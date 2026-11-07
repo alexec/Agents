@@ -25,6 +25,15 @@ extension DaemonAPI.Method {
     /// An IMAP mailbox and its app password (Email, #1780): the host signs in once and keeps it.
     public static let connectionsSignInEmail = "connections/sign-in/email"
     public static let connectionsDisconnect = "connections/disconnect"
+    /// The person's agents' bot on this host (#3858), with the accounts it is installed on.
+    public static let connectionsBot = "connections/bot"
+    /// The bot's App manifest, which the client posts to GitHub.
+    public static let connectionsBotStart = "connections/bot/start"
+    /// The code and the state the hand-back page gave the client; the host turns the code into
+    /// the App's key and keeps it.
+    public static let connectionsBotComplete = "connections/bot/complete"
+    /// Forgets the bot's key on this host. The App stays on GitHub until the person deletes it.
+    public static let connectionsBotRemove = "connections/bot/remove"
     public static let connectorsSetup = "connectors/setup"
     public static let connectorsSetupSkip = "connectors/setup/skip"
     public static let connectorsCodespaces = "connectors/codespaces"
@@ -216,6 +225,81 @@ extension DaemonAPI {
     public struct ConnectionDisconnectAnswer: Codable, Sendable, Hashable {
         public var error: String?
         public init(error: String? = nil) { self.error = error }
+    }
+
+    /// Make the person's agents' bot (#3858): public is true when an organisation must install it.
+    public struct ConnectionBotStartRequest: Codable, Sendable, Hashable {
+        public var origin: String?
+        public var `public`: Bool?
+        public init(origin: String? = nil, public isPublic: Bool? = nil) { self.origin = origin; self.public = isPublic }
+    }
+
+    /// What the client posts to GitHub: a form to action, with one field, manifest.
+    public struct ConnectionBotStart: Codable, Sendable, Hashable {
+        public var action: String
+        public var manifest: String
+        public var state: String
+        public var expiresAt: Date
+        public init(action: String, manifest: String, state: String, expiresAt: Date) {
+            self.action = action; self.manifest = manifest; self.state = state; self.expiresAt = expiresAt
+        }
+
+        /// The hand-back site's page that posts the manifest to GitHub, for an authentication
+        /// session, which opens only an address (#3858). The manifest is in the fragment, which
+        /// the browser never sends.
+        public var formURL: URL? {
+            var parts = URLComponents()
+            parts.queryItems = [URLQueryItem(name: "action", value: action), URLQueryItem(name: "manifest", value: manifest)]
+            guard let fragment = parts.percentEncodedQuery else { return nil }
+            return URL(string: "https://oauth.agentloops.dev/oauth/github-app#" + fragment)
+        }
+    }
+
+    /// What the hand-back page gave the client after GitHub made the App.
+    public struct ConnectionBotCompleteRequest: Codable, Sendable, Hashable {
+        public var state: String
+        public var code: String?
+        public var error: String?
+        public init(state: String, code: String? = nil, error: String? = nil) {
+            self.state = state; self.code = code; self.error = error
+        }
+
+        /// The answer in agents://oauth/callback?code=…&state=…, or nil for another address.
+        public init?(callback: URL) {
+            guard let r = ConnectionSignInCompleteRequest(flowID: UUID(), callback: callback) else { return nil }
+            self.init(state: r.state, code: r.code, error: r.error)
+        }
+    }
+
+    /// An account the bot is installed on.
+    public struct ConnectionBotInstallation: Codable, Sendable, Hashable {
+        public var account: String
+        /// Every repository of the account, or the ones chosen.
+        public var all: Bool
+        public var settingsURL: String?
+        public init(account: String, all: Bool, settingsURL: String? = nil) {
+            self.account = account; self.all = all; self.settingsURL = settingsURL
+        }
+    }
+
+    /// The person's agents' bot on the host (#3858). Never its key.
+    public struct ConnectionBot: Codable, Sendable, Hashable {
+        public var made: Bool
+        /// <slug>[bot]
+        public var name: String?
+        public var slug: String?
+        public var owner: String?
+        public var installURL: String?
+        /// The App's page on GitHub, where the person deletes it.
+        public var appURL: String?
+        /// Nil when GitHub could not be asked.
+        public var installations: [ConnectionBotInstallation]?
+        public var message: String?
+        public init(made: Bool, name: String? = nil, slug: String? = nil, owner: String? = nil, installURL: String? = nil,
+                    appURL: String? = nil, installations: [ConnectionBotInstallation]? = nil, message: String? = nil) {
+            self.made = made; self.name = name; self.slug = slug; self.owner = owner; self.installURL = installURL
+            self.appURL = appURL; self.installations = installations; self.message = message
+        }
     }
 
     /// One slot of a folder's set-up, in the page's order. Docs is where the folder's docs live

@@ -32,6 +32,7 @@ const CapClient1 = "client/1"
 const CapClients1 = "clients/1"
 const CapClone1 = "clone/1"
 const CapConnection1 = "connection/1"
+const CapConnectionsBot1 = "connections.bot/1"
 const CapConnectionsEmail1 = "connections.email/1"
 const CapConnections1 = "connections/1"
 const CapConnectorsSetup1 = "connectors.setup/1"
@@ -253,6 +254,10 @@ var HostCapabilities = pairs([][2]string{
 	{"clientPermissions/set", "client-permissions/1"},
 	{"clientPermissions/state", "client-permissions/1"},
 	{"connection/bindDevice", "connection/1"},
+	{"connections/bot", "connections.bot/1"},
+	{"connections/bot/complete", "connections.bot/1"},
+	{"connections/bot/remove", "connections.bot/1"},
+	{"connections/bot/start", "connections.bot/1"},
 	{"connections/disconnect", "connections/1"},
 	{"connections/list", "connections/1"},
 	{"connections/sign-in", "connections/1"},

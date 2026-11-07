@@ -57,6 +57,30 @@ On **Connectors ▸ Connections**:
   which slots. To revoke the App too, go to github.com ▸ Settings ▸ Applications.
 - When GitHub refuses a renewal, the row says so. Choose **Connect Again…**.
 
+### Make your agents' bot
+
+With only the connection, your agents post on GitHub as you. A bot of their own posts as
+`<login>-agents[bot]`. Each comment, issue and pull request ends with a line that names you,
+and each commit ends with a `Co-authored-by` trailer for you (#3858).
+
+1. On **Connectors ▸ Connections**, under the GitHub row, choose **Make My Agents' Bot…**.
+2. To use the bot on an organisation's repositories, turn on **Organisations can install
+   it**. The organisation's owner then approves the install.
+3. Choose **Continue on github.com**, then **Create GitHub App** on GitHub.
+4. Back in Agents, choose **Install on Repositories…** and select the repositories that
+   agents work on.
+
+The bot can read and write code, issues and pull requests, read checks and statuses, and run
+workflows again. It can never change workflows, secrets, environments, settings or members
+(`specs/3856-agent-identity-github-app/spec.md`). The tools that need those use your own
+connection.
+
+GitHub gives the bot's key to the machine that made it. The key stays in that machine's
+Keychain, or in `~/.agents-secrets` on Linux. It never goes to Agents' servers or to another
+machine. The github server on that machine uses the bot when the bot is installed on the owner
+of the folder's repository. **Forget the Bot…** deletes the key and opens the App's page on
+GitHub, where you delete the App.
+
 ## Set up a folder's tools
 
 A folder's **Connectors** page starts with its set-up. It shows four slots: **Tasks**,

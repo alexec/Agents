@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/alexec/agents/Go/internal/connections"
 	"github.com/github/github-mcp-server/v2/pkg/github"
 	"github.com/github/github-mcp-server/v2/pkg/http/transport"
 	"github.com/github/github-mcp-server/v2/pkg/observability"
@@ -46,6 +47,9 @@ type UpstreamConfig struct {
 	Toolsets []string
 	ReadOnly bool
 	Logger   *slog.Logger
+	// Bot is the person's bot when Token sends its token (#3858): each write then names the
+	// person (SignTransport). nil when the toolsets post as the person only.
+	Bot func() (connections.Bot, bool)
 }
 
 // NewUpstream is the official server with cfg's toolsets and without HiddenTools.
@@ -82,9 +86,13 @@ func newUpstream(ctx context.Context, cfg UpstreamConfig, issueReader *IssueRead
 	auth := func(next http.RoundTripper) http.RoundTripper {
 		return &transport.BearerAuthTransport{Transport: next, TokenProvider: cfg.Token, AllowedHosts: allowed}
 	}
+	var restTransport http.RoundTripper = &transport.UserAgentTransport{
+		Transport: &transport.ETagTransport{Transport: http.DefaultTransport}, Agent: agent}
+	if cfg.Bot != nil {
+		restTransport = &SignTransport{Next: restTransport, Bot: cfg.Bot}
+	}
 	rest, err := gogithub.NewClient(
-		gogithub.WithHTTPClient(&http.Client{Transport: auth(&transport.UserAgentTransport{
-			Transport: &transport.ETagTransport{Transport: http.DefaultTransport}, Agent: agent})}),
+		gogithub.WithHTTPClient(&http.Client{Transport: auth(restTransport)}),
 		gogithub.WithEnterpriseURLs(restURL.String(), uploadURL.String()))
 	if err != nil {
 		return nil, fmt.Errorf("REST client: %w", err)

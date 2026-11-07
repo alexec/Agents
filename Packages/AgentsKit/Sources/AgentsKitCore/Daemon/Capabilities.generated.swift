@@ -33,6 +33,7 @@ public enum Capability {
     public static let clients1 = "clients/1"
     public static let clone1 = "clone/1"
     public static let connection1 = "connection/1"
+    public static let connectionsBot1 = "connections.bot/1"
     public static let connectionsEmail1 = "connections.email/1"
     public static let connections1 = "connections/1"
     public static let connectorsSetup1 = "connectors.setup/1"
@@ -254,6 +255,10 @@ public enum Capability {
         "clientPermissions/set": "client-permissions/1",
         "clientPermissions/state": "client-permissions/1",
         "connection/bindDevice": "connection/1",
+        "connections/bot": "connections.bot/1",
+        "connections/bot/complete": "connections.bot/1",
+        "connections/bot/remove": "connections.bot/1",
+        "connections/bot/start": "connections.bot/1",
         "connections/disconnect": "connections/1",
         "connections/list": "connections/1",
         "connections/sign-in": "connections/1",

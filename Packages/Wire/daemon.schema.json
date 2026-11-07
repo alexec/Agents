@@ -4854,6 +4854,133 @@
       ],
       "additionalProperties": false
     },
+    "ConnectionBot": {
+      "type": "object",
+      "description": "The person's agents' bot on this machine (#3858). Never its key.",
+      "properties": {
+        "made": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string",
+          "description": "The bot's GitHub name: <slug>[bot]."
+        },
+        "slug": {
+          "type": "string"
+        },
+        "owner": {
+          "type": "string",
+          "description": "The account the App is on."
+        },
+        "installURL": {
+          "type": "string",
+          "description": "Where the person installs the App on repositories."
+        },
+        "appURL": {
+          "type": "string",
+          "description": "The App's page on GitHub, where the person deletes it."
+        },
+        "installations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ConnectionBotInstallation"
+          },
+          "description": "Absent when GitHub could not be asked."
+        },
+        "message": {
+          "type": "string",
+          "description": "What failed, in words."
+        }
+      },
+      "required": [
+        "made"
+      ],
+      "additionalProperties": false
+    },
+    "ConnectionBotCompleteRequest": {
+      "type": "object",
+      "description": "What the hand-back page gave the client after GitHub made the App: the code and the state, or GitHub's error. The host checks the state and turns the code into the App's key at once; the key stays on this machine.",
+      "properties": {
+        "state": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "ConnectionBotInstallation": {
+      "type": "object",
+      "description": "An account the bot is installed on.",
+      "properties": {
+        "account": {
+          "type": "string"
+        },
+        "all": {
+          "type": "boolean",
+          "description": "True when it reaches every repository of the account, false for the ones chosen."
+        },
+        "settingsURL": {
+          "type": "string",
+          "description": "Where the installation's repositories are chosen on GitHub."
+        }
+      },
+      "required": [
+        "account",
+        "all"
+      ],
+      "additionalProperties": false
+    },
+    "ConnectionBotStart": {
+      "type": "object",
+      "description": "What the client posts to GitHub (#3858): an HTML form to action, method POST, with one field, manifest. GitHub sends the code and the state to the hand-back page.",
+      "properties": {
+        "action": {
+          "type": "string",
+          "description": "GitHub's page for a new App, with the state in its query."
+        },
+        "manifest": {
+          "type": "string",
+          "description": "The App manifest's JSON, with the fixed permissions."
+        },
+        "state": {
+          "type": "string"
+        },
+        "expiresAt": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "action",
+        "manifest",
+        "state",
+        "expiresAt"
+      ],
+      "additionalProperties": false
+    },
+    "ConnectionBotStartRequest": {
+      "type": "object",
+      "description": "Make the person's agents' bot (#3858): the host makes the GitHub App manifest for its GitHub connection's account.",
+      "properties": {
+        "origin": {
+          "type": "string",
+          "description": "The web page's origin, as connections/sign-in takes it; left out on the Mac."
+        },
+        "public": {
+          "type": "boolean",
+          "description": "True when an organisation must install the bot: GitHub lets only the owning account install a private App (spec 3856 §4)."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
     "ConnectionDisconnectAnswer": {
       "type": "object",
       "properties": {

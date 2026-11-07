@@ -89,6 +89,7 @@ func (d *Daemon) register() {
 	d.registerMCPVerify()
 	d.registerMCPSignIn()
 	d.registerConnections()
+	d.registerGitHubBot()
 	d.registerConnectorSetup()
 	d.registerAssess()
 	d.registerHostedMCP()

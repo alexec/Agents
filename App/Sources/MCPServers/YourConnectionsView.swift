@@ -49,6 +49,11 @@ struct YourConnectionsView: View {
                     ForEach(Array(connections.enumerated()), id: \.element.provider) { index, c in
                         if index > 0 { Divider().padding(.leading, 58) }
                         connectionRow(c)
+                        // The person's agents' bot (#3858), on a host that makes one.
+                        if c.provider == .github, c.state == .connected, model.host(.mac, has: Capability.connectionsBot1) {
+                            Divider().padding(.leading, 58)
+                            AgentsBotRow(host: .mac)
+                        }
                     }
                 } else if connections != nil {
                     Text(ConnectorSetupWords.noConnections)

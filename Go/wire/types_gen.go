@@ -2347,6 +2347,73 @@ type Connection struct {
 	Newest *ConnectorProof `json:"newest,omitzero"`
 }
 
+// The person's agents' bot on this machine (#3858). Never its key.
+type ConnectionBot struct {
+	Made bool `json:"made"`
+
+	// The bot's GitHub name: <slug>[bot].
+	Name *string `json:"name,omitzero"`
+
+	Slug *string `json:"slug,omitzero"`
+
+	// The account the App is on.
+	Owner *string `json:"owner,omitzero"`
+
+	// Where the person installs the App on repositories.
+	InstallURL *string `json:"installURL,omitzero"`
+
+	// The App's page on GitHub, where the person deletes it.
+	AppURL *string `json:"appURL,omitzero"`
+
+	// Absent when GitHub could not be asked.
+	Installations []ConnectionBotInstallation `json:"installations,omitzero"`
+
+	// What failed, in words.
+	Message *string `json:"message,omitzero"`
+}
+
+// What the hand-back page gave the client after GitHub made the App: the code and the state, or GitHub's error. The host checks the state and turns the code into the App's key at once; the key stays on this machine.
+type ConnectionBotCompleteRequest struct {
+	State string `json:"state"`
+
+	Code *string `json:"code,omitzero"`
+
+	Error *string `json:"error,omitzero"`
+}
+
+// An account the bot is installed on.
+type ConnectionBotInstallation struct {
+	Account string `json:"account"`
+
+	// True when it reaches every repository of the account, false for the ones chosen.
+	All bool `json:"all"`
+
+	// Where the installation's repositories are chosen on GitHub.
+	SettingsURL *string `json:"settingsURL,omitzero"`
+}
+
+// What the client posts to GitHub (#3858): an HTML form to action, method POST, with one field, manifest. GitHub sends the code and the state to the hand-back page.
+type ConnectionBotStart struct {
+	// GitHub's page for a new App, with the state in its query.
+	Action string `json:"action"`
+
+	// The App manifest's JSON, with the fixed permissions.
+	Manifest string `json:"manifest"`
+
+	State string `json:"state"`
+
+	ExpiresAt Date `json:"expiresAt"`
+}
+
+// Make the person's agents' bot (#3858): the host makes the GitHub App manifest for its GitHub connection's account.
+type ConnectionBotStartRequest struct {
+	// The web page's origin, as connections/sign-in takes it; left out on the Mac.
+	Origin *string `json:"origin,omitzero"`
+
+	// True when an organisation must install the bot: GitHub lets only the owning account install a private App (spec 3856 §4).
+	Public *bool `json:"public,omitzero"`
+}
+
 type ConnectionDisconnectAnswer struct {
 	Error *string `json:"error,omitzero"`
 }

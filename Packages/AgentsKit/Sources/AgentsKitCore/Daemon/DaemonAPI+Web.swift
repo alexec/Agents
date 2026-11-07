@@ -183,6 +183,13 @@ public extension DaemonAPI {
                     result: ConnectionTokenAnswer.self, kind: .hostRequest),
                 Row(Method.connectionsDisconnect, params: ConnectionProviderRequest.self,
                     result: ConnectionDisconnectAnswer.self, kind: .hostRequest),
+                // The person's agents' bot (#3858).
+                Row(Method.connectionsBot, params: Empty.self, result: ConnectionBot.self, kind: .hostRequest),
+                Row(Method.connectionsBotStart, params: ConnectionBotStartRequest.self, result: ConnectionBotStart.self,
+                    kind: .hostRequest),
+                Row(Method.connectionsBotComplete, params: ConnectionBotCompleteRequest.self, result: ConnectionBot.self,
+                    kind: .hostRequest),
+                Row(Method.connectionsBotRemove, params: Empty.self, result: ConnectionBot.self, kind: .hostRequest),
                 Row(Method.connectorsCodespaces, params: ConnectorCodespacesRequest.self, result: ConnectorCodespaces.self,
                     kind: .hostRequest),
                 Row(Method.connectorsSetup, params: ConnectorSetupRequest.self, result: ConnectorSetup.self, kind: .hostRequest),

@@ -1,0 +1,22 @@
+<!doctype html>
+<!-- The manifest page for the agents' bot (#3858): it holds nothing. A client that can only open
+     an address (the Mac's authentication session) opens it with the App manifest in the
+     fragment, which the browser never sends; github-app.js posts it to GitHub's "new App" page,
+     and GitHub sends the code to /oauth/callback. See deploy/site/README.md. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Agents</title>
+<link rel="stylesheet" href="/oauth/callback.css">
+<script src="/oauth/github-app.js" defer></script>
+</head>
+<body>
+<main>
+<h1>Agents</h1>
+<p id="words">Going to GitHub…</p>
+<form id="form" method="post"><input type="hidden" name="manifest" id="manifest"><button type="submit" hidden id="go">Go to GitHub</button></form>
+</main>
+</body>
+</html>
