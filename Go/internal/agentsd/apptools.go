@@ -103,6 +103,9 @@ func appToolCalls() []appTool {
 		{"docs_search", (*Daemon).docsSearchTool},
 		{"docs_read", (*Daemon).docsReadTool},
 		{"estimate_issue", (*Daemon).estimateIssueTool},
+		{"set_ci_secret", (*Daemon).setCISecret},
+		{"set_ci_variable", (*Daemon).setCIVariable},
+		{"set_environment_gate", (*Daemon).setEnvironmentGate},
 	}
 }
 

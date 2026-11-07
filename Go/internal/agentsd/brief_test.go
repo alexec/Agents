@@ -273,7 +273,7 @@ func TestTheBriefNamesEveryAppTool(t *testing.T) {
 	}
 	d, _ := start(t, t.TempDir())
 	defer d.Shutdown()
-	full := d.brief(&wire.Agent{RuntimeID: "claude"}) + "\n" + toolsBrief(true, true, false)
+	full := d.brief(&wire.Agent{RuntimeID: "claude"}) + "\n" + toolsBrief(true, true, false, true)
 	for _, tool := range all {
 		if toolsBriefSkips[tool.Name] == "" && !strings.Contains(full, tool.Name) {
 			t.Errorf("the brief does not name %s: add a line to toolsBrief, or a reason to toolsBriefSkips", tool.Name)
@@ -288,15 +288,16 @@ func TestTheBriefNamesEveryAppTool(t *testing.T) {
 		t.Error("the brief does not name the browser tools")
 	}
 	for _, c := range []struct {
-		browser, screen, bot bool
-		named, unnamed       []string
+		browser, screen, bot, github bool
+		named, unnamed               []string
 	}{
-		{false, false, false, nil, []string{"browser_", "fill_secret", "hand_to_person", "drive_screen"}},
-		{true, false, false, []string{"browser_* tools", "fill_secret", "hand_to_person", "take the browser lease themselves"}, []string{"drive_screen"}},
-		{true, false, true, []string{"browser_* tools", "fill_secret"}, []string{"hand_to_person"}},
-		{false, true, false, []string{"drive_screen", "takes the screen lease itself"}, []string{"browser_"}},
+		{false, false, false, false, nil, []string{"browser_", "fill_secret", "hand_to_person", "drive_screen", "set_ci_secret"}},
+		{true, false, false, false, []string{"browser_* tools", "fill_secret", "hand_to_person", "take the browser lease themselves"}, []string{"drive_screen"}},
+		{true, false, true, false, []string{"browser_* tools", "fill_secret"}, []string{"hand_to_person"}},
+		{false, true, false, false, []string{"drive_screen", "takes the screen lease itself"}, []string{"browser_"}},
+		{false, false, false, true, []string{"set_ci_secret", "set_ci_variable", "set_environment_gate"}, []string{"browser_"}},
 	} {
-		got := toolsBrief(c.browser, c.screen, c.bot)
+		got := toolsBrief(c.browser, c.screen, c.bot, c.github)
 		for _, w := range c.named {
 			if !strings.Contains(got, w) {
 				t.Errorf("%+v: no %q in %q", c, w, got)
