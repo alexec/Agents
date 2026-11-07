@@ -205,6 +205,8 @@ private struct ReplyBlocks: View {
                 .appText(.reading)
                 // A shell's code block in a reply can be run (#1533).
                 .environment(\.codeRuns, true)
+                // A table or code wider than the text may reach into the margins (#3895).
+                .environment(\.widensBlocks, true)
                 .copiesMessage(entry)
         }
     }
@@ -375,6 +377,8 @@ private struct EntryRow: View {
                 .appText(.reading)
                 // A shell's code block in a reply can be run (#1533).
                 .environment(\.codeRuns, true)
+                // A table or code wider than the text may reach into the margins (#3895).
+                .environment(\.widensBlocks, true)
                 .copiesMessage(entry)
 
         case .agentThought(_, let text):
