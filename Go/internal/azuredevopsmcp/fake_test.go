@@ -29,24 +29,25 @@ const (
 )
 
 type fakeAzureDevOps struct {
-	t        *testing.T
-	mu       sync.Mutex
-	pulls    []obj
-	threads  map[int][]obj // pull request → its threads
-	statuses map[int][]obj // pull request → its statuses
-	builds   []obj
-	timeline map[int][]obj // build → its records
-	logs     map[int]string
-	me       string
-	posted   []obj // what was POSTed, PATCHed or PUT, with its method and path
-	status   int   // answer every request with this, when set
+	t          *testing.T
+	mu         sync.Mutex
+	pulls      []obj
+	threads    map[int][]obj // pull request → its threads
+	statuses   map[int][]obj // pull request → its statuses
+	iterations map[int][]obj // pull request → its pushes; none for one of one push
+	builds     []obj
+	timeline   map[int][]obj // build → its records
+	logs       map[int]string
+	me         string
+	posted     []obj // what was POSTed, PATCHed or PUT, with its method and path
+	status     int   // answer every request with this, when set
 	// signIn answers as Azure DevOps does a token it does not take: 203 and a sign-in page.
 	signIn bool
 	server *httptest.Server
 }
 
 func newFake(t *testing.T) *fakeAzureDevOps {
-	f := &fakeAzureDevOps{t: t, threads: map[int][]obj{}, statuses: map[int][]obj{}, timeline: map[int][]obj{}, logs: map[int]string{},
+	f := &fakeAzureDevOps{t: t, threads: map[int][]obj{}, statuses: map[int][]obj{}, iterations: map[int][]obj{}, timeline: map[int][]obj{}, logs: map[int]string{},
 		me: alex["id"].(string)}
 	f.server = httptest.NewServer(http.HandlerFunc(f.serve))
 	t.Cleanup(f.server.Close)
@@ -76,7 +77,9 @@ var (
 var start = time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC)
 
 // at is start and n minutes, as Azure DevOps writes a time: seven places of a second.
-func at(n int) string { return start.Add(time.Duration(n) * time.Minute).Format("2006-01-02T15:04:05.0000000Z") }
+func at(n int) string {
+	return start.Add(time.Duration(n) * time.Minute).Format("2006-01-02T15:04:05.0000000Z")
+}
 
 func pull(number int, branch string, author obj, extra obj) obj {
 	p := obj{"pullRequestId": number, "title": "PR " + strconv.Itoa(number), "description": "", "status": "active", "createdBy": author,
@@ -95,17 +98,35 @@ func build(id, pr int, sha, name, result string, finished int) obj {
 		"_links": obj{"web": obj{"href": "https://ado.test/acme/Web%20App/_build/results?buildId=" + strconv.Itoa(id)}}}
 }
 
+// branchBuild is a build that a push to branch started (a CI trigger), of no pull request.
+func branchBuild(id int, branch, sha, name, result string, finished int) obj {
+	b := build(id, 0, sha, name, result, finished)
+	b["sourceBranch"], b["sourceVersion"], b["triggerInfo"] = "refs/heads/"+branch, sha, obj{}
+	return b
+}
+
+// prStatus is a status another service set on a pull request, of iteration (0 for none).
+func prStatus(id int, genre, name, state string, set, iteration int) obj {
+	s := obj{"id": id, "state": state, "description": name, "targetUrl": "https://scan.test/" + strconv.Itoa(id),
+		"creationDate": at(set), "updatedDate": at(set), "context": obj{"genre": genre, "name": name}}
+	if iteration != 0 {
+		s["iterationId"] = iteration
+	}
+	return s
+}
+
 const gitRoot = "/acme/Web App/_apis/git/repositories/app"
 
 var (
-	pullsPath    = regexp.MustCompile(`^` + gitRoot + `/pullrequests$`)
-	pullPath     = regexp.MustCompile(`^` + gitRoot + `/pullrequests/([0-9]+)$`)
-	reviewerPath = regexp.MustCompile(`^` + gitRoot + `/pullrequests/([0-9]+)/reviewers/([^/]+)$`)
-	threadsPath  = regexp.MustCompile(`^` + gitRoot + `/pullRequests/([0-9]+)/threads$`)
-	replyPath    = regexp.MustCompile(`^` + gitRoot + `/pullRequests/([0-9]+)/threads/([0-9]+)/comments$`)
-	statusesPath = regexp.MustCompile(`^` + gitRoot + `/pullRequests/([0-9]+)/statuses$`)
-	timelinePath = regexp.MustCompile(`^/acme/Web App/_apis/build/builds/([0-9]+)/timeline$`)
-	logPath      = regexp.MustCompile(`^/acme/Web App/_apis/build/builds/([0-9]+)/logs/([0-9]+)$`)
+	pullsPath      = regexp.MustCompile(`^` + gitRoot + `/pullrequests$`)
+	pullPath       = regexp.MustCompile(`^` + gitRoot + `/pullrequests/([0-9]+)$`)
+	reviewerPath   = regexp.MustCompile(`^` + gitRoot + `/pullrequests/([0-9]+)/reviewers/([^/]+)$`)
+	threadsPath    = regexp.MustCompile(`^` + gitRoot + `/pullRequests/([0-9]+)/threads$`)
+	replyPath      = regexp.MustCompile(`^` + gitRoot + `/pullRequests/([0-9]+)/threads/([0-9]+)/comments$`)
+	statusesPath   = regexp.MustCompile(`^` + gitRoot + `/pullRequests/([0-9]+)/statuses$`)
+	iterationsPath = regexp.MustCompile(`^` + gitRoot + `/pullRequests/([0-9]+)/iterations$`)
+	timelinePath   = regexp.MustCompile(`^/acme/Web App/_apis/build/builds/([0-9]+)/timeline$`)
+	logPath        = regexp.MustCompile(`^/acme/Web App/_apis/build/builds/([0-9]+)/logs/([0-9]+)$`)
 )
 
 func (f *fakeAzureDevOps) serve(w http.ResponseWriter, r *http.Request) {
@@ -204,6 +225,8 @@ func (f *fakeAzureDevOps) serve(w http.ResponseWriter, r *http.Request) {
 		list(f.threads[n(threadsPath.FindStringSubmatch(p))])
 	case statusesPath.MatchString(p):
 		list(f.statuses[n(statusesPath.FindStringSubmatch(p))])
+	case iterationsPath.MatchString(p):
+		list(f.iterations[n(iterationsPath.FindStringSubmatch(p))])
 	case p == "/acme/Web App/_apis/build/builds":
 		if q.Get("repositoryId") != "repo-guid" {
 			f.t.Errorf("builds of %q", q.Get("repositoryId"))

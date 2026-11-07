@@ -75,16 +75,23 @@ func prInput() schema {
 // fixesSchema is a pull request's fixes: the work items its description closes, "#12" (#2349).
 var fixesSchema = map[string]any{"type": "array", "items": str}
 
-// events are the events this server offers, in the gitlab server's order; the gitlab server's
-// issue events are the tracker's here.
+// events are the events this server offers, in the gitlab server's order, and checks.passed
+// as the github server's (#3805); the gitlab server's issue events are the tracker's here.
 var events = []event{
 	{name: "checks.failed", title: "Checks failed",
-		description: "An Azure Pipelines build of an open pull request failed at its head commit: a pull request's build validation, or any pipeline it triggers. One event per commit and failure time, so a build run again that fails again is a new one. failedJobs are the failed builds; run is the first of them (get_build_log reads its failed steps)." + ownPRs,
+		description: "An open pull request's checks failed at its head commit: an Azure Pipelines build of it (its build validation, or any pipeline it triggers), a build of its branch at that commit (a CI trigger's), or the newest status that another service set on it (failed or error). One event per commit and failure time, so a build run again that fails again is a new one. failedJobs are the failed builds and statuses; run is the first failed build (get_build_log reads its failed steps), or the first failed status with id 0 when no build failed." + ownPRs,
 		input:       schema{repoProperty, branchProperty("Only checks of the pull request from this branch."), prProperty, anyoneProperty, mineProperty},
 		payload: object(map[string]any{
 			"pr": prSchema(nil), "headSha": str,
 			"run":        object(map[string]any{"id": integer, "name": str, "url": str}),
 			"failedJobs": map[string]any{"type": "array", "items": object(map[string]any{"name": str, "url": str})},
+		})},
+	{name: "checks.passed", title: "Checks passed",
+		description: "One of an open pull request's checks passed at its head commit: an Azure Pipelines build of it or of its branch at that commit, or the newest status of one context that another service set on it. One event per build or status, so a lane waiting on CI going green wakes without polling. run is the build (id 0 for a status)." + ownPRs,
+		input:       schema{repoProperty, branchProperty("Only checks of the pull request from this branch."), prProperty, anyoneProperty, mineProperty},
+		payload: object(map[string]any{
+			"pr": prSchema(nil), "headSha": str,
+			"run": object(map[string]any{"id": integer, "name": str, "url": str}),
 		})},
 	{name: "pr.opened", title: "Pull request opened",
 		description: "A pull request was opened, or a draft was published: a pull request active and not a draft now that was not at the last poll. Drafts never count. Reactivated, it is raised again." + ownPRs,
@@ -202,7 +209,7 @@ func (p pollParams) firstPoll() bool { return len(p.Cursor) == 0 || string(p.Cur
 // Events answers events/list and events/poll over an Azure DevOps.
 type Events struct {
 	AzureDevOps AzureDevOps
-	Now     func() time.Time
+	Now         func() time.Time
 }
 
 func (s *Events) now() time.Time {
@@ -478,6 +485,20 @@ func candidates(ctx context.Context, f AzureDevOps, name string, a args, yours *
 		for _, d := range failed {
 			if at := normalized(d.At); at != "" && wanted(d.PR, d.Trusted) {
 				list = append(list, candidate{eventID: fmt.Sprintf("checks.failed:%s:%s:%s", repo, d.HeadSHA, at), time: at,
+					data: func() (map[string]any, error) { return d.json(), nil }})
+			}
+		}
+		return list, listed, nil
+	case "checks.passed":
+		passed, listed, err := f.PassedChecks(ctx, repo, since)
+		if err != nil {
+			return nil, Listed{}, err
+		}
+		// One a build or a status, at its time: a build run again that passes again is a new one.
+		var list []candidate
+		for _, d := range passed {
+			if at := normalized(d.At); at != "" && wanted(d.PR, d.Trusted) {
+				list = append(list, candidate{eventID: fmt.Sprintf("checks.passed:%s:%s:%s:%s", repo, d.HeadSHA, d.Key, at), time: at,
 					data: func() (map[string]any, error) { return d.json(), nil }})
 			}
 		}
