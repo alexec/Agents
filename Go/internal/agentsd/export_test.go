@@ -293,7 +293,7 @@ func TestExportAndImportStreamABigTranscript(t *testing.T) {
 	bd, _ := start(t, t.TempDir())
 	var res wire.BackupRestoreResult
 	imported := allocatedBy(func() {
-		if res, err = bd.restoreArchive(path, a.Store.RootID, false, false, ""); err != nil {
+		if res, err = bd.restoreArchive(path, a.Store.RootID, false, false, "", nil); err != nil {
 			t.Fatal(err)
 		}
 	})

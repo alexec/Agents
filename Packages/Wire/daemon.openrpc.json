@@ -767,6 +767,27 @@
       }
     },
     {
+      "name": "agents/moveIn",
+      "x-capability": "sessions.move/1",
+      "description": "A session moving here from another of the person's machines with move_session (#3717), through the control plane: its export, uploaded with folders/receiveUpload, goes on here with its id, in the folder its branch was sent to.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SessionMoveIn"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "agents/options",
       "x-capability": "agents/1",
       "tags": [
@@ -6814,6 +6835,32 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/FeatureUsage"
+        }
+      }
+    },
+    {
+      "name": "reports/problem",
+      "x-capability": "reports.problem/1",
+      "description": "Report a Problem (#3718): the person's words with this machine's version, OS and, when asked, recent log lines, made into a GitHub new-issue link. Sends nothing: the client opens the link.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ProblemReportRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ProblemReport"
         }
       }
     },

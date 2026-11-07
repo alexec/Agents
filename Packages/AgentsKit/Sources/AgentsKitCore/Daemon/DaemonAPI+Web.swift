@@ -139,6 +139,7 @@ public extension DaemonAPI {
                 Row(Method.timeHistory, params: Empty.self, result: TimeHistory.self, kind: .hostRequest),
                 // Reports ▸ Features (#2165).
                 Row(Method.reportsFeatures, params: Empty.self, result: FeatureUsage.self, kind: .hostRequest),
+                Row(Method.reportsProblem, params: ProblemReportRequest.self, result: ProblemReport.self, kind: .hostRequest),
                 // The Time page's milestones (#984).
                 Row(Method.milestonesState, params: Empty.self, result: Milestones.self, kind: .hostRequest),
                 Row(Method.eventsList, params: EventsListRequest.self, result: EventsPage.self, kind: .hostRequest),

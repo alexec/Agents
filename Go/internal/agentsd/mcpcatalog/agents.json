@@ -384,6 +384,130 @@
           }
         }
       }
+    },
+    {
+      "server": {
+        "name": "agents/bitbucket",
+        "title": "Bitbucket",
+        "description": "Pull requests, checks and issues on Bitbucket Cloud: tools to read them and comment, and events"
+      },
+      "_meta": {
+        "dev.agentloops/connector": {
+          "command": "bitbucket-mcp",
+          "hosted": true,
+          "declares": {
+            "tools": true,
+            "events": [
+              "checks.failed",
+              "pr.opened",
+              "pr.merged",
+              "pr.closed",
+              "pr.conflicted",
+              "review.requested",
+              "review.comment",
+              "issue.opened",
+              "issue.labelled",
+              "issue.commented",
+              "issue.closed",
+              "issue.assigned"
+            ],
+            "views": false
+          },
+          "secrets": [
+            {
+              "name": "BITBUCKET_TOKEN",
+              "description": "An Atlassian API token with scopes for Bitbucket (read and write on repositories, pull requests and issues; read on account and workspace membership), or a repository, project or workspace access token",
+              "required": true
+            },
+            {
+              "name": "BITBUCKET_EMAIL",
+              "description": "Your Atlassian account's email, for an API token; left out for an access token",
+              "required": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "server": {
+        "name": "agents/azuredevops",
+        "title": "Azure DevOps",
+        "description": "Pull requests and Azure Pipelines builds on Azure DevOps Repos or your own Azure DevOps Server: tools to read them and comment, and events"
+      },
+      "_meta": {
+        "dev.agentloops/connector": {
+          "command": "azuredevops-mcp",
+          "hosted": true,
+          "declares": {
+            "tools": true,
+            "events": [
+              "checks.failed",
+              "checks.passed",
+              "run.completed",
+              "pr.opened",
+              "pr.merged",
+              "pr.closed",
+              "pr.conflicted",
+              "review.requested",
+              "review.comment"
+            ],
+            "views": false
+          },
+          "secrets": [
+            {
+              "name": "AZURE_DEVOPS_TOKEN",
+              "description": "A personal access token (User settings ▸ Personal access tokens) with Code (read and write) and Build (read)",
+              "required": true
+            },
+            {
+              "name": "AZURE_DEVOPS_URL",
+              "description": "Azure DevOps: https://dev.azure.com when left out, or your own Azure DevOps Server's collections, as https://server/tfs",
+              "required": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "server": {
+        "name": "agents/azureboards",
+        "title": "Azure Boards",
+        "description": "Work items on Azure Boards or your own Azure DevOps Server, as a tracker: tools to read them and comment, and events when one is opened, tagged, commented on, closed or assigned to you"
+      },
+      "_meta": {
+        "dev.agentloops/connector": {
+          "command": "azureboards-mcp",
+          "hosted": true,
+          "declares": {
+            "tools": true,
+            "events": [
+              "issue.opened",
+              "issue.labelled",
+              "issue.commented",
+              "issue.closed",
+              "issue.assigned"
+            ],
+            "views": false
+          },
+          "secrets": [
+            {
+              "name": "AZURE_DEVOPS_TOKEN",
+              "description": "A personal access token (User settings ▸ Personal access tokens) with Work Items (read and write); the azuredevops connector's, with Work Items added",
+              "required": true
+            },
+            {
+              "name": "AZURE_DEVOPS_URL",
+              "description": "Azure DevOps: https://dev.azure.com when left out, or your own Azure DevOps Server's collections, as https://server/tfs",
+              "required": false
+            },
+            {
+              "name": "AZURE_BOARDS_PROJECT",
+              "description": "The project, as organization/project; left out, the folder's Azure Repos remote's",
+              "required": false
+            }
+          ]
+        }
+      }
     }
   ]
 }

@@ -154,6 +154,7 @@ const (
 	MethodSendFacts         = "folders/sendFacts"
 	MethodSendPack          = "folders/sendPack"
 	MethodSendRead          = "folders/sendRead"
+	MethodAgentsMoveIn      = "agents/moveIn"
 )
 
 // Notification names (DaemonAPI.Notification).

@@ -120,7 +120,7 @@ counting again from the next agent that works.
 
 | Event | Filter by | Details | What it means |
 | --- | --- | --- | --- |
-| `branch.moved` | branch | branch, from, to | A branch an agent works on moved; never the default branch. |
+| `branch.moved` | branch, any | branch, from, to | A branch an agent works on moved; never the default branch. A wait names the branch or sets `any: true` (#3797). |
 
 ## Drop box
 
@@ -264,6 +264,34 @@ trigger is:
   and checked against the event's filter schema, as a trigger's are: *github's pr.merged takes
   branch, pr, repo; "sha" is not one of its arguments.* They are not matched against the event's details.
   `server:` narrows it to the servers named.
+- **One `where` for several events.** When a wait names several of a server's events, each
+  event gets only the keys it takes. So `issue.closed` gets `issue` and `pr.merged` gets
+  `fixes`, in one wait. A key that none of them takes is refused. A key that two of them
+  take goes to both: `branch` on `pr.merged` means a PR *from* that branch.
+- **It names what it waits for** (#3797). This applies to a wait on an event about one
+  thing, on a server whose event takes `any`: today the `github`, `forgejo` and `gitlab`
+  servers. The wait names the thing, or it sets `any: true` to wake on every one. A wait
+  that does neither is refused, with the words that say what to set: *github's pr.merged:
+  Name the PR (`pr`, `branch`, `fixes` or `mine`), or set `any: true` to wake on every PR
+  in the repo.* `any` is about *which* ones. It is not `anyone`, which is about *who*.
+  Workflow triggers are not checked: a trigger on every merge is the usual trigger, and a
+  person reads it in its file.
+
+  | Event | Names it with | `any: true` |
+  | --- | --- | --- |
+  | `pr.merged`, `pr.closed`, `pr.conflicted`, `pr.commented`, `pr.labelled`, `pr.unlabelled`, `review.posted`, `review.comment` | `pr`, `branch`, `fixes` or `mine` | yes |
+  | `checks.failed`, `checks.passed` | `pr`, `branch`, `fixes` or `mine` | yes |
+  | `run.completed` | `run`, `branch` or `workflow` | yes |
+  | `issue.closed`, `issue.commented`, `issue.labelled` | `issue` or `label` | yes |
+  | `branch.moved` (the app's) | `branch` | yes |
+
+  `pr.opened` and `issue.opened` are not checked, because a wait on a new one cannot name
+  it. `issue.assigned` and `review.requested` are not checked, because they are only the
+  connected account's. Only the keys that a server offers are named: GitHub's
+  `pr.commented` has no `branch`. `fixes` is a list of issues, `"#12"` (the repo's own) or
+  `"owner/repo#12"`. It matches a PR whose body closes one of them, so a lead can wait on
+  a child's PR before the PR exists. `issue` takes one number or a list. `mine` is the
+  connected account's own PRs, merged or closed ones too.
 - **It subscribes for as long as it waits**, from now, sharing a workflow's subscription
   when they ask for the same thing. When it is answered, times out or is cancelled, the
   subscription ends unless a workflow or another wait still holds it. A restart keeps it.

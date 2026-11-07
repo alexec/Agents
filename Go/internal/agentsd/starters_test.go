@@ -98,6 +98,9 @@ func TestStartersSayTheirDeploys(t *testing.T) {
 			".github/workflows/setup.yml:swift scripts/asc.swift register",
 			"project.yml:SentryDSN: $(SENTRY_DSN)",
 			"App/StarterApp.swift:options.releaseName",
+			".github/workflows/release.yml:SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}",
+			".github/workflows/release.yml:SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}",
+			".github/workflows/release.yml:debug-files upload --project \"$SENTRY_PROJECT\" \"$RUNNER_TEMP/App.xcarchive/dSYMs\"",
 		},
 		"web-service": {
 			".github/workflows/deploy.yml:::notice title=deploy::cloudrun:$PROJECT/$REGION/$SERVICE/$SERVICE-${{ github.run_number }}",

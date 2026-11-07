@@ -422,7 +422,24 @@ func parsePattern(given string, filters map[string][]string) (waitPattern, strin
 		}
 		return p, problem
 	}
+	// any says which ones (#3797), every one; no event carries it as a detail.
+	delete(p.filters, "any")
 	return p, ""
+}
+
+// unnamedBranchWords is why a wait on branch.moved that names no branch, and does not set
+// any: true, is refused (#3797), or "": it woke on every branch an agent works on.
+func unnamedBranchWords(p waitPattern, filters map[string][]string) string {
+	if p.name != "branch.moved" && p.name != "branch.*" {
+		return ""
+	}
+	if _, named := filters["branch"]; named {
+		return ""
+	}
+	if all := filters["any"]; len(all) == 1 && all[0] == "true" {
+		return ""
+	}
+	return p.name + ": Name the branch (`branch`), or set `any: true` to wake on every branch in the folder. Nothing is waiting."
 }
 
 // The wait on the agent's record, and its words.
@@ -487,9 +504,29 @@ func detailsLine(e wire.Event) string {
 	sort.Strings(keys)
 	var parts []string
 	for _, k := range keys {
+		if _, structured := yamlBlock(e.Details[k]); structured {
+			continue // said below the line, as YAML (#3569)
+		}
 		parts = append(parts, k+"="+e.Details[k])
 	}
 	return strings.Join(parts, ", ")
+}
+
+// structuredDetails is each detail whose value is a JSON object or list (an MCP event's
+// payload), as YAML under its key, one after another; "" when there is none (#3569).
+func structuredDetails(e wire.Event) string {
+	keys := make([]string, 0, len(e.Details))
+	for k := range e.Details {
+		if _, ok := yamlBlock(e.Details[k]); ok {
+			keys = append(keys, k)
+		}
+	}
+	sort.Strings(keys)
+	blocks := make([]string, 0, len(keys))
+	for _, k := range keys {
+		blocks = append(blocks, detailWords(k, e.Details[k]))
+	}
+	return strings.Join(blocks, "\n")
 }
 
 func matchedWords(e wire.Event, waited *int) string {
@@ -505,8 +542,12 @@ func matchedWords(e wire.Event, waited *int) string {
 	if e.Message != nil {
 		message = ". Message: " + *e.Message
 	}
-	return fmt.Sprintf("%s happened at %s (position %d)%s: %s%s%s. You can carry on.", e.Name, clock(e.At), e.Position, after,
+	said := fmt.Sprintf("%s happened at %s (position %d)%s: %s%s%s.", e.Name, clock(e.At), e.Position, after,
 		e.Sentence, details, message)
+	if blocks := structuredDetails(e); blocks != "" {
+		return said + "\n" + blocks + "\nYou can carry on."
+	}
+	return said + " You can carry on."
 }
 
 func stillWaitingWords(w *wire.EventWait) string {
@@ -550,7 +591,7 @@ func wakeWords(e wire.Event, extra int) string {
 		if t, ok := e.Details["agent_title"]; k == "agent" && ok {
 			v = t + " (" + v + ")"
 		}
-		lines = append(lines, k+": "+v)
+		lines = append(lines, detailWords(k, v))
 	}
 	if e.Publisher != nil {
 		lines = append(lines, "published by: "+e.Publisher.Title)
@@ -739,6 +780,9 @@ func (d *Daemon) waitForEvent(agent wire.UUID, args map[string]json.RawMessage) 
 		p, problem := parsePattern(n, filters)
 		if problem != "" {
 			return "", eventRefused(problem)
+		}
+		if words := unnamedBranchWords(p, filters); words != "" {
+			return "", eventRefused(words)
 		}
 		if isServerPattern(p.name) {
 			// A server's event is matched by its subscription, not its details: `where`

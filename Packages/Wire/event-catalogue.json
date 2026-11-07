@@ -630,6 +630,10 @@
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
+          "any": {
+            "description": "true: every branch an agent works on. A wait (not a workflow trigger) that names no branch is refused without it.",
+            "type": "boolean"
+          },
           "branch": {
             "type": "string"
           }

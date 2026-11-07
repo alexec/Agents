@@ -140,10 +140,10 @@ Agents starts these tools. It does not own what they keep.
 | OpenCode's `opencode.db` | OpenCode's copies, all in one SQLite file | **Not erased**, unless OpenCode can delete a conversation (ACP `session/delete`). When it cannot, the Delete confirmation says so on every client (#3669) |
 | `~/.claude/history.jsonl`, Codex's history and indexes | Each runtime's own history | **Not erased** |
 | Docker images and named volumes | What Docker workspaces pulled and kept | **Delete Machine** removes the workspace's container, its volumes and its image, when no other container uses them (#3728). Docker keeps an image with a second tag or a child image. |
-| DigitalOcean, Codespaces, EC2 and GCP machines | Cloud machines | **No limit in count or time, and no stop when idle.** Only **Delete Machine** removes one. |
+| DigitalOcean, Codespaces, EC2 and GCP machines | Cloud machines | **No limit in count.** A linked machine stops after **2 hours** idle by default: no turn running, no answer waited on, no terminal open (#3729). Each machine's **Stop when idle** sets the time, or **Never**, on the Mac and the web. A stopped machine keeps its disk; only **Delete Machine** removes one. |
 | `~/.ssh/config` (or `AGENTS_SSH_CONFIG`) | A block for each codespace | A codespace's block goes when **Delete Machine** deletes it (#3746). A codespace deleted outside Agents keeps its block. The one block that agentsd keeps for all codespaces is written again each time it prepares ssh. |
 | `/tmp/agents-tunnels-<uid>-<pid>` | ssh control sockets | Removed at a clean stop; one whose process is gone goes when a control plane's tunnels start (#3649) |
-| `$TMPDIR/agents-output-*` | Output that the Mac window opened in TextEdit | **None**; macOS clears its temporary folder |
+| `$TMPDIR/agents-output-*` | Output that the Mac window opened in TextEdit | 1 day: the Mac window removes older copies when it starts (#3747) |
 
 ## On the control plane
 
@@ -259,6 +259,8 @@ What the Mac window and the Remote keep in their defaults, and the web page in
 | `sidebar.folder.<folder>.width`, `.pane` (Mac only) | A folder window's inspector width and pane | As the folds | As the folds |
 | `newSessionProjectFolders` (`agents.newSession.projectFolders` on the web page) | New Session's last folder for each project | As the folds | As the folds |
 | `machineLockPin.<key>` (`agents-lock-pin.<key>` on the web page) | The machine-lock pins, the lock and each person's | This control plane's only: another control plane's go once the client is paired (#3750), and all go on **Forget** (#3670) | When the control plane answers |
+| Drafts (`draft.agent.<uuid>`, `draft.new.<folder>`, and the Mac's `draft.start`) | Prompts not sent, with their attachments | 512 KiB of attachments a draft. Deleted after 30 days without an edit, when its agent is archived, on send, and on **Forget** (#3749). | At start; on archive |
+| Drafts on the web page (`agents.drafts`) | Prompts not sent, with their attachments | The newest 40 drafts; attachments only while they are under 256 KiB. Deleted on send and on **Forget**. | On write |
 
 ## In memory
 
@@ -323,6 +325,14 @@ control plane does not read the old one's pins.
 
 The Mac and the Remote keep their own key in the keychain, so that a new pairing can use
 it. The web page deletes its key.
+
+A walk's Mac window (run-app, `--walk <name>`) keeps its own keys,
+`control-client-key.walk.<name>` and `lock-signing-key.walk.<name>`. When its folder has
+gone, the next Mac window to start deletes them with the walk's defaults (#3747).
+
+Voice mode's Kokoro models are in the app. The Mac window and the Remote link them into
+FluidAudio's cache when voice mode loads, and remove there what the app no longer carries,
+such as an older model (#3747). Only the current version stays.
 
 ## Export and import
 

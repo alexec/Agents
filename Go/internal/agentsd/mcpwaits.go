@@ -154,6 +154,81 @@ func mcpWaitArguments(filters map[string][]string, schema json.RawMessage) map[s
 	return out
 }
 
+// namedEvents are the server events about one thing (#3797): a wait on one names that
+// thing, by the keys that say which, or sets any: true. A wait that does neither woke on
+// every PR that merged in the repo. Workflow triggers are not checked: a trigger on every
+// merge is the usual one, written in a file a person reads.
+var namedEvents = map[string]struct {
+	thing, every string
+	keys         []string
+}{
+	"pr.merged":      {"PR", "every PR in the repo", prNamingKeys},
+	"pr.closed":      {"PR", "every PR in the repo", prNamingKeys},
+	"pr.conflicted":  {"PR", "every PR in the repo", prNamingKeys},
+	"pr.commented":   {"PR", "every PR in the repo", prNamingKeys},
+	"pr.labelled":    {"PR", "every PR in the repo", prNamingKeys},
+	"pr.unlabelled":  {"PR", "every PR in the repo", prNamingKeys},
+	"review.posted":  {"PR", "every PR in the repo", prNamingKeys},
+	"review.comment": {"PR", "every PR in the repo", prNamingKeys},
+	"checks.failed":  {"PR", "every PR in the repo", prNamingKeys},
+	"checks.passed":  {"PR", "every PR in the repo", prNamingKeys},
+	"run.completed":  {"run", "every run in the repo", []string{"run", "branch", "workflow"}},
+	"issue.closed":   {"issue", "every issue in the repo", []string{"issue", "label"}},
+	"issue.commented": {"issue", "every issue in the repo", []string{"issue", "label"}},
+	"issue.labelled": {"issue", "every issue in the repo", []string{"issue", "label"}},
+}
+
+var prNamingKeys = []string{"pr", "branch", "fixes", "mine"}
+
+// unnamedWaitWords is why a wait on a server's event that names nothing is refused, or
+// "". Only a server whose event offers any is held to it: one that does not yet (a forge
+// added since) waits as before.
+func unnamedWaitWords(name string, given map[string][]string, schema json.RawMessage) string {
+	named, ok := namedEvents[name]
+	if !ok {
+		return ""
+	}
+	offers := propertiesOf(schema)
+	if !offers["any"] {
+		return ""
+	}
+	if all := given["any"]; len(all) == 1 && all[0] == "true" {
+		return ""
+	}
+	var keys []string
+	for _, k := range named.keys {
+		if !offers[k] {
+			continue
+		}
+		if v, set := given[k]; set && !(k == "mine" && (len(v) != 1 || v[0] != "true")) {
+			return ""
+		}
+		keys = append(keys, "`"+k+"`")
+	}
+	return "Name the " + named.thing + " (" + orList(keys) + "), or set `any: true` to wake on " + named.every + "."
+}
+
+// propertiesOf is the keys a server's event takes, from its inputSchema.
+func propertiesOf(schema json.RawMessage) map[string]bool {
+	var s struct {
+		Properties map[string]json.RawMessage `json:"properties"`
+	}
+	json.Unmarshal(schema, &s)
+	out := map[string]bool{}
+	for k := range s.Properties {
+		out[k] = true
+	}
+	return out
+}
+
+// orList is "a, b or c".
+func orList(items []string) string {
+	if len(items) <= 1 {
+		return strings.Join(items, "")
+	}
+	return strings.Join(items[:len(items)-1], ", ") + " or " + items[len(items)-1]
+}
+
 type offeredEvents struct {
 	server eventServer
 	events []mcpEventDef
@@ -241,7 +316,23 @@ func (d *Daemon) checkMCPWait(names []string, filters map[string][]string, folde
 	if isNarrowed {
 		servedBy = narrowed
 	}
-	var warnings []string
+	// One where for several events (#3797): each event takes only the keys it offers, so a
+	// lead names its children's issues for issue.closed and their fixes for pr.merged in one
+	// wait. A key none of them offers still goes to each, which says what it takes.
+	takenBySome := map[string]bool{}
+	for _, name := range names {
+		probe := mcpTrigger{event: name, servers: servedBy}
+		for _, server := range servers {
+			for _, def := range offered[server].events {
+				if probe.covers(def.Name) && def.offersPoll() {
+					for k := range propertiesOf(def.InputSchema) {
+						takenBySome[k] = true
+					}
+				}
+			}
+		}
+	}
+	var warnings, unnamed []string
 	for _, name := range names {
 		probe := mcpTrigger{event: name, servers: servedBy}
 		var on []string
@@ -253,12 +344,26 @@ func (d *Daemon) checkMCPWait(names []string, filters map[string][]string, folde
 				if !probe.covers(def.Name) || !def.offersPoll() {
 					continue
 				}
-				typed := mcpWaitArguments(given, def.InputSchema)
+				own := given
+				if len(names) > 1 {
+					own = map[string][]string{}
+					offers := propertiesOf(def.InputSchema)
+					for k, v := range given {
+						if offers[k] || !takenBySome[k] {
+							own[k] = v
+						}
+					}
+				}
+				typed := mcpWaitArguments(own, def.InputSchema)
 				if len(def.InputSchema) > 0 {
 					if p := jsonSchemaProblem(mustRaw(typed), def.InputSchema, server+"'s "+def.Name); p != "" {
 						problems = append(problems, p)
 						continue
 					}
+				}
+				if p := unnamedWaitWords(def.Name, own, def.InputSchema); p != "" {
+					unnamed = append(unnamed, server+"'s "+def.Name+": "+p)
+					continue
 				}
 				if arguments == nil {
 					arguments = typed
@@ -286,6 +391,8 @@ func (d *Daemon) checkMCPWait(names []string, filters map[string][]string, folde
 			d.mcpEvMu.Unlock()
 		case len(problems) > 0:
 			return check, eventRefused(strings.Join(problems, " ") + " Nothing is waiting.")
+		case len(unnamed) > 0:
+			return mcpWaitCheck{}, eventRefused(strings.Join(unnamed, " ") + " Nothing is waiting.")
 		case len(mayComeBack) > 0:
 			check.events = append(check.events, wire.WaitServerEvent{Trigger: trigger.wire(), Servers: []string{}})
 			warnings = append(warnings, serversMayComeBackWords(name, mayComeBack))
@@ -301,6 +408,11 @@ func (d *Daemon) checkMCPWait(names []string, filters map[string][]string, folde
 			}
 			return check, eventRefused(notOfferedWords(name, offers) + " Nothing is waiting.")
 		}
+	}
+	// One server's event that names nothing refuses the whole wait, not only that server's
+	// subscription: a wait the others took would never wake for it.
+	if len(unnamed) > 0 {
+		return mcpWaitCheck{}, eventRefused(strings.Join(unnamed, " ") + " Nothing is waiting.")
 	}
 	check.warning = strings.Join(warnings, "")
 	return check, nil

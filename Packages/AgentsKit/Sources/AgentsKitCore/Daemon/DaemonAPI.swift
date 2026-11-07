@@ -439,6 +439,9 @@ public enum DaemonAPI {
         public static let timeHistory = "time/history"
         /// Which features this host counted (#2165), for Reports ▸ Features. No params.
         public static let reportsFeatures = "reports/features"
+        /// Report a Problem (#3718): the person's words made into a GitHub new-issue link,
+        /// tokens and home folders cut out. Sends nothing.
+        public static let reportsProblem = "reports/problem"
         /// The milestones the person has earned (#984), for the Time page. No params.
         public static let milestonesState = "milestones/state"
         public static let costSetLimits = "cost/setLimits"

@@ -139,9 +139,9 @@ server offers the Playwright tools to the agent (`browser_navigate`, `browser_sn
 - A small bar over the stream has Back, Forward, Reload, the address, and Done when a
   hand-off is open.
 - **Mac:** the stream in the side pane, beside the chat, as a new pane next to Files,
-  Browser and Terminal. **Web:** the same view, in the same place. **Remote:** `remote:
-  tier mac+web` for the stream. The hand-off card is a question card (Core): on the
-  Remote it says to open the page on the Mac or the web page.
+  Browser and Terminal. **Web:** the same view, in the same place. **Remote:** the same
+  stream in its Browser pane (Core since #3800; it was `remote: tier mac+web`). The
+  hand-off card is a question card (Core): on the Remote, Open the page opens that pane.
 - **Through the control plane:** frames for a hosted folder go through the control plane
   like every other message. It routes them and keeps none (Principles 6 and 7), and TLS
   protects them in transit (Principle 8).

@@ -26,6 +26,9 @@ stay as they are.
 | `cmd/whatsapp-mcp/`, `internal/whatsappmcp/` | The `whatsapp` MCP server (#1352): a WhatsApp Business number's messages and answers as `message.received` and `question.answered`, by Meta's signed webhook, and tools that send as the number | whatsapp |
 | `cmd/gitlab-mcp/`, `internal/gitlabmcp/` | The `gitlab` MCP server (#1629): merge requests, pipelines and issues on GitLab, tools and events on REST v4 | gitlab |
 | `cmd/forgejo-mcp/`, `internal/forgejomcp/` | The `forgejo` MCP server (#1753): pull requests, checks and issues on Forgejo or Gitea, tools and events on REST v1, in the gitlab server's shape | forgejo |
+| `cmd/bitbucket-mcp/`, `internal/bitbucketmcp/` | The `bitbucket` MCP server (#2828): pull requests, checks and issues on Bitbucket Cloud, tools and events on REST 2.0, in the gitlab server's shape | bitbucket |
+| `cmd/azuredevops-mcp/`, `internal/azuredevopsmcp/` | The `azuredevops` MCP server (#2829): pull requests and Azure Pipelines builds on Azure DevOps, tools and events on REST 7.1, in the gitlab server's shape | azuredevops |
+| `cmd/azureboards-mcp/`, `internal/azureboardsmcp/` | The `azureboards` MCP server (#3804): Azure Boards work items as a tracker, tools and events on REST 7.1, in the jira server's shape | azureboards |
 | `cmd/workspace-commands/`, `internal/workspacecommands/` | The command machine provider (#691, in Go since #1364): workspaces as shell commands and presets, an MCP server the control plane runs | workspaces |
 
 ## Building and testing
@@ -247,6 +250,94 @@ The tests run it against a fake Forgejo over HTTP (`fake_test.go`); `walk_live_t
 container. Agents Host carries it (`scripts/go-github-mcp.sh forgejo-mcp`) and every Linux
 host installs `forgejo-mcp-linux-<arch>`; the catalogue lists it as `agents/forgejo`, which
 asks for no secret: it reads the connection, as the gitlab server does. See `docs/how-to/use-forgejo.md`.
+
+## The bitbucket MCP server (`bitbucket-mcp`, #2828)
+
+The forgejo server's shape for Bitbucket Cloud's REST API 2.0: a stdio front
+(`bitbucketmcp.Front`) answers `events/list` and `events/poll` and passes everything else to a
+go-sdk server with our own tools, all with one token, `BITBUCKET_TOKEN`: an Atlassian API
+token with scopes (with `BITBUCKET_EMAIL`, as Basic auth) or a repository, project or
+workspace access token (as a Bearer token). Bitbucket Cloud only; `BITBUCKET_API_URL` (or
+`--api`) points it at a fake.
+
+- **Events**, polled every 30 s, with the gitlab server's names, cursor and paging:
+  `checks.failed` (a FAILED commit status on an open pull request's head: Pipelines or any
+  CI), `pr.opened`, `pr.merged` and `pr.closed` (declined; the time is the activity's state
+  change, as `updated_on` moves with every comment), `pr.conflicted` (a file of the
+  diffstat in conflict), `review.requested`, `review.comment` (inline comments of the pull
+  requests updated since), `issue.opened`, `issue.labelled` and `issue.closed` (the changes
+  of the issues updated since; an issue's kind and component are its labels),
+  `issue.commented`, `issue.assigned`. The trust filter (#728): write or admin by the
+  repository's permissions, falling back to the workspace's members for a token without
+  admin, never an app or a bot, never a fork.
+- **Tools:** the forgejo server's, by the same names; `merge_pull_request` and
+  `approve_pull_request` on the host's copy only, refused when the head is not the commit
+  the person saw.
+- **No views yet**, and no connection.
+
+The tests run it against a fake Bitbucket over HTTP (`fake_test.go`). Agents Host carries it
+(`scripts/go-github-mcp.sh bitbucket-mcp`) and every Linux host installs
+`bitbucket-mcp-linux-<arch>`; the catalogue lists it as `agents/bitbucket`. See
+`docs/how-to/use-bitbucket.md`.
+
+## The azuredevops MCP server (`azuredevops-mcp`, #2829)
+
+The gitlab server's shape for Azure DevOps Services and Azure DevOps Server (REST API 7.1): a
+stdio front (`azuredevopsmcp.Front`) answers `events/list` and `events/poll` and passes
+everything else to a go-sdk server with our own tools, all with one personal access token,
+`AZURE_DEVOPS_TOKEN` (Code read and write, Build read), sent as Basic. `AZURE_DEVOPS_URL` (or
+`--url`) is a server's collections, such as `https://server/tfs`: `https://dev.azure.com`
+when empty. A repository is `organization/project/name`.
+
+- **Events**, polled every 30 s, with the gitlab server's names, cursor and paging, for pull
+  requests only: `checks.failed` (a pull request build that failed at an active pull
+  request's head commit, from the builds finished since), `pr.opened`, `pr.merged`
+  (completed), `pr.closed` (abandoned; both from the pull requests closed since,
+  `queryTimeRangeType=closed`), `pr.conflicted` (`mergeStatus` is `conflicts`),
+  `review.requested` (the token's owner is a reviewer with no vote), `review.comment` (the
+  threads of the 50 newest active pull requests and of those closed since). Arguments
+  `repo`, `branch`, `pr`, `anyone` and `mine`; left out, never a bot (a build service, a
+  group) or a fork (#728). Only a project's members can write to it, so no access is read.
+- **Tools:** `list_pull_requests`, `get_pull_request`, `get_checks`, `get_build_log` (a
+  build's failed steps from its timeline, and the end of each log),
+  `comment_on_pull_request`; for the ready-made workflows (#1633) `create_pull_request`,
+  `list_pull_request_comments` and `reply_to_pull_request_comment` (by `threadId`); and, on
+  the host's copy only, `merge_pull_request` and `approve_pull_request`.
+- **No work items:** they are the tracker's. **No views yet**, and no connection.
+
+Not Microsoft's own server (`@azure-devops/mcp`, MIT): it needs Node on every host, it offers
+agents the votes and the completion that only a person may give (#837), and it has no events,
+which need their own REST client anyway. The tests run against a fake Azure DevOps over HTTP
+(`fake_test.go`). Agents Host carries it (`scripts/go-github-mcp.sh azuredevops-mcp`) and
+every Linux host installs `azuredevops-mcp-linux-<arch>`; the catalogue lists it as
+`agents/azuredevops`. See `docs/how-to/use-azure-devops.md`.
+
+## The azureboards MCP server (`azureboards-mcp`, #3804)
+
+The jira server's shape for Azure Boards, the tracker of Azure DevOps (REST API 7.1): a stdio
+front (`azureboardsmcp.Front`) answers `events/list` and `events/poll` and passes everything
+else to a go-sdk server with its tools. It is its own server, not part of `azuredevops-mcp`,
+because the catalogue runs one connector a command and a tracker is chosen apart from the
+code host. It shares the azuredevops server's token, `AZURE_DEVOPS_TOKEN` (with Work Items
+read and write), and `AZURE_DEVOPS_URL`; `AZURE_BOARDS_PROJECT` (or `--project`) is
+`organization/project`, the folder's Azure Repos remote's when empty.
+
+- **Events**, polled every minute, with the jira and linear servers' names and cursor:
+  `issue.opened` (WIQL on `System.CreatedDate`), and from the 50 work items changed since
+  (WIQL on `System.ChangedDate`, `timePrecision=true`, then `workitemsbatch`):
+  `issue.labelled` (a tag added in an update), `issue.closed` (an update into a state of the
+  Completed or Removed category, from the work item types' states), `issue.assigned` (an
+  update that assigns the token's owner) and `issue.commented` (the comments API,
+  7.1-preview.4). An update's time is its `System.ChangedDate`, not its `revisedDate`.
+  Arguments `area`, `type`, `label`, `issue` and `anyone`; left out, never a bot (#728).
+- **Tools:** `list_work_items`, `get_work_item` and `comment_on_work_item` (Markdown).
+- **No views yet,** and no Work pages, Tasks slot or board.
+
+It imports only `azuredevopsmcp.BaseURL` and `GitRepo` from the azuredevops server; its HTTP
+client is its own, as each of our servers' is. The tests run against a fake Azure DevOps over
+HTTP (`fake_test.go`). Agents Host carries it (`scripts/go-github-mcp.sh azureboards-mcp`)
+and every Linux host installs `azureboards-mcp-linux-<arch>`; the catalogue lists it as
+`agents/azureboards`. See `docs/how-to/use-azure-boards.md`.
 
 ## The email MCP server (`email-mcp`, #1780)
 

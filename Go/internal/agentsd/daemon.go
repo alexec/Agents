@@ -37,6 +37,10 @@ type Daemon struct {
 	carriedOnce sync.Once
 	carriedHeld *carriedProviders
 
+	// machineMoves is the moves to another machine agents asked for, made when their turn
+	// ends (move_session, #3717), by agent.
+	machineMoves sync.Map
+
 	mu      sync.Mutex
 	clients map[int64]*Client
 	unknown map[string]int

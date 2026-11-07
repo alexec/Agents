@@ -2,7 +2,7 @@ providers/list
 {"providers":[{"id":"<provider>","name":"DigitalOcean","kind":"commands","secrets":{"DIGITALOCEAN_TOKEN":true},"capabilities":["create","delete","options"],"contract":1,"mapped":false,"preset":"doctl","workspaces":[{"id":"agents-devbox","name":"agents-devbox","state":"stopped","ssh":"alex@127.0.0.1 -p 2222"},{"id":"scratch-1","name":"scratch-1","state":"running"}],"listedAt":<date>,"current":true,"mayUse":true,"machine":"carrier1","machineName":"carrier"}]}
 
 machines/link
-{"ID":"devbox01","State":"online","Workspace":{"provider":"<provider>","providerName":"DigitalOcean","workspace":"agents-devbox","workspaceName":"agents-devbox","workspaceState":"stopped","hostState":"stopped","canStart":true,"canStop":false,"startWhenUsed":true,"stopWhenIdleMinutes":30,"current":true,"startForSchedules":true,"tellsSchedule":false}}
+{"ID":"devbox01","State":"online","Workspace":{"provider":"<provider>","providerName":"DigitalOcean","workspace":"agents-devbox","workspaceName":"agents-devbox","workspaceState":"stopped","hostState":"stopped","canStart":true,"canStop":false,"startWhenUsed":true,"stopWhenIdleMinutes":120,"current":true,"startForSchedules":true,"tellsSchedule":false}}
 
 machines/setMachineOptions
 {"ID":"devbox01","State":"online","Workspace":{"provider":"<provider>","providerName":"DigitalOcean","workspace":"agents-devbox","workspaceName":"agents-devbox","workspaceState":"stopped","hostState":"stopped","canStart":true,"canStop":false,"startWhenUsed":true,"stopWhenIdleMinutes":30,"current":true,"startForSchedules":true,"tellsSchedule":false}}

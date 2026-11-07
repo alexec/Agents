@@ -129,6 +129,7 @@ const CapProviders1 = "providers/1"
 const CapReadapi1 = "readapi/1"
 const CapRelay1 = "relay/1"
 const CapReportsNodes1 = "reports.nodes/1"
+const CapReportsProblem1 = "reports.problem/1"
 const CapReportsScope1 = "reports.scope/1"
 const CapReportsValue1 = "reports.value/1"
 const CapReportsViews1 = "reports.views/1"
@@ -145,6 +146,7 @@ const CapRuntimes1 = "runtimes/1"
 const CapSandbox1 = "sandbox/1"
 const CapSealing1 = "sealing/1"
 const CapSessionsElsewhere1 = "sessions.elsewhere/1"
+const CapSessionsMove1 = "sessions.move/1"
 const CapSessionsOnMachine1 = "sessions.on-machine/1"
 const CapSessionsProject1 = "sessions.project/1"
 const CapSessions1 = "sessions/1"
@@ -194,6 +196,7 @@ var HostCapabilities = pairs([][2]string{
 	{"agents/labelVocabulary", "agents/1"},
 	{"agents/list", "agents/1"},
 	{"agents/move", "agents/1"},
+	{"agents/moveIn", "sessions.move/1"},
 	{"agents/options", "agents/1"},
 	{"agents/prewarm", "agents/1"},
 	{"agents/prompt", "agents/1"},
@@ -425,6 +428,7 @@ var HostCapabilities = pairs([][2]string{
 	{"relay/grant", "relay/1"},
 	{"relay/offer", "relay/1"},
 	{"reports/features", "features/1"},
+	{"reports/problem", "reports.problem/1"},
 	{"resources/declare", "resources/1"},
 	{"resources/end", "resources.leases/1"},
 	{"resources/lease", "resources.leases/1"},
