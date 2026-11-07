@@ -127,6 +127,7 @@ func (d *Daemon) sweepHourly() {
 		log.Printf("retention: %d ended lineage links past %v", n, lineage.KeepEnded)
 	}
 	d.sweepHistories(nowFunc())
+	d.sweepSmallStores(nowFunc())
 }
 
 // sweepHistories bounds spend, usage, time and features by age (#3686), so a machine

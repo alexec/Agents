@@ -54,7 +54,7 @@ Mac.
 | `lineage.jsonl` | Links between issues, PRs, sessions and deploys | Ended links 90 days, 20,000 links | When it opens, when it grows by 2,000, and hourly (#3649) |
 | `lineage-cost.json` | Cost of each lineage node | 90 days, 5,000 nodes | On write |
 | `lineage-comments.json` | Cost comments on PRs | 500, 30 days | On write |
-| `release-tags.json` | Release tags already linked, for each repo | **None** | Never |
+| `release-tags.json` | Release tags already linked, for each repo | The newest 50 for each repo; an older tag counts as linked (#3652) | On write |
 | `achievements.json` | Milestones | A fixed set | — |
 
 ### Workflows, assessments, approvals and devices
@@ -62,14 +62,14 @@ Mac.
 | Store | What it keeps | How long, how large | Applied |
 | --- | --- | --- | --- |
 | `workflows.json`: runs | Workflow runs | 7 days, unless its agent still works | At start, when a run ends, and hourly (#3649) |
-| `workflows.json`: states | A state for each folder and workflow ever seen | **None** | Only the app's **Remove** |
+| `workflows.json`: states | A state for each folder and workflow ever seen | 30 days after its workflow file goes (#3652) | Hourly, and the app's **Remove** |
 | `workflow-copies/` | The approved text of each workflow and its skills | The copies that the states name; an older version goes when one is saved | On write |
 | `assessments/` | Each runtime assessment's start, score and scope | The newest 50 | When one starts |
 | `mcp-events.json` | MCP event IDs already seen | 2,000 IDs, 7 days | On write |
 | `mcp-views/` | View catalogues | Pruned to the live servers | On write |
-| `mcp-approvals.json`, `plugin-approvals.json` | Digests of approved MCP servers and plugins | **None.** It grows with folders × servers. | MCP: only on remove. Plugins: never. |
-| `devices.json` | Paired devices | **None** | Only **Forget** |
-| `review-dismissals.json`, `review-opened.json` | PR links for each folder | 200 a folder; **a folder's entry is never removed** | On write |
+| `mcp-approvals.json`, `plugin-approvals.json` | Digests of approved MCP servers and plugins | The folders that exist: a folder that is not on disk and not in the app goes (#3652) | Hourly; MCP also on remove |
+| `devices.json` | Paired devices | 90 days after a device was last seen (#3652) | Hourly, and **Forget** |
+| `review-dismissals.json`, `review-opened.json` | PR links for each folder | 200 a folder; a folder that is not on disk and not in the app goes (#3652) | On write, and hourly |
 | `lock-seen.json` | IDs of signed requests already seen | 4,096 | On write |
 | `attention.json` | What needs you, and what was delivered | The live needs | On write |
 | `leases.json`, `resources.json` | Resource leases | 240 minutes a lease; dropped when its agent stops | On write |
