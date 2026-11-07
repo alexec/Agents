@@ -14,8 +14,10 @@ when a person approves it, submits it for App Review. Crashes go to Sentry.
    Environments**), each with **Required reviewers**. Nothing ships before a reviewer
    approves it.
 2. In App Store Connect, make a team API key (**Users and Access ▸ Integrations ▸ Team
-   Keys**) and download it. Put it in the repository's secrets:
-   - `ASC_KEY_P8`: the text of the `.p8` file.
+   Keys**) with the role **Admin**, and download it. Cloud-managed signing refuses a key with
+   a smaller role. Put it in the repository's secrets:
+   - `ASC_KEY_P8`: the text of the `.p8` file. Its line breaks can go: the workflows put
+     them back (`scripts/asc-key.sh`).
    - `ASC_KEY_ID`: the key's ID.
    - `ASC_ISSUER_ID`: the issuer ID, above the list of keys.
 3. Put your team ID (**Membership details** on developer.apple.com) in the repository

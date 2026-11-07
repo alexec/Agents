@@ -63,7 +63,7 @@ jobs:
             echo "::error::Set the secrets ASC_KEY_P8, ASC_KEY_ID and ASC_ISSUER_ID. Nothing was submitted to App Review."
             exit 1
           fi
-          echo "$ASC_KEY_P8" > "$RUNNER_TEMP/asc.p8"
+          bash scripts/asc-key.sh "$RUNNER_TEMP/asc.p8"
 
       # "What's New" is the tag's message.
       - name: Submit for App Review

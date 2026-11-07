@@ -2,6 +2,14 @@ package agentsd
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"encoding/pem"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -149,5 +157,52 @@ func TestStarterKeepsTheIcon(t *testing.T) {
 	icon := files["App/Assets.xcassets/AppIcon.appiconset/AppIcon.png"]
 	if !bytes.HasPrefix(icon, []byte("\x89PNG\r\n\x1a\n")) {
 		t.Fatal("no AppIcon.png")
+	}
+}
+
+// A key pasted in ask_secret's one-line field loses its line breaks (#3709,
+// specs/3656-new-app/apple.md, step 5): every workflow writes the .p8 file with asc-key.sh,
+// which puts them back, so the file is the one Apple gave.
+func TestStarterRebuildsThePastedKey(t *testing.T) {
+	files, err := starterFiles("iphone-app", starterValues["iphone-app"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, w := range []string{"setup.yml", "release.yml", "app-store.yml"} {
+		y := string(files[".github/workflows/"+w])
+		if !strings.Contains(y, `bash scripts/asc-key.sh "$RUNNER_TEMP/asc.p8"`) || strings.Contains(y, `echo "$ASC_KEY_P8"`) {
+			t.Errorf("%s does not write the key with scripts/asc-key.sh", w)
+		}
+	}
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	der, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p8 := string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}))
+	dir := t.TempDir()
+	script := filepath.Join(dir, "asc-key.sh")
+	if err := os.WriteFile(script, files["scripts/asc-key.sh"], 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for name, pasted := range map[string]string{"as downloaded": p8, "no line breaks": strings.ReplaceAll(p8, "\n", ""),
+		"spaces": strings.ReplaceAll(p8, "\n", " ")} {
+		out := filepath.Join(dir, "asc.p8")
+		cmd := exec.Command("bash", script, out)
+		cmd.Env = append(os.Environ(), "ASC_KEY_P8="+pasted)
+		if b, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("%s: %v: %s", name, err, b)
+		}
+		if got, _ := os.ReadFile(out); string(got) != p8 {
+			t.Errorf("%s: wrote\n%s\nwant\n%s", name, got, p8)
+		}
+	}
+	cmd := exec.Command("bash", script, filepath.Join(dir, "bad.p8"))
+	cmd.Env = append(os.Environ(), "ASC_KEY_P8=not a key!")
+	if err := cmd.Run(); err == nil {
+		t.Error("asc-key.sh took text that is not a key")
 	}
 }
