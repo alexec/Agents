@@ -37,6 +37,14 @@ type forgeForgejo interface {
 	Merge(ctx context.Context, repo string, number int, sha, method string, auto bool) error
 	Approve(ctx context.Context, repo string, number int, sha string) (string, error)
 	PRDiff(ctx context.Context, repo string, number int) (map[string]any, error)
+	// What lineage asks (lineageforgejo.go).
+	Node(ctx context.Context, repo string, number int) (forgejomcp.Node, error)
+	MilestoneNode(ctx context.Context, repo string, id int) (forgejomcp.Node, error)
+	Milestones(ctx context.Context, repo string) ([]forgejomcp.Milestone, error)
+	CommitTime(ctx context.Context, repo, ref string) (time.Time, error)
+	Compare(ctx context.Context, repo, base, head string) ([]forgejomcp.Commit, error)
+	CommitPR(ctx context.Context, repo, sha string) (int, error)
+	CostComment(ctx context.Context, repo string, number int, id, mark, body string) (string, error)
 }
 
 // forgejoNoChecksAPI is why a Forgejo pull request's checks are not run again or read here.

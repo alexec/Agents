@@ -144,8 +144,15 @@ never a bot. A pull request from a fork never counts.
   label in a folder on Forgejo works on that issue or pull request. A pull request's events
   link it to the sessions on its branch and to the issues its description closes. A folder
   is on Forgejo when its `origin` is on the connected Forgejo, or on a host whose name says
-  Codeberg, Forgejo or Gitea. Lineage does not ask Forgejo for an issue's milestone,
-  parent or title, for a release's pull requests, or to post a merged pull request's cost.
+  Codeberg, Forgejo or Gitea.
+- **Lineage asks the connected Forgejo (#3844),** with the Forgejo connection, about the
+  repositories of the folders on it: an issue's, a pull request's and a milestone's title
+  and state, an issue's milestone, a version tag's pull requests (from `(#12)` at the end of
+  a squash commit's title, or else the commit's pull request) and the milestone whose title
+  starts with its version, and the cost comment on a merged pull request (when the folder's
+  `prCostComment` says so). Forgejo has no parent issues, so an issue has none. An issue's
+  address on the connected Forgejo is read in a filed issue's output. A doc's address is
+  `/src/HEAD/<path>`, which Forgejo sends on to the default branch.
 - **Not yet:** an epic's plan and the Board filter.
 
 ## See also

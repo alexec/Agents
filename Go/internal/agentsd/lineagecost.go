@@ -281,7 +281,7 @@ func (d *Daemon) refreshCostResolvedLocked() {
 		if !ok || !e.ok {
 			if c.Node.Kind == lineage.KindIssue && c.Level == nil && c.Resolved == nil && len(ask) < resolvePerWalk &&
 				!d.resolveAsking[c.Node] && (!ok || now.Sub(e.at) >= resolveRecheck) {
-				if _, _, can := nodeOfRepo(c.Node); can {
+				if _, _, can := askedNode(c.Node); can {
 					ask = append(ask, c.Node)
 				}
 			}

@@ -244,8 +244,8 @@ func docName(ref string) string {
 	return name
 }
 
-// docURL is a doc's web address: the page's own, or the file's on GitHub or the GitLab of
-// the page, on its default branch.
+// docURL is a doc's web address: the page's own, or the file's on GitHub, or on the GitLab or
+// Forgejo of the page, on its default branch.
 func docURL(ref, base string) string {
 	if strings.HasPrefix(ref, "https://") || strings.HasPrefix(ref, "http://") {
 		return ref
@@ -263,7 +263,13 @@ func docURL(ref, base string) string {
 			base = "https://gitlab.com"
 		}
 		return base + "/" + repo + "/-/blob/HEAD/" + rel
+	case "forgejo":
+		// A Forgejo's node does not say its host: only the page's. /src/HEAD/ sends the reader
+		// on to /src/branch/<default>/.
+		if base == "" || strings.EqualFold(base, "https://linear.app") {
+			return ""
+		}
+		return base + "/" + repo + "/src/HEAD/" + rel
 	}
-	// A Forgejo's doc has none: its address names the default branch, which its node does not say.
 	return ""
 }

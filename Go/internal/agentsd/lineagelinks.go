@@ -74,8 +74,12 @@ type forgeKind struct {
 	anyHost bool
 	// cli is the person's CLI that lineage asks the forge with: a node's title, an issue's
 	// milestone and parent, a release's commits and milestones, a merged pull request's cost
-	// comment. "" asks nothing: the forge's nodes are linked, and nothing is looked up.
+	// comment.
 	cli string
+	// connection: lineage asks the forge the same by the person's connection to it
+	// (lineageforgejo.go), not a CLI. With neither, the forge's nodes are linked, and nothing
+	// is looked up.
+	connection bool
 }
 
 // forgeKinds, GitLab first: its addresses have a /-/ that GitHub's do not.
@@ -86,9 +90,8 @@ var forgeKinds = []struct {
 	{"gitlab", forgeKind{prMark: "!", prPath: "/-/merge_requests/", issuePath: "/-/issues/", cli: "glab"}},
 	{"github", forgeKind{prMark: "#", prPath: "/pull/", issuePath: "/issues/", cli: "gh"}},
 	// Forgejo and Gitea number issues and pull requests together, as forgeforgejo.go's nodes
-	// say. Only they say /pulls/12. They are asked by their connection, not a CLI, so
-	// lineage asks them nothing yet.
-	{"forgejo", forgeKind{prMark: "#", prPath: "/pulls/", issuePath: "/issues/", anyHost: true}},
+	// say. Only they say /pulls/12. They are asked by their connection, not a CLI.
+	{"forgejo", forgeKind{prMark: "#", prPath: "/pulls/", issuePath: "/issues/", anyHost: true, connection: true}},
 }
 
 // kindOf is forge's row of forgeKinds.
@@ -101,10 +104,10 @@ func kindOf(forge string) (forgeKind, bool) {
 	return forgeKind{}, false
 }
 
-// asks says lineage asks r's forge, by its CLI, about r's nodes.
+// asks says lineage asks r's forge, by its CLI or its connection, about r's nodes.
 func (r forgeRepo) asks() bool {
 	k, _ := kindOf(r.forge)
-	return k.cli != ""
+	return k.cli != "" || k.connection
 }
 
 func (r forgeRepo) issue(n int) wire.LineageNode {
