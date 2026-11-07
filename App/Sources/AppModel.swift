@@ -36,9 +36,9 @@ final class AppModel {
     /// An agent has run a turn on this root, once seen: archived agents are not listed,
     /// and the step stays ticked when the first one is archived.
     var hasSeenAgentRun = GetStartedStore.ranAgent
-    /// The milestones this window has shown a card for (#984); nil before its first look
-    /// on this root. See `AppModel+Milestones`.
-    var milestonesSeen: Set<String>? = MilestonesSeenStore.seen
+    /// The achievements this window has shown a card for (#984); nil before its first look
+    /// on this root. See `AppModel+Achievements`.
+    var achievementsSeen: Set<String>? = AchievementsSeenStore.seen
     /// What each runtime last said about itself: signed in or not, what it takes in a
     /// prompt, which provider is answering.
     private(set) var accounts: [String: RuntimeAccount] = [:]
@@ -197,7 +197,7 @@ final class AppModel {
             showsMCPServers = false
             showsSecrets = false
             showsTime = false
-            showsMilestones = false
+            showsAchievements = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -223,7 +223,7 @@ final class AppModel {
             showsMCPServers = false
             showsSecrets = false
             showsTime = false
-            showsMilestones = false
+            showsAchievements = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -248,7 +248,7 @@ final class AppModel {
             showsMCPServers = false
             showsSecrets = false
             showsTime = false
-            showsMilestones = false
+            showsAchievements = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -271,7 +271,7 @@ final class AppModel {
             showsEvents = false
             showsRuntimes = false
             showsTime = false
-            showsMilestones = false
+            showsAchievements = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -294,7 +294,7 @@ final class AppModel {
             showsRuntimes = false
             showsMCPServers = false
             showsTime = false
-            showsMilestones = false
+            showsAchievements = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -316,7 +316,7 @@ final class AppModel {
             showsRuntimes = false
             showsMCPServers = false
             showsSecrets = false
-            showsMilestones = false
+            showsAchievements = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -328,11 +328,11 @@ final class AppModel {
         }
     }
 
-    /// Whether the window is showing Milestones: the first steps taken, and the ones still to
+    /// Whether the window is showing Achievements: the first steps taken, and the ones still to
     /// take (#1067). A page like Time, and not persisted for the same reason.
-    var showsMilestones = false {
+    var showsAchievements = false {
         didSet {
-            guard showsMilestones, showsMilestones != oldValue else { return }
+            guard showsAchievements, showsAchievements != oldValue else { return }
             showsSpending = false
             showsEvents = false
             showsRuntimes = false
@@ -361,7 +361,7 @@ final class AppModel {
             showsMCPServers = false
             showsSecrets = false
             showsTime = false
-            showsMilestones = false
+            showsAchievements = false
             machinePage = nil
             showsWork = false
             showsDocs = false
@@ -385,7 +385,7 @@ final class AppModel {
             showsMCPServers = false
             showsSecrets = false
             showsTime = false
-            showsMilestones = false
+            showsAchievements = false
             showsTokens = false
             selection = nil
             openWorkflow = nil
@@ -407,7 +407,7 @@ final class AppModel {
             showsMCPServers = false
             showsSecrets = false
             showsTime = false
-            showsMilestones = false
+            showsAchievements = false
             showsTokens = false
             machinePage = nil
             selection = nil
@@ -428,7 +428,7 @@ final class AppModel {
             showsMCPServers = false
             showsSecrets = false
             showsTime = false
-            showsMilestones = false
+            showsAchievements = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -510,7 +510,7 @@ final class AppModel {
         showsMCPServers = false
         showsSecrets = false
         showsTime = false
-        showsMilestones = false
+        showsAchievements = false
         showsTokens = false
         machinePage = nil
         showsWork = false
@@ -536,7 +536,7 @@ final class AppModel {
         showsMCPServers = false
         showsSecrets = false
         showsTime = false
-        showsMilestones = false
+        showsAchievements = false
         showsTokens = false
         machinePage = nil
         showsWork = false
@@ -583,7 +583,7 @@ final class AppModel {
             if showsSpending { return .spending }
             if showsTokens { return .tokens }
             if showsTime { return .time }
-            if showsMilestones { return .milestones }
+            if showsAchievements { return .achievements }
             if showsWork { return .work }
             if showsDocs { return .docs }
             guard let key = selectedFolderKey else { return nil }
@@ -608,7 +608,7 @@ final class AppModel {
                 showsMCPServers = false
                 showsSecrets = false
                 showsTime = false
-                showsMilestones = false
+                showsAchievements = false
                 showsTokens = false
                 machinePage = nil
                 showsWork = false
@@ -629,8 +629,8 @@ final class AppModel {
                 showsTokens = true
             case .time:
                 showsTime = true
-            case .milestones:
-                showsMilestones = true
+            case .achievements:
+                showsAchievements = true
             case .work:
                 showsWork = true
             case .docs:
@@ -655,7 +655,7 @@ final class AppModel {
                 showsMCPServers = false
                 showsSecrets = false
                 showsTime = false
-                showsMilestones = false
+                showsAchievements = false
                 showsTokens = false
                 machinePage = nil
                 showsWork = false
@@ -678,7 +678,7 @@ final class AppModel {
         showsMCPServers = false
         showsSecrets = false
         showsTime = false
-        showsMilestones = false
+        showsAchievements = false
         showsTokens = false
         machinePage = nil
         showsWork = false
@@ -709,7 +709,7 @@ final class AppModel {
         showsMCPServers = false
         showsSecrets = false
         showsTime = false
-        showsMilestones = false
+        showsAchievements = false
         showsTokens = false
         machinePage = nil
         showsWork = false
@@ -947,7 +947,7 @@ final class AppModel {
         showsMCPServers = false
         showsSecrets = false
         showsTime = false
-        showsMilestones = false
+        showsAchievements = false
         showsTokens = false
         machinePage = nil
         showsWork = false
@@ -2080,12 +2080,12 @@ final class AppModel {
         work.replaceStoreNotes(notes)
     }
 
-    /// The milestones (#984), asked once on connecting. A host too old to know the method
+    /// The achievements (#984), asked once on connecting. A host too old to know the method
     /// leaves them nil, and the Time page shows none.
-    func refreshMilestones() async {
-        guard let milestones = try? await macClient.call(DaemonAPI.Method.milestonesState, Optional<String>.none,
-                                                      returning: Milestones.self) else { return }
-        takeMilestones(milestones)
+    func refreshAchievements() async {
+        guard let achievements = try? await macClient.call(DaemonAPI.Method.achievementsState, Optional<String>.none,
+                                                      returning: Achievements.self) else { return }
+        takeAchievements(achievements)
     }
 
     func refreshWakeState() async {
@@ -4002,9 +4002,9 @@ final class AppModel {
             return
         case DaemonAPI.Notification.wakeChanged, DaemonAPI.Notification.modesChanged,
              DaemonAPI.Notification.attentionChanged, DaemonAPI.Notification.storeNotesChanged,
-             DaemonAPI.Notification.milestonesChanged, DaemonAPI.Notification.preferencesChanged,
+             DaemonAPI.Notification.achievementsChanged, DaemonAPI.Notification.preferencesChanged,
              DaemonAPI.Notification.backupsChanged, DaemonAPI.Notification.dailySummaryChanged:
-            // The milestones and display choices are the person's, kept on the Mac's own
+            // The achievements and display choices are the person's, kept on the Mac's own
             // host (#984, #1033). Settings ▸ Machines ▸ This Mac ▸ Backups is this Mac's (#1810).
             return
         default:
@@ -4116,7 +4116,7 @@ final class AppModel {
         DaemonAPI.Notification.resourcesChanged, DaemonAPI.Notification.eventsChanged,
         DaemonAPI.Notification.mcpHostedChanged, DaemonAPI.Notification.wakeChanged,
         DaemonAPI.Notification.selfUpdateChanged, DaemonAPI.Notification.modesChanged, DaemonAPI.Notification.storeNotesChanged,
-        DaemonAPI.Notification.milestonesChanged, DaemonAPI.Notification.preferencesChanged,
+        DaemonAPI.Notification.achievementsChanged, DaemonAPI.Notification.preferencesChanged,
         DaemonAPI.Notification.runtimeChanged, DaemonAPI.Notification.runtimeAccountChanged,
         DaemonAPI.Notification.signInNeeded, DaemonAPI.Notification.clientPermissionsChanged,
         DaemonAPI.Notification.personChanged, DaemonAPI.Notification.sandboxChanged, DaemonAPI.Notification.autoChanged,
@@ -4138,7 +4138,7 @@ final class AppModel {
         async let runtimeStates: Void = refreshRuntimeAllowances()
         async let wake: Void = refreshWakeState()
         async let storeNotes: Void = refreshStoreNotes()
-        async let milestones: Void = refreshMilestones()
+        async let achievements: Void = refreshAchievements()
         async let leases: Void = refreshLeases()
         async let hostedMCP: Void = refreshHostedMCP()
         async let events: Void = refreshEvents()
@@ -4146,7 +4146,7 @@ final class AppModel {
         async let display: Void = refreshDisplayPreferences()
         async let auto: Void = refreshAuto()
         _ = await (runtimes, accounts, cost, retention, clientPermissions, sandbox, policy, person, runtimeStates, wake,
-                   storeNotes, milestones, leases, hostedMCP, events, modes, display, auto)
+                   storeNotes, achievements, leases, hostedMCP, events, modes, display, auto)
     }
 
     func refreshEverything() async {
@@ -4174,7 +4174,7 @@ final class AppModel {
         async let cloning: Void = refreshClones()
         async let wake: Void = refreshWakeState()
         async let storeNotes: Void = refreshStoreNotes()
-        async let milestones: Void = refreshMilestones()
+        async let achievements: Void = refreshAchievements()
         async let leases: Void = refreshLeases()
         async let hostedMCP: Void = refreshHostedMCP()
         async let mcpHealth: Void = refreshMCPHealth()
@@ -4187,7 +4187,7 @@ final class AppModel {
         async let auto: Void = refreshAuto()
         _ = await (popped, runtimes, accounts, workflows, pinned, permissions,
                    elicitations, attention, resuming, cost, retention, clientPermissions, cloning, wake, leases, events, modes,
-                   transcript, runtimeStates, sandbox, person, disk, storeNotes, hostedMCP, mcpHealth, milestones,
+                   transcript, runtimeStates, sandbox, person, disk, storeNotes, hostedMCP, mcpHealth, achievements,
                    display, auto)
     }
 

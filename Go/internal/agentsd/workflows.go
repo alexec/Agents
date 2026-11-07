@@ -328,7 +328,7 @@ func (d *Daemon) scanLocked() {
 	// A folder added, archived or gone since: the watches follow it.
 	d.kickFolderWatches()
 	// A workflow made here can earn the first workflow (#984).
-	defer d.checkMilestonesSoon()
+	defer d.checkAchievementsSoon()
 	r := d.recordsLocked()
 	if r.ApprovalsBegan == nil && !d.workflowRecsBad {
 		t := now()

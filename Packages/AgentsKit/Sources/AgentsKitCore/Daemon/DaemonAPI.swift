@@ -445,8 +445,8 @@ public enum DaemonAPI {
         /// Report a Problem (#3718): the person's words made into a GitHub new-issue link,
         /// tokens and home folders cut out. Sends nothing.
         public static let reportsProblem = "reports/problem"
-        /// The milestones the person has earned (#984), for the Time page. No params.
-        public static let milestonesState = "milestones/state"
+        /// The achievements the person has earned (#984), for the Time page. No params.
+        public static let achievementsState = "achievements/state"
         public static let costSetLimits = "cost/setLimits"
         /// Cursor and Grok permission mode (061). Control only.
         public static let clientPermissionsState = "clientPermissions/state"
@@ -645,8 +645,8 @@ public enum DaemonAPI {
         public static let wakeChanged = "wake/changed"
         /// `StoreNotes`, whenever a file is set aside, held, or reads again (#205).
         public static let storeNotesChanged = "store/notesChanged"
-        /// A milestone was earned (#984). Carries the whole `Milestones`.
-        public static let milestonesChanged = "milestones/changed"
+        /// An achievement was earned (#984). Carries the whole `Achievements`.
+        public static let achievementsChanged = "achievements/changed"
     }
 
     // MARK: Requests

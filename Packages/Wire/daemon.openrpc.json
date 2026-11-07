@@ -69,6 +69,51 @@
   ],
   "methods": [
     {
+      "name": "achievements/changed",
+      "x-capability": "achievements/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Achievements"
+          }
+        }
+      ]
+    },
+    {
+      "name": "achievements/state",
+      "x-capability": "achievements/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Achievements"
+        }
+      }
+    },
+    {
       "name": "agent/changed",
       "x-capability": "agent/1",
       "tags": [
@@ -5463,51 +5508,6 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/MCPVerifyAnswer"
-        }
-      }
-    },
-    {
-      "name": "milestones/changed",
-      "x-capability": "milestones/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Milestones"
-          }
-        }
-      ]
-    },
-    {
-      "name": "milestones/state",
-      "x-capability": "milestones/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Milestones"
         }
       }
     },

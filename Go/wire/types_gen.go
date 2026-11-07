@@ -97,6 +97,10 @@ type AccountRequest struct {
 	AccountID string `json:"accountID"`
 }
 
+type Achievements struct {
+	Earned []EarnedAchievement `json:"earned"`
+}
+
 // clients/setActivityToken (#1744): the push token of this device's Live Activity, in hex, for one session it speaks for (#2991: one activity for every turn sent from the device, so one token for several sessions), for the control plane to update it by APNs while the Remote is not running. startedAt is when the session's turn began. No token takes the session out of it.
 type ActivityToken struct {
 	AgentID UUID `json:"agentID"`
@@ -1899,7 +1903,7 @@ type CatchUpSnapshot struct {
 
 	StoreNotes *StoreNotes `json:"storeNotes,omitzero"`
 
-	Milestones *Milestones `json:"milestones,omitzero"`
+	Achievements *Achievements `json:"achievements,omitzero"`
 
 	Workflows []WorkflowSummary `json:"workflows,omitzero"`
 
@@ -3590,7 +3594,7 @@ type DropboxPutResponse struct {
 	Path string `json:"path"`
 }
 
-type EarnedMilestone struct {
+type EarnedAchievement struct {
 	ID string `json:"id"`
 
 	At Date `json:"at"`
@@ -7048,10 +7052,6 @@ type MessagingServerState string
 const MessagingServerStateNotRead MessagingServerState = "notRead"
 const MessagingServerStateRead MessagingServerState = "read"
 const MessagingServerStateFailed MessagingServerState = "failed"
-
-type Milestones struct {
-	Earned []EarnedMilestone `json:"earned"`
-}
 
 type MissingFolder struct {
 	BranchKept bool `json:"branchKept"`

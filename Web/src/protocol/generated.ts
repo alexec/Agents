@@ -171,6 +171,10 @@ export interface AccountRequest {
   accountID: string;
 }
 
+export interface Achievements {
+  earned: EarnedAchievement[];
+}
+
 /**
  * clients/setActivityToken (#1744): the push token of this device's Live Activity, in hex, for one
  * session it speaks for (#2991: one activity for every turn sent from the device, so one token for
@@ -1626,7 +1630,7 @@ export interface CatchUpSnapshot {
   resuming: UUID[];
   disk?: DiskState;
   storeNotes?: StoreNotes;
-  milestones?: Milestones;
+  achievements?: Achievements;
   workflows?: WorkflowSummary[];
   pins?: FolderPins[];
   leases?: CatchUpLeases;
@@ -3153,7 +3157,7 @@ export interface DropboxPutResponse {
   path: string;
 }
 
-export interface EarnedMilestone {
+export interface EarnedAchievement {
   id: string;
   at: WireDate;
 }
@@ -6081,10 +6085,6 @@ export type MessagingServerState =
   | "notRead"
   | "read"
   | "failed";
-
-export interface Milestones {
-  earned: EarnedMilestone[];
-}
 
 export interface MissingFolder {
   branchKept: boolean;
@@ -11505,6 +11505,7 @@ export interface YourPolicyState {
 
 /** Every method the web remote may call: its params and its result. */
 export interface Methods {
+  "achievements/state": { params: Empty; result: Achievements };
   "agentConfig/editorFiles": { params: AgentConfigEditorRequest; result: AgentConfigEditorFiles };
   "agentConfig/editorSave": { params: AgentConfigEditorSaveRequest; result: Empty };
   "agents/answerSandbox": { params: AnswerSandboxRequest; result: Agent };
@@ -11712,7 +11713,6 @@ export interface Methods {
   "mcp/health/check": { params: MCPHealthCheckRequest; result: MCPHealthSnapshot };
   "mcp/hosted": { params: Empty; result: HostedMCPSnapshot };
   "mcp/remove": { params: MCPRemoveRequest; result: MCPRemoveAnswer };
-  "milestones/state": { params: Empty; result: Milestones };
   "modes/remembered": { params: Empty; result: Record<string, JSONValue> };
   "options/remembered": { params: RememberedOptionsRequest; result: ConfigOption[] };
   "orgRoutes/check": { params: OrgRouteRequest; result: OrgRouteCheck };
@@ -11886,6 +11886,7 @@ export interface Methods {
 
 /** Whether a method goes to a host (with `h`) or to the control plane itself. */
 export const MethodTarget = {
+  "achievements/state": "host",
   "agentConfig/editorFiles": "host",
   "agentConfig/editorSave": "host",
   "agents/answerSandbox": "host",
@@ -12093,7 +12094,6 @@ export const MethodTarget = {
   "mcp/health/check": "host",
   "mcp/hosted": "host",
   "mcp/remove": "host",
-  "milestones/state": "host",
   "modes/remembered": "host",
   "options/remembered": "host",
   "orgRoutes/check": "control",
@@ -12267,6 +12267,7 @@ export const MethodTarget = {
 
 /** Every notification the web remote hears, and its params. */
 export interface Notifications {
+  "achievements/changed": Achievements;
   "agent/changed": Agent;
   "agent/elicitation": ElicitationNotification;
   "agent/entry": EntryNotification;
@@ -12317,7 +12318,6 @@ export interface Notifications {
   "folder/removed": FolderRemovedNotification;
   "mcp/healthChanged": MCPHealthSnapshot;
   "mcp/hostedChanged": HostedMCPSnapshot;
-  "milestones/changed": Milestones;
   "modes/changed": Record<string, JSONValue>;
   "pages/changed": PagesChangedNotification;
   "pins/changed": PinsChangedNotification;
@@ -12339,6 +12339,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ACPProviderInfo: { required: ["id"], optional: ["name", "protocol", "configured"] },
   AccountProfile: { required: ["id", "runtimeID", "name", "reach", "addedAt", "signedIn"], optional: ["signedInAs", "signInCommand", "source", "isDefault", "setBy"] },
   AccountRequest: { required: ["runtimeID", "accountID"], optional: [] },
+  Achievements: { required: ["earned"], optional: [] },
   ActivityToken: { required: ["agentID", "environment", "startedAt"], optional: ["token"] },
   AddAccountRequest: { required: ["runtimeID", "name"], optional: [] },
   AddFolderRequest: { required: ["folder"], optional: ["project"] },
@@ -12461,7 +12462,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   CatalogUseRow: { required: ["kind", "name", "version", "machines", "people"], optional: ["source"] },
   CatchUpLeases: { required: ["leases", "hosted", "health"], optional: [] },
   CatchUpRequest: { required: [], optional: ["agents", "parts"] },
-  CatchUpSnapshot: { required: ["agents", "permissions", "elicitations", "attention", "resuming", "folders"], optional: ["disk", "storeNotes", "milestones", "workflows", "pins", "leases"] },
+  CatchUpSnapshot: { required: ["agents", "permissions", "elicitations", "attention", "resuming", "folders"], optional: ["disk", "storeNotes", "achievements", "workflows", "pins", "leases"] },
   ChangedFile: { required: ["path", "source", "state", "editCount", "beyondReported", "inProgress", "outsideFolder"], optional: ["relativePath", "added", "removed", "firstLine", "oldPath"] },
   ChangedFileDetail: { required: ["file", "edits"], optional: ["hunks", "whole"] },
   ChangesFileRequest: { required: ["agentID", "path", "whole"], optional: [] },
@@ -12582,7 +12583,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   DraftStep: { required: ["at", "kind", "text"], optional: [] },
   DropboxPutRequest: { required: ["folder", "name", "data"], optional: ["subfolder"] },
   DropboxPutResponse: { required: ["path"], optional: [] },
-  EarnedMilestone: { required: ["id", "at"], optional: [] },
+  EarnedAchievement: { required: ["id", "at"], optional: [] },
   EditQueuedRequest: { required: ["agentID", "promptID", "text"], optional: [] },
   EditQueuedResult: { required: ["edited"], optional: [] },
   EffectiveLayerValue: { required: ["layer", "words", "kept"], optional: ["value"] },
@@ -12855,7 +12856,6 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MarketplacesListRequest: { required: [], optional: ["kind", "destination"] },
   MessageSender: { required: ["agentID", "title"], optional: [] },
   MessagingServer: { required: ["name", "word", "state"], optional: ["proof", "message", "events"] },
-  Milestones: { required: ["earned"], optional: [] },
   MissingFolder: { required: ["branchKept"], optional: [] },
   MoveAnswer: { required: ["when", "message"], optional: ["agent"] },
   MoveRequest: { required: ["agentID", "removeLeft", "discardChanges"], optional: ["target"] },

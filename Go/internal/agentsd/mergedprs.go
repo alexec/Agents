@@ -61,7 +61,7 @@ func (d *Daemon) countMergedPRsEveryHour() {
 			}
 			d.checkCloudHosts()
 			d.countMergedPRs(ctx)
-			d.checkMilestonesSoon()
+			d.checkAchievementsSoon()
 			wait.Reset(mergedPRsInterval)
 		}
 	})

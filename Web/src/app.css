@@ -1729,17 +1729,17 @@ button.plain:hover { opacity: 1; }
 .time-bar.others { fill: color-mix(in srgb, currentColor 35%, transparent); }
 .time-bar.person { fill: var(--tint-attention); }
 .time-charts g.dim { opacity: 0.35; }
-/* The milestones (#984): the Time page's checklist, and the one-time card at the bottom right. */
-.milestones { margin-bottom: 24px; }
-.milestones ul { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.milestones li, .milestone-card-head { display: flex; gap: 8px; align-items: baseline; }
-.milestones li > span:last-child, .milestone-card-head > span:nth-child(2) { display: flex; flex-direction: column; gap: 2px; flex: 1; }
-.milestones li.done .milestone-title { opacity: 0.65; }
-.milestone-mark { color: var(--accent); font-weight: 600; }
-.milestones li:not(.done) .milestone-mark { color: inherit; opacity: 0.5; }
-.milestones-count { font-weight: normal; margin-left: 6px; font-variant-numeric: tabular-nums; }
-.milestone-card { position: fixed; right: 20px; bottom: 20px; max-width: 320px; z-index: 20; }
-.milestone-card > button.link { align-self: flex-start; }
+/* The achievements (#984): the Time page's checklist, and the one-time card at the bottom right. */
+.achievements { margin-bottom: 24px; }
+.achievements ul { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.achievements li, .achievement-card-head { display: flex; gap: 8px; align-items: baseline; }
+.achievements li > span:last-child, .achievement-card-head > span:nth-child(2) { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.achievements li.done .achievement-title { opacity: 0.65; }
+.achievement-mark { color: var(--accent); font-weight: 600; }
+.achievements li:not(.done) .achievement-mark { color: inherit; opacity: 0.5; }
+.achievements-count { font-weight: normal; margin-left: 6px; font-variant-numeric: tabular-nums; }
+.achievement-card { position: fixed; right: 20px; bottom: 20px; max-width: 320px; z-index: 20; }
+.achievement-card > button.link { align-self: flex-start; }
 .time-swatch { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 8px; vertical-align: baseline; }
 .time-swatch.agent { background: var(--accent); }
 .time-swatch.tools { background: color-mix(in srgb, var(--accent) 50%, transparent); }

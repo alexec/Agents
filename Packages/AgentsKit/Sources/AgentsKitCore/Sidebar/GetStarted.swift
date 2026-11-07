@@ -4,7 +4,7 @@ import Foundation
 /// and on to a paired phone or browser. Each step is ticked from what is really so, never
 /// from a flag the person sets; the only thing kept is whether the card has gone.
 ///
-/// Pure, so the rules are tested here and #984's milestones can take the same facts.
+/// Pure, so the rules are tested here and #984's achievements can take the same facts.
 public enum GetStarted {
     public enum Step: String, CaseIterable, Hashable, Sendable, Identifiable {
         case host, runtime, folder, firstAgent, device
