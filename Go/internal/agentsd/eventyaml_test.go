@@ -47,3 +47,18 @@ func TestDetailWordsLeaveTextAlone(t *testing.T) {
 		}
 	}
 }
+
+// wait_for_event's own answer says the plain details on its line and the payload below it as
+// YAML (#3569); an event with no payload reads as before.
+func TestMatchedWordsSayAPayloadAsYAML(t *testing.T) {
+	e := wire.Event{Name: "checks.passed", Position: 3, Sentence: "github reported checks.passed",
+		Details: map[string]string{"event": "checks.passed", "payload": `{"pr":{"number":3811}}`}}
+	got := matchedWords(e, nil)
+	if !strings.HasSuffix(got, ": github reported checks.passed. event=checks.passed.\npayload:\n  pr:\n    number: 3811\nYou can carry on.") {
+		t.Fatalf("matched words: %q", got)
+	}
+	plain := wire.Event{Name: "server.offline", Sentence: "ci went offline.", Details: map[string]string{"server": "ci"}}
+	if got := matchedWords(plain, nil); !strings.HasSuffix(got, ": ci went offline.. server=ci. You can carry on.") {
+		t.Fatalf("plain matched words: %q", got)
+	}
+}
