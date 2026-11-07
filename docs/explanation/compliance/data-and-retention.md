@@ -52,6 +52,8 @@ that machine starts.
 | Kept requests | Prompts and agent starts for a stopped workspace | Until the machine starts and takes them; 20 a machine at most |
 | A person's settings and secrets | Settings that follow a person; secrets, sealed | Until changed |
 | Server backups | See below | The newest **Keep** of each server; a removed server's for 90 days after its newest |
+| `store-before-<time>`, beside a folder store on the Mac | A whole old store, set aside by Agents Host on a store switch or a move back | The newest 2; an older one is deleted when another is set aside (#3671) |
+| `control-key-before-<time>`, in the Mac's keychain | The control plane's key from before a move back | The newest 2, deleted with the stores (#3671) |
 
 On the hosted service, an account keeps its GitHub user id, its GitHub login and the date it
 signed up. **Delete Account** stops its control plane and deletes everything under that
