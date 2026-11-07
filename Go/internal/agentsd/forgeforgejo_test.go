@@ -22,6 +22,8 @@ type fakeForgeForgejo struct {
 	searches []string
 	items    []string
 	wrote    []string
+	// asked is what lineage asked (lineageforgejo_test.go).
+	asked []string
 }
 
 func (f *fakeForgeForgejo) note(to *[]string, s string) {
@@ -298,6 +300,9 @@ func TestLineageOnAForgejoFolder(t *testing.T) {
 	}
 	if _, _, ok := nodeOfRepo(pr); ok {
 		t.Fatal("a Forgejo node is asked of gh")
+	}
+	if _, _, ok := askedNode(pr); !ok {
+		t.Fatal("a Forgejo node is not asked of its connection")
 	}
 
 	// Disconnected, the folder is on no forge lineage knows; Codeberg's is by its host.

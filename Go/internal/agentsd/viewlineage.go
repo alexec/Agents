@@ -82,7 +82,7 @@ func (d *Daemon) lineageViewResult(s viewServer, args json.RawMessage) (wire.JSO
 		URL string `json:"url"`
 	}
 	_ = json.Unmarshal(args, &a)
-	node, base, ok := nodeOfURL(a.URL)
+	node, base, ok := d.nodeOfURLHere(a.URL)
 	if !ok {
 		return toolError("No issue or pull request at " + strconv.Quote(a.URL) + ".")
 	}
@@ -136,6 +136,23 @@ func nodeOfURL(raw string) (wire.LineageNode, string, bool) {
 		return r.issue(n), base, true
 	}
 	return wire.LineageNode{}, "", false
+}
+
+// nodeOfURLHere is nodeOfURL, or an issue on the connected Forgejo, whose host's name need
+// not say Forgejo.
+func (d *Daemon) nodeOfURLHere(raw string) (wire.LineageNode, string, bool) {
+	if n, base, ok := nodeOfURL(raw); ok {
+		return n, base, true
+	}
+	_, root := d.forgejoRoot()
+	if root == "" {
+		return wire.LineageNode{}, "", false
+	}
+	repo, n, ok := issueOfURLOn(raw, root)
+	if !ok {
+		return wire.LineageNode{}, "", false
+	}
+	return repo.issue(n), strings.TrimSuffix(root, "/"), true
 }
 
 // lineageViewOf is node's section: the walk for who worked on it, the rollup for the cost.

@@ -52,8 +52,9 @@ func filesIssue(call wire.ToolCall) bool {
 	return strings.Contains(name, "issue_write") && issueWriteCreate.MatchString(in)
 }
 
-// issuesIn is the forge issues whose addresses what a tool call gave back names, each once.
-func issuesIn(call wire.ToolCall) []wire.LineageNode {
+// issuesIn is the forge issues whose addresses what a tool call gave back names, each once:
+// on the Forgejo whose root is forgejoRoot too, the connected one's ("" for none).
+func issuesIn(call wire.ToolCall, forgejoRoot string) []wire.LineageNode {
 	texts := []string{string(call.RawOutput)}
 	for _, c := range call.Content {
 		if c.Content != nil && c.Content.Text != nil {
@@ -67,7 +68,7 @@ func issuesIn(call wire.ToolCall) []wire.LineageNode {
 			continue
 		}
 		for _, raw := range urlSaid.FindAllString(text, filedIssuesMax) {
-			repo, n, ok := issueOfURL(strings.TrimRight(raw, ".,;:!?"))
+			repo, n, ok := issueOfURLOn(strings.TrimRight(raw, ".,;:!?"), forgejoRoot)
 			if !ok {
 				continue
 			}
@@ -103,7 +104,8 @@ func (d *Daemon) noteIssueFiled(l *live, call wire.ToolCall) {
 	if !filing {
 		return
 	}
-	if issues := issuesIn(call); len(issues) > 0 {
+	_, root := d.forgejoRoot()
+	if issues := issuesIn(call, root); len(issues) > 0 {
 		d.noteFiledIssues(l.id, issues)
 	}
 }

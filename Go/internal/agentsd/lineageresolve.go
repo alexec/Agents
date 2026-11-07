@@ -22,8 +22,8 @@ import (
 // lookup already does (lineagemilestone.go, #2935). Resolved on demand, not polled: a
 // lineage walk is read far less often than a sidebar list, so each node is asked again only
 // when it is walked again after resolveRecheck, and never when no folder is signed in to ask
-// with. Linear, Forgejo and releases are not resolved yet (a Forgejo item the Work pages show
-// is); a GitHub or GitLab issue, pull request or milestone is. A milestone is sent to be resolved when an issue's milestone is found
+// with. Linear and releases are not resolved yet; a GitHub, GitLab or Forgejo issue, pull
+// request or milestone is (Forgejo's by its connection, lineageforgejo.go). A milestone is sent to be resolved when an issue's milestone is found
 // (lineagemilestone.go), as no walk asks for it before Work lists it.
 //
 // Never on the walk's own path (#3102): a walk answers at once with what the cache holds
@@ -77,7 +77,7 @@ func (d *Daemon) resolvedGraph(g wire.LineageGraph) wire.LineageGraph {
 	now := nowFunc()
 	d.resolveMu.Lock()
 	for _, n := range g.Nodes {
-		if _, _, ok := nodeOfRepo(n); !ok {
+		if _, _, ok := askedNode(n); !ok {
 			continue
 		}
 		e, cached := d.resolveCache[n]
@@ -109,7 +109,7 @@ func (d *Daemon) resolvedGraph(g wire.LineageGraph) wire.LineageGraph {
 // resolveSoon sends n to be asked in the background, unless it is being asked, or its answer
 // is younger than resolveRecheck.
 func (d *Daemon) resolveSoon(n wire.LineageNode) {
-	if _, _, ok := nodeOfRepo(n); !ok {
+	if _, _, ok := askedNode(n); !ok {
 		return
 	}
 	d.resolveMu.Lock()
@@ -161,10 +161,10 @@ func (d *Daemon) resolveSettle(wait time.Duration) {
 }
 
 // resolveNode asks for n's title, state and labels and caches them; the answer is not ok when
-// n is not an issue, pull request or milestone of a forge lineage asks (nodeOfRepo), or no
+// n is not an issue, pull request or milestone of a forge lineage asks (askedNode), or no
 // folder is signed in to ask with.
 func (d *Daemon) resolveNode(ctx context.Context, n wire.LineageNode) {
-	repo, num, ok := nodeOfRepo(n)
+	repo, num, ok := askedNode(n)
 	if !ok {
 		return
 	}
@@ -179,6 +179,9 @@ func (d *Daemon) resolveNode(ctx context.Context, n wire.LineageNode) {
 	} else {
 		if ask == nil {
 			ask = forgeResolveNode
+			if repo.forge == "forgejo" {
+				ask = d.forgejoResolveNode
+			}
 		}
 		r, err = ask(ctx, folder, repo, n.Kind, num)
 	}
@@ -213,6 +216,16 @@ func (d *Daemon) dropOldestResolvedLocked() {
 // lineage asks by its CLI (forgeKind.cli): github:o/r#12, gitlab:g/p!4, github:o/r/milestone/3
 // (GitLab: the milestone's iid). The Work pages ask the other forges by their own nodes first.
 func nodeOfRepo(n wire.LineageNode) (forgeRepo, int, bool) {
+	repo, i, ok := askedNode(n)
+	if k, _ := kindOf(repo.forge); !ok || k.cli == "" {
+		return forgeRepo{}, 0, false
+	}
+	return repo, i, true
+}
+
+// askedNode is nodeOfRepo on any forge lineage asks, by its CLI or its connection:
+// forgejo:o/r#12 and forgejo:o/r/milestone/3 (the milestone's id) too.
+func askedNode(n wire.LineageNode) (forgeRepo, int, bool) {
 	if n.Kind != lineage.KindIssue && n.Kind != lineage.KindPR && n.Kind != lineage.KindMilestone {
 		return forgeRepo{}, 0, false
 	}
