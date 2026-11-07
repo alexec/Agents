@@ -68,7 +68,7 @@ struct YourConnectionsView: View {
         .task { await load() }
         .sheet(item: $connecting) { p in
             switch p {
-            case .github: ConnectGitHubSheet(host: .mac, onConnected: { Task { await load() } })
+            case .github: ConnectGitHubSheet(host: .mac, again: again, onConnected: { Task { await load() } })
             case .linear: ConnectLinearSheet(host: .mac, onConnected: { Task { await load() } })
             case .gitlab: ConnectGitLabSheet(host: .mac, again: again, onConnected: { Task { await load() } })
             case .email: ConnectEmailSheet(host: .mac, onConnected: { Task { await load() } })

@@ -104,7 +104,7 @@ func TestACastOfARealChromium(t *testing.T) {
 
 	frames := make(chan Frame, 16)
 	pages := make(chan Page, 16)
-	cast, err := Watch(p.endpoint, 640, 480, func(f Frame) {
+	cast, err := Watch(p.endpoint, "", 640, 480, func(f Frame) {
 		select {
 		case frames <- f:
 		default:

@@ -134,6 +134,9 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
 
     public var createdAt: Date
     public var lastActivityAt: Date
+    /// When the agent's first browser call of its latest turn that used the machine's
+    /// browser came (#3916). A client opens the session's Agent Browser pane when it moves.
+    public var browserUsedAt: Date?
     /// A finished conversation nobody has looked at since it finished. Set by the
     /// daemon when an agent finishes with nobody watching, cleared when a presence
     /// report puts the conversation in front of an active person. Only ever true of a
@@ -340,6 +343,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         availableCommands = try c.decodeIfPresent([SlashCommand].self, forKey: .availableCommands) ?? []
         createdAt = try c.decode(Date.self, forKey: .createdAt)
         lastActivityAt = try c.decode(Date.self, forKey: .lastActivityAt)
+        browserUsedAt = try? c.decodeIfPresent(Date.self, forKey: .browserUsedAt)
         isUnread = try c.decodeIfPresent(Bool.self, forKey: .isUnread) ?? false
         isMuted = (try? c.decodeIfPresent(Bool.self, forKey: .isMuted)) ?? false
         reportSeenAt = try c.decodeIfPresent(Date.self, forKey: .reportSeenAt)
@@ -467,6 +471,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encode(availableCommands, forKey: .availableCommands)
         try c.encode(createdAt, forKey: .createdAt)
         try c.encode(lastActivityAt, forKey: .lastActivityAt)
+        try c.encodeIfPresent(browserUsedAt, forKey: .browserUsedAt)
         if isUnread { try c.encode(isUnread, forKey: .isUnread) }
         if isMuted { try c.encode(isMuted, forKey: .isMuted) }
         try c.encodeIfPresent(reportSeenAt, forKey: .reportSeenAt)
@@ -534,7 +539,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
 
     enum CodingKeys: String, CodingKey, CaseIterable {
         case id, runtimeID, cwd, title, labels, state, runtimeSessionID, runtimeKeepsCopy, startOptions
-        case advertisedOptions, availableCommands, createdAt, lastActivityAt, isUnread, isMuted, reportSeenAt
+        case advertisedOptions, availableCommands, createdAt, lastActivityAt, browserUsedAt, isUnread, isMuted, reportSeenAt
         case endedReason, archivedReason
         case usage, lastTurnUsage, costToDate, costCeiling, tokensToDate, tokenCeiling, plans, additionalDirectories, mcpServers
         case queuedPrompts, suggestedPrompts

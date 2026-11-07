@@ -168,32 +168,10 @@ struct MarkdownText: View {
             trailed(image(source: source, alt: alt), by: caret)
 
         case .table(let table):
-            // Columns keep their width, so a wide table scrolls rather than
-            // squeezing its text into a stack of single words.
-            trailed(Sideways {
-                Grid(alignment: .topLeading, horizontalSpacing: 18, verticalSpacing: 6) {
-                    GridRow {
-                        ForEach(Array(table.header.enumerated()), id: \.offset) { index, cell in
-                            Text.markingLinks(cell)
-                                .appText(.supporting).fontWeight(.semibold)
-                                .linkPointer(cell)
-                                .gridColumnAlignment(columnAlignment(table, index))
-                        }
-                    }
-                    Divider().gridCellUnsizedAxes(.horizontal)
-                    ForEach(Array(table.rows.enumerated()), id: \.offset) { _, row in
-                        GridRow {
-                            ForEach(Array(row.enumerated()), id: \.offset) { _, cell in
-                                Text.markingLinks(cell).appText(.supporting)
-                                    .linkPointer(cell)
-                            }
-                        }
-                    }
-                }
-                .padding(2)
-            }
-            .textSelection(.enabled)
-            .modifier(Overhang(surplus: overhang)), by: caret)
+            // A short column keeps its width and a column of sentences wraps, so the
+            // table fits the room; only one too wide at its least scrolls (#3943).
+            trailed(MarkdownTable(table: table, surplus: overhang)
+                .textSelection(.enabled), by: caret)
 
         case .rule:
             trailed(Divider(), by: caret)
@@ -260,16 +238,6 @@ struct MarkdownText: View {
     #else
     private static let itemSpacing: CGFloat = 6
     #endif
-
-    /// What the dashes under the header said about this column.
-    private func columnAlignment(_ table: MarkdownBlock.Table, _ index: Int) -> HorizontalAlignment {
-        guard table.columns.indices.contains(index) else { return .leading }
-        switch table.columns[index] {
-        case .leading: return .leading
-        case .centre: return .center
-        case .trailing: return .trailing
-        }
-    }
 }
 
 /// A link's words, marked so the laid-out text can say where they are (#515).
@@ -349,12 +317,6 @@ private struct LinkPointer: ViewModifier {
 }
 #endif
 
-/// Content that scrolls sideways when it is wider than the column, and is simply drawn
-/// when it is not (#90).
-///
-/// The same to look at either way: a scroll view takes the whole width offered, so the
-/// narrow case is held to it too. Most code and tables an agent writes fit, and a
-/// scroll view each was a platform view every redraw of the chat had to visit.
 /// A block that may be wider than the column it is in (#3895): as wide as it needs,
 /// up to the column and the margin either side of it. It starts where the text starts
 /// and grows to the right; only when the right margin runs out does it slide left into
@@ -402,6 +364,171 @@ private struct OverhangLayout: Layout {
     }
 }
 
+/// A Markdown table (#3943): each column as wide as its widest cell while the table
+/// fits, and a column of sentences wrapped when it does not (`TableColumns`). In an
+/// agent's reply the room is the column and the margins either side of it (#3895).
+/// Only a table too wide at its least scrolls, as every wide table did before.
+private struct MarkdownTable: View {
+    let table: MarkdownBlock.Table
+    let surplus: Double
+
+    var body: some View {
+        // The first fits when its columns at their least fit; its width with no
+        // proposal is that least, so the test is the right one.
+        ViewThatFits(in: .horizontal) {
+            TableLayout(columns: count, surplus: surplus, scrolls: false) { cells }
+            ScrollView(.horizontal, showsIndicators: false) {
+                TableLayout(columns: count, surplus: 0, scrolls: true) { cells }
+            }
+        }
+        .padding(2)
+    }
+
+    /// Every row has a cell for each column, so a short row is drawn with blanks.
+    private var count: Int { max(table.header.count, table.rows.map(\.count).max() ?? 0) }
+
+    @ViewBuilder
+    private var cells: some View {
+        ForEach(0..<count, id: \.self) { index in
+            cell(table.header[safe: index]).fontWeight(.semibold)
+                .multilineTextAlignment(alignment(index).text)
+                .layoutValue(key: TableColumn.self, value: alignment(index).column)
+        }
+        // Drawn, not a `Divider`, which takes its direction from a stack and this is none.
+        Rectangle().fill(.quaternary).frame(height: 1)
+        ForEach(Array(table.rows.enumerated()), id: \.offset) { _, row in
+            ForEach(0..<count, id: \.self) { index in
+                cell(row[safe: index])
+                    .multilineTextAlignment(alignment(index).text)
+                    .layoutValue(key: TableColumn.self, value: alignment(index).column)
+            }
+        }
+    }
+
+    private func cell(_ text: AttributedString?) -> some View {
+        Text.markingLinks(text ?? AttributedString()).appText(.supporting)
+            .linkPointer(text ?? AttributedString())
+    }
+
+    /// What the dashes under the header said about this column.
+    private func alignment(_ index: Int) -> (text: TextAlignment, column: HorizontalAlignment) {
+        guard table.columns.indices.contains(index) else { return (.leading, .leading) }
+        switch table.columns[index] {
+        case .leading: return (.leading, .leading)
+        case .centre: return (.center, .center)
+        case .trailing: return (.trailing, .trailing)
+        }
+    }
+}
+
+/// Where a cell sits in its column.
+private struct TableColumn: LayoutValueKey {
+    static let defaultValue: HorizontalAlignment = .leading
+}
+
+/// The header's cells, a rule, then each row's cells, `columns` to a row.
+///
+/// Given a width, the columns share it and the margins either side (`surplus`), starting
+/// where the text starts and sliding left only when the right margin runs out, as
+/// `Overhang` does for code. With none, it is as narrow as it can be: that is what lets
+/// `ViewThatFits` choose it, and, scrolled, it is drawn at that.
+private struct TableLayout: Layout {
+    let columns: Int
+    let surplus: Double
+    let scrolls: Bool
+
+    private static let across: Double = 18
+    private static let down: Double = 6
+
+    struct Plan {
+        var widths: [Double]
+        var rows: [Double]
+        var rule: Double
+        var total: Double { widths.reduce(0, +) + TableLayout.across * Double(max(0, widths.count - 1)) }
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard columns > 0 else { return .zero }
+        let plan = plan(proposal.width.map(Double.init), subviews)
+        let height = plan.rows.reduce(0, +) + plan.rule + Self.down * Double(plan.rows.count)
+        if let width = proposal.width, width.isFinite, !scrolls {
+            return CGSize(width: width, height: height)
+        }
+        // Unproposed: the least it takes, less the margins it may reach into.
+        return CGSize(width: max(0, plan.total - (scrolls ? 0 : surplus * 2)), height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews,
+                       cache: inout ()) {
+        guard columns > 0 else { return }
+        let plan = plan(scrolls ? nil : Double(bounds.width), subviews)
+        let slide = scrolls ? 0 : min(surplus, max(0, plan.total - bounds.width - surplus))
+        var y = bounds.minY
+        for (row, height) in plan.rows.enumerated() {
+            var x = bounds.minX - slide
+            for column in 0..<columns {
+                let cell = subviews[index(row: row, column: column)]
+                let width = plan.widths[column]
+                let (dx, anchor): (Double, UnitPoint) = switch cell[TableColumn.self] {
+                case .center: (width / 2, .top)
+                case .trailing: (width, .topTrailing)
+                default: (0, .topLeading)
+                }
+                cell.place(at: CGPoint(x: x + dx, y: y), anchor: anchor,
+                           proposal: ProposedViewSize(width: width, height: nil))
+                x += width + Self.across
+            }
+            y += height + Self.down
+            if row == 0 {
+                subviews[columns].place(at: CGPoint(x: bounds.minX - slide, y: y), anchor: .topLeading,
+                                        proposal: ProposedViewSize(width: plan.total, height: plan.rule))
+                y += plan.rule + Self.down
+            }
+        }
+    }
+
+    /// The header is subviews `0..<columns`, the rule is `columns`, and row `n` (from
+    /// 1) follows it.
+    private func index(row: Int, column: Int) -> Int {
+        row == 0 ? column : columns + 1 + (row - 1) * columns + column
+    }
+
+    private func plan(_ width: Double?, _ subviews: Subviews) -> Plan {
+        let count = (subviews.count - 1) / columns
+        var natural = [Double](repeating: 0, count: columns)
+        for row in 0..<count {
+            for column in 0..<columns {
+                let size = subviews[index(row: row, column: column)].sizeThatFits(.unspecified)
+                natural[column] = max(natural[column], Double(size.width))
+            }
+        }
+        let gaps = Self.across * Double(max(0, columns - 1))
+        let widths = if let width, width.isFinite {
+            TableColumns.widths(natural: natural, room: width + surplus * 2 - gaps)
+        } else {
+            TableColumns.least(natural)
+        }
+        let rows = (0..<count).map { row in
+            (0..<columns).map { column in
+                subviews[index(row: row, column: column)]
+                    .sizeThatFits(ProposedViewSize(width: widths[column], height: nil)).height
+            }.map(Double.init).max() ?? 0
+        }
+        let rule = Double(subviews[columns].sizeThatFits(ProposedViewSize(width: nil, height: nil)).height)
+        return Plan(widths: widths, rows: rows, rule: rule)
+    }
+}
+
+private extension Array {
+    subscript(safe index: Int) -> Element? { indices.contains(index) ? self[index] : nil }
+}
+
+/// Content that scrolls sideways when it is wider than the column, and is simply drawn
+/// when it is not (#90).
+///
+/// The same to look at either way: a scroll view takes the whole width offered, so the
+/// narrow case is held to it too. Most code and tables an agent writes fit, and a
+/// scroll view each was a platform view every redraw of the chat had to visit.
 private struct Sideways<Content: View>: View {
     @ViewBuilder let content: Content
 

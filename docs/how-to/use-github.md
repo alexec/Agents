@@ -47,6 +47,26 @@ The host keeps the token: on a Mac in the Keychain, on a Linux host in
 `~/.agents-secrets/connections.json`, readable only by you. The token never goes in a log,
 an error or an answer to a client. The host renews it by itself before it ends.
 
+### Which token agents use
+
+The connection's row on **Connectors ▸ Connections** says which kind of token GitHub uses:
+
+- **App user token** (the default): the token from **Continue on github.com**. GitHub lets it
+  do only what both you and the `agents-loops` App can do, on the repositories where the App
+  is installed. So an agent never has more rights than you. Each issue, comment, pull request
+  and review that an agent makes through the github server shows the App's badge. The host
+  renews the token before it ends, so a long session gets no error.
+- **Personal access token** (the fallback): a token that you made on github.com, for an
+  organisation that does not let the App in. It has all the rights that you gave it, and a
+  post shows no badge. The row says when it ends. To use one, choose **Personal access
+  token** on the **Connect GitHub** sheet, on the Mac or the web page. **Make a Token on
+  GitHub** opens github.com's page for a classic token, named Agents, with the `repo` and
+  `codespace` scopes. Paste the token (it starts with `ghp` or `github_pat`) and choose **Connect**. The
+  host checks the token with github.com and keeps it; the host does not renew it, so make a
+  new one when it ends. Agents connects only github.com, not a GitHub Enterprise Server.
+
+The token stays on the host. It never goes to the control plane.
+
 ### Change or end the connection
 
 On **Connectors ▸ Connections**:

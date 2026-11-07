@@ -272,8 +272,15 @@ func wireConnection(c connections.Connection) wire.Connection {
 		w.Workspace = &c.Workspace
 	}
 	if c.Provider == connections.GitHub {
-		install := connections.GitHubInstallURL
-		w.InstallURL = &install
+		// The App's user token (#3857), also when it must sign in again (the refresh is gone,
+		// and so is an end it knows), or a personal access token, which the App's install
+		// does not touch.
+		if connections.ByAppToken(c) || (c.SignInAgain && c.AccessExpiresAt.IsZero()) {
+			install := connections.GitHubInstallURL
+			w.InstallURL = &install
+		} else {
+			w.ByToken = new(true)
+		}
 	}
 	if c.Refresh == "" && !c.AccessExpiresAt.IsZero() {
 		w.ExpiresAt = new(wire.DateOf(c.AccessExpiresAt))
@@ -554,9 +561,11 @@ func (d *Daemon) connectionSignInToken(ctx context.Context, r wire.ConnectionTok
 		return d.connectionSignInBitbucketToken(ctx, r)
 	case wire.ConnectionProviderAzuredevops:
 		return d.connectionSignInAzureDevOpsToken(ctx, r)
+	case wire.ConnectionProviderGithub:
+		return d.connectionSignInGitHubToken(ctx, r)
 	case wire.ConnectionProviderGitlab:
 	default:
-		return wire.ConnectionTokenAnswer{}, invalid("Agents takes an access token only for GitLab, Forgejo, Bitbucket, Azure DevOps and Jira.")
+		return wire.ConnectionTokenAnswer{}, invalid("Agents takes an access token only for GitHub, GitLab, Forgejo, Bitbucket, Azure DevOps and Jira.")
 	}
 	fail := func(why string) (wire.ConnectionTokenAnswer, error) {
 		log.Printf("connections: %s token not taken", r.Provider)
@@ -585,6 +594,45 @@ func (d *Daemon) connectionSignInToken(ctx context.Context, r wire.ConnectionTok
 		return fail(sentence(err.Error()))
 	}
 	c := connections.GitLabConnection(root, token, t, time.Now())
+	d.connRenew.Lock()
+	err = s.Put(c)
+	d.connRenew.Unlock()
+	if err != nil {
+		return fail(sentence(err.Error()))
+	}
+	log.Printf("connections: %s connected with a token", r.Provider)
+	w := wireConnection(c)
+	return wire.ConnectionTokenAnswer{Connection: &w}, nil
+}
+
+// connectionSignInGitHubToken checks a personal access token with github.com and keeps it
+// (#3857): the fallback for an organisation that does not let the App in. It replaces the App's
+// user token, so agents act with the token's rights and their posts show no badge. The token
+// is in no log and no answer; a failure says what failed, in words.
+func (d *Daemon) connectionSignInGitHubToken(ctx context.Context, r wire.ConnectionTokenRequest) (wire.ConnectionTokenAnswer, error) {
+	fail := func(why string) (wire.ConnectionTokenAnswer, error) {
+		log.Printf("connections: %s token not taken", r.Provider)
+		return wire.ConnectionTokenAnswer{Error: &why}, nil
+	}
+	if deref(r.URL) != "" {
+		return fail("Agents connects only github.com, not a GitHub Enterprise Server.")
+	}
+	token := strings.TrimSpace(r.Token)
+	if token == "" || strings.ContainsAny(token, " \t\r\n") {
+		return fail("Paste the access token: one word, such as github_pat_….")
+	}
+	s, err := d.connectionStore()
+	if err != nil {
+		return wire.ConnectionTokenAnswer{}, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	flow := d.deviceFlow(wire.ConnectionProviderGithub)
+	login, ends, err := connections.CheckGitHubToken(ctx, flow.HTTP, flow.API, token)
+	if err != nil {
+		return fail(sentence(err.Error()))
+	}
+	c := connections.GitHubTokenConnection(token, login, ends, time.Now())
 	d.connRenew.Lock()
 	err = s.Put(c)
 	d.connRenew.Unlock()

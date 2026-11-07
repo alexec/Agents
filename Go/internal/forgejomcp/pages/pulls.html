@@ -48,17 +48,21 @@
   };
 
   const row = (pr) => {
+    const action = el("span", { className: "meta" });
+    const retry = pr.checks === "failing" && pr.failedRunId
+      ? button("Retry", (event) => retryFailed(pr, event.target, action), { title: "Run the failed jobs again" }) : null;
     const title = el("a", { className: "title", textContent: pr.title, title: "Open #" + pr.number, href: "#" });
     title.onclick = (event) => { event.preventDefault(); open(pr.number); };
     return el("li", {}, [
       link(`#${pr.number}`, pr.url),
       title,
-      el("span", { className: "pills" }, [yourReview(pr), ui.agentOn(pr.agentOn), ...prPills(ui, pr)]),
+      el("span", { className: "pills" }, [yourReview(pr), ui.agentOn(pr.agentOn), ...prPills(ui, pr), retry]),
       el("span", { className: "meta" }, [
         el("span", { className: "branch", textContent: pr.branch, title: `${pr.branch} → ${pr.base}` }),
         ...ui.who(pr.author, pr.authorBot, pr.authorName),
         pr.updatedAt ? el("span", { textContent: ui.ago(pr.updatedAt) }) : null,
       ]),
+      action,
     ]);
   };
 
@@ -74,6 +78,18 @@
     $("refresh").disabled = true;
     try { draw(await ui.request("tools/call", { name: "show_pull_requests", arguments: { repo } })); }
     catch (e) { say("Couldn't list pull requests: " + e.message, true); $("refresh").disabled = false; }
+  };
+
+  const retryFailed = async (pr, b, action) => {
+    b.disabled = true; b.textContent = "Retrying…";
+    try {
+      await ui.call("retry_pipeline", { repo, runId: pr.failedRunId });
+      ui.log(`retry #${pr.number} run ${pr.failedRunId}`);
+      await list();
+    } catch (e) {
+      b.disabled = false; b.textContent = "Retry";
+      action.replaceChildren(el("span", { className: "error", textContent: e.message }));
+    }
   };
 
   $("refresh").onclick = list;

@@ -647,7 +647,7 @@ func (t *macToolset) installNode(progress func(string)) error {
 			return installFailure(name + " needs glibc 2.28 or later, and this server has " + has + ".")
 		}
 	}
-	return t.build(func(part string) error {
+	err := t.build(func(part string) error {
 		lib := filepath.Join(part, "lib")
 		if err := os.MkdirAll(lib, 0o755); err != nil {
 			return err
@@ -660,35 +660,10 @@ func (t *macToolset) installNode(progress func(string)) error {
 		if err := copyFile(filepath.Join(t.folder, "manifest.json"), filepath.Join(part, "manifest.json")); err != nil {
 			return err
 		}
-		progress("Downloading Node.js " + v)
-		node := filepath.Join(part, "node")
-		os.MkdirAll(node, 0o755)
-		base := strings.TrimSuffix(nodeDistURL, "/") + "/" + v + "/node-" + v
-		if serverToolsets {
-			// A tar.xz, unpacked here: a minimal Debian has no xz (043).
-			tarball := filepath.Join(part, "node.tar.xz")
-			if err := download(base+"-linux-"+macArch()+".tar.xz", tarball, 0, sum, "Node.js", nil); err != nil {
-				return err
-			}
-			progress("Unpacking Node.js")
-			if err := untarXZ(tarball, node); err != nil {
-				if errors.Is(err, syscall.ENOSPC) {
-					return err
-				}
-				return installFailure("Couldn’t unpack Node.js: " + err.Error())
-			}
-			os.Remove(tarball)
-		} else {
-			tarball := filepath.Join(part, "node.tar.gz")
-			if err := download(base+"-darwin-"+macArch()+".tar.gz", tarball, 0, sum, "Node.js", nil); err != nil {
-				return err
-			}
-			progress("Unpacking Node.js")
-			if out, err := step(installTimeout, part, loginEnvironment(), "/usr/bin/tar", "-xzf", tarball, "-C", node, "--strip-components=1"); err != nil {
-				return unpackProblem(out, "Couldn’t download Node.js: "+tail(out, 1))
-			}
-			os.Remove(tarball)
+		if err := linkNode(part, v, sum, progress); err != nil {
+			return err
 		}
+		node := filepath.Join(part, "node")
 		progress("Installing " + name)
 		env := loginEnvironment()
 		for i, kv := range env {
@@ -715,6 +690,96 @@ func (t *macToolset) installNode(progress func(string)) error {
 			`d=$(cd "$(dirname "$0")/.." && pwd -P)`,
 			`PATH="$d/node/bin:$PATH" exec "$d/node/bin/node" "$d/` + entry + `"` + forwards})
 	})
+	if err == nil {
+		tidyNode()
+	}
+	return err
+}
+
+// nodeMu holds <tools>/node still (#3959): linkNode makes a Node and links a toolset to it,
+// and tidyNode removes the Nodes no toolset links to, never in between.
+var nodeMu sync.Mutex
+
+// linkNode makes part/node a link to <tools>/node/<v>, one Node for each version that every
+// toolset pinning it shares (#3959), downloaded first unless it is there already.
+func linkNode(part, v, sum string, progress func(string)) error {
+	nodeMu.Lock()
+	defer nodeMu.Unlock()
+	nodes := filepath.Join(toolsHome, "node")
+	if _, err := os.Stat(filepath.Join(nodes, v)); err != nil {
+		progress("Downloading Node.js " + v)
+		node := filepath.Join(nodes, ".part-"+v)
+		os.RemoveAll(node)
+		if err := os.MkdirAll(node, 0o755); err != nil {
+			return err
+		}
+		if err := unpackNode(node, v, sum, progress); err != nil {
+			os.RemoveAll(node)
+			return err
+		}
+		if err := os.Rename(node, filepath.Join(nodes, v)); err != nil {
+			return err
+		}
+	}
+	return os.Symlink(filepath.Join("..", "..", "node", v), filepath.Join(part, "node"))
+}
+
+// unpackNode downloads Node v from nodejs.org into node, checked against sum.
+func unpackNode(node, v, sum string, progress func(string)) error {
+	base := strings.TrimSuffix(nodeDistURL, "/") + "/" + v + "/node-" + v
+	if serverToolsets {
+		// A tar.xz, unpacked here: a minimal Debian has no xz (043).
+		tarball := node + ".tar.xz"
+		defer os.Remove(tarball)
+		if err := download(base+"-linux-"+macArch()+".tar.xz", tarball, 0, sum, "Node.js", nil); err != nil {
+			return err
+		}
+		progress("Unpacking Node.js")
+		if err := untarXZ(tarball, node); err != nil {
+			if errors.Is(err, syscall.ENOSPC) {
+				return err
+			}
+			return installFailure("Couldn’t unpack Node.js: " + err.Error())
+		}
+		return nil
+	}
+	tarball := node + ".tar.gz"
+	defer os.Remove(tarball)
+	if err := download(base+"-darwin-"+macArch()+".tar.gz", tarball, 0, sum, "Node.js", nil); err != nil {
+		return err
+	}
+	progress("Unpacking Node.js")
+	if out, err := step(installTimeout, node, loginEnvironment(), "/usr/bin/tar", "-xzf", tarball, "-C", node, "--strip-components=1"); err != nil {
+		return unpackProblem(out, "Couldn’t download Node.js: "+tail(out, 1))
+	}
+	return nil
+}
+
+// tidyNode removes every <tools>/node/<v> that no toolset left in <tools> links to, and
+// anything half-made. A toolset that carries its own node/ (before #3959) links to none.
+func tidyNode() {
+	nodeMu.Lock()
+	defer nodeMu.Unlock()
+	nodes := filepath.Join(toolsHome, "node")
+	keep := map[string]bool{}
+	homes, _ := os.ReadDir(toolsHome)
+	for _, h := range homes {
+		if h.Name() == "node" {
+			continue
+		}
+		toolsets, _ := os.ReadDir(filepath.Join(toolsHome, h.Name()))
+		for _, t := range toolsets {
+			if to, err := os.Readlink(filepath.Join(toolsHome, h.Name(), t.Name(), "node")); err == nil {
+				keep[filepath.Base(to)] = true
+			}
+		}
+	}
+	names, _ := os.ReadDir(nodes)
+	for _, n := range names {
+		if !keep[n.Name()] {
+			os.RemoveAll(filepath.Join(nodes, n.Name()))
+		}
+	}
 }
 
 // installArchive is MacArchiveInstaller.install: the vendor's archive for this Mac,
@@ -844,6 +909,7 @@ func (d *Daemon) loadAndServeInstall(folder string) {
 	for _, id := range ids {
 		d.toolsets[id].tidy()
 	}
+	tidyNode()
 	On(d, wire.CallRuntimesInstall, func(_ context.Context, c *Client, r wire.RuntimeRequest) (wire.RuntimeStatus, error) {
 		return d.installRuntime(c, r.RuntimeID)
 	})

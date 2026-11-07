@@ -228,14 +228,14 @@ func TestTheWorkflowBriefIsShorterWhereSchedulingIsRemoved(t *testing.T) {
 	}
 }
 
-// Live documents, helpers and sessions are told to every agent, worktrees only where
+// Live documents, helpers, sessions and memory are told to every agent, worktrees only where
 // move_worktree is offered, residue and first-prompt cards only on their runtime.
 func TestTheBriefSaysTheRestWhereItApplies(t *testing.T) {
 	d, _ := start(t, t.TempDir())
 	defer d.Shutdown()
 	for _, rt := range catalog {
 		got := d.brief(&wire.Agent{RuntimeID: rt.ID})
-		for _, want := range []string{liveDocumentBrief, helpersBrief, sessionsBrief} {
+		for _, want := range []string{liveDocumentBrief, helpersBrief, sessionsBrief, memoryBrief} {
 			if !strings.Contains(got, want) {
 				t.Fatalf("%s: no %q", rt.ID, want)
 			}

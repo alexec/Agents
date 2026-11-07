@@ -25,8 +25,13 @@ import (
 
 const domain = "hosted.test"
 
+// testKeeper is the tests' keeper, which an Admin needs for an email's mark too.
+var testKeeper = "base64key://" + base64.URLEncoding.EncodeToString(bytes.Repeat([]byte{3}, 32))
+
 // fakeGitHub signs in user 42, ana, made in 2015, for the code "good"; user <id>, <login>,
 // made <days> days ago, for the code "u.<id>.<login>.<days>"; and nobody for any other.
+// Each has the verified primary email u<id>@example.com, but the login noemail, whose
+// primary email is not verified; the code "u.<id>.<login>.<days>.<email>" has that email.
 func fakeGitHub(t *testing.T) *httptest.Server {
 	g := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -38,6 +43,22 @@ func fakeGitHub(t *testing.T) *httptest.Server {
 				return
 			}
 			json.NewEncoder(w).Encode(map[string]string{"access_token": "gho_" + code})
+		case "/user/emails":
+			token, _ := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer gho_")
+			parts := strings.Split(token, ".")
+			id, email := "42", ""
+			if len(parts) >= 4 {
+				id = parts[1]
+			}
+			if len(parts) > 4 {
+				email = strings.Join(parts[4:], ".")
+			}
+			if email == "" {
+				email = "u" + id + "@example.com"
+			}
+			verified := len(parts) < 4 || parts[2] != "noemail"
+			json.NewEncoder(w).Encode([]map[string]any{{"email": "other" + id + "@example.com", "primary": false, "verified": true},
+				{"email": email, "primary": true, "verified": verified}})
 		case "/user":
 			token, _ := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer gho_")
 			if token == "good" {
@@ -45,7 +66,7 @@ func fakeGitHub(t *testing.T) *httptest.Server {
 				return
 			}
 			parts := strings.Split(token, ".")
-			if len(parts) != 4 || parts[0] != "u" {
+			if len(parts) < 4 || parts[0] != "u" {
 				w.WriteHeader(http.StatusUnauthorized)
 				return
 			}
@@ -93,7 +114,7 @@ func startWith(t *testing.T, cfg Config) (*Service, func() *browser) {
 func startWithServer(t *testing.T, cfg Config, serving **httptest.Server) (*Service, func() *browser) {
 	t.Helper()
 	g := fakeGitHub(t)
-	cfg.Keeper = "base64key://" + base64.URLEncoding.EncodeToString(bytes.Repeat([]byte{3}, 32))
+	cfg.Keeper = testKeeper
 	cfg.Domain, cfg.GitHubClientID, cfg.GitHubSecret, cfg.GitHubWeb, cfg.GitHubAPI = domain, "Iv1.test", "secret", g.URL, g.URL
 	cfg.Log = func(line string) { t.Log(line) }
 	s, err := New(context.Background(), cfg)

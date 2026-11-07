@@ -29,6 +29,8 @@ public enum ChatOpening {
         /// The turns could not be read, so `page` is the end of the whole transcript and
         /// there are no summaries. The chat opens on it and says so.
         public var turnsFailure: String?
+        /// The open turn's prompt, read on its own when `page` starts after it (#3948).
+        public var ask: TranscriptEntry?
     }
 
     /// The most of the turn in progress an opening takes whole (#1130): what one page
@@ -45,10 +47,12 @@ public enum ChatOpening {
     /// turn in progress, so a turn longer than it lost its start: the ask and the first
     /// lines of the reply, under the summaries where nothing showed they were missing,
     /// until the reader scrolled to the top (#1130). Such a turn is asked for again
-    /// whole, up to `wholeTurn`.
+    /// whole, up to `wholeTurn`. Longer still, its prompt is read on its own with `entry`,
+    /// so the turn is never drawn without it (#3948).
     public static func load(limit: Int = wholeTurn,
                             turns: () async throws -> TurnsPage,
                             transcript: (_ from: Int, _ limit: Int) async throws -> TranscriptPage,
+                            entry: ((_ index: Int) async throws -> TranscriptPage)? = nil,
                             describe: (any Error) -> String = { String(describing: $0) },
                             isolation: isolated (any Actor)? = #isolation) async throws -> Loaded {
         let opening: TurnsPage
@@ -67,7 +71,10 @@ public enum ChatOpening {
         if turnsKnown, page.firstIndex > opening.openStart, page.entries.count < min(turnLength, wholeTurn) {
             page = try await transcript(opening.openStart, min(turnLength, wholeTurn))
         }
-        return Loaded(turns: opening, page: page, turnsFailure: turnsFailure)
+        // A prompt that did not come is only a turn drawn without it, as before.
+        let ask = turnsKnown && page.firstIndex > opening.openStart
+            ? try? await entry?(opening.openStart).entries.first : nil
+        return Loaded(turns: opening, page: page, turnsFailure: turnsFailure, ask: ask)
     }
 
     /// Whether an opening that failed is its host saying it has no such session: an
@@ -85,7 +92,7 @@ extension AgentsModel {
     public func takeOpening(_ loaded: ChatOpening.Loaded, load: Int) -> Bool {
         guard isLatestTranscriptLoad(load) else { return false }
         replaceTurns(with: loaded.turns)
-        replaceTranscript(with: loaded.page)
+        replaceTranscript(with: loaded.page, ask: loaded.ask)
         if let reason = loaded.turnsFailure {
             noteTranscriptLoadFailed(TranscriptLoadFailure(nothingLoaded: false, reason: reason))
         }

@@ -121,7 +121,7 @@ func TestDailySummaryIsTheHomeFolders(t *testing.T) {
 	}
 	text, skill := readyMadeText(dailySummaryID)
 	w := parseWorkflow(text, dailySummaryID, "/p")
-	if w.Settings.PermissionMode == nil || *w.Settings.PermissionMode != "plan" || len(w.Triggers) != 1 || w.Triggers[0].Schedule == nil {
+	if w.Settings.PermissionMode == nil || *w.Settings.PermissionMode != "ask" || len(w.Triggers) != 1 || w.Triggers[0].Schedule == nil {
 		t.Fatalf("%+v", w)
 	}
 	if !strings.Contains(skill, "`write_daily_summary`") || !oneMachineWorkflows[dailySummaryID] {

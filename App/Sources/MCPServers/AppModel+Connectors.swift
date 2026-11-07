@@ -69,7 +69,7 @@ extension AppModel {
         }
     }
 
-    /// A personal access token (GitLab, #1630; Jira, #3304, with the account's email on Jira
+    /// A personal access token (GitLab, #1630; GitHub, #3945; Jira, #3304, with the account's email on Jira
     /// Cloud): the connection it made, or why it made none.
     func signInWithToken(_ provider: DaemonAPI.ConnectionProvider, url: String?, user: String? = nil, token: String,
                          on host: MachineRef) async -> Result<DaemonAPI.Connection, ConnectorProblem> {

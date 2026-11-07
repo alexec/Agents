@@ -22,7 +22,9 @@ import (
 // flow, and comes back to /signin/callback, as from GitHub. The service trades the code for
 // an ID token with its client secret, checks the token as the control plane checks one
 // (signin.OIDC: the signature, iss, aud, the expiry and the sign-in's nonce), takes its
-// subject, and forgets the rest. It asks only for openid: no email and no name.
+// subject and the email the provider verified (#3388), and forgets the rest. It asks for
+// openid and email: no name. With the email scope Apple answers only by a form post
+// (response_mode=form_post), so the callback takes a POST too.
 
 // Endpoints are where a provider is asked; tests give a fake's.
 type Endpoints struct {
@@ -42,7 +44,8 @@ type oidcSignIn struct {
 	secret   func() (string, error)
 	at       Endpoints
 	redirect string
-	// pkce says the provider takes PKCE: Google does; Apple does not say it does.
+	// pkce says the provider takes PKCE: Google does; Apple does not say it does, and
+	// answers by a form post.
 	pkce  bool
 	check *signin.OIDC
 	http  *http.Client
@@ -67,14 +70,14 @@ func newOIDCSignIn(provider, clientID string, secret func() (string, error), at,
 // authorize is where the browser goes to sign in, for this state, nonce and PKCE verifier.
 func (o *oidcSignIn) authorize(state, nonce, verifier string) string {
 	q := url.Values{"client_id": {o.clientID}, "redirect_uri": {o.redirect}, "response_type": {"code"},
-		"scope": {"openid"}, "state": {state}, "nonce": {nonce}}
+		"scope": {"openid email"}, "state": {state}, "nonce": {nonce}}
 	if o.pkce {
 		sum := sha256.Sum256([]byte(verifier))
 		q.Set("code_challenge", base64.RawURLEncoding.EncodeToString(sum[:]))
 		q.Set("code_challenge_method", "S256")
 	} else {
-		// With no scope beyond openid, Apple comes back with a GET, as the others do.
-		q.Set("response_mode", "query")
+		// Apple asked for an email comes back only by a form post.
+		q.Set("response_mode", "form_post")
 	}
 	return o.at.Authorize + "?" + q.Encode()
 }
@@ -98,6 +101,11 @@ func (o *oidcSignIn) user(ctx context.Context, code, nonce, verifier string) (Si
 		return SignIn{}, err
 	}
 	user := SignIn{Provider: o.provider, Subject: claims.Subject}
+	// Google says if it verified the email; Apple gives only verified ones, a private
+	// relay address too (#3387).
+	if claims.Email != "" && (claims.EmailVerified || o.provider == signin.Apple) {
+		user.Email = strings.ToLower(claims.Email)
+	}
 	if !user.valid() {
 		return SignIn{}, errors.New(signin.Title(o.provider) + " named a subject this service cannot keep")
 	}

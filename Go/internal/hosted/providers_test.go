@@ -107,15 +107,25 @@ func (u *signUps) signUpWith(t *testing.T, b *browser, provider, invite string) 
 	if res.StatusCode != http.StatusSeeOther {
 		t.Fatalf("%d %s", res.StatusCode, b.last)
 	}
+	return u.backFrom(t, b, provider, to)
+}
+
+// backFrom is the provider at to signing the person in and sending the browser back: by a
+// form post from Apple, which is asked for an email (#3388), by a redirect from the others.
+func (u *signUps) backFrom(t *testing.T, b *browser, provider, to string) *http.Response {
+	t.Helper()
 	fake := map[string]*signintest.Provider{signin.Apple: u.apple, signin.Google: u.google}[provider]
 	if !strings.HasPrefix(to, fake.Issuer+"/authorize?") {
 		t.Fatal(to)
 	}
 	q, _ := url.Parse(to)
-	if q.Query().Get("redirect_uri") != "https://"+domain+"/signin/callback" || q.Query().Get("scope") != "openid" {
+	if q.Query().Get("redirect_uri") != "https://"+domain+"/signin/callback" || q.Query().Get("scope") != "openid email" {
 		t.Fatal(to)
 	}
-	// The provider signs them in and sends the browser back.
+	formPost := q.Query().Get("response_mode") == "form_post"
+	if formPost != (provider == signin.Apple) {
+		t.Fatalf("%s: response_mode %q", provider, q.Query().Get("response_mode"))
+	}
 	c := fake.HTTP()
 	c.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	back, err := c.Get(to)
@@ -123,7 +133,15 @@ func (u *signUps) signUpWith(t *testing.T, b *browser, provider, invite string) 
 		t.Fatal(err)
 	}
 	back.Body.Close()
-	res, _ = b.get(back.Header.Get("Location"))
+	if !formPost {
+		res, _ := b.get(back.Header.Get("Location"))
+		return res
+	}
+	// Apple posts the answer to the callback from its own page.
+	answer, _ := url.Parse(back.Header.Get("Location"))
+	callback := *answer
+	callback.RawQuery = ""
+	res, _ := b.post(callback.String(), answer.Query())
 	return res
 }
 
@@ -235,67 +253,152 @@ func TestSignUpWithEachProviderAndSignInToTheControlPlane(t *testing.T) {
 	}
 }
 
-// #3386: Apple and Google have no account age, so they sign up only with an invite, also
-// when sign-up is open (#3387 decides what checks them instead); with none, the waitlist.
-// Signing in again finds the same account, and a blocked one gets nothing.
-func TestAppleAndGoogleNeedAnInvite(t *testing.T) {
+// #3388: open sign-up needs an email the provider verified, Google's email_verified,
+// Apple's email (a private relay address too) or GitHub's verified primary; with none,
+// refused with words, and nobody waits. With an invite, no email is needed.
+func TestOpenSignUpNeedsAVerifiedEmail(t *testing.T) {
 	st := store.NewMemory()
+	ctx := context.Background()
 	u := startSignUps(t, st, SignUpOpen)
+	if _, page := u.newBrowser().get("https://" + domain + "/"); !strings.Contains(page, "verified") || strings.Contains(page, "by invitation") {
+		t.Fatal(page)
+	}
 	u.apple.SignInAs(signintest.Claims{"sub": "000111.aaa.222"})
-	u.google.SignInAs(signintest.Claims{"sub": "333444"})
-	for _, provider := range []string{signin.Apple, signin.Google} {
+	u.google.SignInAs(signintest.Claims{"sub": "333444", "email": "sam@example.com", "email_verified": false})
+	for _, provider := range []string{signin.Apple, signin.Google, signin.GitHub} {
 		b := u.newBrowser()
-		res := u.signUpWith(t, b, provider, "")
-		if res.StatusCode != http.StatusOK || !strings.Contains(b.last, "number 1 on the waitlist") && !strings.Contains(b.last, "number 2 on the waitlist") ||
-			!strings.Contains(b.last, "by invitation") {
+		var res *http.Response
+		if provider == signin.GitHub {
+			res = b.signIn("u.9.noemail.400")
+		} else {
+			res = u.signUpWith(t, b, provider, "")
+		}
+		want := map[string]string{signin.Apple: "Apple gave none", signin.Google: "Google gave none", signin.GitHub: "github.com/settings/emails"}[provider]
+		if res.StatusCode != http.StatusForbidden || !strings.Contains(b.last, want) {
 			t.Fatalf("%s: %d %s", provider, res.StatusCode, b.last)
 		}
 	}
-	if list, _ := (Admin{Store: st}).Waitlist(context.Background()); len(list) != 2 || list[0].SignIn.String() != "apple:000111.aaa.222" {
+	if list, _ := (Admin{Store: st}).Waitlist(ctx); len(list) != 0 {
 		t.Fatalf("%+v", list)
 	}
-	// GitHub, open, signs up with no invite, by its age.
-	if res := u.newBrowser().signIn("good"); !strings.Contains(res.Header.Get("Location"), "/#code=") {
-		t.Fatal(res.Header.Get("Location"))
+	if n, _ := u.s.accounts.count(ctx); n != 0 {
+		t.Fatalf("%d accounts", n)
 	}
 
-	// With an invite, off the waitlist; again, the same account.
-	admin := Admin{Store: st, Domain: domain}
-	link, _ := admin.Invite(context.Background(), 0)
+	// Verified: an account each. Apple's relay address is an email, with no email_verified.
+	u.apple.SignInAs(signintest.Claims{"sub": "000111.aaa.222", "email": "x7@privaterelay.appleid.com"})
+	u.google.SignInAs(signintest.Claims{"sub": "333444", "email": "Sam@Example.com", "email_verified": true})
+	for _, provider := range []string{signin.Apple, signin.Google} {
+		b := u.newBrowser()
+		if res := u.signUpWith(t, b, provider, ""); !strings.Contains(res.Header.Get("Location"), "/#code=") {
+			t.Fatalf("%s: %s %s", provider, res.Header.Get("Location"), b.last)
+		}
+	}
+	if res := u.newBrowser().signIn("u.10.lee.400"); !strings.Contains(res.Header.Get("Location"), "/#code=") {
+		t.Fatal(res.Header.Get("Location"))
+	}
+	// Nowhere in the store is an address: only its mark.
+	keys, _ := st.List(ctx, "")
+	for _, k := range keys {
+		o, _ := st.Get(ctx, k.Key)
+		if text := strings.ToLower(k.Key + string(o.Data)); strings.Contains(text, "example.com") || strings.Contains(text, "privaterelay") {
+			t.Fatalf("an email is kept: %s %s", k.Key, o.Data)
+		}
+	}
+
+	// With an invite, no email is needed.
+	admin := Admin{Store: st, Domain: domain, Keeper: testKeeper}
+	link, _ := admin.Invite(ctx, 0)
+	u.apple.SignInAs(signintest.Claims{"sub": "000999.bbb.111"})
 	b := u.newBrowser()
-	if res := u.signUpWith(t, b, signin.Google, strings.TrimPrefix(link, "https://"+domain+"/?invite=")); !strings.Contains(res.Header.Get("Location"), "/#code=") {
+	if res := u.signUpWith(t, b, signin.Apple, strings.TrimPrefix(link, "https://"+domain+"/?invite=")); !strings.Contains(res.Header.Get("Location"), "/#code=") {
 		t.Fatal(res.Header.Get("Location"), b.last)
 	}
-	if list, _ := admin.Waitlist(context.Background()); len(list) != 1 {
-		t.Fatalf("%+v", list)
-	}
-	if res := u.signUpWith(t, u.newBrowser(), signin.Google, ""); res.Header.Get("Location") != "/account" {
+}
+
+// #3388: one email has one account: a second provider's sign-in with the same verified
+// email gets the account it has. Deleting the account lets the email sign up again.
+func TestOneAccountPerEmail(t *testing.T) {
+	st := store.NewMemory()
+	ctx := context.Background()
+	u := startSignUps(t, st, SignUpOpen)
+	u.google.SignInAs(signintest.Claims{"sub": "333444", "email": "Sam@Example.com", "email_verified": true})
+	if res := u.signUpWith(t, u.newBrowser(), signin.Google, ""); !strings.Contains(res.Header.Get("Location"), "/#code=") {
 		t.Fatal(res.Header.Get("Location"))
 	}
-	acc, _ := u.s.accounts.bySignIn(context.Background(), SignIn{Provider: signin.Google, Subject: "333444"})
-	if acc == nil {
-		t.Fatal("no account")
+	b := u.newBrowser()
+	if res := b.signIn("u.50.sam.400.sam@example.com"); res.Header.Get("Location") != "/account" {
+		t.Fatal(res.Header.Get("Location"), b.last)
+	}
+	if _, page := b.get("https://" + domain + "/account"); !strings.Contains(page, "Signed in with Google.") {
+		t.Fatal(page)
+	}
+	u.apple.SignInAs(signintest.Claims{"sub": "000111.aaa.222", "email": "sam@example.com", "email_verified": "true"})
+	if res := u.signUpWith(t, u.newBrowser(), signin.Apple, ""); res.Header.Get("Location") != "/account" {
+		t.Fatal(res.Header.Get("Location"))
+	}
+	if n, _ := u.s.accounts.count(ctx); n != 1 {
+		t.Fatalf("%d accounts", n)
 	}
 
-	// Blocked by provider:subject: refused, and the account suspended.
-	if who, err := admin.Block(context.Background(), "google:333444", "Spam"); err != nil || who.String() != "google:333444" {
+	acc, _ := u.s.accounts.bySignIn(ctx, SignIn{Provider: signin.Google, Subject: "333444"})
+	if acc == nil || acc.EmailMark == "" {
+		t.Fatalf("%+v", acc)
+	}
+	if err := u.s.accounts.remove(ctx, acc); err != nil {
+		t.Fatal(err)
+	}
+	if o, _ := st.Get(ctx, emailKey(acc.EmailMark)); o != nil {
+		t.Fatal("the email's link is kept")
+	}
+	if res := u.newBrowser().signIn("u.50.sam.400.sam@example.com"); !strings.Contains(res.Header.Get("Location"), "/#code=") {
+		t.Fatal(res.Header.Get("Location"))
+	}
+}
+
+// #3388: a block by sign-in blocks its account's email too, from every provider; a block by
+// email needs the keeper, and blocks that email alone. Unblock lets each sign up again.
+func TestBlocksByEmail(t *testing.T) {
+	st := store.NewMemory()
+	ctx := context.Background()
+	u := startSignUps(t, st, SignUpOpen)
+	u.google.SignInAs(signintest.Claims{"sub": "333444", "email": "spam@example.com", "email_verified": true})
+	if res := u.signUpWith(t, u.newBrowser(), signin.Google, ""); !strings.Contains(res.Header.Get("Location"), "/#code=") {
+		t.Fatal(res.Header.Get("Location"))
+	}
+	admin := Admin{Store: st, Domain: domain, Keeper: testKeeper}
+	if _, err := admin.Block(ctx, "google:333444", "Spam"); err != nil {
+		t.Fatal(err)
+	}
+	// The same email from GitHub, as a new user: refused, and nothing made.
+	b := u.newBrowser()
+	if res := b.signIn("u.60.spammer.400.spam@example.com"); res.StatusCode != http.StatusForbidden || !strings.Contains(b.last, "not open to this GitHub account") {
+		t.Fatal(res.StatusCode, b.last)
+	}
+	if err := admin.Unblock(ctx, "google:333444"); err != nil {
+		t.Fatal(err)
+	}
+	if res := u.newBrowser().signIn("u.60.spammer.400.spam@example.com"); res.Header.Get("Location") != "/account" {
+		t.Fatal(res.Header.Get("Location"))
+	}
+
+	// By email alone: needs the keeper; then refuses it, in any case.
+	if _, err := (Admin{Store: st}).Block(ctx, "other@example.com", ""); err == nil {
+		t.Fatal("blocked an email with no keeper")
+	}
+	if who, err := admin.Block(ctx, "Other@Example.com", "Spam"); err != nil || who.Provider != "" {
 		t.Fatal(who, err)
 	}
-	if acc, _ := u.s.accounts.get(context.Background(), acc.ID); acc.Suspended == nil {
-		t.Fatal("not suspended")
-	}
-	if err := admin.Unblock(context.Background(), "google:333444"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := admin.Block(context.Background(), "apple:000111.aaa.222", ""); err != nil {
-		t.Fatal(err)
-	}
+	u.apple.SignInAs(signintest.Claims{"sub": "000111.aaa.222", "email": "other@example.com"})
 	b = u.newBrowser()
 	if res := u.signUpWith(t, b, signin.Apple, ""); res.StatusCode != http.StatusForbidden || !strings.Contains(b.last, "not open to this Apple account") {
 		t.Fatal(res.StatusCode, b.last)
 	}
-	if list, _ := admin.Waitlist(context.Background()); len(list) != 0 {
-		t.Fatalf("a blocked sign-in is still waiting: %+v", list)
+	if err := admin.Unblock(ctx, "other@example.com"); err != nil {
+		t.Fatal(err)
+	}
+	if res := u.signUpWith(t, u.newBrowser(), signin.Apple, ""); !strings.Contains(res.Header.Get("Location"), "/#code=") {
+		t.Fatal(res.Header.Get("Location"))
 	}
 }
 
@@ -389,4 +492,61 @@ func proxyTo(t *testing.T, address string) {
 func aged(user SignIn, created time.Time) SignIn {
 	user.Created = created
 	return user
+}
+
+// #3388: with Turnstile's keys, the sign-up page's buttons are one form with the widget,
+// and only a token Cloudflare says passed goes on to the provider; a GET of /signin goes
+// back to the page. One key alone is an error; with none, there is no Turnstile.
+func TestTurnstileOnTheSignUpPage(t *testing.T) {
+	cf := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = r.ParseForm()
+		ok := r.PostForm.Get("secret") == "ts-secret" && r.PostForm.Get("response") == "passed"
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": ok, "error-codes": []string{"invalid-input-response"}})
+	}))
+	t.Cleanup(cf.Close)
+	cfg := Config{Store: store.NewMemory(), SignUp: SignUpOpen, TurnstileSiteKey: "ts-site", TurnstileSecret: "ts-secret", TurnstileAPI: cf.URL}
+	_, newBrowser := startWith(t, cfg)
+	b := newBrowser()
+	res, page := b.get("https://" + domain + "/?invite=abcdefghij0123456789")
+	csp := res.Header.Get("Content-Security-Policy")
+	if !strings.Contains(page, `data-sitekey="ts-site"`) || !strings.Contains(page, `<form class="signup" method="post" action="/signin">`) ||
+		!strings.Contains(page, `name="with" value="github"`) || !strings.Contains(page, `name="invite" value="abcdefghij0123456789"`) ||
+		!strings.Contains(page, turnstileScript) || strings.Contains(page, `href="/signin?with=`) {
+		t.Fatal(page)
+	}
+	if !strings.Contains(csp, "script-src "+turnstileOrigin) || !strings.Contains(csp, "frame-src "+turnstileOrigin) ||
+		!strings.Contains(csp, "form-action 'self' http://127.0.0.1:") {
+		t.Fatal(csp)
+	}
+	if res, _ := b.get("https://" + domain + "/signin?with=github"); res.StatusCode != http.StatusSeeOther || res.Header.Get("Location") != "/" {
+		t.Fatal(res.StatusCode, res.Header.Get("Location"))
+	}
+	for _, token := range []string{"", "failed"} {
+		if res, page := b.post("https://"+domain+"/signin", url.Values{"with": {"github"}, turnstileField: {token}}); res.StatusCode != http.StatusForbidden ||
+			!strings.Contains(page, "did not pass") {
+			t.Fatal(res.StatusCode, page)
+		}
+	}
+	res, _ = b.post("https://"+domain+"/signin", url.Values{"with": {"github"}, turnstileField: {"passed"}})
+	to, _ := url.Parse(res.Header.Get("Location"))
+	if res.StatusCode != http.StatusSeeOther || to.Path != "/login/oauth/authorize" {
+		t.Fatal(res.StatusCode, res.Header.Get("Location"))
+	}
+	back, _ := b.get("https://" + domain + "/signin/callback?" + url.Values{"code": {"good"}, "state": {to.Query().Get("state")}}.Encode())
+	if !strings.Contains(back.Header.Get("Location"), "/#code=") {
+		t.Fatal(back.Header.Get("Location"), b.last)
+	}
+
+	// Cloudflare down: refused, with words that say to try again.
+	cf.Close()
+	if res, page := newBrowser().post("https://"+domain+"/signin", url.Values{"with": {"github"}, turnstileField: {"passed"}}); res.StatusCode != http.StatusServiceUnavailable ||
+		!strings.Contains(page, "could not be made") {
+		t.Fatal(res.StatusCode, page)
+	}
+
+	cfg.TurnstileSecret = ""
+	cfg.Keeper, cfg.Domain = testKeeper, domain
+	if _, err := New(context.Background(), cfg); err == nil || !strings.Contains(err.Error(), "AGENTS_HOSTED_TURNSTILE_SECRET") {
+		t.Fatal(err)
+	}
 }

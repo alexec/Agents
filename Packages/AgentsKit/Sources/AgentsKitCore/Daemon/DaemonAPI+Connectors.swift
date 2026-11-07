@@ -65,8 +65,9 @@ extension DaemonAPI {
         public var workspace: String?
         /// When a token the host cannot renew ends: a GitLab access token's expiry.
         public var expiresAt: Date?
-        /// A token the person made, which the host does not renew and whose end it does not
-        /// know: a Jira API token (#3304). Nil for OAuth.
+        /// A token the person made, which the host does not renew: a Jira API token (#3304), or
+        /// a GitHub personal access token in place of the App's user token (#3857), whose end,
+        /// when it has one, is `expiresAt`. Nil for OAuth and for GitHub's App user token.
         public var byToken: Bool?
         /// Only in the answer that made the connection: the one real read that proves it, such
         /// as Jira's newest issue (#3304).

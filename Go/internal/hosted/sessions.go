@@ -13,7 +13,10 @@ import (
 
 // A session is a signed cookie: the account and when it ends, with an HMAC under the
 // service's session key. Nothing about a session is kept on the server. The sign-in's
-// state is a second, short cookie, so a callback answers only the browser that left.
+// state is a second, short cookie, so a callback answers only the browser that left. It,
+// and an invite's, are SameSite=None (#3388): Apple comes back by a cross-site form post,
+// which a Lax cookie is not sent with. Each is signed, and good for minutes; neither signs
+// anyone in.
 
 const (
 	sessionCookie = "agents_session"
@@ -88,7 +91,7 @@ func (s sessions) newState(w http.ResponseWriter, provider string) string {
 	b := make([]byte, 24)
 	_, _ = rand.Read(b)
 	state := provider + "." + base64.RawURLEncoding.EncodeToString(b)
-	setCookie(w, stateCookie, s.sign(state), stateLife)
+	setFlowCookie(w, stateCookie, s.sign(state))
 	return state
 }
 
@@ -119,6 +122,13 @@ func (s sessions) stateOK(r *http.Request, state string) bool {
 func setCookie(w http.ResponseWriter, name, value string, life time.Duration) {
 	http.SetCookie(w, &http.Cookie{Name: name, Value: value, Path: "/", MaxAge: int(life.Seconds()), HttpOnly: true,
 		Secure: true, SameSite: http.SameSiteLaxMode})
+}
+
+// setFlowCookie is a cookie for one sign-in, sent back with the provider's answer however
+// it comes.
+func setFlowCookie(w http.ResponseWriter, name, value string) {
+	http.SetCookie(w, &http.Cookie{Name: name, Value: value, Path: "/", MaxAge: int(stateLife.Seconds()), HttpOnly: true,
+		Secure: true, SameSite: http.SameSiteNoneMode})
 }
 
 func endCookie(w http.ResponseWriter, name string) {

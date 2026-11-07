@@ -123,7 +123,7 @@ func briefOutOfPrompt(runtimeID string) bool {
 func (d *Daemon) brief(a *wire.Agent) string {
 	parts := []string{d.namingBrief(a), leasesWithDeclared(d.declaredResources()), eventsBrief,
 		endingBrief(a.RuntimeID), liveDocumentBrief, escalationBrief(a.RuntimeID),
-		workflowsBrief(a.RuntimeID), helpersBrief, sessionsBrief,
+		workflowsBrief(a.RuntimeID), helpersBrief, sessionsBrief, memoryBrief,
 		toolsBrief(d.offersBrowser(), d.offersDriveScreen(), d.isBot(), d.hasGitHub())}
 	if appToolServed("move_worktree") && runtimeCanMove(a.RuntimeID) {
 		parts = append(parts, worktreesBrief)
@@ -259,6 +259,19 @@ const helpersBrief = "For work that can run alongside yours, use start_session w
 const sessionsBrief = "To continue another session in this folder, read it with read_session " +
 	"(by id or exact title; reading changes nothing). list_sessions lists them. Send words " +
 	"to one with message_session."
+
+// memoryBrief is where an agent keeps what it learns (#3949): a runtime's own memory
+// (Claude's projects folder, say) is seen by that runtime on that machine only, so a
+// lesson learnt with one agent was lost to the next. A fact about the folder goes in the
+// folder (#3960), so it goes wherever the repository goes, a Codespace too; what is private
+// stays in ~/.agents, because a folder can be public.
+const memoryBrief = "Keep what you must remember after this session as one fact per file, <name>.md, " +
+	"with a one-line pointer to it in MEMORY.md beside it. A fact about this folder (its code, tools, " +
+	"process or decisions) goes in this folder's .agents/memory/, committed with your change; write " +
+	"nothing private there. A fact about me or this machine (devices, accounts, keys, mail, my own " +
+	"ways) goes in ~/.agents/memory/. Never keep it in your runtime's own memory folder or files: " +
+	"other agents never read them. Read both MEMORY.md files before the first step of a task. Update " +
+	"or delete a file that is wrong rather than add a second one."
 
 // toolsBrief names the rest of the app's tools, each with when to use it (#3608). Claude
 // defers MCP tools, so a tool no paragraph names is one it does not know it has; and a

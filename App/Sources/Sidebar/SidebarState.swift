@@ -171,6 +171,9 @@ final class AgentPaneState {
     /// HTML files the person let run scripts, by path. Off for every other file.
     var scriptsAllowed: Set<String> = []
     var browserURL: URL?
+    /// The agent's last use of the machine's browser that the Agent Browser pane opened
+    /// for, or saw (#3916): the pane opens again only for a newer one.
+    var browserUseSeen: Date?
     /// The file open in the Changes pane, and which edit to bring into view. Nil is
     /// the list.
     var changesSelection: ChangesSelection?

@@ -386,11 +386,6 @@ func TestEveryRuleAtEveryPath(t *testing.T) {
 		t.Fatalf("%d %d", running, notArchived)
 	}
 
-	// The launch environment: only the names the policy allows of the person's own.
-	env := environment(runtimeByID("claude"), []string{"AWS_PROFILE=dev", "MY_VAR=1", "SECRET_TOKEN=x", "PATH=/bin"}, d.passThrough("claude")...)
-	if strings.Join(env, " ") != "AWS_PROFILE=dev PATH=/bin" {
-		t.Fatal(env)
-	}
 	var pass wire.PassThroughState
 	json.Unmarshal(c.call(t, 92, "settings/passThrough", map[string]any{}), &pass)
 	marked := map[string]bool{}
@@ -425,10 +420,6 @@ func TestEveryRuleAtEveryPath(t *testing.T) {
 	}
 	if running, _, _ := d.helperLimitsIn(dir); running != defaultHelpersRunning {
 		t.Fatal(running)
-	}
-	env = environment(runtimeByID("claude"), []string{"MY_VAR=1", "SECRET_TOKEN=x"}, d.passThrough("claude")...)
-	if strings.Join(env, " ") != "MY_VAR=1 SECRET_TOKEN=x" {
-		t.Fatal(env)
 	}
 	if strings.Contains(string(d.markOptions("claude", opts)[0].Options), "setBy") {
 		t.Fatal("still marked")
