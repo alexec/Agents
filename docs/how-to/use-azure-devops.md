@@ -70,6 +70,11 @@ here too:
   another service set on it. `run.id` is the first failed build's id, for `get_build_log`
   (0 when only a status failed).
 - `checks.passed`: one of those passed at the head commit, one event per build or status.
+- `run.completed`: a build of any trigger finished, whatever its result, as the github
+  connector's: for a build no pull request owns, such as `main`'s or a tag's release, or one
+  started by hand. `pipeline` (its name), `branch` (a branch or tag, as `main` or `v0.16.0`)
+  and `run` (a build's id) narrow it. `run.conclusion` is Azure DevOps's result
+  (`succeeded`, `failed`, `canceled`, `partiallySucceeded`); a build run again is a new event.
 - `pr.opened`, `pr.merged` (completed), `pr.closed` (abandoned), `pr.conflicted`.
 - `review.requested`: for you, the token's owner: you are a reviewer and have not voted.
 - `review.comment`: a comment on a line of a pull request's diff. `comment.threadId` is
