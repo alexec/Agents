@@ -178,6 +178,8 @@ final class RemoteModel {
     /// This device's end of each of an agent's shells it has opened (034), one per
     /// terminal tab (055, #345). The shells are the Mac's; these only know how to reach them.
     @ObservationIgnored private var shells: [ShellKey: ShellClient] = [:]
+    /// The Agent Browser pane's view of each host's browser (#3800), made once per host.
+    @ObservationIgnored private var machineBrowsers: [MachineRef: MachineBrowser] = [:]
     /// Shells no screen shows that still hold their emulator, most recent last, so going
     /// back to an agent's terminal finds it as it was instead of rebuilding it and
     /// replaying megabytes on the main thread (#419, as the Mac since #401). A few, not
@@ -2116,6 +2118,7 @@ final class RemoteModel {
             await DaemonClient.$patience.withValue(Self.catchUpPatience) {
                 await files.reconnected()
                 await catchUp()
+                await machineBrowsers[.mac]?.rewatchIfWatching()
             }
             watchOtherHosts()
             note("link: settled after \(ContinuousClock.now - began); still connected \(isConnected)")
@@ -2563,11 +2566,17 @@ final class RemoteModel {
                 work.replaceAgents(agents, from: id)
             }
             await refreshServerRuntimes(id)
+            await machineBrowsers[id]?.rewatchIfWatching()
             let notes = other.notifications()
             let shown = work.shown
             // Read off the main actor, once, and applied there (#203).
             Task.detached(priority: .userInitiated) { [weak self] in
                 for await note in notes {
+                    // Its browser, for the Agent Browser pane alone (#3800).
+                    if Self.browserNotifications.contains(note.method) {
+                        await self?.receivedBrowser(note.method, note.params, from: id)
+                        continue
+                    }
                     // Its runtimes, and the start page's draft made there (#240).
                     if note.method == DaemonAPI.Notification.runtimeChanged
                         || note.method == DaemonAPI.Notification.costChanged
@@ -2658,6 +2667,10 @@ final class RemoteModel {
 
     private func received(_ notification: (method: String, params: JSONValue?), _ update: AgentsModel.Update?) {
         self.lastHeardFrom = Date()
+        if Self.browserNotifications.contains(notification.method) {
+            receivedBrowser(notification.method, notification.params, from: .mac)
+            return
+        }
         var updated: Agent?
         if case .agentChanged(let agent)? = update { updated = agent }
         let previousLabels = updated.flatMap { self.work.agent($0.id)?.labels }
@@ -4289,6 +4302,37 @@ final class RemoteModel {
                                                        returning: DaemonAPI.FileCompletions.self)
         } catch {
             return DaemonAPI.FileCompletions(items: [], reason: DaemonAPI.FileCompletions.failure(error))
+        }
+    }
+
+    /// What a host says about its browser (#3800): for the Agent Browser pane alone.
+    nonisolated private static let browserNotifications: Set<String> = [
+        DaemonAPI.Notification.browserFrame, DaemonAPI.Notification.browserPageChanged,
+    ]
+
+    /// The Agent Browser pane's view of the browser on a session's host (#3800), made once
+    /// per host. Nil while that host cannot be reached from here.
+    func machineBrowser(for agentID: UUID) -> MachineBrowser? {
+        let host = work.agent(agentID)?.host ?? .mac
+        if let existing = machineBrowsers[host] { return existing }
+        guard let client = try? client(for: DaemonAPI.AgentRequest(agentID: agentID)) else { return nil }
+        let fresh = MachineBrowser(client: client, describe: Self.describeBrowserFailure)
+        machineBrowsers[host] = fresh
+        return fresh
+    }
+
+    private func receivedBrowser(_ method: String, _ params: JSONValue?, from host: MachineRef) {
+        machineBrowsers[host]?.received(method, params)
+    }
+
+    /// A browser call that failed, in words, under the page.
+    private static func describeBrowserFailure(_ error: any Error) -> String {
+        switch error {
+        case is HostAway: "The machine can't be reached right now."
+        case is MacAway: "Your Mac can't be reached right now."
+        case is DaemonClient.NoAnswer: "No answer from the machine in time."
+        case let error as JSONRPCError: error.message
+        default: "The connection to the machine was lost."
         }
     }
 

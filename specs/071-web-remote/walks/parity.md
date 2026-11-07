@@ -23,7 +23,7 @@ Alex chose tiers on 2026-10-27 (#2796). Each row has a **Tier** cell after its F
 
 **Core** is:
 - the session list, chat, question and permission cards, the prompt bar, approvals, notices and the Brief (the first list in #2796);
-- the session and folder work the Remote keeps (#2798): terminals, reading and editing files, diffs and Changes, the Worktrees list and the Simulator pane;
+- the session and folder work the Remote keeps (#2798): terminals, reading and editing files, diffs and Changes, the Worktrees list, the Simulator pane and the Agent Browser (Alex, 2026-11-07, #3800);
 - runtimes' details (accounts, Reaches the Model By, Mark Available), the Auto runtime on the new-session form and in the chat (Alex, 2026-10-29, #2923), personas on the new-session form (Alex, 2026-10-29, #2924), the Events and Resources pages, and MCP app views and their pins;
 - the workflow page's Activity, Run Now, Approve and Enabled; today's cost in Activity and the limit banners;
 - the join and sign-in approval cards, pairing and sign-in, and the strips that say a machine or the control plane is away;
