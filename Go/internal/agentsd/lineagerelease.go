@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -49,6 +50,10 @@ var releaseTagsDelay = time.Minute
 
 var versionTagPattern = regexp.MustCompile(`^v[0-9]+\.[0-9]+\.[0-9]+$`)
 
+// releaseTagsKept is how many done tags release-tags.json keeps for each repo (#3652): the
+// newest. A tag older than the oldest kept is done too, so a dropped one is not linked again.
+const releaseTagsKept = 50
+
 type releaseTagsFile struct {
 	// Done is each repo's (forge:path) tags already linked, so a tag is done once.
 	Done map[string][]string `json:"done,omitempty"`
@@ -85,15 +90,24 @@ func (d *Daemon) releaseTagsFileLocked() *releaseTagsFile {
 	return d.releaseFile
 }
 
-func (d *Daemon) doneReleaseTags(repo forgeRepo) map[string]bool {
+// doneReleaseTags is a repo's done tags, and, when the list is full, the oldest of them:
+// every tag older than that one is done too.
+func (d *Daemon) doneReleaseTags(repo forgeRepo) (done map[string]bool, floor string) {
 	d.releaseMu.Lock()
 	defer d.releaseMu.Unlock()
 	f := d.releaseTagsFileLocked()
-	done := map[string]bool{}
-	for _, t := range f.Done[repo.forge+":"+repo.path] {
+	done = map[string]bool{}
+	list := f.Done[repo.forge+":"+repo.path]
+	for _, t := range list {
 		done[t] = true
+		if floor == "" || versionLess(versionOf(t), versionOf(floor)) {
+			floor = t
+		}
 	}
-	return done
+	if len(list) < releaseTagsKept {
+		floor = ""
+	}
+	return done, floor
 }
 
 func (d *Daemon) markReleaseTagDone(repo forgeRepo, tag string) {
@@ -106,7 +120,7 @@ func (d *Daemon) markReleaseTagDone(repo forgeRepo, tag string) {
 			return
 		}
 	}
-	f.Done[key] = append(f.Done[key], tag)
+	f.Done[key] = keepNewestTags(append(f.Done[key], tag))
 	if err := writeStore(d.releaseTagsPath(), f); err != nil {
 		log.Printf("release-tags.json: could not save: %v", err)
 	}
@@ -155,9 +169,9 @@ func (d *Daemon) checkReleaseTagsForFolder(ctx context.Context, folder string, r
 		return
 	}
 	sortVersionTags(found)
-	done := d.doneReleaseTags(repo)
+	done, floor := d.doneReleaseTags(repo)
 	for i, tag := range found {
-		if done[tag] {
+		if done[tag] || floor != "" && versionLess(versionOf(tag), versionOf(floor)) {
 			continue
 		}
 		prev := ""
@@ -301,6 +315,15 @@ func milestoneVersionOf(tag string) string {
 }
 
 // sortVersionTags sorts tags by version, lowest first.
+// keepNewestTags is tags sorted, the newest releaseTagsKept of them.
+func keepNewestTags(tags []string) []string {
+	sortVersionTags(tags)
+	if n := len(tags) - releaseTagsKept; n > 0 {
+		tags = slices.Clone(tags[n:])
+	}
+	return tags
+}
+
 func sortVersionTags(tags []string) {
 	sort.Slice(tags, func(i, j int) bool { return versionLess(versionOf(tags[i]), versionOf(tags[j])) })
 }

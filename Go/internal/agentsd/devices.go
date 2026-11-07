@@ -258,6 +258,12 @@ func (d *Daemon) forgetDevice(c *Client, id wire.UUID) error {
 	if err := d.writeDevices(); err != nil {
 		return &Error{Code: wire.FailureCouldNotSave, Message: "devices.json: " + err.Error()}
 	}
+	d.afterDeviceForgottenLocked(id)
+	return nil
+}
+
+// afterDeviceForgottenLocked says a device is gone and closes its connections.
+func (d *Daemon) afterDeviceForgottenLocked(id wire.UUID) {
 	yes := true
 	Broadcast(d, wire.NotifyDeviceChanged, wire.DeviceNotification{ID: id, Removed: &yes})
 	d.mu.Lock()
@@ -272,7 +278,6 @@ func (d *Daemon) forgetDevice(c *Client, id wire.UUID) error {
 		k.conn.Close()
 	}
 	safe.Go("reconsider", d.reconsider)
-	return nil
 }
 
 // serveDevices registers the methods; devices_darwin.go calls it.
