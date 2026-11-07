@@ -3,9 +3,11 @@ package bitbucketmcp
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"regexp"
 	"sort"
@@ -34,6 +36,9 @@ type fakeBitbucket struct {
 	diffstat      map[int][]obj
 	prComments    map[int][]obj
 	statuses      map[string][]obj // commit → its statuses
+	steps         map[int][]obj    // Pipelines build number → its steps
+	logs          map[string]string // step uuid → its log, served from storage
+	ranges        []string          // the Range of each log read from storage
 	issues        []obj
 	issueComments map[int][]obj
 	changes       map[int][]obj
@@ -49,14 +54,19 @@ type fakeBitbucket struct {
 	email  string
 	status int // answer every request with this, when set
 	server *httptest.Server
+	// storage is where a step's log redirects to, as Bitbucket's goes to its file store.
+	storage *httptest.Server
 }
 
 func newFake(t *testing.T) *fakeBitbucket {
 	f := &fakeBitbucket{t: t, activity: map[int][]obj{}, diffstat: map[int][]obj{}, prComments: map[int][]obj{}, statuses: map[string][]obj{},
 		issueComments: map[int][]obj{}, changes: map[int][]obj{},
 		perms: map[string]string{"a-alex": "admin", "a-dev": "write", "a-reader": "read"}, members: map[string]bool{}, me: alex}
+	f.steps, f.logs = map[int][]obj{}, map[string]string{}
 	f.server = httptest.NewServer(http.HandlerFunc(f.serve))
 	t.Cleanup(f.server.Close)
+	f.storage = httptest.NewServer(http.HandlerFunc(f.serveLog))
+	t.Cleanup(f.storage.Close)
 	return f
 }
 
@@ -142,6 +152,8 @@ var (
 	issuePath         = regexp.MustCompile(`^` + root + `/issues/([0-9]+)$`)
 	issueCommentsPath = regexp.MustCompile(`^` + root + `/issues/([0-9]+)/comments$`)
 	changesPath       = regexp.MustCompile(`^` + root + `/issues/([0-9]+)/changes$`)
+	stepsPath         = regexp.MustCompile(`^` + root + `/pipelines/([0-9]+)/steps$`)
+	logPath           = regexp.MustCompile(`^` + root + `/pipelines/([0-9]+)/steps/(\{[^/]+\})/log$`)
 	permPath          = regexp.MustCompile(`^` + root + `/permissions-config/users/([^/]+)$`)
 	memberPath        = regexp.MustCompile(`^/workspaces/acme/members/([^/]+)$`)
 	sinceQuery        = regexp.MustCompile(`updated_on>=(\S+)`)
@@ -280,6 +292,17 @@ func (f *fakeBitbucket) serve(w http.ResponseWriter, r *http.Request) {
 		page(newestFirst(f.issueComments[n(issueCommentsPath.FindStringSubmatch(p))]))
 	case changesPath.MatchString(p):
 		page(newestFirst(f.changes[n(changesPath.FindStringSubmatch(p))]))
+	case stepsPath.MatchString(p):
+		page(f.steps[n(stepsPath.FindStringSubmatch(p))])
+	case logPath.MatchString(p):
+		uuid := logPath.FindStringSubmatch(p)[2]
+		if _, ok := f.logs[uuid]; !ok {
+			notFound()
+			return
+		}
+		// Another host's name, as Bitbucket's file store has: Go keeps the token on a redirect to the same one.
+		store := strings.Replace(f.storage.URL, "127.0.0.1", "localhost", 1)
+		http.Redirect(w, r, store+"/logs/"+url.PathEscape(uuid), http.StatusTemporaryRedirect)
 	case permPath.MatchString(p):
 		if f.adminless {
 			w.WriteHeader(http.StatusForbidden)
@@ -301,6 +324,40 @@ func (f *fakeBitbucket) serve(w http.ResponseWriter, r *http.Request) {
 		f.t.Errorf("fake Bitbucket: no %s %s", r.Method, r.URL)
 		notFound()
 	}
+}
+
+// serveLog is the file store a step's log redirects to: it takes a Range of the log's end,
+// and never the person's token.
+func (f *fakeBitbucket) serveLog(w http.ResponseWriter, r *http.Request) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if r.Header.Get("Authorization") != "" {
+		f.t.Errorf("the file store got the token")
+	}
+	f.ranges = append(f.ranges, r.Header.Get("Range"))
+	log := f.logs[strings.TrimPrefix(r.URL.Path, "/logs/")]
+	var want int
+	if _, err := fmt.Sscanf(r.Header.Get("Range"), "bytes=-%d", &want); err != nil {
+		_, _ = io.WriteString(w, log)
+		return
+	}
+	if len(log) == 0 {
+		w.WriteHeader(http.StatusRequestedRangeNotSatisfiable)
+		return
+	}
+	start := max(0, len(log)-want)
+	w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, len(log)-1, len(log)))
+	w.WriteHeader(http.StatusPartialContent)
+	_, _ = io.WriteString(w, log[start:])
+}
+
+// step is a Pipelines step, done with result (SUCCESSFUL, FAILED, ERROR), or still state.
+func step(uuid, name, result string) obj {
+	state := obj{"name": "COMPLETED", "result": obj{"name": result}}
+	if result == "" {
+		state = obj{"name": "IN_PROGRESS"}
+	}
+	return obj{"uuid": uuid, "name": name, "state": state}
 }
 
 // newestFirst is list by created_on, newest first, as sort=-created_on asks.

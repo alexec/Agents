@@ -143,7 +143,7 @@ Agents starts these tools. It does not own what they keep.
 | DigitalOcean, Codespaces, EC2 and GCP machines | Cloud machines | **No limit in count or time, and no stop when idle.** Only **Delete Machine** removes one. |
 | `~/.ssh/config` (or `AGENTS_SSH_CONFIG`) | A block for each codespace | A codespace's block goes when **Delete Machine** deletes it (#3746). A codespace deleted outside Agents keeps its block. The one block that agentsd keeps for all codespaces is written again each time it prepares ssh. |
 | `/tmp/agents-tunnels-<uid>-<pid>` | ssh control sockets | Removed at a clean stop; one whose process is gone goes when a control plane's tunnels start (#3649) |
-| `$TMPDIR/agents-output-*` | Output that the Mac window opened in TextEdit | **None**; macOS clears its temporary folder |
+| `$TMPDIR/agents-output-*` | Output that the Mac window opened in TextEdit | 1 day: the Mac window removes older copies when it starts (#3747) |
 
 ## On the control plane
 
@@ -323,6 +323,14 @@ control plane does not read the old one's pins.
 
 The Mac and the Remote keep their own key in the keychain, so that a new pairing can use
 it. The web page deletes its key.
+
+A walk's Mac window (run-app, `--walk <name>`) keeps its own keys,
+`control-client-key.walk.<name>` and `lock-signing-key.walk.<name>`. When its folder has
+gone, the next Mac window to start deletes them with the walk's defaults (#3747).
+
+Voice mode's Kokoro models are in the app. The Mac window and the Remote link them into
+FluidAudio's cache when voice mode loads, and remove there what the app no longer carries,
+such as an older model (#3747). Only the current version stays.
 
 ## Export and import
 

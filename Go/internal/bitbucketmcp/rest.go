@@ -106,6 +106,24 @@ const NotConnected = "Bitbucket is not connected, or its token ended: set BITBUC
 	"repositories, pull requests and issues (and BITBUCKET_EMAIL to its account's email), or to an access token"
 
 func (b *RealBitbucket) do(ctx context.Context, method, path string, body any) ([]byte, error) {
+	res, err := b.request(ctx, method, path, body, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	data, err := io.ReadAll(io.LimitReader(res.Body, 64<<20))
+	if err != nil {
+		return nil, &BitbucketError{Kind: Failed, Message: "Bitbucket: " + err.Error()}
+	}
+	if res.StatusCode >= 200 && res.StatusCode < 300 {
+		return data, nil
+	}
+	return nil, failure(res, data)
+}
+
+// request sends method to path as the person, with header's lines too, and gives the response
+// with its body unread, whatever its status.
+func (b *RealBitbucket) request(ctx context.Context, method, path string, body any, header http.Header) (*http.Response, error) {
 	token := b.Token()
 	if token == "" {
 		return nil, &BitbucketError{Kind: NotSignedIn, Message: NotConnected}
@@ -133,19 +151,14 @@ func (b *RealBitbucket) do(ctx context.Context, method, path string, body any) (
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 	req.Header.Set("User-Agent", "agents-bitbucket-mcp")
+	for k, v := range header {
+		req.Header[k] = v
+	}
 	res, err := b.Client.Do(req)
 	if err != nil {
 		return nil, &BitbucketError{Kind: Failed, Message: "Bitbucket: " + err.Error()}
 	}
-	defer res.Body.Close()
-	data, err := io.ReadAll(io.LimitReader(res.Body, 64<<20))
-	if err != nil {
-		return nil, &BitbucketError{Kind: Failed, Message: "Bitbucket: " + err.Error()}
-	}
-	if res.StatusCode >= 200 && res.StatusCode < 300 {
-		return data, nil
-	}
-	return nil, failure(res, data)
+	return res, nil
 }
 
 // failure is a response Bitbucket refused, as what went wrong.

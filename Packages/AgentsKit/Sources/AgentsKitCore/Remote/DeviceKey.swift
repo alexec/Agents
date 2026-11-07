@@ -142,10 +142,12 @@ public struct DeviceKey: Sendable {
     /// The device's keychain, and nothing else: one generic-password item per account.
     struct Keychain {
         var accessGroup: String?
+        /// Tests give a scratch service, so they never touch the device's own items.
+        var service = "com.alexecollins.agents.device"
 
         private func base(_ account: String) -> [String: Any] {
             var query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
-                                        kSecAttrService as String: "com.alexecollins.agents.device",
+                                        kSecAttrService as String: service,
                                         kSecAttrAccount as String: account]
             if let accessGroup { query[kSecAttrAccessGroup as String] = accessGroup }
             return query
@@ -159,6 +161,18 @@ public struct DeviceKey: Sendable {
             if status == errSecItemNotFound { return nil }
             guard status == errSecSuccess else { throw Failure.keychain(status) }
             return item as? Data
+        }
+
+        /// Every account this service keeps an item for.
+        func accounts() -> [String] {
+            var query = base("")
+            query.removeValue(forKey: kSecAttrAccount as String)
+            query[kSecReturnAttributes as String] = true
+            query[kSecMatchLimit as String] = kSecMatchLimitAll
+            var items: CFTypeRef?
+            guard SecItemCopyMatching(query as CFDictionary, &items) == errSecSuccess,
+                  let found = items as? [[String: Any]] else { return [] }
+            return found.compactMap { $0[kSecAttrAccount as String] as? String }
         }
 
         func delete(account: String) {
