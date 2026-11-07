@@ -85,6 +85,9 @@ type live struct {
 	briefDue bool
 	// tools is the turn's tool calls in flight, for Agent.RunningTool (runningtool.go).
 	tools toolsInFlight
+	// denied is the title of the tool call the person last refused on a card this turn,
+	// until the agent says or calls something after it (#3722).
+	denied string
 }
 
 type pendingPermission struct {
@@ -762,6 +765,7 @@ func (l *live) turn() bool {
 	clear(l.toolCalls)
 	l.evidence = turnEvidence{}
 	l.failure = nil
+	l.denied = ""
 	l.mu.Unlock()
 	// Archived or stopped while it got ready (#1611): its context is gone, and the state
 	// is left as the stop wrote it.
@@ -950,6 +954,7 @@ func (l *live) turn() bool {
 	}
 	switch r.StopReason {
 	case sdk.StopReasonEndTurn:
+		d.carryOnAfterDeny(l)
 		d.end(l, wire.AgentStateFinished, wire.EndedReasonEndTurn)
 	case sdk.StopReasonCancelled:
 		// A stop leaves what is queued behind it.
@@ -1329,6 +1334,7 @@ func (l *live) Update(n sdk.SessionNotification) {
 		}
 		l.lastMessage.WriteString(text)
 		l.evidence.takeReply(text)
+		l.denied = ""
 		l.mu.Unlock()
 		// The docs a message names, once it is whole (#3308).
 		d.noteDocLinks(l.id, said)
@@ -1351,6 +1357,7 @@ func (l *live) Update(n sdk.SessionNotification) {
 		said := l.lastMessage.String()
 		l.lastMessageID, l.lastMessage = "", strings.Builder{}
 		l.toolCalls[string(u.ToolCall.ToolCallId)] = true
+		l.denied = ""
 		l.seen.Broadcast()
 		l.mu.Unlock()
 		l.noteToolCall(call, true)
@@ -1526,6 +1533,7 @@ func (l *live) Permission(ctx context.Context, p sdk.RequestPermissionRequest) s
 			}
 		}
 		d.record(l.id, wire.TranscriptEntryKind{PermissionAnswered: &wire.TranscriptEntryKindPermissionAnswered{OptionID: option, OptionName: &name}})
+		l.noteDenied(req, option)
 	}
 	Broadcast(d, wire.NotifyAgentPermission, wire.PermissionNotification{AgentID: l.id, RequestID: req.ID})
 	d.reconsider()
@@ -1533,6 +1541,43 @@ func (l *live) Permission(ctx context.Context, p sdk.RequestPermissionRequest) s
 		d.setState(l.id, wire.AgentStateRunning)
 	}
 	return option
+}
+
+// noteDenied keeps the tool call the person refused, for carryOnAfterDeny.
+func (l *live) noteDenied(req wire.PermissionRequest, option string) {
+	for _, o := range req.Options {
+		if o.OptionID == option {
+			l.mu.Lock()
+			if o.Kind == wire.PermissionOptionKindRejectOnce || o.Kind == wire.PermissionOptionKindRejectAlways {
+				l.denied = req.ToolCall.Title
+			} else {
+				l.denied = ""
+			}
+			l.mu.Unlock()
+			return
+		}
+	}
+}
+
+// carryOnAfterDeny starts the agent again when its turn ended right after the person
+// refused a card, with no word after it (#3722): Copilot ends the whole turn on a reject,
+// but to a person Deny is "not that", not "stop". Nothing is sent when a prompt is queued
+// already, since that is the next turn.
+func (d *Daemon) carryOnAfterDeny(l *live) {
+	l.mu.Lock()
+	tool := l.denied
+	l.denied = ""
+	l.mu.Unlock()
+	if a := d.Store.Agent(l.id); tool == "" || a == nil || len(a.QueuedPrompts) > 0 {
+		return
+	}
+	if err := d.enqueue(l.id, wire.QueuedPrompt{ID: store.NewUUID(), Text: carryOnAfterDenyWords(tool), QueuedAt: now(), From: wire.PromptOriginApp}, false); err != nil {
+		log.Printf("agent %s: carry on after a deny: %v", l.id, err)
+	}
+}
+
+func carryOnAfterDenyWords(tool string) string {
+	return "The person denied “" + tool + "”. Carry on without it, or ask."
 }
 
 // refuseForBot answers a permission on a bot's machine: its reject option, said in the
