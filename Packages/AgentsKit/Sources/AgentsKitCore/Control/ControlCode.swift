@@ -118,7 +118,7 @@ public struct ControlCode: Sendable, Hashable {
 }
 
 public extension DaemonAPI {
-    /// `clients/startPairing`, `hosts/startEnroll`: the code, and until when it works.
+    /// `clients/startPairing`, `machines/startEnroll`: the code, and until when it works.
     struct ControlCodeShown: Codable, Sendable, Hashable {
         public var text: String
         public var expires: Date
@@ -146,7 +146,7 @@ public extension DaemonAPI {
         }
     }
 
-    /// `hosts/announce`, on an enrolment connection.
+    /// `machines/announce`, on an enrolment connection.
     struct MachineAnnounce: Codable, Sendable, Hashable {
         public var publicKey: Data
         public var name: String

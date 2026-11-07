@@ -197,6 +197,32 @@ struct DraftStoreTests {
         #expect(DraftStore(defaults: defaults).startDraft() == form)
     }
 
+    // MARK: Forget (#3670)
+
+    /// Forgetting the control plane clears every draft and the start form, and only this
+    /// root's: a scratch root's stay, and so does anything that is not a draft.
+    @Test func aForgetClearsThisRootsDraftsAndNoOthers() {
+        let defaults = MemoryDefaults()
+        let ordinary = DraftStore(defaults: defaults)
+        let scratch = DraftStore(defaults: defaults, scope: "run-forget")
+        ordinary.save(draft("to the old control plane"), for: .agent(UUID()))
+        ordinary.save(draft("a new one"), for: .newAgent(folder: URL(filePath: "/tmp/somewhere/api")))
+        ordinary.saveStartDraft(StartDraft(runtimeID: "claude"))
+        scratch.save(draft("a test's"), for: .newAgent(folder: nil))
+        defaults.set(true, forKey: "sidebar.folded")
+
+        ordinary.clearAll()
+
+        #expect(defaults.dictionaryRepresentation().keys.filter { $0.hasPrefix(ordinary.scopePrefix) }
+            .allSatisfy { $0.hasPrefix(scratch.scopePrefix) })
+        #expect(ordinary.startDraft() == nil)
+        #expect(scratch.draft(for: .newAgent(folder: nil))?.text == "a test's")
+        #expect(defaults.bool(forKey: "sidebar.folded"))
+
+        scratch.clearAll()
+        #expect(scratch.draft(for: .newAgent(folder: nil)) == nil)
+    }
+
     // MARK: One root's drafts are that root's
 
     /// A copy of the app on a scratch root shares the ordinary app's defaults. Neither may

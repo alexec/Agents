@@ -156,7 +156,7 @@ func (r *fakeRouter) asks() []delivered {
 
 func (r *fakeRouter) HostCan(string, string) bool { return true }
 
-// row is a hosts/list row, as far as the tests read it.
+// row is a machines/list row, as far as the tests read it.
 type row struct {
 	ID        string
 	State     string

@@ -86,6 +86,10 @@ export const openTurnsHeld = 8;
 export const historyEntriesCap = 1_600;
 export const historyTurnsCap = 200;
 
+/** How many events a host's list keeps as new ones come, and how many paging back brings in (#3650; the window's). */
+export const eventsKept = 1_000;
+export const eventsPagedMost = 5_000;
+
 /** A page of a finished turn's entries (#291). */
 export interface TurnDetailPage {
   entries: TranscriptEntry[];
@@ -1118,7 +1122,7 @@ export class Work {
   /** A host's git asking to use a Mac's git access (#1122), not answered here yet. */
   get gitLendAsk(): GitLendAsk | null { return firstAsk(this.hosts.value, this.gitAsksAnswered.value); }
 
-  /** The hosts whose `hosts/start` is out now, so the strip's Start waits for it (#691). */
+  /** The hosts whose `machines/start` is out now, so the strip's Start waits for it (#691). */
   readonly hostsBeingStarted = signal<readonly string[]>([]);
 
   /** Prompts and starts the control plane keeps for a stopped workspace (#691 US3), every host's. */
@@ -1496,7 +1500,7 @@ export class Store extends Work {
    */
   load(): Promise<void> {
     return this.once("*", async () => {
-      const [hosts] = await Promise.all([this.link.call("hosts/list", {}), this.loadPlane(), this.loadKept(), this.loadJoinRequests(),
+      const [hosts] = await Promise.all([this.link.call("machines/list", {}), this.loadPlane(), this.loadKept(), this.loadJoinRequests(),
         this.loadPeople().then(() => Promise.all([this.loadLinkRequests(), this.loadGovernanceRequests(), this.loadBudgetRequests(),
           this.loadRemoveRequests()])),
         this.loadSignInRequests()]);
@@ -1519,7 +1523,7 @@ export class Store extends Work {
 
   /** What the control plane keeps for stopped workspaces; one without providers keeps nothing. */
   private async loadKept(): Promise<void> {
-    const listed = await this.link.call("hosts/listKept", {}).catch(() => null);
+    const listed = await this.link.call("machines/listKept", {}).catch(() => null);
     this.kept.value = listed?.kept ?? [];
   }
 
@@ -1536,7 +1540,7 @@ export class Store extends Work {
 
   /** Machines waiting to join (#994); a control plane before it has none to say. */
   private async loadJoinRequests(): Promise<void> {
-    const listed = await this.link.call("hosts/joinRequests", {}).catch(() => null);
+    const listed = await this.link.call("machines/joinRequests", {}).catch(() => null);
     this.joinRequests.value = listed ?? [];
   }
 
@@ -1646,7 +1650,7 @@ export class Store extends Work {
    */
   async decideJoin(request: string, approve: boolean): Promise<void> {
     try {
-      await this.link.call(approve ? "hosts/approveJoin" : "hosts/denyJoin", { request });
+      await this.link.call(approve ? "machines/approveJoin" : "machines/denyJoin", { request });
       this.joinRequests.value = withoutJoin(this.joinRequests.value, request);
     } catch (error) {
       this.say(describe(error));
@@ -1715,7 +1719,7 @@ export class Store extends Work {
   }
 
   private async reloadHost(host: string): Promise<void> {
-    const hosts = await this.link.call("hosts/list", {});
+    const hosts = await this.link.call("machines/list", {});
     this.takeHosts(hosts);
     await this.onHost(host, async () => {
       const now = this.hosts.value.find((h) => h.id === host);
@@ -1776,7 +1780,7 @@ export class Store extends Work {
    *  a page opened while it is stopped lists its folders and sessions as one open when it went. */
   private async loadLastHeard(host: string): Promise<void> {
     if (this.hostIsOnline(host) || this.folders.value[host] !== undefined) return;
-    const heard = await this.link.call("hosts/lastHeard", { host: host as MachineRef }).catch(() => null);
+    const heard = await this.link.call("machines/lastHeard", { host: host as MachineRef }).catch(() => null);
     if (!heard || this.hostIsOnline(host) || this.folders.value[host] !== undefined) return;
     batch(() => {
       if (heard.agents) this.replaceAgents(heard.agents, host);
@@ -2372,7 +2376,7 @@ export class Store extends Work {
   /** Said to the control plane; Settings ▸ Git access takes one back with `allowed` false. */
   async lendGit(host: string, from: string, server: string, allowed: boolean): Promise<void> {
     try {
-      await this.link.call("hosts/lendGit", { host: host as MachineRef, from: from as MachineRef, server, allowed });
+      await this.link.call("machines/lendGit", { host: host as MachineRef, from: from as MachineRef, server, allowed });
       if (!allowed) {
         this.hosts.value = this.hosts.value.map((row) => {
           if (row.id !== host || !row.gitFrom) return row;
@@ -2391,7 +2395,7 @@ export class Store extends Work {
     if (this.hostsBeingStarted.value.includes(host)) return;
     this.hostsBeingStarted.value = [...this.hostsBeingStarted.value, host];
     try {
-      const row = await this.link.call("hosts/start", { host: host as MachineRef });
+      const row = await this.link.call("machines/start", { host: host as MachineRef });
       this.takeHostRow(row);
     } catch (error) {
       log("call.failed", error instanceof CallFailed ? error.code : undefined);
@@ -2404,7 +2408,7 @@ export class Store extends Work {
   /** Remove… on a machine (#3381): it stops connecting, and its agents are left running where they are. */
   async removeHost(host: string): Promise<void> {
     try {
-      await this.link.call("hosts/remove", { host: host as MachineRef });
+      await this.link.call("machines/remove", { host: host as MachineRef });
       this.takeHosts(this.hosts.value.filter((h) => h.id !== host));
       this.forgetHost(host);
     } catch (error) {
@@ -2415,12 +2419,12 @@ export class Store extends Work {
   /** × on a kept prompt: it isn't sent, and the workspace keeps starting (US3 AS3). */
   async dropKept(kept: KeptRequest): Promise<void> {
     this.kept.value = this.kept.value.filter((k) => k.id !== kept.id);
-    await this.link.call("hosts/dropKept", { host: kept.host, id: kept.id }).catch((error: unknown) => this.say(describe(error)));
+    await this.link.call("machines/dropKept", { host: kept.host, id: kept.id }).catch((error: unknown) => this.say(describe(error)));
   }
 
   /** Try Again on one that wasn't sent: kept again, and the workspace started. */
   async retryKept(kept: KeptRequest): Promise<void> {
-    await this.link.call("hosts/retryKept", { host: kept.host, id: kept.id }).catch((error: unknown) => this.say(describe(error)));
+    await this.link.call("machines/retryKept", { host: kept.host, id: kept.id }).catch((error: unknown) => this.say(describe(error)));
   }
 
   /** Calls `method`, and on failure says why in `problem` and answers null. */
@@ -3558,13 +3562,18 @@ export class Store extends Work {
     return agent;
   }
 
+  /**
+   * The newest page, laid over what is held. The list keeps `eventsKept` of them, as the window's
+   * live events (#3650); what goes is still the host's, and paging back brings it in.
+   */
   async loadEvents(host: string, limit = 50): Promise<void> {
     const page = await this.link.call("events/list", { limit }, host).catch(() => null);
     if (page) {
       const older = this.events.value[host]?.events ?? [];
       const merged = [...page.events, ...older.filter((event) => !page.events.some((next: ActivityEvent) => next.position === event.position))]
         .sort((a: ActivityEvent, b: ActivityEvent) => b.position - a.position);
-      this.events.value = { ...this.events.value, [host]: { ...page, events: merged } };
+      const hasMore = page.hasMore || merged.length > eventsKept;
+      this.events.value = { ...this.events.value, [host]: { ...page, events: merged.slice(0, eventsKept), hasMore } };
     }
   }
 
@@ -3586,8 +3595,10 @@ export class Store extends Work {
     const held = this.events.value[host];
     if (!held) return;
     const byPosition = new Map([...held.events, ...page.events].map((event: ActivityEvent) => [event.position, event]));
+    const events = [...byPosition.values()].sort((a, b) => b.position - a.position);
+    // Paging back stops at eventsPagedMost (#3650), as in the window.
     this.events.value = { ...this.events.value, [host]: {
-      ...held, events: [...byPosition.values()].sort((a, b) => b.position - a.position), hasMore: page.hasMore,
+      ...held, events: events.slice(0, eventsPagedMost), hasMore: page.hasMore && events.length < eventsPagedMost,
     } };
   }
 

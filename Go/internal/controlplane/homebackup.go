@@ -41,13 +41,16 @@ type HomeParts struct {
 	// The certificate and its key: a self-signed one's, or one given by path.
 	TLSCert, TLSKey string
 	APNsKey         string
+	// WebPushKey is the VAPID key (#3651): a restore without it makes every browser's push
+	// subscription stop working.
+	WebPushKey string
 }
 
 // HomePartsIn is where a home keeps them: what serve --home uses.
 func HomePartsIn(home string) HomeParts {
 	return HomeParts{ControlKey: filepath.Join(home, "control-key"), SecretsKey: filepath.Join(home, "secrets-key"),
 		TLSCert: filepath.Join(home, "tls", "cert.pem"), TLSKey: filepath.Join(home, "tls", "key.pem"),
-		APNsKey: filepath.Join(home, "apns.p8")}
+		APNsKey: filepath.Join(home, "apns.p8"), WebPushKey: filepath.Join(home, "webpush-key.pem")}
 }
 
 // BackupList is backup.json.
@@ -65,7 +68,7 @@ func backupFiles(p HomeParts) []struct{ from, name string } {
 	return []struct{ from, name string }{
 		{p.ControlKey, "control-key"}, {p.SecretsKey, "secrets-key"},
 		{p.TLSCert, filepath.Join("tls", "cert.pem")}, {p.TLSKey, filepath.Join("tls", "key.pem")},
-		{p.APNsKey, "apns.p8"},
+		{p.APNsKey, "apns.p8"}, {p.WebPushKey, "webpush-key.pem"},
 	}
 }
 
@@ -116,8 +119,8 @@ func Backup(ctx context.Context, st store.Store, parts HomeParts, to string) (*B
 
 // Restore puts a backup back: each part where parts says, and the records into st, which
 // must be empty. A part already there is not overwritten: a restore goes into a new home.
-// One that is there already the same is left, and so is an APNs key given as a secret (a
-// cloud machine's, read only): Kept says which were left. With newKeeper, the control key
+// One that is there already the same is left, and so is an APNs or VAPID key given as a
+// secret (a cloud machine's, read only): Kept says which were left. With newKeeper, the control key
 // sealed by the old KMS is left out, for the key exported with the backup to be sealed by a
 // new one; what the old KMS sealed (people's and providers' secrets) does not open.
 func Restore(ctx context.Context, from string, parts HomeParts, st store.Store, newKeeper bool) (*BackupList, error) {
@@ -141,7 +144,7 @@ func Restore(ctx context.Context, from string, parts HomeParts, st store.Store, 
 		there, err := os.ReadFile(f.from)
 		switch {
 		case errors.Is(err, os.ErrNotExist):
-		case err == nil && string(there) == string(mine), f.name == "apns.p8":
+		case err == nil && string(there) == string(mine), f.name == "apns.p8", f.name == "webpush-key.pem":
 			left[f.name] = true
 			list.Kept = append(list.Kept, f.from)
 		default:

@@ -58,11 +58,11 @@ func notFound(method string) *RPCError {
 var noSSHHere = fail(notSupported, "This control plane runs on our servers, which have no ssh of yours. Add a machine with its join command or a code, or from a machine provider.")
 
 // overSSH are the methods that reach a machine over this machine's ssh.
-var overSSH = map[string]bool{"hosts/install": true, "hosts/detect": true, "hosts/sshHosts": true}
+var overSSH = map[string]bool{"machines/install": true, "machines/detect": true, "machines/sshHosts": true}
 
 // ownersSSH are the methods that log in with this account's ssh: its config, agent and
 // known_hosts. That ssh is the local owner's, so no other person, admin or not, uses it.
-var ownersSSH = map[string]bool{"hosts/install": true, "hosts/detect": true, "hosts/sshHosts": true, "hosts/update": true}
+var ownersSSH = map[string]bool{"machines/install": true, "machines/detect": true, "machines/sshHosts": true, "machines/update": true}
 
 // notOwnersSSH is the answer to another person who calls one of ownersSSH.
 var notOwnersSSH = fail(notPermitted, "Only the control plane's owner can use its ssh. Add a machine with its join command or a code.")
@@ -109,13 +109,12 @@ type message struct {
 	Lock json.RawMessage `json:"lock,omitempty"`
 }
 
-// decode reads a line, with a machine/* or machines/* method under its old name (#2653).
+// decode reads a line.
 func decode(line string) (*message, bool) {
 	var m message
 	if json.Unmarshal([]byte(line), &m) != nil {
 		return nil, false
 	}
-	m.Method = wire.OldMethodName(m.Method)
 	return &m, true
 }
 

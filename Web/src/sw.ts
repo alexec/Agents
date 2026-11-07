@@ -18,6 +18,7 @@ interface NotificationEvent extends Event {
 interface WindowClient {
   readonly url: string;
   focus(): Promise<WindowClient>;
+  navigate(url: string): Promise<WindowClient | null>;
 }
 interface Scope {
   readonly registration: ServiceWorkerRegistration;
@@ -50,10 +51,12 @@ scope.addEventListener("push", (event) => {
 
 scope.addEventListener("notificationclick", (event) => {
   event.notification.close();
+  const open = (event.notification.data as { open?: string } | null)?.open ?? "/";
   event.waitUntil((async () => {
     const pages = await scope.clients.matchAll({ type: "window", includeUncontrolled: true });
     const page = pages[0];
-    if (page) await page.focus();
-    else await scope.clients.openWindow("/");
+    if (!page) await scope.clients.openWindow(open);
+    else if (open === "/") await page.focus();
+    else await (await page.navigate(open))?.focus();
   })());
 });

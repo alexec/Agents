@@ -6,7 +6,9 @@ import { App } from "./App";
 import { Store } from "./model/store";
 import { Session } from "./session";
 import { startPresence } from "./presence";
-import { startPageNotices } from "./pageNotices";
+import { dropWebPush, startPageNotices } from "./pageNotices";
+import { forgetPins } from "./model/machineLock";
+import { effect } from "@preact/signals";
 import { startAgentLinks } from "./model/agentLink";
 import { startSpinnerClock } from "./spinnerClock";
 
@@ -16,6 +18,14 @@ startPresence(store);
 startPageNotices(store);
 startAgentLinks(store);
 startSpinnerClock();
+// Forgotten, here or in another tab (#3670): the drafts, the lock pins and the push subscription
+// were that control plane's, and go with it.
+effect(() => {
+  if (session.state.value.kind !== "forgotten") return;
+  store.drafts.clear();
+  forgetPins();
+  void dropWebPush();
+});
 const root = document.getElementById("app");
 if (root) render(<App session={session} store={store} />, root);
 session.start(linkedCode, oidcBack);

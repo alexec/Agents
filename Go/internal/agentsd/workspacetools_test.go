@@ -12,7 +12,7 @@ import (
 )
 
 // Ports WorkspaceToolsTests (#1444): an agent's workspace tools go to the control plane as
-// host/machines, named for its log; off a control plane they say there are none; making
+// machine/machines, named for its log; off a control plane they say there are none; making
 // one asks the person first, and nothing is made without their yes.
 
 func TestAnAgentsWorkspaceTools(t *testing.T) {
@@ -50,7 +50,7 @@ func TestAnAgentsWorkspaceTools(t *testing.T) {
 		case "machines/forAgent":
 			b, _ := json.Marshal(listed)
 			return b, nil
-		case "hosts/start":
+		case "machines/start":
 			return json.RawMessage(`{"state":"online"}`), nil
 		case "providers/create":
 			return json.RawMessage(`{"workspace":{"id":"w2","name":"second"},"joining":true}`), nil
@@ -114,7 +114,7 @@ func TestAnAgentsWorkspaceTools(t *testing.T) {
 	mu.Lock()
 	defer mu.Unlock()
 	for _, call := range asked {
-		if call.Method == "hosts/deleteMachine" {
+		if call.Method == "machines/deleteMachine" {
 			t.Fatal("deleted without a yes")
 		}
 	}

@@ -39,6 +39,8 @@ type processBook struct {
 	procCPU                 map[int32]float64
 	procAt                  time.Time
 	machineBusy, machineAll float64
+	// machineAt is when machineBusy and machineAll were read, by either ask (#3626).
+	machineAt time.Time
 }
 
 // processNode is a process in the tree: its parent, and the session it is part of.
@@ -138,15 +140,7 @@ func (d *Daemon) processesState(ctx context.Context) wire.ProcessesState {
 		}
 		return m
 	}
-	machineOf := func() (busy, all float64) {
-		ts, err := cpu.TimesWithContext(ctx, false)
-		if err != nil || len(ts) == 0 {
-			return 0, 0
-		}
-		t := ts[0]
-		all = t.User + t.System + t.Idle + t.Nice + t.Iowait + t.Irq + t.Softirq + t.Steal
-		return all - t.Idle - t.Iowait, all
-	}
+	machineOf := func() (busy, all float64) { return machineCPU(ctx) }
 
 	// The start of "now": the last ask's, when it is fresh, or a sample taken here.
 	before, beforeAt := d.procCPU, d.procAt
@@ -161,7 +155,7 @@ func (d *Daemon) processesState(ctx context.Context) wire.ProcessesState {
 	}
 	now, nowAt := cpuOf(), time.Now()
 	busy, all := machineOf()
-	d.procCPU, d.procAt, d.machineBusy, d.machineAll = now, nowAt, busy, all
+	d.procCPU, d.procAt, d.machineBusy, d.machineAll, d.machineAt = now, nowAt, busy, all, nowAt
 
 	out := wire.ProcessesState{Processes: make([]wire.ProcessUsage, 0, len(nodes)), Omitted: int64(omitted)}
 	elapsed := nowAt.Sub(beforeAt).Seconds()
@@ -186,12 +180,53 @@ func (d *Daemon) processesState(ctx context.Context) wire.ProcessesState {
 		out.Processes = append(out.Processes, u)
 	}
 
-	out.Machine.CpuCount = int64(goruntime.NumCPU())
+	out.Machine = machineUsage(ctx, beforeBusy, beforeAll, busy, all)
+	return out
+}
+
+// machineCPU is the machine's busy and total CPU seconds, every core together.
+func machineCPU(ctx context.Context) (busy, all float64) {
+	ts, err := cpu.TimesWithContext(ctx, false)
+	if err != nil || len(ts) == 0 {
+		return 0, 0
+	}
+	t := ts[0]
+	all = t.User + t.System + t.Idle + t.Nice + t.Iowait + t.Irq + t.Softirq + t.Steal
+	return all - t.Idle - t.Iowait, all
+}
+
+// machineUsage is the machine's CPU between two reads of machineCPU, and its memory now.
+func machineUsage(ctx context.Context, beforeBusy, beforeAll, busy, all float64) wire.MachineUsage {
+	u := wire.MachineUsage{CpuCount: int64(goruntime.NumCPU())}
 	if all > beforeAll {
-		out.Machine.CpuPercent = max(0, min(100, (busy-beforeBusy)/(all-beforeAll)*100))
+		u.CpuPercent = max(0, min(100, (busy-beforeBusy)/(all-beforeAll)*100))
 	}
 	if v, err := mem.VirtualMemoryWithContext(ctx); err == nil {
-		out.Machine.MemoryUsed, out.Machine.MemoryTotal = int64(v.Used), int64(v.Total)
+		u.MemoryUsed, u.MemoryTotal = int64(v.Used), int64(v.Total)
 	}
+	return u
+}
+
+// machineUsageState is machine/usage (#3626): a machine's page. Its CPU since the last ask
+// (of either this or processes/list), or over processesSample when there was none in the last
+// minute; its memory now; and every disk the last disk look found, ok ones too.
+func (d *Daemon) machineUsageState(ctx context.Context) wire.MachineUsageState {
+	d.procMu.Lock()
+	beforeBusy, beforeAll := d.machineBusy, d.machineAll
+	if d.machineAt.IsZero() || time.Since(d.machineAt) > processesFresh {
+		beforeBusy, beforeAll = machineCPU(ctx)
+		select {
+		case <-ctx.Done():
+		case <-time.After(processesSample):
+		}
+	}
+	busy, all := machineCPU(ctx)
+	d.machineBusy, d.machineAll, d.machineAt = busy, all, time.Now()
+	d.procMu.Unlock()
+
+	out := wire.MachineUsageState{Machine: machineUsage(ctx, beforeBusy, beforeAll, busy, all)}
+	d.diskMu.Lock()
+	out.Disks = append([]wire.DiskAlarm{}, d.diskVolumes...)
+	d.diskMu.Unlock()
 	return out
 }

@@ -29,7 +29,7 @@ import (
 // control plane's key, so a scratch control plane's host never takes the person's.
 //
 // The control plane stays the authority for who may connect. The host lets in only a
-// window the control plane lists as paired (host/clients), and keeps that list in its root
+// window the control plane lists as paired (machine/clients), and keeps that list in its root
 // for when the control plane is away. The window proves its key with the control plane's
 // own exchange (hello, auth, ok), with this host's key in place of the control plane's.
 // What it does is then what it would do through the control plane: the host tells every
@@ -42,7 +42,7 @@ const LocalGroup = "6T4RVD5724.com.alexecollins.agents"
 // for the control plane cannot be replayed here, nor one made here there.
 const localOrigin = "local:agentsd"
 
-// localClientsFile is the last host/clients, in the root.
+// localClientsFile is the last machine/clients, in the root.
 const localClientsFile = "control-clients.json"
 
 // localExchangeWait bounds the exchange: a caller that says nothing is let go.
@@ -66,12 +66,12 @@ func LocalSocketDir(home string) string {
 
 type localBook struct {
 	localMu sync.Mutex
-	// localClients is the last host/clients, by upper-case id; nil until read.
+	// localClients is the last machine/clients, by upper-case id; nil until read.
 	localClients map[string]wire.MachineClient
 	// localConns is each connection on the local socket, and the window it proved.
 	localConns map[*sockConn]string
 	// localKept is what localClientsFile holds, read the first time; it is written only
-	// when host/clients differs from it (#1528).
+	// when machine/clients differs from it (#1528).
 	localKept []byte
 	// localKey is the control plane's key the socket is named by, and localMove ends the
 	// socket at the old name when it changes (#997).
@@ -93,7 +93,7 @@ func (d *Daemon) MoveLocal(controlKey []byte) {
 	}
 }
 
-// SetLocalClients is host/clients: the windows the control plane lists as paired. It is
+// SetLocalClients is machine/clients: the windows the control plane lists as paired. It is
 // kept in the root, and a window no longer listed (forgotten) is cut off at once.
 func (d *Daemon) SetLocalClients(list wire.MachineClients) {
 	clients := ownUsersWindows(list)
@@ -135,7 +135,7 @@ func (d *Daemon) SetLocalClients(list wire.MachineClients) {
 	}
 }
 
-// ownUsersWindows is the windows of a host/clients by upper-case id: of the host's own user
+// ownUsersWindows is the windows of a machine/clients by upper-case id: of the host's own user
 // only, when the control plane says who that is (FR-020). A window of another person is
 // never let in here, even if a control plane lists it; an older control plane, which says
 // no user, is taken at its word.
@@ -166,27 +166,25 @@ func (d *Daemon) localClient(id string) (wire.MachineClient, bool) {
 	return c, ok
 }
 
-// Told is what the control plane tells this host on its uplink's channel 0, a machine/*
-// method under its old name (#2653).
+// Told is what the control plane tells this host on its uplink's channel 0.
 func (d *Daemon) Told(method string, params json.RawMessage) {
-	method = wire.OldMethodName(method)
-	if method == wire.NotifyHostUserSettings.Name {
+	if method == wire.NotifyMachineUserSettings.Name {
 		d.toldUserSettings(params)
 		return
 	}
-	if method == wire.NotifyHostLock.Name {
+	if method == wire.NotifyMachineLock.Name {
 		d.toldLock(params)
 		return
 	}
-	if method == wire.NotifyHostLockJoinChanged.Name {
+	if method == wire.NotifyMachineLockJoinChanged.Name {
 		d.toldLockJoin(params)
 		return
 	}
-	if method == wire.NotifyHostUser.Name {
+	if method == wire.NotifyMachineUser.Name {
 		d.toldHostUser(params)
 		return
 	}
-	if method == wire.NotifyHostPolicy.Name {
+	if method == wire.NotifyMachinePolicy.Name {
 		d.toldPolicy(params)
 		return
 	}
@@ -194,15 +192,15 @@ func (d *Daemon) Told(method string, params json.RawMessage) {
 		d.toldUserSuspended(params)
 		return
 	}
-	if method == wire.NotifyHostRelease.Name {
+	if method == wire.NotifyMachineRelease.Name {
 		d.toldRelease(params)
 		return
 	}
-	if method == wire.NotifyHostProjects.Name {
+	if method == wire.NotifyMachineProjects.Name {
 		d.toldProjects(params)
 		return
 	}
-	if method == wire.NotifyHostOrgRoutes.Name {
+	if method == wire.NotifyMachineOrgRoutes.Name {
 		d.toldOrgRoutes(params)
 		return
 	}
@@ -210,7 +208,7 @@ func (d *Daemon) Told(method string, params json.RawMessage) {
 		d.toldNoticeDelivered(params)
 		return
 	}
-	if method != wire.NotifyHostClients.Name {
+	if method != wire.NotifyMachineClients.Name {
 		return
 	}
 	var list wire.MachineClients

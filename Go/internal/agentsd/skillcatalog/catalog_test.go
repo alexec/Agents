@@ -147,3 +147,35 @@ func TestASkillFileSaysItsNameAndDescription(t *testing.T) {
 		t.Fatal(FolderName("My Skill!"), FolderName(".."), Slug("Swift_UI expert"))
 	}
 }
+
+func TestTheFolderLockKeepsPersonasApartFromSkills(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "skills-lock.json")
+	copyLock(t, "folder-before.json", path)
+	lock, _ := LoadLock(FolderScope, path)
+	skills := lock.Names()
+	sort.Strings(skills)
+	lock.UpsertPersona("reviewer", PersonaEntry{Source: "o/r", Path: "personas/reviewer.md", Commit: "c", BlobSHA: "b"}, lockNow)
+	lock.Write()
+	again, err := LoadLock(FolderScope, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e, ok := again.Persona("reviewer"); !ok || e.BlobSHA != "b" || strings.Join(again.Names(), ",") != strings.Join(skills, ",") {
+		t.Fatalf("%+v %v", e, again.Names())
+	}
+	again.RemovePersona("reviewer")
+	again.Write()
+	// The last one out takes the key with it, so the file is as the CLI writes it again.
+	if b, _ := os.ReadFile(path); strings.Contains(string(b), "personas") {
+		t.Fatal(string(b))
+	}
+}
+
+func TestOnlyTopLevelPersonaFilesAreListed(t *testing.T) {
+	got := PersonaFiles([]TreeEntry{{Path: "personas/a.md", Type: "blob"}, {Path: "personas/x/b.md", Type: "blob"},
+		{Path: "personas/.hidden.md", Type: "blob"}, {Path: "personas/c.txt", Type: "blob"}, {Path: "personas/l.md", Type: "blob", Mode: "120000"},
+		{Path: "other/personas/d.md", Type: "blob"}})
+	if len(got) != 1 || got[0].ID != "a" {
+		t.Fatalf("%+v", got)
+	}
+}

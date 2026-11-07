@@ -29,6 +29,7 @@ machine, see [Back up and restore a machine](back-up-and-restore.md).
 | `secrets-key` | The key that seals secrets on a Mac. A cloud machine uses its KMS instead. |
 | `tls/cert.pem`, `tls/key.pem` | The certificate that every device and machine is pinned to, when the control plane makes its own. |
 | `apns.p8` | The APNs key, when there is one. |
+| `webpush-key.pem` | The Web Push (VAPID) key, when there is one (`AGENTS_WEBPUSH_KEY_FILE`). Without it, a restored control plane cannot push to a browser that subscribed before. |
 | `backup.json` | When the backup was made, and what is in it. |
 
 The backup holds keys in clear. Keep it as safe as the control plane's own folder: on an

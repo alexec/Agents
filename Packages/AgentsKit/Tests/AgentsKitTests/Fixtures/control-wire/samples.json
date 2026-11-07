@@ -1328,5 +1328,12 @@
         "agentId": "6F9619FF-8B86-D011-B42D-00C04FC964FF", "title": "title" }
     ],
     "omitted": 7
+  },
+  "MachineUsageState": {
+    "machine": { "cpuPercent": 12.5, "cpuCount": 8, "memoryUsed": 7000000000, "memoryTotal": 16000000000 },
+    "disks": [
+      { "reading": { "volume": "Macintosh HD", "mount": "/", "freeBytes": 9000000000, "totalBytes": 500000000000 },
+        "level": "low", "threshold": 20000000000, "worktrees": [] }
+    ]
   }
 }

@@ -24,6 +24,8 @@ final class MacNotifier: NSObject, UNUserNotificationCenterDelegate {
     var open: @MainActor (UUID, UUID?) -> Void = { _, _ in }
     /// A folder's page, for a question asked of the folder rather than a session (#531).
     var openFolder: @MainActor (URL) -> Void = { _ in }
+    /// This Mac's page, for a machine's notice (#3682): a volume almost full.
+    var openMachine: @MainActor () -> Void = {}
     /// One of the banner's own buttons (#1170): the need's token, the answer, and the line
     /// typed for a reply.
     var answer: @MainActor (String, QuickAnswer, String?) async -> Void = { _, _, _ in }
@@ -175,6 +177,11 @@ final class MacNotifier: NSObject, UNUserNotificationCenterDelegate {
             await MainActor.run {
                 NSApp.activate()
                 open(agentID, line)
+            }
+        } else if NeedID.isMachineNotice(token: request.identifier) {
+            await MainActor.run {
+                NSApp.activate()
+                openMachine()
             }
         } else if let folder = NeedID.guardedFolder(fromToken: request.identifier) {
             await MainActor.run {

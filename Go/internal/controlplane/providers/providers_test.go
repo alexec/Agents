@@ -785,7 +785,7 @@ func TestAnAgentMakesAtAProviderByItsName(t *testing.T) {
 func TestAnAgentCantAskAnythingElse(t *testing.T) {
 	h := newHarness(t)
 	h.add()
-	for _, method := range []string{MethodProvidersAdd, MethodProvidersRemove, "hosts/remove", MethodProvidersList} {
+	for _, method := range []string{MethodProvidersAdd, MethodProvidersRemove, "machines/remove", MethodProvidersList} {
 		if _, err := h.agentCall(method, map[string]any{}); failureOf(err) == nil || failureOf(err).Code != CodeNotPermitted {
 			t.Errorf("%s: %v", method, err)
 		}
@@ -986,8 +986,8 @@ func TestACarriedCodespaceIsInstalledFromItsMachine(t *testing.T) {
 		if deref(ask.Trust) != "SHA256:abc" {
 			return rawOf(wire.ProviderCarried{Result: rawOf(SSHResult{NeedsTrust: new("SHA256:abc")})})
 		}
-		h.providers.HostSaid(other, wire.NotifyHostInstallProgress.Name, rawOf(wire.ControlInstallProgress{Name: "fuzzy", Step: "not-this"}))
-		h.providers.HostSaid(carrier, wire.NotifyHostInstallProgress.Name, rawOf(wire.ControlInstallProgress{Name: "fuzzy", Step: "setUp"}))
+		h.providers.HostSaid(other, wire.NotifyMachineInstallProgress.Name, rawOf(wire.ControlInstallProgress{Name: "fuzzy", Step: "not-this"}))
+		h.providers.HostSaid(carrier, wire.NotifyMachineInstallProgress.Name, rawOf(wire.ControlInstallProgress{Name: "fuzzy", Step: "setUp"}))
 		return rawOf(wire.ProviderCarried{Result: rawOf(SSHResult{})})
 	}
 	request := wire.MachineInstall{Destination: "cs.fuzzy-space.main", Name: new("fuzzy"), Provider: &id,
@@ -1017,7 +1017,7 @@ func TestACarriedCodespaceIsInstalledFromItsMachine(t *testing.T) {
 		t.Error("the install's progress was not said as it should be")
 	}
 	// After the install, a machine's progress is not said.
-	h.providers.HostSaid(carrier, wire.NotifyHostInstallProgress.Name, rawOf(wire.ControlInstallProgress{Name: "fuzzy", Step: "late"}))
+	h.providers.HostSaid(carrier, wire.NotifyMachineInstallProgress.Name, rawOf(wire.ControlInstallProgress{Name: "fuzzy", Step: "late"}))
 	if h.router.heard("late") {
 		t.Error("progress said with no install running")
 	}

@@ -42,6 +42,8 @@ func TestMain(m *testing.M) {
 	milestoneLookup = func(context.Context, string, forgeRepo, int) (issueOnForge, error) { return issueOnForge{}, errNoForgeInTests }
 	// Nor erases a deleted agent's runtime copy (#1001): that starts the runtime.
 	erasing = false
+	// Nor asks a runtime its version (#3674): that starts the runtime too.
+	runtimeVersion = func(string) string { return "" }
 	os.Exit(m.Run())
 }
 
@@ -75,6 +77,19 @@ func systemPromptOf(meta any) string {
 	}
 	s, _ := m["rules"].(string)
 	return s
+}
+
+// instructionsOf is the files named in OPENCODE_CONFIG_CONTENT's instructions, read as
+// OpenCode reads them on each prompt (#2612).
+func instructionsOf() string {
+	var config struct{ Instructions []string }
+	json.Unmarshal([]byte(os.Getenv("OPENCODE_CONFIG_CONTENT")), &config)
+	var out []string
+	for _, file := range config.Instructions {
+		b, _ := os.ReadFile(file)
+		out = append(out, strings.TrimSuffix(string(b), "\n"))
+	}
+	return strings.Join(out, "\n\n")
 }
 
 func (f *fakeRuntime) Initialize(context.Context, sdk.InitializeRequest) (sdk.InitializeResponse, error) {
@@ -138,7 +153,7 @@ func (f *fakeRuntime) ResumeSession(_ context.Context, r sdk.ResumeSessionReques
 	}
 	b, _ := json.Marshal(r.Meta)
 	f.sandboxOff = strings.Contains(string(b), `"sandbox":{"enabled":false}`)
-	f.systemPrompt = systemPromptOf(r.Meta)
+	f.systemPrompt = systemPromptOf(r.Meta) + instructionsOf()
 	var out sdk.ResumeSessionResponse
 	if filepath.Base(r.Cwd) == "reconnecting" {
 		json.Unmarshal([]byte(`{"configOptions":[{"type":"select","id":"mode","name":"Mode","currentValue":"default",
@@ -156,7 +171,7 @@ func (f *fakeRuntime) NewSession(_ context.Context, r sdk.NewSessionRequest) (sd
 	}
 	b, _ := json.Marshal(r.Meta)
 	f.sandboxOff = strings.Contains(string(b), `"sandbox":{"enabled":false}`)
-	f.systemPrompt = systemPromptOf(r.Meta)
+	f.systemPrompt = systemPromptOf(r.Meta) + instructionsOf()
 	if filepath.Base(r.Cwd) != "offers" {
 		return sdk.NewSessionResponse{SessionId: "fake-session"}, nil
 	}

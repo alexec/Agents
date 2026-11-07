@@ -50,7 +50,6 @@ struct ChatView: View {
                         .safeAreaInset(edge: .top, spacing: 0) {
                             VStack(spacing: 0) {
                                 OfflineStrip(host: agent.host)
-                                DiskStrip(host: agent.host)
                                 actions(for: agent)
                                 if finding, popped == nil {
                                     ChatFindBar(agentID: agent.id,

@@ -264,7 +264,7 @@ func TestNoToolsetFolderInstallsNone(t *testing.T) {
 		json.RawMessage(`{"destination":"devbox","trust":"`+hostKeyFingerprint+`"}`)))
 	// None is installed, and that is said (#3383).
 	if _, err := os.Stat(f.server("tools")); err == nil || len(f.logs) != 1 ||
-		f.logs[0] != "hosts/install: no toolset for claude: no toolsets folder on devbox" {
+		f.logs[0] != "machines/install: no toolset for claude: no toolsets folder on devbox" {
 		t.Fatalf("tools made, logs %v", f.logs)
 	}
 }

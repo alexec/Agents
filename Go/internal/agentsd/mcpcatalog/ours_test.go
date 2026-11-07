@@ -8,6 +8,7 @@ import (
 	"github.com/alexec/agents/Go/internal/emailmcp"
 	"github.com/alexec/agents/Go/internal/githubmcp"
 	"github.com/alexec/agents/Go/internal/gitlabmcp"
+	"github.com/alexec/agents/Go/internal/betterstackmcp"
 	"github.com/alexec/agents/Go/internal/googlechatmcp"
 	"github.com/alexec/agents/Go/internal/jiramcp"
 	"github.com/alexec/agents/Go/internal/linearmcp"
@@ -218,6 +219,27 @@ func TestSentryEventsAskForItsToken(t *testing.T) {
 	}
 	if len(built.Variables) != 3 || !built.Variables[0].Required || built.Variables[0].AlreadySet || !built.Variables[1].AlreadySet ||
 		built.Variables[2].Required || built.Variables[0].Kind != wire.MCPVariableKindSecret {
+		t.Fatalf("variables: %+v", built.Variables)
+	}
+}
+
+// Better Stack's events (#3655) ask for a token, kept in the person's secrets, declare the
+// events their server raises and no tools: Better Stack's own server has them.
+func TestBetterStackEventsAskForItsToken(t *testing.T) {
+	bs, ok := OursByID("agents/betterstack")
+	if !ok || bs.Command != "betterstack-mcp" || bs.Declares.Tools || bs.Declares.Views ||
+		!reflect.DeepEqual(bs.Declares.Events, betterstackmcp.EventNames()) {
+		t.Fatalf("betterstack: %+v %v, the server's %v", bs, ok, betterstackmcp.EventNames())
+	}
+	if bs.NameHere() != "better-stack-events" {
+		t.Fatalf("name: %s", bs.NameHere())
+	}
+	built := BuildOurs(bs, func(string) bool { return false })
+	want := `{"command":"betterstack-mcp","hosted":true,"env":{"BETTERSTACK_API_TOKEN":"${BETTERSTACK_API_TOKEN}","BETTERSTACK_TEAM":"${BETTERSTACK_TEAM}","BETTERSTACK_URL":"${BETTERSTACK_URL}"}}`
+	if got := strings.Join(strings.Fields(built.Entry.Stringified()), ""); got != want {
+		t.Fatalf("entry: %s", got)
+	}
+	if len(built.Variables) != 3 || !built.Variables[0].Required || built.Variables[1].Required || built.Variables[2].Required {
 		t.Fatalf("variables: %+v", built.Variables)
 	}
 }

@@ -640,7 +640,7 @@ func (b *Book) Work(ctx context.Context, user, client string, recipients []wire.
 	return items, lacks, nil
 }
 
-// Delivery is host/userSettings for a machine of user's: the settings, and each secret as
+// Delivery is machine/userSettings for a machine of user's: the settings, and each secret as
 // the person's client sealed it to recipient, the machine. Only for that user's own
 // machine's link (FR-025). A secret with no copy for it is left out, and named in waiting
 // as <name>|<version>.

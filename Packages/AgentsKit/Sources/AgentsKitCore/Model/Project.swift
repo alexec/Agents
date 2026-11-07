@@ -109,7 +109,7 @@ public extension DaemonAPI {
         }
     }
 
-    /// `projects/joined`'s answer and `host/projects` (#2669).
+    /// `projects/joined`'s answer and `machine/projects` (#2669).
     struct MachineProjects: Codable, Sendable, Hashable {
         public var projects: [ProjectTools]
 

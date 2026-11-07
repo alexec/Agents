@@ -57,6 +57,14 @@ func TestStoreReadsAreReadOnceByTag(t *testing.T) {
 	if len(c.held) != 29 {
 		t.Fatalf("%d held", len(c.held))
 	}
+	// #3650: the bytes held are counted, as the keys are.
+	sum := 0
+	for _, held := range c.held {
+		sum += len(held.data)
+	}
+	if c.bytes != sum {
+		t.Fatalf("%d bytes counted, %d held", c.bytes, sum)
+	}
 }
 
 // #2056: past mostRunsRead claims in a week, the newest are counted, not the oldest.

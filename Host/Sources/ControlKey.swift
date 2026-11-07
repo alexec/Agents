@@ -62,6 +62,30 @@ enum HostSecrets {
             try write(mine, account: aside)
             try write(key, account: "control-key")
         }
+        pruneKeysAside(paths)
+    }
+
+    /// Deletes the `control-key-before-*` keys past the newest 2, as their stores go (#3671):
+    /// a move back needs only the last one. A scratch set-up's are files in its own root.
+    static func pruneKeysAside(_ paths: HostPaths) {
+        if paths.scratch {
+            let names = (try? FileManager.default.contentsOfDirectory(atPath: paths.controlHome.path)) ?? []
+            for name in StoresAside.beyond(names.filter { $0.hasPrefix(StoresAside.keyPrefix) }) {
+                try? FileManager.default.removeItem(at: paths.controlHome.appendingPathComponent(name))
+            }
+            return
+        }
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,
+                                    kSecReturnAttributes as String: true, kSecMatchLimit as String: kSecMatchLimitAll]
+        var result: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+              let items = result as? [[String: Any]] else { return }
+        let accounts = items.compactMap { $0[kSecAttrAccount as String] as? String }
+        for account in StoresAside.beyond(accounts.filter { $0.hasPrefix(StoresAside.keyPrefix) }) {
+            let match: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,
+                                        kSecAttrAccount as String: account]
+            SecItemDelete(match as CFDictionary)
+        }
     }
 
     static func bucketKeys(_ paths: HostPaths) -> BucketKeys? {

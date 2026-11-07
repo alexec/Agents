@@ -12,7 +12,7 @@ import { signal } from "@preact/signals";
 import {
   Failure, type ControlCodeShown, type Lock, type LockJoinDecided, type LockJoinRequest, type LockJoinStarted, type WireDate,
 } from "../protocol/generated";
-import { base64, same } from "../wire/bytes";
+import { base64, fromBase64url, hex, same } from "../wire/bytes";
 import {
   b64, commitment, digits, follow, fromBase64, hashOf, inviteCode, isClient, LockCheckError, lockClientKind, makeInviteKey, makeRecovery,
   makeSigningKey, newNonce, openRecovery, parseRecovery, RecoveryError, sign, signedRecipients, wireNow, zeroPin, type LockPin,
@@ -23,7 +23,7 @@ import type { LockSigner } from "../wire/lockChannel";
 /** What the model needs of the link: the control plane's calls and this page's keys. */
 export interface LockLink {
   call(method: string, params: unknown): Promise<unknown>;
-  keyRecord(): Promise<{ client: string } | null>;
+  keyRecord(): Promise<{ client: string; control?: string } | null>;
   lockKey(): Promise<CryptoKeyPair | null>;
   saveLockKey(pair: CryptoKeyPair): Promise<void>;
 }
@@ -36,12 +36,24 @@ export interface PinStore {
 
 const pinKey = "agents-lock-pin";
 
-/** The pin kept in localStorage under key. */
-export function pinsAt(key: string): PinStore {
+/**
+ * The name this browser keeps a control plane's lock pins under (#3651), as the Mac and the
+ * Remote name theirs: the first eight bytes of the control plane's key, in hex. A re-pair to
+ * another control plane then starts from no pin, not from the old one. Without a key, the
+ * plain name.
+ */
+export function pinName(control: string | undefined): string {
+  const key = control ? fromBase64url(control) : null;
+  return key && key.length >= 8 ? `${pinKey}.${hex(key.subarray(0, 8))}` : pinKey;
+}
+
+/** The pin kept in localStorage under key, or under the name key() gives at each use. */
+export function pinsAt(key: string | (() => string)): PinStore {
+  const name = typeof key === "string" ? () => key : key;
   return {
     load() {
       try {
-        const said = JSON.parse(globalThis.localStorage?.getItem(key) ?? "null") as Partial<LockPin> | null;
+        const said = JSON.parse(globalThis.localStorage?.getItem(name()) ?? "null") as Partial<LockPin> | null;
         if (said && typeof said.person === "string" && typeof said.count === "number" && typeof said.head === "string") {
           return { person: said.person, count: said.count, head: said.head };
         }
@@ -52,15 +64,13 @@ export function pinsAt(key: string): PinStore {
     },
     save(pin) {
       try {
-        globalThis.localStorage?.setItem(key, JSON.stringify(pin));
+        globalThis.localStorage?.setItem(name(), JSON.stringify(pin));
       } catch {
         // Storage that is full or off keeps no pin.
       }
     },
   };
 }
-
-export const localPins: PinStore = pinsAt(pinKey);
 
 /**
  * Whether the person saved or skipped the recovery key on this device (#3493, D4), by person:
@@ -71,22 +81,25 @@ export interface RecoveryDone {
   set(person: string): void;
 }
 
-export const localRecoveryDone: RecoveryDone = {
-  done(person) {
-    try {
-      return globalThis.localStorage?.getItem(`agents-lock-recovery-done:${person}`) === "1";
-    } catch {
-      return false;
-    }
-  },
-  set(person) {
-    try {
-      globalThis.localStorage?.setItem(`agents-lock-recovery-done:${person}`, "1");
-    } catch {
-      // Storage that is full or off asks again next time.
-    }
-  },
-};
+/** The recovery marks kept in localStorage beside the pins named by name(). */
+export function recoveryDoneAt(name: () => string): RecoveryDone {
+  return {
+    done(person) {
+      try {
+        return globalThis.localStorage?.getItem(`${name()}.recoveryDone:${person}`) === "1";
+      } catch {
+        return false;
+      }
+    },
+    set(person) {
+      try {
+        globalThis.localStorage?.setItem(`${name()}.recoveryDone:${person}`, "1");
+      } catch {
+        // Storage that is full or off asks again next time.
+      }
+    },
+  };
+}
 
 export class MemoryRecoveryDone implements RecoveryDone {
   readonly people = new Set<string>();
@@ -98,8 +111,22 @@ export class MemoryRecoveryDone implements RecoveryDone {
   }
 }
 
-/** Another person's lock, as an admin's page pins it to check the machines it seals to (D7). */
-export const localPinsOf = (person: string): PinStore => pinsAt(`${pinKey}:${person}`);
+/** The pins and recovery marks this browser keeps, mine and other people's, for every control
+ *  plane, gone when the control plane forgets it (#3670): a new pairing starts clean. */
+export function forgetPins(storage: Pick<Storage, "length" | "key" | "removeItem"> | undefined = globalThis.localStorage): void {
+  if (!storage) return;
+  try {
+    const kept: string[] = [];
+    for (let i = 0; i < storage.length; i++) {
+      const key = storage.key(i);
+      if (key && (key === pinKey || key.startsWith(`${pinKey}:`) || key.startsWith(`${pinKey}.`)
+        || key.startsWith("agents-lock-recovery-done:"))) kept.push(key);
+    }
+    for (const key of kept) storage.removeItem(key);
+  } catch {
+    // Storage that is off keeps nothing to forget.
+  }
+}
 
 export class MemoryPins implements PinStore {
   pin: LockPin = zeroPin;
@@ -174,10 +201,22 @@ export class MachineLock {
   private again = false;
   private timer: ReturnType<typeof setTimeout> | undefined;
 
-  constructor(private readonly link: LockLink, private readonly pins: PinStore = localPins,
+  /** The control plane's key from the key record, which names where the pins are kept. */
+  private control: string | undefined;
+  private readonly pins: PinStore;
+  private readonly pinsOf: (person: string) => PinStore;
+  private readonly recoveryDone: RecoveryDone;
+
+  /** Without stores, the pins are kept in localStorage under this control plane's name (#3651). */
+  constructor(private readonly link: LockLink, pins?: PinStore,
     private readonly say: (error: unknown) => void = () => undefined, private readonly now: () => WireDate = () => wireNow(),
-    private readonly pinsOf: (person: string) => PinStore = localPinsOf,
-    private readonly recoveryDone: RecoveryDone = localRecoveryDone) {}
+    pinsOf?: (person: string) => PinStore, recoveryDone?: RecoveryDone) {
+    const name = () => pinName(this.control);
+    this.pins = pins ?? pinsAt(name);
+    // Another person's lock, as an admin's page pins it to check the machines it seals to (D7).
+    this.pinsOf = pinsOf ?? ((person) => pinsAt(() => `${name()}:${person}`));
+    this.recoveryDone = recoveryDone ?? recoveryDoneAt(name);
+  }
 
   /** The flow, once at a time: asked again while it runs, it runs once more after. */
   run(): Promise<void> {
@@ -243,6 +282,8 @@ export class MachineLock {
   /** The lock, checked against the pin, and the pin moved on; null when it is broken. */
   private async checked(): Promise<{ lock: Lock; state: LockState } | null> {
     const lock = (await this.link.call("lock/get", {})) as Lock;
+    // Asked before the first step (an admin's seal): the pins' name is the control plane's.
+    if (this.control === undefined) this.control = (await this.link.keyRecord())?.control;
     try {
       const state = await follow(this.pins.load(), lock);
       this.pins.save(state.pin());
@@ -260,6 +301,7 @@ export class MachineLock {
     const record = await this.link.keyRecord();
     if (!record) return;
     this.client = record.client.toUpperCase();
+    this.control = record.control;
     const { pair, publicRaw } = await this.signingKey();
     let read = await this.checked();
     if (!read) return;

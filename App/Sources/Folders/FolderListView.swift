@@ -18,6 +18,8 @@ struct FolderListView: View {
     /// Status, open until folded, and kept so. It keeps Activity's key (#915), so it
     /// opens as Activity was left.
     @AppStorage("showsActivity", store: WindowDefaults.store) private var showsStatus = true
+    /// Machines, open until folded, and kept so (#3626).
+    @AppStorage("showsMachines", store: WindowDefaults.store) private var showsMachines = true
     /// Usage, open until folded, and kept so (#915).
     @AppStorage("showsUsage", store: WindowDefaults.store) private var showsUsage = true
     /// The smart groups turned off in Settings ▸ Sidebar (#846).
@@ -58,6 +60,11 @@ struct FolderListView: View {
 
     /// One group per project (#3278): a project's folders on every machine together.
     private var groups: [SidebarProjects.Group] { SidebarProjects.groups(orderedFolders) }
+
+    /// This Mac, when it is one of the machines, then the others by name (#3626).
+    private var machines: [MachineRef] {
+        (model.hasMacHost ? [.mac] : []) + model.hosts.servers
+    }
 
     /// No runtime can be started on: Runtimes' icon says so in red (#587).
     private var runtimesFailing: Bool {
@@ -207,17 +214,27 @@ struct FolderListView: View {
             Section(isExpanded: $showsStatus) {
                 EventsRow().activityIcon("list.bullet.rectangle")
                     .appText(.supporting).sidebarInk(.events).tag(SidebarItem.events)
-                ResourcesRow().activityIcon("square.stack.3d.up")
-                    .appText(.supporting).sidebarInk(.resources).tag(SidebarItem.resources)
                 RuntimesRow().activityIcon("cpu", warns: runtimesFailing)
                     .appText(.supporting).sidebarInk(.runtimes).tag(SidebarItem.runtimes)
                 MCPServersRow().activityIcon("server.rack", warns: connectorsWarn)
                     .appText(.supporting).sidebarInk(.mcpServers).tag(SidebarItem.mcpServers)
-                WorktreesRow().activityIcon("arrow.triangle.branch")
-                    .appText(.supporting).sidebarInk(.worktrees).tag(SidebarItem.worktrees)
             } header: {
                 // The size of every other group's heading (#495).
                 Text("Status").appText(.supporting)
+            }
+
+            // A row per machine (#3626), each its page: CPU, memory and disks. Red when a
+            // disk is low.
+            if !machines.isEmpty {
+                Section(isExpanded: $showsMachines) {
+                    ForEach(machines, id: \.self) { host in
+                        MachineRow(host: host)
+                            .activityIcon(host == .mac ? "laptopcomputer" : "desktopcomputer", warns: model.diskWarns(host))
+                            .appText(.supporting).sidebarInk(.machine(host)).tag(SidebarItem.machine(host))
+                    }
+                } header: {
+                    Text("Machines").appText(.supporting)
+                }
             }
 
             Section(isExpanded: $showsUsage) {

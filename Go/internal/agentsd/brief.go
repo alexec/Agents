@@ -6,9 +6,11 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
+	"github.com/alexec/agents/Go/internal/agentsd/acp"
 	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -63,6 +65,56 @@ func endingBrief(runtimeID string) string {
 // route in initialize, which acp reads like the standard one (#2613). Cursor has no
 // fallback.
 var compatibilitySystemPromptDelivery = map[string]string{"claude": "append", "grok": "rules", "codex": "customInstructions"}
+
+// briefFileDelivery is the runtimes that read the brief from a file of the agent's own,
+// named in their configuration for that process, and the variable that carries it (#2612).
+// OpenCode 1.18.33 advertises no system prompt and ignores _meta.systemPrompt, but reads
+// each path in OPENCODE_CONFIG_CONTENT's instructions as system instructions on every
+// prompt, also after session/load. One process serves one agent, so the file is private to
+// it: the folder's AGENTS.md and the person's opencode.json are not touched.
+var briefFileDelivery = map[string]string{"opencode": "OPENCODE_CONFIG_CONTENT"}
+
+// briefFileName is the brief's file in the agent's own folder, which goes with the agent.
+const briefFileName = "brief.md"
+
+// withBriefFile is l with the brief written to the agent's folder and named in the
+// runtime's configuration, where runtimeID reads one (briefFileDelivery).
+func withBriefFile(l acp.Launch, runtimeID, folder, words string) (acp.Launch, error) {
+	variable := briefFileDelivery[runtimeID]
+	if words == "" || variable == "" {
+		return l, nil
+	}
+	if err := os.MkdirAll(folder, 0o700); err != nil {
+		return l, err
+	}
+	file := filepath.Join(folder, briefFileName)
+	if err := os.WriteFile(file, []byte(words+"\n"), 0o600); err != nil {
+		return l, err
+	}
+	config := map[string]any{}
+	prefix := variable + "="
+	for _, kv := range l.Env {
+		if strings.HasPrefix(kv, prefix) {
+			if err := json.Unmarshal([]byte(kv[len(prefix):]), &config); err != nil {
+				return l, fmt.Errorf("%s: %w", variable, err)
+			}
+		}
+	}
+	instructions, _ := config["instructions"].([]any)
+	config["instructions"] = append(slices.Clone(instructions), file)
+	b, err := json.Marshal(config)
+	if err != nil {
+		return l, err
+	}
+	l.Env = append(without(l.Env, variable), prefix+string(b))
+	return l, nil
+}
+
+// briefOutOfPrompt is whether the runtime takes the brief some other way than before the
+// person's words in the first prompt.
+func briefOutOfPrompt(runtimeID string) bool {
+	return compatibilitySystemPromptDelivery[runtimeID] != "" || briefFileDelivery[runtimeID] != ""
+}
 
 // brief is the whole of it for an agent, in the order it is said: who is who first, since
 // the paragraphs after it say "I" and "me" and that is the person it names; then the three

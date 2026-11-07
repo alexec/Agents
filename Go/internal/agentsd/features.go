@@ -73,13 +73,18 @@ func (d *Daemon) countFeature(method, client string) {
 	if day == nil {
 		day = map[string]map[string]int64{}
 		f.Days[today] = day
-		keepNewest(f.Days, featuresDaysKept, today)
+		pruneFeatures(f, nowFunc())
 	}
 	if day[method] == nil {
 		day[method] = map[string]int64{}
 	}
 	day[method][client]++
 	d.featureDirty = true
+}
+
+// pruneFeatures bounds features-history.json to its days (#3686).
+func pruneFeatures(f *featuresFile, now time.Time) int {
+	return keepSince(f.Days, oldestDay(now, featuresDaysKept), featuresDaysKept, dayStamp(now))
 }
 
 // countCall counts a socket call that was answered, as the client its connection is.
