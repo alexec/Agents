@@ -1,0 +1,32 @@
+# Registers the app's bundle id with Apple, once, before the app's record is made in App Store
+# Connect (which has no API for that). Run it from the Actions tab, or with
+# `gh workflow run setup.yml`. It does nothing when the bundle id is there already.
+#
+# It needs the secrets ASC_KEY_P8, ASC_KEY_ID and ASC_ISSUER_ID, as release.yml does.
+name: setup
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bundle-id:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Register the bundle id
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          if [[ -z $ASC_KEY_P8 || -z $ASC_KEY_ID || -z $ASC_ISSUER_ID ]]; then
+            echo "::error::Set the secrets ASC_KEY_P8, ASC_KEY_ID and ASC_ISSUER_ID."
+            exit 1
+          fi
+          echo "$ASC_KEY_P8" > "$RUNNER_TEMP/asc.p8"
+          ASC_KEY_PATH="$RUNNER_TEMP/asc.p8" swift scripts/asc.swift register

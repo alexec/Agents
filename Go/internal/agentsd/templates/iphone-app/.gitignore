@@ -1,0 +1,4 @@
+# xcodegen makes the project from project.yml.
+*.xcodeproj
+build/
+DerivedData/
