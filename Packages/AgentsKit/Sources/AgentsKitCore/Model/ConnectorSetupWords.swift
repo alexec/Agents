@@ -470,6 +470,43 @@ public enum ConnectorSetupWords {
     // MARK: The sheet
 
     /// Connect Linear (#1343, frame H): the same sheet, its own list.
+    /// The person's agents' bot (#3858): a GitHub App of their own, so agents post as
+    /// <login>-agents[bot] and not as the person. The web page's words are the same
+    /// (Web/src/model/connectorSetup.ts, botWords).
+    public enum Bot {
+        public static let title = "Agents' bot"
+        public static let makeButton = "Make My Agents' Bot\u{2026}"
+        public static let sheetTitle = "Make your agents' bot"
+        public static let notMade = "Your agents post as you. A bot of their own posts as <login>-agents[bot], and names you."
+        /// What the bot can do: the manifest's fixed permissions (connections.BotPermissions).
+        public static let abilities = [
+            "Read and write code, on branches and pull requests",
+            "Open and comment on issues and pull requests",
+            "Read checks and statuses, and run workflows again",
+        ]
+        public static let never = "Never: change workflows, secrets, environments, settings or members. Those stay yours."
+        public static let publicToggle = "Organisations can install it"
+        public static let publicHelp = "Turn on to use the bot on an organisation's repositories. The organisation's owner approves the install."
+        public static let keyNote = "GitHub gives the bot's key to this machine only. It never goes to Agents' servers."
+        public static let continueButton = "Continue on github.com"
+        public static let waiting = "Waiting for github.com\u{2026} Choose Create GitHub App there, and Agents comes back by itself."
+        public static let finishing = "Taking the bot's key on this machine\u{2026}"
+        public static let installButton = "Install on Repositories\u{2026}"
+        public static let removeButton = "Forget the Bot\u{2026}"
+        public static let removeTitle = "Forget your agents' bot?"
+        public static let removeMessage = "This machine deletes the bot's key, and agents post as you again. The App stays on GitHub until you delete it there."
+
+        /// The bot's line under the GitHub row: its name, and where it is installed.
+        public static func note(_ bot: DaemonAPI.ConnectionBot) -> String {
+            guard bot.made else { return notMade }
+            let name = bot.name ?? "Your bot"
+            guard let list = bot.installations else { return bot.message ?? "\(name). GitHub could not be asked where it is installed." }
+            if list.isEmpty { return "\(name), not installed yet: install it on the repositories agents work on." }
+            let places = list.map { $0.all ? "\($0.account) (all repositories)" : "\($0.account) (chosen repositories)" }
+            return "\(name), on " + places.joined(separator: ", ") + "."
+        }
+    }
+
     public enum Linear {
         public static let abilities = [
             "Read and write issues",

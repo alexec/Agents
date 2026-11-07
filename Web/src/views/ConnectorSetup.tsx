@@ -3,6 +3,7 @@
 // window's ConnectorSetupView, ConnectGitHubSheet and YourConnectionsView. The state is the host's, so all three clients
 // show the same ticks. The page draws the Mac's grid; Where agents run says the machine the
 // folder is on, and has Add a Machine… and Add Provider… in place (#2131).
+import { Fragment } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { Store } from "../model/store";
 import type {
@@ -18,6 +19,7 @@ import type { Project, ProjectBoard } from "../protocol/generated";
 import { addMachineWords, whereAgentsRun } from "../model/addMachine";
 import { Modal } from "./Modal";
 import { AddMachineDialog } from "./AddMachineDialog";
+import { AgentsBotRow } from "./AgentsBot";
 
 function why(e: unknown): string {
   if (e && typeof e === "object" && "message" in e) return String((e as { message: unknown }).message);
@@ -831,7 +833,8 @@ export function YourConnections({ store, host }: { store: Store; host: string })
       {problem && <p class="small failure">{problem}</p>}
       <ul class="setup-card list">
         {connections?.map((c) => (
-          <li key={c.provider} class="connection">
+          <Fragment key={c.provider}>
+          <li class="connection">
             <span class="connector-mark soft" aria-hidden="true">{(c.login ?? words.letters(c.provider)).slice(0, 1).toUpperCase()}</span>
             <div class="grow">
               <p class="strong">{words.connectionTitle(c)}</p>
@@ -842,7 +845,12 @@ export function YourConnections({ store, host }: { store: Store; host: string })
               : c.provider === "github" && <button class="link small" onClick={() => openOut(words.installationsURL)}>Repositories on github.com</button>}
             <button class="destructive" onClick={() => void disconnect(c)}>Disconnect</button>
           </li>
+          {/* The person's agents' bot (#3858), on a host that makes one. */}
+          {c.provider === "github" && c.state === "connected" && store.has(host, Capability.connectionsBot1)
+            && <AgentsBotRow store={store} host={host} />}
+          </Fragment>
         ))}
+
         {notConnected.map((p) => (
           <li key={p} class="connection">
             <span class="connector-mark" aria-hidden="true">{words.letters(p)}</span>

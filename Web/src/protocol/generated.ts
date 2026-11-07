@@ -1978,6 +1978,71 @@ export interface Connection {
   newest?: ConnectorProof;
 }
 
+/** The person's agents' bot on this machine (#3858). Never its key. */
+export interface ConnectionBot {
+  made: boolean;
+  /** The bot's GitHub name: <slug>[bot]. */
+  name?: string;
+  slug?: string;
+  /** The account the App is on. */
+  owner?: string;
+  /** Where the person installs the App on repositories. */
+  installURL?: string;
+  /** The App's page on GitHub, where the person deletes it. */
+  appURL?: string;
+  /** Absent when GitHub could not be asked. */
+  installations?: ConnectionBotInstallation[];
+  /** What failed, in words. */
+  message?: string;
+}
+
+/**
+ * What the hand-back page gave the client after GitHub made the App: the code and the state, or
+ * GitHub's error. The host checks the state and turns the code into the App's key at once; the key
+ * stays on this machine.
+ */
+export interface ConnectionBotCompleteRequest {
+  state: string;
+  code?: string;
+  error?: string;
+}
+
+/** An account the bot is installed on. */
+export interface ConnectionBotInstallation {
+  account: string;
+  /** True when it reaches every repository of the account, false for the ones chosen. */
+  all: boolean;
+  /** Where the installation's repositories are chosen on GitHub. */
+  settingsURL?: string;
+}
+
+/**
+ * What the client posts to GitHub (#3858): an HTML form to action, method POST, with one field,
+ * manifest. GitHub sends the code and the state to the hand-back page.
+ */
+export interface ConnectionBotStart {
+  /** GitHub's page for a new App, with the state in its query. */
+  action: string;
+  /** The App manifest's JSON, with the fixed permissions. */
+  manifest: string;
+  state: string;
+  expiresAt: WireDate;
+}
+
+/**
+ * Make the person's agents' bot (#3858): the host makes the GitHub App manifest for its GitHub
+ * connection's account.
+ */
+export interface ConnectionBotStartRequest {
+  /** The web page's origin, as connections/sign-in takes it; left out on the Mac. */
+  origin?: string;
+  /**
+   * True when an organisation must install the bot: GitHub lets only the owning account install a
+   * private App (spec 3856 §4).
+   */
+  public?: boolean;
+}
+
 export interface ConnectionDisconnectAnswer {
   error?: string;
 }
@@ -11595,6 +11660,10 @@ export interface Methods {
   "clients/forgetSelf": { params: Empty; result: Empty };
   "clients/setWebPush": { params: WebPushSubscription; result: Empty };
   "clients/webPushKey": { params: Empty; result: WebPushKey };
+  "connections/bot": { params: Empty; result: ConnectionBot };
+  "connections/bot/complete": { params: ConnectionBotCompleteRequest; result: ConnectionBot };
+  "connections/bot/remove": { params: Empty; result: ConnectionBot };
+  "connections/bot/start": { params: ConnectionBotStartRequest; result: ConnectionBotStart };
   "connections/disconnect": { params: ConnectionProviderRequest; result: ConnectionDisconnectAnswer };
   "connections/list": { params: Empty; result: ConnectionsList };
   "connections/sign-in": { params: ConnectionProviderRequest; result: ConnectionSignIn };
@@ -11976,6 +12045,10 @@ export const MethodTarget = {
   "clients/forgetSelf": "control",
   "clients/setWebPush": "control",
   "clients/webPushKey": "control",
+  "connections/bot": "host",
+  "connections/bot/complete": "host",
+  "connections/bot/remove": "host",
+  "connections/bot/start": "host",
   "connections/disconnect": "host",
   "connections/list": "host",
   "connections/sign-in": "host",
@@ -12502,6 +12575,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConfigChoiceGroup: { required: ["options"], optional: ["name", "group"] },
   ConfigOption: { required: ["id", "name", "type"], optional: ["description", "category", "currentValue", "options"] },
   Connection: { required: ["provider", "state", "connectedAt"], optional: ["login", "installURL", "workspace", "expiresAt", "byToken", "newest"] },
+  ConnectionBot: { required: ["made"], optional: ["name", "slug", "owner", "installURL", "appURL", "installations", "message"] },
+  ConnectionBotCompleteRequest: { required: ["state"], optional: ["code", "error"] },
+  ConnectionBotInstallation: { required: ["account", "all"], optional: ["settingsURL"] },
+  ConnectionBotStart: { required: ["action", "manifest", "state", "expiresAt"], optional: [] },
+  ConnectionBotStartRequest: { required: [], optional: ["origin", "public"] },
   ConnectionDisconnectAnswer: { required: [], optional: ["error"] },
   ConnectionEmailRequest: { required: ["server", "user", "password"], optional: [] },
   ConnectionProviderRequest: { required: ["provider"], optional: ["origin"] },

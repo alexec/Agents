@@ -188,3 +188,34 @@ extension AppModel {
         endedConnections.keep(Set(folders.map(\.key)))
     }
 }
+
+// MARK: The person's agents' bot (#3858)
+
+extension AppModel {
+    func agentsBot(on host: MachineRef = .mac) async -> Result<DaemonAPI.ConnectionBot, ConnectorProblem> {
+        await connectorCall(host) {
+            try await $0.call(DaemonAPI.Method.connectionsBot, DaemonAPI.Empty(), returning: DaemonAPI.ConnectionBot.self)
+        }
+    }
+
+    func startAgentsBot(public isPublic: Bool, on host: MachineRef) async -> Result<DaemonAPI.ConnectionBotStart, ConnectorProblem> {
+        await connectorCall(host) {
+            try await $0.call(DaemonAPI.Method.connectionsBotStart, DaemonAPI.ConnectionBotStartRequest(public: isPublic),
+                              returning: DaemonAPI.ConnectionBotStart.self)
+        }
+    }
+
+    /// Gives the host the code GitHub sent back; the host takes the bot's key and keeps it.
+    func completeAgentsBot(_ request: DaemonAPI.ConnectionBotCompleteRequest, on host: MachineRef) async
+        -> Result<DaemonAPI.ConnectionBot, ConnectorProblem> {
+        await connectorCall(host) {
+            try await $0.call(DaemonAPI.Method.connectionsBotComplete, request, returning: DaemonAPI.ConnectionBot.self)
+        }
+    }
+
+    func removeAgentsBot(on host: MachineRef) async -> Result<DaemonAPI.ConnectionBot, ConnectorProblem> {
+        await connectorCall(host) {
+            try await $0.call(DaemonAPI.Method.connectionsBotRemove, DaemonAPI.Empty(), returning: DaemonAPI.ConnectionBot.self)
+        }
+    }
+}

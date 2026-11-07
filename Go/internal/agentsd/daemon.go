@@ -117,6 +117,7 @@ type Daemon struct {
 	deviceBook
 	localBook
 	connectionBook
+	botBook
 	setupBook
 	forgeBook
 	orgPolicyState

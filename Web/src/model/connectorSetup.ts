@@ -1,7 +1,7 @@
 // The words of a folder's Connectors set-up and the one Connect sheet (#1336), ported from
 // ConnectorSetupWords in AgentsKitCore so the Mac, the Remote and the page say the same.
 import type {
-  Connection, ConnectionProvider, ConnectionSignIn, ConnectionSignInCompleteRequest, UUID, ConnectorEvents, ConnectorProof, ConnectorSetup, ConnectorSlot, ConnectorSlotKind, DocsServer, MessagingServer,
+  Connection, ConnectionBot, ConnectionBotCompleteRequest, ConnectionProvider, ConnectionSignIn, ConnectionSignInCompleteRequest, UUID, ConnectorEvents, ConnectorProof, ConnectorSetup, ConnectorSlot, ConnectorSlotKind, DocsServer, MessagingServer,
 } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 
@@ -777,4 +777,51 @@ export function authorizeState(verificationURL: string): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * The person's agents' bot (#3858): a GitHub App of their own, so agents post as
+ * <login>-agents[bot] and not as the person. ConnectorSetupWords.Bot's words.
+ */
+export const botWords = {
+  title: "Agents' bot",
+  makeButton: "Make My Agents' Bot…",
+  sheetTitle: "Make your agents' bot",
+  notMade: "Your agents post as you. A bot of their own posts as <login>-agents[bot], and names you.",
+  abilities: [
+    "Read and write code, on branches and pull requests",
+    "Open and comment on issues and pull requests",
+    "Read checks and statuses, and run workflows again",
+  ],
+  never: "Never: change workflows, secrets, environments, settings or members. Those stay yours.",
+  publicToggle: "Organisations can install it",
+  publicHelp: "Turn on to use the bot on an organisation's repositories. The organisation's owner approves the install.",
+  keyNote: "GitHub gives the bot's key to this machine only. It never goes to Agents' servers.",
+  continueButton: "Continue on github.com",
+  waiting: "Waiting for github.com… Choose Create GitHub App there, and Agents comes back by itself.",
+  finishing: "Taking the bot's key on this machine…",
+  installButton: "Install on Repositories…",
+  removeButton: "Forget the Bot…",
+  removeTitle: "Forget your agents' bot?",
+  removeMessage: "This machine deletes the bot's key, and agents post as you again. The App stays on GitHub until you delete it there.",
+};
+
+/** The bot's line under the GitHub row: its name, and where it is installed. */
+export function botNote(bot: ConnectionBot): string {
+  if (!bot.made) return botWords.notMade;
+  const name = bot.name ?? "Your bot";
+  const list = bot.installations;
+  if (!list) return bot.message ?? `${name}. GitHub could not be asked where it is installed.`;
+  if (list.length === 0) return `${name}, not installed yet: install it on the repositories agents work on.`;
+  return `${name}, on ${list.map((i) => `${i.account} (${i.all ? "all" : "chosen"} repositories)`).join(", ")}.`;
+}
+
+/** The hand-back page's message after GitHub made the App, for the setup with state only. */
+export function botCallback(event: { origin: string; data: unknown }, state: string): ConnectionBotCompleteRequest | undefined {
+  const answer = oauthCallback(event, "" as unknown as UUID, state);
+  if (!answer) return undefined;
+  const out: ConnectionBotCompleteRequest = { state: answer.state };
+  if (answer.code) out.code = answer.code;
+  if (answer.error) out.error = answer.error;
+  return out;
 }
