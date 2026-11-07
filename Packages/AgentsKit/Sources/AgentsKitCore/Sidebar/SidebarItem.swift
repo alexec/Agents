@@ -40,7 +40,8 @@ public enum SidebarItem: Hashable, Sendable {
     /// What happened, and what came of it (042).
     case events
     /// Each runtime and where its allowance stands (065). Status, not a control, so it
-    /// is here rather than in Settings.
+    /// is here rather than in Settings. On the Mac it is **Your setup** (#3631): each runtime
+    /// once, with the accounts, and a line per machine.
     case runtimes
     /// The person's own MCP servers (#488, #589, #753): every one in `~/.agents/mcp.json`,
     /// and how each is doing.

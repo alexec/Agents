@@ -32,7 +32,7 @@ struct MachineRuntimesSection: View {
         } header: {
             Text("Runtimes")
         } footer: {
-            Text("What agents can start on here. Your accounts and allowances are in Runtimes.")
+            Text("What agents can start on here. Your accounts and allowances are in Your setup.")
                 .foregroundStyle(.secondary)
         }
         .task(id: host) {

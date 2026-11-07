@@ -2,7 +2,7 @@
 // /w/<workflow> for a workflow's page in the chat's place (#98), /ar/1 for the folder's archive (#499),
 // /rv/<kind:key> for a change waiting for an OK, on its Review page (#1472),
 // The page is by section (#2141): #/ is the Overview, #/agents the sidebar with nothing chosen, and
-// #/<section>/<page> a page of another section (#/machines/runtimes, #/reports/spend, #/settings/policy),
+// #/<section>/<page> a page of another section (#/setup/runtimes, #/reports/spend, #/settings/policy),
 // and #/<section>/<page>/<item> one item on it: #/work/pr/github%3Aalexec%2FAgents%2399 is PR #99 (#3119),
 // and #/docs/<ref> a doc's page (#3321).
 // The addresses before it, #/console/<page> (#1804) and #/a/<page> (#151), are read as their new place.
@@ -67,6 +67,8 @@ export function parseRoute(hash: string): Route {
   if (first && first !== "overview" && (navSections as readonly string[]).includes(first)) {
     const nav = first as Exclude<NavSection, "overview">;
     if (!section) return { nav };
+    // Runtimes moved from Machines to Your setup (#3631): an old link still opens it.
+    if (nav === "machines" && section === "runtimes") return { nav: "setup", section };
     // A doc's page is #/docs/<ref> (spec 3319): Docs has one page, so the ref takes its place.
     if (nav === "docs" && !item && section !== "docs") return { nav, section: "docs", item: decodeURIComponent(section) };
     return item ? { nav, section: decodeURIComponent(section), item: decodeURIComponent(item) } : { nav, section: decodeURIComponent(section) };
@@ -131,9 +133,9 @@ function sectionHash(r: Route): string {
   return `#/${r.nav}` + (r.section ? "/" + encodeURIComponent(r.section) + (r.item ? "/" + encodeURIComponent(r.item) : "") : "");
 }
 
-/** Whether an address is one from before #2141, which the page writes again as its new place. */
+/** Whether an address is one from before #2141, or Machines ▸ Runtimes from before #3631, which the page writes again as its new place. */
 export function isOldAddress(hash: string): boolean {
-  return /^#\/?(console|a)(\/|$)/.test(hash);
+  return /^#\/?(console|a)(\/|$)/.test(hash) || /^#\/?machines\/runtimes$/.test(hash);
 }
 
 /** The section a route is in: Agents for a host's places, the Overview for none. */

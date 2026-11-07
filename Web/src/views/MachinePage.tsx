@@ -112,7 +112,7 @@ function MachineWorktrees({ store, host }: { store: Store; host: string }) {
 
 /** The runtimes installed on the machine (#3629): each with whether it is there and signed in, and Sign In… on a
  * server's Claude or Codex (#3349). A server installs its runtimes when it is set up, and the daemon takes an install
- * only from the Mac, so there is no Install here. Accounts and allowances are the person's: Machines ▸ Runtimes. */
+ * only from the Mac, so there is no Install here. Accounts and allowances are the person’s: Your setup ▸ Runtimes. */
 function MachineRuntimes({ store, host, name }: { store: Store; host: string; name: string }) {
   const [signingIn, setSigningIn] = useState<RuntimeStatus | null>(null);
   const runtimes = store.runtimes.value[host];
@@ -133,7 +133,7 @@ function MachineRuntimes({ store, host, name }: { store: Store; host: string; na
           ))}
         </ul>
       )}
-      <p class="hint">What agents can start on here. Your accounts and allowances are in Machines ▸ Runtimes.</p>
+      <p class="hint">What agents can start on here. Your accounts and allowances are in Your setup.</p>
       {signingIn && (
         <RuntimeSignInDialog store={store} host={host} runtimeID={signingIn.runtime.id} runtimeName={signingIn.runtime.name}
           machine={name} close={() => setSigningIn(null)} />
