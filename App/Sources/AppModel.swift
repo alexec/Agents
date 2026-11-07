@@ -2294,6 +2294,12 @@ final class AppModel {
         work.replaceDisk(state)
     }
 
+    /// Report a Problem's issue (#3718), made by this Mac's host: the person's words, the
+    /// versions and the log lines, with tokens and home folders cut out. Sends nothing.
+    func problemReport(_ request: DaemonAPI.ProblemReportRequest) async throws -> DaemonAPI.ProblemReport {
+        try await macClient.call(DaemonAPI.Method.reportsProblem, request, returning: DaemonAPI.ProblemReport.self)
+    }
+
     private func refreshServerDisk(_ host: MachineRef) async {
         guard let state = try? await client(for: host).call(DaemonAPI.Method.diskState,
                                                             Optional<String>.none,

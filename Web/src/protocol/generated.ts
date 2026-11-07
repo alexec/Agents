@@ -7491,6 +7491,42 @@ export type PrewarmRequestWhy =
   | "opened"
   | "typing";
 
+/**
+ * A problem report, ready to post (#3718): the new issue's title and body, and the GitHub page that
+ * opens it already filled in, so the person posts it from their own account. Every known token
+ * shape and every home folder in it is cut out (~ in place of a home), and nothing is sent
+ * anywhere: the client shows the body, then opens the url.
+ */
+export interface ProblemReport {
+  title: string;
+  /**
+   * Markdown: what happened, what the person expected, and the versions, the machine and the
+   * runtime; with the recent log lines when asked.
+   */
+  body: string;
+  /**
+   * The repository's new-issue page with the title and body in its query. When the body is too long
+   * for a link, the oldest log lines are left out of the link first, then the end of the body.
+   */
+  url: string;
+}
+
+/** What the person wrote in Report a Problem, and which client it is (#3718). */
+export interface ProblemReportRequest {
+  /** What happened, in the person's words. */
+  happened: string;
+  /** What the person expected. */
+  expected: string;
+  /** The client and its version, such as "Mac window 0.17.0" or "Web page". */
+  client: string;
+  /** The client's OS, such as "macOS 26.1", or the browser's. */
+  clientOS: string;
+  /** The runtime of the open session, when there is one. */
+  runtime?: string;
+  /** Add this machine's recent daemon.log lines. */
+  withLog: boolean;
+}
+
 /** One process of processes/list (#3453): the daemon, a session's runtime, or a child of either. */
 export interface ProcessUsage {
   pid: number;
@@ -11708,6 +11744,7 @@ export interface Methods {
   "reports/features": { params: Empty; result: FeatureUsage };
   "reports/nodes": { params: ReportNodesQuery; result: ReportNodes };
   "reports/policy": { params: Empty; result: ReportPolicy };
+  "reports/problem": { params: ProblemReportRequest; result: ProblemReport };
   "reports/saveView": { params: ReportView; result: ReportViews };
   "reports/scopes": { params: Empty; result: ReportScopes };
   "reports/setPolicy": { params: ReportPolicy; result: ReportPolicy };
@@ -12079,6 +12116,7 @@ export const MethodTarget = {
   "reports/features": "host",
   "reports/nodes": "control",
   "reports/policy": "control",
+  "reports/problem": "host",
   "reports/saveView": "control",
   "reports/scopes": "control",
   "reports/setPolicy": "control",
@@ -12886,6 +12924,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PresenceReport: { required: ["active"], optional: ["watching", "mayNotify", "showing", "alsoShowing"] },
   PreviewFile: { required: ["path", "bytes", "runnable", "via"], optional: [] },
   PrewarmRequest: { required: ["agentID", "why"], optional: [] },
+  ProblemReport: { required: ["title", "body", "url"], optional: [] },
+  ProblemReportRequest: { required: ["happened", "expected", "client", "clientOS", "withLog"], optional: ["runtime"] },
   ProcessUsage: { required: ["pid", "parent", "depth", "name", "cpuPercent", "memory"], optional: ["agentId", "title"] },
   ProcessesState: { required: ["machine", "processes", "omitted"], optional: [] },
   Project: { required: ["id", "name", "owner", "folders", "mayChange"], optional: ["slots", "boards"] },

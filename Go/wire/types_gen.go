@@ -8618,6 +8618,38 @@ type PrewarmRequestWhy string
 const PrewarmRequestWhyOpened PrewarmRequestWhy = "opened"
 const PrewarmRequestWhyTyping PrewarmRequestWhy = "typing"
 
+// A problem report, ready to post (#3718): the new issue's title and body, and the GitHub page that opens it already filled in, so the person posts it from their own account. Every known token shape and every home folder in it is cut out (~ in place of a home), and nothing is sent anywhere: the client shows the body, then opens the url.
+type ProblemReport struct {
+	Title string `json:"title"`
+
+	// Markdown: what happened, what the person expected, and the versions, the machine and the runtime; with the recent log lines when asked.
+	Body string `json:"body"`
+
+	// The repository's new-issue page with the title and body in its query. When the body is too long for a link, the oldest log lines are left out of the link first, then the end of the body.
+	URL string `json:"url"`
+}
+
+// What the person wrote in Report a Problem, and which client it is (#3718).
+type ProblemReportRequest struct {
+	// What happened, in the person's words.
+	Happened string `json:"happened"`
+
+	// What the person expected.
+	Expected string `json:"expected"`
+
+	// The client and its version, such as "Mac window 0.17.0" or "Web page".
+	Client string `json:"client"`
+
+	// The client's OS, such as "macOS 26.1", or the browser's.
+	ClientOS string `json:"clientOS"`
+
+	// The runtime of the open session, when there is one.
+	Runtime *string `json:"runtime,omitzero"`
+
+	// Add this machine's recent daemon.log lines.
+	WithLog bool `json:"withLog"`
+}
+
 // One process of processes/list (#3453): the daemon, a session's runtime, or a child of either.
 type ProcessUsage struct {
 	Pid int64 `json:"pid"`
