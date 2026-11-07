@@ -1857,6 +1857,11 @@ public enum DaemonAPI {
             from = try c.decodeIfPresent(Int.self, forKey: .from)
         }
 
+        /// The one entry at `index`: the open turn's prompt, when its first page starts after it (#3948).
+        public static func entry(_ index: Int, of agentID: UUID) -> TranscriptRequest {
+            TranscriptRequest(agentID: agentID, before: index + 1, limit: 1, from: index)
+        }
+
         /// The few entries around `index`, to find an entry sent as a stub among them by its
         /// id (#203); the last page when where it is was not said.
         public static func around(_ index: Int?, of agentID: UUID) -> TranscriptRequest {

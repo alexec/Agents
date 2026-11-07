@@ -147,6 +147,67 @@ struct ChatOpeningTests {
         #expect(loaded.page.entries.count == ChatOpening.wholeTurn)
     }
 
+    /// A turn longer than `wholeTurn` opens on its end, and its prompt, read on its own,
+    /// is drawn above it: the reply was shown with no question (#3948).
+    @Test func aVeryLongTurnOpensWithItsPrompt() async throws {
+        let turn = 40..<5_000
+        let ask = TranscriptEntry(kind: .userMessage("Why is my question not shown?"))
+        var askedFor: Int?
+        let loaded = try await ChatOpening.load(
+            turns: { TurnsPage(turns: [], firstTurn: 3, openStart: turn.lowerBound) },
+            transcript: { from, limit in self.tail(of: turn, from: from, limit: limit) },
+            entry: { index in
+                askedFor = index
+                return TranscriptPage(firstIndex: index, total: turn.upperBound, entries: [ask])
+            })
+        #expect(askedFor == turn.lowerBound)
+
+        let model = AgentsModel()
+        model.watching = UUID()
+        model.takeOpening(loaded, load: model.beginTranscriptLoad())
+        #expect(model.entries.count == ChatOpening.wholeTurn)
+        #expect(model.transcriptItems.turns(reusing: []).last?.ask?.id == ask.id)
+    }
+
+    /// A turn that fits is not asked for its prompt again: it is on the page.
+    @Test func aTurnThatFitsDoesNotReadItsPromptAgain() async throws {
+        var askedFor: Int?
+        _ = try await ChatOpening.load(
+            turns: { TurnsPage(turns: [], firstTurn: 0, openStart: 10) },
+            transcript: { from, limit in self.tail(of: 10..<30, from: from, limit: limit) },
+            entry: { index in askedFor = index; return self.page(["x"], firstIndex: index) })
+        #expect(askedFor == nil)
+    }
+
+    /// A reply of more than the entries a followed chat keeps cuts its front, prompt and
+    /// all; the prompt stays drawn above what is kept, and once paged back in it is drawn
+    /// once, from among the entries (#3948).
+    @Test func aTrimKeepsTheTurnsPrompt() throws {
+        let model = AgentsModel()
+        let agentID = UUID()
+        model.watching = agentID
+        let ask = TranscriptEntry(kind: .userMessage("Why is my question not shown?"))
+        _ = model.beginTranscriptLoad()
+        model.replaceTranscript(with: TranscriptPage(firstIndex: 0, total: 1, entries: [ask]))
+        for index in 0..<900 {
+            model.apply(.entry(DaemonAPI.EntryNotification(agentID: agentID, entry: TranscriptEntry(
+                kind: .agentMessage(messageID: "m\(index)", text: "Step \(index).")))))
+        }
+        #expect(model.entries.first?.id != ask.id, "the trim cut the prompt's entry")
+        #expect(model.hasMoreBefore)
+        #expect(model.transcriptItems.first?.id == ask.id)
+        #expect(model.transcriptItems.turns(reusing: []).map(\.ask?.id) == [ask.id])
+
+        // Paged back in, it is one of the entries and drawn once.
+        let first = model.firstEntryIndex
+        model.prepend(TranscriptPage(firstIndex: 0, total: first + model.entries.count,
+                                     entries: [ask] + (1..<first).map {
+                                         TranscriptEntry(kind: .agentMessage(messageID: "p\($0)", text: "\($0)"))
+                                     }))
+        #expect(model.entries.first?.id == ask.id)
+        #expect(model.transcriptItems.filter { $0.id == ask.id }.count == 1)
+    }
+
     /// Without turns the page is the end of the whole transcript, not a cut turn.
     @Test func noTurnsMeansNoSecondAsk() async throws {
         struct Broken: Error {}
