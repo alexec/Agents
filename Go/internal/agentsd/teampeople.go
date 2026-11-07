@@ -39,8 +39,9 @@ func (d *Daemon) teamMeta(ctx context.Context, folder string) map[string]any {
 		meta["agentOnIssue"] = issues
 	}
 	if len(linear) > 0 {
-		// A key (ENG-4) does not say whether it is Linear's or Jira's (#3247).
-		meta["agentOnLinear"], meta["agentOnJira"] = linear, linear
+		// A key (ENG-4) does not say whether it is Linear's or Jira's (#3247); AB#12 is Azure
+		// Boards' (#3826).
+		meta["agentOnLinear"], meta["agentOnJira"], meta["agentOnBoards"] = linear, linear, linear
 	}
 	return meta
 }
@@ -182,8 +183,9 @@ func connectionLogin(s connections.Store, provider string) string {
 // sessions (#3108); an archived session is not on it any more.
 //   - prs and issues: this folder's repo's own sessions labelled #n or P#n, by number,
 //     never another person's machines (this daemon's own Store is this machine's own).
-//   - linear: sessions labelled a Linear key (ENG-4), by key, in whichever folder they are
-//     in: a Linear issue is not one folder's own.
+//   - linear: sessions labelled a Linear or Jira key (ENG-4) or an Azure Boards work item
+//     (AB#12, #3826), by label, in whichever folder they are in: a tracker's issue is not
+//     one folder's own.
 func (d *Daemon) agentOnIt(folder string) (prs, issues, linear map[string]string) {
 	repo := d.folderRepo(folder)
 	prs, issues, linear = map[string]string{}, map[string]string{}, map[string]string{}
@@ -198,7 +200,7 @@ func (d *Daemon) agentOnIt(folder string) (prs, issues, linear map[string]string
 		// The folder's repo only when a label could use it.
 		inRepo, asked := false, false
 		for _, l := range a.Labels {
-			if linearLabel.MatchString(l.Value) {
+			if linearLabel.MatchString(l.Value) || abLabel.MatchString(l.Value) {
 				linear[l.Value] = title
 				continue
 			}

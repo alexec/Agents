@@ -235,6 +235,31 @@ func TestAProjectsSlotsGoToItsMachines(t *testing.T) {
 	if e := callError(t, owner, "", "projects/setSlot", wire.ProjectSlotSet{ID: made.ID, Slot: wire.ConnectorSlotKindCi, Value: &wire.ProjectSlot{Slot: wire.ConnectorSlotKindCi, Repository: &bad}}); !strings.Contains(e, "owner/name") {
 		t.Fatal(e)
 	}
+	// A Forgejo repository (#3752): owner/name, on Codeberg when no site is given.
+	forgejo, fjRepo := wire.ConnectionProviderForgejo, "agentstest/agents-walk"
+	json.Unmarshal(call(t, owner, "", "projects/setSlot", wire.ProjectSlotSet{ID: made.ID, Slot: wire.ConnectorSlotKindCi,
+		Value: &wire.ProjectSlot{Slot: wire.ConnectorSlotKindCi, Forge: &forgejo, Repository: &fjRepo}}), &got)
+	if len(got.Slots) != 2 || *got.Slots[1].Forge != forgejo || *got.Slots[1].Site != "codeberg.org" {
+		t.Fatalf("%+v", got)
+	}
+	// A Bitbucket repository (#3785): workspace/name, always on bitbucket.org.
+	bitbucket, bbRepo, elsewhere := wire.ConnectionProviderBitbucket, "agentstest/agents-walk", "bitbucket.example.com"
+	json.Unmarshal(call(t, owner, "", "projects/setSlot", wire.ProjectSlotSet{ID: made.ID, Slot: wire.ConnectorSlotKindCodeReview,
+		Value: &wire.ProjectSlot{Slot: wire.ConnectorSlotKindCodeReview, Forge: &bitbucket, Repository: &bbRepo, Site: &elsewhere}}), &got)
+	var review *wire.ProjectSlot
+	for i := range got.Slots {
+		if got.Slots[i].Slot == wire.ConnectorSlotKindCodeReview {
+			review = &got.Slots[i]
+		}
+	}
+	if review == nil || *review.Forge != bitbucket || *review.Site != "bitbucket.org" {
+		t.Fatalf("%+v", got)
+	}
+	deep := "group/sub/app"
+	if e := callError(t, owner, "", "projects/setSlot", wire.ProjectSlotSet{ID: made.ID, Slot: wire.ConnectorSlotKindCi,
+		Value: &wire.ProjectSlot{Slot: wire.ConnectorSlotKindCi, Forge: &forgejo, Repository: &deep}}); !strings.Contains(e, "owner/name") {
+		t.Fatal(e)
+	}
 }
 
 // waitFor waits up to five seconds for ok.

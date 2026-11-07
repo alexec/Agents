@@ -64,9 +64,10 @@ export function repoOf(ref: string): string {
 }
 
 /** "alexec/Agents" of "github:alexec/Agents", for a row's repo column; "Linear · ENG" of a Linear team (#3311); a tracker
- * (jira, #3260) by its own name. */
+ * (jira, #3260) by its own name; "Azure Boards · acme/web" of an Azure Boards project (#3815). */
 export function repoName(repo: string): string {
   if (repo.startsWith("linear:")) return `Linear · ${repo.slice("linear:".length)}`;
+  if (repo.startsWith("azureboards:")) return `Azure Boards · ${repo.slice("azureboards:".length)}`;
   return repo.includes(":") ? repo.replace(/^[a-z][a-z0-9-]*:/, "") : forgeTitle[repo] ?? repo;
 }
 
@@ -304,12 +305,18 @@ export function errorWords(e: ForgeListError, machine: string | undefined): stri
   return `${forge}${machine ? ` on ${machine}` : ""}: ${e.message}`;
 }
 
-export const forgeTitle: Record<string, string> = { github: "GitHub", gitlab: "GitLab", linear: "Linear", jira: "Jira" };
+export const forgeTitle: Record<string, string> = { github: "GitHub", gitlab: "GitLab", linear: "Linear", jira: "Jira",
+  azureboards: "Azure Boards", forgejo: "Forgejo", bitbucket: "Bitbucket" };
 
 /** "Open on GitHub", by the ref's forge. */
 export function openOnWords(ref: string): string {
+  return `Open on ${forgeName(ref)}`;
+}
+
+/** "GitHub" of "github:alexec/Agents#12", by the ref's forge; "the forge" of one it does not know. */
+export function forgeName(ref: string): string {
   const forge = /^([a-z][a-z0-9-]*):/.exec(ref)?.[1] ?? "";
-  return `Open on ${forgeTitle[forge] ?? "the forge"}`;
+  return forgeTitle[forge] ?? "the forge";
 }
 
 /** The text colour that reads on a label's colour (#2956): black on a light one, white on a dark one. */

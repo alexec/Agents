@@ -8,7 +8,7 @@ import { useEffect, useMemo } from "preact/hooks";
 import type { ForgeDone, ForgeItemDetail, ForgeLabel, ForgeMergeMethod, LineageNode } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { describe } from "../model/errors";
-import { closeTitle, doneWords, failedChecks, mergeButton, mergeWaits, shortRef } from "../model/work";
+import { closeTitle, doneWords, failedChecks, forgeName, mergeButton, mergeWaits, shortRef } from "../model/work";
 import type { Diff } from "./chat/appViewBridge";
 import { ViewDiff } from "./chat/ViewDiff";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
@@ -109,7 +109,7 @@ export function WorkActions({ store, host, detail, wrote }: {
         )}
         {item.state === "open" && failed.length > 0 && <button type="button" disabled={busy.value} onClick={() => void act("forge/rerun", { node })}>Rerun failed</button>}
         {isPR && <button type="button" disabled={busy.value} onClick={() => void read(() => store.link.call("forge/diff", { node }, host), (d) => {
-          diff.value = { title: `${shortRef(node.ref)} ${item.title}`, url: d.url, files: d.files, cut: d.cut };
+          diff.value = { title: `${shortRef(node.ref)} ${item.title}`, url: d.url, files: d.files, cut: d.cut, site: forgeName(node.ref) };
         })}>Show Diff</button>}
         {transitions && <button type="button" disabled={busy.value || transitions.length === 0} onClick={statusMenu}
           title={transitions.length === 0 ? "No moves" : "Move it by its workflow"}>{item.status ?? "Status"} ▾</button>}

@@ -262,6 +262,15 @@ extension RuntimeStatus {
         return outdated ? line + " · an update is out" : line
     }
 
+    /// Whether it is on the machine, so the machine's page lists it (#3743): not missing,
+    /// and not a failed install.
+    public var isInstalled: Bool {
+        switch availability {
+        case .missing, .installFailed: false
+        default: true
+        }
+    }
+
     /// Whether this Mac can install it, or install it again, from its page: not there, or
     /// a failed install, with a recipe the daemon carries out.
     public var offersInstall: Bool {

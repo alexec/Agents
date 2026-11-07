@@ -41,7 +41,7 @@ public struct WorkspaceLink: Codable, Hashable, Sendable {
     /// The due time it was last started for, so each starts it once (FR-006).
     public var wokeFor: Date?
 
-    public static let defaultIdleMinutes = 30
+    public static let defaultIdleMinutes = 120
 
     public init(provider: ProviderID, workspace: String, startWhenUsed: Bool? = true,
                 stopWhenIdleMinutes: Int? = WorkspaceLink.defaultIdleMinutes) {

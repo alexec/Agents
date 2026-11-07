@@ -12,7 +12,7 @@ import (
 
 // The agent tools scoped to the project (#3277, specs/3273-project-unit "Agent tools:
 // scoped to the project"). list_sessions, read_session, message_session, cancel_message
-// and wait_for_agents reach every session of the agent's project: those in this machine's
+// and wait_for_event on agent.ended reach every session of the agent's project: those in this machine's
 // folders of it, and, through the control plane, those on the person's other machines
 // (machines/projectSessions). start_session with machine alone starts in the project's
 // folder there (machines/projectFolders). A folder in no project, or a machine on no
@@ -154,7 +154,7 @@ func (d *Daemon) messageElsewhere(me *wire.Agent, s *startedThere, text string, 
 }
 
 // waitElsewhere is the session of caller's project on another machine that
-// wait_for_agents names, kept so its end comes back (#3277); nil when name is none.
+// a wait on agent.ended names, kept so its end comes back (#3277); nil when name is none.
 func (d *Daemon) waitElsewhere(name string, caller *wire.Agent) (*wire.Agent, error) {
 	s, ambiguous := d.elsewhereNamed(caller, name)
 	if ambiguous != "" {
@@ -171,7 +171,7 @@ func (d *Daemon) waitElsewhere(name string, caller *wire.Agent) (*wire.Agent, er
 	}
 	if reply.Ended != nil {
 		e := wire.WaitEnding{How: *reply.Ended}
-		return nil, blockRefusal(quotedTitle(&s.Title) + " has already ended (" + endingSummary(&e) + "). Read it with read_session rather than waiting on it.")
+		return nil, &endedAlready{id: s.Session, title: s.Title, there: " on " + s.Machine, how: endingSummary(&e)}
 	}
 	d.noteWatched(*s)
 	title := s.Title

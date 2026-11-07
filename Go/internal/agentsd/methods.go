@@ -30,6 +30,7 @@ func (d *Daemon) register() {
 	d.registerSuggestions()
 	d.registerSettings()
 	d.registerHost()
+	d.registerProblemReport()
 	d.registerBackups()
 	d.registerLockHello()
 	d.registerLockReset()

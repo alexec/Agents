@@ -1,24 +1,28 @@
 // Machines ▸ <machine> (#3626): one machine's page, the place to go for its status, as the window's MachinePage.
-// Its CPU and memory now, every disk its agents write to with its level (low or almost full), its worktrees, a
-// section per folder (#3627), its runtimes and resources (#3629), and its processes (#3453). Read with machine/usage when it opens and every few seconds while it is open and the tab is seen.
+// A summary first (#3743): its CPU, memory and worst disk on one line. Then the detail, most of it closed until the
+// person opens it: the disk that matters with the others folded, a row per folder's worktrees (#3627), the runtimes
+// installed there (#3629), resources only when one is declared or held, and its processes (#3453). Read with
+// machine/usage when it opens and every few seconds while it is open and the tab is seen.
 import { useEffect, useState } from "preact/hooks";
 import type { Store } from "../model/store";
 import { hostAnswers, hostHas } from "../model/capabilities";
-import { diskLine, freeWords, levelWords } from "../model/disk";
-import { machineCPUWords, machineMemoryWords } from "../model/processes";
+import { diskLine, freeWords, headline, levelWords, summaryWords } from "../model/disk";
+import { cpuWords, machineCPUWords, machineMemoryWords } from "../model/processes";
 import { Capability } from "../protocol/capabilities.generated";
-import type { MachineUsageState } from "../protocol/generated";
+import type { DiskAlarm, MachineUsageState } from "../protocol/generated";
 import { go } from "../route";
 import { MachineProcesses } from "./settings/Processes";
 import { chooseSettingsMachine } from "./settings/SettingsMachine";
 import { WorktreesList } from "./Worktrees";
 import { Resources } from "./Resources";
 import { RuntimeSignInDialog } from "./RuntimeSignInDialog";
-import { machineRuntimeLine, offersMachineSignIn, signInOnTheMac } from "../model/runtimes";
+import { isInstalled, machineRuntimeLine, offersMachineSignIn, signInOnTheMac } from "../model/runtimes";
 import type { RuntimeStatus } from "../protocol/generated";
 import { forCleanup, pageLine, tally, worktreesIntro } from "../model/worktrees";
 
-export const disksFooter = "Each disk its agents write to. Low and almost full are the lines set in Folder Settings ▸ Disk Space.";
+const disksHelp = "Each disk its agents write to. Low and almost full are the lines set in Folder Settings ▸ Disk Space.";
+
+const levelClass = (disk: DiskAlarm) => disk.level === "critical" ? "failure" : disk.level === "low" ? "tinted" : "";
 
 export function MachinePage({ store, host }: { store: Store; host: string }) {
   const hosts = store.hosts.value;
@@ -43,6 +47,17 @@ export function MachinePage({ store, host }: { store: Store; host: string }) {
   }, [store, host, asks]);
 
   if (!machine) return <p class="hint">No machine by that name here now.</p>;
+  // The disk the summary names and Disks shows open: the worst, or the folders' own; the others fold (#3743).
+  const disks = usage?.disks ?? [];
+  const top = headline(disks, (store.worktreeLists.value[host] ?? []).map((g) => decodeURIComponent(new URL(g.folder, "file:///").pathname)));
+  const shownDisks = disks.filter((d) => d.level !== "ok" || d === top);
+  const otherDisks = disks.filter((d) => !shownDisks.includes(d));
+  const diskRow = (disk: DiskAlarm) => (
+    <div class="setting" key={disk.reading.mount} title={disk.level === "ok" ? disk.reading.mount : `${disk.reading.mount}: ${diskLine(disk)}`}>
+      <span>{disk.reading.volume}</span>
+      <span>{freeWords(disk)} <span class={levelClass(disk) || "faint"}>{levelWords(disk.level)}</span></span>
+    </div>
+  );
   return (
     <>
       <div class="setting">
@@ -54,32 +69,33 @@ export function MachinePage({ store, host }: { store: Store; host: string }) {
         : !asks ? <p class="hint">Update Agents on {name} to see its CPU, memory and disks here.</p>
         : (
           <>
-            <section aria-labelledby="machine-usage">
-              <h3 class="section-head" id="machine-usage">Usage</h3>
+            <section aria-labelledby="machine-summary">
+              <h3 class="section-head visually-hidden" id="machine-summary">Summary</h3>
               {!usage && <p class="hint">{failure ?? "Loading…"}</p>}
               {usage && (
                 <>
-                  <div class="setting"><span>CPU</span><span>{machineCPUWords(usage.machine)}</span></div>
-                  <div class="setting"><span>Memory</span><span>{machineMemoryWords(usage.machine)}</span></div>
+                  <div class="setting machine-summary" title={machineCPUWords(usage.machine)}>
+                    <span>
+                      CPU {cpuWords(usage.machine.cpuPercent)} · Memory {machineMemoryWords(usage.machine)}
+                      {top && <> · <span class={levelClass(top)} title={top.level === "ok" ? top.reading.volume : diskLine(top)}>
+                        {summaryWords(top)}</span></>}
+                    </span>
+                  </div>
                   {failure && <p class="hint">{failure}</p>}
                 </>
               )}
             </section>
             {usage && (
               <section aria-labelledby="machine-disks">
-                <h3 class="section-head" id="machine-disks">Disks</h3>
+                <h3 class="section-head" id="machine-disks" title={disksHelp}>Disks</h3>
                 {usage.disks.length === 0 && <p class="hint">No disk looked at yet. {name} looks every minute.</p>}
-                {usage.disks.map((disk) => (
-                  <div class="setting" key={disk.reading.mount} title={disk.level === "ok" ? disk.reading.mount : diskLine(disk)}>
-                    <span>{disk.reading.volume} <span class="faint small">{disk.reading.mount}</span></span>
-                    <span>
-                      {freeWords(disk)}{" "}
-                      <span class={disk.level === "critical" ? "failure" : disk.level === "low" ? "tinted" : "faint"}>
-                        {levelWords(disk.level)}</span>
-                    </span>
-                  </div>
-                ))}
-                <p class="hint">{disksFooter}</p>
+                {shownDisks.map(diskRow)}
+                {otherDisks.length > 0 && (
+                  <details class="machine-fold">
+                    <summary>Other disks ({otherDisks.length})</summary>
+                    {otherDisks.map(diskRow)}
+                  </details>
+                )}
               </section>
             )}
           </>
@@ -88,39 +104,39 @@ export function MachinePage({ store, host }: { store: Store; host: string }) {
       {answers && <MachineRuntimes store={store} host={host} name={name} />}
       {answers && <Resources store={store} host={host} />}
       {answers && hostHas(hosts, host, Capability.processes1) && (
-        <MachineProcesses store={store} host={host} name={name} showsTotals={false} />
+        <MachineProcesses store={store} host={host} name={name} showsTotals={false} folds />
       )}
     </>
   );
 }
 
-/** The machine's worktrees (#3627): how much they hold, Refresh, and a section per folder. */
+/** The machine's worktrees (#3627): how much they hold, Refresh, and a closed row per folder (#3743). */
 function MachineWorktrees({ store, host }: { store: Store; host: string }) {
   const groups = forCleanup(store.worktreeLists.value[host] ?? [], store.worktreeSizes.value[host]);
   return (
     <section aria-labelledby="machine-worktrees">
-      <h3 class="section-head" id="machine-worktrees">Worktrees</h3>
+      <h3 class="section-head" id="machine-worktrees" title={worktreesIntro}>Worktrees</h3>
       <div class="setting">
         <span>{pageLine(tally(groups.flatMap((g) => g.worktrees)))}</span>
         <button type="button" title="List the worktrees again" onClick={() => void store.loadWorktrees(host)}>Refresh</button>
       </div>
-      <p class="hint">{worktreesIntro}</p>
       <WorktreesList store={store} host={host} />
     </section>
   );
 }
 
-/** The runtimes installed on the machine (#3629): each with whether it is there and signed in, and Sign In… on a
- * server's Claude or Codex (#3349). A server installs its runtimes when it is set up, and the daemon takes an install
- * only from the Mac, so there is no Install here. Accounts and allowances are the person’s: Your setup ▸ Runtimes. */
+/** The runtimes installed on the machine (#3629), one line each: its version and whether it is signed in, and Sign In…
+ * on a server's Claude or Codex (#3349). Only the installed ones (#3743): Your setup lists every runtime. A server installs
+ * its runtimes when it is set up, and the daemon takes an install only from the Mac, so there is no Install here.
+ * Accounts and allowances are the person’s: Your setup ▸ Runtimes. */
 function MachineRuntimes({ store, host, name }: { store: Store; host: string; name: string }) {
   const [signingIn, setSigningIn] = useState<RuntimeStatus | null>(null);
-  const runtimes = store.runtimes.value[host];
+  const runtimes = store.runtimes.value[host]?.filter(isInstalled);
   const signs = store.has(host, Capability.runtimesSignIn1);
   return (
     <section class="machine-runtimes" aria-labelledby="machine-runtimes">
-      <h3 class="section-head" id="machine-runtimes">Runtimes</h3>
-      {!runtimes ? <p class="hint">Loading…</p> : runtimes.length === 0 ? <p class="hint">No runtimes known yet.</p> : (
+      <h3 class="section-head" id="machine-runtimes" title="What agents can start on here">Runtimes</h3>
+      {!runtimes ? <p class="hint">Loading…</p> : runtimes.length === 0 ? <p class="hint">None installed here yet.</p> : (
         <ul>
           {runtimes.map((status) => (
             <li key={status.runtime.id}>
@@ -133,7 +149,8 @@ function MachineRuntimes({ store, host, name }: { store: Store; host: string; na
           ))}
         </ul>
       )}
-      <p class="hint">What agents can start on here. Your accounts and allowances are in Your setup.</p>
+      <p><button type="button" class="link small" onClick={() => go({ nav: "setup", section: "runtimes" })}>
+        Every runtime, your accounts and allowances, in Your setup</button></p>
       {signingIn && (
         <RuntimeSignInDialog store={store} host={host} runtimeID={signingIn.runtime.id} runtimeName={signingIn.runtime.name}
           machine={name} close={() => setSigningIn(null)} />

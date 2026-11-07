@@ -426,7 +426,8 @@ struct RemoteSmartFold: View {
 }
 
 /// One thing waiting for an OK under Needs You (#773), the window's `ApprovalListRow`: a
-/// tap opens its Review page (#1472), pushed on an iPhone; a long press answers at once.
+/// tap opens its Review page (#1472), pushed on an iPhone; a long press answers at once, and
+/// so do Approve, a leading swipe, and Deny, a trailing one (#3763).
 private struct RemoteApprovalRow: View {
     @Environment(RemoteModel.self) private var model
     let approval: Approval
@@ -438,6 +439,18 @@ private struct RemoteApprovalRow: View {
     var body: some View {
         ApprovalRowLabel(approval: approval, place: place)
             .tag(item)
+            .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                if approval.actions.contains(.approve) {
+                    Button(approval.word(for: .approve), systemImage: "checkmark") { answerNow(.approve) }
+                        .tint(Paper.accent)
+                }
+            }
+            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                if approval.actions.contains(.deny) {
+                    Button(approval.word(for: .deny), systemImage: "xmark") { answerNow(.deny) }
+                        .tint(StateTint.failure.color)
+                }
+            }
             .contextMenu {
                 Button("Review…", systemImage: "doc.text.magnifyingglass") { model.sidebarItem = item }
                 if approval.actions.contains(.approve) {

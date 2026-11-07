@@ -27,19 +27,32 @@ func TestALeadWaitsOnItsHelper(t *testing.T) {
 	})
 	m := appClient(t, d, lead.ID)
 	m.post("initialize", map[string]any{}, 1)
-	if text, isErr := m.tool(2, "wait_for_agents", map[string]any{"agents": []string{"Nobody"}, "until_minutes": 30}); !isErr ||
+	if text, isErr := m.tool(2, "wait_for_event", map[string]any{"events": []string{"agent.ended"}, "where": map[string]any{"agent": []string{"Nobody"}}, "until_minutes": 30}); !isErr ||
 		!strings.HasPrefix(text, "Nothing was recorded: no agent in this folder is called “Nobody”. The agents here are: ") {
 		t.Fatal(text)
 	}
-	if text, isErr := m.tool(3, "wait_for_agents", map[string]any{"agents": []string{"Done one"}, "until_minutes": 30}); !isErr ||
-		text != "Nothing was recorded: “Done one” has already ended (complete — All good.). Use what it said rather than waiting on it." {
+	// One that has already ended answers at once, with how, and nothing is waited for (#3799).
+	if text, isErr := m.tool(3, "wait_for_event", map[string]any{"events": []string{"agent.ended"}, "where": map[string]any{"agent": []string{"Done one"}}, "until_minutes": 30}); isErr ||
+		text != "Not waiting: the session you named has already ended.\n\n- “Done one” (id "+string(done.ID)+"): complete — All good.\n\n"+
+			"Carry on from here, and read what each said with read_session." {
 		t.Fatal(text)
 	}
-	if text, isErr := m.tool(4, "wait_for_agents", map[string]any{"agents": []string{"Helper"}}); !isErr || !strings.HasPrefix(text, "Nothing is waited for: until_minutes is required") {
+	if r := d.Store.Agent(lead.ID).Report; r != nil {
+		t.Fatalf("an ended one recorded %+v", r)
+	}
+	// With wake_on any, one ended is enough.
+	if text, isErr := m.tool(31, "wait_for_event", map[string]any{"events": []string{"agent.ended"}, "where": map[string]any{"agent": []string{"Helper", "Done one"}},
+		"wake_on": "any", "until_minutes": 30}); isErr || !strings.HasPrefix(text, "Not waiting: you asked to wake when any of them ended, and one has already ended.") ||
+		!strings.Contains(text, "): still working") {
 		t.Fatal(text)
 	}
-	text, _ := m.tool(5, "wait_for_agents", map[string]any{"agents": []string{"helper"}, "until_minutes": 30, "message": "Waiting for the tests."})
-	if text != "Recorded. The person will see this conversation under \"Waiting\". You will be resumed when “Helper” has finished, or in 30 minutes, whichever comes first." {
+	if text, isErr := m.tool(4, "wait_for_event", map[string]any{"events": []string{"agent.ended"}, "where": map[string]any{"agent": []string{"Helper"}}}); !isErr || !strings.HasPrefix(text, "until_minutes is required") {
+		t.Fatal(text)
+	}
+	// With wake_on all, the ended one is said and the wait is for the rest.
+	text, _ := m.tool(5, "wait_for_event", map[string]any{"events": []string{"agent.ended"}, "where": map[string]any{"agent": []string{"helper", "Done one"}}, "until_minutes": 30, "message": "Waiting for the tests."})
+	if text != "“Done one” has already ended (complete — All good.). It is not waited on. "+
+		"Recorded. The person will see this conversation under \"Waiting\". You will be resumed when “Helper” has finished, or in 30 minutes, whichever comes first." {
 		t.Fatal(text)
 	}
 	if w := d.waitingAgents(); len(w) != 1 || w[0].Status.Line != "◷ Waiting for “Helper” to finish" || w[0].Status.Cancellable {
@@ -69,7 +82,55 @@ func TestALeadWaitsOnItsHelper(t *testing.T) {
 		l.mu.Unlock()
 		return !busy && d.Store.Agent(lead.ID).State == wire.AgentStateFinished && len(d.Store.Agent(lead.ID).QueuedPrompts) == 0
 	})
-	_ = done
+}
+
+// agent.ended names its sessions, or sets any: true, and waits on its own; wake_on is for it
+// alone (#3799).
+func TestAWaitOnAgentEndedNamesItsSessions(t *testing.T) {
+	fakeRuntimes(t)
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	m := appClient(t, d, seeded(t, d, t.TempDir(), nil).ID)
+	m.post("initialize", map[string]any{}, 1)
+	for i, c := range []struct {
+		args map[string]any
+		want string
+	}{
+		{map[string]any{"events": []string{"agent.ended"}, "until_minutes": 5},
+			"agent.ended: Name the sessions (`agent`, by id or exact title), or set `any: true` to wake when any session in the folder ends. Nothing is waiting."},
+		{map[string]any{"events": []string{"agent.ended", "branch.moved"}, "where": map[string]any{"agent": "Helper", "branch": "x"}, "until_minutes": 5},
+			`agent.ended with agent waits on its own: call wait_for_event with events ["agent.ended"] alone. Nothing is waiting.`},
+		{map[string]any{"events": []string{"agent.finished"}, "wake_on": "any", "until_minutes": 5},
+			"wake_on is only for agent.ended with the sessions named in agent. Nothing is waiting."},
+		{map[string]any{"events": []string{"agent.ended"}, "where": map[string]any{"agent": "Helper"}, "wake_on": "some", "until_minutes": 5},
+			"wake_on has to be all or any. Nothing is waiting."},
+	} {
+		if text, isErr := m.tool(10+i, "wait_for_event", c.args); !isErr || text != c.want {
+			t.Errorf("%v: %s", c.args, text)
+		}
+	}
+}
+
+// Every way a session ends is agent.ended, with how; a turn that ends waiting is not (#3799).
+func TestEndedHow(t *testing.T) {
+	report := func(o wire.WorkOutcome) *wire.Agent { return &wire.Agent{Report: &wire.WorkReport{Outcome: o}} }
+	for _, c := range []struct {
+		a    *wire.Agent
+		next wire.AgentState
+		why  *wire.EndedReason
+		want string
+	}{
+		{report(wire.WorkOutcomeDone), wire.AgentStateFinished, nil, "done"},
+		{report(wire.WorkOutcomeNeedsAnswer), wire.AgentStateFinished, nil, "needs_answer"},
+		{report(wire.WorkOutcomeWaiting), wire.AgentStateFinished, nil, ""},
+		{&wire.Agent{}, wire.AgentStateFinished, nil, "done"},
+		{&wire.Agent{}, wire.AgentStateStopped, reason(wire.EndedReasonCancelled), "stopped"},
+		{&wire.Agent{}, wire.AgentStateStopped, reason(wire.EndedReasonProcessDied), "failed"},
+	} {
+		if got := endedHow(c.a, c.next, c.why); got != c.want {
+			t.Errorf("%+v %s: %q, want %q", c.a.Report, c.next, got, c.want)
+		}
+	}
 }
 
 // A block reported before a card in the same turn is still the turn's ending once the card
@@ -122,7 +183,7 @@ func TestCheckAgainNeedsInMinutes(t *testing.T) {
 	}
 }
 
-// Only one of a Block (check_again, wait_for_agents) and an EventWait (wait_for_event) is
+// Only one of a Block (check_again, a wait on agent.ended) and an EventWait (wait_for_event) is
 // ever open at a time, in either order (#3094): the chat draws one wait card at the foot
 // of the chat, not two.
 func TestOnlyOneWaitAtATime(t *testing.T) {
@@ -145,7 +206,7 @@ func TestOnlyOneWaitAtATime(t *testing.T) {
 	}
 
 	// wait_for_event closes the open block: it is replaced, not stacked.
-	text, _ = m.tool(3, "wait_for_event", map[string]any{"events": "branch.moved", "until_minutes": 10})
+	text, _ = m.tool(3, "wait_for_event", map[string]any{"events": "branch.moved", "where": map[string]any{"any": true}, "until_minutes": 10})
 	if !strings.HasPrefix(text, "Still waiting for branch.moved") {
 		t.Fatal(text)
 	}

@@ -39,6 +39,11 @@ public struct WorktreeTally: Hashable, Sendable {
         return "Worktrees hold \(over)\(DiskSpace.words(bytes)), \(DiskSpace.words(idleBytes)) of it idle."
     }
 
+    /// A folder's closed row on a machine's page (#3743): "Agents · 4 worktrees".
+    public static func folderLine(_ folder: String, count: Int) -> String {
+        "\(folder) · \(count == 1 ? "1 worktree" : "\(count) worktrees")"
+    }
+
     public static let empty = "No worktrees. A session started in a new worktree makes one."
     /// The section's intro, under its title.
     public static let intro = "Each folder's worktrees on this machine and how much each holds on disk. Idle ones, with no session in them, come first, largest first."

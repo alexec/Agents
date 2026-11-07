@@ -13,6 +13,7 @@ export const preferenceKeys = {
   showsUsage: "showsUsage",
   startRuntimeID: "startRuntimeID",
   startChoices: "startChoices",
+  startLevels: "startLevels",
   agentsMayArchiveMyChats: "agentsMayArchiveMyChats",
   noticeBurst: "noticeBurst",
   noticeCooldownMinutes: "noticeCooldownMinutes",

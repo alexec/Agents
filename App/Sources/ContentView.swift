@@ -381,6 +381,11 @@ struct ContentView: View {
         }
         // The project's settings or one folder's, over whatever the window is showing (066, #3280).
         .settingsSheets(requests)
+        // Help ▸ Report a Problem… (#3718).
+        .sheet(isPresented: Binding(get: { requests.showsReportProblem },
+                                    set: { requests.showsReportProblem = $0 })) {
+            ReportProblemSheet().paperSheet()
+        }
         // An agent that needs its runtime signed in gets the sign-in, not an error.
         .sheet(isPresented: Binding(get: { model.signInRuntimeID != nil },
                                     set: { if !$0 { model.putAwaySignIn() } })) {

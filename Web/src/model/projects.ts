@@ -77,7 +77,7 @@ export function slotLine(slot: ConnectorSlot, name: string): string {
   const skipped = slot.state === "skipped";
   if (slot.fromProject) return skipped ? `Skipped in every folder of ${name}.` : `${what}, for every folder of ${name}.`;
   if (skipped) return "Skipped in this folder only.";
-  return slot.repository == null ? "This folder has no GitHub or GitLab remote." : `${what}, this folder's own.`;
+  return slot.repository == null ? "This folder has no GitHub, GitLab, Forgejo or Bitbucket remote." : `${what}, this folder's own.`;
 }
 
 /** The folder's own slot, as the project's for every folder. */

@@ -54,6 +54,9 @@ const allowedURLs = new Set([
   // Connect GitLab (#1630): the address field's example, and Make a Token's page with no address,
   // a link the person opens in a new tab, never fetched.
   "https://gitlab.com",
+  // Connect Forgejo (#3752): the address field's example, and Make a Token's page with no
+  // address, a link the person opens in a new tab, never fetched.
+  "https://codeberg.org",
   // The wait card's link to the merge request or issue its arguments name (#3077): a link
   // the person opens in a new tab, never fetched.
   "https://gitlab.com/",

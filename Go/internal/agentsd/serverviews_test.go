@@ -151,13 +151,17 @@ func TestOurViewsShowWhereTheRepoFits(t *testing.T) {
 	github, _ := mcpcatalog.OursByID("agents/github")
 	gitlab, _ := mcpcatalog.OursByID("agents/gitlab")
 	linear, _ := mcpcatalog.OursByID("agents/linear")
+	forgejo, _ := mcpcatalog.OursByID("agents/forgejo")
+	if !oursFits(forgejo, "codeberg.org") || oursFits(forgejo, "github.com") || oursFits(forgejo, "") {
+		t.Fatal("forgejo fits")
+	}
 	if !oursFits(github, "github.com") || oursFits(github, "gitlab.com") || oursFits(github, "") ||
 		!oursFits(gitlab, "git.acme.dev") || oursFits(gitlab, "github.com") || !oursFits(linear, "") {
 		t.Fatal("fits")
 	}
 	// #3131, #3311: Work lists GitHub's and GitLab's issues and pull requests and Linear's
 	// issues, so their rows go where they fit.
-	if !inWork(github) || !inWork(gitlab) || !inWork(linear) {
+	if !inWork(github) || !inWork(gitlab) || !inWork(forgejo) || !inWork(linear) {
 		t.Fatal("in Work")
 	}
 }

@@ -551,6 +551,7 @@ func (l *live) turn() bool {
 	l.turnSeq++
 	l.inTurn, l.prompting, l.stopped, l.reported, l.showedFile = true, false, false, false, false
 	l.heldBlock = nil
+	noSession := l.session == nil
 	l.mu.Unlock()
 	defer cancel()
 	defer func() {
@@ -558,8 +559,13 @@ func (l *live) turn() bool {
 		l.inTurn, l.prompting = false, false
 		l.mu.Unlock()
 	}()
+	// No turn starts once the host is going (#3828). The run loop can come back here after
+	// stopAll looked, with a stop it never saw: the queue waits for the next start.
+	if d.going() {
+		return false
+	}
 
-	if l.session == nil {
+	if noSession {
 		rt := runtimeByID(a.RuntimeID)
 		dir := store.FolderPath(a.Cwd)
 		account, err := d.accountFor(a)

@@ -102,7 +102,7 @@ func BaseURL(base string) string {
 // MARK: HTTP
 
 // NotConnected is what a call says with no token, or one Bitbucket no longer takes.
-const NotConnected = "Bitbucket is not connected, or its token ended: set BITBUCKET_TOKEN to an API token with read and write on " +
+const NotConnected = "Bitbucket is not connected, or its token ended: connect Bitbucket in Connectors, or set BITBUCKET_TOKEN to an API token with read and write on " +
 	"repositories, pull requests and issues (and BITBUCKET_EMAIL to its account's email), or to an access token"
 
 func (b *RealBitbucket) do(ctx context.Context, method, path string, body any) ([]byte, error) {
@@ -460,6 +460,9 @@ type issueJSON struct {
 	Component *struct {
 		Name string `json:"name"`
 	} `json:"component"`
+	Milestone *struct {
+		Name string `json:"name"`
+	} `json:"milestone"`
 	CreatedOn string `json:"created_on"`
 	UpdatedOn string `json:"updated_on"`
 	Links     links  `json:"links"`

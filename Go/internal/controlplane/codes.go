@@ -45,8 +45,19 @@ type storedCode struct {
 	// The person whose client or machine uses it (#994); none is the local owner.
 	Owner *string `json:"owner,omitempty"`
 	// An invite (#994): the client that uses it is a new person's first.
-	Invite  *invite       `json:"invite,omitempty"`
-	Expires records.Stamp `json:"expires"`
+	Invite *invite `json:"invite,omitempty"`
+	// The workspace an install made a host code for (#3871): the host that joins with it is
+	// linked to it, whatever name the host joins with.
+	Workspace *codeWorkspace `json:"workspace,omitempty"`
+	Expires   records.Stamp  `json:"expires"`
+}
+
+// codeWorkspace is a provider's workspace that a host code is for, and the host key the
+// person trusted for it at the install.
+type codeWorkspace struct {
+	Provider  string `json:"provider"`
+	Workspace string `json:"workspace"`
+	Trust     string `json:"trust,omitempty"`
 }
 
 // invite is who an invite code makes: their name and role, and the admin who asked.
@@ -112,6 +123,7 @@ func (c *Codes) issue(ctx context.Context, host, browser bool, lifetime time.Dur
 	}
 	if host {
 		stored.Purpose = "host"
+		stored.Workspace = codeWorkspaceOf(ctx)
 	} else if browser {
 		yes := true
 		stored.Browser = &yes
@@ -244,8 +256,8 @@ var serverFileNames = func() map[string]bool {
 		// The host (Go, #1136; one name since #1381); github-mcp (#1232), linear-mcp (#839), gitlab-mcp (#1629),
 		// email-mcp (#1780), jira-mcp (#3247), slack-mcp (#3475), googlechat-mcp (#1016),
 		// whatsapp-mcp (#1352), sentry-mcp (#3583), betterstack-mcp (#3655), forgejo-mcp (#1753),
-		// bitbucket-mcp (#2828).
-		for _, program := range []string{"agentsd", "github-mcp", "linear-mcp", "gitlab-mcp", "email-mcp", "jira-mcp", "slack-mcp", "googlechat-mcp", "whatsapp-mcp", "sentry-mcp", "betterstack-mcp", "forgejo-mcp", "bitbucket-mcp"} {
+		// bitbucket-mcp (#2828), azuredevops-mcp (#2829), azureboards-mcp (#3804).
+		for _, program := range []string{"agentsd", "github-mcp", "linear-mcp", "gitlab-mcp", "email-mcp", "jira-mcp", "slack-mcp", "googlechat-mcp", "whatsapp-mcp", "sentry-mcp", "betterstack-mcp", "forgejo-mcp", "bitbucket-mcp", "azuredevops-mcp", "azureboards-mcp"} {
 			names[program+"-linux-"+arch] = true
 			names[program+"-linux-"+arch+".sha256"] = true
 		}

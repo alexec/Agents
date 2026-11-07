@@ -266,7 +266,7 @@ public enum ProjectWords {
         case (true, false): return "\(what), for every folder of \(name)."
         case (false, true): return "Skipped in this folder only."
         case (false, false):
-            return slot.repository == nil ? "This folder has no GitHub or GitLab remote." : "\(what), this folder's own."
+            return slot.repository == nil ? "This folder has no GitHub, GitLab, Forgejo or Bitbucket remote." : "\(what), this folder's own."
         }
     }
     /// Make the folder's own slot the project's.

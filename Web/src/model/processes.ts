@@ -1,5 +1,5 @@
 // A machine's processes (#3453): the words its page says, as the window's ProcessWords says them.
-import type { MachineUsage, ProcessUsage } from "../protocol/generated";
+import type { MachineUsage, ProcessesState, ProcessUsage } from "../protocol/generated";
 
 /** A process's CPU, of one core: more than 100% on several. */
 export function cpuWords(percent: number): string {
@@ -26,6 +26,13 @@ export function machineCPUWords(machine: MachineUsage): string {
 
 export function machineMemoryWords(machine: MachineUsage): string {
   return `${memoryWords(machine.memoryUsed)} of ${memoryWords(machine.memoryTotal)}`;
+}
+
+/** The closed Processes row on a machine's page (#3743): "Processes (12) · 4.5% · 1.2 GB", ProcessWords.processesLine. */
+export function processesLine(state: ProcessesState): string {
+  const cpu = state.processes.reduce((n, p) => n + p.cpuPercent, 0);
+  const memory = state.processes.reduce((n, p) => n + p.memory, 0);
+  return `Processes (${state.processes.length + state.omitted}) · ${cpuWords(cpu)} · ${memoryWords(memory)}`;
 }
 
 /** Whether a row is the top of a session's processes (its runtime or a terminal), not a child of one: only

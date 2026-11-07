@@ -108,7 +108,7 @@ it out of Codex.
 A folder can also keep plugins in `.agents/plugins` inside the folder. Those
 apply only in that folder. Because a plugin can run hooks and start connectors when a
 session begins, a new or changed folder plugin does not reach any agent until you approve
-it on the folder's page — the same idea as [a workflow waiting for your OK](set-up-a-workflow.md).
+it in Project Settings ▸ Plugins (Needs You lists it) — the same idea as [a workflow waiting for your OK](set-up-a-workflow.md).
 
 On the Mac, open the folder. Under **Plugins**, each plugin lists what it carries. One
 that is new or has changed since you approved it says it is waiting; click **Approve**

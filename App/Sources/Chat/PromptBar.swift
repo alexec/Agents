@@ -1440,6 +1440,8 @@ struct PromptBar: View {
             model.draftRuntimeID = shared.runtimeID
             DraftKeeper.shared.putBackSharedChoices(shared.chosen)
         }
+        // The levels last chosen on any client, not Ask again each launch (#3798).
+        model.draftLevels = DisplayPreference.keptLevels(in: model.displayMirror.preferences, default: model.draftLevels)
         if model.draftRuntimeID == nil || !model.isAutoDraft && !model.availableRuntimes.contains(where: { $0.id == model.draftRuntimeID }) {
             // The one rule (#264): what was put back, else the catalog's default, else the first.
             model.draftRuntimeID = model.defaultRuntimeID

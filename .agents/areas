@@ -337,6 +337,16 @@ Go/cmd/bitbucket-mcp/                                  bitbucket
 Go/internal/bitbucketmcp/                              bitbucket
 docs/how-to/use-bitbucket.md                           bitbucket
 
+# azuredevops: the azuredevops MCP server (#2829): pull requests and Azure Pipelines builds on Azure DevOps.
+Go/cmd/azuredevops-mcp/                                azuredevops
+Go/internal/azuredevopsmcp/                            azuredevops
+docs/how-to/use-azure-devops.md                        azuredevops
+
+# azureboards: the azureboards MCP server (#3804): Azure Boards work items, the tracker slot's.
+Go/cmd/azureboards-mcp/                                azureboards
+Go/internal/azureboardsmcp/                            azureboards
+docs/how-to/use-azure-boards.md                        azureboards
+
 # email: the email MCP server (#1780): one IMAP mailbox's new mail, read, never sent.
 Go/cmd/email-mcp/                                      email
 Go/internal/emailmcp/                                  email

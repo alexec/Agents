@@ -401,9 +401,9 @@ and taking a computer off it is a change you commit.
 
 A workflow waiting for your OK is also asked as a question, the same one a change to
 `.agents/folder.json` or `.agents/pins.json` made outside the app is (#569): over the
-prompt of the agent whose turn was running when the file changed, or on the folder's
-page when none was (a merge or pull, or something outside the app), and notified like
-any question. It says who changed the file, the lines removed and added against the copy
+prompt of the agent whose turn was running when the file changed, and notified like
+any question. When none was (a merge or pull, or something outside the app), Needs You
+lists it; the new session page does not ask it (#3762). It says who changed the file, the lines removed and added against the copy
 you last approved, and offers **Keep** and **Undo**:
 
 - **Keep** is **Approve**, of the file as you were shown it.

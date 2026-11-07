@@ -2,7 +2,7 @@ import AgentsKitCore
 import SwiftUI
 
 /// A machine's worktrees on its page (#790, #3627), and how much each holds on disk: a
-/// section per folder.
+/// row per folder with its count, closed until the person opens it (#3743).
 ///
 /// They were Activity ▸ Worktrees, and before that Folder Settings ▸ Worktrees (030). A
 /// worktree is a folder's, and a folder is one machine's, so its page is where its disk
@@ -35,38 +35,40 @@ struct MachineWorktreesSections: View {
             } label: {
                 Text(WorktreeTally(groups).pageLine)
             }
+            ForEach(groups) { group in
+                WorktreesGroup(group: group, host: host)
+            }
         } header: {
             Text("Worktrees")
-        } footer: {
-            Text(WorktreeTally.intro).foregroundStyle(.secondary)
+                .help(WorktreeTally.intro)
         }
         .task(id: host) { await model.loadWorktrees(on: host) }
-        ForEach(groups) { group in
-            WorktreesGroup(group: group, host: host)
-        }
     }
 }
 
-/// One folder's worktrees under its name, with Clean up worktrees.
+/// One folder's worktrees, closed under "Agents · 4 worktrees", with Clean up worktrees.
 struct WorktreesGroup: View {
     @Environment(AppModel.self) private var model
     let group: DaemonAPI.FolderWorktrees
     let host: MachineRef
 
     var body: some View {
-        Section {
-            ForEach(group.worktrees) { worktree in
-                WorktreeRow(worktree: worktree, folder: group.folder, host: host)
-            }
-        } header: {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(model.work.folder(FolderKey(host: host, folder: group.folder))?.name ?? group.folder.lastPathComponent)
+        // Clean up is inside, not on the row: a press on the row opens it, never starts a session.
+        DisclosureGroup {
+            HStack {
                 Spacer()
                 Button("Clean up worktrees") { model.offerCleanUp(in: group.folder, on: host) }
                     .buttonStyle(.paper)
                     .appText(.fine)
                     .help("A new session here, offered the words to remove what has been merged")
             }
+            ForEach(group.worktrees) { worktree in
+                WorktreeRow(worktree: worktree, folder: group.folder, host: host)
+            }
+        } label: {
+            Text(WorktreeTally.folderLine(
+                model.work.folder(FolderKey(host: host, folder: group.folder))?.name ?? group.folder.lastPathComponent,
+                count: group.worktrees.count))
         }
     }
 }

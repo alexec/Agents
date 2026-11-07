@@ -33,6 +33,39 @@ struct WorkListTests {
         #expect(WorkList.repoName("github:alexec/Agents") == "alexec/Agents")
     }
 
+    @Test func anAzureBoardsWorkItemsRowHasItsStatesNameItsProjectAndOpenOnAzureBoards() {
+        let row = WorkList.Row(.init(node: Node(kind: "issue", ref: "azureboards:acme/web app#12"), title: "Export", state: "open",
+                                     updatedAt: day, status: "Active"), on: .mac)
+        #expect(row.status == "Active")
+        #expect(row.repo == "azureboards:acme/web app")
+        #expect(WorkList.repoName(row.repo) == "Azure Boards · acme/web app")
+        #expect(WorkList.shortRef(row.node.ref) == "#12")
+        #expect(WorkList.openOnWords(row.node.ref) == "Open on Azure Boards")
+    }
+
+    @Test func aForgejoPullRequestsRowHasItsRepoAndOpenOnForgejo() {
+        let row = WorkList.Row(.init(node: Node(kind: "pr", ref: "forgejo:walkalex/app#8"), title: "Add hello", state: "open",
+                                     updatedAt: day), on: .mac)
+        #expect(row.repo == "forgejo:walkalex/app")
+        #expect(WorkList.repoName(row.repo) == "walkalex/app")
+        #expect(WorkList.shortRef(row.node.ref) == "#8")
+        #expect(WorkList.openOnWords(row.node.ref) == "Open on Forgejo")
+        #expect(WorkList.forgeName("pagure:a/b#1") == "the forge")
+        #expect(WorkList.failureWords(JSONRPCError(code: -32602, message: "forge/rerun: open the check on Forgejo")) ==
+            "forge/rerun: open the check on Forgejo")
+        #expect(WorkList.errorWords(.init(forge: "forgejo", message: "not connected"), machine: "Studio") == "Forgejo on Studio: not connected")
+    }
+
+    @Test func aBitbucketIssuesRowHasItsRepoAndOpenOnBitbucket() {
+        let row = WorkList.Row(.init(node: Node(kind: "issue", ref: "bitbucket:walkalex/app#3"), title: "Export", state: "open",
+                                     updatedAt: day), on: .mac)
+        #expect(row.repo == "bitbucket:walkalex/app")
+        #expect(WorkList.repoName(row.repo) == "walkalex/app")
+        #expect(WorkList.shortRef(row.node.ref) == "#3")
+        #expect(WorkList.openOnWords(row.node.ref) == "Open on Bitbucket")
+        #expect(WorkList.errorWords(.init(forge: "bitbucket", message: "not connected"), machine: "Studio") == "Bitbucket on Studio: not connected")
+    }
+
     @Test func oneRowPerRefTheLastUpdatedCopyWithItsLineage() {
         let rows = WorkList.merge([
             (host: .mac, items: [item(1), item(2, title: "Old")]),
@@ -222,6 +255,19 @@ struct WorkPageTests {
         try #require(page.files.map(\.path) == ["a.go", "b.png"])
         #expect(page.files[0].hunks.first?.oldStart == 1 && page.files[0].hunks.first?.lines.first?.kind == .added)
         #expect(page.files[1].note == "binary")
+        #expect(page.site == "GitHub")
+        #expect(diff.appViewDiff(title: "!1 T", site: "GitLab").site == "GitLab")
+    }
+
+    /// #3837: a view's diff names the forge it is on (the gitlab server's says GitLab), GitHub when it names none.
+    @Test func aViewsDiffNamesItsSite() throws {
+        let files: JSONValue = .array([.object(["path": .string("a.go")])])
+        let none = try AppViewDiff.read(.object(["files": files])).get()
+        #expect(none.site == "GitHub")
+        let gitlab = try AppViewDiff.read(.object(["files": files, "site": .string(" GitLab ")])).get()
+        #expect(gitlab.site == "GitLab")
+        let long = try AppViewDiff.read(.object(["files": files, "site": .string(String(repeating: "x", count: 99))])).get()
+        #expect(long.site.count == AppViewDiff.siteLimit)
     }
 
     @Test func aPlaceIsAListOrAPage() {

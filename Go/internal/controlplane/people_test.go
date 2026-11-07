@@ -542,6 +542,32 @@ func TestACodeMadeForAPersonMakesTheirMachine(t *testing.T) {
 	}
 }
 
+// Add as Machine…'s host code names the workspace it is for (#3871), so the host that
+// joins with it is linked to that workspace, whatever name it joins with. A code for no
+// workspace names none.
+func TestAnInstallsHostCodeNamesItsWorkspace(t *testing.T) {
+	t.Parallel()
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	ctx := context.Background()
+	provider, workspace, trust := wire.ProviderID("codespaces"), "machine-1", "SHA256:abc"
+	install := wire.MachineInstall{Destination: "machine-1", Provider: &provider, Workspace: &workspace, Trust: &trust}
+	_, id, err := p.s.Codes().HostCode(withInstallWorkspace(ctx, install), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored, err := p.s.Codes().Stored(ctx, id, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if w := stored.Workspace; w == nil || *w != (codeWorkspace{Provider: "codespaces", Workspace: "machine-1", Trust: trust}) {
+		t.Fatalf("%+v", w)
+	}
+	_, id, _ = p.s.Codes().HostCode(withInstallWorkspace(ctx, wire.MachineInstall{Destination: "devbox"}), "")
+	if stored, _ := p.s.Codes().Stored(ctx, id, false); stored == nil || stored.Workspace != nil {
+		t.Fatalf("%+v", stored)
+	}
+}
+
 // FR-020, FR-021: a machine is told only its own user's windows, and lends and borrows a
 // sign-in or git access only within one user. A lend made before the team tier by another
 // user's machine is neither shown nor used.

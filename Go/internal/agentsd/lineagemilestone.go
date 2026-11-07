@@ -21,17 +21,18 @@ import (
 // Each issue is part of its milestone (#2935), so a milestone's cost adds up (#2350):
 //
 //   - For each forge issue the host knows (a session's #n, a PR's fixes), it asks the forge
-//     for the issue's milestone, with the person's own gh or glab in the folder, and links
-//     the issue part-of the milestone, source forge. A milestone is
-//     github:<owner>/<repo>/milestone/<number>, or gitlab:<group>/<project>/milestone/<iid>.
+//     for the issue's milestone, with the person's own gh or glab in the folder (Forgejo: its
+//     connection, lineageforgejo.go), and links the issue part-of the milestone, source forge.
+//     A milestone is github:<owner>/<repo>/milestone/<number>,
+//     gitlab:<group>/<project>/milestone/<iid>, or forgejo:<owner>/<repo>/milestone/<id>.
 //   - The answer is kept milestoneRecheck: an issue named again after that is asked again.
 //     When its milestone is another one now, the old link ends and a new one starts; with
 //     none, the link ends.
 //   - The same answer says the issue's parent (a GitHub sub-issue's epic, #3582): the issue
 //     is part-of its parent, source forge, and a parent's sub-issues (at most
 //     subIssuesMax) are each part-of it, so a walk from an epic reaches its children. A
-//     move or a removal ends the old link as for a milestone. GitLab's REST API says no
-//     parent, so a GitLab issue gets none.
+//     move or a removal ends the old link as for a milestone. GitLab's and Forgejo's REST
+//     APIs say no parent, so their issues get none.
 //   - Bounded: one lookup at a time, on its own goroutine so the linker never waits on the
 //     forge; at most milestoneLookupsHeld wait, each issue once, and milestonesCached
 //     answers are kept.
@@ -85,9 +86,9 @@ func (r forgeRepo) milestone(n int) wire.LineageNode {
 }
 
 // noteIssueMilestone asks, unless it asked within milestoneRecheck, for an issue's
-// milestone, and links the issue to it.
+// milestone, and links the issue to it: on a forge lineage asks (forgeKind.cli).
 func (d *Daemon) noteIssueMilestone(folder string, repo forgeRepo, n int) {
-	if repo.forge == "" || n <= 0 {
+	if !repo.asks() || n <= 0 {
 		return
 	}
 	issue := repo.issue(n)
@@ -119,6 +120,9 @@ func (d *Daemon) noteIssueMilestone(folder string, repo forgeRepo, n int) {
 func (d *Daemon) askIssueMilestone(j milestoneJob) {
 	issue := j.repo.issue(j.n)
 	ask := milestoneLookup
+	if j.repo.forge == "forgejo" {
+		ask = d.forgejoIssue
+	}
 	if d.issueLookup != nil {
 		ask = d.issueLookup
 	}
@@ -277,25 +281,34 @@ func issueOfAPIURL(raw string) (forgeRepo, int, bool) {
 	return issueOfURL("https://github.com/" + rest)
 }
 
-// issueOfURL is the repo and number of an issue's web address: github.com/o/r/issues/5, or
-// <gitlab>/group/project/-/issues/5.
+// issueOfURL is the repo and number of an issue's web address: github.com/o/r/issues/5,
+// <gitlab>/group/project/-/issues/5, or codeberg.org/o/r/issues/5.
 func issueOfURL(raw string) (forgeRepo, int, bool) {
 	u, err := url.Parse(raw)
 	if err != nil || (u.Scheme != "https" && u.Scheme != "http") {
 		return forgeRepo{}, 0, false
 	}
-	path := strings.Trim(u.Path, "/")
-	for _, sep := range []string{"/-/issues/", "/issues/"} {
-		if repo, num, ok := strings.Cut(path, sep); ok {
-			n, err := strconv.Atoi(strings.SplitN(num, "/", 2)[0])
-			r := forgeOf(u.Host, repo)
-			if err != nil || n <= 0 || r.forge == "" || (sep == "/issues/") != (r.forge == "github") {
-				return forgeRepo{}, 0, false
-			}
-			return r, n, true
-		}
+	return ofURL(u.Host, strings.Trim(u.Path, "/"), false)
+}
+
+// issueOfURLOn is issueOfURL, or an issue on the Forgejo whose root is root (the connected
+// one's, "" for none): its host's name need not say Forgejo, as issueOfURL's must.
+func issueOfURLOn(raw, root string) (forgeRepo, int, bool) {
+	if repo, n, ok := issueOfURL(raw); ok || root == "" {
+		return repo, n, ok
 	}
-	return forgeRepo{}, 0, false
+	u, err := url.Parse(raw)
+	r, rerr := url.Parse(root)
+	if err != nil || rerr != nil || !strings.EqualFold(u.Scheme, r.Scheme) || !strings.EqualFold(u.Host, r.Host) {
+		return forgeRepo{}, 0, false
+	}
+	rest, ok := strings.CutPrefix(u.Path, r.Path)
+	repo, num, cut := strings.Cut(strings.Trim(rest, "/"), "/issues/")
+	n, nerr := strconv.Atoi(strings.SplitN(num, "/", 2)[0])
+	if !ok || !cut || nerr != nil || n <= 0 || strings.Count(repo, "/") != 1 || strings.HasPrefix(repo, "/") || strings.HasSuffix(repo, "/") {
+		return forgeRepo{}, 0, false
+	}
+	return forgeRepo{"forgejo", repoPath(repo)}, n, true
 }
 
 // issueMilestoneOf is the milestone of an issue as the forge's API says it: number on
@@ -322,10 +335,10 @@ func issueMilestoneOf(out []byte) (int, error) {
 	return 0, errors.New("the forge did not say the milestone's number")
 }
 
-// issueOfNode is the repo and number of a forge issue node: github:o/r#12.
+// issueOfNode is the repo and number of a forge issue node: github:o/r#12, forgejo:o/r#12.
 func issueOfNode(n wire.LineageNode) (forgeRepo, int, bool) {
 	forge, rest, ok := strings.Cut(n.Ref, ":")
-	if n.Kind != lineage.KindIssue || !ok || (forge != "github" && forge != "gitlab") {
+	if _, known := kindOf(forge); n.Kind != lineage.KindIssue || !ok || !known {
 		return forgeRepo{}, 0, false
 	}
 	path, num, ok := strings.Cut(rest, "#")
