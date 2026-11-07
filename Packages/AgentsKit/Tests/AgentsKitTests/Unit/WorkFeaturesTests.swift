@@ -31,6 +31,22 @@ struct WorkFeaturesTests {
         #expect(WorkFeatures.title("") == "")
         #expect(WorkFeatures.countWords(.init(name: "work", epics: 3, open: 2)) == "3 epics · 2 open")
         #expect(WorkFeatures.countWords(.init(name: "hosted", epics: 1, open: 0)) == "1 epic · 0 open")
+        #expect(WorkFeatures.countWords(.init(name: "work", epics: 1, open: 0, issues: 0)) == "1 epic · 0 open")
+        #expect(WorkFeatures.countWords(.init(name: "work", epics: 1, open: 0, issues: 1)) == "1 epic · 0 open · 1 open issue")
+        #expect(WorkFeatures.countWords(.init(name: "work", epics: 2, open: 1, issues: 4)) == "2 epics · 1 open · 4 open issues")
+    }
+
+    @Test func aFeatureWithNoOpenWorkIsFinished() {
+        let features: [DaemonAPI.ForgeFeature] = [
+            .init(name: "browser", epics: 1, open: 0, issues: 0),
+            .init(name: "lineage", epics: 2, open: 1, issues: 0),
+            .init(name: "old", epics: 1, open: 0),
+            .init(name: "work", epics: 3, open: 0, issues: 2),
+        ]
+        let groups = WorkFeatures.groups(features)
+        #expect(groups.active.map(\.name) == ["lineage", "old", "work"])
+        #expect(groups.finished.map(\.name) == ["browser"])
+        #expect(WorkFeatures.finishedWords(7) == "Finished (7)")
     }
 
     @Test func severalMachinesFeaturesAddUpByName() throws {
@@ -42,6 +58,9 @@ struct WorkFeaturesTests {
         #expect(merged[1].epics == 3)
         #expect(merged[1].open == 2)
         #expect(merged[1].color == "#1d76db")
+        let counted = WorkFeatures.merge([[.init(name: "work", epics: 1, open: 0, issues: 1)], [.init(name: "work", epics: 1, open: 0, issues: 2)],
+                                          [.init(name: "docs", epics: 1, open: 0, issues: 0)], [.init(name: "docs", epics: 1, open: 0)]])
+        #expect(counted.map(\.issues) == [nil, 3])
     }
 
     @Test func anOpenedFeatureShowsItsEpicsAndItsLooseIssues() throws {

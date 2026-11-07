@@ -181,10 +181,14 @@ func TestForgeFeatureFilterAndFeatures(t *testing.T) {
 	gh.epics = []githubmcp.Item{planIssue(1, "open", "epic", "feature:work"), planIssue(2, "closed", "epic", "feature:Work"),
 		planIssue(3, "open", "epic", "feature:lineage"), planIssue(4, "open", "epic")}
 	gh.epics[0].LabelColors = map[string]string{"feature:work": "#1d76db"}
+	// #3741: the open issues that are not epics count under their feature; one with no epic adds no feature.
+	gh.open = []githubmcp.Item{planIssue(1, "open", "epic", "feature:work"), planIssue(5, "open", "bug", "feature:Work"),
+		planIssue(6, "open", "story", "feature:work"), planIssue(7, "open", "feature:docs"), planIssue(8, "open")}
 	var out wire.ForgeFeatures
 	json.Unmarshal(c.call(t, 2, "forge/features", wire.ForgeFeaturesRequest{}), &out)
 	if len(out.Features) != 2 || out.Features[0].Name != "lineage" || out.Features[1].Name != "work" || out.Features[1].Epics != 2 ||
-		out.Features[1].Open != 1 || deref(out.Features[1].Color) != "#1d76db" || len(out.Errors) != 0 {
+		out.Features[1].Open != 1 || deref(out.Features[1].Color) != "#1d76db" || len(out.Errors) != 0 ||
+		out.Features[0].Issues == nil || *out.Features[0].Issues != 0 || out.Features[1].Issues == nil || *out.Features[1].Issues != 2 {
 		t.Fatalf("features: %+v", out)
 	}
 	if searches, _ := gh.asked(); !strings.Contains(searches[len(searches)-1], `label:"epic"`) || strings.Contains(searches[len(searches)-1], "is:open") {

@@ -10,12 +10,32 @@ public enum WorkFeatures {
         return first.uppercased() + name.dropFirst()
     }
 
-    /// A feature's counts: "3 epics · 2 open".
+    /// A feature's counts: "3 epics · 2 open", and "· 4 open issues" when it has open issues
+    /// that are not epics (#3741).
     public static func countWords(_ feature: DaemonAPI.ForgeFeature) -> String {
-        "\(feature.epics) \(feature.epics == 1 ? "epic" : "epics") · \(feature.open) open"
+        let epics = "\(feature.epics) \(feature.epics == 1 ? "epic" : "epics") · \(feature.open) open"
+        guard let issues = feature.issues, issues > 0 else { return epics }
+        return epics + " · \(issues) open \(issues == 1 ? "issue" : "issues")"
     }
 
+    /// A feature with no open epic and no open issue (#3741). A daemon that does not count the
+    /// issues says nothing, so none of its features is finished.
+    public static func isFinished(_ feature: DaemonAPI.ForgeFeature) -> Bool {
+        feature.open == 0 && feature.issues == 0
+    }
+
+    /// The features as the list shows them (#3741): those with open work at the top, in their
+    /// order, and the finished ones in the Finished group at the bottom.
+    public static func groups(_ features: [DaemonAPI.ForgeFeature])
+        -> (active: [DaemonAPI.ForgeFeature], finished: [DaemonAPI.ForgeFeature]) {
+        (features.filter { !isFinished($0) }, features.filter(isFinished))
+    }
+
+    /// The Finished group's head: "Finished (7)".
+    public static func finishedWords(_ count: Int) -> String { "Finished (\(count))" }
+
     /// The features of several machines as one list, by name: the counts of one feature added up.
+    /// Its issues are unknown when one machine does not count them.
     public static func merge(_ lists: [[DaemonAPI.ForgeFeature]]) -> [DaemonAPI.ForgeFeature] {
         var by: [String: DaemonAPI.ForgeFeature] = [:]
         var order: [String] = []
@@ -24,6 +44,7 @@ public enum WorkFeatures {
             if var had = by[key] {
                 had.epics += f.epics
                 had.open += f.open
+                had.issues = had.issues.flatMap { mine in f.issues.map { mine + $0 } }
                 had.color = had.color ?? f.color
                 by[key] = had
             } else {
