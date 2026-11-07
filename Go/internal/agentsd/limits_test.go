@@ -27,6 +27,7 @@ func TestALimitInWords(t *testing.T) {
 		{"codex", c(-32603), "You have exhausted your daily quota", "", limitSpent},
 		{"copilot", nil, "", "You have exceeded your monthly quota for premium requests.", limitSpent},
 		{"grok", nil, "", "Error: Usage balance exhausted", limitSpent},
+		{"opencode", nil, "", "Free usage limit reached. Free models work in OpenCode (https://opencode.ai)", limitSpent},
 		{"claude", nil, "", "You've hit your limit, says the doc I read.", limitNone},
 		{"antigravity", nil, "", "Resource has been exhausted (e.g. check quota).", limitRateLimited},
 	} {
