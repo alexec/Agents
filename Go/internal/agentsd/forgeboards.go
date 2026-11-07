@@ -22,6 +22,9 @@ import (
 //   - Linear: the team.
 //   - Jira: the board's filter.
 //
+// Forgejo has project boards, but its API (11) cannot read them, so a list narrowed to a board
+// lists no Forgejo items (#3835).
+//
 // A board this machine has not heard of lists nothing: it is no board of its folders.
 
 func (d *Daemon) registerForgeBoards() {
@@ -99,6 +102,7 @@ func narrowToBoard(s *forgeSources, b wire.ProjectBoard, in []string, prs bool) 
 	key := deref(b.Key)
 	repos, gitlab := s.repos, s.gitlab
 	s.repos, s.gitlab, s.teams, s.projects, s.workspace, s.gitlabErr = nil, nil, nil, nil, false, nil
+	s.forgejo, s.forgejoErr = nil, nil
 	switch *b.Forge {
 	case wire.ConnectionProviderGithub:
 		s.repos, board.project = repos, key
