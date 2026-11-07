@@ -149,7 +149,7 @@ func (d *Daemon) importExport(r wire.AgentsImportRequest) (wire.BackupRestoreRes
 		return wire.BackupRestoreResult{}, err
 	}
 	// Never this machine's own: an imported agent is shown and never run (#1001).
-	return d.restoreArchive(path, m.RootID, false, false, into)
+	return d.restoreArchive(path, m.RootID, false, false, into, nil)
 }
 
 // readExportManifest reads an archive's first entry, which a backup and an export both
