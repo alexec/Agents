@@ -58,9 +58,12 @@ The connection's row on **Connectors ▸ Connections** says which kind of token 
   renews the token before it ends, so a long session gets no error.
 - **Personal access token** (the fallback): a token that you made on github.com, for an
   organisation that does not let the App in. It has all the rights that you gave it, and a
-  post shows no badge. The row says when it ends. The host's `connections/sign-in/token`
-  method takes it; the sheets do not show a field for it yet. Agents connects only
-  github.com, not a GitHub Enterprise Server.
+  post shows no badge. The row says when it ends. To use one, choose **Personal access
+  token** on the **Connect GitHub** sheet, on the Mac or the web page. **Make a Token on
+  GitHub** opens github.com's page for a classic token, named Agents, with the `repo` and
+  `codespace` scopes. Paste the token (`ghp_…` or `github_pat_…`) and choose **Connect**. The
+  host checks the token with github.com and keeps it; the host does not renew it, so make a
+  new one when it ends. Agents connects only github.com, not a GitHub Enterprise Server.
 
 The token stays on the host. It never goes to the control plane.
 

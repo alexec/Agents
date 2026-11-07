@@ -313,6 +313,18 @@ export function connectionTitle(c: Connection): string {
 export const githubTokens = {
   app: "App user token · renews by itself · posts show the App",
   personal: "Personal access token · posts show no App",
+  /** The Connect GitHub sheet's second way in (#3945), as GitLab's sheet has. */
+  signInWay: "github.com",
+  tokenWay: "Personal access token",
+  tokenIntro: "For an organisation that does not let the agents-loops App in: make a personal access token on github.com, and paste it here.",
+  /** What the person gives up with a token of their own, in place of the App's. */
+  tokenCost: "The token has all the rights you give it, not only what the App can do. Agents' posts show no App badge, and the token does not renew: make a new one when it ends.",
+  tokenLabel: "Access token",
+  tokenPrompt: "ghp_… or github_pat_…",
+  newTokenButton: "Make a Token on GitHub",
+  /** A classic token with the scopes for what the sheet lists: repositories and Codespaces. */
+  newTokenURL: "https://github.com/settings/tokens/new?description=Agents&scopes=repo,codespace",
+  checking: "Checking the token with GitHub…",
 };
 
 export function connectionNote(c: Connection, now: Date = new Date()): string {

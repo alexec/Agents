@@ -146,6 +146,19 @@ struct ConnectorSetupWordsTests {
         #expect(ConnectorSetupWords.connectionNote(own, now: now) == "Personal access token \u{00B7} posts show no App \u{00B7} ends 1 Feb 2027")
     }
 
+    /// The Connect GitHub sheet's second way (#3945): it says what the person gives up, and
+    /// where to make the token, as the web page's.
+    @Test func githubTokenSheetWords() throws {
+        typealias T = ConnectorSetupWords.GitHubTokens
+        #expect(T.tokenWay == "Personal access token")
+        #expect(T.tokenCost.contains("all the rights you give it"))
+        #expect(T.tokenCost.contains("no App badge"))
+        #expect(T.tokenPrompt == "ghp_\u{2026} or github_pat_\u{2026}")
+        let url = try #require(URLComponents(string: T.newTokenURL))
+        #expect(url.host == "github.com")
+        #expect(url.queryItems?.first { $0.name == "scopes" }?.value == "repo,codespace")
+    }
+
     /// Connect GitLab (#1630): a token's row says its GitLab and when it ends, as the web page's.
     @Test func gitlabWords() throws {
         let now = try Date("2026-10-20T00:00:00Z", strategy: .iso8601)
