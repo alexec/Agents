@@ -1,7 +1,7 @@
 ---
 diataxis: how-to
 devices: [mac, web]
-description: Connect Forgejo with an access token and add the forgejo connector, so that agents read and comment on pull requests, checks and issues on Codeberg or your own Forgejo or Gitea, and a workflow or a wait starts on their events.
+description: Connect Forgejo with an access token and add the forgejo connector, so that agents read and comment on pull requests, checks and issues on Codeberg or your own Forgejo or Gitea, a workflow or a wait starts on their events, and the Work pages list them.
 ---
 
 # Use Forgejo or Gitea
@@ -12,8 +12,8 @@ connector is for both: Codeberg, your own Forgejo, or your own Gitea. Agents Hos
 it, and every Linux host installs it beside agentsd.
 
 It has tools to read pull requests, their checks and issues, and to comment on them, and
-it has events that start a workflow or a wait. It has no pages yet: the Work pages do not
-list a Forgejo repository.
+it has events that start a workflow or a wait. With the Forgejo connection, the Work pages
+list a Forgejo repository's issues and pull requests too (#3753).
 
 ## Before you start
 
@@ -74,6 +74,24 @@ The set-up adds it for you. To add it to another folder:
 The connector finds the repository from the folder's git remote (`origin` first). A tool or
 an event can name another one with `repo`, as `owner/name`.
 
+## On the Work pages
+
+With Forgejo connected, **Work ▸ Issues** and **Work ▸ Pull requests** list the issues and pull
+requests of each folder whose remote is on the connected Forgejo, beside the other forges',
+the last updated first. The repository is a choice in the **Repo** filter. A folder on another
+Forgejo is left out, and the list says why: the token counts only on its own Forgejo.
+
+- **An issue's page:** its description and comments, **Open on Forgejo**, **Start Agent**
+  (the session is labelled `#12`), **Close** or **Reopen**, **Labels** (the repository's) and a
+  comment box.
+- **A pull request's page:** the same, and its checks (the head commit's statuses), **Merge**
+  (the repository's default method first; merge, squash or rebase, as the repository allows;
+  and *Merge when checks pass*), **Approve** and **Show Diff**. Forgejo's API cannot run a
+  check again or give its log, so **Rerun failed** and a check's log say to open the check on
+  Forgejo.
+
+Each write is yours, with your token, from the machine that read the item.
+
 ## The tools
 
 - `list_pull_requests`, `get_pull_request` (with its description, head commit and the
@@ -113,7 +131,10 @@ never a bot. A pull request from a fork never counts.
   After the host starts again, a conflict that was already there is raised once more.
 - **Checks are read for the 50 open pull requests updated last.** Forgejo has no list of a
   repository's failed checks, so each poll reads the head of each of those.
-- **Not yet:** the Work pages and a failed job's log.
+- **The Work pages read Forgejo on each machine.** The list asks each repository for a page,
+  as Forgejo has no list across chosen repositories.
+- **Not yet:** a failed job's log, an epic's plan, the Board filter, and lineage links from a
+  session's `#12` label to a Forgejo issue.
 
 ## See also
 
