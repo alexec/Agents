@@ -69,6 +69,8 @@ const eventMeanings: Record<string, string> = {
   "workflow.completed": "A workflow's run in this folder finished",
   "workflow.refused": "A workflow in this folder did not run, and why",
   "branch.moved": "A branch an agent works on moved; never the default branch",
+  "file.added": "Files a wait or a trigger watches appeared in this folder",
+  "file.removed": "Files a wait or a trigger watches went from this folder",
   "lease.granted": "An agent was given a lease",
   "lease.released": "A lease was given back, ended or ran out",
   "mac.sleep": "This Mac is going to sleep",

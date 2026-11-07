@@ -5,7 +5,7 @@ import Testing
 /// The one list of what can happen (042 FR-003, FR-022, FR-024).
 @Suite("The event catalogue")
 struct EventCatalogueTests {
-    @Test func thereAreThirtyTwoUniqueWellFormedNames() {
+    @Test func thereAreThirtyFourUniqueWellFormedNames() {
         let names = EventCatalogue.all.map(\.name)
         // 30 from 042, 051's agent.retired (agent.deleted since #398), and 052's switch and two allowance kinds,
         // less the ten pull-request kinds that went with GitHub support, and the switch,
@@ -13,10 +13,10 @@ struct EventCatalogueTests {
         // and agent.archived (#96), and
         // mac.disk_low and mac.disk_ok (#195, machine.* since #372), folder.idle (#360),
         // and dropbox.file_added (#231), and agent.messaged (#560), and system.restarted (#1219),
-        // and agent.ended (#3799).
-        #expect(names.count == 32)
+        // and agent.ended (#3799), and file.added and file.removed (#3795).
+        #expect(names.count == 34)
         for name in ["system.restarted", "cost.allowance_out", "cost.allowance_back", "agent.archive_requested", "agent.archived",
-                     "machine.disk_low", "machine.disk_ok", "folder.idle", "dropbox.file_added",
+                     "machine.disk_low", "machine.disk_ok", "folder.idle", "dropbox.file_added", "file.added", "file.removed",
                      "agent.messaged", "agent.waiting"] {
             #expect(names.contains(name), "\(name)")
         }
@@ -82,12 +82,13 @@ struct EventCatalogueTests {
         #expect(granted.details == ["resource", "agent"])
     }
 
-    /// Only four events take a filter (#574, #2361), and only those have an inputSchema
+    /// Only seven events take a filter (#574, #2361, #3795), and only those have an inputSchema
     /// with anything in it (#579).
     @Test func onlyTheFiltersAreInTheInputSchema() throws {
         let filtered = EventCatalogue.all.filter { !$0.filters.isEmpty }
             .map { "\($0.name) \($0.filters.map(\.key).joined(separator: ","))" }
-        #expect(filtered == ["agent.ended agent", "branch.moved branch", "lease.granted resource,agent", "person.away why", "person.back why"])
+        #expect(filtered == ["agent.ended agent", "branch.moved branch", "file.added paths", "file.removed paths",
+                             "lease.granted resource,agent", "person.away why", "person.back why"])
         let branch = try #require(EventCatalogue.kind(named: "branch.moved"))
         #expect(branch.inputSchema == ["type": "object", "additionalProperties": false,
                                        "properties": ["branch": ["type": "string"]]])

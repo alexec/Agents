@@ -155,7 +155,10 @@ func TestAnAgentsLifeIsOnTheLog(t *testing.T) {
 	id := startAgent(t, c, 1, dir, "Write it")
 	waitFor(t, "it finished", func() bool { a := d.Store.Agent(id); return a.State == wire.AgentStateFinished })
 	// agent.ended comes right after the finish (#3799), with how.
-	waitFor(t, "the finish on the log", func() bool { n := names(d); return len(n) > 1 && n[len(n)-2] == "agent.finished" && n[len(n)-1] == "agent.ended" })
+	waitFor(t, "the finish on the log", func() bool {
+		n := names(d)
+		return len(n) > 1 && n[len(n)-2] == "agent.finished" && n[len(n)-1] == "agent.ended"
+	})
 	if end := logged(d)[0]; end.Details["how"] != string(d.Store.Agent(id).Report.Outcome) || end.Details["agent"] != string(id) {
 		t.Fatalf("%+v", end)
 	}

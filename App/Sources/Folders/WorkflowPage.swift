@@ -604,6 +604,7 @@ struct WorkflowPage: View {
             case .workflow: return "arrow.triangle.2.circlepath"
             case .branch: return "arrow.triangle.branch"
             case .dropbox: return "tray.and.arrow.down"
+            case .file: return "doc"
             default: return "desktopcomputer"
             }
         case .serverEvent: return "antenna.radiowaves.left.and.right"
