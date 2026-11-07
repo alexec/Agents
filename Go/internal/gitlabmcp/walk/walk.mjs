@@ -75,7 +75,8 @@ await new Promise((resolve) => gitlab.once("listening", resolve));
 
 // MARK: The server, over stdio
 
-const server = spawn(binary, [], { env: { ...process.env, GITLAB_TOKEN: "glpat-walk", GITLAB_URL: `http://127.0.0.1:${gitlab.address().port}` },
+// The copy a host runs for its views (AGENTS_MCP_HOSTED), the only one with approve and merge (#1896).
+const server = spawn(binary, [], { env: { ...process.env, GITLAB_TOKEN: "glpat-walk", GITLAB_URL: `http://127.0.0.1:${gitlab.address().port}`, AGENTS_MCP_HOSTED: "1" },
   stdio: ["pipe", "pipe", "inherit"] });
 let next = 1, buffer = "";
 const waiting = new Map();
@@ -103,6 +104,7 @@ const host = (view, tool, args) => `<!doctype html><html><head><title>host</titl
 window.asked = []; window.diff = null; window.started = null; window.opened = null;
 const frame = document.getElementById("view");
 const tell = (m) => frame.contentWindow.postMessage(Object.assign({ jsonrpc: "2.0" }, m), "*");
+// The server's whole answer, so an error goes back to the view as an error, as a real host's does.
 const call = (params) => fetch("/call", { method: "POST", body: JSON.stringify(params) }).then((r) => r.json());
 window.addEventListener("message", async (event) => {
   const m = event.data;
@@ -113,9 +115,9 @@ window.addEventListener("message", async (event) => {
     case "ui/initialize": reply({ protocolVersion: "2026-01-26", hostContext: { theme: "light" } }); break;
     case "ui/notifications/initialized":
       tell({ method: "ui/notifications/tool-input", params: { arguments: ${js(args)} } });
-      tell({ method: "ui/notifications/tool-result", params: await call({ name: ${js(tool)}, arguments: ${js(args)} }) });
+      tell({ method: "ui/notifications/tool-result", params: (await call({ name: ${js(tool)}, arguments: ${js(args)} })).result });
       break;
-    case "tools/call": reply(await call(m.params)); break;
+    case "tools/call": { const r = await call(m.params); reply(r.result, r.error); break; }
     case "agents/open-diff": window.diff = m.params; reply({}); break;
     case "agents/start-agent": window.started = m.params; reply({}); break;
     case "agents/message-agent": reply(null, { code: -32001, message: "no agent on that branch" }); break;
@@ -131,7 +133,7 @@ const front = createServer((req, res) => {
   if (url.pathname === "/call") {
     let body = "";
     req.on("data", (c) => { body += c; });
-    req.on("end", async () => { res.writeHead(200, { "content-type": "application/json" }); res.end(js((await rpc("tools/call", JSON.parse(body))).result)); });
+    req.on("end", async () => { res.writeHead(200, { "content-type": "application/json" }); const { result, error } = await rpc("tools/call", JSON.parse(body)); res.end(js({ result, error })); });
     return;
   }
   if (url.pathname === "/view") { html(url.searchParams.get("uri")).then((h) => { res.writeHead(200, { "content-type": "text/html" }); res.end(h); }); return; }
@@ -163,15 +165,19 @@ const press = (page, words) => page.eval(view(`(() => {
   if (b) b.click();
   return Boolean(b);
 })()`));
+// A list's rows, not its section headers (Needs you, Yours, Team, Others: #2952).
+const ROW = "li:not(.section)";
 const text = (page) => page.eval(view(`d.querySelector("main").innerText`));
 
 try {
   // Merge requests, and a merge request's page in place.
   const list = await chrome.page(`${base}/mrs`, { width: 900, height: 1100 });
-  await waitFor(list, `d.querySelectorAll("#mrs li").length === 2`, "two merge requests");
-  const rows = await list.eval(view(`[...d.querySelectorAll("#mrs li")].map((li) => li.innerText.replace(/\\s+/g, " "))`));
-  check(/Pipeline failed/.test(rows[0]) && /Approval needed/.test(rows[0]) && /Retry/.test(rows[0]), `!3 says its failed pipeline, approvals and Retry: ${js(rows[0])}`);
-  check(/Draft/.test(rows[1]) && /Pipeline running/.test(rows[1]) && /Auto-merge on/.test(rows[1]), `!4 says draft, running and auto-merge: ${js(rows[1])}`);
+  await waitFor(list, `d.querySelectorAll("#mrs ${ROW}").length === 2`, "two merge requests");
+  // In their sections: !4 is the viewer's own (Yours), !3 another's (Others).
+  const rows = await list.eval(view(`Object.fromEntries([...d.querySelectorAll("#mrs ${ROW}")].map((li) => li.innerText.replace(/\\s+/g, " "))
+    .map((row) => [row.match(/!\\d+/)[0], row]))`));
+  check(/Pipeline failed/.test(rows["!3"]) && /Approval needed/.test(rows["!3"]) && /Retry/.test(rows["!3"]), `!3 says its failed pipeline, approvals and Retry: ${js(rows["!3"])}`);
+  check(/Draft/.test(rows["!4"]) && /Pipeline running/.test(rows["!4"]) && /Auto-merge on/.test(rows["!4"]), `!4 says draft, running and auto-merge: ${js(rows["!4"])}`);
   await list.shot(`${out}/web-1-merge-requests.png`);
 
   await press(list, "Fix the mean");
@@ -228,7 +234,7 @@ try {
 
   // Issues, and Start Agent.
   const issues = await chrome.page(`${base}/issues`, { width: 900, height: 700 });
-  await waitFor(issues, `d.querySelectorAll("#issues li").length === 1`, "one issue");
+  await waitFor(issues, `d.querySelectorAll("#issues ${ROW}").length === 1`, "one issue");
   check(/@alex/.test(await text(issues)) && /bug/.test(await text(issues)), "the issue with its assignee and label");
   check(!/Show details|Hide details/.test(await text(issues)), "the issue has no details button");
   await issues.eval(view(`d.querySelector("#issues .title").click()`));
@@ -237,9 +243,9 @@ try {
   await issues.eval(view(`d.querySelector(".issue-body a").click()`));
   await waitFor(issues, `window.parent.opened === "https://gitlab.test/docs"`, "a Markdown link opens through the host");
   await issues.eval(view(`d.querySelector("#issues .title").click()`));
-  check(await issues.eval(view(`d.querySelector("#issues li").getAttribute("aria-expanded")`)) === "false", "clicking the row closes its details");
+  check(await issues.eval(view(`d.querySelector("#issues ${ROW}").getAttribute("aria-expanded")`)) === "false", "clicking the row closes its details");
   await issues.eval(view(`d.querySelector("#issues .title").click()`));
-  await waitFor(issues, `d.querySelector("#issues li").getAttribute("aria-expanded") === "true"`, "the row opens again");
+  await waitFor(issues, `d.querySelector("#issues ${ROW}").getAttribute("aria-expanded") === "true"`, "the row opens again");
   await press(issues, "Start Agent");
   await sleep(500);
   const forIssue = await issues.eval("window.started");
