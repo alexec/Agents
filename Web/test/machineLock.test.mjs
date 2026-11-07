@@ -525,3 +525,24 @@ test("the page keeps its pins by control plane, so a re-pair to another starts f
     globalThis.localStorage = before;
   }
 });
+
+test("once paired, another control plane's pins go, and the page's own stay (#3750)", () => {
+  const items = new Map([
+    ["agents-lock-pin", "{}"], ["agents-lock-pin:ana@example.com", "{}"], ["agents-lock-pin.0401020304050607", "{}"],
+    ["agents-lock-pin.0401020304050607:ana@example.com", "{}"], ["agents-lock-pin.0401020304050607.recoveryDone:ana@example.com", "1"],
+    ["agents-lock-pin.0409090909090909", "{}"], ["agents-lock-pin.0409090909090909.recoveryDone:ana@example.com", "1"],
+    ["agents-lock-recovery-done:ana@example.com", "1"], ["agents.drafts", "[]"], ["agents-lock-pinned-elsewhere", "x"],
+  ]);
+  const storage = {
+    get length() { return items.size; },
+    key: (i) => [...items.keys()][i] ?? null,
+    removeItem: (key) => items.delete(key),
+  };
+  model.prunePins("agents-lock-pin", storage);
+  assert.equal(items.size, 10, "with no control plane known, nothing goes");
+  model.prunePins("agents-lock-pin.0401020304050607", storage);
+  assert.deepEqual([...items.keys()], [
+    "agents-lock-pin.0401020304050607", "agents-lock-pin.0401020304050607:ana@example.com",
+    "agents-lock-pin.0401020304050607.recoveryDone:ana@example.com", "agents.drafts", "agents-lock-pinned-elsewhere",
+  ]);
+});

@@ -202,6 +202,7 @@ final class LockState {
     /// The control plane answered. One with no lock does not know the methods: nothing shows.
     func connected(_ control: DaemonClient, client: UUID) async {
         self.client = client.uuidString
+        pins.pruneOthers()
         await refresh(control)
         settled = true
         let listed = try? await control.call(DaemonAPI.Method.lockJoinRequests, DaemonAPI.Empty(),
@@ -497,6 +498,10 @@ struct LockPins {
             defaults.removeObject(forKey: key)
         }
     }
+
+    /// Forgets the pins kept for another control plane than this name's (#3750): a client
+    /// is paired with one at a time.
+    func pruneOthers() { ClientDefaults.pruneLockPins(defaults, keeping: name) }
 
     /// The person saved or skipped the recovery key on this device (#3493).
     func recoveryDone(_ person: String) -> Bool { defaults.bool(forKey: "\(name).recoveryDone.\(person)") }
