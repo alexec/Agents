@@ -86,4 +86,18 @@ struct ChatMetricsTests {
         #expect(ChatMetrics.forPane(width: 10).measure >= 0)
         #expect(ChatMetrics.forPane(width: 0).measure == 0)
     }
+
+    @Test func aWideBlockReachesTheMarginNotThePaneEdge() {
+        // #3895: a table may use the margin either side of the column, inside the padding.
+        let wide = ChatMetrics.forPane(width: 1_600)
+        let surplus = ChatMetrics.surplus(pane: 1_600)
+        #expect(wide.measure + surplus * 2 + wide.padding * 2 == 1_600)
+        #expect(surplus > 0)
+    }
+
+    @Test func aPaneNoWiderThanTheColumnLeavesNoSurplus() {
+        #expect(ChatMetrics.surplus(pane: 860) == 0)
+        #expect(ChatMetrics.surplus(pane: 300) == 0)
+        #expect(ChatMetrics.surplus(pane: 0) == 0)
+    }
 }

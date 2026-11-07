@@ -281,6 +281,7 @@ struct ChatTranscript: View {
                             .id(part.id)
                     }
                     .environment(\.backgroundWork, agent.background)
+                    .environment(\.chatSurplus, paneWidth > 0 ? ChatMetrics.surplus(pane: paneWidth) : 0)
                     foot(column)
                         .layoutValue(key: TranscriptRowID.self, value: Self.foot)
                 }
