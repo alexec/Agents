@@ -273,7 +273,7 @@ func TestBitbucketAsksForItsToken(t *testing.T) {
 		t.Fatalf("bitbucket: %+v %v, the server's %v", bitbucket, ok, bitbucketmcp.EventNames())
 	}
 	built := BuildOurs(bitbucket, func(string) bool { return false })
-	want := `{"command":"bitbucket-mcp","hosted":true,"env":{"BITBUCKET_EMAIL":"${BITBUCKET_EMAIL}","BITBUCKET_TOKEN":"${BITBUCKET_TOKEN}"}}`
+	want := `{"command":"bitbucket-mcp","hosted":true,"env":{"BITBUCKET_TOKEN":"${BITBUCKET_TOKEN}","BITBUCKET_EMAIL":"${BITBUCKET_EMAIL}"}}`
 	if got := strings.Join(strings.Fields(built.Entry.Stringified()), ""); got != want {
 		t.Fatalf("entry: %s", got)
 	}
