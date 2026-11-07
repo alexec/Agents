@@ -28,9 +28,10 @@ const (
 )
 
 type fakeItem struct {
-	fields   obj
-	updates  []obj
-	comments []obj
+	fields    obj
+	updates   []obj
+	comments  []obj
+	relations []obj
 }
 
 type fakeBoards struct {
@@ -166,6 +167,10 @@ func (f *fakeBoards) serve(w http.ResponseWriter, r *http.Request) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.requests = append(f.requests, r.Method+" "+r.URL.Path)
+	// Azure DevOps's names do not care about case: the forge names the project in lower case.
+	if rest, ok := strings.CutPrefix(r.URL.Path, "/acme/web app/"); ok {
+		r.URL.Path = "/acme/Web App/" + rest
+	}
 	if f.signIn {
 		w.Header().Set("Content-Type", "text/html")
 		w.WriteHeader(http.StatusNonAuthoritativeInfo)
@@ -187,6 +192,9 @@ func (f *fakeBoards) serve(w http.ResponseWriter, r *http.Request) {
 	answer := func(v any) {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		_ = json.NewEncoder(w).Encode(v)
+	}
+	if f.serveForge(w, r, answer) {
+		return
 	}
 	switch {
 	case r.URL.Path == "/acme/_apis/connectionData":

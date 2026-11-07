@@ -33,6 +33,16 @@ struct WorkListTests {
         #expect(WorkList.repoName("github:alexec/Agents") == "alexec/Agents")
     }
 
+    @Test func anAzureBoardsWorkItemsRowHasItsStatesNameItsProjectAndOpenOnAzureBoards() {
+        let row = WorkList.Row(.init(node: Node(kind: "issue", ref: "azureboards:acme/web app#12"), title: "Export", state: "open",
+                                     updatedAt: day, status: "Active"), on: .mac)
+        #expect(row.status == "Active")
+        #expect(row.repo == "azureboards:acme/web app")
+        #expect(WorkList.repoName(row.repo) == "Azure Boards · acme/web app")
+        #expect(WorkList.shortRef(row.node.ref) == "#12")
+        #expect(WorkList.openOnWords(row.node.ref) == "Open on Azure Boards")
+    }
+
     @Test func oneRowPerRefTheLastUpdatedCopyWithItsLineage() {
         let rows = WorkList.merge([
             (host: .mac, items: [item(1), item(2, title: "Old")]),

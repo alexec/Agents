@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/azureboardsmcp"
 	"github.com/alexec/agents/Go/internal/connections"
 	"github.com/alexec/agents/Go/internal/githubmcp"
 	"github.com/alexec/agents/Go/internal/gitlabmcp"
@@ -36,7 +37,8 @@ import (
 // as the Linear connector's view lists it (#3311). Jira (#3260) is read with the jira connector's
 // sign-in (JIRA_URL, JIRA_EMAIL and JIRA_API_TOKEN in the secrets) through jiramcp.RealJira,
 // issues only, of the projects the folders' .agents/folder.json name in "jiraProjects": one
-// search for every project.
+// search for every project. Azure Boards (#3815) is read the same way, of the projects the
+// folders name in "azureBoardsProjects" (forgeazure.go).
 //
 // A list is one page of every forge, merged by updatedAt: each forge is asked for a page, the
 // newest of them all are kept, and each forge's cursor goes on after the last of its own kept.
@@ -123,6 +125,8 @@ type forgeBook struct {
 	newForgeLinear func(key string) forgeLinear
 	// newForgeJira is Jira with the connector's sign-in; a test gives a fake.
 	newForgeJira func(auth jiramcp.Auth) forgeJira
+	// newForgeAzureBoards is Azure Boards at base with a token; a test gives a fake.
+	newForgeAzureBoards func(base, token string) forgeAzureBoards
 }
 
 func (d *Daemon) registerForge() {
@@ -152,11 +156,12 @@ type forgeCursor struct {
 	GitLab string   `json:"gitlab,omitempty"`
 	Linear string   `json:"linear,omitempty"`
 	Jira   string   `json:"jira,omitempty"`
+	Boards string   `json:"azureboards,omitempty"`
 	Done   []string `json:"done,omitempty"`
 }
 
 func (c *forgeCursor) of(forge string) *string {
-	return map[string]*string{"github": &c.GitHub, "gitlab": &c.GitLab, "linear": &c.Linear, "jira": &c.Jira}[forge]
+	return map[string]*string{"github": &c.GitHub, "gitlab": &c.GitLab, "linear": &c.Linear, "jira": &c.Jira, "azureboards": &c.Boards}[forge]
 }
 
 func (c forgeCursor) text() *string {
@@ -300,6 +305,10 @@ func (d *Daemon) forgeList(ctx context.Context, prs bool, r wire.ForgeListReques
 		p.err = err
 		pages = append(pages, p)
 	}
+	if len(sources.boards) > 0 && !slices.Contains(cursor.Done, "azureboards") {
+		pages = append(pages, d.boardsPage(ctx, sources, azureboardsmcp.SearchFilter{State: state, Label: deref(r.Label),
+			Assignee: deref(r.Assignee), Query: deref(r.Query), Feature: deref(r.Feature)}, cursor.Boards, limit))
+	}
 	var more bool
 	out.Items, cursor, more = mergeForgePages(pages, cursor, limit)
 	for _, p := range pages {
@@ -345,7 +354,7 @@ func mergeForgePages(pages []forgePage, from forgeCursor, limit int) ([]wire.For
 		items = append(items, pages[best].items[taken[best]])
 		taken[best]++
 	}
-	next := forgeCursor{GitHub: from.GitHub, GitLab: from.GitLab, Linear: from.Linear, Jira: from.Jira, Done: slices.Clone(from.Done)}
+	next := forgeCursor{GitHub: from.GitHub, GitLab: from.GitLab, Linear: from.Linear, Jira: from.Jira, Boards: from.Boards, Done: slices.Clone(from.Done)}
 	more := false
 	for n, p := range pages {
 		switch {
@@ -380,14 +389,17 @@ type forgeSources struct {
 	folderOf      map[forgeRepo]string
 	teamFolder    map[string]string
 	projectFolder map[string]string
+	// boards is the Azure Boards projects (#3815), organization/project.
+	boards       []string
+	boardsFolder map[string]string
 }
 
 func (s forgeSources) key() []any {
-	return []any{s.repos, s.root, s.gitlab, s.teams, s.workspace, s.linearHome, s.projects}
+	return []any{s.repos, s.root, s.gitlab, s.teams, s.workspace, s.linearHome, s.projects, s.boards}
 }
 
 func (d *Daemon) forgeSources(ctx context.Context, prs bool, folders []string) forgeSources {
-	s := forgeSources{folderOf: map[forgeRepo]string{}, teamFolder: map[string]string{}, projectFolder: map[string]string{}}
+	s := forgeSources{folderOf: map[forgeRepo]string{}, teamFolder: map[string]string{}, projectFolder: map[string]string{}, boardsFolder: map[string]string{}}
 	gl, glConnected := d.gitlabConnection()
 	if glConnected && gl.Usable(nowFunc()) {
 		s.root = gitlabmcp.BaseURL(gl.URL)
@@ -425,6 +437,12 @@ func (d *Daemon) forgeSources(ctx context.Context, prs bool, folders []string) f
 				s.projects = append(s.projects, project)
 			}
 		}
+		for _, project := range d.folderBoardsProjects(f) {
+			if _, seen := s.boardsFolder[project]; !seen {
+				s.boardsFolder[project] = f
+				s.boards = append(s.boards, project)
+			}
+		}
 	}
 	if !prs && len(s.teams) == 0 && d.linearConnected() && !d.anyLinearTeams() {
 		s.workspace, s.linearHome = true, d.linearHome()
@@ -433,6 +451,7 @@ func (d *Daemon) forgeSources(ctx context.Context, prs bool, folders []string) f
 	slices.Sort(s.gitlab)
 	slices.Sort(s.teams)
 	slices.Sort(s.projects)
+	slices.Sort(s.boards)
 	if len(s.gitlab) == 0 && elsewhere {
 		// A page still says why GitLab's folders are not in it.
 		s.gitlabErr = errors.New(gitlabmcp.NotConnected)
@@ -567,8 +586,10 @@ func (d *Daemon) forgeItem(ctx context.Context, kind string, r wire.ForgeItemReq
 		out, err = d.linearItem(ctx, method, identifier, deref(r.Cursor))
 	} else if key, ok := strings.CutPrefix(r.Node.Ref, "jira:"); ok && kind == lineage.KindIssue && linearLabel.MatchString(key) {
 		out, err = d.jiraItem(ctx, method, key, deref(r.Cursor))
+	} else if project, id, ok := boardsOfNode(r.Node); ok && kind == lineage.KindIssue {
+		out, err = d.boardsItem(ctx, method, project, id, deref(r.Cursor))
 	} else if repo, number, ok := nodeOfRepo(r.Node); !ok {
-		return wire.ForgeItemDetail{}, Invalid("%s: %s is not an issue or a pull request on GitHub, GitLab, Linear or Jira", method, r.Node.Ref)
+		return wire.ForgeItemDetail{}, Invalid("%s: %s is not an issue or a pull request on GitHub, GitLab, Linear, Jira or Azure Boards", method, r.Node.Ref)
 	} else if repo.forge == "gitlab" {
 		out, err = d.gitlabItem(ctx, method, kind, repo, number, deref(r.Cursor))
 	} else {

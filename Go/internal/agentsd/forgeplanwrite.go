@@ -14,7 +14,8 @@ import (
 // The plan's writes (#3271): a person changes an epic's plan from its page. Add child adds a new
 // issue, or one that is there, as a sub-issue of the epic; Blocked by sets which issues a child
 // waits for. They are the forge's own sub-issues and links (GitHub's sub-issue and dependency
-// APIs, Linear's parent and "blocks" relations), so the plan forge/plan reads next is the
+// APIs, Linear's parent and "blocks" relations, Azure Boards' parent and predecessor links,
+// #3815), so the plan forge/plan reads next is the
 // forge's, as for every other reader. GitLab's links are Premium only and Jira's come later, so
 // those two refuse, and say so. Like the other writes (forgewrite.go), only a person's window or
 // device may call them.
@@ -98,6 +99,9 @@ func (d *Daemon) forgeAddChild(ctx context.Context, r wire.ForgeAddChildRequest)
 	var url string
 	if t.linear != nil {
 		_, url, err = t.linear.AddChild(ctx, t.identifier, title, labels)
+	} else if t.boards != nil {
+		// The level is the work item's type too, as its process names it.
+		_, url, err = t.boards.AddChild(ctx, t.project, t.number, title, labels, level)
 	} else {
 		var n int
 		if n, url, err = t.github.CreateIssue(ctx, t.repo.path, title, labels); err == nil {
@@ -125,6 +129,15 @@ func (d *Daemon) addExistingChild(ctx context.Context, method string, t forgeTar
 			return wire.ForgeDone{}, Invalid("%s: an epic is not its own child", method)
 		}
 		err = t.linear.SetParent(ctx, key, t.identifier)
+	} else if t.boards != nil {
+		id, ok := boardsItemID(ref)
+		if !ok {
+			return wire.ForgeDone{}, Invalid("%s: %q is not a work item: give its id, such as 12 or AB#12, or its page", method, ref)
+		}
+		if id == t.number {
+			return wire.ForgeDone{}, Invalid("%s: an epic is not its own child", method)
+		}
+		err = t.boards.SetParent(ctx, t.project, id, t.number)
 	} else {
 		m := githubIssueRef.FindStringSubmatch(ref)
 		if m == nil {
@@ -177,11 +190,15 @@ func (d *Daemon) forgeBlockedBy(ctx context.Context, r wire.ForgeBlockedByReques
 			}
 			key, onLinear := strings.CutPrefix(b.Ref, "linear:")
 			repo, n, onRepo := nodeOfRepo(b)
+			project, id, onBoards := boardsOfNode(b)
 			switch {
 			case b.Kind != lineage.KindIssue:
 				return wire.ForgeDone{}, Invalid("%s: %s is not an issue", method, b.Ref)
 			case t.linear != nil && onLinear && linearLabel.MatchString(key):
 				todo = append(todo, blocker{key: key, blocked: list.blocked})
+			// A link is within an organization.
+			case t.boards != nil && onBoards && boardsOrg(project) == boardsOrg(t.project):
+				todo = append(todo, blocker{number: id, blocked: list.blocked})
 			case t.github != nil && onRepo && repo.forge == "github":
 				todo = append(todo, blocker{repo: repo.path, number: n, blocked: list.blocked})
 			default:
@@ -192,6 +209,8 @@ func (d *Daemon) forgeBlockedBy(ctx context.Context, r wire.ForgeBlockedByReques
 	for _, b := range todo {
 		if t.linear != nil {
 			err = t.linear.SetBlockedBy(ctx, t.identifier, b.key, b.blocked)
+		} else if t.boards != nil {
+			err = t.boards.SetBlockedBy(ctx, t.project, t.number, b.number, b.blocked)
 		} else {
 			err = t.github.SetBlockedBy(ctx, t.repo.path, t.number, b.repo, b.number, b.blocked)
 		}

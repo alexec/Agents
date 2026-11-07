@@ -27,6 +27,15 @@ test("a Jira issue's row has its status and the tracker jira (#3260)", () => {
   assert.equal(w.repoName("github:alexec/Agents"), "alexec/Agents");
 });
 
+test("an Azure Boards work item's row has its state's name, its project and Open on Azure Boards (#3815)", () => {
+  const row = w.forgeRow(item(0, { node: { kind: "issue", ref: "azureboards:acme/web app#12" }, status: "Active" }), "mac");
+  assert.equal(row.status, "Active");
+  assert.equal(row.repo, "azureboards:acme/web app");
+  assert.equal(w.repoName(row.repo), "Azure Boards · acme/web app");
+  assert.equal(w.shortRef(row.node.ref), "#12");
+  assert.equal(w.openOnWords(row.node.ref), "Open on Azure Boards");
+});
+
 test("one row per ref, the last updated copy, with its lineage", () => {
   const rows = w.mergeForge([
     { host: "mac", items: [item(1), item(2, { title: "Old" })] },

@@ -1,7 +1,7 @@
 ---
 diataxis: how-to
 devices: [mac, web]
-description: Add the azureboards connector with a personal access token, so that agents read and comment on Azure Boards work items, and a workflow or a wait starts when one is opened, tagged, commented on, closed or assigned to you.
+description: Add the azureboards connector with a personal access token, so that agents read and comment on Azure Boards work items, a workflow or a wait starts when one is opened, tagged, commented on, closed or assigned to you, and the Work pages list and change them.
 ---
 
 # Use Azure Boards work items
@@ -67,14 +67,42 @@ Each takes `area`, `type` and `label`; all but `issue.opened` take `issue` (a wo
 id). Unless `anyone` is true, a bot (a build service, a service account or a group) never
 counts.
 
+## On the Work pages
+
+Work ▸ Issues lists the work items of the projects a folder names (#3815), beside its GitHub,
+GitLab, Linear and Jira issues. Name them in the folder's `.agents/folder.json`:
+
+```json
+{ "azureBoardsProjects": ["acme/Web App"] }
+```
+
+Each project is `organization/project` (on a server, `collection/project`). The Work pages
+use the connector's `AZURE_DEVOPS_TOKEN` and `AZURE_DEVOPS_URL`.
+
+- **A row** says the work item's state (as Active), in the colour of open or closed, and its
+  tags. **Azure Boards · acme/web app** is a choice in the Repo filter.
+- **A work item's page** shows its description and its comments as Markdown, Open on Azure
+  Boards, Start Agent, Labels (its tags), a comment box, and a state menu in place of Close
+  and Reopen: the other states of its type.
+- **Its plan** is its children (its Child links), each in the step after its predecessors
+  (its Predecessor links). Add child makes a new work item of the level's type (User Story,
+  Product Backlog Item, Requirement or Issue for a story or a spike; Task; Bug), or moves
+  one that is there (give `12`, `AB#12` or its page) under it. Blocked by adds or takes off
+  a predecessor in the same organization.
+- **Lineage:** Start Agent labels the session `AB#12`. A session labelled `AB#12`, and a pull
+  request whose title or branch says `AB#12` (as Azure Boards itself links them), count
+  towards the work item of the folder's first project.
+
+Every write is your own click, made with your token: no approval card.
+
 ## What to know
 
 - **Events are polled once a minute,** from the 50 work items changed last since the poll
   before. A poll that finds more says it is `truncated`.
 - **Closed is by category,** read from the project's work item types, so a process of your
   own with other state names works.
-- **Not yet:** the Work pages, the Tasks slot of a folder's set-up, a project's board, and a
-  **Connect Azure DevOps** sheet with a sign-in.
+- **Not yet:** the Tasks slot of a folder's set-up, a project's board, a view of the
+  connector's own, and a **Connect Azure DevOps** sheet with a sign-in.
 
 ## See also
 

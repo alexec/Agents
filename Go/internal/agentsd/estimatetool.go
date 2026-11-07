@@ -31,7 +31,7 @@ func (d *Daemon) estimateNode(caller wire.UUID, issue string) (wire.LineageNode,
 	if issue == "" {
 		return wire.LineageNode{}, Invalid("Nothing estimated: give the issue or epic, such as #12, in issue.")
 	}
-	for _, forge := range []string{"github:", "gitlab:", "linear:", "jira:"} {
+	for _, forge := range []string{"github:", "gitlab:", "linear:", "jira:", "azureboards:"} {
 		if strings.HasPrefix(issue, forge) {
 			return wire.LineageNode{Kind: lineage.KindIssue, Ref: issue}, nil
 		}

@@ -120,10 +120,13 @@ var (
 
 // labelNode is the issue or PR a label names, in the folder's repo: #n, P#n, or a key such as
 // ENG-4: on Jira when the folder's .agents/folder.json names its project in "jiraProjects"
-// (#3260), else on Linear.
+// (#3260), else on Linear; or AB#n, a work item of the folder's Azure Boards project (#3815).
 func (d *Daemon) labelNode(folder, label string) (wire.LineageNode, bool) {
 	if linearLabel.MatchString(label) {
 		return keyNode(label, d.folderJiraProjects(folder)), true
+	}
+	if abLabel.MatchString(label) {
+		return d.boardsLabelNode(folder, label)
 	}
 	issue, pr := issueLabel.FindStringSubmatch(label), prLabel.FindStringSubmatch(label)
 	if issue == nil && pr == nil {
@@ -434,6 +437,16 @@ func (d *Daemon) lineageEvent(e wire.Event) {
 			}
 			for _, key := range jiraKeys(p.PR.Branch, jira) {
 				d.link(pr, wire.LineageNode{Kind: lineage.KindIssue, Ref: "jira:" + key}, lineage.RelFixes, lineage.SourceBranch)
+			}
+		}
+		// AB#12 in its title or branch, a work item of its repo's folder's first Azure Boards
+		// project (#3815), as Azure Boards itself links a commit or a pull request to one.
+		if boards := d.folderBoardsProjects(d.repoFolder(repo)); len(boards) > 0 {
+			for _, id := range boardsKeys(p.PR.Title) {
+				d.link(pr, boardsNode(boards[0], id), lineage.RelFixes, lineage.SourcePRBody)
+			}
+			for _, id := range boardsKeys(p.PR.Branch) {
+				d.link(pr, boardsNode(boards[0], id), lineage.RelFixes, lineage.SourceBranch)
 			}
 		}
 		// How it ended, for its cost (#2350).

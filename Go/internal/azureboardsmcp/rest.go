@@ -36,9 +36,22 @@ type RealBoards struct {
 	running map[string]*fetch
 	sharing time.Duration
 	me      string
-	// states is each work item type's states' categories, read at statesAt.
-	states   map[string]map[string]string
-	statesAt time.Time
+	// types is each project's work item types and their states, in order, by project (lower
+	// case), as they were read.
+	types map[string]typesRead
+}
+
+// typesRead is a project's work item types, each type's states in its process's order, and when
+// they were read.
+type typesRead struct {
+	at    time.Time
+	types map[string][]State
+}
+
+// State is a state of a work item type: its name (Active) and its category (Proposed,
+// InProgress, Resolved, Completed or Removed).
+type State struct {
+	Name, Category string
 }
 
 type sharedBody struct {
@@ -125,7 +138,10 @@ func (f *RealBoards) do(ctx context.Context, method, path string, body any) ([]b
 		return nil, &BoardsError{Kind: Failed, Message: "Azure DevOps: " + err.Error()}
 	}
 	req.Header.Set("Accept", "application/json")
-	if body != nil {
+	if _, ok := body.(patch); ok {
+		// A work item is changed by a JSON Patch.
+		req.Header.Set("Content-Type", "application/json-patch+json")
+	} else if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
 	// A personal access token is the password of Basic, with no user.
@@ -427,38 +443,52 @@ func (f *RealBoards) items(ctx context.Context, project string, ids []int, field
 	return out, nil
 }
 
-// categories is each work item type's states' categories (Proposed, InProgress, Resolved,
-// Completed, Removed), read again after statesFor.
-func (f *RealBoards) categories(ctx context.Context, project string) (map[string]map[string]string, error) {
+// typesOf is a project's work item types and their states, in their process's order, read
+// again after statesFor.
+func (f *RealBoards) typesOf(ctx context.Context, project string) (map[string][]State, error) {
+	key := strings.ToLower(project)
 	f.mu.Lock()
-	if f.states != nil && time.Since(f.statesAt) < statesFor {
-		states := f.states
+	if kept, ok := f.types[key]; ok && time.Since(kept.at) < statesFor {
 		f.mu.Unlock()
-		return states, nil
+		return kept.types, nil
 	}
 	f.mu.Unlock()
 	var answer struct {
 		Value []struct {
-			Name   string `json:"name"`
-			States []struct {
-				Name     string `json:"name"`
-				Category string `json:"category"`
-			} `json:"states"`
+			Name   string  `json:"name"`
+			States []State `json:"states"`
 		} `json:"value"`
 	}
 	if err := f.call(ctx, http.MethodGet, api(projectPath(project)+"wit/workitemtypes", nil, apiVersion), nil, true, &answer); err != nil {
 		return nil, err
 	}
-	states := map[string]map[string]string{}
+	types := map[string][]State{}
 	for _, t := range answer.Value {
-		states[t.Name] = map[string]string{}
-		for _, s := range t.States {
-			states[t.Name][s.Name] = s.Category
-		}
+		types[t.Name] = t.States
 	}
 	f.mu.Lock()
-	f.states, f.statesAt = states, time.Now()
+	if f.types == nil {
+		f.types = map[string]typesRead{}
+	}
+	f.types[key] = typesRead{at: time.Now(), types: types}
 	f.mu.Unlock()
+	return types, nil
+}
+
+// categories is each work item type's states' categories (Proposed, InProgress, Resolved,
+// Completed, Removed).
+func (f *RealBoards) categories(ctx context.Context, project string) (map[string]map[string]string, error) {
+	types, err := f.typesOf(ctx, project)
+	if err != nil {
+		return nil, err
+	}
+	states := map[string]map[string]string{}
+	for name, list := range types {
+		states[name] = map[string]string{}
+		for _, s := range list {
+			states[name][s.Name] = s.Category
+		}
+	}
 	return states, nil
 }
 
