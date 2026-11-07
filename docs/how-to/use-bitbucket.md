@@ -26,7 +26,8 @@ list a Bitbucket repository.
 1. Make a token. Use one of these:
    - **An API token with scopes** (Atlassian account ▸ **Security** ▸ **Create API token
      with scopes**, app **Bitbucket**): read and write on repositories, pull requests and
-     issues, and read on account, workspace membership and pipelines (for `failed_log`).
+     issues, read on account and workspace membership, and read and write on pipelines
+     (for `failed_log` and `retry_pipeline`).
      It acts as you.
    - **An access token** of the repository, project or workspace (its **Settings ▸
      Access tokens**), with the same scopes. It acts as its own bot user, so
@@ -53,6 +54,10 @@ an event can name another one with `repo`, as `workspace/name`.
   or of one step by name (`step`). Give it `pipelineId`, the run's build number: `run.id`
   in a `checks.failed` event. So the **Fix failed checks** workflow works on Bitbucket too.
   Another CI's logs are on its own pages; `get_checks` gives their addresses.
+- `retry_pipeline`: a new run of a Pipelines run that has ended (`pipelineId`), the same
+  pipeline on the same commit, with the same variables. Pipelines cannot run only the
+  failed steps again, so every step runs. It refuses a run that has not ended, and one with
+  a secured variable, whose value Bitbucket does not give back: run that one from its page.
 - `comment_on_pull_request` and `comment_on_issue`.
 - For the ready-made workflows: `create_pull_request`, `list_pull_request_comments` (the
   comments on lines of the diff) and `reply_to_pull_request_comment` (an answer in the

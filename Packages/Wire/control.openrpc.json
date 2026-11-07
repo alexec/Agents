@@ -3136,7 +3136,7 @@
     {
       "name": "machines/sendFolder",
       "x-capability": "folders.to-machine/1",
-      "description": "Through machine/machines only: one step of an agent's start_session with send (#2929), which sends this folder's branch to another of the person's machines, as Send to ‹machine›… does, or of its bring_back (#2947), which brings a branch back from there, as Bring Back from ‹machine›… does. The control plane sends that machine's folders/receiveState, folders/receiveUpload, folders/receive, folders/sendFacts, folders/sendPack or folders/sendRead; the machine has to be online.",
+      "description": "Through machine/machines only: one step of an agent's start_session with send (#2929), which sends this folder's branch to another of the person's machines, as Send to ‹machine›… does, or of its bring_back (#2947), which brings a branch back from there, as Bring Back from ‹machine›… does, or of its move_session (#3717), which moves a session there after its branch. The control plane sends that machine's folders/receiveState, folders/receiveUpload, folders/receive, folders/sendFacts, folders/sendPack, folders/sendRead or agents/moveIn; the machine has to be online.",
       "paramStructure": "by-name",
       "params": [
         {

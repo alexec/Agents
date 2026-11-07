@@ -259,6 +259,8 @@ What the Mac window and the Remote keep in their defaults, and the web page in
 | `sidebar.folder.<folder>.width`, `.pane` (Mac only) | A folder window's inspector width and pane | As the folds | As the folds |
 | `newSessionProjectFolders` (`agents.newSession.projectFolders` on the web page) | New Session's last folder for each project | As the folds | As the folds |
 | `machineLockPin.<key>` (`agents-lock-pin.<key>` on the web page) | The machine-lock pins, the lock and each person's | This control plane's only: another control plane's go once the client is paired (#3750), and all go on **Forget** (#3670) | When the control plane answers |
+| Drafts (`draft.agent.<uuid>`, `draft.new.<folder>`, and the Mac's `draft.start`) | Prompts not sent, with their attachments | 512 KiB of attachments a draft. Deleted after 30 days without an edit, when its agent is archived, on send, and on **Forget** (#3749). | At start; on archive |
+| Drafts on the web page (`agents.drafts`) | Prompts not sent, with their attachments | The newest 40 drafts; attachments only while they are under 256 KiB. Deleted on send and on **Forget**. | On write |
 
 ## In memory
 

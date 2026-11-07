@@ -664,7 +664,7 @@ func (d *Daemon) restoreBackup(id string) (wire.BackupRestoreResult, error) {
 	archive, _, _ := d.backupPaths(id)
 	// The folder, not the manifest, says whose backup it is.
 	folder, _, _ := strings.Cut(id, "/")
-	return d.restoreArchive(archive, listed.RootID, folder == d.Store.RootID, true, "")
+	return d.restoreArchive(archive, listed.RootID, folder == d.Store.RootID, true, "", nil)
 }
 
 // restoredElsewhere is the root a record from another machine's backup is stamped with
@@ -675,8 +675,9 @@ const restoredElsewhere = "restored"
 // whether it is this machine's own backup. An import (#1001) takes no root files
 // (withRoot false): an export has none, and one made by hand must not change this
 // machine's history or its erased list. into, when not empty, is the folder every
-// agent is put in (#2389); empty keeps each agent's own.
-func (d *Daemon) restoreArchive(archive, madeIn string, mine, withRoot bool, into string) (wire.BackupRestoreResult, error) {
+// agent is put in (#2389); empty keeps each agent's own. in, when not nil, is a session
+// moving here with move_session (#3717): it goes on here, not archived.
+func (d *Daemon) restoreArchive(archive, madeIn string, mine, withRoot bool, into string, in *arrival) (wire.BackupRestoreResult, error) {
 	res := wire.BackupRestoreResult{}
 	f, err := os.Open(archive)
 	if err != nil {
@@ -722,7 +723,7 @@ func (d *Daemon) restoreArchive(archive, madeIn string, mine, withRoot bool, int
 			res.Skipped++
 			return nil
 		}
-		restored, err := d.restoreAgent(held, record, files, madeIn, mine, into)
+		restored, err := d.restoreAgent(held, record, files, madeIn, mine, into, in)
 		drop()
 		if err != nil {
 			return err
@@ -800,7 +801,7 @@ func (d *Daemon) restoreArchive(archive, madeIn string, mine, withRoot bool, int
 // restoreAgent writes one agent's folder and saves its record archived; false when this
 // machine has it already or the record can't be read. into, when not empty, is the folder
 // it is put in: its worktree, which was on the machine that made it, is left behind.
-func (d *Daemon) restoreAgent(id wire.UUID, raw []byte, files map[string]string, madeIn string, mine bool, into string) (bool, error) {
+func (d *Daemon) restoreAgent(id wire.UUID, raw []byte, files map[string]string, madeIn string, mine bool, into string, in *arrival) (bool, error) {
 	if raw == nil || d.Store.Agent(id) != nil {
 		return false, nil
 	}
@@ -817,6 +818,30 @@ func (d *Daemon) restoreAgent(id wire.UUID, raw []byte, files map[string]string,
 	if into != "" {
 		a.Cwd, a.Worktree = store.FolderURL(into), nil
 	}
+	if in != nil {
+		d.arrive(&a, in)
+	} else if err := d.restored(&a, madeIn, mine); err != nil {
+		return false, err
+	}
+	folder := d.Store.Loc.Agent(string(id))
+	if err := os.MkdirAll(folder, 0o755); err != nil {
+		return false, err
+	}
+	for name, p := range files {
+		if err := os.Rename(p, filepath.Join(folder, name)); err != nil {
+			return false, err
+		}
+	}
+	if err := d.Store.Save(a); err != nil {
+		return false, err
+	}
+	d.tellChanged(a, nil)
+	return true, nil
+}
+
+// restored is restoreAgent's change to a record from a backup or an import: archived, and
+// one from another machine never runs here.
+func (d *Daemon) restored(a *wire.Agent, madeIn string, mine bool) error {
 	// Made under the root that made the backup. This machine's own record keeps what it
 	// says; one from another machine never names this root, and brings no MCP servers and
 	// no runtime session or account: those belong to the set-up that made it.
@@ -844,20 +869,7 @@ func (d *Daemon) restoreAgent(id wire.UUID, raw []byte, files map[string]string,
 	t := now()
 	a.ArchivedAt = &t
 	a.EventWait, a.PendingMove, a.ArchiveRequest, a.AfterTurn = nil, nil, nil, nil
-	folder := d.Store.Loc.Agent(string(id))
-	if err := os.MkdirAll(folder, 0o755); err != nil {
-		return false, err
-	}
-	for name, p := range files {
-		if err := os.Rename(p, filepath.Join(folder, name)); err != nil {
-			return false, err
-		}
-	}
-	if err := d.Store.Save(a); err != nil {
-		return false, err
-	}
-	d.tellChanged(a, nil)
-	return true, nil
+	return nil
 }
 
 // readHeld reads an archive's entry into memory: a record or a root file, at most

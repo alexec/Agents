@@ -1136,6 +1136,8 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 	if s == wire.AgentStateFinished {
 		d.scoreAssessmentIfDue(l.id)
 	}
+	// A move to another machine asked for in this turn goes now (#3717).
+	d.afterTurnMachineMove(l.id, s)
 }
 
 func firstSentence(s string) string {
