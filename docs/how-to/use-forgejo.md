@@ -124,8 +124,9 @@ A pull request's page has five tabs: **Conversation**, **Line comments**, **File
 
 - **Files**: **Show Diff**, or a file's name, shows the changed lines in the app's own diff.
 - **Checks**: the head commit's statuses. A failed Forgejo Actions run has **Show Log**, the
-  end of its failed jobs' logs (`failed_log`: Forgejo 16 or Gitea 1.25 or later). Another
-  CI's check opens on its own page.
+  end of its failed jobs' logs (`failed_log`: Forgejo 16 or Gitea 1.25 or later). When the
+  checks failed, **Retry Failed Jobs** runs the failed jobs again (`retry_pipeline`: Forgejo
+  17 or Gitea 1.26 or later). Another CI's check opens on its own page.
 
 Under the tabs is a box for your words, and these buttons. Each one acts on Forgejo as you:
 
@@ -170,6 +171,12 @@ other forges' epics.
   or later, or Gitea 1.25 or later; an older server, such as Forgejo 11 LTS or Gitea 1.24,
   has no API for it, and the tool says which version it needs and gives the run's address.
   Another CI's logs are on its own pages.
+- `retry_pipeline`: runs a finished Forgejo Actions run's failed jobs again, and the jobs
+  that need them. `runId` is the run's number, as for `failed_log`. Forgejo 17 reruns each
+  failed job (`actions/jobs/{id}/rerun`); Gitea 1.26 reruns the run's failed jobs in one call
+  (`actions/runs/{id}/rerun-failed-jobs`). Forgejo 16 and Gitea 1.25 have no API for it, and
+  the tool says which version it needs. A run that has not ended is refused by Forgejo. The
+  token needs write on repository.
 - For the pages: `show_pull_requests`, `show_issues`, `show_issue_details`,
   `show_pull_request` and `show_pull_request_diff`.
 - For the ready-made workflows: `create_pull_request` (a draft's title starts `WIP:`),
@@ -224,7 +231,6 @@ never a bot. A pull request from a fork never counts.
   `/src/HEAD/<path>`, which Forgejo sends on to the default branch.
 - **The Board filter has no Forgejo board.** Forgejo has project boards, but its API (11)
   cannot read them, so a list narrowed to a board lists no Forgejo items.
-- **Not yet:** Retry on the pages (#3842).
 
 ## See also
 

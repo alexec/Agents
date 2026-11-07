@@ -128,7 +128,8 @@ func TestEachViewHasAToolThatFeedsItAndAPage(t *testing.T) {
 			}
 		}
 		for _, other := range []string{"GitLab", "GitHub", "merge request", "pipeline", "project"} {
-			if strings.Contains(html, other) {
+			// retry_pipeline is the tool's name, as the gitlab server's.
+			if strings.Contains(strings.ReplaceAll(html, `"retry_pipeline"`, ""), other) {
 				t.Errorf("%s still speaks of %s", uri, other)
 			}
 		}

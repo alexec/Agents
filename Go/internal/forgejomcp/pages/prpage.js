@@ -121,7 +121,15 @@ const prPage = (ui, repo, back) => {
         shown ? el("pre", { className: "log", textContent: shown }) : null,
       ]);
     });
-    return [el("ul", { className: "checks" }, rows.length ? rows : [el("li", { className: "muted", textContent: "No checks." })])];
+    const out = [el("ul", { className: "checks" }, rows.length ? rows : [el("li", { className: "muted", textContent: "No checks." })])];
+    if (pr.checks === "failing" && pr.failedRunId && pr.state === "open") {
+      out.push(el("div", { className: "actions" }, [button("Retry Failed Jobs", async (event) => {
+        event.target.disabled = true;
+        try { await ui.call("retry_pipeline", { repo: repo() || pr.repo, runId: pr.failedRunId }); say("The failed jobs run again."); refresh(); }
+        catch (e) { event.target.disabled = false; say("Couldn't retry: " + e.message, true); }
+      })]));
+    }
+    return out;
   };
   const toggleLog = async (c, key) => {
     if (logs.has(key)) { logs.delete(key); draw(); return; }
