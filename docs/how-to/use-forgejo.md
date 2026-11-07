@@ -143,6 +143,20 @@ Agents can't merge or approve from this page. Those tools are for a person only.
 the commit that the page shows. When the pull request has a newer commit, nothing happens:
 open the page again.
 
+### An epic's plan and features
+
+Forgejo has no sub-issues, so an epic's children are the issues it **depends on** (Forgejo's
+issue dependencies, *This issue depends on*), and a child waits for the issues it depends on
+in turn. An issue labelled `epic` has a **Plan** on its page, its children step by step, as on
+GitHub. **Add child** makes the epic depend on a new issue (with its level and the epic's
+`feature:<name>` label) or on one that is there (`#12`, `owner/repo#12` or its address on the
+connected Forgejo); **Blocked by** makes a child depend on another child, or no longer.
+Forgejo keeps an issue with open dependencies from being closed, so an epic closes after its
+children.
+
+**Work ▸ Features** counts a Forgejo epic under its `feature:<name>` label, as it counts the
+other forges' epics.
+
 ## The tools
 
 - `list_pull_requests`, `get_pull_request` (with its description, head commit and the
@@ -195,9 +209,22 @@ never a bot. A pull request from a fork never counts.
   as Forgejo has no list across chosen repositories.
 - **The Pull requests page reads each pull request's checks and reviews.** Forgejo has no list
   of many commits' statuses, so the page reads four pull requests at a time.
-- **Not yet:** an epic's plan, the Board filter, Retry on the pages (#3842), and lineage links
-  from a session's `#12` label to a Forgejo issue: a page's **Lineage** tab says the app keeps
-  none there.
+- **Lineage links Forgejo's issues and pull requests (#3834).** A session's `#12` or `P#12`
+  label in a folder on Forgejo works on that issue or pull request. A pull request's events
+  link it to the sessions on its branch and to the issues its description closes. A folder
+  is on Forgejo when its `origin` is on the connected Forgejo, or on a host whose name says
+  Codeberg, Forgejo or Gitea.
+- **Lineage asks the connected Forgejo (#3844),** with the Forgejo connection, about the
+  repositories of the folders on it: an issue's, a pull request's and a milestone's title
+  and state, an issue's milestone, a version tag's pull requests (from `(#12)` at the end of
+  a squash commit's title, or else the commit's pull request) and the milestone whose title
+  starts with its version, and the cost comment on a merged pull request (when the folder's
+  `prCostComment` says so). Forgejo has no parent issues, so an issue has none. An issue's
+  address on the connected Forgejo is read in a filed issue's output. A doc's address is
+  `/src/HEAD/<path>`, which Forgejo sends on to the default branch.
+- **The Board filter has no Forgejo board.** Forgejo has project boards, but its API (11)
+  cannot read them, so a list narrowed to a board lists no Forgejo items.
+- **Not yet:** Retry on the pages (#3842).
 
 ## See also
 

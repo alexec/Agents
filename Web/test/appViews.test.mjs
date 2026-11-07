@@ -227,6 +227,9 @@ test("the bridge reads a diff to draw, and refuses one that is not", () => {
   assert.equal(read.diff.url, "https://github.com/o/r/pull/1/files");
   assert.equal(read.diff.path, "logo.png");
   assert.equal(read.diff.cut, false);
+  assert.equal(read.diff.site, "GitHub");
+  assert.equal(ask("agents/open-diff", { files, site: " GitLab " }).diff.site, "GitLab");
+  assert.equal(ask("agents/open-diff", { files, site: "x".repeat(99) }).diff.site.length, bridge.diffSiteLimit);
   assert.deepEqual(read.diff.files[0].hunks, files[0].hunks);
   assert.equal(read.diff.files[1].note, "No lines to show.");
   assert.equal(ask("agents/open-diff", { title: "x" }).kind, "malformed");

@@ -148,6 +148,10 @@ func TestPROfURL(t *testing.T) {
 		"https://github.com/alexec/Agents/issues/12":               "",
 		"https://example.com/o/r/pull/1":                           "",
 		"https://github.com/o/r/pull/x":                            "",
+		"https://codeberg.org/kim/Notes/pulls/5":                   "forgejo:kim/notes#5",
+		"http://localhost:3753/walkalex/App/pulls/8/files":         "forgejo:walkalex/app#8",
+		"https://github.com/o/r/pulls/5":                           "",
+		"https://gitlab.com/o/r/pulls/5":                           "",
 	} {
 		repo, n, ok := prOfURL(raw)
 		got := ""
