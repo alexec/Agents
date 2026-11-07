@@ -247,27 +247,13 @@ func AddTools(server *mcp.Server, f *RealAzureDevOps, person bool) {
 			}
 			out := map[string]any{"repo": repo, "ref": ref, "state": combined(builds), "checks": checks}
 			if in.Branch == "" {
-				var statuses struct {
-					Value []struct {
-						State       string `json:"state"`
-						Description string `json:"description"`
-						TargetURL   string `json:"targetUrl"`
-						Context     struct {
-							Name  string `json:"name"`
-							Genre string `json:"genre"`
-						} `json:"context"`
-					} `json:"value"`
-				}
-				if err := f.get(ctx, api(fmt.Sprintf("%s/pullRequests/%d/statuses", repoPath(repo), in.PR), nil), false, &statuses); err != nil {
+				statuses, err := f.statuses(ctx, repo, in.PR, false)
+				if err != nil {
 					return nil, err
 				}
 				list := []any{}
-				for _, s := range statuses.Value {
-					name := s.Context.Name
-					if s.Context.Genre != "" {
-						name = s.Context.Genre + "/" + name
-					}
-					list = append(list, map[string]any{"name": name, "state": s.State, "description": s.Description, "url": s.TargetURL})
+				for _, s := range statuses {
+					list = append(list, map[string]any{"name": s.name(), "state": s.State, "description": s.Description, "url": s.TargetURL})
 				}
 				out["statuses"] = list
 			}

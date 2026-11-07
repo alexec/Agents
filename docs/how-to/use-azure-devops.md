@@ -65,8 +65,11 @@ runs for your own windows and devices, never offered to an agent.
 The events have the gitlab connector's names, so a workflow made for GitHub or GitLab works
 here too:
 
-- `checks.failed`: an Azure Pipelines build of an active pull request failed at its head
-  commit. `run.id` is the build's id, for `get_build_log`.
+- `checks.failed`: an active pull request's checks failed at its head commit: a build of the
+  pull request, a build of its branch at that commit (a CI trigger), or the newest status that
+  another service set on it. `run.id` is the first failed build's id, for `get_build_log`
+  (0 when only a status failed).
+- `checks.passed`: one of those passed at the head commit, one event per build or status.
 - `pr.opened`, `pr.merged` (completed), `pr.closed` (abandoned), `pr.conflicted`.
 - `review.requested`: for you, the token's owner: you are a reviewer and have not voted.
 - `review.comment`: a comment on a line of a pull request's diff. `comment.threadId` is
@@ -80,8 +83,9 @@ one, so every other person counts.
 
 - **Comments are read for the 50 newest active pull requests,** and those closed since the
   last poll. Azure DevOps has no list of a repository's comments.
-- **Checks are Azure Pipelines builds.** A status that another service sets on a pull
-  request shows in `get_checks`, but does not raise `checks.failed`.
+- **Checks are builds and statuses.** Statuses are read for the 50 newest active pull
+  requests, the newest of each context, at the pull request's newest push. A build of a branch
+  that no active pull request is from (`main`, a tag) raises no event.
 - **Not yet:** the Work pages, a **Connect Azure DevOps** sheet with a sign-in, and the
   set-up of a folder's Code review and CI from an Azure DevOps remote.
 

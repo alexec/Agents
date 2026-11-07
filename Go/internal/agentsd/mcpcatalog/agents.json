@@ -454,6 +454,7 @@
             "tools": true,
             "events": [
               "checks.failed",
+              "checks.passed",
               "pr.opened",
               "pr.merged",
               "pr.closed",

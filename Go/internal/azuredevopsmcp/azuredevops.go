@@ -84,17 +84,19 @@ type ClosedPR struct {
 	Trusted  bool
 }
 
-// Check is one failed Azure Pipelines build.
+// Check is one Azure Pipelines build, or one status another service set: its pipeline's
+// name or the status's genre/name, and its page.
 type Check struct{ Name, URL string }
 
 // FailedChecks is a checks.failed event's data: an active pull request whose head commit's
-// builds failed, and those builds. At is the newest of their finish times, so a build run
+// builds or statuses failed, and those. At is the newest of their times, so a build run
 // again that fails again is a new one.
 type FailedChecks struct {
 	PR      PR
 	HeadSHA string
 	At      string
-	// RunID is the first failed build's id, RunName its pipeline's name.
+	// RunID is the first failed build's id, RunName its pipeline's name; with no failed
+	// build, RunID is 0 and RunName the first failed status's name.
 	RunID   int
 	RunName string
 	RunURL  string
@@ -112,6 +114,24 @@ func (d FailedChecks) json() map[string]any {
 		"run":        map[string]any{"id": d.RunID, "name": d.RunName, "url": d.RunURL},
 		"failedJobs": jobs,
 	}
+}
+
+// PassedCheck is a checks.passed event's data: a build or a status that passed at an active
+// pull request's head commit. Key is build:<id> or status:<id>; RunID is 0 for a status.
+type PassedCheck struct {
+	PR      PR
+	HeadSHA string
+	At      string
+	Key     string
+	RunID   int
+	RunName string
+	RunURL  string
+	Trusted bool
+}
+
+func (d PassedCheck) json() map[string]any {
+	return map[string]any{"pr": d.PR.json(), "headSha": d.HeadSHA,
+		"run": map[string]any{"id": d.RunID, "name": d.RunName, "url": d.RunURL}}
 }
 
 // ReviewComment is a comment on a line of a pull request's diff, or an answer in its thread.
@@ -159,8 +179,12 @@ type AzureDevOps interface {
 	OpenPRs(ctx context.Context, repo string) ([]OpenPR, error)
 	// ClosedPRs are pull requests completed, and abandoned, at or after since.
 	ClosedPRs(ctx context.Context, repo, since string) (merged []MergedPR, closed []ClosedPR, listed Listed, err error)
-	// FailedChecks are the active pull requests whose head commit failed a build, in any order.
+	// FailedChecks are the active pull requests whose head commit failed a build or a status
+	// at or after since, in any order.
 	FailedChecks(ctx context.Context, repo, since string) (failed []FailedChecks, listed Listed, err error)
+	// PassedChecks are the builds and statuses that passed at an active pull request's head
+	// commit at or after since, in any order.
+	PassedChecks(ctx context.Context, repo, since string) (passed []PassedCheck, listed Listed, err error)
 	// ReviewComments are the comments on pull requests' diffs made at or after since.
 	ReviewComments(ctx context.Context, repo, since string) (comments []ReviewComment, listed Listed, err error)
 	// Yours is what the token's owner has in the repository (#2034).
