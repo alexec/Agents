@@ -23,11 +23,15 @@ package hosttunnels
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/alexec/agents/Go/internal/controlplane/records"
@@ -196,6 +200,27 @@ func New(c Config) *Tunnels {
 	}
 }
 
+// sweepDeadFolders removes the agents-tunnels-<uid>-<pid> folders in dir whose process is
+// gone (#3649): Stop removes its own, but a crash leaves it.
+func sweepDeadFolders(dir string, uid int) {
+	prefix := fmt.Sprintf("agents-tunnels-%d-", uid)
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		rest, ok := strings.CutPrefix(e.Name(), prefix)
+		pid, err := strconv.Atoi(rest)
+		if !ok || err != nil || pid <= 0 || alive(pid) {
+			continue
+		}
+		os.RemoveAll(filepath.Join(dir, e.Name()))
+	}
+}
+
+// alive says whether a process pid is running; one of another user counts.
+func alive(pid int) bool {
+	err := syscall.Kill(pid, 0)
+	return err == nil || errors.Is(err, syscall.EPERM)
+}
+
 // Port is the port on both ends, for hostinstall's Tunnels.
 func (t *Tunnels) Port() int { return t.port }
 
@@ -208,6 +233,7 @@ func (t *Tunnels) Start(every time.Duration) {
 	if every <= 0 {
 		every = 15 * time.Second
 	}
+	sweepDeadFolders("/tmp", os.Getuid())
 	t.mu.Lock()
 	if t.ticker != nil {
 		t.mu.Unlock()

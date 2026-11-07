@@ -79,6 +79,12 @@ public enum NeedID: Hashable, Sendable, Codable {
         return UUID(uuidString: String(token.dropFirst("notice:".count)))
     }
 
+    /// Whether a token is a machine's notice (#3682): a volume almost full, posted with no
+    /// session behind it, so a tap on its banner opens the machine's page.
+    public static func isMachineNotice(token: String?) -> Bool {
+        token?.hasPrefix("notice:disk:") ?? false
+    }
+
     /// The folder a guarded change's token names (#531), for a banner opened with no
     /// session behind it: its page is where the question is. Standardised as a folder's
     /// folder is, so `folder(_:)` finds it (#1367): a folder with a trailing slash is not

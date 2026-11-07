@@ -16,6 +16,13 @@ type AttentionNeed = wire.AttentionNeed
 // Push: a need posted to it, or (with no headline) taken back from it.
 type RelayDelivery = wire.RelayDelivery
 
+// postedFor and postedMost bound the desk (#3650): a need that is never withdrawn (its host
+// crashed or was removed) goes after a week, and past postedMost the oldest go first.
+const (
+	postedFor  = 7 * 24 * time.Hour
+	postedMost = 10_000
+)
+
 type posted struct {
 	device string
 	alert  bool
@@ -84,6 +91,7 @@ func (d *Desk) Heard(message AttentionNeed, presences map[Surface]Presence, devi
 		}
 	}
 	d.posted[k] = posted{device: chosen.ID, alert: decision.Alert, at: now}
+	d.prune(now)
 	headline := message.Headline
 	if headline == nil {
 		headline = &need.Headline
@@ -100,4 +108,22 @@ func (d *Desk) withdraw(id wire.NeedID) []RelayDelivery {
 	}
 	delete(d.posted, k)
 	return []RelayDelivery{{NeedID: id, Device: wire.UUID(previous.device)}}
+}
+
+// prune drops what was posted longer ago than postedFor, then the oldest past postedMost.
+func (d *Desk) prune(now time.Time) {
+	for k, p := range d.posted {
+		if now.Sub(p.at) > postedFor {
+			delete(d.posted, k)
+		}
+	}
+	for len(d.posted) > postedMost {
+		oldest, at := "", now
+		for k, p := range d.posted {
+			if oldest == "" || p.at.Before(at) {
+				oldest, at = k, p.at
+			}
+		}
+		delete(d.posted, oldest)
+	}
 }

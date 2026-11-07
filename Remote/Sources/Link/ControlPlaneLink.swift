@@ -88,8 +88,10 @@ enum RemoteControl {
         try? FileManager.default.removeItem(at: folder.appendingPathComponent("control-relay-key.pub"))
     }()
 
-    /// Forget the pairing: this device goes back to asking for a code.
+    /// Forget the pairing: this device goes back to asking for a code. Its machine-lock
+    /// pins go with it (#3670), named by the control plane while it is known.
     static func forget() {
+        LockPins(defaults: .standard, name: lockPinName).clearAll()
         try? FileManager.default.removeItem(at: membershipFile)
         try? FileManager.default.removeItem(at: movedFile)
     }

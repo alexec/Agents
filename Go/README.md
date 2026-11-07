@@ -102,7 +102,8 @@ trust filter (#728), polled only: `checks.failed`, `pr.opened`, `pr.merged`, `pr
 whatever its conclusion, for the runs no pull request owns (a tag's `release.yml`, a
 `workflow_dispatch` dry run); `workflow`, `branch` (a branch or a tag) and `run` filter it.
 Its `deploys` are what the run's jobs say they deployed (#3584), each a notice
-`::notice title=deploy::<target>:<id>/<version>`, as `testflight:<bundle id>/<build>`: one
+`::notice title=deploy::<target>:<id>/<version>`, as `testflight:<bundle id>/<build>` or
+`appstore:<bundle id>/<version>` (#3657): one
 request for the run's check suite, and one for each job that has annotations.
 `deploy.waiting` (#3587) is a run held by an environment with required reviewers (a job's
 `environment: production`), once per run, attempt and set of environments, with the

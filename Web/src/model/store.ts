@@ -86,6 +86,10 @@ export const openTurnsHeld = 8;
 export const historyEntriesCap = 1_600;
 export const historyTurnsCap = 200;
 
+/** How many events a host's list keeps as new ones come, and how many paging back brings in (#3650; the window's). */
+export const eventsKept = 1_000;
+export const eventsPagedMost = 5_000;
+
 /** A page of a finished turn's entries (#291). */
 export interface TurnDetailPage {
   entries: TranscriptEntry[];
@@ -3558,13 +3562,18 @@ export class Store extends Work {
     return agent;
   }
 
+  /**
+   * The newest page, laid over what is held. The list keeps `eventsKept` of them, as the window's
+   * live events (#3650); what goes is still the host's, and paging back brings it in.
+   */
   async loadEvents(host: string, limit = 50): Promise<void> {
     const page = await this.link.call("events/list", { limit }, host).catch(() => null);
     if (page) {
       const older = this.events.value[host]?.events ?? [];
       const merged = [...page.events, ...older.filter((event) => !page.events.some((next: ActivityEvent) => next.position === event.position))]
         .sort((a: ActivityEvent, b: ActivityEvent) => b.position - a.position);
-      this.events.value = { ...this.events.value, [host]: { ...page, events: merged } };
+      const hasMore = page.hasMore || merged.length > eventsKept;
+      this.events.value = { ...this.events.value, [host]: { ...page, events: merged.slice(0, eventsKept), hasMore } };
     }
   }
 
@@ -3586,8 +3595,10 @@ export class Store extends Work {
     const held = this.events.value[host];
     if (!held) return;
     const byPosition = new Map([...held.events, ...page.events].map((event: ActivityEvent) => [event.position, event]));
+    const events = [...byPosition.values()].sort((a, b) => b.position - a.position);
+    // Paging back stops at eventsPagedMost (#3650), as in the window.
     this.events.value = { ...this.events.value, [host]: {
-      ...held, events: [...byPosition.values()].sort((a, b) => b.position - a.position), hasMore: page.hasMore,
+      ...held, events: events.slice(0, eventsPagedMost), hasMore: page.hasMore && events.length < eventsPagedMost,
     } };
   }
 

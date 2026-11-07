@@ -2,9 +2,12 @@ package agentsd
 
 import (
 	"log"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/lineage"
 	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -90,12 +93,17 @@ func keepDays(keep wire.RetentionKeepFor) (time.Duration, bool) {
 	return time.Duration(n) * 24 * time.Hour, ok
 }
 
-// StartRetention sweeps now, then every hour: archived agents, then attachments (#1556).
-func (d *Daemon) StartRetention() { safe.Go("retention", d.retentionClock) }
+// StartRetention sweeps now, then every hour: archived agents, then attachments (#1556),
+// then the stores whose bound was applied only at start or on next use (#3649). What a
+// crash left is swept once, at start.
+func (d *Daemon) StartRetention() {
+	started := time.Now()
+	safe.Go("retention", func() { d.retentionClock(started) })
+}
 
-func (d *Daemon) retentionClock() {
-	d.sweepArchived()
-	d.sweepAttachments()
+func (d *Daemon) retentionClock(started time.Time) {
+	d.sweepCrashLeftovers(started)
+	d.sweepHourly()
 	t := time.NewTicker(retentionSweepEvery)
 	defer t.Stop()
 	for {
@@ -103,10 +111,38 @@ func (d *Daemon) retentionClock() {
 		case <-d.ctx.Done():
 			return
 		case <-t.C:
-			d.sweepArchived()
-			d.sweepAttachments()
+			d.sweepHourly()
 		}
 	}
+}
+
+func (d *Daemon) sweepHourly() {
+	d.sweepArchived()
+	d.sweepAttachments()
+	d.sweepOldRuns()
+	sweepTransfers(d.outgoingFolder())
+	sweepTransfers(d.incomingFolder())
+	if n := d.lineage().Prune(); n > 0 {
+		log.Printf("retention: %d ended lineage links past %v", n, lineage.KeepEnded)
+	}
+}
+
+// sweepCrashLeftovers removes what a run cut off by a crash left (#3649): a restore's
+// staging folder, the skill catalog's previews and the browser's output. Only what was
+// last changed before this start goes: a restore or a browser begun since is in use.
+func (d *Daemon) sweepCrashLeftovers(started time.Time) {
+	remove := func(dir string, match func(name string) bool) {
+		entries, _ := os.ReadDir(dir)
+		for _, e := range entries {
+			if info, err := e.Info(); err == nil && match(e.Name()) && info.ModTime().Before(started) {
+				os.RemoveAll(filepath.Join(dir, e.Name()))
+			}
+		}
+	}
+	remove(d.Store.Loc.Root, func(name string) bool { return strings.HasPrefix(name, ".restore-") })
+	every := func(string) bool { return true }
+	remove(filepath.Join(d.Store.Loc.Cache, "catalog-staging"), every)
+	remove(filepath.Join(d.Store.Loc.Cache, "browser", "output"), every)
 }
 
 // sweepArchived deletes each archived agent archived longer ago than keepFor. A pinned

@@ -659,6 +659,35 @@ struct AgentsModelTests {
         #expect(model.firstTurn == 5 + 40)
     }
 
+    /// A chat scrolled up stops paging back at the history cap, as the web page does
+    /// (#3650): neither the turns nor the entries grow past it.
+    @Test func pagingBackStopsAtTheHistoryCap() {
+        let model = AgentsModel()
+        model.isFollowingEnd = false
+        model.replaceTurns(with: TurnsPage(turns: (0..<50).map { turnSummary(100_000 + $0) },
+                                           firstTurn: 10_000, openStart: 50_000))
+        var first = 10_000
+        while model.hasMoreOfTheConversation {
+            first -= 50
+            model.prependTurns(TurnsPage(turns: (0..<50).map { turnSummary(first * 10 + $0) },
+                                         firstTurn: first, openStart: 50_000))
+        }
+        #expect(model.turns.count == AgentsModel.historyTurnsCap)
+        model.prependTurns(TurnsPage(turns: [turnSummary(1)], firstTurn: 1, openStart: 50_000))
+        #expect(model.turns.count == AgentsModel.historyTurnsCap)
+
+        let entries = { (n: Int) in (0..<n).map { _ in TranscriptEntry(kind: .agentMessage(messageID: nil, text: "x")) } }
+        model.replaceTranscript(with: TranscriptPage(firstIndex: 100_000, total: 100_200, entries: entries(200)))
+        var index = 100_000
+        while model.hasMoreOfTheConversation, model.hasMoreBefore {
+            index -= 200
+            model.prepend(TranscriptPage(firstIndex: index, total: 100_200, entries: entries(200)))
+        }
+        #expect(model.entries.count == AgentsModel.historyEntriesCap)
+        #expect(model.hasMoreBefore)
+        #expect(!model.hasMoreOfTheConversation)
+    }
+
     /// The Prompts list numbers from the host's count of the person's prompts before the
     /// turns (#1862). Turns let go at the front add theirs, so a row keeps its number.
     @Test func trimmedTurnsKeepThePromptNumbers() {

@@ -4909,6 +4909,32 @@
       }
     },
     {
+      "name": "machine/usage",
+      "x-capability": "machine.usage/1",
+      "description": "A machine's page (#3626): its CPU and memory now, and every disk its agents write to with its level. Asked while the page is open; nothing is kept between asks but the machine's last CPU time.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/MachineUsageState"
+        }
+      }
+    },
+    {
       "name": "mailbox/carry",
       "x-capability": "mailbox/1",
       "paramStructure": "by-name",
@@ -5661,6 +5687,48 @@
       }
     },
     {
+      "name": "personas/add",
+      "x-capability": "personas.catalog/1",
+      "description": "Write a previewed persona to .agents/personas at the destination and name it in the lock (#3665). replace is true to put it over the one there.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SkillAddRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/PersonaAddAnswer"
+        }
+      }
+    },
+    {
+      "name": "personas/check-updates",
+      "x-capability": "personas.catalog/1",
+      "description": "Whether each persona added from a marketplace has an update, by id; each repository asked at most once an hour (#3665).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SkillsListRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SkillUpdatesAnswer"
+        }
+      }
+    },
+    {
       "name": "personas/files",
       "x-capability": "personas/2",
       "tags": [
@@ -5714,6 +5782,69 @@
       }
     },
     {
+      "name": "personas/managed",
+      "x-capability": "personas.catalog/1",
+      "description": "The personas at a destination that a lock names, added from a marketplace (#3665).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SkillsListRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/PersonasManagedAnswer"
+        }
+      }
+    },
+    {
+      "name": "personas/preview",
+      "x-capability": "personas.catalog/1",
+      "description": "Fetch a persona file at its repository's current commit to show before adding (#3665).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/CatalogPreviewRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/PersonaPreviewAnswer"
+        }
+      }
+    },
+    {
+      "name": "personas/remove",
+      "x-capability": "personas.catalog/1",
+      "description": "Move a persona a lock names to the Trash and take it out of the lock (#3665). name is its id.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SkillNameRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SkillRemoveAnswer"
+        }
+      }
+    },
+    {
       "name": "personas/save",
       "x-capability": "personas/2",
       "tags": [
@@ -5735,6 +5866,48 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "personas/search",
+      "x-capability": "personas.catalog/1",
+      "description": "The personas in a GitHub marketplace's personas/ folder whose id holds the query (#3665).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/CatalogSearchRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/CatalogSearchAnswer"
+        }
+      }
+    },
+    {
+      "name": "personas/update-preview",
+      "x-capability": "personas.catalog/1",
+      "description": "A persona's source at its current commit, staged, with the file as it is now and the runtime and permission-mode it changes (#3665).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SkillNameRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/PersonaUpdatePreviewAnswer"
         }
       }
     },

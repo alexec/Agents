@@ -3,7 +3,9 @@ package hosttunnels
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -537,5 +539,29 @@ func TestARepinnedKeyIsKeptAndItsSessionStartsAgain(t *testing.T) {
 	})
 	if ok, _ := tunnels.Repin(ctx, "other", "x"); ok {
 		t.Error("pinned a host no tunnel carries")
+	}
+}
+
+// A crash leaves its tunnels' folder; the next start removes it, and keeps a live one's
+// and another user's (#3649).
+func TestStartSweepsADeadProcessesFolder(t *testing.T) {
+	dir := t.TempDir()
+	cmd := exec.Command("true")
+	if err := cmd.Run(); err != nil {
+		t.Fatal(err)
+	}
+	dead := filepath.Join(dir, fmt.Sprintf("agents-tunnels-501-%d", cmd.Process.Pid))
+	live := filepath.Join(dir, fmt.Sprintf("agents-tunnels-501-%d", os.Getpid()))
+	other := filepath.Join(dir, fmt.Sprintf("agents-tunnels-502-%d", cmd.Process.Pid))
+	for _, f := range []string{dead, live, other} {
+		if err := os.MkdirAll(filepath.Join(f, "sockets"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	sweepDeadFolders(dir, 501)
+	for f, want := range map[string]bool{dead: false, live: true, other: true} {
+		if _, err := os.Stat(f); (err == nil) != want {
+			t.Errorf("%s: kept %v, want %v", filepath.Base(f), err == nil, want)
+		}
 	}
 }

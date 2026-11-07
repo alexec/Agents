@@ -7,7 +7,7 @@ import { useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import type { Store } from "../model/store";
 import { go, route, sectionOf, usageAsked } from "../route";
-import { gated, groupedPages, navPages, navTitle, openPage, pagesShown, sectionKeys, sectionsShown, usagePaneTitle, usagePanes,
+import { gated, groupedPages, machinePages, navPages, navTitle, openPage, pagesShown, sectionKeys, sectionsShown, usagePaneTitle, usagePanes,
   type NavPage, type NavSection } from "../model/nav";
 import { adminOf, adminsOnly } from "../model/console";
 import { hostAnswers, stateWords, versionWords } from "../model/capabilities";
@@ -21,6 +21,7 @@ import { ReportsPage } from "./Reports";
 import { WorkList, WorkPage } from "./Work";
 import { WorkFeatures } from "./WorkFeatures";
 import { DocPage, DocsList } from "./Docs";
+import { MachinePage } from "./MachinePage";
 import { SettingsPage } from "./Settings";
 import { WorkflowRow } from "./WorkflowRow";
 import { BackToList } from "./BackToList";
@@ -101,6 +102,10 @@ function PageMark({ store, page }: { store: Store; page: NavPage }) {
   if (page.id === "reportPolicy" && policyNotSaved(store)) return <span class="quiet small attention">Not saved</span>;
   if (page.id === "policy" && orgPolicyNotSaved(store)) return <span class="quiet small attention">Not saved</span>;
   // Connectors: a connector of the person's that does not answer, or a connection that ended (#3407), as the window's red icon.
+  // A machine with a low disk (#3626), as the window's red row.
+  if (page.draw.kind === "machine" && (store.disk.value[page.draw.host]?.alarms ?? []).some((a) => a.level !== "ok")) {
+    return <span class="small failure" title="A disk is low" aria-label="A disk is low">●</span>;
+  }
   if (page.id === "mcp") {
     const words = store.connectorsWarning();
     if (words) return <span class="small failure" title={words} aria-label={words}>●</span>;
@@ -112,8 +117,10 @@ function PageMark({ store, page }: { store: Store; page: NavPage }) {
 export function SectionPage({ store, section, down }: { store: Store; section: Exclude<NavSection, "overview" | "agents">; down: boolean }) {
   const admin = adminOf(store);
   const r = route.value;
-  const open = openPage(section, r.section, admin);
-  const list = pagesShown(section, admin, open?.id);
+  // A page per machine under Machines (#3626).
+  const more = section === "machines" ? machinePages(store.hosts.value, store.macHostID.value) : [];
+  const open = openPage(section, r.section, admin, more);
+  const list = pagesShown(section, admin, open?.id, more);
   return (
     <div class={`columns sub-app console${list.length > 1 ? "" : " one-page"}`} aria-busy={down}>
       {list.length > 1 && (
@@ -154,6 +161,7 @@ export function PageView({ store, page, down }: { store: Store; page: NavPage; d
         : page.draw.kind === "work" ? (route.value.item
           ? <WorkPage key={route.value.item} store={store} kind={page.draw.work} ref={route.value.item} />
           : <WorkList key={page.draw.work} store={store} kind={page.draw.work} />)
+        : page.draw.kind === "machine" ? <MachinePage key={page.draw.host} store={store} host={page.draw.host} />
         : page.draw.kind === "features" ? <WorkFeatures store={store} />
         : page.draw.kind === "docs" ? (route.value.item
           ? <DocPage key={route.value.item} store={store} docRef={route.value.item} />
@@ -164,6 +172,7 @@ export function PageView({ store, page, down }: { store: Store; page: NavPage; d
 
 /** The section a page is in, for its breadcrumb. */
 function sectionOfPage(page: NavPage): Exclude<NavSection, "overview"> {
+  if (page.draw.kind === "machine") return "machines";
   return (Object.keys(navPages) as NavSection[]).find((s) => navPages[s].includes(page)) as Exclude<NavSection, "overview"> ?? "agents";
 }
 

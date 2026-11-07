@@ -1,7 +1,7 @@
 import Foundation
 
 /// How full a volume is allowed to get before the app says so (#195): `machine.disk_low` and
-/// `machine.disk_ok`, and the strip in the window.
+/// `machine.disk_ok`, and the machine's row and page (#3628).
 ///
 /// Set in a folder's `.agents/folder.json` beside `helperLimits`, or in Folder
 /// Settings. A nil field is its default. A volume holding several folders goes by the
@@ -200,6 +200,20 @@ public enum DiskSpace {
             return String(format: "%.1f GB", Double(bytes) / Double(gigabyte))
         }
         return "\(max(0, bytes) / 1_000_000) MB"
+    }
+
+    /// A volume on a machine's page (#3626): "120.3 GB free of 500.0 GB (24%)".
+    public static func freeWords(_ reading: DiskReading) -> String {
+        "\(words(reading.freeBytes)) free of \(words(reading.totalBytes)) (\(reading.freePercent)%)"
+    }
+
+    /// A level as a machine's page says it, beside the volume (#3626).
+    public static func levelWords(_ level: DiskLevel) -> String {
+        switch level {
+        case .ok: "OK"
+        case .low: "Low"
+        case .critical: "Almost full"
+        }
     }
 
     /// "a 12.3 GB, b over 8.0 GB".

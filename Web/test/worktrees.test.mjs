@@ -1,4 +1,4 @@
-// Activity ▸ Worktrees (#790): the same order and words as AgentsKitCore's WorktreeTally.
+// A machine's worktrees (#790, #3627): the same order and words as AgentsKitCore's WorktreeTally.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "./load.mjs";
@@ -16,13 +16,11 @@ test("worktrees: idle first, largest first, then unmeasured, then by name", () =
   assert.deepEqual([...listed].sort(w.cleanupOrder).map((t) => t.name), ["big", "small", "a", "b", "busy-big"]);
 });
 
-test("worktrees: the page and the row say how much and how much is idle", () => {
+test("worktrees: the page says how much and how much is idle", () => {
   const t = w.tally([tree("a", 9, 1), tree("b", 3, 0, true), tree("c", null)]);
-  assert.equal(w.rowWords(t), "3 worktrees, 2 idle");
   assert.equal(w.pageLine(t), "Worktrees hold over 12.0 GB, 3.0 GB of it idle.");
   assert.equal(w.pageLine(w.tally([tree("c", null)])), "Measuring 1 worktree…");
   assert.equal(w.pageLine(w.tally([])), w.worktreesEmpty);
-  assert.equal(w.rowWords(w.tally([])), null);
 });
 
 test("worktrees: what Remove build output freed, and what Remove… would lose", () => {

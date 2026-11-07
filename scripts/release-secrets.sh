@@ -15,6 +15,12 @@
 # identity and the Mac installer identity ("3rd Party Mac Developer Installer"), each exported
 # from Keychain Access as a .p12, and the four installed App Store profiles, found by name. Run
 # the plain form first: it makes the environment and sets the App Store Connect key both use.
+#
+#   scripts/release-secrets.sh --app-store [reviewer]
+#
+# The App Review gate (#3657): the `app-store` environment, for v* tags only, with the reviewer
+# (the signed-in GitHub user by default) required, and the App Store Connect key from
+# ~/.private_keys. Without a required reviewer app-store.yml submits nothing.
 set -euo pipefail
 
 repo=${RELEASE_REPO:-alexec/Agents}
@@ -75,12 +81,41 @@ if [[ ${1:-} == --store ]]; then
     exit 0
 fi
 
-p12=${1:?usage: release-secrets.sh path/to/DeveloperID.p12 | --store Distribution.p12 Installer.p12}
-
 p8=( $keys/AuthKey_*.p8(N) )
 (( ${#p8} == 1 )) || { print -u2 "Expected one AuthKey_*.p8 in $keys."; exit 1 }
 asc_key_id=$(sed -n 's/^ASC_KEY_ID=//p' $keys/asc.env)
 asc_issuer_id=$(sed -n 's/^ASC_ISSUER_ID=//p' $keys/asc.env)
+
+# set_asc ENVIRONMENT: the App Store Connect key, into that environment.
+set_asc() {
+    gh secret set ASC_KEY_P8 --env $1 -R $repo < $p8[1]
+    print -rn -- $asc_key_id | gh secret set ASC_KEY_ID --env $1 -R $repo
+    print -rn -- $asc_issuer_id | gh secret set ASC_ISSUER_ID --env $1 -R $repo
+}
+
+# tags_only ENVIRONMENT: only a v* tag reaches it.
+tags_only() {
+    gh api repos/$repo/environments/$1/deployment-branch-policies --jq '.branch_policies[].name' | grep -qx 'v\*' ||
+        gh api -X POST repos/$repo/environments/$1/deployment-branch-policies -f name='v*' -f type=tag --silent
+}
+
+if [[ ${1:-} == --app-store ]]; then
+    reviewer=${2:-$(gh api user --jq .login)}
+    reviewer_id=$(gh api users/$reviewer --jq .id)
+    print "the app-store environment, for v* tags only, with $reviewer required…"
+    gh api -X PUT repos/$repo/environments/app-store --silent --input - <<JSON
+{"reviewers":[{"type":"User","id":$reviewer_id}],"prevent_self_review":false,
+ "deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}
+JSON
+    tags_only app-store
+    print "its secrets…"
+    set_asc app-store
+    gh secret list --env app-store -R $repo
+    print "Done. The next v* tag waits for $reviewer before it goes to App Review."
+    exit 0
+fi
+
+p12=${1:?usage: release-secrets.sh path/to/DeveloperID.p12 | --store Distribution.p12 Installer.p12 | --app-store [reviewer]}
 
 read -rs "password?Password for $p12: "
 print
@@ -90,14 +125,11 @@ openssl pkcs12 -in $p12 -passin "pass:$password" -nokeys -legacy 2>/dev/null | g
 
 print "the release environment, for v* tags only…"
 gh api -X PUT repos/$repo/environments/release --silent --input - <<<'{"deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}'
-gh api repos/$repo/environments/release/deployment-branch-policies --jq '.branch_policies[].name' | grep -qx 'v\*' ||
-    gh api -X POST repos/$repo/environments/release/deployment-branch-policies -f name='v*' -f type=tag --silent
+tags_only release
 
 print "its secrets…"
 base64 -i $p12 | gh secret set DEVELOPER_ID_P12 --env release -R $repo
 print -rn -- $password | gh secret set DEVELOPER_ID_P12_PASSWORD --env release -R $repo
-gh secret set ASC_KEY_P8 --env release -R $repo < $p8[1]
-print -rn -- $asc_key_id | gh secret set ASC_KEY_ID --env release -R $repo
-print -rn -- $asc_issuer_id | gh secret set ASC_ISSUER_ID --env release -R $repo
+set_asc release
 gh secret list --env release -R $repo
 print "Done. Delete $p12, then tag main to release (docs/how-to/release-agents-host.md)."

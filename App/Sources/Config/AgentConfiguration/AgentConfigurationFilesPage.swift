@@ -10,6 +10,9 @@ struct AgentConfigurationFilesPage: View {
     var looks: [DaemonAPI.Look] = []
     @State private var showingSkillCatalogue = false
     @State private var opening: String?
+    /// Moves on when a persona from a marketplace was added, updated or removed, so the
+    /// editor reads its files again (#3665).
+    @State private var personaRevision = 0
 
     private var folder: URL? {
         if case .folder(let folder) = place { return folder }
@@ -38,6 +41,13 @@ struct AgentConfigurationFilesPage: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 12)
             }
+            // Personas from a marketplace (#3665): added, updated and removed above the editor,
+            // which still lists every file, the person's own too.
+            if kind == .personas {
+                MarketplacePersonasSection(place: place, changed: { personaRevision += 1 })
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+            }
             // Your workflows: the daily summary's one control, for all folders (#3351).
             if kind == .workflows, folder == nil, let settings = model.dailySummarySettings {
                 VStack(alignment: .leading, spacing: 6) {
@@ -63,6 +73,7 @@ struct AgentConfigurationFilesPage: View {
                                                                            path: path, content: content, delete: delete)
                                   },
                                   unsaved: unsaved, open: $opening)
+                .id(personaRevision)
         }
         .task {
             if kind == .workflows, folder == nil { await model.refreshDailySummarySettings() }

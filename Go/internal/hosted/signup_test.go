@@ -2,6 +2,7 @@ package hosted
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -300,5 +301,43 @@ func must(t *testing.T, err error) {
 	t.Helper()
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+// #3672: Delete Account deletes the invites its sign-in used, also one from before #3386,
+// and leaves the others; the used code still signs nobody up.
+func TestDeleteAccountDeletesTheInvitesItUsed(t *testing.T) {
+	ctx := context.Background()
+	st := store.NewMemory()
+	a := &accounts{store: st, now: time.Now}
+	ana := gitHubSignIn(501, "ana")
+	acc, _, err := a.make(ctx, ana)
+	if err != nil {
+		t.Fatal(err)
+	}
+	put := func(code string, used *Used) {
+		data, _ := json.Marshal(Invite{Expires: time.Now().Add(time.Hour), Used: used})
+		if _, err := st.Put(ctx, inviteKey(code), data, store.Absent); err != nil {
+			t.Fatal(err)
+		}
+	}
+	other := SignIn{Provider: "apple", Subject: "501"}
+	put("aaaaaaaaaaaaaaaaaaaa", &Used{By: &ana, At: time.Now()})
+	put("bbbbbbbbbbbbbbbbbbbb", &Used{GitHub: 501, At: time.Now()})
+	put("cccccccccccccccccccc", &Used{By: &other, At: time.Now()})
+	put("dddddddddddddddddddd", &Used{GitHub: 502, At: time.Now()})
+	put("eeeeeeeeeeeeeeeeeeee", nil)
+	if err := a.remove(ctx, acc); err != nil {
+		t.Fatal(err)
+	}
+	for code, kept := range map[string]bool{"aaaaaaaaaaaaaaaaaaaa": false, "bbbbbbbbbbbbbbbbbbbb": false,
+		"cccccccccccccccccccc": true, "dddddddddddddddddddd": true, "eeeeeeeeeeeeeeeeeeee": true} {
+		if o, _ := st.Get(ctx, inviteKey(code)); (o != nil) != kept {
+			t.Errorf("invite %s: kept %v, want %v", code, o != nil, kept)
+		}
+	}
+	_, browserFor := startWith(t, Config{Store: st, SignUpsPerAddress: 100})
+	if _, page := browserFor().signInPage("u.503.kim.400", "aaaaaaaaaaaaaaaaaaaa"); !strings.Contains(page, "used or expired") {
+		t.Fatal(page)
 	}
 }

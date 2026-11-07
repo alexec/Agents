@@ -57,7 +57,7 @@ new stage needs no wire change: only a new linker in the host.
 | PR | `pr`, `github:<o>/<r>#n` | session `opens` PR; PR `fixes` issue | there (#2349) |
 | Build (CI run) | `ci-run`, `github:<o>/<r>/actions/run/<id>` | `ci-run` `builds` PR, or `builds` release | there (#3581): `checks.*` and `run.completed` on a `v*` tag; a PR keeps its last 20 runs |
 | Release | `release`, `github:<o>/<r>/release/<tag>` | PR `part-of` release; milestone `shipped-in` release | there (#3023) |
-| Deploy | `deploy`, `<target>:<id>/<version>`, as `testflight:<bundle id>/<build>` | release `deployed-as` deploy; deploy `part-of` its target | there (#3584): a job's `::notice title=deploy::testflight:<bundle id>/<build>`, read from `run.completed` on a `v*` tag |
+| Deploy | `deploy`, `<target>:<id>/<version>`, as `testflight:<bundle id>/<build>` or `cloudrun:<project>/<region>/<service>/<revision>` | release `deployed-as` deploy; deploy `part-of` its target | there (#3584, Cloud Run #3654): a job's `::notice title=deploy::<ref>`, read from `run.completed` on a `v*` tag |
 | Health signal | `health`, `<source>:<id>`, as `sentry:<org>/<issue id>` | health `seen-in` release or deploy | there (#3585): `health.issue_new` and `health.issue_regressed`, matched to the release by version; a Better Stack incident (#3655), `betterstack:<incident id>`, seen-in the release out when it started |
 | New issue | `issue` | issue `reports` health | there (#3586): the ready-made **File a bug from Sentry**; the bug its session labels itself with |
 
@@ -78,6 +78,14 @@ new stage needs no wire change: only a new linker in the host.
   `release.yml` do it for Agents now, and it puts the build on a person's iPhone, as the
   north star says. A cloud service (Fly, Cloud Run, Vercel or similar) is the second.
   Alex can overrule.
+- **Decided: the second deploy target is Google Cloud Run (#3654).** Because the customer's
+  CI signs in to it with no key (Workload Identity Federation, by the official
+  `google-github-actions/auth`), so no long-lived credential sits in their secrets to leak;
+  `gcloud`, its official CLI, is already on GitHub's runners; and a revision's ref names
+  its project, region and service, so each client links to it in the console. Not chosen:
+  Fly (its deploy token is long-lived), Vercel (it is made to deploy from its own Git
+  integration, not from the customer's CI), and Google's `deploy-cloudrun` action (no
+  update since 2025-09). Alex can overrule.
 - **Decided: a deploy runs in the customer's own CI** (GitHub Actions, or GitLab CI),
   started by a tag, as `release.yml` does it now. The signing secrets are the repo's CI
   secrets. A machine of the customer's (a Mac as a self-hosted runner) is the option when
@@ -139,11 +147,13 @@ The children are sub-issues of #3579, with "blocked by" links. Step 1 can start 
 
 Later, filed by the lead when the loop works:
 
-- A cloud service as the second deploy target (Fly, Cloud Run or Vercel).
+- A cloud service as the second deploy target (Fly, Cloud Run or Vercel): Cloud Run, #3654.
 - A status page: there (#3655), Better Stack.
 - A new app from nothing, by voice: a repo, outside accounts and secrets.
 - The App Store (not only TestFlight) as a deploy target, with Alex's approval for each
-  release to App Review.
+  release to App Review: #3657. `app-store.yml` waits at the `app-store` environment's gate
+  (#3587), then submits; its run says `appstore:<bundle id>/<version>` and the TestFlight
+  build it submitted, which is `deployed-as` that version.
 
 ## Clients
 
