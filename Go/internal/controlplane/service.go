@@ -235,7 +235,10 @@ type Service struct {
 	servers  []*http.Server
 	sockets  map[*Conn]bool
 	stop     chan struct{}
-	ready    bool
+	// The TLS listener's sockets still in accept: Stop waits for them, so none logs
+	// after it returns (#3869).
+	accepting sync.WaitGroup
+	ready     bool
 	loopback *web.Listener
 	// The page at this copy's own origin (#1459), or nil.
 	page *web.Public
@@ -582,6 +585,7 @@ func (s *Service) Stop() {
 	for c := range sockets {
 		c.Close()
 	}
+	s.accepting.Wait()
 	if tunnels != nil {
 		tunnels.Stop()
 	}
@@ -1045,7 +1049,16 @@ func (s *Service) serveHTTP(w http.ResponseWriter, r *http.Request) {
 			proved(false)
 			return
 		}
-		go s.accept(s.adopt(newConn(ws, source)), webOrigin, proved)
+		conn := newConn(ws, source)
+		if !s.startAccept() {
+			conn.Close()
+			proved(false)
+			return
+		}
+		go func() {
+			defer s.accepting.Done()
+			s.accept(s.adopt(conn), webOrigin, proved)
+		}()
 	default:
 		if s.page != nil && s.page.Serve(w, r) {
 			return
@@ -1075,6 +1088,20 @@ func (s *Service) mayDownload(r *http.Request) bool {
 	}
 	s.refusals.note("download", keyOf(source), "refused downloads from "+keyOf(source)+": over the rate")
 	return false
+}
+
+// startAccept counts one more socket in accept, for Stop to wait for, unless Stop has
+// begun: then it says false, and the socket is closed.
+func (s *Service) startAccept() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	select {
+	case <-s.stop:
+		return false
+	default:
+	}
+	s.accepting.Add(1)
+	return true
 }
 
 // adopt keeps a socket so Stop can close it.
