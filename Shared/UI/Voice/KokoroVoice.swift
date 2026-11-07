@@ -111,8 +111,9 @@ actor KokoroVoice {
     /// The bundle's Voice folder, linked into FluidAudio's cache folder (in the app's
     /// container on the Mac, Application Support on iOS): the English front end into
     /// `Models/kokoro`, the models and voices into `Models/kokoro-82m-coreml/ANE`. A link left
-    /// by an older copy of the app points at a bundle that has moved, so each is made again.
-    /// A build without the voice (a Debug build offline) links nothing, and FluidAudio
+    /// by an older copy of the app points at a bundle that has moved, so each is made again,
+    /// and an entry the bundle no longer has (an older model, such as `KokoroTail.mlmodelc`
+    /// next to `KokoroTail_v2.mlmodelc`) is removed (#3747). A build without the voice (a Debug build offline) links nothing, and FluidAudio
     /// downloads what it needs.
     static func link(from voice: URL) throws {
         let files = FileManager.default
@@ -133,6 +134,7 @@ actor KokoroVoice {
                     try files.copyItem(at: target, to: link) // store-ok: from the app's own bundle to its container
                 }
             }
+            Leftovers.removeAll(in: cache, except: Set(names))
         }
     }
 }

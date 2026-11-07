@@ -19,5 +19,28 @@ public enum ControlClientKey {
         try keychain.write(made, account: account)
         return made
     }
+
+    /// Deletes the keys of walks that are gone (#3747): each `<account>.walk.<name>` item,
+    /// the client key's and the lock's, whose `name` `isGone` says has gone. The person's
+    /// own items have no `.walk.` and are never deleted. Gives the accounts deleted.
+    @discardableResult
+    public static func deleteWalkKeys(isGone: (String) -> Bool) -> [String] {
+        deleteWalkKeys(in: DeviceKey.Keychain(accessGroup: nil), isGone: isGone)
+    }
+
+    static func deleteWalkKeys(in keychain: DeviceKey.Keychain, isGone: (String) -> Bool) -> [String] {
+        var deleted: [String] = []
+        for account in keychain.accounts() {
+            guard let infix = account.range(of: walkInfix) else { continue }
+            let walk = String(account[infix.upperBound...])
+            guard !walk.isEmpty, isGone(walk) else { continue }
+            keychain.delete(account: account)
+            deleted.append(account)
+        }
+        return deleted
+    }
+
+    /// Between an account and a walk's name, as the Mac window names a walk's keys.
+    static let walkInfix = ".walk."
 }
 #endif
