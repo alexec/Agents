@@ -15,8 +15,9 @@ An enhancement counts only when its files change what a person gets (#2857): a c
 the host or daemon, or the capability list (SEEN). An enhancement to release tooling,
 workflows, skills or docs is listed as `[tooling]`, so the notes put it under "Changed".
 
-The open milestone (the earliest open one by the version its title starts with, #1340) has a
-version too. When it differs from `next:`, the plan says why. The release skill then asks Alex.
+Milestones are themes, not versions (#3760): no milestone holds a release, and the plan
+does not compare a milestone with the version. It prints `finished:` for each open milestone
+whose items are all closed, for the notes' "Milestones finished"; the release skill closes it.
 
 The gate's commit (#3045) stays the same while lanes land after it: `--after` names only the
 pull requests merged after it that fix a blocking issue (`priority:high`). Only those make the
@@ -51,12 +52,6 @@ def bump(tag):
     return f"{major}.{mid + 1}.0"
 
 
-def milestone_version(title):
-    """The version a milestone's title starts with: "0.13 Auto runtime" is 0.13.0."""
-    m = re.match(r"v?(\d+)\.(\d+)(?:\.(\d+))?(?:\s|$)", title)
-    return f"{m[1]}.{m[2]}.{m[3] or 0}" if m else None
-
-
 # The paths of an enhancement that makes a minor (#2857): the clients, the host and daemon,
 # and the capability list (capability-changes.py's documents).
 SEEN = ("App/Sources/", "Remote/Sources/", "Shared/UI/", "Web/src/", "Go/", "Host/",
@@ -69,22 +64,11 @@ def seen(files):
     return any(f.startswith(SEEN) for f in files)
 
 
-def key(version):
-    return tuple(int(n) for n in version.split("."))
-
-
-def open_milestone(titles):
-    """The earliest open milestone as (title, version), or None."""
-    found = sorted(((milestone_version(t), t) for t in titles if milestone_version(t)), key=lambda vt: key(vt[0]))
-    return (found[0][1], found[0][0]) if found else None
-
-
-def differs(version, planned):
-    """Why the plan's version is not the milestone's, or None when they agree."""
-    if version == planned:
-        return None
-    why = "the milestone is ahead of the tag" if key(version) < key(planned) else "the milestone is behind the tag"
-    return f"plan v{version}, milestone v{planned} ({why}); ask Alex which version"
+def finished(milestones):
+    """The open milestones whose items are all closed (#3760), as (title, url), by due date."""
+    done = [m for m in milestones if m["open_issues"] == 0 and m["closed_issues"] > 0]
+    done.sort(key=lambda m: (m.get("due_on") is None, m.get("due_on") or "", m["title"]))
+    return [(m["title"], m["html_url"]) for m in done]
 
 
 def blocking(labels):
@@ -93,13 +77,14 @@ def blocking(labels):
 
 
 def selftest():
-    assert milestone_version("0.12.3 Bug fixes") == "0.12.3"
-    assert milestone_version("0.13 Auto runtime and voice mode") == "0.13.0"
-    assert milestone_version("1.0 Public release") == "1.0.0"
-    assert milestone_version("Backlog") is None
-    assert open_milestone(["0.15 Hosted", "1.0 Public release", "0.9 x", "0.12.3 Bug fixes", "Later"]) == ("0.9 x", "0.9.0")
-    assert open_milestone(["0.13 A", "0.12.3 B"]) == ("0.12.3 B", "0.12.3")
-    assert open_milestone([]) is None
+    def m(title, open_, closed, due=None):
+        return {"title": title, "open_issues": open_, "closed_issues": closed, "due_on": due,
+                "html_url": f"u/{title}"}
+    assert finished([m("Projects", 0, 4, "2026-12-01"), m("Channels", 2, 1), m("Empty", 0, 0)]) == [
+        ("Projects", "u/Projects")]
+    assert finished([m("Later", 0, 1), m("B", 0, 1, "2026-12-02"), m("A", 0, 1, "2026-12-01")]) == [
+        ("A", "u/A"), ("B", "u/B"), ("Later", "u/Later")]
+    assert finished([]) == []
     assert bump("v0.15.0") == "0.16.0"
     assert bump("v0.14.1") == "0.15.0"
     assert seen(["Web/src/App.tsx", "docs/a.md"])
@@ -108,11 +93,6 @@ def selftest():
     assert not seen([".agents/skills/release/SKILL.md", "AGENTS.md", "docs/reference/x.md"])
     assert not seen([".github/workflows/ci.yml", "scripts/lint.sh", "specs/071-web-remote/walks/parity.md"])
     assert not seen([])
-    assert differs("0.16.0", "0.16.0") is None
-    assert differs("0.16.0", "0.15.1") == (
-        "plan v0.16.0, milestone v0.15.1 (the milestone is behind the tag); ask Alex which version")
-    assert differs("0.16.0", "0.17.0") == (
-        "plan v0.16.0, milestone v0.17.0 (the milestone is ahead of the tag); ask Alex which version")
     assert blocking({"bug", "priority:high"})
     assert blocking({"priority:high"})
     assert not blocking({"bug", "priority:medium"})
@@ -217,17 +197,11 @@ def main():
            f"{' …' if len(enhancements) > 8 else ''}") if enhancements else "no enhancement merged"
     if tooling:
         why += f"; tooling: {', '.join(f'#{n}' for n in tooling)}"
-    milestone = open_milestone(run("gh", "api", "repos/{owner}/{repo}/milestones?state=open", "--paginate",
-                                   "--jq", ".[].title").splitlines())
+    done = finished(gh_json("api", "repos/{owner}/{repo}/milestones?state=open&per_page=100"))
     print(f"last: {tag} ({since[:10]})")
-    if milestone:
-        title, planned = milestone
-        print(f"next: v{version} ({why}); milestone: v{planned} ({title})")
-        mismatch = differs(version, planned)
-        if mismatch:
-            print(f"differs: {mismatch}")
-    else:
-        print(f"next: v{version} ({why}); milestone: none open")
+    print(f"next: v{version} ({why})")
+    for title, url in done:
+        print(f"finished: {title} ({url})")
     print(f"commits: {len(subjects)}, pull requests: {len(rows)}")
     print("pull requests:")
     for row in rows:
