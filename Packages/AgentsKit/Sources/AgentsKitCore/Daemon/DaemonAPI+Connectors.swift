@@ -32,7 +32,7 @@ extension DaemonAPI.Method {
 
 extension DaemonAPI {
     public enum ConnectionProvider: String, Codable, Sendable, Hashable, CaseIterable, Identifiable {
-        case github, linear, gitlab, email, atlassian, forgejo
+        case github, linear, gitlab, email, atlassian, forgejo, bitbucket
         public var id: String { rawValue }
     }
 
@@ -211,7 +211,7 @@ extension DaemonAPI {
         case failed
         /// The provider refused the read: the person grants it on the provider's site.
         case refused
-        /// The folder has no GitHub, GitLab or Forgejo remote.
+        /// The folder has no GitHub, GitLab, Forgejo or Bitbucket remote.
         case noRemote
         /// Skipped: it counts as done.
         case skipped
@@ -346,7 +346,7 @@ extension DaemonAPI {
     public struct ConnectorSetup: Codable, Sendable, Hashable {
         public var folder: String
         /// owner/name on GitHub, group/folder on GitLab, from the folder's git remote. Nil
-        /// with no GitHub, GitLab or Forgejo remote.
+        /// with no GitHub, GitLab, Forgejo or Bitbucket remote.
         public var repository: String?
         /// The forge that fills Tasks, Code review and CI; nil is GitHub.
         public var forge: ConnectionProvider?

@@ -7,12 +7,12 @@ import (
 
 	"github.com/alexec/agents/Go/internal/azureboardsmcp"
 	"github.com/alexec/agents/Go/internal/azuredevopsmcp"
+	"github.com/alexec/agents/Go/internal/betterstackmcp"
 	"github.com/alexec/agents/Go/internal/bitbucketmcp"
 	"github.com/alexec/agents/Go/internal/emailmcp"
 	"github.com/alexec/agents/Go/internal/forgejomcp"
 	"github.com/alexec/agents/Go/internal/githubmcp"
 	"github.com/alexec/agents/Go/internal/gitlabmcp"
-	"github.com/alexec/agents/Go/internal/betterstackmcp"
 	"github.com/alexec/agents/Go/internal/googlechatmcp"
 	"github.com/alexec/agents/Go/internal/jiramcp"
 	"github.com/alexec/agents/Go/internal/linearmcp"
@@ -267,20 +267,21 @@ func TestForgejoReadsItsConnection(t *testing.T) {
 	}
 }
 
-// Bitbucket (#2828) asks for a token, and the email of an Atlassian API token, kept in the
-// person's secrets, and declares the events its server raises: the gitlab server's.
-func TestBitbucketAsksForItsToken(t *testing.T) {
+// Bitbucket (#2828) asks for no secret: it reads the Bitbucket connection (#3785), as the
+// forgejo server does, and BITBUCKET_TOKEN (with BITBUCKET_EMAIL) only when the person names
+// it by hand. It declares the events its server raises: the gitlab server's.
+func TestBitbucketReadsItsConnection(t *testing.T) {
 	bitbucket, ok := OursByID("agents/bitbucket")
 	if !ok || bitbucket.Command != "bitbucket-mcp" || !bitbucket.Declares.Tools || bitbucket.Declares.Views ||
 		!reflect.DeepEqual(bitbucket.Declares.Events, bitbucketmcp.EventNames()) {
 		t.Fatalf("bitbucket: %+v %v, the server's %v", bitbucket, ok, bitbucketmcp.EventNames())
 	}
 	built := BuildOurs(bitbucket, func(string) bool { return false })
-	want := `{"command":"bitbucket-mcp","hosted":true,"env":{"BITBUCKET_TOKEN":"${BITBUCKET_TOKEN}","BITBUCKET_EMAIL":"${BITBUCKET_EMAIL}"}}`
+	want := `{"command":"bitbucket-mcp","hosted":true}`
 	if got := strings.Join(strings.Fields(built.Entry.Stringified()), ""); got != want {
 		t.Fatalf("entry: %s", got)
 	}
-	if built.NameHere != "bitbucket" || len(built.Variables) != 2 || !built.Variables[0].Required || built.Variables[1].Required {
+	if built.NameHere != "bitbucket" || len(built.Variables) != 0 {
 		t.Fatalf("built: %+v", built)
 	}
 }

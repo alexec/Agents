@@ -2359,7 +2359,7 @@ type ConnectionEmailRequest struct {
 	Password string `json:"password"`
 }
 
-// A tool the person connects to: GitHub (#1335) and Linear (#1343) with OAuth, GitLab (#1630) with OAuth on gitlab.com or a personal access token on any GitLab, email (#1780): one IMAP mailbox with an app password, Atlassian (#3304): one sign-in for Jira and Confluence, with OAuth on Atlassian Cloud or a token on one site, and Forgejo (#3752): an access token on Codeberg or any Forgejo or Gitea.
+// A tool the person connects to: GitHub (#1335) and Linear (#1343) with OAuth, GitLab (#1630) with OAuth on gitlab.com or a personal access token on any GitLab, email (#1780): one IMAP mailbox with an app password, Atlassian (#3304): one sign-in for Jira and Confluence, with OAuth on Atlassian Cloud or a token on one site, Forgejo (#3752): an access token on Codeberg or any Forgejo or Gitea, and Bitbucket (#3785): an Atlassian API token with its email, or an access token, on Bitbucket Cloud.
 type ConnectionProvider string
 
 const ConnectionProviderGithub ConnectionProvider = "github"
@@ -2368,6 +2368,7 @@ const ConnectionProviderGitlab ConnectionProvider = "gitlab"
 const ConnectionProviderEmail ConnectionProvider = "email"
 const ConnectionProviderAtlassian ConnectionProvider = "atlassian"
 const ConnectionProviderForgejo ConnectionProvider = "forgejo"
+const ConnectionProviderBitbucket ConnectionProvider = "bitbucket"
 
 type ConnectionProviderRequest struct {
 	Provider ConnectionProvider `json:"provider"`
@@ -2447,14 +2448,14 @@ type ConnectionTokenAnswer struct {
 	Error *string `json:"error,omitzero"`
 }
 
-// connections/sign-in/token (#1630, #3304, #3752): a personal access token the person made, for a provider with no Agents application there (a self-managed GitLab, a Jira site, any Forgejo or Gitea). The host checks it with the provider, keeps it in its own store, and never logs it or gives it back.
+// connections/sign-in/token (#1630, #3304, #3752, #3785): a personal access token the person made, for a provider with no Agents application there (a self-managed GitLab, a Jira site, any Forgejo or Gitea, Bitbucket Cloud). The host checks it with the provider, keeps it in its own store, and never logs it or gives it back.
 type ConnectionTokenRequest struct {
 	Provider ConnectionProvider `json:"provider"`
 
-	// The provider's address, such as gitlab.example.com, example.atlassian.net or git.example.com (https:// when it names no scheme). gitlab.com, or codeberg.org for Forgejo, when left out; a Jira site must be given.
+	// The provider's address, such as gitlab.example.com, example.atlassian.net or git.example.com (https:// when it names no scheme). gitlab.com, or codeberg.org for Forgejo, when left out; a Jira site must be given. Bitbucket takes none: it is Bitbucket Cloud's.
 	URL *string `json:"url,omitzero"`
 
-	// Atlassian only: the account's email, sent with a Jira Cloud API token. Left out for a Jira Data Center personal access token.
+	// Atlassian and Bitbucket: the account's email, sent with a Jira Cloud or Atlassian API token. Left out for a Jira Data Center personal access token or a Bitbucket access token.
 	User *string `json:"user,omitzero"`
 
 	Token string `json:"token"`
@@ -2537,20 +2538,20 @@ type ConnectorProof struct {
 	At *Date `json:"at,omitzero"`
 }
 
-// A folder's Connectors set-up (#1336): its GitHub, GitLab or Forgejo repository (#1632, #3752), the person's connection to that forge, four slots that each prove themselves with one read, and the events.
+// A folder's Connectors set-up (#1336): its GitHub, GitLab, Forgejo or Bitbucket repository (#1632, #3752, #3785), the person's connection to that forge, four slots that each prove themselves with one read, and the events.
 type ConnectorSetup struct {
 	Folder string `json:"folder"`
 
-	// owner/name on GitHub or Forgejo, or group/project on GitLab, from the folder's git remote (origin first). Absent with no GitHub, GitLab or Forgejo remote.
+	// owner/name on GitHub or Forgejo, workspace/name on Bitbucket, or group/project on GitLab, from the folder's git remote (origin first). Absent with no GitHub, GitLab, Forgejo or Bitbucket remote.
 	Repository *string `json:"repository,omitzero"`
 
-	// The forge the repository is on, which fills Tasks, Code review and CI: github, gitlab (#1632) or forgejo (#3752). Absent is github.
+	// The forge the repository is on, which fills Tasks, Code review and CI: github, gitlab (#1632), forgejo (#3752) or bitbucket (#3785). Absent is github.
 	Forge *ConnectionProvider `json:"forge,omitzero"`
 
-	// The repository's host, as the page says it before the repository: github.com, gitlab.com, codeberg.org, or a self-managed GitLab's or Forgejo's host.
+	// The repository's host, as the page says it before the repository: github.com, gitlab.com, codeberg.org, bitbucket.org, or a self-managed GitLab's or Forgejo's host.
 	Site *string `json:"site,omitzero"`
 
-	// The repository's page on its forge, where the person asks for access when a read is refused (GitLab, Forgejo).
+	// The repository's page on its forge, where the person asks for access when a read is refused (GitLab, Forgejo, Bitbucket).
 	RepositoryURL *string `json:"repositoryURL,omitzero"`
 
 	Connection *Connection `json:"connection,omitzero"`
@@ -2641,7 +2642,7 @@ const ConnectorSlotKindDocs ConnectorSlotKind = "docs"
 const ConnectorSlotKindMessaging ConnectorSlotKind = "messaging"
 const ConnectorSlotKindWorkspace ConnectorSlotKind = "workspace"
 
-// notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach the provider; message says why. refused: the provider refused the read, so the person grants it on the provider's site. noRemote: the folder has no GitHub, GitLab or Forgejo remote. skipped: the person skipped it; it counts as done.
+// notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach the provider; message says why. refused: the provider refused the read, so the person grants it on the provider's site. noRemote: the folder has no GitHub, GitLab, Forgejo or Bitbucket remote. skipped: the person skipped it; it counts as done.
 type ConnectorSlotState string
 
 const ConnectorSlotStateNotConnected ConnectorSlotState = "notConnected"

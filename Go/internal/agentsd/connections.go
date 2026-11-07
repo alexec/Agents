@@ -52,6 +52,11 @@ import (
 // Forgejo (#3752) has no device flow either: the person makes an access token on Codeberg or
 // any Forgejo or Gitea (connections/sign-in/token), and the host checks it with that Forgejo
 // and keeps it with its address. A Forgejo token does not end.
+//
+// Bitbucket (#3785) has no device flow: the person makes an Atlassian API token (with the
+// account's email) or a repository, project or workspace access token, and the host checks it
+// with Bitbucket Cloud (connections/sign-in/token) and keeps it. The token has no refresh: it
+// ends on the date the person gave it, and the bitbucket server then says to connect again.
 
 var (
 	// connectionWaitLimit is one long poll of connections/sign-in/wait.
@@ -77,6 +82,10 @@ type connectionBook struct {
 	gitlabHTTP *http.Client
 	// forgejoHTTP checks a Forgejo access token; a test gives a fake Forgejo's client.
 	forgejoHTTP *http.Client
+	// bitbucketHTTP checks a Bitbucket token, at bitbucketAPI (BITBUCKET_API_URL, else
+	// Bitbucket Cloud's); a test gives a fake Bitbucket's client and API.
+	bitbucketHTTP *http.Client
+	bitbucketAPI  string
 	// emailCheck signs in to an IMAP server once; emailmcp.Check when nil.
 	emailCheck func(context.Context, emailmcp.Account) error
 	// jiraHTTP reads a Jira site; a test gives a fake Jira's client.
@@ -171,7 +180,8 @@ func (d *Daemon) registerConnections() {
 
 func knownProvider(p wire.ConnectionProvider) bool {
 	return p == wire.ConnectionProviderGithub || p == wire.ConnectionProviderLinear || p == wire.ConnectionProviderGitlab ||
-		p == wire.ConnectionProviderEmail || p == wire.ConnectionProviderAtlassian || p == wire.ConnectionProviderForgejo
+		p == wire.ConnectionProviderEmail || p == wire.ConnectionProviderAtlassian || p == wire.ConnectionProviderForgejo ||
+		p == wire.ConnectionProviderBitbucket
 }
 
 // codeFlowProvider is a provider whose sign-in is the authorization code with PKCE.
@@ -294,6 +304,9 @@ func (d *Daemon) connectionSignIn(ctx context.Context, p wire.ConnectionProvider
 	}
 	if p == wire.ConnectionProviderForgejo {
 		return wire.ConnectionSignIn{}, invalid("Forgejo has no sign-in page: connect it with an access token.")
+	}
+	if p == wire.ConnectionProviderBitbucket {
+		return wire.ConnectionSignIn{}, invalid("Bitbucket has no sign-in page: connect it with an API token or an access token.")
 	}
 	if origin != "" {
 		o, err := connections.CleanOrigin(origin)
@@ -520,9 +533,11 @@ func (d *Daemon) connectionSignInToken(ctx context.Context, r wire.ConnectionTok
 		return d.connectionSignInJiraToken(ctx, r)
 	case wire.ConnectionProviderForgejo:
 		return d.connectionSignInForgejoToken(ctx, r)
+	case wire.ConnectionProviderBitbucket:
+		return d.connectionSignInBitbucketToken(ctx, r)
 	case wire.ConnectionProviderGitlab:
 	default:
-		return wire.ConnectionTokenAnswer{}, invalid("Agents takes an access token only for GitLab, Forgejo and Jira.")
+		return wire.ConnectionTokenAnswer{}, invalid("Agents takes an access token only for GitLab, Forgejo, Bitbucket and Jira.")
 	}
 	fail := func(why string) (wire.ConnectionTokenAnswer, error) {
 		log.Printf("connections: %s token not taken", r.Provider)
@@ -598,6 +613,56 @@ func (d *Daemon) connectionSignInForgejoToken(ctx context.Context, r wire.Connec
 	log.Printf("connections: %s connected with a token", r.Provider)
 	w := wireConnection(c)
 	return wire.ConnectionTokenAnswer{Connection: &w}, nil
+}
+
+// connectionSignInBitbucketToken checks a token with Bitbucket Cloud and keeps it: with the
+// account's email (r.User), an Atlassian API token; without, an access token. The token is in
+// no log and no answer; a failure says what failed, in words.
+func (d *Daemon) connectionSignInBitbucketToken(ctx context.Context, r wire.ConnectionTokenRequest) (wire.ConnectionTokenAnswer, error) {
+	fail := func(why string) (wire.ConnectionTokenAnswer, error) {
+		log.Printf("connections: %s token not taken", r.Provider)
+		return wire.ConnectionTokenAnswer{Error: &why}, nil
+	}
+	token, email := strings.TrimSpace(r.Token), strings.TrimSpace(deref(r.User))
+	if token == "" || strings.ContainsAny(token, " \t\r\n") {
+		return fail("Paste the token: one word.")
+	}
+	if strings.ContainsAny(email, " \t\r\n:") || (email != "" && !strings.Contains(email, "@")) {
+		return fail("Give the Atlassian account's email, or leave it empty for an access token.")
+	}
+	api, err := d.bitbucketRoot()
+	if err != nil {
+		return fail(sentence(err.Error()))
+	}
+	s, err := d.connectionStore()
+	if err != nil {
+		return wire.ConnectionTokenAnswer{}, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	login, err := connections.CheckBitbucketToken(ctx, d.bitbucketHTTP, api, email, token)
+	if err != nil {
+		return fail(sentence(err.Error()))
+	}
+	c := connections.BitbucketConnection(api, email, token, login, time.Now())
+	d.connRenew.Lock()
+	err = s.Put(c)
+	d.connRenew.Unlock()
+	if err != nil {
+		return fail(sentence(err.Error()))
+	}
+	log.Printf("connections: %s connected with a token", r.Provider)
+	w := wireConnection(c)
+	return wire.ConnectionTokenAnswer{Connection: &w}, nil
+}
+
+// bitbucketRoot is the Bitbucket API this host checks and reads: Bitbucket Cloud's, or
+// BITBUCKET_API_URL (a fake in tests and walks, as the bitbucket server takes it).
+func (d *Daemon) bitbucketRoot() (string, error) {
+	if d.bitbucketAPI != "" {
+		return connections.BitbucketRoot(d.bitbucketAPI)
+	}
+	return connections.BitbucketRoot(os.Getenv("BITBUCKET_API_URL"))
 }
 
 // connectionSignInJiraToken checks a token with the Jira site at r.URL and keeps it: with the

@@ -123,6 +123,8 @@ struct ConnectorSetupView: View {
                 ConnectGitLabSheet(host: folder.host, onConnected: { Task { await load(.fresh) } })
             } else if setup?.forgeOrGitHub == .forgejo {
                 ConnectForgejoSheet(host: folder.host, onConnected: { Task { await load(.fresh) } })
+            } else if setup?.forgeOrGitHub == .bitbucket {
+                ConnectBitbucketSheet(host: folder.host, onConnected: { Task { await load(.fresh) } })
             } else {
                 ConnectGitHubSheet(host: folder.host, folder: folder, onConnected: { Task { await load(.fresh) } })
             }

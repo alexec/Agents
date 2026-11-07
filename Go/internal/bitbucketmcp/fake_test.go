@@ -35,9 +35,9 @@ type fakeBitbucket struct {
 	activity      map[int][]obj // pull request → its activity, newest first
 	diffstat      map[int][]obj
 	prComments    map[int][]obj
-	statuses      map[string][]obj // commit → its statuses
-	pipelines     map[int]obj      // Pipelines build number → its run
-	steps         map[int][]obj    // Pipelines build number → its steps
+	statuses      map[string][]obj  // commit → its statuses
+	pipelines     map[int]obj       // Pipelines build number → its run
+	steps         map[int][]obj     // Pipelines build number → its steps
 	logs          map[string]string // step uuid → its log, served from storage
 	ranges        []string          // the Range of each log read from storage
 	issues        []obj
@@ -52,9 +52,11 @@ type fakeBitbucket struct {
 	// noTracker answers 404 to every issue path, as for a repository with its tracker off.
 	noTracker bool
 	// email is the email a Basic login must give; "" wants a Bearer token.
-	email  string
-	status int // answer every request with this, when set
-	server *httptest.Server
+	email string
+	// branches is each branch's head commit, for refs/branches; the repository's main branch is main.
+	branches map[string]string
+	status   int // answer every request with this, when set
+	server   *httptest.Server
 	// storage is where a step's log redirects to, as Bitbucket's goes to its file store.
 	storage *httptest.Server
 }
@@ -64,6 +66,7 @@ func newFake(t *testing.T) *fakeBitbucket {
 		issueComments: map[int][]obj{}, changes: map[int][]obj{},
 		perms: map[string]string{"a-alex": "admin", "a-dev": "write", "a-reader": "read"}, members: map[string]bool{}, me: alex}
 	f.pipelines, f.steps, f.logs = map[int]obj{}, map[int][]obj{}, map[string]string{}
+	f.branches = map[string]string{}
 	f.server = httptest.NewServer(http.HandlerFunc(f.serve))
 	t.Cleanup(f.server.Close)
 	f.storage = httptest.NewServer(http.HandlerFunc(f.serveLog))
@@ -156,6 +159,7 @@ var (
 	pipelinesPath     = regexp.MustCompile(`^` + root + `/pipelines/$`)
 	pipelinePath      = regexp.MustCompile(`^` + root + `/pipelines/([0-9]+)$`)
 	stepsPath         = regexp.MustCompile(`^` + root + `/pipelines/([0-9]+)/steps$`)
+	branchPath        = regexp.MustCompile(`^` + root + `/refs/branches/([^/]+)$`)
 	logPath           = regexp.MustCompile(`^` + root + `/pipelines/([0-9]+)/steps/(\{[^/]+\})/log$`)
 	permPath          = regexp.MustCompile(`^` + root + `/permissions-config/users/([^/]+)$`)
 	memberPath        = regexp.MustCompile(`^/workspaces/acme/members/([^/]+)$`)
@@ -242,6 +246,15 @@ func (f *fakeBitbucket) serve(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case p == "/user":
 		reply(f.me)
+	case p == root:
+		reply(obj{"full_name": repo, "has_issues": !f.noTracker, "mainbranch": obj{"name": "main"},
+			"links": obj{"html": obj{"href": "https://bitbucket.org/" + repo}}})
+	case branchPath.MatchString(p):
+		if hash, ok := f.branches[branchPath.FindStringSubmatch(p)[1]]; ok {
+			reply(obj{"name": branchPath.FindStringSubmatch(p)[1], "target": obj{"hash": hash}})
+			return
+		}
+		notFound()
 	case pullsPath.MatchString(p):
 		out := []obj{}
 		for _, pr := range f.pulls {

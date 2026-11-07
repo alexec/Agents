@@ -29,7 +29,7 @@ public enum ConnectorSetupWords {
 
     /// The page's line under its title.
     public static func intro(folder: String, repository: String?, site: String = "github.com") -> String {
-        guard let repository else { return "What agents in \(folder) can reach. It has no GitHub, GitLab or Forgejo remote." }
+        guard let repository else { return "What agents in \(folder) can reach. It has no GitHub, GitLab, Forgejo or Bitbucket remote." }
         return "What agents in \(folder) can reach. Repository \(site)/\(repository), from its git remote."
     }
 
@@ -38,20 +38,21 @@ public enum ConnectorSetupWords {
         c.state == .signInAgain ? "\(name(c.provider)) asks you to sign in again" : "Connected to \(name(c.provider)) as \(c.login ?? "you")"
     }
 
-    // MARK: The forge (#1632, #3752): GitHub, GitLab or Forgejo fills Tasks, Code review and CI
+    // MARK: The forge (#1632, #3752, #3785): GitHub, GitLab, Forgejo or Bitbucket fills Tasks, Code review and CI
 
     /// The card's title before the forge is connected.
     public static func connectTitle(_ forge: DaemonAPI.ConnectionProvider) -> String {
         switch forge {
         case .gitlab: "Connect GitLab once: issues, merge requests and pipelines."
         case .forgejo: Forgejo.connectTitle
+        case .bitbucket: Bitbucket.connectTitle
         default: connectTitle
         }
     }
 
     public static func connectNote(_ forge: DaemonAPI.ConnectionProvider) -> String {
         switch forge {
-        case .gitlab, .forgejo: "Your connection, for every folder. It reaches what your \(name(forge)) account can see."
+        case .gitlab, .forgejo, .bitbucket: "Your connection, for every folder. It reaches what your \(name(forge)) account can see."
         default: connectNote
         }
     }
@@ -71,10 +72,10 @@ public enum ConnectorSetupWords {
     }
 
     /// A slot's state in a word, for no remote.
-    public static let noRemote = "No GitHub, GitLab or Forgejo remote"
+    public static let noRemote = "No GitHub, GitLab, Forgejo or Bitbucket remote"
 
-    /// The button on a refused slot: GitHub's App is granted on github.com; on GitLab and
-    /// Forgejo the person asks for access to the repository there.
+    /// The button on a refused slot: GitHub's App is granted on github.com; on GitLab, Forgejo
+    /// and Bitbucket the person asks for access to the repository there.
     public static func grantButton(_ setup: Setup) -> String {
         setup.forgeOrGitHub == .github ? "Grant on github.com" : "Open on \(setup.siteOrGitHub)"
     }
@@ -124,7 +125,7 @@ public enum ConnectorSetupWords {
     public static func line(_ slot: Slot, folder: String, repository: String?,
                             forge: DaemonAPI.ConnectionProvider = .github) -> String {
         let repo = repository ?? folder
-        let gitlab = forge == .gitlab, forgejo = forge == .forgejo
+        let gitlab = forge == .gitlab, checks = forge == .forgejo || forge == .bitbucket
         switch slot.state {
         case .skipped:
             return switch slot.slot {
@@ -137,7 +138,7 @@ public enum ConnectorSetupWords {
             case .workspace: "Agents run on this Mac."
             }
         case .noRemote:
-            return "\(folder) has no GitHub, GitLab or Forgejo remote, so \(slot.choice) can't be read for it."
+            return "\(folder) has no GitHub, GitLab, Forgejo or Bitbucket remote, so \(slot.choice) can't be read for it."
         case .failed, .refused:
             return slot.message ?? "The read didn't work."
         case .notRead:
@@ -151,7 +152,7 @@ public enum ConnectorSetupWords {
             case .tasks: "No issues yet in \(repo)."
             case .codeReview: gitlab ? "No merge requests yet in \(repo)." : "No pull requests yet in \(repo)."
             case .ci: gitlab ? "No pipelines yet in \(repo)."
-                : forgejo ? "No checks yet on \(repo)'s default branch." : "No workflow runs yet in \(repo)."
+                : checks ? "No checks yet on \(repo)'s default branch." : "No workflow runs yet in \(repo)."
             case .docs, .messaging, .workspace: ""
             }
         case .notConnected:
@@ -312,7 +313,7 @@ public enum ConnectorSetupWords {
 
     // MARK: Connectors ▸ Connections
 
-    public static let noConnections = "No connections yet. Connect GitHub to give agents issues, pull requests and Actions in every folder, Linear or Jira for their issues, GitLab for merge requests, pipelines and issues, Forgejo for pull requests, checks and issues on Codeberg or your own Forgejo or Gitea, and Email for the mail they wait for."
+    public static let noConnections = "No connections yet. Connect GitHub to give agents issues, pull requests and Actions in every folder, Linear or Jira for their issues, GitLab for merge requests, pipelines and issues, Forgejo for pull requests, checks and issues on Codeberg or your own Forgejo or Gitea, Bitbucket for the same on Bitbucket Cloud, and Email for the mail they wait for."
 
     /// The provider's name: GitHub, Linear.
     public static func name(_ p: DaemonAPI.ConnectionProvider) -> String {
@@ -323,6 +324,7 @@ public enum ConnectorSetupWords {
         case .email: Email.name
         case .atlassian: Jira.provider
         case .forgejo: Forgejo.name
+        case .bitbucket: Bitbucket.name
         }
     }
 
@@ -340,6 +342,7 @@ public enum ConnectorSetupWords {
         case .email: Email.letters
         case .atlassian: Jira.letters
         case .forgejo: Forgejo.letters
+        case .bitbucket: Bitbucket.letters
         }
     }
 
@@ -355,7 +358,7 @@ public enum ConnectorSetupWords {
                 : "The access token ended: connect again with a new one"
         }
         let how = c.expiresAt.map { "Access token \u{00B7} " + tokenEnds($0, now: now) }
-            ?? (c.provider == .forgejo ? Forgejo.how : c.byToken == true ? Jira.tokenWay : "OAuth \u{00B7} renews by itself")
+            ?? (c.provider == .forgejo ? Forgejo.how : c.provider == .bitbucket ? Bitbucket.how : c.byToken == true ? Jira.tokenWay : "OAuth \u{00B7} renews by itself")
         return [c.workspace, how].compactMap { $0 }.joined(separator: " \u{00B7} ")
     }
 
@@ -401,6 +404,7 @@ public enum ConnectorSetupWords {
         case .email: Email.notConnectedNote
         case .atlassian: Jira.notConnectedNote
         case .forgejo: Forgejo.notConnectedNote
+        case .bitbucket: Bitbucket.notConnectedNote
         }
     }
 
@@ -414,16 +418,17 @@ public enum ConnectorSetupWords {
         case .email: Email.disconnectNote
         case .atlassian: Jira.disconnectNote
         case .forgejo: Forgejo.disconnectNote
+        case .bitbucket: Bitbucket.disconnectNote
         }
     }
 
     /// Disconnect's message: which folders lose which slots, before it goes, then the note.
     /// Only a folder on that connection's forge loses anything (#1868): GitHub fills a GitHub
-    /// folder's slots, GitLab a GitLab folder's (#1632) and Forgejo a Forgejo folder's (#3752);
-    /// other connections fill none.
+    /// folder's slots, GitLab a GitLab folder's (#1632), Forgejo a Forgejo folder's (#3752) and
+    /// Bitbucket a Bitbucket folder's (#3785); other connections fill none.
     public static func disconnectMessage(_ p: DaemonAPI.ConnectionProvider,
                                          folders: [(name: String, setup: Setup)]) -> String {
-        guard p == .github || p == .gitlab || p == .forgejo else { return disconnectNote(p) }
+        guard p == .github || p == .gitlab || p == .forgejo || p == .bitbucket else { return disconnectNote(p) }
         let losing = folders.compactMap { folder -> String? in
             guard folder.setup.forgeOrGitHub == p else { return nil }
             let slots = folder.setup.slots.filter { $0.slot.isProjects && $0.state == .read }.map { heading($0.slot) }
@@ -539,6 +544,37 @@ public enum ConnectorSetupWords {
         }
     }
 
+    /// Connect Bitbucket (#3785): a token on Bitbucket Cloud, as the bitbucket server takes it:
+    /// an Atlassian API token with its account's email, or a repository, project or workspace
+    /// access token with no email. Bitbucket has no device page, so the sheet has one way in.
+    public enum Bitbucket {
+        public static let name = "Bitbucket"
+        public static let letters = "BB"
+        public static let title = "Connect Bitbucket"
+        public static let connectTitle = "Connect Bitbucket once: issues, pull requests and checks."
+        public static let notConnectedNote = "Pull requests, checks and issues on Bitbucket Cloud."
+        public static let subtitle = "For you, in every folder. Agents talks to Bitbucket Cloud's API directly."
+        public static let abilities = [
+            "Read and write pull requests and their comments",
+            "Read checks (Pipelines and other commit statuses)",
+            "Read and write issues",
+        ]
+        public static let tokenIntro = "Make an Atlassian API token with the Bitbucket scopes and give its account's email. Or paste a repository, project or workspace access token, and leave the email empty."
+        public static let emailLabel = "Atlassian email"
+        public static let emailPrompt = "Empty for an access token"
+        public static let tokenLabel = "Token"
+        public static let tokenPrompt = "Paste the token"
+        public static let tokenButton = "Connect"
+        public static let newTokenButton = "Make an API Token on Atlassian"
+        /// Where the person makes an Atlassian API token.
+        public static let newTokenURL = "https://id.atlassian.com/manage-profile/security/api-tokens"
+        public static let checking = "Checking the token with Bitbucket\u{2026}"
+        public static let choose = "An API token ends on the date you gave it. You can take it back at id.atlassian.com \u{25B8} Security \u{25B8} API tokens (an access token in the repository's settings), or with Disconnect on Connectors."
+        /// The connection's note after its host: how it signs in.
+        public static let how = "Token"
+        public static let disconnectNote = "Disconnect deletes the machine's token. Every folder's Bitbucket slots wait for a connection again. Bitbucket's events stop until you connect again or set BITBUCKET_TOKEN. To revoke it too, go to id.atlassian.com \u{25B8} Security \u{25B8} API tokens, or the repository's Access tokens."
+    }
+
     /// Connect Jira (#3304): one Atlassian sign-in for Jira and Confluence (#3248), by Atlassian
     /// Cloud's page, or a token on one Jira site (Jira Data Center, or Cloud without the sign-in).
     /// The connection is Atlassian's; the sheet and the Tasks slot say Jira.
@@ -630,6 +666,7 @@ public enum ConnectorSetupWords {
         case .email: Email.subtitle
         case .atlassian: Jira.subtitle
         case .forgejo: Forgejo.subtitle
+        case .bitbucket: Bitbucket.subtitle
         }
     }
 
@@ -641,6 +678,7 @@ public enum ConnectorSetupWords {
         case .email: Email.abilities
         case .atlassian: Jira.abilities
         case .forgejo: Forgejo.abilities
+        case .bitbucket: Bitbucket.abilities
         }
     }
 
@@ -652,6 +690,7 @@ public enum ConnectorSetupWords {
         case .email: Email.choose
         case .atlassian: Jira.choose
         case .forgejo: Forgejo.choose
+        case .bitbucket: Bitbucket.choose
         }
     }
 
@@ -663,6 +702,7 @@ public enum ConnectorSetupWords {
         case .email: Email.button
         case .atlassian: Jira.continueButton
         case .forgejo: Forgejo.tokenButton
+        case .bitbucket: Bitbucket.tokenButton
         }
     }
 
@@ -675,8 +715,8 @@ public enum ConnectorSetupWords {
         // Email has no device page: the sheet never shows this.
         case .email: ""
         case .atlassian: Jira.site
-        // Forgejo has no device page either.
-        case .forgejo: ""
+        // Forgejo and Bitbucket have no device page either.
+        case .forgejo, .bitbucket: ""
         }
     }
 
