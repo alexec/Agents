@@ -11,3 +11,7 @@ func StandardRoot(home string) string { return filepath.Join(home, ".local", "sh
 func folders(root, home string, env func(string) string) Locations {
 	return platformFolders(root, home, env)
 }
+
+func rootsFolders(home string, env func(string) string) [2]string {
+	return platformRootsFolders(home, env)
+}

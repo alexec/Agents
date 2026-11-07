@@ -93,3 +93,41 @@ func TestPrepareSaysThereIsNoGH(t *testing.T) {
 		t.Errorf("%v", err)
 	}
 }
+
+// A deleted codespace's block goes, and every other line stays (#3746).
+func TestRemoveTakesOutOnlyItsBlock(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config")
+	if err := os.WriteFile(path, []byte("Host mine\n  User me\n"), 0o640); err != nil {
+		t.Fatal(err)
+	}
+	for _, label := range []string{"", "first", "second"} {
+		if err := Merge(path, label, []byte("Host cs."+label+".main\n  User codespace")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if removed, err := Remove(path, "first"); err != nil || !removed {
+		t.Fatalf("%v %v", removed, err)
+	}
+	data, _ := os.ReadFile(path)
+	text := string(data)
+	if strings.Contains(text, "cs.first.main") || strings.Contains(text, Begin("first")) || strings.Contains(text, "\n\n\n") {
+		t.Errorf("first's block is still here:\n%s", text)
+	}
+	if !strings.HasPrefix(text, "Host mine\n  User me\n") || !Has(path, "", "cs..main") || !Has(path, "second", "cs.second.main") {
+		t.Errorf("another block went:\n%s", text)
+	}
+	if info, _ := os.Stat(path); info.Mode().Perm() != 0o640 {
+		t.Errorf("mode %v", info.Mode())
+	}
+	if removed, err := Remove(path, "first"); err != nil || removed {
+		t.Fatalf("again: %v %v", removed, err)
+	}
+	if removed, err := Remove(filepath.Join(t.TempDir(), "none"), "first"); err != nil || removed {
+		t.Fatalf("no file: %v %v", removed, err)
+	}
+	Remove(path, "")
+	Remove(path, "second")
+	if data, _ := os.ReadFile(path); string(data) != "Host mine\n  User me\n" {
+		t.Errorf("the person's lines changed: %q", data)
+	}
+}

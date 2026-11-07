@@ -101,7 +101,7 @@ Mac.
 | The Mac browser pane's website data (WebKit's default store) | The sign-ins of every site the pane opened, and its caches | Sign-ins until the site ends them. The caches are emptied once each time the app starts (#3727). | At the first pane of each launch |
 | `catalog-staging/`, in the cache folder | Skill previews | 8 previews, 30 minutes; folders left by a restart go at the next start (#3649) | On use; at start |
 | `option-cache.json`, in the cache folder | Runtime options | 50 | On write |
-| Cache and log folders of each other data folder (`roots/<name>-<hash>`) | As above, for a second copy | **None.** Not removed when that data folder is deleted. | Never |
+| Cache and log folders of each other data folder (`roots/<name>-<hash>`) | As above, for a second copy | Removed when that data folder is gone (#3746). Each keeps its data folder's path in `root-path`; a folder made before that is kept, and so is one whose data folder's parent is gone too, as on a disk that is not attached. | Hourly, by a machine whose data folder is not a temporary one |
 | Terminal scrollback | What a terminal showed | In memory only, 4 MiB a terminal | On write |
 
 ### `~/.agents` and `~/.agents-secrets`
@@ -141,7 +141,7 @@ Agents starts these tools. It does not own what they keep.
 | `~/.claude/history.jsonl`, Codex's history and indexes | Each runtime's own history | **Not erased** |
 | Docker images and named volumes | What Docker workspaces pulled and kept | **Delete Machine** removes the workspace's container, its volumes and its image, when no other container uses them (#3728). Docker keeps an image with a second tag or a child image. |
 | DigitalOcean, Codespaces, EC2 and GCP machines | Cloud machines | **No limit in count or time, and no stop when idle.** Only **Delete Machine** removes one. |
-| `~/.ssh/config` | A block for each codespace | **Never removed** |
+| `~/.ssh/config` (or `AGENTS_SSH_CONFIG`) | A block for each codespace | A codespace's block goes when **Delete Machine** deletes it (#3746). A codespace deleted outside Agents keeps its block. The one block that agentsd keeps for all codespaces is written again each time it prepares ssh. |
 | `/tmp/agents-tunnels-<uid>-<pid>` | ssh control sockets | Removed at a clean stop; one whose process is gone goes when a control plane's tunnels start (#3649) |
 | `$TMPDIR/agents-output-*` | Output that the Mac window opened in TextEdit | **None**; macOS clears its temporary folder |
 
