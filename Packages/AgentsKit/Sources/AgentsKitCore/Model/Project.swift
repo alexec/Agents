@@ -33,7 +33,7 @@ public extension DaemonAPI {
     }
 
     /// One board in a project's Tasks slot (#3282): a GitHub Projects board, a Jira board, a
-    /// Linear team or a GitLab group board, by its address and a name (the team's). A client
+    /// Linear team, a GitLab group board or an Azure Boards board (#3816), by its address and a name (the team's). A client
     /// sends the name and the address; the control plane reads the rest from the address.
     struct ProjectBoard: Codable, Sendable, Hashable, Identifiable {
         public var name: String
@@ -42,7 +42,7 @@ public extension DaemonAPI {
         public var url: String
         public var forge: ConnectionProvider?
         /// The board on its forge: `<owner>/<number>`, a Jira board id, a Linear team key,
-        /// `<group>#<id>`.
+        /// `<group>#<id>`, `<org>/<project>/<team>`.
         public var key: String?
         public var site: String?
 
@@ -291,7 +291,7 @@ public enum ProjectWords {
 /// web page's are in `Web/src/model/projects.ts`).
 public enum ProjectBoardWords {
     public static let heading = "Boards"
-    public static let note = "A board is a GitHub Projects board, a Jira board, a Linear team or a GitLab group board. "
+    public static let note = "A board is a GitHub Projects board, a Jira board, a Linear team, a GitLab group board or an Azure Boards board. "
         + "Work ▸ Issues and Features can show one board."
     public static let none = "No boards. Work shows every issue of the project."
     public static let onlyOwner = "Only the project's owner or an admin can change its boards."
@@ -306,6 +306,7 @@ public enum ProjectBoardWords {
         case .atlassian: "Jira"
         case .linear: "Linear team"
         case .gitlab: "GitLab"
+        case .azuredevops: "Azure Boards"
         default: ""
         }
     }

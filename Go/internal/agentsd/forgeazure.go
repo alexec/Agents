@@ -3,6 +3,7 @@ package agentsd
 import (
 	"context"
 	"errors"
+	"net/url"
 	"regexp"
 	"slices"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/azureboardsmcp"
+	"github.com/alexec/agents/Go/internal/azuredevopsmcp"
 	"github.com/alexec/agents/Go/internal/connections"
 	"github.com/alexec/agents/Go/internal/lineage"
 	"github.com/alexec/agents/Go/wire"
@@ -38,6 +40,7 @@ type forgeAzureBoards interface {
 	AddChild(ctx context.Context, project string, parent int, title string, labels []string, level string) (int, string, error)
 	SetParent(ctx context.Context, project string, id, parent int) error
 	SetBlockedBy(ctx context.Context, project string, id, blocker int, blocked bool) error
+	TeamAreas(ctx context.Context, project, team string) ([]azureboardsmcp.Area, error)
 }
 
 var (
@@ -106,16 +109,32 @@ func (d *Daemon) boardsFolder(project string) string {
 	return ""
 }
 
-// forgeAzureBoards is Azure Boards as the azuredevops connector's sign-in on this host (its
-// secrets), else the Azure DevOps connection (#3802), or why there is none.
-func (d *Daemon) forgeAzureBoards() (forgeAzureBoards, error) {
+// azureBoardsSignIn is the azuredevops connector's sign-in on this host (its secrets), else the
+// Azure DevOps connection's (#3802): its token, "" for none, and the Azure DevOps it is for.
+func (d *Daemon) azureBoardsSignIn() (token, base string) {
 	secrets := d.secrets()
-	token, base := secrets["AZURE_DEVOPS_TOKEN"], secrets["AZURE_DEVOPS_URL"]
+	token, base = secrets["AZURE_DEVOPS_TOKEN"], secrets["AZURE_DEVOPS_URL"]
 	if token == "" {
 		if c, ok := d.storedConnection(connections.AzureDevOps); ok && c.Usable(time.Now()) {
 			token, base = c.Access, c.URL
 		}
 	}
+	return token, base
+}
+
+// azureBoardsSite is the host of the Azure DevOps the sign-in is for: dev.azure.com by default.
+func (d *Daemon) azureBoardsSite() string {
+	_, base := d.azureBoardsSignIn()
+	if u, err := url.Parse(azuredevopsmcp.BaseURL(base)); err == nil && u.Host != "" {
+		return strings.ToLower(u.Host)
+	}
+	return "dev.azure.com"
+}
+
+// forgeAzureBoards is Azure Boards as the azuredevops connector's sign-in on this host (its
+// secrets), else the Azure DevOps connection (#3802), or why there is none.
+func (d *Daemon) forgeAzureBoards() (forgeAzureBoards, error) {
+	token, base := d.azureBoardsSignIn()
 	if token == "" {
 		return nil, errors.New("Azure DevOps is not connected: connect Azure DevOps in Connectors, with a personal access token with Work Items (read and write)")
 	}
@@ -141,10 +160,18 @@ func boardsItemOf(i azureboardsmcp.Item, folder string) wire.ForgeItem {
 	return out
 }
 
-// boardsPage is a page of the work items of projects for a list.
-func (d *Daemon) boardsPage(ctx context.Context, sources forgeSources, f azureboardsmcp.SearchFilter, after string, limit int) forgePage {
+// boardsPage is a page of the work items of projects for a list; with an Azure Boards board,
+// of the team's area paths (#3816), on the Azure DevOps the board is on.
+func (d *Daemon) boardsPage(ctx context.Context, sources forgeSources, board *forgeBoard, f azureboardsmcp.SearchFilter, after string, limit int) forgePage {
 	p := forgePage{forge: "azureboards"}
 	b, err := d.forgeAzureBoards()
+	if err == nil && board != nil && board.azureTeam != "" {
+		if site := d.azureBoardsSite(); !strings.EqualFold(site, board.azureSite) {
+			err = errors.New("Azure DevOps is connected at " + site + ", and the board is on " + board.azureSite)
+		} else {
+			f.Areas, err = b.TeamAreas(ctx, board.azureProject, board.azureTeam)
+		}
+	}
 	if err == nil {
 		var page azureboardsmcp.SearchPage
 		page, err = b.Search(ctx, sources.boards, f, after, limit)

@@ -327,7 +327,7 @@ func (d *Daemon) forgeList(ctx context.Context, prs bool, r wire.ForgeListReques
 		pages = append(pages, p)
 	}
 	if len(sources.boards) > 0 && !slices.Contains(cursor.Done, "azureboards") {
-		pages = append(pages, d.boardsPage(ctx, sources, azureboardsmcp.SearchFilter{State: state, Label: deref(r.Label),
+		pages = append(pages, d.boardsPage(ctx, sources, board, azureboardsmcp.SearchFilter{State: state, Label: deref(r.Label),
 			Assignee: deref(r.Assignee), Query: deref(r.Query), Feature: deref(r.Feature)}, cursor.Boards, limit))
 	}
 	var more bool
