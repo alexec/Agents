@@ -37,15 +37,19 @@ service's own ssh. Machines join with a code or their join command, from the web
 - At least one way to sign up. Each uses `https://<your domain>/signin/callback` as its
   return address:
   - **GitHub:** the GitHub App's client secret, with that address in the App's callback URLs.
+    For open sign-up, give the App the **Email addresses** account permission (read-only),
+    so the service can read the verified primary email.
   - **Apple:** in the Apple Developer account, a Services ID with Sign in with Apple turned
     on, your domain, and that return address; and a key with Sign in with Apple, its key id,
     and its `.p8` file. The Services ID must be in the same team as the app, so a person has
     the same Apple id here and in the app.
   - **Google:** in Google Cloud ▸ APIs & Services ▸ Credentials, an OAuth client of the
-    **Web application** kind, with that return address. Its consent screen asks for no
-    scope beyond `openid`.
+    **Web application** kind, with that return address. Its consent screen asks for the
+    `openid` and `email` scopes.
 
-  The service asks each provider only who the person is: no email address and no name.
+  The service asks each provider who the person is and the email address the provider
+  verified, never a name. It keeps only a keyed hash of the email (its mark), so that one
+  email has one account, and never the address.
 
 ## Start it
 
@@ -164,9 +168,8 @@ again later to see if their account is ready.
 These limits keep the service whole. Each is a setting below:
 
 - A GitHub account younger than 30 days waits, unless its login is allowed.
-- Apple and Google have no account age and no login to allow: they sign up only with an
-  invite, also when `AGENTS_HOSTED_SIGNUP` is `open`. The open sign-up spike (#3387) decides
-  what checks them instead.
+- Apple and Google have no account age and no login to allow: with sign-up by invitation,
+  they sign up only with an invite.
 - 3 new accounts or waitlist entries an hour from one address, and 30 an hour in all. A
   person who has an account signs in whatever the rate.
 - At most 100 accounts. At the cap, even an invited person waits, at the front.
@@ -281,6 +284,28 @@ An account that was deleted comes back whole, unless the person has signed up ag
 then delete the new account first. Its control key is sealed with the service's KMS key, so a
 backup restores only with the same key.
 
+### Open sign-up
+
+Set `AGENTS_HOSTED_SIGNUP=open` and anyone with Apple, Google or GitHub can sign up with
+no invite (#3388, decided in #3387). The limits above still hold: the rates, the cap and
+the waitlist, GitHub's account age, and the blocks. Open sign-up also checks these:
+
+- **A verified email.** Google must say `email_verified`. Apple must give an email; Apple
+  gives only verified ones, and a private relay address is accepted. GitHub must have a
+  verified primary email, which needs the App's **Email addresses** permission. A person
+  with none is refused, with a line that says why, and does not go on the waitlist. An
+  invite or an allowed login needs no email.
+- **One account per email.** A second sign-in, from another provider, with the same
+  verified email gets the account that email has. Deleting the account frees the email.
+- **Blocks by email.** `admin block` also blocks the email of the account it blocks, and
+  `admin block <email>` blocks an email from every provider.
+- **Cloudflare Turnstile** on the sign-up page, when `AGENTS_HOSTED_TURNSTILE_SITE_KEY` and
+  `AGENTS_HOSTED_TURNSTILE_SECRET` are set. The page's buttons are one form with
+  Turnstile's widget, and the service sends a browser to the provider only after Cloudflare
+  says the check passed. With no keys there is no Turnstile, so a self-hosted or local
+  copy needs no Cloudflare. Make the widget in the Cloudflare dashboard ▸ Turnstile, for
+  your domain, in **Managed** mode.
+
 ## Suspend or block an account
 
 Run these on the service's machine. A running service sees each change within a minute.
@@ -290,8 +315,8 @@ Run these on the service's machine. A running service sees each change within a 
 | `agents-hosted admin accounts` | Lists every account, its sign-in (`apple:…`, `google:…` or `github:<id>`), GitHub login, plan and state |
 | `agents-hosted admin suspend <account> <why>` | Stops its control plane, which then refuses every request. Its records are kept. The person reads why on their account page, and can delete the account |
 | `agents-hosted admin unsuspend <account>` | Lets it start again |
-| `agents-hosted admin block <sign-in> [why]` | Refuses that sign-in, and suspends its account. Give `provider:subject` as `accounts` and `waitlist` list it, a GitHub id, or a GitHub login |
-| `agents-hosted admin unblock <sign-in>` | Lets it sign up again: `provider:subject` or a GitHub id |
+| `agents-hosted admin block <sign-in> [why]` | Refuses that sign-in and its account's email, and suspends its account. Give `provider:subject` as `accounts` and `waitlist` list it, a GitHub id, or a GitHub login; or give an email, to refuse it from every provider |
+| `agents-hosted admin unblock <sign-in>` | Lets it sign up again: `provider:subject`, a GitHub id, or an email |
 | `agents-hosted admin plan <account> free\|pro` | Puts an account on a plan by hand |
 | `agents-hosted admin delete <account>` | Deletes a suspended account and everything it keeps |
 | `agents-hosted admin backup [--keep N] <dir> [account…]` | Copies accounts' records into a folder, and keeps the newest N backups (7 by default) |
@@ -328,7 +353,7 @@ pass. They answer only from loopback and `AGENTS_HOSTED_METRICS_FROM`. In
 | `agents_hosted_waitlist` | People on the waitlist |
 | `agents_hosted_copies_running` | Control planes running now |
 | `agents_hosted_signups_total{kind}` | New accounts (`account`) and waitlist entries (`waitlist`) |
-| `agents_hosted_refusals_total{kind}` | Refusals: `blocked`, `closed`, `rate`, `waitlist_full`, `store`, `full`, `suspended`, `certificates`, `upgrade_full`, `disk`, and each plan limit (`machines`, `clients`, `storage`, `connections`) |
+| `agents_hosted_refusals_total{kind}` | Refusals: `blocked`, `closed`, `no_email`, `turnstile`, `rate`, `waitlist_full`, `store`, `full`, `suspended`, `certificates`, `upgrade_full`, `disk`, and each plan limit (`machines`, `clients`, `storage`, `connections`) |
 | `agents_hosted_certificates_allowed_total` | New names allowed a certificate |
 | `agents_hosted_disk_bytes{kind}` | The store's disk: `total` and `free` (a file store only) |
 | `agents_hosted_disk_high_water_bytes` | Used bytes past which accounts' writes are refused: 90% of the disk |
@@ -369,7 +394,9 @@ one line per event, and never a code, a key, a token or an email address.
 | `AGENTS_HOSTED_GOOGLE_CLIENT_ID` | Google's OAuth client, of the web kind; Google is offered with this and its secret |
 | `AGENTS_HOSTED_GOOGLE_SECRET` | Its client secret |
 | `AGENTS_HOSTED_VIEWS_DOMAIN` | The name where each page's MCP Apps views are drawn, or none |
-| `AGENTS_HOSTED_SIGNUP` | `invite` (the default), `open` or `closed` |
+| `AGENTS_HOSTED_SIGNUP` | `invite` (the default), `open` (a verified email; see [Open sign-up](#open-sign-up)) or `closed` |
+| `AGENTS_HOSTED_TURNSTILE_SITE_KEY` | Cloudflare Turnstile's site key, for the sign-up page; Turnstile is on with this and its secret |
+| `AGENTS_HOSTED_TURNSTILE_SECRET` | Turnstile's secret key |
 | `AGENTS_HOSTED_MAX_ACCOUNTS` | The most accounts; 100 |
 | `AGENTS_HOSTED_MIN_GITHUB_AGE` | The youngest GitHub account that may sign up without being allowed, in days; 30 |
 | `AGENTS_HOSTED_SIGNUPS_PER_ADDRESS` | New accounts and waitlist entries an hour from one address; 3 |
