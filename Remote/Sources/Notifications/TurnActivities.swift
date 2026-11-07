@@ -76,6 +76,20 @@ final class TurnActivities {
 
     private var current: TurnActivity? { live.first }
 
+    /// Ended ones the Lock Screen still shows, for `keptAfterEnd` or a push's dismissal date.
+    private var shownEnded: [TurnActivity] {
+        TurnActivity.activities.filter { $0.activityState == .ended }
+    }
+
+    /// An ended one still shown goes at once when another takes its place: one in total, not
+    /// the last Done beside the new turn.
+    private func dismissEnded() {
+        for old in shownEnded {
+            note("live activity: an ended one still shown, dismissing")
+            Task { await Self.end(old.id, nil, .immediate) }
+        }
+    }
+
     /// A prompt went from here to this session: a new turn, or one more for the turn
     /// running, which the daemon queues.
     func sent(to agentID: UUID, in model: AgentsModel) {
@@ -96,6 +110,7 @@ final class TurnActivities {
             return
         }
         guard let content = summary(with: model) else { return }
+        dismissEnded()
         do {
             let activity = try TurnActivity.request(attributes: TurnActivityAttributes(), content: Self.content(content),
                                                     pushType: .token)
@@ -124,7 +139,8 @@ final class TurnActivities {
 
     /// The activity against the model, once it is caught up: on connecting, on coming to
     /// the front, and on launch, for one left from before. More than one, from a build
-    /// before #2991, are one too many: all but one end at once.
+    /// before #2991, are one too many: all but one end at once, and an ended one still shown
+    /// beside a running one goes.
     func settle(with model: AgentsModel) {
         let live = live
         for extra in live.dropFirst() {
@@ -135,6 +151,7 @@ final class TurnActivities {
             turns.removeAll()
             return
         }
+        dismissEnded()
         refresh(activity, with: model)
     }
 
