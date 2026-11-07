@@ -175,6 +175,18 @@ page as **App Store 0.17.0**, after its TestFlight build.
 To approve here, the GitHub App `agents-loops` must have the **Deployments** permission
 (read and write). Without it, GitHub refuses the answer and the row says why.
 
+## Make a new app's repository
+
+Ask an agent for a new app, and it can make the app's repository for you (#3708): a
+private repository in your GitHub account, or in an organisation you name, with a starter
+(an iPhone app or a web service) as its first commit. The agent's machine clones it beside
+your other clones and adds it as a folder, so it shows in the session list on every client.
+When a step fails, ask again: each step that is done already is skipped.
+
+To make a repository, the GitHub App `agents-loops` must have the **Administration**
+permission (read and write), and be installed on **All repositories**, so that it can push
+to the new one. Without them, GitHub refuses, and the agent says so.
+
 ## Open a pull request
 
 Agents open pull requests with the connector's `create_pull_request` tool. Ask the agent
