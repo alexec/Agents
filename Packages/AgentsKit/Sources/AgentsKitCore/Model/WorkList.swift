@@ -144,9 +144,11 @@ public enum WorkList {
         ReportValueWords.url(node).map { LineageList.pullRequest(node, $0) }
     }
 
-    /// "alexec/Agents" of "github:alexec/Agents"; "Linear · ENG" of a Linear team (#3311); "Jira" of "jira".
+    /// "alexec/Agents" of "github:alexec/Agents"; "Linear · ENG" of a Linear team (#3311); "Jira" of "jira";
+    /// "Azure Boards · acme/web" of an Azure Boards project (#3815).
     public static func repoName(_ repo: String) -> String {
         if repo.hasPrefix("linear:") { return "Linear · \(repo.dropFirst("linear:".count))" }
+        if repo.hasPrefix("azureboards:") { return "Azure Boards · \(repo.dropFirst("azureboards:".count))" }
         if let tracker = forgeTitle[repo], !repo.contains(":") { return tracker }
         return repo.replacingOccurrences(of: #"^[a-z][a-z0-9-]*:"#, with: "", options: .regularExpression)
     }
@@ -377,7 +379,8 @@ public enum WorkList {
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
-    public static let forgeTitle = ["github": "GitHub", "gitlab": "GitLab", "linear": "Linear", "jira": "Jira"]
+    public static let forgeTitle = ["github": "GitHub", "gitlab": "GitLab", "linear": "Linear", "jira": "Jira",
+                                    "azureboards": "Azure Boards"]
 
     /// A forge that could not be read: "GitHub on Studio: not connected".
     public static func errorWords(_ e: DaemonAPI.ForgeListError, machine: String?) -> String {
