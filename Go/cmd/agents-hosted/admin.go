@@ -32,10 +32,14 @@ const adminUsage = `usage: agents-hosted admin <verb> …
   backup [--keep N] <dir> [account…]
                              copy accounts (every one when none is named) into dir;
                              --keep N deletes all but the newest N backups beside it
+                             (7 when not set; --keep 0 deletes none)
   restore <dir> <account>    put one suspended or deleted account back from dir
   delete <account>           delete a suspended account and everything it keeps
 
 It reads AGENTS_STORE and AGENTS_HOSTED_DOMAIN, as serve does.`
+
+// backupKeepDefault is backup's --keep when none is given.
+const backupKeepDefault = 7
 
 // admin runs one admin verb, and is the exit status.
 func admin(args []string, out, errOut io.Writer) int {
@@ -163,7 +167,8 @@ func runAdmin(ctx context.Context, a hosted.Admin, args []string, out io.Writer)
 		}
 		return a.SetPlan(ctx, rest[0], rest[1])
 	case "backup":
-		keep := 0
+		// Kept bounded unless the operator says otherwise (#3648).
+		keep := backupKeepDefault
 		if len(rest) > 0 && (rest[0] == "--keep" || strings.HasPrefix(rest[0], "--keep=")) {
 			n := strings.TrimPrefix(rest[0], "--keep=")
 			rest = rest[1:]
@@ -174,7 +179,7 @@ func runAdmin(ctx context.Context, a hosted.Admin, args []string, out io.Writer)
 				n, rest = rest[0], rest[1:]
 			}
 			k, err := strconv.Atoi(n)
-			if err != nil || k < 1 {
+			if err != nil || k < 0 {
 				return errUsage
 			}
 			keep = k

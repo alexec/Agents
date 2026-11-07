@@ -487,3 +487,31 @@ func TestTheSweepDeletesEndedRequests(t *testing.T) {
 		}
 	}
 }
+
+// #3648: copies' change events go after a day, not with the audit's days.
+func TestTheSweepKeepsMeshEventsADay(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	s := store.NewMemory()
+	rs := records.New(s)
+	rs.SettingsOrMake(ctx, func() records.Settings { return records.Settings{Name: "test", MachineID: "m"} })
+	now := time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC)
+	for _, day := range []string{"2026-11-04", "2026-11-05", "2026-11-06"} {
+		s.Put(ctx, meshEventsPrefix+day+"/0000000000001-abcdefgh.json", []byte("{}"), store.Absent)
+	}
+	s.Put(ctx, eventsPrefix+"2026-11-04/audit.json", []byte("{}"), store.Absent)
+	if _, err := sweep(ctx, rs, now, mostPerSweep, nil); err != nil {
+		t.Fatal(err)
+	}
+	keys, _ := s.List(ctx, "v1/")
+	var got []string
+	for _, k := range keys {
+		if strings.Contains(k.Key, "events/") {
+			got = append(got, k.Key)
+		}
+	}
+	want := "v1/events/2026-11-04/audit.json v1/mesh/events/2026-11-05/0000000000001-abcdefgh.json v1/mesh/events/2026-11-06/0000000000001-abcdefgh.json"
+	if strings.Join(got, " ") != want {
+		t.Fatalf("left %v", got)
+	}
+}
