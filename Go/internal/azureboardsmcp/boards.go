@@ -44,6 +44,10 @@ type WorkItem struct {
 	URL        string
 	CreatedAt  string
 	Creator    *Person
+	// Category is its state's category: Proposed, InProgress, Resolved, Completed or Removed.
+	Category string
+	// UpdatedAt is when it changed last.
+	UpdatedAt string
 }
 
 func (w WorkItem) json() map[string]any {

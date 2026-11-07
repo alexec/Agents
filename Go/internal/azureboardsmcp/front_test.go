@@ -105,7 +105,7 @@ func TestTheFrontOffersEventsAndTools(t *testing.T) {
 	for _, tool := range c.call("tools/list", map[string]any{})["result"].(map[string]any)["tools"].([]any) {
 		names = append(names, tool.(map[string]any)["name"].(string))
 	}
-	same(t, names, []string{"comment_on_work_item", "get_work_item", "list_work_items"})
+	same(t, names, []string{"comment_on_work_item", "get_work_item", "list_work_items", "show_issue_details", "show_issues"})
 
 	ids := func(r map[string]any) []string {
 		var out []string

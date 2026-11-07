@@ -1,7 +1,7 @@
 ---
 diataxis: how-to
 devices: [mac, web]
-description: Add the azureboards connector with a personal access token, so that agents read and comment on Azure Boards work items, a workflow or a wait starts when one is opened, tagged, commented on, closed or assigned to you, and the Work pages list and change them.
+description: Add the azureboards connector with a personal access token, so that agents read and comment on Azure Boards work items, a workflow or a wait starts when one is opened, tagged, commented on, closed or assigned to you, its Work items page lists them with Start Agent, and the Work pages list and change them.
 ---
 
 # Use Azure Boards work items
@@ -50,6 +50,24 @@ issue's key.
 - `comment_on_work_item`: a comment, in Markdown.
 
 A work item's state and its assignee are a person's to change, in Azure Boards.
+
+## The Work items page
+
+The connector has a page of its own (#3826), in the jira connector's shape. It is a row in
+the folder's group of the sidebar, **Azure Boards · Work items**, and you can pin it.
+
+- **The project's open work items**, changed last first, at most 50, in sections: **Needs
+  you** (assigned to you), **Yours** (made by you) and **Team** (the rest). Each row says its
+  type, its state, its assignee, its author, its area, when it changed and its tags. The
+  sidebar's count is the work items that need you.
+- **A type, a state category** (Proposed, In progress, Resolved) **and tags** narrow it.
+- **A row expands** to its description, made safe, and its **Lineage** section: the
+  sessions labelled `AB#12`, the pull requests that name `AB#12`, and what they cost.
+- **Start Agent** opens the new-agent form, filled in: the session is labelled `AB#12`, and
+  the agent is asked to put `AB#12` in its branch and its pull request's title.
+
+The page only reads. Change a work item's state or tags on the Work pages, or in Azure
+Boards.
 
 ## The events
 
@@ -101,8 +119,9 @@ Every write is your own click, made with your token: no approval card.
   before. A poll that finds more says it is `truncated`.
 - **Closed is by category,** read from the project's work item types, so a process of your
   own with other state names works.
-- **Not yet:** the Tasks slot of a folder's set-up, a project's board, a view of the
-  connector's own, and a **Connect Azure DevOps** sheet with a sign-in.
+- **Not yet:** the Tasks slot of a folder's set-up, a project's board, and a **Connect
+  Azure DevOps** sheet with a sign-in. On the Work items page, Team is everyone else in the
+  organization: the control plane's people have no Azure DevOps login yet.
 
 ## See also
 
