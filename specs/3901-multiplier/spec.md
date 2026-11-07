@@ -95,6 +95,14 @@ That is "an average engineer works 40 hours a week and merges 1.4 PRs in it". En
 - Give `prsMerged` (counted), `multiplier`, `engineerHours` and `agentsWorking`, and the baseline (1.4, "DX 2025") so the clients do not keep their own copy.
 - Tests: 7 merged PRs and 0 reverts is 5.0× and 200 h; 7 merged and 1 revert is 4.3×; nothing merged is no figure (the page shows `— ×`), not 0×.
 
+### As built (#3903)
+
+- **The wire:** `multiplier/state` (the window asks on each open), `multiplier/changed` (told on a merge or a merged revert, with the PR in `changedBy`), and `multiplier/count` (a host asks its control plane). The type is `Multiplier`, with the baseline in `MultiplierBaseline`. The figure is rounded on the host: the multiplier to 0.1, the hours to 1 h.
+- **Only the agents' PRs:** a PR counts when a session worked on it (its node has sessions). A PR that the person merged by hand, or another person's PR in the same repo, counts 0. A revert counts the same way.
+- **Reviewed-only PRs still count:** a review session's `P#n` label is a `works-on` link, so lineage cannot tell a review from work.
+- **Kept, not read again:** the control plane keeps each person's merges by the entity tags of their machines' lineage objects, and counts again only when a machine sent new lineage. With no control plane, or when it does not answer, the host counts its own ledger's merges, kept as they happen.
+- **Live on one machine:** the host that hears the `pr.merged` sends its lineage to the control plane, then tells its own window. The person's other machines show it on their next open.
+
 ## What it is not
 
 - Cost and tokens do not change the figure (#985): only merged PRs do.

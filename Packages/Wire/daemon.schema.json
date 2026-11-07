@@ -15971,6 +15971,75 @@
         "nothing"
       ]
     },
+    "Multiplier": {
+      "type": "object",
+      "description": "The Multiplier (#3901, #3903; method in specs/3901-multiplier/spec.md): the PRs the person's agents merged in the last 7 days, less the merged reverts, against the PRs an average engineer merged in a week in 2025. With a control plane it counts all the person's machines, else this machine. multiplier and engineerHours are absent when nothing is counted: the page shows — ×, not 0×.",
+      "properties": {
+        "prsMerged": {
+          "type": "integer",
+          "description": "The PRs counted: merged in the range, less the merged reverts, never below 0. A PR counts when a session of the person worked on it."
+        },
+        "reverts": {
+          "type": "integer",
+          "description": "The merged reverts in the range."
+        },
+        "multiplier": {
+          "type": "number",
+          "description": "prsMerged ÷ baseline.prsPerWeek, to one decimal: 5.0 is 5.0×."
+        },
+        "engineerHours": {
+          "type": "number",
+          "description": "prsMerged × baseline.hoursPerWeek ÷ baseline.prsPerWeek, to the whole hour."
+        },
+        "agentsWorking": {
+          "type": "integer",
+          "description": "This machine's agents with a turn running now."
+        },
+        "since": {
+          "$ref": "#/definitions/WireDate",
+          "description": "The start of the range: 7 days before it was counted."
+        },
+        "baseline": {
+          "$ref": "#/definitions/MultiplierBaseline"
+        },
+        "changedBy": {
+          "$ref": "#/definitions/LineageNode",
+          "description": "On multiplier/changed: the PR whose merge or revert changed it."
+        }
+      },
+      "required": [
+        "prsMerged",
+        "reverts",
+        "agentsWorking",
+        "since",
+        "baseline"
+      ],
+      "additionalProperties": false
+    },
+    "MultiplierBaseline": {
+      "type": "object",
+      "description": "What the Multiplier compares with (#3902), so that no client keeps its own copy: an engineer with no AI in 2025.",
+      "properties": {
+        "prsPerWeek": {
+          "type": "number",
+          "description": "Merged PRs a week: 1.4."
+        },
+        "hoursPerWeek": {
+          "type": "number",
+          "description": "The hours of that week: 40."
+        },
+        "source": {
+          "type": "string",
+          "description": "Where the figure is from, for the page's small line: DX 2025."
+        }
+      },
+      "required": [
+        "prsPerWeek",
+        "hoursPerWeek",
+        "source"
+      ],
+      "additionalProperties": false
+    },
     "NativeSetting": {
       "type": "object",
       "description": "A runtime's own setting for one level: config option values (mode, model, effort), a sandbox choice, or the answer to permission requests.",

@@ -101,6 +101,7 @@ public enum Capability {
     public static let marketplaces1 = "marketplaces/1"
     public static let mcp1 = "mcp/1"
     public static let modes1 = "modes/1"
+    public static let multiplier1 = "multiplier/1"
     public static let mute1 = "mute/1"
     public static let notices1 = "notices/1"
     public static let options1 = "options/1"
@@ -380,6 +381,7 @@ public enum Capability {
         "mcp/sign-out": "mcp/1",
         "mcp/verify": "mcp/1",
         "modes/remembered": "modes/1",
+        "multiplier/state": "multiplier/1",
         "options/remembered": "options/1",
         "permissions/answer": "permissions/1",
         "permissions/pending": "permissions/1",
@@ -555,6 +557,7 @@ public enum Capability {
         "mcp/healthChanged": "mcp/1",
         "mcp/hostedChanged": "mcp/1",
         "modes/changed": "modes/1",
+        "multiplier/changed": "multiplier/1",
         "pages/changed": "pages/1",
         "person/changed": "person/1",
         "pins/changed": "pins/1",
@@ -688,6 +691,7 @@ public enum Capability {
         "machines/summaryFacts": "summary.machines/1",
         "machines/unlink": "machines/1",
         "machines/update": "machines/1",
+        "multiplier/count": "multiplier/1",
         "notices/take": "notices/1",
         "orgRoutes/check": "org-routes/2",
         "orgRoutes/list": "org-routes/2",

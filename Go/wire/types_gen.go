@@ -7147,6 +7147,44 @@ const MoveWhenNow MoveWhen = "now"
 const MoveWhenAfterTurn MoveWhen = "afterTurn"
 const MoveWhenNothing MoveWhen = "nothing"
 
+// The Multiplier (#3901, #3903; method in specs/3901-multiplier/spec.md): the PRs the person's agents merged in the last 7 days, less the merged reverts, against the PRs an average engineer merged in a week in 2025. With a control plane it counts all the person's machines, else this machine. multiplier and engineerHours are absent when nothing is counted: the page shows — ×, not 0×.
+type Multiplier struct {
+	// The PRs counted: merged in the range, less the merged reverts, never below 0. A PR counts when a session of the person worked on it.
+	PrsMerged int64 `json:"prsMerged"`
+
+	// The merged reverts in the range.
+	Reverts int64 `json:"reverts"`
+
+	// prsMerged ÷ baseline.prsPerWeek, to one decimal: 5.0 is 5.0×.
+	Multiplier *float64 `json:"multiplier,omitzero"`
+
+	// prsMerged × baseline.hoursPerWeek ÷ baseline.prsPerWeek, to the whole hour.
+	EngineerHours *float64 `json:"engineerHours,omitzero"`
+
+	// This machine's agents with a turn running now.
+	AgentsWorking int64 `json:"agentsWorking"`
+
+	// The start of the range: 7 days before it was counted.
+	Since Date `json:"since"`
+
+	Baseline MultiplierBaseline `json:"baseline"`
+
+	// On multiplier/changed: the PR whose merge or revert changed it.
+	ChangedBy *LineageNode `json:"changedBy,omitzero"`
+}
+
+// What the Multiplier compares with (#3902), so that no client keeps its own copy: an engineer with no AI in 2025.
+type MultiplierBaseline struct {
+	// Merged PRs a week: 1.4.
+	PrsPerWeek float64 `json:"prsPerWeek"`
+
+	// The hours of that week: 40.
+	HoursPerWeek float64 `json:"hoursPerWeek"`
+
+	// Where the figure is from, for the page's small line: DX 2025.
+	Source string `json:"source"`
+}
+
 // A runtime's own setting for one level: config option values (mode, model, effort), a sandbox choice, or the answer to permission requests.
 type NativeSetting struct {
 	Options map[string]JSONValue `json:"options,omitzero"`

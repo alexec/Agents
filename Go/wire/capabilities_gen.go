@@ -100,6 +100,7 @@ const CapMailbox1 = "mailbox/1"
 const CapMarketplaces1 = "marketplaces/1"
 const CapMcp1 = "mcp/1"
 const CapModes1 = "modes/1"
+const CapMultiplier1 = "multiplier/1"
 const CapMute1 = "mute/1"
 const CapNotices1 = "notices/1"
 const CapOptions1 = "options/1"
@@ -379,6 +380,7 @@ var HostCapabilities = pairs([][2]string{
 	{"mcp/sign-out", "mcp/1"},
 	{"mcp/verify", "mcp/1"},
 	{"modes/remembered", "modes/1"},
+	{"multiplier/state", "multiplier/1"},
 	{"options/remembered", "options/1"},
 	{"permissions/answer", "permissions/1"},
 	{"permissions/pending", "permissions/1"},
@@ -554,6 +556,7 @@ var HostCapabilities = pairs([][2]string{
 	{"mcp/healthChanged", "mcp/1"},
 	{"mcp/hostedChanged", "mcp/1"},
 	{"modes/changed", "modes/1"},
+	{"multiplier/changed", "multiplier/1"},
 	{"pages/changed", "pages/1"},
 	{"person/changed", "person/1"},
 	{"pins/changed", "pins/1"},
@@ -609,6 +612,7 @@ var HostNotifications = set([]string{
 	"mcp/healthChanged",
 	"mcp/hostedChanged",
 	"modes/changed",
+	"multiplier/changed",
 	"pages/changed",
 	"person/changed",
 	"pins/changed",
@@ -742,6 +746,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"machines/summaryFacts", "summary.machines/1"},
 	{"machines/unlink", "machines/1"},
 	{"machines/update", "machines/1"},
+	{"multiplier/count", "multiplier/1"},
 	{"notices/take", "notices/1"},
 	{"orgRoutes/check", "org-routes/2"},
 	{"orgRoutes/list", "org-routes/2"},
