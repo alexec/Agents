@@ -2463,6 +2463,9 @@ type ConnectionTokenRequest struct {
 
 type ConnectionsList struct {
 	Connections []Connection `json:"connections"`
+
+	// The providers this host connects (#3824), so a client newer than its host offers only those. A client drops a name it does not know. Absent from a host older than #3824: it connects GitHub, Linear, GitLab, Atlassian and, with connections.email/1, Email.
+	Providers []ConnectionProvider `json:"providers,omitzero"`
 }
 
 // A GitHub Codespace for a folder's repository (#1591).

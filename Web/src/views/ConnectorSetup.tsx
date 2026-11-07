@@ -802,14 +802,18 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
 /** Activity ▸ Connectors: Connections, with Disconnect (frame E), and a row to connect each provider that is not connected. */
 export function YourConnections({ store, host }: { store: Store; host: string }) {
   const [connections, setConnections] = useState<Connection[]>();
+  /** What the host says it connects (#3824); undefined from an older host. */
+  const [hostProviders, setHostProviders] = useState<string[]>();
   const [problem, setProblem] = useState<string>();
   const [connecting, setConnecting] = useState<ConnectionProvider>();
   /** The ended connection Connect Again… is for, so its dialog opens the way it was made. */
   const [again, setAgain] = useState<Connection>();
   const load = async () => {
     try {
-      const list = (await store.link.call("connections/list", {}, host)).connections;
+      const answer = await store.link.call("connections/list", {}, host);
+      const list = answer.connections;
       setConnections(list);
+      setHostProviders(answer.providers);
       store.knowConnections(host, list);
       setProblem(undefined);
     } catch (e) {
@@ -828,8 +832,8 @@ export function YourConnections({ store, host }: { store: Store; host: string })
     }
     await load();
   };
-  // Email only on a host with connections.email/1 (#1780): an older host does not show it.
-  const notConnected = connections ? words.providersFor(store.has(host, Capability.connectionsEmail1)).filter((p) => !connections.some((c) => c.provider === p)) : [];
+  // Only what the host connects (#3824); from an older host, Email only with connections.email/1 (#1780).
+  const notConnected = connections ? words.providersFor(store.has(host, Capability.connectionsEmail1), hostProviders).filter((p) => !connections.some((c) => c.provider === p)) : [];
   return (
     <div class="connections">
       <p class="setup-row">

@@ -2122,6 +2122,12 @@ export interface ConnectionTokenRequest {
 
 export interface ConnectionsList {
   connections: Connection[];
+  /**
+   * The providers this host connects (#3824), so a client newer than its host offers only those. A
+   * client drops a name it does not know. Absent from a host older than #3824: it connects GitHub,
+   * Linear, GitLab, Atlassian and, with connections.email/1, Email.
+   */
+  providers?: ConnectionProvider[];
 }
 
 /** A GitHub Codespace for a folder's repository (#1591). */
@@ -12447,7 +12453,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConnectionSignInFlowRequest: { required: ["flowID"], optional: [] },
   ConnectionTokenAnswer: { required: [], optional: ["connection", "error"] },
   ConnectionTokenRequest: { required: ["provider", "token"], optional: ["url", "user"] },
-  ConnectionsList: { required: ["connections"], optional: [] },
+  ConnectionsList: { required: ["connections"], optional: ["providers"] },
   ConnectorCodespace: { required: ["id", "name", "repository", "state", "ssh"], optional: ["ref"] },
   ConnectorCodespaces: { required: ["codespaces"], optional: ["repository", "message"] },
   ConnectorCodespacesRequest: { required: ["folder", "action"], optional: ["id", "name"] },

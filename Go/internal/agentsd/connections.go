@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	goruntime "runtime"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -178,10 +179,16 @@ func (d *Daemon) registerConnections() {
 	})
 }
 
+// hostProviders are the providers this host connects, in the order Connect… shows them.
+// connections/list says them (#3824), so a client newer than this host offers only these.
+var hostProviders = []wire.ConnectionProvider{
+	wire.ConnectionProviderGithub, wire.ConnectionProviderLinear, wire.ConnectionProviderGitlab,
+	wire.ConnectionProviderEmail, wire.ConnectionProviderAtlassian, wire.ConnectionProviderForgejo,
+	wire.ConnectionProviderBitbucket,
+}
+
 func knownProvider(p wire.ConnectionProvider) bool {
-	return p == wire.ConnectionProviderGithub || p == wire.ConnectionProviderLinear || p == wire.ConnectionProviderGitlab ||
-		p == wire.ConnectionProviderEmail || p == wire.ConnectionProviderAtlassian || p == wire.ConnectionProviderForgejo ||
-		p == wire.ConnectionProviderBitbucket
+	return slices.Contains(hostProviders, p)
 }
 
 // codeFlowProvider is a provider whose sign-in is the authorization code with PKCE.
@@ -279,7 +286,7 @@ func (d *Daemon) connectionsList() (wire.ConnectionsList, error) {
 	if err != nil {
 		return wire.ConnectionsList{}, err
 	}
-	out := wire.ConnectionsList{Connections: []wire.Connection{}}
+	out := wire.ConnectionsList{Connections: []wire.Connection{}, Providers: slices.Clone(hostProviders)}
 	for _, c := range all {
 		out.Connections = append(out.Connections, wireConnection(c))
 	}

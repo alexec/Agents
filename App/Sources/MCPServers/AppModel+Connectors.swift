@@ -34,9 +34,14 @@ extension AppModel {
     }
 
     func connections(on host: MachineRef = .mac) async -> Result<[DaemonAPI.Connection], ConnectorProblem> {
+        await connectionsList(on: host).map(\.connections)
+    }
+
+    /// The connections and the providers the host connects (#3824).
+    func connectionsList(on host: MachineRef = .mac) async -> Result<DaemonAPI.ConnectionsList, ConnectorProblem> {
         await connectorCall(host) {
             try await $0.call(DaemonAPI.Method.connectionsList, DaemonAPI.Empty(),
-                              returning: DaemonAPI.ConnectionsList.self).connections
+                              returning: DaemonAPI.ConnectionsList.self)
         }
     }
 

@@ -258,9 +258,14 @@ export function codespacesElsewhere(hasMac: boolean): string {
 /** The providers a person connects, in the order Connectors shows them. */
 export const providers: ConnectionProvider[] = ["github", "linear", "gitlab", "email", "atlassian", "forgejo", "bitbucket"];
 
-/** The providers that host can connect: Email only when it has connections.email/1 (#1780). */
-export function providersFor(hasEmail: boolean): ConnectionProvider[] {
-  return hasEmail ? providers : providers.filter((p) => p !== "email");
+/**
+ * The providers that host can connect, in this page's order: the ones its connections/list says (#3824),
+ * less any this page does not know. A host older than #3824 says none: it connects GitHub, Linear,
+ * GitLab, Atlassian and, when it has connections.email/1 (#1780), Email.
+ */
+export function providersFor(hasEmail: boolean, hostProviders?: readonly string[]): ConnectionProvider[] {
+  const takes: readonly string[] = hostProviders ?? ["github", "linear", "gitlab", "atlassian", ...(hasEmail ? ["email"] : [])];
+  return providers.filter((p) => takes.includes(p));
 }
 
 /** The provider's name: GitHub, Linear, GitLab, Email, Atlassian (Jira and Confluence, #3304), Forgejo, Bitbucket. */
