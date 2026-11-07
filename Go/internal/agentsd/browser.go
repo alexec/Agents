@@ -48,6 +48,7 @@ func (d *Daemon) installBrowserToolset(progress func(string)) (browser.Toolset, 
 		return browser.Toolset{}, err
 	}
 	t.tidy()
+	tidyNode()
 	cur := filepath.Join(toolsHome, browserToolsetID, "current")
 	return browser.Toolset{
 		Node:     filepath.Join(cur, "node", "bin", "node"),

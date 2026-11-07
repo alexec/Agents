@@ -38,7 +38,7 @@ person's view of a local server.
 | Agent can drive it | Only by our own tools over `evaluateJavaScript` | Playwright, over CDP | Playwright, over CDP |
 | CAPTCHA | Supported by reCAPTCHA, hCaptcha and Turnstile | Supported | Supported, best signals |
 | Extensions | No | Yes (`--load-extension` in Chromium builds) | Yes, the person's own |
-| Size | 0 (in the OS) | About 150 to 250 MB, downloaded on first use | 0 |
+| Size | 0 (in the OS) | About 570 MB (567 MB measured on a Mac, #3959), downloaded on first use | 0 |
 | Licence | In the OS | BSD-3 (Chromium) | n/a |
 
 - **WKWebView fails Principle 1.** It cannot run on a Linux machine, and it gives the web
@@ -78,7 +78,7 @@ we know:
 
 | Library | Purpose | Licence | Latest | Size |
 |---|---|---|---|---|
-| Chromium (Playwright's build) | The browser | BSD-3 | follows Playwright | 150 to 250 MB, downloaded on first use |
+| Chromium (Playwright's build) | The browser | BSD-3 | follows Playwright | About 570 MB (567 MB measured on a Mac, #3959), downloaded on first use |
 | `@playwright/mcp` | The agent's browser tools | Apache-2.0 | v0.0.84, 2026-10-31; 39k stars | npm package plus Playwright |
 | `github.com/chromedp/cdproto` (and `chromedp`) | `agentsd` speaks CDP: screencast, input, fill, mask | MIT | v0.22.1, 2026-11-04 | Go, no cgo |
 | `github.com/modelcontextprotocol/go-sdk` | `agentsd` is the Playwright server's MCP client | MIT | already in `go.mod` (v1.8.0) | already in |
