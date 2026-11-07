@@ -23,7 +23,7 @@ const Instructions = "This repository's pull requests, their checks, and its iss
 	"checks.failed (a pull request's head commit failed its checks), pr.opened, pr.merged, pr.closed, pr.conflicted, review.comment (a comment on a line of a pull request's diff), " +
 	"issue.opened, issue.labelled (an issue's kind or component), issue.commented, issue.closed. " +
 	"list_pull_requests, get_pull_request, get_checks, list_issues and get_issue read them; " +
-	"failed_log reads the end of a failed Pipelines run's steps' logs (pipelineId is run.id in checks.failed). " +
+	"failed_log reads the end of a failed Pipelines run's steps' logs (pipelineId is run.id in checks.failed), retry_pipeline starts it again on the same commit. " +
 	"comment_on_pull_request and comment_on_issue comment. " +
 	"create_pull_request opens a pull request from a pushed branch; list_pull_request_comments lists its line comments, and " +
 	"reply_to_pull_request_comment answers one in its thread. " +
