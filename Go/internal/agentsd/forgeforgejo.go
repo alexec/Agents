@@ -155,7 +155,8 @@ func (d *Daemon) forgejoPage(ctx context.Context, s forgeSources, f forgejomcp.S
 	if p.err != nil {
 		return p
 	}
-	page, err := d.forgeForgejo(s.forgejoRoot).Search(ctx, s.forgejo, f, after, limit)
+	c, _ := d.forgejoConnection()
+	page, err := d.forgeForgejo(s.forgejoRoot, c.Access).Search(ctx, s.forgejo, f, after, limit)
 	for _, i := range page.Items {
 		p.items = append(p.items, forgejoItemOf(i, s.folderOf[forgeRepo{"forgejo", strings.ToLower(i.Repo)}]))
 	}
@@ -175,19 +176,18 @@ func (d *Daemon) forgejoOf(ctx context.Context, method, repo string) (forgeForge
 			continue
 		}
 		if at, named := d.forgejoRepoAt(ctx, f, c.URL); at == root && strings.EqualFold(named, repo) {
-			return d.forgeForgejo(root), named, f, nil
+			return d.forgeForgejo(root, c.Access), named, f, nil
 		}
 	}
 	return nil, "", "", Invalid("%s: no folder here is on %s on the connected Forgejo, %s", method, repo, root)
 }
 
-// forgeForgejo is the Forgejo at root as the person's connection; the caller has checked there is one.
-func (d *Daemon) forgeForgejo(root string) forgeForgejo {
-	c, _ := d.forgejoConnection()
+// forgeForgejo is the Forgejo at root with the person's token, from the connection the caller
+// read (read again, a disconnect in between gives an empty token).
+func (d *Daemon) forgeForgejo(root, token string) forgeForgejo {
 	if d.newForgeForgejo != nil {
-		return d.newForgeForgejo(root, c.Access)
+		return d.newForgeForgejo(root, token)
 	}
-	token := c.Access
 	return forgejomcp.NewRealForgejo(root, func() string { return token }, nil)
 }
 
