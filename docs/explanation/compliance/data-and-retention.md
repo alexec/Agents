@@ -155,17 +155,19 @@ attachments), and lineage nodes (each issue, PR and session it links, with its c
 One sweep runs every hour. It removes old audit days, codes, tombstones, records with no
 owner, usage, workflow runs and lineage, join, lock-join, sign-in and link requests, and
 policy, governance and remove requests (#3649), and once a day the backups of removed
-servers.
+servers. It also forgets clients and machines whose key expired 90 days ago, and removes
+the approvals of people and groups that are gone, and probes and move marks left by a
+copy that stopped (#3748).
 
-A removed client, machine, group, project or route leaves a **tombstone** for 7 days, so
+A removed client, machine, group, project, route or machine provider leaves a **tombstone** for 7 days, so
 the other copies of the control plane learn that it went.
 
 ### People, machines and clients
 
 | Records | What they keep | How long, how large | Applied |
 | --- | --- | --- | --- |
-| Clients | Name, kind, public key, when last seen, push tokens (APNs, up to 16 Live Activity tokens of 12 hours each, Web Push) | Until forgotten, then a tombstone for 7 days. A key lives 90 days; **a client whose key expired is kept.** No count limit on a control plane of your own (hosted: 5 or 50). | Hourly |
-| Machines | Name, key, platform, version, owner, workspace | Until removed, then a tombstone for 7 days. **An expired machine is kept.** No count limit (hosted: 2 or 20). | Hourly |
+| Clients | Name, kind, public key, when last seen, push tokens (APNs, up to 16 Live Activity tokens of 12 hours each, Web Push) | Until forgotten, then a tombstone for 7 days. A key lives 90 days; a client whose key expired is forgotten 90 days later (#3748). No count limit on a control plane of your own (hosted: 5 or 50). | Hourly |
+| Machines | Name, key, platform, version, owner, workspace | Until removed, then a tombstone for 7 days. A machine whose key expired is removed 90 days later; a started machine's workspace stays (#3748). No count limit (hosted: 2 or 20). | Hourly |
 | People | Name, role, sign-ins (email, login), SCIM data, old names for 90 days | A removed person goes after 14 days. One with a sign-in is kept, so that sign-in stays refused, but only as a tombstone: the ID, kind, role and each sign-in's provider and account (#3647) | Hourly |
 | Groups, projects | Name and members; name, owner, slots and boards | 1,000 groups; 500 projects a person | Tombstone, hourly |
 | Projects' folders | Each machine's joined folders | 1,000 | Hourly |
@@ -177,10 +179,10 @@ the other copies of the control plane learn that it went.
 
 | Records | What they keep | How long, how large | Applied |
 | --- | --- | --- | --- |
-| Codes | A code's purpose, owner and expiry, and an invite's name and role; never its secret | Deleted 24 hours after it expires. No count limit; only a rate limit. | Hourly |
+| Codes | A code's purpose, owner and expiry, and an invite's name and role; never its secret | Deleted 24 hours after it expires. 1,000 codes; a new one over that is refused (#3748). | Hourly |
 | Join, lock-join and sign-in requests | The asking key and its address | 10 minutes; 50, 200 and 50 open | On read and hourly, 1 hour after expiry |
 | Link requests | A channel link that waits | 24 hours; 50 open | On read and hourly, 24 hours after expiry |
-| Sign-in state | PKCE state and sealed refresh tokens while a sign-in runs | 10 and 2 minutes | Hourly, 1 hour after expiry |
+| Sign-in state | PKCE state and sealed refresh tokens while a sign-in runs | 10 and 2 minutes; 1,000 sign-ins started, each with at most one ticket (#3748) | Hourly, 1 hour after expiry |
 | Sign-in settings | Org OIDC providers, domain claims, one sealed refresh token a person and provider | 5 providers, 20 domains | On remove |
 | SCIM and read tokens | Token hashes, address of last use | 2 live of 20; 10 live of 50 | On write |
 | Policy, governance and remove requests | Asks for a budget, a catalogue item, or removal of a person | 1,000; a decided one 30 days | On read and hourly |
@@ -195,10 +197,10 @@ the other copies of the control plane learn that it went.
 | Lineage | Cost of each issue, PR and session node | 5,000 nodes, 90 days | On write |
 | Workflow runs | Which machine took each workflow trigger | 7 days | Hourly |
 | Report views | Saved report views | 50 a person | When the person is removed |
-| Machine providers | Each provider | No count limit. **A tombstone is never removed.** | — |
+| Machine providers | Each provider | No count limit. A removed one's tombstone for 7 days (#3748) | Hourly |
 | Tunnels | Servers' reverse tunnels | 15 minutes unjoined | On use |
 | Policy | The org policy and its old versions | 64 KiB; 100 versions | On write |
-| Governance | Installed servers and skills; approvals | 500 items; 1,000 approvals, **no expiry** | — |
+| Governance | Installed servers and skills; approvals | 500 items; 1,000 approvals. An approval stays until an admin takes it back, or its person or group is gone (#3748) | Hourly |
 | Org keys and gateways | Routes and their sealed secrets | 50 routes | Tombstone, hourly |
 
 ### Audit, keys and backups
@@ -211,7 +213,7 @@ the other copies of the control plane learn that it went.
 | Keys | The sealed control key and the previous one; the sealed key for server backups | 2; the previous one 30 days | — |
 | Server backups | Servers' sealed backups (their transcripts) | The newest **Keep** of each server (1 to 10). At most 20 GiB a server, the newest always kept; a backup over 20 GiB is refused (#3648). A removed server's for 90 days after its newest. A cut-off backup's parts after a day; a name more than a day ahead is refused, and its parts deleted. | After each backup, and daily |
 | Leases and heartbeats | Which copy holds what | 30 seconds | Hourly |
-| Move forwarding and marks | Where a moved control plane went | Forwarding 30 days. **A mark left by a move that stopped stays.** | — |
+| Move forwarding and marks | Where a moved control plane went | Forwarding 30 days. A mark, and a start-up probe, left by a copy that stopped: 1 to 2 hours (#3748) | Hourly |
 
 ## The hosted service
 
