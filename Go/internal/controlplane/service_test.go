@@ -496,6 +496,9 @@ func TestAForgottenClientIsClosedAndRefused(t *testing.T) {
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, window := p.client("Window")
 	other, phone := p.client("Phone")
+	// A dial returns at the ok, before the session is attached (#3893): one count of 1
+	// after the forget could still be the phone not attached yet.
+	p.waitFor(func() bool { return p.s.Router().Sessions() == 2 }, "both sessions to attach")
 	call(t, window, "", "clients/forget", map[string]string{"client": other.Client})
 	p.waitFor(func() bool { return p.s.Router().Sessions() == 1 }, "the phone's session to end")
 	_, err := phone.Call(context.Background(), "", "control/status", nil)

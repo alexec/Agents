@@ -446,6 +446,9 @@ public struct ReviewPull: Codable, Sendable, Hashable, Identifiable {
     public var title: String
     /// owner/name.
     public var repo: String
+    /// Its lineage ref, "github:owner/name#12": a press opens its Work page. Nil from an older
+    /// host: a press opens its forge page.
+    public var ref: String?
     public var author: String?
     public var updatedAt: Date
     /// The person has opened its page (`reviews/open`, #3464): its row is drawn read, not bold.
@@ -455,12 +458,13 @@ public struct ReviewPull: Codable, Sendable, Hashable, Identifiable {
     /// Not opened yet: its title is bold.
     public var isUnread: Bool { opened != true }
 
-    public init(url: URL, number: Int, title: String, repo: String, author: String? = nil, updatedAt: Date,
-                opened: Bool? = nil) {
+    public init(url: URL, number: Int, title: String, repo: String, ref: String? = nil, author: String? = nil,
+                updatedAt: Date, opened: Bool? = nil) {
         self.url = url
         self.number = number
         self.title = title
         self.repo = repo
+        self.ref = ref
         self.author = author
         self.updatedAt = updatedAt
         self.opened = opened

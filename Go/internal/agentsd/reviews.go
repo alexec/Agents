@@ -124,7 +124,7 @@ func reviewPullOf(i wire.ForgeItem) (wire.ReviewPull, bool) {
 		return wire.ReviewPull{}, false
 	}
 	return wire.ReviewPull{URL: wire.URL(*i.URL), Number: number, Title: i.Title, Repo: ref[:at],
-		Author: i.Author, UpdatedAt: i.UpdatedAt}, true
+		Ref: new(i.Node.Ref), Author: i.Author, UpdatedAt: i.UpdatedAt}, true
 }
 
 // readReviews reads every folder's open pull requests labelled needs-approval once, and says a

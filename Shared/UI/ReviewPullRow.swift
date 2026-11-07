@@ -3,8 +3,8 @@ import SwiftUI
 
 /// A pull request waiting for the person's approval in For Review (#3330), drawn as an
 /// approval's row is (#773): the mark, the title and its folder, the time, and one grey line,
-/// its number and repo. A press opens its page in the browser, so its title is drawn as a link
-/// is, in the accent and underlined. Its title is bold until the person opens it, as an unread
+/// its number and repo. A press opens its Work page (its forge page from an older host), so its
+/// title is drawn as a link is, in the accent and underlined. Its title is bold until the person opens it, as an unread
 /// mail's is (#3464). The window and the Remote both draw it; each adds its own Dismiss.
 struct ReviewPullRowLabel: View {
     let pull: ReviewPull
@@ -19,7 +19,7 @@ struct ReviewPullRowLabel: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
-                    // A link, not white as other rows' titles are (#587): a press leaves the app.
+                    // A link, not white as other rows' titles are (#587): a press opens its page.
                     Text(pull.title)
                         .appText(.supporting)
                         .fontWeight(pull.isUnread ? .semibold : .regular)

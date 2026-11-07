@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -170,32 +171,31 @@ func (d *Daemon) summaryFacts(me wire.UUID, at time.Time) string {
 	checked := summaryList{title: "Found by the checks", none: "The checks found nothing.", lines: here.Checked}
 	elsewhere, unreached := d.otherMachinesFacts(me, since)
 	folders := here.Folders
-	pulls := map[string]bool{}
-	for _, line := range here.Landed {
-		pulls[line] = true
-	}
 	for _, m := range elsewhere {
 		folders += m.Facts.Folders
-		on := func(lines []string) []string {
-			out := make([]string, 0, len(lines))
+		on := func(l *summaryList, lines []string) {
 			for _, line := range lines {
-				// The same pull request from a checkout on each machine is one.
-				if strings.HasPrefix(line, pullLine) {
-					if !pulls[line] {
-						pulls[line] = true
-						out = append(out, line)
+				if key := forgeKey(line); key != "" {
+					// The same item on GitHub from a checkout on each machine is one line, with
+					// the sessions of both under it.
+					_, under, _ := strings.Cut(line, "\n")
+					if i := slices.IndexFunc(l.lines, func(have string) bool { return forgeKey(have) == key }); i >= 0 {
+						if under != "" {
+							l.lines[i] += "\n" + under
+						}
+						continue
 					}
+					l.lines = append(l.lines, line)
 					continue
 				}
-				out = append(out, "On "+m.MachineName+": "+line)
+				l.lines = append(l.lines, "On "+m.MachineName+": "+line)
 			}
-			return out
 		}
-		landed.lines = append(landed.lines, on(m.Facts.Landed)...)
-		failed.lines = append(failed.lines, on(m.Facts.Failed)...)
-		waiting.lines = append(waiting.lines, on(m.Facts.Waiting)...)
-		suggested.lines = append(suggested.lines, on(m.Facts.Suggested)...)
-		checked.lines = append(checked.lines, on(m.Facts.Checked)...)
+		on(&landed, m.Facts.Landed)
+		on(&failed, m.Facts.Failed)
+		on(&waiting, m.Facts.Waiting)
+		on(&suggested, m.Facts.Suggested)
+		on(&checked, m.Facts.Checked)
 	}
 	var b strings.Builder
 	machines := host
@@ -206,8 +206,8 @@ func (d *Daemon) summaryFacts(me wire.UUID, at time.Time) string {
 		}
 		machines = strings.Join(names, ", ")
 	}
-	fmt.Fprintf(&b, "# Facts for the daily summary\n\nSince %s, on %s (%d folders). Each session link opens it in the app.\n",
-		since.Local().Format("Mon 2 Jan 15:04"), machines, folders)
+	fmt.Fprintf(&b, "# Facts for the daily summary\n\nFor you: %s\n\nSince %s, on %s (%d folders). Each session link opens it in the app.\n",
+		personLine(waiting.lines, landed.lines), since.Local().Format("Mon 2 Jan 15:04"), machines, folders)
 	if len(unreached) > 0 {
 		b.WriteString("\nNot in these facts: " + strings.Join(unreached, "; ") + ". Say so on the page.\n")
 	}
@@ -218,13 +218,22 @@ func (d *Daemon) summaryFacts(me wire.UUID, at time.Time) string {
 	return b.String()
 }
 
-// pullLine starts a landed line for a merged pull request.
-const pullLine = "Pull request merged at "
-
 // machineSummaryFacts is this machine's lines for a summary since a time: for its own
 // summary, and for one another of the person's machines writes (agents/summaryFacts). me,
 // the summary's own session, is left out; so are the summary's and the checks' sessions.
 func (d *Daemon) machineSummaryFacts(me wire.UUID, since time.Time) wire.SummaryFacts {
+	return d.machineSummaryFactsWith(me, since, findGH())
+}
+
+// workflowRuns is the sessions one workflow in one folder started that ended well: one line.
+type workflowRuns struct {
+	name, folder string
+	runs         int
+	last         *wire.Agent
+}
+
+// machineSummaryFactsWith is machineSummaryFacts with this gh, "" for none.
+func (d *Daemon) machineSummaryFactsWith(me wire.UUID, since time.Time, gh string) wire.SummaryFacts {
 	home := d.personalHome()
 	from := wire.DateOf(since)
 	out := wire.SummaryFacts{Folders: int64(len(d.folderPaths())), Landed: []string{}, Failed: []string{},
@@ -232,7 +241,13 @@ func (d *Daemon) machineSummaryFacts(me wire.UUID, since time.Time) wire.Summary
 	if out.Checked == nil {
 		out.Checked = []string{}
 	}
+	workflows := d.workflowSummaries("")
+	names := map[string]string{}
+	for _, w := range workflows {
+		names[filepath.Clean(store.FolderPath(w.Workflow.Folder))+"\x00"+w.Workflow.WorkflowID] = w.Workflow.Name
+	}
 	active := map[string]bool{}
+	var recent, done []*wire.Agent
 	agents := d.Store.Agents()
 	sort.Slice(agents, func(i, j int) bool { return agents[i].LastActivityAt < agents[j].LastActivityAt })
 	for i := range agents {
@@ -244,6 +259,7 @@ func (d *Daemon) machineSummaryFacts(me wire.UUID, since time.Time) wire.Summary
 		where := fmt.Sprintf("%q in %s", agentTitle(a), filepath.Base(folder))
 		if a.LastActivityAt >= from {
 			active[folder] = true
+			recent = append(recent, a)
 		}
 		switch {
 		case a.LastActivityAt < from:
@@ -251,8 +267,7 @@ func (d *Daemon) machineSummaryFacts(me wire.UUID, since time.Time) wire.Summary
 			out.Failed = append(out.Failed, fmt.Sprintf("Session %s stopped at %s: %s. %s", where,
 				summaryClock(a.LastActivityAt.Time()), failedEnds[*a.EndedReason], sessionLink(a.ID)))
 		case a.State == wire.AgentStateFinished || a.ArchivedAt != nil && *a.ArchivedAt >= from:
-			out.Landed = append(out.Landed, fmt.Sprintf("Session %s done at %s. %s", where,
-				summaryClock(a.LastActivityAt.Time()), sessionLink(a.ID)))
+			done = append(done, a)
 		}
 		if a.State != wire.AgentStateArchived && len(a.SuggestedPrompts) > 0 {
 			s := a.SuggestedPrompts[0]
@@ -260,10 +275,58 @@ func (d *Daemon) machineSummaryFacts(me wire.UUID, since time.Time) wire.Summary
 				prefix(strings.Join(strings.Fields(s.Prompt), " "), 200), sessionLink(a.ID)))
 		}
 	}
-	for _, p := range d.summaryPulls(active, since) {
-		out.Landed = append(out.Landed, fmt.Sprintf("%s%s: %s", pullLine, summaryClock(p.MergedAt), p.URL))
+	used := map[wire.UUID]bool{}
+	if gh != "" {
+		var worked []string
+		for f := range active {
+			worked = append(worked, filepath.Clean(f))
+		}
+		var outcomes []string
+		outcomes, used = d.forgeOutcomes(gh, d.summaryRepos(gh, worked), since, recent)
+		out.Landed = append(out.Landed, outcomes...)
 	}
-	for _, w := range d.workflowSummaries("") {
+	// A workflow's runs are one line, not one a run (#3720); a session with no outcome is a
+	// line of its own, at most otherSessionLines of them.
+	var routine []*workflowRuns
+	byWorkflow := map[string]*workflowRuns{}
+	var others []string
+	for _, a := range done {
+		if used[a.ID] {
+			continue
+		}
+		folder := filepath.Clean(folderPath(a))
+		if a.StartedByWorkflow != nil {
+			key := filepath.Clean(store.FolderPath(a.Cwd)) + "\x00" + *a.StartedByWorkflow
+			w := byWorkflow[key]
+			if w == nil {
+				name := names[key]
+				if name == "" {
+					name = *a.StartedByWorkflow
+				}
+				w = &workflowRuns{name: name, folder: filepath.Base(folder)}
+				byWorkflow[key] = w
+				routine = append(routine, w)
+			}
+			w.runs++
+			w.last = a
+			continue
+		}
+		others = append(others, fmt.Sprintf("Session %q in %s done at %s. %s", agentTitle(a), filepath.Base(folder),
+			summaryClock(a.LastActivityAt.Time()), sessionLink(a.ID)))
+	}
+	for _, w := range routine {
+		times := "once"
+		if w.runs > 1 {
+			times = fmt.Sprintf("%d times", w.runs)
+		}
+		out.Landed = append(out.Landed, fmt.Sprintf("Workflow %q in %s ran %s, the last at %s. %s", w.name, w.folder, times,
+			summaryClock(w.last.LastActivityAt.Time()), sessionLink(w.last.ID)))
+	}
+	if len(others) > otherSessionLines {
+		others = append(others[:otherSessionLines], fmt.Sprintf("and %d other sessions done", len(others)-otherSessionLines))
+	}
+	out.Landed = append(out.Landed, others...)
+	for _, w := range workflows {
 		o := w.LastOutcome
 		if w.Workflow.WorkflowID == dailySummaryID || w.Workflow.WorkflowID == dailyChecksID || o == nil || o.Refused == nil || o.Refused.At < from {
 			continue
@@ -281,6 +344,9 @@ func (d *Daemon) machineSummaryFacts(me wire.UUID, since time.Time) wire.Summary
 			line += " " + sessionLink(*n.AgentID)
 		}
 		out.Waiting = append(out.Waiting, line)
+	}
+	if gh != "" {
+		out.Waiting = append(out.Waiting, d.forgeWaits(gh, d.summaryRepos(gh, d.folderPaths()))...)
 	}
 	return out
 }
@@ -327,38 +393,6 @@ func (d *Daemon) otherMachinesFacts(me wire.UUID, since time.Time) ([]wire.Machi
 		}
 	}
 	return facts, unreached
-}
-
-// summaryPulls is the pull requests merged since, in the folders that had work: gh names
-// them, when the person has it. The same pull request from two checkouts is one.
-func (d *Daemon) summaryPulls(folders map[string]bool, since time.Time) []mergedPull {
-	gh := findGH()
-	if gh == "" {
-		return nil
-	}
-	var names []string
-	for f := range folders {
-		if _, err := os.Stat(filepath.Join(f, ".git")); err == nil {
-			names = append(names, f)
-		}
-	}
-	sort.Strings(names)
-	seen := map[string]bool{}
-	var out []mergedPull
-	for _, f := range names {
-		found, err := mergedPullRequests(d.ctx, gh, f, dayStamp(since))
-		if err != nil {
-			continue
-		}
-		for _, p := range found {
-			if !seen[p.URL] && !p.MergedAt.Before(since) {
-				seen[p.URL] = true
-				out = append(out, p)
-			}
-		}
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].MergedAt.Before(out[j].MergedAt) })
-	return out
 }
 
 // summaryTitle is a page's first heading, such as "Daily summary, Mon 2 Nov"; "" when it has none.

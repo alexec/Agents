@@ -8746,6 +8746,11 @@ export interface ReviewPull {
   title: string;
   /** owner/name. */
   repo: string;
+  /**
+   * Its lineage ref, "github:owner/name#12" or "gitlab:group/project!12": a press opens its Work
+   * page in the app. Nil from an older host: a press opens its forge page.
+   */
+  ref?: string;
   author?: string;
   updatedAt: WireDate;
   /** The person has opened its page (reviews/open, #3464): its row is drawn read, not bold. */
@@ -13096,7 +13101,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RetentionState: { required: ["settings", "archivedCount", "archivedBytes"], optional: [] },
   ReviewDismissRequest: { required: ["folder", "url"], optional: [] },
   ReviewOpenRequest: { required: ["folder", "url"], optional: [] },
-  ReviewPull: { required: ["url", "number", "title", "repo", "updatedAt"], optional: ["author", "opened"] },
+  ReviewPull: { required: ["url", "number", "title", "repo", "updatedAt"], optional: ["ref", "author", "opened"] },
   Runtime: { required: ["id", "name", "executable", "arguments", "installPage", "usesAppCopyOnly"], optional: ["install", "accountFolderVariable"] },
   RuntimeAccount: { required: ["runtimeID", "state", "authMethods", "canLogOut", "providers", "promptCapabilities", "canSteer", "checkedAt"], optional: ["currentProviderID", "signedInAs"] },
   RuntimeAllowances: { required: ["rows", "at"], optional: ["shared"] },

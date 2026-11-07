@@ -22141,6 +22141,10 @@
           "type": "string",
           "description": "owner/name."
         },
+        "ref": {
+          "type": "string",
+          "description": "Its lineage ref, \"github:owner/name#12\" or \"gitlab:group/project!12\": a press opens its Work page in the app. Nil from an older host: a press opens its forge page."
+        },
         "author": {
           "type": "string"
         },
