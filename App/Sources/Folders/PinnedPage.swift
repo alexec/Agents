@@ -185,8 +185,9 @@ final class PagePictures {
 
     private let model: AppModel
     private let folder: FolderKey
-    /// About a page or two of diagrams, as the phone keeps (#175, #213).
-    private var held = LRUCache<URL, Held>(limit: 24)
+    /// About a page or two of diagrams, and at most 64 MiB of them, as the phone keeps
+    /// (#175, #213, #3650).
+    private var held = LRUCache<URL, Held>(limit: 24, costLimit: pictureBytesHeld)
 
     init(model: AppModel, folder: FolderKey) {
         self.model = model
@@ -209,7 +210,7 @@ final class PagePictures {
             return known
         case .image(let bytes, _, let stamp):
             let fresh = Held(stamp: stamp, image: NSImage(data: bytes))
-            held.set(fresh, for: url)
+            held.set(fresh, for: url, cost: pictureCost(fresh.image, read: bytes))
             return fresh
         case .text(_, _, _, let stamp), .other(_, _, let stamp):
             let fresh = Held(stamp: stamp, image: nil)

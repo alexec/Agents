@@ -421,6 +421,7 @@ func (d *Daemon) archiveBy(id wire.UUID, by wire.AgentArchivedReason) error {
 		d.checkQueueSoon(folderPath(a))
 	}
 	d.agentEnded(id)
+	d.forgetAgentInMemory(id)
 	// An archived session is not kept pinned (unpinArchived).
 	if a := d.Store.Agent(id); a != nil {
 		d.unpinSession(folderPath(a), id)

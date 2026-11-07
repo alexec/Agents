@@ -169,3 +169,31 @@ func TestTheDesk(t *testing.T) {
 		t.Fatal(string(b))
 	}
 }
+
+// #3650: a need that is never withdrawn (its host crashed) goes from the desk after a week.
+func TestTheDeskForgetsAnOldNeed(t *testing.T) {
+	desk := NewDesk()
+	devices := []Device{device(phone, IPhone, &yes, t0)}
+	heard := func(id string, now time.Time) {
+		var message AttentionNeed
+		raised := strconv.FormatFloat(float64(wire.DateOf(now.Add(-600*time.Second))), 'g', -1, 64)
+		if err := json.Unmarshal([]byte(`{"need":{"id":{"permission":"`+id+`"},"agentID":"`+agent+
+			`","folder":"file:///work","kind":"permission","raisedAt":`+raised+
+			`,"headline":{"h1":"work","h2":"Fix the test","h3":"may run a command"}}}`), &message); err != nil {
+			t.Fatal(err)
+		}
+		devices[0].LastSeen = now
+		if out := desk.Heard(message, map[Surface]Presence{dev(phone): {Surface: dev(phone), Active: true, HeardAt: now}}, devices, now); len(out) != 1 {
+			t.Fatalf("%+v", out)
+		}
+	}
+	heard("E0000000-0000-4000-8000-000000000005", t0)
+	heard("E0000000-0000-4000-8000-000000000006", t0.Add(time.Hour))
+	if len(desk.posted) != 2 {
+		t.Fatalf("%d posted", len(desk.posted))
+	}
+	heard("E0000000-0000-4000-8000-000000000007", t0.Add(postedFor+30*time.Minute))
+	if len(desk.posted) != 2 {
+		t.Fatalf("%d posted after a week", len(desk.posted))
+	}
+}

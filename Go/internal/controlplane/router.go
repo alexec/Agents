@@ -84,7 +84,8 @@ type Router struct {
 	asks map[string]*hostAsk
 	// Kept requests on their way to a host, by their delivery, until it answers.
 	keptWaits map[string]chan *message
-	// Where each session last said the person was, keyed by the session.
+	// Where each session last said the person was, keyed by the session; a report made at
+	// another copy is keyed by peerPresenceKey and goes when no copy links its client.
 	presence map[string]notedPresence
 	// Told when a host's real uplink here ends.
 	localEnded func(host string)
@@ -550,10 +551,14 @@ func (r *Router) DropPeer(id string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	delete(r.peers, id)
-	if gone := r.peerLinks[id]; len(gone) > 0 {
+	gone := r.peerLinks[id]
+	if len(gone) > 0 {
 		r.broadcastControlLocked("control/clientChanged", map[string]any{})
 	}
 	delete(r.peerLinks, id)
+	for client := range gone {
+		r.forgetPeerPresenceLocked(client)
+	}
 	for _, h := range r.hosts {
 		if !h.local {
 			continue
@@ -662,8 +667,24 @@ func (r *Router) NotePeerLink(peer, client string, connected bool) {
 		r.peerLinks[peer][client] = true
 	} else {
 		delete(r.peerLinks[peer], client)
+		r.forgetPeerPresenceLocked(client)
 	}
 	r.broadcastControlLocked("control/clientChanged", map[string]any{"client": client})
+}
+
+// peerPresenceKey is where a presence report made at another copy is kept: apart from the
+// sessions here, so the end of a session here never takes it, nor the end of a link to it.
+func peerPresenceKey(client string) string { return "peer/" + client }
+
+// forgetPeerPresenceLocked drops a client's report made at another copy once no copy links
+// it any more (#3650): it was added by client and never removed, so it grew without bound.
+func (r *Router) forgetPeerPresenceLocked(client string) {
+	for _, links := range r.peerLinks {
+		if links[client] {
+			return
+		}
+	}
+	delete(r.presence, peerPresenceKey(client))
 }
 
 // LinksHere is every client connected here, as it was said: for a peer that just linked.
@@ -697,12 +718,12 @@ func (r *Router) NotePeerPresence(client string, device bool, report json.RawMes
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	previous := r.presence[client]
+	previous := r.presence[peerPresenceKey(client)]
 	may := p.MayNotify
 	if may == nil {
 		may = previous.mayNotify
 	}
-	r.presence[client] = notedPresence{client: client, device: device, watching: (*string)(p.Watching), active: p.Active,
+	r.presence[peerPresenceKey(client)] = notedPresence{client: client, device: device, watching: (*string)(p.Watching), active: p.Active,
 		heardAt: time.Now(), mayNotify: may}
 }
 

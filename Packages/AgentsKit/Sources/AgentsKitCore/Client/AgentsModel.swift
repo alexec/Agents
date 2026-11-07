@@ -92,8 +92,17 @@ public final class AgentsModel {
     public private(set) var firstPrompt: Int?
     public private(set) var openTurnStart = 0
     public var hasMoreTurns: Bool { firstTurn > 0 }
-    /// Whether anything at all of the conversation comes before what is in hand.
-    public var hasMoreOfTheConversation: Bool { hasMoreBefore || hasMoreTurns }
+    /// Whether anything of the conversation comes before what is in hand, and the chat will
+    /// still take it. At the history cap it waits until the reader is back at the end, as on
+    /// the web page (#3650).
+    public var hasMoreOfTheConversation: Bool {
+        hasMoreBefore ? entries.count < Self.historyEntriesCap : hasMoreTurns && turns.count < Self.historyTurnsCap
+    }
+    /// How much history a chat scrolled up keeps (#3650, the web page's `historyEntriesCap`
+    /// and `historyTurnsCap`). The trims below run only while the chat follows the end, so
+    /// without these a chat paged back held all of a conversation, once per window.
+    public static let historyEntriesCap = 1_600
+    public static let historyTurnsCap = 200
     /// The page as the chat draws it: chunks joined, tool calls folded into runs.
     ///
     /// Kept here, folded once as each entry lands, rather than folded by the view on
@@ -1221,6 +1230,12 @@ public final class AgentsModel {
             recentEvents = page.events
         }
         moreEvents = page.hasMore
+        // Paging back stops at eventsPagedMost (#3650): what is further back is still the
+        // daemon's, but this list does not take it.
+        if recentEvents.count >= Self.eventsPagedMost {
+            recentEvents.removeLast(recentEvents.count - Self.eventsPagedMost)
+            moreEvents = false
+        }
         waitingAgents = page.waiting
         eventsLoaded = true
     }
@@ -1264,6 +1279,8 @@ public final class AgentsModel {
 
     /// How many live events a window keeps before the oldest go; paging back brings them in.
     static let eventsKept = 1_000
+    /// The most events paging back brings in (#3650), as on the web page.
+    static let eventsPagedMost = 5_000
 
     /// What an agent is waiting on, in the words its row, card and capsule use.
     public func waitStatus(of agent: Agent) -> WaitStatus? {
@@ -1394,6 +1411,7 @@ public final class AgentsModel {
     /// Earlier finished turns, put in front. While the reader is up the page, they
     /// stay; back at the end, the cap lets the oldest go (#285).
     public func prependTurns(_ page: TurnsPage) {
+        guard turns.count < Self.historyTurnsCap else { return }
         turns = (page.turns + turns).keepingLastTurnWithEachID()
         firstTurn = page.firstTurn
         firstPrompt = page.firstPrompt
@@ -1458,6 +1476,7 @@ public final class AgentsModel {
 
     /// An earlier page, put in front of what is already held.
     public func prepend(_ page: TranscriptPage) {
+        guard entries.count < Self.historyEntriesCap else { return }
         // Only what is not already held. Where a trimmed page starts is counted, not
         // read off the file, and an entry that was heard but never written would put
         // the count past it: the page asked for then ends with entries already here.
