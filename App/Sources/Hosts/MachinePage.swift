@@ -190,28 +190,68 @@ struct MachinePage: View {
     }
 }
 
-/// A machine's row under Machines in the sidebar (#3626): its name, and offline when it is.
+/// A machine's row under Machines in the sidebar (#3626): its name, and under it, in grey,
+/// the most urgent thing it needs (#3764), with Start for a stopped workspace. A machine
+/// that needs nothing shows only its name.
 struct MachineRow: View {
     @Environment(AppModel.self) private var model
     let host: MachineRef
 
     var body: some View {
         let name = model.hosts.label(host)
-        let offline = model.hosts.isOffline(host)
-        HStack(alignment: .firstTextBaseline) {
+        let row = model.hosts.controlRows[host]
+        let need = model.need(of: host)
+        let words = need.map { MachineNeedWords.line($0, name: name, row: row) }
+        VStack(alignment: .leading, spacing: 2) {
             Text(name).foregroundStyle(.primary).lineLimit(1)
-            Spacer()
-            if offline {
-                Text("Offline").appText(.fine).foregroundStyle(.secondary)
+            if let words {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(words)
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                    if need == .stopped, let row, let workspace = row.workspace,
+                       OfflineWords.offersStart(state: row.state, workspace: workspace) {
+                        Button("Start") { Task { await model.startHost(host) } }
+                            .controlSize(.small)
+                            .disabled(model.hostsBeingStarted.contains(host))
+                            .help("Starts \(workspace.workspaceName) at \(workspace.providerName).")
+                    }
+                }
             }
         }
-        .help(model.diskWarns(host) ? "\(name): a disk is low. Its CPU, memory, disks, worktrees, runtimes and resources"
-            : "\(name): its CPU, memory, disks, worktrees, runtimes and resources")
-        .accessibilityValue(offline ? "Offline" : "")
+        .help(words.map { "\(name): \($0)" } ?? (model.diskWarns(host)
+            ? "\(name): a disk is low. Its CPU, memory, disks, worktrees, runtimes and resources"
+            : "\(name): its CPU, memory, disks, worktrees, runtimes and resources"))
+        .accessibilityElement(children: .contain)
+        .accessibilityValue(words ?? "")
+    }
+}
+
+/// The grey line under a machine's row (#3764), in the words the rest of the window says
+/// them in: the sidebar foot's (OfflineWords), set-up's (HostProblem) and updates' (UpdateWords).
+enum MachineNeedWords {
+    static func line(_ need: MachineNeed, name: String, row: DaemonAPI.ControlMachine?) -> String {
+        switch need {
+        case .offline, .stopped: OfflineWords.footLine(name: name, row: row)
+        case .setupFailed: HostProblem.installFailed("").sentence(name: name, label: name)
+        case .update: row.map(UpdateWords.state) ?? "Needs an update"
+        case .signIn(let runtimes):
+            "\(ListFormatter.localizedString(byJoining: runtimes)) \(runtimes.count == 1 ? "needs" : "need") sign-in"
+        }
     }
 }
 
 extension AppModel {
+    /// A machine's most urgent need, as its row says it (#3764). Sign-in is what its runtimes
+    /// last said: This Mac's are always read, a server's when its page was opened.
+    func need(of host: MachineRef) -> MachineNeed? {
+        MachineNeed.most(row: hosts.controlRows[host], offline: hostUnreachable(host),
+                         runtimes: runtimes(on: host))
+    }
+
     /// Whether a disk on the machine is low or almost full, as its page says (#3626, #3628).
     func diskWarns(_ host: MachineRef) -> Bool {
         let alarms = host == .mac ? work.disk.alarms : serverDisks[host]?.alarms ?? []

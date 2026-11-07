@@ -1232,6 +1232,9 @@ button.remove:hover { opacity: 1; }
 .sub-app .settings-body .settings-scope { margin-bottom: 20px; }
 .sub-app .settings-body .scope-head { font-size: 0.875rem; font-weight: 600; margin: 8px 8px 4px; }
 .sub-app-row { display: flex; justify-content: space-between; align-items: center; }
+/* A machine's need under its row (#3764), as the window's grey line. */
+.machine-need { padding: 0 20px 6px; margin-top: -6px; font-size: 0.75rem; line-height: 1.35; }
+.machine-need .foot-start { margin-left: 6px; font-size: inherit; }
 .team-workflows { display: flex; flex-direction: column; gap: 12px; max-width: 720px; }
 .bot-card { border: 1px solid var(--paper-rule); border-radius: var(--radius-card); padding: 10px 12px; background: var(--paper-raised); }
 .bot-card h3 { margin: 0 0 2px; font-size: 0.875rem; }
