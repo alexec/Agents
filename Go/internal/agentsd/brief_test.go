@@ -296,11 +296,11 @@ func TestTheBriefNamesEveryAppTool(t *testing.T) {
 		browser, screen, bot, github bool
 		named, unnamed               []string
 	}{
-		{false, false, false, false, nil, []string{"browser_", "fill_secret", "hand_to_person", "drive_screen", "set_ci_secret", "make_app_repository"}},
+		{false, false, false, false, nil, []string{"browser_", "fill_secret", "hand_to_person", "drive_screen", "set_ci_secret", "make_app_repository", "start-a-new-app"}},
 		{true, false, false, false, []string{"browser_* tools", "fill_secret", "hand_to_person", "take the browser lease themselves"}, []string{"drive_screen"}},
 		{true, false, true, false, []string{"browser_* tools", "fill_secret"}, []string{"hand_to_person"}},
 		{false, true, false, false, []string{"drive_screen", "takes the screen lease itself"}, []string{"browser_"}},
-		{false, false, false, true, []string{"set_ci_secret", "set_ci_variable", "set_environment_gate", "make_app_repository"}, []string{"browser_"}},
+		{false, false, false, true, []string{"set_ci_secret", "set_ci_variable", "set_environment_gate", "make_app_repository", "start-a-new-app"}, []string{"browser_"}},
 	} {
 		got := toolsBrief(c.browser, c.screen, c.bot, c.github)
 		for _, w := range c.named {
@@ -312,6 +312,31 @@ func TestTheBriefNamesEveryAppTool(t *testing.T) {
 			if strings.Contains(got, w) {
 				t.Errorf("%+v: %q in %q", c, w, got)
 			}
+		}
+	}
+}
+
+// #3712: the brief's start-a-new-app is a ready-made skill, so every person has it, and
+// it names only app tools that this host serves.
+func TestTheNewAppSkillIsReadyMade(t *testing.T) {
+	const id = "start-a-new-app"
+	found := false
+	for _, s := range readyMadeSkillIDs() {
+		found = found || s == id
+	}
+	if !found {
+		t.Fatalf("%s is not a ready-made skill: %v", id, readyMadeSkillIDs())
+	}
+	skill, err := readyMadeSkillsFS.ReadFile("readymadeskills/" + id + "/SKILL.md")
+	if err != nil || !strings.HasPrefix(string(skill), "---\nname: "+id+"\n") {
+		t.Fatalf("its SKILL.md does not start with its name: %v", err)
+	}
+	for _, tool := range []string{"make_app_repository", "set_environment_gate", "set_ci_secret", "set_ci_variable", "ask_secret", "ask_question", "wait_for_event", "start_session"} {
+		if !strings.Contains(string(skill), "`"+tool+"`") {
+			t.Errorf("the skill does not name %s", tool)
+		}
+		if !appToolServed(tool) {
+			t.Errorf("the skill names %s, which this host does not serve", tool)
 		}
 	}
 }
