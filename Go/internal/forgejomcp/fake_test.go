@@ -3,6 +3,7 @@ package forgejomcp
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -42,11 +43,21 @@ type fakeForgejo struct {
 	adminless     bool
 	collaborators map[string]bool
 	status        int // answer every request with this, when set
+	// version is what /version says: Forgejo 17 when empty.
+	version string
+	// runs are the Actions runs, newest first; jobs a run's jobs by its id, logs a job's log by
+	// its id, and with ?step=n, one step's. giteaJobs answers a run's jobs as Gitea does, {"jobs": …}.
+	runs      []obj
+	jobs      map[int][]obj
+	logs      map[string]string
+	giteaJobs bool
+	ranges    []string // each log read's Range
 	server        *httptest.Server
 }
 
 func newFake(t *testing.T) *fakeForgejo {
 	f := &fakeForgejo{t: t, timeline: map[int][]obj{}, reviews: map[int][]obj{}, lines: map[int][]obj{}, statuses: map[string]obj{},
+		jobs: map[int][]obj{}, logs: map[string]string{},
 		perms: map[string]string{"alex": "admin", "dev": "write", "reader": "read"}, me: "alex", collaborators: map[string]bool{}}
 	f.server = httptest.NewServer(http.HandlerFunc(f.serve))
 	t.Cleanup(f.server.Close)
@@ -114,6 +125,9 @@ var (
 	statusPath   = regexp.MustCompile(`^/api/v1/repos/acme/app/commits/([^/]+)/status$`)
 	permPath     = regexp.MustCompile(`^/api/v1/repos/acme/app/collaborators/([^/]+)/permission$`)
 	collabPath   = regexp.MustCompile(`^/api/v1/repos/acme/app/collaborators/([^/]+)$`)
+	runJobsPath  = regexp.MustCompile(`^/api/v1/repos/acme/app/actions/runs/([0-9]+)/jobs$`)
+	jobPath      = regexp.MustCompile(`^/api/v1/repos/acme/app/actions/jobs/([0-9]+)$`)
+	jobLogPath   = regexp.MustCompile(`^/api/v1/repos/acme/app/actions/jobs/([0-9]+)/logs$`)
 )
 
 func (f *fakeForgejo) serve(w http.ResponseWriter, r *http.Request) {
@@ -161,6 +175,58 @@ func (f *fakeForgejo) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch {
+	case p == "/api/v1/version":
+		v := f.version
+		if v == "" {
+			v = "17.0.1+gitea-1.22.0"
+		}
+		reply(obj{"version": v})
+	case p == "/api/v1/repos/acme/app/actions/runs":
+		out := []obj{}
+		for _, run := range f.runs {
+			// Forgejo filters by run_number; Gitea has no such filter and lists them all.
+			if f.giteaJobs || q.Get("run_number") == "" || strconv.Itoa(run["index_in_repo"].(int)) == q.Get("run_number") {
+				out = append(out, run)
+			}
+		}
+		reply(obj{"workflow_runs": out, "total_count": len(out)})
+	case runJobsPath.MatchString(p):
+		jobs := orEmpty(f.jobs[n(runJobsPath.FindStringSubmatch(p))])
+		if f.giteaJobs {
+			reply(obj{"jobs": jobs, "total_count": len(jobs)})
+			return
+		}
+		reply(jobs)
+	case jobPath.MatchString(p):
+		id := n(jobPath.FindStringSubmatch(p))
+		for _, jobs := range f.jobs {
+			for _, j := range jobs {
+				if j["id"] == id {
+					reply(j)
+					return
+				}
+			}
+		}
+		w.WriteHeader(http.StatusNotFound)
+	case jobLogPath.MatchString(p):
+		key := jobLogPath.FindStringSubmatch(p)[1]
+		if step := q.Get("step"); step != "" {
+			key += "?step=" + step
+		}
+		text, ok := f.logs[key]
+		if !ok {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		f.ranges = append(f.ranges, r.Header.Get("Range"))
+		// The end the Range asks for, as Forgejo's ServeContent answers it.
+		if size, err := strconv.Atoi(strings.TrimPrefix(r.Header.Get("Range"), "bytes=-")); err == nil && size < len(text) {
+			w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", len(text)-size, len(text)-1, len(text)))
+			w.WriteHeader(http.StatusPartialContent)
+			_, _ = w.Write([]byte(text[len(text)-size:]))
+			return
+		}
+		_, _ = w.Write([]byte(text))
 	case p == "/api/v1/user":
 		reply(obj{"id": 1, "login": f.me})
 	case p == "/api/v1/repos/acme/app":

@@ -37,6 +37,17 @@ type forgeForgejo interface {
 	Merge(ctx context.Context, repo string, number int, sha, method string, auto bool) error
 	Approve(ctx context.Context, repo string, number int, sha string) (string, error)
 	PRDiff(ctx context.Context, repo string, number int) (map[string]any, error)
+	// What lineage asks (lineageforgejo.go).
+	Node(ctx context.Context, repo string, number int) (forgejomcp.Node, error)
+	MilestoneNode(ctx context.Context, repo string, id int) (forgejomcp.Node, error)
+	Milestones(ctx context.Context, repo string) ([]forgejomcp.Milestone, error)
+	CommitTime(ctx context.Context, repo, ref string) (time.Time, error)
+	Compare(ctx context.Context, repo, base, head string) ([]forgejomcp.Commit, error)
+	CommitPR(ctx context.Context, repo, sha string) (int, error)
+	CostComment(ctx context.Context, repo string, number int, id, mark, body string) (string, error)
+	Plan(ctx context.Context, repo string, number int) (forgejomcp.Plan, error)
+	CreateIssue(ctx context.Context, repo, title string, labels []string) (int, string, error)
+	SetBlockedBy(ctx context.Context, repo string, number int, blockerRepo string, blockerNumber int, blocked bool) error
 }
 
 // forgejoNoChecksAPI is why a Forgejo pull request's checks are not run again or read here.
@@ -101,6 +112,9 @@ func (d *Daemon) forgejoRepoAt(ctx context.Context, folder, connected string) (r
 	return root, repo
 }
 
+// onGitHubOrGitLab says r is a GitHub or GitLab repo, which the Forgejo lists leave to theirs.
+func onGitHubOrGitLab(r forgeRepo) bool { return r.forge == "github" || r.forge == "gitlab" }
+
 // forgejoSources adds to s the repositories of folders on the connected Forgejo: a folder whose
 // remote is neither GitHub's nor GitLab's. A Forgejo folder elsewhere leaves a reason.
 func (d *Daemon) forgejoSources(ctx context.Context, s *forgeSources, folders []string) {
@@ -108,7 +122,7 @@ func (d *Daemon) forgejoSources(ctx context.Context, s *forgeSources, folders []
 	s.forgejoRoot = root
 	elsewhere := false
 	for _, f := range folders {
-		if d.folderRepo(f).forge != "" {
+		if onGitHubOrGitLab(d.folderRepo(f)) {
 			continue
 		}
 		at, repo := d.forgejoRepoAt(ctx, f, c.URL)
@@ -157,7 +171,7 @@ func (d *Daemon) forgejoOf(ctx context.Context, method, repo string) (forgeForge
 		return nil, "", "", errors.New(forgejomcp.NotConnected)
 	}
 	for _, f := range d.folderPaths() {
-		if d.folderRepo(f).forge != "" {
+		if onGitHubOrGitLab(d.folderRepo(f)) {
 			continue
 		}
 		if at, named := d.forgejoRepoAt(ctx, f, c.URL); at == root && strings.EqualFold(named, repo) {
@@ -222,8 +236,64 @@ func forgejoItemOf(i forgejomcp.Item, folder string) wire.ForgeItem {
 	if i.PR {
 		out.Draft, out.AutoMerge = new(i.Draft), new(i.AutoMerge)
 		out.Checks, out.Review, out.Mergeable = optional(i.Checks), optional(i.Review), optional(i.Mergeable)
+		return out
 	}
+	// An issue's level and feature are its labels'; Forgejo has no parent, and a list does not
+	// read an epic's children (forgejoPlan does).
+	withHierarchy(&out, nil, 0, 0)
 	return out
+}
+
+// forgejoPlan is a Forgejo epic and its children, the issues it depends on (#3835), each blocked
+// by the issues it depends on. The children say the epic is their parent, and the epic says how
+// many of them are done.
+func (d *Daemon) forgejoPlan(ctx context.Context, method, repo string, number int) (wire.ForgeItem, []planChild, error) {
+	fj, named, folder, err := d.forgejoOf(ctx, method, repo)
+	if err != nil {
+		return wire.ForgeItem{}, nil, err
+	}
+	p, err := fj.Plan(ctx, named, number)
+	if err != nil {
+		if forgejomcp.IsNotFound(err) {
+			return wire.ForgeItem{}, nil, Invalid("%s: %v", method, err)
+		}
+		return wire.ForgeItem{}, nil, err
+	}
+	epic := forgejoItemOf(p.Epic, folder)
+	var children []planChild
+	done := 0
+	for _, c := range p.Children {
+		item := forgejoItemOf(c.Item, d.forgejoFolder(ctx, c.Repo, named, folder))
+		item.Parent = new(epic.Node)
+		if item.State == "closed" {
+			done++
+		}
+		pc := planChild{item: item}
+		for _, b := range c.BlockedBy {
+			pc.blockedBy = append(pc.blockedBy, planRef{node: forgejoNode(b.Repo, b.Number, b.PR), open: b.Open})
+		}
+		children = append(children, pc)
+	}
+	withHierarchy(&epic, nil, len(children), done)
+	return epic, children, nil
+}
+
+// forgejoFolder is the folder of repo on the connected Forgejo: folder when repo is the epic's
+// own (named), else the folder a list would give it, if any.
+func (d *Daemon) forgejoFolder(ctx context.Context, repo, named, folder string) string {
+	if strings.EqualFold(repo, named) {
+		return folder
+	}
+	c, root := d.forgejoRoot()
+	for _, f := range d.folderPaths() {
+		if onGitHubOrGitLab(d.folderRepo(f)) {
+			continue
+		}
+		if at, r := d.forgejoRepoAt(ctx, f, c.URL); at == root && strings.EqualFold(r, repo) {
+			return f
+		}
+	}
+	return ""
 }
 
 // forgejoMerge merges a pull request by the method asked for, or the repository's default.

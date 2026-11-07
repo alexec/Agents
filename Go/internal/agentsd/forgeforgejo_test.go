@@ -3,6 +3,7 @@ package agentsd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/internal/connections"
 	"github.com/alexec/agents/Go/internal/forgejomcp"
 	"github.com/alexec/agents/Go/wire"
@@ -21,6 +23,8 @@ type fakeForgeForgejo struct {
 	searches []string
 	items    []string
 	wrote    []string
+	// asked is what lineage asked (lineageforgejo_test.go).
+	asked []string
 }
 
 func (f *fakeForgeForgejo) note(to *[]string, s string) {
@@ -32,10 +36,14 @@ func (f *fakeForgeForgejo) note(to *[]string, s string) {
 func (f *fakeForgeForgejo) Search(_ context.Context, repos []string, sf forgejomcp.SearchFilter, after string, first int) (forgejomcp.SearchPage, error) {
 	f.note(&f.searches, fmt.Sprintf("%v prs=%v label=%s after=%s first=%d", repos, sf.PRs, sf.Label, after, first))
 	page := forgejomcp.SearchPage{}
+	labels := []string{"bug"}
+	if sf.Label == "epic" {
+		labels = []string{"epic", "feature:Export"}
+	}
 	for n, repo := range repos {
 		page.Items = append(page.Items, forgejomcp.Item{Repo: repo, Number: 7 + n, PR: sf.PRs, State: "open", Title: "On " + repo,
 			URL: "http://localhost:3753/" + repo + "/issues/7", Author: "kim", UpdatedAt: "2026-11-07T10:00:00Z",
-			Labels: []string{"bug"}, LabelColors: map[string]string{"bug": "#ee0701"}, Mergeable: "unknown"})
+			Labels: labels, LabelColors: map[string]string{"bug": "#ee0701", "feature:Export": "#5319e7"}, Mergeable: "unknown"})
 		page.Cursors = append(page.Cursors, "c"+repo)
 	}
 	return page, nil
@@ -93,6 +101,31 @@ func (f *fakeForgeForgejo) Approve(_ context.Context, repo string, number int, s
 func (f *fakeForgeForgejo) PRDiff(_ context.Context, repo string, number int) (map[string]any, error) {
 	return map[string]any{"files": []any{map[string]any{"path": "hello.txt", "change": "added", "additions": 1, "deletions": 0,
 		"hunks": []any{map[string]any{"oldStart": 0, "newStart": 1, "lines": []any{map[string]any{"kind": "added", "text": "hello"}}}}}}}, nil
+}
+
+func (f *fakeForgeForgejo) Plan(_ context.Context, repo string, number int) (forgejomcp.Plan, error) {
+	f.note(&f.items, fmt.Sprintf("plan %s#%d", repo, number))
+	if number == 404 {
+		return forgejomcp.Plan{}, &forgejomcp.ForgejoError{Kind: forgejomcp.NotFound, Message: "not found on Forgejo"}
+	}
+	issue := func(n int, state string, labels ...string) forgejomcp.Item {
+		return forgejomcp.Item{Repo: repo, Number: n, State: state, Title: fmt.Sprint("Issue ", n), Labels: labels, UpdatedAt: "2026-11-07T10:00:00Z"}
+	}
+	return forgejomcp.Plan{Epic: issue(number, "open", "epic", "feature:Export"), Children: []forgejomcp.PlanChild{
+		{Item: issue(2, "open", "story"), BlockedBy: []forgejomcp.Ref{{Repo: repo, Number: 3}}},
+		{Item: issue(3, "closed", "task"), BlockedBy: []forgejomcp.Ref{}},
+		{Item: issue(4, "open"), BlockedBy: []forgejomcp.Ref{{Repo: "kim/notes", Number: 9, Open: true}}},
+	}}, nil
+}
+
+func (f *fakeForgeForgejo) CreateIssue(_ context.Context, repo, title string, labels []string) (int, string, error) {
+	f.note(&f.wrote, fmt.Sprintf("create %s %s %v", repo, title, labels))
+	return 12, "http://localhost:3753/" + repo + "/issues/12", nil
+}
+
+func (f *fakeForgeForgejo) SetBlockedBy(_ context.Context, repo string, number int, blockerRepo string, blockerNumber int, blocked bool) error {
+	f.note(&f.wrote, fmt.Sprintf("blocked %s#%d by %s#%d %v", repo, number, blockerRepo, blockerNumber, blocked))
+	return nil
 }
 
 // forgejoDaemon is a daemon with a folder on the connected Forgejo (localhost:3753), one on
@@ -256,5 +289,155 @@ func TestForgejoOfNode(t *testing.T) {
 		if got != want {
 			t.Errorf("%s: %q, want %q", ref, got, want)
 		}
+	}
+}
+
+// #3835: a Forgejo epic's plan is the issues it depends on, in steps by their own dependencies;
+// a blocker outside the plan is said; the children say the epic is their parent.
+func TestForgePlanReadsAForgejoEpic(t *testing.T) {
+	_, c, fj, _ := forgejoDaemon(t)
+	epic := wire.LineageNode{Kind: "issue", Ref: "forgejo:walkalex/app#1"}
+	var plan wire.ForgePlan
+	json.Unmarshal(c.call(t, 1, "forge/plan", wire.ForgePlanRequest{Node: epic}), &plan)
+	if deref(plan.Item.Level) != "epic" || deref(plan.Item.Feature) != "Export" || plan.Item.Progress == nil ||
+		plan.Item.Progress.Done != 1 || plan.Item.Progress.Total != 3 || deref(plan.Item.Folder) == "" {
+		t.Fatalf("epic: %+v", plan.Item)
+	}
+	var got []string
+	for _, ch := range plan.Children {
+		got = append(got, fmt.Sprintf("%s step=%d level=%s parent=%v outside=%v", ch.Item.Node.Ref, ch.Step, deref(ch.Item.Level),
+			ch.Item.Parent != nil && *ch.Item.Parent == epic, ch.BlockedOutside))
+	}
+	want := []string{
+		"forgejo:walkalex/app#3 step=1 level=task parent=true outside=[]",
+		"forgejo:walkalex/app#4 step=1 level= parent=true outside=[{issue forgejo:kim/notes#9}]",
+		"forgejo:walkalex/app#2 step=2 level=story parent=true outside=[]",
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("children:\n%s", strings.Join(got, "\n"))
+	}
+	if fj.items[0] != "plan walkalex/App#1" {
+		t.Fatalf("Forgejo was asked %v", fj.items)
+	}
+	for i, n := range []wire.LineageNode{{Kind: "issue", Ref: "forgejo:walkalex/app#404"}, {Kind: "issue", Ref: "forgejo:kim/notes#1"}} {
+		if e := c.callError(t, 10+i, "forge/plan", wire.ForgePlanRequest{Node: n}); e == nil || !strings.Contains(e.Message, "forge/plan") {
+			t.Fatalf("%s: %v", n.Ref, e)
+		}
+	}
+}
+
+// forge/features counts a Forgejo epic under its feature:<name> label.
+func TestForgeFeaturesCountForgejoEpics(t *testing.T) {
+	_, c, _, _ := forgejoDaemon(t)
+	var features wire.ForgeFeatures
+	json.Unmarshal(c.call(t, 1, "forge/features", wire.ForgeFeaturesRequest{}), &features)
+	var export *wire.ForgeFeature
+	for _, f := range features.Features {
+		if f.Name == "Export" {
+			export = &f
+		}
+	}
+	if export == nil || export.Epics != 1 || export.Open != 1 || deref(export.Color) != "#5319e7" {
+		t.Fatalf("features: %+v", features)
+	}
+}
+
+// Add child makes the Forgejo epic depend on a new issue (in the epic's feature) or one that is
+// there; Blocked by makes a child depend on another, or no longer.
+func TestForgePlanWritesOnAForgejoEpic(t *testing.T) {
+	_, c, fj, _ := forgejoDaemon(t)
+	epic := wire.LineageNode{Kind: "issue", Ref: "forgejo:walkalex/app#1"}
+	var done wire.ForgeDone
+	json.Unmarshal(c.call(t, 1, "forge/add-child", wire.ForgeAddChildRequest{Node: epic, Title: new("Export as CSV"), Level: new("story")}), &done)
+	if deref(done.URL) != "http://localhost:3753/walkalex/App/issues/12" {
+		t.Fatalf("add child: %+v", done)
+	}
+	c.call(t, 2, "forge/add-child", wire.ForgeAddChildRequest{Node: epic, Issue: new("#5")})
+	c.call(t, 3, "forge/add-child", wire.ForgeAddChildRequest{Node: epic, Issue: new("walkalex/lib#6")})
+	c.call(t, 4, "forge/add-child", wire.ForgeAddChildRequest{Node: epic, Issue: new("http://localhost:3753/walkalex/App/issues/7")})
+	child := wire.LineageNode{Kind: "issue", Ref: "forgejo:walkalex/app#2"}
+	c.call(t, 5, "forge/blocked-by", wire.ForgeBlockedByRequest{Node: child, Add: []wire.LineageNode{{Kind: "issue", Ref: "forgejo:walkalex/app#4"}},
+		Remove: []wire.LineageNode{{Kind: "issue", Ref: "forgejo:walkalex/app#3"}}})
+	want := []string{"create walkalex/App Export as CSV [story feature:Export]", "blocked walkalex/App#1 by walkalex/App#12 true",
+		"blocked walkalex/App#1 by walkalex/app#5 true", "blocked walkalex/App#1 by walkalex/lib#6 true",
+		"blocked walkalex/App#1 by walkalex/app#7 true",
+		"blocked walkalex/App#2 by walkalex/app#4 true", "blocked walkalex/App#2 by walkalex/app#3 false"}
+	if strings.Join(fj.wrote, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("wrote:\n%s", strings.Join(fj.wrote, "\n"))
+	}
+	for i, r := range []struct{ issue, says string }{
+		{"#1", "not its own child"},
+		{"https://codeberg.org/kim/notes/issues/3", "not an issue on the connected Forgejo"},
+		{"ENG-4", "not an issue on the connected Forgejo"},
+	} {
+		if e := c.callError(t, 10+i, "forge/add-child", wire.ForgeAddChildRequest{Node: epic, Issue: new(r.issue)}); e == nil || !strings.Contains(e.Message, r.says) {
+			t.Fatalf("%s: %v", r.issue, e)
+		}
+	}
+	if e := c.callError(t, 20, "forge/blocked-by", wire.ForgeBlockedByRequest{Node: child, Add: []wire.LineageNode{{Kind: "issue", Ref: "github:alexec/agents#1"}}}); e == nil ||
+		!strings.Contains(e.Message, "not on the forge") {
+		t.Fatalf("a blocker on GitHub: %v", e)
+	}
+}
+
+// A list narrowed to a board has no Forgejo items: Forgejo's API cannot read its project boards.
+func TestABoardLeavesForgejoOut(t *testing.T) {
+	s := forgeSources{forgejo: []string{"walkalex/App"}, forgejoErr: errors.New("elsewhere")}
+	narrowToBoard(&s, wire.ProjectBoard{Forge: new(wire.ConnectionProviderGithub), Key: new("alexec/1")}, []string{"/f"}, false)
+	if s.forgejo != nil || s.forgejoErr != nil {
+		t.Fatalf("sources: %+v", s)
+	}
+}
+
+// #3834: lineage takes a Forgejo folder's labels and pull request events as Forgejo nodes: a
+// folder on the connected Forgejo while it is connected, and a Codeberg folder by its host.
+// Nothing is asked of gh or glab about them.
+func TestLineageOnAForgejoFolder(t *testing.T) {
+	d, _, _, file := forgejoDaemon(t)
+	var connected, codeberg string
+	for _, f := range d.folderPaths() {
+		switch d.folderRepo(f) {
+		case forgeRepo{"forgejo", "walkalex/app"}:
+			connected = f
+		case forgeRepo{"forgejo", "kim/notes"}:
+			codeberg = f
+		}
+	}
+	if connected == "" || codeberg == "" {
+		t.Fatalf("the Forgejo folders' repos: %v", d.folderPaths())
+	}
+	branch := "agents/7-fix"
+	a := seeded(t, d, connected, func(a *wire.Agent) {
+		a.Labels = []wire.SessionLabel{{Value: "#7", Owner: wire.SessionLabelOwnerPerson}}
+		a.Worktree = &wire.AgentWorktree{Name: "7-fix", Branch: &branch, Folder: store.FolderURL(connected)}
+	})
+	d.noteLineage(nil, a)
+	s := sessionNode(a.ID)
+	d.lineageEvent(wire.Event{Name: "pr.opened", Details: map[string]string{"payload": `{"pr":{"number":8,"branch":"agents/7-fix",` +
+		`"url":"http://localhost:3753/walkalex/App/pulls/8","fixes":["#7"]}}`}})
+	pr := wire.LineageNode{Kind: "pr", Ref: "forgejo:walkalex/app#8"}
+	wantLinks(t, active(d, pr),
+		s.Ref+" opens "+pr.Ref+" (branch)",
+		pr.Ref+" fixes forgejo:walkalex/app#7 (pr-body)")
+	wantLinks(t, active(d, s),
+		s.Ref+" works-on forgejo:walkalex/app#7 (start)",
+		s.Ref+" opens "+pr.Ref+" (branch)")
+	if n, ok := d.labelNode(codeberg, "P#4"); !ok || n != (wire.LineageNode{Kind: "pr", Ref: "forgejo:kim/notes#4"}) {
+		t.Fatalf("a Codeberg folder's P#4: %+v", n)
+	}
+	if _, _, ok := nodeOfRepo(pr); ok {
+		t.Fatal("a Forgejo node is asked of gh")
+	}
+	if _, _, ok := askedNode(pr); !ok {
+		t.Fatal("a Forgejo node is not asked of its connection")
+	}
+
+	// Disconnected, the folder is on no forge lineage knows; Codeberg's is by its host.
+	file.Delete(connections.Forgejo)
+	if r := d.folderRepo(connected); r.forge != "" {
+		t.Fatalf("with no Forgejo connection: %+v", r)
+	}
+	if r := d.folderRepo(codeberg); r != (forgeRepo{"forgejo", "kim/notes"}) {
+		t.Fatalf("a Codeberg folder with no connection: %+v", r)
 	}
 }

@@ -8,8 +8,6 @@ import SwiftUI
 /// the new on a wide page. Shown over the view, on the Mac, the iPad and the iPhone alike.
 struct AppViewDiffPage: View {
     let diff: AppViewDiff
-    /// Where the diff is, for Open on and the cut line: GitHub for a view's, the item's forge for a Work page's.
-    var site = "GitHub"
     var openLink: (URL) -> Void = { _ in }
 
     @Environment(\.dismiss) private var dismiss
@@ -80,11 +78,11 @@ struct AppViewDiffPage: View {
                     .accessibilityLabel("\(added) lines added, \(removed) removed")
                 Spacer(minLength: 0)
                 if let url = diff.url {
-                    Button("Open on \(site)") { openLink(url) }.buttonStyle(.paper).appText(.fine)
+                    Button("Open on \(diff.site)") { openLink(url) }.buttonStyle(.paper).appText(.fine)
                 }
             }
             if diff.cut {
-                Text("The diff is too long to show every file here. A file with no lines below is on \(site).")
+                Text("The diff is too long to show every file here. A file with no lines below is on \(diff.site).")
                     .appText(.fine)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
