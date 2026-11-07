@@ -550,7 +550,7 @@ func wakeWords(e wire.Event, extra int) string {
 		if t, ok := e.Details["agent_title"]; k == "agent" && ok {
 			v = t + " (" + v + ")"
 		}
-		lines = append(lines, k+": "+v)
+		lines = append(lines, detailWords(k, v))
 	}
 	if e.Publisher != nil {
 		lines = append(lines, "published by: "+e.Publisher.Title)
