@@ -221,7 +221,7 @@ func TestForgeAzureBoardsNotSignedIn(t *testing.T) {
 	os.Remove(filepath.Join(os.Getenv("AGENTS_PERSONAL_HOME"), ".agents-secrets", "secrets.env"))
 	var list wire.ForgeList
 	json.Unmarshal(c.call(t, 1, "forge/issues", wire.ForgeListRequest{}), &list)
-	if len(list.Errors) != 1 || list.Errors[0].Forge != "azureboards" || !strings.Contains(list.Errors[0].Message, "Azure DevOps is not signed in") {
+	if len(list.Errors) != 1 || list.Errors[0].Forge != "azureboards" || !strings.Contains(list.Errors[0].Message, "Azure DevOps is not connected") {
 		t.Fatalf("errors: %+v", list.Errors)
 	}
 }

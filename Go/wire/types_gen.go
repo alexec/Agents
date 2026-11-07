@@ -2363,7 +2363,7 @@ type ConnectionEmailRequest struct {
 	Password string `json:"password"`
 }
 
-// A tool the person connects to: GitHub (#1335) and Linear (#1343) with OAuth, GitLab (#1630) with OAuth on gitlab.com or a personal access token on any GitLab, email (#1780): one IMAP mailbox with an app password, Atlassian (#3304): one sign-in for Jira and Confluence, with OAuth on Atlassian Cloud or a token on one site, Forgejo (#3752): an access token on Codeberg or any Forgejo or Gitea, and Bitbucket (#3785): an Atlassian API token with its email, or an access token, on Bitbucket Cloud.
+// A tool the person connects to: GitHub (#1335) and Linear (#1343) with OAuth, GitLab (#1630) with OAuth on gitlab.com or a personal access token on any GitLab, email (#1780): one IMAP mailbox with an app password, Atlassian (#3304): one sign-in for Jira and Confluence, with OAuth on Atlassian Cloud or a token on one site, Forgejo (#3752): an access token on Codeberg or any Forgejo or Gitea, Bitbucket (#3785): an Atlassian API token with its email, or an access token, on Bitbucket Cloud, and Azure DevOps (#3802): a personal access token on one organization of dev.azure.com or one collection of an Azure DevOps Server.
 type ConnectionProvider string
 
 const ConnectionProviderGithub ConnectionProvider = "github"
@@ -2373,6 +2373,7 @@ const ConnectionProviderEmail ConnectionProvider = "email"
 const ConnectionProviderAtlassian ConnectionProvider = "atlassian"
 const ConnectionProviderForgejo ConnectionProvider = "forgejo"
 const ConnectionProviderBitbucket ConnectionProvider = "bitbucket"
+const ConnectionProviderAzuredevops ConnectionProvider = "azuredevops"
 
 type ConnectionProviderRequest struct {
 	Provider ConnectionProvider `json:"provider"`
@@ -2456,7 +2457,7 @@ type ConnectionTokenAnswer struct {
 type ConnectionTokenRequest struct {
 	Provider ConnectionProvider `json:"provider"`
 
-	// The provider's address, such as gitlab.example.com, example.atlassian.net or git.example.com (https:// when it names no scheme). gitlab.com, or codeberg.org for Forgejo, when left out; a Jira site must be given. Bitbucket takes none: it is Bitbucket Cloud's.
+	// The provider's address, such as gitlab.example.com, example.atlassian.net or git.example.com (https:// when it names no scheme). gitlab.com, or codeberg.org for Forgejo, when left out; a Jira site must be given. Bitbucket takes none: it is Bitbucket Cloud's. Azure DevOps takes its organization (dev.azure.com/acme) or an Azure DevOps Server's collection (server/tfs/DefaultCollection), which must be given.
 	URL *string `json:"url,omitzero"`
 
 	// Atlassian and Bitbucket: the account's email, sent with a Jira Cloud or Atlassian API token. Left out for a Jira Data Center personal access token or a Bitbucket access token.
@@ -2545,20 +2546,20 @@ type ConnectorProof struct {
 	At *Date `json:"at,omitzero"`
 }
 
-// A folder's Connectors set-up (#1336): its GitHub, GitLab, Forgejo or Bitbucket repository (#1632, #3752, #3785), the person's connection to that forge, four slots that each prove themselves with one read, and the events.
+// A folder's Connectors set-up (#1336): its GitHub, GitLab, Forgejo, Bitbucket or Azure DevOps repository (#1632, #3752, #3785, #3802), the person's connection to that forge, four slots that each prove themselves with one read, and the events.
 type ConnectorSetup struct {
 	Folder string `json:"folder"`
 
-	// owner/name on GitHub or Forgejo, workspace/name on Bitbucket, or group/project on GitLab, from the folder's git remote (origin first). Absent with no GitHub, GitLab, Forgejo or Bitbucket remote.
+	// owner/name on GitHub or Forgejo, workspace/name on Bitbucket, organization/project/name on Azure DevOps, or group/project on GitLab, from the folder's git remote (origin first). Absent with no GitHub, GitLab, Forgejo, Bitbucket or Azure DevOps remote.
 	Repository *string `json:"repository,omitzero"`
 
-	// The forge the repository is on, which fills Tasks, Code review and CI: github, gitlab (#1632), forgejo (#3752) or bitbucket (#3785). Absent is github.
+	// The forge the repository is on, which fills Tasks, Code review and CI: github, gitlab (#1632), forgejo (#3752), bitbucket (#3785) or azuredevops (#3802). Absent is github.
 	Forge *ConnectionProvider `json:"forge,omitzero"`
 
-	// The repository's host, as the page says it before the repository: github.com, gitlab.com, codeberg.org, bitbucket.org, or a self-managed GitLab's or Forgejo's host.
+	// The repository's host, as the page says it before the repository: github.com, gitlab.com, codeberg.org, bitbucket.org, dev.azure.com, or a self-managed GitLab's, Forgejo's or Azure DevOps Server's host.
 	Site *string `json:"site,omitzero"`
 
-	// The repository's page on its forge, where the person asks for access when a read is refused (GitLab, Forgejo, Bitbucket).
+	// The repository's page on its forge, where the person asks for access when a read is refused (GitLab, Forgejo, Bitbucket, Azure DevOps).
 	RepositoryURL *string `json:"repositoryURL,omitzero"`
 
 	Connection *Connection `json:"connection,omitzero"`
@@ -2649,7 +2650,7 @@ const ConnectorSlotKindDocs ConnectorSlotKind = "docs"
 const ConnectorSlotKindMessaging ConnectorSlotKind = "messaging"
 const ConnectorSlotKindWorkspace ConnectorSlotKind = "workspace"
 
-// notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach the provider; message says why. refused: the provider refused the read, so the person grants it on the provider's site. noRemote: the folder has no GitHub, GitLab, Forgejo or Bitbucket remote. skipped: the person skipped it; it counts as done.
+// notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach the provider; message says why. refused: the provider refused the read, so the person grants it on the provider's site. noRemote: the folder has no GitHub, GitLab, Forgejo, Bitbucket or Azure DevOps remote. skipped: the person skipped it; it counts as done.
 type ConnectorSlotState string
 
 const ConnectorSlotStateNotConnected ConnectorSlotState = "notConnected"

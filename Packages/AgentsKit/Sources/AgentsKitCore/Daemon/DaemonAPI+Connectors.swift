@@ -32,7 +32,7 @@ extension DaemonAPI.Method {
 
 extension DaemonAPI {
     public enum ConnectionProvider: String, Codable, Sendable, Hashable, CaseIterable, Identifiable {
-        case github, linear, gitlab, email, atlassian, forgejo, bitbucket
+        case github, linear, gitlab, email, atlassian, forgejo, bitbucket, azuredevops
         public var id: String { rawValue }
     }
 
@@ -85,7 +85,8 @@ extension DaemonAPI {
 
         public init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
-            connections = try c.decode([Connection].self, forKey: .connections)
+            // A connection to a provider this client does not know (a newer host's) is dropped.
+            connections = try c.decode([Known<Connection>].self, forKey: .connections).compactMap(\.value)
             providers = try c.decodeIfPresent([String].self, forKey: .providers)?.compactMap(ConnectionProvider.init(rawValue:))
         }
 
@@ -95,6 +96,12 @@ extension DaemonAPI {
             let takes = providers ?? [.github, .linear, .gitlab, .atlassian] + (hostHasEmail ? [.email] : [])
             return ConnectionProvider.allCases.filter(takes.contains)
         }
+    }
+
+    /// A value this client may not know, such as a newer host's provider: nil when it does not decode.
+    struct Known<Value: Decodable>: Decodable {
+        let value: Value?
+        init(from decoder: Decoder) throws { value = try? Value(from: decoder) }
     }
 
     public struct ConnectionProviderRequest: Codable, Sendable, Hashable {
@@ -231,7 +238,7 @@ extension DaemonAPI {
         case failed
         /// The provider refused the read: the person grants it on the provider's site.
         case refused
-        /// The folder has no GitHub, GitLab, Forgejo or Bitbucket remote.
+        /// The folder has no GitHub, GitLab, Forgejo, Bitbucket or Azure DevOps remote.
         case noRemote
         /// Skipped: it counts as done.
         case skipped
@@ -366,10 +373,13 @@ extension DaemonAPI {
     public struct ConnectorSetup: Codable, Sendable, Hashable {
         public var folder: String
         /// owner/name on GitHub, group/folder on GitLab, from the folder's git remote. Nil
-        /// with no GitHub, GitLab, Forgejo or Bitbucket remote.
+        /// with no GitHub, GitLab, Forgejo, Bitbucket or Azure DevOps remote.
         public var repository: String?
         /// The forge that fills Tasks, Code review and CI; nil is GitHub.
         public var forge: ConnectionProvider?
+        /// The forge's name when this client does not know it (a newer host's, #3802): the
+        /// set-up says to update Agents, and offers no Connect.
+        public var unknownForge: String?
         /// The repository's host: github.com, gitlab.com, or a self-managed GitLab's.
         public var site: String?
         /// The repository's page on its forge.
@@ -399,6 +409,32 @@ extension DaemonAPI {
             self.connection = connection; self.installed = installed
             self.installURL = installURL; self.repositories = repositories; self.slots = slots; self.events = events
             self.done = done; self.project = project; self.projectName = projectName
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case folder, repository, forge, site, repositoryURL, connection, installed, installURL, repositories, slots, events, done
+            case project, projectName
+        }
+
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            folder = try c.decode(String.self, forKey: .folder)
+            repository = try c.decodeIfPresent(String.self, forKey: .repository)
+            if let raw = try c.decodeIfPresent(String.self, forKey: .forge) {
+                forge = ConnectionProvider(rawValue: raw)
+                unknownForge = forge == nil ? raw : nil
+            }
+            site = try c.decodeIfPresent(String.self, forKey: .site)
+            repositoryURL = try c.decodeIfPresent(String.self, forKey: .repositoryURL)
+            connection = try c.decodeIfPresent(Known<Connection>.self, forKey: .connection)?.value
+            installed = try c.decodeIfPresent(Bool.self, forKey: .installed)
+            installURL = try c.decodeIfPresent(String.self, forKey: .installURL)
+            repositories = try c.decodeIfPresent(Int.self, forKey: .repositories)
+            slots = try c.decode([ConnectorSlot].self, forKey: .slots)
+            events = try c.decode(ConnectorEvents.self, forKey: .events)
+            done = try c.decode(Int.self, forKey: .done)
+            project = try c.decodeIfPresent(String.self, forKey: .project)
+            projectName = try c.decodeIfPresent(String.self, forKey: .projectName)
         }
 
         public func slot(_ kind: ConnectorSlotKind) -> ConnectorSlot? { slots.first { $0.slot == kind } }

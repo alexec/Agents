@@ -7,8 +7,10 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/alexec/agents/Go/internal/azureboardsmcp"
+	"github.com/alexec/agents/Go/internal/connections"
 	"github.com/alexec/agents/Go/internal/lineage"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -16,7 +18,7 @@ import (
 // Azure Boards on the Work pages (#3815, after Jira's #3260): the work items of the projects
 // the folders' .agents/folder.json name in "azureBoardsProjects": ["organization/project"],
 // read and written with the azuredevops and azureboards connectors' sign-in (AZURE_DEVOPS_TOKEN
-// and AZURE_DEVOPS_URL in the secrets) through azureboardsmcp.RealBoards. A work item is the
+// and AZURE_DEVOPS_URL in the secrets, else the Azure DevOps connection, #3802) through azureboardsmcp.RealBoards. A work item is the
 // node azureboards:organization/project#12, in lower case; its state's name is its status, and
 // its page moves it to another state of its type, as a Jira issue's moves by a transition. A
 // session labelled AB#12, and a pull request whose title or branch says AB#12 (Azure Boards'
@@ -105,12 +107,17 @@ func (d *Daemon) boardsFolder(project string) string {
 }
 
 // forgeAzureBoards is Azure Boards as the azuredevops connector's sign-in on this host (its
-// secrets), or why there is none.
+// secrets), else the Azure DevOps connection (#3802), or why there is none.
 func (d *Daemon) forgeAzureBoards() (forgeAzureBoards, error) {
 	secrets := d.secrets()
 	token, base := secrets["AZURE_DEVOPS_TOKEN"], secrets["AZURE_DEVOPS_URL"]
 	if token == "" {
-		return nil, errors.New("Azure DevOps is not signed in: add the Azure Boards connector in Connectors, with a personal access token (AZURE_DEVOPS_TOKEN) with Work Items (read and write)")
+		if c, ok := d.storedConnection(connections.AzureDevOps); ok && c.Usable(time.Now()) {
+			token, base = c.Access, c.URL
+		}
+	}
+	if token == "" {
+		return nil, errors.New("Azure DevOps is not connected: connect Azure DevOps in Connectors, with a personal access token with Work Items (read and write)")
 	}
 	if d.newForgeAzureBoards != nil {
 		return d.newForgeAzureBoards(base, token), nil

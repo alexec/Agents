@@ -13,9 +13,11 @@ test("a Bitbucket connection's row says bitbucket.org and that it is a token", (
 });
 
 test("the request sends the email only for an Atlassian API token", () => {
-  assert.deepEqual(c.bitbucketTokenRequest(" me@example.com ", " t "), { provider: "bitbucket", user: "me@example.com", token: "t" });
-  assert.deepEqual(c.bitbucketTokenRequest("", "t"), { provider: "bitbucket", token: "t" });
-  assert.equal(c.bitbucketTokenRequest("me@example.com", " "), undefined);
+  const sheet = c.tokenSheet("bitbucket");
+  assert.equal(sheet.fieldLabel, "Atlassian email");
+  assert.deepEqual(c.tokenRequest(sheet, " me@example.com ", " t "), { provider: "bitbucket", user: "me@example.com", token: "t" });
+  assert.deepEqual(c.tokenRequest(sheet, "", "t"), { provider: "bitbucket", token: "t" });
+  assert.equal(c.tokenRequest(sheet, "me@example.com", " "), undefined);
 });
 
 test("Bitbucket is a provider to connect, with a mark and a name", () => {

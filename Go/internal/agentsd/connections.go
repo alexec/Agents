@@ -58,6 +58,11 @@ import (
 // account's email) or a repository, project or workspace access token, and the host checks it
 // with Bitbucket Cloud (connections/sign-in/token) and keeps it. The token has no refresh: it
 // ends on the date the person gave it, and the bitbucket server then says to connect again.
+//
+// Azure DevOps (#3802) has no device flow for Agents: the person makes a personal access token
+// in one organization of dev.azure.com (or one collection of an Azure DevOps Server), and the
+// host checks it with that organization (connections/sign-in/token) and keeps it with its
+// address. The token has no refresh: it ends on the date the person gave it.
 
 var (
 	// connectionWaitLimit is one long poll of connections/sign-in/wait.
@@ -87,6 +92,8 @@ type connectionBook struct {
 	// Bitbucket Cloud's); a test gives a fake Bitbucket's client and API.
 	bitbucketHTTP *http.Client
 	bitbucketAPI  string
+	// azureDevOpsHTTP checks an Azure DevOps token; a test gives a fake Azure DevOps's client.
+	azureDevOpsHTTP *http.Client
 	// emailCheck signs in to an IMAP server once; emailmcp.Check when nil.
 	emailCheck func(context.Context, emailmcp.Account) error
 	// jiraHTTP reads a Jira site; a test gives a fake Jira's client.
@@ -184,7 +191,7 @@ func (d *Daemon) registerConnections() {
 var hostProviders = []wire.ConnectionProvider{
 	wire.ConnectionProviderGithub, wire.ConnectionProviderLinear, wire.ConnectionProviderGitlab,
 	wire.ConnectionProviderEmail, wire.ConnectionProviderAtlassian, wire.ConnectionProviderForgejo,
-	wire.ConnectionProviderBitbucket,
+	wire.ConnectionProviderBitbucket, wire.ConnectionProviderAzuredevops,
 }
 
 func knownProvider(p wire.ConnectionProvider) bool {
@@ -314,6 +321,9 @@ func (d *Daemon) connectionSignIn(ctx context.Context, p wire.ConnectionProvider
 	}
 	if p == wire.ConnectionProviderBitbucket {
 		return wire.ConnectionSignIn{}, invalid("Bitbucket has no sign-in page: connect it with an API token or an access token.")
+	}
+	if p == wire.ConnectionProviderAzuredevops {
+		return wire.ConnectionSignIn{}, invalid("Azure DevOps has no sign-in page: connect it with a personal access token.")
 	}
 	if origin != "" {
 		o, err := connections.CleanOrigin(origin)
@@ -542,9 +552,11 @@ func (d *Daemon) connectionSignInToken(ctx context.Context, r wire.ConnectionTok
 		return d.connectionSignInForgejoToken(ctx, r)
 	case wire.ConnectionProviderBitbucket:
 		return d.connectionSignInBitbucketToken(ctx, r)
+	case wire.ConnectionProviderAzuredevops:
+		return d.connectionSignInAzureDevOpsToken(ctx, r)
 	case wire.ConnectionProviderGitlab:
 	default:
-		return wire.ConnectionTokenAnswer{}, invalid("Agents takes an access token only for GitLab, Forgejo, Bitbucket and Jira.")
+		return wire.ConnectionTokenAnswer{}, invalid("Agents takes an access token only for GitLab, Forgejo, Bitbucket, Azure DevOps and Jira.")
 	}
 	fail := func(why string) (wire.ConnectionTokenAnswer, error) {
 		log.Printf("connections: %s token not taken", r.Provider)
@@ -652,6 +664,44 @@ func (d *Daemon) connectionSignInBitbucketToken(ctx context.Context, r wire.Conn
 		return fail(sentence(err.Error()))
 	}
 	c := connections.BitbucketConnection(api, email, token, login, time.Now())
+	d.connRenew.Lock()
+	err = s.Put(c)
+	d.connRenew.Unlock()
+	if err != nil {
+		return fail(sentence(err.Error()))
+	}
+	log.Printf("connections: %s connected with a token", r.Provider)
+	w := wireConnection(c)
+	return wire.ConnectionTokenAnswer{Connection: &w}, nil
+}
+
+// connectionSignInAzureDevOpsToken checks a personal access token with the organization at
+// r.URL (dev.azure.com/acme, or an Azure DevOps Server's collection) and keeps it. The token is
+// in no log and no answer; a failure says what failed, in words.
+func (d *Daemon) connectionSignInAzureDevOpsToken(ctx context.Context, r wire.ConnectionTokenRequest) (wire.ConnectionTokenAnswer, error) {
+	fail := func(why string) (wire.ConnectionTokenAnswer, error) {
+		log.Printf("connections: %s token not taken", r.Provider)
+		return wire.ConnectionTokenAnswer{Error: &why}, nil
+	}
+	token := strings.TrimSpace(r.Token)
+	if token == "" || strings.ContainsAny(token, " \t\r\n") {
+		return fail("Paste the personal access token: one word.")
+	}
+	root, org, err := connections.AzureDevOpsOrganization(deref(r.URL))
+	if err != nil {
+		return fail(sentence(err.Error()))
+	}
+	s, err := d.connectionStore()
+	if err != nil {
+		return wire.ConnectionTokenAnswer{}, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	login, err := connections.CheckAzureDevOpsToken(ctx, d.azureDevOpsHTTP, root, org, token)
+	if err != nil {
+		return fail(sentence(err.Error()))
+	}
+	c := connections.AzureDevOpsConnection(root, org, token, login, time.Now())
 	d.connRenew.Lock()
 	err = s.Put(c)
 	d.connRenew.Unlock()

@@ -2004,8 +2004,9 @@ export interface ConnectionEmailRequest {
  * OAuth on gitlab.com or a personal access token on any GitLab, email (#1780): one IMAP mailbox
  * with an app password, Atlassian (#3304): one sign-in for Jira and Confluence, with OAuth on
  * Atlassian Cloud or a token on one site, Forgejo (#3752): an access token on Codeberg or any
- * Forgejo or Gitea, and Bitbucket (#3785): an Atlassian API token with its email, or an access
- * token, on Bitbucket Cloud.
+ * Forgejo or Gitea, Bitbucket (#3785): an Atlassian API token with its email, or an access token,
+ * on Bitbucket Cloud, and Azure DevOps (#3802): a personal access token on one organization of
+ * dev.azure.com or one collection of an Azure DevOps Server.
  */
 export type ConnectionProvider =
   | "github"
@@ -2014,7 +2015,8 @@ export type ConnectionProvider =
   | "email"
   | "atlassian"
   | "forgejo"
-  | "bitbucket";
+  | "bitbucket"
+  | "azuredevops";
 
 export interface ConnectionProviderRequest {
   provider: ConnectionProvider;
@@ -2113,7 +2115,9 @@ export interface ConnectionTokenRequest {
   /**
    * The provider's address, such as gitlab.example.com, example.atlassian.net or git.example.com
    * (https:// when it names no scheme). gitlab.com, or codeberg.org for Forgejo, when left out; a
-   * Jira site must be given. Bitbucket takes none: it is Bitbucket Cloud's.
+   * Jira site must be given. Bitbucket takes none: it is Bitbucket Cloud's. Azure DevOps takes its
+   * organization (dev.azure.com/acme) or an Azure DevOps Server's collection
+   * (server/tfs/DefaultCollection), which must be given.
    */
   url?: string;
   /**
@@ -2197,31 +2201,32 @@ export interface ConnectorProof {
 }
 
 /**
- * A folder's Connectors set-up (#1336): its GitHub, GitLab, Forgejo or Bitbucket repository (#1632,
- * #3752, #3785), the person's connection to that forge, four slots that each prove themselves with
- * one read, and the events.
+ * A folder's Connectors set-up (#1336): its GitHub, GitLab, Forgejo, Bitbucket or Azure DevOps
+ * repository (#1632, #3752, #3785, #3802), the person's connection to that forge, four slots that
+ * each prove themselves with one read, and the events.
  */
 export interface ConnectorSetup {
   folder: string;
   /**
-   * owner/name on GitHub or Forgejo, workspace/name on Bitbucket, or group/project on GitLab, from
-   * the folder's git remote (origin first). Absent with no GitHub, GitLab, Forgejo or Bitbucket
-   * remote.
+   * owner/name on GitHub or Forgejo, workspace/name on Bitbucket, organization/project/name on
+   * Azure DevOps, or group/project on GitLab, from the folder's git remote (origin first). Absent
+   * with no GitHub, GitLab, Forgejo, Bitbucket or Azure DevOps remote.
    */
   repository?: string;
   /**
    * The forge the repository is on, which fills Tasks, Code review and CI: github, gitlab (#1632),
-   * forgejo (#3752) or bitbucket (#3785). Absent is github.
+   * forgejo (#3752), bitbucket (#3785) or azuredevops (#3802). Absent is github.
    */
   forge?: ConnectionProvider;
   /**
    * The repository's host, as the page says it before the repository: github.com, gitlab.com,
-   * codeberg.org, bitbucket.org, or a self-managed GitLab's or Forgejo's host.
+   * codeberg.org, bitbucket.org, dev.azure.com, or a self-managed GitLab's, Forgejo's or Azure
+   * DevOps Server's host.
    */
   site?: string;
   /**
    * The repository's page on its forge, where the person asks for access when a read is refused
-   * (GitLab, Forgejo, Bitbucket).
+   * (GitLab, Forgejo, Bitbucket, Azure DevOps).
    */
   repositoryURL?: string;
   connection?: Connection;
@@ -2326,8 +2331,8 @@ export type ConnectorSlotKind =
  * notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not
  * read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach
  * the provider; message says why. refused: the provider refused the read, so the person grants it
- * on the provider's site. noRemote: the folder has no GitHub, GitLab, Forgejo or Bitbucket remote.
- * skipped: the person skipped it; it counts as done.
+ * on the provider's site. noRemote: the folder has no GitHub, GitLab, Forgejo, Bitbucket or Azure
+ * DevOps remote. skipped: the person skipped it; it counts as done.
  */
 export type ConnectorSlotState =
   | "notConnected"

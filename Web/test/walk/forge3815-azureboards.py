@@ -5,16 +5,21 @@ workitemsbatch of the organization, a work item with its links, its comments, th
 item types and tags) and the writes the pages make (a comment, tags, a state, a new child), kept
 in memory so the next read shows them; and the project's own WIQL, workitemsbatch and
 connectionData (Kim Lee is the token's owner), which the azureboards server's Azure Boards page
-reads (#3826). Scratch data only. Point a run-app host at it with a
+reads (#3826); and the repository acme/Web Shop/shop with one pull request and one Azure
+Pipelines build, which an Azure DevOps folder's set-up reads (#3802), and a no to the token
+"wrong-token". Scratch data only. Point a run-app host at it with a
 scratch AGENTS_PERSONAL_HOME whose .agents-secrets/secrets.env says
 
     AZURE_DEVOPS_URL=http://127.0.0.1:<port>
     AZURE_DEVOPS_TOKEN=walk
 
-and a folder whose .agents/folder.json says {"azureBoardsProjects": ["acme/Web Shop"]}.
+and a folder whose .agents/folder.json says {"azureBoardsProjects": ["acme/Web Shop"]}. For the
+set-up (#3802), connect Azure DevOps with the organization http://127.0.0.1:<port>/acme instead,
+and give the folder the remote http://127.0.0.1:<port>/acme/Web%20Shop/_git/shop.
 
     python3 Web/test/walk/forge3815-azureboards.py <port>
 """
+import base64
 import json
 import re
 import sys
@@ -130,8 +135,23 @@ class Handler(BaseHTTPRequestHandler):
         path, q = unquote(u.path), parse_qs(u.query)
         project = f"/acme/{PROJECT}/_apis/wit/".lower()
         lower = path.lower()
+        auth = self.headers.get("Authorization", "")
+        if auth.startswith("Basic ") and base64.b64decode(auth[6:]).decode().endswith(":wrong-token"):
+            return self.answer({"message": "TF400813: The user is not authorized to access this resource."}, 401)
         if method == "GET" and path == "/acme/_apis/connectionData":
-            return self.answer({"authenticatedUser": {"id": KIM["id"]}})
+            return self.answer({"authenticatedUser": {"id": KIM["id"], "providerDisplayName": KIM["displayName"]}})
+        repo = f"/acme/{PROJECT}/_apis/git/repositories/shop".lower()
+        if method == "GET" and lower == repo:
+            return self.answer({"id": "r-shop", "name": "shop", "defaultBranch": "refs/heads/main",
+                                "webUrl": f"{BASE}/acme/{PROJECT}/_git/shop"})
+        if method == "GET" and lower == repo + "/pullrequests":
+            return self.answer({"value": [{"pullRequestId": 7, "title": "Pay with a saved card", "status": "active",
+                                           "createdBy": SAM, "creationDate": ago(5), "sourceRefName": "refs/heads/saved-card",
+                                           "targetRefName": "refs/heads/main"}]})
+        if method == "GET" and lower == f"/acme/{PROJECT}/_apis/build/builds".lower():
+            return self.answer({"value": [{"id": 31, "buildNumber": "20261107.3", "status": "completed", "result": "succeeded",
+                                           "queueTime": ago(4), "finishTime": ago(3.9), "definition": {"id": 1, "name": "shop-ci"},
+                                           "repository": {"id": "r-shop"}}]})
         if method == "POST" and lower in ("/acme/_apis/wit/wiql", project + "wiql"):
             ids = wiql(self.body()["query"])[: int(q.get("$top", ["200"])[0])]
             return self.answer({"workItems": [{"id": n} for n in ids]})
