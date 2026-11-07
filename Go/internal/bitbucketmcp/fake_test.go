@@ -36,6 +36,7 @@ type fakeBitbucket struct {
 	diffstat      map[int][]obj
 	prComments    map[int][]obj
 	statuses      map[string][]obj // commit → its statuses
+	pipelines     map[int]obj      // Pipelines build number → its run
 	steps         map[int][]obj    // Pipelines build number → its steps
 	logs          map[string]string // step uuid → its log, served from storage
 	ranges        []string          // the Range of each log read from storage
@@ -62,7 +63,7 @@ func newFake(t *testing.T) *fakeBitbucket {
 	f := &fakeBitbucket{t: t, activity: map[int][]obj{}, diffstat: map[int][]obj{}, prComments: map[int][]obj{}, statuses: map[string][]obj{},
 		issueComments: map[int][]obj{}, changes: map[int][]obj{},
 		perms: map[string]string{"a-alex": "admin", "a-dev": "write", "a-reader": "read"}, members: map[string]bool{}, me: alex}
-	f.steps, f.logs = map[int][]obj{}, map[string]string{}
+	f.pipelines, f.steps, f.logs = map[int]obj{}, map[int][]obj{}, map[string]string{}
 	f.server = httptest.NewServer(http.HandlerFunc(f.serve))
 	t.Cleanup(f.server.Close)
 	f.storage = httptest.NewServer(http.HandlerFunc(f.serveLog))
@@ -152,6 +153,8 @@ var (
 	issuePath         = regexp.MustCompile(`^` + root + `/issues/([0-9]+)$`)
 	issueCommentsPath = regexp.MustCompile(`^` + root + `/issues/([0-9]+)/comments$`)
 	changesPath       = regexp.MustCompile(`^` + root + `/issues/([0-9]+)/changes$`)
+	pipelinesPath     = regexp.MustCompile(`^` + root + `/pipelines/$`)
+	pipelinePath      = regexp.MustCompile(`^` + root + `/pipelines/([0-9]+)$`)
 	stepsPath         = regexp.MustCompile(`^` + root + `/pipelines/([0-9]+)/steps$`)
 	logPath           = regexp.MustCompile(`^` + root + `/pipelines/([0-9]+)/steps/(\{[^/]+\})/log$`)
 	permPath          = regexp.MustCompile(`^` + root + `/permissions-config/users/([^/]+)$`)
@@ -221,6 +224,16 @@ func (f *fakeBitbucket) serve(w http.ResponseWriter, r *http.Request) {
 			reply(obj{"id": 55, "links": obj{"html": obj{"href": "https://bitbucket.org/c/55"}}})
 		case mergePath.MatchString(p):
 			reply(obj{})
+		case pipelinesPath.MatchString(p):
+			next := 1
+			for n := range f.pipelines {
+				next = max(next, n+1)
+			}
+			run := obj{"uuid": fmt.Sprintf("{p%d}", next), "build_number": next, "target": body["target"], "state": obj{"name": "PENDING"}}
+			f.pipelines[next] = run
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(run)
 		default:
 			notFound()
 		}
@@ -292,6 +305,12 @@ func (f *fakeBitbucket) serve(w http.ResponseWriter, r *http.Request) {
 		page(newestFirst(f.issueComments[n(issueCommentsPath.FindStringSubmatch(p))]))
 	case changesPath.MatchString(p):
 		page(newestFirst(f.changes[n(changesPath.FindStringSubmatch(p))]))
+	case pipelinePath.MatchString(p):
+		if run, ok := f.pipelines[n(pipelinePath.FindStringSubmatch(p))]; ok {
+			reply(run)
+			return
+		}
+		notFound()
 	case stepsPath.MatchString(p):
 		page(f.steps[n(stepsPath.FindStringSubmatch(p))])
 	case logPath.MatchString(p):
