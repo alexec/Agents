@@ -34,7 +34,7 @@ import { artifactsIn, withArtifactsOf, type Artifact } from "./artifacts";
 import { log } from "../log";
 import { knowPublicViews } from "../place";
 import { folderKey, folderPath as agentFolderPath, folderView, type FolderView } from "./groups";
-import { decideMacHostNotice, type MacHostNotice } from "./macHostNotice";
+import { decideMacHostNotice, steadyNotice, type MacHostNotice } from "./macHostNotice";
 import { DisplayBuilder, isPersonsAsk, keepingTurns, storedTurn, turns, type ChatTurn, type Item } from "./turns";
 import { sortedRuntimes } from "./runtimes";
 import { personPrompts } from "./sessionPrompts";
@@ -460,13 +460,15 @@ export class Work {
   /** Whether the person has a Mac among their machines (#3382, #3425): with none, a line says what to do here. */
   readonly hasMac: ReadonlySignal<boolean> = computed(() => this.hosts.value.some((h) => this.isMac(h.id)));
   /** Why this Mac's host is quiet, as the window says it (#666), or nil while it is online. */
-  readonly macHostNotice: ReadonlySignal<MacHostNotice | null> = computed(() => {
+  private readonly macHostNoticeNow: ReadonlySignal<MacHostNotice | null> = computed(() => {
     const plane = this.plane.value;
     const macID = this.macHostID.value;
     const mac = this.hosts.value.find((h) => h.id === macID);
     const onThisMac = !!plane?.machineID && plane.machineID === mac?.machineID;
     return decideMacHostNotice(onThisMac, mac?.state, plane?.thisMacHost);
   });
+  /** That notice, held a few seconds after it goes, so a host that keeps dropping and joining does not flicker it. */
+  readonly macHostNotice: ReadonlySignal<MacHostNotice | null> = steadyNotice(this.macHostNoticeNow);
   /** Who this client belongs to (#994), from `control/status`: none from a control plane before it. */
   readonly person = signal<ControlPerson | null>(null);
   /** The line a server runs to ask to join as this client's person, with no code (#994), from `control/status`. */

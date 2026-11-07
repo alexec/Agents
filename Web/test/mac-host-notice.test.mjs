@@ -35,3 +35,18 @@ test("not running and not joined say to open Agents Host", async () => {
     "It’s running, and it has no membership. The code expired. Open Agents Host and press Try Again there.");
   assert.match(detail({ kind: "notAnswering" }), /trying again by itself/);
 });
+
+test("steadyNotice keeps a notice that goes and comes back, so the footer does not flicker", async () => {
+  const { signal, steadyNotice } = await load("test/steadyNotice-entry.ts");
+  const now = signal({ kind: "notAnswering" });
+  const shown = steadyNotice(now, 40);
+  assert.deepEqual(shown.value, { kind: "notAnswering" });
+  now.value = null;
+  assert.deepEqual(shown.value, { kind: "notAnswering" });
+  now.value = { kind: "notAnswering" };
+  await new Promise((r) => setTimeout(r, 80));
+  assert.deepEqual(shown.value, { kind: "notAnswering" });
+  now.value = null;
+  await new Promise((r) => setTimeout(r, 80));
+  assert.equal(shown.value, null);
+});
