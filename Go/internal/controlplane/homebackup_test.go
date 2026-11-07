@@ -55,13 +55,17 @@ func TestABackupRestoresAControlPlaneInANewHome(t *testing.T) {
 	p := &plane{t: t, s: s, url: s.cfg.URL}
 	member, _ := p.client("Window")
 	s.Stop()
+	// The VAPID key (#3651): without it, every browser's push subscription stops working.
+	if err := os.WriteFile(filepath.Join(old, "webpush-key.pem"), []byte("scratch VAPID key"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 
 	backup := filepath.Join(t.TempDir(), "backup")
 	list, err := Backup(ctx, store.NewFolder(filepath.Join(old, "store")), HomePartsIn(old), backup)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"control-key", "secrets-key", filepath.Join("tls", "cert.pem"), filepath.Join("tls", "key.pem")} {
+	for _, want := range []string{"control-key", "secrets-key", filepath.Join("tls", "cert.pem"), filepath.Join("tls", "key.pem"), "webpush-key.pem"} {
 		if !strings.Contains(strings.Join(list.Files, " "), want) {
 			t.Fatalf("the backup has %v, not %s", list.Files, want)
 		}
@@ -101,8 +105,40 @@ func TestABackupRestoresAControlPlaneInANewHome(t *testing.T) {
 		t.Fatalf("the member was refused by the restored control plane: %v", err)
 	}
 	session.Close()
+	if b, err := os.ReadFile(filepath.Join(home, "webpush-key.pem")); err != nil || string(b) != "scratch VAPID key" {
+		t.Fatalf("the restored VAPID key: %q, %v", b, err)
+	}
 	// The certificate members are pinned to.
 	if _, again, err := SelfSigned(filepath.Join(home, "tls"), "control.test"); err != nil || again != pin {
 		t.Fatalf("the restored certificate's pin is %s, not %s (%v)", again, pin, err)
+	}
+}
+
+// A VAPID key given as a secret (a cloud machine's, read only) is left as it is on a restore,
+// as the APNs key is (#3651).
+func TestARestoreLeavesAVAPIDKeyGivenAsASecret(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	old := t.TempDir()
+	if err := os.WriteFile(filepath.Join(old, "webpush-key.pem"), []byte("old VAPID key"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	backup := filepath.Join(t.TempDir(), "backup")
+	if _, err := Backup(ctx, store.NewFolder(filepath.Join(old, "store")), HomeParts{WebPushKey: filepath.Join(old, "webpush-key.pem")}, backup); err != nil {
+		t.Fatal(err)
+	}
+	secret := filepath.Join(t.TempDir(), "vapid-key")
+	if err := os.WriteFile(secret, []byte("the secret's VAPID key"), 0o400); err != nil {
+		t.Fatal(err)
+	}
+	list, err := Restore(ctx, backup, HomeParts{WebPushKey: secret}, store.NewFolder(filepath.Join(t.TempDir(), "store")), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list.Kept) != 1 || list.Kept[0] != secret {
+		t.Fatalf("kept %v, not the secret", list.Kept)
+	}
+	if b, _ := os.ReadFile(secret); string(b) != "the secret's VAPID key" {
+		t.Fatalf("the secret became %q", b)
 	}
 }

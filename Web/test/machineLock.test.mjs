@@ -473,7 +473,8 @@ test("a lock with one client offers a recovery key until it is saved or skipped 
 
 test("a forget clears every lock pin and recovery mark, and nothing else (#3670)", () => {
   const items = new Map([
-    ["agents-lock-pin", "{}"], ["agents-lock-pin:ana@example.com", "{}"],
+    ["agents-lock-pin", "{}"], ["agents-lock-pin:ana@example.com", "{}"], ["agents-lock-pin.0401020304050607", "{}"],
+    ["agents-lock-pin.0401020304050607:ana@example.com", "{}"], ["agents-lock-pin.0401020304050607.recoveryDone:ana@example.com", "1"],
     ["agents-lock-recovery-done:ana@example.com", "1"], ["agents.drafts", "[]"], ["agents-lock-pinned-elsewhere", "x"],
   ]);
   const storage = {
@@ -483,4 +484,44 @@ test("a forget clears every lock pin and recovery mark, and nothing else (#3670)
   };
   model.forgetPins(storage);
   assert.deepEqual([...items.keys()], ["agents.drafts", "agents-lock-pinned-elsewhere"]);
+});
+
+test("the page keeps its pins by control plane, so a re-pair to another starts from none (#3651)", async () => {
+  const items = new Map();
+  const before = globalThis.localStorage;
+  globalThis.localStorage = {
+    getItem: (key) => items.get(key) ?? null, setItem: (key, value) => items.set(key, String(value)),
+    removeItem: (key) => items.delete(key), get length() { return items.size; }, key: (i) => [...items.keys()][i] ?? null,
+  };
+  try {
+    // Two control planes' keys, base64url; the name is the first eight bytes, in hex, as on the Mac.
+    const first = Buffer.from([4, 1, 2, 3, 4, 5, 6, 7, 8, 9]).toString("base64url");
+    const second = Buffer.from([4, 9, 9, 9, 9, 9, 9, 9, 8, 9]).toString("base64url");
+    assert.equal(model.pinName(first), "agents-lock-pin.0401020304050607");
+    assert.equal(model.pinName(undefined), "agents-lock-pin");
+    const page = (plane, control) => {
+      const keys = { pair: null };
+      const said = [];
+      const lock = new model.MachineLock({
+        call: (method, params) => plane.answer("AAAA-1111", "Web", "browser", method, structuredClone(params)),
+        keyRecord: async () => ({ client: "AAAA-1111", control }),
+        lockKey: async () => keys.pair, saveLockKey: async (pair) => { keys.pair = pair; },
+      }, undefined, (error) => said.push(error.message));
+      return { lock, said };
+    };
+    const one = page(controlPlane("alex"), first);
+    await one.lock.run();
+    assert.equal(one.lock.device.value.kind, "member");
+    assert.equal(JSON.parse(items.get("agents-lock-pin.0401020304050607")).count, 2);
+    assert.equal(items.has("agents-lock-pin"), false);
+    // Another control plane, with a lock of its own: not the first one's pin, so not a fork.
+    const two = page(controlPlane("alex"), second);
+    await two.lock.run();
+    assert.equal(two.lock.device.value.kind, "member", two.said.join("; "));
+    assert.equal(JSON.parse(items.get("agents-lock-pin.0409090909090909")).count, 2);
+    model.forgetPins();
+    assert.deepEqual([...items.keys()], []);
+  } finally {
+    globalThis.localStorage = before;
+  }
 });

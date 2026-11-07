@@ -66,7 +66,7 @@ var backupPartBytes = 8 << 20
 
 // backupAgentFiles are the files of an agent's folder a backup carries: the record, the
 // transcript, and what the transcript points at. Anything else there is left out.
-var backupAgentFiles = []string{"agent.json", "transcript.jsonl", "turns.jsonl", "app-tools.jsonl", "said.json"}
+var backupAgentFiles = []string{"agent.json", "transcript.jsonl", "app-tools.jsonl", "said.json"}
 
 // backupRootFiles are the root's files a backup carries.
 var backupRootFiles = []string{"usage-history.json", "time-history.json", erasedFile}

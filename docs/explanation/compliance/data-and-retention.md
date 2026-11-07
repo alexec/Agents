@@ -242,7 +242,7 @@ account's machines. It leaves the operator's backups of it, and Stripe's own rec
 | `Agents Control/store-before-<…>` | A whole old store, set aside when you change the store or move back. Each holds the audit, sealed secrets and server backups. | **Never pruned** |
 | Keychain `com.alexecollins.agentshost` | The control key, bucket keys, and `control-key-before-<time>` | **A `control-key-before-*` item is added on each move back and never deleted** |
 | `~/Library/Logs/Agents/control.log` | What the control plane did | 4 MB, and one older file |
-| The Web Push key | The key that signs browser push | One. Not in `agents-control backup`. |
+| The Web Push key | The key that signs browser push | One. In `agents-control backup` as `webpush-key.pem` (#3651). |
 
 ## In memory
 
@@ -301,6 +301,10 @@ also deletes what it kept of that control plane (#3670):
 - **The web page:** its drafts and machine-lock pins in `localStorage`, and its Web Push
   subscription.
 
+Each client keeps its machine-lock pins by control plane (`machineLockPin.<key>` on the Mac
+and the Remote, `agents-lock-pin.<key>` on the web page, #3651), so a pairing with another
+control plane does not read the old one's pins.
+
 The Mac and the Remote keep their own key in the keychain, so that a new pairing can use
 it. The web page deletes its key.
 
@@ -345,8 +349,9 @@ The first HADR review (2026-10-21, #1557) found these. Each one is an open issue
   server backup in its store.
 - **A copy of the store does not restore a control plane on its own** (#2137). A restore
   also needs the control key, the `secrets-key` and the TLS certificate from the old home.
-  With all of them, a machine joined again in 26 seconds in the review's drill. The Web
-  Push key is not in `agents-control backup` either, so browser push stops after a restore.
+  With all of them, a machine joined again in 26 seconds in the review's drill.
+  `agents-control backup` also holds the Web Push key (#3651), so browser push goes on
+  after a restore.
 - **Machine providers' secrets are on the machine that carries each provider** (#3398), not
   on the control plane. A copy of the store does not carry them, and nor does a machine's
   backup: when that machine is lost, add the provider again on another one.
