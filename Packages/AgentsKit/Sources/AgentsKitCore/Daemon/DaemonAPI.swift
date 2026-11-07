@@ -439,6 +439,9 @@ public enum DaemonAPI {
         public static let timeHistory = "time/history"
         /// Which features this host counted (#2165), for Reports ▸ Features. No params.
         public static let reportsFeatures = "reports/features"
+        /// Report a Problem (#3718): the person's words made into a GitHub new-issue link,
+        /// tokens and home folders cut out. Sends nothing.
+        public static let reportsProblem = "reports/problem"
         /// The milestones the person has earned (#984), for the Time page. No params.
         public static let milestonesState = "milestones/state"
         public static let costSetLimits = "cost/setLimits"
@@ -3194,7 +3197,7 @@ public enum DaemonAPI {
         }
     }
 
-    /// `wait_for_agents` or `check_again` (#481, #1915): the block `finish_turn` used to carry.
+    /// A wait on sessions (`wait_for_event` on `agent.ended`, #3799) or `check_again` (#481, #1915): the block `finish_turn` used to carry.
     public struct WaitOnRequest: Codable, Sendable {
         public var token: String
         /// By id or exact title, as `waiting_on` took them.

@@ -699,10 +699,14 @@ func endedCode(r wire.EndedReason) string {
 
 // raiseAgentEnding is agent.finished, agent.stopped or agent.failed. Stopped is somebody
 // or something choosing to stop it; failed is everything that ended it that nobody chose.
+// Each is also agent.ended (#3799), with how, unless the turn ended waiting.
 func (d *Daemon) raiseAgentEnding(id wire.UUID, next wire.AgentState, why *wire.EndedReason, archiving ...bool) {
 	a := d.Store.Agent(id)
 	if a == nil {
 		return
+	}
+	if how := endedHow(a, next, why); how != "" {
+		defer d.raiseAgentEvent("agent.ended", id, "ended: "+strings.ReplaceAll(how, "_", " ")+".", map[string]string{"how": how})
 	}
 	if next == wire.AgentStateFinished {
 		details := map[string]string{"afterwards": "stay"}
@@ -736,6 +740,25 @@ func (d *Daemon) raiseAgentEnding(id wire.UUID, next wire.AgentState, why *wire.
 		words = strings.ToLower(s)
 	}
 	d.raiseAgentEvent("agent.failed", id, "ended in an error: "+words+".", map[string]string{"reason": endedCode(*why)})
+}
+
+// endedHow is agent.ended's how (#3799): the outcome the session's row shows (done,
+// nothing_to_do, needs_answer), stopped or failed; "" for a turn that ended waiting, which
+// has not ended.
+func endedHow(a *wire.Agent, next wire.AgentState, why *wire.EndedReason) string {
+	if next == wire.AgentStateFinished {
+		switch {
+		case a.Report == nil:
+			return string(wire.WorkOutcomeDone)
+		case a.Report.Outcome == wire.WorkOutcomeWaiting:
+			return ""
+		}
+		return string(a.Report.Outcome)
+	}
+	if why == nil || *why == wire.EndedReasonCancelled || *why == wire.EndedReasonCostLimit || *why == wire.EndedReasonStoppedByAdmin {
+		return "stopped"
+	}
+	return "failed"
 }
 
 // raiseLeaseEvent is lease.granted and lease.released, on the host's log: the event raised,

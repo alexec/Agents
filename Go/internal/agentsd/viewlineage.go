@@ -14,9 +14,9 @@ import (
 
 // The Lineage section of the Issues and PR pages (#2941): the sessions that worked on an
 // issue or a pull request, and on its pull requests, with what each cost. The github, gitlab,
-// linear and jira servers have no way to the host's record, so the host answers a view's
+// linear, jira and azureboards servers have no way to the host's record, so the host answers a view's
 // tools/call of lineageViewTool itself, with lineage/walk and lineage/cost, and never passes
-// it on. Only a view of one of those four servers may ask: the record names the person's
+// it on. Only a view of one of those servers may ask: the record names the person's
 // sessions and what they spent.
 
 const (
@@ -28,7 +28,7 @@ const (
 )
 
 // lineageViewServers is the servers whose views may ask, by their mcpcatalog id.
-var lineageViewServers = map[string]bool{"agents/github": true, "agents/gitlab": true, "agents/linear": true, "agents/jira": true}
+var lineageViewServers = map[string]bool{"agents/github": true, "agents/gitlab": true, "agents/linear": true, "agents/jira": true, "agents/azureboards": true}
 
 type lineageView struct {
 	// Ref is the node, as lineage refs name it: github:owner/repo#12.
@@ -82,7 +82,7 @@ func (d *Daemon) lineageViewResult(s viewServer, args json.RawMessage) (wire.JSO
 		URL string `json:"url"`
 	}
 	_ = json.Unmarshal(args, &a)
-	node, base, ok := nodeOfURL(a.URL)
+	node, base, ok := d.nodeOfURLHere(a.URL)
 	if !ok {
 		return toolError("No issue or pull request at " + strconv.Quote(a.URL) + ".")
 	}
@@ -107,8 +107,8 @@ func toolError(words string) (wire.JSONValue, error) {
 
 // nodeOfURL is the issue or pull request at a web address, and the address's scheme and host
 // (for the links to its pull requests on a GitLab of its own): github.com/o/r/issues/5,
-// <gitlab>/group/project/-/issues/5, linear.app/<team>/issue/ENG-4/..., <jira>/browse/PROJ-12,
-// or a pull request's.
+// <gitlab>/group/project/-/issues/5, codeberg.org/o/r/issues/5, linear.app/<team>/issue/ENG-4/..., <jira>/browse/PROJ-12,
+// dev.azure.com/org/project/_workitems/edit/12 (#3815), or a pull request's.
 func nodeOfURL(raw string) (wire.LineageNode, string, bool) {
 	u, err := url.Parse(raw)
 	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
@@ -126,20 +126,33 @@ func nodeOfURL(raw string) (wire.LineageNode, string, bool) {
 		}
 		return wire.LineageNode{}, "", false
 	}
+	if project, id, ok := boardsOfURL(path); ok {
+		return boardsNode(project, id), "", true
+	}
 	if key, ok := strings.CutPrefix(path, "browse/"); ok && !strings.EqualFold(u.Host, "github.com") && linearLabel.MatchString(strings.ToUpper(key)) {
 		return wire.LineageNode{Kind: lineage.KindIssue, Ref: "jira:" + strings.ToUpper(key)}, "", true
 	}
-	for _, sep := range []string{"/-/issues/", "/issues/"} {
-		if repo, num, ok := strings.Cut(path, sep); ok {
-			n, err := strconv.Atoi(strings.SplitN(num, "/", 2)[0])
-			r := forgeOf(u.Host, repo)
-			if err != nil || n <= 0 || r.forge == "" || (sep == "/issues/") != (r.forge == "github") {
-				return wire.LineageNode{}, "", false
-			}
-			return r.issue(n), base, true
-		}
+	if r, n, ok := ofURL(u.Host, path, false); ok {
+		return r.issue(n), base, true
 	}
 	return wire.LineageNode{}, "", false
+}
+
+// nodeOfURLHere is nodeOfURL, or an issue on the connected Forgejo, whose host's name need
+// not say Forgejo.
+func (d *Daemon) nodeOfURLHere(raw string) (wire.LineageNode, string, bool) {
+	if n, base, ok := nodeOfURL(raw); ok {
+		return n, base, true
+	}
+	_, root := d.forgejoRoot()
+	if root == "" {
+		return wire.LineageNode{}, "", false
+	}
+	repo, n, ok := issueOfURLOn(raw, root)
+	if !ok {
+		return wire.LineageNode{}, "", false
+	}
+	return repo.issue(n), strings.TrimSuffix(root, "/"), true
 }
 
 // lineageViewOf is node's section: the walk for who worked on it, the rollup for the cost.
@@ -375,7 +388,7 @@ func lineageCostZero(c wire.LineageCost) bool {
 }
 
 // refName is a node as the page names it: #7 or !4 in the page's own repo, owner/repo#7 in
-// another, ENG-4 on Linear, PROJ-12 on Jira.
+// another, ENG-4 on Linear, PROJ-12 on Jira, AB#12 on Azure Boards.
 func refName(ref, page string) string {
 	if rest, ok := strings.CutPrefix(ref, "linear:"); ok {
 		return rest
@@ -383,11 +396,15 @@ func refName(ref, page string) string {
 	if rest, ok := strings.CutPrefix(ref, "jira:"); ok {
 		return rest
 	}
+	if _, id, ok := boardsOfNode(wire.LineageNode{Kind: lineage.KindIssue, Ref: ref}); ok {
+		return "AB#" + strconv.Itoa(id)
+	}
 	return shortRef(ref, page)
 }
 
-// refURL is a node's web address: GitHub's, or a GitLab's on the page's own host. Linear's
-// pull requests are on GitHub or GitLab; its issues have none here.
+// refURL is a node's web address: GitHub's, or a GitLab's or a Forgejo's on the page's own
+// host. Linear's pull requests are on GitHub or GitLab; its issues have none here. A forge
+// with no case has none.
 func refURL(n wire.LineageNode, base string) string {
 	scheme, id, _ := strings.Cut(n.Ref, ":")
 	i := strings.LastIndexAny(id, "#!")
@@ -409,6 +426,15 @@ func refURL(n wire.LineageNode, base string) string {
 			return base + "/" + path + "/-/merge_requests/" + num
 		}
 		return base + "/" + path + "/-/issues/" + num
+	case "forgejo":
+		// A Forgejo's node does not say its host: only the page's.
+		if base == "" || strings.EqualFold(base, "https://linear.app") {
+			return ""
+		}
+		if n.Kind == lineage.KindPR {
+			return base + "/" + path + "/pulls/" + num
+		}
+		return base + "/" + path + "/issues/" + num
 	}
 	return ""
 }

@@ -17,39 +17,63 @@ struct MachineProcessesSection: View {
     /// The machine's CPU and memory above the processes: not on the machine's page, which
     /// says them in its own Usage section (#3626).
     var showsTotals = true
+    /// Closed under one row with the count and their total, as the machine's page draws it
+    /// (#3743), until the person opens it.
+    var folds = false
 
     @State private var state: DaemonAPI.ProcessesState?
     @State private var failure: String?
+    @State private var open = false
+
+    private static let footer = "Agents’ own processes only. Stop a session to stop its processes."
 
     var body: some View {
-        Section {
-            if let state {
-                if showsTotals {
-                    LabeledContent("CPU", value: ProcessWords.machineCPU(state.machine))
-                    LabeledContent("Memory", value: ProcessWords.machineMemory(state.machine))
+        Group {
+            if folds {
+                Section {
+                    DisclosureGroup(isExpanded: $open) {
+                        list
+                    } label: {
+                        Text(state.map(ProcessWords.processesLine) ?? "Processes")
+                            .monospacedDigit()
+                            .help(Self.footer)
+                    }
                 }
-                ForEach(state.processes) { process in
-                    row(process)
-                }
-                if state.omitted > 0 {
-                    Text("And \(state.omitted) more.").foregroundStyle(.secondary)
-                }
-            } else if let failure {
-                Text(failure).foregroundStyle(.secondary)
             } else {
-                ProgressView()
+                Section {
+                    list
+                } header: {
+                    Text("Processes on \(hostName)")
+                } footer: {
+                    Text(Self.footer).foregroundStyle(.secondary)
+                }
             }
-        } header: {
-            Text("Processes on \(hostName)")
-        } footer: {
-            Text("Agents’ own processes only. Stop a session to stop its processes.")
-                .foregroundStyle(.secondary)
         }
         .task {
             while !Task.isCancelled {
                 await read()
                 try? await Task.sleep(for: .seconds(3))
             }
+        }
+    }
+
+    @ViewBuilder
+    private var list: some View {
+        if let state {
+            if showsTotals {
+                LabeledContent("CPU", value: ProcessWords.machineCPU(state.machine))
+                LabeledContent("Memory", value: ProcessWords.machineMemory(state.machine))
+            }
+            ForEach(state.processes) { process in
+                row(process)
+            }
+            if state.omitted > 0 {
+                Text("And \(state.omitted) more.").foregroundStyle(.secondary)
+            }
+        } else if let failure {
+            Text(failure).foregroundStyle(.secondary)
+        } else {
+            ProgressView()
         }
     }
 
@@ -130,6 +154,15 @@ enum ProcessWords {
 
     static func machineMemory(_ machine: DaemonAPI.MachineUsage) -> String {
         "\(memory(machine.memoryUsed)) of \(memory(machine.memoryTotal))"
+    }
+
+    /// The closed Processes row on a machine's page (#3743): "Processes (12) · 4.5% · 1.2 GB",
+    /// what Agents' own processes use together.
+    static func processesLine(_ state: DaemonAPI.ProcessesState) -> String {
+        let count = state.processes.count + state.omitted
+        let cpu = state.processes.reduce(0) { $0 + $1.cpuPercent }
+        let memory = state.processes.reduce(Int64(0)) { $0 + $1.memory }
+        return "Processes (\(count)) · \(Self.cpu(cpu)) · \(Self.memory(memory))"
     }
 }
 

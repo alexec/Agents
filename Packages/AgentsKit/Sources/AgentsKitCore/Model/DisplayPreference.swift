@@ -17,6 +17,9 @@ public enum DisplayPreference {
     public static let startRuntimeID = "startRuntimeID"
     /// The choices last made on the start form, per runtime: `{runtimeID: {optionID: value}}`.
     public static let startChoices = "startChoices"
+    /// The model and permission levels last chosen on a start form (#3798):
+    /// `{"model": …, "permission": …}`, so a new session does not fall back to Ask.
+    public static let startLevels = "startLevels"
     /// The marketplace last chosen in Add Skill and Add MCP Server.
     public static let skillsMarketplace = "catalog.skills.marketplace"
     public static let mcpMarketplace = "catalog.mcp.marketplace"
@@ -47,4 +50,25 @@ public enum DisplayPreference {
         agentsMayArchiveMyChats: .bool,
         noticeBurst: .int, noticeCooldownMinutes: .int,
     ]
+}
+
+extension DisplayPreference {
+    /// The levels kept under `startLevels`; a level not kept, or not known, is the default's.
+    public static func keptLevels(in preferences: DaemonAPI.DisplayPreferences,
+                                   default fallback: Levels = Levels(model: .balanced, permission: .ask)) -> Levels {
+        let kept = preferences[startLevels]?.objectValue ?? [:]
+        var levels = fallback
+        if let model = kept["model"]?.stringValue.flatMap(ModelLevel.init(rawValue:)) { levels.model = model }
+        if let permission = kept["permission"]?.stringValue.flatMap(PermissionLevel.init(rawValue:)) { levels.permission = permission }
+        return levels
+    }
+
+    /// The change that keeps levels' model and permission under `startLevels`, or none when
+    /// they are kept already.
+    public static func keeping(_ levels: Levels, in preferences: DaemonAPI.DisplayPreferences) -> DaemonAPI.DisplayPreferences {
+        var kept: [String: JSONValue] = [:]
+        if let model = levels.model { kept["model"] = .string(model.rawValue) }
+        if let permission = levels.permission { kept["permission"] = .string(permission.rawValue) }
+        return preferences[startLevels] == .object(kept) ? [:] : [startLevels: .object(kept)]
+    }
 }

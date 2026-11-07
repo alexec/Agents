@@ -2294,6 +2294,12 @@ final class AppModel {
         work.replaceDisk(state)
     }
 
+    /// Report a Problem's issue (#3718), made by this Mac's host: the person's words, the
+    /// versions and the log lines, with tokens and home folders cut out. Sends nothing.
+    func problemReport(_ request: DaemonAPI.ProblemReportRequest) async throws -> DaemonAPI.ProblemReport {
+        try await macClient.call(DaemonAPI.Method.reportsProblem, request, returning: DaemonAPI.ProblemReport.self)
+    }
+
     private func refreshServerDisk(_ host: MachineRef) async {
         guard let state = try? await client(for: host).call(DaemonAPI.Method.diskState,
                                                             Optional<String>.none,
@@ -2642,6 +2648,11 @@ final class AppModel {
         case .permission: draftLevels.permission = PermissionLevel(rawValue: level)
         case .permissionRequests: draftClientPermission = ClientPermissionMode(rawValue: level)
         case .sandbox: draftSandbox = SandboxChoice(rawValue: level)
+        }
+        if field == .model || field == .permission {
+            // Kept for the next session, on every client (#3798).
+            let change = DisplayPreference.keeping(draftLevels, in: displayMirror.preferences)
+            if !change.isEmpty { displayMirror.set(change) }
         }
         draftAutoRefusal = nil
         if isAutoDraft {

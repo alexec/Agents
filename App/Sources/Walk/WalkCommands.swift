@@ -30,6 +30,15 @@ enum WalkCommands {
         }
     }
 
+    /// Before `run`, on the main thread: a shot first asks the window's web views for their
+    /// pictures (#3854), which come back on the main thread, so the socket waits on `group`
+    /// off it.
+    static func before(_ line: Data, group: DispatchGroup) {
+        guard let request = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
+              request["cmd"] as? String == "shot", let window = try? target(request) else { return }
+        WalkShot.snapshotWebViews(in: window, group: group)
+    }
+
     private static func perform(_ verb: String, _ request: [String: Any]) throws -> [String: Any] {
         switch verb {
         // Voice mode with no microphone and no sound (#2322).
@@ -157,7 +166,12 @@ enum WalkCommands {
             }
         case "set":
             guard let value = request["value"] as? String else { throw WalkError("set wants a value") }
-            guard let match = try matches(request).last else { throw WalkError("nothing matched \(request["text"] ?? "")") }
+            // A field before a text with the same words (#3825): a field's label is often a
+            // text beside it, as a SecureField whose label is also its own title is.
+            let found = try matches(request)
+            guard let match = found.last(where: { WalkText.isField($0.element) }) ?? found.last else {
+                throw WalkError("nothing matched \(request["text"] ?? "")")
+            }
             guard WalkText.set(match.element, in: match.window, to: value) else {
                 throw WalkError("\(match.element.line(in: match.window)) takes no text")
             }

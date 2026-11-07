@@ -1244,11 +1244,7 @@ struct LinkWorkspaceSheet: View {
             .frame(maxHeight: 280)
             Toggle("Start when used", isOn: $startWhenUsed)
             Picker("Stop when idle", selection: $stopWhenIdle) {
-                Text("Off").tag(0)
-                Text("After 15 minutes").tag(15)
-                Text("After 30 minutes").tag(30)
-                Text("After 1 hour").tag(60)
-                Text("After 2 hours").tag(120)
+                ForEach(MachineProviderWords.idleChoices, id: \.minutes) { Text($0.label).tag($0.minutes) }
             }
             .fixedSize()
             if let fingerprint {

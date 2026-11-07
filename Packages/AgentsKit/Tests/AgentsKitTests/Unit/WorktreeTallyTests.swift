@@ -27,6 +27,8 @@ struct WorktreeTallyTests {
         #expect(tally.pageLine == "Worktrees hold over 12.0 GB, 3.0 GB of it idle.")
         #expect(WorktreeTally([worktree("c", gb: nil)]).pageLine == "Measuring 1 worktree…")
         #expect(WorktreeTally([DaemonAPI.WorktreeSummary]()).pageLine == WorktreeTally.empty)
+        #expect(WorktreeTally.folderLine("Agents", count: 4) == "Agents · 4 worktrees")
+        #expect(WorktreeTally.folderLine("Agents", count: 1) == "Agents · 1 worktree")
     }
 
     @Test func removeBuildOutputSaysWhatItFreed() {

@@ -38,3 +38,18 @@ test("start form: a runtime that can't start any more takes its choices with it"
   assert.deepEqual(f.formFor(form, ["claude", "grok"]), form);
   assert.deepEqual(f.formFor(form, ["claude"]), { chosen: {}, folders: ["file:///y/"] });
 });
+
+test("start form: the levels last chosen are the next session's, on every client (#3798)", async () => {
+  const m = await load("test/preferences-entry.ts");
+  const sent = [];
+  m.sendPreferencesWith((changes) => sent.push(changes));
+  m.preferencesSaid({});
+  assert.deepEqual(m.keptLevels(), { model: "balanced", permission: "ask" }, "nothing kept: Balanced and Ask");
+  m.keepLevels({ model: "smart", permission: "bypassPermissions" });
+  assert.deepEqual(sent, [{ startLevels: { model: "smart", permission: "bypassPermissions" } }]);
+  assert.deepEqual(m.keptLevels(), { model: "smart", permission: "bypassPermissions" });
+  m.keepLevels({ model: "smart", permission: "bypassPermissions" });
+  assert.equal(sent.length, 1, "no change, nothing sent");
+  m.preferencesSaid({ startLevels: { model: "huge", permission: "approveForMe" } });
+  assert.deepEqual(m.keptLevels(), { model: "balanced", permission: "approveForMe" }, "a level not known is the default");
+});

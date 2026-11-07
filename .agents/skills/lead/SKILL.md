@@ -34,7 +34,8 @@ not start a second one.
 - **Follow AGENTS.md** for the order of work, the area limit (#873), "Questions that
   already have an answer" and "Decide and tell". The lead does not count as a lane; its
   lanes count towards the folder's lane and open-PR limits.
-- **Wait with `wait_for_event` or `wait_for_agents`, never by polling.**
+- **Wait with `wait_for_event`, never by polling.** To wait on lanes themselves, wait on
+  `agent.ended` alone, with `agent` their ids and `wake_on: any`.
 - **Name people in questions:** "Claude (the epic's lead) will…", "Alex, do you want…?".
 
 ## 1. Read the plan
@@ -83,15 +84,19 @@ with a form for the rest), then close it. Otherwise give it a lane as above.
 ## 3. Wait
 
 End each pass with one `wait_for_event` call: `events: ["issue.closed", "pr.merged",
-"checks.failed", "pr.conflicted"]`, `until_minutes: 60`. Then end your turn. When you
-start again:
+"checks.failed", "pr.conflicted"]`, `where: {"issue": [<open children>], "fixes": ["#<child>",
+…]}`, `until_minutes: 60`. Then end your turn. The wait names this epic's children (#3797):
+`issue` for `issue.closed`, and `fixes` for the PR events, which match a PR whose body
+closes one of them, so you know the child before its lane opens the PR. Each event takes
+only the keys it has. A wait that names nothing is refused. When you start again:
 
 - **`issue.closed` or `pr.merged`** of a child: read the plan again (step 1) and start
   the lanes of the children that are now ready (step 2).
 - **`checks.failed` or `pr.conflicted`** on a child's PR: its lane fixes it. If the lane
   has ended or stopped, message it about its own PR (`message_session`), never to widen
   its work. Leave a PR labelled `needs-approval` alone: it waits for Alex.
-- **An event that is not about this epic:** wait again.
+- **An event that is not about this epic** (a PR that fixes a child and something else):
+  wait again.
 - **The time limit:** run `scripts/rearm-automerge.sh --stalled`, read the plan again,
   and wait again.
 

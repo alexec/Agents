@@ -40,15 +40,29 @@ struct MachineResourcesSection: View {
             .filter { !$0.rows.isEmpty }
     }
 
+    /// Whether the section is drawn (#3743): only when a resource is declared, held or
+    /// awaited. Free simulators and browsers alone are not news.
+    private var shows: Bool {
+        (snapshot?.resources ?? []).contains { $0.declared != nil || !$0.holds.isEmpty || !$0.line.isEmpty }
+    }
+
     var body: some View {
+        if shows { section }
+    }
+
+    /// The machine's leases, read while its page is open: by the page, as the section may not
+    /// be drawn. This Mac's arrive as they change; another machine's are read every few seconds.
+    static func read(_ model: AppModel, on host: MachineRef) async {
+        await model.refreshLeases(on: host)
+        guard host != .mac else { return }
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(5))
+            await model.refreshLeases(on: host)
+        }
+    }
+
+    private var section: some View {
         Section {
-            if snapshot == nil {
-                ProgressView().id(Self.top)
-            } else if groups.isEmpty {
-                Text("Nothing to take turns with here yet. An agent names one when it leases it.")
-                    .foregroundStyle(.secondary)
-                    .id(Self.top)
-            }
             ForEach(Array(groups.enumerated()), id: \.element.title) { index, group in
                 Text(group.title.uppercased())
                     .appText(.fine).fontWeight(.semibold)
@@ -69,24 +83,13 @@ struct MachineResourcesSection: View {
         } header: {
             HStack(alignment: .firstTextBaseline) {
                 Text("Resources")
+                    .help("Things on this machine that agents take turns with. A lease is an agreement between agents, not a lock.")
                 Spacer()
                 if host == .mac {
                     SettingsLink { Text("Declare in Settings\u{2026}") }
                         .simultaneousGesture(TapGesture().onEnded { model.settingsPaneAsked = .resources })
                         .appText(.fine)
                 }
-            }
-        } footer: {
-            Text("Things on this machine that agents take turns with. A lease is an agreement between agents, not a lock.")
-                .foregroundStyle(.secondary)
-        }
-        .task(id: host) {
-            // This Mac's arrive as they change; another machine's are read while its page is open.
-            await model.refreshLeases(on: host)
-            guard host != .mac else { return }
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(5))
-                await model.refreshLeases(on: host)
             }
         }
     }

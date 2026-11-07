@@ -9,6 +9,8 @@ struct YourConnectionsView: View {
     @Environment(AppModel.self) private var model
 
     @State private var connections: [DaemonAPI.Connection]?
+    /// What the host connects (#3824): Connect… offers only that.
+    @State private var offered: [DaemonAPI.ConnectionProvider] = []
     @State private var setups: [FolderKey: DaemonAPI.ConnectorSetup] = [:]
     @State private var problem: String?
     @State private var connecting: DaemonAPI.ConnectionProvider?
@@ -66,6 +68,8 @@ struct YourConnectionsView: View {
             case .gitlab: ConnectGitLabSheet(host: .mac, again: again, onConnected: { Task { await load() } })
             case .email: ConnectEmailSheet(host: .mac, onConnected: { Task { await load() } })
             case .atlassian: ConnectJiraSheet(host: .mac, onConnected: { Task { await load() } })
+            case .forgejo: ConnectForgejoSheet(host: .mac, again: again, onConnected: { Task { await load() } })
+            case .bitbucket: ConnectBitbucketSheet(host: .mac, onConnected: { Task { await load() } })
             }
         }
         .confirmationDialog(disconnectTitle, isPresented: Binding(get: { disconnecting != nil },
@@ -119,13 +123,9 @@ struct YourConnectionsView: View {
         }
     }
 
-    /// The providers with no working connection, for Connect…. Email only on a host that can
-    /// sign in to a mailbox (#1780); an older host does not show it.
+    /// The providers the host connects (#3824) with no working connection, for Connect….
     private var unconnected: [DaemonAPI.ConnectionProvider] {
-        DaemonAPI.ConnectionProvider.allCases.filter { p in
-            if p == .email, !model.host(.mac, has: Capability.connectionsEmail1) { return false }
-            return connections?.contains(where: { $0.provider == p && $0.state == .connected }) != true
-        }
+        offered.filter { p in connections?.contains(where: { $0.provider == p && $0.state == .connected }) != true }
     }
 
     private var disconnectTitle: String {
@@ -141,8 +141,10 @@ struct YourConnectionsView: View {
     }
 
     private func load() async {
-        switch await model.connections(on: .mac) {
-        case .success(let list): connections = list; problem = nil; model.endedConnections.set(list, on: .mac)
+        switch await model.connectionsList(on: .mac) {
+        case .success(let list):
+            connections = list.connections; problem = nil; model.endedConnections.set(list.connections, on: .mac)
+            offered = list.offered(hostHasEmail: model.host(.mac, has: Capability.connectionsEmail1))
         case .failure(let failure): connections = []; problem = failure.words
         }
         for p in folders {

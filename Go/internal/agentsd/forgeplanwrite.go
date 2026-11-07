@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/alexec/agents/Go/internal/forgejomcp"
 	"github.com/alexec/agents/Go/internal/lineage"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -14,7 +15,8 @@ import (
 // The plan's writes (#3271): a person changes an epic's plan from its page. Add child adds a new
 // issue, or one that is there, as a sub-issue of the epic; Blocked by sets which issues a child
 // waits for. They are the forge's own sub-issues and links (GitHub's sub-issue and dependency
-// APIs, Linear's parent and "blocks" relations), so the plan forge/plan reads next is the
+// APIs, Linear's parent and "blocks" relations, Azure Boards' parent and predecessor links,
+// #3815, and Forgejo's issue dependencies, #3835), so the plan forge/plan reads next is the
 // forge's, as for every other reader. GitLab's links are Premium only and Jira's come later, so
 // those two refuse, and say so. Like the other writes (forgewrite.go), only a person's window or
 // device may call them.
@@ -32,6 +34,9 @@ var childLevels = []string{"", "story", "task", "spike", "bug"}
 var (
 	// githubIssueRef is #12, owner/repo#12 or an issue's URL on github.com.
 	githubIssueRef = regexp.MustCompile(`^(?:https://github\.com/([\w.-]+/[\w.-]+)/issues/|([\w.-]+/[\w.-]+)?#)([0-9]{1,9})/?$`)
+	// forgejoIssueRef is #12, owner/repo#12, or an issue's URL on a Forgejo (checked against the
+	// connected one's root).
+	forgejoIssueRef = regexp.MustCompile(`^(?:(https?://\S+/)([\w.-]+/[\w.-]+)/issues/|([\w.-]+/[\w.-]+)?#)([0-9]{1,9})/?$`)
 	// linearIssueRef is ENG-4, or its URL on linear.app.
 	linearIssueRef = regexp.MustCompile(`^(?:https://linear\.app/[\w.-]+/issue/)?([A-Za-z][A-Za-z0-9]{0,9}-[0-9]{1,9})(?:/[\w.-]*)?$`)
 )
@@ -98,6 +103,15 @@ func (d *Daemon) forgeAddChild(ctx context.Context, r wire.ForgeAddChildRequest)
 	var url string
 	if t.linear != nil {
 		_, url, err = t.linear.AddChild(ctx, t.identifier, title, labels)
+	} else if t.boards != nil {
+		// The level is the work item's type too, as its process names it.
+		_, url, err = t.boards.AddChild(ctx, t.project, t.number, title, labels, level)
+	} else if t.forgejo != nil {
+		// A Forgejo epic's children are the issues it depends on.
+		var n int
+		if n, url, err = t.forgejo.CreateIssue(ctx, t.project, title, labels); err == nil {
+			err = t.forgejo.SetBlockedBy(ctx, t.project, t.number, t.project, n, true)
+		}
 	} else {
 		var n int
 		if n, url, err = t.github.CreateIssue(ctx, t.repo.path, title, labels); err == nil {
@@ -125,6 +139,24 @@ func (d *Daemon) addExistingChild(ctx context.Context, method string, t forgeTar
 			return wire.ForgeDone{}, Invalid("%s: an epic is not its own child", method)
 		}
 		err = t.linear.SetParent(ctx, key, t.identifier)
+	} else if t.boards != nil {
+		id, ok := boardsItemID(ref)
+		if !ok {
+			return wire.ForgeDone{}, Invalid("%s: %q is not a work item: give its id, such as 12 or AB#12, or its page", method, ref)
+		}
+		if id == t.number {
+			return wire.ForgeDone{}, Invalid("%s: an epic is not its own child", method)
+		}
+		err = t.boards.SetParent(ctx, t.project, id, t.number)
+	} else if t.forgejo != nil {
+		repo, n, ok := d.forgejoIssueOf(ref, t.project)
+		if !ok {
+			return wire.ForgeDone{}, Invalid("%s: %q is not an issue on the connected Forgejo: give #12, owner/repo#12 or its URL", method, ref)
+		}
+		if forgejoNode(repo, n, false) == epic {
+			return wire.ForgeDone{}, Invalid("%s: an epic is not its own child", method)
+		}
+		err = t.forgejo.SetBlockedBy(ctx, t.project, t.number, repo, n, true)
 	} else {
 		m := githubIssueRef.FindStringSubmatch(ref)
 		if m == nil {
@@ -145,6 +177,25 @@ func (d *Daemon) addExistingChild(ctx context.Context, method string, t forgeTar
 	}
 	d.forgeWrote()
 	return wire.ForgeDone{}, nil
+}
+
+// forgejoIssueOf is the repository and number ref names on the connected Forgejo: #12 is in
+// repo, the epic's own; a URL must be on the connected Forgejo.
+func (d *Daemon) forgejoIssueOf(ref, repo string) (string, int, bool) {
+	m := forgejoIssueRef.FindStringSubmatch(ref)
+	if m == nil {
+		return "", 0, false
+	}
+	if m[1] != "" {
+		if _, root := d.forgejoRoot(); root == "" || !strings.EqualFold(forgejomcp.BaseURL(m[1]), root) {
+			return "", 0, false
+		}
+	}
+	if named := m[2] + m[3]; named != "" {
+		repo = named
+	}
+	n, _ := strconv.Atoi(m[4])
+	return strings.ToLower(repo), n, true
 }
 
 func (d *Daemon) forgeBlockedBy(ctx context.Context, r wire.ForgeBlockedByRequest) (wire.ForgeDone, error) {
@@ -177,11 +228,18 @@ func (d *Daemon) forgeBlockedBy(ctx context.Context, r wire.ForgeBlockedByReques
 			}
 			key, onLinear := strings.CutPrefix(b.Ref, "linear:")
 			repo, n, onRepo := nodeOfRepo(b)
+			project, id, onBoards := boardsOfNode(b)
+			fjRepo, fjNumber, onForgejo := forgejoOfNode(b)
 			switch {
 			case b.Kind != lineage.KindIssue:
 				return wire.ForgeDone{}, Invalid("%s: %s is not an issue", method, b.Ref)
 			case t.linear != nil && onLinear && linearLabel.MatchString(key):
 				todo = append(todo, blocker{key: key, blocked: list.blocked})
+			// A link is within an organization.
+			case t.boards != nil && onBoards && boardsOrg(project) == boardsOrg(t.project):
+				todo = append(todo, blocker{number: id, blocked: list.blocked})
+			case t.forgejo != nil && onForgejo:
+				todo = append(todo, blocker{repo: fjRepo, number: fjNumber, blocked: list.blocked})
 			case t.github != nil && onRepo && repo.forge == "github":
 				todo = append(todo, blocker{repo: repo.path, number: n, blocked: list.blocked})
 			default:
@@ -192,6 +250,10 @@ func (d *Daemon) forgeBlockedBy(ctx context.Context, r wire.ForgeBlockedByReques
 	for _, b := range todo {
 		if t.linear != nil {
 			err = t.linear.SetBlockedBy(ctx, t.identifier, b.key, b.blocked)
+		} else if t.boards != nil {
+			err = t.boards.SetBlockedBy(ctx, t.project, t.number, b.number, b.blocked)
+		} else if t.forgejo != nil {
+			err = t.forgejo.SetBlockedBy(ctx, t.project, t.number, b.repo, b.number, b.blocked)
 		} else {
 			err = t.github.SetBlockedBy(ctx, t.repo.path, t.number, b.repo, b.number, b.blocked)
 		}

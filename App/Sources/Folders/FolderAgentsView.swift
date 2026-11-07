@@ -50,7 +50,6 @@ struct FolderAgentsView: View {
 
     private var page: some View {
         VStack(spacing: 0) {
-            WaitingForOKBanner(folder: folder)
             // The same strip as over a chat: a prompt here goes to that host too (#83).
             if let summary {
                 OfflineStrip(host: summary.host)
@@ -326,69 +325,6 @@ struct FolderAgentsView: View {
     private func place(_ summary: DaemonAPI.FolderSummary) -> String {
         let machine = summary.host == .mac ? "this Mac" : model.hosts.label(summary.host)
         return "\(FolderPlace.path(summary.folder.folder, on: summary.host)) · \(machine)"
-    }
-}
-
-/// Everything in the folder waiting for somebody's OK, as one banner across the top of
-/// the pane: plugins new or changed since they were approved, which no agent is given
-/// until then, and workflows likewise, which do not run. Review opens the one thing when
-/// there is one, and otherwise the place they are listed.
-struct WaitingForOKBanner: View {
-    @Environment(AppModel.self) private var model
-    @Environment(WindowRequests.self) private var requests
-    let folder: URL?
-
-    private var plugins: [FolderPlugin] {
-        model.plugins(in: folder).filter { $0.awaitingApproval != nil }
-    }
-    private var workflows: [WorkflowSummary] {
-        model.workflows(in: folder).filter { $0.awaitingApproval != nil && !$0.isArchived }
-    }
-
-    var body: some View {
-        if !plugins.isEmpty || !workflows.isEmpty {
-            HStack(spacing: 10) {
-                Image(systemName: "hand.raised")
-                    .tinted(.attention)
-                    .accessibilityHidden(true)
-                Text(sentence)
-                    .appText(.supporting)
-                    .lineLimit(2)
-                Spacer(minLength: 8)
-                Button("Review…") { review() }
-                    .buttonStyle(.paper)
-                    .appText(.fine)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Paper.wash)
-            .overlay(alignment: .bottom) { Rectangle().fill(Paper.rule).frame(height: 1) }
-            .accessibilityElement(children: .contain)
-        }
-    }
-
-    private var sentence: String {
-        switch (plugins.count, workflows.count) {
-        case (1, 0): return "Plugin \(plugins[0].name) is waiting for your OK"
-        case (0, 1): return "Workflow \(workflows[0].workflow.name) is waiting for your OK"
-        default:
-            var parts: [String] = []
-            if !plugins.isEmpty { parts.append(plugins.count == 1 ? "1 plugin" : "\(plugins.count) plugins") }
-            if !workflows.isEmpty { parts.append(workflows.count == 1 ? "1 workflow" : "\(workflows.count) workflows") }
-            let total = plugins.count + workflows.count
-            return "\(parts.joined(separator: " and ")) \(total == 1 ? "is" : "are") waiting for your OK"
-        }
-    }
-
-    /// Plugins first: they are approved in Project Settings, and a workflow is approved
-    /// on its own page, which is one click from the middle column anyway.
-    private func review() {
-        if !plugins.isEmpty {
-            requests.projectSettings = .plugins
-        } else if let first = workflows.first {
-            model.openWorkflow = first.id
-        }
     }
 }
 

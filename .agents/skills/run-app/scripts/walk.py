@@ -11,7 +11,7 @@
     walk.py ROOT press --x X --y Y               what is at a point of the shot, for a control left out of the tree
     walk.py ROOT select TEXT                     a sidebar or list row
     walk.py ROOT unfold|fold TEXT                a sidebar project, a disclosure row
-    walk.py ROOT set TEXT VALUE                  type VALUE into the field labelled TEXT
+    walk.py ROOT set TEXT VALUE                  type VALUE into the field labelled TEXT: a field before a text (#3825)
     walk.py ROOT scroll TEXT                     bring TEXT into view
     walk.py ROOT scroll [TEXT] --to top|bottom | --y N | --by N
     walk.py ROOT size WIDTH HEIGHT [--x X --y Y]  the window's frame (top left from the main screen's)

@@ -447,13 +447,19 @@ const signInWindow = "agents-sign-in";
  * device flow on gitlab.com, or an access token on any GitLab, which goes to the host only.
  * Connect Jira (#3304): Linear's code flow on Atlassian Cloud, or a token on one Jira site, and it
  * ends on the site's newest issue, which proves it. Connect Email (#1780): an IMAP server, a user and an app password, which go to the host only.
+ * Connect Forgejo (#3752): GitLab's access token way alone, on Codeberg or any Forgejo or Gitea.
+ * Connect Bitbucket (#3785): Forgejo's shape on Bitbucket Cloud, with the email of an Atlassian API token in place of the address.
  */
 export function ConnectDialog({ store, host, provider, folder, again, connected, close }: {
   store: Store; host: string; provider: ConnectionProvider; folder?: string;
   /** The ended connection Connect Again… is for: GitLab's opens the way it was made, with its address (#1865). */
   again?: Connection | undefined; connected: () => void; close: () => void;
 }) {
-  const opening = provider === "gitlab" && again ? words.gitlabAgain(again) : undefined;
+  const isForgejo = provider === "forgejo";
+  const isBitbucket = provider === "bitbucket";
+  const opening = provider === "gitlab" && again ? words.gitlabAgain(again)
+    : isForgejo ? { withToken: true, address: again ? words.forgejoAgain(again) : "" }
+    : isBitbucket ? { withToken: true, address: "" } : undefined;
   type Step = { kind: "asking" } | { kind: "starting" } | { kind: "waiting"; flow: ConnectionSignIn }
     | { kind: "finishing" } | { kind: "install"; login: string; repository: string; url: string }
     | { kind: "checking" } | { kind: "jira"; connection: Connection } | { kind: "failed"; why: string };
@@ -462,7 +468,7 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
   const [withToken, setWithToken] = useState(opening?.withToken ?? false);
   const [address, setAddress] = useState(opening?.address ?? "");
   const [token, setToken] = useState("");
-  /** Jira only (#3304): the account's email, for a Jira Cloud API token. */
+  /** Jira (#3304) and Bitbucket (#3785): the account's email, for an Atlassian API token. */
   const [jiraEmail, setJiraEmail] = useState("");
   /** Email only (#1780). The app password stays in this state, and is cleared after the sign-in. */
   const [server, setServer] = useState("");
@@ -574,7 +580,8 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
   const connectWithToken = async () => {
     const typed = token.trim();
     if (!typed || busy) return;
-    const jiraRequest = isJira ? words.jiraTokenRequest(address, jiraEmail, typed) : undefined;
+    const jiraRequest = isJira ? words.jiraTokenRequest(address, jiraEmail, typed)
+      : isBitbucket ? words.bitbucketTokenRequest(jiraEmail, typed) : undefined;
     if (isJira && !jiraRequest) return;
     setStep({ kind: "checking" });
     const url = address.trim();
@@ -670,7 +677,37 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
             <button type="button" class="link small" onClick={() => openOut(words.jira.newTokenURL)}>{words.jira.newTokenButton}</button>
           </form>
         )}
-        {withToken && !isJira && (
+        {isForgejo && (
+          <form id="connect-token" class="token-form" onSubmit={(e) => { e.preventDefault(); void connectWithToken(); }}>
+            <p class="small">{words.forgejo.tokenIntro}</p>
+            <label>{words.forgejo.addressLabel}
+              <input type="url" value={address} placeholder={words.forgejo.addressPrompt} disabled={busy}
+                autocomplete="off" autocapitalize="off" spellcheck={false}
+                onInput={(e) => setAddress((e.target as HTMLInputElement).value)} />
+            </label>
+            <label>{words.forgejo.tokenLabel}
+              <input type="password" value={token} placeholder={words.forgejo.tokenPrompt} disabled={busy} autocomplete="off"
+                onInput={(e) => setToken((e.target as HTMLInputElement).value)} />
+            </label>
+            <button type="button" class="link small" onClick={() => openOut(words.newForgejoTokenURL(address))}>{words.forgejo.newTokenButton}</button>
+          </form>
+        )}
+        {isBitbucket && (
+          <form id="connect-token" class="token-form" onSubmit={(e) => { e.preventDefault(); void connectWithToken(); }}>
+            <p class="small">{words.bitbucket.tokenIntro}</p>
+            <label>{words.bitbucket.emailLabel}
+              <input type="email" value={jiraEmail} placeholder={words.bitbucket.emailPrompt} disabled={busy}
+                autocomplete="off" autocapitalize="off" spellcheck={false}
+                onInput={(e) => setJiraEmail((e.target as HTMLInputElement).value)} />
+            </label>
+            <label>{words.bitbucket.tokenLabel}
+              <input type="password" value={token} placeholder={words.bitbucket.tokenPrompt} disabled={busy} autocomplete="off"
+                onInput={(e) => setToken((e.target as HTMLInputElement).value)} />
+            </label>
+            <button type="button" class="link small" onClick={() => openOut(words.bitbucket.newTokenURL)}>{words.bitbucket.newTokenButton}</button>
+          </form>
+        )}
+        {withToken && !isJira && !isForgejo && !isBitbucket && (
           <form id="connect-token" class="token-form" onSubmit={(e) => { e.preventDefault(); void connectWithToken(); }}>
             <p class="small">{words.gitlab.tokenIntro}</p>
             <label>{words.gitlab.addressLabel}
@@ -722,7 +759,7 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
           </div>
         )}
         {step.kind === "finishing" && <p class="quiet small">{words.linear.finishing}</p>}
-        {step.kind === "checking" && <p class="quiet small">{isEmail ? words.email.checking : isJira ? words.jira.checking : words.gitlab.checking}</p>}
+        {step.kind === "checking" && <p class="quiet small">{isEmail ? words.email.checking : isJira ? words.jira.checking : isForgejo ? words.forgejo.checking : isBitbucket ? words.bitbucket.checking : words.gitlab.checking}</p>}
         {step.kind === "install" && (
           <div class="sign-in-code">
             <p class="strong">Connected as {step.login}.</p>
@@ -765,14 +802,18 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
 /** Activity ▸ Connectors: Connections, with Disconnect (frame E), and a row to connect each provider that is not connected. */
 export function YourConnections({ store, host }: { store: Store; host: string }) {
   const [connections, setConnections] = useState<Connection[]>();
+  /** What the host says it connects (#3824); undefined from an older host. */
+  const [hostProviders, setHostProviders] = useState<string[]>();
   const [problem, setProblem] = useState<string>();
   const [connecting, setConnecting] = useState<ConnectionProvider>();
   /** The ended connection Connect Again… is for, so its dialog opens the way it was made. */
   const [again, setAgain] = useState<Connection>();
   const load = async () => {
     try {
-      const list = (await store.link.call("connections/list", {}, host)).connections;
+      const answer = await store.link.call("connections/list", {}, host);
+      const list = answer.connections;
       setConnections(list);
+      setHostProviders(answer.providers);
       store.knowConnections(host, list);
       setProblem(undefined);
     } catch (e) {
@@ -791,8 +832,8 @@ export function YourConnections({ store, host }: { store: Store; host: string })
     }
     await load();
   };
-  // Email only on a host with connections.email/1 (#1780): an older host does not show it.
-  const notConnected = connections ? words.providersFor(store.has(host, Capability.connectionsEmail1)).filter((p) => !connections.some((c) => c.provider === p)) : [];
+  // Only what the host connects (#3824); from an older host, Email only with connections.email/1 (#1780).
+  const notConnected = connections ? words.providersFor(store.has(host, Capability.connectionsEmail1), hostProviders).filter((p) => !connections.some((c) => c.provider === p)) : [];
   return (
     <div class="connections">
       <p class="setup-row">

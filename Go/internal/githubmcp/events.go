@@ -39,6 +39,12 @@ var (
 	// mineProperty is only the connection's owner's own PRs (#2034), a fork's too.
 	mineProperty = property{name: "mine", kind: "boolean",
 		description: "true: only pull requests by the GitHub account this server is connected as, whatever anyone says."}
+	// anyProperty is every one in the repo (#3797): a wait that names none sets it.
+	anyProperty = property{name: "any", kind: "boolean",
+		description: "true: every one in the repo. A wait (not a workflow trigger) that names none, by the other arguments that say which, is refused without it. It is about which ones; anyone is about who."}
+	// fixesProperty is the PRs that close these issues (#3797): a lead knows a child's issue before its PR.
+	fixesProperty = property{name: "fixes", kind: "refs",
+		description: `Only pull requests whose body closes one of these issues, as "#12" (this repo's) or "owner/repo#12".`}
 )
 
 // ownPRs is what every PR event says of whose PRs it raises.
@@ -55,7 +61,7 @@ func object(props map[string]any) map[string]any {
 var str, integer = map[string]any{"type": "string"}, map[string]any{"type": "integer"}
 
 func prSchema(extra map[string]any) map[string]any {
-	props := map[string]any{"number": integer, "title": str, "branch": str, "url": str}
+	props := map[string]any{"number": integer, "title": str, "branch": str, "url": str, "fixes": fixesSchema}
 	for k, v := range extra {
 		props[k] = v
 	}
@@ -69,7 +75,7 @@ var fixesSchema = map[string]any{"type": "array", "items": str}
 var events = append([]event{
 	{name: "checks.failed", title: "Checks failed",
 		description: "A pull request's checks finished with a failure: one event per run and attempt, so a rerun that fails again is a new one." + ownPRs,
-		input:       schema{repoProperty, branchProperty("Only runs on this PR branch."), prProperty, anyoneProperty, mineProperty},
+		input:       schema{repoProperty, branchProperty("Only runs on this PR branch."), prProperty, fixesProperty, anyoneProperty, mineProperty, anyProperty},
 		payload: object(map[string]any{
 			"pr": prSchema(nil), "headSha": str,
 			"run":        object(map[string]any{"id": integer, "attempt": integer, "name": str, "url": str}),
@@ -77,7 +83,7 @@ var events = append([]event{
 		})},
 	{name: "checks.passed", title: "Checks passed",
 		description: "A pull request's checks finished with a success: one event per run and attempt, so a lane waiting on CI going green wakes without polling." + ownPRs,
-		input:       schema{repoProperty, branchProperty("Only runs on this PR branch."), prProperty, anyoneProperty, mineProperty},
+		input:       schema{repoProperty, branchProperty("Only runs on this PR branch."), prProperty, fixesProperty, anyoneProperty, mineProperty, anyProperty},
 		payload: object(map[string]any{
 			"pr": prSchema(nil), "headSha": str,
 			"run": object(map[string]any{"id": integer, "attempt": integer, "name": str, "url": str}),
@@ -89,7 +95,7 @@ var events = append([]event{
 			property{name: "workflow", kind: "string", description: "Only runs of this workflow, by its file name, as release.yml.",
 				pattern: regexp.MustCompile(`^[A-Za-z0-9_.-]+\.ya?ml$`), looksLike: "release.yml"},
 			branchProperty("Only runs on this branch or tag, as main or v0.16.0."),
-			property{name: "run", kind: "integer", description: "Only this run, by its id."}, anyoneProperty},
+			property{name: "run", kind: "integer", description: "Only this run, by its id."}, anyoneProperty, anyProperty},
 		payload: object(map[string]any{
 			"run": object(map[string]any{"id": integer, "attempt": integer, "name": str, "workflow": str, "event": str,
 				"branch": str, "headSha": str, "url": str, "conclusion": str, "actor": str}),
@@ -115,20 +121,20 @@ var events = append([]event{
 	{name: "pr.opened", title: "Pull request opened",
 		description: "A pull request was opened, or a draft was marked ready for review: a PR open and not a draft now that was not at the last poll. Drafts never count. Reopened, it is raised again." + ownPRs,
 		input:       schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, anyoneProperty},
-		payload:     object(map[string]any{"pr": prSchema(map[string]any{"author": str, "fixes": fixesSchema}), "openedAt": str})},
+		payload:     object(map[string]any{"pr": prSchema(map[string]any{"author": str}), "openedAt": str})},
 	{name: "pr.merged", title: "Pull request merged", description: "A pull request was merged." + ownPRs,
-		input:   schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, anyoneProperty},
-		payload: object(map[string]any{"pr": prSchema(map[string]any{"fixes": fixesSchema}), "mergedAt": str, "mergeSha": str})},
+		input:   schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, fixesProperty, anyoneProperty, mineProperty, anyProperty},
+		payload: object(map[string]any{"pr": prSchema(nil), "mergedAt": str, "mergeSha": str})},
 	{name: "pr.closed", title: "Pull request closed", description: "A pull request was closed without being merged." + ownPRs,
-		input:   schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, anyoneProperty},
-		payload: object(map[string]any{"pr": prSchema(map[string]any{"fixes": fixesSchema}), "closedAt": str})},
+		input:   schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, fixesProperty, anyoneProperty, mineProperty, anyProperty},
+		payload: object(map[string]any{"pr": prSchema(nil), "closedAt": str})},
 	{name: "pr.conflicted", title: "Pull request in conflict",
 		description: "An open pull request began to conflict with its base, so it cannot merge and its CI may not run until it is rebased. Once per conflict: it is raised again only after the PR merges cleanly and then conflicts anew." + ownPRs,
-		input:       schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, anyoneProperty, mineProperty},
+		input:       schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, fixesProperty, anyoneProperty, mineProperty, anyProperty},
 		payload:     object(map[string]any{"pr": prSchema(nil), "conflictedAt": str})},
 	{name: "pr.commented", title: "Pull request commented on",
 		description: "A comment was left on a pull request's conversation (not a review comment on a line of its diff, which review.comment covers). Its body is the first 4000 characters. A comment whose body starts with <!-- agent --> is left out: an agent's, not a person's, since every PR and comment is posted as the same account. Only comments by the repo's owner, members and collaborators, never a bot, unless anyone is true.",
-		input:       schema{repoProperty, prProperty, anyoneProperty},
+		input:       schema{repoProperty, prProperty, fixesProperty, anyoneProperty, mineProperty, anyProperty},
 		payload: object(map[string]any{"pr": prSchema(nil),
 			"comment": object(map[string]any{"author": str, "url": str, "body": str}), "commentedAt": str})},
 	// For the person, not the repo (#2034): what asks the connection's owner for something.
@@ -139,11 +145,11 @@ var events = append([]event{
 	// CodeRabbit's (#1344), known by its GitHub App, not by a name.
 	{name: "review.posted", title: "CodeRabbit reviewed",
 		description: "CodeRabbit finished a review of a pull request's head commit: its CodeRabbit status on that commit gone to success, or, where it sets no status, a review by its GitHub App on that commit. Once per review: a push it reviews, or a full review asked of the same commit (coderabbit_review with full), is a new one. state is its review's (commented, approved or changes_requested), empty when only its status says so; its comments come as review.comment." + ownPRs,
-		input:       schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, anyoneProperty},
+		input:       schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, fixesProperty, anyoneProperty, mineProperty, anyProperty},
 		payload:     object(map[string]any{"pr": prSchema(nil), "headSha": str, "state": str, "url": str, "reviewedAt": str})},
 	{name: "review.comment", title: "CodeRabbit commented on a line",
 		description: "CodeRabbit left a review comment on a pull request: on a line of its diff, or as an answer in a thread (inReplyTo is the comment it answers). Its body is the first 4000 characters. Answer it with coderabbit_reply and comment.id." + ownPRs,
-		input:       schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, anyoneProperty},
+		input:       schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, fixesProperty, anyoneProperty, mineProperty, anyProperty},
 		payload: object(map[string]any{"pr": prSchema(nil), "commentedAt": str,
 			"comment": object(map[string]any{"id": integer, "path": str, "line": integer, "inReplyTo": integer, "body": str, "url": str})})},
 }, append(prLabelEvents(), append(issueEvents(), assignedEvent)...)...)
@@ -167,7 +173,7 @@ func prLabelEvents() []event {
 		label := property{name: "label", kind: "string", description: "Only when this label is the one changed."}
 		description := k.description + " " + k.who + " the repo's owner, members and collaborators, never a bot, unless anyone is true."
 		out[i] = event{name: "pr." + string(k.kind), title: k.title, description: description,
-			input:   schema{repoProperty, prProperty, label, anyoneProperty},
+			input:   schema{repoProperty, prProperty, label, fixesProperty, anyoneProperty, mineProperty, anyProperty},
 			payload: object(map[string]any{"pr": prSchema(nil), "label": str, "by": str, k.timeKey: str})}
 	}
 	return out
@@ -187,7 +193,7 @@ func issueEvents() []event {
 		"number": integer, "title": str, "author": str, "labels": map[string]any{"type": "array", "items": str}, "url": str,
 		"assignees": map[string]any{"type": "array", "items": str},
 	})
-	issue := property{name: "issue", kind: "integer", description: "Only this issue, by number."}
+	issue := property{name: "issue", kind: "integers", description: "Only this issue, or these, by number."}
 	kinds := []struct {
 		kind                      IssueKind
 		title, description, label string
@@ -210,7 +216,7 @@ func issueEvents() []event {
 	out := make([]event, len(kinds))
 	for i, k := range kinds {
 		label := property{name: "label", kind: "string", description: k.label}
-		input := schema{repoProperty, label, issue, anyoneProperty}
+		input := schema{repoProperty, label, issue, anyoneProperty, anyProperty}
 		if k.kind == IssueOpened {
 			input = schema{repoProperty, label, anyoneProperty}
 		}
@@ -382,7 +388,7 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 		return s.pollDiff(ctx, e.name, "assignedAt", a, p, func() ([]state, error) {
 			var out []state
 			for _, i := range yours.Assigned {
-				if a.issue == 0 || i.Number == a.issue {
+				if a.wantsIssue(i.Number) {
 					out = append(out, state{pr: PR{Number: i.Number, Title: i.Title, URL: i.URL}, on: new(true), json: i.json()})
 				}
 			}
@@ -423,7 +429,7 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 			prs, err := s.GitHub.CodeRabbitPRs(ctx, a.repo)
 			var out []state
 			for _, r := range prs {
-				if a.anyone || r.Trusted {
+				if a.byMe(r.PR, yours) && (a.mine || a.anyone || r.Trusted) {
 					reviewed := r.Reviewed
 					out = append(out, state{pr: r.PR, on: &reviewed, key: r.round(),
 						json: r.PR.json(), extra: map[string]any{"headSha": r.HeadSHA, "state": r.Review, "url": r.URL}})
@@ -563,7 +569,7 @@ func (s *Events) pollDiff(_ context.Context, name, key string, a args, p pollPar
 	}
 	var still, fresh []state
 	for _, st := range prs {
-		if (a.pr != 0 && st.pr.Number != a.pr) || (a.branch != "" && st.pr.Branch != a.branch) {
+		if (a.pr != 0 && st.pr.Number != a.pr) || (a.branch != "" && st.pr.Branch != a.branch) || !a.closesOne(st.pr) {
 			continue
 		}
 		on := (st.on != nil && *st.on) || (st.on == nil && was[id(st)])
@@ -609,7 +615,7 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 		}
 		var list []candidate
 		for _, it := range items {
-			if a.issue != 0 && it.Issue.Number != a.issue {
+			if !a.wantsIssue(it.Issue.Number) {
 				continue
 			}
 			if !a.anyone && !it.Trusted {
@@ -643,7 +649,7 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 		}
 		var list []candidate
 		for _, it := range items {
-			if a.pr != 0 && it.PR.Number != a.pr {
+			if (a.pr != 0 && it.PR.Number != a.pr) || !a.closesOne(it.PR) || !a.byMe(it.PR, yours) {
 				continue
 			}
 			if !a.anyone && !it.Trusted {
@@ -669,7 +675,8 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 		var list []candidate
 		for _, c := range comments {
 			at := normalized(c.At)
-			if at == "" || (a.pr != 0 && c.PR.Number != a.pr) || (a.branch != "" && c.PR.Branch != a.branch) || !(a.anyone || c.Trusted) {
+			if at == "" || (a.pr != 0 && c.PR.Number != a.pr) || (a.branch != "" && c.PR.Branch != a.branch) ||
+				!(a.mine || a.anyone || c.Trusted) || !a.closesOne(c.PR) || !a.byMe(c.PR, yours) {
 				continue
 			}
 			list = append(list, candidate{eventID: fmt.Sprintf("review.comment:%s:%d", repo, c.ID), time: at,
@@ -691,7 +698,7 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 			}
 			list = append(list, candidate{eventID: fmt.Sprintf("pr.commented:%s:%d", repo, c.ID), time: at,
 				data: func() (map[string]any, error) {
-					if c.Other || (a.pr != 0 && c.PR.Number != a.pr) || !(a.anyone || c.Trusted) {
+					if c.Other || (a.pr != 0 && c.PR.Number != a.pr) || !(a.anyone || c.Trusted) || !a.closesOne(c.PR) || !a.byMe(c.PR, yours) {
 						return nil, nil
 					}
 					return c.data(), nil
@@ -751,7 +758,9 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 		return nil, false, err
 	}
 	wanted := func(p PR, trusted bool) bool {
-		return (a.pr == 0 || p.Number == a.pr) && (a.branch == "" || p.Branch == a.branch) && (a.anyone || trusted)
+		// mine: the owner's own PR, trusted or not, as checks.* and pr.conflicted (#3797).
+		return (a.pr == 0 || p.Number == a.pr) && (a.branch == "" || p.Branch == a.branch) && a.closesOne(p) &&
+			(a.mine && a.byMe(p, yours) || !a.mine && (a.anyone || trusted))
 	}
 	var list []candidate
 	if name == "pr.merged" {
@@ -815,7 +824,7 @@ func checkRunCandidates(ctx context.Context, gh GitHub, name string, a args, you
 				if err != nil || details == nil {
 					return nil, err
 				}
-				if a.pr != 0 && details.PR.Number != a.pr {
+				if a.pr != 0 && details.PR.Number != a.pr || !a.closesOne(details.PR) {
 					return nil, nil
 				}
 				// mine: the owner's own PR, trusted or not; else the trust filter (#728).

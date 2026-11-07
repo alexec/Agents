@@ -217,7 +217,7 @@ $S/walk.py $ROOT find "Not now"                 # every element whose label hold
 $S/walk.py $ROOT press "=Not now"               # AXPress the innermost match (=: whole label)
 $S/walk.py $ROOT unfold proj00                  # a sidebar folder, as its chevron does
 $S/walk.py $ROOT select "Fix the build"         # a sidebar row, as a click selects it
-$S/walk.py $ROOT set "What do you want to do" "Write hello.txt"   # a field, by label or placeholder
+$S/walk.py $ROOT set "What do you want to do" "Write hello.txt"   # a field, by label or placeholder; a field before a text (#3825)
 $S/walk.py $ROOT click proj00                   # a click on a label's middle, for a tap gesture
 $S/walk.py $ROOT key return                     # a key to the window's first responder
 $S/walk.py $ROOT wait "P00 seeded live 0" 10    # until it is there (gone: until it has left)
@@ -242,7 +242,9 @@ button or the row instead).
 and the window's own render while it is locked: on screen, a window's layers are on the GPU,
 and its own render draws the sidebar and the terminal black. The locked render draws the
 glass and materials as plain fills, the selected row in the grey of a window that is not
-key, and no traffic lights. `--render` takes the window's own render either way.
+key, and no traffic lights. A web view (a pinned MCP App, an HTML page, the browser pane)
+draws in its own process: the render asks it for its picture first and draws that in its
+place (#3854). `--render` takes the window's own render either way.
 
 ```sh
 $S/shot.sh $ROOT out.png            # window server capture, behind the user's window; unlocked only

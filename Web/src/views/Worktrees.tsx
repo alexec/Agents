@@ -7,10 +7,10 @@ import type { Store } from "../model/store";
 import type { WorktreeSummary } from "../protocol/generated";
 import { folderKey } from "../model/groups";
 import {
-  cleanUpDraft, forCleanup, freedWords, isIdle, measuring, removalMessage, sizeWords, worktreeDetail,
+  cleanUpDraft, folderLine, forCleanup, freedWords, isIdle, measuring, removalMessage, sizeWords, worktreeDetail,
 } from "../model/worktrees";
 
-/** One host's worktrees, a section per folder. */
+/** One host's worktrees, a row per folder with its count, closed until the person opens it (#3743). */
 export function WorktreesList({ store, host }: { store: Store; host: string }) {
   useEffect(() => { void store.loadWorktrees(host); }, [host]);
   const groups = forCleanup(store.worktreeLists.value[host] ?? [], store.worktreeSizes.value[host]);
@@ -27,16 +27,17 @@ export function WorktreesList({ store, host }: { store: Store; host: string }) {
   return (
     <div class="resources worktrees">
       {groups.map((group) => (
-        <section key={group.folder}>
-          <h3 class="section-head worktrees-head">
-            <span>{folderName(group.folder)}</span>
+        <details class="machine-fold" key={group.folder}>
+          <summary>{folderLine(folderName(group.folder), group.worktrees.length)}</summary>
+          <p class="worktrees-head">
+            <span />
             <button class="small" title="A new session here, offered the words to remove what has been merged"
               onClick={() => cleanUp(group.folder)}>Clean up worktrees</button>
-          </h3>
+          </p>
           <ul>
             {group.worktrees.map((w) => <WorktreeItem key={w.root} store={store} host={host} folder={group.folder} worktree={w} />)}
           </ul>
-        </section>
+        </details>
       ))}
     </div>
   );

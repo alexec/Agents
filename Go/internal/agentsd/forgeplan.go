@@ -97,8 +97,12 @@ func (d *Daemon) forgePlan(ctx context.Context, r wire.ForgePlanRequest) (wire.F
 			epic, children, err = d.linearPlan(ctx, method, identifier)
 		} else if key, ok := strings.CutPrefix(r.Node.Ref, "jira:"); ok && linearLabel.MatchString(key) {
 			epic, children, err = d.jiraPlan(ctx, method, key)
+		} else if project, id, ok := boardsOfNode(r.Node); ok {
+			epic, children, err = d.boardsPlan(ctx, method, project, id)
+		} else if repo, number, ok := forgejoOfNode(r.Node); ok {
+			epic, children, err = d.forgejoPlan(ctx, method, repo, number)
 		} else if repo, number, ok := nodeOfRepo(r.Node); !ok {
-			return wire.ForgePlan{}, Invalid("%s: %s is not an issue on GitHub, GitLab, Linear or Jira", method, r.Node.Ref)
+			return wire.ForgePlan{}, Invalid("%s: %s is not an issue on GitHub, GitLab, Forgejo, Linear, Jira or Azure Boards", method, r.Node.Ref)
 		} else if repo.forge == "gitlab" {
 			epic, children, err = d.gitlabPlan(ctx, method, repo, number)
 		} else {

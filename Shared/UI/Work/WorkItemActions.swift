@@ -130,7 +130,7 @@ struct WorkItemActions: View {
                                             returning: DaemonAPI.ForgeLog.self, on: host)
             log = WorkLog(title: check, text: got.text)
         } catch {
-            said = (error.localizedDescription, true)
+            said = (WorkList.failureWords(error), true)
         }
     }
 
@@ -140,9 +140,9 @@ struct WorkItemActions: View {
         do {
             let got = try await model.forge(DaemonAPI.Method.forgeDiff, DaemonAPI.ForgeNodeRequest(node: node),
                                             returning: DaemonAPI.ForgeDiff.self, on: host)
-            diff = got.appViewDiff(title: "\(WorkList.shortRef(node.ref)) \(item.title)")
+            diff = got.appViewDiff(title: "\(WorkList.shortRef(node.ref)) \(item.title)", site: WorkList.forgeName(node.ref))
         } catch {
-            said = (error.localizedDescription, true)
+            said = (WorkList.failureWords(error), true)
         }
     }
 
@@ -205,7 +205,7 @@ struct WorkItemActions: View {
                 said = (WorkList.doneWords(method, done, reopened: close?.reopen == true, moved: close?.transition != nil), false)
                 wrote()
             } catch {
-                said = (error.localizedDescription, true)
+                said = (WorkList.failureWords(error), true)
             }
         }
     }

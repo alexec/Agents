@@ -18,7 +18,8 @@ export function GuardedChangeCards({ store, host, where, down = false }: {
   /** Its host is down: the answers are held until it is back. */
   down?: boolean;
 }) {
-  const asked = store.guardedChanges(host, where);
+  // On the folder's page, not a workflow's file: that is the workflow's own approval, which Needs You lists already (#3762).
+  const asked = store.guardedChanges(host, where).filter(({ change }) => "session" in where || workflowID(change.path) === undefined);
   if (!asked.length) return null;
   return (
     <div class="cards">

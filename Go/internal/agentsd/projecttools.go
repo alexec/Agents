@@ -7,6 +7,9 @@ import (
 	"sync"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/alexec/agents/Go/internal/bitbucketmcp"
+	"github.com/alexec/agents/Go/internal/connections"
+	"github.com/alexec/agents/Go/internal/forgejomcp"
 	"github.com/alexec/agents/Go/internal/githubmcp"
 	"github.com/alexec/agents/Go/internal/gitlabmcp"
 	"github.com/alexec/agents/Go/wire"
@@ -120,6 +123,17 @@ func projectForge(s wire.ProjectSlot) forge {
 		}
 		f.root = gitlabmcp.BaseURL(f.site)
 	}
+	if s.Forge != nil && *s.Forge == wire.ConnectionProviderForgejo {
+		f.provider, f.site = wire.ConnectionProviderForgejo, "codeberg.org"
+		if s.Site != nil && *s.Site != "" {
+			f.site = *s.Site
+		}
+		f.root = forgejomcp.BaseURL(f.site)
+	}
+	if s.Forge != nil && *s.Forge == wire.ConnectionProviderBitbucket {
+		// Bitbucket Cloud only: its site is bitbucket.org, its root the API.
+		f.provider, f.site, f.root = wire.ConnectionProviderBitbucket, connections.BitbucketSite, bitbucketmcp.DefaultBase
+	}
 	return f
 }
 
@@ -135,6 +149,10 @@ func viewSlot(ours, uri string) (wire.ConnectorSlotKind, wire.ConnectionProvider
 		return wire.ConnectorSlotKindTasks, wire.ConnectionProviderGitlab, "project", true
 	case "agents/gitlab " + gitlabmcp.MergeRequestsURI:
 		return wire.ConnectorSlotKindCodeReview, wire.ConnectionProviderGitlab, "project", true
+	case "agents/forgejo " + forgejomcp.IssuesURI:
+		return wire.ConnectorSlotKindTasks, wire.ConnectionProviderForgejo, "repo", true
+	case "agents/forgejo " + forgejomcp.PullsURI:
+		return wire.ConnectorSlotKindCodeReview, wire.ConnectionProviderForgejo, "repo", true
 	}
 	return "", "", "", false
 }
@@ -160,7 +178,8 @@ func (d *Daemon) projectViewArguments(folder, ours, uri string) (wire.JSONValue,
 
 // projectFills says the folder's project points one of ours's views at a repository.
 func (d *Daemon) projectFills(folder, ours string) bool {
-	for _, uri := range []string{githubmcp.IssuesURI, githubmcp.PullsURI, gitlabmcp.IssuesURI, gitlabmcp.MergeRequestsURI} {
+	for _, uri := range []string{githubmcp.IssuesURI, githubmcp.PullsURI, gitlabmcp.IssuesURI, gitlabmcp.MergeRequestsURI,
+		forgejomcp.IssuesURI, forgejomcp.PullsURI} {
 		if _, ok := d.projectViewArguments(folder, ours, uri); ok {
 			return true
 		}

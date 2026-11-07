@@ -54,7 +54,7 @@ that is not done.
 4. **Make the project and its DSN.** A connector that is added during a session reaches
    only the agents that start after it. So when the agent has no Sentry tools, it starts
    a helper in the new folder with `start_session`, and waits for it with
-   `wait_for_agents`. The agent, or its helper, with Sentry's tools:
+   `wait_for_event` on `agent.ended`, naming it in `agent`. The agent, or its helper, with Sentry's tools:
    1. `find_organizations`: the organization from step 2. When there is more than one,
       take the one the person chose in step 3.
    2. `find_teams`: the organization's first team. With none, `create_team` with the

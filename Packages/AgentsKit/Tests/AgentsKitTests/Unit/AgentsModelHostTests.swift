@@ -42,6 +42,17 @@ struct AgentsModelHostTests {
         #expect(!model.addsFolder(.folderRemoved(FolderKey(host: .mac, folder: path))))
     }
 
+    /// The folder's page asks no workflow's file: Needs You lists that approval already (#3762).
+    @Test func theFolderPageAsksNoWorkflowFile() {
+        let model = AgentsModel()
+        var folder = summary(path)
+        folder.guardedChanges = [".agents/pins.json", ".agents/workflows/nightly.md"].map {
+            GuardedChange(path: $0, digest: "d", changedBy: [], changedByIDs: [], byGit: true, since: .now)
+        }
+        model.replaceFolders([folder], from: .mac)
+        #expect(model.guardedChanges(ofFolder: folder.key).map(\.path) == [".agents/pins.json"])
+    }
+
     @Test func aHostIsNeverWrittenIntoTheRecord() throws {
         var one = agent(path)
         one.host = devbox

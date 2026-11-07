@@ -1,12 +1,13 @@
 // A machine's resources, read-only (#116), as a section of its page (#3629; MachineResourcesSection.swift):
 // what the person declared there, each with its description and "2 of 3 held", then whatever else is held
-// or awaited. Declaring and ending leases are the Mac's (Settings ▸ Resources, the machine's page).
+// or awaited. Declaring and ending leases are the Mac's (Settings ▸ Resources, the machine's page). No section when
+// nothing is declared, held or awaited (#3743).
 import { useEffect, useRef } from "preact/hooks";
 import { signal } from "@preact/signals";
 import type { Store } from "../model/store";
 import type { Lease, ResourceState } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
-import { noResourcesHint, resourcesHint } from "../model/onTheMac";
+import { resourcesHint } from "../model/onTheMac";
 
 /** "14:05", twenty-four hours, as LeaseWords.clock says it to agents and the Mac. */
 function clock(at: number): string {
@@ -56,15 +57,11 @@ export function Resources({ store, host }: { store: Store; host: string }) {
       </li>
     );
   };
+  if (declared.length === 0 && busy.length === 0) return null;
   return (
     <section class="resources" aria-labelledby="machine-resources" ref={ref}>
-      <h3 class="section-head" id="machine-resources">Resources</h3>
-      {!snapshot ? <p class="hint">Loading…</p>
-        : declared.length === 0 && busy.length === 0 ? <p class="hint">{noResourcesHint(store.hasMac.value)}</p>
-        : <>
-          <ul>{declared.map(row)}{busy.map(row)}</ul>
-          <p class="hint">{resourcesHint(store.hasMac.value)}</p>
-        </>}
+      <h3 class="section-head" id="machine-resources" title={resourcesHint(store.hasMac.value)}>Resources</h3>
+      <ul>{declared.map(row)}{busy.map(row)}</ul>
     </section>
   );
 }
