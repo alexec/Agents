@@ -4545,7 +4545,7 @@ type ForgeDone struct {
 	Reran *int64 `json:"reran,omitzero"`
 }
 
-// A feature (#3267): name is its label's after feature:, with the label's colour where the forge gives one; epics counts its epics, open the open ones.
+// A feature (#3267): name is its label's after feature:, with the label's colour where the forge gives one; epics counts its epics, open the open ones. issues counts its open issues that are not epics, of the newest 500 open issues (#3741); a feature with no open epic and no such issue is finished.
 type ForgeFeature struct {
 	Name string `json:"name"`
 
@@ -4554,6 +4554,8 @@ type ForgeFeature struct {
 	Epics int64 `json:"epics"`
 
 	Open int64 `json:"open"`
+
+	Issues *int64 `json:"issues,omitzero"`
 }
 
 // forge/features (#3267): the feature:<name> labels of the epics (the issues labelled epic, open or closed, the newest 500), by name; errors says a forge that could not be read, as in ForgeList.
@@ -4727,7 +4729,7 @@ type ForgeLogRequest struct {
 	Check *string `json:"check,omitzero"`
 }
 
-// people/setForgeLogins (#2951): the caller's own GitHub, GitLab, Linear and Jira logins (#3313), for Settings ▸ You, replacing what was kept; blank clears one.
+// people/setForgeLogins (#2951): the caller's own GitHub, GitLab, Linear, Jira (#3313) and Forgejo (#3836) logins, for Settings ▸ You, replacing what was kept; blank clears one.
 type ForgeLogins struct {
 	Github *string `json:"github,omitzero"`
 
@@ -4736,6 +4738,8 @@ type ForgeLogins struct {
 	Linear *string `json:"linear,omitzero"`
 
 	Jira *string `json:"jira,omitzero"`
+
+	Forgejo *string `json:"forgejo,omitzero"`
 }
 
 // How forge/merge merges a pull request (#3130): a merge commit, one squashed commit, or its commits rebased onto the base.
@@ -7117,6 +7121,24 @@ type MoveTargetNewWorktree struct {
 
 type MoveTargetExisting struct {
 	Value URL `json:"_0"`
+}
+
+// What agents/moveToMachine did (#3790): the folder on that machine the session now goes on in, and whether it carries on there at once, as it was working when it moved.
+type MoveToMachineAnswer struct {
+	Folder string `json:"folder"`
+
+	CarriesOn bool `json:"carriesOn"`
+}
+
+// The person moving a session to another of their machines (#3790), as move_session does (#3717). `machine` is the control plane's id or name for it, and `machineName` the name the person knows it by, for the words; `folder` is an absolute path there, or, when left out, the folder of the session's project there.
+type MoveToMachineRequest struct {
+	AgentID UUID `json:"agentID"`
+
+	Machine string `json:"machine"`
+
+	MachineName *string `json:"machineName,omitzero"`
+
+	Folder *string `json:"folder,omitzero"`
 }
 
 type MoveWhen string
@@ -11803,6 +11825,9 @@ type TeamPerson struct {
 
 	// Their Jira login (#3313): the Atlassian account's email, account id or display name.
 	JiraLogin *string `json:"jiraLogin,omitzero"`
+
+	// Their Forgejo login (#3836): their user name on the connected Forgejo or Gitea.
+	ForgejoLogin *string `json:"forgejoLogin,omitzero"`
 
 	You *bool `json:"you,omitzero"`
 }

@@ -12,6 +12,8 @@ final class WorkFeaturesState {
     var errors: [String] = []
     /// The features opened, by name in lower case.
     var opened: Set<String> = []
+    /// The Finished group opened (#3741); closed until a person opens it, unless every feature is in it.
+    var finishedOpen: Bool?
     /// An opened feature's open issues, by name in lower case; absent while they are read.
     var items: [String: [DaemonAPI.ForgeItem]] = [:]
     var itemErrors: [String: [String]] = [:]
@@ -114,7 +116,8 @@ final class WorkFeaturesState {
 
 /// Work ▸ Features (#3269, spec 3265), as the web page's `WorkFeatures`: a row per `feature:` label
 /// with its epic counts; opened, its open epics, each with its progress and lead, and its issues
-/// with no epic. A row opens the issue's page.
+/// with no epic. A row opens the issue's page. The features with no open work are in a Finished
+/// group at the bottom, closed (#3741).
 struct WorkFeaturesPane: View {
     let model: any WorkModel
     @Bindable var state: WorkFeaturesState
@@ -152,10 +155,13 @@ struct WorkFeaturesPane: View {
                 if features.isEmpty {
                     Text(WorkFeatures.noFeatures).foregroundStyle(.secondary)
                 }
-                ForEach(features, id: \.name) { feature in
-                    featureRow(feature)
-                    if state.opened.contains(feature.name.lowercased()) {
-                        opened(feature)
+                let groups = WorkFeatures.groups(features)
+                ForEach(groups.active, id: \.name) { feature($0) }
+                if !groups.finished.isEmpty {
+                    let isOpen = state.finishedOpen ?? groups.active.isEmpty
+                    finishedRow(count: groups.finished.count, isOpen: isOpen)
+                    if isOpen {
+                        ForEach(groups.finished, id: \.name) { feature($0) }
                     }
                 }
             }
@@ -163,6 +169,36 @@ struct WorkFeaturesPane: View {
         } else {
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+
+    @ViewBuilder
+    private func feature(_ feature: DaemonAPI.ForgeFeature) -> some View {
+        featureRow(feature)
+        if state.opened.contains(feature.name.lowercased()) {
+            opened(feature)
+        }
+    }
+
+    /// The Finished group's head (#3741): the features with no open epic and no open issue.
+    private func finishedRow(count: Int, isOpen: Bool) -> some View {
+        Button {
+            state.finishedOpen = !isOpen
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "chevron.right")
+                    .rotationEffect(.degrees(isOpen ? 90 : 0))
+                    .frame(width: 12)
+                Text(WorkFeatures.finishedWords(count)).fontWeight(.semibold)
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(.secondary)
+            .padding(.top, 8).padding(.vertical, 3)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(WorkFeatures.finishedWords(count))
+        .accessibilityValue(isOpen ? "open" : "closed")
+        .help(isOpen ? "Fold the finished features" : "Show the features with no open epic or issue")
     }
 
     private func featureRow(_ feature: DaemonAPI.ForgeFeature) -> some View {

@@ -1,7 +1,8 @@
 // Work ▸ Features (#3269, spec 3265), as the window's WorkFeaturesPane: a row per feature:<name> label
 // (forge/features on each machine) with its epic counts; opened, its open epics (forge/issues with the
 // feature), each with its progress and its lead, and its issues with no epic. A row opens the issue's page.
-// The Board menu (#3282) narrows both reads to one board, on the machines that know boards.
+// The Board menu (#3282) narrows both reads to one board, on the machines that know boards. The
+// features with no open work are in a Finished group at the bottom, closed (#3741).
 import { signal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import { useEffect } from "preact/hooks";
@@ -12,7 +13,8 @@ import { boardChoices, boardName, errorWords, labelColor, noForgeHere, shortRef,
 import { boardHosts, boards, forgeHosts, listHosts, loadBoards } from "../model/workLists";
 import { Choice } from "./Work";
 import {
-  epicLead, epicProgressWords, featureCountWords, featureTitle, leadRowWords, mergeFeatures, noFeatures, nothingOpen, openedFeature,
+  epicLead, epicProgressWords, featureCountWords, featureGroups, featureTitle, finishedWords, leadRowWords, mergeFeatures, noFeatures,
+  nothingOpen, openedFeature,
 } from "../model/workFeatures";
 import { go } from "../route";
 import { ForgeTitle } from "../render/ForgeTitle";
@@ -21,6 +23,8 @@ import { ForgeTitle } from "../render/ForgeTitle";
 const features = signal<ForgeFeature[] | null>(null);
 const errors = signal<string[]>([]);
 const opened = signal<ReadonlySet<string>>(new Set());
+/** The Finished group opened (#3741); closed until a person opens it, unless every feature is in it. */
+const finishedOpen = signal<boolean | undefined>(undefined);
 const items = signal<Readonly<Record<string, { items: ForgeItem[]; errors: string[] }>>>({});
 const asked = signal(0);
 /** The board chosen, by its url; empty for all. */
@@ -95,12 +99,36 @@ export function WorkFeatures({ store }: { store: Store }) {
       {hosts.length === 0 ? <p class="hint">{noForgeHere}</p>
         : list === null ? <p class="hint">Loading…</p>
         : list.length === 0 ? <p class="hint">{noFeatures}</p>
-        : (
-          <ul class="work-rows">
-            {list.map((f) => <FeatureRow key={f.name} store={store} feature={f} />)}
-          </ul>
-        )}
+        : <FeatureGroups store={store} list={list} />}
     </div>
+  );
+}
+
+/** The features with open work, then the Finished group (#3741), closed. */
+function FeatureGroups({ store, list }: { store: Store; list: ForgeFeature[] }) {
+  const { active, finished } = featureGroups(list);
+  const isOpen = finishedOpen.value ?? active.length === 0;
+  return (
+    <>
+      <ul class="work-rows">
+        {active.map((f) => <FeatureRow key={f.name} store={store} feature={f} />)}
+      </ul>
+      {finished.length > 0 && (
+        <>
+          <button type="button" class="work-feature-head work-finished-head" aria-expanded={isOpen}
+            onClick={() => { finishedOpen.value = !isOpen; }}
+            title={isOpen ? "Fold the finished features" : "Show the features with no open epic or issue"}>
+            <span class="chevron" aria-hidden="true">{isOpen ? "▾" : "▸"}</span>
+            <span class="work-title">{finishedWords(finished.length)}</span>
+          </button>
+          {isOpen && (
+            <ul class="work-rows">
+              {finished.map((f) => <FeatureRow key={f.name} store={store} feature={f} />)}
+            </ul>
+          )}
+        </>
+      )}
+    </>
   );
 }
 

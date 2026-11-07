@@ -149,7 +149,7 @@ func TestForgeLoginsAreSelfOnlyAndSeenByEveryone(t *testing.T) {
 
 	call(t, alexWindow, "", "people/setForgeLogins",
 		wire.ForgeLogins{Github: optional("alexec"), Gitlab: optional("alex"), Linear: optional("alex@example.com"),
-			Jira: optional("Alex Collins")})
+			Jira: optional("Alex Collins"), Forgejo: optional("alex-fj")})
 	call(t, sam.window, "", "people/setForgeLogins", wire.ForgeLogins{Github: optional("sam-gh")})
 
 	var forSam wire.PeopleForViews
@@ -170,7 +170,8 @@ func TestForgeLoginsAreSelfOnlyAndSeenByEveryone(t *testing.T) {
 		}
 	}
 	if me == nil || me.You == nil || !*me.You || me.GithubLogin == nil || *me.GithubLogin != "alexec" ||
-		me.GitlabLogin == nil || *me.GitlabLogin != "alex" || me.JiraLogin == nil || *me.JiraLogin != "Alex Collins" {
+		me.GitlabLogin == nil || *me.GitlabLogin != "alex" || me.JiraLogin == nil || *me.JiraLogin != "Alex Collins" ||
+		me.ForgejoLogin == nil || *me.ForgejoLogin != "alex-fj" {
 		t.Fatalf("alex's own row: %+v", me)
 	}
 	if them == nil || (them.You != nil && *them.You) || them.GithubLogin == nil || *them.GithubLogin != "sam-gh" {

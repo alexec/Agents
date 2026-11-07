@@ -3916,13 +3916,16 @@ export interface ForgeDone {
 
 /**
  * A feature (#3267): name is its label's after feature:, with the label's colour where the forge
- * gives one; epics counts its epics, open the open ones.
+ * gives one; epics counts its epics, open the open ones. issues counts its open issues that are not
+ * epics, of the newest 500 open issues (#3741); a feature with no open epic and no such issue is
+ * finished.
  */
 export interface ForgeFeature {
   name: string;
   color?: string;
   epics: number;
   open: number;
+  issues?: number;
 }
 
 /**
@@ -4095,14 +4098,15 @@ export interface ForgeLogRequest {
 }
 
 /**
- * people/setForgeLogins (#2951): the caller's own GitHub, GitLab, Linear and Jira logins (#3313),
- * for Settings ▸ You, replacing what was kept; blank clears one.
+ * people/setForgeLogins (#2951): the caller's own GitHub, GitLab, Linear, Jira (#3313) and Forgejo
+ * (#3836) logins, for Settings ▸ You, replacing what was kept; blank clears one.
  */
 export interface ForgeLogins {
   github?: string;
   gitlab?: string;
   linear?: string;
   jira?: string;
+  forgejo?: string;
 }
 
 /**
@@ -6123,6 +6127,28 @@ export type MoveTarget =
   | { newWorktree: { name?: string } }
   | { existing: { _0: URLString } }
   | { folderPath: Record<string, never> };
+
+/**
+ * What agents/moveToMachine did (#3790): the folder on that machine the session now goes on in, and
+ * whether it carries on there at once, as it was working when it moved.
+ */
+export interface MoveToMachineAnswer {
+  folder: string;
+  carriesOn: boolean;
+}
+
+/**
+ * The person moving a session to another of their machines (#3790), as move_session does (#3717).
+ * `machine` is the control plane's id or name for it, and `machineName` the name the person knows
+ * it by, for the words; `folder` is an absolute path there, or, when left out, the folder of the
+ * session's project there.
+ */
+export interface MoveToMachineRequest {
+  agentID: UUID;
+  machine: string;
+  machineName?: string;
+  folder?: string;
+}
 
 export type MoveWhen =
   | "now"
@@ -10344,6 +10370,8 @@ export interface TeamPerson {
   linearLogin?: string;
   /** Their Jira login (#3313): the Atlassian account's email, account id or display name. */
   jiraLogin?: string;
+  /** Their Forgejo login (#3836): their user name on the connected Forgejo or Gitea. */
+  forgejoLogin?: string;
   you?: boolean;
 }
 
@@ -11502,6 +11530,7 @@ export interface Methods {
   "agents/importUpload": { params: ReceiveUploadRequest; result: Empty };
   "agents/labelVocabulary": { params: LabelVocabularyRequest; result: string[] };
   "agents/list": { params: ListRequest; result: Agent[] };
+  "agents/moveToMachine": { params: MoveToMachineRequest; result: MoveToMachineAnswer };
   "agents/options": { params: OptionsRequest; result: OptionsResponse };
   "agents/prewarm": { params: PrewarmRequest; result: Empty };
   "agents/prompt": { params: PromptRequest; result: Empty };
@@ -11874,6 +11903,7 @@ export const MethodTarget = {
   "agents/importUpload": "host",
   "agents/labelVocabulary": "host",
   "agents/list": "host",
+  "agents/moveToMachine": "host",
   "agents/options": "host",
   "agents/prewarm": "host",
   "agents/prompt": "host",
@@ -12618,7 +12648,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeDiffFile: { required: ["path", "change", "additions", "deletions", "hunks"], optional: ["previousPath", "note"] },
   ForgeDiffHunk: { required: ["oldStart", "newStart", "lines"], optional: [] },
   ForgeDone: { required: [], optional: ["url", "auto", "reran"] },
-  ForgeFeature: { required: ["name", "epics", "open"], optional: ["color"] },
+  ForgeFeature: { required: ["name", "epics", "open"], optional: ["color", "issues"] },
   ForgeFeatures: { required: ["features"], optional: ["errors"] },
   ForgeFeaturesRequest: { required: [], optional: ["folder", "board"] },
   ForgeItem: { required: ["node", "title", "state", "labels", "assignees", "updatedAt", "comments"], optional: ["status", "url", "folder", "author", "milestone", "draft", "checks", "review", "mergeable", "autoMerge", "parent", "level", "feature", "progress"] },
@@ -12633,7 +12663,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeListRequest: { required: [], optional: ["folder", "state", "label", "assignee", "query", "cursor", "limit", "feature", "board"] },
   ForgeLog: { required: ["text"], optional: [] },
   ForgeLogRequest: { required: ["node"], optional: ["check"] },
-  ForgeLogins: { required: [], optional: ["github", "gitlab", "linear", "jira"] },
+  ForgeLogins: { required: [], optional: ["github", "gitlab", "linear", "jira", "forgejo"] },
   ForgeMergeRequest: { required: ["node", "sha"], optional: ["method", "auto"] },
   ForgeNodeRequest: { required: ["node"], optional: [] },
   ForgePlan: { required: ["item", "children", "steps"], optional: ["lead"] },
@@ -12818,6 +12848,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MissingFolder: { required: ["branchKept"], optional: [] },
   MoveAnswer: { required: ["when", "message"], optional: ["agent"] },
   MoveRequest: { required: ["agentID", "removeLeft", "discardChanges"], optional: ["target"] },
+  MoveToMachineAnswer: { required: ["folder", "carriesOn"], optional: [] },
+  MoveToMachineRequest: { required: ["agentID", "machine"], optional: ["machineName", "folder"] },
   NativeSetting: { required: [], optional: ["options", "sandbox", "clientPermission"] },
   Need: { required: ["id", "folder", "kind", "raisedAt", "headline"], optional: ["agentID"] },
   NotCommittedResponse: { required: ["isRepository", "paths", "more"], optional: [] },
@@ -13215,7 +13247,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SurfaceIdentification: { required: ["id", "name", "kind"], optional: [] },
   TeamBot: { required: ["user", "name", "spentTodayUSD", "capped", "machines", "online", "workflows", "live"], optional: ["group", "groupName", "caps"] },
   TeamBotRun: { required: ["host", "hostName", "agent"], optional: ["workflow", "since"] },
-  TeamPerson: { required: ["id", "name", "kind"], optional: ["githubLogin", "gitlabLogin", "linearLogin", "jiraLogin", "you"] },
+  TeamPerson: { required: ["id", "name", "kind"], optional: ["githubLogin", "gitlabLogin", "linearLogin", "jiraLogin", "forgejoLogin", "you"] },
   TeamTrigger: { required: ["workflow", "trigger", "runsOn"], optional: ["event", "dueAt"] },
   TeamTriggerFired: { required: ["ran"], optional: [] },
   TeamTriggerSent: { required: ["taken"], optional: [] },

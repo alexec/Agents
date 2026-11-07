@@ -29,7 +29,8 @@ var forgeLevels = []string{"epic", "story", "task", "spike"}
 // featurePrefix starts a feature's label.
 const featurePrefix = "feature:"
 
-// Features are read from the newest epics, at most featureEpicPages pages of forgeListMost.
+// Features are read from the newest epics and open issues, at most featureEpicPages pages of
+// forgeListMost of each.
 const featureEpicPages = 5
 
 func (d *Daemon) registerForgePlans() {
@@ -292,6 +293,32 @@ func (d *Daemon) linearPlan(ctx context.Context, method, identifier string) (wir
 	return epic, children, nil
 }
 
+// featurePages reads at most featureEpicPages pages of the issues q asks for, on r's folder and
+// board, giving each to each and adding the forges that could not be read to out.Errors.
+func (d *Daemon) featurePages(ctx context.Context, r wire.ForgeFeaturesRequest, out *wire.ForgeFeatures, q wire.ForgeListRequest,
+	each func(wire.ForgeItem)) error {
+	q.Folder, q.Board, q.Limit = r.Folder, r.Board, new(int64(forgeListMost))
+	for range featureEpicPages {
+		page, err := d.forgeList(ctx, false, q)
+		if err != nil {
+			return Invalid("forge/features: %v", strings.TrimPrefix(err.Error(), "forge/issues: "))
+		}
+		for _, e := range page.Errors {
+			if !slices.Contains(out.Errors, e) {
+				out.Errors = append(out.Errors, e)
+			}
+		}
+		for _, i := range page.Items {
+			each(i)
+		}
+		if page.Cursor == nil {
+			return nil
+		}
+		q.Cursor = page.Cursor
+	}
+	return nil
+}
+
 // jiraPlan is a Jira epic or parent and its children (#3260), each blocked by the issues its
 // Blocks links say.
 func (d *Daemon) jiraPlan(ctx context.Context, method, key string) (wire.ForgeItem, []planChild, error) {
@@ -321,46 +348,43 @@ func (d *Daemon) jiraPlan(ctx context.Context, method, key string) (wire.ForgeIt
 
 // forgeFeatures are the features on the epics of r.folder, or of every folder: the newest epics,
 // open and closed (a closed epic keeps its labels), each counted under its feature:<name> label.
+// issues counts each feature's open issues that are not epics (#3741), from the newest open issues,
+// so a feature whose epics are closed but that has loose open work is not finished.
 func (d *Daemon) forgeFeatures(ctx context.Context, r wire.ForgeFeaturesRequest) (wire.ForgeFeatures, error) {
 	out := wire.ForgeFeatures{Features: []wire.ForgeFeature{}}
 	by := map[string]*wire.ForgeFeature{}
-	var cursor *string
-	for range featureEpicPages {
-		page, err := d.forgeList(ctx, false, wire.ForgeListRequest{Folder: r.Folder, State: new("all"), Label: new("epic"),
-			Limit: new(int64(forgeListMost)), Cursor: cursor, Board: r.Board})
-		if err != nil {
-			return wire.ForgeFeatures{}, Invalid("forge/features: %v", strings.TrimPrefix(err.Error(), "forge/issues: "))
+	loose := map[string]int64{}
+	err := d.featurePages(ctx, r, &out, wire.ForgeListRequest{State: new("open")}, func(i wire.ForgeItem) {
+		if i.Feature != nil && deref(i.Level) != "epic" {
+			loose[strings.ToLower(*i.Feature)]++
 		}
-		for _, e := range page.Errors {
-			if !slices.Contains(out.Errors, e) {
-				out.Errors = append(out.Errors, e)
-			}
+	})
+	if err != nil {
+		return wire.ForgeFeatures{}, err
+	}
+	err = d.featurePages(ctx, r, &out, wire.ForgeListRequest{State: new("all"), Label: new("epic")}, func(i wire.ForgeItem) {
+		if i.Feature == nil {
+			return
 		}
-		for _, i := range page.Items {
-			if i.Feature == nil {
-				continue
-			}
-			f := by[strings.ToLower(*i.Feature)]
-			if f == nil {
-				f = &wire.ForgeFeature{Name: *i.Feature}
-				by[strings.ToLower(*i.Feature)] = f
-			}
-			if f.Color == nil {
-				for _, l := range i.Labels {
-					if name, ok := featureName(l.Name); ok && strings.EqualFold(name, f.Name) {
-						f.Color = l.Color
-					}
+		f := by[strings.ToLower(*i.Feature)]
+		if f == nil {
+			f = &wire.ForgeFeature{Name: *i.Feature, Issues: new(loose[strings.ToLower(*i.Feature)])}
+			by[strings.ToLower(*i.Feature)] = f
+		}
+		if f.Color == nil {
+			for _, l := range i.Labels {
+				if name, ok := featureName(l.Name); ok && strings.EqualFold(name, f.Name) {
+					f.Color = l.Color
 				}
 			}
-			f.Epics++
-			if i.State == "open" {
-				f.Open++
-			}
 		}
-		if page.Cursor == nil {
-			break
+		f.Epics++
+		if i.State == "open" {
+			f.Open++
 		}
-		cursor = page.Cursor
+	})
+	if err != nil {
+		return wire.ForgeFeatures{}, err
 	}
 	for _, f := range by {
 		out.Features = append(out.Features, *f)

@@ -18,6 +18,21 @@ test("a feature says its name and counts", () => {
   assert.equal(f.featureTitle(""), "");
   assert.equal(f.featureCountWords({ name: "work", epics: 3, open: 2 }), "3 epics · 2 open");
   assert.equal(f.featureCountWords({ name: "hosted", epics: 1, open: 0 }), "1 epic · 0 open");
+  assert.equal(f.featureCountWords({ name: "work", epics: 1, open: 0, issues: 0 }), "1 epic · 0 open");
+  assert.equal(f.featureCountWords({ name: "work", epics: 1, open: 0, issues: 1 }), "1 epic · 0 open · 1 open issue");
+  assert.equal(f.featureCountWords({ name: "work", epics: 2, open: 1, issues: 4 }), "2 epics · 1 open · 4 open issues");
+});
+
+test("a feature with no open work is finished", () => {
+  const groups = f.featureGroups([
+    { name: "browser", epics: 1, open: 0, issues: 0 },
+    { name: "lineage", epics: 2, open: 1, issues: 0 },
+    { name: "old", epics: 1, open: 0 },
+    { name: "work", epics: 3, open: 0, issues: 2 },
+  ]);
+  assert.deepEqual(groups.active.map((x) => x.name), ["lineage", "old", "work"]);
+  assert.deepEqual(groups.finished.map((x) => x.name), ["browser"]);
+  assert.equal(f.finishedWords(7), "Finished (7)");
 });
 
 test("several machines' features add up by name", () => {
@@ -27,6 +42,9 @@ test("several machines' features add up by name", () => {
   ]);
   assert.deepEqual(merged.map((x) => x.name), ["lineage", "work"]);
   assert.deepEqual([merged[1].epics, merged[1].open, merged[1].color], [3, 2, "#1d76db"]);
+  const counted = f.mergeFeatures([[{ name: "work", epics: 1, open: 0, issues: 1 }], [{ name: "work", epics: 1, open: 0, issues: 2 }],
+    [{ name: "docs", epics: 1, open: 0, issues: 0 }], [{ name: "docs", epics: 1, open: 0 }]]);
+  assert.deepEqual(counted.map((x) => x.issues), [undefined, 3]);
 });
 
 test("an opened feature shows its epics and its loose issues", () => {

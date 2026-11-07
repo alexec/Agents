@@ -9907,7 +9907,7 @@
     },
     "ForgeFeature": {
       "type": "object",
-      "description": "A feature (#3267): name is its label's after feature:, with the label's colour where the forge gives one; epics counts its epics, open the open ones.",
+      "description": "A feature (#3267): name is its label's after feature:, with the label's colour where the forge gives one; epics counts its epics, open the open ones. issues counts its open issues that are not epics, of the newest 500 open issues (#3741); a feature with no open epic and no such issue is finished.",
       "properties": {
         "name": {
           "type": "string"
@@ -9919,6 +9919,9 @@
           "type": "integer"
         },
         "open": {
+          "type": "integer"
+        },
+        "issues": {
           "type": "integer"
         }
       },
@@ -10307,7 +10310,7 @@
     },
     "ForgeLogins": {
       "type": "object",
-      "description": "people/setForgeLogins (#2951): the caller's own GitHub, GitLab, Linear and Jira logins (#3313), for Settings ▸ You, replacing what was kept; blank clears one.",
+      "description": "people/setForgeLogins (#2951): the caller's own GitHub, GitLab, Linear, Jira (#3313) and Forgejo (#3836) logins, for Settings ▸ You, replacing what was kept; blank clears one.",
       "properties": {
         "github": {
           "type": "string"
@@ -10319,6 +10322,9 @@
           "type": "string"
         },
         "jira": {
+          "type": "string"
+        },
+        "forgejo": {
           "type": "string"
         }
       },
@@ -15916,6 +15922,46 @@
           "additionalProperties": false
         }
       ]
+    },
+    "MoveToMachineAnswer": {
+      "type": "object",
+      "description": "What agents/moveToMachine did (#3790): the folder on that machine the session now goes on in, and whether it carries on there at once, as it was working when it moved.",
+      "properties": {
+        "folder": {
+          "type": "string"
+        },
+        "carriesOn": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "folder",
+        "carriesOn"
+      ],
+      "additionalProperties": false
+    },
+    "MoveToMachineRequest": {
+      "type": "object",
+      "description": "The person moving a session to another of their machines (#3790), as move_session does (#3717). `machine` is the control plane's id or name for it, and `machineName` the name the person knows it by, for the words; `folder` is an absolute path there, or, when left out, the folder of the session's project there.",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "machine": {
+          "type": "string"
+        },
+        "machineName": {
+          "type": "string"
+        },
+        "folder": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "agentID",
+        "machine"
+      ],
+      "additionalProperties": false
     },
     "MoveWhen": {
       "type": "string",
@@ -26615,6 +26661,10 @@
         "jiraLogin": {
           "type": "string",
           "description": "Their Jira login (#3313): the Atlassian account's email, account id or display name."
+        },
+        "forgejoLogin": {
+          "type": "string",
+          "description": "Their Forgejo login (#3836): their user name on the connected Forgejo or Gitea."
         },
         "you": {
           "type": "boolean"

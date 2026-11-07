@@ -69,18 +69,21 @@ type Person struct {
 	Rev       int
 	Removed   *bool
 	RemovedAt *Stamp
-	// Their GitHub, GitLab, Linear and Jira logins (#2951, #3313), for the github, gitlab,
-	// linear and jira servers' Team section and rows named as the control plane knows them.
-	// Set from a machine's own connection when it is signed in, or by hand in Settings ▸ You.
-	// A Jira login is the Atlassian account's email, account id or display name.
-	GitHubLogin string
-	GitLabLogin string
-	LinearLogin string
-	JiraLogin   string
-	Extra       Extra
+	// Their GitHub, GitLab, Linear, Jira and Forgejo logins (#2951, #3313, #3836), for the
+	// github, gitlab, linear and jira servers' Team section and rows named as the control plane
+	// knows them. Set from a machine's own connection when it is signed in, or by hand in
+	// Settings ▸ You. A Jira login is the Atlassian account's email, account id or display
+	// name; a Forgejo login is the user name on the connected Forgejo or Gitea.
+	GitHubLogin  string
+	GitLabLogin  string
+	LinearLogin  string
+	JiraLogin    string
+	ForgejoLogin string
+	Extra        Extra
 }
 
-// ForgeLogin is the person's login on that forge ("github", "gitlab", "linear" or "jira"), or "".
+// ForgeLogin is the person's login on that forge ("github", "gitlab", "linear", "jira" or
+// "forgejo"), or "".
 func (p *Person) ForgeLogin(forge string) string {
 	switch forge {
 	case "github":
@@ -91,6 +94,8 @@ func (p *Person) ForgeLogin(forge string) string {
 		return p.LinearLogin
 	case "jira":
 		return p.JiraLogin
+	case "forgejo":
+		return p.ForgejoLogin
 	}
 	return ""
 }
@@ -132,32 +137,33 @@ type Caps struct {
 }
 
 type personJSON struct {
-	ID          string      `json:"id"`
-	Name        string      `json:"name"`
-	Kind        string      `json:"kind,omitempty"`
-	Role        string      `json:"role,omitempty"`
-	SignIns     []SignIn    `json:"signIns,omitempty"`
-	Group       string      `json:"group,omitempty"`
-	Caps        *Caps       `json:"caps,omitempty"`
-	SCIM        *PersonSCIM `json:"scim,omitempty"`
-	Provisioned bool        `json:"provisioned,omitempty"`
-	Suspended   *Suspension `json:"suspended,omitempty"`
-	RoleFrom    []string    `json:"roleFrom,omitempty"`
-	RoleByHand  string      `json:"roleByHand,omitempty"`
-	LastNames   []LastName  `json:"lastNames,omitempty"`
-	Rev         int         `json:"rev,omitempty"`
-	Removed     *bool       `json:"removed,omitempty"`
-	RemovedAt   *Stamp      `json:"removedAt,omitempty"`
-	GitHubLogin string      `json:"gitHubLogin,omitempty"`
-	GitLabLogin string      `json:"gitLabLogin,omitempty"`
-	LinearLogin string      `json:"linearLogin,omitempty"`
-	JiraLogin   string      `json:"jiraLogin,omitempty"`
+	ID           string      `json:"id"`
+	Name         string      `json:"name"`
+	Kind         string      `json:"kind,omitempty"`
+	Role         string      `json:"role,omitempty"`
+	SignIns      []SignIn    `json:"signIns,omitempty"`
+	Group        string      `json:"group,omitempty"`
+	Caps         *Caps       `json:"caps,omitempty"`
+	SCIM         *PersonSCIM `json:"scim,omitempty"`
+	Provisioned  bool        `json:"provisioned,omitempty"`
+	Suspended    *Suspension `json:"suspended,omitempty"`
+	RoleFrom     []string    `json:"roleFrom,omitempty"`
+	RoleByHand   string      `json:"roleByHand,omitempty"`
+	LastNames    []LastName  `json:"lastNames,omitempty"`
+	Rev          int         `json:"rev,omitempty"`
+	Removed      *bool       `json:"removed,omitempty"`
+	RemovedAt    *Stamp      `json:"removedAt,omitempty"`
+	GitHubLogin  string      `json:"gitHubLogin,omitempty"`
+	GitLabLogin  string      `json:"gitLabLogin,omitempty"`
+	LinearLogin  string      `json:"linearLogin,omitempty"`
+	JiraLogin    string      `json:"jiraLogin,omitempty"`
+	ForgejoLogin string      `json:"forgejoLogin,omitempty"`
 }
 
 func (p Person) MarshalJSON() ([]byte, error) {
 	return encodeKeeping(personJSON{p.ID, p.Name, p.Kind, p.Role, p.SignIns, p.Group, p.Caps, p.SCIM, p.Provisioned, p.Suspended,
 		p.RoleFrom, p.RoleByHand, p.LastNames, p.Rev, p.Removed, p.RemovedAt, p.GitHubLogin, p.GitLabLogin, p.LinearLogin,
-		p.JiraLogin}, p.Extra)
+		p.JiraLogin, p.ForgejoLogin}, p.Extra)
 }
 
 func (p *Person) UnmarshalJSON(data []byte) error {
@@ -168,7 +174,7 @@ func (p *Person) UnmarshalJSON(data []byte) error {
 	}
 	*p = Person{j.ID, j.Name, j.Kind, j.Role, j.SignIns, j.Group, j.Caps, j.SCIM, j.Provisioned, j.Suspended, j.RoleFrom,
 		j.RoleByHand, j.LastNames, j.Rev, j.Removed, j.RemovedAt, j.GitHubLogin, j.GitLabLogin, j.LinearLogin,
-		j.JiraLogin, extra}
+		j.JiraLogin, j.ForgejoLogin, extra}
 	return nil
 }
 

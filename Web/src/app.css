@@ -1489,6 +1489,14 @@ dialog.sheet:has(.settings-sheet) { width: min(760px, calc(100vw - 32px)); max-h
   border: 1px solid var(--paper-rule); border-radius: var(--radius-control);
 }
 .report-problem .sheet-actions .spacer { flex: 1; }
+/* Move to Machine… (#3790): the machine, the folder there, and what goes. */
+.move-to-machine { width: min(460px, 86vw); }
+.move-to-machine label { display: flex; flex-direction: column; gap: 4px; font-size: 0.8125rem; }
+.move-to-machine select, .move-to-machine input[type=text] {
+  font: inherit; color: inherit; padding: 5px 8px;
+  border: 1px solid var(--paper-rule); border-radius: var(--radius-control); background: var(--paper-ground);
+}
+.move-to-machine p { margin: 0; }
 /* A change waiting for an OK, on its Review page (#1472): the header, the whole change, which the
    page scrolls, and the answers in a bar that stays at the foot. */
 .review-body { max-width: 1400px; padding: 12px 16px 24px; display: flex; flex-direction: column; gap: 12px; }
@@ -1969,6 +1977,7 @@ dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
 .work-feature-head .chevron { display: inline-block; width: 1em; opacity: 0.6; }
 .work-feature-head .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
 .work-feature-head .counts, .work-feature-row .figures { margin-left: auto; opacity: 0.7; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.work-finished-head { margin-top: 12px; opacity: 0.75; }
 .work-feature-open { padding: 0 0 6px 22px; }
 .work-feature-items { list-style: none; margin: 0; padding: 0; }
 .work-rows .work-feature-items li { border: none; }

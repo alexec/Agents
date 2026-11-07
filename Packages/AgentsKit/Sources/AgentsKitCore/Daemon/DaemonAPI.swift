@@ -378,6 +378,9 @@ public enum DaemonAPI {
         /// The person moving an agent into a worktree or back to its folder, or
         /// taking back a move still waiting for the turn to end (053).
         public static let agentsMove = "agents/move"
+        /// Move to Machine… (#3790): the person moving a session to another of their
+        /// machines, with its branch and its uncommitted changes, as move_session does.
+        public static let agentsMoveToMachine = "agents/moveToMachine"
 
         public static let permissionsPending = "permissions/pending"
         public static let elicitationsPending = "elicitations/pending"
@@ -4166,6 +4169,33 @@ public extension DaemonAPI {
 
     /// The most `dropbox/put` carries: what one message over the phone's link takes.
     static let dropboxPutLimit = attachmentLimit
+
+    // MARK: Move to Machine… (#3790)
+
+    /// `agents/moveToMachine`. `machine` is the control plane's id for it, and `machineName`
+    /// its name, for the words; no `folder` is the folder of the session's project there.
+    struct MoveToMachineRequest: Codable, Hashable, Sendable {
+        public var agentID: UUID
+        public var machine: String
+        public var machineName: String?
+        public var folder: String?
+        public init(agentID: UUID, machine: String, machineName: String? = nil, folder: String? = nil) {
+            self.agentID = agentID
+            self.machine = machine
+            self.machineName = machineName
+            self.folder = folder
+        }
+    }
+
+    /// The folder there the session goes on in, and whether it carries on there at once.
+    struct MoveToMachineAnswer: Codable, Hashable, Sendable {
+        public var folder: String
+        public var carriesOn: Bool
+        public init(folder: String, carriesOn: Bool) {
+            self.folder = folder
+            self.carriesOn = carriesOn
+        }
+    }
 
     // MARK: Send to ‹host›… (#1123)
 

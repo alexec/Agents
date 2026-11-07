@@ -7,10 +7,27 @@ import { shortRef } from "./work";
 /** A feature's name as a title: work is Work. */
 export const featureTitle = (name: string) => name.charAt(0).toUpperCase() + name.slice(1);
 
-/** A feature's counts: "3 epics · 2 open". */
-export const featureCountWords = (f: ForgeFeature) => `${f.epics} ${f.epics === 1 ? "epic" : "epics"} · ${f.open} open`;
+/** A feature's counts: "3 epics · 2 open", and "· 4 open issues" when it has open issues that are
+ * not epics (#3741). */
+export function featureCountWords(f: ForgeFeature): string {
+  const epics = `${f.epics} ${f.epics === 1 ? "epic" : "epics"} · ${f.open} open`;
+  return f.issues ? `${epics} · ${f.issues} open ${f.issues === 1 ? "issue" : "issues"}` : epics;
+}
 
-/** The features of several machines as one list, by name: the counts of one feature added up. */
+/** A feature with no open epic and no open issue (#3741). A daemon that does not count the issues
+ * says nothing, so none of its features is finished. */
+export const isFinished = (f: ForgeFeature) => f.open === 0 && f.issues === 0;
+
+/** The features as the list shows them (#3741): those with open work at the top, in their order, and
+ * the finished ones in the Finished group at the bottom. */
+export const featureGroups = (features: readonly ForgeFeature[]) =>
+  ({ active: features.filter((f) => !isFinished(f)), finished: features.filter(isFinished) });
+
+/** The Finished group's head: "Finished (7)". */
+export const finishedWords = (count: number) => `Finished (${count})`;
+
+/** The features of several machines as one list, by name: the counts of one feature added up. Its
+ * issues are unknown when one machine does not count them. */
 export function mergeFeatures(lists: readonly (readonly ForgeFeature[])[]): ForgeFeature[] {
   const by = new Map<string, ForgeFeature>();
   for (const f of lists.flat()) {
@@ -19,6 +36,8 @@ export function mergeFeatures(lists: readonly (readonly ForgeFeature[])[]): Forg
     if (!had) { by.set(key, { ...f }); continue; }
     had.epics += f.epics;
     had.open += f.open;
+    if (had.issues === undefined || f.issues === undefined) delete had.issues;
+    else had.issues += f.issues;
     if (had.color === undefined && f.color !== undefined) had.color = f.color;
   }
   return [...by.values()].sort((a, b) => a.name.toLowerCase() < b.name.toLowerCase() ? -1 : a.name.toLowerCase() > b.name.toLowerCase() ? 1 : 0);
