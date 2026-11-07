@@ -272,7 +272,7 @@ func TestForgejoReadsItsConnection(t *testing.T) {
 // it by hand. It declares the events its server raises: the gitlab server's.
 func TestBitbucketReadsItsConnection(t *testing.T) {
 	bitbucket, ok := OursByID("agents/bitbucket")
-	if !ok || bitbucket.Command != "bitbucket-mcp" || !bitbucket.Declares.Tools || bitbucket.Declares.Views ||
+	if !ok || bitbucket.Command != "bitbucket-mcp" || !bitbucket.Declares.Tools || !bitbucket.Declares.Views ||
 		!reflect.DeepEqual(bitbucket.Declares.Events, bitbucketmcp.EventNames()) {
 		t.Fatalf("bitbucket: %+v %v, the server's %v", bitbucket, ok, bitbucketmcp.EventNames())
 	}
