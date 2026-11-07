@@ -66,6 +66,21 @@ type spent struct {
 	replayed bool
 }
 
+// codesMost is how many codes the store holds at most, live or expired, until the sweep
+// deletes them (#3748): a code is made only so fast (limits.go), but there was no count.
+const codesMost = 1000
+
+// countSuffix is how many of keys end in suffix.
+func countSuffix(keys []store.Key, suffix string) int {
+	n := 0
+	for _, k := range keys {
+		if strings.HasSuffix(k.Key, suffix) {
+			n++
+		}
+	}
+	return n
+}
+
 func codeKey(id string) string  { return "v1/codes/" + id + ".json" }
 func spentKey(id string) string { return "v1/codes/" + id + ".spent" }
 
@@ -104,6 +119,13 @@ func (c *Codes) issue(ctx context.Context, host, browser bool, lifetime time.Dur
 	data, err := records.Encode(stored)
 	if err != nil {
 		return nil, "", err
+	}
+	keys, err := c.Store.List(ctx, codesPrefix)
+	if err != nil {
+		return nil, "", err
+	}
+	if made := countSuffix(keys, ".json"); made >= codesMost {
+		return nil, "", fail(tooManyRequests, "There are %d codes already. Try again when older ones have run out.", made)
 	}
 	if _, err := c.Store.Put(ctx, codeKey(id), data, store.Absent); err != nil {
 		return nil, "", err

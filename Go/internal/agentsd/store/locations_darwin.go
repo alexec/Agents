@@ -20,11 +20,20 @@ func macFolders(root, home string) Locations {
 	if isTemporary(root) {
 		return Locations{Root: root, Cache: filepath.Join(root, "cache"), Logs: filepath.Join(root, "logs")}
 	}
-	cache := filepath.Join(home, "Library", "Caches", "com.alexecollins.agents")
-	logs := filepath.Join(home, "Library", "Logs", "Agents")
 	if root != StandardRoot(home) {
-		own := filepath.Join("roots", filepath.Base(root)+"-"+PathHash(root))
-		cache, logs = filepath.Join(cache, own), filepath.Join(logs, own)
+		roots := macRootsFolders(home)
+		return Locations{Root: root, Cache: filepath.Join(roots[0], ownName(root)), Logs: filepath.Join(roots[1], ownName(root))}
 	}
-	return Locations{Root: root, Cache: cache, Logs: logs}
+	return Locations{Root: root, Cache: macCache(home), Logs: macLogs(home)}
 }
+
+func macCache(home string) string { return filepath.Join(home, "Library", "Caches", "com.alexecollins.agents") }
+func macLogs(home string) string  { return filepath.Join(home, "Library", "Logs", "Agents") }
+
+// macRootsFolders is where macFolders puts each root's own folders: the cache's, then the
+// logs'.
+func macRootsFolders(home string) [2]string {
+	return [2]string{filepath.Join(macCache(home), "roots"), filepath.Join(macLogs(home), "roots")}
+}
+
+func rootsFolders(home string, env func(string) string) [2]string { return macRootsFolders(home) }
