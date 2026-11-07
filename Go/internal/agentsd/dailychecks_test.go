@@ -182,7 +182,7 @@ func TestSummaryAndChecksSchedulesTheChecks(t *testing.T) {
 		t.Fatal(got)
 	}
 	text, _ := os.ReadFile(filepath.Join(home, ".agents", "workflows", dailyChecksID+".md"))
-	if !strings.Contains(string(text), "when-done: archive") || !strings.Contains(string(text), "permission-mode: plan") {
+	if !strings.Contains(string(text), "when-done: archive") || !strings.Contains(string(text), "permission-mode: ask") {
 		t.Fatalf("the rest of the metadata went:\n%s", text)
 	}
 	five := int64(5)
@@ -198,12 +198,12 @@ func TestSummaryAndChecksSchedulesTheChecks(t *testing.T) {
 	}
 }
 
-// The Daily checks workflow is the home folder's, runs on one machine, in plan mode, every 4
+// The Daily checks workflow is the home folder's, runs on one machine, in ask mode, every 4
 // hours but the summary's.
 func TestDailyChecksIsTheHomeFolders(t *testing.T) {
 	text, skill := readyMadeText(dailyChecksID)
 	w := parseWorkflow(text, dailyChecksID, "/p")
-	if w.Settings.PermissionMode == nil || *w.Settings.PermissionMode != "plan" || len(w.Triggers) != 5 {
+	if w.Settings.PermissionMode == nil || *w.Settings.PermissionMode != "ask" || len(w.Triggers) != 5 {
 		t.Fatalf("%+v", w)
 	}
 	for _, tr := range w.Triggers {
