@@ -244,6 +244,23 @@ account's machines. It leaves the operator's backups of it, and Stripe's own rec
 | `~/Library/Logs/Agents/control.log` | What the control plane did | 4 MB, and one older file |
 | The Web Push key | The key that signs browser push | One. Not in `agents-control backup`. |
 
+## In memory
+
+What a process holds while it runs, and goes when it stops. Each has a bound (#3650).
+
+| Process | What it holds | How large |
+| --- | --- | --- |
+| Machine | A session's running cost, its views' calls, its undo notes | Until the agent is archived or deleted; 64 view calls and 21 undo notes an agent |
+| Machine | A terminal a runtime asks for | The limit the runtime asks for, 4 MiB at most |
+| Control plane | A store copy, backup or handover | One record at a time, and a hash of each record to check the copy |
+| Control plane | A socket's lines waiting to go | 8,192 lines and 64 MiB; a slower socket is closed |
+| Control plane | Records read for reports and the Console | 40,000 records and 256 MiB |
+| Control plane | Notifications posted to devices | A week, and 10,000 at most |
+| Control plane | Presence reported at another copy | Until no copy links the client |
+| Mac, Remote, web | A chat's history | 600 to 800 entries while it follows the end; paging back stops at 1,600 entries and 200 turns |
+| Mac, Remote, web | Events | 1,000 as new ones come; paging back stops at 5,000 |
+| Mac, Remote | Pictures in a page | 64 MiB |
+
 ## Erasure
 
 **Delete** works on an archived agent. It stops the agent's runtime, takes back its tokens,

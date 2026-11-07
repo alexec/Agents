@@ -268,6 +268,21 @@ func (d *Daemon) costState() wire.CostState {
 
 func (d *Daemon) tellCost() { Broadcast(d, wire.NotifyCostChanged, d.costState()) }
 
+// forgetAgentInMemory lets go of what is held in memory for an agent while it runs, when it
+// is archived or deleted (#3650): its session's running cost, its views' calls and its undo
+// notes. A
+// session that runs again starts its running total afresh, as after a restart.
+func (d *Daemon) forgetAgentInMemory(id wire.UUID) {
+	d.costMu.Lock()
+	delete(d.sessionCost, id)
+	d.costMu.Unlock()
+	d.viewMu.Lock()
+	delete(d.viewCalls, id)
+	delete(d.viewContexts, id)
+	d.viewMu.Unlock()
+	d.undoNotes.forget(id)
+}
+
 // bankSessionCost is DaemonCore.bank: a usage_update's cost is the session's running
 // total, so what is new is what it rose by.
 func (d *Daemon) bankSessionCost(id wire.UUID, c wire.Cost) {

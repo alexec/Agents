@@ -5,7 +5,7 @@ import { load } from "./load.mjs";
 
 const {
   Work, Store, archivedPage, recentArchivedShown, searchShown, keepingTurns, effect,
-  turnPage, openTurnsHeld, historyEntriesCap, historyTurnsCap, rememberOpen, quietSettle,
+  turnPage, openTurnsHeld, historyEntriesCap, historyTurnsCap, eventsKept, eventsPagedMost, rememberOpen, quietSettle,
   CallFailed, Failure,
 } = await load("test/bounded.ts");
 const w = await load("test/wire.ts");
@@ -798,4 +798,30 @@ test("a session whose lookup failed is not looked for, and is once its host says
   await store.reloadTranscript();
   await wait(0);
   assert.deepEqual(store.lookedFor.value, { host: "mac", session: "gone" });
+});
+
+test("a host's events are bounded as new ones come and as paging back brings more (#3650)", async () => {
+  const hosts = [{ id: "mac", state: "online" }];
+  let newest = 20_000;
+  const events = (from, n) => Array.from({ length: n }, (_, i) => ({ position: from - i, name: "agent.finished" }));
+  const link = fakeLink((method, p) => {
+    if (method === "hosts/list") return hosts;
+    if (method === "agents/list" || method.endsWith("/pending")) return [];
+    if (method === "events/list") {
+      const before = p.before ?? newest + 1;
+      return { events: events(before - 1, p.limit), waiting: [], hasMore: true };
+    }
+    return undefined;
+  });
+  const store = new Store(link);
+  for (let i = 0; i < 30; i++) {
+    newest += 50;
+    await store.loadEvents("mac");
+  }
+  assert.equal(store.events.value.mac.events.length, eventsKept);
+  assert.equal(store.events.value.mac.events[0].position, newest);
+  assert.ok(store.events.value.mac.hasMore);
+  while (store.events.value.mac.hasMore) await store.loadOlderEvents("mac");
+  assert.equal(store.events.value.mac.events.length, eventsPagedMost);
+  assert.equal(store.events.value.mac.events[0].position, newest);
 });
