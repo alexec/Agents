@@ -27,4 +27,5 @@ test("a save sends each trimmed, blank to clear, and only when something changed
 test("its words are the window's", () => {
   assert.equal(f.forgeLoginsTitle, "GitHub, GitLab, Linear, Jira and Forgejo");
   assert.deepEqual(f.forgeLoginFields.map((x) => x.label), ["GitHub login", "GitLab login", "Linear login", "Jira login", "Forgejo login"]);
+  assert.match(f.forgeLoginsFooter, /A Forgejo login is your user name on the connected Forgejo\./);
 });

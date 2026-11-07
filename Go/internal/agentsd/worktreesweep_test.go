@@ -10,10 +10,10 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// #3726: an agent's worktree goes when it is deleted, or archived with its branch merged,
-// and never when it has uncommitted or untracked changes, another agent names it, or its
-// branch is not merged (for an archive); an unmerged branch is never deleted. Only scratch
-// repositories in a temp folder.
+// #3726, #3877: an agent's worktree goes when it is archived or deleted, merged or not,
+// with its uncommitted and untracked changes too, and never while an agent not archived
+// works in it or names it; an unmerged branch is never deleted. Only scratch repositories
+// in a temp folder.
 
 func sweepGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
@@ -53,8 +53,16 @@ func archiveAndSweep(t *testing.T, d *Daemon, id wire.UUID) {
 	d.sweeps.Wait()
 }
 
+// deleteAndSweep deletes id, archived first with no sweep, as a delete needs.
 func deleteAndSweep(t *testing.T, d *Daemon, id wire.UUID) {
 	t.Helper()
+	if a := d.Store.Agent(id); a != nil && a.State != wire.AgentStateArchived {
+		by := wire.AgentArchivedReasonByUser
+		a.State, a.ArchivedReason = wire.AgentStateArchived, &by
+		if err := d.Store.Save(*a); err != nil {
+			t.Fatal(err)
+		}
+	}
 	if err := d.delete(id); err != nil {
 		t.Fatal(err)
 	}
@@ -83,39 +91,45 @@ func TestAnArchivedAgentsMergedCleanWorktreeIsRemoved(t *testing.T) {
 	}
 }
 
-func TestAnArchivedAgentsUnmergedWorktreeIsKept(t *testing.T) {
+func TestAnArchivedAgentsUnmergedWorktreeGoesButItsBranchStays(t *testing.T) {
 	d, _ := start(t, t.TempDir())
 	dir := repo(t)
 	a, root := laneWorktree(t, d, dir, "unmerged")
 	commitIn(t, root, "work.txt")
+	tip := sweepGit(t, dir, "rev-parse", "agents/unmerged")
 	archiveAndSweep(t, d, a.ID)
-	if !isDir(root) || !hasBranch(t, dir, "agents/unmerged") {
-		t.Fatal("an unmerged worktree went on archive")
+	if isDir(root) {
+		t.Fatal("an unmerged worktree stayed on archive")
+	}
+	if !hasBranch(t, dir, "agents/unmerged") || sweepGit(t, dir, "rev-parse", "agents/unmerged") != tip {
+		t.Fatal("the unmerged branch went with the worktree")
+	}
+	if n := runtimeNotes(d, a.ID); len(n) == 0 || n[len(n)-1] != "Removed the worktree unmerged; its branch agents/unmerged is kept." {
+		t.Fatal(n)
 	}
 }
 
-func TestAWorktreeWithChangesIsNeverRemoved(t *testing.T) {
+func TestAWorktreeWithChangesGoesOnArchiveAndDelete(t *testing.T) {
 	d, _ := start(t, t.TempDir())
 	dir := repo(t)
+	commitIn(t, dir, "tracked.txt")
 	untracked, uRoot := laneWorktree(t, d, dir, "untracked")
 	os.WriteFile(filepath.Join(uRoot, "notes.txt"), []byte("x"), 0o644)
-	commitIn(t, dir, "tracked.txt")
 	edited, eRoot := laneWorktree(t, d, dir, "edited")
 	os.WriteFile(filepath.Join(eRoot, "tracked.txt"), []byte("changed"), 0o644)
 	staged, sRoot := laneWorktree(t, d, dir, "staged")
 	os.WriteFile(filepath.Join(sRoot, "new.txt"), []byte("x"), 0o644)
 	sweepGit(t, sRoot, "add", "new.txt")
-	for _, a := range []wire.Agent{untracked, edited, staged} {
-		archiveAndSweep(t, d, a.ID) // merged: no commits of their own
-		deleteAndSweep(t, d, a.ID)
-	}
+	archiveAndSweep(t, d, untracked.ID)
+	archiveAndSweep(t, d, edited.ID)
+	deleteAndSweep(t, d, staged.ID)
 	for _, root := range []string{uRoot, eRoot, sRoot} {
-		if !isDir(root) {
-			t.Fatalf("%s went with changes in it", root)
+		if isDir(root) {
+			t.Fatalf("%s stayed with changes in it", root)
 		}
 	}
-	if b, _ := os.ReadFile(filepath.Join(uRoot, "notes.txt")); string(b) != "x" {
-		t.Fatal("the untracked file went")
+	if n := runtimeNotes(d, untracked.ID); len(n) == 0 || !strings.HasPrefix(n[len(n)-1], "Removed the worktree untracked and its branch agents/untracked, as the branch is merged. It had 1 uncommitted change: untracked notes.txt") {
+		t.Fatal(n)
 	}
 }
 
@@ -125,10 +139,7 @@ func TestAWorktreeAnotherAgentUsesIsKept(t *testing.T) {
 	a, root := laneWorktree(t, d, dir, "shared")
 	other := seeded(t, d, root, nil) // works there, with no worktree of its own
 	named, nRoot := laneWorktree(t, d, dir, "named")
-	archived := seeded(t, d, dir, inWorktree(dir, nRoot, "agents/named"))
-	if err := d.archive(archived.ID); err != nil {
-		t.Fatal(err)
-	}
+	seeded(t, d, dir, inWorktree(dir, nRoot, "agents/named")) // names it, not archived
 	for _, id := range []wire.UUID{a.ID, named.ID} {
 		archiveAndSweep(t, d, id)
 		deleteAndSweep(t, d, id)
@@ -141,16 +152,30 @@ func TestAWorktreeAnotherAgentUsesIsKept(t *testing.T) {
 	}
 }
 
+func TestAnArchivedAgentDoesNotKeepAWorktree(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	dir := repo(t)
+	a, root := laneWorktree(t, d, dir, "restarted")
+	earlier := seeded(t, d, root, inWorktree(dir, root, "agents/restarted"))
+	if err := d.archive(earlier.ID); err != nil {
+		t.Fatal(err)
+	}
+	d.sweeps.Wait()
+	if !isDir(root) {
+		t.Fatal("went while a live agent works there")
+	}
+	archiveAndSweep(t, d, a.ID)
+	if isDir(root) {
+		t.Fatal("an archived agent's record kept the worktree")
+	}
+}
+
 func TestADeletedAgentsWorktreeGoesButItsUnmergedBranchStays(t *testing.T) {
 	d, _ := start(t, t.TempDir())
 	dir := repo(t)
 	a, root := laneWorktree(t, d, dir, "deleted")
 	commitIn(t, root, "work.txt")
 	tip := sweepGit(t, dir, "rev-parse", "agents/deleted")
-	archiveAndSweep(t, d, a.ID)
-	if !isDir(root) {
-		t.Fatal("went on archive, unmerged")
-	}
 	deleteAndSweep(t, d, a.ID)
 	if isDir(root) {
 		t.Fatal("the deleted agent's worktree is still there")
@@ -170,30 +195,6 @@ func TestAWorktreeNotMadeByTheAppIsKept(t *testing.T) {
 	deleteAndSweep(t, d, a.ID)
 	if !isDir(root) || !hasBranch(t, dir, "mine") {
 		t.Fatal("a worktree outside the app's folder went")
-	}
-}
-
-func TestAPullRequestMergedArchiveKeepsUnpushedWork(t *testing.T) {
-	d, _ := start(t, t.TempDir())
-	dir := repo(t)
-	a, root := laneWorktree(t, d, dir, "squashed")
-	commitIn(t, root, "work.txt")
-	by := wire.AgentArchivedReasonByAgent
-	a.State, a.ArchivedReason = wire.AgentStateArchived, &by
-	if err := d.Store.Save(a); err != nil {
-		t.Fatal(err)
-	}
-	// A squash leaves the branch out of main, and no remote has its commit.
-	if _, kept := d.sweepWorktree(a, sweepArchivedMerged); kept == "" || !isDir(root) {
-		t.Fatal("unpushed work went on a merged pull request's archive")
-	}
-	remote := canonical(t.TempDir())
-	sweepGit(t, remote, "init", "-q", "--bare")
-	sweepGit(t, dir, "remote", "add", "origin", remote)
-	sweepGit(t, dir, "push", "-q", "origin", "agents/squashed")
-	said, kept := d.sweepWorktree(a, sweepArchivedMerged)
-	if kept != "" || isDir(root) || !hasBranch(t, dir, "agents/squashed") || !strings.Contains(said, "its branch agents/squashed is kept") {
-		t.Fatal(said, kept)
 	}
 }
 

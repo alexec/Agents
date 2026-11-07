@@ -49,6 +49,39 @@ func TestAgentOnByNumber(t *testing.T) {
 	}
 }
 
+// A Forgejo remote is a forge's too (#3882): a session labelled #n or P#n in a folder that
+// pushes to the same Codeberg repo is on it, and one whose folder pushes to another is not.
+func TestAgentOnAForgejoRemote(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	folder, worktree, other := t.TempDir(), t.TempDir(), t.TempDir()
+	for dir, remote := range map[string]string{
+		folder:   "https://codeberg.org/alex/shop.git",
+		worktree: "git@codeberg.org:alex/shop.git",
+		other:    "https://codeberg.org/alex/other.git",
+	} {
+		gitIn(t, dir, "init", "-q")
+		gitIn(t, dir, "remote", "add", "origin", remote)
+	}
+
+	title := "Fix the cart totals"
+	seeded(t, d, worktree, func(a *wire.Agent) {
+		a.Title = &title
+		a.Labels = []wire.SessionLabel{{Value: "#7"}, {Value: "P#8"}}
+	})
+	seeded(t, d, other, func(a *wire.Agent) {
+		a.Labels = []wire.SessionLabel{{Value: "#9"}}
+	})
+
+	prs, issues, _ := d.agentOnIt(folder)
+	if len(prs) != 1 || prs["8"] != title {
+		t.Errorf("prs: %+v", prs)
+	}
+	if len(issues) != 1 || issues["7"] != title {
+		t.Errorf("issues: %+v", issues)
+	}
+}
+
 // A Linear key is not one folder's own: a session labelled one is on it whichever
 // folder it is in.
 func TestAgentOnByLinearKey(t *testing.T) {
