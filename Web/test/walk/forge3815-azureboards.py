@@ -7,7 +7,9 @@ in memory so the next read shows them; and the project's own WIQL, workitemsbatc
 connectionData (Kim Lee is the token's owner), which the azureboards server's Azure Boards page
 reads (#3826); and the repository acme/Web Shop/shop with one pull request and one Azure
 Pipelines build, which an Azure DevOps folder's set-up reads (#3802), and a no to the token
-"wrong-token". Scratch data only. Point a run-app host at it with a
+"wrong-token"; and that repository's pull requests on the Work pages (#3803): three of them, a
+pull request's threads, builds, a status, its files and their diff, tags, and the writes the
+pages make (a comment, tags, abandon, complete, a vote, a build run again). Scratch data only. Point a run-app host at it with a
 scratch AGENTS_PERSONAL_HOME whose .agents-secrets/secrets.env says
 
     AZURE_DEVOPS_URL=http://127.0.0.1:<port>
@@ -82,6 +84,41 @@ ITEMS = {
 }
 NEXT = [100]
 
+# The repository acme/Web Shop/shop's pull requests (#3803), and what each one's page reads.
+PULLS = {
+    7: {"pullRequestId": 7, "title": "Pay with a saved card", "status": "active", "createdBy": SAM, "creationDate": ago(5),
+        "sourceRefName": "refs/heads/saved-card", "targetRefName": "refs/heads/main", "mergeStatus": "succeeded",
+        "description": "Adds **saved cards** to checkout.\n\nFixes AB#41", "lastMergeSourceCommit": {"commitId": "c7head"},
+        "labels": [{"name": "payments", "active": True}], "reviewers": [{**KIM, "vote": 0}]},
+    8: {"pullRequestId": 8, "title": "Coupon field above the keyboard", "status": "active", "createdBy": KIM, "creationDate": ago(2),
+        "sourceRefName": "refs/heads/coupon", "targetRefName": "refs/heads/main", "mergeStatus": "conflicts", "isDraft": True,
+        "description": "", "lastMergeSourceCommit": {"commitId": "c8head"}, "labels": [], "reviewers": []},
+    6: {"pullRequestId": 6, "title": "Log the dismiss reason", "status": "completed", "createdBy": KIM, "creationDate": ago(30),
+        "closedDate": ago(26), "sourceRefName": "refs/heads/dismiss", "targetRefName": "refs/heads/main", "mergeStatus": "succeeded",
+        "description": "", "lastMergeSourceCommit": {"commitId": "c6head"}, "labels": [{"name": "ux", "active": True}],
+        "reviewers": [{**SAM, "vote": 10}]},
+}
+THREADS = {7: [
+    {"id": 1, "status": "active", "comments": [{"id": 1, "author": KIM, "content": "Does it work with **Apple Pay** too?",
+                                               "publishedDate": ago(4), "commentType": "text"}]},
+    {"id": 2, "status": "active", "comments": [{"id": 1, "author": BOT, "content": "Policy: build validation queued",
+                                               "publishedDate": ago(4.5), "commentType": "system"}]},
+    {"id": 3, "status": "active", "threadContext": {"filePath": "/src/checkout.ts", "rightFileStart": {"line": 3}},
+     "comments": [{"id": 1, "author": KIM, "content": "Name this savedCard", "publishedDate": ago(3.5), "commentType": "text"}]},
+]}
+BUILDS = [{"id": 31, "buildNumber": "20261107.3", "status": "completed", "result": "succeeded", "queueTime": ago(4),
+           "finishTime": ago(3.9), "definition": {"id": 1, "name": "shop-ci"}, "repository": {"id": "r-shop"},
+           "sourceBranch": "refs/heads/main", "_links": {"web": {"href": f"{BASE}/acme/{PROJECT}/_build/results?buildId=31"}}},
+          {"id": 32, "buildNumber": "20261107.4", "status": "completed", "result": "failed", "queueTime": ago(3),
+           "finishTime": ago(2.9), "definition": {"id": 2, "name": "shop-pr"}, "repository": {"id": "r-shop"},
+           "sourceBranch": "refs/pull/7/merge", "triggerInfo": {"pr.number": "7", "pr.sourceSha": "c7head"},
+           "_links": {"web": {"href": f"{BASE}/acme/{PROJECT}/_build/results?buildId=32"}}}]
+STATUSES = {7: [{"id": 1, "state": "succeeded", "description": "No secrets", "targetUrl": "https://scan.example/1",
+                 "creationDate": ago(3), "context": {"genre": "scan", "name": "secrets"}}]}
+FILES = {"c7base:/src/checkout.ts": "export function pay(card) {\n  return charge(card);\n}\n",
+         "c7head:/src/checkout.ts": "export function pay(card, saved) {\n  const card2 = saved ?? card;\n  return charge(card2);\n}\n",
+         "c7head:/src/saved.ts": "export const saved = [];\n"}
+
 
 def full(n):
     it = ITEMS[n]
@@ -144,14 +181,9 @@ class Handler(BaseHTTPRequestHandler):
         if method == "GET" and lower == repo:
             return self.answer({"id": "r-shop", "name": "shop", "defaultBranch": "refs/heads/main",
                                 "webUrl": f"{BASE}/acme/{PROJECT}/_git/shop"})
-        if method == "GET" and lower == repo + "/pullrequests":
-            return self.answer({"value": [{"pullRequestId": 7, "title": "Pay with a saved card", "status": "active",
-                                           "createdBy": SAM, "creationDate": ago(5), "sourceRefName": "refs/heads/saved-card",
-                                           "targetRefName": "refs/heads/main"}]})
-        if method == "GET" and lower == f"/acme/{PROJECT}/_apis/build/builds".lower():
-            return self.answer({"value": [{"id": 31, "buildNumber": "20261107.3", "status": "completed", "result": "succeeded",
-                                           "queueTime": ago(4), "finishTime": ago(3.9), "definition": {"id": 1, "name": "shop-ci"},
-                                           "repository": {"id": "r-shop"}}]})
+        if lower.startswith(repo + "/") or lower.startswith(f"/acme/{PROJECT}/_apis/build/".lower()) or \
+                lower == f"/acme/{PROJECT}/_apis/git/policy/configurations".lower():
+            return self.repos(method, lower[len(repo):] if lower.startswith(repo) else lower, q)
         if method == "POST" and lower in ("/acme/_apis/wit/wiql", project + "wiql"):
             ids = wiql(self.body()["query"])[: int(q.get("$top", ["200"])[0])]
             return self.answer({"workItems": [{"id": n} for n in ids]})
@@ -206,6 +238,89 @@ class Handler(BaseHTTPRequestHandler):
             return self.answer(full(n))
         return self.answer({"message": f"the fixture has no {method} {path}"}, 404)
 
+    def repos(self, method, rest, q):
+        """The repository's pull requests and builds (#3803)."""
+        one = lambda k: q.get(k, [""])[0]
+        if method == "GET" and rest == "/pullrequests":
+            status = one("searchCriteria.status") or "active"
+            out = sorted((p for p in PULLS.values() if status == "all" or p["status"] == status), key=lambda p: -p["pullRequestId"])
+            skip, top = int(one("$skip") or 0), int(one("$top") or 100)
+            return self.answer({"value": out[skip:skip + top]})
+        m = re.fullmatch(r"/pullrequests/(\d+)", rest)
+        if m:
+            p = PULLS.get(int(m.group(1)))
+            if p is None:
+                return self.answer({"message": "TF401180: The requested pull request was not found."}, 404)
+            if method == "PATCH":
+                b = self.body()
+                if b.get("status"):
+                    p["status"] = b["status"]
+                    if b["status"] != "active":
+                        p["closedDate"] = NOW
+                if b.get("autoCompleteSetBy"):
+                    p["autoCompleteSetBy"] = KIM
+            return self.answer(p)
+        m = re.fullmatch(r"/pullrequests/(\d+)/threads", rest)
+        if m:
+            n = int(m.group(1))
+            if method == "POST":
+                c = self.body()["comments"][0]
+                t = {"id": NEXT[0], "status": "active", "comments": [{"id": 1, "author": KIM, "content": c["content"],
+                                                                     "publishedDate": NOW, "commentType": "text"}]}
+                NEXT[0] += 1
+                THREADS.setdefault(n, []).append(t)
+                return self.answer(t)
+            return self.answer({"value": THREADS.get(n, [])})
+        m = re.fullmatch(r"/pullrequests/(\d+)/labels(?:/(.+))?", rest)
+        if m:
+            p = PULLS[int(m.group(1))]
+            if method == "POST":
+                p["labels"].append({"name": self.body()["name"], "active": True})
+            elif method == "DELETE":
+                p["labels"] = [l for l in p["labels"] if l["name"].lower() != m.group(2)]
+            return self.answer({})
+        m = re.fullmatch(r"/pullrequests/(\d+)/reviewers/(.+)", rest)
+        if method == "PUT" and m:
+            p = PULLS[int(m.group(1))]
+            p["reviewers"] = [r for r in p["reviewers"] if r["id"] != KIM["id"]] + [{**KIM, "vote": self.body()["vote"]}]
+            return self.answer({})
+        m = re.fullmatch(r"/pullrequests/(\d+)/statuses", rest)
+        if m:
+            return self.answer({"value": STATUSES.get(int(m.group(1)), [])})
+        m = re.fullmatch(r"/pullrequests/(\d+)/iterations", rest)
+        if m:
+            n = int(m.group(1))
+            return self.answer({"value": [{"id": 1, "sourceRefCommit": {"commitId": f"c{n}head"},
+                                           "commonRefCommit": {"commitId": f"c{n}base"}}]})
+        m = re.fullmatch(r"/pullrequests/(\d+)/iterations/1/changes", rest)
+        if m:
+            changes = [{"changeType": "edit", "item": {"path": "/src/checkout.ts"}}, {"changeType": "add", "item": {"path": "/src/saved.ts"}}]
+            return self.answer({"changeEntries": changes if m.group(1) == "7" else []})
+        if method == "POST" and rest == "/filediffs":
+            return self.answer([{"path": "/src/checkout.ts", "lineDiffBlocks": [
+                {"changeType": "edit", "originalLineNumberStart": 1, "originalLinesCount": 2, "modifiedLineNumberStart": 1,
+                 "modifiedLinesCount": 3}]}])
+        if method == "GET" and rest == "/items":
+            text = FILES.get(one("versionDescriptor.version") + ":" + one("path"))
+            return self.answer({"content": text}) if text is not None else self.answer({"message": "no such file"}, 404)
+        if rest.endswith("/_apis/git/policy/configurations"):
+            return self.answer({"value": [{"isEnabled": True, "settings": {"allowSquash": True, "allowNoFastForward": True}}]})
+        if rest.endswith("/_apis/build/builds") and method == "GET":
+            out = [b for b in reversed(BUILDS) if not one("branchName") or b["sourceBranch"] == one("branchName")]
+            return self.answer({"value": out})
+        m = re.search(r"/_apis/build/builds/(\d+)$", rest)
+        if m and method == "PATCH":
+            b = next(b for b in BUILDS if b["id"] == int(m.group(1)))
+            b["status"], b["result"] = "inProgress", ""
+            return self.answer(b)
+        if re.search(r"/_apis/build/builds/(\d+)/timeline$", rest):
+            return self.answer({"records": [{"id": "j", "type": "Job", "name": "Test"},
+                                            {"id": "t", "parentId": "j", "type": "Task", "name": "npm test", "result": "failed",
+                                             "log": {"id": 4}, "issues": [{"type": "error", "message": "1 test failed"}]}]})
+        if re.search(r"/_apis/build/builds/(\d+)/logs/4$", rest):
+            return self.answer({"value": ["> npm test", "FAIL checkout.test.ts", "  expected saved card"]})
+        return self.answer({"message": f"the fixture has no {method} {rest}"}, 404)
+
     def apply(self, it, ops):
         for op in ops:
             path = op["path"]
@@ -225,6 +340,12 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_PATCH(self):
         self.route("PATCH")
+
+    def do_PUT(self):
+        self.route("PUT")
+
+    def do_DELETE(self):
+        self.route("DELETE")
 
 
 if __name__ == "__main__":

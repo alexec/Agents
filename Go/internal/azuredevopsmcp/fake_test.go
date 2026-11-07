@@ -38,6 +38,10 @@ type fakeAzureDevOps struct {
 	builds     []obj
 	timeline   map[int][]obj // build → its records
 	logs       map[int]string
+	changes    map[int][]obj     // pull request → the files its newest push changes
+	fileDiffs  []obj             // what filediffs answers
+	files      map[string]string // commit:path → the file's text
+	policies   []obj             // the target branch's "Limit merge types" policies
 	me         string
 	posted     []obj // what was POSTed, PATCHed or PUT, with its method and path
 	status     int   // answer every request with this, when set
@@ -48,7 +52,7 @@ type fakeAzureDevOps struct {
 
 func newFake(t *testing.T) *fakeAzureDevOps {
 	f := &fakeAzureDevOps{t: t, threads: map[int][]obj{}, statuses: map[int][]obj{}, iterations: map[int][]obj{}, timeline: map[int][]obj{}, logs: map[int]string{},
-		me: alex["id"].(string)}
+		changes: map[int][]obj{}, files: map[string]string{}, me: alex["id"].(string)}
 	f.server = httptest.NewServer(http.HandlerFunc(f.serve))
 	t.Cleanup(f.server.Close)
 	return f
@@ -129,6 +133,8 @@ var (
 	buildPath      = regexp.MustCompile(`^/acme/Web App/_apis/build/builds/([0-9]+)$`)
 	timelinePath   = regexp.MustCompile(`^/acme/Web App/_apis/build/builds/([0-9]+)/timeline$`)
 	logPath        = regexp.MustCompile(`^/acme/Web App/_apis/build/builds/([0-9]+)/logs/([0-9]+)$`)
+	labelsPath     = regexp.MustCompile(`^` + gitRoot + `/pullRequests/([0-9]+)/labels(?:/[^/]+)?$`)
+	changesPath    = regexp.MustCompile(`^` + gitRoot + `/pullRequests/([0-9]+)/iterations/([0-9]+)/changes$`)
 )
 
 func (f *fakeAzureDevOps) serve(w http.ResponseWriter, r *http.Request) {
@@ -163,8 +169,8 @@ func (f *fakeAzureDevOps) serve(w http.ResponseWriter, r *http.Request) {
 		if items == nil {
 			items = []obj{}
 		}
-		if q.Get("$skip") != "" && q.Get("$skip") != "0" {
-			items = []obj{}
+		if skip, _ := strconv.Atoi(q.Get("$skip")); skip > 0 {
+			items = items[min(skip, len(items)):]
 		}
 		reply(obj{"count": len(items), "value": items})
 	}
@@ -173,6 +179,9 @@ func (f *fakeAzureDevOps) serve(w http.ResponseWriter, r *http.Request) {
 		var body obj
 		data, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(data, &body)
+		if body == nil {
+			body = obj{}
+		}
 		body["_method"], body["_path"] = r.Method, p
 		f.posted = append(f.posted, body)
 		switch {
@@ -183,6 +192,12 @@ func (f *fakeAzureDevOps) serve(w http.ResponseWriter, r *http.Request) {
 			reply(obj{"id": 77})
 		case replyPath.MatchString(p):
 			reply(obj{"id": 2})
+		case labelsPath.MatchString(p):
+			reply(obj{"name": body["name"], "active": true})
+		case p == gitRoot+"/filediffs":
+			reply(f.fileDiffs)
+		case buildPath.MatchString(p):
+			reply(obj{"id": n(buildPath.FindStringSubmatch(p)), "_links": obj{"web": obj{"href": "https://ado.test/build"}}})
 		case pullPath.MatchString(p), reviewerPath.MatchString(p):
 			reply(obj{})
 		default:
@@ -227,6 +242,17 @@ func (f *fakeAzureDevOps) serve(w http.ResponseWriter, r *http.Request) {
 		list(f.threads[n(threadsPath.FindStringSubmatch(p))])
 	case statusesPath.MatchString(p):
 		list(f.statuses[n(statusesPath.FindStringSubmatch(p))])
+	case changesPath.MatchString(p):
+		reply(obj{"changeEntries": f.changes[n(changesPath.FindStringSubmatch(p))]})
+	case p == gitRoot+"/items":
+		text, ok := f.files[q.Get("versionDescriptor.version")+":"+q.Get("path")]
+		if !ok {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		reply(obj{"path": q.Get("path"), "content": text})
+	case p == "/acme/Web App/_apis/git/policy/configurations":
+		list(f.policies)
 	case iterationsPath.MatchString(p):
 		list(f.iterations[n(iterationsPath.FindStringSubmatch(p))])
 	case p == "/acme/Web App/_apis/build/builds":

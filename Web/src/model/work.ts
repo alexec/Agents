@@ -306,7 +306,7 @@ export function errorWords(e: ForgeListError, machine: string | undefined): stri
 }
 
 export const forgeTitle: Record<string, string> = { github: "GitHub", gitlab: "GitLab", linear: "Linear", jira: "Jira",
-  azureboards: "Azure Boards", forgejo: "Forgejo", bitbucket: "Bitbucket" };
+  azureboards: "Azure Boards", forgejo: "Forgejo", bitbucket: "Bitbucket", azuredevops: "Azure DevOps" };
 
 /** "Open on GitHub", by the ref's forge. */
 export function openOnWords(ref: string): string {
