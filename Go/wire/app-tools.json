@@ -823,6 +823,35 @@
     "title": "Bring a branch back"
   },
   {
+    "description": "Move a session, with its unpushed work, to another of the person's machines (list_machines names them), where it goes on: yourself when your work needs that machine (more CPU, a machine that stays on, the person's laptop closing), or a session you started here. The person is asked first, on your question card, unless the folder's settings let agents start sessions on machines without asking.\n\nThe branch it works on goes there first, with its commits and its uncommitted changes, into the folder there, as start_session with send does: the folder is made there when it is not there yet, and a folder there with work of its own stops the move before anything changes. Then the session goes on there with the same id, labels, transcript and runtime, in that folder on that branch; its runtime reads the app's record of the conversation, since the runtime's own copy stays here. This machine then lets it go. Yourself, you move when this turn ends, and carry on there; a session you started is stopped first if it is working, and carries on there if it was. The machine has to be running; start it with start_machine first. Only a session in a Git repository, on a branch, can move.",
+    "inputSchema": {
+      "properties": {
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
+        },
+        "folder": {
+          "description": "Optional. The folder on that machine, as an absolute path, such as /home/me/project. Leave it out for the project's folder there.",
+          "type": "string"
+        },
+        "machine": {
+          "description": "The machine, by its name as list_machines gives it.",
+          "type": "string"
+        },
+        "session": {
+          "description": "Optional. The id of a session you started here, from start_session or list_sessions. Leave it out to move yourself.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "machine"
+      ],
+      "type": "object"
+    },
+    "name": "move_session",
+    "title": "Move a session to another machine"
+  },
+  {
     "description": "Take back the one message you have waiting for another session in this project on this machine, by its id or exact title. It says when nothing is waiting: already read, or nothing was sent. Only your own queued message is removed.",
     "inputSchema": {
       "properties": {

@@ -133,7 +133,9 @@ public enum AppTool {
     public static let deleteMachine = "delete_machine"
     /// Bring a branch back from a folder on another machine, once the person says yes.
     public static let bringBack = "bring_back"
-    public static let machineTools = [listMachines, startMachine, stopMachine, makeMachine, deleteMachine, bringBack]
+    /// Move a session, with its unpushed work, to another machine, once the person says yes (#3717).
+    public static let moveSession = "move_session"
+    public static let machineTools = [listMachines, startMachine, stopMachine, makeMachine, deleteMachine, bringBack, moveSession]
 
     // Seven for the agent that writes a provider's tool map or commands (#858). Offered to
     // that agent alone, and it is offered nothing else. None ends with another tool's name.

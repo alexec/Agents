@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/controlplane/audit"
+	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -25,7 +26,8 @@ import (
 //     when its host has no record;
 //   - v1/governance/requests/<id>.json: at most 10 waiting per person and 1000 in all; a
 //     decided one goes after 30 days;
-//   - v1/governance/approvals/<hash>.json: at most 1000.
+//   - v1/governance/approvals/<hash>.json: at most 1000; one goes with its person or group
+//     (#3748).
 //
 // Policy's marketplace allowlist (#998) still says what a machine may install: an approval
 // is the admin's answer and its record, not a change to the allowlist.
@@ -402,6 +404,54 @@ func (s *Service) keepApproval(ctx context.Context, a wire.CatalogApproval) erro
 	data, _ := json.Marshal(a)
 	if _, err := s.cfg.Store.Put(ctx, key, data, store.Always); err != nil {
 		return fail(storeUnavailable, "The approval could not be kept: %v", err)
+	}
+	return nil
+}
+
+// sweepApprovals deletes the approvals of a person or a group that is gone (#3748): removed,
+// or with no record in the store at all, so not one this copy has not read yet. An
+// approval of one that is still there stays until an admin takes it back.
+func (s *Service) sweepApprovals(ctx context.Context) error {
+	keys, err := s.cfg.Store.List(ctx, governanceApprovalPrefix)
+	if err != nil {
+		return err
+	}
+	gone := func(key string) (bool, error) {
+		object, err := s.cfg.Store.Get(ctx, key)
+		if err != nil || object == nil {
+			return object == nil, err
+		}
+		var mark struct {
+			Removed *bool `json:"removed"`
+		}
+		return json.Unmarshal(object.Data, &mark) == nil && mark.Removed != nil && *mark.Removed, nil
+	}
+	for _, k := range keys {
+		object, err := s.cfg.Store.Get(ctx, k.Key)
+		if err != nil {
+			return err
+		}
+		var a wire.CatalogApproval
+		if object == nil || json.Unmarshal(object.Data, &a) != nil {
+			continue
+		}
+		var key string
+		switch {
+		case a.Group != nil && s.records.Group(*a.Group) == nil:
+			key = records.GroupKey(*a.Group)
+		case a.User != nil && *a.User != s.localOwner() &&
+			(s.records.Person(*a.User) == nil || s.records.Person(*a.User).IsRemoved()):
+			key = records.PersonKey(*a.User)
+		default:
+			continue
+		}
+		if went, err := gone(key); err != nil {
+			return err
+		} else if went {
+			if err := s.cfg.Store.Delete(ctx, k.Key); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

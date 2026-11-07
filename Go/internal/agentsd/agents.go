@@ -532,17 +532,7 @@ func (d *Daemon) deleteArchived(a *wire.Agent, because string) error {
 // deleteArchivedThen is deleteArchived, with erase to queue the runtime's copy: a sweep
 // collects them, to queue many at once (#2427).
 func (d *Daemon) deleteArchivedThen(a *wire.Agent, because string, erase func(*wire.Agent)) error {
-	d.mu.Lock()
-	l := d.lives[a.ID]
-	delete(d.lives, a.ID)
-	d.mu.Unlock()
-	if l != nil {
-		l.halt()
-	}
-	d.dropAppTokens(a.ID)
-	d.dropStandIn(a.ID)
-	d.dropSessionSecrets(a.ID)
-	d.forgetAgentInMemory(a.ID)
+	d.forgetLive(a.ID)
 	if err := d.Store.Delete(a.ID); err != nil {
 		return &Error{Code: wire.FailureCouldNotSave, Message: "The agent could not be deleted: " + err.Error()}
 	}
@@ -558,6 +548,22 @@ func (d *Daemon) deleteArchivedThen(a *wire.Agent, because string, erase func(*w
 	d.folderChanged(folderPath(a))
 	d.sweepWorktreeSoon(*a, sweepDeleted)
 	return nil
+}
+
+// forgetLive halts an agent that is going from this machine, and drops what it holds in
+// memory: its runtime, tokens, stand-in and secrets.
+func (d *Daemon) forgetLive(id wire.UUID) {
+	d.mu.Lock()
+	l := d.lives[id]
+	delete(d.lives, id)
+	d.mu.Unlock()
+	if l != nil {
+		l.halt()
+	}
+	d.dropAppTokens(id)
+	d.dropStandIn(id)
+	d.dropSessionSecrets(id)
+	d.forgetAgentInMemory(id)
 }
 
 // setOption is agents/setOption: to the live session when there is one, and kept as a

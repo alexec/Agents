@@ -93,7 +93,7 @@ The person can start again later: each step checks what is already there and ski
 | GitHub | nothing more: they are signed in | makes the repository, the environments and the reviewers | — |
 | Apple | enrols in the Apple Developer Program and pays; makes the app's record in App Store Connect; makes a team API key and downloads it | registers the bundle id with the key, from a one-time CI job | secrets `ASC_KEY_P8`, `ASC_KEY_ID`, `ASC_ISSUER_ID` |
 | Google Cloud | signs up and gives a card; runs the starter's set-up script in Cloud Shell, which makes the project, the deploy service account and Workload Identity Federation | reads the two names the script prints | variables `GCP_WIF_PROVIDER`, `GCP_DEPLOY_SA` (no secret) |
-| Sentry | signs up (the free plan needs no card); signs in to Sentry's MCP server; makes an organization auth token | makes the project and its DSN with Sentry's MCP server; adds Sentry events (#3583) | variable `SENTRY_DSN`; secret `SENTRY_AUTH_TOKEN` (debug symbols and source maps) |
+| Sentry | signs up (the free plan needs no card); signs in to Sentry's MCP server; makes an organization auth token | makes the project and its DSN with Sentry's MCP server; adds Sentry events (#3583) | variable `SENTRY_DSN`; for an iPhone app, also variable `SENTRY_PROJECT` and secret `SENTRY_AUTH_TOKEN` (debug symbols; [sentry.md](sentry.md)) |
 
 - **Apple signing has 3 secrets, not 9.** The starter's `release.yml` uses Xcode's
   cloud-managed signing: `xcodebuild -allowProvisioningUpdates` with the API key's
@@ -164,9 +164,9 @@ The lead owns the plan from here.
 | 1 | #3706 CI secrets, variables and gates as app tools: `set_ci_secret`, `set_ci_variable`, `set_environment_gate` (GitHub) | task | — |
 | 1 | #3707 Starters: an iPhone app (TestFlight and App Store with cloud-managed signing) and a web service (Cloud Run), each with Sentry, under `templates/` | task | — |
 | 2 | #3708 A repository from a starter: made on GitHub, cloned on the machine, shown as a folder | story | #3707 |
-| 3 | #3709 Apple: the cards, the key as a CI secret, the bundle id from a one-time CI job | story | #3706, #3708 |
-| 3 | #3710 Google Cloud: the Cloud Shell card and the two variables | story | #3706, #3708 |
-| 3 | #3711 Sentry: the cards, the project and DSN, the token as a CI secret | story | #3706, #3708 |
+| 3 | #3709 Apple: the cards, the key as a CI secret, the bundle id from a one-time CI job ([apple.md](apple.md)) | story | #3706, #3708 |
+| 3 | #3710 Google Cloud: the Cloud Shell card and the two variables ([google-cloud.md](google-cloud.md)) | story | #3706, #3708 |
+| 3 | #3711 Sentry: the cards, the project and DSN, the token as a CI secret ([sentry.md](sentry.md)) | story | #3706, #3708 |
 | 4 | #3712 `start-a-new-app`: the ready-made skill and its brief line, from the first question to the approved first deploy | story | #3709, #3710, #3711 |
 
 Later, filed by the lead when the flow works: GitLab as the forge; Android (Google Play)

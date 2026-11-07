@@ -945,10 +945,11 @@ func promptNumber(entries []wire.TranscriptEntry) int {
 }
 
 // branchPreface is what a branch's runtime reads ahead of its first prompt: the record it
-// was branched with, as read_session writes a session. Nil for any other agent, and once
-// the branch has a conversation of its own.
+// was branched with, as read_session writes a session. So does the runtime of a session that
+// moved here from another machine (#3717), whose own conversation stayed there. Nil for any
+// other agent, and once it has a conversation of its own.
 func (d *Daemon) branchPreface(a *wire.Agent) *string {
-	if a.BranchedFrom == nil || a.RuntimeSessionID != nil {
+	if a.BranchedFrom == nil && a.MovedFrom == nil || a.RuntimeSessionID != nil {
 		return nil
 	}
 	entries, _, err := d.Store.Transcript(a.ID, 0)
@@ -958,6 +959,10 @@ func (d *Daemon) branchPreface(a *wire.Agent) *string {
 	header := "This conversation goes on from an earlier one: the person branched it from just before one of their prompts. " +
 		"Below is the app's record of that conversation up to there. Carry on from it as if it were your own; " +
 		"the person's next words follow it.\n\n"
+	if a.BranchedFrom == nil {
+		header = "This conversation goes on from " + a.MovedFrom.Machine + ": it moved to this machine, and the runtime there kept its own copy. " +
+			"Below is the app's record of it. Carry on from it as if it were your own; the next words follow it.\n\n"
+	}
 	p := history(a, entries, header)
 	return &p
 }

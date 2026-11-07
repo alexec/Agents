@@ -13,6 +13,7 @@ import { placedSessions } from "../model/overview";
 import { searchFound } from "../model/search";
 import { navTitle } from "../model/nav";
 import { initialOf, type Crumb } from "../model/crumbs";
+import { reportProblem } from "./ReportProblemDialog";
 
 /** "/" goes to the search field, when the focus is not in a field, as a web console's does. */
 function useSlashKey(field: { current: HTMLInputElement | null }, open: () => void) {
@@ -110,6 +111,7 @@ export function PersonMenu({ store, session }: { store: Store; session: Session 
             {role && <span class="quiet small">{role}</span>}
           </div>
           <button type="button" role="menuitem" onClick={() => { open.value = false; go({ nav: "settings" }); }}>Settings</button>
+          <button type="button" role="menuitem" onClick={() => { open.value = false; reportProblem(); }}>Report a Problem…</button>
           {confirming.value ? (
             <div class="forget" role="group" aria-label="Forget This Browser">
               <p class="small">This browser is cut off at once, at home and away, until it is paired again.</p>

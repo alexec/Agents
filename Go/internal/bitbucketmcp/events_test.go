@@ -1,0 +1,339 @@
+package bitbucketmcp
+
+import (
+	"context"
+	"encoding/json"
+	"strings"
+	"testing"
+
+	"github.com/alexec/agents/Go/internal/gitlabmcp"
+)
+
+// The events over the fake Bitbucket: the gitlab server's names, the trust filter (#728), and
+// each one raised once from what Bitbucket says.
+
+func TestTheEventsAreTheGitLabServersNames(t *testing.T) {
+	same(t, EventNames(), gitlabmcp.EventNames())
+}
+
+func TestOpenedIsRaisedWhenReadyAndOnlyForTheReposOwn(t *testing.T) {
+	f := newFake(t)
+	f.pulls = []obj{pull(1, "old", alex, nil)}
+	own := newPoller(t, f, "pr.opened", nil)
+	anyone := newPoller(t, f, "pr.opened", map[string]any{"anyone": true})
+	ids, _ := own.poll()
+	same(t, ids, []string(nil)) // the first poll takes what is open as known
+	anyone.poll()
+
+	f.set(func() {
+		f.pulls = append(f.pulls,
+			pull(2, "feature", dev, obj{"description": "Fixes #12 and closes other/repo#3"}),
+			pull(3, "draft", alex, obj{"draft": true}),
+			pull(4, "fork", alex, obj{"source": obj{"branch": obj{"name": "fork"}, "commit": obj{"hash": "s4"}, "repository": obj{"full_name": "alex/app"}}}),
+			pull(5, "outside", stranger, nil),
+			pull(6, "bot", renovate, nil),
+			pull(7, "reader", reader, nil),
+			pull(8, "app", pipelines, nil))
+	})
+	ids, result := own.poll()
+	if len(ids) != 1 || !strings.HasPrefix(ids[0], "pr.opened:acme/app:2:") {
+		t.Fatalf("own: %v", ids)
+	}
+	pr := data(t, result, 0)["pr"].(map[string]any)
+	if pr["author"] != "dev" || pr["branch"] != "feature" || pr["number"] != 2 || pr["url"] != "https://bitbucket.org/acme/app/pull-requests/2" {
+		t.Fatalf("pr %v", pr)
+	}
+	same(t, pr["fixes"], []string{"#12", "other/repo#3"})
+	ids, _ = anyone.poll()
+	if len(ids) != 6 {
+		t.Fatalf("anyone: %v", ids)
+	}
+
+	// The draft marked ready is raised; nothing else again.
+	f.set(func() { f.pulls[2]["draft"] = false })
+	ids, _ = own.poll()
+	if len(ids) != 1 || !strings.HasPrefix(ids[0], "pr.opened:acme/app:3:") {
+		t.Fatalf("ready: %v", ids)
+	}
+	ids, _ = own.poll()
+	same(t, ids, []string(nil))
+}
+
+func TestAnAdminlessTokenTrustsTheWorkspacesMembers(t *testing.T) {
+	f := newFake(t)
+	f.adminless = true
+	f.members["a-dev"] = true
+	own := newPoller(t, f, "pr.opened", nil)
+	own.poll()
+	f.set(func() { f.pulls = []obj{pull(1, "a", dev, nil), pull(2, "b", stranger, nil)} })
+	ids, _ := own.poll()
+	if len(ids) != 1 || !strings.HasPrefix(ids[0], "pr.opened:acme/app:1:") {
+		t.Fatalf("adminless: %v", ids)
+	}
+}
+
+func TestAPersonWithNoLineOfTheirOwnFallsToTheWorkspace(t *testing.T) {
+	f := newFake(t)
+	delete(f.perms, "a-dev") // given access by the workspace, not the repository
+	f.members["a-dev"] = true
+	own := newPoller(t, f, "pr.opened", nil)
+	own.poll()
+	f.set(func() { f.pulls = []obj{pull(1, "a", dev, nil), pull(2, "b", reader, nil)} })
+	ids, _ := own.poll()
+	// reader has a line of their own, read: not trusted, member or not.
+	if len(ids) != 1 || !strings.HasPrefix(ids[0], "pr.opened:acme/app:1:") {
+		t.Fatalf("workspace: %v", ids)
+	}
+}
+
+func TestConflictedIsAFileInConflict(t *testing.T) {
+	f := newFake(t)
+	f.pulls = []obj{pull(1, "feature", dev, nil)}
+	f.diffstat[1] = []obj{{"status": "modified"}}
+	p := newPoller(t, f, "pr.conflicted", nil)
+	p.poll()
+	f.set(func() { f.diffstat[1] = []obj{{"status": "modified"}, {"status": "merge conflict"}} })
+	ids, result := p.poll()
+	if len(ids) != 1 || data(t, result, 0)["pr"].(map[string]any)["number"] != 1 {
+		t.Fatalf("conflicted: %v", ids)
+	}
+	ids, _ = p.poll()
+	same(t, ids, []string(nil))
+	// Clean again, then in conflict anew: a new event.
+	f.set(func() { f.diffstat[1] = []obj{{"status": "modified"}} })
+	p.poll()
+	f.set(func() { f.diffstat[1] = []obj{{"status": "local deleted"}} })
+	ids, _ = p.poll()
+	if len(ids) != 1 {
+		t.Fatalf("conflicted anew: %v", ids)
+	}
+}
+
+func TestMergedAndDeclinedAtTheirActivitysTime(t *testing.T) {
+	f := newFake(t)
+	f.pulls = []obj{pull(1, "old", dev, obj{"state": "MERGED", "updated_on": at(-5)})}
+	merged := newPoller(t, f, "pr.merged", nil)
+	closed := newPoller(t, f, "pr.closed", nil)
+	merged.poll()
+	closed.poll()
+	f.set(func() {
+		f.pulls = append(f.pulls,
+			pull(2, "done", dev, obj{"state": "MERGED", "updated_on": at(1), "merge_commit": obj{"hash": "m2"}}),
+			pull(3, "dropped", dev, obj{"state": "DECLINED", "updated_on": at(1)}),
+			pull(4, "fork", dev, obj{"state": "MERGED", "updated_on": at(1),
+				"source": obj{"branch": obj{"name": "fork"}, "commit": obj{"hash": "s4"}, "repository": obj{"full_name": "dev/app"}}}))
+		f.activity[2] = []obj{{"update": obj{"state": "MERGED", "date": at(1)}}, {"update": obj{"state": "OPEN", "date": at(-9)}}}
+		f.activity[3] = []obj{{"update": obj{"state": "DECLINED", "date": at(1)}}}
+	})
+	ids, result := merged.poll()
+	same(t, ids, []string{"pr.merged:acme/app:2"})
+	same(t, data(t, result, 0)["mergeSha"], "m2")
+	ids, _ = closed.poll()
+	if len(ids) != 1 || !strings.HasPrefix(ids[0], "pr.closed:acme/app:3:") {
+		t.Fatalf("closed: %v", ids)
+	}
+	// A comment after the merge moves updated_on, not the merge: nothing again.
+	f.set(func() { f.pulls[1]["updated_on"] = at(3) })
+	ids, _ = merged.poll()
+	same(t, ids, []string(nil))
+}
+
+func TestChecksFailedForAPullRequestsHead(t *testing.T) {
+	f := newFake(t)
+	f.pulls = []obj{pull(1, "feature", dev, nil), pull(2, "green", dev, nil)}
+	p := newPoller(t, f, "checks.failed", nil)
+	p.poll()
+	run := "https://bitbucket.org/acme/app/pipelines/results/12/steps/%7Bstep%7D"
+	f.set(func() {
+		f.statuses["sha1"] = []obj{
+			{"key": "pipeline-1", "name": "Pipeline #12 for feature", "state": "FAILED", "url": run, "updated_on": at(1)},
+			{"key": "lint", "name": "", "state": "SUCCESSFUL", "url": "https://ci.test/lint", "updated_on": at(1)},
+		}
+		f.statuses["sha2"] = []obj{{"key": "pipeline-2", "state": "SUCCESSFUL", "updated_on": at(1)}}
+	})
+	ids, result := p.poll()
+	same(t, ids, []string{"checks.failed:acme/app:sha1:" + timeString(start.Add(60e9))})
+	d := data(t, result, 0)
+	same(t, d["headSha"], "sha1")
+	same(t, d["run"], map[string]any{"id": 12, "name": "Pipeline #12 for feature", "url": run})
+	same(t, d["failedJobs"], []any{map[string]any{"name": "Pipeline #12 for feature", "url": run}})
+	ids, _ = p.poll()
+	same(t, ids, []string(nil))
+	// Run again and failed again: a new one.
+	f.set(func() { f.statuses["sha1"][0]["updated_on"] = at(3) })
+	ids, _ = p.poll()
+	if len(ids) != 1 {
+		t.Fatalf("again: %v", ids)
+	}
+}
+
+func TestIssueEvents(t *testing.T) {
+	f := newFake(t)
+	opened := newPoller(t, f, "issue.opened", nil)
+	commented := newPoller(t, f, "issue.commented", nil)
+	closed := newPoller(t, f, "issue.closed", nil)
+	labelled := newPoller(t, f, "issue.labelled", map[string]any{"label": "agent"})
+	for _, p := range []*poller{opened, commented, closed, labelled} {
+		p.poll()
+	}
+	f.set(func() {
+		f.issues = []obj{
+			issue(1, dev, obj{"created_on": at(1), "updated_on": at(1), "component": obj{"name": "agent"}}),
+			issue(2, stranger, obj{"created_on": at(1), "updated_on": at(1)}),
+			issue(3, dev, obj{"state": "resolved", "created_on": at(-5), "updated_on": at(1)}),
+		}
+		f.issueComments[2] = []obj{
+			comment(10, dev, "Seen it.", at(1), nil),
+			comment(11, dev, "", at(1), nil), // a change's own comment, with no words
+			comment(12, stranger, "Me too.", at(1), nil),
+		}
+		f.changes[1] = []obj{
+			{"id": 20, "user": dev, "created_on": at(1), "changes": obj{"component": obj{"old": "", "new": "agent"}}},
+			{"id": 21, "user": dev, "created_on": at(1), "changes": obj{"priority": obj{"old": "major", "new": "minor"}}},
+		}
+		f.changes[3] = []obj{{"id": 30, "user": alex, "created_on": at(1), "changes": obj{"state": obj{"old": "open", "new": "resolved"}}}}
+	})
+	ids, result := opened.poll()
+	same(t, ids, []string{"issue.opened:acme/app:1"})
+	same(t, data(t, result, 0)["issue"].(map[string]any)["labels"], []string{"bug", "agent"})
+	ids, result = commented.poll()
+	same(t, ids, []string{"issue.commented:acme/app:10"})
+	same(t, data(t, result, 0)["comment"], map[string]any{"author": "dev", "url": "https://bitbucket.org/c/10", "body": "Seen it."})
+	ids, result = closed.poll()
+	same(t, ids, []string{"issue.closed:acme/app:3:" + timeString(start.Add(60e9))})
+	same(t, data(t, result, 0)["by"], "alex")
+	ids, result = labelled.poll()
+	same(t, ids, []string{"issue.labelled:acme/app:label:20:component"})
+	same(t, data(t, result, 0)["label"], "agent")
+}
+
+func TestAnIssueTrackerThatIsOffHasNoEvents(t *testing.T) {
+	f := newFake(t)
+	f.noTracker = true
+	p := newPoller(t, f, "issue.opened", nil)
+	p.poll()
+	ids, _ := p.poll()
+	same(t, ids, []string(nil))
+	a := newPoller(t, f, "issue.assigned", nil)
+	a.poll()
+	ids, _ = a.poll()
+	same(t, ids, []string(nil))
+}
+
+func TestReviewCommentIsALineOfTheDiff(t *testing.T) {
+	f := newFake(t)
+	f.pulls = []obj{pull(1, "feature", alex, nil)}
+	p := newPoller(t, f, "review.comment", nil)
+	p.poll()
+	f.set(func() {
+		f.pulls[0]["updated_on"] = at(1)
+		f.prComments[1] = []obj{
+			comment(41, dev, "Rename this.", at(1), obj{"inline": obj{"path": "main.go", "to": 12}}),
+			comment(42, stranger, "Spam.", at(1), obj{"inline": obj{"path": "main.go", "to": 3}}),
+			comment(43, dev, "Looks good overall.", at(1), nil),
+			comment(44, dev, "Old line.", at(1), obj{"inline": obj{"path": "old.go", "from": 7}}),
+		}
+	})
+	ids, result := p.poll()
+	same(t, ids, []string{"review.comment:acme/app:41", "review.comment:acme/app:44"})
+	same(t, data(t, result, 0)["comment"], map[string]any{"id": 41, "author": "dev", "path": "main.go", "line": 12, "body": "Rename this.",
+		"url": "https://bitbucket.org/c/41"})
+	same(t, data(t, result, 1)["comment"].(map[string]any)["line"], 7)
+}
+
+func TestReviewRequestedAndAssignedAreTheOwnersAndRaisedOnce(t *testing.T) {
+	f := newFake(t)
+	requested := newPoller(t, f, "review.requested", nil)
+	assigned := newPoller(t, f, "issue.assigned", nil)
+	requested.poll()
+	assigned.poll()
+	f.set(func() {
+		f.pulls = []obj{pull(1, "a", stranger, obj{"reviewers": []any{alex}}), pull(2, "b", dev, obj{"reviewers": []any{dev}})}
+		f.issues = []obj{issue(3, stranger, obj{"assignee": alex}), issue(4, dev, obj{"assignee": dev})}
+	})
+	ids, _ := requested.poll()
+	if len(ids) != 1 || !strings.HasPrefix(ids[0], "review.requested:acme/app:1:") {
+		t.Fatalf("requested: %v", ids)
+	}
+	ids, result := assigned.poll()
+	if len(ids) != 1 || !strings.HasPrefix(ids[0], "issue.assigned:acme/app:3:") {
+		t.Fatalf("assigned: %v", ids)
+	}
+	same(t, data(t, result, 0)["issue"].(map[string]any)["assignees"], []string{"alex"})
+	ids, _ = requested.poll()
+	same(t, ids, []string(nil))
+}
+
+func TestMineIsOnlyTheOwnersPullRequests(t *testing.T) {
+	f := newFake(t)
+	f.pulls = []obj{pull(1, "mine", alex, nil), pull(2, "theirs", dev, nil)}
+	p := newPoller(t, f, "pr.conflicted", map[string]any{"mine": true})
+	p.poll()
+	f.set(func() {
+		f.diffstat[1], f.diffstat[2] = []obj{{"status": "merge conflict"}}, []obj{{"status": "merge conflict"}}
+	})
+	ids, _ := p.poll()
+	if len(ids) != 1 || !strings.HasPrefix(ids[0], "pr.conflicted:acme/app:1:") {
+		t.Fatalf("mine: %v", ids)
+	}
+}
+
+func TestAnAPITokenSignsInWithItsEmail(t *testing.T) {
+	f := newFake(t)
+	f.email = "alex@example.com"
+	p := newPoller(t, f, "pr.merged", nil)
+	p.poll()
+	if ids, _ := p.poll(); ids != nil {
+		t.Fatalf("ids: %v", ids)
+	}
+}
+
+func TestFailuresAreTheDraftsErrors(t *testing.T) {
+	f := newFake(t)
+	p := newPoller(t, f, "pr.merged", nil)
+	p.poll()
+	f.set(func() { f.status = 429 })
+	raw, _ := json.Marshal(map[string]any{"name": "pr.merged", "cursor": p.cursor})
+	_, err := p.events.Poll(context.Background(), raw)
+	if err == nil || err.Code != -32013 || err.Data["retryAfterMs"] != 7000 {
+		t.Fatalf("rate limited: %+v", err)
+	}
+	f.set(func() { f.status = 401 })
+	if _, err = p.events.Poll(context.Background(), raw); err == nil || err.Code != -32012 {
+		t.Fatalf("not signed in: %+v", err)
+	}
+	f.set(func() { f.status = 403 })
+	if _, err = p.events.Poll(context.Background(), raw); err == nil || err.Code != -32603 || !strings.Contains(err.Message, "HTTP 403: no") {
+		t.Fatalf("refused: %+v", err)
+	}
+	raw, _ = json.Marshal(map[string]any{"name": "pr.merged", "arguments": map[string]any{"repo": "no-slash"}})
+	if _, err = p.events.Poll(context.Background(), raw); err == nil || err.Code != -32602 {
+		t.Fatalf("bad repo: %+v", err)
+	}
+	raw, _ = json.Marshal(map[string]any{"name": "pr.labelled"})
+	if _, err = p.events.Poll(context.Background(), raw); err == nil || err.Code != -32011 {
+		t.Fatalf("no such event: %+v", err)
+	}
+}
+
+func TestRepoOfRemote(t *testing.T) {
+	for _, c := range []struct{ remote, want string }{
+		{"https://alex@bitbucket.org/acme/app.git", "acme/app"},
+		{"https://bitbucket.org/acme/app", "acme/app"},
+		{"git@bitbucket.org:acme/app.git", "acme/app"},
+		{"ssh://git@bitbucket.org/acme/app.git", "acme/app"},
+		{"https://github.com/acme/app", ""},
+		{"https://bitbucket.org/acme/sub/app", ""},
+	} {
+		got, _ := RepoOfRemote(c.remote)
+		if got != c.want {
+			t.Errorf("%s: got %q, want %q", c.remote, got, c.want)
+		}
+	}
+}
+
+func TestBaseURL(t *testing.T) {
+	same(t, BaseURL(""), "https://api.bitbucket.org/2.0/")
+	same(t, BaseURL("http://localhost:3000"), "http://localhost:3000/")
+	same(t, BaseURL("api.example.com/2.0/"), "https://api.example.com/2.0/")
+}

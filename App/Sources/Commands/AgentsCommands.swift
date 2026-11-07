@@ -39,6 +39,9 @@ final class WindowRequests {
     /// Open File… is up over the window (#415), searching the open session's folders.
     var showsFileSearch = false
 
+    /// Help ▸ Report a Problem… is up over the window (#3718).
+    var showsReportProblem = false
+
     /// The Project Settings pane showing, or nil while the sheet is shut (066, #3280). Set
     /// by the folder's context menu, the menu bar and the folder's banner, and taken down by
     /// the sheet's Done. The project is the selected folder's.
@@ -377,6 +380,8 @@ struct AgentsCommands: Commands {
         CommandGroup(replacing: .help) {
             Button("Agents Help") { NSWorkspace.shared.open(HelpSite.url) }  // store-ok: a web page
                 .keyboardShortcut("?")
+            Divider()
+            Button("Report a Problem…") { requests.showsReportProblem = true }
         }
     }
 

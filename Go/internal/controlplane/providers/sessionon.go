@@ -134,7 +134,9 @@ func (p *Providers) sessionEnded(fromName string, params json.RawMessage, caller
 // folders/receiveUpload, or folders/receive, which makes the copy. Or one step of its
 // bring_back (#2947), the reverse, as Bring Back from ‹machine›… does: that machine's
 // folders/sendFacts, folders/sendPack, which makes the bundle, or a part of it with
-// folders/sendRead. Only an online machine takes it; nothing of a send is kept.
+// folders/sendRead. Or the last step of its move_session (#3717), after the branch and the
+// session's export: that machine's agents/moveIn, which has the session go on there. Only an
+// online machine takes it; nothing of a send is kept.
 func (p *Providers) sendFolder(fromName, agent string, params json.RawMessage, caller Caller, deliver *wire.LockDelivery) (any, error) {
 	var request wire.MachineFolderSend
 	if err := requireParams(params, &request, "MachineFolderSend", "host"); err != nil {
@@ -176,8 +178,15 @@ func (p *Providers) sendFolder(fromName, agent string, params json.RawMessage, c
 		out.Read = &wire.SendRead{}
 		method, step, answer, steps = MethodSendRead, request.Read, out.Read, steps+1
 	}
+	if request.MoveIn != nil {
+		// The machine it leaves is as the control plane knows it, as for agents/start.
+		in := *request.MoveIn
+		in.From.Machine, in.From.Who = fromName, agent
+		method, step, steps = MethodAgentsMoveIn, in, steps+1
+		p.log(fmt.Sprintf("workspace: agent %s on %s moves a session to %s, in %s", agent, fromName, name, in.Folder))
+	}
 	if steps != 1 {
-		return nil, invalid("Give exactly one of state, upload, receive, facts, pack and read.")
+		return nil, invalid("Give exactly one of state, upload, receive, facts, pack, read and moveIn.")
 	}
 	if !p.router.Online(host) {
 		return nil, fail(CodeHostOffline, "%s is offline.", name)

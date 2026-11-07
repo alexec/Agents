@@ -257,3 +257,17 @@ test("Link to Machine with no machine says Add a Machine…, not the Mac app (#3
   assert.doesNotMatch(w.providerWords.noHosts, /\bMac\b/);
   assert.match(w.providerWords.noHosts, /Add a Machine…/);
 });
+
+test("a cloud machine stops after 2 hours idle unless the person says Never (#3729)", async () => {
+  assert.equal(w.defaultIdleMinutes, 120);
+  assert.deepEqual(w.idleChoices[0], { minutes: 0, label: "Never" });
+  assert.equal(w.idleRowWords(0), "Never stop when idle");
+  assert.equal(w.idleRowWords(120), "Stop after 2 hours idle");
+  assert.equal(w.idleRowWords(7), "Stop after 7 minutes idle");
+  const asked = [];
+  const p = new w.Providers({ call: async (method, params) => { asked.push([method, params]); return {}; } });
+  assert.equal(await p.setIdle("7", 0), null);
+  assert.deepEqual(asked, [["machines/setMachineOptions", { host: "7", stopWhenIdleMinutes: 0 }]]);
+  const refused = new w.Providers({ call: async () => { throw new w.CallFailed(-32602, "There is no such host."); } });
+  assert.equal(await refused.setIdle("7", 60), "There is no such host.");
+});

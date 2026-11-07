@@ -292,14 +292,21 @@ export function linkableHosts(workspace: MachineInfo, hosts: readonly ControlMac
   return [...free.filter((h) => mayBe(workspace, h.name)), ...free.filter((h) => !mayBe(workspace, h.name))];
 }
 
-/** The window's Stop when idle choices, in minutes; 0 is Off. */
+/** The window's Stop when idle choices, in minutes; 0 is Never. */
 export const idleChoices: readonly { minutes: number; label: string }[] = [
-  { minutes: 0, label: "Off" },
+  { minutes: 0, label: "Never" },
   { minutes: 15, label: "After 15 minutes" },
   { minutes: 30, label: "After 30 minutes" },
   { minutes: 60, label: "After 1 hour" },
   { minutes: 120, label: "After 2 hours" },
 ];
 
+/** A Stop when idle choice as a linked machine's row says it, standing alone (#3729). */
+export function idleRowWords(minutes: number): string {
+  const choice = idleChoices.find((c) => c.minutes === minutes);
+  if (!minutes) return "Never stop when idle";
+  return `Stop ${choice ? choice.label.toLowerCase() : `after ${minutes} minutes`} idle`;
+}
+
 /** WorkspaceLink.defaultIdleMinutes. */
-export const defaultIdleMinutes = 30;
+export const defaultIdleMinutes = 120;

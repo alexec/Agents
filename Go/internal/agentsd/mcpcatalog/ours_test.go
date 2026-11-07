@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alexec/agents/Go/internal/azuredevopsmcp"
+	"github.com/alexec/agents/Go/internal/bitbucketmcp"
 	"github.com/alexec/agents/Go/internal/emailmcp"
 	"github.com/alexec/agents/Go/internal/forgejomcp"
 	"github.com/alexec/agents/Go/internal/githubmcp"
@@ -259,6 +261,43 @@ func TestForgejoAsksForItsToken(t *testing.T) {
 		t.Fatalf("entry: %s", got)
 	}
 	if built.NameHere != "forgejo" || len(built.Variables) != 2 || !built.Variables[0].Required || built.Variables[1].Required {
+		t.Fatalf("built: %+v", built)
+	}
+}
+
+// Bitbucket (#2828) asks for a token, and the email of an Atlassian API token, kept in the
+// person's secrets, and declares the events its server raises: the gitlab server's.
+func TestBitbucketAsksForItsToken(t *testing.T) {
+	bitbucket, ok := OursByID("agents/bitbucket")
+	if !ok || bitbucket.Command != "bitbucket-mcp" || !bitbucket.Declares.Tools || bitbucket.Declares.Views ||
+		!reflect.DeepEqual(bitbucket.Declares.Events, bitbucketmcp.EventNames()) {
+		t.Fatalf("bitbucket: %+v %v, the server's %v", bitbucket, ok, bitbucketmcp.EventNames())
+	}
+	built := BuildOurs(bitbucket, func(string) bool { return false })
+	want := `{"command":"bitbucket-mcp","hosted":true,"env":{"BITBUCKET_TOKEN":"${BITBUCKET_TOKEN}","BITBUCKET_EMAIL":"${BITBUCKET_EMAIL}"}}`
+	if got := strings.Join(strings.Fields(built.Entry.Stringified()), ""); got != want {
+		t.Fatalf("entry: %s", got)
+	}
+	if built.NameHere != "bitbucket" || len(built.Variables) != 2 || !built.Variables[0].Required || built.Variables[1].Required {
+		t.Fatalf("built: %+v", built)
+	}
+}
+
+// Azure DevOps (#2829) asks for a personal access token, and the server when it is not
+// dev.azure.com, kept in the person's secrets, and declares the events its server raises:
+// the gitlab server's pull request events.
+func TestAzureDevOpsAsksForItsToken(t *testing.T) {
+	ado, ok := OursByID("agents/azuredevops")
+	if !ok || ado.Command != "azuredevops-mcp" || !ado.Declares.Tools || ado.Declares.Views ||
+		!reflect.DeepEqual(ado.Declares.Events, azuredevopsmcp.EventNames()) {
+		t.Fatalf("azuredevops: %+v %v, the server's %v", ado, ok, azuredevopsmcp.EventNames())
+	}
+	built := BuildOurs(ado, func(string) bool { return false })
+	want := `{"command":"azuredevops-mcp","hosted":true,"env":{"AZURE_DEVOPS_TOKEN":"${AZURE_DEVOPS_TOKEN}","AZURE_DEVOPS_URL":"${AZURE_DEVOPS_URL}"}}`
+	if got := strings.Join(strings.Fields(built.Entry.Stringified()), ""); got != want {
+		t.Fatalf("entry: %s", got)
+	}
+	if built.NameHere != "azure-devops" || len(built.Variables) != 2 || !built.Variables[0].Required || built.Variables[1].Required {
 		t.Fatalf("built: %+v", built)
 	}
 }

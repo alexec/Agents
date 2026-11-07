@@ -242,7 +242,7 @@ type Providers struct {
 	// many installs: only their machine/installProgress is said to clients.
 	installing map[string]int
 	done       chan struct{}
-	stopOnce    sync.Once
+	stopOnce   sync.Once
 }
 
 // NewProviders is WorkspaceProviders.init.
@@ -1102,8 +1102,8 @@ func (p *Providers) remove(id string) error {
 	if !ok {
 		return invalid("There is no such provider.")
 	}
-	yes := true
-	held.record.Forgotten = &yes
+	yes, now := true, records.Now()
+	held.record.Forgotten, held.record.ForgottenAt = &yes, &now
 	held.record.Rev++
 	data, err := records.Encode(held.record)
 	if err != nil {

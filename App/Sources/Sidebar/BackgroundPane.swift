@@ -59,6 +59,9 @@ struct BackgroundPane: View {
 /// A task's output file, opened in TextEdit: it has no extension anything else claims,
 /// and it is the runtime's file, not inside the agent's folders.
 enum BackgroundOutput {
+    /// The start of each copy's name: `WindowDefaults.sweep` removes old ones (#3747).
+    static let prefix = "agents-output-"
+
     /// Read through `files/read` on the agent's host and opened from what came back
     /// (058, R11), this Mac's included. A path the host will not give is left unopened.
     @MainActor
@@ -68,7 +71,7 @@ enum BackgroundOutput {
         guard let text = await model.textFile(at: url, on: agent.host, agentID: agent.id) else { return }
         let ext = url.pathExtension.isEmpty ? "txt" : url.pathExtension
         let local = FileManager.default.temporaryDirectory
-            .appendingPathComponent("agents-output-\(item.id)")
+            .appendingPathComponent("\(prefix)\(item.id)")
             .appendingPathExtension(ext)
         guard (try? text.write(to: local, atomically: true, encoding: .utf8)) != nil else { return }  // store-ok: the app's own temporary folder
         // Async because this function already is: the synchronous open is not the one

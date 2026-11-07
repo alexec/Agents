@@ -183,6 +183,15 @@ private repository in your GitHub account, or in an organisation you name, with 
 your other clones and adds it as a folder, so it shows in the session list on every client.
 When a step fails, ask again: each step that is done already is skipped.
 
+The agent follows the ready-made skill `start-a-new-app` (#3712), in voice mode or typed,
+from the first question to the first deploy. It asks the kind of app (an iPhone app, a web
+service, or both) and its name, makes the repository and the deploy gates with you as their
+reviewer, then does Apple, Google Cloud and Sentry as the app needs them. Each step that
+needs your hands is a card, and each secret is a form for this session only, which goes
+into the repository's CI. Then it tags `v0.1.0`, and you approve the deploy in **Needs
+You**. When you answer **Can't do it**, it stops and says what is left; ask again later,
+and it goes on from there.
+
 To make a repository, the GitHub App `agents-loops` must have the **Administration**
 permission (read and write), and be installed on **All repositories**, so that it can push
 to the new one. Without them, GitHub refuses, and the agent says so.

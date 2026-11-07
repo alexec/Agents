@@ -133,3 +133,45 @@ func (s *Service) renewConnected(ctx context.Context) {
 		}
 	}
 }
+
+// expiredKept is how long a client or machine is kept after its key expired (#3748): it
+// can never connect again, but its person still sees it, and why, for this long.
+const expiredKept = 90 * 24 * time.Hour
+
+// forgetExpired forgets, at most most, the clients and machines whose key expired
+// expiredKept ago, as a forget or a removal by hand does: a tombstone a week, and what
+// was kept for it goes. A started machine's workspace is left as it is: only its record
+// goes. It says how many went.
+func (s *Service) forgetExpired(ctx context.Context, now time.Time, most int) int {
+	before := now.Add(-expiredKept)
+	gone := 0
+	for _, c := range s.records.Clients() {
+		if gone >= most {
+			return gone
+		}
+		if c.Expires == nil || !c.Expires.Before(before) {
+			continue
+		}
+		if err := s.methods.forget(ctx, c.ID, 0); err != nil {
+			s.log("could not forget " + c.Name + ", whose key expired: " + err.Error())
+			continue
+		}
+		s.announce("clientForgotten", c.ID, "")
+		s.log("client " + c.Name + " forgotten: its key expired " + c.Expires.UTC().Format(time.DateOnly))
+		gone++
+	}
+	for _, h := range s.records.Hosts() {
+		if gone >= most {
+			return gone
+		}
+		if h.Expires == nil || !h.Expires.Before(before) {
+			continue
+		}
+		if _, err := s.methods.removeHost(ctx, h.ID, Caller{}); err != nil {
+			s.log("could not remove " + h.ID + ", whose key expired: " + err.Error())
+			continue
+		}
+		gone++
+	}
+	return gone
+}
