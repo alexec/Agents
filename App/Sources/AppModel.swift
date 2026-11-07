@@ -4819,6 +4819,11 @@ final class AppModel {
                                               DaemonAPI.TranscriptRequest(agentID: selection, limit: limit, from: from),
                                               returning: TranscriptPage.self)
                     },
+                    entry: { index in
+                        try await client.call(DaemonAPI.Method.agentsTranscript,
+                                              DaemonAPI.TranscriptRequest.entry(index, of: selection),
+                                              returning: TranscriptPage.self)
+                    },
                     describe: { self.describe($0) })
                 // Clicking through chats quickly can have the answer for the last one
                 // arrive after the next was picked. It is dropped, not shown under the
@@ -4880,6 +4885,11 @@ final class AppModel {
                     transcript: { from, limit in
                         try await client.call(DaemonAPI.Method.agentsTranscript,
                                               DaemonAPI.TranscriptRequest(agentID: id, limit: limit, from: from),
+                                              returning: TranscriptPage.self)
+                    },
+                    entry: { index in
+                        try await client.call(DaemonAPI.Method.agentsTranscript,
+                                              DaemonAPI.TranscriptRequest.entry(index, of: id),
                                               returning: TranscriptPage.self)
                     },
                     describe: { self.describe($0) })
