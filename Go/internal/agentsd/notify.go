@@ -42,13 +42,16 @@ const (
 
 // postedNotice is a notice still posted: withdrawn when its chat is opened, the session
 // goes, or a day passes. Its id is its transcript entry's, so the banner names the line a
-// tap goes to (#2860); to is where its line last said it went.
+// tap goes to (#2860); to is where its line last said it went. A machine's notice
+// (#3682) has no chat: mount is its volume, and it is withdrawn when the volume climbs
+// back.
 type postedNotice struct {
 	id      string
 	agentID wire.UUID
 	h3      string
 	raised  wire.Date
 	to      wire.NoticeDevice
+	mount   string
 }
 
 // noticeLimits are the person's burst and cool-down, from your layer (#2957, FR-002's new
@@ -166,6 +169,14 @@ func (d *Daemon) noticeNeedsLocked(at time.Time) []wire.Need {
 	var out []wire.Need
 	kept := d.notices[:0]
 	for _, n := range d.notices {
+		if n.mount != "" {
+			kept = append(kept, n)
+			id := n.id
+			out = append(out, wire.Need{ID: wire.NeedID{Notice: &id}, Folder: fileURL(d.Store.Loc.Root, true),
+				Kind: wire.NeedKindNotice, RaisedAt: n.raised,
+				Headline: truncating(wire.Headline{H1: macName(), H2: diskNoticeTitle, H3: n.h3})})
+			continue
+		}
 		a := d.Store.Agent(n.agentID)
 		watched := false
 		for _, p := range d.presences {
@@ -268,7 +279,7 @@ func (d *Daemon) noticeWentTo(id string, to wire.NoticeDevice) {
 	var agentID wire.UUID
 	found := false
 	for i := range d.notices {
-		if d.notices[i].id == id && d.notices[i].to != to {
+		if d.notices[i].id == id && d.notices[i].to != to && d.notices[i].mount == "" {
 			d.notices[i].to, agentID, found = to, d.notices[i].agentID, true
 		}
 	}

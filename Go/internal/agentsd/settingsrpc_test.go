@@ -185,3 +185,15 @@ func TestGitFillStaysOffTheWindowAndAnswersTheControlPlane(t *testing.T) {
 		t.Fatal("the control plane was not answered")
 	}
 }
+
+// The app's own tools are allowed with no card, under Claude's name and Antigravity's
+// (agents_<tool>, #1361); a runtime's own tool with a look-alike name still asks.
+func TestAppToolTitlesAllowedWithNoCard(t *testing.T) {
+	for title, want := range map[string]bool{"mcp__agents__lease_resource": true, "agents_lease_resource": true,
+		"agents_show_file": true, "agents_browser_navigate": true, "agents_delete_everything": false,
+		"Run client_create_file?": false, "lease_resource": false} {
+		if got := isAppToolTitle(title); got != want {
+			t.Errorf("%s: %v", title, got)
+		}
+	}
+}

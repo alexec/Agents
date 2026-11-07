@@ -49,6 +49,9 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// window stamps it on arrival. A record read without it is this Mac's.
     public var host: MachineRef = .mac
     public var runtimeSessionID: String?
+    /// Delete leaves the runtime's own copy of the conversation (#3669), as the daemon
+    /// found when the runtime's session started: OpenCode without session/delete.
+    public var runtimeKeepsCopy: Bool = false
     public var startOptions: StartOptions
 
     /// What the runtime last said it offers, kept on the record so the controls
@@ -329,6 +332,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
             rawState = writtenState
         }
         runtimeSessionID = try c.decodeIfPresent(String.self, forKey: .runtimeSessionID)
+        runtimeKeepsCopy = try c.decodeIfPresent(Bool.self, forKey: .runtimeKeepsCopy) ?? false
         startOptions = try c.decodeIfPresent(StartOptions.self, forKey: .startOptions) ?? .none
         // Always written, and still read as empty when absent: a build that stops
         // writing either must not cost an older reader the whole agent.
@@ -457,6 +461,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         // to `stopped` (FR-021).
         try c.encode(rawState ?? state.rawValue, forKey: .state)
         try c.encodeIfPresent(runtimeSessionID, forKey: .runtimeSessionID)
+        if runtimeKeepsCopy { try c.encode(runtimeKeepsCopy, forKey: .runtimeKeepsCopy) }
         try c.encode(startOptions, forKey: .startOptions)
         try c.encode(advertisedOptions, forKey: .advertisedOptions)
         try c.encode(availableCommands, forKey: .availableCommands)
@@ -528,7 +533,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey, CaseIterable {
-        case id, runtimeID, cwd, title, labels, state, runtimeSessionID, startOptions
+        case id, runtimeID, cwd, title, labels, state, runtimeSessionID, runtimeKeepsCopy, startOptions
         case advertisedOptions, availableCommands, createdAt, lastActivityAt, isUnread, isMuted, reportSeenAt
         case endedReason, archivedReason
         case usage, lastTurnUsage, costToDate, costCeiling, tokensToDate, tokenCeiling, plans, additionalDirectories, mcpServers

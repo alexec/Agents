@@ -40,6 +40,16 @@ enum MacPageActions {
     }
 }
 
+/// The most bytes of pictures a `ServerPictures` or `PagePictures` keeps, as the phone's
+/// `PhonePictures` (#3650).
+let pictureBytesHeld = 64 << 20
+
+/// What a picture costs to keep: its bytes as read, or its pixels drawn, whichever is more.
+func pictureCost(_ image: NSImage?, read bytes: Data) -> Int {
+    let drawn = image?.representations.map { $0.pixelsWide * $0.pixelsHigh * 4 }.max() ?? 0
+    return max(bytes.count, drawn)
+}
+
 /// A server's pictures, read through its daemon and kept while the app runs (037). The
 /// Mac's twin of the phone's `PhonePictures`: each is held with the stamp it was read at,
 /// so asking whether it changed costs one small request and no bytes. `NSImage` reads
@@ -52,8 +62,9 @@ final class ServerPictures {
     }
 
     private let files: RemoteFiles
-    /// About a page or two of diagrams, as the phone keeps (#175, #213).
-    private var held = LRUCache<URL, Held>(limit: 24)
+    /// About a page or two of diagrams, and at most 64 MiB of them, as the phone keeps
+    /// (#175, #213, #3650).
+    private var held = LRUCache<URL, Held>(limit: 24, costLimit: pictureBytesHeld)
 
     init(files: RemoteFiles) { self.files = files }
 
@@ -75,7 +86,7 @@ final class ServerPictures {
             return known
         case .image(let bytes, _, let stamp):
             let fresh = Held(stamp: stamp, image: NSImage(data: bytes))
-            held.set(fresh, for: url)
+            held.set(fresh, for: url, cost: pictureCost(fresh.image, read: bytes))
             return fresh
         case .text(_, _, _, let stamp), .other(_, _, let stamp):
             let fresh = Held(stamp: stamp, image: nil)

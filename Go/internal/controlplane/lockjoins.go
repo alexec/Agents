@@ -27,8 +27,8 @@ import (
 // every copy.
 //
 // A machine that is not in the lock and has no invite asks the same way (#3491, D3), on its
-// channel 0: host/lockJoin and host/lockJoinReveal, told how it goes with
-// host/lockJoinChanged. Its request names the machine, and a signer approves it with an
+// channel 0: machine/lockJoin and machine/lockJoinReveal, told how it goes with
+// machine/lockJoinChanged. Its request names the machine, and a signer approves it with an
 // addMachine whose key is the machine's.
 
 const (
@@ -134,7 +134,7 @@ func (j *lockJoins) row(r lockJoinRecord) wire.LockJoinRequest {
 // when it is held here.
 func (j *lockJoins) tell(r lockJoinRecord) {
 	if r.Machine && r.Result == "" {
-		j.s.router.Tell(r.Client, wire.NewMethodName(wire.NotifyHostLockJoinChanged.Name), j.row(r))
+		j.s.router.Tell(r.Client, wire.NotifyMachineLockJoinChanged.Name, j.row(r))
 	}
 	if r.Result != "" {
 		j.s.router.TellPerson(r.Person, wire.NotifyControlLockJoinDecided.Name, wire.LockJoinDecided{Request: r.ID, Result: r.Result})
@@ -229,7 +229,7 @@ func (m *Methods) lockJoinMethod(ctx context.Context, method string, params json
 	return nil, fail(methodNotFound, "No method %s.", method)
 }
 
-// nonce is lock/joinAnswer (a signer's, answer) or lock/joinReveal and host/lockJoinReveal
+// nonce is lock/joinAnswer (a signer's, answer) or lock/joinReveal and machine/lockJoinReveal
 // (the asking client's or machine's own).
 func (j *lockJoins) nonce(ctx context.Context, person, from string, answer bool, request wire.LockJoinNonce) error {
 	if len(request.Nonce) != machinelock.NonceSize {
@@ -277,7 +277,7 @@ func (j *lockJoins) ask(ctx context.Context, person, client string, request wire
 	return j.open1(ctx, lockJoinRecord{Person: person, Client: client, Name: record.Name, Kind: record.Kind}, request)
 }
 
-// askMachine is host/lockJoin: a machine of the person asks, as a client does (#3491).
+// askMachine is machine/lockJoin: a machine of the person asks, as a client does (#3491).
 func (j *lockJoins) askMachine(ctx context.Context, host string, request wire.LockJoin) (any, error) {
 	record := j.s.records.Host(host)
 	person := j.s.ownerOf(host)

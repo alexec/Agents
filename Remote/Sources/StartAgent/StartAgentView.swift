@@ -165,7 +165,6 @@ struct StartAgentView: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 0) {
                 HostOfflineStrip(host: model.startHost)
-                HostDiskStrip(host: model.startHost)
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { promptBar }

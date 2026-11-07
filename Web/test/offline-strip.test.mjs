@@ -1,5 +1,5 @@
 // The strip over a chat whose host is down (#83), and a workspace host's (#691, layouts.md L1):
-// the words OfflineWords.swift says, Start or a timer at its end, and Start as hosts/start.
+// the words OfflineWords.swift says, Start or a timer at its end, and Start as machines/start.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "./load.mjs";
@@ -70,12 +70,12 @@ function fakeLink(answer) {
 
 test("Start asks the control plane, waits while it is out, and takes the row it answers", async () => {
   let answer;
-  const link = fakeLink((method) => method === "hosts/start" ? new Promise((r) => { answer = r; }) : []);
+  const link = fakeLink((method) => method === "machines/start" ? new Promise((r) => { answer = r; }) : []);
   const store = new Store(link);
   store.takeHosts([row("stopped", workspace())]);
   const started = store.startHost("box");
   assert.deepEqual(store.hostsBeingStarted.value, ["box"]);
-  assert.deepEqual(link.asked.at(-1), { method: "hosts/start", params: { host: "box" }, host: undefined });
+  assert.deepEqual(link.asked.at(-1), { method: "machines/start", params: { host: "box" }, host: undefined });
   answer(row("starting", workspace({ phase: "provider" })));
   await started;
   assert.deepEqual(store.hostsBeingStarted.value, []);
@@ -119,15 +119,15 @@ test("a page opened while a host is stopped lists what it last did, from the con
     startOptions: { extraArguments: [], values: {} } };
   const folder = { folder: { folder: "file:///home/agents/chat/", name: "chat", addedAt: 1 }, lastActivityAt: 1, exists: true };
   const link = fakeLink((method) => {
-    if (method === "hosts/list") return [row("stopped", workspace())];
-    if (method === "hosts/lastHeard") return { host: "box", folders: [folder], agents: [agent] };
+    if (method === "machines/list") return [row("stopped", workspace())];
+    if (method === "machines/lastHeard") return { host: "box", folders: [folder], agents: [agent] };
     if (method === "control/status") return { machineID: "m" };
-    if (method === "hosts/listKept") return { kept: [] };
+    if (method === "machines/listKept") return { kept: [] };
     return [];
   });
   const store = new Store(link);
   await store.load();
-  assert.deepEqual(link.asked.find((a) => a.method === "hosts/lastHeard")?.params, { host: "box" });
+  assert.deepEqual(link.asked.find((a) => a.method === "machines/lastHeard")?.params, { host: "box" });
   assert.equal(store.folders.value.box?.length, 1);
   assert.equal((store.agents.value.box ?? []).length, 1);
   // Nothing the host itself was asked: it is stopped.

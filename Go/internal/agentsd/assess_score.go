@@ -320,7 +320,7 @@ func (r assessRecord) leases() (verdict, string) {
 }
 
 func (r assessRecord) workspaces() (verdict, string) {
-	all := r.callsOf("workspaces/list")
+	all := r.callsOf("machines/list")
 	var listed []appToolCall
 	for _, c := range all {
 		if a := arg(c, "action"); a == "" || a == "list" {
@@ -334,7 +334,7 @@ func (r assessRecord) workspaces() (verdict, string) {
 	if last.Ok {
 		return passed, "`list_machines` answered"
 	}
-	if strings.Contains(strings.ToLower(answerOfCall(last)), "has no workspaces") {
+	if a := strings.ToLower(answerOfCall(last)); strings.Contains(a, "has no workspaces") || strings.Contains(a, "has no machine providers") {
 		return passed, "`list_machines` answered that this machine has no workspaces"
 	}
 	return failedStep, "`list_machines` refused: " + clip(answerOfCall(last), 160)
@@ -562,27 +562,35 @@ func questionsOf(c appToolCall) []formQuestion {
 
 func (r assessRecord) askQuestion() (verdict, string) {
 	asked := r.callsOf("questions/ask")
+	// The first form with both a choice and a text field: should_ask's question can come
+	// first, by ask_question too (#1356).
 	var call *appToolCall
+	var text *formQuestion
+	answered := false
 	for i := range asked {
-		if asked[i].Ok {
-			call = &asked[i]
+		if !asked[i].Ok {
+			continue
+		}
+		answered = true
+		var choice bool
+		var field *formQuestion
+		for _, q := range questionsOf(asked[i]) {
+			q := q
+			if q.choices {
+				choice = true
+			} else if field == nil {
+				field = &q
+			}
+		}
+		if choice && field != nil {
+			call, text = &asked[i], field
 			break
 		}
 	}
-	if call == nil {
+	if !answered {
 		return failedStep, said(asked, "ask_question")
 	}
-	var choice bool
-	var text *formQuestion
-	for _, q := range questionsOf(*call) {
-		q := q
-		if q.choices {
-			choice = true
-		} else if text == nil {
-			text = &q
-		}
-	}
-	if !choice || text == nil {
+	if call == nil {
 		return failedStep, "`ask_question` was not asked with both a choice and a text field"
 	}
 	given := ""
@@ -625,8 +633,22 @@ func (r assessRecord) toldToAsk() *wire.Date {
 		if a := e.Kind.ElicitationAsked; a != nil && strings.Contains(elicitationWords(a.Value), "running unattended") {
 			return &e.At
 		}
+		if c := ownQuestionCard(e); c != nil && strings.Contains(c.ToolCall.Title, "running unattended") {
+			return &e.At
+		}
 	}
 	return nil
+}
+
+// ownQuestionCard is a question the runtime's own tool put to the person as a permission
+// card, its choices the options: Antigravity 1.4.5's ask_question comes as
+// session/request_permission on a tool call named interaction_<id> (#1361).
+func ownQuestionCard(e wire.TranscriptEntry) *wire.PermissionRequest {
+	p := e.Kind.PermissionAsked
+	if p == nil || p.Value.ToolCall.ToolCallID == nil || !strings.HasPrefix(*p.Value.ToolCall.ToolCallID, "interaction_") {
+		return nil
+	}
+	return &p.Value
 }
 
 // elicitationWords is everything a question shows: its message, title, description and fields.
@@ -640,7 +662,7 @@ func elicitationWords(q wire.ElicitationRequest) string {
 func (r assessRecord) questionsBetween(from, to *wire.Date) (asked, app int) {
 	in := func(at wire.Date) bool { return (from == nil || at >= *from) && (to == nil || at < *to) }
 	for _, e := range r.transcript {
-		if e.Kind.ElicitationAsked != nil && in(e.At) {
+		if (e.Kind.ElicitationAsked != nil || ownQuestionCard(e) != nil) && in(e.At) {
 			asked++
 		}
 	}
@@ -753,11 +775,20 @@ func (r assessRecord) helperSteps() (verdict, string) {
 			requested = append(requested, c)
 		}
 	}
-	if !anyOk(requested) {
+	// A helper that archived itself first (as its brief says, once done) leaves the request
+	// nothing to change: that counts, when an agent did archive it.
+	selfArchived := helper.ArchivedReason != nil && *helper.ArchivedReason == wire.AgentArchivedReasonByAgent
+	for _, c := range requested {
+		selfArchived = selfArchived && strings.Contains(answerOfCall(c), "is already archived")
+	}
+	if !anyOk(requested) && (len(requested) == 0 || !selfArchived) {
 		return failedStep, said(requested, "archive_session")
 	}
 	if helper.ArchivedAt == nil || helper.ArchivedReason == nil || *helper.ArchivedReason != wire.AgentArchivedReasonByAgent {
 		return failedStep, "the helper is not archived by an agent"
+	}
+	if !anyOk(requested) {
+		return passed, "helper " + short + " on " + helper.RuntimeID + ": marked as this agent's, resumed this one when it finished, archived itself before the request"
 	}
 	return passed, "helper " + short + " on " + helper.RuntimeID + ": marked as this agent's, resumed this one when it finished, archived on request"
 }

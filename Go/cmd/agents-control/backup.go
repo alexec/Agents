@@ -12,7 +12,8 @@ import (
 
 // homeParts is where this control plane keeps what a restore needs besides the store
 // (#2137), as serve finds each: the key file, secrets-key beside it, the certificate
-// (--self-signed, the home's tls/, or AGENTS_CONTROL_TLS_CERT/_KEY) and the APNs key.
+// (--self-signed, the home's tls/, or AGENTS_CONTROL_TLS_CERT/_KEY), the APNs key and the
+// VAPID key (#3651).
 func homeParts() controlplane.HomeParts {
 	var p controlplane.HomeParts
 	if file := keyFile(); file != "" {
@@ -33,6 +34,11 @@ func homeParts() controlplane.HomeParts {
 		p.APNsKey = file
 	} else if home() != "" {
 		p.APNsKey = filepath.Join(home(), "apns.p8")
+	}
+	if file := os.Getenv("AGENTS_WEBPUSH_KEY_FILE"); file != "" {
+		p.WebPushKey = file
+	} else if home() != "" {
+		p.WebPushKey = filepath.Join(home(), "webpush-key.pem")
 	}
 	return p
 }
@@ -77,6 +83,11 @@ func restore() {
 	if p := homeParts(); p.APNsKey != "" && os.Getenv("AGENTS_APNS_KEY_FILE") == "" {
 		if _, err := os.Stat(p.APNsKey); err == nil {
 			fmt.Println("the APNs key is at " + p.APNsKey + ": give it as AGENTS_APNS_KEY_FILE")
+		}
+	}
+	if p := homeParts(); p.WebPushKey != "" && os.Getenv("AGENTS_WEBPUSH_KEY_FILE") == "" {
+		if _, err := os.Stat(p.WebPushKey); err == nil {
+			fmt.Println("the VAPID key is at " + p.WebPushKey + ": give it as AGENTS_WEBPUSH_KEY_FILE")
 		}
 	}
 }

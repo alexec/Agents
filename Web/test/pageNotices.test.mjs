@@ -40,6 +40,15 @@ test("a Web Push shows the need's words, buzzing only for an alert, one a need",
   assert.equal(quiet.title, "Agents");
   assert.equal(quiet.options.body, "An agent needs you");
   assert.equal(quiet.options.silent, true);
+  assert.equal(quiet.options.data.open, "/");
+});
+
+test("a machine's notice opens the machines, not a chat (#3682)", () => {
+  assert.equal(pageNotices.isMachineNotice("disk:/"), true);
+  assert.equal(pageNotices.isMachineNotice("e0000000-0000-4000-8000-000000000006"), false);
+  const disk = pushItem.notificationFor({ needID: { notice: "disk:/" }, alert: true, headline: { h1: "mac", h2: "Disk almost full", h3: "1.5 GB free" } });
+  assert.equal(disk.title, "Disk almost full");
+  assert.equal(disk.options.data.open, "/#/machines/machines");
 });
 
 test("Web Push needs a worker and a push manager; on iOS, the Home Screen", () => {

@@ -478,6 +478,10 @@ targets:
       - name: Build the Sentry events MCP server
         script: sh "$SRCROOT/scripts/go-github-mcp.sh" sentry-mcp
         basedOnDependencyAnalysis: false
+      # The Better Stack events MCP server (#3655), built and carried the same way.
+      - name: Build the Better Stack events MCP server
+        script: sh "$SRCROOT/scripts/go-github-mcp.sh" betterstack-mcp
+        basedOnDependencyAnalysis: false
       # The forgejo MCP server (#1753), built and carried the same way.
       - name: Build the forgejo MCP server
         script: sh "$SRCROOT/scripts/go-github-mcp.sh" forgejo-mcp
@@ -522,6 +526,9 @@ targets:
         basedOnDependencyAnalysis: false
       - name: Carry the Sentry events MCP server
         script: sh "$SRCROOT/scripts/go-github-mcp.sh" --carry sentry-mcp
+        basedOnDependencyAnalysis: false
+      - name: Carry the Better Stack events MCP server
+        script: sh "$SRCROOT/scripts/go-github-mcp.sh" --carry betterstack-mcp
         basedOnDependencyAnalysis: false
       - name: Carry the forgejo MCP server
         script: sh "$SRCROOT/scripts/go-github-mcp.sh" --carry forgejo-mcp

@@ -94,6 +94,22 @@ struct CatchUpPlanTests {
         #expect(cache.count == 0)
     }
 
+    /// A cost bound lets the least recently used go too, and a value set again is counted
+    /// once (#3650).
+    @Test func aCacheIsBoundedByCost() {
+        var cache = LRUCache<String, Int>(limit: 10, costLimit: 100)
+        cache.set(1, for: "a", cost: 40)
+        cache.set(2, for: "b", cost: 40)
+        cache.set(2, for: "b", cost: 50)
+        #expect(cache.cost == 90)
+        cache.set(3, for: "c", cost: 30)
+        #expect(cache.peek("a") == nil)
+        #expect(cache.cost == 80)
+        cache.set(4, for: "d", cost: 200)
+        #expect(cache.count == 0)
+        #expect(cache.cost == 0)
+    }
+
     @Test func archivedAgentsOutsideTheOpenFolderAreLetGo() {
         let here = URL(filePath: "/work/here", directoryHint: .isDirectory)
         let there = URL(filePath: "/work/there", directoryHint: .isDirectory)

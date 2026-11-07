@@ -1,8 +1,8 @@
 package controlplane
 
 import (
-	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"strings"
@@ -65,7 +65,10 @@ func copyStoreLeaving(ctx context.Context, from, to store.Store, leaving []strin
 			oldMachines = false
 		}
 	}
-	written := map[string][]byte{}
+	// Each object is held only while it is written: what is kept to check the copy is a
+	// hash per key, so a backup of a large store (server backups included) does not hold
+	// the whole store in memory (#3650).
+	written := map[string][sha256.Size]byte{}
 	for _, k := range keys {
 		if leftOut(k.Key, leaving) {
 			skipped++
@@ -86,7 +89,7 @@ func copyStoreLeaving(ctx context.Context, from, to store.Store, leaving []strin
 		if _, err := to.Put(ctx, key, object.Data, store.Absent); err != nil {
 			return 0, 0, err
 		}
-		written[key] = object.Data
+		written[key] = sha256.Sum256(object.Data)
 	}
 	landed, err := to.List(ctx, "v1/")
 	if err != nil {
@@ -104,12 +107,12 @@ func copyStoreLeaving(ctx context.Context, from, to store.Store, leaving []strin
 	if count != len(written) {
 		return 0, 0, mismatch(fmt.Sprintf("%d records copied, %d found", len(written), count))
 	}
-	for key, data := range written {
+	for key, sum := range written {
 		back, err := to.Get(ctx, key)
 		if err != nil {
 			return 0, 0, err
 		}
-		if back == nil || !bytes.Equal(back.Data, data) {
+		if back == nil || sha256.Sum256(back.Data) != sum {
 			return 0, 0, mismatch(key)
 		}
 	}

@@ -61,6 +61,9 @@ const allowedURLs = new Set([
   // issue, links the person opens in a new tab, never fetched.
   "https://appstoreconnect.apple.com/apps",
   "https://sentry.io/organizations/",
+  // A Cloud Run revision's service in the Google Cloud console (#3654), a link the person opens
+  // in a new tab, never fetched.
+  "https://console.cloud.google.com/run/detail/",
   // Connect Jira (#3304): Make an API Token's page on Atlassian, a link the person opens in a
   // new tab, never fetched.
   "https://id.atlassian.com/manage-profile/security/api-tokens",

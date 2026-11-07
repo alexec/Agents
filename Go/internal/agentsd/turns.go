@@ -85,6 +85,9 @@ type live struct {
 	briefDue bool
 	// tools is the turn's tool calls in flight, for Agent.RunningTool (runningtool.go).
 	tools toolsInFlight
+	// denied is the title of the tool call the person last refused on a card this turn,
+	// until the agent says or calls something after it (#3722).
+	denied string
 }
 
 type pendingPermission struct {
@@ -575,6 +578,11 @@ func (l *live) turn() bool {
 		launch, meta := withSandbox(launch, agentSessionMeta(a), a.RuntimeID, sandbox)
 		brief := d.briefFor(a)
 		compatibilityMeta := withSystemPrompt(meta, a.RuntimeID, brief)
+		if launch, err = withBriefFile(launch, a.RuntimeID, d.Store.Loc.Agent(string(l.id)), brief); err != nil {
+			d.record(l.id, notice("error", rt.Name+" did not start", "The brief could not be written: "+err.Error()))
+			d.end(l, wire.AgentStateStopped, wire.EndedReasonRuntimeError)
+			return false
+		}
 		s, err := acp.Start(ctx, launch, l, d.mcpServersFor(l.id), meta, compatibilityMeta, continuing, brief)
 		if err != nil {
 			d.dropAppTokens(l.id)
@@ -611,7 +619,7 @@ func (l *live) turn() bool {
 		l.session = s
 		// A conversation begun, or begun again because the runtime lost it: the brief it
 		// had lived in the history that is gone.
-		l.briefDue = !s.Continued && brief != "" && !s.SupportsSystemPrompt() && compatibilitySystemPromptDelivery[a.RuntimeID] == ""
+		l.briefDue = !s.Continued && brief != "" && !s.SupportsSystemPrompt() && !briefOutOfPrompt(a.RuntimeID)
 		l.mu.Unlock()
 		// Started as the host goes, after stopAll looked (#1272): it would be left running.
 		if d.going() {
@@ -633,6 +641,10 @@ func (l *live) turn() bool {
 		sessionID := string(s.ID)
 		d.change(l.id, func(a *wire.Agent) {
 			a.RuntimeSessionID = &sessionID
+			a.RuntimeKeepsCopy = nil
+			if keepsCopy(a.RuntimeID, s.CanDelete()) {
+				a.RuntimeKeepsCopy = new(true)
+			}
 			if opts := configOptions(s.NewResult.ConfigOptions); opts != nil {
 				a.AdvertisedOptions = d.markOptions(a.RuntimeID, withAppOptions(a.RuntimeID, a.StartOptions.Values, opts))
 				a.Levels = d.matchLevels(a)
@@ -753,6 +765,7 @@ func (l *live) turn() bool {
 	clear(l.toolCalls)
 	l.evidence = turnEvidence{}
 	l.failure = nil
+	l.denied = ""
 	l.mu.Unlock()
 	// Archived or stopped while it got ready (#1611): its context is gone, and the state
 	// is left as the stop wrote it.
@@ -941,6 +954,7 @@ func (l *live) turn() bool {
 	}
 	switch r.StopReason {
 	case sdk.StopReasonEndTurn:
+		d.carryOnAfterDeny(l)
 		d.end(l, wire.AgentStateFinished, wire.EndedReasonEndTurn)
 	case sdk.StopReasonCancelled:
 		// A stop leaves what is queued behind it.
@@ -1320,6 +1334,7 @@ func (l *live) Update(n sdk.SessionNotification) {
 		}
 		l.lastMessage.WriteString(text)
 		l.evidence.takeReply(text)
+		l.denied = ""
 		l.mu.Unlock()
 		// The docs a message names, once it is whole (#3308).
 		d.noteDocLinks(l.id, said)
@@ -1342,6 +1357,7 @@ func (l *live) Update(n sdk.SessionNotification) {
 		said := l.lastMessage.String()
 		l.lastMessageID, l.lastMessage = "", strings.Builder{}
 		l.toolCalls[string(u.ToolCall.ToolCallId)] = true
+		l.denied = ""
 		l.seen.Broadcast()
 		l.mu.Unlock()
 		l.noteToolCall(call, true)
@@ -1458,6 +1474,21 @@ func messageID(p *string) *string {
 	return p
 }
 
+// isAppToolTitle is whether a permission card's title is a call to one of the app's own
+// tools: Claude's mcp__agents__<tool>, or Antigravity's agents_<tool> (1.4.5, #1361), only
+// for a tool this host serves, so a runtime's own tool named agents_… still asks.
+func isAppToolTitle(title string) bool {
+	if strings.HasPrefix(title, "mcp__agents__") {
+		return true
+	}
+	name, ok := strings.CutPrefix(title, "agents_")
+	if !ok {
+		return false
+	}
+	_, browser := browserTools()
+	return appToolServed(name) || browser[name]
+}
+
 // Permission asks the person, as a card, and waits for the answer: the option chosen, or
 // "" when the turn was stopped.
 func (l *live) Permission(ctx context.Context, p sdk.RequestPermissionRequest) string {
@@ -1469,7 +1500,7 @@ func (l *live) Permission(ctx context.Context, p sdk.RequestPermissionRequest) s
 		req.Options = append(req.Options, wire.PermissionOption{OptionID: string(o.OptionId), Name: o.Name, Kind: wire.PermissionOptionKind(o.Kind)})
 	}
 	// The app's own tools are allowed with no question, as the Swift host does.
-	if strings.HasPrefix(req.ToolCall.Title, "mcp__agents__") {
+	if isAppToolTitle(req.ToolCall.Title) {
 		for _, o := range req.Options {
 			if o.Kind == "allow_always" || o.Kind == "allow_once" {
 				return o.OptionID
@@ -1517,6 +1548,7 @@ func (l *live) Permission(ctx context.Context, p sdk.RequestPermissionRequest) s
 			}
 		}
 		d.record(l.id, wire.TranscriptEntryKind{PermissionAnswered: &wire.TranscriptEntryKindPermissionAnswered{OptionID: option, OptionName: &name}})
+		l.noteDenied(req, option)
 	}
 	Broadcast(d, wire.NotifyAgentPermission, wire.PermissionNotification{AgentID: l.id, RequestID: req.ID})
 	d.reconsider()
@@ -1524,6 +1556,43 @@ func (l *live) Permission(ctx context.Context, p sdk.RequestPermissionRequest) s
 		d.setState(l.id, wire.AgentStateRunning)
 	}
 	return option
+}
+
+// noteDenied keeps the tool call the person refused, for carryOnAfterDeny.
+func (l *live) noteDenied(req wire.PermissionRequest, option string) {
+	for _, o := range req.Options {
+		if o.OptionID == option {
+			l.mu.Lock()
+			if o.Kind == wire.PermissionOptionKindRejectOnce || o.Kind == wire.PermissionOptionKindRejectAlways {
+				l.denied = req.ToolCall.Title
+			} else {
+				l.denied = ""
+			}
+			l.mu.Unlock()
+			return
+		}
+	}
+}
+
+// carryOnAfterDeny starts the agent again when its turn ended right after the person
+// refused a card, with no word after it (#3722): Copilot ends the whole turn on a reject,
+// but to a person Deny is "not that", not "stop". Nothing is sent when a prompt is queued
+// already, since that is the next turn.
+func (d *Daemon) carryOnAfterDeny(l *live) {
+	l.mu.Lock()
+	tool := l.denied
+	l.denied = ""
+	l.mu.Unlock()
+	if a := d.Store.Agent(l.id); tool == "" || a == nil || len(a.QueuedPrompts) > 0 {
+		return
+	}
+	if err := d.enqueue(l.id, wire.QueuedPrompt{ID: store.NewUUID(), Text: carryOnAfterDenyWords(tool), QueuedAt: now(), From: wire.PromptOriginApp}, false); err != nil {
+		log.Printf("agent %s: carry on after a deny: %v", l.id, err)
+	}
+}
+
+func carryOnAfterDenyWords(tool string) string {
+	return "The person denied “" + tool + "”. Carry on without it, or ask."
 }
 
 // refuseForBot answers a permission on a bot's machine: its reject option, said in the

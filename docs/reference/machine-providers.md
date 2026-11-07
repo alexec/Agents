@@ -109,11 +109,11 @@ logged.
 - **A codespace over ssh.** The machine that carries a codespaces provider starts a
   codespace's agentsd over ssh with `gh` and the token (`providers/ssh`), reads its host
   key for a link, and installs Agents in it for Add as Machine… (op `install`, #3497).
-  `hosts/install` names the provider and the workspace; the control plane makes a host code
+  `machines/install` names the provider and the workspace; the control plane makes a host code
   for the caller, who must own the carrying machine, and sends it with the trusted key's
   fingerprint. That machine checks the host key, then runs
   `curl … <url>/v1/install.sh | sh -s -- '<code>' '<name>'` in the codespace, with the
-  address and pin the code names, and says each step back as `host/installProgress`, which
+  address and pin the code names, and says each step back as `machine/installProgress`, which
   clients hear as `control/installProgress`. This works on a hosted control plane too: the
   ssh is the carrying machine's. The control plane has no token, so it keeps no tunnel to a
   codespace: the codespace dials the control plane's own address, which must be one it can

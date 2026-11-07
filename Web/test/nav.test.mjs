@@ -6,12 +6,12 @@ import { load } from "./load.mjs";
 
 const n = await load("src/model/nav.ts");
 
-test("a member's bar has eight sections, an admin's ten", () => {
+test("a member's bar has nine sections, an admin's eleven", () => {
   assert.deepEqual(n.sectionsShown(false, "overview").map((s) => n.navTitle[s]),
-    ["Overview", "Agents", "Work", "Docs", "Machines", "Workflows", "Reports", "Settings"]);
+    ["Overview", "Agents", "Work", "Docs", "Machines", "Workflows", "Reports", "Your setup", "Settings"]);
   assert.deepEqual(n.sectionsShown(null, "agents"), n.sectionsShown(false, "agents"), "not known yet is a member's");
   assert.deepEqual(n.sectionsShown(true, "overview").map((s) => n.navTitle[s]),
-    ["Overview", "Agents", "Work", "Docs", "Machines", "Workflows", "Reports", "Requests", "People", "Settings"]);
+    ["Overview", "Agents", "Work", "Docs", "Machines", "Workflows", "Reports", "Requests", "People", "Your setup", "Settings"]);
   assert.ok(n.sectionsShown(false, "people").includes("people"), "a member who opens People by its address sees where they are");
 });
 
@@ -32,6 +32,8 @@ test("every page has a title, and its group headings come in order", () => {
   for (const s of n.navSections) for (const p of n.navPages[s]) assert.ok(p.title, `${s}/${p.id}`);
   assert.deepEqual(n.groupedPages(n.navPages.reports).map(([g]) => g), ["Reports", "Saved", "Yours", "Records"]);
   assert.deepEqual(n.groupedPages(n.navPages.machines).map(([g]) => g), ["Machines", "On them"]);
+  assert.deepEqual(n.navPages.setup.map((p) => p.id), ["runtimes"], "Runtimes is the person's, once (#3631)");
+  assert.ok(n.navPages.machines.every((p) => p.id !== "runtimes"));
 });
 
 test("each section is its own address, and #/ is the Overview", async () => {
@@ -43,7 +45,8 @@ test("each section is its own address, and #/ is the Overview", async () => {
     assert.equal(r.sectionOf(r.parseRoute("#/")), "overview");
     assert.deepEqual(r.parseRoute("#/agents"), { nav: "agents" });
     assert.deepEqual(r.parseRoute("#/agents/live"), { nav: "agents", section: "live" });
-    assert.deepEqual(r.parseRoute("#/machines/runtimes"), { nav: "machines", section: "runtimes" });
+    assert.deepEqual(r.parseRoute("#/setup/runtimes"), { nav: "setup", section: "runtimes" });
+    assert.deepEqual(r.parseRoute("#/machines/runtimes"), { nav: "setup", section: "runtimes" }, "an old link opens its new place (#3631)");
     assert.deepEqual(r.parseRoute("#/reports/spend"), { nav: "reports", section: "spend" });
     assert.equal(r.routeHash({ nav: "settings", section: "policy" }, undefined), "#/settings/policy");
     assert.equal(r.routeHash({}, undefined), "#/");
@@ -75,7 +78,7 @@ test("an address from before #2141 opens its page's new place", async () => {
       "#/console/audit": { nav: "reports", section: "audit" }, "#/console/requests": { nav: "requests" },
       "#/console/people": { nav: "people", section: "people" }, "#/console/signIn": { nav: "people", section: "signIn" },
       "#/console/policy": { nav: "settings", section: "policy" }, "#/console/readApi": { nav: "settings", section: "readApi" },
-      "#/a/runtimes": { nav: "machines", section: "runtimes" }, "#/a/mcp": { nav: "machines", section: "mcp" },
+      "#/a/runtimes": { nav: "setup", section: "runtimes" }, "#/a/mcp": { nav: "machines", section: "mcp" },
       "#/a/events": { nav: "reports", section: "events" }, "#/a/milestones": { nav: "reports", section: "milestones" },
       "#/a/tokens": { nav: "reports", section: "usage" },
     };
@@ -85,6 +88,8 @@ test("an address from before #2141 opens its page's new place", async () => {
     }
     assert.equal(r.usageAsked.value, "tokens", "Usage opens on the pane the old address named");
     assert.equal(r.isOldAddress("#/reports/spend"), false);
+    assert.equal(r.isOldAddress("#/machines/runtimes"), true, "Runtimes went to Your setup (#3631)");
+    assert.equal(r.isOldAddress("#/machines/machines"), false);
     assert.equal(r.isOldAddress("#/h/mac/p/x"), false);
     // Every page an old address names is a page of its section.
     for (const now of Object.values(moved)) {
@@ -104,4 +109,14 @@ test("Agents' state filter keeps the sessions in that state", async () => {
   assert.equal(f.keptByState(agent("running"), "needsYou"), false);
   assert.equal(f.keptByState(agent("finished"), "done"), true);
   assert.equal(f.keptByState(agent("finished"), "working"), false);
+});
+
+test("worktrees are on each machine's page, and the old address goes to Machines (#3627)", () => {
+  assert.ok(n.navPages.machines.every((p) => p.id !== "worktrees"));
+  assert.deepEqual(n.movedPage("a", "worktrees"), { nav: "machines", section: "machines" });
+});
+
+test("resources are on each machine's page, and the old address goes to Machines (#3629)", () => {
+  assert.ok(n.navPages.machines.every((p) => p.id !== "resources"));
+  assert.deepEqual(n.movedPage("a", "resources"), { nav: "machines", section: "machines" });
 });

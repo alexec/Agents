@@ -120,7 +120,12 @@ struct SettingsWindow: View {
                     model.agentConfigFileAsked = nil
                 }
             }
-            if asked == .machines { machinesPage = .list }
+            if asked == .machines {
+                // This Mac's own page when its page asked; another machine's settings are on
+                // the list, in its menu.
+                machinesPage = model.settingsMachineAsked == .mac && model.hasMacHost ? .thisMac : .list
+                model.settingsMachineAsked = nil
+            }
         }
         .onChange(of: pane.wrappedValue) { _, chosen in
             if chosen == .agentConfiguration { Task { await refreshShared() } }

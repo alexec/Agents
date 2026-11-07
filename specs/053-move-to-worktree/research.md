@@ -64,7 +64,8 @@ So Grok and Cursor may answer `session/resume` or `session/load` in a new folder
 | Cursor | yes | yes (the hash was not the folder, or its load looks further) |
 | Grok | **no**: `session/load` answers `-32603 Path not found` (`FS_NOT_FOUND`) | — |
 | Codex | yes (measured 2026-09-26 on the app's own copy) | yes |
-| Gemini, Antigravity | not measured: each needs a credential the daemon lends at launch, which the bare test does not have | |
+| Antigravity | yes (1.4.5, measured 2026-11-06 by hand through its ACP adapter, by `session/resume` and by `session/load`; its own tools worked in folder B, #1361) | yes |
+| Gemini | not measured: it needs a credential the daemon lends at launch, which the bare test does not have | |
 
 **Decision (Alex, 2026-09-26)**: runtimes that do not carry their conversation are left out of
 moving altogether: `RuntimeCatalog.carriesConversationAcrossFolders` lists the ones measured to

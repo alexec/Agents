@@ -132,8 +132,8 @@ test("Add as Machine… installs, shows a new host key first, and links the mach
   const p = new w.Providers({
     call: async (method, params) => {
       asked.push({ method, params });
-      if (method === "hosts/install") return params.trust ? { name: "cs-box", tunnel: false } : { needsTrust: "SHA256:abc", name: "cs-box" };
-      if (method === "hosts/link") return {};
+      if (method === "machines/install") return params.trust ? { name: "cs-box", tunnel: false } : { needsTrust: "SHA256:abc", name: "cs-box" };
+      if (method === "machines/link") return {};
       throw new Error(method);
     },
   });
@@ -144,16 +144,16 @@ test("Add as Machine… installs, shows a new host key first, and links the mach
     { destination: "cs.cs-box", name: "cs-box", provider: "gh", workspace: "cs-box-id", trust: "SHA256:abc" });
   // Not joined yet: nothing to link.
   p.linkJoined([{ id: "1", name: "other" }]);
-  assert.equal(asked.filter((a) => a.method === "hosts/link").length, 0);
+  assert.equal(asked.filter((a) => a.method === "machines/link").length, 0);
   p.linkJoined([{ id: "1", name: "other" }, { id: "7", name: "cs-box" }]);
   p.linkJoined([{ id: "7", name: "cs-box" }]);
   // The key trusted for the install is the one the link keeps (#3379).
-  assert.deepEqual(asked.filter((a) => a.method === "hosts/link").map((a) => a.params),
+  assert.deepEqual(asked.filter((a) => a.method === "machines/link").map((a) => a.params),
     [{ host: "7", provider: "gh", workspace: "cs-box-id", trust: "SHA256:abc" }]);
 });
 
 test("Link to Machine… shows a new host key first, then links with it trusted (#3379)", async () => {
-  assert.ok(w.callTimeoutFor("hosts/link") >= 60_000);
+  assert.ok(w.callTimeoutFor("machines/link") >= 60_000);
   const asked = [];
   const p = new w.Providers({
     call: async (method, params) => {
@@ -175,12 +175,12 @@ test("Add as Machine… says why the control plane refused", async () => {
 });
 
 test("Add as Machine… waits for the install, and links the machine also when the page stopped waiting (#3377)", async () => {
-  assert.ok(w.callTimeoutFor("hosts/install") >= 10 * 60_000);
+  assert.ok(w.callTimeoutFor("machines/install") >= 10 * 60_000);
   const linked = [];
   const p = new w.Providers({
     call: async (method, params) => {
-      if (method === "hosts/install") throw new w.CallTimedOut("hosts/install");
-      if (method === "hosts/link") return linked.push(params);
+      if (method === "machines/install") throw new w.CallTimedOut("machines/install");
+      if (method === "machines/link") return linked.push(params);
       throw new Error(method);
     },
   });
@@ -190,7 +190,7 @@ test("Add as Machine… waits for the install, and links the machine also when t
   // A refusal installed nothing: nothing to link.
   const refused = new w.Providers({
     call: async (method, params) => {
-      if (method === "hosts/install") throw new w.CallFailed(-32001, "No.");
+      if (method === "machines/install") throw new w.CallFailed(-32001, "No.");
       return linked.push(params);
     },
   });
@@ -212,7 +212,7 @@ function plane({ oneCopy = true, working = false } = {}) {
       if (method === "providers/refresh") return {};
       if (method === "providers/add") return summary({ id: "new", name: params.name });
       if (method === "providers/remove") return {};
-      if (method === "hosts/stop") {
+      if (method === "machines/stop") {
         if (working && !params.confirmRunning) throw new w.CallFailed(w.Failure.agentsWorking, "Stop box? A is working there.");
         return { id: params.host };
       }

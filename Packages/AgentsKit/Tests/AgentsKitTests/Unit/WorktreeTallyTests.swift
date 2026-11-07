@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import AgentsKitCore
 
-/// Activity ▸ Worktrees (#790): the order, the words, and sizes heard after the list.
+/// A machine's worktrees (#790, #3627): the order, the words, and sizes heard after the list.
 @Suite("Worktree tally")
 struct WorktreeTallyTests {
     private static let gb: Int64 = 1_000_000_000
@@ -24,11 +24,9 @@ struct WorktreeTallyTests {
 
     @Test func thePageSaysHowMuchAndHowMuchIsIdle() {
         let tally = WorktreeTally([worktree("a", gb: 9, agents: 1), worktree("b", gb: 3, partial: true), worktree("c", gb: nil)])
-        #expect(tally.rowWords == "3 worktrees, 2 idle")
         #expect(tally.pageLine == "Worktrees hold over 12.0 GB, 3.0 GB of it idle.")
         #expect(WorktreeTally([worktree("c", gb: nil)]).pageLine == "Measuring 1 worktree…")
         #expect(WorktreeTally([DaemonAPI.WorktreeSummary]()).pageLine == WorktreeTally.empty)
-        #expect(WorktreeTally([DaemonAPI.WorktreeSummary]()).rowWords == nil)
     }
 
     @Test func removeBuildOutputSaysWhatItFreed() {

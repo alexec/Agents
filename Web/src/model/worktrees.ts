@@ -1,5 +1,5 @@
-// Activity ▸ Worktrees (#790), as AgentsKitCore's WorktreeTally and WorktreeSummary.cleanupOrder
-// say it, so the page says what the window's and the Remote's say: idle ones first, largest first.
+// A machine's worktrees on its page (#790, #3627), as AgentsKitCore's WorktreeTally and
+// WorktreeSummary.cleanupOrder say it, so the page says what the window's says: idle ones first, largest first.
 import type {
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeStatus, WorktreeSummary,
 } from "../protocol/generated";
@@ -43,14 +43,8 @@ export function tally(worktrees: readonly WorktreeSummary[]): WorktreeTally {
   return t;
 }
 
-/** The Activity row's tooltip: "12 worktrees, 5 idle". */
-export function rowWords(t: WorktreeTally): string | null {
-  if (t.count === 0) return null;
-  return `${t.count} ${t.count === 1 ? "worktree" : "worktrees"}, ${t.idle} idle`;
-}
-
 export const worktreesEmpty = "No worktrees. A session started in a new worktree makes one.";
-export const worktreesIntro = "Every folder's worktrees and how much each holds on disk. Idle ones, with no session in them, come first, largest first.";
+export const worktreesIntro = "Each folder's worktrees on this machine and how much each holds on disk. Idle ones, with no session in them, come first, largest first.";
 export const measuring = "Measuring…";
 export const cleanUpPrompt = "Remove worktrees and delete branches for any work that has been merged to the default branch.";
 

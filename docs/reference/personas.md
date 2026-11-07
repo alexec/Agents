@@ -73,3 +73,38 @@ Picking a persona:
 You can still change anything before you start.
 
 When a runtime advertises ACP's session system-prompt capability, the persona prompt is appended after the app's briefing on session creation and when the app loads, resumes or forks the session. Otherwise the app uses a runtime compatibility adapter where available, or sends the persona prompt before your words in the first user prompt. It is read from the file each time, and is not shown in the transcript.
+
+## From a marketplace
+
+A GitHub marketplace (a repository; see [Choose marketplaces](../how-to/choose-marketplaces.md))
+can hold personas as well as skills. They are the files in its `personas/` folder, next to
+`skills/`, one `<id>.md` each, in the format above. Only the top of `personas/` counts: a file
+in a folder inside it is not a persona. skills.sh lists skills only, so it has no personas.
+
+In **Settings ▸ Agent Configuration ▸ Personas** (and Project Settings, for a folder),
+**Add persona…** searches the marketplace you choose. Choosing one shows the whole file,
+front matter included, and the `runtime`, `model`, `effort` and `permission-mode` it sets.
+**Add** writes it at the repository's current commit to `~/.agents/personas/<id>.md` or the
+folder's `.agents/personas/<id>.md`.
+
+The app records each one in the same lock file as skills, `~/.agents/.skill-lock.json` or the
+folder's `skills-lock.json`, under a `personas` key of its own, with the repository, the path,
+the commit and the file's blob SHA. Personas are kept out of `skills` so that the `skills`
+tool never takes one for a skill. That tool does not know the key, so when it writes a
+folder's lock again, the key goes, and those personas become ones you made: the app leaves
+them alone.
+
+- **Update:** when the source changes, the persona shows **update**. The app asks GitHub at
+  most once an hour for each repository. **Update…** shows a diff of the file, and nothing
+  changes until you choose **Update**. The old copy goes to the Trash.
+- **A warning:** when an update changes `runtime` or `permission-mode`, the update sheet says
+  so above the diff, with the old and the new value.
+- **No automatic update.** A persona sets the permission mode and the runtime, so a silent
+  change at the source could give new sessions more permissions, or a runtime that costs more.
+- **Personas you made:** the app does not update or remove a persona that the lock does not
+  name, and does not add one over it. If you edit one that you added, the page marks it
+  **edited**, and an update asks again before your edits go to the Trash.
+- **Remove…** moves the file to the Trash and takes it out of the lock.
+
+This is on the Mac. The web page and the Remote do not add personas from a marketplace yet;
+they still pick and edit them.

@@ -73,7 +73,7 @@ export function AddMachineDialog({ store, close, start = { kind: "choose" } }: {
   );
 }
 
-/** A server's one command, or another Mac's code: `hosts/startEnroll`, with Copy, and who joined with it. */
+/** A server's one command, or another Mac's code: `machines/startEnroll`, with Copy, and who joined with it. */
 function EnrollCode({ store, command, close }: { store: Store; command: boolean; close: () => void }) {
   const shown = useSignal<ControlCodeShown | null>(null);
   const problem = useSignal<string | null>(null);
@@ -81,7 +81,7 @@ function EnrollCode({ store, command, close }: { store: Store; command: boolean;
   const [before] = useState(() => new Set(store.hosts.peek().map((h) => h.id)));
   useEffect(() => {
     // With an invite on the lock in the code, so the machine adds itself (#3491, D3).
-    store.link.call("hosts/startEnroll", {})
+    store.link.call("machines/startEnroll", {})
       .then((code) => (store.planeHas(Capability.lockJoin1) ? store.machineLock.invite(code) : code))
       .then((code) => { shown.value = code; })
       .catch((error) => { problem.value = describe(error); });

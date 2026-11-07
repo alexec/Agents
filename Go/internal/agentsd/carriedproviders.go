@@ -51,7 +51,7 @@ func (d *Daemon) carried() *carriedProviders {
 }
 
 // carriedMethods are the asks askedProvider answers on channel 0, which no client can send:
-// said in host/hello as providers.carry/1, so the control plane asks only a host that has them.
+// said in machine/hello as providers.carry/1, so the control plane asks only a host that has them.
 var carriedMethods = []string{wire.CallProvidersCarry.Name, wire.CallProvidersForget.Name,
 	wire.CallProvidersKeepSecrets.Name, wire.CallProvidersSSH.Name}
 
@@ -253,10 +253,10 @@ func (c *carriedProviders) forget(provider string) wire.ProviderCarried {
 }
 
 // installProgress says a step of an install this machine runs to the control plane
-// (host/installProgress, #3497), which says it to the person's clients.
+// (machine/installProgress, #3497), which says it to the person's clients.
 func (d *Daemon) installProgress(name, step string) {
 	if tell := d.tellControl.Load(); tell != nil {
-		(*tell)(wire.NotifyHostInstallProgress.Name, wire.ControlInstallProgress{Name: name, Step: step})
+		(*tell)(wire.NotifyMachineInstallProgress.Name, wire.ControlInstallProgress{Name: name, Step: step})
 	}
 }
 

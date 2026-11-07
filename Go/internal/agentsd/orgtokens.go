@@ -17,9 +17,9 @@ import (
 // machine as it seals a key; the control plane cannot open it, so this machine makes its
 // own token from it, at most an hour long, and a new one when the last has less than 10
 // minutes to go. The token is kept in memory only. orgRoutes/check comes here too
-// (host/orgRouteCheck): this machine has the key, the control plane does not.
+// (machine/orgRouteCheck): this machine has the key, the control plane does not.
 
-// orgCheckTimeout bounds host/orgRouteCheck.
+// orgCheckTimeout bounds machine/orgRouteCheck.
 const orgCheckTimeout = 25 * time.Second
 
 // orgToken is a token made for a route's seal, and after a renewal that failed, how many
@@ -96,7 +96,7 @@ func (d *Daemon) routeToken(ctx context.Context, r wire.DeliveredRoute, values m
 	return t.value, nil
 }
 
-// checkOrgRoute is host/orgRouteCheck: orgRoutes/check with this machine's copy.
+// checkOrgRoute is machine/orgRouteCheck: orgRoutes/check with this machine's copy.
 func (d *Daemon) checkOrgRoute(params json.RawMessage) wire.OrgRouteCheck {
 	var request wire.OrgRouteRequest
 	if json.Unmarshal(params, &request) != nil {

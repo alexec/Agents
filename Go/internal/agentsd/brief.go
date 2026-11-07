@@ -6,9 +6,11 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
+	"github.com/alexec/agents/Go/internal/agentsd/acp"
 	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -64,6 +66,56 @@ func endingBrief(runtimeID string) string {
 // fallback.
 var compatibilitySystemPromptDelivery = map[string]string{"claude": "append", "grok": "rules", "codex": "customInstructions"}
 
+// briefFileDelivery is the runtimes that read the brief from a file of the agent's own,
+// named in their configuration for that process, and the variable that carries it (#2612).
+// OpenCode 1.18.33 advertises no system prompt and ignores _meta.systemPrompt, but reads
+// each path in OPENCODE_CONFIG_CONTENT's instructions as system instructions on every
+// prompt, also after session/load. One process serves one agent, so the file is private to
+// it: the folder's AGENTS.md and the person's opencode.json are not touched.
+var briefFileDelivery = map[string]string{"opencode": "OPENCODE_CONFIG_CONTENT"}
+
+// briefFileName is the brief's file in the agent's own folder, which goes with the agent.
+const briefFileName = "brief.md"
+
+// withBriefFile is l with the brief written to the agent's folder and named in the
+// runtime's configuration, where runtimeID reads one (briefFileDelivery).
+func withBriefFile(l acp.Launch, runtimeID, folder, words string) (acp.Launch, error) {
+	variable := briefFileDelivery[runtimeID]
+	if words == "" || variable == "" {
+		return l, nil
+	}
+	if err := os.MkdirAll(folder, 0o700); err != nil {
+		return l, err
+	}
+	file := filepath.Join(folder, briefFileName)
+	if err := os.WriteFile(file, []byte(words+"\n"), 0o600); err != nil {
+		return l, err
+	}
+	config := map[string]any{}
+	prefix := variable + "="
+	for _, kv := range l.Env {
+		if strings.HasPrefix(kv, prefix) {
+			if err := json.Unmarshal([]byte(kv[len(prefix):]), &config); err != nil {
+				return l, fmt.Errorf("%s: %w", variable, err)
+			}
+		}
+	}
+	instructions, _ := config["instructions"].([]any)
+	config["instructions"] = append(slices.Clone(instructions), file)
+	b, err := json.Marshal(config)
+	if err != nil {
+		return l, err
+	}
+	l.Env = append(without(l.Env, variable), prefix+string(b))
+	return l, nil
+}
+
+// briefOutOfPrompt is whether the runtime takes the brief some other way than before the
+// person's words in the first prompt.
+func briefOutOfPrompt(runtimeID string) bool {
+	return compatibilitySystemPromptDelivery[runtimeID] != "" || briefFileDelivery[runtimeID] != ""
+}
+
 // brief is the whole of it for an agent, in the order it is said: who is who first, since
 // the paragraphs after it say "I" and "me" and that is the person it names; then the three
 // of #1801; then the rest of Briefing.lines(for:), the ones that depend on the runtime
@@ -72,7 +124,7 @@ func (d *Daemon) brief(a *wire.Agent) string {
 	parts := []string{d.namingBrief(a), leasesWithDeclared(d.declaredResources()), eventsBrief,
 		endingBrief(a.RuntimeID), liveDocumentBrief, escalationBrief(a.RuntimeID),
 		workflowsBrief(a.RuntimeID), helpersBrief, sessionsBrief,
-		toolsBrief(d.offersBrowser(), d.offersDriveScreen(), d.isBot())}
+		toolsBrief(d.offersBrowser(), d.offersDriveScreen(), d.isBot(), d.hasGitHub())}
 	if appToolServed("move_worktree") && runtimeCanMove(a.RuntimeID) {
 		parts = append(parts, worktreesBrief)
 	}
@@ -207,8 +259,8 @@ const sessionsBrief = "To continue another session in this folder, read it with 
 // defers MCP tools, so a tool no paragraph names is one it does not know it has; and a
 // folder's AGENTS.md and skills reach only that folder. The browser and drive_screen are
 // named only where this host lists them, as tools/list does; hand_to_person not on a bot's
-// machine, where nobody answers it.
-func toolsBrief(browser, screen, bot bool) string {
+// machine, where nobody answers it. The CI tools (#3706) only where GitHub is connected.
+func toolsBrief(browser, screen, bot, github bool) string {
 	lines := []string{
 		"- notify: tell me that something happened, when you have no question for me.",
 		"- set_session_labels: label this session #<n> for an issue or P#<n> for a pull request. This links them to it.",
@@ -216,6 +268,10 @@ func toolsBrief(browser, screen, bot bool) string {
 		"- estimate_issue: say what an issue or an epic will cost and take.",
 		"- list_machines, then start_session with machine: work on another of my machines. bring_back " +
 			"brings its branch back here. start_machine, stop_machine, make_machine and delete_machine control the machines.",
+	}
+	if github {
+		lines = append(lines, "- set_ci_secret, set_ci_variable and set_environment_gate: set up a GitHub repository's CI. "+
+			"set_ci_secret puts a secret I gave you with ask_secret into it, without you seeing the value; never put a secret's value in a variable.")
 	}
 	if browser {
 		lines = append(lines,
@@ -249,6 +305,12 @@ var residueBrief = map[string]string{
 // firstPromptCards is AppToolPreface.firstPrompt: Cursor has the app's tools from the
 // agents server itself and only needs pointing at them.
 var firstPromptCards = map[string]string{"cursor": "Call `agents` tools directly."}
+
+// hasGitHub is whether this host has a GitHub connection it can use, for the CI tools.
+func (d *Daemon) hasGitHub() bool {
+	c, ok := d.githubConnection()
+	return ok && c.Usable(nowFunc())
+}
 
 // appToolServed is whether this host serves an app tool, so the brief names none it lacks.
 func appToolServed(name string) bool {

@@ -83,7 +83,7 @@ func TestAFrozenCopyChangesNothing(t *testing.T) {
 	if e := callError(t, window, "", "clients/startPairing", nil); !strings.Contains(e, "moving to another machine") {
 		t.Fatal(e)
 	}
-	call(t, window, "", "hosts/list", nil)
+	call(t, window, "", "machines/list", nil)
 	d.must("handover/unfreeze", nil)
 	call(t, window, "", "clients/startPairing", nil)
 }

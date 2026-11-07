@@ -255,11 +255,20 @@ func TestOursAreListedAndAddedLikeAnyConnector(t *testing.T) {
 
 	var ours wire.MCPSearchAnswer
 	json.Unmarshal(c.call(t, 2, "catalog/search", map[string]any{"query": "", "kind": "mcp", "marketplace": "provided:agents"}), &ours)
-	if len(ours.Results) != 11 || ours.Results[0].Title != "GitHub" || ours.Results[1].Title != "Linear" || ours.Results[2].Title != "Jira" ||
+	if len(ours.Results) != 13 || ours.Results[0].Title != "GitHub" || ours.Results[1].Title != "Linear" || ours.Results[2].Title != "Jira" ||
 		ours.Results[3].Title != "GitLab" || ours.Results[4].Title != "Email" || ours.Results[5].Title != "Slack" ||
 		ours.Results[6].Title != "Google Chat" || ours.Results[7].Title != "WhatsApp" || ours.Results[8].Title != "Sentry" ||
-		ours.Results[9].Title != "Sentry events" || ours.Results[10].Title != "Forgejo" {
+		ours.Results[9].Title != "Sentry events" || ours.Results[10].Title != "Better Stack" || ours.Results[11].Title != "Better Stack events" ||
+		ours.Results[12].Title != "Forgejo" {
 		t.Fatalf("%+v", ours)
+	}
+	// Better Stack's own server is a remote one on its host (#3655); its events are ours.
+	if bs := ours.Results[10]; bs.ID != "com.betterstack/mcp" || bs.Publisher.Label != "betterstack" ||
+		len(bs.Runs) != 1 || bs.Runs[0] != wire.MCPRunKindRemote || deref(bs.RemoteHost) != "mcp.betterstack.com" {
+		t.Fatalf("better stack: %+v", bs)
+	}
+	if events := ours.Results[11]; *events.Levels != (wire.MCPLevels{Events: true}) {
+		t.Fatalf("better stack events: %+v", events.Levels)
 	}
 	// Sentry's own server is a remote one on Sentry's host, signed in by OAuth (#3583); its events are ours,
 	// and File a bug from Sentry starts on them (#3586).

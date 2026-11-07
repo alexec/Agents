@@ -19,7 +19,7 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// The machine lock (#3399, specs/3399-machine-lock): host/lock is the person's whole lock.
+// The machine lock (#3399, specs/3399-machine-lock): machine/lock is the person's whole lock.
 // This host checks it, and pins the head it took in <root>/lock-pin.json; it takes only a
 // lock that grows from that pin. The first lock it is sent is taken on trust (D9), unless
 // the code it joined with carried the lock's head (D3): then it pins that one. A lock that
@@ -28,8 +28,8 @@ import (
 // the lock again (lockcheck.go, #3492).
 //
 // A machine joins the lock (#3491, D3): with the invite from its join code it signs its
-// own addMachine (host/lockAdd). With none (it asked to join, a provider started it with no
-// client there, or it joined before the lock) it asks as a client does (host/lockJoin): a
+// own addMachine (machine/lockAdd). With none (it asked to join, a provider started it with no
+// client there, or it joined before the lock) it asks as a client does (machine/lockJoin): a
 // signer sends a nonce, this machine reveals its own, and it shows the six digits in its
 // log and in <root>/lock-join-shown for the person to compare.
 
@@ -116,7 +116,7 @@ func (d *Daemon) LockPin() machinelock.Pin {
 	return pin
 }
 
-// toldLock is host/lock.
+// toldLock is machine/lock.
 func (d *Daemon) toldLock(params json.RawMessage) {
 	var lock wire.Lock
 	if err := json.Unmarshal(params, &lock); err != nil {
@@ -214,7 +214,7 @@ func (d *Daemon) joinLockLocked(state *machinelock.State, invite *controllink.Lo
 			if _, open := state.Invite(machinelock.PublicKey(signer), now); open {
 				entry, err := machinelock.AddMachine(signer, state, key, host, name, now)
 				if err == nil {
-					(*tell)(wire.NewMethodName(wire.CallHostLockAdd.Name), wire.LockAdd{Entries: []wire.LockEntry{entry}})
+					(*tell)(wire.CallMachineLockAdd.Name, wire.LockAdd{Entries: []wire.LockEntry{entry}})
 					log.Printf("lock: added this machine to %s's lock with the invite from its join code", state.Person)
 					return
 				}
@@ -230,11 +230,11 @@ func (d *Daemon) joinLockLocked(state *machinelock.State, invite *controllink.Lo
 	rand.Read(nonce)
 	d.lockAsk = &lockAsk{nonce: nonce, asked: now}
 	os.Remove(filepath.Join(root, lockShownFile))
-	(*tell)(wire.NewMethodName(wire.CallHostLockJoin.Name), wire.LockJoin{Key: key, Commitment: machinelock.Commitment(key, nonce)})
+	(*tell)(wire.CallMachineLockJoin.Name, wire.LockJoin{Key: key, Commitment: machinelock.Commitment(key, nonce)})
 	log.Printf("lock: this machine is not in %s's lock: asking to join; approve it on one of your devices", state.Person)
 }
 
-// toldLockJoin is host/lockJoinChanged: this machine's request, as it goes on.
+// toldLockJoin is machine/lockJoinChanged: this machine's request, as it goes on.
 func (d *Daemon) toldLockJoin(params json.RawMessage) {
 	var r wire.LockJoinRequest
 	if err := json.Unmarshal(params, &r); err != nil {
@@ -256,7 +256,7 @@ func (d *Daemon) toldLockJoin(params json.RawMessage) {
 		return
 	}
 	ask.revealed = true
-	(*tell)(wire.NewMethodName(wire.CallHostLockJoinReveal.Name), wire.LockJoinNonce{Request: r.Request, Nonce: ask.nonce})
+	(*tell)(wire.CallMachineLockJoinReveal.Name, wire.LockJoinNonce{Request: r.Request, Nonce: ask.nonce})
 	// The digits made here, from this machine's own key and nonce: a control plane that
 	// passed on another key could only pass on that key's digits.
 	digits := machinelock.Digits(r.Key, ask.nonce, r.Nonce)
@@ -290,7 +290,7 @@ func (d *Daemon) ResetLock() {
 	d.lockHeld, d.lockRead, d.lockAsk = nil, false, nil
 	log.Printf("lock: reset by agentsd lock reset; the next lock the control plane sends is pinned on first use")
 	if tell := d.tellControl.Load(); tell != nil {
-		(*tell)(wire.NewMethodName(wire.CallHostLockAgain.Name), wire.Empty{})
+		(*tell)(wire.CallMachineLockAgain.Name, wire.Empty{})
 	}
 }
 

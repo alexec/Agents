@@ -113,7 +113,7 @@ public extension DaemonAPI {
                 Row(Method.agentsResuming, params: Empty.self, result: ResumingResponse.self, kind: .hostRequest),
                 Row(Method.worktreesList, params: WorktreesListRequest.self, result: WorktreesListResponse.self,
                     kind: .hostRequest),
-                // Activity ▸ Worktrees (#790): every folder's, with sizes; Remove build output and Remove….
+                // A machine's page ▸ Worktrees (#790, #3627): every folder's, with sizes; Remove build output and Remove….
                 Row(Method.worktreesAll, params: Empty.self, result: [FolderWorktrees].self, kind: .hostRequest),
                 Row(Method.worktreesRemoveBuildOutput, params: WorktreeRemovalRequest.self, result: BuildOutputRemoved.self,
                     kind: .hostRequest),
@@ -176,6 +176,8 @@ public extension DaemonAPI {
                 Row(Method.diskState, params: Empty.self, result: DiskState.self, kind: .hostRequest),
                 // What runs on a machine, on its page (#3453).
                 Row(Method.processesList, params: Empty.self, result: ProcessesState.self, kind: .hostRequest),
+                // A machine's page: its CPU, memory and disks (#3626).
+                Row(Method.machineUsage, params: Empty.self, result: MachineUsageState.self, kind: .hostRequest),
                 // Backups of the machine, in Settings (#1810).
                 Row(Method.backupsState, params: Empty.self, result: BackupState.self, kind: .hostRequest),
                 Row(Method.backupsConfigure, params: BackupSettings.self, result: BackupState.self, kind: .hostRequest),

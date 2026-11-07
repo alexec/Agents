@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -29,6 +30,8 @@ type quitState struct {
 	diskMu     sync.Mutex
 	diskLevels map[string]wire.DiskLevel
 	diskAlarms []wire.DiskAlarm
+	// diskVolumes is every volume of the last look, ok ones too, for a machine's page (#3626).
+	diskVolumes []wire.DiskAlarm
 	// toldRefused is set once storage/writeFailed has said the disk refused a chat's
 	// lines, and cleared when every held line is written (#3245): one alert an outage.
 	toldRefused atomic.Bool
@@ -58,6 +61,9 @@ func (d *Daemon) registerHost() {
 	})
 	On(d, wire.CallDiskState, func(ctx context.Context, c *Client, _ wire.Empty) (wire.DiskState, error) {
 		return d.diskState(), nil
+	})
+	On(d, wire.CallMachineUsage, func(ctx context.Context, c *Client, _ wire.Empty) (wire.MachineUsageState, error) {
+		return d.machineUsageState(ctx), nil
 	})
 	On(d, wire.CallProcessesList, func(ctx context.Context, c *Client, _ wire.Empty) (wire.ProcessesState, error) {
 		return d.processesState(ctx), nil
@@ -439,7 +445,7 @@ func (d *Daemon) checkDisk() {
 		}
 		d.eventMu.Unlock()
 	}
-	var alarms []wire.DiskAlarm
+	var alarms, volumes []wire.DiskAlarm
 	var crossedLow []wire.DiskAlarm
 	type crossedOK struct {
 		reading   wire.DiskReading
@@ -463,6 +469,7 @@ func (d *Daemon) checkDisk() {
 			threshold = critical
 		}
 		alarm := wire.DiskAlarm{Reading: m.reading, Level: level, Threshold: threshold, Worktrees: []wire.DiskWorktree{}}
+		volumes = append(volumes, alarm)
 		if level != wire.DiskLevelOk {
 			alarms = append(alarms, alarm)
 		}
@@ -477,17 +484,22 @@ func (d *Daemon) checkDisk() {
 	for k, v := range d.diskLevels {
 		levels[k] = string(v)
 	}
-	sort.Slice(alarms, func(i, j int) bool {
-		if alarms[i].Level != alarms[j].Level {
-			return alarms[i].Level == wire.DiskLevelCritical
+	worstFirst := func(as []wire.DiskAlarm) func(i, j int) bool {
+		return func(i, j int) bool {
+			if as[i].Level != as[j].Level {
+				return rank[as[i].Level] > rank[as[j].Level]
+			}
+			return as[i].Reading.FreeBytes < as[j].Reading.FreeBytes
 		}
-		return alarms[i].Reading.FreeBytes < alarms[j].Reading.FreeBytes
-	})
+	}
+	sort.Slice(alarms, worstFirst(alarms))
+	sort.Slice(volumes, worstFirst(volumes))
 	changed := len(alarms) != len(d.diskAlarms)
 	for i := 0; !changed && i < len(alarms); i++ {
 		changed = alarms[i].Level != d.diskAlarms[i].Level || alarms[i].Reading.Mount != d.diskAlarms[i].Reading.Mount
 	}
 	d.diskAlarms = alarms
+	d.diskVolumes = volumes
 	d.diskMu.Unlock()
 	d.eventMu.Lock()
 	d.eventStateNow.DiskLevels = levels
@@ -495,9 +507,13 @@ func (d *Daemon) checkDisk() {
 	d.eventMu.Unlock()
 	for _, a := range crossedLow {
 		d.raiseDiskLow(a, noticed)
+		if a.Level == wire.DiskLevelCritical {
+			d.postDiskNotice(a)
+		}
 	}
 	for _, c := range crossedBack {
 		d.raiseDiskOK(c.reading, c.threshold, noticed)
+		d.withdrawDiskNotice(c.reading.Mount)
 	}
 	if changed {
 		Broadcast(d, wire.NotifyDiskChanged, wire.DiskState{Alarms: alarms})
@@ -589,6 +605,41 @@ func inScope(path string, folders []string) bool {
 
 const dropboxLimit = 25 * 1024 * 1024
 
+// dropboxTotal is the most a folder's drop box holds from dropbox/put (#3648), as
+// attachments do: one file put there by hand is the person's, and is never deleted.
+const dropboxTotal = 500 * 1024 * 1024
+
+// dropboxBytes is the bytes of every file under a drop box, but the file at but, which a
+// put replaces.
+func dropboxBytes(dir, but string) int64 {
+	var n int64
+	filepath.WalkDir(dir, func(p string, e fs.DirEntry, err error) error {
+		if err == nil && e.Type().IsRegular() && p != but {
+			if fi, err := e.Info(); err == nil {
+				n += fi.Size()
+			}
+		}
+		return nil
+	})
+	return n
+}
+
+// sweepDropboxParts removes what a put cut off left in each folder's drop box: a .part a
+// day old.
+func (d *Daemon) sweepDropboxParts() {
+	for _, p := range d.folders(true) {
+		root := filepath.Join(store.FolderPath(p.Folder.Folder), ".agents", "dropbox")
+		filepath.WalkDir(root, func(path string, e fs.DirEntry, err error) error {
+			if err == nil && e.Type().IsRegular() && strings.HasPrefix(e.Name(), ".") && strings.HasSuffix(e.Name(), ".part") {
+				if fi, err := e.Info(); err == nil && nowFunc().Sub(fi.ModTime()) > 24*time.Hour {
+					os.Remove(path)
+				}
+			}
+			return nil
+		})
+	}
+}
+
 // putInDropbox is dropbox/put: a file into a folder's .agents/dropbox, whole or not at all.
 func (d *Daemon) putInDropbox(r wire.DropboxPutRequest) (wire.DropboxPutResponse, error) {
 	folder := store.FolderPath(r.Folder)
@@ -624,6 +675,10 @@ func (d *Daemon) putInDropbox(r wire.DropboxPutRequest) (wire.DropboxPutResponse
 			}
 			dir = filepath.Join(dir, part)
 		}
+	}
+	box := filepath.Join(folder, ".agents", "dropbox")
+	if dropboxBytes(box, filepath.Join(dir, name))+int64(len(r.Data)) > dropboxTotal {
+		return wire.DropboxPutResponse{}, Invalid("The drop box is full (500 MB). Move or delete files in .agents/dropbox/ on its machine first.")
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return wire.DropboxPutResponse{}, &Error{Code: wire.FailureCouldNotSave, Message: "The file could not be put in the drop box."}

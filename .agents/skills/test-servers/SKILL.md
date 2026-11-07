@@ -120,7 +120,7 @@ The window lists the box under its own heading. `devbox.sh logs` has the server'
 
 Install over ssh instead (FR-018a), from the window's Add a Machine ▸ Over ssh, or over
 the control plane's socket: when the box's key is not in the known_hosts ssh reads, the first
-`hosts/install` answers `needsTrust` with its fingerprint, and the second, with the fingerprint,
+`machines/install` answers `needsTrust` with its fingerprint, and the second, with the fingerprint,
 installs; a key already there goes straight on (#610). `Walk610LiveTests` drives the whole of
 #610 (known, unknown, behind a jump with a tunnel, a direct host with a tunnel, a dropped
 tunnel) against a scratch control plane started with `--control-env AGENTS_SSH_CONFIG=<config>`;

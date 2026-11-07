@@ -22,6 +22,21 @@ struct EventsPageModelTests {
         DaemonAPI.EventsPage(events: events, waiting: [], hasMore: hasMore)
     }
 
+    /// Paging back stops at a bound (#3650), as live events are trimmed: the list says
+    /// there is no more for it to take.
+    @Test func pagingBackStopsAtItsBound() {
+        let model = AgentsModel()
+        let most = Int64(AgentsModel.eventsPagedMost)
+        model.takeEvents(page((0..<1_000).map { event(most * 2 - $0) }, hasMore: true))
+        var next = most * 2 - 1_000
+        while model.moreEvents {
+            model.takeEvents(page((0..<1_000).map { event(next - $0) }, hasMore: true), appending: true)
+            next -= 1_000
+        }
+        #expect(model.recentEvents.count == AgentsModel.eventsPagedMost)
+        #expect(model.recentEvents.first?.position == most * 2)
+    }
+
     @Test func aFilterIsAskedOfTheDaemon() {
         let request = DaemonAPI.EventsListRequest(before: 9, EventFilter(scope: web, groups: [.mac, .agents]))
         #expect(request.before == 9)

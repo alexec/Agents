@@ -489,6 +489,15 @@ struct LockPins {
         defaults.removeObject(forKey: name + ".lock")
     }
 
+    /// Forgets everything kept under this name (#3670): the pin, the lock, each person's pin
+    /// and lock, and whether each saved the recovery key. For a Forget of the control plane.
+    func clearAll() {
+        for key in defaults.dictionaryRepresentation().keys
+        where key == name || key.hasPrefix(name + ".") || key.hasPrefix(name + ":") {
+            defaults.removeObject(forKey: key)
+        }
+    }
+
     /// The person saved or skipped the recovery key on this device (#3493).
     func recoveryDone(_ person: String) -> Bool { defaults.bool(forKey: "\(name).recoveryDone.\(person)") }
 
