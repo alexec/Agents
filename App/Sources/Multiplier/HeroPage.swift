@@ -58,13 +58,13 @@ struct HeroPage: View {
     private var figures: some View {
         VStack(spacing: 0) {
             Text("Last 7 days")
-                .font(.title3)
+                .appText(.reading)
                 .foregroundStyle(.secondary)
             CountingText(value: shown.multiplier, digits: 1, suffix: "×")
-                .font(.system(size: 148, weight: .heavy))
+                .appFigure(.hero)
                 .padding(.top, 8)
             CountingText(value: shown.multiplier, digits: 1, prefix: "the work of ", suffix: " engineers")
-                .font(.title2)
+                .appText(.title)
                 .foregroundStyle(.secondary)
                 .padding(.bottom, 56)
             HStack(alignment: .top, spacing: 72) {
@@ -75,8 +75,9 @@ struct HeroPage: View {
             Group {
                 if let news {
                     Text(news.words)
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(news.up ? Color.accentColor : .secondary)
+                        .appText(.reading)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(news.up ? Paper.accent : .secondary)
                         .id(news.id)
                         .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),
                                                 removal: .move(edge: .top).combined(with: .opacity)))
@@ -92,8 +93,9 @@ struct HeroPage: View {
     private func stat(_ value: Double, _ label: String) -> some View {
         VStack(spacing: 4) {
             CountingText(value: value, digits: 0)
-                .font(.system(size: 56, weight: .bold))
+                .appFigure(.big)
             Text(label)
+                .appText(.supporting)
                 .foregroundStyle(.secondary)
         }
     }
@@ -101,11 +103,12 @@ struct HeroPage: View {
     private var empty: some View {
         VStack(spacing: 8) {
             Text("— ×")
-                .font(.system(size: 148, weight: .heavy))
+                .appFigure(.hero)
                 .foregroundStyle(.secondary)
             Text("No merged work in the last 7 days.")
-                .font(.title3)
+                .appText(.reading)
             Text("Your number starts when an agent’s first PR merges.")
+                .appText(.supporting)
                 .foregroundStyle(.secondary)
         }
         .lineLimit(1)
@@ -119,7 +122,7 @@ struct HeroPage: View {
             }
             Text("⌘N new session · ↑↓ move · ⌘F find")
         }
-        .font(.caption)
+        .appText(.fine)
         .foregroundStyle(.secondary)
     }
 
@@ -174,6 +177,5 @@ private struct CountingText: View {
 
     var body: some View {
         Text(prefix + value.formatted(.number.precision(.fractionLength(digits))) + suffix)
-            .monospacedDigit()
     }
 }
