@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -82,6 +83,10 @@ func TestConnectingGitHubWithTheDeviceFlow(t *testing.T) {
 	json.Unmarshal(raw, &list)
 	if len(list.Connections) != 1 || list.Connections[0].State != wire.ConnectionStateConnected {
 		t.Fatalf("list: %+v", list)
+	}
+	// The list says every provider this host connects (#3824), so a newer client offers only those.
+	if !slices.Contains(list.Providers, wire.ConnectionProviderForgejo) || len(list.Providers) != len(hostProviders) {
+		t.Fatalf("providers: %v", list.Providers)
 	}
 
 	c.call(t, 31, "connections/disconnect", map[string]any{"provider": "github"})
