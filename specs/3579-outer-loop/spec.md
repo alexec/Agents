@@ -58,7 +58,7 @@ new stage needs no wire change: only a new linker in the host.
 | Build (CI run) | `ci-run`, `github:<o>/<r>/actions/run/<id>` | `ci-run` `builds` PR, or `builds` release | there (#3581): `checks.*` and `run.completed` on a `v*` tag; a PR keeps its last 20 runs |
 | Release | `release`, `github:<o>/<r>/release/<tag>` | PR `part-of` release; milestone `shipped-in` release | there (#3023) |
 | Deploy | `deploy`, `<target>:<id>/<version>`, as `testflight:<bundle id>/<build>` or `cloudrun:<project>/<region>/<service>/<revision>` | release `deployed-as` deploy; deploy `part-of` its target | there (#3584, Cloud Run #3654): a job's `::notice title=deploy::<ref>`, read from `run.completed` on a `v*` tag |
-| Health signal | `health`, `<source>:<id>`, as `sentry:<org>/<issue id>` | health `seen-in` release or deploy | there (#3585): `health.issue_new` and `health.issue_regressed`, matched to the release by version |
+| Health signal | `health`, `<source>:<id>`, as `sentry:<org>/<issue id>` | health `seen-in` release or deploy | there (#3585): `health.issue_new` and `health.issue_regressed`, matched to the release by version; a Better Stack incident (#3655), `betterstack:<incident id>`, seen-in the release out when it started |
 | New issue | `issue` | issue `reports` health | there (#3586): the ready-made **File a bug from Sentry**; the bug its session labels itself with |
 
 - The `ci-run` kind is new, not `workflow-run`: `workflow-run` is an Agents workflow's run
@@ -117,6 +117,9 @@ new stage needs no wire change: only a new linker in the host.
     a service before our own code). The crash-reports skill stays for this folder.
 - **Decided: a status page comes later**, after the loop works. Sentry has none. Better
   Stack, Instatus and Atlassian Statuspage are the choices then. Alex can overrule.
+  **Decided (#3655): Better Stack**, because it is the only one of the three with an
+  official MCP server (`mcp.betterstack.com`: monitors, incidents and status pages), and
+  its monitors make the incidents its status page shows. Alex can overrule.
 - **Decided: health comes back as an issue, by a ready-made workflow.** A new or regressed
   Sentry issue starts a workflow. Its agent files an issue (or comments on the one that
   tracks it), as the crash-reports skill does, and links issue `reports` health. Because
@@ -145,7 +148,7 @@ The children are sub-issues of #3579, with "blocked by" links. Step 1 can start 
 Later, filed by the lead when the loop works:
 
 - A cloud service as the second deploy target (Fly, Cloud Run or Vercel): Cloud Run, #3654.
-- A status page.
+- A status page: there (#3655), Better Stack.
 - A new app from nothing, by voice: a repo, outside accounts and secrets.
 - The App Store (not only TestFlight) as a deploy target, with Alex's approval for each
   release to App Review: #3657. `app-store.yml` waits at the `app-store` environment's gate

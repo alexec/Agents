@@ -382,6 +382,12 @@ The health stage of the outer loop (spec `3579-outer-loop`), in
   `com.example.app@1.2.0+42` names the build `testflight:com.example.app/42`.
 - A walk from a health node reaches the release (1 link), its PRs (2) and the issues they
   fix (3).
+- **A Better Stack incident (#3655).** Kind `health`, ref `betterstack:<incident id>`, from
+  the betterstack events server's `health.incident_started`. An incident names no version,
+  so it is `seen-in` the release that was out when it started, source `health`, at the
+  start: of the `v*` tags done in the repo of the folder the event is scoped to, the
+  highest whose release node's first link is at or before the start. An event with no
+  folder links nothing. `health.incident_resolved` links nothing.
 - **Health back into work (#3586).** A workflow run that a `health.*` event starts links
   health `started` its session, source `helper`. An issue that session works on (its `#n`
   label: the ready-made **File a bug from Sentry** labels its session with the bug it filed
