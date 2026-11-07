@@ -15,8 +15,9 @@ iPhone, and on a narrow web page, it is the first screen, and what you open goes
 | Part | What it is |
 | --- | --- |
 | **New Session** | Starts a session in the folder you last started one in. The page it opens can change the folder. |
-| **Status** | Pages about the work going on now: **Events**, **Resources**, **Runtimes**, **Connectors** and **Worktrees**. |
-| **Usage** | Pages about past work: **Cost**, **Tokens**, **Time**, and **Milestones** until you have done every first step. |
+| **Your setup** | What is yours, once: **Runtimes**, **Connectors** and **Secrets**. |
+| **Machines** | A page for each machine: its disks, CPU and memory, **Runtimes** installed, **Resources** and **Worktrees**. |
+| **Usage** | Pages about past work: **Cost**, **Tokens**, **Time**, **Events**, and **Milestones** until you have done every first step. |
 | Smart groups | **Pinned**, **Needs You**, **For Review**, **Working** and **Unread**, each across every folder and host. See [Smart groups](#smart-groups). |
 | One group per project | Each project's sessions on every machine, and its folder's workflows. A project with one folder is that folder's group. See [A folder's group](#a-folders-group) and [A project with folders on several machines](#a-project-with-folders-on-several-machines). |
 | **Archived folders** | Folders you put away. The heading stays folded until you open it. Each has **Unarchive**. |
@@ -30,10 +31,12 @@ stays in its place however busy its folder is.
 The folders of one project are one group, in the place of the first of them. See
 [A project with folders on several machines](#a-project-with-folders-on-several-machines).
 
-**Status** and **Usage** each fold, as a folder does. Both start open. A row in **Status**
-shows its icon in red when something is wrong: **Runtimes** when no runtime can start,
-and **Connectors** when one of your connectors does not answer or one of your connections
-ended (for example, a GitLab token that expired). Its tooltip says which.
+**Your setup**, **Machines** and **Usage** each fold, as a folder does. All start open.
+On the Mac they replace the **Status** group. The iPhone and the iPad keep **Status**. A
+row in **Your setup** shows its icon in red when something is wrong: **Runtimes** when no
+runtime can start, and **Connectors** when one of your connectors does not answer or one
+of your connections ended (for example, a GitLab token that expired). Its tooltip says
+which. A machine's row is red when one of its disks is low.
 
 ## Smart groups
 

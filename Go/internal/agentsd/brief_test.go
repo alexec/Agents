@@ -296,11 +296,11 @@ func TestTheBriefNamesEveryAppTool(t *testing.T) {
 		browser, screen, bot, github bool
 		named, unnamed               []string
 	}{
-		{false, false, false, false, nil, []string{"browser_", "fill_secret", "hand_to_person", "drive_screen", "set_ci_secret"}},
+		{false, false, false, false, nil, []string{"browser_", "fill_secret", "hand_to_person", "drive_screen", "set_ci_secret", "make_app_repository"}},
 		{true, false, false, false, []string{"browser_* tools", "fill_secret", "hand_to_person", "take the browser lease themselves"}, []string{"drive_screen"}},
 		{true, false, true, false, []string{"browser_* tools", "fill_secret"}, []string{"hand_to_person"}},
 		{false, true, false, false, []string{"drive_screen", "takes the screen lease itself"}, []string{"browser_"}},
-		{false, false, false, true, []string{"set_ci_secret", "set_ci_variable", "set_environment_gate"}, []string{"browser_"}},
+		{false, false, false, true, []string{"set_ci_secret", "set_ci_variable", "set_environment_gate", "make_app_repository"}, []string{"browser_"}},
 	} {
 		got := toolsBrief(c.browser, c.screen, c.bot, c.github)
 		for _, w := range c.named {

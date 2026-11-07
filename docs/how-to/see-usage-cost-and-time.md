@@ -102,7 +102,7 @@ milestone, the **Milestones** list is under the Time charts. See
 ## See how much of an allowance is used
 
 A runtime on a plan, such as a Claude or Grok subscription, has an allowance for a
-period of time. The **Runtimes** page, in the **Status** group of the sidebar, shows
+period of time. The **Runtimes** page, in the **Your setup** group of the sidebar, shows
 where each allowance stands. When the runtime gives an amount, a bar under the words
 shows how much is used:
 

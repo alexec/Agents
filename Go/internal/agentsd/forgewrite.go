@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/alexec/agents/Go/internal/githubmcp"
 	"github.com/alexec/agents/Go/internal/lineage"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -52,6 +53,8 @@ type forgeGitHubWrites interface {
 	SetActionsSecret(ctx context.Context, repo, name, value string) error
 	SetActionsVariable(ctx context.Context, repo, name, value string) (bool, error)
 	SetEnvironmentGate(ctx context.Context, repo, environment string, reviewers []string) error
+	// A new app's repository (#3708).
+	MakeRepository(ctx context.Context, owner, name, description string) (githubmcp.Repository, bool, error)
 }
 
 // forgeGitLabWrites is what the writes ask of GitLab; a test gives a fake.

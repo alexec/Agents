@@ -114,13 +114,28 @@ export class MemoryRecoveryDone implements RecoveryDone {
 /** The pins and recovery marks this browser keeps, mine and other people's, for every control
  *  plane, gone when the control plane forgets it (#3670): a new pairing starts clean. */
 export function forgetPins(storage: Pick<Storage, "length" | "key" | "removeItem"> | undefined = globalThis.localStorage): void {
+  removePins(storage, () => true);
+}
+
+/** The pins and recovery marks of every other control plane than the one `name` is for, gone once
+ *  the page knows its own (#3750): a page is paired with one at a time. Nothing goes while `name` is
+ *  the plain one. */
+export function prunePins(name: string, storage: Pick<Storage, "length" | "key" | "removeItem"> | undefined = globalThis.localStorage): void {
+  if (name === pinKey) return;
+  removePins(storage, (key) => !under(key, name));
+}
+
+function under(key: string, name: string): boolean {
+  return key === name || key.startsWith(`${name}:`) || key.startsWith(`${name}.`);
+}
+
+function removePins(storage: Pick<Storage, "length" | "key" | "removeItem"> | undefined, goes: (key: string) => boolean): void {
   if (!storage) return;
   try {
     const kept: string[] = [];
     for (let i = 0; i < storage.length; i++) {
       const key = storage.key(i);
-      if (key && (key === pinKey || key.startsWith(`${pinKey}:`) || key.startsWith(`${pinKey}.`)
-        || key.startsWith("agents-lock-recovery-done:"))) kept.push(key);
+      if (key && (under(key, pinKey) || key.startsWith("agents-lock-recovery-done:")) && goes(key)) kept.push(key);
     }
     for (const key of kept) storage.removeItem(key);
   } catch {
@@ -204,6 +219,8 @@ export class MachineLock {
   /** The control plane's key from the key record, which names where the pins are kept. */
   private control: string | undefined;
   private readonly pins: PinStore;
+  /** The pins are this page's own, in localStorage, so another control plane's can be pruned. */
+  private readonly keepsPins: boolean;
   private readonly pinsOf: (person: string) => PinStore;
   private readonly recoveryDone: RecoveryDone;
 
@@ -212,6 +229,7 @@ export class MachineLock {
     private readonly say: (error: unknown) => void = () => undefined, private readonly now: () => WireDate = () => wireNow(),
     pinsOf?: (person: string) => PinStore, recoveryDone?: RecoveryDone) {
     const name = () => pinName(this.control);
+    this.keepsPins = !pins;
     this.pins = pins ?? pinsAt(name);
     // Another person's lock, as an admin's page pins it to check the machines it seals to (D7).
     this.pinsOf = pinsOf ?? ((person) => pinsAt(() => `${name()}:${person}`));
@@ -302,6 +320,7 @@ export class MachineLock {
     if (!record) return;
     this.client = record.client.toUpperCase();
     this.control = record.control;
+    if (this.keepsPins) prunePins(pinName(this.control));
     const { pair, publicRaw } = await this.signingKey();
     let read = await this.checked();
     if (!read) return;
