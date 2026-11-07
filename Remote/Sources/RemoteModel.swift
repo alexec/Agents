@@ -1271,6 +1271,11 @@ final class RemoteModel {
         case .permissionRequests: startClientPermission = ClientPermissionMode(rawValue: level)
         case .sandbox: startSandbox = SandboxChoice(rawValue: level)
         }
+        if field == .model || field == .permission {
+            // Kept for the next session, on every client (#3798).
+            let change = DisplayPreference.keeping(startLevels, in: displayMirror.preferences)
+            if !change.isEmpty { displayMirror.set(change) }
+        }
         if isAutoStart {
             Task { await refreshStartAutoPreview() }
         } else {
@@ -1349,6 +1354,8 @@ final class RemoteModel {
     /// choices on the page.
     func loadStartChoices() async {
         guard let folder = startOptionsFolder else { return }
+        // The levels last chosen on any client, not Ask again each time (#3798).
+        startLevels = DisplayPreference.keptLevels(in: displayMirror.preferences, default: startLevels)
         // Auto has no runtime yet, so no options of its own: what it would pick (#2658).
         if startRuntimeID == LevelWords.autoID {
             startGeneration += 1
