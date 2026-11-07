@@ -435,8 +435,9 @@ button.link {
 .markdown .table-scroll { overflow-x: auto; max-width: 100%; margin: 0 0 8px; }
 .markdown table { border-collapse: collapse; }
 .markdown th, .markdown td { border: 1px solid var(--paper-rule); padding: 3px 8px; }
-/* Its columns keep their width, as the Mac's grid does, so a wide table scrolls rather than wraps to a column of single words (#3895). */
-.markdown .table-scroll table { width: max-content; }
+/* A long cell wraps, but not to a column of single words: the Mac's TableColumns.floor, so only a table too wide at that scrolls (#3943). */
+.markdown .table-scroll :is(td, th) { vertical-align: top; }
+.markdown .table-scroll :is(td, th).long { min-width: 12em; }
 .image-placeholder { opacity: 0.6; font-style: italic; }
 
 .quiet { opacity: 0.65; margin: 0; }
@@ -1992,7 +1993,7 @@ dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
 .work-feature-row { display: flex; gap: 10px; align-items: baseline; width: 100%; padding: 3px 4px; text-align: left; background: none; border: none;
   border-radius: 0; color: inherit; font: inherit; cursor: pointer; }
 .work-feature-row .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.work-feature-row .lead { min-width: 9em; opacity: 0.7; white-space: nowrap; }
+.work-feature-row .lead { min-width: 12em; opacity: 0.7; white-space: nowrap; }
 .work-feature-row .lead.attention { color: var(--tint-attention); opacity: 1; }
 .work-plan-item { display: flex; align-items: baseline; }
 .work-plan-blocked { flex: none; margin-right: 8px; background: none; border: none; color: inherit; font: inherit; font-size: 0.85em; opacity: 0.7; cursor: pointer; white-space: nowrap; }

@@ -67,6 +67,12 @@ test("a table scrolls sideways in its own box rather than squeezing its cells (#
   assert.match(drawn, /<\/table><\/div>$/);
 });
 
+test("a table's long cell may wrap, its short ones keep their width (#3943)", () => {
+  const drawn = md("| name | purpose |\n|---|---|\n| length | Some sites refuse long passwords. |");
+  assert.match(drawn, /<td class="long">Some sites refuse long passwords\.<\/td>/);
+  assert.match(drawn, /<td>length<\/td>/);
+});
+
 test("known fenced code is coloured as inert token spans; unknown fences stay plain", () => {
   const code = md('```swift\nlet answer = "yes" // ready\n```');
   assert.match(code, /class="code-keyword">let<\/span>/);
