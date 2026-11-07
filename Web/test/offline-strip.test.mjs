@@ -133,3 +133,35 @@ test("a page opened while a host is stopped lists what it last did, from the con
   // Nothing the host itself was asked: it is stopped.
   assert.equal(link.asked.filter((a) => a.host === "box").length, 0);
 });
+
+// A machine's grey line under Machines (#3764): the same cases as MachineNeedTests.swift.
+const { machineNeed, machineNeedLine } = await load("src/views/OfflineStrip.tsx");
+const rt = (name, availability, signIn) => ({ runtime: { id: name.toLowerCase(), name }, availability, ...(signIn ? { signIn } : {}) });
+const available = { available: { path: "/p", supportsResume: true } };
+const notSignedIn = rt("Claude", { needsSignIn: { authMethods: [] } });
+
+test("a machine that needs nothing says nothing", () => {
+  assert.equal(machineNeed(row("online"), true, [rt("Claude", available)]), null);
+  assert.equal(machineNeed(undefined, true, []), null);
+});
+
+test("a machine's need goes offline, stopped, set-up, update, sign-in", () => {
+  assert.deepEqual(machineNeed(row("offline"), false, [notSignedIn]), { kind: "offline" });
+  assert.deepEqual(machineNeed(row("stopped", workspace()), false, []), { kind: "stopped" });
+  assert.deepEqual(machineNeed(row("failed", workspace({ workspaceState: "failed", problem: "No quota" })), false, []), { kind: "stopped" });
+  assert.deepEqual(machineNeed(row("offline", workspace({ workspaceState: "running" })), false, []), { kind: "offline" });
+  assert.deepEqual(machineNeed(row("failed"), false, []), { kind: "setupFailed" });
+  assert.deepEqual(machineNeed(row("needsUpdate"), true, [notSignedIn]), { kind: "update" });
+  const runtimes = [notSignedIn, rt("Codex", available, { signedIn: false }), rt("Grok", available, { signedIn: false, relayed: true }),
+    rt("Copilot", available, { signedIn: true }), rt("OpenCode", { missing: { lookedIn: [] } })];
+  assert.deepEqual(machineNeed(row("online"), true, runtimes), { kind: "signIn", runtimes: ["Claude", "Codex"] });
+});
+
+test("a machine's need in words", () => {
+  assert.equal(machineNeedLine({ kind: "offline" }, row("offline")), "devbox is offline");
+  assert.equal(machineNeedLine({ kind: "stopped" }, row("stopped", workspace())), "devbox is stopped. Agents there are paused until it starts.");
+  assert.equal(machineNeedLine({ kind: "setupFailed" }, row("failed")), "Setting up devbox failed.");
+  assert.equal(machineNeedLine({ kind: "update" }, row("needsUpdate")), "Needs an update");
+  assert.equal(machineNeedLine({ kind: "signIn", runtimes: ["Claude"] }, row("online")), "Claude needs sign-in");
+  assert.equal(machineNeedLine({ kind: "signIn", runtimes: ["Claude", "Codex"] }, row("online")), "Claude and Codex need sign-in");
+});

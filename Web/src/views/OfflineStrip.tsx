@@ -5,7 +5,7 @@
 // runs on a provider's workspace (#691, layouts.md L1): then a stopped or failed one offers Start,
 // and a starting one shows a spinner and how long so far. The words are OfflineWords.swift's.
 import { useEffect, useState } from "preact/hooks";
-import type { ControlMachine, MachineWorkspace } from "../protocol/generated";
+import type { ControlMachine, MachineWorkspace, RuntimeStatus } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import type { Store } from "../model/store";
 
@@ -50,6 +50,41 @@ export function clock(at: number, now: number): string {
 export function footLine(host: ControlMachine): string {
   const said = host.workspace ? workspaceLine(host.name, host.state, host.workspace) : null;
   return said ?? `${host.name} is ${host.state === "connecting" ? "connecting…" : "offline"}`;
+}
+
+/** What a machine needs, as its row under Machines says it in one grey line (#3764; MachineNeed.swift). */
+export type MachineNeed = { kind: "offline" | "stopped" | "setupFailed" | "update" } | { kind: "signIn"; runtimes: string[] };
+
+/** Installed but not signed in, as its line on the machine's page says (#3629; RuntimeStatus.needsSignIn). */
+export function needsSignIn(status: RuntimeStatus): boolean {
+  const a = status.availability;
+  if ("needsSignIn" in a) return true;
+  return "available" in a && status.signIn !== undefined && status.signIn !== null
+    && !status.signIn.signedIn && status.signIn.relayed !== true;
+}
+
+/** A machine's most urgent need (MachineNeed.most): offline, then stopped, then a set-up that failed,
+ *  then an update, then a runtime's sign-in; null when it needs nothing. */
+export function machineNeed(host: ControlMachine | undefined, online: boolean, runtimes: readonly RuntimeStatus[]): MachineNeed | null {
+  if (!online) {
+    const ws = host?.workspace;
+    if (host && ws && (ws.problem || ["stopped", "starting", "stopping"].includes(host.state))) return { kind: "stopped" };
+    return { kind: host?.state === "failed" ? "setupFailed" : "offline" };
+  }
+  if (host?.state === "needsUpdate") return { kind: "update" };
+  const signIn = runtimes.filter(needsSignIn).map((s) => s.runtime.name);
+  return signIn.length ? { kind: "signIn", runtimes: signIn } : null;
+}
+
+/** The grey line under a machine's row (MachineNeedWords.line): the foot's words for offline and stopped,
+ *  set-up's (HostProblem.installFailed) and updates' (stateWords). */
+export function machineNeedLine(need: MachineNeed, host: ControlMachine): string {
+  switch (need.kind) {
+    case "offline": case "stopped": return footLine(host);
+    case "setupFailed": return `Setting up ${host.name} failed.`;
+    case "update": return "Needs an update";
+    case "signIn": return `${new Intl.ListFormat("en", { type: "conjunction" }).format(need.runtimes)} ${need.runtimes.length === 1 ? "needs" : "need"} sign-in`;
+  }
 }
 
 /** Whether the strip offers Start: a stopped or failed workspace, with nothing under way. */
