@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/alexec/agents/Go/internal/emailmcp"
+	"github.com/alexec/agents/Go/internal/forgejomcp"
 	"github.com/alexec/agents/Go/internal/githubmcp"
 	"github.com/alexec/agents/Go/internal/gitlabmcp"
 	"github.com/alexec/agents/Go/internal/googlechatmcp"
@@ -219,5 +220,23 @@ func TestSentryEventsAskForItsToken(t *testing.T) {
 	if len(built.Variables) != 3 || !built.Variables[0].Required || built.Variables[0].AlreadySet || !built.Variables[1].AlreadySet ||
 		built.Variables[2].Required || built.Variables[0].Kind != wire.MCPVariableKindSecret {
 		t.Fatalf("variables: %+v", built.Variables)
+	}
+}
+
+// Forgejo (#1753) asks for a token, and the Forgejo when it is not Codeberg, kept in the
+// person's secrets, and declares the events its server raises: the gitlab server's.
+func TestForgejoAsksForItsToken(t *testing.T) {
+	forgejo, ok := OursByID("agents/forgejo")
+	if !ok || forgejo.Command != "forgejo-mcp" || !forgejo.Declares.Tools || forgejo.Declares.Views ||
+		!reflect.DeepEqual(forgejo.Declares.Events, forgejomcp.EventNames()) {
+		t.Fatalf("forgejo: %+v %v, the server's %v", forgejo, ok, forgejomcp.EventNames())
+	}
+	built := BuildOurs(forgejo, func(string) bool { return false })
+	want := `{"command":"forgejo-mcp","hosted":true,"env":{"FORGEJO_TOKEN":"${FORGEJO_TOKEN}","FORGEJO_URL":"${FORGEJO_URL}"}}`
+	if got := strings.Join(strings.Fields(built.Entry.Stringified()), ""); got != want {
+		t.Fatalf("entry: %s", got)
+	}
+	if built.NameHere != "forgejo" || len(built.Variables) != 2 || !built.Variables[0].Required || built.Variables[1].Required {
+		t.Fatalf("built: %+v", built)
 	}
 }

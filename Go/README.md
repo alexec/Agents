@@ -24,6 +24,7 @@ stay as they are.
 | `cmd/sentry-mcp/`, `internal/sentrymcp/` | The `sentry` events MCP server (#3583): an organization's new and regressed issues as `health.issue_new` and `health.issue_regressed`, polled on Sentry's REST API; no tools (Sentry's own server has them) | sentry |
 | `cmd/whatsapp-mcp/`, `internal/whatsappmcp/` | The `whatsapp` MCP server (#1352): a WhatsApp Business number's messages and answers as `message.received` and `question.answered`, by Meta's signed webhook, and tools that send as the number | whatsapp |
 | `cmd/gitlab-mcp/`, `internal/gitlabmcp/` | The `gitlab` MCP server (#1629): merge requests, pipelines and issues on GitLab, tools and events on REST v4 | gitlab |
+| `cmd/forgejo-mcp/`, `internal/forgejomcp/` | The `forgejo` MCP server (#1753): pull requests, checks and issues on Forgejo or Gitea, tools and events on REST v1, in the gitlab server's shape | forgejo |
 | `cmd/workspace-commands/`, `internal/workspacecommands/` | The command machine provider (#691, in Go since #1364): workspaces as shell commands and presets, an MCP server the control plane runs | workspaces |
 
 ## Building and testing
@@ -203,6 +204,42 @@ The tests run it against a fake GitLab over HTTP (`fake_test.go`). Agents Host c
 (`scripts/go-github-mcp.sh gitlab-mcp`) and every Linux host installs
 `gitlab-mcp-linux-<arch>` (#1636); the catalogue lists it as `agents/gitlab`, which asks for
 no secret: it reads the connection, as the linear server does.
+
+## The forgejo MCP server (`forgejo-mcp`, #1753)
+
+The gitlab server's shape for Forgejo and Gitea, which share one REST API (v1): a stdio front
+(`forgejomcp.Front`) answers `events/list` and `events/poll` and passes everything else to a
+go-sdk server with our own tools, all with one token, `FORGEJO_TOKEN` (an access token with
+read and write on repository and issue, and read on user and organization). `FORGEJO_URL`
+(or `--url`) is the Forgejo or Gitea: `https://codeberg.org` when empty.
+
+- **Events**, polled every 30 s, with the gitlab server's names, cursor and paging:
+  `checks.failed` (an open pull request's head commit whose combined commit status is
+  failure or error: Forgejo Actions, Woodpecker or any CI; the 50 open pull requests updated
+  last are read), `pr.opened`, `pr.merged`, `pr.closed`, `pr.conflicted` (not mergeable for a
+  minute at one head: Forgejo says not mergeable while it checks too), `review.requested`,
+  `review.comment` (the reviews of the pull requests updated since), `issue.opened`,
+  `issue.labelled` and `issue.closed` (the timelines of the issues updated since),
+  `issue.commented` (the repository's issue comments), `issue.assigned`. Arguments `repo`
+  (`owner/name`; left out, the repository this folder pushes to), `branch`, `pr`, `label`,
+  `issue`, `anyone` and `mine`; left out, only the owner, collaborators with write access or
+  more and the owning organisation's members count, never a bot or a fork (#728). A token
+  without admin cannot read another person's access, so it falls back to whether they are a
+  collaborator or a member.
+- **Tools:** `list_pull_requests`, `get_pull_request`, `get_checks`, `list_issues`,
+  `get_issue`, `comment_on_pull_request`, `comment_on_issue`; for the ready-made workflows
+  (#1633) `create_pull_request`, `list_pull_request_comments` and
+  `reply_to_pull_request_comment` (a review comment on the same file and line, which Forgejo
+  keeps in that thread); and, on the host's copy only, `merge_pull_request` and
+  `approve_pull_request` (a person merges, as on GitHub).
+- **No views yet**, and no connection: the Work pages, a sign-in and the folder set-up from
+  a Forgejo remote are follow-ups.
+
+The tests run it against a fake Forgejo over HTTP (`fake_test.go`); `walk_live_test.go`
+(`-tags live`) walks every event and tool on a real Forgejo or Gitea, a scratch one in a
+container. Agents Host carries it (`scripts/go-github-mcp.sh forgejo-mcp`) and every Linux
+host installs `forgejo-mcp-linux-<arch>`; the catalogue lists it as `agents/forgejo`, which
+asks for `FORGEJO_TOKEN` and `FORGEJO_URL`. See `docs/how-to/use-forgejo.md`.
 
 ## The email MCP server (`email-mcp`, #1780)
 

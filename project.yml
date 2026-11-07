@@ -478,6 +478,10 @@ targets:
       - name: Build the Sentry events MCP server
         script: sh "$SRCROOT/scripts/go-github-mcp.sh" sentry-mcp
         basedOnDependencyAnalysis: false
+      # The forgejo MCP server (#1753), built and carried the same way.
+      - name: Build the forgejo MCP server
+        script: sh "$SRCROOT/scripts/go-github-mcp.sh" forgejo-mcp
+        basedOnDependencyAnalysis: false
       # The command machine provider (#691, in Go since #1364), which agents-control looks
       # for beside itself, built and carried the same way.
       - name: Build the command machine provider
@@ -518,6 +522,9 @@ targets:
         basedOnDependencyAnalysis: false
       - name: Carry the Sentry events MCP server
         script: sh "$SRCROOT/scripts/go-github-mcp.sh" --carry sentry-mcp
+        basedOnDependencyAnalysis: false
+      - name: Carry the forgejo MCP server
+        script: sh "$SRCROOT/scripts/go-github-mcp.sh" --carry forgejo-mcp
         basedOnDependencyAnalysis: false
       - name: Carry the command machine provider
         script: sh "$SRCROOT/scripts/go-github-mcp.sh" --carry workspace-commands

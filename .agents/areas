@@ -327,6 +327,11 @@ specs/038-*/                                           ci-server
 Go/cmd/gitlab-mcp/                                     gitlab
 Go/internal/gitlabmcp/                                 gitlab
 
+# forgejo: the forgejo MCP server (#1753): pull requests, checks and issues on Forgejo or Gitea.
+Go/cmd/forgejo-mcp/                                    forgejo
+Go/internal/forgejomcp/                                forgejo
+docs/how-to/use-forgejo.md                             forgejo
+
 # email: the email MCP server (#1780): one IMAP mailbox's new mail, read, never sent.
 Go/cmd/email-mcp/                                      email
 Go/internal/emailmcp/                                  email

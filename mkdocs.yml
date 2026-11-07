@@ -123,6 +123,7 @@ nav:
       - how-to/start-a-workflow-from-an-mcp-event.md
       - how-to/use-github.md
       - how-to/use-gitlab.md
+      - how-to/use-forgejo.md
       - how-to/use-linear-issues.md
       - how-to/use-jira-issues.md
       - how-to/wait-for-mail.md
