@@ -1,0 +1,6 @@
+# Agent bots and their owners (#3859). The agent bot check
+# (.github/workflows/agent-bot-check.yml) fails a pull request that a bot here opened
+# when its owner has lost write access, or when the owner is its only approver. The
+# check reads this file from the base branch, and CODEOWNERS protects it.
+bots:
+  alexec-agents[bot]: alexec

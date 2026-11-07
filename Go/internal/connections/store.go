@@ -1,8 +1,8 @@
 // Package connections is the person's sign-ins to tools such as GitHub (#1335), Linear
-// (#1343), GitLab (#1630), one mailbox (#1780), Forgejo (#3752) and Bitbucket (#3785): one
-// connection per provider, kept by the host. The host signs in (GitHub's and GitLab's device
-// flow, Linear's authorization code with PKCE, a GitLab, Forgejo or Bitbucket token, or an IMAP
-// app password),
+// (#1343), GitLab (#1630), one mailbox (#1780), Forgejo (#3752), Bitbucket (#3785) and Azure
+// DevOps (#3802): one connection per provider, kept by the host. The host signs in (GitHub's
+// and GitLab's device flow, Linear's authorization code with PKCE, a GitLab, Forgejo, Bitbucket
+// or Azure DevOps token, or an IMAP app password),
 // keeps the tokens and refreshes them; a server that uses one (the github server) only reads it.
 //
 // Secrets are not configuration (#1035): a connection is kept in this Mac's Keychain, one
@@ -32,11 +32,11 @@ import (
 )
 
 // GitHub is the first provider (#1335). Linear is in linear.go, GitLab in gitlab.go, Email in
-// email.go, Atlassian in atlassian.go, Forgejo in forgejo.go, Bitbucket in bitbucket.go.
+// email.go, Atlassian in atlassian.go, Forgejo in forgejo.go, Bitbucket in bitbucket.go, Azure DevOps in azuredevops.go.
 const GitHub = "github"
 
 // Providers is every provider a store is asked about when it lists.
-var Providers = []string{GitHub, Linear, GitLab, Email, Atlassian, Forgejo, Bitbucket}
+var Providers = []string{GitHub, Linear, GitLab, Email, Atlassian, Forgejo, Bitbucket, AzureDevOps}
 
 // Connection is one provider's sign-in. Access and Refresh are secrets: they leave the
 // store only to the host's refresh and to a server's Authorization header.
@@ -49,7 +49,7 @@ type Connection struct {
 	// URL is the provider's root when it is not the usual one: a self-managed GitLab's.
 	URL string `json:"url,omitempty"`
 	// Resource is the provider's id for what the token reaches: an Atlassian site's cloud id,
-	// for api.atlassian.com/ex/jira/<id> (#3304).
+	// for api.atlassian.com/ex/jira/<id> (#3304), or an Azure DevOps organization (#3802).
 	Resource string `json:"resource,omitempty"`
 	// User is the name a token is sent with when it is not a bearer token: the Atlassian
 	// account's email, with a Jira Cloud API token (Basic).

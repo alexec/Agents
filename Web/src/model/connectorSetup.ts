@@ -23,25 +23,37 @@ export const otherProvidersElsewhere = "Other providers are set up on the Mac.";
 export const disconnectNote = "Disconnect deletes the machine's tokens. Every folder's GitHub slots wait for a connection again. To revoke the App too, go to github.com ▸ Settings ▸ Applications.";
 
 export function intro(folder: string, repository: string | undefined, site = "github.com"): string {
-  if (!repository) return `What agents in ${folder} can reach. It has no GitHub, GitLab, Forgejo or Bitbucket remote.`;
+  if (!repository) return `What agents in ${folder} can reach. It has no GitHub, GitLab, Forgejo, Bitbucket or Azure DevOps remote.`;
   return `What agents in ${folder} can reach. Repository ${site}/${repository}, from its git remote.`;
 }
 
-// The forge (#1632, #3752, #3785): GitHub, GitLab, Forgejo or Bitbucket fills Tasks, Code review and CI, as the Mac's words.
+// The forge (#1632, #3752, #3785, #3802): GitHub, GitLab, Forgejo, Bitbucket or Azure DevOps fills Tasks, Code review and CI, as the Mac's words.
 
 /** The forge, GitHub when the host did not say. */
 export function forgeOf(setup: ConnectorSetup): ConnectionProvider {
   return setup.forge ?? "github";
 }
 
+/** The forge's name when this page does not know it (a newer host's, #3802), else undefined. */
+export function unknownForgeOf(setup: ConnectorSetup): string | undefined {
+  const f: string | undefined = setup.forge;
+  return f !== undefined && !(providers as readonly string[]).includes(f) ? f : undefined;
+}
+
+/** The card in place of Connect for a forge this page can't connect: the Mac's ConnectorSetupWords.unknownForge. */
+export function unknownForge(setup: ConnectorSetup): string {
+  return `${setup.site ?? "github.com"} is on a forge this version of Agents can't connect (${unknownForgeOf(setup) ?? "unknown"}). Update Agents to set it up here.`;
+}
+
 export function connectTitleFor(forge: ConnectionProvider): string {
   if (forge === "forgejo") return forgejo.connectTitle;
   if (forge === "bitbucket") return bitbucket.connectTitle;
+  if (forge === "azuredevops") return azureDevOps.connectTitle;
   return forge === "gitlab" ? "Connect GitLab once: issues, merge requests and pipelines." : connectTitle;
 }
 
 export function connectNoteFor(forge: ConnectionProvider): string {
-  return forge === "gitlab" || forge === "forgejo" || forge === "bitbucket" ? `Your connection, for every folder. It reaches what your ${name(forge)} account can see.` : connectNote;
+  return forge === "gitlab" || forge === "forgejo" || forge === "bitbucket" || forge === "azuredevops" ? `Your connection, for every folder. It reaches what your ${name(forge)} account can see.` : connectNote;
 }
 
 export function connectAgain(forge: ConnectionProvider): string {
@@ -52,9 +64,9 @@ export function comesWith(forge: ConnectionProvider): string {
   return `Comes with the ${name(forge)} connection.`;
 }
 
-export const noRemote = "No GitHub, GitLab, Forgejo or Bitbucket remote";
+export const noRemote = "No GitHub, GitLab, Forgejo, Bitbucket or Azure DevOps remote";
 
-/** The button on a refused slot, and where it goes: the App's install on GitHub, the repository on GitLab, Forgejo and Bitbucket. */
+/** The button on a refused slot, and where it goes: the App's install on GitHub, the repository on GitLab, Forgejo, Bitbucket and Azure DevOps. */
 export function grantButton(setup: ConnectorSetup): string {
   return forgeOf(setup) === "github" ? "Grant on github.com" : `Open on ${setup.site ?? site(forgeOf(setup))}`;
 }
@@ -143,7 +155,7 @@ export function title(slot: ConnectorSlot): string {
 export function line(slot: ConnectorSlot, folder: string, repository: string | undefined, onMac: boolean,
   forge: ConnectionProvider = "github"): string {
   const repo = repository ?? folder;
-  const gitlab = forge === "gitlab", checks = forge === "forgejo" || forge === "bitbucket";
+  const gitlab = forge === "gitlab", checks = forge === "forgejo" || forge === "bitbucket", azure = forge === "azuredevops";
   switch (slot.state) {
     case "skipped":
       return {
@@ -155,7 +167,7 @@ export function line(slot: ConnectorSlot, folder: string, repository: string | u
         workspace: "Agents run on this Mac.",
       }[slot.slot];
     case "noRemote":
-      return `${folder} has no GitHub, GitLab, Forgejo or Bitbucket remote, so ${slot.choice} can't be read for it.`;
+      return `${folder} has no GitHub, GitLab, Forgejo, Bitbucket or Azure DevOps remote, so ${slot.choice} can't be read for it.`;
     case "failed":
     case "refused":
       return slot.message ?? "The read didn't work.";
@@ -163,19 +175,20 @@ export function line(slot: ConnectorSlot, folder: string, repository: string | u
       return "Reading…";
     case "read":
       return {
-        tasks: `No issues yet in ${repo}.`,
+        tasks: azure ? `No work items yet in ${repo}'s project.` : `No issues yet in ${repo}.`,
         codeReview: gitlab ? `No merge requests yet in ${repo}.` : `No pull requests yet in ${repo}.`,
-        ci: gitlab ? `No pipelines yet in ${repo}.` : checks ? `No checks yet on ${repo}'s default branch.` : `No workflow runs yet in ${repo}.`,
+        ci: gitlab ? `No pipelines yet in ${repo}.` : azure ? `No builds yet in ${repo}.` : checks ? `No checks yet on ${repo}'s default branch.` : `No workflow runs yet in ${repo}.`,
         docs: docs.none,
         messaging: "",
         workspace: onMac ? "Nothing to set up. Other places are set up in Providers." : otherProvidersElsewhere,
       }[slot.slot];
     case "notConnected":
       return {
-        tasks: `Agents read, file and close issues in ${repo}. ${comesWith(forge)}`,
+        tasks: azure ? `Agents read, file and close work items in ${repo}'s project. ${comesWith(forge)}`
+          : `Agents read, file and close issues in ${repo}. ${comesWith(forge)}`,
         codeReview: gitlab ? `Agents read merge requests and answer their comments. ${comesWith(forge)}`
           : `Agents open pull requests and answer reviews. ${comesWith(forge)}`,
-        ci: gitlab ? `Agents see pipelines pass and fail, and wait on them. ${comesWith(forge)}`
+        ci: gitlab || azure ? `Agents see pipelines pass and fail, and wait on them. ${comesWith(forge)}`
           : `Agents see checks pass and fail, and wait on them. ${comesWith(forge)}`,
         docs: docs.none,
         messaging: messaging.noneLine(false),
@@ -256,7 +269,7 @@ export function codespacesElsewhere(hasMac: boolean): string {
 }
 
 /** The providers a person connects, in the order Connectors shows them. */
-export const providers: ConnectionProvider[] = ["github", "linear", "gitlab", "email", "atlassian", "forgejo", "bitbucket"];
+export const providers: ConnectionProvider[] = ["github", "linear", "gitlab", "email", "atlassian", "forgejo", "bitbucket", "azuredevops"];
 
 /**
  * The providers that host can connect, in this page's order: the ones its connections/list says (#3824),
@@ -268,19 +281,24 @@ export function providersFor(hasEmail: boolean, hostProviders?: readonly string[
   return providers.filter((p) => takes.includes(p));
 }
 
-/** The provider's name: GitHub, Linear, GitLab, Email, Atlassian (Jira and Confluence, #3304), Forgejo, Bitbucket. */
+/** The connections to providers this page knows: a newer host's other ones are left out (#3802). */
+export function knownConnections(list: readonly Connection[]): Connection[] {
+  return list.filter((c) => (providers as readonly string[]).includes(c.provider));
+}
+
+/** The provider's name: GitHub, Linear, GitLab, Email, Atlassian (Jira and Confluence, #3304), Forgejo, Bitbucket, Azure DevOps. */
 export function name(p: ConnectionProvider): string {
-  return { github: "GitHub", linear: "Linear", gitlab: "GitLab", email: "Email", atlassian: jira.provider, forgejo: forgejo.name, bitbucket: bitbucket.name }[p];
+  return { github: "GitHub", linear: "Linear", gitlab: "GitLab", email: "Email", atlassian: jira.provider, forgejo: forgejo.name, bitbucket: bitbucket.name, azuredevops: azureDevOps.name }[p];
 }
 
 /** The provider's letters on its mark. */
 export function letters(p: ConnectionProvider): string {
-  return { github: "GH", linear: "L", gitlab: "GL", email: "EM", atlassian: jira.letters, forgejo: forgejo.letters, bitbucket: bitbucket.letters }[p];
+  return { github: "GH", linear: "L", gitlab: "GL", email: "EM", atlassian: jira.letters, forgejo: forgejo.letters, bitbucket: bitbucket.letters, azuredevops: azureDevOps.letters }[p];
 }
 
-/** The device page's site, for "Open github.com Again". Email has no device page; Forgejo's is Codeberg's, Bitbucket's bitbucket.org. */
+/** The device page's site, for "Open github.com Again". Email has no device page; Forgejo's is Codeberg's, Bitbucket's bitbucket.org, Azure DevOps's dev.azure.com. */
 export function site(p: ConnectionProvider): string {
-  return { github: "github.com", linear: "linear.app", gitlab: "gitlab.com", email: "", atlassian: jira.site, forgejo: "codeberg.org", bitbucket: "bitbucket.org" }[p];
+  return { github: "github.com", linear: "linear.app", gitlab: "gitlab.com", email: "", atlassian: jira.site, forgejo: "codeberg.org", bitbucket: "bitbucket.org", azuredevops: "dev.azure.com" }[p];
 }
 
 export function connectionTitle(c: Connection): string {
@@ -295,7 +313,8 @@ export function connectionNote(c: Connection, now: Date = new Date()): string {
       : "The access token ended: connect again with a new one";
   }
   const how = c.expiresAt !== undefined ? `Access token · ${tokenEnds(fromWireDate(c.expiresAt), now)}`
-    : c.provider === "forgejo" ? forgejo.how : c.provider === "bitbucket" ? bitbucket.how : c.byToken ? jira.tokenWay : "OAuth · renews by itself";
+    : c.provider === "forgejo" ? forgejo.how : c.provider === "bitbucket" ? bitbucket.how
+    : c.provider === "azuredevops" ? azureDevOps.how : c.byToken ? jira.tokenWay : "OAuth · renews by itself";
   return [c.workspace, how].filter((x): x is string => !!x).join(" · ");
 }
 
@@ -334,6 +353,7 @@ export function notConnectedNote(p: ConnectionProvider): string {
     atlassian: jira.notConnectedNote,
     forgejo: forgejo.notConnectedNote,
     bitbucket: bitbucket.notConnectedNote,
+    azuredevops: azureDevOps.notConnectedNote,
   }[p];
 }
 
@@ -349,6 +369,7 @@ export function disconnectNoteFor(p: ConnectionProvider): string {
   if (p === "atlassian") return jira.disconnectNote;
   if (p === "forgejo") return forgejo.disconnectNote;
   if (p === "bitbucket") return bitbucket.disconnectNote;
+  if (p === "azuredevops") return azureDevOps.disconnectNote;
   return "Disconnect deletes the machine's tokens. Linear's events stop until you connect again or set LINEAR_API_KEY. To revoke Agents too, go to linear.app ▸ Settings ▸ Security & access.";
 }
 
@@ -499,11 +520,114 @@ export const bitbucket = {
   disconnectNote: "Disconnect deletes the machine's token. Every folder's Bitbucket slots wait for a connection again. Bitbucket's events stop until you connect again or set BITBUCKET_TOKEN. To revoke it too, go to id.atlassian.com ▸ Security ▸ API tokens, or the repository's Access tokens.",
 };
 
-/** The connections/sign-in/token request for Bitbucket: the email only for an Atlassian API token. */
-export function bitbucketTokenRequest(email: string, token: string): { provider: "bitbucket"; user?: string; token: string } | undefined {
-  const user = email.trim(), typed = token.trim();
+/**
+ * Connect Azure DevOps (#3802): a personal access token on one organization of dev.azure.com or
+ * one collection of an Azure DevOps Server. No device page for Agents. The Mac's
+ * ConnectorSetupWords.AzureDevOps.
+ */
+export const azureDevOps = {
+  name: "Azure DevOps",
+  letters: "AZ",
+  title: "Connect Azure DevOps",
+  connectTitle: "Connect Azure DevOps once: work items, pull requests and pipelines.",
+  notConnectedNote: "Pull requests, pipelines and work items on dev.azure.com or your own Azure DevOps Server.",
+  subtitle: "For you, in every folder. Agents talks to Azure DevOps's API directly.",
+  abilities: [
+    "Read and write pull requests and their comments",
+    "Read Azure Pipelines builds",
+    "Read and write Azure Boards work items",
+  ],
+  tokenIntro: "In your organization, open User settings ▸ Personal access tokens, make a token with Code (read and write), Build (read) and Work Items (read and write), and paste it here with the organization.",
+  addressLabel: "Organization",
+  addressPrompt: "dev.azure.com/your-organization",
+  tokenLabel: "Personal access token",
+  tokenPrompt: "Paste the token",
+  tokenButton: "Connect",
+  newTokenButton: "Make a Token on Azure DevOps",
+  checking: "Checking the token with Azure DevOps…",
+  choose: "The token ends on the date you gave it. You can take it back in User settings ▸ Personal access tokens, or with Disconnect on Connectors.",
+  how: "Personal access token",
+  disconnectNote: "Disconnect deletes the machine's token. Every folder's Azure DevOps slots wait for a connection again. Azure DevOps's and Azure Boards' events stop until you connect again or set AZURE_DEVOPS_TOKEN. To revoke it too, go to User settings ▸ Personal access tokens in the organization.",
+};
+
+/** Azure DevOps Services: Make a Token's page with no organization. */
+export const azureDevOpsServices = "https://dev.azure.com";
+
+/**
+ * Where the person makes a token in the organization at address: its User settings ▸ Personal
+ * access tokens (dev.azure.com's own when no organization is given). The Mac's AzureDevOps.newTokenURL.
+ */
+export function newAzureDevOpsTokenURL(address: string): string {
+  const services = `${azureDevOpsServices}/`;
+  let typed = address.trim();
+  if (!typed) return services;
+  if (!/[./:]/.test(typed)) typed = `dev.azure.com/${typed}`;
+  let url: URL;
+  try {
+    url = new URL(typed.includes("://") ? typed : `${new URL(azureDevOpsServices).protocol}//${typed}`);
+  } catch {
+    return services;
+  }
+  const host = url.hostname.toLowerCase();
+  let parts = url.pathname.split("/").filter((p) => p);
+  let origin = url.origin;
+  if (host.endsWith(".visualstudio.com") && host !== "vs-ssh.visualstudio.com") {
+    parts = [host.slice(0, -".visualstudio.com".length)];
+    origin = azureDevOpsServices;
+  } else if (host === "dev.azure.com") {
+    parts = parts.slice(0, 1);
+  }
+  return `${origin}/${[...parts, "_usersSettings", "tokens"].join("/")}`;
+}
+
+/**
+ * The one token sheet (#3802): Connect Forgejo, Connect Bitbucket and Connect Azure DevOps, each
+ * with its own words and its one field beside the token (an address, sent as url, or an email,
+ * sent as user). The Mac's ConnectorSetupWords.TokenSheet.
+ */
+export interface TokenSheet {
+  provider: ConnectionProvider;
+  title: string;
+  intro: string;
+  field: "url" | "user";
+  fieldLabel: string;
+  fieldPrompt: string;
+  fieldType: "url" | "email" | "text";
+  tokenLabel: string;
+  tokenPrompt: string;
+  newTokenButton: string;
+  checking: string;
+  newTokenURL: (field: string) => string;
+  again: (c: Connection) => string;
+}
+
+/** The token sheet of a provider that has one: Forgejo, Bitbucket and Azure DevOps. */
+export function tokenSheet(p: ConnectionProvider): TokenSheet | undefined {
+  switch (p) {
+    case "forgejo":
+      return { provider: p, title: forgejo.title, intro: forgejo.tokenIntro, field: "url", fieldLabel: forgejo.addressLabel,
+        fieldPrompt: forgejo.addressPrompt, fieldType: "url", tokenLabel: forgejo.tokenLabel, tokenPrompt: forgejo.tokenPrompt,
+        newTokenButton: forgejo.newTokenButton, checking: forgejo.checking, newTokenURL: newForgejoTokenURL, again: forgejoAgain };
+    case "bitbucket":
+      return { provider: p, title: bitbucket.title, intro: bitbucket.tokenIntro, field: "user", fieldLabel: bitbucket.emailLabel,
+        fieldPrompt: bitbucket.emailPrompt, fieldType: "email", tokenLabel: bitbucket.tokenLabel, tokenPrompt: bitbucket.tokenPrompt,
+        newTokenButton: bitbucket.newTokenButton, checking: bitbucket.checking, newTokenURL: () => bitbucket.newTokenURL, again: () => "" };
+    case "azuredevops":
+      return { provider: p, title: azureDevOps.title, intro: azureDevOps.tokenIntro, field: "url", fieldLabel: azureDevOps.addressLabel,
+        fieldPrompt: azureDevOps.addressPrompt, fieldType: "text", tokenLabel: azureDevOps.tokenLabel, tokenPrompt: azureDevOps.tokenPrompt,
+        newTokenButton: azureDevOps.newTokenButton, checking: azureDevOps.checking, newTokenURL: newAzureDevOpsTokenURL,
+        again: (c) => c.workspace ?? "" };
+    default:
+      return undefined;
+  }
+}
+
+/** A token sheet's connections/sign-in/token request: the field as its url or user, left out when empty. */
+export function tokenRequest(sheet: TokenSheet, field: string, token: string):
+  { provider: ConnectionProvider; url?: string; user?: string; token: string } | undefined {
+  const value = field.trim(), typed = token.trim();
   if (!typed) return undefined;
-  return user ? { provider: "bitbucket", user, token: typed } : { provider: "bitbucket", token: typed };
+  return value ? { provider: sheet.provider, [sheet.field]: value, token: typed } : { provider: sheet.provider, token: typed };
 }
 
 /** Connect Email (#1780): one IMAP mailbox, by an app password that goes to the host only. */
@@ -595,19 +719,19 @@ export function emailRequest(server: string, user: string, password: string): { 
 
 /** The sheet's subtitle, list and button, by provider. */
 export function sheetSubtitleFor(p: ConnectionProvider): string {
-  return { github: sheetSubtitle, linear: linear.subtitle, gitlab: gitlab.subtitle, email: email.subtitle, atlassian: jira.subtitle, forgejo: forgejo.subtitle, bitbucket: bitbucket.subtitle }[p];
+  return { github: sheetSubtitle, linear: linear.subtitle, gitlab: gitlab.subtitle, email: email.subtitle, atlassian: jira.subtitle, forgejo: forgejo.subtitle, bitbucket: bitbucket.subtitle, azuredevops: azureDevOps.subtitle }[p];
 }
 
 export function abilitiesFor(p: ConnectionProvider): string[] {
-  return { github: abilities, linear: linear.abilities, gitlab: gitlab.abilities, email: email.abilities, atlassian: jira.abilities, forgejo: forgejo.abilities, bitbucket: bitbucket.abilities }[p];
+  return { github: abilities, linear: linear.abilities, gitlab: gitlab.abilities, email: email.abilities, atlassian: jira.abilities, forgejo: forgejo.abilities, bitbucket: bitbucket.abilities, azuredevops: azureDevOps.abilities }[p];
 }
 
 export function sheetChooseFor(p: ConnectionProvider): string {
-  return { github: sheetChoose, linear: linear.choose, gitlab: gitlab.choose, email: email.choose, atlassian: jira.choose, forgejo: forgejo.choose, bitbucket: bitbucket.choose }[p];
+  return { github: sheetChoose, linear: linear.choose, gitlab: gitlab.choose, email: email.choose, atlassian: jira.choose, forgejo: forgejo.choose, bitbucket: bitbucket.choose, azuredevops: azureDevOps.choose }[p];
 }
 
 export function continueButtonFor(p: ConnectionProvider): string {
-  return { github: continueButton, linear: linear.continueButton, gitlab: gitlab.continueButton, email: email.button, atlassian: jira.continueButton, forgejo: forgejo.tokenButton, bitbucket: bitbucket.tokenButton }[p];
+  return { github: continueButton, linear: linear.continueButton, gitlab: gitlab.continueButton, email: email.button, atlassian: jira.continueButton, forgejo: forgejo.tokenButton, bitbucket: bitbucket.tokenButton, azuredevops: azureDevOps.tokenButton }[p];
 }
 
 export function sheetStatus(s: ConnectionSignIn): string {

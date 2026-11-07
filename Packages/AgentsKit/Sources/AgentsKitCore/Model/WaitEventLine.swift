@@ -110,6 +110,7 @@ public struct WaitEventLine: Identifiable, Hashable, Sendable {
         case "workflow": "Workflows"
         case "branch": "Branches"
         case "dropbox": "Drop box"
+        case "file": "Files"
         default: "Agents"
         }
     }

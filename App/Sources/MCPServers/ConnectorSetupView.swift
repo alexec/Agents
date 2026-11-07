@@ -121,10 +121,8 @@ struct ConnectorSetupView: View {
         .sheet(isPresented: $connecting) {
             if setup?.forgeOrGitHub == .gitlab {
                 ConnectGitLabSheet(host: folder.host, onConnected: { Task { await load(.fresh) } })
-            } else if setup?.forgeOrGitHub == .forgejo {
-                ConnectForgejoSheet(host: folder.host, onConnected: { Task { await load(.fresh) } })
-            } else if setup?.forgeOrGitHub == .bitbucket {
-                ConnectBitbucketSheet(host: folder.host, onConnected: { Task { await load(.fresh) } })
+            } else if let words = setup.flatMap({ ConnectorSetupWords.tokenSheet($0.forgeOrGitHub) }) {
+                ConnectTokenSheet(words, host: folder.host, onConnected: { Task { await load(.fresh) } })
             } else {
                 ConnectGitHubSheet(host: folder.host, folder: folder, onConnected: { Task { await load(.fresh) } })
             }
@@ -156,7 +154,14 @@ struct ConnectorSetupView: View {
     // MARK: The connection
 
     @ViewBuilder private func connection(_ setup: DaemonAPI.ConnectorSetup) -> some View {
-        if let c = setup.connection, c.state == .connected {
+        if setup.unknownForge != nil {
+            // A newer host's forge (#3802): this app can't connect it, so it offers no Connect.
+            Text(ConnectorSetupWords.unknownForge(setup)).appText(.supporting).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(14)
+                .paperRaised(in: RoundedRectangle(cornerRadius: 10))
+        } else if let c = setup.connection, c.state == .connected {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 12) {
                     ConnectorMark(letters: String((c.login ?? "G").prefix(1)).uppercased())

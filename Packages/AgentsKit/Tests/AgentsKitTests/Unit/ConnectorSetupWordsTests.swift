@@ -110,7 +110,7 @@ struct ConnectorSetupWordsTests {
         let slot = DaemonAPI.ConnectorSlot(slot: .tasks, choice: "GitHub Issues", state: .noRemote)
         #expect(ConnectorSetupWords.title(slot) == "Choose a tracker")
         #expect(ConnectorSetupWords.line(slot, folder: "Blog", repository: nil)
-                == "Blog has no GitHub, GitLab, Forgejo or Bitbucket remote, so GitHub Issues can't be read for it.")
+                == "Blog has no GitHub, GitLab, Forgejo, Bitbucket or Azure DevOps remote, so GitHub Issues can't be read for it.")
     }
 
     /// Connect Linear (#1343): the hand-back page's agents://oauth/callback, read for the host.
@@ -195,6 +195,56 @@ struct ConnectorSetupWordsTests {
         #expect(ConnectorSetupWords.line(ci, folder: "App", repository: "team/app", forge: .bitbucket)
                 == "No checks yet on team/app's default branch.")
         #expect(ConnectorSetupWords.disconnectNote(.bitbucket).hasPrefix("Disconnect deletes the machine's token. Every folder's Bitbucket slots"))
+    }
+
+    /// Connect Azure DevOps (#3802): a token's row says its organization, Make a Token opens the
+    /// organization's tokens page, and an Azure DevOps folder says work items, pull requests and
+    /// builds, as the web page's.
+    @Test func azureDevOpsWords() throws {
+        let c = DaemonAPI.Connection(provider: .azuredevops, login: "Agents Test", connectedAt: Date(), workspace: "dev.azure.com/acme")
+        #expect(ConnectorSetupWords.connectionTitle(c) == "Azure DevOps \u{00B7} Agents Test")
+        #expect(ConnectorSetupWords.connectionNote(c) == "dev.azure.com/acme \u{00B7} Personal access token")
+        #expect(ConnectorSetupWords.AzureDevOps.again(c) == "dev.azure.com/acme")
+        for (typed, page) in [("", "https://dev.azure.com/"), ("acme", "https://dev.azure.com/acme/_usersSettings/tokens"),
+                              ("https://dev.azure.com/acme/Web/_git/app", "https://dev.azure.com/acme/_usersSettings/tokens"),
+                              ("acme.visualstudio.com", "https://dev.azure.com/acme/_usersSettings/tokens"),
+                              ("tfs.example.com/tfs/Main/", "https://tfs.example.com/tfs/Main/_usersSettings/tokens")] {
+            #expect(ConnectorSetupWords.AzureDevOps.newTokenURL(typed) == page)
+        }
+        #expect(ConnectorSetupWords.connectTitle(.azuredevops) == "Connect Azure DevOps once: work items, pull requests and pipelines.")
+        #expect(ConnectorSetupWords.connectButton(.azuredevops) == "Connect Azure DevOps\u{2026}")
+        let ci = DaemonAPI.ConnectorSlot(slot: .ci, choice: "Azure Pipelines", state: .read)
+        #expect(ConnectorSetupWords.line(ci, folder: "App", repository: "acme/Web/app", forge: .azuredevops)
+                == "No builds yet in acme/Web/app.")
+        let tasks = DaemonAPI.ConnectorSlot(slot: .tasks, choice: "Azure Boards work items", state: .read)
+        #expect(ConnectorSetupWords.line(tasks, folder: "App", repository: "acme/Web/app", forge: .azuredevops)
+                == "No work items yet in acme/Web/app's project.")
+        let sheet = try #require(ConnectorSetupWords.tokenSheet(.azuredevops))
+        #expect(sheet.field == .url && sheet.fieldLabel == "Organization" && sheet.again(c) == "dev.azure.com/acme")
+    }
+
+    /// The one token sheet (#3802): Forgejo's address, Bitbucket's email and Azure DevOps's
+    /// organization beside the token; the other providers have sheets of their own.
+    @Test func theTokenSheetsFields() throws {
+        let forgejo = try #require(ConnectorSetupWords.tokenSheet(.forgejo))
+        #expect(forgejo.field == .url && forgejo.title == "Connect Forgejo" && forgejo.newTokenURL("") == "https://codeberg.org/user/settings/applications")
+        let bitbucket = try #require(ConnectorSetupWords.tokenSheet(.bitbucket))
+        #expect(bitbucket.field == .user && bitbucket.fieldLabel == "Atlassian email")
+        for p in [DaemonAPI.ConnectionProvider.github, .linear, .gitlab, .email, .atlassian] {
+            #expect(ConnectorSetupWords.tokenSheet(p) == nil)
+        }
+    }
+
+    /// A newer host's forge or connection (#3802, after #3824): the set-up still reads, says to
+    /// update Agents, and a connection this client does not know is left out of the list.
+    @Test func aForgeThisClientDoesNotKnow() throws {
+        let raw = #"{"folder":"/tmp/walk","repository":"a/b","forge":"sourcehut","site":"git.sr.ht","connection":{"provider":"sourcehut","state":"connected","connectedAt":782000000},"slots":[],"events":{"state":"off","names":[],"workflows":[]},"done":0}"#
+        let setup = try JSONDecoder().decode(Setup.self, from: Data(raw.utf8))
+        #expect(setup.forge == nil && setup.unknownForge == "sourcehut" && setup.connection == nil)
+        #expect(ConnectorSetupWords.unknownForge(setup).hasPrefix("git.sr.ht is on a forge this version of Agents can't connect"))
+        let list = try JSONDecoder().decode(DaemonAPI.ConnectionsList.self, from: Data(
+            #"{"connections":[{"provider":"sourcehut","state":"connected","connectedAt":782000000},{"provider":"github","login":"a","state":"connected","connectedAt":782000000}]}"#.utf8))
+        #expect(list.connections.map(\.provider) == [.github])
     }
 
     /// A connection that ended turns the Connectors rows red (#3407): a refused renewal, or a
@@ -284,10 +334,10 @@ struct ConnectorSetupWordsTests {
     /// Connect… offers only what the host connects (#3824): its list, in this client's order,
     /// less names this client does not know; an older host's list is what it connected then.
     @Test func connectOffersOnlyWhatTheHostConnects() throws {
-        let raw = #"{"connections":[],"providers":["bitbucket","github","azuredevops","forgejo"]}"#
+        let raw = #"{"connections":[],"providers":["bitbucket","github","azuredevops","sourcehut","forgejo"]}"#
         let list = try JSONDecoder().decode(DaemonAPI.ConnectionsList.self, from: Data(raw.utf8))
-        #expect(list.providers == [.bitbucket, .github, .forgejo])
-        #expect(list.offered(hostHasEmail: true) == [.github, .forgejo, .bitbucket])
+        #expect(list.providers == [.bitbucket, .github, .azuredevops, .forgejo])
+        #expect(list.offered(hostHasEmail: true) == [.github, .forgejo, .bitbucket, .azuredevops])
 
         let older = try JSONDecoder().decode(DaemonAPI.ConnectionsList.self, from: Data(#"{"connections":[]}"#.utf8))
         #expect(older.providers == nil)

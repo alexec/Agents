@@ -173,7 +173,9 @@ A release to the App Store is one of these (#3657): the **app-store** workflow w
 page as **App Store 0.17.0**, after its TestFlight build.
 
 To approve here, the GitHub App `agents-loops` must have the **Deployments** permission
-(read and write). Without it, GitHub refuses the answer and the row says why.
+(read and write), and the installation must accept it (github.com/settings/installations).
+Without it, the row still shows, but GitHub refuses Approve and the app shows an error (#3932
+makes the error say why).
 
 ## Make a new app's repository
 

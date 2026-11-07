@@ -38,7 +38,7 @@ down for a runtime that has none. [Overall score](#overall-score), after the
 tables, adds every feature up.
 
 The matrix was filled in on 2026-10-12 from each app's own docs, changelog, README,
-releases and, where open, source. Agents' row was last brought up to date on 2026-11-04. Every app is held to the same bar, Agents included: a ●
+releases and, where open, source. Agents' row was last brought up to date on 2026-11-07. Every app is held to the same bar, Agents included: a ●
 needs the whole feature, documented by the app itself, and a ○ needs evidence, such as an
 app that ships for macOS alone having no Android app. Once per release, after the
 Competitor check, the Feature matrix workflow (`.agents/workflows/feature-matrix.md`)
@@ -56,13 +56,6 @@ Agents' ◐ cells, and why:
 - **Spending limits:** in money or in tokens (#838), so only for runtimes that report a
   price or tokens. Cursor, Antigravity and Grok report neither, and run past every
   limit. See [Limit spending](../how-to/limit-spending.md).
-- **A browser the agent drives:** through the Playwright server from the MCP marketplace,
-  with nothing shown in the app, or with **Use Chrome** (#1837), which drives the person's
-  own Chrome for Claude alone, once its extension is installed. Desktop control's
-  `drive_screen` (#3004) lets an agent of any runtime drive a browser, or any other app on
-  the Mac, by its screen, mouse and keyboard, and every client shows it working on a live
-  tile; but there is no browser pane of its own. See
-  [Let an agent drive desktop apps](../how-to/let-an-agent-drive-desktop-apps.md).
 - **Several accounts per runtime:** for Claude and Codex alone (#840). The person picks
   the account when a session starts. See
   [More than one account](runtimes.md#more-than-one-account).
@@ -155,6 +148,7 @@ Agents has none of these at all:
 | Orca | ● | ● | ● | ◐ | ◐ | ◐ | 75% |
 | Paradev (was Superset) | ● | ● | ● | ?⃝ | ● | ◐ | 75% |
 | Pragma | ● | ● | ● | ◐ | ● | ?⃝ | 75% |
+| Ace | ● | ● | ● | ?⃝ | ● | ?⃝ | 67% |
 | Claude Code | ● | ● | ○ | ?⃝ | ● | ● | 67% |
 | CodeAgentSwarm | ● | ● | ● | ◐ | ○ | ◐ | 67% |
 | OpenAI Codex | ● | ● | ○ | ?⃝ | ● | ● | 67% |
@@ -163,7 +157,6 @@ Agents has none of these at all:
 | Rove | ● | ● | ● | ?⃝ | ● | ?⃝ | 67% |
 | Vibe Kanban | ● | ● | ● | ?⃝ | ● | ?⃝ | 67% |
 | Sculptor | ● | ● | ● | ?⃝ | ?⃝ | ◐ | 58% |
-| Ace | ● | ?⃝ | ● | ?⃝ | ● | ?⃝ | 50% |
 | Atelier (was Acepe) | ● | ?⃝ | ● | ● | ?⃝ | ?⃝ | 50% |
 | Claude Squad | ● | ● | ● | ○ | ?⃝ | ?⃝ | 50% |
 | Maestro | ● | ● | ● | ?⃝ | ?⃝ | ?⃝ | 50% |
@@ -279,11 +272,11 @@ Agents has none of these at all:
 | tuios | ● | ● | ?⃝ | ● | ?⃝ | 60% |
 | Vibe Kanban | ● | ● | ● | ?⃝ | ?⃝ | 60% |
 | Warp | ● | ?⃝ | ● | ?⃝ | ● | 60% |
+| Ace | ● | ◐ | ?⃝ | ● | ?⃝ | 50% |
 | Maestro | ● | ● | ?⃝ | ?⃝ | ◐ | 50% |
 | VibeiDE | ● | ?⃝ | ?⃝ | ?⃝ | ● | 40% |
 | CodeAgentSwarm | ● | ?⃝ | ◐ | ?⃝ | ?⃝ | 30% |
 | Happy | ● | ?⃝ | ?⃝ | ?⃝ | ◐ | 30% |
-| Ace | ● | ○ | ?⃝ | ?⃝ | ?⃝ | 20% |
 | Claude Squad | ● | ?⃝ | ○ | ?⃝ | ○ | 20% |
 | DockTerm | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 20% |
 | Helicon | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 20% |
@@ -293,7 +286,7 @@ Agents has none of these at all:
 
 | App | Terminal | Browser or preview (not scored) | A browser the agent drives | Simulator or emulator panes | File editor | Language servers in the editor | Score |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|--:|
-| **Agents** | ● | ◐ | ◐ | ● | ● | ● | 90% |
+| **Agents** | ● | ● | ● | ● | ● | ● | 100% |
 | Agentastic | ● | ● | ● | ?⃝ | ● | ● | 80% |
 | Cursor | ● | ● | ● | ?⃝ | ● | ● | 80% |
 | GitHub Copilot | ● | ● | ● | ?⃝ | ● | ● | 80% |
@@ -410,12 +403,12 @@ Agents has none of these at all:
 
 | App | Labels or tags | Pins | Archive | Teams | Open source | Self-hosted | Score |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|--:|
+| Paradev (was Superset) | ● | ● | ● | ● | ● | ● | 100% |
 | Paseo | ● | ● | ● | ● | ● | ● | 100% |
 | **Agents** | ● | ● | ● | ● | ○ | ● | 83% |
 | Codeg | ● | ● | ?⃝ | ● | ● | ● | 83% |
 | Nimbalyst | ● | ● | ● | ◐ | ● | ◐ | 83% |
 | Nuphos | ?⃝ | ● | ● | ● | ● | ● | 83% |
-| Paradev (was Superset) | ● | ● | ● | ● | ○ | ● | 83% |
 | Orca | ○ | ● | ● | ◐ | ● | ● | 75% |
 | Claude Code | ?⃝ | ● | ● | ● | ○ | ● | 67% |
 | Conductor | ?⃝ | ● | ● | ● | ○ | ● | 67% |
@@ -451,7 +444,7 @@ Each app's score in every table, and overall: its points over the 50 scored feat
 
 | Rank | App | Running | Reach | Following | Reviewing | Tools | Tasks | Extensions | Organising | Overall |
 |--:|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|
-| 1 | **Agents** | 100% | 50% | 100% | 100% | 90% | 100% | 80% | 83% | **89%** |
+| 1 | **Agents** | 100% | 50% | 100% | 100% | 100% | 100% | 80% | 83% | **90%** |
 | 2 | GitHub Copilot | 92% | 83% | 100% | 100% | 80% | 61% | 100% | 50% | **82%** |
 | 3 | Paseo | 100% | 100% | 69% | 90% | 60% | 61% | 60% | 100% | **79%** |
 | 4 | Cursor | 83% | 67% | 81% | 100% | 80% | 67% | 80% | 50% | **75%** |
@@ -459,9 +452,9 @@ Each app's score in every table, and overall: its points over the 50 scored feat
 | 6 | Codeg | 100% | 67% | 69% | 90% | 60% | 67% | 40% | 83% | **72%** |
 | 6 | Nimbalyst | 83% | 83% | 75% | 70% | 70% | 50% | 70% | 83% | **72%** |
 | 6 | Orca | 75% | 67% | 69% | 80% | 70% | 72% | 70% | 75% | **72%** |
-| 9 | Agentastic | 100% | 42% | 69% | 90% | 80% | 67% | 80% | 33% | **69%** |
-| 9 | OpenAI Codex | 67% | 83% | 75% | 70% | 40% | 67% | 80% | 67% | **69%** |
-| 11 | Paradev (was Superset) | 75% | 42% | 63% | 70% | 60% | 72% | 80% | 83% | **68%** |
+| 9 | Paradev (was Superset) | 75% | 42% | 63% | 70% | 60% | 72% | 80% | 100% | **70%** |
+| 10 | Agentastic | 100% | 42% | 69% | 90% | 80% | 67% | 80% | 33% | **69%** |
+| 10 | OpenAI Codex | 67% | 83% | 75% | 70% | 40% | 67% | 80% | 67% | **69%** |
 | 12 | T3 Code | 83% | 92% | 69% | 80% | 80% | 39% | 40% | 67% | **67%** |
 | 12 | Threadlines | 83% | 67% | 75% | 100% | 40% | 50% | 60% | 67% | **67%** |
 | 12 | Warp | 83% | 58% | 75% | 60% | 70% | 67% | 70% | 50% | **67%** |
@@ -470,9 +463,9 @@ Each app's score in every table, and overall: its points over the 50 scored feat
 | 17 | Happy | 92% | 100% | 69% | 30% | 20% | 33% | 40% | 67% | **57%** |
 | 18 | Maestro | 50% | 50% | 63% | 50% | 60% | 56% | 60% | 50% | **55%** |
 | 19 | Emdash | 83% | 33% | 50% | 70% | 70% | 33% | 40% | 67% | **54%** |
-| 20 | Parallel Code | 67% | 75% | 69% | 60% | 20% | 56% | 20% | 33% | **52%** |
-| 21 | Conductor | 75% | 25% | 44% | 80% | 40% | 50% | 10% | 67% | **49%** |
-| 22 | Ace | 50% | 67% | 75% | 20% | 40% | 33% | 40% | 50% | **48%** |
+| 20 | Ace | 67% | 67% | 75% | 50% | 40% | 33% | 40% | 50% | **53%** |
+| 21 | Parallel Code | 67% | 75% | 69% | 60% | 20% | 56% | 20% | 33% | **52%** |
+| 22 | Conductor | 75% | 25% | 44% | 80% | 40% | 50% | 10% | 67% | **49%** |
 | 23 | Rove | 67% | 33% | 25% | 60% | 20% | 61% | 40% | 50% | **45%** |
 | 24 | Atelier (was Acepe) | 50% | 8% | 63% | 60% | 60% | 33% | 20% | 50% | **43%** |
 | 24 | CodeAgentSwarm | 67% | 58% | 31% | 30% | 30% | 39% | 80% | 17% | **43%** |
@@ -591,7 +584,7 @@ has the page that did not say.
 - **[Nuphos](https://github.com/nuphos/nuphos):** A team workspace over ACP, local, remote or in cloud containers.
 - **[OpenAI Codex](https://developers.openai.com/codex):** OpenAI's agent in the ChatGPT apps, the cloud and a CLI; open source and self-hosted apply to the CLI only.
 - **[Orca](https://github.com/stablyai/orca):** An open-source (MIT) desktop app for Mac, Windows and Linux running many CLI agents side by side, a worktree each, with terminals, a browser the agents drive, pull requests, SSH and self-hosted Orca servers, and a beta phone companion.
-- **[Paradev (was Superset)](https://paradev.com):** A desktop app for parallel agents with its own task tracker, cloud workspaces, plugins and an iPhone app; renamed from Superset on 2026-10-26 ([changelog](https://paradev.com/changelog)). Its Mobile pane for simulators and emulators is off "for now" since desktop 1.40.
+- **[Paradev (was Superset)](https://paradev.com):** A desktop app for parallel agents with its own task tracker, cloud workspaces, plugins and an iPhone app; renamed from Superset on 2026-10-26 ([changelog](https://paradev.com/changelog)). Its Mobile pane for simulators and emulators is off "for now" since desktop 1.40. It is under the MIT licence since desktop 2.0.5 ([release](https://github.com/ParadevAI/Paradev/releases/tag/desktop-v2.0.5)).
 - **[Parallel Code](https://github.com/johannesjo/parallel-code):** A desktop app with tiled tasks, Docker sandboxes and an Android app.
 - **[Paseo](https://github.com/getpaseo/paseo):** An open-source daemon with desktop, iOS, Android, web and CLI clients.
 - **[Pragma](https://pragma-app.sh):** A desktop app with a task board, SSH remote projects and the Pragma Go mobile client.

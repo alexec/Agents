@@ -42,6 +42,8 @@ var findGH = func() string {
 
 // mergedPull is one pull request gh pr list --state merged named.
 type mergedPull struct {
+	Number      int       `json:"number"`
+	Title       string    `json:"title"`
 	URL         string    `json:"url"`
 	MergedAt    time.Time `json:"mergedAt"`
 	HeadRefName string    `json:"headRefName"`
@@ -117,7 +119,7 @@ func (d *Daemon) countMergedPRsWith(ctx context.Context, gh string) {
 func mergedPullRequests(ctx context.Context, gh, folder, day string) ([]mergedPull, error) {
 	var pulls []mergedPull
 	if err := ghJSON(ctx, gh, folder, &pulls, "pr", "list", "--state", "merged", "--search", "merged:>="+day,
-		"--json", "url,mergedAt,headRefName", "--limit", "1000"); err != nil {
+		"--json", "number,title,url,mergedAt,headRefName", "--limit", "1000"); err != nil {
 		return nil, err
 	}
 	return pulls, nil

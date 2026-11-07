@@ -162,11 +162,11 @@ func (d *Daemon) registerForge() {
 // forgeCursor is a list's cursor, one per forge, so a page goes on where each forge stopped.
 // Done are the forges whose list has ended.
 type forgeCursor struct {
-	GitHub  string   `json:"github,omitempty"`
-	GitLab  string   `json:"gitlab,omitempty"`
-	Linear  string   `json:"linear,omitempty"`
-	Jira    string   `json:"jira,omitempty"`
-	Boards  string   `json:"azureboards,omitempty"`
+	GitHub    string   `json:"github,omitempty"`
+	GitLab    string   `json:"gitlab,omitempty"`
+	Linear    string   `json:"linear,omitempty"`
+	Jira      string   `json:"jira,omitempty"`
+	Boards    string   `json:"azureboards,omitempty"`
 	Forgejo   string   `json:"forgejo,omitempty"`
 	Bitbucket string   `json:"bitbucket,omitempty"`
 	Done      []string `json:"done,omitempty"`
@@ -327,7 +327,7 @@ func (d *Daemon) forgeList(ctx context.Context, prs bool, r wire.ForgeListReques
 		pages = append(pages, p)
 	}
 	if len(sources.boards) > 0 && !slices.Contains(cursor.Done, "azureboards") {
-		pages = append(pages, d.boardsPage(ctx, sources, azureboardsmcp.SearchFilter{State: state, Label: deref(r.Label),
+		pages = append(pages, d.boardsPage(ctx, sources, board, azureboardsmcp.SearchFilter{State: state, Label: deref(r.Label),
 			Assignee: deref(r.Assignee), Query: deref(r.Query), Feature: deref(r.Feature)}, cursor.Boards, limit))
 	}
 	var more bool

@@ -34,7 +34,9 @@ func (p *fillPage) callTool(_ context.Context, name string, args map[string]json
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.calls, p.names = append(p.calls, args), append(p.names, name)
-	text := func(s string) *mcp.CallToolResult { return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: s}}} }
+	text := func(s string) *mcp.CallToolResult {
+		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: s}}}
+	}
 	switch name {
 	case "browser_type":
 		json.Unmarshal(args["text"], &p.value)

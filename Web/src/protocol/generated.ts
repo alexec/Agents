@@ -2023,8 +2023,9 @@ export interface ConnectionEmailRequest {
  * OAuth on gitlab.com or a personal access token on any GitLab, email (#1780): one IMAP mailbox
  * with an app password, Atlassian (#3304): one sign-in for Jira and Confluence, with OAuth on
  * Atlassian Cloud or a token on one site, Forgejo (#3752): an access token on Codeberg or any
- * Forgejo or Gitea, and Bitbucket (#3785): an Atlassian API token with its email, or an access
- * token, on Bitbucket Cloud.
+ * Forgejo or Gitea, Bitbucket (#3785): an Atlassian API token with its email, or an access token,
+ * on Bitbucket Cloud, and Azure DevOps (#3802): a personal access token on one organization of
+ * dev.azure.com or one collection of an Azure DevOps Server.
  */
 export type ConnectionProvider =
   | "github"
@@ -2033,7 +2034,8 @@ export type ConnectionProvider =
   | "email"
   | "atlassian"
   | "forgejo"
-  | "bitbucket";
+  | "bitbucket"
+  | "azuredevops";
 
 export interface ConnectionProviderRequest {
   provider: ConnectionProvider;
@@ -2132,7 +2134,9 @@ export interface ConnectionTokenRequest {
   /**
    * The provider's address, such as gitlab.example.com, example.atlassian.net or git.example.com
    * (https:// when it names no scheme). gitlab.com, or codeberg.org for Forgejo, when left out; a
-   * Jira site must be given. Bitbucket takes none: it is Bitbucket Cloud's.
+   * Jira site must be given. Bitbucket takes none: it is Bitbucket Cloud's. Azure DevOps takes its
+   * organization (dev.azure.com/acme) or an Azure DevOps Server's collection
+   * (server/tfs/DefaultCollection), which must be given.
    */
   url?: string;
   /**
@@ -2216,31 +2220,32 @@ export interface ConnectorProof {
 }
 
 /**
- * A folder's Connectors set-up (#1336): its GitHub, GitLab, Forgejo or Bitbucket repository (#1632,
- * #3752, #3785), the person's connection to that forge, four slots that each prove themselves with
- * one read, and the events.
+ * A folder's Connectors set-up (#1336): its GitHub, GitLab, Forgejo, Bitbucket or Azure DevOps
+ * repository (#1632, #3752, #3785, #3802), the person's connection to that forge, four slots that
+ * each prove themselves with one read, and the events.
  */
 export interface ConnectorSetup {
   folder: string;
   /**
-   * owner/name on GitHub or Forgejo, workspace/name on Bitbucket, or group/project on GitLab, from
-   * the folder's git remote (origin first). Absent with no GitHub, GitLab, Forgejo or Bitbucket
-   * remote.
+   * owner/name on GitHub or Forgejo, workspace/name on Bitbucket, organization/project/name on
+   * Azure DevOps, or group/project on GitLab, from the folder's git remote (origin first). Absent
+   * with no GitHub, GitLab, Forgejo, Bitbucket or Azure DevOps remote.
    */
   repository?: string;
   /**
    * The forge the repository is on, which fills Tasks, Code review and CI: github, gitlab (#1632),
-   * forgejo (#3752) or bitbucket (#3785). Absent is github.
+   * forgejo (#3752), bitbucket (#3785) or azuredevops (#3802). Absent is github.
    */
   forge?: ConnectionProvider;
   /**
    * The repository's host, as the page says it before the repository: github.com, gitlab.com,
-   * codeberg.org, bitbucket.org, or a self-managed GitLab's or Forgejo's host.
+   * codeberg.org, bitbucket.org, dev.azure.com, or a self-managed GitLab's, Forgejo's or Azure
+   * DevOps Server's host.
    */
   site?: string;
   /**
    * The repository's page on its forge, where the person asks for access when a read is refused
-   * (GitLab, Forgejo, Bitbucket).
+   * (GitLab, Forgejo, Bitbucket, Azure DevOps).
    */
   repositoryURL?: string;
   connection?: Connection;
@@ -2345,8 +2350,8 @@ export type ConnectorSlotKind =
  * notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not
  * read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach
  * the provider; message says why. refused: the provider refused the read, so the person grants it
- * on the provider's site. noRemote: the folder has no GitHub, GitLab, Forgejo or Bitbucket remote.
- * skipped: the person skipped it; it counts as done.
+ * on the provider's site. noRemote: the folder has no GitHub, GitLab, Forgejo, Bitbucket or Azure
+ * DevOps remote. skipped: the person skipped it; it counts as done.
  */
 export type ConnectorSlotState =
   | "notConnected"
@@ -7639,28 +7644,30 @@ export interface Project {
 }
 
 /**
- * One board in a project's Tasks slot (#3282): a GitHub Projects board, a Jira board, a Linear team
- * or a GitLab group board, by its address and a name (the team's). Work's Issues and Features lists
- * narrow to one. A client sends name and url; the control plane reads forge, key and site from the
- * url.
+ * One board in a project's Tasks slot (#3282): a GitHub Projects board, a Jira board, a Linear
+ * team, a GitLab group board or an Azure Boards board (a team's, #3816), by its address and a name
+ * (the team's). Work's Issues and Features lists narrow to one. A client sends name and url; the
+ * control plane reads forge, key and site from the url.
  */
 export interface ProjectBoard {
   name: string;
   /**
    * The board's address on the web: github.com/orgs/<org>/projects/<n> (or users/<login>),
-   * <site>/jira/software/…/boards/<id>, linear.app/<workspace>/team/<KEY>, or
-   * <gitlab>/groups/<group>/-/boards/<id>. It names the board in forge/issues' board.
+   * <site>/jira/software/…/boards/<id>, linear.app/<workspace>/team/<KEY>,
+   * <gitlab>/groups/<group>/-/boards/<id>, or dev.azure.com/<org>/<project>/_boards/board/t/<team>
+   * (or an Azure DevOps Server's). It names the board in forge/issues' board.
    */
   url: string;
-  /** github, atlassian (Jira), linear or gitlab. */
+  /** github, atlassian (Jira), linear, gitlab or azuredevops (Azure Boards). */
   forge?: ConnectionProvider;
   /**
    * The board on its forge: <owner>/<number> on GitHub, the board id on Jira, the team key on
-   * Linear, <group>#<id> on GitLab.
+   * Linear, <group>#<id> on GitLab, <org>/<project>/<team> on Azure Boards.
    */
   key?: string;
   /**
-   * The board's host: github.com, the Jira site, linear.app, gitlab.com or a self-managed GitLab.
+   * The board's host: github.com, the Jira site, linear.app, gitlab.com or a self-managed GitLab,
+   * dev.azure.com or an Azure DevOps Server.
    */
   site?: string;
 }
@@ -8758,6 +8765,11 @@ export interface ReviewPull {
   title: string;
   /** owner/name. */
   repo: string;
+  /**
+   * Its lineage ref, "github:owner/name#12" or "gitlab:group/project!12": a press opens its Work
+   * page in the app. Nil from an older host: a press opens its forge page.
+   */
+  ref?: string;
   author?: string;
   updatedAt: WireDate;
   /** The person has opened its page (reviews/open, #3464): its row is drawn read, not bold. */
@@ -13108,7 +13120,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RetentionState: { required: ["settings", "archivedCount", "archivedBytes"], optional: [] },
   ReviewDismissRequest: { required: ["folder", "url"], optional: [] },
   ReviewOpenRequest: { required: ["folder", "url"], optional: [] },
-  ReviewPull: { required: ["url", "number", "title", "repo", "updatedAt"], optional: ["author", "opened"] },
+  ReviewPull: { required: ["url", "number", "title", "repo", "updatedAt"], optional: ["ref", "author", "opened"] },
   Runtime: { required: ["id", "name", "executable", "arguments", "installPage", "usesAppCopyOnly"], optional: ["install", "accountFolderVariable"] },
   RuntimeAccount: { required: ["runtimeID", "state", "authMethods", "canLogOut", "providers", "promptCapabilities", "canSteer", "checkedAt"], optional: ["currentProviderID", "signedInAs"] },
   RuntimeAllowances: { required: ["rows", "at"], optional: ["shared"] },

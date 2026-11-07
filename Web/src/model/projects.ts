@@ -25,7 +25,7 @@ export const projectWords = {
 /** A project's boards (#3282), on the Connectors page and in Work's Board menu, as ProjectBoardWords on the window. */
 export const boardWords = {
   heading: "Boards",
-  note: "A board is a GitHub Projects board, a Jira board, a Linear team or a GitLab group board. "
+  note: "A board is a GitHub Projects board, a Jira board, a Linear team, a GitLab group board or an Azure Boards board. "
     + "Work ▸ Issues and Features can show one board.",
   none: "No boards. Work shows every issue of the project.",
   onlyOwner: "Only the project's owner or an admin can change its boards.",
@@ -42,6 +42,7 @@ export function boardForge(board: ProjectBoard): string {
     case "atlassian": return "Jira";
     case "linear": return "Linear team";
     case "gitlab": return "GitLab";
+    case "azuredevops": return "Azure Boards";
     default: return "";
   }
 }
@@ -77,7 +78,7 @@ export function slotLine(slot: ConnectorSlot, name: string): string {
   const skipped = slot.state === "skipped";
   if (slot.fromProject) return skipped ? `Skipped in every folder of ${name}.` : `${what}, for every folder of ${name}.`;
   if (skipped) return "Skipped in this folder only.";
-  return slot.repository == null ? "This folder has no GitHub, GitLab, Forgejo or Bitbucket remote." : `${what}, this folder's own.`;
+  return slot.repository == null ? "This folder has no GitHub, GitLab, Forgejo, Bitbucket or Azure DevOps remote." : `${what}, this folder's own.`;
 }
 
 /** The folder's own slot, as the project's for every folder. */

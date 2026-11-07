@@ -23,7 +23,8 @@ import (
 // guarded file changed outside the app waits for the person (#502), a folder MCP server
 // or plugin is looked at again, a branch tip an agent's worktree is on moving raises
 // branch.moved (042 R9), and a file arriving in the drop box raises dropbox.file_added
-// (#231). The watches follow the folder list: every workflow scan looks at it again.
+// (#231), and a file a wait or a trigger watches coming or going raises file.added or
+// file.removed (#3795). The watches follow the folder list: every workflow scan looks at it again.
 
 // dropboxSettle is DaemonCore.dropboxSettle: how long a file must stay as it is before it
 // counts as arrived.
@@ -58,6 +59,10 @@ type folderWatchState struct {
 	dropSeen      map[string]map[string]dropStamp
 	dropSettling  map[string]map[string]dropStamp
 	dropTimers    map[string]*time.Timer
+	// fileMu holds fileWatches, what each folder's file events know (#3795), and fileKicked.
+	fileMu      sync.Mutex
+	fileWatches map[string]*watchedFiles
+	fileKicked  bool
 }
 
 // skipWatched is what a folder's watch leaves out (folderWatchExclusions, WatchFilter):
@@ -165,6 +170,7 @@ func (d *Daemon) syncFolderWatches() {
 		// Seed what the tips are now, so the first move after this is a move; one that
 		// moved while no host ran is raised now.
 		d.scheduleBranchCheck(folder, 0)
+		d.followFileGlobs(folder)
 	}
 }
 
@@ -180,6 +186,7 @@ func (d *Daemon) forgetFolderLocked(folder string) {
 	}
 	delete(d.dropSeen, folder)
 	delete(d.dropSettling, folder)
+	d.forgetWatchedFiles(folder)
 }
 
 // stopFolderWatches ends every watch, for good: the host is going.
@@ -250,6 +257,7 @@ func (d *Daemon) folderFilesChanged(folder string, paths []string) {
 			approvals = true
 		}
 	}
+	d.watchedFilesChanged(folder, paths)
 	if branches {
 		d.scheduleBranchCheck(folder, branchSettle)
 	}

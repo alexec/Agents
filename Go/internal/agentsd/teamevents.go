@@ -14,7 +14,7 @@ import (
 // Scoped events (#2011, spec 736 FR-035). On a bot's machine, a runs-on: workflow's
 // trigger is one of three scopes:
 //
-//   - a machine event (machine.*, dropbox.*) stays on its machine: it runs here, unclaimed;
+//   - a machine event (machine.*, dropbox.*, file.*) stays on its machine: it runs here, unclaimed;
 //   - a folder or control-plane event (a server's, such as github or a channel's) or a
 //     schedule is sent to the control plane (workflows/trigger), which sends it once, to one
 //     of the bot's machines (workflows/fire);
@@ -42,7 +42,7 @@ func scopeOf(fr fireRequest) triggerScope {
 	}
 	noun, _, _ := strings.Cut(fr.event.Name, ".")
 	switch {
-	case noun == "machine" || noun == "dropbox":
+	case noun == "machine" || noun == "dropbox" || noun == "file":
 		return scopeMachine
 	case fr.event.Details["server"] != "" && isServerEventName(fr.event.Name):
 		return scopeTeam

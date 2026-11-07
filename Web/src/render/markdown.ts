@@ -112,6 +112,9 @@ function build(tokens: readonly Token[], images?: PageImages, openFile?: OpenFil
     if (token.nesting === -1) {
       const frame = stack.pop()!;
       if (frame.tag === "") top().children.push(...frame.children);
+      // A table keeps its columns and scrolls sideways when it is wider than the reply, as
+      // on the Mac, rather than squeezing its cells to a word a line (#3895).
+      else if (frame.tag === "table") push(h("div", { class: "table-scroll" }, h("table", frame.props, ...frame.children)));
       else push(h(frame.tag, frame.props, ...frame.children));
       continue;
     }
