@@ -341,7 +341,7 @@ public struct StoreLocations: Sendable {
     /// Where the time of running chats went by hour and by day, per runtime (#852), for
     /// the Time page. Bounded as the usage history is (`TimeHistory`).
     public var timeHistory: URL { root.appendingPathComponent("time-history.json") }
-    /// The milestones the person has earned (#984): one entry each, never more (`Milestones`).
+    /// The achievements the person has earned (#984): one entry each, never more (`Achievements`).
     public var achievements: URL { root.appendingPathComponent("achievements.json") }
 
     public func agent(_ id: UUID) -> URL {

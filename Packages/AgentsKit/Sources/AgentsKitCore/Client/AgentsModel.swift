@@ -387,9 +387,9 @@ public final class AgentsModel {
     public private(set) var wakeState: DaemonAPI.WakeState?
     /// Files the host could not read in this run (#205); empty when all read.
     public private(set) var storeNotes: [String] = []
-    /// The milestones the person has earned (#984); nil until the host has said, or from
+    /// The achievements the person has earned (#984); nil until the host has said, or from
     /// a host that predates them.
-    public private(set) var milestones: Milestones?
+    public private(set) var achievements: Achievements?
 
     /// What each command the agent on screen ran has printed (033, #203).
     ///
@@ -481,7 +481,7 @@ public final class AgentsModel {
         case modesChanged(DaemonAPI.RememberedModes)
         case wakeChanged(DaemonAPI.WakeState)
         case storeNotesChanged(DaemonAPI.StoreNotes)
-        case milestonesChanged(Milestones)
+        case achievementsChanged(Achievements)
         case showFile(DaemonAPI.ShowFileNotification)
         case resuming(DaemonAPI.ResumingNotification)
         case terminalOutput(DaemonAPI.TerminalOutputNotification)
@@ -543,7 +543,7 @@ public final class AgentsModel {
         case DaemonAPI.Notification.modesChanged: return decode(DaemonAPI.RememberedModes.self, Update.modesChanged)
         case DaemonAPI.Notification.wakeChanged: return decode(DaemonAPI.WakeState.self, Update.wakeChanged)
         case DaemonAPI.Notification.storeNotesChanged: return decode(DaemonAPI.StoreNotes.self, Update.storeNotesChanged)
-        case DaemonAPI.Notification.milestonesChanged: return decode(Milestones.self, Update.milestonesChanged)
+        case DaemonAPI.Notification.achievementsChanged: return decode(Achievements.self, Update.achievementsChanged)
         case DaemonAPI.Notification.agentShowFile: return decode(DaemonAPI.ShowFileNotification.self, Update.showFile)
         case DaemonAPI.Notification.agentResuming: return decode(DaemonAPI.ResumingNotification.self, Update.resuming)
         case DaemonAPI.Notification.agentTerminalOutput: return decode(DaemonAPI.TerminalOutputNotification.self, Update.terminalOutput)
@@ -765,8 +765,8 @@ public final class AgentsModel {
         case .storeNotesChanged(let notes):
             storeNotes = notes.notes
 
-        case .milestonesChanged(let milestones):
-            self.milestones = milestones
+        case .achievementsChanged(let achievements):
+            self.achievements = achievements
 
         case .showFile(let notification):
             filesToShow[notification.agentID] = notification.file
@@ -1318,7 +1318,7 @@ public final class AgentsModel {
     public func rememberedMode(for runtimeID: String) -> JSONValue? { rememberedModes[runtimeID] }
     public func replaceWakeState(_ state: DaemonAPI.WakeState) { wakeState = state }
     public func replaceStoreNotes(_ notes: DaemonAPI.StoreNotes) { storeNotes = notes.notes }
-    public func replaceMilestones(_ milestones: Milestones) { self.milestones = milestones }
+    public func replaceAchievements(_ achievements: Achievements) { self.achievements = achievements }
 
     // MARK: Choices in flight
 

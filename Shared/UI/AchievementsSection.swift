@@ -1,29 +1,29 @@
 import AgentsKitCore
 import SwiftUI
 
-/// The milestones (#984): the first steps the person has taken, each with its
+/// The achievements (#984): the first steps the person has taken, each with its
 /// day, then the ones not taken yet, greyed with how. The second list is the newcomer's
-/// checklist. Drawn by the window and the Remote; the page draws `Milestones` in
-/// Milestones.tsx. Kept and worked out on the host, in `Milestones`.
-struct MilestonesSection: View {
-    let milestones: Milestones
+/// checklist. Drawn by the window and the Remote; the page draws `Achievements` in
+/// Achievements.tsx. Kept and worked out on the host, in `Achievements`.
+struct AchievementsSection: View {
+    let achievements: Achievements
     /// Earned and not seen on this device yet: marked New (the iPhone, which shows no card).
-    var fresh: Set<Milestone> = []
+    var fresh: Set<Achievement> = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
-                Text("Milestones").appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
-                Text("\(milestones.ordered.filter { $0.at != nil }.count) of \(Milestone.allCases.count)")
+                Text("Achievements").appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
+                Text("\(achievements.ordered.filter { $0.at != nil }.count) of \(Achievement.allCases.count)")
                     .appText(.fine)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
             }
-            ForEach(milestones.ordered, id: \.milestone) { row in
+            ForEach(achievements.ordered, id: \.achievement) { row in
                 HStack(alignment: .firstTextBaseline) {
-                    ChecklistRow(title: row.milestone.title, how: row.milestone.how, isDone: row.at != nil,
+                    ChecklistRow(title: row.achievement.title, how: row.achievement.how, isDone: row.at != nil,
                                  doneNote: row.at.map(Self.dayWords))
-                    if fresh.contains(row.milestone) {
+                    if fresh.contains(row.achievement) {
                         Text("New")
                             .appText(.fine)
                             .fontWeight(.semibold)
@@ -33,7 +33,7 @@ struct MilestonesSection: View {
             }
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Milestones")
+        .accessibilityLabel("Achievements")
     }
 
     /// "12 Oct 2026".
@@ -42,28 +42,28 @@ struct MilestonesSection: View {
     }
 }
 
-/// The Time page with its milestones under the charts, once all are earned (#984). Until
+/// The Time page with its achievements under the charts, once all are earned (#984). Until
 /// then they are a page of their own, with a row in the sidebar (#1067).
-struct TimeMilestonesUnder<Content: View>: View {
-    let milestones: Milestones?
-    var fresh: Set<Milestone> = []
+struct TimeAchievementsUnder<Content: View>: View {
+    let achievements: Achievements?
+    var fresh: Set<Achievement> = []
     @ViewBuilder var content: () -> Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
             content()
-            if let milestones, milestones.isComplete {
-                MilestonesSection(milestones: milestones, fresh: fresh)
+            if let achievements, achievements.isComplete {
+                AchievementsSection(achievements: achievements, fresh: fresh)
             }
         }
     }
 }
 
-/// The one-time card when a milestone is earned (#984), on the Mac and the iPad; the page
-/// draws `MilestoneCard` in MilestoneCard.tsx. Small, and it goes when closed or opened. No
+/// The one-time card when an achievement is earned (#984), on the Mac and the iPad; the page
+/// draws `AchievementCard` in AchievementCard.tsx. Small, and it goes when closed or opened. No
 /// notification is ever sent for one.
-struct MilestoneCard: View {
-    let milestone: Milestone
+struct AchievementCard: View {
+    let achievement: Achievement
     let open: () -> Void
     let dismiss: () -> Void
 
@@ -75,10 +75,10 @@ struct MilestoneCard: View {
                 .foregroundStyle(Paper.accent)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Milestone").appText(.fine).foregroundStyle(.secondary)
-                Text(milestone.title)
+                Text("Achievement").appText(.fine).foregroundStyle(.secondary)
+                Text(achievement.title)
                     .fixedSize(horizontal: false, vertical: true)
-                Button("See Milestones", action: open)
+                Button("See Achievements", action: open)
                     .buttonStyle(.borderless)
                     .tint(Paper.accent)
                     .appText(.fine)
@@ -93,13 +93,13 @@ struct MilestoneCard: View {
             }
             .buttonStyle(.plain)
             .help("Dismiss")
-            .accessibilityLabel("Dismiss milestone")
+            .accessibilityLabel("Dismiss achievement")
         }
         .appText(.supporting)
         .padding(12)
         .background(Paper.raised, in: RoundedRectangle(cornerRadius: Paper.Radius.card))
         .overlay { RoundedRectangle(cornerRadius: Paper.Radius.card).strokeBorder(Paper.rule) }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Milestone earned: \(milestone.title)")
+        .accessibilityLabel("Achievement earned: \(achievement.title)")
     }
 }

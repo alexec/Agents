@@ -140,8 +140,8 @@ public extension DaemonAPI {
                 // Reports ▸ Features (#2165).
                 Row(Method.reportsFeatures, params: Empty.self, result: FeatureUsage.self, kind: .hostRequest),
                 Row(Method.reportsProblem, params: ProblemReportRequest.self, result: ProblemReport.self, kind: .hostRequest),
-                // The Time page's milestones (#984).
-                Row(Method.milestonesState, params: Empty.self, result: Milestones.self, kind: .hostRequest),
+                // The Time page's achievements (#984).
+                Row(Method.achievementsState, params: Empty.self, result: Achievements.self, kind: .hostRequest),
                 Row(Method.eventsList, params: EventsListRequest.self, result: EventsPage.self, kind: .hostRequest),
                 Row(Method.resourcesSnapshot, params: Empty.self, result: LeaseSnapshot.self, kind: .hostRequest),
                 // The MCP servers the host runs for every agent (#488), for the Resources page.
@@ -628,7 +628,7 @@ public extension DaemonAPI {
                 Row(Notification.diskChanged, params: DiskState.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.backupsChanged, params: BackupState.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.worktreesSized, params: WorktreesSized.self, result: Empty.self, kind: .hostNotification),
-                Row(Notification.milestonesChanged, params: Milestones.self, result: Empty.self, kind: .hostNotification),
+                Row(Notification.achievementsChanged, params: Achievements.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.storeNotesChanged, params: StoreNotes.self, result: Empty.self,
                     kind: .hostNotification),
                 Row(Notification.pinsChanged, params: PinsChangedNotification.self, result: Empty.self,

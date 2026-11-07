@@ -29,7 +29,7 @@ import { MCPServersPage } from "./MCPServers";
 import { ReviewPage } from "./Review";
 import { projectNameOf, Sidebar } from "./Sidebar";
 import { ContextMenu } from "./ContextMenu";
-import { MilestoneCard } from "./MilestoneCard";
+import { AchievementCard } from "./AchievementCard";
 import { NavBar, PageView, SectionPage } from "./Nav";
 import { Overview } from "./Overview";
 import { navPages } from "../model/nav";
@@ -114,7 +114,7 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
       <GitLendDialog store={store} />
       <ExportImportDialog store={store} />
       <ContextMenu />
-      <MilestoneCard store={store} />
+      <AchievementCard store={store} />
     </div>
   );
 }

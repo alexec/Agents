@@ -212,6 +212,21 @@
       ],
       "additionalProperties": false
     },
+    "Achievements": {
+      "type": "object",
+      "properties": {
+        "earned": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EarnedAchievement"
+          }
+        }
+      },
+      "required": [
+        "earned"
+      ],
+      "additionalProperties": false
+    },
     "ActivityToken": {
       "type": "object",
       "description": "clients/setActivityToken (#1744): the push token of this device's Live Activity, in hex, for one session it speaks for (#2991: one activity for every turn sent from the device, so one token for several sessions), for the control plane to update it by APNs while the Remote is not running. startedAt is when the session's turn began. No token takes the session out of it.",
@@ -3939,8 +3954,8 @@
         "storeNotes": {
           "$ref": "#/definitions/StoreNotes"
         },
-        "milestones": {
-          "$ref": "#/definitions/Milestones"
+        "achievements": {
+          "$ref": "#/definitions/Achievements"
         },
         "workflows": {
           "type": "array",
@@ -7638,7 +7653,7 @@
       ],
       "additionalProperties": false
     },
-    "EarnedMilestone": {
+    "EarnedAchievement": {
       "type": "object",
       "properties": {
         "id": {
@@ -15775,21 +15790,6 @@
         "read",
         "failed"
       ]
-    },
-    "Milestones": {
-      "type": "object",
-      "properties": {
-        "earned": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/EarnedMilestone"
-          }
-        }
-      },
-      "required": [
-        "earned"
-      ],
-      "additionalProperties": false
     },
     "MissingFolder": {
       "type": "object",

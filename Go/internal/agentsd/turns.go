@@ -154,7 +154,7 @@ func (d *Daemon) recordEntry(id, entryID wire.UUID, kind wire.TranscriptEntryKin
 	}
 	// A turn starting or ending can earn the first agent or five at once (#984).
 	if kind.StateChanged != nil {
-		d.checkMilestonesSoon()
+		d.checkAchievementsSoon()
 	}
 }
 

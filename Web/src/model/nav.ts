@@ -69,7 +69,7 @@ export const navPages: Record<NavSection, readonly NavPage[]> = {
   reports: [
     ...reportSections.map((s): NavPage => ({ id: s.id, title: s.title, group: s.group, draw: { kind: "report", section: s } })),
     { id: "usage", title: "Usage", group: "Yours", draw: { kind: "usage" } },
-    { id: "milestones", title: "Milestones", group: "Yours", draw: { kind: "activity", page: "milestones" } },
+    { id: "achievements", title: "Achievements", group: "Yours", draw: { kind: "activity", page: "achievements" } },
     { id: "events", title: "Events", group: "Records", draw: { kind: "activity", page: "events" } },
     adminPage("audit", "Audit", "Records"),
   ],
@@ -159,7 +159,7 @@ export function movedPage(app: "console" | "a", page: string | undefined): { nav
     case "runtimes": case "mcp": return { nav: "setup", section: page };
     // Worktrees (#3627) and resources (#3629) are on each machine's page now.
     case "worktrees": case "resources": return { nav: "machines", section: "machines" };
-    case "events": case "milestones": return { nav: "reports", section: page };
+    case "events": case "achievements": return { nav: "reports", section: page };
     case "spending": case "tokens": case "time": return { nav: "reports", section: "usage", usage: page };
     default: return {};
   }

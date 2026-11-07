@@ -13,7 +13,7 @@ import type {
   StartRequest, UUID, AutoMappings, AutoPreview, AutoPreviewRequest, AutoSettings, ClientPermissionMode, Levels, ModelLevel, PermissionLevel, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, DiskState, StoreNotes,
   CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ReviewPull, CheckSuggestion, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, PolicySetBy, RuntimeAllowances,
-  GuardedChange, GuardedChangeReading, MachineJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
+  GuardedChange, GuardedChangeReading, MachineJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Achievements,
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, DailySummarySettings, DesktopControlSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
   PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, BudgetRequest, RemoveRequest, ClientPermissionSettings, PRCostComment,
@@ -48,7 +48,7 @@ import type { WhenDone } from "./workflowSettings";
 import { askID, firstAsk, waiting, type GitLendAsk } from "./gitLending";
 import { dropboxRefusal, dropboxRequest } from "./dropbox";
 import { goOnRequest } from "./limits";
-import { milestonesSeen } from "./milestones";
+import { achievementsSeen } from "./achievements";
 import { hostAnswers, hostHas } from "./capabilities";
 import { Capability } from "../protocol/capabilities.generated";
 import { providerManaged, withJoin, withoutJoin } from "./people";
@@ -423,12 +423,12 @@ export class Work {
   readonly worktreeSizes = signal<Record<string, Record<string, WorktreeSize>>>({});
   /** Each host's files it could not read in this run (#205, #223), replaced whole by each store/notesChanged. */
   readonly storeNotes = signal<Record<string, string[]>>({});
-  /** Each host's milestones (#984), replaced whole by each milestones/changed. */
-  readonly milestones = signal<Record<string, Milestones>>({});
+  /** Each host's achievements (#984), replaced whole by each achievements/changed. */
+  readonly achievements = signal<Record<string, Achievements>>({});
 
-  protected takeMilestones(host: string, milestones: Milestones): void {
-    this.milestones.value = { ...this.milestones.value, [host]: milestones };
-    milestonesSeen.take(milestones);
+  protected takeAchievements(host: string, achievements: Achievements): void {
+    this.achievements.value = { ...this.achievements.value, [host]: achievements };
+    achievementsSeen.take(achievements);
   }
   /**
    * The control plane's machine, its home host, and how this Mac's host says its join stands
@@ -729,8 +729,8 @@ export class Work {
       case "store/notesChanged":
         this.storeNotes.value = { ...this.storeNotes.value, [host]: (params as StoreNotes).notes };
         return true;
-      case "milestones/changed":
-        this.takeMilestones(host, params as Milestones);
+      case "achievements/changed":
+        this.takeAchievements(host, params as Achievements);
         return true;
       case "preferences/changed":
         if (this.isMac(host)) preferencesSaid(params as Record<string, JSONValue>);
@@ -1888,9 +1888,9 @@ export class Store extends Work {
       void this.link.call("preferences/get", {}, host).then((said) => preferencesSaid(said))
         .catch(failed("preferences/get"));
     }
-    // A host from before #984 doesn't know it: the Time page shows no milestones.
-    void this.link.call("milestones/state", {}, host).then((state) => this.takeMilestones(host, state))
-      .catch(failed("milestones/state"));
+    // A host from before #984 doesn't know it: the Time page shows no achievements.
+    void this.link.call("achievements/state", {}, host).then((state) => this.takeAchievements(host, state))
+      .catch(failed("achievements/state"));
     const [permissions, elicitations] = await Promise.all([
       this.link.call("permissions/pending", {}, host).catch(failed("permissions/pending")),
       this.link.call("elicitations/pending", {}, host).catch(failed("elicitations/pending")),
