@@ -210,6 +210,8 @@ port, with a random path token.
 
 This is why the epic's guardrail matters more than the mask: a card for agents is
 locked to one merchant and has a spend limit, so a leak costs at most that limit.
+#3923 (Alex, 2026-11-07) relaxed this: a card needs a spend limit; a merchant or category lock is
+recommended, not required.
 
 ### A secret the person types in a hand-off
 

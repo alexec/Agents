@@ -261,9 +261,9 @@ public enum UserScopeWords {
     public static let addCard = "Add a Card…"
     public static let cardKind = "Card"
     /// Where a person adds a card: what a card for agents must be.
-    public static let cardRule = "Add only a card that is locked to one merchant and has a spend limit, such as a Privacy.com card. "
+    public static let cardRule = "Add only a card that has a spend limit, such as a Privacy.com card. A card locked to one merchant or category is safer. "
         + "An agent fills it into a page with fill_secret and never sees it. It stays sealed on your own machines."
-    public static let cardConfirm = "This card is locked to one merchant and has a spend limit"
+    public static let cardConfirm = "This card has a spend limit"
 
     public static func refusal(_ error: any Error) -> String {
         if let error = error as? JSONRPCError {
@@ -275,8 +275,8 @@ public enum UserScopeWords {
     }
 }
 
-/// A card secret (#3531): a payment card that is locked to one merchant and has a spend limit,
-/// kept as one secret whose value is a JSON object of its parts. agentsd's fill_secret reads it
+/// A card secret (#3531, #3923): a payment card that has a spend limit (a merchant or category lock
+/// is recommended), kept as one secret whose value is a JSON object of its parts. agentsd's fill_secret reads it
 /// a part at a time (`Go/internal/agentsd/browserfill.go`); the web page writes the same in
 /// `Web/src/model/userScope.ts`.
 public struct CardSecret: Codable, Sendable, Hashable {

@@ -64,7 +64,7 @@ function SecretSheet({ store, replacing, close }: { store: Store; replacing: Use
   );
 }
 
-/** Add a Card… and a card's Replace… (#3531): only a card locked to a merchant with a spend limit. */
+/** Add a Card… and a card's Replace… (#3531): only a card with a spend limit (a merchant or category lock is recommended). */
 function CardSheet({ store, replacing, close }: { store: Store; replacing: UserSecretRow | null; close: () => void }) {
   const name = useSignal(replacing?.name ?? "");
   const number = useSignal("");

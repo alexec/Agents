@@ -54,15 +54,15 @@ export function isSecretName(name: string): boolean {
   return /^[A-Z_][A-Z0-9_]{0,63}$/.test(name);
 }
 
-// Card secrets (#3531), as CardSecret in Packages/AgentsKit: a payment card that is locked to one merchant
-// and has a spend limit, kept as one secret whose value is a JSON object of its parts. agentsd's fill_secret
+// Card secrets (#3531, #3923), as CardSecret in Packages/AgentsKit: a payment card that has a spend limit
+// (a merchant or category lock is recommended), kept as one secret whose value is a JSON object of its parts. agentsd's fill_secret
 // reads it a part at a time.
 export const cardKind = "card";
 export const addCard = "Add a Card…";
 export const cardKindLabel = "Card";
-export const cardRule = "Add only a card that is locked to one merchant and has a spend limit, such as a Privacy.com card. "
+export const cardRule = "Add only a card that has a spend limit, such as a Privacy.com card. A card locked to one merchant or category is safer. "
   + "An agent fills it into a page with fill_secret and never sees it. It stays sealed on your own machines.";
-export const cardConfirm = "This card is locked to one merchant and has a spend limit";
+export const cardConfirm = "This card has a spend limit";
 
 export interface Card { number: string; expiry: string; cvc: string; name: string; zip: string }
 
