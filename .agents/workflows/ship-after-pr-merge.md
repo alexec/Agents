@@ -3,7 +3,7 @@ name: Ship after PR merge
 on:
   - pr.merged
 agent: new
-cooldown: 1h
+cooldown: 4h
 when-done: archive
 permission-mode: approve-for-me
 ---

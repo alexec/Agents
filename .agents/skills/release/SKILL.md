@@ -1,6 +1,6 @@
 ---
 name: release
-description: Take main to a new version with nobody watching (#914), started by Alex. Every release is a minor (x.y.0), with no patch after it (#3212). Run the three checks once each (runtimes, competitors, the feature matrix; the five reviews are paused until 1.0, #3215), read the Dependabot alerts, have the high issues fixed through the Scrum Master's lanes, check the gate, choose the version, check its milestone, write the notes, tag and push, check the GitHub release and both TestFlight builds, deploy the live control plane, close the milestone, and review how the release went. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
+description: Take main to a new version with nobody watching (#914), started by Alex. Every release is a minor (x.y.0), with no patch after it (#3212). Run the three checks once each (runtimes, competitors, the feature matrix; the five reviews are not part of a release, #3215), read the Dependabot alerts, have the high issues fixed through the Scrum Master's lanes, check the gate, choose the version, check its milestone, write the notes, tag and push, check the GitHub release and both TestFlight builds, deploy the live control plane, close the milestone, and review how the release went. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
 ---
 
 # Release
@@ -24,7 +24,7 @@ Alex decided (2026-10-13, #914):
   until 1.0** (Alex, 2026-11-01, #3215): security, performance, HADR, dead code and
   usability. Before 1.0 the product changes too fast for release-time reviews to pay back
   what they cost; #3216 brings them back at 1.0, at PR time. Their skills and workflows
-  stay, turned off.
+  stay, turned off, except the dead-code review, which runs on its own schedule (#3715).
 - **Scope is what changed** (#1462): the checks read only `main` since the last tag.
   Step 3 also carries forward the draft security advisories that earlier reviews made.
   Older open issues are not this release's.
@@ -98,10 +98,13 @@ calendar day in America/Los_Angeles, not 24 hours since the tag.
 
 ## 2. Checks, once each
 
-Three workflows run exactly once per release, and only here (#1462). None has a schedule.
-`security-review`, `performance-review`, `hadr-review`, `dead-code-review` and
-`usability-check` are paused until 1.0 (#3215): their files say `enabled: false`, and the
-release never starts them.
+Three workflows run once per release, here (#1462). They also run on a schedule of their
+own (#3715): the runtime check on Tuesday and Friday, the competitor check and the feature
+matrix on Monday. The release still starts each of them with Run now.
+`security-review`, `performance-review`, `hadr-review` and `usability-check` are paused
+until 1.0 (#3215): their files say `enabled: false`, and the release never starts them.
+`dead-code-review` runs on its own schedule (Tuesday, Thursday and Saturday), never from
+the release.
 
 | Order | Workflow | It writes |
 |---|---|---|
