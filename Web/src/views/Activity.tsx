@@ -17,7 +17,7 @@ import { ReportsPane } from "./Reports";
 import { BackToList } from "./BackToList";
 import { Modal } from "./Modal";
 import { folderKey, folderPath } from "../model/groups";
-import { accountChoices, accountRows, accountState, agentsHolding, allowanceLine, allowancePace, allowancePaceLine, pastWeeksLine, defaultAccountName, isOrgRow, orgAllowanceLine, ownRow, ownSignInID, reachesFoot, reachesTheModelBy, machineSignInLine, offersMachineSignIn, removeMessage, rowTitle, runtimeTime, runtimesHint, setupMachineLine, setupRuntimes, signInOnTheMac } from "../model/runtimes";
+import { accountChoices, accountRows, accountState, agentsHolding, allowanceLine, allowancePace, allowancePaceLine, pastWeeksLine, defaultAccountName, isOrgRow, orgAllowanceLine, ownRow, ownSignInID, reachesFoot, reachesTheModelBy, machineSignInLine, offersMachineSignIn, removeMessage, rowTitle, runtimeTime, runtimesHint, machinesSummary, machinesWords, setupRuntimes, signInOnTheMac, type MachinesPart, type SetupRuntime } from "../model/runtimes";
 import { RuntimeSignInDialog } from "./RuntimeSignInDialog";
 import { limitsHint } from "../model/onTheMac";
 import { fromOrganisation } from "../model/orgAccounts";
@@ -234,6 +234,101 @@ const onlineHosts = (store: Store): ControlMachine[] => store.hosts.value.filter
 
 const pageTitles: Record<ActivityPage, string> = { events: "Events", runtimes: "Runtimes", mcp: "Connectors", spending: "Cost", tokens: "Tokens", time: "Time", milestones: "Milestones" };
 
+/** How much is left, with no times, as allowanceReading's first part: "62% left". Null when the reading has no amount. */
+function allowanceAmount(state: AllowanceState, now: Date): string | null {
+  const reading = state.reading;
+  if (!reading || (reading.resetsAt && fromWireDate(reading.resetsAt).getTime() <= now.getTime())) return null;
+  const left = reading.spent ? 0 : reading.used == null ? null : Math.round((1 - reading.used) * 100);
+  return left === null ? (reading.nearlySpent ? "Nearly used up" : null) : left === 0 ? "None left" : `${left}% left`;
+}
+
+/**
+ * One runtime on Your setup in short rows (#3744): its name, one line and its allowance bar, then each account in the same
+ * way, then its machines in one line, each name a link to its page. Details opens the rest of the runtime's and its accounts'
+ * allowance: the times, the pace, the past weeks and the notes.
+ */
+function SetupRuntimeRows({ store, runtime: { status, home: hostID, machines }, parts, hostName, signIn }: {
+  store: Store; runtime: SetupRuntime; parts: MachinesPart[]; hostName: (host: string) => string;
+  signIn: (host: string, status: RuntimeStatus) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const several = machines.length > 1;
+  const host = { id: hostID };
+  const allowanceSet = store.runtimeAllowances.value[host.id];
+  const allowance = allowanceSet && ownRow(allowanceSet.rows, status.runtime.id);
+  const isAllowanceOut = !!allowance && "out" in allowance.state.status && !allowance.unusable;
+  const now = allowanceSet ? fromWireDate(allowanceSet.at) : new Date();
+  const accounts = allowanceSet ? accountRows(allowanceSet.rows, status.runtime.id) : [];
+  const short = (line: string, state: AllowanceState, out: boolean) => {
+    const amount = out ? null : allowanceAmount(state, now);
+    return amount ? `${line} · ${amount}` : line;
+  };
+  const bar = (state: AllowanceState) => state.reading && allowanceReading(state, now)
+    && <div title={allowanceReading(state, now) ?? undefined}><AllowanceBar reading={state.reading} /></div>;
+  const detail = (state: AllowanceState) => <>
+    {allowanceReading(state, now) && <p class="quiet small">{allowanceReading(state, now)}</p>}
+    <AllowancePace state={state} now={now} />
+  </>;
+  const has = (state: AllowanceState) => !!allowanceReading(state, now) || !!allowancePaceLine(state, now) || !!pastWeeksLine(state, now);
+  const detailed = !!status.poolNote || !!allowance?.setupNote || !!machineSignInLine(status)
+    || (!!allowance && !allowance.unusable && has(allowance.state)) || accounts.some((r) => !r.unusable && has(r.state));
+  return <Fragment>
+    <li class={isAllowanceOut || isOut(status) ? "out" : ""}>
+      <p class={status.setBy ? "set-by-org" : undefined}><span class="strong">{status.runtime.name}</span>{" "}
+        <span class="quiet small">{allowance?.unusable ? `Not usable: ${allowance.unusable}`
+          : allowance ? short(allowanceLine(allowance.state), allowance.state, isAllowanceOut) : availabilityWords(status.availability)}{status.outdated ? " · an update is out" : ""}</span></p>
+      {allowance && !allowance.unusable && bar(allowance.state)}
+      {/* A runtime the organisation does not allow here: shown, with why (#998). */}
+      <OrgPolicyLine mark={status.setBy} />
+      {open && <>
+        {allowance && !allowance.unusable && detail(allowance.state)}
+        {status.poolNote && <p class="quiet small">{status.poolNote}</p>}
+        {allowance?.setupNote && <p class="quiet small">{allowance.setupNote.split("`").map((part, i) => i % 2 ? <code key={i}>{part}</code> : part)}</p>}
+        {/* A server's Claude or Codex, signed in there from here (#3349). Said once: the allowance says "not signed in" already. */}
+        {machineSignInLine(status) && !allowance?.unusable && <p class="quiet small">{machineSignInLine(status)}</p>}
+      </>}
+      {isAllowanceOut && allowance && <button onClick={() => void store.markRuntimeAvailable(host.id, allowance.credentialKey)}>Mark available</button>}
+      {offersMachineSignIn(status) && store.has(host.id, Capability.runtimesSignIn1) && (
+        <button onClick={() => signIn(host.id, status)}>Sign In…</button>
+      )}
+      {/* Only this Mac's, and only one that is on it: no client can sign in a server's account (#2257). */}
+      {status.runtime.accountFolderVariable !== undefined && !("missing" in status.availability) && store.isMac(host.id) && <AddAccount store={store} host={host.id} runtime={status.runtime.id} />}
+      <ReachesTheModelBy store={store} host={host.id} runtime={status.runtime.id} />
+    </li>
+    {/* Each account added to it (#840), then the organisation's (#999), under it, one line each. */}
+    {accounts.map((row) => {
+      const out = "out" in row.state.status && !row.unusable;
+      const org = isOrgRow(row);
+      // An org account is the organisation's to remove (#999).
+      const account = org ? undefined : store.addedAccounts(host.id, status.runtime.id).find((a) => a.id === row.accountID);
+      return <li key={row.credentialKey} class={`setup-account${out ? " out" : ""}`}>
+        <p><span class="strong">{rowTitle(row, status.runtime.name)}</span>{" "}
+          <span class="quiet small">{row.unusable ? `Not usable: ${row.unusable}`
+            : org ? orgAllowanceLine(row.state, row.tokensToday, now, runtimeTime, allowanceLine) : short(allowanceLine(row.state), row.state, out)}</span></p>
+        {/* Where it is from, never a key or an address (FR-023, FR-026). */}
+        {org && <p class="quiet small">{fromOrganisation}</p>}
+        {account?.signedInAs !== undefined && <p class="quiet small">{accountState(account)}</p>}
+        {!row.unusable && bar(row.state)}
+        {open && !row.unusable && detail(row.state)}
+        {account && !account.signedIn && store.isMac(host.id) && <p class="quiet small">{signInOnTheMac}</p>}
+        {out && <button onClick={() => void store.markRuntimeAvailable(host.id, row.credentialKey)}>Mark available</button>}
+        {account && <RemoveAccount store={store} host={host.id} account={account}
+          place={store.isMac(host.id) ? "the Mac" : hostName(host.id)} />}
+      </li>;
+    })}
+    <li class="setup-machines">
+      <p class="quiet small">
+        {/* With one machine alone, the row's own line says it already. */}
+        {several && <span aria-label={`${status.runtime.name}: ${machinesWords(parts, hostName)}`}>{parts.map((part, i) => <Fragment key={part.words}>
+          {i > 0 && " · "}{part.words}
+          {part.hosts.map((h, n) => <Fragment key={h}>{n === 0 ? " " : ", "}<a href={routeHash({ nav: "machines", section: `machine-${h}` })}>{hostName(h)}</a></Fragment>)}
+        </Fragment>)}</span>}
+        {detailed && <>{" "}<button class="link" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? "Hide Details" : "Details"}</button></>}
+      </p>
+    </li>
+  </Fragment>;
+}
+
 /** An Activity page in the chat's place. */
 export function ActivityPageView({ store, page }: { store: Store; page: ActivityPage }) {
   const hosts = onlineHosts(store);
@@ -273,78 +368,25 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
           )}
           {page === "events" && pane.value === "events" && <EventsList store={store} hostName={hostName} />}
           {page === "events" && pane.value === "audit" && <AuditPane store={store} hostName={hostName} />}
-          {/* Your setup ▸ Runtimes (#3631): each runtime once, its accounts and allowances read on its home machine,
-              then a line per machine, each to that machine's page. */}
+          {/* Your setup ▸ Runtimes (#3631, #3744): the runtimes installed somewhere first, each in a short row,
+              then the others under "Other runtimes", closed. Accounts and allowances are read on the runtime's home machine. */}
           {page === "runtimes" && (
             <section>
-              <ul class="runtime-list">
-                {setupRuntimes(store.hosts.value, store.macHostID.value, store.runtimes.value).map(({ status, home: hostID, machines }) => {
-                  const host = { id: hostID };
-                  const allowanceSet = store.runtimeAllowances.value[host.id];
-                  const allowance = allowanceSet && ownRow(allowanceSet.rows, status.runtime.id);
-                  const isAllowanceOut = !!allowance && "out" in allowance.state.status && !allowance.unusable;
-                  const now = allowanceSet ? fromWireDate(allowanceSet.at) : new Date();
-                  return <Fragment key={status.runtime.id}>
-                    <li class={isAllowanceOut || isOut(status) ? "out" : ""}>
-                      <p class={status.setBy ? "set-by-org" : undefined}><span class="strong">{status.runtime.name}</span>{" "}
-                        <span class="quiet small">{allowance?.unusable ? `Not usable: ${allowance.unusable}` : allowance ? allowanceLine(allowance.state) : availabilityWords(status.availability)}{status.outdated ? " · an update is out" : ""}</span></p>
-                      {allowance && !allowance.unusable && allowanceReading(allowance.state, now) && <>
-                        <p class="quiet small">{allowanceReading(allowance.state, now)}</p>
-                        {allowance.state.reading && <AllowanceBar reading={allowance.state.reading} />}
-                      </>}
-                      {allowance && !allowance.unusable && <AllowancePace state={allowance.state} now={now} />}
-                      {/* A runtime the organisation does not allow here: shown, with why (#998). */}
-                      <OrgPolicyLine mark={status.setBy} />
-                      {status.poolNote && <p class="quiet small">{status.poolNote}</p>}
-                      {allowance?.setupNote && <p class="quiet small">{allowance.setupNote.split("`").map((part, i) => i % 2 ? <code key={i}>{part}</code> : part)}</p>}
-                      {isAllowanceOut && allowance && <button onClick={() => void store.markRuntimeAvailable(host.id, allowance.credentialKey)}>Mark available</button>}
-                      {/* A server's Claude or Codex, signed in there from here (#3349). */}
-                      {/* Said once: the allowance says "not signed in" already. */}
-                      {machineSignInLine(status) && !allowance?.unusable && <p class="quiet small">{machineSignInLine(status)}</p>}
-                      {offersMachineSignIn(status) && store.has(host.id, Capability.runtimesSignIn1) && (
-                        <button onClick={() => { signingIn.value = { host: host.id, status }; }}>Sign In…</button>
-                      )}
-                      {/* Only this Mac's, and only one that is on it: no client can sign in a server's account (#2257). */}
-                      {status.runtime.accountFolderVariable !== undefined && !("missing" in status.availability) && store.isMac(host.id) && <AddAccount store={store} host={host.id} runtime={status.runtime.id} />}
-                      <ReachesTheModelBy store={store} host={host.id} runtime={status.runtime.id} />
-                    </li>
-                    {/* Each account added to it (#840), then the organisation's (#999), under it, with its own allowance. */}
-                    {allowanceSet && accountRows(allowanceSet.rows, status.runtime.id).map((row) => {
-                      const out = "out" in row.state.status && !row.unusable;
-                      const org = isOrgRow(row);
-                      // An org account is the organisation's to remove (#999).
-                      const account = org ? undefined : store.addedAccounts(host.id, status.runtime.id).find((a) => a.id === row.accountID);
-                      return <li key={row.credentialKey} class={out ? "out" : ""}>
-                        <p><span class="strong">{rowTitle(row, status.runtime.name)}</span>{" "}
-                          <span class="quiet small">{row.unusable ? `Not usable: ${row.unusable}`
-                            : org ? orgAllowanceLine(row.state, row.tokensToday, now, runtimeTime, allowanceLine) : allowanceLine(row.state)}</span></p>
-                        {/* Where it is from, never a key or an address (FR-023, FR-026). */}
-                        {org && <p class="quiet small">{fromOrganisation}</p>}
-                        {account?.signedInAs !== undefined && <p class="quiet small">{accountState(account)}</p>}
-                        {!row.unusable && allowanceReading(row.state, now) && <>
-                          <p class="quiet small">{allowanceReading(row.state, now)}</p>
-                          {row.state.reading && <AllowanceBar reading={row.state.reading} />}
-                        </>}
-                        {!row.unusable && <AllowancePace state={row.state} now={now} />}
-                        {account && !account.signedIn && store.isMac(host.id) && <p class="quiet small">{signInOnTheMac}</p>}
-                        {out && <button onClick={() => void store.markRuntimeAvailable(host.id, row.credentialKey)}>Mark available</button>}
-                        {account && <RemoveAccount store={store} host={host.id} account={account}
-                          place={store.isMac(host.id) ? "the Mac" : hostName(host.id)} />}
-                      </li>;
-                    })}
-                    <li class="setup-machines">
-                      <ul aria-label={`${status.runtime.name} on each machine`}>
-                        {machines.map((m) => (
-                          <li key={m.host}>
-                            <a href={routeHash({ nav: "machines", section: `machine-${m.host}` })}>{hostName(m.host)}</a>{" "}
-                            <span class="quiet small">{setupMachineLine(m.status, onlineIDs.has(m.host))}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </li>
-                  </Fragment>;
-                })}
-              </ul>
+              {(() => {
+                const all = setupRuntimes(store.hosts.value, store.macHostID.value, store.runtimes.value)
+                  .map((r) => ({ ...r, summary: machinesSummary(r.machines, (h) => onlineIDs.has(h)) }));
+                const row = (r: (typeof all)[number]) => <SetupRuntimeRows key={r.status.runtime.id} store={store} runtime={r}
+                  parts={r.summary.parts} hostName={hostName} signIn={(host, status) => { signingIn.value = { host, status }; }} />;
+                const inUse = all.filter((r) => r.summary.inUse);
+                const others = all.filter((r) => !r.summary.inUse);
+                return <>
+                  {inUse.length > 0 && <ul class="runtime-list">{inUse.map(row)}</ul>}
+                  {others.length > 0 && <details class="other-runtimes">
+                    <summary>Other runtimes ({others.length})</summary>
+                    <ul class="runtime-list">{others.map(row)}</ul>
+                  </details>}
+                </>;
+              })()}
               {/* The person's own pass-through names, a name the policy refuses dimmed (#998), for each machine that has any. */}
               {store.hosts.value.filter((h) => (store.passThrough.value[h.id] ?? []).length > 0).map((h) => (
                 <section key={h.id}>

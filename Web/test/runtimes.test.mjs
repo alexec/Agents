@@ -243,7 +243,35 @@ test("Your setup: each runtime once, read on the Mac, with a line per machine, t
   assert.deepEqual(got[1].machines.map((m) => m.host), ["mac", "d", "z"]);
   assert.equal(got[1].machines[0].status, undefined, "the Mac does not list Codex");
   assert.deepEqual(r.setupRuntimes(hosts, "mac", {}), []);
-  assert.equal(r.setupMachineLine(undefined, true), "Not known yet");
-  assert.equal(r.setupMachineLine(undefined, false), "Offline");
-  assert.equal(r.setupMachineLine(status("claude", "Claude", false), true), "Not installed");
+});
+
+// RuntimeMachinesSummaryTests on the Mac, the same cases (#3744).
+const summaryLine = (machines, offline = []) => {
+  const got = r.machinesSummary(machines.map(([host, st]) => ({ host, status: st })), (h) => !offline.includes(h));
+  return r.machinesWords(got.parts, (h) => h);
+};
+const at = (availability, more = {}) => ({ runtime: { id: "codex", name: "Codex" }, availability, ...more });
+const ready = { available: { path: "/p", supportsResume: true } };
+
+test("Your setup: on every machine says how many, one machine is named (#3744)", () => {
+  assert.equal(summaryLine([["This Mac", at(ready)], ["devbox", at(ready, { signIn: { signedIn: true } })],
+    ["relay", at(ready, { signIn: { signedIn: false, relayed: true } })]]), "On all 3 machines");
+  assert.equal(summaryLine([["This Mac", at(ready)]]), "On This Mac");
+});
+
+test("Your setup: the other machines are named by what stops them (#3744)", () => {
+  assert.equal(summaryLine([["This Mac", at(ready)], ["build-box", at({ missing: { lookedIn: [] } })]]),
+    "On This Mac · Not on build-box");
+  assert.equal(summaryLine([["This Mac", at(ready)], ["a", at(ready, { signIn: { signedIn: false } })],
+    ["b", at({ needsSignIn: { authMethods: [] } })], ["c", at({ failed: { reason: "x" } })], ["d", at({ installing: {} })],
+    ["e", undefined], ["f", undefined]], ["e"]),
+  "On This Mac · Not signed in on a, b · Can’t be used on c · Installing on d · Offline: e · Not known yet on f");
+  assert.equal(summaryLine([["This Mac", at(ready, { outdated: true })], ["devbox", at(ready)]]),
+    "On all 2 machines · An update is out on This Mac");
+});
+
+test("Your setup: a runtime is in use when it is installed somewhere (#3744)", () => {
+  const missing = at({ missing: { lookedIn: [] } });
+  assert.equal(r.machinesSummary([{ host: "m", status: missing }, { host: "s" }], () => true).inUse, false);
+  assert.equal(r.machinesSummary([{ host: "m", status: missing }, { host: "s", status: at({ needsSignIn: { authMethods: [] } }) }], () => true).inUse, true);
 });

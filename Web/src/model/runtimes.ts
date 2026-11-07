@@ -217,10 +217,37 @@ export function setupRuntimes(hosts: readonly { id: string; name: string }[], ma
   return sortedRuntimes([...out.values()].map((r) => r.status)).map((s) => out.get(s.runtime.id)!);
 }
 
-/** A machine's line under a runtime on Your setup: what the machine page says, or why it says nothing. */
-export function setupMachineLine(status: RuntimeStatus | undefined, online: boolean): string {
-  if (status) return machineRuntimeLine(status);
-  return online ? "Not known yet" : "Offline";
+/** A part of a runtime's machines line: the words, then the machines they are true of. */
+export interface MachinesPart { words: string; hosts: string[] }
+
+/**
+ * A runtime's machines on Your setup in one line (#3744), RuntimeMachinesSummary on the Mac: "On all 3
+ * machines", or "On This Mac · Not on build-box". `inUse` is installed, or being installed, somewhere.
+ */
+export function machinesSummary(machines: readonly { host: string; status?: RuntimeStatus }[],
+                                online: (host: string) => boolean): { parts: MachinesPart[]; inUse: boolean } {
+  const order = ["On", "Not signed in on", "Can’t be used on", "Installing on", "Not on", "Offline:", "Not known yet on"] as const;
+  const kind = (status: RuntimeStatus | undefined, host: string): (typeof order)[number] => {
+    if (!status) return online(host) ? "Not known yet on" : "Offline:";
+    const a = status.availability;
+    if ("available" in a) return status.signIn && !status.signIn.signedIn && !status.signIn.relayed ? "Not signed in on" : "On";
+    if ("needsSignIn" in a) return "Not signed in on";
+    if ("missing" in a) return "Not on";
+    if ("installing" in a) return "Installing on";
+    return "Can’t be used on";
+  };
+  const groups = order.map((words) => ({ words, hosts: machines.filter((m) => kind(m.status, m.host) === words).map((m) => m.host) }));
+  const parts: MachinesPart[] = machines.length > 1 && groups[0]!.hosts.length === machines.length
+    ? [{ words: `On all ${machines.length} machines`, hosts: [] }]
+    : groups.filter((g) => g.hosts.length > 0).map((g) => ({ words: g.words, hosts: g.hosts }));
+  const outdated = machines.filter((m) => m.status?.outdated).map((m) => m.host);
+  if (outdated.length) parts.push({ words: "An update is out on", hosts: outdated });
+  return { parts, inUse: machines.some((m) => m.status && !("missing" in m.status.availability)) };
+}
+
+/** The machines line as plain words: "On This Mac, devbox · Not on build-box". */
+export function machinesWords(parts: readonly MachinesPart[], name: (host: string) => string): string {
+  return parts.map((p) => [p.words, p.hosts.map(name).join(", ")].filter(Boolean).join(" ")).join(" · ");
 }
 
 /** The words of the sheet that signs a runtime in on a machine with no browser. */
