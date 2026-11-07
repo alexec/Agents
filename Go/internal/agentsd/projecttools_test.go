@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/alexec/agents/Go/internal/bitbucketmcp"
 	"github.com/alexec/agents/Go/internal/forgejomcp"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -48,5 +49,20 @@ func TestTheForgejoListsAreTheTasksAndCodeReviewSlotsPages(t *testing.T) {
 	}
 	if _, _, _, ok := viewSlot("agents/gitlab", forgejomcp.PullsURI); ok {
 		t.Error("another server's view took the forgejo server's page")
+	}
+}
+
+// The bitbucket server's list views (#3866) are the Tasks and Code review slots' pages, as the
+// forgejo server's are, pointed at the repository by its repo argument.
+func TestTheBitbucketListsAreTheTasksAndCodeReviewSlotsPages(t *testing.T) {
+	for uri, want := range map[string]wire.ConnectorSlotKind{bitbucketmcp.IssuesURI: wire.ConnectorSlotKindTasks,
+		bitbucketmcp.PullsURI: wire.ConnectorSlotKindCodeReview} {
+		kind, provider, key, ok := viewSlot("agents/bitbucket", uri)
+		if !ok || kind != want || provider != wire.ConnectionProviderBitbucket || key != "repo" {
+			t.Errorf("%s: %v %v %q %v", uri, kind, provider, key, ok)
+		}
+	}
+	if _, _, _, ok := viewSlot("agents/forgejo", bitbucketmcp.PullsURI); ok {
+		t.Error("another server's view took the bitbucket server's page")
 	}
 }
