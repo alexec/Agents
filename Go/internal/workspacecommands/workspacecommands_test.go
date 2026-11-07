@@ -10,8 +10,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -710,12 +712,81 @@ func TestDockerWithAnImageMakesAndDeletesLabelledContainers(t *testing.T) {
 		t.Errorf("%q", r.all())
 	}
 	call(t, s, "workspace_delete", `{"id":"build-2"}`)
-	if !r.has("docker rm -f -v 'build-2'") {
+	if !slices.ContainsFunc(r.all(), func(l string) bool { return strings.Contains(l, "docker rm -f -v 'build-2'") }) {
 		t.Errorf("%q", r.all())
 	}
 	// Without an image, or with named containers, it makes nothing.
 	if config(t, `{"preset":"docker"}`).Making.Create != "" || config(t, `{"preset":"docker","containers":["a"],"image":"x"}`).Making.Create != "" {
 		t.Error("docker makes workspaces without an image")
+	}
+}
+
+// fakeDocker is a docker on PATH that keeps its containers, volumes and images as files in
+// dir, so a test never touches a real one: containers/<name> holds its image and then its
+// volumes, one a line. It refuses to remove a volume or an image a container uses, as
+// Docker does, and logs each call.
+const fakeDocker = `#!/bin/sh
+d=$(dirname "$0")
+echo "$*" >> "$d/log"
+uses() { grep -lx "$1" "$d"/containers/* 2>/dev/null; }
+case "$1 $2" in
+"ps -a")
+  for c in "$d"/containers/*; do [ -e "$c" ] && printf '%s\trunning\t\n' "$(basename "$c")"; done ;;
+"ps -aq")
+  for c in $(uses "${4#*=}"); do basename "$c"; done ;;
+"inspect -f")
+  [ -e "$d/containers/$4" ] || exit 1
+  case "$3" in *Mounts*) tail -n +2 "$d/containers/$4" | tr '\n' ' ' ;; *) head -n 1 "$d/containers/$4" ;; esac ;;
+"rm -f")
+  rm "$d/containers/$4" ;;
+"volume rm"|"image rm")
+  [ -z "$(uses "$3")" ] || exit 1
+  rm "$d/$1s/$3" ;;
+esac
+`
+
+func TestDockerDeleteKeepsWhatAnotherContainerUses(t *testing.T) {
+	dir := t.TempDir()
+	for _, sub := range []string{"containers", "volumes", "images"} {
+		if err := os.Mkdir(filepath.Join(dir, sub), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write := func(path, text string) {
+		if err := os.WriteFile(filepath.Join(dir, path), []byte(text), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("docker", fakeDocker)
+	// build-1 and build-2 share the image and the cache volume; build-2 has a home of its own.
+	write("containers/build-1", "sha256:shared\ncache\n")
+	write("containers/build-2", "sha256:shared\ncache\nhome-2\n")
+	for _, f := range []string{"volumes/cache", "volumes/home-2", "images/sha256:shared"} {
+		write(f, "")
+	}
+	run := func(line string, deadline time.Duration) Outcome {
+		return Shell("PATH="+ShellQuoted(dir)+":\"$PATH\"; "+line, deadline)
+	}
+	exists := func(path string) bool { _, err := os.Stat(filepath.Join(dir, path)); return err == nil }
+	s := server(t, `{"preset":"docker","image":"scratch:latest"}`, quick, run)
+
+	if answer := call(t, s, "workspace_delete", `{"id":"build-2"}`); answer["isError"] != nil {
+		t.Fatalf("%v", answer)
+	}
+	if exists("containers/build-2") || exists("volumes/home-2") {
+		t.Error("build-2's container or its own volume is left")
+	}
+	if !exists("volumes/cache") || !exists("images/sha256:shared") {
+		t.Error("removed the volume or the image build-1 uses")
+	}
+
+	// The last one to use them takes them with it.
+	if answer := call(t, s, "workspace_delete", `{"id":"build-1"}`); answer["isError"] != nil {
+		t.Fatalf("%v", answer)
+	}
+	if exists("containers/build-1") || exists("volumes/cache") || exists("images/sha256:shared") {
+		log, _ := os.ReadFile(filepath.Join(dir, "log"))
+		t.Errorf("left something behind:\n%s", log)
 	}
 }
 

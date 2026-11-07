@@ -53,7 +53,7 @@ func ptr(s string) *string { return &s }
 // devbox: the ones named in containers, or else every container labelled agents.workspace,
 // each reached by its agents.ssh label or the shared ssh line. With an image, it makes
 // labelled containers from it, which install Agents and join by themselves (#1025), and
-// deletes them with their anonymous volumes.
+// deletes them with their volumes and image when no other container uses them (#3728).
 func docker(o map[string]any) Config {
 	var containers []string
 	for _, c := range strings_(o["containers"]) {
@@ -90,13 +90,24 @@ func docker(o map[string]any) Config {
 	if image := nonEmpty(o["image"]); image != nil {
 		making = Making{
 			Create: "docker run -d --name ${name} --label agents.workspace ${image} && docker exec ${name} sh -c ${firstBoot}",
-			Delete: "docker rm -f -v ${id}",
+			Delete: dockerDelete,
 			Options: map[string]any{"type": "object", "properties": map[string]any{
 				"image": map[string]any{"type": "string", "title": "Image", "description": *image, "default": *image}}},
 		}
 	}
 	return newConfig(nil, listing, states, making)
 }
+
+// dockerDelete deletes a workspace's container with its anonymous volumes, then its named
+// volumes and its image when no container uses them any more (#3728). It asks Docker
+// which containers use each one, of every label, and Docker itself refuses to remove a
+// volume or an image that a container uses, so another workspace's are kept. An image with
+// a second tag or a child image is kept too. The delete's status is the container's.
+const dockerDelete = `image=$(docker inspect -f '{{.Image}}' ${id}) && ` +
+	`volumes=$(docker inspect -f '{{range .Mounts}}{{if eq .Type "volume"}}{{.Name}} {{end}}{{end}}' ${id}) && ` +
+	`docker rm -f -v ${id} && { ` +
+	`for v in $volumes; do [ -n "$(docker ps -aq --filter volume="$v")" ] || docker volume rm "$v" >/dev/null 2>&1; done; ` +
+	`[ -n "$(docker ps -aq --filter ancestor="$image")" ] || docker image rm "$image" >/dev/null 2>&1; true; }`
 
 // doctl is DigitalOcean droplets with a tag.
 func doctl(o map[string]any) (Config, error) {
