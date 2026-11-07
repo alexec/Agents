@@ -6818,6 +6818,32 @@
       }
     },
     {
+      "name": "reports/problem",
+      "x-capability": "reports.problem/1",
+      "description": "Report a Problem (#3718): the person's words with this machine's version, OS and, when asked, recent log lines, made into a GitHub new-issue link. Sends nothing: the client opens the link.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ProblemReportRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ProblemReport"
+        }
+      }
+    },
+    {
       "name": "resources/changed",
       "x-capability": "resources.leases/1",
       "tags": [

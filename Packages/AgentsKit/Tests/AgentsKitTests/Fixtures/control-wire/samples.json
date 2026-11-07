@@ -1121,6 +1121,19 @@
     "request": "request",
     "result": "approved"
   },
+  "ProblemReportRequest": {
+    "happened": "The chat froze",
+    "expected": "It to go on",
+    "client": "Mac window 0.17.0",
+    "clientOS": "macOS 26.1",
+    "runtime": "claude",
+    "withLog": true
+  },
+  "ProblemReport": {
+    "title": "The chat froze",
+    "body": "## What happened",
+    "url": "https://github.com/alexec/Agents/issues/new?title=The+chat+froze"
+  },
   "FeatureUsage": {
     "days": 90,
     "since": "2026-08-02",

@@ -17,7 +17,7 @@ import type {
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, DailySummarySettings, DesktopControlSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
   PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, BudgetRequest, RemoveRequest, ClientPermissionSettings, PRCostComment,
-  Connection } from "../protocol/generated";
+  Connection, ProblemReport, ProblemReportRequest } from "../protocol/generated";
 import { endedConnections, endedLine, hasEnded } from "./connectorSetup";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
@@ -3099,6 +3099,14 @@ export class Store extends Work {
 
   async writeArtifact(host: string, agentID: string, path: string, text: string): Promise<boolean> {
     return (await this.act("artifact/write", { agentID: agentID as UUID, path, text }, host)) !== null;
+  }
+
+  /**
+   * Report a Problem's issue (#3718), made by `host`: the person's words, the versions and, when
+   * asked, its log lines, with tokens and home folders cut out. Sends nothing; throws why not.
+   */
+  async problemReport(host: string, request: ProblemReportRequest): Promise<ProblemReport> {
+    return await this.link.call("reports/problem", request, host);
   }
 
   /**

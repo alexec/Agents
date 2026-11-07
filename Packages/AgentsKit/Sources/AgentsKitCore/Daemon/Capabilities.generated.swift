@@ -130,6 +130,7 @@ public enum Capability {
     public static let readapi1 = "readapi/1"
     public static let relay1 = "relay/1"
     public static let reportsNodes1 = "reports.nodes/1"
+    public static let reportsProblem1 = "reports.problem/1"
     public static let reportsScope1 = "reports.scope/1"
     public static let reportsValue1 = "reports.value/1"
     public static let reportsViews1 = "reports.views/1"
@@ -426,6 +427,7 @@ public enum Capability {
         "relay/grant": "relay/1",
         "relay/offer": "relay/1",
         "reports/features": "features/1",
+        "reports/problem": "reports.problem/1",
         "resources/declare": "resources/1",
         "resources/end": "resources.leases/1",
         "resources/lease": "resources.leases/1",
