@@ -1474,6 +1474,21 @@ func messageID(p *string) *string {
 	return p
 }
 
+// isAppToolTitle is whether a permission card's title is a call to one of the app's own
+// tools: Claude's mcp__agents__<tool>, or Antigravity's agents_<tool> (1.4.5, #1361), only
+// for a tool this host serves, so a runtime's own tool named agents_… still asks.
+func isAppToolTitle(title string) bool {
+	if strings.HasPrefix(title, "mcp__agents__") {
+		return true
+	}
+	name, ok := strings.CutPrefix(title, "agents_")
+	if !ok {
+		return false
+	}
+	_, browser := browserTools()
+	return appToolServed(name) || browser[name]
+}
+
 // Permission asks the person, as a card, and waits for the answer: the option chosen, or
 // "" when the turn was stopped.
 func (l *live) Permission(ctx context.Context, p sdk.RequestPermissionRequest) string {
@@ -1485,7 +1500,7 @@ func (l *live) Permission(ctx context.Context, p sdk.RequestPermissionRequest) s
 		req.Options = append(req.Options, wire.PermissionOption{OptionID: string(o.OptionId), Name: o.Name, Kind: wire.PermissionOptionKind(o.Kind)})
 	}
 	// The app's own tools are allowed with no question, as the Swift host does.
-	if strings.HasPrefix(req.ToolCall.Title, "mcp__agents__") {
+	if isAppToolTitle(req.ToolCall.Title) {
 		for _, o := range req.Options {
 			if o.Kind == "allow_always" || o.Kind == "allow_once" {
 				return o.OptionID

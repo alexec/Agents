@@ -266,3 +266,52 @@ func TestAnAppToolCallsArgumentsAreCut(t *testing.T) {
 		t.Fatalf("%v", call.Arguments)
 	}
 }
+
+// Antigravity 1.4.5's own ask_question reaches the app as a permission card on a tool call
+// named interaction_<id>, its choices the options; and its helper archives itself before
+// the assessing agent asks (#1361).
+func TestAntigravityQuestionCardAndASelfArchivedHelper(t *testing.T) {
+	text := func(s string) *string { return &s }
+	card := func(at wire.Date, id, title string) wire.TranscriptEntry {
+		return wire.TranscriptEntry{At: at, Kind: wire.TranscriptEntryKind{PermissionAsked: &wire.TranscriptEntryKindPermissionAsked{
+			Value: wire.PermissionRequest{ToolCall: wire.ToolCall{ToolCallID: text(id), Title: title}}}}}
+	}
+	form := appToolCall{At: 20, Method: "questions/ask", Ok: true, Arguments: map[string]json.RawMessage{
+		"questions": json.RawMessage(`[{"id":"pick","prompt":"Pick one","options":[{"id":"a"}]},{"id":"words","prompt":"Type any short phrase"}]`)}}
+	report := "Shelf: scratch\n"
+	r := assessRecord{escalation: "ask_question", calls: []appToolCall{form}, reportText: &report, transcript: []wire.TranscriptEntry{
+		card(10, "6476b6fab22c467db87d", "agents_show_file"),
+		{At: 20, Kind: wire.TranscriptEntryKind{ElicitationAsked: &wire.TranscriptEntryKindElicitationAsked{Value: wire.ElicitationRequest{Message: text("Pick one")}}}},
+		card(30, "interaction_f4066315", "Is this assessment running unattended?")}}
+	if v, why := r.shouldAsk(); v != failedStep {
+		t.Fatal("a tool's permission card counted as a question:", why)
+	}
+	if v, why := r.ownAsk(); v != passed || why != "1 question reached the app through `ask_question`" {
+		t.Fatal(v, why)
+	}
+	r.transcript = append([]wire.TranscriptEntry{card(5, "interaction_aa", "Which shelf, kept or scratch?")}, r.transcript...)
+	if v, why := r.shouldAsk(); v != passed {
+		t.Fatal(v, why)
+	}
+
+	helper := wire.UUID("BF77631E-2DEE-426F-B13F-FF0656448A19")
+	byAgent := wire.AgentArchivedReasonByAgent
+	at := wire.Date(45)
+	r = assessRecord{
+		calls: []appToolCall{
+			{At: 40, Method: "sessions/start", Ok: true, AgentID: &helper},
+			{At: 41, Method: "sessions/list", Ok: true, Arguments: map[string]json.RawMessage{"started_by": json.RawMessage(`"me"`)}},
+			{At: 50, Method: "sessions/archive", Ok: false, Answer: text("Nothing changed: “Reply with the word OK.” is already archived."),
+				Arguments: map[string]json.RawMessage{"id": json.RawMessage(`"` + string(helper) + `"`)}},
+		},
+		helpers:    []wire.Agent{{ID: helper, RuntimeID: "antigravity", ArchivedAt: &at, ArchivedReason: &byAgent}},
+		transcript: []wire.TranscriptEntry{{At: 46, Kind: wire.TranscriptEntryKind{UserMessage: &wire.TranscriptEntryKindUserMessage{Value: "The wait you reported has cleared"}}}},
+	}
+	if v, why := r.helperSteps(); v != passed || !strings.Contains(why, "archived itself") {
+		t.Fatal(v, why)
+	}
+	r.calls[2].Answer = text("No session with that id.")
+	if v, _ := r.helperSteps(); v != failedStep {
+		t.Fatal("a refused archive passed")
+	}
+}

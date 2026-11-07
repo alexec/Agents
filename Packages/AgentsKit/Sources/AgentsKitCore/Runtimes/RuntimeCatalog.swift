@@ -163,11 +163,12 @@ public enum RuntimeCatalog {
     /// different folder, which is what moving an agent into a worktree mid-work asks of
     /// them (053). Measured, not assumed, by `RuntimeMoveLiveTests` through each ACP
     /// adapter (research R3, 2026-09-26): Claude, Copilot, Cursor and Codex did; Grok
-    /// answers "Path not found", because it files sessions by folder. Antigravity is left
-    /// out until measured. OpenCode loads its conversation in a new
-    /// folder but keeps working in the old one (049, research R9), so it is left out too. A runtime not here is never offered the
+    /// answers "Path not found", because it files sessions by folder. Antigravity 1.4.5
+    /// did, by `session/resume` and by `session/load`, measured by hand (#1361,
+    /// 2026-11-06). OpenCode loads its conversation in a new
+    /// folder but keeps working in the old one (049, research R9), so it is left out. A runtime not here is never offered the
     /// move tools, and cannot be moved, so nobody loses a conversation to a move.
-    public static let carriesConversationAcrossFolders: Set<String> = ["claude", "copilot", "cursor", "codex"]
+    public static let carriesConversationAcrossFolders: Set<String> = ["claude", "copilot", "cursor", "codex", "antigravity"]
 
     /// Whether an agent on this runtime can be moved to another folder (053).
     public static func canMoveFolders(runtimeID: String) -> Bool {
