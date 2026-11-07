@@ -417,6 +417,8 @@ type forgeSources struct {
 	// forgejo is the repositories on the connected Forgejo at forgejoRoot (#3753), owner/repo.
 	forgejo     []string
 	forgejoRoot string
+	// forgejoConn is the connection read with forgejoRoot.
+	forgejoConn connections.Connection
 	forgejoErr  error
 	// bitbucket is the repositories on Bitbucket Cloud (#3786), workspace/repo, read at
 	// bitbucketRoot, the connection's API.

@@ -230,6 +230,14 @@ never a bot. A pull request from a fork never counts.
   `prCostComment` says so). Forgejo has no parent issues, so an issue has none. An issue's
   address on the connected Forgejo is read in a filed issue's output. A doc's address is
   `/src/HEAD/<path>`, which Forgejo sends on to the default branch.
+- **The forgejo server's pages have a Lineage section (#3850).** An issue's row and a pull
+  request's Lineage tab name the sessions that worked on it, its pull requests or issues, and
+  what they cost, as on GitHub and GitLab, also for a Forgejo whose host's name does not say
+  Forgejo.
+- **An issue filed with `tea` or `fj` is linked (#3850).** A session that runs
+  `tea issues create` (Gitea's CLI) or `fj issue create` (Forgejo's) opens the issue it
+  made. `tea` prints the issue's address. `fj` prints only `created issue #12`, so the issue
+  is on the repository its `--repo` names, or else on the folder's Forgejo repository.
 - **The Board filter has no Forgejo board.** Forgejo has project boards, but its API (11)
   cannot read them, so a list narrowed to a board lists no Forgejo items.
 - **Not yet:** Retry on the pages (#3842).

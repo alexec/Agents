@@ -119,7 +119,7 @@ func onGitHubOrGitLab(r forgeRepo) bool { return r.forge == "github" || r.forge 
 // remote is neither GitHub's nor GitLab's. A Forgejo folder elsewhere leaves a reason.
 func (d *Daemon) forgejoSources(ctx context.Context, s *forgeSources, folders []string) {
 	c, root := d.forgejoRoot()
-	s.forgejoRoot = root
+	s.forgejoRoot, s.forgejoConn = root, c
 	elsewhere := false
 	for _, f := range folders {
 		if onGitHubOrGitLab(d.folderRepo(f)) {
@@ -155,8 +155,7 @@ func (d *Daemon) forgejoPage(ctx context.Context, s forgeSources, f forgejomcp.S
 	if p.err != nil {
 		return p
 	}
-	c, _ := d.forgejoConnection()
-	page, err := d.forgeForgejo(s.forgejoRoot, c.Access).Search(ctx, s.forgejo, f, after, limit)
+	page, err := d.forgeForgejo(s.forgejoConn, s.forgejoRoot).Search(ctx, s.forgejo, f, after, limit)
 	for _, i := range page.Items {
 		p.items = append(p.items, forgejoItemOf(i, s.folderOf[forgeRepo{"forgejo", strings.ToLower(i.Repo)}]))
 	}
@@ -176,18 +175,19 @@ func (d *Daemon) forgejoOf(ctx context.Context, method, repo string) (forgeForge
 			continue
 		}
 		if at, named := d.forgejoRepoAt(ctx, f, c.URL); at == root && strings.EqualFold(named, repo) {
-			return d.forgeForgejo(root, c.Access), named, f, nil
+			return d.forgeForgejo(c, root), named, f, nil
 		}
 	}
 	return nil, "", "", Invalid("%s: no folder here is on %s on the connected Forgejo, %s", method, repo, root)
 }
 
-// forgeForgejo is the Forgejo at root with the person's token, from the connection the caller
-// read (read again, a disconnect in between gives an empty token).
-func (d *Daemon) forgeForgejo(root, token string) forgeForgejo {
+// forgeForgejo is the Forgejo at root as connection c, which the caller read with root: read
+// again, it may have gone in between, and the call would go with no token.
+func (d *Daemon) forgeForgejo(c connections.Connection, root string) forgeForgejo {
 	if d.newForgeForgejo != nil {
-		return d.newForgeForgejo(root, token)
+		return d.newForgeForgejo(root, c.Access)
 	}
+	token := c.Access
 	return forgejomcp.NewRealForgejo(root, func() string { return token }, nil)
 }
 

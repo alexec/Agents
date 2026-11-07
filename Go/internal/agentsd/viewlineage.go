@@ -14,7 +14,7 @@ import (
 
 // The Lineage section of the Issues and PR pages (#2941): the sessions that worked on an
 // issue or a pull request, and on its pull requests, with what each cost. The github, gitlab,
-// linear, jira and azureboards servers have no way to the host's record, so the host answers a view's
+// forgejo, linear, jira and azureboards servers have no way to the host's record, so the host answers a view's
 // tools/call of lineageViewTool itself, with lineage/walk and lineage/cost, and never passes
 // it on. Only a view of one of those servers may ask: the record names the person's
 // sessions and what they spent.
@@ -28,7 +28,8 @@ const (
 )
 
 // lineageViewServers is the servers whose views may ask, by their mcpcatalog id.
-var lineageViewServers = map[string]bool{"agents/github": true, "agents/gitlab": true, "agents/linear": true, "agents/jira": true, "agents/azureboards": true}
+var lineageViewServers = map[string]bool{"agents/github": true, "agents/gitlab": true, "agents/forgejo": true, "agents/linear": true,
+	"agents/jira": true, "agents/azureboards": true}
 
 type lineageView struct {
 	// Ref is the node, as lineage refs name it: github:owner/repo#12.
@@ -138,21 +139,20 @@ func nodeOfURL(raw string) (wire.LineageNode, string, bool) {
 	return wire.LineageNode{}, "", false
 }
 
-// nodeOfURLHere is nodeOfURL, or an issue on the connected Forgejo, whose host's name need
-// not say Forgejo.
+// nodeOfURLHere is nodeOfURL, or an issue or a pull request on the connected Forgejo (#3850),
+// whose host's name need not say Forgejo, with the Forgejo's root as the base: it may be
+// under a path of its host.
 func (d *Daemon) nodeOfURLHere(raw string) (wire.LineageNode, string, bool) {
-	if n, base, ok := nodeOfURL(raw); ok {
-		return n, base, true
+	if _, root := d.forgejoRoot(); root != "" {
+		base := strings.TrimSuffix(root, "/")
+		if repo, n, ok := forgejoOfURLOn(raw, root, "/pulls/"); ok {
+			return repo.pr(n), base, true
+		}
+		if repo, n, ok := forgejoOfURLOn(raw, root, "/issues/"); ok {
+			return repo.issue(n), base, true
+		}
 	}
-	_, root := d.forgejoRoot()
-	if root == "" {
-		return wire.LineageNode{}, "", false
-	}
-	repo, n, ok := issueOfURLOn(raw, root)
-	if !ok {
-		return wire.LineageNode{}, "", false
-	}
-	return repo.issue(n), strings.TrimSuffix(root, "/"), true
+	return nodeOfURL(raw)
 }
 
 // lineageViewOf is node's section: the walk for who worked on it, the rollup for the cost.
