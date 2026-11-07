@@ -1388,6 +1388,12 @@ func (s *Service) acceptVia(conn *Conn, webOrigin string, proved func(failed boo
 				return
 			}
 		}
+		// Forgotten after its key was looked up (#3893): never attached, so none of its
+		// calls is answered.
+		if s.records.Client(client.ID) == nil && s.records.WasForgotten(client.ID) {
+			conn.CloseWith(ForgottenCloseCode, "forgotten")
+			return
+		}
 		session := s.router.AttachClient(client, conn, auth.Capabilities)
 		if carried != nil {
 			s.router.NoteCarried(session, via)
