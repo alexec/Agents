@@ -25,7 +25,7 @@ const window = (...args) => {
 };
 
 const op = await Operator.pair(controlURL, operatorCode);
-const host = (await op.call("hosts/list")).find((h) => h.state === "online")?.id;
+const host = (await op.call("machines/list")).find((h) => h.state === "online")?.id;
 const record = async (id) => (await op.link.call("agents/list", { includeArchived: true, archivedOnly: false, archivedCommands: false }, host))
   .find((a) => a.id === id);
 const until = async (what, test, seconds = 60) => {

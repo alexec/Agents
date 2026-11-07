@@ -147,7 +147,7 @@ type MachineRecord struct {
 	PublicKey []byte
 	Platform  string
 	Version   string
-	// Whether hosts/install put it there, so removing it can offer to take it away.
+	// Whether machines/install put it there, so removing it can offer to take it away.
 	Installed bool
 	// The machine it runs on, so a window can tell a host on its own Mac (R11).
 	MachineID *string

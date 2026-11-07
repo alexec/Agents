@@ -32,7 +32,7 @@ func TestUserSettingsGoIntoTheMachinesFiles(t *testing.T) {
 		Runtimes:    json.RawMessage(`{"sandbox":{"defaults":{"claude":"on"}}}`),
 	}, Secrets: []wire.SealedUserSecret{sealedSecret(t, public, "sam", "GITHUB_TOKEN", 1, "ghp_sams"),
 		sealedSecret(t, controllinkPublic(t), "sam", "OTHERS", 1, "for-another-machine")}}
-	d.Told(wire.NotifyHostUserSettings.Name, mustJSON(sent))
+	d.Told(wire.NotifyMachineUserSettings.Name, mustJSON(sent))
 
 	read := func(parts ...string) string {
 		b, _ := os.ReadFile(filepath.Join(parts...))
@@ -54,16 +54,16 @@ func TestUserSettingsGoIntoTheMachinesFiles(t *testing.T) {
 	}
 	// An older version, which a control plane could send back, is refused: the newer stays.
 	sent.Secrets = []wire.SealedUserSecret{sealedSecret(t, public, "sam", "GITHUB_TOKEN", 2, "ghp_rotated")}
-	d.Told(wire.NotifyHostUserSettings.Name, mustJSON(sent))
+	d.Told(wire.NotifyMachineUserSettings.Name, mustJSON(sent))
 	sent.Secrets = []wire.SealedUserSecret{sealedSecret(t, public, "sam", "GITHUB_TOKEN", 1, "ghp_sams")}
-	d.Told(wire.NotifyHostUserSettings.Name, mustJSON(sent))
+	d.Told(wire.NotifyMachineUserSettings.Name, mustJSON(sent))
 	if secrets := read(home, ".agents-secrets", "secrets.env"); !strings.Contains(secrets, "GITHUB_TOKEN=ghp_rotated") {
 		t.Fatal("an older version was taken")
 	}
 	// Sealed as another person's, it does not open.
 	sent.Secrets = []wire.SealedUserSecret{sealedSecret(t, public, "sam", "GITHUB_TOKEN", 2, "ghp_rotated"),
 		sealedSecret(t, public, "kim", "KIMS_TOKEN", 1, "ghp_kims")}
-	d.Told(wire.NotifyHostUserSettings.Name, mustJSON(sent))
+	d.Told(wire.NotifyMachineUserSettings.Name, mustJSON(sent))
 	if secrets := read(home, ".agents-secrets", "secrets.env"); strings.Contains(secrets, "ghp_kims") {
 		t.Fatal("another person's secret opened")
 	}
@@ -85,7 +85,7 @@ func TestUserSettingsGoIntoTheMachinesFiles(t *testing.T) {
 	// A removed persona and secret are taken away.
 	sent.Settings.AgentConfig = mustJSON(wire.UserAgentConfig{Instructions: &instructions})
 	sent.Secrets = nil
-	d.Told(wire.NotifyHostUserSettings.Name, mustJSON(sent))
+	d.Told(wire.NotifyMachineUserSettings.Name, mustJSON(sent))
 	if _, err := os.Stat(filepath.Join(home, ".agents", "personas", "reviewer.md")); !os.IsNotExist(err) {
 		t.Fatal("the persona is still there")
 	}
@@ -133,7 +133,7 @@ func TestAgentConfigFilesFromAnotherMachineAreNotWritten(t *testing.T) {
 	server := base64.StdEncoding.EncodeToString([]byte(`{"x":{"command":"y"}}`))
 	rules := base64.StdEncoding.EncodeToString([]byte("Follow the shared rules."))
 	yes := true
-	d.Told(wire.NotifyHostUserSettings.Name, mustJSON(wire.MachineUserSettings{
+	d.Told(wire.NotifyMachineUserSettings.Name, mustJSON(wire.MachineUserSettings{
 		User: "sam",
 		Settings: wire.UserSettings{AgentConfigFiles: &wire.AgentConfigFiles{Files: []wire.AgentConfigFile{
 			{Path: "mcp.json", Contents: &server, Time: 10, Machine: "other", Digest: "a"},
@@ -171,7 +171,7 @@ func TestAnOldMarkTakesAwayOnlyWhatAgentConfigWrote(t *testing.T) {
 	old, _ := json.Marshal(userSettingsSyncState{User: "sam", Secrets: []string{},
 		Files: []string{"mcp.json", "plugins/one/plugin.json", "skills/tool/run.sh", "personas/old.md"}})
 	os.WriteFile(d.userSettingsSyncPath(), old, 0o644)
-	d.Told(wire.NotifyHostUserSettings.Name, mustJSON(wire.MachineUserSettings{
+	d.Told(wire.NotifyMachineUserSettings.Name, mustJSON(wire.MachineUserSettings{
 		User: "sam",
 		Settings: wire.UserSettings{McpServers: wire.JSONValue(`{"mine":{"command":"x"}}`),
 			AgentConfig: wire.JSONValue(`{"instructions":"Be brief."}`)},

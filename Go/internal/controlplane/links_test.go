@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/alexec/agents/Go/internal/controllink"
+	"github.com/alexec/agents/Go/internal/controlplane/locks"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 	"github.com/alexec/agents/Go/internal/controlplane/usersettings"
@@ -301,7 +302,7 @@ func TestARemovedPersonsRecordsGo(t *testing.T) {
 	ctx := context.Background()
 	keys := func(user string) []string {
 		return []string{usersettings.Prefix + user + "/settings.json", usersettings.Prefix + user + "/secrets/TOKEN.json",
-			reportViewsKey(user)}
+			reportViewsKey(user), locks.Prefix + user + "/000000.json", locks.Prefix + user + "/000001.json"}
 	}
 	for _, user := range []string{sam.id, "someone-else"} {
 		for _, k := range keys(user) {
@@ -318,5 +319,12 @@ func TestARemovedPersonsRecordsGo(t *testing.T) {
 		if o, _ := st.Get(ctx, k); o == nil {
 			t.Fatalf("%s went", k)
 		}
+	}
+	// Their record is a tombstone: the id and the sign-in it refuses, not their name (#3647).
+	o, _ := st.Get(ctx, records.PersonKey(sam.id))
+	var kept records.Person
+	if o == nil || json.Unmarshal(o.Data, &kept) != nil || !kept.IsRemoved() || kept.Name != "" || len(kept.SignIns) != 1 ||
+		kept.SignIns[0].Account == "" || kept.SignIns[0].Added != nil || strings.Contains(string(o.Data), "Sam") {
+		t.Fatalf("the removed person is kept as %s", o.Data)
 	}
 }

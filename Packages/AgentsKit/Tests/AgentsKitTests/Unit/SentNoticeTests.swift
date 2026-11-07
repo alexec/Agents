@@ -58,6 +58,15 @@ struct SentNoticeTests {
         #expect(NeedID.noticeEntry(fromToken: nil) == nil)
     }
 
+    /// A machine's notice (#3682) names no line: a tap opens the machine's page.
+    @Test func aDiskNoticeIsTheMachines() {
+        let token = NeedID.notice("disk:/").token
+        #expect(NeedID.isMachineNotice(token: token))
+        #expect(NeedID.noticeEntry(fromToken: token) == nil)
+        #expect(!NeedID.isMachineNotice(token: NeedID.notice(UUID().uuidString).token))
+        #expect(!NeedID.isMachineNotice(token: nil))
+    }
+
     @Test func aNoticeNeedReadsAsTheHostWritesIt() throws {
         let json = #"{"notice":"e0000000-0000-4000-8000-000000000006"}"#
         let id = try JSONDecoder().decode(NeedID.self, from: Data(json.utf8))

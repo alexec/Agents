@@ -1049,6 +1049,32 @@ func (d *Daemon) runningOf(folder, id string) bool {
 	return d.runningLocked(folder, id)
 }
 
+// sweepOldRuns lets go, every hour, of a run older than a week that nothing carries on
+// (#3649): its agent gone, archived or ended. Before, only a start let it go.
+func (d *Daemon) sweepOldRuns() {
+	d.workflowMu.Lock()
+	defer d.workflowMu.Unlock()
+	rec := d.recordsLocked()
+	kept := rec.Runs[:0]
+	for _, r := range rec.Runs {
+		if time.Since(r.StartedAt.Time()) > workflowRunsKept && !d.workflowStarting[r.ID] {
+			a := (*wire.Agent)(nil)
+			if r.AgentID != nil {
+				a = d.Store.Agent(*r.AgentID)
+			}
+			if a == nil || a.State == wire.AgentStateArchived || !inFlight(a.State) && a.RestartPickUps == nil {
+				log.Printf("let go of the %s run: it is over a week old and its agent is not working", r.WorkflowID)
+				continue
+			}
+		}
+		kept = append(kept, r)
+	}
+	if len(kept) != len(rec.Runs) {
+		rec.Runs = kept
+		d.saveRecordsLocked(false)
+	}
+}
+
 // restoreRuns lets go of runs a restart cannot carry on: older than a week, their workflow
 // or agent gone, or their agent ended and not about to be picked up.
 func (d *Daemon) restoreRuns() {

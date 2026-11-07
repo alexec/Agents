@@ -7,7 +7,7 @@ import { cases } from "./fixtures.mjs";
 // Branch opens the new session (#342), so the menu reads the page's address as it loads.
 globalThis.location = { hash: "" };
 globalThis.addEventListener = () => {};
-const { sessionActions, headerActions, deleteTitle, deleteMessage, cleanedTitle, sessionTabURL, findInChatItem } = await load("src/views/SessionMenu.tsx");
+const { sessionActions, headerActions, deleteTitle, deleteMessage, deleteMessageFor, cleanedTitle, sessionTabURL, findInChatItem } = await load("src/views/SessionMenu.tsx");
 delete globalThis.location;
 delete globalThis.addEventListener;
 const agents = Object.fromEntries(cases("groups/agents.json").map((c) => [c.name, c.input.agent]));
@@ -41,6 +41,12 @@ test("Delete asks with the window's words", () => {
   assert.equal(deleteTitle("Fix the build"), "Delete \u201CFix the build\u201D?");
   assert.equal(deleteTitle("  "), "Delete this session?");
   assert.equal(deleteMessage, "Its conversation and record are removed. This cannot be undone.");
+});
+
+test("Delete says when the runtime keeps its own copy (#3669), as the Mac and the Remote do", () => {
+  assert.equal(deleteMessageFor({ runtimeID: "opencode" }), deleteMessage);
+  assert.equal(deleteMessageFor({ runtimeID: "opencode", runtimeKeepsCopy: true }),
+    "Its conversation and record are removed. This cannot be undone. OpenCode keeps its own copy of this conversation.");
 });
 
 test("given whether it is pinned, Pin or Unpin before Branch and Archive; never on archived (#180, #342)", () => {

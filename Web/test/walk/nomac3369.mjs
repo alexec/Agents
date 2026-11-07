@@ -92,9 +92,9 @@ try {
     const host = process.env.WALK_HOST;
     if (host) {
       await page.eval(`window.__walkSocket.addEventListener("message", (e) => { if (String(e.data).includes("walk-3369-r")) window.__walkRemoved = String(e.data); })`);
-      await page.eval(`window.__walkSocket.send(${JSON.stringify(JSON.stringify({ jsonrpc: "2.0", id: "walk-3369-u", method: "hosts/unlink", params: { host } }))})`);
+      await page.eval(`window.__walkSocket.send(${JSON.stringify(JSON.stringify({ jsonrpc: "2.0", id: "walk-3369-u", method: "machines/unlink", params: { host } }))})`);
       await sleep(2000);
-      await page.eval(`window.__walkSocket.send(${JSON.stringify(JSON.stringify({ jsonrpc: "2.0", id: "walk-3369-r", method: "hosts/remove", params: { host } }))})`);
+      await page.eval(`window.__walkSocket.send(${JSON.stringify(JSON.stringify({ jsonrpc: "2.0", id: "walk-3369-r", method: "machines/remove", params: { host } }))})`);
       await page.waitFor(`!!window.__walkRemoved`, 30_000);
       const removed = await page.eval(`window.__walkRemoved`);
       check(!removed.includes('"error"'), `the machine removed: ${removed.slice(0, 200)}`);

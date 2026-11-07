@@ -17,11 +17,11 @@ func TestAHostedCopyHasNoSSH(t *testing.T) {
 		t.Fatal("a hosted copy has ssh tunnels")
 	}
 	_, window := p.client("Window")
-	for _, method := range []string{"hosts/install", "hosts/detect", "hosts/sshHosts"} {
+	for _, method := range []string{"machines/install", "machines/detect", "machines/sshHosts"} {
 		if e := callError(t, window, "", method, map[string]any{}); !strings.Contains(e, "no ssh of yours") {
 			t.Fatalf("%s: %s", method, e)
 		}
 	}
 	// Codes still work: machines join with one.
-	call(t, window, "", "hosts/startEnroll", map[string]any{})
+	call(t, window, "", "machines/startEnroll", map[string]any{})
 }

@@ -210,6 +210,18 @@
   max-width: 420px; padding: 6px 8px; border-bottom: 1px solid var(--paper-rule); }
 .with-sidebar .settings-body select { font: inherit; color: inherit; background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-control); }
 .with-sidebar .settings-body .hint { max-width: 420px; font-size: 0.75rem; line-height: 1.45; }
+/* A machine's runtimes and resources (#3629): rows in the page's column. */
+:is(.with-sidebar, .sub-app) .settings-body :is(.machine-runtimes, .resources) ul { list-style: none; margin: 0; padding: 0; max-width: 420px; border: 0; background: none; }
+:is(.with-sidebar, .sub-app) .settings-body :is(.machine-runtimes, .resources) li { padding: 6px 8px; border-bottom: 1px solid var(--paper-rule); }
+:is(.with-sidebar, .sub-app) .settings-body :is(.machine-runtimes, .resources) li p { margin: 0; }
+:is(.with-sidebar, .sub-app) .settings-body .machine-runtimes li { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 8px; }
+
+/* A machine's worktrees (#3627): the page's rows, a section per folder, in its column. */
+:is(.with-sidebar, .sub-app) .settings-body .worktrees { max-width: 420px; }
+:is(.with-sidebar, .sub-app) .settings-body .worktrees ul { list-style: none; margin: 0; padding: 0; border: 0; background: none; }
+:is(.with-sidebar, .sub-app) .settings-body .worktrees .worktree { padding: 6px 8px; border-bottom: 1px solid var(--paper-rule); }
+:is(.with-sidebar, .sub-app) .settings-body .worktrees .worktree p { margin: 0; }
+:is(.with-sidebar, .sub-app) .settings-body .worktrees .worktrees-head { margin: 14px 8px 4px; font-size: 0.8125rem; }
 :is(.with-sidebar, .sub-app) .event-day { font-size: 0.75rem; font-weight: 600; margin: 14px 8px 4px; opacity: 0.65; }
 :is(.with-sidebar, .sub-app) .event-list .event-name { font-family: var(--font-mono); font-size: 0.6875rem; }
 :is(.with-sidebar, .sub-app) .event-consequence { display: block; margin-left: 8px; }

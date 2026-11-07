@@ -144,7 +144,7 @@ public extension DaemonAPI {
         }
     }
 
-    /// `hosts/startEnroll` with `as`: a code for a bot's machine, an admin's only (#1761).
+    /// `machines/startEnroll` with `as`: a code for a bot's machine, an admin's only (#1761).
     struct MachineEnroll: Codable, Sendable, Hashable {
         public var `as`: String?
 

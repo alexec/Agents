@@ -77,3 +77,72 @@ func TestRetentionDeletesOldArchivedAgents(t *testing.T) {
 		t.Fatal(d.keepFor())
 	}
 }
+
+// What a crash left is swept at start, but not what was made since (#3649).
+func TestStartSweepsCrashLeftovers(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	old := time.Now().Add(-time.Hour)
+	made := func(path string, at time.Time) string {
+		t.Helper()
+		if err := os.MkdirAll(path, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		os.Chtimes(path, at, at)
+		return path
+	}
+	restore := made(filepath.Join(d.Store.Loc.Root, ".restore-123"), old)
+	other := made(filepath.Join(d.Store.Loc.Root, ".kept"), old)
+	staged := made(filepath.Join(d.Store.Loc.Cache, "catalog-staging", "A"), old)
+	output := made(filepath.Join(d.Store.Loc.Cache, "browser", "output", "B"), old)
+	since := made(filepath.Join(d.Store.Loc.Cache, "browser", "output", "C"), time.Now().Add(time.Minute))
+	d.sweepCrashLeftovers(time.Now())
+	for path, want := range map[string]bool{restore: false, staged: false, output: false, other: true, since: true} {
+		if _, err := os.Stat(path); (err == nil) != want {
+			t.Errorf("%s: kept %v, want %v", path, err == nil, want)
+		}
+	}
+}
+
+// The hour's sweep lets go of a week-old run whose agent ended, and of an abandoned
+// transfer, without waiting for a start or the next send (#3649).
+func TestTheHourlySweepAppliesLateBounds(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	ended := seeded(t, d, t.TempDir(), func(a *wire.Agent) { a.State = wire.AgentStateFinished })
+	working := seeded(t, d, t.TempDir(), func(a *wire.Agent) { a.State = wire.AgentStateRunning })
+	weekAgo := wire.DateOf(time.Now().Add(-8 * 24 * time.Hour))
+	d.workflowMu.Lock()
+	d.recordsLocked().Runs = []workflowRun{
+		{ID: store.NewUUID(), WorkflowID: "ended", AgentID: &ended.ID, StartedAt: weekAgo},
+		{ID: store.NewUUID(), WorkflowID: "working", AgentID: &working.ID, StartedAt: weekAgo},
+		{ID: store.NewUUID(), WorkflowID: "young", AgentID: &ended.ID, StartedAt: wire.DateOf(time.Now())},
+	}
+	d.workflowMu.Unlock()
+	transfer := func(dir, name string, at time.Time) string {
+		t.Helper()
+		os.MkdirAll(dir, 0o700)
+		path := filepath.Join(dir, name)
+		os.WriteFile(path, []byte("x"), 0o600)
+		os.Chtimes(path, at, at)
+		return path
+	}
+	stale := transfer(d.incomingFolder(), "stale", time.Now().Add(-2*transferLimit))
+	fresh := transfer(d.outgoingFolder(), "fresh", time.Now())
+	d.sweepHourly()
+	d.workflowMu.Lock()
+	var left []string
+	for _, r := range d.recordsLocked().Runs {
+		left = append(left, r.WorkflowID)
+	}
+	d.workflowMu.Unlock()
+	if len(left) != 2 || left[0] != "working" || left[1] != "young" {
+		t.Fatalf("runs left %v, want [working young]", left)
+	}
+	if _, err := os.Stat(stale); err == nil {
+		t.Fatal("an abandoned transfer was kept")
+	}
+	if _, err := os.Stat(fresh); err != nil {
+		t.Fatal("a transfer under way was deleted")
+	}
+}

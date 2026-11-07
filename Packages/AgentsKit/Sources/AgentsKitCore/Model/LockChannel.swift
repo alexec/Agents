@@ -175,7 +175,7 @@ public enum LockChannel {
         return String(decoding: try encoder.encode(value), as: UTF8.self)
     }
 
-    /// A kept request signed by this device, as `hosts/keep` carries it.
+    /// A kept request signed by this device, as `machines/keep` carries it.
     public static func delivery(_ signer: LockSigningKey, to host: String, method: String, params: JSONValue) throws -> DaemonAPI.LockDelivery {
         let text = try text(params)
         return DaemonAPI.LockDelivery(method: method, params: text, lock: try sign(signer, to: host, method: method, params: text))

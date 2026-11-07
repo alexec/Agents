@@ -260,12 +260,12 @@ func (p *Providers) hostKey(host string, link WorkspaceLink, destination, trust 
 // the carrying machine gives it, and a minute more: within the page's 15 minutes.
 var carriedInstallPatience = StandardCalls.Long + 2*time.Minute
 
-// InstallCarried is hosts/install for Add as Machine… on a codespace whose provider a
+// InstallCarried is machines/install for Add as Machine… on a codespace whose provider a
 // machine carries (#3497): that machine installs Agents in it over ssh, with the token it
 // keeps, and the codespace joins with code, a host code made here for person. It has no
 // tunnel: the codespace dials this control plane's own address (the tunnel would be ssh
 // with the token too). False when request is not for such a codespace: it is installed as
-// any server is. The answer is hosts/install's: {needsTrust, name} for a host key to trust
+// any server is. The answer is machines/install's: {needsTrust, name} for a host key to trust
 // first, else {started: true, name, tunnel: false}.
 func (p *Providers) InstallCarried(request wire.MachineInstall, person string, code func() (string, error)) (any, bool, error) {
 	if request.Provider == nil || request.Workspace == nil {

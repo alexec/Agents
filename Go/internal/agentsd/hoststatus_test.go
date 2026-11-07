@@ -16,7 +16,7 @@ type toldStatus struct {
 }
 
 func (c *toldStatus) tell(method string, params any) {
-	if method != wire.NewMethodName(wire.CallHostStatus.Name) {
+	if method != wire.CallMachineStatus.Name {
 		return
 	}
 	c.mu.Lock()
@@ -30,7 +30,7 @@ func (c *toldStatus) all() []wire.MachineStatus {
 	return append([]wire.MachineStatus(nil), c.sent...)
 }
 
-// host/status (#1387), as DaemonCore+MachineStatus: said to the control plane when the uplink
+// machine/status (#1387), as DaemonCore+MachineStatus: said to the control plane when the uplink
 // comes, again only when it changes, and again whole when the uplink comes back; busy while
 // an agent works, idle once none does, with the next scheduled workflow.
 func TestAHostTellsItsControlPlaneWhetherItIsIdle(t *testing.T) {

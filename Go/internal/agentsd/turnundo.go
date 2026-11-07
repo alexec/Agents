@@ -393,11 +393,23 @@ func (u *undoNotes) remember(id wire.UUID, root string, paths []string) {
 		u.byAgent = map[wire.UUID][]string{}
 	}
 	for _, p := range paths {
+		// Capped as it is written (#3650): take tells pageEditLimit and "and others", so
+		// one more than that is all it needs.
+		if len(u.byAgent[id]) > pageEditLimit {
+			break
+		}
 		if rel, ok := relativeTo(p, root); ok {
 			p = rel
 		}
 		u.byAgent[id] = append(u.byAgent[id], p)
 	}
+}
+
+// forget drops an agent's notes, when it is archived or deleted.
+func (u *undoNotes) forget(id wire.UUID) {
+	u.mu.Lock()
+	delete(u.byAgent, id)
+	u.mu.Unlock()
 }
 
 func (u *undoNotes) take(id wire.UUID) string {

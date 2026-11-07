@@ -13,8 +13,10 @@ import (
 
 // The `skills` CLI's two lock files, read and written in the CLI's own shape (SkillLock),
 // so each tool sees what the other added. A skill a lock names is one a tool put there; a
-// folder no lock names is the person's own, and is never touched. The app adds no key of
-// its own to either file.
+// folder no lock names is the person's own, and is never touched. The app adds one key of
+// its own to either file, personas (#3665): the personas it added from a marketplace, kept
+// out of skills so the CLI never takes one for a skill. The CLI does not know the key; a
+// folder lock it writes again drops it, and those personas become the person's own.
 
 type LockKind int
 
@@ -25,7 +27,7 @@ const (
 
 const (
 	personalVersion = 3
-	folderVersion  = 1
+	folderVersion   = 1
 )
 
 // Entry is one lock entry, the fields the CLI writes for a GitHub skill.
@@ -162,13 +164,20 @@ func (l *Lock) Text() string {
 	if l.Kind == Personal {
 		return l.root.Stringified()
 	}
-	skills := append([]Pair(nil), l.skills().Pairs...)
-	sort.SliceStable(skills, func(i, j int) bool { return skills[i].Key < skills[j].Key })
+	byName := func(v Value) Value {
+		pairs := append([]Pair(nil), v.Pairs...)
+		sort.SliceStable(pairs, func(i, j int) bool { return pairs[i].Key < pairs[j].Key })
+		return Object(pairs...)
+	}
 	version, ok := l.root.Get("version")
 	if !ok {
 		version = Number("1")
 	}
-	return Object(Pair{"version", version}, Pair{"skills", Object(skills...)}).Stringified() + "\n"
+	out := Object(Pair{"version", version}, Pair{"skills", byName(l.skills())})
+	if personas := l.personas(); len(personas.Pairs) > 0 {
+		out.Set("personas", byName(personas))
+	}
+	return out.Stringified() + "\n"
 }
 
 // Write puts the file whole, beside it and renamed, so a reader never sees half of one.
@@ -181,3 +190,64 @@ func (l *Lock) Write() error {
 
 // Stamp is `new Date().toISOString()`: milliseconds, UTC, Z.
 func Stamp(t time.Time) string { return t.UTC().Format("2006-01-02T15:04:05.000Z") }
+
+// PersonaEntry is one persona the app added from a marketplace (#3665): its repository, the
+// file's path there, the commit it was taken at, and the file's blob SHA then.
+type PersonaEntry struct {
+	Source, Path, Commit, BlobSHA, InstalledAt, UpdatedAt string
+}
+
+func (l *Lock) personas() Value {
+	p, ok := l.root.Get("personas")
+	if !ok || p.Kind != 'o' {
+		return Object()
+	}
+	return p
+}
+
+// PersonaIDs is the lock's personas in its own order.
+func (l *Lock) PersonaIDs() []string {
+	var out []string
+	for _, p := range l.personas().Pairs {
+		out = append(out, p.Key)
+	}
+	return out
+}
+
+// Persona is the entry for id, if it has a GitHub source.
+func (l *Lock) Persona(id string) (PersonaEntry, bool) {
+	e, ok := l.personas().Get(id)
+	if !ok || e.Kind != 'o' {
+		return PersonaEntry{}, false
+	}
+	s := func(k string) string { v, _ := e.Str(k); return v }
+	if s("sourceType") != "github" || s("source") == "" {
+		return PersonaEntry{}, false
+	}
+	return PersonaEntry{Source: s("source"), Path: s("path"), Commit: s("commit"), BlobSHA: s("blobSHA"),
+		InstalledAt: s("installedAt"), UpdatedAt: s("updatedAt")}, true
+}
+
+// UpsertPersona adds or replaces a persona's entry, keeping its first installedAt.
+func (l *Lock) UpsertPersona(id string, e PersonaEntry, now time.Time) {
+	stamp := Stamp(now)
+	installed := stamp
+	if was, ok := l.Persona(id); ok && was.InstalledAt != "" {
+		installed = was.InstalledAt
+	}
+	personas := l.personas()
+	personas.Set(id, Object(Pair{"source", String(e.Source)}, Pair{"sourceType", String("github")},
+		Pair{"path", String(e.Path)}, Pair{"commit", String(e.Commit)}, Pair{"blobSHA", String(e.BlobSHA)},
+		Pair{"installedAt", String(installed)}, Pair{"updatedAt", String(stamp)}))
+	l.root.Set("personas", personas)
+}
+
+func (l *Lock) RemovePersona(id string) {
+	personas := l.personas()
+	personas.Remove(id)
+	if len(personas.Pairs) == 0 {
+		l.root.Remove("personas")
+		return
+	}
+	l.root.Set("personas", personas)
+}

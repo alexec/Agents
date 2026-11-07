@@ -6,7 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -184,5 +186,20 @@ func TestShouldAskCountsOnlyTheQuestionsBeforeTheBriefSaysToAsk(t *testing.T) {
 	r.calls = append([]appToolCall{{At: 10, Method: "questions/ask", Ok: true}}, r.calls...)
 	if v, why := r.shouldAsk(); v != passed || why != "asked the person with the app's `ask_question`" {
 		t.Fatal(v, why)
+	}
+}
+
+// An agent's app tool calls go in its own folder, upper case as Delete removes it, also for
+// an ID given in lower case: Linux is case-sensitive (#3651).
+func TestAppToolCallsGoInTheAgentsUpperCaseFolder(t *testing.T) {
+	root := t.TempDir()
+	d := &Daemon{Store: &store.Store{Loc: store.Locations{Root: root}}}
+	const id = "0a1b2c3d-0000-4000-8000-00000000abcd"
+	d.keepAppToolCall(wire.UUID(id), "show_file", nil, "", nil, time.Now())
+	if _, err := os.Stat(filepath.Join(root, "agents", strings.ToUpper(id), "app-tools.jsonl")); err != nil {
+		t.Fatal(err)
+	}
+	if calls := d.appToolCalls(wire.UUID(strings.ToUpper(id))); len(calls) != 1 || calls[0].Method != "files/show" {
+		t.Fatalf("%+v", calls)
 	}
 }

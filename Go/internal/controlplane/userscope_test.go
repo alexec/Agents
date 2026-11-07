@@ -15,7 +15,7 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// deliveries is every host/userSettings each machine was told, by machine.
+// deliveries is every machine/userSettings each machine was told, by machine.
 type deliveries struct {
 	mu  sync.Mutex
 	got map[string][]wire.MachineUserSettings
@@ -24,7 +24,7 @@ type deliveries struct {
 }
 
 func (d *deliveries) heard(host, method string, params json.RawMessage) {
-	if method != wire.NewMethodName(wire.NotifyHostUserSettings.Name) {
+	if method != wire.NotifyMachineUserSettings.Name {
 		return
 	}
 	var u wire.MachineUserSettings
@@ -100,7 +100,7 @@ func setSecret(t *testing.T, who *person, name, value string, was int64) {
 	call(t, who.window, "", "user/setSecret", set)
 }
 
-// takingHello is a machine that writes host/userSettings (it serves settings/userPart),
+// takingHello is a machine that writes machine/userSettings (it serves settings/userPart),
 // and opens the secrets sealed to it.
 func takingHello(name string) controllink.MachineHello {
 	hello := fakeHello(name)
@@ -204,7 +204,7 @@ func TestSettingsAndSecretsGoOnlyToTheirPersonsMachines(t *testing.T) {
 	}
 
 	// Removed, a machine is sent nothing more, and Sam hears what was on it (FR-026).
-	call(t, sam.window, "", "hosts/remove", wire.MachineRequest{Host: wire.MachineRef(next.member.Host)})
+	call(t, sam.window, "", "machines/remove", wire.MachineRequest{Host: wire.MachineRef(next.member.Host)})
 	note := waitNote(t, sam.window, wire.NotifyControlSecretsLeft.Name)
 	var left wire.SecretsLeft
 	json.Unmarshal(note.Params, &left)
@@ -256,7 +256,7 @@ func TestSecretsAreSealedOrRefused(t *testing.T) {
 	}
 }
 
-// hello1x is a machine that takes host/userSettings but not the secrets sealed to it.
+// hello1x is a machine that takes machine/userSettings but not the secrets sealed to it.
 func hello1x(name string) controllink.MachineHello {
 	hello := fakeHello(name)
 	hello.Capabilities = append(slices.DeleteFunc(slices.Clone(hello.Capabilities), func(c string) bool { return c == wire.CapHostUserSettings2 }),
@@ -354,7 +354,7 @@ func TestADeliveryFitsTheMachinesLink(t *testing.T) {
 	}
 }
 
-// notTakingPolicyLayersHello says CapHostUserSettings (so it takes host/userSettings) but
+// notTakingPolicyLayersHello says CapHostUserSettings (so it takes machine/userSettings) but
 // not host.policy-layers/1: the part policy is withheld from it (contracts/policy-layers-
 // api.md), the way the parts a machine does not ask for always are.
 func notTakingPolicyLayersHello(name string) controllink.MachineHello {

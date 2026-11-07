@@ -19,7 +19,7 @@ const notes = [];
 const say = (line) => { notes.push(line); console.log(line); };
 
 const op = await Operator.pair(controlURL, operatorCode);
-const hosts = await op.call("hosts/list");
+const hosts = await op.call("machines/list");
 const host = hosts.find((h) => h.state === "online")?.id;
 if (!host) throw new Error("no host online");
 

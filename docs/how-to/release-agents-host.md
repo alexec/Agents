@@ -27,7 +27,14 @@ publishes a release. The tag starts the `release` workflow, which:
   pushed;
 - in its `testflight` job, archives the Mac window and the Remote (one Universal app),
   checks both archives with `scripts/check-store-archive.sh`, uploads them to TestFlight
-  and waits until App Store Connect has processed both. Nothing goes to App Review.
+  and waits until App Store Connect has processed both. Nothing goes to App Review here.
+
+Beside it, the **app-store** workflow (`app-store.yml`, #3657) waits at the `app-store`
+environment's gate for a person to approve the release for App Review. Approve it in Agents
+(Needs You ▸ **Deploy**, see [Use GitHub](use-github.md#approve-a-waiting-deploy)) or on
+GitHub. Then it waits for the processed builds, sets "What's New" to the tag's message and
+submits the iOS and the macOS version for App Review. Reject it, and the release stays on
+TestFlight only.
 
 The **Release** workflow (`.agents/workflows/release.md`, the `release` skill) does all of
 this when you press **Run now**, and nobody needs to watch it. It has the high and medium
@@ -86,6 +93,18 @@ You set this up once, as the Apple Developer account's Account Holder.
    `base64 -i <profile> | gh secret set PROFILE_… --env release`. Say so in the pull request.
    Setting the secrets is Alex's to approve.
 
+4. **The App Review gate.** Run `scripts/release-secrets.sh --app-store`. It makes the
+   `app-store` environment for `v*` tags, with you as its required reviewer
+   (`--app-store <login>` names another), and sets `ASC_KEY_P8`, `ASC_KEY_ID` and
+   `ASC_ISSUER_ID` in it from `~/.private_keys`. Without a required reviewer the
+   **app-store** workflow submits nothing, and says so in a notice: it never goes to App
+   Review without a person's approval.
+
+   App Review also needs the App Store listing in App Store Connect (the description, the
+   screenshots, the privacy answers and the age rating) before the first submission. The
+   script does not write them. Until they are there, App Store Connect refuses the
+   submission and the run's log says what is missing.
+
 ## Steps
 
 1. Choose the version, for example `0.2.0`: minor when an enhancement merged since the
@@ -105,6 +124,8 @@ You set this up once, as the Apple Developer account's Account Holder.
 4. When it finishes, the release is on the Releases page as **Agents Host 0.2.0**, and
    0.2.0 (the run number) is on TestFlight for iOS and macOS.
    `swift scripts/asc-builds.swift 0.2.0 <run number>` says each build's state.
+5. The **app-store** run waits for your approval. When you approve it, App Review gets
+   0.2.0. `swift scripts/asc-submit.swift 0.2.0` does the same from this Mac.
 
 To make a release again from a tag that is already there (after fixing a secret, say), run
 the **release** workflow by hand and give it the tag. It replaces the release's files.
@@ -139,6 +160,9 @@ the commit it will tag: `gh workflow run release-dry-run.yml -f ref=<sha>`.
   `xcrun notarytool log <id> --key … --key-id … --issuer …` to see why.
 - **"The release environment has no …":** a TestFlight secret is missing. Run
   `scripts/release-secrets.sh --store …`, then run the **release** workflow again with the tag.
+- **"App Store Connect said 409" in the app-store run:** App Review needs something the
+  version does not have yet, often a listing field or an answer for the first version. The
+  error names it. Add it in App Store Connect, then re-run the failed job.
 - **An upload is refused as a duplicate:** that build number is taken for the version. Run
   the workflow again: the new run number is a new build.
 - **"PROFILE_… has no …, which ….entitlements asks for":** the profile in that secret was

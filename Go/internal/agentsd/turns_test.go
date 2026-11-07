@@ -42,6 +42,8 @@ func TestMain(m *testing.M) {
 	milestoneLookup = func(context.Context, string, forgeRepo, int) (issueOnForge, error) { return issueOnForge{}, errNoForgeInTests }
 	// Nor erases a deleted agent's runtime copy (#1001): that starts the runtime.
 	erasing = false
+	// Nor asks a runtime its version (#3674): that starts the runtime too.
+	runtimeVersion = func(string) string { return "" }
 	os.Exit(m.Run())
 }
 

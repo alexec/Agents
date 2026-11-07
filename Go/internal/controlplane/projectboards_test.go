@@ -47,7 +47,7 @@ func TestAProjectsBoardsGoToItsMachines(t *testing.T) {
 	var mu sync.Mutex
 	var heard []wire.MachineProjects
 	p.told = func(host, method string, params json.RawMessage) {
-		if method != wire.NewMethodName(wire.NotifyHostProjects.Name) {
+		if method != wire.NotifyMachineProjects.Name {
 			return
 		}
 		var m wire.MachineProjects

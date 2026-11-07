@@ -371,7 +371,7 @@ public enum DaemonAPI {
         public static let worktreesCheck = "worktrees/check"
         /// Remove a worktree the app made, and its branch when that is safe.
         public static let worktreesRemove = "worktrees/remove"
-        /// Every folder's worktrees on this host, for Activity ▸ Worktrees (#790).
+        /// Every folder's worktrees on this host, for its machine's page (#790, #3627).
         public static let worktreesAll = "worktrees/all"
         /// Delete the build output git ignores in an idle worktree the app made (#790).
         public static let worktreesRemoveBuildOutput = "worktrees/removeBuildOutput"
@@ -3560,7 +3560,7 @@ public enum DaemonAPI {
         public var id: URL { root }
 
         /// No agent that is not archived works in it (#790): what may be removed, and
-        /// what Activity ▸ Worktrees puts first.
+        /// what a machine's Worktrees puts first.
         public var isIdle: Bool { agents.isEmpty }
 
         public init(name: String, root: URL, branch: String?, isFolderPath: Bool,
@@ -3590,7 +3590,7 @@ public enum DaemonAPI {
             size = try c.decodeIfPresent(WorktreeSize.self, forKey: .size)
         }
 
-        /// Activity ▸ Worktrees' order (#790): idle ones first, the largest of each first,
+        /// A machine's Worktrees' order (#790): idle ones first, the largest of each first,
         /// those not measured yet after, then by name.
         public static func cleanupOrder(_ a: WorktreeSummary, _ b: WorktreeSummary) -> Bool {
             if a.isIdle != b.isIdle { return a.isIdle }
