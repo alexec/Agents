@@ -19,10 +19,12 @@ import (
 func TestStopWaitsForASocketInAccept(t *testing.T) {
 	t.Parallel()
 	logging, release := make(chan struct{}), make(chan struct{})
-	var logged atomic.Bool
+	var held, logged atomic.Bool
 	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(cfg *Config) {
 		cfg.Log = func(line string) {
-			if strings.HasPrefix(line, "refused a connection from ") {
+			// accept's last line for the socket: "refused a connection from …" or "a
+			// connection from … ended"; the first one is held.
+			if strings.Contains(line, "a connection from ") && held.CompareAndSwap(false, true) {
 				close(logging)
 				<-release
 				logged.Store(true)
@@ -39,14 +41,15 @@ func TestStopWaitsForASocketInAccept(t *testing.T) {
 	if _, _, err := ws.Read(ctx); err != nil {
 		t.Fatal(err)
 	}
-	// No auth: accept refuses it, and its log line holds it in accept until released.
+	// No hello back: accept ends the socket, and its log line holds it in accept until
+	// released.
 	if err := ws.Write(ctx, websocket.MessageText, []byte(`{}`)); err != nil {
 		t.Fatal(err)
 	}
 	select {
 	case <-logging:
 	case <-ctx.Done():
-		t.Fatal("the refusal was not logged")
+		t.Fatal("accept logged nothing for the socket")
 	}
 	stopped := make(chan bool, 1)
 	go func() {

@@ -231,15 +231,15 @@ type Service struct {
 	// What each machine here was last sent of its projects (#2735).
 	toldProjects toldProjects
 
-	mu       sync.Mutex
-	servers  []*http.Server
-	sockets  map[*Conn]bool
-	stop     chan struct{}
+	mu      sync.Mutex
+	servers []*http.Server
+	sockets map[*Conn]bool
+	stop    chan struct{}
 	// The TLS listener's sockets still in accept: Stop waits for them, so none logs
 	// after it returns (#3869).
 	accepting sync.WaitGroup
 	ready     bool
-	loopback *web.Listener
+	loopback  *web.Listener
 	// The page at this copy's own origin (#1459), or nil.
 	page *web.Public
 	// What an operations team scrapes (#2176): always counted, served only by ServeMetrics.
