@@ -332,6 +332,11 @@ Go/cmd/forgejo-mcp/                                    forgejo
 Go/internal/forgejomcp/                                forgejo
 docs/how-to/use-forgejo.md                             forgejo
 
+# bitbucket: the bitbucket MCP server (#2828): pull requests, checks and issues on Bitbucket Cloud.
+Go/cmd/bitbucket-mcp/                                  bitbucket
+Go/internal/bitbucketmcp/                              bitbucket
+docs/how-to/use-bitbucket.md                           bitbucket
+
 # email: the email MCP server (#1780): one IMAP mailbox's new mail, read, never sent.
 Go/cmd/email-mcp/                                      email
 Go/internal/emailmcp/                                  email
