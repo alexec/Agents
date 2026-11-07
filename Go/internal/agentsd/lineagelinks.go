@@ -1,6 +1,7 @@
 package agentsd
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/url"
@@ -50,28 +51,77 @@ type lineageLinker struct {
 	repoMu     sync.Mutex
 	// repos is each folder's forge repo, looked up once: a remote seldom changes.
 	repos map[string]forgeRepo
+	// otherHost is each folder in repos whose origin is on a host forgeOf does not name: it
+	// may be the connected Forgejo's, which can change.
+	otherHost map[string]bool
 }
 
-// forgeRepo is a repository on a forge, as lineage refs name it: forge github or gitlab,
-// path owner/repo (group/sub/project on GitLab), lower case. The zero value is none.
+// forgeRepo is a repository on a forge, as lineage refs name it: forge github, gitlab or
+// forgejo, path owner/repo (group/sub/project on GitLab), lower case. The zero value is none.
 type forgeRepo struct{ forge, path string }
+
+// forgeKind is what lineage does on one forge. A forge that is not in forgeKinds has no
+// lineage; a new one (Bitbucket, Azure DevOps) is a row here, and each lookup's switch
+// (lineageresolve.go, lineagemilestone.go, lineagerelease.go, lineagecomment.go, the doc and
+// ref addresses) says what it asks there, or nothing.
+type forgeKind struct {
+	// prMark is between a pull request node's path and its number: GitLab numbers its merge
+	// requests apart from its issues, so its mark is !.
+	prMark string
+	// prPath and issuePath are in a pull request's and an issue's web address.
+	prPath, issuePath string
+	// anyHost: the pull request's address says the forge on a host of any name.
+	anyHost bool
+	// cli is the person's CLI that lineage asks the forge with: a node's title, an issue's
+	// milestone and parent, a release's commits and milestones, a merged pull request's cost
+	// comment. "" asks nothing: the forge's nodes are linked, and nothing is looked up.
+	cli string
+}
+
+// forgeKinds, GitLab first: its addresses have a /-/ that GitHub's do not.
+var forgeKinds = []struct {
+	name string
+	forgeKind
+}{
+	{"gitlab", forgeKind{prMark: "!", prPath: "/-/merge_requests/", issuePath: "/-/issues/", cli: "glab"}},
+	{"github", forgeKind{prMark: "#", prPath: "/pull/", issuePath: "/issues/", cli: "gh"}},
+	// Forgejo and Gitea number issues and pull requests together, as forgeforgejo.go's nodes
+	// say. Only they say /pulls/12. They are asked by their connection, not a CLI, so
+	// lineage asks them nothing yet.
+	{"forgejo", forgeKind{prMark: "#", prPath: "/pulls/", issuePath: "/issues/", anyHost: true}},
+}
+
+// kindOf is forge's row of forgeKinds.
+func kindOf(forge string) (forgeKind, bool) {
+	for _, k := range forgeKinds {
+		if k.name == forge {
+			return k.forgeKind, true
+		}
+	}
+	return forgeKind{}, false
+}
+
+// asks says lineage asks r's forge, by its CLI, about r's nodes.
+func (r forgeRepo) asks() bool {
+	k, _ := kindOf(r.forge)
+	return k.cli != ""
+}
 
 func (r forgeRepo) issue(n int) wire.LineageNode {
 	return wire.LineageNode{Kind: lineage.KindIssue, Ref: r.forge + ":" + r.path + "#" + strconv.Itoa(n)}
 }
 
-// pr is a pull request, or a merge request on GitLab, which numbers them apart from issues.
+// pr is a pull request, or a merge request on GitLab.
 func (r forgeRepo) pr(n int) wire.LineageNode {
-	mark := "#"
-	if r.forge == "gitlab" {
-		mark = "!"
-	}
-	return wire.LineageNode{Kind: lineage.KindPR, Ref: r.forge + ":" + r.path + mark + strconv.Itoa(n)}
+	k, _ := kindOf(r.forge)
+	return wire.LineageNode{Kind: lineage.KindPR, Ref: r.forge + ":" + r.path + k.prMark + strconv.Itoa(n)}
 }
 
-// forgeOf is the forge a remote is on: github.com, or a host whose name says GitLab.
+// forgeOf is the forge a remote is on: github.com, a host whose name says GitLab, or
+// codeberg.org or a host whose name says Forgejo or Gitea (as forgejomcp.RepoAt finds one).
+// A Forgejo of another name is the connected one's, which folderRepo asks for.
 func forgeOf(host, path string) forgeRepo {
-	path = strings.ToLower(strings.TrimSuffix(strings.Trim(path, "/"), ".git"))
+	path = repoPath(path)
 	switch host = strings.ToLower(host); {
 	case path == "":
 		return forgeRepo{}
@@ -79,29 +129,59 @@ func forgeOf(host, path string) forgeRepo {
 		return forgeRepo{"github", path}
 	case strings.Contains(host, "gitlab"):
 		return forgeRepo{"gitlab", path}
+	case strings.Contains(host, "forgejo") || strings.Contains(host, "gitea") || strings.Contains(host, "codeberg"):
+		return forgeRepo{"forgejo", path}
 	}
 	return forgeRepo{}
 }
 
-// prOfURL is the repo and number of a PR's web address: github.com/o/r/pull/5, or
-// <gitlab>/group/project/-/merge_requests/5.
+// repoPath is a repository's path as a node names it: lower case, with no .git.
+func repoPath(path string) string {
+	return strings.ToLower(strings.TrimSuffix(strings.Trim(path, "/"), ".git"))
+}
+
+// ofURL is the repo and number of the issue (or, pr, the pull request) at a forge's web
+// address, by its host and path: github.com/o/r/issues/5, <gitlab>/group/project/-/issues/5,
+// <forgejo>/o/r/pulls/5. The first forge whose address the path has must be one whose host
+// it is on: GitHub's and Forgejo's issues have the same address.
+func ofURL(host, path string, pr bool) (forgeRepo, int, bool) {
+	matched := ""
+	for _, k := range forgeKinds {
+		sep := k.issuePath
+		if pr {
+			sep = k.prPath
+		}
+		if matched != "" && sep != matched {
+			continue
+		}
+		repo, num, ok := strings.Cut(path, sep)
+		if !ok {
+			continue
+		}
+		matched = sep
+		n, err := strconv.Atoi(strings.SplitN(num, "/", 2)[0])
+		if err != nil || n <= 0 {
+			return forgeRepo{}, 0, false
+		}
+		r := forgeOf(host, repo)
+		if r.forge == "" && pr && k.anyHost {
+			r = forgeRepo{k.name, repoPath(repo)}
+		}
+		if r.path != "" && r.forge == k.name {
+			return r, n, true
+		}
+	}
+	return forgeRepo{}, 0, false
+}
+
+// prOfURL is the repo and number of a PR's web address: github.com/o/r/pull/5,
+// <gitlab>/group/project/-/merge_requests/5, or <forgejo>/o/r/pulls/5.
 func prOfURL(raw string) (forgeRepo, int, bool) {
 	u, err := url.Parse(raw)
 	if err != nil {
 		return forgeRepo{}, 0, false
 	}
-	path := strings.Trim(u.Path, "/")
-	for _, sep := range []string{"/-/merge_requests/", "/pull/"} {
-		if repo, num, ok := strings.Cut(path, sep); ok {
-			n, err := strconv.Atoi(strings.SplitN(num, "/", 2)[0])
-			r := forgeOf(u.Host, repo)
-			if err != nil || n <= 0 || r.forge == "" || (sep == "/pull/") != (r.forge == "github") {
-				return forgeRepo{}, 0, false
-			}
-			return r, n, true
-		}
-	}
-	return forgeRepo{}, 0, false
+	return ofURL(u.Host, strings.Trim(u.Path, "/"), true)
 }
 
 func sessionNode(id wire.UUID) wire.LineageNode {
@@ -165,17 +245,23 @@ func jiraKeys(text string, jira []string) []string {
 	return keys
 }
 
-// folderRepo is the forge repo a folder pushes to, from its origin remote.
+// folderRepo is the forge repo a folder pushes to, from its origin remote: on a host whose name
+// says its forge, or on the connected Forgejo.
 func (d *Daemon) folderRepo(folder string) forgeRepo {
 	d.repoMu.Lock()
 	r, ok := d.repos[folder]
+	other := d.otherHost[folder]
 	d.repoMu.Unlock()
 	if ok {
+		if other {
+			return d.connectedForgejoRepo(folder)
+		}
 		return r
 	}
 	if out, err := git(folder, "remote", "get-url", "origin"); err == nil {
 		if remote, ok := parseRemote(out); ok {
 			r = forgeOf(remote.host, remote.path)
+			other = r.forge == ""
 		}
 	} else if !isDir(folder) {
 		// A folder gone is not remembered, in case it comes back.
@@ -186,8 +272,30 @@ func (d *Daemon) folderRepo(folder string) forgeRepo {
 		d.repos = map[string]forgeRepo{}
 	}
 	d.repos[folder] = r
+	if other {
+		if d.otherHost == nil {
+			d.otherHost = map[string]bool{}
+		}
+		d.otherHost[folder] = true
+	}
 	d.repoMu.Unlock()
+	if other {
+		return d.connectedForgejoRepo(folder)
+	}
 	return r
+}
+
+// connectedForgejoRepo is folder's repo on the connected Forgejo, as the Work pages find it
+// (forgejoSources), or none.
+func (d *Daemon) connectedForgejoRepo(folder string) forgeRepo {
+	c, root := d.forgejoRoot()
+	if root == "" {
+		return forgeRepo{}
+	}
+	if at, repo := d.forgejoRepoAt(context.Background(), folder, c.URL); at == root && repo != "" {
+		return forgeRepo{"forgejo", repoPath(repo)}
+	}
+	return forgeRepo{}
 }
 
 // lineageDo runs f after the work before it, on the linker's goroutine. It is false when

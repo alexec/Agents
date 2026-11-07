@@ -101,6 +101,9 @@ func (d *Daemon) forgejoRepoAt(ctx context.Context, folder, connected string) (r
 	return root, repo
 }
 
+// onGitHubOrGitLab says r is a GitHub or GitLab repo, which the Forgejo lists leave to theirs.
+func onGitHubOrGitLab(r forgeRepo) bool { return r.forge == "github" || r.forge == "gitlab" }
+
 // forgejoSources adds to s the repositories of folders on the connected Forgejo: a folder whose
 // remote is neither GitHub's nor GitLab's. A Forgejo folder elsewhere leaves a reason.
 func (d *Daemon) forgejoSources(ctx context.Context, s *forgeSources, folders []string) {
@@ -108,7 +111,7 @@ func (d *Daemon) forgejoSources(ctx context.Context, s *forgeSources, folders []
 	s.forgejoRoot = root
 	elsewhere := false
 	for _, f := range folders {
-		if d.folderRepo(f).forge != "" {
+		if onGitHubOrGitLab(d.folderRepo(f)) {
 			continue
 		}
 		at, repo := d.forgejoRepoAt(ctx, f, c.URL)
@@ -157,7 +160,7 @@ func (d *Daemon) forgejoOf(ctx context.Context, method, repo string) (forgeForge
 		return nil, "", "", errors.New(forgejomcp.NotConnected)
 	}
 	for _, f := range d.folderPaths() {
-		if d.folderRepo(f).forge != "" {
+		if onGitHubOrGitLab(d.folderRepo(f)) {
 			continue
 		}
 		if at, named := d.forgejoRepoAt(ctx, f, c.URL); at == root && strings.EqualFold(named, repo) {
