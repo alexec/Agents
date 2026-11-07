@@ -35,6 +35,6 @@ test("the request has all three fields, or none", () => {
 });
 
 test("Email comes before Atlassian, and only on a host with connections.email/1", () => {
-  assert.deepEqual(c.providersFor(true), ["github", "linear", "gitlab", "email", "atlassian"]);
-  assert.deepEqual(c.providersFor(false), ["github", "linear", "gitlab", "atlassian"]);
+  assert.deepEqual(c.providersFor(true), ["github", "linear", "gitlab", "email", "atlassian", "forgejo"]);
+  assert.deepEqual(c.providersFor(false), ["github", "linear", "gitlab", "atlassian", "forgejo"]);
 });

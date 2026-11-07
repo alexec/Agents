@@ -33,6 +33,29 @@ struct WorkListTests {
         #expect(WorkList.repoName("github:alexec/Agents") == "alexec/Agents")
     }
 
+    @Test func anAzureBoardsWorkItemsRowHasItsStatesNameItsProjectAndOpenOnAzureBoards() {
+        let row = WorkList.Row(.init(node: Node(kind: "issue", ref: "azureboards:acme/web app#12"), title: "Export", state: "open",
+                                     updatedAt: day, status: "Active"), on: .mac)
+        #expect(row.status == "Active")
+        #expect(row.repo == "azureboards:acme/web app")
+        #expect(WorkList.repoName(row.repo) == "Azure Boards · acme/web app")
+        #expect(WorkList.shortRef(row.node.ref) == "#12")
+        #expect(WorkList.openOnWords(row.node.ref) == "Open on Azure Boards")
+    }
+
+    @Test func aForgejoPullRequestsRowHasItsRepoAndOpenOnForgejo() {
+        let row = WorkList.Row(.init(node: Node(kind: "pr", ref: "forgejo:walkalex/app#8"), title: "Add hello", state: "open",
+                                     updatedAt: day), on: .mac)
+        #expect(row.repo == "forgejo:walkalex/app")
+        #expect(WorkList.repoName(row.repo) == "walkalex/app")
+        #expect(WorkList.shortRef(row.node.ref) == "#8")
+        #expect(WorkList.openOnWords(row.node.ref) == "Open on Forgejo")
+        #expect(WorkList.forgeName("bitbucket:a/b#1") == "the forge")
+        #expect(WorkList.failureWords(JSONRPCError(code: -32602, message: "forge/rerun: open the check on Forgejo")) ==
+            "forge/rerun: open the check on Forgejo")
+        #expect(WorkList.errorWords(.init(forge: "forgejo", message: "not connected"), machine: "Studio") == "Forgejo on Studio: not connected")
+    }
+
     @Test func oneRowPerRefTheLastUpdatedCopyWithItsLineage() {
         let rows = WorkList.merge([
             (host: .mac, items: [item(1), item(2, title: "Old")]),

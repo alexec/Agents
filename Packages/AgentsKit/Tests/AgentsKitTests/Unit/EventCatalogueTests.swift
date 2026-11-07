@@ -5,15 +5,16 @@ import Testing
 /// The one list of what can happen (042 FR-003, FR-022, FR-024).
 @Suite("The event catalogue")
 struct EventCatalogueTests {
-    @Test func thereAreThirtyOneUniqueWellFormedNames() {
+    @Test func thereAreThirtyTwoUniqueWellFormedNames() {
         let names = EventCatalogue.all.map(\.name)
         // 30 from 042, 051's agent.retired (agent.deleted since #398), and 052's switch and two allowance kinds,
         // less the ten pull-request kinds that went with GitHub support, and the switch,
         // which went with the pool (065), and agent.parked (agent.archive_requested since #584)
         // and agent.archived (#96), and
         // mac.disk_low and mac.disk_ok (#195, machine.* since #372), folder.idle (#360),
-        // and dropbox.file_added (#231), and agent.messaged (#560), and system.restarted (#1219).
-        #expect(names.count == 31)
+        // and dropbox.file_added (#231), and agent.messaged (#560), and system.restarted (#1219),
+        // and agent.ended (#3799).
+        #expect(names.count == 32)
         for name in ["system.restarted", "cost.allowance_out", "cost.allowance_back", "agent.archive_requested", "agent.archived",
                      "machine.disk_low", "machine.disk_ok", "folder.idle", "dropbox.file_added",
                      "agent.messaged", "agent.waiting"] {
@@ -86,7 +87,7 @@ struct EventCatalogueTests {
     @Test func onlyTheFiltersAreInTheInputSchema() throws {
         let filtered = EventCatalogue.all.filter { !$0.filters.isEmpty }
             .map { "\($0.name) \($0.filters.map(\.key).joined(separator: ","))" }
-        #expect(filtered == ["branch.moved branch", "lease.granted resource,agent", "person.away why", "person.back why"])
+        #expect(filtered == ["agent.ended agent", "branch.moved branch", "lease.granted resource,agent", "person.away why", "person.back why"])
         let branch = try #require(EventCatalogue.kind(named: "branch.moved"))
         #expect(branch.inputSchema == ["type": "object", "additionalProperties": false,
                                        "properties": ["branch": ["type": "string"]]])
@@ -94,7 +95,7 @@ struct EventCatalogueTests {
         #expect(away.inputSchema["properties"]?["why"] == ["type": "string", "enum": ["locked", "idle"]])
         let finished = try #require(EventCatalogue.kind(named: "agent.finished"))
         #expect(finished.inputSchema == ["type": "object", "additionalProperties": false, "properties": [:]])
-        #expect(EventList.text().contains("use wait_for_agents"))
+        #expect(EventList.text().contains("use agent.ended with agent"))
     }
 
     // MARK: #579: the app's events in events/list's shape

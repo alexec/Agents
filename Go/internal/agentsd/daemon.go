@@ -217,6 +217,25 @@ func (d *Daemon) removeClient(c *Client) {
 	d.unwatchBrowser(c)
 }
 
+// clientsToTell is every client, or none once Shutdown has begun (#3828): what is said as
+// the host goes is not heard, and a client that reads nothing would hold each write that
+// follows a turn up to its own limit, past Shutdown's wait for them.
+func (d *Daemon) clientsToTell() []*Client {
+	d.afterTurnMu.Lock()
+	closed := d.afterTurnClosed
+	d.afterTurnMu.Unlock()
+	if closed {
+		return nil
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	cs := make([]*Client, 0, len(d.clients))
+	for _, c := range d.clients {
+		cs = append(cs, c)
+	}
+	return cs
+}
+
 // Broadcast sends a notification to every client.
 func Broadcast[P any](d *Daemon, n wire.Notification[P], params P) {
 	p, err := json.Marshal(params)
@@ -225,12 +244,7 @@ func Broadcast[P any](d *Daemon, n wire.Notification[P], params P) {
 		return
 	}
 	b, _ := json.Marshal(message{JSONRPC: "2.0", Method: n.Name, Params: p})
-	d.mu.Lock()
-	cs := make([]*Client, 0, len(d.clients))
-	for _, c := range d.clients {
-		cs = append(cs, c)
-	}
-	d.mu.Unlock()
+	cs := d.clientsToTell()
 	// Those on a control-plane uplink: one frame per uplink, naming who hears it (#167).
 	routed := map[*controllink.Uplink][]fanned{}
 	for _, c := range cs {

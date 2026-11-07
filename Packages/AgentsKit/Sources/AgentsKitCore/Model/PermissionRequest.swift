@@ -173,7 +173,12 @@ public struct ToolCall: Codable, Hashable, Sendable {
         if called.hasSuffix(AppTool.archiveSession) || AppTool.retiredOwnArchive.contains(where: called.hasSuffix) {
             return rawInput?["id"]?.stringValue?.isEmpty ?? true
         }
-        if called.hasSuffix(AppTool.waitForAgents) || called.hasSuffix(AppTool.checkAgain) { return true }
+        if called.hasSuffix(AppTool.checkAgain) { return true }
+        // A wait on sessions is `wait_for_event` on `agent.ended` (#3799).
+        if called.hasSuffix(AppTool.waitForEvent) {
+            let events = rawInput?["events"]?.arrayValue?.compactMap(\.stringValue) ?? [rawInput?["events"]?.stringValue].compactMap { $0 }
+            return events.contains("agent.ended")
+        }
         return false
     }
 

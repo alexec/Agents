@@ -3197,7 +3197,7 @@ public enum DaemonAPI {
         }
     }
 
-    /// `wait_for_agents` or `check_again` (#481, #1915): the block `finish_turn` used to carry.
+    /// A wait on sessions (`wait_for_event` on `agent.ended`, #3799) or `check_again` (#481, #1915): the block `finish_turn` used to carry.
     public struct WaitOnRequest: Codable, Sendable {
         public var token: String
         /// By id or exact title, as `waiting_on` took them.

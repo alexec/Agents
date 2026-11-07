@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/alexec/agents/Go/internal/forgejomcp"
 	"github.com/alexec/agents/Go/internal/githubmcp"
 	"github.com/alexec/agents/Go/internal/gitlabmcp"
 	"github.com/alexec/agents/Go/wire"
@@ -119,6 +120,13 @@ func projectForge(s wire.ProjectSlot) forge {
 			f.site = *s.Site
 		}
 		f.root = gitlabmcp.BaseURL(f.site)
+	}
+	if s.Forge != nil && *s.Forge == wire.ConnectionProviderForgejo {
+		f.provider, f.site = wire.ConnectionProviderForgejo, "codeberg.org"
+		if s.Site != nil && *s.Site != "" {
+			f.site = *s.Site
+		}
+		f.root = forgejomcp.BaseURL(f.site)
 	}
 	return f
 }

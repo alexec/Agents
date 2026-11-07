@@ -79,6 +79,7 @@ func (f *fakeGitHub) addPR(number int, branch string, edit func(*fakePR)) {
 	if edit != nil {
 		edit(p)
 	}
+	p.pr.Author = p.author
 	f.prs[number] = p
 }
 
@@ -409,7 +410,16 @@ func TestEventsListGivesEveryEventPollOnlyWithTheirSchemas(t *testing.T) {
 		_, hasAnyone := props["anyone"]
 		equal(t, hasAnyone, !personal, name+" anyone")
 		_, hasMine := props["mine"]
-		equal(t, hasMine, name == "checks.failed" || name == "checks.passed" || name == "pr.conflicted", name+" mine")
+		// Every event about one PR names it by mine too (#3797), and all of them take any.
+		named := map[string]bool{"checks.failed": true, "checks.passed": true, "pr.merged": true, "pr.closed": true,
+			"pr.conflicted": true, "pr.commented": true, "pr.labelled": true, "pr.unlabelled": true,
+			"review.posted": true, "review.comment": true}
+		equal(t, hasMine, named[name], name+" mine")
+		_, hasFixes := props["fixes"]
+		equal(t, hasFixes, named[name], name+" fixes")
+		_, hasAny := props["any"]
+		equal(t, hasAny, named[name] || name == "run.completed" || name == "issue.closed" || name == "issue.commented" ||
+			name == "issue.labelled", name+" any")
 		if strings.HasPrefix(name, "issue.") {
 			_, hasIssue := props["issue"]
 			equal(t, hasIssue, name != "issue.opened", name+" issue")
@@ -610,6 +620,33 @@ func TestPRMergedAndClosed(t *testing.T) {
 	equal(t, ids(h.poll("pr.closed", args, closed["cursor"])), []string{"pr.closed:" + repo + ":408:" + closedAt}, "closed")
 }
 
+// #3797: a lead knows the issue a lane's PR fixes before the PR is opened, so fixes
+// narrows by the issues a PR's body closes, "#12" being the repo's own; mine is the
+// owner's PR also once it is merged and no longer open.
+func TestFixesAndMineNarrowMergedPRs(t *testing.T) {
+	h := newHarness(t)
+	h.fake.addPR(501, "agents/a", func(p *fakePR) { p.pr.Fixes = []string{"#3795"} })
+	h.fake.addPR(502, "agents/b", func(p *fakePR) { p.pr.Fixes = []string{"other/repo#3795"}; p.author = "bob" })
+	h.fake.addPR(503, "agents/c", func(p *fakePR) { p.author = "bob" })
+	fixes := map[string]any{"repo": repo, "fixes": []any{"#3795"}}
+	full := map[string]any{"repo": repo, "fixes": []any{repo + "#3795", "other/repo#3795"}}
+	mine := map[string]any{"repo": repo, "mine": true}
+	all := map[string]any{"repo": repo, "any": true}
+	a, b, c, d := h.poll("pr.merged", fixes, nil), h.poll("pr.merged", full, nil), h.poll("pr.merged", mine, nil), h.poll("pr.merged", all, nil)
+	for _, n := range []int{501, 502, 503} {
+		h.fake.edit(n, func(p *fakePR) { p.state, p.mergedAt = "merged", h.at(5) })
+	}
+	id := func(n int) string { return fmt.Sprintf("pr.merged:%s:%d", repo, n) }
+	equal(t, ids(h.poll("pr.merged", fixes, a["cursor"])), []string{id(501)}, "fixes #3795")
+	equal(t, ids(h.poll("pr.merged", full, b["cursor"])), []string{id(501), id(502)}, "fixes owner/repo#3795")
+	equal(t, ids(h.poll("pr.merged", mine, c["cursor"])), []string{id(501)}, "mine once merged")
+	equal(t, ids(h.poll("pr.merged", all, d["cursor"])), []string{id(501), id(502), id(503)}, "any is every one")
+	_, err := h.rpc(map[string]any{"name": "pr.merged", "arguments": map[string]any{"repo": repo, "fixes": []any{"3795"}}, "cursor": nil})
+	if err == nil || err.Code != -32602 || !strings.Contains(err.Message, `"#12"`) {
+		t.Fatalf("a bare number: %v", err)
+	}
+}
+
 func TestRepoLeftOutIsTheFoldersAndNoRepoIsInvalidParams(t *testing.T) {
 	h := newHarness(t)
 	first := h.poll("pr.merged", map[string]any{}, nil)
@@ -668,6 +705,11 @@ func TestIssueEventsLabelsAndReasons(t *testing.T) {
 	equal(t, eventsOf(l)[0]["data"].(map[string]any)["by"], "alexec", "by")
 	c := h.poll("issue.closed", map[string]any{"repo": repo, "issue": 411}, closed["cursor"])
 	equal(t, eventsOf(c)[0]["data"].(map[string]any)["reason"], "not_planned", "reason")
+	// A lead waits on all its open children at once (#3797).
+	equal(t, ids(h.poll("issue.closed", map[string]any{"repo": repo, "issue": []any{409, 411}}, closed["cursor"])),
+		[]string{"issue.closed:" + repo + ":8102"}, "a list of issues")
+	equal(t, ids(h.poll("issue.closed", map[string]any{"repo": repo, "issue": []any{409}}, closed["cursor"])),
+		[]string{}, "not in the list")
 	cm := h.poll("issue.commented", bugs, commented["cursor"])
 	equal(t, ids(cm), []string{"issue.commented:" + repo + ":7100"}, "commented")
 	body := eventsOf(cm)[0]["data"].(map[string]any)["comment"].(map[string]any)["body"].(string)
@@ -795,7 +837,7 @@ func TestBadArgumentsAreInvalidParamsAnUnknownEventIsItsOwnCode(t *testing.T) {
 		}
 	}
 	check(map[string]any{"name": "pr.merged", "arguments": map[string]any{"repo": repo, "sha": "x"}, "cursor": nil}, -32602,
-		"unknown argument sha; takes repo, branch, pr, anyone")
+		"unknown argument sha; takes repo, branch, pr, fixes, anyone, mine, any")
 	for _, name := range []string{"checks.failed", "pr.merged"} {
 		for _, pr := range []any{"551", 0, -1, 1.5} {
 			check(map[string]any{"name": name, "arguments": map[string]any{"repo": repo, "pr": pr}, "cursor": nil}, -32602,

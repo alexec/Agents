@@ -13,7 +13,8 @@ type DiffHolder = Pick<ViewLayer, "diff">;
 
 const layoutKey = "reviewDiffLayout";
 
-export function ViewDiff({ layer, openLink }: { layer: DiffHolder; openLink: (url: string) => void }) {
+/** site is where the diff is, for Open on and the cut line: GitHub for a view's, the item's forge for a Work page's. */
+export function ViewDiff({ layer, openLink, site = "GitHub" }: { layer: DiffHolder; openLink: (url: string) => void; site?: string }) {
   const diff = layer.diff.value;
   const layout = useSignal<DiffLayout>(globalThis.localStorage?.getItem(layoutKey) === "sideBySide" ? "sideBySide" : "unified");
   const wide = useSignal(typeof innerWidth === "number" && innerWidth >= 820);
@@ -53,9 +54,9 @@ export function ViewDiff({ layer, openLink }: { layer: DiffHolder; openLink: (ur
             <span>{diff.files.length} {diff.files.length === 1 ? "file" : "files"} changed</span>
             <span class="quiet small counts" aria-label={`${added} lines added, ${removed} removed`}>+{added} −{removed}</span>
             <span class="spacer" />
-            {diff.url && <button type="button" onClick={() => openLink(diff.url!)}>Open on GitHub</button>}
+            {diff.url && <button type="button" onClick={() => openLink(diff.url!)}>Open on {site}</button>}
           </div>
-          {diff.cut && <p class="quiet small">The diff is too long to show every file here. A file with no lines below is on GitHub.</p>}
+          {diff.cut && <p class="quiet small">The diff is too long to show every file here. A file with no lines below is on {site}.</p>}
           {diff.files.map((f, i) => (
             <section class="view-diff-file" data-path={f.path} key={f.path}>
               <div class="review-diff-head">

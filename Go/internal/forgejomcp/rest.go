@@ -109,7 +109,7 @@ func (f *RealForgejo) now() time.Time {
 // MARK: HTTP
 
 // NotConnected is what a call says with no token, or one Forgejo no longer takes.
-const NotConnected = "Forgejo is not connected, or its token ended: set FORGEJO_TOKEN to an access token with read and write on repository and issue"
+const NotConnected = "Forgejo is not connected, or its token ended: connect Forgejo in Connectors, or set FORGEJO_TOKEN to an access token with read and write on repository and issue"
 
 func (f *RealForgejo) do(ctx context.Context, method, path string, body any) ([]byte, error) {
 	res, err := f.request(ctx, method, path, body, nil)
@@ -383,7 +383,7 @@ type pullJSON struct {
 var wipPrefixes = []string{"wip:", "[wip]"}
 
 func (p pullJSON) pr() PR {
-	return PR{Number: p.Number, Title: p.Title, Branch: p.Head.Ref, URL: p.HTMLURL, Fixes: closingRefs(p.Body)}
+	return PR{Number: p.Number, Title: p.Title, Branch: p.Head.Ref, URL: p.HTMLURL, Fixes: closingRefs(p.Body), Author: p.User.Login}
 }
 
 func (p pullJSON) draft() bool {

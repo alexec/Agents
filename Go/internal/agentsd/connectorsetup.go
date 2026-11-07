@@ -9,12 +9,14 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/mcpcatalog"
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/internal/connections"
+	"github.com/alexec/agents/Go/internal/forgejomcp"
 	"github.com/alexec/agents/Go/internal/githubmcp"
 	"github.com/alexec/agents/Go/internal/gitlabmcp"
 	"github.com/alexec/agents/Go/wire"
@@ -36,6 +38,11 @@ import (
 // a host named gitlab) picks GitLab, and the GitLab connection fills the three slots, proved by
 // the newest issue, the newest merge request and the last pipeline; the gitlab connector's
 // events go on. The connection counts only on the GitLab it was made on.
+//
+// Forgejo (#3752): with neither, a Forgejo remote (codeberg.org, the connected Forgejo, or a
+// host named forgejo, gitea or codeberg) picks Forgejo, and the Forgejo connection fills the
+// three slots, proved by the newest issue, the newest pull request and the default branch's
+// checks; the forgejo connector's events go on. The connection counts only on its own Forgejo.
 
 var (
 	// setupFresh is how long a read is used again before GitHub is asked again.
@@ -60,6 +67,12 @@ var gitlabSlotChoice = map[wire.ConnectorSlotKind]string{
 	wire.ConnectorSlotKindCi:         "GitLab pipelines",
 }
 
+var forgejoSlotChoice = map[wire.ConnectorSlotKind]string{
+	wire.ConnectorSlotKindTasks:      "Forgejo issues",
+	wire.ConnectorSlotKindCodeReview: "Forgejo pull requests",
+	wire.ConnectorSlotKindCi:         "Forgejo checks",
+}
+
 var slotThing = map[wire.ConnectorSlotKind]string{
 	wire.ConnectorSlotKindTasks:      "issues",
 	wire.ConnectorSlotKindCodeReview: "pull requests",
@@ -72,8 +85,14 @@ var gitlabSlotThing = map[wire.ConnectorSlotKind]string{
 	wire.ConnectorSlotKindCi:         "pipelines",
 }
 
-// forge is what a folder's remote picked: the provider, its root (GitLab's), the repository
-// or folder, and its host as the page says it.
+var forgejoSlotThing = map[wire.ConnectorSlotKind]string{
+	wire.ConnectorSlotKindTasks:      "issues",
+	wire.ConnectorSlotKindCodeReview: "pull requests",
+	wire.ConnectorSlotKindCi:         "checks",
+}
+
+// forge is what a folder's remote picked: the provider, its root (GitLab's or Forgejo's), the
+// repository or folder, and its host as the page says it.
 type forge struct {
 	provider wire.ConnectionProvider
 	root     string
@@ -82,8 +101,11 @@ type forge struct {
 }
 
 func (f forge) name() string {
-	if f.provider == wire.ConnectionProviderGitlab {
+	switch f.provider {
+	case wire.ConnectionProviderGitlab:
 		return "GitLab"
+	case wire.ConnectionProviderForgejo:
+		return "Forgejo"
 	}
 	return "GitHub"
 }
@@ -92,22 +114,36 @@ func (f forge) choice(kind wire.ConnectorSlotKind) string {
 	if c, ok := gitlabSlotChoice[kind]; ok && f.provider == wire.ConnectionProviderGitlab {
 		return c
 	}
+	if c, ok := forgejoSlotChoice[kind]; ok && f.provider == wire.ConnectionProviderForgejo {
+		return c
+	}
 	return slotChoice[kind]
 }
 
 func (f forge) thing(kind wire.ConnectorSlotKind) string {
-	if f.provider == wire.ConnectionProviderGitlab {
+	switch f.provider {
+	case wire.ConnectionProviderGitlab:
 		return gitlabSlotThing[kind]
+	case wire.ConnectionProviderForgejo:
+		return forgejoSlotThing[kind]
 	}
 	return slotThing[kind]
 }
 
 // ours is the made-by-Agents connector whose events the forge's set-up turns on.
 func (f forge) ours() string {
-	if f.provider == wire.ConnectionProviderGitlab {
+	switch f.provider {
+	case wire.ConnectionProviderGitlab:
 		return "agents/gitlab"
+	case wire.ConnectionProviderForgejo:
+		return "agents/forgejo"
 	}
 	return "agents/github"
+}
+
+// rooted is a forge whose connection counts only on its own root: GitLab and Forgejo.
+func (f forge) rooted() bool {
+	return f.provider == wire.ConnectionProviderGitlab || f.provider == wire.ConnectionProviderForgejo
 }
 
 // gitlabSetupReader is the reads a GitLab set-up makes; a test gives a fake GitLab.
@@ -115,6 +151,13 @@ type gitlabSetupReader interface {
 	NewestIssue(ctx context.Context, folder string) (*gitlabmcp.Newest, error)
 	NewestMergeRequest(ctx context.Context, folder string) (*gitlabmcp.Newest, error)
 	LastPipeline(ctx context.Context, folder string) (*gitlabmcp.Newest, error)
+}
+
+// forgejoSetupReader is the reads a Forgejo set-up makes; a test gives a fake Forgejo.
+type forgejoSetupReader interface {
+	NewestIssue(ctx context.Context, repo string) (*forgejomcp.Newest, error)
+	NewestPull(ctx context.Context, repo string) (*forgejomcp.Newest, error)
+	LastChecks(ctx context.Context, repo string) (*forgejomcp.Newest, error)
 }
 
 // setupReader is the reads a set-up makes; a test gives a fake GitHub.
@@ -132,6 +175,8 @@ type setupBook struct {
 	newSetupReader func(token string) setupReader
 	// newGitLabSetupReader is the GitLab at root as the token's owner; a test gives a fake.
 	newGitLabSetupReader func(root, token string) gitlabSetupReader
+	// newForgejoSetupReader is the Forgejo at root as the token's owner; a test gives a fake.
+	newForgejoSetupReader func(root, token string) forgejoSetupReader
 	// newCodespacesClient reads and changes Codespaces as the GitHub connection owner.
 	newCodespacesClient func(token string) codespacesClient
 }
@@ -139,7 +184,7 @@ type setupBook struct {
 // setupRecord is what this host last read for one folder.
 type setupRecord struct {
 	Repo string `json:"repo"`
-	// Forge is gitlab for a GitLab folder; empty is GitHub.
+	// Forge is gitlab or forgejo for a GitLab or Forgejo folder; empty is GitHub.
 	Forge        string                                 `json:"forge,omitempty"`
 	ReadAt       time.Time                              `json:"readAt"`
 	Installed    *bool                                  `json:"installed,omitempty"`
@@ -166,9 +211,9 @@ type slotRecord struct {
 	Messaging []wire.MessagingServer `json:"messaging,omitempty"`
 }
 
-// forgeName is the record's name for f's forge: gitlab, or empty for GitHub.
+// forgeName is the record's name for f's forge: gitlab or forgejo, or empty for GitHub.
 func forgeName(f forge) string {
-	if f.provider == wire.ConnectionProviderGitlab {
+	if f.rooted() {
 		return string(f.provider)
 	}
 	return ""
@@ -333,27 +378,50 @@ func (d *Daemon) gitlabSetupReader(root, token string) gitlabSetupReader {
 	return gitlabmcp.NewRealGitLab(root, func() string { return token }, nil)
 }
 
+func (d *Daemon) forgejoSetupReader(root, token string) forgejoSetupReader {
+	if d.newForgejoSetupReader != nil {
+		return d.newForgejoSetupReader(root, token)
+	}
+	return forgejomcp.NewRealForgejo(root, func() string { return token }, nil)
+}
+
 // gitlabConnection is the person's GitLab connection on this host, if any.
 func (d *Daemon) gitlabConnection() (connections.Connection, bool) {
+	return d.storedConnection(connections.GitLab)
+}
+
+// forgejoConnection is the person's Forgejo connection on this host, if any.
+func (d *Daemon) forgejoConnection() (connections.Connection, bool) {
+	return d.storedConnection(connections.Forgejo)
+}
+
+func (d *Daemon) storedConnection(provider string) (connections.Connection, bool) {
 	s, err := d.connectionStore()
 	if err != nil {
 		return connections.Connection{}, false
 	}
-	c, ok, err := s.Get(connections.GitLab)
+	c, ok, err := s.Get(provider)
 	return c, ok && err == nil
 }
 
 // connectionFor is the person's connection to f's forge, and whether it counts there: a
-// GitLab connection counts only on its own GitLab.
+// GitLab or Forgejo connection counts only on its own root.
 func (d *Daemon) connectionFor(f forge) (connections.Connection, bool) {
-	if f.provider != wire.ConnectionProviderGitlab {
-		return d.githubConnection()
+	switch f.provider {
+	case wire.ConnectionProviderGitlab:
+		c, connected := d.gitlabConnection()
+		if !connected || gitlabmcp.BaseURL(c.URL) != f.root {
+			return connections.Connection{}, false
+		}
+		return c, true
+	case wire.ConnectionProviderForgejo:
+		c, connected := d.forgejoConnection()
+		if !connected || forgejomcp.BaseURL(c.URL) != f.root {
+			return connections.Connection{}, false
+		}
+		return c, true
 	}
-	c, connected := d.gitlabConnection()
-	if !connected || gitlabmcp.BaseURL(c.URL) != f.root {
-		return connections.Connection{}, false
-	}
-	return c, true
+	return d.githubConnection()
 }
 
 // slotSources is what fills each of the forge's slots: the project's setting where its
@@ -368,7 +436,7 @@ func (d *Daemon) slotSources(folder string, own forge, conn connections.Connecti
 			src.fromProject = true
 			skipped[kind] = ps.Skipped != nil && *ps.Skipped
 			if !skipped[kind] {
-				src.f = projectForge(ps)
+				src.f = d.atConnectedRoot(projectForge(ps))
 				c, ok := d.connectionFor(src.f)
 				src.conn, src.usable = c, ok && c.Usable(now)
 			}
@@ -378,9 +446,33 @@ func (d *Daemon) slotSources(folder string, own forge, conn connections.Connecti
 	return out
 }
 
+// atConnectedRoot is f at its connection's own root when the connection is on f's site: a
+// project's slot keeps only the host, and a Forgejo or GitLab on this machine is on http.
+func (d *Daemon) atConnectedRoot(f forge) forge {
+	var c connections.Connection
+	var ok bool
+	switch f.provider {
+	case wire.ConnectionProviderGitlab:
+		c, ok = d.gitlabConnection()
+	case wire.ConnectionProviderForgejo:
+		c, ok = d.forgejoConnection()
+	default:
+		return f
+	}
+	if !ok || c.URL == "" {
+		return f
+	}
+	if u, err := url.Parse(c.URL); err == nil && strings.EqualFold(u.Host, f.site) {
+		f.root = c.URL
+	}
+	return f
+}
+
 // forgeAt is what the folder's git remote names: a GitHub repository first, else a GitLab
-// folder on the connected GitLab, gitlab.com, or a host named gitlab. Its connection, and
-// whether there is one, come with it: a GitLab connection counts only on its own GitLab.
+// folder on the connected GitLab, gitlab.com, or a host named gitlab, else a Forgejo
+// repository on the connected Forgejo, codeberg.org, or a host named forgejo, gitea or
+// codeberg. Its connection, and whether there is one, come with it: a GitLab or Forgejo
+// connection counts only on its own root.
 func (d *Daemon) forgeAt(ctx context.Context, folder string) (forge, connections.Connection, bool) {
 	gitCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
@@ -397,6 +489,10 @@ func (d *Daemon) forgeAt(ctx context.Context, folder string) (forge, connections
 	}
 	root, project, ok := gitlabmcp.ProjectAt(gitCtx, folder, roots)
 	if !ok {
+		if f, ok := d.forgejoAt(gitCtx, folder); ok {
+			c, connected := d.connectionFor(f)
+			return f, c, connected
+		}
 		c, connected := d.githubConnection()
 		return github, c, connected
 	}
@@ -411,6 +507,23 @@ func (d *Daemon) forgeAt(ctx context.Context, folder string) (forge, connections
 	return f, c, connected
 }
 
+// forgejoAt is the Forgejo repository the folder's git remote names, if any.
+func (d *Daemon) forgejoAt(ctx context.Context, folder string) (forge, bool) {
+	roots := []string{connections.Codeberg}
+	if c, connected := d.forgejoConnection(); connected && c.URL != "" {
+		roots = append([]string{c.URL}, roots...)
+	}
+	root, repo, ok := forgejomcp.RepoAt(ctx, folder, roots)
+	if !ok {
+		return forge{}, false
+	}
+	f := forge{provider: wire.ConnectionProviderForgejo, root: root, repo: repo, site: "codeberg.org"}
+	if u, err := url.Parse(root); err == nil && u.Host != "" {
+		f.site = u.Host
+	}
+	return f, true
+}
+
 func (d *Daemon) connectorSetup(ctx context.Context, folder string, reading wire.ConnectorSetupReading) (wire.ConnectorSetup, error) {
 	folder, err := d.setupFolder(folder)
 	if err != nil {
@@ -418,10 +531,7 @@ func (d *Daemon) connectorSetup(ctx context.Context, folder string, reading wire
 	}
 	f, conn, connected := d.forgeAt(ctx, folder)
 	repo := f.repo
-	recForge := ""
-	if f.provider == wire.ConnectionProviderGitlab {
-		recForge = string(f.provider)
-	}
+	recForge := forgeName(f)
 	skipped := d.skippedSlots(folder)
 	usable := connected && conn.Usable(time.Now())
 	sources := d.slotSources(folder, f, conn, connected, skipped)
@@ -479,7 +589,7 @@ func (d *Daemon) connectorSetup(ctx context.Context, folder string, reading wire
 	if repo != "" {
 		out.Repository = &repo
 		page := "https://github.com/" + repo
-		if f.provider == wire.ConnectionProviderGitlab {
+		if f.rooted() {
 			page = f.root + repo
 		}
 		out.RepositoryURL = &page
@@ -598,11 +708,18 @@ func (d *Daemon) readSetup(ctx context.Context, own forge, ownUsable bool, ownTo
 
 // slotReader is the read that proves one slot on f's forge.
 func (d *Daemon) slotReader(f forge, token string, slot wire.ConnectorSlotKind) slotRead {
-	if f.provider == wire.ConnectionProviderGitlab {
+	switch f.provider {
+	case wire.ConnectionProviderGitlab:
 		gl := d.gitlabSetupReader(f.root, token)
 		return map[wire.ConnectorSlotKind]slotRead{
 			wire.ConnectorSlotKindTasks: fromGitLab(gl.NewestIssue), wire.ConnectorSlotKindCodeReview: fromGitLab(gl.NewestMergeRequest),
 			wire.ConnectorSlotKindCi: fromGitLab(gl.LastPipeline),
+		}[slot]
+	case wire.ConnectionProviderForgejo:
+		fj := d.forgejoSetupReader(f.root, token)
+		return map[wire.ConnectorSlotKind]slotRead{
+			wire.ConnectorSlotKindTasks: fromForgejo(fj.NewestIssue), wire.ConnectorSlotKindCodeReview: fromForgejo(fj.NewestPull),
+			wire.ConnectorSlotKindCi: fromForgejo(fj.LastChecks),
 		}[slot]
 	}
 	gh := d.setupReader(token)
@@ -615,6 +732,17 @@ func (d *Daemon) slotReader(f forge, token string, slot wire.ConnectorSlotKind) 
 func fromGitLab(read func(context.Context, string) (*gitlabmcp.Newest, error)) slotRead {
 	return func(ctx context.Context, folder string) (*githubmcp.Newest, error) {
 		n, err := read(ctx, folder)
+		if n == nil || err != nil {
+			return nil, err
+		}
+		return &githubmcp.Newest{Number: n.Number, Title: n.Title, URL: n.URL, At: n.At, Outcome: n.Outcome}, nil
+	}
+}
+
+// fromForgejo is a Forgejo read as a slot's read.
+func fromForgejo(read func(context.Context, string) (*forgejomcp.Newest, error)) slotRead {
+	return func(ctx context.Context, repo string) (*githubmcp.Newest, error) {
+		n, err := read(ctx, repo)
 		if n == nil || err != nil {
 			return nil, err
 		}
@@ -636,6 +764,18 @@ func readFailure(f forge, err error) (refused bool, words string) {
 			return false, "GitLab did not take the connection. Connect GitLab again."
 		case errors.As(err, &gl) && gl.Kind == gitlabmcp.RateLimited:
 			return false, "GitLab's rate limit was reached. Try again in a minute."
+		}
+		return false, "Connected, but " + f.site + " can't be reached for the first read."
+	}
+	if f.provider == wire.ConnectionProviderForgejo {
+		var fj *forgejomcp.ForgejoError
+		switch {
+		case errors.As(err, &fj) && fj.Refused:
+			return true, ""
+		case errors.As(err, &fj) && fj.Kind == forgejomcp.NotSignedIn:
+			return false, "Forgejo did not take the connection. Connect Forgejo again."
+		case errors.As(err, &fj) && fj.Kind == forgejomcp.RateLimited:
+			return false, "Forgejo's rate limit was reached. Try again in a minute."
 		}
 		return false, "Connected, but " + f.site + " can't be reached for the first read."
 	}
@@ -702,7 +842,7 @@ func forgeSlot(f forge, kind wire.ConnectorSlotKind, connected, skipped bool, re
 	return s
 }
 
-// setupEvents is the forge's connector's events for the folder (github's or gitlab's). With
+// setupEvents is the forge's connector's events for the folder (github's, gitlab's or forgejo's). With
 // turnOn, a set-up that can read turns them on: the made-by-Agents entry goes in the
 // folder's .agents/mcp.json, approved, once.
 func (d *Daemon) setupEvents(ctx context.Context, f forge, folder string, rec *setupRecord, slots []wire.ConnectorSlot, turnOn bool) wire.ConnectorEvents {

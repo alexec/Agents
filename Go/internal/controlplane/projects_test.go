@@ -235,6 +235,18 @@ func TestAProjectsSlotsGoToItsMachines(t *testing.T) {
 	if e := callError(t, owner, "", "projects/setSlot", wire.ProjectSlotSet{ID: made.ID, Slot: wire.ConnectorSlotKindCi, Value: &wire.ProjectSlot{Slot: wire.ConnectorSlotKindCi, Repository: &bad}}); !strings.Contains(e, "owner/name") {
 		t.Fatal(e)
 	}
+	// A Forgejo repository (#3752): owner/name, on Codeberg when no site is given.
+	forgejo, fjRepo := wire.ConnectionProviderForgejo, "agentstest/agents-walk"
+	json.Unmarshal(call(t, owner, "", "projects/setSlot", wire.ProjectSlotSet{ID: made.ID, Slot: wire.ConnectorSlotKindCi,
+		Value: &wire.ProjectSlot{Slot: wire.ConnectorSlotKindCi, Forge: &forgejo, Repository: &fjRepo}}), &got)
+	if len(got.Slots) != 2 || *got.Slots[1].Forge != forgejo || *got.Slots[1].Site != "codeberg.org" {
+		t.Fatalf("%+v", got)
+	}
+	deep := "group/sub/app"
+	if e := callError(t, owner, "", "projects/setSlot", wire.ProjectSlotSet{ID: made.ID, Slot: wire.ConnectorSlotKindCi,
+		Value: &wire.ProjectSlot{Slot: wire.ConnectorSlotKindCi, Forge: &forgejo, Repository: &deep}}); !strings.Contains(e, "owner/name") {
+		t.Fatal(e)
+	}
 }
 
 // waitFor waits up to five seconds for ok.

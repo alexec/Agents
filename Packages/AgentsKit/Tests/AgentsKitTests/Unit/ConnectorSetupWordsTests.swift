@@ -110,7 +110,7 @@ struct ConnectorSetupWordsTests {
         let slot = DaemonAPI.ConnectorSlot(slot: .tasks, choice: "GitHub Issues", state: .noRemote)
         #expect(ConnectorSetupWords.title(slot) == "Choose a tracker")
         #expect(ConnectorSetupWords.line(slot, folder: "Blog", repository: nil)
-                == "Blog has no GitHub or GitLab remote, so GitHub Issues can't be read for it.")
+                == "Blog has no GitHub, GitLab or Forgejo remote, so GitHub Issues can't be read for it.")
     }
 
     /// Connect Linear (#1343): the hand-back page's agents://oauth/callback, read for the host.
@@ -164,6 +164,22 @@ struct ConnectorSetupWordsTests {
         com.expiresAt = nil
         let signIn = ConnectorSetupWords.GitLab.again(com)
         #expect(!signIn.withToken && signIn.address.isEmpty)
+    }
+
+    /// Connect Forgejo (#3752): a token's row says its Forgejo, Make a Token opens its
+    /// applications page, and a Forgejo folder says pull requests and checks, as the web page's.
+    @Test func forgejoWords() {
+        let c = DaemonAPI.Connection(provider: .forgejo, login: "agentstest", connectedAt: Date(), workspace: "codeberg.org")
+        #expect(ConnectorSetupWords.connectionTitle(c) == "Forgejo \u{00B7} agentstest")
+        #expect(ConnectorSetupWords.connectionNote(c) == "codeberg.org \u{00B7} Access token")
+        #expect(ConnectorSetupWords.Forgejo.again(c) == "https://codeberg.org")
+        #expect(ConnectorSetupWords.Forgejo.newTokenURL("") == "https://codeberg.org/user/settings/applications")
+        #expect(ConnectorSetupWords.Forgejo.newTokenURL("git.example.com/api/v1/") == "https://git.example.com/user/settings/applications")
+        #expect(ConnectorSetupWords.connectTitle(.forgejo) == "Connect Forgejo once: issues, pull requests and checks.")
+        #expect(ConnectorSetupWords.connectButton(.forgejo) == "Connect Forgejo\u{2026}")
+        let ci = DaemonAPI.ConnectorSlot(slot: .ci, choice: "Forgejo checks", state: .read)
+        #expect(ConnectorSetupWords.line(ci, folder: "App", repository: "team/app", forge: .forgejo)
+                == "No checks yet on team/app's default branch.")
     }
 
     /// A connection that ended turns the Connectors rows red (#3407): a refused renewal, or a

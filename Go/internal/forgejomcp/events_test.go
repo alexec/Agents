@@ -3,6 +3,8 @@ package forgejomcp
 import (
 	"context"
 	"encoding/json"
+	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -157,8 +159,11 @@ func TestIssueEvents(t *testing.T) {
 	opened := newPoller(t, f, "issue.opened", nil)
 	commented := newPoller(t, f, "issue.commented", nil)
 	closed := newPoller(t, f, "issue.closed", nil)
+	// A lead waits on all its open children at once (#3797).
+	closedList := newPoller(t, f, "issue.closed", map[string]any{"issue": []any{1, 3}})
+	closedOther := newPoller(t, f, "issue.closed", map[string]any{"issue": []any{1}})
 	labelled := newPoller(t, f, "issue.labelled", map[string]any{"label": "agent"})
-	for _, p := range []*poller{opened, commented, closed, labelled} {
+	for _, p := range []*poller{opened, commented, closed, closedList, closedOther, labelled} {
 		p.poll()
 	}
 	f.set(func() {
@@ -187,6 +192,10 @@ func TestIssueEvents(t *testing.T) {
 	ids, result = closed.poll()
 	same(t, ids, []string{"issue.closed:acme/app:3:" + timeString(start.Add(60e9))})
 	same(t, data(t, result, 0)["by"], "alex")
+	ids, _ = closedList.poll()
+	same(t, ids, []string{"issue.closed:acme/app:3:" + timeString(start.Add(60e9))})
+	ids, _ = closedOther.poll()
+	same(t, ids, []string(nil))
 	ids, result = labelled.poll()
 	same(t, ids, []string{"issue.labelled:acme/app:label:20"})
 	same(t, data(t, result, 0)["label"], "agent")
@@ -293,4 +302,69 @@ func TestBaseURL(t *testing.T) {
 	same(t, BaseURL(""), "https://codeberg.org/")
 	same(t, BaseURL("git.example.com/api/v1/"), "https://git.example.com/")
 	same(t, BaseURL("http://localhost:3000"), "http://localhost:3000/")
+}
+
+// Every event about one pull request is named by pr, branch, fixes or mine, or takes any
+// (#3797); the issue events but issue.opened take a list of issues and any too.
+func TestEventsListSchemas(t *testing.T) {
+	named := map[string]bool{"checks.failed": true, "pr.merged": true, "pr.closed": true, "pr.conflicted": true, "review.comment": true}
+	for _, e := range eventsList()["events"].([]any) {
+		e := e.(map[string]any)
+		name := e["name"].(string)
+		props := e["inputSchema"].(map[string]any)["properties"].(map[string]any)
+		has := func(key string, want bool) {
+			if _, ok := props[key]; ok != want {
+				t.Errorf("%s: %s is %v, want %v", name, key, ok, want)
+			}
+		}
+		has("mine", named[name])
+		has("fixes", named[name])
+		has("any", named[name] || name == "issue.closed" || name == "issue.commented" || name == "issue.labelled")
+		if issue, ok := props["issue"].(map[string]any); ok && name != "issue.assigned" && !reflect.DeepEqual(issue["type"], []string{"integer", "array"}) {
+			t.Errorf("%s: issue is %v", name, issue["type"])
+		}
+		if pr, ok := e["payloadSchema"].(map[string]any)["properties"].(map[string]any)["pr"].(map[string]any); ok {
+			if _, ok := pr["properties"].(map[string]any)["fixes"]; !ok {
+				t.Errorf("%s: pr has no fixes", name)
+			}
+		}
+	}
+	raw, _ := json.Marshal(map[string]any{"name": "pr.merged", "arguments": map[string]any{"repo": repo, "sha": "x"}})
+	_, err := newPoller(t, newFake(t), "pr.merged", nil).events.Poll(context.Background(), raw)
+	if err == nil || err.Code != -32602 || err.Message != "unknown argument sha; takes repo, branch, pr, fixes, anyone, mine, any" {
+		t.Fatalf("unknown argument: %+v", err)
+	}
+}
+
+// #3797: a lead knows the issue a lane's pull request fixes before it is opened, so fixes
+// narrows by the issues a description closes, "#12" being the repository's own; mine is
+// the owner's pull request also once it is merged and no longer open.
+func TestFixesAndMineNarrowMergedPRs(t *testing.T) {
+	f := newFake(t)
+	fixes := newPoller(t, f, "pr.merged", map[string]any{"fixes": []any{"#3795"}})
+	full := newPoller(t, f, "pr.merged", map[string]any{"fixes": []any{"ACME/app#3795", "other/repo#3795"}})
+	mine := newPoller(t, f, "pr.merged", map[string]any{"mine": true})
+	all := newPoller(t, f, "pr.merged", map[string]any{"any": true})
+	for _, p := range []*poller{fixes, full, mine, all} {
+		p.poll()
+	}
+	merged := func(n int, author obj, body string) obj {
+		return pull(n, "b"+strconv.Itoa(n), author, obj{"state": "closed", "merged": true, "merged_at": at(1), "updated_at": at(1), "body": body})
+	}
+	f.set(func() {
+		f.pulls = []obj{merged(501, alex, "Fixes #3795"), merged(502, dev, "Closes other/repo#3795"), merged(503, dev, "")}
+	})
+	id := func(n int) string { return "pr.merged:acme/app:" + strconv.Itoa(n) }
+	ids, _ := fixes.poll()
+	same(t, ids, []string{id(501)})
+	ids, _ = full.poll()
+	same(t, ids, []string{id(501), id(502)})
+	ids, _ = mine.poll()
+	same(t, ids, []string{id(501)})
+	ids, _ = all.poll()
+	same(t, ids, []string{id(501), id(502), id(503)})
+	raw, _ := json.Marshal(map[string]any{"name": "pr.merged", "arguments": map[string]any{"repo": repo, "fixes": []any{"3795"}}})
+	if _, err := fixes.events.Poll(context.Background(), raw); err == nil || err.Code != -32602 || !strings.Contains(err.Message, `"#12"`) {
+		t.Fatalf("a bare number: %+v", err)
+	}
 }

@@ -30,6 +30,14 @@ enum WalkText {
         }
     }
 
+    /// The element is a field a person types into, not a text that only says something.
+    static func isField(_ element: WalkAX) -> Bool {
+        if let view = element.object as? NSTextView { return !view.isFieldEditor && view.isEditable }
+        if let view = element.object as? NSTextField { return view.isEditable }
+        if let view = (element.object as? NSCell)?.controlView as? NSTextField { return view.isEditable }
+        return ["AXTextField", "AXTextArea", "AXComboBox", "AXSearchField"].contains(element.role)
+    }
+
     /// The text view or editable field the element is, or the smallest one under its
     /// middle: SwiftUI's element for a field is not the field's view. Never a field editor,
     /// which belongs to whichever field has the keyboard.

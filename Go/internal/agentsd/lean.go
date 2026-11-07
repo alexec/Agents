@@ -90,12 +90,7 @@ func (d *Daemon) tellEntry(id wire.UUID, e wire.TranscriptEntry, index int) {
 
 // sendEach sends a notification to the clients pick says yes to, each with its own params.
 func sendEach[P any](d *Daemon, n wire.Notification[P], pick func(c *Client) (P, bool)) {
-	d.mu.Lock()
-	cs := make([]*Client, 0, len(d.clients))
-	for _, c := range d.clients {
-		cs = append(cs, c)
-	}
-	d.mu.Unlock()
+	cs := d.clientsToTell()
 	for _, c := range cs {
 		params, ok := pick(c)
 		if !ok {

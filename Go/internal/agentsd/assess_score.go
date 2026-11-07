@@ -121,9 +121,34 @@ func (r assessRecord) callsOf(method string) []appToolCall {
 	return out
 }
 
-// waitsOnSessions is wait_for_agents (`agents/wait`).
+// waitsOnSessions is wait_for_event on agent.ended with agent (`events/wait`, #3799).
 func (r assessRecord) waitsOnSessions() []appToolCall {
-	return r.callsOf("agents/wait")
+	var out []appToolCall
+	for _, c := range r.callsOf("events/wait") {
+		if waitsOn(c, "agent.ended") && len(whereAgents(c)) > 0 {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// waitsOn says a wait_for_event call named the event.
+func waitsOn(c appToolCall, name string) bool {
+	for _, e := range listArg(c, "events") {
+		if strings.EqualFold(strings.TrimSpace(e), name) {
+			return true
+		}
+	}
+	return false
+}
+
+// whereAgents is the sessions a wait on agent.ended names in where's agent.
+func whereAgents(c appToolCall) []string {
+	var where map[string]json.RawMessage
+	if json.Unmarshal(c.Arguments["where"], &where) != nil {
+		return nil
+	}
+	return listArg(appToolCall{Arguments: where}, "agent")
 }
 
 // listsOwnHelpers and listsSessions are list_sessions with started_by me, and without
@@ -461,14 +486,6 @@ func (r assessRecord) eventSteps() (verdict, string) {
 	if !raised {
 		return failedStep, "no " + assessPingEvent + " to this agent for its second lease on the log"
 	}
-	waitsOn := func(c appToolCall, name string) bool {
-		for _, e := range listArg(c, "events") {
-			if e == name {
-				return true
-			}
-		}
-		return false
-	}
 	// from is gone, so a wait after the ping lease cannot see the already-raised event.
 	// Require an unknown name to be refused, naming what is offered.
 	var unknown []appToolCall
@@ -718,16 +735,17 @@ func (r assessRecord) ownAsk() (verdict, string) {
 	return failedStep, "nothing asked with `" + r.escalation + "` reached the app"
 }
 
-// blockFoundHelperDone is a wait on the helper refused because it had already ended.
+// blockFoundHelperDone is a wait on the helper answered at once because it had already
+// ended.
 func (r assessRecord) blockFoundHelperDone(helper *wire.UUID) bool {
 	for _, c := range r.waitsOnSessions() {
-		if c.Ok || !strings.Contains(answerOfCall(c), "has already ended") {
+		if !strings.Contains(answerOfCall(c), "has already ended") {
 			continue
 		}
 		if helper == nil {
 			return true
 		}
-		for _, a := range listArg(c, "agents") {
+		for _, a := range whereAgents(c) {
 			if strings.EqualFold(a, string(*helper)) {
 				return true
 			}
@@ -838,10 +856,11 @@ func (r assessRecord) ending() (verdict, string) {
 			refused++
 			continue
 		}
-		outcomes = append(outcomes, "waiting")
-		if len(listArg(c, "agents")) > 0 {
-			onHelper = true
+		if strings.HasPrefix(answerOfCall(c), "Not waiting") {
+			continue
 		}
+		outcomes = append(outcomes, "waiting")
+		onHelper = true
 		if _, ok := intArg(c, "until_minutes", "untilMinutes"); ok {
 			withTime = true
 		}

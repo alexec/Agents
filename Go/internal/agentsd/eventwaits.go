@@ -365,7 +365,7 @@ func parsePattern(given string, filters map[string][]string) (waitPattern, strin
 	p := waitPattern{name: name, filters: clean}
 	if name == "custom" || strings.HasPrefix(name, "custom.") {
 		return p, `"` + name + `" is never raised: agents no longer publish events, so there are no custom.* events to wait or trigger on. ` +
-			"Use one the app raises, such as agent.finished or branch.moved; to wait for particular agents, use wait_for_agents."
+			"Use one the app raises, such as agent.ended or branch.moved; to wait for particular agents, use agent.ended with agent."
 	}
 	unknown := func() (waitPattern, string) {
 		kinds, _ := catalogue()
@@ -418,11 +418,58 @@ func parsePattern(given string, filters map[string][]string) (waitPattern, strin
 	}
 	if problem != "" {
 		if strings.HasPrefix(name, "agent.") {
-			problem += " To wait for particular agents, use wait_for_agents."
+			problem += " To wait for particular agents, use agent.ended with agent."
 		}
 		return p, problem
 	}
+	// any says which ones (#3797), every one; no event carries it as a detail.
+	delete(p.filters, "any")
 	return p, ""
+}
+
+// unnamedBranchWords is why a wait on branch.moved that names no branch, and does not set
+// any: true, is refused (#3797), or "": it woke on every branch an agent works on.
+func unnamedBranchWords(p waitPattern, filters map[string][]string) string {
+	if p.name != "branch.moved" && p.name != "branch.*" {
+		return ""
+	}
+	if _, named := filters["branch"]; named {
+		return ""
+	}
+	if all := filters["any"]; len(all) == 1 && all[0] == "true" {
+		return ""
+	}
+	return p.name + ": Name the branch (`branch`), or set `any: true` to wake on every branch in the folder. Nothing is waiting."
+}
+
+// endedWaitWords is why a wait that names agent.ended, or sets wake_on, is refused (#3799),
+// or "": agent.ended names the sessions it waits for in agent, or sets any: true, and waits
+// on its own; wake_on is for agent.ended with agent alone.
+func endedWaitWords(names []string, filters map[string][]string, wakeOn string) string {
+	ended := false
+	for _, n := range names {
+		ended = ended || strings.EqualFold(strings.TrimSpace(n), "agent.ended")
+	}
+	_, named := filters["agent"]
+	if wakeOn != "" && (!ended || !named) {
+		return "wake_on is only for agent.ended with the sessions named in agent. Nothing is waiting."
+	}
+	if wakeOn != "" && wakeOn != "all" && wakeOn != "any" {
+		return "wake_on has to be all or any. Nothing is waiting."
+	}
+	if !ended {
+		return ""
+	}
+	if !named {
+		if all := filters["any"]; len(all) == 1 && all[0] == "true" {
+			return ""
+		}
+		return "agent.ended: Name the sessions (`agent`, by id or exact title), or set `any: true` to wake when any session in the folder ends. Nothing is waiting."
+	}
+	if len(names) > 1 {
+		return "agent.ended with agent waits on its own: call wait_for_event with events [\"agent.ended\"] alone. Nothing is waiting."
+	}
+	return ""
 }
 
 // The wait on the agent's record, and its words.
@@ -757,12 +804,19 @@ func (d *Daemon) waitForEvent(agent wire.UUID, args map[string]json.RawMessage) 
 	if problem != "" {
 		return "", eventRefused(problem)
 	}
+	wakeOn := strings.ToLower(strings.TrimSpace(argString(args, "wake_on")))
+	if words := endedWaitWords(names, filters, wakeOn); words != "" {
+		return "", eventRefused(words)
+	}
 	var patterns []waitPattern
 	var serverNames []string
 	for _, n := range names {
 		p, problem := parsePattern(n, filters)
 		if problem != "" {
 			return "", eventRefused(problem)
+		}
+		if words := unnamedBranchWords(p, filters); words != "" {
+			return "", eventRefused(words)
 		}
 		if isServerPattern(p.name) {
 			// A server's event is matched by its subscription, not its details: `where`
@@ -772,6 +826,13 @@ func (d *Daemon) waitForEvent(agent wire.UUID, args map[string]json.RawMessage) 
 			continue
 		}
 		patterns = append(patterns, p)
+	}
+	// agent.ended on named sessions is a block on them (#3799), as a wait on sessions was:
+	// it reaches every session of the project, on every machine, and wakes on all or any.
+	if len(patterns) == 1 && patterns[0].name == "agent.ended" {
+		if who := patterns[0].filters["agent"]; len(who) > 0 {
+			return d.waitForEnded(agent, who, wakeOn, minutes, argString(args, "message"))
+		}
 	}
 	if branches, ok := filters["branch"]; ok {
 		for _, p := range patterns {

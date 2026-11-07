@@ -8,7 +8,7 @@ import { useEffect, useMemo } from "preact/hooks";
 import type { ForgeDone, ForgeItemDetail, ForgeLabel, ForgeMergeMethod, LineageNode } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { describe } from "../model/errors";
-import { closeTitle, doneWords, failedChecks, mergeButton, mergeWaits, shortRef } from "../model/work";
+import { closeTitle, doneWords, failedChecks, forgeName, mergeButton, mergeWaits, shortRef } from "../model/work";
 import type { Diff } from "./chat/appViewBridge";
 import { ViewDiff } from "./chat/ViewDiff";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
@@ -138,7 +138,7 @@ export function WorkActions({ store, host, detail, wrote }: {
           </div>
         </Modal>
       )}
-      <ViewDiff layer={{ diff }} openLink={openLink} />
+      <ViewDiff layer={{ diff }} openLink={openLink} site={forgeName(node.ref)} />
     </div>
   );
 }

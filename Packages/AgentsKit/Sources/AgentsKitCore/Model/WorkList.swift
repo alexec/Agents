@@ -144,9 +144,11 @@ public enum WorkList {
         ReportValueWords.url(node).map { LineageList.pullRequest(node, $0) }
     }
 
-    /// "alexec/Agents" of "github:alexec/Agents"; "Linear · ENG" of a Linear team (#3311); "Jira" of "jira".
+    /// "alexec/Agents" of "github:alexec/Agents"; "Linear · ENG" of a Linear team (#3311); "Jira" of "jira";
+    /// "Azure Boards · acme/web" of an Azure Boards project (#3815).
     public static func repoName(_ repo: String) -> String {
         if repo.hasPrefix("linear:") { return "Linear · \(repo.dropFirst("linear:".count))" }
+        if repo.hasPrefix("azureboards:") { return "Azure Boards · \(repo.dropFirst("azureboards:".count))" }
         if let tracker = forgeTitle[repo], !repo.contains(":") { return tracker }
         return repo.replacingOccurrences(of: #"^[a-z][a-z0-9-]*:"#, with: "", options: .regularExpression)
     }
@@ -377,7 +379,8 @@ public enum WorkList {
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
-    public static let forgeTitle = ["github": "GitHub", "gitlab": "GitLab", "linear": "Linear", "jira": "Jira"]
+    public static let forgeTitle = ["github": "GitHub", "gitlab": "GitLab", "linear": "Linear", "jira": "Jira",
+                                    "azureboards": "Azure Boards", "forgejo": "Forgejo"]
 
     /// A forge that could not be read: "GitHub on Studio: not connected".
     public static func errorWords(_ e: DaemonAPI.ForgeListError, machine: String?) -> String {
@@ -385,9 +388,18 @@ public enum WorkList {
     }
 
     /// "Open on GitHub", by the ref's forge.
-    public static func openOnWords(_ ref: String) -> String {
+    public static func openOnWords(_ ref: String) -> String { "Open on \(forgeName(ref))" }
+
+    /// "GitHub" of "github:alexec/Agents#12", by the ref's forge; "the forge" of one it does not know.
+    public static func forgeName(_ ref: String) -> String {
         let forge = ref.split(separator: ":", maxSplits: 1).first.map(String.init) ?? ""
-        return "Open on \(forgeTitle[forge] ?? "the forge")"
+        return forgeTitle[forge] ?? "the forge"
+    }
+
+    /// Why a write failed, in the machine's own words: a JSON-RPC error's message, not Foundation's
+    /// "The operation couldn't be completed".
+    public static func failureWords(_ error: any Error) -> String {
+        (error as? JSONRPCError)?.message ?? error.localizedDescription
     }
 
     /// A label's colour (#2956) as red, green and blue from 0 to 1; nil when the forge gave none.

@@ -183,7 +183,7 @@ When a repository has all of its names, skip to step 5.
    Sign in… and choose the organization <org>. Done?`
 3. **The project and its DSN.** A connector added during a session reaches only agents
    that start after it. So when you have no Sentry tools, start a helper in the new folder
-   with `start_session` to do this step, and wait for it with `wait_for_agents`. With
+   with `start_session` to do this step, and wait for it with `wait_for_event` on `agent.ended`, naming it in `agent`. With
    Sentry's tools: `find_organizations` (the one from step 1); `find_teams` (the first one,
    or `create_team` named as the organization); `find_projects` (use one named as the
    repository, else `create_project`); `find_dsns` for its public DSN. Then

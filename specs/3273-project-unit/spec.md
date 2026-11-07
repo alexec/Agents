@@ -138,7 +138,7 @@ Today each tool says "in this folder". They become "in this project":
 | Tool | Today | After |
 |---|---|---|
 | `list_sessions` | this folder's sessions | the project's sessions on every machine, each with its machine |
-| `read_session`, `message_session`, `stop_session`, `archive_session`, `wait_for_agents` | this folder, and sessions this one started on other machines (#2887) | any session of the project, through the control plane |
+| `read_session`, `message_session`, `stop_session`, `archive_session`, `wait_for_event` on `agent.ended` | this folder, and sessions this one started on other machines (#2887) | any session of the project, through the control plane |
 | `start_session` | this folder; `machine` + `folder` (an absolute path) for another machine | this project; `machine` alone picks the project's folder there. `folder` stays for a folder in another project. |
 | `manage_workflows` | this folder's workflows | the project's workflows. `runs-on` already picks the machines. |
 
