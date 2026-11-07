@@ -59,7 +59,7 @@ func TestAgentOnByLinearKey(t *testing.T) {
 	title := "Fix the totals"
 	seeded(t, d, folderA, func(a *wire.Agent) {
 		a.Title = &title
-		a.Labels = []wire.SessionLabel{{Value: "ENG-4"}}
+		a.Labels = []wire.SessionLabel{{Value: "ENG-4"}, {Value: "AB#12"}}
 	})
 	byUser := wire.AgentArchivedReasonByUser
 	seeded(t, d, folderB, func(a *wire.Agent) {
@@ -68,7 +68,7 @@ func TestAgentOnByLinearKey(t *testing.T) {
 	})
 
 	_, _, got := d.agentOnIt(folderA)
-	if len(got) != 1 || got["ENG-4"] != title {
+	if len(got) != 2 || got["ENG-4"] != title || got["AB#12"] != title {
 		t.Errorf("got %+v", got)
 	}
 }

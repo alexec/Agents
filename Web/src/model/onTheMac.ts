@@ -7,12 +7,6 @@ export function resourcesHint(hasMac: boolean): string {
     : "Agents lease one whenever its description applies. The web page cannot declare resources yet.";
 }
 
-/** The Resources page when no machine has one. */
-export function noResourcesHint(hasMac: boolean): string {
-  return hasMac ? "Nothing is declared or held. Resources are declared on the Mac, in Settings ▸ Resources."
-    : "Nothing is declared or held. The web page cannot declare resources yet.";
-}
-
 /** Under Tokens and Spending: where the daily and per-agent limits are set. */
 export function limitsHint(hasMac: boolean): string {
   return hasMac ? "Limits are set on the Mac." : "The web page cannot set limits yet.";

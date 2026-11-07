@@ -472,7 +472,7 @@
       "server": {
         "name": "agents/azureboards",
         "title": "Azure Boards",
-        "description": "Work items on Azure Boards or your own Azure DevOps Server, as a tracker: tools to read them and comment, and events when one is opened, tagged, commented on, closed or assigned to you"
+        "description": "Work items on Azure Boards or your own Azure DevOps Server, as a tracker: a page of open work items with Start Agent, tools to read them and comment, and events when one is opened, tagged, commented on, closed or assigned to you"
       },
       "_meta": {
         "dev.agentloops/connector": {
@@ -487,7 +487,7 @@
               "issue.closed",
               "issue.assigned"
             ],
-            "views": false
+            "views": true
           },
           "secrets": [
             {

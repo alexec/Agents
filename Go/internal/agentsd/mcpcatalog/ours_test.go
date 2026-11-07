@@ -308,7 +308,7 @@ func TestAzureDevOpsAsksForItsToken(t *testing.T) {
 // server and the project, and declares the jira and linear servers' issue events.
 func TestAzureBoardsAsksForItsTokenAndProject(t *testing.T) {
 	boards, ok := OursByID("agents/azureboards")
-	if !ok || boards.Command != "azureboards-mcp" || !boards.Declares.Tools || boards.Declares.Views ||
+	if !ok || boards.Command != "azureboards-mcp" || !boards.Declares.Tools || !boards.Declares.Views ||
 		!reflect.DeepEqual(boards.Declares.Events, azureboardsmcp.EventNames()) {
 		t.Fatalf("azureboards: %+v %v, the server's %v", boards, ok, azureboardsmcp.EventNames())
 	}

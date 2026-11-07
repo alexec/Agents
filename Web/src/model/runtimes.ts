@@ -187,6 +187,12 @@ export function machineRuntimeLine(status: RuntimeStatus): string {
   return status.outdated ? `${line} · an update is out` : line;
 }
 
+/** Whether it is on the machine, so the machine's page lists it (#3743): not missing, and not a failed install.
+ * RuntimeStatus.isInstalled. */
+export function isInstalled(status: RuntimeStatus): boolean {
+  return !("missing" in status.availability) && !("installFailed" in status.availability);
+}
+
 /**
  * One runtime on Your setup ▸ Runtimes (#3631): shown once, not once per machine. Its accounts,
  * allowances and Reaches the Model By are read on its home machine: the Mac when it lists the

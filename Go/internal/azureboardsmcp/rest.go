@@ -516,12 +516,31 @@ func closedStates(states map[string]map[string]string) []string {
 	return out
 }
 
+// statesOf is every type's states of category's names, sorted.
+func statesOf(states map[string]map[string]string, category string) []string {
+	seen := map[string]bool{}
+	for _, list := range states {
+		for state, c := range list {
+			if c == category {
+				seen[state] = true
+			}
+		}
+	}
+	out := make([]string, 0, len(seen))
+	for s := range seen {
+		out = append(out, s)
+	}
+	sort.Strings(out)
+	return out
+}
+
 func (f *RealBoards) workItem(project string, w workItemJSON, states map[string]map[string]string) WorkItem {
 	assignee := w.who(fieldAssigned)
 	kind, state := w.text(fieldType), w.text(fieldState)
 	return WorkItem{ID: w.ID, Title: w.text(fieldTitle), Type: kind, State: state, Closed: closedIn(states, kind, state),
 		Area: w.text(fieldArea), Tags: tags(w.text(fieldTags)), Assignee: assignee.person().name(), AssigneeID: assignee.ID,
-		URL: f.webURL(project, w.ID), CreatedAt: w.text(fieldCreated), Creator: w.who(fieldCreatedBy).person()}
+		URL: f.webURL(project, w.ID), CreatedAt: w.text(fieldCreated), Creator: w.who(fieldCreatedBy).person(),
+		Category: states[kind][state], UpdatedAt: w.text(fieldChanged)}
 }
 
 // me is the token's owner's id.
@@ -693,6 +712,8 @@ func fromUpdate(kind Kind, item WorkItem, u updateJSON, at, me string, states ma
 type Filter struct {
 	State, Label, Type, Area string
 	Mine                     bool
+	// Category is only work items in a state of this category, as InProgress (the Issues page's).
+	Category string
 }
 
 // List is the project's work items that filter names, changed last first, at most maxListed.
@@ -716,6 +737,17 @@ func (f *RealBoards) List(ctx context.Context, filter Filter) ([]WorkItem, bool,
 			op = "IN"
 		}
 		where = append(where, "[System.State] "+op+" ("+strings.Join(quoted, ", ")+")")
+	}
+	if filter.Category != "" {
+		in := statesOf(states, filter.Category)
+		if len(in) == 0 {
+			return nil, false, nil
+		}
+		quoted := make([]string, len(in))
+		for i, s := range in {
+			quoted[i] = wiqlQuoted(s)
+		}
+		where = append(where, "[System.State] IN ("+strings.Join(quoted, ", ")+")")
 	}
 	if filter.Label != "" {
 		where = append(where, "[System.Tags] CONTAINS "+wiqlQuoted(filter.Label))
@@ -752,7 +784,7 @@ type Comment struct {
 	AuthorIsBot bool
 }
 
-// Get is one work item, its description and its newest comments.
+// Get is one work item, its description and its newest comments (none when comments is 0).
 func (f *RealBoards) Get(ctx context.Context, id int, comments int) (WorkItem, string, []Comment, error) {
 	project, err := f.Project(ctx)
 	if err != nil {
@@ -769,9 +801,11 @@ func (f *RealBoards) Get(ctx context.Context, id int, comments int) (WorkItem, s
 	if len(list) == 0 {
 		return WorkItem{}, "", nil, &BoardsError{Kind: NotFound, Message: fmt.Sprintf("no work item %d in %s", id, project)}
 	}
-	read, err := f.comments(ctx, project, id, comments, false)
-	if err != nil {
-		return WorkItem{}, "", nil, err
+	var read []commentJSON
+	if comments > 0 {
+		if read, err = f.comments(ctx, project, id, comments, false); err != nil {
+			return WorkItem{}, "", nil, err
+		}
 	}
 	out := make([]Comment, len(read))
 	for i, c := range read {
