@@ -2,6 +2,7 @@ package agentsd
 
 import (
 	"context"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -120,13 +121,22 @@ type sizedAt struct {
 
 // ensureExcluded keeps the worktrees folder out of the repository's view of the folder.
 func ensureExcluded(commonDir string) error {
+	if err := excludeLine(commonDir, "# Worktrees the Agents app makes for its agents.", "/.agents/worktrees/"); err != nil {
+		return worktreeFailed("Could not keep the worktrees out of the folder: " + err.Error())
+	}
+	return nil
+}
+
+// excludeLine adds line, after its comment, to the repository's info/exclude when it is not
+// there yet. The file is shared by the checkout and all its worktrees, and never committed.
+func excludeLine(commonDir, comment, line string) error {
 	path := filepath.Join(commonDir, "info", "exclude")
 	b, err := os.ReadFile(path)
 	if err != nil && !os.IsNotExist(err) {
-		return worktreeFailed("Could not keep the worktrees out of the folder: " + path + " could not be read, so it was left as it is.")
+		return fmt.Errorf("%s could not be read, so it was left as it is", path)
 	}
 	for _, l := range strings.Split(string(b), "\n") {
-		if strings.TrimSpace(l) == "/.agents/worktrees/" {
+		if strings.TrimSpace(l) == line {
 			return nil
 		}
 	}
@@ -138,7 +148,7 @@ func ensureExcluded(commonDir string) error {
 	if text != "" && !strings.HasSuffix(text, "\n") {
 		text += "\n"
 	}
-	text += "# Worktrees the Agents app makes for its agents.\n/.agents/worktrees/\n"
+	text += comment + "\n" + line + "\n"
 	os.MkdirAll(filepath.Dir(path), 0o755)
 	return store.WriteAtomically(path, []byte(text), mode)
 }
