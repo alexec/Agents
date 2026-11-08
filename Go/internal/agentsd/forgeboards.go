@@ -108,7 +108,7 @@ func narrowToBoard(s *forgeSources, b wire.ProjectBoard, in []string, prs bool) 
 	key := deref(b.Key)
 	repos, gitlab := s.repos, s.gitlab
 	s.repos, s.gitlab, s.teams, s.projects, s.workspace, s.gitlabErr = nil, nil, nil, nil, false, nil
-	s.forgejo, s.forgejoErr = nil, nil
+	s.forgejo, s.forgejoErr, s.bitbucket, s.bitbucketErr = nil, nil, nil, nil
 	boards := s.boards
 	s.boards = nil
 	switch *b.Forge {
