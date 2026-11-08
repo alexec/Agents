@@ -104,6 +104,20 @@ function canonicalJSON(value: JSONValue): string {
   return JSON.stringify(value);
 }
 
+/** MCPEventTrigger.words: an argument in words. A list is its values joined with ", " and a last
+ *  " or " ("3986, 3987 or 3988", #4003); an object is its canonical JSON. */
+export function triggerWords(value: JSONValue): string {
+  if (typeof value === "string") return value;
+  if (value === null || typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) {
+    const words = value.map(triggerWords);
+    const last = words.pop();
+    if (last === undefined) return "[]";
+    return words.length === 0 ? last : `${words.join(", ")} or ${last}`;
+  }
+  return canonicalJSON(value);
+}
+
 /** A server's event (#383) as MCPEventTrigger(event:keys:) reads it, or null when it is not one. */
 function serverEvent(trigger: WorkflowTriggerStored): { name: string; servers: string[] | null; arguments: Record<string, JSONValue> } | null {
   if (!("unrecognised" in trigger) || !isServerEventName(trigger.unrecognised.name)) return null;
@@ -120,10 +134,7 @@ function serverEvent(trigger: WorkflowTriggerStored): { name: string; servers: s
 /** MCPEventTrigger.summary: "When ci reports checks.failed (repo alexec/Agents)". */
 function serverEventSummary(event: NonNullable<ReturnType<typeof serverEvent>>): string {
   const who = event.servers ? event.servers.join(" or ") : "a server here";
-  const narrowed = Object.keys(event.arguments).sort().map((k) => {
-    const value = event.arguments[k]!;
-    return `${k} ${typeof value === "string" ? value : canonicalJSON(value)}`;
-  });
+  const narrowed = Object.keys(event.arguments).sort().map((k) => `${k} ${triggerWords(event.arguments[k]!)}`);
   return `When ${who} reports ${event.name}` + (narrowed.length ? ` (${narrowed.join(", ")})` : "");
 }
 

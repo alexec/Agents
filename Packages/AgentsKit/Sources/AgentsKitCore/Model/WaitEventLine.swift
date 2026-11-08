@@ -33,7 +33,7 @@ public struct WaitEventLine: Identifiable, Hashable, Sendable {
             let finisher = pattern.name == "agent.finished" && pattern.filters.count == 1
                 ? pattern.filters["agent"]?.single.map { id in UUID(uuidString: id).flatMap(names) ?? id } : nil
             let arguments: [String] = if let server {
-                server.trigger.arguments.sorted { $0.key < $1.key }.map { "\($0.key) \(valueWords($0.value))" }
+                server.trigger.arguments.sorted { $0.key < $1.key }.map { "\($0.key) \(MCPEventTrigger.words($0.value))" }
             } else if finisher != nil {
                 []
             } else {
@@ -124,14 +124,4 @@ public struct WaitEventLine: Identifiable, Hashable, Sendable {
         }
     }
 
-    static func valueWords(_ value: JSONValue) -> String {
-        switch value {
-        case .string(let text): text
-        case .int(let number): String(number)
-        case .double(let number): String(number)
-        case .bool(let flag): String(flag)
-        case .null: "null"
-        case .array, .object: String(describing: value)
-        }
-    }
 }

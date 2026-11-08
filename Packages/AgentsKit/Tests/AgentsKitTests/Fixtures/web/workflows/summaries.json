@@ -1432,7 +1432,7 @@
     "expected" : {
       "canFire" : true,
       "needsAPerson" : false,
-      "summary" : "When a server here reports pr.merged, and When github or gitlab reports pr.opened (draft false, labels [\"bug\"]), in a new agent"
+      "summary" : "When a server here reports pr.merged, and When github or gitlab reports pr.opened (draft false, labels bug), in a new agent"
     },
     "input" : {
       "holdsAFire" : false,

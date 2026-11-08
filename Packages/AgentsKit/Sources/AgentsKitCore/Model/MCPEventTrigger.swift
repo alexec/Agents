@@ -111,6 +111,9 @@ public struct MCPEventTrigger: Codable, Hashable, Sendable {
         return "When \(who) reports \(event)" + (narrowed.isEmpty ? "" : " (\(narrowed.joined(separator: ", ")))")
     }
 
+    /// An argument in words: a list is its values joined with ", " and a last " or "
+    /// ("3986, 3987 or 3988", #4003); an object is its canonical JSON. The web page's is
+    /// `valueWords` in `rowLines.ts`.
     static func words(_ value: JSONValue) -> String {
         switch value {
         case .string(let text): return text
@@ -118,7 +121,11 @@ public struct MCPEventTrigger: Codable, Hashable, Sendable {
         case .double(let number): return String(number)
         case .bool(let flag): return String(flag)
         case .null: return "null"
-        case .array, .object: return canonicalJSON(value)
+        case .array(let values):
+            let words = values.map(words)
+            guard let last = words.last else { return "[]" }
+            return words.count == 1 ? last : words.dropLast().joined(separator: ", ") + " or " + last
+        case .object: return canonicalJSON(value)
         }
     }
 
