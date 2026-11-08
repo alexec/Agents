@@ -27,6 +27,11 @@ Agents Host carries `email-mcp`, and every Linux host installs it beside agentsd
 - A mailbox for the agents, not your own: agents can read every message in it.
 - Its IMAP server, such as `imap.fastmail.com`, and an **app password** made for Agents at
   the mail provider. Most providers need IMAP turned on first.
+- **Fastmail:** a trial account makes no app password until it passes a phone check (a
+  code by SMS) or is paid; the Basic plan has no IMAP at all. In **Settings ▸ Privacy &
+  Security ▸ App passwords**, choose **New app password**, a name such as "Agents", and the
+  access **IMAP**. Leave **Read-only access** off: **Mark Read**, **Move** and the
+  **Answer a sign-up code** workflow change the mailbox. Fastmail shows the password once.
 
 ## Connect Email
 
