@@ -7300,6 +7300,12 @@ type Multiplier struct {
 
 	// On multiplier/changed: the PR whose merge or revert changed it.
 	ChangedBy *LineageNode `json:"changedBy,omitzero"`
+
+	// The person's best week (#3988): the highest Multiplier of a calendar week, Monday to Sunday in the host's time zone, this week too, counted as multiplier is. Absent until the first counted merge is 7 days old, or when no week has a figure.
+	BestWeek *float64 `json:"bestWeek,omitzero"`
+
+	// The most of this machine's agents in a turn at the same time, ever (#3988): the time history's record. Absent when none has run.
+	MostAtOnce *int64 `json:"mostAtOnce,omitzero"`
 }
 
 // What the Multiplier compares with (#3902), so that no client keeps its own copy: an engineer with no AI in 2025.
@@ -7312,6 +7318,12 @@ type MultiplierBaseline struct {
 
 	// Where the figure is from, for the page's small line: DX 2025.
 	Source string `json:"source"`
+}
+
+// multiplier/count's params (#3988): the host's time zone, so the control plane counts calendar weeks as the person does.
+type MultiplierCountParams struct {
+	// An IANA zone name, such as Europe/London. Absent or unknown: UTC.
+	TimeZone *string `json:"timeZone,omitzero"`
 }
 
 // A runtime's own setting for one level: config option values (mode, model, effort), a sandbox choice, or the answer to permission requests.

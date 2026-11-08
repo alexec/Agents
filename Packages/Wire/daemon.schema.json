@@ -16253,6 +16253,14 @@
         "changedBy": {
           "$ref": "#/definitions/LineageNode",
           "description": "On multiplier/changed: the PR whose merge or revert changed it."
+        },
+        "bestWeek": {
+          "type": "number",
+          "description": "The person's best week (#3988): the highest Multiplier of a calendar week, Monday to Sunday in the host's time zone, this week too, counted as multiplier is. Absent until the first counted merge is 7 days old, or when no week has a figure."
+        },
+        "mostAtOnce": {
+          "type": "integer",
+          "description": "The most of this machine's agents in a turn at the same time, ever (#3988): the time history's record. Absent when none has run."
         }
       },
       "required": [
@@ -16286,6 +16294,17 @@
         "hoursPerWeek",
         "source"
       ],
+      "additionalProperties": false
+    },
+    "MultiplierCountParams": {
+      "type": "object",
+      "description": "multiplier/count's params (#3988): the host's time zone, so the control plane counts calendar weeks as the person does.",
+      "properties": {
+        "timeZone": {
+          "type": "string",
+          "description": "An IANA zone name, such as Europe/London. Absent or unknown: UTC."
+        }
+      },
       "additionalProperties": false
     },
     "NativeSetting": {

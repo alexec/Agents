@@ -84,3 +84,53 @@ func TestMergesLeavesOut(t *testing.T) {
 		t.Fatalf("a week later %d", m.PrsMerged)
 	}
 }
+
+// The best week (#3988): the highest calendar week, Monday to Sunday in the zone given,
+// less its reverts; none until the first merge is 7 days old.
+func TestBestWeekOf(t *testing.T) {
+	london, err := time.LoadLocation("Europe/London")
+	if err != nil {
+		t.Skip("no zoneinfo:", err)
+	}
+	// Saturday 7 November 2026, noon in London.
+	now := time.Date(2026, 11, 7, 12, 0, 0, 0, london)
+	n := 0
+	merges := map[wire.LineageNode]Merge{}
+	add := func(at time.Time, reverted bool) {
+		n++
+		merges[wire.LineageNode{Kind: KindPR, Ref: "github:o/r#" + string(rune('a'+n))}] = Merge{At: wire.DateOf(at), Reverted: reverted}
+	}
+	// This week: 2 merged.
+	add(time.Date(2026, 11, 2, 0, 30, 0, 0, london), false)
+	add(time.Date(2026, 11, 6, 9, 0, 0, 0, london), false)
+	if got := BestWeekOf(merges, now, london); got != nil {
+		t.Fatalf("a best week before 7 days of lineage: %v", *got)
+	}
+	// Last week: 7 merged, one reverted, the last of them late on Sunday.
+	for d := range 6 {
+		add(time.Date(2026, 10, 26+d, 10, 0, 0, 0, london), false)
+	}
+	add(time.Date(2026, 11, 1, 23, 30, 0, 0, london), false)
+	add(time.Date(2026, 10, 28, 11, 0, 0, 0, london), true)
+	got := BestWeekOf(merges, now, london)
+	if got == nil || *got != 4.3 {
+		t.Fatalf("best week %v, want 4.3 (6 PRs)", got)
+	}
+	// In New York, this week's Monday 00:30 merge in London is last week's Sunday evening.
+	ny, _ := time.LoadLocation("America/New_York")
+	if got := BestWeekOf(merges, now, ny); got == nil || *got != 5 {
+		t.Fatalf("New York's best week %v, want 5.0 (7 PRs)", got)
+	}
+	// This week passes it: a new best.
+	for d := range 6 {
+		add(time.Date(2026, 11, 3, 10+d, 0, 0, 0, london), false)
+	}
+	if got := BestWeekOf(merges, now, london); got == nil || *got != 5.7 {
+		t.Fatalf("best week %v, want 5.7 (8 PRs)", got)
+	}
+	// Only reverts: no figure.
+	only := map[wire.LineageNode]Merge{{Kind: KindPR, Ref: "x"}: {At: wire.DateOf(now.Add(-10 * 24 * time.Hour)), Reverted: true}}
+	if got := BestWeekOf(only, now, london); got != nil {
+		t.Fatalf("a best week of reverts: %v", *got)
+	}
+}

@@ -1179,7 +1179,12 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 		}
 		return m.s.keepJoined(ctx, host, joined)
 	case "multiplier/count":
-		return m.s.multiplierCount(ctx, host, time.Now())
+		// An older host sends {}: its weeks are UTC's.
+		var count wire.MultiplierCountParams
+		if len(params) > 0 {
+			_ = json.Unmarshal(params, &count)
+		}
+		return m.s.multiplierCount(ctx, host, zoneOf(count.TimeZone), time.Now())
 	case "usage/rollup":
 		rollup, err := require[wire.UsageRollup](params, "UsageRollup")
 		if err != nil {

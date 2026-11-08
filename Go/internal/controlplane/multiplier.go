@@ -29,12 +29,13 @@ type multiplierBook struct {
 type keptMultiplier struct {
 	// tags is the person's lineage objects and their entity tags, as listed.
 	tags string
-	// merges is the person's merges since the range then; at most a few hundred a week.
+	// merges is the person's merges, all of them for the best week; a few hundred a week.
 	merges map[wire.LineageNode]lineage.Merge
 }
 
-// multiplierCount is multiplier/count for host's person. agentsWorking is the host's own.
-func (s *Service) multiplierCount(ctx context.Context, host string, now time.Time) (wire.Multiplier, error) {
+// multiplierCount is multiplier/count for host's person, with the best week in loc.
+// agentsWorking and mostAtOnce are the host's own.
+func (s *Service) multiplierCount(ctx context.Context, host string, loc *time.Location, now time.Time) (wire.Multiplier, error) {
 	owner := s.ownerOf(host)
 	keep := func(person string) bool { return person == owner }
 	keys, read, err := s.scopeLineageKeys(ctx, keep)
@@ -50,9 +51,9 @@ func (s *Service) multiplierCount(ctx context.Context, host string, now time.Tim
 		if err != nil {
 			return wire.Multiplier{}, err
 		}
-		held = keptMultiplier{tags: tags, merges: lineage.Merges(nodes, lineage.MultiplierSince(now))}
+		held = keptMultiplier{tags: tags, merges: lineage.Merges(nodes, lineage.AllMerges)}
 		if !tagged {
-			return lineage.MultiplierOf(held.merges, now), nil
+			return multiplierOf(held.merges, loc, now), nil
 		}
 		s.multiplierMu.Lock()
 		if s.multiplierHeld == nil || len(s.multiplierHeld) >= mostMultipliersKept {
@@ -61,7 +62,25 @@ func (s *Service) multiplierCount(ctx context.Context, host string, now time.Tim
 		s.multiplierHeld[owner] = held
 		s.multiplierMu.Unlock()
 	}
-	return lineage.MultiplierOf(held.merges, now), nil
+	return multiplierOf(held.merges, loc, now), nil
+}
+
+// multiplierOf is the figure and the best week of merges.
+func multiplierOf(merges map[wire.LineageNode]lineage.Merge, loc *time.Location, now time.Time) wire.Multiplier {
+	m := lineage.MultiplierOf(merges, now)
+	m.BestWeek = lineage.BestWeekOf(merges, now, loc)
+	return m
+}
+
+// zoneOf is the named zone, or UTC when it has no name or this machine does not know it.
+func zoneOf(name *string) *time.Location {
+	if name == nil || *name == "" {
+		return time.UTC
+	}
+	if loc, err := time.LoadLocation(*name); err == nil {
+		return loc
+	}
+	return time.UTC
 }
 
 // tagsOf is keys and their entity tags, in the listing's order, as one string, or not tagged
