@@ -273,6 +273,7 @@ public extension DaemonAPI {
                 Row(Method.forgePlan, params: ForgePlanRequest.self, result: ForgePlan.self, kind: .hostRequest),
                 Row(Method.forgeFeatures, params: ForgeFeaturesRequest.self, result: ForgeFeatures.self, kind: .hostRequest),
                 Row(Method.forgeBoards, params: ForgeBoardsRequest.self, result: ForgeBoards.self, kind: .hostRequest),
+                Row(Method.forgeImage, params: ForgeImageRequest.self, result: ForgeImage.self, kind: .hostRequest),
                 Row(Method.forgeAddChild, params: ForgeAddChildRequest.self, result: ForgeDone.self, kind: .hostRequest),
                 Row(Method.forgeBlockedBy, params: ForgeBlockedByRequest.self, result: ForgeDone.self, kind: .hostRequest),
                 Row(Method.docsList, params: DocsListRequest.self, result: DocsList.self, kind: .hostRequest),

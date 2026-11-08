@@ -547,6 +547,25 @@ public extension DaemonAPI {
         public init(boards: [ProjectBoard] = []) { self.boards = boards }
     }
 
+    /// `forge/image`'s question (#4009): the url of an image on a forge page.
+    struct ForgeImageRequest: Codable, Sendable, Hashable {
+        public var url: String
+
+        public init(url: String) { self.url = url }
+    }
+
+    /// `forge/image`'s answer: the image's bytes and their type (PNG, JPEG, GIF or WebP), so a
+    /// client never loads the page's remote URL.
+    struct ForgeImage: Codable, Sendable, Hashable {
+        public var mimeType: String
+        public var data: Data
+
+        public init(mimeType: String, data: Data) {
+            self.mimeType = mimeType
+            self.data = data
+        }
+    }
+
     /// A feature: its label's name after `feature:`, with its colour; its epics, and the open ones;
     /// its open issues that are not epics (#3741), absent from a daemon that does not count them.
     struct ForgeFeature: Codable, Sendable, Hashable {
@@ -601,6 +620,8 @@ public extension DaemonAPI.Method {
     static let forgeFeatures = "forge/features"
     /// `ForgeBoardsRequest` → `ForgeBoards` (#3282).
     static let forgeBoards = "forge/boards"
+    /// `ForgeImageRequest` → `ForgeImage` (#4009).
+    static let forgeImage = "forge/image"
     /// The plan's writes (#3271): `ForgeAddChildRequest` and `ForgeBlockedByRequest` → `ForgeDone`.
     static let forgeAddChild = "forge/add-child"
     static let forgeBlockedBy = "forge/blocked-by"

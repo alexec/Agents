@@ -64,6 +64,7 @@ public enum Capability {
     public static let folders1 = "folders/1"
     public static let forgeWrite1 = "forge-write/1"
     public static let forgeBoards1 = "forge.boards/1"
+    public static let forgeImage1 = "forge.image/1"
     public static let forge1 = "forge/1"
     public static let git1 = "git/1"
     public static let governance1 = "governance/1"
@@ -347,6 +348,7 @@ public enum Capability {
         "forge/comment": "forge-write/1",
         "forge/diff": "forge-write/1",
         "forge/features": "forge/1",
+        "forge/image": "forge.image/1",
         "forge/issue": "forge/1",
         "forge/issues": "forge/1",
         "forge/label": "forge-write/1",
