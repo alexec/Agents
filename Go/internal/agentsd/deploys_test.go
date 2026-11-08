@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/alexec/agents/Go/internal/connections"
@@ -31,7 +32,7 @@ func (f *fakeForgeGitHub) Compare(_ context.Context, repo, base, head string) ([
 
 func (f *fakeForgeGitHub) ReviewDeployments(_ context.Context, repo string, runID int, environments []int64, approve bool, comment string) error {
 	f.note("deploy %s %d %v %t %s", repo, runID, environments, approve, comment)
-	return nil
+	return f.deployErr
 }
 
 // waitingRelease is a tag's release.yml run waiting for production's reviewers.
@@ -154,5 +155,25 @@ func TestWaitingDeploysNeedAConnection(t *testing.T) {
 	d.readDeploys(d.ctx)
 	if got, _ := deployApprovalsIn(d, "alexec/agents"); len(got) != 0 {
 		t.Fatalf("not connected: %+v", got)
+	}
+}
+
+// #3932: GitHub's 403 to an answer says what the App needs, and the deploy stays listed.
+func TestRefusedDeployAnswerSaysWhatGitHubNeeds(t *testing.T) {
+	d, c, gh, _ := forgeDaemon(t)
+	gh.waiting = map[string][]githubmcp.WaitingDeploy{"alexec/agents": {waitingRelease(77, true)}}
+	gh.deployErr = &githubmcp.GitHubError{Kind: githubmcp.Failed, Message: "GitHub: HTTP 403", Refused: true}
+	d.readDeploys(d.ctx)
+	got, folder := deployApprovalsIn(d, "alexec/agents")
+	if len(got) != 1 {
+		t.Fatalf("approvals: %+v", got)
+	}
+	e := c.callError(t, 1, "approvals/answer", wire.ApprovalAnswer{Folder: wire.URL("file://" + folder), Kind: wire.ApprovalKindDeploy,
+		Key: got[0].Key, Digest: got[0].Digest, Action: wire.ApprovalActionApprove})
+	if e == nil || !strings.Contains(e.Message, "agents-loops app needs the Deployments permission") {
+		t.Fatalf("refused: %+v", e)
+	}
+	if left, _ := deployApprovalsIn(d, "alexec/agents"); len(left) != 1 {
+		t.Fatalf("dropped: %+v", left)
 	}
 }

@@ -36,6 +36,8 @@ type fakeForgeGitHub struct {
 	reviews []githubmcp.Item
 	// waiting are each repo's deploys waiting for a reviewer (#3587).
 	waiting map[string][]githubmcp.WaitingDeploy
+	// deployErr is what ReviewDeployments gives (#3932).
+	deployErr error
 	// bare is the repository MakeRepository gives as the clone address, and made the ones it made (#3708).
 	bare string
 	made []string
