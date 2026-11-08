@@ -171,6 +171,7 @@ var CallForgeClose = Method[ForgeCloseRequest, ForgeDone]{"forge/close"}
 var CallForgeComment = Method[ForgeCommentRequest, ForgeDone]{"forge/comment"}
 var CallForgeDiff = Method[ForgeNodeRequest, ForgeDiff]{"forge/diff"}
 var CallForgeFeatures = Method[ForgeFeaturesRequest, ForgeFeatures]{"forge/features"}
+var CallForgeImage = Method[ForgeImageRequest, ForgeImage]{"forge/image"}
 var CallForgeIssue = Method[ForgeItemRequest, ForgeItemDetail]{"forge/issue"}
 var CallForgeIssues = Method[ForgeListRequest, ForgeList]{"forge/issues"}
 var CallForgeLabel = Method[ForgeLabelRequest, ForgeDone]{"forge/label"}

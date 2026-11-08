@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"os"
 	"slices"
 	"strings"
@@ -141,6 +142,10 @@ type forgeBook struct {
 	newForgeBitbucket func(root, email, token string) forgeBitbucket
 	// newForgeAzureDevOps is the Azure DevOps at root with a token; a test gives a fake.
 	newForgeAzureDevOps func(root, token string) forgeAzureDevOps
+	// forgeImages are the images forge/image read (#4009), the most recent kept.
+	forgeImages forgeImageCache
+	// forgeImageTransport reads forge/image's images; a test gives a fake, nil is the default.
+	forgeImageTransport http.RoundTripper
 }
 
 func (d *Daemon) registerForge() {
@@ -161,6 +166,7 @@ func (d *Daemon) registerForge() {
 	d.registerForgePlans()
 	d.registerForgeWrites()
 	d.registerForgeBoards()
+	d.registerForgeImage()
 }
 
 // forgeCursor is a list's cursor, one per forge, so a page goes on where each forge stopped.
