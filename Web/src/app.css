@@ -1131,6 +1131,34 @@ button.remove:hover { opacity: 1; }
 .picture-bar { display: flex; align-items: center; gap: 4px; }
 .picture-bar .caption { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .page-picture { max-width: 100%; height: auto; border-radius: var(--radius-control); }
+/* A Work page's image (#4011): a click opens it in the viewer. */
+.page-picture-open { padding: 0; border: 0; background: none; max-width: 100%; cursor: zoom-in; vertical-align: bottom; }
+.page-picture-open .page-picture { display: block; }
+/* The viewer, as the Mac's sheet (#4010): the image over a bar with its name, the zoom and Done. */
+dialog.image-viewer {
+  box-sizing: border-box;
+  max-width: 100vw;
+  max-height: 100vh;
+  padding: 0;
+  color: inherit;
+  background: var(--paper-raised);
+  border: 1px solid var(--paper-rule);
+  border-radius: var(--radius-card);
+  box-shadow: 0 12px 40px var(--paper-shadow);
+  overflow: hidden;
+}
+dialog.image-viewer[open] { display: flex; flex-direction: column; }
+dialog.image-viewer::backdrop { background: rgb(0 0 0 / 0.45); }
+.image-viewer-stage { flex: 1; min-height: 0; display: flex; overflow: auto; touch-action: none; user-select: none; }
+.image-viewer-stage.zoomed { cursor: grab; }
+.image-viewer-stage.zoomed:active { cursor: grabbing; }
+/* margin: auto, not justify-content: a zoomed image can then be scrolled to its every edge. */
+.image-viewer-stage img { margin: auto; flex: none; max-width: none; }
+.image-viewer-bar { display: flex; align-items: center; gap: 6px; height: 44px; box-sizing: border-box; padding: 0 12px; border-top: 1px solid var(--paper-rule); }
+.image-viewer-bar .caption { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.image-viewer-bar .spacer { flex: 1; }
+.image-viewer-bar .zoom-level { min-width: 52px; font-variant-numeric: tabular-nums; }
+.image-viewer-bar .done { margin-left: 6px; }
 .entry-mark { display: contents; }
 .exchanged-empty { display: flex; flex-direction: column; gap: 8px; padding: 24px 8px; text-align: center; }
 .exchanged-empty p { margin: 0; }

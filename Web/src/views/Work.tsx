@@ -24,7 +24,8 @@ import { nodeName } from "../model/value";
 import { actualWords, estimateLine, estimateRangeWords, estimateSpentWords, showsEstimate } from "../model/estimate";
 import { ago } from "../model/connectorSetup";
 import { fromWireDate } from "../protocol/dates";
-import { Markdown } from "../render/markdown";
+import { type ForgeImages, Markdown } from "../render/markdown";
+import { bytesOf } from "../model/pageImage";
 import { forgeMarkdown } from "../model/forgeMarkdown";
 import { ForgeTitle } from "../render/ForgeTitle";
 import { WorkActions, WorkCommentBox } from "./WorkActions";
@@ -181,6 +182,11 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
   const pipeline = useSignal<PipelineStep[]>([]);
   const forgeHosts = store.hosts.value.filter((h) => hostAnswers(h.state) && store.has(h.id, Capability.forge1));
   const lineageHosts = store.hosts.value.filter((h) => hostAnswers(h.state) && store.has(h.id, Capability.lineage1));
+  // The page's images, read by the machine that read the page (#4011); without forge/image there, their words.
+  const imageHost = detail.value && store.has(detail.value.host, Capability.forgeImage1) ? detail.value.host : null;
+  const forgeImages = useMemo<ForgeImages | undefined>(() => imageHost === null ? undefined
+    : (url) => store.link.call("forge/image", { url }, imageHost).then((got) => ({ bytes: bytesOf(got.data), type: got.mimeType })),
+  [imageHost]);
   // Lineage from the machine that read the forge, else this Mac, else the first that keeps links.
   const lineageHost = lineageHosts.find((h) => h.id === detail.value?.host)?.id
     ?? lineageHosts.find((h) => h.id === store.macHostID.value)?.id ?? lineageHosts[0]?.id;
@@ -308,7 +314,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
       )}
       {detail.value && (
         <section class="work-body" aria-label="Description">
-          {detail.value.got.body.trim() ? <Markdown text={forgeMarkdown(detail.value.got.body)} /> : <p class="quiet">No description.</p>}
+          {detail.value.got.body.trim() ? <Markdown text={forgeMarkdown(detail.value.got.body)} forgeImages={forgeImages} /> : <p class="quiet">No description.</p>}
         </section>
       )}
       {detail.value && (detail.value.got.comments.length > 0 || detail.value.got.cursor) && (
@@ -319,7 +325,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
           {detail.value.got.comments.map((c, i) => (
             <div key={`${c.at}-${i}`} class="work-comment">
               <p class="quiet small"><span class="strong">{c.author}</span>{c.bot ? " (bot)" : ""} · {ago(fromWireDate(c.at))}</p>
-              <Markdown text={forgeMarkdown(c.body)} />
+              <Markdown text={forgeMarkdown(c.body)} forgeImages={forgeImages} />
             </div>
           ))}
         </section>
