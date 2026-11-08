@@ -4688,6 +4688,18 @@ type ForgeFeaturesRequest struct {
 	Board *string `json:"board,omitzero"`
 }
 
+// forge/image (#4009): an image's bytes, so that a client never loads a forge page's remote URL. mimeType is image/png, image/jpeg, image/gif or image/webp, read from the bytes.
+type ForgeImage struct {
+	MimeType string `json:"mimeType"`
+
+	Data Data `json:"data"`
+}
+
+// forge/image (#4009): the url of an image on a forge page. Only a forge's own image hosts are read (for GitHub: github.com's user-attachments and repo assets, and user-images, private-user-images, raw and avatars on githubusercontent.com); the forge's token goes only to its own hosts.
+type ForgeImageRequest struct {
+	URL string `json:"url"`
+}
+
 // An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for GitHub, GitLab, Linear and Jira (#3260), so one page draws each. node is its lineage node (kind issue or pr, ref github:alexec/Agents#12). state is open, closed or merged; status is the tracker's own name for its step, where its workflow has steps (a Jira status, as In Progress; one in Jira's Done category is closed). folder is a folder on this machine on its repo, to act from. labels have their #rrggbb colour where the forge gives one (#2956). The pull request's own fields: draft; checks is passing, failing, running or none; review is approved, changes_requested or review_required; mergeable is mergeable, conflicting or unknown; autoMerge says auto-merge is on. The hierarchy (#3267): parent is the issue it is a sub-issue (a Linear or GitLab child) of; level is epic, story, task or spike, from its labels; feature is the name of its feature:<name> label; progress is a parent's closed children of all of them, where the forge says it: in a GitHub list, and on an issue's own read.
 type ForgeItem struct {
 	Node LineageNode `json:"node"`
@@ -12180,6 +12192,35 @@ type SummaryFacts struct {
 // agents/summaryFacts and machines/summaryFacts (#3354): the facts since this time.
 type SummaryFactsRequest struct {
 	Since Date `json:"since"`
+}
+
+// One saved page of the daily summary (#3721), in ~/.agents/summaries on this machine: the sidebar's Summary row and the Summary page.
+type SummaryPage struct {
+	// The file's name without .md, such as 2026-11-06-1810: what summaries/read names.
+	Name string `json:"name"`
+
+	// The page's first heading, such as "Daily summary, Fri 6 Nov"; the name when it has none.
+	Title string `json:"title"`
+
+	SavedAt Date `json:"savedAt"`
+
+	// Nobody has read it with summaries/read since it was saved.
+	Unread bool `json:"unread"`
+
+	// The Daily summary workflow's session that wrote it: the page's "How this was written". Absent for a page saved before #3721.
+	Writer *UUID `json:"writer,omitzero"`
+}
+
+// summaries/read (#3721): a saved page of the daily summary and its Markdown.
+type SummaryPageText struct {
+	Page SummaryPage `json:"page"`
+
+	Markdown string `json:"markdown"`
+}
+
+// summaries/read (#3721): the page to read, as SummaryPage.name says it.
+type SummaryReadRequest struct {
+	Name string `json:"name"`
 }
 
 // Surface (Attention/Surface.swift): a tagged object, `{ mac: {} }` or `{ device: "<uuid>" }`.

@@ -386,3 +386,19 @@ export function worktreeHelp(worktree: AgentWorktree, gone: boolean): string {
   const branch = worktree.branch ?? "detached";
   return gone ? `${branch} — ${path}, which is not there any more` : `${branch} — ${path}`;
 }
+
+/**
+ * WaitStatus.cardTime: the wait card's time (#2843), "12 / 30 min" or "12 min" while both are
+ * under an hour, then hours and minutes for each, "1 h 5 min / 2 h".
+ */
+export function eventWaitTime(elapsed: number, total?: number): string {
+  if (Math.max(elapsed, total ?? 0) < 60) return total === undefined ? `${elapsed} min` : `${elapsed} / ${total} min`;
+  return total === undefined ? hoursAndMinutes(elapsed) : `${hoursAndMinutes(elapsed)} / ${hoursAndMinutes(total)}`;
+}
+
+/** "45 min", "2 h", "1 h 5 min". */
+function hoursAndMinutes(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`;
+  const rest = minutes % 60;
+  return rest === 0 ? `${Math.trunc(minutes / 60)} h` : `${Math.trunc(minutes / 60)} h ${rest} min`;
+}

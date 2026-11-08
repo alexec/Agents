@@ -399,6 +399,12 @@ struct RemoteView: View {
         case .resources: ResourcesListView().paperGround()
         case .runtimes: RuntimesView().paperGround()
         case .work: WorkView(model: model).paperGround()
+        case .summary:
+            SummaryPageView(pages: model.summaryPages, settings: model.dailySummarySettings,
+                            read: { await model.readSummaryPage($0) },
+                            setSettings: { changed in Task { _ = await model.setDailySummarySettings(changed) } },
+                            openAgent: { model.open($0) })
+                .paperGround()
         // Usage and connectors are Mac + web (#2798): nothing opens them here.
         default: NothingPickedPage()
         }

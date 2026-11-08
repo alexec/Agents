@@ -4073,6 +4073,24 @@ export interface ForgeFeaturesRequest {
 }
 
 /**
+ * forge/image (#4009): an image's bytes, so that a client never loads a forge page's remote URL.
+ * mimeType is image/png, image/jpeg, image/gif or image/webp, read from the bytes.
+ */
+export interface ForgeImage {
+  mimeType: string;
+  data: Base64;
+}
+
+/**
+ * forge/image (#4009): the url of an image on a forge page. Only a forge's own image hosts are read
+ * (for GitHub: github.com's user-attachments and repo assets, and user-images, private-user-images,
+ * raw and avatars on githubusercontent.com); the forge's token goes only to its own hosts.
+ */
+export interface ForgeImageRequest {
+  url: string;
+}
+
+/**
  * An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for
  * GitHub, GitLab, Linear and Jira (#3260), so one page draws each. node is its lineage node (kind
  * issue or pr, ref github:alexec/Agents#12). state is open, closed or merged; status is the
@@ -10753,6 +10771,36 @@ export interface SummaryFactsRequest {
   since: WireDate;
 }
 
+/**
+ * One saved page of the daily summary (#3721), in ~/.agents/summaries on this machine: the
+ * sidebar's Summary row and the Summary page.
+ */
+export interface SummaryPage {
+  /** The file's name without .md, such as 2026-11-06-1810: what summaries/read names. */
+  name: string;
+  /** The page's first heading, such as "Daily summary, Fri 6 Nov"; the name when it has none. */
+  title: string;
+  savedAt: WireDate;
+  /** Nobody has read it with summaries/read since it was saved. */
+  unread: boolean;
+  /**
+   * The Daily summary workflow's session that wrote it: the page's "How this was written". Absent
+   * for a page saved before #3721.
+   */
+  writer?: UUID;
+}
+
+/** summaries/read (#3721): a saved page of the daily summary and its Markdown. */
+export interface SummaryPageText {
+  page: SummaryPage;
+  markdown: string;
+}
+
+/** summaries/read (#3721): the page to read, as SummaryPage.name says it. */
+export interface SummaryReadRequest {
+  name: string;
+}
+
 /** Surface (Attention/Surface.swift): a tagged object, `{ mac: {} }` or `{ device: "<uuid>" }`. */
 export type Surface =
   | { mac: Record<string, never> }
@@ -12119,6 +12167,7 @@ export interface Methods {
   "forge/comment": { params: ForgeCommentRequest; result: ForgeDone };
   "forge/diff": { params: ForgeNodeRequest; result: ForgeDiff };
   "forge/features": { params: ForgeFeaturesRequest; result: ForgeFeatures };
+  "forge/image": { params: ForgeImageRequest; result: ForgeImage };
   "forge/issue": { params: ForgeItemRequest; result: ForgeItemDetail };
   "forge/issues": { params: ForgeListRequest; result: ForgeList };
   "forge/label": { params: ForgeLabelRequest; result: ForgeDone };
@@ -12320,6 +12369,8 @@ export interface Methods {
   "store/notes": { params: Empty; result: StoreNotes };
   "suggestions/dismiss": { params: SuggestionRequest; result: Empty };
   "suggestions/start": { params: SuggestionRequest; result: UUID };
+  "summaries/list": { params: Empty; result: SummaryPage[] };
+  "summaries/read": { params: SummaryReadRequest; result: SummaryPageText };
   "surface/identify": { params: SurfaceIdentification; result: Empty };
   "time/history": { params: Empty; result: TimeHistory };
   "usage/history": { params: Empty; result: UsageHistory };
@@ -12506,6 +12557,7 @@ export const MethodTarget = {
   "forge/comment": "host",
   "forge/diff": "host",
   "forge/features": "host",
+  "forge/image": "host",
   "forge/issue": "host",
   "forge/issues": "host",
   "forge/label": "host",
@@ -12707,6 +12759,8 @@ export const MethodTarget = {
   "store/notes": "host",
   "suggestions/dismiss": "host",
   "suggestions/start": "host",
+  "summaries/list": "host",
+  "summaries/read": "host",
   "surface/identify": "host",
   "time/history": "host",
   "usage/history": "host",
@@ -12802,6 +12856,7 @@ export interface Notifications {
   "runtimes/accountProfilesChanged": AccountProfile[];
   "storage/writeFailed": WriteFailure;
   "store/notesChanged": StoreNotes;
+  "summaries/changed": SummaryPage[];
   "workflow/changed": WorkflowSummary;
   "workflow/removed": WorkflowRemovedNotification;
   "worktrees/sized": WorktreesSized;
@@ -13146,6 +13201,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeFeature: { required: ["name", "epics", "open"], optional: ["color", "issues"] },
   ForgeFeatures: { required: ["features"], optional: ["errors"] },
   ForgeFeaturesRequest: { required: [], optional: ["folder", "board"] },
+  ForgeImage: { required: ["mimeType", "data"], optional: [] },
+  ForgeImageRequest: { required: ["url"], optional: [] },
   ForgeItem: { required: ["node", "title", "state", "labels", "assignees", "updatedAt", "comments"], optional: ["status", "url", "folder", "author", "milestone", "draft", "checks", "review", "mergeable", "autoMerge", "parent", "level", "feature", "progress"] },
   ForgeItemDetail: { required: ["item", "body", "comments"], optional: ["cursor", "checks", "reviewThreads", "filesChanged", "head", "mergeMethods", "start", "transitions"] },
   ForgeItemRequest: { required: ["node"], optional: ["cursor"] },
@@ -13760,6 +13817,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SuggestionRequest: { required: ["folder", "id"], optional: [] },
   SummaryFacts: { required: ["folders", "landed", "failed", "waiting", "suggested", "checked"], optional: [] },
   SummaryFactsRequest: { required: ["since"], optional: [] },
+  SummaryPage: { required: ["name", "title", "savedAt", "unread"], optional: ["writer"] },
+  SummaryPageText: { required: ["page", "markdown"], optional: [] },
+  SummaryReadRequest: { required: ["name"], optional: [] },
   SurfaceIdentification: { required: ["id", "name", "kind"], optional: [] },
   TeamBot: { required: ["user", "name", "spentTodayUSD", "capped", "machines", "online", "workflows", "live"], optional: ["group", "groupName", "caps"] },
   TeamBotRun: { required: ["host", "hostName", "agent"], optional: ["workflow", "since"] },

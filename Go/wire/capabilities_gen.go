@@ -63,6 +63,7 @@ const CapFoldersToMachine1 = "folders.to-machine/1"
 const CapFolders1 = "folders/1"
 const CapForgeWrite1 = "forge-write/1"
 const CapForgeBoards1 = "forge.boards/1"
+const CapForgeImage1 = "forge.image/1"
 const CapForge1 = "forge/1"
 const CapGit1 = "git/1"
 const CapGovernance1 = "governance/1"
@@ -163,6 +164,7 @@ const CapSkills1 = "skills/1"
 const CapStorage1 = "storage/1"
 const CapStore1 = "store/1"
 const CapSuggestions1 = "suggestions/1"
+const CapSummaries1 = "summaries/1"
 const CapSummaryMachines1 = "summary.machines/1"
 const CapSurface1 = "surface/1"
 const CapTime1 = "time/1"
@@ -346,6 +348,7 @@ var HostCapabilities = pairs([][2]string{
 	{"forge/comment", "forge-write/1"},
 	{"forge/diff", "forge-write/1"},
 	{"forge/features", "forge/1"},
+	{"forge/image", "forge.image/1"},
 	{"forge/issue", "forge/1"},
 	{"forge/issues", "forge/1"},
 	{"forge/label", "forge-write/1"},
@@ -511,6 +514,8 @@ var HostCapabilities = pairs([][2]string{
 	{"store/notes", "store/1"},
 	{"suggestions/dismiss", "suggestions/1"},
 	{"suggestions/start", "suggestions/1"},
+	{"summaries/list", "summaries/1"},
+	{"summaries/read", "summaries/1"},
 	{"surface/identify", "surface/1"},
 	{"time/history", "time/1"},
 	{"usage/history", "usage/1"},
@@ -590,6 +595,7 @@ var HostCapabilities = pairs([][2]string{
 	{"shell/stateChanged", "shell/1"},
 	{"storage/writeFailed", "storage/1"},
 	{"store/notesChanged", "store/1"},
+	{"summaries/changed", "summaries/1"},
 	{"wake/changed", "wake/1"},
 	{"workflow/changed", "workflow/1"},
 	{"workflow/removed", "workflow/1"},
@@ -647,6 +653,7 @@ var HostNotifications = set([]string{
 	"shell/stateChanged",
 	"storage/writeFailed",
 	"store/notesChanged",
+	"summaries/changed",
 	"wake/changed",
 	"workflow/changed",
 	"workflow/removed",

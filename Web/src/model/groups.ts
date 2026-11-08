@@ -89,7 +89,14 @@ export function personTriggerOf(agent: Agent): MCPEventTrigger | undefined {
 
 /** Agent.showsUnread: a finished turn nobody has opened since. A mark on the row, never a group (#70). */
 export function showsUnread(agent: Agent): boolean {
-  return agent.state === "finished" && agent.isUnread === true;
+  return agent.state === "finished" && agent.isUnread === true && !writesDailySummary(agent);
+}
+
+/** Agent.writesDailySummary (#3721): the Daily summary workflow's session. Its page is the sidebar's
+ *  Summary row, so it is not listed under the home folder, in For Review or in Unread; Needs You
+ *  still lists one that asks the person something. */
+export function writesDailySummary(agent: Agent): boolean {
+  return agent.startedByWorkflow === "daily-summary";
 }
 
 /** Agent.drawsUnread: the row's bold title (#1323), only in Done; the counts go by showsUnread. */

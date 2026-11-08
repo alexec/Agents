@@ -82,6 +82,14 @@ test("the event wait card reads its wire dates as seconds since 2001 (#2843)", (
   assert.deepEqual(lines.eventWaitMinutes({ ...wait, deadline: undefined }, new Date(since.getTime() + 2 * 60_000)), { elapsed: 2 });
 });
 
+test("the event wait card says hours and minutes past an hour", () => {
+  assert.equal(lines.eventWaitTime(12, 30), "12 / 30 min");
+  assert.equal(lines.eventWaitTime(59), "59 min");
+  assert.equal(lines.eventWaitTime(45, 120), "45 min / 2 h");
+  assert.equal(lines.eventWaitTime(65, 120), "1 h 5 min / 2 h");
+  assert.equal(lines.eventWaitTime(125), "2 h 5 min");
+});
+
 test("the event wait card groups events with the same source and filters", () => {
   const wait = { id: "w", from: 0, since: 0, patterns: [
     { name: "checks.failed", filters: {} },

@@ -75,6 +75,7 @@ func (d *Daemon) register() {
 	d.registerHeadlessSignIn()
 	d.registerWorkflows()
 	d.registerDailySummary()
+	d.registerSummaryPages()
 	d.registerShells()
 	d.registerSkills()
 	d.registerAgentConfigEditor()

@@ -283,6 +283,20 @@ test("For Review lists a session done with a file nobody opened, not Unread, and
   assert.equal(keepsInUnread(read, [], noReview, "forReview"), false, "off, it keeps nothing");
 });
 
+test("the daily summary's sessions are the Summary row's: not in For Review, Unread or their folder; asking, in Needs You (#3721)", async () => {
+  const { home, smartAgents, folderSessions } = await load("src/model/sidebar.ts");
+  const writes = { startedByWorkflow: "daily-summary" };
+  const live = [
+    agent("written", 1, { ...writes, isUnread: true, fileToSee: { path: "/h/.agents/summaries/2026-11-06-1810.md" } }),
+    agent("asking", 2, { ...writes, state: "waitingOnUser" }),
+    agent("done", 3, writes),
+  ];
+  assert.deepEqual(live.map((a) => home(a, false)), [null, "needsYou", null]);
+  assert.deepEqual(smartAgents("forReview", live), []);
+  assert.deepEqual(smartAgents("unread", live), []);
+  assert.deepEqual(folderSessions(live, []), [], "not under the home folder");
+});
+
 test("a group turned off is not drawn, and its sessions go to the next group they fit, or under their folder (#846)", async () => {
   const { smartAgents, smartRows, folderSessions, keepsInUnread, pinnedSessions } = await load("src/model/sidebar.ts");
   const live = [

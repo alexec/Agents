@@ -197,6 +197,13 @@ struct FolderListView: View {
                     .help("Every folder’s Markdown docs and your docs connectors’ pages, read only")
                     .activityIcon("doc.text")
                     .appText(.supporting).sidebarInk(.docs).tag(SidebarItem.docs)
+                // The daily summary's page (#3721), while the daily summary is on.
+                if model.dailySummarySettings?.mode.writesPages == true {
+                    SummaryRowLabel(newest: model.summaryPages.first)
+                        .help("Your daily summary: what landed, what failed and what waits on you")
+                        .activityIcon(SummaryRowLabel.systemImage)
+                        .appText(.supporting).sidebarInk(.summary).tag(SidebarItem.summary)
+                }
             }
 
             // Work (#3119): a row per list (#4004), as the web's Work section has them; an item's
