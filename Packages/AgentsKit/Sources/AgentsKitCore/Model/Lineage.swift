@@ -20,11 +20,26 @@ public extension DaemonAPI {
         }
     }
 
+    /// One heading of a search for an epic (#3900): the epic or one of its sub-issues, and its
+    /// title, nil while the host has not resolved it.
+    struct LineageSessionIssue: Codable, Sendable, Hashable {
+        public var node: LineageNode
+        public var title: String?
+        public init(node: LineageNode, title: String? = nil) {
+            self.node = node
+            self.title = title
+        }
+    }
+
     struct LineageSessions: Codable, Sendable, Hashable {
         public var matches: [LineageSessionMatch]
+        /// The issue asked for, then its sub-issues in the epic's order (#3900); nil from a host
+        /// too old to say.
+        public var issues: [LineageSessionIssue]?
         public var limited: Bool?
-        public init(matches: [LineageSessionMatch], limited: Bool? = nil) {
+        public init(matches: [LineageSessionMatch], issues: [LineageSessionIssue]? = nil, limited: Bool? = nil) {
             self.matches = matches
+            self.issues = issues
             self.limited = limited
         }
     }

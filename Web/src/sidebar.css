@@ -74,6 +74,13 @@
 .with-sidebar details.sessions .nav-item > .row.session { padding-left: calc(8px + 26px); }
 .with-sidebar details.sessions .nav-item.child > .row.session { padding-left: calc(8px + 26px + 26px * var(--indent, 1)); }
 .with-sidebar details.recent-archived-sessions .row.session { padding-left: calc(8px + 26px); }
+/* A search for an epic (#3900): a heading for each issue, one level in as the Sessions row's title, its rows one more. */
+.with-sidebar .issue-group-heading { display: flex; gap: 6px; padding: 5px 8px 3px 34px;
+  font-size: 0.6875rem; color: color-mix(in srgb, currentColor 60%, transparent); }
+.with-sidebar .issue-group-heading .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.with-sidebar .issue-group-heading .count { margin-left: auto; font-variant-numeric: tabular-nums; }
+.with-sidebar .issue-group .nav-item > .row.session { padding-left: calc(8px + 26px); }
+.with-sidebar .issue-group .nav-item.child > .row.session { padding-left: calc(8px + 26px + 26px * var(--indent, 1)); }
 
 /* The groups at the top (#495): Pinned, Needs You, Working, Unread, headed and folding as Activity
    is, the count on the right, Needs You's in the attention tint. */
@@ -202,7 +209,7 @@
 .runtime-list .past-weeks ol { display: flex; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .runtime-list .past-weeks li { display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .runtime-list .past-weeks .week-bar { display: flex; flex-direction: column; justify-content: flex-end; width: 22px; height: 28px; border-radius: 2px; background: var(--paper-rule); overflow: hidden; }
-/* Your setup ▸ Runtimes (#3631, #3744): a runtime, its accounts and its machines in one line are one group, ruled off below. */
+/* Status ▸ Runtimes (#3631, #3744): a runtime, its accounts and its machines in one line are one group, ruled off below. */
 .runtime-list, .runtime-list ul { list-style: none; margin: 0; padding: 0; }
 .sub-app .runtime-list > li { padding: 6px 0; border-bottom: 1px solid var(--paper-rule); }
 :is(.with-sidebar, .sub-app) .runtime-list > li:not(.setup-machines) { border-bottom: 0; padding-bottom: 0; }

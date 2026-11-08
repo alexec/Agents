@@ -5064,6 +5064,15 @@ export interface LineageResolved {
 }
 
 /**
+ * One heading of a search for an epic (#3900): the epic or one of its sub-issues, and its title,
+ * absent while the host has not resolved it.
+ */
+export interface LineageSessionIssue {
+  node: LineageNode;
+  title?: string;
+}
+
+/**
  * A session on the issue, and the issue it is on: the one asked for, or one of its sub-issues. A
  * session on a PR is on the issue the PR fixes.
  */
@@ -5074,10 +5083,17 @@ export interface LineageSessionMatch {
 
 /**
  * The sessions on this machine that lineage links to the issue, to its sub-issues or to their PRs,
- * each once. limited says there were more sub-issues or sessions than are counted.
+ * each once, on the first issue in issues they came by. limited says there were more sub-issues or
+ * sessions than are counted.
  */
 export interface LineageSessions {
   matches: LineageSessionMatch[];
+  /**
+   * The issue asked for, then its sub-issues in the epic's order (#3900), each once, with its title
+   * when the host has it: the headings a search for an epic groups its sessions under. Only the
+   * issue asked for when it has no sub-issues; absent from a host too old to say.
+   */
+  issues?: LineageSessionIssue[];
   limited?: boolean;
 }
 
@@ -6962,9 +6978,9 @@ export interface OrgRoutesMine {
 }
 
 /**
- * Your setup ▸ Accounts (#3967): one outside account of the person's (gitlab.com, AWS, Slack…). It
- * holds no secret: card and secret are the names of secrets in Your setup ▸ Secrets, or where one
- * is.
+ * Settings ▸ You ▸ Accounts (#3967): one outside account of the person's (gitlab.com, AWS, Slack…).
+ * It holds no secret: card and secret are the names of secrets in Settings ▸ You ▸ Secrets, or
+ * where one is.
  */
 export interface OutsideAccount {
   /** The service, as its address: gitlab.com, aws.amazon.com. */
@@ -6975,9 +6991,9 @@ export interface OutsideAccount {
   plan?: string;
   /** What it costs a month, in US dollars. Absent when not known. */
   monthlyCostUsd?: number;
-  /** The card it bills, by its name in Your setup ▸ Secrets. Never the number. */
+  /** The card it bills, by its name in Settings ▸ You ▸ Secrets. Never the number. */
   card?: string;
-  /** Its token or key, by its name in Your setup ▸ Secrets or where it is. Never the value. */
+  /** Its token or key, by its name in Settings ▸ You ▸ Secrets or where it is. Never the value. */
   secret?: string;
   /** TOTP, passkey, SMS, or absent for none. */
   twoFactor?: string;
@@ -8998,12 +9014,13 @@ export interface Request {
 
 /**
  * One of the answers: form for a question, a secret or a step (#3863); checklist and approval for a
- * forge item (#3865).
+ * forge item (#3865); secretUse for the use of a secret with Ask before use (#4015).
  */
 export interface RequestAnswer {
   form?: RequestFormAnswer;
   checklist?: RequestChecklistAnswer;
   approval?: RequestApprovalAnswer;
+  secretUse?: RequestSecretUseAnswer;
 }
 
 /**
@@ -9030,6 +9047,7 @@ export interface RequestChecklistLine {
 /** The part of a request that depends on its source. */
 export interface RequestDetail {
   elicitation?: ElicitationRequest;
+  secretUse?: RequestSecretUse;
 }
 
 export type RequestDroppedWhy =
@@ -9073,13 +9091,38 @@ export type RequestKind =
   | "step"
   | "secret";
 
+/**
+ * A use of a secret with Ask before use (#4015), waiting on a person: its kind is approve. It names
+ * the secret, never its value, and where agentsd puts the value.
+ */
+export interface RequestSecretUse {
+  name: string;
+  use: SecretUse;
+  /** Where the value goes: the page's domain for a fill, owner/repo for CI. */
+  place: string;
+  /**
+   * The secret is the session's own (#3548): Allow always is the same as Allow for this session.
+   */
+  sessionOnly?: boolean;
+}
+
+/**
+ * A person's answer to a secret's use (#4015). once allows this use; session every use at this
+ * place until the session ends or is archived; always adds a grant for this place, for every
+ * session; deny refuses it. Only the control and device roles answer.
+ */
+export interface RequestSecretUseAnswer {
+  action: "once" | "session" | "always" | "deny";
+}
+
 export type RequestSource =
   | "question"
   | "secret"
   | "handOff"
   | "permission"
   | "guardedChange"
-  | "forge";
+  | "forge"
+  | "secretUse";
 
 export type RequestState =
   | "open"
@@ -9658,6 +9701,30 @@ export interface SealingWork {
 }
 
 /**
+ * A place where a person allowed a secret with Ask before use always (#4015): a use there does not
+ * ask.
+ */
+export interface SecretGrant {
+  name: string;
+  use: SecretUse;
+  /** The page's domain for a fill, owner/repo for CI. */
+  place: string;
+}
+
+/**
+ * secrets/addGrant and secrets/removeGrant (#4015): a person allows a secret with Ask before use
+ * always at a place, or takes that away. Only the control and device roles reach them.
+ */
+export interface SecretGrantChange {
+  grant: SecretGrant;
+}
+
+/** secrets/grants (#4015): every grant of this machine's secrets with Ask before use. */
+export interface SecretGrants {
+  grants: SecretGrant[];
+}
+
+/**
  * A machine that was removed with a secret on it (#1760, FR-026): change the secret where it was
  * issued.
  */
@@ -9671,14 +9738,22 @@ export interface SecretLeftOn {
 /**
  * secrets/setNeedsApproval (#4014): a person turns Ask before use on or off for a secret of this
  * machine's secrets.env, or for one session's (agentID). On takes the value out of the plain file
- * and seals it to this machine; off puts it back. A Your setup secret's flag is its client's to
- * seal, so it is refused here.
+ * and seals it to this machine; off puts it back. The flag of a secret of the person's (Settings ▸
+ * You ▸ Secrets) is its client's to seal, so it is refused here.
  */
 export interface SecretNeedsApprovalRequest {
   name: string;
   agentID?: UUID;
   needsApproval: boolean;
 }
+
+/**
+ * What agentsd does with a secret with Ask before use (#4015): fill types it into a page
+ * (fill_secret), ci sends it to GitHub (set_ci_secret).
+ */
+export type SecretUse =
+  | "fill"
+  | "ci";
 
 /**
  * control/secretsLeft (#1760, FR-026): to the person's own clients, when one of their machines was
@@ -12487,6 +12562,8 @@ export interface Methods {
   "workflows/enable": { params: WorkflowEnableRequest; result: WorkflowSummary };
   "workflows/list": { params: WorkflowsListRequest; result: WorkflowSummary[] };
   "workflows/mcpTrigger/clearMissed": { params: WorkflowMCPClearMissedRequest; result: WorkflowSummary };
+  "workflows/readyMade/keep": { params: WorkflowRequest; result: WorkflowSummary };
+  "workflows/readyMade/take": { params: WorkflowRequest; result: WorkflowSummary };
   "workflows/run": { params: WorkflowRequest; result: WorkflowSummary };
   "workflows/setMuted": { params: WorkflowMuteRequest; result: WorkflowSummary };
   "workflows/settings": { params: WorkflowSettingsRequest; result: WorkflowSummary };
@@ -12880,6 +12957,8 @@ export const MethodTarget = {
   "workflows/enable": "host",
   "workflows/list": "host",
   "workflows/mcpTrigger/clearMissed": "host",
+  "workflows/readyMade/keep": "host",
+  "workflows/readyMade/take": "host",
   "workflows/run": "host",
   "workflows/setMuted": "host",
   "workflows/settings": "host",
@@ -13385,8 +13464,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineageNode: { required: ["kind", "ref"], optional: [] },
   LineageNodeRequest: { required: ["node"], optional: ["depth"] },
   LineageResolved: { required: ["title"], optional: ["state", "labels"] },
+  LineageSessionIssue: { required: ["node"], optional: ["title"] },
   LineageSessionMatch: { required: ["agentID", "on"], optional: [] },
-  LineageSessions: { required: ["matches"], optional: ["limited"] },
+  LineageSessions: { required: ["matches"], optional: ["issues", "limited"] },
   LineageSessionsRequest: { required: ["number"], optional: [] },
   ListCursor: { required: ["lastActivityAt", "id"], optional: ["archivedAt"] },
   ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID", "after", "query", "project"] },
@@ -13730,13 +13810,15 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ReportViews: { required: ["views"], optional: [] },
   ReportedEdit: { required: ["path", "newText", "toolCallID", "index", "entryIndex", "replaceAll", "at"], optional: ["oldText"] },
   Request: { required: ["id", "kind", "source", "state", "title", "detail", "folder", "waiters", "askedAt"], optional: ["askedBy", "forge", "answeredAt", "answeredBy", "answer", "droppedWhy"] },
-  RequestAnswer: { required: [], optional: ["form", "checklist", "approval"] },
+  RequestAnswer: { required: [], optional: ["form", "checklist", "approval", "secretUse"] },
   RequestApprovalAnswer: { required: ["action"], optional: ["note"] },
   RequestChecklistAnswer: { required: ["done"], optional: [] },
   RequestChecklistLine: { required: ["text", "done"], optional: [] },
-  RequestDetail: { required: [], optional: ["elicitation"] },
+  RequestDetail: { required: [], optional: ["elicitation", "secretUse"] },
   RequestForge: { required: ["provider", "repo", "item", "number", "url", "label", "checklist", "seenAt"], optional: ["screenshots", "author", "updatedAt"] },
   RequestFormAnswer: { required: ["action"], optional: ["content"] },
+  RequestSecretUse: { required: ["name", "use", "place"], optional: ["sessionOnly"] },
+  RequestSecretUseAnswer: { required: ["action"], optional: [] },
   RequestUpdate: { required: ["request"], optional: [] },
   RequestWaiter: { required: ["agent", "since"], optional: [] },
   RequestsAnswer: { required: ["id", "answer"], optional: [] },
@@ -13792,6 +13874,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SealingAddItem: { required: ["item", "id", "version", "values"], optional: [] },
   SealingItem: { required: ["item", "id", "version", "mine", "missing"], optional: ["user", "kind", "vendor", "settings", "needsApproval"] },
   SealingWork: { required: ["items"], optional: [] },
+  SecretGrant: { required: ["name", "use", "place"], optional: [] },
+  SecretGrantChange: { required: ["grant"], optional: [] },
+  SecretGrants: { required: ["grants"], optional: [] },
   SecretLeftOn: { required: ["host", "name", "at"], optional: [] },
   SecretNeedsApprovalRequest: { required: ["name", "needsApproval"], optional: ["agentID"] },
   SecretsLeft: { required: ["host", "name", "secrets"], optional: [] },

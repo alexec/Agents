@@ -421,7 +421,7 @@
       "server": {
         "name": "agents/azuredevops",
         "title": "Azure DevOps",
-        "description": "Pull requests and Azure Pipelines builds on Azure DevOps Repos or your own Azure DevOps Server: tools to read them and comment, and events"
+        "description": "Pull requests and Azure Pipelines builds on Azure DevOps Repos or your own Azure DevOps Server: their pages, tools to read them and comment, and events"
       },
       "_meta": {
         "dev.agentloops/connector": {
@@ -440,7 +440,7 @@
               "review.requested",
               "review.comment"
             ],
-            "views": false
+            "views": true
           }
         }
       }

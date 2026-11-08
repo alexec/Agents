@@ -11,9 +11,9 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// Your setup ▸ Accounts (#3967): the person's outside accounts, the accounts part of their
+// Settings ▸ You ▸ Accounts (#3967): the person's outside accounts, the accounts part of their
 // settings, so they go by the same store and path as the rest. A record holds no secret,
-// only the name of one in Your setup ▸ Secrets (#3403, principle 7).
+// only the name of one in Settings ▸ You ▸ Secrets (#3403, principle 7).
 
 // looksSecret is a value that looks like a secret: a known token prefix, a card number, a
 // PEM key. As scripts/accounts.sh check had it (#3909).
@@ -35,7 +35,7 @@ func checkAccounts(value json.RawMessage) error {
 		}
 		for _, v := range accountTexts(a) {
 			if looksSecret.MatchString(v) {
-				return fmt.Errorf("%w: A value of %s looks like a secret. Keep it in Your setup ▸ Secrets and give its name.", ErrInvalid, a.Service)
+				return fmt.Errorf("%w: A value of %s looks like a secret. Keep it in Settings ▸ You ▸ Secrets and give its name.", ErrInvalid, a.Service)
 			}
 		}
 	}

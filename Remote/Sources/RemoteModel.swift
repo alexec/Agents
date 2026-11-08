@@ -657,10 +657,10 @@ final class RemoteModel {
                 openWorkflow = nil
                 openReview = nil
                 openArchive = true
-            case .multiplier, .spending, .tokens, .time, .mcpServers, .secrets, .accounts,
+            case .multiplier, .spending, .tokens, .time,
                  .folderMCPServers, .docs, .machine:
-                // Usage, connectors, secrets, accounts, Docs and a machine's page are Mac + web
-                // (#2798, #3321, #3626, #3632, #3967), and the Multiplier page the Mac's (#3986):
+                // Usage, a folder's connectors, Docs and a machine's page are Mac + web
+                // (#2798, #3321, #3626), and the Multiplier page the Mac's (#3986):
                 // the Remote opens none of them.
                 break
             }
@@ -3568,6 +3568,7 @@ final class RemoteModel {
         }
         work.saidLines = [:]
         work.issueSessions = [:]
+        work.issueHeadings = []
         guard !words.isEmpty else { return }
         let request = DaemonAPI.ListRequest(archivedCommands: false, limit: Self.searchShown, lean: true, query: words)
         let hosts: [MachineRef] = [.mac] + reachableHosts.sorted { $0.rawValue < $1.rawValue }
@@ -3581,7 +3582,7 @@ final class RemoteModel {
                                                DaemonAPI.LineageSessionsRequest(number: issue),
                                                returning: DaemonAPI.LineageSessions.self),
                !Task.isCancelled {
-                for match in on.matches { work.issueSessions[match.agentID] = match.on }
+                work.noteIssueSessions(on)
             }
             // What was said (#1585): the sessions whose prompts or replies hold the words. Not
             // asked of a host too old to say (#1748).
@@ -4019,6 +4020,18 @@ final class RemoteModel {
                                                            workflowID: summary.workflowID,
                                                            archived: archived)
             try await client(for: request).call(DaemonAPI.Method.workflowsArchive, request)
+        } catch {
+            problem = sentence(for: error)
+        }
+    }
+
+    /// An edited ready-made copy (#4075): the newer ready-made version over it, or the copy
+    /// kept and the notice hidden until the next version. `workflow/changed` redraws the page.
+    func answerReadyMade(_ summary: WorkflowSummary, take: Bool) async {
+        do {
+            let request = DaemonAPI.WorkflowRequest(folder: summary.folder, workflowID: summary.workflowID)
+            try await client(for: request).call(take ? DaemonAPI.Method.workflowsReadyMadeTake
+                                                     : DaemonAPI.Method.workflowsReadyMadeKeep, request)
         } catch {
             problem = sentence(for: error)
         }

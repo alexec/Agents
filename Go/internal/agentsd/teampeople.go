@@ -18,11 +18,11 @@ import (
 // Linear, Jira, Forgejo (#3836), Bitbucket and Azure DevOps (#3853) logins and which is the
 // viewer's own, so a row can be named as the control plane knows the person, Team can be
 // told from Others, and the viewer's own rows can say an agent is on it. The github, gitlab,
-// linear, jira, forgejo, bitbucket and azureboards servers read it off the call; they make no
-// control-plane call of their own.
+// linear, jira, forgejo, bitbucket, azureboards and azuredevops (#4098) servers read it off the
+// call; they make no control-plane call of their own.
 
-// teamFeedingTools are the github, gitlab, linear, jira, forgejo, bitbucket and azureboards
-// servers' feeding tools that take the control plane's people in their call's _meta (#2951).
+// teamFeedingTools are the github, gitlab, linear, jira, forgejo, bitbucket, azureboards and
+// azuredevops servers' feeding tools that take the control plane's people in their call's _meta (#2951).
 var teamFeedingTools = map[string]bool{"show_pull_requests": true, "show_issues": true, "show_merge_requests": true}
 
 // teamMeta is the feeding tool's _meta: nil with no control plane, or it could not say.

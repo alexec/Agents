@@ -3,6 +3,7 @@ package agentsd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"slices"
 	"strings"
 
@@ -91,6 +92,7 @@ func fillWords(msg string) ([]any, bool, string) {
 
 // secretFill is what one fill_secret call types, read before the lease.
 type secretFill struct {
+	name  string // the secret's name
 	label string // the secret's name, and a card's part: what the agent is told was filled
 	value string
 	// hide is every value the call puts in the filter, by its label: for a card, all its
@@ -158,7 +160,7 @@ func (d *Daemon) fillSecretValue(agent wire.UUID, args map[string]json.RawMessag
 		if parts[part] == "" {
 			return fill, "Nothing was filled: " + name + " has no " + part + ". Ask the person to replace it in Settings ▸ Secrets."
 		}
-		fill = secretFill{label: name + " " + part, value: parts[part], hide: map[string]string{}, codes: map[string]string{}}
+		fill = secretFill{name: name, label: name + " " + part, value: parts[part], hide: map[string]string{}, codes: map[string]string{}}
 		for p, value := range parts {
 			switch p {
 			case "cvc":
@@ -178,7 +180,54 @@ func (d *Daemon) fillSecretValue(agent wire.UUID, args map[string]json.RawMessag
 	if len([]rune(v)) < 4 {
 		return fill, "Nothing was filled: " + name + " is shorter than four characters, too short to keep out of page reads."
 	}
-	return secretFill{label: name, value: v, hide: map[string]string{name: v}}, ""
+	return secretFill{name: name, label: name, value: v, hide: map[string]string{name: v}}, ""
+}
+
+// fieldSite says the domain of the field's own document: where a fill sends the value, a
+// payment frame's and not the page around it.
+const fieldSite = `(el) => 'agents-site:' + el.ownerDocument.location.hostname`
+
+// fillSite is the domain the field is on, for a person to approve a flagged secret (#4015).
+func fillSite(ctx context.Context, drive *browserDrive, args map[string]json.RawMessage) (string, error) {
+	call := map[string]json.RawMessage{"function": rawString(fieldSite), "target": args["target"]}
+	if e, ok := args["element"]; ok {
+		call["element"] = e
+	}
+	res, err := drive.call(ctx, "browser_evaluate", call)
+	if err != nil {
+		return "", err
+	}
+	if res.IsError {
+		return "", errors.New(resultText(res))
+	}
+	text := resultText(res)
+	const mark = "### Result\n\"agents-site:"
+	i := strings.Index(text, mark)
+	if i < 0 {
+		return "", errors.New("the field's site could not be read")
+	}
+	site, _, _ := strings.Cut(text[i+len(mark):], "\"")
+	if site == "" {
+		return "", errors.New("the field is on a page with no site")
+	}
+	return site, nil
+}
+
+// approveFill holds a fill of a flagged secret on a person's approval for the field's
+// site (#4015). It says nothing when the fill may go on.
+func (d *Daemon) approveFill(ctx context.Context, agent wire.UUID, drive *browserDrive, fill secretFill, args map[string]json.RawMessage) (words string, isError bool) {
+	if !d.secretIsSealed(agent, fill.name) {
+		return "", false
+	}
+	site, err := fillSite(ctx, drive, args)
+	if err != nil {
+		return "Nothing was filled: " + d.browser.Filter.Text(err.Error()), true
+	}
+	waiting, err := d.approveSecretUse(agent, fill.name, wire.SecretUseFill, site)
+	if err != nil {
+		return "Nothing was filled: " + err.Error(), true
+	}
+	return waiting, false
 }
 
 // fillSecret types the value into the field and masks it. The value is hidden by the

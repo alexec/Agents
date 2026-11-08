@@ -1,7 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Your setup ▸ Secrets (#1760, #3632): the person’s secrets, by name only, kept by the control
+/// Settings ▸ You ▸ Secrets (#1760, #3632): the person’s secrets, by name only, kept by the control
 /// plane and sent to each machine of theirs. The window draws it; the web page
 /// draws the same in `Web/src/views/UserScope.tsx`. A card (#3531) is a secret of its own kind.
 /// Ask before use (#4016) is sealed with the value, so it is set on Add and Replace, which seal it

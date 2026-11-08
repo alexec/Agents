@@ -41,20 +41,13 @@ public enum SidebarItem: Hashable, Sendable {
     /// Every resource an agent can lease, and who holds and waits for each (036). The Remote's
     /// only: the Mac and the web page show a machine's resources on its page (#3629).
     case resources
-    /// What happened, and what came of it (042).
+    /// What happened, and what came of it (042), under **Status** (#3998).
     case events
     /// Each runtime and where its allowance stands (065). Status, not a control, so it
-    /// is here rather than in Settings. On the Mac it is **Your setup** (#3631): each runtime
-    /// once, with the accounts, and a line per machine.
+    /// is here rather than in Settings: under **Status** (#3998), each runtime once, with the
+    /// accounts, and a line per machine (#3631). The person's connectors, secrets and outside
+    /// accounts are settings, in Settings ▸ You (#3998).
     case runtimes
-    /// The person's own MCP servers (#488, #589, #753): every one in `~/.agents/mcp.json`,
-    /// and how each is doing. On the Mac it is under **Your setup** (#3632).
-    case mcpServers
-    /// The person's secrets and cards, kept by the control plane and sent to each machine of
-    /// theirs (#1760), under **Your setup** (#3632). Mac + web: the Remote has no row for it (#2796).
-    case secrets
-    /// The person's outside accounts (#3967), under **Your setup**, beside Secrets. Mac + web.
-    case accounts
     /// One machine's page (#3626): its CPU, memory and disks, from its row under Machines.
     /// Mac + web: the Remote has no row for it (#2796).
     case machine(MachineRef)

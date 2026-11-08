@@ -123,6 +123,22 @@ public final class AgentsModel {
     /// While the sidebar searches for `#<n>`: the sessions on that issue, its sub-issues and their
     /// PRs, and the issue each is on, as their hosts found them (`lineage/sessions`, #3899).
     public var issueSessions: [UUID: DaemonAPI.LineageNode] = [:]
+    /// While the sidebar searches for `#<n>`: the issue, then its sub-issues in the epic's
+    /// order, from each host that said them, each once (#3900). More than one is an epic, whose
+    /// sessions the sidebar groups under them (`SidebarIssueGroups`).
+    public var issueHeadings: [DaemonAPI.LineageSessionIssue] = []
+
+    /// Takes in a host's answer to `lineage/sessions` (#3899, #3900).
+    public func noteIssueSessions(_ answer: DaemonAPI.LineageSessions) {
+        for match in answer.matches { issueSessions[match.agentID] = match.on }
+        for issue in answer.issues ?? [] {
+            if let at = issueHeadings.firstIndex(where: { $0.node == issue.node }) {
+                if issueHeadings[at].title == nil { issueHeadings[at].title = issue.title }
+            } else {
+                issueHeadings.append(issue)
+            }
+        }
+    }
 
     /// Whether the transcript entry at `index` is in hand: in the page of entries, or in one
     /// of the stored turns before it. Find goes to a match once it is (#1532).
