@@ -1691,7 +1691,7 @@ final class RemoteModel {
     }
 
     private func sentence(for error: any Error) -> String {
-        (error as? JSONRPCError)?.message ?? "Your Mac did not answer."
+        (error as? JSONRPCError).map(OlderPeer.controlRefusal) ?? "Your Mac did not answer."
     }
 
     /// A refusal in the Remote's words.
@@ -2563,6 +2563,7 @@ final class RemoteModel {
         gitAsksAnswered.formIntersection(GitLendAsk.waiting(in: listed))
         controlHome = status.homeHost
         controlStatus = status
+        OlderPeer.controlVersion = status.version
         let others = listed.filter { $0.id != status.homeHost && $0.answers }
         for host in others {
             let lock = lock

@@ -3821,6 +3821,7 @@ final class AppModel {
     private func refreshMacHostJoin(_ control: DaemonClient) async {
         guard let status = try? await control.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self) else { return }
         let connected = status.thisMacHost?.connected == true
+        OlderPeer.controlVersion = status.version
         macHostJoin = status.thisMacHost
         controlPlaneMachine = status.machineID
         if connected, !isConnected { backoff.nudge() }
@@ -4032,6 +4033,7 @@ final class AppModel {
               let status = try? await control.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self)
         else { return }
         controlPlaneHosts = listed
+        OlderPeer.controlVersion = status.version
         if let controlKey = Self.controlKey {
             KeptThisMacHost.keep(from: listed, controlKey: controlKey, in: WindowDefaults.store)
             keptHost = KeptThisMacHost.read(controlKey: controlKey, from: WindowDefaults.store)

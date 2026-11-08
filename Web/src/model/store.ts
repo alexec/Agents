@@ -24,7 +24,7 @@ import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
 import { sealWork } from "../wire/sealing";
 import type { FolderGoneAsk } from "./missingFolder";
-import { describe, methodNotFound } from "./errors";
+import { describe, knowVersions, methodNotFound } from "./errors";
 import { freeProjectName } from "./projectSettings";
 import { fromWireDate } from "../protocol/dates";
 import { addCap, dropCap, openCaps } from "./teamGroups";
@@ -1147,6 +1147,15 @@ export class Work {
       this.downSince.value = since;
       this.gitAsksAnswered.value = new Set([...this.gitAsksAnswered.value].filter((id) => still.has(id)));
     });
+    this.knowVersions();
+  }
+
+  /** The versions a refusal's words compare (#4096); `mac` is the person's Mac, as a call's route says it. */
+  protected knowVersions(): void {
+    const machines = this.hosts.value.filter((h) => h.version).map((h): [string, string] => [h.id, h.version]);
+    const mac = this.hosts.value.find((h) => h.id === this.macHostID.value);
+    if (mac?.version) machines.push(["mac", mac.version]);
+    knowVersions(this.plane.value?.version, machines);
   }
 
   /** Git asks answered on this page, until the control plane's list drops them (#1122). */
@@ -1571,6 +1580,7 @@ export class Store extends Work {
     this.person.value = status.person ?? null;
     this.joinCommand.value = status.joinCommand || null;
     knowPublicViews(status.publicViews);
+    this.knowVersions();
   }
 
   /** Machines waiting to join (#994); a control plane before it has none to say. */
