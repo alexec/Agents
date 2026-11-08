@@ -22,7 +22,12 @@ import { WorkList, WorkPage } from "./Work";
 import { WorkFeatures } from "./WorkFeatures";
 import { DocPage, DocsList } from "./Docs";
 import { MachinePage } from "./MachinePage";
-import { machineNeed, machineNeedLine, offersStart } from "./OfflineStrip";
+import { machineNeed, machineNeedLine } from "./OfflineStrip";
+import { MachineRow, MakingRow } from "./MachineRow";
+import { makingRows } from "../model/machineRow";
+import { openContextMenu, type MenuItem } from "./ContextMenu";
+import { AddMachineDialog } from "./AddMachineDialog";
+import { addMachineWords } from "../model/addMachine";
 import { SettingsPage } from "./Settings";
 import { SecretsSection } from "./UserScope";
 import { AccountsSection } from "./Accounts";
@@ -117,20 +122,14 @@ function PageMark({ store, page }: { store: Store; page: NavPage }) {
   return null;
 }
 
-/** Under a machine's row (#3764), in grey: the most urgent thing it needs, with Start for a stopped workspace.
+/** Under a machine's row (#3764), in grey: the most urgent thing it needs; Start is in the row's menu and swipe (#3974).
  * Nothing when it needs nothing. The window's MachineRow. A sign-in is what its runtimes last said. */
 function MachineNeedLine({ store, host }: { store: Store; host: string }) {
   const row = store.hosts.value.find((h) => h.id === host);
   const need = row ? machineNeed(row, store.hostIsOnline(host), store.runtimes.value[host] ?? []) : null;
   if (!row || !need) return null;
   return (
-    <p class="machine-need quiet small" role="status">
-      {machineNeedLine(need, row)}
-      {need.kind === "stopped" && row.workspace && offersStart(row.state, row.workspace) ? (
-        <button type="button" class="foot-start" disabled={store.hostsBeingStarted.value.includes(host)}
-          aria-label={`Start ${row.name}`} onClick={() => void store.startHost(host)}>Start</button>
-      ) : null}
-    </p>
+    <p class="machine-need quiet small" role="status">{machineNeedLine(need, row)}</p>
   );
 }
 
@@ -142,26 +141,46 @@ export function SectionPage({ store, section, down }: { store: Store; section: E
   const more = section === "machines" ? machinePages(store.hosts.value, store.macHostID.value) : [];
   const open = openPage(section, r.section, admin, more);
   const list = pagesShown(section, admin, open?.id, more);
+  const registering = useSignal(false);
+  // The Machines header (#3974): + makes a machine with no questions; its menu also registers one.
+  const machinesHead = (group: string) => section === "machines" && group === "Machines";
+  const headItems = (): MenuItem[] => [
+    { label: "New Machine", run: () => void store.makeMachine() },
+    { label: addMachineWords.menuItem, run: () => { registering.value = true; } },
+  ];
   return (
     <div class={`columns sub-app console${list.length > 1 ? "" : " one-page"}`} aria-busy={down}>
       {list.length > 1 && (
         <nav class="folders sub-app-list" aria-label={navTitle[section]}>
           {groupedPages(list).map(([group, pages]) => (
             <div key={group} class="sub-app-group">
-              <h2 class="section-head">{group}</h2>
-              {pages.map((p) => [
+              {machinesHead(group) ? (
+                <h2 class="section-head with-add" onContextMenu={(e) => openContextMenu(e, headItems())}>
+                  {group}
+                  <button type="button" class="head-add" title="New Machine" aria-label="New Machine"
+                    onClick={() => void store.makeMachine()}>+</button>
+                </h2>
+              ) : <h2 class="section-head">{group}</h2>}
+              {pages.map((p) => p.draw.kind === "machine" ? (
+                <MachineRow key={p.id} store={store} host={p.draw.host} on={p.id === open?.id}
+                  open={() => go({ nav: section, section: p.id })} mark={<PageMark store={store} page={p} />}>
+                  <MachineNeedLine store={store} host={p.draw.host} />
+                </MachineRow>
+              ) : (
                 <button key={p.id} type="button" class={`sub-app-row${p.id === open?.id ? " on" : ""}`}
                   aria-current={p.id === open?.id ? "page" : undefined} onClick={() => go({ nav: section, section: p.id })}>
                   {p.title}
                   <PageMark store={store} page={p} />
-                </button>,
-                p.draw.kind === "machine" ? <MachineNeedLine key={`${p.id}-need`} store={store} host={p.draw.host} /> : null,
-              ])}
+                </button>
+              ))}
+              {machinesHead(group) && makingRows(store.machinesMaking.value, store.hosts.value)
+                .map((name, i) => <MakingRow key={`making-${i}`} name={name} />)}
             </div>
           ))}
         </nav>
       )}
       {open && <PageView store={store} page={open} down={down} />}
+      {registering.value && <AddMachineDialog store={store} close={() => { registering.value = false; }} />}
     </div>
   );
 }

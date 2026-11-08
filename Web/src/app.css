@@ -1239,6 +1239,30 @@ button.remove:hover { opacity: 1; }
 /* A machine's need under its row (#3764), as the window's grey line. */
 .machine-need { padding: 0 20px 6px; margin-top: -6px; font-size: 0.75rem; line-height: 1.35; }
 .machine-need .foot-start { margin-left: 6px; font-size: inherit; }
+/* A machine's row (#3974), as the window's MachineRow: the dot, ··· on hover, and a swipe on a touch screen. */
+.machine-row { position: relative; overflow: hidden; touch-action: pan-y; }
+.machine-row-body { position: relative; background: var(--paper-sidebar); transition: transform 0.15s ease-out; }
+.machine-row.swiping .machine-row-body { transition: none; }
+.machine-row .sub-app-row { width: 100%; }
+.machine-name { display: inline-flex; align-items: center; gap: 7px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.machine-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; box-sizing: border-box; }
+.machine-dot.online { background: var(--tint-vouched); }
+.machine-dot.busy { border: 1.5px solid var(--tint-attention); border-right-color: transparent; animation: spin 1s linear infinite; width: 8px; height: 8px; }
+.machine-dot.stopped { border: 1.5px solid currentColor; opacity: 0.5; }
+.machine-dot.offline { background: var(--tint-failure); }
+.machine-dot.attention { background: var(--tint-attention); }
+.machine-more { position: absolute; right: 6px; top: 4px; border: 0; background: var(--paper-wash); border-radius: var(--radius-control);
+  padding: 0 6px; font: inherit; color: inherit; cursor: pointer; opacity: 0; }
+.machine-row:hover .machine-more, .machine-more:focus-visible { opacity: 1; }
+@media (hover: none) { .machine-more { display: none; } }
+.machine-swipe { position: absolute; inset: 0; display: flex; align-items: center; padding: 0 14px; font-size: 0.8125rem; font-weight: 600; color: #fff;
+  background: var(--tint-vouched); }
+.machine-swipe.trailing { justify-content: flex-end; }
+.machine-swipe.stop, .machine-swipe.remove { background: var(--paper-rule); color: inherit; }
+.machine-swipe.delete { background: var(--tint-failure); }
+.section-head.with-add { display: flex; justify-content: space-between; align-items: center; }
+.section-head .head-add { border: 0; background: none; padding: 0 4px; font: inherit; font-size: 0.9375rem; line-height: 1; color: inherit; cursor: pointer; opacity: 0.6; }
+.section-head .head-add:hover { opacity: 1; }
 .team-workflows { display: flex; flex-direction: column; gap: 12px; max-width: 720px; }
 .bot-card { border: 1px solid var(--paper-rule); border-radius: var(--radius-card); padding: 10px 12px; background: var(--paper-raised); }
 .bot-card h3 { margin: 0 0 2px; font-size: 0.875rem; }
@@ -1356,6 +1380,7 @@ button.remove:hover { opacity: 1; }
   .sub-app-list { display: flex; flex-wrap: wrap; gap: 4px; border-right: none; border-bottom: 1px solid var(--paper-rule); }
   .sub-app-group { flex-direction: row; flex-wrap: wrap; }
   .sub-app-group .section-head { display: none; }
+  .sub-app-group .section-head.with-add { display: flex; width: 100%; }
 }
 .triggers { list-style: none; margin: 0; padding: 0; background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-card); }
 .trigger { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; column-gap: 10px; padding: 10px 14px; align-items: start; }
