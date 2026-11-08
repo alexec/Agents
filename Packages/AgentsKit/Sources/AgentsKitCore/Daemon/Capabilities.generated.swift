@@ -81,6 +81,7 @@ public enum Capability {
     public static let hostPolicyLayers1 = "host.policy-layers/1"
     public static let hostPolicy1 = "host.policy/1"
     public static let hostSecretApproval1 = "host.secret-approval/1"
+    public static let hostSecretGrants1 = "host.secret-grants/1"
     public static let hostSessionSecrets1 = "host.session-secrets/1"
     public static let hostSuspend1 = "host.suspend/1"
     public static let hostTeam1 = "host.team/1"
@@ -483,6 +484,9 @@ public enum Capability {
         "runtimes/signInStart": "runtimes.sign-in/1",
         "sandbox/set": "sandbox/1",
         "sandbox/state": "sandbox/1",
+        "secrets/addGrant": "host.secret-grants/1",
+        "secrets/grants": "host.secret-grants/1",
+        "secrets/removeGrant": "host.secret-grants/1",
         "secrets/sessionList": "host.session-secrets/1",
         "secrets/sessionRemove": "host.session-secrets/1",
         "secrets/sessionSet": "host.session-secrets/1",
@@ -884,6 +888,7 @@ public enum Capability {
             "host.policy-layers/1",
             "host.browser-settings/1",
             "host.secret-approval/1",
+            "host.secret-grants/1",
             "host.session-secrets/1",
             "host.desktop-control/1",
             "host.org-routes/2",

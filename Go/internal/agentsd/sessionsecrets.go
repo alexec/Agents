@@ -45,7 +45,7 @@ type sessionSecretValue struct {
 	Value string `json:"value,omitempty"`
 	// Sealed is a flagged one's value (#4014), in place of Value: sealedsecrets.go.
 	Sealed *sealedValue `json:"sealed,omitempty"`
-	SetAt  wire.Date     `json:"setAt"`
+	SetAt  wire.Date    `json:"setAt"`
 }
 
 func (d *Daemon) sessionSecretsDir() string {
@@ -247,6 +247,7 @@ func (d *Daemon) removeSessionSecret(agent wire.UUID, name string) error {
 // expireSessionSecrets is a session's archive: its values go, its names stay to say they
 // expired.
 func (d *Daemon) expireSessionSecrets(agent wire.UUID) {
+	d.forgetSessionSecretUses(agent)
 	d.sessionSecretsMu.Lock()
 	defer d.sessionSecretsMu.Unlock()
 	f := d.readSessionSecrets(agent)
@@ -271,6 +272,7 @@ func (d *Daemon) expireSessionSecrets(agent wire.UUID) {
 
 // dropSessionSecrets is a session's deletion: the file goes, names and all.
 func (d *Daemon) dropSessionSecrets(agent wire.UUID) {
+	d.forgetSessionSecretUses(agent)
 	d.sessionSecretsMu.Lock()
 	defer d.sessionSecretsMu.Unlock()
 	if p := d.sessionSecretsPath(agent); p != "" {

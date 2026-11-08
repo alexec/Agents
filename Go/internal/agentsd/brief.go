@@ -291,7 +291,8 @@ func toolsBrief(browser, screen, bot, github bool) string {
 	}
 	if github {
 		lines = append(lines, "- set_ci_secret, set_ci_variable and set_environment_gate: set up a GitHub repository's CI. "+
-			"set_ci_secret puts a secret I gave you with ask_secret into it, without you seeing the value; never put a secret's value in a variable.",
+			"set_ci_secret puts a secret I gave you with ask_secret into it, without you seeing the value; never put a secret's value in a variable. "+
+			"For a secret with Ask before use it waits on my approval; when it names a request, wait for it with wait_for_event, then call it again.",
 			"- make_app_repository: make a new app's private GitHub repository from a starter, cloned here and added as a folder. "+
 				"Call it again after a step fails: it skips what is there.",
 			"- When I ask for a new app (an iPhone app or a web service), by voice or typed, follow the start-a-new-app skill: "+
@@ -301,7 +302,8 @@ func toolsBrief(browser, screen, bot, github bool) string {
 		lines = append(lines,
 			"- browser_navigate, browser_snapshot, browser_click and the other browser_* tools: use a web "+
 				"page in this machine's browser. They take the browser lease themselves.",
-			"- fill_secret: type one of my secrets into a field on the page. Never type a secret with browser_type.",
+			"- fill_secret: type one of my secrets into a field on the page. Never type a secret with browser_type. "+
+				"For a secret with Ask before use it waits on my approval; when it names a request, wait for it with wait_for_event, then call it again.",
 			"- generate_secret: make a new account's password, save it as one of my secrets and type it into the field. Never make a password yourself.",
 			"- capture_secret: save a value the page shows once (an app password, an API token) as one of my secrets. Never read it with browser_snapshot first.")
 		if !bot {

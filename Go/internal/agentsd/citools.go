@@ -105,6 +105,16 @@ func (d *Daemon) setCISecret(caller wire.UUID, args map[string]json.RawMessage) 
 	if err != nil {
 		return "", err
 	}
+	if d.secretIsSealed(caller, secret) {
+		// Ask before use (#4015): a person approves it for this repo.
+		waiting, err := d.approveSecretUse(caller, secret, wire.SecretUseCi, repo)
+		if err != nil {
+			return "", Invalid("Nothing was set: %s", err.Error())
+		}
+		if waiting != "" {
+			return waiting, nil
+		}
+	}
 	ctx, cancel := context.WithTimeout(d.ctx, ciToolTimeout)
 	defer cancel()
 	if err := gh.SetActionsSecret(ctx, repo, name, v); err != nil {
