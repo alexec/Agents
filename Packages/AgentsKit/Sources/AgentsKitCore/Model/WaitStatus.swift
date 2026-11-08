@@ -95,6 +95,20 @@ public struct WaitStatus: Codable, Hashable, Sendable {
         return "\(symbol) Waiting for \(first)" + (things.count > 1 ? " (+\(things.count - 1))" : "")
     }
 
+    /// The wait card's time (#2843): "12 / 30 min" or "12 min" while both are under an
+    /// hour, then hours and minutes for each, "1 h 5 min / 2 h".
+    public static func cardTime(elapsed: Int, total: Int?) -> String {
+        guard max(elapsed, total ?? 0) >= 60 else { return total.map { "\(elapsed) / \($0) min" } ?? "\(elapsed) min" }
+        return total.map { "\(minutes(elapsed)) / \(minutes($0))" } ?? minutes(elapsed)
+    }
+
+    /// "45 min", "2 h", "1 h 5 min".
+    static func minutes(_ minutes: Int) -> String {
+        if minutes < 60 { return "\(minutes) min" }
+        let rest = minutes % 60
+        return rest == 0 ? "\(minutes / 60) h" : "\(minutes / 60) h \(rest) min"
+    }
+
     static func finishing(_ names: [String]) -> String {
         let quoted = names.map { "\u{201C}\($0)\u{201D}" }
         switch quoted.count {
