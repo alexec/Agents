@@ -318,14 +318,13 @@ func (d *Daemon) generateSecret(ctx context.Context, drive *browserDrive, args m
 	if err := d.saveSecret(name, value); err != nil {
 		return fillWords("Nothing was made: " + err.Error() + ".")
 	}
-	content, isError, note := d.fillSecret(ctx, drive, secretFill{label: name, value: value, hide: map[string]string{name: value}}, args)
+	_, isError, note := d.fillSecret(ctx, drive, secretFill{label: name, value: value, hide: map[string]string{name: value}}, args)
 	if isError {
 		msg := name + " was made and saved, but not filled: " + strings.TrimPrefix(note, "Nothing was filled: ") + " Fill it with fill_secret."
 		return fillWords(msg)
 	}
 	note = strings.Replace(note, name+" filled", name+" made and filled", 1)
-	content = []any{map[string]any{"type": "text", "text": note}}
-	return content, false, note
+	return []any{map[string]any{"type": "text", "text": note}}, false, note
 }
 
 // fieldPasswordRules is the field's own rules, or false when it has none.
