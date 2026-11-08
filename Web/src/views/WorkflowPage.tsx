@@ -11,7 +11,7 @@ import { useEffect } from "preact/hooks";
 import type { Agent } from "../protocol/generated";
 import type { Store } from "../model/store";
 import {
-  cooldownSentence, labelsNote, mcpMissedWords, mcpTriggerWords, agentModeWords, unknownLines, isUnapproved, canBeApproved, canBeDenied, workflowStatusLines, isOn, isSupportedTrigger, switchesSentence, scopeSentence, lastRanLine, nextLine, resumedAgent, scopeLine, triggerFilters, triggerGlyph,
+  cooldownSentence, labelsNote, mcpMissedWords, mcpTriggerWords, agentModeWords, unknownLines, isUnapproved, canBeApproved, canBeDenied, workflowStatusLines, takeReadyMadeTitle, takeReadyMadeHelp, keepEditedTitle, keepEditedHelp, isOn, isSupportedTrigger, switchesSentence, scopeSentence, lastRanLine, nextLine, resumedAgent, scopeLine, triggerFilters, triggerGlyph,
   runsOnParts, triggerSummary, workflowRunsOnSentence, workflowHostChoices, workflowSummary,
 } from "../model/workflows";
 import { go } from "../route";
@@ -195,6 +195,12 @@ export function WorkflowPage({ store, host, folder, folderName, workflowID, down
                 </li>
               ))}
             </ul>
+            {summary.newerReadyMade !== undefined && (
+              <div class="ready-made-choice">
+                <button class="run-now prominent" disabled={down} title={takeReadyMadeHelp} onClick={() => void store.answerReadyMade(host, summary, true)}>{takeReadyMadeTitle}</button>
+                <button class="archive" disabled={down} title={keepEditedHelp} onClick={() => void store.answerReadyMade(host, summary, false)}>{keepEditedTitle}</button>
+              </div>
+            )}
 
             {workflow.problem && "unreadable" in workflow.problem && <UnreadableFile store={store} host={host} folder={folder} workflowID={workflowID} />}
 

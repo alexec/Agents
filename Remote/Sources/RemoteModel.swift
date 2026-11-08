@@ -4012,6 +4012,18 @@ final class RemoteModel {
         }
     }
 
+    /// An edited ready-made copy (#4075): the newer ready-made version over it, or the copy
+    /// kept and the notice hidden until the next version. `workflow/changed` redraws the page.
+    func answerReadyMade(_ summary: WorkflowSummary, take: Bool) async {
+        do {
+            let request = DaemonAPI.WorkflowRequest(folder: summary.folder, workflowID: summary.workflowID)
+            try await client(for: request).call(take ? DaemonAPI.Method.workflowsReadyMadeTake
+                                                     : DaemonAPI.Method.workflowsReadyMadeKeep, request)
+        } catch {
+            problem = sentence(for: error)
+        }
+    }
+
     /// Let a waiting one run as its file now reads (#142): the digest is what the page
     /// was showing, so a file changed since is still waiting afterwards.
     func approveWorkflow(_ summary: WorkflowSummary) async {

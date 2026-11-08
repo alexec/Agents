@@ -537,6 +537,8 @@ public enum Capability {
         "workflows/limit": "workflows/1",
         "workflows/list": "workflows/1",
         "workflows/mcpTrigger/clearMissed": "workflows/1",
+        "workflows/readyMade/keep": "workflows/1",
+        "workflows/readyMade/take": "workflows/1",
         "workflows/run": "workflows/1",
         "workflows/setLimit": "workflows/1",
         "workflows/setMuted": "mute/1",

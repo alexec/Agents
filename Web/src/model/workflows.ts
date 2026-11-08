@@ -572,6 +572,11 @@ export function readyMadeUpdatedSentence(s: WorkflowSummary): string | null {
 export const readyMadeUpdatedDetail = "You had not edited your copy, so the daemon wrote the new version over it";
 export const newerReadyMadeSentence = "A newer ready-made version is available";
 export const newerReadyMadeDetail = "You edited your copy, so it was not updated";
+/** WorkflowSummary's two buttons under that line (#4075). */
+export const takeReadyMadeTitle = "Take the New Version";
+export const takeReadyMadeHelp = "Write the ready-made version over your copy. It keeps whether it is on, archived or muted, and waits for your approval";
+export const keepEditedTitle = "Keep My Copy";
+export const keepEditedHelp = "Keep your copy as it is, and say no more of this version";
 
 /** WorkflowSummary.scopeSentence (#2759): a user workflow is in every folder; null for a folder's own. */
 export function scopeSentence(s: WorkflowSummary): string | null {

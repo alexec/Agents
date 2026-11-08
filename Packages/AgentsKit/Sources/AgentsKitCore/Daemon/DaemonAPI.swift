@@ -319,6 +319,10 @@ public enum DaemonAPI {
         public static let workflowsArchive = "workflows/archive"
         /// Delete a workflow's file at the person's request. Never exposed to agent tools.
         public static let workflowsDelete = "workflows/delete"
+        /// An edited ready-made copy (#4075): take the newer ready-made version over it, or
+        /// keep it and hide the notice until the next version. Each takes a `WorkflowRequest`.
+        public static let workflowsReadyMadeTake = "workflows/readyMade/take"
+        public static let workflowsReadyMadeKeep = "workflows/readyMade/keep"
         /// Turn one on or off, keeping its place on the list (#100).
         public static let workflowsEnable = "workflows/enable"
         /// Mute Notifications for every run of one, or Unmute (#2003): `muted: true` in

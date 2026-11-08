@@ -3424,6 +3424,12 @@ export class Store extends Work {
     if (changed) this.placeWorkflow(changed, host);
   }
 
+  /** An edited ready-made copy (#4075): the newer version over it, or the copy kept and the notice hidden. */
+  async answerReadyMade(host: string, summary: WorkflowSummary, take: boolean): Promise<void> {
+    await this.act(take ? "workflows/readyMade/take" : "workflows/readyMade/keep",
+      { folder: summary.workflow.folder, workflowID: summary.workflow.workflowID }, host);
+  }
+
   /** Delete its workflow file and let workflow/removed update every open view (#605). */
   async deleteWorkflow(host: string, summary: WorkflowSummary): Promise<boolean> {
     const deleted = await this.act("workflows/delete",

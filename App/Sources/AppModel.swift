@@ -1785,6 +1785,16 @@ final class AppModel {
         }
     }
 
+    /// An edited ready-made copy (#4075): the newer ready-made version over it, or the copy
+    /// kept and the notice hidden until the next version.
+    func answerReadyMade(_ summary: WorkflowSummary, take: Bool) async {
+        await attempt(on: selectedFolderHost) {
+            try await self.client(for: self.selectedFolderHost).call(
+                take ? DaemonAPI.Method.workflowsReadyMadeTake : DaemonAPI.Method.workflowsReadyMadeKeep,
+                DaemonAPI.WorkflowRequest(folder: summary.folder, workflowID: summary.workflowID))
+        }
+    }
+
     /// Delete a workflow's file from its folder (#605).
     func deleteWorkflow(_ summary: WorkflowSummary, on host: MachineRef? = nil) async -> Bool {
         let host = host ?? selectedFolderHost

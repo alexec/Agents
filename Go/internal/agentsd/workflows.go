@@ -1190,6 +1190,12 @@ func (d *Daemon) registerWorkflows() {
 	On(d, wire.CallWorkflowsDelete, func(ctx context.Context, c *Client, r wire.WorkflowRequest) (wire.Empty, error) {
 		return wire.Empty{}, d.deleteWorkflow(r)
 	})
+	On(d, wire.CallWorkflowsReadyMadeTake, func(ctx context.Context, c *Client, r wire.WorkflowRequest) (wire.WorkflowSummary, error) {
+		return d.takeReadyMade(r)
+	})
+	On(d, wire.CallWorkflowsReadyMadeKeep, func(ctx context.Context, c *Client, r wire.WorkflowRequest) (wire.WorkflowSummary, error) {
+		return d.keepReadyMade(r)
+	})
 	On(d, wire.CallWorkflowsSetMuted, func(ctx context.Context, c *Client, r wire.WorkflowMuteRequest) (wire.WorkflowSummary, error) {
 		return d.muteWorkflow(r, d.byPerson(c))
 	})
