@@ -5062,6 +5062,31 @@
       }
     },
     {
+      "name": "lineage/sessions",
+      "x-capability": "lineage.sessions/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LineageSessionsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LineageSessions"
+        }
+      }
+    },
+    {
       "name": "lineage/walk",
       "x-capability": "lineage/1",
       "tags": [

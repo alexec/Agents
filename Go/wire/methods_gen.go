@@ -188,6 +188,7 @@ var CallLineageEnd = Method[LineageEndRequest, LineageLinks]{"lineage/end"}
 var CallLineageEstimate = Method[LineageEstimateRequest, LineageEstimate]{"lineage/estimate"}
 var CallLineageLink = Method[LineageLinkRequest, LineageLink]{"lineage/link"}
 var CallLineageLinks = Method[LineageNodeRequest, LineageLinks]{"lineage/links"}
+var CallLineageSessions = Method[LineageSessionsRequest, LineageSessions]{"lineage/sessions"}
 var CallLineageWalk = Method[LineageNodeRequest, LineageGraph]{"lineage/walk"}
 var CallLockHello = Method[LockHello, LockHelloReply]{"lock/hello"}
 var CallMacOpen = Method[MacPathRequest, Empty]{"mac/open"}

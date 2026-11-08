@@ -135,7 +135,7 @@ public struct SidebarFolderFold {
         self.key = key
         let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
         self.query = words
-        let matcher = words.isEmpty ? nil : SessionLabelQuery(words, said: work.saidLines)
+        let matcher = words.isEmpty ? nil : SessionLabelQuery(words, said: work.saidLines, onIssue: work.issueSessions)
         isUnfolded = isOpen || matcher != nil
         if matcher != nil { nameMatches = label.localizedCaseInsensitiveContains(words) }
         guard isUnfolded else { return }

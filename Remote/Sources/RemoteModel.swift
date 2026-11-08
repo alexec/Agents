@@ -3566,11 +3566,22 @@ final class RemoteModel {
             work.forget(earlier.filter { unseen.contains($0) })
         }
         work.saidLines = [:]
+        work.issueSessions = [:]
         guard !words.isEmpty else { return }
         let request = DaemonAPI.ListRequest(archivedCommands: false, limit: Self.searchShown, lean: true, query: words)
         let hosts: [MachineRef] = [.mac] + reachableHosts.sorted { $0.rawValue < $1.rawValue }
+        let issue = SessionLabelQuery.issue(in: words)
         for host in hosts {
             await search(request, on: host)
+            // The sessions on the issue, its sub-issues and their PRs (#3899), from each host's
+            // Lineage, as the window asks. A host too old to say matches the #<n> label only.
+            if let issue, self.host(host, has: Capability.lineageSessions1), let target = hostClient(host),
+               let on = try? await target.call(DaemonAPI.Method.lineageSessions,
+                                               DaemonAPI.LineageSessionsRequest(number: issue),
+                                               returning: DaemonAPI.LineageSessions.self),
+               !Task.isCancelled {
+                for match in on.matches { work.issueSessions[match.agentID] = match.on }
+            }
             // What was said (#1585): the sessions whose prompts or replies hold the words. Not
             // asked of a host too old to say (#1748).
             if self.host(host, has: Capability.agentsSaid1), let target = hostClient(host),

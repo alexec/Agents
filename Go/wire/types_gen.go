@@ -5724,6 +5724,25 @@ type LineageResolved struct {
 	Labels []string `json:"labels,omitzero"`
 }
 
+// A session on the issue, and the issue it is on: the one asked for, or one of its sub-issues. A session on a PR is on the issue the PR fixes.
+type LineageSessionMatch struct {
+	AgentID UUID `json:"agentID"`
+
+	On LineageNode `json:"on"`
+}
+
+// The sessions on this machine that lineage links to the issue, to its sub-issues or to their PRs, each once. limited says there were more sub-issues or sessions than are counted.
+type LineageSessions struct {
+	Matches []LineageSessionMatch `json:"matches"`
+
+	Limited *bool `json:"limited,omitzero"`
+}
+
+// lineage/sessions (#3899): a session search for #<number> asks for the sessions on that issue, on the issues part-of it (its sub-issues, at most 100) and on the PRs that fix them. The issue is #<number> in the forge repo of each of this machine's folders.
+type LineageSessionsRequest struct {
+	Number int64 `json:"number"`
+}
+
 type ListCursor struct {
 	LastActivityAt Date `json:"lastActivityAt"`
 

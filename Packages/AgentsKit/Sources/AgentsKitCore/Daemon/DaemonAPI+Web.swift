@@ -280,6 +280,8 @@ public extension DaemonAPI {
                 Row(Method.docsList, params: DocsListRequest.self, result: DocsList.self, kind: .hostRequest),
                 Row(Method.docsSearch, params: DocsSearchRequest.self, result: DocsSearch.self, kind: .hostRequest),
                 Row(Method.docsRead, params: DocsReadRequest.self, result: DocsReading.self, kind: .hostRequest),
+                Row(Method.lineageSessions, params: LineageSessionsRequest.self, result: LineageSessions.self,
+                    kind: .hostRequest),
                 Row(Method.lineageWalk, params: LineageNodeRequest.self, result: LineageGraph.self, kind: .hostRequest),
                 // The checked channel to a machine (#3492).
                 Row(Method.lockHello, params: LockHello.self, result: LockHelloReply.self, kind: .hostRequest),
