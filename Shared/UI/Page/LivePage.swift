@@ -103,11 +103,14 @@ struct LivePage: View {
                 // `PageMetrics` carries that arithmetic.
                 .appText(.reading)
                 .environment(\.textZoom, zoom)
-                .simultaneousGesture(pinch)
                 #if os(macOS)
+                // AppKit's magnify events, not a `MagnifyGesture`: under the scroll view
+                // and the selectable text, that gesture did not see a trackpad pinch (#3980).
+                .trackpadPinch(changed: pinched(by:), ended: { pinchStart = nil })
                 // What View ▸ Zoom In, Zoom Out and Actual Size act on (#1419).
                 .focusedSceneValue(\.pageZoom, PageZoomAction(level: $zoomLevel))
                 #else
+                .simultaneousGesture(pinch)
                 .background { zoomKeys }
                 #endif
                 .textSelection(.enabled)
@@ -156,16 +159,20 @@ struct LivePage: View {
     private var zoom: Double { PageZoom.snapped(zoomLevel) }
 
     /// A pinch on the trackpad or the glass goes through the same steps as the keys.
+    private func pinched(by magnification: Double) {
+        let start = pinchStart ?? zoom
+        pinchStart = start
+        let next = PageZoom.pinched(from: start, by: magnification)
+        if next != zoom { zoomLevel = next }
+    }
+
+    #if os(iOS)
     private var pinch: some Gesture {
         MagnifyGesture()
-            .onChanged { value in
-                let start = pinchStart ?? zoom
-                pinchStart = start
-                let next = PageZoom.pinched(from: start, by: value.magnification)
-                if next != zoom { zoomLevel = next }
-            }
+            .onChanged { pinched(by: $0.magnification) }
             .onEnded { _ in pinchStart = nil }
     }
+    #endif
 
     #if os(iOS)
     /// ⌘+, ⌘− and ⌘0 with an iPad's keyboard: buttons no one sees, so the keys are

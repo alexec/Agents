@@ -145,7 +145,8 @@ final class SwipeAnchor {
     }
 }
 
-private struct SwipeAnchorView: NSViewRepresentable {
+/// Also the page's pinch anchor (`TrackpadPinch`, #3980).
+struct SwipeAnchorView: NSViewRepresentable {
     let anchor: SwipeAnchor
 
     func makeNSView(context: Context) -> NSView {
