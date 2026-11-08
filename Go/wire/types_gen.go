@@ -13744,6 +13744,12 @@ type WorkflowSummary struct {
 	// A bot's workflow that does not run here (#2027): the bot's name. This machine hears its server triggers with its own servers, once approved here, and sends each match to the control plane, which runs it on one of the bot's machines. Nothing of it runs here.
 	HearsFor *string `json:"hearsFor,omitzero"`
 
+	// When the daemon wrote a newer ready-made version over this unedited copy (#4071), for 7 days after it did.
+	ReadyMadeUpdatedAt *Date `json:"readyMadeUpdatedAt,omitzero"`
+
+	// An edited copy of a ready-made workflow whose ready-made version changed since the daemon made the copy (#4071): what the newer version changes. The daemon never writes over an edited copy.
+	NewerReadyMade *string `json:"newerReadyMade,omitzero"`
+
 	AwaitingApproval *WorkflowApproval `json:"awaitingApproval,omitzero"`
 
 	DeniedHere *WorkflowApproval `json:"deniedHere,omitzero"`
