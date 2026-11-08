@@ -1,7 +1,7 @@
 ---
 diataxis: how-to
 devices: [mac, web]
-description: Add the azuredevops connector with a personal access token, so that agents read and comment on pull requests and their Azure Pipelines builds on Azure DevOps Repos or your own Azure DevOps Server, a workflow or a wait starts on their events, and the Work pages list the pull requests.
+description: Add the azuredevops connector with a personal access token, so that agents read and comment on pull requests and their Azure Pipelines builds on Azure DevOps Repos or your own Azure DevOps Server, a workflow or a wait starts on their events, the Work pages list the pull requests, and the connector's own pages show them.
 ---
 
 # Use Azure DevOps Repos
@@ -13,7 +13,9 @@ Server. Agents Host carries it, and every Linux host installs it beside agentsd.
 
 It has tools to read pull requests and their builds, to read a failed build's log, and to
 comment, and it has events that start a workflow or a wait. With the Azure DevOps connection
-(#3802), the Work pages list and act on the pull requests (#3803).
+(#3802), the Work pages list and act on the pull requests (#3803). It also has two pages of
+its own (#4098): **Pull requests** and a pull request's page. The Mac window, the Remote on
+iPhone and iPad, and the web page show the same pages.
 
 Work items (Azure Boards) are not in this connector. They are the tracker's, as Linear's
 and Jira's issues are: see [Use Azure Boards work items](use-azure-boards.md).
@@ -29,7 +31,8 @@ and Jira's issues are: see [Use Azure Boards work items](use-azure-boards.md).
 ## Add the connector
 
 1. In Azure DevOps, open **User settings ▸ Personal access tokens** and make a token for
-   your organization with **Code: Read & write** and **Build: Read**.
+   your organization with **Code: Read & write** and **Build: Read**. To run a build's
+   failed jobs again (`retry_build`, **Retry**), give it **Build: Read & execute**.
 2. In Agents, open **Settings ▸ Agent Configuration ▸ Connectors** (or a folder's
    **Connectors** page) and choose **Add Connector…**.
 3. Choose the **Agents** marketplace, then **Azure DevOps**, and add it.
@@ -52,6 +55,8 @@ an event can name another one with `repo`, as `organization/project/name` (on a 
   pull request).
 - `get_build_log`: a failed build's failed steps, their errors and the end of each log.
 - `comment_on_pull_request`: a comment in a new thread.
+- `retry_build`: a finished build's failed jobs run again, in the same build.
+- For the pages: `show_pull_requests`, `show_pull_request` and `show_pull_request_diff`.
 - For the ready-made workflows: `create_pull_request`, `list_pull_request_comments` (the
   comments on lines of the diff, with each one's `threadId`) and
   `reply_to_pull_request_comment` (an answer in that thread).
@@ -84,6 +89,59 @@ Unless an event's `anyone` is true, a bot (a build service) and a pull request f
 never count. Azure DevOps lets only a project's members open a pull request or comment on
 one, so every other person counts.
 
+## See pull requests on the connector's pages
+
+An agent shows a page when it calls the tool that feeds it. Ask, for example, "Show the open
+pull requests on Azure DevOps".
+
+**Pull requests** (`show_pull_requests`) lists the 50 newest active pull requests. Each one
+has its checks (its builds and other services' statuses), a conflict, its review and
+**Auto-complete** when that is on. A pull request whose build failed has **Retry**. Click a
+title to open its page in the same view.
+
+The list is in sections: **Needs you** (you are a reviewer who has not voted, or your own pull
+request has failed checks, a conflict, or a reviewer who rejected it or waits for you),
+**Yours**, **Team** and **Others**. With a control plane, **Team** is its people and bots, by
+their Azure DevOps login (see
+[Your Azure DevOps login](use-azure-boards.md#your-azure-devops-login)), and a row shows the
+name the control plane knows; the rest are **Others**. Without one,
+everyone else in the organization is **Team**, as an organization has only its own members.
+
+A folder's own repository is on the Work pages, so its sidebar has no row for this list. To
+keep the page, choose **Pin to Folder** in the view's menu. See
+[Pin a page to a folder](pin-a-page-to-a-folder.md).
+
+### Work on a pull request
+
+A pull request's page has five tabs: **Conversation**, **Line comments**, **Files**,
+**Checks** and **Lineage**.
+
+- **Files**: each file and how it changed. Azure DevOps says no counts of lines here.
+  **Show Diff**, or a file's name, shows the changed lines in the app's own diff.
+- **Checks**: the newest build of each pipeline and the newest status of each other service.
+  A failed build has **Show Log**, the end of its failed steps' logs (`get_build_log`), and
+  **Retry Failed Jobs** runs them again (`retry_build`). Another service's status opens on
+  its own page.
+- **Lineage**: the sessions on the pull request, with what they cost (#3952).
+
+Under the tabs is a box for your words, and these buttons. Each one acts on Azure DevOps as
+you:
+
+- **Comment** adds the box's words as a comment, in a thread of its own.
+- **Approve** shows only on someone else's pull request: a vote of *approved*.
+- **Merge** completes it into the target branch (squashes it, when the branch's *Limit merge
+  types* policy allows squash and not a merge) and deletes the branch. It asks you again
+  first. A draft, or a pull request in conflict, can't be merged.
+- **Auto-merge** shows while its checks run: Azure DevOps's *auto-complete*, which completes
+  it once its policies pass.
+- **Ask an Agent** sends the work to the agent on the branch: failed checks, a conflict or
+  open line comments, with the box's words. The app asks you before it sends. With no agent
+  on that branch, the new-agent form opens on the branch.
+
+Agents can't merge or approve from this page. Those tools are for a person only. They carry
+the commit that the page shows. When the pull request has a newer commit, nothing happens:
+open the page again.
+
 ## On the Work pages
 
 With Azure DevOps connected, **Work ▸ Pull requests** lists the pull requests of each folder
@@ -115,6 +173,8 @@ service), **Open on Azure DevOps**, and:
 
 ## What to know
 
+- **The Pull requests page reads each pull request's builds and statuses.** Azure DevOps
+  has no list of many pull requests' builds, so the page reads four pull requests at a time.
 - **Comments are read for the 50 newest active pull requests,** and those closed since the
   last poll. Azure DevOps has no list of a repository's comments.
 - **Checks are builds and statuses.** Statuses are read for the 50 newest active pull
