@@ -62,8 +62,10 @@ type lineageResolveBook struct {
 	resolveAsking map[wire.LineageNode]bool
 	// resolveSlots holds a place for each gh or glab running, at most resolveWorkers.
 	resolveSlots chan struct{}
-	// resolveWait counts the nodes being asked, for tests and shutdown to wait on.
-	resolveWait sync.WaitGroup
+	// resolveIdle is closed when the last node being asked is answered, for tests and
+	// shutdown to wait on; nil when none is asked. Not a sync.WaitGroup: a node can be sent
+	// while shutdown waits (#4070), and a WaitGroup's Add from zero must not race its Wait.
+	resolveIdle chan struct{}
 	// resolveLookup, when set, is asked in place of forgeResolveNode.
 	resolveLookup resolveLookup
 }
@@ -129,7 +131,9 @@ func (d *Daemon) askResolveLocked(ask []wire.LineageNode) {
 	if d.resolveSlots == nil {
 		d.resolveSlots = make(chan struct{}, resolveWorkers)
 	}
-	d.resolveWait.Add(len(ask))
+	if len(ask) > 0 && d.resolveIdle == nil {
+		d.resolveIdle = make(chan struct{})
+	}
 	for _, n := range ask {
 		d.resolveAsking[n] = true
 		go d.resolveInBackground(n)
@@ -138,7 +142,6 @@ func (d *Daemon) askResolveLocked(ask []wire.LineageNode) {
 
 // resolveInBackground asks for n once a place is free, and caches the answer.
 func (d *Daemon) resolveInBackground(n wire.LineageNode) {
-	defer d.resolveWait.Done()
 	d.resolveSlots <- struct{}{}
 	defer func() { <-d.resolveSlots }()
 	ctx := d.ctx
@@ -148,15 +151,23 @@ func (d *Daemon) resolveInBackground(n wire.LineageNode) {
 	d.resolveNode(ctx, n)
 	d.resolveMu.Lock()
 	delete(d.resolveAsking, n)
+	if len(d.resolveAsking) == 0 && d.resolveIdle != nil {
+		close(d.resolveIdle)
+		d.resolveIdle = nil
+	}
 	d.resolveMu.Unlock()
 }
 
 // resolveSettle waits up to wait for the nodes being asked.
 func (d *Daemon) resolveSettle(wait time.Duration) {
-	done := make(chan struct{})
-	go func() { d.resolveWait.Wait(); close(done) }()
+	d.resolveMu.Lock()
+	idle := d.resolveIdle
+	d.resolveMu.Unlock()
+	if idle == nil {
+		return
+	}
 	select {
-	case <-done:
+	case <-idle:
 	case <-time.After(wait):
 	}
 }
