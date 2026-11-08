@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """A fixture Azure DevOps for the Work pages (#3815): the project acme/Web Shop (Agile's work item
-types), with four work items, as forge/* reads them over Azure DevOps's REST API 7.1 (WIQL and
+types), with five work items (#3939: two Epics with feature: tags), as forge/* reads them over Azure DevOps's REST API 7.1 (WIQL and
 workitemsbatch of the organization, a work item with its links, its comments, the project's work
 item types and tags) and the writes the pages make (a comment, tags, a state, a new child), kept
 in memory so the next read shows them; and the project's own WIQL, workitemsbatch and
@@ -69,11 +69,11 @@ def link(rel, n):
 
 
 ITEMS = {
-    40: item("Pay with a wallet", "Epic", "Active", ["payments"], SAM, SAM, ago(3),
+    40: item("Pay with a wallet", "Epic", "Active", ["payments", "feature:wallet"], SAM, SAM, ago(3),
              "<p>Apple Pay and Google Pay at checkout.</p>",
              relations=[link("System.LinkTypes.Hierarchy-Forward", 41), link("System.LinkTypes.Hierarchy-Forward", 42)],
              area=PAYMENTS),
-    41: item("Apple Pay sheet closes before the payment is confirmed", "Bug", "Active", ["payments", "mobile"], SAM, KIM,
+    41: item("Apple Pay sheet closes before the payment is confirmed", "Bug", "Active", ["payments", "mobile", "feature:wallet"], SAM, KIM,
              ago(1),
              "<h3>Steps</h3><ol><li>Add an item to the cart</li><li>Pay with <b>Apple Pay</b></li></ol>"
              "<p>The sheet closes and the order stays unpaid.</p>",
@@ -87,6 +87,8 @@ ITEMS = {
              area=PAYMENTS),
     43: item("Coupon field hides behind the keyboard", "User Story", "Resolved", ["checkout", "ux"], SAM, SAM,
              ago(1.25), "<p>On a small phone the coupon field is under the keyboard.</p>"),
+    # An epic outside the team Payments, done, with no epic tag: Work ▸ Features finds it by its type (#3939).
+    44: item("Gift cards", "Epic", "Closed", ["feature:gift-cards"], KIM, None, ago(40), "<p>Sell and redeem gift cards.</p>"),
 }
 NEXT = [100]
 
@@ -141,6 +143,12 @@ def wiql(query):
     for m in re.finditer(r"\[System\.State\] (NOT IN|IN) \(([^)]*)\)", query):
         names = set(re.findall(r"'([^']*)'", m.group(2)))
         ids = [n for n in ids if (ITEMS[n]["fields"]["System.State"] in names) == (m.group(1) == "IN")]
+    # The label epic: an Epic work item, or one tagged epic (#3939).
+    m = re.search(r"\(\[System\.WorkItemType\] = '([^']*)' OR \[System\.Tags\] CONTAINS '([^']*)'\)", query)
+    if m:
+        ids = [n for n in ids if ITEMS[n]["fields"]["System.WorkItemType"] == m.group(1) or
+               m.group(2).lower() in [t.strip().lower() for t in ITEMS[n]["fields"]["System.Tags"].split(";")]]
+        query = query.replace(m.group(0), "")
     m = re.search(r"\[System\.WorkItemType\] = '([^']*)'", query)
     if m:
         ids = [n for n in ids if ITEMS[n]["fields"]["System.WorkItemType"] == m.group(1)]
