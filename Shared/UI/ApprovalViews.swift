@@ -3,8 +3,9 @@ import SwiftUI
 
 /// One thing waiting for the person's OK in Needs You (#773): an MCP server, a workflow, a
 /// plugin or a guarded file, drawn as a session's row is (#587) — the mark, the title, the
-/// time and one grey line — with the same orange mark for every kind, so "needs
-/// approving" reads the same whatever it is. The window and the Remote both draw it.
+/// time and one grey line — with the same orange shield for every kind, so "needs
+/// approving" reads the same whatever it is. (A request's row, below, has a mark for each
+/// kind instead.) The window and the Remote both draw it.
 struct ApprovalRowLabel: View {
     let approval: Approval
     /// Which folder it is in, after the title, as a smart group's rows name theirs.
@@ -43,7 +44,9 @@ struct ApprovalRowLabel: View {
 
 /// One request to the person in Needs You (#3864): what is asked, as its title, then its
 /// kind, who asked it and how many sessions it blocks, and how long it has waited. Drawn as
-/// an approval's row is, its mark in the attention tint. The window and the Remote both draw it.
+/// an approval's row is, its mark in the attention tint. Unlike an approval's, the mark is
+/// one for each kind (`NeedRequest.symbol`, #4026), so it says what is asked; the web's
+/// RequestRow.tsx draws the same marks. The window and the Remote both draw it.
 struct RequestRowLabel: View {
     let request: NeedRequest
     /// The asker's name, as its session row says it.
