@@ -316,8 +316,10 @@ func (d *Daemon) launchOn(r *runtimeDef, dir string, account *wire.AccountProfil
 	if self, err := os.Executable(); err == nil {
 		env = appendPath(env, filepath.Dir(self))
 	}
-	// The session's secrets for this session only (#3548), as the agent's own variables.
+	// Its gh and git as the GitHub App, asking for the token at each call (#3926); then the
+	// session's secrets for this session only (#3548), as the agent's own variables.
 	if agent != "" {
+		env = d.withGitHubCredential(env, agent, dir)
 		env = append(env, d.sessionSecretEnv(agent)...)
 	}
 	root := d.Store.Loc.Root

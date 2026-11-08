@@ -235,6 +235,10 @@ func (d *Daemon) serveAppTools(w http.ResponseWriter, r *http.Request) {
 		d.serveHosted(w, r)
 		return
 	}
+	if r.URL.Path == githubCredentialPath {
+		d.serveGitHubCredential(w, r)
+		return
+	}
 	if r.URL.Path != appToolsPath {
 		w.WriteHeader(http.StatusNotFound)
 		return
