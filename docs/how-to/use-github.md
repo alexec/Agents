@@ -67,6 +67,19 @@ The connection's row on **Connectors ▸ Connections** says which kind of token 
 
 The token stays on the host. It never goes to the control plane.
 
+An agent's own `gh` and `git` use the same token (#3926), in a folder whose repository the
+App reaches: the `agents-loops` App is installed on it, or your bot is installed on its owner
+(then the bot's token). Agents puts its own `gh` first on the agent's PATH, and makes
+`agentsd credential` git's only credential helper for `https://github.com`. Both ask the host
+for the current token at each call, so a session of any length gets no error. The agent's
+environment holds only a grant for that one session, which the host takes back when the
+session's runtime ends; no token is in the environment or in a file. In a folder that the App
+does not reach, and with a personal access token, the agent's `gh` and `git` use your own
+login, as before. A push over SSH always uses your own key.
+
+The App and the bot have no Workflows permission, so GitHub refuses their push of a change to
+`.github/workflows/`. Push such a change from your own terminal.
+
 ### Change or end the connection
 
 On **Connectors ▸ Connections**:

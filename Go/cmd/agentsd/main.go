@@ -52,6 +52,10 @@ func main() {
 		supervise(os.Args[2:])
 		return
 	}
+	// An agent's git and gh asking for the GitHub App's token (#3926).
+	if len(os.Args) > 1 && os.Args[1] == "credential" {
+		os.Exit(agentsd.CredentialCommand(os.Args[2:], os.Getenv, os.Stdin, os.Stdout))
+	}
 	if len(os.Args) > 1 && os.Args[1] == "lock" {
 		os.Exit(lockCommand(os.Args[2:]))
 	}

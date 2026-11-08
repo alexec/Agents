@@ -597,6 +597,7 @@ func (l *live) turn() bool {
 		if err != nil {
 			d.dropAppTokens(l.id)
 			d.dropStandIn(l.id)
+			d.dropGitHubCredential(l.id)
 		}
 		if err != nil && ctx.Err() != nil {
 			d.end(l, wire.AgentStateStopped, wire.EndedReasonCancelled)
@@ -668,6 +669,7 @@ func (l *live) turn() bool {
 				l.session = nil
 				// Before the next runtime can start, so its stand-in is a new one.
 				d.dropStandIn(l.id)
+				d.dropGitHubCredential(l.id)
 			}
 			l.mu.Unlock()
 			// A new process is a new MCP server, with a token of its own.

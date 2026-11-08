@@ -562,6 +562,7 @@ func (d *Daemon) forgetLive(id wire.UUID) {
 	}
 	d.dropAppTokens(id)
 	d.dropStandIn(id)
+	d.dropGitHubCredential(id)
 	d.dropSessionSecrets(id)
 	d.forgetAgentInMemory(id)
 }

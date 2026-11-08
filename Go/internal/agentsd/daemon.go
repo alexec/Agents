@@ -73,6 +73,7 @@ type Daemon struct {
 	eventBook
 	actorBook
 	appToolsState
+	gitCredentialState
 	screenDriveState
 	browserDriveState
 	browserTabState
