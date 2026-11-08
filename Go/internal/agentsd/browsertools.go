@@ -233,6 +233,11 @@ func (d *Daemon) driveBrowser(ctx context.Context, agent wire.UUID, name string,
 		// In line behind another agent: told its place, started again on lease.granted.
 		return []any{map[string]any{"type": "text", "text": reply}}, false, reply
 	}
+	// The tabs that open from here on are this agent's (#3916); the first call of its turn
+	// opens its session's Agent Browser pane on the clients.
+	if d.driveBrowserAs(agent) {
+		d.markBrowserUsed(agent)
+	}
 	if name == handToPersonName {
 		// The person drives: no Playwright is needed for it.
 		said, isError := d.handToPerson(agent, args)
@@ -290,10 +295,13 @@ func (d *Daemon) browserDriveFor(ctx context.Context, agent wire.UUID, cwd strin
 	if err := os.MkdirAll(drive.output, 0o700); err != nil {
 		return nil, err
 	}
+	// Followed before Playwright starts, so the tab it opens is known to be this agent's.
+	d.followBrowserTabs(endpoint)
 	s, err := openBrowserSession(ctx, browserStart{toolset: d.browser.Toolset(), endpoint: endpoint, cwd: cwd, output: drive.output, env: loginEnvironment()})
 	if err != nil {
 		return nil, err
 	}
+	d.startOnSessionTab(ctx, agent, s)
 	drive.session, drive.endpoint = s, endpoint
 	return drive, nil
 }
@@ -398,6 +406,7 @@ func (d *Daemon) endBrowserSession(agent wire.UUID) {
 // the answer starts it again, and the lease's own length ends it if nobody answers.
 func (d *Daemon) endBrowserDrive(agent wire.UUID) {
 	d.endBrowserSession(agent)
+	d.stopDrivingBrowser(agent)
 	if d.holdsBrowser(agent) && d.handOffOpen(agent) == nil {
 		d.releaseResource(agent, browserLeaseName)
 	}

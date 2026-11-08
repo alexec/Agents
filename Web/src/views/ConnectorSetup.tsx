@@ -449,6 +449,8 @@ const signInWindow = "agents-sign-in";
  * (frame H): the same sheet. The host gives an authorize address; the page opens it in a window,
  * and the hand-back page sends the code back here by postMessage. Connect GitLab (#1630): the
  * device flow on gitlab.com, or an access token on any GitLab, which goes to the host only.
+ * Connect GitHub has the same second way (#3945): a personal access token, for an organisation
+ * that does not let the App in.
  * Connect Jira (#3304): Linear's code flow on Atlassian Cloud, or a token on one Jira site, and it
  * ends on the site's newest issue, which proves it. Connect Email (#1780): an IMAP server, a user and an app password, which go to the host only.
  * Connect Forgejo (#3752), Connect Bitbucket (#3785) and Connect Azure DevOps (#3802): one token sheet
@@ -463,12 +465,13 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
   /** Forgejo, Bitbucket and Azure DevOps: the one token sheet, its field in address. */
   const sheet = words.tokenSheet(provider);
   const opening = provider === "gitlab" && again ? words.gitlabAgain(again)
+    : provider === "github" && again?.byToken ? { withToken: true, address: "" }
     : sheet ? { withToken: true, address: again ? sheet.again(again) : "" } : undefined;
   type Step = { kind: "asking" } | { kind: "starting" } | { kind: "waiting"; flow: ConnectionSignIn }
     | { kind: "finishing" } | { kind: "install"; login: string; repository: string; url: string }
     | { kind: "checking" } | { kind: "jira"; connection: Connection } | { kind: "failed"; why: string };
   const [step, setStep] = useState<Step>({ kind: "asking" });
-  /** GitLab only (#1630): an access token instead of the sign-in, for a self-managed GitLab. */
+  /** GitLab (#1630), GitHub (#3945) and Jira: an access token instead of the sign-in. */
   const [withToken, setWithToken] = useState(opening?.withToken ?? false);
   const [address, setAddress] = useState(opening?.address ?? "");
   const [token, setToken] = useState("");
@@ -480,6 +483,7 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
   const [password, setPassword] = useState("");
   const isEmail = provider === "email";
   const isJira = provider === "atlassian";
+  const isGitHub = provider === "github";
   /** The authorization code with PKCE, handed back by postMessage: Linear and Atlassian. */
   const codeFlow = provider === "linear" || isJira;
   const busy = step.kind === "starting" || step.kind === "waiting" || step.kind === "finishing" || step.kind === "checking";
@@ -649,12 +653,14 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
           </div>
         )}
         {step.kind !== "jira" && <>
-        {(provider === "gitlab" || isJira) && (
+        {(provider === "gitlab" || isGitHub || isJira) && (
           <div class="button-group" role="radiogroup" aria-label="Connect with">
             {([false, true] as const).map((t) => (
               <button key={String(t)} type="button" role="radio" aria-checked={withToken === t} class={withToken === t ? "on" : ""}
                 disabled={busy} onClick={() => { setWithToken(t); if (step.kind === "failed") setStep({ kind: "asking" }); }}>
-                {isJira ? (t ? words.jira.tokenWay : words.jira.signInWay) : (t ? words.gitlab.tokenWay : words.gitlab.signInWay)}
+                {isJira ? (t ? words.jira.tokenWay : words.jira.signInWay)
+                  : isGitHub ? (t ? words.githubTokens.tokenWay : words.githubTokens.signInWay)
+                  : (t ? words.gitlab.tokenWay : words.gitlab.signInWay)}
               </button>
             ))}
           </div>
@@ -697,7 +703,18 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
             <button type="button" class="link small" onClick={() => openOut(sheet.newTokenURL(address))}>{sheet.newTokenButton}</button>
           </form>
         )}
-        {withToken && !isJira && !sheet && (
+        {withToken && isGitHub && (
+          <form id="connect-token" class="token-form" onSubmit={(e) => { e.preventDefault(); void connectWithToken(); }}>
+            <p class="small">{words.githubTokens.tokenIntro}</p>
+            <p class="small attention">{words.githubTokens.tokenCost}</p>
+            <label>{words.githubTokens.tokenLabel}
+              <input type="password" value={token} placeholder={words.githubTokens.tokenPrompt} disabled={busy} autocomplete="off"
+                onInput={(e) => setToken((e.target as HTMLInputElement).value)} />
+            </label>
+            <button type="button" class="link small" onClick={() => openOut(words.githubTokens.newTokenURL)}>{words.githubTokens.newTokenButton}</button>
+          </form>
+        )}
+        {withToken && provider === "gitlab" && (
           <form id="connect-token" class="token-form" onSubmit={(e) => { e.preventDefault(); void connectWithToken(); }}>
             <p class="small">{words.gitlab.tokenIntro}</p>
             <label>{words.gitlab.addressLabel}
@@ -731,7 +748,8 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
             </label>
           </form>
         )}
-        <p class="quiet small">{words.sheetChooseFor(provider)}</p>
+        {/* The repositories are chosen on github.com for the App only, not for a token. */}
+        {!(isGitHub && withToken) && <p class="quiet small">{words.sheetChooseFor(provider)}</p>}
         </>}
         {step.kind === "starting" && (
           <p class="quiet small">{codeFlow ? "Starting the sign-in…" : `Asking ${providerName} for a code…`}</p>
@@ -749,7 +767,7 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
           </div>
         )}
         {step.kind === "finishing" && <p class="quiet small">{words.linear.finishing}</p>}
-        {step.kind === "checking" && <p class="quiet small">{isEmail ? words.email.checking : isJira ? words.jira.checking : sheet ? sheet.checking : words.gitlab.checking}</p>}
+        {step.kind === "checking" && <p class="quiet small">{isEmail ? words.email.checking : isJira ? words.jira.checking : isGitHub ? words.githubTokens.checking : sheet ? sheet.checking : words.gitlab.checking}</p>}
         {step.kind === "install" && (
           <div class="sign-in-code">
             <p class="strong">Connected as {step.login}.</p>

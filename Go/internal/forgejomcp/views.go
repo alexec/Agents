@@ -164,11 +164,11 @@ func addViews(server *mcp.Server, f *RealForgejo, repoOf func(context.Context, s
 	meta := mcp.Meta{"ui": map[string]any{"csp": map[string]any{}, "prefersBorder": true}}
 	for _, v := range []struct{ uri, name, title, description, file string }{
 		{pullsURI, "pull-requests", "Pull requests", "The repository's open pull requests, newest created first, with their checks, conflict " +
-			"and review; a pull request opens its page. Fed by show_pull_requests.", "pulls.html"},
+			"and review, and Retry on a failed Actions run; a pull request opens its page. Fed by show_pull_requests.", "pulls.html"},
 		{issuesURI, "issues", "Issues", "The repository's open issues, newest created first, with their labels and assignees, and Start Agent; " +
 			"a label narrows the list. A person expands a row to read its Markdown description. Fed by show_issues.", "issues.html"},
 		{prURI, "pr", "Pull request", "One pull request's page: description, comments, line comments, files with the app's diff, " +
-			"and its checks with a failed Forgejo Actions run's log, with Comment, Approve, Merge, Auto-merge and Ask an Agent. " +
+			"and its checks with a failed Forgejo Actions run's log and Retry Failed Jobs, with Comment, Approve, Merge, Auto-merge and Ask an Agent. " +
 			"Fed by show_pull_request.", "pr.html"},
 	} {
 		html := page(v.file)

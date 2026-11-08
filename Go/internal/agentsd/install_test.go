@@ -170,6 +170,57 @@ func TestInstallTheAppsOwnCopies(t *testing.T) {
 	}
 }
 
+// Toolsets that pin the same Node share one <tools>/node/<v> (#3959); a new pin adds a
+// second, and tidy removes the first once no toolset links to it.
+func TestToolsetsShareOneNode(t *testing.T) {
+	_, bundle := fakeVendors(t)
+	oldHome, oldServer := toolsHome, serverToolsets
+	toolsHome, serverToolsets = filepath.Join(t.TempDir(), "tools"), false
+	t.Cleanup(func() { toolsHome, serverToolsets = oldHome, oldServer })
+	ts := loadToolsets(bundle)
+	codex := ts["codex"]
+	browser := *codex
+	browser.runtimeID, browser.id = browserToolsetID, "b1"
+	for _, ts := range []*macToolset{codex, &browser} {
+		if err := ts.installNode(func(string) {}); err != nil {
+			t.Fatal(err)
+		}
+		if to, err := os.Readlink(filepath.Join(toolsHome, ts.runtimeID, ts.id, "node")); err != nil || to != "../../node/v1" {
+			t.Fatalf("%s's node: %q %v", ts.runtimeID, to, err)
+		}
+		if _, err := os.Stat(filepath.Join(toolsHome, ts.runtimeID, "current", "node", "bin", "node")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if names, _ := os.ReadDir(filepath.Join(toolsHome, "node")); len(names) != 1 {
+		t.Fatalf("Nodes: %v", names)
+	}
+
+	// A new pin for the browser: v1 stays while Codex links to it.
+	if err := os.CopyFS(filepath.Join(toolsHome, "node", "v2"), os.DirFS(filepath.Join(toolsHome, "node", "v1"))); err != nil {
+		t.Fatal(err)
+	}
+	browser.node = &struct {
+		Version string            `json:"version"`
+		SHA256  map[string]string `json:"sha256"`
+	}{"v2", codex.node.SHA256}
+	browser.id = "b2"
+	if err := browser.installNode(func(string) {}); err != nil {
+		t.Fatal(err)
+	}
+	browser.tidy()
+	tidyNode()
+	if names, _ := os.ReadDir(filepath.Join(toolsHome, "node")); len(names) != 2 {
+		t.Fatalf("Nodes: %v", names)
+	}
+	// Codex moves on too: v1 has no toolset left, so it goes.
+	os.RemoveAll(filepath.Join(toolsHome, "codex"))
+	tidyNode()
+	if names, _ := os.ReadDir(filepath.Join(toolsHome, "node")); len(names) != 1 || names[0].Name() != "v2" {
+		t.Fatalf("Nodes: %v", names)
+	}
+}
+
 type deviceConn struct{ *conn }
 
 func (deviceConn) Device() string { return "11111111-2222-3333-4444-555555555555" }

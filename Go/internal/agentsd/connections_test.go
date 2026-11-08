@@ -292,9 +292,78 @@ func TestConnectingGitLabWithAnAccessToken(t *testing.T) {
 	if len(list.Connections) != 1 || list.Connections[0].Provider != wire.ConnectionProviderGitlab {
 		t.Fatalf("list: %+v", list)
 	}
-	// Only GitLab takes a token.
-	if msg := c.callErr(t, 5, "connections/sign-in/token", map[string]any{"provider": "github", "token": "x"}); !strings.Contains(msg, "only for GitLab") {
-		t.Fatalf("github token: %s", msg)
+	// Linear takes no token.
+	if msg := c.callErr(t, 5, "connections/sign-in/token", map[string]any{"provider": "linear", "token": "x"}); !strings.Contains(msg, "only for GitHub, GitLab") {
+		t.Fatalf("linear token: %s", msg)
+	}
+}
+
+// A GitHub personal access token (#3857) is the fallback for the App's user token: the host
+// checks it with GitHub, keeps when it ends, and the row says it is a token, with no App to
+// install. An App's own token, which ends in hours, and a GitHub Enterprise Server are refused.
+func TestConnectingGitHubWithAPersonalAccessToken(t *testing.T) {
+	gh := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Header.Get("Authorization") != "Bearer github_pat_secret" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		if r.URL.Path != "/api/user" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("GitHub-Authentication-Token-Expiration", "2027-02-01 08:00:00 -0800")
+		fmt.Fprint(w, `{"login":"octocat"}`)
+	}))
+	defer gh.Close()
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	file := &connections.File{Path: filepath.Join(t.TempDir(), connections.FileName)}
+	d.connStoreFor = func() (connections.Store, error) { return file, nil }
+	d.newDeviceFlow = func(wire.ConnectionProvider) *connections.DeviceFlow {
+		return &connections.DeviceFlow{ClientID: connections.GitHubClientID, Base: gh.URL + "/", API: gh.URL + "/api/", HTTP: gh.Client()}
+	}
+
+	for i, bad := range []map[string]any{
+		{"provider": "github", "token": "github_pat_wrong"},
+		{"provider": "github", "token": "ghu_apptoken"},
+		{"provider": "github", "url": "https://github.example.com", "token": "github_pat_secret"},
+	} {
+		var refused wire.ConnectionTokenAnswer
+		json.Unmarshal(c.call(t, 1+i, "connections/sign-in/token", bad), &refused)
+		if refused.Error == nil || refused.Connection != nil || strings.Contains(*refused.Error, bad["token"].(string)) {
+			t.Fatalf("refused %d: %+v", i, refused)
+		}
+	}
+
+	raw := c.call(t, 10, "connections/sign-in/token", map[string]any{"provider": "github", "token": " github_pat_secret\n"})
+	if strings.Contains(string(raw), "github_pat_secret") {
+		t.Fatalf("the token went back to the client: %s", raw)
+	}
+	var made wire.ConnectionTokenAnswer
+	json.Unmarshal(raw, &made)
+	if made.Error != nil || made.Connection == nil || deref(made.Connection.Login) != "octocat" ||
+		made.Connection.ByToken == nil || !*made.Connection.ByToken || made.Connection.InstallURL != nil ||
+		made.Connection.ExpiresAt == nil {
+		t.Fatalf("made: %+v", made)
+	}
+	kept, ok, _ := file.Get(connections.GitHub)
+	if !ok || kept.Access != "github_pat_secret" || kept.Refresh != "" ||
+		!kept.AccessExpiresAt.Equal(time.Date(2027, 2, 1, 16, 0, 0, 0, time.UTC)) || connections.ByAppToken(kept) {
+		t.Fatalf("kept: %+v", kept)
+	}
+}
+
+// The App's user token is the default (#3857): its row has the App to install and is not a
+// token the person made, also when it must sign in again.
+func TestGitHubAppTokenRowSaysTheApp(t *testing.T) {
+	app := connections.Connection{Provider: connections.GitHub, Login: "octocat", Access: "ghu_x", Refresh: "ghr_x",
+		AccessExpiresAt: time.Now().Add(time.Hour)}
+	for _, c := range []connections.Connection{app, {Provider: connections.GitHub, Login: "octocat", SignInAgain: true}} {
+		w := wireConnection(c)
+		if w.InstallURL == nil || w.ByToken != nil || w.ExpiresAt != nil {
+			t.Fatalf("app row: %+v", w)
+		}
 	}
 }
 

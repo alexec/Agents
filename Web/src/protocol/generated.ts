@@ -237,6 +237,11 @@ export interface Agent {
   availableCommands: SlashCommand[];
   createdAt: WireDate;
   lastActivityAt: WireDate;
+  /**
+   * When the agent's first browser call of its latest turn that used the browser came (#3916). A
+   * client opens the session's Agent Browser pane when this moves.
+   */
+  browserUsedAt?: WireDate;
   isUnread?: boolean;
   /**
    * Mute Notifications (#2003): the session still goes under Needs you and counts in the badge, but
@@ -1315,6 +1320,15 @@ export interface BrowserPageState {
   detail?: string;
   url?: string;
   title?: string;
+  /**
+   * True when the watch names a session whose agent has opened no tab in the browser (#3916): the
+   * client shows that, not a page.
+   */
+  noTab?: boolean;
+  /** The session whose agent holds browser:agents now, when one does (#3916). */
+  holder?: UUID;
+  /** That session's title. */
+  holderTitle?: string;
 }
 
 /**
@@ -1356,6 +1370,11 @@ export type BrowserStatus =
 export interface BrowserWatchRequest {
   width: number;
   height: number;
+  /**
+   * The session whose tab the client shows (#3916): the newest tab its agent opened. Without it,
+   * the machine's newest tab.
+   */
+  agent?: UUID;
 }
 
 /**
@@ -1953,7 +1972,7 @@ export interface Connection {
   connectedAt: WireDate;
   /**
    * Where the person installs the provider's App: a GitHub user token reaches only the repositories
-   * where it is installed.
+   * where it is installed. Set only for GitHub's App user token, the default (#3857).
    */
   installURL?: string;
   /**
@@ -1967,8 +1986,10 @@ export interface Connection {
    */
   expiresAt?: WireDate;
   /**
-   * The connection is a token the person made and the host does not renew, with no end it knows: a
-   * Jira API token or Data Center personal access token (#3304). Left out for OAuth.
+   * The connection is a token the person made and the host does not renew: a Jira API token or Data
+   * Center personal access token (#3304), or a GitHub personal access token, the fallback for the
+   * App's user token (#3857), whose end, when it has one, is expiresAt. Left out for OAuth and for
+   * GitHub's App user token.
    */
   byToken?: boolean;
   /**
@@ -2206,10 +2227,10 @@ export interface ConnectionTokenAnswer {
 }
 
 /**
- * connections/sign-in/token (#1630, #3304, #3752, #3785): a personal access token the person made,
- * for a provider with no Agents application there (a self-managed GitLab, a Jira site, any Forgejo
- * or Gitea, Bitbucket Cloud). The host checks it with the provider, keeps it in its own store, and
- * never logs it or gives it back.
+ * connections/sign-in/token (#1630, #3304, #3752, #3785, #3857): a personal access token the person
+ * made, for a provider with no Agents application there (a self-managed GitLab, a Jira site, any
+ * Forgejo or Gitea, Bitbucket Cloud), or on github.com in place of the App's user token. The host
+ * checks it with the provider, keeps it in its own store, and never logs it or gives it back.
  */
 export interface ConnectionTokenRequest {
   provider: ConnectionProvider;
@@ -11017,10 +11038,10 @@ export interface UserSecret {
 }
 
 /**
- * What a secret holds, when it is more than one value (#3531). card: a payment card that is locked
- * to one merchant and has a spend limit (Privacy.com or the same), as one JSON object of number,
- * expiry (MM/YY), cvc, name and zip. fill_secret fills it a part at a time. Left out for a plain
- * value.
+ * What a secret holds, when it is more than one value (#3531). card: a payment card that has a
+ * spend limit (locked to a merchant or category is recommended; Privacy.com or the same), as one
+ * JSON object of number, expiry (MM/YY), cvc, name and zip. fill_secret fills it a part at a time.
+ * Left out for a plain value.
  */
 export type UserSecretKind = "card";
 
@@ -12518,7 +12539,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AddFolderRequest: { required: ["folder"], optional: ["project"] },
   Admitted: { required: [], optional: ["client", "host"] },
   AdoptRequest: { required: ["runtimeID", "sessionID", "cwd"], optional: [] },
-  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "runtimeKeepsCopy", "isUnread", "isMuted", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "desktopControlPause", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "movedFrom", "fileToSee", "continueWhenBack", "runningTool", "accountID", "auto", "clientPermission", "levels", "voiceHungUpAt", "goal", "project"] },
+  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "runtimeKeepsCopy", "browserUsedAt", "isUnread", "isMuted", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "desktopControlPause", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "movedFrom", "fileToSee", "continueWhenBack", "runningTool", "accountID", "auto", "clientPermission", "levels", "voiceHungUpAt", "goal", "project"] },
   AgentConfigEditorFile: { required: ["path", "content"], optional: [] },
   AgentConfigEditorRequest: { required: ["kind"], optional: ["folder"] },
   AgentConfigEditorSaveRequest: { required: ["kind", "path", "content"], optional: ["folder", "delete"] },
@@ -12607,10 +12628,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BrowserFrame: { required: ["image", "ack", "width", "height"], optional: [] },
   BrowserInputRequest: { required: ["kind"], optional: ["type", "x", "y", "button", "clickCount", "deltaX", "deltaY", "key", "code", "keyCode", "text", "modifiers"] },
   BrowserNavigateRequest: { required: ["action"], optional: ["url"] },
-  BrowserPageState: { required: ["status"], optional: ["detail", "url", "title"] },
+  BrowserPageState: { required: ["status"], optional: ["detail", "url", "title", "noTab", "holder", "holderTitle"] },
   BrowserSite: { required: ["site", "cookies"], optional: [] },
   BrowserState: { required: ["installed", "running", "downloadBytes", "sites"], optional: ["problem"] },
-  BrowserWatchRequest: { required: ["width", "height"], optional: [] },
+  BrowserWatchRequest: { required: ["width", "height"], optional: ["agent"] },
   BudgetRaise: { required: ["user", "day", "by"], optional: ["daily", "dailyTokens", "request"] },
   BudgetRequest: { required: ["id", "user", "userName", "day", "at", "state"], optional: ["why", "daily", "dailyTokens", "decidedBy", "decidedAt"] },
   BudgetRequestList: { required: ["requests"], optional: [] },

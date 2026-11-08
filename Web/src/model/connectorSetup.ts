@@ -305,12 +305,39 @@ export function connectionTitle(c: Connection): string {
   return c.login ? `${name(c.provider)} · ${c.login}` : name(c.provider);
 }
 
+/**
+ * The kind of token a GitHub connection uses (#3857), as the Mac's `GitHubTokens`. The App's user
+ * token is the default: it can do only what both the person and the App can, and each post shows
+ * the App's badge. A personal access token, the fallback, has all the rights the person gave it.
+ */
+export const githubTokens = {
+  app: "App user token · renews by itself · posts show the App",
+  personal: "Personal access token · posts show no App",
+  /** The Connect GitHub sheet's second way in (#3945), as GitLab's sheet has. */
+  signInWay: "github.com",
+  tokenWay: "Personal access token",
+  tokenIntro: "For an organisation that does not let the agents-loops App in: make a personal access token on github.com, and paste it here.",
+  /** What the person gives up with a token of their own, in place of the App's. */
+  tokenCost: "The token has all the rights you give it, not only what the App can do. Agents' posts show no App badge, and the token does not renew: make a new one when it ends.",
+  tokenLabel: "Access token",
+  tokenPrompt: "ghp_… or github_pat_…",
+  newTokenButton: "Make a Token on GitHub",
+  /** A classic token with the scopes for what the sheet lists: repositories and Codespaces. */
+  newTokenURL: "https://github.com/settings/tokens/new?description=Agents&scopes=repo,codespace",
+  checking: "Checking the token with GitHub…",
+};
+
 export function connectionNote(c: Connection, now: Date = new Date()): string {
   // An email connection: the IMAP server and an app password, which does not end (#1780).
   if (c.provider === "email") return [c.workspace, email.passwordLabel].filter((x): x is string => !!x).join(" · ");
   if (c.state === "signInAgain") {
     return c.expiresAt === undefined ? `${name(c.provider)} refused the renewal: sign in again`
       : "The access token ended: connect again with a new one";
+  }
+  // GitHub says which token it uses (#3857): the App's user token, or the person's own.
+  if (c.provider === "github") {
+    return c.byToken ? githubTokens.personal + (c.expiresAt !== undefined ? ` · ${tokenEnds(fromWireDate(c.expiresAt), now)}` : "")
+      : githubTokens.app;
   }
   const how = c.expiresAt !== undefined ? `Access token · ${tokenEnds(fromWireDate(c.expiresAt), now)}`
     : c.provider === "forgejo" ? forgejo.how : c.provider === "bitbucket" ? bitbucket.how

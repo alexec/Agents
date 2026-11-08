@@ -470,8 +470,11 @@ The control changes the workflow file itself: `enabled:`, and the schedule's `at
 `between:`. A change to the file by hand shows in the control. It runs on weekdays. To change
 the days, edit the schedule's `days:`.
 
-- It runs in your home folder, in plan mode, on the Auto runtime. It is never copied into a
-  project's workflows.
+- It runs in your home folder, in ask mode (`permission-mode: ask`), on the Auto runtime. It
+  is never copied into a project's workflows. Ask mode lets it save the page with no question
+  to you, as the app's own tools need no approval, and asks you before any change to a folder
+  (#3922). Plan mode made it wait for your approval before it saved. A copy made before
+  #3922 still says `permission-mode: plan`: change it to `ask` in both files.
 - Of your machines that have it on, only one writes each summary: the first to claim that
   morning's run from your control plane. A machine with no control plane writes its own.
 - Its agent calls [`write_daily_summary`](agent-tools.md) for the facts. These are every folder on
@@ -500,7 +503,7 @@ default every 4 hours from the summary's time (00:00, 04:00, 12:00, 16:00 and 20
 no work since the last check. It only reads: it never pushes, comments, sends a message or
 starts a session.
 
-- It runs in your home folder, in plan mode, on the Auto runtime, on one of your machines, as
+- It runs in your home folder, in ask mode, on the Auto runtime, on one of your machines, as
   the summary does. Its session is archived when it is done.
 - Its agent calls [`check_folders`](agent-tools.md) for what looks wrong, using that machine's
   `gh`: a workflow whose newest run on the default branch failed, a pull request in conflict

@@ -315,3 +315,69 @@ func (t Token) Connection(provider, login string, at time.Time) Connection {
 	return Connection{Provider: provider, Login: login, Access: t.Access, Refresh: t.Refresh,
 		AccessExpiresAt: t.AccessExpiresAt, RefreshExpiresAt: t.RefreshExpiresAt, ConnectedAt: at}
 }
+
+// MARK: A personal access token (#3857)
+
+// The App's user token is the default: GitHub limits it to what both the person and the App
+// may do, and each post shows the App's badge. A personal access token is the fallback, for an
+// organisation that does not let the App in: it has all the rights the person gave it, and a
+// post shows no badge.
+
+// gitHubTokenEnds is the header in which GitHub says when a personal access token ends.
+const gitHubTokenEnds = "GitHub-Authentication-Token-Expiration"
+
+// CheckGitHubToken asks GitHub's API at api whose personal access token this is, and when it
+// ends (zero when it does not end). The token goes only in the Authorization header; an error
+// never holds it.
+func CheckGitHubToken(ctx context.Context, client *http.Client, api, token string) (string, time.Time, error) {
+	if strings.HasPrefix(token, "ghu_") || strings.HasPrefix(token, "ghs_") {
+		return "", time.Time{}, errors.New("this is an App's token, which ends in hours: paste a personal access token (ghp_… or github_pat_…), or use Continue on github.com")
+	}
+	if client == nil {
+		client = &http.Client{Timeout: 30 * time.Second}
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, api+"user", nil)
+	if err != nil {
+		return "", time.Time{}, errors.New("the request to GitHub could not be made")
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/json")
+	res, err := client.Do(req)
+	if err != nil {
+		return "", time.Time{}, errors.New("GitHub could not be reached")
+	}
+	defer res.Body.Close()
+	if res.StatusCode == http.StatusUnauthorized {
+		return "", time.Time{}, errors.New("GitHub did not take the token")
+	}
+	var u struct {
+		Login string `json:"login"`
+	}
+	if res.StatusCode != http.StatusOK || json.NewDecoder(io.LimitReader(res.Body, 1<<20)).Decode(&u) != nil || u.Login == "" {
+		return "", time.Time{}, fmt.Errorf("GitHub answered %d for the account", res.StatusCode)
+	}
+	return u.Login, gitHubTokenEnd(res.Header.Get(gitHubTokenEnds)), nil
+}
+
+// gitHubTokenEnd reads the end GitHub gives, such as "2026-12-01 00:00:00 UTC" or
+// "2026-12-01 08:00:00 -0800"; zero when there is none or it does not read.
+func gitHubTokenEnd(v string) time.Time {
+	for _, layout := range []string{"2006-01-02 15:04:05 -0700", "2006-01-02 15:04:05 MST"} {
+		if t, err := time.Parse(layout, strings.TrimSpace(v)); err == nil {
+			return t
+		}
+	}
+	return time.Time{}
+}
+
+// GitHubTokenConnection is the connection a personal access token makes for login. It has no
+// refresh: when ends is not zero, the host marks it ended then.
+func GitHubTokenConnection(token, login string, ends, at time.Time) Connection {
+	return Connection{Provider: GitHub, Login: login, Access: token, AccessExpiresAt: ends, ConnectedAt: at}
+}
+
+// ByAppToken is a GitHub connection that is the App's user token, which the host renews:
+// the default. A personal access token has no refresh token.
+func ByAppToken(c Connection) bool {
+	return c.Provider == GitHub && c.Refresh != ""
+}

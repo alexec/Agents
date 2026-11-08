@@ -7,7 +7,7 @@ on:
       days: [mon, tue, wed, thu, fri]
 agent: new
 labels: [daily-summary]
-permission-mode: plan
+permission-mode: ask
 enabled: false
 when-done: keep
 ---

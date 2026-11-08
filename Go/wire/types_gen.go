@@ -173,6 +173,9 @@ type Agent struct {
 
 	LastActivityAt Date `json:"lastActivityAt"`
 
+	// When the agent's first browser call of its latest turn that used the browser came (#3916). A client opens the session's Agent Browser pane when this moves.
+	BrowserUsedAt *Date `json:"browserUsedAt,omitzero"`
+
 	IsUnread *bool `json:"isUnread,omitzero"`
 
 	// Mute Notifications (#2003): the session still goes under Needs you and counts in the badge, but sends no push, no Mac notification and no banner. A muted workflow's runs start muted.
@@ -1492,6 +1495,15 @@ type BrowserPageState struct {
 	URL *string `json:"url,omitzero"`
 
 	Title *string `json:"title,omitzero"`
+
+	// True when the watch names a session whose agent has opened no tab in the browser (#3916): the client shows that, not a page.
+	NoTab *bool `json:"noTab,omitzero"`
+
+	// The session whose agent holds browser:agents now, when one does (#3916).
+	Holder *UUID `json:"holder,omitzero"`
+
+	// That session's title.
+	HolderTitle *string `json:"holderTitle,omitzero"`
 }
 
 // One site that keeps cookies in the machine's browser (#3535), which is how a site remembers a sign-in.
@@ -1530,6 +1542,9 @@ type BrowserWatchRequest struct {
 	Width int64 `json:"width"`
 
 	Height int64 `json:"height"`
+
+	// The session whose tab the client shows (#3916): the newest tab its agent opened. Without it, the machine's newest tab.
+	Agent *UUID `json:"agent,omitzero"`
 }
 
 // A budget raised for one person for one UTC day (#998, FR-019), kept in the policy and swept the day after.
@@ -2331,7 +2346,7 @@ type Connection struct {
 
 	ConnectedAt Date `json:"connectedAt"`
 
-	// Where the person installs the provider's App: a GitHub user token reaches only the repositories where it is installed.
+	// Where the person installs the provider's App: a GitHub user token reaches only the repositories where it is installed. Set only for GitHub's App user token, the default (#3857).
 	InstallURL *string `json:"installURL,omitzero"`
 
 	// The part of the provider the token reaches, such as a Linear workspace's name, or a self-managed GitLab's host.
@@ -2340,7 +2355,7 @@ type Connection struct {
 	// When a token the host cannot renew ends: a GitLab personal access token's expiry. The person makes a new one before then.
 	ExpiresAt *Date `json:"expiresAt,omitzero"`
 
-	// The connection is a token the person made and the host does not renew, with no end it knows: a Jira API token or Data Center personal access token (#3304). Left out for OAuth.
+	// The connection is a token the person made and the host does not renew: a Jira API token or Data Center personal access token (#3304), or a GitHub personal access token, the fallback for the App's user token (#3857), whose end, when it has one, is expiresAt. Left out for OAuth and for GitHub's App user token.
 	ByToken *bool `json:"byToken,omitzero"`
 
 	// Only in the answer that made the connection: the one real read that proves it, such as Jira's newest issue (#3304). Left out when the read found nothing or failed.
@@ -2549,7 +2564,7 @@ type ConnectionTokenAnswer struct {
 	Error *string `json:"error,omitzero"`
 }
 
-// connections/sign-in/token (#1630, #3304, #3752, #3785): a personal access token the person made, for a provider with no Agents application there (a self-managed GitLab, a Jira site, any Forgejo or Gitea, Bitbucket Cloud). The host checks it with the provider, keeps it in its own store, and never logs it or gives it back.
+// connections/sign-in/token (#1630, #3304, #3752, #3785, #3857): a personal access token the person made, for a provider with no Agents application there (a self-managed GitLab, a Jira site, any Forgejo or Gitea, Bitbucket Cloud), or on github.com in place of the App's user token. The host checks it with the provider, keeps it in its own store, and never logs it or gives it back.
 type ConnectionTokenRequest struct {
 	Provider ConnectionProvider `json:"provider"`
 
@@ -12694,7 +12709,7 @@ type UserSecret struct {
 	Value string `json:"value"`
 }
 
-// What a secret holds, when it is more than one value (#3531). card: a payment card that is locked to one merchant and has a spend limit (Privacy.com or the same), as one JSON object of number, expiry (MM/YY), cvc, name and zip. fill_secret fills it a part at a time. Left out for a plain value.
+// What a secret holds, when it is more than one value (#3531). card: a payment card that has a spend limit (locked to a merchant or category is recommended; Privacy.com or the same), as one JSON object of number, expiry (MM/YY), cvc, name and zip. fill_secret fills it a part at a time. Left out for a plain value.
 type UserSecretKind string
 
 const UserSecretKindCard UserSecretKind = "card"

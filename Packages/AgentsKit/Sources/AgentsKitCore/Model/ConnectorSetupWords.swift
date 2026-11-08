@@ -367,9 +367,36 @@ public enum ConnectorSetupWords {
             return c.expiresAt == nil ? "\(name(c.provider)) refused the renewal: sign in again"
                 : "The access token ended: connect again with a new one"
         }
+        // GitHub says which token it uses (#3857): the App's user token, or the person's own.
+        if c.provider == .github {
+            let ends = c.expiresAt.map { " \u{00B7} " + tokenEnds($0, now: now) } ?? ""
+            return c.byToken == true ? GitHubTokens.personal + ends : GitHubTokens.app
+        }
         let how = c.expiresAt.map { "Access token \u{00B7} " + tokenEnds($0, now: now) }
             ?? tokenHow(c.provider) ?? (c.byToken == true ? Jira.tokenWay : "OAuth \u{00B7} renews by itself")
         return [c.workspace, how].compactMap { $0 }.joined(separator: " \u{00B7} ")
+    }
+
+    /// The kind of token a GitHub connection uses (#3857). The App's user token is the default:
+    /// it can do only what both the person and the App can, and each post shows the App's badge.
+    /// A personal access token, the fallback, has all the rights the person gave it, and no badge.
+    public enum GitHubTokens {
+        public static let app = "App user token \u{00B7} renews by itself \u{00B7} posts show the App"
+        public static let personal = "Personal access token \u{00B7} posts show no App"
+
+        /// The Connect GitHub sheet's second way in (#3945), as GitLab's sheet has.
+        public static let signInWay = "github.com"
+        public static let tokenWay = "Personal access token"
+        public static let tokenIntro = "For an organisation that does not let the agents-loops App in: make a personal access token on github.com, and paste it here."
+        /// What the person gives up with a token of their own, in place of the App's.
+        public static let tokenCost = "The token has all the rights you give it, not only what the App can do. Agents' posts show no App badge, and the token does not renew: make a new one when it ends."
+        public static let tokenLabel = "Access token"
+        public static let tokenPrompt = "ghp_\u{2026} or github_pat_\u{2026}"
+        public static let tokenButton = "Connect"
+        public static let newTokenButton = "Make a Token on GitHub"
+        /// A classic token with the scopes for what the sheet lists: repositories and Codespaces.
+        public static let newTokenURL = "https://github.com/settings/tokens/new?description=Agents&scopes=repo,codespace"
+        public static let checking = "Checking the token with GitHub\u{2026}"
     }
 
     /// How a token sheet's connection signs in, after its host; nil for the others.

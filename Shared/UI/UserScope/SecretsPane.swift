@@ -181,7 +181,7 @@ private struct SecretSheet: View {
 }
 
 /// Add a Card… and a card's Replace… (#3531): a payment card for agents to fill into a page,
-/// only one locked to a merchant with a spend limit. Its parts are one secret; none is shown again.
+/// only one with a spend limit (a merchant or category lock is recommended). Its parts are one secret; none is shown again.
 private struct CardSheet: View {
     /// The card replaced, or nil for a new one.
     let name: String?

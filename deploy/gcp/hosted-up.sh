@@ -20,7 +20,8 @@
 # and, when set, passes these on to the service: AGENTS_HOSTED_GITHUB_CLIENT_ID, Apple's and
 # Google's sign-up (AGENTS_HOSTED_APPLE_SERVICES_ID, _TEAM_ID, _KEY_ID and _KEY, a .p8 on one
 # line; AGENTS_HOSTED_GOOGLE_CLIENT_ID and _SECRET; #3386), the sign-up
-# settings and limits (AGENTS_HOSTED_SIGNUP, AGENTS_HOSTED_MAX_ACCOUNTS, …), and billing's
+# settings and limits (AGENTS_HOSTED_SIGNUP, AGENTS_HOSTED_MAX_ACCOUNTS, …), Turnstile's
+# AGENTS_HOSTED_TURNSTILE_SITE_KEY and _SECRET (#3388), and billing's
 # AGENTS_HOSTED_STRIPE_KEY, AGENTS_HOSTED_STRIPE_PRICE and AGENTS_HOSTED_STRIPE_WEBHOOK_SECRET
 # (all three, or none). AGENTS_HOSTED_MACHINE_TYPE (e2-medium) and AGENTS_HOSTED_DISK_GB (50)
 # size the VM.
@@ -244,7 +245,7 @@ cp "$root/deploy/compose.hosted.yaml" "$root/deploy/Caddyfile.hosted" "$stage/de
 		AGENTS_HOSTED_VIEWS_DOMAIN AGENTS_HOSTED_SIGNUP AGENTS_HOSTED_MAX_ACCOUNTS \
 		AGENTS_HOSTED_MIN_GITHUB_AGE AGENTS_HOSTED_SIGNUPS_PER_ADDRESS AGENTS_HOSTED_SIGNUPS_PER_HOUR \
 		AGENTS_HOSTED_MAX_COPIES AGENTS_HOSTED_CERTS_PER_HOUR AGENTS_HOSTED_CERTS_PER_WEEK AGENTS_HOSTED_STORAGE_TOTAL_GB \
-		"${stripe[@]}"; do
+		AGENTS_HOSTED_TURNSTILE_SITE_KEY AGENTS_HOSTED_TURNSTILE_SECRET "${stripe[@]}"; do
 		[[ -z ${!v:-} ]] || printf '%s=%s\n' "$v" "${!v}"
 	done
 } >"$stage/deploy/.env.new"

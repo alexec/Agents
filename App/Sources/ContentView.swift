@@ -173,7 +173,7 @@ struct ContentView: View {
                                                  set: { model.selection = $0 }))
                 .paperGround()
         } else {
-            NothingPickedPage().paperGround()
+            HeroPage().paperGround()
         }
     }
 
@@ -403,24 +403,6 @@ struct ContentView: View {
         .onChange(of: model.iconMood, initial: true) { _, mood in
             DockMood.show(mood)
         }
-    }
-}
-
-/// The detail with nothing picked (#145): what the sidebar is, and the keys through it.
-private struct NothingPickedPage: View {
-    var body: some View {
-        ContentUnavailableView {
-            Label("Nothing selected", systemImage: "sidebar.left")
-        } description: {
-            Text("""
-            Pick a session on the left to read it, or New Session at the top to \
-            start one. ⌘N does the same.
-
-            ↑ and ↓ move through the list, → and ← unfold and fold a folder, \
-            and ⌘F finds a session.
-            """)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

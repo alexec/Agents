@@ -4223,6 +4223,11 @@ final class RemoteModel {
                     return try await client(for: request).call(DaemonAPI.Method.agentsTranscript, request,
                                                                returning: TranscriptPage.self)
                 },
+                entry: { index in
+                    let request = DaemonAPI.TranscriptRequest.entry(index, of: selection)
+                    return try await self.client(for: request).call(DaemonAPI.Method.agentsTranscript, request,
+                                                                returning: TranscriptPage.self)
+                },
                 describe: Self.describeLoadFailure)
             // A chat left before its page arrived does not get that page shown under the
             // next one's name.
@@ -5201,6 +5206,11 @@ extension RemoteModel {
                     let request = DaemonAPI.TranscriptRequest(agentID: id, limit: limit, from: from)
                     return try await client(for: request).call(DaemonAPI.Method.agentsTranscript, request,
                                                                returning: TranscriptPage.self)
+                },
+                entry: { index in
+                    let request = DaemonAPI.TranscriptRequest.entry(index, of: id)
+                    return try await self.client(for: request).call(DaemonAPI.Method.agentsTranscript, request,
+                                                                returning: TranscriptPage.self)
                 },
                 describe: Self.describeLoadFailure)
             // A scene closed while it loaded has nothing to put it in.

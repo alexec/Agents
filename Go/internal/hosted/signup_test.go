@@ -173,6 +173,7 @@ func TestSignUpRates(t *testing.T) {
 	for i := range 200 {
 		user := gitHubSignIn(int64(1000+i), "x"+itoa(i))
 		user.Created = now.Now().Add(-400 * 24 * time.Hour)
+		user.Email = "x" + itoa(i) + "@example.com"
 		if got := s.gate(context.Background(), "198.51.100."+itoa(i%20), user, ""); got.account != nil {
 			made++
 		}
@@ -181,7 +182,9 @@ func TestSignUpRates(t *testing.T) {
 		t.Fatalf("%d made in the hour, want 27", made)
 	}
 	now.add(time.Hour + time.Second)
-	if got := s.gate(context.Background(), "203.0.113.1", aged(gitHubSignIn(2000, "later"), now.Now().Add(-400*24*time.Hour)), ""); got.account == nil {
+	later := aged(gitHubSignIn(2000, "later"), now.Now().Add(-400*24*time.Hour))
+	later.Email = "later@example.com"
+	if got := s.gate(context.Background(), "203.0.113.1", later, ""); got.account == nil {
 		t.Fatalf("refused an hour later: %+v", got)
 	}
 }

@@ -33,6 +33,16 @@ func nextBrowserFrame(c *conn, wait time.Duration) *wire.BrowserFrame {
 	}
 }
 
+// screenGen is the cast generation of the screen of agent's tab.
+func screenGen(d *Daemon, agent wire.UUID) int {
+	d.bw.mu.Lock()
+	defer d.bw.mu.Unlock()
+	if sc := d.bw.screens[agent]; sc != nil {
+		return sc.gen
+	}
+	return -1
+}
+
 func TestWatchingTheBrowserStartsNothing(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	var s wire.BrowserPageState
@@ -81,9 +91,7 @@ func TestFramesGoOnlyToTheClientsThatWatch(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 
-	d.bw.mu.Lock()
-	gen := d.bw.gen
-	d.bw.mu.Unlock()
+	gen := screenGen(d, "")
 	d.browserFrame(gen, browser.Frame{JPEG: []byte("jpeg"), Ack: 7, Width: 800, Height: 600})
 	f := nextBrowserFrame(watcher, 2*time.Second)
 	if f == nil || string(f.Image) != "jpeg" || f.Ack != 7 || f.Width != 800 {
@@ -119,9 +127,7 @@ func TestTheWiresInputIsTheBrowsers(t *testing.T) {
 func TestAWatcherWhoJoinsSeesTheLastFrame(t *testing.T) {
 	d, first := start(t, t.TempDir())
 	first.call(t, 1, "browser/watch", wire.BrowserWatchRequest{Width: 800, Height: 600})
-	d.bw.mu.Lock()
-	gen := d.bw.gen
-	d.bw.mu.Unlock()
+	gen := screenGen(d, "")
 	d.browserFrame(gen, browser.Frame{JPEG: []byte("still"), Ack: 3, Width: 800, Height: 600})
 	if f := nextBrowserFrame(first, 10*time.Second); f == nil {
 		t.Fatal("the first watcher saw no frame in 10 s")

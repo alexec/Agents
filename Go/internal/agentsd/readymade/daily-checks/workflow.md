@@ -18,7 +18,7 @@ on:
       between: "20:00-20:00"
 agent: new
 labels: [daily-checks]
-permission-mode: plan
+permission-mode: ask
 enabled: false
 when-done: archive
 ---

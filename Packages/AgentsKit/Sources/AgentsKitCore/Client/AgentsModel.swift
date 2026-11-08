@@ -91,6 +91,10 @@ public final class AgentsModel {
     /// Nil from a host too old to say.
     public private(set) var firstPrompt: Int?
     public private(set) var openTurnStart = 0
+    /// The prompt of the turn `entries` start in, when it is not among them: a long turn
+    /// trimmed at the front, or opened from its end. Drawn above them, so the turn keeps its
+    /// prompt whatever is trimmed, as on the web page (#3249, #3948).
+    private var leadAsk: TranscriptEntry?
     public var hasMoreTurns: Bool { firstTurn > 0 }
     /// Whether anything of the conversation comes before what is in hand, and the chat will
     /// still take it. At the history cap it waits until the reader is back at the end, as on
@@ -390,6 +394,9 @@ public final class AgentsModel {
     /// The achievements the person has earned (#984); nil until the host has said, or from
     /// a host that predates them.
     public private(set) var achievements: Achievements?
+    /// The Multiplier (#3903), for the hero page (#3904); nil until the host has said, or
+    /// from a host that predates it.
+    public private(set) var multiplier: DaemonAPI.Multiplier?
 
     /// What each command the agent on screen ran has printed (033, #203).
     ///
@@ -482,6 +489,7 @@ public final class AgentsModel {
         case wakeChanged(DaemonAPI.WakeState)
         case storeNotesChanged(DaemonAPI.StoreNotes)
         case achievementsChanged(Achievements)
+        case multiplierChanged(DaemonAPI.Multiplier)
         case showFile(DaemonAPI.ShowFileNotification)
         case resuming(DaemonAPI.ResumingNotification)
         case terminalOutput(DaemonAPI.TerminalOutputNotification)
@@ -544,6 +552,7 @@ public final class AgentsModel {
         case DaemonAPI.Notification.wakeChanged: return decode(DaemonAPI.WakeState.self, Update.wakeChanged)
         case DaemonAPI.Notification.storeNotesChanged: return decode(DaemonAPI.StoreNotes.self, Update.storeNotesChanged)
         case DaemonAPI.Notification.achievementsChanged: return decode(Achievements.self, Update.achievementsChanged)
+        case DaemonAPI.Notification.multiplierChanged: return decode(DaemonAPI.Multiplier.self, Update.multiplierChanged)
         case DaemonAPI.Notification.agentShowFile: return decode(DaemonAPI.ShowFileNotification.self, Update.showFile)
         case DaemonAPI.Notification.agentResuming: return decode(DaemonAPI.ResumingNotification.self, Update.resuming)
         case DaemonAPI.Notification.agentTerminalOutput: return decode(DaemonAPI.TerminalOutputNotification.self, Update.terminalOutput)
@@ -767,6 +776,9 @@ public final class AgentsModel {
 
         case .achievementsChanged(let achievements):
             self.achievements = achievements
+
+        case .multiplierChanged(let multiplier):
+            self.multiplier = multiplier
 
         case .showFile(let notification):
             filesToShow[notification.agentID] = notification.file
@@ -1319,6 +1331,7 @@ public final class AgentsModel {
     public func replaceWakeState(_ state: DaemonAPI.WakeState) { wakeState = state }
     public func replaceStoreNotes(_ notes: DaemonAPI.StoreNotes) { storeNotes = notes.notes }
     public func replaceAchievements(_ achievements: Achievements) { self.achievements = achievements }
+    public func replaceMultiplier(_ multiplier: DaemonAPI.Multiplier) { self.multiplier = multiplier }
 
     // MARK: Choices in flight
 
@@ -1448,14 +1461,16 @@ public final class AgentsModel {
         transcriptLoadFailure = failure
     }
 
-    /// The first page of the conversation being read: the end of it.
-    public func replaceTranscript(with page: TranscriptPage) {
+    /// The first page of the conversation being read: the end of it. `ask` is the open
+    /// turn's prompt, read on its own when the page starts after it (#3948).
+    public func replaceTranscript(with page: TranscriptPage, ask: TranscriptEntry? = nil) {
         // What was heard was written after the page was read. When an id overlaps, its
         // notification is the newer copy of that entry.
         entries = Self.entriesKeepingLatest(page.entries + (heardSincePage ?? []))
         heardSincePage = nil
         firstEntryIndex = page.firstIndex
         hasMoreBefore = page.firstIndex > openTurnStart
+        leadAsk = page.firstIndex > openTurnStart ? ask.flatMap { TranscriptItem.entry($0).isPersonsAsk ? $0 : nil } : nil
         transcriptLoadFailure = nil
         refold()
     }
@@ -1497,6 +1512,7 @@ public final class AgentsModel {
         firstTurn = 0
         firstPrompt = nil
         openTurnStart = 0
+        leadAsk = nil
         refold()
     }
 
@@ -1505,6 +1521,9 @@ public final class AgentsModel {
     private func refold() {
         entryIDs = Set(entries.map(\.id))
         display = TranscriptDisplayBuilder()
+        // Paged back in, the prompt is drawn from among the entries.
+        if let ask = leadAsk, entryIDs.contains(ask.id) { leadAsk = nil }
+        if let leadAsk { display.add(leadAsk) }
         for entry in entries { display.add(entry) }
         transcriptItems = display.items
         fileIndex = TranscriptFileIndex(entries: entries)
@@ -1542,12 +1561,23 @@ public final class AgentsModel {
             return
         }
         let dropped = Array(entries[..<cut])
+        keepLeadAsk(dropped: dropped, kept: entries[cut...])
         entries.removeFirst(cut)
         firstEntryIndex += cut
         hasMoreBefore = true
         refold()
         nextTrimAt = max(Self.entriesTrimmedAt, entries.count + Self.entriesTrimmedAt - Self.entriesKept)
         onTrimmed(dropped)
+    }
+
+    /// The prompt of the turn `kept` starts in, from what goes before it, unless `kept`
+    /// starts with one (#3948).
+    private func keepLeadAsk(dropped: [TranscriptEntry], kept: ArraySlice<TranscriptEntry>) {
+        if let first = kept.first, TranscriptItem.entry(first).isPersonsAsk {
+            leadAsk = nil
+        } else if let ask = dropped.last(where: { TranscriptItem.entry($0).isPersonsAsk }) {
+            leadAsk = ask
+        }
     }
 
     /// Taken out once it has been acted on. This is "look at this now", and a client

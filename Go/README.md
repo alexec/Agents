@@ -235,7 +235,10 @@ Forgejo it was made on.
   without admin cannot read another person's access, so it falls back to whether they are a
   collaborator or a member.
 - **Tools:** `list_pull_requests`, `get_pull_request`, `get_checks`, `list_issues`,
-  `get_issue`, `comment_on_pull_request`, `comment_on_issue`; for the ready-made workflows
+  `get_issue`, `comment_on_pull_request`, `comment_on_issue`; `failed_log` (the end of a
+  failed Forgejo Actions run's jobs' logs, Forgejo 16 or Gitea 1.25, #3761) and
+  `retry_pipeline` (its failed jobs again, Forgejo 17 or Gitea 1.26, #3842), each by the
+  run's number (`run.id` in `checks.failed`); for the ready-made workflows
   (#1633) `create_pull_request`, `list_pull_request_comments` and
   `reply_to_pull_request_comment` (a review comment on the same file and line, which Forgejo
   keeps in that thread); and, on the host's copy only, `merge_pull_request` and
@@ -247,7 +250,8 @@ Forgejo it was made on.
   `common.css`, `lineage.js` and `prpage.css` are the github server's, word for word, and a test
   keeps them so): Pull requests (`show_pull_requests`), Issues (`show_issues`, with
   `show_issue_details`) and a pull request's page (`show_pull_request`), with
-  `show_pull_request_diff` for the app's diff and `failed_log` for a failed run's log.
+  `show_pull_request_diff` for the app's diff, `failed_log` for a failed run's log and
+  `retry_pipeline` for Retry.
 
 The tests run it against a fake Forgejo over HTTP (`fake_test.go`); `walk_live_test.go`
 (`-tags live`) walks every event and tool on a real Forgejo or Gitea, a scratch one in a

@@ -1,0 +1,133 @@
+<!doctype html>
+<!-- Wireframe for #3901 / #3904: the Multiplier hero page on the Mac window, animated. Example figures only. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Wireframe: the Multiplier hero page</title>
+<style>
+  :root { --ink:#1d1d1f; --mute:#86868b; --line:#d2d2d7; --blue:#2f5bea; --bg:#fff; --side:#f5f5f7; }
+  @media (prefers-color-scheme: dark) { :root { --ink:#f5f5f7; --mute:#98989d; --line:#3a3a3c; --bg:#1c1c1e; --side:#2c2c2e; } }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px -apple-system, system-ui, sans-serif; color:var(--ink); background:var(--side); }
+  .bar { padding:10px 16px; display:flex; gap:8px; align-items:center; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .bar button { font:inherit; padding:4px 10px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--ink); cursor:pointer; }
+  .bar label { color:var(--mute); margin-left:8px; }
+  .win { display:grid; grid-template-columns:240px 1fr; height:calc(100vh - 46px); }
+  .side { padding:12px; border-right:1px solid var(--line); }
+  .side .g { color:var(--mute); margin:12px 0 4px; }
+  .side .s { padding:3px 0 3px 12px; }
+  .main { background:var(--bg); display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; position:relative; }
+  .range { color:var(--mute); font-size:15px; }
+  .hero { font-size:148px; font-weight:800; letter-spacing:-4px; line-height:1; margin:8px 0 6px; font-variant-numeric:tabular-nums; }
+  .means { font-size:20px; color:var(--mute); margin-bottom:56px; }
+  .stats { display:flex; gap:72px; }
+  .stat b { display:block; font-size:56px; font-weight:700; font-variant-numeric:tabular-nums; line-height:1; }
+  .stat span { color:var(--mute); font-size:14px; }
+  .news { height:28px; margin-top:44px; font-size:18px; font-weight:600; color:var(--blue); }
+  .news.down { color:var(--mute); }
+  .news.go { animation:rise 2.4s ease-out forwards; }
+  @keyframes rise { 0% { opacity:0; transform:translateY(16px); } 15% { opacity:1; transform:none; } 70% { opacity:1; } 100% { opacity:0; transform:translateY(-16px); } }
+  .keys { position:absolute; bottom:18px; color:var(--mute); font-size:12px; }
+  .empty { display:none; }
+  body.isempty .full { display:none; } body.isempty .empty { display:block; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <strong>Wireframe #3904 (Mac only)</strong>
+  <button id="land">Land a PR</button>
+  <button id="revert">Revert one</button>
+  <button id="agent">Agent starts / stops</button>
+  <button id="reopen">Open the window again</button>
+  <button id="empty">Empty state</button>
+  <label><input type="checkbox" id="still"> Reduce Motion</label>
+</div>
+<div class="win">
+  <div class="side">
+    <div>+ New Session</div>
+    <div class="g">▾ Agents (5)</div>
+    <div class="s">● Rewrite settings sheet</div><div class="s">◐ Check the build</div><div class="s">◐ Tidy error codes</div>
+    <div class="g">▾ Web (2)</div>
+    <div class="s">◐ Parity walk</div><div class="s">○ Fix sidebar badge</div>
+  </div>
+  <div class="main">
+    <div class="full">
+      <div class="range">Last 7 days</div>
+      <div class="hero" id="hero">3.2×</div>
+      <div class="means" id="means">the work of 3.2 engineers</div>
+      <div class="stats">
+        <div class="stat"><b id="prs">23</b><span>PRs merged</span></div>
+        <div class="stat"><b id="hours">128</b><span>engineer-hours</span></div>
+        <div class="stat"><b id="agents">5</b><span>agents now</span></div>
+      </div>
+      <div class="news" id="news"></div>
+    </div>
+    <div class="empty">
+      <div class="hero" style="color:var(--mute)">— ×</div>
+      <div class="means">No merged work in the last 7 days.<br>Your number starts when an agent's first PR merges.</div>
+    </div>
+    <div class="keys">⌘N new session · ↑↓ move · ⌘F find</div>
+  </div>
+</div>
+<script>
+// Example data only: engineer-hours a PR adds, against 40 h a week.
+const WEEK = 40;
+const $ = id => document.getElementById(id);
+const now = { prs: 23, hours: 128, agents: 5 };
+let shown = { ...now }, seen = { ...now }, n = 1234, running = {};
+const still = () => $('still').checked || matchMedia('(prefers-reduced-motion: reduce)').matches;
+const mult = h => h / WEEK;
+const fmt = v => (v >= 10 ? Math.round(v) : v.toFixed(1));
+
+function draw(s) {
+  $('hero').textContent = fmt(mult(s.hours)) + '×';
+  $('means').textContent = `the work of ${fmt(mult(s.hours))} engineers`;
+  $('prs').textContent = Math.round(s.prs);
+  $('hours').textContent = Math.round(s.hours);
+  $('agents').textContent = Math.round(s.agents);
+}
+// Count every number from what the window showed to the value now.
+function countTo(ms) {
+  cancelAnimationFrame(running.id);
+  const from = { ...shown };
+  if (still()) { shown = { ...now }; draw(shown); return; }
+  const t0 = performance.now();
+  const step = t => {
+    const k = Math.min(1, (t - t0) / ms), e = 1 - Math.pow(1 - k, 3);
+    for (const key in now) shown[key] = from[key] + (now[key] - from[key]) * e;
+    draw(shown);
+    if (k < 1) running.id = requestAnimationFrame(step); else { shown = { ...now }; draw(shown); }
+  };
+  running.id = requestAnimationFrame(step);
+}
+function news(text, down) {
+  const el = $('news');
+  el.className = 'news' + (down ? ' down' : '');
+  el.textContent = still() ? '' : text;
+  void el.offsetWidth;
+  if (!still()) el.classList.add('go');
+}
+$('land').onclick = () => {
+  const h = [4, 8, 12, 24][Math.floor(Math.random() * 4)];
+  n += 1 + Math.floor(Math.random() * 3);
+  now.prs++; now.hours += h;
+  news(`+ ${(h / WEEK).toFixed(1)}×  #${n} merged`);
+  countTo(1000);
+};
+$('revert').onclick = () => {
+  const h = 8; now.prs = Math.max(0, now.prs - 1); now.hours = Math.max(0, now.hours - h);
+  news(`− ${(h / WEEK).toFixed(1)}×  #${n - 4} reverted`, true);
+  countTo(1000);
+};
+$('agent').onclick = () => { now.agents += now.agents >= 7 ? -3 : 1; countTo(600); };
+$('reopen').onclick = () => {
+  // Work landed while the window was closed: count from the last values it showed.
+  now.prs += 2; now.hours += 16;
+  shown = { ...seen }; draw(shown); countTo(1000);
+  seen = { ...now };
+};
+$('empty').onclick = () => document.body.classList.toggle('isempty');
+draw(shown);
+</script>
+</body>
+</html>

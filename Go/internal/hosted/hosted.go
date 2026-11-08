@@ -27,7 +27,7 @@ import (
 )
 
 // Config is what the service needs. Nothing in it is a secret except GitHubSecret,
-// GoogleSecret, AppleKey and WebPush's key.
+// GoogleSecret, AppleKey, TurnstileSecret and WebPush's key.
 type Config struct {
 	// The store every account's records are kept in, each under accounts/<id>/.
 	Store store.Store
@@ -75,6 +75,10 @@ type Config struct {
 	SignUp string
 	// The most accounts; at the cap, new people wait. 0 is 100.
 	MaxAccounts int
+	// Cloudflare Turnstile's widget on the sign-up page (#3388): its site key and secret
+	// key, both or neither; neither is no Turnstile, as a self-hosted or local copy needs.
+	// TurnstileAPI is its siteverify address, Cloudflare's when "" (tests give a fake's).
+	TurnstileSiteKey, TurnstileSecret, TurnstileAPI string
 	// The youngest GitHub account that may sign up without an allowlist entry. 0 is 30
 	// days; below 0 is none.
 	MinGitHubAge time.Duration
@@ -113,6 +117,10 @@ type Service struct {
 	oidc map[string]*oidcSignIn
 	rates    rates
 	certs    certificates
+	// The key of emails' marks (emailMark), from the service's own key.
+	markKey []byte
+	// Cloudflare Turnstile on the sign-up page, or nil (turnstile.go).
+	turnstile *turnstile
 	// Stripe, or nil when billing is off.
 	stripe billing.Stripe
 
@@ -186,7 +194,13 @@ func New(ctx context.Context, cfg Config) (*Service, error) {
 		github: gitHub{clientID: cfg.GitHubClientID, secret: cfg.GitHubSecret, web: cfg.GitHubWeb, api: cfg.GitHubAPI,
 			redirect: "https://" + cfg.Domain + "/signin/callback"},
 		stripe: stripe, copies: map[string]*copyRunning{}, starting: map[string]chan struct{}{}, stop: make(chan struct{}),
-		disk: &disk{read: cfg.Disk, now: cfg.Now}, oidc: map[string]*oidcSignIn{}}
+		disk: &disk{read: cfg.Disk, now: cfg.Now}, oidc: map[string]*oidcSignIn{}, markKey: emailMarkKey(own)}
+	if (cfg.TurnstileSiteKey == "") != (cfg.TurnstileSecret == "") {
+		return nil, errors.New("Turnstile needs both AGENTS_HOSTED_TURNSTILE_SITE_KEY and AGENTS_HOSTED_TURNSTILE_SECRET")
+	}
+	if cfg.TurnstileSiteKey != "" {
+		s.turnstile = newTurnstile(cfg.TurnstileSiteKey, cfg.TurnstileSecret, cfg.TurnstileAPI, cfg.SignInHTTP)
+	}
 	redirect := "https://" + cfg.Domain + "/signin/callback"
 	if cfg.AppleServicesID != "" || cfg.AppleTeamID != "" || cfg.AppleKeyID != "" || len(cfg.AppleKey) > 0 {
 		if cfg.AppleServicesID == "" || cfg.AppleTeamID == "" || cfg.AppleKeyID == "" || len(cfg.AppleKey) == 0 {
