@@ -591,7 +591,7 @@ func (d *Daemon) lineageEvent(e wire.Event) {
 	if json.Unmarshal([]byte(e.Details["payload"]), &p) != nil {
 		return
 	}
-	repo, n, ok := prOfURL(p.PR.URL)
+	repo, n, ok := d.prOfURLHere(p.PR.URL)
 	if !ok {
 		return
 	}

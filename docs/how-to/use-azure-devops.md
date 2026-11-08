@@ -201,9 +201,11 @@ service), **Open on Azure DevOps**, and:
   and the cost comment on a merged pull request (when the folder's `prCostComment` says so),
   in a closed thread of its own, so a policy that wants comments resolved is not held by it.
   Azure Repos has no milestones. A doc's address is `?path=/<path>`, on the default branch.
-- **On an Azure DevOps Server,** a pull request's address names its collection two parts
-  before `_git`; a repository named as its project, under a path such as `/tfs/`, is not
-  linked from its address.
+- **On an Azure DevOps Server (#4107),** lineage reads a pull request's address by the
+  connected Server's root (the connection's, else `AZURE_DEVOPS_URL`), so a path such as
+  `/tfs/` is left out before the collection, and a repository named as its project
+  (`collection/_git/name`) is linked. The addresses a Lineage section gives keep that path. A
+  Server that is not connected has its collection read two parts before `_git`.
 - **Not yet:** a Microsoft Entra sign-in (a personal access token only).
 
 ## See also

@@ -16,6 +16,10 @@ azureboardsmcp fake_test.go). Scratch data only, kept in memory: a walk makes no
   conflict, completed), a pull request's threads, statuses, files and their diff, tags, its
   Azure Pipelines builds (one failed, with its timeline and log), and the writes the pages make
   (a comment, tags, abandon, complete, a vote, a build run again).
+- What lineage asks of it (#3952, #4107): the repository's commits, newest first, with the tags
+  v1.0.0 and v1.1.0, so the release v1.1.0 has the pull requests 6 (by its "Merged PR 6:"
+  title) and 5 (a squash with no such title, by pullrequestquery on its lastMergeCommit); the
+  cost comment, posted in a closed thread and edited (a comment's PATCH).
 
 run-app starts it with `launch.sh --fake-azure-devops` and gives the host a scratch
 AGENTS_PERSONAL_HOME whose .agents-secrets/secrets.env says
@@ -115,9 +119,14 @@ PULLS = {
     8: {"pullRequestId": 8, "title": "Coupon field above the keyboard", "status": "active", "createdBy": KIM, "creationDate": ago(2),
         "sourceRefName": "refs/heads/coupon", "targetRefName": "refs/heads/main", "mergeStatus": "conflicts", "isDraft": True,
         "description": "", "lastMergeSourceCommit": {"commitId": "c8head"}, "labels": [], "reviewers": []},
+    5: {"pullRequestId": 5, "title": "Show the card's brand", "status": "completed", "createdBy": SAM, "creationDate": ago(50),
+        "closedDate": ago(45), "sourceRefName": "refs/heads/brand", "targetRefName": "refs/heads/main", "mergeStatus": "succeeded",
+        "description": "Fixes AB#43", "lastMergeSourceCommit": {"commitId": "c5head"},
+        "lastMergeCommit": {"commitId": "b5" * 20}, "labels": [], "reviewers": [{**KIM, "vote": 10}]},
     6: {"pullRequestId": 6, "title": "Log the dismiss reason", "status": "completed", "createdBy": KIM, "creationDate": ago(30),
         "closedDate": ago(26), "sourceRefName": "refs/heads/dismiss", "targetRefName": "refs/heads/main", "mergeStatus": "succeeded",
-        "description": "", "lastMergeSourceCommit": {"commitId": "c6head"}, "labels": [{"name": "ux", "active": True}],
+        "description": "", "lastMergeSourceCommit": {"commitId": "c6head"}, "lastMergeCommit": {"commitId": "a6" * 20},
+        "labels": [{"name": "ux", "active": True}],
         "reviewers": [{**SAM, "vote": 10}]},
 }
 THREADS = {7: [
@@ -137,9 +146,43 @@ BUILDS = [{"id": 31, "buildNumber": "20261107.3", "status": "completed", "result
            "_links": {"web": {"href": f"{BASE}/acme/{PROJECT}/_build/results?buildId=32"}}}]
 STATUSES = {7: [{"id": 1, "state": "succeeded", "description": "No secrets", "targetUrl": "https://scan.example/1",
                  "creationDate": ago(3), "context": {"genre": "scan", "name": "secrets"}}]}
+# The repository's commits on main, newest first, and its tags (#3952): lineage reads a release
+# by them (commits with itemVersion and compareVersion, then pullrequestquery).
+COMMITS = [
+    {"commitId": "c1" * 20, "comment": "Fix a typo in the README", "committer": {"name": "Kim Lee", "date": ago(20)}},
+    {"commitId": "a6" * 20, "comment": "Merged PR 6: Log the dismiss reason", "committer": {"name": "Kim Lee", "date": ago(26)}},
+    {"commitId": "b5" * 20, "comment": "Show the card's brand", "committer": {"name": "Sam Ortiz", "date": ago(45)}},
+    {"commitId": "d0" * 20, "comment": "Merged PR 4: Checkout in one page", "committer": {"name": "Sam Ortiz", "date": ago(70)}},
+]
+TAGS_AT = {"v1.1.0": "c1" * 20, "v1.0.0": "d0" * 20}
 FILES = {"c7base:/src/checkout.ts": "export function pay(card) {\n  return charge(card);\n}\n",
          "c7head:/src/checkout.ts": "export function pay(card, saved) {\n  const card2 = saved ?? card;\n  return charge(card2);\n}\n",
          "c7head:/src/saved.ts": "export const saved = [];\n"}
+
+
+def commits_of(q):
+    """The commits a commits query asks for: from its itemVersion, newest first, up to its
+    compareVersion, a page of searchCriteria.$top after searchCriteria.$skip."""
+    one = lambda k: q.get(k, [""])[0]
+
+    def index(which):
+        ref = one(f"searchCriteria.{which}.version")
+        if one(f"searchCriteria.{which}.versionType") == "tag":
+            ref = TAGS_AT.get(ref, "")
+        return next((i for i, c in enumerate(COMMITS) if ref and c["commitId"] == ref), None)
+
+    start = index("itemVersion") if one("searchCriteria.itemVersion.version") else 0
+    if start is None:
+        return None
+    end = len(COMMITS)
+    if one("searchCriteria.compareVersion.version"):
+        end = index("compareVersion")
+        if end is None:
+            return None
+    out = COMMITS[start:max(start, end)]
+    skip = int(one("searchCriteria.$skip") or 0)
+    top = int(one("searchCriteria.$top") or 100)
+    return out[skip:skip + top]
 
 
 def full(n):
@@ -294,6 +337,18 @@ class Handler(BaseHTTPRequestHandler):
     def repos(self, method, rest, q):
         """The repository's pull requests and builds (#3803)."""
         one = lambda k: q.get(k, [""])[0]
+        if method == "GET" and rest == "/commits":
+            out = commits_of(q)
+            if out is None:
+                return self.answer({"message": "TF401175: The version descriptor could not be resolved."}, 404)
+            return self.answer({"count": len(out), "value": out})
+        if method == "POST" and rest == "/pullrequestquery":
+            found = {}
+            for query in self.body()["queries"]:
+                for sha in query["items"]:
+                    found[sha] = [{"pullRequestId": p["pullRequestId"], "status": p["status"]} for p in PULLS.values()
+                                  if query["type"] == "lastMergeCommit" and p.get("lastMergeCommit", {}).get("commitId") == sha]
+            return self.answer({"results": [found]})
         if method == "GET" and rest == "/pullrequests":
             status = one("searchCriteria.status") or "active"
             out = sorted((p for p in PULLS.values() if status == "all" or p["status"] == status), key=lambda p: -p["pullRequestId"])
@@ -322,13 +377,23 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             n = int(m.group(1))
             if method == "POST":
-                c = self.body()["comments"][0]
-                t = {"id": NEXT[0], "status": "active", "comments": [{"id": 1, "author": KIM, "content": c["content"],
+                b = self.body()
+                c = b["comments"][0]
+                # The cost comment is posted in a closed thread (#3952).
+                t = {"id": NEXT[0], "status": b.get("status") or "active", "comments": [{"id": 1, "author": KIM, "content": c["content"],
                                                                      "publishedDate": NOW, "commentType": "text"}]}
                 NEXT[0] += 1
                 THREADS.setdefault(n, []).append(t)
                 return self.answer(t)
             return self.answer({"value": THREADS.get(n, [])})
+        m = re.fullmatch(r"/pullrequests/(\d+)/threads/(\d+)/comments/(\d+)", rest)
+        if method == "PATCH" and m:
+            t = next((t for t in THREADS.get(int(m.group(1)), []) if t["id"] == int(m.group(2))), None)
+            c = next((c for c in (t or {}).get("comments", []) if c["id"] == int(m.group(3))), None)
+            if c is None:
+                return self.answer({"message": "TF401181: The comment was not found."}, 404)
+            c["content"], c["lastUpdatedDate"] = self.body()["content"], NOW
+            return self.answer(c)
         m = re.fullmatch(r"/pullrequests/(\d+)/labels(?:/(.+))?", rest)
         if m:
             p = PULLS[int(m.group(1))]
