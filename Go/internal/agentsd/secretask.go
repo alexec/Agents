@@ -47,8 +47,9 @@ func (d *Daemon) askSecret(id wire.UUID, args map[string]json.RawMessage) (strin
 		return "", err
 	}
 	path := skillcatalog.SecretsPath(home)
-	sessionOnly := true
-	secret := wire.ElicitationSecret{Name: name, IsSet: skillcatalog.LoadSecrets(path).IsSet(name) || isSealedSecret(home, name), CanBeSessionOnly: &sessionOnly}
+	sessionOnly, ask := true, true
+	secret := wire.ElicitationSecret{Name: name, IsSet: skillcatalog.LoadSecrets(path).IsSet(name) || isSealedSecret(home, name),
+		CanBeSessionOnly: &sessionOnly, CanAskBeforeUse: &ask}
 	if u := strings.TrimSpace(argString(args, "url")); strings.HasPrefix(u, "https://") || strings.HasPrefix(u, "http://") {
 		secret.URL = &u
 	}
@@ -74,7 +75,8 @@ func (d *Daemon) secretNote(agent wire.UUID, name string, action wire.AnswerElic
 	case wire.AnswerElicitationRequestActionAccept:
 		if d.secretIsSealed(agent, name) {
 			return name + " is saved with Ask before use: it is sealed on this machine, and it is not in your environment " +
-				"or in a file you can read. Use it with fill_secret or set_ci_secret, which put it where it goes for you."
+				"or in a file you can read. Use it with fill_secret or set_ci_secret, which put it where it goes for you. " +
+				"A person approves each use: the call waits for them, or tells you which request to wait on with wait_for_event."
 		}
 		if _, ok, _ := d.sessionSecret(agent, name); ok {
 			return name + " is kept for this session only, and deleted when the session is archived (#3548). " +

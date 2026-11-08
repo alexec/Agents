@@ -100,7 +100,7 @@
   {
     "name": "manage_accounts",
     "title": "The person's outside accounts",
-    "description": "The person's outside accounts (gitlab.com, AWS, Slack and the like), as Your setup ▸ Accounts in the app keeps them for every machine of theirs. Before you make an account on a service, list with service to find out whether there is one already, and use it. When you make one, add it. An account holds no secret: card and secret are the names of secrets in Your setup ▸ Secrets (or where one is), never a value; a value that looks like a token, a key or a card number is refused. add puts an account with the same service and address in place of the old one. import adds the old registry's files in ~/.agents/accounts/ on this machine, once.",
+    "description": "The person's outside accounts (gitlab.com, AWS, Slack and the like), as Settings ▸ You ▸ Accounts in the app keeps them for every machine of theirs. Before you make an account on a service, list with service to find out whether there is one already, and use it. When you make one, add it. An account holds no secret: card and secret are the names of secrets in Settings ▸ You ▸ Secrets (or where one is), never a value; a value that looks like a token, a key or a card number is refused. add puts an account with the same service and address in place of the old one. import adds the old registry's files in ~/.agents/accounts/ on this machine, once.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -147,11 +147,11 @@
             },
             "card": {
               "type": "string",
-              "description": "The card it bills, by its name in Your setup ▸ Secrets. Never the number."
+              "description": "The card it bills, by its name in Settings ▸ You ▸ Secrets. Never the number."
             },
             "secret": {
               "type": "string",
-              "description": "Its token or key, by its name in Your setup ▸ Secrets or where it is. Never the value."
+              "description": "Its token or key, by its name in Settings ▸ You ▸ Secrets or where it is. Never the value."
             },
             "twoFactor": {
               "type": "string",

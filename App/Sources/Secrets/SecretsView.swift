@@ -1,9 +1,10 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Your setup ▸ Secrets (#3632): the person's secrets and cards, kept by the control plane and
+/// Settings ▸ You ▸ Secrets (#3998): the person's secrets and cards, kept by the control plane and
 /// sent to each machine of theirs (#1760), then this Mac's secrets for one session (#3548). Was
-/// Settings ▸ Machines ▸ Secrets. The web page draws the same in Your setup ▸ Secrets.
+/// Settings ▸ You ▸ Secrets (#3632), and before that Settings ▸ Machines ▸ Secrets. The web page draws
+/// the same in Settings ▸ You ▸ Secrets.
 struct SecretsView: View {
     @Environment(AppModel.self) private var model
 
@@ -13,16 +14,5 @@ struct SecretsView: View {
             .frame(maxWidth: 560)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .navigationTitle(UserScopeWords.secretsTitle)
-    }
-}
-
-struct SecretsRow: View {
-    var body: some View {
-        // The title alone (#587).
-        HStack(alignment: .firstTextBaseline) {
-            Text(UserScopeWords.secretsTitle).foregroundStyle(.primary)
-            Spacer()
-        }
-        .help("Your secrets and cards, sent to each machine of yours")
     }
 }

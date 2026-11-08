@@ -2,12 +2,12 @@ import AgentsKitCore
 import SwiftUI
 
 /// The runtimes installed on a machine (#3629), as a section of its page: one line each, its
-/// version and, where the machine says, signed in. Only the installed ones (#3743): Your setup
+/// version and, where the machine says, signed in. Only the installed ones (#3743): Status ▸ Runtimes
 /// lists every runtime. **Update** on This Mac, whose daemon installs from the app (048), and
 /// **Install** on the ones it can install, closed under Not installed: this page is where
 /// This Mac installs one after start-up. A server installs its runtimes when it is set up,
 /// and refuses an install from a client. **Sign In…** on This Mac opens the runtime's sign-in sheet.
-/// Accounts and allowances are the person's, not the machine's: they stay in Your setup.
+/// Accounts and allowances are the person's, not the machine's: they stay in Status.
 /// The web page draws the same in Web/src/views/MachinePage.tsx.
 struct MachineRuntimesSection: View {
     @Environment(AppModel.self) private var model
@@ -33,7 +33,7 @@ struct MachineRuntimesSection: View {
                     ForEach(installable) { status in row(status) }
                 }
             }
-            Button("Every runtime, your accounts and allowances, in Your setup") { model.showRuntimes() }
+            Button("Every runtime, your accounts and allowances, in Status") { model.showRuntimes() }
                 .buttonStyle(.link)
                 .appText(.supporting)
         } header: {

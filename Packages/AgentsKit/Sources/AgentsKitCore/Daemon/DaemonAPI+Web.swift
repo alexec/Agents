@@ -68,6 +68,7 @@ public extension DaemonAPI {
                 Row(Method.secretsSessionList, params: Empty.self, result: SessionSecrets.self, kind: .hostRequest),
                 Row(Method.secretsSessionSet, params: SessionSecretSetRequest.self, result: SessionSecrets.self, kind: .hostRequest),
                 Row(Method.secretsSessionRemove, params: SessionSecretRemoveRequest.self, result: SessionSecrets.self, kind: .hostRequest),
+                Row(Method.secretsSetNeedsApproval, params: SecretNeedsApprovalRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.desktopControlSet, params: DesktopControlSettings.self, result: DesktopControlSettings.self,
                     kind: .hostRequest),
                 // Pause on touch's two answers (#3004, US3).
@@ -280,6 +281,8 @@ public extension DaemonAPI {
                 Row(Method.docsList, params: DocsListRequest.self, result: DocsList.self, kind: .hostRequest),
                 Row(Method.docsSearch, params: DocsSearchRequest.self, result: DocsSearch.self, kind: .hostRequest),
                 Row(Method.docsRead, params: DocsReadRequest.self, result: DocsReading.self, kind: .hostRequest),
+                Row(Method.lineageSessions, params: LineageSessionsRequest.self, result: LineageSessions.self,
+                    kind: .hostRequest),
                 Row(Method.lineageWalk, params: LineageNodeRequest.self, result: LineageGraph.self, kind: .hostRequest),
                 // The checked channel to a machine (#3492).
                 Row(Method.lockHello, params: LockHello.self, result: LockHelloReply.self, kind: .hostRequest),
@@ -375,6 +378,11 @@ public extension DaemonAPI {
                 Row(Method.workflowsArchive, params: WorkflowArchiveRequest.self, result: WorkflowSummary.self,
                     kind: .hostRequest),
                 Row(Method.workflowsDelete, params: WorkflowRequest.self, result: Empty.self, kind: .hostRequest),
+                // An edited ready-made copy's two buttons (#4075).
+                Row(Method.workflowsReadyMadeTake, params: WorkflowRequest.self, result: WorkflowSummary.self,
+                    kind: .hostRequest),
+                Row(Method.workflowsReadyMadeKeep, params: WorkflowRequest.self, result: WorkflowSummary.self,
+                    kind: .hostRequest),
                 // Its settings, labels and cooldown on the page (#162), each control its one key.
                 Row(Method.workflowsSettings, params: WorkflowSettingsRequest.self, result: WorkflowSummary.self,
                     kind: .hostRequest),

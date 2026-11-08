@@ -3,6 +3,47 @@ import Foundation
 /// The lineage graph as the clients read it: `lineage/walk` from a node, and `lineage/cost`
 /// for each issue and PR the walk reached (#2348, #2350).
 public extension DaemonAPI {
+    /// `lineage/sessions` (#3899): a search for `#<number>` asks for the sessions on that issue,
+    /// on its sub-issues and on their PRs.
+    struct LineageSessionsRequest: Codable, Sendable, Hashable {
+        public var number: Int
+        public init(number: Int) { self.number = number }
+    }
+
+    /// A session on the issue, and the issue it is on: the one asked for or one of its sub-issues.
+    struct LineageSessionMatch: Codable, Sendable, Hashable {
+        public var agentID: UUID
+        public var on: LineageNode
+        public init(agentID: UUID, on: LineageNode) {
+            self.agentID = agentID
+            self.on = on
+        }
+    }
+
+    /// One heading of a search for an epic (#3900): the epic or one of its sub-issues, and its
+    /// title, nil while the host has not resolved it.
+    struct LineageSessionIssue: Codable, Sendable, Hashable {
+        public var node: LineageNode
+        public var title: String?
+        public init(node: LineageNode, title: String? = nil) {
+            self.node = node
+            self.title = title
+        }
+    }
+
+    struct LineageSessions: Codable, Sendable, Hashable {
+        public var matches: [LineageSessionMatch]
+        /// The issue asked for, then its sub-issues in the epic's order (#3900); nil from a host
+        /// too old to say.
+        public var issues: [LineageSessionIssue]?
+        public var limited: Bool?
+        public init(matches: [LineageSessionMatch], issues: [LineageSessionIssue]? = nil, limited: Bool? = nil) {
+            self.matches = matches
+            self.issues = issues
+            self.limited = limited
+        }
+    }
+
     /// `lineage/links` and `lineage/walk`: a node, and for a walk how many links away to go
     /// (1 to 4; 2 when not said: issue, sessions, PRs).
     struct LineageNodeRequest: Codable, Sendable, Hashable {

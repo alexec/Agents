@@ -28,6 +28,7 @@ type fillPage struct {
 	filled   bool   // the field has the fill's mark
 	noMask   bool   // the page will not let the field be masked
 	navigate bool   // the page went somewhere else
+	site     string // the field's domain, shop.example.com when left out
 }
 
 func (p *fillPage) callTool(_ context.Context, name string, args map[string]json.RawMessage) (*mcp.CallToolResult, error) {
@@ -56,6 +57,12 @@ func (p *fillPage) callTool(_ context.Context, name string, args map[string]json
 			return text("### Result\n\"agents-filled\""), nil
 		case fn == filledCheck:
 			return text("### Result\n\"agents-clear\""), nil
+		case fn == fieldSite:
+			site := p.site
+			if site == "" {
+				site = "shop.example.com"
+			}
+			return text("### Result\n\"agents-site:" + site + "\""), nil
 		}
 		return text("### Result\n\"" + p.value + "\""), nil
 	case "browser_navigate":

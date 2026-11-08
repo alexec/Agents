@@ -25,7 +25,8 @@ const Instructions = "This repository's pull requests and their Azure Pipelines 
 	"list_pull_requests, get_pull_request and get_checks read them, and get_build_log reads a failed build's failed steps; " +
 	"comment_on_pull_request comments. " +
 	"create_pull_request opens a pull request from a pushed branch; list_pull_request_comments lists its line comments, and " +
-	"reply_to_pull_request_comment answers one in its thread. " +
+	"reply_to_pull_request_comment answers one in its thread. retry_build runs a build's failed jobs again. " +
+	"show_pull_requests and show_pull_request draw this server's pages: Pull requests and a pull request's page. " +
 	"Work items are not here: use the tracker's tools. " +
 	"Merging and approving a pull request are a person's: those tools are not for agents."
 

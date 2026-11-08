@@ -2,7 +2,7 @@ import AgentsKitCore
 import AppKit
 import SwiftUI
 
-/// Your setup ▸ Connectors (#1336, frame E; #3632): the person's connections, one row each with
+/// Settings ▸ You ▸ Connectors (#1336, frame E; #3632): the person's connections, one row each with
 /// Disconnect. A connection is the person's, so it lives here; a project's page shows it as
 /// one line. Each project's set-up is on its own Connectors row in the sidebar (#3407).
 struct YourConnectionsView: View {

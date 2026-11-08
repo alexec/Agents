@@ -45,6 +45,9 @@ public struct SidebarFolderFold {
     /// their last activity, so a working session does not climb past the pointer with
     /// every line it writes (as folders stopped doing, #357).
     public private(set) var sessions: [Agent] = []
+    /// While a search names an epic (#3900): every session it found here, pinned, live and
+    /// archived, under its issue's heading. `sessions`, `pinned` and `archived` are then empty.
+    public private(set) var issueGroups: [SidebarIssueGroup] = []
     /// The archived sessions held, newest first: a page while the fold is open (#165).
     public private(set) var archived: [Agent] = []
     /// The three most recently archived sessions, shown under Sessions (#2587), of those
@@ -81,7 +84,7 @@ public struct SidebarFolderFold {
 
     /// Whether the folder is drawn at all: always, unless a search found nothing in it.
     public var isShown: Bool {
-        !isSearching || nameMatches || hasPinned || !groups.isEmpty || !archived.isEmpty
+        !isSearching || nameMatches || hasPinned || !groups.isEmpty || !archived.isEmpty || !issueGroups.isEmpty
             || !workflows.isEmpty || !archivedWorkflows.isEmpty
     }
 
@@ -135,7 +138,7 @@ public struct SidebarFolderFold {
         self.key = key
         let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
         self.query = words
-        let matcher = words.isEmpty ? nil : SessionLabelQuery(words, said: work.saidLines)
+        let matcher = words.isEmpty ? nil : SessionLabelQuery(words, said: work.saidLines, onIssue: work.issueSessions)
         isUnfolded = isOpen || matcher != nil
         if matcher != nil { nameMatches = label.localizedCaseInsensitiveContains(words) }
         guard isUnfolded else { return }
@@ -181,6 +184,13 @@ public struct SidebarFolderFold {
         }.sorted { $0.createdAt > $1.createdAt }
         let archived = shelf.groups[.archived] ?? []
         self.archived = matcher.map { archived.filter($0.matches) } ?? archived
+        // A search for an epic (#3900): no smart group takes a session from its issue's
+        // heading, so each is listed here once, under it.
+        if matcher != nil, SidebarIssueGroup.isOn(query: words, in: work) {
+            let found = self.pinned + groups.flatMap(\.agents).filter { !$0.writesDailySummary } + self.archived
+            issueGroups = SidebarIssueGroup.groups(found, in: work)
+            (self.pinned, sessions, self.archived) = ([], [], [])
+        }
     }
 }
 

@@ -1,4 +1,4 @@
-// Your setup ▸ Secrets (#1760, #3632), as the window's (Shared/UI/UserScope): the person's secrets
+// Settings ▸ You ▸ Secrets (#1760, #3632), as the window's (Shared/UI/UserScope): the person's secrets
 // and cards, by name only, which go to every machine of theirs.
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
@@ -9,6 +9,8 @@ import { sealSecret } from "../wire/sealing";
 import { describe, methodNotFound } from "../model/errors";
 import { addCard, addSecret, cardConfirm, cardKind, cardKindLabel, cardProblem, cardRule, cardValue, isSecretName, leftOn,
   machines, nameHint, nextVersion, secretsFoot, secretsLeft, secretsTitle, tidyCard, waitingOn } from "../model/userScope";
+import { askBeforeUseWords } from "../model/askBeforeUse";
+import { AskBeforeUseCheck } from "./AskBeforeUse";
 import { Modal } from "./Modal";
 
 function sentence(error: unknown): string {
@@ -17,24 +19,29 @@ function sentence(error: unknown): string {
 }
 
 /** Seals the value here to each of the person's machines and apps (#3397), and sends only the envelopes: the
- * control plane never has it. kind is "card" for a card (#3531). */
-async function setSecret(store: Store, name: string, value: string, replacing: UserSecretRow | null, kind?: UserSecretKind) {
+ * control plane never has it. kind is "card" for a card (#3531). Ask before use (#4016) is sealed into every
+ * copy's associated data, so it is set here, on Add and Replace: no client can read a value back to seal it again. */
+async function setSecret(store: Store, name: string, value: string, replacing: UserSecretRow | null, ask: boolean,
+  kind?: UserSecretKind) {
   const version = nextVersion(replacing, Date.now());
   const { recipients, user } = await store.link.call("user/secretRecipients", {});
   // Only to the machines the lock names (#3491, D8): the control plane cannot add a key of its own.
-  const values = await sealSecret(user ?? "", name, version, value, await store.signedRecipients(recipients));
-  await store.link.call("user/setSecret", { name: name as never, version, values, ...(kind ? { kind } : {}) });
+  const values = await sealSecret(user ?? "", name, version, value, await store.signedRecipients(recipients), ask);
+  await store.link.call("user/setSecret", { name: name as never, version, values, ...(kind ? { kind } : {}),
+    ...(ask ? { needsApproval: true } : {}) });
 }
 
 function SecretSheet({ store, replacing, close }: { store: Store; replacing: UserSecretRow | null; close: () => void }) {
   const name = useSignal(replacing?.name ?? "");
   const value = useSignal("");
+  // A person's secret starts off; a replaced one keeps its own.
+  const ask = useSignal(replacing?.needsApproval === true);
   const problem = useSignal<string | null>(null);
   const busy = useSignal(false);
   const save = async () => {
     busy.value = true;
     try {
-      await setSecret(store, name.value.trim(), value.value, replacing);
+      await setSecret(store, name.value.trim(), value.value, replacing, ask.value);
       value.value = "";
       close();
     } catch (error) {
@@ -54,6 +61,7 @@ function SecretSheet({ store, replacing, close }: { store: Store; replacing: Use
         )}
         <input type="password" aria-label="Value" placeholder="Value" autocomplete="off" value={value.value}
           onInput={(e) => (value.value = (e.currentTarget as HTMLInputElement).value)} />
+        <AskBeforeUseCheck on={ask} />
         <p class={problem.value ? "sheet-note failure" : "sheet-note"} role={problem.value ? "alert" : undefined}>{problem.value ?? nameHint}</p>
         <div class="sheet-actions">
           <button type="button" onClick={close}>Cancel</button>
@@ -73,6 +81,7 @@ function CardSheet({ store, replacing, close }: { store: Store; replacing: UserS
   const holder = useSignal("");
   const zip = useSignal("");
   const locked = useSignal(false);
+  const ask = useSignal(replacing?.needsApproval === true);
   const problem = useSignal<string | null>(null);
   const busy = useSignal(false);
   const save = async () => {
@@ -84,7 +93,7 @@ function CardSheet({ store, replacing, close }: { store: Store; replacing: UserS
     }
     busy.value = true;
     try {
-      await setSecret(store, name.value.trim(), cardValue(card), replacing, cardKind);
+      await setSecret(store, name.value.trim(), cardValue(card), replacing, ask.value, cardKind);
       number.value = "";
       cvc.value = "";
       close();
@@ -117,6 +126,7 @@ function CardSheet({ store, replacing, close }: { store: Store; replacing: UserS
         {field("CVC", cvc, { type: "password", inputMode: "numeric" })}
         {field("Name on card", holder)}
         {field("Billing ZIP", zip)}
+        <AskBeforeUseCheck on={ask} />
         <p class={problem.value ? "sheet-note failure" : "sheet-note"} role={problem.value ? "alert" : undefined}>{problem.value ?? nameHint}</p>
         <div class="sheet-actions">
           <button type="button" onClick={close}>Cancel</button>
@@ -138,6 +148,7 @@ function SecretItem({ row, replace, remove, down }: { row: UserSecretRow; replac
       <code>{row.name}</code>
       {row.kind === cardKind && <span class="hint">{cardKindLabel}</span>}
       <span class="hint">{machines(row)}</span>
+      {row.needsApproval && <span class="hint"><span aria-hidden="true">✋ </span>{askBeforeUseWords.asks}</span>}
       {waiting && <p class="hint attention">{waiting}</p>}
       {left && <p class="hint attention">{left}</p>}
       <span class="row-actions">

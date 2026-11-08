@@ -36,7 +36,7 @@ Bitbucket has no sign-in page for Agents, so you connect it with a token (#3785)
    - **An access token** of the repository, project or workspace (its **Settings ▸
      Access tokens**), with the same scopes. It acts as its own bot user, so
      `review.requested`, `issue.assigned` and `mine` are that bot's.
-2. In Agents, open **Your setup ▸ Connectors** and choose **Connect… ▸ Bitbucket** (on the
+2. In Agents, open **Settings ▸ You ▸ Connectors** and choose **Connect… ▸ Bitbucket** (on the
    web page, **Connect Bitbucket…** on Connections). Or, on a folder whose remote is on
    bitbucket.org, choose **Connect Bitbucket…** on its Connectors page.
 3. For an API token, give its **Atlassian email**. For an access token, leave it empty.

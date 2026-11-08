@@ -2,6 +2,8 @@ package agentsd
 
 import (
 	"context"
+	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -110,4 +112,66 @@ func azureDevOpsOfPath(host, path string, anyHost bool) (string, bool) {
 		return strings.ToLower(parts[n-4] + "/" + parts[n-3] + "/" + parts[n-1]), true
 	}
 	return "", false
+}
+
+// azureDevOpsServerRoot is the root of the connected Azure DevOps Server, with its trailing
+// slash: the Azure DevOps connection's, else the one AZURE_DEVOPS_URL names with
+// AZURE_DEVOPS_TOKEN, as azureDevOpsAt and azureDevOpsToken read them; "" for none or for
+// dev.azure.com. It may be under a path of its host (tfs/), which an address's own path does
+// not tell apart from a collection (#4107).
+func (d *Daemon) azureDevOpsServerRoot() string {
+	var bases []string
+	if c, ok := d.azureDevOpsConnection(); ok && c.Usable(nowFunc()) && c.URL != "" {
+		bases = append(bases, c.URL)
+	}
+	if secrets := d.secrets(); secrets["AZURE_DEVOPS_TOKEN"] != "" && secrets["AZURE_DEVOPS_URL"] != "" {
+		bases = append(bases, secrets["AZURE_DEVOPS_URL"])
+	}
+	for _, base := range bases {
+		if root := azuredevopsmcp.BaseURL(base); root != azuredevopsmcp.DefaultBase {
+			return root
+		}
+	}
+	return ""
+}
+
+// onAzureDevOpsRoot says raw is an address under root: its host and the path root has.
+func onAzureDevOpsRoot(raw, root string) bool {
+	u, err := url.Parse(raw)
+	r, rerr := url.Parse(root)
+	if err != nil || rerr != nil || root == "" || !strings.EqualFold(u.Host, r.Host) {
+		return false
+	}
+	prefix := strings.Trim(r.Path, "/")
+	path := strings.Trim(u.Path, "/")
+	return prefix == "" || strings.EqualFold(path, prefix) || len(path) > len(prefix) && strings.EqualFold(path[:len(prefix)+1], prefix+"/")
+}
+
+// azureDevOpsOfURLOn is the repository and number of a pull request's address on the Azure
+// DevOps Server at root, root's path left out: [prefix/]collection/project/_git/name or
+// [prefix/]collection/_git/name, read as azuredevopsmcp.RepoOfRemote reads a remote.
+func azureDevOpsOfURLOn(raw, root string) (forgeRepo, int, bool) {
+	u, err := url.Parse(raw)
+	if err != nil || !onAzureDevOpsRoot(raw, root) {
+		return forgeRepo{}, 0, false
+	}
+	repo, num, ok := strings.Cut(u.EscapedPath(), "/pullrequest/")
+	n, nerr := strconv.Atoi(strings.SplitN(num, "/", 2)[0])
+	if !ok || nerr != nil || n <= 0 {
+		return forgeRepo{}, 0, false
+	}
+	named, ok := azuredevopsmcp.RepoOfRemote(root, u.Scheme+"://"+u.Host+repo)
+	if !ok {
+		return forgeRepo{}, 0, false
+	}
+	return forgeRepo{"azuredevops", strings.ToLower(named)}, n, true
+}
+
+// prOfURLHere is prOfURL, or a pull request on the connected Azure DevOps Server, whose path
+// may start with a prefix of its own (#4107).
+func (d *Daemon) prOfURLHere(raw string) (forgeRepo, int, bool) {
+	if repo, n, ok := azureDevOpsOfURLOn(raw, d.azureDevOpsServerRoot()); ok {
+		return repo, n, true
+	}
+	return prOfURL(raw)
 }

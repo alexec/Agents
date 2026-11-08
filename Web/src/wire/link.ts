@@ -55,7 +55,9 @@ export type LinkState =
 /** A JSON-RPC error from a host or the control plane. */
 export class CallFailed extends Error {
   /** What the failure carries besides its sentence: a sandbox refusal's way on, say (#257). */
-  constructor(readonly code: number, message: string, readonly data?: unknown) {
+  constructor(readonly code: number, message: string, readonly data?: unknown,
+    /** The machine the call went to; null or absent for the control plane (#4096). */
+    readonly route?: string | null) {
     super(message);
   }
 }
@@ -575,7 +577,7 @@ export class Link {
       for (const [id, pending] of this.pending) {
         if (pending.route !== route) continue;
         this.pending.delete(id);
-        pending.reject(new CallFailed(message.error.code, message.error.message, message.error.data));
+        pending.reject(new CallFailed(message.error.code, message.error.message, message.error.data, pending.route));
       }
       return;
     }
@@ -585,7 +587,7 @@ export class Link {
       this.pending.delete(message.id);
       if (message.error) {
         log("call.failed", message.error.code);
-        pending.reject(new CallFailed(message.error.code, message.error.message, message.error.data));
+        pending.reject(new CallFailed(message.error.code, message.error.message, message.error.data, pending.route));
       } else {
         pending.resolve(message.result);
       }

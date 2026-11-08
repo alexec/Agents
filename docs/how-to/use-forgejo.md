@@ -31,7 +31,7 @@ Forgejo has no sign-in page for Agents, so you connect it with an access token (
 1. On your Forgejo, open **Settings ▸ Applications** and make an access token with
    **Read and write** on **repository** and **issue**, and **Read** on **user** and
    **organization**.
-2. In Agents, open **Your setup ▸ Connectors** and choose **Connect… ▸ Forgejo** (on the web
+2. In Agents, open **Settings ▸ You ▸ Connectors** and choose **Connect… ▸ Forgejo** (on the web
    page, **Connect Forgejo…** on Connections). Or, on a folder whose remote is on a Forgejo,
    choose **Connect Forgejo…** on its Connectors page.
 3. Fill in the **Forgejo address**: leave it empty for Codeberg, or give your own Forgejo's
@@ -153,8 +153,8 @@ open the page again.
 
 With a control plane, **Settings ▸ Account** on the Mac (**Settings ▸ Control plane** on the
 web page) keeps your **Forgejo login**, your user name on the connected Forgejo, beside your
-GitHub, GitLab, Linear and Jira logins. The control plane gives the logins of all its people
-to the servers that draw a Team section. A Forgejo login is your user name on the connected
+GitHub, GitLab, Linear, Jira, Bitbucket and Azure DevOps logins. The control plane gives the
+logins of all its people to the servers that draw a Team section. A Forgejo login is your user name on the connected
 Forgejo. A machine that has Forgejo connected fills in your
 login from the connection, so you give it only when that machine is not connected.
 

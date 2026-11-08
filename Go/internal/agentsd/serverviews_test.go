@@ -165,7 +165,8 @@ func TestOurViewsShowWhereTheRepoFits(t *testing.T) {
 	}
 	// #3131, #3311: Work lists GitHub's and GitLab's issues and pull requests and Linear's
 	// issues, so their rows go where they fit.
-	if !inWork(github) || !inWork(gitlab) || !inWork(forgejo) || !inWork(bitbucket) || !inWork(linear) {
+	azuredevops, _ := mcpcatalog.OursByID("agents/azuredevops")
+	if !inWork(github) || !inWork(gitlab) || !inWork(forgejo) || !inWork(bitbucket) || !inWork(azuredevops) || !inWork(linear) {
 		t.Fatal("in Work")
 	}
 }

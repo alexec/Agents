@@ -675,14 +675,28 @@ func (d *Daemon) bitbucketAt(ctx context.Context, folder string) (forge, bool) {
 		site: connections.BitbucketSite}), true
 }
 
-// azureDevOpsAt is the Azure Repos repository the folder's git remote names, if any: on the
-// connected Azure DevOps first (an Azure DevOps Server, or a fake in a walk), else on
-// dev.azure.com.
-func (d *Daemon) azureDevOpsAt(ctx context.Context, folder string) (forge, bool) {
-	roots := []string{azuredevopsmcp.DefaultBase}
+// azureDevOpsRoots is where an Azure DevOps folder's remote can be, in order: the connected
+// Azure DevOps (an Azure DevOps Server, or a fake in a walk), the connector's AZURE_DEVOPS_URL
+// in the secrets (#4072), then dev.azure.com.
+func (d *Daemon) azureDevOpsRoots() []string {
+	var roots []string
 	if c, connected := d.azureDevOpsConnection(); connected && c.URL != "" {
-		roots = append([]string{azuredevopsmcp.BaseURL(c.URL)}, roots...)
+		roots = append(roots, azuredevopsmcp.BaseURL(c.URL))
 	}
+	if u := d.secrets()["AZURE_DEVOPS_URL"]; u != "" {
+		roots = append(roots, azuredevopsmcp.BaseURL(u))
+	}
+	roots = append(roots, azuredevopsmcp.DefaultBase)
+	return slices.Compact(roots)
+}
+
+// azureDevOpsAt is the Azure Repos repository the folder's git remote names, if any, on the
+// first of azureDevOpsRoots that it is on.
+func (d *Daemon) azureDevOpsAt(ctx context.Context, folder string) (forge, bool) {
+	return d.azureDevOpsAtRoots(ctx, folder, d.azureDevOpsRoots())
+}
+
+func (d *Daemon) azureDevOpsAtRoots(ctx context.Context, folder string, roots []string) (forge, bool) {
 	for _, root := range roots {
 		if repo, ok := azuredevopsmcp.RepoAt(ctx, folder, root); ok {
 			f := forge{provider: wire.ConnectionProviderAzuredevops, root: root, repo: repo, site: "dev.azure.com"}

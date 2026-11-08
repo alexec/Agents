@@ -9,14 +9,18 @@ public struct SessionSecret: Codable, Sendable, Hashable, Identifiable {
     public var title: String
     public var name: String
     public var setAt: Date
+    /// Ask before use (#4014): sealed in the session's file, never there as plain text.
+    public var needsApproval: Bool?
 
     public var id: String { "\(agentID.uuidString)/\(name)" }
+    public var asksBeforeUse: Bool { needsApproval == true }
 
-    public init(agentID: UUID, title: String, name: String, setAt: Date) {
+    public init(agentID: UUID, title: String, name: String, setAt: Date, needsApproval: Bool? = nil) {
         self.agentID = agentID
         self.title = title
         self.name = name
         self.setAt = setAt
+        self.needsApproval = needsApproval
     }
 }
 
@@ -33,11 +37,28 @@ public struct SessionSecretSetRequest: Codable, Sendable, Hashable {
     public var agentID: UUID
     public var name: String
     public var value: String
+    /// Ask before use (#4014); nil is off.
+    public var needsApproval: Bool?
 
-    public init(agentID: UUID, name: String, value: String) {
+    public init(agentID: UUID, name: String, value: String, needsApproval: Bool? = nil) {
         self.agentID = agentID
         self.name = name
         self.value = value
+        self.needsApproval = needsApproval
+    }
+}
+
+/// `secrets/setNeedsApproval` (#4014): a person turns Ask before use on or off for a secret of
+/// the machine's secrets.env, or for one session's (`agentID`). The person's own clients only.
+public struct SecretNeedsApprovalRequest: Codable, Sendable, Hashable {
+    public var name: String
+    public var agentID: UUID?
+    public var needsApproval: Bool
+
+    public init(name: String, agentID: UUID? = nil, needsApproval: Bool) {
+        self.name = name
+        self.agentID = agentID
+        self.needsApproval = needsApproval
     }
 }
 

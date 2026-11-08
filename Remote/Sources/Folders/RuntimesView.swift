@@ -5,7 +5,7 @@ import SwiftUI
 /// when it is next checked, and what is left of its plan. The Mac's Agent Runtimes
 /// words, as a list. Mark available is a swipe action.
 /// An account added to a runtime (#840) is its own row; Add Account is in the toolbar and
-/// Remove is a swipe. Signing one in is done on the Mac, in Your setup (#2255, #3631). An org account (#999) is a row too,
+/// Remove is a swipe. Signing one in is done on the Mac, in Status (#2255, #3631). An org account (#999) is a row too,
 /// which only the organisation removes, and a runtime with accounts has **Reaches the Model
 /// By** under its own row.
 struct RuntimesView: View {
@@ -47,7 +47,7 @@ struct RuntimesView: View {
             }
             if model.accountProfiles.contains(where: { !$0.isOrganisation }) {
                 Section {} footer: {
-                    Text("Sign in to an added account on the Mac, in Your setup.")
+                    Text("Sign in to an added account on the Mac, in Status.")
                 }
             }
         }

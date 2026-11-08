@@ -1,7 +1,7 @@
 // Labels on a session and the search field's query: SessionLabelPolicy (Model/SessionLabel.swift)
 // and SessionLabelQuery (Model/SessionLabelQuery.swift), ported by hand and held to
 // Fixtures/web/labels (research R7).
-import type { Agent, SessionLabel } from "../protocol/generated";
+import type { Agent, LineageSessionIssue, SessionLabel } from "../protocol/generated";
 
 export const maximumLabels = 5;
 export const maximumLabelLength = 24;
@@ -62,17 +62,38 @@ export function labelClass(label: Pick<SessionLabel, "value" | "owner">): string
 
 export interface LabelQuery {
   label: string | null;
+  /** The issue the search names (#3899): `#3465`, `issue:#3465` or `issue:3465`, as a word of its own. */
+  issue: number | null;
   text: string;
   /** The sessions whose prompts or replies hold the words, by id, as their hosts found them (agents/said, #1585). */
   said?: Readonly<Record<string, string>>;
+  /** The sessions Lineage links to the issue, its sub-issues or their PRs, by id (lineage/sessions, #3899). */
+  onIssue?: Readonly<Record<string, unknown>>;
+  /** The issue, then its sub-issues in the epic's order, as the hosts said them (lineage/sessions, #3900). */
+  issueHeadings?: readonly LineageSessionIssue[];
 }
 
-/** The search field's words: `label:x` or `label:"x y"` filters, the rest matches title and report. */
+/** The first match of `pattern` in `input`, taken out of it: its first capture that matched, or "". */
+function take(pattern: RegExp, input: string): { value: string | null; rest: string } {
+  const match = pattern.exec(input);
+  if (!match) return { value: null, rest: input };
+  return { value: match[1] ?? match[2] ?? "", rest: input.slice(0, match.index) + input.slice(match.index + match[0].length) };
+}
+
+/** The search field's words: `label:x` or `label:"x y"` filters, `#<n>` asks for an issue's sessions,
+ *  the rest matches title and report. */
 export function parseQuery(input: string): LabelQuery {
-  const match = /(?:^|\s)label:(?:"([^"]*)"|(\S*))/i.exec(input);
-  if (!match) return { label: null, text: trim(input) };
-  const label = match[1] ?? match[2] ?? "";
-  return { label, text: trim(input.slice(0, match.index) + input.slice(match.index + match[0].length)) };
+  const label = take(/(?:^|\s)label:(?:"([^"]*)"|(\S*))/i, input);
+  const issue = take(/(?:^|\s)(?:issue:#?|#)([0-9]{1,9})(?=\s|$)/i, label.rest);
+  return { label: label.value, issue: issue.value === null ? null : Number(issue.value), text: trim(issue.rest) };
+}
+
+/** Whether text holds `#<n>` as a number of its own: `#38` is not in "#3899". */
+function namesIssue(text: string, mark: string): boolean {
+  for (let at = text.indexOf(mark); at >= 0; at = text.indexOf(mark, at + mark.length)) {
+    if (!/[0-9]/.test(text.charAt(at + mark.length))) return true;
+  }
+  return false;
 }
 
 /** Whether the search asks for this label, so its chip can look chosen (#3898). */
@@ -94,6 +115,11 @@ function containsIgnoringCase(haystack: string, needle: string): boolean {
 }
 
 export function queryMatches(query: LabelQuery, agent: Agent): boolean {
+  if (query.issue !== null) {
+    const mark = `#${query.issue}`;
+    if (query.onIssue?.[agent.id] === undefined && !(agent.labels ?? []).some((label) => labelKey(label.value) === mark)
+      && !(agent.title !== undefined && namesIssue(agent.title, mark))) return false;
+  }
   if (query.label !== null) {
     const wanted = labelKey(query.label);
     if (!wanted || !(agent.labels ?? []).some((label) => labelKey(label.value) === wanted)) return false;

@@ -316,6 +316,35 @@ struct SidebarModelTests {
         #expect(SidebarFolderFold(key, label: "api", in: model, isOpen: false).sessions.isEmpty)
     }
 
+    /// #3900: a search for an epic lists what it found under each issue, the epic's own
+    /// first, then the children in the epic's order; live before archived; a session no
+    /// host placed (found by its title) under the epic; no smart row takes one.
+    @Test func aSearchForAnEpicGroupsItsSessionsUnderEachIssue() {
+        let model = AgentsModel()
+        let lead = started(api, .running, "lead", at: 1)
+        let lane = started(api, .finished, "lane", at: 2)
+        let merged = started(api, .archived, "merged", at: 3)
+        let named = started(api, .finished, "Work on #40", at: 4)
+        let other = started(api, .finished, "other", at: 5)
+        model.replaceAgents([lead, lane, merged, named, other])
+        let node = { (n: Int) in DaemonAPI.LineageNode(kind: "issue", ref: "github:o/r#\(n)") }
+        model.noteIssueSessions(DaemonAPI.LineageSessions(
+            matches: [.init(agentID: lead.id, on: node(40)), .init(agentID: lane.id, on: node(42)),
+                      .init(agentID: merged.id, on: node(41))],
+            issues: [.init(node: node(40), title: "Epic"), .init(node: node(41)), .init(node: node(42), title: "Second")]))
+
+        let fold = SidebarFolderFold(key, label: "api", in: model, query: "#40", isOpen: false)
+        #expect(fold.issueGroups.map(\.title) == ["#40 Epic", "#41", "#42 Second"])
+        #expect(fold.issueGroups.map { $0.sessions.map(\.id) } == [[named.id, lead.id], [merged.id], [lane.id]])
+        #expect(fold.sessions.isEmpty && fold.archived.isEmpty)
+        #expect(SidebarSmartRow.working.agents(in: model, folders: [key], query: "#40").isEmpty)
+        #expect(SidebarSmartRow.working.agents(in: model, folders: [key]).map(\.id) == [lead.id])
+
+        // An issue with no sub-issues, or another search, keeps one list.
+        model.issueHeadings = [.init(node: node(40))]
+        #expect(SidebarFolderFold(key, label: "api", in: model, query: "#40", isOpen: false).issueGroups.isEmpty)
+    }
+
     /// The smart rows gather across every folder (#495), by what each session wants.
     @Test func smartRowsGatherAcrossFolders() {
         let model = AgentsModel()

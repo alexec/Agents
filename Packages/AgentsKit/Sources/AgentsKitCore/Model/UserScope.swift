@@ -80,8 +80,8 @@ public extension DaemonAPI {
         }
     }
 
-    /// Your setup ▸ Accounts (#3967): one outside account of the person's. It holds no secret:
-    /// `card` and `secret` are the names of secrets in Your setup ▸ Secrets, or where one is.
+    /// Settings ▸ You ▸ Accounts (#3967): one outside account of the person's. It holds no secret:
+    /// `card` and `secret` are the names of secrets in Settings ▸ You ▸ Secrets, or where one is.
     struct OutsideAccount: Codable, Sendable, Hashable, Identifiable {
         public var service: String
         public var address: String?
@@ -144,12 +144,15 @@ public extension DaemonAPI {
         public var values: [String: Envelope]
         /// `card` for a card secret (#3531); nil for a plain value.
         public var kind: String?
+        /// Ask before use (#4014): every envelope's associated data ends `|ask`. nil is off.
+        public var needsApproval: Bool?
 
-        public init(name: String, version: Int, values: [String: Envelope], kind: String? = nil) {
+        public init(name: String, version: Int, values: [String: Envelope], kind: String? = nil, needsApproval: Bool? = nil) {
             self.name = name
             self.version = version
             self.values = values
             self.kind = kind
+            self.needsApproval = needsApproval
         }
     }
 
@@ -178,9 +181,12 @@ public extension DaemonAPI {
         public var waiting: [String]?
         /// `card` for a card secret (#3531); nil for a plain value.
         public var kind: String? = nil
+        /// Ask before use (#4014), as the person's client last sealed it.
+        public var needsApproval: Bool? = nil
 
         public var id: String { name }
         public var isCard: Bool { kind == CardSecret.kind }
+        public var asksBeforeUse: Bool { needsApproval == true }
     }
 
     /// `user/secretNames`.
@@ -246,7 +252,7 @@ public extension DaemonAPI.Notification {
 
 /// The words for settings with a fixed scope (#2410) and the Secrets page.
 public enum UserScopeWords {
-    /// Your setup ▸ Secrets (#3632).
+    /// Settings ▸ You ▸ Secrets (#3632).
     public static let secretsTitle = "Secrets"
     public static let yoursOnEveryMachine = "Yours, on every machine"
     /// Under "This Mac's" at the top of the `~/.agents` pages and editors (#2704): what goes to

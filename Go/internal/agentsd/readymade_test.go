@@ -390,4 +390,23 @@ func TestReadyMadeUpdatesOnlyTheUneditedCopy(t *testing.T) {
 	if n := notices()["daily-checks"].NewerReadyMade; n == nil || *n != readyMadeChange["daily-checks"] {
 		t.Fatalf("an edited copy of an older version: %v", n)
 	}
+
+	// #4075: Keep my copy hides the notice and leaves the file; Take the new version writes it
+	// over the copy with its state keys.
+	userURL := store.FolderURL(home)
+	var kept wire.WorkflowSummary
+	json.Unmarshal(c.call(t, 4, "workflows/readyMade/keep", map[string]any{"folder": userURL, "workflowID": "daily-checks"}), &kept)
+	if kept.NewerReadyMade != nil || notices()["daily-checks"].NewerReadyMade != nil || !fileHas(t, path("daily-checks"), edited) {
+		t.Fatalf("kept: %+v", kept)
+	}
+	os.Remove(keptReadyMadePath(home))
+	var taken wire.WorkflowSummary
+	json.Unmarshal(c.call(t, 5, "workflows/readyMade/take", map[string]any{"folder": userURL, "workflowID": "daily-checks"}), &taken)
+	want, _ := withStateKeys(edited, checks, "daily-checks", home)
+	if taken.NewerReadyMade != nil || !fileHas(t, path("daily-checks"), want) {
+		t.Fatalf("taken: %+v", taken)
+	}
+	if digest, _ := readyMadeDigest(checks); madeReadyMade(home)["daily-checks"] != digest {
+		t.Fatal("taking it did not keep its digest")
+	}
 }

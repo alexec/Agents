@@ -92,7 +92,7 @@ func (d *Daemon) lineageCIEvent(e wire.Event) {
 		})
 		return
 	}
-	repo, n, ok := prOfURL(p.PR.URL)
+	repo, n, ok := d.prOfURLHere(p.PR.URL)
 	if !ok {
 		return
 	}
