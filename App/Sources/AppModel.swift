@@ -2161,7 +2161,7 @@ final class AppModel {
     }
 
     /// Whether this Mac's host keeps Ask before use (#4014): it offers the toggle (#4016).
-    var macHostAsksBeforeUse: Bool { host(macHostElsewhere ?? .mac, has: Capability.hostSecretApproval1) }
+    var sessionHostAsksBeforeUse: Bool { host(macHostElsewhere ?? .mac, has: Capability.hostSecretApproval1) }
 
     /// Turn Ask before use on or off for a session's secret (#4016): the list after, or why not.
     func setSessionSecretAsksBeforeUse(_ secret: SessionSecret, _ on: Bool) async -> Result<SessionSecrets?, Error> {
@@ -6839,3 +6839,6 @@ struct FolderGoneAsk: Identifiable, Equatable {
 
 /// Work (#3119) is drawn by `Shared/UI/Work`, for the window and the Remote (#3256).
 extension AppModel: WorkModel {}
+
+/// Settings ▸ You ▸ Secrets ▸ For One Session (#3548), through this Mac's host.
+extension AppModel: SessionSecretsSource {}

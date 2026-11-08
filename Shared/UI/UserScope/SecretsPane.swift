@@ -6,7 +6,8 @@ import SwiftUI
 /// draws the same in `Web/src/views/UserScope.tsx`. A card (#3531) is a secret of its own kind.
 /// Ask before use (#4016) is sealed with the value, so it is set on Add and Replace, which seal it
 /// again: no client can read a value back to seal it with a new flag.
-/// `extra` is what a client draws after them: the window's secrets for one session (#3548).
+/// `extra` is what a client draws after them: the Mac's secrets for one session (#3548). The window
+/// and the Remote (#4032) draw it.
 struct SecretsPane<Extra: View>: View {
     /// The control plane, or nil while it cannot be reached.
     let control: DaemonClient?
@@ -195,7 +196,9 @@ private struct SecretSheet: View {
             .rowButtons()
         }
         .paperForm()
+        #if os(macOS)
         .frame(minWidth: 360)
+        #endif
         .onDisappear { value = "" }
     }
 }
@@ -282,7 +285,9 @@ private struct CardSheet: View {
             .rowButtons()
         }
         .paperForm()
+        #if os(macOS)
         .frame(minWidth: 400)
+        #endif
         .onDisappear { number = ""; cvc = "" }
     }
 }
