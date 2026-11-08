@@ -384,3 +384,46 @@ func TestASignedStartGoesAsTheAskingMachineSignedIt(t *testing.T) {
 		t.Fatal("it was delivered")
 	}
 }
+
+// The bot's key between the person's machines (#3950): it goes only as the asking machine
+// signed it, never in the control plane's own words, and never to another person's machine.
+func TestTheBotsKeyGoesOnlyAsItsMachineSignedIt(t *testing.T) {
+	h := newHarness(t)
+	h.router.mu.Lock()
+	h.router.answer = func(host, method string, params json.RawMessage) *Reply { return &Reply{Result: rawOf(map[string]any{})} }
+	h.router.mu.Unlock()
+	h.router.setOnline(devbox, true)
+	sealed := `{"appId":42,"version":1,"sealed":{"encapsulated":"AQ==","ciphertext":"Ag=="}}`
+	params := map[string]any{"host": "devbox", "copy": json.RawMessage(sealed)}
+	call := func(d *wire.LockDelivery) (any, error) {
+		return h.providers.HostSaid(other, MethodHostMachines, rawOf(MachineWorkspaceCall{Agent: "the agents' bot", Method: MethodBotKey,
+			Params: rawOf(params), Deliver: d}))
+	}
+	if _, err := call(nil); failureOf(err) == nil {
+		t.Fatal("an unsigned copy went")
+	}
+	deliver := &wire.LockDelivery{Method: MethodBotTake, Params: sealed, Lock: wire.LockSignature{At: time.Now().Unix(), Key: []byte{4}, Sig: []byte{1}}}
+	terminal := *deliver
+	terminal.Method = "mac/terminal"
+	if _, err := call(&terminal); failureOf(err) == nil {
+		t.Fatal("a signed terminal went as the bot's key")
+	}
+	if len(h.router.deliveries()) != 0 {
+		t.Fatal("it was delivered")
+	}
+	if _, err := call(deliver); err != nil {
+		t.Fatal(err)
+	}
+	if sent := h.router.deliveries(); len(sent) != 1 || sent[0].method != MethodBotTake || string(sent[0].params) != sealed {
+		t.Fatalf("not delivered as signed: %+v", sent)
+	}
+	h.providers.hooks.OwnerOf = func(host string) string {
+		if host == devbox {
+			return "kim"
+		}
+		return "lee"
+	}
+	if _, err := call(deliver); failureOf(err) == nil || failureOf(err).Code != CodeNoSuchHost {
+		t.Fatalf("another person's machine: %v", err)
+	}
+}

@@ -165,6 +165,10 @@ func (d *Daemon) TakeLock(lock wire.Lock) bool {
 		}
 	}
 	d.joinLockLocked(state, invite, time.Now())
+	if state.Count() != kept.Count {
+		// A machine new to the lock waits for the bot's key (#3950).
+		d.goShareBotKey(false)
+	}
 	return true
 }
 

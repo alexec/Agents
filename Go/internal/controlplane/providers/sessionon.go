@@ -263,3 +263,44 @@ func (p *Providers) deliverPeer(deliver *wire.LockDelivery, method string, param
 	}
 	return p.router.DeliverKept(method, params, caller.Client, caller.Kind, host, patience)
 }
+
+// botKey is machines/botKey (#3950): one of the person's machines gives the bot's key to
+// another of theirs, sealed to that machine's key from the person's lock, or tells it to
+// forget the bot. It goes only as the asking machine signed it: this control plane cannot
+// open the copy, and has no words of its own to send in its place.
+func (p *Providers) botKey(from, fromName string, params json.RawMessage, caller Caller, deliver *wire.LockDelivery) (any, error) {
+	var request wire.MachineBotKey
+	if err := requireParams(params, &request, "MachineBotKey", "host"); err != nil {
+		return nil, err
+	}
+	method := MethodBotTake
+	switch {
+	case request.Copy != nil && request.Drop == nil:
+	case request.Drop != nil && request.Copy == nil:
+		method = MethodBotDrop
+	default:
+		return nil, invalid("Give exactly one of copy and drop.")
+	}
+	if deliver == nil || deliver.Method != method {
+		return nil, invalid("The bot's key goes only as its machine signed it.")
+	}
+	host, name := request.Host, request.Host
+	if h := p.records.Host(host); h != nil {
+		name = h.Name
+	}
+	if host == from {
+		return nil, invalid("That is the asking machine.")
+	}
+	if !p.router.Online(host) {
+		return nil, fail(CodeHostOffline, "%s is offline.", name)
+	}
+	p.log(fmt.Sprintf("workspace: %s gives the bot's key to %s, sealed", fromName, name))
+	reply := p.deliverPeer(deliver, method, nil, caller, host, time.Minute)
+	if reply == nil {
+		return nil, fail(CodeHostOffline, "%s did not answer.", name)
+	}
+	if reply.Error != nil {
+		return nil, reply.Error
+	}
+	return map[string]any{}, nil
+}

@@ -2013,6 +2013,11 @@ export interface ConnectionBot {
   appURL?: string;
   /** Absent when GitHub could not be asked. */
   installations?: ConnectionBotInstallation[];
+  /**
+   * The person's machines in their lock and whether each holds the bot's key, as this machine knows
+   * (#3950). Absent with no lock: then the key is on this machine only.
+   */
+  keyOn?: ConnectionBotMachine[];
   /** What failed, in words. */
   message?: string;
 }
@@ -2028,6 +2033,28 @@ export interface ConnectionBotCompleteRequest {
   error?: string;
 }
 
+/**
+ * The bot's key, sealed by one of the person's machines to another (#3950): HPKE to the receiving
+ * machine's sealing key from the person's lock, under com.alexecollins.agents.githubbot.v1, with
+ * the associated data githubbot.v1|<person>|m:<machine>|<appId>|<version>. Delivered as
+ * connections/bot/take, signed by the giving machine. No client and not the control plane can open
+ * it.
+ */
+export interface ConnectionBotCopy {
+  appId: number;
+  /** When the bot was made, in Unix milliseconds: a machine keeps the newest bot. */
+  version: number;
+  sealed: SealedEnvelope;
+}
+
+/**
+ * Forget the Bot on one machine, sent to the others (#3950): each deletes its copy of that App's
+ * key, and takes no copy of it again.
+ */
+export interface ConnectionBotDrop {
+  appId: number;
+}
+
 /** An account the bot is installed on. */
 export interface ConnectionBotInstallation {
   account: string;
@@ -2035,6 +2062,15 @@ export interface ConnectionBotInstallation {
   all: boolean;
   /** Where the installation's repositories are chosen on GitHub. */
   settingsURL?: string;
+}
+
+/** One of the person's machines, and whether it holds the bot's key (#3950). */
+export interface ConnectionBotMachine {
+  name: string;
+  /** The machine that answered. */
+  here?: boolean;
+  /** False while it waits: it gets the key when it and a machine with the key are both online. */
+  has: boolean;
 }
 
 /**
@@ -5648,6 +5684,17 @@ export interface MachineAnnounce {
   version: string;
   machineID: string;
   implementation?: string;
+}
+
+/**
+ * machines/botKey through machine/machines (#3950): one of the person's machines gives the bot's
+ * key, sealed, to another of theirs (copy), or tells it to forget it (drop). Exactly one of them.
+ */
+export interface MachineBotKey {
+  /** The machine's id, as the person's lock names it. */
+  host: string;
+  copy?: ConnectionBotCopy;
+  drop?: ConnectionBotDrop;
 }
 
 /**
@@ -12690,9 +12737,12 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConfigChoiceGroup: { required: ["options"], optional: ["name", "group"] },
   ConfigOption: { required: ["id", "name", "type"], optional: ["description", "category", "currentValue", "options"] },
   Connection: { required: ["provider", "state", "connectedAt"], optional: ["login", "installURL", "workspace", "expiresAt", "byToken", "newest"] },
-  ConnectionBot: { required: ["made"], optional: ["name", "slug", "owner", "installURL", "appURL", "installations", "message"] },
+  ConnectionBot: { required: ["made"], optional: ["name", "slug", "owner", "installURL", "appURL", "installations", "keyOn", "message"] },
   ConnectionBotCompleteRequest: { required: ["state"], optional: ["code", "error"] },
+  ConnectionBotCopy: { required: ["appId", "version", "sealed"], optional: [] },
+  ConnectionBotDrop: { required: ["appId"], optional: [] },
   ConnectionBotInstallation: { required: ["account", "all"], optional: ["settingsURL"] },
+  ConnectionBotMachine: { required: ["name", "has"], optional: ["here"] },
   ConnectionBotStart: { required: ["action", "manifest", "state", "expiresAt"], optional: [] },
   ConnectionBotStartRequest: { required: [], optional: ["origin", "public"] },
   ConnectionDisconnectAnswer: { required: [], optional: ["error"] },
@@ -13011,6 +13061,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MacTerminalRequest: { required: [], optional: ["path"] },
   MachineAccountsCall: { required: [], optional: ["add"] },
   MachineAnnounce: { required: ["publicKey", "name", "platform", "version", "machineID"], optional: ["implementation"] },
+  MachineBotKey: { required: ["host"], optional: ["copy", "drop"] },
   MachineCatalog: { required: ["items"], optional: [] },
   MachineClient: { required: ["id", "kind", "publicKey"], optional: ["person"] },
   MachineClients: { required: ["clients"], optional: ["user"] },

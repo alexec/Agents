@@ -510,6 +510,8 @@ func (p *Providers) AgentCall(host, agent, method string, params json.RawMessage
 		return p.sessionEnded(hostName, rawOf(given), caller, deliver)
 	case MethodSendFolder:
 		return p.sendFolder(hostName, agent, rawOf(given), caller, deliver)
+	case MethodBotKey:
+		return p.botKey(host, hostName, rawOf(given), caller, deliver)
 	case MethodProjectFolders:
 		return p.projectFolders(rawOf(given), caller)
 	case MethodProjectSessions:

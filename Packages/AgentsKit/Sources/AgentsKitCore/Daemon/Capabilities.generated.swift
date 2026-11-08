@@ -34,6 +34,7 @@ public enum Capability {
     public static let clone1 = "clone/1"
     public static let connection1 = "connection/1"
     public static let connectionsBot1 = "connections.bot/1"
+    public static let connectionsBotkey1 = "connections.botkey/1"
     public static let connectionsEmail1 = "connections.email/1"
     public static let connections1 = "connections/1"
     public static let connectorsSetup1 = "connectors.setup/1"
@@ -258,8 +259,10 @@ public enum Capability {
         "connection/bindDevice": "connection/1",
         "connections/bot": "connections.bot/1",
         "connections/bot/complete": "connections.bot/1",
+        "connections/bot/drop": "connections.botkey/1",
         "connections/bot/remove": "connections.bot/1",
         "connections/bot/start": "connections.bot/1",
+        "connections/bot/take": "connections.botkey/1",
         "connections/disconnect": "connections/1",
         "connections/list": "connections/1",
         "connections/sign-in": "connections/1",
@@ -666,6 +669,7 @@ public enum Capability {
         "machine/status": "machine/1",
         "machines/announce": "machines/1",
         "machines/approveJoin": "hosts.join/1",
+        "machines/botKey": "connections.botkey/1",
         "machines/checkAgain": "machines/1",
         "machines/deleteMachine": "machines/1",
         "machines/denyJoin": "hosts.join/1",

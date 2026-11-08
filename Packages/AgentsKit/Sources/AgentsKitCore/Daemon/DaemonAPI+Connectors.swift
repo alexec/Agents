@@ -283,6 +283,16 @@ extension DaemonAPI {
         }
     }
 
+    /// One of the person's machines, and whether it holds the bot's key (#3950).
+    public struct ConnectionBotMachine: Codable, Sendable, Hashable {
+        public var name: String
+        /// The machine that answered.
+        public var here: Bool?
+        /// False while it waits for a machine with the key to be online with it.
+        public var has: Bool
+        public init(name: String, here: Bool? = nil, has: Bool) { self.name = name; self.here = here; self.has = has }
+    }
+
     /// The person's agents' bot on the host (#3858). Never its key.
     public struct ConnectionBot: Codable, Sendable, Hashable {
         public var made: Bool
@@ -295,11 +305,14 @@ extension DaemonAPI {
         public var appURL: String?
         /// Nil when GitHub could not be asked.
         public var installations: [ConnectionBotInstallation]?
+        /// The person's machines and which hold the key (#3950); nil with no lock.
+        public var keyOn: [ConnectionBotMachine]?
         public var message: String?
         public init(made: Bool, name: String? = nil, slug: String? = nil, owner: String? = nil, installURL: String? = nil,
-                    appURL: String? = nil, installations: [ConnectionBotInstallation]? = nil, message: String? = nil) {
+                    appURL: String? = nil, installations: [ConnectionBotInstallation]? = nil,
+                    keyOn: [ConnectionBotMachine]? = nil, message: String? = nil) {
             self.made = made; self.name = name; self.slug = slug; self.owner = owner; self.installURL = installURL
-            self.appURL = appURL; self.installations = installations; self.message = message
+            self.appURL = appURL; self.installations = installations; self.keyOn = keyOn; self.message = message
         }
     }
 

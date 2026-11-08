@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { Store } from "../model/store";
 import type { ConnectionBot, ConnectionBotStart } from "../protocol/generated";
-import { botCallback, botNote, botWords } from "../model/connectorSetup";
+import { botCallback, botKeyOn, botNote, botWords } from "../model/connectorSetup";
 import { Modal } from "./Modal";
 
 function why(e: unknown): string {
@@ -47,6 +47,7 @@ export function AgentsBotRow({ store, host }: { store: Store; host: string }) {
       <div class="grow">
         <p class="strong">{botWords.title}</p>
         <p class={`small ${problem ? "failure" : "quiet"}`}>{problem ?? (bot ? botNote(bot) : "…")}</p>
+        {!problem && bot && botKeyOn(bot) && <p class="small quiet">{botKeyOn(bot)}</p>}
       </div>
       {bot?.made && bot.installURL && <button class="link small" onClick={() => openOut(bot.installURL!)}>{botWords.installButton}</button>}
       {bot?.made && <button class="destructive" onClick={() => void forget()}>{botWords.removeButton}</button>}

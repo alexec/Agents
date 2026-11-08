@@ -823,14 +823,14 @@ export const botWords = {
   never: "Never: change workflows, secrets, environments, settings or members. Those stay yours.",
   publicToggle: "Organisations can install it",
   publicHelp: "Turn on to use the bot on an organisation's repositories. The organisation's owner approves the install.",
-  keyNote: "GitHub gives the bot's key to this machine only. It never goes to Agents' servers.",
+  keyNote: "GitHub gives the bot's key to this machine. It goes to your other machines sealed to each one, and Agents' servers cannot read it.",
   continueButton: "Continue on github.com",
   waiting: "Waiting for github.com… Choose Create GitHub App there, and Agents comes back by itself.",
   finishing: "Taking the bot's key on this machine…",
   installButton: "Install on Repositories…",
   removeButton: "Forget the Bot…",
   removeTitle: "Forget your agents' bot?",
-  removeMessage: "This machine deletes the bot's key, and agents post as you again. The App stays on GitHub until you delete it there.",
+  removeMessage: "Your machines delete the bot's key, and agents post as you again. The App stays on GitHub until you delete it there.",
 };
 
 /** The bot's line under the GitHub row: its name, and where it is installed. */
@@ -841,6 +841,25 @@ export function botNote(bot: ConnectionBot): string {
   if (!list) return bot.message ?? `${name}. GitHub could not be asked where it is installed.`;
   if (list.length === 0) return `${name}, not installed yet: install it on the repositories agents work on.`;
   return `${name}, on ${list.map((i) => `${i.account} (${i.all ? "all" : "chosen"} repositories)`).join(", ")}.`;
+}
+
+/** a, b and c. */
+function both(names: string[]): string {
+  if (names.length < 2) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+/** Which of the person's machines hold the bot's key (#3950); undefined before it is made. */
+export function botKeyOn(bot: ConnectionBot): string | undefined {
+  if (!bot.made) return undefined;
+  if (!bot.keyOn) return "Its key is on this machine only.";
+  const has = bot.keyOn.filter((m) => m.has).map((m) => (m.here ? `${m.name} (here)` : m.name));
+  const waiting = bot.keyOn.filter((m) => !m.has).map((m) => m.name);
+  let words = `Its key is on ${both(has)}.`;
+  if (waiting.length > 0) {
+    words += ` ${both(waiting)} ${waiting.length === 1 ? "gets it when it is online." : "get it when they are online."}`;
+  }
+  return words;
 }
 
 /** The hand-back page's message after GitHub made the App, for the setup with state only. */

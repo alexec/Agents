@@ -941,8 +941,9 @@ func (d *Daemon) connectionClock() {
 		select {
 		case <-d.ctx.Done():
 			return
-		case <-t.C:
+		case now := <-t.C:
 			d.renewConnections()
+			d.shareBotKeyDue(now)
 		}
 	}
 }

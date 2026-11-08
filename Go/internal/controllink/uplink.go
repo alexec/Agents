@@ -45,6 +45,9 @@ type Uplink struct {
 	channels map[int]*channel
 	nextID   atomic.Int64
 	OnChange func(connected bool, problem string)
+	// OnRefused is told why the control plane refused this host, such as Forgotten when the
+	// person removed it (#3950); nil hears none of it.
+	OnRefused func(reason string)
 	tunnels  map[string]chan *channel
 	asks     map[int64]chan askReply // Ask's requests on channel 0, by id, until answered
 	// Lend is where this host's relay for a runtime listens on loopback, for a tunnel the
@@ -226,6 +229,9 @@ func (u *Uplink) Run(ctx context.Context) {
 		if err != nil {
 			problem := u.problem(err)
 			log.Printf("uplink: could not reach the control plane: %s", problem)
+			if r := (*Refusal)(nil); errors.As(err, &r) && u.OnRefused != nil {
+				u.OnRefused(r.Reason)
+			}
 			if u.OnChange != nil {
 				u.OnChange(false, problem)
 			}
