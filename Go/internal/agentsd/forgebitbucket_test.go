@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -23,6 +24,8 @@ type fakeForgeBitbucket struct {
 	items    []string
 	wrote    []string
 	asked    []string
+	// labels are each issue's labels: its kind and component; bug when nil.
+	labels []string
 }
 
 func (f *fakeForgeBitbucket) note(to *[]string, s string) {
@@ -34,10 +37,17 @@ func (f *fakeForgeBitbucket) note(to *[]string, s string) {
 func (f *fakeForgeBitbucket) Search(_ context.Context, repos []string, sf bitbucketmcp.SearchFilter, after string, first int) (bitbucketmcp.SearchPage, error) {
 	f.note(&f.searches, fmt.Sprintf("%v prs=%v label=%s after=%s first=%d", repos, sf.PRs, sf.Label, after, first))
 	page := bitbucketmcp.SearchPage{}
+	labels := f.labels
+	if labels == nil {
+		labels = []string{"bug"}
+	}
+	if sf.Label != "" && !slices.Contains(labels, sf.Label) {
+		return page, nil
+	}
 	for n, repo := range repos {
 		page.Items = append(page.Items, bitbucketmcp.Item{Repo: repo, Number: 7 + n, PR: sf.PRs, State: "open", Title: "On " + repo,
 			URL: "https://bitbucket.org/" + repo + "/issues/7", Author: "kim", UpdatedAt: "2026-11-07T10:00:00.123456+00:00",
-			Labels: []string{"bug"}, Mergeable: "unknown"})
+			Labels: labels, Mergeable: "unknown"})
 		page.Cursors = append(page.Cursors, "c"+repo)
 	}
 	return page, nil
@@ -301,5 +311,37 @@ func TestABoardLeavesBitbucketOut(t *testing.T) {
 	narrowToBoard(&s, wire.ProjectBoard{Forge: new(wire.ConnectionProviderGithub), Key: new("alexec/1")}, []string{"/f"}, false)
 	if s.bitbucket != nil || s.bitbucketErr != nil {
 		t.Fatalf("sources: %+v", s)
+	}
+}
+
+// #3880: an open Bitbucket issue's feature:<name> component is a feature on Work ▸ Features,
+// with its open issues and no epics: Bitbucket has none.
+func TestForgeFeaturesCountBitbucketComponents(t *testing.T) {
+	_, c, bb, _ := bitbucketDaemon(t)
+	bb.labels = []string{"task", "feature:Export"}
+	var features wire.ForgeFeatures
+	json.Unmarshal(c.call(t, 1, "forge/features", wire.ForgeFeaturesRequest{}), &features)
+	var export *wire.ForgeFeature
+	for _, f := range features.Features {
+		if f.Name == "Export" {
+			export = &f
+		}
+	}
+	if export == nil || export.Epics != 0 || export.Open != 0 || export.Issues == nil || *export.Issues != 1 || export.Color != nil || len(features.Errors) != 0 {
+		t.Fatalf("features: %+v", features)
+	}
+	var list wire.ForgeList
+	json.Unmarshal(c.call(t, 2, "forge/issues", wire.ForgeListRequest{Feature: new("Export")}), &list)
+	if len(list.Items) == 0 || deref(list.Items[0].Feature) != "Export" || deref(list.Items[0].Level) != "task" {
+		t.Fatalf("the feature's issues: %+v", list)
+	}
+}
+
+// #3880: a Bitbucket issue has no plan, and forge/plan says why.
+func TestForgePlanRefusesABitbucketIssue(t *testing.T) {
+	_, c, _, _ := bitbucketDaemon(t)
+	e := c.callError(t, 1, "forge/plan", wire.ForgePlanRequest{Node: wire.LineageNode{Kind: "issue", Ref: "bitbucket:walkalex/app#7"}})
+	if e == nil || !strings.Contains(e.Message, bitbucketNoPlan) {
+		t.Fatalf("forge/plan: %+v", e)
 	}
 }

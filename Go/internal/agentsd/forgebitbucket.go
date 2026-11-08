@@ -23,7 +23,9 @@ import (
 // says which.
 //
 // Bitbucket's issues have no labels: their kind and component are their labels, as the
-// bitbucket server's events say them. Its pull requests have none. Rerun failed runs each
+// bitbucket server's events say them. A feature:<name> component is the issue's feature on
+// Work ▸ Features (#3880); Bitbucket has no epics, sub-issues or dependencies, so it has no plan
+// and no board. Its pull requests have none. Rerun failed runs each
 // failed Pipelines run again, every step, as Pipelines cannot run only the failed ones.
 
 // forgeBitbucket is what the forge reads and writes ask of Bitbucket; a test gives a fake.
@@ -52,6 +54,9 @@ type forgeBitbucket interface {
 
 // bitbucketNoAutoMerge is why a merge when checks pass is refused: Bitbucket's API has none.
 const bitbucketNoAutoMerge = "Bitbucket's API cannot merge when checks pass: merge once they have"
+
+// bitbucketNoPlan is why a Bitbucket issue has no plan (#3880).
+const bitbucketNoPlan = "Bitbucket's issues have no sub-issues or dependencies, so a Bitbucket issue has no plan"
 
 // bitbucketOfNode is the repository, workspace/repo, and the number of a Bitbucket issue's or
 // pull request's node.
