@@ -1015,7 +1015,7 @@ func (g *RealGitHub) PRLabelActivity(ctx context.Context, repo string, kind PRLa
 		if e.Event != wanted || e.Issue == nil || !e.Issue.isPR() {
 			continue
 		}
-		// Labelling takes triage access, so whoever did it is trusted, never a bot (#728).
+		// Labelling takes triage access, so whoever did it is trusted, never a bot but the agents' (#728, #3860).
 		out = append(out, PRLabelActivity{
 			ID:      strconv.Itoa(e.ID),
 			At:      e.CreatedAt,

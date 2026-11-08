@@ -11,17 +11,15 @@ import (
 // comment with words. Once agents post as their own bot, the person approves a UI enhancement
 // with a real review, and pr.reviewed wakes the lane that waits for it.
 type PRReview struct {
-	ID     int
-	PR     PR
-	Author string
-	// State is approved, changes_requested or commented.
-	State  string
-	Body   string
-	URL    string
-	Commit string
-	At     string
-	// Trusted: the repo's owner, a member or a collaborator, and not a bot (#728).
-	Trusted bool
+	ID      int
+	PR      PR
+	Author  string
+	State   string // approved, changes_requested or commented
+	Body    string
+	URL     string
+	Commit  string
+	At      string
+	Trusted bool // the repo's owner, a member or a collaborator, and not a bot (#728)
 }
 
 func (r PRReview) data() map[string]any {
