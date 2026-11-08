@@ -1951,7 +1951,7 @@
       "result": {
         "name": "result",
         "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
+          "$ref": "daemon.schema.json#/definitions/BrowserInputResult"
         }
       }
     },
@@ -5058,6 +5058,31 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/LineageLinks"
+        }
+      }
+    },
+    {
+      "name": "lineage/sessions",
+      "x-capability": "lineage.sessions/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LineageSessionsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LineageSessions"
         }
       }
     },
@@ -9531,6 +9556,58 @@
           "required": true,
           "schema": {
             "$ref": "daemon.schema.json#/definitions/WorkflowMCPClearMissedRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/WorkflowSummary"
+        }
+      }
+    },
+    {
+      "name": "workflows/readyMade/keep",
+      "description": "Keep an edited copy of a ready-made workflow as it is (#4075): its page says no more of the newer version, until the next one.",
+      "x-capability": "workflows/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/WorkflowRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/WorkflowSummary"
+        }
+      }
+    },
+    {
+      "name": "workflows/readyMade/take",
+      "description": "Write the newer ready-made version over an edited copy of it (#4075). The copy keeps its state keys, and the new version waits for approval as any changed workflow does.",
+      "x-capability": "workflows/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/WorkflowRequest"
           }
         }
       ],

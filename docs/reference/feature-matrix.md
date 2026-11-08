@@ -38,7 +38,7 @@ down for a runtime that has none. [Overall score](#overall-score), after the
 tables, adds every feature up.
 
 The matrix was filled in on 2026-10-12 from each app's own docs, changelog, README,
-releases and, where open, source. Agents' row was last brought up to date on 2026-11-07. Every app is held to the same bar, Agents included: a ●
+releases and, where open, source. Agents' row was last brought up to date on 2026-11-08. Every app is held to the same bar, Agents included: a ●
 needs the whole feature, documented by the app itself, and a ○ needs evidence, such as an
 app that ships for macOS alone having no Android app. Once per release, after the
 Competitor check, the Feature matrix workflow (`.agents/workflows/feature-matrix.md`)
@@ -344,9 +344,9 @@ Agents has none of these at all:
 | Pragma | ● | ◐ | ?⃝ | ● | ● | ● | ?⃝ | ?⃝ | ?⃝ | 50% |
 | Threadlines | ?⃝ | ● | ?⃝ | ● | ● | ● | ○ | ◐ | ○ | 50% |
 | Nuphos | ?⃝ | ?⃝ | ● | ● | ● | ● | ○ | ○ | ○ | 44% |
+| Ace | ● | ?⃝ | ?⃝ | ?⃝ | ● | ● | ?⃝ | ◐ | ?⃝ | 39% |
 | CodeAgentSwarm | ● | ?⃝ | ◐ | ?⃝ | ● | ● | ?⃝ | ?⃝ | ?⃝ | 39% |
 | T3 Code | ?⃝ | ?⃝ | ○ | ● | ● | ● | ○ | ◐ | ○ | 39% |
-| Ace | ● | ?⃝ | ?⃝ | ?⃝ | ● | ● | ?⃝ | ?⃝ | ?⃝ | 33% |
 | Atelier (was Acepe) | ● | ?⃝ | ● | ?⃝ | ?⃝ | ● | ○ | ○ | ○ | 33% |
 | Emdash | ○ | ● | ● | ● | ?⃝ | ○ | ○ | ○ | ○ | 33% |
 | Happy | ?⃝ | ?⃝ | ?⃝ | ● | ● | ● | ○ | ○ | ○ | 33% |
@@ -462,8 +462,8 @@ Each app's score in every table, and overall: its points over the 50 scored feat
 | 16 | Nuphos | 83% | 58% | 69% | 70% | 40% | 44% | 20% | 83% | **59%** |
 | 17 | Happy | 92% | 100% | 69% | 30% | 20% | 33% | 40% | 67% | **57%** |
 | 18 | Maestro | 50% | 50% | 63% | 50% | 60% | 56% | 60% | 50% | **55%** |
+| 19 | Ace | 67% | 67% | 75% | 50% | 40% | 39% | 40% | 50% | **54%** |
 | 19 | Emdash | 83% | 33% | 50% | 70% | 70% | 33% | 40% | 67% | **54%** |
-| 20 | Ace | 67% | 67% | 75% | 50% | 40% | 33% | 40% | 50% | **53%** |
 | 21 | Parallel Code | 67% | 75% | 69% | 60% | 20% | 56% | 20% | 33% | **52%** |
 | 22 | Conductor | 75% | 25% | 44% | 80% | 40% | 50% | 10% | 67% | **49%** |
 | 23 | Rove | 67% | 33% | 25% | 60% | 20% | 61% | 40% | 50% | **45%** |
@@ -488,7 +488,7 @@ thing. A ?⃝ has no link: the app's docs did not say.
 
 - **Agents:** Leases ● ([source](../explanation/leases.md)); Waits ● ([source](../how-to/wait-for-something.md)); Workflows in the repository ● ([source](../how-to/set-up-a-workflow.md)); Live documents ● ([source](../how-to/follow-a-live-document.md)).
 - **Agentastic:** Leases ?⃝; Waits ?⃝; Workflows in the repository ○ ([source](https://www.agentastic.com/docs/advanced/task-scheduler)); Live documents ?⃝.
-- **Ace:** Leases ?⃝; Waits ?⃝; Workflows in the repository ?⃝; Live documents ?⃝.
+- **Ace:** Leases ?⃝; Waits ◐, an agent's own background build or test run wakes it when the job ends ([source](https://github.com/flazouh/ace-releases/releases/tag/v0.1.99)); Workflows in the repository ?⃝; Live documents ?⃝.
 - **Atelier (was Acepe):** Leases ○ ([source](https://github.com/flazouh/atelier)); Waits ○ ([source](https://github.com/flazouh/atelier)); Workflows in the repository ○ ([source](https://github.com/flazouh/atelier)); Live documents ◐ ([source](https://github.com/flazouh/atelier/blob/HEAD/docs/app.md)).
 - **Claude Code:** Leases ?⃝; Waits ◐ ([source](https://code.claude.com/docs/en/tools-reference)); Workflows in the repository ● ([source](https://code.claude.com/docs/en/github-actions)); Live documents ?⃝.
 - **Claude Squad:** Leases ○ ([source](https://github.com/smtg-ai/claude-squad)); Waits ○ ([source](https://github.com/smtg-ai/claude-squad)); Workflows in the repository ○ ([source](https://github.com/smtg-ai/claude-squad)); Live documents ○ ([source](https://github.com/smtg-ai/claude-squad/blob/HEAD/README.md)).

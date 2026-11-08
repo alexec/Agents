@@ -127,6 +127,10 @@ struct WorkflowPage: View {
                 }
             }
             .paperRaised(in: RoundedRectangle(cornerRadius: 18))
+            if summary.newerReadyMade != nil {
+                ReadyMadeChoice(take: { await model.answerReadyMade(summary, take: true) },
+                                keep: { await model.answerReadyMade(summary, take: false) })
+            }
             // How often it may run, the Mac page's sentence under its triggers (#103).
             if let cooldown = summary.cooldownSentence(formatting: { $0.formatted(date: .omitted, time: .shortened) }) {
                 note(cooldown)

@@ -14,8 +14,8 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// manageAccounts is manage_accounts (#3967): the person's outside accounts, from Your setup ▸
-// Accounts on the control plane. list (or find, with service), add one, or import the files
+// manageAccounts is manage_accounts (#3967): the person's outside accounts, from Settings ▸
+// You ▸ Accounts on the control plane. list (or find, with service), add one, or import the files
 // of the old registry in ~/.agents/accounts/ (#3909) once.
 func (d *Daemon) manageAccounts(_ wire.UUID, args map[string]json.RawMessage) (string, error) {
 	var call wire.MachineAccountsCall

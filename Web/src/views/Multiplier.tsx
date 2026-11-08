@@ -119,7 +119,6 @@ export function MultiplierPage({ store }: { store: Store }) {
           <>
             <p class="multiplier-range">Last 7 days</p>
             <p class="multiplier-hero">{oneDecimal(shown.multiplier)}×</p>
-            <p class="multiplier-words">the work of {oneDecimal(shown.multiplier)} engineers</p>
             <div class="multiplier-stats">
               <Stat value={shown.prsMerged} label="PRs merged" />
               <Stat value={shown.engineerHours} label="engineer-hours" />

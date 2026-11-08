@@ -17,8 +17,9 @@ import (
 // the events, in the gitlab server's shape (Go/internal/gitlabmcp/tools.go): list and read
 // pull requests and their builds, read a failed build's log, and comment on a pull request.
 // For the ready-made workflows (#1633): open a pull request, list its line comments, and
-// answer one in its thread. Merging and approving are a person's, as on GitHub (#837): they
-// are only on the host's copy, never offered to an agent. Work items are the tracker's.
+// answer one in its thread. For the views (views.go, #4098): run a build's failed jobs again.
+// Merging and approving are a person's, as on GitHub (#837): they are only on the host's copy,
+// never offered to an agent. Work items are the tracker's.
 
 const repoWords = "organization/project/name; the repository this folder pushes to when left out"
 
@@ -139,7 +140,8 @@ func tool[In any](server *mcp.Server, t *mcp.Tool, f func(context.Context, In) (
 	})
 }
 
-// AddTools puts the tools on server; with person, also the tools only a person may call.
+// AddTools puts the tools and the views (views.go) on server; with person, also the tools only
+// a person may call.
 func AddTools(server *mcp.Server, f *RealAzureDevOps, person bool) {
 	repoOf := func(ctx context.Context, repo string) (string, error) {
 		if repo != "" {
@@ -152,6 +154,7 @@ func AddTools(server *mcp.Server, f *RealAzureDevOps, person bool) {
 	}
 	readOnly := &mcp.ToolAnnotations{ReadOnlyHint: true}
 	agents := visibility("model", "app")
+	addViews(server, f, repoOf)
 	pull := func(ctx context.Context, repo string, number int) (pullJSON, error) {
 		var p pullJSON
 		err := f.get(ctx, api(fmt.Sprintf("%s/pullrequests/%d", repoPath(repo), number), nil), false, &p)
@@ -273,6 +276,25 @@ func AddTools(server *mcp.Server, f *RealAzureDevOps, person bool) {
 				return nil, fmt.Errorf("buildId is needed")
 			}
 			return f.buildLog(ctx, repo, in.Build)
+		})
+
+	tool(server, &mcp.Tool{Name: "retry_build", Title: "Run a build's failed jobs again",
+		Description: "Runs a finished Azure Pipelines build's failed jobs again, in the same build, as the person whose token it is. " +
+			"Use it for a failure that is known to be flaky, not to hide a real one.",
+		Meta: agents},
+		func(ctx context.Context, in buildLogArgs) (map[string]any, error) {
+			repo, err := repoOf(ctx, in.Repo)
+			if err != nil {
+				return nil, err
+			}
+			if in.Build <= 0 {
+				return nil, fmt.Errorf("buildId is needed")
+			}
+			link, err := f.RetryBuild(ctx, repo, in.Build)
+			if err != nil {
+				return nil, err
+			}
+			return map[string]any{"buildId": in.Build, "url": link}, nil
 		})
 
 	tool(server, &mcp.Tool{Name: "comment_on_pull_request", Title: "Comment on a pull request",

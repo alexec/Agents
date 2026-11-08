@@ -34,7 +34,7 @@ public enum AppTool {
     /// that run themselves when something happens.
     public static let manageWorkflows = "manage_workflows"
 
-    /// The person's outside accounts, Your setup ▸ Accounts (#3967): list, add and import.
+    /// The person's outside accounts, Settings ▸ You ▸ Accounts (#3967): list, add and import.
     public static let manageAccounts = "manage_accounts"
 
     /// Ask the person a question or a short form and wait for the answer. The

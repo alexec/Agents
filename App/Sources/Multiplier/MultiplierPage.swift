@@ -2,8 +2,8 @@ import AgentsKitCore
 import SwiftUI
 
 /// The detail with nothing picked (#3904, in place of #145's page): the Multiplier, the
-/// work of how many engineers the agents did in the last 7 days, the crowd of them over it
-/// (#3985), three big numbers under it, the person's bests in one line (#3988), and the
+/// work of how many engineers the agents did in the last 7 days (the number alone), the
+/// crowd of them over it (#3985), three big numbers under it, the person's bests in one line (#3988), and the
 /// earned achievements as badges (#3987). A show-off page: nothing else, and the key hints
 /// in one small line.
 ///
@@ -84,9 +84,6 @@ struct MultiplierPage: View {
             CountingText(value: shown.multiplier, digits: 1, suffix: "×")
                 .appFigure(.hero)
                 .padding(.top, 8)
-            CountingText(value: shown.multiplier, digits: 1, prefix: "the work of ", suffix: " engineers")
-                .appText(.title)
-                .foregroundStyle(.secondary)
                 .padding(.bottom, 56)
             HStack(alignment: .top, spacing: 72) {
                 stat(shown.prsMerged, "PRs merged")

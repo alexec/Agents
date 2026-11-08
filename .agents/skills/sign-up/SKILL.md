@@ -56,7 +56,7 @@ against. It is never Alex's personal account.
 
 ## Is there already an account?
 
-Before anything else, find the person's outside accounts (Your setup ▸ Accounts, #3967):
+Before anything else, find the person's outside accounts (Settings ▸ You ▸ Accounts, #3967):
 `manage_accounts` with `service` (for example `gitlab`). When the service is there, use that
 account and do not sign up again. Its `secret` says which secret (or where) the token is,
 and its `notes` say where the password is. If `~/.agents/accounts/` still has files (the old
@@ -105,11 +105,11 @@ the tab with `browser_close` when done.
   `scripts/okta-signin.mjs` makes one with `WebAuthn.addVirtualAuthenticator`, enrols it, and
   saves it with `WebAuthn.getCredentials` for the next run (`okta-integrator-passkey.json`).
 - **Accounts:** `manage_accounts` with action `add` (#3967): service, address, plan, monthly
-  cost, card (its name in Your setup ▸ Secrets), secret (its name there, or where it is), the
+  cost, card (its name in Settings ▸ You ▸ Secrets), secret (its name there, or where it is), the
   2FA method, the issue, the date made, when the token expires, the projects that use it
   (none: all) and notes. Never a secret value, a password or a card number: the control
   plane refuses one that looks like a token, a key or a card number.
-- **Tracker:** the account's row in Your setup ▸ Accounts (`manage_accounts`) and its notes.
+- **Tracker:** the account's row in Settings ▸ You ▸ Accounts (`manage_accounts`) and its notes.
   No secrets.
 
 ## Finish

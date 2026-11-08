@@ -68,7 +68,8 @@ extension HostProblem {
 
     /// What Settings ▸ Control plane says when the control plane refused a change (058,
     /// T081): the two refusals that come from there being several copies over one store,
-    /// in words, and anything else as the control plane said it.
+    /// in words; a method or parameters that an older control plane does not know, as "needs
+    /// an update" (#4096); and anything else as the control plane said it.
     static func controlRefusal(_ error: JSONRPCError) -> String {
         switch error.code {
         case DaemonAPI.Failure.changedElsewhere:
@@ -76,7 +77,7 @@ extension HostProblem {
         case DaemonAPI.Failure.storeUnavailable:
             "The control plane can’t reach where it keeps its records, so nothing was changed. Agents that are running carry on."
         default:
-            error.message
+            OlderPeer.controlRefusal(error)
         }
     }
 }

@@ -90,6 +90,7 @@ const CapHostWire1 = "host.wire/1"
 const CapHostsJoin1 = "hosts.join/1"
 const CapLineageComment1 = "lineage.comment/1"
 const CapLineageEstimate1 = "lineage.estimate/1"
+const CapLineageSessions1 = "lineage.sessions/1"
 const CapLineage1 = "lineage/1"
 const CapLinks1 = "links/1"
 const CapLiveactivity1 = "liveactivity/1"
@@ -365,6 +366,7 @@ var HostCapabilities = pairs([][2]string{
 	{"lineage/estimate", "lineage.estimate/1"},
 	{"lineage/link", "lineage/1"},
 	{"lineage/links", "lineage/1"},
+	{"lineage/sessions", "lineage.sessions/1"},
 	{"lineage/walk", "lineage/1"},
 	{"lock/hello", "host.lock/3"},
 	{"mac/open", "mac/1"},
@@ -536,6 +538,8 @@ var HostCapabilities = pairs([][2]string{
 	{"workflows/limit", "workflows/1"},
 	{"workflows/list", "workflows/1"},
 	{"workflows/mcpTrigger/clearMissed", "workflows/1"},
+	{"workflows/readyMade/keep", "workflows/1"},
+	{"workflows/readyMade/take", "workflows/1"},
 	{"workflows/run", "workflows/1"},
 	{"workflows/setLimit", "workflows/1"},
 	{"workflows/setMuted", "mute/1"},

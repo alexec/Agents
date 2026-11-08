@@ -4,8 +4,8 @@ import UIKit
 
 /// The browser on the session's machine, which agents drive (#3800), as the window's
 /// `AgentBrowserPane` shows it (#3528): a screencast of this session's own tab (#3916),
-/// which the person can use at any time, and who holds the browser when another session does. A tap is a click, a drag scrolls the page, and the keyboard button
-/// types into it. Frames come only while the pane is on screen and the app is not in the background.
+/// which the person can use at any time, and who holds the browser when another session does. A tap is a click, a drag scrolls the page, a tap in a
+/// field of the page opens the keyboard, and the keyboard button types into the page anywhere. Frames come only while the pane is on screen and the app is not in the background.
 struct AgentBrowserPane: View {
     @Environment(RemoteModel.self) private var model
     @Environment(\.scenePhase) private var scenePhase
@@ -71,6 +71,11 @@ struct AgentBrowserPane: View {
         }
         .onChange(of: browser.state.url, initial: true) { _, url in
             if !addressFocused { typed = url ?? "" }
+        }
+        // A tap in a field of the page opens the keyboard, and a tap outside one closes it,
+        // as in Safari.
+        .onChange(of: browser.editing) { _, said in
+            if let said { typing = said.inField }
         }
     }
 

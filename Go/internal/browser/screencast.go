@@ -360,17 +360,24 @@ func (c *Cast) Resize(width, height int64) error {
 	return c.start(ctx, w, h)
 }
 
-// Input sends the person's input to the page.
-func (c *Cast) Input(in Input) error {
+// Input sends the person's input to the page. After a click is released it says whether
+// the page's focus is now in a field that takes text, so a touch client opens its keyboard;
+// for other input, or when the page cannot say, editing is nil.
+func (c *Cast) Input(in Input) (editing *bool, err error) {
 	ctx, err := c.tabContext()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	call, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	switch in.Kind {
 	case "mouse", "wheel":
 		_, err = chromedp.Call(call, input.DispatchMouseEvent, mouseParams(in))
+		if err == nil && in.Kind == "mouse" && in.Type == string(input.DispatchMouseEventTypeMouseReleased) {
+			if e, err := chromedp.Run(call, chromedp.Evaluate[bool](focusEditable)); err == nil {
+				editing = &e
+			}
+		}
 	case "key":
 		_, err = chromedp.Call(call, input.DispatchKeyEvent, keyParams(in))
 	case "text":
@@ -378,8 +385,26 @@ func (c *Cast) Input(in Input) error {
 	default:
 		err = errors.New("unknown input: " + in.Kind)
 	}
-	return err
+	return editing, err
 }
+
+// focusEditable is true when the focused element takes text: a text input, a textarea or
+// contenteditable, also inside a same-origin frame or a shadow root.
+const focusEditable = `(() => {
+	let e = document.activeElement;
+	for (;;) {
+		if (e && e.shadowRoot && e.shadowRoot.activeElement) { e = e.shadowRoot.activeElement; continue; }
+		let inner = null;
+		try { inner = e && e.contentDocument && e.contentDocument.activeElement; } catch (_) {}
+		if (inner) { e = inner; continue; }
+		break;
+	}
+	if (!e || e.disabled || e.readOnly) return false;
+	if (e.isContentEditable) return true;
+	if (e.tagName === "TEXTAREA") return true;
+	if (e.tagName !== "INPUT") return false;
+	return !["button", "checkbox", "color", "file", "hidden", "image", "radio", "range", "reset", "submit"].includes((e.type || "").toLowerCase());
+})()`
 
 func mouseParams(in Input) input.DispatchMouseEventParams {
 	p := input.DispatchMouseEventParams{X: in.X, Y: in.Y, Modifiers: in.Modifiers}

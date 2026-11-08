@@ -50,6 +50,7 @@ func (d *Daemon) register() {
 	d.registerEventWaits()
 	d.registerCost()
 	d.registerLineage()
+	d.registerLineageSessions()
 	d.registerForge()
 	d.registerDocs()
 	d.registerDevices()
@@ -484,6 +485,7 @@ func (d *Daemon) listAgents(r wire.ListRequest) []wire.Agent {
 		query = *r.Query
 	}
 	read := 0
+	issue := d.issueSearchOf(query)
 	projects := projectsOfFolders{}
 	agents := d.Store.Agents()
 	if r.ArchivedOnly {
@@ -523,7 +525,11 @@ func (d *Daemon) listAgents(r wire.ListRequest) []wire.Agent {
 		}
 		// A search (#165) asks for the sessions it matches; what was said is read for the
 		// most recently active saidSessions only (#1585).
-		if query != "" {
+		if issue != nil {
+			if !issue.matches(a) {
+				continue
+			}
+		} else if query != "" {
 			if read++; read > saidSessions && !d.titleMatches(a, query) || read <= saidSessions && !d.queryMatches(a, query) {
 				continue
 			}

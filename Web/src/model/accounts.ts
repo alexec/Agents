@@ -1,4 +1,4 @@
-// Your setup ▸ Accounts (#3967): the words and sums, as the window's AccountsWords.
+// Settings ▸ You ▸ Accounts (#3967): the words and sums, as the window's AccountsWords.
 import type { OutsideAccount } from "../protocol/generated";
 
 export const accountsTitle = "Accounts";

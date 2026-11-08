@@ -205,8 +205,10 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
     public func agents(in work: AgentsModel, folders: [FolderKey], query: String = "",
                        on: Set<SidebarSmartRow> = all) -> [Agent] {
         let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        let matcher = words.isEmpty ? nil : SessionLabelQuery(words, said: work.saidLines)
+        let matcher = words.isEmpty ? nil : SessionLabelQuery(words, said: work.saidLines, onIssue: work.issueSessions)
         guard on.contains(self) else { return [] }
+        // A search for an epic lists its sessions under their issues in the folders (#3900).
+        if matcher != nil, SidebarIssueGroup.isOn(query: words, in: work) { return [] }
         if on != Self.all, self != .pinned {
             // A group off (#846): each live session goes where `home` puts it.
             let gathered = folders.flatMap { key -> [Agent] in
@@ -258,7 +260,7 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
         -> [(folder: FolderKey, workflow: WorkflowSummary)] {
         guard self == .pinned else { return [] }
         let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        let matcher = words.isEmpty ? nil : SessionLabelQuery(words, said: work.saidLines)
+        let matcher = words.isEmpty ? nil : SessionLabelQuery(words, said: work.saidLines, onIssue: work.issueSessions)
         return folders.flatMap { key in
             Self.pinnedWorkflows(in: work, key)
                 .filter { matcher?.matches($0) ?? true }

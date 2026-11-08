@@ -136,6 +136,8 @@ public enum DaemonAPI {
         /// The lineage graph from a node, and a node's cost rolled up (#2348, #2350): read by a
         /// session's Lineage pane (#2940).
         public static let lineageWalk = "lineage/walk"
+        /// The sessions on an issue, its sub-issues and their PRs, for a `#<n>` search (#3899).
+        public static let lineageSessions = "lineage/sessions"
         public static let lineageCost = "lineage/cost"
         /// What an issue or an epic will probably cost and take, from past work (#3559, #3560).
         public static let lineageEstimate = "lineage/estimate"
@@ -319,6 +321,10 @@ public enum DaemonAPI {
         public static let workflowsArchive = "workflows/archive"
         /// Delete a workflow's file at the person's request. Never exposed to agent tools.
         public static let workflowsDelete = "workflows/delete"
+        /// An edited ready-made copy (#4075): take the newer ready-made version over it, or
+        /// keep it and hide the notice until the next version. Each takes a `WorkflowRequest`.
+        public static let workflowsReadyMadeTake = "workflows/readyMade/take"
+        public static let workflowsReadyMadeKeep = "workflows/readyMade/keep"
         /// Turn one on or off, keeping its place on the list (#100).
         public static let workflowsEnable = "workflows/enable"
         /// Mute Notifications for every run of one, or Unmute (#2003): `muted: true` in

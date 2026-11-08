@@ -1,6 +1,6 @@
-// The #3631 walk: Your setup ▸ Runtimes, each runtime once with a line per machine. Pairs, checks the bar has
-// Your setup and Machines has no Runtimes, shoots the page, follows a machine's line to its page, and checks the
-// addresses from before #3631 open Your setup.
+// The #3631 walk: Status ▸ Runtimes (Your setup ▸ Runtimes until #3998), each runtime once with a line per machine.
+// Pairs, checks the bar has Status and Machines has no Runtimes, shoots the page, follows a machine's line to its
+// page, and checks the addresses from before #3631 and #3998 open Status.
 //
 //   node Web/test/walk/yourSetup3631.mjs <WEB_URL> <browser code> <out dir> <profile>
 //
@@ -36,13 +36,13 @@ try {
   await page.waitFor(`document.body.innerText.includes("Overview")`, 30_000);
   const bar = await page.eval(`[...document.querySelectorAll(".nav-items .nav-item")].map((b) => b.innerText)`);
   console.log("bar:", JSON.stringify(bar));
-  if (!bar.some((b) => b.startsWith("Your setup"))) throw new Error("no Your setup in the bar");
+  if (!bar.some((b) => b.startsWith("Status"))) throw new Error("no Status in the bar");
   await page.eval(`location.hash = "#/machines"`);
   await page.waitFor(`document.querySelectorAll(".sub-app-row").length > 1`, 20_000);
   const rows = await page.eval(`[...document.querySelectorAll(".sub-app-row")].map((b) => b.innerText)`);
   console.log("machines rows:", JSON.stringify(rows));
   if (rows.some((r) => r.startsWith("Runtimes"))) throw new Error("Machines ▸ Runtimes is still there");
-  await page.eval(`[...document.querySelectorAll(".nav-items .nav-item")].find((b) => b.innerText.startsWith("Your setup")).click()`);
+  await page.eval(`[...document.querySelectorAll(".nav-items .nav-item")].find((b) => b.innerText.startsWith("Status")).click()`);
   try {
     await page.waitFor(`document.querySelectorAll(".setup-machines li").length > 1`, 30_000);
   } catch (e) {
@@ -58,8 +58,8 @@ try {
   await page.eval(`document.querySelector(".setup-machines a").click()`);
   await sleep(1500);
   console.log("a machine's line →", await page.eval(`location.hash`));
-  // The addresses from before #3631 open Your setup.
-  for (const old of ["#/a/runtimes", "#/machines/runtimes"]) {
+  // The addresses from before #3631 and #3998 open Status.
+  for (const old of ["#/a/runtimes", "#/machines/runtimes", "#/setup/runtimes"]) {
     await page.eval(`location.hash = ${JSON.stringify(old)}`);
     await sleep(1500);
     console.log(old, "→", await page.eval(`location.hash`));

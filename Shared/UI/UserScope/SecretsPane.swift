@@ -1,7 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Your setup ▸ Secrets (#1760, #3632): the person’s secrets, by name only, kept by the control
+/// Settings ▸ You ▸ Secrets (#1760, #3632): the person’s secrets, by name only, kept by the control
 /// plane and sent to each machine of theirs. The window draws it; the web page
 /// draws the same in `Web/src/views/UserScope.tsx`. A card (#3531) is a secret of its own kind.
 /// `extra` is what a client draws after them: the window's secrets for one session (#3548).

@@ -10,14 +10,18 @@ This page lists every control in the Mac's Settings window, **Agents ▸ Setting
 by pane, the **Resources** page (not in that window), and the system settings the app on
 iPhone and iPad depends on.
 
-The Mac's Settings window has panes chosen from one rail down its left side, in four
-groups by what they are about: **This app** (**Appearance**, **Sidebar** and **Voice**: how the app
+The Mac's Settings window has panes chosen from one rail down its left side, in five
+groups by what they are about: **You** (**Connectors**, **Secrets**, with **For One Session**
+on its page, and **Accounts**: your own, on every machine of yours; Secrets and Accounts only
+with a control plane, #3998); **This app** (**Appearance**, **Sidebar** and **Voice**: how the app
 draws); **Agents** (**Policy**, **Spending** and **Resources**: what agents may do, what they
-spend and what they take, #2957); **Machines** (**Machines**, **Agent Runtimes**, **Browser**, **Agent Configuration**
-and **Secrets**: the machines that run your agents); and **Control
+spend and what they take, #2957); **Machines** (**Machines**, **Agent Runtimes**, **Browser** and **Agent Configuration**:
+the machines that run your agents); and **Control
 plane** (**Account** and **Sign-ins** first, shown also with no control plane; then
 **People**, **Bots**, **Groups**, **Channels**, **Sign-In**, **Organisation Policy**, **Machine Providers**, **Clients** and
-**Overview**). The web page calls the first group **This browser**, and its **Agents** group has **Policy** only.
+**Overview**). On the web page, **You** is the first group of Settings' list of pages, and Settings' own page is
+still the one it opens on; it calls **This app** **This browser**, and its **Agents** group has **Policy** only.
+The Connectors row shows a warning sign when one of your connectors does not answer or a connection ended.
 Policy, Spending, Agent Runtimes and Agent Configuration say **Yours, on every machine**. Resources says **This Mac's**.
 Each setting has one fixed scope; there is no switch. See [Secrets and what follows you](on-every-machine.md).
 **Machines** lists every
@@ -73,8 +77,8 @@ Change one on any of them and the others follow. They are kept on your Mac, in
 | iPhone, iPad, web | Agent Configuration | **Skills**, **Personas**, **Workflows** | Your own skills, personas and workflows in `~/.agents`, created, edited and deleted in the app, as on the Mac. A workflow there is in every folder. |
 | Mac | Policy, Spending, Agent Runtimes, Agent Configuration, Resources | Fixed scope label | Policy, Spending, Agent Runtimes and Agent Configuration say **Yours, on every machine**. Resources says **This Mac's**. Edits to person settings sync to each machine; resource declarations stay local. |
 | iPhone, iPad, web | Machines | No scope list | The Machines page does not list settings that have a fixed scope. |
-| Mac, web | Your setup ▸ Secrets (#3632) | **Add a Secret…**, **Replace…**, **Remove…** | The secrets the control plane sends to each machine of yours, by name only. See [Secrets and what follows you](on-every-machine.md). |
-| Mac, web | Your setup ▸ Secrets ▸ For One Session | **Add for a Session…**, **Remove…** | A machine's secrets for one session only (#3548), with the session each belongs to. Only that session's agent can use one (`fill_secret`, its environment, `${NAME}` in its connectors), and the machine deletes it when the session is archived; then the agent is told it expired. It is never in `secrets.env` and never leaves the machine. The `ask_secret` card sets one with **For this session only**. |
+| Mac, web | Settings ▸ You ▸ Secrets (#3632) | **Add a Secret…**, **Replace…**, **Remove…** | The secrets the control plane sends to each machine of yours, by name only. See [Secrets and what follows you](on-every-machine.md). |
+| Mac, web | Settings ▸ You ▸ Secrets ▸ For One Session | **Add for a Session…**, **Remove…** | A machine's secrets for one session only (#3548), with the session each belongs to. Only that session's agent can use one (`fill_secret`, its environment, `${NAME}` in its connectors), and the machine deletes it when the session is archived; then the agent is told it expired. It is never in `secrets.env` and never leaves the machine. The `ask_secret` card sets one with **For this session only**. |
 | Mac, web | Policy | The banner | Who sets limits above yours, with a link to **Organisation Policy**; or **You set every limit**, with how many folders set rules of their own. A machine of yours that does not follow the layers yet is named under it. |
 | Mac, web | Policy | **Permissions**: **Permission mode**, **Permission requests**, **Sandbox** | Your layer of the policy (#2957). Each row starts at **Not set**, which leaves the rule to the layers above and the default. **Permission mode** is the mode Auto gives a new agent and the loosest anyone may choose: **Plan**, **Ask**, **Approve for me** or **Bypass Permissions**. **Permission requests**: **Ask me** or **Approve for me**. **Sandbox**: **Off allowed**, **The runtime's** or **On**. |
 | Mac, web | Policy | **Money**: **Per agent**, **Tokens per agent**, **Per day**, **Tokens per day** | Was in Cost. The most one agent may spend across its whole life, and the most everything may spend in one local day, in US dollars and in tokens. Type a number and press Return; an empty field is no limit, never a zero. An agent that reaches a limit finishes its turn and takes no further prompt. A runtime that reports neither a cost nor tokens is not stopped by your limits. |

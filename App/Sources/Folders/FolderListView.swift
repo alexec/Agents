@@ -1,7 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// The window's one sidebar (#145): Your setup, Machines and Usage at the top, then every folder, each a row
+/// The window's one sidebar (#145): Status, Machines and Usage at the top, then every folder, each a row
 /// that folds open on its sessions and workflows, and at the foot what this Mac and its
 /// hosts are doing.
 ///
@@ -17,7 +17,8 @@ struct FolderListView: View {
     @AppStorage("showsArchivedFolders", store: WindowDefaults.store) private var showsArchived = false
     /// Machines, open until folded, and kept so (#3626).
     @AppStorage("showsMachines", store: WindowDefaults.store) private var showsMachines = true
-    @AppStorage("showsYourSetup", store: WindowDefaults.store) private var showsYourSetup = true
+    /// Status, open until folded, and kept so: its key from before #3633 (#3998).
+    @AppStorage("showsStatus", store: WindowDefaults.store) private var showsStatus = true
     /// The Work group (#4004), open the first time: folded, it hides what the one Work row showed.
     @AppStorage("showsWork", store: WindowDefaults.store) private var showsWorkLists = true
     /// Usage, open until folded, and kept so (#915).
@@ -67,16 +68,9 @@ struct FolderListView: View {
         (model.hasMacHost ? [.mac] : []) + model.hosts.servers
     }
 
-    /// No runtime can be started on: Your setup's icon says so in red (#587).
+    /// No runtime can be started on: Runtimes' icon says so in red (#587).
     private var runtimesFailing: Bool {
         RuntimeTally(model.runtimes, allowances: model.runtimeAllowances)?.noneWorking == true
-    }
-
-    /// A hosted server stopped while in use, or a connection ended: Connectors' icon says so
-    /// in red (#587, #589, #3407).
-    private var connectorsWarn: Bool {
-        MCPHealthWords.tally(model.work.mcpHealthSnapshot()?.personal ?? [])?.failing == true
-            || !model.endedConnections.on(.mac).isEmpty
     }
 
     /// Each project's Connectors folder (#3407), whose stored set-up says whether a slot's
@@ -224,23 +218,16 @@ struct FolderListView: View {
             // groups (Alex, #495): rows of
             // the list, so they take its selection and keys, each with its icon in the
             // accent beside the plain title (#155), and folding as a folder does.
-            // Your setup (#3630): what is the person's own, once, not once per machine: their
-            // runtimes and accounts (#3631), their connectors, and their secrets (#3632). It,
-            // Machines and Usage took the place of Status (#3633).
-            Section(isExpanded: $showsYourSetup) {
+            // Status (#3998): what is going on, and no settings. Each runtime once, with the
+            // accounts and a line per machine (#3631), and the record of what happened. The
+            // person's connectors, secrets and outside accounts are in Settings ▸ You.
+            Section(isExpanded: $showsStatus) {
                 RuntimesRow().activityIcon("cpu", warns: runtimesFailing)
                     .appText(.supporting).sidebarInk(.runtimes).tag(SidebarItem.runtimes)
-                MCPServersRow().activityIcon("server.rack", warns: connectorsWarn)
-                    .appText(.supporting).sidebarInk(.mcpServers).tag(SidebarItem.mcpServers)
-                // The control plane keeps them (#1760): no row without one.
-                if ControlConfig.endpoint != nil {
-                    SecretsRow().activityIcon("key")
-                        .appText(.supporting).sidebarInk(.secrets).tag(SidebarItem.secrets)
-                    AccountsRow().activityIcon("person.crop.rectangle.stack")
-                        .appText(.supporting).sidebarInk(.accounts).tag(SidebarItem.accounts)
-                }
+                EventsRow().activityIcon("list.bullet.rectangle")
+                    .appText(.supporting).sidebarInk(.events).tag(SidebarItem.events)
             } header: {
-                Text("Your setup").appText(.supporting)
+                Text("Status").appText(.supporting)
             }
 
             // A row per machine (#3626), each its page: CPU, memory and disks. Red when a
@@ -271,9 +258,6 @@ struct FolderListView: View {
                     .appText(.supporting).sidebarInk(.tokens).tag(SidebarItem.tokens)
                 TimeRow().activityIcon("clock")
                     .appText(.supporting).sidebarInk(.time).tag(SidebarItem.time)
-                // A record of what happened, as the web's Reports ▸ Records (#3633).
-                EventsRow().activityIcon("list.bullet.rectangle")
-                    .appText(.supporting).sidebarInk(.events).tag(SidebarItem.events)
             } header: {
                 // The size of every other group's heading (#495).
                 Text("Usage").appText(.supporting)
@@ -645,6 +629,16 @@ struct FolderFold: View {
                     SessionSidebarRow(agent: row.item.agent, place: machineMark(row.item.agent),
                                       tree: row.item, folds: folds, isNested: grouped)
                 }
+                // A search for an epic (#3900): what it found here, live and archived, under a
+                // heading for each of its issues, the epic's own first. Held open, as a
+                // search holds Sessions.
+                ForEach(fold.issueGroups) { group in
+                    IssueGroupHeading(title: group.title, count: group.sessions.count)
+                    ForEach(FoldedRow.rows(SidebarTree.rows(group.sessions, in: model.work, folds: folds), in: .sessions)) { row in
+                        SessionSidebarRow(agent: row.item.agent, place: machineMark(row.item.agent),
+                                          tree: row.item, folds: folds, isNested: true)
+                    }
+                }
                 if !fold.recentArchived.isEmpty {
                     let recentOpen = folds.isOpen(key, .recentArchivedSessions)
                     SidebarFoldRow(title: "Recently archived sessions", count: fold.recentArchived.count, isOpen: Binding(
@@ -745,6 +739,29 @@ struct FolderFold: View {
                 .appText(.fine)
                 .foregroundStyle(.secondary)
         }
+    }
+}
+
+/// The heading over one issue's sessions in a search for an epic (#3900): `#3898 Title` and
+/// how many, in line with the Sessions row's title. Not a fold: the search holds it open.
+private struct IssueGroupHeading: View {
+    let title: String
+    let count: Int
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(title).lineLimit(1).truncationMode(.tail)
+            Text("\(count)").monospacedDigit().foregroundStyle(.tertiary)
+        }
+        .appText(.fine)
+        .foregroundStyle(.secondary)
+        .padding(.leading, 22)
+        .padding(.top, 2)
+        .help(title)
+        // One label, over children it ignores: one stacked on a child's crashes AppKit.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(title), \(count)")
+        .accessibilityAddTraits(.isHeader)
     }
 }
 

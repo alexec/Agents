@@ -1294,6 +1294,15 @@ export interface BrowserInputRequest {
   modifiers?: number;
 }
 
+/**
+ * browser/input's answer. editing is said after a mouseReleased only: whether the click left the
+ * page's focus in a field that takes text (an input, a textarea, a contenteditable), so a touch
+ * client opens or closes its keyboard. Left out for other input, and by a host before it was added.
+ */
+export interface BrowserInputResult {
+  editing?: boolean;
+}
+
 export type BrowserNavigateAction =
   | "go"
   | "back"
@@ -5048,6 +5057,49 @@ export interface LineageResolved {
   labels?: string[];
 }
 
+/**
+ * One heading of a search for an epic (#3900): the epic or one of its sub-issues, and its title,
+ * absent while the host has not resolved it.
+ */
+export interface LineageSessionIssue {
+  node: LineageNode;
+  title?: string;
+}
+
+/**
+ * A session on the issue, and the issue it is on: the one asked for, or one of its sub-issues. A
+ * session on a PR is on the issue the PR fixes.
+ */
+export interface LineageSessionMatch {
+  agentID: UUID;
+  on: LineageNode;
+}
+
+/**
+ * The sessions on this machine that lineage links to the issue, to its sub-issues or to their PRs,
+ * each once, on the first issue in issues they came by. limited says there were more sub-issues or
+ * sessions than are counted.
+ */
+export interface LineageSessions {
+  matches: LineageSessionMatch[];
+  /**
+   * The issue asked for, then its sub-issues in the epic's order (#3900), each once, with its title
+   * when the host has it: the headings a search for an epic groups its sessions under. Only the
+   * issue asked for when it has no sub-issues; absent from a host too old to say.
+   */
+  issues?: LineageSessionIssue[];
+  limited?: boolean;
+}
+
+/**
+ * lineage/sessions (#3899): a session search for #<number> asks for the sessions on that issue, on
+ * the issues part-of it (its sub-issues, at most 100) and on the PRs that fix them. The issue is
+ * #<number> in the forge repo of each of this machine's folders.
+ */
+export interface LineageSessionsRequest {
+  number: number;
+}
+
 export interface ListCursor {
   lastActivityAt: WireDate;
   id: UUID;
@@ -6920,9 +6972,9 @@ export interface OrgRoutesMine {
 }
 
 /**
- * Your setup ▸ Accounts (#3967): one outside account of the person's (gitlab.com, AWS, Slack…). It
- * holds no secret: card and secret are the names of secrets in Your setup ▸ Secrets, or where one
- * is.
+ * Settings ▸ You ▸ Accounts (#3967): one outside account of the person's (gitlab.com, AWS, Slack…).
+ * It holds no secret: card and secret are the names of secrets in Settings ▸ You ▸ Secrets, or
+ * where one is.
  */
 export interface OutsideAccount {
   /** The service, as its address: gitlab.com, aws.amazon.com. */
@@ -6933,9 +6985,9 @@ export interface OutsideAccount {
   plan?: string;
   /** What it costs a month, in US dollars. Absent when not known. */
   monthlyCostUsd?: number;
-  /** The card it bills, by its name in Your setup ▸ Secrets. Never the number. */
+  /** The card it bills, by its name in Settings ▸ You ▸ Secrets. Never the number. */
   card?: string;
-  /** Its token or key, by its name in Your setup ▸ Secrets or where it is. Never the value. */
+  /** Its token or key, by its name in Settings ▸ You ▸ Secrets or where it is. Never the value. */
   secret?: string;
   /** TOTP, passkey, SMS, or absent for none. */
   twoFactor?: string;
@@ -9624,8 +9676,8 @@ export interface SecretLeftOn {
 /**
  * secrets/setNeedsApproval (#4014): a person turns Ask before use on or off for a secret of this
  * machine's secrets.env, or for one session's (agentID). On takes the value out of the plain file
- * and seals it to this machine; off puts it back. A Your setup secret's flag is its client's to
- * seal, so it is refused here.
+ * and seals it to this machine; off puts it back. The flag of a secret of the person's (Settings ▸
+ * You ▸ Secrets) is its client's to seal, so it is refused here.
  */
 export interface SecretNeedsApprovalRequest {
   name: string;
@@ -12127,7 +12179,7 @@ export interface Methods {
   "bots/stopRun": { params: BotStopRun; result: Empty };
   "browser/ack": { params: BrowserAckRequest; result: Empty };
   "browser/clear": { params: BrowserClearRequest; result: BrowserState };
-  "browser/input": { params: BrowserInputRequest; result: Empty };
+  "browser/input": { params: BrowserInputRequest; result: BrowserInputResult };
   "browser/navigate": { params: BrowserNavigateRequest; result: Empty };
   "browser/state": { params: Empty; result: BrowserState };
   "browser/unwatch": { params: Empty; result: Empty };
@@ -12235,6 +12287,7 @@ export interface Methods {
   "groups/setRole": { params: GroupRoleSet; result: Group };
   "lineage/cost": { params: LineageNodeRequest; result: LineageCostRollup };
   "lineage/estimate": { params: LineageEstimateRequest; result: LineageEstimate };
+  "lineage/sessions": { params: LineageSessionsRequest; result: LineageSessions };
   "lineage/walk": { params: LineageNodeRequest; result: LineageGraph };
   "links/approve": { params: ChannelLinkDecide; result: Empty };
   "links/deny": { params: ChannelLinkDecide; result: Empty };
@@ -12438,6 +12491,8 @@ export interface Methods {
   "workflows/enable": { params: WorkflowEnableRequest; result: WorkflowSummary };
   "workflows/list": { params: WorkflowsListRequest; result: WorkflowSummary[] };
   "workflows/mcpTrigger/clearMissed": { params: WorkflowMCPClearMissedRequest; result: WorkflowSummary };
+  "workflows/readyMade/keep": { params: WorkflowRequest; result: WorkflowSummary };
+  "workflows/readyMade/take": { params: WorkflowRequest; result: WorkflowSummary };
   "workflows/run": { params: WorkflowRequest; result: WorkflowSummary };
   "workflows/setMuted": { params: WorkflowMuteRequest; result: WorkflowSummary };
   "workflows/settings": { params: WorkflowSettingsRequest; result: WorkflowSummary };
@@ -12626,6 +12681,7 @@ export const MethodTarget = {
   "groups/setRole": "control",
   "lineage/cost": "host",
   "lineage/estimate": "host",
+  "lineage/sessions": "host",
   "lineage/walk": "host",
   "links/approve": "control",
   "links/deny": "control",
@@ -12829,6 +12885,8 @@ export const MethodTarget = {
   "workflows/enable": "host",
   "workflows/list": "host",
   "workflows/mcpTrigger/clearMissed": "host",
+  "workflows/readyMade/keep": "host",
+  "workflows/readyMade/take": "host",
   "workflows/run": "host",
   "workflows/setMuted": "host",
   "workflows/settings": "host",
@@ -13011,6 +13069,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BrowserClearRequest: { required: [], optional: ["site"] },
   BrowserFrame: { required: ["image", "ack", "width", "height"], optional: [] },
   BrowserInputRequest: { required: ["kind"], optional: ["type", "x", "y", "button", "clickCount", "deltaX", "deltaY", "key", "code", "keyCode", "text", "modifiers"] },
+  BrowserInputResult: { required: [], optional: ["editing"] },
   BrowserNavigateRequest: { required: ["action"], optional: ["url"] },
   BrowserPageState: { required: ["status"], optional: ["detail", "url", "title", "noTab", "holder", "holderTitle"] },
   BrowserSite: { required: ["site", "cookies"], optional: [] },
@@ -13333,6 +13392,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineageNode: { required: ["kind", "ref"], optional: [] },
   LineageNodeRequest: { required: ["node"], optional: ["depth"] },
   LineageResolved: { required: ["title"], optional: ["state", "labels"] },
+  LineageSessionIssue: { required: ["node"], optional: ["title"] },
+  LineageSessionMatch: { required: ["agentID", "on"], optional: [] },
+  LineageSessions: { required: ["matches"], optional: ["issues", "limited"] },
+  LineageSessionsRequest: { required: ["number"], optional: [] },
   ListCursor: { required: ["lastActivityAt", "id"], optional: ["archivedAt"] },
   ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID", "after", "query", "project"] },
   ListedSkill: { required: ["name", "folder"], optional: ["description", "managed"] },

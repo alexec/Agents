@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 	"unsafe"
 
 	"github.com/ebitengine/purego"
@@ -15,7 +16,12 @@ import (
 // signature (agentsd's identifier and team) reads it without a prompt, and any other
 // program, /usr/bin/security too, gets a prompt for the person's password. That is the
 // difference from connections.Keychain, whose items /usr/bin/security makes and so trusts.
-// A read never shows a prompt here: the daemon has nobody to answer it.
+//
+// The trust is the maker's designated requirement. For an ad-hoc signature (a Debug build
+// signed with -) that is the cdhash, so every new build is another program. The login
+// Keychain then shows a prompt for the read, also with kSecUseAuthenticationUIFail, and
+// SecItemCopyMatching waits until a person answers it (#4045). The daemon has nobody to
+// answer it, so a read has a time limit: see KeychainGet.
 
 // ErrKeychainDenied is a Keychain that would ask the person, or refused this program.
 var ErrKeychainDenied = errors.New("the Keychain did not let this program read the item")
@@ -154,11 +160,61 @@ func item(service, account string) *query {
 	return q
 }
 
-// KeychainGet is the item's data, or false when there is no such item.
+// keychainReadLimit is how long a read waits for SecItemCopyMatching. A read that waits
+// longer waits on a prompt (#4045): the item is another program's.
+var keychainReadLimit = 5 * time.Second
+
+// keychainReads are the items whose read waits on a prompt still. A new read of one of them
+// is denied at once: it would wait on the same prompt, and hold one more thread.
+var keychainReads struct {
+	sync.Mutex
+	waiting map[[2]string]bool
+}
+
+type keychainRead struct {
+	data []byte
+	ok   bool
+	err  error
+}
+
+// KeychainGet is the item's data, or false when there is no such item. A read that waits on
+// a prompt is ErrKeychainDenied after keychainReadLimit; the call stays on its own goroutine
+// until the prompt goes, and its value is dropped.
 func KeychainGet(service, account string) ([]byte, bool, error) {
 	if err := loadKeychain(); err != nil {
 		return nil, false, err
 	}
+	at := [2]string{service, account}
+	keychainReads.Lock()
+	if keychainReads.waiting[at] {
+		keychainReads.Unlock()
+		return nil, false, ErrKeychainDenied
+	}
+	if keychainReads.waiting == nil {
+		keychainReads.waiting = map[[2]string]bool{}
+	}
+	keychainReads.waiting[at] = true
+	keychainReads.Unlock()
+
+	done := make(chan keychainRead, 1)
+	go func() {
+		data, ok, err := keychainGet(service, account)
+		keychainReads.Lock()
+		delete(keychainReads.waiting, at)
+		keychainReads.Unlock()
+		done <- keychainRead{data, ok, err}
+	}()
+	timer := time.NewTimer(keychainReadLimit)
+	defer timer.Stop()
+	select {
+	case r := <-done:
+		return r.data, r.ok, r.err
+	case <-timer.C:
+		return nil, false, ErrKeychainDenied
+	}
+}
+
+func keychainGet(service, account string) ([]byte, bool, error) {
 	q := item(service, account)
 	defer q.release()
 	q.set(keychain.returnData, keychain.booleanTrue)

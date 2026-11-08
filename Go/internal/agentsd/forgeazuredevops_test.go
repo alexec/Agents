@@ -24,6 +24,7 @@ type fakeForgeAzureDevOps struct {
 	searches []string
 	items    []string
 	wrote    []string
+	asked    []string
 }
 
 func (f *fakeForgeAzureDevOps) note(to *[]string, s string) {

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/azuredevopsmcp"
 	"github.com/alexec/agents/Go/internal/bitbucketmcp"
 	"github.com/alexec/agents/Go/internal/lineage"
 	"github.com/alexec/agents/Go/wire"
@@ -30,7 +31,7 @@ const (
 
 // lineageViewServers is the servers whose views may ask, by their mcpcatalog id.
 var lineageViewServers = map[string]bool{"agents/github": true, "agents/gitlab": true, "agents/forgejo": true, "agents/bitbucket": true, "agents/linear": true,
-	"agents/jira": true, "agents/azureboards": true}
+	"agents/jira": true, "agents/azureboards": true, "agents/azuredevops": true}
 
 type lineageView struct {
 	// Ref is the node, as lineage refs name it: github:owner/repo#12.
@@ -403,8 +404,8 @@ func refName(ref, page string) string {
 	return shortRef(ref, page)
 }
 
-// refURL is a node's web address: GitHub's or Bitbucket's, or a GitLab's or a Forgejo's on
-// the page's own host. Linear's pull requests are on GitHub or GitLab; its issues have none here. A forge
+// refURL is a node's web address: GitHub's or Bitbucket's, or a GitLab's, a Forgejo's or an
+// Azure DevOps's (dev.azure.com without one) on the page's own host. Linear's pull requests are on GitHub or GitLab; its issues have none here. A forge
 // with no case has none.
 func refURL(n wire.LineageNode, base string) string {
 	scheme, id, _ := strings.Cut(n.Ref, ":")
@@ -441,6 +442,15 @@ func refURL(n wire.LineageNode, base string) string {
 			return "https://" + bitbucketmcp.Host + "/" + path + "/pull-requests/" + num
 		}
 		return "https://" + bitbucketmcp.Host + "/" + path + "/issues/" + num
+	case "azuredevops":
+		// Its work items are Azure Boards' nodes.
+		if n.Kind != lineage.KindPR {
+			return ""
+		}
+		if base == "" || strings.EqualFold(base, "https://linear.app") {
+			base = azuredevopsmcp.DefaultBase
+		}
+		return azuredevopsmcp.WebURL(base, path) + "/pullrequest/" + num
 	}
 	return ""
 }

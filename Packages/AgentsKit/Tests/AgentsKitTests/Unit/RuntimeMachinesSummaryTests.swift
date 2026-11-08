@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import AgentsKitCore
 
-/// A runtime's machines in one line on Your setup (#3744). The web page's machinesSummary is
+/// A runtime's machines in one line on Status ▸ Runtimes (#3744). The web page's machinesSummary is
 /// tested with the same cases.
 @Suite("A runtime's machines in one line")
 struct RuntimeMachinesSummaryTests {

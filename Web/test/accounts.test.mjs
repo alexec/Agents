@@ -1,4 +1,4 @@
-// Your setup ▸ Accounts (#3967): the project filter, the foot and the token mark, as the window's.
+// Settings ▸ You ▸ Accounts (#3967, #3998): the project filter, the foot and the token mark, as the window's.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "./load.mjs";

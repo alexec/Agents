@@ -30,7 +30,7 @@ import { parseQuery, queryMatches, type LabelQuery } from "../model/labels";
 import { searchPrompt, sidebarSearch } from "../model/sessionSearch";
 import { folderLine, groupLabel, keeper, keepsInUnread, machineMark, machineState, newSessionFolder, pinnedSessions, pinnedWorkflows,
   connectorsPlace, folderSessions, projectGroups, rememberedFolder, rememberFolder, sharedProjects, smartAgents, smartApprovals, smartPulls,
-  smartSuggestions, smartRows, smartTitles, withKept, type FolderKey, type ProjectGroup, type SmartRow } from "../model/sidebar";
+  smartSuggestions, smartRows, smartTitles, withKept, groupsByIssue, issueGroups, type FolderKey, type ProjectGroup, type SmartRow } from "../model/sidebar";
 import { endedLine } from "../model/connectorSetup";
 import { updatedLine } from "../model/updated";
 import { namedRelative, workflowSummary } from "../model/workflows";
@@ -423,12 +423,12 @@ function inOpenSmartRow(store: Store, host: string, agent: Agent): boolean {
   return (["needsYou", "forReview", "working", "unread"] as const).some((row) => folds.isSmartOpen(row) && smartAgents(row, [agent], undefined, pins, on).length > 0);
 }
 
-/** A search narrows workflows by name and what they are; one asking for a label leaves them out. */
+/** A search narrows workflows by name and what they are; one asking for a label or an issue leaves them out. */
 function workflowMatches(store: Store, host: string, query: LabelQuery | undefined): (w: WorkflowSummary) => boolean {
   if (!query) return () => true;
   const runtimeName = (id: string) => (store.runtimes.value[host] ?? []).find((s) => s.runtime.id === id)?.runtime.name;
   const text = query.text.toLowerCase();
-  return (w) => query.label === null && (!text
+  return (w) => query.label === null && query.issue === null && (!text
     || [w.workflow.name, workflowSummary(w.workflow, runtimeName)].some((t) => t.toLowerCase().includes(text)));
 }
 
@@ -490,7 +490,7 @@ function SmartFold({ row, store, folders, places, query, linkDown, downSince }: 
   downSince?: number | undefined;
 }) {
   const r = route.value;
-  const parsed = query ? { ...parseQuery(query), said: store.saidLines.value } : undefined;
+  const parsed = query ? { ...parseQuery(query), said: store.saidLines.value, onIssue: store.issueSessions.value, issueHeadings: store.issueHeadings.value } : undefined;
   // Pinned workflows of folded folders are listed too, held while Pinned is drawn (#432).
   const flowPinned = row !== "pinned" ? [] : folders.filter(({ host, folder }) =>
     store.hostIsOnline(host.id) && store.workflowPinsIn(host.id, folder.folder.folder).length > 0);
@@ -697,7 +697,7 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
 
   const view = store.folderView(host.id, folder);
   // The matcher is made once per fold, not per row.
-  const parsed = searching ? { ...parseQuery(query), said: store.saidLines.value } : undefined;
+  const parsed = searching ? { ...parseQuery(query), said: store.saidLines.value, onIssue: store.issueSessions.value, issueHeadings: store.issueHeadings.value } : undefined;
   const live = view.headings.flatMap((h) => h.agents).filter((a) => isAlone || keptByState(a, stateFilter.value));
   // Those a group at the top lists are there alone (#495, #587), out of the folder's list. A
   // group turned off (#846) lists nothing, so its sessions are here unless the next group has them.
@@ -714,9 +714,13 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
     for (const agent of listed) elsewhere.set(agent.id, placed);
     return listed;
   });
-  const sessions = !unfolded ? [] : [...folderSessions(live, pins, parsed, kept, on), ...theirs].sort(byStart);
+  const found = !unfolded ? [] : [...folderSessions(live, pins, parsed, kept, on), ...theirs].sort(byStart);
   const recentArchived = !parsed ? recentlyArchived(view.archived, recentArchivedShown, toWireDate(new Date())) : [];
-  const archived = !unfolded || !parsed ? [] : view.archived.filter((a) => queryMatches(parsed, a));
+  const archivedFound = !unfolded || !parsed ? [] : view.archived.filter((a) => queryMatches(parsed, a));
+  // A search for an epic (#3900): what it found here, live and archived, under a heading for each of its issues.
+  const byIssue = parsed && groupsByIssue(parsed) ? issueGroups([...found, ...archivedFound], parsed) : [];
+  const sessions = byIssue.length > 0 ? [] : found;
+  const archived = byIssue.length > 0 ? [] : archivedFound;
   const allWorkflows = (unfolded ? store.folderWorkflows(host.id, folder) : [])
     .filter(workflowMatches(store, host.id, parsed))
     .sort((a, b) => a.workflow.name.localeCompare(b.workflow.name));
@@ -733,7 +737,7 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
   const sessionsOpen = searching || folds.isSessionsOpen(host.id, folder);
   const recentArchivedOpen = searching || folds.isRecentArchivedSessionsOpen(host.id, folder);
   const nameMatches = label.toLowerCase().includes(query.toLowerCase());
-  if (searching && sessions.length === 0 && archived.length === 0 && workflows.length === 0
+  if (searching && sessions.length === 0 && archived.length === 0 && byIssue.length === 0 && workflows.length === 0
     && archivedWorkflows.length === 0 && !nameMatches) return null;
 
   const here = r.host === host.id && r.folder !== undefined && folderKey(r.folder) === folderKey(folder);
@@ -868,6 +872,16 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
               {sessionsOpen && sessionRows.map((tree) => row(tree.agent, tree))}
             </details>
           ) : sessionRows.map((tree) => row(tree.agent, tree))}
+          {/* A search for an epic (#3900): a heading for each issue, the epic's own first, held open as a search holds Sessions. */}
+          {byIssue.map((group) => (
+            <div class="issue-group" role="group" key={group.issue.node.ref} aria-label={`${group.title}, ${group.sessions.length}`}>
+              <div class="issue-group-heading" title={group.title} aria-hidden="true">
+                <span class="title">{group.title}</span><span class="count">{group.sessions.length}</span>
+              </div>
+              {treeRows(group.sessions, (id) => others.length > 0 ? startedByOf(store, id) : store.agent(host.id, id)?.startedByAgent,
+                (id) => folds.isSessionOpen(id)).map((tree) => row(tree.agent, tree))}
+            </div>
+          ))}
           {recentArchived.length > 0 && (
             <details class="recent-archived-sessions" open={recentArchivedOpen}
               onToggle={(e) => {

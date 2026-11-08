@@ -37,6 +37,24 @@ struct SessionLabelQueryTests {
         #expect(SessionLabelQuery("").matches(nightly))
         #expect(!SessionLabelQuery("parser").matches(nightly))
         #expect(!SessionLabelQuery("label:perf").matches(nightly))
+        #expect(!SessionLabelQuery("#12").matches(nightly))
+    }
+
+    /// #3899: `#<n>` finds the sessions labelled with the issue, named by it in their title, or
+    /// on it, its sub-issues or their PRs by Lineage, and keeps the other words.
+    @Test func anIssueFindsItsSessions() {
+        let labelled = agent("Make parser fast", labels: ["#12"])
+        let titled = agent("#12: Fix the build", labels: [])
+        let longer = agent("#123: Another", labels: [])
+        let lane = agent("Parser lane", labels: ["P#40"])
+        let query = SessionLabelQuery("#12", said: [:], onIssue: [lane.id: DaemonAPI.LineageNode(kind: "issue", ref: "github:o/r#13")])
+        #expect(query.issue == 12 && query.text.isEmpty)
+        #expect([labelled, titled, longer, lane].filter(query.matches).map(\.id) == [labelled.id, titled.id, lane.id])
+        #expect(SessionLabelQuery("issue:#12 parser").matches(labelled))
+        #expect(!SessionLabelQuery("issue:12 build").matches(labelled))
+        #expect(SessionLabelQuery("P#12").issue == nil)
+        #expect(SessionLabelQuery("label:#12").issue == nil)
+        #expect(SessionLabelQuery.issue(in: "flaky #7") == 7)
     }
 
     @Test func twoHundredSessionsStayCheap() {

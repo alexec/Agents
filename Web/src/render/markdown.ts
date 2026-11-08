@@ -4,7 +4,8 @@
 // turned into Preact nodes here, never into an HTML string, so nothing an agent says can reach an
 // HTML sink. An image in a chat, or any image that is not a file beside a Markdown page, becomes
 // a placeholder naming it: the page loads nothing from anywhere but itself (the CSP says so too).
-// A picture beside a page is drawn from bytes `files/read` returns. A link opens in a new tab,
+// A picture beside a page is drawn from bytes `files/read` returns, and an image on a Work page
+// from bytes `forge/image` returns (#4011). A link opens in a new tab,
 // and only http, https and mailto links are links at all. A file: link, or a bare absolute path, is a link only
 // where the page says how a file opens (a chat opens it in Files, #548), and then it never navigates.
 // An agents://agent/<id> link selects that session (#3353), as on the Mac and the Remote.
@@ -12,6 +13,8 @@ import MarkdownIt, { type Token } from "markdown-it";
 import { pageImagePath } from "../model/pageImage";
 import { agentLinkID, openAgentLink } from "../model/agentLink";
 import { LocalPicture } from "./LocalPicture";
+import { ForgePicture } from "./ForgePicture";
+import { forgeImageURL } from "../model/forgeMarkdown";
 import { memo } from "./memo";
 import { highlightCode } from "./codeHighlight";
 import { MermaidFence } from "./MermaidView";
@@ -25,6 +28,12 @@ export interface PageImages {
   revision: number;
   read: (path: string) => Promise<{ bytes: Uint8Array; type: string } | null>;
 }
+
+/**
+ * A forge page's images (#4011): read through the machine that read the page, with forge/image,
+ * never from their address. Only the Work page gives one; null is an image it does not read.
+ */
+export type ForgeImages = (url: string) => Promise<{ bytes: Uint8Array; type: string } | null>;
 
 const parser = new MarkdownIt({ html: false, linkify: true, typographer: false, breaks: false });
 // markdown-it drops a file: link to its bare text; it is kept as a link token so `build` can
@@ -71,7 +80,7 @@ interface Frame {
 }
 
 /** Builds nodes from a flat token list with nesting, as markdown-it hands them over. */
-function build(tokens: readonly Token[], images?: PageImages, openFile?: OpenFile): ComponentChildren[] {
+function build(tokens: readonly Token[], images?: PageImages, openFile?: OpenFile, forgeImages?: ForgeImages): ComponentChildren[] {
   const root: Frame = { tag: "", props: {}, children: [] };
   const stack: Frame[] = [root];
   const top = () => stack[stack.length - 1]!;
@@ -135,7 +144,7 @@ function build(tokens: readonly Token[], images?: PageImages, openFile?: OpenFil
         }
         // A cell of more than a few words may wrap, but not under 12em, as the Mac's TableColumns (#3943).
         if ((top().tag === "td" || top().tag === "th") && token.content.length > 16) top().props["class"] = "long";
-        top().children.push(...build(token.children ?? [], images, openFile));
+        top().children.push(...build(token.children ?? [], images, openFile, forgeImages));
         break;
       }
       case "text":
@@ -166,10 +175,14 @@ function build(tokens: readonly Token[], images?: PageImages, openFile?: OpenFil
         const alt = token.children?.map((child) => child.content).join("") || String(token.attrGet("alt") ?? "");
         const src = String(token.attrGet("src") ?? "");
         // Beside the document, and only there. A chat has no document, so every image stays
-        // a placeholder, and a remote one does even on a page (FR-031).
+        // a placeholder, and a remote one does even on a page (FR-031), but on a Work page,
+        // whose host reads it with forge/image (#4011).
         const path = images ? pageImagePath(src, images.document) : null;
+        const url = forgeImages ? forgeImageURL(src) : null;
         if (path && images) {
           push(h(LocalPicture, { path, alt, revision: images.revision, read: images.read }));
+        } else if (url && forgeImages) {
+          push(h(ForgePicture, { url, alt, read: forgeImages }));
         } else {
           push(h("span", { class: "image-placeholder", title: src }, alt ? `[image: ${alt}]` : "[image]"));
         }
@@ -184,11 +197,12 @@ function build(tokens: readonly Token[], images?: PageImages, openFile?: OpenFil
 }
 
 /**
- * Markdown as Preact nodes. `images` draws pictures from beside a document; without it, none are
- * fetched. `openFile` makes a file: link a way into that file; without it, the link is its words.
+ * Markdown as Preact nodes. `images` draws pictures from beside a document, and `forgeImages` a
+ * forge page's; without them, none are fetched. `openFile` makes a file: link a way into that
+ * file; without it, the link is its words.
  */
-export function renderMarkdown(source: string, images?: PageImages, openFile?: OpenFile): ComponentChildren[] {
-  return build(parser.parse(source, {}), images, openFile);
+export function renderMarkdown(source: string, images?: PageImages, openFile?: OpenFile, forgeImages?: ForgeImages): ComponentChildren[] {
+  return build(parser.parse(source, {}), images, openFile, forgeImages);
 }
 
 const fenceOpen = /^ {0,3}(`{3,}|~{3,})/;
@@ -254,15 +268,15 @@ export function markdownBlocks(source: string): string[] {
 }
 
 /** One finished block, parsed once. */
-const MarkdownBlock = memo(function MarkdownBlock({ text, images, openFile }: {
-  text: string; images?: PageImages | undefined; openFile?: OpenFile | undefined;
+const MarkdownBlock = memo(function MarkdownBlock({ text, images, openFile, forgeImages }: {
+  text: string; images?: PageImages | undefined; openFile?: OpenFile | undefined; forgeImages?: ForgeImages | undefined;
 }): ComponentChildren {
-  return h(Fragment, null, ...renderMarkdown(text, images, openFile));
+  return h(Fragment, null, ...renderMarkdown(text, images, openFile, forgeImages));
 });
 
 /** A message's text, drawn; only a block whose text changed is parsed again (#170, #214). */
-export const Markdown = memo(function Markdown({ text, images, openFile }: {
-  text: string; images?: PageImages | undefined; openFile?: OpenFile | undefined;
+export const Markdown = memo(function Markdown({ text, images, openFile, forgeImages }: {
+  text: string; images?: PageImages | undefined; openFile?: OpenFile | undefined; forgeImages?: ForgeImages | undefined;
 }): ComponentChildren {
-  return h("div", { class: "markdown" }, ...markdownBlocks(text).map((block, index) => h(MarkdownBlock, { key: index, text: block, images, openFile })));
+  return h("div", { class: "markdown" }, ...markdownBlocks(text).map((block, index) => h(MarkdownBlock, { key: index, text: block, images, openFile, forgeImages })));
 });

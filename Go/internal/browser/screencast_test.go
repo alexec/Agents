@@ -158,13 +158,28 @@ func TestACastOfARealChromium(t *testing.T) {
 		{Kind: "key", Type: "keyUp", Key: "Backspace", Code: "Backspace", KeyCode: 8},
 		{Kind: "text", Text: " there"},
 	} {
-		if err := cast.Input(in); err != nil {
+		editing, err := cast.Input(in)
+		if err != nil {
 			t.Fatal(in, err)
+		}
+		// A click released in the field leaves the focus in it: a phone opens its keyboard.
+		if released := in.Type == "mouseReleased"; released != (editing != nil) || released && !*editing {
+			t.Fatalf("%v: editing %v", in, editing)
 		}
 	}
 	value, err := chromedp.Run(ctx, chromedp.Evaluate[string](`document.getElementById("f").value`))
 	if err != nil || value != "h there" {
 		t.Fatalf("%q %v", value, err)
+	}
+	// A click beside the field takes the focus out of it: the keyboard goes.
+	for _, kind := range []string{"mousePressed", "mouseReleased"} {
+		editing, err := cast.Input(Input{Kind: "mouse", Type: kind, X: 400, Y: 300, Button: "left"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if kind == "mouseReleased" && (editing == nil || *editing) {
+			t.Fatalf("editing %v after a click outside the field", editing)
+		}
 	}
 
 	// An agent's new tab is the one watched.

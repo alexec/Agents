@@ -7,8 +7,8 @@
 // and each folder's approvals as rows of their own. For Review (#3194) holds what is ready to look at
 // but blocks no agent: a session done with a file it showed that nobody has opened, then each folder's
 // open pull requests labelled needs-approval (#3330), then the read-only daily checks' suggestions (#3331).
-import type { Agent, Approval, CheckSuggestion, ReviewPull, WorkflowSummary } from "../protocol/generated";
-import { asksToArchive, byStart, folderKey, groupOf, showsUnread, writesDailySummary } from "./groups";
+import type { Agent, Approval, CheckSuggestion, LineageNode, LineageSessionIssue, ReviewPull, WorkflowSummary } from "../protocol/generated";
+import { asksToArchive, byArchived, byStart, folderKey, groupOf, showsUnread, writesDailySummary } from "./groups";
 import { queryMatches, type LabelQuery } from "./labels";
 import { isSessionApproval, kindWords } from "./approvals";
 
@@ -90,6 +90,7 @@ export function sessionMark(agent: Agent): SessionMark | null {
 
 /** One folder's pinned sessions, held and not archived, in the order they were put in, as a search leaves them. */
 export function pinnedSessions(live: readonly Agent[], pins: readonly string[], query?: LabelQuery): Agent[] {
+  if (groupsByIssue(query)) return [];
   const pinned = pins.flatMap((id) => live.filter((a) => a.id === id && a.state !== "archived"));
   return query ? pinned.filter((a) => queryMatches(query, a)) : pinned;
 }
@@ -109,7 +110,9 @@ export function pinnedWorkflows(held: readonly WorkflowSummary[], pins: readonly
 export function folderSessions(live: readonly Agent[], pins: readonly string[], query?: LabelQuery,
   kept?: string, on: ReadonlySet<SmartRow> = allSmartRows): Agent[] {
   const pinned = new Set(pins);
-  return live.filter((a) => home(a, pinned.has(a.id), on) === null && a.id !== kept && !writesDailySummary(a)
+  // A search for an epic: each session it found is under its issue's heading here, none in a group at the top (#3900).
+  const grouped = groupsByIssue(query);
+  return live.filter((a) => (grouped || home(a, pinned.has(a.id), on) === null) && a.id !== kept && !writesDailySummary(a)
     && (!query || queryMatches(query, a))).sort(byStart);
 }
 
@@ -132,8 +135,58 @@ export function keepsInUnread(agent: Agent, pins: readonly string[], on: Readonl
  */
 export function smartAgents(row: Exclude<SmartRow, "pinned">, live: readonly Agent[], query?: LabelQuery,
   pins: readonly string[] = [], on: ReadonlySet<SmartRow> = allSmartRows): Agent[] {
+  if (groupsByIssue(query)) return [];
   const pinned = new Set(pins);
   return live.filter((a) => home(a, pinned.has(a.id), on) === row && (!query || queryMatches(query, a))).sort(byStart);
+}
+
+/**
+ * A search for an epic (#3900), as `SidebarIssueGroup`: what it found under a heading for each of its
+ * issues, the epic's own (its lead) first, then each child's in the epic's order. A session on two
+ * children is under the first; one no host placed (found by its label or title) under the epic. Only
+ * while a search names an issue the hosts said has sub-issues: the sidebar stays one list (#495, #2381).
+ */
+export interface IssueGroup {
+  issue: LineageSessionIssue;
+  title: string;
+  /** The live newest started first, then the archived newest archived first. */
+  sessions: Agent[];
+}
+
+/** Whether the search names an epic, so its folders group what it found by issue. */
+export function groupsByIssue(query?: LabelQuery): boolean {
+  return !!query && query.issue !== null && (query.issueHeadings?.length ?? 0) > 1;
+}
+
+/** `#3898 Session search: …`, or `#3898` while its title is not known. */
+export function issueGroupTitle(issue: LineageSessionIssue): string {
+  const ref = issue.node.ref;
+  const at = ref.lastIndexOf("#");
+  const number = at < 0 ? ref : ref.slice(at);
+  const title = issue.title?.trim() ?? "";
+  return title ? `${number} ${title}` : number;
+}
+
+/** The sessions under their issues' headings, the headings with none left out. */
+export function issueGroups(found: readonly Agent[], query: LabelQuery): IssueGroup[] {
+  const headings = query.issueHeadings ?? [];
+  const epic = headings[0];
+  if (!epic) return [];
+  const key = (node: LineageNode) => `${node.kind}|${node.ref}`;
+  const known = new Set(headings.map((h) => key(h.node)));
+  const under = new Map<string, Agent[]>();
+  for (const agent of found) {
+    const on = query.onIssue?.[agent.id] as LineageNode | undefined;
+    const at = on && known.has(key(on)) ? key(on) : key(epic.node);
+    under.set(at, [...(under.get(at) ?? []), agent]);
+  }
+  return headings.flatMap((issue) => {
+    const held = under.get(key(issue.node)) ?? [];
+    if (held.length === 0) return [];
+    const live = held.filter((a) => a.state !== "archived").sort(byStart);
+    const archived = held.filter((a) => a.state === "archived").sort(byArchived);
+    return [{ issue, title: issueGroupTitle(issue), sessions: [...live, ...archived] }];
+  });
 }
 
 /**

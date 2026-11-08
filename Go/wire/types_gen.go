@@ -1471,6 +1471,11 @@ type BrowserInputRequest struct {
 	Modifiers *int64 `json:"modifiers,omitzero"`
 }
 
+// browser/input's answer. editing is said after a mouseReleased only: whether the click left the page's focus in a field that takes text (an input, a textarea, a contenteditable), so a touch client opens or closes its keyboard. Left out for other input, and by a host before it was added.
+type BrowserInputResult struct {
+	Editing *bool `json:"editing,omitzero"`
+}
+
 type BrowserNavigateAction string
 
 const BrowserNavigateActionGo BrowserNavigateAction = "go"
@@ -5719,6 +5724,35 @@ type LineageResolved struct {
 	Labels []string `json:"labels,omitzero"`
 }
 
+// One heading of a search for an epic (#3900): the epic or one of its sub-issues, and its title, absent while the host has not resolved it.
+type LineageSessionIssue struct {
+	Node LineageNode `json:"node"`
+
+	Title *string `json:"title,omitzero"`
+}
+
+// A session on the issue, and the issue it is on: the one asked for, or one of its sub-issues. A session on a PR is on the issue the PR fixes.
+type LineageSessionMatch struct {
+	AgentID UUID `json:"agentID"`
+
+	On LineageNode `json:"on"`
+}
+
+// The sessions on this machine that lineage links to the issue, to its sub-issues or to their PRs, each once, on the first issue in issues they came by. limited says there were more sub-issues or sessions than are counted.
+type LineageSessions struct {
+	Matches []LineageSessionMatch `json:"matches"`
+
+	// The issue asked for, then its sub-issues in the epic's order (#3900), each once, with its title when the host has it: the headings a search for an epic groups its sessions under. Only the issue asked for when it has no sub-issues; absent from a host too old to say.
+	Issues []LineageSessionIssue `json:"issues,omitzero"`
+
+	Limited *bool `json:"limited,omitzero"`
+}
+
+// lineage/sessions (#3899): a session search for #<number> asks for the sessions on that issue, on the issues part-of it (its sub-issues, at most 100) and on the PRs that fix them. The issue is #<number> in the forge repo of each of this machine's folders.
+type LineageSessionsRequest struct {
+	Number int64 `json:"number"`
+}
+
 type ListCursor struct {
 	LastActivityAt Date `json:"lastActivityAt"`
 
@@ -7866,7 +7900,7 @@ type OrgRoutesMine struct {
 	Routes []OrgRouteMine `json:"routes"`
 }
 
-// Your setup ▸ Accounts (#3967): one outside account of the person's (gitlab.com, AWS, Slack…). It holds no secret: card and secret are the names of secrets in Your setup ▸ Secrets, or where one is.
+// Settings ▸ You ▸ Accounts (#3967): one outside account of the person's (gitlab.com, AWS, Slack…). It holds no secret: card and secret are the names of secrets in Settings ▸ You ▸ Secrets, or where one is.
 type OutsideAccount struct {
 	// The service, as its address: gitlab.com, aws.amazon.com.
 	Service string `json:"service"`
@@ -7880,10 +7914,10 @@ type OutsideAccount struct {
 	// What it costs a month, in US dollars. Absent when not known.
 	MonthlyCostUsd *float64 `json:"monthlyCostUsd,omitzero"`
 
-	// The card it bills, by its name in Your setup ▸ Secrets. Never the number.
+	// The card it bills, by its name in Settings ▸ You ▸ Secrets. Never the number.
 	Card *string `json:"card,omitzero"`
 
-	// Its token or key, by its name in Your setup ▸ Secrets or where it is. Never the value.
+	// Its token or key, by its name in Settings ▸ You ▸ Secrets or where it is. Never the value.
 	Secret *string `json:"secret,omitzero"`
 
 	// TOTP, passkey, SMS, or absent for none.
@@ -10908,7 +10942,7 @@ type SecretLeftOn struct {
 	At string `json:"at"`
 }
 
-// secrets/setNeedsApproval (#4014): a person turns Ask before use on or off for a secret of this machine's secrets.env, or for one session's (agentID). On takes the value out of the plain file and seals it to this machine; off puts it back. A Your setup secret's flag is its client's to seal, so it is refused here.
+// secrets/setNeedsApproval (#4014): a person turns Ask before use on or off for a secret of this machine's secrets.env, or for one session's (agentID). On takes the value out of the plain file and seals it to this machine; off puts it back. The flag of a secret of the person's (Settings ▸ You ▸ Secrets) is its client's to seal, so it is refused here.
 type SecretNeedsApprovalRequest struct {
 	Name string `json:"name"`
 

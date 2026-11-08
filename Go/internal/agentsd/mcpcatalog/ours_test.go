@@ -292,7 +292,7 @@ func TestBitbucketReadsItsConnection(t *testing.T) {
 // request events.
 func TestAzureDevOpsReadsItsConnection(t *testing.T) {
 	ado, ok := OursByID("agents/azuredevops")
-	if !ok || ado.Command != "azuredevops-mcp" || !ado.Declares.Tools || ado.Declares.Views ||
+	if !ok || ado.Command != "azuredevops-mcp" || !ado.Declares.Tools || !ado.Declares.Views ||
 		!reflect.DeepEqual(ado.Declares.Events, azuredevopsmcp.EventNames()) {
 		t.Fatalf("azuredevops: %+v %v, the server's %v", ado, ok, azuredevopsmcp.EventNames())
 	}
