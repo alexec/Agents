@@ -140,6 +140,30 @@ func (g *RealGitHub) AppReach(ctx context.Context, repo, slug string) (installed
 	return installed, repositories, nil
 }
 
+// AppPermissions is what the GitHub App named slug may do on its install on owner, as the
+// person's token sees it (contents: write, actions: read, …), or nil when it is not installed
+// there. A user token of the App can do only what both the person and the install can (#4077).
+func (g *RealGitHub) AppPermissions(ctx context.Context, owner, slug string) (map[string]string, error) {
+	var installations struct {
+		Installations []struct {
+			AppSlug string `json:"app_slug"`
+			Account struct {
+				Login string `json:"login"`
+			} `json:"account"`
+			Permissions map[string]string `json:"permissions"`
+		} `json:"installations"`
+	}
+	if err := g.get(ctx, "user/installations?per_page=100", false, &installations); err != nil {
+		return nil, err
+	}
+	for _, in := range installations.Installations {
+		if in.AppSlug == slug && strings.EqualFold(in.Account.Login, owner) {
+			return in.Permissions, nil
+		}
+	}
+	return nil, nil
+}
+
 // RepoAt is the GitHub repo a folder pushes to, from its git remote (origin first).
 func RepoAt(ctx context.Context, folder string) (string, bool) {
 	for _, remote := range remotesAt(ctx, folder) {

@@ -22,6 +22,8 @@ type fakeSetupGitHub struct {
 	mu    sync.Mutex
 	err   map[string]error
 	reads int
+	// readOnly is an install of the App with no Contents write (#4077).
+	readOnly bool
 }
 
 func (f *fakeSetupGitHub) fail(what string) error {
@@ -51,6 +53,15 @@ func (f *fakeSetupGitHub) LastRun(ctx context.Context, repo string) (*githubmcp.
 
 func (f *fakeSetupGitHub) AppReach(ctx context.Context, repo, slug string) (bool, int, error) {
 	return repo == "alexec/agents-walk" && slug == "agents-loops", 3, f.fail("reach")
+}
+
+func (f *fakeSetupGitHub) AppPermissions(ctx context.Context, owner, slug string) (map[string]string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.readOnly {
+		return map[string]string{"contents": "read", "actions": "read"}, nil
+	}
+	return map[string]string{"contents": "write", "actions": "read"}, nil
 }
 
 func gitFolder(t *testing.T, remote string) string {
