@@ -37,6 +37,7 @@ import { BackToList } from "./BackToList";
 import { DataTable } from "./DataTable";
 import { PageTitle, PersonMenu, SearchBox } from "./TopBar";
 import { pageCrumbs } from "../model/crumbs";
+import { MultiplierPage } from "./Multiplier";
 import type { Session } from "../session";
 
 /**
@@ -201,6 +202,7 @@ export function PageView({ store, page, down }: { store: Store; page: NavPage; d
   const admin = adminOf(store);
   if (!gated(page, admin) && page.draw.kind === "activity") return <ActivityPageView store={store} page={page.draw.page} />;
   if (!gated(page, admin) && page.draw.kind === "settings") return <SettingsPage store={store} down={down} />;
+  if (page.draw.kind === "multiplier") return <MultiplierPage store={store} />;
   return (
     <Framed title={page.title} section={section}>
       {gated(page, admin) ? <p class="hint">{admin === null ? "Loading…" : roleProblemOf(store) ?? adminsOnly}</p>
