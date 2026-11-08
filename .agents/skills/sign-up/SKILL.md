@@ -90,6 +90,16 @@ Alex types those.
   a script that finds it in the page (by its prefix, such as `glpat-` or `dop_v1_`) and
   writes the file without printing it. Test it with one API call that prints only a name or
   a status code.
+- **Two-factor (#3908):** choose an authenticator app (TOTP) wherever the site offers it,
+  then SMS, then a voice call (#3906); never a passkey on Alex's devices, because then every
+  sign-in waits for Alex. On the setup page, choose "can't scan" to show the setup key, and
+  pipe it from the page into `scripts/totp.sh --save <service>` (it writes
+  `~/.agents/secrets/<service>-totp`, mode 600) without printing it. `scripts/totp.sh
+  <service>` prints only the current code: type it with a script, never into a transcript.
+  Where a site takes only a passkey, use a software passkey on Chrome's virtual authenticator
+  (WebAuthn over CDP), its key in `~/.agents/secrets/<service>-passkey.json`:
+  `scripts/okta-signin.mjs` makes one with `WebAuthn.addVirtualAuthenticator`, enrols it, and
+  saves it with `WebAuthn.getCredentials` for the next run (`okta-integrator-passkey.json`).
 - **Accounts:** `manage_accounts` with action `add` (#3967): service, address, plan, monthly
   cost, card (its name in Your setup ▸ Secrets), secret (its name there, or where it is), the
   2FA method, the issue, the date made, when the token expires, the projects that use it

@@ -33,3 +33,4 @@ Go/out/
 # The observability walk's certificates and answers (#3417).
 Go/internal/controlplane/walk/observability/run/
 __pycache__/
+scripts/totp/node_modules/

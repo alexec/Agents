@@ -1,0 +1,9 @@
+{
+  "name": "agents-totp",
+  "private": true,
+  "type": "module",
+  "description": "scripts/totp.sh: two-factor codes from a seed in ~/.agents/secrets (#3908)",
+  "dependencies": {
+    "otpauth": "9.6.0"
+  }
+}
