@@ -21,6 +21,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 	"github.com/alexec/agents/Go/internal/controlplane/web"
 	"github.com/alexec/agents/Go/internal/controlplane/webpush"
+	"github.com/alexec/agents/Go/internal/lineage"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -1179,12 +1180,16 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 		}
 		return m.s.keepJoined(ctx, host, joined)
 	case "multiplier/count":
-		// An older host sends {}: its weeks are UTC's.
+		// An older host sends {}: its weeks are UTC's, and its baseline is 1.4.
 		var count wire.MultiplierCountParams
 		if len(params) > 0 {
 			_ = json.Unmarshal(params, &count)
 		}
-		return m.s.multiplierCount(ctx, host, zoneOf(count.TimeZone), time.Now())
+		var prs float64
+		if count.PrsPerWeek != nil {
+			prs = *count.PrsPerWeek
+		}
+		return m.s.multiplierCount(ctx, host, zoneOf(count.TimeZone), lineage.BaselineOf(prs, ""), time.Now())
 	case "usage/rollup":
 		rollup, err := require[wire.UsageRollup](params, "UsageRollup")
 		if err != nil {

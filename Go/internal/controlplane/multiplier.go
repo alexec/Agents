@@ -33,9 +33,9 @@ type keptMultiplier struct {
 	merges map[wire.LineageNode]lineage.Merge
 }
 
-// multiplierCount is multiplier/count for host's person, with the best week in loc.
-// agentsWorking and mostAtOnce are the host's own.
-func (s *Service) multiplierCount(ctx context.Context, host string, loc *time.Location, now time.Time) (wire.Multiplier, error) {
+// multiplierCount is multiplier/count for host's person, with the best week in loc, against
+// the baseline the host sent (#3991). agentsWorking, mostAtOnce and the line are the host's own.
+func (s *Service) multiplierCount(ctx context.Context, host string, loc *time.Location, b wire.MultiplierBaseline, now time.Time) (wire.Multiplier, error) {
 	owner := s.ownerOf(host)
 	keep := func(person string) bool { return person == owner }
 	keys, read, err := s.scopeLineageKeys(ctx, keep)
@@ -53,7 +53,7 @@ func (s *Service) multiplierCount(ctx context.Context, host string, loc *time.Lo
 		}
 		held = keptMultiplier{tags: tags, merges: lineage.Merges(nodes, lineage.AllMerges)}
 		if !tagged {
-			return multiplierOf(held.merges, loc, now), nil
+			return multiplierOf(held.merges, loc, b, now), nil
 		}
 		s.multiplierMu.Lock()
 		if s.multiplierHeld == nil || len(s.multiplierHeld) >= mostMultipliersKept {
@@ -62,13 +62,13 @@ func (s *Service) multiplierCount(ctx context.Context, host string, loc *time.Lo
 		s.multiplierHeld[owner] = held
 		s.multiplierMu.Unlock()
 	}
-	return multiplierOf(held.merges, loc, now), nil
+	return multiplierOf(held.merges, loc, b, now), nil
 }
 
-// multiplierOf is the figure and the best week of merges.
-func multiplierOf(merges map[wire.LineageNode]lineage.Merge, loc *time.Location, now time.Time) wire.Multiplier {
-	m := lineage.MultiplierOf(merges, now)
-	m.BestWeek = lineage.BestWeekOf(merges, now, loc)
+// multiplierOf is the figure and the best week of merges, against b.
+func multiplierOf(merges map[wire.LineageNode]lineage.Merge, loc *time.Location, b wire.MultiplierBaseline, now time.Time) wire.Multiplier {
+	m := lineage.MultiplierOf(merges, now, b)
+	m.BestWeek = lineage.BestWeekOf(merges, now, loc, b)
 	return m
 }
 

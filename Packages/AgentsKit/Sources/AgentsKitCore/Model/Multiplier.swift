@@ -42,20 +42,32 @@ public extension DaemonAPI {
         }
     }
 
-    /// What the Multiplier compares with (#3902): an engineer with no AI in 2025.
+    /// What the Multiplier compares with (#3902): an engineer with no AI in 2025, or the
+    /// person's own figure and line (#3991), from Settings ▸ Cost ▸ Multiplier.
     struct MultiplierBaseline: Codable, Sendable, Hashable {
-        /// Merged PRs a week: 1.4.
+        /// Merged PRs a week: 1.4 unless the person set their own.
         public var prsPerWeek: Double
         /// The hours of that week: 40.
         public var hoursPerWeek: Double
         /// Where the figure is from: DX 2025.
         public var source: String
+        /// The person's own line under the figures; nil is `defaultLine`.
+        public var line: String?
 
-        public init(prsPerWeek: Double, hoursPerWeek: Double, source: String) {
+        public init(prsPerWeek: Double, hoursPerWeek: Double, source: String, line: String? = nil) {
             self.prsPerWeek = prsPerWeek
             self.hoursPerWeek = hoursPerWeek
             self.source = source
+            self.line = line
         }
+
+        /// The line the page shows when the person has none of their own.
+        public var defaultLine: String {
+            "An average engineer merged \(prsPerWeek.formatted()) PRs a week (\(source))"
+        }
+
+        /// The line under the figures: the person's, else the default.
+        public var shownLine: String { line ?? defaultLine }
     }
 }
 

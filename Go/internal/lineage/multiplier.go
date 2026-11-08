@@ -9,8 +9,8 @@ import (
 
 // The Multiplier (#3901, #3903; specs/3901-multiplier/spec.md): the PRs the person's
 // agents merged in the last 7 days, less the merged reverts, never below 0, against the
-// PRs an average engineer merged in a week in 2025. The host and the control plane count
-// the same way, and the clients keep no copy of the baseline.
+// PRs an average engineer merged in a week in 2025, or the person's own figure (#3991). The
+// host and the control plane count the same way, and the clients keep no copy of the baseline.
 
 const (
 	// MultiplierRange is the rolling range, by the PR's endedAt.
@@ -21,7 +21,23 @@ const (
 	BaselineHoursPerWeek = 40.0
 	// BaselineSource is said under the figure.
 	BaselineSource = "DX 2025"
+	// LeastPRsPerWeek and MostPRsPerWeek bound the person's own baseline (#3991).
+	LeastPRsPerWeek = 0.1
+	MostPRsPerWeek  = 100.0
 )
+
+// BaselineOf is the baseline with the person's PRs a week, rounded to one decimal and kept
+// from 0.1 to 100, and their line; 0 is the default, 1.4, and "" is the default line.
+func BaselineOf(prsPerWeek float64, line string) wire.MultiplierBaseline {
+	b := wire.MultiplierBaseline{PrsPerWeek: BaselinePRsPerWeek, HoursPerWeek: BaselineHoursPerWeek, Source: BaselineSource}
+	if prsPerWeek > 0 && !math.IsInf(prsPerWeek, 0) {
+		b.PrsPerWeek = min(max(math.Round(prsPerWeek*10)/10, LeastPRsPerWeek), MostPRsPerWeek)
+	}
+	if line != "" {
+		b.Line = &line
+	}
+	return b
+}
 
 // Merge is one counted PR's end: a merge, or a merged revert.
 type Merge struct {
@@ -53,12 +69,11 @@ func Merges(nodes []wire.LineageCostNode, since wire.Date) map[wire.LineageNode]
 // MultiplierSince is the start of the range that ends at now.
 func MultiplierSince(now time.Time) wire.Date { return wire.DateOf(now.Add(-MultiplierRange)) }
 
-// MultiplierOf is the figure for merges in the range that ends at now. Nothing counted is
-// no figure, not 0×.
-func MultiplierOf(merges map[wire.LineageNode]Merge, now time.Time) wire.Multiplier {
+// MultiplierOf is the figure for merges in the range that ends at now, against b. Nothing
+// counted is no figure, not 0×.
+func MultiplierOf(merges map[wire.LineageNode]Merge, now time.Time, b wire.MultiplierBaseline) wire.Multiplier {
 	since := MultiplierSince(now)
-	out := wire.Multiplier{Since: since, Baseline: wire.MultiplierBaseline{PrsPerWeek: BaselinePRsPerWeek,
-		HoursPerWeek: BaselineHoursPerWeek, Source: BaselineSource}}
+	out := wire.Multiplier{Since: since, Baseline: b}
 	var merged int64
 	for _, m := range merges {
 		if m.At < since {
@@ -73,8 +88,8 @@ func MultiplierOf(merges map[wire.LineageNode]Merge, now time.Time) wire.Multipl
 	// A revert is not a PR of work, and takes one away: it undoes the PR it reverts.
 	out.PrsMerged = max(merged-out.Reverts, 0)
 	if out.PrsMerged > 0 {
-		x := math.Round(float64(out.PrsMerged)/BaselinePRsPerWeek*10) / 10
-		h := math.Round(float64(out.PrsMerged) * BaselineHoursPerWeek / BaselinePRsPerWeek)
+		x := math.Round(float64(out.PrsMerged)/b.PrsPerWeek*10) / 10
+		h := math.Round(float64(out.PrsMerged) * b.HoursPerWeek / b.PrsPerWeek)
 		out.Multiplier, out.EngineerHours = &x, &h
 	}
 	return out
@@ -88,7 +103,7 @@ var AllMerges = wire.Date(math.Inf(-1))
 // this week too, counted as MultiplierOf counts: the week's merges less its reverts. It is
 // nil until the first merge is 7 days old (before that "best week" means nothing), and
 // when no week has a figure.
-func BestWeekOf(merges map[wire.LineageNode]Merge, now time.Time, loc *time.Location) *float64 {
+func BestWeekOf(merges map[wire.LineageNode]Merge, now time.Time, loc *time.Location, b wire.MultiplierBaseline) *float64 {
 	first := wire.DateOf(now)
 	net := map[time.Time]int64{}
 	for _, m := range merges {
@@ -109,7 +124,7 @@ func BestWeekOf(merges map[wire.LineageNode]Merge, now time.Time, loc *time.Loca
 	if best == 0 {
 		return nil
 	}
-	x := math.Round(float64(best)/BaselinePRsPerWeek*10) / 10
+	x := math.Round(float64(best)/b.PrsPerWeek*10) / 10
 	return &x
 }
 

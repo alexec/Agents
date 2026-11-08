@@ -90,8 +90,8 @@ func TestMultiplierFollowsTheMerges(t *testing.T) {
 		m.MostAtOnce == nil || *m.MostAtOnce != 9 {
 		t.Fatalf("the control plane's: %+v", m)
 	}
-	if asked.TimeZone != zoneName() {
-		t.Fatalf("asked in zone %v, want %v", asked.TimeZone, zoneName())
+	if asked.TimeZone != zoneName() || asked.PrsPerWeek == nil || *asked.PrsPerWeek != 1.4 {
+		t.Fatalf("asked in zone %v with %v, want %v with 1.4", asked.TimeZone, asked.PrsPerWeek, zoneName())
 	}
 	// One that cannot answer: this machine's own.
 	d.SetControlAsk(askControl(func(context.Context, string, any) (json.RawMessage, error) {
@@ -100,5 +100,17 @@ func TestMultiplierFollowsTheMerges(t *testing.T) {
 	// Its merges are an hour old: no best week before 7 days of them.
 	if m := state(5); m.PrsMerged != 0 || m.Reverts != 1 || m.BestWeek != nil || m.MostAtOnce == nil {
 		t.Fatalf("offline: %+v", m)
+	}
+
+	// The person's own baseline (#3991): a change is told at once, and counted with.
+	c.call(t, 6, "preferences/set", map[string]any{"multiplierPRsPerWeek": 2.04, "multiplierLine": "My team: 2 a week"})
+	c.until(t, "the baseline told", func(m string, p json.RawMessage) bool {
+		return m == "multiplier/changed" && strings.Contains(string(p), `"prsPerWeek":2,`) &&
+			strings.Contains(string(p), `"line":"My team: 2 a week"`)
+	})
+	// Reset: the default figure and line.
+	c.call(t, 7, "preferences/set", map[string]any{"multiplierPRsPerWeek": nil, "multiplierLine": nil})
+	if m := state(8); m.Baseline.PrsPerWeek != 1.4 || m.Baseline.Line != nil {
+		t.Fatalf("reset: %+v", m.Baseline)
 	}
 }
