@@ -10139,13 +10139,15 @@ type Request struct {
 	DroppedWhy *RequestDroppedWhy `json:"droppedWhy,omitzero"`
 }
 
-// One of the answers: form for a question, a secret or a step (#3863); checklist and approval for a forge item (#3865).
+// One of the answers: form for a question, a secret or a step (#3863); checklist and approval for a forge item (#3865); secretUse for the use of a secret with Ask before use (#4015).
 type RequestAnswer struct {
 	Form *RequestFormAnswer `json:"form,omitzero"`
 
 	Checklist *RequestChecklistAnswer `json:"checklist,omitzero"`
 
 	Approval *RequestApprovalAnswer `json:"approval,omitzero"`
+
+	SecretUse *RequestSecretUseAnswer `json:"secretUse,omitzero"`
 }
 
 // A needs-approval pull request's answer: approve adds approved, changes adds changes-wanted; the note is the person's comment on it.
@@ -10169,6 +10171,8 @@ type RequestChecklistLine struct {
 // The part of a request that depends on its source.
 type RequestDetail struct {
 	Elicitation *ElicitationRequest `json:"elicitation,omitzero"`
+
+	SecretUse *RequestSecretUse `json:"secretUse,omitzero"`
 }
 
 type RequestDroppedWhy string
@@ -10225,6 +10229,24 @@ const RequestKindAccount RequestKind = "account"
 const RequestKindStep RequestKind = "step"
 const RequestKindSecret RequestKind = "secret"
 
+// A use of a secret with Ask before use (#4015), waiting on a person: its kind is approve. It names the secret, never its value, and where agentsd puts the value.
+type RequestSecretUse struct {
+	Name string `json:"name"`
+
+	Use SecretUse `json:"use"`
+
+	// Where the value goes: the page's domain for a fill, owner/repo for CI.
+	Place string `json:"place"`
+
+	// The secret is the session's own (#3548): Allow always is the same as Allow for this session.
+	SessionOnly *bool `json:"sessionOnly,omitzero"`
+}
+
+// A person's answer to a secret's use (#4015). once allows this use; session every use at this place until the session ends or is archived; always adds a grant for this place, for every session; deny refuses it. Only the control and device roles answer.
+type RequestSecretUseAnswer struct {
+	Action string `json:"action"`
+}
+
 type RequestSource string
 
 const RequestSourceQuestion RequestSource = "question"
@@ -10233,6 +10255,7 @@ const RequestSourceHandOff RequestSource = "handOff"
 const RequestSourcePermission RequestSource = "permission"
 const RequestSourceGuardedChange RequestSource = "guardedChange"
 const RequestSourceForge RequestSource = "forge"
+const RequestSourceSecretUse RequestSource = "secretUse"
 
 type RequestState string
 
@@ -10932,6 +10955,26 @@ type SealingWork struct {
 	Items []SealingItem `json:"items"`
 }
 
+// A place where a person allowed a secret with Ask before use always (#4015): a use there does not ask.
+type SecretGrant struct {
+	Name string `json:"name"`
+
+	Use SecretUse `json:"use"`
+
+	// The page's domain for a fill, owner/repo for CI.
+	Place string `json:"place"`
+}
+
+// secrets/addGrant and secrets/removeGrant (#4015): a person allows a secret with Ask before use always at a place, or takes that away. Only the control and device roles reach them.
+type SecretGrantChange struct {
+	Grant SecretGrant `json:"grant"`
+}
+
+// secrets/grants (#4015): every grant of this machine's secrets with Ask before use.
+type SecretGrants struct {
+	Grants []SecretGrant `json:"grants"`
+}
+
 // A machine that was removed with a secret on it (#1760, FR-026): change the secret where it was issued.
 type SecretLeftOn struct {
 	Host MachineRef `json:"host"`
@@ -10950,6 +10993,12 @@ type SecretNeedsApprovalRequest struct {
 
 	NeedsApproval bool `json:"needsApproval"`
 }
+
+// What agentsd does with a secret with Ask before use (#4015): fill types it into a page (fill_secret), ci sends it to GitHub (set_ci_secret).
+type SecretUse string
+
+const SecretUseFill SecretUse = "fill"
+const SecretUseCi SecretUse = "ci"
 
 // control/secretsLeft (#1760, FR-026): to the person's own clients, when one of their machines was removed with secrets on it.
 type SecretsLeft struct {

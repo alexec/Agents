@@ -80,6 +80,7 @@ const CapHostOrgRoutes2 = "host.org-routes/2"
 const CapHostPolicyLayers1 = "host.policy-layers/1"
 const CapHostPolicy1 = "host.policy/1"
 const CapHostSecretApproval1 = "host.secret-approval/1"
+const CapHostSecretGrants1 = "host.secret-grants/1"
 const CapHostSessionSecrets1 = "host.session-secrets/1"
 const CapHostSuspend1 = "host.suspend/1"
 const CapHostTeam1 = "host.team/1"
@@ -482,6 +483,9 @@ var HostCapabilities = pairs([][2]string{
 	{"runtimes/signInStart", "runtimes.sign-in/1"},
 	{"sandbox/set", "sandbox/1"},
 	{"sandbox/state", "sandbox/1"},
+	{"secrets/addGrant", "host.secret-grants/1"},
+	{"secrets/grants", "host.secret-grants/1"},
+	{"secrets/removeGrant", "host.secret-grants/1"},
 	{"secrets/sessionList", "host.session-secrets/1"},
 	{"secrets/sessionRemove", "host.session-secrets/1"},
 	{"secrets/sessionSet", "host.session-secrets/1"},
@@ -996,6 +1000,7 @@ var DeclaredCapabilities = map[string][]string{
 		"host.policy-layers/1",
 		"host.browser-settings/1",
 		"host.secret-approval/1",
+		"host.secret-grants/1",
 		"host.session-secrets/1",
 		"host.desktop-control/1",
 		"host.org-routes/2",

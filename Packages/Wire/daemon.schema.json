@@ -22461,7 +22461,7 @@
     },
     "RequestAnswer": {
       "type": "object",
-      "description": "One of the answers: form for a question, a secret or a step (#3863); checklist and approval for a forge item (#3865).",
+      "description": "One of the answers: form for a question, a secret or a step (#3863); checklist and approval for a forge item (#3865); secretUse for the use of a secret with Ask before use (#4015).",
       "properties": {
         "form": {
           "$ref": "#/definitions/RequestFormAnswer"
@@ -22471,6 +22471,9 @@
         },
         "approval": {
           "$ref": "#/definitions/RequestApprovalAnswer"
+        },
+        "secretUse": {
+          "$ref": "#/definitions/RequestSecretUseAnswer"
         }
       },
       "additionalProperties": false
@@ -22533,6 +22536,9 @@
       "properties": {
         "elicitation": {
           "$ref": "#/definitions/ElicitationRequest"
+        },
+        "secretUse": {
+          "$ref": "#/definitions/RequestSecretUse"
         }
       },
       "additionalProperties": false
@@ -22642,6 +22648,51 @@
         "secret"
       ]
     },
+    "RequestSecretUse": {
+      "type": "object",
+      "description": "A use of a secret with Ask before use (#4015), waiting on a person: its kind is approve. It names the secret, never its value, and where agentsd puts the value.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "use": {
+          "$ref": "#/definitions/SecretUse"
+        },
+        "place": {
+          "type": "string",
+          "description": "Where the value goes: the page's domain for a fill, owner/repo for CI."
+        },
+        "sessionOnly": {
+          "type": "boolean",
+          "description": "The secret is the session's own (#3548): Allow always is the same as Allow for this session."
+        }
+      },
+      "required": [
+        "name",
+        "use",
+        "place"
+      ],
+      "additionalProperties": false
+    },
+    "RequestSecretUseAnswer": {
+      "type": "object",
+      "description": "A person's answer to a secret's use (#4015). once allows this use; session every use at this place until the session ends or is archived; always adds a grant for this place, for every session; deny refuses it. Only the control and device roles answer.",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "once",
+            "session",
+            "always",
+            "deny"
+          ]
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "additionalProperties": false
+    },
     "RequestSource": {
       "type": "string",
       "enum": [
@@ -22650,7 +22701,8 @@
         "handOff",
         "permission",
         "guardedChange",
-        "forge"
+        "forge",
+        "secretUse"
       ]
     },
     "RequestState": {
@@ -24240,6 +24292,57 @@
       ],
       "additionalProperties": false
     },
+    "SecretGrant": {
+      "type": "object",
+      "description": "A place where a person allowed a secret with Ask before use always (#4015): a use there does not ask.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "use": {
+          "$ref": "#/definitions/SecretUse"
+        },
+        "place": {
+          "type": "string",
+          "description": "The page's domain for a fill, owner/repo for CI."
+        }
+      },
+      "required": [
+        "name",
+        "use",
+        "place"
+      ],
+      "additionalProperties": false
+    },
+    "SecretGrantChange": {
+      "type": "object",
+      "description": "secrets/addGrant and secrets/removeGrant (#4015): a person allows a secret with Ask before use always at a place, or takes that away. Only the control and device roles reach them.",
+      "properties": {
+        "grant": {
+          "$ref": "#/definitions/SecretGrant"
+        }
+      },
+      "required": [
+        "grant"
+      ],
+      "additionalProperties": false
+    },
+    "SecretGrants": {
+      "type": "object",
+      "description": "secrets/grants (#4015): every grant of this machine's secrets with Ask before use.",
+      "properties": {
+        "grants": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SecretGrant"
+          }
+        }
+      },
+      "required": [
+        "grants"
+      ],
+      "additionalProperties": false
+    },
     "SecretLeftOn": {
       "type": "object",
       "description": "A machine that was removed with a secret on it (#1760, FR-026): change the secret where it was issued.",
@@ -24282,6 +24385,14 @@
         "needsApproval"
       ],
       "additionalProperties": false
+    },
+    "SecretUse": {
+      "type": "string",
+      "description": "What agentsd does with a secret with Ask before use (#4015): fill types it into a page (fill_secret), ci sends it to GitHub (set_ci_secret).",
+      "enum": [
+        "fill",
+        "ci"
+      ]
     },
     "SecretsLeft": {
       "type": "object",
