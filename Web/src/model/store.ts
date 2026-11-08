@@ -1135,6 +1135,8 @@ export class Work {
 
   /** The hosts whose `machines/start` is out now, so the strip's Start waits for it (#691). */
   readonly hostsBeingStarted = signal<readonly string[]>([]);
+  /** The machines New Machine is making (#3974), by name; "" while the control plane has not named it yet. */
+  readonly machinesMaking = signal<readonly string[]>([]);
 
   /** Prompts and starts the control plane keeps for a stopped workspace (#691 US3), every host's. */
   readonly kept = signal<readonly KeptRequest[]>([]);
@@ -2424,6 +2426,39 @@ export class Store extends Work {
   async removeHost(host: string): Promise<void> {
     try {
       await this.link.call("machines/remove", { host: host as MachineRef });
+      this.takeHosts(this.hosts.value.filter((h) => h.id !== host));
+      this.forgetHost(host);
+    } catch (error) {
+      this.say(describe(error));
+    }
+  }
+
+  /** New Machine (#3974): the default provider makes `machine-N` with its defaults, with no questions.
+   * Its row says Making until the machine joins; a make that fails says the provider's reason. */
+  async makeMachine(): Promise<void> {
+    const making = "";
+    this.machinesMaking.value = [...this.machinesMaking.value, making];
+    const drop = (name: string) => {
+      const at = this.machinesMaking.value.indexOf(name);
+      if (at >= 0) this.machinesMaking.value = this.machinesMaking.value.filter((_, i) => i !== at);
+    };
+    try {
+      const made = await this.link.call("providers/create", {});
+      drop(making);
+      if (made.workspace.state === "failed") { this.say(made.workspace.reason || `Could not make ${made.workspace.name}.`); return; }
+      this.machinesMaking.value = [...this.machinesMaking.value, made.workspace.name];
+      // A row is drawn for it until a machine of that name joins, or ten minutes at most.
+      setTimeout(() => drop(made.workspace.name), 10 * 60_000);
+    } catch (error) {
+      drop(making);
+      this.say(describe(error));
+    }
+  }
+
+  /** Delete… on a machine a provider made (#3974): the provider deletes it, then the host goes as Remove does. */
+  async deleteHost(host: string): Promise<void> {
+    try {
+      await this.link.call("machines/deleteMachine", { host: host as MachineRef });
       this.takeHosts(this.hosts.value.filter((h) => h.id !== host));
       this.forgetHost(host);
     } catch (error) {

@@ -12096,6 +12096,7 @@ export interface Methods {
   "lock/reset": { params: Empty; result: Empty };
   "machine/usage": { params: Empty; result: MachineUsageState };
   "machines/approveJoin": { params: JoinRequestDecide; result: JoinApproved };
+  "machines/deleteMachine": { params: MachineRequest; result: Empty };
   "machines/denyJoin": { params: JoinRequestDecide; result: Empty };
   "machines/dropKept": { params: KeptRequestID; result: Empty };
   "machines/install": { params: MachineInstall; result: JSONValue };
@@ -12481,6 +12482,7 @@ export const MethodTarget = {
   "lock/reset": "control",
   "machine/usage": "host",
   "machines/approveJoin": "control",
+  "machines/deleteMachine": "control",
   "machines/denyJoin": "control",
   "machines/dropKept": "control",
   "machines/install": "control",
