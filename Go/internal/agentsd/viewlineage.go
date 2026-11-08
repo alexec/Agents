@@ -143,8 +143,18 @@ func nodeOfURL(raw string) (wire.LineageNode, string, bool) {
 
 // nodeOfURLHere is nodeOfURL, or an issue or a pull request on the connected Forgejo (#3850),
 // whose host's name need not say Forgejo, with the Forgejo's root as the base: it may be
-// under a path of its host.
+// under a path of its host. An address on the connected Azure DevOps Server (#4107) has the
+// Server's root as the base, as it may be under a path of its host too (tfs/).
 func (d *Daemon) nodeOfURLHere(raw string) (wire.LineageNode, string, bool) {
+	if root := d.azureDevOpsServerRoot(); onAzureDevOpsRoot(raw, root) {
+		base := strings.TrimSuffix(root, "/")
+		if repo, n, ok := azureDevOpsOfURLOn(raw, root); ok {
+			return repo.pr(n), base, true
+		}
+		if node, _, ok := nodeOfURL(raw); ok {
+			return node, base, true
+		}
+	}
 	if _, root := d.forgejoRoot(); root != "" {
 		base := strings.TrimSuffix(root, "/")
 		if repo, n, ok := forgejoOfURLOn(raw, root, "/pulls/"); ok {
