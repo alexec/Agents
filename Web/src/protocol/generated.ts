@@ -6324,6 +6324,17 @@ export interface Multiplier {
   baseline: MultiplierBaseline;
   /** On multiplier/changed: the PR whose merge or revert changed it. */
   changedBy?: LineageNode;
+  /**
+   * The person's best week (#3988): the highest Multiplier of a calendar week, Monday to Sunday in
+   * the host's time zone, this week too, counted as multiplier is. Absent until the first counted
+   * merge is 7 days old, or when no week has a figure.
+   */
+  bestWeek?: number;
+  /**
+   * The most of this machine's agents in a turn at the same time, ever (#3988): the time history's
+   * record. Absent when none has run.
+   */
+  mostAtOnce?: number;
 }
 
 /**
@@ -6337,6 +6348,15 @@ export interface MultiplierBaseline {
   hoursPerWeek: number;
   /** Where the figure is from, for the page's small line: DX 2025. */
   source: string;
+}
+
+/**
+ * multiplier/count's params (#3988): the host's time zone, so the control plane counts calendar
+ * weeks as the person does.
+ */
+export interface MultiplierCountParams {
+  /** An IANA zone name, such as Europe/London. Absent or unknown: UTC. */
+  timeZone?: string;
 }
 
 /**
@@ -13284,8 +13304,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MoveRequest: { required: ["agentID", "removeLeft", "discardChanges"], optional: ["target"] },
   MoveToMachineAnswer: { required: ["folder", "carriesOn"], optional: [] },
   MoveToMachineRequest: { required: ["agentID", "machine"], optional: ["machineName", "folder"] },
-  Multiplier: { required: ["prsMerged", "reverts", "agentsWorking", "since", "baseline"], optional: ["multiplier", "engineerHours", "changedBy"] },
+  Multiplier: { required: ["prsMerged", "reverts", "agentsWorking", "since", "baseline"], optional: ["multiplier", "engineerHours", "changedBy", "bestWeek", "mostAtOnce"] },
   MultiplierBaseline: { required: ["prsPerWeek", "hoursPerWeek", "source"], optional: [] },
+  MultiplierCountParams: { required: [], optional: ["timeZone"] },
   NativeSetting: { required: [], optional: ["options", "sandbox", "clientPermission"] },
   Need: { required: ["id", "folder", "kind", "raisedAt", "headline"], optional: ["agentID"] },
   NotCommittedResponse: { required: ["isRepository", "paths", "more"], optional: [] },

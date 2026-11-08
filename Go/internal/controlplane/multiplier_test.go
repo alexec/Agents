@@ -67,6 +67,17 @@ func TestMultiplierCountsThePersonsMachines(t *testing.T) {
 	if m := count(mac.member.Host); m.PrsMerged != 6 || m.Reverts != 1 || *m.Multiplier != 4.3 {
 		t.Fatalf("one revert: %+v", m)
 	}
+	// No best week before the first merge is 7 days old (#3988); then the best calendar week.
+	if m := count(mac.member.Host); m.BestWeek != nil || m.MostAtOnce != nil {
+		t.Fatalf("a best week too soon: %+v", m)
+	}
+	old := wire.DateOf(time.Now().Add(-21 * 24 * time.Hour))
+	first := pr(11, "merged")
+	first.EndedAt, first.LastAt = &old, old
+	send(mac.member.Host, first)
+	if m := count(mac.member.Host); m.BestWeek == nil || *m.BestWeek < 0.7 {
+		t.Fatalf("a best week: %+v", m)
+	}
 	if b := count(beas.member.Host); b.PrsMerged != 2 {
 		t.Fatalf("Bea's: %+v", b)
 	}

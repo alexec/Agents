@@ -79,3 +79,43 @@ func MultiplierOf(merges map[wire.LineageNode]Merge, now time.Time) wire.Multipl
 	}
 	return out
 }
+
+// AllMerges is the time to keep merges from for the best week: all of them. A merge is at
+// most a few a day, so a person's every merge is a few thousand.
+var AllMerges = wire.Date(math.Inf(-1))
+
+// BestWeekOf is the highest Multiplier of a calendar week (#3988), Monday to Sunday in loc,
+// this week too, counted as MultiplierOf counts: the week's merges less its reverts. It is
+// nil until the first merge is 7 days old (before that "best week" means nothing), and
+// when no week has a figure.
+func BestWeekOf(merges map[wire.LineageNode]Merge, now time.Time, loc *time.Location) *float64 {
+	first := wire.DateOf(now)
+	net := map[time.Time]int64{}
+	for _, m := range merges {
+		first = min(first, m.At)
+		if m.Reverted {
+			net[weekOf(m.At.Time(), loc)]--
+		} else {
+			net[weekOf(m.At.Time(), loc)]++
+		}
+	}
+	if first > MultiplierSince(now) {
+		return nil
+	}
+	var best int64
+	for _, n := range net {
+		best = max(best, n)
+	}
+	if best == 0 {
+		return nil
+	}
+	x := math.Round(float64(best)/BaselinePRsPerWeek*10) / 10
+	return &x
+}
+
+// weekOf is the Monday, at midnight in loc, that starts t's week.
+func weekOf(t time.Time, loc *time.Location) time.Time {
+	l := t.In(loc)
+	back := (int(l.Weekday()) + 6) % 7
+	return time.Date(l.Year(), l.Month(), l.Day()-back, 0, 0, 0, 0, loc)
+}

@@ -20,9 +20,15 @@ public extension DaemonAPI {
         public var baseline: MultiplierBaseline
         /// On `multiplier/changed`: the PR whose merge or revert changed it.
         public var changedBy: LineageNode?
+        /// The highest Multiplier of a calendar week, Monday to Sunday, this week too (#3988).
+        /// Nil until the first counted merge is 7 days old: the page shows no bests.
+        public var bestWeek: Double?
+        /// The most of the host's agents in a turn at the same time, ever (#3988).
+        public var mostAtOnce: Int?
 
         public init(prsMerged: Int = 0, reverts: Int = 0, multiplier: Double? = nil, engineerHours: Double? = nil,
-                    agentsWorking: Int = 0, since: Date, baseline: MultiplierBaseline, changedBy: LineageNode? = nil) {
+                    agentsWorking: Int = 0, since: Date, baseline: MultiplierBaseline, changedBy: LineageNode? = nil,
+                    bestWeek: Double? = nil, mostAtOnce: Int? = nil) {
             self.prsMerged = prsMerged
             self.reverts = reverts
             self.multiplier = multiplier
@@ -31,6 +37,8 @@ public extension DaemonAPI {
             self.since = since
             self.baseline = baseline
             self.changedBy = changedBy
+            self.bestWeek = bestWeek
+            self.mostAtOnce = mostAtOnce
         }
     }
 

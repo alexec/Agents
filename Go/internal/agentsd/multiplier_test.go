@@ -70,22 +70,35 @@ func TestMultiplierFollowsTheMerges(t *testing.T) {
 		t.Fatalf("one revert: %+v", m)
 	}
 
-	// With a control plane: its count of the person's machines, this machine's agents.
-	d.SetControlAsk(askControl(func(_ context.Context, method string, _ any) (json.RawMessage, error) {
+	// The most at once is the time history's record (#3988), with or without a control plane.
+	d.timeMu.Lock()
+	d.timeLocked().Records.MostAgents = &wire.TimeRecord{Value: 9, Day: "2026-11-02"}
+	d.timeMu.Unlock()
+
+	// With a control plane: its count of the person's machines and best week in this
+	// machine's zone, this machine's agents.
+	var asked wire.MultiplierCountParams
+	d.SetControlAsk(askControl(func(_ context.Context, method string, params any) (json.RawMessage, error) {
 		if method == wire.CallMultiplierCount.Name {
+			asked, _ = params.(wire.MultiplierCountParams)
 			return json.RawMessage(`{"prsMerged":7,"reverts":0,"multiplier":5,"engineerHours":200,"agentsWorking":0,"since":0,` +
-				`"baseline":{"prsPerWeek":1.4,"hoursPerWeek":40,"source":"DX 2025"}}`), nil
+				`"bestWeek":6.4,"baseline":{"prsPerWeek":1.4,"hoursPerWeek":40,"source":"DX 2025"}}`), nil
 		}
 		return json.RawMessage(`{}`), nil
 	}))
-	if m := state(4); m.PrsMerged != 7 || *m.Multiplier != 5 {
+	if m := state(4); m.PrsMerged != 7 || *m.Multiplier != 5 || m.BestWeek == nil || *m.BestWeek != 6.4 ||
+		m.MostAtOnce == nil || *m.MostAtOnce != 9 {
 		t.Fatalf("the control plane's: %+v", m)
+	}
+	if asked.TimeZone != zoneName() {
+		t.Fatalf("asked in zone %v, want %v", asked.TimeZone, zoneName())
 	}
 	// One that cannot answer: this machine's own.
 	d.SetControlAsk(askControl(func(context.Context, string, any) (json.RawMessage, error) {
 		return nil, errors.New("offline")
 	}))
-	if m := state(5); m.PrsMerged != 0 || m.Reverts != 1 {
+	// Its merges are an hour old: no best week before 7 days of them.
+	if m := state(5); m.PrsMerged != 0 || m.Reverts != 1 || m.BestWeek != nil || m.MostAtOnce == nil {
 		t.Fatalf("offline: %+v", m)
 	}
 }

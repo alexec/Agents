@@ -27,11 +27,27 @@ func (d *Daemon) multiplierState(ctx context.Context) wire.Multiplier {
 	m, ok := d.multiplierOfControl(ctx)
 	if !ok {
 		d.workMu.Lock()
-		m = lineage.MultiplierOf(d.multiplierMergesLocked(), now)
+		merges := d.multiplierMergesLocked()
+		m = lineage.MultiplierOf(merges, now)
+		m.BestWeek = lineage.BestWeekOf(merges, now, time.Local)
 		d.workMu.Unlock()
 	}
 	m.AgentsWorking = d.agentsWorking()
+	m.MostAtOnce = d.mostAtOnce()
 	return m
+}
+
+// mostAtOnce is the time history's record of agents in a turn at once (#3988), nil when
+// none has run.
+func (d *Daemon) mostAtOnce() *int64 {
+	d.timeMu.Lock()
+	defer d.timeMu.Unlock()
+	rec := d.timeLocked().Records.MostAgents
+	if rec == nil || rec.Value < 1 {
+		return nil
+	}
+	n := int64(rec.Value)
+	return &n
 }
 
 // multiplierOfControl is the control plane's count, when this machine has one and it answered.
@@ -42,7 +58,7 @@ func (d *Daemon) multiplierOfControl(ctx context.Context) (wire.Multiplier, bool
 	}
 	ctx, cancel := context.WithTimeout(ctx, multiplierPatience)
 	defer cancel()
-	raw, err := (*ask)(ctx, wire.CallMultiplierCount.Name, wire.Empty{})
+	raw, err := (*ask)(ctx, wire.CallMultiplierCount.Name, wire.MultiplierCountParams{TimeZone: zoneName()})
 	var m wire.Multiplier
 	if err == nil {
 		err = json.Unmarshal(raw, &m)
@@ -65,12 +81,12 @@ func (d *Daemon) agentsWorking() int64 {
 	return n
 }
 
-// multiplierMergesLocked is this machine's merges in the range, counted from the ledger the
-// first time and kept by noteMergeLocked after.
+// multiplierMergesLocked is this machine's merges, all of them for the best week (#3988),
+// counted from the ledger the first time and kept by noteMergeLocked after.
 func (d *Daemon) multiplierMergesLocked() map[wire.LineageNode]lineage.Merge {
 	if d.multiplierMerges == nil {
 		d.refreshCostLinksLocked()
-		d.multiplierMerges = lineage.Merges(ledgerNodes(d.costLedgerLocked()), lineage.MultiplierSince(nowFunc()))
+		d.multiplierMerges = lineage.Merges(ledgerNodes(d.costLedgerLocked()), lineage.AllMerges)
 	}
 	return d.multiplierMerges
 }
@@ -80,12 +96,6 @@ func (d *Daemon) multiplierMergesLocked() map[wire.LineageNode]lineage.Merge {
 // links to it say so, as its sessions are only refreshed for a send.
 func (d *Daemon) noteMergeLocked(c wire.LineageCostNode) bool {
 	merges := d.multiplierMergesLocked()
-	since := lineage.MultiplierSince(nowFunc())
-	for n, m := range merges {
-		if m.At < since {
-			delete(merges, n)
-		}
-	}
 	delete(merges, c.Node)
 	if len(c.Sessions) == 0 {
 		for _, l := range d.lineage().Links(c.Node).Links {
@@ -96,7 +106,7 @@ func (d *Daemon) noteMergeLocked(c wire.LineageCostNode) bool {
 			}
 		}
 	}
-	for n, m := range lineage.Merges([]wire.LineageCostNode{c}, since) {
+	for n, m := range lineage.Merges([]wire.LineageCostNode{c}, lineage.AllMerges) {
 		merges[n] = m
 		return true
 	}

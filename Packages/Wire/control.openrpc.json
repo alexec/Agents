@@ -3457,14 +3457,14 @@
     {
       "name": "multiplier/count",
       "x-capability": "multiplier/1",
-      "description": "A host, on its channel 0 (#3903): the Multiplier of the machine's person over all their machines' lineage, cached until a machine sends new lineage. agentsWorking is 0: the host gives its own.",
+      "description": "A host, on its channel 0 (#3903): the Multiplier of the machine's person over all their machines' lineage, cached until a machine sends new lineage, with the best week in the host's timeZone (#3988). agentsWorking and mostAtOnce are absent: the host gives its own.",
       "paramStructure": "by-name",
       "params": [
         {
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
+            "$ref": "daemon.schema.json#/definitions/MultiplierCountParams"
           }
         }
       ],

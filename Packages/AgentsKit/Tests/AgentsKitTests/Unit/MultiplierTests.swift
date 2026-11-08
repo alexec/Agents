@@ -9,7 +9,7 @@ struct MultiplierTests {
     static let changed = Data("""
     {"prsMerged":7,"reverts":1,"multiplier":5,"engineerHours":200,"agentsWorking":2,
      "since":815000000,"baseline":{"prsPerWeek":1.4,"hoursPerWeek":40,"source":"DX 2025"},
-     "changedBy":{"kind":"pr","ref":"github:alexec/agents#1234"}}
+     "changedBy":{"kind":"pr","ref":"github:alexec/agents#1234"},"bestWeek":6.4,"mostAtOnce":9}
     """.utf8)
 
     @Test func readsWhatTheHostSends() throws {
@@ -19,6 +19,8 @@ struct MultiplierTests {
         #expect(m.engineerHours == 200)
         #expect(m.baseline.source == "DX 2025")
         #expect(m.changedBy?.shortName == "#1234")
+        #expect(m.bestWeek == 6.4)
+        #expect(m.mostAtOnce == 9)
     }
 
     @Test func nothingCountedHasNoFigure() throws {
@@ -28,6 +30,8 @@ struct MultiplierTests {
         """.utf8))
         #expect(m.multiplier == nil)
         #expect(m.engineerHours == nil)
+        #expect(m.bestWeek == nil)
+        #expect(m.mostAtOnce == nil)
     }
 
     @Test func writesWhatTheSchemaSays() throws {

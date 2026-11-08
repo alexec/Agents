@@ -3,11 +3,13 @@ import SwiftUI
 
 /// The detail with nothing picked (#3904, in place of #145's page): the Multiplier, the
 /// work of how many engineers the agents did in the last 7 days, the crowd of them over it
-/// (#3985), three big numbers under it, and the earned achievements as badges (#3987). A
-/// show-off page: nothing else, and the key hints in one small line.
+/// (#3985), three big numbers under it, the person's bests in one line (#3988), and the
+/// earned achievements as badges (#3987). A show-off page: nothing else, and the key hints
+/// in one small line.
 ///
 /// The numbers count to each new value (about 1 s), from the last values this window
-/// showed when it opens. When a PR merges or a revert does, a line says so and fades.
+/// showed when it opens. When a PR merges or a revert does, a line says so and fades; a new
+/// best week says that instead.
 /// Under Reduce Motion they change with no count and no line.
 /// The page's row, first under Usage (#3986): the way back to it from a session or a page.
 struct MultiplierRow: View {
@@ -28,6 +30,8 @@ struct MultiplierPage: View {
     @AppStorage("hero.prsMerged", store: WindowDefaults.store) private var lastPRs = 0.0
     @AppStorage("hero.engineerHours", store: WindowDefaults.store) private var lastHours = 0.0
     @AppStorage("hero.agentsWorking", store: WindowDefaults.store) private var lastAgents = 0.0
+    @AppStorage("hero.bestWeek", store: WindowDefaults.store) private var lastBestWeek = 0.0
+    @AppStorage("hero.mostAtOnce", store: WindowDefaults.store) private var lastMostAtOnce = 0.0
     @State private var shown = MultiplierFigures()
     @State private var news: MultiplierNews?
 
@@ -41,7 +45,8 @@ struct MultiplierPage: View {
 
     private var target: MultiplierFigures {
         MultiplierFigures(multiplier: multiplier?.multiplier ?? 0, prsMerged: Double(multiplier?.prsMerged ?? 0),
-                    engineerHours: multiplier?.engineerHours ?? 0, agentsWorking: Double(agentsWorking))
+                    engineerHours: multiplier?.engineerHours ?? 0, agentsWorking: Double(agentsWorking),
+                    bestWeek: multiplier?.bestWeek ?? 0, mostAtOnce: Double(multiplier?.mostAtOnce ?? 0))
     }
 
     var body: some View {
@@ -62,7 +67,8 @@ struct MultiplierPage: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             shown = MultiplierFigures(multiplier: lastMultiplier, prsMerged: lastPRs,
-                                engineerHours: lastHours, agentsWorking: lastAgents)
+                                engineerHours: lastHours, agentsWorking: lastAgents,
+                                bestWeek: lastBestWeek, mostAtOnce: lastMostAtOnce)
             Task { @MainActor in show(target) }
         }
         .onChange(of: target) { _, figures in show(figures) }
@@ -87,8 +93,10 @@ struct MultiplierPage: View {
                 stat(shown.engineerHours, "engineer-hours")
                 stat(shown.agentsWorking, "agents now")
             }
+            bests
+                .padding(.top, 32)
             EarnedBadges(achievements: model.work.achievements)
-                .padding(.top, 40)
+                .padding(.top, 28)
             Group {
                 if let news {
                     Text(news.words)
@@ -117,6 +125,30 @@ struct MultiplierPage: View {
         }
     }
 
+    /// `Best week 4.1×  ·  Most at once 9` (#3988): not a streak, so nothing here is lost on a
+    /// day with no work. None until the host has a week of merges to say a best week from.
+    @ViewBuilder private var bests: some View {
+        if multiplier?.bestWeek != nil {
+            HStack(spacing: 10) {
+                Text("Best week")
+                CountingText(value: shown.bestWeek, digits: 1, suffix: "×")
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.primary)
+                if multiplier?.mostAtOnce != nil {
+                    Text("·")
+                    Text("Most at once")
+                    CountingText(value: shown.mostAtOnce, digits: 0)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.primary)
+                }
+            }
+            .appText(.supporting)
+            .foregroundStyle(.secondary)
+            .monospacedDigit()
+            .accessibilityElement(children: .combine)
+        }
+    }
+
     private var empty: some View {
         VStack(spacing: 8) {
             Text("— ×")
@@ -127,6 +159,8 @@ struct MultiplierPage: View {
             Text("Your number starts when an agent’s first PR merges.")
                 .appText(.supporting)
                 .foregroundStyle(.secondary)
+            bests
+                .padding(.top, 16)
             EarnedBadges(achievements: model.work.achievements)
                 .padding(.top, 24)
         }
@@ -152,16 +186,24 @@ struct MultiplierPage: View {
         lastPRs = figures.prsMerged
         lastHours = figures.engineerHours
         lastAgents = figures.agentsWorking
+        lastBestWeek = figures.bestWeek
+        lastMostAtOnce = figures.mostAtOnce
     }
 
-    /// The line for the PR that changed the figure: `+0.3×  #1234 merged`, rising and fading.
+    /// The line for the PR that changed the figure: `+0.3×  #1234 merged`, rising and fading;
+    /// `New best week: 4.3×` when the merge passed the best week (#3988).
     private func announce(from old: DaemonAPI.Multiplier?, to new: DaemonAPI.Multiplier?) {
         guard !reduceMotion, let new, let pr = new.changedBy else { return }
         let reverted = new.prsMerged < (old?.prsMerged ?? 0)
         let change = (new.multiplier ?? 0) - (old?.multiplier ?? 0)
         let sign = change < 0 ? "−" : "+"
-        let words = "\(sign)\(abs(change).formatted(.number.precision(.fractionLength(1))))×  "
-            + "\(pr.shortName) \(reverted ? "reverted" : "merged")"
+        let words: String
+        if let best = new.bestWeek, let before = old?.bestWeek, best > before {
+            words = "New best week: \(best.formatted(.number.precision(.fractionLength(1))))×"
+        } else {
+            words = "\(sign)\(abs(change).formatted(.number.precision(.fractionLength(1))))×  "
+                + "\(pr.shortName) \(reverted ? "reverted" : "merged")"
+        }
         let next = MultiplierNews(words: words, up: !reverted)
         withAnimation(.easeOut(duration: 0.4)) { news = next }
         Task { @MainActor in
@@ -177,6 +219,8 @@ struct MultiplierFigures: Equatable {
     var prsMerged = 0.0
     var engineerHours = 0.0
     var agentsWorking = 0.0
+    var bestWeek = 0.0
+    var mostAtOnce = 0.0
 }
 
 /// The line under the numbers about the PR that changed them.
