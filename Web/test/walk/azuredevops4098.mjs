@@ -165,6 +165,8 @@ try {
   const diff = await page.eval(`({ files: [...document.querySelectorAll(".view-diff-file")].map((f) => f.dataset.path),
     added: document.querySelectorAll(".view-diff .file-diff .line.added").length })`);
   check(diff.files.length >= 1 && diff.added >= 1, `the diff, file by file: ${js(diff)}`);
+  const open = await page.eval(`[...document.querySelectorAll(".view-diff button")].map((b) => b.textContent).filter((t) => t.startsWith("Open on"))`);
+  check(open.length === 1 && open[0] === "Open on Azure DevOps", `the diff names its forge (#4128): ${js(open)}`);
   await sleep(300);
   await page.shot(`${out}/web-pr-diff.png`);
   await page.press("Done");
