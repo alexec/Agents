@@ -12,16 +12,17 @@ struct EventCatalogueTests {
         // which went with the pool (065), and agent.parked (agent.archive_requested since #584)
         // and agent.archived (#96), and
         // mac.disk_low and mac.disk_ok (#195, machine.* since #372), folder.idle (#360),
-        // and dropbox.file_added (#231), and agent.messaged (#560), and system.restarted (#1219),
-        // and agent.ended (#3799), and file.added and file.removed (#3795).
-        #expect(names.count == 34)
+        // and agent.messaged (#560), and system.restarted (#1219), and agent.ended (#3799), and
+        // file.added and file.removed (#3795), which took dropbox.file_added's place (#231, #3796).
+        #expect(names.count == 33)
         for name in ["system.restarted", "cost.allowance_out", "cost.allowance_back", "agent.archive_requested", "agent.archived",
-                     "machine.disk_low", "machine.disk_ok", "folder.idle", "dropbox.file_added", "file.added", "file.removed",
+                     "machine.disk_low", "machine.disk_ok", "folder.idle", "file.added", "file.removed",
                      "agent.messaged", "agent.waiting"] {
             #expect(names.contains(name), "\(name)")
         }
         #expect(!names.contains("agent.runtime_switched"))
         #expect(!names.contains("agent.blocked"))
+        #expect(!names.contains("dropbox.file_added"))
         #expect(Set(names).count == names.count)
         for name in names { #expect(EventDraft.isWellFormed(name), "\(name)") }
         for kind in EventCatalogue.all { #expect(EventSubject(name: kind.name) != nil, "\(kind.name)") }

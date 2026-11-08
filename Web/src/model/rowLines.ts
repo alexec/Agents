@@ -310,7 +310,6 @@ function waitSourceName(event: string): string {
   if (["mac", "machine", "person", "system", "cost", "lease"].includes(subject)) return "This Mac";
   if (subject === "workflow") return "Workflows";
   if (subject === "branch") return "Branches";
-  if (subject === "dropbox") return "Drop box";
   if (subject === "file") return "Files";
   return "Agents";
 }

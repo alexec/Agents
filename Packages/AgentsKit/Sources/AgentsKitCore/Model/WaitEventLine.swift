@@ -109,7 +109,6 @@ public struct WaitEventLine: Identifiable, Hashable, Sendable {
         case "mac", "machine", "person", "system", "cost", "lease": "This Mac"
         case "workflow": "Workflows"
         case "branch": "Branches"
-        case "dropbox": "Drop box"
         case "file": "Files"
         default: "Agents"
         }

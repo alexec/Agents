@@ -104,8 +104,8 @@ function FillDropbox({ store, host, folder, label, close }: Filling & { store: S
         <input type="file" multiple aria-label="Files"
           onChange={(e) => (files.value = Array.from((e.currentTarget as HTMLInputElement).files ?? []))} />
         <p class="sheet-note">
-          Into .agents/dropbox/ in {label}, where a workflow on dropbox.file_added picks them up. Up to 900 KB
-          each; a file with the same name replaces the one there.
+          Into .agents/dropbox/ in {label}, where a workflow on file.added picks them up. Up to 900 KB
+          each; a file with the same name replaces the one there, and starts nothing.
         </p>
         <div class="sheet-actions">
           <button type="button" onClick={close}>Cancel</button>

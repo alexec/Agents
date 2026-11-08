@@ -80,17 +80,17 @@ To start a new agent for each file dropped into the folder's `.agents/dropbox/` 
 ---
 name: Review what lands in the drop box
 on:
-  - dropbox.file_added
+  - file.added:
+      paths: [".agents/dropbox/review/*.pdf", ".agents/dropbox/review/*.md"]
 agent: new
 ---
 
-If the dropped file is not a PDF or Markdown file, leave it and stop. Otherwise read it and
-review it, then move it out of .agents/dropbox/, to reviewed/.
+Read each dropped file and review it, then move it out of .agents/dropbox/, to reviewed/.
 ```
 
-An arrival can't be narrowed by its folder or extension, so the prompt says which files to
-leave, and a file the agent is done with leaves the drop box: moved to a folder inside it, it
-would arrive again.
+`paths` narrows the trigger to the files it takes, so a file dropped anywhere else does not
+start it. A file the agent is done with leaves the drop box: moved to another folder inside
+it, it arrives there, and a workflow that watches that folder runs.
 
 A run started by an event, such as this one, is told the event at the end of its prompt,
 details and all, so the agent reads the file's `path` there.

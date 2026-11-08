@@ -34,7 +34,7 @@ func TestABotsMachineSendsTeamEventsAndKeepsItsOwn(t *testing.T) {
 		want triggerScope
 	}{
 		{fireRequest{event: &wire.Event{Name: "machine.disk_low"}}, scopeMachine},
-		{fireRequest{event: &wire.Event{Name: "dropbox.file_added"}}, scopeMachine},
+		{fireRequest{event: &wire.Event{Name: "file.added"}}, scopeMachine},
 		{fireRequest{event: &server}, scopeTeam},
 		{fireRequest{dueAt: &due}, scopeTeam},
 		{fireRequest{event: &wire.Event{Name: "agent.finished"}}, scopeClaimed},

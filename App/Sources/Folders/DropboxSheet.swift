@@ -4,7 +4,7 @@ import SwiftUI
 /// Put files into a folder's drop box (#231), inside a folder of it when one is named:
 /// the Mac's way to choose that folder, which a drag onto the folder's row (always the
 /// drop box's top) cannot. Files are chosen, or dragged onto the sheet. A workflow on
-/// `dropbox.file_added` picks them up on the folder's host.
+/// `file.added` with `paths` under `.agents/dropbox/` picks them up on the folder's host (#3796).
 struct DropboxSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -27,7 +27,7 @@ struct DropboxSheet: View {
                 .appText(.fine)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            Text(sending ? "Sending…" : sent ?? "Drag files here, or choose them. A file with the same name replaces the one there.")
+            Text(sending ? "Sending…" : sent ?? "Drag files here, or choose them. A file with the same name replaces the one there, and starts nothing.")
                 .appText(.fine)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, minHeight: 64)

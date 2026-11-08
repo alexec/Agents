@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-04
 
-**Status**: Draft
+**Status**: Draft. Since #3796 the drop box has no event of its own: a workflow takes its files on `file.added` with `paths` under `.agents/dropbox/` (#3795), and a file put under a name already there starts nothing. What this spec says about `dropbox.file_added` is history.
 
 **Input**: Issue #231, "Drop box per project: files dropped in .agents/dropbox trigger workflows". Alex's decisions of 2026-10-04 in the issue are taken as given. The issue's two open points, upload on the Remote and the web page and a subfolder from a Mac drag, are answered here with a default. They are repeated, with a few more found while grounding the spec in the code, under [Open questions](#open-questions-for-alex).
 
