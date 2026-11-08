@@ -45,6 +45,15 @@ extension WorkflowSummary {
         if !isArchived {
             lines.append(enabledLine)
         }
+        // A ready-made copy's newer versions (#4071).
+        if let updated = readyMadeUpdatedSentence {
+            lines.append(WorkflowStatusLine(symbol: "arrow.triangle.2.circlepath", text: updated,
+                                            detail: Self.readyMadeUpdatedDetail))
+        }
+        if let change = newerReadyMade {
+            lines.append(WorkflowStatusLine(symbol: "sparkles", text: Self.newerReadyMadeSentence,
+                                            detail: "\(change) \(Self.newerReadyMadeDetail)"))
+        }
         if let limit = overLimit {
             lines.append(WorkflowStatusLine(symbol: "exclamationmark.triangle", text: "Over the limit: \(limit.sentence(total: limitTotal))",
                                             detail: limit.remedy, tint: .attention))

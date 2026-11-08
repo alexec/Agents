@@ -11,8 +11,10 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // Ready-made workflows (#1342, #1633) are copied to the person's workflow folder once.
@@ -32,6 +34,11 @@ func readyMadeIDs() []string {
 		}
 	}
 	return ids
+}
+
+func isReadyMade(id string) bool {
+	_, err := readyMadeFS.ReadFile("readymade/" + id + "/workflow.md")
+	return err == nil
 }
 
 // Ready-made skills with no workflow (#3307) are copied to the person's skills once, as a
@@ -221,6 +228,65 @@ var earlierReadyMade = map[string]map[string]bool{
 	"daily-checks":  {"0dff5345182c13cbf18da06086d57e03371baa9db9565b69f8d51ff3a4a3512e": false},
 }
 
+// readyMadeChange is what each ready-made workflow's version today changes, in a sentence: what
+// an edited copy's page says the newer version does (#4071). A change to a ready-made
+// workflow.md says it here, as it adds the version it replaces to earlierReadyMade.
+var readyMadeChange = map[string]string{
+	"daily-summary": "It runs in ask mode rather than plan mode, so a run no longer waits for your approval before it saves (#3922).",
+	"daily-checks":  "It runs in ask mode rather than plan mode, so a run no longer waits for your approval before it saves (#3922).",
+}
+
+// updatedReadyMadePath keeps when the daemon last wrote a newer version over each unedited
+// copy, by id, so its row and page can say so (#4071).
+func updatedReadyMadePath(home string) string {
+	return filepath.Join(home, ".agents", "settings", "ready-made-updated.json")
+}
+
+func markReadyMadeUpdated(home, id string, at time.Time) {
+	updated := map[string]wire.Date{}
+	if data, err := os.ReadFile(updatedReadyMadePath(home)); err == nil {
+		_ = json.Unmarshal(data, &updated)
+	}
+	updated[id] = wire.DateOf(at)
+	if data, err := json.Marshal(updated); err == nil {
+		_ = store.WriteAtomically(updatedReadyMadePath(home), data, 0o600)
+	}
+}
+
+// readyMadeNotice is what a ready-made copy's summary says about its newer versions (#4071):
+// when the daemon updated an unedited copy, for 7 days, or, for a copy the person edited, what
+// the newer version changes. Neither for a copy made before the daemon kept digests, whose
+// version it does not know.
+func readyMadeNotice(home, id, text string, now time.Time) (updatedAt *wire.Date, newer *string) {
+	workflow, _ := readyMadeText(id)
+	want, ok := readyMadeDigest(workflow)
+	if workflow == "" || !ok {
+		return nil, nil
+	}
+	have, ok := readyMadeDigest(text)
+	if !ok {
+		return nil, nil
+	}
+	if have == want {
+		updated := map[string]wire.Date{}
+		if data, err := os.ReadFile(updatedReadyMadePath(home)); err == nil {
+			_ = json.Unmarshal(data, &updated)
+		}
+		if at, ok := updated[id]; ok && now.Sub(at.Time()) < 7*24*time.Hour {
+			return &at, nil
+		}
+		return nil, nil
+	}
+	if made := madeReadyMade(home)[id]; made != "" && made != want {
+		change := readyMadeChange[id]
+		if change == "" {
+			change = "Its ready-made version changed since this copy was made."
+		}
+		return nil, &change
+	}
+	return nil, nil
+}
+
 // madeReadyMadePath keeps the readyMadeDigest of each copy the daemon made, by id.
 func madeReadyMadePath(home string) string {
 	return filepath.Join(home, ".agents", "settings", "ready-made-workflows.json")
@@ -299,6 +365,7 @@ func (d *Daemon) updateReadyMadeLocked(home, id, path, workflow, madeDigest stri
 		return
 	}
 	markReadyMadeMade(home, id, want)
+	markReadyMadeUpdated(home, id, time.Now())
 	log.Printf("workflows: updated the unedited ready-made %s to today's version", id)
 	st := d.stateLocked(home, id, false)
 	if widens || d.workflowRecsBad || st == nil {
