@@ -12161,6 +12161,35 @@ type SummaryFactsRequest struct {
 	Since Date `json:"since"`
 }
 
+// One saved page of the daily summary (#3721), in ~/.agents/summaries on this machine: the sidebar's Summary row and the Summary page.
+type SummaryPage struct {
+	// The file's name without .md, such as 2026-11-06-1810: what summaries/read names.
+	Name string `json:"name"`
+
+	// The page's first heading, such as "Daily summary, Fri 6 Nov"; the name when it has none.
+	Title string `json:"title"`
+
+	SavedAt Date `json:"savedAt"`
+
+	// Nobody has read it with summaries/read since it was saved.
+	Unread bool `json:"unread"`
+
+	// The Daily summary workflow's session that wrote it: the page's "How this was written". Absent for a page saved before #3721.
+	Writer *UUID `json:"writer,omitzero"`
+}
+
+// summaries/read (#3721): a saved page of the daily summary and its Markdown.
+type SummaryPageText struct {
+	Page SummaryPage `json:"page"`
+
+	Markdown string `json:"markdown"`
+}
+
+// summaries/read (#3721): the page to read, as SummaryPage.name says it.
+type SummaryReadRequest struct {
+	Name string `json:"name"`
+}
+
 // Surface (Attention/Surface.swift): a tagged object, `{ mac: {} }` or `{ device: "<uuid>" }`.
 type Surface struct {
 	Mac *struct{} `json:"mac,omitzero"`

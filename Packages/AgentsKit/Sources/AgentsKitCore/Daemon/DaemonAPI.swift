@@ -480,6 +480,9 @@ public enum DaemonAPI {
         /// folders. The home folder's Daily summary workflow keeps it.
         public static let dailySummarySettings = "dailySummary/settings"
         public static let dailySummarySetSettings = "dailySummary/setSettings"
+        /// The daily summary's saved pages (#3721): the sidebar's Summary row and page.
+        public static let summariesList = "summaries/list"
+        public static let summariesRead = "summaries/read"
         /// One agent's override (nil clears it), and the card's recovery (064).
         public static let agentsSetSandbox = "agents/setSandbox"
         public static let agentsAnswerSandbox = "agents/answerSandbox"
@@ -560,6 +563,9 @@ public enum DaemonAPI {
         /// The daily summary's control changed (#3351): the whole of it, as
         /// `dailySummary/settings` answers.
         public static let dailySummaryChanged = "dailySummary/changed"
+        /// The daily summary's saved pages changed (#3721): all of them, as `summaries/list`
+        /// answers.
+        public static let summariesChanged = "summaries/changed"
         /// The whole resolved fact for one need: where it should be showing and whether
         /// the person may be buzzed. Broadcast to every connection, not only to `to`,
         /// which is what lets the losers withdraw (021).

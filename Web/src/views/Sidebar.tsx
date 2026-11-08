@@ -16,6 +16,7 @@ import { undoLabel, undoMillis } from "../model/archiveWords";
 import { healthTally, folderServers } from "../model/hostedMCP";
 import { signal, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
+import { nonePage } from "./SummaryPage";
 import { FolderSettingsModal, ProjectSettingsModal } from "./ProjectSettings";
 import { projectSettingsWords } from "../model/projectSettings";
 import { actDoing, recentArchivedShown, type Store } from "../model/store";
@@ -235,6 +236,8 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
       {!held && <AgentFilters store={store} />}
       <div class="scroll" onKeyDown={(e) => moveWithKeys(e)}>
         {folders.length > 0 && <NewSessionTopRow store={store} folders={folders} linkDown={linkDown} />}
+        {/* The daily summary's page (#3721), above the smart groups, while the daily summary is on. */}
+        {!held && <SummaryRow store={store} />}
         {/* A machine asking to join (#994): at the top, whatever groups are on, and with no folder yet. */}
         {!held && <JoinRequests store={store} down={linkDown} />}
         {/* A channel identity asking to act as this person (#1762), beside the machines. */}
@@ -340,6 +343,24 @@ function AgentFilters({ store }: { store: Store }) {
         {stateFilters.map((f) => <option key={f} value={f}>{stateFilterTitle[f]}</option>)}
       </select>
     </div>
+  );
+}
+
+/** The Summary row (#3721), as the Mac's and the Remote's SummaryRowLabel: the newest page's title
+ *  under it and a dot while that page is unread. Only while the daily summary is on. */
+function SummaryRow({ store }: { store: Store }) {
+  const settings = store.dailySummary.value;
+  if (!settings || settings.mode === "off") return null;
+  const newest = store.summaryPages.value[0];
+  const chosen = route.value.nav === "agents" && route.value.section === "summary";
+  return (
+    <button class={`row activity-row summary-row${chosen ? " chosen" : ""}${newest?.unread ? " unread" : ""}`}
+      aria-current={chosen} title="Your daily summary: what landed, what failed and what waits on you"
+      onClick={() => go({ nav: "agents", section: "summary" })}>
+      <span class="activity-icon" aria-hidden="true">{"☀"}</span>
+      <span class="title">Summary{newest?.unread && <span class="dot" aria-label="Unread" />}</span>
+      <span class="small quiet line">{newest?.title ?? nonePage}</span>
+    </button>
   );
 }
 

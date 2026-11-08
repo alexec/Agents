@@ -144,6 +144,12 @@ struct RemoteSidebar: View {
                 // A folder's long press starts one in it.
                 Section {
                     NewSessionTopRow()
+                    // The daily summary's page (#3721), while the daily summary is on.
+                    if model.dailySummarySettings?.mode.writesPages == true {
+                        SummaryRowLabel(newest: model.summaryPages.first)
+                            .accessibilityHint("Opens your daily summary")
+                            .activityIcon(SummaryRowLabel.systemImage).appText(.supporting).tag(SidebarItem.summary)
+                    }
                 }
 
                 // Work (#3119, #3256): a row per list, as the window has them (#4004), above

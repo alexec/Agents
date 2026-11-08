@@ -638,7 +638,7 @@ final class RemoteModel {
                 openWorkflow = nil
                 openArchive = false
                 openReview = id
-            case .resources, .events, .runtimes:
+            case .resources, .events, .runtimes, .summary:
                 openActivity = newValue
             case .work(let kind):
                 // The list's row: its list, or the place in it still open (#4004).
@@ -952,6 +952,9 @@ final class RemoteModel {
     /// The daily summary's Off / Summary control and its time (#3351), from the Mac's host. Nil
     /// until it has said, or from a host too old to know the method.
     private(set) var dailySummarySettings: DailySummarySettings?
+    /// The daily summary's saved pages on the Mac's host, newest first (#3721): the Summary row
+    /// and page. Empty from a host too old to know `summaries/list`.
+    private(set) var summaryPages: [SummaryPage] = []
     /// Each runtime's sandbox default, read from the Mac, for "Use runtime default (Off)".
     private(set) var sandboxSettings = SandboxSettings()
     /// The Mac-wide permission choice for Cursor, Grok and OpenCode (061).
@@ -1330,6 +1333,18 @@ final class RemoteModel {
     func refreshDailySummarySettings() async {
         dailySummarySettings = try? await client.call(DaemonAPI.Method.dailySummarySettings, DaemonAPI.Empty(),
                                                       returning: DailySummarySettings.self)
+    }
+
+    /// The daily summary's saved pages (#3721), from the Mac's host.
+    func refreshSummaryPages() async {
+        summaryPages = (try? await client.call(DaemonAPI.Method.summariesList, DaemonAPI.Empty(),
+                                               returning: [SummaryPage].self)) ?? []
+    }
+
+    /// One saved page of the daily summary (#3721); reading the newest marks it read.
+    func readSummaryPage(_ name: String) async -> SummaryPageText? {
+        try? await client.call(DaemonAPI.Method.summariesRead, SummaryReadRequest(name: name),
+                               returning: SummaryPageText.self)
     }
 
     /// The person chose Off or Summary, or a time, for the daily summary (#3351). Nil when it
@@ -2706,6 +2721,10 @@ final class RemoteModel {
            let settings = try? notification.params?.decode(DailySummarySettings.self) {
             self.dailySummarySettings = settings
         }
+        if notification.method == DaemonAPI.Notification.summariesChanged,
+           let pages = try? notification.params?.decode([SummaryPage].self) {
+            self.summaryPages = pages
+        }
         if notification.method == DaemonAPI.Notification.preferencesChanged,
            let preferences = try? notification.params?.decode(DaemonAPI.DisplayPreferences.self) {
             self.displayMirror.hostSaid(preferences)
@@ -2937,6 +2956,10 @@ final class RemoteModel {
         publishAttention()
         liveActivities.settle(with: work)
         if let pendingOpen { open(pendingOpen) }
+        // The Summary row (#3721): shown only while the daily summary is on, with its newest page.
+        async let dailySummary: Void = refreshDailySummarySettings()
+        async let summaries: Void = refreshSummaryPages()
+        _ = await (dailySummary, summaries)
         if let pendingNeed {
             self.pendingNeed = nil
             if let agentID = agentID(forNeedToken: pendingNeed) { open(agentID) } else { openUnheld(needToken: pendingNeed) }
