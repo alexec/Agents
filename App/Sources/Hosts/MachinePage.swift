@@ -301,7 +301,7 @@ private struct MachineDotView: View {
         Group {
             switch dot {
             case .online: Circle().tinted(.vouched)
-            case .busy: SyncedSpinner(diameter: 8, color: StateTint.attention.color ?? .orange)
+            case .busy: SyncedSpinner(diameter: 8, color: StateTint.attention.color ?? .secondary)
             case .stopped: Circle().strokeBorder(.secondary, lineWidth: 1.2)
             case .offline: Circle().tinted(.failure)
             case .attention: Circle().tinted(.attention)
