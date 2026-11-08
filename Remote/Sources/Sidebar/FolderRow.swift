@@ -102,6 +102,7 @@ struct FolderRow: View {
 struct Waiting: View {
     @Environment(RemoteModel.self) private var model
     @State private var pairingAgain = false
+    @State private var adding: NewFolderSheet.Kind?
 
     var body: some View {
         if model.needsPairing {
@@ -119,10 +120,17 @@ struct Waiting: View {
             }
             .sheet(isPresented: $pairingAgain) { PairingView() }
         } else {
-            VStack(spacing: 12) {
+            // What to do next, on the default machine, as the page's empty list (#4036).
+            ContentUnavailableView {
                 Text("No folders yet").appText(.title)
+            } description: {
+                Text("Add a folder on your Mac, or clone one from a Git URL.")
+            } actions: {
+                Button("Add Folder…") { adding = .folder(.mac, "This Mac") }
+                    .buttonStyle(.borderedProminent)
+                Button("Clone Git URL…") { adding = .clone(.mac, "This Mac") }
             }
-            .padding()
+            .sheet(item: $adding) { NewFolderSheet(kind: $0) }
         }
     }
 }

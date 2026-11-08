@@ -3660,6 +3660,53 @@ final class RemoteModel {
         }
     }
 
+    /// The machines a folder can be added to (#4036): this Mac first, then each other host
+    /// of the control plane, as the sidebar heads them.
+    var folderMachines: [HostSection] {
+        let sections = hostSections
+        return sections.isEmpty ? [HostSection(id: .mac, title: "This Mac", offline: false)] : sections
+    }
+
+    /// What is in a folder on `host` (#4036), for Add Folder's picker: `files/browse`, as
+    /// the window's server folder sheet reads it.
+    func browse(_ path: String, on host: MachineRef) async throws -> DirectoryListing {
+        let request = DaemonAPI.FilesBrowseRequest(path: path)
+        return try await client(for: request, on: host).call(DaemonAPI.Method.filesBrowse, request,
+                                                             returning: DirectoryListing.self)
+    }
+
+    /// A folder on `host` added as a folder (#115, #4036), to its default project, and opened.
+    /// Answers why not, or nil.
+    func addFolder(_ folder: URL, on host: MachineRef) async -> String? {
+        await takeNewFolder(on: host) { client in
+            try await client.call(DaemonAPI.Method.foldersAdd, DaemonAPI.AddFolderRequest(folder: folder, project: nil),
+                                  returning: DaemonAPI.FolderSummary.self)
+        }
+    }
+
+    /// A Git URL cloned into `host`'s home folder and added as a folder (027, #4036), then
+    /// opened. The daemon answers once the clone has finished. Answers why not, or nil.
+    func cloneFolder(_ url: String, on host: MachineRef) async -> String? {
+        await takeNewFolder(on: host) { client in
+            try await client.call(DaemonAPI.Method.foldersClone, DaemonAPI.CloneRequest(url: url),
+                                  returning: DaemonAPI.FolderSummary.self)
+        }
+    }
+
+    private func takeNewFolder(on host: MachineRef,
+                               _ call: (DaemonClient) async throws -> DaemonAPI.FolderSummary) async -> String? {
+        do {
+            let target = try client(for: Optional<String>.none, on: host)
+            var summary = try await call(target)
+            summary.host = host
+            work.upsert(summary)
+            sidebarItem = .folder(summary.key)
+            return nil
+        } catch {
+            return away(error, "the folder could not be added.") ?? sentence(for: error)
+        }
+    }
+
 
     /// What today has cost and what the reader will allow. The phone shows limits
     /// and never sets them. A daemon too old to know the method leaves this nil, and
