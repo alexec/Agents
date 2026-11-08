@@ -151,7 +151,8 @@ export function FilesPane({ store, host, session }: { store: Store; host: string
       </header>
       <div class="scroll pane-body">
         {pane.tab === "files" && root && <Browser key={session} store={store} host={host} session={session} root={root} />}
-        {pane.tab === "changes" && <Changes store={store} host={host} session={session} />}
+        {/* Keyed by session, so one session's list never shows under the next (#4020). */}
+        {pane.tab === "changes" && <Changes key={session} store={store} host={host} session={session} />}
         {pane.tab === "page" && (pane.page
           ? <LiveDocument store={store} host={host} agentID={session} path={pane.page} line={pane.line} />
           : <p class="hint">A Markdown file the agent shows reads here.</p>)}

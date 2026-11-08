@@ -160,7 +160,9 @@ struct PaneView: View {
             case .files:
                 FilesPane(agent: agent)
             case .changes:
+                // Rebuilt per session: its list, open file and folds are that session's (#4020).
                 RemoteChangesPane(agent: agent)
+                    .id(agent.id)
             case .terminal:
                 TerminalPane(agent: agent)
             case .browser:

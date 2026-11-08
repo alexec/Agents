@@ -48,9 +48,10 @@ struct RemoteChangesPane: View {
             guard !Task.isCancelled else { return }
             await fetch()
         }
-        .task {
+        .task(id: agent.cwd) {
             // The folder is watched while the pane shows it, so `files/changed` brings
-            // a change git sees outside the conversation (#535).
+            // a change git sees outside the conversation (#535). A move watches the new
+            // worktree instead (#4020).
             await model.files.watch(agentID: agent.id, folder: agent.cwd)
             await untilCancelled()
             await model.files.unwatch(agentID: agent.id, folder: agent.cwd)
