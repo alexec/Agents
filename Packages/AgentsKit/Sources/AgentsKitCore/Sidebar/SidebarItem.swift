@@ -28,9 +28,6 @@ public enum SidebarItem: Hashable, Sendable {
     case tokens
     /// Where the time of running chats went (#852): the agent, its tools, and waiting.
     case time
-    /// The first steps taken, and the ones still to take (#984, #1067): a row only while
-    /// some are still to earn.
-    case achievements
     /// Every issue and pull request from the forges, with lineage on top, and the milestones
     /// and releases lineage knows (#3119). Mac + web: the Remote has no row for it (#2796).
     case work

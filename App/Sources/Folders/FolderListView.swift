@@ -175,7 +175,7 @@ struct FolderListView: View {
             if let achievement = model.achievementCard {
                 Section {
                     AchievementCard(achievement: achievement,
-                                  open: { model.dismissAchievement(achievement); picked = [.achievements] },
+                                  open: { model.dismissAchievement(achievement); picked = [.multiplier] },
                                   dismiss: { model.dismissAchievement(achievement) })
                         .listRowSeparator(.hidden)
                         .selectionDisabled()
@@ -258,12 +258,6 @@ struct FolderListView: View {
                 // A record of what happened, as the web's Reports ▸ Records (#3633).
                 EventsRow().activityIcon("list.bullet.rectangle")
                     .appText(.supporting).sidebarInk(.events).tag(SidebarItem.events)
-                // The newcomer's checklist (#1067), only while an achievement is still to earn,
-                // as an empty smart group hides (#507). Then the list is under Time's charts.
-                if model.work.achievements?.isComplete == false {
-                    AchievementsRow().activityIcon("checkmark.seal")
-                        .appText(.supporting).sidebarInk(.achievements).tag(SidebarItem.achievements)
-                }
             } header: {
                 // The size of every other group's heading (#495).
                 Text("Usage").appText(.supporting)

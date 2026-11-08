@@ -84,15 +84,22 @@ list with how to earn them.
 
 | Client | Where |
 | --- | --- |
-| Mac | The **Achievements** row in the **Usage** group of the sidebar, or **View ▸ Achievements**. |
+| Mac | The **Multiplier** page (**View ▸ Multiplier**, ⌘0), under its numbers. |
 | iPhone and iPad | The **Achievements** row in the **Usage** group of the sidebar. |
 | Web page | The **Achievements** row in the **Usage** group of the sidebar. |
 
-The page has the heading **Achievements** and a count such as **3 of 7**. Earned achievements
+On the Mac, each earned achievement is a round badge, earliest first. Hold the pointer on a
+badge to see its title and date. A count such as **3 of 7** is next to the badges, and a
+**Next:** line under them says how to earn the first achievement that is still to earn. With
+none earned, only the **Next:** line shows. With all seven earned, only the badges show. A
+badge that you earn while the page is open grows into place, with no movement under Reduce
+Motion.
+
+On the web page, the page has the heading **Achievements** and a count such as **3 of 7**. Earned achievements
 come first, earliest first, each with its date. The rest follow, greyed, each with its
 line on how to earn it.
 
-The **Achievements** row shows only while an achievement is still to earn, as an empty smart
+On the web page, the **Achievements** row shows only while an achievement is still to earn, as an empty smart
 group hides. When you have earned all seven, the row goes and the list moves under the
 charts on the **Time** page. See [See usage, cost and time](../how-to/see-usage-cost-and-time.md).
 
@@ -105,7 +112,7 @@ charts on the **Time** page. See [See usage, cost and time](../how-to/see-usage-
 | Web page | The same card at the bottom right of the page. |
 | iPhone | No card. The achievement has a **New** mark on the **Achievements** page until you leave the page. |
 
-**See Achievements** opens the page. Each card shows once: it goes when you close it or open
+**See Achievements** opens the page (on the Mac, the **Multiplier** page). Each card shows once: it goes when you close it or open
 it. Agents never sends a notification for an achievement. On the first look from a device or
 a browser, the achievements earned before are not news, so they show no card.
 
