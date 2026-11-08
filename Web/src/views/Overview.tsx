@@ -140,7 +140,7 @@ export function Overview({ store, down }: { store: Store; down: boolean }) {
                 <p class="small">{budgetWords(spend.value.monthSpentUSD, spend.value.budgetUSD)}</p>
               )}
             </Card>
-            <Card title="Recent activity" line={events.length ? null : noEvents} links={[["Events", { nav: "reports", section: "events" }]]}>
+            <Card title="Recent activity" line={events.length ? null : noEvents} links={[["Events", { nav: "status", section: "events" }]]}>
               <ul class="overview-rows">
                 {events.map(({ host, event }) => (
                   <li key={`${host}|${event.position}`}>

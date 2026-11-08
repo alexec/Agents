@@ -31,7 +31,7 @@ const (
 
 // lineageViewServers is the servers whose views may ask, by their mcpcatalog id.
 var lineageViewServers = map[string]bool{"agents/github": true, "agents/gitlab": true, "agents/forgejo": true, "agents/bitbucket": true, "agents/linear": true,
-	"agents/jira": true, "agents/azureboards": true}
+	"agents/jira": true, "agents/azureboards": true, "agents/azuredevops": true}
 
 type lineageView struct {
 	// Ref is the node, as lineage refs name it: github:owner/repo#12.

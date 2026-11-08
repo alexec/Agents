@@ -280,3 +280,33 @@ func TestAzureReposAddressesOnAServerUnderAPath(t *testing.T) {
 		t.Errorf("a pull request on the connected Server: %+v %d %v", repo, n, ok)
 	}
 }
+
+// #4098: the azuredevops server's pull request page asks for lineage by its address: the
+// sessions on the pull request.
+func TestTheAzureDevOpsServersViewsAskForLineage(t *testing.T) {
+	d, _, _, _ := azureDevOpsDaemon(t)
+	folder := azureDevOpsFolder(t, d)
+	a := seeded(t, d, folder, func(a *wire.Agent) {
+		title := "Fix the walk"
+		a.Title = &title
+		a.Labels = []wire.SessionLabel{{Value: "P#8", Owner: wire.SessionLabelOwnerPerson}}
+	})
+	d.noteLineage(nil, a)
+
+	ado := viewServer{name: "azuredevops", filled: sdk.McpServer{Stdio: &sdk.McpServerStdio{Name: "azuredevops", Command: "azuredevops-mcp"}}}
+	raw, err := d.lineageViewResult(ado, json.RawMessage(`{"url":"https://dev.azure.com/acme/Web%20App/_git/App/pullrequest/8"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var r struct {
+		StructuredContent lineageView `json:"structuredContent"`
+		IsError           bool        `json:"isError"`
+	}
+	if json.Unmarshal(raw, &r) != nil || r.IsError {
+		t.Fatalf("the pull request's: %s", raw)
+	}
+	v := r.StructuredContent
+	if v.Ref != "azuredevops:acme/web app/app#8" || len(v.Sessions) != 1 || v.Sessions[0].Title != "Fix the walk" {
+		t.Errorf("the pull request's: %+v", v)
+	}
+}

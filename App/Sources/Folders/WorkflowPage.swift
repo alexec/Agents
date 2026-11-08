@@ -372,6 +372,10 @@ struct WorkflowPage: View {
                 }
             }
             .paperRaised(in: RoundedRectangle(cornerRadius: 18))
+            if summary.newerReadyMade != nil {
+                ReadyMadeChoice(take: { await model.answerReadyMade(summary, take: true) },
+                                keep: { await model.answerReadyMade(summary, take: false) })
+            }
         }
     }
 

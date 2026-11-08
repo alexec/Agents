@@ -3,7 +3,7 @@ import SwiftUI
 
 /// A project's Connectors page, with its set-up first (#1336), or the person's own Connectors page, with
 /// their connections first. Then every MCP server in one `mcp.json` and how each is doing
-/// (#753): under Status, the person's own `~/.agents/mcp.json` (#589); under a project, its
+/// (#753): in Settings ▸ You (#3998), the person's own `~/.agents/mcp.json` (#589); under a project, its
 /// repository's `.agents/mcp.json`, read in one of its folders (#3407).
 ///
 /// A hosted server (#488) says what its one copy is doing; any other, what the host found
@@ -161,21 +161,15 @@ struct MCPServersView: View {
     }
 }
 
-/// The way into MCP Servers under Activity.
-struct MCPServersRow: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        // The title alone (#587): the count is the tooltip's, and one not answering, or a
-        // connection that ended (#3407), turns the row's icon red (`activityIcon(_:warns:)`).
-        let words = [MCPHealthWords.tally(model.work.mcpHealthSnapshot()?.personal ?? [])?.words,
-                     ConnectorSetupWords.endedLine(model.endedConnections.on(.mac))].compactMap { $0 }
-        HStack(alignment: .firstTextBaseline) {
-            Text("Connectors").foregroundStyle(.primary)
-            Spacer()
-        }
-        .help((words + ["Your connections and the connectors in your own mcp.json, and how each is doing"])
-              .joined(separator: ". "))
-        .accessibilityValue(words.joined(separator: ". "))
+/// Settings ▸ You ▸ Connectors' warning (#3998): a connector of the person's own that does not
+/// answer, or a connection that ended (#587, #589, #3407), in words; nil when all is well. The
+/// rail shows it as its warning sign, as the web's Settings list marks its row.
+extension AppModel {
+    var connectorsWarning: String? {
+        let tally = MCPHealthWords.tally(work.mcpHealthSnapshot()?.personal ?? [])
+        let ended = endedConnections.on(.mac)
+        guard tally?.failing == true || !ended.isEmpty else { return nil }
+        return [tally?.failing == true ? tally?.words : nil, ConnectorSetupWords.endedLine(ended)]
+            .compactMap { $0 }.joined(separator: ". ")
     }
 }

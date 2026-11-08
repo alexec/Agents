@@ -5724,6 +5724,35 @@ type LineageResolved struct {
 	Labels []string `json:"labels,omitzero"`
 }
 
+// One heading of a search for an epic (#3900): the epic or one of its sub-issues, and its title, absent while the host has not resolved it.
+type LineageSessionIssue struct {
+	Node LineageNode `json:"node"`
+
+	Title *string `json:"title,omitzero"`
+}
+
+// A session on the issue, and the issue it is on: the one asked for, or one of its sub-issues. A session on a PR is on the issue the PR fixes.
+type LineageSessionMatch struct {
+	AgentID UUID `json:"agentID"`
+
+	On LineageNode `json:"on"`
+}
+
+// The sessions on this machine that lineage links to the issue, to its sub-issues or to their PRs, each once, on the first issue in issues they came by. limited says there were more sub-issues or sessions than are counted.
+type LineageSessions struct {
+	Matches []LineageSessionMatch `json:"matches"`
+
+	// The issue asked for, then its sub-issues in the epic's order (#3900), each once, with its title when the host has it: the headings a search for an epic groups its sessions under. Only the issue asked for when it has no sub-issues; absent from a host too old to say.
+	Issues []LineageSessionIssue `json:"issues,omitzero"`
+
+	Limited *bool `json:"limited,omitzero"`
+}
+
+// lineage/sessions (#3899): a session search for #<number> asks for the sessions on that issue, on the issues part-of it (its sub-issues, at most 100) and on the PRs that fix them. The issue is #<number> in the forge repo of each of this machine's folders.
+type LineageSessionsRequest struct {
+	Number int64 `json:"number"`
+}
+
 type ListCursor struct {
 	LastActivityAt Date `json:"lastActivityAt"`
 
@@ -7871,7 +7900,7 @@ type OrgRoutesMine struct {
 	Routes []OrgRouteMine `json:"routes"`
 }
 
-// Your setup ▸ Accounts (#3967): one outside account of the person's (gitlab.com, AWS, Slack…). It holds no secret: card and secret are the names of secrets in Your setup ▸ Secrets, or where one is.
+// Settings ▸ You ▸ Accounts (#3967): one outside account of the person's (gitlab.com, AWS, Slack…). It holds no secret: card and secret are the names of secrets in Settings ▸ You ▸ Secrets, or where one is.
 type OutsideAccount struct {
 	// The service, as its address: gitlab.com, aws.amazon.com.
 	Service string `json:"service"`
@@ -7885,10 +7914,10 @@ type OutsideAccount struct {
 	// What it costs a month, in US dollars. Absent when not known.
 	MonthlyCostUsd *float64 `json:"monthlyCostUsd,omitzero"`
 
-	// The card it bills, by its name in Your setup ▸ Secrets. Never the number.
+	// The card it bills, by its name in Settings ▸ You ▸ Secrets. Never the number.
 	Card *string `json:"card,omitzero"`
 
-	// Its token or key, by its name in Your setup ▸ Secrets or where it is. Never the value.
+	// Its token or key, by its name in Settings ▸ You ▸ Secrets or where it is. Never the value.
 	Secret *string `json:"secret,omitzero"`
 
 	// TOTP, passkey, SMS, or absent for none.
@@ -10110,13 +10139,15 @@ type Request struct {
 	DroppedWhy *RequestDroppedWhy `json:"droppedWhy,omitzero"`
 }
 
-// One of the answers: form for a question, a secret or a step (#3863); checklist and approval for a forge item (#3865).
+// One of the answers: form for a question, a secret or a step (#3863); checklist and approval for a forge item (#3865); secretUse for the use of a secret with Ask before use (#4015).
 type RequestAnswer struct {
 	Form *RequestFormAnswer `json:"form,omitzero"`
 
 	Checklist *RequestChecklistAnswer `json:"checklist,omitzero"`
 
 	Approval *RequestApprovalAnswer `json:"approval,omitzero"`
+
+	SecretUse *RequestSecretUseAnswer `json:"secretUse,omitzero"`
 }
 
 // A needs-approval pull request's answer: approve adds approved, changes adds changes-wanted; the note is the person's comment on it.
@@ -10140,6 +10171,8 @@ type RequestChecklistLine struct {
 // The part of a request that depends on its source.
 type RequestDetail struct {
 	Elicitation *ElicitationRequest `json:"elicitation,omitzero"`
+
+	SecretUse *RequestSecretUse `json:"secretUse,omitzero"`
 }
 
 type RequestDroppedWhy string
@@ -10196,6 +10229,24 @@ const RequestKindAccount RequestKind = "account"
 const RequestKindStep RequestKind = "step"
 const RequestKindSecret RequestKind = "secret"
 
+// A use of a secret with Ask before use (#4015), waiting on a person: its kind is approve. It names the secret, never its value, and where agentsd puts the value.
+type RequestSecretUse struct {
+	Name string `json:"name"`
+
+	Use SecretUse `json:"use"`
+
+	// Where the value goes: the page's domain for a fill, owner/repo for CI.
+	Place string `json:"place"`
+
+	// The secret is the session's own (#3548): Allow always is the same as Allow for this session.
+	SessionOnly *bool `json:"sessionOnly,omitzero"`
+}
+
+// A person's answer to a secret's use (#4015). once allows this use; session every use at this place until the session ends or is archived; always adds a grant for this place, for every session; deny refuses it. Only the control and device roles answer.
+type RequestSecretUseAnswer struct {
+	Action string `json:"action"`
+}
+
 type RequestSource string
 
 const RequestSourceQuestion RequestSource = "question"
@@ -10204,6 +10255,7 @@ const RequestSourceHandOff RequestSource = "handOff"
 const RequestSourcePermission RequestSource = "permission"
 const RequestSourceGuardedChange RequestSource = "guardedChange"
 const RequestSourceForge RequestSource = "forge"
+const RequestSourceSecretUse RequestSource = "secretUse"
 
 type RequestState string
 
@@ -10903,6 +10955,26 @@ type SealingWork struct {
 	Items []SealingItem `json:"items"`
 }
 
+// A place where a person allowed a secret with Ask before use always (#4015): a use there does not ask.
+type SecretGrant struct {
+	Name string `json:"name"`
+
+	Use SecretUse `json:"use"`
+
+	// The page's domain for a fill, owner/repo for CI.
+	Place string `json:"place"`
+}
+
+// secrets/addGrant and secrets/removeGrant (#4015): a person allows a secret with Ask before use always at a place, or takes that away. Only the control and device roles reach them.
+type SecretGrantChange struct {
+	Grant SecretGrant `json:"grant"`
+}
+
+// secrets/grants (#4015): every grant of this machine's secrets with Ask before use.
+type SecretGrants struct {
+	Grants []SecretGrant `json:"grants"`
+}
+
 // A machine that was removed with a secret on it (#1760, FR-026): change the secret where it was issued.
 type SecretLeftOn struct {
 	Host MachineRef `json:"host"`
@@ -10913,7 +10985,7 @@ type SecretLeftOn struct {
 	At string `json:"at"`
 }
 
-// secrets/setNeedsApproval (#4014): a person turns Ask before use on or off for a secret of this machine's secrets.env, or for one session's (agentID). On takes the value out of the plain file and seals it to this machine; off puts it back. A Your setup secret's flag is its client's to seal, so it is refused here.
+// secrets/setNeedsApproval (#4014): a person turns Ask before use on or off for a secret of this machine's secrets.env, or for one session's (agentID). On takes the value out of the plain file and seals it to this machine; off puts it back. The flag of a secret of the person's (Settings ▸ You ▸ Secrets) is its client's to seal, so it is refused here.
 type SecretNeedsApprovalRequest struct {
 	Name string `json:"name"`
 
@@ -10921,6 +10993,12 @@ type SecretNeedsApprovalRequest struct {
 
 	NeedsApproval bool `json:"needsApproval"`
 }
+
+// What agentsd does with a secret with Ask before use (#4015): fill types it into a page (fill_secret), ci sends it to GitHub (set_ci_secret).
+type SecretUse string
+
+const SecretUseFill SecretUse = "fill"
+const SecretUseCi SecretUse = "ci"
 
 // control/secretsLeft (#1760, FR-026): to the person's own clients, when one of their machines was removed with secrets on it.
 type SecretsLeft struct {

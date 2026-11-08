@@ -255,7 +255,7 @@ func markReadyMadeUpdated(home, id string, at time.Time) {
 
 // readyMadeNotice is what a ready-made copy's summary says about its newer versions (#4071):
 // when the daemon updated an unedited copy, for 7 days, or, for a copy the person edited, what
-// the newer version changes. Neither for a copy made before the daemon kept digests, whose
+// the newer version changes, until they take it or keep their copy (#4075). Neither for a copy made before the daemon kept digests, whose
 // version it does not know.
 func readyMadeNotice(home, id, text string, now time.Time) (updatedAt *wire.Date, newer *string) {
 	workflow, _ := readyMadeText(id)
@@ -277,7 +277,7 @@ func readyMadeNotice(home, id, text string, now time.Time) (updatedAt *wire.Date
 		}
 		return nil, nil
 	}
-	if made := madeReadyMade(home)[id]; made != "" && made != want {
+	if made := madeReadyMade(home)[id]; made != "" && made != want && keptReadyMade(home)[id] != want {
 		change := readyMadeChange[id]
 		if change == "" {
 			change = "Its ready-made version changed since this copy was made."
@@ -312,6 +312,123 @@ func markReadyMadeMade(home, id, digest string) {
 	}
 }
 
+// withStateKeys is the ready-made workflow with the state keys of the copy it goes over.
+func withStateKeys(old, workflow, id, home string) (string, error) {
+	oldWF := parseWorkflow(old, id, home)
+	text := workflow
+	for _, key := range readyMadeStateKeys {
+		var v *bool
+		switch key {
+		case "enabled":
+			v = oldWF.Enabled
+		case "archived":
+			v = oldWF.Archived
+		case "continue-when-back":
+			v = oldWF.ContinueWhenBack
+		case "muted":
+			v = oldWF.Muted
+		}
+		var value *string
+		if v != nil {
+			value = strPtr(strconv.FormatBool(*v))
+		}
+		var err error
+		if text, err = setFrontMatter(key, value, text); err != nil {
+			return "", err
+		}
+	}
+	return text, nil
+}
+
+// keptReadyMadePath keeps, by id, the ready-made version whose notice the person hid by
+// keeping their edited copy (#4075).
+func keptReadyMadePath(home string) string {
+	return filepath.Join(home, ".agents", "settings", "ready-made-kept.json")
+}
+
+func keptReadyMade(home string) map[string]string {
+	kept := map[string]string{}
+	if data, err := os.ReadFile(keptReadyMadePath(home)); err == nil {
+		_ = json.Unmarshal(data, &kept)
+	}
+	return kept
+}
+
+// readyMadeCopyLocked is the edited copy of a ready-made workflow that workflows/readyMade/take
+// and keep act on: a workflow of the person's own whose ready-made version is newer.
+func (d *Daemon) readyMadeCopyLocked(r wire.WorkflowRequest) (home, path, text, want string, err error) {
+	folder := store.FolderPath(r.Folder)
+	d.scanLocked()
+	f := d.fileLocked(folder, r.WorkflowID)
+	home = d.personalHome()
+	if f == nil {
+		return "", "", "", "", noSuchWorkflow(r.WorkflowID)
+	}
+	if f.scope != "user" || home == "" || !isReadyMade(r.WorkflowID) {
+		return "", "", "", "", &Error{Code: wire.FailureNotChanged, Message: f.wf.Name + " is not a copy of a ready-made workflow."}
+	}
+	if _, newer := readyMadeNotice(home, r.WorkflowID, f.text, time.Now()); newer == nil {
+		return "", "", "", "", &Error{Code: wire.FailureNotChanged, Message: f.wf.Name + " has no newer ready-made version."}
+	}
+	path, ok := workflowSourcePath(folder, r.WorkflowID, f)
+	if !ok {
+		return "", "", "", "", notInFolder(r.WorkflowID)
+	}
+	text, _ = readyMadeText(r.WorkflowID)
+	want, _ = readyMadeDigest(text)
+	return home, path, text, want, nil
+}
+
+// takeReadyMade is workflows/readyMade/take (#4075): the newer ready-made version written over
+// an edited copy, with the copy's state keys. Its approval does not go with it: the new version
+// waits for the person as any changed workflow does.
+func (d *Daemon) takeReadyMade(r wire.WorkflowRequest) (wire.WorkflowSummary, error) {
+	d.workflowMu.Lock()
+	home, path, workflow, want, err := d.readyMadeCopyLocked(r)
+	if err == nil {
+		old, _, why := readWorkflowFile(path)
+		if why != "" {
+			err = &Error{Code: wire.FailureWorkflowUnreadable, Message: why}
+		} else if text, kerr := withStateKeys(old, workflow, r.WorkflowID, home); kerr != nil {
+			err = &Error{Code: wire.FailureWorkflowUnreadable, Message: kerr.Error()}
+		} else if werr := store.WriteAtomically(path, []byte(text), 0o644); werr != nil {
+			err = &Error{Code: wire.FailureWorkflowUnreadable, Message: r.WorkflowID + ".md was not changed: " + werr.Error() + "."}
+		} else {
+			markReadyMadeMade(home, r.WorkflowID, want)
+			log.Printf("workflows: took the newer ready-made %s over the edited copy", r.WorkflowID)
+			d.scanLocked()
+		}
+	}
+	d.workflowMu.Unlock()
+	if err != nil {
+		return wire.WorkflowSummary{}, err
+	}
+	d.tellEveryWorkflow()
+	return d.oneWorkflow(store.FolderPath(r.Folder), r.WorkflowID)
+}
+
+// keepReadyMade is workflows/readyMade/keep (#4075): the edited copy stays as it is, and its
+// page says no more of this ready-made version.
+func (d *Daemon) keepReadyMade(r wire.WorkflowRequest) (wire.WorkflowSummary, error) {
+	d.workflowMu.Lock()
+	home, _, _, want, err := d.readyMadeCopyLocked(r)
+	if err == nil {
+		kept := keptReadyMade(home)
+		kept[r.WorkflowID] = want
+		if data, merr := json.Marshal(kept); merr == nil {
+			if werr := store.WriteAtomically(keptReadyMadePath(home), data, 0o600); werr != nil {
+				err = &Error{Code: wire.FailureWorkflowUnreadable, Message: "Could not save that you kept your copy: " + werr.Error()}
+			}
+		}
+	}
+	d.workflowMu.Unlock()
+	if err != nil {
+		return wire.WorkflowSummary{}, err
+	}
+	d.tellEveryWorkflow()
+	return d.oneWorkflow(store.FolderPath(r.Folder), r.WorkflowID)
+}
+
 // updateReadyMadeLocked writes today's ready-made version over a copy the person did not
 // edit: one the same as the copy the daemon made, or as an earlier version. The copy keeps
 // its state keys. Its approval goes with it when the step does not widen what it can do;
@@ -336,28 +453,9 @@ func (d *Daemon) updateReadyMadeLocked(home, id, path, workflow, madeDigest stri
 	if !earlier {
 		widens = true // made by the daemon, but no one said what the step does
 	}
-	oldWF := parseWorkflow(old, id, home)
-	text := workflow
-	for _, key := range readyMadeStateKeys {
-		var v *bool
-		switch key {
-		case "enabled":
-			v = oldWF.Enabled
-		case "archived":
-			v = oldWF.Archived
-		case "continue-when-back":
-			v = oldWF.ContinueWhenBack
-		case "muted":
-			v = oldWF.Muted
-		}
-		var value *string
-		if v != nil {
-			value = strPtr(strconv.FormatBool(*v))
-		}
-		var err error
-		if text, err = setFrontMatter(key, value, text); err != nil {
-			return
-		}
+	text, err := withStateKeys(old, workflow, id, home)
+	if err != nil {
+		return
 	}
 	oldSkills, _ := readWorkflowSkills(home, old)
 	oldDigest := workflowDigest(oldFileDigest, old, oldSkills)

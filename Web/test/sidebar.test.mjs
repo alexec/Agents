@@ -85,7 +85,7 @@ test("smart groups gather by what a session wants, newest started first (#495)",
   assert.deepEqual(smartAgents("needsYou", live).map((a) => a.id), ["asked"]);
   assert.deepEqual(smartAgents("working", live).map((a) => a.id), ["new-work", "old-work"], "by start, not activity");
   assert.deepEqual(smartAgents("unread", live).map((a) => a.id), ["unread"]);
-  assert.deepEqual(smartAgents("working", live, { label: null, text: "old" }).map((a) => a.id), ["old-work"], "a search narrows it");
+  assert.deepEqual(smartAgents("working", live, { label: null, issue: null, text: "old" }).map((a) => a.id), ["old-work"], "a search narrows it");
   assert.deepEqual(live.map(sessionMark), ["needsYou", "working", "working", "done", "done"], "one ring, read or not (#1323)");
   assert.equal(sessionMark(agent("paused", 1, { state: "stopped", endedReason: "cancelled" })), "paused", "in the accent (#630)");
   assert.equal(sessionMark(agent("queued", 1, { state: "queued" })), "queued", "its own mark (#630)");
@@ -416,12 +416,12 @@ test("an Activity page is a page of Machines or Reports (#2141), and an unknown 
   globalThis.addEventListener = () => {};
   try {
     const { parseRoute, routeHash } = await load("src/route.ts");
-    assert.equal(routeHash({ nav: "reports", section: "events", host: "mac", folder: "file:///w/a" }), "#/reports/events");
+    assert.equal(routeHash({ nav: "status", section: "events", host: "mac", folder: "file:///w/a" }), "#/status/events");
     assert.deepEqual(parseRoute("#/a/spending"), { nav: "reports", section: "usage" });
     assert.deepEqual(parseRoute("#/a/time"), { nav: "reports", section: "usage" });
     assert.deepEqual(parseRoute("#/a/achievements"), { nav: "reports", section: "multiplier" }, "the Multiplier page took its place (#3990)");
     assert.deepEqual(parseRoute("#/reports/achievements"), { nav: "reports", section: "multiplier" });
-    assert.deepEqual(parseRoute("#/a/mcp"), { nav: "setup", section: "mcp" }, "Connectors has a page of its own (#589)");
+    assert.deepEqual(parseRoute("#/a/mcp"), { nav: "settings", section: "mcp" }, "Connectors has a page of its own (#589), in Settings ▸ You (#3998)");
     assert.deepEqual(parseRoute("#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/m/1"), { host: "mac", folder: "file:///w/a", mcp: true },
       "a folder's Connectors has a page of its own (#753)");
     assert.equal(routeHash({ host: "mac", folder: "file:///w/a", mcp: true }), "#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/m/1");
@@ -727,4 +727,25 @@ test("a host's list prunes the folds of its folders that are gone, and no other 
   first.prune("box", []);
   assert.equal(new Folds(storage).isSessionsOpen("box", "file:///w/gone"), true, "a host that left takes its own");
   assert.equal(new Folds(storage).isOpen("box", "file:///w/gone"), false);
+});
+
+test("a search for an epic groups what it found under each issue, the epic's own first (#3900)", async () => {
+  const { issueGroups, groupsByIssue, folderSessions, smartAgents } = await load("src/model/sidebar.ts");
+  const agent = (id, state, createdAt, archivedAt) => ({ id, state, createdAt, lastActivityAt: createdAt, archivedAt, labels: [], title: id });
+  const node = (n) => ({ kind: "issue", ref: `github:o/r#${n}` });
+  const lead = agent("lead", "running", 1), lane = agent("lane", "finished", 2), merged = agent("merged", "archived", 3, 9);
+  const named = agent("named", "finished", 4), old = agent("old", "archived", 0, 5);
+  const query = {
+    label: null, issue: 40, text: "",
+    onIssue: { lead: node(40), lane: node(42), merged: node(41), old: node(41) },
+    issueHeadings: [{ node: node(40), title: "Epic" }, { node: node(41) }, { node: node(42), title: "Second" }],
+  };
+  assert.equal(groupsByIssue(query), true);
+  const groups = issueGroups([lead, lane, named, old, merged], query);
+  assert.deepEqual(groups.map((g) => g.title), ["#40 Epic", "#41", "#42 Second"]);
+  assert.deepEqual(groups.map((g) => g.sessions.map((a) => a.id)), [["named", "lead"], ["merged", "old"], ["lane"]],
+    "a session no host placed is under the epic; live before archived");
+  assert.deepEqual(smartAgents("working", [lead], query), [], "no group at the top takes one");
+  assert.deepEqual(folderSessions([lead], [], query).map((a) => a.id), ["lead"], "its folder lists it, working or not");
+  assert.equal(groupsByIssue({ ...query, issueHeadings: [{ node: node(40) }] }), false, "an issue with no sub-issues keeps one list");
 });

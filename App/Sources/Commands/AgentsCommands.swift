@@ -85,6 +85,7 @@ struct AgentsCommands: Commands {
     /// A Markdown page on screen in the key window (#1419), for View ▸ Zoom.
     @FocusedValue(\.pageZoom) private var pageZoom
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
     /// Whether the chat draws the agent's thoughts (#1725), turned on and off here (#2383).
     @AppStorage(ChatThoughts.showsKey, store: WindowDefaults.store) private var showsThoughts = ChatThoughts.showsAtFirst
 
@@ -196,11 +197,12 @@ struct AgentsCommands: Commands {
                 .keyboardShortcut("e", modifiers: [.command, .option])
             Button("Resources") { model.showResources() }
                 .keyboardShortcut("l", modifiers: [.command, .option])
-            // Your setup's pages (#3631, #3632).
+            // Status's page (#3998).
             Button("Runtimes") { model.showRuntimes() }
                 .keyboardShortcut("r", modifiers: [.command, .option])
-            Button("Connectors") { model.showsMCPServers = true }
-            Button("Secrets") { model.showsSecrets = true }
+            // The person's own, in Settings ▸ You (#3998).
+            Button("Connectors") { model.settingsPaneAsked = .connectors; openSettings() }
+            Button("Secrets") { model.settingsPaneAsked = .secrets; openSettings() }
                 .disabled(ControlConfig.endpoint == nil)
             // A list each, as the sidebar's Work group (#4004).
             Menu("Work") {

@@ -394,6 +394,7 @@ func (d *Daemon) dropRequest(r wire.RequestsDrop, by *wire.AuditActor) (wire.Req
 	if d.liveFormOf(r.ID) != nil {
 		d.answerElicitation(wire.AnswerElicitationRequest{RequestID: r.ID, Action: wire.AnswerElicitationRequestActionCancel})
 	}
+	d.secretUseEnded(r.ID)
 	after := d.request(r.ID)
 	return wire.RequestUpdate{Request: *after}, nil
 }
@@ -431,6 +432,12 @@ func (d *Daemon) registerRequests() {
 	On(d, wire.CallRequestsAnswer, func(ctx context.Context, c *Client, r wire.RequestsAnswer) (wire.RequestUpdate, error) {
 		if rec := d.request(r.ID); rec != nil && rec.Forge != nil && rec.State == wire.RequestStateOpen {
 			return d.answerForgeRequest(ctx, *rec, r.Answer, c.actor())
+		}
+		if rec := d.request(r.ID); rec != nil && rec.Detail.SecretUse != nil && rec.State == wire.RequestStateOpen {
+			if !askBeforeUseAllowed(c) {
+				return wire.RequestUpdate{}, &Error{Code: CodeNotPermitted, Message: "Only a person's own client approves the use of a secret."}
+			}
+			return d.answerSecretUse(*rec, r.Answer.SecretUse, c.actor())
 		}
 		return d.answerRequest(r, c.actor())
 	})

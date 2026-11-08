@@ -242,7 +242,7 @@ function allowanceAmount(state: AllowanceState, now: Date): string | null {
 }
 
 /**
- * One runtime on Your setup in short rows (#3744): its name, one line and its allowance bar, then each account in the same
+ * One runtime on Status ▸ Runtimes in short rows (#3744): its name, one line and its allowance bar, then each account in the same
  * way, then its machines in one line, each name a link to its page. Details opens the rest of the runtime's and its accounts'
  * allowance: the times, the pace, the past weeks and the notes.
  */
@@ -367,7 +367,7 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
           )}
           {page === "events" && pane.value === "events" && <EventsList store={store} hostName={hostName} />}
           {page === "events" && pane.value === "audit" && <AuditPane store={store} hostName={hostName} />}
-          {/* Your setup ▸ Runtimes (#3631, #3744): the runtimes installed somewhere first, each in a short row,
+          {/* Status ▸ Runtimes (#3631, #3744): the runtimes installed somewhere first, each in a short row,
               then the others under "Other runtimes", closed. Accounts and allowances are read on the runtime's home machine. */}
           {page === "runtimes" && (
             <section>

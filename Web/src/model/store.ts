@@ -17,13 +17,14 @@ import type {
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, DailySummarySettings, SummaryPage, SummaryPageText, DesktopControlSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
   PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, BudgetRequest, RemoveRequest, ClientPermissionSettings, PRCostComment,
-  Connection, MoveToMachineAnswer, ProblemReport, ProblemReportRequest, Request as PersonRequest, RequestUpdate } from "../protocol/generated";
+  Connection, LineageNode, LineageSessionIssue, MoveToMachineAnswer, ProblemReport, ProblemReportRequest, Request as PersonRequest, RequestUpdate } from "../protocol/generated";
 import { endedConnections, endedLine, hasEnded } from "./connectorSetup";
+import { parseQuery } from "./labels";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
 import { sealWork } from "../wire/sealing";
 import type { FolderGoneAsk } from "./missingFolder";
-import { describe, methodNotFound } from "./errors";
+import { describe, knowVersions, methodNotFound } from "./errors";
 import { freeProjectName } from "./projectSettings";
 import { fromWireDate } from "../protocol/dates";
 import { addCap, dropCap, openCaps } from "./teamGroups";
@@ -523,7 +524,7 @@ export class Work {
   dismissCap(reached: CapReached) {
     this.capped.value = dropCap(reached, this.capped.value);
   }
-  /** Counts each control/userSettingsChanged (#1760): Your setup ▸ Secrets loads again when it moves. */
+  /** Counts each control/userSettingsChanged (#1760): Settings ▸ You ▸ Secrets loads again when it moves. */
   readonly userScopeChanges = signal(0);
   /**
    * The organisation's policy in force (#998): from policy/mine when Settings ▸ Policy loads it, and from each
@@ -1146,6 +1147,15 @@ export class Work {
       this.downSince.value = since;
       this.gitAsksAnswered.value = new Set([...this.gitAsksAnswered.value].filter((id) => still.has(id)));
     });
+    this.knowVersions();
+  }
+
+  /** The versions a refusal's words compare (#4096); `mac` is the person's Mac, as a call's route says it. */
+  protected knowVersions(): void {
+    const machines = this.hosts.value.filter((h) => h.version).map((h): [string, string] => [h.id, h.version]);
+    const mac = this.hosts.value.find((h) => h.id === this.macHostID.value);
+    if (mac?.version) machines.push(["mac", mac.version]);
+    knowVersions(this.plane.value?.version, machines);
   }
 
   /** Git asks answered on this page, until the control plane's list drops them (#1122). */
@@ -1570,6 +1580,7 @@ export class Store extends Work {
     this.person.value = status.person ?? null;
     this.joinCommand.value = status.joinCommand || null;
     knowPublicViews(status.publicViews);
+    this.knowVersions();
   }
 
   /** Machines waiting to join (#994); a control plane before it has none to say. */
@@ -2039,7 +2050,10 @@ export class Store extends Work {
     this.searchNext.value = {};
     this.forgetSearched();
     this.saidLines.value = {};
+    this.issueSessions.value = {};
+    this.issueHeadings.value = [];
     if (!words) return;
+    const issue = parseQuery(words).issue;
     const request: ListRequest = {
       includeArchived: true, archivedCommands: false, archivedOnly: false, lean: true, limit: searchShown, query: words,
     };
@@ -2048,6 +2062,16 @@ export class Store extends Work {
       if (!this.hostIsOnline(host.id)) continue;
       await this.search(request, host.id, turn);
       if (turn !== this.searchTurn) return;
+      // The sessions on the issue, its sub-issues and their PRs (#3899). A host too old to say
+      // matches the #<n> label only.
+      if (issue !== null && this.has(host.id, Capability.lineageSessions1)) {
+        const on = await this.link.call("lineage/sessions", { number: issue }, host.id).catch(() => null);
+        if (Array.isArray(on?.matches) && turn === this.searchTurn) {
+          this.issueSessions.value = { ...this.issueSessions.value, ...Object.fromEntries(on.matches.map((m) => [m.agentID, m.on])) };
+          this.noteIssueHeadings(on.issues ?? []);
+        }
+        if (turn !== this.searchTurn) return;
+      }
       // What was said (#1585): the sessions whose prompts or replies hold the words. Not asked of a
       // host too old to say (#1748).
       if (!this.has(host.id, Capability.agentsSaid1)) continue;
@@ -2060,6 +2084,23 @@ export class Store extends Work {
 
   /** While the sidebar searches: the line each session said that matches, by its id (#1585). */
   readonly saidLines = signal<Record<string, string>>({});
+
+  /** While the sidebar searches for #<n>: the issue each session on it is on, by its id (lineage/sessions, #3899). */
+  readonly issueSessions = signal<Record<string, LineageNode>>({});
+
+  /** While the sidebar searches for #<n>: the issue, then its sub-issues in the epic's order, from each
+   *  host that said them, each once (#3900). More than one is an epic, whose sessions the sidebar groups. */
+  readonly issueHeadings = signal<LineageSessionIssue[]>([]);
+
+  private noteIssueHeadings(issues: readonly LineageSessionIssue[]): void {
+    const held = [...this.issueHeadings.value];
+    for (const issue of issues) {
+      const at = held.findIndex((h) => h.node.kind === issue.node.kind && h.node.ref === issue.node.ref);
+      if (at < 0) held.push(issue);
+      else if (held[at]!.title === undefined && issue.title !== undefined) held[at] = { ...held[at]!, title: issue.title };
+    }
+    this.issueHeadings.value = held;
+  }
 
   /** A lead's epic progress, "5/7", by host and session id (#3270), for its sidebar row. */
   readonly leadProgress = signal<Record<string, string>>({});
@@ -3432,6 +3473,12 @@ export class Store extends Work {
     const changed = await this.act("workflows/archive",
       { folder: summary.workflow.folder, workflowID: summary.workflow.workflowID, archived }, host);
     if (changed) this.placeWorkflow(changed, host);
+  }
+
+  /** An edited ready-made copy (#4075): the newer version over it, or the copy kept and the notice hidden. */
+  async answerReadyMade(host: string, summary: WorkflowSummary, take: boolean): Promise<void> {
+    await this.act(take ? "workflows/readyMade/take" : "workflows/readyMade/keep",
+      { folder: summary.workflow.folder, workflowID: summary.workflow.workflowID }, host);
   }
 
   /** Delete its workflow file and let workflow/removed update every open view (#605). */

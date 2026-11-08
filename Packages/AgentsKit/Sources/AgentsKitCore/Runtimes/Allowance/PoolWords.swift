@@ -73,7 +73,7 @@ public enum PoolWords {
     }
 
     /// How much is left, with no times: "28% left this week". Nil when the reading has no
-    /// amount. The short row on Your setup (#3744) says this after its state; the times are
+    /// amount. The short row on Status ▸ Runtimes (#3744) says this after its state; the times are
     /// under its Details.
     public static func amount(_ reading: AllowanceReading?, now: Date) -> String? {
         guard let reading, reading.isCurrent(now: now) else { return nil }
