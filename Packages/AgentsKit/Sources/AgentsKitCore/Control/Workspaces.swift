@@ -200,6 +200,11 @@ public extension DaemonAPI.Method {
     static let providersCreate = "providers/create"
     /// `MachineRequest` → `{}`: its workspace deleted, then the host removed (US5).
     static let hostsDeleteMachine = "machines/deleteMachine"
+    /// `MachineRequest` → `StartedMachinePreview`: Delete's question, the worktrees on it with
+    /// work not pushed (#3979).
+    static let hostsDeletePreview = "machines/deletePreview"
+    /// `ProviderRequest` → `{}`: Make Default, the provider New Machine uses (#3979).
+    static let providersMakeDefault = "providers/makeDefault"
 
     /// Every method the control plane's workspace part answers.
     static let workspaceMethods: Set<String> = [
@@ -208,6 +213,7 @@ public extension DaemonAPI.Method {
         hostsKeep, hostsListKept, hostsDropKept, hostsRetryKept,
         providersOptions, providersCreate, hostsDeleteMachine,
         providersDraftStart, providersDraftCancel, providersDraftAnswer, providersDraftSigned, providersRuntimes,
+        providersMakeDefault,
     ]
 }
 
@@ -296,6 +302,9 @@ public extension DaemonAPI {
         /// The caller may start machines from it (#1761). Nil from an older control plane,
         /// which lets everyone.
         public var mayUse: Bool?
+        /// New Machine makes the caller's machines on it (#3979): the one made on last or
+        /// chosen with Make Default, or else the first one added. Nil from an older control plane.
+        public var `default`: Bool?
         /// The CLI its machines are reached through over ssh (gh, coder) when the machine
         /// that runs the provider has none (#3367). Nil when it needs none or has it.
         public var sshToolMissing: String?
@@ -311,7 +320,8 @@ public extension DaemonAPI {
                     workspaces: [MachineInfo] = [], listedAt: Date? = nil, current: Bool = true,
                     problem: String? = nil, group: String? = nil, mayUse: Bool? = nil,
                     sshToolMissing: String? = nil, machine: MachineRef? = nil, machineName: String? = nil,
-                    machineOffline: Bool? = nil) {
+                    machineOffline: Bool? = nil, default isDefault: Bool? = nil) {
+            self.default = isDefault
             self.machine = machine
             self.machineName = machineName
             self.machineOffline = machineOffline

@@ -177,6 +177,11 @@ final class ControlSettingsModel {
         } catch {}
     }
 
+    /// Make Default (#3979): New Machine uses this provider, until a machine is made on another.
+    func makeDefault(_ provider: ProviderID) async {
+        await perform(DaemonAPI.Method.providersMakeDefault, DaemonAPI.ProviderRequest(id: provider))
+    }
+
     /// Ask every provider for its workspaces now (FR-004: when a page that shows them opens).
     func listMachinesAgain(_ provider: ProviderID? = nil) async {
         _ = try? await client.call(DaemonAPI.Method.providersRefresh, DaemonAPI.ProviderRequest(id: provider))

@@ -17,7 +17,7 @@ import type {
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, DailySummarySettings, SummaryPage, SummaryPageText, DesktopControlSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
   PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, BudgetRequest, RemoveRequest, ClientPermissionSettings, PRCostComment,
-  Connection, LineageNode, LineageSessionIssue, MoveToMachineAnswer, ProblemReport, ProblemReportRequest, Request as PersonRequest, RequestUpdate } from "../protocol/generated";
+  Connection, LineageNode, LineageSessionIssue, MoveToMachineAnswer, ProblemReport, ProblemReportRequest, Request as PersonRequest, RequestUpdate, ProviderID, StartedMachinePreview } from "../protocol/generated";
 import { endedConnections, endedLine, hasEnded } from "./connectorSetup";
 import { parseQuery } from "./labels";
 import { Failure } from "../protocol/generated";
@@ -1168,6 +1168,8 @@ export class Work {
   readonly hostsBeingStarted = signal<readonly string[]>([]);
   /** The machines New Machine is making (#3974), by name; "" while the control plane has not named it yet. */
   readonly machinesMaking = signal<readonly string[]>([]);
+  /** A New Machine the provider refused (#3979): its reason, with Try Again on the provider it asked. */
+  readonly makeFailed = signal<{ reason: string; provider: string | undefined } | null>(null);
 
   /** Prompts and starts the control plane keeps for a stopped workspace (#691 US3), every host's. */
   readonly kept = signal<readonly KeptRequest[]>([]);
@@ -2518,9 +2520,11 @@ export class Store extends Work {
     }
   }
 
-  /** New Machine (#3974): the default provider makes `machine-N` with its defaults, with no questions.
-   * Its row says Making until the machine joins; a make that fails says the provider's reason. */
-  async makeMachine(): Promise<void> {
+  /** New Machine (#3974): the default provider makes `machine-N` with the options used last on it, with no
+   * questions; New Machine on names another provider, which is then the default (#3979). Its row says Making
+   * until the machine joins; a make that fails says the provider's reason, with Try Again. */
+  async makeMachine(provider?: string): Promise<void> {
+    this.makeFailed.value = null;
     const making = "";
     this.machinesMaking.value = [...this.machinesMaking.value, making];
     const drop = (name: string) => {
@@ -2528,16 +2532,33 @@ export class Store extends Work {
       if (at >= 0) this.machinesMaking.value = this.machinesMaking.value.filter((_, i) => i !== at);
     };
     try {
-      const made = await this.link.call("providers/create", {});
+      const made = await this.link.call("providers/create", provider ? { id: provider as ProviderID } : {});
       drop(making);
-      if (made.workspace.state === "failed") { this.say(made.workspace.reason || `Could not make ${made.workspace.name}.`); return; }
+      if (made.workspace.state === "failed") {
+        this.makeFailed.value = { reason: made.workspace.reason || `Could not make ${made.workspace.name}.`, provider };
+        return;
+      }
       this.machinesMaking.value = [...this.machinesMaking.value, made.workspace.name];
       // A row is drawn for it until a machine of that name joins, or ten minutes at most.
       setTimeout(() => drop(made.workspace.name), 10 * 60_000);
     } catch (error) {
       drop(making);
+      this.makeFailed.value = { reason: describe(error), provider };
+    }
+  }
+
+  /** Check Again on a machine's row (#3979): the control plane asks it how it is now. */
+  async checkAgain(host: string): Promise<void> {
+    try {
+      await this.link.call("machines/checkAgain", { host: host as MachineRef });
+    } catch (error) {
       this.say(describe(error));
     }
+  }
+
+  /** Delete's question (#3979): the worktrees on the machine with work not pushed; null when it can't be asked. */
+  async deletePreview(host: string): Promise<StartedMachinePreview | null> {
+    return this.link.call("machines/deletePreview", { host: host as MachineRef }).catch(() => null);
   }
 
   /** Delete… on a machine a provider made (#3974): the provider deletes it, then the host goes as Remove does. */

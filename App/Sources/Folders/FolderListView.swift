@@ -1051,15 +1051,30 @@ private struct MachinesHeader: View {
             if hovering, ControlConfig.endpoint != nil {
                 Button { Task { await model.newMachine() } } label: { Image(systemName: "plus") }
                     .buttonStyle(.borderless)
-                    .help("New Machine: the default provider makes one, with its defaults")
+                    .help("New Machine: the default provider makes one, with the options used last")
                     .accessibilityLabel("New Machine")
             }
         }
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
+        .task { await model.loadMachineProviders() }
         .contextMenu {
             if ControlConfig.endpoint != nil {
-                Button("New Machine") { Task { await model.newMachine() } }
+                let providers = model.machineProviders
+                // With two or more providers, New Machine names the default, and New Machine
+                // on ▸ picks another, which is then the default (#3979).
+                if providers.count > 1 {
+                    let chosen = providers.first { $0.default == true } ?? providers[0]
+                    Button("New Machine (\(chosen.name))") { Task { await model.newMachine() } }
+                    Menu("New Machine on") {
+                        ForEach(providers) { provider in
+                            Toggle(provider.name, isOn: Binding(get: { provider.id == chosen.id },
+                                                                set: { _ in Task { await model.newMachine(on: provider.id) } }))
+                        }
+                    }
+                } else {
+                    Button("New Machine") { Task { await model.newMachine() } }
+                }
                 Divider()
                 Button("Register a Machine…") { requests.folderSheet = .addMachine }
                 Button("Machine Providers…") {

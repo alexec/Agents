@@ -199,9 +199,16 @@ struct MachineRow: View {
     let host: MachineRef
     let open: () -> Void
     @State private var deleting = false
+    /// What Delete loses: the worktrees on it with work not pushed (#3979), asked as it opens.
+    @State private var deleteWork: DaemonAPI.StartedMachinePreview?
+    @State private var askingWork = false
     @State private var removing = false
     /// Stop, asked first while agents work there, with who they are.
     @State private var stoppingNames: [String] = []
+    /// A sheet from its menu (#3979), as Settings ▸ Machines opens them.
+    @State private var sheet: MachineSheet?
+    /// The control plane's model, for the sheets that need it, made as one opens.
+    @State private var control: ControlSettingsModel?
 
     var body: some View {
         let name = model.hosts.label(host)
@@ -239,24 +246,41 @@ struct MachineRow: View {
         // A full swipe never deletes: Delete and Remove ask first.
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             if actions.delete {
-                Button("Delete", systemImage: "trash", role: .destructive) { deleting = true }
+                Button("Delete", systemImage: "trash", role: .destructive) { askDelete() }
             } else if actions.remove {
                 Button("Remove", systemImage: "minus.circle") { removing = true }.tint(.gray)
             }
         }
         .contextMenu {
             Button("Open", action: open)
-            if actions.start {
+            if let row, host != .mac {
+                // The items of Settings ▸ Machines' menu, moved here (#3979).
                 Divider()
-                Button("Start") { Task { await model.startHost(host) } }
-            } else if actions.stop {
+                if actions.start {
+                    Button("Start") { Task { await model.startHost(host) } }
+                } else if actions.stop {
+                    Button("Stop") { Task { await stop() } }
+                }
+                Button("Check Again") { Task { await model.checkAgain(host) } }
+                if row.state == "needsUpdate" {
+                    Button("Update…") { show(.update) }
+                }
                 Divider()
-                Button("Stop") { Task { await stop() } }
+                Button("Choose Folders…") { show(.folders) }.disabled(!row.answers)
+                if model.host(host, has: Capability.backups1) {
+                    Button("Backups…") { show(.backups) }.disabled(!row.answers)
+                }
+                if model.host(host, has: Capability.processes1) {
+                    Button("Processes…") { show(.processes) }.disabled(!row.answers)
+                }
+                if row.workspace == nil {
+                    Button("Link to Provider…") { show(.link) }
+                }
             }
             if actions.delete || actions.remove {
                 Divider()
                 if actions.delete {
-                    Button("Delete \(name)…", role: .destructive) { deleting = true }
+                    Button("Delete \(name)…", role: .destructive) { askDelete() }
                 } else {
                     Button("Remove \(name)…") { removing = true }
                 }
@@ -267,8 +291,12 @@ struct MachineRow: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             if let row {
-                Text(MachineRowActions.deleteMessage(row, sessions: model.work.agents.filter { $0.host == host }.count))
+                Text(MachineRowActions.deleteMessage(row, sessions: model.work.agents.filter { $0.host == host }.count,
+                                                     preview: deleteWork, asking: askingWork))
             }
+        }
+        .sheet(item: $sheet, onDismiss: { control?.stop(); control = nil }) { shown in
+            sheetView(shown).paperSheet()
         }
         .confirmationDialog("Remove \(name)?", isPresented: $removing, titleVisibility: .visible) {
             Button("Remove", role: .destructive) { Task { await model.removeMachine(host) } }
@@ -290,6 +318,56 @@ struct MachineRow: View {
     private func stop() async {
         if let names = await model.stopHost(host) { stoppingNames = names }
     }
+
+    /// Delete asks at once, and the machine is asked meanwhile which worktrees have work not pushed.
+    private func askDelete() {
+        deleteWork = nil
+        askingWork = true
+        deleting = true
+        Task {
+            deleteWork = await model.deletePreview(host)
+            askingWork = false
+        }
+    }
+
+    private func show(_ shown: MachineSheet) {
+        if shown.needsControl {
+            control = ControlConfig.endpoint.flatMap { ControlSettingsModel(endpoint: $0) }
+            guard control != nil else { return }
+        }
+        sheet = shown
+    }
+
+    @ViewBuilder
+    private func sheetView(_ shown: MachineSheet) -> some View {
+        if let row = model.hosts.controlRows[host] {
+            switch shown {
+            case .backups: HostBackupsSheet(host: row)
+            case .processes: MachineProcessesSheet(host: row)
+            case .folders:
+                if let control {
+                    ChooseFoldersSheet(host: host, hostName: row.name, paths: control.suggestedPaths)
+                        .task { await control.start() }
+                }
+            case .update:
+                if let control {
+                    ControlAddServerSheet(control: control, updating: row).task { await control.start() }
+                }
+            case .link:
+                if let control {
+                    LinkWorkspaceSheet(control: control, host: row).task { await control.start() }
+                }
+            }
+        }
+    }
+}
+
+/// A sheet a machine's row opens from its menu (#3979).
+enum MachineSheet: String, Identifiable {
+    case update, folders, backups, processes, link
+    var id: String { rawValue }
+    /// Opened with the control plane's model, as in Settings ▸ Machines.
+    var needsControl: Bool { self == .update || self == .folders || self == .link }
 }
 
 /// A machine's dot (#3973): green online, amber and turning while it changes, grey and hollow

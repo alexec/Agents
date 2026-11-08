@@ -24,7 +24,7 @@ import { DocPage, DocsList } from "./Docs";
 import { MachinePage } from "./MachinePage";
 import { machineNeed, machineNeedLine } from "./OfflineStrip";
 import { MachineRow, MakingRow } from "./MachineRow";
-import { makingRows } from "../model/machineRow";
+import { makingRows, newMachineItems } from "../model/machineRow";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { AddMachineDialog } from "./AddMachineDialog";
 import { addMachineWords } from "../model/addMachine";
@@ -155,8 +155,12 @@ export function SectionPage({ store, section, down }: { store: Store; section: E
   const registering = useSignal(false);
   // The Machines header (#3974): + makes a machine with no questions; its menu also registers one.
   const machinesHead = (group: string) => section === "machines" && group === "Machines";
+  // With two or more providers, New Machine names the default, and New Machine on ‹name› makes it on another (#3979).
+  useEffect(() => {
+    if (section === "machines" && store.providers.list.value === null) void store.providers.load();
+  }, [section]);
   const headItems = (): MenuItem[] => [
-    { label: "New Machine", run: () => void store.makeMachine() },
+    ...newMachineItems(store.providers.list.value ?? []).map((item) => ({ label: item.label, run: () => void store.makeMachine(item.provider) })),
     { label: addMachineWords.menuItem, run: () => { registering.value = true; } },
   ];
   return (

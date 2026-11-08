@@ -9454,6 +9454,9 @@ type ProviderSummary struct {
 	// The caller may start machines from it (#1761): they are in its group. Absent from an older control plane, which lets everyone.
 	MayUse *bool `json:"mayUse,omitzero"`
 
+	// New Machine makes the caller's machines on it (#3979): the one they made a machine on last or chose with Make Default, or else the first one added. True on one provider at most; absent from an older control plane.
+	Default *bool `json:"default,omitzero"`
+
 	// The machine that carries it: runs its server and keeps its secrets (#3398). Absent for one made before, which must be added again.
 	Machine *MachineRef `json:"machine,omitzero"`
 

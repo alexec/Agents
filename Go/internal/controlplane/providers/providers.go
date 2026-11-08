@@ -615,6 +615,15 @@ func (p *Providers) answer(method string, params json.RawMessage, caller Caller,
 			return nil, invalid("Those parameters are not a ProviderAdd.")
 		}
 		return p.save(request, method == MethodProvidersUpdate, caller)
+	case MethodProvidersMakeDefault:
+		var request providerRequest
+		if err := requireParams(params, &request, "ProviderRequest"); err != nil {
+			return nil, err
+		}
+		if deref(request.ID) == "" {
+			return nil, invalid("Which provider?")
+		}
+		return map[string]any{}, p.makeDefault(caller.Person, string(*request.ID))
 	case MethodProvidersRemove:
 		var request providerRequest
 		if err := requireParams(params, &request, "ProviderRequest"); err != nil {
@@ -1738,10 +1747,15 @@ func (p *Providers) create(request ProviderCreate, who string, caller *Caller) (
 	}
 	firstBoot := command + " " + shellQuoted(name)
 	began := time.Now()
+	// Options left out are the ones used last on this provider, or else its defaults (#3979).
 	options := valueOf(request.Options)
 	if options == nil {
-		options = p.defaultOptions(id)
+		if options = p.lastOptions(person, id); options == nil {
+			options = p.defaultOptions(id)
+		}
 	}
+	// Kept as given, before a repository is put in them.
+	used, _ := json.Marshal(options)
 	// A repository (#1809): the provider makes the workspace from it when its form asks for
 	// one (Codespaces), and otherwise the host clones it first once it joins.
 	var clones []string
@@ -1775,6 +1789,7 @@ func (p *Providers) create(request ProviderCreate, who string, caller *Caller) (
 		p.failed(id, name, person, errorWords(err))
 		return nil, err
 	}
+	p.madeOn(person, id, used)
 	p.Refresh(id)
 	p.mu.Lock()
 	var listedNow []MachineInfo
