@@ -1,6 +1,7 @@
 package lineage
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -39,7 +40,7 @@ func TestMultiplierOf(t *testing.T) {
 		{"nothing merged", 0, 0, 0, 0, 0},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			got := MultiplierOf(Merges(multiplierNodes(now, c.merged, c.reverted), since), now)
+			got := MultiplierOf(Merges(multiplierNodes(now, c.merged, c.reverted), since), now, BaselineOf(0, ""))
 			if got.PrsMerged != c.prs || got.Reverts != int64(c.reverted) {
 				t.Fatalf("prs %d reverts %d, want %d %d", got.PrsMerged, got.Reverts, c.prs, c.reverted)
 			}
@@ -57,6 +58,30 @@ func TestMultiplierOf(t *testing.T) {
 				t.Fatalf("baseline %+v", got.Baseline)
 			}
 		})
+	}
+}
+
+// The person's own baseline (#3991): one decimal, from 0.1 to 100, and their line; the
+// figure, the engineer-hours and the best week count against it.
+func TestBaselineOf(t *testing.T) {
+	for _, c := range []struct {
+		in, want float64
+	}{{0, 1.4}, {-3, 1.4}, {2.34, 2.3}, {0.01, 0.1}, {500, 100}, {math.Inf(1), 1.4}} {
+		if got := BaselineOf(c.in, "").PrsPerWeek; got != c.want {
+			t.Errorf("BaselineOf(%v) = %v, want %v", c.in, got, c.want)
+		}
+	}
+	if b := BaselineOf(0, ""); b.Line != nil || b.HoursPerWeek != 40 || b.Source != "DX 2025" {
+		t.Fatalf("default %+v", b)
+	}
+	b := BaselineOf(2, "My team merged 2 a week")
+	if b.Line == nil || *b.Line != "My team merged 2 a week" {
+		t.Fatalf("line %v", b.Line)
+	}
+	now := time.Date(2026, 11, 7, 12, 0, 0, 0, time.UTC)
+	got := MultiplierOf(Merges(multiplierNodes(now, 7, 0), MultiplierSince(now)), now, b)
+	if *got.Multiplier != 3.5 || *got.EngineerHours != 140 || got.Baseline != b {
+		t.Fatalf("got %v× %v h %+v", *got.Multiplier, *got.EngineerHours, got.Baseline)
 	}
 }
 
@@ -80,7 +105,7 @@ func TestMergesLeavesOut(t *testing.T) {
 		t.Fatalf("merges %v", got)
 	}
 	// A merge kept goes out of the range as time goes on.
-	if m := MultiplierOf(got, now.Add(7*24*time.Hour)); m.PrsMerged != 0 {
+	if m := MultiplierOf(got, now.Add(7*24*time.Hour), BaselineOf(0, "")); m.PrsMerged != 0 {
 		t.Fatalf("a week later %d", m.PrsMerged)
 	}
 }
@@ -92,6 +117,7 @@ func TestBestWeekOf(t *testing.T) {
 	if err != nil {
 		t.Skip("no zoneinfo:", err)
 	}
+	dx := BaselineOf(0, "")
 	// Saturday 7 November 2026, noon in London.
 	now := time.Date(2026, 11, 7, 12, 0, 0, 0, london)
 	n := 0
@@ -103,7 +129,7 @@ func TestBestWeekOf(t *testing.T) {
 	// This week: 2 merged.
 	add(time.Date(2026, 11, 2, 0, 30, 0, 0, london), false)
 	add(time.Date(2026, 11, 6, 9, 0, 0, 0, london), false)
-	if got := BestWeekOf(merges, now, london); got != nil {
+	if got := BestWeekOf(merges, now, london, dx); got != nil {
 		t.Fatalf("a best week before 7 days of lineage: %v", *got)
 	}
 	// Last week: 7 merged, one reverted, the last of them late on Sunday.
@@ -112,25 +138,25 @@ func TestBestWeekOf(t *testing.T) {
 	}
 	add(time.Date(2026, 11, 1, 23, 30, 0, 0, london), false)
 	add(time.Date(2026, 10, 28, 11, 0, 0, 0, london), true)
-	got := BestWeekOf(merges, now, london)
+	got := BestWeekOf(merges, now, london, dx)
 	if got == nil || *got != 4.3 {
 		t.Fatalf("best week %v, want 4.3 (6 PRs)", got)
 	}
 	// In New York, this week's Monday 00:30 merge in London is last week's Sunday evening.
 	ny, _ := time.LoadLocation("America/New_York")
-	if got := BestWeekOf(merges, now, ny); got == nil || *got != 5 {
+	if got := BestWeekOf(merges, now, ny, dx); got == nil || *got != 5 {
 		t.Fatalf("New York's best week %v, want 5.0 (7 PRs)", got)
 	}
 	// This week passes it: a new best.
 	for d := range 6 {
 		add(time.Date(2026, 11, 3, 10+d, 0, 0, 0, london), false)
 	}
-	if got := BestWeekOf(merges, now, london); got == nil || *got != 5.7 {
+	if got := BestWeekOf(merges, now, london, dx); got == nil || *got != 5.7 {
 		t.Fatalf("best week %v, want 5.7 (8 PRs)", got)
 	}
 	// Only reverts: no figure.
 	only := map[wire.LineageNode]Merge{{Kind: KindPR, Ref: "x"}: {At: wire.DateOf(now.Add(-10 * 24 * time.Hour)), Reverted: true}}
-	if got := BestWeekOf(only, now, london); got != nil {
+	if got := BestWeekOf(only, now, london, dx); got != nil {
 		t.Fatalf("a best week of reverts: %v", *got)
 	}
 }

@@ -361,6 +361,7 @@ func (d *Daemon) registerSettings() {
 			if burstChanged || cooldownChanged {
 				d.mirrorNoticeLimitsFrom(m)
 			}
+			d.baselineChanged(r)
 			if v, ok := r[agentsMayArchiveMyChatsKey]; ok {
 				var on bool
 				if json.Unmarshal(v, &on) == nil {

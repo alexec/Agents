@@ -81,4 +81,17 @@ func TestMultiplierCountsThePersonsMachines(t *testing.T) {
 	if b := count(beas.member.Host); b.PrsMerged != 2 {
 		t.Fatalf("Bea's: %+v", b)
 	}
+	// The person's own baseline, sent by the host (#3991): the 6 PRs over 2 a week.
+	out, err := p.s.methods.HostSaid(mac.member.Host, "multiplier/count", json.RawMessage(`{"prsPerWeek":2}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, _ := json.Marshal(out)
+	var own wire.Multiplier
+	if err := json.Unmarshal(data, &own); err != nil {
+		t.Fatal(err)
+	}
+	if own.Baseline.PrsPerWeek != 2 || *own.Multiplier != 3 || *own.EngineerHours != 120 {
+		t.Fatalf("against 2 a week: %+v", own)
+	}
 }

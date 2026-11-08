@@ -40,6 +40,13 @@ public enum DisplayPreference {
     /// presses from 10 to 60 minutes. The web keeps its number field, so a value set there
     /// may be none of these; the menu then shows it as well.
     public static let noticeCooldownPresets = [1, 5, 10, 15, 30, 60, 120, 240, 480, 1440]
+    /// The person's Multiplier baseline (#3991), from Settings ▸ Cost ▸ Multiplier: merged PRs
+    /// a week, and the line under the figures. Absent is the 2025 figure and its line; the
+    /// host counts with them and sends them on `multiplier/changed`.
+    public static let multiplierPRsPerWeek = "multiplierPRsPerWeek"
+    public static let multiplierPRsPerWeekDefault = 1.4
+    public static let multiplierPRsPerWeekRange = 0.1...100.0
+    public static let multiplierLine = "multiplierLine"
 
     /// The ones kept as a plain value in a client's defaults, and the kind of each.
     public enum Kind: Sendable { case bool, string, int }

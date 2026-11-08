@@ -40,6 +40,16 @@ struct MultiplierTests {
         #expect(schema.errors(written, against: "Multiplier").isEmpty)
     }
 
+    /// The line under the figures (#3991): the person's own, else the default with their figure.
+    @Test func theLineIsThePersonsOrTheDefault() throws {
+        let own = try JSONDecoder().decode(DaemonAPI.MultiplierBaseline.self, from: Data("""
+        {"prsPerWeek":2,"hoursPerWeek":40,"source":"DX 2025","line":"My team: 2 a week"}
+        """.utf8))
+        #expect(own.shownLine == "My team: 2 a week")
+        let none = DaemonAPI.MultiplierBaseline(prsPerWeek: 2, hoursPerWeek: 40, source: "DX 2025")
+        #expect(none.shownLine == "An average engineer merged 2 PRs a week (DX 2025)")
+    }
+
     @Test func aRefWithNoNumberIsItself() {
         #expect(DaemonAPI.LineageNode(kind: "pr", ref: "linear:ENG-4").shortName == "linear:ENG-4")
     }

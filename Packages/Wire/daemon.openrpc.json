@@ -5707,7 +5707,7 @@
     {
       "name": "multiplier/changed",
       "x-capability": "multiplier/1",
-      "description": "The Multiplier changed (#3903): a PR of the person's agents merged or a revert merged, with the PR in changedBy. The Mac window follows it; it does not poll.",
+      "description": "The Multiplier changed (#3903): a PR of the person's agents merged or a revert merged, with the PR in changedBy, or the person changed their baseline (#3991), with no changedBy. The Mac window follows it; it does not poll.",
       "x-notification": true,
       "paramStructure": "by-name",
       "params": [
