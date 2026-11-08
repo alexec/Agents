@@ -4,3 +4,9 @@
 # check reads this file from the base branch, and CODEOWNERS protects it.
 bots:
   alexec-agents[bot]: alexec
+# A repository of one person (#3860): Alex owns the bot and is the only one who approves.
+require-another-approver: false
+# A UI enhancement that adds a screen, control or layout (AGENTS.md, #3474) is labelled
+# needs-approval, then approved: the bot's PR fails the check until a person approves its
+# newest commit with a review.
+approval-labels: needs-approval, approved

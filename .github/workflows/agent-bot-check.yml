@@ -20,6 +20,9 @@
 #     alexec-agents[bot]: alexec
 #   # A repository of one person: the owner's approval is enough.
 #   require-another-approver: false
+#   # A bot's pull request with one of these labels waits for a person's approval of its
+#   # newest commit (#3860). Add `labeled` and `unlabeled` to the caller's pull_request types.
+#   approval-labels: needs-approval, approved
 #
 # It uses only the run's own GITHUB_TOKEN. The script is in this file, so a caller pins
 # one ref and needs no checkout; scripts/agent-bot-check-selftest.py tests it.
@@ -57,8 +60,9 @@ jobs:
 
           def parse_config(text):
               """The small part of YAML that agent-bots.yml uses: `bots:`, a map of bot to
-              owner, and `require-another-approver: true|false`."""
-              bots, require, section = {}, True, None
+              owner, `require-another-approver: true|false`, and `approval-labels:`, a list
+              of labels split by commas."""
+              bots, require, labels, section = {}, True, set(), None
               for raw in text.splitlines():
                   line = raw.split(" #", 1)[0].rstrip() if not raw.lstrip().startswith("#") else ""
                   if not line.strip():
@@ -71,18 +75,21 @@ jobs:
                           if value.lower() not in ("true", "false"):
                               raise ValueError(f"{CONFIG}: require-another-approver is {value!r}, not true or false")
                           require = value.lower() == "true"
+                      elif key == "approval-labels":
+                          labels = {label.strip() for label in value.split(",") if label.strip()}
                       elif key != "bots":
                           raise ValueError(f"{CONFIG}: unknown key {key!r}")
                   elif section == "bots" and key and value:
                       bots[key] = value
                   else:
                       raise ValueError(f"{CONFIG}: cannot read the line {raw.strip()!r}")
-              return bots, require
+              return bots, require, labels
 
 
-          def approvers(reviews):
-              """The people whose latest review approves. A bot's review never counts, and
-              a comment does not change an earlier approval."""
+          def approvers(reviews, head=None):
+              """The people whose latest review approves; with head, only an approval of
+              that commit. A bot's review never counts, and a comment does not change an
+              earlier approval."""
               latest = {}
               for review in reviews:
                   user = review.get("user") or {}
@@ -91,17 +98,18 @@ jobs:
                       continue
                   state = review.get("state")
                   if state in ("APPROVED", "CHANGES_REQUESTED", "DISMISSED"):
-                      latest[login] = state
-              return sorted(login for login, state in latest.items() if state == "APPROVED")
+                      latest[login] = (state, review.get("commit_id"))
+              return sorted(login for login, (state, commit) in latest.items()
+                            if state == "APPROVED" and (head is None or commit == head))
 
 
-          def check(api, repo, number, author, base):
+          def check(api, repo, number, author, base, labels=(), head=None):
               """Returns (passed, message). `api(path)` returns the decoded JSON, or None
-              for a 404."""
+              for a 404. labels are the pull request's, and head its newest commit."""
               content = api(f"repos/{repo}/contents/{CONFIG}?ref={urllib.parse.quote(base, safe='')}")
               if content is None:
                   return True, f"No {CONFIG} on {base}: no agent bots to check."
-              bots, require = parse_config(base64.b64decode(content["content"]).decode())
+              bots, require, approval_labels = parse_config(base64.b64decode(content["content"]).decode())
               owner = bots.get(author)
               if owner is None:
                   return True, f"{author} is not an agent bot in {CONFIG}."
@@ -114,9 +122,17 @@ jobs:
                       f"the install of {author.removesuffix('[bot]')}: Settings, GitHub Apps, "
                       f"Configure, Uninstall. Then remove {author} from {CONFIG}."
                   )
+              reviews = api(f"repos/{repo}/pulls/{number}/reviews?per_page=100", pages=True)
+              waiting = sorted(approval_labels & set(labels))
+              if waiting and not approvers(reviews, head):
+                  return False, (
+                      f"This pull request is labelled {', '.join(waiting)}, so it waits for a "
+                      f"person to approve its newest commit ({(head or '')[:7]}) with a review: "
+                      f"Files changed, Review changes, Approve."
+                  )
               if not require:
                   return True, f"{owner} has {permission} access; {CONFIG} lets the owner approve alone."
-              people = approvers(api(f"repos/{repo}/pulls/{number}/reviews?per_page=100", pages=True))
+              people = approvers(reviews)
               if people and set(people) == {owner}:
                   return False, (
                       f"{owner} is the only approver of a pull request that their bot {author} "
@@ -156,7 +172,9 @@ jobs:
                   event = json.load(file)
               pull = event["pull_request"]
               passed, message = check(github_api, event["repository"]["full_name"], pull["number"],
-                                      pull["user"]["login"], pull["base"]["ref"])
+                                      pull["user"]["login"], pull["base"]["ref"],
+                                      [label["name"] for label in pull.get("labels") or []],
+                                      pull["head"]["sha"])
               print(message if passed else f"::error title=Agent bot check::{message}")
               return 0 if passed else 1
 

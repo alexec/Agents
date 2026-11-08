@@ -3,8 +3,11 @@
 name: agent-bots
 
 on:
+  # labeled and unlabeled: a bot's PR with an approval label waits for a person (#3860).
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   pull_request_review:
+    types: [submitted, dismissed]
 
 permissions:
   contents: read
