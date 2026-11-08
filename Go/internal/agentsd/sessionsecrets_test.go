@@ -45,7 +45,7 @@ func TestASecretForThisSessionOnly(t *testing.T) {
 	}
 	const value = "hunter2-3548-not-real"
 	c.call(t, 2, "elicitations/answer", map[string]any{"requestID": pending[0].ID, "action": "accept",
-		"content": map[string]any{"value": value, "sessionOnly": true}})
+		"content": map[string]any{"value": value, "sessionOnly": true, "needsApproval": false}})
 	text := <-answered
 	if !strings.HasPrefix(text, "SHOP_PASSWORD is kept for this session only") || strings.Contains(text, value) {
 		t.Fatal(text)

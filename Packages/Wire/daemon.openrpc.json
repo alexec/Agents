@@ -37,6 +37,11 @@
       "description": "The host serves browser/state and browser/clear (#3535): Settings ▸ Browser, the sites the machine's browser keeps cookies for, Clear, and the size of the Chromium download."
     },
     {
+      "name": "host.secret-approval/1",
+      "by": "host",
+      "description": "The host keeps a secret with Ask before use sealed to this machine's key (#4014), never in secrets.env or a session's file as plain text: an agent's ask_secret, generate_secret and mcp/set-secret turn it on, and secrets/setNeedsApproval lets a person's client turn it on or off."
+    },
+    {
       "name": "host.session-secrets/1",
       "by": "host",
       "description": "The host keeps secrets for one session only (#3548): an ask_secret answer with sessionOnly, and secrets/sessionList, secrets/sessionSet and secrets/sessionRemove for Settings ▸ Secrets. Only that session's agent can use one, and the host deletes it when the session is archived."
@@ -8119,6 +8124,27 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/SessionSecrets"
+        }
+      }
+    },
+    {
+      "name": "secrets/setNeedsApproval",
+      "x-capability": "host.secret-approval/1",
+      "description": "Turn Ask before use on or off for one secret (#4014). The person's own clients only (the control and device roles); an agent has no way to change it.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SecretNeedsApprovalRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
         }
       }
     },

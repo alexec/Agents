@@ -8,7 +8,6 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/alexec/agents/Go/internal/agentsd/skillcatalog"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -144,10 +143,7 @@ func (d *Daemon) fillSecretValue(agent wire.UUID, args map[string]json.RawMessag
 	if home == "" {
 		return fill, "Nothing was filled: this machine has no personal home to keep secrets in."
 	}
-	v, ok, expired := d.sessionSecret(agent, name)
-	if !ok {
-		v, ok = skillcatalog.LoadSecrets(skillcatalog.SecretsPath(home)).Value(name)
-	}
+	v, ok, expired := d.localSecret(agent, name)
 	if expired && (!ok || v == "") {
 		return fill, name + " was for this session only and has expired. Ask the person for it again with ask_secret if you still need it."
 	}

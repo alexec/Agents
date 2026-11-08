@@ -6363,6 +6363,9 @@ type MCPSetSecretRequest struct {
 	Name string `json:"name"`
 
 	Value string `json:"value"`
+
+	// Ask before use (#4014): kept sealed on this machine, never in secrets.env, and a person approves each use (#4015). Left out is off. From the agent role it is always on.
+	NeedsApproval *bool `json:"needsApproval,omitzero"`
 }
 
 type MCPSignInAnswer struct {
@@ -10820,6 +10823,9 @@ type SealedUserSecret struct {
 	Version int64 `json:"version"`
 
 	Sealed SealedEnvelope `json:"sealed"`
+
+	// Ask before use (#4014), as the person's client sealed it: the associated data ends |ask when it is on, so a flag the control plane changed does not open. Left out is off.
+	NeedsApproval *bool `json:"needsApproval,omitzero"`
 }
 
 // sealing/add (#3397).
@@ -10878,6 +10884,15 @@ type SecretLeftOn struct {
 	Name string `json:"name"`
 
 	At string `json:"at"`
+}
+
+// secrets/setNeedsApproval (#4014): a person turns Ask before use on or off for a secret of this machine's secrets.env, or for one session's (agentID). On takes the value out of the plain file and seals it to this machine; off puts it back. A Your setup secret's flag is its client's to seal, so it is refused here.
+type SecretNeedsApprovalRequest struct {
+	Name string `json:"name"`
+
+	AgentID *UUID `json:"agentID,omitzero"`
+
+	NeedsApproval bool `json:"needsApproval"`
 }
 
 // control/secretsLeft (#1760, FR-026): to the person's own clients, when one of their machines was removed with secrets on it.
@@ -11163,6 +11178,9 @@ type SessionSecret struct {
 	Name string `json:"name"`
 
 	SetAt Date `json:"setAt"`
+
+	// Ask before use (#4014): its value is sealed in the session's file, never there as plain text, and a person approves each use (#4015).
+	NeedsApproval *bool `json:"needsApproval,omitzero"`
 }
 
 // secrets/sessionRemove (#3548): take one session's secret out now.
@@ -11179,6 +11197,9 @@ type SessionSecretSetRequest struct {
 	Name string `json:"name"`
 
 	Value string `json:"value"`
+
+	// Ask before use (#4014): kept sealed, and a person approves each use (#4015). Left out is off.
+	NeedsApproval *bool `json:"needsApproval,omitzero"`
 }
 
 // secrets/sessionList (#3548): every secret this machine keeps for one session only, by session title then name. No value.
@@ -12990,6 +13011,9 @@ type UserSecretRow struct {
 
 	// The person's machines that have no copy yet: they wait for one of the person's clients to seal it (#3397).
 	Waiting []MachineRef `json:"waiting,omitzero"`
+
+	// Ask before use (#4014), as the person's client last sealed it. The machines check it: the associated data binds it.
+	NeedsApproval *bool `json:"needsApproval,omitzero"`
 }
 
 // user/setSecret (#1760, FR-025, #3397): a secret as the person's client sealed it to each recipient of user/secretRecipients, info com.alexecollins.agents.usersecret.v1, associated data usersecret.v1|<person id>|<recipient>|<name>|<version>. version is above the kept one: the kept one plus one, or for a name the client has none of, the time in milliseconds, above a removed one's. The control plane never has the value.
@@ -13002,6 +13026,9 @@ type UserSecretSet struct {
 
 	// By recipient.
 	Values map[string]SealedEnvelope `json:"values"`
+
+	// Ask before use (#4014): when on, every envelope's associated data ends |ask (usersecret.v1|<person id>|<recipient>|<name>|<version>|ask), so the control plane cannot change it. Left out is off, and the associated data is as before.
+	NeedsApproval *bool `json:"needsApproval,omitzero"`
 }
 
 // user/settings (#1760, #2410): the person's settings that follow them to each of their machines. An omitted part has no value yet, but does not make that setting machine-local. The control plane does not read inside a part.
