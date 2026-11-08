@@ -175,7 +175,7 @@ struct ContentView: View {
                                                  set: { model.selection = $0 }))
                 .paperGround()
         } else {
-            HeroPage().paperGround()
+            MultiplierPage().paperGround()
         }
     }
 

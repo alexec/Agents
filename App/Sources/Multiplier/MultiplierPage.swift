@@ -2,13 +2,14 @@ import AgentsKitCore
 import SwiftUI
 
 /// The detail with nothing picked (#3904, in place of #145's page): the Multiplier, the
-/// work of how many engineers the agents did in the last 7 days, and three big numbers
-/// under it. A show-off page: nothing else, and the key hints in one small line.
+/// work of how many engineers the agents did in the last 7 days, the crowd of them over it
+/// (#3985), and three big numbers under it. A show-off page: nothing else, and the key
+/// hints in one small line.
 ///
 /// The numbers count to each new value (about 1 s), from the last values this window
 /// showed when it opens. When a PR merges or a revert does, a line says so and fades.
 /// Under Reduce Motion they change with no count and no line.
-struct HeroPage: View {
+struct MultiplierPage: View {
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// What the page showed last, so the next open counts from there (the first, from 0).
@@ -16,8 +17,8 @@ struct HeroPage: View {
     @AppStorage("hero.prsMerged", store: WindowDefaults.store) private var lastPRs = 0.0
     @AppStorage("hero.engineerHours", store: WindowDefaults.store) private var lastHours = 0.0
     @AppStorage("hero.agentsWorking", store: WindowDefaults.store) private var lastAgents = 0.0
-    @State private var shown = HeroFigures()
-    @State private var news: HeroNews?
+    @State private var shown = MultiplierFigures()
+    @State private var news: MultiplierNews?
 
     private var multiplier: DaemonAPI.Multiplier? { model.work.multiplier }
 
@@ -27,14 +28,17 @@ struct HeroPage: View {
         model.agents.count { $0.state == .starting || $0.state == .running }
     }
 
-    private var target: HeroFigures {
-        HeroFigures(multiplier: multiplier?.multiplier ?? 0, prsMerged: Double(multiplier?.prsMerged ?? 0),
+    private var target: MultiplierFigures {
+        MultiplierFigures(multiplier: multiplier?.multiplier ?? 0, prsMerged: Double(multiplier?.prsMerged ?? 0),
                     engineerHours: multiplier?.engineerHours ?? 0, agentsWorking: Double(agentsWorking))
     }
 
     var body: some View {
         VStack(spacing: 0) {
             Spacer()
+            Crowd(multiplier: multiplier?.multiplier == nil ? nil : shown.multiplier)
+                .frame(maxWidth: 820)
+                .padding(.bottom, 12)
             if multiplier?.multiplier == nil {
                 empty
             } else {
@@ -46,7 +50,7 @@ struct HeroPage: View {
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
-            shown = HeroFigures(multiplier: lastMultiplier, prsMerged: lastPRs,
+            shown = MultiplierFigures(multiplier: lastMultiplier, prsMerged: lastPRs,
                                 engineerHours: lastHours, agentsWorking: lastAgents)
             Task { @MainActor in show(target) }
         }
@@ -127,7 +131,7 @@ struct HeroPage: View {
     }
 
     /// Count to figures, or jump there under Reduce Motion, and keep them for the next open.
-    private func show(_ figures: HeroFigures) {
+    private func show(_ figures: MultiplierFigures) {
         withAnimation(reduceMotion ? nil : .easeOut(duration: 1)) { shown = figures }
         lastMultiplier = figures.multiplier
         lastPRs = figures.prsMerged
@@ -143,7 +147,7 @@ struct HeroPage: View {
         let sign = change < 0 ? "−" : "+"
         let words = "\(sign)\(abs(change).formatted(.number.precision(.fractionLength(1))))×  "
             + "\(pr.shortName) \(reverted ? "reverted" : "merged")"
-        let next = HeroNews(words: words, up: !reverted)
+        let next = MultiplierNews(words: words, up: !reverted)
         withAnimation(.easeOut(duration: 0.4)) { news = next }
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(2.4))
@@ -152,8 +156,8 @@ struct HeroPage: View {
     }
 }
 
-/// The numbers the hero page shows, as doubles so they can count.
-struct HeroFigures: Equatable {
+/// The numbers the Multiplier page shows, as doubles so they can count.
+struct MultiplierFigures: Equatable {
     var multiplier = 0.0
     var prsMerged = 0.0
     var engineerHours = 0.0
@@ -161,7 +165,7 @@ struct HeroFigures: Equatable {
 }
 
 /// The line under the numbers about the PR that changed them.
-private struct HeroNews: Identifiable {
+private struct MultiplierNews: Identifiable {
     let id = UUID()
     let words: String
     let up: Bool
