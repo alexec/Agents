@@ -461,6 +461,7 @@ type issueJSON struct {
 		Name string `json:"name"`
 	} `json:"component"`
 	Milestone *struct {
+		ID   int    `json:"id"`
 		Name string `json:"name"`
 	} `json:"milestone"`
 	CreatedOn string `json:"created_on"`

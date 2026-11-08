@@ -21,6 +21,7 @@ type fakeForgeBitbucket struct {
 	searches []string
 	items    []string
 	wrote    []string
+	asked    []string
 }
 
 func (f *fakeForgeBitbucket) note(to *[]string, s string) {
