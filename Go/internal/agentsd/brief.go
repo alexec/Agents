@@ -301,7 +301,8 @@ func toolsBrief(browser, screen, bot, github bool) string {
 		lines = append(lines,
 			"- browser_navigate, browser_snapshot, browser_click and the other browser_* tools: use a web "+
 				"page in this machine's browser. They take the browser lease themselves.",
-			"- fill_secret: type one of my secrets into a field on the page. Never type a secret with browser_type.")
+			"- fill_secret: type one of my secrets into a field on the page. Never type a secret with browser_type.",
+			"- generate_secret: make a new account's password, save it as one of my secrets and type it into the field. Never make a password yourself.")
 		if !bot {
 			lines = append(lines, "- "+handToPersonName+": give me one step on the page that only I can do, such as a CAPTCHA or a sign-in.")
 		}
