@@ -649,8 +649,12 @@ func (b *Book) Work(ctx context.Context, user, client string, recipients []wire.
 		}
 		if len(missing) > 0 {
 			u := user
-			items = append(items, wire.SealingItem{Item: wire.SealingItemKindUserSecret, ID: r.Name, User: &u, Version: r.Version,
-				Mine: map[string]wire.SealedEnvelope{"value": mine}, Missing: missing})
+			item := wire.SealingItem{Item: wire.SealingItemKindUserSecret, ID: r.Name, User: &u, Version: r.Version,
+				Mine: map[string]wire.SealedEnvelope{"value": mine}, Missing: missing}
+			if r.NeedsApproval {
+				item.NeedsApproval = new(true)
+			}
+			items = append(items, item)
 		}
 	}
 	return items, lacks, nil

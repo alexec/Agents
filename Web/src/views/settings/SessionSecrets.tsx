@@ -1,6 +1,6 @@
 // Your setup ▸ Secrets ▸ For One Session (#3548, #3632): a machine's secrets for one session only, each
-// with the session it belongs to and a Remove, and Add for a Session…. Listed in ./sections.ts, after the
-// person's secrets. As the window's SessionSecretsSection.
+// with the session it belongs to, an Ask before use checkbox (#4016) and a Remove, and Add for a Session….
+// Listed in ./sections.ts, after the person's secrets. As the window's SessionSecretsSection.
 import { signal, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { SessionSecret, SessionSecrets, UUID } from "../../protocol/generated";
@@ -8,6 +8,9 @@ import type { Store } from "../../model/store";
 import { describe } from "../../model/errors";
 import { isSecretName } from "../../model/userScope";
 import { removeQuestion, sessionSecretWords, sessionsForSecrets } from "../../model/sessionSecrets";
+import { askBeforeUseHint, askBeforeUseWords } from "../../model/askBeforeUse";
+import { Capability } from "../../protocol/capabilities.generated";
+import { AskBeforeUseCheck } from "../AskBeforeUse";
 import { Modal } from "../Modal";
 import { useSettingsMachine } from "./SettingsMachine";
 
@@ -26,6 +29,17 @@ export function SessionSecretsSection({ store, down }: { store: Store; down: boo
   }, [store, host]);
   const list = host ? lists.value[host] : undefined;
   if (list === null) return null;
+  // A host from before Ask before use (#4014) has no such flag.
+  const offersAsk = !!host && store.has(host, Capability.hostSecretApproval1);
+  const setAsk = async (secret: SessionSecret, on: boolean) => {
+    if (!host) return;
+    try {
+      await store.link.call("secrets/setNeedsApproval", { name: secret.name, agentID: secret.agentID, needsApproval: on }, host);
+      lists.value = { ...lists.value, [host]: await store.link.call("secrets/sessionList", {}, host) };
+    } catch (error) {
+      store.say(describe(error));
+    }
+  };
   const remove = async (secret: SessionSecret) => {
     if (!host || !window.confirm(`${removeQuestion(secret)} ${sessionSecretWords.removeMessage}`)) return;
     try {
@@ -43,6 +57,14 @@ export function SessionSecretsSection({ store, down }: { store: Store; down: boo
       {list?.secrets.map((s) => (
         <div class="setting" key={`${s.agentID}/${s.name}`}>
           <span><code>{s.name}</code> <span class="faint small">{s.title}</span></span>
+          {offersAsk && (
+            <label title={askBeforeUseHint(s.needsApproval === true)}>
+              <input type="checkbox" checked={s.needsApproval === true} disabled={down}
+                aria-label={`${askBeforeUseWords.toggle}: ${s.name} for ${s.title}`}
+                onChange={(e) => void setAsk(s, (e.currentTarget as HTMLInputElement).checked)} />
+              {" "}{askBeforeUseWords.toggle}
+            </label>
+          )}
           <button type="button" aria-label={`Remove ${s.name} from ${s.title}`} disabled={down}
             onClick={() => void remove(s)}>Remove…</button>
         </div>
@@ -55,7 +77,7 @@ export function SessionSecretsSection({ store, down }: { store: Store; down: boo
       )}
       <p class="hint">{sessionSecretWords.footer}</p>
       {adding.value && host && (
-        <SessionSecretSheet store={store} host={host} close={() => (adding.value = false)}
+        <SessionSecretSheet store={store} host={host} offersAsk={offersAsk} close={() => (adding.value = false)}
           saved={(after) => { lists.value = { ...lists.value, [host]: after }; }} />
       )}
     </section>
@@ -63,13 +85,15 @@ export function SessionSecretsSection({ store, down }: { store: Store; down: boo
 }
 
 /** Add for a Session…: which session, a name and a value. The value is never shown again. */
-function SessionSecretSheet({ store, host, close, saved }: {
-  store: Store; host: string; close: () => void; saved: (after: SessionSecrets) => void;
+function SessionSecretSheet({ store, host, offersAsk, close, saved }: {
+  store: Store; host: string; offersAsk: boolean; close: () => void; saved: (after: SessionSecrets) => void;
 }) {
   const sessions = sessionsForSecrets(store.agents.value[host] ?? []);
   const session = useSignal<UUID | null>(sessions[0]?.id ?? null);
   const name = useSignal("");
   const value = useSignal("");
+  // A person's secret starts off (#4016).
+  const ask = useSignal(false);
   const problem = useSignal<string | null>(null);
   const busy = useSignal(false);
   const chosen = name.value.trim();
@@ -77,7 +101,8 @@ function SessionSecretSheet({ store, host, close, saved }: {
     if (!session.value) return;
     busy.value = true;
     try {
-      saved(await store.link.call("secrets/sessionSet", { agentID: session.value, name: chosen, value: value.value }, host));
+      saved(await store.link.call("secrets/sessionSet", { agentID: session.value, name: chosen, value: value.value,
+        ...(offersAsk && ask.value ? { needsApproval: true } : {}) }, host));
       value.value = "";
       close();
     } catch (error) {
@@ -101,6 +126,7 @@ function SessionSecretSheet({ store, host, close, saved }: {
           value={name.value} onInput={(e) => (name.value = (e.currentTarget as HTMLInputElement).value.toUpperCase())} />
         <input type="password" aria-label="Value" placeholder="Value" autocomplete="off" value={value.value}
           onInput={(e) => (value.value = (e.currentTarget as HTMLInputElement).value)} />
+        {offersAsk && <AskBeforeUseCheck on={ask} />}
         <p class={problem.value ? "sheet-note failure" : "sheet-note"} role={problem.value ? "alert" : undefined}>
           {problem.value ?? sessionSecretWords.footer}
         </p>

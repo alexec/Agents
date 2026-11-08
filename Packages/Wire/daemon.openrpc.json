@@ -8190,6 +8190,11 @@
     {
       "name": "secrets/setNeedsApproval",
       "x-capability": "host.secret-approval/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "description": "Turn Ask before use on or off for one secret (#4014). The person's own clients only (the control and device roles); an agent has no way to change it.",
       "paramStructure": "by-name",
       "params": [

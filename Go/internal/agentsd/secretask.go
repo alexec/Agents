@@ -47,8 +47,9 @@ func (d *Daemon) askSecret(id wire.UUID, args map[string]json.RawMessage) (strin
 		return "", err
 	}
 	path := skillcatalog.SecretsPath(home)
-	sessionOnly := true
-	secret := wire.ElicitationSecret{Name: name, IsSet: skillcatalog.LoadSecrets(path).IsSet(name) || isSealedSecret(home, name), CanBeSessionOnly: &sessionOnly}
+	sessionOnly, ask := true, true
+	secret := wire.ElicitationSecret{Name: name, IsSet: skillcatalog.LoadSecrets(path).IsSet(name) || isSealedSecret(home, name),
+		CanBeSessionOnly: &sessionOnly, CanAskBeforeUse: &ask}
 	if u := strings.TrimSpace(argString(args, "url")); strings.HasPrefix(u, "https://") || strings.HasPrefix(u, "http://") {
 		secret.URL = &u
 	}

@@ -4,6 +4,8 @@ import SwiftUI
 /// Your setup ▸ Secrets (#1760, #3632): the person’s secrets, by name only, kept by the control
 /// plane and sent to each machine of theirs. The window draws it; the web page
 /// draws the same in `Web/src/views/UserScope.tsx`. A card (#3531) is a secret of its own kind.
+/// Ask before use (#4016) is sealed with the value, so it is set on Add and Replace, which seal it
+/// again: no client can read a value back to seal it with a new flag.
 /// `extra` is what a client draws after them: the window's secrets for one session (#3548).
 struct SecretsPane<Extra: View>: View {
     /// The control plane, or nil while it cannot be reached.
@@ -47,24 +49,28 @@ struct SecretsPane<Extra: View>: View {
         .task(id: control != nil) { await state.load(control) }
         .refreshable { await state.load(control) }
         .sheet(isPresented: $isAdding) {
-            SecretSheet(name: nil) { name, value in await state.setSecret(name, value: value, on: control) }
-                .paperSheet()
+            SecretSheet(name: nil, asks: false) { name, value, ask in
+                await state.setSecret(name, value: value, askBeforeUse: ask, on: control)
+            }
+            .paperSheet()
         }
         .sheet(isPresented: $isAddingCard) {
-            CardSheet(name: nil) { name, value in
-                await state.setSecret(name, value: value, kind: CardSecret.kind, on: control)
+            CardSheet(name: nil, asks: false) { name, value, ask in
+                await state.setSecret(name, value: value, kind: CardSecret.kind, askBeforeUse: ask, on: control)
             }
             .paperSheet()
         }
         .sheet(item: $replacing) { row in
             if row.isCard {
-                CardSheet(name: row.name) { name, value in
-                    await state.setSecret(name, value: value, kind: CardSecret.kind, replacing: row, on: control)
+                CardSheet(name: row.name, asks: row.asksBeforeUse) { name, value, ask in
+                    await state.setSecret(name, value: value, kind: CardSecret.kind, replacing: row, askBeforeUse: ask, on: control)
                 }
                 .paperSheet()
             } else {
-                SecretSheet(name: row.name) { name, value in await state.setSecret(name, value: value, replacing: row, on: control) }
-                    .paperSheet()
+                SecretSheet(name: row.name, asks: row.asksBeforeUse) { name, value, ask in
+                    await state.setSecret(name, value: value, replacing: row, askBeforeUse: ask, on: control)
+                }
+                .paperSheet()
             }
         }
         .confirmationDialog(removing.map { "Remove \($0.name)?" } ?? "",
@@ -100,6 +106,10 @@ struct SecretsPane<Extra: View>: View {
                         .accessibilityLabel("\(row.name) actions")
                     }
                     Text(UserScopeWords.machines(row)).appText(.fine).foregroundStyle(.secondary)
+                    if row.asksBeforeUse {
+                        Label(AskBeforeUseWords.asks, systemImage: "hand.raised")
+                            .appText(.fine).foregroundStyle(.secondary)
+                    }
                     if let waiting = UserScopeWords.waiting(row) {
                         Text(waiting).appText(.fine).tinted(.attention)
                             .fixedSize(horizontal: false, vertical: true)
@@ -131,13 +141,22 @@ extension SecretsPane where Extra == EmptyView {
 private struct SecretSheet: View {
     /// The secret replaced, or nil for a new one.
     let name: String?
-    let save: (String, String) async -> String?
+    /// Save, with the name, the value and Ask before use.
+    let save: (String, String, Bool) async -> String?
 
     @Environment(\.dismiss) private var dismiss
     @State private var typedName = ""
     @State private var value = ""
+    @State private var askBeforeUse: Bool
     @State private var problem: String?
     @State private var saving = false
+
+    /// `asks`: Ask before use as the toggle starts: the replaced secret's, off for a new one.
+    init(name: String?, asks: Bool, save: @escaping (String, String, Bool) async -> String?) {
+        self.name = name
+        self.save = save
+        _askBeforeUse = State(initialValue: asks)
+    }
 
     private var chosen: String { name ?? typedName.trimmingCharacters(in: .whitespaces) }
 
@@ -152,6 +171,7 @@ private struct SecretSheet: View {
                         #endif
                 }
                 SecureField("Value", text: $value)
+                AskBeforeUseToggle(isOn: $askBeforeUse)
             } header: {
                 Text(name.map { "Replace \($0)" } ?? "Add a Secret")
             } footer: {
@@ -164,7 +184,7 @@ private struct SecretSheet: View {
                 Button(name == nil ? "Add" : "Replace") {
                     Task {
                         saving = true
-                        problem = await save(chosen, value)
+                        problem = await save(chosen, value, askBeforeUse)
                         saving = false
                         if problem == nil { dismiss() }
                     }
@@ -185,7 +205,8 @@ private struct SecretSheet: View {
 private struct CardSheet: View {
     /// The card replaced, or nil for a new one.
     let name: String?
-    let save: (String, String) async -> String?
+    /// Save, with the name, the card's parts as one value and Ask before use.
+    let save: (String, String, Bool) async -> String?
 
     @Environment(\.dismiss) private var dismiss
     @State private var typedName = ""
@@ -195,8 +216,16 @@ private struct CardSheet: View {
     @State private var holder = ""
     @State private var zip = ""
     @State private var locked = false
+    @State private var askBeforeUse: Bool
     @State private var problem: String?
     @State private var saving = false
+
+    /// `asks`: Ask before use as the toggle starts: the replaced card's, off for a new one.
+    init(name: String?, asks: Bool, save: @escaping (String, String, Bool) async -> String?) {
+        self.name = name
+        self.save = save
+        _askBeforeUse = State(initialValue: asks)
+    }
 
     private var chosen: String { name ?? typedName.trimmingCharacters(in: .whitespaces) }
     private var card: CardSecret { CardSecret(number: number, expiry: expiry, cvc: cvc, name: holder, zip: zip) }
@@ -225,6 +254,7 @@ private struct CardSheet: View {
                     .autocorrectionDisabled()
                 TextField("Billing ZIP", text: $zip, prompt: Text("ZIP or postal code"))
                     .autocorrectionDisabled()
+                AskBeforeUseToggle(isOn: $askBeforeUse)
             } header: {
                 Text(name.map { "Replace \($0)" } ?? "Add a Card")
             } footer: {
@@ -241,7 +271,7 @@ private struct CardSheet: View {
                     }
                     Task {
                         saving = true
-                        problem = await save(chosen, card.value)
+                        problem = await save(chosen, card.value, askBeforeUse)
                         saving = false
                         if problem == nil { dismiss() }
                     }

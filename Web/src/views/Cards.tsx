@@ -27,6 +27,7 @@ import { handOffAnswer } from "../model/handOff";
 import { setPane } from "./files/paneState";
 import { replace, route } from "../route";
 import { keepingForSession, sessionOnlyField, sessionSecretWords } from "../model/sessionSecrets";
+import { askBeforeUseHint, askBeforeUseWords, needsApprovalField } from "../model/askBeforeUse";
 
 type Held = (
   | { kind: "permission"; request: PermissionRequest }
@@ -379,8 +380,12 @@ function ElicitationCard({ request, asker, hold, answer, active, openBrowser }: 
     const reason = "form" in request.mode ? request.mode.form._0.properties[0]?.title : undefined;
     body = <SecretField secret={request.secret} reason={reason} recipient={hold.recipient} inert={inert}
       save={button("save", "prominent")} decline={decline}
-      send={(typed, sessionOnly) => (typed === null ? go("decline", "decline")
-        : go("save", "accept", sessionOnly ? { [secretField]: typed, [sessionOnlyField]: true } : { [secretField]: typed }))} />;
+      send={(typed, sessionOnly, ask) => (typed === null ? go("decline", "decline")
+        : go("save", "accept", {
+          [secretField]: typed,
+          ...(sessionOnly ? { [sessionOnlyField]: true } : {}),
+          ...(ask === null ? {} : { [needsApprovalField]: ask }),
+        }))} />;
   } else if ("url" in request.mode) {
     const url = request.mode.url._0;
     body = (
@@ -522,17 +527,20 @@ function HandOffField({ handOff, inert, open, done, cannot, send }: {
 /**
  * An agent's ask_secret (#2885): its name, why, where to get it, and a masked field. What is
  * typed goes to the host, which saves it to the person's secrets.env, or keeps it for this
- * session only (#3548); the chat, the agent and every other client get the name only. As the
- * window's and the Remote's SecretAskCard.
+ * session only (#3548); the chat, the agent and every other client get the name only. Ask before
+ * use (#4016) is on unless the person turns it off. As the window's and the Remote's SecretAskCard.
  */
 function SecretField({ secret, reason, recipient, inert, save, decline, send }: {
   secret: ElicitationSecret; reason: string | undefined; recipient: string; inert: boolean;
   save: AnswerButton; decline: AnswerButton;
-  send: (typed: string | null, sessionOnly: boolean) => void;
+  send: (typed: string | null, sessionOnly: boolean, askBeforeUse: boolean | null) => void;
 }) {
   const text = useSignal("");
   const sessionOnly = useSignal(false);
+  const askBeforeUse = useSignal(true);
   const forSession = sessionOnly.value && secret.canBeSessionOnly === true;
+  // A host with no such flag is sent none.
+  const ask = secret.canAskBeforeUse === true ? askBeforeUse.value : null;
   const typed = text.value.trim();
   const link = getIt(secret.url);
   return (
@@ -547,7 +555,7 @@ function SecretField({ secret, reason, recipient, inert, save, decline, send }: 
           onKeyDown={(e) => {
             if (e.key === "Enter" && typed) {
               e.preventDefault();
-              send(typed, forSession);
+              send(typed, forSession, ask);
             }
           }} />
         <span class="quiet small">{forSession ? keepingForSession(recipient) : keeping(secret, recipient)}</span>
@@ -559,11 +567,21 @@ function SecretField({ secret, reason, recipient, inert, save, decline, send }: 
           {" "}{sessionSecretWords.toggle}
         </label>
       )}
+      {secret.canAskBeforeUse && (
+        <div class="field">
+          <label>
+            <input type="checkbox" checked={askBeforeUse.value} disabled={inert}
+              onChange={(e) => (askBeforeUse.value = (e.currentTarget as HTMLInputElement).checked)} />
+            {" "}{askBeforeUseWords.toggle}
+          </label>
+          <span class="quiet small">{askBeforeUseHint(askBeforeUse.value)}</span>
+        </div>
+      )}
       <div class="form-row">
         <span class="spacer" />
-        <button class={decline.class} aria-disabled={decline.disabled} onClick={() => send(null, false)}>No thanks{decline.telling}</button>
+        <button class={decline.class} aria-disabled={decline.disabled} onClick={() => send(null, false, null)}>No thanks{decline.telling}</button>
         <button class={save.class} disabled={!typed} aria-disabled={save.disabled} data-default=""
-          onClick={() => send(typed, forSession)}>Save securely{save.telling}</button>
+          onClick={() => send(typed, forSession, ask)}>Save securely{save.telling}</button>
       </div>
     </>
   );

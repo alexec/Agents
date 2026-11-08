@@ -65,8 +65,10 @@ final class UserScopeState {
     /// Seals the value here to each of the person's machines and apps (#3397), and sends only
     /// the envelopes: the control plane never has it. `kind` is `card` for a card (#3531).
     /// `replacing` is the row replaced, for its version.
+    /// `askBeforeUse` (#4016) is sealed into every copy's associated data, so the control plane
+    /// cannot change it.
     func setSecret(_ name: String, value: String, kind: String? = nil, replacing: DaemonAPI.UserSecretRow? = nil,
-                   on control: DaemonClient?) async -> String? {
+                   askBeforeUse: Bool = false, on control: DaemonClient?) async -> String? {
         guard let control else { return "The control plane can’t be reached." }
         do {
             let to = try await control.call(DaemonAPI.Method.userSecretRecipients, DaemonAPI.Empty(),
@@ -74,8 +76,11 @@ final class UserScopeState {
             let version = UserScopeWords.nextVersion(replacing ?? secrets?.secrets.first { $0.name == name }, now: Date())
             // Only to the machines the lock names (#3491, D8): the control plane cannot add a key of its own.
             let recipients = if let lock { await lock.signed(to.recipients, on: control) } else { to.recipients }
-            let values = try ClientSealing.sealSecret(user: to.user ?? "", name: name, version: version, value: value, to: recipients)
-            _ = try await control.call(DaemonAPI.Method.userSetSecret, DaemonAPI.UserSecretSet(name: name, version: version, values: values, kind: kind))
+            let values = try ClientSealing.sealSecret(user: to.user ?? "", name: name, version: version, value: value,
+                                                      ask: askBeforeUse, to: recipients)
+            _ = try await control.call(DaemonAPI.Method.userSetSecret,
+                                       DaemonAPI.UserSecretSet(name: name, version: version, values: values, kind: kind,
+                                                               needsApproval: askBeforeUse ? true : nil))
             await load(control)
             return nil
         } catch {

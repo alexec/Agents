@@ -73,6 +73,24 @@ test("a person's secret sealed here opens with the person and the version in it"
   assert.equal(await s.fingerprint("sk-ant-org-0123456789abcdef"), "01ce2783");
 });
 
+test("Ask before use is sealed into a person's secret, and sealing/work keeps it (#4016)", async () => {
+  assert.equal(text(s.userSecretAD("sam", "m:box", "SHOP_PASSWORD", 1, true)), "usersecret.v1|sam|m:box|SHOP_PASSWORD|1|ask");
+  const phone = await pageKey("eeee-5555");
+  const later = await pageKey("ffff-6666");
+  const values = await s.sealSecret("sam", "SHOP_PASSWORD", 2, "hunter2", [phone.recipient], true);
+  const item = { item: "userSecret", id: "SHOP_PASSWORD", user: "sam", version: 2, needsApproval: true,
+    mine: { value: values[phone.recipient.id] }, missing: [later.recipient] };
+  assert.deepEqual(await s.openItem(phone.record, item), { value: "hunter2" });
+  // A control plane that took the flag off does not get it sealed again.
+  const { needsApproval: _, ...cleared } = item;
+  await assert.rejects(s.openItem(phone.record, cleared));
+  assert.deepEqual(await s.sealWork(phone.record, { items: [cleared] }), []);
+  const [add] = await s.sealWork(phone.record, { items: [item] });
+  const copy = { ...item, mine: { value: add.values[later.recipient.id].value } };
+  assert.deepEqual(await s.openItem(later.record, copy), { value: "hunter2" });
+  await assert.rejects(s.openItem(later.record, { ...copy, needsApproval: undefined }));
+});
+
 test("a new route's id is the control plane's, and a save seals again only when the key goes elsewhere", async () => {
   assert.equal(o.routeIDFrom("Acme Bedrock"), "acme-bedrock");
   assert.equal(o.routeIDFrom("  Ünïcode -- Gateway!! "), "n-code-gateway");

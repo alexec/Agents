@@ -40,7 +40,7 @@ func TestASecretForThisSessionOnly(t *testing.T) {
 		json.Unmarshal(c.call(t, 1, "elicitations/pending", nil), &pending)
 		return len(pending) == 1
 	})
-	if s := pending[0].Secret; s == nil || s.CanBeSessionOnly == nil || !*s.CanBeSessionOnly {
+	if s := pending[0].Secret; s == nil || s.CanBeSessionOnly == nil || !*s.CanBeSessionOnly || s.CanAskBeforeUse == nil || !*s.CanAskBeforeUse {
 		t.Fatalf("%+v", pending[0].Secret)
 	}
 	const value = "hunter2-3548-not-real"

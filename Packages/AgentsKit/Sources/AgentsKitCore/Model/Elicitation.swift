@@ -49,15 +49,20 @@ public struct ElicitationRequest: Codable, Hashable, Sendable, Identifiable {
         public var isSet: Bool
         /// The host can keep it for this session only (#3548). False from an older host.
         public var canBeSessionOnly: Bool
+        /// The host keeps it with Ask before use unless the answer says `needsApproval` false
+        /// (#4014, #4016). False from an older host, which has no such flag.
+        public var canAskBeforeUse: Bool
 
-        public init(name: String, url: String? = nil, isSet: Bool = false, canBeSessionOnly: Bool = false) {
+        public init(name: String, url: String? = nil, isSet: Bool = false, canBeSessionOnly: Bool = false,
+                    canAskBeforeUse: Bool = false) {
             self.name = name
             self.url = url
             self.isSet = isSet
             self.canBeSessionOnly = canBeSessionOnly
+            self.canAskBeforeUse = canAskBeforeUse
         }
 
-        private enum CodingKeys: String, CodingKey { case name, url, isSet, canBeSessionOnly }
+        private enum CodingKeys: String, CodingKey { case name, url, isSet, canBeSessionOnly, canAskBeforeUse }
 
         public init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -65,6 +70,7 @@ public struct ElicitationRequest: Codable, Hashable, Sendable, Identifiable {
             url = try c.decodeIfPresent(String.self, forKey: .url)
             isSet = try c.decode(Bool.self, forKey: .isSet)
             canBeSessionOnly = try c.decodeIfPresent(Bool.self, forKey: .canBeSessionOnly) ?? false
+            canAskBeforeUse = try c.decodeIfPresent(Bool.self, forKey: .canAskBeforeUse) ?? false
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -73,6 +79,7 @@ public struct ElicitationRequest: Codable, Hashable, Sendable, Identifiable {
             try c.encodeIfPresent(url, forKey: .url)
             try c.encode(isSet, forKey: .isSet)
             if canBeSessionOnly { try c.encode(true, forKey: .canBeSessionOnly) }
+            if canAskBeforeUse { try c.encode(true, forKey: .canAskBeforeUse) }
         }
     }
 
@@ -136,11 +143,15 @@ public struct ElicitationRequest: Codable, Hashable, Sendable, Identifiable {
     public static let secretField = "value"
     /// The answer's choice to keep the secret for this session only (#3548), beside the field.
     public static let sessionOnlyField = "sessionOnly"
+    /// The answer's Ask before use (#4014, #4016): the host takes it as on when it is left out.
+    public static let needsApprovalField = "needsApproval"
 
-    /// A secret card's answer: the value, and the choice to keep it for this session only.
-    public static func secretAnswer(_ typed: String, sessionOnly: Bool) -> [String: JSONValue] {
+    /// A secret card's answer: the value, the choice to keep it for this session only, and Ask
+    /// before use (nil, for a host that has no such flag, sends none).
+    public static func secretAnswer(_ typed: String, sessionOnly: Bool, askBeforeUse: Bool? = nil) -> [String: JSONValue] {
         var content: [String: JSONValue] = [secretField: .string(typed)]
         if sessionOnly { content[sessionOnlyField] = .bool(true) }
+        if let askBeforeUse { content[needsApprovalField] = .bool(askBeforeUse) }
         return content
     }
 

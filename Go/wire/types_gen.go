@@ -3935,6 +3935,9 @@ type ElicitationSecret struct {
 
 	// The host can keep it for this session only (#3548): an answer whose content has sessionOnly true is kept for the asking session and deleted when it is archived, not saved to secrets.env. Left out by an older host.
 	CanBeSessionOnly *bool `json:"canBeSessionOnly,omitzero"`
+
+	// The host keeps it with Ask before use (#4014, #4016): on unless the answer's content has needsApproval false, which the card's toggle sends. Left out by an older host, which has no such flag.
+	CanAskBeforeUse *bool `json:"canAskBeforeUse,omitzero"`
 }
 
 type Empty struct {
@@ -10905,6 +10908,9 @@ type SealingItem struct {
 	Vendor *OrgRouteVendor `json:"vendor,omitzero"`
 
 	Settings *OrgRouteSettings `json:"settings,omitzero"`
+
+	// Ask before use (#4014), for a person's secret: the associated data of every copy ends |ask, so the client opens its own copy and seals the missing ones with it (#4016). Left out is off.
+	NeedsApproval *bool `json:"needsApproval,omitzero"`
 
 	Mine map[string]SealedEnvelope `json:"mine"`
 
