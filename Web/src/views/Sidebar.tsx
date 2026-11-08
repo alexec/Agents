@@ -423,12 +423,12 @@ function inOpenSmartRow(store: Store, host: string, agent: Agent): boolean {
   return (["needsYou", "forReview", "working", "unread"] as const).some((row) => folds.isSmartOpen(row) && smartAgents(row, [agent], undefined, pins, on).length > 0);
 }
 
-/** A search narrows workflows by name and what they are; one asking for a label leaves them out. */
+/** A search narrows workflows by name and what they are; one asking for a label or an issue leaves them out. */
 function workflowMatches(store: Store, host: string, query: LabelQuery | undefined): (w: WorkflowSummary) => boolean {
   if (!query) return () => true;
   const runtimeName = (id: string) => (store.runtimes.value[host] ?? []).find((s) => s.runtime.id === id)?.runtime.name;
   const text = query.text.toLowerCase();
-  return (w) => query.label === null && (!text
+  return (w) => query.label === null && query.issue === null && (!text
     || [w.workflow.name, workflowSummary(w.workflow, runtimeName)].some((t) => t.toLowerCase().includes(text)));
 }
 
@@ -490,7 +490,7 @@ function SmartFold({ row, store, folders, places, query, linkDown, downSince }: 
   downSince?: number | undefined;
 }) {
   const r = route.value;
-  const parsed = query ? { ...parseQuery(query), said: store.saidLines.value } : undefined;
+  const parsed = query ? { ...parseQuery(query), said: store.saidLines.value, onIssue: store.issueSessions.value } : undefined;
   // Pinned workflows of folded folders are listed too, held while Pinned is drawn (#432).
   const flowPinned = row !== "pinned" ? [] : folders.filter(({ host, folder }) =>
     store.hostIsOnline(host.id) && store.workflowPinsIn(host.id, folder.folder.folder).length > 0);
@@ -697,7 +697,7 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
 
   const view = store.folderView(host.id, folder);
   // The matcher is made once per fold, not per row.
-  const parsed = searching ? { ...parseQuery(query), said: store.saidLines.value } : undefined;
+  const parsed = searching ? { ...parseQuery(query), said: store.saidLines.value, onIssue: store.issueSessions.value } : undefined;
   const live = view.headings.flatMap((h) => h.agents).filter((a) => isAlone || keptByState(a, stateFilter.value));
   // Those a group at the top lists are there alone (#495, #587), out of the folder's list. A
   // group turned off (#846) lists nothing, so its sessions are here unless the next group has them.

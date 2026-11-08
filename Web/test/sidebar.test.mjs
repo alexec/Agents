@@ -85,7 +85,7 @@ test("smart groups gather by what a session wants, newest started first (#495)",
   assert.deepEqual(smartAgents("needsYou", live).map((a) => a.id), ["asked"]);
   assert.deepEqual(smartAgents("working", live).map((a) => a.id), ["new-work", "old-work"], "by start, not activity");
   assert.deepEqual(smartAgents("unread", live).map((a) => a.id), ["unread"]);
-  assert.deepEqual(smartAgents("working", live, { label: null, text: "old" }).map((a) => a.id), ["old-work"], "a search narrows it");
+  assert.deepEqual(smartAgents("working", live, { label: null, issue: null, text: "old" }).map((a) => a.id), ["old-work"], "a search narrows it");
   assert.deepEqual(live.map(sessionMark), ["needsYou", "working", "working", "done", "done"], "one ring, read or not (#1323)");
   assert.equal(sessionMark(agent("paused", 1, { state: "stopped", endedReason: "cancelled" })), "paused", "in the accent (#630)");
   assert.equal(sessionMark(agent("queued", 1, { state: "queued" })), "queued", "its own mark (#630)");
@@ -416,12 +416,12 @@ test("an Activity page is a page of Machines or Reports (#2141), and an unknown 
   globalThis.addEventListener = () => {};
   try {
     const { parseRoute, routeHash } = await load("src/route.ts");
-    assert.equal(routeHash({ nav: "reports", section: "events", host: "mac", folder: "file:///w/a" }), "#/reports/events");
+    assert.equal(routeHash({ nav: "status", section: "events", host: "mac", folder: "file:///w/a" }), "#/status/events");
     assert.deepEqual(parseRoute("#/a/spending"), { nav: "reports", section: "usage" });
     assert.deepEqual(parseRoute("#/a/time"), { nav: "reports", section: "usage" });
     assert.deepEqual(parseRoute("#/a/achievements"), { nav: "reports", section: "multiplier" }, "the Multiplier page took its place (#3990)");
     assert.deepEqual(parseRoute("#/reports/achievements"), { nav: "reports", section: "multiplier" });
-    assert.deepEqual(parseRoute("#/a/mcp"), { nav: "setup", section: "mcp" }, "Connectors has a page of its own (#589)");
+    assert.deepEqual(parseRoute("#/a/mcp"), { nav: "settings", section: "mcp" }, "Connectors has a page of its own (#589), in Settings ▸ You (#3998)");
     assert.deepEqual(parseRoute("#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/m/1"), { host: "mac", folder: "file:///w/a", mcp: true },
       "a folder's Connectors has a page of its own (#753)");
     assert.equal(routeHash({ host: "mac", folder: "file:///w/a", mcp: true }), "#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/m/1");

@@ -657,10 +657,10 @@ final class RemoteModel {
                 openWorkflow = nil
                 openReview = nil
                 openArchive = true
-            case .multiplier, .spending, .tokens, .time, .mcpServers, .secrets, .accounts,
+            case .multiplier, .spending, .tokens, .time,
                  .folderMCPServers, .docs, .machine:
-                // Usage, connectors, secrets, accounts, Docs and a machine's page are Mac + web
-                // (#2798, #3321, #3626, #3632, #3967), and the Multiplier page the Mac's (#3986):
+                // Usage, a folder's connectors, Docs and a machine's page are Mac + web
+                // (#2798, #3321, #3626), and the Multiplier page the Mac's (#3986):
                 // the Remote opens none of them.
                 break
             }
@@ -1691,7 +1691,7 @@ final class RemoteModel {
     }
 
     private func sentence(for error: any Error) -> String {
-        (error as? JSONRPCError)?.message ?? "Your Mac did not answer."
+        (error as? JSONRPCError).map(OlderPeer.controlRefusal) ?? "Your Mac did not answer."
     }
 
     /// A refusal in the Remote's words.
@@ -2563,6 +2563,7 @@ final class RemoteModel {
         gitAsksAnswered.formIntersection(GitLendAsk.waiting(in: listed))
         controlHome = status.homeHost
         controlStatus = status
+        OlderPeer.controlVersion = status.version
         let others = listed.filter { $0.id != status.homeHost && $0.answers }
         for host in others {
             let lock = lock
@@ -3566,11 +3567,22 @@ final class RemoteModel {
             work.forget(earlier.filter { unseen.contains($0) })
         }
         work.saidLines = [:]
+        work.issueSessions = [:]
         guard !words.isEmpty else { return }
         let request = DaemonAPI.ListRequest(archivedCommands: false, limit: Self.searchShown, lean: true, query: words)
         let hosts: [MachineRef] = [.mac] + reachableHosts.sorted { $0.rawValue < $1.rawValue }
+        let issue = SessionLabelQuery.issue(in: words)
         for host in hosts {
             await search(request, on: host)
+            // The sessions on the issue, its sub-issues and their PRs (#3899), from each host's
+            // Lineage, as the window asks. A host too old to say matches the #<n> label only.
+            if let issue, self.host(host, has: Capability.lineageSessions1), let target = hostClient(host),
+               let on = try? await target.call(DaemonAPI.Method.lineageSessions,
+                                               DaemonAPI.LineageSessionsRequest(number: issue),
+                                               returning: DaemonAPI.LineageSessions.self),
+               !Task.isCancelled {
+                for match in on.matches { work.issueSessions[match.agentID] = match.on }
+            }
             // What was said (#1585): the sessions whose prompts or replies hold the words. Not
             // asked of a host too old to say (#1748).
             if self.host(host, has: Capability.agentsSaid1), let target = hostClient(host),

@@ -120,6 +120,9 @@ public final class AgentsModel {
     /// While the sidebar searches: the sessions whose prompts or replies hold the words, and
     /// the line, as their hosts found them (`agents/said`, #1585). Empty otherwise.
     public var saidLines: [UUID: String] = [:]
+    /// While the sidebar searches for `#<n>`: the sessions on that issue, its sub-issues and their
+    /// PRs, and the issue each is on, as their hosts found them (`lineage/sessions`, #3899).
+    public var issueSessions: [UUID: DaemonAPI.LineageNode] = [:]
 
     /// Whether the transcript entry at `index` is in hand: in the page of entries, or in one
     /// of the stored turns before it. Find goes to a match once it is (#1532).

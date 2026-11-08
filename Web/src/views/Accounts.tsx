@@ -1,6 +1,6 @@
-// Your setup ▸ Accounts (#3967), as the window's (App/Sources/Accounts): the person's outside accounts, the
+// Settings ▸ You ▸ Accounts (#3967), as the window's (App/Sources/Accounts): the person's outside accounts, the
 // accounts part of their settings, which go to every machine of theirs as their secrets do. A record holds no
-// secret, only the name of one in Your setup ▸ Secrets.
+// secret, only the name of one in Settings ▸ You ▸ Secrets.
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";

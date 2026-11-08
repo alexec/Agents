@@ -1,4 +1,4 @@
-// Your setup ▸ Secrets (#1760, #3632), as the window's (Shared/UI/UserScope): the person's secrets
+// Settings ▸ You ▸ Secrets (#1760, #3632), as the window's (Shared/UI/UserScope): the person's secrets
 // and cards, by name only, which go to every machine of theirs.
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";

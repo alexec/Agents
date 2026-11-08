@@ -4,7 +4,7 @@ import Foundation
 /// #2265). `Web/src/model/runtimes.ts` says the same on the web page.
 public enum AccountWords {
     /// Where an added account is signed in: the Mac's Runtimes page (#2255).
-    public static let signInOnTheMac = "Sign it in on the Mac, in Your setup."
+    public static let signInOnTheMac = "Sign it in on the Mac, in Status."
 
     /// What Remove does, under its question: how many sessions it stops, and that it cannot be
     /// undone (#2264). `place` is where the sign-in is, such as "this Mac" or "the Mac".

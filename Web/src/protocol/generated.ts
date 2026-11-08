@@ -5057,6 +5057,33 @@ export interface LineageResolved {
   labels?: string[];
 }
 
+/**
+ * A session on the issue, and the issue it is on: the one asked for, or one of its sub-issues. A
+ * session on a PR is on the issue the PR fixes.
+ */
+export interface LineageSessionMatch {
+  agentID: UUID;
+  on: LineageNode;
+}
+
+/**
+ * The sessions on this machine that lineage links to the issue, to its sub-issues or to their PRs,
+ * each once. limited says there were more sub-issues or sessions than are counted.
+ */
+export interface LineageSessions {
+  matches: LineageSessionMatch[];
+  limited?: boolean;
+}
+
+/**
+ * lineage/sessions (#3899): a session search for #<number> asks for the sessions on that issue, on
+ * the issues part-of it (its sub-issues, at most 100) and on the PRs that fix them. The issue is
+ * #<number> in the forge repo of each of this machine's folders.
+ */
+export interface LineageSessionsRequest {
+  number: number;
+}
+
 export interface ListCursor {
   lastActivityAt: WireDate;
   id: UUID;
@@ -6929,9 +6956,9 @@ export interface OrgRoutesMine {
 }
 
 /**
- * Your setup ▸ Accounts (#3967): one outside account of the person's (gitlab.com, AWS, Slack…). It
- * holds no secret: card and secret are the names of secrets in Your setup ▸ Secrets, or where one
- * is.
+ * Settings ▸ You ▸ Accounts (#3967): one outside account of the person's (gitlab.com, AWS, Slack…).
+ * It holds no secret: card and secret are the names of secrets in Settings ▸ You ▸ Secrets, or
+ * where one is.
  */
 export interface OutsideAccount {
   /** The service, as its address: gitlab.com, aws.amazon.com. */
@@ -6942,9 +6969,9 @@ export interface OutsideAccount {
   plan?: string;
   /** What it costs a month, in US dollars. Absent when not known. */
   monthlyCostUsd?: number;
-  /** The card it bills, by its name in Your setup ▸ Secrets. Never the number. */
+  /** The card it bills, by its name in Settings ▸ You ▸ Secrets. Never the number. */
   card?: string;
-  /** Its token or key, by its name in Your setup ▸ Secrets or where it is. Never the value. */
+  /** Its token or key, by its name in Settings ▸ You ▸ Secrets or where it is. Never the value. */
   secret?: string;
   /** TOTP, passkey, SMS, or absent for none. */
   twoFactor?: string;
@@ -9633,8 +9660,8 @@ export interface SecretLeftOn {
 /**
  * secrets/setNeedsApproval (#4014): a person turns Ask before use on or off for a secret of this
  * machine's secrets.env, or for one session's (agentID). On takes the value out of the plain file
- * and seals it to this machine; off puts it back. A Your setup secret's flag is its client's to
- * seal, so it is refused here.
+ * and seals it to this machine; off puts it back. The flag of a secret of the person's (Settings ▸
+ * You ▸ Secrets) is its client's to seal, so it is refused here.
  */
 export interface SecretNeedsApprovalRequest {
   name: string;
@@ -12244,6 +12271,7 @@ export interface Methods {
   "groups/setRole": { params: GroupRoleSet; result: Group };
   "lineage/cost": { params: LineageNodeRequest; result: LineageCostRollup };
   "lineage/estimate": { params: LineageEstimateRequest; result: LineageEstimate };
+  "lineage/sessions": { params: LineageSessionsRequest; result: LineageSessions };
   "lineage/walk": { params: LineageNodeRequest; result: LineageGraph };
   "links/approve": { params: ChannelLinkDecide; result: Empty };
   "links/deny": { params: ChannelLinkDecide; result: Empty };
@@ -12635,6 +12663,7 @@ export const MethodTarget = {
   "groups/setRole": "control",
   "lineage/cost": "host",
   "lineage/estimate": "host",
+  "lineage/sessions": "host",
   "lineage/walk": "host",
   "links/approve": "control",
   "links/deny": "control",
@@ -13343,6 +13372,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineageNode: { required: ["kind", "ref"], optional: [] },
   LineageNodeRequest: { required: ["node"], optional: ["depth"] },
   LineageResolved: { required: ["title"], optional: ["state", "labels"] },
+  LineageSessionMatch: { required: ["agentID", "on"], optional: [] },
+  LineageSessions: { required: ["matches"], optional: ["limited"] },
+  LineageSessionsRequest: { required: ["number"], optional: [] },
   ListCursor: { required: ["lastActivityAt", "id"], optional: ["archivedAt"] },
   ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID", "after", "query", "project"] },
   ListedSkill: { required: ["name", "folder"], optional: ["description", "managed"] },
