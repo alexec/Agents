@@ -1471,6 +1471,11 @@ type BrowserInputRequest struct {
 	Modifiers *int64 `json:"modifiers,omitzero"`
 }
 
+// browser/input's answer. editing is said after a mouseReleased only: whether the click left the page's focus in a field that takes text (an input, a textarea, a contenteditable), so a touch client opens or closes its keyboard. Left out for other input, and by a host before it was added.
+type BrowserInputResult struct {
+	Editing *bool `json:"editing,omitzero"`
+}
+
 type BrowserNavigateAction string
 
 const BrowserNavigateActionGo BrowserNavigateAction = "go"

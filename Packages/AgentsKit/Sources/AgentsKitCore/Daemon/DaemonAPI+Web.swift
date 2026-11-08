@@ -297,7 +297,7 @@ public extension DaemonAPI {
                 Row(Method.browserWatch, params: BrowserWatchRequest.self, result: BrowserPageState.self, kind: .hostRequest),
                 Row(Method.browserUnwatch, params: Empty.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.browserAck, params: BrowserAckRequest.self, result: Empty.self, kind: .hostRequest),
-                Row(Method.browserInput, params: BrowserInputRequest.self, result: Empty.self, kind: .hostRequest),
+                Row(Method.browserInput, params: BrowserInputRequest.self, result: BrowserInputResult.self, kind: .hostRequest),
                 Row(Method.browserNavigate, params: BrowserNavigateRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsStop, params: AgentStopRequest.self, result: Empty.self, kind: .hostRequest),
                 // Events ▸ Waiting now's ✕, as the window and the Remote have it (#541).

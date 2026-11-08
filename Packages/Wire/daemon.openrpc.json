@@ -1951,7 +1951,7 @@
       "result": {
         "name": "result",
         "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
+          "$ref": "daemon.schema.json#/definitions/BrowserInputResult"
         }
       }
     },

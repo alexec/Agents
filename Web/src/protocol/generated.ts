@@ -1294,6 +1294,15 @@ export interface BrowserInputRequest {
   modifiers?: number;
 }
 
+/**
+ * browser/input's answer. editing is said after a mouseReleased only: whether the click left the
+ * page's focus in a field that takes text (an input, a textarea, a contenteditable), so a touch
+ * client opens or closes its keyboard. Left out for other input, and by a host before it was added.
+ */
+export interface BrowserInputResult {
+  editing?: boolean;
+}
+
 export type BrowserNavigateAction =
   | "go"
   | "back"
@@ -12127,7 +12136,7 @@ export interface Methods {
   "bots/stopRun": { params: BotStopRun; result: Empty };
   "browser/ack": { params: BrowserAckRequest; result: Empty };
   "browser/clear": { params: BrowserClearRequest; result: BrowserState };
-  "browser/input": { params: BrowserInputRequest; result: Empty };
+  "browser/input": { params: BrowserInputRequest; result: BrowserInputResult };
   "browser/navigate": { params: BrowserNavigateRequest; result: Empty };
   "browser/state": { params: Empty; result: BrowserState };
   "browser/unwatch": { params: Empty; result: Empty };
@@ -13011,6 +13020,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BrowserClearRequest: { required: [], optional: ["site"] },
   BrowserFrame: { required: ["image", "ack", "width", "height"], optional: [] },
   BrowserInputRequest: { required: ["kind"], optional: ["type", "x", "y", "button", "clickCount", "deltaX", "deltaY", "key", "code", "keyCode", "text", "modifiers"] },
+  BrowserInputResult: { required: [], optional: ["editing"] },
   BrowserNavigateRequest: { required: ["action"], optional: ["url"] },
   BrowserPageState: { required: ["status"], optional: ["detail", "url", "title", "noTab", "holder", "holderTitle"] },
   BrowserSite: { required: ["site", "cookies"], optional: [] },
