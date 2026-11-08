@@ -101,6 +101,8 @@ func (d *Daemon) forgePlan(ctx context.Context, r wire.ForgePlanRequest) (wire.F
 			epic, children, err = d.boardsPlan(ctx, method, project, id)
 		} else if repo, number, ok := forgejoOfNode(r.Node); ok {
 			epic, children, err = d.forgejoPlan(ctx, method, repo, number)
+		} else if _, _, ok := bitbucketOfNode(r.Node); ok {
+			return wire.ForgePlan{}, Invalid("%s: %s", method, bitbucketNoPlan)
 		} else if repo, number, ok := nodeOfRepo(r.Node); !ok {
 			return wire.ForgePlan{}, Invalid("%s: %s is not an issue on GitHub, GitLab, Forgejo, Linear, Jira or Azure Boards", method, r.Node.Ref)
 		} else if repo.forge == "gitlab" {
@@ -354,9 +356,15 @@ func (d *Daemon) forgeFeatures(ctx context.Context, r wire.ForgeFeaturesRequest)
 	out := wire.ForgeFeatures{Features: []wire.ForgeFeature{}}
 	by := map[string]*wire.ForgeFeature{}
 	loose := map[string]int64{}
+	// Bitbucket's issues have no epics (#3880): its feature:<name> components are features with
+	// open issues only.
+	bitbucket := map[string]string{}
 	err := d.featurePages(ctx, r, &out, wire.ForgeListRequest{State: new("open")}, func(i wire.ForgeItem) {
 		if i.Feature != nil && deref(i.Level) != "epic" {
 			loose[strings.ToLower(*i.Feature)]++
+			if _, _, ok := bitbucketOfNode(i.Node); ok && bitbucket[strings.ToLower(*i.Feature)] == "" {
+				bitbucket[strings.ToLower(*i.Feature)] = *i.Feature
+			}
 		}
 	})
 	if err != nil {
@@ -385,6 +393,11 @@ func (d *Daemon) forgeFeatures(ctx context.Context, r wire.ForgeFeaturesRequest)
 	})
 	if err != nil {
 		return wire.ForgeFeatures{}, err
+	}
+	for key, name := range bitbucket {
+		if by[key] == nil {
+			by[key] = &wire.ForgeFeature{Name: name, Issues: new(loose[key])}
+		}
 	}
 	for _, f := range by {
 		out.Features = append(out.Features, *f)

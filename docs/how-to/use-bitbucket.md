@@ -99,8 +99,15 @@ connection, the list says Bitbucket is not connected.
   request has no labels, so its page has no **Labels** (#3881). **Rerun failed** starts each failed Pipelines run again, every step,
   and a check's log is the end of its failed steps' logs; another CI's checks run again and
   show their logs on their own pages.
-- **Not on Bitbucket:** *Merge when checks pass* (its API has none) and **Reopen** of a
-  declined pull request (Bitbucket cannot reopen one).
+- **Features (#3880):** an issue whose component is `feature:<name>`, such as
+  `feature:export`, is in that feature on **Work ▸ Features**. Bitbucket has no epics, so the
+  feature shows its open issues under **Issues with no epic**, and its count says
+  `0 epics · 0 open · 3 open issues`. A feature that also has epics on another forge adds
+  the Bitbucket issues to them.
+- **Not on Bitbucket:** *Merge when checks pass* (its API has none), **Reopen** of a
+  declined pull request (Bitbucket cannot reopen one), an epic's **Plan** (Bitbucket's issues
+  have no sub-issues or dependencies) and a board in the **Board** filter (its API has no
+  boards).
 
 Each write is yours, with your token, from the machine that read the item.
 
