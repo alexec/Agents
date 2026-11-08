@@ -110,6 +110,10 @@ type secretRecord struct {
 	// Kind is what the value holds, such as a card (#3531); empty for a plain value. It is
 	// not secret: the clients draw a card's row and its sheet from it.
 	Kind string `json:"kind,omitempty"`
+	// NeedsApproval is Ask before use (#4014), as the person's client said it. Not secret,
+	// and not the control plane's to change: each envelope's associated data binds it, so a
+	// machine opens nothing whose flag differs from what the client sealed.
+	NeedsApproval bool `json:"needsApproval,omitempty"`
 	// Sealed is each recipient's envelope (m:<machine> or c:<client>), as the person's
 	// client sealed it (#3397). Nothing here opens one.
 	Sealed   map[string]wire.SealedEnvelope `json:"sealed,omitempty"`
@@ -456,7 +460,8 @@ func (b *Book) SetSecret(ctx context.Context, user string, set wire.UserSecretSe
 		if set.Kind != nil {
 			kind = string(*set.Kind)
 		}
-		r = secretRecord{Name: name, Version: set.Version, Kind: kind, Sealed: sealed, Updated: b.stamp(), Machines: r.Machines}
+		r = secretRecord{Name: name, Version: set.Version, Kind: kind, NeedsApproval: set.NeedsApproval != nil && *set.NeedsApproval,
+			Sealed: sealed, Updated: b.stamp(), Machines: r.Machines}
 		return records.Encode(r)
 	})
 }
@@ -597,6 +602,9 @@ func (b *Book) Names(ctx context.Context, user string, machines []string) ([]wir
 			kind := wire.UserSecretKind(r.Kind)
 			row.Kind = &kind
 		}
+		if r.NeedsApproval {
+			row.NeedsApproval = new(true)
+		}
 		for _, m := range r.Machines {
 			row.Machines = append(row.Machines, wire.MachineRef(m))
 		}
@@ -675,7 +683,11 @@ func (b *Book) Delivery(ctx context.Context, user, recipient string) (out wire.M
 			waiting = append(waiting, fmt.Sprintf("%s|%d", r.Name, r.Version))
 			continue
 		}
-		out.Secrets = append(out.Secrets, wire.SealedUserSecret{Name: wire.UserSecretName(r.Name), Version: r.Version, Sealed: e})
+		s := wire.SealedUserSecret{Name: wire.UserSecretName(r.Name), Version: r.Version, Sealed: e}
+		if r.NeedsApproval {
+			s.NeedsApproval = new(true)
+		}
+		out.Secrets = append(out.Secrets, s)
 	}
 	return out, waiting, nil
 }

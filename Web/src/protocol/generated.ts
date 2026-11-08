@@ -5547,6 +5547,11 @@ export interface MCPSetSecretAnswer {
 export interface MCPSetSecretRequest {
   name: string;
   value: string;
+  /**
+   * Ask before use (#4014): kept sealed on this machine, never in secrets.env, and a person
+   * approves each use (#4015). Left out is off. From the agent role it is always on.
+   */
+  needsApproval?: boolean;
 }
 
 export interface MCPSignInAnswer {
@@ -9538,6 +9543,11 @@ export interface SealedUserSecret {
   name: UserSecretName;
   version: number;
   sealed: SealedEnvelope;
+  /**
+   * Ask before use (#4014), as the person's client sealed it: the associated data ends |ask when it
+   * is on, so a flag the control plane changed does not open. Left out is off.
+   */
+  needsApproval?: boolean;
 }
 
 /** sealing/add (#3397). */
@@ -9593,6 +9603,18 @@ export interface SecretLeftOn {
   /** The machine's name when it was removed. */
   name: string;
   at: string;
+}
+
+/**
+ * secrets/setNeedsApproval (#4014): a person turns Ask before use on or off for a secret of this
+ * machine's secrets.env, or for one session's (agentID). On takes the value out of the plain file
+ * and seals it to this machine; off puts it back. A Your setup secret's flag is its client's to
+ * seal, so it is refused here.
+ */
+export interface SecretNeedsApprovalRequest {
+  name: string;
+  agentID?: UUID;
+  needsApproval: boolean;
 }
 
 /**
@@ -9837,6 +9859,11 @@ export interface SessionSecret {
   title: string;
   name: string;
   setAt: WireDate;
+  /**
+   * Ask before use (#4014): its value is sealed in the session's file, never there as plain text,
+   * and a person approves each use (#4015).
+   */
+  needsApproval?: boolean;
 }
 
 /** secrets/sessionRemove (#3548): take one session's secret out now. */
@@ -9853,6 +9880,10 @@ export interface SessionSecretSetRequest {
   agentID: UUID;
   name: string;
   value: string;
+  /**
+   * Ask before use (#4014): kept sealed, and a person approves each use (#4015). Left out is off.
+   */
+  needsApproval?: boolean;
 }
 
 /**
@@ -11349,6 +11380,11 @@ export interface UserSecretRow {
    * it (#3397).
    */
   waiting?: MachineRef[];
+  /**
+   * Ask before use (#4014), as the person's client last sealed it. The machines check it: the
+   * associated data binds it.
+   */
+  needsApproval?: boolean;
 }
 
 /**
@@ -11364,6 +11400,12 @@ export interface UserSecretSet {
   version: number;
   /** By recipient. */
   values: Record<string, SealedEnvelope>;
+  /**
+   * Ask before use (#4014): when on, every envelope's associated data ends |ask
+   * (usersecret.v1|<person id>|<recipient>|<name>|<version>|ask), so the control plane cannot
+   * change it. Left out is off, and the associated data is as before.
+   */
+  needsApproval?: boolean;
 }
 
 /**
@@ -13288,7 +13330,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MCPServer: { required: ["name", "transport"], optional: [] },
   MCPServerHealth: { required: ["name", "transport", "hosted", "check"], optional: ["live", "checkedAt", "lastError", "tools", "levels", "folder"] },
   MCPSetSecretAnswer: { required: ["set"], optional: [] },
-  MCPSetSecretRequest: { required: ["name", "value"], optional: [] },
+  MCPSetSecretRequest: { required: ["name", "value"], optional: ["needsApproval"] },
   MCPSignInAnswer: { required: [], optional: ["flowID", "authorizationURL", "needsClient", "callback", "error"] },
   MCPSignInClient: { required: ["id"], optional: ["secret"] },
   MCPSignInFlowRequest: { required: ["flowID"], optional: [] },
@@ -13642,12 +13684,13 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SealRecipient: { required: ["id", "name", "publicKey"], optional: ["owner"] },
   SealRecipients: { required: ["recipients"], optional: ["user"] },
   SealedEnvelope: { required: ["encapsulated", "ciphertext"], optional: [] },
-  SealedUserSecret: { required: ["name", "version", "sealed"], optional: [] },
+  SealedUserSecret: { required: ["name", "version", "sealed"], optional: ["needsApproval"] },
   SealingAdd: { required: ["items"], optional: [] },
   SealingAddItem: { required: ["item", "id", "version", "values"], optional: [] },
   SealingItem: { required: ["item", "id", "version", "mine", "missing"], optional: ["user", "kind", "vendor", "settings"] },
   SealingWork: { required: ["items"], optional: [] },
   SecretLeftOn: { required: ["host", "name", "at"], optional: [] },
+  SecretNeedsApprovalRequest: { required: ["name", "needsApproval"], optional: ["agentID"] },
   SecretsLeft: { required: ["host", "name", "secrets"], optional: [] },
   SelfUpdate: { required: ["autoUpdate", "state", "running"], optional: ["release", "message"] },
   SelfUpdateSet: { required: ["autoUpdate"], optional: [] },
@@ -13669,9 +13712,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SessionMoveIn: { required: ["upload", "folder", "from"], optional: ["carryOn"] },
   SessionMovedFrom: { required: ["machine", "at"], optional: [] },
   SessionNotice: { required: ["severity", "title"], optional: ["detail"] },
-  SessionSecret: { required: ["agentID", "title", "name", "setAt"], optional: [] },
+  SessionSecret: { required: ["agentID", "title", "name", "setAt"], optional: ["needsApproval"] },
   SessionSecretRemoveRequest: { required: ["agentID", "name"], optional: [] },
-  SessionSecretSetRequest: { required: ["agentID", "name", "value"], optional: [] },
+  SessionSecretSetRequest: { required: ["agentID", "name", "value"], optional: ["needsApproval"] },
   SessionSecrets: { required: ["secrets"], optional: [] },
   SessionsListRequest: { required: ["runtimeID", "cwd"], optional: [] },
   SetCeilingRequest: { required: ["agentID"], optional: ["ceiling", "tokenCeiling"] },
@@ -13821,8 +13864,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   UserSecret: { required: ["name", "value"], optional: [] },
   UserSecretNames: { required: ["secrets"], optional: [] },
   UserSecretRequest: { required: ["name"], optional: [] },
-  UserSecretRow: { required: ["name", "updated", "machines"], optional: ["kind", "leftOn", "version", "waiting"] },
-  UserSecretSet: { required: ["name", "version", "values"], optional: ["kind"] },
+  UserSecretRow: { required: ["name", "updated", "machines"], optional: ["kind", "leftOn", "version", "waiting", "needsApproval"] },
+  UserSecretSet: { required: ["name", "version", "values"], optional: ["kind", "needsApproval"] },
   UserSettings: { required: [], optional: ["mcpServers", "agentConfig", "agentConfigFiles", "runtimes", "costLimits", "notifications", "accounts", "policy", "updated"] },
   UserSettingsChanged: { required: [], optional: ["parts", "agentConfigFiles", "secrets"] },
   UserSettingsPart: { required: ["part", "value"], optional: [] },

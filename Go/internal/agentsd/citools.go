@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/agentsd/skillcatalog"
 	"github.com/alexec/agents/Go/internal/githubmcp"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -95,12 +94,7 @@ func (d *Daemon) setCISecret(caller wire.UUID, args map[string]json.RawMessage) 
 	if !secretAskName.MatchString(secret) {
 		return "", Invalid("Nothing was set: secret is the name of a secret you asked for with ask_secret, e.g. SENTRY_AUTH_TOKEN.")
 	}
-	v, ok, expired := d.sessionSecret(caller, secret)
-	if !ok {
-		if home := d.personalHome(); home != "" {
-			v, ok = skillcatalog.LoadSecrets(skillcatalog.SecretsPath(home)).Value(secret)
-		}
-	}
+	v, ok, expired := d.localSecret(caller, secret)
 	if expired && (!ok || v == "") {
 		return "", Invalid("Nothing was set: %s was for this session only and has expired. Ask me for it again with ask_secret.", secret)
 	}

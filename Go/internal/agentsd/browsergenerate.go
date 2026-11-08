@@ -279,7 +279,7 @@ func (d *Daemon) generateSecretCheck(args map[string]json.RawMessage) string {
 	if home == "" {
 		return "Nothing was made: this machine has no personal home to keep secrets in."
 	}
-	if string(args["replace"]) != "true" && skillcatalog.LoadSecrets(skillcatalog.SecretsPath(home)).IsSet(name) {
+	if string(args["replace"]) != "true" && (skillcatalog.LoadSecrets(skillcatalog.SecretsPath(home)).IsSet(name) || isSealedSecret(home, name)) {
 		return "Nothing was made: " + name + " exists. Fill it with fill_secret, or set replace to true on a change-password page."
 	}
 	if _, err := parsePasswordRules(argString(args, "rules"), pinLength(args)); err != nil {
@@ -307,15 +307,15 @@ func (d *Daemon) generateSecret(ctx context.Context, drive *browserDrive, args m
 	if err != nil {
 		return fillWords("Nothing was made: " + err.Error() + ".")
 	}
-	home := d.personalHome()
+	// An agent's write: Ask before use is on, the old value's too (#4014).
 	if string(args["replace"]) == "true" {
-		if old, ok := skillcatalog.LoadSecrets(skillcatalog.SecretsPath(home)).Value(name); ok && old != "" {
-			if err := d.saveSecret(name+"_PREVIOUS", old); err != nil {
+		if old, ok, _ := d.localSecret("", name); ok && old != "" {
+			if err := d.saveSecret(name+"_PREVIOUS", old, true); err != nil {
 				return fillWords("Nothing was made: " + err.Error() + ".")
 			}
 		}
 	}
-	if err := d.saveSecret(name, value); err != nil {
+	if err := d.saveSecret(name, value, true); err != nil {
 		return fillWords("Nothing was made: " + err.Error() + ".")
 	}
 	_, isError, note := d.fillSecret(ctx, drive, secretFill{label: name, value: value, hide: map[string]string{name: value}}, args)

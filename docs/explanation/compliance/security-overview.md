@@ -187,6 +187,7 @@ An organisation will be able to require a sandbox by policy (T5, below).
 | Runtime keys that a Mac lends to its servers | Keychain, this device only, when unlocked | Borrowed for each run |
 | MCP sign-ins (OAuth) | `~/.agents-secrets/mcp-sign-ins.json`, mode 0600 | The same |
 | A person's secrets from the control plane | `~/.agents-secrets/secrets.env`, mode 0600 | The same |
+| A secret with Ask before use (#4014) | `~/.agents-secrets/sealed.json`, mode 0600, sealed under a key made from the machine's key, which is in the Keychain: an agent can read the file but cannot open it | The same, but the machine's key is a 0600 file. A second layer under a release key that the control plane keeps comes next. |
 | A machine provider's tokens and keys, on the machine that carries it (#3398) | `~/.agents-secrets/provider-secrets.json`, mode 0600 | The same |
 | The machine's own key | A file of mode 0600 in its data folder | The same |
 | The control plane's key | Keychain (Agents Host), or a file of mode 0600 | A file of mode 0600, or sealed in the store by KMS |

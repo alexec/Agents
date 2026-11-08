@@ -306,6 +306,7 @@ var CallSandboxState = Method[Empty, SandboxSettings]{"sandbox/state"}
 var CallSecretsSessionList = Method[Empty, SessionSecrets]{"secrets/sessionList"}
 var CallSecretsSessionRemove = Method[SessionSecretRemoveRequest, SessionSecrets]{"secrets/sessionRemove"}
 var CallSecretsSessionSet = Method[SessionSecretSetRequest, SessionSecrets]{"secrets/sessionSet"}
+var CallSecretsSetNeedsApproval = Method[SecretNeedsApprovalRequest, Empty]{"secrets/setNeedsApproval"}
 var CallSelfUpdateSet = Method[SelfUpdateSet, SelfUpdate]{"selfUpdate/set"}
 var CallSelfUpdateStatus = Method[Empty, SelfUpdate]{"selfUpdate/status"}
 var CallSessionsAdopt = Method[AdoptRequest, UUID]{"sessions/adopt"}

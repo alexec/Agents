@@ -49,7 +49,7 @@ func (d *Daemon) captureSecretCheck(args map[string]json.RawMessage) string {
 	if home == "" {
 		return "Nothing was saved: this machine has no personal home to keep secrets in."
 	}
-	if string(args["replace"]) != "true" && skillcatalog.LoadSecrets(skillcatalog.SecretsPath(home)).IsSet(name) {
+	if string(args["replace"]) != "true" && (skillcatalog.LoadSecrets(skillcatalog.SecretsPath(home)).IsSet(name) || isSealedSecret(home, name)) {
 		return "Nothing was saved: " + name + " exists. Set replace to true to save a new value."
 	}
 	if _, err := regexp.Compile(argString(args, "pattern")); err != nil {
@@ -88,14 +88,15 @@ func (d *Daemon) captureSecret(ctx context.Context, drive *browserDrive, args ma
 		return fillWords("Nothing was saved: the match is shorter than four characters, too short to keep out of page reads.")
 	}
 	d.browser.Filter.Hide(name, value)
+	// An agent's write: Ask before use is on, the old value's too (#4014).
 	if string(args["replace"]) == "true" {
-		if old, ok := skillcatalog.LoadSecrets(skillcatalog.SecretsPath(d.personalHome())).Value(name); ok && old != "" {
-			if err := d.saveSecret(name+"_PREVIOUS", old); err != nil {
+		if old, ok, _ := d.localSecret("", name); ok && old != "" {
+			if err := d.saveSecret(name+"_PREVIOUS", old, true); err != nil {
 				return fillWords("Nothing was saved: " + err.Error() + ".")
 			}
 		}
 	}
-	if err := d.saveSecret(name, value); err != nil {
+	if err := d.saveSecret(name, value, true); err != nil {
 		return fillWords("Nothing was saved: " + d.browser.Filter.Text(err.Error()) + ".")
 	}
 	note := name + " saved (" + strconv.Itoa(len([]rune(value))) + " characters)."

@@ -28,13 +28,18 @@ func TestCaptureSecretSavesTheMatchAndNeverSaysIt(t *testing.T) {
 	if r.IsError || replyText(r) != "GITLAB_TOKEN saved (26 characters)." {
 		t.Fatalf("%+v", r)
 	}
-	if saved, _ := skillcatalog.LoadSecrets(skillcatalog.SecretsPath(d.personalHome())).Value("GITLAB_TOKEN"); saved != token {
+	// An agent's write: Ask before use is on (#4014), so it is sealed, not in secrets.env.
+	if skillcatalog.LoadSecrets(skillcatalog.SecretsPath(d.personalHome())).IsSet("GITLAB_TOKEN") {
+		t.Fatal("a captured secret is in secrets.env")
+	}
+	if saved, _, _ := d.localSecret("", "GITLAB_TOKEN"); saved != token {
 		t.Fatal("not saved")
 	}
 	if r := m.browserTool(3, "browser_snapshot", nil); strings.Contains(replyText(r), token) || !strings.Contains(replyText(r), "<secret GITLAB_TOKEN>") {
 		t.Fatal("the value came back")
 	}
 	assertNotUnder(t, d.Store.Loc.Root, token)
+	assertNotUnder(t, d.personalHome(), token)
 
 	// It exists now: refused, unless replace, which keeps the old one.
 	if r := m.browserTool(4, "capture_secret", map[string]any{"secret": "GITLAB_TOKEN", "target": "e7"}); !r.IsError || !strings.Contains(replyText(r), "exists") {
@@ -44,8 +49,7 @@ func TestCaptureSecretSavesTheMatchAndNeverSaysIt(t *testing.T) {
 	if r := m.browserTool(5, "capture_secret", map[string]any{"secret": "GITLAB_TOKEN", "target": "e7", "replace": true}); r.IsError {
 		t.Fatalf("%+v", r)
 	}
-	env := skillcatalog.LoadSecrets(skillcatalog.SecretsPath(d.personalHome()))
-	if prev, _ := env.Value("GITLAB_TOKEN_PREVIOUS"); prev != token {
+	if prev, _, _ := d.localSecret("", "GITLAB_TOKEN_PREVIOUS"); prev != token {
 		t.Fatal("the old value was not kept")
 	}
 }
@@ -63,7 +67,7 @@ func TestCaptureSecretRefusesNoMatchAndSaysNothingItSaw(t *testing.T) {
 			t.Fatalf("%v: %+v", args, r)
 		}
 	}
-	if skillcatalog.LoadSecrets(skillcatalog.SecretsPath(d.personalHome())).IsSet("MAIL_PASSWORD") {
+	if skillcatalog.LoadSecrets(skillcatalog.SecretsPath(d.personalHome())).IsSet("MAIL_PASSWORD") || isSealedSecret(d.personalHome(), "MAIL_PASSWORD") {
 		t.Fatal("saved")
 	}
 }
