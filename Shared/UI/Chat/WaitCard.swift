@@ -127,7 +127,7 @@ struct WaitCard: View {
                     Text("Waiting for event").fontWeight(.semibold)
                 }
                 Spacer(minLength: 6)
-                Text(total.map { "\(elapsed) / \($0) min" } ?? "\(elapsed) min")
+                Text(WaitStatus.cardTime(elapsed: elapsed, total: total))
                     .appText(.fine).foregroundStyle(.secondary).monospacedDigit()
             }
             ForEach(lines) { line in
@@ -219,7 +219,7 @@ struct BlockWaitCard: View {
                 WaitingBeacon(size: 14)
                 Text(block.cardTitle()).fontWeight(.semibold)
                 Spacer(minLength: 6)
-                Text(total.map { "\(elapsed) / \($0) min" } ?? "\(elapsed) min")
+                Text(WaitStatus.cardTime(elapsed: elapsed, total: total))
                     .appText(.fine).foregroundStyle(.secondary).monospacedDigit()
             }
             ForEach(lines, id: \.self) { line in

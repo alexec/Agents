@@ -53,7 +53,7 @@ import { DesktopControlPauseCard } from "./DesktopControlPauseCard";
 import { DesktopControlTile } from "./DesktopControlTile";
 import { showsThoughts, shownItems } from "../model/thoughts";
 import { hasTurnInFlight, promptPlaceholder, willQueue } from "../model/promptWords";
-import { eventCarryOnPrompt, eventWaitLine, eventWaitMinutes, eventWaitSummaryLines, leaseMark, lineCarryOnPrompt, lineResource, triggerURL } from "../model/rowLines";
+import { eventCarryOnPrompt, eventWaitLine, eventWaitMinutes, eventWaitSummaryLines, eventWaitTime, leaseMark, lineCarryOnPrompt, lineResource, triggerURL } from "../model/rowLines";
 import { routeHash } from "../route";
 import { sessionRuntimeName } from "../model/runtimes";
 import { GuardedChangeCard } from "./GuardedChange";
@@ -922,7 +922,7 @@ function WaitCard({ agent, title, disabled, continueNow, stop }: { agent: Agent;
             {asks
               ? <span class="wait-card-title tinted"><span class="wait-card-mark" aria-hidden="true">!</span>{asks}</span>
               : <span class="wait-card-title"><span class="wait-card-broadcast waiting-beacon" aria-hidden="true"><Beacon /></span>Waiting for event</span>}
-            <span class="wait-card-time">{total === undefined ? `${elapsed} min` : `${elapsed} / ${total} min`}</span>
+            <span class="wait-card-time">{eventWaitTime(elapsed, total)}</span>
           </div>
           <div class="wait-card-events">
             {eventWaitSummaryLines(wait, title).map((line) => <p class="wait-card-event" key={line.id} title={line.events.join(", ")}>
@@ -976,7 +976,7 @@ function BlockWaitCard({ store, host, agent, disabled }: { store: Store; host: s
       <div class="card wait-card block-wait-card">
         <div class="wait-card-heading">
           <span class="wait-card-title"><span class="wait-card-broadcast waiting-beacon" aria-hidden="true"><Beacon /></span>{cardTitle(block)}</span>
-          <span class="wait-card-time">{total === undefined ? `${elapsed} min` : `${elapsed} / ${total} min`}</span>
+          <span class="wait-card-time">{eventWaitTime(elapsed, total)}</span>
         </div>
         <div class="wait-card-events">
           {store.waitsOf(host, agent).map((line) => <p class="wait-card-event" key={line}>{line}</p>)}
