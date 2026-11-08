@@ -39,6 +39,12 @@ type forgeAzureDevOps interface {
 	PRDiff(ctx context.Context, repo string, number int) (map[string]any, error)
 	RetryBuild(ctx context.Context, repo string, build int) (string, error)
 	FailedLog(ctx context.Context, repo string, build int) (string, error)
+	// What lineage asks (lineageazuredevops.go).
+	Node(ctx context.Context, repo string, number int) (azuredevopsmcp.Node, error)
+	CommitTime(ctx context.Context, repo, ref string) (time.Time, error)
+	Compare(ctx context.Context, repo, base, head string) ([]azuredevopsmcp.Commit, error)
+	CommitPR(ctx context.Context, repo, sha string) (int, error)
+	CostComment(ctx context.Context, repo string, number int, id, mark, body string) (string, error)
 }
 
 // azureDevOpsOfNode is the repository, organization/project/name, and the number of an Azure

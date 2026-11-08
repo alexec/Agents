@@ -127,8 +127,24 @@ service), **Open on Azure DevOps**, and:
   request has reviewers, not assignees.
 - **The Work pages read one Azure DevOps on a machine:** the first folder's, with a token
   for it. A folder on another lists nothing, and says so when none is read.
-- **Not yet:** a Microsoft Entra sign-in (a personal access token only), and lineage links
-  from a session or a pull request to its Azure Repos pull request.
+- **Lineage links Azure Repos pull requests (#3952).** A session's `P#12` label in a folder
+  on Azure DevOps works on pull request 12, and its `#12` label on work item 12 of the
+  repository's project on Azure Boards, as Azure DevOps reads `#12` in a description. A pull
+  request's events link it to the sessions on its branch and to the work items its
+  description closes, and a failed Azure Pipelines build builds it
+  (`azuredevops:<org>/<project>/<repo>/builds/<id>`). An Azure Boards work item's Lineage
+  section lists the pull requests that fix it.
+- **Lineage asks Azure DevOps** with the Azure DevOps connection or `AZURE_DEVOPS_TOKEN`,
+  about the repositories of the folders on it: a pull request's title, state (an abandoned
+  one is closed) and tags, a version tag's pull requests (from `Merged PR 12:` at the start
+  of a merge or squash commit's title, or else the pull request whose merge commit it is),
+  and the cost comment on a merged pull request (when the folder's `prCostComment` says so),
+  in a closed thread of its own, so a policy that wants comments resolved is not held by it.
+  Azure Repos has no milestones. A doc's address is `?path=/<path>`, on the default branch.
+- **On an Azure DevOps Server,** a pull request's address names its collection two parts
+  before `_git`; a repository named as its project, under a path such as `/tfs/`, is not
+  linked from its address.
+- **Not yet:** a Microsoft Entra sign-in (a personal access token only).
 
 ## See also
 

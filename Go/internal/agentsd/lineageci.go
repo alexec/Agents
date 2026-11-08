@@ -15,7 +15,8 @@ import (
 //
 //   - Kind ci-run, ref github:<owner>/<repo>/actions/run/<id> (GitLab:
 //     gitlab:<group>/<project>/pipelines/<id>; Bitbucket: bitbucket:<workspace>/<repo>/pipelines/<n>,
-//     the Pipelines run's build number). Not workflow-run: that is an Agents
+//     the Pipelines run's build number; Azure DevOps: azuredevops:<org>/<project>/<repo>/builds/<id>,
+//     the Azure Pipelines build's id). Not workflow-run: that is an Agents
 //     workflow's run.
 //   - checks.passed and checks.failed link the run builds its PR. A rerun has the same id,
 //     so it is the same node.
@@ -37,8 +38,11 @@ const ciRunsPerPR = 20
 
 func (r forgeRepo) ciRun(id int64) wire.LineageNode {
 	ref := r.forge + ":" + r.path + "/actions/run/" + strconv.FormatInt(id, 10)
-	if r.forge == "gitlab" || r.forge == "bitbucket" {
+	switch r.forge {
+	case "gitlab", "bitbucket":
 		ref = r.forge + ":" + r.path + "/pipelines/" + strconv.FormatInt(id, 10)
+	case "azuredevops":
+		ref = r.forge + ":" + r.path + "/builds/" + strconv.FormatInt(id, 10)
 	}
 	return wire.LineageNode{Kind: lineage.KindCIRun, Ref: ref}
 }

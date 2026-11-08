@@ -23,8 +23,8 @@ import (
 // lineage walk is read far less often than a sidebar list, so each node is asked again only
 // when it is walked again after resolveRecheck, and never when no folder is signed in to ask
 // with. Linear and releases are not resolved yet; a GitHub, GitLab, Forgejo or Bitbucket
-// issue, pull request or milestone is (Forgejo's and Bitbucket's by their connections,
-// connectionAsks). A milestone is sent to be resolved when an issue's milestone is found
+// issue, pull request or milestone is, and an Azure Repos pull request (Forgejo's, Bitbucket's
+// and Azure DevOps's by their connections, connectionAsks). A milestone is sent to be resolved when an issue's milestone is found
 // (lineagemilestone.go), as no walk asks for it before Work lists it.
 //
 // Never on the walk's own path (#3102): a walk answers at once with what the cache holds
