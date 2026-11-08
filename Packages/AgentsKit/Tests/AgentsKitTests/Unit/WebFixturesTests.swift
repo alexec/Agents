@@ -767,6 +767,20 @@ struct WebFixturesTests {
                             "matches": .bool(query.matches(try input["agent"]!.decode(Agent.self)))])
         }
 
+        let toggles: [(String, String, String)] = [
+            ("empty", "", "bug"), ("words kept", "login", "bug"), ("again clears", "label:bug", "bug"),
+            ("again, other case", "label:BUG login", "bug"), ("another label", "label:ui login", "bug"),
+            ("spaces quoted", "", "web ui"), ("quoted again clears", "label:\"web ui\"", "web ui"),
+            ("empty label token", "label:", "bug"),
+        ]
+        try pin("labels/toggle.json", toggles.map { name, query, label in
+            Case(name: name, input: .object(["query": .string(query), "label": .string(label)]))
+        }) { input in
+            let query = input["query"]!.stringValue!, label = input["label"]!.stringValue!
+            let toggled = SessionLabelQuery.toggling(label, in: query)
+            return .object(["query": .string(toggled), "asks": .bool(SessionLabelQuery(toggled).asks(for: label))])
+        }
+
         let kinds = ["#2958", "P#2955", "p#7", "ENG-4", " #12 ", "#", "#12a", "P#", "eng-4", "merged", "Archived",
                      "closed", "bug", "web ui"]
         try pin("labels/kind.json", kinds.map { Case(name: $0, input: .string($0)) }) { input in

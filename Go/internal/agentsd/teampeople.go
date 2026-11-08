@@ -15,13 +15,14 @@ import (
 // The control plane's people, in a feeding tool's _meta (#2951, specs/2453-team-lists.md
 // part 4): callFromView and readViewCount give show_pull_requests, show_issues and
 // show_merge_requests the control plane's people and bots, with their GitHub, GitLab,
-// Linear, Jira and Forgejo (#3836) logins and which is the viewer's own, so a row can be
-// named as the control plane knows the person, Team can be told from Others, and the
-// viewer's own rows can say an agent is on it. The github, gitlab, linear, jira and forgejo
-// servers read it off the call; they make no control-plane call of their own.
+// Linear, Jira, Forgejo (#3836), Bitbucket and Azure DevOps (#3853) logins and which is the
+// viewer's own, so a row can be named as the control plane knows the person, Team can be
+// told from Others, and the viewer's own rows can say an agent is on it. The github, gitlab,
+// linear, jira, forgejo, bitbucket and azureboards servers read it off the call; they make no
+// control-plane call of their own.
 
-// teamFeedingTools are the github, gitlab, linear, jira and forgejo servers' feeding tools that
-// take the control plane's people in their call's _meta (#2951).
+// teamFeedingTools are the github, gitlab, linear, jira, forgejo, bitbucket and azureboards
+// servers' feeding tools that take the control plane's people in their call's _meta (#2951).
 var teamFeedingTools = map[string]bool{"show_pull_requests": true, "show_issues": true, "show_merge_requests": true}
 
 // teamMeta is the feeding tool's _meta: nil with no control plane, or it could not say.
@@ -125,7 +126,7 @@ func (d *Daemon) teamPeople(ctx context.Context, ask *askControl) []map[string]a
 	for _, p := range list.People {
 		you := p.You != nil && *p.You
 		github, gitlab, linear, jira := optstr(p.GithubLogin), optstr(p.GitlabLogin), optstr(p.LinearLogin), optstr(p.JiraLogin)
-		forgejo := optstr(p.ForgejoLogin)
+		forgejo, bitbucket, azureDevOps := optstr(p.ForgejoLogin), optstr(p.BitbucketLogin), optstr(p.AzureDevOpsLogin)
 		if you && conns != nil {
 			if github == "" {
 				github = connectionLogin(conns, connections.GitHub)
@@ -141,6 +142,12 @@ func (d *Daemon) teamPeople(ctx context.Context, ask *askControl) []map[string]a
 			}
 			if forgejo == "" {
 				forgejo = connectionLogin(conns, connections.Forgejo)
+			}
+			if bitbucket == "" {
+				bitbucket = connectionLogin(conns, connections.Bitbucket)
+			}
+			if azureDevOps == "" {
+				azureDevOps = connectionLogin(conns, connections.AzureDevOps)
 			}
 		}
 		row := map[string]any{"name": p.Name}
@@ -161,6 +168,12 @@ func (d *Daemon) teamPeople(ctx context.Context, ask *askControl) []map[string]a
 		}
 		if forgejo != "" {
 			row["forgejo"] = forgejo
+		}
+		if bitbucket != "" {
+			row["bitbucket"] = bitbucket
+		}
+		if azureDevOps != "" {
+			row["azuredevops"] = azureDevOps
 		}
 		if you {
 			row["you"] = true

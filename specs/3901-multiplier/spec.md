@@ -17,7 +17,9 @@ Alex (2026-11-07, on #3902): the number is a show-off number, and a simple metho
 - **Splitting PRs.** A count of PRs goes up when the agents make smaller PRs. The risk is low here: in the backtest (below) this repo's median PR is 225 lines changed. LinearB 2026 (2025 data) says that the median AI-assisted PR is 96 lines. So these PRs are not smaller than others. A later issue can add a size weight if the number goes up for the wrong reason.
 - **Closed issues: not used.** Issue sizes vary too much, and many PRs fix no issue.
 
-## 2. The 2025 baseline: 1.4 merged PRs a week
+## 2. The 2025 baseline: 1.4 merged PRs a week, by default
+
+1.4 is the default, not a fixed figure (Alex, 2026-11-07, #3991): the person can set their own PRs a week (0.1 to 100, one decimal) and the line under the figures in Settings ▸ Cost ▸ Multiplier. The host keeps both in the person's preferences (`multiplierPRsPerWeek`, `multiplierLine`), counts with them, sends the figure with `multiplier/count` so the control plane counts every machine the same, and tells `multiplier/changed` at once. An empty line is the default line, with the person's figure. Hours a week stays 40.
 
 | Figure | Population | Source |
 |---|---|---|
@@ -29,7 +31,7 @@ Alex (2026-11-07, on #3902): the number is a show-off number, and a simple metho
 - LinearB ([linearb.io](https://linearb.io/library/engineering-benchmarks-and-research)) puts 1.4 in its "Good" band, so the two sources agree.
 - **Recommended: 1.4, because** it is an engineer's own output with no AI, and the Multiplier compares the person with their agents against that engineer. Alex chose it (2026-11-07). 1.8 (a weekly AI user) was the other choice: it makes every figure 22% lower.
 - **Not used:** DX's Core 4 benchmark page says 3.8 merged PRs a week at P50, but it has no date and does not say who it counts. Faros AI (2025) and DORA 2025 give only changes in per cent, not a figure.
-- **The page says the source** in one small line: "An average engineer merged 1.4 PRs a week in 2025 (DX)".
+- **The page says the source** in one small line: "An average engineer merged 1.4 PRs a week (DX 2025)", or the person's own line.
 
 ### Engineer-hours
 

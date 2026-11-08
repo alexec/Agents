@@ -19,4 +19,17 @@ struct WorkflowScopeSentenceTests {
         let off = WorkflowSummary(workflow: workflow, scope: "user", isEnabled: false)
         #expect(off.rowHelp == "Turned off. \(workflow.summary)\nYour workflow: in every folder")
     }
+
+    /// A ready-made copy says it was updated, on its row too, or that a newer version is
+    /// available (#4071), from what the daemon sends.
+    @Test func aReadyMadeCopySaysItsNewerVersion() throws {
+        var s = WorkflowSummary(workflow: workflow, scope: "user")
+        s.readyMadeUpdatedAt = Date()
+        s.newerReadyMade = "It asks."
+        let back = try JSONDecoder().decode(WorkflowSummary.self, from: JSONEncoder().encode(s))
+        #expect(back.newerReadyMade == "It asks.")
+        let updated = try #require(back.readyMadeUpdatedSentence)
+        #expect(updated.hasPrefix("Updated to the new ready-made version on "))
+        #expect(back.rowHelp == "\(workflow.summary)\nYour workflow: in every folder\n\(updated)")
+    }
 }

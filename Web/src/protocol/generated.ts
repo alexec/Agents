@@ -4242,8 +4242,9 @@ export interface ForgeLogRequest {
 }
 
 /**
- * people/setForgeLogins (#2951): the caller's own GitHub, GitLab, Linear, Jira (#3313) and Forgejo
- * (#3836) logins, for Settings ▸ You, replacing what was kept; blank clears one.
+ * people/setForgeLogins (#2951): the caller's own GitHub, GitLab, Linear, Jira (#3313), Forgejo
+ * (#3836), Bitbucket and Azure DevOps (#3853) logins, for Settings ▸ You, replacing what was kept;
+ * blank clears one.
  */
 export interface ForgeLogins {
   github?: string;
@@ -4251,6 +4252,8 @@ export interface ForgeLogins {
   linear?: string;
   jira?: string;
   forgejo?: string;
+  bitbucket?: string;
+  azureDevOps?: string;
 }
 
 /**
@@ -6365,21 +6368,34 @@ export interface Multiplier {
  * no AI in 2025.
  */
 export interface MultiplierBaseline {
-  /** Merged PRs a week: 1.4. */
+  /**
+   * Merged PRs a week: 1.4 unless the person set their own (#3991), from 0.1 to 100, to one
+   * decimal.
+   */
   prsPerWeek: number;
   /** The hours of that week: 40. */
   hoursPerWeek: number;
   /** Where the figure is from, for the page's small line: DX 2025. */
   source: string;
+  /**
+   * The person's own line under the figures (#3991), from Settings ▸ Cost ▸ Multiplier. Absent: the
+   * default line, "An average engineer merged <prsPerWeek> PRs a week (<source>)".
+   */
+  line?: string;
 }
 
 /**
  * multiplier/count's params (#3988): the host's time zone, so the control plane counts calendar
- * weeks as the person does.
+ * weeks as the person does, and the person's baseline (#3991).
  */
 export interface MultiplierCountParams {
   /** An IANA zone name, such as Europe/London. Absent or unknown: UTC. */
   timeZone?: string;
+  /**
+   * The person's baseline on the host (#3991), so the figure is the same on every machine. Absent:
+   * 1.4.
+   */
+  prsPerWeek?: number;
 }
 
 /**
@@ -10860,6 +10876,13 @@ export interface TeamPerson {
   jiraLogin?: string;
   /** Their Forgejo login (#3836): their user name on the connected Forgejo or Gitea. */
   forgejoLogin?: string;
+  /** Their Bitbucket login (#3853): their Bitbucket nickname. */
+  bitbucketLogin?: string;
+  /**
+   * Their Azure DevOps login (#3853): their sign-in email or display name in the Azure DevOps
+   * organization.
+   */
+  azureDevOpsLogin?: string;
   you?: boolean;
 }
 
@@ -11882,6 +11905,16 @@ export interface WorkflowSummary {
    * which runs it on one of the bot's machines. Nothing of it runs here.
    */
   hearsFor?: string;
+  /**
+   * When the daemon wrote a newer ready-made version over this unedited copy (#4071), for 7 days
+   * after it did.
+   */
+  readyMadeUpdatedAt?: WireDate;
+  /**
+   * An edited copy of a ready-made workflow whose ready-made version changed since the daemon made
+   * the copy (#4071): what the newer version changes. The daemon never writes over an edited copy.
+   */
+  newerReadyMade?: string;
   awaitingApproval?: WorkflowApproval;
   deniedHere?: WorkflowApproval;
   lastFiredAt?: WireDate;
@@ -12242,6 +12275,7 @@ export interface Methods {
   "mcp/hosted": { params: Empty; result: HostedMCPSnapshot };
   "mcp/remove": { params: MCPRemoveRequest; result: MCPRemoveAnswer };
   "modes/remembered": { params: Empty; result: Record<string, JSONValue> };
+  "multiplier/state": { params: Empty; result: Multiplier };
   "options/remembered": { params: RememberedOptionsRequest; result: ConfigOption[] };
   "orgRoutes/check": { params: OrgRouteRequest; result: OrgRouteCheck };
   "orgRoutes/list": { params: Empty; result: OrgRouteList };
@@ -12632,6 +12666,7 @@ export const MethodTarget = {
   "mcp/hosted": "host",
   "mcp/remove": "host",
   "modes/remembered": "host",
+  "multiplier/state": "host",
   "options/remembered": "host",
   "orgRoutes/check": "control",
   "orgRoutes/list": "control",
@@ -12859,6 +12894,7 @@ export interface Notifications {
   "mcp/healthChanged": MCPHealthSnapshot;
   "mcp/hostedChanged": HostedMCPSnapshot;
   "modes/changed": Record<string, JSONValue>;
+  "multiplier/changed": Multiplier;
   "pages/changed": PagesChangedNotification;
   "pins/changed": PinsChangedNotification;
   "policy/effectiveChanged": PolicyEffectiveRequest;
@@ -13227,7 +13263,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeListRequest: { required: [], optional: ["folder", "state", "label", "assignee", "query", "cursor", "limit", "feature", "board"] },
   ForgeLog: { required: ["text"], optional: [] },
   ForgeLogRequest: { required: ["node"], optional: ["check"] },
-  ForgeLogins: { required: [], optional: ["github", "gitlab", "linear", "jira", "forgejo"] },
+  ForgeLogins: { required: [], optional: ["github", "gitlab", "linear", "jira", "forgejo", "bitbucket", "azureDevOps"] },
   ForgeMergeRequest: { required: ["node", "sha"], optional: ["method", "auto"] },
   ForgeNodeRequest: { required: ["node"], optional: [] },
   ForgePlan: { required: ["item", "children", "steps"], optional: ["lead"] },
@@ -13416,8 +13452,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MoveToMachineAnswer: { required: ["folder", "carriesOn"], optional: [] },
   MoveToMachineRequest: { required: ["agentID", "machine"], optional: ["machineName", "folder"] },
   Multiplier: { required: ["prsMerged", "reverts", "agentsWorking", "since", "baseline"], optional: ["multiplier", "engineerHours", "changedBy", "bestWeek", "mostAtOnce"] },
-  MultiplierBaseline: { required: ["prsPerWeek", "hoursPerWeek", "source"], optional: [] },
-  MultiplierCountParams: { required: [], optional: ["timeZone"] },
+  MultiplierBaseline: { required: ["prsPerWeek", "hoursPerWeek", "source"], optional: ["line"] },
+  MultiplierCountParams: { required: [], optional: ["timeZone", "prsPerWeek"] },
   NativeSetting: { required: [], optional: ["options", "sandbox", "clientPermission"] },
   Need: { required: ["id", "folder", "kind", "raisedAt", "headline"], optional: ["agentID"] },
   NotCommittedResponse: { required: ["isRepository", "paths", "more"], optional: [] },
@@ -13835,7 +13871,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SurfaceIdentification: { required: ["id", "name", "kind"], optional: [] },
   TeamBot: { required: ["user", "name", "spentTodayUSD", "capped", "machines", "online", "workflows", "live"], optional: ["group", "groupName", "caps"] },
   TeamBotRun: { required: ["host", "hostName", "agent"], optional: ["workflow", "since"] },
-  TeamPerson: { required: ["id", "name", "kind"], optional: ["githubLogin", "gitlabLogin", "linearLogin", "jiraLogin", "forgejoLogin", "you"] },
+  TeamPerson: { required: ["id", "name", "kind"], optional: ["githubLogin", "gitlabLogin", "linearLogin", "jiraLogin", "forgejoLogin", "bitbucketLogin", "azureDevOpsLogin", "you"] },
   TeamTrigger: { required: ["workflow", "trigger", "runsOn"], optional: ["event", "dueAt"] },
   TeamTriggerFired: { required: ["ran"], optional: [] },
   TeamTriggerSent: { required: ["taken"], optional: [] },
@@ -13917,7 +13953,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkflowSchedule: { required: ["minutes", "hours", "startMinute", "endMinute", "days"], optional: [] },
   WorkflowSettings: { required: ["options", "labels"], optional: ["permissionMode", "runtimeID", "model", "effort", "permissionRequests", "sandbox"] },
   WorkflowSettingsRequest: { required: ["folder", "workflowID", "settings"], optional: ["cooldown", "labels", "whenDone", "continueWhenBack", "runsOn"] },
-  WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire", "queued"], optional: ["scope", "content", "overLimit", "totalLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "hearsFor", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID", "mcpTriggers"] },
+  WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire", "queued"], optional: ["scope", "content", "overLimit", "totalLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "hearsFor", "readyMadeUpdatedAt", "newerReadyMade", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID", "mcpTriggers"] },
   WorkflowWriteRequest: { required: ["workflowID", "content"], optional: [] },
   WorkflowsListRequest: { required: [], optional: ["folder", "scope"] },
   WorktreeRemovalRequest: { required: ["root", "confirmed", "folder"], optional: [] },

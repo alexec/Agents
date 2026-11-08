@@ -4856,7 +4856,7 @@ type ForgeLogRequest struct {
 	Check *string `json:"check,omitzero"`
 }
 
-// people/setForgeLogins (#2951): the caller's own GitHub, GitLab, Linear, Jira (#3313) and Forgejo (#3836) logins, for Settings ▸ You, replacing what was kept; blank clears one.
+// people/setForgeLogins (#2951): the caller's own GitHub, GitLab, Linear, Jira (#3313), Forgejo (#3836), Bitbucket and Azure DevOps (#3853) logins, for Settings ▸ You, replacing what was kept; blank clears one.
 type ForgeLogins struct {
 	Github *string `json:"github,omitzero"`
 
@@ -4867,6 +4867,10 @@ type ForgeLogins struct {
 	Jira *string `json:"jira,omitzero"`
 
 	Forgejo *string `json:"forgejo,omitzero"`
+
+	Bitbucket *string `json:"bitbucket,omitzero"`
+
+	AzureDevOps *string `json:"azureDevOps,omitzero"`
 }
 
 // How forge/merge merges a pull request (#3130): a merge commit, one squashed commit, or its commits rebased onto the base.
@@ -7325,7 +7329,7 @@ type Multiplier struct {
 
 // What the Multiplier compares with (#3902), so that no client keeps its own copy: an engineer with no AI in 2025.
 type MultiplierBaseline struct {
-	// Merged PRs a week: 1.4.
+	// Merged PRs a week: 1.4 unless the person set their own (#3991), from 0.1 to 100, to one decimal.
 	PrsPerWeek float64 `json:"prsPerWeek"`
 
 	// The hours of that week: 40.
@@ -7333,12 +7337,18 @@ type MultiplierBaseline struct {
 
 	// Where the figure is from, for the page's small line: DX 2025.
 	Source string `json:"source"`
+
+	// The person's own line under the figures (#3991), from Settings ▸ Cost ▸ Multiplier. Absent: the default line, "An average engineer merged <prsPerWeek> PRs a week (<source>)".
+	Line *string `json:"line,omitzero"`
 }
 
-// multiplier/count's params (#3988): the host's time zone, so the control plane counts calendar weeks as the person does.
+// multiplier/count's params (#3988): the host's time zone, so the control plane counts calendar weeks as the person does, and the person's baseline (#3991).
 type MultiplierCountParams struct {
 	// An IANA zone name, such as Europe/London. Absent or unknown: UTC.
 	TimeZone *string `json:"timeZone,omitzero"`
+
+	// The person's baseline on the host (#3991), so the figure is the same on every machine. Absent: 1.4.
+	PrsPerWeek *float64 `json:"prsPerWeek,omitzero"`
 }
 
 // A runtime's own setting for one level: config option values (mode, model, effort), a sandbox choice, or the answer to permission requests.
@@ -12298,6 +12308,12 @@ type TeamPerson struct {
 	// Their Forgejo login (#3836): their user name on the connected Forgejo or Gitea.
 	ForgejoLogin *string `json:"forgejoLogin,omitzero"`
 
+	// Their Bitbucket login (#3853): their Bitbucket nickname.
+	BitbucketLogin *string `json:"bitbucketLogin,omitzero"`
+
+	// Their Azure DevOps login (#3853): their sign-in email or display name in the Azure DevOps organization.
+	AzureDevOpsLogin *string `json:"azureDevOpsLogin,omitzero"`
+
 	You *bool `json:"you,omitzero"`
 }
 
@@ -13737,6 +13753,12 @@ type WorkflowSummary struct {
 
 	// A bot's workflow that does not run here (#2027): the bot's name. This machine hears its server triggers with its own servers, once approved here, and sends each match to the control plane, which runs it on one of the bot's machines. Nothing of it runs here.
 	HearsFor *string `json:"hearsFor,omitzero"`
+
+	// When the daemon wrote a newer ready-made version over this unedited copy (#4071), for 7 days after it did.
+	ReadyMadeUpdatedAt *Date `json:"readyMadeUpdatedAt,omitzero"`
+
+	// An edited copy of a ready-made workflow whose ready-made version changed since the daemon made the copy (#4071): what the newer version changes. The daemon never writes over an edited copy.
+	NewerReadyMade *string `json:"newerReadyMade,omitzero"`
 
 	AwaitingApproval *WorkflowApproval `json:"awaitingApproval,omitzero"`
 

@@ -367,4 +367,27 @@ func TestReadyMadeUpdatesOnlyTheUneditedCopy(t *testing.T) {
 	if want, _ := readyMadeDigest(summary); madeReadyMade(home)["daily-summary"] != want {
 		t.Fatal("the update did not keep its digest")
 	}
+
+	// #4071: an updated copy says when; an edited one says nothing while its version is not
+	// known, and what the newer version changes once the daemon knows it made an older one.
+	notices := func() map[string]wire.WorkflowSummary {
+		t.Helper()
+		var list []wire.WorkflowSummary
+		json.Unmarshal(c.call(t, 3, "workflows/list", map[string]any{"scope": "user"}), &list)
+		by := map[string]wire.WorkflowSummary{}
+		for _, s := range list {
+			by[s.Workflow.WorkflowID] = s
+		}
+		return by
+	}
+	by := notices()
+	if by["daily-summary"].ReadyMadeUpdatedAt == nil || by["work-an-issue"].ReadyMadeUpdatedAt == nil ||
+		by["daily-summary"].NewerReadyMade != nil || by["daily-checks"].NewerReadyMade != nil || by["daily-checks"].ReadyMadeUpdatedAt != nil {
+		t.Fatalf("notices: %+v", by)
+	}
+	older, _ := readyMadeDigest(strings.Replace(checks, "permission-mode: ask", "permission-mode: plan", 1))
+	markReadyMadeMade(home, "daily-checks", older)
+	if n := notices()["daily-checks"].NewerReadyMade; n == nil || *n != readyMadeChange["daily-checks"] {
+		t.Fatalf("an edited copy of an older version: %v", n)
+	}
 }

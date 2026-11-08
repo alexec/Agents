@@ -35,10 +35,6 @@ export function orderedAchievements(achievements: Achievements): AchievementRow[
   return [...done, ...rows.filter((r) => !r.at)];
 }
 
-export function isComplete(achievements: Achievements): boolean {
-  return achievementList.every((m) => achievements.earned.some((e) => e.id === m.id));
-}
-
 /** As `Achievements.unseen`: the first look takes everything earned so far as seen. */
 export function unseenAchievements(achievements: Achievements, seen: Set<string> | null): { show: AchievementID[]; seen: Set<string> } {
   const ids = new Set(achievements.earned.map((e) => e.id));

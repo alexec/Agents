@@ -1,6 +1,6 @@
 // The one-time card for an achievement just earned (#984): the page's half of the window's and the
-// iPad's AchievementCard, at the bottom right until closed or opened; See Achievements opens their page
-// (#1067). Apart from Achievements.tsx so the pages do not load the router.
+// iPad's AchievementCard, at the bottom right until closed or opened; See Achievements opens the Multiplier
+// page, where the badges are (#3990). Apart from Achievements.tsx so the pages do not load the router.
 import { type AchievementID, achievementList, achievementsSeen } from "../model/achievements";
 import { go } from "../route";
 import type { Store } from "../model/store";
@@ -23,7 +23,7 @@ export function AchievementCard({ store }: { store: Store }) {
         </span>
         <button class="link close" aria-label="Dismiss achievement" title="Dismiss" onClick={() => dismiss(id)}>✕</button>
       </div>
-      <button class="link small" onClick={() => { dismiss(id); go({ nav: "reports", section: "achievements" }); }}>
+      <button class="link small" onClick={() => { dismiss(id); go({ nav: "reports", section: "multiplier" }); }}>
         See Achievements
       </button>
     </aside>

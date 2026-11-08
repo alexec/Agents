@@ -17,7 +17,7 @@ import { fromWireDate } from "../protocol/dates";
 import { Telling } from "./Telling";
 import { folderIsMissing, folderPath as missingFolderPath, missingFolderLabel } from "../model/missingFolder";
 import { shortAgo } from "../model/activity";
-import { labelClass } from "../model/labels";
+import { FilterChip } from "./Labels";
 import { runningTool, runningToolLabel, sessionMark, type SessionMark } from "../model/sidebar";
 import { isMuted, muteMark, mutedHelp, mutedWords } from "../model/mute";
 import { callLine } from "../model/turns";
@@ -231,7 +231,7 @@ export function SessionRow({ agent, chosen, onPick, going, extras, inSidebar = f
           {(agent.worktree || labels.length > 0) && (
             <span class="chips">
               {agent.worktree && <span class={`chip worktree${folderIsMissing(agent) ? " gone" : ""}`} title={worktreeHelp(agent.worktree, folderIsMissing(agent))}>⑂ {agent.worktree.name}</span>}
-              {labels.map((label) => <span key={label.value} class={labelClass(label)}>{label.value}</span>)}
+              {labels.map((label) => <FilterChip key={label.value} label={label} />)}
             </span>
           )}
           {/* What it holds (036), so an idle agent still holding the screen can be seen. What it waits for is the wait line's. */}

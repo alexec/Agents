@@ -8,6 +8,7 @@ import { useEffect, useRef } from "preact/hooks";
 import type { Agent, SessionLabel } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { accepted, labelClass, maximumLabels, splitTyped } from "../model/labels";
+import { filterByLabel, filterHint, filtersBy } from "../model/sessionSearch";
 
 /** Below 760 the prompt's head is one line, as on the iPhone (#1107). */
 const narrowQuery = typeof matchMedia === "function" ? matchMedia("(max-width: 759px)") : null;
@@ -40,8 +41,11 @@ export function LabelField({ store, host, folder, labels, add, remove, disabled,
   return (
     <div class="labels" role="group" aria-label="Labels" ref={group}>
       {labels.map((label) => (
-        <span key={label.value} class={labelClass(label)} title={label.owner === "agent" ? "Added by the agent" : "Added by you"}>
-          {label.value}
+        <span key={label.value} class={`${labelClass(label)}${filtersBy(label.value) ? " chosen" : ""}`}
+          title={label.owner === "agent" ? "Added by the agent" : "Added by you"}>
+          {/* Its words filter the sidebar by it (#3898); the cross still takes it off. */}
+          <button class="filter" aria-pressed={filtersBy(label.value)} title={filterHint}
+            onClick={() => filterByLabel(label.value)}>{label.value}</button>
           <button class="remove" aria-label={`Remove the label ${label.value}`} disabled={disabled}
             onClick={() => {
               remove(label.value);
@@ -73,6 +77,18 @@ export function LabelField({ store, host, folder, labels, add, remove, disabled,
         {vocabulary.value.filter((w) => !existing.some((x) => x.toLowerCase() === w.toLowerCase())).map((w) => <option key={w} value={w} />)}
       </datalist>
     </div>
+  );
+}
+
+/** A label's chip in a row, which filters the sidebar by it (#3898). The row is a button, so this is
+ *  a span that acts as one, and keeps its click from opening the row. */
+export function FilterChip({ label }: { label: Pick<SessionLabel, "value" | "owner"> }) {
+  const on = filtersBy(label.value);
+  const pick = (e: Event) => { e.stopPropagation(); e.preventDefault(); filterByLabel(label.value); };
+  return (
+    <span class={`${labelClass(label)} filters${on ? " chosen" : ""}`} role="button" tabIndex={0} aria-pressed={on}
+      title={filterHint} onClick={pick}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") pick(e); }}>{label.value}</span>
   );
 }
 

@@ -57,7 +57,11 @@ The connector has a page of its own (#3826), in the jira connector's shape. It i
 the folder's group of the sidebar, **Azure Boards · Work items**, and you can pin it.
 
 - **The project's open work items**, changed last first, at most 50, in sections: **Needs
-  you** (assigned to you), **Yours** (made by you) and **Team** (the rest). Each row says its
+  you** (assigned to you), **Yours** (made by you), **Team** and **Others**. With a control
+  plane, **Team** is its people and bots, by their Azure DevOps login (see
+  [Your Azure DevOps login](#your-azure-devops-login)), a row shows the name the control plane
+  knows them by, and the rest is **Others**. With no control plane, **Team** is the rest and
+  there is no **Others**: an organization has only its members and its bots. Each row says its
   type, its state, its assignee, its author, its area, when it changed and its tags. The
   sidebar's count is the work items that need you.
 - **A type, a state category** (Proposed, In progress, Resolved) **and tags** narrow it.
@@ -68,6 +72,15 @@ the folder's group of the sidebar, **Azure Boards · Work items**, and you can p
 
 The page only reads. Change a work item's state or tags on the Work pages, or in Azure
 Boards.
+
+### Your Azure DevOps login
+
+With a control plane, **Settings ▸ Account** on the Mac (**Settings ▸ Control plane** on the
+web page) keeps your **Azure DevOps login**, beside your GitHub, GitLab, Linear, Jira, Forgejo
+and Bitbucket logins. An Azure DevOps login is your sign-in email or your display name in the
+organization. The control plane gives the logins of all its people to the servers that draw a
+Team section. A machine that has Azure DevOps connected fills in your login from the
+connection, so you give it only when that machine is not connected.
 
 ## The events
 
@@ -136,8 +149,7 @@ Every write is your own click, made with your token: no approval card.
 - **Closed is by category,** read from the project's work item types, so a process of your
   own with other state names works.
 - **Not yet:** the Tasks slot of a folder's set-up, a project's board, and a **Connect
-  Azure DevOps** sheet with a sign-in. On the Work items page, Team is everyone else in the
-  organization: the control plane's people have no Azure DevOps login yet.
+  Azure DevOps** sheet with a sign-in.
 
 ## See also
 

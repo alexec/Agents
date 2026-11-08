@@ -251,6 +251,12 @@ func (m *Methods) peopleMethod(ctx context.Context, method string, params json.R
 			if request.Forgejo != nil {
 				p.ForgejoLogin = *request.Forgejo
 			}
+			if request.Bitbucket != nil {
+				p.BitbucketLogin = *request.Bitbucket
+			}
+			if request.AzureDevOps != nil {
+				p.AzureDevOpsLogin = *request.AzureDevOps
+			}
 			return []records.Person{p}, nil
 		})
 		if err != nil {
@@ -387,7 +393,8 @@ func (m *Methods) peopleForViews(user string) wire.PeopleForViews {
 	for _, p := range people {
 		row := wire.TeamPerson{ID: p.ID, Name: p.Name, Kind: kindOf(p),
 			GithubLogin: optional(p.GitHubLogin), GitlabLogin: optional(p.GitLabLogin), LinearLogin: optional(p.LinearLogin),
-			JiraLogin: optional(p.JiraLogin), ForgejoLogin: optional(p.ForgejoLogin)}
+			JiraLogin: optional(p.JiraLogin), ForgejoLogin: optional(p.ForgejoLogin),
+			BitbucketLogin: optional(p.BitbucketLogin), AzureDevOpsLogin: optional(p.AzureDevOpsLogin)}
 		if p.ID == m.s.localOwner() && (row.Name == "" || (m.records.Settings() != nil && row.Name == m.records.Settings().Name)) {
 			row.Name = localOwnerName
 		}

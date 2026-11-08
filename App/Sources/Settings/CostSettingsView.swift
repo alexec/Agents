@@ -5,7 +5,8 @@ import SwiftUI
 /// limits have stopped (#838). The limits themselves, in money and in tokens, and how many
 /// workflows may run (#506), are rules of Agents ▸ Policy now (#2957, FR-018, FR-023).
 ///
-/// Read only: nothing on this page starts, stops or changes anything.
+/// Read only but for the Multiplier's baseline (#3991): nothing on this page starts, stops
+/// or changes an agent.
 struct CostSettingsView: View {
     @Environment(AppModel.self) private var model
 
@@ -46,6 +47,8 @@ struct CostSettingsView: View {
             .paperListRow()
 
             if !stoppedByALimit.isEmpty { stopped }
+
+            MultiplierBaselineSection()
         }
         .paperForm()
         .task { await model.refreshCostState() }
@@ -101,5 +104,65 @@ struct CostSettingsView: View {
 
     private var stoppedByALimit: [Agent] {
         model.agents.filter { $0.endedReason == .costLimit }
+    }
+}
+
+/// Settings ▸ Cost ▸ Multiplier (#3991): what the Multiplier counts against, kept by this
+/// Mac's host in the person's preferences, which counts with it and tells the page at once.
+private struct MultiplierBaselineSection: View {
+    @Environment(AppModel.self) private var model
+    @State private var prsPerWeek = DisplayPreference.multiplierPRsPerWeekDefault
+    @State private var line = ""
+
+    /// The baseline as the host last said it, or the 2025 figure.
+    private var baseline: DaemonAPI.MultiplierBaseline {
+        model.work.multiplier?.baseline
+            ?? .init(prsPerWeek: DisplayPreference.multiplierPRsPerWeekDefault, hoursPerWeek: 40, source: "DX 2025")
+    }
+
+    var body: some View {
+        Section {
+            TextField("PRs a week", value: $prsPerWeek, format: .number.precision(.fractionLength(0...1)))
+                .monospacedDigit()
+                .onSubmit(save)
+            TextField("Line under the numbers", text: $line,
+                      prompt: Text(DaemonAPI.MultiplierBaseline(prsPerWeek: prsPerWeek, hoursPerWeek: 40,
+                                                                 source: baseline.source).defaultLine))
+                .onSubmit(save)
+            Button("Reset to the 2025 figure") {
+                prsPerWeek = DisplayPreference.multiplierPRsPerWeekDefault
+                line = ""
+                save()
+            }
+            .disabled(baseline.prsPerWeek == DisplayPreference.multiplierPRsPerWeekDefault && baseline.line == nil
+                      && prsPerWeek == DisplayPreference.multiplierPRsPerWeekDefault && line.isEmpty)
+        } header: {
+            Text("Multiplier")
+        } footer: {
+            Text("The Multiplier is the PRs your agents merged in the last 7 days over these PRs a week, "
+                 + "from 0.1 to 100. An empty line shows the default.")
+        }
+        .paperListRow()
+        .onAppear(perform: load)
+        .onChange(of: baseline) { load() }
+        .onDisappear(perform: save)
+    }
+
+    private func load() {
+        prsPerWeek = baseline.prsPerWeek
+        line = baseline.line ?? ""
+    }
+
+    /// Send what changed; the default figure and an empty line take their keys away.
+    private func save() {
+        let range = DisplayPreference.multiplierPRsPerWeekRange
+        let prs = min(max((prsPerWeek * 10).rounded() / 10, range.lowerBound), range.upperBound)
+        prsPerWeek = prs
+        let text = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard prs != baseline.prsPerWeek || (text.isEmpty ? nil : text) != baseline.line else { return }
+        model.displayMirror.set([
+            DisplayPreference.multiplierPRsPerWeek: prs == DisplayPreference.multiplierPRsPerWeekDefault ? .null : .double(prs),
+            DisplayPreference.multiplierLine: text.isEmpty ? .null : .string(text),
+        ])
     }
 }

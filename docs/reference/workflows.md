@@ -481,6 +481,10 @@ the days, edit the schedule's `days:`.
   keeps the digest of each copy it makes in `~/.agents/settings/ready-made-workflows.json`.
   The copy keeps its `enabled:`, `archived:`, `muted:` and `continue-when-back:`. The new
   version is asked for your approval again when it widens what the workflow can do.
+- The workflow's page and its row's help say "Updated to the new ready-made version on <date>"
+  for 7 days after an update. A copy you edited is not updated: its page says "A newer
+  ready-made version is available", with what the newer version changes (#4071). It says so
+  only for a copy the daemon made after it started to keep digests.
 - Of your machines that have it on, only one writes each summary: the first to claim that
   morning's run from your control plane. A machine with no control plane writes its own.
 - Its agent calls [`write_daily_summary`](agent-tools.md) for the facts. These are every folder on

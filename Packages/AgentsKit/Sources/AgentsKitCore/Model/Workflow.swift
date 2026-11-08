@@ -322,6 +322,12 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     /// approved here, this host's servers hear its triggers and send each match to the
     /// control plane, which runs it on one of the bot's machines. Nothing of it runs here.
     public var hearsFor: String?
+    /// When the daemon wrote a newer ready-made version over this unedited copy (#4071),
+    /// for 7 days after it did.
+    public var readyMadeUpdatedAt: Date?
+    /// An edited copy of a ready-made workflow whose ready-made version changed (#4071):
+    /// what the newer version changes. The daemon never writes over an edited copy.
+    public var newerReadyMade: String?
 
     public var id: String { workflow.id }
     public var folder: URL { workflow.folder }
@@ -452,12 +458,20 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     public static let userScopeSentence = "Your workflow: in every folder"
     public var scopeSentence: String? { scope == "user" ? Self.userScopeSentence : nil }
 
-    /// A row's tooltip: what it does, led by Turned off when it is, and then where it is
-    /// (#2759). The Remote's row says where it is to VoiceOver.
+    /// What a ready-made copy's row and page say about its newer versions (#4071). The
+    /// Remote and the web page say the same words.
+    public var readyMadeUpdatedSentence: String? {
+        readyMadeUpdatedAt.map { "Updated to the new ready-made version on \($0.formatted(date: .abbreviated, time: .omitted))" }
+    }
+    public static let readyMadeUpdatedDetail = "You had not edited your copy, so the daemon wrote the new version over it"
+    public static let newerReadyMadeSentence = "A newer ready-made version is available"
+    public static let newerReadyMadeDetail = "You edited your copy, so it was not updated"
+
+    /// A row's tooltip: what it does, led by Turned off when it is, then where it is
+    /// (#2759) and a ready-made update (#4071). The Remote's row says where it is to VoiceOver.
     public var rowHelp: String {
         let what = !isEnabled && !isArchived ? "Turned off. \(workflow.summary)" : workflow.summary
-        guard let scopeSentence else { return what }
-        return "\(what)\n\(scopeSentence)"
+        return ([what, scopeSentence, readyMadeUpdatedSentence] as [String?]).compactMap { $0 }.joined(separator: "\n")
     }
 
     /// Read leniently: a daemon from before #100 sends no `isEnabled`, and an outcome
@@ -490,6 +504,8 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
         // A state or failure this version does not know costs the lines, not the list (#383).
         mcpTriggers = (try? c.decodeIfPresent([MCPTriggerStatus].self, forKey: .mcpTriggers)) ?? nil
         hearsFor = try c.decodeIfPresent(String.self, forKey: .hearsFor)
+        readyMadeUpdatedAt = try c.decodeIfPresent(Date.self, forKey: .readyMadeUpdatedAt)
+        newerReadyMade = try c.decodeIfPresent(String.self, forKey: .newerReadyMade)
     }
 
     /// What its cooldown is doing, in one sentence, for the pages that show triggers

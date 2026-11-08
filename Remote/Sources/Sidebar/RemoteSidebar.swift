@@ -17,7 +17,8 @@ struct RemoteSidebar: View {
     @Environment(RemoteModel.self) private var model
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var folds = SidebarFolds(scope: "")
-    @State private var query = ""
+    /// The search field's words, the model's so a label's chip can set them (#3898).
+    private var query: String { model.sidebarSearch }
     /// The field's words once typing pauses, so a keystroke costs the field and not a
     /// pass over every folder (#176).
     @State private var searched = ""
@@ -260,7 +261,7 @@ struct RemoteSidebar: View {
         .toolbarBackground(Paper.sidebar, for: .navigationBar)
         .navigationTitle("Agents")
         .sheet(isPresented: $showsSettings) { RemoteSettings() }
-        .searchable(text: $query, prompt: "Search")
+        .searchable(text: Bindable(model).sidebarSearch, prompt: SessionSearchWords.prompt)
         .task(id: query) {
             let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
             if !words.isEmpty { try? await Task.sleep(for: .milliseconds(150)) }

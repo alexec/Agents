@@ -5737,7 +5737,12 @@
     {
       "name": "multiplier/changed",
       "x-capability": "multiplier/1",
-      "description": "The Multiplier changed (#3903): a PR of the person's agents merged or a revert merged, with the PR in changedBy. The Mac window follows it; it does not poll.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "The Multiplier changed (#3903): a PR of the person's agents merged or a revert merged, with the PR in changedBy, or the person changed their baseline (#3991), with no changedBy. The Mac window follows it; it does not poll.",
       "x-notification": true,
       "paramStructure": "by-name",
       "params": [
@@ -5753,6 +5758,11 @@
     {
       "name": "multiplier/state",
       "x-capability": "multiplier/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "description": "The Multiplier now (#3903): from the control plane's count of the person's machines when this machine has one, else from this machine's lineage. Cheap: the Mac window asks on each open.",
       "paramStructure": "by-name",
       "params": [
