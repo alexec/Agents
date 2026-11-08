@@ -37,7 +37,7 @@ Rules from Alex (2026-10-12/13) that are not in AGENTS.md:
   #3474).** Other UI enhancements auto-merge at once, with `Approval: not needed` in
   their body. Never turn on auto-merge, fix checks or
   rebase a PR labelled `needs-approval`, and never message its lane about one: it fixes
-  nothing until Alex comments on the PR. Its stuck checks are not
+  nothing until Alex reviews or comments on the PR. Its stuck checks are not
   stuck. Report the waiting ones to Alex in your table, with the list
   https://github.com/alexec/Agents/pulls?q=is%3Aopen+label%3Aneeds-approval.
 - **Priority:** build speed and PR throughput, then bugs, then enhancements; `expedite`

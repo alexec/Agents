@@ -21,8 +21,8 @@ import (
 // the open items with each label (forge/issues and forge/pulls, so one search for every folder)
 // and opens, updates or ends their records. Answered in the app, the answer goes back to
 // GitHub as the person: a ticked line ticks the issue's line, the last one takes the label and
-// the person off and says so in a comment; an approval comments and sets approved or
-// changes-wanted. The labels then only mirror the request, and a label set by hand still
+// the person off and says so in a comment; an approval comments (a review on the agents'
+// bot's PR, #3860) and sets approved or changes-wanted. The labels then only mirror the request, and a label set by hand still
 // opens or ends it at the next sweep.
 
 // forgeRequestLabel is a label that makes a request, on an issue or a pull request.
@@ -332,8 +332,19 @@ func (d *Daemon) answerForgeRequest(ctx context.Context, rec wire.Request, a wir
 		default:
 			return wire.RequestUpdate{}, Invalid("An approval is approve or changes, not %q.", action)
 		}
-		// The person's own comment: no <!-- agent --> mark.
-		if _, err := gh.CommentOnPR(ctx, f.Repo, number, note); err != nil {
+		page, err := gh.ItemPage(ctx, f.Repo, number, "")
+		if err != nil {
+			return wire.RequestUpdate{}, err
+		}
+		// Another's PR, as the agents' bot's (#3860): a real review of the head commit, which the
+		// agent bot check and a required review count. The person's own PR takes no review from
+		// them, so there it is the person's own comment, with no <!-- agent --> mark.
+		if c, ok := d.githubConnection(); ok && c.Login != "" && page.Author != "" && page.Head != "" && !strings.EqualFold(page.Author, c.Login) {
+			_, err = gh.ReviewPR(ctx, f.Repo, number, page.Head, action == "approve", note)
+		} else {
+			_, err = gh.CommentOnPR(ctx, f.Repo, number, note)
+		}
+		if err != nil {
 			return wire.RequestUpdate{}, err
 		}
 		if err := gh.SetLabels(ctx, f.Repo, number, []string{add}, remove); err != nil {

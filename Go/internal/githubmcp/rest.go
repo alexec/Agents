@@ -356,7 +356,7 @@ func (p pull) pr() PR {
 // author one of the repo's own people.
 func (p pull) trusted(repo string) bool {
 	own := p.Head.Repo != nil && strings.EqualFold(p.Head.Repo.FullName, repo)
-	return own && isTrusted(p.Association, p.User.Login, p.User.Type)
+	return own && isOwnAuthor(p.Association, p.User.Login, p.User.Type)
 }
 
 type label struct {
@@ -410,7 +410,7 @@ func (i issueJSON) issue() Issue {
 	return Issue{Number: i.Number, Title: i.Title, Author: i.User.Login, Labels: labels, URL: i.HTMLURL, Assignees: assignees}
 }
 
-func (i issueJSON) trusted() bool { return isTrusted(i.Association, i.User.Login, i.User.Type) }
+func (i issueJSON) trusted() bool { return isOwnAuthor(i.Association, i.User.Login, i.User.Type) }
 
 func query(path string, page int) string {
 	sep := "?"
@@ -768,7 +768,7 @@ func (g *RealGitHub) ConflictPRs(ctx context.Context, repo string) ([]ConflictPR
 		}
 		// A deleted account is no author: not trusted.
 		if n.Author != nil && !n.CrossRepo {
-			c.Trusted = isTrusted(n.Association, n.Author.Login, n.Author.Typename)
+			c.Trusted = isOwnAuthor(n.Association, n.Author.Login, n.Author.Typename)
 		}
 		// UNKNOWN while GitHub works it out: neither yes nor no.
 		switch n.Mergeable {
@@ -1015,7 +1015,7 @@ func (g *RealGitHub) PRLabelActivity(ctx context.Context, repo string, kind PRLa
 		if e.Event != wanted || e.Issue == nil || !e.Issue.isPR() {
 			continue
 		}
-		// Labelling takes triage access, so whoever did it is trusted, never a bot (#728).
+		// Labelling takes triage access, so whoever did it is trusted, never a bot but the agents' (#728, #3860).
 		out = append(out, PRLabelActivity{
 			ID:      strconv.Itoa(e.ID),
 			At:      e.CreatedAt,

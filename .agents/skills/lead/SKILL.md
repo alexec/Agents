@@ -128,7 +128,8 @@ When all the children are closed:
 2. Ask `estimate_issue` for the epic (#3590). Closed, it says the estimate the epic had
    when its work started against what it took, in one line: "Estimated $X, Zh of work;
    actual $A, Hh of work".
-3. Post one comment on the epic, starting with `<!-- agent -->`: a table of each child,
+3. Post one comment on the epic, starting with `<!-- agent -->` when you post as `alexec`
+   (AGENTS.md, "Who an agent posts as"): a table of each child,
    its PR, and what it cost (from each lane's session, `read_session`), then the total.
    Then that line, as `estimate_issue` says it; when it says no estimate was kept, say
    that. Say what was left out and where it went.

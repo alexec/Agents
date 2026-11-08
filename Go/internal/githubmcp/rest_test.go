@@ -497,3 +497,52 @@ func TestClosingRefs(t *testing.T) {
 		t.Fatalf("fixes with none: %v", j)
 	}
 }
+
+// #3860: pr.reviewed's read: a person's Approve and Request changes, a comment with words;
+// never a pending, dismissed or empty review, or one before since. A bot's is not trusted.
+func TestPRReviewsKeepsPostedReviewsAndJudgesTheReviewer(t *testing.T) {
+	api := newFakeAPI(t, map[string]string{"graphql": `{"data": {"repository": {"pullRequests": {"nodes": [
+		{"number": 70, "title": "New control", "body": "Fixes #69", "headRefName": "agents/70", "url": "u70", "author": {"login": "alexec-agents"},
+		 "reviews": {"nodes": [
+			{"author": {"login": "alexec", "__typename": "User"}, "authorAssociation": "OWNER", "state": "APPROVED", "body": "", "url": "r1", "databaseId": 1, "submittedAt": "2026-11-07T10:05:00Z", "commit": {"oid": "h70"}},
+			{"author": {"login": "alexec", "__typename": "User"}, "authorAssociation": "OWNER", "state": "CHANGES_REQUESTED", "body": "Move it left", "url": "r2", "databaseId": 2, "submittedAt": "2026-11-07T10:06:00Z", "commit": {"oid": "h70"}},
+			{"author": {"login": "alexec", "__typename": "User"}, "authorAssociation": "OWNER", "state": "COMMENTED", "body": "", "databaseId": 3, "submittedAt": "2026-11-07T10:07:00Z"},
+			{"author": {"login": "alexec", "__typename": "User"}, "authorAssociation": "OWNER", "state": "PENDING", "body": "draft", "databaseId": 4},
+			{"author": {"login": "alexec", "__typename": "User"}, "authorAssociation": "OWNER", "state": "DISMISSED", "body": "", "databaseId": 5, "submittedAt": "2026-11-07T10:08:00Z"},
+			{"author": {"login": "alexec", "__typename": "User"}, "authorAssociation": "OWNER", "state": "APPROVED", "body": "", "databaseId": 6, "submittedAt": "2026-11-06T10:00:00Z"},
+			{"author": {"login": "coderabbitai", "__typename": "Bot"}, "authorAssociation": "NONE", "state": "COMMENTED", "body": "Actionable comments posted: 0", "databaseId": 7, "submittedAt": "2026-11-07T10:09:00Z"}]}},
+		{"number": 71, "headRefName": "agents/71", "url": "u71", "author": {"login": "alexec"},
+		 "reviews": {"nodes": [{"author": {"login": "alexec", "__typename": "User"}, "authorAssociation": "OWNER", "state": "APPROVED", "databaseId": 8, "submittedAt": "2026-11-07T10:10:00Z"}]}}]}}}}`})
+	g := api.github()
+	since := "2026-11-07T10:00:00.000Z"
+	reviews, err := g.PRReviews(context.Background(), repo, since, 70)
+	if err != nil {
+		t.Fatal(err)
+	}
+	equal(t, len(reviews), 3, "approve, request changes and CodeRabbit's words")
+	equal(t, reviews[0].State, "approved", "approve")
+	equal(t, reviews[0].Commit, "h70", "its commit")
+	equal(t, reviews[0].PR.Branch, "agents/70", "its PR")
+	equal(t, reviews[0].PR.Fixes, []string{"#69"}, "its fixes")
+	equal(t, reviews[0].Trusted, true, "Alex")
+	equal(t, reviews[1].State, "changes_requested", "request changes")
+	equal(t, reviews[1].Body, "Move it left", "body")
+	equal(t, reviews[2].Author, "coderabbitai", "CodeRabbit")
+	equal(t, reviews[2].Trusted, false, "a bot's review is not a person's")
+	all, err := g.PRReviews(context.Background(), repo, since, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	equal(t, len(all), 4, "every open PR's")
+}
+
+// #3860: the person's agents' bot opens the repo's own PRs; another bot does not.
+func TestTheAgentsBotsPRIsTheReposOwn(t *testing.T) {
+	equal(t, isOwnAuthor("CONTRIBUTOR", "alexec-agents[bot]", "Bot"), true, "REST's bot")
+	equal(t, isOwnAuthor("NONE", "alexec-agents", "Bot"), true, "GraphQL's bot")
+	equal(t, isOwnAuthor("NONE", "dependabot[bot]", "Bot"), false, "another bot")
+	equal(t, isOwnAuthor("NONE", "some-agents", "User"), false, "a person named so")
+	equal(t, isOwnAuthor("OWNER", "alexec", "User"), true, "the person")
+	equal(t, isTrusted("CONTRIBUTOR", "alexec-agents[bot]", "Bot"), false, "the bot's comments are still the agents' own")
+	equal(t, isTrustedActor("alexec-agents[bot]", "Bot", false, "", false), true, "the bot's labels")
+}

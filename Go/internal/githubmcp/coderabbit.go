@@ -191,7 +191,7 @@ func (g *RealGitHub) CodeRabbitPRs(ctx context.Context, repo string) ([]Reviewed
 			r.PR.Author = n.Author.Login
 		}
 		if n.Author != nil && !n.CrossRepo {
-			r.Trusted = isTrusted(n.Association, n.Author.Login, n.Author.Typename)
+			r.Trusted = isOwnAuthor(n.Association, n.Author.Login, n.Author.Typename)
 		}
 		for _, v := range n.Reviews.Nodes {
 			if v.Author.isCodeRabbit() && isWholeReview(v.Body, v.State) && v.Commit != nil && v.Commit.Oid == n.HeadRefOid {

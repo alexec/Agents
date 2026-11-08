@@ -17,6 +17,7 @@ BOT = "alexec-agents[bot]"
 
 CONFIG = f"bots:\n  {BOT}: alexec  # the owner\n"
 ONE_PERSON = CONFIG + "require-another-approver: false\n"
+LABELLED = ONE_PERSON + "approval-labels: needs-approval, approved\n"
 
 
 def load():
@@ -29,8 +30,8 @@ def load():
     return module
 
 
-def review(login, state, kind="User"):
-    return {"user": {"login": login, "type": kind}, "state": state}
+def review(login, state, kind="User", commit="h2"):
+    return {"user": {"login": login, "type": kind}, "state": state, "commit_id": commit}
 
 
 def fake(config=CONFIG, permission="write", reviews=()):
@@ -48,6 +49,7 @@ def fake(config=CONFIG, permission="write", reviews=()):
 
 def main():
     check = load()["check"]
+    failed = 0
     cases = [
         ("owner with write access passes", fake(), BOT, True),
         ("owner with admin access passes", fake(permission="admin"), BOT, True),
@@ -72,7 +74,27 @@ def main():
         ("a person's pull request passes", fake(), "sam", True),
         ("no agent-bots.yml passes", fake(config=None), BOT, True),
     ]
-    failed = 0
+    # #3860: a bot's PR with an approval label waits for a person's approval of its head (h2).
+    labelled = [
+        ("labelled with no approval fails", fake(config=LABELLED), ["needs-approval"], False),
+        ("labelled and approved on the head passes",
+         fake(config=LABELLED, reviews=[review("alexec", "APPROVED")]), ["needs-approval"], True),
+        ("approved label still needs the review", fake(config=LABELLED), ["approved"], False),
+        ("an approval of an older commit does not count",
+         fake(config=LABELLED, reviews=[review("alexec", "APPROVED", commit="h1")]), ["approved"], False),
+        ("changes asked after an approval fail",
+         fake(config=LABELLED, reviews=[review("alexec", "APPROVED"), review("alexec", "CHANGES_REQUESTED")]),
+         ["needs-approval"], False),
+        ("a bot's approval does not count",
+         fake(config=LABELLED, reviews=[review("helper[bot]", "APPROVED", "Bot")]), ["needs-approval"], False),
+        ("no approval label passes", fake(config=LABELLED), ["enhancement"], True),
+        ("no approval-labels in the file passes", fake(config=ONE_PERSON), ["needs-approval"], True),
+    ]
+    for name, api, labels, want in labelled:
+        passed, message = check(api, REPO, 7, BOT, "main", labels, "h2")
+        if passed != want:
+            failed += 1
+            print(f"FAIL {name}: passed={passed}, want {want}: {message}")
     for name, api, author, want in cases:
         passed, message = check(api, REPO, 7, author, "main")
         if passed != want:
@@ -87,7 +109,7 @@ def main():
         print(f"FAIL a config with a {name} is an error")
     if failed:
         return 1
-    print(f"agent-bot-check: {len(cases) + 2} cases pass")
+    print(f"agent-bot-check: {len(cases) + len(labelled) + 2} cases pass")
     return 0
 
 

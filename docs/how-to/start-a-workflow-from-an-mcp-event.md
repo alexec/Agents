@@ -113,6 +113,11 @@ and use `add_issue_comment` on the PR to say what you changed.
   ready for review. It takes the same filters and `anyone`. Drafts never raise it. The
   **Review pull requests** workflow in `.agents/workflows/` starts an agent on it that
   reads the diff and leaves one comment.
+- Its `pr.reviewed` (#3860) is raised for each review a person posts on an open pull
+  request: `state` is `approved` (Approve), `changes_requested` (Request changes) or
+  `commented` (a review with words only). A pending, dismissed or empty review raises
+  nothing, nor does a bot's, unless `anyone` is set. It takes the same filters as
+  `pr.merged`. A lane whose pull request waits for the person's approval waits on it.
 - Its CodeRabbit events (#1344) take the same filters and `anyone`. `review.posted` is raised
   once for each review CodeRabbit finishes on a pull request's head commit: each time its
   `CodeRabbit` status on that commit goes to success (where it sets no status, its review on

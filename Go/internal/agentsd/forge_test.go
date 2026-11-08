@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -46,6 +47,8 @@ type fakeForgeGitHub struct {
 	todos  []githubmcp.Item
 	bodies map[int]string
 	states map[int]string
+	// authors are ItemPage's author by number, when set (#3860); its head is then h<number>.
+	authors map[int]string
 }
 
 func (f *fakeForgeGitHub) Search(_ context.Context, repos []string, sf githubmcp.SearchFilter, after string, first int) (githubmcp.SearchPage, error) {
@@ -83,12 +86,17 @@ func (f *fakeForgeGitHub) ItemPage(_ context.Context, repo string, number int, b
 	f.items++
 	body, hasBody := f.bodies[number]
 	state := f.states[number]
+	author := f.authors[number]
 	f.mu.Unlock()
 	if hasBody {
 		if state == "" {
 			state = "open"
 		}
-		return githubmcp.ItemDetail{Item: githubmcp.Item{Repo: repo, Number: number, PR: number == 12, State: state, Title: "Item", UpdatedAt: "2026-11-01T10:00:00Z"}, Body: body}, nil
+		d := githubmcp.ItemDetail{Item: githubmcp.Item{Repo: repo, Number: number, PR: number == 12, State: state, Title: "Item", Author: author, UpdatedAt: "2026-11-01T10:00:00Z"}, Body: body}
+		if author != "" {
+			d.Head = fmt.Sprintf("h%d", number)
+		}
+		return d, nil
 	}
 	if number == 404 {
 		return githubmcp.ItemDetail{}, &githubmcp.GitHubError{Kind: githubmcp.NotFound, Message: "not found on GitHub"}

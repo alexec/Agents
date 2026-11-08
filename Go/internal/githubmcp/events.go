@@ -48,7 +48,7 @@ var (
 )
 
 // ownPRs is what every PR event says of whose PRs it raises.
-const ownPRs = " Only PRs from a branch of the repo itself, not a fork, by the repo's owner, members and collaborators, never a bot, unless anyone is true."
+const ownPRs = " Only PRs from a branch of the repo itself, not a fork, by the repo's owner, members and collaborators or their agents' bot (<login>-agents), never another bot, unless anyone is true."
 
 func branchProperty(description string) property {
 	return property{name: "branch", kind: "string", description: description}
@@ -137,6 +137,12 @@ var events = append([]event{
 		input:       schema{repoProperty, prProperty, fixesProperty, anyoneProperty, mineProperty, anyProperty},
 		payload: object(map[string]any{"pr": prSchema(nil),
 			"comment": object(map[string]any{"author": str, "url": str, "body": str}), "commentedAt": str})},
+	// A person's review (#3860): how the person approves a bot's PR, where a comment did before.
+	{name: "pr.reviewed", title: "Pull request reviewed",
+		description: "A review was posted on a pull request: Approve (state approved), Request changes (changes_requested), or a comment with words (commented). A pending, a dismissed and an empty review are left out. Its body is the first 4000 characters, and commit is the commit it reviewed. Only reviews by the repo's owner, members and collaborators, never a bot, unless anyone is true; only open pull requests." + ownPRs,
+		input:       schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, fixesProperty, anyoneProperty, mineProperty, anyProperty},
+		payload: object(map[string]any{"pr": prSchema(nil),
+			"review": object(map[string]any{"author": str, "state": str, "body": str, "url": str, "commit": str}), "reviewedAt": str})},
 	// For the person, not the repo (#2034): what asks the connection's owner for something.
 	{name: "review.requested", title: "Review requested from me",
 		description: "A review was requested from the GitHub account this server is connected as, on an open pull request: once per request, so a request taken back and made again is a new one. Anyone's PR, a fork's too.",
@@ -706,6 +712,23 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 		}
 		return list, truncated, nil
 	}
+	if name == "pr.reviewed" {
+		reviews, err := gh.PRReviews(ctx, repo, since, a.pr)
+		if err != nil {
+			return nil, false, err
+		}
+		var list []candidate
+		for _, r := range reviews {
+			at := normalized(r.At)
+			if at == "" || (a.pr != 0 && r.PR.Number != a.pr) || (a.branch != "" && r.PR.Branch != a.branch) ||
+				!(a.anyone || r.Trusted) || !a.closesOne(r.PR) || !a.byMe(r.PR, yours) {
+				continue
+			}
+			list = append(list, candidate{eventID: fmt.Sprintf("pr.reviewed:%s:%d", repo, r.ID), time: at,
+				data: func() (map[string]any, error) { return r.data(), nil }})
+		}
+		return list, false, nil
+	}
 	if name == "deploy.waiting" {
 		waiting, err := gh.WaitingDeploys(ctx, repo, a.workflow, a.branch)
 		if err != nil {
@@ -828,7 +851,7 @@ func checkRunCandidates(ctx context.Context, gh GitHub, name string, a args, you
 					return nil, nil
 				}
 				// mine: the owner's own PR, trusted or not; else the trust filter (#728).
-				if yours != nil && !yours.owns(details.PR.Number) || yours == nil && !a.anyone && !details.Trusted {
+				if yours != nil && !yours.ownsPR(details.PR) || yours == nil && !a.anyone && !details.Trusted {
 					return nil, nil
 				}
 				return toJSON(*details), nil
