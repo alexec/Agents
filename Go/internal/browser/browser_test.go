@@ -2,6 +2,7 @@ package browser
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +11,10 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	cdpbrowser "github.com/chromedp/cdproto/browser"
+	"github.com/chromedp/cdproto/cdp"
+	"github.com/chromedp/chromedp"
 )
 
 // fake is a machine whose Node is a script that "installs" Chromium as an empty program,
@@ -206,6 +211,14 @@ func TestARealChromium(t *testing.T) {
 	if !strings.HasPrefix(p.endpoint, "ws://127.0.0.1:") || !strings.Contains(p.endpoint, "/devtools/browser/") {
 		t.Fatal(p.endpoint)
 	}
+	// A checkout refuses HeadlessChrome (#4060).
+	v, err := chromedp.CallBrowser(p.store.(cdpStore).ctx, cdpbrowser.GetVersion, cdp.Empty{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(v.UserAgent, "Headless") {
+		t.Fatal(v.UserAgent)
+	}
 	if out, _ := exec.Command("lsof", "-a", "-p", strconv.Itoa(p.pid), "-iTCP", "-sTCP:LISTEN", "-nP").Output(); strings.Contains(string(out), "*:") {
 		t.Fatalf("listens beyond 127.0.0.1:\n%s", out)
 	}
@@ -220,6 +233,12 @@ func TestARealChromium(t *testing.T) {
 	}
 }
 
+func TestHeadedUserAgent(t *testing.T) {
+	const ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) %s/156.0.0.0 Safari/537.36"
+	if got, want := headedUserAgent(fmt.Sprintf(ua, "HeadlessChrome")), fmt.Sprintf(ua, "Chrome"); got != want {
+		t.Fatal(got)
+	}
+}
 
 func mustStart(t *testing.T, m *Machine) {
 	t.Helper()
