@@ -198,7 +198,6 @@ final class AppModel {
             showsSecrets = false
             showsAccounts = false
             showsTime = false
-            showsAchievements = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -225,7 +224,6 @@ final class AppModel {
             showsSecrets = false
             showsAccounts = false
             showsTime = false
-            showsAchievements = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -251,7 +249,6 @@ final class AppModel {
             showsSecrets = false
             showsAccounts = false
             showsTime = false
-            showsAchievements = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -275,7 +272,6 @@ final class AppModel {
             showsEvents = false
             showsRuntimes = false
             showsTime = false
-            showsAchievements = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -299,7 +295,6 @@ final class AppModel {
             showsRuntimes = false
             showsMCPServers = false
             showsTime = false
-            showsAchievements = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -322,7 +317,6 @@ final class AppModel {
             showsRuntimes = false
             showsMCPServers = false
             showsTime = false
-            showsAchievements = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -345,30 +339,6 @@ final class AppModel {
             showsMCPServers = false
             showsSecrets = false
             showsAccounts = false
-            showsAchievements = false
-            showsTokens = false
-            machinePage = nil
-            showsWork = false
-            showsDocs = false
-            selection = nil
-            openWorkflow = nil
-            folderPage = nil
-            composing = false
-        }
-    }
-
-    /// Whether the window is showing Achievements: the first steps taken, and the ones still to
-    /// take (#1067). A page like Time, and not persisted for the same reason.
-    var showsAchievements = false {
-        didSet {
-            guard showsAchievements, showsAchievements != oldValue else { return }
-            showsSpending = false
-            showsEvents = false
-            showsRuntimes = false
-            showsMCPServers = false
-            showsSecrets = false
-            showsAccounts = false
-            showsTime = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -392,7 +362,6 @@ final class AppModel {
             showsSecrets = false
             showsAccounts = false
             showsTime = false
-            showsAchievements = false
             machinePage = nil
             showsWork = false
             showsDocs = false
@@ -417,7 +386,6 @@ final class AppModel {
             showsSecrets = false
             showsAccounts = false
             showsTime = false
-            showsAchievements = false
             showsTokens = false
             selection = nil
             openWorkflow = nil
@@ -440,7 +408,6 @@ final class AppModel {
             showsSecrets = false
             showsAccounts = false
             showsTime = false
-            showsAchievements = false
             showsTokens = false
             machinePage = nil
             selection = nil
@@ -462,7 +429,6 @@ final class AppModel {
             showsSecrets = false
             showsAccounts = false
             showsTime = false
-            showsAchievements = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -545,7 +511,6 @@ final class AppModel {
         showsSecrets = false
         showsAccounts = false
         showsTime = false
-        showsAchievements = false
         showsTokens = false
         machinePage = nil
         showsWork = false
@@ -572,7 +537,6 @@ final class AppModel {
         showsSecrets = false
         showsAccounts = false
         showsTime = false
-        showsAchievements = false
         showsTokens = false
         machinePage = nil
         showsWork = false
@@ -620,7 +584,6 @@ final class AppModel {
             if showsSpending { return .spending }
             if showsTokens { return .tokens }
             if showsTime { return .time }
-            if showsAchievements { return .achievements }
             if showsWork { return .work(workPlace.kind) }
             if showsDocs { return .docs }
             // Nothing else open is the Multiplier page (#3986), as the detail draws it.
@@ -647,7 +610,6 @@ final class AppModel {
                 showsSecrets = false
                 showsAccounts = false
                 showsTime = false
-                showsAchievements = false
                 showsTokens = false
                 machinePage = nil
                 showsWork = false
@@ -670,8 +632,6 @@ final class AppModel {
                 showsTokens = true
             case .time:
                 showsTime = true
-            case .achievements:
-                showsAchievements = true
             case .work(let kind):
                 // The list's row: its list, or the place in it still open.
                 showWork(workPlace.kind == kind ? workPlace : WorkPlace(kind: kind))
@@ -700,7 +660,6 @@ final class AppModel {
                 showsSecrets = false
                 showsAccounts = false
                 showsTime = false
-                showsAchievements = false
                 showsTokens = false
                 machinePage = nil
                 showsWork = false
@@ -725,7 +684,6 @@ final class AppModel {
         showsSecrets = false
         showsAccounts = false
         showsTime = false
-        showsAchievements = false
         showsTokens = false
         machinePage = nil
         showsWork = false
@@ -742,7 +700,6 @@ final class AppModel {
         showsSecrets = false
         showsAccounts = false
         showsTime = false
-        showsAchievements = false
         showsTokens = false
         machinePage = nil
         showsWork = false
@@ -774,7 +731,6 @@ final class AppModel {
         showsSecrets = false
         showsAccounts = false
         showsTime = false
-        showsAchievements = false
         showsTokens = false
         machinePage = nil
         showsWork = false
@@ -1013,7 +969,6 @@ final class AppModel {
         showsSecrets = false
         showsAccounts = false
         showsTime = false
-        showsAchievements = false
         showsTokens = false
         machinePage = nil
         showsWork = false

@@ -3,8 +3,8 @@ import SwiftUI
 
 /// The detail with nothing picked (#3904, in place of #145's page): the Multiplier, the
 /// work of how many engineers the agents did in the last 7 days, the crowd of them over it
-/// (#3985), and three big numbers under it. A show-off page: nothing else, and the key
-/// hints in one small line.
+/// (#3985), three big numbers under it, and the earned achievements as badges (#3987). A
+/// show-off page: nothing else, and the key hints in one small line.
 ///
 /// The numbers count to each new value (about 1 s), from the last values this window
 /// showed when it opens. When a PR merges or a revert does, a line says so and fades.
@@ -87,6 +87,8 @@ struct MultiplierPage: View {
                 stat(shown.engineerHours, "engineer-hours")
                 stat(shown.agentsWorking, "agents now")
             }
+            EarnedBadges(achievements: model.work.achievements)
+                .padding(.top, 40)
             Group {
                 if let news {
                     Text(news.words)
@@ -99,7 +101,7 @@ struct MultiplierPage: View {
                 }
             }
             .frame(height: 28)
-            .padding(.top, 44)
+            .padding(.top, 20)
         }
         .lineLimit(1)
         .minimumScaleFactor(0.3)
@@ -125,6 +127,8 @@ struct MultiplierPage: View {
             Text("Your number starts when an agent’s first PR merges.")
                 .appText(.supporting)
                 .foregroundStyle(.secondary)
+            EarnedBadges(achievements: model.work.achievements)
+                .padding(.top, 24)
         }
         .lineLimit(1)
         .minimumScaleFactor(0.3)

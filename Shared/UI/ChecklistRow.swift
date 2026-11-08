@@ -2,9 +2,7 @@ import SwiftUI
 
 /// One step of a checklist: a tick or an open circle, the title, and while it is not done
 /// a grey line saying how, with the step's own button under it. The Mac's Get started
-/// card draws it (#982); here, not in the app, so the achievements list on all three
-/// clients (#984) can draw an earned and an unearned achievement with the same row.
-/// `doneNote` is a grey line once it is done: an achievement's date.
+/// card draws it (#982). `doneNote` is a grey line once it is done.
 struct ChecklistRow<Action: View>: View {
     let title: String
     let how: String

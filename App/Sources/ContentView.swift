@@ -121,8 +121,6 @@ struct ContentView: View {
             TokensView().paperGround()
         } else if model.showsTime {
             TimeView().paperGround()
-        } else if model.showsAchievements {
-            AchievementsView().paperGround()
         } else if model.showsWork {
             WorkView(model: model).paperGround()
         } else if model.showsDocs {
@@ -185,7 +183,7 @@ struct ContentView: View {
     private var folderForTerminal: DaemonAPI.FolderSummary? {
         guard terminal.isOpen, !model.showsEvents, !model.showsRuntimes,
               !model.showsMCPServers, !model.showsSecrets, !model.showsAccounts, model.machinePage == nil,
-              !model.showsSpending, !model.showsTokens, !model.showsTime, !model.showsAchievements,
+              !model.showsSpending, !model.showsTokens, !model.showsTime,
               !model.showsWork, !model.showsDocs, let folder = model.selectedFolderSummary, folder.exists else { return nil }
         return folder
     }
@@ -200,7 +198,7 @@ struct ContentView: View {
     private var showsChat: Bool {
         model.selection != nil && !model.showsEvents
             && !model.showsRuntimes && !model.showsMCPServers && !model.showsSecrets && !model.showsAccounts && model.machinePage == nil
-            && !model.showsSpending && !model.showsTime && !model.showsAchievements && !model.showsWork && !model.showsDocs
+            && !model.showsSpending && !model.showsTime && !model.showsWork && !model.showsDocs
             && model.openWorkflow == nil
             && model.folderPage == nil && model.openPin == nil
     }
