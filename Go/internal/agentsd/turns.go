@@ -92,6 +92,10 @@ type live struct {
 	denied string
 	// lastUpdate is when the runtime last sent a session/update (opencoderefusal.go).
 	lastUpdate atomic.Int64
+	// warm is what its runtime started with, and pool its place in the warm pool
+	// (warmpool.go, #4044).
+	warm warmStart
+	pool warmLive
 }
 
 type pendingPermission struct {
@@ -505,6 +509,8 @@ func textBlock(text string) wire.ContentBlock {
 func (l *live) run() {
 	// A wait that cleared or came due in a turn could not resume it then (#3173).
 	defer l.d.resumeIfCleared(l.id)
+	// The runtime left goes to the warm pool, which may release it (#4044).
+	defer l.d.warmSoon(l)
 	for {
 		l.mu.Lock()
 		a := l.d.Store.Agent(l.id)
@@ -566,157 +572,12 @@ func (l *live) turn() bool {
 		return false
 	}
 
-	if noSession {
-		rt := runtimeByID(a.RuntimeID)
-		dir := store.FolderPath(a.Cwd)
-		account, err := d.accountFor(a)
-		var launch acp.Launch
-		if err == nil {
-			launch, err = d.launchOn(rt, dir, account, l.id)
-		}
-		if err != nil {
-			d.record(l.id, notice("error", rt.Name+" did not start", err.Error()))
-			d.end(l, wire.AgentStateStopped, wire.EndedReasonRuntimeError)
-			return false
-		}
-		d.record(l.id, wire.TranscriptEntryKind{RuntimeNote: &wire.TranscriptEntryKindRuntimeNote{Value: "Starting " + rt.Name + "…"}})
-		continuing := ""
-		if a.RuntimeSessionID != nil {
-			continuing = *a.RuntimeSessionID
-		}
-		sandbox, why := d.resolveSandbox(a.RuntimeID, a.SandboxOverride, a.StartedByAgent)
-		launch, meta := withSandbox(launch, agentSessionMeta(a), a.RuntimeID, sandbox)
-		brief := d.briefFor(a)
-		compatibilityMeta := withSystemPrompt(meta, a.RuntimeID, brief)
-		if launch, err = withBriefFile(launch, a.RuntimeID, d.Store.Loc.Agent(string(l.id)), brief); err != nil {
-			d.record(l.id, notice("error", rt.Name+" did not start", "The brief could not be written: "+err.Error()))
-			d.end(l, wire.AgentStateStopped, wire.EndedReasonRuntimeError)
-			return false
-		}
-		s, err := acp.Start(ctx, launch, l, d.mcpServersFor(l.id), meta, compatibilityMeta, continuing, brief)
-		if err != nil {
-			d.dropAppTokens(l.id)
-			d.dropStandIn(l.id)
-			d.dropGitHubCredential(l.id)
-		}
-		if err != nil && ctx.Err() != nil {
-			d.end(l, wire.AgentStateStopped, wire.EndedReasonCancelled)
-			return false
-		}
-		if err != nil {
-			log.Printf("agent %s: %v", l.id, err)
-			// Its sandbox first (064): a runtime that fell over because it could not set one up.
-			if detail := sandboxMatch(a.RuntimeID, err.Error()); detail != "" {
-				d.recordSandboxFailure(l.id, detail, 0)
-				d.end(l, wire.AgentStateStopped, wire.EndedReasonSandboxFailed)
-				return false
-			}
-			// A runtime with no sign-in refuses session/new with -32000 (#1430): it is not
-			// signed in, not crashed, and the Pool page says so.
-			if code, _ := refusal(err); code != nil && *code == authRequired {
-				// An added account's sign-in is its own (#840): the runtime's is not in question.
-				if account == nil {
-					d.markNeedsSignIn(a.RuntimeID)
-				}
-				d.record(l.id, notice("error", d.credentialName(agentKey(a))+" is not signed in", err.Error()))
-				d.end(l, wire.AgentStateStopped, wire.EndedReasonSignInRefused)
-				return false
-			}
-			d.record(l.id, notice("error", rt.Name+" did not start", err.Error()))
-			d.end(l, wire.AgentStateStopped, wire.EndedReasonProcessDied)
-			return false
-		}
-		l.mu.Lock()
-		l.session = s
-		// A conversation begun, or begun again because the runtime lost it: the brief it
-		// had lived in the history that is gone.
-		l.briefDue = !s.Continued && brief != "" && !s.SupportsSystemPrompt() && !briefOutOfPrompt(a.RuntimeID)
-		l.mu.Unlock()
-		// Started as the host goes, after stopAll looked (#1272): it would be left running.
-		if d.going() {
-			s.Stop()
-			d.end(l, wire.AgentStateStopped, wire.EndedReasonCancelled)
-			return false
-		}
-		d.noteEffectiveSandbox(l.id, sandbox, why)
-		// The handshake says the runtime is ready, and what it takes (noteAccount).
-		pc := s.Init.AgentCapabilities.PromptCapabilities
-		image, audio, embedded := pc.Image, pc.Audio, pc.EmbeddedContext
-		d.noteAccount(a.RuntimeID, s.SupportsSteering(), wire.ACPPromptCapabilities{Image: &image, Audio: &audio, EmbeddedContext: &embedded})
-		switch {
-		case s.Continued:
-			d.record(l.id, runtimeNote("Picked the conversation back up."))
-		case s.Lost:
-			d.record(l.id, runtimeNote(rt.Name+" no longer has this conversation. Carrying on in a new one; everything above is kept."))
-		}
-		sessionID := string(s.ID)
-		d.change(l.id, func(a *wire.Agent) {
-			a.RuntimeSessionID = &sessionID
-			a.RuntimeKeepsCopy = nil
-			if keepsCopy(a.RuntimeID, s.CanDelete()) {
-				a.RuntimeKeepsCopy = new(true)
-			}
-			if opts := configOptions(s.NewResult.ConfigOptions); opts != nil {
-				a.AdvertisedOptions = d.markOptions(a.RuntimeID, withAppOptions(a.RuntimeID, a.StartOptions.Values, opts))
-				a.Levels = d.matchLevels(a)
-			}
-		})
-		safe.Go("session watch", func() {
-			<-s.Done()
-			l.mu.Lock()
-			ours := l.session == s
-			if ours {
-				l.session = nil
-				// Before the next runtime can start, so its stand-in is a new one.
-				d.dropStandIn(l.id)
-				d.dropGitHubCredential(l.id)
-			}
-			l.mu.Unlock()
-			// A new process is a new MCP server, with a token of its own.
-			if ours {
-				d.dropAppTokens(l.id)
-				// The folder of a route taken away while this ran goes now (#3127).
-				if a := d.Store.Agent(l.id); a != nil && orgRouteOf(a.AccountID) != "" {
-					d.sweepOrgAccountFolders()
-				}
-			}
-		})
-		// The start options the window chose (model, mode) go first. What the runtime
-		// hands back replaces the handshake's own defaults above, so the mode pill shows
-		// the person's choice, not the runtime's; a push it refuses is a notice, not a
-		// silent revert (#3082).
-		var pushed []wire.ConfigOption
-		refused := false
-		for k, v := range a.StartOptions.Values {
-			var sv string
-			if json.Unmarshal(v, &sv) == nil && sv != "" {
-				got, err := s.SetOption(ctx, k, sv)
-				if err != nil {
-					log.Printf("agent %s: set %s=%s: %v", l.id, k, sv, err)
-					refused = true
-					continue
-				}
-				if opts := configOptions(got); len(opts) > 0 {
-					pushed = opts
-				}
-			}
-		}
-		if len(pushed) > 0 {
-			d.change(l.id, func(a *wire.Agent) {
-				a.AdvertisedOptions = d.markOptions(a.RuntimeID, withAppOptions(a.RuntimeID, a.StartOptions.Values, pushed))
-				a.Levels = d.matchLevels(a)
-			})
-		}
-		if refused {
-			d.record(l.id, notice("error", rt.Name+" did not keep its mode and model",
-				"Showing what it started with until the next reconnect."))
-		}
-		// The policy again, now the runtime has said its options: an agent with no model
-		// or mode chosen runs on the runtime's own, which the check before it started
-		// could not see. A refused one waits, as at the start of a turn.
-		if d.holdsForPolicy(l) {
-			return false
-		}
+	// A runtime kept warm since a start that differs from this one's is not reused (#4044).
+	if !noSession && !d.warmFits(l, a) {
+		noSession = true
+	}
+	if noSession && !l.open(ctx, a, false) {
+		return false
 	}
 	// The words, off the queue now the runtime is there to take them.
 	var q wire.QueuedPrompt
@@ -1823,4 +1684,184 @@ func keepMode(a *wire.Agent, id string, v wire.JSONValue) {
 		}
 	}
 	a.AdvertisedOptions = opts
+}
+
+// open starts the agent's runtime and its session, and is false when it did not start.
+// For a turn, a runtime that will not start says why in the chat and ends the turn. Quiet
+// is a prewarm (#4044): it says nothing in the chat and leaves the agent's state as it was,
+// only the log saying why it did not start.
+func (l *live) open(ctx context.Context, a *wire.Agent, quiet bool) bool {
+	d := l.d
+	// stopped ends a start that went wrong: said, and the turn ended, unless it is quiet.
+	stopped := func(why wire.EndedReason, say func()) bool {
+		if quiet {
+			return false
+		}
+		if say != nil {
+			say()
+		}
+		d.end(l, wire.AgentStateStopped, why)
+		return false
+	}
+	say := func(kind wire.TranscriptEntryKind) {
+		if !quiet {
+			d.record(l.id, kind)
+		}
+	}
+	rt := runtimeByID(a.RuntimeID)
+	if rt == nil {
+		log.Printf("agent %s: no runtime %s", l.id, a.RuntimeID)
+		return stopped(wire.EndedReasonRuntimeError, nil)
+	}
+	dir := store.FolderPath(a.Cwd)
+	// What the runtime starts with, read before anything is made for it (warmKey).
+	key := d.warmKey(a)
+	account, err := d.accountFor(a)
+	var launch acp.Launch
+	if err == nil {
+		launch, err = d.launchOn(rt, dir, account, l.id)
+	}
+	if err != nil {
+		log.Printf("agent %s: %s did not start: %v", l.id, rt.Name, err)
+		return stopped(wire.EndedReasonRuntimeError, func() { d.record(l.id, notice("error", rt.Name+" did not start", err.Error())) })
+	}
+	say(wire.TranscriptEntryKind{RuntimeNote: &wire.TranscriptEntryKindRuntimeNote{Value: "Starting " + rt.Name + "…"}})
+	continuing := ""
+	if a.RuntimeSessionID != nil {
+		continuing = *a.RuntimeSessionID
+	}
+	sandbox, why := d.resolveSandbox(a.RuntimeID, a.SandboxOverride, a.StartedByAgent)
+	launch, meta := withSandbox(launch, agentSessionMeta(a), a.RuntimeID, sandbox)
+	brief := d.briefFor(a)
+	compatibilityMeta := withSystemPrompt(meta, a.RuntimeID, brief)
+	if launch, err = withBriefFile(launch, a.RuntimeID, d.Store.Loc.Agent(string(l.id)), brief); err != nil {
+		log.Printf("agent %s: the brief could not be written: %v", l.id, err)
+		return stopped(wire.EndedReasonRuntimeError, func() {
+			d.record(l.id, notice("error", rt.Name+" did not start", "The brief could not be written: "+err.Error()))
+		})
+	}
+	s, err := acp.Start(ctx, launch, l, d.mcpServersFor(l.id), meta, compatibilityMeta, continuing, brief)
+	if err != nil {
+		d.dropAppTokens(l.id)
+		d.dropStandIn(l.id)
+		d.dropGitHubCredential(l.id)
+	}
+	if err != nil && ctx.Err() != nil {
+		return stopped(wire.EndedReasonCancelled, nil)
+	}
+	if err != nil {
+		log.Printf("agent %s: %v", l.id, err)
+		// Its sandbox first (064): a runtime that fell over because it could not set one up.
+		if detail := sandboxMatch(a.RuntimeID, err.Error()); detail != "" {
+			return stopped(wire.EndedReasonSandboxFailed, func() { d.recordSandboxFailure(l.id, detail, 0) })
+		}
+		// A runtime with no sign-in refuses session/new with -32000 (#1430): it is not
+		// signed in, not crashed, and the Pool page says so.
+		if code, _ := refusal(err); code != nil && *code == authRequired {
+			// An added account's sign-in is its own (#840): the runtime's is not in question.
+			if account == nil {
+				d.markNeedsSignIn(a.RuntimeID)
+			}
+			return stopped(wire.EndedReasonSignInRefused, func() {
+				d.record(l.id, notice("error", d.credentialName(agentKey(a))+" is not signed in", err.Error()))
+			})
+		}
+		return stopped(wire.EndedReasonProcessDied, func() { d.record(l.id, notice("error", rt.Name+" did not start", err.Error())) })
+	}
+	own := d.descendants(s.Pid())
+	l.mu.Lock()
+	l.session = s
+	l.warm = warmStart{key: key, own: own}
+	// A conversation begun, or begun again because the runtime lost it: the brief it
+	// had lived in the history that is gone.
+	l.briefDue = !s.Continued && brief != "" && !s.SupportsSystemPrompt() && !briefOutOfPrompt(a.RuntimeID)
+	l.mu.Unlock()
+	// Started as the host goes, after stopAll looked (#1272): it would be left running.
+	if d.going() {
+		s.Stop()
+		return stopped(wire.EndedReasonCancelled, nil)
+	}
+	d.noteEffectiveSandbox(l.id, sandbox, why, !quiet)
+	// The handshake says the runtime is ready, and what it takes (noteAccount).
+	pc := s.Init.AgentCapabilities.PromptCapabilities
+	image, audio, embedded := pc.Image, pc.Audio, pc.EmbeddedContext
+	d.noteAccount(a.RuntimeID, s.SupportsSteering(), wire.ACPPromptCapabilities{Image: &image, Audio: &audio, EmbeddedContext: &embedded})
+	switch {
+	case s.Continued:
+		say(runtimeNote("Picked the conversation back up."))
+	case s.Lost:
+		// Said also for a prewarm: what the agent remembers is not what the chat shows.
+		d.record(l.id, runtimeNote(rt.Name+" no longer has this conversation. Carrying on in a new one; everything above is kept."))
+	}
+	sessionID := string(s.ID)
+	// A prewarm does not move the session up its list.
+	d.changeAgent(l.id, !quiet, func(a *wire.Agent) {
+		a.RuntimeSessionID = &sessionID
+		a.RuntimeKeepsCopy = nil
+		if keepsCopy(a.RuntimeID, s.CanDelete()) {
+			a.RuntimeKeepsCopy = new(true)
+		}
+		if opts := configOptions(s.NewResult.ConfigOptions); opts != nil {
+			a.AdvertisedOptions = d.markOptions(a.RuntimeID, withAppOptions(a.RuntimeID, a.StartOptions.Values, opts))
+			a.Levels = d.matchLevels(a)
+		}
+	})
+	safe.Go("session watch", func() {
+		<-s.Done()
+		l.mu.Lock()
+		ours := l.session == s
+		if ours {
+			l.session = nil
+			// Before the next runtime can start, so its stand-in is a new one.
+			d.dropStandIn(l.id)
+			d.dropGitHubCredential(l.id)
+		}
+		l.mu.Unlock()
+		// A new process is a new MCP server, with a token of its own.
+		if ours {
+			d.dropAppTokens(l.id)
+			// The folder of a route taken away while this ran goes now (#3127).
+			if a := d.Store.Agent(l.id); a != nil && orgRouteOf(a.AccountID) != "" {
+				d.sweepOrgAccountFolders()
+			}
+		}
+	})
+	// The start options the window chose (model, mode) go first. What the runtime
+	// hands back replaces the handshake's own defaults above, so the mode pill shows
+	// the person's choice, not the runtime's; a push it refuses is a notice, not a
+	// silent revert (#3082).
+	var pushed []wire.ConfigOption
+	refused := false
+	for k, v := range a.StartOptions.Values {
+		var sv string
+		if json.Unmarshal(v, &sv) == nil && sv != "" {
+			got, err := s.SetOption(ctx, k, sv)
+			if err != nil {
+				log.Printf("agent %s: set %s=%s: %v", l.id, k, sv, err)
+				refused = true
+				continue
+			}
+			if opts := configOptions(got); len(opts) > 0 {
+				pushed = opts
+			}
+		}
+	}
+	if len(pushed) > 0 {
+		d.changeAgent(l.id, !quiet, func(a *wire.Agent) {
+			a.AdvertisedOptions = d.markOptions(a.RuntimeID, withAppOptions(a.RuntimeID, a.StartOptions.Values, pushed))
+			a.Levels = d.matchLevels(a)
+		})
+	}
+	if refused {
+		say(notice("error", rt.Name+" did not keep its mode and model",
+			"Showing what it started with until the next reconnect."))
+	}
+	// The policy again, now the runtime has said its options: an agent with no model
+	// or mode chosen runs on the runtime's own, which the check before it started
+	// could not see. A refused one waits, as at the start of a turn; a prewarmed one is
+	// looked at again before its turn, in run.
+	if !quiet && d.holdsForPolicy(l) {
+		return false
+	}
+	return true
 }

@@ -358,6 +358,38 @@ func (s *Session) Pids() []int {
 	return pids
 }
 
+// Pid is the runtime's own process, the leader of its process group; 0 before it started.
+func (s *Session) Pid() int {
+	if s.cmd.Process == nil {
+		return 0
+	}
+	return s.cmd.Process.Pid
+}
+
+// Command is a process the session runs besides the runtime: its pid and command line.
+type Command struct {
+	Pid  int
+	Line string
+}
+
+// Terminals is each terminal the runtime asked for that still runs (#4044): a dev server
+// or a watcher it left going is one, which the warm pool keeps the runtime for.
+func (s *Session) Terminals() []Command {
+	s.client.mu.Lock()
+	defer s.client.mu.Unlock()
+	var out []Command
+	for _, t := range s.client.terminals {
+		select {
+		case <-t.done:
+		default:
+			if t.cmd.Process != nil {
+				out = append(out, Command{Pid: t.cmd.Process.Pid, Line: t.line})
+			}
+		}
+	}
+	return out
+}
+
 // client answers the runtime's requests.
 type client struct {
 	sink Sink
@@ -836,7 +868,9 @@ func writeRequest(asked, path, content string) sdk.RequestPermissionRequest {
 const terminalOutputMost = 4 << 20
 
 type terminal struct {
-	cmd    *exec.Cmd
+	cmd *exec.Cmd
+	// line is the command as the runtime asked for it, for the warm pool's note (#4044).
+	line   string
 	mu     sync.Mutex
 	out    []byte
 	limit  int
@@ -883,7 +917,8 @@ func (c *client) CreateTerminal(ctx context.Context, p sdk.CreateTerminalRequest
 		// The runtime asks for its limit; a terminal holds at most terminalOutputMost (#3650).
 		limit = min(*p.OutputByteLimit, terminalOutputMost)
 	}
-	t := &terminal{cmd: cmd, limit: limit, done: make(chan struct{})}
+	line := strings.Join(append([]string{command}, args...), " ")
+	t := &terminal{cmd: cmd, line: line, limit: limit, done: make(chan struct{})}
 	cmd.Stdout, cmd.Stderr = t, t
 	if err := cmd.Start(); err != nil {
 		return sdk.CreateTerminalResponse{}, err
@@ -906,7 +941,7 @@ func (c *client) CreateTerminal(ctx context.Context, p sdk.CreateTerminalRequest
 	id := fmt.Sprintf("term-%d", c.next)
 	c.terminals[id] = t
 	c.mu.Unlock()
-	c.sink.Served("terminal", strings.Join(append([]string{command}, args...), " "))
+	c.sink.Served("terminal", line)
 	return sdk.CreateTerminalResponse{TerminalId: id}, nil
 }
 

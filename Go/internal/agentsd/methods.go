@@ -16,8 +16,7 @@ func (d *Daemon) register() {
 	On(d, wire.CallDaemonPing, func(context.Context, *Client, wire.Empty) (wire.PingResponse, error) {
 		return wire.PingResponse{Ok: true}, nil
 	})
-	// What the window pushes on connecting, which this host has no use for yet.
-	Quiet(d, wire.CallAgentsPrewarm.Name)
+	d.registerWarmPool()
 	d.registerRequests()
 	// No runtime takes a pasted key now that Gemini, the last one that did, is retired
 	// (#3043): a window still offers its (always empty) list on every connect.
