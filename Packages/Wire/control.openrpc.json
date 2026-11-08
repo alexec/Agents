@@ -2229,6 +2229,27 @@
       }
     },
     {
+      "name": "machine/accounts",
+      "x-capability": "machine/1",
+      "description": "A host, for an agent there (#3967): its person's outside accounts, with add added.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineAccountsCall"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/OutsideAccounts"
+        }
+      }
+    },
+    {
       "name": "machine/clients",
       "x-capability": "machine/1",
       "description": "To every host, on its channel 0, when it connects and when a window is paired or forgotten (#1118): the windows it may let in on its local socket.",

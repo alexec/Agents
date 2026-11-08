@@ -49,6 +49,8 @@ public enum SidebarItem: Hashable, Sendable {
     /// The person's secrets and cards, kept by the control plane and sent to each machine of
     /// theirs (#1760), under **Your setup** (#3632). Mac + web: the Remote has no row for it (#2796).
     case secrets
+    /// The person's outside accounts (#3967), under **Your setup**, beside Secrets. Mac + web.
+    case accounts
     /// One machine's page (#3626): its CPU, memory and disks, from its row under Machines.
     /// Mac + web: the Remote has no row for it (#2796).
     case machine(MachineRef)

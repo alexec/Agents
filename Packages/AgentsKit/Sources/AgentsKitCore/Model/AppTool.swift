@@ -34,6 +34,9 @@ public enum AppTool {
     /// that run themselves when something happens.
     public static let manageWorkflows = "manage_workflows"
 
+    /// The person's outside accounts, Your setup ▸ Accounts (#3967): list, add and import.
+    public static let manageAccounts = "manage_accounts"
+
     /// Ask the person a question or a short form and wait for the answer. The
     /// fallback for runtimes whose own ask tool never reaches the model, and the
     /// only channel on runtimes that have none. It was `ask_form` until #2298. Antigravity's
@@ -172,7 +175,7 @@ public enum AppTool {
 
     /// Every tool the app's MCP server serves.
     public static let all: [String] = [
-        finishTurn, showFile, notify, manageWorkflows, askQuestion, askSecret, suggestNextPrompt, hangUp, startSession, stopSession, archiveSession,
+        finishTurn, showFile, notify, manageWorkflows, manageAccounts, askQuestion, askSecret, suggestNextPrompt, hangUp, startSession, stopSession, archiveSession,
         leaseResource, releaseResource, listResources, waitForEvent, checkAgain,
         cancelWait, listSessions, readSession,
         setSessionLabels, moveWorktree, messageSession, cancelMessage,

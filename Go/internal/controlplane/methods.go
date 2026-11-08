@@ -1216,6 +1216,21 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 			return nil, err
 		}
 		return m.s.links.check(ctx, sender)
+	case "machine/accounts":
+		// For an agent on the machine (#3967): the accounts are its person's, as their secrets are.
+		request, err := require[wire.MachineAccountsCall](params, "MachineAccountsCall")
+		if err != nil {
+			return nil, err
+		}
+		user := m.s.ownerOf(host)
+		listed, changed, err := m.s.users.AddAccounts(ctx, user, request.Add)
+		if err != nil {
+			return nil, userFailure(err)
+		}
+		if changed {
+			m.s.userChanged(user, []wire.UserSettingsPartName{wire.UserSettingsPartNameAccounts}, false, host)
+		}
+		return listed, nil
 	case "machine/machines", "machine/providerDraft", "machine/status", "machine/installProgress":
 		if m.s.providers == nil {
 			if method == "machine/status" || method == "machine/installProgress" {

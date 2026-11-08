@@ -79,6 +79,7 @@ var appToolMethods = map[string]string{
 	"notify":               "people/notify",
 	"hang_up":              "calls/hangUp",
 	"manage_workflows":     "workflows/manage",
+	"manage_accounts":      "accounts/manage",
 	"lease_resource":       "resources/lease",
 	"release_resource":     "resources/release",
 	"list_resources":       "resources/list",

@@ -6,7 +6,7 @@ import Foundation
 public extension DaemonAPI {
     /// A part of the user settings. Each keeps the shape its file has on a machine.
     enum UserSettingsPartName: String, Codable, Sendable, Hashable, CaseIterable {
-        case mcpServers, agentConfig, runtimes, costLimits, notifications
+        case mcpServers, agentConfig, runtimes, costLimits, notifications, accounts
     }
 
     /// The agentConfig part: the person's own instructions, personas and skills.
@@ -52,16 +52,19 @@ public extension DaemonAPI {
         public var costLimits: JSONValue?
         /// The person's notice limits (#2859): `{"burst", "cooldownMinutes"}`.
         public var notifications: JSONValue?
+        /// The person's outside accounts (#3967), as an `OutsideAccounts`.
+        public var accounts: JSONValue?
         public var updated: String?
 
         public init(mcpServers: JSONValue? = nil, agentConfig: JSONValue? = nil, agentConfigFiles: AgentConfigFiles? = nil, runtimes: JSONValue? = nil,
-                    costLimits: JSONValue? = nil, notifications: JSONValue? = nil, updated: String? = nil) {
+                    costLimits: JSONValue? = nil, notifications: JSONValue? = nil, accounts: JSONValue? = nil, updated: String? = nil) {
             self.mcpServers = mcpServers
             self.agentConfig = agentConfig
             self.agentConfigFiles = agentConfigFiles
             self.runtimes = runtimes
             self.costLimits = costLimits
             self.notifications = notifications
+            self.accounts = accounts
             self.updated = updated
         }
 
@@ -72,8 +75,53 @@ public extension DaemonAPI {
             case .runtimes: runtimes
             case .costLimits: costLimits
             case .notifications: notifications
+            case .accounts: accounts
             }
         }
+    }
+
+    /// Your setup ▸ Accounts (#3967): one outside account of the person's. It holds no secret:
+    /// `card` and `secret` are the names of secrets in Your setup ▸ Secrets, or where one is.
+    struct OutsideAccount: Codable, Sendable, Hashable, Identifiable {
+        public var service: String
+        public var address: String?
+        public var plan: String?
+        public var monthlyCostUsd: Double?
+        public var card: String?
+        public var secret: String?
+        public var twoFactor: String?
+        public var issue: String?
+        public var made: String?
+        public var tokenExpires: String?
+        public var notes: String?
+        /// The projects that use it, by name; none is all of them.
+        public var projects: [String]?
+
+        public var id: String { service.lowercased() + "#" + (address ?? "").lowercased() }
+
+        public init(service: String, address: String? = nil, plan: String? = nil, monthlyCostUsd: Double? = nil,
+                    card: String? = nil, secret: String? = nil, twoFactor: String? = nil, issue: String? = nil,
+                    made: String? = nil, tokenExpires: String? = nil, notes: String? = nil, projects: [String]? = nil) {
+            self.service = service
+            self.address = address
+            self.plan = plan
+            self.monthlyCostUsd = monthlyCostUsd
+            self.card = card
+            self.secret = secret
+            self.twoFactor = twoFactor
+            self.issue = issue
+            self.made = made
+            self.tokenExpires = tokenExpires
+            self.notes = notes
+            self.projects = projects
+        }
+    }
+
+    /// The accounts part.
+    struct OutsideAccounts: Codable, Sendable, Hashable {
+        public var accounts: [OutsideAccount]
+
+        public init(accounts: [OutsideAccount]) { self.accounts = accounts }
     }
 
     /// `user/setSettings`: one part, or `.null` to take it out of the user scope.

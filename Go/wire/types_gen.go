@@ -6545,6 +6545,11 @@ type MacTerminalRequest struct {
 	Path *string `json:"path,omitzero"`
 }
 
+// machine/accounts (#3967), for an agent on a machine: its person's outside accounts, after add is added (one with the same service and address goes in its place).
+type MachineAccountsCall struct {
+	Add []OutsideAccount `json:"add,omitzero"`
+}
+
 // machines/announce, on an enrolment connection.
 type MachineAnnounce struct {
 	PublicKey Data `json:"publicKey"`
@@ -7780,6 +7785,50 @@ type OrgRoutesLeft struct {
 // orgRoutes/mine (#999).
 type OrgRoutesMine struct {
 	Routes []OrgRouteMine `json:"routes"`
+}
+
+// Your setup ▸ Accounts (#3967): one outside account of the person's (gitlab.com, AWS, Slack…). It holds no secret: card and secret are the names of secrets in Your setup ▸ Secrets, or where one is.
+type OutsideAccount struct {
+	// The service, as its address: gitlab.com, aws.amazon.com.
+	Service string `json:"service"`
+
+	// The address it signs in with.
+	Address *string `json:"address,omitzero"`
+
+	// Free, Pro…
+	Plan *string `json:"plan,omitzero"`
+
+	// What it costs a month, in US dollars. Absent when not known.
+	MonthlyCostUsd *float64 `json:"monthlyCostUsd,omitzero"`
+
+	// The card it bills, by its name in Your setup ▸ Secrets. Never the number.
+	Card *string `json:"card,omitzero"`
+
+	// Its token or key, by its name in Your setup ▸ Secrets or where it is. Never the value.
+	Secret *string `json:"secret,omitzero"`
+
+	// TOTP, passkey, SMS, or absent for none.
+	TwoFactor *string `json:"twoFactor,omitzero"`
+
+	// The issue that made it: #12 or owner/repo#12.
+	Issue *string `json:"issue,omitzero"`
+
+	// The date it was made, YYYY-MM-DD.
+	Made *string `json:"made,omitzero"`
+
+	// The date its token expires, YYYY-MM-DD.
+	TokenExpires *string `json:"tokenExpires,omitzero"`
+
+	// Where the password is, the account's name and the like. Never a secret.
+	Notes *string `json:"notes,omitzero"`
+
+	// The projects that use it, by name. Absent or empty: all of them.
+	Projects []string `json:"projects,omitzero"`
+}
+
+// The accounts part of the person's settings (#3967), and machine/accounts' answer.
+type OutsideAccounts struct {
+	Accounts []OutsideAccount `json:"accounts"`
 }
 
 // What the host says on a folder's pull request when it merges (#2352): nothing (off, the default), the tokens and time only, or the cost too. Kept in the folder's .agents/folder.json, so the repo's people choose what a public repo publishes.
@@ -12736,6 +12785,9 @@ type UserSettings struct {
 	// The person's notice limits (#2859), as a NoticeLimits.
 	Notifications JSONValue `json:"notifications,omitzero"`
 
+	// The person's outside accounts (#3967), as an OutsideAccounts. The control plane refuses one with a value that looks like a secret.
+	Accounts JSONValue `json:"accounts,omitzero"`
+
 	// #2957, research R11: your layer, as a SignedYourPolicy. Only the keeper sets it (user/setPolicy); a client cannot (user/setSettings refuses this part).
 	Policy JSONValue `json:"policy,omitzero"`
 
@@ -12760,7 +12812,7 @@ type UserSettingsPart struct {
 	Value JSONValue `json:"value"`
 }
 
-// A part of a person's user settings (#1760, #2410). Each part has one fixed scope: MCP servers, agent configuration, runtimes, cost limits and notices (#2859) follow the person. Resources belong to each machine. policy (#2957) is set only by the keeper, through user/setPolicy; user/setSettings refuses it.
+// A part of a person's user settings (#1760, #2410). Each part has one fixed scope: MCP servers, agent configuration, runtimes, cost limits, notices (#2859) and outside accounts (#3967) follow the person. Resources belong to each machine. policy (#2957) is set only by the keeper, through user/setPolicy; user/setSettings refuses it.
 type UserSettingsPartName string
 
 const UserSettingsPartNameMcpServers UserSettingsPartName = "mcpServers"
@@ -12768,6 +12820,7 @@ const UserSettingsPartNameAgentConfig UserSettingsPartName = "agentConfig"
 const UserSettingsPartNameRuntimes UserSettingsPartName = "runtimes"
 const UserSettingsPartNameCostLimits UserSettingsPartName = "costLimits"
 const UserSettingsPartNameNotifications UserSettingsPartName = "notifications"
+const UserSettingsPartNameAccounts UserSettingsPartName = "accounts"
 const UserSettingsPartNamePolicy UserSettingsPartName = "policy"
 
 // user/suspended (#1002, FR-018): to each machine of a suspended person, at hello before its settings and within 5 seconds of a change; off: true ends it.

@@ -32,8 +32,8 @@ test("every page has a title, and its group headings come in order", () => {
   for (const s of n.navSections) for (const p of n.navPages[s]) assert.ok(p.title, `${s}/${p.id}`);
   assert.deepEqual(n.groupedPages(n.navPages.reports).map(([g]) => g), ["Reports", "Saved", "Yours", "Records"]);
   assert.deepEqual(n.groupedPages(n.navPages.machines).map(([g]) => g), ["Machines"]);
-  assert.deepEqual(n.navPages.setup.map((p) => p.id), ["runtimes", "mcp", "secrets"],
-    "Runtimes (#3631), Connectors and Secrets (#3632) are the person's, once");
+  assert.deepEqual(n.navPages.setup.map((p) => p.id), ["runtimes", "mcp", "secrets", "accounts"],
+    "Runtimes (#3631), Connectors, Secrets (#3632) and Accounts (#3967) are the person's, once");
   assert.ok(n.navPages.machines.every((p) => p.id !== "runtimes" && p.id !== "mcp"));
   assert.ok(n.navPages.settings.every((p) => p.id !== "secrets"));
 });

@@ -28,6 +28,7 @@ export type PageDraw =
   | { kind: "docs" }
   | { kind: "machine"; host: string }
   | { kind: "secrets" }
+  | { kind: "accounts" }
   | { kind: "usage" | "machines" | "workflows" | "settings" };
 
 export interface NavPage {
@@ -81,6 +82,8 @@ export const navPages: Record<NavSection, readonly NavPage[]> = {
     { id: "runtimes", title: "Runtimes", group: "Your setup", draw: { kind: "activity", page: "runtimes" } },
     { id: "mcp", title: "Connectors", group: "Your setup", draw: { kind: "activity", page: "mcp" } },
     { id: "secrets", title: "Secrets", group: "Your setup", draw: { kind: "secrets" } },
+    // The person's outside accounts (#3967), kept and sent as their secrets are.
+    { id: "accounts", title: "Accounts", group: "Your setup", draw: { kind: "accounts" } },
   ],
   settings: [
     { id: "settings", title: "Settings", group: "Settings", draw: { kind: "settings" } },

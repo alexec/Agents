@@ -89,6 +89,7 @@ func appToolCalls() []appTool {
 		{"stop_session", (*Daemon).stopSession},
 		{"start_session", (*Daemon).startSession},
 		{"manage_workflows", (*Daemon).manageWorkflows},
+		{"manage_accounts", (*Daemon).manageAccounts},
 		{"list_machines", (*Daemon).listMachines},
 		{"start_machine", (*Daemon).startMachine},
 		{"stop_machine", (*Daemon).stopMachine},

@@ -25,6 +25,7 @@ import { MachinePage } from "./MachinePage";
 import { machineNeed, machineNeedLine, offersStart } from "./OfflineStrip";
 import { SettingsPage } from "./Settings";
 import { SecretsSection } from "./UserScope";
+import { AccountsSection } from "./Accounts";
 import { SessionSecretsSection } from "./settings/SessionSecrets";
 import { WorkflowRow } from "./WorkflowRow";
 import { BackToList } from "./BackToList";
@@ -186,6 +187,7 @@ export function PageView({ store, page, down }: { store: Store; page: NavPage; d
         : page.draw.kind === "features" ? <WorkFeatures store={store} />
         // The person's secrets and cards (#1760), then a machine's for one session (#3548); were in Settings ▸ Machines.
         : page.draw.kind === "secrets" ? <><SecretsSection store={store} down={down} /><SessionSecretsSection store={store} down={down} /></>
+        : page.draw.kind === "accounts" ? <AccountsSection store={store} down={down} />
         : page.draw.kind === "docs" ? (route.value.item
           ? <DocPage key={route.value.item} store={store} docRef={route.value.item} />
           : <DocsList store={store} />) : null}
