@@ -334,6 +334,37 @@ struct SidebarModelTests {
         #expect(SidebarSmartRow.needsYou.agents(in: model, folders: folders, query: "web").map(\.id) == [askingWeb.id])
     }
 
+    /// Needs You lists a row per request (#3864): its asker is not a session row too, and the
+    /// count and the badge count requests, so two requests from one session are two, and a
+    /// request that ended leaves at once.
+    @Test func needsYouListsARowPerRequest() {
+        let model = AgentsModel()
+        let asking = started(api, .waitingOnUser, "asking", at: 1)
+        let other = started(api, .waitingOnUser, "other", at: 2)
+        model.replaceAgents([asking, other])
+        func request(_ title: String, at: TimeInterval) -> NeedRequest {
+            NeedRequest(id: UUID(), kind: .decide, source: "question", title: title, folder: api, askedBy: asking.id,
+                        waiters: [.init(agent: asking.id, since: Date(timeIntervalSince1970: at)),
+                                  .init(agent: other.id, since: Date(timeIntervalSince1970: at))],
+                        askedAt: Date(timeIntervalSince1970: at))
+        }
+        let first = request("Which port?", at: 10)
+        let second = request("Which name?", at: 20)
+        model.replaceRequests([second, first])
+
+        #expect(SidebarSmartRow.needsYou.requests(in: model, folders: [key]).map(\.request.id) == [first.id, second.id])
+        #expect(SidebarSmartRow.needsYou.agents(in: model, folders: [key]).map(\.id) == [other.id])
+        #expect(SidebarSmartRow.needsYou.count(in: model, folders: [key]) == 3)
+        #expect(model.attentionCount(in: key) + model.requestBadgeShift(in: api) == 3)
+        #expect(first.line(asker: "asking") == "Question · asking · blocks 2 sessions")
+        #expect(SidebarSmartRow.needsYou.requests(in: model, folders: [key], query: "port").map(\.request.id) == [first.id])
+
+        var answered = first
+        answered.state = .answered
+        model.apply(.requestChanged(answered))
+        #expect(SidebarSmartRow.needsYou.count(in: model, folders: [key]) == 2)
+    }
+
     /// Needs You holds everything waiting for an OK (#773): a session asking to be archived
     /// as its own row (Approve Archiving is gone), and every other kind of approval as a row
     /// of its own, counted with the sessions and found by a search.

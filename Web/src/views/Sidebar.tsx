@@ -50,6 +50,7 @@ import { markAgentOf, treeRows, type TreeRow } from "../model/tree";
 import { WorkflowRow } from "./WorkflowRow";
 import { footLine, offersStart } from "./OfflineStrip";
 import { PinnedPageRows, ServerViewRows, showHiddenViewsItem } from "./Pins";
+import { RequestRow } from "./RequestRow";
 import { ApprovalRow, FailedWorkflowRow } from "./Approval";
 import { ReviewPullRow } from "./ReviewPull";
 import { CheckSuggestionRow } from "./CheckSuggestion";
@@ -505,8 +506,12 @@ function SmartFold({ row, store, folders, places, query, linkDown, downSince }: 
       const live = liveSessions(store, placed.host.id, placed.folder.folder.folder);
       // The pinned are in Pinned alone: each session is listed once (#587).
       const pins = store.sessionPinsIn(placed.host.id, placed.folder.folder.folder);
-      // A failed workflow run's agent is its workflow's row under Needs You, not a session too (#989).
+      // A failed workflow run's agent is its workflow's row under Needs You, not a session too (#989);
+      // an asker, its requests' rows (#3864).
       const failed = row === "needsYou" ? failedRuns(placed.folder.approvals) : new Set<string>();
+      if (row === "needsYou") {
+        for (const request of store.personRequestsIn(placed.host.id, placed.folder.folder.folder)) failed.add(request.askedBy as string);
+      }
       const gathered = (query?: typeof parsed) => smartAgents(row, live, query, pins, on).filter((a) => !failed.has(a.id));
       count += gathered().length;
       if (open || parsed) for (const agent of gathered(parsed)) found.set(agent, placed);
@@ -521,6 +526,11 @@ function SmartFold({ row, store, folders, places, query, linkDown, downSince }: 
     lines = treeRows(listed, (id) => startedByOf(store, id), (id) => folds.isSessionOpen(id))
       .map((tree): SmartLine => ({ ...(found.get(tree.agent) ?? keptPlace!), kind: "session", agent: tree.agent, tree }));
   }
+  // Each request to the person, each folder's, before the sessions (#3864). A search matches the title.
+  const requests = row !== "needsYou" ? [] : folders.flatMap((placed) => store.personRequestsIn(placed.host.id, placed.folder.folder.folder)
+    .map((request) => ({ folder: placed, request })));
+  const asked = parsed ? requests.filter(({ request }) => request.title.toLowerCase().includes(query.toLowerCase())) : requests;
+  count += requests.length;
   // What waits for an OK, each folder's, after the sessions (#773).
   const waiting = row !== "needsYou" ? [] : folders.map((placed) => ({ folder: placed, approvals: placed.folder.approvals }));
   const approvals = smartApprovals(waiting, query);
@@ -535,7 +545,7 @@ function SmartFold({ row, store, folders, places, query, linkDown, downSince }: 
     suggestions: store.checkSuggestionsIn(placed.host.id, placed.folder.folder.folder) }));
   const suggestions = smartSuggestions(checked, query);
   if (row === "forReview") count += query ? smartSuggestions(checked).length : suggestions.length;
-  if (parsed ? lines.length === 0 && approvals.length === 0 && pulls.length === 0 && suggestions.length === 0
+  if (parsed ? lines.length === 0 && asked.length === 0 && approvals.length === 0 && pulls.length === 0 && suggestions.length === 0
     : count === 0 && !keptPlace) return null;
   const title = smartTitles[row];
   const updated = row === "needsYou" && downSince !== undefined ? updatedLine(downSince) : null;
@@ -551,6 +561,12 @@ function SmartFold({ row, store, folders, places, query, linkDown, downSince }: 
         {updated && <span class="updated">{updated}</span>}
         {count > 0 && <span class={`count${row === "needsYou" ? " needs" : ""}`}>{count}</span>}
       </summary>
+      {open && asked.map(({ folder: placed, request }) => {
+        const host = placed.host.id;
+        return <RequestRow key={`${host}|${request.id}`} store={store} host={host} folder={placed.folder.folder.folder} request={request}
+          place={placeOf(places, placed.host, placed.folder, store.macHostID.value)}
+          chosen={r.host === host && r.session === request.askedBy} />;
+      })}
       {open && lines.map((line) => {
         const host = line.host.id;
         const folder = line.folder.folder.folder;

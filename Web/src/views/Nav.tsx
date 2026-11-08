@@ -39,10 +39,19 @@ import { PageTitle, PersonMenu, SearchBox } from "./TopBar";
 import { pageCrumbs } from "../model/crumbs";
 import type { Session } from "../session";
 
-/** How many sessions need the person, across every folder: Agents' count in the bar. */
+/**
+ * How many requests and sessions need the person, across every folder: Agents' count in the bar.
+ * Requests, not sessions (#3864): each open request, and each session needing the person that asked none.
+ */
 export function needsYouCount(store: Store): number {
-  return needingYou(placedSessions(store.hosts.value, store.folders.value,
-    (h, f) => store.folderView(h, f).headings.flatMap((x) => x.agents))).length;
+  const requests = store.hosts.value.flatMap((h) => (store.folders.value[h.id] ?? [])
+    .filter((f) => f.folder.archivedAt === undefined)
+    .flatMap((f) => store.personRequestsIn(h.id, f.folder.folder).map((r) => `${h.id}|${r.askedBy}`)));
+  const askers = new Set(requests);
+  const sessions = needingYou(placedSessions(store.hosts.value, store.folders.value,
+    (h, f) => store.folderView(h, f).headings.flatMap((x) => x.agents)))
+    .filter((p) => !askers.has(`${p.host.id}|${p.agent.id}`));
+  return requests.length + sessions.length;
 }
 
 function countOf(store: Store, section: NavSection, admin: boolean | null): number {

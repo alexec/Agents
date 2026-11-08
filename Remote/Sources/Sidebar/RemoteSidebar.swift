@@ -332,6 +332,10 @@ struct RemoteSmartFold: View {
                 if row == .pinned {
                     ForEach(keys, id: \.self) { key in pinnedRows(key) }
                 } else {
+                    // Each request to the person first (#3864), as the window lists them.
+                    ForEach(row.requests(in: model.work, folders: keys, query: query), id: \.request.id) { item in
+                        RemoteRequestRow(request: item.request, place: place(of: item.folder))
+                    }
                     // Each under the session that started it when this group lists that too (#835).
                     ForEach(SidebarTree.rows(shown(keys), in: model.work, folds: folds)) { row in
                         SidebarSessionRow(agent: row.agent, place: place(of: row.agent), tree: row, folds: folds)
@@ -549,6 +553,21 @@ private struct RemoteCheckSuggestionRow: View {
 
     private func dismissNow() {
         Task { await model.dismissSuggestion(suggestion, in: folder.folder) }
+    }
+}
+
+/// One request to the person under Needs You (#3864), the window's `RequestListRow`: a tap
+/// opens the session that asked it, where its card takes the answer.
+private struct RemoteRequestRow: View {
+    @Environment(RemoteModel.self) private var model
+    let request: NeedRequest
+    let place: String?
+
+    var body: some View {
+        if let id = request.askedBy {
+            RequestRowLabel(request: request, asker: model.work.agent(id)?.title, place: place)
+                .tag(SidebarItem.session(id))
+        }
     }
 }
 

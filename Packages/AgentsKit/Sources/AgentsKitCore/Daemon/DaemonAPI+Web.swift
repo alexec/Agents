@@ -219,6 +219,8 @@ public extension DaemonAPI {
                 Row(Method.storeNotes, params: Empty.self, result: StoreNotes.self, kind: .hostRequest),
                 // Pinned pages (#159): the sidebar's rows and the pages themselves.
                 Row(Method.pinsList, params: Empty.self, result: [FolderPins].self, kind: .hostRequest),
+                Row(Method.requestsList, params: RequestsListRequest.self, result: RequestsListResult.self,
+                    kind: .hostRequest),
                 Row(Method.pinsRead, params: PinReadRequest.self, result: FileReading.self, kind: .hostRequest),
                 // A view drawn in the chat (#187): its resource, and what it asks of its server.
                 Row(Method.viewsRead, params: ViewReadRequest.self, result: ViewResource.self, kind: .hostRequest),
@@ -656,6 +658,8 @@ public extension DaemonAPI {
                 Row(Notification.storeNotesChanged, params: StoreNotes.self, result: Empty.self,
                     kind: .hostNotification),
                 Row(Notification.pinsChanged, params: PinsChangedNotification.self, result: Empty.self,
+                    kind: .hostNotification),
+                Row(Notification.requestsChanged, params: RequestUpdate.self, result: Empty.self,
                     kind: .hostNotification),
                 Row(Notification.pagesChanged, params: PagesChangedNotification.self, result: Empty.self,
                     kind: .hostNotification),

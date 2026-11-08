@@ -36,6 +36,11 @@ struct SmartFold: View {
             if row == .pinned {
                 if isOpen { pinnedRows }
             } else {
+                if isOpen {
+                    ForEach(row.requests(in: model.work, folders: folders, query: query), id: \.request.id) { item in
+                        RequestListRow(request: item.request, place: place(of: item.folder))
+                    }
+                }
                 // Each under the session that started it when this group lists that too (#835).
                 ForEach(FoldedRow.rows(SidebarTree.rows(agents, in: model.work, folds: folds), in: .smart(row))) { item in
                     SessionSidebarRow(agent: item.item.agent, place: place(of: item.item.agent),
@@ -134,6 +139,31 @@ struct SmartFold: View {
         if let place = places[key] { return place }
         guard let summary = model.work.folder(key) else { return nil }
         return SidebarOrder.label(summary) { model.hosts.label($0) }
+    }
+}
+
+/// One request to the person under Needs You (#3864): a click opens the session that asked
+/// it, where its card takes the answer.
+private struct RequestListRow: View {
+    @Environment(AppModel.self) private var model
+    /// In a folder's own window, how it opens what is picked (#1090).
+    @Environment(\.windowOpen) private var windowOpen
+    let request: NeedRequest
+    let place: String?
+
+    var body: some View {
+        if let id = request.askedBy {
+            let item = SidebarItem.session(id)
+            RequestRowLabel(request: request, asker: model.work.agent(id)?.title, place: place)
+                .help(request.line(asker: model.work.agent(id)?.title))
+                .sidebarInk(item)
+                .tag(item)
+                .contextMenu {
+                    Button("Open Session") {
+                        if let windowOpen { windowOpen(item) } else { model.sidebarItem = item }
+                    }
+                }
+        }
     }
 }
 

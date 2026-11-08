@@ -12207,6 +12207,7 @@ export interface Methods {
   "reports/usage": { params: ReportQuery; result: UsageReport };
   "reports/value": { params: ReportQuery; result: ReportValue };
   "reports/views": { params: Empty; result: ReportViews };
+  "requests/list": { params: RequestsList; result: RequestsListResult };
   "resources/snapshot": { params: Empty; result: LeaseSnapshot };
   "reviews/dismiss": { params: ReviewDismissRequest; result: Empty };
   "reviews/open": { params: ReviewOpenRequest; result: Empty };
@@ -12593,6 +12594,7 @@ export const MethodTarget = {
   "reports/usage": "control",
   "reports/value": "control",
   "reports/views": "control",
+  "requests/list": "host",
   "resources/snapshot": "host",
   "reviews/dismiss": "host",
   "reviews/open": "host",
@@ -12733,6 +12735,7 @@ export interface Notifications {
   "pins/changed": PinsChangedNotification;
   "policy/effectiveChanged": PolicyEffectiveRequest;
   "preferences/changed": Record<string, JSONValue>;
+  "requests/changed": RequestUpdate;
   "resources/changed": LeaseSnapshot;
   "runtimes/accountProfilesChanged": AccountProfile[];
   "storage/writeFailed": WriteFailure;
