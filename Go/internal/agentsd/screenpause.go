@@ -62,6 +62,49 @@ func (d *Daemon) pauseScreen(agent wire.UUID) {
 	d.change(agent, func(a *wire.Agent) {
 		a.DesktopControlPause = &wire.DesktopControlPause{App: app, PausedAt: now()}
 	})
+	d.postPauseNotice(agent, app)
+}
+
+// pauseNoticePrefix starts a pause notice's id; the rest is the agent's id.
+const pauseNoticePrefix = "pause:"
+
+// postPauseNotice is US4's scenario 2: a pause waits for the person, so a client in the
+// background gets a notice, as the agent's notify does. Not from the person's notice
+// bucket, as a disk notice is not: it comes once per pause. Not for a muted chat, and
+// dropped while the chat is in front of the person (noticeNeedsLocked).
+func (d *Daemon) postPauseNotice(agent wire.UUID, app string) {
+	if d.muted(&agent) {
+		return
+	}
+	what := "the screen"
+	if app != "" {
+		what = app
+	}
+	d.attentionMu.Lock()
+	d.notices = append(d.notices, postedNotice{id: pauseNoticePrefix + string(agent), agentID: agent, raised: now(),
+		h3: "Paused driving " + what + " when you touched the mouse or keyboard. Resume or Take Over."})
+	d.attentionMu.Unlock()
+	d.reconsider()
+}
+
+// withdrawPauseNotice takes back this agent's pause notice, when it is posted.
+func (d *Daemon) withdrawPauseNotice(agent wire.UUID) {
+	id := pauseNoticePrefix + string(agent)
+	d.attentionMu.Lock()
+	kept := d.notices[:0]
+	gone := false
+	for _, n := range d.notices {
+		if n.id == id {
+			gone = true
+			continue
+		}
+		kept = append(kept, n)
+	}
+	d.notices = kept
+	d.attentionMu.Unlock()
+	if gone {
+		d.reconsider()
+	}
 }
 
 // endScreenPause ends this agent's pause, if there is one, with outcome; and clears the
@@ -75,6 +118,7 @@ func (d *Daemon) endScreenPause(agent wire.UUID, outcome string) bool {
 		close(p.done)
 	}
 	d.driveMu.Unlock()
+	d.withdrawPauseNotice(agent)
 	if a := d.Store.Agent(agent); a != nil && a.DesktopControlPause != nil {
 		d.change(agent, func(a *wire.Agent) { a.DesktopControlPause = nil })
 	}

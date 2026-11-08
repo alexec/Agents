@@ -133,3 +133,48 @@ func TestStopEndsAPausedDriveScreen(t *testing.T) {
 		t.Fatal("Stop left the screen held or the pause on the record")
 	}
 }
+
+// pauseNotice is the pause's notice among the needs, if it is posted.
+func pauseNotice(d *Daemon, id wire.UUID) *wire.Need {
+	d.attentionMu.Lock()
+	needs := d.needs()
+	d.attentionMu.Unlock()
+	for _, n := range needs {
+		if n.ID.Notice != nil && *n.ID.Notice == pauseNoticePrefix+string(id) {
+			return &n
+		}
+	}
+	return nil
+}
+
+// US4, scenario 2: a pause sends a notice to a client in the background, and the notice
+// goes when the pause does.
+func TestAPausePostsANoticeUntilThePersonAnswers(t *testing.T) {
+	d, a, m := drivingAgent(t)
+	answered := touchedMidType(t, d, m, a.ID)
+	n := pauseNotice(d, a.ID)
+	if n == nil || n.Kind != wire.NeedKindNotice || n.AgentID == nil || *n.AgentID != a.ID ||
+		!strings.Contains(n.Headline.H3, "TextEdit") {
+		t.Fatalf("%+v", n)
+	}
+	if err := d.resumeScreen(&Client{Role: RoleControl, d: d}, a.ID); err != nil {
+		t.Fatal(err)
+	}
+	<-answered
+	if n := pauseNotice(d, a.ID); n != nil {
+		t.Fatalf("the notice stayed after Resume: %+v", n)
+	}
+}
+
+func TestAMutedChatsPausePostsNoNotice(t *testing.T) {
+	d, a, m := drivingAgent(t)
+	d.change(a.ID, func(a *wire.Agent) { yes := true; a.IsMuted = &yes })
+	answered := touchedMidType(t, d, m, a.ID)
+	if n := pauseNotice(d, a.ID); n != nil {
+		t.Fatalf("%+v", n)
+	}
+	if err := d.takeOverScreen(&Client{Role: RoleControl, d: d}, a.ID); err != nil {
+		t.Fatal(err)
+	}
+	<-answered
+}
