@@ -305,10 +305,13 @@ pauses or ends while backgrounded (spec US4 Acceptance Scenarios 1–4, SC-001, 
 - The web tile is in `Web/src/views/DesktopControlTile.tsx`, beside the pause card, and drawn in
   `Chat.tsx`'s cards, not `Rows.tsx`; its test is `Web/test/desktopControl.test.mjs` (Node's test
   runner, as every web test).
-- Still open from US4: Acceptance Scenario 2's notice when a run **pauses** while the client is
-  in the background. A turn's end already gets the ordinary turn notice, but a pause is not a
-  `Need` (`Go/internal/agentsd/attention.go`'s `needs()`), so it raises no banner or push. It needs
-  a new `NeedKind` on the wire and every client's Needs you and notice code: a change of its own.
+- US4's Acceptance Scenario 2, the notice when a run **pauses** while the client is in the
+  background, uses the notice path of the agent's `notify` (#2805), not a new `NeedKind`: the
+  pause posts a `NeedKindNotice` whose id is `pause:<agent>` (`screenpause.go`'s
+  `postPauseNotice`), so every client's banner and push carry it with no change, and a tap opens
+  the chat. It is not taken from the person's notice bucket, as a disk notice is not; a muted
+  chat gets none; it is dropped while the chat is in front of the person, and withdrawn when
+  the pause ends (Resume, Take Over or the turn's end).
 
 **Checkpoint**: all three clients show the live tile for a session holding `screen`, the locked
 placeholder never carries pixels, and no screenshot is ever written to disk or saved history (SC-005).
