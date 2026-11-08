@@ -3,7 +3,7 @@
 // category, expands a work item for its description and its Lineage section, and presses Start
 // Agent, which opens the new-agent form filled in. Starts no agent. Expects the folder's
 // .agents/mcp.json to have the azureboards server (hosted, approved) pointed at the fixture Azure
-// DevOps (Web/test/walk/forge3815-azureboards.py, AZURE_BOARDS_PROJECT=acme/Web Shop), and
+// DevOps (.agents/skills/run-app/scripts/fake-azure-devops.py, AZURE_BOARDS_PROJECT=acme/Web Shop), and
 // ui://azureboards/issues pinned.
 //
 //   [RECOVERY_KEY=…] node Web/test/walk/views3826-azureboards.mjs <WEB_URL> <browser code> <out dir>

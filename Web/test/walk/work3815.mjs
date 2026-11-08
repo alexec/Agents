@@ -1,5 +1,5 @@
 // Azure Boards in the Work pages (#3815): on a run-app root whose folder names the fixture Azure
-// DevOps's project acme/Web Shop (forge3815-azureboards.py), open Work ▸ Issues and see the work
+// DevOps's project acme/Web Shop (.agents/skills/run-app/scripts/fake-azure-devops.py), open Work ▸ Issues and see the work
 // items with their states and the project in the Repo filter; open work item 41's page (its
 // description as Markdown, its comments, Open on Azure Boards, Start Agent and its state menu in
 // place of Close); open the state menu and move it; add a tag; write a comment. Screenshots into
