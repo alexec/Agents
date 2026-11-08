@@ -1,0 +1,437 @@
+<!doctype html>
+<!-- High-fidelity mock for #3984: the Multiplier page on the Mac window, with the crowd (#3985), the way back (#3986),
+     the earned badges (#3987), personal bests (#3988) and the baseline setting (#3991). Example figures only. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mock: the Multiplier page (#3984)</title>
+<style>
+  :root {
+    --ground:#F7F8F9; --sidebar:#F0F1F3; --raised:#FFFFFF; --well:#F0F2F4; --wash:#E7EAEE; --rule:#DDE1E6;
+    --ink:#1C1D20; --mute:#6E7279; --faint:#9A9EA5; --accent:#2F6FEB; --sel:#D8DEE6; --pull:#7442B8;
+    --chrome:#ECEDEF; --shadow:0 24px 70px rgba(20,24,30,.22), 0 0 0 .5px rgba(0,0,0,.18);
+  }
+  body.dark {
+    --ground:#1C1D20; --sidebar:#161719; --raised:#26282C; --well:#2A2D31; --wash:#33363B; --rule:#3A3E44;
+    --ink:#E8EAED; --mute:#A0A4AB; --faint:#6F737A; --accent:#5B8DF5; --sel:#3A3E44; --pull:#B79AF0;
+    --chrome:#232427; --shadow:0 24px 70px rgba(0,0,0,.6), 0 0 0 .5px rgba(255,255,255,.12);
+  }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; }
+  body { font:13px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; color:var(--ink);
+         background:linear-gradient(160deg,#8EA7C9,#B9A6D6 55%,#E2B9C2); -webkit-font-smoothing:antialiased; }
+  body.dark { background:linear-gradient(160deg,#1E2A44,#2E2346 55%,#3B2430); }
+
+  .controls { position:fixed; left:0; right:0; top:0; display:flex; gap:6px; align-items:center; flex-wrap:wrap;
+              padding:8px 14px; background:rgba(255,255,255,.72); backdrop-filter:blur(20px); font-size:12px; z-index:5;
+              border-bottom:.5px solid rgba(0,0,0,.12); color:#1C1D20; }
+  .controls b { margin-right:6px; }
+  .controls button { font:inherit; padding:3px 9px; border-radius:6px; border:.5px solid rgba(0,0,0,.2); background:#fff; cursor:pointer; }
+  .controls button.on { background:#2F6FEB; color:#fff; border-color:#2F6FEB; }
+  .controls label { display:flex; gap:4px; align-items:center; margin-left:6px; }
+  .controls input[type=range] { width:150px; }
+  .controls .sep { width:1px; height:18px; background:rgba(0,0,0,.15); margin:0 4px; }
+
+  .stage { position:absolute; inset:46px 0 0 0; display:flex; align-items:center; justify-content:center; padding:24px; }
+  .window { width:1180px; height:760px; border-radius:12px; overflow:hidden; box-shadow:var(--shadow); display:grid;
+            grid-template-columns:250px 1fr; background:var(--ground); position:relative; }
+
+  /* Sidebar */
+  .side { background:var(--sidebar); border-right:.5px solid var(--rule); padding:0 10px; display:flex; flex-direction:column;
+          backdrop-filter:blur(30px); }
+  .lights { display:flex; gap:8px; padding:18px 8px 14px; }
+  .lights i { width:12px; height:12px; border-radius:50%; display:block; }
+  .lights i:nth-child(1){background:#FF5F57} .lights i:nth-child(2){background:#FEBC2E} .lights i:nth-child(3){background:#28C840}
+  .newbtn { display:flex; align-items:center; gap:6px; padding:5px 8px; border-radius:7px; background:var(--raised);
+            border:.5px solid var(--rule); font-weight:500; margin:0 2px 10px; box-shadow:0 1px 1px rgba(0,0,0,.04); }
+  .newbtn svg { width:14px; height:14px; }
+  .search { margin:0 2px 12px; padding:5px 8px; border-radius:7px; background:var(--wash); color:var(--faint); display:flex; gap:6px; align-items:center; }
+  .grp { display:flex; justify-content:space-between; align-items:center; color:var(--mute); font-weight:600; font-size:11.5px;
+         padding:10px 8px 4px; }
+  .grp span { font-weight:500; color:var(--faint); }
+  .row { display:flex; align-items:center; gap:8px; padding:4px 8px; border-radius:6px; color:var(--ink); cursor:default; white-space:nowrap; }
+  .row svg { width:15px; height:15px; flex:none; color:var(--mute); }
+  .row.sel { background:var(--sel); }
+  .row.sel svg { color:var(--accent); }
+  .row .dot { width:8px; height:8px; border-radius:50%; flex:none; margin:0 3px; }
+  .dot.run { background:var(--accent); box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+  .dot.wait { border:1.5px solid var(--accent); }
+  .dot.done { border:1.5px solid var(--faint); }
+  .row .meta { margin-left:auto; color:var(--faint); font-size:11.5px; }
+  .row:hover:not(.sel) { background:color-mix(in srgb, var(--sel) 55%, transparent); }
+
+  /* Main */
+  .main { position:relative; display:flex; flex-direction:column; align-items:center; text-align:center; overflow:hidden; }
+  .toolbar { align-self:stretch; height:52px; display:flex; align-items:center; padding:0 18px; color:var(--mute); font-weight:600; }
+  .toolbar .title { color:var(--ink); font-size:13px; }
+  .page { display:flex; flex-direction:column; align-items:center; width:100%; flex:1; }
+  canvas#crowd { width:820px; height:190px; display:block; margin-top:2px; }
+  .range { color:var(--mute); font-size:13px; font-weight:500; letter-spacing:.2px; margin-top:6px; }
+  .hero { font:800 128px/1 "SF Pro Display", -apple-system, system-ui, sans-serif; letter-spacing:-5px; margin:4px 0 2px;
+          font-variant-numeric:tabular-nums; color:var(--ink); }
+  .hero .x { font-weight:600; letter-spacing:0; margin-left:4px; color:var(--mute); }
+  .means { font-size:17px; color:var(--mute); margin-bottom:26px; }
+  .stats { display:flex; gap:64px; }
+  .stat b { display:block; font:700 42px/1 "SF Pro Display", -apple-system, system-ui, sans-serif; letter-spacing:-1px; font-variant-numeric:tabular-nums; }
+  .stat span { color:var(--mute); font-size:12.5px; }
+  .bests { margin-top:22px; font-size:13.5px; color:var(--mute); display:flex; gap:10px; align-items:center; }
+  .bests b { color:var(--ink); font-weight:600; font-variant-numeric:tabular-nums; }
+  .bests .new { color:var(--accent); }
+  .badges { margin-top:18px; display:flex; gap:8px; align-items:center; }
+  .badge { width:30px; height:30px; border-radius:50%; display:grid; place-items:center; color:#fff; position:relative;
+           background:linear-gradient(150deg,#6C9BFF,#3A62D8); box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.35), 0 1px 2px rgba(0,0,0,.18); }
+  .badge svg { width:15px; height:15px; }
+  .badge.pop { animation:pop .5s cubic-bezier(.3,1.6,.5,1); }
+  @keyframes pop { from { transform:scale(0); } }
+  .badges .count { margin-left:6px; color:var(--mute); font-size:12.5px; font-variant-numeric:tabular-nums; }
+  .next { margin-top:8px; font-size:12.5px; color:var(--mute); }
+  .next b { color:var(--ink); font-weight:600; }
+  .news { height:24px; margin-top:16px; font-size:15px; font-weight:600; color:var(--accent); font-variant-numeric:tabular-nums; }
+  .news.down { color:var(--mute); }
+  .news.go { animation:rise 2.4s ease-out forwards; }
+  @keyframes rise { 0% { opacity:0; transform:translateY(14px); } 15% { opacity:1; transform:none; } 70% { opacity:1; } 100% { opacity:0; transform:translateY(-14px); } }
+  .source { position:absolute; bottom:40px; color:var(--faint); font-size:11.5px; }
+  .keys { position:absolute; bottom:16px; color:var(--faint); font-size:11.5px; }
+  .keys kbd { font:inherit; color:var(--mute); }
+  .tip { position:absolute; padding:4px 8px; border-radius:6px; background:var(--raised); color:var(--ink); font-size:11.5px;
+         box-shadow:0 4px 14px rgba(0,0,0,.18), 0 0 0 .5px var(--rule); pointer-events:none; white-space:nowrap; display:none; z-index:3; }
+  .empty .hero { color:var(--faint); }
+  .hide { display:none !important; }
+
+  /* Settings */
+  .settings { position:absolute; inset:0; background:var(--ground); display:grid; grid-template-columns:220px 1fr; }
+  .settings .side { padding-top:0; }
+  .form { padding:20px 40px; overflow:auto; }
+  .form h1 { font-size:20px; margin:8px 0 18px; font-weight:700; }
+  .card { background:var(--raised); border-radius:10px; box-shadow:0 0 0 .5px var(--rule); margin-bottom:8px; }
+  .card .line { display:flex; align-items:center; gap:12px; padding:9px 14px; border-top:.5px solid var(--rule); min-height:38px; }
+  .card .line:first-child { border-top:none; }
+  .card .line .lab { flex:1; }
+  .card .line .help { color:var(--mute); font-size:11.5px; }
+  .sect { color:var(--mute); font-weight:600; font-size:11.5px; margin:20px 4px 6px; }
+  .foot { color:var(--mute); font-size:11.5px; margin:0 4px 6px; }
+  .field { font:inherit; color:var(--ink); background:var(--ground); border:.5px solid var(--rule); border-radius:6px; padding:4px 8px;
+           box-shadow:inset 0 .5px 1px rgba(0,0,0,.06); }
+  .field:focus { outline:3px solid color-mix(in srgb, var(--accent) 40%, transparent); outline-offset:0; }
+  .num { width:64px; text-align:right; font-variant-numeric:tabular-nums; }
+  .wide { width:420px; }
+  .stepper { display:inline-flex; flex-direction:column; margin-left:-6px; }
+  .stepper button { font-size:8px; line-height:9px; height:11px; width:16px; padding:0; border:.5px solid var(--rule); background:var(--raised); color:var(--ink); }
+  .stepper button:first-child { border-radius:4px 4px 0 0; } .stepper button:last-child { border-radius:0 0 4px 4px; border-top:none; }
+  .pbtn { font:inherit; padding:3px 12px; border-radius:6px; border:.5px solid var(--rule); background:var(--raised); color:var(--ink);
+          box-shadow:0 .5px 1px rgba(0,0,0,.08); }
+  .toggle { width:32px; height:19px; border-radius:10px; background:var(--accent); position:relative; flex:none; }
+  .toggle::after { content:""; position:absolute; right:2px; top:2px; width:15px; height:15px; border-radius:50%; background:#fff; }
+  .preview { color:var(--mute); font-size:11.5px; font-style:italic; }
+</style>
+</head>
+<body>
+<div class="controls">
+  <b>Mock #3984 (Mac window)</b>
+  <button id="tabPage" class="on">Multiplier page</button>
+  <button id="tabSettings">Settings ▸ Cost</button>
+  <span class="sep"></span>
+  <button id="land">Land a PR</button>
+  <button id="revert">Revert one</button>
+  <button id="earn">Earn an achievement</button>
+  <button id="empty">Empty state</button>
+  <label>Multiplier <input id="mult" type="range" min="0" max="3.4" step="0.01" value="2.45"> <span id="multv"></span></label>
+  <span class="sep"></span>
+  <label><input type="checkbox" id="dark"> Dark</label>
+  <label><input type="checkbox" id="still"> Reduce Motion</label>
+</div>
+
+<div class="stage">
+  <div class="window">
+    <aside class="side">
+      <div class="lights"><i></i><i></i><i></i></div>
+      <div class="newbtn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 3v10M3 8h10"/></svg>New Session</div>
+      <div class="search"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>Search</div>
+
+      <div class="grp">Usage</div>
+      <div class="row sel" id="rowMult">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+        Multiplier<span class="meta" id="rowMultMeta">282×</span></div>
+      <div class="row"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6"/><path d="M8 4.5v7M10 6.2c-.4-.7-1.1-1-2-1-1.1 0-2 .6-2 1.5 0 2 4 1 4 3 0 .9-.9 1.5-2 1.5-.9 0-1.6-.3-2-1"/></svg>Cost</div>
+      <div class="row"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M6 2.5 4.5 13.5M11.5 2.5 10 13.5M2.5 6h11M2 10.5h11"/></svg>Tokens</div>
+      <div class="row"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.5 1.5"/></svg>Time</div>
+      <div class="row"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2.5" y="3" width="11" height="10" rx="2"/><path d="M5 6.5h6M5 9.5h4"/></svg>Events</div>
+
+      <div class="grp">Agents <span>5</span></div>
+      <div class="row"><i class="dot run"></i>Rewrite settings sheet<span class="meta">2m</span></div>
+      <div class="row"><i class="dot wait"></i>Check the build<span class="meta">5m</span></div>
+      <div class="row"><i class="dot run"></i>Tidy error codes<span class="meta">now</span></div>
+      <div class="row"><i class="dot run"></i>Crowd in one Canvas<span class="meta">now</span></div>
+      <div class="row"><i class="dot done"></i>Rename HeroPage<span class="meta">1h</span></div>
+      <div class="grp">Web <span>2</span></div>
+      <div class="row"><i class="dot run"></i>Parity walk<span class="meta">now</span></div>
+      <div class="row"><i class="dot done"></i>Fix sidebar badge<span class="meta">3h</span></div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="toolbar"><span class="title">Multiplier</span></div>
+      <div class="page" id="full">
+        <canvas id="crowd" width="1640" height="380"></canvas>
+        <div class="range">Last 7 days</div>
+        <div class="hero"><span id="hero">282</span><span class="x">×</span></div>
+        <div class="means" id="means">the work of 282 engineers</div>
+        <div class="stats">
+          <div class="stat"><b id="prs">395</b><span>PRs merged</span></div>
+          <div class="stat"><b id="hours">11,286</b><span>engineer-hours</span></div>
+          <div class="stat"><b id="agents">7</b><span>agents now</span></div>
+        </div>
+        <div class="bests">Best week <b id="bestWeek">260×</b> <span>·</span> Most at once <b id="mostAtOnce">9</b></div>
+        <div class="badges" id="badges"></div>
+        <div class="next" id="next"></div>
+        <div class="news" id="news"></div>
+      </div>
+      <div class="page empty hide" id="emptyPage">
+        <canvas id="crowdEmpty" width="1640" height="380" style="width:820px;height:190px"></canvas>
+        <div class="range">Last 7 days</div>
+        <div class="hero">— <span class="x">×</span></div>
+        <div class="means">No merged work in the last 7 days.<br>Your number starts when an agent's first PR merges.</div>
+        <div class="next">Next: <b>Start an agent and let it run a turn.</b></div>
+      </div>
+      <div class="source" id="source">An average engineer merged 1.4 PRs a week (DX 2025)</div>
+      <div class="keys"><kbd>⌘0</kbd> Multiplier · <kbd>⌘N</kbd> new session · <kbd>↑↓</kbd> move · <kbd>⌘F</kbd> find</div>
+      <div class="tip" id="tip"></div>
+    </main>
+
+    <div class="settings hide" id="settings">
+      <aside class="side">
+        <div class="lights"><i></i><i></i><i></i></div>
+        <div class="grp">This app</div>
+        <div class="row">Appearance</div><div class="row">Sidebar</div><div class="row">Voice</div>
+        <div class="grp">Agents</div>
+        <div class="row">Agents</div><div class="row sel">Cost</div><div class="row">Resources</div>
+        <div class="grp">Machines</div>
+        <div class="row">Machines</div><div class="row">Runtimes</div><div class="row">Browser</div>
+      </aside>
+      <div class="form">
+        <h1>Cost</h1>
+        <div class="sect">Limits</div>
+        <div class="card">
+          <div class="line"><span class="lab">Daily spending limit</span><input class="field num" value="$40"></div>
+          <div class="line"><span class="lab">Warn at</span><input class="field num" value="80%"></div>
+          <div class="line"><span class="lab">Stop agents at the limit</span><span class="toggle"></span></div>
+        </div>
+        <div class="sect">Multiplier</div>
+        <div class="card">
+          <div class="line"><span class="lab">PRs a week<br><span class="help">What one engineer merges in a week. The Multiplier is your agents' PRs ÷ this.</span></span>
+            <input class="field num" id="base" value="1.4"><span class="stepper"><button id="up">▲</button><button id="down">▼</button></span></div>
+          <div class="line"><span class="lab">Line under the numbers<br><span class="help">Leave it empty for the default line.</span></span>
+            <input class="field wide" id="msg" placeholder="An average engineer merged 1.4 PRs a week (DX 2025)"></div>
+          <div class="line"><span class="lab preview" id="preview">With these figures, this week is 282×: the work of 282 engineers.</span>
+            <button class="pbtn" id="reset">Reset to the 2025 Figure</button></div>
+        </div>
+        <div class="foot">Kept on your machines, so every machine shows the same figure. The default is DX's 2025 median for an engineer with no AI.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const DEFAULT_BASE = 1.4, HOURS = 40;
+const ACH = [
+  { title:"First agent started", how:"Start an agent and let it run a turn.", day:"12 Oct 2026", icon:'<path d="M5 3.5v9l7-4.5z" fill="currentColor"/>' },
+  { title:"First phone or browser paired", how:"Pair a phone or a browser with Pair a Device….", day:"13 Oct 2026", icon:'<rect x="4.5" y="2" width="7" height="12" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M7 12h2" stroke="currentColor" stroke-width="1.5"/>' },
+  { title:"First question answered away from the Mac", how:"Answer an agent's question from the Remote or the web page.", day:"15 Oct 2026", icon:'<path d="M2.5 4.5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H7l-3 2.5v-2.5a2 2 0 0 1-1.5-2z" fill="none" stroke="currentColor" stroke-width="1.5"/>' },
+  { title:"First workflow made", how:"Make a workflow that runs an agent on a schedule or an event.", day:"19 Oct 2026", icon:'<circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3l2 1.5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>' },
+  { title:"First pull request landed with nobody watching", how:"Let an agent open a pull request that merges by itself.", day:"20 Oct 2026", icon:'<circle cx="4.5" cy="3.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="4.5" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="11.5" cy="8" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M4.5 5v6M4.5 5c0 3 7 0 7 1.4" fill="none" stroke="currentColor" stroke-width="1.4"/>' },
+  { title:"Five agents working at once", how:"Have five agents in a turn at the same time.", day:"24 Oct 2026", icon:'<text x="8" y="12" text-anchor="middle" font-size="11" font-weight="800" fill="currentColor" font-family="-apple-system,system-ui">5</text>' },
+  { title:"First cloud machine started", how:"Start a machine on a cloud provider.", day:"7 Nov 2026", icon:'<path d="M4.5 12.5h7a2.5 2.5 0 0 0 .3-5A3.5 3.5 0 0 0 5 6.5a3 3 0 0 0-.5 6z" fill="none" stroke="currentColor" stroke-width="1.5"/>' },
+];
+let earned = 6;
+let base = DEFAULT_BASE, msg = "";
+const state = { mult: 282, prs: 395, agents: 7, bestWeek: 260 };
+let shown = { ...state };
+let pr = 3992, empty = false;
+const still = () => $('still').checked || matchMedia('(prefers-reduced-motion: reduce)').matches;
+const fmtMult = v => v >= 10 ? Math.round(v).toLocaleString() : v.toFixed(1);
+const fmtInt = v => Math.round(v).toLocaleString();
+
+/* ---------- The crowd ---------- */
+const BODY = new Path2D("M0 -290 C188 -290 300 -186 300 4 C300 196 188 290 0 290 C-188 290 -300 196 -300 4 C-300 -186 -188 -290 0 -290 Z");
+const SMILE = new Path2D("M-64 80 Q0 150 64 80");
+function blob(ctx, x, y, s, { fill = "#CFE3FF", alpha = 1, shut = false, look = 0, tilt = 0, outline = "#3A78E6" } = {}) {
+  ctx.save(); ctx.globalAlpha = alpha; ctx.translate(x, y); ctx.rotate(tilt); ctx.scale(s, s);
+  ctx.lineJoin = "round"; ctx.lineWidth = 56; ctx.strokeStyle = outline; ctx.stroke(BODY);
+  ctx.fillStyle = fill; ctx.fill(BODY);
+  ctx.fillStyle = "#0E1A3A";
+  for (const ex of [-92, 92]) { ctx.beginPath(); ctx.ellipse(ex + look * 18, -30, 46, shut ? 6 : 62, 0, 0, Math.PI * 2); ctx.fill(); }
+  ctx.lineWidth = 28; ctx.lineCap = "round"; ctx.strokeStyle = "#0E1A3A"; ctx.stroke(SMILE);
+  ctx.restore();
+}
+// A fixed set of places for each N: a mound of rows around you, the nearest places filled first,
+// so 3 is a Huddle and 300 is a crowd in a stadium.
+function layout(n, W, H) {
+  if (n <= 0) { crowd.w = 0; return []; }
+  const a = W / 2, b = H;                       // a half-ellipse with you at the middle of its base
+  let w = Math.sqrt((Math.PI * a * b / 2) / (n * 0.52)) * 0.9;
+  w = Math.min(w, 140);
+  const rowStep = w * 0.52, cx = W / 2, base = H - w * 0.45;
+  crowd.w = w;
+  const cells = [];
+  const rows = Math.ceil(b / rowStep) + 2, cols = Math.ceil(W / w) + 2;
+  for (let r = 0; r < rows; r++) for (let c = -cols; c <= cols; c++) {
+    const x = cx + (c + (r % 2) * 0.5) * w;
+    const y = base - r * rowStep;
+    if (x < w / 2 || x > W - w / 2 || y < w / 2) continue;
+    const dx = (x - cx) / a, dy = (base - y + w * 0.6) / b;
+    if (r === 0 && Math.abs(x - cx) < Math.max(w * 0.9, 80)) continue;  // your place, in front
+    cells.push({ x, y, r, d: dx * dx + dy * dy });
+  }
+  cells.sort((p, q) => p.d - q.d);
+  const size = w / 600 * 0.86;
+  return cells.slice(0, n).map((p, i) => {
+    const seed = (i * 9301 + 49297) % 233280 / 233280;
+    return { ...p, x: p.x + (seed - .5) * w * 0.18, y: p.y + ((seed * 7) % 1 - .5) * w * 0.12, s: size, seed };
+  });
+}
+const crowd = { n: 0, frac: 0, popAt: new Map(), blink: new Set(), each: 1 };
+function drawCrowd(canvas, mult) {
+  const ctx = canvas.getContext("2d"), W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  const dark = document.body.classList.contains("dark");
+  let each = 1, whole = Math.floor(mult), frac = mult - whole;
+  if (whole > 1000) { each = 10; whole = Math.floor(mult / 10); frac = mult / 10 - whole; }
+  crowd.each = each;
+  const total = whole + (frac > 0.05 ? 1 : 0);
+  const places = layout(total, W, H - 40);
+  const now = performance.now();
+  places.slice().sort((a, b) => a.y - b.y).forEach(p => {
+    const i = places.indexOf(p);
+    const isFrac = i === total - 1 && frac > 0.05;
+    let s = p.s;
+    const t0 = crowd.popAt.get(i);
+    if (t0 !== undefined && !still()) { const k = Math.min((now - t0) / 500, 1); s *= k < 1 ? (1.25 * k - 0.25 * k * k * k) + Math.sin(k * Math.PI) * 0.15 : 1; }
+    const hue = p.seed;
+    const fill = dark ? `hsl(${212 + hue * 10} 70% ${70 + hue * 8}%)` : `hsl(${210 + hue * 12} 100% ${86 + hue * 6}%)`;
+    blob(ctx, p.x, p.y, s, { fill, alpha: isFrac ? Math.max(frac, 0.12) : 1, shut: crowd.blink.has(i), look: (hue - .5) * 1.6, tilt: (hue - .5) * 0.18 });
+  });
+  // you, in front, white, the Huddle's size
+  const ys = Math.min(Math.max(0.13, (crowd.w || 0) * 1.15 / 600), 0.27);
+  blob(ctx, W / 2, H - 4 - 300 * ys, ys, { fill: "#FFFFFF", shut: crowd.blink.has(-1), look: you.look });
+  if (each > 1) { ctx.fillStyle = dark ? "#A0A4AB" : "#6E7279"; ctx.font = "22px -apple-system, system-ui"; ctx.textAlign = "right"; ctx.fillText("each Blob is 10 engineers", W - 8, H - 8); }
+}
+const you = { look: 0 };
+function frame() {
+  drawCrowd($('crowd'), shown.mult);
+  drawCrowd($('crowdEmpty'), 0);
+  requestAnimationFrame(frame);
+}
+// blinks now and then, a few at a time; your eyes look around
+setInterval(() => {
+  if (still()) { crowd.blink.clear(); you.look = 0; return; }
+  const n = Math.floor(shown.mult);
+  crowd.blink.clear();
+  for (let k = 0; k < 1 + Math.random() * 4; k++) crowd.blink.add(Math.floor(Math.random() * Math.max(n, 1)));
+  if (Math.random() < .25) crowd.blink.add(-1);
+  setTimeout(() => crowd.blink.clear(), 140);
+  if (Math.random() < .4) you.look = (Math.random() - .5) * 1.8;
+}, 900);
+
+/* ---------- Numbers ---------- */
+let running = null;
+function countTo(next) {
+  const from = { ...shown };
+  cancelAnimationFrame(running);
+  if (still()) { shown = { ...next }; paint(); return; }
+  const t0 = performance.now();
+  const step = t => {
+    const k = Math.min((t - t0) / 1000, 1), e = 1 - Math.pow(1 - k, 3);
+    for (const key of Object.keys(next)) shown[key] = from[key] + (next[key] - from[key]) * e;
+    paint();
+    if (k < 1) running = requestAnimationFrame(step);
+  };
+  running = requestAnimationFrame(step);
+}
+function paint() {
+  $('hero').textContent = fmtMult(shown.mult);
+  $('means').textContent = `the work of ${fmtMult(shown.mult)} engineers`;
+  $('prs').textContent = fmtInt(shown.prs);
+  $('hours').textContent = fmtInt(shown.prs * HOURS / base);
+  $('agents').textContent = fmtInt(shown.agents);
+  $('bestWeek').textContent = fmtMult(shown.bestWeek) + "×";
+  $('rowMultMeta').textContent = fmtMult(shown.mult) + "×";
+  $('source').textContent = msg || `An average engineer merged ${base} PRs a week (DX 2025)`;
+  $('multv').textContent = fmtMult(state.mult) + "×";
+}
+function news(text, down) {
+  if (still()) return;
+  const el = $('news'); el.className = "news"; void el.offsetWidth;
+  el.textContent = text; el.className = "news go" + (down ? " down" : "");
+}
+function setPRs(prs, why) {
+  const before = state.mult, wholeBefore = Math.floor(before);
+  state.prs = Math.max(prs, 0); state.mult = state.prs / base;
+  let newBest = false;
+  if (state.mult > state.bestWeek) { state.bestWeek = state.mult; newBest = true; }
+  const wholeAfter = Math.floor(state.mult);
+  if (wholeAfter > wholeBefore) for (let i = wholeBefore; i < wholeAfter; i++) crowd.popAt.set(i, performance.now());
+  countTo({ ...state });
+  if (why) {
+    const d = state.mult - before;
+    news(newBest ? `New best week: ${fmtMult(state.mult)}×` : `${d >= 0 ? "+" : "−"}${Math.abs(d).toFixed(1)}×  ${why}`, d < 0);
+  }
+}
+$('land').onclick = () => setPRs(state.prs + 1, `#${pr++} merged`);
+$('revert').onclick = () => setPRs(state.prs - 1, `#${pr - 7} reverted`);
+$('mult').oninput = e => { const m = Math.round(Math.pow(10, +e.target.value) - 1); setPRs(Math.round(m * base)); };
+
+/* ---------- Badges ---------- */
+function paintBadges(popLast) {
+  const box = $('badges'); box.innerHTML = "";
+  ACH.slice(0, earned).forEach((a, i) => {
+    const b = document.createElement("div");
+    b.className = "badge" + (popLast && i === earned - 1 && !still() ? " pop" : "");
+    b.innerHTML = `<svg viewBox="0 0 16 16">${a.icon}</svg>`;
+    b.setAttribute("aria-label", `${a.title}, ${a.day}`);
+    b.onmouseenter = () => { const t = $('tip'), r = b.getBoundingClientRect(), m = $('main').getBoundingClientRect();
+      t.textContent = `${a.title}, ${a.day}`; t.style.display = "block";
+      t.style.left = (r.left - m.left + r.width / 2 - t.offsetWidth / 2) + "px"; t.style.top = (r.top - m.top - 30) + "px"; };
+    b.onmouseleave = () => $('tip').style.display = "none";
+    box.appendChild(b);
+  });
+  const done = earned >= ACH.length;
+  if (!done) { const c = document.createElement("span"); c.className = "count"; c.textContent = `${earned} of ${ACH.length}`; box.appendChild(c); }
+  $('next').innerHTML = done ? "" : `Next: <b>${ACH[earned].how}</b>`;
+  $('next').classList.toggle("hide", done);
+}
+$('earn').onclick = () => { earned = earned >= ACH.length ? 3 : earned + 1; paintBadges(true); };
+
+/* ---------- Empty, dark, tabs ---------- */
+$('empty').onclick = () => { empty = !empty; $('empty').classList.toggle("on", empty);
+  $('full').classList.toggle("hide", empty); $('emptyPage').classList.toggle("hide", !empty);
+  $('rowMultMeta').style.visibility = empty ? "hidden" : "visible"; };
+$('dark').onchange = e => document.body.classList.toggle("dark", e.target.checked);
+if (matchMedia('(prefers-color-scheme: dark)').matches) { $('dark').checked = true; document.body.classList.add("dark"); }
+const tab = which => { $('settings').classList.toggle("hide", which !== "settings");
+  $('tabPage').classList.toggle("on", which === "page"); $('tabSettings').classList.toggle("on", which === "settings"); };
+$('tabPage').onclick = () => tab("page"); $('tabSettings').onclick = () => tab("settings");
+
+/* ---------- Settings ---------- */
+function setBase(v) {
+  base = Math.min(Math.max(Math.round(v * 10) / 10, 0.1), 100);
+  $('base').value = base;
+  $('msg').placeholder = `An average engineer merged ${base} PRs a week (DX 2025)`;
+  state.mult = state.prs / base; state.bestWeek = Math.max(state.bestWeek * DEFAULT_BASE / base, state.mult);
+  countTo({ ...state });
+  $('preview').textContent = `With these figures, this week is ${fmtMult(state.mult)}×: the work of ${fmtMult(state.mult)} engineers.`;
+}
+$('base').onchange = e => setBase(parseFloat(e.target.value) || DEFAULT_BASE);
+$('up').onclick = () => setBase(base + 0.1); $('down').onclick = () => setBase(base - 0.1);
+$('msg').oninput = e => { msg = e.target.value.trim(); paint(); };
+$('reset').onclick = () => { $('msg').value = ""; msg = ""; setBase(DEFAULT_BASE); };
+
+/* ---------- Start ---------- */
+const params = new URLSearchParams(location.search);
+if (params.get("settings")) tab("settings");
+if (params.get("m")) { const m = +params.get("m"); state.prs = Math.round(m * base); state.mult = state.prs / base; shown = { ...state }; }
+if (params.get("empty")) $('empty').onclick();
+$('mult').value = Math.log10(state.mult + 1);
+paint(); paintBadges(false); frame();
+</script>
+</body>
+</html>
