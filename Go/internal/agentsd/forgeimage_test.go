@@ -119,8 +119,8 @@ func TestForgeImageRefusesSVGAndBigImages(t *testing.T) {
 	svg := []byte(`<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>`)
 	big := append(append([]byte(nil), pngBytes...), make([]byte, forgeImageMost)...)
 	c, _ := imageDaemon(t, map[string]func() *http.Response{
-		"https://raw.githubusercontent.com/a/b/main/x.svg":   imageAnswer("image/svg+xml", svg),
-		"https://raw.githubusercontent.com/a/b/main/y.png":   imageAnswer("image/png", svg),
+		"https://raw.githubusercontent.com/a/b/main/x.svg": imageAnswer("image/svg+xml", svg),
+		"https://raw.githubusercontent.com/a/b/main/y.png": imageAnswer("image/png", svg),
 		"https://raw.githubusercontent.com/a/b/main/big.png": imageAnswer("image/png", big),
 		"https://raw.githubusercontent.com/a/b/main/unsaid.png": func() *http.Response {
 			r := imageAnswer("image/png", big)()
