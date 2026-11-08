@@ -138,6 +138,8 @@ export function Changes({ store, host, session }: { store: Store; host: string; 
   // Read again whenever the agent's folders change.
   const changedAt = store.filesChanged.value?.agentID === session ? store.filesChanged.value.at : 0;
   const agentState = store.agent(host, session)?.state;
+  // A move to another worktree changes where git's view is taken, as on the Mac (053, #4020).
+  const cwd = store.agent(host, session)?.cwd;
   // Each read is dropped if a later one has started: a slow answer for the last session or file
   // must not land under this one (the window's #89).
   useEffect(() => {
@@ -146,7 +148,7 @@ export function Changes({ store, host, session }: { store: Store; host: string; 
       (l) => { if (current) { list.value = l; failed.value = null; } },
       (e) => { if (current) failed.value = describe(e); });
     return () => { current = false; };
-  }, [host, session, changedAt, agentState]);
+  }, [host, session, changedAt, agentState, cwd]);
   // Opened from an edit in the chat, the file's row is brought into view.
   useEffect(() => {
     if (open) document.querySelector(".changes .row.changed.chosen")?.scrollIntoView({ block: "nearest" });
