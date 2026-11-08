@@ -81,8 +81,13 @@ Alex types those.
 
 ## Where things live
 
-- **Passwords:** a generic Keychain item `agents-signup:<domain>`, account = the sign-up
-  email. Make the password without seeing it:
+- **Passwords:** with the browser tools, make it with `generate_secret` (#4000) on the
+  password field, named `<PROVIDER>_PASSWORD`: it is saved in Settings ▸ Secrets and typed
+  in unseen. Fill a confirm field, and later sign-ins, with `fill_secret` and the same name.
+  Give the site's rules as `rules` when it states them in words. On a change-password page,
+  set `replace: true`; the old value stays as `<NAME>_PREVIOUS`.
+- **Passwords in the private Chrome:** a generic Keychain item `agents-signup:<domain>`,
+  account = the sign-up email. Make the password without seeing it:
   `security add-generic-password -s agents-signup:<domain> -a <email> -w "$(openssl rand -base64 24 | tr -d '/+=' | cut -c1-24)Aa1!"`.
   An older item for the same domain under another account can exist: leave it, and name
   yours with `service#account`.

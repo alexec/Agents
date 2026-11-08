@@ -114,6 +114,9 @@ func appToolMethod(tool string) string {
 	if tool == fillSecretName {
 		return "secrets/fill"
 	}
+	if tool == generateSecretName {
+		return "secrets/generate"
+	}
 	// hand_to_person (#3529), the same.
 	if tool == handToPersonName {
 		return "browser/handToPerson"

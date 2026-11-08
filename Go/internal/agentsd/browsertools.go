@@ -92,6 +92,9 @@ var browserTools = sync.OnceValues(func() ([]json.RawMessage, map[string]bool) {
 	// The app's own fill (#3530), listed and called with Playwright's tools.
 	names[fillSecretName] = true
 	out = append(out, fillSecretTool)
+	// The app's own password maker (#4000), the same.
+	names[generateSecretName] = true
+	out = append(out, generateSecretTool)
 	// The hand-off to the person (#3529), the same.
 	names[handToPersonName] = true
 	out = append(out, handToPersonTool)
@@ -225,6 +228,11 @@ func (d *Daemon) driveBrowser(ctx context.Context, agent wire.UUID, name string,
 			return failed(refusal)
 		}
 	}
+	if name == generateSecretName {
+		if refusal := d.generateSecretCheck(args); refusal != "" {
+			return failed(refusal)
+		}
+	}
 	reply, err := d.leaseResource(agent, browserLeaseName)
 	if err != nil {
 		return failed(browserWords(err))
@@ -251,6 +259,9 @@ func (d *Daemon) driveBrowser(ctx context.Context, agent wire.UUID, name string,
 	}
 	if name == fillSecretName {
 		return d.fillSecret(ctx, drive, fill, args)
+	}
+	if name == generateSecretName {
+		return d.generateSecret(ctx, drive, args)
 	}
 	if refusal := d.browserRefusal(ctx, drive, name, args); refusal != "" {
 		return failed(refusal)
