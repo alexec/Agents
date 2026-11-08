@@ -116,10 +116,18 @@ struct WorkItemPage: View {
                 HStack(spacing: 16) { pageLinks }
                 titleLine(title)
             } else {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    titleLine(title)
-                    Spacer()
-                    pageLinks
+                // Beside the title only when it keeps a readable width; in a narrow pane (an
+                // iPad's detail, a narrow Mac window) they go above it, as on a phone (#4082).
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        titleLine(title)
+                            .frame(minWidth: 320, idealWidth: 320, maxWidth: .infinity, alignment: .leading)
+                        pageLinks
+                    }
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 16) { pageLinks }
+                        titleLine(title)
+                    }
                 }
             }
             WrappingHStack(spacing: 6) {
@@ -188,16 +196,14 @@ struct WorkItemPage: View {
         return Text(line).appText(.supporting).foregroundStyle(.secondary).monospacedDigit()
     }
 
-    @ViewBuilder
+    /// The title and its number as one text, so the number wraps with the title rather than
+    /// taking a column of its own (#4082).
     private func titleLine(_ title: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text.forgeTitle(title)
-                .appText(.title).fontWeight(.semibold)
-                .textSelection(.enabled)
-            if !WorkList.titleSaysRef(title, node.ref) {
-                Text(WorkList.shortRef(node.ref)).appText(.title).foregroundStyle(.secondary)
-            }
+        var line = Text.forgeTitle(title).fontWeight(.semibold)
+        if !WorkList.titleSaysRef(title, node.ref) {
+            line = Text("\(line) \(Text(WorkList.shortRef(node.ref)).fontWeight(.regular).foregroundStyle(.secondary))")
         }
+        return line.appText(.title).textSelection(.enabled)
     }
 
     @ViewBuilder
