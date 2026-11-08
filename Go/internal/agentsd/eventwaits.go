@@ -939,6 +939,14 @@ func (d *Daemon) waitForEvent(agent wire.UUID, args map[string]json.RawMessage) 
 		d.takeOpenWait(agent)
 		return "", &Error{Code: CodeNoSuchAgent, Message: "That agent is not here."}
 	}
+	// A wait on a request is one of its waiters (#3863).
+	for _, p := range patterns {
+		if strings.HasPrefix(p.name, "request.") {
+			for _, id := range p.filters["request"] {
+				d.addRequestWaiter(wire.UUID(id), agent)
+			}
+		}
+	}
 	// What the files it watches are now is not raised as added (#3795).
 	d.followFileGlobs(folderPath(a))
 	d.startMCPWait(servers)

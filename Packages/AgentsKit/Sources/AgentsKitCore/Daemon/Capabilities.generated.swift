@@ -138,6 +138,7 @@ public enum Capability {
     public static let reportsValue1 = "reports.value/1"
     public static let reportsViews1 = "reports.views/1"
     public static let reports1 = "reports/1"
+    public static let requests1 = "requests/1"
     public static let resourcesLeases1 = "resources.leases/1"
     public static let resources1 = "resources/1"
     public static let retention1 = "retention/1"
@@ -441,6 +442,9 @@ public enum Capability {
         "relay/offer": "relay/1",
         "reports/features": "features/1",
         "reports/problem": "reports.problem/1",
+        "requests/answer": "requests/1",
+        "requests/drop": "requests/1",
+        "requests/list": "requests/1",
         "resources/declare": "resources/1",
         "resources/end": "resources.leases/1",
         "resources/lease": "resources.leases/1",
@@ -572,6 +576,7 @@ public enum Capability {
         "plugins/changed": "plugins/1",
         "policy/effectiveChanged": "host.policy-layers/1",
         "preferences/changed": "preferences/1",
+        "requests/changed": "requests/1",
         "resources/changed": "resources.leases/1",
         "retention/changed": "retention/1",
         "runtime/account": "runtime/1",

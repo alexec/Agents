@@ -137,6 +137,7 @@ const CapReportsScope1 = "reports.scope/1"
 const CapReportsValue1 = "reports.value/1"
 const CapReportsViews1 = "reports.views/1"
 const CapReports1 = "reports/1"
+const CapRequests1 = "requests/1"
 const CapResourcesLeases1 = "resources.leases/1"
 const CapResources1 = "resources/1"
 const CapRetention1 = "retention/1"
@@ -440,6 +441,9 @@ var HostCapabilities = pairs([][2]string{
 	{"relay/offer", "relay/1"},
 	{"reports/features", "features/1"},
 	{"reports/problem", "reports.problem/1"},
+	{"requests/answer", "requests/1"},
+	{"requests/drop", "requests/1"},
+	{"requests/list", "requests/1"},
 	{"resources/declare", "resources/1"},
 	{"resources/end", "resources.leases/1"},
 	{"resources/lease", "resources.leases/1"},
@@ -571,6 +575,7 @@ var HostCapabilities = pairs([][2]string{
 	{"plugins/changed", "plugins/1"},
 	{"policy/effectiveChanged", "host.policy-layers/1"},
 	{"preferences/changed", "preferences/1"},
+	{"requests/changed", "requests/1"},
 	{"resources/changed", "resources.leases/1"},
 	{"retention/changed", "retention/1"},
 	{"runtime/account", "runtime/1"},
@@ -627,6 +632,7 @@ var HostNotifications = set([]string{
 	"plugins/changed",
 	"policy/effectiveChanged",
 	"preferences/changed",
+	"requests/changed",
 	"resources/changed",
 	"retention/changed",
 	"runtime/account",

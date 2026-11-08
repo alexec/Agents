@@ -124,7 +124,8 @@ func helperRunning(a *wire.Agent) bool {
 func (d *Daemon) runningHelpers(folder string) []wire.Agent {
 	var out []wire.Agent
 	for _, a := range d.helpersIn(folder) {
-		if helperRunning(&a) {
+		// One that waits only on a person holds no place (#3863).
+		if helperRunning(&a) && !waitsOnlyOnPeople(&a) {
 			out = append(out, a)
 		}
 	}

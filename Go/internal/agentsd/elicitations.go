@@ -88,6 +88,7 @@ func (l *live) holdForm(ctx context.Context, req wire.ElicitationRequest) elicit
 	case <-ctx.Done():
 		// The runtime went (closeQuestionsOfAGoneRuntime): nothing to say to it.
 		if l.take(req.ID) != nil {
+			d.endRequest(req.ID, wire.RequestStateDropped, nil, wire.RequestDroppedWhyAskerEnded, nil)
 			d.record(l.id, wire.TranscriptEntryKind{RuntimeNote: &wire.TranscriptEntryKindRuntimeNote{Value: questionWentUnanswered}})
 			d.formDown(l.id, req.ID)
 		}
@@ -104,6 +105,7 @@ func (l *live) showForm(req wire.ElicitationRequest) *pendingElicitation {
 	l.mu.Unlock()
 	d.record(l.id, wire.TranscriptEntryKind{ElicitationAsked: &wire.TranscriptEntryKindElicitationAsked{Value: req}})
 	d.moveIf(l.id, wire.AgentStateRunning, wire.AgentStateWaitingOnUser)
+	d.openFormRequest(req)
 	Broadcast(d, wire.NotifyAgentElicitation, wire.ElicitationNotification{AgentID: l.id, RequestID: req.ID, Request: &req})
 	d.raiseAgentEvent("agent.asked_form", l.id, "is asking for a form to be filled in.", nil)
 	d.reconsider()
@@ -187,6 +189,7 @@ func (l *live) ElicitationComplete(elicitationID string) {
 		// not see an agent still waiting on one.
 		l.d.moveIf(l.id, wire.AgentStateWaitingOnUser, wire.AgentStateRunning)
 		if l.take(id) != nil {
+			l.d.endRequest(id, wire.RequestStateDropped, nil, wire.RequestDroppedWhyAskerEnded, nil)
 			pe.reply <- cancelled()
 		}
 		l.d.formDown(l.id, id)
@@ -214,6 +217,7 @@ func (l *live) closeForms(every bool) {
 	}
 	l.mu.Unlock()
 	for _, pe := range pes {
+		l.d.endRequest(pe.req.ID, wire.RequestStateDropped, nil, wire.RequestDroppedWhyAskerEnded, nil)
 		l.d.record(l.id, wire.TranscriptEntryKind{RuntimeNote: &wire.TranscriptEntryKindRuntimeNote{Value: questionWentUnanswered}})
 		pe.reply <- cancelled()
 		l.d.formDown(l.id, pe.req.ID)
@@ -291,6 +295,7 @@ func (d *Daemon) answerElicitation(r wire.AnswerElicitationRequest) error {
 	case action == wire.AnswerElicitationRequestActionAccept && form != nil:
 		said = answers(form.Value, content, pe.req.Message)
 	}
+	d.endRequest(r.RequestID, wire.RequestStateAnswered, formAnswerSummary(action, said), "", d.takeAnsweredBy(r.RequestID))
 	d.record(l.id, wire.TranscriptEntryKind{ElicitationAnswered: &wire.TranscriptEntryKindElicitationAnswered{ID: r.RequestID,
 		Summary: outcomeSummary(action), Answers: said}})
 	d.moveIf(l.id, wire.AgentStateWaitingOnUser, wire.AgentStateRunning)
