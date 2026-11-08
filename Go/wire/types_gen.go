@@ -10050,6 +10050,9 @@ type Request struct {
 	// The session that asked.
 	AskedBy *UUID `json:"askedBy,omitzero"`
 
+	// A forge item's (#3865): an issue labelled alex-todo or needs-account, or a pull request labelled needs-approval.
+	Forge *RequestForge `json:"forge,omitzero"`
+
 	// Every session that waits on it; the asker first. Kept as history once it ends.
 	Waiters []RequestWaiter `json:"waiters"`
 
@@ -10065,9 +10068,31 @@ type Request struct {
 	DroppedWhy *RequestDroppedWhy `json:"droppedWhy,omitzero"`
 }
 
-// One of the answers; only form today (#3863).
+// One of the answers: form for a question, a secret or a step (#3863); checklist and approval for a forge item (#3865).
 type RequestAnswer struct {
 	Form *RequestFormAnswer `json:"form,omitzero"`
+
+	Checklist *RequestChecklistAnswer `json:"checklist,omitzero"`
+
+	Approval *RequestApprovalAnswer `json:"approval,omitzero"`
+}
+
+// A needs-approval pull request's answer: approve adds approved, changes adds changes-wanted; the note is the person's comment on it.
+type RequestApprovalAnswer struct {
+	Action string `json:"action"`
+
+	Note *string `json:"note,omitzero"`
+}
+
+// The checklist's lines now ticked, by index. When every line is ticked, the request is answered.
+type RequestChecklistAnswer struct {
+	Done []int64 `json:"done"`
+}
+
+type RequestChecklistLine struct {
+	Text string `json:"text"`
+
+	Done bool `json:"done"`
 }
 
 // The part of a request that depends on its source.
@@ -10082,6 +10107,37 @@ const RequestDroppedWhyFolderArchived RequestDroppedWhy = "folderArchived"
 const RequestDroppedWhyForgeClosed RequestDroppedWhy = "forgeClosed"
 const RequestDroppedWhyRestarted RequestDroppedWhy = "restarted"
 const RequestDroppedWhyByPerson RequestDroppedWhy = "byPerson"
+
+// The forge item a request is (spec 3862 §4).
+type RequestForge struct {
+	// github, gitlab, forgejo, …
+	Provider string `json:"provider"`
+
+	Repo string `json:"repo"`
+
+	Item string `json:"item"`
+
+	Number int64 `json:"number"`
+
+	URL string `json:"url"`
+
+	// alex-todo, needs-account or needs-approval.
+	Label string `json:"label"`
+
+	// An issue's lines under its first "## What <name> does" heading.
+	Checklist []RequestChecklistLine `json:"checklist"`
+
+	// A pull request's image links under its "## Screenshots" heading.
+	Screenshots []string `json:"screenshots,omitzero"`
+
+	Author *string `json:"author,omitzero"`
+
+	// The item's, when it was last read: a newer one is read again.
+	UpdatedAt *Date `json:"updatedAt,omitzero"`
+
+	// The last sweep that saw it open with the label.
+	SeenAt Date `json:"seenAt"`
+}
 
 // The answer elicitations/answer takes, for a question, a secret or a step.
 type RequestFormAnswer struct {

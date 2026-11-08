@@ -114,6 +114,26 @@ func (g *RealGitHub) SetState(ctx context.Context, repo string, number int, clos
 	return err
 }
 
+// SetBody writes an issue's or a pull request's body: a forge request's ticked line (#3865).
+func (g *RealGitHub) SetBody(ctx context.Context, repo string, number int, text string) error {
+	if _, _, err := ownerName(repo); err != nil {
+		return err
+	}
+	body, _ := json.Marshal(map[string]string{"body": text})
+	_, err := g.do(ctx, http.MethodPatch, fmt.Sprintf("repos/%s/issues/%d", repo, number), body, false)
+	return err
+}
+
+// Unassign takes people off an issue or a pull request: a forge request done (#3865).
+func (g *RealGitHub) Unassign(ctx context.Context, repo string, number int, logins []string) error {
+	if _, _, err := ownerName(repo); err != nil {
+		return err
+	}
+	body, _ := json.Marshal(map[string][]string{"assignees": logins})
+	_, err := g.do(ctx, http.MethodDelete, fmt.Sprintf("repos/%s/issues/%d/assignees", repo, number), body, false)
+	return err
+}
+
 // RepoLabels are a repo's labels, at most 100, with their colours.
 func (g *RealGitHub) RepoLabels(ctx context.Context, repo string) ([]string, map[string]string, error) {
 	if _, _, err := ownerName(repo); err != nil {

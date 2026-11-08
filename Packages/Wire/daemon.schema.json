@@ -22269,6 +22269,10 @@
           "$ref": "#/definitions/UUID",
           "description": "The session that asked."
         },
+        "forge": {
+          "$ref": "#/definitions/RequestForge",
+          "description": "A forge item's (#3865): an issue labelled alex-todo or needs-account, or a pull request labelled needs-approval."
+        },
         "waiters": {
           "type": "array",
           "items": {
@@ -22308,12 +22312,70 @@
     },
     "RequestAnswer": {
       "type": "object",
-      "description": "One of the answers; only form today (#3863).",
+      "description": "One of the answers: form for a question, a secret or a step (#3863); checklist and approval for a forge item (#3865).",
       "properties": {
         "form": {
           "$ref": "#/definitions/RequestFormAnswer"
+        },
+        "checklist": {
+          "$ref": "#/definitions/RequestChecklistAnswer"
+        },
+        "approval": {
+          "$ref": "#/definitions/RequestApprovalAnswer"
         }
       },
+      "additionalProperties": false
+    },
+    "RequestApprovalAnswer": {
+      "type": "object",
+      "description": "A needs-approval pull request's answer: approve adds approved, changes adds changes-wanted; the note is the person's comment on it.",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "approve",
+            "changes"
+          ]
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "additionalProperties": false
+    },
+    "RequestChecklistAnswer": {
+      "type": "object",
+      "description": "The checklist's lines now ticked, by index. When every line is ticked, the request is answered.",
+      "properties": {
+        "done": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        }
+      },
+      "required": [
+        "done"
+      ],
+      "additionalProperties": false
+    },
+    "RequestChecklistLine": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "done": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "text",
+        "done"
+      ],
       "additionalProperties": false
     },
     "RequestDetail": {
@@ -22335,6 +22397,72 @@
         "restarted",
         "byPerson"
       ]
+    },
+    "RequestForge": {
+      "type": "object",
+      "description": "The forge item a request is (spec 3862 §4).",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "description": "github, gitlab, forgejo, …"
+        },
+        "repo": {
+          "type": "string"
+        },
+        "item": {
+          "type": "string",
+          "enum": [
+            "issue",
+            "pr"
+          ]
+        },
+        "number": {
+          "type": "integer"
+        },
+        "url": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string",
+          "description": "alex-todo, needs-account or needs-approval."
+        },
+        "checklist": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RequestChecklistLine"
+          },
+          "description": "An issue's lines under its first \"## What <name> does\" heading."
+        },
+        "screenshots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "A pull request's image links under its \"## Screenshots\" heading."
+        },
+        "author": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "$ref": "#/definitions/WireDate",
+          "description": "The item's, when it was last read: a newer one is read again."
+        },
+        "seenAt": {
+          "$ref": "#/definitions/WireDate",
+          "description": "The last sweep that saw it open with the label."
+        }
+      },
+      "required": [
+        "provider",
+        "repo",
+        "item",
+        "number",
+        "url",
+        "label",
+        "checklist",
+        "seenAt"
+      ],
+      "additionalProperties": false
     },
     "RequestFormAnswer": {
       "type": "object",

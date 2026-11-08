@@ -57,6 +57,9 @@ type forgeGitHubWrites interface {
 	SetEnvironmentGate(ctx context.Context, repo, environment string, reviewers []string) error
 	// A new app's repository (#3708).
 	MakeRepository(ctx context.Context, owner, name, description string) (githubmcp.Repository, bool, error)
+	// A forge request's answer (#3865).
+	SetBody(ctx context.Context, repo string, number int, body string) error
+	Unassign(ctx context.Context, repo string, number int, logins []string) error
 }
 
 // forgeGitLabWrites is what the writes ask of GitLab; a test gives a fake.

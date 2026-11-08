@@ -197,11 +197,20 @@ a request with `wait_for_event` on `request.answered` and `request.dropped`, `wh
 {request: <id>}`; every session that waits on it wakes when it ends. A session whose turn has
 ended and that waits only on requests (or on a wait for the person) holds no running place.
 
+A GitHub item that asks the person for something is a request too (#3865): an issue labelled
+`alex-todo` (a step) or `needs-account` (an account), with its `## What Alex does` checklist,
+and a pull request labelled `needs-approval` (an approval), with its `## Screenshots`. The
+daemon sweeps every 5 minutes. Answered in the app, the answer goes to GitHub as the person: a
+ticked line ticks the issue's line; the last one removes the label, unassigns the person and
+says so in a comment; an approval posts the note and sets `approved` (or `changes-wanted`).
+A label changed on GitHub opens or ends the request at the next sweep. A lane waits on its
+approval with `where: {pr: <n>}`; the answer is `approve: <note>` or `changes: <note>`.
+
 | Event | Filter by | Details | Meaning |
 |---|---|---|---|
-| `request.opened` | request, kind | request, kind, source, title, agent | An agent in this folder asked a person for something. |
-| `request.answered` | request, kind | request, kind, source, title, agent, answer, answered_by | A request was answered. `answer` is a summary, never a secret's value. |
-| `request.dropped` | request, kind | request, kind, source, title, agent, why | A request ended with no answer. `why` is `askerEnded`, `folderArchived`, `forgeClosed`, `restarted` or `byPerson`. |
+| `request.opened` | request, kind, pr, issue | request, kind, source, title, agent, pr or issue, url | An agent in this folder asked a person for something. |
+| `request.answered` | request, kind, pr, issue | request, kind, source, title, agent, pr or issue, url, answer, answered_by | A request was answered. `answer` is a summary, never a secret's value. |
+| `request.dropped` | request, kind, pr, issue | request, kind, source, title, agent, pr or issue, url, why | A request ended with no answer. `why` is `askerEnded`, `folderArchived`, `forgeClosed`, `restarted` or `byPerson`. |
 
 ## Restarts
 

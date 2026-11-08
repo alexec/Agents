@@ -8880,6 +8880,11 @@ export interface Request {
   folder: string;
   /** The session that asked. */
   askedBy?: UUID;
+  /**
+   * A forge item's (#3865): an issue labelled alex-todo or needs-account, or a pull request
+   * labelled needs-approval.
+   */
+  forge?: RequestForge;
   /** Every session that waits on it; the asker first. Kept as history once it ends. */
   waiters: RequestWaiter[];
   askedAt: WireDate;
@@ -8890,9 +8895,35 @@ export interface Request {
   droppedWhy?: RequestDroppedWhy;
 }
 
-/** One of the answers; only form today (#3863). */
+/**
+ * One of the answers: form for a question, a secret or a step (#3863); checklist and approval for a
+ * forge item (#3865).
+ */
 export interface RequestAnswer {
   form?: RequestFormAnswer;
+  checklist?: RequestChecklistAnswer;
+  approval?: RequestApprovalAnswer;
+}
+
+/**
+ * A needs-approval pull request's answer: approve adds approved, changes adds changes-wanted; the
+ * note is the person's comment on it.
+ */
+export interface RequestApprovalAnswer {
+  action: "approve" | "changes";
+  note?: string;
+}
+
+/**
+ * The checklist's lines now ticked, by index. When every line is ticked, the request is answered.
+ */
+export interface RequestChecklistAnswer {
+  done: number[];
+}
+
+export interface RequestChecklistLine {
+  text: string;
+  done: boolean;
 }
 
 /** The part of a request that depends on its source. */
@@ -8906,6 +8937,27 @@ export type RequestDroppedWhy =
   | "forgeClosed"
   | "restarted"
   | "byPerson";
+
+/** The forge item a request is (spec 3862 §4). */
+export interface RequestForge {
+  /** github, gitlab, forgejo, … */
+  provider: string;
+  repo: string;
+  item: "issue" | "pr";
+  number: number;
+  url: string;
+  /** alex-todo, needs-account or needs-approval. */
+  label: string;
+  /** An issue's lines under its first "## What <name> does" heading. */
+  checklist: RequestChecklistLine[];
+  /** A pull request's image links under its "## Screenshots" heading. */
+  screenshots?: string[];
+  author?: string;
+  /** The item's, when it was last read: a newer one is read again. */
+  updatedAt?: WireDate;
+  /** The last sweep that saw it open with the label. */
+  seenAt: WireDate;
+}
 
 /** The answer elicitations/answer takes, for a question, a secret or a step. */
 export interface RequestFormAnswer {
@@ -13449,9 +13501,13 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ReportViewID: { required: ["id"], optional: [] },
   ReportViews: { required: ["views"], optional: [] },
   ReportedEdit: { required: ["path", "newText", "toolCallID", "index", "entryIndex", "replaceAll", "at"], optional: ["oldText"] },
-  Request: { required: ["id", "kind", "source", "state", "title", "detail", "folder", "waiters", "askedAt"], optional: ["askedBy", "answeredAt", "answeredBy", "answer", "droppedWhy"] },
-  RequestAnswer: { required: [], optional: ["form"] },
+  Request: { required: ["id", "kind", "source", "state", "title", "detail", "folder", "waiters", "askedAt"], optional: ["askedBy", "forge", "answeredAt", "answeredBy", "answer", "droppedWhy"] },
+  RequestAnswer: { required: [], optional: ["form", "checklist", "approval"] },
+  RequestApprovalAnswer: { required: ["action"], optional: ["note"] },
+  RequestChecklistAnswer: { required: ["done"], optional: [] },
+  RequestChecklistLine: { required: ["text", "done"], optional: [] },
   RequestDetail: { required: [], optional: ["elicitation"] },
+  RequestForge: { required: ["provider", "repo", "item", "number", "url", "label", "checklist", "seenAt"], optional: ["screenshots", "author", "updatedAt"] },
   RequestFormAnswer: { required: ["action"], optional: ["content"] },
   RequestUpdate: { required: ["request"], optional: [] },
   RequestWaiter: { required: ["agent", "since"], optional: [] },

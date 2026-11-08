@@ -1005,6 +1005,10 @@
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
+          "issue": {
+            "description": "A forge request's issue, by number (#3865).",
+            "type": "integer"
+          },
           "kind": {
             "enum": [
               "decide",
@@ -1014,6 +1018,10 @@
               "secret"
             ],
             "type": "string"
+          },
+          "pr": {
+            "description": "A forge request's pull request, by number (#3865).",
+            "type": "integer"
           },
           "request": {
             "description": "The request's id.",
@@ -1031,6 +1039,10 @@
             "description": "The session that asked.",
             "type": "string"
           },
+          "issue": {
+            "description": "A forge request's issue number.",
+            "type": "integer"
+          },
           "kind": {
             "enum": [
               "decide",
@@ -1040,6 +1052,10 @@
               "secret"
             ],
             "type": "string"
+          },
+          "pr": {
+            "description": "A forge request's pull request number.",
+            "type": "integer"
           },
           "request": {
             "type": "string"
@@ -1057,6 +1073,10 @@
           },
           "title": {
             "type": "string"
+          },
+          "url": {
+            "description": "A forge request's item.",
+            "type": "string"
           }
         },
         "type": "object"
@@ -1067,6 +1087,10 @@
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
+          "issue": {
+            "description": "A forge request's issue, by number (#3865).",
+            "type": "integer"
+          },
           "kind": {
             "enum": [
               "decide",
@@ -1077,6 +1101,10 @@
             ],
             "type": "string"
           },
+          "pr": {
+            "description": "A forge request's pull request, by number (#3865).",
+            "type": "integer"
+          },
           "request": {
             "description": "The request's id.",
             "type": "string"
@@ -1085,7 +1113,7 @@
         "type": "object"
       },
       "macOnly": false,
-      "meaning": "A request in this folder was answered. Every session that waits on it with where: {request: <id>} wakes.",
+      "meaning": "A request in this folder was answered. Every session that waits on it with where: {request: <id>}, or for a forge request {pr: <n>} or {issue: <n>}, wakes.",
       "name": "request.answered",
       "payloadSchema": {
         "properties": {
@@ -1100,6 +1128,10 @@
           "answered_by": {
             "type": "string"
           },
+          "issue": {
+            "description": "A forge request's issue number.",
+            "type": "integer"
+          },
           "kind": {
             "enum": [
               "decide",
@@ -1109,6 +1141,10 @@
               "secret"
             ],
             "type": "string"
+          },
+          "pr": {
+            "description": "A forge request's pull request number.",
+            "type": "integer"
           },
           "request": {
             "type": "string"
@@ -1126,6 +1162,10 @@
           },
           "title": {
             "type": "string"
+          },
+          "url": {
+            "description": "A forge request's item.",
+            "type": "string"
           }
         },
         "type": "object"
@@ -1136,6 +1176,10 @@
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
+          "issue": {
+            "description": "A forge request's issue, by number (#3865).",
+            "type": "integer"
+          },
           "kind": {
             "enum": [
               "decide",
@@ -1145,6 +1189,10 @@
               "secret"
             ],
             "type": "string"
+          },
+          "pr": {
+            "description": "A forge request's pull request, by number (#3865).",
+            "type": "integer"
           },
           "request": {
             "description": "The request's id.",
@@ -1162,6 +1210,10 @@
             "description": "The session that asked.",
             "type": "string"
           },
+          "issue": {
+            "description": "A forge request's issue number.",
+            "type": "integer"
+          },
           "kind": {
             "enum": [
               "decide",
@@ -1171,6 +1223,10 @@
               "secret"
             ],
             "type": "string"
+          },
+          "pr": {
+            "description": "A forge request's pull request number.",
+            "type": "integer"
           },
           "request": {
             "type": "string"
@@ -1187,6 +1243,10 @@
             "type": "string"
           },
           "title": {
+            "type": "string"
+          },
+          "url": {
+            "description": "A forge request's item.",
             "type": "string"
           },
           "why": {
