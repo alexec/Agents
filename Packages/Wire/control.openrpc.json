@@ -2609,6 +2609,48 @@
       ]
     },
     {
+      "name": "machine/secretKey",
+      "x-capability": "host.secret-release/1",
+      "description": "A Linux machine, on its channel 0 (#4058): the public half of its release key, made the first time it asks. It seals each value with Ask before use to it as well as to its own key, so the machine alone cannot open the value.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SecretReleaseKey"
+        }
+      }
+    },
+    {
+      "name": "machine/secretRelease",
+      "x-capability": "host.secret-release/1",
+      "description": "A Linux machine, on its channel 0 (#4058): the key for one value's release layer, for an approval a client of the machine's person's lock signed to this machine (secrets/approveUse) within the last 10 minutes, for that name. The control plane refuses one it has seen before, and never sees the value.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SecretRelease"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SecretReleased"
+        }
+      }
+    },
+    {
       "name": "machine/status",
       "x-capability": "machine/1",
       "description": "A host, on its channel 0 (#691 US4).",

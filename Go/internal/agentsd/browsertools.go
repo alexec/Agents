@@ -1,6 +1,7 @@
 package agentsd
 
 import (
+	"cmp"
 	"context"
 	_ "embed"
 	"encoding/base64"
@@ -268,6 +269,13 @@ func (d *Daemon) driveBrowser(ctx context.Context, agent wire.UUID, name string,
 	if name == fillSecretName {
 		if words, isError := d.approveFill(ctx, agent, drive, fill, args); words != "" {
 			return []any{map[string]any{"type": "text", "text": words}}, isError, words
+		}
+		if fill.released {
+			// Approved: the value is in agentsd's memory now (#4058).
+			var refusal string
+			if fill, refusal = d.fillSecretValue(agent, args); refusal != "" || fill.released {
+				return failed(cmp.Or(refusal, "Nothing was filled: "+fill.name+" did not open."))
+			}
 		}
 		return d.fillSecret(ctx, drive, fill, args)
 	}

@@ -82,6 +82,7 @@ public enum Capability {
     public static let hostPolicy1 = "host.policy/1"
     public static let hostSecretApproval1 = "host.secret-approval/1"
     public static let hostSecretGrants1 = "host.secret-grants/1"
+    public static let hostSecretRelease1 = "host.secret-release/1"
     public static let hostSessionSecrets1 = "host.session-secrets/1"
     public static let hostSuspend1 = "host.suspend/1"
     public static let hostTeam1 = "host.team/1"
@@ -687,6 +688,8 @@ public enum Capability {
         "machine/orgRoutesApplied": "host.org-routes/2",
         "machine/policyApplied": "host.policy/1",
         "machine/providerDraft": "machine/1",
+        "machine/secretKey": "host.secret-release/1",
+        "machine/secretRelease": "host.secret-release/1",
         "machine/status": "machine/1",
         "machines/announce": "machines/1",
         "machines/approveJoin": "hosts.join/1",

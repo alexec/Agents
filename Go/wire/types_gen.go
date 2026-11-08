@@ -10243,11 +10243,17 @@ type RequestSecretUse struct {
 
 	// The secret is the session's own (#3548): Allow always is the same as Allow for this session.
 	SessionOnly *bool `json:"sessionOnly,omitzero"`
+
+	// The machine is Linux (#4058): the value opens only with the release key its control plane keeps, which the control plane gives only for an approval the person's client signed. An answer that allows the use carries approval; one without it is refused.
+	NeedsSignature *bool `json:"needsSignature,omitzero"`
 }
 
 // A person's answer to a secret's use (#4015). once allows this use; session every use at this place until the session ends or is archived; always adds a grant for this place, for every session; deny refuses it. Only the control and device roles answer.
 type RequestSecretUseAnswer struct {
 	Action string `json:"action"`
+
+	// The answering client's signature of its answer (#4058), required when the request says needsSignature and the action is not deny: method secrets/approveUse, params the JSON text {"request":<the request's id>,"name","use","place","action"} as the request names them, and a LockSignature to this machine by the client's lock key. The machine checks it against its lock and sends it to the control plane, which gives the release key only for a fresh one it has not seen.
+	Approval *LockDelivery `json:"approval,omitzero"`
 }
 
 type RequestSource string
@@ -10998,6 +11004,25 @@ type SecretNeedsApprovalRequest struct {
 	AgentID *UUID `json:"agentID,omitzero"`
 
 	NeedsApproval bool `json:"needsApproval"`
+}
+
+// machine/secretRelease (#4058): a Linux machine asks its control plane to open the release layer of one value with Ask before use, for a person's signed approval. encapsulated is the HPKE encapsulated key the machine sealed the value's key with (DHKEM X25519, HKDF-SHA256, AES-256-GCM, info agents-secret-release/1); the control plane answers with the 32 bytes exported with the context "sealedsecret.release.v1|" then name. It never sees the value, which is also sealed to the machine's key.
+type SecretRelease struct {
+	Name string `json:"name"`
+
+	Encapsulated Data `json:"encapsulated"`
+
+	Approval LockDelivery `json:"approval"`
+}
+
+// machine/secretKey (#4058): the public half of this machine's release key, X25519, 32 bytes. The control plane makes the key pair the first time a machine asks, keeps the private half sealed by its keeper, and gives it to nobody.
+type SecretReleaseKey struct {
+	PublicKey Data `json:"publicKey"`
+}
+
+// The answer to machine/secretRelease (#4058): the key that opens the release layer of one value, which the machine uses once and does not keep.
+type SecretReleased struct {
+	Key Data `json:"key"`
 }
 
 // What agentsd does with a secret with Ask before use (#4015): fill types it into a page (fill_secret), ci sends it to GitHub (set_ci_secret).
