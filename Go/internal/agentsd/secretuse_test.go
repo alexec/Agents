@@ -238,3 +238,69 @@ func TestOnlyAPersonApprovesASecretsUse(t *testing.T) {
 		t.Fatal("a grant for a secret with no Ask before use")
 	}
 }
+
+// requestNeeds is the needs posted for requests: a secret's use, for its banner.
+func requestNeeds(d *Daemon) []wire.Need {
+	d.attentionMu.Lock()
+	defer d.attentionMu.Unlock()
+	if d.raisedAt == nil {
+		d.raisedAt, d.raisedNeed = map[string]wire.Date{}, map[string]wire.NeedID{}
+	}
+	var out []wire.Need
+	for _, n := range d.needs() {
+		if n.ID.Request != nil {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+// #4017: a secret's use waiting on a person is posted, so a phone answers it from its
+// banner: the secret's name and the place, never the value, and the row's four answers.
+// Answered, it goes.
+func TestASecretUseIsPostedWithItsAnswers(t *testing.T) {
+	was := formHoldLimit
+	formHoldLimit = 300 * time.Millisecond
+	defer func() { formHoldLimit = was }()
+	m, _, d := fillSetUp(t, nil)
+	if err := d.saveSecret("GITLAB_PASSWORD", filledValue, true); err != nil {
+		t.Fatal(err)
+	}
+	done := fillAsync(m, 2)
+	r := openSecretUse(t, d)
+	needs := requestNeeds(d)
+	if len(needs) != 1 || *needs[0].ID.Request != r.ID || needs[0].Kind != wire.NeedKindRequest || needs[0].AgentID == nil ||
+		*needs[0].AgentID != *r.AskedBy || needs[0].Headline.H3 != "Wants to use GITLAB_PASSWORD on shop.example.com" {
+		t.Fatalf("%+v", needs)
+	}
+	var answers []string
+	for _, a := range needs[0].Headline.Answers {
+		answers = append(answers, a.ID+"="+a.Title+fmt.Sprint(a.IsDestructive))
+	}
+	if strings.Join(answers, ", ") != "once=Allow Oncefalse, session=Allow for This Sessionfalse, always=Allow Alwaysfalse, deny=Denytrue" {
+		t.Fatal(answers)
+	}
+	if b, _ := json.Marshal(needs); strings.Contains(string(b), filledValue) {
+		t.Fatalf("the need holds the value: %s", b)
+	}
+	answerUse(t, d, r, secretUseOnce)
+	replyOf(t, done)
+	if needs := requestNeeds(d); len(needs) != 0 {
+		t.Fatalf("still posted: %+v", needs)
+	}
+}
+
+// A session's own secret has no Allow always on its banner, as on its row.
+func TestASessionSecretsBannerHasNoAllowAlways(t *testing.T) {
+	yes := true
+	var ids []string
+	for _, a := range secretUseAnswers(wire.RequestSecretUse{Name: "X", Use: wire.SecretUseCi, Place: "o/r", SessionOnly: &yes}) {
+		ids = append(ids, a.ID)
+	}
+	if strings.Join(ids, ",") != "once,session,deny" {
+		t.Fatal(ids)
+	}
+	if got := secretUseWanted(wire.RequestSecretUse{Name: "X", Use: wire.SecretUseCi, Place: "o/r"}); got != "Wants to use X as a CI secret in o/r" {
+		t.Fatal(got)
+	}
+}

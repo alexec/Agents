@@ -16578,9 +16578,21 @@
             "notice"
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "request": {
+              "$ref": "#/definitions/UUID"
+            }
+          },
+          "required": [
+            "request"
+          ],
+          "additionalProperties": false
         }
       ],
-      "description": "NeedID (Attention/Need.swift): what is being answered, one key per kind. A notice (#2805) is what an agent told the person with `notify`: posted, never a Needs you row."
+      "description": "NeedID (Attention/Need.swift): what is being answered, one key per kind. A notice (#2805) is what an agent told the person with `notify`: posted, never a Needs you row. A request (#4017) is a Needs you request posted so a phone can answer it: today only a secret's use (#4015), whose banner has its four answers."
     },
     "NeedKind": {
       "type": "string",
@@ -16589,7 +16601,8 @@
         "elicitation",
         "report",
         "guardedChange",
-        "notice"
+        "notice",
+        "request"
       ]
     },
     "NotCommittedResponse": {

@@ -191,7 +191,7 @@ public struct TurnActivityContent: Codable, Hashable, Sendable {
         let title = agent.title ?? untitled
         let need = needs.filter { $0.agentID == agent.id }.max { $0.raisedAt < $1.raisedAt }
         switch need?.kind {
-        case .permission?, .guardedChange?:
+        case .permission?, .guardedChange?, .request?:
             return TurnActivityContent(phase: .approval, title: title, line: need?.headline.h3, startedAt: startedAt)
         case .elicitation?:
             return TurnActivityContent(phase: .question, title: title, line: need?.headline.h3, startedAt: startedAt)

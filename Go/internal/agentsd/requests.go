@@ -243,6 +243,9 @@ func (d *Daemon) endRequest(id wire.UUID, state wire.RequestState, answer *strin
 	} else {
 		d.raiseRequestEvent("request.dropped", c, map[string]string{"why": string(why)}, by)
 	}
+	if c.Detail.SecretUse != nil {
+		d.reconsider() // its banner goes (#4017)
+	}
 	return true
 }
 

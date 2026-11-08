@@ -1974,6 +1974,24 @@ final class RemoteModel {
         if let why = await answerApproval(approval, action, digest: approval.digest, note: nil, for: key) { problem = why }
     }
 
+    /// A person's answer to a secret's use (#4017), from its Needs you row or its banner: to
+    /// the host of the session that asked. Whether it went; why not is the problem.
+    @discardableResult
+    func answerSecretUse(_ request: NeedRequest, _ action: NeedRequest.Action) async -> Bool {
+        let answer = DaemonAPI.RequestsAnswer(id: request.id, secretUse: action)
+        let host = request.askedBy.flatMap { work.agent($0)?.host } ?? .mac
+        do {
+            let update = try await client(for: answer, on: host)
+                .call(DaemonAPI.Method.requestsAnswer, answer, returning: DaemonAPI.RequestUpdate.self)
+            work.replaceRequests(work.requests.filter { $0.id != update.request.id })
+            publishAttention()
+            return true
+        } catch {
+            problem = sentence(for: error)
+            return false
+        }
+    }
+
     /// Deny a session's ask to be archived (#773): the mark goes and the session stays.
     func keepSession(_ agent: Agent) async {
         let denial = ArchiveActions.denial(for: agent)
@@ -4647,6 +4665,9 @@ final class RemoteModel {
                 return false
             }
             sent = await answer(request, action: .accept, content: content)
+        case .secretUse(let request):
+            guard let action = NeedRequest.Action(rawValue: quick.id) else { return false }
+            sent = await answerSecretUse(request, action)
         case nil:
             note("banner: \(token) is over, nothing sent, in \(ContinuousClock.now - began)")
             return false
@@ -4665,6 +4686,7 @@ final class RemoteModel {
     private enum BannerQuestion {
         case permission(PermissionRequest)
         case elicitation(ElicitationRequest)
+        case secretUse(NeedRequest)
     }
 
     /// The question a banner's token names, while it is still asked.
@@ -4676,6 +4698,8 @@ final class RemoteModel {
             return work.permissions.first { $0.id.uuidString == parts[1] }.map(BannerQuestion.permission)
         case "elicitation":
             return work.elicitations.first { $0.id.uuidString == parts[1] }.map(BannerQuestion.elicitation)
+        case "request":
+            return work.requests.first { $0.id.uuidString == parts[1] && $0.secretUse != nil }.map(BannerQuestion.secretUse)
         default:
             return nil
         }

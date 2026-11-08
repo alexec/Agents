@@ -211,6 +211,7 @@ func (d *Daemon) openSecretUseRequest(agent wire.UUID, ask wire.RequestSecretUse
 	log.Printf("secret use: %s asks to use %s at %s", agent, ask.Name, grantPlace(ask.Use, ask.Place))
 	Broadcast(d, wire.NotifyRequestsChanged, wire.RequestUpdate{Request: c})
 	d.raiseRequestEvent("request.opened", c, nil, nil)
+	d.reconsider() // its banner (#4017)
 	return r.ID, true
 }
 
