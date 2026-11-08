@@ -312,3 +312,59 @@ func TestShutdownEndsTheWorkflowClock(t *testing.T) {
 		t.Fatal("the clock still runs")
 	}
 }
+
+// A copy the person did not edit takes a newer ready-made version, with its approval when
+// the step does not widen it; an edited copy is left alone (#4048).
+func TestReadyMadeUpdatesOnlyTheUneditedCopy(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	home := t.TempDir()
+	d.PersonalHome = home
+	c.call(t, 1, "workflows/list", map[string]any{"scope": "user"})
+	path := func(id string) string { return filepath.Join(workflowsFolder(home), id+".md") }
+	approve := func(id, text string) {
+		t.Helper()
+		if err := os.WriteFile(path(id), []byte(text), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		d.workflowMu.Lock()
+		_, fileDigest, _ := readWorkflowFile(path(id))
+		skills, _ := readWorkflowSkills(home, text)
+		d.keepCopyLocked(d.stateLocked(home, id, true), &workflowFile{text: text, skills: skills, digest: workflowDigest(fileDigest, text, skills)})
+		d.saveRecordsLocked(true)
+		d.workflowMu.Unlock()
+	}
+	summary, _ := readyMadeText("daily-summary")
+	checks, _ := readyMadeText("daily-checks")
+	work, _ := readyMadeText("work-an-issue")
+	// Daily summary as #3922 found it, turned on: unedited, and plan → ask does not widen it.
+	turnedOn, _ := setFrontMatter("enabled", nil, strings.Replace(summary, "permission-mode: ask", "permission-mode: plan", 1))
+	approve("daily-summary", turnedOn)
+	// Daily checks edited by the person.
+	edited := strings.Replace(checks, "permission-mode: ask", "permission-mode: plan", 1) + "\nMy own line.\n"
+	approve("daily-checks", edited)
+	// Work an issue as the daemon made an earlier version that no one listed, turned on: it
+	// is updated, and asked again. (A copy that is the app's own text is approved anyway.)
+	work, _ = setFrontMatter("enabled", nil, work)
+	madeEarlier := strings.Replace(work, "agent: new", "agent: new\neffort: high", 1)
+	digest, _ := readyMadeDigest(madeEarlier)
+	markReadyMadeMade(home, "work-an-issue", digest)
+	approve("work-an-issue", madeEarlier)
+
+	var list []wire.WorkflowSummary
+	json.Unmarshal(c.call(t, 2, "workflows/list", map[string]any{"scope": "user"}), &list)
+	wantOn, _ := setFrontMatter("enabled", nil, summary)
+	if !fileHas(t, path("daily-summary"), wantOn) || !fileHas(t, path("daily-checks"), edited) || !fileHas(t, path("work-an-issue"), work) {
+		t.Fatal("the unedited copies were not updated, or the edited one was")
+	}
+	waits := map[string]bool{}
+	for _, s := range list {
+		waits[s.Workflow.WorkflowID] = s.AwaitingApproval != nil
+	}
+	if waits["daily-summary"] || waits["daily-checks"] || !waits["work-an-issue"] {
+		t.Fatalf("approvals: %v", waits)
+	}
+	if want, _ := readyMadeDigest(summary); madeReadyMade(home)["daily-summary"] != want {
+		t.Fatal("the update did not keep its digest")
+	}
+}

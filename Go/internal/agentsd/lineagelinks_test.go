@@ -152,6 +152,10 @@ func TestPROfURL(t *testing.T) {
 		"http://localhost:3753/walkalex/App/pulls/8/files":         "forgejo:walkalex/app#8",
 		"https://github.com/o/r/pulls/5":                           "",
 		"https://gitlab.com/o/r/pulls/5":                           "",
+		"https://bitbucket.org/walkalex/App/pull-requests/8/diff":  "bitbucket:walkalex/app#8",
+		"https://bitbucket.org/walkalex/app/pull/8":                "",
+		"https://bitbucket.org/a/b/c/pull-requests/8":              "",
+		"https://example.com/walkalex/app/pull-requests/8":         "",
 	} {
 		repo, n, ok := prOfURL(raw)
 		got := ""

@@ -23,6 +23,7 @@ type fakeForgeBitbucket struct {
 	searches []string
 	items    []string
 	wrote    []string
+	asked    []string
 	// labels are each issue's labels: its kind and component; bug when nil.
 	labels []string
 }

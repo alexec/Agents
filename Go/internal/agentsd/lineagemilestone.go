@@ -21,10 +21,11 @@ import (
 // Each issue is part of its milestone (#2935), so a milestone's cost adds up (#2350):
 //
 //   - For each forge issue the host knows (a session's #n, a PR's fixes), it asks the forge
-//     for the issue's milestone, with the person's own gh or glab in the folder (Forgejo: its
-//     connection, lineageforgejo.go), and links the issue part-of the milestone, source forge.
+//     for the issue's milestone, with the person's own gh or glab in the folder (Forgejo and
+//     Bitbucket: its connection, lineageforgejo.go, lineagebitbucket.go), and links the issue part-of the milestone, source forge.
 //     A milestone is github:<owner>/<repo>/milestone/<number>,
-//     gitlab:<group>/<project>/milestone/<iid>, or forgejo:<owner>/<repo>/milestone/<id>.
+//     gitlab:<group>/<project>/milestone/<iid>, forgejo:<owner>/<repo>/milestone/<id>, or
+//     bitbucket:<workspace>/<repo>/milestone/<id>.
 //   - The answer is kept milestoneRecheck: an issue named again after that is asked again.
 //     When its milestone is another one now, the old link ends and a new one starts; with
 //     none, the link ends.
@@ -120,8 +121,8 @@ func (d *Daemon) noteIssueMilestone(folder string, repo forgeRepo, n int) {
 func (d *Daemon) askIssueMilestone(j milestoneJob) {
 	issue := j.repo.issue(j.n)
 	ask := milestoneLookup
-	if j.repo.forge == "forgejo" {
-		ask = d.forgejoIssue
+	if c, ok := d.connectionAsks(j.repo.forge); ok {
+		ask = c.issue
 	}
 	if d.issueLookup != nil {
 		ask = d.issueLookup
@@ -341,7 +342,8 @@ func issueMilestoneOf(out []byte) (int, error) {
 	return 0, errors.New("the forge did not say the milestone's number")
 }
 
-// issueOfNode is the repo and number of a forge issue node: github:o/r#12, forgejo:o/r#12.
+// issueOfNode is the repo and number of a forge issue node: github:o/r#12, forgejo:o/r#12,
+// bitbucket:w/r#12.
 func issueOfNode(n wire.LineageNode) (forgeRepo, int, bool) {
 	forge, rest, ok := strings.Cut(n.Ref, ":")
 	if _, known := kindOf(forge); n.Kind != lineage.KindIssue || !ok || !known {
