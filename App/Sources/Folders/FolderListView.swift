@@ -18,6 +18,8 @@ struct FolderListView: View {
     /// Machines, open until folded, and kept so (#3626).
     @AppStorage("showsMachines", store: WindowDefaults.store) private var showsMachines = true
     @AppStorage("showsYourSetup", store: WindowDefaults.store) private var showsYourSetup = true
+    /// The Work group (#4004), open the first time: folded, it hides what the one Work row showed.
+    @AppStorage("showsWork", store: WindowDefaults.store) private var showsWorkLists = true
     /// Usage, open until folded, and kept so (#915).
     @AppStorage("showsUsage", store: WindowDefaults.store) private var showsUsage = true
     /// The smart groups turned off in Settings ▸ Sidebar (#846).
@@ -189,19 +191,25 @@ struct FolderListView: View {
                 // One way to start a session (#495), in the folder last started in; the
                 // page it opens can switch folder.
                 NewSessionTopRow()
-            }
-
-            // Work (#3119): the issues and pull requests from the forges, lineage on top.
-            Section {
-                HStack { Text("Work").foregroundStyle(.primary); Spacer() }
-                    .help("Every issue and pull request in your folders’ repos, and what agents spent on each")
-                    .activityIcon("checklist")
-                    .appText(.supporting).sidebarInk(.work).tag(SidebarItem.work)
-                // Docs (#3321): the folders' docs and the docs connectors', below Work.
+                // Docs (#3321): the folders' docs and the docs connectors', beside New Session,
+                // so the rows with no header stay together (#4004).
                 HStack { Text("Docs").foregroundStyle(.primary); Spacer() }
                     .help("Every folder’s Markdown docs and your docs connectors’ pages, read only")
                     .activityIcon("doc.text")
                     .appText(.supporting).sidebarInk(.docs).tag(SidebarItem.docs)
+            }
+
+            // Work (#3119): a row per list (#4004), as the web's Work section has them; an item's
+            // page keeps its list's row picked.
+            Section(isExpanded: $showsWorkLists) {
+                ForEach(WorkList.Kind.allCases) { kind in
+                    HStack { Text(kind.title).foregroundStyle(.primary); Spacer() }
+                        .help(kind.sidebarHelp)
+                        .activityIcon(kind.sidebarIcon)
+                        .appText(.supporting).sidebarInk(.work(kind)).tag(SidebarItem.work(kind))
+                }
+            } header: {
+                Text("Work").appText(.supporting)
             }
 
             // The pages about all the work, a group like a folder's, above the smart

@@ -202,7 +202,12 @@ struct AgentsCommands: Commands {
             Button("Connectors") { model.showsMCPServers = true }
             Button("Secrets") { model.showsSecrets = true }
                 .disabled(ControlConfig.endpoint == nil)
-            Button("Work") { model.showsWork = true }
+            // A list each, as the sidebar's Work group (#4004).
+            Menu("Work") {
+                ForEach(WorkList.Kind.allCases) { kind in
+                    Button(kind.title) { model.sidebarItem = .work(kind) }
+                }
+            }
             Button("Docs") { model.showDocs(model.docsHistory.current ?? DocsPlace()) }
             // The page the window opens to (#3986). ⌘1…n are the inspector panes, so ⌘0 is
             // next to them; Actual Size keeps it while a Markdown page is in front.
