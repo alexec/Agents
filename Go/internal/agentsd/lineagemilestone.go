@@ -74,6 +74,9 @@ type issueMilestoneBook struct {
 	issueAsked map[wire.LineageNode]time.Time
 	// issueLookup, when set, is asked in place of milestoneLookup.
 	issueLookup issueLookup
+	// subIssues is each parent's sub-issues in the forge's order, as it last said them: the
+	// epic's order a search for it groups its sessions in (#3900). Kept as long as issueAsked.
+	subIssues map[wire.LineageNode][]wire.LineageNode
 }
 
 type milestoneJob struct {
@@ -164,6 +167,16 @@ func (d *Daemon) askIssueMilestone(j milestoneJob) {
 	d.issueMu.Lock()
 	defer d.issueMu.Unlock()
 	delete(d.issueWaiting, issue)
+	if err == nil {
+		if d.subIssues == nil {
+			d.subIssues = map[wire.LineageNode][]wire.LineageNode{}
+		}
+		if len(got.children) > 0 {
+			d.subIssues[issue] = got.children
+		} else {
+			delete(d.subIssues, issue)
+		}
+	}
 	if d.issueAsked == nil {
 		d.issueAsked = map[wire.LineageNode]time.Time{}
 	}
@@ -183,6 +196,14 @@ func (d *Daemon) dropOldestAnswerLocked() {
 		}
 	}
 	delete(d.issueAsked, oldest)
+	delete(d.subIssues, oldest)
+}
+
+// subIssueOrder is the parent's sub-issues in the forge's order, as it last said them (#3900).
+func (d *Daemon) subIssueOrder(parent wire.LineageNode) []wire.LineageNode {
+	d.issueMu.Lock()
+	defer d.issueMu.Unlock()
+	return d.subIssues[parent]
 }
 
 // repoFolder is a folder of repo, where gh or glab finds its sign-in; "" for none.

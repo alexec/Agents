@@ -1,7 +1,10 @@
 package agentsd
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -98,5 +101,50 @@ func TestListQueryForAnIssue(t *testing.T) {
 	}
 	if len(listed) != 3 || !got[on] || !got[labelled] || !got[named] {
 		t.Fatalf("listed %+v", listed)
+	}
+}
+
+// #3900: lineage/sessions says the epic, then its sub-issues in the forge's order (by number for
+// those it has not said), with the titles it has; a session on two of them is on the first.
+func TestLineageSessionsIssuesInTheEpicsOrder(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	folder := realTempDir(t)
+	d.repos = map[string]forgeRepo{folder: {"github", "alexec/agents"}}
+	c.call(t, 9, "folders/add", map[string]any{"folder": "file://" + folder})
+	repo := d.repos[folder]
+	epic, first, second, unsaid := repo.issue(3897), repo.issue(3900), repo.issue(3898), repo.issue(3899)
+	d.resolveMu.Lock()
+	d.resolveLookup = func(context.Context, string, forgeRepo, string, int) (wire.LineageResolved, error) {
+		return wire.LineageResolved{}, errors.New("not asked in this test")
+	}
+	d.resolveCache = map[wire.LineageNode]resolvedEntry{epic: {resolved: wire.LineageResolved{Title: "Find sessions"}, ok: true, at: nowFunc()}}
+	d.resolveMu.Unlock()
+	d.issueMu.Lock()
+	d.subIssues = map[wire.LineageNode][]wire.LineageNode{epic: {first, second}}
+	d.issueMu.Unlock()
+	both := sessionNode("00000000-0000-0000-0000-000000000001")
+	d.lineageDo(func() {
+		for _, child := range []wire.LineageNode{unsaid, second, first} {
+			d.link(child, epic, lineage.RelPartOf, lineage.SourceForge)
+		}
+		d.link(both, second, lineage.RelWorksOn, lineage.SourceStart)
+		d.link(both, first, lineage.RelWorksOn, lineage.SourceStart)
+	})
+	d.lineageSettle(2 * time.Second)
+	var got wire.LineageSessions
+	json.Unmarshal(c.call(t, 1, "lineage/sessions", wire.LineageSessionsRequest{Number: 3897}), &got)
+	var order []string
+	for _, i := range got.Issues {
+		order = append(order, i.Node.Ref)
+	}
+	if want := []string{epic.Ref, first.Ref, second.Ref, unsaid.Ref}; !slices.Equal(order, want) {
+		t.Fatalf("issues %v, want %v", order, want)
+	}
+	if got.Issues[0].Title == nil || *got.Issues[0].Title != "Find sessions" || got.Issues[1].Title != nil {
+		t.Errorf("titles %+v", got.Issues)
+	}
+	if len(got.Matches) != 1 || got.Matches[0].On != first {
+		t.Errorf("matches %+v, want the session on %s", got.Matches, first.Ref)
 	}
 }

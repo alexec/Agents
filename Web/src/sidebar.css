@@ -74,6 +74,13 @@
 .with-sidebar details.sessions .nav-item > .row.session { padding-left: calc(8px + 26px); }
 .with-sidebar details.sessions .nav-item.child > .row.session { padding-left: calc(8px + 26px + 26px * var(--indent, 1)); }
 .with-sidebar details.recent-archived-sessions .row.session { padding-left: calc(8px + 26px); }
+/* A search for an epic (#3900): a heading for each issue, one level in as the Sessions row's title, its rows one more. */
+.with-sidebar .issue-group-heading { display: flex; gap: 6px; padding: 5px 8px 3px 34px;
+  font-size: 0.6875rem; color: color-mix(in srgb, currentColor 60%, transparent); }
+.with-sidebar .issue-group-heading .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.with-sidebar .issue-group-heading .count { margin-left: auto; font-variant-numeric: tabular-nums; }
+.with-sidebar .issue-group .nav-item > .row.session { padding-left: calc(8px + 26px); }
+.with-sidebar .issue-group .nav-item.child > .row.session { padding-left: calc(8px + 26px + 26px * var(--indent, 1)); }
 
 /* The groups at the top (#495): Pinned, Needs You, Working, Unread, headed and folding as Activity
    is, the count on the right, Needs You's in the attention tint. */

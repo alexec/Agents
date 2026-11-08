@@ -1468,6 +1468,7 @@ final class AppModel {
         work.forget(earlier)
         work.saidLines = [:]
         work.issueSessions = [:]
+        work.issueHeadings = []
         guard !words.isEmpty else { return }
         let request = DaemonAPI.ListRequest(archivedCommands: false, limit: Self.searchShown, lean: true, query: words)
         let hosts: [MachineRef] = (hasMacHost ? [.mac] : []) + self.hosts.servers.filter { !hostUnreachable($0) }
@@ -1481,7 +1482,7 @@ final class AppModel {
                                                           DaemonAPI.LineageSessionsRequest(number: issue),
                                                           returning: DaemonAPI.LineageSessions.self),
                !Task.isCancelled {
-                for match in on.matches { work.issueSessions[match.agentID] = match.on }
+                work.noteIssueSessions(on)
             }
             // What was said (#1585): the sessions whose prompts or replies hold the words. Not
             // asked of a host too old to say (#1748).

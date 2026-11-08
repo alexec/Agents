@@ -787,6 +787,15 @@ struct RemoteFolderFold: View {
             SidebarSessionRow(agent: row.agent, place: SidebarProjects.machineMark(of: row.agent, in: group) { model.hostLabel($0) },
                               tree: row, folds: folds, isNested: grouped)
         }
+        // A search for an epic (#3900): what it found here, live and archived, under a heading
+        // for each of its issues, the epic's own first, as the Mac's `FolderFold` draws them.
+        ForEach(fold.issueGroups) { issue in
+            IssueGroupHeading(title: issue.title, count: issue.sessions.count)
+            ForEach(SidebarTree.rows(issue.sessions, in: model.work, folds: folds)) { row in
+                SidebarSessionRow(agent: row.agent, place: SidebarProjects.machineMark(of: row.agent, in: group) { model.hostLabel($0) },
+                                  tree: row, folds: folds, isNested: true)
+            }
+        }
         if !fold.recentArchived.isEmpty {
             let recentOpen = folds.isOpen(key, .recentArchivedSessions)
             SidebarFoldRow(title: "Recently archived sessions", count: fold.recentArchived.count, isOpen: recentOpen) {
@@ -881,6 +890,30 @@ private struct FolderPageRow: View {
 /// The Workflows row of a folder's fold (#885), and its Sessions row (#2312): the chevron
 /// in the session rows' mark well, the word where their titles start, and the count at the
 /// end (#1079). A tap anywhere on it folds or unfolds it.
+/// The heading over one issue's sessions in a search for an epic (#3900): `#3898 Title` and
+/// how many, in line with a fold row's title. Not a fold: the search holds it open.
+private struct IssueGroupHeading: View {
+    let title: String
+    let count: Int
+
+    /// In line with a fold row's title, past its chevron's well (#750).
+    @ScaledMetric private var scale: CGFloat = 1
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text(title).lineLimit(1)
+            Spacer(minLength: 4)
+            Text("\(count)").monospacedDigit()
+        }
+        .appText(.fine)
+        .foregroundStyle(.secondary)
+        .padding(.leading, 30 * scale)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(title), \(count)")
+        .accessibilityAddTraits(.isHeader)
+    }
+}
+
 private struct SidebarFoldRow: View {
     let title: String
     let count: Int

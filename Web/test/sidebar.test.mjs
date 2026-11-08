@@ -728,3 +728,24 @@ test("a host's list prunes the folds of its folders that are gone, and no other 
   assert.equal(new Folds(storage).isSessionsOpen("box", "file:///w/gone"), true, "a host that left takes its own");
   assert.equal(new Folds(storage).isOpen("box", "file:///w/gone"), false);
 });
+
+test("a search for an epic groups what it found under each issue, the epic's own first (#3900)", async () => {
+  const { issueGroups, groupsByIssue, folderSessions, smartAgents } = await load("src/model/sidebar.ts");
+  const agent = (id, state, createdAt, archivedAt) => ({ id, state, createdAt, lastActivityAt: createdAt, archivedAt, labels: [], title: id });
+  const node = (n) => ({ kind: "issue", ref: `github:o/r#${n}` });
+  const lead = agent("lead", "running", 1), lane = agent("lane", "finished", 2), merged = agent("merged", "archived", 3, 9);
+  const named = agent("named", "finished", 4), old = agent("old", "archived", 0, 5);
+  const query = {
+    label: null, issue: 40, text: "",
+    onIssue: { lead: node(40), lane: node(42), merged: node(41), old: node(41) },
+    issueHeadings: [{ node: node(40), title: "Epic" }, { node: node(41) }, { node: node(42), title: "Second" }],
+  };
+  assert.equal(groupsByIssue(query), true);
+  const groups = issueGroups([lead, lane, named, old, merged], query);
+  assert.deepEqual(groups.map((g) => g.title), ["#40 Epic", "#41", "#42 Second"]);
+  assert.deepEqual(groups.map((g) => g.sessions.map((a) => a.id)), [["named", "lead"], ["merged", "old"], ["lane"]],
+    "a session no host placed is under the epic; live before archived");
+  assert.deepEqual(smartAgents("working", [lead], query), [], "no group at the top takes one");
+  assert.deepEqual(folderSessions([lead], [], query).map((a) => a.id), ["lead"], "its folder lists it, working or not");
+  assert.equal(groupsByIssue({ ...query, issueHeadings: [{ node: node(40) }] }), false, "an issue with no sub-issues keeps one list");
+});

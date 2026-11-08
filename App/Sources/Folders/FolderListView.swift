@@ -629,6 +629,16 @@ struct FolderFold: View {
                     SessionSidebarRow(agent: row.item.agent, place: machineMark(row.item.agent),
                                       tree: row.item, folds: folds, isNested: grouped)
                 }
+                // A search for an epic (#3900): what it found here, live and archived, under a
+                // heading for each of its issues, the epic's own first. Held open, as a
+                // search holds Sessions.
+                ForEach(fold.issueGroups) { group in
+                    IssueGroupHeading(title: group.title, count: group.sessions.count)
+                    ForEach(FoldedRow.rows(SidebarTree.rows(group.sessions, in: model.work, folds: folds), in: .sessions)) { row in
+                        SessionSidebarRow(agent: row.item.agent, place: machineMark(row.item.agent),
+                                          tree: row.item, folds: folds, isNested: true)
+                    }
+                }
                 if !fold.recentArchived.isEmpty {
                     let recentOpen = folds.isOpen(key, .recentArchivedSessions)
                     SidebarFoldRow(title: "Recently archived sessions", count: fold.recentArchived.count, isOpen: Binding(
@@ -729,6 +739,29 @@ struct FolderFold: View {
                 .appText(.fine)
                 .foregroundStyle(.secondary)
         }
+    }
+}
+
+/// The heading over one issue's sessions in a search for an epic (#3900): `#3898 Title` and
+/// how many, in line with the Sessions row's title. Not a fold: the search holds it open.
+private struct IssueGroupHeading: View {
+    let title: String
+    let count: Int
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(title).lineLimit(1).truncationMode(.tail)
+            Text("\(count)").monospacedDigit().foregroundStyle(.tertiary)
+        }
+        .appText(.fine)
+        .foregroundStyle(.secondary)
+        .padding(.leading, 22)
+        .padding(.top, 2)
+        .help(title)
+        // One label, over children it ignores: one stacked on a child's crashes AppKit.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(title), \(count)")
+        .accessibilityAddTraits(.isHeader)
     }
 }
 
