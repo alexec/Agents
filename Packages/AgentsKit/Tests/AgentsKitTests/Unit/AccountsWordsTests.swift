@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import AgentsKitCore
 
-/// Your setup ▸ Accounts (#3967): the project filter, the foot and the token mark.
+/// Settings ▸ You ▸ Accounts (#3967): the project filter, the foot and the token mark.
 struct AccountsWordsTests {
     let all = [
         DaemonAPI.OutsideAccount(service: "gitlab.com", monthlyCostUsd: 0),

@@ -1,6 +1,6 @@
 import Foundation
 
-/// The words and sums of Your setup ▸ Accounts (#3967), as the web page's `model/accounts.ts`.
+/// The words and sums of Settings ▸ You ▸ Accounts (#3967), as the web page's `model/accounts.ts`.
 public enum AccountsWords {
     public static let title = "Accounts"
     public static let noSecrets = "No secret goes here: give a card or a token by its name in Secrets."

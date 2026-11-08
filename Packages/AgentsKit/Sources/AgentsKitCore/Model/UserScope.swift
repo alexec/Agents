@@ -80,8 +80,8 @@ public extension DaemonAPI {
         }
     }
 
-    /// Your setup ▸ Accounts (#3967): one outside account of the person's. It holds no secret:
-    /// `card` and `secret` are the names of secrets in Your setup ▸ Secrets, or where one is.
+    /// Settings ▸ You ▸ Accounts (#3967): one outside account of the person's. It holds no secret:
+    /// `card` and `secret` are the names of secrets in Settings ▸ You ▸ Secrets, or where one is.
     struct OutsideAccount: Codable, Sendable, Hashable, Identifiable {
         public var service: String
         public var address: String?
@@ -246,7 +246,7 @@ public extension DaemonAPI.Notification {
 
 /// The words for settings with a fixed scope (#2410) and the Secrets page.
 public enum UserScopeWords {
-    /// Your setup ▸ Secrets (#3632).
+    /// Settings ▸ You ▸ Secrets (#3632).
     public static let secretsTitle = "Secrets"
     public static let yoursOnEveryMachine = "Yours, on every machine"
     /// Under "This Mac's" at the top of the `~/.agents` pages and editors (#2704): what goes to

@@ -9,7 +9,7 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// Your setup ▸ Accounts (#3967): add puts an account with the same service and address in
+// Settings ▸ You ▸ Accounts (#3967): add puts an account with the same service and address in
 // place of the old one, and a value that looks like a secret is refused.
 func TestAccounts(t *testing.T) {
 	ctx := context.Background()

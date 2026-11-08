@@ -1,6 +1,6 @@
 import Foundation
 
-/// A runtime's machines on Your setup, in one line (#3744): "On all 3 machines", or
+/// A runtime's machines on Status ▸ Runtimes, in one line (#3744): "On all 3 machines", or
 /// "On This Mac · Not on build-box". It takes the place of a line per machine; each name in
 /// it is a link to that machine's page, which has the whole line (`machineLine`). The web
 /// page's `machinesSummary` says the same.

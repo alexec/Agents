@@ -9,6 +9,7 @@ import SwiftUI
 /// the same ticks.
 struct ConnectorSetupView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.openSettings) private var openSettings
     var folder: FolderKey
     var folderName: String
     /// Opens the catalogue (Add Connector…), for Linear and the others, with a search typed
@@ -170,7 +171,11 @@ struct ConnectorSetupView: View {
                         Text(ConnectorSetupWords.connectedNote(setup)).appText(.fine).foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 8)
-                    Button("Manage in Connectors\u{2026}") { model.sidebarItem = .mcpServers }
+                    Button("Manage in Connectors\u{2026}") {
+                        // Settings ▸ You ▸ Connectors (#3998).
+                        model.settingsPaneAsked = .connectors
+                        openSettings()
+                    }
                         .buttonStyle(.link).appText(.fine)
                 }
                 if setup.installed == false, let repository = setup.repository {

@@ -44,7 +44,7 @@ import (
 const (
 	sealedSecretsInfo    = "com.alexecollins.agents.sealedsecret.v1"
 	sealedSecretsVersion = 1
-	// sealedFromUser is a secret that Your setup sent with the flag on: the person's client
+	// sealedFromUser is a secret of the person's (Settings ▸ You ▸ Secrets) sent with the flag on: the person's client
 	// sealed the flag, and the sync owns the record.
 	sealedFromUser = "user"
 	// sealedLocal names this machine's store in the associated data (sealedSessionStore a
@@ -278,7 +278,7 @@ func removePlainSecret(home, name string) error {
 	return nil
 }
 
-// syncUserSealed keeps Your setup's flagged secrets (#4014): each one sent flagged is sealed
+// syncUserSealed keeps the flagged secrets of the person's (Settings ▸ You ▸ Secrets) (#4014): each one sent flagged is sealed
 // here, one sent plain loses any sealed copy, and one the sync sealed before and no longer
 // sends goes. kept are names whose newer version here stays as it is.
 func (d *Daemon) syncUserSealed(home string, flagged, plain []wire.UserSecret, kept []string) error {
@@ -337,7 +337,7 @@ func (d *Daemon) setNeedsApproval(r wire.SecretNeedsApprovalRequest) error {
 		return Invalid("This machine has no personal home to keep secrets in.")
 	}
 	if d.isUserSecret(r.Name) {
-		return Invalid("%s comes from Your setup: change Ask before use there, where your client seals it.", r.Name)
+		return Invalid("%s comes from Settings ▸ You ▸ Secrets: change Ask before use there, where your client seals it.", r.Name)
 	}
 	if r.NeedsApproval {
 		v, ok := skillcatalog.LoadSecrets(skillcatalog.SecretsPath(home)).Value(r.Name)
@@ -379,7 +379,7 @@ func (d *Daemon) setNeedsApproval(r wire.SecretNeedsApprovalRequest) error {
 	return nil
 }
 
-// isUserSecret is whether Your setup sent name: its flag is its client's to seal.
+// isUserSecret is whether name is a secret of the person's (Settings ▸ You ▸ Secrets): its flag is its client's to seal.
 func (d *Daemon) isUserSecret(name string) bool {
 	d.userScopeMu.Lock()
 	defer d.userScopeMu.Unlock()

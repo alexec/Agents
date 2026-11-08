@@ -197,9 +197,6 @@ final class AppModel {
             guard showsSpending, showsSpending != oldValue else { return }
             showsEvents = false
             showsRuntimes = false
-            showsMCPServers = false
-            showsSecrets = false
-            showsAccounts = false
             showsTime = false
             showsTokens = false
             machinePage = nil
@@ -224,9 +221,6 @@ final class AppModel {
             guard showsEvents, showsEvents != oldValue else { return }
             showsSpending = false
             showsRuntimes = false
-            showsMCPServers = false
-            showsSecrets = false
-            showsAccounts = false
             showsTime = false
             showsTokens = false
             machinePage = nil
@@ -250,80 +244,6 @@ final class AppModel {
             guard showsRuntimes, showsRuntimes != oldValue else { return }
             showsSpending = false
             showsEvents = false
-            showsMCPServers = false
-            showsSecrets = false
-            showsAccounts = false
-            showsTime = false
-            showsTokens = false
-            machinePage = nil
-            showsWork = false
-            showsDocs = false
-            showsSummary = false
-            selection = nil
-            openWorkflow = nil
-            folderPage = nil
-            composing = false
-        }
-    }
-
-    /// Whether the window is showing MCP Servers: the servers this Mac runs once for
-    /// every agent, and why each last stopped (#488, #589). A page like Runtimes, and not
-    /// persisted for the same reason.
-    var showsMCPServers = false {
-        didSet {
-            guard showsMCPServers, showsMCPServers != oldValue else { return }
-            showsSecrets = false
-            showsAccounts = false
-            showsSpending = false
-            showsEvents = false
-            showsRuntimes = false
-            showsTime = false
-            showsTokens = false
-            machinePage = nil
-            showsWork = false
-            showsDocs = false
-            showsSummary = false
-            selection = nil
-            openWorkflow = nil
-            folderPage = nil
-            composing = false
-        }
-    }
-
-    /// Whether the window is showing Secrets: the person's secrets and cards, kept by the control
-    /// plane and sent to each machine of theirs (#1760), under Your setup (#3632). Was Settings ▸
-    /// Machines ▸ Secrets. A page like Connectors, and not persisted for the same reason.
-    var showsSecrets = false {
-        didSet {
-            guard showsSecrets, showsSecrets != oldValue else { return }
-            showsAccounts = false
-            showsSpending = false
-            showsEvents = false
-            showsRuntimes = false
-            showsMCPServers = false
-            showsTime = false
-            showsTokens = false
-            machinePage = nil
-            showsWork = false
-            showsDocs = false
-            showsSummary = false
-            selection = nil
-            openWorkflow = nil
-            folderPage = nil
-            composing = false
-        }
-    }
-
-    /// Whether the window is showing Accounts: the person's outside accounts (#3967), kept by
-    /// the control plane as their secrets are, under Your setup. Not persisted, as Secrets.
-    var showsAccounts = false {
-        didSet {
-            guard showsAccounts, showsAccounts != oldValue else { return }
-            showsSecrets = false
-            showsSpending = false
-            showsEvents = false
-            showsRuntimes = false
-            showsMCPServers = false
             showsTime = false
             showsTokens = false
             machinePage = nil
@@ -345,9 +265,6 @@ final class AppModel {
             showsSpending = false
             showsEvents = false
             showsRuntimes = false
-            showsMCPServers = false
-            showsSecrets = false
-            showsAccounts = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -368,9 +285,6 @@ final class AppModel {
             showsSpending = false
             showsEvents = false
             showsRuntimes = false
-            showsMCPServers = false
-            showsSecrets = false
-            showsAccounts = false
             showsTime = false
             machinePage = nil
             showsWork = false
@@ -394,9 +308,6 @@ final class AppModel {
             showsSpending = false
             showsEvents = false
             showsRuntimes = false
-            showsMCPServers = false
-            showsSecrets = false
-            showsAccounts = false
             showsTime = false
             showsTokens = false
             selection = nil
@@ -417,9 +328,6 @@ final class AppModel {
             showsSpending = false
             showsEvents = false
             showsRuntimes = false
-            showsMCPServers = false
-            showsSecrets = false
-            showsAccounts = false
             showsTime = false
             showsTokens = false
             machinePage = nil
@@ -439,9 +347,6 @@ final class AppModel {
             showsSpending = false
             showsEvents = false
             showsRuntimes = false
-            showsMCPServers = false
-            showsSecrets = false
-            showsAccounts = false
             showsTime = false
             showsTokens = false
             machinePage = nil
@@ -462,8 +367,6 @@ final class AppModel {
             showsSpending = false
             showsEvents = false
             showsRuntimes = false
-            showsMCPServers = false
-            showsSecrets = false
             showsTime = false
             showsTokens = false
             machinePage = nil
@@ -532,7 +435,7 @@ final class AppModel {
         machinePage = .mac
     }
 
-    /// Your setup, at its Runtimes (#3631), from the prompt bar's warning about starting on one
+    /// Status ▸ Runtimes (#3631), from the prompt bar's warning about starting on one
     /// that is out.
     func showRuntimes() {
         showsRuntimes = true
@@ -544,9 +447,6 @@ final class AppModel {
         showsSpending = false
         showsEvents = false
         showsRuntimes = false
-        showsMCPServers = false
-        showsSecrets = false
-        showsAccounts = false
         showsTime = false
         showsTokens = false
         machinePage = nil
@@ -571,9 +471,6 @@ final class AppModel {
         showsSpending = false
         showsEvents = false
         showsRuntimes = false
-        showsMCPServers = false
-        showsSecrets = false
-        showsAccounts = false
         showsTime = false
         showsTokens = false
         machinePage = nil
@@ -620,9 +517,6 @@ final class AppModel {
         get {
             if showsEvents { return .events }
             if showsRuntimes { return .runtimes }
-            if showsMCPServers { return .mcpServers }
-            if showsSecrets { return .secrets }
-            if showsAccounts { return .accounts }
             if let machinePage { return .machine(machinePage) }
             if showsSpending { return .spending }
             if showsTokens { return .tokens }
@@ -650,9 +544,6 @@ final class AppModel {
                 showsSpending = false
                 showsEvents = false
                 showsRuntimes = false
-                showsMCPServers = false
-                showsSecrets = false
-                showsAccounts = false
                 showsTime = false
                 showsTokens = false
                 machinePage = nil
@@ -691,21 +582,12 @@ final class AppModel {
                 showEvents()
             case .runtimes:
                 showRuntimes()
-            case .mcpServers:
-                showsMCPServers = true
-            case .secrets:
-                showsSecrets = true
-            case .accounts:
-                showsAccounts = true
             case .machine(let host):
                 machinePage = host
             case .folder(let key):
                 showsSpending = false
                 showsEvents = false
                 showsRuntimes = false
-                showsMCPServers = false
-                showsSecrets = false
-                showsAccounts = false
                 showsTime = false
                 showsTokens = false
                 machinePage = nil
@@ -728,9 +610,6 @@ final class AppModel {
         showsSpending = false
         showsEvents = false
         showsRuntimes = false
-        showsMCPServers = false
-        showsSecrets = false
-        showsAccounts = false
         showsTime = false
         showsTokens = false
         machinePage = nil
@@ -745,9 +624,6 @@ final class AppModel {
         showsSpending = false
         showsEvents = false
         showsRuntimes = false
-        showsMCPServers = false
-        showsSecrets = false
-        showsAccounts = false
         showsTime = false
         showsTokens = false
         machinePage = nil
@@ -777,9 +653,6 @@ final class AppModel {
         showsSpending = false
         showsEvents = false
         showsRuntimes = false
-        showsMCPServers = false
-        showsSecrets = false
-        showsAccounts = false
         showsTime = false
         showsTokens = false
         machinePage = nil
@@ -1016,9 +889,6 @@ final class AppModel {
         showsSpending = false
         showsEvents = false
         showsRuntimes = false
-        showsMCPServers = false
-        showsSecrets = false
-        showsAccounts = false
         showsTime = false
         showsTokens = false
         machinePage = nil

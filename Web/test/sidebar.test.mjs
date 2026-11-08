@@ -416,12 +416,12 @@ test("an Activity page is a page of Machines or Reports (#2141), and an unknown 
   globalThis.addEventListener = () => {};
   try {
     const { parseRoute, routeHash } = await load("src/route.ts");
-    assert.equal(routeHash({ nav: "reports", section: "events", host: "mac", folder: "file:///w/a" }), "#/reports/events");
+    assert.equal(routeHash({ nav: "status", section: "events", host: "mac", folder: "file:///w/a" }), "#/status/events");
     assert.deepEqual(parseRoute("#/a/spending"), { nav: "reports", section: "usage" });
     assert.deepEqual(parseRoute("#/a/time"), { nav: "reports", section: "usage" });
     assert.deepEqual(parseRoute("#/a/achievements"), { nav: "reports", section: "multiplier" }, "the Multiplier page took its place (#3990)");
     assert.deepEqual(parseRoute("#/reports/achievements"), { nav: "reports", section: "multiplier" });
-    assert.deepEqual(parseRoute("#/a/mcp"), { nav: "setup", section: "mcp" }, "Connectors has a page of its own (#589)");
+    assert.deepEqual(parseRoute("#/a/mcp"), { nav: "settings", section: "mcp" }, "Connectors has a page of its own (#589), in Settings ▸ You (#3998)");
     assert.deepEqual(parseRoute("#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/m/1"), { host: "mac", folder: "file:///w/a", mcp: true },
       "a folder's Connectors has a page of its own (#753)");
     assert.equal(routeHash({ host: "mac", folder: "file:///w/a", mcp: true }), "#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/m/1");

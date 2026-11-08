@@ -202,7 +202,7 @@
 .runtime-list .past-weeks ol { display: flex; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .runtime-list .past-weeks li { display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .runtime-list .past-weeks .week-bar { display: flex; flex-direction: column; justify-content: flex-end; width: 22px; height: 28px; border-radius: 2px; background: var(--paper-rule); overflow: hidden; }
-/* Your setup ▸ Runtimes (#3631, #3744): a runtime, its accounts and its machines in one line are one group, ruled off below. */
+/* Status ▸ Runtimes (#3631, #3744): a runtime, its accounts and its machines in one line are one group, ruled off below. */
 .runtime-list, .runtime-list ul { list-style: none; margin: 0; padding: 0; }
 .sub-app .runtime-list > li { padding: 6px 0; border-bottom: 1px solid var(--paper-rule); }
 :is(.with-sidebar, .sub-app) .runtime-list > li:not(.setup-machines) { border-bottom: 0; padding-bottom: 0; }

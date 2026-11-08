@@ -159,7 +159,7 @@ func TestAChangedSealedRecordDoesNotOpen(t *testing.T) {
 	}
 }
 
-// #4014: Your setup's flag is bound into each envelope's associated data. Flagged, it is
+// #4014: the flag of a secret of the person's (Settings ▸ You ▸ Secrets) is bound into each envelope's associated data. Flagged, it is
 // sealed here and not in secrets.env; a flag the control plane changed either way does not
 // open; turned off by the person's client, it goes back to secrets.env.
 func TestYourSetupsFlagIsSealed(t *testing.T) {
@@ -175,7 +175,7 @@ func TestYourSetupsFlagIsSealed(t *testing.T) {
 	}
 	send(flaggedSecret(t, public, "sam", "GITHUB_TOKEN", 1, "ghp_flagged", true))
 	if skillcatalog.LoadSecrets(path).IsSet("GITHUB_TOKEN") {
-		t.Fatal("a flagged Your setup secret is in secrets.env")
+		t.Fatal("a flagged secret of the person's is in secrets.env")
 	}
 	if v, ok, _ := d.localSecret("", "GITHUB_TOKEN"); !ok || v != "ghp_flagged" {
 		t.Fatalf("%q", v)
@@ -184,7 +184,7 @@ func TestYourSetupsFlagIsSealed(t *testing.T) {
 	assertNotUnder(t, root, "ghp_flagged")
 	// Only the client turns it off: not secrets/setNeedsApproval.
 	if e := c.callError(t, 1, wire.CallSecretsSetNeedsApproval.Name, map[string]any{"name": "GITHUB_TOKEN", "needsApproval": false}); e == nil ||
-		!strings.Contains(e.Message, "Your setup") {
+		!strings.Contains(e.Message, "Settings ▸ You ▸ Secrets") {
 		t.Fatalf("%+v", e)
 	}
 
