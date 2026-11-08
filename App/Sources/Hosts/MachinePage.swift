@@ -319,6 +319,7 @@ enum MachineNeedWords {
         switch need {
         case .offline, .stopped: OfflineWords.footLine(name: name, row: row)
         case .setupFailed: HostProblem.installFailed("").sentence(name: name, label: name)
+        case .disk(let disk): DiskSpace.needWords(disk)
         case .update: row.map(UpdateWords.state) ?? "Needs an update"
         case .signIn(let runtimes):
             "\(ListFormatter.localizedString(byJoining: runtimes)) \(runtimes.count == 1 ? "needs" : "need") sign-in"
@@ -331,12 +332,15 @@ extension AppModel {
     /// last said: This Mac's are always read, a server's when its page was opened.
     func need(of host: MachineRef) -> MachineNeed? {
         MachineNeed.most(row: hosts.controlRows[host], offline: hostUnreachable(host),
-                         runtimes: runtimes(on: host))
+                         runtimes: runtimes(on: host), disks: diskAlarms(host))
     }
 
     /// Whether a disk on the machine is low or almost full, as its page says (#3626, #3628).
     func diskWarns(_ host: MachineRef) -> Bool {
-        let alarms = host == .mac ? work.disk.alarms : serverDisks[host]?.alarms ?? []
-        return alarms.contains { $0.level != .ok }
+        diskAlarms(host).contains { $0.level != .ok }
+    }
+
+    private func diskAlarms(_ host: MachineRef) -> [DiskAlarm] {
+        host == .mac ? work.disk.alarms : serverDisks[host]?.alarms ?? []
     }
 }

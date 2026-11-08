@@ -50,6 +50,24 @@ struct MachineNeedTests {
         #expect(MachineNeed.most(row: row("failed"), offline: true, runtimes: []) == .setupFailed)
     }
 
+    private func disk(_ volume: String, _ level: DiskLevel, free: Int64) -> DiskAlarm {
+        DiskAlarm(reading: DiskReading(volume: volume, mount: "/\(volume)", freeBytes: free, totalBytes: 494 * DiskSpace.gigabyte),
+                  level: level, threshold: 24_700_000_000)
+    }
+
+    @Test func aLowDiskSaysWhyTheIconIsRed() {
+        let low = disk("Data", .low, free: 24_100_000_000)
+        let full = disk("Scratch", .critical, free: 1_800_000_000)
+        #expect(MachineNeed.most(row: row("needsUpdate"), offline: false, runtimes: [notSignedIn], disks: [low]) == .disk(low))
+        #expect(MachineNeed.most(row: row("online"), offline: false, runtimes: [], disks: [low, full]) == .disk(full))
+        #expect(MachineNeed.most(row: row("online"), offline: false, runtimes: [],
+                                 disks: [disk("Data", .ok, free: 300 * DiskSpace.gigabyte)]) == nil)
+        // An offline machine cannot say how its disk is now.
+        #expect(MachineNeed.most(row: row("failed"), offline: true, runtimes: [], disks: [low]) == .setupFailed)
+        #expect(DiskSpace.needWords(low) == "Disk low: 24.1 GB free")
+        #expect(DiskSpace.needWords(full) == "Disk almost full: 1.8 GB free")
+    }
+
     @Test func anUpdateGoesBeforeSignIn() {
         #expect(MachineNeed.most(row: row("needsUpdate"), offline: false, runtimes: [notSignedIn]) == .update)
     }

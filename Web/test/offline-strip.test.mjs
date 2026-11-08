@@ -139,6 +139,18 @@ const { machineNeed, machineNeedLine } = await load("src/views/OfflineStrip.tsx"
 const rt = (name, availability, signIn) => ({ runtime: { id: name.toLowerCase(), name }, availability, ...(signIn ? { signIn } : {}) });
 const available = { available: { path: "/p", supportsResume: true } };
 const notSignedIn = rt("Claude", { needsSignIn: { authMethods: [] } });
+const disk = (volume, level, freeBytes) => ({ reading: { volume, mount: `/${volume}`, freeBytes, totalBytes: 494_000_000_000 },
+  level, threshold: 24_700_000_000, worktrees: [] });
+
+test("a low disk says why the machine is red (#3928)", () => {
+  const low = disk("Data", "low", 24_100_000_000);
+  const full = disk("Scratch", "critical", 1_800_000_000);
+  assert.deepEqual(machineNeed(row("needsUpdate"), true, [notSignedIn], [low]), { kind: "disk", alarm: low });
+  assert.deepEqual(machineNeed(row("online"), true, [], [low, full]), { kind: "disk", alarm: full });
+  assert.equal(machineNeed(row("online"), true, [], [disk("Data", "ok", 300_000_000_000)]), null);
+  // An offline machine cannot say how its disk is now.
+  assert.deepEqual(machineNeed(row("failed"), false, [], [low]), { kind: "setupFailed" });
+});
 
 test("a machine that needs nothing says nothing", () => {
   assert.equal(machineNeed(row("online"), true, [rt("Claude", available)]), null);
@@ -163,5 +175,8 @@ test("a machine's need in words", () => {
   assert.equal(machineNeedLine({ kind: "setupFailed" }, row("failed")), "Setting up devbox failed.");
   assert.equal(machineNeedLine({ kind: "update" }, row("needsUpdate")), "Needs an update");
   assert.equal(machineNeedLine({ kind: "signIn", runtimes: ["Claude"] }, row("online")), "Claude needs sign-in");
+  assert.equal(machineNeedLine({ kind: "disk", alarm: disk("Data", "low", 24_100_000_000) }, row("online")), "Disk low: 24.1 GB free");
+  assert.equal(machineNeedLine({ kind: "disk", alarm: disk("Scratch", "critical", 1_800_000_000) }, row("online")),
+    "Disk almost full: 1.8 GB free");
   assert.equal(machineNeedLine({ kind: "signIn", runtimes: ["Claude", "Codex"] }, row("online")), "Claude and Codex need sign-in");
 });
