@@ -244,6 +244,8 @@ public extension DaemonAPI {
         public var cost: String?
         /// The host it is linked to, in `providers/list`.
         public var host: MachineRef?
+        /// Why the make failed, in the provider's words, when `state` is failed (#3973).
+        public var reason: String?
 
         public init(id: String, name: String, state: String, ssh: String? = nil, tunnel: Bool? = nil,
                     hostKeyRenews: Bool? = nil, cost: String? = nil, host: MachineRef? = nil) {

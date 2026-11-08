@@ -3785,6 +3785,65 @@ final class AppModel {
         }
     }
 
+    /// Stop on a machine's row (#3973). Unconfirmed while agents work there, the control plane
+    /// says who they are, and they are returned for the question; nil once it is stopping or refused.
+    func stopHost(_ host: MachineRef, confirmed: Bool = false) async -> [String]? {
+        guard let controlRequests else { return nil }
+        do {
+            _ = try await controlRequests.call(DaemonAPI.Method.hostsStop,
+                                               DaemonAPI.MachineStop(host: host, confirmRunning: confirmed ? true : nil))
+        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.agentsWorking {
+            let names = error.data?["running"]?.arrayValue?.compactMap(\.stringValue) ?? []
+            if !names.isEmpty { return names }
+            problem = HostProblem.controlRefusal(error)
+        } catch let error as JSONRPCError {
+            problem = HostProblem.controlRefusal(error)
+        } catch {
+            problem = "The control plane can’t be reached, so \(hosts.label(host)) can’t be stopped."
+        }
+        return nil
+    }
+
+    /// Delete… on a machine a provider made (#3973): the provider deletes it, then the host
+    /// goes as Remove does.
+    func deleteMachine(_ host: MachineRef) async {
+        await machineCall(DaemonAPI.Method.hostsDeleteMachine, host)
+    }
+
+    /// Remove… on a registered machine (#3973): Agents forgets it; the computer stays.
+    func removeMachine(_ host: MachineRef) async {
+        await machineCall(DaemonAPI.Method.hostsRemove, host)
+    }
+
+    private func machineCall(_ method: String, _ host: MachineRef) async {
+        guard let controlRequests else { return }
+        do {
+            _ = try await controlRequests.call(method, DaemonAPI.MachineRequest(host: host))
+            await syncControlHosts(controlRequests)
+        } catch let error as JSONRPCError {
+            problem = HostProblem.controlRefusal(error)
+        } catch {
+            problem = "The control plane can’t be reached."
+        }
+    }
+
+    /// New Machine (#3973): the default provider makes `machine-N` with its defaults, with no
+    /// questions (#3972). A make that fails says the provider's reason.
+    func newMachine() async {
+        guard let controlRequests else { return }
+        do {
+            let made = try await controlRequests.call(DaemonAPI.Method.providersCreate, DaemonAPI.Empty(),
+                                                      returning: DaemonAPI.ProviderCreated.self)
+            if made.workspace.state == "failed" {
+                problem = made.workspace.reason ?? "\(made.workspace.name) could not be made."
+            }
+        } catch let error as JSONRPCError {
+            problem = HostProblem.controlRefusal(error)
+        } catch {
+            problem = "The control plane can’t be reached, so no machine can be made."
+        }
+    }
+
     /// Approve or Deny on a machine's card (#994): a refusal is the window's alert.
     func answerJoin(_ request: DaemonAPI.JoinRequest, approve: Bool) async {
         if let refused = await people.answer(request, approve: approve, on: controlRequests) {

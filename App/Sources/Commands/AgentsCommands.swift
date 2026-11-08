@@ -141,6 +141,10 @@ struct AgentsCommands: Commands {
                     }
                 }
             }
+            // As the Machines header's `+` (#3973): the default provider, no questions.
+            Button("New Machine") { Task { await model.newMachine() } }
+                .keyboardShortcut("m", modifiers: [.command, .shift])
+                .disabled(model.needsFirstRun || ControlConfig.endpoint == nil)
             // As Settings ▸ Machines has it (#2755); a machine joins a control plane, so
             // with none (the window is at first run) there is nothing to add it to.
             Button(AddMachine.Words.menuItem) { requests.folderSheet = .addMachine }
