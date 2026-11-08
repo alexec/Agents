@@ -447,6 +447,8 @@ public enum DaemonAPI {
         public static let reportsProblem = "reports/problem"
         /// The achievements the person has earned (#984), for the Time page. No params.
         public static let achievementsState = "achievements/state"
+        /// The Multiplier now (#3903), for the hero page (#3904). No params.
+        public static let multiplierState = "multiplier/state"
         public static let costSetLimits = "cost/setLimits"
         /// Cursor and Grok permission mode (061). Control only.
         public static let clientPermissionsState = "clientPermissions/state"
@@ -647,6 +649,9 @@ public enum DaemonAPI {
         public static let storeNotesChanged = "store/notesChanged"
         /// An achievement was earned (#984). Carries the whole `Achievements`.
         public static let achievementsChanged = "achievements/changed"
+        /// A PR of the person's agents merged, or a revert did (#3903). Carries the whole
+        /// `Multiplier`, with the PR in `changedBy`.
+        public static let multiplierChanged = "multiplier/changed"
     }
 
     // MARK: Requests

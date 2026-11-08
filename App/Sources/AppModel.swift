@@ -2088,6 +2088,15 @@ final class AppModel {
         takeAchievements(achievements)
     }
 
+    /// The Multiplier (#3903), asked on connecting and each time the hero page opens, then
+    /// heard on `multiplier/changed`. A host too old to know the method leaves it nil, and
+    /// the page says it has no number yet.
+    func refreshMultiplier() async {
+        guard let multiplier = try? await macClient.call(DaemonAPI.Method.multiplierState, Optional<String>.none,
+                                                    returning: DaemonAPI.Multiplier.self) else { return }
+        work.replaceMultiplier(multiplier)
+    }
+
     func refreshWakeState() async {
         guard let state = try? await macClient.call(DaemonAPI.Method.wakeState,
                                                  Optional<String>.none,
@@ -4003,6 +4012,7 @@ final class AppModel {
         case DaemonAPI.Notification.wakeChanged, DaemonAPI.Notification.modesChanged,
              DaemonAPI.Notification.attentionChanged, DaemonAPI.Notification.storeNotesChanged,
              DaemonAPI.Notification.achievementsChanged, DaemonAPI.Notification.preferencesChanged,
+             DaemonAPI.Notification.multiplierChanged,
              DaemonAPI.Notification.backupsChanged, DaemonAPI.Notification.dailySummaryChanged:
             // The achievements and display choices are the person's, kept on the Mac's own
             // host (#984, #1033). Settings ▸ Machines ▸ This Mac ▸ Backups is this Mac's (#1810).
@@ -4117,6 +4127,7 @@ final class AppModel {
         DaemonAPI.Notification.mcpHostedChanged, DaemonAPI.Notification.wakeChanged,
         DaemonAPI.Notification.selfUpdateChanged, DaemonAPI.Notification.modesChanged, DaemonAPI.Notification.storeNotesChanged,
         DaemonAPI.Notification.achievementsChanged, DaemonAPI.Notification.preferencesChanged,
+        DaemonAPI.Notification.multiplierChanged,
         DaemonAPI.Notification.runtimeChanged, DaemonAPI.Notification.runtimeAccountChanged,
         DaemonAPI.Notification.signInNeeded, DaemonAPI.Notification.clientPermissionsChanged,
         DaemonAPI.Notification.personChanged, DaemonAPI.Notification.sandboxChanged, DaemonAPI.Notification.autoChanged,
@@ -4175,6 +4186,7 @@ final class AppModel {
         async let wake: Void = refreshWakeState()
         async let storeNotes: Void = refreshStoreNotes()
         async let achievements: Void = refreshAchievements()
+        async let multiplier: Void = refreshMultiplier()
         async let leases: Void = refreshLeases()
         async let hostedMCP: Void = refreshHostedMCP()
         async let mcpHealth: Void = refreshMCPHealth()
@@ -4187,7 +4199,7 @@ final class AppModel {
         async let auto: Void = refreshAuto()
         _ = await (popped, runtimes, accounts, workflows, pinned, permissions,
                    elicitations, attention, resuming, cost, retention, clientPermissions, cloning, wake, leases, events, modes,
-                   transcript, runtimeStates, sandbox, person, disk, storeNotes, hostedMCP, mcpHealth, achievements,
+                   transcript, runtimeStates, sandbox, person, disk, storeNotes, hostedMCP, mcpHealth, achievements, multiplier,
                    display, auto)
     }
 

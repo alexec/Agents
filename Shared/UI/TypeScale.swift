@@ -235,6 +235,35 @@ extension TextStep {
     }
 }
 
+/// A show-off figure (#3904), which is not a step: the hero page's numbers, read from across
+/// the room and screenshotted. `hero` is the Multiplier, the largest text in the app;
+/// `big` is the three numbers under it. Each grows with the reader's text size, as
+/// `.largeTitle` does.
+enum FigureSize {
+    // On one line: these are not steps, and theScaleStaysFourStepsAndCode counts steps.
+    case hero, big
+}
+
+extension View {
+    /// Sets a figure's size, in digits that keep their width as they count.
+    func appFigure(_ size: FigureSize) -> some View {
+        modifier(FigureText(size: size))
+    }
+}
+
+private struct FigureText: ViewModifier {
+    let size: FigureSize
+    @ScaledMetric(relativeTo: .largeTitle) private var hero: CGFloat = 148
+    @ScaledMetric(relativeTo: .largeTitle) private var big: CGFloat = 56
+
+    func body(content: Content) -> some View {
+        switch size {
+        case .hero: content.font(.system(size: hero, weight: .heavy)).monospacedDigit()
+        case .big: content.font(.system(size: big, weight: .bold)).monospacedDigit()
+        }
+    }
+}
+
 #if os(iOS)
 extension TextStep {
     /// The same step for a UIKit text view: the page's passage editor (034). The
