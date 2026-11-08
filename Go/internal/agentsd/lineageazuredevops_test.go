@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -209,5 +211,72 @@ func TestAnAzureBoardsViewListsItsAzureReposPullRequests(t *testing.T) {
 	}
 	if len(v.PRs) != 1 || v.PRs[0].URL != "https://dev.azure.com/acme/web%20app/_git/app/pullrequest/8" {
 		t.Errorf("the work item's pull requests: %+v", v.PRs)
+	}
+}
+
+// #4107: on an Azure DevOps Server under a path of its host (tfs/), a pull request's address is
+// read by the Server's root, so a repository named as its project (collection/_git/name) is
+// found, and the addresses lineage gives keep the root's path.
+func TestAzureReposAddressesOnAServerUnderAPath(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("AGENTS_PERSONAL_HOME", home)
+	d, _ := start(t, t.TempDir())
+	t.Cleanup(d.Shutdown)
+	os.MkdirAll(filepath.Join(home, ".agents-secrets"), 0o700)
+	os.WriteFile(filepath.Join(home, ".agents-secrets", "secrets.env"),
+		[]byte("AZURE_DEVOPS_URL=https://tfs.example/tfs\nAZURE_DEVOPS_TOKEN=tok\n"), 0o600)
+
+	for raw, want := range map[string]string{
+		"https://tfs.example/tfs/Main/_git/App/pullrequest/8":         "azuredevops:main/app/app#8",
+		"https://tfs.example/tfs/Main/Web/_git/App/pullrequest/8":     "azuredevops:main/web/app#8",
+		"https://TFS.example/tfs/Main/Web/_git/App/pullrequest/8?a=1": "azuredevops:main/web/app#8",
+		"https://dev.azure.com/acme/Web%20App/_git/App/pullrequest/8": "azuredevops:acme/web app/app#8",
+		"https://tfs.example/other/Main/Web/_git/App/pullrequest/8":   "azuredevops:main/web/app#8",
+	} {
+		repo, n, ok := d.prOfURLHere(raw)
+		got := ""
+		if ok {
+			got = repo.pr(n).Ref
+		}
+		if got != want {
+			t.Errorf("%s: %q, want %q", raw, got, want)
+		}
+	}
+
+	if onAzureDevOpsRoot("https://tfs.example/tfsx/Main/_git/App", "https://tfs.example/tfs/") {
+		t.Error("tfsx/ is under tfs/")
+	}
+
+	node, base, ok := d.nodeOfURLHere("https://tfs.example/tfs/Main/_git/App/pullrequest/8")
+	if !ok || node.Ref != "azuredevops:main/app/app#8" || base != "https://tfs.example/tfs" {
+		t.Fatalf("the pull request's node: %+v %q %v", node, base, ok)
+	}
+	if u := refURL(node, base); u != "https://tfs.example/tfs/main/app/_git/app/pullrequest/8" {
+		t.Errorf("the pull request's address: %s", u)
+	}
+	item, base, ok := d.nodeOfURLHere("https://tfs.example/tfs/Main/Web/_workitems/edit/7")
+	if !ok || item.Ref != "azureboards:main/web#7" || base != "https://tfs.example/tfs" {
+		t.Fatalf("the work item's node: %+v %q %v", item, base, ok)
+	}
+	server := forgeRepo{"azuredevops", "main/web/app"}
+	if u := refURL(server.pr(8), base); u != "https://tfs.example/tfs/main/web/_git/app/pullrequest/8" {
+		t.Errorf("a pull request's address from the work item: %s", u)
+	}
+	if u := docURL(server.doc("docs/a.md").Ref, base); u != "https://tfs.example/tfs/main/web/_git/app?path=%2Fdocs%2Fa.md" {
+		t.Errorf("a doc's address: %s", u)
+	}
+	if _, base, ok := d.nodeOfURLHere("https://dev.azure.com/acme/Web%20App/_workitems/edit/7"); !ok || base != "" {
+		t.Errorf("a work item on dev.azure.com has the base %q", base)
+	}
+
+	// The connection's Server comes first.
+	file := &connections.File{Path: filepath.Join(t.TempDir(), ".agents-secrets", connections.FileName)}
+	d.connStoreFor = func() (connections.Store, error) { return file, nil }
+	file.Put(connections.AzureDevOpsConnection("https://ado.example/collections/", "Main", "tok", "Kim", time.Now()))
+	if root := d.azureDevOpsServerRoot(); root != "https://ado.example/collections/" {
+		t.Errorf("the connected Server's root: %q", root)
+	}
+	if repo, n, ok := d.prOfURLHere("https://ado.example/collections/Main/_git/App/pullrequest/3"); !ok || repo.pr(n).Ref != "azuredevops:main/app/app#3" {
+		t.Errorf("a pull request on the connected Server: %+v %d %v", repo, n, ok)
 	}
 }
