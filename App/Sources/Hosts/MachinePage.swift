@@ -190,43 +190,125 @@ struct MachinePage: View {
     }
 }
 
-/// A machine's row under Machines in the sidebar (#3626): its name, and under it, in grey,
-/// the most urgent thing it needs (#3764), with Start for a stopped workspace. A machine
-/// that needs nothing shows only its name.
+/// A machine's row under Machines in the sidebar (#3626): its name and its dot, and under it,
+/// in grey, the most urgent thing it needs (#3764). The dot and the line say only the machine's
+/// own state: its sessions do not roll up into it (#3973). Its menu and swipes start, stop,
+/// delete or remove it, as the web page's rows do (#3974).
 struct MachineRow: View {
     @Environment(AppModel.self) private var model
     let host: MachineRef
+    let open: () -> Void
+    @State private var deleting = false
+    @State private var removing = false
+    /// Stop, asked first while agents work there, with who they are.
+    @State private var stoppingNames: [String] = []
 
     var body: some View {
         let name = model.hosts.label(host)
         let row = model.hosts.controlRows[host]
         let need = model.need(of: host)
         let words = need.map { MachineNeedWords.line($0, name: name, row: row) }
-        VStack(alignment: .leading, spacing: 2) {
-            Text(name).foregroundStyle(.primary).lineLimit(1)
-            if let words {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
+        let actions = MachineRowActions.of(row, isThisMac: host == .mac)
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name).foregroundStyle(.primary).lineLimit(1)
+                if let words {
                     Text(words)
                         .appText(.fine)
                         .foregroundStyle(.secondary)
                         .lineLimit(3)
                         .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 0)
-                    if need == .stopped, let row, let workspace = row.workspace,
-                       OfflineWords.offersStart(state: row.state, workspace: workspace) {
-                        Button("Start") { Task { await model.startHost(host) } }
-                            .controlSize(.small)
-                            .disabled(model.hostsBeingStarted.contains(host))
-                            .help("Starts \(workspace.workspaceName) at \(workspace.providerName).")
-                    }
                 }
             }
+            Spacer(minLength: 4)
+            MachineDotView(dot: MachineDot.of(row, online: !model.hostUnreachable(host),
+                                              starting: model.hostsBeingStarted.contains(host)))
         }
         .help(words.map { "\(name): \($0)" } ?? (model.diskWarns(host)
             ? "\(name): a disk is low. Its CPU, memory, disks, worktrees, runtimes and resources"
             : "\(name): its CPU, memory, disks, worktrees, runtimes and resources"))
         .accessibilityElement(children: .contain)
         .accessibilityValue(words ?? "")
+        .swipeActions(edge: .leading) {
+            if actions.start {
+                SwipeAction("Start", systemImage: "play") { await model.startHost(host) }.tint(Paper.accent)
+            } else if actions.stop {
+                SwipeAction("Stop", systemImage: "stop") { await stop() }.tint(Paper.accent)
+            }
+        }
+        // A full swipe never deletes: Delete and Remove ask first.
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            if actions.delete {
+                Button("Delete", systemImage: "trash", role: .destructive) { deleting = true }
+            } else if actions.remove {
+                Button("Remove", systemImage: "minus.circle") { removing = true }.tint(.gray)
+            }
+        }
+        .contextMenu {
+            Button("Open", action: open)
+            if actions.start {
+                Divider()
+                Button("Start") { Task { await model.startHost(host) } }
+            } else if actions.stop {
+                Divider()
+                Button("Stop") { Task { await stop() } }
+            }
+            if actions.delete || actions.remove {
+                Divider()
+                if actions.delete {
+                    Button("Delete \(name)…", role: .destructive) { deleting = true }
+                } else {
+                    Button("Remove \(name)…") { removing = true }
+                }
+            }
+        }
+        .confirmationDialog("Delete \(name)?", isPresented: $deleting, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) { Task { await model.deleteMachine(host) } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            if let row {
+                Text(MachineRowActions.deleteMessage(row, sessions: model.work.agents.filter { $0.host == host }.count))
+            }
+        }
+        .confirmationDialog("Remove \(name)?", isPresented: $removing, titleVisibility: .visible) {
+            Button("Remove", role: .destructive) { Task { await model.removeMachine(host) } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("It stops connecting, and every window and device stops seeing it. Its agents are left running where they are.")
+        }
+        .confirmationDialog("Stop \(name)?", isPresented: Binding(get: { !stoppingNames.isEmpty },
+                                                                  set: { if !$0 { stoppingNames = [] } }),
+                            titleVisibility: .visible) {
+            Button("Stop") { Task { _ = await model.stopHost(host, confirmed: true) } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("\(ControlHostsPage.list(stoppingNames)) \(stoppingNames.count == 1 ? "is" : "are") working there. Stopping the machine stops them.")
+        }
+    }
+
+    /// Stop asks only when sessions run there: the control plane says who.
+    private func stop() async {
+        if let names = await model.stopHost(host) { stoppingNames = names }
+    }
+}
+
+/// A machine's dot (#3973): green online, amber and turning while it changes, grey and hollow
+/// stopped, red offline, amber when it needs an update.
+private struct MachineDotView: View {
+    let dot: MachineDot
+
+    var body: some View {
+        Group {
+            switch dot {
+            case .online: Circle().tinted(.vouched)
+            case .busy: SyncedSpinner(diameter: 8, color: StateTint.attention.color ?? .secondary)
+            case .stopped: Circle().strokeBorder(.secondary, lineWidth: 1.2)
+            case .offline: Circle().tinted(.failure)
+            case .attention: Circle().tinted(.attention)
+            }
+        }
+        .frame(width: 8, height: 8)
+        .accessibilityHidden(true)
     }
 }
 

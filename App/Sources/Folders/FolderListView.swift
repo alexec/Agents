@@ -232,12 +232,15 @@ struct FolderListView: View {
             if !machines.isEmpty {
                 Section(isExpanded: $showsMachines) {
                     ForEach(machines, id: \.self) { host in
-                        MachineRow(host: host)
-                            .activityIcon(host == .mac ? "laptopcomputer" : "desktopcomputer", warns: model.diskWarns(host))
+                        // A cloud for a machine a provider made, a rack for a registered one (#3973).
+                        MachineRow(host: host) { picked = [.machine(host)] }
+                            .activityIcon(host == .mac ? "laptopcomputer"
+                                : model.hosts.controlRows[host]?.workspace != nil ? "cloud" : "server.rack",
+                                          warns: model.diskWarns(host))
                             .appText(.supporting).sidebarInk(.machine(host)).tag(SidebarItem.machine(host))
                     }
                 } header: {
-                    Text("Machines").appText(.supporting)
+                    MachinesHeader()
                 }
             }
 
@@ -1006,6 +1009,41 @@ private extension FolderMenu {
 
 /// The sidebar's foot: the connection, then why the Mac is awake. Nothing at all when
 /// both have nothing to say.
+/// The Machines group's header (#3973): `+` on hover makes a machine with no questions, and
+/// its menu has New Machine, Register a Machine… and Machine Providers….
+private struct MachinesHeader: View {
+    @Environment(AppModel.self) private var model
+    @Environment(WindowRequests.self) private var requests
+    @Environment(\.openSettings) private var openSettings
+    @State private var hovering = false
+
+    var body: some View {
+        HStack {
+            Text("Machines").appText(.supporting)
+            Spacer()
+            if hovering, ControlConfig.endpoint != nil {
+                Button { Task { await model.newMachine() } } label: { Image(systemName: "plus") }
+                    .buttonStyle(.borderless)
+                    .help("New Machine: the default provider makes one, with its defaults")
+                    .accessibilityLabel("New Machine")
+            }
+        }
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 }
+        .contextMenu {
+            if ControlConfig.endpoint != nil {
+                Button("New Machine") { Task { await model.newMachine() } }
+                Divider()
+                Button("Register a Machine…") { requests.folderSheet = .addMachine }
+                Button("Machine Providers…") {
+                    model.settingsPaneAsked = .providers
+                    openSettings()
+                }
+            }
+        }
+    }
+}
+
 private struct SidebarFoot: View {
     @Environment(AppModel.self) private var model
     /// Machines' group open: its rows say why a server is quiet, so the foot does not (#3764).
