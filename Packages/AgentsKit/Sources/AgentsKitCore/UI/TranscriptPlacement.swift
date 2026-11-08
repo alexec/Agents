@@ -30,6 +30,18 @@ public enum TranscriptPlacement {
         public var height: Double
     }
 
+    /// Whether the pane's top margin, which hides the slack, follows it now (#4087).
+    /// Following the end, always. Reading, only when the screen's top is within two panes
+    /// of the margin: a scroll view keeps its offset from the content's top, which the
+    /// margin moves, so every move of it under a reader moved the screen for a frame or
+    /// more. Further back, a row measured above the screen or a page that lands leaves the
+    /// margin where it is; the reader reaches it, and the margin moves, only near the top.
+    public static func marginFollows(slack: Double, margin: Double, top: Double, pane: Double,
+                                     following: Bool) -> Bool {
+        guard abs(slack - margin) > 0.5 else { return false }
+        return following || top - margin < pane * 2
+    }
+
     /// Places rows of `heights`. With an `anchor` (a row's index, and where it starts), that
     /// row stays where it is, and the slack is what is left above the first row; when that
     /// would be less than nothing, everything moves down to leave `reserve`. With no
