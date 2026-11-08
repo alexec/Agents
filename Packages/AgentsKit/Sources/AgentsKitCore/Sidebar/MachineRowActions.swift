@@ -45,10 +45,22 @@ public struct MachineRowActions: Equatable, Sendable {
                                  delete: true)
     }
 
-    /// Delete's question: it always asks, and says how many sessions stop.
-    public static func deleteMessage(_ row: DaemonAPI.ControlMachine, sessions: Int) -> String {
+    /// Delete's question: it always asks, says how many sessions stop, and names the worktrees
+    /// on it with work not pushed (#3979), as the machine said them; nil while it is asked.
+    public static func deleteMessage(_ row: DaemonAPI.ControlMachine, sessions: Int,
+                                     preview: DaemonAPI.StartedMachinePreview? = nil, asking: Bool = false) -> String {
         let at = row.workspace.map { "\($0.providerName) deletes" } ?? "Its provider deletes"
         let stop = sessions == 0 ? "" : sessions == 1 ? " 1 session on it stops." : " \(sessions) sessions on it stop."
-        return "\(at) this machine and its disk.\(stop)"
+        var words = "\(at) this machine and its disk.\(stop)"
+        if asking {
+            words += " Asking \(row.name) what work on it is not pushed…"
+        } else if let unknown = preview?.unknown {
+            words += " " + unknown
+        } else if let work = preview?.unpushed, !work.isEmpty {
+            let count = work.count == 1 ? "1 worktree has" : "\(work.count) worktrees have"
+            words += " \(count) work not pushed, which is lost:\n"
+                + work.map { "\($0.folder.lastPathComponent) · \(PeopleWords.unpushedWords($0))" }.joined(separator: "\n")
+        }
+        return words
     }
 }

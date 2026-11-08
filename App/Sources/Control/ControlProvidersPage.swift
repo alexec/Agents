@@ -120,6 +120,10 @@ struct ControlProvidersPage: View {
                     if control.isAdmin, provider.preset != nil {
                         Button("Edit…") { editing = provider }
                     }
+                    // The provider New Machine uses (#3979).
+                    if provider.capabilities.contains("create"), provider.usable, provider.default != true {
+                        Button("Make Default") { Task { await control.makeDefault(provider.id) } }
+                    }
                     Button("List Again") { Task { await control.listMachinesAgain(provider.id) } }
                     // An agent writes its map or commands again, from the ones it has (#858 US4).
                     if control.isAdmin, provider.kind == "commands" ? provider.preset == nil : provider.mapped {
@@ -192,7 +196,12 @@ struct ControlProvidersPage: View {
         }
     }
 
+    /// Its kind, after "default" on the one New Machine uses (#3979).
     private func kindChip(_ provider: DaemonAPI.ProviderSummary) -> String {
+        provider.default == true ? "default · " + kindWords(provider) : kindWords(provider)
+    }
+
+    private func kindWords(_ provider: DaemonAPI.ProviderSummary) -> String {
         // An API preset needs only a token; a CLI one, its CLI signed in (#1119).
         if let preset = provider.preset {
             return "command provider · \(preset) · \(AddProviderSheet.Kind.byAPI(preset) ? "API" : "CLI")"

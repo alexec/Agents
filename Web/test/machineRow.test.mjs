@@ -42,6 +42,22 @@ test("Delete says who deletes it and how many sessions stop", () => {
   assert.match(m.removeQuestion(registered), /^Remove build-box\? /);
 });
 
+test("Delete names the worktrees with work not pushed (#3979)", () => {
+  const preview = { host: "h1", name: "machine-1", state: "online", unpushed: [
+    { folder: "file:///src/Agents/", worktree: "file:///src/Agents/wt", branch: "agents/fix-3928", ahead: 3 }] };
+  assert.equal(m.deleteQuestion(made("online"), 0, preview),
+    "Delete machine-1? DigitalOcean deletes this machine and its disk. 1 worktree has work not pushed, which is lost:\nAgents · agents/fix-3928 (3 commits not pushed)");
+  assert.equal(m.deleteQuestion(made("stopped"), 0, { ...preview, unpushed: [], unknown: "machine-1 is not online, so it could not be asked." }),
+    "Delete machine-1? DigitalOcean deletes this machine and its disk. machine-1 is not online, so it could not be asked.");
+});
+
+test("New Machine names the default once there are two providers (#3979)", () => {
+  const p = (id, extra = {}) => ({ id, name: id.toUpperCase(), capabilities: ["create"], ...extra });
+  assert.deepEqual(m.newMachineItems([p("do")]), [{ label: "New Machine" }]);
+  assert.deepEqual(m.newMachineItems([p("do"), p("docker", { default: true }), p("ro", { capabilities: [] })]),
+    [{ label: "New Machine (DOCKER)" }, { label: "New Machine on DO", provider: "do" }]);
+});
+
 test("a machine being made has a row until one of its name joins", () => {
   assert.deepEqual(m.makingRows(["", "machine-2", "machine-1"], [{ name: "machine-1" }]), ["", "machine-2"]);
 });

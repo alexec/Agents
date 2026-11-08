@@ -2731,6 +2731,11 @@
     {
       "name": "machines/checkAgain",
       "x-capability": "machines/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -2770,6 +2775,32 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "machines/deletePreview",
+      "x-capability": "machines/1",
+      "description": "Delete's question on a machine a provider made (#3979): the worktrees on it with work that is not pushed, asked of the machine at once. `unknown` says why it could not be asked.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/StartedMachinePreview"
         }
       }
     },
@@ -4449,6 +4480,32 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/ProviderList"
+        }
+      }
+    },
+    {
+      "name": "providers/makeDefault",
+      "x-capability": "providers/1",
+      "description": "Make Default (#3979): the provider New Machine uses for the caller, until they make a machine on another one.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ProviderRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
         }
       }
     },

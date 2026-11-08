@@ -273,7 +273,7 @@ var hostNamingMethods = map[string]bool{
 	"machines/update": true, "machines/checkAgain": true, "machines/remove": true,
 	"machines/lendSignIn": true, "machines/lendGit": true, "machines/lastHeard": true,
 	"machines/link": true, "machines/unlink": true, "machines/start": true, "machines/stop": true, "machines/keep": true,
-	"machines/deleteMachine": true, "machines/setMachineOptions": true,
+	"machines/deleteMachine": true, "machines/setMachineOptions": true, "machines/deletePreview": true,
 }
 
 // hostNamingParams are params that would do something with host for each of them.
@@ -306,7 +306,7 @@ func TestEveryClientMethodChecksTheOwner(t *testing.T) {
 		"machines/denyJoin": true, "control/rotate": true,
 		"providers/list": true, "providers/refresh": true, "providers/add": true, "providers/update": true,
 		"providers/remove": true, "providers/options": true, "providers/runtimes": true, "providers/draftStart": true,
-		"providers/draftAnswer": true, "providers/draftCancel": true, "providers/draftSigned": true, "providers/create": true, "machines/listKept": true,
+		"providers/draftAnswer": true, "providers/draftCancel": true, "providers/draftSigned": true, "providers/create": true, "providers/makeDefault": true, "machines/listKept": true,
 		"machines/retryKept": true, "machines/dropKept": true, "reports/usage": true, "reports/export": true, "reports/value": true, "reports/nodes": true,
 		"user/settings": true, "user/setSettings": true, "user/setAgentConfigFile": true, "user/setSecret": true, "user/removeSecret": true,
 		"user/secretNames": true, "groups/list": true, "groups/set": true, "groups/remove": true,
@@ -680,6 +680,26 @@ func TestRemoveFirstSaysWhatWorkIsNotPushed(t *testing.T) {
 	}
 	if e := callError(t, alexWindow, "", "people/removePreview", wire.PersonRequest{User: sam.id}); !strings.Contains(e, "no such person") {
 		t.Fatalf("a removed person: %s", e)
+	}
+}
+
+// Delete on a machine's row (#3979) first asks the machine which worktrees have work not
+// pushed; only its owner, or an admin, may ask.
+func TestDeleteFirstSaysWhichWorktreesAreNotPushed(t *testing.T) {
+	t.Parallel()
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	_, alexWindow := p.client("Alex's Mac")
+	sam := p.invite(alexWindow, "Sam", wire.UserRoleMember)
+	bea := p.invite(alexWindow, "Bea", wire.UserRoleMember)
+	box := p.machine(sam, "SAM-WS").member.Host
+
+	var preview wire.StartedMachinePreview
+	json.Unmarshal(call(t, sam.window, "", "machines/deletePreview", wire.MachineRequest{Host: wire.MachineRef(box)}), &preview)
+	if string(preview.Host) != box || preview.Unknown != nil || len(preview.Unpushed) != 3 || deref(preview.Unpushed[0].Ahead) != 2 {
+		t.Fatalf("%+v", preview)
+	}
+	if e := callError(t, bea.window, "", "machines/deletePreview", wire.MachineRequest{Host: wire.MachineRef(box)}); e == "" {
+		t.Fatal("another person's machine was asked")
 	}
 }
 

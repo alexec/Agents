@@ -8,6 +8,15 @@ import type { Store } from "../model/store";
 import { deleteQuestion, machineActions, machineDot, machineSwipes, removeQuestion, swipeDistance } from "../model/machineRow";
 import { placedSessions } from "../model/overview";
 import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
+import { chooseSettingsMachine } from "./settings/SettingsMachine";
+import { go } from "../route";
+
+/** Settings ▸ Machines' section for this machine (#3979): Backups… and Processes… open it there. */
+function openSettings(host: string, section: string) {
+  chooseSettingsMachine(host);
+  go({ nav: "settings" });
+  setTimeout(() => document.getElementById(section)?.scrollIntoView({ block: "start" }), 0);
+}
 
 const swipeWords = { start: "Start", stop: "Stop", delete: "Delete", remove: "Remove" } as const;
 
@@ -38,13 +47,22 @@ export function MachineRow({ store, host, on, open, mark, children }: {
   const run = {
     start: () => void store.startHost(host),
     stop: () => void stop(),
-    delete: () => { if (window.confirm(deleteQuestion(row, sessions()))) void store.deleteHost(host); },
+    // Delete asks the machine first which worktrees have work not pushed (#3979).
+    delete: () => void store.deletePreview(host).then((preview) => {
+      if (window.confirm(deleteQuestion(row, sessions(), preview))) void store.deleteHost(host);
+    }),
     remove: () => { if (window.confirm(removeQuestion(row))) void store.removeHost(host); },
   };
   const items = (): MenuItem[] => [
     { label: "Open", run: open },
     ...(actions.start ? [{ label: "Start", run: run.start }] : []),
     ...(actions.stop ? [{ label: "Stop", run: run.stop }] : []),
+    // As Settings ▸ Machines has them (#3979).
+    ...(mac ? [] : [
+      { label: "Check Again", run: () => void store.checkAgain(host) },
+      { label: "Backups…", disabled: !store.hostIsOnline(host), run: () => openSettings(host, "settings-server-backups") },
+      { label: "Processes…", disabled: !store.hostIsOnline(host), run: () => openSettings(host, "settings-processes") },
+    ]),
     ...(actions.delete ? [{ label: `Delete ${row.name}…`, run: run.delete }] : []),
     ...(actions.remove ? [{ label: `Remove ${row.name}…`, run: run.remove }] : []),
   ];

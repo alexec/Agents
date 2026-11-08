@@ -79,12 +79,17 @@ function ProviderCard({ store, provider, say, edit, link, install }: {
     <ul class="setup-card list provider-card" aria-label={provider.name}>
       <li class="connection">
         <div class="grow">
-          <p class="strong">{provider.name} <span class="chip">{kindChip(provider)}</span></p>
+          <p class="strong">{provider.name} <span class="chip">{kindChip(provider)}</span>
+            {provider.default && <span class="chip default-chip" title="New Machine makes your machines here">Default</span>}</p>
           {line && <p class="small quiet">{line}</p>}
         </div>
         {/* The same New Machine as Add a Machine…, at this provider (#2131). */}
         {makers([provider]).length > 0 && (
           <button type="button" onClick={() => setMaking(true)}>New Machine…</button>
+        )}
+        {/* The provider New Machine uses (#3979). */}
+        {makers([provider]).length > 0 && !provider.default && (
+          <button type="button" class="link small" onClick={() => void store.providers.makeDefault(provider.id).then(say)}>Make Default</button>
         )}
         <button type="button" class="link small" onClick={() => void store.providers.refresh(provider.id)}>List Again</button>
         {/* Who may start machines from it (#1761): an admin gives it to a group. */}

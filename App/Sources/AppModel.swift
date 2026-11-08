@@ -81,6 +81,11 @@ final class AppModel {
     /// A send refused because the agent's folder has gone (#119), with the ways on. Said
     /// in the window's alert instead of `problem`, and the words stay in the bar.
     var folderGone: FolderGoneAsk?
+    /// A New Machine the provider refused (#3979), said in the window's alert with Try Again.
+    var makeFailed: MachineMakeFailure?
+    /// The machine providers New Machine can use, as the control plane last listed them for
+    /// this person (#3979): the Machines header's New Machine on ▸.
+    private(set) var machineProviders: [DaemonAPI.ProviderSummary] = []
     /// A runtime of this Mac's that refused for want of a sign-in: the window answers
     /// with its sign-in sheet rather than an error nobody can act on.
     var signInRuntimeID: String?
@@ -3664,6 +3669,11 @@ final class AppModel {
                         case DaemonAPI.Notification.controlHostChanged:
                             self?.hostCameOnline(note.params)
                             await self?.syncControlHosts(control)
+                        case DaemonAPI.Notification.controlProvidersChanged:
+                            // The Machines header's New Machine on ▸ and its default (#3979).
+                            if let listed = try? note.params?["providers"]?.decode([DaemonAPI.ProviderSummary].self) {
+                                self?.machineProviders = listed.filter { $0.capabilities.contains("create") && $0.usable }
+                            }
                         case DaemonAPI.Notification.controlThisMacHostChanged:
                             // The join file changed and the host list may not have (#303).
                             await self?.refreshMacHostJoin(control)
@@ -3781,20 +3791,45 @@ final class AppModel {
     }
 
     /// New Machine (#3973): the default provider makes `machine-N` with its defaults, with no
-    /// questions (#3972). A make that fails says the provider's reason.
-    func newMachine() async {
+    /// questions (#3972); New Machine on ▸ names the provider, which is then the default
+    /// (#3979). Either takes the options used last on that provider. A make that fails says
+    /// the provider's reason, with Try Again.
+    func newMachine(on provider: ProviderID? = nil) async {
         guard let controlRequests else { return }
         do {
-            let made = try await controlRequests.call(DaemonAPI.Method.providersCreate, DaemonAPI.Empty(),
+            let made = try await controlRequests.call(DaemonAPI.Method.providersCreate, DaemonAPI.ProviderRequest(id: provider),
                                                       returning: DaemonAPI.ProviderCreated.self)
             if made.workspace.state == "failed" {
-                problem = made.workspace.reason ?? "\(made.workspace.name) could not be made."
+                makeFailed = MachineMakeFailure(reason: made.workspace.reason ?? "\(made.workspace.name) could not be made.",
+                                                provider: provider)
             }
         } catch let error as JSONRPCError {
-            problem = HostProblem.controlRefusal(error)
+            makeFailed = MachineMakeFailure(reason: HostProblem.controlRefusal(error), provider: provider)
         } catch {
             problem = "The control plane can’t be reached, so no machine can be made."
         }
+        await loadMachineProviders()
+    }
+
+    /// The providers New Machine can use (#3979), for the Machines header's menu.
+    func loadMachineProviders() async {
+        guard let controlRequests,
+              let answer = try? await controlRequests.call(DaemonAPI.Method.providersList, DaemonAPI.Empty()),
+              let listed = try? answer["providers"]?.decode([DaemonAPI.ProviderSummary].self)
+        else { return }
+        machineProviders = listed.filter { $0.capabilities.contains("create") && $0.usable }
+    }
+
+    /// Delete's question on a machine's row (#3979): the worktrees on it with work not
+    /// pushed. Nil when the control plane can't say (an older one).
+    func deletePreview(_ host: MachineRef) async -> DaemonAPI.StartedMachinePreview? {
+        try? await controlRequests?.call(DaemonAPI.Method.hostsDeletePreview, DaemonAPI.MachineRequest(host: host),
+                                         returning: DaemonAPI.StartedMachinePreview.self)
+    }
+
+    /// Check Again on a machine's row (#3979), as Settings ▸ Machines has it.
+    func checkAgain(_ host: MachineRef) async {
+        await machineCall(DaemonAPI.Method.hostsCheckAgain, host)
     }
 
     /// Approve or Deny on a machine's card (#994): a refusal is the window's alert.

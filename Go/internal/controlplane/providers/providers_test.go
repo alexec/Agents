@@ -675,6 +675,67 @@ func TestAMakeThatFailsStaysAsAFailedRow(t *testing.T) {
 	}
 }
 
+// The last-used provider and options, and Make Default (#3979).
+
+func defaultOf(t *testing.T, h *harness) string {
+	t.Helper()
+	chosen := ""
+	for _, p := range h.must(MethodProvidersList, nil).(map[string]any)["providers"].([]ProviderSummary) {
+		if deref(p.Default) {
+			if chosen != "" {
+				t.Fatalf("two defaults: %s and %s", chosen, p.ID)
+			}
+			chosen = string(p.ID)
+		}
+	}
+	return chosen
+}
+
+func TestNewMachineTakesTheOptionsUsedLastOnItsProvider(t *testing.T) {
+	h := newHarness(t)
+	id := h.add()
+	provider := wire.ProviderID(id)
+	name := "big-1"
+	if _, err := h.call(MethodProvidersCreate, ProviderCreate{ID: &provider, Name: &name,
+		Options: wire.JSONValue(rawOf(map[string]any{"size": "large"}))}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.createNameless(); err != nil {
+		t.Fatal(err)
+	}
+	if got := h.provider.madeWith[1]; !reflect.DeepEqual(got, map[string]any{"size": "large"}) {
+		t.Errorf("the options used last: %v", got)
+	}
+}
+
+func TestMakeDefaultAndTheLastMakeChooseNewMachinesProvider(t *testing.T) {
+	h := newHarness(t)
+	first := h.add()
+	time.Sleep(2 * time.Millisecond)
+	second := string(h.must(MethodProvidersAdd, map[string]any{"name": "Alpha", "kind": "commands",
+		"commands": map[string]any{"preset": "doctl", "tag": "alpha"}, "secrets": map[string]string{"DIGITALOCEAN_TOKEN": "hunter2"}}).(ProviderSummary).ID)
+	h.providers.Refresh("")
+	if got := defaultOf(t, h); got != first {
+		t.Fatalf("default %s, want the first added %s", got, first)
+	}
+	h.must(MethodProvidersMakeDefault, map[string]any{"id": second})
+	if got := defaultOf(t, h); got != second {
+		t.Fatalf("default %s after Make Default, want %s", got, second)
+	}
+	// A make on another provider makes it the one New Machine uses.
+	provider := wire.ProviderID(first)
+	name := "on-first"
+	if _, err := h.call(MethodProvidersCreate, ProviderCreate{ID: &provider, Name: &name}); err != nil {
+		t.Fatal(err)
+	}
+	if got := defaultOf(t, h); got != first {
+		t.Fatalf("default %s after a make, want %s", got, first)
+	}
+	if _, err := h.call(MethodProvidersMakeDefault, map[string]any{"id": "no-such"}); err == nil {
+		t.Error("no such provider was made the default")
+	}
+}
+
 // A machine from a repository (#1809).
 
 func (h *harness) createFrom(name, repository string, clones []string) (ProviderCreated, error) {

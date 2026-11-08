@@ -51,4 +51,20 @@ struct MachineRowActionsTests {
         #expect(MachineRowActions.deleteMessage(row("online"), sessions: 2)
                 == "DigitalOcean deletes this machine and its disk. 2 sessions on it stop.")
     }
+
+    @Test func deleteNamesTheWorktreesWithWorkNotPushed() {
+        let work = DaemonAPI.UnpushedWork(folder: URL(fileURLWithPath: "/src/Agents"), worktree: URL(fileURLWithPath: "/src/Agents/wt"),
+                                          branch: "agents/fix-3928", ahead: 3)
+        let preview = DaemonAPI.StartedMachinePreview(host: MachineRef(rawValue: "devbox"), name: "devbox", state: "online",
+                                                      unpushed: [work])
+        #expect(MachineRowActions.deleteMessage(row("online"), sessions: 0, preview: preview)
+                == "DigitalOcean deletes this machine and its disk. 1 worktree has work not pushed, which is lost:\n"
+                + "Agents · agents/fix-3928 (3 commits not pushed)")
+        #expect(MachineRowActions.deleteMessage(row("online"), sessions: 0, asking: true)
+                == "DigitalOcean deletes this machine and its disk. Asking devbox what work on it is not pushed…")
+        let offline = DaemonAPI.StartedMachinePreview(host: MachineRef(rawValue: "devbox"), name: "devbox", state: "stopped",
+                                                      unknown: "devbox is not online, so it could not be asked.")
+        #expect(MachineRowActions.deleteMessage(row("stopped"), sessions: 0, preview: offline)
+                == "DigitalOcean deletes this machine and its disk. devbox is not online, so it could not be asked.")
+    }
 }

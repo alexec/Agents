@@ -8394,6 +8394,12 @@ export interface ProviderSummary {
    */
   mayUse?: boolean;
   /**
+   * New Machine makes the caller's machines on it (#3979): the one they made a machine on last or
+   * chose with Make Default, or else the first one added. True on one provider at most; absent from
+   * an older control plane.
+   */
+  default?: boolean;
+  /**
    * The machine that carries it: runs its server and keeps its secrets (#3398). Absent for one made
    * before, which must be added again.
    */
@@ -12375,7 +12381,9 @@ export interface Methods {
   "lock/reset": { params: Empty; result: Empty };
   "machine/usage": { params: Empty; result: MachineUsageState };
   "machines/approveJoin": { params: JoinRequestDecide; result: JoinApproved };
+  "machines/checkAgain": { params: MachineRequest; result: Empty };
   "machines/deleteMachine": { params: MachineRequest; result: Empty };
+  "machines/deletePreview": { params: MachineRequest; result: StartedMachinePreview };
   "machines/denyJoin": { params: JoinRequestDecide; result: Empty };
   "machines/dropKept": { params: KeptRequestID; result: Empty };
   "machines/install": { params: MachineInstall; result: JSONValue };
@@ -12467,6 +12475,7 @@ export interface Methods {
   "providers/add": { params: ProviderAdd; result: ProviderSummary };
   "providers/create": { params: ProviderCreate; result: ProviderCreated };
   "providers/list": { params: Empty; result: ProviderList };
+  "providers/makeDefault": { params: ProviderRequest; result: Empty };
   "providers/options": { params: ProviderRequest; result: ProviderOptions };
   "providers/refresh": { params: ProviderRequest; result: Empty };
   "providers/remove": { params: ProviderRequest; result: Empty };
@@ -12770,7 +12779,9 @@ export const MethodTarget = {
   "lock/reset": "control",
   "machine/usage": "host",
   "machines/approveJoin": "control",
+  "machines/checkAgain": "control",
   "machines/deleteMachine": "control",
+  "machines/deletePreview": "control",
   "machines/denyJoin": "control",
   "machines/dropKept": "control",
   "machines/install": "control",
@@ -12862,6 +12873,7 @@ export const MethodTarget = {
   "providers/add": "control",
   "providers/create": "control",
   "providers/list": "control",
+  "providers/makeDefault": "control",
   "providers/options": "control",
   "providers/refresh": "control",
   "providers/remove": "control",
@@ -13763,7 +13775,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ProviderSSH: { required: ["provider", "op", "destination"], optional: ["hostCode", "codespace", "knownHosts", "name", "renew", "trust"] },
   ProviderSSHResult: { required: [], optional: ["knownHosts", "needsTrust"] },
   ProviderSecretsKeep: { required: ["provider", "secrets"], optional: [] },
-  ProviderSummary: { required: ["id", "name", "kind", "secrets", "capabilities", "contract", "mapped", "workspaces", "current"], optional: ["preset", "listedAt", "problem", "group", "mayUse", "machine", "machineName", "machineOffline", "sshToolMissing"] },
+  ProviderSummary: { required: ["id", "name", "kind", "secrets", "capabilities", "contract", "mapped", "workspaces", "current"], optional: ["preset", "listedAt", "problem", "group", "mayUse", "default", "machine", "machineName", "machineOffline", "sshToolMissing"] },
   PushToken: { required: ["environment"], optional: ["token"] },
   QueuedPrompt: { required: ["id", "text", "attachments", "queuedAt", "from"], optional: ["preface", "sender"] },
   QueuedStart: { required: ["labels"], optional: ["runtimeID", "permissionMode", "model", "worktree"] },

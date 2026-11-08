@@ -87,6 +87,17 @@ export class Providers {
     }
   }
 
+  /** Make Default (#3979): New Machine uses this provider, until a machine is made on another. The new list comes as control/providersChanged. */
+  async makeDefault(id: string): Promise<string | null> {
+    try {
+      await this.caller.call("providers/makeDefault", { id: id as ProviderID });
+      this.list.value = (this.list.value ?? []).map((p) => ({ ...p, default: p.id === id }));
+      return null;
+    } catch (error) {
+      return describe(error);
+    }
+  }
+
   async remove(id: string): Promise<string | null> {
     try {
       await this.caller.call("providers/remove", { id: id as ProviderID });

@@ -757,7 +757,7 @@ struct CodeSheet: View {
 
 /// A server's backups (#1815), from its menu: the same section as Settings ▸ Machines ▸ This Mac ▸ Backups,
 /// sent to that host.
-private struct HostBackupsSheet: View {
+struct HostBackupsSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     let host: DaemonAPI.ControlMachine
