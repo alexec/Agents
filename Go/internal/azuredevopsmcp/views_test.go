@@ -110,6 +110,10 @@ func TestEachViewHasAToolThatFeedsItAndAPage(t *testing.T) {
 			!strings.Contains(html, "const bridge") || !strings.Contains(html, "const prPage") {
 			t.Errorf("%s is not a whole page", uri)
 		}
+		// Its diff names its forge, so the app's diff says Open on Azure DevOps (#4128).
+		if !strings.Contains(html, `site: "Azure DevOps"`) {
+			t.Errorf("%s asks the app's diff with no site: it says Open on GitHub", uri)
+		}
 		// A page names no other forge, and calls only this server's tools.
 		for _, other := range []string{"Forgejo", "Bitbucket", "failed_log", "retry_pipeline"} {
 			if strings.Contains(html, other) {
