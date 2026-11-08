@@ -4856,7 +4856,7 @@ type ForgeLogRequest struct {
 	Check *string `json:"check,omitzero"`
 }
 
-// people/setForgeLogins (#2951): the caller's own GitHub, GitLab, Linear, Jira (#3313) and Forgejo (#3836) logins, for Settings ▸ You, replacing what was kept; blank clears one.
+// people/setForgeLogins (#2951): the caller's own GitHub, GitLab, Linear, Jira (#3313), Forgejo (#3836), Bitbucket and Azure DevOps (#3853) logins, for Settings ▸ You, replacing what was kept; blank clears one.
 type ForgeLogins struct {
 	Github *string `json:"github,omitzero"`
 
@@ -4867,6 +4867,10 @@ type ForgeLogins struct {
 	Jira *string `json:"jira,omitzero"`
 
 	Forgejo *string `json:"forgejo,omitzero"`
+
+	Bitbucket *string `json:"bitbucket,omitzero"`
+
+	AzureDevOps *string `json:"azureDevOps,omitzero"`
 }
 
 // How forge/merge merges a pull request (#3130): a merge commit, one squashed commit, or its commits rebased onto the base.
@@ -12303,6 +12307,12 @@ type TeamPerson struct {
 
 	// Their Forgejo login (#3836): their user name on the connected Forgejo or Gitea.
 	ForgejoLogin *string `json:"forgejoLogin,omitzero"`
+
+	// Their Bitbucket login (#3853): their Bitbucket nickname.
+	BitbucketLogin *string `json:"bitbucketLogin,omitzero"`
+
+	// Their Azure DevOps login (#3853): their sign-in email or display name in the Azure DevOps organization.
+	AzureDevOpsLogin *string `json:"azureDevOpsLogin,omitzero"`
 
 	You *bool `json:"you,omitzero"`
 }

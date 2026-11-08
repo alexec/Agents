@@ -15,6 +15,9 @@ import (
 type Person struct {
 	ID   string
 	Name string
+	// DisplayName is the identity's display name, also when Name is its sign-in name: an Azure
+	// DevOps login is either (#3853).
+	DisplayName string
 	// Bot says it is not a person: a build service, a service or a group (#728).
 	Bot bool
 }
