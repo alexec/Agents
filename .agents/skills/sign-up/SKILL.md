@@ -88,10 +88,11 @@ the tab with `browser_close` when done.
   `rules` when it states them in words. On a change-password page, set `replace: true`; the
   old value stays as `<NAME>_PREVIOUS`. Older accounts (0.7) keep theirs in the Keychain item
   `agents-signup:<domain>`.
-- **Tokens and keys:** `~/.agents/secrets/<name>`, mode 600. A token shows once: save it with
-  a script that finds it in the page (by its prefix, such as `glpat-` or `dop_v1_`) and
-  writes the file without printing it. Test it with one API call that prints only a name or
-  a status code.
+- **Tokens, keys and app passwords a page shows once:** save it with `capture_secret` (#4028)
+  on the element that shows it, named `<PROVIDER>_TOKEN` (or `_PASSWORD`), with its prefix as
+  `pattern` (`glpat-[A-Za-z0-9_-]{20,}`, `dop_v1_[a-f0-9]{64}`). It is saved in Settings ▸
+  Secrets unseen. Never take a snapshot of the page before it. Test it with one API call that
+  prints only a name or a status code.
 - **Two-factor (#3908):** choose an authenticator app (TOTP) wherever the site offers it;
   SMS or a voice call only when there is no TOTP, because each code then waits for Alex
   (#3906, #3914); never a passkey on Alex's devices, because then every
@@ -134,7 +135,7 @@ What the 0.7 sign-ups found (2026-10-19). Pages change; read the page before you
 - Read the emailed code from `~/.agents/mail`. The welcome form (company, group, folder, then dropdowns
   whose choices are `[role=option]`) makes the first group and folder.
 - Token: Access tokens, Generate token, Legacy token (by scope) or Fine-grained (by
-  folder). Tick only the scopes needed, set an expiry, save the `glpat-` token by script.
+  folder). Tick only the scopes needed, set an expiry, save the `glpat-` token with `capture_secret`.
 - An OAuth application is made under the user's Applications settings once its redirect
   URI is known.
 
@@ -150,7 +151,7 @@ What the 0.7 sign-ups found (2026-10-19). Pages change; read the page before you
   droplets.
 - Token: API, Generate, Custom Scopes. Ticking "droplet" also ticks `droplet:admin`: expand
   the row and untick it. Generate asks for required read scopes (image, regions, sizes,
-  actions, snapshot, vpc): add them. Save the `dop_v1_` token by script.
+  actions, snapshot, vpc): add them. Save the `dop_v1_` token with `capture_secret`.
 - Afterwards, check Settings, Notifications for newsletter switches.
 
 ### AWS (EC2 only, $20/month)
