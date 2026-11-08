@@ -17,7 +17,7 @@ import type {
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, DailySummarySettings, SummaryPage, SummaryPageText, DesktopControlSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
   PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, BudgetRequest, RemoveRequest, ClientPermissionSettings, PRCostComment,
-  Connection, LineageNode, LineageSessionIssue, MoveToMachineAnswer, ProblemReport, ProblemReportRequest, Request as PersonRequest, RequestUpdate, ProviderID, StartedMachinePreview } from "../protocol/generated";
+  Connection, LineageNode, LineageSessionIssue, MoveToMachineAnswer, ProblemReport, ProblemReportRequest, Request as PersonRequest, RequestUpdate, ProviderID, StartedMachinePreview, FoldersFindRequest, FoundFolder } from "../protocol/generated";
 import { endedConnections, endedLine, hasEnded } from "./connectorSetup";
 import { parseQuery } from "./labels";
 import { Failure } from "../protocol/generated";
@@ -2604,6 +2604,31 @@ export class Store extends Work {
     const summary = await this.act("folders/add", params, host);
     if (summary) this.upsertFolder(summary, host);
     return summary;
+  }
+
+  /** Where Choose Folders… looks on a machine (#4122), as the window's: the control plane's auto-detect paths, none with it off. */
+  async folderPaths(): Promise<string[]> {
+    const status = await this.link.call("control/status", {}).catch(() => null);
+    const detection = status?.folderDetection;
+    return detection?.enabled ? detection.paths : [];
+  }
+
+  /** The git repositories under `paths` on `host`, or the `folders` typed, as they stand there (#4122). It throws when the host can't be asked. */
+  findFolders(host: string, request: FoldersFindRequest): Promise<FoundFolder[]> {
+    return this.link.call("folders/find", request, host);
+  }
+
+  /** Choose Folders…' Add (#4122): each folder added on `host`; answers why each that failed was not, by folder. */
+  async addFolders(host: string, folders: readonly string[]): Promise<Record<string, string>> {
+    const failed: Record<string, string> = {};
+    for (const folder of folders) {
+      try {
+        this.upsertFolder(await this.link.call("folders/add", { folder: folder as never }, host), host);
+      } catch (error) {
+        failed[folder] = describe(error);
+      }
+    }
+    return failed;
   }
 
   /**

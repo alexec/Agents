@@ -393,6 +393,8 @@ public extension DaemonAPI {
                 // as the window's folders column has them.
                 Row(Method.filesBrowse, params: FilesBrowseRequest.self, result: DirectoryListing.self, kind: .hostRequest),
                 Row(Method.foldersAdd, params: AddFolderRequest.self, result: FolderSummary.self, kind: .hostRequest),
+                // Choose Folders… on a machine's row (#4122): the git repositories under its auto-detect paths.
+                Row(Method.foldersFind, params: FoldersFindRequest.self, result: [FoundFolder].self, kind: .hostRequest),
                 Row(Method.foldersClone, params: CloneRequest.self, result: FolderSummary.self, kind: .hostRequest),
                 Row(Method.foldersClones, params: Empty.self, result: [CloneSummary].self, kind: .hostRequest),
                 // Archive… on a folder's menu (#668), as the window's folder menu has it.
@@ -466,6 +468,8 @@ public extension DaemonAPI {
                 Row(Method.providersMakeDefault, params: ProviderRequest.self, result: Empty.self, kind: .controlRequest),
                 // Add as Machine… on a workspace (#3365): installed over the control plane's ssh.
                 Row(Method.hostsInstall, params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                // Update… on a machine's row (#4122): updated over the control plane's ssh, as installed.
+                Row(Method.hostsUpdate, params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
                 Row(Method.hostsSetMachineOptions, params: MachineOptions.self, result: ControlMachine.self,
                     kind: .controlRequest),
                 // Start a Machine from a Repository (#1809): the provider's form, then the machine.
