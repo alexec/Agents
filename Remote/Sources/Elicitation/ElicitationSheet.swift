@@ -45,10 +45,11 @@ struct ElicitationSheet: View {
             }
 
             if let handOff = request.handOff {
-                // A step on the page in the machine's browser (#3529), done in the Browser pane
-                // (#3800); a host too old to have one says where to do it.
+                // A step on the page in the machine's browser (#3529): Open the page opens the
+                // Agent Browser pane (#3800, #4038), as on the Mac and the web; a host too old
+                // to have one says so.
                 HandOffCard(handOff: handOff, open: model.agent(request.agentID, has: Capability.browser1) ? openAgentBrowser : nil,
-                            elsewhere: "Do it on your Mac or the web page, in the Agent Browser.",
+                            elsewhere: "This machine’s Agents is too old to show its browser here. Update it, then open the page.",
                             host: model.answerRecipient(request.agentID), sending: chosen != nil) { done, note in
                     send(done ? "Done" : "Can't do it", action: .accept, content: ElicitationRequest.handOffAnswer(done: done, note: note))
                 }
