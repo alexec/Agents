@@ -307,7 +307,7 @@ func (i identity) person() *Person {
 	if i.UniqueName != "" && !strings.Contains(i.UniqueName, `\`) {
 		name = i.UniqueName
 	}
-	return &Person{ID: i.ID, Name: name, Bot: isBot(i)}
+	return &Person{ID: i.ID, Name: name, DisplayName: i.DisplayName, Bot: isBot(i)}
 }
 
 // The fields a work item is read with.

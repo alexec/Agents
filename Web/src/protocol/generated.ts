@@ -4242,8 +4242,9 @@ export interface ForgeLogRequest {
 }
 
 /**
- * people/setForgeLogins (#2951): the caller's own GitHub, GitLab, Linear, Jira (#3313) and Forgejo
- * (#3836) logins, for Settings ▸ You, replacing what was kept; blank clears one.
+ * people/setForgeLogins (#2951): the caller's own GitHub, GitLab, Linear, Jira (#3313), Forgejo
+ * (#3836), Bitbucket and Azure DevOps (#3853) logins, for Settings ▸ You, replacing what was kept;
+ * blank clears one.
  */
 export interface ForgeLogins {
   github?: string;
@@ -4251,6 +4252,8 @@ export interface ForgeLogins {
   linear?: string;
   jira?: string;
   forgejo?: string;
+  bitbucket?: string;
+  azureDevOps?: string;
 }
 
 /**
@@ -10860,6 +10863,13 @@ export interface TeamPerson {
   jiraLogin?: string;
   /** Their Forgejo login (#3836): their user name on the connected Forgejo or Gitea. */
   forgejoLogin?: string;
+  /** Their Bitbucket login (#3853): their Bitbucket nickname. */
+  bitbucketLogin?: string;
+  /**
+   * Their Azure DevOps login (#3853): their sign-in email or display name in the Azure DevOps
+   * organization.
+   */
+  azureDevOpsLogin?: string;
   you?: boolean;
 }
 
@@ -13215,7 +13225,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeListRequest: { required: [], optional: ["folder", "state", "label", "assignee", "query", "cursor", "limit", "feature", "board"] },
   ForgeLog: { required: ["text"], optional: [] },
   ForgeLogRequest: { required: ["node"], optional: ["check"] },
-  ForgeLogins: { required: [], optional: ["github", "gitlab", "linear", "jira", "forgejo"] },
+  ForgeLogins: { required: [], optional: ["github", "gitlab", "linear", "jira", "forgejo", "bitbucket", "azureDevOps"] },
   ForgeMergeRequest: { required: ["node", "sha"], optional: ["method", "auto"] },
   ForgeNodeRequest: { required: ["node"], optional: [] },
   ForgePlan: { required: ["item", "children", "steps"], optional: ["lead"] },
@@ -13823,7 +13833,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SurfaceIdentification: { required: ["id", "name", "kind"], optional: [] },
   TeamBot: { required: ["user", "name", "spentTodayUSD", "capped", "machines", "online", "workflows", "live"], optional: ["group", "groupName", "caps"] },
   TeamBotRun: { required: ["host", "hostName", "agent"], optional: ["workflow", "since"] },
-  TeamPerson: { required: ["id", "name", "kind"], optional: ["githubLogin", "gitlabLogin", "linearLogin", "jiraLogin", "forgejoLogin", "you"] },
+  TeamPerson: { required: ["id", "name", "kind"], optional: ["githubLogin", "gitlabLogin", "linearLogin", "jiraLogin", "forgejoLogin", "bitbucketLogin", "azureDevOpsLogin", "you"] },
   TeamTrigger: { required: ["workflow", "trigger", "runsOn"], optional: ["event", "dueAt"] },
   TeamTriggerFired: { required: ["ran"], optional: [] },
   TeamTriggerSent: { required: ["taken"], optional: [] },

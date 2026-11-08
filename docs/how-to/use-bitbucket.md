@@ -120,13 +120,25 @@ pull requests on Bitbucket".
 
 Each list is in sections: **Needs you** (you are a reviewer who has not approved it, the issue
 is assigned to you, or your own pull request has failed checks, a conflict or changes
-requested), **Yours**, **Team** (the people with write access to the repository or more, or
-the workspace's members for a token without admin, and bots) and **Others**.
+requested), **Yours**, **Team** and **Others**. With a control plane, **Team** is its people
+and bots, by their Bitbucket login (see [Your Bitbucket login](#your-bitbucket-login)), and a
+row shows the name the control plane knows them by. With no control plane, **Team** is the
+people with write access to the repository or more, or the workspace's members for a token
+without admin, and bots.
 
 A folder's own repository is on the Work pages, so its sidebar has no row for these lists. A
 project whose Tasks or Code review slot names another Bitbucket repository gets a row for that
 repository. To keep a page, choose **Pin to Folder** in the view's menu. See
 [Pin a page to a folder](pin-a-page-to-a-folder.md).
+
+### Your Bitbucket login
+
+With a control plane, **Settings ▸ Account** on the Mac (**Settings ▸ Control plane** on the
+web page) keeps your **Bitbucket login**, beside your GitHub, GitLab, Linear, Jira and Forgejo
+logins. A Bitbucket login is your Bitbucket nickname (Personal settings ▸ Account settings).
+The control plane gives the logins of all its people to the servers that draw a Team section.
+A machine that has Bitbucket connected fills in your login from the connection, so you give it
+only when that machine is not connected.
 
 ### Work on a pull request
 
