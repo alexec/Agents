@@ -341,8 +341,8 @@ memory, with no outside account. The host is signed in to it by the `AZURE_DEVOP
 `AZURE_DEVOPS_TOKEN` of a scratch personal home, `<root>/personal`, and `launch.sh` also
 prints `AZURE_DEVOPS_URL` and `AZURE_DEVOPS_REMOTE`. Give a folder `{"azureBoardsProjects":
 ["acme/Web Shop"]}` in its `.agents/folder.json` for its work items. For its pull requests, give
-it that remote and connect Azure DevOps to the fake first: the host finds an Azure Repos remote
-only on a connection's organization, and it keeps a folder's first answer. The script's own top
+it that remote: the host finds an Azure Repos remote on the connected Azure DevOps or the
+secrets' `AZURE_DEVOPS_URL`, before or after the folder is added (#4072). The script's own top
 comment says what else it holds. `stop.sh` stops it.
 
 ```sh

@@ -79,9 +79,11 @@ func (d *Daemon) azureDevOpsToken(root string) string {
 }
 
 // azureDevOpsRepoAt is the Azure DevOps a folder's remote is on and its repository there; read
-// once, as GitLab's.
+// once for the roots it can be on, as GitLab's is for the connected GitLab: a connection made
+// after the folder was added is a new key, so it is read again (#4072).
 func (d *Daemon) azureDevOpsRepoAt(ctx context.Context, folder string) (root, repo string) {
-	key := "azuredevops " + folder
+	roots := d.azureDevOpsRoots()
+	key := "azuredevops " + folder + " " + strings.Join(roots, " ")
 	d.forgeMu.Lock()
 	at, ok := d.forgeRoots[key]
 	d.forgeMu.Unlock()
@@ -90,7 +92,7 @@ func (d *Daemon) azureDevOpsRepoAt(ctx context.Context, folder string) (root, re
 	}
 	gitCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	if f, found := d.azureDevOpsAt(gitCtx, folder); found {
+	if f, found := d.azureDevOpsAtRoots(gitCtx, folder, roots); found {
 		root, repo = f.root, f.repo
 	}
 	d.forgeMu.Lock()
