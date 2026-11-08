@@ -28,7 +28,7 @@ import (
 // What a folder's matching files are is taken when the globs change (a wait starts, a
 // workflow is read or turned on), so a file that appears afterwards is added and one that
 // goes is removed. A file written over under the same name fires nothing. A file still
-// being written is added once, after it has stayed as it is for dropboxSettle. Every file
+// being written is added once, after it has stayed as it is for fileSettle. Every file
 // added (or removed) in one look is one event.
 
 // fileEventPathsLimit is the most paths an event lists; count says how many there were.
@@ -38,8 +38,8 @@ const fileEventPathsLimit = 100
 // matching files that were there, the ones still being written, and the paths to look at.
 type watchedFiles struct {
 	globs    []string
-	seen     map[string]dropStamp
-	settling map[string]dropStamp
+	seen     map[string]watchStamp
+	settling map[string]watchStamp
 	pending  map[string]bool
 	timer    *time.Timer
 }
@@ -158,22 +158,22 @@ func (d *Daemon) fileGlobs(folder string) []string {
 }
 
 // fileStamp is a regular file's stamp, or false for anything else or nothing.
-func fileStamp(p string) (dropStamp, bool) {
+func fileStamp(p string) (watchStamp, bool) {
 	info, err := os.Lstat(p)
 	if err != nil || !info.Mode().IsRegular() {
-		return dropStamp{}, false
+		return watchStamp{}, false
 	}
 	var file uint64
 	if st, ok := info.Sys().(*syscall.Stat_t); ok {
 		file = uint64(st.Ino)
 	}
-	return dropStamp{size: info.Size(), modified: info.ModTime(), file: file}, true
+	return watchStamp{size: info.Size(), modified: info.ModTime(), file: file}, true
 }
 
 // walkWatched is every file under dir (absolute) that one of the globs matches, by its path
 // relative to the folder, leaving out what the folder's watch leaves out and .git.
-func walkWatched(folder, dir string, globs []string) map[string]dropStamp {
-	files := map[string]dropStamp{}
+func walkWatched(folder, dir string, globs []string) map[string]watchStamp {
+	files := map[string]watchStamp{}
 	filepath.WalkDir(dir, func(p string, e os.DirEntry, err error) error {
 		if err != nil {
 			return nil
@@ -255,7 +255,7 @@ func (d *Daemon) followFileGlobs(folder string) {
 		d.fileWatches = map[string]*watchedFiles{}
 	}
 	if st = d.fileWatches[folder]; st == nil {
-		st = &watchedFiles{settling: map[string]dropStamp{}, pending: map[string]bool{}}
+		st = &watchedFiles{settling: map[string]watchStamp{}, pending: map[string]bool{}}
 		d.fileWatches[folder] = st
 	}
 	st.globs, st.seen = globs, seen
@@ -343,7 +343,7 @@ func (d *Daemon) scheduleFileCheckLocked(folder string, st *watchedFiles) {
 	if st.timer != nil {
 		return
 	}
-	st.timer = time.AfterFunc(dropboxSettle, func() { d.checkWatchedFiles(folder) })
+	st.timer = time.AfterFunc(fileSettle, func() { d.checkWatchedFiles(folder) })
 }
 
 // checkWatchedFiles is one look at the paths heard since the last: a matching file that
@@ -364,7 +364,7 @@ func (d *Daemon) checkWatchedFiles(folder string) {
 	pending := st.pending
 	st.pending = map[string]bool{}
 	d.fileMu.Unlock()
-	stamps := map[string]dropStamp{}
+	stamps := map[string]watchStamp{}
 	for rel := range pending {
 		if stamp, ok := fileStamp(filepath.Join(folder, filepath.FromSlash(rel))); ok {
 			stamps[rel] = stamp

@@ -64,7 +64,7 @@ func TestAPullThatAddsThreeWatchedFilesWakesOnceWithThePaths(t *testing.T) {
 		!strings.Contains(text, "reports/c.csv") || strings.Contains(text, "notes.txt") || strings.Contains(text, "old.csv") {
 		t.Fatal(text)
 	}
-	time.Sleep(3 * dropboxSettle)
+	time.Sleep(3 * fileSettle)
 	got := raised(d, "file.added")
 	if len(got) != 1 {
 		t.Fatalf("%d events: %+v", len(got), got)
@@ -102,13 +102,13 @@ func TestAChangeNothingWatchesWritesNothing(t *testing.T) {
 	d, _ := watched(t, folder)
 	// No wait at all: nothing is looked at.
 	os.WriteFile(filepath.Join(folder, "reports", "early.csv"), []byte("x"), 0o644)
-	time.Sleep(3 * dropboxSettle)
+	time.Sleep(3 * fileSettle)
 	agent, answered := fileWait(t, d, folder, "file.added", "reports/*.csv")
 	// Not watched, written over, or the folder itself: nothing.
 	os.WriteFile(filepath.Join(folder, "notes.txt"), []byte("x"), 0o644)
 	os.WriteFile(filepath.Join(folder, "reports", "kept.csv"), []byte("new and longer"), 0o644)
 	os.WriteFile(filepath.Join(folder, "reports", "early.csv"), []byte("again"), 0o644)
-	time.Sleep(3 * dropboxSettle)
+	time.Sleep(3 * fileSettle)
 	if got := append(raised(d, "file.added"), raised(d, "file.removed")...); len(got) != 0 {
 		t.Fatalf("%+v", got)
 	}
@@ -129,13 +129,13 @@ func TestAFileStillBeingWrittenIsAddedOnceAfterItStops(t *testing.T) {
 	}
 	for i := 0; i < 4; i++ {
 		f.WriteString("line\n")
-		time.Sleep(dropboxSettle / 3)
+		time.Sleep(fileSettle / 3)
 	}
 	f.Close()
 	if text := answer(t, answered); !strings.Contains(text, "out/run.log") {
 		t.Fatal(text)
 	}
-	time.Sleep(3 * dropboxSettle)
+	time.Sleep(3 * fileSettle)
 	if got := raised(d, "file.added"); len(got) != 1 {
 		t.Fatalf("%d events: %+v", len(got), got)
 	}
@@ -185,7 +185,7 @@ func TestAFilePatternMatchesWhenOneOfItsPathsDoes(t *testing.T) {
 			t.Errorf("%s: %v", paths, got)
 		}
 	}
-	if p.matches(wire.Event{Name: "dropbox.file_added", Details: map[string]string{"paths": `["reports/a.csv"]`}}) {
+	if p.matches(wire.Event{Name: "branch.moved", Details: map[string]string{"paths": `["reports/a.csv"]`}}) {
 		t.Error("another event")
 	}
 }

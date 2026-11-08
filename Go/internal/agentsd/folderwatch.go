@@ -2,13 +2,10 @@ package agentsd
 
 import (
 	"log"
-	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
@@ -22,21 +19,18 @@ import (
 // file that arrives on disk (a pull, an agent's own Write) is read again and told, a
 // guarded file changed outside the app waits for the person (#502), a folder MCP server
 // or plugin is looked at again, a branch tip an agent's worktree is on moving raises
-// branch.moved (042 R9), and a file arriving in the drop box raises dropbox.file_added
-// (#231), and a file a wait or a trigger watches coming or going raises file.added or
-// file.removed (#3795). The watches follow the folder list: every workflow scan looks at it again.
+// branch.moved (042 R9), and a file a wait or a trigger watches coming or going raises
+// file.added or file.removed (#3795; the drop box is one such place, #3796). The watches follow the folder list: every workflow scan looks at it again.
 
-// dropboxSettle is DaemonCore.dropboxSettle: how long a file must stay as it is before it
-// counts as arrived.
-const dropboxSettle = 600 * time.Millisecond
+// fileSettle is how long a file must stay as it is before it counts as arrived.
+const fileSettle = 600 * time.Millisecond
 
 // branchSettle is how long git is given to finish writing (a rebase writes many refs)
 // before the tips are looked at once.
 const branchSettle = time.Second
 
-// dropStamp is DropboxStamp: enough to tell a file arrived, was replaced, or is still
-// being written.
-type dropStamp struct {
+// watchStamp is enough to tell a file arrived, was replaced, or is still being written.
+type watchStamp struct {
 	size     int64
 	modified time.Time
 	file     uint64
@@ -56,9 +50,6 @@ type folderWatchState struct {
 	// (the first seed and a move) let the one that read first write its older tips last, and
 	// the move after it was not raised (#1278).
 	branchCheckMu sync.Mutex
-	dropSeen      map[string]map[string]dropStamp
-	dropSettling  map[string]map[string]dropStamp
-	dropTimers    map[string]*time.Timer
 	// fileMu holds fileWatches, what each folder's file events know (#3795), and fileKicked.
 	fileMu      sync.Mutex
 	fileWatches map[string]*watchedFiles
@@ -159,13 +150,6 @@ func (d *Daemon) syncFolderWatches() {
 			return
 		}
 		d.pwWatches[folder] = w
-		// What is in the drop box now was there before the watch (#231).
-		if d.dropSeen == nil {
-			d.dropSeen = map[string]map[string]dropStamp{}
-		}
-		if d.dropSeen[folder] == nil {
-			d.dropSeen[folder] = dropboxFiles(folder)
-		}
 		d.pwMu.Unlock()
 		// Seed what the tips are now, so the first move after this is a move; one that
 		// moved while no host ran is raised now.
@@ -180,12 +164,6 @@ func (d *Daemon) forgetFolderLocked(folder string) {
 		t.Stop()
 		delete(d.branchTimers, folder)
 	}
-	if t := d.dropTimers[folder]; t != nil {
-		t.Stop()
-		delete(d.dropTimers, folder)
-	}
-	delete(d.dropSeen, folder)
-	delete(d.dropSettling, folder)
 	d.forgetWatchedFiles(folder)
 }
 
@@ -228,18 +206,13 @@ func (d *Daemon) folderFilesChanged(folder string, paths []string) {
 		return
 	}
 	agents := filepath.Join(folder, ".agents")
-	dropbox := filepath.Join(agents, "dropbox")
 	workflows := workflowsFolder(folder)
 	under := func(p, dir string) bool { return p == dir || strings.HasPrefix(p, dir+string(filepath.Separator)) }
-	var branches, drop, rescan, approvals bool
+	var branches, rescan, approvals bool
 	guarded := map[string]bool{}
 	for _, p := range paths {
 		if isBranchPath(p) {
 			branches = true
-		}
-		// The top and .agents change when the drop box is made with a file in it at once.
-		if under(p, dropbox) || (p == folder || p == agents) && isDir(dropbox) {
-			drop = true
 		}
 		if !under(p, agents) {
 			continue
@@ -260,9 +233,6 @@ func (d *Daemon) folderFilesChanged(folder string, paths []string) {
 	d.watchedFilesChanged(folder, paths)
 	if branches {
 		d.scheduleBranchCheck(folder, branchSettle)
-	}
-	if drop {
-		d.scheduleDropboxCheck(folder)
 	}
 	if rescan {
 		d.rescanWorkflows(folder)
@@ -429,125 +399,6 @@ func short(s string, n int) string {
 		return s[:n]
 	}
 	return s
-}
-
-// MARK: dropbox.file_added (DaemonCore+Dropbox, #231)
-
-// dropboxFiles is DaemonCore.dropboxFiles: every file in a folder's drop box, by its path
-// inside it. Folders are not files, and neither is anything whose name starts with a dot
-// (what a copy writes before it renames the file into place).
-func dropboxFiles(folder string) map[string]dropStamp {
-	root := filepath.Join(folder, ".agents", "dropbox")
-	files := map[string]dropStamp{}
-	filepath.WalkDir(root, func(p string, e os.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		if p != root && strings.HasPrefix(e.Name(), ".") {
-			if e.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if !e.Type().IsRegular() {
-			return nil
-		}
-		info, err := e.Info()
-		if err != nil {
-			return nil
-		}
-		var file uint64
-		if st, ok := info.Sys().(*syscall.Stat_t); ok {
-			file = uint64(st.Ino)
-		}
-		rel, _ := filepath.Rel(root, p)
-		files[filepath.ToSlash(rel)] = dropStamp{size: info.Size(), modified: info.ModTime(), file: file}
-		return nil
-	})
-	return files
-}
-
-// scheduleDropboxCheck looks in a moment, unless a look is already due: one waiting is not
-// put off again, so a folder whose top changes all the time still has its drop box looked at.
-func (d *Daemon) scheduleDropboxCheck(folder string) {
-	d.pwMu.Lock()
-	defer d.pwMu.Unlock()
-	if d.pwStopped || d.dropSeen[folder] == nil || d.dropTimers[folder] != nil {
-		return
-	}
-	if d.dropTimers == nil {
-		d.dropTimers = map[string]*time.Timer{}
-	}
-	d.dropTimers[folder] = time.AfterFunc(dropboxSettle, func() { d.checkDropbox(folder) })
-}
-
-// checkDropbox is DaemonCore.checkDropbox: a file new or changed since the last look is
-// announced when this look finds it as the last one did; until then it is settling, and
-// another look is due.
-func (d *Daemon) checkDropbox(folder string) {
-	if !d.pwEnter("") {
-		return
-	}
-	defer d.pwBusy.Done()
-	now := dropboxFiles(folder)
-	d.pwMu.Lock()
-	delete(d.dropTimers, folder)
-	seen := d.dropSeen[folder]
-	if seen == nil || d.pwStopped {
-		d.pwMu.Unlock()
-		return
-	}
-	settling := d.dropSettling[folder]
-	stillSettling := map[string]dropStamp{}
-	var arrived []string
-	for path, stamp := range now {
-		if old, ok := seen[path]; ok && old == stamp {
-			continue
-		}
-		if s, ok := settling[path]; ok && s == stamp {
-			arrived = append(arrived, path)
-		} else {
-			stillSettling[path] = stamp
-		}
-	}
-	for path := range seen {
-		if _, ok := now[path]; !ok {
-			delete(seen, path)
-		}
-	}
-	for _, path := range arrived {
-		seen[path] = now[path]
-	}
-	if d.dropSettling == nil {
-		d.dropSettling = map[string]map[string]dropStamp{}
-	}
-	if len(stillSettling) == 0 {
-		delete(d.dropSettling, folder)
-	} else {
-		d.dropSettling[folder] = stillSettling
-	}
-	d.pwMu.Unlock()
-	sort.Strings(arrived)
-	for _, path := range arrived {
-		d.raiseDropboxArrival(folder, path, now[path])
-	}
-	if len(stillSettling) > 0 {
-		d.scheduleDropboxCheck(folder)
-	}
-}
-
-func (d *Daemon) raiseDropboxArrival(folder, relative string, stamp dropStamp) {
-	file := filepath.Join(folder, ".agents", "dropbox", filepath.FromSlash(relative))
-	name := filepath.Base(file)
-	inside, place := "", "the drop box"
-	if i := strings.LastIndex(relative, "/"); i >= 0 {
-		inside = relative[:i]
-		place = "dropbox/" + inside
-	}
-	d.raise(wire.EventDraft{Name: "dropbox.file_added", At: now(), Scope: folderScope(folder),
-		Sentence: name + " arrived in " + place + ".",
-		Details: map[string]string{"path": file, "name": name, "folder": inside,
-			"extension": strings.ToLower(strings.TrimPrefix(filepath.Ext(name), ".")), "size": strconv.FormatInt(stamp.size, 10)}})
 }
 
 // saveFolders writes folders.json, and has the watches follow what it now says.

@@ -64,7 +64,7 @@ func kindNamed(name string) *eventKind {
 	return nil
 }
 
-var eventSubjects = []string{"agent", "folder", "workflow", "branch", "dropbox", "file", "lease", "mac", "machine", "person", "cost", "server", "system"}
+var eventSubjects = []string{"agent", "folder", "workflow", "branch", "file", "lease", "mac", "machine", "person", "cost", "server", "system"}
 
 func isSubject(s string) bool {
 	for _, x := range eventSubjects {

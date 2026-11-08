@@ -124,15 +124,6 @@ counting again from the next agent that works.
 | --- | --- | --- | --- |
 | `branch.moved` | branch, any | branch, from, to | A branch an agent works on moved; never the default branch. A wait names the branch or sets `any: true` (#3797). |
 
-## Drop box
-
-Each folder has a drop box, the folder `.agents/dropbox/` in it. See
-[Hand files to a workflow](../how-to/hand-files-to-a-workflow.md).
-
-| Event | Filter by | Details | What it means |
-| --- | --- | --- | --- |
-| `dropbox.file_added` | — | path, name, folder, extension, size | A file arrived in this folder's drop box, or a folder in it. `path` is the file's full path on the folder's host. `name` is its name. `folder` is where it is inside `.agents/dropbox/`, such as `review` or `review/2026`, and empty at the top. `extension` is in lower case without the dot, and empty when there is none. `size` is in bytes. Raised once, when the file has stopped changing. A file replaced under the same name, or changed where it lies, is raised again. Files there when the app starts, and names starting with a dot, are not. |
-
 ## Files
 
 `file.added` and `file.removed` are about files in the folder (#3795). A wait or a trigger
@@ -140,6 +131,10 @@ on them names the files it watches in `paths`: a list of globs relative to the f
 such as `reports/*.csv`. `*` stays in one folder; `**` reaches into folders, as in
 `docs/**/*.md`. A wait or a trigger without `paths` is refused, and so is a glob that starts
 with `/` or goes up with `..`.
+
+Each folder's drop box, the folder `.agents/dropbox/` in it, has no event of its own
+(#3796): a file put there is a `file.added`, which a wait or a trigger watches with paths
+such as `.agents/dropbox/review/**`. See [Hand files to a workflow](../how-to/hand-files-to-a-workflow.md).
 
 | Event | Filter by | Details | What it means |
 | --- | --- | --- | --- |
@@ -162,7 +157,7 @@ with `/` or goes up with `..`.
   `.gitignore` is not read: the glob says which files matter.
 - **From when it watches.** The files there when a wait starts, or when a workflow is read
   or turned on, are not added.
-- **This machine.** A file event stays on the machine whose folder it is, as `dropbox.*` does.
+- **This machine.** A file event stays on the machine whose folder it is.
 
 ## This Mac
 

@@ -95,25 +95,28 @@ func TestAWorkflowFileOnDiskIsToldAtOnce(t *testing.T) {
 	}
 }
 
-func TestADropboxArrivalIsRaisedOnce(t *testing.T) {
+// The drop box has no event of its own (#3796): a file into it is a file.added, and a
+// trigger narrows to one of its folders with paths.
+func TestADropboxArrivalIsAFileAddedOnlyWhereItsPathsSay(t *testing.T) {
 	folder := canonical(t.TempDir())
 	box := filepath.Join(folder, ".agents", "dropbox")
-	os.MkdirAll(box, 0o755)
-	os.WriteFile(filepath.Join(box, "before.txt"), []byte("old"), 0o644)
+	os.MkdirAll(filepath.Join(box, "review"), 0o755)
+	os.WriteFile(filepath.Join(box, "review", "before.txt"), []byte("old"), 0o644)
 	d, _ := watched(t, folder)
-	os.MkdirAll(filepath.Join(box, "in"), 0o755)
-	os.WriteFile(filepath.Join(box, "in", ".partial"), []byte("x"), 0o644)
-	os.WriteFile(filepath.Join(box, "in", "Report.PDF"), []byte("hello"), 0o644)
-	until(t, "dropbox.file_added", func() bool { return len(raised(d, "dropbox.file_added")) > 0 })
-	time.Sleep(2 * dropboxSettle)
-	got := raised(d, "dropbox.file_added")
-	if len(got) != 1 {
-		t.Fatalf("%d events: %+v", len(got), got)
+	_, answered := fileWait(t, d, folder, "file.added", ".agents/dropbox/review/**")
+	os.MkdirAll(filepath.Join(box, "notes"), 0o755)
+	os.WriteFile(filepath.Join(box, "notes", "skip.md"), []byte("x"), 0o644)
+	time.Sleep(3 * fileSettle)
+	if got := raised(d, "file.added"); len(got) != 0 {
+		t.Fatalf("notes/: %+v", got)
 	}
-	e := got[0]
-	if e.Details["name"] != "Report.PDF" || e.Details["folder"] != "in" || e.Details["extension"] != "pdf" || e.Details["size"] != "5" ||
-		e.Details["path"] != filepath.Join(box, "in", "Report.PDF") || e.Sentence != "Report.PDF arrived in dropbox/in." {
-		t.Fatalf("%+v", e)
+	os.WriteFile(filepath.Join(box, "review", "Report.PDF"), []byte("hello"), 0o644)
+	if text := answer(t, answered); !strings.Contains(text, ".agents/dropbox/review/Report.PDF") || strings.Contains(text, "before.txt") {
+		t.Fatal(text)
+	}
+	time.Sleep(3 * fileSettle)
+	if got := raised(d, "file.added"); len(got) != 1 || got[0].Details["paths"] != `[".agents/dropbox/review/Report.PDF"]` {
+		t.Fatalf("%+v", got)
 	}
 }
 

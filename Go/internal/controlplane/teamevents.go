@@ -18,7 +18,7 @@ import (
 // once, by the control plane. Each machine that hears it sends it here (workflows/trigger);
 // the first is claimed as workflows/claimRun claims it, and the control plane asks the
 // bot's machines held here, one at a time, to run it (workflows/fire) until one takes it.
-// Machine events (machine.*, dropbox.*) stay on their machine and never come here.
+// Machine events (machine.*, file.*) stay on their machine and never come here.
 
 // fireTimeout is how long a bot's machine has to say whether it takes a trigger.
 const fireTimeout = 30 * time.Second
