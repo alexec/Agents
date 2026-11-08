@@ -12,7 +12,7 @@
 import { signal } from "@preact/signals";
 import { movedPage, navSections, type NavSection, type UsagePane } from "./model/nav";
 
-export type ActivityPage = "events" | "runtimes" | "mcp" | "spending" | "tokens" | "time" | "achievements";
+export type ActivityPage = "events" | "runtimes" | "mcp" | "spending" | "tokens" | "time";
 
 export interface Route {
   /** The section (#2141); none is the Overview, or Agents when a host is named. */
@@ -69,6 +69,8 @@ export function parseRoute(hash: string): Route {
     if (!section) return { nav };
     // Runtimes (#3631) and Connectors (#3632) moved from Machines to Your setup: an old link still opens them.
     if (nav === "machines" && (section === "runtimes" || section === "mcp")) return { nav: "setup", section };
+    // The Multiplier page took the Achievements page's place (#3990): an old link opens it.
+    if (nav === "reports" && section === "achievements") return { nav, section: "multiplier" };
     // A doc's page is #/docs/<ref> (spec 3319): Docs has one page, so the ref takes its place.
     if (nav === "docs" && !item && section !== "docs") return { nav, section: "docs", item: decodeURIComponent(section) };
     return item ? { nav, section: decodeURIComponent(section), item: decodeURIComponent(item) } : { nav, section: decodeURIComponent(section) };

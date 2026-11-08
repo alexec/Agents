@@ -12265,6 +12265,7 @@ export interface Methods {
   "mcp/hosted": { params: Empty; result: HostedMCPSnapshot };
   "mcp/remove": { params: MCPRemoveRequest; result: MCPRemoveAnswer };
   "modes/remembered": { params: Empty; result: Record<string, JSONValue> };
+  "multiplier/state": { params: Empty; result: Multiplier };
   "options/remembered": { params: RememberedOptionsRequest; result: ConfigOption[] };
   "orgRoutes/check": { params: OrgRouteRequest; result: OrgRouteCheck };
   "orgRoutes/list": { params: Empty; result: OrgRouteList };
@@ -12655,6 +12656,7 @@ export const MethodTarget = {
   "mcp/hosted": "host",
   "mcp/remove": "host",
   "modes/remembered": "host",
+  "multiplier/state": "host",
   "options/remembered": "host",
   "orgRoutes/check": "control",
   "orgRoutes/list": "control",
@@ -12882,6 +12884,7 @@ export interface Notifications {
   "mcp/healthChanged": MCPHealthSnapshot;
   "mcp/hostedChanged": HostedMCPSnapshot;
   "modes/changed": Record<string, JSONValue>;
+  "multiplier/changed": Multiplier;
   "pages/changed": PagesChangedNotification;
   "pins/changed": PinsChangedNotification;
   "policy/effectiveChanged": PolicyEffectiveRequest;

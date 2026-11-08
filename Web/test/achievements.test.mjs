@@ -21,7 +21,6 @@ test("earned first, earliest first, then the rest in order", () => {
 test("an id a newer host knows is kept out of the list but not lost", () => {
   const achievements = { earned: [{ id: "somethingNew", at: 0 }] };
   assert.equal(m.orderedAchievements(achievements).filter((r) => r.at).length, 0);
-  assert.equal(m.isComplete(achievements), false);
 });
 
 test("the card is only for what was earned after the first look", () => {

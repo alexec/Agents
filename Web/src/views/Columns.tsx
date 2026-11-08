@@ -1,7 +1,7 @@
 // The Mac window's layout in a tab (071 US2, US6; #151, #235). As the window since #145: one
 // sidebar (New Session, Activity, the smart groups, a group per folder, the hosts' state at its
 // foot; #499), then the chat, a folder's new-session form, a workflow, its archive, an Activity
-// page, a change's Review page (#1472), this browser's Settings (#846), or help text with nothing chosen; the files pane a third column from 1440, over the chat below that. Below 760 the same
+// page, a change's Review page (#1472), this browser's Settings (#846), or the Multiplier page with nothing chosen (#3990); the files pane a third column from 1440, over the chat below that. Below 760 the same
 // sidebar is the root list, as the iPhone Remote's is (#226), and what it picks takes its place,
 // with ‹ Agents back to it. Above it all, the bar of sections (#2141): this is Agents; the Overview
 // and every other section take the place of the sidebar and the chat.
@@ -33,6 +33,7 @@ import { ReviewPage } from "./Review";
 import { projectNameOf, Sidebar } from "./Sidebar";
 import { ContextMenu } from "./ContextMenu";
 import { AchievementCard } from "./AchievementCard";
+import { MultiplierPage } from "./Multiplier";
 import { NavBar, PageView, SectionPage } from "./Nav";
 import { Overview } from "./Overview";
 import { navPages } from "../model/nav";
@@ -128,7 +129,7 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
           ) : r.host && r.folder && folder && r.compose ? (
             // Only when asked for: leaving a session shows nothing chosen, not New Session (#2090).
             <NewAgent store={store} host={r.host} folder={folder.folder.folder} folderName={folder.name} down={down} />
-          ) : <NothingChosen />}
+          ) : <MultiplierPage store={store} />}
         {r.host && r.session && r.files && <FilesPane store={store} host={r.host} session={r.session} />}
       </div>}
       <NewFolderDialog store={store} />
@@ -169,18 +170,6 @@ function MissingSession({ store, looked }: { store: Store; looked: boolean }) {
       <span class="glyph" aria-hidden="true">🗑</span>
       <h2>This session was deleted</h2>
       <p>There is nothing left of it to show. Pick another session on the left.</p>
-    </section>
-  );
-}
-
-/** With nothing chosen, what the sidebar is for and its keys, in the window's words (#145). */
-function NothingChosen() {
-  return (
-    <section class="chat empty nothing-chosen" aria-label="Nothing selected">
-      <span class="glyph" aria-hidden="true">◧</span>
-      <h2>Nothing selected</h2>
-      <p>Pick a session on the left to read it, or New Session at the top to start one.</p>
-      <p>↑ and ↓ move through the list, → and ← unfold and fold a folder.</p>
     </section>
   );
 }

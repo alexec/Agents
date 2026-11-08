@@ -83,7 +83,7 @@ test("an address from before #2141 opens its page's new place", async () => {
       "#/console/people": { nav: "people", section: "people" }, "#/console/signIn": { nav: "people", section: "signIn" },
       "#/console/policy": { nav: "settings", section: "policy" }, "#/console/readApi": { nav: "settings", section: "readApi" },
       "#/a/runtimes": { nav: "setup", section: "runtimes" }, "#/a/mcp": { nav: "setup", section: "mcp" },
-      "#/a/events": { nav: "reports", section: "events" }, "#/a/achievements": { nav: "reports", section: "achievements" },
+      "#/a/events": { nav: "reports", section: "events" }, "#/a/achievements": { nav: "reports", section: "multiplier" },
       "#/a/tokens": { nav: "reports", section: "usage" },
     };
     for (const [old, now] of Object.entries(moved)) {

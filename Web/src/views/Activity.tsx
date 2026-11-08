@@ -31,7 +31,6 @@ import { mergeUsage } from "../model/usage";
 import { hostAnswers, hostNeedsUpdate } from "../model/capabilities";
 import { mergeTime } from "../model/time";
 import { TimeCharts } from "./TimeCharts";
-import { AchievementsSection, TimeAchievementsUnder } from "./Achievements";
 import { Capability } from "../protocol/capabilities.generated";
 import { OrgBudget, OrgPolicyLine, PassThroughList } from "./OrgPolicyLine";
 import { PageTitle } from "./TopBar";
@@ -232,7 +231,7 @@ export function availabilityWords(availability: RuntimeAvailability): string {
 
 const onlineHosts = (store: Store): ControlMachine[] => store.hosts.value.filter((h) => hostAnswers(h.state));
 
-const pageTitles: Record<ActivityPage, string> = { events: "Events", runtimes: "Runtimes", mcp: "Connectors", spending: "Cost", tokens: "Tokens", time: "Time", achievements: "Achievements" };
+const pageTitles: Record<ActivityPage, string> = { events: "Events", runtimes: "Runtimes", mcp: "Connectors", spending: "Cost", tokens: "Tokens", time: "Time" };
 
 /** How much is left, with no times, as allowanceReading's first part: "62% left". Null when the reading has no amount. */
 function allowanceAmount(state: AllowanceState, now: Date): string | null {
@@ -427,7 +426,6 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
           {page === "spending" && costPane.value === "reports" && <ReportsPane store={store} runtimeName={chartRuntimeName(store, chartHosts(store))} />}
           {page === "tokens" && <TokensPage store={store} hostName={hostName} />}
           {page === "time" && <TimePage store={store} />}
-          {page === "achievements" && <AchievementsPage store={store} />}
         </div>
       </div>
       {signingIn.value && (
@@ -620,24 +618,7 @@ function TimePage({ store }: { store: Store }) {
   const runtimeName = chartRuntimeName(store, hosts);
   if (!host) return <p class="quiet">No machine is connected.</p>;
   const history = store.time.value[host] ? mergeTime(hosts.flatMap((each) => store.time.value[each] ?? [])) : undefined;
-  return (
-    <TimeAchievementsUnder achievements={store.achievements.value[host]}>
-      <TimeCharts history={history} runtimeName={runtimeName} />
-    </TimeAchievementsUnder>
-  );
-}
-
-/** The host whose achievements are drawn: this Mac's, as on the window and the Remote. */
-function achievementsHost(store: Store): string | undefined {
-  const macID = store.macHostID.value;
-  return store.hosts.value.some((h) => h.id === macID) ? macID : store.hosts.value[0]?.id;
-}
-
-/** The achievements as a page (#1067): the newcomer's checklist, from its row in Usage. */
-function AchievementsPage({ store }: { store: Store }) {
-  const achievements = store.achievements.value[achievementsHost(store) ?? ""];
-  if (!achievements) return <p class="quiet">No machine is connected.</p>;
-  return <AchievementsSection achievements={achievements} />;
+  return <TimeCharts history={history} runtimeName={runtimeName} />;
 }
 
 /** What the work used in tokens (#956): the charts in tokens, then each host's day against its token limits. */

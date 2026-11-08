@@ -13,7 +13,7 @@ import type {
   StartRequest, UUID, AutoMappings, AutoPreview, AutoPreviewRequest, AutoSettings, ClientPermissionMode, Levels, ModelLevel, PermissionLevel, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, DiskState, StoreNotes,
   CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ReviewPull, CheckSuggestion, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, PolicySetBy, RuntimeAllowances,
-  GuardedChange, GuardedChangeReading, MachineJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Achievements,
+  GuardedChange, GuardedChangeReading, MachineJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Achievements, Multiplier,
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, DailySummarySettings, SummaryPage, SummaryPageText, DesktopControlSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
   PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, BudgetRequest, RemoveRequest, ClientPermissionSettings, PRCostComment,
@@ -435,6 +435,9 @@ export class Work {
     this.achievements.value = { ...this.achievements.value, [host]: achievements };
     achievementsSeen.take(achievements);
   }
+  /** Each host's Multiplier (#3990), from multiplier/state and replaced whole by each multiplier/changed. With a
+   * control plane the host counts all the person's machines (#3903), so the page asks only the Mac's. */
+  readonly multiplier = signal<Record<string, Multiplier>>({});
   /**
    * The control plane's machine, its home host, and how this Mac's host says its join stands
    * (#666), from `control/status`.
@@ -745,6 +748,9 @@ export class Work {
         return true;
       case "achievements/changed":
         this.takeAchievements(host, params as Achievements);
+        return true;
+      case "multiplier/changed":
+        this.multiplier.value = { ...this.multiplier.value, [host]: params as Multiplier };
         return true;
       case "preferences/changed":
         if (this.isMac(host)) preferencesSaid(params as Record<string, JSONValue>);
@@ -1919,6 +1925,10 @@ export class Store extends Work {
     // A host from before #984 doesn't know it: the Time page shows no achievements.
     void this.link.call("achievements/state", {}, host).then((state) => this.takeAchievements(host, state))
       .catch(failed("achievements/state"));
+    // A host from before #3903 doesn't know it: the Multiplier page shows — ×.
+    void this.link.call("multiplier/state", {}, host)
+      .then((state) => { this.multiplier.value = { ...this.multiplier.value, [host]: state }; })
+      .catch(failed("multiplier/state"));
     const [permissions, elicitations] = await Promise.all([
       this.link.call("permissions/pending", {}, host).catch(failed("permissions/pending")),
       this.link.call("elicitations/pending", {}, host).catch(failed("elicitations/pending")),
