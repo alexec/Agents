@@ -478,6 +478,8 @@ public enum DaemonAPI {
         public static let secretsSessionList = "secrets/sessionList"
         public static let secretsSessionSet = "secrets/sessionSet"
         public static let secretsSessionRemove = "secrets/sessionRemove"
+        /// Ask before use on or off (#4014, #4016). The person's own clients only.
+        public static let secretsSetNeedsApproval = "secrets/setNeedsApproval"
         public static let desktopControlState = "desktopControl/state"
         public static let desktopControlSet = "desktopControl/set"
         public static let desktopControlResume = "desktopControl/resume"

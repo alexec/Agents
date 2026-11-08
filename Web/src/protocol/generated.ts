@@ -3455,6 +3455,12 @@ export interface ElicitationSecret {
    * Left out by an older host.
    */
   canBeSessionOnly?: boolean;
+  /**
+   * The host keeps it with Ask before use (#4014, #4016): on unless the answer's content has
+   * needsApproval false, which the card's toggle sends. Left out by an older host, which has no
+   * such flag.
+   */
+  canAskBeforeUse?: boolean;
 }
 
 export interface Empty {}
@@ -9675,6 +9681,11 @@ export interface SealingItem {
   kind?: OrgRouteKind;
   vendor?: OrgRouteVendor;
   settings?: OrgRouteSettings;
+  /**
+   * Ask before use (#4014), for a person's secret: the associated data of every copy ends |ask, so
+   * the client opens its own copy and seals the missing ones with it (#4016). Left out is off.
+   */
+  needsApproval?: boolean;
   mine: Record<string, SealedEnvelope>;
   missing: SealRecipient[];
 }
@@ -12501,6 +12512,7 @@ export interface Methods {
   "secrets/sessionList": { params: Empty; result: SessionSecrets };
   "secrets/sessionRemove": { params: SessionSecretRemoveRequest; result: SessionSecrets };
   "secrets/sessionSet": { params: SessionSecretSetRequest; result: SessionSecrets };
+  "secrets/setNeedsApproval": { params: SecretNeedsApprovalRequest; result: Empty };
   "settings/passThrough": { params: Empty; result: PassThroughState };
   "signIn/approve": { params: SignInDecide; result: Empty };
   "signIn/configure": { params: SignInConfigure; result: SignInProviders };
@@ -12895,6 +12907,7 @@ export const MethodTarget = {
   "secrets/sessionList": "host",
   "secrets/sessionRemove": "host",
   "secrets/sessionSet": "host",
+  "secrets/setNeedsApproval": "host",
   "settings/passThrough": "host",
   "signIn/approve": "control",
   "signIn/configure": "control",
@@ -13301,7 +13314,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ElicitationSchema: { required: ["properties"], optional: ["title", "description"] },
   ElicitationSchemaProperty: { required: ["name", "isRequired", "kind"], optional: ["title", "description", "defaultValue"] },
   ElicitationSchemaPropertyChoice: { required: ["value", "title"], optional: ["description"] },
-  ElicitationSecret: { required: ["name", "isSet"], optional: ["url", "canBeSessionOnly"] },
+  ElicitationSecret: { required: ["name", "isSet"], optional: ["url", "canBeSessionOnly", "canAskBeforeUse"] },
   Empty: { required: [], optional: [] },
   EntryNotification: { required: ["agentID", "entry"], optional: ["index", "oversized"] },
   Event: { required: ["position", "name", "at", "count", "scope", "sentence", "details", "chainDepth", "consequences"], optional: ["lastAt", "publisher", "message", "actor"] },
@@ -13859,7 +13872,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SealedUserSecret: { required: ["name", "version", "sealed"], optional: ["needsApproval"] },
   SealingAdd: { required: ["items"], optional: [] },
   SealingAddItem: { required: ["item", "id", "version", "values"], optional: [] },
-  SealingItem: { required: ["item", "id", "version", "mine", "missing"], optional: ["user", "kind", "vendor", "settings"] },
+  SealingItem: { required: ["item", "id", "version", "mine", "missing"], optional: ["user", "kind", "vendor", "settings", "needsApproval"] },
   SealingWork: { required: ["items"], optional: [] },
   SecretGrant: { required: ["name", "use", "place"], optional: [] },
   SecretGrantChange: { required: ["grant"], optional: [] },

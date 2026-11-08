@@ -49,6 +49,8 @@ public extension DaemonAPI {
         public var kind: String?
         public var vendor: String?
         public var settings: OrgRouteSettings?
+        /// Ask before use (#4014), for a person's secret: every copy's associated data ends `|ask`.
+        public var needsApproval: Bool?
         public var mine: [String: Envelope]
         public var missing: [SealRecipient]
     }
@@ -118,17 +120,19 @@ public enum ClientSealing {
         Data("orgroute.v3|\(route)|\(recipient)|\(field)|\(sealVersion)|\(kind)|\(vendor ?? "")|\(binding(settings))".utf8)
     }
 
-    public static func userSecretAD(user: String, recipient: String, name: String, version: Int) -> Data {
-        Data("usersecret.v1|\(user)|\(recipient)|\(name)|\(version)".utf8)
+    /// Ask before use (#4014) adds `|ask`, as Go's `UserSecretADAsk`, so a flag the control plane
+    /// changed does not open.
+    public static func userSecretAD(user: String, recipient: String, name: String, version: Int, ask: Bool = false) -> Data {
+        Data("usersecret.v1|\(user)|\(recipient)|\(name)|\(version)\(ask ? "|ask" : "")".utf8)
     }
 
     /// A person's secret sealed to each recipient.
-    public static func sealSecret(user: String, name: String, version: Int, value: String,
+    public static func sealSecret(user: String, name: String, version: Int, value: String, ask: Bool = false,
                                   to recipients: [DaemonAPI.SealRecipient]) throws -> [String: Envelope] {
         var out: [String: Envelope] = [:]
         for r in recipients {
             out[r.id] = try Envelope.seal(Data(value.utf8), to: r.publicKey, info: userSecretPurpose,
-                                          authenticating: userSecretAD(user: user, recipient: r.id, name: name, version: version))
+                                          authenticating: userSecretAD(user: user, recipient: r.id, name: name, version: version, ask: ask))
         }
         return out
     }
@@ -141,7 +145,8 @@ public enum ClientSealing {
             switch item.item {
             case .userSecret:
                 out[field] = try key.open(sealed, info: userSecretPurpose,
-                                          authenticating: userSecretAD(user: item.user ?? "", recipient: me, name: item.id, version: item.version))
+                                          authenticating: userSecretAD(user: item.user ?? "", recipient: me, name: item.id, version: item.version,
+                                                                       ask: item.needsApproval == true))
             case .orgRoute:
                 out[field] = try key.open(sealed, info: orgRoutePurpose,
                                           authenticating: orgRouteAD(route: item.id, recipient: me, field: field, sealVersion: item.version,
@@ -164,7 +169,8 @@ public enum ClientSealing {
                     switch item.item {
                     case .userSecret:
                         info = userSecretPurpose
-                        ad = userSecretAD(user: item.user ?? "", recipient: r.id, name: item.id, version: item.version)
+                        ad = userSecretAD(user: item.user ?? "", recipient: r.id, name: item.id, version: item.version,
+                                          ask: item.needsApproval == true)
                     case .orgRoute:
                         info = orgRoutePurpose
                         ad = orgRouteAD(route: item.id, recipient: r.id, field: field, sealVersion: item.version,

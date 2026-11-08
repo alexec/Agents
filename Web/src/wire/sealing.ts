@@ -46,8 +46,9 @@ export async function orgRouteAD(route: RouteBinding, recipient: string, field: 
   return utf8(`orgroute.v3|${route.id}|${recipient}|${field}|${sealVersion}|${route.kind}|${route.vendor ?? ""}|${binding}`);
 }
 
-export function userSecretAD(user: string, recipient: string, name: string, version: number): Uint8Array {
-  return utf8(`usersecret.v1|${user}|${recipient}|${name}|${version}`);
+/** Ask before use (#4014) adds "|ask", as Go's UserSecretADAsk, so a flag the control plane changed does not open. */
+export function userSecretAD(user: string, recipient: string, name: string, version: number, ask = false): Uint8Array {
+  return utf8(`usersecret.v1|${user}|${recipient}|${name}|${version}${ask ? "|ask" : ""}`);
 }
 
 function fromBase64(text: string): Uint8Array {
@@ -93,9 +94,9 @@ export async function sealRoute(route: RouteBinding, values: Record<string, stri
 
 /** A person's secret sealed to each recipient. */
 export async function sealSecret(user: string, name: string, version: number, value: string,
-  recipients: SealRecipient[]): Promise<{ [recipient: string]: SealedEnvelope }> {
+  recipients: SealRecipient[], ask = false): Promise<{ [recipient: string]: SealedEnvelope }> {
   const out: { [recipient: string]: SealedEnvelope } = {};
-  for (const r of recipients) out[r.id] = await seal(r.publicKey, userSecretPurpose, userSecretAD(user, r.id, name, version), utf8(value));
+  for (const r of recipients) out[r.id] = await seal(r.publicKey, userSecretPurpose, userSecretAD(user, r.id, name, version, ask), utf8(value));
   return out;
 }
 
@@ -105,7 +106,7 @@ export async function openItem(record: KeyRecord, item: SealingItem): Promise<Re
   const out: Record<string, string> = {};
   for (const [field, sealed] of Object.entries(item.mine)) {
     const plain = item.item === "userSecret"
-      ? await open(record, userSecretPurpose, userSecretAD(item.user ?? "", me, item.id, item.version), sealed)
+      ? await open(record, userSecretPurpose, userSecretAD(item.user ?? "", me, item.id, item.version, item.needsApproval === true), sealed)
       : await open(record, orgRoutePurpose, await orgRouteAD({ id: item.id, kind: item.kind!, vendor: item.vendor, settings: item.settings },
         me, field, item.version), sealed);
     out[field] = new TextDecoder().decode(plain);
@@ -124,7 +125,8 @@ export async function sealWork(record: KeyRecord, work: SealingWork): Promise<Se
       continue;
     }
     const sealed = item.item === "userSecret"
-      ? Object.fromEntries(Object.entries(await sealSecret(item.user ?? "", item.id, item.version, values["value"] ?? "", item.missing))
+      ? Object.fromEntries(Object.entries(await sealSecret(item.user ?? "", item.id, item.version, values["value"] ?? "", item.missing,
+        item.needsApproval === true))
         .map(([recipient, e]) => [recipient, { value: e }]))
       : await sealRoute({ id: item.id, kind: item.kind!, vendor: item.vendor, settings: item.settings }, values, item.version, item.missing);
     out.push({ item: item.item, id: item.id, version: item.version, values: sealed });

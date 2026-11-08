@@ -422,4 +422,10 @@ func TestAskBeforeUseIsCarriedAsTheClientSaidIt(t *testing.T) {
 	if plain, err := controllink.Open(box.private, controllink.UserSecretPurpose, controllink.UserSecretADAsk("sam", box.id, "SHOP_PASSWORD", 1, true), s.Sealed); err != nil || string(plain) != "hunter2" {
 		t.Fatal(err)
 	}
+	// A new machine waits for a client to seal it a copy: the work says |ask, or the copy
+	// would not open there (#4016).
+	items, _, err := b.Work(ctx, "sam", box.id, []wire.SealRecipient{{ID: "m:new"}})
+	if err != nil || len(items) != 1 || items[0].NeedsApproval == nil || !*items[0].NeedsApproval {
+		t.Fatalf("%+v %v", items, err)
+	}
 }

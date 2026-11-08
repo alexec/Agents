@@ -144,12 +144,15 @@ public extension DaemonAPI {
         public var values: [String: Envelope]
         /// `card` for a card secret (#3531); nil for a plain value.
         public var kind: String?
+        /// Ask before use (#4014): every envelope's associated data ends `|ask`. nil is off.
+        public var needsApproval: Bool?
 
-        public init(name: String, version: Int, values: [String: Envelope], kind: String? = nil) {
+        public init(name: String, version: Int, values: [String: Envelope], kind: String? = nil, needsApproval: Bool? = nil) {
             self.name = name
             self.version = version
             self.values = values
             self.kind = kind
+            self.needsApproval = needsApproval
         }
     }
 
@@ -178,9 +181,12 @@ public extension DaemonAPI {
         public var waiting: [String]?
         /// `card` for a card secret (#3531); nil for a plain value.
         public var kind: String? = nil
+        /// Ask before use (#4014), as the person's client last sealed it.
+        public var needsApproval: Bool? = nil
 
         public var id: String { name }
         public var isCard: Bool { kind == CardSecret.kind }
+        public var asksBeforeUse: Bool { needsApproval == true }
     }
 
     /// `user/secretNames`.

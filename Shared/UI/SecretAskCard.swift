@@ -5,7 +5,7 @@ import SwiftUI
 /// `ElicitationSheet` under their own "who asks" line: the secret's name, why, where to get
 /// it, and a masked field. What is typed goes to the host, which saves it to the person's
 /// secrets.env, or keeps it for this session only (#3548); the chat, the agent and every
-/// other client get the name only.
+/// other client get the name only. Ask before use (#4016) is on unless the person turns it off.
 struct SecretAskCard: View {
     let secret: ElicitationRequest.Secret
     /// The agent's reason, the form's one field's title.
@@ -14,10 +14,23 @@ struct SecretAskCard: View {
     let host: String
     /// An answer is on the way: the card is held until the daemon takes it down.
     let sending: Bool
-    /// Save (with the value, and whether for this session only) or No thanks (nil).
-    let send: @MainActor (String?, Bool) -> Void
+    /// Save or No thanks (nil).
+    let send: @MainActor (Answer?) -> Void
     @State private var text = ""
     @State private var sessionOnly = false
+    @State private var askBeforeUse = true
+
+    /// What Save sends: the value, whether for this session only, and Ask before use (nil for a
+    /// host that has no such flag).
+    struct Answer {
+        var typed: String
+        var sessionOnly: Bool
+        var askBeforeUse: Bool?
+
+        var content: [String: JSONValue] {
+            ElicitationRequest.secretAnswer(typed, sessionOnly: sessionOnly, askBeforeUse: askBeforeUse)
+        }
+    }
     @FocusState private var focused: Bool
 
     private var typed: String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -61,11 +74,15 @@ struct SecretAskCard: View {
                     .appText(.supporting)
                     .disabled(sending)
             }
+            if secret.canAskBeforeUse {
+                AskBeforeUseToggle(isOn: $askBeforeUse)
+                    .disabled(sending)
+            }
             HStack(spacing: 8) {
                 if sending { Telling(host: host) }
                 Spacer(minLength: 0)
                 // No Escape: in the chat, an Escape meant for something else would decline it.
-                Button("No thanks") { send(nil, false) }
+                Button("No thanks") { send(nil) }
                     .buttonStyle(.paper)
                     .disabled(sending)
                 Button("Save securely", action: save)
@@ -79,7 +96,8 @@ struct SecretAskCard: View {
 
     private func save() {
         guard !typed.isEmpty, !sending else { return }
-        send(typed, sessionOnly && secret.canBeSessionOnly)
+        send(Answer(typed: typed, sessionOnly: sessionOnly && secret.canBeSessionOnly,
+                    askBeforeUse: secret.canAskBeforeUse ? askBeforeUse : nil))
     }
 
     /// Under the field: where it goes, and that the agent never sees it.

@@ -2155,6 +2155,21 @@ final class AppModel {
         }
     }
 
+    /// Whether this Mac's host keeps Ask before use (#4014): it offers the toggle (#4016).
+    var macHostAsksBeforeUse: Bool { host(macHostElsewhere ?? .mac, has: Capability.hostSecretApproval1) }
+
+    /// Turn Ask before use on or off for a session's secret (#4016): the list after, or why not.
+    func setSessionSecretAsksBeforeUse(_ secret: SessionSecret, _ on: Bool) async -> Result<SessionSecrets?, Error> {
+        do {
+            _ = try await macClient.call(DaemonAPI.Method.secretsSetNeedsApproval,
+                                         SecretNeedsApprovalRequest(name: secret.name, agentID: secret.agentID, needsApproval: on),
+                                         returning: DaemonAPI.Empty.self)
+            return .success(await sessionSecrets())
+        } catch {
+            return .failure(error)
+        }
+    }
+
     /// Take a session's secret out now (#3548): its agent is told it expired.
     func removeSessionSecret(_ secret: SessionSecret) async -> SessionSecrets? {
         var after: SessionSecrets?
