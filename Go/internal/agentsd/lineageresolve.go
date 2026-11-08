@@ -22,8 +22,9 @@ import (
 // lookup already does (lineagemilestone.go, #2935). Resolved on demand, not polled: a
 // lineage walk is read far less often than a sidebar list, so each node is asked again only
 // when it is walked again after resolveRecheck, and never when no folder is signed in to ask
-// with. Linear and releases are not resolved yet; a GitHub, GitLab or Forgejo issue, pull
-// request or milestone is (Forgejo's by its connection, lineageforgejo.go). A milestone is sent to be resolved when an issue's milestone is found
+// with. Linear and releases are not resolved yet; a GitHub, GitLab, Forgejo or Bitbucket
+// issue, pull request or milestone is (Forgejo's and Bitbucket's by their connections,
+// connectionAsks). A milestone is sent to be resolved when an issue's milestone is found
 // (lineagemilestone.go), as no walk asks for it before Work lists it.
 //
 // Never on the walk's own path (#3102): a walk answers at once with what the cache holds
@@ -179,8 +180,8 @@ func (d *Daemon) resolveNode(ctx context.Context, n wire.LineageNode) {
 	} else {
 		if ask == nil {
 			ask = forgeResolveNode
-			if repo.forge == "forgejo" {
-				ask = d.forgejoResolveNode
+			if c, ok := d.connectionAsks(repo.forge); ok {
+				ask = c.resolve
 			}
 		}
 		r, err = ask(ctx, folder, repo, n.Kind, num)
@@ -224,7 +225,7 @@ func nodeOfRepo(n wire.LineageNode) (forgeRepo, int, bool) {
 }
 
 // askedNode is nodeOfRepo on any forge lineage asks, by its CLI or its connection:
-// forgejo:o/r#12 and forgejo:o/r/milestone/3 (the milestone's id) too.
+// forgejo:o/r#12, bitbucket:w/r#12 and forgejo:o/r/milestone/3 (the milestone's id) too.
 func askedNode(n wire.LineageNode) (forgeRepo, int, bool) {
 	if n.Kind != lineage.KindIssue && n.Kind != lineage.KindPR && n.Kind != lineage.KindMilestone {
 		return forgeRepo{}, 0, false

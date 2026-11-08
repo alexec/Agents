@@ -24,6 +24,9 @@ const secretField = "value"
 // field of the form, so a client that does not offer it sends none, and it goes to secrets.env.
 const sessionOnlyField = "sessionOnly"
 
+// needsApprovalField is the answer's Ask before use (#4014): left out is on.
+const needsApprovalField = "needsApproval"
+
 var secretAskName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]{0,63}$`)
 
 // askSecret is ask_secret: the person asked for a secret, as a form held like ask_question's.
@@ -45,7 +48,7 @@ func (d *Daemon) askSecret(id wire.UUID, args map[string]json.RawMessage) (strin
 	}
 	path := skillcatalog.SecretsPath(home)
 	sessionOnly := true
-	secret := wire.ElicitationSecret{Name: name, IsSet: skillcatalog.LoadSecrets(path).IsSet(name), CanBeSessionOnly: &sessionOnly}
+	secret := wire.ElicitationSecret{Name: name, IsSet: skillcatalog.LoadSecrets(path).IsSet(name) || isSealedSecret(home, name), CanBeSessionOnly: &sessionOnly}
 	if u := strings.TrimSpace(argString(args, "url")); strings.HasPrefix(u, "https://") || strings.HasPrefix(u, "http://") {
 		secret.URL = &u
 	}
@@ -69,6 +72,10 @@ func (d *Daemon) secretNote(agent wire.UUID, name string, action wire.AnswerElic
 	path := skillcatalog.SecretsPath(d.personalHome())
 	switch action {
 	case wire.AnswerElicitationRequestActionAccept:
+		if d.secretIsSealed(agent, name) {
+			return name + " is saved with Ask before use: it is sealed on this machine, and it is not in your environment " +
+				"or in a file you can read. Use it with fill_secret or set_ci_secret, which put it where it goes for you."
+		}
 		if _, ok, _ := d.sessionSecret(agent, name); ok {
 			return name + " is kept for this session only, and deleted when the session is archived (#3548). " +
 				"It is in your environment as $" + name + " from your next start, and fills ${" + name + "} in your MCP servers. " +
@@ -103,6 +110,14 @@ func askedSessionOnly(content map[string]wire.JSONValue) bool {
 	return b
 }
 
+// askedNeedsApproval is Ask before use for a typed answer (#4014): on, as for every secret an
+// agent adds, unless the person turned it off on the card (#4016), which only a person's
+// client answers.
+func askedNeedsApproval(content map[string]wire.JSONValue) bool {
+	b, set := value(content[needsApprovalField]).(bool)
+	return !set || b
+}
+
 // saveAskedSecret saves the value typed into a secret's form: for the asking session only,
 // or to secrets.env. An error is the person's to read on the card, and never holds the value.
 func (d *Daemon) saveAskedSecret(agent wire.UUID, s wire.ElicitationSecret, content map[string]wire.JSONValue) error {
@@ -114,21 +129,31 @@ func (d *Daemon) saveAskedSecret(agent wire.UUID, s wire.ElicitationSecret, cont
 	if strings.ContainsAny(v, "\n\r\x00") {
 		return Invalid("%s has to be one line.", s.Name)
 	}
+	ask := askedNeedsApproval(content)
 	if askedSessionOnly(content) {
-		return d.setSessionSecret(agent, s.Name, v)
+		return d.setSessionSecret(agent, s.Name, v, ask)
 	}
-	if err := d.saveSecret(s.Name, v); err != nil {
+	if err := d.saveSecret(s.Name, v, ask); err != nil {
 		return Invalid("%s was not saved: %s", s.Name, err.Error())
 	}
 	log.Printf("ask_secret: saved %s", s.Name)
 	return nil
 }
 
-// saveSecret sets one secret in the person's secrets.env, and tells the connectors.
-func (d *Daemon) saveSecret(name, value string) error {
+// saveSecret sets one secret, and tells the connectors. needsApproval keeps it sealed
+// (sealedsecrets.go), out of secrets.env; off writes the line and takes out any sealed copy.
+// An agent's write always passes true (#4014).
+func (d *Daemon) saveSecret(name, value string, needsApproval bool) error {
 	home := d.personalHome()
 	if home == "" {
 		return errors.New("this machine has no personal home")
+	}
+	if needsApproval {
+		if err := d.saveSealedSecret(home, name, value, ""); err != nil {
+			return err
+		}
+		d.mcpChanged()
+		return nil
 	}
 	path := skillcatalog.SecretsPath(home)
 	env, err := skillcatalog.LoadSecretsForChange(path)
@@ -138,6 +163,9 @@ func (d *Daemon) saveSecret(name, value string) error {
 	env.Set(name, value)
 	if err := env.Save(path); err != nil {
 		return errors.New("secrets.env could not be written")
+	}
+	if err := d.removeSealedSecret(home, name); err != nil {
+		return errors.New("sealed.json could not be written")
 	}
 	d.mcpChanged()
 	return nil

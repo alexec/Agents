@@ -59,6 +59,12 @@ func TestSquashPRNumber(t *testing.T) {
 	if _, ok := squashPRNumber("gitlab", "Lineage: release nodes (#3023)"); ok {
 		t.Fatal("github's mark is not gitlab's")
 	}
+	if n, ok := squashPRNumber("bitbucket", "Merged in agents/7-fix (pull request #8)\n\nFix it"); !ok || n != 8 {
+		t.Fatalf("bitbucket: got %d, %v", n, ok)
+	}
+	if _, ok := squashPRNumber("bitbucket", "Fix it (#8)"); ok {
+		t.Fatal("github's mark is not bitbucket's")
+	}
 }
 
 func TestCommitTimeOf(t *testing.T) {

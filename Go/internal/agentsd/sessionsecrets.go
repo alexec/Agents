@@ -42,8 +42,10 @@ type sessionSecretFile struct {
 }
 
 type sessionSecretValue struct {
-	Value string    `json:"value"`
-	SetAt wire.Date `json:"setAt"`
+	Value string `json:"value,omitempty"`
+	// Sealed is a flagged one's value (#4014), in place of Value: sealedsecrets.go.
+	Sealed *sealedValue `json:"sealed,omitempty"`
+	SetAt  wire.Date     `json:"setAt"`
 }
 
 func (d *Daemon) sessionSecretsDir() string {
@@ -122,7 +124,15 @@ func (d *Daemon) writeSessionSecretsLocked(agent wire.UUID, f sessionSecretFile)
 func (d *Daemon) sessionSecret(agent wire.UUID, name string) (value string, ok, expired bool) {
 	f := d.readSessionSecrets(agent)
 	if v, has := f.Secrets[name]; has {
-		return v.Value, true, false
+		if v.Sealed == nil {
+			return v.Value, true, false
+		}
+		plain, err := d.openSealedSecret(sealedSessionStore(agent), name, *v.Sealed)
+		if err != nil {
+			log.Printf("session secrets: %s for %s: %v", name, agent, err)
+			return "", false, false
+		}
+		return plain, true, false
 	}
 	for _, n := range f.Expired {
 		if n == name {
@@ -133,14 +143,16 @@ func (d *Daemon) sessionSecret(agent wire.UUID, name string) (value string, ok, 
 }
 
 // sessionSecretValues is every value a session has, by name: for its runtime's environment
-// and its MCP servers.
+// and its MCP servers. A flagged one is never there (#4014).
 func (d *Daemon) sessionSecretValues(agent wire.UUID) map[string]string {
 	out := map[string]string{}
 	if agent == "" {
 		return out
 	}
 	for n, v := range d.readSessionSecrets(agent).Secrets {
-		out[n] = v.Value
+		if v.Sealed == nil {
+			out[n] = v.Value
+		}
 	}
 	return out
 }
@@ -160,8 +172,9 @@ func (d *Daemon) sessionSecretEnv(agent wire.UUID) []string {
 	return env
 }
 
-// setSessionSecret keeps one secret for a session that is not archived.
-func (d *Daemon) setSessionSecret(agent wire.UUID, name, value string) error {
+// setSessionSecret keeps one secret for a session that is not archived; needsApproval keeps
+// it sealed (#4014).
+func (d *Daemon) setSessionSecret(agent wire.UUID, name, value string, needsApproval bool) error {
 	a := d.Store.Agent(agent)
 	if a == nil {
 		return &Error{Code: CodeNoSuchAgent, Message: "That session is gone."}
@@ -178,12 +191,27 @@ func (d *Daemon) setSessionSecret(agent wire.UUID, name, value string) error {
 	if strings.ContainsAny(value, "\n\r\x00") {
 		return Invalid("%s has to be one line.", name)
 	}
+	entry := sessionSecretValue{Value: value, SetAt: now()}
+	if needsApproval {
+		sealed, err := d.sealSecret(sealedSessionStore(agent), name, value, nil)
+		if err != nil {
+			log.Printf("session secrets: %s for %s: %v", name, agent, err)
+			return Invalid("%s was not saved: it could not be sealed on this machine.", name)
+		}
+		entry = sessionSecretValue{Sealed: &sealed, SetAt: sealed.SetAt}
+	}
 	d.sessionSecretsMu.Lock()
 	f := d.readSessionSecrets(agent)
 	if f.Secrets == nil {
 		f.Secrets = map[string]sessionSecretValue{}
 	}
-	f.Secrets[name] = sessionSecretValue{Value: value, SetAt: now()}
+	if old, had := f.Secrets[name]; had && old.Sealed != nil && entry.Sealed != nil {
+		// A new value is not a new place: the grants stay (#4015).
+		if sealed, err := d.sealSecret(sealedSessionStore(agent), name, value, old.Sealed.Grants); err == nil {
+			entry.Sealed = &sealed
+		}
+	}
+	f.Secrets[name] = entry
 	f.Expired = slices.DeleteFunc(f.Expired, func(n string) bool { return n == name })
 	err := d.writeSessionSecretsLocked(agent, f)
 	d.sessionSecretsMu.Unlock()
@@ -294,7 +322,11 @@ func (d *Daemon) sessionSecretList() wire.SessionSecrets {
 			continue
 		}
 		for n, v := range d.readSessionSecrets(wire.UUID(id)).Secrets {
-			out.Secrets = append(out.Secrets, wire.SessionSecret{AgentID: a.ID, Title: agentTitle(a), Name: n, SetAt: v.SetAt})
+			row := wire.SessionSecret{AgentID: a.ID, Title: agentTitle(a), Name: n, SetAt: v.SetAt}
+			if v.Sealed != nil {
+				row.NeedsApproval = new(true)
+			}
+			out.Secrets = append(out.Secrets, row)
 		}
 	}
 	sort.Slice(out.Secrets, func(i, j int) bool {
@@ -316,7 +348,8 @@ func (d *Daemon) registerSessionSecrets() {
 		return d.sessionSecretList(), nil
 	})
 	On(d, wire.CallSecretsSessionSet, func(_ context.Context, _ *Client, in wire.SessionSecretSetRequest) (wire.SessionSecrets, error) {
-		if err := d.setSessionSecret(in.AgentID, strings.TrimSpace(in.Name), strings.TrimSpace(in.Value)); err != nil {
+		ask := in.NeedsApproval != nil && *in.NeedsApproval
+		if err := d.setSessionSecret(in.AgentID, strings.TrimSpace(in.Name), strings.TrimSpace(in.Value), ask); err != nil {
 			return wire.SessionSecrets{}, err
 		}
 		return d.sessionSecretList(), nil
@@ -327,4 +360,38 @@ func (d *Daemon) registerSessionSecrets() {
 		}
 		return d.sessionSecretList(), nil
 	})
+}
+
+// setSessionNeedsApproval turns a session secret's flag on or off (#4014): its value is
+// sealed in place, or opened back to plain.
+func (d *Daemon) setSessionNeedsApproval(agent wire.UUID, name string, on bool) error {
+	d.sessionSecretsMu.Lock()
+	defer d.sessionSecretsMu.Unlock()
+	f := d.readSessionSecrets(agent)
+	v, ok := f.Secrets[name]
+	if !ok {
+		return Invalid("That session has no %s.", name)
+	}
+	switch {
+	case on && v.Sealed == nil:
+		sealed, err := d.sealSecret(sealedSessionStore(agent), name, v.Value, nil)
+		if err != nil {
+			return Invalid("%s was not changed: it could not be sealed on this machine.", name)
+		}
+		f.Secrets[name] = sessionSecretValue{Sealed: &sealed, SetAt: v.SetAt}
+	case !on && v.Sealed != nil:
+		plain, err := d.openSealedSecret(sealedSessionStore(agent), name, *v.Sealed)
+		if err != nil {
+			return Invalid("%s does not open on this machine, so it was left as it is.", name)
+		}
+		f.Secrets[name] = sessionSecretValue{Value: plain, SetAt: v.SetAt}
+	default:
+		return nil
+	}
+	if err := d.writeSessionSecretsLocked(agent, f); err != nil {
+		return Invalid("%s was not changed: the session's secrets file could not be written.", name)
+	}
+	log.Printf("session secrets: %s for %s: Ask before use %v", name, agent, on)
+	d.mcpChanged()
+	return nil
 }

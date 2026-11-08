@@ -8,7 +8,7 @@
 // but blocks no agent: a session done with a file it showed that nobody has opened, then each folder's
 // open pull requests labelled needs-approval (#3330), then the read-only daily checks' suggestions (#3331).
 import type { Agent, Approval, CheckSuggestion, ReviewPull, WorkflowSummary } from "../protocol/generated";
-import { asksToArchive, byStart, folderKey, groupOf, showsUnread } from "./groups";
+import { asksToArchive, byStart, folderKey, groupOf, showsUnread, writesDailySummary } from "./groups";
 import { queryMatches, type LabelQuery } from "./labels";
 import { isSessionApproval, kindWords } from "./approvals";
 
@@ -29,9 +29,10 @@ export function smartStartsOpen(row: SmartRow): boolean {
   return row === "pinned" || row === "needsYou" || row === "forReview";
 }
 
-/** SidebarSmartRow.isForReview (#3194): done, with a file it showed that nobody has opened. */
+/** SidebarSmartRow.isForReview (#3194): done, with a file it showed that nobody has opened. Not the
+ *  daily summary's, whose page is the Summary row (#3721). */
 export function isForReview(agent: Agent): boolean {
-  return groupOf(agent) === "finished" && agent.fileToSee != null;
+  return groupOf(agent) === "finished" && agent.fileToSee != null && !writesDailySummary(agent);
 }
 
 /** SidebarSmartRow.keeper: the group that keeps the session opened while it is open (#495),
@@ -108,8 +109,8 @@ export function pinnedWorkflows(held: readonly WorkflowSummary[], pins: readonly
 export function folderSessions(live: readonly Agent[], pins: readonly string[], query?: LabelQuery,
   kept?: string, on: ReadonlySet<SmartRow> = allSmartRows): Agent[] {
   const pinned = new Set(pins);
-  return live.filter((a) => home(a, pinned.has(a.id), on) === null && a.id !== kept && (!query || queryMatches(query, a)))
-    .sort(byStart);
+  return live.filter((a) => home(a, pinned.has(a.id), on) === null && a.id !== kept && !writesDailySummary(a)
+    && (!query || queryMatches(query, a))).sort(byStart);
 }
 
 /**

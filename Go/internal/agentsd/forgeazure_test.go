@@ -28,6 +28,13 @@ func (f *fakeForgeBoards) Search(_ context.Context, projects []string, sf azureb
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.searches = append(f.searches, azureboardsmcp.SearchWhere(projects, sf, []string{"Closed"})+" after="+after)
+	if sf.Label == "epic" {
+		// An Epic work item, with its feature's tag and no epic tag (#3939).
+		return azureboardsmcp.SearchPage{Cursors: []string{"acme=1"}, Items: []azureboardsmcp.Item{
+			{ID: 40, Project: boardsProjectName, State: "open", Status: "Active", Type: "Epic", Title: "Invoices",
+				Labels: []string{"feature:billing"}, UpdatedAt: "2026-11-01T12:00:00.000Z"},
+		}}, nil
+	}
 	return azureboardsmcp.SearchPage{Cursors: []string{"acme=1"}, Items: []azureboardsmcp.Item{
 		{ID: 12, Project: boardsProjectName, State: "open", Status: "Active", Type: "User Story", Title: "Export the invoices",
 			URL: "https://dev.azure.com/acme/web%20app/_workitems/edit/12", Author: "kim@acme.test", Labels: []string{"billing"},
@@ -338,5 +345,36 @@ func TestAnAzureBoardsBoardNarrowsWorkToItsTeam(t *testing.T) {
 	c.call(t, 4, "forge/issues", wire.ForgeListRequest{Board: &web.URL})
 	if after, _ := b.asked(); len(after) != len(searches) {
 		t.Fatalf("a GitHub board asked Azure Boards: %q", after[len(searches):])
+	}
+}
+
+// #3939: Work ▸ Features narrowed to an Azure Boards board lists the features of the Epic work
+// items under the team's area paths, though the epic has no epic tag.
+func TestFeaturesOfAnAzureBoardsBoard(t *testing.T) {
+	d, c, b, app := boardsDaemon(t)
+	id, _, _ := d.folderProject(app)
+	payments := board("Payments", "https://tfs.acme.test/acme/Web%20App/_boards/board/t/Payments", wire.ConnectionProviderAzuredevops,
+		"acme/Web App/Payments", "tfs.acme.test")
+	d.heardProjects(wire.MachineProjects{Projects: []wire.ProjectTools{
+		{ID: id, Name: "App", Slots: []wire.ProjectSlot{}, Boards: []wire.ProjectBoard{payments}},
+	}})
+	var out wire.ForgeFeatures
+	json.Unmarshal(c.call(t, 1, "forge/features", wire.ForgeFeaturesRequest{Board: &payments.URL}), &out)
+	if len(out.Features) != 1 || out.Features[0].Name != "billing" || out.Features[0].Epics != 1 || out.Features[0].Open != 1 ||
+		len(out.Errors) != 0 {
+		t.Fatalf("features %+v", out)
+	}
+	searches, _ := b.asked()
+	areas := `([System.AreaPath] UNDER 'Web App\Payments' OR [System.AreaPath] = 'Web App')`
+	if len(searches) != 2 || !strings.Contains(searches[1], "([System.WorkItemType] = 'Epic' OR [System.Tags] CONTAINS 'epic')") ||
+		!strings.Contains(searches[0], areas) || !strings.Contains(searches[1], areas) {
+		t.Fatalf("searches %q", searches)
+	}
+
+	// The epic is an epic on Work ▸ Issues too.
+	var list wire.ForgeList
+	json.Unmarshal(c.call(t, 2, "forge/issues", wire.ForgeListRequest{Board: &payments.URL, Label: new("epic"), State: new("all")}), &list)
+	if len(list.Items) != 1 || deref(list.Items[0].Level) != "epic" || deref(list.Items[0].Feature) != "billing" {
+		t.Fatalf("list %+v", list.Items)
 	}
 }

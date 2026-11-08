@@ -14,7 +14,8 @@ import (
 // CI runs (#3581, spec 3579-outer-loop): the build stage of the outer loop, as a node.
 //
 //   - Kind ci-run, ref github:<owner>/<repo>/actions/run/<id> (GitLab:
-//     gitlab:<group>/<project>/pipelines/<id>). Not workflow-run: that is an Agents
+//     gitlab:<group>/<project>/pipelines/<id>; Bitbucket: bitbucket:<workspace>/<repo>/pipelines/<n>,
+//     the Pipelines run's build number). Not workflow-run: that is an Agents
 //     workflow's run.
 //   - checks.passed and checks.failed link the run builds its PR. A rerun has the same id,
 //     so it is the same node.
@@ -36,7 +37,7 @@ const ciRunsPerPR = 20
 
 func (r forgeRepo) ciRun(id int64) wire.LineageNode {
 	ref := r.forge + ":" + r.path + "/actions/run/" + strconv.FormatInt(id, 10)
-	if r.forge == "gitlab" {
+	if r.forge == "gitlab" || r.forge == "bitbucket" {
 		ref = r.forge + ":" + r.path + "/pipelines/" + strconv.FormatInt(id, 10)
 	}
 	return wire.LineageNode{Kind: lineage.KindCIRun, Ref: ref}

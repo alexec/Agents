@@ -171,10 +171,13 @@ public struct SidebarFolderFold {
             }
         }
         // Only those no smart group lists: each session is in the sidebar once (#587), the
-        // one Unread keeps too (#689).
+        // one Unread keeps too (#689). The daily summary's sessions are the Summary row's (#3721).
         let kept = SidebarSmartRow.keptInUnread(keptInUnread, in: work, query: words, on: on, keptBy: keptBy)?.id
         sessions = groups.flatMap { group in
-            group.agents.filter { SidebarSmartRow.home(of: $0, in: group.group, isPinned: false, on: on) == nil && $0.id != kept }
+            group.agents.filter {
+                SidebarSmartRow.home(of: $0, in: group.group, isPinned: false, on: on) == nil && $0.id != kept
+                    && !$0.writesDailySummary
+            }
         }.sorted { $0.createdAt > $1.createdAt }
         let archived = shelf.groups[.archived] ?? []
         self.archived = matcher.map { archived.filter($0.matches) } ?? archived

@@ -77,6 +77,9 @@ public extension DaemonAPI {
                 Row(Method.dailySummarySettings, params: Empty.self, result: DailySummarySettings.self, kind: .hostRequest),
                 Row(Method.dailySummarySetSettings, params: DailySummarySettings.self, result: DailySummarySettings.self,
                     kind: .hostRequest),
+                // The Summary row and page (#3721): the saved pages, and one page's Markdown.
+                Row(Method.summariesList, params: Empty.self, result: [SummaryPage].self, kind: .hostRequest),
+                Row(Method.summariesRead, params: SummaryReadRequest.self, result: SummaryPageText.self, kind: .hostRequest),
                 // Auto (#2658): the order and cells, what it would pick now.
                 Row(Method.autoState, params: Empty.self, result: AutoSettings.self, kind: .hostRequest),
                 Row(Method.autoSet, params: AutoSettings.self, result: AutoSettings.self, kind: .hostRequest),
@@ -270,6 +273,7 @@ public extension DaemonAPI {
                 Row(Method.forgePlan, params: ForgePlanRequest.self, result: ForgePlan.self, kind: .hostRequest),
                 Row(Method.forgeFeatures, params: ForgeFeaturesRequest.self, result: ForgeFeatures.self, kind: .hostRequest),
                 Row(Method.forgeBoards, params: ForgeBoardsRequest.self, result: ForgeBoards.self, kind: .hostRequest),
+                Row(Method.forgeImage, params: ForgeImageRequest.self, result: ForgeImage.self, kind: .hostRequest),
                 Row(Method.forgeAddChild, params: ForgeAddChildRequest.self, result: ForgeDone.self, kind: .hostRequest),
                 Row(Method.forgeBlockedBy, params: ForgeBlockedByRequest.self, result: ForgeDone.self, kind: .hostRequest),
                 Row(Method.docsList, params: DocsListRequest.self, result: DocsList.self, kind: .hostRequest),
@@ -634,6 +638,7 @@ public extension DaemonAPI {
                     kind: .hostNotification),
                 Row(Notification.dailySummaryChanged, params: DailySummarySettings.self, result: Empty.self,
                     kind: .hostNotification),
+                Row(Notification.summariesChanged, params: [SummaryPage].self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.workflowChanged, params: WorkflowSummary.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.workflowRemoved, params: WorkflowRemovedNotification.self, result: Empty.self,
                     kind: .hostNotification),

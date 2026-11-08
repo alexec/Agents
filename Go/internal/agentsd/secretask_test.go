@@ -59,7 +59,7 @@ func TestAskingForASecret(t *testing.T) {
 	}
 	const value = "sk-test-2885-not-a-real-key"
 	c.call(t, 3, "elicitations/answer", map[string]any{"requestID": pending[0].ID, "action": "accept",
-		"content": map[string]any{"value": value + "\n"}})
+		"content": map[string]any{"value": value + "\n", "needsApproval": false}})
 	text := <-answered
 	path := skillcatalog.SecretsPath(home)
 	if !strings.HasPrefix(text, "OPENAI_API_KEY is saved in the person's secrets file, "+path) || strings.Contains(text, value) {
@@ -137,7 +137,11 @@ func TestASecretLeftOpenBringsOnlyItsName(t *testing.T) {
 		}
 		return false
 	})
-	if got, _ := skillcatalog.LoadSecrets(path).Value("GITLAB_TOKEN"); got != "new-token" {
-		t.Fatalf("secrets.env has %q", got)
+	// An agent's ask saves it with Ask before use (#4014): sealed, and the old plain line goes.
+	if skillcatalog.LoadSecrets(path).IsSet("GITLAB_TOKEN") {
+		t.Fatal("a flagged secret is still in secrets.env")
+	}
+	if got, ok, _ := d.localSecret(a.ID, "GITLAB_TOKEN"); !ok || got != "new-token" {
+		t.Fatalf("sealed.json has %q", got)
 	}
 }

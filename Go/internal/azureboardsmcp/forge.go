@@ -206,10 +206,14 @@ func SearchWhere(projects []string, f SearchFilter, closed []string) string {
 		}
 		where = append(where, "[System.State] "+op+" ("+strings.Join(quoted, ", ")+")")
 	}
-	for _, tag := range []string{f.Label, featureTag(f.Feature)} {
-		if tag != "" {
-			where = append(where, "[System.Tags] CONTAINS "+wiqlQuoted(tag))
-		}
+	// The label epic is an Epic work item too (#3939): Azure Boards says an epic by its type.
+	if strings.EqualFold(strings.TrimSpace(f.Label), epicLevel) {
+		where = append(where, "([System.WorkItemType] = "+wiqlQuoted(EpicType)+" OR [System.Tags] CONTAINS "+wiqlQuoted(f.Label)+")")
+	} else if f.Label != "" {
+		where = append(where, "[System.Tags] CONTAINS "+wiqlQuoted(f.Label))
+	}
+	if tag := featureTag(f.Feature); tag != "" {
+		where = append(where, "[System.Tags] CONTAINS "+wiqlQuoted(tag))
 	}
 	if f.Assignee != "" {
 		where = append(where, "[System.AssignedTo] = "+wiqlQuoted(f.Assignee))
@@ -222,6 +226,13 @@ func SearchWhere(projects []string, f SearchFilter, closed []string) string {
 	}
 	return strings.Join(where, " AND ")
 }
+
+// EpicType is the work item type that is an epic in every process (Agile, Scrum, CMMI and Basic),
+// and epicLevel the label that says the level on every forge.
+const (
+	EpicType  = "Epic"
+	epicLevel = "epic"
+)
 
 func featureTag(name string) string {
 	if name = strings.TrimSpace(name); name == "" {

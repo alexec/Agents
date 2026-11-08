@@ -157,6 +157,10 @@ func boardsItemOf(i azureboardsmcp.Item, folder string) wire.ForgeItem {
 		parent = new(boardsNode(i.Project, i.Parent))
 	}
 	withHierarchy(&out, parent, i.SubTotal, i.SubDone)
+	// An Epic work item is an epic with no epic tag (#3939), so Work ▸ Features counts it.
+	if out.Level == nil && strings.EqualFold(i.Type, azureboardsmcp.EpicType) {
+		out.Level = new("epic")
+	}
 	return out
 }
 

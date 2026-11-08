@@ -390,3 +390,36 @@ func TestEveryMachineTakesFromThePersonsOneBucket(t *testing.T) {
 		t.Fatal(string(settings.Notifications))
 	}
 }
+
+// #4014: Ask before use goes where the client said, on the row and in each machine's copy.
+// The control plane changes nothing in it: a machine opens a copy only with the flag its
+// client sealed (agentsd's TestYourSetupsFlagIsSealed).
+func TestAskBeforeUseIsCarriedAsTheClientSaidIt(t *testing.T) {
+	ctx := context.Background()
+	b := New(store.NewMemory(), nil, "")
+	box := newRecipient(t, "m:box")
+	set := wire.UserSecretSet{Name: "SHOP_PASSWORD", Version: 1, Values: map[string]wire.SealedEnvelope{}, NeedsApproval: new(true)}
+	e, err := controllink.Seal(box.public, controllink.UserSecretPurpose, controllink.UserSecretADAsk("sam", box.id, "SHOP_PASSWORD", 1, true), []byte("hunter2"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	set.Values[box.id] = e
+	if err := b.SetSecret(ctx, "sam", set, allowing(box)); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := b.Names(ctx, "sam", nil)
+	if err != nil || len(rows) != 1 || rows[0].NeedsApproval == nil || !*rows[0].NeedsApproval {
+		t.Fatalf("%+v %v", rows, err)
+	}
+	got, _, err := b.Delivery(ctx, "sam", box.id)
+	if err != nil || len(got.Secrets) != 1 || got.Secrets[0].NeedsApproval == nil || !*got.Secrets[0].NeedsApproval {
+		t.Fatalf("%+v %v", got, err)
+	}
+	s := got.Secrets[0]
+	if _, err := opens(t, box, "sam", s); err == nil {
+		t.Fatal("a flagged copy opened without its flag")
+	}
+	if plain, err := controllink.Open(box.private, controllink.UserSecretPurpose, controllink.UserSecretADAsk("sam", box.id, "SHOP_PASSWORD", 1, true), s.Sealed); err != nil || string(plain) != "hunter2" {
+		t.Fatal(err)
+	}
+}

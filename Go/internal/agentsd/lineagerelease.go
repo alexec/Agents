@@ -25,7 +25,8 @@ import (
 // starts with its version, so the graph and the cost rollup reach "got to people".
 //
 //   - Kind release, ref github:<owner>/<repo>/release/<tag> (GitLab: gitlab:<group>/<project>/release/<tag>;
-//     Forgejo: forgejo:<owner>/<repo>/release/<tag>, asked by its connection, lineageforgejo.go).
+//     Forgejo: forgejo:<owner>/<repo>/release/<tag>, and Bitbucket: bitbucket:<workspace>/<repo>/release/<tag>,
+//     asked by their connections, lineageforgejo.go and lineagebitbucket.go).
 //   - The host reads each folder's tags with `git ls-remote --tags origin`, at most once an
 //     hour (#3023's decided answer (a)): no forge event says "tag pushed" today.
 //   - A new v* tag gets the commits since the version tag before it (the forge's compare
@@ -192,8 +193,8 @@ func (d *Daemon) checkReleaseTagsForFolder(ctx context.Context, folder string, r
 // next hour tries again.
 func (d *Daemon) linkRelease(ctx context.Context, folder string, repo forgeRepo, tag, prev string) bool {
 	commitTime, compare, milestones := forgeCommitTime, forgeCompareCommits, forgeMilestones
-	if repo.forge == "forgejo" {
-		commitTime, compare, milestones = d.forgejoCommitTime, d.forgejoCompareCommits, d.forgejoMilestones
+	if c, ok := d.connectionAsks(repo.forge); ok {
+		commitTime, compare, milestones = c.commitTime, c.compare, c.milestones
 	}
 	if d.releaseCommitTime != nil {
 		commitTime = d.releaseCommitTime
@@ -242,8 +243,8 @@ func (d *Daemon) linkReleaseCommits(ctx context.Context, folder string, repo for
 		commits = commits[:releaseCommitsMax]
 	}
 	commitPR := forgeCommitPR
-	if repo.forge == "forgejo" {
-		commitPR = d.forgejoCommitPR
+	if c, ok := d.connectionAsks(repo.forge); ok {
+		commitPR = c.commitPR
 	}
 	if d.releaseCommitPR != nil {
 		commitPR = d.releaseCommitPR
@@ -358,10 +359,12 @@ type forgeMilestone struct {
 var (
 	githubSquashPR = regexp.MustCompile(`\(#([0-9]+)\)\s*$`)
 	gitlabSquashMR = regexp.MustCompile(`\(!([0-9]+)\)\s*$`)
+	// bitbucketMergedPR is the "(pull request #n)" Bitbucket ends its merge and squash titles with.
+	bitbucketMergedPR = regexp.MustCompile(`\(pull request #([0-9]+)\)\s*$`)
 )
 
 // squashPRNumber is the PR or MR a squash commit's title names, from the "(#n)" GitHub and
-// Forgejo add, or the "(!n)" GitLab adds.
+// Forgejo add, the "(!n)" GitLab adds, or Bitbucket's "(pull request #n)".
 func squashPRNumber(forge, message string) (int, bool) {
 	title, _, _ := strings.Cut(message, "\n")
 	var re *regexp.Regexp
@@ -370,6 +373,8 @@ func squashPRNumber(forge, message string) (int, bool) {
 		re = githubSquashPR
 	case "gitlab":
 		re = gitlabSquashMR
+	case "bitbucket":
+		re = bitbucketMergedPR
 	default:
 		return 0, false
 	}

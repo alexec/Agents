@@ -10,7 +10,7 @@
 #
 # Never `pkill -f agentsd`: this session is itself hosted by an Agents daemon, and a
 # pattern kill takes that one down with it. The pids in the root (daemon.lock,
-# control/control.pid) are the only helpers this script may touch.
+# control/control.pid, fake-azure-devops.pid) are the only helpers this script may touch.
 set -euo pipefail
 
 ROOT="${1:-}"
@@ -59,6 +59,7 @@ done
 
 stop_pid "$(tr -d '[:space:]' < "$ROOT/daemon.lock" 2>/dev/null || true)" agentsd host
 stop_pid "$(tr -d '[:space:]' < "$ROOT/control/control.pid" 2>/dev/null || true)" agents-control "control plane"
+stop_pid "$(tr -d '[:space:]' < "$ROOT/fake-azure-devops.pid" 2>/dev/null || true)" fake-azure-devops "fake Azure DevOps"
 
 # Runtimes and MCP helpers the host started carry the root in their argv or environment.
 for pid in $(pgrep -f "AGENTS_ROOT.*$ROOT" || true); do kill "$pid" 2>/dev/null || true; done

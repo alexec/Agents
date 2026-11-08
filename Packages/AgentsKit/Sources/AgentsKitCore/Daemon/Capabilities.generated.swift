@@ -64,6 +64,7 @@ public enum Capability {
     public static let folders1 = "folders/1"
     public static let forgeWrite1 = "forge-write/1"
     public static let forgeBoards1 = "forge.boards/1"
+    public static let forgeImage1 = "forge.image/1"
     public static let forge1 = "forge/1"
     public static let git1 = "git/1"
     public static let governance1 = "governance/1"
@@ -79,6 +80,7 @@ public enum Capability {
     public static let hostOrgRoutes2 = "host.org-routes/2"
     public static let hostPolicyLayers1 = "host.policy-layers/1"
     public static let hostPolicy1 = "host.policy/1"
+    public static let hostSecretApproval1 = "host.secret-approval/1"
     public static let hostSessionSecrets1 = "host.session-secrets/1"
     public static let hostSuspend1 = "host.suspend/1"
     public static let hostTeam1 = "host.team/1"
@@ -163,6 +165,7 @@ public enum Capability {
     public static let storage1 = "storage/1"
     public static let store1 = "store/1"
     public static let suggestions1 = "suggestions/1"
+    public static let summaries1 = "summaries/1"
     public static let summaryMachines1 = "summary.machines/1"
     public static let surface1 = "surface/1"
     public static let time1 = "time/1"
@@ -346,6 +349,7 @@ public enum Capability {
         "forge/comment": "forge-write/1",
         "forge/diff": "forge-write/1",
         "forge/features": "forge/1",
+        "forge/image": "forge.image/1",
         "forge/issue": "forge/1",
         "forge/issues": "forge/1",
         "forge/label": "forge-write/1",
@@ -480,6 +484,7 @@ public enum Capability {
         "secrets/sessionList": "host.session-secrets/1",
         "secrets/sessionRemove": "host.session-secrets/1",
         "secrets/sessionSet": "host.session-secrets/1",
+        "secrets/setNeedsApproval": "host.secret-approval/1",
         "selfUpdate/set": "host.update/1",
         "selfUpdate/status": "host.update/1",
         "sessions/adopt": "sessions/1",
@@ -510,6 +515,8 @@ public enum Capability {
         "store/notes": "store/1",
         "suggestions/dismiss": "suggestions/1",
         "suggestions/start": "suggestions/1",
+        "summaries/list": "summaries/1",
+        "summaries/read": "summaries/1",
         "surface/identify": "surface/1",
         "time/history": "time/1",
         "usage/history": "usage/1",
@@ -589,6 +596,7 @@ public enum Capability {
         "shell/stateChanged": "shell/1",
         "storage/writeFailed": "storage/1",
         "store/notesChanged": "store/1",
+        "summaries/changed": "summaries/1",
         "wake/changed": "wake/1",
         "workflow/changed": "workflow/1",
         "workflow/removed": "workflow/1",
@@ -871,6 +879,7 @@ public enum Capability {
             "host.suspend/1",
             "host.policy-layers/1",
             "host.browser-settings/1",
+            "host.secret-approval/1",
             "host.session-secrets/1",
             "host.desktop-control/1",
             "host.org-routes/2",

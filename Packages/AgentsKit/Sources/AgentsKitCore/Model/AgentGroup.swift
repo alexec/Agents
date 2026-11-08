@@ -158,7 +158,14 @@ public extension Agent {
     /// A finished turn nobody has opened since: news, but not a need (#70). Drawn as a
     /// mark on the row and counted beside the groups, never as a group of its own.
     var showsUnread: Bool {
-        state == .finished && isUnread
+        state == .finished && isUnread && !writesDailySummary
+    }
+
+    /// The Daily summary workflow's session (#3721): its page is the sidebar's Summary row, so
+    /// it is not listed under the home folder, in For Review or in Unread. Needs You still
+    /// lists one that asks the person something; the page's "How this was written" opens it.
+    var writesDailySummary: Bool {
+        startedByWorkflow == "daily-summary"
     }
 
     /// Whether the row draws it unread: a bold title (#1323). Only in Done, so a session

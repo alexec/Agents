@@ -130,10 +130,25 @@ func (d *Daemon) ApplyUserSettings(u wire.MachineUserSettings) error {
 	if partSent(s.Policy) {
 		note(wire.UserSettingsPartNamePolicy, d.applyYoursFromControlPlane(s.Policy))
 	}
-	opened, versions, kept := d.openUserSecrets(u, before)
+	opened, flagged, versions, kept := d.openUserSecrets(u, before)
 	names, err := writeSecrets(home, opened, before.Secrets, kept)
+	if err == nil && home != "" {
+		// Ask before use (#4014): the flagged ones are sealed here, never in secrets.env, which
+		// writeSecrets has just taken them out of.
+		if err = d.syncUserSealed(home, flagged, opened, kept); err == nil {
+			for _, s := range flagged {
+				if secretNameHere.MatchString(string(s.Name)) {
+					names = append(names, string(s.Name))
+				}
+			}
+			sort.Strings(names)
+		}
+	}
 	for i := range opened {
 		opened[i].Value = ""
+	}
+	for i := range flagged {
+		flagged[i].Value = ""
 	}
 	if err != nil {
 		problems = append(problems, "secrets: "+err.Error())
@@ -386,15 +401,14 @@ func (d *Daemon) applyYoursFromControlPlane(raw wire.JSONValue) error {
 // set before and no longer sends. A secret the person set here by hand, under a name the
 // control plane never sent, is left alone. It gives the names now from the control plane.
 // openUserSecrets opens each secret the person's client sealed to this machine (#3397):
-// the values, the version of each, and the names to keep as they are in the file, those
-// whose version here is newer than the one sent. One that does not open is left out.
-func (d *Daemon) openUserSecrets(u wire.MachineUserSettings, before userSettingsSyncState) ([]wire.UserSecret, map[string]int64, []string) {
+// the values, those with Ask before use apart (#4014), the version of each, and the names to
+// keep as they are in the file, those whose version here is newer than the one sent. One
+// that does not open is left out: a flag the control plane changed does not open.
+func (d *Daemon) openUserSecrets(u wire.MachineUserSettings, before userSettingsSyncState) (plain, flagged []wire.UserSecret, versions map[string]int64, kept []string) {
 	d.orgRouteMu.Lock()
 	id := d.identityLocked()
 	d.orgRouteMu.Unlock()
-	var out []wire.UserSecret
-	versions := map[string]int64{}
-	var kept []string
+	versions = map[string]int64{}
 	for _, s := range u.Secrets {
 		name := string(s.Name)
 		if had := before.Versions[name]; s.Version < had && slices.Contains(before.Secrets, name) {
@@ -407,17 +421,23 @@ func (d *Daemon) openUserSecrets(u wire.MachineUserSettings, before userSettings
 			log.Printf("user settings: %s: this machine has not joined a control plane", name)
 			continue
 		}
-		ad := controllink.UserSecretAD(u.User, controllink.MachineRecipient(id.host), name, s.Version)
-		plain, err := controllink.Open(id.private, controllink.UserSecretPurpose, ad, s.Sealed)
+		ask := s.NeedsApproval != nil && *s.NeedsApproval
+		ad := controllink.UserSecretADAsk(u.User, controllink.MachineRecipient(id.host), name, s.Version, ask)
+		value, err := controllink.Open(id.private, controllink.UserSecretPurpose, ad, s.Sealed)
 		if err != nil {
 			log.Printf("user settings: %s version %d does not open here: %v", name, s.Version, err)
 			continue
 		}
-		out = append(out, wire.UserSecret{Name: s.Name, Value: string(plain)})
-		clear(plain)
+		opened := wire.UserSecret{Name: s.Name, Value: string(value)}
+		clear(value)
+		if ask {
+			flagged = append(flagged, opened)
+		} else {
+			plain = append(plain, opened)
+		}
 		versions[name] = s.Version
 	}
-	return out, versions, kept
+	return plain, flagged, versions, kept
 }
 
 // writeSecrets writes the secrets into ~/.agents-secrets/secrets.env and takes out those

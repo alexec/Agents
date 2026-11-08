@@ -26,7 +26,11 @@ func TestGenerateSecretSavesFillsAndNeverSaysIt(t *testing.T) {
 	if r.IsError || replyText(r) != "GITLAB_PASSWORD made and filled." {
 		t.Fatalf("%+v", r)
 	}
-	saved, _ := skillcatalog.LoadSecrets(skillcatalog.SecretsPath(d.personalHome())).Value("GITLAB_PASSWORD")
+	// An agent's write: Ask before use is on (#4014), so it is sealed, not in secrets.env.
+	if skillcatalog.LoadSecrets(skillcatalog.SecretsPath(d.personalHome())).IsSet("GITLAB_PASSWORD") {
+		t.Fatal("a made password is in secrets.env")
+	}
+	saved, _, _ := d.localSecret("", "GITLAB_PASSWORD")
 	if len(saved) != generateLength || page.value != saved {
 		t.Fatalf("saved %d characters, typed %d", len(saved), len(page.value))
 	}
@@ -34,6 +38,7 @@ func TestGenerateSecretSavesFillsAndNeverSaysIt(t *testing.T) {
 		t.Fatal("the value came back")
 	}
 	assertNotUnder(t, d.Store.Loc.Root, saved)
+	assertNotUnder(t, d.personalHome(), saved)
 
 	// It exists now: refused, unless replace, which keeps the old one.
 	if r := m.browserTool(4, "generate_secret", map[string]any{"secret": "GITLAB_PASSWORD", "target": "e12"}); !r.IsError || !strings.Contains(replyText(r), "exists") {
@@ -42,11 +47,10 @@ func TestGenerateSecretSavesFillsAndNeverSaysIt(t *testing.T) {
 	if r := m.browserTool(5, "generate_secret", map[string]any{"secret": "GITLAB_PASSWORD", "target": "e12", "replace": true}); r.IsError {
 		t.Fatalf("%+v", r)
 	}
-	env := skillcatalog.LoadSecrets(skillcatalog.SecretsPath(d.personalHome()))
-	if prev, _ := env.Value("GITLAB_PASSWORD_PREVIOUS"); prev != saved {
+	if prev, _, _ := d.localSecret("", "GITLAB_PASSWORD_PREVIOUS"); prev != saved {
 		t.Fatal("the old value was not kept")
 	}
-	if now, _ := env.Value("GITLAB_PASSWORD"); now == saved {
+	if now, _, _ := d.localSecret("", "GITLAB_PASSWORD"); now == saved {
 		t.Fatal("not replaced")
 	}
 }

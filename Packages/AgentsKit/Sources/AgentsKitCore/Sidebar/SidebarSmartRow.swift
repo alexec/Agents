@@ -125,9 +125,10 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
     }
 
     /// Whether a session goes to For Review when nothing before it takes it (#3194): done,
-    /// with a file it showed that nobody has opened. Reading it clears the file (#1802).
+    /// with a file it showed that nobody has opened. Reading it clears the file (#1802). Not
+    /// the daily summary's, whose page is the Summary row (#3721).
     public static func isForReview(_ agent: Agent, in group: AgentGroup) -> Bool {
-        group == .finished && agent.fileToSee != nil
+        group == .finished && agent.fileToSee != nil && !agent.writesDailySummary
     }
 
     /// The group that keeps a session opened from the sidebar while it is open (#495): For

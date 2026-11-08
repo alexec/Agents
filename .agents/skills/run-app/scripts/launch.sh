@@ -39,7 +39,8 @@ while [ $# -gt 0 ]; do
     --app-arg)   APP_ARGS+=("$2"); shift ;;   # one more argument for the window, e.g. a defaults key: -key value
     --outside-checkout) OUTSIDE=1 ;;  # open a copy of the window from the root, so its title names no worktree (#1078)
     --person)    PERSON="$2"; shift ;;   # the first name the window gives the person, in place of the Mac account's (#1078)
-    *) echo "usage: launch.sh [--slug NAME] [--config Debug|Live] [--seeded] [--no-build] [--front] [--no-window] [--first-run] [--lan] [--host-first] [--web-port N] [--env KEY=VALUE]… [--control-env KEY=VALUE]… [--appearance light|dark] [--app-arg ARG]… [--outside-checkout] [--person NAME]" >&2; exit 2 ;;
+    --fake-azure-devops) FAKE_AZURE_DEVOPS=1 ;;  # Azure Repos and Azure Boards for the host (scripts/fake-azure-devops.py, #4063)
+    *) echo "usage: launch.sh [--slug NAME] [--config Debug|Live] [--seeded] [--no-build] [--front] [--no-window] [--first-run] [--lan] [--host-first] [--web-port N] [--env KEY=VALUE]… [--control-env KEY=VALUE]… [--appearance light|dark] [--app-arg ARG]… [--outside-checkout] [--person NAME] [--fake-azure-devops]" >&2; exit 2 ;;
   esac
   shift
 done
@@ -115,6 +116,30 @@ echo "control plane: $(basename "$CONTROL"), host: $(basename "$AGENTSD")" >&2
 mkdir -p "$ROOT/control"
 CLEAN=(env -i HOME="$HOME" USER="$USER" LOGNAME="$USER" TMPDIR="${TMPDIR:-/tmp}" LANG=en_US.UTF-8
        PATH="/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin")
+
+# --fake-azure-devops (#4063): the fake Azure DevOps on a free loopback port, its pid in the
+# root for stop.sh, and the host signed in to it by the secrets of a scratch personal home
+# (<root>/personal, or the one --env AGENTS_PERSONAL_HOME=… names), never the person's own.
+AZURE_DEVOPS_URL=""
+if [ "${FAKE_AZURE_DEVOPS:-0}" = 1 ]; then
+  ADO_PORT="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')"
+  AZURE_DEVOPS_URL="http://127.0.0.1:$ADO_PORT"
+  "${CLEAN[@]}" nohup python3 "$REPO/.agents/skills/run-app/scripts/fake-azure-devops.py" "$ADO_PORT" \
+    >"$ROOT/fake-azure-devops.out" 2>&1 &
+  echo $! >"$ROOT/fake-azure-devops.pid"
+  for _ in $(seq 1 50); do curl -fs -o /dev/null "$AZURE_DEVOPS_URL/acme/_apis/connectionData" && break; sleep 0.1; done
+  curl -fs -o /dev/null "$AZURE_DEVOPS_URL/acme/_apis/connectionData" \
+    || { echo "the fake Azure DevOps did not answer on $AZURE_DEVOPS_URL — see $ROOT/fake-azure-devops.out" >&2; exit 1; }
+  PERSONAL="$ROOT/personal"
+  for kv in ${EXTRA_ENV[@]+"${EXTRA_ENV[@]}"}; do
+    case "$kv" in AGENTS_PERSONAL_HOME=*) PERSONAL="${kv#AGENTS_PERSONAL_HOME=}" ;; esac
+  done
+  [ "$PERSONAL" = "$HOME" ] && { echo "refusing: --fake-azure-devops writes secrets into AGENTS_PERSONAL_HOME, and $HOME is the person's own" >&2; exit 1; }
+  [ "$PERSONAL" = "$ROOT/personal" ] && EXTRA_ENV+=(AGENTS_PERSONAL_HOME="$PERSONAL")
+  mkdir -p "$PERSONAL/.agents-secrets"
+  printf 'AZURE_DEVOPS_URL=%s\nAZURE_DEVOPS_TOKEN=walk\n' "$AZURE_DEVOPS_URL" >>"$PERSONAL/.agents-secrets/secrets.env"
+  chmod 600 "$PERSONAL/.agents-secrets/secrets.env"
+fi
 
 # The control plane: a single copy on a free loopback port, its store, key and certificate
 # in <root>/control, and no Bonjour, so no window on the network finds it.
@@ -246,4 +271,8 @@ WEB_URL=http://localhost:$WEB_PORT/
 PAIR_CODE=${PAIR_CODE:-}
 SOCK=$ROOT/daemon.sock
 LOG=$ROOT/logs/daemon.log
+EOF
+[ -z "$AZURE_DEVOPS_URL" ] || cat <<EOF
+AZURE_DEVOPS_URL=$AZURE_DEVOPS_URL
+AZURE_DEVOPS_REMOTE=$AZURE_DEVOPS_URL/acme/Web%20Shop/_git/shop
 EOF

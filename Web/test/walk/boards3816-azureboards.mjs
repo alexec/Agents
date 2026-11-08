@@ -1,4 +1,4 @@
-// The #3816 walk on a scratch root with the fixture Azure DevOps (Web/test/walk/forge3815-azureboards.py):
+// The #3816 walk on a scratch root with the fixture Azure DevOps (.agents/skills/run-app/scripts/fake-azure-devops.py):
 // connect Azure DevOps, open the Azure Repos folder's set-up (its Tasks slot reads Azure Boards and
 // names the project for Work), add the team Payments' board to the folder's project, and choose it in
 // Work ▸ Issues: only the work items under the team's area path. Screenshots go to <out dir>. The
