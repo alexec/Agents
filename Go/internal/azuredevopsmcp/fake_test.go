@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -42,6 +44,9 @@ type fakeAzureDevOps struct {
 	fileDiffs  []obj             // what filediffs answers
 	files      map[string]string // commit:path → the file's text
 	policies   []obj             // the target branch's "Limit merge types" policies
+	commits    []obj             // the repository's commits, newest first (#3952)
+	tags       map[string]string // tag → its commit's id
+	merged     map[string]int    // a merge commit's id → its completed pull request
 	me         string
 	posted     []obj // what was POSTed, PATCHed or PUT, with its method and path
 	status     int   // answer every request with this, when set
@@ -52,7 +57,7 @@ type fakeAzureDevOps struct {
 
 func newFake(t *testing.T) *fakeAzureDevOps {
 	f := &fakeAzureDevOps{t: t, threads: map[int][]obj{}, statuses: map[int][]obj{}, iterations: map[int][]obj{}, timeline: map[int][]obj{}, logs: map[int]string{},
-		changes: map[int][]obj{}, files: map[string]string{}, me: alex["id"].(string)}
+		changes: map[int][]obj{}, files: map[string]string{}, tags: map[string]string{}, merged: map[string]int{}, me: alex["id"].(string)}
 	f.server = httptest.NewServer(http.HandlerFunc(f.serve))
 	t.Cleanup(f.server.Close)
 	return f
@@ -135,6 +140,7 @@ var (
 	logPath        = regexp.MustCompile(`^/acme/Web App/_apis/build/builds/([0-9]+)/logs/([0-9]+)$`)
 	labelsPath     = regexp.MustCompile(`^` + gitRoot + `/pullRequests/([0-9]+)/labels(?:/[^/]+)?$`)
 	changesPath    = regexp.MustCompile(`^` + gitRoot + `/pullRequests/([0-9]+)/iterations/([0-9]+)/changes$`)
+	commentPath    = regexp.MustCompile(`^` + gitRoot + `/pullRequests/([0-9]+)/threads/([0-9]+)/comments/([0-9]+)$`)
 )
 
 func (f *fakeAzureDevOps) serve(w http.ResponseWriter, r *http.Request) {
@@ -192,6 +198,25 @@ func (f *fakeAzureDevOps) serve(w http.ResponseWriter, r *http.Request) {
 			reply(obj{"id": 77})
 		case replyPath.MatchString(p):
 			reply(obj{"id": 2})
+		case commentPath.MatchString(p):
+			m := commentPath.FindStringSubmatch(p)
+			if !f.hasComment(n(m), m[2], m[3]) {
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write([]byte(`{"message":"TF401181: The comment was not found."}`))
+				return
+			}
+			id, _ := strconv.Atoi(m[3])
+			reply(obj{"id": id})
+		case p == gitRoot+"/pullrequestquery":
+			found := obj{}
+			for _, q := range body["queries"].([]any) {
+				for _, sha := range q.(map[string]any)["items"].([]any) {
+					if pr, ok := f.merged[sha.(string)]; ok {
+						found[sha.(string)] = []obj{{"pullRequestId": pr, "status": "completed"}}
+					}
+				}
+			}
+			reply(obj{"results": []obj{found}})
 		case labelsPath.MatchString(p):
 			reply(obj{"name": body["name"], "active": true})
 		case p == gitRoot+"/filediffs":
@@ -242,6 +267,8 @@ func (f *fakeAzureDevOps) serve(w http.ResponseWriter, r *http.Request) {
 		list(f.threads[n(threadsPath.FindStringSubmatch(p))])
 	case statusesPath.MatchString(p):
 		list(f.statuses[n(statusesPath.FindStringSubmatch(p))])
+	case p == gitRoot+"/commits":
+		list(f.commitsOf(q))
 	case changesPath.MatchString(p):
 		reply(obj{"changeEntries": f.changes[n(changesPath.FindStringSubmatch(p))]})
 	case p == gitRoot+"/items":
@@ -292,6 +319,50 @@ func (f *fakeAzureDevOps) serve(w http.ResponseWriter, r *http.Request) {
 		f.t.Errorf("fake Azure DevOps: no %s %s", r.Method, r.URL)
 		w.WriteHeader(http.StatusNotFound)
 	}
+}
+
+// hasComment says whether a pull request's thread has a comment that is not deleted.
+func (f *fakeAzureDevOps) hasComment(pr int, thread, comment string) bool {
+	for _, t := range f.threads[pr] {
+		if fmt.Sprint(t["id"]) != thread {
+			continue
+		}
+		comments, _ := t["comments"].([]any)
+		for _, c := range comments {
+			if c, _ := c.(obj); fmt.Sprint(c["id"]) == comment && c["isDeleted"] != true {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// commitsOf is the commits a commits query asks for: from its itemVersion, newest first, up to
+// its compareVersion, a page of searchCriteria.$top after searchCriteria.$skip.
+func (f *fakeAzureDevOps) commitsOf(q url.Values) []obj {
+	index := func(which string) int {
+		ref := q.Get("searchCriteria." + which + ".version")
+		if q.Get("searchCriteria."+which+".versionType") == "tag" {
+			ref = f.tags[ref]
+		}
+		for i, c := range f.commits {
+			if c["commitId"] == ref {
+				return i
+			}
+		}
+		return len(f.commits)
+	}
+	from, to := index("itemVersion"), len(f.commits)
+	if q.Get("searchCriteria.compareVersion.version") != "" {
+		to = index("compareVersion")
+	}
+	out := f.commits[from:max(from, to)]
+	skip, _ := strconv.Atoi(q.Get("searchCriteria.$skip"))
+	out = out[min(skip, len(out)):]
+	if top, _ := strconv.Atoi(q.Get("searchCriteria.$top")); top > 0 {
+		out = out[:min(top, len(out))]
+	}
+	return out
 }
 
 // poller polls one event as the daemon does, keeping its cursor, on a clock a minute on each poll.

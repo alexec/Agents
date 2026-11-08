@@ -25,8 +25,9 @@ import (
 // starts with its version, so the graph and the cost rollup reach "got to people".
 //
 //   - Kind release, ref github:<owner>/<repo>/release/<tag> (GitLab: gitlab:<group>/<project>/release/<tag>;
-//     Forgejo: forgejo:<owner>/<repo>/release/<tag>, and Bitbucket: bitbucket:<workspace>/<repo>/release/<tag>,
-//     asked by their connections, lineageforgejo.go and lineagebitbucket.go).
+//     Forgejo: forgejo:<owner>/<repo>/release/<tag>, Bitbucket: bitbucket:<workspace>/<repo>/release/<tag>,
+//     and Azure DevOps: azuredevops:<org>/<project>/<repo>/release/<tag>, asked by their
+//     connections, lineageforgejo.go, lineagebitbucket.go and lineageazuredevops.go).
 //   - The host reads each folder's tags with `git ls-remote --tags origin`, at most once an
 //     hour (#3023's decided answer (a)): no forge event says "tag pushed" today.
 //   - A new v* tag gets the commits since the version tag before it (the forge's compare
@@ -361,10 +362,13 @@ var (
 	gitlabSquashMR = regexp.MustCompile(`\(!([0-9]+)\)\s*$`)
 	// bitbucketMergedPR is the "(pull request #n)" Bitbucket ends its merge and squash titles with.
 	bitbucketMergedPR = regexp.MustCompile(`\(pull request #([0-9]+)\)\s*$`)
+	// azureDevOpsMergedPR is the "Merged PR n: " Azure Repos starts its merge and squash titles with.
+	azureDevOpsMergedPR = regexp.MustCompile(`^Merged PR ([0-9]+):`)
 )
 
 // squashPRNumber is the PR or MR a squash commit's title names, from the "(#n)" GitHub and
-// Forgejo add, the "(!n)" GitLab adds, or Bitbucket's "(pull request #n)".
+// Forgejo add, the "(!n)" GitLab adds, Bitbucket's "(pull request #n)", or Azure Repos's
+// "Merged PR n: ".
 func squashPRNumber(forge, message string) (int, bool) {
 	title, _, _ := strings.Cut(message, "\n")
 	var re *regexp.Regexp
@@ -375,6 +379,8 @@ func squashPRNumber(forge, message string) (int, bool) {
 		re = gitlabSquashMR
 	case "bitbucket":
 		re = bitbucketMergedPR
+	case "azuredevops":
+		re = azureDevOpsMergedPR
 	default:
 		return 0, false
 	}

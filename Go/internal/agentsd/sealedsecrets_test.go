@@ -32,7 +32,10 @@ func TestAnAgentsSecretIsSealed(t *testing.T) {
 	for i, sessionOnly := range []bool{false, true} {
 		name := []string{"SHOP_PASSWORD", "SHOP_PIN_CODE"}[i]
 		answered := make(chan string, 1)
-		go func() { text, _ := m.tool(10+i, "ask_secret", map[string]any{"name": name, "reason": "To sign in."}); answered <- text }()
+		go func() {
+			text, _ := m.tool(10+i, "ask_secret", map[string]any{"name": name, "reason": "To sign in."})
+			answered <- text
+		}()
 		var pending []wire.ElicitationRequest
 		waitFor(t, "the card", func() bool {
 			json.Unmarshal(c.call(t, 1, "elicitations/pending", nil), &pending)

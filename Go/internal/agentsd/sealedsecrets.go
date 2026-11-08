@@ -57,7 +57,7 @@ type sealedSecretsState struct {
 }
 
 type sealedSecretsFile struct {
-	V       int                     `json:"v"`
+	V       int                    `json:"v"`
 	Secrets map[string]sealedValue `json:"secrets,omitempty"`
 }
 

@@ -275,9 +275,12 @@ func api(path string, query url.Values) string {
 }
 
 // webURL is a repository's page: https://dev.azure.com/org/project/_git/name.
-func (f *RealAzureDevOps) webURL(repo string) string {
+func (f *RealAzureDevOps) webURL(repo string) string { return WebURL(f.Base, repo) }
+
+// WebURL is the page of a repository (organization/project/name) of the Azure DevOps at base.
+func WebURL(base, repo string) string {
 	org, project, name := splitRepo(repo)
-	return f.Base + url.PathEscape(org) + "/" + url.PathEscape(project) + "/_git/" + url.PathEscape(name)
+	return BaseURL(base) + url.PathEscape(org) + "/" + url.PathEscape(project) + "/_git/" + url.PathEscape(name)
 }
 
 // pages lists path ($top and $skip) to its end, at most maxPages; truncated says it stopped there.

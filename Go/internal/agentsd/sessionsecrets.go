@@ -45,7 +45,7 @@ type sessionSecretValue struct {
 	Value string `json:"value,omitempty"`
 	// Sealed is a flagged one's value (#4014), in place of Value: sealedsecrets.go.
 	Sealed *sealedValue `json:"sealed,omitempty"`
-	SetAt  wire.Date     `json:"setAt"`
+	SetAt  wire.Date    `json:"setAt"`
 }
 
 func (d *Daemon) sessionSecretsDir() string {

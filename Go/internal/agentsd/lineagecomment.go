@@ -31,8 +31,8 @@ import (
 //   - Our store is the master; the comment is a copy (Alex, 2026-10-22). The numbers are
 //     this machine's, as lineage/cost's are.
 //   - The person's own gh (GitHub) or glab (GitLab) posts it, in the folder, as the Time
-//     page asks gh for merged PRs; on Forgejo and Bitbucket, the person's connection
-//     (lineageforgejo.go, lineagebitbucket.go).
+//     page asks gh for merged PRs; on Forgejo, Bitbucket and Azure DevOps, the person's
+//     connection (lineageforgejo.go, lineagebitbucket.go, lineageazuredevops.go).
 //   - The comment starts with prCommentMark, so a host that lost its record, or another
 //     machine, finds the comment and edits it.
 //   - The setting is read at each post and edit: turned off, the host stops editing.
