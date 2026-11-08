@@ -40,17 +40,22 @@ starts lanes.
      step 7, as for a bug fix.
    - Needed: open the PR with auto-merge **off** and the label `needs-approval`.
    - Needed: fix nothing until Alex answers: no CI fixes, rebases or conflict fixes. Wait with
-     `wait_for_event` on `pr.commented` and `pr.closed`, `where: {"pr": <n>}`, and end
-     your turn (#2838): `pr.commented` wakes you with the comment itself (author, url,
-     body, commentedAt), so there is no timer to re-check on and no need to re-read the
-     comments by hand. Start every comment you write with `<!-- agent -->`:
-     `pr.commented` already leaves those out, so a comment it raises is always Alex's.
-   - Alex approves (for example "I approve these screenshots, ship it"): add
-     `approved`, remove `needs-approval`, write `Alex approved (<comment link>)` in the
-     PR body, fix the checks, rebase, turn on squash auto-merge and go on to step 7.
-   - Alex asks for changes (any other comment): add `changes-wanted`, make the changes,
-     take a new set of screenshots, remove `changes-wanted`, say on the PR what you
-     changed and wait again. When you cannot tell which one Alex means, ask on the PR.
+     `wait_for_event` on `pr.reviewed`, `pr.commented` and `pr.closed`, `where: {"pr": <n>}`,
+     and end your turn (#2838, #3860): each wakes you with the review or the comment itself
+     (author, state, url, body), so there is no timer to re-check on and no need to re-read
+     the PR by hand. A comment you write as `alexec` starts with `<!-- agent -->`
+     (AGENTS.md, "Who an agent posts as"): `pr.commented` leaves those out, and a bot's,
+     so a comment it raises is always Alex's.
+   - Alex approves: a review with **Approve** (`pr.reviewed`, state `approved`) on the
+     bot's PR, or a comment such as "I approve these screenshots, ship it" on a PR posted
+     as `alexec`, who cannot review their own. Add `approved`, remove `needs-approval`,
+     write `Alex approved (<review or comment link>)` in the PR body, fix the checks,
+     rebase, turn on squash auto-merge and go on to step 7.
+   - Alex asks for changes: a review with **Request changes** (state `changes_requested`)
+     or any other comment. Add `changes-wanted`, make the changes, take a new set of
+     screenshots, remove `changes-wanted`, say on the PR what you changed and wait again.
+     A review with only words (state `commented`) is a comment. When you cannot tell which
+     one Alex means, ask on the PR.
    - Closed: Alex dropped it. Go to step 9.
 7. Wait for the pull request to merge. Use one `wait_for_event` call with
    `events: ["pr.merged", "pr.closed", "checks.failed", "checks.passed", "pr.conflicted"]`,

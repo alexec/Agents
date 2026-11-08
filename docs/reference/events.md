@@ -203,6 +203,9 @@ and a pull request labelled `needs-approval` (an approval), with its `## Screens
 daemon sweeps every 5 minutes. Answered in the app, the answer goes to GitHub as the person: a
 ticked line ticks the issue's line; the last one removes the label, unassigns the person and
 says so in a comment; an approval posts the note and sets `approved` (or `changes-wanted`).
+On a pull request that the agents' bot opened, the note is the person's real review of its
+head commit, Approve or Request changes (#3860); on the person's own, which GitHub does not
+let them review, it is a comment.
 A label changed on GitHub opens or ends the request at the next sweep. A lane waits on its
 approval with `where: {pr: <n>}`; the answer is `approve: <note>` or `changes: <note>`.
 
@@ -333,7 +336,7 @@ trigger is:
 
   | Event | Names it with | `any: true` |
   | --- | --- | --- |
-  | `pr.merged`, `pr.closed`, `pr.conflicted`, `pr.commented`, `pr.labelled`, `pr.unlabelled`, `review.posted`, `review.comment` | `pr`, `branch`, `fixes` or `mine` | yes |
+  | `pr.merged`, `pr.closed`, `pr.conflicted`, `pr.commented`, `pr.reviewed`, `pr.labelled`, `pr.unlabelled`, `review.posted`, `review.comment` | `pr`, `branch`, `fixes` or `mine` | yes |
   | `checks.failed`, `checks.passed` | `pr`, `branch`, `fixes` or `mine` | yes |
   | `run.completed` | `run`, `branch` or `workflow` | yes |
   | `issue.closed`, `issue.commented`, `issue.labelled` | `issue` or `label` | yes |

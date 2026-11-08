@@ -119,7 +119,7 @@ func (a args) byMe(p PR, yours *Yours) bool {
 	if !a.mine {
 		return true
 	}
-	return yours != nil && (yours.owns(p.Number) || p.Author != "" && strings.EqualFold(p.Author, yours.Login))
+	return yours != nil && yours.ownsPR(p)
 }
 
 // check reads raw (null or missing as {}) and checks it: no unknown keys, types, shapes.

@@ -312,6 +312,9 @@ type GitHub interface {
 	// comments on a line) at or after since. An agent's own, an issue's, and another PR's when pr
 	// is not 0 are Other, with nothing fetched for them.
 	PRComments(ctx context.Context, repo, since string, pr int) (comments []PRComment, truncated bool, err error)
+	// PRReviews are people's and bots' reviews of the open PRs submitted at or after since (#3860),
+	// only PR number pr's when it is not 0.
+	PRReviews(ctx context.Context, repo, since string, pr int) ([]PRReview, error)
 	// CodeRabbitPRs are the open PRs and whether CodeRabbit has reviewed each one's head commit (#1344).
 	CodeRabbitPRs(ctx context.Context, repo string) ([]ReviewedPR, error)
 	// CodeRabbitComments are CodeRabbit's review comments made at or after since.
@@ -336,6 +339,18 @@ func (y Yours) owns(pr int) bool {
 		}
 	}
 	return false
+}
+
+// ownsPR says whether p is the owner's: one of their open PRs, or a PR by them or by their
+// agents' bot, <login>-agents (#3860).
+func (y Yours) ownsPR(p PR) bool {
+	if y.owns(p.Number) {
+		return true
+	}
+	if p.Author == "" || y.Login == "" {
+		return false
+	}
+	return strings.EqualFold(p.Author, y.Login) || strings.EqualFold(strings.TrimSuffix(p.Author, "[bot]"), y.Login+"-agents")
 }
 
 // ErrorKind is why a GitHub call failed.
@@ -382,10 +397,28 @@ func isTrusted(association, login, typ string) bool {
 	return false
 }
 
+// isAgentsBot says whether an account is a person's agents' bot (#3858): the App that
+// connections.BotName names <login>-agents, which REST gives as <login>-agents[bot] and
+// GraphQL as the Bot <login>-agents. A bot acts only where an admin installed it.
+func isAgentsBot(login, typ string) bool {
+	return (typ == "Bot" || strings.HasSuffix(login, "[bot]")) &&
+		(strings.HasSuffix(login, "-agents[bot]") || typ == "Bot" && strings.HasSuffix(login, "-agents"))
+}
+
+// isOwnAuthor says whether an issue or a pull request is the repo's own (#728): a person's
+// who is trusted, or their agents' bot's (#3860), so a lane's wait on its PR still wakes once
+// the bot opens it. The bot's comments are not: they are the agents' own, never a person's.
+func isOwnAuthor(association, login, typ string) bool {
+	return isTrusted(association, login, typ) || isAgentsBot(login, typ)
+}
+
 // isTrustedActor says whether a label or a close was the repo's own doing (#728). Labelling
 // takes triage access, so a person who did it is trusted; closing does not, since an author
-// may close their own.
+// may close their own. The agents' bot labels as its person does (#3860).
 func isTrustedActor(actor, typ string, closing bool, issueAuthor string, authorTrusted bool) bool {
+	if isAgentsBot(actor, typ) {
+		return !closing || actor != issueAuthor || authorTrusted
+	}
 	if typ == "Bot" || strings.HasSuffix(actor, "[bot]") {
 		return false
 	}

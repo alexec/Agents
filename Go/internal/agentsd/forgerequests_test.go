@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/alexec/agents/Go/internal/githubmcp"
@@ -149,6 +150,36 @@ func TestTheForgeEndsARequest(t *testing.T) {
 			if r.State != wire.RequestStateAnswered || deref(r.Answer) != "The label needs-approval was taken off" {
 				t.Fatalf("%+v", r)
 			}
+		}
+	}
+}
+
+// #3860: on the agents' bot's PR, Approve and Request changes in Agents are the person's real
+// review of the head commit, not a comment; the labels still mirror it.
+func TestAnApprovalOfTheBotsPRIsARealReview(t *testing.T) {
+	d, c, gh := forgeRequestsDaemon(t)
+	gh.mu.Lock()
+	gh.authors = map[int]string{12: "alexec-agents"}
+	gh.mu.Unlock()
+	sweepAgain(d)
+	var review wire.Request
+	for _, r := range listedRequests(t, c, 1, "open") {
+		if r.Forge.Item == "pr" {
+			review = r
+		}
+	}
+	var u wire.RequestUpdate
+	json.Unmarshal(c.call(t, 2, "requests/answer", map[string]any{"id": review.ID, "answer": map[string]any{"approval": map[string]any{"action": "changes", "note": "Move it left"}}}), &u)
+	if u.Request.State != wire.RequestStateAnswered {
+		t.Fatalf("%+v", u.Request)
+	}
+	w := gh.writes()
+	if !slices.Contains(w, "review alexec/agents#12 h12 approve=false") || !slices.Contains(w, "labels alexec/agents#12 +changes-wanted -") {
+		t.Fatalf("%q", w)
+	}
+	for _, line := range w {
+		if strings.HasPrefix(line, "comment alexec/agents#12") {
+			t.Fatalf("a comment as well: %q", w)
 		}
 	}
 }

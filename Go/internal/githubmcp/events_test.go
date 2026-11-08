@@ -25,6 +25,7 @@ type fakeGitHub struct {
 	reviewed   []ReviewedPR
 	rabbit     []CodeRabbitComment
 	prComments []PRComment
+	prReviews  []PRReview
 	completed  []CompletedRun
 	deploys    map[int][]string
 	waiting    []WaitingDeploy
@@ -322,6 +323,27 @@ func (f *fakeGitHub) PRComments(_ context.Context, _, since string, pr int) ([]P
 	return out, false, nil
 }
 
+func (f *fakeGitHub) PRReviews(_ context.Context, _, since string, pr int) ([]PRReview, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.err != nil {
+		return nil, f.err
+	}
+	var out []PRReview
+	for _, r := range f.prReviews {
+		if !before(r.At, since) && (pr == 0 || r.PR.Number == pr) {
+			out = append(out, r)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeGitHub) addPRReview(r PRReview) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.prReviews = append(f.prReviews, r)
+}
+
 // harness polls a fake through Events, with a clock that moves on by a second a poll, as
 // real polls are seconds apart.
 type harness struct {
@@ -412,7 +434,7 @@ func TestEventsListGivesEveryEventPollOnlyWithTheirSchemas(t *testing.T) {
 		_, hasMine := props["mine"]
 		// Every event about one PR names it by mine too (#3797), and all of them take any.
 		named := map[string]bool{"checks.failed": true, "checks.passed": true, "pr.merged": true, "pr.closed": true,
-			"pr.conflicted": true, "pr.commented": true, "pr.labelled": true, "pr.unlabelled": true,
+			"pr.conflicted": true, "pr.commented": true, "pr.labelled": true, "pr.unlabelled": true, "pr.reviewed": true,
 			"review.posted": true, "review.comment": true}
 		equal(t, hasMine, named[name], name+" mine")
 		_, hasFixes := props["fixes"]
@@ -433,7 +455,7 @@ func TestEventsListGivesEveryEventPollOnlyWithTheirSchemas(t *testing.T) {
 	}
 	sort.Strings(names)
 	equal(t, names, []string{"checks.failed", "checks.passed", "deploy.waiting", "issue.assigned", "issue.closed", "issue.commented", "issue.labelled", "issue.opened",
-		"pr.closed", "pr.commented", "pr.conflicted", "pr.labelled", "pr.merged", "pr.opened", "pr.unlabelled", "review.comment", "review.posted",
+		"pr.closed", "pr.commented", "pr.conflicted", "pr.labelled", "pr.merged", "pr.opened", "pr.reviewed", "pr.unlabelled", "review.comment", "review.posted",
 		"review.requested", "run.completed"}, "names")
 }
 
@@ -1014,4 +1036,37 @@ func TestPRCommentedNarrowsByPR(t *testing.T) {
 	h.fake.addPRComment(PRComment{ID: 4, PR: pr950, Author: "alexec", Body: "ship it", At: h.at(5), Trusted: true})
 	h.fake.addPRComment(PRComment{ID: 5, PR: pr951, Author: "alexec", Body: "ship it", At: h.at(5), Trusted: true})
 	equal(t, ids(h.poll("pr.commented", byPR, first["cursor"])), []string{"pr.commented:" + repo + ":4"}, "narrowed")
+}
+
+// #3860: pr.reviewed wakes a lane waiting for Alex's review of the bot's PR. A bot's review
+// (CodeRabbit's, the agents' own) and a stranger's are left out unless anyone is true; the
+// wait narrows by PR.
+func TestPRReviewedRaisesAPersonsReviewAndLeavesOutBots(t *testing.T) {
+	h := newHarness(t)
+	pr := PR{Number: 960, Title: "A new control", Branch: "agents/960-ui", URL: "u960", Author: "alexec-agents[bot]"}
+	other := PR{Number: 961, URL: "u961"}
+	byPR, anyone := map[string]any{"repo": repo, "pr": 960}, map[string]any{"repo": repo, "pr": 960, "anyone": true}
+	a, b := h.poll("pr.reviewed", byPR, nil), h.poll("pr.reviewed", anyone, nil)
+	h.fake.addPRReview(PRReview{ID: 1, PR: pr, Author: "coderabbitai", State: "commented", Body: "Actionable comments posted: 0", At: h.at(5)})
+	h.fake.addPRReview(PRReview{ID: 2, PR: pr, Author: "stranger", State: "approved", At: h.at(5)})
+	h.fake.addPRReview(PRReview{ID: 3, PR: pr, Author: "alexec", State: "approved", Commit: "h1", URL: "r3", At: h.at(5), Trusted: true})
+	h.fake.addPRReview(PRReview{ID: 4, PR: other, Author: "alexec", State: "changes_requested", At: h.at(5), Trusted: true})
+	raised := h.poll("pr.reviewed", byPR, a["cursor"])
+	equal(t, ids(raised), []string{"pr.reviewed:" + repo + ":3"}, "only Alex's, on this PR")
+	data := eventsOf(raised)[0]["data"].(map[string]any)
+	equal(t, data["review"].(map[string]any)["state"], "approved", "state")
+	equal(t, data["review"].(map[string]any)["commit"], "h1", "commit")
+	equal(t, data["pr"].(map[string]any)["branch"], "agents/960-ui", "pr")
+	equal(t, ids(h.poll("pr.reviewed", anyone, b["cursor"])),
+		[]string{"pr.reviewed:" + repo + ":1", "pr.reviewed:" + repo + ":2", "pr.reviewed:" + repo + ":3"}, "anyone")
+}
+
+// #3860: once lanes open PRs as the person's agents' bot, mine still names them.
+func TestMineCountsTheAgentsBotsPRs(t *testing.T) {
+	y := Yours{Login: "alexec"}
+	equal(t, y.ownsPR(PR{Number: 1, Author: "alexec-agents[bot]"}), true, "REST's bot")
+	equal(t, y.ownsPR(PR{Number: 1, Author: "alexec-agents"}), true, "GraphQL's bot")
+	equal(t, y.ownsPR(PR{Number: 1, Author: "alexec"}), true, "the person")
+	equal(t, y.ownsPR(PR{Number: 1, Author: "alexec[bot]"}), false, "another bot")
+	equal(t, y.ownsPR(PR{Number: 1, Author: "mallory-agents[bot]"}), false, "someone else's bot")
 }
