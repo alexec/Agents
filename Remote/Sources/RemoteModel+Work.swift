@@ -9,7 +9,7 @@ extension RemoteModel {
         // The list Work opens on is no place yet: a page opened from it puts it first, so Back finds it (#3257).
         if place.fromList, workHistory.current == nil { workHistory.go(WorkPlace(kind: place.kind)) }
         if place != workHistory.current { workHistory.go(place) }
-        sidebarItem = .work
+        sidebarItem = .work(place.kind)
     }
 
     var forgeMachines: [(id: MachineRef, name: String)] {

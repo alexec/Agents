@@ -1,0 +1,181 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700" font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif">
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#20242A" flood-opacity="0.14"/>
+    </filter>
+    <symbol id="issue" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="2" fill="currentColor"/></symbol>
+    <symbol id="pr" viewBox="0 0 16 16"><circle cx="4" cy="3.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="4" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="12" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M4 5.1v5.8M12 10.9V6.5a2 2 0 0 0-2-2H7.5M9 3l-1.6 1.5L9 6" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="flag" viewBox="0 0 16 16"><path d="M3.5 14V2.5M3.5 3h8.5l-2 3 2 3H3.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="box" viewBox="0 0 16 16"><path d="M2.5 5l5.5-2.5L13.5 5v6.5L8 14l-5.5-2.5zM2.5 5L8 7.5 13.5 5M8 7.5V14M5.2 3.8l5.6 2.5" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></symbol>
+    <symbol id="plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="list" viewBox="0 0 16 16"><rect x="2.5" y="2.5" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M5 6h6M5 8.5h6M5 11h4" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></symbol>
+    <symbol id="cpu" viewBox="0 0 16 16"><rect x="4" y="4" width="8" height="8" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M6 2v2M10 2v2M6 12v2M10 12v2M2 6h2M2 10h2M12 6h2M12 10h2" stroke="currentColor" stroke-width="1.1"/></symbol>
+    <symbol id="chev-down" viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="chev-right" viewBox="0 0 10 10"><path d="M3.5 2l3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="chev-left" viewBox="0 0 10 10"><path d="M6.5 2l-3 3 3 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  </defs>
+
+  <rect width="1200" height="700" fill="#E7EAEE"/>
+  <text x="24" y="34" font-size="15" font-weight="600" fill="#1C1D20">Remote · the Work group on the iPhone and the iPad, and the web as it is</text>
+  <text x="24" y="54" font-size="12" fill="#6B7280">Hi-fi mock for #4004 · Paper palette, light · no Features row on the Remote (tier mac+web, #3269)</text>
+
+  <!-- ============ iPhone: root list ============ -->
+  <g transform="translate(24,80)">
+    <text x="0" y="0" font-size="13" font-weight="600" fill="#1C1D20">iPhone · the list</text>
+    <g transform="translate(0,14)" filter="url(#shadow)"><rect width="250" height="520" rx="34" fill="#F2F3F5"/></g>
+    <g transform="translate(0,14)">
+      <text x="28" y="34" font-size="12" font-weight="600" fill="#1C1D20">9:41</text>
+      <rect x="92" y="18" width="66" height="20" rx="10" fill="#1C1D20"/>
+      <text x="20" y="84" font-size="26" font-weight="700" fill="#1C1D20">Agents</text>
+
+      <rect x="14" y="100" width="222" height="40" rx="10" fill="#fff"/>
+      <use href="#plus" x="26" y="112" width="16" height="16" color="#0A84FF"/>
+      <text x="52" y="125" font-size="15" fill="#1C1D20">New Session</text>
+
+      <use href="#chev-down" x="20" y="157" width="10" height="10" color="#8A9099"/>
+      <text x="34" y="166" font-size="12" font-weight="600" fill="#8A9099">Work</text>
+      <rect x="14" y="174" width="222" height="160" rx="10" fill="#fff"/>
+      <g font-size="15" fill="#1C1D20">
+        <use href="#issue" x="26" y="186" width="16" height="16" color="#0A84FF"/><text x="52" y="199">Issues</text>
+        <use href="#chev-right" x="216" y="189" width="10" height="10" color="#B5BAC2"/>
+        <path d="M52 214h184" stroke="#ECEEF1"/>
+        <use href="#pr" x="26" y="226" width="16" height="16" color="#0A84FF"/><text x="52" y="239">Pull requests</text>
+        <use href="#chev-right" x="216" y="229" width="10" height="10" color="#B5BAC2"/>
+        <path d="M52 254h184" stroke="#ECEEF1"/>
+        <use href="#flag" x="26" y="266" width="16" height="16" color="#0A84FF"/><text x="52" y="279">Milestones</text>
+        <use href="#chev-right" x="216" y="269" width="10" height="10" color="#B5BAC2"/>
+        <path d="M52 294h184" stroke="#ECEEF1"/>
+        <use href="#box" x="26" y="306" width="16" height="16" color="#0A84FF"/><text x="52" y="319">Releases</text>
+        <use href="#chev-right" x="216" y="309" width="10" height="10" color="#B5BAC2"/>
+      </g>
+
+      <g opacity=".45">
+        <use href="#chev-down" x="20" y="351" width="10" height="10" color="#8A9099"/>
+        <text x="34" y="360" font-size="12" font-weight="600" fill="#8A9099">Status</text>
+        <rect x="14" y="368" width="222" height="80" rx="10" fill="#fff"/>
+        <use href="#list" x="26" y="380" width="16" height="16" color="#0A84FF"/><text x="52" y="393" font-size="15" fill="#1C1D20">Events</text>
+        <path d="M52 408h184" stroke="#ECEEF1"/>
+        <use href="#cpu" x="26" y="420" width="16" height="16" color="#0A84FF"/><text x="52" y="433" font-size="15" fill="#1C1D20">Runtimes</text>
+      </g>
+      <rect x="88" y="504" width="74" height="5" rx="2.5" fill="#1C1D20"/>
+    </g>
+  </g>
+
+  <!-- ============ iPhone: pushed list ============ -->
+  <g transform="translate(300,80)">
+    <text x="0" y="0" font-size="13" font-weight="600" fill="#1C1D20">iPhone · Issues pushed</text>
+    <g transform="translate(0,14)" filter="url(#shadow)"><rect width="250" height="520" rx="34" fill="#F2F3F5"/></g>
+    <g transform="translate(0,14)">
+      <text x="28" y="34" font-size="12" font-weight="600" fill="#1C1D20">9:41</text>
+      <rect x="92" y="18" width="66" height="20" rx="10" fill="#1C1D20"/>
+      <use href="#chev-left" x="14" y="58" width="14" height="14" color="#0A84FF"/>
+      <text x="30" y="70" font-size="15" fill="#0A84FF">Agents</text>
+      <text x="125" y="70" font-size="15" font-weight="600" fill="#1C1D20" text-anchor="middle">Issues</text>
+      <text x="196" y="70" font-size="15" fill="#B5BAC2">‹</text>
+      <text x="218" y="70" font-size="15" fill="#B5BAC2">›</text>
+
+      <g font-size="12" fill="#3F444B">
+        <rect x="14" y="88" width="84" height="26" rx="13" fill="#E6E8EC"/><text x="24" y="105">State: Open</text>
+        <rect x="104" y="88" width="80" height="26" rx="13" fill="#E6E8EC"/><text x="114" y="105">Label: Any</text>
+        <rect x="190" y="88" width="60" height="26" rx="13" fill="#E6E8EC"/><text x="200" y="105">Repo…</text>
+      </g>
+      <rect x="14" y="122" width="222" height="30" rx="9" fill="#E6E8EC"/>
+      <text x="26" y="142" font-size="13" fill="#9AA1AB">Search issues</text>
+
+      <g font-size="14" fill="#1C1D20">
+        <rect x="14" y="162" width="222" height="76" rx="10" fill="#fff"/>
+        <circle cx="30" cy="180" r="5" fill="none" stroke="#1F883D" stroke-width="1.6"/><circle cx="30" cy="180" r="1.6" fill="#1F883D"/>
+        <text x="44" y="184">Sidebar: a folding Work</text>
+        <text x="44" y="202">group with a row per list</text>
+        <text x="44" y="224" font-size="11" fill="#8A9099">#4004 · 2 sessions · $0.41</text>
+        <rect x="14" y="246" width="222" height="76" rx="10" fill="#fff"/>
+        <circle cx="30" cy="264" r="5" fill="none" stroke="#1F883D" stroke-width="1.6"/><circle cx="30" cy="264" r="1.6" fill="#1F883D"/>
+        <text x="44" y="268">Machines in the sidebar,</text>
+        <text x="44" y="286">part 2</text>
+        <text x="44" y="308" font-size="11" fill="#8A9099">#3979 · No agent yet</text>
+        <g opacity=".5"><rect x="14" y="330" width="222" height="76" rx="10" fill="#fff"/><rect x="14" y="414" width="222" height="76" rx="10" fill="#fff"/></g>
+      </g>
+      <rect x="88" y="504" width="74" height="5" rx="2.5" fill="#1C1D20"/>
+    </g>
+  </g>
+
+  <!-- callouts under the phones -->
+  <g font-size="11.5" fill="#3F444B" transform="translate(24,640)">
+    <text x="0" y="0">A row pushes its list; the bar's title is the list's. The kind menu in the bar is gone.</text>
+    <text x="0" y="16" fill="#6B7280">‹ › stay at the bar's end, for Back and Forward along the places, as now.</text>
+  </g>
+
+  <!-- ============ iPad ============ -->
+  <g transform="translate(590,80)">
+    <text x="0" y="0" font-size="13" font-weight="600" fill="#1C1D20">iPad · as the Mac, with no segmented control</text>
+    <g transform="translate(0,14)" filter="url(#shadow)"><rect width="586" height="330" rx="18" fill="#FBFBFC"/></g>
+    <g transform="translate(0,14)">
+      <path d="M18 0h182v330H18a18 18 0 0 1-18-18V18A18 18 0 0 1 18 0z" fill="#F0F1F3"/>
+      <path d="M200 0v330" stroke="#E0E3E7"/>
+      <use href="#plus" x="18" y="30" width="16" height="16" color="#0A84FF"/>
+      <text x="42" y="43" font-size="13" fill="#1C1D20">New Session</text>
+      <use href="#chev-down" x="14" y="65" width="10" height="10" color="#8A9099"/>
+      <text x="30" y="74" font-size="11" font-weight="600" fill="#8A9099">Work</text>
+      <rect x="8" y="84" width="184" height="28" rx="6" fill="#0A84FF"/>
+      <use href="#issue" x="18" y="90" width="16" height="16" color="#fff"/><text x="42" y="103" font-size="13" fill="#fff">Issues</text>
+      <use href="#pr" x="18" y="118" width="16" height="16" color="#0A84FF"/><text x="42" y="131" font-size="13" fill="#1C1D20">Pull requests</text>
+      <use href="#flag" x="18" y="146" width="16" height="16" color="#0A84FF"/><text x="42" y="159" font-size="13" fill="#1C1D20">Milestones</text>
+      <use href="#box" x="18" y="174" width="16" height="16" color="#0A84FF"/><text x="42" y="187" font-size="13" fill="#1C1D20">Releases</text>
+      <g opacity=".45">
+        <use href="#chev-down" x="14" y="211" width="10" height="10" color="#8A9099"/>
+        <text x="30" y="220" font-size="11" font-weight="600" fill="#8A9099">Status</text>
+        <use href="#list" x="18" y="230" width="16" height="16" color="#0A84FF"/><text x="42" y="243" font-size="13" fill="#1C1D20">Events</text>
+        <use href="#cpu" x="18" y="258" width="16" height="16" color="#0A84FF"/><text x="42" y="271" font-size="13" fill="#1C1D20">Runtimes</text>
+      </g>
+
+      <path d="M200 48h386" stroke="#E0E3E7"/>
+      <text x="220" y="31" font-size="15" fill="#B5BAC2">‹  ›</text>
+      <text x="393" y="31" font-size="14" font-weight="600" fill="#1C1D20" text-anchor="middle">Issues</text>
+      <g font-size="11.5" fill="#3F444B">
+        <rect x="216" y="62" width="82" height="22" rx="6" fill="#EEF0F3"/><text x="224" y="77">State: Open</text>
+        <rect x="304" y="62" width="76" height="22" rx="6" fill="#EEF0F3"/><text x="312" y="77">Label: Any</text>
+        <rect x="386" y="62" width="182" height="22" rx="6" fill="#fff" stroke="#DADDE2"/><text x="396" y="77" fill="#9AA1AB">Search issues</text>
+      </g>
+      <g font-size="13" fill="#1C1D20">
+        <rect x="216" y="96" width="352" height="50" rx="8" fill="#fff" stroke="#ECEEF1"/>
+        <circle cx="232" cy="114" r="5" fill="none" stroke="#1F883D" stroke-width="1.6"/><circle cx="232" cy="114" r="1.6" fill="#1F883D"/>
+        <text x="246" y="118">Sidebar: a folding Work group</text>
+        <text x="246" y="136" font-size="11" fill="#8A9099">#4004 · 2 sessions · $0.41</text>
+        <rect x="216" y="154" width="352" height="50" rx="8" fill="#fff" stroke="#ECEEF1"/>
+        <circle cx="232" cy="172" r="5" fill="none" stroke="#1F883D" stroke-width="1.6"/><circle cx="232" cy="172" r="1.6" fill="#1F883D"/>
+        <text x="246" y="176">Machines in the sidebar, part 2</text>
+        <text x="246" y="194" font-size="11" fill="#8A9099">#3979 · No agent yet</text>
+        <g opacity=".5"><rect x="216" y="212" width="352" height="50" rx="8" fill="#fff" stroke="#ECEEF1"/><rect x="216" y="270" width="352" height="50" rx="8" fill="#fff" stroke="#ECEEF1"/></g>
+      </g>
+    </g>
+  </g>
+
+  <!-- ============ Web, as it is ============ -->
+  <g transform="translate(590,450)">
+    <text x="0" y="0" font-size="13" font-weight="600" fill="#1C1D20">Web · no change: it already lists the pages</text>
+    <g transform="translate(0,14)" filter="url(#shadow)"><rect width="586" height="190" rx="10" fill="#FBFBFC"/></g>
+    <g transform="translate(0,14)">
+      <path d="M10 0h566a10 10 0 0 1 10 10v26H0V10A10 10 0 0 1 10 0z" fill="#F0F1F3"/>
+      <g font-size="12" fill="#5B616A">
+        <text x="16" y="23">Overview</text><text x="84" y="23">Agents</text>
+        <rect x="134" y="8" width="48" height="22" rx="6" fill="#D8DEE6"/><text x="144" y="23" fill="#1C1D20" font-weight="600">Work</text>
+        <text x="194" y="23">Docs</text><text x="236" y="23">Machines</text><text x="302" y="23">Workflows</text><text x="372" y="23">Reports</text>
+      </g>
+      <path d="M150 36v154" stroke="#E0E3E7"/>
+      <text x="16" y="58" font-size="10.5" font-weight="600" fill="#8A9099" letter-spacing=".5">WORK</text>
+      <g font-size="12.5" fill="#1C1D20">
+        <rect x="8" y="66" width="134" height="22" rx="5" fill="#D8DEE6"/><text x="16" y="81">Issues</text>
+        <text x="16" y="105">Pull requests</text>
+        <text x="16" y="127">Features</text>
+        <text x="16" y="149">Milestones</text>
+        <text x="16" y="171">Releases</text>
+      </g>
+      <g opacity=".6">
+        <rect x="166" y="50" width="82" height="20" rx="5" fill="#EEF0F3"/><rect x="254" y="50" width="76" height="20" rx="5" fill="#EEF0F3"/>
+        <rect x="166" y="80" width="404" height="30" rx="6" fill="#fff" stroke="#ECEEF1"/>
+        <rect x="166" y="116" width="404" height="30" rx="6" fill="#fff" stroke="#ECEEF1"/>
+        <rect x="166" y="152" width="404" height="30" rx="6" fill="#fff" stroke="#ECEEF1"/>
+      </g>
+    </g>
+  </g>
+</svg>

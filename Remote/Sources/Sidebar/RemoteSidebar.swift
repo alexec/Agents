@@ -28,6 +28,8 @@ struct RemoteSidebar: View {
     /// Status, open until folded, and kept so, as the window keeps it. It keeps Activity's
     /// key (#915), so it opens as Activity was left.
     @AppStorage("showsActivity") private var showsStatus = true
+    /// The Work group (#4004), open the first time.
+    @AppStorage("showsWork") private var showsWork = true
     /// The smart groups turned off in Settings ▸ Sidebar (#846).
     @AppStorage(SidebarSmartRow.offDefaultsKey) private var smartOff = SidebarSmartRow.offAtFirst
     /// Settings (#846), opened from the sidebar's foot.
@@ -144,12 +146,16 @@ struct RemoteSidebar: View {
                     NewSessionTopRow()
                 }
 
-                // Work (#3119, #3256): the issues and pull requests from the forges, lineage on
-                // top, as the window has it, above Status.
-                Section {
-                    HStack { Text("Work"); Spacer() }
-                        .accessibilityHint("Opens Work: every issue and pull request in your folders’ repos")
-                        .activityIcon("checklist").appText(.supporting).tag(SidebarItem.work)
+                // Work (#3119, #3256): a row per list, as the window has them (#4004), above
+                // Status. No Features: it is Mac + web (#3269).
+                Section(isExpanded: $showsWork) {
+                    ForEach(WorkList.Kind.allCases.filter { $0 != .feature }) { kind in
+                        HStack { Text(kind.title); Spacer() }
+                            .accessibilityHint(kind.sidebarHelp)
+                            .activityIcon(kind.sidebarIcon).appText(.supporting).tag(SidebarItem.work(kind))
+                    }
+                } header: {
+                    Text("Work")
                 }
 
                 // Pages about all the work rather than one folder, above the smart

@@ -1,0 +1,176 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="660" viewBox="0 0 1200 660" font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif">
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#20242A" flood-opacity="0.14"/>
+    </filter>
+    <!-- SF-like glyphs, 16x16 -->
+    <symbol id="issue" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="2" fill="currentColor"/></symbol>
+    <symbol id="pr" viewBox="0 0 16 16"><circle cx="4" cy="3.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="4" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="12" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M4 5.1v5.8M12 10.9V6.5a2 2 0 0 0-2-2H7.5M9 3l-1.6 1.5L9 6" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="sparkles" viewBox="0 0 16 16"><path d="M6.5 2.5l1.2 3.3 3.3 1.2-3.3 1.2-1.2 3.3-1.2-3.3L2 7l3.3-1.2zM12 9.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></symbol>
+    <symbol id="flag" viewBox="0 0 16 16"><path d="M3.5 14V2.5M3.5 3h8.5l-2 3 2 3H3.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="box" viewBox="0 0 16 16"><path d="M2.5 5l5.5-2.5L13.5 5v6.5L8 14l-5.5-2.5zM2.5 5L8 7.5 13.5 5M8 7.5V14M5.2 3.8l5.6 2.5" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></symbol>
+    <symbol id="doc" viewBox="0 0 16 16"><path d="M4 1.8h5.2L12.5 5v9.2H4zM9 1.8V5.2h3.5M6 8h4.5M6 10.5h4.5" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></symbol>
+    <symbol id="plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="cpu" viewBox="0 0 16 16"><rect x="4" y="4" width="8" height="8" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M6 2v2M10 2v2M6 12v2M10 12v2M2 6h2M2 10h2M12 6h2M12 10h2" stroke="currentColor" stroke-width="1.1"/></symbol>
+    <symbol id="chev-down" viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="chev-right" viewBox="0 0 10 10"><path d="M3.5 2l3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="chev-left" viewBox="0 0 10 10"><path d="M6.5 2l-3 3 3 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  </defs>
+
+  <rect width="1200" height="660" fill="#E7EAEE"/>
+  <text x="24" y="34" font-size="15" font-weight="600" fill="#1C1D20">Mac · the Work group in the sidebar, and its page with no picker</text>
+  <text x="24" y="54" font-size="12" fill="#6B7280">Hi-fi mock for #4004 · Paper palette, light · Issues is open</text>
+
+  <!-- ============ Window ============ -->
+  <g transform="translate(24,72)" filter="url(#shadow)">
+    <rect width="860" height="564" rx="12" fill="#FBFBFC"/>
+  </g>
+  <g transform="translate(24,72)">
+    <!-- sidebar -->
+    <path d="M12 0h248v564H12a12 12 0 0 1-12-12V12A12 12 0 0 1 12 0z" fill="#F0F1F3"/>
+    <path d="M260 0v564" stroke="#E0E3E7"/>
+    <circle cx="20" cy="20" r="6" fill="#FF5F57"/><circle cx="40" cy="20" r="6" fill="#FEBC2E"/><circle cx="60" cy="20" r="6" fill="#28C840"/>
+
+    <!-- top rows, no header -->
+    <use href="#plus" x="20" y="48" width="16" height="16" color="#0A84FF"/>
+    <text x="44" y="61" font-size="13" fill="#1C1D20">New Session</text>
+    <use href="#doc" x="20" y="76" width="16" height="16" color="#0A84FF"/>
+    <text x="44" y="89" font-size="13" fill="#1C1D20">Docs</text>
+
+    <!-- Work group -->
+    <use href="#chev-down" x="14" y="113" width="10" height="10" color="#8A9099"/>
+    <text x="30" y="122" font-size="11" font-weight="600" fill="#8A9099">Work</text>
+
+    <rect x="8" y="132" width="244" height="28" rx="6" fill="#D8DEE6"/>
+    <use href="#issue" x="20" y="138" width="16" height="16" color="#0A84FF"/>
+    <text x="44" y="151" font-size="13" fill="#1C1D20">Issues</text>
+
+    <use href="#pr" x="20" y="166" width="16" height="16" color="#0A84FF"/>
+    <text x="44" y="179" font-size="13" fill="#1C1D20">Pull requests</text>
+    <use href="#sparkles" x="20" y="194" width="16" height="16" color="#0A84FF"/>
+    <text x="44" y="207" font-size="13" fill="#1C1D20">Features</text>
+    <use href="#flag" x="20" y="222" width="16" height="16" color="#0A84FF"/>
+    <text x="44" y="235" font-size="13" fill="#1C1D20">Milestones</text>
+    <use href="#box" x="20" y="250" width="16" height="16" color="#0A84FF"/>
+    <text x="44" y="263" font-size="13" fill="#1C1D20">Releases</text>
+
+    <!-- the groups after, faded -->
+    <g opacity=".45">
+      <use href="#chev-down" x="14" y="287" width="10" height="10" color="#8A9099"/>
+      <text x="30" y="296" font-size="11" font-weight="600" fill="#8A9099">Your setup</text>
+      <use href="#cpu" x="20" y="306" width="16" height="16" color="#0A84FF"/>
+      <text x="44" y="319" font-size="13" fill="#1C1D20">Runtimes</text>
+      <use href="#chev-right" x="14" y="339" width="10" height="10" color="#8A9099"/>
+      <text x="30" y="348" font-size="11" font-weight="600" fill="#8A9099">Machines</text>
+      <use href="#chev-right" x="14" y="365" width="10" height="10" color="#8A9099"/>
+      <text x="30" y="374" font-size="11" font-weight="600" fill="#8A9099">Usage</text>
+      <use href="#chev-down" x="14" y="399" width="10" height="10" color="#8A9099"/>
+      <text x="30" y="408" font-size="11" font-weight="600" fill="#8A9099">Agents</text>
+      <rect x="20" y="420" width="12" height="12" rx="3" fill="#C9CED6"/>
+      <text x="44" y="430" font-size="13" fill="#1C1D20">Fix the low-disk grey line</text>
+      <rect x="20" y="448" width="12" height="12" rx="3" fill="#C9CED6"/>
+      <text x="44" y="458" font-size="13" fill="#1C1D20">Bitbucket pull requests</text>
+    </g>
+
+    <!-- content: toolbar -->
+    <path d="M260 52h600" stroke="#E0E3E7"/>
+    <use href="#chev-left" x="282" y="20" width="12" height="12" color="#5B616A"/>
+    <use href="#chev-right" x="306" y="20" width="12" height="12" color="#B5BAC2"/>
+    <text x="336" y="31" font-size="13" font-weight="600" fill="#1C1D20">Issues</text>
+
+    <!-- filters -->
+    <g font-size="12" fill="#3F444B">
+      <rect x="280" y="66" width="98" height="24" rx="6" fill="#EEF0F3"/><text x="290" y="82">State: Open</text><use href="#chev-down" x="364" y="74" width="8" height="8" color="#6B7280"/>
+      <rect x="386" y="66" width="88" height="24" rx="6" fill="#EEF0F3"/><text x="396" y="82">Repo: Any</text><use href="#chev-down" x="460" y="74" width="8" height="8" color="#6B7280"/>
+      <rect x="482" y="66" width="90" height="24" rx="6" fill="#EEF0F3"/><text x="492" y="82">Label: Any</text><use href="#chev-down" x="558" y="74" width="8" height="8" color="#6B7280"/>
+      <rect x="580" y="66" width="110" height="24" rx="6" fill="#EEF0F3"/><text x="590" y="82">Last updated</text><use href="#chev-down" x="676" y="74" width="8" height="8" color="#6B7280"/>
+      <rect x="700" y="66" width="140" height="24" rx="6" fill="#fff" stroke="#DADDE2"/><text x="712" y="82" fill="#9AA1AB">Search issues</text>
+    </g>
+
+    <!-- rows -->
+    <g font-size="13" fill="#1C1D20">
+      <g transform="translate(280,104)">
+        <rect width="560" height="56" rx="8" fill="#fff" stroke="#ECEEF1"/>
+        <circle cx="18" cy="20" r="5" fill="none" stroke="#1F883D" stroke-width="1.6"/><circle cx="18" cy="20" r="1.6" fill="#1F883D"/>
+        <text x="34" y="24">Sidebar: a folding Work group with a row per list</text>
+        <text x="34" y="44" font-size="11" fill="#8A9099">#4004 · 2 sessions · $0.41 · updated 4 min ago</text>
+        <rect x="438" y="12" width="64" height="18" rx="9" fill="#DCEBFF"/><text x="470" y="25" font-size="10.5" fill="#1D5FBF" text-anchor="middle">enhancement</text>
+      </g>
+      <g transform="translate(280,168)">
+        <rect width="560" height="56" rx="8" fill="#fff" stroke="#ECEEF1"/>
+        <circle cx="18" cy="20" r="5" fill="none" stroke="#1F883D" stroke-width="1.6"/><circle cx="18" cy="20" r="1.6" fill="#1F883D"/>
+        <text x="34" y="24">Machines in the sidebar, part 2: New Machine on ▸</text>
+        <text x="34" y="44" font-size="11" fill="#8A9099">#3979 · No agent yet · updated 1 h ago</text>
+        <rect x="474" y="12" width="40" height="18" rx="9" fill="#E8E1FB"/><text x="494" y="25" font-size="10.5" fill="#6A44C7" text-anchor="middle">story</text>
+      </g>
+      <g transform="translate(280,232)">
+        <rect width="560" height="56" rx="8" fill="#fff" stroke="#ECEEF1"/>
+        <circle cx="18" cy="20" r="5" fill="none" stroke="#1F883D" stroke-width="1.6"/><circle cx="18" cy="20" r="1.6" fill="#1F883D"/>
+        <text x="34" y="24">Sidebar: Runtimes icon in the warning colour</text>
+        <text x="34" y="44" font-size="11" fill="#8A9099">#3956 · 1 session · $0.12 · updated 3 h ago</text>
+      </g>
+      <g transform="translate(280,296)">
+        <rect width="560" height="56" rx="8" fill="#fff" stroke="#ECEEF1"/>
+        <circle cx="18" cy="20" r="5" fill="none" stroke="#1F883D" stroke-width="1.6"/><circle cx="18" cy="20" r="1.6" fill="#1F883D"/>
+        <text x="34" y="24">A machine that is red for a low disk says so</text>
+        <text x="34" y="44" font-size="11" fill="#8A9099">#3928 · No agent yet · updated 5 h ago</text>
+        <rect x="490" y="12" width="32" height="18" rx="9" fill="#FCE1E1"/><text x="506" y="25" font-size="10.5" fill="#B42318" text-anchor="middle">bug</text>
+      </g>
+      <g opacity=".5">
+        <rect x="280" y="360" width="560" height="56" rx="8" fill="#fff" stroke="#ECEEF1"/>
+        <rect x="280" y="424" width="560" height="56" rx="8" fill="#fff" stroke="#ECEEF1"/>
+      </g>
+    </g>
+  </g>
+
+  <!-- callouts -->
+  <g font-size="11.5" fill="#3F444B">
+    <path d="M290 147h-0" />
+    <text x="904" y="96" font-size="13" font-weight="600" fill="#1C1D20">What changed</text>
+
+    <text x="904" y="124">1. Work is a group that folds, as Your setup is.</text>
+    <text x="904" y="139" fill="#6B7280">Open the first time; folded or open is kept.</text>
+
+    <text x="904" y="166">2. A row per list, in the web's order.</text>
+    <text x="904" y="181" fill="#6B7280">The list shown is the selected row. An item's page</text>
+    <text x="904" y="196" fill="#6B7280">keeps its list's row selected.</text>
+
+    <text x="904" y="223">3. Docs moves up beside New Session.</text>
+    <text x="904" y="238" fill="#6B7280">The rows with no header stay together.</text>
+
+    <text x="904" y="265">4. The toolbar: ‹ › and the list's title.</text>
+    <text x="904" y="280" fill="#6B7280">No segmented control. Filters, sort and scroll</text>
+    <text x="904" y="295" fill="#6B7280">are kept per list, as now.</text>
+
+    <text x="904" y="322">5. No counts on the rows.</text>
+    <text x="904" y="337" fill="#6B7280">Not in this change (an open question).</text>
+  </g>
+
+  <!-- View menu -->
+  <g transform="translate(904,372)">
+    <text x="0" y="0" font-size="13" font-weight="600" fill="#1C1D20">View ▸ Work</text>
+    <g transform="translate(0,14)" filter="url(#shadow)">
+      <rect width="130" height="132" rx="8" fill="#F6F7F8" stroke="#DADDE2"/>
+    </g>
+    <g transform="translate(0,14)" font-size="13" fill="#1C1D20">
+      <text x="12" y="24">Sessions</text>
+      <rect x="5" y="34" width="120" height="22" rx="4" fill="#0A84FF"/>
+      <text x="12" y="50" fill="#fff">Work</text>
+      <use href="#chev-right" x="108" y="40" width="10" height="10" color="#fff"/>
+      <text x="12" y="76">Docs</text>
+      <path d="M8 88h114" stroke="#E0E3E7"/>
+      <text x="12" y="108">Runtimes</text>
+    </g>
+    <g transform="translate(134,48)" filter="url(#shadow)">
+      <rect width="140" height="128" rx="8" fill="#F6F7F8" stroke="#DADDE2"/>
+    </g>
+    <g transform="translate(134,48)" font-size="13" fill="#1C1D20">
+      <text x="12" y="24">Issues</text>
+      <text x="12" y="48">Pull requests</text>
+      <text x="12" y="72">Features</text>
+      <text x="12" y="96">Milestones</text>
+      <text x="12" y="120">Releases</text>
+    </g>
+    <text x="0" y="218" font-size="11.5" fill="#6B7280">No new keyboard shortcuts.</text>
+  </g>
+</svg>
