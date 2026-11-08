@@ -20,6 +20,10 @@ public final class MachineBrowser {
     public private(set) var frame: DaemonAPI.BrowserFrame?
     /// A call that failed, said under the page; cleared by the next one that works.
     public private(set) var problem: String?
+    /// What the host said after the person's last click: whether the page's focus is in a
+    /// field that takes text, so a touch pane opens or closes its keyboard. Each click makes a
+    /// new one, so a second tap in a field opens the keyboard again after the person hid it.
+    public private(set) var editing: PageEditing?
 
     private let client: DaemonClient
     private let describe: @MainActor (any Error) -> String
@@ -111,7 +115,11 @@ public final class MachineBrowser {
         while !outbox.isEmpty {
             let next = outbox.removeFirst()
             do {
-                _ = try await client.call(DaemonAPI.Method.browserInput, next)
+                let said = try await client.call(DaemonAPI.Method.browserInput, next,
+                                                 returning: DaemonAPI.BrowserInputResult.self)
+                if let field = said.editing {
+                    editing = PageEditing(inField: field, click: (editing?.click ?? 0) + 1)
+                }
                 problem = nil
             } catch {
                 // Input queued behind a failure is not sent later, out of context.
@@ -150,6 +158,12 @@ public final class MachineBrowser {
         return CGRect(x: (view.width - size.width) / 2, y: (view.height - size.height) / 2,
                       width: size.width, height: size.height)
     }
+}
+
+/// Whether a click left the page's focus in a field that takes text, and which click it was.
+public struct PageEditing: Hashable, Sendable {
+    public var inField: Bool
+    public var click: Int
 }
 
 /// When a session's Agent Browser pane opens by itself (#3916): when its agent starts to

@@ -127,7 +127,7 @@ export function Huddle({ focused, typed, height = 72 }: { focused: boolean; type
  * One Blob's body, outline, eyes and smile, centred on 0 0 in its own units of 600 by 580, as
  * `Blob` in Swift: the Huddle draws it three times.
  */
-function BlobParts({ fill, facing = 0, look, shut, pace, lag }: {
+export function BlobParts({ fill, facing = 0, look, shut, pace, lag }: {
   fill: string; facing?: number; look: Look; shut: boolean; pace?: number; lag?: number;
 }) {
   return (

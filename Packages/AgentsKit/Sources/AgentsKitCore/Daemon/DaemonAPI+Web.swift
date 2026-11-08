@@ -160,6 +160,7 @@ public extension DaemonAPI {
                 Row(Method.reportsProblem, params: ProblemReportRequest.self, result: ProblemReport.self, kind: .hostRequest),
                 // The Time page's achievements (#984).
                 Row(Method.achievementsState, params: Empty.self, result: Achievements.self, kind: .hostRequest),
+                Row(Method.multiplierState, params: Empty.self, result: Multiplier.self, kind: .hostRequest),
                 Row(Method.eventsList, params: EventsListRequest.self, result: EventsPage.self, kind: .hostRequest),
                 Row(Method.resourcesSnapshot, params: Empty.self, result: LeaseSnapshot.self, kind: .hostRequest),
                 // The MCP servers the host runs for every agent (#488), for the Resources page.
@@ -279,6 +280,8 @@ public extension DaemonAPI {
                 Row(Method.docsList, params: DocsListRequest.self, result: DocsList.self, kind: .hostRequest),
                 Row(Method.docsSearch, params: DocsSearchRequest.self, result: DocsSearch.self, kind: .hostRequest),
                 Row(Method.docsRead, params: DocsReadRequest.self, result: DocsReading.self, kind: .hostRequest),
+                Row(Method.lineageSessions, params: LineageSessionsRequest.self, result: LineageSessions.self,
+                    kind: .hostRequest),
                 Row(Method.lineageWalk, params: LineageNodeRequest.self, result: LineageGraph.self, kind: .hostRequest),
                 // The checked channel to a machine (#3492).
                 Row(Method.lockHello, params: LockHello.self, result: LockHelloReply.self, kind: .hostRequest),
@@ -296,7 +299,7 @@ public extension DaemonAPI {
                 Row(Method.browserWatch, params: BrowserWatchRequest.self, result: BrowserPageState.self, kind: .hostRequest),
                 Row(Method.browserUnwatch, params: Empty.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.browserAck, params: BrowserAckRequest.self, result: Empty.self, kind: .hostRequest),
-                Row(Method.browserInput, params: BrowserInputRequest.self, result: Empty.self, kind: .hostRequest),
+                Row(Method.browserInput, params: BrowserInputRequest.self, result: BrowserInputResult.self, kind: .hostRequest),
                 Row(Method.browserNavigate, params: BrowserNavigateRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsStop, params: AgentStopRequest.self, result: Empty.self, kind: .hostRequest),
                 // Events ▸ Waiting now's ✕, as the window and the Remote have it (#541).
@@ -660,6 +663,7 @@ public extension DaemonAPI {
                 Row(Notification.backupsChanged, params: BackupState.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.worktreesSized, params: WorktreesSized.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.achievementsChanged, params: Achievements.self, result: Empty.self, kind: .hostNotification),
+                Row(Notification.multiplierChanged, params: Multiplier.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.storeNotesChanged, params: StoreNotes.self, result: Empty.self,
                     kind: .hostNotification),
                 Row(Notification.pinsChanged, params: PinsChangedNotification.self, result: Empty.self,

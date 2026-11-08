@@ -1,4 +1,4 @@
-// Settings ▸ Control plane ▸ GitHub, GitLab, Linear, Jira and Forgejo (#3160, #3313, #3836), as the window's Settings ▸ Account has them (#2951).
+// Settings ▸ Control plane ▸ GitHub, GitLab, Linear, Jira, Forgejo, Bitbucket and Azure DevOps (#3160, #3313, #3836, #3853), as the window's Settings ▸ Account has them (#2951).
 // Saved on Return or on leaving a field, as the window saves. Listed in ./sections.ts.
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
@@ -11,7 +11,8 @@ import { forgeLoginFields, forgeLoginsFooter, forgeLoginsNotSaved, forgeLoginsTi
 export function ForgeLoginsSection({ store, down }: { store: Store; down: boolean }) {
   // Null until people/forViews answers, so a save before then cannot clear what is kept.
   const kept = useSignal<Required<ForgeLogins> | null>(null);
-  const typed = useSignal<Required<ForgeLogins>>({ github: "", gitlab: "", linear: "", jira: "", forgejo: "" });
+  const typed = useSignal<Required<ForgeLogins>>({ github: "", gitlab: "", linear: "", jira: "", forgejo: "", bitbucket: "",
+    azureDevOps: "" });
   const unknown = useSignal(false);
   const problem = useSignal("");
 

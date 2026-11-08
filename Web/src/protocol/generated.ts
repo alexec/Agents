@@ -1294,6 +1294,15 @@ export interface BrowserInputRequest {
   modifiers?: number;
 }
 
+/**
+ * browser/input's answer. editing is said after a mouseReleased only: whether the click left the
+ * page's focus in a field that takes text (an input, a textarea, a contenteditable), so a touch
+ * client opens or closes its keyboard. Left out for other input, and by a host before it was added.
+ */
+export interface BrowserInputResult {
+  editing?: boolean;
+}
+
 export type BrowserNavigateAction =
   | "go"
   | "back"
@@ -4242,8 +4251,9 @@ export interface ForgeLogRequest {
 }
 
 /**
- * people/setForgeLogins (#2951): the caller's own GitHub, GitLab, Linear, Jira (#3313) and Forgejo
- * (#3836) logins, for Settings ▸ You, replacing what was kept; blank clears one.
+ * people/setForgeLogins (#2951): the caller's own GitHub, GitLab, Linear, Jira (#3313), Forgejo
+ * (#3836), Bitbucket and Azure DevOps (#3853) logins, for Settings ▸ You, replacing what was kept;
+ * blank clears one.
  */
 export interface ForgeLogins {
   github?: string;
@@ -4251,6 +4261,8 @@ export interface ForgeLogins {
   linear?: string;
   jira?: string;
   forgejo?: string;
+  bitbucket?: string;
+  azureDevOps?: string;
 }
 
 /**
@@ -5043,6 +5055,33 @@ export interface LineageResolved {
   title: string;
   state?: string;
   labels?: string[];
+}
+
+/**
+ * A session on the issue, and the issue it is on: the one asked for, or one of its sub-issues. A
+ * session on a PR is on the issue the PR fixes.
+ */
+export interface LineageSessionMatch {
+  agentID: UUID;
+  on: LineageNode;
+}
+
+/**
+ * The sessions on this machine that lineage links to the issue, to its sub-issues or to their PRs,
+ * each once. limited says there were more sub-issues or sessions than are counted.
+ */
+export interface LineageSessions {
+  matches: LineageSessionMatch[];
+  limited?: boolean;
+}
+
+/**
+ * lineage/sessions (#3899): a session search for #<number> asks for the sessions on that issue, on
+ * the issues part-of it (its sub-issues, at most 100) and on the PRs that fix them. The issue is
+ * #<number> in the forge repo of each of this machine's folders.
+ */
+export interface LineageSessionsRequest {
+  number: number;
 }
 
 export interface ListCursor {
@@ -10873,6 +10912,13 @@ export interface TeamPerson {
   jiraLogin?: string;
   /** Their Forgejo login (#3836): their user name on the connected Forgejo or Gitea. */
   forgejoLogin?: string;
+  /** Their Bitbucket login (#3853): their Bitbucket nickname. */
+  bitbucketLogin?: string;
+  /**
+   * Their Azure DevOps login (#3853): their sign-in email or display name in the Azure DevOps
+   * organization.
+   */
+  azureDevOpsLogin?: string;
   you?: boolean;
 }
 
@@ -12117,7 +12163,7 @@ export interface Methods {
   "bots/stopRun": { params: BotStopRun; result: Empty };
   "browser/ack": { params: BrowserAckRequest; result: Empty };
   "browser/clear": { params: BrowserClearRequest; result: BrowserState };
-  "browser/input": { params: BrowserInputRequest; result: Empty };
+  "browser/input": { params: BrowserInputRequest; result: BrowserInputResult };
   "browser/navigate": { params: BrowserNavigateRequest; result: Empty };
   "browser/state": { params: Empty; result: BrowserState };
   "browser/unwatch": { params: Empty; result: Empty };
@@ -12225,6 +12271,7 @@ export interface Methods {
   "groups/setRole": { params: GroupRoleSet; result: Group };
   "lineage/cost": { params: LineageNodeRequest; result: LineageCostRollup };
   "lineage/estimate": { params: LineageEstimateRequest; result: LineageEstimate };
+  "lineage/sessions": { params: LineageSessionsRequest; result: LineageSessions };
   "lineage/walk": { params: LineageNodeRequest; result: LineageGraph };
   "links/approve": { params: ChannelLinkDecide; result: Empty };
   "links/deny": { params: ChannelLinkDecide; result: Empty };
@@ -12265,6 +12312,7 @@ export interface Methods {
   "mcp/hosted": { params: Empty; result: HostedMCPSnapshot };
   "mcp/remove": { params: MCPRemoveRequest; result: MCPRemoveAnswer };
   "modes/remembered": { params: Empty; result: Record<string, JSONValue> };
+  "multiplier/state": { params: Empty; result: Multiplier };
   "options/remembered": { params: RememberedOptionsRequest; result: ConfigOption[] };
   "orgRoutes/check": { params: OrgRouteRequest; result: OrgRouteCheck };
   "orgRoutes/list": { params: Empty; result: OrgRouteList };
@@ -12615,6 +12663,7 @@ export const MethodTarget = {
   "groups/setRole": "control",
   "lineage/cost": "host",
   "lineage/estimate": "host",
+  "lineage/sessions": "host",
   "lineage/walk": "host",
   "links/approve": "control",
   "links/deny": "control",
@@ -12655,6 +12704,7 @@ export const MethodTarget = {
   "mcp/hosted": "host",
   "mcp/remove": "host",
   "modes/remembered": "host",
+  "multiplier/state": "host",
   "options/remembered": "host",
   "orgRoutes/check": "control",
   "orgRoutes/list": "control",
@@ -12882,6 +12932,7 @@ export interface Notifications {
   "mcp/healthChanged": MCPHealthSnapshot;
   "mcp/hostedChanged": HostedMCPSnapshot;
   "modes/changed": Record<string, JSONValue>;
+  "multiplier/changed": Multiplier;
   "pages/changed": PagesChangedNotification;
   "pins/changed": PinsChangedNotification;
   "policy/effectiveChanged": PolicyEffectiveRequest;
@@ -12998,6 +13049,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BrowserClearRequest: { required: [], optional: ["site"] },
   BrowserFrame: { required: ["image", "ack", "width", "height"], optional: [] },
   BrowserInputRequest: { required: ["kind"], optional: ["type", "x", "y", "button", "clickCount", "deltaX", "deltaY", "key", "code", "keyCode", "text", "modifiers"] },
+  BrowserInputResult: { required: [], optional: ["editing"] },
   BrowserNavigateRequest: { required: ["action"], optional: ["url"] },
   BrowserPageState: { required: ["status"], optional: ["detail", "url", "title", "noTab", "holder", "holderTitle"] },
   BrowserSite: { required: ["site", "cookies"], optional: [] },
@@ -13250,7 +13302,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeListRequest: { required: [], optional: ["folder", "state", "label", "assignee", "query", "cursor", "limit", "feature", "board"] },
   ForgeLog: { required: ["text"], optional: [] },
   ForgeLogRequest: { required: ["node"], optional: ["check"] },
-  ForgeLogins: { required: [], optional: ["github", "gitlab", "linear", "jira", "forgejo"] },
+  ForgeLogins: { required: [], optional: ["github", "gitlab", "linear", "jira", "forgejo", "bitbucket", "azureDevOps"] },
   ForgeMergeRequest: { required: ["node", "sha"], optional: ["method", "auto"] },
   ForgeNodeRequest: { required: ["node"], optional: [] },
   ForgePlan: { required: ["item", "children", "steps"], optional: ["lead"] },
@@ -13320,6 +13372,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineageNode: { required: ["kind", "ref"], optional: [] },
   LineageNodeRequest: { required: ["node"], optional: ["depth"] },
   LineageResolved: { required: ["title"], optional: ["state", "labels"] },
+  LineageSessionMatch: { required: ["agentID", "on"], optional: [] },
+  LineageSessions: { required: ["matches"], optional: ["limited"] },
+  LineageSessionsRequest: { required: ["number"], optional: [] },
   ListCursor: { required: ["lastActivityAt", "id"], optional: ["archivedAt"] },
   ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID", "after", "query", "project"] },
   ListedSkill: { required: ["name", "folder"], optional: ["description", "managed"] },
@@ -13858,7 +13913,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SurfaceIdentification: { required: ["id", "name", "kind"], optional: [] },
   TeamBot: { required: ["user", "name", "spentTodayUSD", "capped", "machines", "online", "workflows", "live"], optional: ["group", "groupName", "caps"] },
   TeamBotRun: { required: ["host", "hostName", "agent"], optional: ["workflow", "since"] },
-  TeamPerson: { required: ["id", "name", "kind"], optional: ["githubLogin", "gitlabLogin", "linearLogin", "jiraLogin", "forgejoLogin", "you"] },
+  TeamPerson: { required: ["id", "name", "kind"], optional: ["githubLogin", "gitlabLogin", "linearLogin", "jiraLogin", "forgejoLogin", "bitbucketLogin", "azureDevOpsLogin", "you"] },
   TeamTrigger: { required: ["workflow", "trigger", "runsOn"], optional: ["event", "dueAt"] },
   TeamTriggerFired: { required: ["ran"], optional: [] },
   TeamTriggerSent: { required: ["taken"], optional: [] },

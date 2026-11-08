@@ -29,6 +29,7 @@ export type PageDraw =
   | { kind: "machine"; host: string }
   | { kind: "secrets" }
   | { kind: "accounts" }
+  | { kind: "multiplier" }
   | { kind: "usage" | "machines" | "workflows" | "settings" };
 
 export interface NavPage {
@@ -69,8 +70,9 @@ export const navPages: Record<NavSection, readonly NavPage[]> = {
   ],
   reports: [
     ...reportSections.map((s): NavPage => ({ id: s.id, title: s.title, group: s.group, draw: { kind: "report", section: s } })),
+    // The Multiplier page first (#3990), as the window's first row under Usage; it took the Achievements page's place.
+    { id: "multiplier", title: "Multiplier", group: "Yours", draw: { kind: "multiplier" } },
     { id: "usage", title: "Usage", group: "Yours", draw: { kind: "usage" } },
-    { id: "achievements", title: "Achievements", group: "Yours", draw: { kind: "activity", page: "achievements" } },
     adminPage("audit", "Audit", "Records"),
   ],
   requests: [adminPage("requests", "Requests", "Requests")],
@@ -171,7 +173,7 @@ export function movedPage(app: "console" | "a", page: string | undefined): { nav
     // Worktrees (#3627) and resources (#3629) are on each machine's page now.
     case "worktrees": case "resources": return { nav: "machines", section: "machines" };
     case "events": return { nav: "status", section: page };
-    case "achievements": return { nav: "reports", section: page };
+    case "achievements": return { nav: "reports", section: "multiplier" };
     case "spending": case "tokens": case "time": return { nav: "reports", section: "usage", usage: page };
     default: return {};
   }

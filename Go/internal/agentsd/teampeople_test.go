@@ -207,3 +207,26 @@ func TestTeamPeopleFillsTheViewersForgejoLoginFromTheForgejoConnection(t *testin
 		t.Fatalf("people: %+v", people)
 	}
 }
+
+// The viewer's own blank Bitbucket and Azure DevOps logins come from this machine's Bitbucket
+// and Azure DevOps connections (#3853); another person's logins are theirs as kept.
+func TestTeamPeopleFillsTheViewersBitbucketAndAzureDevOpsLoginsFromTheConnections(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	file := &connections.File{Path: filepath.Join(t.TempDir(), connections.FileName)}
+	d.connStoreFor = func() (connections.Store, error) { return file, nil }
+	file.Put(connections.Connection{Provider: connections.Bitbucket, Login: "alex-bb", Access: "bb", ConnectedAt: time.Now()})
+	file.Put(connections.Connection{Provider: connections.AzureDevOps, Login: "Alex Collins", Access: "ado", ConnectedAt: time.Now()})
+	you, sam, samADO := true, "sam", "sam@example.com"
+	ask := askControl(func(context.Context, string, any) (json.RawMessage, error) {
+		return json.Marshal(wire.PeopleForViews{People: []wire.TeamPerson{
+			{ID: "a", Name: "Alex", Kind: "person", You: &you},
+			{ID: "s", Name: "Sam", Kind: "person", BitbucketLogin: &sam, AzureDevOpsLogin: &samADO},
+		}})
+	})
+	people := d.teamPeople(context.Background(), &ask)
+	if len(people) != 2 || people[0]["bitbucket"] != "alex-bb" || people[0]["azuredevops"] != "Alex Collins" ||
+		people[1]["bitbucket"] != sam || people[1]["azuredevops"] != samADO {
+		t.Fatalf("people: %+v", people)
+	}
+}

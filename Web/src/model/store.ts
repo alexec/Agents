@@ -13,17 +13,18 @@ import type {
   StartRequest, UUID, AutoMappings, AutoPreview, AutoPreviewRequest, AutoSettings, ClientPermissionMode, Levels, ModelLevel, PermissionLevel, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, DiskState, StoreNotes,
   CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ReviewPull, CheckSuggestion, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, PolicySetBy, RuntimeAllowances,
-  GuardedChange, GuardedChangeReading, MachineJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Achievements,
+  GuardedChange, GuardedChangeReading, MachineJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Achievements, Multiplier,
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, DailySummarySettings, SummaryPage, SummaryPageText, DesktopControlSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
   PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, BudgetRequest, RemoveRequest, ClientPermissionSettings, PRCostComment,
-  Connection, MoveToMachineAnswer, ProblemReport, ProblemReportRequest, Request as PersonRequest, RequestUpdate } from "../protocol/generated";
+  Connection, LineageNode, MoveToMachineAnswer, ProblemReport, ProblemReportRequest, Request as PersonRequest, RequestUpdate } from "../protocol/generated";
 import { endedConnections, endedLine, hasEnded } from "./connectorSetup";
+import { parseQuery } from "./labels";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
 import { sealWork } from "../wire/sealing";
 import type { FolderGoneAsk } from "./missingFolder";
-import { describe, methodNotFound } from "./errors";
+import { describe, knowVersions, methodNotFound } from "./errors";
 import { freeProjectName } from "./projectSettings";
 import { fromWireDate } from "../protocol/dates";
 import { addCap, dropCap, openCaps } from "./teamGroups";
@@ -435,6 +436,9 @@ export class Work {
     this.achievements.value = { ...this.achievements.value, [host]: achievements };
     achievementsSeen.take(achievements);
   }
+  /** Each host's Multiplier (#3990), from multiplier/state and replaced whole by each multiplier/changed. With a
+   * control plane the host counts all the person's machines (#3903), so the page asks only the Mac's. */
+  readonly multiplier = signal<Record<string, Multiplier>>({});
   /**
    * The control plane's machine, its home host, and how this Mac's host says its join stands
    * (#666), from `control/status`.
@@ -745,6 +749,9 @@ export class Work {
         return true;
       case "achievements/changed":
         this.takeAchievements(host, params as Achievements);
+        return true;
+      case "multiplier/changed":
+        this.multiplier.value = { ...this.multiplier.value, [host]: params as Multiplier };
         return true;
       case "preferences/changed":
         if (this.isMac(host)) preferencesSaid(params as Record<string, JSONValue>);
@@ -1140,6 +1147,15 @@ export class Work {
       this.downSince.value = since;
       this.gitAsksAnswered.value = new Set([...this.gitAsksAnswered.value].filter((id) => still.has(id)));
     });
+    this.knowVersions();
+  }
+
+  /** The versions a refusal's words compare (#4096); `mac` is the person's Mac, as a call's route says it. */
+  protected knowVersions(): void {
+    const machines = this.hosts.value.filter((h) => h.version).map((h): [string, string] => [h.id, h.version]);
+    const mac = this.hosts.value.find((h) => h.id === this.macHostID.value);
+    if (mac?.version) machines.push(["mac", mac.version]);
+    knowVersions(this.plane.value?.version, machines);
   }
 
   /** Git asks answered on this page, until the control plane's list drops them (#1122). */
@@ -1564,6 +1580,7 @@ export class Store extends Work {
     this.person.value = status.person ?? null;
     this.joinCommand.value = status.joinCommand || null;
     knowPublicViews(status.publicViews);
+    this.knowVersions();
   }
 
   /** Machines waiting to join (#994); a control plane before it has none to say. */
@@ -1919,6 +1936,10 @@ export class Store extends Work {
     // A host from before #984 doesn't know it: the Time page shows no achievements.
     void this.link.call("achievements/state", {}, host).then((state) => this.takeAchievements(host, state))
       .catch(failed("achievements/state"));
+    // A host from before #3903 doesn't know it: the Multiplier page shows — ×.
+    void this.link.call("multiplier/state", {}, host)
+      .then((state) => { this.multiplier.value = { ...this.multiplier.value, [host]: state }; })
+      .catch(failed("multiplier/state"));
     const [permissions, elicitations] = await Promise.all([
       this.link.call("permissions/pending", {}, host).catch(failed("permissions/pending")),
       this.link.call("elicitations/pending", {}, host).catch(failed("elicitations/pending")),
@@ -2029,7 +2050,9 @@ export class Store extends Work {
     this.searchNext.value = {};
     this.forgetSearched();
     this.saidLines.value = {};
+    this.issueSessions.value = {};
     if (!words) return;
+    const issue = parseQuery(words).issue;
     const request: ListRequest = {
       includeArchived: true, archivedCommands: false, archivedOnly: false, lean: true, limit: searchShown, query: words,
     };
@@ -2038,6 +2061,15 @@ export class Store extends Work {
       if (!this.hostIsOnline(host.id)) continue;
       await this.search(request, host.id, turn);
       if (turn !== this.searchTurn) return;
+      // The sessions on the issue, its sub-issues and their PRs (#3899). A host too old to say
+      // matches the #<n> label only.
+      if (issue !== null && this.has(host.id, Capability.lineageSessions1)) {
+        const on = await this.link.call("lineage/sessions", { number: issue }, host.id).catch(() => null);
+        if (Array.isArray(on?.matches) && turn === this.searchTurn) {
+          this.issueSessions.value = { ...this.issueSessions.value, ...Object.fromEntries(on.matches.map((m) => [m.agentID, m.on])) };
+        }
+        if (turn !== this.searchTurn) return;
+      }
       // What was said (#1585): the sessions whose prompts or replies hold the words. Not asked of a
       // host too old to say (#1748).
       if (!this.has(host.id, Capability.agentsSaid1)) continue;
@@ -2050,6 +2082,9 @@ export class Store extends Work {
 
   /** While the sidebar searches: the line each session said that matches, by its id (#1585). */
   readonly saidLines = signal<Record<string, string>>({});
+
+  /** While the sidebar searches for #<n>: the issue each session on it is on, by its id (lineage/sessions, #3899). */
+  readonly issueSessions = signal<Record<string, LineageNode>>({});
 
   /** A lead's epic progress, "5/7", by host and session id (#3270), for its sidebar row. */
   readonly leadProgress = signal<Record<string, string>>({});

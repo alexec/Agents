@@ -115,6 +115,34 @@ func TestShowIssuesSaysAnAgentIsOnIt(t *testing.T) {
 	}
 }
 
+// With the control plane's people in _meta (#3853), Team is those people and bots by their
+// Azure DevOps login, its sign-in email or display name, named as the control plane knows
+// them; everyone else is Others.
+func TestShowIssuesTellsTeamFromOthersByTheAzureDevOpsLogin(t *testing.T) {
+	f := newFake(t)
+	sam := obj{"id": "s4", "displayName": "Sam Smith", "uniqueName": "sam@acme.test", "descriptor": "aad.c2Ft"}
+	f.item(1, "Dev's", "Bug", "Active", dev, 1, nil)
+	f.item(2, "Sam's", "Bug", "Active", sam, 2, nil)
+	f.item(3, "A build's", "Bug", "New", builder, 3, nil)
+	f.item(4, "Mine", "Bug", "New", alex, 4, nil)
+	c := serve(t, f)
+	result := c.call("tools/call", map[string]any{"name": "show_issues", "arguments": map[string]any{},
+		"_meta": map[string]any{"people": []any{
+			map[string]any{"name": "Alex", "you": true, "azuredevops": "Alex"},
+			map[string]any{"name": "Dev Person", "azuredevops": "DEV@acme.test"},
+			map[string]any{"name": "Sam", "github": "sam"},
+		}}})["result"].(map[string]any)
+	sections, names := map[string]string{}, map[string]any{}
+	for _, w := range result["structuredContent"].(map[string]any)["issues"].([]any) {
+		w := w.(map[string]any)
+		sections[w["key"].(string)], names[w["key"].(string)] = w["section"].(string), w["authorName"]
+	}
+	equal(t, sections, map[string]string{"AB#1": "team", "AB#2": "others", "AB#3": "others", "AB#4": "yours"})
+	if names["AB#1"] != "Dev Person" || names["AB#2"] != nil || names["AB#4"] != "Alex" {
+		t.Fatalf("names: %v", names)
+	}
+}
+
 func TestShowIssueDetailsMakesTheDescriptionSafe(t *testing.T) {
 	f := newFake(t)
 	f.item(1, "Bug", "Bug", "Active", dev, 1, obj{fieldDesc: `<p>It <b>fails</b>.</p><script>alert(1)</script><a href="javascript:x">x</a>`})

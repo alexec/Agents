@@ -2986,6 +2986,16 @@
       ],
       "additionalProperties": false
     },
+    "BrowserInputResult": {
+      "type": "object",
+      "description": "browser/input's answer. editing is said after a mouseReleased only: whether the click left the page's focus in a field that takes text (an input, a textarea, a contenteditable), so a touch client opens or closes its keyboard. Left out for other input, and by a host before it was added.",
+      "properties": {
+        "editing": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
     "BrowserNavigateAction": {
       "type": "string",
       "enum": [
@@ -10566,7 +10576,7 @@
     },
     "ForgeLogins": {
       "type": "object",
-      "description": "people/setForgeLogins (#2951): the caller's own GitHub, GitLab, Linear, Jira (#3313) and Forgejo (#3836) logins, for Settings ▸ You, replacing what was kept; blank clears one.",
+      "description": "people/setForgeLogins (#2951): the caller's own GitHub, GitLab, Linear, Jira (#3313), Forgejo (#3836), Bitbucket and Azure DevOps (#3853) logins, for Settings ▸ You, replacing what was kept; blank clears one.",
       "properties": {
         "github": {
           "type": "string"
@@ -10581,6 +10591,12 @@
           "type": "string"
         },
         "forgejo": {
+          "type": "string"
+        },
+        "bitbucket": {
+          "type": "string"
+        },
+        "azureDevOps": {
           "type": "string"
         }
       },
@@ -12495,6 +12511,55 @@
       },
       "required": [
         "title"
+      ],
+      "additionalProperties": false
+    },
+    "LineageSessionMatch": {
+      "type": "object",
+      "description": "A session on the issue, and the issue it is on: the one asked for, or one of its sub-issues. A session on a PR is on the issue the PR fixes.",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "on": {
+          "$ref": "#/definitions/LineageNode"
+        }
+      },
+      "required": [
+        "agentID",
+        "on"
+      ],
+      "additionalProperties": false
+    },
+    "LineageSessions": {
+      "type": "object",
+      "description": "The sessions on this machine that lineage links to the issue, to its sub-issues or to their PRs, each once. limited says there were more sub-issues or sessions than are counted.",
+      "properties": {
+        "matches": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LineageSessionMatch"
+          }
+        },
+        "limited": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "matches"
+      ],
+      "additionalProperties": false
+    },
+    "LineageSessionsRequest": {
+      "type": "object",
+      "description": "lineage/sessions (#3899): a session search for #<number> asks for the sessions on that issue, on the issues part-of it (its sub-issues, at most 100) and on the PRs that fix them. The issue is #<number> in the forge repo of each of this machine's folders.",
+      "properties": {
+        "number": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "number"
       ],
       "additionalProperties": false
     },
@@ -27585,6 +27650,14 @@
         "forgejoLogin": {
           "type": "string",
           "description": "Their Forgejo login (#3836): their user name on the connected Forgejo or Gitea."
+        },
+        "bitbucketLogin": {
+          "type": "string",
+          "description": "Their Bitbucket login (#3853): their Bitbucket nickname."
+        },
+        "azureDevOpsLogin": {
+          "type": "string",
+          "description": "Their Azure DevOps login (#3853): their sign-in email or display name in the Azure DevOps organization."
         },
         "you": {
           "type": "boolean"

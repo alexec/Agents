@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/alexec/agents/Go/internal/azuredevopsmcp"
 	"github.com/alexec/agents/Go/internal/bitbucketmcp"
 	"github.com/alexec/agents/Go/internal/lineage"
 	"github.com/alexec/agents/Go/wire"
@@ -246,7 +247,8 @@ func docName(ref string) string {
 }
 
 // docURL is a doc's web address: the page's own, or the file's on GitHub or Bitbucket, or on
-// the GitLab or Forgejo of the page, on its default branch.
+// the GitLab, Forgejo or Azure DevOps (dev.azure.com without one) of the page, on its default
+// branch.
 func docURL(ref, base string) string {
 	if strings.HasPrefix(ref, "https://") || strings.HasPrefix(ref, "http://") {
 		return ref
@@ -273,6 +275,11 @@ func docURL(ref, base string) string {
 		return base + "/" + repo + "/src/HEAD/" + rel
 	case "bitbucket":
 		return "https://" + bitbucketmcp.Host + "/" + repo + "/src/HEAD/" + rel
+	case "azuredevops":
+		if base == "" || strings.EqualFold(base, "https://linear.app") {
+			base = azuredevopsmcp.DefaultBase
+		}
+		return azuredevopsmcp.WebURL(base, repo) + "?path=" + url.QueryEscape("/"+rel)
 	}
 	return ""
 }

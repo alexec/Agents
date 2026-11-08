@@ -136,6 +136,8 @@ public enum DaemonAPI {
         /// The lineage graph from a node, and a node's cost rolled up (#2348, #2350): read by a
         /// session's Lineage pane (#2940).
         public static let lineageWalk = "lineage/walk"
+        /// The sessions on an issue, its sub-issues and their PRs, for a `#<n>` search (#3899).
+        public static let lineageSessions = "lineage/sessions"
         public static let lineageCost = "lineage/cost"
         /// What an issue or an epic will probably cost and take, from past work (#3559, #3560).
         public static let lineageEstimate = "lineage/estimate"

@@ -755,16 +755,32 @@ struct WebFixturesTests {
 
         let labelled = Self.agent(50, .finished, title: "Fix the Login page", report: Self.report(.done, "Logins work again."),
                                   labels: [SessionLabel(value: "Bug", owner: .person, addedAt: Self.base),
-                                           SessionLabel(value: "web ui", owner: .agent, addedAt: Self.base)])
+                                           SessionLabel(value: "web ui", owner: .agent, addedAt: Self.base),
+                                           SessionLabel(value: "#12", owner: .agent, addedAt: Self.base)])
+        let titled = Self.agent(51, .finished, title: "#3465: Fix the parser")
         let queries = ["", "login", "LOGINS", "label:bug", "label:BUG login", "label:\"web ui\"", "label:web",
-                       "label:", "nothing here", "label:bug nothing"]
-        let queryCases = try queries.map {
+                       "label:", "nothing here", "label:bug nothing", "#12", "issue:#12", "ISSUE:12 login", "#1",
+                       "#12 nothing", "P#12", "a#12", "#12a", "label:#12", "label:bug #12"]
+        var queryCases = try queries.map {
             Case(name: $0.isEmpty ? "empty" : $0, input: .object(["query": .string($0), "agent": try Self.encode(labelled)]))
         }
+        // #3899: a title names the issue only as a number of its own, and Lineage's sessions match.
+        for (name, query, onIssue) in [("title names it", "#3465", false), ("title, a longer number", "#346", false),
+                                       ("on the issue by lineage", "#9", true), ("not on it", "#9", false)] {
+            queryCases.append(Case(name: name, input: .object([
+                "query": .string(query), "agent": try Self.encode(titled),
+                "onIssue": .array(onIssue ? [.string(titled.id.uuidString)] : []),
+            ])))
+        }
         try pin("labels/query.json", queryCases) { input in
-            let query = SessionLabelQuery(input["query"]!.stringValue!)
-            return .object(["label": query.label.map(JSONValue.string) ?? .null, "text": .string(query.text),
-                            "matches": .bool(query.matches(try input["agent"]!.decode(Agent.self)))])
+            let agent = try input["agent"]!.decode(Agent.self)
+            var query = SessionLabelQuery(input["query"]!.stringValue!)
+            for id in input["onIssue"]?.arrayValue ?? [] {
+                query.onIssue[UUID(uuidString: id.stringValue!)!] = DaemonAPI.LineageNode(kind: "issue", ref: "github:o/r#9")
+            }
+            return .object(["label": query.label.map(JSONValue.string) ?? .null,
+                            "issue": query.issue.map(JSONValue.int) ?? .null, "text": .string(query.text),
+                            "matches": .bool(query.matches(agent))])
         }
 
         let toggles: [(String, String, String)] = [

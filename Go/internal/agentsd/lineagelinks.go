@@ -57,20 +57,21 @@ type lineageLinker struct {
 	otherHost map[string]bool
 }
 
-// forgeRepo is a repository on a forge, as lineage refs name it: forge github, gitlab, forgejo
-// or bitbucket, path owner/repo (group/sub/project on GitLab, workspace/repo on Bitbucket),
-// lower case. The zero value is none.
+// forgeRepo is a repository on a forge, as lineage refs name it: forge github, gitlab, forgejo,
+// bitbucket or azuredevops, path owner/repo (group/sub/project on GitLab, workspace/repo on
+// Bitbucket, organization/project/repo on Azure DevOps), lower case. The zero value is none.
 type forgeRepo struct{ forge, path string }
 
 // forgeKind is what lineage does on one forge. A forge that is not in forgeKinds has no
-// lineage; a new one (Bitbucket, Azure DevOps) is a row here, and each lookup's switch
+// lineage; a new one is a row here, and each lookup's switch
 // (lineageresolve.go, lineagemilestone.go, lineagerelease.go, lineagecomment.go, the doc and
 // ref addresses) says what it asks there, or nothing.
 type forgeKind struct {
 	// prMark is between a pull request node's path and its number: GitLab numbers its merge
 	// requests apart from its issues, so its mark is !.
 	prMark string
-	// prPath and issuePath are in a pull request's and an issue's web address.
+	// prPath and issuePath are in a pull request's and an issue's web address; a forge with
+	// no issues of its own has no issuePath.
 	prPath, issuePath string
 	// anyHost: the pull request's address says the forge on a host of any name.
 	anyHost bool
@@ -79,7 +80,7 @@ type forgeKind struct {
 	// comment.
 	cli string
 	// connection: lineage asks the forge the same by the person's connection to it
-	// (connectionAsks: lineageforgejo.go, lineagebitbucket.go), not a CLI. With neither, the
+	// (connectionAsks: lineageforgejo.go, lineagebitbucket.go, lineageazuredevops.go), not a CLI. With neither, the
 	// forge's nodes are linked, and nothing is looked up.
 	connection bool
 }
@@ -97,6 +98,9 @@ var forgeKinds = []struct {
 	// Bitbucket Cloud numbers its pull requests apart from its issues, but forgebitbucket.go's
 	// nodes say both with #: the node's kind says which. It is only on bitbucket.org.
 	{"bitbucket", forgeKind{prMark: "#", prPath: "/pull-requests/", issuePath: "/issues/", connection: true}},
+	// Azure Repos has pull requests only: its issues are Azure Boards' work items (forgeRepo.issue).
+	// Its pull request's address has /_git/ in it, on dev.azure.com or a Server of any name.
+	{"azuredevops", forgeKind{prMark: "#", prPath: "/pullrequest/", anyHost: true, connection: true}},
 }
 
 // kindOf is forge's row of forgeKinds.
@@ -141,11 +145,21 @@ func (d *Daemon) connectionAsks(forge string) (forgeAsks, bool) {
 	case "bitbucket":
 		return forgeAsks{d.bitbucketResolveNode, d.bitbucketIssue, d.bitbucketCommitTime, d.bitbucketCompareCommits, d.bitbucketCommitPR,
 			d.bitbucketMilestones, d.bitbucketCostComment}, true
+	case "azuredevops":
+		return forgeAsks{d.azureDevOpsResolveNode, d.azureDevOpsIssue, d.azureDevOpsCommitTime, d.azureDevOpsCompareCommits,
+			d.azureDevOpsCommitPR, d.azureDevOpsMilestones, d.azureDevOpsCostComment}, true
 	}
 	return forgeAsks{}, false
 }
 
+// issue is an issue of r; on Azure Repos, the work item n of r's project on Azure Boards, as a
+// pull request's "#12" names one there.
 func (r forgeRepo) issue(n int) wire.LineageNode {
+	if r.forge == "azuredevops" {
+		org, rest, _ := strings.Cut(r.path, "/")
+		project, _, _ := strings.Cut(rest, "/")
+		return boardsNode(org+"/"+project, n)
+	}
 	return wire.LineageNode{Kind: lineage.KindIssue, Ref: r.forge + ":" + r.path + "#" + strconv.Itoa(n)}
 }
 
@@ -156,8 +170,9 @@ func (r forgeRepo) pr(n int) wire.LineageNode {
 }
 
 // forgeOf is the forge a remote is on: github.com, a host whose name says GitLab, codeberg.org
-// or a host whose name says Forgejo or Gitea (as forgejomcp.RepoAt finds one), or
-// bitbucket.org. A Forgejo of another name is the connected one's, which folderRepo asks for.
+// or a host whose name says Forgejo or Gitea (as forgejomcp.RepoAt finds one), bitbucket.org,
+// or Azure DevOps Services (dev.azure.com, <org>.visualstudio.com). A Forgejo or an Azure
+// DevOps Server of another name is the connected one's, which folderRepo asks for.
 func forgeOf(host, path string) forgeRepo {
 	path = repoPath(path)
 	switch host = strings.ToLower(host); {
@@ -171,6 +186,11 @@ func forgeOf(host, path string) forgeRepo {
 			return forgeRepo{}
 		}
 		return forgeRepo{"bitbucket", path}
+	case host == "dev.azure.com" || host == "ssh.dev.azure.com" || strings.HasSuffix(host, ".visualstudio.com"):
+		if repo, ok := azureDevOpsOfPath(host, path, false); ok {
+			return forgeRepo{"azuredevops", repo}
+		}
+		return forgeRepo{}
 	case strings.Contains(host, "gitlab"):
 		return forgeRepo{"gitlab", path}
 	case strings.Contains(host, "forgejo") || strings.Contains(host, "gitea") || strings.Contains(host, "codeberg"):
@@ -186,7 +206,8 @@ func repoPath(path string) string {
 
 // ofURL is the repo and number of the issue (or, pr, the pull request) at a forge's web
 // address, by its host and path: github.com/o/r/issues/5, <gitlab>/group/project/-/issues/5,
-// <forgejo>/o/r/pulls/5, bitbucket.org/w/r/pull-requests/5. The first forge whose address the
+// <forgejo>/o/r/pulls/5, bitbucket.org/w/r/pull-requests/5,
+// dev.azure.com/org/project/_git/repo/pullrequest/5. The first forge whose address the
 // path has must be one whose host it is on: GitHub's, Forgejo's and Bitbucket's issues have
 // the same address.
 func ofURL(host, path string, pr bool) (forgeRepo, int, bool) {
@@ -196,7 +217,7 @@ func ofURL(host, path string, pr bool) (forgeRepo, int, bool) {
 		if pr {
 			sep = k.prPath
 		}
-		if matched != "" && sep != matched {
+		if sep == "" || matched != "" && sep != matched {
 			continue
 		}
 		repo, num, ok := strings.Cut(path, sep)
@@ -210,7 +231,7 @@ func ofURL(host, path string, pr bool) (forgeRepo, int, bool) {
 		}
 		r := forgeOf(host, repo)
 		if r.forge == "" && pr && k.anyHost {
-			r = forgeRepo{k.name, repoPath(repo)}
+			r = anyHostRepo(k.name, host, repo)
 		}
 		if r.path != "" && r.forge == k.name {
 			return r, n, true
@@ -219,9 +240,22 @@ func ofURL(host, path string, pr bool) (forgeRepo, int, bool) {
 	return forgeRepo{}, 0, false
 }
 
+// anyHostRepo is the repo of forge's pull request address on a host whose name does not say
+// it, by the path up to its prPath: owner/repo on a Forgejo, and the Server's
+// collection/project/_git/repo on Azure DevOps.
+func anyHostRepo(forge, host, path string) forgeRepo {
+	if forge != "azuredevops" {
+		return forgeRepo{forge, repoPath(path)}
+	}
+	if repo, ok := azureDevOpsOfPath(host, path, true); ok {
+		return forgeRepo{forge, repo}
+	}
+	return forgeRepo{}
+}
+
 // prOfURL is the repo and number of a PR's web address: github.com/o/r/pull/5,
-// <gitlab>/group/project/-/merge_requests/5, <forgejo>/o/r/pulls/5, or
-// bitbucket.org/w/r/pull-requests/5.
+// <gitlab>/group/project/-/merge_requests/5, <forgejo>/o/r/pulls/5,
+// bitbucket.org/w/r/pull-requests/5, or dev.azure.com/org/project/_git/repo/pullrequest/5.
 func prOfURL(raw string) (forgeRepo, int, bool) {
 	u, err := url.Parse(raw)
 	if err != nil {
@@ -292,7 +326,7 @@ func jiraKeys(text string, jira []string) []string {
 }
 
 // folderRepo is the forge repo a folder pushes to, from its origin remote: on a host whose name
-// says its forge, or on the connected Forgejo.
+// says its forge, or on the connected Forgejo or Azure DevOps Server.
 func (d *Daemon) folderRepo(folder string) forgeRepo {
 	d.repoMu.Lock()
 	r, ok := d.repos[folder]
@@ -300,7 +334,7 @@ func (d *Daemon) folderRepo(folder string) forgeRepo {
 	d.repoMu.Unlock()
 	if ok {
 		if other {
-			return d.connectedForgejoRepo(folder)
+			return d.connectedRepo(folder)
 		}
 		return r
 	}
@@ -326,9 +360,21 @@ func (d *Daemon) folderRepo(folder string) forgeRepo {
 	}
 	d.repoMu.Unlock()
 	if other {
-		return d.connectedForgejoRepo(folder)
+		return d.connectedRepo(folder)
 	}
 	return r
+}
+
+// connectedRepo is folder's repo on the connected Forgejo, else on the connected Azure DevOps
+// Server, as the Work pages find each (azureDevOpsRepoAt), or none.
+func (d *Daemon) connectedRepo(folder string) forgeRepo {
+	if r := d.connectedForgejoRepo(folder); r.forge != "" {
+		return r
+	}
+	if _, repo := d.azureDevOpsRepoAt(context.Background(), folder); repo != "" {
+		return forgeRepo{"azuredevops", strings.ToLower(repo)}
+	}
+	return forgeRepo{}
 }
 
 // connectedForgejoRepo is folder's repo on the connected Forgejo, as the Work pages find it

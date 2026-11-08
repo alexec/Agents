@@ -1,6 +1,7 @@
 [
   {
     "expected" : {
+      "issue" : null,
       "label" : null,
       "matches" : true,
       "text" : ""
@@ -26,6 +27,11 @@
             "addedAt" : 812500000,
             "owner" : "agent",
             "value" : "web ui"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "#12"
           }
         ],
         "lastActivityAt" : 812500000,
@@ -52,6 +58,7 @@
   },
   {
     "expected" : {
+      "issue" : null,
       "label" : null,
       "matches" : true,
       "text" : "login"
@@ -77,6 +84,11 @@
             "addedAt" : 812500000,
             "owner" : "agent",
             "value" : "web ui"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "#12"
           }
         ],
         "lastActivityAt" : 812500000,
@@ -103,6 +115,7 @@
   },
   {
     "expected" : {
+      "issue" : null,
       "label" : null,
       "matches" : true,
       "text" : "LOGINS"
@@ -128,6 +141,11 @@
             "addedAt" : 812500000,
             "owner" : "agent",
             "value" : "web ui"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "#12"
           }
         ],
         "lastActivityAt" : 812500000,
@@ -154,6 +172,7 @@
   },
   {
     "expected" : {
+      "issue" : null,
       "label" : "bug",
       "matches" : true,
       "text" : ""
@@ -179,6 +198,11 @@
             "addedAt" : 812500000,
             "owner" : "agent",
             "value" : "web ui"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "#12"
           }
         ],
         "lastActivityAt" : 812500000,
@@ -205,6 +229,7 @@
   },
   {
     "expected" : {
+      "issue" : null,
       "label" : "BUG",
       "matches" : true,
       "text" : "login"
@@ -230,6 +255,11 @@
             "addedAt" : 812500000,
             "owner" : "agent",
             "value" : "web ui"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "#12"
           }
         ],
         "lastActivityAt" : 812500000,
@@ -256,6 +286,7 @@
   },
   {
     "expected" : {
+      "issue" : null,
       "label" : "web ui",
       "matches" : true,
       "text" : ""
@@ -281,6 +312,11 @@
             "addedAt" : 812500000,
             "owner" : "agent",
             "value" : "web ui"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "#12"
           }
         ],
         "lastActivityAt" : 812500000,
@@ -307,6 +343,7 @@
   },
   {
     "expected" : {
+      "issue" : null,
       "label" : "web",
       "matches" : false,
       "text" : ""
@@ -332,6 +369,11 @@
             "addedAt" : 812500000,
             "owner" : "agent",
             "value" : "web ui"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "#12"
           }
         ],
         "lastActivityAt" : 812500000,
@@ -358,6 +400,7 @@
   },
   {
     "expected" : {
+      "issue" : null,
       "label" : "",
       "matches" : false,
       "text" : ""
@@ -383,6 +426,11 @@
             "addedAt" : 812500000,
             "owner" : "agent",
             "value" : "web ui"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "#12"
           }
         ],
         "lastActivityAt" : 812500000,
@@ -409,6 +457,7 @@
   },
   {
     "expected" : {
+      "issue" : null,
       "label" : null,
       "matches" : false,
       "text" : "nothing here"
@@ -434,6 +483,11 @@
             "addedAt" : 812500000,
             "owner" : "agent",
             "value" : "web ui"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "#12"
           }
         ],
         "lastActivityAt" : 812500000,
@@ -460,6 +514,7 @@
   },
   {
     "expected" : {
+      "issue" : null,
       "label" : "bug",
       "matches" : false,
       "text" : "nothing"
@@ -485,6 +540,11 @@
             "addedAt" : 812500000,
             "owner" : "agent",
             "value" : "web ui"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "#12"
           }
         ],
         "lastActivityAt" : 812500000,
@@ -508,5 +568,727 @@
       "query" : "label:bug nothing"
     },
     "name" : "label:bug nothing"
+  },
+  {
+    "expected" : {
+      "issue" : 12,
+      "label" : null,
+      "matches" : true,
+      "text" : ""
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/folder/",
+        "id" : "00000000-0000-0000-0000-000000000050",
+        "labels" : [
+          {
+            "addedAt" : 812500000,
+            "owner" : "person",
+            "value" : "Bug"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "web ui"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "#12"
+          }
+        ],
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "message" : "Logins work again.",
+          "outcome" : "done"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Fix the Login page"
+      },
+      "query" : "#12"
+    },
+    "name" : "#12"
+  },
+  {
+    "expected" : {
+      "issue" : 12,
+      "label" : null,
+      "matches" : true,
+      "text" : ""
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/folder/",
+        "id" : "00000000-0000-0000-0000-000000000050",
+        "labels" : [
+          {
+            "addedAt" : 812500000,
+            "owner" : "person",
+            "value" : "Bug"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "web ui"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "#12"
+          }
+        ],
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "message" : "Logins work again.",
+          "outcome" : "done"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Fix the Login page"
+      },
+      "query" : "issue:#12"
+    },
+    "name" : "issue:#12"
+  },
+  {
+    "expected" : {
+      "issue" : 12,
+      "label" : null,
+      "matches" : true,
+      "text" : "login"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/folder/",
+        "id" : "00000000-0000-0000-0000-000000000050",
+        "labels" : [
+          {
+            "addedAt" : 812500000,
+            "owner" : "person",
+            "value" : "Bug"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "web ui"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "#12"
+          }
+        ],
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "message" : "Logins work again.",
+          "outcome" : "done"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Fix the Login page"
+      },
+      "query" : "ISSUE:12 login"
+    },
+    "name" : "ISSUE:12 login"
+  },
+  {
+    "expected" : {
+      "issue" : 1,
+      "label" : null,
+      "matches" : false,
+      "text" : ""
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/folder/",
+        "id" : "00000000-0000-0000-0000-000000000050",
+        "labels" : [
+          {
+            "addedAt" : 812500000,
+            "owner" : "person",
+            "value" : "Bug"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "web ui"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "#12"
+          }
+        ],
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "message" : "Logins work again.",
+          "outcome" : "done"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Fix the Login page"
+      },
+      "query" : "#1"
+    },
+    "name" : "#1"
+  },
+  {
+    "expected" : {
+      "issue" : 12,
+      "label" : null,
+      "matches" : false,
+      "text" : "nothing"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/folder/",
+        "id" : "00000000-0000-0000-0000-000000000050",
+        "labels" : [
+          {
+            "addedAt" : 812500000,
+            "owner" : "person",
+            "value" : "Bug"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "web ui"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "#12"
+          }
+        ],
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "message" : "Logins work again.",
+          "outcome" : "done"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Fix the Login page"
+      },
+      "query" : "#12 nothing"
+    },
+    "name" : "#12 nothing"
+  },
+  {
+    "expected" : {
+      "issue" : null,
+      "label" : null,
+      "matches" : false,
+      "text" : "P#12"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/folder/",
+        "id" : "00000000-0000-0000-0000-000000000050",
+        "labels" : [
+          {
+            "addedAt" : 812500000,
+            "owner" : "person",
+            "value" : "Bug"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "web ui"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "#12"
+          }
+        ],
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "message" : "Logins work again.",
+          "outcome" : "done"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Fix the Login page"
+      },
+      "query" : "P#12"
+    },
+    "name" : "P#12"
+  },
+  {
+    "expected" : {
+      "issue" : null,
+      "label" : null,
+      "matches" : false,
+      "text" : "a#12"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/folder/",
+        "id" : "00000000-0000-0000-0000-000000000050",
+        "labels" : [
+          {
+            "addedAt" : 812500000,
+            "owner" : "person",
+            "value" : "Bug"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "web ui"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "#12"
+          }
+        ],
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "message" : "Logins work again.",
+          "outcome" : "done"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Fix the Login page"
+      },
+      "query" : "a#12"
+    },
+    "name" : "a#12"
+  },
+  {
+    "expected" : {
+      "issue" : null,
+      "label" : null,
+      "matches" : false,
+      "text" : "#12a"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/folder/",
+        "id" : "00000000-0000-0000-0000-000000000050",
+        "labels" : [
+          {
+            "addedAt" : 812500000,
+            "owner" : "person",
+            "value" : "Bug"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "web ui"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "#12"
+          }
+        ],
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "message" : "Logins work again.",
+          "outcome" : "done"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Fix the Login page"
+      },
+      "query" : "#12a"
+    },
+    "name" : "#12a"
+  },
+  {
+    "expected" : {
+      "issue" : null,
+      "label" : "#12",
+      "matches" : true,
+      "text" : ""
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/folder/",
+        "id" : "00000000-0000-0000-0000-000000000050",
+        "labels" : [
+          {
+            "addedAt" : 812500000,
+            "owner" : "person",
+            "value" : "Bug"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "web ui"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "#12"
+          }
+        ],
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "message" : "Logins work again.",
+          "outcome" : "done"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Fix the Login page"
+      },
+      "query" : "label:#12"
+    },
+    "name" : "label:#12"
+  },
+  {
+    "expected" : {
+      "issue" : 12,
+      "label" : "bug",
+      "matches" : true,
+      "text" : ""
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/folder/",
+        "id" : "00000000-0000-0000-0000-000000000050",
+        "labels" : [
+          {
+            "addedAt" : 812500000,
+            "owner" : "person",
+            "value" : "Bug"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "web ui"
+          },
+          {
+            "addedAt" : 812500000,
+            "owner" : "agent",
+            "value" : "#12"
+          }
+        ],
+        "lastActivityAt" : 812500000,
+        "report" : {
+          "at" : 812500060,
+          "message" : "Logins work again.",
+          "outcome" : "done"
+        },
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Fix the Login page"
+      },
+      "query" : "label:bug #12"
+    },
+    "name" : "label:bug #12"
+  },
+  {
+    "expected" : {
+      "issue" : 3465,
+      "label" : null,
+      "matches" : true,
+      "text" : ""
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/folder/",
+        "id" : "00000000-0000-0000-0000-000000000051",
+        "lastActivityAt" : 812500000,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "#3465: Fix the parser"
+      },
+      "onIssue" : [
+
+      ],
+      "query" : "#3465"
+    },
+    "name" : "title names it"
+  },
+  {
+    "expected" : {
+      "issue" : 346,
+      "label" : null,
+      "matches" : false,
+      "text" : ""
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/folder/",
+        "id" : "00000000-0000-0000-0000-000000000051",
+        "lastActivityAt" : 812500000,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "#3465: Fix the parser"
+      },
+      "onIssue" : [
+
+      ],
+      "query" : "#346"
+    },
+    "name" : "title, a longer number"
+  },
+  {
+    "expected" : {
+      "issue" : 9,
+      "label" : null,
+      "matches" : true,
+      "text" : ""
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/folder/",
+        "id" : "00000000-0000-0000-0000-000000000051",
+        "lastActivityAt" : 812500000,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "#3465: Fix the parser"
+      },
+      "onIssue" : [
+        "00000000-0000-0000-0000-000000000051"
+      ],
+      "query" : "#9"
+    },
+    "name" : "on the issue by lineage"
+  },
+  {
+    "expected" : {
+      "issue" : 9,
+      "label" : null,
+      "matches" : false,
+      "text" : ""
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/folder/",
+        "id" : "00000000-0000-0000-0000-000000000051",
+        "lastActivityAt" : 812500000,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "#3465: Fix the parser"
+      },
+      "onIssue" : [
+
+      ],
+      "query" : "#9"
+    },
+    "name" : "not on it"
   }
 ]

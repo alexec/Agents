@@ -10,8 +10,8 @@ import SwiftUI
 /// Saved on Return or on leaving the field, not per keystroke: each save goes to every
 /// server too.
 ///
-/// A second section (#2951) keeps the person's GitHub, GitLab, Linear, Jira (#3313) and
-/// Forgejo (#3836) logins: named on the Pull requests, Merge requests and Issues pages' Team section, and used to say an
+/// A second section (#2951) keeps the person's GitHub, GitLab, Linear, Jira (#3313), Forgejo
+/// (#3836), Bitbucket and Azure DevOps (#3853) logins: named on the Pull requests, Merge requests and Issues pages' Team section, and used to say an
 /// agent is on one of the viewer's own rows. Filled in from this Mac's own connection
 /// (Activity ▸ Connectors) when it is signed in; given here only when it is not. Shown only
 /// with a control plane, which keeps them, and a save that fails says so (#3160).
@@ -24,6 +24,8 @@ struct PersonSettingsSection: View {
     @State private var linear = ""
     @State private var jira = ""
     @State private var forgejo = ""
+    @State private var bitbucket = ""
+    @State private var azureDevOps = ""
     /// By provider: the Atlassian connection (#3304) is a provider this build may not know.
     @State private var connectionLogins: [String: String] = [:]
     /// False until loadLogins answers, so a save before then cannot clear what is kept.
@@ -31,7 +33,7 @@ struct PersonSettingsSection: View {
     @State private var loginsNotSaved = false
     @FocusState private var focused: Field?
 
-    private enum Field { case name, pronouns, github, gitlab, linear, jira, forgejo }
+    private enum Field { case name, pronouns, github, gitlab, linear, jira, forgejo, bitbucket, azureDevOps }
 
     /// What a blank name gives: the first word of this Mac account's full name.
     private var accountName: String { PersonSettings().effectiveName() }
@@ -74,8 +76,14 @@ struct PersonSettingsSection: View {
                     TextField("Forgejo login", text: $forgejo, prompt: Text(connectionLogins["forgejo"] ?? "Not given"))
                         .focused($focused, equals: .forgejo)
                         .onSubmit(saveLogins)
+                    TextField("Bitbucket login", text: $bitbucket, prompt: Text(connectionLogins["bitbucket"] ?? "Not given"))
+                        .focused($focused, equals: .bitbucket)
+                        .onSubmit(saveLogins)
+                    TextField("Azure DevOps login", text: $azureDevOps, prompt: Text(connectionLogins["azuredevops"] ?? "Not given"))
+                        .focused($focused, equals: .azureDevOps)
+                        .onSubmit(saveLogins)
                 } header: {
-                    Text("GitHub, GitLab, Linear, Jira and Forgejo")
+                    Text("GitHub, GitLab, Linear, Jira, Forgejo, Bitbucket and Azure DevOps")
                 } footer: {
                     VStack(alignment: .leading, spacing: 4) {
                         if loginsNotSaved {
@@ -83,7 +91,7 @@ struct PersonSettingsSection: View {
                                 .appText(.fine)
                                 .tinted(.failure)
                         }
-                        Text("Named on the Pull requests, Merge requests and Issues pages’ Team section, and used to say an agent is on one of your own. Filled in from this Mac’s own connection (Activity ▸ Connectors) when it is signed in; given here only when it is not. A Jira login is your Atlassian account’s email, account id or display name. A Forgejo login is your user name on the connected Forgejo.")
+                        Text("Named on the Pull requests, Merge requests and Issues pages’ Team section, and used to say an agent is on one of your own. Filled in from this Mac’s own connection (Activity ▸ Connectors) when it is signed in; given here only when it is not. A Jira login is your Atlassian account’s email, account id or display name. A Forgejo login is your user name on the connected Forgejo. A Bitbucket login is your Bitbucket nickname. An Azure DevOps login is your sign-in email or display name in the organization.")
                             .appText(.fine)
                             .foregroundStyle(.secondary)
                     }
@@ -106,7 +114,7 @@ struct PersonSettingsSection: View {
         Task { await model.setPerson(next) }
     }
 
-    /// The control plane's own answer for "me" (#2951), to fill the five fields.
+    /// The control plane's own answer for "me" (#2951), to fill the seven fields.
     private func loadLogins() async {
         guard let control = model.controlRequests,
               let list = try? await control.call(DaemonAPI.Method.peopleForViews, DaemonAPI.Empty(),
@@ -118,6 +126,8 @@ struct PersonSettingsSection: View {
         linear = me.linearLogin ?? ""
         jira = me.jiraLogin ?? ""
         forgejo = me.forgejoLogin ?? ""
+        bitbucket = me.bitbucketLogin ?? ""
+        azureDevOps = me.azureDevOpsLogin ?? ""
     }
 
     /// This Mac's own connections (#2951), for the fields' placeholders.
@@ -133,7 +143,8 @@ struct PersonSettingsSection: View {
     private func saveLogins() {
         guard loginsLoaded, let control = model.controlRequests else { return }
         let logins = DaemonAPI.ForgeLogins(github: Self.kept(github) ?? "", gitlab: Self.kept(gitlab) ?? "", linear: Self.kept(linear) ?? "",
-                                             jira: Self.kept(jira) ?? "", forgejo: Self.kept(forgejo) ?? "")
+                                             jira: Self.kept(jira) ?? "", forgejo: Self.kept(forgejo) ?? "",
+                                             bitbucket: Self.kept(bitbucket) ?? "", azureDevOps: Self.kept(azureDevOps) ?? "")
         Task {
             do {
                 _ = try await control.call(DaemonAPI.Method.peopleSetForgeLogins, logins)

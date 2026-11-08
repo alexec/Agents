@@ -21,6 +21,10 @@ final class TranscriptGeometry: @unchecked Sendable {
     var slack: Double = 0
     /// The row a reader's place is held by, and where it starts: nil while following the end.
     var anchor: (id: UUID, top: Double)?
+    /// Told, after the pass, that the slack changed: a page landed above, or a row above
+    /// the reader changed height. The pane decides then whether its margin follows, not at the
+    /// next scroll, or a reader near the top stops at a top that is no longer there (#4087).
+    var slackChanged: (@MainActor () -> Void)?
     /// How far the content moved down, all at once, because the slack ran out: the pane
     /// moves by as much (`TranscriptPlacement.Placed.shift`). Taken by the transcript.
     var shift: Double = 0
@@ -70,6 +74,9 @@ final class TranscriptGeometry: @unchecked Sendable {
         self.heights = heights
         tops = placed.tops
         height = placed.height
+        if abs(placed.slack - slack) > 0.5, let slackChanged {
+            DispatchQueue.main.async { slackChanged() }
+        }
         slack = placed.slack
         if placed.shift > 0, let held = anchor {
             anchor = (held.id, held.top + placed.shift)

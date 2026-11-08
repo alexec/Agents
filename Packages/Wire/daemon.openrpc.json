@@ -1951,7 +1951,7 @@
       "result": {
         "name": "result",
         "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
+          "$ref": "daemon.schema.json#/definitions/BrowserInputResult"
         }
       }
     },
@@ -5062,6 +5062,31 @@
       }
     },
     {
+      "name": "lineage/sessions",
+      "x-capability": "lineage.sessions/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LineageSessionsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LineageSessions"
+        }
+      }
+    },
+    {
       "name": "lineage/walk",
       "x-capability": "lineage/1",
       "tags": [
@@ -5737,6 +5762,11 @@
     {
       "name": "multiplier/changed",
       "x-capability": "multiplier/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "description": "The Multiplier changed (#3903): a PR of the person's agents merged or a revert merged, with the PR in changedBy, or the person changed their baseline (#3991), with no changedBy. The Mac window follows it; it does not poll.",
       "x-notification": true,
       "paramStructure": "by-name",
@@ -5753,6 +5783,11 @@
     {
       "name": "multiplier/state",
       "x-capability": "multiplier/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "description": "The Multiplier now (#3903): from the control plane's count of the person's machines when this machine has one, else from this machine's lineage. Cheap: the Mac window asks on each open.",
       "paramStructure": "by-name",
       "params": [

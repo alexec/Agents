@@ -1467,11 +1467,22 @@ final class AppModel {
         searchNext = [:]
         work.forget(earlier)
         work.saidLines = [:]
+        work.issueSessions = [:]
         guard !words.isEmpty else { return }
         let request = DaemonAPI.ListRequest(archivedCommands: false, limit: Self.searchShown, lean: true, query: words)
         let hosts: [MachineRef] = (hasMacHost ? [.mac] : []) + self.hosts.servers.filter { !hostUnreachable($0) }
+        let issue = SessionLabelQuery.issue(in: words)
         for host in hosts {
             await search(request, on: host)
+            // The sessions on the issue, its sub-issues and their PRs (#3899). A host too old to
+            // say matches the #<n> label only.
+            if let issue, self.host(host, has: Capability.lineageSessions1),
+               let on = try? await client(for: host).call(DaemonAPI.Method.lineageSessions,
+                                                          DaemonAPI.LineageSessionsRequest(number: issue),
+                                                          returning: DaemonAPI.LineageSessions.self),
+               !Task.isCancelled {
+                for match in on.matches { work.issueSessions[match.agentID] = match.on }
+            }
             // What was said (#1585): the sessions whose prompts or replies hold the words. Not
             // asked of a host too old to say (#1748).
             if self.host(host, has: Capability.agentsSaid1),
@@ -3680,6 +3691,7 @@ final class AppModel {
     private func refreshMacHostJoin(_ control: DaemonClient) async {
         guard let status = try? await control.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self) else { return }
         let connected = status.thisMacHost?.connected == true
+        OlderPeer.controlVersion = status.version
         macHostJoin = status.thisMacHost
         controlPlaneMachine = status.machineID
         if connected, !isConnected { backoff.nudge() }
@@ -3891,6 +3903,7 @@ final class AppModel {
               let status = try? await control.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self)
         else { return }
         controlPlaneHosts = listed
+        OlderPeer.controlVersion = status.version
         if let controlKey = Self.controlKey {
             KeptThisMacHost.keep(from: listed, controlKey: controlKey, in: WindowDefaults.store)
             keptHost = KeptThisMacHost.read(controlKey: controlKey, from: WindowDefaults.store)

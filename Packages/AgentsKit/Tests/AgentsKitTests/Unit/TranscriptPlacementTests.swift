@@ -76,6 +76,29 @@ struct TranscriptPlacementTests {
         #expect(anchor?.top == 300)
     }
 
+    /// Reading far back, a page that lands above leaves the margin where it is: moving it
+    /// moved the screen for a frame (#4087).
+    @Test func aReaderFarBackKeepsTheMargin() {
+        #expect(!TranscriptPlacement.marginFollows(slack: 489_000, margin: 500_000, top: 503_000,
+                                                   pane: 800, following: false))
+    }
+
+    /// A reader near the margin, or at it as a page lands, needs the rows it hid: it moves.
+    @Test func aReaderNearTheTopTakesTheMargin() {
+        #expect(TranscriptPlacement.marginFollows(slack: 489_000, margin: 500_000, top: 500_000,
+                                                  pane: 800, following: false))
+        #expect(TranscriptPlacement.marginFollows(slack: 500_300, margin: 500_000, top: 501_500,
+                                                  pane: 800, following: false))
+    }
+
+    /// Following the end, the margin follows the slack at once; with no change, never.
+    @Test func followingAlwaysTakesTheMargin() {
+        #expect(TranscriptPlacement.marginFollows(slack: 489_000, margin: 500_000, top: 520_000,
+                                                  pane: 800, following: true))
+        #expect(!TranscriptPlacement.marginFollows(slack: 500_000.2, margin: 500_000, top: 500_000,
+                                                   pane: 800, following: false))
+    }
+
     /// A row taller than the screen holds the place by itself.
     @Test func aRowTallerThanTheScreenIsItsOwnAnchor() {
         let anchor = TranscriptPlacement.anchor(tops: [0, 100, 3000], heights: [100, 2900, 50],

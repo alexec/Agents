@@ -370,13 +370,12 @@ for (const scene of scenes) {
       say(`levels: ${JSON.stringify(await page.eval(`[...document.querySelectorAll(".mcp-page .connector-levels")].map((p) => p.getAttribute("aria-label"))`))}`);
       await shot("connectors");
     } else if (scene === "achievements") {
-      // #984, #1067: the achievements on their own page, from their row in Usage, then the
-      // one-time card for one earned while the page looks. The walker earns one meanwhile (a
-      // first turn, from the socket).
-      say(`usage rows: ${JSON.stringify(await visible(".activity-row .title"))}`);
+      // #984, #3990: the earned badges and the Next line on the Multiplier page (an old
+      // #/a/achievements opens it), then the one-time card for one earned while the page looks.
+      // The walker earns one meanwhile (a first turn, from the socket).
       await page.eval(`location.hash = "#/a/achievements"`);
-      await page.waitFor(`document.querySelector(".achievements li")`, 30_000);
-      say(`achievements: ${JSON.stringify(await visible(".achievements li"))}`);
+      await page.waitFor(`document.querySelector(".multiplier-badges")`, 30_000);
+      say(`achievements: ${JSON.stringify(await visible(".multiplier-badges .badge, .multiplier-badges p"))}`);
       await shot("achievements");
       await page.waitFor(`document.querySelector(".achievement-card")`, 300_000);
       // Fixed in place, so it has no offsetParent and `visible` would skip it.
@@ -386,7 +385,7 @@ for (const scene of scenes) {
       await page.eval(`document.querySelector(".achievement-card button.close").click()`);
       await sleep(300);
       say(`card after ✕: ${JSON.stringify(await card())}`);
-      say(`achievements after: ${JSON.stringify(await visible(".achievements li.done"))}`);
+      say(`achievements after: ${JSON.stringify(await visible(".multiplier-badges .badge"))}`);
     } else if (scene === "identity") {
       // #111: the footer names the browser, and no grant.
       say(`footer: ${JSON.stringify(await page.text(".identity"))}`);

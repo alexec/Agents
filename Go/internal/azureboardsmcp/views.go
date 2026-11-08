@@ -50,23 +50,84 @@ var openCategories = []string{"Proposed", "InProgress", "Resolved"}
 
 // The Issues page's sections (#2453, specs/2453-team-lists.md), the jira server's
 // (Go/internal/jiramcp/sections.go) in Azure Boards' words. An organization has only its own
-// members and its bots, no customers, so every work item that is not the viewer's is Team.
+// members and its bots, no customers, so with no control-plane people (#2951) every work item
+// that is not the viewer's is Team. With control-plane people, Team is the people and bots on
+// this control plane, by their Azure DevOps login (#3853), and Others is the rest.
 const (
 	sectionNeedsYou = "needs_you"
 	sectionYours    = "yours"
 	sectionTeam     = "team"
+	sectionOthers   = "others"
 )
 
 // itemSection is a work item's section: Needs you is assigned to the viewer, the token's
 // owner; Yours is made by the viewer.
-func itemSection(w WorkItem, me string) string {
+func itemSection(w WorkItem, me string, people teamMeta) string {
 	switch {
 	case me != "" && w.AssigneeID == me:
 		return sectionNeedsYou
 	case me != "" && w.Creator != nil && w.Creator.ID == me:
 		return sectionYours
 	}
+	if len(people) > 0 {
+		if _, on := people.of(w.Creator); !on {
+			return sectionOthers
+		}
+	}
 	return sectionTeam
+}
+
+// teamMeta is the control plane's people and bots, by Azure DevOps login lowercased (#2951,
+// #3853): read from the call's _meta, which the host fills in, so this server makes no
+// control-plane call of its own. Empty with no control plane, or a host that gives no Azure
+// DevOps logins.
+type teamMeta map[string]teamPerson
+
+// teamPerson is one of teamMeta's people, as the control plane knows them.
+type teamPerson struct {
+	Name string
+	Bot  bool
+}
+
+// teamMetaOf reads _meta's people (#2951): each with an Azure DevOps login, lowercased.
+func teamMetaOf(meta mcp.Meta) teamMeta {
+	list, ok := meta["people"].([]any)
+	if !ok {
+		return nil
+	}
+	out := teamMeta{}
+	for _, item := range list {
+		row, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		login, _ := row["azuredevops"].(string)
+		if login == "" {
+			continue
+		}
+		name, _ := row["name"].(string)
+		bot, _ := row["bot"].(bool)
+		out[strings.ToLower(login)] = teamPerson{Name: name, Bot: bot}
+	}
+	return out
+}
+
+// of is the control-plane person who is p (#3853). An Azure DevOps login is the sign-in email
+// or the display name (the connection's own is the display name), so either matches, and the
+// identity's id too.
+func (t teamMeta) of(p *Person) (teamPerson, bool) {
+	if p == nil {
+		return teamPerson{}, false
+	}
+	for _, login := range []string{p.Name, p.DisplayName, p.ID} {
+		if login == "" {
+			continue
+		}
+		if tp, on := t[strings.ToLower(login)]; on {
+			return tp, true
+		}
+	}
+	return teamPerson{}, false
 }
 
 // agentOnOf reads _meta's agentOnBoards (#2951): who is on that work item (AB#12), or "".
@@ -89,7 +150,7 @@ type issuesArgs struct {
 func AddViews(server *mcp.Server, b *RealBoards) {
 	mcp.AddTool(server, &mcp.Tool{Name: "show_issues", Title: "Show Azure Boards work items",
 		Description: "The project's open work items (not in a Completed or Removed state), changed last first, at most 50, each with " +
-			"its id (AB#12), type, state and its category, area, tags (labels), assignee, author and section for the token's owner: needs_you (assigned to you), yours (made by you) or team; attention counts needs_you. agentOn says who is " +
+			"its id (AB#12), type, state and its category, area, tags (labels), assignee, author and section for the token's owner: needs_you (assigned to you), yours (made by you), team (the people and bots on this control plane by their Azure DevOps login, or with no control plane everyone else) or others; attention counts needs_you. agentOn says who is " +
 			"on one of the viewer's own. It also gives the project's work item types. " +
 			"A type, a state category (Proposed, InProgress or Resolved) or a tag narrows it. " +
 			"Its view is the Azure Boards page, where a person expands a row for its description or chooses Start Agent.",
@@ -123,6 +184,7 @@ func AddViews(server *mcp.Server, b *RealBoards) {
 			items := make([]any, len(list))
 			// The count on the sidebar's row (#2033): the work items that need the viewer (#2453).
 			needsYou := 0
+			people := teamMetaOf(req.Params.Meta)
 			for i, w := range list {
 				j := w.json()
 				j["key"] = "AB#" + itoa(w.ID)
@@ -130,12 +192,18 @@ func AddViews(server *mcp.Server, b *RealBoards) {
 				if w.Creator != nil && w.Creator.Bot {
 					j["authorBot"] = true
 				}
-				section := itemSection(w, me)
+				if tp, on := people.of(w.Creator); on {
+					j["authorName"] = tp.Name
+					if tp.Bot {
+						j["authorBot"] = true
+					}
+				}
+				section := itemSection(w, me, people)
 				j["section"] = section
 				if section == sectionNeedsYou {
 					needsYou++
 				}
-				if section != sectionTeam {
+				if section == sectionNeedsYou || section == sectionYours {
 					if who := agentOnOf(req.Params.Meta, w.ID); who != "" {
 						j["agentOn"] = who
 					}

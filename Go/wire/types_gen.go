@@ -1471,6 +1471,11 @@ type BrowserInputRequest struct {
 	Modifiers *int64 `json:"modifiers,omitzero"`
 }
 
+// browser/input's answer. editing is said after a mouseReleased only: whether the click left the page's focus in a field that takes text (an input, a textarea, a contenteditable), so a touch client opens or closes its keyboard. Left out for other input, and by a host before it was added.
+type BrowserInputResult struct {
+	Editing *bool `json:"editing,omitzero"`
+}
+
 type BrowserNavigateAction string
 
 const BrowserNavigateActionGo BrowserNavigateAction = "go"
@@ -4856,7 +4861,7 @@ type ForgeLogRequest struct {
 	Check *string `json:"check,omitzero"`
 }
 
-// people/setForgeLogins (#2951): the caller's own GitHub, GitLab, Linear, Jira (#3313) and Forgejo (#3836) logins, for Settings ▸ You, replacing what was kept; blank clears one.
+// people/setForgeLogins (#2951): the caller's own GitHub, GitLab, Linear, Jira (#3313), Forgejo (#3836), Bitbucket and Azure DevOps (#3853) logins, for Settings ▸ You, replacing what was kept; blank clears one.
 type ForgeLogins struct {
 	Github *string `json:"github,omitzero"`
 
@@ -4867,6 +4872,10 @@ type ForgeLogins struct {
 	Jira *string `json:"jira,omitzero"`
 
 	Forgejo *string `json:"forgejo,omitzero"`
+
+	Bitbucket *string `json:"bitbucket,omitzero"`
+
+	AzureDevOps *string `json:"azureDevOps,omitzero"`
 }
 
 // How forge/merge merges a pull request (#3130): a merge commit, one squashed commit, or its commits rebased onto the base.
@@ -5713,6 +5722,25 @@ type LineageResolved struct {
 	State *string `json:"state,omitzero"`
 
 	Labels []string `json:"labels,omitzero"`
+}
+
+// A session on the issue, and the issue it is on: the one asked for, or one of its sub-issues. A session on a PR is on the issue the PR fixes.
+type LineageSessionMatch struct {
+	AgentID UUID `json:"agentID"`
+
+	On LineageNode `json:"on"`
+}
+
+// The sessions on this machine that lineage links to the issue, to its sub-issues or to their PRs, each once. limited says there were more sub-issues or sessions than are counted.
+type LineageSessions struct {
+	Matches []LineageSessionMatch `json:"matches"`
+
+	Limited *bool `json:"limited,omitzero"`
+}
+
+// lineage/sessions (#3899): a session search for #<number> asks for the sessions on that issue, on the issues part-of it (its sub-issues, at most 100) and on the PRs that fix them. The issue is #<number> in the forge repo of each of this machine's folders.
+type LineageSessionsRequest struct {
+	Number int64 `json:"number"`
 }
 
 type ListCursor struct {
@@ -12303,6 +12331,12 @@ type TeamPerson struct {
 
 	// Their Forgejo login (#3836): their user name on the connected Forgejo or Gitea.
 	ForgejoLogin *string `json:"forgejoLogin,omitzero"`
+
+	// Their Bitbucket login (#3853): their Bitbucket nickname.
+	BitbucketLogin *string `json:"bitbucketLogin,omitzero"`
+
+	// Their Azure DevOps login (#3853): their sign-in email or display name in the Azure DevOps organization.
+	AzureDevOpsLogin *string `json:"azureDevOpsLogin,omitzero"`
 
 	You *bool `json:"you,omitzero"`
 }
