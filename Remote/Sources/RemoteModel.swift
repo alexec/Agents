@@ -657,11 +657,13 @@ final class RemoteModel {
                 openWorkflow = nil
                 openReview = nil
                 openArchive = true
+            case .machine:
+                // A machine's page (#4034), as the window's Machines group opens it.
+                openActivity = newValue
             case .multiplier, .spending, .tokens, .time,
-                 .folderMCPServers, .docs, .machine:
-                // Usage, a folder's connectors, Docs and a machine's page are Mac + web
-                // (#2798, #3321, #3626), and the Multiplier page the Mac's (#3986):
-                // the Remote opens none of them.
+                 .folderMCPServers, .docs:
+                // Usage, a folder's connectors and Docs are Mac + web (#2798, #3321), and
+                // the Multiplier page the Mac's (#3986): the Remote opens none of them.
                 break
             }
         }
@@ -2424,6 +2426,162 @@ final class RemoteModel {
     }
 
 
+    // MARK: Machines (#4034), as the window's Machines group (#3973)
+
+    /// The Machines group's rows: This Mac first, then every other machine the control plane
+    /// lists. None against a bridge with no control plane.
+    var machines: [MachineRef] {
+        guard let home = controlHome, !controlHosts.isEmpty else { return [] }
+        return [.mac] + controlHosts.map(\.id).filter { $0 != home && $0 != .mac }
+    }
+
+    /// A machine's row as `machines/list` last said it; This Mac's is the home host's.
+    func machineRow(_ host: MachineRef) -> DaemonAPI.ControlMachine? {
+        host == .mac ? controlHosts.first { $0.id == controlHome } : controlHost(host)
+    }
+
+    /// A machine's name in the group: This Mac, or the name the control plane gave it.
+    func machineName(_ host: MachineRef) -> String {
+        guard host != .mac, let row = controlHost(host) else { return host == .mac ? "This Mac" : host.rawValue }
+        return row.name.isEmpty ? host.rawValue : row.name
+    }
+
+    /// Whether the machine answers calls now, as its row last said.
+    func machineOffline(_ host: MachineRef) -> Bool {
+        machineRow(host).map { !$0.answers } ?? false
+    }
+
+    /// Each other machine's disks, as it last said them (#3628), for its row's red and its page.
+    private(set) var serverDisks: [MachineRef: DiskState] = [:]
+
+    private func receivedDisk(_ state: DiskState?, from host: MachineRef) {
+        serverDisks[host] = state
+    }
+
+    /// What the machine says of its disks now, as it joins (#3628).
+    private func refreshServerDisk(_ host: MachineRef) async {
+        guard let other = otherHosts[host],
+              let state = try? await other.call(DaemonAPI.Method.diskState, Optional<String>.none, returning: DiskState.self)
+        else { return }
+        serverDisks[host] = state
+    }
+
+    /// A machine's most urgent need, as its row says it (#3764).
+    func need(of host: MachineRef) -> MachineNeed? {
+        MachineNeed.most(row: machineRow(host), offline: machineOffline(host),
+                         runtimes: runtimes(on: host), disks: diskAlarms(host))
+    }
+
+    /// Whether a disk on the machine is low or almost full, as its page says (#3626).
+    /// Not while it is offline: what its disks last said is old, and its line says why it is quiet.
+    func diskWarns(_ host: MachineRef) -> Bool {
+        !machineOffline(host) && diskAlarms(host).contains { $0.level != .ok }
+    }
+
+    private func diskAlarms(_ host: MachineRef) -> [DiskAlarm] {
+        host == .mac ? work.disk.alarms : serverDisks[host]?.alarms ?? []
+    }
+
+    /// The providers New Machine can use (#3979), for the Machines header's menu.
+    private(set) var machineProviders: [DaemonAPI.ProviderSummary] = []
+
+    /// A New Machine the provider could not make, with its reason, and Try Again.
+    var makeFailed: MachineMakeFailure?
+
+    /// Stop on a machine's row (#3973). Unconfirmed while agents work there, the control plane
+    /// says who they are, and they are returned for the question; nil once it is stopping or refused.
+    func stopHost(_ host: MachineRef, confirmed: Bool = false) async -> [String]? {
+        guard let control = controlPlane else {
+            problem = "The control plane isn’t answering, so \(machineName(host)) could not be stopped."
+            return nil
+        }
+        do {
+            _ = try await control.call(DaemonAPI.Method.hostsStop,
+                                       DaemonAPI.MachineStop(host: host, confirmRunning: confirmed ? true : nil))
+        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.agentsWorking {
+            let names = error.data?["running"]?.arrayValue?.compactMap(\.stringValue) ?? []
+            if !names.isEmpty { return names }
+            problem = sentence(for: error)
+        } catch {
+            problem = sentence(for: error)
+        }
+        return nil
+    }
+
+    /// Delete… on a machine a provider made (#3973): the provider deletes it, then the host goes.
+    func deleteMachine(_ host: MachineRef) async {
+        await machineCall(DaemonAPI.Method.hostsDeleteMachine, host)
+    }
+
+    /// Remove… on a registered machine (#3973): Agents forgets it; the computer stays.
+    func removeMachine(_ host: MachineRef) async {
+        await machineCall(DaemonAPI.Method.hostsRemove, host)
+    }
+
+    private func machineCall(_ method: String, _ host: MachineRef) async {
+        guard let control = controlPlane else {
+            problem = "The control plane isn’t answering."
+            return
+        }
+        do {
+            _ = try await control.call(method, DaemonAPI.MachineRequest(host: host))
+            controlHosts.removeAll { $0.id == host }
+        } catch {
+            problem = sentence(for: error)
+        }
+    }
+
+    /// Delete's question (#3979): the worktrees on the machine with work not pushed. Nil when
+    /// the control plane can't say.
+    func deletePreview(_ host: MachineRef) async -> DaemonAPI.StartedMachinePreview? {
+        try? await controlPlane?.call(DaemonAPI.Method.hostsDeletePreview, DaemonAPI.MachineRequest(host: host),
+                                      returning: DaemonAPI.StartedMachinePreview.self)
+    }
+
+    /// New Machine (#3973): the default provider makes `machine-N` with the options used last,
+    /// with no questions; New Machine on ▸ names the provider, which is then the default (#3979).
+    func newMachine(on provider: ProviderID? = nil) async {
+        guard let control = controlPlane else {
+            problem = "The control plane isn’t answering, so no machine can be made."
+            return
+        }
+        do {
+            let made = try await control.call(DaemonAPI.Method.providersCreate, DaemonAPI.ProviderRequest(id: provider),
+                                              returning: DaemonAPI.ProviderCreated.self)
+            if made.workspace.state == "failed" {
+                makeFailed = MachineMakeFailure(reason: made.workspace.reason ?? "\(made.workspace.name) could not be made.",
+                                                provider: provider)
+            }
+        } catch {
+            makeFailed = MachineMakeFailure(reason: sentence(for: error), provider: provider)
+        }
+        await loadMachineProviders()
+    }
+
+    private func heardProviders(_ params: JSONValue?) {
+        guard let listed = try? params?["providers"]?.decode([DaemonAPI.ProviderSummary].self) else { return }
+        machineProviders = listed.filter { $0.capabilities.contains("create") && $0.usable }
+    }
+
+    func loadMachineProviders() async {
+        guard let control = controlPlane,
+              let answer = try? await control.call(DaemonAPI.Method.providersList, DaemonAPI.Empty()),
+              let listed = try? answer["providers"]?.decode([DaemonAPI.ProviderSummary].self)
+        else { return }
+        machineProviders = listed.filter { $0.capabilities.contains("create") && $0.usable }
+    }
+
+    /// A machine's runtimes, asked again as its page opens (#3629).
+    func refreshMachineRuntimes(_ host: MachineRef) async {
+        if host == .mac { await refreshRuntimes() } else { await refreshServerRuntimes(host) }
+    }
+
+    /// A machine's CPU, memory and disks for its page (#3626), asked of the machine itself.
+    func machineUsage(_ host: MachineRef) async throws -> DaemonAPI.MachineUsageState {
+        try await client(for: DaemonAPI.Empty(), on: host)
+            .call(DaemonAPI.Method.machineUsage, DaemonAPI.Empty(), returning: DaemonAPI.MachineUsageState.self)
+    }
+
     /// A host's git asking to use a Mac's git access (#1122), not answered here yet. Any
     /// client may answer it; the control plane takes the first answer.
     var gitLendAsk: GitLendAsk? {
@@ -2483,6 +2641,7 @@ final class RemoteModel {
                     backoff.connected()
                     self?.controlPlane = control
                     await self?.syncOtherHosts(control, link: link)
+                    await self?.loadMachineProviders()
                     await self?.loadKept(control)
                     await self?.people.connected(control)
                     await self?.signIn.connected(control)
@@ -2504,6 +2663,11 @@ final class RemoteModel {
                         if change.method == DaemonAPI.Notification.controlKeptChanged
                             || change.method == DaemonAPI.Notification.controlKeptDelivered {
                             await self.heardKept(change.method, change.params)
+                            continue
+                        }
+                        if change.method == DaemonAPI.Notification.controlProvidersChanged {
+                            // The Machines group's New Machine row and its default (#4034).
+                            self.heardProviders(change.params)
                             continue
                         }
                         guard change.method == DaemonAPI.Notification.controlHostChanged else { continue }
@@ -2594,6 +2758,7 @@ final class RemoteModel {
                 work.replaceAgents(agents, from: id)
             }
             await refreshServerRuntimes(id)
+            await refreshServerDisk(id)
             await machineBrowsers[id]?.rewatchIfWatching()
             let notes = other.notifications()
             let shown = work.shown
@@ -2612,10 +2777,13 @@ final class RemoteModel {
                         await self?.received(note.method, note.params, fromOther: id)
                         continue
                     }
-                    // Settings ▸ Backups is the Mac's (#1810); a machine's disks are on its
-                    // page, which the Remote does not have (#3628).
-                    if note.method == DaemonAPI.Notification.diskChanged
-                        || note.method == DaemonAPI.Notification.resourcesChanged
+                    // A machine's disks, for its row and its page (#4034).
+                    if note.method == DaemonAPI.Notification.diskChanged {
+                        await self?.receivedDisk(try? note.params?.decode(DiskState.self), from: id)
+                        continue
+                    }
+                    // Settings ▸ Backups is the Mac's (#1810).
+                    if note.method == DaemonAPI.Notification.resourcesChanged
                         || note.method == DaemonAPI.Notification.mcpHostedChanged
                         || note.method == DaemonAPI.Notification.eventsChanged
                         || note.method == DaemonAPI.Notification.backupsChanged { continue }

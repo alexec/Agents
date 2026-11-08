@@ -1,7 +1,7 @@
 import AgentsKitCore
 import Foundation
 
-/// Every sentence the window says about a server that cannot be used (037), in one
+/// Every sentence the window and the Remote say about a server that cannot be used (037), in one
 /// place, word for word from wireframes.md § Words.
 extension HostProblem {
     func sentence(name: String, label: String) -> String {

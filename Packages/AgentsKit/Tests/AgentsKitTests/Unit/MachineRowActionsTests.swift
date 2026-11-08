@@ -67,4 +67,20 @@ struct MachineRowActionsTests {
         #expect(MachineRowActions.deleteMessage(row("stopped"), sessions: 0, preview: offline)
                 == "DigitalOcean deletes this machine and its disk. devbox is not online, so it could not be asked.")
     }
+
+    @Test func theIconSaysTheStateMostUrgentFirst() {
+        #expect(MachineIcon.of(.online, diskLow: false) == .accent)
+        #expect(MachineIcon.of(.busy, diskLow: true) == .busy)
+        #expect(MachineIcon.of(.offline, diskLow: false) == .failure)
+        #expect(MachineIcon.of(.online, diskLow: true) == .failure)
+        #expect(MachineIcon.of(.attention, diskLow: true) == .failure)
+        #expect(MachineIcon.of(.attention, diskLow: false) == .attention)
+        #expect(MachineIcon.of(.stopped, diskLow: false) == .stopped)
+    }
+
+    @Test func theIconsShapeSaysTheKind() {
+        #expect(MachineIcon.symbol(isThisMac: true, row: row("online")) == "laptopcomputer")
+        #expect(MachineIcon.symbol(isThisMac: false, row: row("online")) == "cloud")
+        #expect(MachineIcon.symbol(isThisMac: false, row: row("online", workspace: false)) == "server.rack")
+    }
 }
