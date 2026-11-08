@@ -528,3 +528,9 @@ func same(t *testing.T, got, want any) {
 		t.Fatalf("got %#v, want %#v", got, want)
 	}
 }
+
+// try is one poll's error, for arguments it refuses.
+func (p *poller) try() (map[string]any, *rpcError) {
+	raw, _ := json.Marshal(map[string]any{"name": p.name, "arguments": p.args})
+	return p.events.Poll(context.Background(), raw)
+}
