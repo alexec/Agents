@@ -46,6 +46,10 @@ struct MarkdownText: View {
     /// Only these of its blocks: the chat draws a long reply as rows of a few blocks each,
     /// so only those near the screen are laid out (P20261022-18).
     var range: Range<Int>?
+    /// Where an image on the network is read from, on a forge's page only (#4010): through
+    /// the machine's `forge/image`, never by the app. Nil everywhere else, where a remote
+    /// image stays its alternative text, so documents and the chat do not change.
+    var remoteImage: RemoteImageLoader?
 
     var body: some View {
         if caret != nil {
@@ -223,10 +227,15 @@ struct MarkdownText: View {
     /// makes a network request on a document's behalf (FR-011), so a remote image is
     /// its alternative text — which is what alternative text is for. How the file is
     /// read is the app's: the Mac's disk, or the phone asking the Mac.
+    ///
+    /// A forge's page is the one exception (#4010): its `remoteImage` asks the machine that
+    /// read the page for an https image, and a click opens it in the image viewer.
     @ViewBuilder
     private func image(source: String, alt: String) -> some View {
         if let base, let url = ImageStamps.url(of: source, base: base) {
             PagePicture(url: url, source: source, alt: alt)
+        } else if let remoteImage, let url = ForgeMarkdown.imageURL(of: source) {
+            PagePicture(url: url, source: source, alt: alt, remote: remoteImage)
         } else {
             PictureAlternative(source: source, alt: alt)
         }
@@ -544,24 +553,37 @@ private struct Sideways<Content: View>: View {
 ///
 /// Loaded once per identity. The page gives a passage a new identity when its
 /// picture's file changes, which is what makes this read it again.
+///
+/// A forge page's picture (`remote`, #4010) is asked for once, shows its alternative text
+/// while it loads and when it cannot be read, is never drawn larger than it is, and opens
+/// in the image viewer when clicked.
 private struct PagePicture: View {
     @Environment(\.pageActions) private var actions
     let url: URL
     let source: String
     let alt: String
+    var remote: RemoteImageLoader?
 
     @State private var loaded: PlatformImage?
     @State private var tried = false
+    @State private var viewed: ViewedImage?
 
     var body: some View {
         Group {
-            if let loaded {
-                Image(platformImage: loaded)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityLabel(alt.isEmpty ? "Image" : alt)
-            } else if tried {
+            if let loaded, remote != nil {
+                Button { viewed = ViewedImage(image: loaded, alt: alt) } label: {
+                    drawn(loaded).frame(maxWidth: loaded.size.width)
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityHint("Opens the image")
+                #if os(macOS)
+                .pointerStyle(.link)
+                #endif
+                .imageViewer($viewed)
+            } else if let loaded {
+                drawn(loaded).frame(maxWidth: .infinity, alignment: .leading)
+            } else if tried || remote != nil {
                 PictureAlternative(source: source, alt: alt)
             } else {
                 // Held open while it loads, so the words below do not jump twice.
@@ -569,6 +591,11 @@ private struct PagePicture: View {
             }
         }
         .task(id: url) {
+            if let remote {
+                loaded = await remote(url)
+                tried = true
+                return
+            }
             // Asked more than once: on a phone a picture is drawn by WebKit, and a
             // drawing that failed the first time can come out the second (034). On the
             // Mac a missing file is simply missing, and asking again costs a stat.
@@ -581,7 +608,18 @@ private struct PagePicture: View {
             tried = true
         }
     }
+
+    private func drawn(_ image: PlatformImage) -> some View {
+        Image(platformImage: image)
+            .resizable()
+            .scaledToFit()
+            .accessibilityLabel(alt.isEmpty ? "Image" : alt)
+    }
 }
+
+/// Reads an image on the network for a page, through the machine (#4010); nil when it
+/// cannot, and the page shows the image's alternative text.
+typealias RemoteImageLoader = @MainActor (URL) async -> PlatformImage?
 
 /// A picture that cannot be drawn: its alternative text, or its name.
 private struct PictureAlternative: View {
