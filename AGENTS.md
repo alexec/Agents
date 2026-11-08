@@ -69,6 +69,8 @@ Alex answered these the same way every time (#601), so do them without asking an
 
 **Alex's to-do (#1668).** When work needs Alex's hands (an account, a card, a CAPTCHA, an email confirmation, an approval on an outside site), put the issue on Alex's list, https://github.com/issues/assigned. Assign `alexec`, add the label `alex-todo`, and start the issue body with a `## What Alex does` checklist: one line per step, each one Alex can do without reading the rest. When the steps are done, or the need goes away, unassign Alex and remove `alex-todo`. A question that needs an answer now still goes by `ask_question` as well.
 
+**Automate each human step (Alex, 2026-11-07).** When a lane hands Alex a step (`hand_to_person`, `ask_secret` for a value an API could make, an `alex-todo` list, a code from Alex's phone), it also files an issue under the autonomy epic (#3905), label `feature:autonomy` and `task` or `spike`, that says the step, the site, and how an agent could do it. First look for an open issue for the same step, and add to it instead. The lane does not wait for that issue.
+
 Alex still decides, by a form: anything hard to undo (deleting data, rewriting history, anything published outside the repo), spending money or making an outside account, restarts of the live app and installs on Alex's devices, and a choice with no option clearly the best.
 
 ## Work by epic, release from main (#1340, #3465, #3760)
