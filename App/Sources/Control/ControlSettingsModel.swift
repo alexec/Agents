@@ -144,6 +144,7 @@ final class ControlSettingsModel {
         do {
             try await client.connect(startIfNeeded: false, timeout: .seconds(2))
             status = try await client.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self)
+            OlderPeer.controlVersion = status?.version
             hosts = try await client.call(DaemonAPI.Method.hostsList, returning: [DaemonAPI.ControlMachine].self)
             clients = try await client.call(DaemonAPI.Method.clientsList, returning: [ClientRecord].self)
                 .sorted { ($0.id == status?.you ? 0 : 1, $0.paired) < ($1.id == status?.you ? 0 : 1, $1.paired) }
