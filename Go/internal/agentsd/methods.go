@@ -18,6 +18,7 @@ func (d *Daemon) register() {
 	})
 	// What the window pushes on connecting, which this host has no use for yet.
 	Quiet(d, wire.CallAgentsPrewarm.Name)
+	d.registerRequests()
 	// No runtime takes a pasted key now that Gemini, the last one that did, is retired
 	// (#3043): a window still offers its (always empty) list on every connect.
 	Quiet(d, wire.CallCredentialsOffer.Name)

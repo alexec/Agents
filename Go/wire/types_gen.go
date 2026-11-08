@@ -10025,6 +10025,131 @@ type ReportedEdit struct {
 	At Date `json:"at"`
 }
 
+// Something an agent asked a person for (#3862, spec 3862 §1): a question, a secret, a step. Kept in <root>/requests/<id>.json, an ended one for 14 days.
+type Request struct {
+	// For an app request, the same id as its ElicitationRequest.
+	ID UUID `json:"id"`
+
+	Kind RequestKind `json:"kind"`
+
+	Source RequestSource `json:"source"`
+
+	State RequestState `json:"state"`
+
+	// One line, for the row.
+	Title string `json:"title"`
+
+	Detail RequestDetail `json:"detail"`
+
+	// The folder's URL.
+	Folder string `json:"folder"`
+
+	// The session that asked.
+	AskedBy *UUID `json:"askedBy,omitzero"`
+
+	// Every session that waits on it; the asker first. Kept as history once it ends.
+	Waiters []RequestWaiter `json:"waiters"`
+
+	AskedAt Date `json:"askedAt"`
+
+	AnsweredAt *Date `json:"answeredAt,omitzero"`
+
+	AnsweredBy *AuditActor `json:"answeredBy,omitzero"`
+
+	// A summary for the row; never a secret's value.
+	Answer *string `json:"answer,omitzero"`
+
+	DroppedWhy *RequestDroppedWhy `json:"droppedWhy,omitzero"`
+}
+
+// One of the answers; only form today (#3863).
+type RequestAnswer struct {
+	Form *RequestFormAnswer `json:"form,omitzero"`
+}
+
+// The part of a request that depends on its source.
+type RequestDetail struct {
+	Elicitation *ElicitationRequest `json:"elicitation,omitzero"`
+}
+
+type RequestDroppedWhy string
+
+const RequestDroppedWhyAskerEnded RequestDroppedWhy = "askerEnded"
+const RequestDroppedWhyFolderArchived RequestDroppedWhy = "folderArchived"
+const RequestDroppedWhyForgeClosed RequestDroppedWhy = "forgeClosed"
+const RequestDroppedWhyRestarted RequestDroppedWhy = "restarted"
+const RequestDroppedWhyByPerson RequestDroppedWhy = "byPerson"
+
+// The answer elicitations/answer takes, for a question, a secret or a step.
+type RequestFormAnswer struct {
+	Action AnswerElicitationRequestAction `json:"action"`
+
+	Content map[string]JSONValue `json:"content,omitzero"`
+}
+
+type RequestKind string
+
+const RequestKindDecide RequestKind = "decide"
+const RequestKindApprove RequestKind = "approve"
+const RequestKindAccount RequestKind = "account"
+const RequestKindStep RequestKind = "step"
+const RequestKindSecret RequestKind = "secret"
+
+type RequestSource string
+
+const RequestSourceQuestion RequestSource = "question"
+const RequestSourceSecret RequestSource = "secret"
+const RequestSourceHandOff RequestSource = "handOff"
+const RequestSourcePermission RequestSource = "permission"
+const RequestSourceGuardedChange RequestSource = "guardedChange"
+const RequestSourceForge RequestSource = "forge"
+
+type RequestState string
+
+const RequestStateOpen RequestState = "open"
+const RequestStateAnswered RequestState = "answered"
+const RequestStateDropped RequestState = "dropped"
+
+type RequestUpdate struct {
+	Request Request `json:"request"`
+}
+
+type RequestWaiter struct {
+	Agent UUID `json:"agent"`
+
+	Since Date `json:"since"`
+}
+
+type RequestsAnswer struct {
+	ID UUID `json:"id"`
+
+	Answer RequestAnswer `json:"answer"`
+}
+
+type RequestsDrop struct {
+	ID UUID `json:"id"`
+
+	Why *RequestDroppedWhy `json:"why,omitzero"`
+}
+
+type RequestsList struct {
+	State *RequestsListState `json:"state,omitzero"`
+
+	// Only this folder's, by URL.
+	Folder *string `json:"folder,omitzero"`
+}
+
+type RequestsListResult struct {
+	Requests []Request `json:"requests"`
+}
+
+// open (the default), ended, or all.
+type RequestsListState string
+
+const RequestsListStateOpen RequestsListState = "open"
+const RequestsListStateEnded RequestsListState = "ended"
+const RequestsListStateAll RequestsListState = "all"
+
 // What the control plane needs of a peer to route for it (#1748): a host without each of host is needsUpdate, and a client without each of client is answered -32008.
 type RequiredCapabilities struct {
 	Host []string `json:"host"`

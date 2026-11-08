@@ -22237,6 +22237,249 @@
       ],
       "additionalProperties": false
     },
+    "Request": {
+      "type": "object",
+      "description": "Something an agent asked a person for (#3862, spec 3862 \u00a71): a question, a secret, a step. Kept in <root>/requests/<id>.json, an ended one for 14 days.",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/UUID",
+          "description": "For an app request, the same id as its ElicitationRequest."
+        },
+        "kind": {
+          "$ref": "#/definitions/RequestKind"
+        },
+        "source": {
+          "$ref": "#/definitions/RequestSource"
+        },
+        "state": {
+          "$ref": "#/definitions/RequestState"
+        },
+        "title": {
+          "type": "string",
+          "description": "One line, for the row."
+        },
+        "detail": {
+          "$ref": "#/definitions/RequestDetail"
+        },
+        "folder": {
+          "type": "string",
+          "description": "The folder's URL."
+        },
+        "askedBy": {
+          "$ref": "#/definitions/UUID",
+          "description": "The session that asked."
+        },
+        "waiters": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RequestWaiter"
+          },
+          "description": "Every session that waits on it; the asker first. Kept as history once it ends."
+        },
+        "askedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "answeredAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "answeredBy": {
+          "$ref": "#/definitions/AuditActor"
+        },
+        "answer": {
+          "type": "string",
+          "description": "A summary for the row; never a secret's value."
+        },
+        "droppedWhy": {
+          "$ref": "#/definitions/RequestDroppedWhy"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "source",
+        "state",
+        "title",
+        "detail",
+        "folder",
+        "waiters",
+        "askedAt"
+      ],
+      "additionalProperties": false
+    },
+    "RequestAnswer": {
+      "type": "object",
+      "description": "One of the answers; only form today (#3863).",
+      "properties": {
+        "form": {
+          "$ref": "#/definitions/RequestFormAnswer"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RequestDetail": {
+      "type": "object",
+      "description": "The part of a request that depends on its source.",
+      "properties": {
+        "elicitation": {
+          "$ref": "#/definitions/ElicitationRequest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RequestDroppedWhy": {
+      "type": "string",
+      "enum": [
+        "askerEnded",
+        "folderArchived",
+        "forgeClosed",
+        "restarted",
+        "byPerson"
+      ]
+    },
+    "RequestFormAnswer": {
+      "type": "object",
+      "description": "The answer elicitations/answer takes, for a question, a secret or a step.",
+      "properties": {
+        "action": {
+          "$ref": "#/definitions/AnswerElicitationRequestAction"
+        },
+        "content": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/JSONValue"
+          }
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "additionalProperties": false
+    },
+    "RequestKind": {
+      "type": "string",
+      "enum": [
+        "decide",
+        "approve",
+        "account",
+        "step",
+        "secret"
+      ]
+    },
+    "RequestSource": {
+      "type": "string",
+      "enum": [
+        "question",
+        "secret",
+        "handOff",
+        "permission",
+        "guardedChange",
+        "forge"
+      ]
+    },
+    "RequestState": {
+      "type": "string",
+      "enum": [
+        "open",
+        "answered",
+        "dropped"
+      ]
+    },
+    "RequestUpdate": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "$ref": "#/definitions/Request"
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "additionalProperties": false
+    },
+    "RequestWaiter": {
+      "type": "object",
+      "properties": {
+        "agent": {
+          "$ref": "#/definitions/UUID"
+        },
+        "since": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "agent",
+        "since"
+      ],
+      "additionalProperties": false
+    },
+    "RequestsAnswer": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/UUID"
+        },
+        "answer": {
+          "$ref": "#/definitions/RequestAnswer"
+        }
+      },
+      "required": [
+        "id",
+        "answer"
+      ],
+      "additionalProperties": false
+    },
+    "RequestsDrop": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/UUID"
+        },
+        "why": {
+          "$ref": "#/definitions/RequestDroppedWhy"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "RequestsList": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "$ref": "#/definitions/RequestsListState"
+        },
+        "folder": {
+          "type": "string",
+          "description": "Only this folder's, by URL."
+        }
+      },
+      "additionalProperties": false
+    },
+    "RequestsListResult": {
+      "type": "object",
+      "properties": {
+        "requests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Request"
+          }
+        }
+      },
+      "required": [
+        "requests"
+      ],
+      "additionalProperties": false
+    },
+    "RequestsListState": {
+      "type": "string",
+      "description": "open (the default), ended, or all.",
+      "enum": [
+        "open",
+        "ended",
+        "all"
+      ]
+    },
     "RequiredCapabilities": {
       "type": "object",
       "description": "What the control plane needs of a peer to route for it (#1748): a host without each of host is needsUpdate, and a client without each of client is answered -32008.",

@@ -8858,6 +8858,111 @@ export interface ReportedEdit {
 }
 
 /**
+ * Something an agent asked a person for (#3862, spec 3862 §1): a question, a secret, a step. Kept
+ * in <root>/requests/<id>.json, an ended one for 14 days.
+ */
+export interface Request {
+  /** For an app request, the same id as its ElicitationRequest. */
+  id: UUID;
+  kind: RequestKind;
+  source: RequestSource;
+  state: RequestState;
+  /** One line, for the row. */
+  title: string;
+  detail: RequestDetail;
+  /** The folder's URL. */
+  folder: string;
+  /** The session that asked. */
+  askedBy?: UUID;
+  /** Every session that waits on it; the asker first. Kept as history once it ends. */
+  waiters: RequestWaiter[];
+  askedAt: WireDate;
+  answeredAt?: WireDate;
+  answeredBy?: AuditActor;
+  /** A summary for the row; never a secret's value. */
+  answer?: string;
+  droppedWhy?: RequestDroppedWhy;
+}
+
+/** One of the answers; only form today (#3863). */
+export interface RequestAnswer {
+  form?: RequestFormAnswer;
+}
+
+/** The part of a request that depends on its source. */
+export interface RequestDetail {
+  elicitation?: ElicitationRequest;
+}
+
+export type RequestDroppedWhy =
+  | "askerEnded"
+  | "folderArchived"
+  | "forgeClosed"
+  | "restarted"
+  | "byPerson";
+
+/** The answer elicitations/answer takes, for a question, a secret or a step. */
+export interface RequestFormAnswer {
+  action: AnswerElicitationRequestAction;
+  content?: Record<string, JSONValue>;
+}
+
+export type RequestKind =
+  | "decide"
+  | "approve"
+  | "account"
+  | "step"
+  | "secret";
+
+export type RequestSource =
+  | "question"
+  | "secret"
+  | "handOff"
+  | "permission"
+  | "guardedChange"
+  | "forge";
+
+export type RequestState =
+  | "open"
+  | "answered"
+  | "dropped";
+
+export interface RequestUpdate {
+  request: Request;
+}
+
+export interface RequestWaiter {
+  agent: UUID;
+  since: WireDate;
+}
+
+export interface RequestsAnswer {
+  id: UUID;
+  answer: RequestAnswer;
+}
+
+export interface RequestsDrop {
+  id: UUID;
+  why?: RequestDroppedWhy;
+}
+
+export interface RequestsList {
+  state?: RequestsListState;
+  /** Only this folder's, by URL. */
+  folder?: string;
+}
+
+export interface RequestsListResult {
+  requests: Request[];
+}
+
+/** open (the default), ended, or all. */
+export type RequestsListState =
+  | "open"
+  | "ended"
+  | "all";
+
+/**
  * What the control plane needs of a peer to route for it (#1748): a host without each of host is
  * needsUpdate, and a client without each of client is answered -32008.
  */
@@ -13338,6 +13443,16 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ReportViewID: { required: ["id"], optional: [] },
   ReportViews: { required: ["views"], optional: [] },
   ReportedEdit: { required: ["path", "newText", "toolCallID", "index", "entryIndex", "replaceAll", "at"], optional: ["oldText"] },
+  Request: { required: ["id", "kind", "source", "state", "title", "detail", "folder", "waiters", "askedAt"], optional: ["askedBy", "answeredAt", "answeredBy", "answer", "droppedWhy"] },
+  RequestAnswer: { required: [], optional: ["form"] },
+  RequestDetail: { required: [], optional: ["elicitation"] },
+  RequestFormAnswer: { required: ["action"], optional: ["content"] },
+  RequestUpdate: { required: ["request"], optional: [] },
+  RequestWaiter: { required: ["agent", "since"], optional: [] },
+  RequestsAnswer: { required: ["id", "answer"], optional: [] },
+  RequestsDrop: { required: ["id"], optional: ["why"] },
+  RequestsList: { required: [], optional: ["state", "folder"] },
+  RequestsListResult: { required: ["requests"], optional: [] },
   RequiredCapabilities: { required: ["host", "client"], optional: [] },
   ResourceState: { required: ["name", "kind", "displayName", "isGone", "line", "endingSoon"], optional: ["holds", "lease", "places", "declared"] },
   ResumingNotification: { required: ["agentID", "isResuming"], optional: [] },

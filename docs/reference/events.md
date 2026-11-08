@@ -37,6 +37,8 @@ give them as two columns:
     raised only for a branch an agent works on, never the default branch (#702), and a wait
     on the default branch is refused: wait for the `github` server's `pr.merged` instead;
   - `why` on `person.away` and `person.back`: `locked` or `idle`;
+  - `request` and `kind` on `request.opened`, `request.answered` and `request.dropped`: a
+    request's id, or `decide`, `secret` or `step` (#3863);
   - an MCP server's event's own, which the server checks (see
     [Events from MCP servers](#events-from-mcp-servers)).
 
@@ -185,6 +187,21 @@ they are `machine.`.
 | `server.offline` | — | server | A server's connection dropped. Raised once, while the Agents window is open. |
 | `server.online` | — | server | A server that was offline is back. Raised once, while the Agents window is open. |
 | `system.restarted` | — | reason, down_since, down_for, down_for_text | Agents started again, on a Mac or a server. `reason` is `stopped` (a clean stop was recorded), `crashed` (it was alive and never said it stopped) or `first_start` (nothing was recorded). `down_since` is when it stopped or was last alive; `down_for` is the gap in seconds and `down_for_text` in words ("3 min", or "unknown"). See [Restarts](#restarts). |
+
+## Requests
+
+What an agent asks a person for (#3863, spec 3862): an `ask_question`, `ask_secret` or
+`hand_to_person`. The daemon keeps each one in `<root>/requests/<id>.json`, so a restart
+does not lose it, and keeps an ended one for 14 days (at most 1,000 records). A session joins
+a request with `wait_for_event` on `request.answered` and `request.dropped`, `where:
+{request: <id>}`; every session that waits on it wakes when it ends. A session whose turn has
+ended and that waits only on requests (or on a wait for the person) holds no running place.
+
+| Event | Filter by | Details | Meaning |
+|---|---|---|---|
+| `request.opened` | request, kind | request, kind, source, title, agent | An agent in this folder asked a person for something. |
+| `request.answered` | request, kind | request, kind, source, title, agent, answer, answered_by | A request was answered. `answer` is a summary, never a secret's value. |
+| `request.dropped` | request, kind | request, kind, source, title, agent, why | A request ended with no answer. `why` is `askerEnded`, `folderArchived`, `forgeClosed`, `restarted` or `byPerson`. |
 
 ## Restarts
 

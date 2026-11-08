@@ -7110,6 +7110,81 @@
       }
     },
     {
+      "name": "requests/answer",
+      "x-capability": "requests/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/RequestsAnswer"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/RequestUpdate"
+        }
+      }
+    },
+    {
+      "name": "requests/changed",
+      "x-capability": "requests/1",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/RequestUpdate"
+          }
+        }
+      ]
+    },
+    {
+      "name": "requests/drop",
+      "x-capability": "requests/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/RequestsDrop"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/RequestUpdate"
+        }
+      }
+    },
+    {
+      "name": "requests/list",
+      "x-capability": "requests/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/RequestsList"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/RequestsListResult"
+        }
+      }
+    },
+    {
       "name": "resources/changed",
       "x-capability": "resources.leases/1",
       "tags": [

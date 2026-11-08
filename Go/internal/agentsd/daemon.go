@@ -21,6 +21,10 @@ type Daemon struct {
 	Store    *store.Store
 	handlers map[string]Handler
 
+	// requests are what agents asked people for (#3863), and who answers each, by id.
+	requests      requestStore
+	requestActors map[wire.UUID]*wire.AuditActor
+
 	// erasures is the queue of runtime copies of deleted agents to erase (#1001).
 	erasures eraser
 
@@ -166,6 +170,7 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 	d.startBrowser()
 	d.loadAttention()
 	d.loadEvents()
+	d.loadRequests()
 	d.beginMCPApprovals()
 	d.recover()
 	// A session archived or deleted while the host was not running loses its secrets (#3548).
