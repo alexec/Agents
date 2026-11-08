@@ -10702,6 +10702,36 @@ export interface SummaryFactsRequest {
   since: WireDate;
 }
 
+/**
+ * One saved page of the daily summary (#3721), in ~/.agents/summaries on this machine: the
+ * sidebar's Summary row and the Summary page.
+ */
+export interface SummaryPage {
+  /** The file's name without .md, such as 2026-11-06-1810: what summaries/read names. */
+  name: string;
+  /** The page's first heading, such as "Daily summary, Fri 6 Nov"; the name when it has none. */
+  title: string;
+  savedAt: WireDate;
+  /** Nobody has read it with summaries/read since it was saved. */
+  unread: boolean;
+  /**
+   * The Daily summary workflow's session that wrote it: the page's "How this was written". Absent
+   * for a page saved before #3721.
+   */
+  writer?: UUID;
+}
+
+/** summaries/read (#3721): a saved page of the daily summary and its Markdown. */
+export interface SummaryPageText {
+  page: SummaryPage;
+  markdown: string;
+}
+
+/** summaries/read (#3721): the page to read, as SummaryPage.name says it. */
+export interface SummaryReadRequest {
+  name: string;
+}
+
 /** Surface (Attention/Surface.swift): a tagged object, `{ mac: {} }` or `{ device: "<uuid>" }`. */
 export type Surface =
   | { mac: Record<string, never> }
@@ -12258,6 +12288,8 @@ export interface Methods {
   "store/notes": { params: Empty; result: StoreNotes };
   "suggestions/dismiss": { params: SuggestionRequest; result: Empty };
   "suggestions/start": { params: SuggestionRequest; result: UUID };
+  "summaries/list": { params: Empty; result: SummaryPage[] };
+  "summaries/read": { params: SummaryReadRequest; result: SummaryPageText };
   "surface/identify": { params: SurfaceIdentification; result: Empty };
   "time/history": { params: Empty; result: TimeHistory };
   "usage/history": { params: Empty; result: UsageHistory };
@@ -12645,6 +12677,8 @@ export const MethodTarget = {
   "store/notes": "host",
   "suggestions/dismiss": "host",
   "suggestions/start": "host",
+  "summaries/list": "host",
+  "summaries/read": "host",
   "surface/identify": "host",
   "time/history": "host",
   "usage/history": "host",
@@ -12740,6 +12774,7 @@ export interface Notifications {
   "runtimes/accountProfilesChanged": AccountProfile[];
   "storage/writeFailed": WriteFailure;
   "store/notesChanged": StoreNotes;
+  "summaries/changed": SummaryPage[];
   "workflow/changed": WorkflowSummary;
   "workflow/removed": WorkflowRemovedNotification;
   "worktrees/sized": WorktreesSized;
@@ -13696,6 +13731,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SuggestionRequest: { required: ["folder", "id"], optional: [] },
   SummaryFacts: { required: ["folders", "landed", "failed", "waiting", "suggested", "checked"], optional: [] },
   SummaryFactsRequest: { required: ["since"], optional: [] },
+  SummaryPage: { required: ["name", "title", "savedAt", "unread"], optional: ["writer"] },
+  SummaryPageText: { required: ["page", "markdown"], optional: [] },
+  SummaryReadRequest: { required: ["name"], optional: [] },
   SurfaceIdentification: { required: ["id", "name", "kind"], optional: [] },
   TeamBot: { required: ["user", "name", "spentTodayUSD", "capped", "machines", "online", "workflows", "live"], optional: ["group", "groupName", "caps"] },
   TeamBotRun: { required: ["host", "hostName", "agent"], optional: ["workflow", "since"] },

@@ -1598,6 +1598,10 @@ dialog.sheet:has(.settings-sheet) { width: min(760px, calc(100vw - 32px)); max-h
 .pinned-page .page-source { flex: 1; overflow: auto; padding: 8px 16px; }
 .pinned-page .page-source pre { margin: 0; white-space: pre-wrap; font-size: 0.75rem; }
 .pinned-page > .hint { padding: 24px; text-align: center; }
+/* The Summary page (#3721): the saved page, "How this was written", and the daily summary's control under it. */
+.summary-page { display: flex; flex-direction: column; }
+.summary-page .summary-body { flex: 1; overflow: auto; padding: 16px 24px; max-width: 760px; }
+.summary-page .summary-body hr { border: none; border-top: 1px solid var(--paper-rule); margin: 16px 0; }
 
 /* A tool's view in the chat (#187): the row holds its place; the frame is in the layer. */
 .transcript { position: relative; }

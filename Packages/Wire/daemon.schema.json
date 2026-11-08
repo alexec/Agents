@@ -27260,6 +27260,68 @@
       ],
       "additionalProperties": false
     },
+    "SummaryPage": {
+      "type": "object",
+      "description": "One saved page of the daily summary (#3721), in ~/.agents/summaries on this machine: the sidebar's Summary row and the Summary page.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The file's name without .md, such as 2026-11-06-1810: what summaries/read names."
+        },
+        "title": {
+          "type": "string",
+          "description": "The page's first heading, such as \"Daily summary, Fri 6 Nov\"; the name when it has none."
+        },
+        "savedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "unread": {
+          "type": "boolean",
+          "description": "Nobody has read it with summaries/read since it was saved."
+        },
+        "writer": {
+          "$ref": "#/definitions/UUID",
+          "description": "The Daily summary workflow's session that wrote it: the page's \"How this was written\". Absent for a page saved before #3721."
+        }
+      },
+      "required": [
+        "name",
+        "title",
+        "savedAt",
+        "unread"
+      ],
+      "additionalProperties": false
+    },
+    "SummaryPageText": {
+      "type": "object",
+      "description": "summaries/read (#3721): a saved page of the daily summary and its Markdown.",
+      "properties": {
+        "page": {
+          "$ref": "#/definitions/SummaryPage"
+        },
+        "markdown": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "page",
+        "markdown"
+      ],
+      "additionalProperties": false
+    },
+    "SummaryReadRequest": {
+      "type": "object",
+      "description": "summaries/read (#3721): the page to read, as SummaryPage.name says it.",
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
     "Surface": {
       "anyOf": [
         {

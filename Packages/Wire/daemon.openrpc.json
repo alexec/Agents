@@ -8868,6 +8868,85 @@
       }
     },
     {
+      "name": "summaries/changed",
+      "x-capability": "summaries/1",
+      "description": "The daily summary's saved pages changed (#3721): a page was saved, or read with summaries/read. The pages, newest first, as summaries/list answers.",
+      "x-notification": true,
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "type": "array",
+            "items": {
+              "$ref": "daemon.schema.json#/definitions/SummaryPage"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "summaries/list",
+      "x-capability": "summaries/1",
+      "description": "The daily summary's saved pages on this machine (#3721), newest first: at most the last three. summaries/changed says when they change.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "daemon.schema.json#/definitions/SummaryPage"
+          }
+        }
+      }
+    },
+    {
+      "name": "summaries/read",
+      "x-capability": "summaries/1",
+      "description": "A saved page of the daily summary and its Markdown (#3721). Reading the newest page marks it read, and the session that wrote it too.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SummaryReadRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SummaryPageText"
+        }
+      }
+    },
+    {
       "name": "surface/identify",
       "x-capability": "surface/1",
       "tags": [

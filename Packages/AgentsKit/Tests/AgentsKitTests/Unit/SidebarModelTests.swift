@@ -556,6 +556,29 @@ struct SidebarModelTests {
         #expect(SidebarSmartRow.keptInUnread(read.id, in: model, on: noReview, keptBy: .forReview) == nil)
     }
 
+    /// The daily summary's sessions are the Summary row's (#3721): done with its page unread,
+    /// one is in neither For Review, Unread nor its folder's list; asking, it is in Needs You.
+    @Test func dailySummarySessionsLeaveTheLists() {
+        let model = AgentsModel()
+        var written = started(api, .finished, "Daily summary, Fri 6 Nov", at: 1, unread: true)
+        written.startedByWorkflow = "daily-summary"
+        written.fileToSee = ShownFile(path: "/home/.agents/summaries/2026-11-06-1810.md")
+        var asking = started(api, .waitingOnUser, "asking", at: 2)
+        asking.startedByWorkflow = "daily-summary"
+        var done = started(api, .finished, "done", at: 3)
+        done.startedByWorkflow = "daily-summary"
+        model.replaceAgents([written, asking, done])
+        let folders = [key]
+
+        #expect(SidebarSmartRow.forReview.agents(in: model, folders: folders).isEmpty)
+        #expect(SidebarSmartRow.forReview.count(in: model, folders: folders) == 0)
+        #expect(SidebarSmartRow.unread.agents(in: model, folders: folders).isEmpty)
+        #expect(SidebarSmartRow.unread.count(in: model, folders: folders) == 0)
+        #expect(SidebarSmartRow.needsYou.agents(in: model, folders: folders).map(\.id) == [asking.id])
+        let fold = SidebarFolderFold(key, label: "api", in: model, isOpen: true)
+        #expect(fold.sessions.isEmpty)
+    }
+
     /// For Review lists, after its sessions, each folder's pull requests waiting for the
     /// person's approval (#3330), newest first, and counts them; a search matches their
     /// title, repo and number; Dismiss takes one out at once.

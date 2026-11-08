@@ -125,6 +125,12 @@ struct ContentView: View {
             WorkView(model: model).paperGround()
         } else if model.showsDocs {
             DocsView().paperGround()
+        } else if model.showsSummary {
+            SummaryPageView(pages: model.summaryPages, settings: model.dailySummarySettings,
+                            read: { await model.readSummaryPage($0) },
+                            setSettings: { changed in Task { await model.setDailySummarySettings(changed) } },
+                            openAgent: { model.openAgent($0) })
+                .paperGround()
         } else if let id = model.openWorkflow {
             // No files pane and no sidebar toggle: a workflow has no agent to have
             // asked about a file, so there would be nothing for either to show.
@@ -184,7 +190,7 @@ struct ContentView: View {
         guard terminal.isOpen, !model.showsEvents, !model.showsRuntimes,
               !model.showsMCPServers, !model.showsSecrets, !model.showsAccounts, model.machinePage == nil,
               !model.showsSpending, !model.showsTokens, !model.showsTime,
-              !model.showsWork, !model.showsDocs, let folder = model.selectedFolderSummary, folder.exists else { return nil }
+              !model.showsWork, !model.showsDocs, !model.showsSummary, let folder = model.selectedFolderSummary, folder.exists else { return nil }
         return folder
     }
 
@@ -199,7 +205,7 @@ struct ContentView: View {
         model.selection != nil && !model.showsEvents
             && !model.showsRuntimes && !model.showsMCPServers && !model.showsSecrets && !model.showsAccounts && model.machinePage == nil
             && !model.showsSpending && !model.showsTime && !model.showsWork && !model.showsDocs
-            && model.openWorkflow == nil
+            && !model.showsSummary && model.openWorkflow == nil
             && model.folderPage == nil && model.openPin == nil
     }
 
