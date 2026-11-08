@@ -38,5 +38,5 @@ test("user scope: a card is one value of its parts, as the window writes it (#35
   assert.equal(u.cardProblem({ ...ok, expiry: "13/31" }), "Write the expiry as MM/YY.");
   assert.equal(u.cardProblem({ ...ok, cvc: "73" }), "The CVC is 3 or 4 digits.");
   assert.equal(u.cardProblem({ ...ok, name: "" }), "Write the name on the card.");
-  assert.match(u.cardRule, /locked to one merchant and has a spend limit/);
+  assert.match(u.cardRule, /has a spend limit, such as a Privacy.com card. A card locked to one merchant or category is safer/);
 });

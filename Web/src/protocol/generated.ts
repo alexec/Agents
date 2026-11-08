@@ -10991,10 +10991,10 @@ export interface UserSecret {
 }
 
 /**
- * What a secret holds, when it is more than one value (#3531). card: a payment card that is locked
- * to one merchant and has a spend limit (Privacy.com or the same), as one JSON object of number,
- * expiry (MM/YY), cvc, name and zip. fill_secret fills it a part at a time. Left out for a plain
- * value.
+ * What a secret holds, when it is more than one value (#3531). card: a payment card that has a
+ * spend limit (locked to a merchant or category is recommended; Privacy.com or the same), as one
+ * JSON object of number, expiry (MM/YY), cvc, name and zip. fill_secret fills it a part at a time.
+ * Left out for a plain value.
  */
 export type UserSecretKind = "card";
 

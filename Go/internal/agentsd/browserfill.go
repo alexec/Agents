@@ -38,7 +38,7 @@ var fillSecretTool = json.RawMessage(`{"name":"fill_secret","title":"Fill a secr
 	`Name the secret and the field as browser_type does (target: a reference from browser_snapshot, or a selector). You get \"<NAME> filled\", never the value. ` +
 	`After it, the field shows as dots, page reads show the value as <secret NAME>, and browser_evaluate is refused on that page until it navigates. ` +
 	`When the secret is not set, ask for it with ask_secret first. Never ask for a secret's value or type it with browser_type. ` +
-	`A card secret (a payment card the person locked to one merchant, with a spend limit) is filled a part at a time: name the part for each field.",` +
+	`A card secret (a payment card with a spend limit) is filled a part at a time: name the part for each field.",` +
 	`"inputSchema":{"type":"object","properties":{` +
 	`"secret":{"type":"string","description":"The secret's name, as in Settings ▸ Secrets, e.g. GITLAB_PASSWORD."},` +
 	`"element":{"type":"string","description":"The field, in words, for the person: e.g. \"Password field\"."},` +
