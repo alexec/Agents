@@ -8,13 +8,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/bitbucketmcp"
 	"github.com/alexec/agents/Go/internal/lineage"
 	"github.com/alexec/agents/Go/wire"
 )
 
 // The Lineage section of the Issues and PR pages (#2941): the sessions that worked on an
 // issue or a pull request, and on its pull requests, with what each cost. The github, gitlab,
-// forgejo, linear, jira and azureboards servers have no way to the host's record, so the host answers a view's
+// forgejo, bitbucket, linear, jira and azureboards servers have no way to the host's record, so the host answers a view's
 // tools/call of lineageViewTool itself, with lineage/walk and lineage/cost, and never passes
 // it on. Only a view of one of those servers may ask: the record names the person's
 // sessions and what they spent.
@@ -28,7 +29,7 @@ const (
 )
 
 // lineageViewServers is the servers whose views may ask, by their mcpcatalog id.
-var lineageViewServers = map[string]bool{"agents/github": true, "agents/gitlab": true, "agents/forgejo": true, "agents/linear": true,
+var lineageViewServers = map[string]bool{"agents/github": true, "agents/gitlab": true, "agents/forgejo": true, "agents/bitbucket": true, "agents/linear": true,
 	"agents/jira": true, "agents/azureboards": true}
 
 type lineageView struct {
@@ -108,7 +109,7 @@ func toolError(words string) (wire.JSONValue, error) {
 
 // nodeOfURL is the issue or pull request at a web address, and the address's scheme and host
 // (for the links to its pull requests on a GitLab of its own): github.com/o/r/issues/5,
-// <gitlab>/group/project/-/issues/5, codeberg.org/o/r/issues/5, linear.app/<team>/issue/ENG-4/..., <jira>/browse/PROJ-12,
+// <gitlab>/group/project/-/issues/5, codeberg.org/o/r/issues/5, bitbucket.org/w/r/issues/5, linear.app/<team>/issue/ENG-4/..., <jira>/browse/PROJ-12,
 // dev.azure.com/org/project/_workitems/edit/12 (#3815), or a pull request's.
 func nodeOfURL(raw string) (wire.LineageNode, string, bool) {
 	u, err := url.Parse(raw)
@@ -402,8 +403,8 @@ func refName(ref, page string) string {
 	return shortRef(ref, page)
 }
 
-// refURL is a node's web address: GitHub's, or a GitLab's or a Forgejo's on the page's own
-// host. Linear's pull requests are on GitHub or GitLab; its issues have none here. A forge
+// refURL is a node's web address: GitHub's or Bitbucket's, or a GitLab's or a Forgejo's on
+// the page's own host. Linear's pull requests are on GitHub or GitLab; its issues have none here. A forge
 // with no case has none.
 func refURL(n wire.LineageNode, base string) string {
 	scheme, id, _ := strings.Cut(n.Ref, ":")
@@ -435,6 +436,11 @@ func refURL(n wire.LineageNode, base string) string {
 			return base + "/" + path + "/pulls/" + num
 		}
 		return base + "/" + path + "/issues/" + num
+	case "bitbucket":
+		if n.Kind == lineage.KindPR {
+			return "https://" + bitbucketmcp.Host + "/" + path + "/pull-requests/" + num
+		}
+		return "https://" + bitbucketmcp.Host + "/" + path + "/issues/" + num
 	}
 	return ""
 }

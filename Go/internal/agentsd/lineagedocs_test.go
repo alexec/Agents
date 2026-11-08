@@ -140,6 +140,7 @@ func TestDocNameAndURL(t *testing.T) {
 		{"gitlab:group/project/doc/docs/a.md", "", "docs/a.md", "https://gitlab.com/group/project/-/blob/HEAD/docs/a.md"},
 		{"forgejo:kim/notes/doc/docs/a.md", "http://localhost:3844", "docs/a.md", "http://localhost:3844/kim/notes/src/HEAD/docs/a.md"},
 		{"forgejo:kim/notes/doc/docs/a.md", "", "docs/a.md", ""},
+		{"bitbucket:walkalex/app/doc/docs/a.md", "", "docs/a.md", "https://bitbucket.org/walkalex/app/src/HEAD/docs/a.md"},
 		{"file:/Users/me/src/thing/specs/1/spec.md", "", "specs/1/spec.md", ""},
 		{"https://www.notion.so/acme/Design-abc123", "", "www.notion.so/acme/Design-abc123", "https://www.notion.so/acme/Design-abc123"},
 	} {

@@ -213,9 +213,20 @@ the members of the workspace instead.
 - **The Pull requests page reads each pull request's checks and diffstat.** Bitbucket has
   no list of many commits' statuses or conflicts, so the page reads four pull requests at a
   time.
-- **Not yet:** an epic's plan, the Board filter, and lineage links from a session's `#12`
-  label to a Bitbucket issue; so a page's Lineage tab, and an issue's Lineage line, say the
-  app keeps none here.
+- **Lineage links Bitbucket's issues and pull requests (#3879).** A session's `#12` label in
+  a folder on bitbucket.org works on issue 12, and its `P#12` label on pull request 12:
+  Bitbucket numbers them apart. A pull request's events link it to the sessions on its
+  branch and to the issues its description closes, and a failed Pipelines run builds it. A
+  page's Lineage tab, and an issue's Lineage line, show them.
+- **Lineage asks Bitbucket** with the Bitbucket connection, about the repositories of the
+  folders on it: an issue's, a pull request's and a milestone's title and state (a declined
+  pull request is closed), an issue's milestone, a version tag's pull requests (from
+  `(pull request #12)` at the end of a merge or squash commit's title, or else the commit's
+  pull request) and the milestone whose name starts with its version, and the cost comment
+  on a merged pull request (when the folder's `prCostComment` says so). An issue's labels
+  are its kind and component. Bitbucket has no parent issues, and its milestones have no
+  state. A doc's address is `/src/HEAD/<path>`, on the main branch.
+- **Not yet:** an epic's plan and the Board filter.
 
 ## See also
 
