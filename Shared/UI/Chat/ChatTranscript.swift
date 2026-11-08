@@ -165,6 +165,9 @@ struct ChatTranscript: View {
     /// Taken off the top of the rows, so the content starts at the first row and counts
     /// from there; `Edges` puts it back, so the rest counts in the rows' own places.
     @State private var slackMargin: CGFloat = 0
+    /// Hidden for the frames in which the slack margin moves under a reader, until the
+    /// screen is back where it was (#4087).
+    @State private var isShifting = false
     /// How the pane last moved, kept where writing it does not draw the pane again.
     @State private var motion = Motion()
     /// Moves the pane: the one way this view moves it (#2310).
@@ -193,6 +196,10 @@ struct ChatTranscript: View {
         var drawn: Set<UUID> = []
         /// What sits over the top of the pane, a title or navigation bar.
         var barInset: CGFloat = 0
+        /// Where the screen's top goes back to once the slack margin moved under a reader,
+        /// and how many moves of the pane have gone by since (#4087).
+        var shiftTo: Double?
+        var shiftMoves = 0
 
     }
 
@@ -298,7 +305,7 @@ struct ChatTranscript: View {
             .environment(\.revealLine, LineRevealer { y in scroll(to: max(geometry.slack, y - Double(paneHeight ?? 800) / 3)) })
             // Hidden from choosing a conversation until it is placed at its end: its first
             // frame is the end, never a jump to it (#1287, #1349).
-            .opacity(isPlacing ? 0 : 1)
+            .opacity(isPlacing || isShifting ? 0 : 1)
             // Open at the foot, and held there as it grows while following. The content's
             // height is the sum of the rows' own, so the foot is where it says (#2310).
             .defaultScrollAnchor(.bottom, for: .initialOffset)
@@ -366,8 +373,14 @@ struct ChatTranscript: View {
             // task of its own: a phone pushing the chat again tells it it has gone 8 ms after
             // it came, though it stays, and a `.task` ended there was never started again,
             // so the conversation opened wherever it had been (#1287).
-            .onAppear { startSettling() }
-            .onChange(of: settleKey) { startSettling() }
+            .onAppear {
+                watchSlack()
+                startSettling()
+            }
+            .onChange(of: settleKey) {
+                watchSlack()
+                startSettling()
+            }
             // Asked for from elsewhere. A message entry is drawn with its own id, so
             // this lands on it once its turn is drawn.
             .onChange(of: focusedEntry) { goToFocus(scroller) }
@@ -514,12 +527,15 @@ struct ChatTranscript: View {
             scroll(to: edges.offset + by)
             return
         }
-        // The margin follows the slack. A scroll view keeps its offset from the margin, not
-        // from the content, so the screen is put back where it was in the same update.
-        if abs(geometry.slack - slackMargin) > 0.5 {
-            slackMargin = geometry.slack
-            if !isFollowing { scroll(to: edges.top) }
+        // The margin moved under a reader: nothing the pane says is the reader's until the
+        // screen is back where it was. A few moves at most, should it never get there.
+        if let to = motion.shiftTo {
+            motion.shiftMoves += 1
+            guard abs(edges.top - to) < 1 || motion.shiftMoves > 12 else { return }
+            motion.shiftTo = nil
+            isShifting = false
         }
+        followSlack(top: edges.top)
         let pane = edges.height
         // The rows drawn follow the screen, a pane either side, moved only near the edge.
         if !isFollowing, edges.top - pane / 2 < drawnSpan.lowerBound || edges.bottom + pane / 2 > drawnSpan.upperBound {
@@ -745,6 +761,45 @@ struct ChatTranscript: View {
         // end following again.
         motion.handStart = -.infinity
         position.scrollTo(edge: .bottom)
+    }
+
+    /// The margin follows the slack, when `TranscriptPlacement.marginFollows` says so. A
+    /// scroll view keeps its offset from the content's top, which the margin moves, and no
+    /// way of moving both in one frame held on the Mac (#4087): the reader saw the top of
+    /// the conversation until the pane was put back. So a reader's margin moves only near
+    /// it, and the pane is hidden until the screen is back where it was.
+    private func followSlack(top: Double) {
+        guard TranscriptPlacement.marginFollows(slack: geometry.slack, margin: slackMargin, top: top,
+                                                pane: Double(paneHeight ?? 800), following: isFollowing)
+        else { return }
+        guard !isFollowing else {
+            slackMargin = geometry.slack
+            return
+        }
+        guard motion.shiftTo == nil else { return }
+        motion.shiftTo = top
+        motion.shiftMoves = 0
+        isShifting = true
+        slackMargin = geometry.slack
+        scroll(to: top)
+        // Never hidden for longer than a moment, should the pane not report the move.
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard motion.shiftTo == top else { return }
+            motion.shiftTo = nil
+            isShifting = false
+        }
+    }
+
+    /// A page that lands, or a row above the reader that changes, is told to the margin at
+    /// once, not at the next scroll (#4087); not while another conversation is being placed. Set again for each one, as
+    /// the closure keeps the `settleKey` it was made with.
+    private func watchSlack() {
+        let key = settleKey
+        geometry.slackChanged = {
+            guard key == motion.key else { return }
+            followSlack(top: motion.visibleTop)
+        }
     }
 
     /// Moves the pane so the screen starts at `y` in the rows' own places. A scroll position
