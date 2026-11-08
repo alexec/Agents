@@ -75,6 +75,20 @@ export function parseQuery(input: string): LabelQuery {
   return { label, text: trim(input.slice(0, match.index) + input.slice(match.index + match[0].length)) };
 }
 
+/** Whether the search asks for this label, so its chip can look chosen (#3898). */
+export function asksFor(query: LabelQuery, label: string): boolean {
+  return !!query.label && labelKey(query.label) === labelKey(label);
+}
+
+/** The search after a click on a label's chip (#3898): it asks for that label in place of any
+ *  other, and keeps the words. A second click, when it already asks for it, takes it out again. */
+export function toggleLabel(input: string, label: string): string {
+  const query = parseQuery(input);
+  if (asksFor(query, label)) return query.text;
+  const token = /\s/u.test(label) ? `label:"${label}"` : `label:${label}`;
+  return query.text ? `${token} ${query.text}` : token;
+}
+
 function containsIgnoringCase(haystack: string, needle: string): boolean {
   return haystack.toLocaleLowerCase().includes(needle.toLocaleLowerCase());
 }

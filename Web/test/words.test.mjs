@@ -60,6 +60,13 @@ for (const { name, input, expected } of cases("labels/query.json")) {
   });
 }
 
+for (const { name, input, expected } of cases("labels/toggle.json")) {
+  test(`label toggle: ${name}`, () => {
+    const toggled = labels.toggleLabel(input.query, input.label);
+    assert.deepEqual({ query: toggled, asks: labels.asksFor(labels.parseQuery(toggled), input.label) }, expected);
+  });
+}
+
 for (const { name, input, expected } of cases("labels/kind.json")) {
   test(`label kind: ${name}`, () => {
     assert.equal(labels.labelKind(input), expected);

@@ -29,7 +29,8 @@ struct FolderListView: View {
     /// What the list has highlighted — one or several (⌘-click), sessions and workflows
     /// alike. Drives bulk Archive; `selection` is still the one thing the detail reads.
     @State private var picked: Set<SidebarItem> = []
-    @State private var query = ""
+    /// The search field's words, the model's so a label's chip can set them (#3898).
+    private var query: String { model.sidebarSearch }
     /// What the folds filter by: the field's words once typing pauses, so a keystroke
     /// costs the field and not a pass over every folder (#176).
     @State private var searched = ""
@@ -361,7 +362,7 @@ struct FolderListView: View {
         .environment(\.sidebarRowSize, .small)
         .scrollContentBackground(.hidden)
         .background(Paper.sidebar)
-        .searchable(text: $query, placement: .sidebar, prompt: "Search")
+        .searchable(text: Bindable(model).sidebarSearch, placement: .sidebar, prompt: SessionSearchWords.prompt)
         // After a pause in the typing (#176): the folds filter what is held, and the
         // archived sessions that match are the hosts' to find, a capped page each (#165).
         .task(id: query) {
