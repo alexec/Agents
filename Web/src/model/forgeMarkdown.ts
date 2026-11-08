@@ -7,6 +7,20 @@
 const fenceOpen = /^ {0,3}(`{3,}|~{3,})/;
 const codeSpan = /(`+)[\s\S]*?(?<!`)\1(?!`)/g;
 
+/**
+ * The url `forge/image` is asked for (#4009, #4011), for an image's source on a forge page: an
+ * https address only, as the daemon reads no other. Null for anything else, which is drawn as its
+ * alternative text. ForgeMarkdown.imageURL(of:) is the Mac's.
+ */
+export function forgeImageURL(source: string): string | null {
+  try {
+    const url = new URL(source.trim());
+    return url.protocol === "https:" && url.hostname !== "" ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
 /** The forge's Markdown as the Markdown our renderers draw the same. */
 export function forgeMarkdown(source: string): string {
   const lines: string[] = [];

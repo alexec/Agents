@@ -128,3 +128,26 @@ export function magnificationAfterDoubleClick(level: number, fit: number): numbe
   if (!fitted) return fit;
   return clampMagnification(fit < 1 ? 1 : 2, fit);
 }
+
+/** The height of the image viewer's bar, under the image (#4011). */
+export const viewerBar = 44;
+
+/**
+ * The image viewer's size on a window of `room` (#4011), as the Mac's sheet (ImageViewer.idealSize):
+ * as large as the image, inside 85% of the window's width and 80% of its height, and never smaller
+ * than 480 by 360 (or the window, when that is smaller).
+ */
+export function viewerSize(imageW: number, imageH: number, roomW: number, roomH: number): { w: number; h: number } {
+  const fit = fitMagnification(imageW, imageH, roomW * 0.85, roomH * 0.8 - viewerBar);
+  const w = Math.max(480, Math.round(imageW * fit)), h = Math.max(360, Math.round(imageH * fit) + viewerBar);
+  return { w: Math.min(w, roomW), h: Math.min(h, roomH) };
+}
+
+/**
+ * The magnification after a wheel turn (#4011): up is closer. A trackpad's pinch arrives as a wheel
+ * with Control held and small steps, so it counts for more.
+ */
+export function magnificationAfterWheel(level: number, fit: number, deltaY: number, pinch: boolean): number {
+  if (!Number.isFinite(deltaY)) return clampMagnification(level, fit);
+  return clampMagnification(level * Math.exp(-deltaY * (pinch ? 0.01 : 0.002)), fit);
+}
