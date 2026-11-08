@@ -3,7 +3,7 @@
 // started it (028), and its worktree's help (WorktreeBadge). Worked out here, so the row only draws them.
 import type { Agent, AgentWorktree, EventPattern, EventWait, LeaseSnapshot, MCPEventTrigger, ResourceKind } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
-import { eventMeaning } from "./workflows";
+import { eventMeaning, triggerWords } from "./workflows";
 
 /** LeaseWords.clock: "14:12". */
 export function clock(date: Date): string {
@@ -250,7 +250,7 @@ export function eventWaitSummaryLines(wait: EventWait, title: (id: string) => st
       ? single(pattern, "agent") : undefined;
     const finisher = finisherID === undefined ? undefined : title(finisherID) ?? finisherID;
     const args = server
-      ? Object.entries(server.trigger.arguments).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => `${key} ${valueWords(value)}`)
+      ? Object.entries(server.trigger.arguments).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => `${key} ${triggerWords(value)}`)
       : finisher !== undefined ? []
       : filterKeys.map((key) => {
         const values = pattern.anyOf?.[key] ?? pattern.filters[key]!.split("|");
@@ -312,19 +312,6 @@ function waitSourceName(event: string): string {
   if (subject === "branch") return "Branches";
   if (subject === "file") return "Files";
   return "Agents";
-}
-
-/** An argument in words: a list is its values joined with ", " and a last " or " (#4003); an object is JSON. */
-function valueWords(value: unknown): string {
-  if (typeof value === "string") return value;
-  if (value === null || typeof value === "number" || typeof value === "boolean") return String(value);
-  if (Array.isArray(value)) {
-    const words = value.map(valueWords);
-    const last = words.pop();
-    if (last === undefined) return "[]";
-    return words.length === 0 ? last : `${words.join(", ")} or ${last}`;
-  }
-  return JSON.stringify(value) ?? "null";
 }
 
 /** WaitStatus.of(…).mark for a wait on events: "◷ Waiting for “Fix login” to finish". A block's is blockLines'. */
