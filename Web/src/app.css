@@ -1435,6 +1435,7 @@ dialog.image-viewer::backdrop { background: rgb(0 0 0 / 0.45); }
 /* The page's status card and what it does (#142), the window's order. */
 .workflow-page .archive, .workflow-page .deny { padding: 5px 14px; border-radius: 999px; }
 .status-card { list-style: none; margin: 0; padding: 0; background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-card); }
+.ready-made-choice { display: flex; gap: 10px; margin-top: 10px; }
 .status-card li { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; column-gap: 10px; padding: 10px 14px; align-items: start; }
 .status-card li + li { border-top: 1px solid var(--paper-rule); }
 .status-card .glyph { opacity: 0.6; text-align: center; }

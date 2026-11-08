@@ -12475,6 +12475,8 @@ export interface Methods {
   "workflows/enable": { params: WorkflowEnableRequest; result: WorkflowSummary };
   "workflows/list": { params: WorkflowsListRequest; result: WorkflowSummary[] };
   "workflows/mcpTrigger/clearMissed": { params: WorkflowMCPClearMissedRequest; result: WorkflowSummary };
+  "workflows/readyMade/keep": { params: WorkflowRequest; result: WorkflowSummary };
+  "workflows/readyMade/take": { params: WorkflowRequest; result: WorkflowSummary };
   "workflows/run": { params: WorkflowRequest; result: WorkflowSummary };
   "workflows/setMuted": { params: WorkflowMuteRequest; result: WorkflowSummary };
   "workflows/settings": { params: WorkflowSettingsRequest; result: WorkflowSummary };
@@ -12867,6 +12869,8 @@ export const MethodTarget = {
   "workflows/enable": "host",
   "workflows/list": "host",
   "workflows/mcpTrigger/clearMissed": "host",
+  "workflows/readyMade/keep": "host",
+  "workflows/readyMade/take": "host",
   "workflows/run": "host",
   "workflows/setMuted": "host",
   "workflows/settings": "host",

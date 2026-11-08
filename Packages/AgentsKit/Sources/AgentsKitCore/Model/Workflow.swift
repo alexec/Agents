@@ -466,6 +466,11 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     public static let readyMadeUpdatedDetail = "You had not edited your copy, so the daemon wrote the new version over it"
     public static let newerReadyMadeSentence = "A newer ready-made version is available"
     public static let newerReadyMadeDetail = "You edited your copy, so it was not updated"
+    /// The two buttons under that line (#4075).
+    public static let takeReadyMadeTitle = "Take the New Version"
+    public static let takeReadyMadeHelp = "Write the ready-made version over your copy. It keeps whether it is on, archived or muted, and waits for your approval"
+    public static let keepEditedTitle = "Keep My Copy"
+    public static let keepEditedHelp = "Keep your copy as it is, and say no more of this version"
 
     /// A row's tooltip: what it does, led by Turned off when it is, then where it is
     /// (#2759) and a ready-made update (#4071). The Remote's row says where it is to VoiceOver.
