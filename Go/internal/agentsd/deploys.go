@@ -2,6 +2,7 @@ package agentsd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"slices"
@@ -10,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/connections"
 	"github.com/alexec/agents/Go/internal/githubmcp"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -264,11 +266,23 @@ func (d *Daemon) answerDeploy(ctx context.Context, folder, key string, digest *s
 		comment = deployApproved
 	}
 	if err := gh.ReviewDeployments(ctx, w.repo, w.Run.Run.ID, w.EnvironmentIDs(), approve, comment); err != nil {
-		return wire.FolderSummary{}, err
+		log.Printf("deploys: %s of %s run %d (%s) failed: %v", comment, w.repo, w.Run.Run.ID, w.EnvironmentNames(), err)
+		return wire.FolderSummary{}, deployRefusal(err)
 	}
 	log.Printf("deploys: %s of %s run %d (%s)", comment, w.repo, w.Run.Run.ID, w.EnvironmentNames())
 	d.dropDeploy(folder, key)
 	return d.sendFolder(folder)
+}
+
+// deployRefusal is a failed answer as the person reads it (#3932): GitHub's 403 is the App
+// without the Deployments permission, since GitHub already said the person is a reviewer.
+func deployRefusal(err error) error {
+	var ge *githubmcp.GitHubError
+	if errors.As(err, &ge) && ge.Kind == githubmcp.Failed && ge.Refused {
+		return Invalid("GitHub refused this: the %s app needs the Deployments permission (read and write). "+
+			"Your organisation or account owner sets it on the app and accepts it on the installation.", connections.GitHubAppSlug)
+	}
+	return err
 }
 
 // readDeploysEvery reads the waiting deploys until ctx ends, at Shutdown.
