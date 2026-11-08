@@ -207,6 +207,8 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
         let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let matcher = words.isEmpty ? nil : SessionLabelQuery(words, said: work.saidLines, onIssue: work.issueSessions)
         guard on.contains(self) else { return [] }
+        // A search for an epic lists its sessions under their issues in the folders (#3900).
+        if matcher != nil, SidebarIssueGroup.isOn(query: words, in: work) { return [] }
         if on != Self.all, self != .pinned {
             // A group off (#846): each live session goes where `home` puts it.
             let gathered = folders.flatMap { key -> [Agent] in

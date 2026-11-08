@@ -17,7 +17,7 @@ import type {
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, DailySummarySettings, SummaryPage, SummaryPageText, DesktopControlSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
   PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, BudgetRequest, RemoveRequest, ClientPermissionSettings, PRCostComment,
-  Connection, LineageNode, MoveToMachineAnswer, ProblemReport, ProblemReportRequest, Request as PersonRequest, RequestUpdate } from "../protocol/generated";
+  Connection, LineageNode, LineageSessionIssue, MoveToMachineAnswer, ProblemReport, ProblemReportRequest, Request as PersonRequest, RequestUpdate } from "../protocol/generated";
 import { endedConnections, endedLine, hasEnded } from "./connectorSetup";
 import { parseQuery } from "./labels";
 import { Failure } from "../protocol/generated";
@@ -2051,6 +2051,7 @@ export class Store extends Work {
     this.forgetSearched();
     this.saidLines.value = {};
     this.issueSessions.value = {};
+    this.issueHeadings.value = [];
     if (!words) return;
     const issue = parseQuery(words).issue;
     const request: ListRequest = {
@@ -2067,6 +2068,7 @@ export class Store extends Work {
         const on = await this.link.call("lineage/sessions", { number: issue }, host.id).catch(() => null);
         if (Array.isArray(on?.matches) && turn === this.searchTurn) {
           this.issueSessions.value = { ...this.issueSessions.value, ...Object.fromEntries(on.matches.map((m) => [m.agentID, m.on])) };
+          this.noteIssueHeadings(on.issues ?? []);
         }
         if (turn !== this.searchTurn) return;
       }
@@ -2085,6 +2087,20 @@ export class Store extends Work {
 
   /** While the sidebar searches for #<n>: the issue each session on it is on, by its id (lineage/sessions, #3899). */
   readonly issueSessions = signal<Record<string, LineageNode>>({});
+
+  /** While the sidebar searches for #<n>: the issue, then its sub-issues in the epic's order, from each
+   *  host that said them, each once (#3900). More than one is an epic, whose sessions the sidebar groups. */
+  readonly issueHeadings = signal<LineageSessionIssue[]>([]);
+
+  private noteIssueHeadings(issues: readonly LineageSessionIssue[]): void {
+    const held = [...this.issueHeadings.value];
+    for (const issue of issues) {
+      const at = held.findIndex((h) => h.node.kind === issue.node.kind && h.node.ref === issue.node.ref);
+      if (at < 0) held.push(issue);
+      else if (held[at]!.title === undefined && issue.title !== undefined) held[at] = { ...held[at]!, title: issue.title };
+    }
+    this.issueHeadings.value = held;
+  }
 
   /** A lead's epic progress, "5/7", by host and session id (#3270), for its sidebar row. */
   readonly leadProgress = signal<Record<string, string>>({});

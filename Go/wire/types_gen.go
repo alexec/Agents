@@ -5724,6 +5724,13 @@ type LineageResolved struct {
 	Labels []string `json:"labels,omitzero"`
 }
 
+// One heading of a search for an epic (#3900): the epic or one of its sub-issues, and its title, absent while the host has not resolved it.
+type LineageSessionIssue struct {
+	Node LineageNode `json:"node"`
+
+	Title *string `json:"title,omitzero"`
+}
+
 // A session on the issue, and the issue it is on: the one asked for, or one of its sub-issues. A session on a PR is on the issue the PR fixes.
 type LineageSessionMatch struct {
 	AgentID UUID `json:"agentID"`
@@ -5731,9 +5738,12 @@ type LineageSessionMatch struct {
 	On LineageNode `json:"on"`
 }
 
-// The sessions on this machine that lineage links to the issue, to its sub-issues or to their PRs, each once. limited says there were more sub-issues or sessions than are counted.
+// The sessions on this machine that lineage links to the issue, to its sub-issues or to their PRs, each once, on the first issue in issues they came by. limited says there were more sub-issues or sessions than are counted.
 type LineageSessions struct {
 	Matches []LineageSessionMatch `json:"matches"`
+
+	// The issue asked for, then its sub-issues in the epic's order (#3900), each once, with its title when the host has it: the headings a search for an epic groups its sessions under. Only the issue asked for when it has no sub-issues; absent from a host too old to say.
+	Issues []LineageSessionIssue `json:"issues,omitzero"`
 
 	Limited *bool `json:"limited,omitzero"`
 }

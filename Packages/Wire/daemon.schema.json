@@ -12514,6 +12514,22 @@
       ],
       "additionalProperties": false
     },
+    "LineageSessionIssue": {
+      "type": "object",
+      "description": "One heading of a search for an epic (#3900): the epic or one of its sub-issues, and its title, absent while the host has not resolved it.",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "node"
+      ],
+      "additionalProperties": false
+    },
     "LineageSessionMatch": {
       "type": "object",
       "description": "A session on the issue, and the issue it is on: the one asked for, or one of its sub-issues. A session on a PR is on the issue the PR fixes.",
@@ -12533,12 +12549,19 @@
     },
     "LineageSessions": {
       "type": "object",
-      "description": "The sessions on this machine that lineage links to the issue, to its sub-issues or to their PRs, each once. limited says there were more sub-issues or sessions than are counted.",
+      "description": "The sessions on this machine that lineage links to the issue, to its sub-issues or to their PRs, each once, on the first issue in issues they came by. limited says there were more sub-issues or sessions than are counted.",
       "properties": {
         "matches": {
           "type": "array",
           "items": {
             "$ref": "#/definitions/LineageSessionMatch"
+          }
+        },
+        "issues": {
+          "type": "array",
+          "description": "The issue asked for, then its sub-issues in the epic's order (#3900), each once, with its title when the host has it: the headings a search for an epic groups its sessions under. Only the issue asked for when it has no sub-issues; absent from a host too old to say.",
+          "items": {
+            "$ref": "#/definitions/LineageSessionIssue"
           }
         },
         "limited": {

@@ -5058,6 +5058,15 @@ export interface LineageResolved {
 }
 
 /**
+ * One heading of a search for an epic (#3900): the epic or one of its sub-issues, and its title,
+ * absent while the host has not resolved it.
+ */
+export interface LineageSessionIssue {
+  node: LineageNode;
+  title?: string;
+}
+
+/**
  * A session on the issue, and the issue it is on: the one asked for, or one of its sub-issues. A
  * session on a PR is on the issue the PR fixes.
  */
@@ -5068,10 +5077,17 @@ export interface LineageSessionMatch {
 
 /**
  * The sessions on this machine that lineage links to the issue, to its sub-issues or to their PRs,
- * each once. limited says there were more sub-issues or sessions than are counted.
+ * each once, on the first issue in issues they came by. limited says there were more sub-issues or
+ * sessions than are counted.
  */
 export interface LineageSessions {
   matches: LineageSessionMatch[];
+  /**
+   * The issue asked for, then its sub-issues in the epic's order (#3900), each once, with its title
+   * when the host has it: the headings a search for an epic groups its sessions under. Only the
+   * issue asked for when it has no sub-issues; absent from a host too old to say.
+   */
+  issues?: LineageSessionIssue[];
   limited?: boolean;
 }
 
@@ -13376,8 +13392,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineageNode: { required: ["kind", "ref"], optional: [] },
   LineageNodeRequest: { required: ["node"], optional: ["depth"] },
   LineageResolved: { required: ["title"], optional: ["state", "labels"] },
+  LineageSessionIssue: { required: ["node"], optional: ["title"] },
   LineageSessionMatch: { required: ["agentID", "on"], optional: [] },
-  LineageSessions: { required: ["matches"], optional: ["limited"] },
+  LineageSessions: { required: ["matches"], optional: ["issues", "limited"] },
   LineageSessionsRequest: { required: ["number"], optional: [] },
   ListCursor: { required: ["lastActivityAt", "id"], optional: ["archivedAt"] },
   ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID", "after", "query", "project"] },

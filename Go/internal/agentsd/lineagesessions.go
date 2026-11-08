@@ -1,6 +1,7 @@
 package agentsd
 
 import (
+	"cmp"
 	"context"
 	"regexp"
 	"slices"
@@ -15,6 +16,11 @@ import (
 // A session search for #<n> (#3899): the sessions on issue n, on its sub-issues (the issues
 // part-of it, #3582) and on the PRs that fix them, from the links lineage already has. It goes
 // along those links only, one way, so a session's other issues do not come in, as a walk's would.
+//
+// It also says the issues, for a search for an epic to group its sessions under (#3900): the
+// issue first, then its sub-issues in the forge's order (lineagemilestone.go keeps it; by number
+// for any it has not said), each with its title from the resolve cache. A session on two of them
+// is on the first.
 
 // mostSubIssues bounds the sub-issues one search reads, as Lineage's epic plan does.
 const mostSubIssues = 100
@@ -77,16 +83,19 @@ func (d *Daemon) sessionsOnIssue(n int) wire.LineageSessions {
 	graph := d.lineage()
 	for _, root := range d.issueNodes(n) {
 		issues := []wire.LineageNode{root}
+		var children []wire.LineageNode
 		for _, l := range graph.Links(root).Links {
-			if l.To == root && l.Rel == lineage.RelPartOf && l.From.Kind == lineage.KindIssue {
-				if len(issues) > mostSubIssues {
+			if l.To == root && l.Rel == lineage.RelPartOf && l.From.Kind == lineage.KindIssue && !slices.Contains(children, l.From) {
+				if len(children) >= mostSubIssues {
 					limited = true
 					break
 				}
-				issues = append(issues, l.From)
+				children = append(children, l.From)
 			}
 		}
+		issues = append(issues, inEpicOrder(children, d.subIssueOrder(root))...)
 		for _, issue := range issues {
+			out.Issues = append(out.Issues, d.sessionIssue(issue))
 			var prs []wire.LineageNode
 			for _, l := range graph.Links(issue).Links {
 				switch {
@@ -109,6 +118,44 @@ func (d *Daemon) sessionsOnIssue(n int) wire.LineageSessions {
 	if limited {
 		out.Limited = &limited
 	}
+	return out
+}
+
+// inEpicOrder is children in the forge's order of the epic's sub-issues, then those it did not
+// say, by number.
+func inEpicOrder(children, order []wire.LineageNode) []wire.LineageNode {
+	at := func(n wire.LineageNode) int {
+		if i := slices.Index(order, n); i >= 0 {
+			return i
+		}
+		return len(order)
+	}
+	number := func(n wire.LineageNode) int {
+		_, i, _ := askedNode(n)
+		return i
+	}
+	out := slices.Clone(children)
+	slices.SortStableFunc(out, func(a, b wire.LineageNode) int {
+		if c := cmp.Compare(at(a), at(b)); c != 0 {
+			return c
+		}
+		return cmp.Compare(number(a), number(b))
+	})
+	return out
+}
+
+// sessionIssue is an issue's heading: its title as the resolve cache holds it, sent to be
+// resolved when it holds none, so the next search has it.
+func (d *Daemon) sessionIssue(n wire.LineageNode) wire.LineageSessionIssue {
+	out := wire.LineageSessionIssue{Node: n}
+	d.resolveMu.Lock()
+	e, ok := d.resolveCache[n]
+	d.resolveMu.Unlock()
+	if ok && e.ok && e.resolved.Title != "" {
+		title := e.resolved.Title
+		out.Title = &title
+	}
+	d.resolveSoon(n)
 	return out
 }
 

@@ -1,7 +1,7 @@
 // Labels on a session and the search field's query: SessionLabelPolicy (Model/SessionLabel.swift)
 // and SessionLabelQuery (Model/SessionLabelQuery.swift), ported by hand and held to
 // Fixtures/web/labels (research R7).
-import type { Agent, SessionLabel } from "../protocol/generated";
+import type { Agent, LineageSessionIssue, SessionLabel } from "../protocol/generated";
 
 export const maximumLabels = 5;
 export const maximumLabelLength = 24;
@@ -69,6 +69,8 @@ export interface LabelQuery {
   said?: Readonly<Record<string, string>>;
   /** The sessions Lineage links to the issue, its sub-issues or their PRs, by id (lineage/sessions, #3899). */
   onIssue?: Readonly<Record<string, unknown>>;
+  /** The issue, then its sub-issues in the epic's order, as the hosts said them (lineage/sessions, #3900). */
+  issueHeadings?: readonly LineageSessionIssue[];
 }
 
 /** The first match of `pattern` in `input`, taken out of it: its first capture that matched, or "". */
