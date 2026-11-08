@@ -3,8 +3,10 @@ package agentsd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -271,5 +273,34 @@ func TestAzureDevOpsOfNode(t *testing.T) {
 	}
 	if _, _, ok := azureDevOpsOfNode(wire.LineageNode{Kind: "issue", Ref: "azuredevops:a/b/c#1"}); ok {
 		t.Error("an issue on Azure Repos")
+	}
+}
+
+// #4055: a Pull requests list narrowed to a board lists Azure Repos pull requests only for an
+// Azure DevOps board, and then only the repositories of its project, on its Azure DevOps.
+func TestABoardNarrowsAzureReposToItsProject(t *testing.T) {
+	sources := func() forgeSources {
+		return forgeSources{azureDevOpsRoot: "https://dev.azure.com/", azureDevOps: []string{"Acme/Web/app", "acme/web/site", "acme/Ops/infra"},
+			azureDevOpsErr: errors.New("elsewhere"), boardsFolder: map[string]string{}}
+	}
+	s := sources()
+	narrowToBoard(&s, wire.ProjectBoard{Forge: new(wire.ConnectionProviderGithub), Key: new("alexec/1")}, []string{"/f"}, true)
+	if s.azureDevOps != nil || s.azureDevOpsErr != nil {
+		t.Fatalf("a GitHub board: %+v", s)
+	}
+	s = sources()
+	narrowToBoard(&s, wire.ProjectBoard{Forge: new(wire.ConnectionProviderAzuredevops), Key: new("acme/web/Web Team"), Site: new("dev.azure.com")}, []string{"/f"}, true)
+	if want := []string{"Acme/Web/app", "acme/web/site"}; !slices.Equal(s.azureDevOps, want) || s.azureDevOpsErr == nil || s.boards != nil {
+		t.Fatalf("an Azure DevOps board: %+v", s)
+	}
+	s = sources()
+	narrowToBoard(&s, wire.ProjectBoard{Forge: new(wire.ConnectionProviderAzuredevops), Key: new("acme/web/Web Team"), Site: new("ado.example.com")}, []string{"/f"}, true)
+	if s.azureDevOps != nil {
+		t.Fatalf("a board on another Azure DevOps: %+v", s)
+	}
+	s = sources()
+	narrowToBoard(&s, wire.ProjectBoard{Forge: new(wire.ConnectionProviderAzuredevops), Key: new("acme/web/Web Team"), Site: new("dev.azure.com")}, []string{"/f"}, false)
+	if s.azureDevOps != nil || s.azureDevOpsErr != nil {
+		t.Fatalf("an Issues list: %+v", s)
 	}
 }

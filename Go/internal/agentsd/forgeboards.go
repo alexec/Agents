@@ -106,9 +106,10 @@ func (b *forgeBoard) key() []any {
 func narrowToBoard(s *forgeSources, b wire.ProjectBoard, in []string, prs bool) *forgeBoard {
 	board := &forgeBoard{home: in[0]}
 	key := deref(b.Key)
-	repos, gitlab := s.repos, s.gitlab
+	repos, gitlab, azureDevOps, azureDevOpsErr := s.repos, s.gitlab, s.azureDevOps, s.azureDevOpsErr
 	s.repos, s.gitlab, s.teams, s.projects, s.workspace, s.gitlabErr = nil, nil, nil, nil, false, nil
 	s.forgejo, s.forgejoErr, s.bitbucket, s.bitbucketErr = nil, nil, nil, nil
+	s.azureDevOps, s.azureDevOpsErr = nil, nil
 	boards := s.boards
 	s.boards = nil
 	switch *b.Forge {
@@ -139,10 +140,22 @@ func narrowToBoard(s *forgeSources, b wire.ProjectBoard, in []string, prs bool) 
 		}
 	case wire.ConnectionProviderAzuredevops:
 		at := strings.LastIndex(key, "/")
-		if prs || at < 0 {
+		if at < 0 {
 			break
 		}
 		project := strings.ToLower(key[:at])
+		if prs {
+			// The pull requests of the project's repositories, on the Azure DevOps the board is on (#4055).
+			s.azureDevOpsErr = azureDevOpsErr
+			if root, err := url.Parse(s.azureDevOpsRoot); err == nil && strings.EqualFold(root.Host, deref(b.Site)) {
+				for _, repo := range azureDevOps {
+					if strings.HasPrefix(strings.ToLower(repo), project+"/") {
+						s.azureDevOps = append(s.azureDevOps, repo)
+					}
+				}
+			}
+			break
+		}
 		board.azureProject, board.azureTeam, board.azureSite = project, key[at+1:], deref(b.Site)
 		s.boards = []string{project}
 		if !slices.Contains(boards, project) {
