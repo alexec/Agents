@@ -119,6 +119,10 @@ not read.
   Product Backlog Item, Requirement or Issue for a story or a spike; Task; Bug), or moves
   one that is there (give `12`, `AB#12` or its page) under it. Blocked by adds or takes off
   a predecessor in the same organization.
+- **Epics and features (#3939):** an Epic work item is an epic, with no `epic` tag; a work
+  item tagged `epic` is one too. Work ▸ Features counts each epic under its `feature:<name>`
+  tag, and each open work item that is not an epic under its own. With a board chosen, it
+  counts only the work items under the team's area paths.
 - **Lineage:** Start Agent labels the session `AB#12`. A session labelled `AB#12`, and a pull
   request whose title or branch says `AB#12` (as Azure Boards itself links them), count
   towards the work item of the folder's first project.
