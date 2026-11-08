@@ -65,6 +65,9 @@ public final class AgentsModel {
     /// Each folder's pull requests waiting for the person's approval (#3330), kept current by
     /// `pins/changed`. A folder with none is absent.
     @ObservationIgnored public private(set) var reviewPulls: [URL: [ReviewPull]] = [:]
+    /// The open requests to the person (#3864), oldest first, from `requests/list` and kept
+    /// current by `requests/changed`. Needs You lists each as a row of its own.
+    public private(set) var requests: [NeedRequest] = []
     /// Each folder's suggestions of the daily checks (#3331), kept current by `pins/changed`.
     /// A folder with none is absent.
     @ObservationIgnored public private(set) var checkSuggestions: [URL: [CheckSuggestion]] = [:]
@@ -470,6 +473,7 @@ public final class AgentsModel {
         case workflowChanged(WorkflowSummary)
         case workflowRemoved(DaemonAPI.WorkflowRemovedNotification)
         case pinsChanged(DaemonAPI.PinsChangedNotification)
+        case requestChanged(NeedRequest)
         case pagesChanged(DaemonAPI.PagesChangedNotification)
         case pluginsChanged(DaemonAPI.PluginsList)
         case costChanged(DaemonAPI.CostState)
@@ -531,6 +535,7 @@ public final class AgentsModel {
         case DaemonAPI.Notification.workflowChanged: return decode(WorkflowSummary.self, Update.workflowChanged)
         case DaemonAPI.Notification.workflowRemoved: return decode(DaemonAPI.WorkflowRemovedNotification.self, Update.workflowRemoved)
         case DaemonAPI.Notification.pinsChanged: return decode(DaemonAPI.PinsChangedNotification.self, Update.pinsChanged)
+        case DaemonAPI.Notification.requestsChanged: return decode(DaemonAPI.RequestUpdate.self) { .requestChanged($0.request) }
         case DaemonAPI.Notification.pagesChanged: return decode(DaemonAPI.PagesChangedNotification.self, Update.pagesChanged)
         case DaemonAPI.Notification.pluginsChanged: return decode(DaemonAPI.PluginsList.self, Update.pluginsChanged)
         case DaemonAPI.Notification.costChanged: return decode(DaemonAPI.CostState.self, Update.costChanged)
@@ -697,6 +702,11 @@ public final class AgentsModel {
                 $0.folder == folder && $0.workflowID == notification.workflowID
             }
             refillWorkflowShelf(folder)
+
+        case .requestChanged(let request):
+            var open = requests.filter { $0.id != request.id }
+            if request.state == .open { open.append(request) }
+            replaceRequests(open)
 
         case .pinsChanged(let notification):
             let folder = Folder.standardize(notification.folder)
@@ -951,6 +961,30 @@ public final class AgentsModel {
         views[at].hidden = hidden ? true : nil
         serverViews[key] = views
         pinShelves[key]?.setViews(views)
+    }
+
+    /// The open requests, as `requests/list` answered.
+    public func replaceRequests(_ listed: [NeedRequest]) {
+        let open = listed.filter { $0.state == .open }.sorted { $0.askedAt < $1.askedAt }
+        if requests != open { requests = open }
+    }
+
+    /// One folder's open requests whose asker this client holds and has not archived, oldest
+    /// first: Needs You's rows (#3864).
+    public func requests(in folder: URL) -> [NeedRequest] {
+        let key = Folder.standardize(folder)
+        return requests.filter { request in
+            Folder.standardize(request.folder) == key
+                && request.askedBy.flatMap { byID[$0] }.map { $0.state != .archived } ?? false
+        }
+    }
+
+    /// What one folder's requests change in the Dock badge and the Remote's (#3864): they
+    /// count requests, not sessions, so one for each request, less each asker counted already.
+    public func requestBadgeShift(in folder: URL) -> Int {
+        let open = requests(in: folder)
+        let askers = Set(open.compactMap(\.askedBy))
+        return open.count - askers.count { id in byID[id].map(wantsALook) ?? false }
     }
 
     public func replacePins(_ listed: [FolderPins]) {

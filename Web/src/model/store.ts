@@ -17,7 +17,7 @@ import type {
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, DailySummarySettings, DesktopControlSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
   PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, BudgetRequest, RemoveRequest, ClientPermissionSettings, PRCostComment,
-  Connection, MoveToMachineAnswer, ProblemReport, ProblemReportRequest } from "../protocol/generated";
+  Connection, MoveToMachineAnswer, ProblemReport, ProblemReportRequest, Request as PersonRequest, RequestUpdate } from "../protocol/generated";
 import { endedConnections, endedLine, hasEnded } from "./connectorSetup";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
@@ -308,6 +308,8 @@ export class Work {
   readonly serverViews = signal<Record<string, PinView[]>>({});
   /** Each folder's pull requests waiting for the person's approval by `host|folder` (#3330), newest first, kept by pins/changed. */
   readonly reviewPulls = signal<Record<string, ReviewPull[]>>({});
+  /** Each host's open requests to the person (#3864), oldest first: Needs You's rows. */
+  readonly personRequests = signal<Record<string, PersonRequest[]>>({});
   /** Each folder's suggestions of the daily checks by `host|folder` (#3331), newest first, kept by pins/changed. */
   readonly checkSuggestions = signal<Record<string, CheckSuggestion[]>>({});
   /** Bumped by pages/changed: a page shown may have changed on disk; read it again. */
@@ -638,6 +640,13 @@ export class Work {
       case "workflow/changed":
         this.placeWorkflow(params as WorkflowSummary, host);
         return true;
+      case "requests/changed": {
+        const { request } = params as RequestUpdate;
+        const list = (this.personRequests.value[host] ?? []).filter((r) => r.id !== request.id);
+        if (request.state === "open") list.push(request);
+        this.personRequests.value = { ...this.personRequests.value, [host]: list.sort(byAsked) };
+        return true;
+      }
       case "pins/changed": {
         const note = params as PinsChangedNotification;
         this.pins.value = { ...this.pins.value, [`${host}|${folderKey(note.folder)}`]: note.pins };
@@ -1860,6 +1869,10 @@ export class Store extends Work {
       this.reviewPulls.value = reviews;
       this.checkSuggestions.value = suggestions;
     }).catch(failed("pins/list"));
+    // A host from before #3863 has none.
+    void this.link.call("requests/list", {}, host).then(({ requests }) => {
+      this.personRequests.value = { ...this.personRequests.value, [host]: requests.filter((r) => r.state === "open").sort(byAsked) };
+    }).catch(() => {});
     // A host from before #251 doesn't answer, and nothing is said to be coming back.
     void this.link.call("agents/resuming", {}, host).then((response) => {
       this.resuming.value = { ...this.resuming.value, [host]: response.agentIDs };
@@ -3182,6 +3195,13 @@ export class Store extends Work {
     await this.act("pins/hideView", { folder: folder as never, uri, hidden }, host);
   }
 
+  /** A folder's open requests to the person whose asker is held and not archived (#3864), oldest first. */
+  personRequestsIn(host: string, folder: string): PersonRequest[] {
+    const key = folderKey(folder);
+    return (this.personRequests.value[host] ?? []).filter((r) => folderKey(r.folder) === key
+      && r.askedBy !== undefined && (this.agent(host, r.askedBy)?.state ?? "archived") !== "archived");
+  }
+
   /** A folder's pull requests waiting for the person's approval (#3330), newest first. */
   reviewPullsIn(host: string, folder: string): ReviewPull[] {
     return this.reviewPulls.value[`${host}|${folderKey(folder)}`] ?? [];
@@ -3657,4 +3677,9 @@ export class Store extends Work {
 /** Whether an entry starts a turn as the person's prompt does (#3249). */
 function isAskEntry(entry: TranscriptEntry): boolean {
   return isPersonsAsk({ kind: "entry", id: entry.id, entry });
+}
+
+/** Oldest asked first. */
+function byAsked(a: PersonRequest, b: PersonRequest): number {
+  return a.askedAt < b.askedAt ? -1 : a.askedAt > b.askedAt ? 1 : 0;
 }

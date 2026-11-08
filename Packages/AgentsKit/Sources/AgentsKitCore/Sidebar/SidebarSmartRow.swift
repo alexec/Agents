@@ -8,7 +8,8 @@ import Foundation
 /// blocked, sessions asking to be archived (#584, #649, once their own group), and each
 /// folder's `approvals` — MCP servers, workflows, plugins and guarded files, and workflows
 /// that failed (#989) — as rows of their own. A failed run's agent is its workflow's row,
-/// not a session row as well.
+/// not a session row as well. Each open request to the person (#3864) is a row of its own
+/// too, before the sessions, and stands for its asker in the same way.
 ///
 /// For Review (#3194) holds what is ready to look at but blocks no agent: today, a session
 /// that ended done with a file it showed that nobody has opened (`fileToSee`), the daily
@@ -69,7 +70,8 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
             // With a group off, its sessions go to the next one they fit (#846): a pass
             // over the live sessions, not the shelf's sums, which are for all four.
             return agents(in: work, folders: folders, on: on).count
-                + (self == .needsYou ? folders.reduce(0) { $0 + Self.ownApprovals(in: work, $1).count } : 0)
+                + (self == .needsYou ? folders.reduce(0) { $0 + Self.ownApprovals(in: work, $1).count
+                    + work.requests(in: $1.folder).count } : 0)
                 + pulls(in: work, folders: folders).count + suggestions(in: work, folders: folders).count
         }
         return folders.reduce(0) { total, key in
@@ -90,6 +92,7 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
                 }
                 return total + (shelf.counts[.needsAttention] ?? 0) + (shelf.counts[.blocked] ?? 0)
                     + Self.askingAtRest(in: shelf) + Self.ownApprovals(in: work, key).count - pinnedHere - failedHere
+                    + Self.requestShift(in: work, key)
             case .forReview:
                 return total + Self.forReview(in: shelf).count + work.reviewPulls(in: key.folder).count
                     + work.checkSuggestions(in: key.folder).count - pinnedHere
@@ -191,6 +194,7 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
         return !agents(in: work, folders: folders, query: query, on: on).isEmpty
             || !workflows(in: work, folders: folders, query: query).isEmpty
             || !approvals(in: work, folders: folders, query: query).isEmpty
+            || !requests(in: work, folders: folders, query: query).isEmpty
             || !pulls(in: work, folders: folders, query: query).isEmpty
             || !suggestions(in: work, folders: folders, query: query).isEmpty
     }
@@ -207,7 +211,7 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
             let gathered = folders.flatMap { key -> [Agent] in
                 let shelf = work.shelf(key)
                 let pinned = Set(work.pinnedSessions(in: key.folder))
-                let failed = self == .needsYou ? Self.failedRuns(in: work, key) : []
+                let failed = self == .needsYou ? Self.failedRuns(in: work, key).union(Self.askers(in: work, key)) : []
                 return AgentGroup.live.flatMap { group in
                     (shelf.groups[group] ?? []).filter {
                         Self.home(of: $0, in: group, isPinned: pinned.contains($0.id), on: on) == self
@@ -237,9 +241,9 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
                 .filter { $0.showsUnread && !$0.asksToArchive }
             }
             // A pinned session is listed in Pinned and nowhere else (#587); a failed run's
-            // agent, as its workflow's row (#989).
+            // agent, as its workflow's row (#989); an asker, as its requests' rows (#3864).
             let hidden = Set(work.pinnedSessions(in: key.folder))
-                .union(self == .needsYou ? Self.failedRuns(in: work, key) : [])
+                .union(self == .needsYou ? Self.failedRuns(in: work, key).union(Self.askers(in: work, key)) : [])
             return hidden.isEmpty ? held : held.filter { !hidden.contains($0.id) }
         }
         let shown = matcher.map { gathered.filter($0.matches) } ?? gathered
@@ -275,6 +279,43 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
                 .map { (folder: key, approval: $0) }
         }
         .sorted { ($0.approval.since ?? .distantPast) < ($1.approval.since ?? .distantPast) }
+    }
+
+    /// The open requests to the person in the folders named, each with its folder (#3864):
+    /// only Needs You lists them, oldest first, before its sessions. A search matches the
+    /// title and the kind.
+    @MainActor
+    public func requests(in work: AgentsModel, folders: [FolderKey], query: String = "")
+        -> [(folder: FolderKey, request: NeedRequest)] {
+        guard self == .needsYou else { return [] }
+        let words = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return folders.flatMap { key in
+            work.requests(in: key.folder)
+                .filter { words.isEmpty || "\($0.title) \($0.kindWord)".lowercased().contains(words) }
+                .map { (folder: key, request: $0) }
+        }
+        .sorted { $0.request.askedAt < $1.request.askedAt }
+    }
+
+    /// The sessions of one folder that asked an open request (#3864): Needs You lists its
+    /// requests' rows for each, and not a session row too.
+    @MainActor
+    public static func askers(in work: AgentsModel, _ key: FolderKey) -> Set<UUID> {
+        Set(work.requests(in: key.folder).compactMap(\.askedBy))
+    }
+
+    /// What one folder's requests change in Needs You's count and the badge (#3864): one for
+    /// each request, less each asker that Needs You would have counted as a session.
+    @MainActor
+    public static func requestShift(in work: AgentsModel, _ key: FolderKey) -> Int {
+        let askers = askers(in: work, key)
+        guard !askers.isEmpty else { return 0 }
+        let pinned = Set(work.pinnedSessions(in: key.folder))
+        let counted = askers.count { id in
+            guard let agent = work.agent(id), !pinned.contains(id) else { return false }
+            return home(of: agent, in: work.group(of: agent), isPinned: false) == .needsYou
+        }
+        return work.requests(in: key.folder).count - counted
     }
 
     /// The pull requests waiting for the person's approval in the folders named, each with

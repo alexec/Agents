@@ -2968,6 +2968,7 @@ final class RemoteModel {
             work.replaceHostedMCP(leases.hosted)
             work.replaceMCPHealth(leases.health)
         }
+        await refreshRequests()
         if let selectedFolder { await fillFolder(selectedFolder) }
         return snapshot
     }
@@ -3332,6 +3333,7 @@ final class RemoteModel {
     /// not redraw for any of those.
     private static let attentionNotifications: Set<String> = [
         DaemonAPI.Notification.attentionChanged,
+        DaemonAPI.Notification.requestsChanged,
     ]
 
     /// A tap on the widget: `agents://attention` for the body, `agents://agent/<id>` for
@@ -3817,6 +3819,14 @@ final class RemoteModel {
         guard let listed = try? await client.call(DaemonAPI.Method.pinsList, DaemonAPI.Empty(),
                                                   returning: [FolderPins].self) else { return }
         work.replacePins(listed)
+    }
+
+    /// The open requests to the person (#3864), for Needs You; `requests/changed` keeps them.
+    func refreshRequests() async {
+        guard let listed = try? await client.call(DaemonAPI.Method.requestsList, DaemonAPI.RequestsListRequest(),
+                                                  returning: DaemonAPI.RequestsListResult.self) else { return }
+        work.replaceRequests(listed.requests)
+        publishAttention()
     }
 
     /// A file of the folder's: a pinned page, a page tile's, or what an HTML page draws.

@@ -192,7 +192,8 @@ public struct AttentionSnapshot: Codable, Hashable, Sendable {
             newestNeed[agentID] = need
         }
         for summary in model.liveFolders {
-            total += model.attentionCount(in: summary.folder.folder)
+            // Requests, not sessions (#3864): one for each open request, less its asker.
+            total += model.attentionCount(in: summary.folder.folder) + model.requestBadgeShift(in: summary.folder.folder)
             waiting += AgentGroup.allCases.flatMap { model.agents(in: summary.folder.folder, group: $0) }
                 .filter(model.wantsALook)
         }

@@ -7132,6 +7132,7 @@
     {
       "name": "requests/changed",
       "x-capability": "requests/1",
+      "tags": [{ "name": "web" }],
       "x-notification": true,
       "paramStructure": "by-name",
       "params": [
@@ -7167,6 +7168,7 @@
     {
       "name": "requests/list",
       "x-capability": "requests/1",
+      "tags": [{ "name": "web" }],
       "paramStructure": "by-name",
       "params": [
         {

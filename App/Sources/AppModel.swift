@@ -1664,10 +1664,11 @@ final class AppModel {
     func counts(in key: FolderKey?) -> [AgentGroup: Int] { work.counts(in: key) }
     func unreadCount(in key: FolderKey?) -> Int { work.unreadCount(in: key) }
 
-    /// How many sessions across every folder need the person: Needs you and Blocked,
-    /// not unread finishes (#1565). Drives the Dock badge.
+    /// How many requests and sessions across every folder need the person: each open
+    /// request (#3864), and the sessions under Needs you and Blocked that asked none; not
+    /// unread finishes (#1565). Drives the Dock badge.
     var needsPersonCount: Int {
-        liveFolders.reduce(0) { $0 + work.attentionCount(in: $1.key) }
+        liveFolders.reduce(0) { $0 + work.attentionCount(in: $1.key) + work.requestBadgeShift(in: $1.key.folder) }
     }
 
     /// The Blob's mood on the Dock tile (#1317), from the same groups the sidebar shows.
@@ -1806,6 +1807,13 @@ final class AppModel {
         guard let listed = try? await client.call(DaemonAPI.Method.pinsList, DaemonAPI.Empty(),
                                                   returning: [FolderPins].self) else { return }
         work.replacePins(listed)
+    }
+
+    /// The open requests to the person (#3864), for Needs You; `requests/changed` keeps them.
+    func refreshRequests() async {
+        guard let listed = try? await client.call(DaemonAPI.Method.requestsList, DaemonAPI.RequestsListRequest(),
+                                                  returning: DaemonAPI.RequestsListResult.self) else { return }
+        work.replaceRequests(listed.requests)
     }
 
     /// A file of a folder's, for a pinned page, a page tile, or what an HTML page draws.
@@ -4216,6 +4224,7 @@ final class AppModel {
         async let accounts: Void = refreshAccounts()
         async let workflows: Void = refreshWorkflows()
         async let pinned: Void = refreshPins()
+        async let requests: Void = refreshRequests()
         async let permissions: Void = refreshPermissions()
         async let elicitations: Void = refreshElicitations()
         async let attention: Void = refreshAttention()
@@ -4241,7 +4250,7 @@ final class AppModel {
         async let transcript: Void = loadTranscript()
         async let popped: Void = loadPoppedTranscripts()
         async let auto: Void = refreshAuto()
-        _ = await (popped, runtimes, accounts, workflows, pinned, permissions,
+        _ = await (popped, runtimes, accounts, workflows, pinned, requests, permissions,
                    elicitations, attention, resuming, cost, retention, clientPermissions, cloning, wake, leases, events, modes,
                    transcript, runtimeStates, sandbox, person, disk, storeNotes, hostedMCP, mcpHealth, achievements, multiplier,
                    display, auto)
