@@ -1,5 +1,5 @@
 // Azure DevOps in the Work pages (#3803): on a run-app root whose folder's remote is the fixture
-// Azure DevOps's http://127.0.0.1:<port>/acme/Web%20Shop/_git/shop (Web/test/walk/forge3815-azureboards.py),
+// Azure DevOps's http://127.0.0.1:<port>/acme/Web%20Shop/_git/shop (.agents/skills/run-app/scripts/fake-azure-devops.py),
 // with the host's Azure DevOps connection made at it, open Work ▸ Pull requests and see the
 // repository's pull requests; open pull request #7 (its description as Markdown, its checks,
 // Open on Azure DevOps, Rerun failed, Approve, Labels, Close) and write a comment; show its diff.

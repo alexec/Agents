@@ -1,4 +1,4 @@
-// The #3802 walk on a scratch root with the fixture Azure DevOps (Web/test/walk/forge3815-azureboards.py):
+// The #3802 walk on a scratch root with the fixture Azure DevOps (.agents/skills/run-app/scripts/fake-azure-devops.py):
 // the one token sheet as Connect Azure DevOps (empty, a wrong token, a token that connects), the
 // connection's row on Connectors, the Azure DevOps folder's three slots read, and the same sheet as
 // Connect Forgejo and Connect Bitbucket. The host has no Azure DevOps connection at the start.

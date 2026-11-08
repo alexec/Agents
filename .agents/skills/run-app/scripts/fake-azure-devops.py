@@ -1,28 +1,33 @@
 #!/usr/bin/env python3
-"""A fixture Azure DevOps for the Work pages (#3815): the project acme/Web Shop (Agile's work item
-types), with four work items, as forge/* reads them over Azure DevOps's REST API 7.1 (WIQL and
-workitemsbatch of the organization, a work item with its links, its comments, the project's work
-item types and tags) and the writes the pages make (a comment, tags, a state, a new child), kept
-in memory so the next read shows them; and the project's own WIQL, workitemsbatch and
-connectionData (Kim Lee is the token's owner), which the azureboards server's Azure Boards page
-reads (#3826); and the repository acme/Web Shop/shop with one pull request and one Azure
-Pipelines build, which an Azure DevOps folder's set-up reads (#3802), and a no to the token
-"wrong-token"; the team Payments, whose area path Web Shop\\Payments holds the wallet's
-work items, for a project's board (#3816):
-http://127.0.0.1:<port>/acme/Web%20Shop/_boards/board/t/Payments; and that repository's pull
-requests on the Work pages (#3803): three of them, a pull request's threads, builds, a status,
-its files and their diff, tags, and the writes the pages make (a comment, tags, abandon,
-complete, a vote, a build run again). Scratch data only. Point a run-app host at it with a
-scratch AGENTS_PERSONAL_HOME whose .agents-secrets/secrets.env says
+"""A fake Azure DevOps for walks on a scratch app (#4063): Azure Repos and Azure Boards over the
+REST API 7.1 paths that the daemon's Work pages (forge/*), the azuredevops server and the
+azureboards server read and write, from their test fakes (Go/internal/azuredevopsmcp and
+azureboardsmcp fake_test.go). Scratch data only, kept in memory: a walk makes no outside account.
+
+- The organization acme, whose connectionData says Kim Lee is the token's owner. Any token
+  connects, except "wrong-token", which gets a 401.
+- The project acme/Web Shop (Agile's work item types, its tags) with four work items, their
+  comments, links and updates (#3815, #3826), and the team Payments, whose area path
+  Web Shop\\Payments holds the wallet's work items, for a project's board (#3816):
+  http://127.0.0.1:<port>/acme/Web%20Shop/_boards/board/t/Payments. WIQL by state, type, tag,
+  area, title, a time and @Me. Writes: a comment, tags, a state, a new child.
+- The repository acme/Web Shop/shop (#3802, #3803): three pull requests (active, a draft in
+  conflict, completed), a pull request's threads, statuses, files and their diff, tags, its
+  Azure Pipelines builds (one failed, with its timeline and log), and the writes the pages make
+  (a comment, tags, abandon, complete, a vote, a build run again).
+
+run-app starts it with `launch.sh --fake-azure-devops` and gives the host a scratch
+AGENTS_PERSONAL_HOME whose .agents-secrets/secrets.env says
 
     AZURE_DEVOPS_URL=http://127.0.0.1:<port>
     AZURE_DEVOPS_TOKEN=walk
 
-and a folder whose .agents/folder.json says {"azureBoardsProjects": ["acme/Web Shop"]}. For the
-set-up (#3802), connect Azure DevOps with the organization http://127.0.0.1:<port>/acme instead,
-and give the folder the remote http://127.0.0.1:<port>/acme/Web%20Shop/_git/shop.
+Then a folder whose .agents/folder.json says {"azureBoardsProjects": ["acme/Web Shop"]} has its
+work items. For pull requests and the set-up (#3802), also connect Azure DevOps with the
+organization http://127.0.0.1:<port>/acme, then add a folder whose remote is
+http://127.0.0.1:<port>/acme/Web%20Shop/_git/shop. By hand:
 
-    python3 Web/test/walk/forge3815-azureboards.py <port>
+    python3 .agents/skills/run-app/scripts/fake-azure-devops.py <port>
 """
 import base64
 import json
@@ -40,6 +45,11 @@ START = datetime.now(timezone.utc)
 def ago(hours):
     """A time hours before the fixture started, so the pages say "3 hours ago"."""
     return (START - timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+
+def when(text):
+    """A time as Azure DevOps or a client writes it (seven places of a second, or none), in UTC."""
+    return datetime.strptime(text.rstrip("Z").split(".")[0][:19], "%Y-%m-%dT%H:%M:%S")
 
 
 NOW = ago(0)
@@ -61,7 +71,10 @@ def item(title, kind, state, tags, creator, assignee, changed, description, comm
               "System.CommentCount": len(comments)}
     if assignee:
         fields["System.AssignedTo"] = assignee
-    return {"rev": 1, "fields": fields, "comments": list(comments), "relations": list(relations)}
+    # The first update, as Azure DevOps keeps it: a revision that is still the newest.
+    made = {"id": 1, "rev": 1, "revisedBy": creator, "revisedDate": "9999-01-01T00:00:00Z",
+            "fields": {"System.ChangedDate": {"newValue": changed}, "System.State": {"newValue": state}}}
+    return {"rev": 1, "fields": fields, "comments": list(comments), "relations": list(relations), "updates": [made]}
 
 
 def link(rel, n):
@@ -154,12 +167,21 @@ def wiql(query):
     m = re.search(r"\[System\.Title\] CONTAINS '([^']*)'", query)
     if m:
         ids = [n for n in ids if m.group(1).lower() in ITEMS[n]["fields"]["System.Title"].lower()]
+    # An event's poll: what was made or changed since its cursor (azureboardsmcp).
+    m = re.search(r"\[(System\.CreatedDate|System\.ChangedDate)\] >= '([^']+)'", query)
+    if m:
+        ids = [n for n in ids if when(ITEMS[n]["fields"][m.group(1)]) >= when(m.group(2))]
+    if "[System.AssignedTo] = @Me" in query:
+        ids = [n for n in ids if (ITEMS[n]["fields"].get("System.AssignedTo") or {}).get("id") == KIM["id"]]
     return sorted(ids, key=lambda n: (ITEMS[n]["fields"]["System.ChangedDate"], n), reverse=True)
 
 
-def touch(it):
+def touch(it, changes=None):
+    """A new revision by Kim, with its fields' old and new values, as the updates list it."""
     it["rev"] += 1
+    fields = {"System.ChangedDate": {"oldValue": it["fields"]["System.ChangedDate"], "newValue": NOW}, **(changes or {})}
     it["fields"]["System.ChangedDate"] = NOW
+    it["updates"].append({"id": len(it["updates"]) + 1, "rev": it["rev"], "revisedBy": KIM, "fields": fields})
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -223,6 +245,14 @@ class Handler(BaseHTTPRequestHandler):
             return self.answer({"value": [{"name": t, "states": [{"name": s, "category": c} for s, c in states]} for t, states in TYPES.items()]})
         if method == "GET" and rest == "tags":
             return self.answer({"value": [{"id": t, "name": t} for t in TAGS]})
+        m = re.fullmatch(r"workItems/(\d+)/updates", rest, re.IGNORECASE)
+        if method == "GET" and m:
+            it = ITEMS.get(int(m.group(1)))
+            if it is None:
+                return self.answer({"message": "TF401232: Work item does not exist"}, 404)
+            skip, top = int(q.get("$skip", ["0"])[0]), int(q.get("$top", ["200"])[0])
+            page = it["updates"][skip:skip + top]
+            return self.answer({"count": len(page), "value": page})
         m = re.fullmatch(r"workItems/(\d+)/comments", rest)
         if m:
             it = ITEMS[int(m.group(1))]
@@ -258,6 +288,11 @@ class Handler(BaseHTTPRequestHandler):
         if method == "GET" and rest == "/pullrequests":
             status = one("searchCriteria.status") or "active"
             out = sorted((p for p in PULLS.values() if status == "all" or p["status"] == status), key=lambda p: -p["pullRequestId"])
+            # An event's poll: closed since its cursor, or one branch's (azuredevopsmcp).
+            if one("searchCriteria.queryTimeRangeType") == "closed" and one("searchCriteria.minTime"):
+                out = [p for p in out if p.get("closedDate") and when(p["closedDate"]) >= when(one("searchCriteria.minTime"))]
+            if one("searchCriteria.sourceRefName"):
+                out = [p for p in out if p["sourceRefName"] == one("searchCriteria.sourceRefName")]
             skip, top = int(one("$skip") or 0), int(one("$top") or 100)
             return self.answer({"value": out[skip:skip + top]})
         m = re.fullmatch(r"/pullrequests/(\d+)", rest)
@@ -320,12 +355,19 @@ class Handler(BaseHTTPRequestHandler):
         if rest.endswith("/_apis/git/policy/configurations"):
             return self.answer({"value": [{"isEnabled": True, "settings": {"allowSquash": True, "allowNoFastForward": True}}]})
         if rest.endswith("/_apis/build/builds") and method == "GET":
-            out = [b for b in reversed(BUILDS) if not one("branchName") or b["sourceBranch"] == one("branchName")]
-            return self.answer({"value": out})
+            out = [b for b in reversed(BUILDS)  # newest first
+                   if (not one("branchName") or b["sourceBranch"] == one("branchName"))
+                   and (not one("repositoryId") or b["repository"]["id"] == one("repositoryId"))
+                   and (not one("resultFilter") or b["result"] == one("resultFilter"))
+                   and (not one("minTime") or when(b["finishTime"]) >= when(one("minTime")))]
+            return self.answer({"count": len(out), "value": out})
         m = re.search(r"/_apis/build/builds/(\d+)$", rest)
-        if m and method == "PATCH":
-            b = next(b for b in BUILDS if b["id"] == int(m.group(1)))
-            b["status"], b["result"] = "inProgress", ""
+        if m and method in ("GET", "PATCH"):
+            b = next((b for b in BUILDS if b["id"] == int(m.group(1))), None)
+            if b is None:
+                return self.answer({"message": "The requested build could not be found."}, 404)
+            if method == "PATCH":
+                b["status"], b["result"] = "inProgress", ""
             return self.answer(b)
         if re.search(r"/_apis/build/builds/(\d+)/timeline$", rest):
             return self.answer({"records": [{"id": "j", "type": "Job", "name": "Test"},
@@ -336,15 +378,21 @@ class Handler(BaseHTTPRequestHandler):
         return self.answer({"message": f"the fixture has no {method} {rest}"}, 404)
 
     def apply(self, it, ops):
+        changes = {}
         for op in ops:
             path = op["path"]
             if op["op"] == "add" and path.startswith("/fields/"):
-                it["fields"][path[len("/fields/"):]] = op["value"]
+                name = path[len("/fields/"):]
+                change = {"newValue": op["value"]}
+                if name in it["fields"]:
+                    change["oldValue"] = it["fields"][name]
+                changes[name] = change
+                it["fields"][name] = op["value"]
             elif op["op"] == "add" and path == "/relations/-":
                 it["relations"].append(op["value"])
             elif op["op"] == "remove" and path.startswith("/relations/"):
                 del it["relations"][int(path[len("/relations/"):])]
-        touch(it)
+        touch(it, changes)
 
     def do_GET(self):
         self.route("GET")
@@ -363,5 +411,5 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    print(f"fixture Azure DevOps on {BASE}", flush=True)
+    print(f"fake Azure DevOps on {BASE}", flush=True)
     ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()

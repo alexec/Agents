@@ -332,6 +332,27 @@ its pairing in `walks/<walk>` and its defaults in a domain of its own,
 `com.alexecollins.agents.store.walk.<walk>` (`WindowDefaults`, #1029); `stop.sh`
 removes both.
 
+## A fake Azure DevOps (#4063)
+
+`launch.sh --fake-azure-devops` starts `scripts/fake-azure-devops.py`: Azure Repos (the
+repository `acme/Web Shop/shop`, its pull requests and Azure Pipelines builds) and Azure
+Boards (the project `acme/Web Shop`, its work items and the team Payments's board), in
+memory, with no outside account. The host is signed in to it by the `AZURE_DEVOPS_URL` and
+`AZURE_DEVOPS_TOKEN` of a scratch personal home, `<root>/personal`, and `launch.sh` also
+prints `AZURE_DEVOPS_URL` and `AZURE_DEVOPS_REMOTE`. Give a folder `{"azureBoardsProjects":
+["acme/Web Shop"]}` in its `.agents/folder.json` for its work items. For its pull requests, give
+it that remote and connect Azure DevOps to the fake first: the host finds an Azure Repos remote
+only on a connection's organization, and it keeps a folder's first answer. The script's own top
+comment says what else it holds. `stop.sh` stops it.
+
+```sh
+eval "$($S/launch.sh --slug ado --fake-azure-devops)"
+$S/rpc.py $ROOT call connections/sign-in/token "{\"provider\":\"azuredevops\",\"url\":\"$AZURE_DEVOPS_URL/acme\",\"token\":\"walk\"}"
+mkdir -p $ROOT/shop/.agents && git -C $ROOT/shop init -q && git -C $ROOT/shop remote add origin "$AZURE_DEVOPS_REMOTE"
+echo '{"azureBoardsProjects": ["acme/Web Shop"]}' >$ROOT/shop/.agents/folder.json
+$S/rpc.py $ROOT call folders/add "{\"folder\":\"file://$ROOT/shop\"}"
+```
+
 ## The Remote
 
 The Remote is built for the generic simulator:
