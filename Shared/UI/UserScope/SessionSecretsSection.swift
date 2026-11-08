@@ -69,7 +69,31 @@ struct SessionSecretsSection<Source: SessionSecretsSource>: View {
                         Text(problem).appText(.fine).tinted(.failure)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                    // The sheet and the question hang on one row: on a Section, iOS gives each row its own,
+                    // and the Remote's Settings closed at Add for a Session… (#4032).
                     Button(SessionSecretWords.add) { isAdding = true }
+                        .sheet(isPresented: $isAdding) {
+                            SessionSecretSheet(sessions: model.sessionsForSecrets, offersAsk: model.sessionHostAsksBeforeUse) { request in
+                                switch await model.setSessionSecret(request) {
+                                case .success(let after):
+                                    self.list = after
+                                    return nil
+                                case .failure(let error):
+                                    return UserScopeWords.refusal(error)
+                                }
+                            }
+                            .paperSheet()
+                        }
+                        .confirmationDialog(removing.map(SessionSecretWords.removeQuestion) ?? "",
+                                            isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
+                                            titleVisibility: .visible, presenting: removing) { secret in
+                            Button("Remove", role: .destructive) {
+                                Task { if let after = await model.removeSessionSecret(secret) { self.list = after } }
+                            }
+                            Button("Cancel", role: .cancel) {}
+                        } message: { _ in
+                            Text(SessionSecretWords.removeMessage)
+                        }
                 } else {
                     ProgressView().controlSize(.small)
                 }
@@ -82,28 +106,6 @@ struct SessionSecretsSection<Source: SessionSecretsSource>: View {
             .task {
                 list = await model.sessionSecrets()
                 loaded = true
-            }
-            .sheet(isPresented: $isAdding) {
-                SessionSecretSheet(sessions: model.sessionsForSecrets, offersAsk: model.sessionHostAsksBeforeUse) { request in
-                    switch await model.setSessionSecret(request) {
-                    case .success(let after):
-                        list = after
-                        return nil
-                    case .failure(let error):
-                        return UserScopeWords.refusal(error)
-                    }
-                }
-                .paperSheet()
-            }
-            .confirmationDialog(removing.map(SessionSecretWords.removeQuestion) ?? "",
-                                isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
-                                titleVisibility: .visible, presenting: removing) { secret in
-                Button("Remove", role: .destructive) {
-                    Task { if let after = await model.removeSessionSecret(secret) { list = after } }
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: { _ in
-                Text(SessionSecretWords.removeMessage)
             }
         }
     }
