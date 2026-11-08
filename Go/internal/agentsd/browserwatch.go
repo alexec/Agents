@@ -82,12 +82,13 @@ func (d *Daemon) registerBrowserWatch() {
 		d.ackBrowserFrame(d.watchedSession(c), r.Ack)
 		return wire.Empty{}, nil
 	})
-	On(d, wire.CallBrowserInput, func(ctx context.Context, c *Client, r wire.BrowserInputRequest) (wire.Empty, error) {
+	On(d, wire.CallBrowserInput, func(ctx context.Context, c *Client, r wire.BrowserInputRequest) (wire.BrowserInputResult, error) {
 		cast, err := d.browserCast(c)
 		if err != nil {
-			return wire.Empty{}, err
+			return wire.BrowserInputResult{}, err
 		}
-		return wire.Empty{}, cast.Input(browserInput(r))
+		editing, err := cast.Input(browserInput(r))
+		return wire.BrowserInputResult{Editing: editing}, err
 	})
 	On(d, wire.CallBrowserNavigate, func(ctx context.Context, c *Client, r wire.BrowserNavigateRequest) (wire.Empty, error) {
 		return wire.Empty{}, d.navigateBrowser(c, r)

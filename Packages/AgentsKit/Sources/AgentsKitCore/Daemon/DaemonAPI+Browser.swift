@@ -121,6 +121,13 @@ public extension DaemonAPI {
         }
     }
 
+    /// browser/input's answer: after a click is released, whether the page's focus is now in
+    /// a field that takes text. Nil for other input, and from a host before it said so.
+    struct BrowserInputResult: Codable, Sendable, Hashable {
+        public var editing: Bool?
+        public init(editing: Bool? = nil) { self.editing = editing }
+    }
+
     enum BrowserNavigateAction: String, Codable, Sendable, Hashable {
         case go, back, forward, reload
     }

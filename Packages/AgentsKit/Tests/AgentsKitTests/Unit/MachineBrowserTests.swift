@@ -64,6 +64,17 @@ struct MachineBrowserTests {
         try check(DaemonAPI.BrowserPageState(status: .running, noTab: true, holder: UUID(), holderTitle: "Sign up"),
                   "BrowserPageState")
         try check(DaemonAPI.BrowserFrame(image: Data([0xFF, 0xD8]), ack: 1, width: 800, height: 600), "BrowserFrame")
+        try check(DaemonAPI.BrowserInputResult(editing: true), "BrowserInputResult")
+        try check(DaemonAPI.BrowserInputResult(), "BrowserInputResult")
+    }
+
+    /// A tap in a field of the page opens the keyboard: the host says so after the click.
+    /// A host from before it said so answers {}, which says nothing.
+    @Test func aClickSaysWhetherThePageWantsTheKeyboard() throws {
+        let said = try JSONDecoder().decode(DaemonAPI.BrowserInputResult.self, from: Data(#"{"editing":true}"#.utf8))
+        #expect(said.editing == true)
+        let old = try JSONDecoder().decode(DaemonAPI.BrowserInputResult.self, from: Data("{}".utf8))
+        #expect(old.editing == nil)
     }
 
     /// #3916: a session's pane shows its own tab, says who else holds the browser, and
