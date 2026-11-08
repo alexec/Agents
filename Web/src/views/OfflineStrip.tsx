@@ -5,9 +5,10 @@
 // runs on a provider's workspace (#691, layouts.md L1): then a stopped or failed one offers Start,
 // and a starting one shows a spinner and how long so far. The words are OfflineWords.swift's.
 import { useEffect, useState } from "preact/hooks";
-import type { ControlMachine, MachineWorkspace, RuntimeStatus } from "../protocol/generated";
+import type { ControlMachine, DiskAlarm, MachineWorkspace, RuntimeStatus } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import type { Store } from "../model/store";
+import { headline, needWords } from "../model/disk";
 
 /** What a workspace host's strip says while it is stopped, starting or failed to start, or null
  *  when the ordinary offline line says it (OfflineWords.workspaceLine). */
@@ -53,7 +54,8 @@ export function footLine(host: ControlMachine): string {
 }
 
 /** What a machine needs, as its row under Machines says it in one grey line (#3764; MachineNeed.swift). */
-export type MachineNeed = { kind: "offline" | "stopped" | "setupFailed" | "update" } | { kind: "signIn"; runtimes: string[] };
+export type MachineNeed = { kind: "offline" | "stopped" | "setupFailed" | "update" } | { kind: "disk"; alarm: DiskAlarm }
+  | { kind: "signIn"; runtimes: string[] };
 
 /** Installed but not signed in, as its line on the machine's page says (#3629; RuntimeStatus.needsSignIn). */
 export function needsSignIn(status: RuntimeStatus): boolean {
@@ -64,24 +66,28 @@ export function needsSignIn(status: RuntimeStatus): boolean {
 }
 
 /** A machine's most urgent need (MachineNeed.most): offline, then stopped, then a set-up that failed,
- *  then an update, then a runtime's sign-in; null when it needs nothing. */
-export function machineNeed(host: ControlMachine | undefined, online: boolean, runtimes: readonly RuntimeStatus[]): MachineNeed | null {
+ *  then its worst disk that is not OK (#3928), then an update, then a runtime's sign-in; null when it needs nothing. */
+export function machineNeed(host: ControlMachine | undefined, online: boolean, runtimes: readonly RuntimeStatus[],
+  disks: readonly DiskAlarm[] = []): MachineNeed | null {
   if (!online) {
     const ws = host?.workspace;
     if (host && ws && (ws.problem || ["stopped", "starting", "stopping"].includes(host.state))) return { kind: "stopped" };
     return { kind: host?.state === "failed" ? "setupFailed" : "offline" };
   }
+  const disk = headline(disks.filter((d) => d.level !== "ok"), []);
+  if (disk) return { kind: "disk", alarm: disk };
   if (host?.state === "needsUpdate") return { kind: "update" };
   const signIn = runtimes.filter(needsSignIn).map((s) => s.runtime.name);
   return signIn.length ? { kind: "signIn", runtimes: signIn } : null;
 }
 
 /** The grey line under a machine's row (MachineNeedWords.line): the foot's words for offline and stopped,
- *  set-up's (HostProblem.installFailed) and updates' (stateWords). */
+ *  set-up's (HostProblem.installFailed), the machine page's disk words and updates' (stateWords). */
 export function machineNeedLine(need: MachineNeed, host: ControlMachine): string {
   switch (need.kind) {
     case "offline": case "stopped": return footLine(host);
     case "setupFailed": return `Setting up ${host.name} failed.`;
+    case "disk": return needWords(need.alarm);
     case "update": return "Needs an update";
     case "signIn": return `${new Intl.ListFormat("en", { type: "conjunction" }).format(need.runtimes)} ${need.runtimes.length === 1 ? "needs" : "need"} sign-in`;
   }
