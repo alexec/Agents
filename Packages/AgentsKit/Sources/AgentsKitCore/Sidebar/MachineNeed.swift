@@ -1,20 +1,24 @@
 import Foundation
 
 /// What a machine needs, as its row under Machines says it in one grey line (#3764). Only the
-/// most urgent is said: offline, then stopped, then a set-up that failed, then an update, then
-/// a runtime's sign-in. The web page's machineNeed picks it the same way.
+/// most urgent is said: offline, then stopped, then a set-up that failed, then a low disk (#3928),
+/// then an update, then a runtime's sign-in. The web page's machineNeed picks it the same way.
 public enum MachineNeed: Equatable, Sendable {
     case offline
     /// Its provider's workspace is stopped, starting, stopping or failed to start (#691).
     case stopped
     case setupFailed
+    /// Its worst disk that is low or almost full (#3928): why its icon is red.
+    case disk(DiskAlarm)
     case update
     /// The runtimes installed there that are not signed in, by name.
     case signIn([String])
 
     /// The machine's most urgent need, or nil when it needs nothing. `offline` is whether the
-    /// window can ask it now; `row` is the control plane's row, nil for a machine it does not list.
-    public static func most(row: DaemonAPI.ControlMachine?, offline: Bool, runtimes: [RuntimeStatus]) -> MachineNeed? {
+    /// window can ask it now; `row` is the control plane's row, nil for a machine it does not list;
+    /// `disks` are its disks that are not OK, as its page says them.
+    public static func most(row: DaemonAPI.ControlMachine?, offline: Bool, runtimes: [RuntimeStatus],
+                            disks: [DiskAlarm] = []) -> MachineNeed? {
         if offline {
             if let row, let workspace = row.workspace,
                workspace.problem != nil || ["stopped", "starting", "stopping"].contains(row.state) {
@@ -22,6 +26,7 @@ public enum MachineNeed: Equatable, Sendable {
             }
             return row?.state == "failed" ? .setupFailed : .offline
         }
+        if let disk = DiskSpace.headline(disks.filter { $0.level != .ok }, folders: []) { return .disk(disk) }
         if row?.state == "needsUpdate" { return .update }
         let signIn = runtimes.filter(\.needsSignIn).map(\.runtime.name)
         return signIn.isEmpty ? nil : .signIn(signIn)

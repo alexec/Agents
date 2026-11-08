@@ -135,7 +135,8 @@ function PageMark({ store, page }: { store: Store; page: NavPage }) {
  * Nothing when it needs nothing. The window's MachineRow. A sign-in is what its runtimes last said. */
 function MachineNeedLine({ store, host }: { store: Store; host: string }) {
   const row = store.hosts.value.find((h) => h.id === host);
-  const need = row ? machineNeed(row, store.hostIsOnline(host), store.runtimes.value[host] ?? []) : null;
+  const need = row ? machineNeed(row, store.hostIsOnline(host), store.runtimes.value[host] ?? [],
+    store.disk.value[host]?.alarms ?? []) : null;
   if (!row || !need) return null;
   return (
     <p class="machine-need quiet small" role="status">{machineNeedLine(need, row)}</p>

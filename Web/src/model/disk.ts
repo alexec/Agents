@@ -42,6 +42,11 @@ export function levelWords(level: DiskAlarm["level"]): string {
   return level === "critical" ? "Almost full" : level === "low" ? "Low" : "OK";
 }
 
+/** A low disk in the grey line under a machine's row (#3928): "Disk low: 24.7 GB free", DiskSpace.needWords. */
+export function needWords(alarm: DiskAlarm): string {
+  return `Disk ${levelWords(alarm.level).toLowerCase()}: ${diskWords(alarm.reading.freeBytes)} free`;
+}
+
 /** One line for the strip: DiskAlarm.line. */
 export function diskLine(alarm: DiskAlarm): string {
   const free = diskWords(alarm.reading.freeBytes);

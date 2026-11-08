@@ -241,6 +241,12 @@ public enum DiskSpace {
         return disk.level == .ok ? free : "\(free) · \(levelWords(disk.level))"
     }
 
+    /// A low disk in the grey line under a machine's row (#3928): "Disk low: 24.7 GB free",
+    /// "Disk almost full: 1.8 GB free".
+    public static func needWords(_ disk: DiskAlarm) -> String {
+        "Disk \(levelWords(disk.level).lowercased()): \(words(disk.reading.freeBytes)) free"
+    }
+
     /// "a 12.3 GB, b over 8.0 GB".
     public static func worktreeWords(_ worktrees: some Sequence<DiskWorktree>) -> String {
         worktrees.map { "\($0.name) \($0.partial ? "over " : "")\(words($0.bytes))" }.joined(separator: ", ")
