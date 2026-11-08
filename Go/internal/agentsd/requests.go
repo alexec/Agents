@@ -143,6 +143,11 @@ func (d *Daemon) listRequests(state wire.RequestsListState, folder string) []wir
 func copyRequest(r *wire.Request) wire.Request {
 	c := *r
 	c.Waiters = append([]wire.RequestWaiter{}, r.Waiters...)
+	if r.Forge != nil {
+		f := *r.Forge
+		f.Checklist = append([]wire.RequestChecklistLine{}, r.Forge.Checklist...)
+		c.Forge = &f
+	}
 	return c
 }
 
@@ -256,6 +261,7 @@ func (d *Daemon) raiseRequestEvent(name string, r wire.Request, extra map[string
 	if r.AskedBy != nil {
 		details["agent"] = string(*r.AskedBy)
 	}
+	forgeRequestDetails(r, details)
 	for k, v := range extra {
 		if v != "" {
 			details[k] = v
@@ -423,6 +429,9 @@ func (d *Daemon) registerRequests() {
 		return wire.RequestsListResult{Requests: d.listRequests(state, deref(r.Folder))}, nil
 	})
 	On(d, wire.CallRequestsAnswer, func(ctx context.Context, c *Client, r wire.RequestsAnswer) (wire.RequestUpdate, error) {
+		if rec := d.request(r.ID); rec != nil && rec.Forge != nil && rec.State == wire.RequestStateOpen {
+			return d.answerForgeRequest(ctx, *rec, r.Answer, c.actor())
+		}
 		return d.answerRequest(r, c.actor())
 	})
 	On(d, wire.CallRequestsDrop, func(ctx context.Context, c *Client, r wire.RequestsDrop) (wire.RequestUpdate, error) {

@@ -39,6 +39,11 @@ type fakeForgeGitHub struct {
 	// bare is the repository MakeRepository gives as the clone address, and made the ones it made (#3708).
 	bare string
 	made []string
+	// todos are what a list of the label alex-todo gives; bodies and states are ItemPage's
+	// body and state by number, when set (#3865).
+	todos  []githubmcp.Item
+	bodies map[int]string
+	states map[int]string
 }
 
 func (f *fakeForgeGitHub) Search(_ context.Context, repos []string, sf githubmcp.SearchFilter, after string, first int) (githubmcp.SearchPage, error) {
@@ -54,6 +59,12 @@ func (f *fakeForgeGitHub) Search(_ context.Context, repos []string, sf githubmcp
 	if sf.Label == "needs-approval" {
 		return githubmcp.SearchPage{Items: f.reviews}, nil
 	}
+	if sf.Label == "alex-todo" {
+		return githubmcp.SearchPage{Items: f.todos}, nil
+	}
+	if sf.Label == "needs-account" {
+		return githubmcp.SearchPage{}, nil
+	}
 	if after != "" {
 		return githubmcp.SearchPage{Items: []githubmcp.Item{{Repo: "alexec/web", Number: 2, PR: sf.PRs, State: "open", Title: "Older"}}}, nil
 	}
@@ -68,7 +79,15 @@ func (f *fakeForgeGitHub) Search(_ context.Context, repos []string, sf githubmcp
 func (f *fakeForgeGitHub) ItemPage(_ context.Context, repo string, number int, before string) (githubmcp.ItemDetail, error) {
 	f.mu.Lock()
 	f.items++
+	body, hasBody := f.bodies[number]
+	state := f.states[number]
 	f.mu.Unlock()
+	if hasBody {
+		if state == "" {
+			state = "open"
+		}
+		return githubmcp.ItemDetail{Item: githubmcp.Item{Repo: repo, Number: number, PR: number == 12, State: state, Title: "Item", UpdatedAt: "2026-11-01T10:00:00Z"}, Body: body}, nil
+	}
 	if number == 404 {
 		return githubmcp.ItemDetail{}, &githubmcp.GitHubError{Kind: githubmcp.NotFound, Message: "not found on GitHub"}
 	}

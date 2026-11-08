@@ -82,3 +82,22 @@ func TestPlanWritesGoByIssueID(t *testing.T) {
 		t.Fatalf("asked:\n%q\nwant\n%q", g, want)
 	}
 }
+
+// #3865: a forge request's answer writes the issue's body and takes the person off it.
+func TestRequestWritesSetBodyAndUnassign(t *testing.T) {
+	g, got := restAPI(t)
+	ctx := context.Background()
+	if err := g.SetBody(ctx, "o/r", 5, "- [x] Sign in"); err != nil {
+		t.Fatal(err)
+	}
+	if err := g.Unassign(ctx, "o/r", 5, []string{"alexec"}); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		`PATCH /repos/o/r/issues/5 {"body":"- [x] Sign in"}`,
+		`DELETE /repos/o/r/issues/5/assignees {"assignees":["alexec"]}`,
+	}
+	if g := got(); !slices.Equal(g, want) {
+		t.Fatalf("asked:\n%q\nwant\n%q", g, want)
+	}
+}

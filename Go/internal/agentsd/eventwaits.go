@@ -945,6 +945,11 @@ func (d *Daemon) waitForEvent(agent wire.UUID, args map[string]json.RawMessage) 
 			for _, id := range p.filters["request"] {
 				d.addRequestWaiter(wire.UUID(id), agent)
 			}
+			for _, item := range []string{"pr", "issue"} {
+				for _, n := range p.filters[item] {
+					d.addForgeRequestWaiter(item, n, agent)
+				}
+			}
 		}
 	}
 	// What the files it watches are now is not raised as added (#3795).
