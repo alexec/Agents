@@ -242,6 +242,9 @@ struct FolderListView: View {
             }
 
             Section(isExpanded: $showsUsage) {
+                // The way back to the page the window opens to (#3986), always first.
+                MultiplierRow().activityIcon("multiply.circle")
+                    .appText(.supporting).sidebarInk(.multiplier).tag(SidebarItem.multiplier)
                 SpendingRow(selection: $selection).activityIcon("dollarsign.circle",
                                                                 warns: model.costState?.daySpendIsCloseToFull == true)
                     .appText(.supporting).sidebarInk(.spending).tag(SidebarItem.spending)

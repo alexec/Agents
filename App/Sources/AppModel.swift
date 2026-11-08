@@ -623,14 +623,15 @@ final class AppModel {
             if showsAchievements { return .achievements }
             if showsWork { return .work }
             if showsDocs { return .docs }
-            guard let key = selectedFolderKey else { return nil }
+            // Nothing else open is the Multiplier page (#3986), as the detail draws it.
+            guard let key = selectedFolderKey else { return selection == nil && !composing ? .multiplier : nil }
             if let id = openWorkflow { return .workflow(id, in: key) }
             if case .review(let id)? = folderPage { return .review(id, in: key) }
             if folderPage == .archive { return .archive(key) }
             if folderPage == .mcpServers { return .folderMCPServers(key) }
             if let openPin { return .pin(openPin, in: key) }
             if let selection { return .session(selection) }
-            return composing ? .folder(key) : nil
+            return composing ? .folder(key) : .multiplier
         }
         set {
             // The person's own pick wins over a banner still waiting for its lists.
@@ -661,6 +662,8 @@ final class AppModel {
                 showFolderPage(.mcpServers, of: key)
             case .review(let id, let key):
                 showFolderPage(.review(id), of: key)
+            case .multiplier:
+                showMultiplier()
             case .spending:
                 showsSpending = true
             case .tokens:
@@ -709,6 +712,24 @@ final class AppModel {
                 break
             }
         }
+    }
+
+    /// The Multiplier page (#3986), from its row under Usage or View ▸ Multiplier (⌘0): every
+    /// page, folder page, pin, workflow and chat closed, as the window opens.
+    func showMultiplier() {
+        showsSpending = false
+        showsEvents = false
+        showsRuntimes = false
+        showsMCPServers = false
+        showsSecrets = false
+        showsAccounts = false
+        showsTime = false
+        showsAchievements = false
+        showsTokens = false
+        machinePage = nil
+        showsWork = false
+        showsDocs = false
+        showNothing()
     }
 
     /// A folder's workflows or its archive, from its row in the sidebar (#495).

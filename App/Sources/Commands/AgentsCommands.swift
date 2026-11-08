@@ -156,7 +156,7 @@ struct AgentsCommands: Commands {
         }
 
         // A Markdown page's text (#1419), as Safari and Preview have it. ⌘0 is Actual
-        // Size while a page is in front, and Agents (All Folders) otherwise.
+        // Size while a page is in front, and View ▸ Multiplier otherwise (#3986).
         CommandGroup(after: .toolbar) {
             Button("Actual Size") { pageZoom?.actualSize() }
                 .keyboardShortcut(pageZoom == nil ? nil : KeyboardShortcut("0"))
@@ -200,6 +200,10 @@ struct AgentsCommands: Commands {
                 .disabled(ControlConfig.endpoint == nil)
             Button("Work") { model.showsWork = true }
             Button("Docs") { model.showDocs(model.docsHistory.current ?? DocsPlace()) }
+            // The page the window opens to (#3986). ⌘1…n are the inspector panes, so ⌘0 is
+            // next to them; Actual Size keeps it while a Markdown page is in front.
+            Button("Multiplier") { model.showMultiplier() }
+                .keyboardShortcut(pageZoom == nil ? KeyboardShortcut("0") : nil)
             Button("Cost") { model.showsSpending = true }
                 .keyboardShortcut("s", modifiers: [.command, .option])
             Button("Tokens") { model.showsTokens = true }
