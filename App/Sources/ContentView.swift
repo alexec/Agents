@@ -308,6 +308,12 @@ struct ContentView: View {
             }
         }
         }
+        // A label's chip, in a row or the chat, filters the sidebar by it (#3898), and
+        // shows the sidebar if it was hidden.
+        .environment(\.labelFilter, LabelFilter(query: model.sidebarSearch) { query in
+            model.sidebarSearch = query
+            columns = .all
+        })
         .environment(frame)
         .environment(terminal)
         .environment(requests)

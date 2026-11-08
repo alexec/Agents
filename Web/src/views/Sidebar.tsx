@@ -26,6 +26,7 @@ import { macHostNoticeDetail, macHostNoticeTitle } from "../model/macHostNotice"
 import { hostAnswers } from "../model/capabilities";
 import { Capability } from "../protocol/capabilities.generated";
 import { parseQuery, queryMatches, type LabelQuery } from "../model/labels";
+import { searchPrompt, sidebarSearch } from "../model/sessionSearch";
 import { folderLine, groupLabel, keeper, keepsInUnread, machineMark, machineState, newSessionFolder, pinnedSessions, pinnedWorkflows,
   connectorsPlace, folderSessions, projectGroups, rememberedFolder, rememberFolder, sharedProjects, smartAgents, smartApprovals, smartPulls,
   smartSuggestions, smartRows, smartTitles, withKept, type FolderKey, type ProjectGroup, type SmartRow } from "../model/sidebar";
@@ -143,7 +144,8 @@ function placeOf(places: ReadonlyMap<string, string>, host: ControlMachine, fold
 }
 
 export function Sidebar({ session, store, linkDown }: { session: Session; store: Store; linkDown: boolean }) {
-  const search = useSignal("");
+  // The model's, so a label's chip can set it (#3898).
+  const search = sidebarSearch;
   // What the folds filter by: the field's words once typing pauses, so a keystroke costs the
   // field and not a pass over every folder (#176, #193).
   const searched = useSignal("");
@@ -227,7 +229,7 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
           <button class="link back-all" aria-label="All folders" onClick={showAll}>‹ All</button>
           <h1 class="alone-title">{folders[0] ? folderLabel(folders[0].host, folders[0].folder, store.macHostID.value) : "Folder"}</h1>
         </> : <h1 class="narrow-only">Agents</h1>}
-        <input class="search" type="search" placeholder="Search" aria-label="Search sessions and workflows"
+        <input class="search" type="search" placeholder={searchPrompt} aria-label="Search sessions and workflows"
           value={search.value} onInput={(e) => (search.value = (e.currentTarget as HTMLInputElement).value)} />
         {/* New folder, which the window has in its File menu (#115): the page has no menu bar. */}
         <NewFolderMenu store={store} newSession={newSessionStart(store, folders, linkDown)} />

@@ -1,0 +1,90 @@
+[
+  {
+    "expected" : {
+      "asks" : true,
+      "query" : "label:bug"
+    },
+    "input" : {
+      "label" : "bug",
+      "query" : ""
+    },
+    "name" : "empty"
+  },
+  {
+    "expected" : {
+      "asks" : true,
+      "query" : "label:bug login"
+    },
+    "input" : {
+      "label" : "bug",
+      "query" : "login"
+    },
+    "name" : "words kept"
+  },
+  {
+    "expected" : {
+      "asks" : false,
+      "query" : ""
+    },
+    "input" : {
+      "label" : "bug",
+      "query" : "label:bug"
+    },
+    "name" : "again clears"
+  },
+  {
+    "expected" : {
+      "asks" : false,
+      "query" : "login"
+    },
+    "input" : {
+      "label" : "bug",
+      "query" : "label:BUG login"
+    },
+    "name" : "again, other case"
+  },
+  {
+    "expected" : {
+      "asks" : true,
+      "query" : "label:bug login"
+    },
+    "input" : {
+      "label" : "bug",
+      "query" : "label:ui login"
+    },
+    "name" : "another label"
+  },
+  {
+    "expected" : {
+      "asks" : true,
+      "query" : "label:\"web ui\""
+    },
+    "input" : {
+      "label" : "web ui",
+      "query" : ""
+    },
+    "name" : "spaces quoted"
+  },
+  {
+    "expected" : {
+      "asks" : false,
+      "query" : ""
+    },
+    "input" : {
+      "label" : "web ui",
+      "query" : "label:\"web ui\""
+    },
+    "name" : "quoted again clears"
+  },
+  {
+    "expected" : {
+      "asks" : true,
+      "query" : "label:bug"
+    },
+    "input" : {
+      "label" : "bug",
+      "query" : "label:"
+    },
+    "name" : "empty label token"
+  }
+]

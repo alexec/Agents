@@ -18,6 +18,7 @@ struct LabelTagField: View {
     var focusFirst = false
     var onEndEditing: (() -> Void)?
 
+    @Environment(\.labelFilter) private var filter
     @State private var text = ""
     @State private var selection: TextSelection?
     /// The chip the cursor is on, when the arrows have moved it off the field.
@@ -107,8 +108,15 @@ struct LabelTagField: View {
     }
 
     private func chip(_ label: SessionLabel, isChosen: Bool) -> some View {
-        HStack(spacing: 3) {
-            Text(label.value)
+        let filtering = filter?.asks(for: label) ?? false
+        return HStack(spacing: 3) {
+            // Its words filter the sidebar by it (#3898); the cross still takes it off.
+            if let filter {
+                Button(label.value) { filter.toggle(label) }
+                    .buttonStyle(.plain)
+            } else {
+                Text(label.value)
+            }
             Button {
                 remove(label.value)
             } label: {
@@ -123,10 +131,13 @@ struct LabelTagField: View {
         .padding(.leading, 7)
         .padding(.trailing, 5)
         .padding(.vertical, 3)
-        .labelChip(label, isChosen: isChosen)
+        .labelChip(label, isChosen: isChosen || filtering)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(label.value), \(label.owner.rawValue) label")
         .accessibilityAction(named: "Remove") { remove(label.value) }
+        .accessibilityActions {
+            if let filter { Button("Filter by label") { filter.toggle(label) } }
+        }
     }
 
     /// On a phone the empty field beside labels is only room to tap, so it does not wrap
@@ -200,17 +211,55 @@ private extension View {
     }
 }
 
+/// The sidebar's search, for a label's chip (#3898): a click asks it for that label, and a
+/// second click takes it out. The window and the Remote set it over the sidebar and what is
+/// read beside it, so a chip in a row or in the chat filters the one list; with none set, as
+/// in a session's own scene, a chip is only shown.
+struct LabelFilter {
+    var query: String
+    var search: (String) -> Void
+
+    func asks(for label: SessionLabel) -> Bool { SessionLabelQuery(query).asks(for: label.value) }
+
+    func toggle(_ label: SessionLabel) { search(SessionLabelQuery.toggling(label.value, in: query)) }
+
+    static let hint = "Shows only the sessions with this label, or all of them again."
+}
+
+extension EnvironmentValues {
+    @Entry var labelFilter: LabelFilter? = nil
+}
+
+/// The sidebar's search field, which names `label:` so it can be found (#3898), as the web
+/// page's says it.
+enum SessionSearchWords {
+    static let prompt = "Search, or label:name"
+}
+
 /// One label where it is only shown: a card or a row, which open the chat to change it.
+/// A click on it filters the sidebar by it (#3898).
 struct LabelChip: View {
+    @Environment(\.labelFilter) private var filter
     let label: SessionLabel
 
     var body: some View {
+        if let filter {
+            Button { filter.toggle(label) } label: { chip(isChosen: filter.asks(for: label)) }
+                .buttonStyle(.plain)
+                .accessibilityHint(LabelFilter.hint)
+        } else {
+            chip(isChosen: false)
+        }
+    }
+
+    private func chip(isChosen: Bool) -> some View {
         Text(label.value)
             .appText(.fine)
             .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, 7)
             .padding(.vertical, 3)
-            .labelChip(label)
+            .labelChip(label, isChosen: isChosen)
+            .contentShape(Capsule())
             .accessibilityLabel("\(label.value), \(label.owner.rawValue) label")
     }
 }

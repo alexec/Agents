@@ -567,6 +567,10 @@ final class RemoteModel {
         }
     }
 
+    /// The sidebar's search field (#3898): the model's, so a label's chip in a card or the
+    /// chat can ask it for that label.
+    var sidebarSearch = ""
+
     /// What the sidebar has picked (#226), the Mac's one value for it: the first of what is
     /// open over the folder — a pinned page, a workflow, a chat — and what
     /// was opened from that is pushed over it in the detail. A folder chosen with nothing

@@ -566,6 +566,10 @@ final class AppModel {
         }
     }
 
+    /// The sidebar's search field (#3898): the model's, so a label's chip anywhere in the
+    /// window can ask it for that label.
+    var sidebarSearch = ""
+
     /// What is picked in the sidebar, as one value.
     ///
     /// Activity, the folders and their sessions and workflows share one list (#145), so
