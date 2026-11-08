@@ -71,13 +71,14 @@ public struct NeedRequest: Codable, Sendable, Hashable, Identifiable {
         }
     }
 
-    /// The row's symbol for its kind.
+    /// The row's symbol for its kind (#4026): each kind its own, so it says what is asked. A
+    /// step's hand taps, because a raised hand is a session that needs the person.
     public var symbol: String {
         switch kind {
         case .decide: "questionmark.bubble"
         case .approve: "checkmark.shield"
         case .account: "person.badge.plus"
-        case .step: "hand.raised"
+        case .step: "hand.tap"
         case .secret: "key"
         }
     }
