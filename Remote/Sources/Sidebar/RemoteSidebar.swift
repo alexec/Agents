@@ -260,6 +260,12 @@ struct RemoteSidebar: View {
         .background(Paper.sidebar)
         .toolbarBackground(Paper.sidebar, for: .navigationBar)
         .navigationTitle("Agents")
+        // Add Folder… and Clone Git URL… on a machine (#4036), as the window's File menu.
+        .toolbar {
+            if !model.needsPairing {
+                ToolbarItem(placement: .primaryAction) { NewFolderMenu() }
+            }
+        }
         .sheet(isPresented: $showsSettings) { RemoteSettings() }
         .searchable(text: Bindable(model).sidebarSearch, prompt: SessionSearchWords.prompt)
         .task(id: query) {
