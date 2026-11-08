@@ -27,7 +27,7 @@ stay as they are.
 | `cmd/gitlab-mcp/`, `internal/gitlabmcp/` | The `gitlab` MCP server (#1629): merge requests, pipelines and issues on GitLab, tools and events on REST v4 | gitlab |
 | `cmd/forgejo-mcp/`, `internal/forgejomcp/` | The `forgejo` MCP server (#1753): pull requests, checks and issues on Forgejo or Gitea, tools, events and views on REST v1, in the gitlab server's shape | forgejo |
 | `cmd/bitbucket-mcp/`, `internal/bitbucketmcp/` | The `bitbucket` MCP server (#2828): pull requests, checks and issues on Bitbucket Cloud, tools, events and views on REST 2.0, in the gitlab server's shape | bitbucket |
-| `cmd/azuredevops-mcp/`, `internal/azuredevopsmcp/` | The `azuredevops` MCP server (#2829): pull requests and Azure Pipelines builds on Azure DevOps, tools and events on REST 7.1, in the gitlab server's shape | azuredevops |
+| `cmd/azuredevops-mcp/`, `internal/azuredevopsmcp/` | The `azuredevops` MCP server (#2829): pull requests and Azure Pipelines builds on Azure DevOps, tools, events and views on REST 7.1, in the gitlab server's shape | azuredevops |
 | `cmd/azureboards-mcp/`, `internal/azureboardsmcp/` | The `azureboards` MCP server (#3804): Azure Boards work items as a tracker, tools and events on REST 7.1, in the jira server's shape | azureboards |
 | `cmd/workspace-commands/`, `internal/workspacecommands/` | The command machine provider (#691, in Go since #1364): workspaces as shell commands and presets, an MCP server the control plane runs | workspaces |
 
@@ -322,9 +322,18 @@ when empty. A repository is `organization/project/name`.
 - **Tools:** `list_pull_requests`, `get_pull_request`, `get_checks`, `get_build_log` (a
   build's failed steps from its timeline, and the end of each log),
   `comment_on_pull_request`; for the ready-made workflows (#1633) `create_pull_request`,
-  `list_pull_request_comments` and `reply_to_pull_request_comment` (by `threadId`); and, on
-  the host's copy only, `merge_pull_request` and `approve_pull_request`.
-- **No work items:** they are the tracker's. **No views yet**, and no connection.
+  `list_pull_request_comments` and `reply_to_pull_request_comment` (by `threadId`);
+  `retry_build` (a build's failed jobs again, #4098); and, on the host's copy only,
+  `merge_pull_request` and `approve_pull_request`.
+- **Views** (`views.go`, `pages.go`, `pages/`, #4098): the forgejo server's pages in Azure
+  DevOps's words: Pull requests (`ui://azuredevops/pull-requests`) and a pull request's page
+  (`ui://azuredevops/pr`), fed by `show_pull_requests` and `show_pull_request`, with
+  `show_pull_request_diff` (`PRDiff`, the Work pages' read). The list is in sections for the
+  viewer, Team by the control plane's people's Azure DevOps logins (#3853) as the
+  azureboards server has them; Show Log and Retry Failed Jobs on a failed build; Auto-merge is
+  auto-complete. `bridge.js`, `common.css`, `lineage.js` and `prpage.css` are the github
+  server's, word for word; a test keeps them so.
+- **No work items:** they are the tracker's (the azureboards server, with its own Issues page).
 
 Not Microsoft's own server (`@azure-devops/mcp`, MIT): it needs Node on every host, it offers
 agents the votes and the completion that only a person may give (#837), and it has no events,
