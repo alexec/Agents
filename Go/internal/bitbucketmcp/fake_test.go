@@ -59,8 +59,14 @@ type fakeBitbucket struct {
 	// request's git diff, by its number (the views, #3866).
 	defaultMerge string
 	diffs        map[int]string
-	status   int // answer every request with this, when set
-	server   *httptest.Server
+	// milestones, commits (by sha or tag), each compare's commits ("head..base", given two to a
+	// page by a token, as Bitbucket's) and each commit's pull requests, for lineage (#3879).
+	milestones  []obj
+	commits     map[string]obj
+	compares    map[string][]obj
+	commitPulls map[string][]obj
+	status      int // answer every request with this, when set
+	server      *httptest.Server
 	// storage is where a step's log redirects to, as Bitbucket's goes to its file store.
 	storage *httptest.Server
 }
@@ -71,6 +77,7 @@ func newFake(t *testing.T) *fakeBitbucket {
 		perms: map[string]string{"a-alex": "admin", "a-dev": "write", "a-reader": "read"}, members: map[string]bool{}, me: alex}
 	f.pipelines, f.steps, f.logs = map[int]obj{}, map[int][]obj{}, map[string]string{}
 	f.branches, f.diffs = map[string]string{}, map[int]string{}
+	f.commits, f.compares, f.commitPulls = map[string]obj{}, map[string][]obj{}, map[string][]obj{}
 	f.server = httptest.NewServer(http.HandlerFunc(f.serve))
 	t.Cleanup(f.server.Close)
 	f.storage = httptest.NewServer(http.HandlerFunc(f.serveLog))
@@ -166,6 +173,11 @@ var (
 	stepsPath         = regexp.MustCompile(`^` + root + `/pipelines/([0-9]+)/steps$`)
 	branchPath        = regexp.MustCompile(`^` + root + `/refs/branches/([^/]+)$`)
 	logPath           = regexp.MustCompile(`^` + root + `/pipelines/([0-9]+)/steps/(\{[^/]+\})/log$`)
+	milestonesPath    = regexp.MustCompile(`^` + root + `/milestones$`)
+	milestonePath     = regexp.MustCompile(`^` + root + `/milestones/([0-9]+)$`)
+	commitPath        = regexp.MustCompile(`^` + root + `/commit/([^/]+)$`)
+	commitPullsPath   = regexp.MustCompile(`^` + root + `/commit/([^/]+)/pullrequests$`)
+	commitsPath       = regexp.MustCompile(`^` + root + `/commits$`)
 	permPath          = regexp.MustCompile(`^` + root + `/permissions-config/users/([^/]+)$`)
 	memberPath        = regexp.MustCompile(`^/workspaces/acme/members/([^/]+)$`)
 	sinceQuery        = regexp.MustCompile(`updated_on>=(\S+)`)
@@ -203,12 +215,42 @@ func (f *fakeBitbucket) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	n := func(m []string) int { i, _ := strconv.Atoi(m[1]); return i }
 	q := r.URL.Query()
+	p := r.URL.Path
+	if commitsPath.MatchString(p) {
+		// Two to a page; the next page's token is not a number.
+		list := f.compares[q.Get("include")+".."+q.Get("exclude")]
+		if q.Get("page") == "t2" {
+			list = list[min(2, len(list)):]
+		} else if len(list) > 2 {
+			reply(obj{"values": list[:2], "next": f.server.URL + p + "?include=" + q.Get("include") + "&exclude=" + q.Get("exclude") + "&page=t2"})
+			return
+		}
+		page(list)
+		return
+	}
 	if q.Get("page") != "" && q.Get("page") != "1" {
 		page(nil)
 		return
 	}
-	p := r.URL.Path
 	if f.noTracker && strings.HasPrefix(p, root+"/issues") {
+		notFound()
+		return
+	}
+	if r.Method == http.MethodPut && prCommentPath.MatchString(p) {
+		var body obj
+		data, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(data, &body)
+		m := prCommentPath.FindStringSubmatch(p)
+		id, _ := strconv.Atoi(m[2])
+		for _, c := range f.prComments[n(m)] {
+			if c["id"] == id && c["deleted"] != true {
+				c["content"] = body["content"]
+				body["_path"] = p
+				f.posted = append(f.posted, body)
+				reply(c)
+				return
+			}
+		}
 		notFound()
 		return
 	}
@@ -352,6 +394,28 @@ func (f *fakeBitbucket) serve(w http.ResponseWriter, r *http.Request) {
 		// Another host's name, as Bitbucket's file store has: Go keeps the token on a redirect to the same one.
 		store := strings.Replace(f.storage.URL, "127.0.0.1", "localhost", 1)
 		http.Redirect(w, r, store+"/logs/"+url.PathEscape(uuid), http.StatusTemporaryRedirect)
+	case milestonesPath.MatchString(p):
+		page(f.milestones)
+	case milestonePath.MatchString(p):
+		for _, m := range f.milestones {
+			if m["id"] == n(milestonePath.FindStringSubmatch(p)) {
+				reply(m)
+				return
+			}
+		}
+		notFound()
+	case commitPullsPath.MatchString(p):
+		if list, ok := f.commitPulls[commitPullsPath.FindStringSubmatch(p)[1]]; ok {
+			page(list)
+			return
+		}
+		notFound()
+	case commitPath.MatchString(p):
+		if c, ok := f.commits[commitPath.FindStringSubmatch(p)[1]]; ok {
+			reply(c)
+			return
+		}
+		notFound()
 	case permPath.MatchString(p):
 		if f.adminless {
 			w.WriteHeader(http.StatusForbidden)

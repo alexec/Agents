@@ -563,6 +563,16 @@ export function switchesSentence(s: WorkflowSummary): string {
   return `Enabled and Archive are saved in .agents/workflows/${s.workflow.workflowID}.md, a file in this folder you may commit`;
 }
 
+/** WorkflowSummary.readyMadeUpdatedSentence (#4071): an unedited ready-made copy the daemon updated, for 7 days. */
+export function readyMadeUpdatedSentence(s: WorkflowSummary): string | null {
+  if (s.readyMadeUpdatedAt === undefined) return null;
+  const on = fromWireDate(s.readyMadeUpdatedAt).toLocaleDateString("en", { dateStyle: "medium" });
+  return `Updated to the new ready-made version on ${on}`;
+}
+export const readyMadeUpdatedDetail = "You had not edited your copy, so the daemon wrote the new version over it";
+export const newerReadyMadeSentence = "A newer ready-made version is available";
+export const newerReadyMadeDetail = "You edited your copy, so it was not updated";
+
 /** WorkflowSummary.scopeSentence (#2759): a user workflow is in every folder; null for a folder's own. */
 export function scopeSentence(s: WorkflowSummary): string | null {
   return s.scope === "user" ? "Your workflow: in every folder" : null;
@@ -704,6 +714,12 @@ export function workflowStatusLines(s: WorkflowSummary, now = new Date()): Statu
       detail: "Other machines still see it waiting. Approve to let it run here" });
   }
   if (!s.isArchived) lines.push(enabledLine(s));
+  // A ready-made copy's newer versions (#4071).
+  const updated = readyMadeUpdatedSentence(s);
+  if (updated) lines.push({ glyph: "↻", text: updated, detail: readyMadeUpdatedDetail });
+  if (s.newerReadyMade !== undefined) {
+    lines.push({ glyph: "✦", text: newerReadyMadeSentence, detail: `${s.newerReadyMade} ${newerReadyMadeDetail}` });
+  }
   if (s.overLimit) {
     lines.push({ glyph: "⚠︎", text: `Over the limit: ${limitSentence(s.overLimit, limitTotal(s))}`, detail: limitRemedy(s.overLimit), tint: "attention" });
   }

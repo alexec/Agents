@@ -177,9 +177,10 @@ func sandboxState(runtimeID string, choice wire.SandboxChoice, codexMode string)
 	return wire.SandboxStateRuntimeControlled
 }
 
-// noteEffectiveSandbox says on the agent what its sandbox is, once its runtime has started.
-func (d *Daemon) noteEffectiveSandbox(id wire.UUID, choice wire.SandboxChoice, reason *string) {
-	d.change(id, func(a *wire.Agent) {
+// noteEffectiveSandbox says on the agent what its sandbox is, once its runtime has started;
+// moveOn false for a prewarm (#4044), which does not move the session up its list.
+func (d *Daemon) noteEffectiveSandbox(id wire.UUID, choice wire.SandboxChoice, reason *string, moveOn bool) {
+	d.changeAgent(id, moveOn, func(a *wire.Agent) {
 		requested := d.defaultSandbox(a.RuntimeID)
 		if a.SandboxOverride != nil {
 			requested = *a.SandboxOverride

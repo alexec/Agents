@@ -7329,7 +7329,7 @@ type Multiplier struct {
 
 // What the Multiplier compares with (#3902), so that no client keeps its own copy: an engineer with no AI in 2025.
 type MultiplierBaseline struct {
-	// Merged PRs a week: 1.4.
+	// Merged PRs a week: 1.4 unless the person set their own (#3991), from 0.1 to 100, to one decimal.
 	PrsPerWeek float64 `json:"prsPerWeek"`
 
 	// The hours of that week: 40.
@@ -7337,12 +7337,18 @@ type MultiplierBaseline struct {
 
 	// Where the figure is from, for the page's small line: DX 2025.
 	Source string `json:"source"`
+
+	// The person's own line under the figures (#3991), from Settings ▸ Cost ▸ Multiplier. Absent: the default line, "An average engineer merged <prsPerWeek> PRs a week (<source>)".
+	Line *string `json:"line,omitzero"`
 }
 
-// multiplier/count's params (#3988): the host's time zone, so the control plane counts calendar weeks as the person does.
+// multiplier/count's params (#3988): the host's time zone, so the control plane counts calendar weeks as the person does, and the person's baseline (#3991).
 type MultiplierCountParams struct {
 	// An IANA zone name, such as Europe/London. Absent or unknown: UTC.
 	TimeZone *string `json:"timeZone,omitzero"`
+
+	// The person's baseline on the host (#3991), so the figure is the same on every machine. Absent: 1.4.
+	PrsPerWeek *float64 `json:"prsPerWeek,omitzero"`
 }
 
 // A runtime's own setting for one level: config option values (mode, model, effort), a sandbox choice, or the answer to permission requests.
@@ -13317,9 +13323,13 @@ type WakeSettings struct {
 
 	GraceHours int64 `json:"graceHours"`
 
+	// How many finished sessions keep their runtime running, ready for a reply (#183, #4044): 0 to 8, default 3, 0 turning the warm pool off. A runtime with background processes does not count against it.
 	WarmRuntimes int64 `json:"warmRuntimes"`
 
 	AwakeOnPower bool `json:"awakeOnPower"`
+
+	// How long a finished runtime whose background processes (a dev server, a build, a watcher) still run is kept, counted from its last turn's end (#4044): 1 to 24 hours, default 4. Its processes are then ended with it. 0, or missing, from a client that does not know it, keeps the value the host has.
+	BackgroundHours *int64 `json:"backgroundHours,omitzero"`
 }
 
 // Why the Mac is, or is not, being kept awake (024).
@@ -13743,6 +13753,12 @@ type WorkflowSummary struct {
 
 	// A bot's workflow that does not run here (#2027): the bot's name. This machine hears its server triggers with its own servers, once approved here, and sends each match to the control plane, which runs it on one of the bot's machines. Nothing of it runs here.
 	HearsFor *string `json:"hearsFor,omitzero"`
+
+	// When the daemon wrote a newer ready-made version over this unedited copy (#4071), for 7 days after it did.
+	ReadyMadeUpdatedAt *Date `json:"readyMadeUpdatedAt,omitzero"`
+
+	// An edited copy of a ready-made workflow whose ready-made version changed since the daemon made the copy (#4071): what the newer version changes. The daemon never writes over an edited copy.
+	NewerReadyMade *string `json:"newerReadyMade,omitzero"`
 
 	AwaitingApproval *WorkflowApproval `json:"awaitingApproval,omitzero"`
 

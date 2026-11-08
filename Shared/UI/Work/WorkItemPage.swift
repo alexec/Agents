@@ -251,7 +251,7 @@ struct WorkItemPage: View {
         if got.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             Text("No description.").foregroundStyle(.secondary)
         } else {
-            MarkdownText(markdown: ForgeMarkdown.markdown(got.body))
+            MarkdownText(markdown: ForgeMarkdown.markdown(got.body), remoteImage: image(on: host))
         }
         if !got.comments.isEmpty || got.cursor != nil {
             Text("Comments").appText(.reading).fontWeight(.semibold).padding(.top, 8)
@@ -265,13 +265,23 @@ struct WorkItemPage: View {
                     Divider()
                     Text("\(c.author)\(c.bot == true ? " (bot)" : "") · \(c.at.formatted(.relative(presentation: .named)))")
                         .appText(.fine).foregroundStyle(.secondary)
-                    MarkdownText(markdown: ForgeMarkdown.markdown(c.body))
+                    MarkdownText(markdown: ForgeMarkdown.markdown(c.body), remoteImage: image(on: host))
                 }
             }
         }
         if model.forgeWrites(on: host) {
             WorkCommentBox(model: model, host: host, node: got.item.node, wrote: { Task { await reread() } })
                 .padding(.top, 8)
+        }
+    }
+
+    /// An image in the body or a comment, read by the machine that read the item (#4010,
+    /// `forge/image`), so the app never loads the page's remote URL. Nil when it cannot.
+    private func image(on host: MachineRef) -> RemoteImageLoader {
+        { [model] url in
+            guard let got = try? await model.forge(DaemonAPI.Method.forgeImage, DaemonAPI.ForgeImageRequest(url: url.absoluteString),
+                                                   returning: DaemonAPI.ForgeImage.self, on: host) else { return nil }
+            return PlatformImage(data: got.data)
         }
     }
 

@@ -693,7 +693,10 @@ private struct PromptHead: View {
                         .appText(.fine)
                         .foregroundStyle(.secondary)
                 } else {
+                    // The one line is the way to edit them: its chips do not filter, the
+                    // field it opens does (#3898).
                     RemoteCompactLabelRow(labels: agent.labels)
+                        .environment(\.labelFilter, nil)
                 }
             }
             .buttonStyle(.plain)

@@ -9,6 +9,15 @@ import Foundation
 /// the same, and any other tag stays text. `forgeMarkdown.ts` does the same on the web
 /// page, with the same cases in its test.
 public enum ForgeMarkdown {
+    /// The url `forge/image` is asked for (#4009, #4010), for an image's source on a forge page: an
+    /// https address only, as the daemon reads no other. Nil for anything else, which is drawn as
+    /// its alternative text.
+    public static func imageURL(of source: String) -> URL? {
+        guard let url = URL(string: source.trimmingCharacters(in: .whitespaces)),
+              url.scheme?.lowercased() == "https", url.host?.isEmpty == false else { return nil }
+        return url
+    }
+
     /// The forge's Markdown as the Markdown `MarkdownText` draws the same.
     public static func markdown(_ source: String) -> String {
         var lines: [String] = []

@@ -1,4 +1,4 @@
-// The #3939 walk on a scratch root with the fixture Azure DevOps (Web/test/walk/forge3815-azureboards.py):
+// The #3939 walk on a scratch root with the fixture Azure DevOps (.agents/skills/run-app/scripts/fake-azure-devops.py):
 // connect Azure DevOps, let the Azure Repos folder's set-up name the project for Work, add the team
 // Payments' board to the folder's project, and open Work ▸ Features: the features of the project's
 // Epic work items (wallet, and gift-cards, finished), which have no epic tag; with the board chosen,

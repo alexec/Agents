@@ -30,6 +30,22 @@ public struct SessionLabelQuery: Hashable, Sendable {
         text = remaining.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// Whether the search asks for this label, so its chip can look chosen (#3898).
+    public func asks(for label: String) -> Bool {
+        guard let wanted = self.label else { return false }
+        return !wanted.isEmpty && SessionLabelPolicy.key(wanted) == SessionLabelPolicy.key(label)
+    }
+
+    /// The search after a click on a label's chip (#3898): it asks for that label in place of
+    /// any other, and keeps the words. A second click, when it already asks for it, takes the
+    /// label out again.
+    public static func toggling(_ label: String, in input: String) -> String {
+        let query = SessionLabelQuery(input)
+        if query.asks(for: label) { return query.text }
+        let token = label.contains(where: \.isWhitespace) ? "label:\"\(label)\"" : "label:\(label)"
+        return query.text.isEmpty ? token : "\(token) \(query.text)"
+    }
+
     public func matches(_ agent: Agent) -> Bool {
         if let label {
             let wanted = SessionLabelPolicy.key(label)

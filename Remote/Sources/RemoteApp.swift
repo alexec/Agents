@@ -205,6 +205,9 @@ struct RemoteView: View {
             .id(model.sidebarItem)
         }
         .navigationSplitViewStyle(.balanced)
+        // A label's chip, in a card or the chat, filters the sidebar by it (#3898). The
+        // chat stays open; on a phone, Back shows the list it filtered.
+        .environment(\.labelFilter, LabelFilter(query: model.sidebarSearch) { model.sidebarSearch = $0 })
         // A folder shown alone on an iPhone (#1089), over every folder, with ‹ All.
         .modifier(PhoneFolderCover())
         // Something picked, here or from a banner, a widget or a start, is shown; back to

@@ -28,6 +28,8 @@ func TestNodeOfURL(t *testing.T) {
 		"https://codeberg.org/kim/Notes/issues/3":                     "issue forgejo:kim/notes#3",
 		"https://codeberg.org/kim/notes/pulls/4":                      "pr forgejo:kim/notes#4",
 		"https://forgejo.example.com/kim/notes/-/issues/3":            "",
+		"https://bitbucket.org/walkalex/App/issues/7/fix-the-walk":    "issue bitbucket:walkalex/app#7",
+		"https://bitbucket.org/walkalex/app/pull-requests/8":          "pr bitbucket:walkalex/app#8",
 		"javascript:alert(1)":                                         "",
 		"":                                                            "",
 	} {
@@ -176,7 +178,9 @@ func TestRefURL(t *testing.T) {
 		{"issue", "forgejo:kim/notes#3", "https://codeberg.org", "https://codeberg.org/kim/notes/issues/3"},
 		{"pr", "forgejo:kim/notes#4", "https://codeberg.org", "https://codeberg.org/kim/notes/pulls/4"},
 		{"pr", "forgejo:kim/notes#4", "", ""},
-		{"issue", "bitbucket:o/r#1", "https://bitbucket.org", ""},
+		{"issue", "bitbucket:o/r#1", "", "https://bitbucket.org/o/r/issues/1"},
+		{"pr", "bitbucket:o/r#2", "https://bitbucket.org", "https://bitbucket.org/o/r/pull-requests/2"},
+		{"issue", "azurerepos:o/p/r#1", "https://dev.azure.com", ""},
 	} {
 		if got := refURL(wire.LineageNode{Kind: c.kind, Ref: c.ref}, c.base); got != c.want {
 			t.Errorf("%s at %q: %q, want %q", c.ref, c.base, got, c.want)

@@ -565,6 +565,11 @@ func (d *Daemon) summaryLocked(folder, id string, over map[string]wire.WorkflowL
 		s.HearsFor = &bot
 	}
 	s.McpTriggers = d.mcpTriggerStatuses(folder, id)
+	if f.scope == "user" {
+		if home := d.personalHome(); home != "" && isReadyMade(id) {
+			s.ReadyMadeUpdatedAt, s.NewerReadyMade = readyMadeNotice(home, id, f.text, time.Now())
+		}
+	}
 	st := d.stateLocked(folder, id, false)
 	if f.scope == "user" && folder != d.personalHome() {
 		s.IsEnabled = st != nil && st.UserEnabled != nil && *st.UserEnabled

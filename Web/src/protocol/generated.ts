@@ -6368,21 +6368,34 @@ export interface Multiplier {
  * no AI in 2025.
  */
 export interface MultiplierBaseline {
-  /** Merged PRs a week: 1.4. */
+  /**
+   * Merged PRs a week: 1.4 unless the person set their own (#3991), from 0.1 to 100, to one
+   * decimal.
+   */
   prsPerWeek: number;
   /** The hours of that week: 40. */
   hoursPerWeek: number;
   /** Where the figure is from, for the page's small line: DX 2025. */
   source: string;
+  /**
+   * The person's own line under the figures (#3991), from Settings ▸ Cost ▸ Multiplier. Absent: the
+   * default line, "An average engineer merged <prsPerWeek> PRs a week (<source>)".
+   */
+  line?: string;
 }
 
 /**
  * multiplier/count's params (#3988): the host's time zone, so the control plane counts calendar
- * weeks as the person does.
+ * weeks as the person does, and the person's baseline (#3991).
  */
 export interface MultiplierCountParams {
   /** An IANA zone name, such as Europe/London. Absent or unknown: UTC. */
   timeZone?: string;
+  /**
+   * The person's baseline on the host (#3991), so the figure is the same on every machine. Absent:
+   * 1.4.
+   */
+  prsPerWeek?: number;
 }
 
 /**
@@ -11606,8 +11619,20 @@ export interface WaitingAgent {
 export interface WakeSettings {
   keepsAwake: boolean;
   graceHours: number;
+  /**
+   * How many finished sessions keep their runtime running, ready for a reply (#183, #4044): 0 to 8,
+   * default 3, 0 turning the warm pool off. A runtime with background processes does not count
+   * against it.
+   */
   warmRuntimes: number;
   awakeOnPower: boolean;
+  /**
+   * How long a finished runtime whose background processes (a dev server, a build, a watcher) still
+   * run is kept, counted from its last turn's end (#4044): 1 to 24 hours, default 4. Its processes
+   * are then ended with it. 0, or missing, from a client that does not know it, keeps the value the
+   * host has.
+   */
+  backgroundHours?: number;
 }
 
 /** Why the Mac is, or is not, being kept awake (024). */
@@ -11880,6 +11905,16 @@ export interface WorkflowSummary {
    * which runs it on one of the bot's machines. Nothing of it runs here.
    */
   hearsFor?: string;
+  /**
+   * When the daemon wrote a newer ready-made version over this unedited copy (#4071), for 7 days
+   * after it did.
+   */
+  readyMadeUpdatedAt?: WireDate;
+  /**
+   * An edited copy of a ready-made workflow whose ready-made version changed since the daemon made
+   * the copy (#4071): what the newer version changes. The daemon never writes over an edited copy.
+   */
+  newerReadyMade?: string;
   awaitingApproval?: WorkflowApproval;
   deniedHere?: WorkflowApproval;
   lastFiredAt?: WireDate;
@@ -13414,8 +13449,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MoveToMachineAnswer: { required: ["folder", "carriesOn"], optional: [] },
   MoveToMachineRequest: { required: ["agentID", "machine"], optional: ["machineName", "folder"] },
   Multiplier: { required: ["prsMerged", "reverts", "agentsWorking", "since", "baseline"], optional: ["multiplier", "engineerHours", "changedBy", "bestWeek", "mostAtOnce"] },
-  MultiplierBaseline: { required: ["prsPerWeek", "hoursPerWeek", "source"], optional: [] },
-  MultiplierCountParams: { required: [], optional: ["timeZone"] },
+  MultiplierBaseline: { required: ["prsPerWeek", "hoursPerWeek", "source"], optional: ["line"] },
+  MultiplierCountParams: { required: [], optional: ["timeZone", "prsPerWeek"] },
   NativeSetting: { required: [], optional: ["options", "sandbox", "clientPermission"] },
   Need: { required: ["id", "folder", "kind", "raisedAt", "headline"], optional: ["agentID"] },
   NotCommittedResponse: { required: ["isRepository", "paths", "more"], optional: [] },
@@ -13894,7 +13929,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WaitServerEvent: { required: ["trigger", "servers"], optional: [] },
   WaitStatus: { required: ["line", "mark", "cancellable"], optional: [] },
   WaitingAgent: { required: ["agentID", "title", "folder", "status"], optional: [] },
-  WakeSettings: { required: ["keepsAwake", "graceHours", "warmRuntimes", "awakeOnPower"], optional: [] },
+  WakeSettings: { required: ["keepsAwake", "graceHours", "warmRuntimes", "awakeOnPower"], optional: ["backgroundHours"] },
   WakeState: { required: ["isHolding", "agentsInFlight", "heldBackByBattery", "onPower"], optional: ["batteryPercent", "since", "graceUntil"] },
   WebPushKey: { required: [], optional: ["publicKey"] },
   WebPushSubscription: { required: [], optional: ["endpoint", "p256dh", "auth"] },
@@ -13915,7 +13950,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkflowSchedule: { required: ["minutes", "hours", "startMinute", "endMinute", "days"], optional: [] },
   WorkflowSettings: { required: ["options", "labels"], optional: ["permissionMode", "runtimeID", "model", "effort", "permissionRequests", "sandbox"] },
   WorkflowSettingsRequest: { required: ["folder", "workflowID", "settings"], optional: ["cooldown", "labels", "whenDone", "continueWhenBack", "runsOn"] },
-  WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire", "queued"], optional: ["scope", "content", "overLimit", "totalLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "hearsFor", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID", "mcpTriggers"] },
+  WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire", "queued"], optional: ["scope", "content", "overLimit", "totalLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "hearsFor", "readyMadeUpdatedAt", "newerReadyMade", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID", "mcpTriggers"] },
   WorkflowWriteRequest: { required: ["workflowID", "content"], optional: [] },
   WorkflowsListRequest: { required: [], optional: ["folder", "scope"] },
   WorktreeRemovalRequest: { required: ["root", "confirmed", "folder"], optional: [] },

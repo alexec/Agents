@@ -171,7 +171,7 @@ struct MultiplierPage: View {
     private var footer: some View {
         VStack(spacing: 4) {
             if let baseline = multiplier?.baseline {
-                Text("An average engineer merged \(baseline.prsPerWeek.formatted()) PRs a week (\(baseline.source))")
+                Text(baseline.shownLine)
             }
             Text("⌘0 Multiplier · ⌘N new session · ↑↓ move · ⌘F find")
         }
