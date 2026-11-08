@@ -170,7 +170,8 @@ func (b *Book) Forget(ctx context.Context, user string) error {
 func partKind(part wire.UserSettingsPartName) (string, bool) {
 	switch part {
 	case wire.UserSettingsPartNameMcpServers, wire.UserSettingsPartNameAgentConfig,
-		wire.UserSettingsPartNameRuntimes, wire.UserSettingsPartNameCostLimits, wire.UserSettingsPartNameNotifications:
+		wire.UserSettingsPartNameRuntimes, wire.UserSettingsPartNameCostLimits, wire.UserSettingsPartNameNotifications,
+		wire.UserSettingsPartNameAccounts:
 		return "{", true
 	}
 	return "", false
@@ -194,6 +195,11 @@ func (b *Book) SetPart(ctx context.Context, user string, part wire.UserSettingsP
 		}
 		if !strings.HasPrefix(string(value), kind) || !json.Valid(value) {
 			return false, fmt.Errorf("%w: %s must be a JSON %s", ErrInvalid, part, map[string]string{"{": "object", "[": "list"}[kind])
+		}
+		if part == wire.UserSettingsPartNameAccounts {
+			if err := checkAccounts(value); err != nil {
+				return false, err
+			}
 		}
 	}
 	var parsed wire.JSONValue
@@ -247,6 +253,8 @@ func partOf(s *wire.UserSettings, part wire.UserSettingsPartName) *wire.JSONValu
 		return &s.CostLimits
 	case wire.UserSettingsPartNameNotifications:
 		return &s.Notifications
+	case wire.UserSettingsPartNameAccounts:
+		return &s.Accounts
 	}
 	return nil
 }

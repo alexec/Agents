@@ -557,6 +557,7 @@ var CallLockJoinDeny = Method[LockJoinEnd, Empty]{"lock/joinDeny"}
 var CallLockJoinRequests = Method[Empty, []LockJoinRequest]{"lock/joinRequests"}
 var CallLockJoinReveal = Method[LockJoinNonce, Empty]{"lock/joinReveal"}
 var CallLockReset = Method[Empty, Empty]{"lock/reset"}
+var CallMachineAccounts = Method[MachineAccountsCall, OutsideAccounts]{"machine/accounts"}
 var CallMachineHello = Method[MachineHello, Empty]{"machine/hello"}
 var CallMachineLockAdd = Method[LockAdd, LockHead]{"machine/lockAdd"}
 var CallMachineLockAgain = Method[Empty, Empty]{"machine/lockAgain"}

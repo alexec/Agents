@@ -220,6 +220,8 @@ struct FolderListView: View {
                 if ControlConfig.endpoint != nil {
                     SecretsRow().activityIcon("key")
                         .appText(.supporting).sidebarInk(.secrets).tag(SidebarItem.secrets)
+                    AccountsRow().activityIcon("person.crop.rectangle.stack")
+                        .appText(.supporting).sidebarInk(.accounts).tag(SidebarItem.accounts)
                 }
             } header: {
                 Text("Your setup").appText(.supporting)

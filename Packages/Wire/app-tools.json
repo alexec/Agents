@@ -98,6 +98,98 @@
     "title": "Manage this folder's workflows"
   },
   {
+    "name": "manage_accounts",
+    "title": "The person's outside accounts",
+    "description": "The person's outside accounts (gitlab.com, AWS, Slack and the like), as Your setup ▸ Accounts in the app keeps them for every machine of theirs. Before you make an account on a service, list with service to find out whether there is one already, and use it. When you make one, add it. An account holds no secret: card and secret are the names of secrets in Your setup ▸ Secrets (or where one is), never a value; a value that looks like a token, a key or a card number is refused. add puts an account with the same service and address in place of the old one. import adds the old registry's files in ~/.agents/accounts/ on this machine, once.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "list",
+            "add",
+            "import"
+          ],
+          "description": "list (the default), add or import."
+        },
+        "service": {
+          "type": "string",
+          "description": "For list: only the accounts whose service has this in it, such as gitlab."
+        },
+        "project": {
+          "type": "string",
+          "description": "For list: only the accounts this project uses, by its name (an account with no projects is for all)."
+        },
+        "account": {
+          "type": "object",
+          "description": "For add: the account.",
+          "properties": {
+            "service": {
+              "type": "string",
+              "description": "The service, as its address: gitlab.com, aws.amazon.com."
+            },
+            "address": {
+              "type": "string",
+              "description": "The address it signs in with."
+            },
+            "plan": {
+              "type": "string",
+              "description": "Free, Pro…"
+            },
+            "monthlyCostUsd": {
+              "type": "number",
+              "description": "What it costs a month, in US dollars. Absent when not known."
+            },
+            "card": {
+              "type": "string",
+              "description": "The card it bills, by its name in Your setup ▸ Secrets. Never the number."
+            },
+            "secret": {
+              "type": "string",
+              "description": "Its token or key, by its name in Your setup ▸ Secrets or where it is. Never the value."
+            },
+            "twoFactor": {
+              "type": "string",
+              "description": "TOTP, passkey, SMS, or absent for none."
+            },
+            "issue": {
+              "type": "string",
+              "description": "The issue that made it: #12 or owner/repo#12."
+            },
+            "made": {
+              "type": "string",
+              "description": "The date it was made, YYYY-MM-DD."
+            },
+            "tokenExpires": {
+              "type": "string",
+              "description": "The date its token expires, YYYY-MM-DD."
+            },
+            "notes": {
+              "type": "string",
+              "description": "Where the password is, the account's name and the like. Never a secret."
+            },
+            "projects": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "The projects that use it, by name. Absent or empty: all of them."
+            }
+          },
+          "required": [
+            "service"
+          ]
+        }
+      },
+      "required": []
+    }
+  },
+  {
     "description": "Ask me a question or a short form and wait for my answer. Use this when something is mine to decide — anything hard to undo, spending money or making an outside account, a restart or an install, a missing credential, a choice with no clear best answer, a choice that I or your task say is mine, a choice that turns on what I want when nothing you can read says it — rather than guessing or ending the turn with the question in your reply. When you would mark one answer recommended and it is easy to undo, and the choice is not mine, do not ask: take it, and write `Decided: <what>, because <why>.` where I will see it.\n\nYour question reaches me wherever I am, including on my phone. The call waits up to 45 seconds for my answer; if I have not answered by then, it says the form is still open and keeps your place: end your turn, and you are started again with my answer when I answer, skip or cancel. Do not ask again. Prefer your runtime's own question tool when you have one; use this when you do not, or when that tool is not in your catalogue.\n\nEach question may offer options to pick, or leave options out for free text. Set allow_multiple when more than one option may be chosen. To ask for a secret (an API key, a token), use ask_secret, never this.",
     "inputSchema": {
       "properties": {

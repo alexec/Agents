@@ -196,6 +196,7 @@ final class AppModel {
             showsRuntimes = false
             showsMCPServers = false
             showsSecrets = false
+            showsAccounts = false
             showsTime = false
             showsAchievements = false
             showsTokens = false
@@ -222,6 +223,7 @@ final class AppModel {
             showsRuntimes = false
             showsMCPServers = false
             showsSecrets = false
+            showsAccounts = false
             showsTime = false
             showsAchievements = false
             showsTokens = false
@@ -247,6 +249,7 @@ final class AppModel {
             showsEvents = false
             showsMCPServers = false
             showsSecrets = false
+            showsAccounts = false
             showsTime = false
             showsAchievements = false
             showsTokens = false
@@ -267,6 +270,7 @@ final class AppModel {
         didSet {
             guard showsMCPServers, showsMCPServers != oldValue else { return }
             showsSecrets = false
+            showsAccounts = false
             showsSpending = false
             showsEvents = false
             showsRuntimes = false
@@ -289,6 +293,30 @@ final class AppModel {
     var showsSecrets = false {
         didSet {
             guard showsSecrets, showsSecrets != oldValue else { return }
+            showsAccounts = false
+            showsSpending = false
+            showsEvents = false
+            showsRuntimes = false
+            showsMCPServers = false
+            showsTime = false
+            showsAchievements = false
+            showsTokens = false
+            machinePage = nil
+            showsWork = false
+            showsDocs = false
+            selection = nil
+            openWorkflow = nil
+            folderPage = nil
+            composing = false
+        }
+    }
+
+    /// Whether the window is showing Accounts: the person's outside accounts (#3967), kept by
+    /// the control plane as their secrets are, under Your setup. Not persisted, as Secrets.
+    var showsAccounts = false {
+        didSet {
+            guard showsAccounts, showsAccounts != oldValue else { return }
+            showsSecrets = false
             showsSpending = false
             showsEvents = false
             showsRuntimes = false
@@ -316,6 +344,7 @@ final class AppModel {
             showsRuntimes = false
             showsMCPServers = false
             showsSecrets = false
+            showsAccounts = false
             showsAchievements = false
             showsTokens = false
             machinePage = nil
@@ -338,6 +367,7 @@ final class AppModel {
             showsRuntimes = false
             showsMCPServers = false
             showsSecrets = false
+            showsAccounts = false
             showsTime = false
             showsTokens = false
             machinePage = nil
@@ -360,6 +390,7 @@ final class AppModel {
             showsRuntimes = false
             showsMCPServers = false
             showsSecrets = false
+            showsAccounts = false
             showsTime = false
             showsAchievements = false
             machinePage = nil
@@ -384,6 +415,7 @@ final class AppModel {
             showsRuntimes = false
             showsMCPServers = false
             showsSecrets = false
+            showsAccounts = false
             showsTime = false
             showsAchievements = false
             showsTokens = false
@@ -406,6 +438,7 @@ final class AppModel {
             showsRuntimes = false
             showsMCPServers = false
             showsSecrets = false
+            showsAccounts = false
             showsTime = false
             showsAchievements = false
             showsTokens = false
@@ -427,6 +460,7 @@ final class AppModel {
             showsRuntimes = false
             showsMCPServers = false
             showsSecrets = false
+            showsAccounts = false
             showsTime = false
             showsAchievements = false
             showsTokens = false
@@ -509,6 +543,7 @@ final class AppModel {
         showsRuntimes = false
         showsMCPServers = false
         showsSecrets = false
+        showsAccounts = false
         showsTime = false
         showsAchievements = false
         showsTokens = false
@@ -535,6 +570,7 @@ final class AppModel {
         showsRuntimes = false
         showsMCPServers = false
         showsSecrets = false
+        showsAccounts = false
         showsTime = false
         showsAchievements = false
         showsTokens = false
@@ -579,6 +615,7 @@ final class AppModel {
             if showsRuntimes { return .runtimes }
             if showsMCPServers { return .mcpServers }
             if showsSecrets { return .secrets }
+            if showsAccounts { return .accounts }
             if let machinePage { return .machine(machinePage) }
             if showsSpending { return .spending }
             if showsTokens { return .tokens }
@@ -607,6 +644,7 @@ final class AppModel {
                 showsRuntimes = false
                 showsMCPServers = false
                 showsSecrets = false
+                showsAccounts = false
                 showsTime = false
                 showsAchievements = false
                 showsTokens = false
@@ -646,6 +684,8 @@ final class AppModel {
                 showsMCPServers = true
             case .secrets:
                 showsSecrets = true
+            case .accounts:
+                showsAccounts = true
             case .machine(let host):
                 machinePage = host
             case .folder(let key):
@@ -654,6 +694,7 @@ final class AppModel {
                 showsRuntimes = false
                 showsMCPServers = false
                 showsSecrets = false
+                showsAccounts = false
                 showsTime = false
                 showsAchievements = false
                 showsTokens = false
@@ -677,6 +718,7 @@ final class AppModel {
         showsRuntimes = false
         showsMCPServers = false
         showsSecrets = false
+        showsAccounts = false
         showsTime = false
         showsAchievements = false
         showsTokens = false
@@ -708,6 +750,7 @@ final class AppModel {
         showsRuntimes = false
         showsMCPServers = false
         showsSecrets = false
+        showsAccounts = false
         showsTime = false
         showsAchievements = false
         showsTokens = false
@@ -946,6 +989,7 @@ final class AppModel {
         showsRuntimes = false
         showsMCPServers = false
         showsSecrets = false
+        showsAccounts = false
         showsTime = false
         showsAchievements = false
         showsTokens = false

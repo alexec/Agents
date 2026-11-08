@@ -651,6 +651,7 @@ public enum Capability {
         "lock/joinRequests": "lock-join/1",
         "lock/joinReveal": "lock-join/1",
         "lock/reset": "lock-reset/1",
+        "machine/accounts": "machine/1",
         "machine/hello": "machine/1",
         "machine/lockAdd": "host.lock/2",
         "machine/lockAgain": "host.lock/4",

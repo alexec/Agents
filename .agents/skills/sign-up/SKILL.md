@@ -39,10 +39,12 @@ against. It is never Alex's personal account.
 
 ## Is there already an account?
 
-Before anything else, read the registry of outside accounts (#3909):
-`scripts/accounts.sh list`. It has one JSON file per account in `~/.agents/accounts/`.
-When the service is in it, use that account and do not sign up again. Its `secret` field
-says where the token is, and its `notes` say where the password is.
+Before anything else, find the person's outside accounts (Your setup ▸ Accounts, #3967):
+`manage_accounts` with `service` (for example `gitlab`). When the service is there, use that
+account and do not sign up again. Its `secret` says which secret (or where) the token is,
+and its `notes` say where the password is. If `~/.agents/accounts/` still has files (the old
+registry, #3909), call `manage_accounts` with action `import` once, then rename the folder to
+`~/.agents/accounts.imported`.
 
 ## Ask first
 
@@ -88,10 +90,11 @@ Alex types those.
   a script that finds it in the page (by its prefix, such as `glpat-` or `dop_v1_`) and
   writes the file without printing it. Test it with one API call that prints only a name or
   a status code.
-- **Registry:** `~/.agents/accounts/<name>.json`, mode 600, one file per account. The
-  fields are in the head of `scripts/accounts.sh`: service, address, plan, monthly cost,
-  card (its Privacy.com nickname), where the secret is, the 2FA method, the issue, the date
-  made and when the token expires. Never a secret value, a password or a card number.
+- **Accounts:** `manage_accounts` with action `add` (#3967): service, address, plan, monthly
+  cost, card (its name in Your setup ▸ Secrets), secret (its name there, or where it is), the
+  2FA method, the issue, the date made, when the token expires, the projects that use it
+  (none: all) and notes. Never a secret value, a password or a card number: the control
+  plane refuses one that looks like a token, a key or a card number.
 - **Tracker:** `.agents/signups/status.md`, local only: a row per service (account name,
   Keychain item, token path, state) and a log. No secrets.
 
@@ -99,7 +102,7 @@ Alex types those.
 
 1. Comment on the issue that needed the account: the account name, the cap, the token's
    scope and expiry, and where the password and token are. Never the token itself.
-2. Write the account's file in the registry, and run `scripts/accounts.sh check`. Update
+2. Add the account with `manage_accounts` (action `add`). Update
    the tracker row, quit the browser (`node $S stop`) and delete any `/tmp` files.
 3. Tell the session that started you, and end.
 
