@@ -13307,9 +13307,13 @@ type WakeSettings struct {
 
 	GraceHours int64 `json:"graceHours"`
 
+	// How many finished sessions keep their runtime running, ready for a reply (#183, #4044): 0 to 8, default 3, 0 turning the warm pool off. A runtime with background processes does not count against it.
 	WarmRuntimes int64 `json:"warmRuntimes"`
 
 	AwakeOnPower bool `json:"awakeOnPower"`
+
+	// How long a finished runtime whose background processes (a dev server, a build, a watcher) still run is kept, counted from its last turn's end (#4044): 1 to 24 hours, default 4. Its processes are then ended with it. 0, or missing, from a client that does not know it, keeps the value the host has.
+	BackgroundHours *int64 `json:"backgroundHours,omitzero"`
 }
 
 // Why the Mac is, or is not, being kept awake (024).

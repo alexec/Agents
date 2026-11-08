@@ -20,6 +20,8 @@ func (d *Daemon) registerWake() {
 		hold:  holdTheMac,
 		tell:  func(s wire.WakeState) { Broadcast(d, wire.NotifyWakeChanged, s) },
 	}
+	settings := w.Settings
+	d.wakeSettings.Store(&settings)
 	On(d, wire.CallWakeState, func(context.Context, *Client, wire.Empty) (wire.WakeState, error) {
 		return w.State(), nil
 	})

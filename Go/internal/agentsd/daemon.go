@@ -70,6 +70,7 @@ type Daemon struct {
 	selfUpdateState
 	quitState
 	processBook
+	warmBook
 	leaseState
 	eventBook
 	actorBook

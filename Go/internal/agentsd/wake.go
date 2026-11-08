@@ -72,8 +72,12 @@ type waker struct {
 }
 
 func defaultWake() wire.WakeSettings {
-	return wire.WakeSettings{KeepsAwake: true, GraceHours: 1, WarmRuntimes: 3}
+	return wire.WakeSettings{KeepsAwake: true, GraceHours: 1, WarmRuntimes: 3, BackgroundHours: new(int64(defaultBackgroundHours))}
 }
+
+// defaultBackgroundHours is how long a finished runtime with background processes is kept
+// (#4044), from 1 to 24.
+const defaultBackgroundHours = 4
 
 // readWakeSettings is WakeSettings' forgiving decoder: a key missing or of the wrong kind
 // takes its default, numbers are clamped, and a file that is not JSON is set aside.
@@ -93,12 +97,21 @@ func readWakeSettings(path string) wire.WakeSettings {
 	json.Unmarshal(m["graceHours"], &s.GraceHours)
 	json.Unmarshal(m["warmRuntimes"], &s.WarmRuntimes)
 	json.Unmarshal(m["awakeOnPower"], &s.AwakeOnPower)
+	var hours int64
+	if json.Unmarshal(m["backgroundHours"], &hours) == nil && hours != 0 {
+		s.BackgroundHours = &hours
+	}
 	return clampWake(s)
 }
 
 func clampWake(s wire.WakeSettings) wire.WakeSettings {
 	s.GraceHours = min(max(s.GraceHours, 0), 8)
 	s.WarmRuntimes = min(max(s.WarmRuntimes, 0), 8)
+	hours := int64(defaultBackgroundHours)
+	if s.BackgroundHours != nil {
+		hours = min(max(*s.BackgroundHours, 1), 24)
+	}
+	s.BackgroundHours = &hours
 	return s
 }
 
@@ -118,8 +131,12 @@ func (w *waker) Settings() wire.WakeSettings {
 
 // Set saves the switch and the hours and applies them at once.
 func (w *waker) Set(s wire.WakeSettings) wire.WakeSettings {
-	s = clampWake(s)
 	w.mu.Lock()
+	// A client that does not know the background hours (#4044) leaves them as they are.
+	if s.BackgroundHours == nil || *s.BackgroundHours == 0 {
+		s.BackgroundHours = w.load().BackgroundHours
+	}
+	s = clampWake(s)
 	w.settings = &s
 	if b, err := storeJSON(s); err == nil {
 		err = store.WriteAtomically(w.file, b, 0o644)

@@ -11596,8 +11596,20 @@ export interface WaitingAgent {
 export interface WakeSettings {
   keepsAwake: boolean;
   graceHours: number;
+  /**
+   * How many finished sessions keep their runtime running, ready for a reply (#183, #4044): 0 to 8,
+   * default 3, 0 turning the warm pool off. A runtime with background processes does not count
+   * against it.
+   */
   warmRuntimes: number;
   awakeOnPower: boolean;
+  /**
+   * How long a finished runtime whose background processes (a dev server, a build, a watcher) still
+   * run is kept, counted from its last turn's end (#4044): 1 to 24 hours, default 4. Its processes
+   * are then ended with it. 0, or missing, from a client that does not know it, keeps the value the
+   * host has.
+   */
+  backgroundHours?: number;
 }
 
 /** Why the Mac is, or is not, being kept awake (024). */
@@ -13884,7 +13896,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WaitServerEvent: { required: ["trigger", "servers"], optional: [] },
   WaitStatus: { required: ["line", "mark", "cancellable"], optional: [] },
   WaitingAgent: { required: ["agentID", "title", "folder", "status"], optional: [] },
-  WakeSettings: { required: ["keepsAwake", "graceHours", "warmRuntimes", "awakeOnPower"], optional: [] },
+  WakeSettings: { required: ["keepsAwake", "graceHours", "warmRuntimes", "awakeOnPower"], optional: ["backgroundHours"] },
   WakeState: { required: ["isHolding", "agentsInFlight", "heldBackByBattery", "onPower"], optional: ["batteryPercent", "since", "graceUntil"] },
   WebPushKey: { required: [], optional: ["publicKey"] },
   WebPushSubscription: { required: [], optional: ["endpoint", "p256dh", "auth"] },

@@ -3,6 +3,7 @@ package agentsd
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -187,7 +188,7 @@ func TestWakeOffHoldsNothingAndOnPowerHoldsIdle(t *testing.T) {
 func TestReadWakeSettingsForgives(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "wake.json")
-	if s := readWakeSettings(path); s != defaultWake() {
+	if s := readWakeSettings(path); !reflect.DeepEqual(s, defaultWake()) {
 		t.Fatalf("missing: %+v", s)
 	}
 	os.WriteFile(path, []byte(`{"keepsAwake":"yes","graceHours":99,"awakeOnPower":true}`), 0o644)
@@ -195,7 +196,7 @@ func TestReadWakeSettingsForgives(t *testing.T) {
 		t.Fatalf("forgiven: %+v", s)
 	}
 	os.WriteFile(path, []byte(`not json`), 0o644)
-	if s := readWakeSettings(path); s != defaultWake() {
+	if s := readWakeSettings(path); !reflect.DeepEqual(s, defaultWake()) {
 		t.Fatalf("corrupt: %+v", s)
 	}
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
