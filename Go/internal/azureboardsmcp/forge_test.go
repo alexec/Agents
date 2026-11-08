@@ -227,6 +227,27 @@ func TestForgeSearchWhere(t *testing.T) {
 	}
 }
 
+// #3939: the label epic finds the Epic work items, with or without the tag, and a story tagged
+// epic, for Work ▸ Features; a feature narrows them.
+func TestForgeSearchFindsEpicsByTheirType(t *testing.T) {
+	f, b := forgeFake(t)
+	f.item(4, "Invoices", "Epic", "New", alex, 4, obj{fieldTags: "feature:billing"})
+	f.item(5, "Payments", "Epic", "Active", alex, 5, nil)
+	f.item(6, "Tagged", "User Story", "New", alex, 6, obj{fieldTags: "Epic; feature:billing"})
+	ctx := context.Background()
+	page, err := b.Search(ctx, []string{"acme/web app"}, SearchFilter{State: "all", Label: "epic"}, "", 50)
+	if err != nil || !slices.Equal(ids(page.Items), []int{6, 5, 4}) {
+		t.Fatalf("epics: %v %v", err, ids(page.Items))
+	}
+	if !strings.Contains(f.lastQuery(), "([System.WorkItemType] = 'Epic' OR [System.Tags] CONTAINS 'epic')") {
+		t.Fatalf("query: %s", f.lastQuery())
+	}
+	page, _ = b.Search(ctx, []string{"acme/web app"}, SearchFilter{State: "all", Label: "epic", Feature: "billing"}, "", 50)
+	if !slices.Equal(ids(page.Items), []int{6, 4}) || page.Items[1].Type != "Epic" {
+		t.Fatalf("billing's epics: %v", ids(page.Items))
+	}
+}
+
 // #3815: a work item's page: its description, made safe, as Markdown, its comments oldest first
 // (HTML ones as Markdown), and the other states of its type.
 func TestForgeItemPage(t *testing.T) {

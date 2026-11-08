@@ -3,6 +3,7 @@ package agentsd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -21,6 +22,7 @@ type fakeForgeBitbucket struct {
 	searches []string
 	items    []string
 	wrote    []string
+	asked    []string
 }
 
 func (f *fakeForgeBitbucket) note(to *[]string, s string) {
@@ -290,5 +292,14 @@ func TestBitbucketOfNode(t *testing.T) {
 		if got != want {
 			t.Errorf("%s: %q, want %q", ref, got, want)
 		}
+	}
+}
+
+// #3938: a list narrowed to a board has no Bitbucket items: Bitbucket has no boards.
+func TestABoardLeavesBitbucketOut(t *testing.T) {
+	s := forgeSources{bitbucket: []string{"walkalex/app"}, bitbucketErr: errors.New("elsewhere")}
+	narrowToBoard(&s, wire.ProjectBoard{Forge: new(wire.ConnectionProviderGithub), Key: new("alexec/1")}, []string{"/f"}, false)
+	if s.bitbucket != nil || s.bitbucketErr != nil {
+		t.Fatalf("sources: %+v", s)
 	}
 }

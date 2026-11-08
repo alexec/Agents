@@ -161,6 +161,8 @@ var (
 	sinceWIQL = regexp.MustCompile(`\[(System\.CreatedDate|System\.ChangedDate)\] >= '([^']+)'`)
 	stateWIQL = regexp.MustCompile(`\[System\.State\] (NOT IN|IN) \(([^)]*)\)`)
 	tagWIQL   = regexp.MustCompile(`\[System\.Tags\] CONTAINS '([^']+)'`)
+	// typeWIQL is a type or a tag, as the label epic asks (#3939).
+	typeWIQL = regexp.MustCompile(`\(\[System\.WorkItemType\] = '([^']+)' OR \[System\.Tags\] CONTAINS '([^']+)'\)`)
 )
 
 func (f *fakeBoards) serve(w http.ResponseWriter, r *http.Request) {
@@ -272,7 +274,7 @@ func (f *fakeBoards) serve(w http.ResponseWriter, r *http.Request) {
 }
 
 // wiql is the work items a query finds, changed last first, at most top: by its time, its
-// states (every state clause), a tag and @Me, the parts of WIQL the server writes.
+// states (every state clause), a type or a tag, a tag and @Me, the parts of WIQL the server writes.
 func (f *fakeBoards) wiql(query string, top int) []obj {
 	var ids []int
 	for id, it := range f.items {
@@ -288,8 +290,11 @@ func (f *fakeBoards) wiql(query string, top int) []obj {
 		if !kept {
 			continue
 		}
-		if m := tagWIQL.FindStringSubmatch(query); m != nil {
-			tag, _ := it.fields[fieldTags].(string)
+		tag, _ := it.fields[fieldTags].(string)
+		if m := typeWIQL.FindStringSubmatch(query); m != nil && it.fields[fieldType] != m[1] && !containsFold(tags(tag), m[2]) {
+			continue
+		}
+		if m := tagWIQL.FindStringSubmatch(typeWIQL.ReplaceAllString(query, "")); m != nil {
 			if !containsFold(tags(tag), m[1]) {
 				continue
 			}

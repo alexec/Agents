@@ -36,6 +36,10 @@
 .with-sidebar .activity-row .activity-icon { color: var(--accent); text-align: center; }
 .with-sidebar .activity-row .activity-icon.warns { color: var(--tint-failure); }
 .with-sidebar .activity-row .title { font-weight: 500; }
+/* The Summary row (#3721): the newest page's title under the name, and a dot while it is unread. */
+.with-sidebar .summary-row .line { grid-column: 2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.with-sidebar .summary-row.unread .title { font-weight: 700; }
+.with-sidebar .summary-row .dot { display: inline-block; width: 7px; height: 7px; margin-left: 6px; border-radius: 50%; background: var(--accent); vertical-align: middle; }
 
 /* A folder's row: the disclosure, the name, and a grey count of its own sessions (#587). */
 .with-sidebar .row.folder { grid-template-columns: 16px minmax(0, 1fr) auto; align-items: center; padding: 0 8px 0 0;

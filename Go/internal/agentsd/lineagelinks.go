@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/bitbucketmcp"
 	"github.com/alexec/agents/Go/internal/lineage"
 	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
@@ -56,8 +57,9 @@ type lineageLinker struct {
 	otherHost map[string]bool
 }
 
-// forgeRepo is a repository on a forge, as lineage refs name it: forge github, gitlab or
-// forgejo, path owner/repo (group/sub/project on GitLab), lower case. The zero value is none.
+// forgeRepo is a repository on a forge, as lineage refs name it: forge github, gitlab, forgejo
+// or bitbucket, path owner/repo (group/sub/project on GitLab, workspace/repo on Bitbucket),
+// lower case. The zero value is none.
 type forgeRepo struct{ forge, path string }
 
 // forgeKind is what lineage does on one forge. A forge that is not in forgeKinds has no
@@ -77,8 +79,8 @@ type forgeKind struct {
 	// comment.
 	cli string
 	// connection: lineage asks the forge the same by the person's connection to it
-	// (lineageforgejo.go), not a CLI. With neither, the forge's nodes are linked, and nothing
-	// is looked up.
+	// (connectionAsks: lineageforgejo.go, lineagebitbucket.go), not a CLI. With neither, the
+	// forge's nodes are linked, and nothing is looked up.
 	connection bool
 }
 
@@ -92,6 +94,9 @@ var forgeKinds = []struct {
 	// Forgejo and Gitea number issues and pull requests together, as forgeforgejo.go's nodes
 	// say. Only they say /pulls/12. They are asked by their connection, not a CLI.
 	{"forgejo", forgeKind{prMark: "#", prPath: "/pulls/", issuePath: "/issues/", anyHost: true, connection: true}},
+	// Bitbucket Cloud numbers its pull requests apart from its issues, but forgebitbucket.go's
+	// nodes say both with #: the node's kind says which. It is only on bitbucket.org.
+	{"bitbucket", forgeKind{prMark: "#", prPath: "/pull-requests/", issuePath: "/issues/", connection: true}},
 }
 
 // kindOf is forge's row of forgeKinds.
@@ -110,6 +115,36 @@ func (r forgeRepo) asks() bool {
 	return k.cli != "" || k.connection
 }
 
+// forgeAsks is what lineage asks a forge by the person's connection to it (forgeKind.connection),
+// each in the shape of the gh and glab default it takes the place of: a node's title and state
+// (lineageresolve.go), an issue's milestone (lineagemilestone.go), a release's commit time,
+// commits, pull requests and milestones (lineagerelease.go), and the cost comment on a merged
+// pull request (lineagecomment.go). The folder each is given is not used: the connection is
+// the person's in every folder.
+type forgeAsks struct {
+	resolve     resolveLookup
+	issue       issueLookup
+	commitTime  func(ctx context.Context, folder string, repo forgeRepo, ref string) (time.Time, error)
+	compare     func(ctx context.Context, folder string, repo forgeRepo, base, head string) ([]compareCommit, error)
+	commitPR    func(ctx context.Context, folder string, repo forgeRepo, sha string) (int, error)
+	milestones  func(ctx context.Context, folder string, repo forgeRepo) ([]forgeMilestone, error)
+	costComment func(ctx context.Context, r prCommentRecord, body string) (string, error)
+}
+
+// connectionAsks is what lineage asks forge by its connection; not ok for a forge it asks by
+// a CLI, or not at all. A new forge with a connection is a case here.
+func (d *Daemon) connectionAsks(forge string) (forgeAsks, bool) {
+	switch forge {
+	case "forgejo":
+		return forgeAsks{d.forgejoResolveNode, d.forgejoIssue, d.forgejoCommitTime, d.forgejoCompareCommits, d.forgejoCommitPR,
+			d.forgejoMilestones, d.forgejoCostComment}, true
+	case "bitbucket":
+		return forgeAsks{d.bitbucketResolveNode, d.bitbucketIssue, d.bitbucketCommitTime, d.bitbucketCompareCommits, d.bitbucketCommitPR,
+			d.bitbucketMilestones, d.bitbucketCostComment}, true
+	}
+	return forgeAsks{}, false
+}
+
 func (r forgeRepo) issue(n int) wire.LineageNode {
 	return wire.LineageNode{Kind: lineage.KindIssue, Ref: r.forge + ":" + r.path + "#" + strconv.Itoa(n)}
 }
@@ -120,9 +155,9 @@ func (r forgeRepo) pr(n int) wire.LineageNode {
 	return wire.LineageNode{Kind: lineage.KindPR, Ref: r.forge + ":" + r.path + k.prMark + strconv.Itoa(n)}
 }
 
-// forgeOf is the forge a remote is on: github.com, a host whose name says GitLab, or
-// codeberg.org or a host whose name says Forgejo or Gitea (as forgejomcp.RepoAt finds one).
-// A Forgejo of another name is the connected one's, which folderRepo asks for.
+// forgeOf is the forge a remote is on: github.com, a host whose name says GitLab, codeberg.org
+// or a host whose name says Forgejo or Gitea (as forgejomcp.RepoAt finds one), or
+// bitbucket.org. A Forgejo of another name is the connected one's, which folderRepo asks for.
 func forgeOf(host, path string) forgeRepo {
 	path = repoPath(path)
 	switch host = strings.ToLower(host); {
@@ -130,6 +165,12 @@ func forgeOf(host, path string) forgeRepo {
 		return forgeRepo{}
 	case host == "github.com":
 		return forgeRepo{"github", path}
+	case host == bitbucketmcp.Host:
+		// A workspace's repository, never under a group.
+		if strings.Count(path, "/") != 1 {
+			return forgeRepo{}
+		}
+		return forgeRepo{"bitbucket", path}
 	case strings.Contains(host, "gitlab"):
 		return forgeRepo{"gitlab", path}
 	case strings.Contains(host, "forgejo") || strings.Contains(host, "gitea") || strings.Contains(host, "codeberg"):
@@ -145,8 +186,9 @@ func repoPath(path string) string {
 
 // ofURL is the repo and number of the issue (or, pr, the pull request) at a forge's web
 // address, by its host and path: github.com/o/r/issues/5, <gitlab>/group/project/-/issues/5,
-// <forgejo>/o/r/pulls/5. The first forge whose address the path has must be one whose host
-// it is on: GitHub's and Forgejo's issues have the same address.
+// <forgejo>/o/r/pulls/5, bitbucket.org/w/r/pull-requests/5. The first forge whose address the
+// path has must be one whose host it is on: GitHub's, Forgejo's and Bitbucket's issues have
+// the same address.
 func ofURL(host, path string, pr bool) (forgeRepo, int, bool) {
 	matched := ""
 	for _, k := range forgeKinds {
@@ -178,7 +220,8 @@ func ofURL(host, path string, pr bool) (forgeRepo, int, bool) {
 }
 
 // prOfURL is the repo and number of a PR's web address: github.com/o/r/pull/5,
-// <gitlab>/group/project/-/merge_requests/5, or <forgejo>/o/r/pulls/5.
+// <gitlab>/group/project/-/merge_requests/5, <forgejo>/o/r/pulls/5, or
+// bitbucket.org/w/r/pull-requests/5.
 func prOfURL(raw string) (forgeRepo, int, bool) {
 	u, err := url.Parse(raw)
 	if err != nil {

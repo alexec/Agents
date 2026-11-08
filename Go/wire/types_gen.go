@@ -4688,6 +4688,18 @@ type ForgeFeaturesRequest struct {
 	Board *string `json:"board,omitzero"`
 }
 
+// forge/image (#4009): an image's bytes, so that a client never loads a forge page's remote URL. mimeType is image/png, image/jpeg, image/gif or image/webp, read from the bytes.
+type ForgeImage struct {
+	MimeType string `json:"mimeType"`
+
+	Data Data `json:"data"`
+}
+
+// forge/image (#4009): the url of an image on a forge page. Only a forge's own image hosts are read (for GitHub: github.com's user-attachments and repo assets, and user-images, private-user-images, raw and avatars on githubusercontent.com); the forge's token goes only to its own hosts.
+type ForgeImageRequest struct {
+	URL string `json:"url"`
+}
+
 // An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for GitHub, GitLab, Linear and Jira (#3260), so one page draws each. node is its lineage node (kind issue or pr, ref github:alexec/Agents#12). state is open, closed or merged; status is the tracker's own name for its step, where its workflow has steps (a Jira status, as In Progress; one in Jira's Done category is closed). folder is a folder on this machine on its repo, to act from. labels have their #rrggbb colour where the forge gives one (#2956). The pull request's own fields: draft; checks is passing, failing, running or none; review is approved, changes_requested or review_required; mergeable is mergeable, conflicting or unknown; autoMerge says auto-merge is on. The hierarchy (#3267): parent is the issue it is a sub-issue (a Linear or GitLab child) of; level is epic, story, task or spike, from its labels; feature is the name of its feature:<name> label; progress is a parent's closed children of all of them, where the forge says it: in a GitHub list, and on an issue's own read.
 type ForgeItem struct {
 	Node LineageNode `json:"node"`
@@ -6363,6 +6375,9 @@ type MCPSetSecretRequest struct {
 	Name string `json:"name"`
 
 	Value string `json:"value"`
+
+	// Ask before use (#4014): kept sealed on this machine, never in secrets.env, and a person approves each use (#4015). Left out is off. From the agent role it is always on.
+	NeedsApproval *bool `json:"needsApproval,omitzero"`
 }
 
 type MCPSignInAnswer struct {
@@ -10820,6 +10835,9 @@ type SealedUserSecret struct {
 	Version int64 `json:"version"`
 
 	Sealed SealedEnvelope `json:"sealed"`
+
+	// Ask before use (#4014), as the person's client sealed it: the associated data ends |ask when it is on, so a flag the control plane changed does not open. Left out is off.
+	NeedsApproval *bool `json:"needsApproval,omitzero"`
 }
 
 // sealing/add (#3397).
@@ -10878,6 +10896,15 @@ type SecretLeftOn struct {
 	Name string `json:"name"`
 
 	At string `json:"at"`
+}
+
+// secrets/setNeedsApproval (#4014): a person turns Ask before use on or off for a secret of this machine's secrets.env, or for one session's (agentID). On takes the value out of the plain file and seals it to this machine; off puts it back. A Your setup secret's flag is its client's to seal, so it is refused here.
+type SecretNeedsApprovalRequest struct {
+	Name string `json:"name"`
+
+	AgentID *UUID `json:"agentID,omitzero"`
+
+	NeedsApproval bool `json:"needsApproval"`
 }
 
 // control/secretsLeft (#1760, FR-026): to the person's own clients, when one of their machines was removed with secrets on it.
@@ -11163,6 +11190,9 @@ type SessionSecret struct {
 	Name string `json:"name"`
 
 	SetAt Date `json:"setAt"`
+
+	// Ask before use (#4014): its value is sealed in the session's file, never there as plain text, and a person approves each use (#4015).
+	NeedsApproval *bool `json:"needsApproval,omitzero"`
 }
 
 // secrets/sessionRemove (#3548): take one session's secret out now.
@@ -11179,6 +11209,9 @@ type SessionSecretSetRequest struct {
 	Name string `json:"name"`
 
 	Value string `json:"value"`
+
+	// Ask before use (#4014): kept sealed, and a person approves each use (#4015). Left out is off.
+	NeedsApproval *bool `json:"needsApproval,omitzero"`
 }
 
 // secrets/sessionList (#3548): every secret this machine keeps for one session only, by session title then name. No value.
@@ -12161,6 +12194,35 @@ type SummaryFactsRequest struct {
 	Since Date `json:"since"`
 }
 
+// One saved page of the daily summary (#3721), in ~/.agents/summaries on this machine: the sidebar's Summary row and the Summary page.
+type SummaryPage struct {
+	// The file's name without .md, such as 2026-11-06-1810: what summaries/read names.
+	Name string `json:"name"`
+
+	// The page's first heading, such as "Daily summary, Fri 6 Nov"; the name when it has none.
+	Title string `json:"title"`
+
+	SavedAt Date `json:"savedAt"`
+
+	// Nobody has read it with summaries/read since it was saved.
+	Unread bool `json:"unread"`
+
+	// The Daily summary workflow's session that wrote it: the page's "How this was written". Absent for a page saved before #3721.
+	Writer *UUID `json:"writer,omitzero"`
+}
+
+// summaries/read (#3721): a saved page of the daily summary and its Markdown.
+type SummaryPageText struct {
+	Page SummaryPage `json:"page"`
+
+	Markdown string `json:"markdown"`
+}
+
+// summaries/read (#3721): the page to read, as SummaryPage.name says it.
+type SummaryReadRequest struct {
+	Name string `json:"name"`
+}
+
 // Surface (Attention/Surface.swift): a tagged object, `{ mac: {} }` or `{ device: "<uuid>" }`.
 type Surface struct {
 	Mac *struct{} `json:"mac,omitzero"`
@@ -12990,6 +13052,9 @@ type UserSecretRow struct {
 
 	// The person's machines that have no copy yet: they wait for one of the person's clients to seal it (#3397).
 	Waiting []MachineRef `json:"waiting,omitzero"`
+
+	// Ask before use (#4014), as the person's client last sealed it. The machines check it: the associated data binds it.
+	NeedsApproval *bool `json:"needsApproval,omitzero"`
 }
 
 // user/setSecret (#1760, FR-025, #3397): a secret as the person's client sealed it to each recipient of user/secretRecipients, info com.alexecollins.agents.usersecret.v1, associated data usersecret.v1|<person id>|<recipient>|<name>|<version>. version is above the kept one: the kept one plus one, or for a name the client has none of, the time in milliseconds, above a removed one's. The control plane never has the value.
@@ -13002,6 +13067,9 @@ type UserSecretSet struct {
 
 	// By recipient.
 	Values map[string]SealedEnvelope `json:"values"`
+
+	// Ask before use (#4014): when on, every envelope's associated data ends |ask (usersecret.v1|<person id>|<recipient>|<name>|<version>|ask), so the control plane cannot change it. Left out is off, and the associated data is as before.
+	NeedsApproval *bool `json:"needsApproval,omitzero"`
 }
 
 // user/settings (#1760, #2410): the person's settings that follow them to each of their machines. An omitted part has no value yet, but does not make that setting machine-local. The control plane does not read inside a part.

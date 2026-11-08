@@ -65,6 +65,7 @@ type Daemon struct {
 	settingsState
 	userScopeState
 	sessionSecretsState
+	sealedSecretsState
 	lockState
 	selfUpdateState
 	quitState

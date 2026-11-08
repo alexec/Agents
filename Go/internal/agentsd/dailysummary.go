@@ -445,6 +445,7 @@ func (d *Daemon) saveSummary(id wire.UUID, markdown, headline string, at time.Ti
 	}
 	said := []string{"Saved at " + path + "."}
 	d.newestSummary(id, markdown)
+	d.markSummarySaved(home, path, id)
 	if _, err := d.showFile(id, map[string]json.RawMessage{"path": jsonString(path)}); err != nil {
 		said = append(said, "Not shown: "+err.Error())
 	}

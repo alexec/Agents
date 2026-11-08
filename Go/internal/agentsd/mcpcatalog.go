@@ -44,6 +44,10 @@ func (d *Daemon) registerMCPCatalog() {
 		return wire.Empty{}, d.mcpForgetViews(r)
 	})
 	On(d, wire.CallMCPSetSecret, func(ctx context.Context, c *Client, r wire.MCPSetSecretRequest) (wire.MCPSetSecretAnswer, error) {
+		// An agent's write always turns Ask before use on (#4014); a person's client chooses.
+		if !askBeforeUseAllowed(c) {
+			r.NeedsApproval = new(true)
+		}
 		return d.mcpSetSecret(r)
 	})
 	On(d, wire.CallMCPRemove, func(ctx context.Context, c *Client, r wire.MCPRemoveRequest) (wire.MCPRemoveAnswer, error) {
@@ -702,7 +706,7 @@ func (d *Daemon) mcpSetSecret(r wire.MCPSetSecretRequest) (wire.MCPSetSecretAnsw
 	case r.Value == "":
 		return wire.MCPSetSecretAnswer{}, mcpRefusal(mcpcatalog.Failed("A secret needs a value."))
 	}
-	if err := d.saveSecret(r.Name, r.Value); err != nil {
+	if err := d.saveSecret(r.Name, r.Value, r.NeedsApproval != nil && *r.NeedsApproval); err != nil {
 		return wire.MCPSetSecretAnswer{}, mcpRefusal(mcpcatalog.Failed(err.Error()))
 	}
 	log.Printf("mcp: set-secret %s", r.Name)

@@ -15,7 +15,7 @@ import type {
   PagesChangedNotification, PinsChangedNotification, PinView, ReviewPull, CheckSuggestion, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, PolicySetBy, RuntimeAllowances,
   GuardedChange, GuardedChangeReading, MachineJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Achievements,
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
-  BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, DailySummarySettings, DesktopControlSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
+  BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, DailySummarySettings, SummaryPage, SummaryPageText, DesktopControlSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
   PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, BudgetRequest, RemoveRequest, ClientPermissionSettings, PRCostComment,
   Connection, MoveToMachineAnswer, ProblemReport, ProblemReportRequest, Request as PersonRequest, RequestUpdate } from "../protocol/generated";
 import { endedConnections, endedLine, hasEnded } from "./connectorSetup";
@@ -418,6 +418,9 @@ export class Work {
   /** The daily summary's Off / Summary control and its time (#3351), for Settings ▸ Workflows: null
    * until the Mac's host has said, or from a host too old to know the method, which leaves it out. */
   readonly dailySummary = signal<DailySummarySettings | null>(null);
+  /** The daily summary's saved pages on the Mac's host, newest first (#3721): the Summary row and
+   * page. Empty from a host too old to know `summaries/list`. */
+  readonly summaryPages = signal<SummaryPage[]>([]);
   /** Each host's folders' worktrees (#790), as `worktrees/all` last answered: asked when Activity ▸
    * Worktrees is shown, not kept up by the host. */
   readonly worktreeLists = signal<Record<string, FolderWorktrees[]>>({});
@@ -748,6 +751,9 @@ export class Work {
         return true;
       case "dailySummary/changed":
         if (this.isMac(host)) this.dailySummary.value = params as DailySummarySettings;
+        return true;
+      case "summaries/changed":
+        if (this.isMac(host)) this.summaryPages.value = params as SummaryPage[];
         return true;
       case "modes/changed":
         this.rememberedModes.value = { ...this.rememberedModes.value, [host]: params as Record<string, JSONValue> };
@@ -1904,6 +1910,11 @@ export class Store extends Work {
     if (host === this.macHostID.peek()) {
       void this.link.call("preferences/get", {}, host).then((said) => preferencesSaid(said))
         .catch(failed("preferences/get"));
+      // The Summary row (#3721): shown only while the daily summary is on, with its newest page.
+      void this.link.call("dailySummary/settings", {}, host).then((settings) => { this.dailySummary.value = settings; })
+        .catch(failed("dailySummary/settings"));
+      void this.link.call("summaries/list", {}, host).then((pages) => { this.summaryPages.value = pages; })
+        .catch(failed("summaries/list"));
     }
     // A host from before #984 doesn't know it: the Time page shows no achievements.
     void this.link.call("achievements/state", {}, host).then((state) => this.takeAchievements(host, state))
@@ -2368,6 +2379,16 @@ export class Store extends Work {
       (settings) => { this.dailySummary.value = settings; },
       () => { /* too old to know the method: the control stays out. */ },
     );
+  }
+
+  /** One saved page of the daily summary (#3721); reading the newest marks it read. Null when it
+   * could not be read. */
+  async readSummaryPage(name: string): Promise<SummaryPageText | null> {
+    try {
+      return await this.link.call("summaries/read", { name }, this.macHostID.value);
+    } catch {
+      return null;
+    }
   }
 
   /** The person chose a mode, a time or how often the checks run, for the daily summary (#3351, #3395). */

@@ -6,8 +6,9 @@ azureboardsmcp fake_test.go). Scratch data only, kept in memory: a walk makes no
 
 - The organization acme, whose connectionData says Kim Lee is the token's owner. Any token
   connects, except "wrong-token", which gets a 401.
-- The project acme/Web Shop (Agile's work item types, its tags) with four work items, their
-  comments, links and updates (#3815, #3826), and the team Payments, whose area path
+- The project acme/Web Shop (Agile's work item types, its tags) with five work items (two of
+  them Epics with feature: tags, for Work ▸ Features, #3939), their comments, links and
+  updates (#3815, #3826), and the team Payments, whose area path
   Web Shop\\Payments holds the wallet's work items, for a project's board (#3816):
   http://127.0.0.1:<port>/acme/Web%20Shop/_boards/board/t/Payments. WIQL by state, type, tag,
   area, title, a time and @Me. Writes: a comment, tags, a state, a new child.
@@ -82,11 +83,11 @@ def link(rel, n):
 
 
 ITEMS = {
-    40: item("Pay with a wallet", "Epic", "Active", ["payments"], SAM, SAM, ago(3),
+    40: item("Pay with a wallet", "Epic", "Active", ["payments", "feature:wallet"], SAM, SAM, ago(3),
              "<p>Apple Pay and Google Pay at checkout.</p>",
              relations=[link("System.LinkTypes.Hierarchy-Forward", 41), link("System.LinkTypes.Hierarchy-Forward", 42)],
              area=PAYMENTS),
-    41: item("Apple Pay sheet closes before the payment is confirmed", "Bug", "Active", ["payments", "mobile"], SAM, KIM,
+    41: item("Apple Pay sheet closes before the payment is confirmed", "Bug", "Active", ["payments", "mobile", "feature:wallet"], SAM, KIM,
              ago(1),
              "<h3>Steps</h3><ol><li>Add an item to the cart</li><li>Pay with <b>Apple Pay</b></li></ol>"
              "<p>The sheet closes and the order stays unpaid.</p>",
@@ -100,6 +101,8 @@ ITEMS = {
              area=PAYMENTS),
     43: item("Coupon field hides behind the keyboard", "User Story", "Resolved", ["checkout", "ux"], SAM, SAM,
              ago(1.25), "<p>On a small phone the coupon field is under the keyboard.</p>"),
+    # An epic outside the team Payments, done, with no epic tag: Work ▸ Features finds it by its type (#3939).
+    44: item("Gift cards", "Epic", "Closed", ["feature:gift-cards"], KIM, None, ago(40), "<p>Sell and redeem gift cards.</p>"),
 }
 NEXT = [100]
 
@@ -154,6 +157,12 @@ def wiql(query):
     for m in re.finditer(r"\[System\.State\] (NOT IN|IN) \(([^)]*)\)", query):
         names = set(re.findall(r"'([^']*)'", m.group(2)))
         ids = [n for n in ids if (ITEMS[n]["fields"]["System.State"] in names) == (m.group(1) == "IN")]
+    # The label epic: an Epic work item, or one tagged epic (#3939).
+    m = re.search(r"\(\[System\.WorkItemType\] = '([^']*)' OR \[System\.Tags\] CONTAINS '([^']*)'\)", query)
+    if m:
+        ids = [n for n in ids if ITEMS[n]["fields"]["System.WorkItemType"] == m.group(1) or
+               m.group(2).lower() in [t.strip().lower() for t in ITEMS[n]["fields"]["System.Tags"].split(";")]]
+        query = query.replace(m.group(0), "")
     m = re.search(r"\[System\.WorkItemType\] = '([^']*)'", query)
     if m:
         ids = [n for n in ids if ITEMS[n]["fields"]["System.WorkItemType"] == m.group(1)]

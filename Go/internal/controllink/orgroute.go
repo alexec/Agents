@@ -82,6 +82,16 @@ func UserSecretAD(user, recipient, name string, version int64) []byte {
 	return fmt.Appendf(nil, "usersecret.v1|%s|%s|%s|%d", user, recipient, name, version)
 }
 
+// UserSecretADAsk is UserSecretAD with Ask before use bound in (#4014): on adds "|ask", so
+// a flag the control plane turned on or off does not open. Off is UserSecretAD as before.
+func UserSecretADAsk(user, recipient, name string, version int64, needsApproval bool) []byte {
+	ad := UserSecretAD(user, recipient, name, version)
+	if needsApproval {
+		ad = append(ad, "|ask"...)
+	}
+	return ad
+}
+
 // Seal is HPKE (P-256, HKDF-SHA256, AES-256-GCM) to a P-256 public key (X9.63), under info
 // and with ad: what a client does, and the tests for it.
 func Seal(publicKey []byte, info string, ad, value []byte) (wire.SealedEnvelope, error) {

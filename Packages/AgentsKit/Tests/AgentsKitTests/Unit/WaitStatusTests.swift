@@ -25,6 +25,14 @@ struct WaitStatusTests {
         #expect(status?.cancellable == true)
     }
 
+    @Test func theCardSaysHoursAndMinutesPastAnHour() {
+        #expect(WaitStatus.cardTime(elapsed: 12, total: 30) == "12 / 30 min")
+        #expect(WaitStatus.cardTime(elapsed: 59, total: nil) == "59 min")
+        #expect(WaitStatus.cardTime(elapsed: 45, total: 120) == "45 min / 2 h")
+        #expect(WaitStatus.cardTime(elapsed: 65, total: 120) == "1 h 5 min / 2 h")
+        #expect(WaitStatus.cardTime(elapsed: 125, total: nil) == "2 h 5 min")
+    }
+
     @Test func withoutADeadlineThereIsNoUntil() {
         var waiting = agent()
         waiting.eventWait = EventWait(patterns: [EventPattern("mac.wake")], from: 0, since: since)
