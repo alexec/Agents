@@ -9,6 +9,17 @@ import SwiftUI
 /// The numbers count to each new value (about 1 s), from the last values this window
 /// showed when it opens. When a PR merges or a revert does, a line says so and fades.
 /// Under Reduce Motion they change with no count and no line.
+/// The page's row, first under Usage (#3986): the way back to it from a session or a page.
+struct MultiplierRow: View {
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text("Multiplier").foregroundStyle(.primary)
+            Spacer()
+        }
+        .help("The work of how many engineers your agents did in the last 7 days")
+    }
+}
+
 struct MultiplierPage: View {
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -124,7 +135,7 @@ struct MultiplierPage: View {
             if let baseline = multiplier?.baseline {
                 Text("An average engineer merged \(baseline.prsPerWeek.formatted()) PRs a week (\(baseline.source))")
             }
-            Text("⌘N new session · ↑↓ move · ⌘F find")
+            Text("⌘0 Multiplier · ⌘N new session · ↑↓ move · ⌘F find")
         }
         .appText(.fine)
         .foregroundStyle(.secondary)

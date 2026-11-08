@@ -20,6 +20,9 @@ public enum SidebarItem: Hashable, Sendable {
     case pin(String, in: FolderKey)
     /// A folder's archived sessions and workflows, as a page (#495), with Unarchive.
     case archive(FolderKey)
+    /// The Multiplier page (#3986): what the window shows with nothing else open, first under
+    /// Usage so there is a way back to it. The Mac window's only: the Remote never has it.
+    case multiplier
     case spending
     /// The tokens the work used, and the token limits (#956): Cost's figures in tokens.
     case tokens
