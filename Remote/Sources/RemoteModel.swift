@@ -576,6 +576,8 @@ final class RemoteModel {
     /// for, and nothing is picked (#2090).
     var sidebarItem: SidebarItem? {
         get {
+            // Work's row is its list's (#4004), and Back can go to another list.
+            if case .work = openActivity { return .work(workPlace.kind) }
             if let openActivity { return openActivity }
             guard let key = selectedKey else { return nil }
             if openArchive { return .archive(key) }
@@ -636,7 +638,11 @@ final class RemoteModel {
                 openWorkflow = nil
                 openArchive = false
                 openReview = id
-            case .resources, .events, .runtimes, .work:
+            case .resources, .events, .runtimes:
+                openActivity = newValue
+            case .work(let kind):
+                // The list's row: its list, or the place in it still open (#4004).
+                if workPlace.kind != kind { workHistory.go(WorkPlace(kind: kind)) }
                 openActivity = newValue
             case .archive(let key):
                 // The folder's archive page (#495, #498), with what is opened from it

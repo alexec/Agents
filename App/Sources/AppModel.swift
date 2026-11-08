@@ -584,7 +584,7 @@ final class AppModel {
             if showsSpending { return .spending }
             if showsTokens { return .tokens }
             if showsTime { return .time }
-            if showsWork { return .work }
+            if showsWork { return .work(workPlace.kind) }
             if showsDocs { return .docs }
             // Nothing else open is the Multiplier page (#3986), as the detail draws it.
             guard let key = selectedFolderKey else { return selection == nil && !composing ? .multiplier : nil }
@@ -632,8 +632,9 @@ final class AppModel {
                 showsTokens = true
             case .time:
                 showsTime = true
-            case .work:
-                showsWork = true
+            case .work(let kind):
+                // The list's row: its list, or the place in it still open.
+                showWork(workPlace.kind == kind ? workPlace : WorkPlace(kind: kind))
             case .docs:
                 showDocs(docsHistory.current ?? DocsPlace())
             case .resources:

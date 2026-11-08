@@ -8,12 +8,6 @@ import SwiftUI
 /// window and the Remote (#3256): on a phone the filters scroll sideways and a row wraps.
 struct WorkView: View {
     let model: any WorkModel
-    #if os(iOS)
-    @Environment(\.horizontalSizeClass) private var sizeClass
-    private var compact: Bool { sizeClass == .compact }
-    #else
-    private let compact = false
-    #endif
 
     var body: some View {
         let place = model.workPlace
@@ -26,9 +20,9 @@ struct WorkView: View {
                 WorkListPane(model: model, kind: place.kind, list: model.workLists[place.kind]).id(place.kind)
             }
         }
-        .navigationTitle(place.ref == nil ? "Work" : place.kind.title)
+        // The list's own title: its row in the sidebar chose it (#4004).
+        .navigationTitle(place.kind.title)
         #if os(iOS)
-        // The kind is in the bar already: no large title over the filters.
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .toolbar {
@@ -40,24 +34,7 @@ struct WorkView: View {
                     .disabled(!model.workHistory.canGoForward)
                     .help("Forward")
             }
-            ToolbarItem(placement: .principal) {
-                Picker("Show", selection: Binding(get: { place.kind }, set: { model.showWork(WorkPlace(kind: $0)) })) {
-                    ForEach(Self.kinds) { Text($0.title).tag($0) }
-                }
-                .labelsHidden()
-                .workKindPickerStyle(compact: compact)
-                .fixedSize()
-            }
         }
-    }
-
-    /// Work's lists. Features is Mac + web (#3269): the Remote has not got it.
-    private static var kinds: [WorkList.Kind] {
-        #if os(iOS)
-        WorkList.Kind.allCases.filter { $0 != .feature }
-        #else
-        WorkList.Kind.allCases
-        #endif
     }
 
     /// Back and Forward: beside the window's title on the Mac, at the bar's end on the Remote,
@@ -71,11 +48,26 @@ struct WorkView: View {
     }
 }
 
-private extension View {
-    /// Work's kinds as segments, or as a menu where a phone has no room for four.
-    @ViewBuilder
-    func workKindPickerStyle(compact: Bool) -> some View {
-        if compact { pickerStyle(.menu) } else { pickerStyle(.segmented) }
+extension WorkList.Kind {
+    /// The list's row in the sidebar's Work group (#4004), in the accent as the other rows.
+    var sidebarIcon: String {
+        switch self {
+        case .issue: "smallcircle.filled.circle"
+        case .pr: "arrow.triangle.pull"
+        case .feature: "sparkles"
+        case .milestone: "flag"
+        case .release: "shippingbox"
+        }
+    }
+
+    var sidebarHelp: String {
+        switch self {
+        case .issue: "Every issue in your folders’ repos, and what agents spent on each"
+        case .pr: "Every pull request in your folders’ repos, and what agents spent on each"
+        case .feature: "Each feature label on your epics, with its epics and their leads"
+        case .milestone: "The milestones lineage knows, and what their work cost"
+        case .release: "The releases lineage knows, and what went into each"
+        }
     }
 }
 
