@@ -3467,6 +3467,11 @@
     {
       "name": "machines/update",
       "x-capability": "machines/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {

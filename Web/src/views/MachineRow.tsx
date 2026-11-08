@@ -6,8 +6,10 @@ import { useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import type { Store } from "../model/store";
 import { deleteQuestion, machineActions, machineDot, machineSwipes, removeQuestion, swipeDistance } from "../model/machineRow";
+import { machineSheets } from "../model/machineSheets";
 import { placedSessions } from "../model/overview";
 import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
+import { MachineSheetDialog, type MachineSheet } from "./MachineSheets";
 import { chooseSettingsMachine } from "./settings/SettingsMachine";
 import { go } from "../route";
 
@@ -27,11 +29,14 @@ export function MachineRow({ store, host, on, open, mark, children }: {
   const dx = useSignal(0);
   const from = useRef<{ x: number; y: number; across: boolean } | null>(null);
   const swiped = useRef(false);
+  // Update…, Choose Folders… or Link to Provider…, open from the menu (#4122).
+  const sheet = useSignal<MachineSheet | null>(null);
   if (!row) return null;
   const mac = host === store.macHostID.value;
   const name = mac ? "This Mac" : row.name;
   const actions = machineActions(row, store.macHostID.value);
   const swipes = machineSwipes(actions);
+  const sheets = machineSheets(row, store.macHostID.value, store.hostIsOnline(host));
   const dot = machineDot(row, store.hostIsOnline(host), store.hostsBeingStarted.value.includes(host));
 
   const stop = async () => {
@@ -60,8 +65,11 @@ export function MachineRow({ store, host, on, open, mark, children }: {
     // As Settings ▸ Machines has them (#3979).
     ...(mac ? [] : [
       { label: "Check Again", run: () => void store.checkAgain(host) },
+      ...(sheets.update ? [{ label: "Update…", run: () => (sheet.value = "update") }] : []),
+      ...(sheets.folders ? [{ label: "Choose Folders…", disabled: !sheets.foldersReady, run: () => (sheet.value = "folders") }] : []),
       { label: "Backups…", disabled: !store.hostIsOnline(host), run: () => openSettings(host, "settings-server-backups") },
       { label: "Processes…", disabled: !store.hostIsOnline(host), run: () => openSettings(host, "settings-processes") },
+      ...(sheets.link ? [{ label: "Link to Provider…", run: () => (sheet.value = "link") }] : []),
     ]),
     ...(actions.delete ? [{ label: `Delete ${row.name}…`, run: run.delete }] : []),
     ...(actions.remove ? [{ label: `Remove ${row.name}…`, run: run.remove }] : []),
@@ -94,26 +102,30 @@ export function MachineRow({ store, host, on, open, mark, children }: {
   const hold = holdForMenu(items);
   const shown = dx.value > 0 ? swipes.leading : dx.value < 0 ? swipes.trailing : null;
 
+  // The sheet is beside the row, not in it, so its pointer events are not the row's swipes and holds.
   return (
-    <div class={`machine-row${dx.value ? " swiping" : ""}`}
-      onPointerDown={(e) => { swipe.onPointerDown(e); hold.onPointerDown(e); }}
-      onPointerMove={(e) => { swipe.onPointerMove(e); hold.onPointerMove(e); }}
-      onPointerUp={() => { swipe.onPointerUp(); hold.onPointerUp(); }}
-      onPointerCancel={() => { swipe.onPointerCancel(); hold.onPointerCancel(); }}>
-      {shown && <span class={`machine-swipe ${shown} ${dx.value > 0 ? "leading" : "trailing"}`} aria-hidden="true">{swipeWords[shown]}</span>}
-      <div class="machine-row-body" style={dx.value ? { transform: `translateX(${dx.value}px)` } : undefined}>
-        <button type="button" class={`sub-app-row${on ? " on" : ""}`} aria-current={on ? "page" : undefined}
-          onClick={() => { if (swiped.current) { swiped.current = false; return; } open(); }}
-          onContextMenu={(e) => openContextMenu(e, items())}
-          onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, items()); }}>
-          <span class="machine-name"><span class={`machine-dot ${dot}`} aria-hidden="true" />{name}</span>
-          {mark}
-        </button>
-        {!mac && <button type="button" class="machine-more" aria-label={`More for ${name}`}
-          onClick={(e) => openContextMenu(e, items())}>···</button>}
-        {children}
+    <>
+      <div class={`machine-row${dx.value ? " swiping" : ""}`}
+        onPointerDown={(e) => { swipe.onPointerDown(e); hold.onPointerDown(e); }}
+        onPointerMove={(e) => { swipe.onPointerMove(e); hold.onPointerMove(e); }}
+        onPointerUp={() => { swipe.onPointerUp(); hold.onPointerUp(); }}
+        onPointerCancel={() => { swipe.onPointerCancel(); hold.onPointerCancel(); }}>
+        {shown && <span class={`machine-swipe ${shown} ${dx.value > 0 ? "leading" : "trailing"}`} aria-hidden="true">{swipeWords[shown]}</span>}
+        <div class="machine-row-body" style={dx.value ? { transform: `translateX(${dx.value}px)` } : undefined}>
+          <button type="button" class={`sub-app-row${on ? " on" : ""}`} aria-current={on ? "page" : undefined}
+            onClick={() => { if (swiped.current) { swiped.current = false; return; } open(); }}
+            onContextMenu={(e) => openContextMenu(e, items())}
+            onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, items()); }}>
+            <span class="machine-name"><span class={`machine-dot ${dot}`} aria-hidden="true" />{name}</span>
+            {mark}
+          </button>
+          {!mac && <button type="button" class="machine-more" aria-label={`More for ${name}`}
+            onClick={(e) => openContextMenu(e, items())}>···</button>}
+          {children}
+        </div>
       </div>
-    </div>
+      {sheet.value && <MachineSheetDialog store={store} host={row} sheet={sheet.value} close={() => (sheet.value = null)} />}
+    </>
   );
 }
 

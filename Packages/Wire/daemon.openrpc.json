@@ -4042,6 +4042,11 @@
     {
       "name": "folders/find",
       "x-capability": "folders/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {

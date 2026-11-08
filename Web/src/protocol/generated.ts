@@ -12321,6 +12321,7 @@ export interface Methods {
   "folders/clone": { params: CloneRequest; result: FolderSummary };
   "folders/clones": { params: Empty; result: CloneSummary[] };
   "folders/delete": { params: FolderRequest; result: Empty };
+  "folders/find": { params: FoldersFindRequest; result: FoundFolder[] };
   "folders/keepGuardedChange": { params: GuardedChangeRequest; result: FolderSummary };
   "folders/list": { params: FoldersListRequest; result: FolderSummary[] };
   "folders/notCommitted": { params: FolderRequest; result: NotCommittedResponse };
@@ -12400,6 +12401,7 @@ export interface Methods {
   "machines/startEnroll": { params: MachineEnroll; result: ControlCodeShown };
   "machines/stop": { params: MachineStop; result: ControlMachine };
   "machines/unlink": { params: MachineRequest; result: ControlMachine };
+  "machines/update": { params: MachineUpdate; result: JSONValue };
   "marketplaces/list": { params: MarketplacesListRequest; result: MarketplacesListAnswer };
   "mcp/health": { params: Empty; result: MCPHealthSnapshot };
   "mcp/health/check": { params: MCPHealthCheckRequest; result: MCPHealthSnapshot };
@@ -12719,6 +12721,7 @@ export const MethodTarget = {
   "folders/clone": "host",
   "folders/clones": "host",
   "folders/delete": "host",
+  "folders/find": "host",
   "folders/keepGuardedChange": "host",
   "folders/list": "host",
   "folders/notCommitted": "host",
@@ -12798,6 +12801,7 @@ export const MethodTarget = {
   "machines/startEnroll": "control",
   "machines/stop": "control",
   "machines/unlink": "control",
+  "machines/update": "control",
   "marketplaces/list": "host",
   "mcp/health": "host",
   "mcp/health/check": "host",

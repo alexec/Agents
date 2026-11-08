@@ -92,6 +92,8 @@ const slowCallTimeout: Readonly<Record<string, number>> = {
   "agents/import": 10 * 60_000,
   // Add as Machine… (#3377): the control plane installs Agents over ssh, about 2 min on a codespace.
   "machines/install": 15 * 60_000,
+  // Update… (#4122): copied over the same ssh, and the machine started again.
+  "machines/update": 15 * 60_000,
   // Link to Machine… (#3379) fetches the machine's ssh host key first, up to a minute.
   "machines/link": 2 * 60_000,
   // Move to Machine… (#3790) sends the session's branch there first, through the control plane.
