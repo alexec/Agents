@@ -59,10 +59,11 @@ func (d *Daemon) pauseScreen(agent wire.UUID) {
 	d.pauses[agent] = &screenPause{done: make(chan struct{})}
 	app := d.screenApps[agent]
 	d.driveMu.Unlock()
+	// The notice first: a client that sees the pause on the record finds its notice too.
+	d.postPauseNotice(agent, app)
 	d.change(agent, func(a *wire.Agent) {
 		a.DesktopControlPause = &wire.DesktopControlPause{App: app, PausedAt: now()}
 	})
-	d.postPauseNotice(agent, app)
 }
 
 // pauseNoticePrefix starts a pause notice's id; the rest is the agent's id.
