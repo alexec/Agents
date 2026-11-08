@@ -56,7 +56,8 @@ for (const { name, input, expected } of cases("labels/policy.json")) {
 for (const { name, input, expected } of cases("labels/query.json")) {
   test(`query: ${name}`, () => {
     const query = labels.parseQuery(input.query);
-    assert.deepEqual({ ...query, matches: labels.queryMatches(query, input.agent) }, expected);
+    const onIssue = Object.fromEntries((input.onIssue ?? []).map((id) => [id, { kind: "issue", ref: "github:o/r#9" }]));
+    assert.deepEqual({ ...query, matches: labels.queryMatches({ ...query, onIssue }, input.agent) }, expected);
   });
 }
 

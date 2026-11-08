@@ -1597,11 +1597,22 @@ final class AppModel {
         searchNext = [:]
         work.forget(earlier)
         work.saidLines = [:]
+        work.issueSessions = [:]
         guard !words.isEmpty else { return }
         let request = DaemonAPI.ListRequest(archivedCommands: false, limit: Self.searchShown, lean: true, query: words)
         let hosts: [MachineRef] = (hasMacHost ? [.mac] : []) + self.hosts.servers.filter { !hostUnreachable($0) }
+        let issue = SessionLabelQuery.issue(in: words)
         for host in hosts {
             await search(request, on: host)
+            // The sessions on the issue, its sub-issues and their PRs (#3899). A host too old to
+            // say matches the #<n> label only.
+            if let issue, self.host(host, has: Capability.lineageSessions1),
+               let on = try? await client(for: host).call(DaemonAPI.Method.lineageSessions,
+                                                          DaemonAPI.LineageSessionsRequest(number: issue),
+                                                          returning: DaemonAPI.LineageSessions.self),
+               !Task.isCancelled {
+                for match in on.matches { work.issueSessions[match.agentID] = match.on }
+            }
             // What was said (#1585): the sessions whose prompts or replies hold the words. Not
             // asked of a host too old to say (#1748).
             if self.host(host, has: Capability.agentsSaid1),

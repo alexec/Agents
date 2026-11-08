@@ -85,7 +85,7 @@ test("smart groups gather by what a session wants, newest started first (#495)",
   assert.deepEqual(smartAgents("needsYou", live).map((a) => a.id), ["asked"]);
   assert.deepEqual(smartAgents("working", live).map((a) => a.id), ["new-work", "old-work"], "by start, not activity");
   assert.deepEqual(smartAgents("unread", live).map((a) => a.id), ["unread"]);
-  assert.deepEqual(smartAgents("working", live, { label: null, text: "old" }).map((a) => a.id), ["old-work"], "a search narrows it");
+  assert.deepEqual(smartAgents("working", live, { label: null, issue: null, text: "old" }).map((a) => a.id), ["old-work"], "a search narrows it");
   assert.deepEqual(live.map(sessionMark), ["needsYou", "working", "working", "done", "done"], "one ring, read or not (#1323)");
   assert.equal(sessionMark(agent("paused", 1, { state: "stopped", endedReason: "cancelled" })), "paused", "in the accent (#630)");
   assert.equal(sessionMark(agent("queued", 1, { state: "queued" })), "queued", "its own mark (#630)");

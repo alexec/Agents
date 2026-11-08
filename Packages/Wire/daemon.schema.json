@@ -12514,6 +12514,55 @@
       ],
       "additionalProperties": false
     },
+    "LineageSessionMatch": {
+      "type": "object",
+      "description": "A session on the issue, and the issue it is on: the one asked for, or one of its sub-issues. A session on a PR is on the issue the PR fixes.",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "on": {
+          "$ref": "#/definitions/LineageNode"
+        }
+      },
+      "required": [
+        "agentID",
+        "on"
+      ],
+      "additionalProperties": false
+    },
+    "LineageSessions": {
+      "type": "object",
+      "description": "The sessions on this machine that lineage links to the issue, to its sub-issues or to their PRs, each once. limited says there were more sub-issues or sessions than are counted.",
+      "properties": {
+        "matches": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LineageSessionMatch"
+          }
+        },
+        "limited": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "matches"
+      ],
+      "additionalProperties": false
+    },
+    "LineageSessionsRequest": {
+      "type": "object",
+      "description": "lineage/sessions (#3899): a session search for #<number> asks for the sessions on that issue, on the issues part-of it (its sub-issues, at most 100) and on the PRs that fix them. The issue is #<number> in the forge repo of each of this machine's folders.",
+      "properties": {
+        "number": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "number"
+      ],
+      "additionalProperties": false
+    },
     "ListCursor": {
       "type": "object",
       "properties": {
