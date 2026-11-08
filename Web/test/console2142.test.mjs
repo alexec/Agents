@@ -44,11 +44,11 @@ test("search finds pages, machines and sessions by name, the best first", () => 
   const sessions = [placed(studio, "api", "s1", "Fix login redirect"), placed(studio, "web", "s2", "Runtime badge")];
   const found = search.searchFound("run", true, [studio, host("m2", "runner-01")], sessions);
   assert.deepEqual(found.map((f) => [f.kind, f.title, f.detail]), [
-    ["page", "Runtimes", "Reports"], ["page", "Runtimes", "Your setup"], ["machine", "runner-01", "Machine · macOS"], ["session", "Runtime badge", "web · Studio"]],
+    ["page", "Runtimes", "Reports"], ["page", "Runtimes", "Status"], ["machine", "runner-01", "Machine · macOS"], ["session", "Runtime badge", "web · Studio"]],
   "names starting with the words, pages before machines before sessions");
   assert.deepEqual(found.find((f) => f.kind === "session").to, { host: "m1", folder: "file:///web/", session: "s2" });
   assert.deepEqual(found.find((f) => f.kind === "machine").to, { nav: "machines" });
-  assert.deepEqual(found.find((f) => f.title === "Runtimes" && f.detail === "Your setup").to, { nav: "setup", section: "runtimes" });
+  assert.deepEqual(found.find((f) => f.title === "Runtimes" && f.detail === "Status").to, { nav: "status", section: "runtimes" });
 });
 
 test("search matches a word inside a name, and says nothing for no words", () => {
@@ -74,8 +74,8 @@ test("search lists at most eight", () => {
 test("a page's breadcrumb is its section, then the page; a page named as its section is one part", () => {
   assert.deepEqual(crumbs.pageCrumbs("machines", "Runtimes"), [{ title: "Machines", to: { nav: "machines" } }, { title: "Runtimes" }]);
   assert.deepEqual(crumbs.pageCrumbs("machines", "Machines"), [{ title: "Machines" }]);
-  assert.equal(crumbs.sectionOfActivity("runtimes"), "setup");
-  assert.equal(crumbs.sectionOfActivity("events"), "reports");
+  assert.equal(crumbs.sectionOfActivity("runtimes"), "status");
+  assert.equal(crumbs.sectionOfActivity("events"), "status");
   assert.equal(crumbs.sectionOfActivity("spending"), undefined, "Usage's panes are drawn in Usage");
 });
 

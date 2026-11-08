@@ -2,7 +2,7 @@
 // /w/<workflow> for a workflow's page in the chat's place (#98), /ar/1 for the folder's archive (#499),
 // /rv/<kind:key> for a change waiting for an OK, on its Review page (#1472),
 // The page is by section (#2141): #/ is the Overview, #/agents the sidebar with nothing chosen, and
-// #/<section>/<page> a page of another section (#/setup/runtimes, #/reports/spend, #/settings/policy),
+// #/<section>/<page> a page of another section (#/status/runtimes, #/reports/spend, #/settings/policy),
 // and #/<section>/<page>/<item> one item on it: #/work/pr/github%3Aalexec%2FAgents%2399 is PR #99 (#3119),
 // and #/docs/<ref> a doc's page (#3321).
 // The addresses before it, #/console/<page> (#1804) and #/a/<page> (#151), are read as their new place.
@@ -64,11 +64,20 @@ export function parseRoute(hash: string): Route {
     if (moved.section) r.section = moved.section;
     return r;
   }
+  // Your setup (#3630) went (#3998): Runtimes to Status, its connectors, secrets and accounts to Settings ▸ You.
+  if (first === "setup") {
+    const page = section === undefined ? undefined : decodeURIComponent(section);
+    return page === "mcp" || page === "secrets" || page === "accounts" ? { nav: "settings", section: page } : { nav: "status", section: "runtimes" };
+  }
   if (first && first !== "overview" && (navSections as readonly string[]).includes(first)) {
     const nav = first as Exclude<NavSection, "overview">;
     if (!section) return { nav };
-    // Runtimes (#3631) and Connectors (#3632) moved from Machines to Your setup: an old link still opens them.
-    if (nav === "machines" && (section === "runtimes" || section === "mcp")) return { nav: "setup", section };
+    // Runtimes (#3631) and Connectors (#3632) moved from Machines, then to Status and Settings ▸ You (#3998): an old link
+    // still opens them.
+    if (nav === "machines" && section === "runtimes") return { nav: "status", section };
+    if (nav === "machines" && section === "mcp") return { nav: "settings", section };
+    // Events left Reports ▸ Records for Status (#3998).
+    if (nav === "reports" && section === "events") return { nav: "status", section };
     // A doc's page is #/docs/<ref> (spec 3319): Docs has one page, so the ref takes its place.
     if (nav === "docs" && !item && section !== "docs") return { nav, section: "docs", item: decodeURIComponent(section) };
     return item ? { nav, section: decodeURIComponent(section), item: decodeURIComponent(item) } : { nav, section: decodeURIComponent(section) };
@@ -136,7 +145,8 @@ function sectionHash(r: Route): string {
 /** Whether an address is one from before #2141, or Machines ▸ Runtimes or Connectors from before #3631 and #3632, which the page writes
  * again as its new place. */
 export function isOldAddress(hash: string): boolean {
-  return /^#\/?(console|a)(\/|$)/.test(hash) || /^#\/?machines\/(runtimes|mcp)$/.test(hash);
+  return /^#\/?(console|a|setup)(\/|$)/.test(hash) || /^#\/?machines\/(runtimes|mcp)$/.test(hash)
+    || /^#\/?reports\/events$/.test(hash);
 }
 
 /** The section a route is in: Agents for a host's places, the Overview for none. */

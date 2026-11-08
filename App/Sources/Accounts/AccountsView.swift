@@ -1,10 +1,10 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Your setup ▸ Accounts (#3967): the person's outside accounts (gitlab.com, AWS, Slack…), the
-/// accounts part of their settings, which the control plane keeps and sends to each machine of
-/// theirs as it does their secrets (#1760). A record holds no secret, only the name of one in
-/// Your setup ▸ Secrets. Agents read and add them with manage_accounts. The web page draws the
+/// Settings ▸ You ▸ Accounts (#3967, #3998; was Settings ▸ You ▸ Accounts): the person's outside
+/// accounts (gitlab.com, AWS, Slack…), the accounts part of their settings, which the control
+/// plane keeps and sends to each machine of theirs as it does their secrets (#1760). A record holds no secret, only the name of one in
+/// Settings ▸ You ▸ Secrets. Agents read and add them with manage_accounts. The web page draws the
 /// same in `Web/src/views/Accounts.tsx`.
 struct AccountsView: View {
     @Environment(AppModel.self) private var model
@@ -99,16 +99,6 @@ struct AccountsView: View {
         let failed = await state.set(.accounts, to: value, on: control)
         if adding == nil { problem = failed }
         return failed
-    }
-}
-
-struct AccountsRow: View {
-    var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(AccountsWords.title).foregroundStyle(.primary)
-            Spacer()
-        }
-        .help("Your outside accounts, for every machine and agent of yours")
     }
 }
 

@@ -1,7 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Your setup (#3630, #3631): every runtime once, where its allowance stands, its accounts,
+/// Status ▸ Runtimes (#3998; was Your setup, #3630, #3631): every runtime once, where its allowance stands, its accounts,
 /// and a line per machine that says whether it is installed and signed in there, each to that
 /// machine's page (#3626). The accounts and allowances are This Mac's, where accounts are added
 /// and signed in (#2257); what a machine installs is on its page (#3629). It was Status ▸
@@ -364,7 +364,7 @@ private struct RuntimeStatusRow<Actions: View>: View {
     private var isOut: Bool { allowance?.state.isOut == true && allowance?.unusable == nil }
 }
 
-/// The sidebar's way into Your setup (065, #3631). It says how many runtimes on this
+/// The sidebar's way into Status ▸ Runtimes (065, #3631). It says how many runtimes on this
 /// Mac can start a turn, out of how many are installed (#379), and a red dot only when
 /// none can: one being out does not matter, the work goes on on the others.
 struct RuntimesRow: View {

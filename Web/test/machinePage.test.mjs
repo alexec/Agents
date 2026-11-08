@@ -13,7 +13,7 @@ test("each machine is a page after Machines ▸ Machines, the Mac first", () => 
     ["machines", "machine-m", "machine-a", "machine-b"]);
   assert.equal(n.openPage("machines", "machine-a", false, more).draw.host, "a");
   assert.equal(n.openPage("machines", "machine-gone", false, more).id, "machines", "a machine gone opens the list");
-  assert.deepEqual(n.pagesShown("machines", false).map((p) => p.id), ["machines"], "no machines, no pages; Connectors is in Your setup (#3632)");
+  assert.deepEqual(n.pagesShown("machines", false).map((p) => p.id), ["machines"], "no machines, no pages; Connectors is in Settings ▸ You (#3998)");
 });
 
 test("a disk says free of total, and its level", () => {

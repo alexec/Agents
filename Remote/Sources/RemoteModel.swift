@@ -657,10 +657,10 @@ final class RemoteModel {
                 openWorkflow = nil
                 openReview = nil
                 openArchive = true
-            case .multiplier, .spending, .tokens, .time, .mcpServers, .secrets, .accounts,
+            case .multiplier, .spending, .tokens, .time,
                  .folderMCPServers, .docs, .machine:
-                // Usage, connectors, secrets, accounts, Docs and a machine's page are Mac + web
-                // (#2798, #3321, #3626, #3632, #3967), and the Multiplier page the Mac's (#3986):
+                // Usage, a folder's connectors, Docs and a machine's page are Mac + web
+                // (#2798, #3321, #3626), and the Multiplier page the Mac's (#3986):
                 // the Remote opens none of them.
                 break
             }

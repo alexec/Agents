@@ -17468,7 +17468,7 @@
     },
     "OutsideAccount": {
       "type": "object",
-      "description": "Your setup ▸ Accounts (#3967): one outside account of the person's (gitlab.com, AWS, Slack…). It holds no secret: card and secret are the names of secrets in Your setup ▸ Secrets, or where one is.",
+      "description": "Settings ▸ You ▸ Accounts (#3967): one outside account of the person's (gitlab.com, AWS, Slack…). It holds no secret: card and secret are the names of secrets in Settings ▸ You ▸ Secrets, or where one is.",
       "properties": {
         "service": {
           "type": "string",
@@ -17488,11 +17488,11 @@
         },
         "card": {
           "type": "string",
-          "description": "The card it bills, by its name in Your setup ▸ Secrets. Never the number."
+          "description": "The card it bills, by its name in Settings ▸ You ▸ Secrets. Never the number."
         },
         "secret": {
           "type": "string",
-          "description": "Its token or key, by its name in Your setup ▸ Secrets or where it is. Never the value."
+          "description": "Its token or key, by its name in Settings ▸ You ▸ Secrets or where it is. Never the value."
         },
         "twoFactor": {
           "type": "string",
@@ -24177,7 +24177,7 @@
     },
     "SecretNeedsApprovalRequest": {
       "type": "object",
-      "description": "secrets/setNeedsApproval (#4014): a person turns Ask before use on or off for a secret of this machine's secrets.env, or for one session's (agentID). On takes the value out of the plain file and seals it to this machine; off puts it back. A Your setup secret's flag is its client's to seal, so it is refused here.",
+      "description": "secrets/setNeedsApproval (#4014): a person turns Ask before use on or off for a secret of this machine's secrets.env, or for one session's (agentID). On takes the value out of the plain file and seals it to this machine; off puts it back. The flag of a secret of the person's (Settings ▸ You ▸ Secrets) is its client's to seal, so it is refused here.",
       "properties": {
         "name": {
           "type": "string"

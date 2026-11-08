@@ -6917,9 +6917,9 @@ export interface OrgRoutesMine {
 }
 
 /**
- * Your setup ▸ Accounts (#3967): one outside account of the person's (gitlab.com, AWS, Slack…). It
- * holds no secret: card and secret are the names of secrets in Your setup ▸ Secrets, or where one
- * is.
+ * Settings ▸ You ▸ Accounts (#3967): one outside account of the person's (gitlab.com, AWS, Slack…).
+ * It holds no secret: card and secret are the names of secrets in Settings ▸ You ▸ Secrets, or
+ * where one is.
  */
 export interface OutsideAccount {
   /** The service, as its address: gitlab.com, aws.amazon.com. */
@@ -6930,9 +6930,9 @@ export interface OutsideAccount {
   plan?: string;
   /** What it costs a month, in US dollars. Absent when not known. */
   monthlyCostUsd?: number;
-  /** The card it bills, by its name in Your setup ▸ Secrets. Never the number. */
+  /** The card it bills, by its name in Settings ▸ You ▸ Secrets. Never the number. */
   card?: string;
-  /** Its token or key, by its name in Your setup ▸ Secrets or where it is. Never the value. */
+  /** Its token or key, by its name in Settings ▸ You ▸ Secrets or where it is. Never the value. */
   secret?: string;
   /** TOTP, passkey, SMS, or absent for none. */
   twoFactor?: string;
@@ -9621,8 +9621,8 @@ export interface SecretLeftOn {
 /**
  * secrets/setNeedsApproval (#4014): a person turns Ask before use on or off for a secret of this
  * machine's secrets.env, or for one session's (agentID). On takes the value out of the plain file
- * and seals it to this machine; off puts it back. A Your setup secret's flag is its client's to
- * seal, so it is refused here.
+ * and seals it to this machine; off puts it back. The flag of a secret of the person's (Settings ▸
+ * You ▸ Secrets) is its client's to seal, so it is refused here.
  */
 export interface SecretNeedsApprovalRequest {
   name: string;

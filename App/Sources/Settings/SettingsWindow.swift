@@ -5,7 +5,7 @@ import SwiftUI
 /// The Settings window (055, look/ frames A–G): one rail down the left and the chosen pane
 /// beside it. It opens at one size for every pane, so choosing another never makes the
 /// window jump, and it can be resized larger than that. The rail has one row for each pane
-/// (#1076), grouped by subject (#2157): This app, Agents (#2957), Machines and Control plane. Agent Runtimes,
+/// (#1076), grouped by subject (#2157): You (#3998), This app, Agents (#2957), Machines and Control plane. Agent Runtimes,
 /// Agent Configuration and Machines list their own pages in a column inside the pane.
 struct SettingsWindow: View {
     @Environment(AppModel.self) private var model
@@ -58,7 +58,7 @@ struct SettingsWindow: View {
                                            guard next != pane.wrappedValue else { return }
                                            $leaving.leave(unsaved: unsaved) { pane.wrappedValue = next }
                                        }),
-                         shows: shows)
+                         shows: shows, warning: warning)
             Divider()
             VStack(alignment: .leading, spacing: 0) {
                 // A pane of this Mac's own things, with no host on this Mac (#1503): what is
@@ -159,8 +159,16 @@ struct SettingsWindow: View {
         case .signIn: control != nil && model.people.you?.isAdmin == true
         // An admin's: a member sees only themselves, so no bots (#2132).
         case .bots: control != nil && model.people.you?.isAdmin == true
+        // The control plane keeps them (#1760): no row without one.
+        case .secrets, .accounts: control != nil
         default: true
         }
+    }
+
+    /// What a pane's rail row warns of, as its warning sign: Connectors' that one of the
+    /// person's own does not answer, or a connection ended (#3998, was the sidebar's red icon).
+    private func warning(_ each: SettingsPane) -> String? {
+        each == .connectors ? model.connectorsWarning : nil
     }
 
     /// The part this pane edits, so it can state its fixed scope (#2410).
@@ -183,6 +191,10 @@ struct SettingsWindow: View {
     @ViewBuilder
     private var content: some View {
         switch pane.wrappedValue {
+        // The person's own (#3998), from the sidebar's Your setup (#3632, #3967).
+        case .connectors: MCPServersView()
+        case .secrets: SecretsView()
+        case .accounts: FormColumn { AccountsView() }
         case .appearance: FormColumn { Form { AppearanceSettingsView() }.paperForm() }
         // The archive switch is a rule of Agents ▸ Policy now (#2957, FR-023).
         case .sidebar: FormColumn { Form { SidebarSettingsSection() }.paperForm() }
@@ -260,6 +272,9 @@ struct SettingsWindow: View {
 extension SettingsScope {
     var panes: [SettingsPane] {
         switch self {
+        // The person's own, on every machine of theirs (#3998): not one machine's, this app's
+        // or the control plane's. Secrets has For One Session after it, on its page.
+        case .you: [.connectors, .secrets, .accounts]
         // How this app draws: Sidebar is kept on the Mac's host so every client draws the
         // same (#1033, #2079), but its subject is the app (#2157).
         // Notifications' limits are rules of Agents ▸ Policy now (#2957, FR-023).
@@ -312,6 +327,9 @@ enum SettingsPane: String, Hashable, CaseIterable {
     case signIns
     /// Was Shared (#754): the raw value is what a window left open on it kept.
     case agentConfiguration = "shared"
+    /// The person's own connectors (#589, #753), their secrets and cards (#1760) and their
+    /// outside accounts (#3967): Settings ▸ You (#3998), from the sidebar's Your setup (#3632).
+    case connectors, secrets, accounts
 
     /// A pane of what this Mac's host keeps: its runtimes, settings, cost and resources.
     /// Machines is one only on its This Mac page.
@@ -319,14 +337,14 @@ enum SettingsPane: String, Hashable, CaseIterable {
         switch self {
         case .runtimes, .agentConfiguration, .spending, .resources, .browser: true
         case .appearance, .sidebar, .agentsPolicy, .voice, .account, .machines, .controlPlane, .providers, .clients, .people, .bots, .groups,
-             .channels, .signIn, .signIns, .policy: false
+             .channels, .signIn, .signIns, .policy, .connectors, .secrets, .accounts: false
         }
     }
 
     /// A pane drawn only with a control plane to show: a window left on one moves away when
     /// the Mac is forgotten (#2258).
     var needsControlPlane: Bool {
-        [.controlPlane, .providers, .clients, .signIns, .people, .bots, .groups, .channels, .signIn, .policy]
+        [.controlPlane, .providers, .clients, .signIns, .people, .bots, .groups, .channels, .signIn, .policy, .secrets, .accounts]
             .contains(self)
     }
 
@@ -353,6 +371,9 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .signIn: SignInWords.paneTitle
         case .policy: OrgPolicyWords.title
         case .signIns: SignInWords.signInsTitle
+        case .connectors: "Connectors"
+        case .secrets: UserScopeWords.secretsTitle
+        case .accounts: AccountsWords.title
         }
     }
 
@@ -379,6 +400,9 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .signIn: SignInWords.paneSymbol
         case .policy: OrgPolicyWords.symbol
         case .signIns: "person.badge.key"
+        case .connectors: "server.rack"
+        case .secrets: "key"
+        case .accounts: "person.crop.rectangle.stack"
         }
     }
 }
@@ -500,6 +524,7 @@ private struct FormColumn<Content: View>: View {
 private struct SettingsRail: View {
     @Binding var pane: SettingsPane
     let shows: (SettingsPane) -> Bool
+    let warning: (SettingsPane) -> String?
 
     var body: some View {
         // Scrolls (#1077): the rows are taller than a small window or large text leaves room for.
@@ -529,7 +554,8 @@ private struct SettingsRail: View {
 
     private func paneItem(_ each: SettingsPane) -> some View {
         let lit = pane == each
-        return RailButton(lit: lit, label: each.title,
+        let warns = warning(each)
+        return RailButton(lit: lit, label: [each.title, warns].compactMap { $0 }.joined(separator: ", "),
                           selected: lit, action: { pane = each }) {
             HStack(spacing: 8) {
                 Image(systemName: each.symbol)
@@ -538,8 +564,14 @@ private struct SettingsRail: View {
                     .accessibilityHidden(true)
                 Text(each.title).lineLimit(1)
                 Spacer()
+                if warns != nil {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(lit ? AnyShapeStyle(.white) : StateTint.failure.style(or: .secondary))
+                        .accessibilityHidden(true)
+                }
             }
         }
+        .help(warns ?? "")
     }
 }
 

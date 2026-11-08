@@ -194,7 +194,7 @@ export function isInstalled(status: RuntimeStatus): boolean {
 }
 
 /**
- * One runtime on Your setup ▸ Runtimes (#3631): shown once, not once per machine. Its accounts,
+ * One runtime on Status ▸ Runtimes (#3631): shown once, not once per machine. Its accounts,
  * allowances and Reaches the Model By are read on its home machine: the Mac when it lists the
  * runtime (accounts are added and signed in there, #2257), else the first machine that does. Then
  * a line per machine, the Mac first and the others by name, as Machines lists them (#3626).
@@ -227,7 +227,7 @@ export function setupRuntimes(hosts: readonly { id: string; name: string }[], ma
 export interface MachinesPart { words: string; hosts: string[] }
 
 /**
- * A runtime's machines on Your setup in one line (#3744), RuntimeMachinesSummary on the Mac: "On all 3
+ * A runtime's machines on Status ▸ Runtimes in one line (#3744), RuntimeMachinesSummary on the Mac: "On all 3
  * machines", or "On This Mac · Not on build-box". `inUse` is installed, or being installed, somewhere.
  */
 export function machinesSummary(machines: readonly { host: string; status?: RuntimeStatus }[],
@@ -283,13 +283,13 @@ export const machineSignInWords = {
  * Settings ▸ Agent Runtimes and Runtimes; with none, the machines' own rows on this page.
  */
 export function runtimesHint(hasMac: boolean): string {
-  return hasMac ? "Install a runtime on the Mac, in Settings ▸ Agent Runtimes. Sign it in on the Mac, in Your setup."
+  return hasMac ? "Install a runtime on the Mac, in Settings ▸ Agent Runtimes. Sign it in on the Mac, in Status."
     : "Runtimes run on your machines: add one in Settings ▸ Machines, with Add a Machine…. "
       + "Sign Claude or Codex in on a machine with Sign In… in its row.";
 }
 
 /** Where an added account is signed in: the Mac's Runtimes page (#2255). */
-export const signInOnTheMac = "Sign it in on the Mac, in Your setup.";
+export const signInOnTheMac = "Sign it in on the Mac, in Status.";
 
 /** What Remove does, under its question: how many sessions it stops, and that it can't be undone (#2264). */
 export function removeMessage(stopping: number, place: string): string {

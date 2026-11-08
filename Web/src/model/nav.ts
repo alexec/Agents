@@ -6,13 +6,13 @@ import type { ActivityPage } from "../route";
 import { reportSections, type Section } from "./console";
 import { workKinds, workKindTitle, type WorkKind } from "./work";
 
-export type NavSection = "overview" | "agents" | "work" | "docs" | "machines" | "workflows" | "reports" | "requests" | "people" | "setup" | "settings";
+export type NavSection = "overview" | "agents" | "work" | "docs" | "machines" | "workflows" | "reports" | "requests" | "people" | "status" | "settings";
 
-export const navSections: readonly NavSection[] = ["overview", "agents", "work", "docs", "machines", "workflows", "reports", "requests", "people", "setup", "settings"];
+export const navSections: readonly NavSection[] = ["overview", "agents", "work", "docs", "machines", "workflows", "reports", "requests", "people", "status", "settings"];
 
 export const navTitle: Record<NavSection, string> = {
   overview: "Overview", agents: "Agents", work: "Work", docs: "Docs", machines: "Machines", workflows: "Workflows", reports: "Reports",
-  requests: "Requests", people: "People", setup: "Your setup", settings: "Settings",
+  requests: "Requests", people: "People", status: "Status", settings: "Settings",
 };
 
 /** The sections only an admin sees in the bar. */
@@ -71,21 +71,23 @@ export const navPages: Record<NavSection, readonly NavPage[]> = {
     ...reportSections.map((s): NavPage => ({ id: s.id, title: s.title, group: s.group, draw: { kind: "report", section: s } })),
     { id: "usage", title: "Usage", group: "Yours", draw: { kind: "usage" } },
     { id: "achievements", title: "Achievements", group: "Yours", draw: { kind: "activity", page: "achievements" } },
-    { id: "events", title: "Events", group: "Records", draw: { kind: "activity", page: "events" } },
     adminPage("audit", "Audit", "Records"),
   ],
   requests: [adminPage("requests", "Requests", "Requests")],
   people: [adminPage("people", "People and Groups", "People"), adminPage("signIn", "Sign-In", "People")],
-  // The person's own setup (#3630), beside Settings: each runtime once, with the accounts, and a line per machine (#3631);
-  // their connectors, and their secrets and cards, which go to every machine of theirs (#3632).
-  setup: [
-    { id: "runtimes", title: "Runtimes", group: "Your setup", draw: { kind: "activity", page: "runtimes" } },
-    { id: "mcp", title: "Connectors", group: "Your setup", draw: { kind: "activity", page: "mcp" } },
-    { id: "secrets", title: "Secrets", group: "Your setup", draw: { kind: "secrets" } },
-    // The person's outside accounts (#3967), kept and sent as their secrets are.
-    { id: "accounts", title: "Accounts", group: "Your setup", draw: { kind: "accounts" } },
+  // Status (#3998), status only and no settings, as the window's sidebar group: each runtime once, with the accounts, and a
+  // line per machine (#3631), and the record of what happened (was Reports ▸ Records ▸ Events).
+  status: [
+    { id: "runtimes", title: "Runtimes", group: "Status", draw: { kind: "activity", page: "runtimes" } },
+    { id: "events", title: "Events", group: "Status", draw: { kind: "activity", page: "events" } },
   ],
+  // You first (#3998), as the window's Settings rail: the person's own connectors, their secrets and cards, which go to every
+  // machine of theirs (#3632), and their outside accounts (#3967), kept and sent as their secrets are. Was Your setup.
+  // Settings itself is still the page the section opens on (settingsHome).
   settings: [
+    { id: "mcp", title: "Connectors", group: "You", draw: { kind: "activity", page: "mcp" } },
+    { id: "secrets", title: "Secrets", group: "You", draw: { kind: "secrets" } },
+    { id: "accounts", title: "Accounts", group: "You", draw: { kind: "accounts" } },
     { id: "settings", title: "Settings", group: "Settings", draw: { kind: "settings" } },
     adminPage("policy", "Policy", "Organisation"),
     adminPage("modelAccess", "Model Access", "Organisation"),
@@ -123,8 +125,12 @@ export function pagesShown(section: NavSection, admin: boolean | null, open?: st
 export function openPage(section: NavSection, id: string | undefined, admin: boolean | null,
                          more: readonly NavPage[] = []): NavPage | undefined {
   const list = withPages(section, more);
-  return list.find((p) => p.id === id) ?? list.find((p) => admin === true || !p.admin) ?? list[0];
+  return list.find((p) => p.id === id) ?? list.find((p) => p.id === sectionHome[section])
+    ?? list.find((p) => admin === true || !p.admin) ?? list[0];
 }
+
+/** The page a section opens on when it is not its first: Settings, below the You group (#3998). */
+const sectionHome: Partial<Record<NavSection, string>> = { settings: "settings" };
 
 /** Whether a page is for admins only and this person is not one (or not known yet). */
 export function gated(page: NavPage, admin: boolean | null): boolean {
@@ -159,10 +165,13 @@ export function movedPage(app: "console" | "a", page: string | undefined): { nav
     }
   }
   switch (page) {
-    case "runtimes": case "mcp": return { nav: "setup", section: page };
+    // Runtimes went to Status and Connectors to Settings ▸ You (#3998).
+    case "runtimes": return { nav: "status", section: page };
+    case "mcp": return { nav: "settings", section: page };
     // Worktrees (#3627) and resources (#3629) are on each machine's page now.
     case "worktrees": case "resources": return { nav: "machines", section: "machines" };
-    case "events": case "achievements": return { nav: "reports", section: page };
+    case "events": return { nav: "status", section: page };
+    case "achievements": return { nav: "reports", section: page };
     case "spending": case "tokens": case "time": return { nav: "reports", section: "usage", usage: page };
     default: return {};
   }
@@ -170,5 +179,5 @@ export function movedPage(app: "console" | "a", page: string | undefined): { nav
 
 /** The g-then-letter key for each section. */
 export const sectionKeys: Record<string, NavSection> = {
-  o: "overview", a: "agents", i: "work", d: "docs", m: "machines", w: "workflows", r: "reports", q: "requests", p: "people", y: "setup", s: "settings",
+  o: "overview", a: "agents", i: "work", d: "docs", m: "machines", w: "workflows", r: "reports", q: "requests", p: "people", t: "status", s: "settings",
 };

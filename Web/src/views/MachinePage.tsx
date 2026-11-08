@@ -126,9 +126,9 @@ function MachineWorktrees({ store, host }: { store: Store; host: string }) {
 }
 
 /** The runtimes installed on the machine (#3629), one line each: its version and whether it is signed in, and Sign In…
- * on a server's Claude or Codex (#3349). Only the installed ones (#3743): Your setup lists every runtime. A server installs
+ * on a server's Claude or Codex (#3349). Only the installed ones (#3743): Status ▸ Runtimes lists every runtime. A server installs
  * its runtimes when it is set up, and the daemon takes an install only from the Mac, so there is no Install here.
- * Accounts and allowances are the person’s: Your setup ▸ Runtimes. */
+ * Accounts and allowances are the person’s: Status ▸ Runtimes. */
 function MachineRuntimes({ store, host, name }: { store: Store; host: string; name: string }) {
   const [signingIn, setSigningIn] = useState<RuntimeStatus | null>(null);
   const runtimes = store.runtimes.value[host]?.filter(isInstalled);
@@ -149,8 +149,8 @@ function MachineRuntimes({ store, host, name }: { store: Store; host: string; na
           ))}
         </ul>
       )}
-      <p><button type="button" class="link small" onClick={() => go({ nav: "setup", section: "runtimes" })}>
-        Every runtime, your accounts and allowances, in Your setup</button></p>
+      <p><button type="button" class="link small" onClick={() => go({ nav: "status", section: "runtimes" })}>
+        Every runtime, your accounts and allowances, in Status</button></p>
       {signingIn && (
         <RuntimeSignInDialog store={store} host={host} runtimeID={signingIn.runtime.id} runtimeName={signingIn.runtime.name}
           machine={name} close={() => setSigningIn(null)} />
