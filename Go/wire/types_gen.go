@@ -6684,7 +6684,7 @@ type MachineHello struct {
 	Capabilities []string `json:"capabilities,omitzero"`
 }
 
-// One workspace, as its provider last listed it. `state` is running, starting, stopping, stopped or unknown.
+// One workspace, as its provider last listed it. `state` is running, starting, stopping, stopped or unknown; or failed, for a make that failed, with the provider's `reason` (#3972).
 type MachineInfo struct {
 	ID string `json:"id"`
 
@@ -6702,6 +6702,9 @@ type MachineInfo struct {
 	Cost *string `json:"cost,omitzero"`
 
 	Host *MachineRef `json:"host,omitzero"`
+
+	// Why the make failed, in the provider's words, when `state` is failed.
+	Reason *string `json:"reason,omitzero"`
 }
 
 // machines/install (MachineInstall.Request): a server over ssh, with its key, the fingerprint trusted, a tunnel. Add as Machine… names the provider and the workspace too (#3497): a codespace whose provider a machine carries is installed from that machine, with the token kept there.
@@ -9162,11 +9165,11 @@ type ProviderCarry struct {
 	Secrets map[string]string `json:"secrets,omitzero"`
 }
 
-// providers/create.
+// providers/create. With no `id`, the person's default provider: the first one added that they may make machines from (#3972). With no `name`, `machine-N`, from the person's own counter. With no `options`, the provider's defaults: each field's `default`, or else the first of its `enum`.
 type ProviderCreate struct {
-	ID ProviderID `json:"id"`
+	ID *ProviderID `json:"id,omitzero"`
 
-	Name string `json:"name"`
+	Name *string `json:"name,omitzero"`
 
 	Options JSONValue `json:"options,omitzero"`
 

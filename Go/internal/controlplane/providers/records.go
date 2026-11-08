@@ -64,6 +64,9 @@ type ProviderRecord struct {
 	// The machine that carries it (#3398): runs its server and keeps its secrets. Nil for
 	// one made before, which is added again on a machine.
 	Machine *string
+	// When it was added, so the first one added is the default for New Machine (#3972).
+	// Nil for one added before it was kept.
+	AddedAt *records.Stamp
 	// What a later build wrote that this one does not know, written back as it was.
 	Extra records.Extra
 }
@@ -93,11 +96,12 @@ type providerJSON struct {
 	WrittenBy    *WrittenBy        `json:"writtenBy,omitempty"`
 	Group        *string           `json:"group,omitempty"`
 	Machine      *string           `json:"machine,omitempty"`
+	AddedAt      *records.Stamp    `json:"addedAt,omitempty"`
 }
 
 func (p ProviderRecord) MarshalJSON() ([]byte, error) {
 	j := providerJSON{p.ID, p.Name, p.Kind, p.Command, p.Args, p.URL, p.Headers, p.Commands, p.SecretNames, p.Map,
-		p.Capabilities, p.Contract, p.Rev, p.Forgotten, p.ForgottenAt, p.WrittenBy, p.Group, p.Machine}
+		p.Capabilities, p.Contract, p.Rev, p.Forgotten, p.ForgottenAt, p.WrittenBy, p.Group, p.Machine, p.AddedAt}
 	if j.SecretNames == nil {
 		j.SecretNames = []string{}
 	}
@@ -117,7 +121,7 @@ func (p *ProviderRecord) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("no provider kind %q", j.Kind)
 	}
 	*p = ProviderRecord{j.ID, j.Name, j.Kind, j.Command, j.Args, j.URL, j.Headers, j.Commands, j.SecretNames, j.Map,
-		j.Capabilities, j.Contract, j.Rev, j.Forgotten, j.ForgottenAt, j.WrittenBy, j.Group, j.Machine, extra}
+		j.Capabilities, j.Contract, j.Rev, j.Forgotten, j.ForgottenAt, j.WrittenBy, j.Group, j.Machine, j.AddedAt, extra}
 	return nil
 }
 

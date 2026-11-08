@@ -102,6 +102,29 @@ func TestAnAgentsWorkspaceTools(t *testing.T) {
 		t.Fatal(text)
 	}
 
+	// With no name, the control plane names it machine-N (#3972).
+	go func() { text, _ := m.tool(9, "make_machine", map[string]any{"provider": "do"}); answered <- text }()
+	waitFor(t, "the nameless card", func() bool {
+		json.Unmarshal(c.call(t, 5, "elicitations/pending", nil), &pending)
+		return len(pending) == 1
+	})
+	if f := pending[0].Mode.Form.Value; *f.Properties[0].Title != "Make a new machine at DigitalOcean?" {
+		t.Fatalf("%+v", pending[0])
+	}
+	c.call(t, 6, "elicitations/answer", map[string]any{"requestID": pending[0].ID, "action": "accept", "content": map[string]any{"go": "yes"}})
+	<-answered
+	mu.Lock()
+	var creates []string
+	for _, call := range asked {
+		if call.Method == "providers/create" {
+			creates = append(creates, string(call.Params))
+		}
+	}
+	mu.Unlock()
+	if len(creates) != 2 || creates[0] != `{"id":"do","name":"second"}` || creates[1] != `{"id":"do"}` {
+		t.Fatalf("%v", creates)
+	}
+
 	go func() { text, _ := m.tool(8, "delete_machine", map[string]any{"host": "devbox"}); answered <- text }()
 	waitFor(t, "the second card", func() bool {
 		json.Unmarshal(c.call(t, 3, "elicitations/pending", nil), &pending)

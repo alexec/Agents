@@ -78,7 +78,7 @@ func TestOnlyAProvidersGroupSeesAndUsesIt(t *testing.T) {
 	if got := listedProviders(t, owner); len(got) != 1 || *got[0].MayUse {
 		t.Fatalf("owner: %+v", got)
 	}
-	create := wire.ProviderCreate{ID: "do-1", Name: "box-1"}
+	create := wire.ProviderCreate{ID: new(wire.ProviderID("do-1")), Name: new("box-1")}
 	if e := callError(t, kim.window, "", "providers/create", create); !strings.Contains(e, "no such provider") {
 		t.Fatal(e)
 	}
