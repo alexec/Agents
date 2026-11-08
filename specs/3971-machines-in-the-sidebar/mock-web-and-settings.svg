@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="560" viewBox="0 0 1000 560" font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif">
+  <defs>
+    <filter id="menu" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000" flood-opacity="0.16"/>
+    </filter>
+    <symbol id="cloud" viewBox="0 0 16 16"><path d="M4.2 12.5h7.6a2.9 2.9 0 0 0 .4-5.8 4.2 4.2 0 0 0-8.1-.9 3.4 3.4 0 0 0 .1 6.7z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
+    <symbol id="server" viewBox="0 0 16 16"><rect x="2" y="2.5" width="12" height="4.5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9" width="12" height="4.5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="4.6" cy="4.75" r=".8" fill="currentColor"/><circle cx="4.6" cy="11.25" r=".8" fill="currentColor"/></symbol>
+    <symbol id="laptop" viewBox="0 0 16 16"><rect x="3" y="3.5" width="10" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M1 12.5h14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+  </defs>
+  <rect width="1000" height="560" fill="#E7EAEE"/>
+  <text x="24" y="34" font-size="15" font-weight="600" fill="#1C1D20">Web page · the Machines section, and Settings after</text>
+  <text x="24" y="54" font-size="12" fill="#6B7280">Hi-fi mock for #3971 · the same rows, dots, menu and confirmations as the Mac; swipe on a touch screen</text>
+
+  <!-- ===== browser ===== -->
+  <g transform="translate(24,72)">
+    <rect width="560" height="460" rx="10" fill="#F7F8F9" stroke="#DDE1E6"/>
+    <rect width="560" height="34" rx="10" fill="#E2E5E9"/><rect y="24" width="560" height="10" fill="#E2E5E9"/>
+    <circle cx="18" cy="17" r="5" fill="#FF5F57"/><circle cx="34" cy="17" r="5" fill="#FEBC2E"/><circle cx="50" cy="17" r="5" fill="#28C840"/>
+    <rect x="140" y="8" width="280" height="18" rx="5" fill="#F7F8F9"/>
+    <text x="280" y="21" font-size="11" fill="#6B7280" text-anchor="middle">agentloops.dev/machines</text>
+
+    <!-- nav -->
+    <rect y="34" width="220" height="426" fill="#F0F1F3"/>
+    <rect x="220" y="34" width="1" height="426" fill="#DDE1E6"/>
+    <g font-size="13" fill="#1C1D20">
+      <text x="16" y="62" font-size="11" font-weight="600" fill="#8A9099">Agents</text>
+      <text x="16" y="84" fill="#6B7280">Needs you</text>
+      <text x="16" y="106" fill="#6B7280">Work</text>
+
+      <text x="16" y="138" font-size="11" font-weight="600" fill="#8A9099">Machines</text>
+      <rect x="190" y="126" width="20" height="16" rx="4" fill="#E2E5E9"/>
+      <path d="M200 129.5v9M195.5 134h9" stroke="#5B616A" stroke-width="1.4" stroke-linecap="round"/>
+
+      <use href="#laptop" x="16" y="150" width="15" height="15" color="#5B616A"/>
+      <text x="38" y="162">This Mac</text><circle cx="202" cy="158" r="4" fill="#34C759"/>
+
+      <!-- hovered row with ··· -->
+      <rect x="8" y="172" width="204" height="26" rx="6" fill="#E2E5E9"/>
+      <use href="#cloud" x="16" y="178" width="15" height="15" color="#5B616A"/>
+      <text x="38" y="190">machine-1</text>
+      <rect x="170" y="176" width="24" height="18" rx="4" fill="#D3D8DE"/>
+      <text x="182" y="189" font-size="13" fill="#3F444B" text-anchor="middle">···</text>
+      <circle cx="202" cy="185" r="4" fill="#34C759"/>
+
+      <use href="#cloud" x="16" y="206" width="15" height="15" color="#5B616A"/>
+      <text x="38" y="218">machine-3</text>
+      <text x="38" y="232" font-size="11" fill="#8A9099">Stopped</text>
+      <circle cx="202" cy="214" r="3.6" fill="none" stroke="#8E8E93" stroke-width="1.4"/>
+
+      <use href="#cloud" x="16" y="244" width="15" height="15" color="#5B616A"/>
+      <text x="38" y="256">machine-7</text>
+      <text x="38" y="270" font-size="11" fill="#8A9099">Making on DigitalOcean…</text>
+      <circle cx="202" cy="252" r="3.6" fill="none" stroke="#FF9F0A" stroke-opacity=".3" stroke-width="1.6"/>
+      <path d="M202 248.4a3.6 3.6 0 0 1 3.6 3.6" fill="none" stroke="#FF9F0A" stroke-width="1.6" stroke-linecap="round"/>
+
+      <use href="#server" x="16" y="282" width="15" height="15" color="#5B616A"/>
+      <text x="38" y="294">build-box</text>
+      <text x="38" y="308" font-size="11" fill="#8A9099">Offline since 14:02</text>
+      <circle cx="202" cy="290" r="4" fill="#FF3B30"/>
+
+      <text x="16" y="344" font-size="11" font-weight="600" fill="#8A9099">Settings</text>
+    </g>
+
+    <!-- menu from ··· -->
+    <g transform="translate(176,198)" filter="url(#menu)">
+      <rect width="200" height="196" rx="8" fill="#FFFFFF" stroke="#DDE1E6"/>
+    </g>
+    <g transform="translate(176,198)" font-size="13" fill="#1C1D20">
+      <text x="14" y="22">Open</text>
+      <path d="M8 32h184" stroke="#E7EAEE"/>
+      <rect x="5" y="37" width="190" height="22" rx="5" fill="#E7EAEE"/>
+      <text x="14" y="52">Stop</text>
+      <text x="14" y="76">Check Again</text>
+      <text x="14" y="98">Rename</text>
+      <text x="14" y="120">Choose Folders…</text>
+      <text x="14" y="142">Processes…</text>
+      <path d="M8 154h184" stroke="#E7EAEE"/>
+      <text x="14" y="176" fill="#D70015">Delete machine-1…</text>
+    </g>
+
+    <!-- page body: machine page -->
+    <g transform="translate(400,60)" font-size="12" fill="#3F444B">
+      <text x="0" y="10" font-size="17" font-weight="600" fill="#1C1D20">machine-1</text>
+      <circle cx="96" cy="5" r="4" fill="#34C759"/>
+      <text x="0" y="32" fill="#6B7280">DigitalOcean · nyc3</text>
+      <text x="0" y="60" font-size="11" font-weight="600" fill="#8A9099">Sessions here</text>
+      <text x="0" y="80">Fix the low-disk line</text>
+      <text x="0" y="98">Release 0.31</text>
+      <text x="0" y="126" font-size="11" fill="#8A9099">Its sessions list here,</text>
+      <text x="0" y="140" font-size="11" fill="#8A9099">not on its nav row.</text>
+    </g>
+  </g>
+
+  <!-- ===== Settings after ===== -->
+  <g transform="translate(616,72)">
+    <text x="0" y="12" font-size="13" font-weight="600" fill="#1C1D20">Settings ▸ Machine Providers (Mac and web)</text>
+    <text x="0" y="30" font-size="11.5" fill="#6B7280">The machine list goes from Settings. Providers stay: they are accounts.</text>
+
+    <rect y="46" width="360" height="196" rx="10" fill="#FFFFFF" stroke="#DDE1E6"/>
+    <g font-size="13" fill="#1C1D20">
+      <text x="16" y="74" font-weight="600">Machine Providers</text>
+      <path d="M0 88h360" stroke="#E7EAEE"/>
+      <circle cx="22" cy="108" r="4" fill="#34C759"/>
+      <text x="36" y="112">DigitalOcean</text>
+      <rect x="128" y="99" width="54" height="18" rx="9" fill="#E3EFFF"/>
+      <text x="155" y="112" font-size="11" fill="#0A6CFF" text-anchor="middle">Default</text>
+      <text x="336" y="112" fill="#6B7280" text-anchor="end">···</text>
+      <path d="M16 128h328" stroke="#F0F1F3"/>
+      <circle cx="22" cy="148" r="4" fill="#34C759"/>
+      <text x="36" y="152">Docker</text>
+      <text x="336" y="152" fill="#6B7280" text-anchor="end">···</text>
+      <path d="M16 168h328" stroke="#F0F1F3"/>
+      <circle cx="22" cy="188" r="4" fill="#FF9F0A"/>
+      <text x="36" y="192">Codespaces</text>
+      <text x="36" y="207" font-size="11" fill="#8A9099">Needs a sign-in</text>
+      <text x="336" y="192" fill="#6B7280" text-anchor="end">···</text>
+      <rect x="16" y="218" width="112" height="16" rx="0" fill="none"/>
+    </g>
+    <rect x="16" y="252" width="118" height="26" rx="13" fill="#FFFFFF" stroke="#C9CED6"/>
+    <text x="75" y="269" font-size="12.5" fill="#1C1D20" text-anchor="middle">Add Provider…</text>
+
+    <!-- ··· menu -->
+    <g transform="translate(200,124)" filter="url(#menu)">
+      <rect width="150" height="100" rx="8" fill="#FFFFFF" stroke="#DDE1E6"/>
+    </g>
+    <g transform="translate(200,124)" font-size="13" fill="#1C1D20">
+      <rect x="5" y="5" width="140" height="22" rx="5" fill="#0A84FF"/>
+      <text x="14" y="20" fill="#fff">Make Default</text>
+      <text x="14" y="44">Edit…</text>
+      <text x="14" y="66">List Again</text>
+      <text x="14" y="88" fill="#D70015">Remove…</text>
+    </g>
+
+    <g font-size="11.5" fill="#3F444B" transform="translate(0,316)">
+      <text x="0" y="0" font-weight="600" fill="#1C1D20">The Remote</text>
+      <text x="0" y="18" fill="#6B7280">No change: tier Mac + web (#2798, Alex 2026-11-07).</text>
+      <text x="0" y="34" fill="#6B7280">Its offline strip keeps Start.</text>
+    </g>
+  </g>
+</svg>

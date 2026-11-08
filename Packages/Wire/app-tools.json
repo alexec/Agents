@@ -712,11 +712,11 @@
           "type": "string"
         },
         "name": {
-          "description": "The new machine's and host's name: letters, digits and dashes.",
+          "description": "The new machine's and host's name: letters, digits and dashes. Leave it out for the next machine-N.",
           "type": "string"
         },
         "options": {
-          "description": "Its choices, as the provider's options in list_machines describe them.",
+          "description": "Its choices, as the provider's options in list_machines describe them. Leave it out for the provider's defaults.",
           "type": "object"
         },
         "provider": {
@@ -725,8 +725,7 @@
         }
       },
       "required": [
-        "provider",
-        "name"
+        "provider"
       ],
       "type": "object"
     },

@@ -60,6 +60,12 @@ func (p *Providers) SummariesFor(person string) []ProviderSummary {
 		if !admin && p.hooks.OwnerOf != nil {
 			mine := []MachineInfo{}
 			for _, w := range s.Workspaces {
+				if maker, failed := p.failedOwner(string(s.ID), w.ID); failed {
+					if maker == person {
+						mine = append(mine, w)
+					}
+					continue
+				}
 				if w.Host == nil || *w.Host == "" || p.hooks.OwnerOf(string(*w.Host)) == person {
 					mine = append(mine, w)
 				}

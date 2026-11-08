@@ -14870,7 +14870,7 @@
     },
     "MachineInfo": {
       "type": "object",
-      "description": "One workspace, as its provider last listed it. `state` is running, starting, stopping, stopped or unknown.",
+      "description": "One workspace, as its provider last listed it. `state` is running, starting, stopping, stopped or unknown; or failed, for a make that failed, with the provider's `reason` (#3972).",
       "properties": {
         "id": {
           "type": "string"
@@ -14896,6 +14896,10 @@
         },
         "host": {
           "$ref": "#/definitions/MachineRef"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Why the make failed, in the provider's words, when `state` is failed."
         }
       },
       "required": [
@@ -20226,7 +20230,7 @@
     },
     "ProviderCreate": {
       "type": "object",
-      "description": "providers/create.",
+      "description": "providers/create. With no `id`, the person's default provider: the first one added that they may make machines from (#3972). With no `name`, `machine-N`, from the person's own counter. With no `options`, the provider's defaults: each field's `default`, or else the first of its `enum`.",
       "properties": {
         "id": {
           "$ref": "#/definitions/ProviderID"
@@ -20248,10 +20252,6 @@
           "description": "The repository to start it from (#1809), an https git address. A provider whose New Machine form has `repository`, such as Codespaces, makes the workspace from it; any other has the host clone it once it joins, before `clones`."
         }
       },
-      "required": [
-        "id",
-        "name"
-      ],
       "additionalProperties": false
     },
     "ProviderCreated": {

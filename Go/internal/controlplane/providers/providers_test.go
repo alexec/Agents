@@ -521,7 +521,7 @@ func TestProviderIDsAndWords(t *testing.T) {
 
 func (h *harness) create(name string, clones []string) (ProviderCreated, error) {
 	provider := h.must(MethodProvidersList, nil).(map[string]any)["providers"].([]ProviderSummary)[0].ID
-	out, err := h.call(MethodProvidersCreate, ProviderCreate{ID: provider, Name: name, Options: jsonValue(map[string]any{"size": "big"}), Clones: clones})
+	out, err := h.call(MethodProvidersCreate, ProviderCreate{ID: &provider, Name: &name, Options: jsonValue(map[string]any{"size": "big"}), Clones: clones})
 	if err != nil {
 		return ProviderCreated{}, err
 	}
@@ -596,11 +596,90 @@ func TestANewWorkspaceClonesItsFoldersOnceItJoins(t *testing.T) {
 	}
 }
 
+// New Machine with no questions (#3972).
+
+func (h *harness) createNameless() (ProviderCreated, error) {
+	out, err := h.call(MethodProvidersCreate, ProviderCreate{})
+	if err != nil {
+		return ProviderCreated{}, err
+	}
+	return out.(ProviderCreated), nil
+}
+
+func TestAMakeWithNoNameOrOptionsTakesMachineNAndTheDefaults(t *testing.T) {
+	h := newHarness(t)
+	h.add()
+	made, err := h.createNameless()
+	if err != nil || made.Workspace.Name != "machine-1" {
+		t.Fatalf("%v %+v", err, made)
+	}
+	if got := h.provider.madeWith[0]; !reflect.DeepEqual(got, map[string]any{"size": "small"}) {
+		t.Errorf("the first choice of each field: %v", got)
+	}
+	// A name the provider has already is skipped, and a number is never used again.
+	h.provider.mu.Lock()
+	h.provider.workspaces = append(h.provider.workspaces, MachineInfo{ID: "ws-machine-3", Name: "machine-3", State: "running"})
+	h.provider.mu.Unlock()
+	h.providers.Refresh("")
+	for _, want := range []string{"machine-2", "machine-4"} {
+		if made, err := h.createNameless(); err != nil || made.Workspace.Name != want {
+			t.Fatalf("want %s: %v %+v", want, err, made)
+		}
+	}
+	h.provider.mu.Lock()
+	h.provider.workspaces = nil
+	h.provider.mu.Unlock()
+	h.providers.Refresh("")
+	if made, err := h.createNameless(); err != nil || made.Workspace.Name != "machine-5" {
+		t.Fatalf("%v %+v", err, made)
+	}
+}
+
+func TestAMakeWithNoProviderTakesTheFirstOneAdded(t *testing.T) {
+	h := newHarness(t)
+	first := h.add()
+	time.Sleep(2 * time.Millisecond)
+	h.must(MethodProvidersAdd, map[string]any{"name": "Alpha", "kind": "commands",
+		"commands": map[string]any{"preset": "doctl", "tag": "alpha"}, "secrets": map[string]string{"DIGITALOCEAN_TOKEN": "hunter2"}})
+	if got := h.providers.defaultProvider(""); got != first {
+		t.Fatalf("default %s, want %s", got, first)
+	}
+	held, _ := h.providers.record(first)
+	if held.AddedAt == nil {
+		t.Fatal("no addedAt")
+	}
+}
+
+func TestAMakeThatFailsStaysAsAFailedRow(t *testing.T) {
+	h := newHarness(t)
+	h.add()
+	h.provider.mu.Lock()
+	h.provider.failCreate = "The droplet limit is reached."
+	h.provider.mu.Unlock()
+	if _, err := h.createNameless(); err == nil || !strings.Contains(err.Error(), "droplet limit") {
+		t.Fatalf("%v", err)
+	}
+	providers := h.must(MethodProvidersList, nil).(map[string]any)["providers"].([]ProviderSummary)
+	var failed *MachineInfo
+	for _, w := range providers[0].Workspaces {
+		if w.State == "failed" {
+			failed = &w
+		}
+	}
+	if failed == nil || failed.Name != "machine-1" || deref(failed.Reason) != "The droplet limit is reached." {
+		t.Fatalf("%+v", providers[0].Workspaces)
+	}
+	// It is its maker's alone.
+	if owner, ok := h.providers.failedOwner(string(providers[0].ID), failed.ID); !ok || owner != "" {
+		t.Errorf("%q %v", owner, ok)
+	}
+}
+
 // A machine from a repository (#1809).
 
 func (h *harness) createFrom(name, repository string, clones []string) (ProviderCreated, error) {
 	provider := h.must(MethodProvidersList, nil).(map[string]any)["providers"].([]ProviderSummary)[0].ID
-	out, err := h.call(MethodProvidersCreate, ProviderCreate{ID: provider, Name: name, Clones: clones, Repository: &repository})
+	out, err := h.call(MethodProvidersCreate, ProviderCreate{ID: &provider, Name: &name, Clones: clones, Repository: &repository})
 	if err != nil {
 		return ProviderCreated{}, err
 	}

@@ -1,0 +1,186 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="640" viewBox="0 0 1000 640" font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif">
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#20242A" flood-opacity="0.14"/>
+    </filter>
+    <!-- SF-like glyphs, 16x16 -->
+    <symbol id="cloud" viewBox="0 0 16 16"><path d="M4.2 12.5h7.6a2.9 2.9 0 0 0 .4-5.8 4.2 4.2 0 0 0-8.1-.9 3.4 3.4 0 0 0 .1 6.7z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
+    <symbol id="server" viewBox="0 0 16 16"><rect x="2" y="2.5" width="12" height="4.5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9" width="12" height="4.5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="4.6" cy="4.75" r=".8" fill="currentColor"/><circle cx="4.6" cy="11.25" r=".8" fill="currentColor"/></symbol>
+    <symbol id="laptop" viewBox="0 0 16 16"><rect x="3" y="3.5" width="10" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M1 12.5h14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+    <symbol id="chev-down" viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="chev-right" viewBox="0 0 10 10"><path d="M3.5 2l3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="spin" viewBox="0 0 10 10"><circle cx="5" cy="5" r="3.6" fill="none" stroke="#FF9F0A" stroke-opacity=".3" stroke-width="1.6"/><path d="M5 1.4a3.6 3.6 0 0 1 3.6 3.6" fill="none" stroke="#FF9F0A" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  </defs>
+
+  <rect width="1000" height="640" fill="#E7EAEE"/>
+  <text x="24" y="34" font-size="15" font-weight="600" fill="#1C1D20">Mac · the Machines group in the sidebar</text>
+  <text x="24" y="54" font-size="12" fill="#6B7280">Hi-fi mock for #3971 · Paper palette, light · the dots and the grey lines show only the machine's own state</text>
+
+  <!-- ============ Window: sidebar ============ -->
+  <g transform="translate(24,72)" filter="url(#shadow)">
+    <rect width="300" height="548" rx="12" fill="#F0F1F3"/>
+    <rect x="300" width="0" height="548"/>
+  </g>
+  <g transform="translate(24,72)">
+    <!-- traffic lights -->
+    <circle cx="20" cy="20" r="6" fill="#FF5F57"/><circle cx="40" cy="20" r="6" fill="#FEBC2E"/><circle cx="60" cy="20" r="6" fill="#28C840"/>
+
+    <!-- Your setup (folded) -->
+    <use href="#chev-right" x="14" y="51" width="10" height="10" color="#8A9099"/>
+    <text x="30" y="60" font-size="11" font-weight="600" fill="#8A9099">Your setup</text>
+
+    <!-- Machines header, hovered: + shows -->
+    <use href="#chev-down" x="14" y="79" width="10" height="10" color="#8A9099"/>
+    <text x="30" y="88" font-size="11" font-weight="600" fill="#8A9099">Machines</text>
+    <rect x="262" y="76" width="22" height="18" rx="5" fill="#E2E5E9"/>
+    <path d="M273 80v10M268 85h10" stroke="#5B616A" stroke-width="1.5" stroke-linecap="round"/>
+
+    <!-- This Mac -->
+    <use href="#laptop" x="20" y="102" width="16" height="16" color="#5B616A"/>
+    <text x="44" y="115" font-size="13" fill="#1C1D20">This Mac</text>
+    <circle cx="276" cy="111" r="4" fill="#34C759"/>
+
+    <!-- machine-1 selected -->
+    <rect x="8" y="126" width="284" height="28" rx="6" fill="#D8DEE6"/>
+    <use href="#cloud" x="20" y="132" width="16" height="16" color="#5B616A"/>
+    <text x="44" y="145" font-size="13" fill="#1C1D20">machine-1</text>
+    <circle cx="276" cy="140" r="4" fill="#34C759"/>
+
+    <!-- machine-3 stopped -->
+    <use href="#cloud" x="20" y="162" width="16" height="16" color="#5B616A"/>
+    <text x="44" y="175" font-size="13" fill="#1C1D20">machine-3</text>
+    <text x="44" y="190" font-size="11" fill="#8A9099">Stopped</text>
+    <circle cx="276" cy="171" r="3.6" fill="none" stroke="#8E8E93" stroke-width="1.4"/>
+
+    <!-- machine-4 starting -->
+    <use href="#cloud" x="20" y="204" width="16" height="16" color="#5B616A"/>
+    <text x="44" y="217" font-size="13" fill="#1C1D20">machine-4</text>
+    <text x="44" y="232" font-size="11" fill="#8A9099">Starting…</text>
+    <use href="#spin" x="271" y="208" width="10" height="10"/>
+
+    <!-- machine-6 low disk -->
+    <use href="#cloud" x="20" y="246" width="16" height="16" color="#FF3B30"/>
+    <text x="44" y="259" font-size="13" fill="#1C1D20">machine-6</text>
+    <text x="44" y="274" font-size="11" fill="#8A9099">Disk 94% full</text>
+    <circle cx="276" cy="255" r="4" fill="#FF3B30"/>
+
+    <!-- machine-7 making -->
+    <use href="#cloud" x="20" y="288" width="16" height="16" color="#5B616A"/>
+    <text x="44" y="301" font-size="13" fill="#1C1D20">machine-7</text>
+    <text x="44" y="316" font-size="11" fill="#8A9099">Making on DigitalOcean…</text>
+    <use href="#spin" x="271" y="292" width="10" height="10"/>
+
+    <!-- machine-8 failed make -->
+    <use href="#cloud" x="20" y="330" width="16" height="16" color="#5B616A"/>
+    <text x="44" y="343" font-size="13" fill="#1C1D20">machine-8</text>
+    <text x="44" y="358" font-size="11" fill="#8A9099">Could not make: the droplet limit is reached</text>
+    <circle cx="276" cy="339" r="4" fill="#FF3B30"/>
+
+    <!-- build-box registered, offline -->
+    <use href="#server" x="20" y="372" width="16" height="16" color="#5B616A"/>
+    <text x="44" y="385" font-size="13" fill="#1C1D20">build-box</text>
+    <text x="44" y="400" font-size="11" fill="#8A9099">Offline since 14:02</text>
+    <circle cx="276" cy="381" r="4" fill="#FF3B30"/>
+
+    <!-- next sections, faded -->
+    <g opacity=".45">
+      <use href="#chev-down" x="14" y="425" width="10" height="10" color="#8A9099"/>
+      <text x="30" y="434" font-size="11" font-weight="600" fill="#8A9099">Agents</text>
+      <rect x="20" y="448" width="12" height="12" rx="3" fill="#C9CED6"/>
+      <text x="44" y="458" font-size="13" fill="#1C1D20">Fix the low-disk grey line</text>
+      <circle cx="276" cy="454" r="4" fill="#0A84FF"/>
+      <rect x="20" y="476" width="12" height="12" rx="3" fill="#C9CED6"/>
+      <text x="44" y="486" font-size="13" fill="#1C1D20">Bitbucket pull requests</text>
+      <rect x="20" y="504" width="12" height="12" rx="3" fill="#C9CED6"/>
+      <text x="44" y="514" font-size="13" fill="#1C1D20">Release 0.31</text>
+    </g>
+  </g>
+
+  <!-- callouts for the sidebar -->
+  <g font-size="11.5" fill="#3F444B">
+    <path d="M330 212h26" stroke="#9AA1AB" stroke-dasharray="3 3"/>
+    <text x="362" y="208">No session count, no "needs you" badge.</text>
+    <text x="362" y="223" fill="#6B7280">Sessions do not roll up into their machine.</text>
+
+
+    <path d="M330 160h26" stroke="#9AA1AB" stroke-dasharray="3 3"/>
+    <text x="362" y="156">+ shows on hover: New Machine, at once,</text>
+    <text x="362" y="171" fill="#6B7280">named machine-9. Right-click: the header menu.</text>
+
+    <path d="M330 373h26" stroke="#9AA1AB" stroke-dasharray="3 3"/>
+    <text x="362" y="369">Numbers only go up: machine-2 and machine-5</text>
+    <text x="362" y="384" fill="#6B7280">were deleted, and their numbers are not used again.</text>
+
+    <path d="M330 453h26" stroke="#9AA1AB" stroke-dasharray="3 3"/>
+    <text x="362" y="449">Server icon = registered (Remove only forgets it).</text>
+    <text x="362" y="464" fill="#6B7280">Cloud icon = made by a provider (Delete destroys it).</text>
+  </g>
+
+  <!-- ============ Swipes ============ -->
+  <g transform="translate(660,72)">
+    <text x="0" y="12" font-size="13" font-weight="600" fill="#1C1D20">Swipe</text>
+    <text x="0" y="30" font-size="11.5" fill="#6B7280">The same swipe as a session's row.</text>
+
+    <!-- 1 leading: start -->
+    <text x="0" y="62" font-size="11" fill="#6B7280">Right, stopped: Start (full swipe)</text>
+    <g transform="translate(0,70)">
+      <rect width="300" height="44" rx="8" fill="#F0F1F3"/>
+      <rect width="84" height="44" rx="8" fill="#0A84FF"/><rect x="76" width="8" height="44" fill="#0A84FF"/>
+      <path d="M34 14v14l11-7z" fill="#fff"/>
+      <text x="42" y="39" font-size="10" fill="#fff" text-anchor="middle">Start</text>
+      <use href="#cloud" x="98" y="9" width="16" height="16" color="#5B616A"/>
+      <text x="122" y="22" font-size="13" fill="#1C1D20">machine-3</text>
+      <text x="122" y="36" font-size="11" fill="#8A9099">Stopped</text>
+      <circle cx="286" cy="18" r="3.6" fill="none" stroke="#8E8E93" stroke-width="1.4"/>
+    </g>
+
+    <!-- 2 leading: stop -->
+    <text x="0" y="140" font-size="11" fill="#6B7280">Right, running: Stop (full swipe)</text>
+    <g transform="translate(0,148)">
+      <rect width="300" height="44" rx="8" fill="#F0F1F3"/>
+      <rect width="84" height="44" rx="8" fill="#5B616A"/><rect x="76" width="8" height="44" fill="#5B616A"/>
+      <rect x="36" y="13" width="12" height="12" rx="2" fill="#fff"/>
+      <text x="42" y="39" font-size="10" fill="#fff" text-anchor="middle">Stop</text>
+      <use href="#cloud" x="98" y="14" width="16" height="16" color="#5B616A"/>
+      <text x="122" y="27" font-size="13" fill="#1C1D20">machine-1</text>
+      <circle cx="286" cy="22" r="4" fill="#34C759"/>
+    </g>
+
+    <!-- 3 trailing: delete -->
+    <text x="0" y="218" font-size="11" fill="#6B7280">Left, made by a provider: Delete (always confirms)</text>
+    <g transform="translate(0,226)">
+      <rect width="300" height="44" rx="8" fill="#F0F1F3"/>
+      <rect x="216" width="84" height="44" rx="8" fill="#FF3B30"/><rect x="216" width="8" height="44" fill="#FF3B30"/>
+      <path d="M252 13h12M255 13v-2h6v2M254 16l1 12h6l1-12" fill="none" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/>
+      <text x="258" y="39" font-size="10" fill="#fff" text-anchor="middle">Delete</text>
+      <use href="#cloud" x="12" y="14" width="16" height="16" color="#5B616A"/>
+      <text x="36" y="27" font-size="13" fill="#1C1D20">machine-1</text>
+      <circle cx="202" cy="22" r="4" fill="#34C759"/>
+    </g>
+
+    <!-- 4 trailing: remove -->
+    <text x="0" y="296" font-size="11" fill="#6B7280">Left, registered: Remove (no Start or Stop)</text>
+    <g transform="translate(0,304)">
+      <rect width="300" height="44" rx="8" fill="#F0F1F3"/>
+      <rect x="216" width="84" height="44" rx="8" fill="#8E8E93"/><rect x="216" width="8" height="44" fill="#8E8E93"/>
+      <circle cx="258" cy="20" r="7" fill="none" stroke="#fff" stroke-width="1.4"/><path d="M254 20h8" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/>
+      <text x="258" y="39" font-size="10" fill="#fff" text-anchor="middle">Remove</text>
+      <use href="#server" x="12" y="9" width="16" height="16" color="#5B616A"/>
+      <text x="36" y="22" font-size="13" fill="#1C1D20">build-box</text>
+      <text x="36" y="36" font-size="11" fill="#8A9099">Offline since 14:02</text>
+      <circle cx="202" cy="18" r="4" fill="#FF3B30"/>
+    </g>
+
+    <text x="0" y="384" font-size="11" fill="#6B7280">This Mac: no swipe.</text>
+
+    <!-- legend -->
+    <g transform="translate(0,412)" font-size="11" fill="#3F444B">
+      <text x="0" y="0" font-size="13" font-weight="600" fill="#1C1D20">The dot</text>
+      <circle cx="6" cy="22" r="4" fill="#34C759"/><text x="18" y="26">Running, online</text>
+      <use href="#spin" x="1" y="37" width="10" height="10"/><text x="18" y="46">Making, starting, stopping</text>
+      <circle cx="6" cy="62" r="3.6" fill="none" stroke="#8E8E93" stroke-width="1.4"/><text x="18" y="66">Stopped</text>
+      <circle cx="6" cy="82" r="4" fill="#FF9F0A"/><text x="18" y="86">Needs an update or a sign-in</text>
+      <circle cx="6" cy="102" r="4" fill="#FF3B30"/><text x="18" y="106">Offline, set-up failed, could not make, low disk</text>
+    </g>
+  </g>
+</svg>

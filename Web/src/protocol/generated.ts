@@ -5734,7 +5734,7 @@ export interface MachineHello {
 
 /**
  * One workspace, as its provider last listed it. `state` is running, starting, stopping, stopped or
- * unknown.
+ * unknown; or failed, for a make that failed, with the provider's `reason` (#3972).
  */
 export interface MachineInfo {
   id: string;
@@ -5749,6 +5749,8 @@ export interface MachineInfo {
   hostKeyRenews?: boolean;
   cost?: string;
   host?: MachineRef;
+  /** Why the make failed, in the provider's words, when `state` is failed. */
+  reason?: string;
 }
 
 /**
@@ -7982,10 +7984,14 @@ export interface ProviderCarry {
   secrets?: Record<string, string>;
 }
 
-/** providers/create. */
+/**
+ * providers/create. With no `id`, the person's default provider: the first one added that they may
+ * make machines from (#3972). With no `name`, `machine-N`, from the person's own counter. With no
+ * `options`, the provider's defaults: each field's `default`, or else the first of its `enum`.
+ */
 export interface ProviderCreate {
-  id: ProviderID;
-  name: string;
+  id?: ProviderID;
+  name?: string;
   options?: JSONValue;
   clones?: string[];
   /**
@@ -12966,7 +12972,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineFolderSend: { required: ["host"], optional: ["state", "upload", "receive", "facts", "pack", "read", "moveIn"] },
   MachineFolderSent: { required: [], optional: ["state", "folder", "facts", "pack", "read"] },
   MachineHello: { required: ["version", "platform", "machineID"], optional: ["host", "name", "implementation", "capabilities"] },
-  MachineInfo: { required: ["id", "name", "state"], optional: ["ssh", "tunnel", "hostKeyRenews", "cost", "host"] },
+  MachineInfo: { required: ["id", "name", "state"], optional: ["ssh", "tunnel", "hostKeyRenews", "cost", "host", "reason"] },
   MachineInstall: { required: ["destination"], optional: ["name", "key", "trust", "tunnel", "provider", "workspace"] },
   MachineJoinAsk: { required: ["name", "platform", "publicKey"], optional: ["version", "machineID", "person"] },
   MachineJoinDecision: { required: ["result"], optional: ["host", "controlKey", "name"] },
@@ -13167,7 +13173,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ProviderAdd: { required: ["name", "kind"], optional: ["id", "command", "args", "url", "headers", "commands", "map", "machine", "secrets", "cli", "draft"] },
   ProviderCarried: { required: [], optional: ["result", "error"] },
   ProviderCarry: { required: ["provider", "record", "call"], optional: ["workspace", "name", "options", "firstBoot", "secrets"] },
-  ProviderCreate: { required: ["id", "name"], optional: ["options", "clones", "repository"] },
+  ProviderCreate: { required: [], optional: ["id", "name", "options", "clones", "repository"] },
   ProviderCreated: { required: ["workspace", "joining"], optional: [] },
   ProviderDraftAnswer: { required: ["draft", "question", "yes"], optional: [] },
   ProviderDraftAnswered: { required: ["note"], optional: ["map", "preset"] },

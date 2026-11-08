@@ -195,6 +195,8 @@ type standIn struct {
 	// fromRepository: its form asks for `repository`, as Codespaces' does (#1809).
 	fromRepository bool
 	madeWith       []any
+	// failCreate: Create fails with these words (#3972).
+	failCreate string
 }
 
 func newStandIn(ws []MachineInfo) *standIn { return &standIn{workspaces: ws, firstBootRuns: true} }
@@ -284,6 +286,9 @@ func (s *standIn) Create(name string, options any, firstBoot *string) (*MachineI
 		s.firstBoots = append(s.firstBoots, *firstBoot)
 	}
 	s.madeWith = append(s.madeWith, options)
+	if s.failCreate != "" {
+		return nil, false, &ProviderFailure{s.failCreate}
+	}
 	made := MachineInfo{ID: "ws-" + name, Name: name, State: "starting", SSH: new("root@10.0.0.9")}
 	s.workspaces = append(s.workspaces, made)
 	return &made, s.firstBootRuns, nil

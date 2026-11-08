@@ -238,6 +238,8 @@ type Providers struct {
 	// (#3348): one try each time one starts.
 	broughtBack map[string]bool
 	joining     map[string]*joining
+	// Makes that failed, by provider (#3972).
+	failedMakes map[string][]failedMake
 	// The machines installing Agents in a codespace for Add as Machine… (#3497), by how
 	// many installs: only their machine/installProgress is said to clients.
 	installing map[string]int
@@ -284,7 +286,8 @@ func NewProviders(cfg Config) *Providers {
 		providers: map[string]heldProvider{}, connections: map[string]Provider{}, listed: map[string]*listed{},
 		activities: map[string]*activity{}, problems: map[string]string{}, statuses: map[string]MachineStatus{},
 		idleTimers: map[string]*time.Timer{}, idleStopping: map[string]int{}, stoppedBy: map[string]string{},
-		broughtBack: map[string]bool{}, joining: map[string]*joining{}, done: make(chan struct{})}
+		broughtBack: map[string]bool{}, joining: map[string]*joining{}, failedMakes: map[string][]failedMake{},
+		done: make(chan struct{})}
 }
 
 // KeepWith keeps prompts and starts for this control plane's stopped hosts (US3).
@@ -704,7 +707,7 @@ func (p *Providers) answer(method string, params json.RawMessage, caller Caller,
 		return ProviderOptions{Schema: rawOf(schema)}, nil
 	case MethodProvidersCreate:
 		var request ProviderCreate
-		if err := requireParams(params, &request, "ProviderCreate", "id", "name"); err != nil {
+		if err := requireParams(params, &request, "ProviderCreate"); err != nil {
 			return nil, err
 		}
 		return p.create(request, who, &caller)
@@ -840,6 +843,10 @@ func (p *Providers) Summaries() []ProviderSummary {
 	for id, l := range p.listed {
 		lists[id] = *l
 	}
+	failed := map[string][]failedMake{}
+	for id, f := range p.failedMakes {
+		failed[id] = append([]failedMake{}, f...)
+	}
 	p.mu.Unlock()
 	sort.Slice(held, func(i, j int) bool { return held[i].record.Name < held[j].record.Name })
 	out := []ProviderSummary{}
@@ -858,6 +865,9 @@ func (p *Providers) Summaries() []ProviderSummary {
 		for _, w := range l.workspaces {
 			w.Host = optional(wire.MachineRef(linked[r.ID+"/"+w.ID]))
 			workspaces = append(workspaces, w)
+		}
+		for _, f := range failed[r.ID] {
+			workspaces = append(workspaces, f.info)
 		}
 		caps := r.Capabilities
 		if caps == nil {
@@ -993,6 +1003,9 @@ func (p *Providers) save(request ProviderAdd, updating bool, caller Caller) (Pro
 	if heldBefore != nil {
 		record.Rev = heldBefore.Rev + 1
 		record.Group = heldBefore.Group
+		record.AddedAt = heldBefore.AddedAt
+	} else {
+		record.AddedAt = new(records.Now())
 	}
 	data, err := records.Encode(record)
 	if err != nil {
@@ -1675,8 +1688,20 @@ var hostNamePattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9-]{0,62}$`)
 // create is WorkspaceProviders.create (FR-040, FR-041): a workspace made with a one-time
 // install command and host code for its first boot, so it joins by itself and is linked.
 // A provider that cannot run it says so, and the person adds it over ssh.
+//
+// With no provider, name or options, it takes the person's default provider, the next
+// machine-N and the provider's defaults (#3972). A make that fails stays as a failed row.
 func (p *Providers) create(request ProviderCreate, who string, caller *Caller) (any, error) {
-	id := string(request.ID)
+	person := ""
+	if caller != nil {
+		person = caller.Person
+	}
+	id := string(deref(request.ID))
+	if id == "" {
+		if id = p.defaultProvider(person); id == "" {
+			return nil, invalid("There is no machine provider you may make machines with. Add one in Settings ▸ Machine Providers.")
+		}
+	}
 	p.mu.Lock()
 	held, ok := p.providers[id]
 	p.mu.Unlock()
@@ -1684,7 +1709,13 @@ func (p *Providers) create(request ProviderCreate, who string, caller *Caller) (
 		return nil, invalid("There is no such provider.")
 	}
 	provider := held.record
-	name := strings.TrimSpace(request.Name)
+	name := strings.TrimSpace(deref(request.Name))
+	if name == "" {
+		var err error
+		if name, err = p.nextName(person, id); err != nil {
+			return nil, err
+		}
+	}
 	if !hostNamePattern.MatchString(name) {
 		return nil, invalid("A workspace’s name is letters, digits and dashes, and starts with a letter.")
 	}
@@ -1695,10 +1726,6 @@ func (p *Providers) create(request ProviderCreate, who string, caller *Caller) (
 	}
 	// The install line holds a host code: passed on, never logged.
 	// The workspace's machine is the starter's (FR-028).
-	person := ""
-	if caller != nil {
-		person = caller.Person
-	}
 	command, err := p.hooks.HostCommand(person)
 	if err != nil {
 		var f *Failure
@@ -1711,7 +1738,7 @@ func (p *Providers) create(request ProviderCreate, who string, caller *Caller) (
 	began := time.Now()
 	options := valueOf(request.Options)
 	if options == nil {
-		options = map[string]any{}
+		options = p.defaultOptions(id)
 	}
 	// A repository (#1809): the provider makes the workspace from it when its form asks for
 	// one (Codespaces), and otherwise the host clones it first once it joins.
@@ -1743,6 +1770,7 @@ func (p *Providers) create(request ProviderCreate, who string, caller *Caller) (
 	})
 	if err != nil {
 		p.log(fmt.Sprintf("workspace: create %s at %s by %s: failed: %s", name, provider.Name, who, errorWords(err)))
+		p.failed(id, name, person, errorWords(err))
 		return nil, err
 	}
 	p.Refresh(id)

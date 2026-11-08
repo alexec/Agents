@@ -148,10 +148,8 @@ func (d *Daemon) makeMachine(agent wire.UUID, args map[string]json.RawMessage) (
 	if err != nil {
 		return "", err
 	}
-	name, err := named(args, "name", "name for the new machine")
-	if err != nil {
-		return "", err
-	}
+	// With no name, the control plane takes the person's next machine-N (#3972).
+	name := strings.TrimSpace(argString(args, "name"))
 	// Checked before the card: the person is never asked about what can't be done (#855).
 	listed, err := d.agentWorkspaces(agent)
 	if err != nil {
@@ -165,7 +163,7 @@ func (d *Daemon) makeMachine(agent wire.UUID, args map[string]json.RawMessage) (
 		return "", Invalid("Nothing was made: %s can’t make machines.", found.Name)
 	}
 	for _, w := range found.Workspaces {
-		if strings.EqualFold(w.Name, name) {
+		if name != "" && strings.EqualFold(w.Name, name) {
 			return "", Invalid("Nothing was made: %s has a machine called %s already.", found.Name, name)
 		}
 	}
@@ -184,7 +182,10 @@ func (d *Daemon) makeMachine(agent wire.UUID, args map[string]json.RawMessage) (
 		}
 		choices = append(choices, k+" "+s)
 	}
-	question := "Make a new machine, " + name + ", at " + found.Name
+	question := "Make a new machine at " + found.Name
+	if name != "" {
+		question = "Make a new machine, " + name + ", at " + found.Name
+	}
 	if len(choices) > 0 {
 		question += " (" + strings.Join(choices, ", ") + ")"
 	}
@@ -195,7 +196,10 @@ func (d *Daemon) makeMachine(agent wire.UUID, args map[string]json.RawMessage) (
 	if !yes {
 		return "Nothing was made: the person said no, or didn’t answer.", nil
 	}
-	params := map[string]any{"id": found.ID, "name": name}
+	params := map[string]any{"id": found.ID}
+	if name != "" {
+		params["name"] = name
+	}
 	if len(args["options"]) > 0 && string(args["options"]) != "null" {
 		params["options"] = args["options"]
 	}
