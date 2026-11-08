@@ -98,6 +98,20 @@ test("the event wait card groups events with the same source and filters", () =>
   ]);
 });
 
+test("the event wait card says a list argument in words (#4003)", () => {
+  const wait = { id: "w", from: 0, since: 0, patterns: [
+    { name: "issue.closed", filters: {} },
+    { name: "pr.merged", filters: {} },
+  ], serverEvents: [
+    { trigger: { event: "issue.closed", servers: ["github"], arguments: { issue: [3986, 3987, 3988] } }, servers: ["github"] },
+    { trigger: { event: "pr.merged", servers: ["github"], arguments: { fixes: ["#3986", "#3991"] } }, servers: ["github"] },
+  ] };
+  assert.deepEqual(lines.eventWaitSummaryLines(wait, title).map((line) => [line.arguments, line.url]), [
+    [["issue 3986, 3987 or 3988"], undefined],
+    [["fixes #3986 or #3991"], undefined],
+  ]);
+});
+
 test("the event wait card links to the PR or issue its arguments name (#3077)", () => {
   const wait = { id: "w", from: 0, since: 0, patterns: [
     { name: "pr.merged", filters: {} },

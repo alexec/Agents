@@ -159,6 +159,24 @@ struct WaitStatusTests {
         #expect(lines[0].url == URL(string: "https://github.com/alexec/Agents/pull/123"))
     }
 
+    /// A list argument reads as its values in words, not Swift's debug text (#4003).
+    @Test func theWaitCardSaysAListInWords() throws {
+        let wait = EventWait(patterns: [EventPattern("issue.closed"), EventPattern("pr.merged")], from: 0, since: since,
+                             serverEvents: [
+            WaitServerEvent(trigger: MCPEventTrigger(event: "issue.closed",
+                                                      arguments: ["issue": .array([.int(3986), .int(3987), .int(3988)])]),
+                            servers: ["github"]),
+            WaitServerEvent(trigger: MCPEventTrigger(event: "pr.merged",
+                                                      arguments: ["fixes": .array([.string("#3986"), .string("#3991")])]),
+                            servers: ["github"]),
+        ])
+        let lines = WaitEventLine.lines(for: wait, names: { _ in nil })
+        try #require(lines.count == 2)
+        #expect(lines[0].arguments == ["issue 3986, 3987 or 3988"])
+        #expect(lines[1].arguments == ["fixes #3986 or #3991"])
+        #expect(lines.allSatisfy { $0.url == nil })
+    }
+
     @Test func theWaitCardHasNoLinkWithoutAPROrAnIssue() throws {
         let wait = EventWait(patterns: [EventPattern("mac.wake")], from: 0, since: since)
         let lines = WaitEventLine.lines(for: wait, names: { _ in nil })

@@ -314,9 +314,16 @@ function waitSourceName(event: string): string {
   return "Agents";
 }
 
+/** An argument in words: a list is its values joined with ", " and a last " or " (#4003); an object is JSON. */
 function valueWords(value: unknown): string {
   if (typeof value === "string") return value;
   if (value === null || typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) {
+    const words = value.map(valueWords);
+    const last = words.pop();
+    if (last === undefined) return "[]";
+    return words.length === 0 ? last : `${words.join(", ")} or ${last}`;
+  }
   return JSON.stringify(value) ?? "null";
 }
 
