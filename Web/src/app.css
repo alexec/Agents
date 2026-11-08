@@ -1602,6 +1602,8 @@ dialog.sheet:has(.settings-sheet) { width: min(760px, calc(100vw - 32px)); max-h
 .summary-page { display: flex; flex-direction: column; }
 .summary-page .summary-body { flex: 1; overflow: auto; padding: 16px 24px; max-width: 760px; }
 .summary-page .summary-body hr { border: none; border-top: 1px solid var(--paper-rule); margin: 16px 0; }
+/* The daily summary's control under the page, as Settings ▸ Workflows draws it: a row per setting. */
+.summary-page .daily-summary .setting { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0; }
 
 /* A tool's view in the chat (#187): the row holds its place; the frame is in the layer. */
 .transcript { position: relative; }

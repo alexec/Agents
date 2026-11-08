@@ -4354,10 +4354,13 @@ final class AppModel {
         async let transcript: Void = loadTranscript()
         async let popped: Void = loadPoppedTranscripts()
         async let auto: Void = refreshAuto()
+        // The Summary row (#3721): shown only while the daily summary is on, with its newest page.
+        async let dailySummary: Void = refreshDailySummarySettings()
+        async let summaries: Void = refreshSummaryPages()
         _ = await (popped, runtimes, accounts, workflows, pinned, requests, permissions,
                    elicitations, attention, resuming, cost, retention, clientPermissions, cloning, wake, leases, events, modes,
                    transcript, runtimeStates, sandbox, person, disk, storeNotes, hostedMCP, mcpHealth, achievements, multiplier,
-                   display, auto)
+                   display, auto, dailySummary, summaries)
     }
 
     #if DEBUG
