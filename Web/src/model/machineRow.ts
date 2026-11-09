@@ -17,6 +17,24 @@ export function machineDot(host: ControlMachine, online: boolean, starting: bool
   return "offline";
 }
 
+/** A row's icon (#4113), as the window's MachineIcon: its shape says the kind, its colour the state, so the row has no dot. */
+export type MachineIconTone = "accent" | "busy" | "failure" | "attention" | "stopped";
+export type MachineKind = "mac" | "cloud" | "rack";
+
+/** The most urgent wins: busy, then red (offline, failed or a low disk), then amber, then grey, then the accent. */
+export function machineIcon(dot: MachineDot, diskLow: boolean): MachineIconTone {
+  if (dot === "busy") return "busy";
+  if (dot === "offline" || diskLow) return "failure";
+  if (dot === "attention") return "attention";
+  if (dot === "stopped") return "stopped";
+  return "accent";
+}
+
+/** A laptop for This Mac, a cloud for a machine a provider made, a rack for a registered one. */
+export function machineKind(host: ControlMachine, macID: string): MachineKind {
+  return host.id === macID ? "mac" : host.workspace ? "cloud" : "rack";
+}
+
 export interface MachineActions {
   start: boolean;
   stop: boolean;

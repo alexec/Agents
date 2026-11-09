@@ -292,7 +292,13 @@ struct MachineRow: View {
         let need = model.need(of: host)
         let words = need.map { MachineNeedWords.line($0, name: name, row: row) }
         let actions = MachineRowActions.of(row, isThisMac: host == .mac)
+        let dot = MachineDot.of(row, online: !model.hostUnreachable(host),
+                                starting: model.hostsBeingStarted.contains(host))
         HStack(alignment: .firstTextBaseline, spacing: 6) {
+            // A laptop, a cloud or a rack, in its state's colour (#4113): the row has no dot.
+            MachineIconView(symbol: MachineIcon.symbol(isThisMac: host == .mac, row: row),
+                            icon: MachineIcon.of(dot, diskLow: model.diskWarns(host)))
+                .frame(width: 16)
             VStack(alignment: .leading, spacing: 2) {
                 Text(name).foregroundStyle(.primary).lineLimit(1)
                 if let words {
@@ -304,14 +310,12 @@ struct MachineRow: View {
                 }
             }
             Spacer(minLength: 4)
-            MachineDotView(dot: MachineDot.of(row, online: !model.hostUnreachable(host),
-                                              starting: model.hostsBeingStarted.contains(host)))
         }
         .help(words.map { "\(name): \($0)" } ?? (model.diskWarns(host)
             ? "\(name): a disk is low. Its CPU, memory, disks, worktrees, runtimes and resources"
             : "\(name): its CPU, memory, disks, worktrees, runtimes and resources"))
         .accessibilityElement(children: .contain)
-        .accessibilityValue(words ?? "")
+        .accessibilityValue(words ?? (dot == .online ? "Online" : ""))
         .swipeActions(edge: .leading) {
             if actions.start {
                 SwipeAction("Start", systemImage: "play") { await model.startHost(host) }.tint(Paper.accent)
@@ -455,26 +459,6 @@ enum MachineSheet: String, Identifiable {
     var id: String { rawValue }
     /// Opened with the control plane's model, as Settings ▸ Machines had them.
     var needsControl: Bool { self == .update || self == .folders || self == .link }
-}
-
-/// A machine's dot (#3973): green online, amber and turning while it changes, grey and hollow
-/// stopped, red offline, amber when it needs an update.
-private struct MachineDotView: View {
-    let dot: MachineDot
-
-    var body: some View {
-        Group {
-            switch dot {
-            case .online: Circle().tinted(.vouched)
-            case .busy: SyncedSpinner(diameter: 8, color: StateTint.attention.color ?? .secondary)
-            case .stopped: Circle().strokeBorder(.secondary, lineWidth: 1.2)
-            case .offline: Circle().tinted(.failure)
-            case .attention: Circle().tinted(.attention)
-            }
-        }
-        .frame(width: 8, height: 8)
-        .accessibilityHidden(true)
-    }
 }
 
 extension AppModel {

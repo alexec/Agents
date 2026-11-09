@@ -121,10 +121,6 @@ function PageMark({ store, page }: { store: Store; page: NavPage }) {
   if (page.id === "reportPolicy" && policyNotSaved(store)) return <span class="quiet small attention">Not saved</span>;
   if (page.id === "policy" && orgPolicyNotSaved(store)) return <span class="quiet small attention">Not saved</span>;
   // Connectors: a connector of the person's that does not answer, or a connection that ended (#3407), as the window's red icon.
-  // A machine with a low disk (#3626), as the window's red row.
-  if (page.draw.kind === "machine" && (store.disk.value[page.draw.host]?.alarms ?? []).some((a) => a.level !== "ok")) {
-    return <span class="small failure" title="A disk is low" aria-label="A disk is low">●</span>;
-  }
   if (page.id === "mcp") {
     const words = store.connectorsWarning();
     if (words) return <span class="small failure" title={words} aria-label={words}>●</span>;
@@ -178,7 +174,7 @@ export function SectionPage({ store, section, down }: { store: Store; section: E
               ) : <h2 class="section-head">{group}</h2>}
               {pages.map((p) => p.draw.kind === "machine" ? (
                 <MachineRow key={p.id} store={store} host={p.draw.host} on={p.id === open?.id}
-                  open={() => go({ nav: section, section: p.id })} mark={<PageMark store={store} page={p} />}>
+                  open={() => go({ nav: section, section: p.id })}>
                   <MachineNeedLine store={store} host={p.draw.host} />
                 </MachineRow>
               ) : (

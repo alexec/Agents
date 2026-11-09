@@ -1,11 +1,12 @@
-// A machine's row in the Machines section (#3974), as the window's MachineRow (#3973): the dot, the
-// name and the grey line; its menu on a right-click, from ··· on hover or a finger held on it; and on
+// A machine's row in the Machines section (#3974), as the window's MachineRow (#3973): the icon (its
+// kind in its shape, its state in its colour, #4113), the name and the grey line; its menu on a right-click, from ··· on hover or a finger held on it; and on
 // a touch screen a swipe to the right starts or stops it, to the left deletes or removes it, both asked first.
 import { useRef } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import type { Store } from "../model/store";
-import { deleteQuestion, machineActions, machineDot, machineSwipes, removeQuestion, swipeDistance } from "../model/machineRow";
+import { deleteQuestion, machineActions, machineDot, machineIcon, machineKind, machineSwipes, removeQuestion, swipeDistance,
+  type MachineIconTone, type MachineKind } from "../model/machineRow";
 import { machineSheets } from "../model/machineSheets";
 import { placedSessions } from "../model/overview";
 import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
@@ -22,8 +23,26 @@ function openSettings(host: string, section: string) {
 
 const swipeWords = { start: "Start", stop: "Stop", delete: "Delete", remove: "Remove" } as const;
 
-export function MachineRow({ store, host, on, open, mark, children }: {
-  store: Store; host: string; on: boolean; open: () => void; mark: ComponentChildren; children: ComponentChildren;
+/** A laptop, a cloud or a rack, as the window's SF Symbols, in its state's colour; amber pulses while it changes. */
+function MachineIcon({ kind, tone }: { kind: MachineKind; tone: MachineIconTone }) {
+  return (
+    <svg class={`machine-icon ${tone}`} viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor"
+      stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">
+      {kind === "mac" && <><rect x="3" y="3.5" width="10" height="7" rx="1" /><path d="M1.5 12.5h13" /></>}
+      {kind === "cloud" && <path d="M4.5 12.5a3 3 0 0 1-.4-6 4 4 0 0 1 7.7-.9 3.5 3.5 0 0 1 .2 6.9z" />}
+      {kind === "rack" && <><rect x="2.5" y="2.5" width="11" height="4.5" rx="1" /><rect x="2.5" y="9" width="11" height="4.5" rx="1" />
+        <path d="M5 4.75h.01M5 11.25h.01" /></>}
+    </svg>
+  );
+}
+
+/** The state in words, for a screen reader, as the window's row says it: the icon's colour is never the only sign. */
+const toneWords: Record<MachineIconTone, string> = {
+  accent: "Online", busy: "Changing", failure: "Needs attention", attention: "Needs an update", stopped: "Stopped",
+};
+
+export function MachineRow({ store, host, on, open, children }: {
+  store: Store; host: string; on: boolean; open: () => void; children: ComponentChildren;
 }) {
   const row = store.hosts.value.find((h) => h.id === host);
   const dx = useSignal(0);
@@ -38,6 +57,9 @@ export function MachineRow({ store, host, on, open, mark, children }: {
   const swipes = machineSwipes(actions);
   const sheets = machineSheets(row, store.macHostID.value, store.hostIsOnline(host));
   const dot = machineDot(row, store.hostIsOnline(host), store.hostsBeingStarted.value.includes(host));
+  const diskLow = (store.disk.value[host]?.alarms ?? []).some((a) => a.level !== "ok");
+  const tone = machineIcon(dot, diskLow);
+  const stateWords = tone === "failure" && dot !== "offline" ? "A disk is low" : toneWords[tone];
 
   const stop = async () => {
     const asked = await store.providers.stop(host);
@@ -116,8 +138,8 @@ export function MachineRow({ store, host, on, open, mark, children }: {
             onClick={() => { if (swiped.current) { swiped.current = false; return; } open(); }}
             onContextMenu={(e) => openContextMenu(e, items())}
             onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, items()); }}>
-            <span class="machine-name"><span class={`machine-dot ${dot}`} aria-hidden="true" />{name}</span>
-            {mark}
+            <span class="machine-name"><MachineIcon kind={machineKind(row, store.macHostID.value)} tone={tone} />{name}
+              <span class="visually-hidden">, {stateWords}</span></span>
           </button>
           {!mac && <button type="button" class="machine-more" aria-label={`More for ${name}`}
             onClick={(e) => openContextMenu(e, items())}>···</button>}
@@ -129,11 +151,11 @@ export function MachineRow({ store, host, on, open, mark, children }: {
   );
 }
 
-/** A machine New Machine is making (#3974): an amber, turning dot and `Making…` until it joins. */
+/** A machine New Machine is making (#3974): an amber, pulsing cloud and `Making…` until it joins. */
 export function MakingRow({ name }: { name: string }) {
   return (
     <div class="machine-row making" role="status">
-      <span class="sub-app-row"><span class="machine-name"><span class="machine-dot busy" aria-hidden="true" />{name || "New machine"}</span></span>
+      <span class="sub-app-row"><span class="machine-name"><MachineIcon kind="cloud" tone="busy" />{name || "New machine"}</span></span>
       <p class="machine-need quiet small">Making…</p>
     </div>
   );

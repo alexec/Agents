@@ -230,16 +230,12 @@ struct FolderListView: View {
                 Text("Status").appText(.supporting)
             }
 
-            // A row per machine (#3626), each its page: CPU, memory and disks. Red when a
-            // disk is low.
+            // A row per machine (#3626), each its page: CPU, memory and disks. Its icon says
+            // its kind and, in its colour, its state (#4113).
             if !machines.isEmpty {
                 Section(isExpanded: $showsMachines) {
                     ForEach(machines, id: \.self) { host in
-                        // A cloud for a machine a provider made, a rack for a registered one (#3973).
                         MachineRow(host: host) { picked = [.machine(host)] }
-                            .activityIcon(host == .mac ? "laptopcomputer"
-                                : model.hosts.controlRows[host]?.workspace != nil ? "cloud" : "server.rack",
-                                          warns: model.diskWarns(host))
                             .appText(.supporting).sidebarInk(.machine(host)).tag(SidebarItem.machine(host))
                     }
                 } header: {

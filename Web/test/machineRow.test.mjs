@@ -61,3 +61,19 @@ test("New Machine names the default once there are two providers (#3979)", () =>
 test("a machine being made has a row until one of its name joins", () => {
   assert.deepEqual(m.makingRows(["", "machine-2", "machine-1"], [{ name: "machine-1" }]), ["", "machine-2"]);
 });
+
+test("the icon's colour says the state, the most urgent first (#4113)", () => {
+  assert.equal(m.machineIcon("online", false), "accent");
+  assert.equal(m.machineIcon("busy", true), "busy", "a change under way wins over a low disk");
+  assert.equal(m.machineIcon("offline", false), "failure");
+  assert.equal(m.machineIcon("online", true), "failure", "a low disk is red");
+  assert.equal(m.machineIcon("attention", true), "failure", "red wins over amber");
+  assert.equal(m.machineIcon("attention", false), "attention");
+  assert.equal(m.machineIcon("stopped", false), "stopped");
+});
+
+test("the icon's shape says the kind", () => {
+  assert.equal(m.machineKind(mac, "mac"), "mac");
+  assert.equal(m.machineKind(made("online"), "mac"), "cloud");
+  assert.equal(m.machineKind(registered, "mac"), "rack");
+});
