@@ -338,7 +338,7 @@ func (d *Daemon) changeGrant(name string, use wire.SecretUse, place string, add 
 	defer d.sealedSecretsMu.Unlock()
 	f := readSealedSecrets(home)
 	s, ok := f.Secrets[name]
-	if !ok {
+	if !ok || s.NoAsk {
 		return Invalid("%s does not have Ask before use on this machine.", name)
 	}
 	g := grantPlace(use, place)

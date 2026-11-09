@@ -17,6 +17,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/skillcatalog"
 	"github.com/alexec/agents/Go/internal/agentsd/store"
@@ -37,11 +38,17 @@ import (
 // the control plane released its key for a person's signed approval (secretrelease.go). A
 // Linux machine with no control plane keeps no flagged value.
 //
-// The associated data binds where it is kept, its name and its grants (#4015's "Allow
-// always" places), so a record moved or changed by hand does not open. Being sealed is the
-// flag: turning it on takes the plain line out, turning it off puts it back.
+// The associated data binds where it is kept, its name, the flag and its grants (#4015's
+// "Allow always" places), so a record moved or changed by hand does not open. Turning the
+// flag on takes the plain line out, turning it off puts it back.
 //
-//	~/.agents-secrets/sealed.json   0600, {"v":1,"secrets":{NAME:{sealed,grants,from,setAt}}}
+// The store also keeps secrets with the flag off (#4176, the spike #4168): the machine's
+// seal only, with no release layer on Linux, so one opens with no approval and a Linux
+// machine with no control plane keeps it. agentsd opens them once each time the store
+// changes and keeps the values in its memory (plainStoreSecrets); every reader of
+// secrets.env reads them first.
+//
+//	~/.agents-secrets/sealed.json   0600, {"v":1,"secrets":{NAME:{sealed,grants,noAsk,from,setAt}}}
 //	sessions/<agent>.json           a session's flagged secret, its "sealed" in place of "value"
 
 const (
@@ -58,7 +65,33 @@ const (
 type sealedSecretsState struct {
 	sealedSecretsMu sync.Mutex
 	releaseState
+	plainStoreMu sync.Mutex
+	plainStore   plainStoreCache
 }
+
+// plainStoreCache is the store's values with the flag off, opened, for the sealed.json they
+// came from.
+type plainStoreCache struct {
+	home   string
+	info   os.FileInfo
+	values map[string]string
+	// failed is when this machine's key last did not read: tried again after plainStoreRetry.
+	failed time.Time
+}
+
+// plainStoreRetry is how long a store whose key did not read is left before agentsd tries
+// the key again: a read that waits on a Keychain prompt takes seconds (#4045).
+const plainStoreRetry = time.Minute
+
+// machineKeyError is this machine's key that does not read (#4045, a changed signature on a
+// Mac): every secret in sealed.json then stops, flag on or off, and each says so the same way.
+type machineKeyError struct{ err error }
+
+func (e machineKeyError) Error() string {
+	return "this machine's key for its secrets does not read, so no secret kept in sealed.json opens until it does (" + e.err.Error() + ")"
+}
+
+func (e machineKeyError) Unwrap() error { return e.err }
 
 type sealedSecretsFile struct {
 	V       int                    `json:"v"`
@@ -72,9 +105,12 @@ type sealedValue struct {
 	Grants []string `json:"grants,omitempty"`
 	// Release says what the machine's key seals is the value's release layer (#4058), not
 	// the value: it opens only with the key the control plane releases.
-	Release bool      `json:"release,omitempty"`
-	From    string    `json:"from,omitempty"`
-	SetAt   wire.Date `json:"setAt"`
+	Release bool `json:"release,omitempty"`
+	// NoAsk is the flag off (#4176): it opens with no approval, and has no grants and no
+	// release layer.
+	NoAsk bool      `json:"noAsk,omitempty"`
+	From  string    `json:"from,omitempty"`
+	SetAt wire.Date `json:"setAt"`
 }
 
 func sealedSecretsPath(home string) string {
@@ -86,9 +122,13 @@ func sealedSessionStore(agent wire.UUID) string { return "session:" + string(age
 
 // sealedSecretAD is what each seal binds: the store, the name, the flag, the grants and
 // whether it holds a release layer.
-func sealedSecretAD(storeName, name string, grants []string, release bool) []byte {
+func sealedSecretAD(storeName, name string, grants []string, release, noAsk bool) []byte {
 	g, _ := json.Marshal(grants)
-	ad := fmt.Appendf(nil, "sealedsecret.v1|%s|%s|ask|%s", storeName, name, g)
+	flag := "ask"
+	if noAsk {
+		flag = "noask"
+	}
+	ad := fmt.Appendf(nil, "sealedsecret.v1|%s|%s|%s|%s", storeName, name, flag, g)
 	if release {
 		ad = append(ad, "|release"...)
 	}
@@ -103,7 +143,7 @@ func (d *Daemon) sealingKey() ([]byte, error) {
 	}
 	private, err := controllink.HostPrivateKey(d.HostKey)
 	if err != nil {
-		return nil, err
+		return nil, machineKeyError{err}
 	}
 	return hkdf.Key(sha256.New, private, nil, sealedSecretsInfo, 32)
 }
@@ -119,11 +159,17 @@ func (d *Daemon) sealSecret(storeName, name, value string, grants []string) (sea
 		}
 		plain, _ = json.Marshal(layer)
 	}
-	return d.sealOuter(storeName, name, plain, grants, release)
+	return d.sealOuter(storeName, name, plain, grants, release, false)
+}
+
+// sealPlainSecret seals a value with the flag off (#4176): to the machine's key only, on
+// Linux too, so it opens with no approval and needs no control plane.
+func (d *Daemon) sealPlainSecret(storeName, name, value string) (sealedValue, error) {
+	return d.sealOuter(storeName, name, []byte(value), nil, false, true)
 }
 
 // sealOuter is the seal to the machine's key, of the value or of its release layer.
-func (d *Daemon) sealOuter(storeName, name string, plain []byte, grants []string, release bool) (sealedValue, error) {
+func (d *Daemon) sealOuter(storeName, name string, plain []byte, grants []string, release, noAsk bool) (sealedValue, error) {
 	gcm, err := d.sealingGCM()
 	if err != nil {
 		return sealedValue{}, err
@@ -131,8 +177,8 @@ func (d *Daemon) sealOuter(storeName, name string, plain []byte, grants []string
 	grants = sortedGrants(grants)
 	nonce := make([]byte, gcm.NonceSize())
 	rand.Read(nonce)
-	return sealedValue{Sealed: gcm.Seal(nonce, nonce, plain, sealedSecretAD(storeName, name, grants, release)),
-		Grants: grants, Release: release, SetAt: now()}, nil
+	return sealedValue{Sealed: gcm.Seal(nonce, nonce, plain, sealedSecretAD(storeName, name, grants, release, noAsk)),
+		Grants: grants, Release: release, NoAsk: noAsk, SetAt: now()}, nil
 }
 
 func (d *Daemon) sealingGCM() (cipher.AEAD, error) {
@@ -155,10 +201,14 @@ func (d *Daemon) openOuter(storeName, name string, s sealedValue) ([]byte, error
 	if err != nil {
 		return nil, err
 	}
+	return openOuterWith(gcm, storeName, name, s)
+}
+
+func openOuterWith(gcm cipher.AEAD, storeName, name string, s sealedValue) ([]byte, error) {
 	if len(s.Sealed) < gcm.NonceSize() {
 		return nil, errors.New("not a sealed value")
 	}
-	plain, err := gcm.Open(nil, s.Sealed[:gcm.NonceSize()], s.Sealed[gcm.NonceSize():], sealedSecretAD(storeName, name, s.Grants, s.Release))
+	plain, err := gcm.Open(nil, s.Sealed[:gcm.NonceSize()], s.Sealed[gcm.NonceSize():], sealedSecretAD(storeName, name, s.Grants, s.Release, s.NoAsk))
 	if err != nil {
 		return nil, errors.New("it does not open with this machine's key")
 	}
@@ -189,7 +239,7 @@ func (d *Daemon) regrant(storeName, name string, s sealedValue, grants []string)
 		return sealedValue{}, err
 	}
 	defer clear(plain)
-	return d.sealOuter(storeName, name, plain, grants, s.Release)
+	return d.sealOuter(storeName, name, plain, grants, s.Release, s.NoAsk)
 }
 
 func sortedGrants(g []string) []string {
@@ -229,7 +279,7 @@ func writeSealedSecrets(home string, f sealedSecretsFile) error {
 	return store.WriteAtomically(p, b, 0o600)
 }
 
-// sealedLocalSecret is the value of a flagged secret of this machine, opened.
+// sealedLocalSecret is the value of a secret in this machine's store, opened: flag on or off.
 func (d *Daemon) sealedLocalSecret(home, name string) (string, bool) {
 	s, ok := readSealedSecrets(home).Secrets[name]
 	if !ok {
@@ -253,15 +303,92 @@ func (d *Daemon) secretIsSealed(agent wire.UUID, name string) bool {
 	return home != "" && isSealedSecret(home, name)
 }
 
-// isSealedSecret is whether name is flagged here, without opening it.
+// isSealedSecret is whether name has Ask before use here, without opening it. A record in
+// the store with the flag off (#4176) is not.
 func isSealedSecret(home, name string) bool {
-	_, ok := readSealedSecrets(home).Secrets[name]
-	return ok
+	s, ok := readSealedSecrets(home).Secrets[name]
+	return ok && !s.NoAsk
+}
+
+// secretIsSet is whether name is set here: in the store, flag on or off, or in secrets.env.
+func secretIsSet(home, name string) bool {
+	if _, ok := readSealedSecrets(home).Secrets[name]; ok {
+		return true
+	}
+	return skillcatalog.LoadSecrets(skillcatalog.SecretsPath(home)).IsSet(name)
+}
+
+// plainSecrets is what is set with the flag off, for reading: secrets.env, with the store's
+// values over it (#4176).
+func (d *Daemon) plainSecrets(home string) skillcatalog.Secrets {
+	s := skillcatalog.LoadSecrets(skillcatalog.SecretsPath(home))
+	for name, v := range d.plainStoreSecrets(home) {
+		s.Set(name, v)
+	}
+	return s
+}
+
+// plainStoreSecrets is the store's values with the flag off, opened once each time
+// sealed.json changes and kept in agentsd's memory, which it makes private first. Not to be
+// changed. When this machine's key does not read, it is empty, with one error for every
+// secret in the log, and the key is tried again after plainStoreRetry.
+func (d *Daemon) plainStoreSecrets(home string) map[string]string {
+	info, err := os.Stat(sealedSecretsPath(home))
+	if err != nil {
+		info = nil
+	}
+	d.plainStoreMu.Lock()
+	defer d.plainStoreMu.Unlock()
+	c := &d.plainStore
+	same := c.home == home && sameFileStamp(c.info, info)
+	if same && (c.failed.IsZero() || time.Since(c.failed) < plainStoreRetry) {
+		return c.values
+	}
+	wasFailing := same && !c.failed.IsZero()
+	*c = plainStoreCache{home: home, info: info}
+	var names []string
+	f := readSealedSecrets(home)
+	for name, s := range f.Secrets {
+		if s.NoAsk {
+			names = append(names, name)
+		}
+	}
+	if len(names) == 0 {
+		return nil
+	}
+	gcm, err := d.sealingGCM()
+	if err != nil {
+		c.failed = time.Now()
+		if !wasFailing {
+			log.Printf("sealed secrets: %v; %d secrets with Ask before use off are not set until then", err, len(names))
+		}
+		return nil
+	}
+	d.keepMemoryPrivateOnce()
+	c.values = make(map[string]string, len(names))
+	for _, name := range names {
+		plain, err := openOuterWith(gcm, sealedLocal, name, f.Secrets[name])
+		if err != nil {
+			log.Printf("sealed secrets: %s: %v", name, err)
+			continue
+		}
+		c.values[name] = string(plain)
+	}
+	return c.values
+}
+
+// sameFileStamp is whether two looks at a file see the same one: a store written again is
+// a new file (store.WriteAtomically), or a new size or time.
+func sameFileStamp(a, b os.FileInfo) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return os.SameFile(a, b) && a.Size() == b.Size() && a.ModTime().Equal(b.ModTime())
 }
 
 // localSecret is what agentsd itself uses for name (fill_secret, set_ci_secret): the
-// session's own first (#3548), then a flagged one, then secrets.env. #4015 asks a person
-// here before a flagged value is used.
+// session's own first (#3548), then the store's (flag on or off, #4176), then secrets.env.
+// #4015 asks a person here before a flagged value is used.
 func (d *Daemon) localSecret(agent wire.UUID, name string) (value string, ok, expired bool) {
 	if v, has, exp := d.sessionSecret(agent, name); has {
 		return v, true, false
@@ -279,16 +406,23 @@ func (d *Daemon) localSecret(agent wire.UUID, name string) (value string, ok, ex
 	return v, ok, expired
 }
 
-// saveSealedSecret keeps value flagged: sealed.json, and out of secrets.env. Grants already
-// made for that name are kept: a new value is not a new place.
-func (d *Daemon) saveSealedSecret(home, name, value, from string) error {
+// saveSealedSecret keeps value in sealed.json, and out of secrets.env: flagged when ask, else
+// with the flag off (#4176). Grants already made for that name are kept: a new value is not
+// a new place.
+func (d *Daemon) saveSealedSecret(home, name, value, from string, ask bool) error {
 	d.sealedSecretsMu.Lock()
 	defer d.sealedSecretsMu.Unlock()
 	f := readSealedSecrets(home)
 	if f.Secrets == nil {
 		f.Secrets = map[string]sealedValue{}
 	}
-	s, err := d.sealSecret(sealedLocal, name, value, f.Secrets[name].Grants)
+	var s sealedValue
+	var err error
+	if ask {
+		s, err = d.sealSecret(sealedLocal, name, value, f.Secrets[name].Grants)
+	} else {
+		s, err = d.sealPlainSecret(sealedLocal, name, value)
+	}
 	if err != nil {
 		return fmt.Errorf("it could not be sealed: %w", err)
 	}
@@ -391,18 +525,21 @@ func (d *Daemon) setNeedsApproval(r wire.SecretNeedsApprovalRequest) error {
 		return Invalid("%s comes from Settings ▸ You ▸ Secrets: change Ask before use there, where your client seals it.", r.Name)
 	}
 	if r.NeedsApproval {
-		v, ok := skillcatalog.LoadSecrets(skillcatalog.SecretsPath(home)).Value(r.Name)
+		v, ok := d.plainSecrets(home).Value(r.Name)
 		if !ok {
 			if isSealedSecret(home, r.Name) {
 				return nil
 			}
 			return Invalid("%s is not set on this machine.", r.Name)
 		}
-		if err := d.saveSealedSecret(home, r.Name, v, ""); err != nil {
+		if err := d.saveSealedSecret(home, r.Name, v, "", true); err != nil {
 			return Invalid("%s was not changed: %s", r.Name, err.Error())
 		}
 		log.Printf("sealed secrets: %s turned on Ask before use", r.Name)
 		d.mcpChanged()
+		return nil
+	}
+	if s, ok := readSealedSecrets(home).Secrets[r.Name]; ok && s.NoAsk {
 		return nil
 	}
 	v, ok := d.sealedLocalSecret(home, r.Name)
