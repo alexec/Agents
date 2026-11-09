@@ -469,10 +469,16 @@ final class HostModel {
         // as it was, with its own control plane and membership.
         do { try services.leaveCode(code) } catch { problem = "\(error)"; return }
         let membership = paths.hostLocations.controlHostMembership
-        // A membership of this Mac's own control plane would be dialled instead.
+        // A membership of this Mac's own control plane would be dialled instead. It is kept
+        // aside for Use This Mac Only (#4228), so the host goes back as the machine it was.
         if FileManager.default.fileExists(atPath: membership.path) {
             do {
-                try FileManager.default.removeItem(at: membership)
+                try? FileManager.default.removeItem(at: keptHereMembership)
+                if settings.role == .runHere {
+                    try FileManager.default.moveItem(at: membership, to: keptHereMembership)
+                } else {
+                    try FileManager.default.removeItem(at: membership)
+                }
             } catch {
                 try? FileManager.default.removeItem(at: paths.hostLocations.controlJoinCode)
                 problem = "This Mac could not leave its control plane: \(error.localizedDescription)"
@@ -486,6 +492,28 @@ final class HostModel {
         guard await start(.daemon) else { return }
         if wasRunning { _ = await services.restart(.daemon) }
         await refresh()
+    }
+
+    /// This Mac's own control plane's membership while the host reports to another (#4228).
+    private var keptHereMembership: URL { paths.hostLocations.controlHostMembership.appendingPathExtension("here") }
+
+    /// **Use This Mac Only** (#4228): this Mac's host leaves the control plane elsewhere, so
+    /// that `runHere()` starts the one on this Mac again. The host goes back with the
+    /// membership it had there, kept aside by `joinElsewhere`, so it is the same machine;
+    /// with none kept, `runHere()` joins it afresh. The control plane elsewhere keeps its
+    /// record of this Mac, offline, until someone removes it there.
+    func leaveElsewhere() async throws {
+        guard settings.role == .joinElsewhere else { return }
+        let membership = paths.hostLocations.controlHostMembership
+        for file in [membership, paths.hostLocations.controlJoinCode] where FileManager.default.fileExists(atPath: file.path) {
+            try FileManager.default.removeItem(at: file)
+        }
+        let kept = FileManager.default.fileExists(atPath: keptHereMembership.path)
+        if kept { try FileManager.default.moveItem(at: keptHereMembership, to: membership) }
+        settings.role = .none
+        settings.save(paths)
+        // Started again, the host dials this Mac's control plane, and waits until it is up.
+        if kept, await services.running(.daemon) != nil { _ = await services.restart(.daemon) }
     }
 
     // MARK: Moved to another machine (T126, frame T)

@@ -143,7 +143,7 @@ func (d *Daemon) takeNotices(agent wire.UUID) string {
 }
 
 // resolveResource is ResourceCatalog.resolve on a server: a declared name, the screen, the
-// machine's browser (#3533), or a name of the agent's own. Under leaseMu.
+// machine's browser (#3533), a simulator by its UDID (#4222), or a name of the agent's own. Under leaseMu.
 func (d *Daemon) resolveResource(given string) (wire.ResourceName, wire.ResourceKind, string, bool) {
 	name, ok := resourceName(given)
 	if !ok {
@@ -159,6 +159,10 @@ func (d *Daemon) resolveResource(given string) (wire.ResourceName, wire.Resource
 	}
 	if name == browser.Resource {
 		return name, "browser", browser.DisplayName, true
+	}
+	if udid := simulatorLease(name); udid != "" {
+		// One lease for each simulator, whether the agent names it with simulator: or not.
+		return wire.ResourceName(simulatorLeasePrefix + strings.ToLower(udid)), "simulator", "Simulator " + udid, true
 	}
 	return name, "named", strings.TrimSpace(given), true
 }
@@ -190,12 +194,17 @@ func (d *Daemon) leaseResource(agent wire.UUID, args map[string]json.RawMessage)
 		json.Unmarshal(raw, &wait)
 	}
 
+	// A simulator by its name, found before the lock: simctl takes a moment.
+	simulator := simulatorDisplay(given)
 	d.leaseMu.Lock()
 	loaded := d.loadLeases()
 	name, kind, display, ok := d.resolveResource(given)
 	if !ok {
 		d.leaseMu.Unlock()
 		return "", leaseRefused(leaseEmptyName)
+	}
+	if kind == "simulator" && simulator != "" {
+		display = simulator
 	}
 	told := d.takeNotices(agent)
 	e := d.book.Entries[name]

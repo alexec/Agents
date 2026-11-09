@@ -89,6 +89,7 @@ const CapHostTeam1 = "host.team/1"
 const CapHostUpdate1 = "host.update/1"
 const CapHostUserSettings1 = "host.user-settings/1"
 const CapHostUserSettings2 = "host.user-settings/2"
+const CapHostWebPairing1 = "host.web-pairing/1"
 const CapHostWire1 = "host.wire/1"
 const CapHostsJoin1 = "hosts.join/1"
 const CapLineageComment1 = "lineage.comment/1"
@@ -750,6 +751,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"machine/orgRouteCheck", "host.org-routes/2"},
 	{"machine/orgRoutesAgain", "host.org-routes/2"},
 	{"machine/orgRoutesApplied", "host.org-routes/2"},
+	{"machine/pairWebPage", "host.web-pairing/1"},
 	{"machine/policyApplied", "host.policy/1"},
 	{"machine/providerDraft", "machine/1"},
 	{"machine/secretKey", "host.secret-release/1"},

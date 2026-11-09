@@ -36,6 +36,8 @@ type liveTileState struct {
 	liveMu    sync.Mutex
 	droveAt   map[liveKey]time.Time
 	driveEnds map[liveKey]*time.Timer
+	// simulatorWatches is the simulator leases being followed (simulatorlive.go).
+	simulatorWatches map[simulatorWatch]bool
 }
 
 // drove marks a call of agent's on source: its frames go for liveDriveWindow from now, and

@@ -153,6 +153,19 @@ Decided: connecting does not copy the local control plane's records (devices, co
 policy), because a single person has almost none, and their sessions are on the host,
 not the control plane. Alex can overrule.
 
+How (#4228):
+
+- **Sign in to agentloops.dev** opens `https://agentloops.dev/app/connect` in an
+  authentication session. Hosted signs the person in (or sees they are) and sends the app
+  a client code for their account's control plane on `agents://hosted` (`Go/internal/hosted/app.go`).
+  No native Apple sheet, so the app needs no `applesignin` entitlement.
+- **Use a code** takes a client code: Settings ▸ Clients ▸ **Pair a Mac…** on that control
+  plane. A machine code is refused with words, because the window makes this Mac's.
+- Decided: **Use This Mac Only** starts the control plane on this Mac again with the store
+  it had, not a new one, and the host and the window go back with the memberships they had
+  there (kept aside on Connect), because a new one would leave a second, offline "This Mac"
+  and a stale client, and devices paired before work again. Alex can overrule.
+
 ## Under the hood
 
 - **One target.** Merge `AgentsStore` into `AgentsHost`, keep its bundle ID
@@ -237,6 +250,13 @@ not the control plane. Alex can overrule.
   checks it on a scratch copy, with `sfltool dumpbtm` before and after.
 - When the role is Joined, can the window use the host's membership to sign in with no
   step? (Lane D finds out.)
+
+  **Answer (#4228): no, and it does not need to.** A host's membership is a machine's, and
+  only a client may make codes, so it cannot pair a window. Connect to Another… goes the
+  other way round: the window pairs first (the sign-in or the code), makes this Mac's
+  machine code with that pairing (`machines/startEnroll`), and the host joins with it. The
+  person signs in or pastes once, and both join. An alpha whose role is Joined already
+  still connects its window with Connect… on the first open, as before.
 
 ## Plan
 

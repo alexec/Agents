@@ -507,6 +507,11 @@ func outcomeSummary(action wire.AnswerElicitationRequestAction) string {
 	return "The form was closed"
 }
 
+// answeredByMessage is what ask_question says when the person sent a message instead of
+// answering: the card is gone, and the message is their answer.
+const answeredByMessage = "They did not answer the form: they sent you a message instead, and the form is closed. " +
+	"End your turn to read the message; it is their answer. Do not ask again."
+
 // askQuestionNote is DaemonCore.askQuestionNote: the words an agent reads for an answer.
 func askQuestionNote(action wire.AnswerElicitationRequestAction, said []wire.ElicitationAnswer) string {
 	switch action {

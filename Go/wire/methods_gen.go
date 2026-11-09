@@ -587,6 +587,7 @@ var CallMachineMachines = Method[MachineWorkspaceCall, JSONValue]{"machine/machi
 var CallMachineOrgRouteCheck = Method[OrgRouteRequest, OrgRouteCheck]{"machine/orgRouteCheck"}
 var CallMachineOrgRoutesAgain = Method[Empty, Empty]{"machine/orgRoutesAgain"}
 var CallMachineOrgRoutesApplied = Method[OrgRoutesApplied, Empty]{"machine/orgRoutesApplied"}
+var CallMachinePairWebPage = Method[Empty, WebPagePairing]{"machine/pairWebPage"}
 var CallMachinePolicyApplied = Method[PolicyApplied, Empty]{"machine/policyApplied"}
 var CallMachineProviderDraft = Method[MachineProviderDraftCall, JSONValue]{"machine/providerDraft"}
 var CallMachineSecretKey = Method[Empty, SecretReleaseKey]{"machine/secretKey"}
