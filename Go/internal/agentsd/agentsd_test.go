@@ -76,6 +76,8 @@ func startWith(t testing.TB, ctx context.Context, root string) (*Daemon, *conn) 
 	// ending, an assessment's score) writes into the root after the test has its answer.
 	// A test that shuts the daemon down itself shuts it down again here, which does nothing.
 	t.Cleanup(d.Shutdown)
+	// As main does at each start (#4177): a fixture's secrets.env goes into sealed.json.
+	d.MoveSecretsFile()
 	c := newConn()
 	go d.Accept(c)
 	t.Cleanup(func() { close(c.in) })

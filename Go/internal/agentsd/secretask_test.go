@@ -61,12 +61,11 @@ func TestAskingForASecret(t *testing.T) {
 	c.call(t, 3, "elicitations/answer", map[string]any{"requestID": pending[0].ID, "action": "accept",
 		"content": map[string]any{"value": value + "\n", "needsApproval": false}})
 	text := <-answered
-	path := skillcatalog.SecretsPath(home)
 	if !strings.Contains(text, "`agents-secret OPENAI_API_KEY`") || strings.Contains(text, "sed ") || strings.Contains(text, value) {
 		t.Fatal(text)
 	}
-	if got, _ := skillcatalog.LoadSecrets(path).Value("OPENAI_API_KEY"); got != value {
-		t.Fatalf("secrets.env has %q", got)
+	if got, _ := d.plainSecrets(home).Value("OPENAI_API_KEY"); got != value {
+		t.Fatalf("the store has %q", got)
 	}
 	var said []wire.ElicitationAnswer
 	waitFor(t, "the answer on the record", func() bool {
@@ -138,8 +137,8 @@ func TestASecretLeftOpenBringsOnlyItsName(t *testing.T) {
 		return false
 	})
 	// An agent's ask saves it with Ask before use (#4014): sealed, and the old plain line goes.
-	if skillcatalog.LoadSecrets(path).IsSet("GITLAB_TOKEN") {
-		t.Fatal("a flagged secret is still in secrets.env")
+	if d.plainSecrets(home).IsSet("GITLAB_TOKEN") {
+		t.Fatal("a flagged secret is still read as plain")
 	}
 	if got, ok, _ := d.localSecret(a.ID, "GITLAB_TOKEN"); !ok || got != "new-token" {
 		t.Fatalf("sealed.json has %q", got)

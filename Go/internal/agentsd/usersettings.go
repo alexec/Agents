@@ -16,7 +16,6 @@ import (
 	"sync"
 
 	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
-	"github.com/alexec/agents/Go/internal/agentsd/skillcatalog"
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/wire"
@@ -32,7 +31,7 @@ import (
 //	costLimits    <settings>/limits.json
 //	notifications <settings>/display.json's noticeBurst and noticeCooldownMinutes (#2859)
 //	resources     <root>/resources.json
-//	secrets       ~/.agents-secrets/secrets.env, NAME=value
+//	secrets       ~/.agents-secrets/sealed.json, sealed (#4177)
 //
 // <root>/user-settings-sync.json stores sync metadata: secret names and the agentConfig
 // files written. A machine does not send its own agent configuration files to the person's
@@ -144,19 +143,7 @@ func (d *Daemon) ApplyUserSettings(u wire.MachineUserSettings) error {
 		note(wire.UserSettingsPartNamePolicy, d.applyYoursFromControlPlane(s.Policy))
 	}
 	opened, flagged, versions, kept := d.openUserSecrets(u, before)
-	names, err := writeSecrets(home, opened, before.Secrets, kept)
-	if err == nil && home != "" {
-		// Ask before use (#4014): the flagged ones are sealed here, never in secrets.env, which
-		// writeSecrets has just taken them out of.
-		if err = d.syncUserSealed(home, flagged, opened, kept); err == nil {
-			for _, s := range flagged {
-				if secretNameHere.MatchString(string(s.Name)) {
-					names = append(names, string(s.Name))
-				}
-			}
-			sort.Strings(names)
-		}
-	}
+	names, err := d.syncUserSecrets(home, opened, flagged, before.Secrets, kept)
 	for i := range opened {
 		opened[i].Value = ""
 	}
@@ -417,9 +404,6 @@ func (d *Daemon) applyYoursFromControlPlane(raw wire.JSONValue) error {
 	return nil // never fails the whole delivery: a bad copy is logged and ignored (FR-011)
 }
 
-// writeSecrets sets each secret in secrets.env, and takes out the ones the control plane
-// set before and no longer sends. A secret the person set here by hand, under a name the
-// control plane never sent, is left alone. It gives the names now from the control plane.
 // openUserSecrets opens each secret the person's client sealed to this machine (#3397):
 // the values, those with Ask before use apart (#4014), the version of each, and the names to
 // keep as they are in the file, those whose version here is newer than the one sent. One
@@ -470,49 +454,6 @@ func secretsAbout(sent []wire.SealedUserSecret, kept []string) []wire.UserSecret
 		out = append(out, wire.UserSecretAbout{Name: s.Name, Kind: s.Kind, Description: s.Description, NeedsApproval: s.NeedsApproval})
 	}
 	return out
-}
-
-// writeSecrets writes the secrets into ~/.agents-secrets/secrets.env and takes out those
-// written before that are not sent now, but for kept, which stay as they are.
-func writeSecrets(home string, secrets []wire.UserSecret, before, kept []string) ([]string, error) {
-	if len(secrets) == 0 && len(before) == 0 {
-		return []string{}, nil
-	}
-	if home == "" {
-		return nil, errors.New("this machine has no personal home")
-	}
-	path := skillcatalog.SecretsPath(home)
-	file, err := skillcatalog.LoadSecretsForChange(path)
-	if err != nil {
-		return nil, err
-	}
-	names := []string{}
-	sent := map[string]bool{}
-	for _, s := range secrets {
-		name := string(s.Name)
-		if !secretNameHere.MatchString(name) || strings.ContainsAny(s.Value, "\n\r\x00") {
-			continue
-		}
-		file.Set(name, s.Value)
-		sent[name] = true
-		names = append(names, name)
-	}
-	for _, name := range kept {
-		if !sent[name] {
-			sent[name] = true
-			names = append(names, name)
-		}
-	}
-	for _, name := range before {
-		if !sent[name] {
-			file.Remove(name)
-		}
-	}
-	if err := file.Save(path); err != nil {
-		return nil, err
-	}
-	sort.Strings(names)
-	return names, nil
 }
 
 var secretNameHere = regexp.MustCompile(`^[A-Z_][A-Z0-9_]{0,63}$`)

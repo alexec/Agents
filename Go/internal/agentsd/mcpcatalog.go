@@ -358,7 +358,7 @@ func (d *Daemon) mcpAdd(r wire.MCPAddRequest) (wire.MCPAddAnswer, error) {
 	return wire.MCPAddAnswer{Server: &server}, nil
 }
 
-// mcpInstall is MCPInstaller.add: its secrets into secrets.env, the entry into mcp.json, the
+// mcpInstall is MCPInstaller.add: its secrets into sealed.json, the entry into mcp.json, the
 // sidecar's record, and for a folder, the entry approved as it was written.
 func (d *Daemon) mcpInstall(st mcpStaged, r wire.MCPAddRequest) (wire.ManagedMCPServer, error) {
 	home := d.personalHome()
@@ -380,33 +380,20 @@ func (d *Daemon) mcpInstall(st mcpStaged, r wire.MCPAddRequest) (wire.ManagedMCP
 	case (state.ManagedSame != nil || state.ManagedOther != nil) && !r.Replace:
 		return wire.ManagedMCPServer{}, mcpcatalog.ReplaceMismatch()
 	}
-	secretsPath := skillcatalog.SecretsPath(home)
-	env, err := skillcatalog.LoadSecretsForChange(secretsPath)
-	if err != nil {
-		return wire.ManagedMCPServer{}, mcpcatalog.Failed(err.Error())
-	}
+	held := d.plainSecrets(home)
 	for _, v := range st.preview.Variables {
-		if v.Kind != wire.MCPVariableKindSecret || !v.Required {
-			continue
-		}
-		if value := r.Secrets[v.Name]; value != "" {
-			env.Set(v.Name, value)
-		} else if !env.IsSet(v.Name) {
+		if v.Kind == wire.MCPVariableKindSecret && v.Required && r.Secrets[v.Name] == "" && !held.IsSet(v.Name) {
 			return wire.ManagedMCPServer{}, mcpcatalog.MissingSecret(v.Name)
 		}
 	}
-	names := make([]string, 0, len(r.Secrets))
-	for n := range r.Secrets {
-		names = append(names, n)
-	}
-	sort.Strings(names)
-	for _, n := range names {
-		if r.Secrets[n] != "" {
-			env.Set(n, r.Secrets[n])
+	typed := map[string]string{}
+	for n, v := range r.Secrets {
+		if v != "" {
+			typed[n] = v
 		}
 	}
-	if err := env.Save(secretsPath); err != nil {
-		return wire.ManagedMCPServer{}, mcpcatalog.Failed("secrets.env could not be written")
+	if err := d.setPlainSecrets(home, typed, ""); err != nil {
+		return wire.ManagedMCPServer{}, mcpcatalog.Failed(err.Error())
 	}
 	entry := st.entry
 	if len(r.Plain) > 0 {
@@ -742,14 +729,8 @@ func (d *Daemon) mcpRemove(r wire.MCPRemoveRequest) (wire.MCPRemoveAnswer, error
 	if r.ForgetSecret != nil {
 		forget = *r.ForgetSecret
 	}
-	var env skillcatalog.Secrets
-	if forget != "" {
-		if d.secretNamedElsewhere(forget, r.Name, path, home) {
-			return wire.MCPRemoveAnswer{}, mcpRefusal(mcpcatalog.SecretStillInUse(forget))
-		}
-		if env, err = skillcatalog.LoadSecretsForChange(skillcatalog.SecretsPath(home)); err != nil {
-			return wire.MCPRemoveAnswer{}, mcpRefusal(mcpcatalog.Failed(err.Error()))
-		}
+	if forget != "" && d.secretNamedElsewhere(forget, r.Name, path, home) {
+		return wire.MCPRemoveAnswer{}, mcpRefusal(mcpcatalog.SecretStillInUse(forget))
 	}
 	entry, _, _ := mcpcatalog.Entry(path, r.Name)
 	if err := mcpcatalog.Remove(path, r.Name); err != nil {
@@ -768,8 +749,9 @@ func (d *Daemon) mcpRemove(r wire.MCPRemoveRequest) (wire.MCPRemoveAnswer, error
 		d.changeMCPApprovals(true, func(approved, _ map[string]string) { delete(approved, mcpApprovalKey(folder, r.Name)) })
 	}
 	if forget != "" {
-		env.Remove(forget)
-		env.Save(skillcatalog.SecretsPath(home))
+		if err := d.forgetPlainSecret(home, forget); err != nil {
+			log.Printf("mcp: remove %s: %s was kept: %v", r.Name, forget, err)
+		}
 	}
 	log.Printf("mcp: remove %s", r.Name)
 	d.mcpChanged()

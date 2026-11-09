@@ -7,7 +7,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/alexec/agents/Go/internal/agentsd/skillcatalog"
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -134,7 +133,7 @@ func askedNeedsApproval(content map[string]wire.JSONValue) bool {
 }
 
 // saveAskedSecret saves the value typed into a secret's form: for the asking session only,
-// or to secrets.env. An error is the person's to read on the card, and never holds the value.
+// or to this machine's store. An error is the person's to read on the card, and never holds the value.
 func (d *Daemon) saveAskedSecret(agent wire.UUID, s wire.ElicitationSecret, content map[string]wire.JSONValue) error {
 	v, _ := text(value(content[secretField]))
 	v = strings.TrimSpace(v)
@@ -168,8 +167,8 @@ func (d *Daemon) saveAskedSecret(agent wire.UUID, s wire.ElicitationSecret, cont
 	return nil
 }
 
-// saveSecret sets one secret, and tells the connectors. needsApproval keeps it sealed
-// (sealedsecrets.go), out of secrets.env; off writes the line and takes out any sealed copy.
+// saveSecret sets one secret in sealed.json, and tells the connectors. needsApproval keeps it
+// flagged (sealedsecrets.go); off keeps it with the flag off (#4177).
 // An agent's write always passes true (#4014).
 func (d *Daemon) saveSecret(name, value string, needsApproval bool) error {
 	home := d.personalHome()
@@ -180,25 +179,8 @@ func (d *Daemon) saveSecret(name, value string, needsApproval bool) error {
 	if secretIsSet(home, name) {
 		change = wire.SecretOperationWhatReplaced
 	}
-	if needsApproval {
-		if err := d.saveSealedSecret(home, name, value, "", true); err != nil {
-			return err
-		}
-		d.secretChanged("", name, change, true)
-		d.mcpChanged()
-		return nil
-	}
-	path := skillcatalog.SecretsPath(home)
-	env, err := skillcatalog.LoadSecretsForChange(path)
-	if err != nil {
+	if err := d.saveSealedSecret(home, name, value, "", needsApproval); err != nil {
 		return err
-	}
-	env.Set(name, value)
-	if err := env.Save(path); err != nil {
-		return errors.New("secrets.env could not be written")
-	}
-	if err := d.removeSealedSecret(home, name); err != nil {
-		return errors.New("sealed.json could not be written")
 	}
 	d.secretChanged("", name, change, true)
 	d.mcpChanged()
