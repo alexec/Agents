@@ -331,7 +331,7 @@ func (d *Daemon) marketplacesList(kind *wire.CatalogKind, dest *wire.SkillDestin
 	}
 	secrets := skillcatalog.Secrets{}
 	if home != "" {
-		secrets = skillcatalog.LoadSecrets(skillcatalog.SecretsPath(home))
+		secrets = d.plainSecrets(home)
 	}
 	// A marketplace the organisation does not allow is not listed (#998, US3 scenario 1),
 	// so nothing is searched, previewed or added from it.

@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/alexec/agents/Go/internal/agentsd/skillcatalog"
 )
 
 // capture_secret (#4028): agentsd reads a value the page shows once (an app password, an
@@ -49,7 +48,7 @@ func (d *Daemon) captureSecretCheck(args map[string]json.RawMessage) string {
 	if home == "" {
 		return "Nothing was saved: this machine has no personal home to keep secrets in."
 	}
-	if string(args["replace"]) != "true" && (skillcatalog.LoadSecrets(skillcatalog.SecretsPath(home)).IsSet(name) || isSealedSecret(home, name)) {
+	if string(args["replace"]) != "true" && secretIsSet(home, name) {
 		return "Nothing was saved: " + name + " exists. Set replace to true to save a new value."
 	}
 	if _, err := regexp.Compile(argString(args, "pattern")); err != nil {

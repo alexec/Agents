@@ -46,9 +46,8 @@ func (d *Daemon) askSecret(id wire.UUID, args map[string]json.RawMessage) (strin
 	if err != nil {
 		return "", err
 	}
-	path := skillcatalog.SecretsPath(home)
 	sessionOnly, ask := true, d.keepsFlagged()
-	secret := wire.ElicitationSecret{Name: name, IsSet: skillcatalog.LoadSecrets(path).IsSet(name) || isSealedSecret(home, name),
+	secret := wire.ElicitationSecret{Name: name, IsSet: secretIsSet(home, name),
 		CanBeSessionOnly: &sessionOnly, CanAskBeforeUse: &ask}
 	if u := strings.TrimSpace(argString(args, "url")); strings.HasPrefix(u, "https://") || strings.HasPrefix(u, "http://") {
 		secret.URL = &u
@@ -154,7 +153,7 @@ func (d *Daemon) saveSecret(name, value string, needsApproval bool) error {
 		return errors.New("this machine has no personal home")
 	}
 	if needsApproval {
-		if err := d.saveSealedSecret(home, name, value, ""); err != nil {
+		if err := d.saveSealedSecret(home, name, value, "", true); err != nil {
 			return err
 		}
 		d.mcpChanged()

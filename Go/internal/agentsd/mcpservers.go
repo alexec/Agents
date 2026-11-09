@@ -171,26 +171,26 @@ func readMCPFile(path string) ([]mcpEntry, string) {
 	return out, ""
 }
 
-// secrets is secrets.env: NAME=value lines.
+// secrets is every secret with Ask before use off: secrets.env's NAME=value lines, and the
+// sealed store's over them (#4176).
 func (d *Daemon) secrets() map[string]string {
 	out := map[string]string{}
 	home := d.personalHome()
 	if home == "" {
 		return out
 	}
-	b, err := os.ReadFile(filepath.Join(home, ".agents-secrets", "secrets.env"))
-	if err != nil {
-		return out
-	}
-	name := regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
-	for _, line := range strings.Split(string(b), "\n") {
-		if strings.HasPrefix(line, "#") {
-			continue
-		}
-		if k, v, ok := strings.Cut(line, "="); ok && name.MatchString(k) {
-			out[k] = v
+	if b, err := os.ReadFile(filepath.Join(home, ".agents-secrets", "secrets.env")); err == nil {
+		name := regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+		for _, line := range strings.Split(string(b), "\n") {
+			if strings.HasPrefix(line, "#") {
+				continue
+			}
+			if k, v, ok := strings.Cut(line, "="); ok && name.MatchString(k) {
+				out[k] = v
+			}
 		}
 	}
+	maps.Copy(out, d.plainStoreSecrets(home))
 	return out
 }
 

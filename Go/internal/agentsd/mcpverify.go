@@ -352,7 +352,7 @@ func (d *Daemon) mcpVerify(ctx context.Context, r wire.MCPVerifyRequest) wire.MC
 	if err := d.requireMCPFolder(r.Destination); err != nil {
 		return refuse(err)
 	}
-	built, err := buildHandEntry(r.Server, skillcatalog.LoadSecrets(skillcatalog.SecretsPath(home)))
+	built, err := buildHandEntry(r.Server, d.plainSecrets(home))
 	if err != nil {
 		return refuse(err)
 	}
