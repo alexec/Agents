@@ -55,7 +55,7 @@ export type FleetFilter = "all" | "offline" | "outOfDate";
 export const fleetFilters: readonly FleetFilter[] = ["all", "offline", "outOfDate"];
 export const fleetFilterTitle: Record<FleetFilter, string> = { all: "All", offline: "Offline", outOfDate: "Out of Date" };
 export const fleetFoot = "Each machine says how many of its agents run each time it lists them. The control plane counts them; it never reads what they say.";
-export const noMachines = "No machines yet. A person adds one on their Mac, in Settings ▸ Machines.";
+export const noMachines = "No machines yet. A person adds one under Machines in the sidebar.";
 
 /** -1, 0 or 1 as dotted version a is older than, the same as or newer than b; 0 for one that is not a number, such as "dev". */
 export function compareVersions(a: string, b: string): number {

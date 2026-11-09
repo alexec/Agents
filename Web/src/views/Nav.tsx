@@ -252,7 +252,7 @@ function YourMachines({ store }: { store: Store }) {
   const hosts = store.hosts.value;
   return (
     <DataTable id="yourMachines" label="Machines" rows={hosts} rowKey={(h) => h.id} order={{ column: "name", dir: "asc" }}
-      empty="No machines yet. Add one on your Mac, in Settings ▸ Machines." columns={[
+      empty="No machines yet. Add one under Machines in the sidebar." columns={[
         { id: "name", title: "Machine", sort: (h) => h.name,
           cell: (h) => <><span class="strong">{h.name}</span><br /><span class="quiet small">{h.workspace?.providerName || h.platform}</span></> },
         { id: "state", title: "State", sort: stateWords, cell: (h) => <span class={`fleet-state ${h.state}`}>{stateWords(h)}</span> },

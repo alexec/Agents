@@ -59,8 +59,7 @@ public enum AddMachine {
         public static let makingCode = "Making a code…"
         public static func joined(_ name: String) -> String { "\(name) joined. The code can’t be used again." }
 
-        /// The Machines page's line under Add a Machine….
-        public static let machinesFoot = "Removing a machine stops it connecting. Its agents are left running where they are."
+        /// What New Machine… says once the provider has made it.
         public static func started(_ name: String) -> String {
             "\(name) is starting. It installs Agents and joins on its first boot."
         }

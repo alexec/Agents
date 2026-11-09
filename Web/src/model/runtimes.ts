@@ -284,7 +284,7 @@ export const machineSignInWords = {
  */
 export function runtimesHint(hasMac: boolean): string {
   return hasMac ? "Install a runtime on the Mac, in Settings ▸ Agent Runtimes. Sign it in on the Mac, in Status."
-    : "Runtimes run on your machines: add one in Settings ▸ Machines, with Add a Machine…. "
+    : "Runtimes run on your machines: add one with Add a Machine… in the sidebar’s Machines menu. "
       + "Sign Claude or Codex in on a machine with Sign In… in its row.";
 }
 

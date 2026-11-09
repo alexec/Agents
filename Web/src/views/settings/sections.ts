@@ -55,7 +55,6 @@ export const settingsSections: readonly SettingsSection[] = [
   { name: "gitAccess", scope: "machines", order: 10, Section: GitAccessSection },
   // Groups own machine providers (#1761).
   { name: "groups", scope: "controlPlane", order: 20, Section: GroupsSection },
-  { name: "machines", scope: "machines", order: 20, Section: VersionsSection },
   // Whether this page shows notices (#2860, #1486); how many agents may send is in Agents ▸ Policy (#2957).
   { name: "notifications", scope: "thisApp", order: 40, Section: NotificationsSection },
   // Who belongs to the control plane, and their machines and clients (#994).
@@ -74,6 +73,8 @@ export const settingsSections: readonly SettingsSection[] = [
   // How you sign in on your Macs, iPhones and iPads (#995).
   { name: "signIns", scope: "controlPlane", order: 5, Section: SignInsSection },
   { name: "skills", scope: "agentConfiguration", order: 10, Section: SkillsConfigSection },
+  // The control plane's version (#1748); the machines it lists are in the sidebar (#3975).
+  { name: "version", scope: "controlPlane", order: 60, Section: VersionsSection },
   { name: "workflows", scope: "agentConfiguration", order: 30, Section: WorkflowsConfigSection },
 ];
 

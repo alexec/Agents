@@ -5,12 +5,13 @@ import SwiftUI
 /// Settings ▸ Control plane (058, frames D–G): where it runs, the machines it reaches and
 /// the screens that reach it. One row in the rail; its pages are listed in the pane (#1076).
 enum ControlPage: Hashable {
-    case overview, hosts, providers, clients
+    /// Auto-detect is Machines' page (#1759): the machines themselves are in the sidebar (#3975).
+    case overview, autoDetect, providers, clients
 
     var title: String {
         switch self {
         case .overview: "Overview"
-        case .hosts: "Machines"
+        case .autoDetect: "Auto-detect"
         case .providers: "Machine Providers"
         case .clients: "Clients"
         }
@@ -26,7 +27,7 @@ struct ControlSettingsView: View {
             VStack(alignment: .leading, spacing: 14) {
                 // Where the page is in the rail (#1759, #2157): Machines, or Control plane.
                 HStack(spacing: 6) {
-                    Text(page == .hosts ? SettingsScope.machines.title : SettingsScope.controlPlane.title)
+                    Text(page == .autoDetect ? SettingsScope.machines.title : SettingsScope.controlPlane.title)
                         .appText(.reading).fontWeight(.semibold)
                     Text("›").foregroundStyle(.secondary)
                     Text(page.title).appText(.reading).foregroundStyle(.secondary)
@@ -40,7 +41,7 @@ struct ControlSettingsView: View {
                 }
                 switch page {
                 case .overview: ControlOverviewPage(control: control)
-                case .hosts: ControlHostsPage(control: control)
+                case .autoDetect: FolderDetectionCard(control: control)
                 case .providers: ControlProvidersPage(control: control)
                 case .clients: ControlClientsPage(control: control)
                 }
@@ -160,11 +161,17 @@ struct ControlOverviewPage: View {
                     .appText(.supporting).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            // The machines themselves are managed in the sidebar (#3975): here, how many.
             SharedSectionLabel("Machines")
             ControlCard {
                 ControlRow(dot: .none, title: "\(count(control.hosts.count, "machine")) · \(control.onlineCount) online",
-                           detail: control.hosts.map(hostName).joined(separator: ", ")) {
-                    Button("Show") { model.settingsPaneAsked = .machines }.buttonStyle(.link)
+                           detail: control.hosts.map(hostName).joined(separator: ", ")) { EmptyView() }
+                // Installed over a tunnel and not joined yet (#660): no machine in the sidebar
+                // yet, so this is where ssh's reason shows once Add a Machine is closed.
+                ForEach(control.status?.unjoinedTunnels ?? [], id: \.name) { pending in
+                    Divider()
+                    ControlRow(dot: pending.tunnel.up ? .offline : .attention, title: pending.name,
+                               detail: unjoinedLine(pending.tunnel)) { EmptyView() }
                 }
             }
             SharedSectionLabel("Clients")
@@ -198,6 +205,12 @@ struct ControlOverviewPage: View {
         if control.publicAddress == nil, let port = status.port { parts.append("port \(port)") }
         // This window too old for it (#1748), on a line of its own.
         return ([parts.joined(separator: " · ")] + [UpdateWords.appMissing(status)].compactMap { $0 }).joined(separator: "\n")
+    }
+
+    private func unjoinedLine(_ tunnel: DaemonAPI.MachineTunnel) -> String {
+        tunnel.up
+            ? "Not joined yet · connects through an ssh tunnel, which is up"
+            : "Not joined yet · ssh tunnel down\(tunnel.problem.map { ": \($0)" } ?? "") · tried again by itself"
     }
 
     private func hostName(_ host: DaemonAPI.ControlMachine) -> String {
@@ -243,344 +256,7 @@ struct ControlBrowserCard: View {
 
 func count(_ n: Int, _ noun: String) -> String { "\(n) \(noun)\(n == 1 ? "" : "s")" }
 
-// MARK: - E · Hosts
-
-struct ControlHostsPage: View {
-    @Environment(AppModel.self) private var model
-    let control: ControlSettingsModel
-    @State private var removing: DaemonAPI.ControlMachine?
-    @State private var addingMachine = false
-    @State private var choosing: DaemonAPI.ControlMachine?
-    /// Link to Machine… (#691, L5).
-    @State private var linking: DaemonAPI.ControlMachine?
-    /// Stop, asked first while agents are working there (L2), with who they are.
-    @State private var stopping: DaemonAPI.ControlMachine?
-    @State private var stoppingNames: [String] = []
-    /// Delete Machine… (US5, L9).
-    @State private var deleting: DaemonAPI.ControlMachine?
-    /// Backups… (#1815): the host's own backups page.
-    @State private var backingUp: DaemonAPI.ControlMachine?
-    /// Processes… (#3453): what runs on the machine.
-    @State private var watching: DaemonAPI.ControlMachine?
-    /// Update… (#1766): a host that needs an update, updated over ssh.
-    @State private var updating: DaemonAPI.ControlMachine?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            ControlCard {
-                if let mac = control.thisMacHost {
-                    // This Mac's host has no buttons but this one (the look gate's
-                    // decision; #656 asked for folders to be chosen here too).
-                    ControlRow(dot: dot(mac), title: "This Mac", detail: thisMacLine(mac)) {
-                        chooseFolders(mac)
-                    }
-                }
-                ForEach(control.otherHosts) { host in
-                    Divider()
-                    ControlRow(dot: dot(host), title: host.name, detail: line(host)) {
-                        // One main action and a menu of the rest (#691, L2).
-                        HStack(spacing: 8) {
-                            mainAction(host)
-                            hostMenu(host)
-                        }
-                        // The buttons keep their one line; the line beside them wraps.
-                        .fixedSize()
-                    }
-                }
-                // Installed over a tunnel and not joined yet (#660): no host row yet, so
-                // this is where ssh's reason shows once Add a Machine is closed.
-                ForEach(control.status?.unjoinedTunnels ?? [], id: \.name) { pending in
-                    Divider()
-                    ControlRow(dot: pending.tunnel.up ? .offline : .attention, title: pending.name,
-                               detail: unjoinedLine(pending.tunnel)) { EmptyView() }
-                }
-            }
-            // One sheet, a provider first (#2131): a server and a code are its other two ways.
-            Button(AddMachine.Words.menuItem) { addingMachine = true }.buttonStyle(.paper)
-            Text("A machine comes from a machine provider, or a Linux machine runs one command, or is installed over ssh as you log in from Terminal, through an ssh tunnel when it can’t reach this Mac. Either way it connects out, so nothing has to reach it. Another Mac joins with a code. " + AddMachine.Words.machinesFoot)
-                .appText(.supporting).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            SharedSectionLabel("Auto-detect")
-            FolderDetectionCard(control: control)
-        }
-        .sheet(isPresented: $addingMachine) { AddMachineSheet(control: control).paperSheet() }
-        .sheet(item: $updating) { host in ControlAddServerSheet(control: control, updating: host).paperSheet() }
-        .sheet(item: $linking) { host in
-            LinkWorkspaceSheet(control: control, host: host).paperSheet()
-        }
-        .confirmationDialog(stopping.map { "Stop \($0.name)?" } ?? "",
-                            isPresented: Binding(get: { stopping != nil }, set: { if !$0 { stopping = nil } }),
-                            titleVisibility: .visible, presenting: stopping) { host in
-            Button("Stop") {
-                Task {
-                    // Asked for its wake-up call only: who is working there is asked next.
-                    guard stoppingNames.isEmpty else { _ = await control.stop(host.id, confirmed: true); return }
-                    guard let names = await control.stop(host.id) else { return }
-                    stoppingNames = names
-                    stopping = host
-                }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: { host in
-            Text(stopWords(host))
-        }
-        .sheet(item: $backingUp) { host in
-            HostBackupsSheet(host: host).paperSheet()
-        }
-        .sheet(item: $watching) { host in
-            MachineProcessesSheet(host: host).paperSheet()
-        }
-        .sheet(item: $choosing) { host in
-            ChooseFoldersSheet(host: host.id, hostName: host.id == control.thisMacHost?.id ? "This Mac" : host.name,
-                                paths: control.suggestedPaths).paperSheet()
-        }
-        .confirmationDialog(deleting.map { "Delete \($0.workspace?.workspaceName ?? $0.name)?" } ?? "",
-                            isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
-                            titleVisibility: .visible, presenting: deleting) { host in
-            Button("Delete", role: .destructive) { Task { await control.deleteMachine(host.id) } }
-            Button("Cancel", role: .cancel) {}
-        } message: { host in
-            Text(deleteWords(host))
-        }
-        .confirmationDialog(removing.map { "Remove \($0.name)?" } ?? "",
-                            isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
-                            titleVisibility: .visible, presenting: removing) { host in
-            Button("Remove", role: .destructive) { Task { await control.remove(host.id) } }
-            Button("Cancel", role: .cancel) {}
-        } message: { _ in
-            Text("It stops connecting, and every window and device stops seeing it. Its agents are left running where they are.")
-        }
-    }
-
-    private func chooseFolders(_ host: DaemonAPI.ControlMachine) -> some View {
-        Button("Choose Folders…") { choosing = host }
-            .buttonStyle(.paper)
-            .disabled(!host.answers)
-            .help(host.answers ? "Pick folders on it to add as folders." : "It has to be online to be asked.")
-    }
-
-    private func dot(_ host: DaemonAPI.ControlMachine) -> ControlDot {
-        if host.workspace?.problem != nil { return .attention }
-        return switch host.state {
-        case "online": .online
-        case "needsUpdate", "failed": .attention
-        default: .offline
-        }
-    }
-
-    // MARK: A linked host's workspace (#691, L2)
-
-    /// Start or Stop for a linked host, while nothing is under way; Check again for any other.
-    @ViewBuilder
-    private func mainAction(_ host: DaemonAPI.ControlMachine) -> some View {
-        if let workspace = host.workspace {
-            if host.state == "starting" || host.state == "stopping" {
-                HStack(spacing: 6) {
-                    ProgressView().controlSize(.small)
-                    Text(Self.underWay(host)).appText(.supporting).foregroundStyle(.secondary)
-                }
-            } else if host.state == "online" || !workspace.canStart {
-                Button("Stop") {
-                    // The control plane knows who is working there, from the host itself (US4).
-                    Task {
-                        // Said first when it will start again for a schedule (#1004 FR-010).
-                        if workspace.wakeAt != nil {
-                            stoppingNames = []
-                            stopping = host
-                            return
-                        }
-                        guard let names = await control.stop(host.id) else { return }
-                        stoppingNames = names
-                        stopping = host
-                    }
-                }
-                .buttonStyle(.paper)
-                .disabled(!workspace.canStop)
-                .help("Stops \(workspace.workspaceName) at \(workspace.providerName).")
-            } else {
-                Button("Start") { Task { await control.start(host.id) } }
-                    .buttonStyle(.paper)
-                    .help("Starts \(workspace.workspaceName) at \(workspace.providerName).")
-            }
-        } else {
-            Button("Check again") { Task { await control.checkAgain(host.id) } }.buttonStyle(.paper)
-        }
-    }
-
-    /// What a start or stop under way says: a delete's backup is a stop of its own (#1815).
-    static func underWay(_ host: DaemonAPI.ControlMachine) -> String {
-        if host.state == "starting" { return "Starting…" }
-        return host.workspace?.phase == "backing up" ? "Backing up to delete…" : "Stopping…"
-    }
-
-    private func hostMenu(_ host: DaemonAPI.ControlMachine) -> some View {
-        Menu {
-            // Older than the control plane needs (#1748): updated over ssh, as installed (#1766).
-            if host.state == "needsUpdate" {
-                Button("Update…") { updating = host }
-                Divider()
-            }
-            Button("Choose Folders…") { choosing = host }.disabled(!host.answers)
-            if model.host(host.id, has: Capability.backups1) {
-                Button("Backups…") { backingUp = host }.disabled(!host.answers)
-            }
-            if model.host(host.id, has: Capability.processes1) {
-                Button("Processes…") { watching = host }.disabled(!host.answers)
-            }
-            if host.workspace != nil {
-                Button("Check again") { Task { await control.checkAgain(host.id) } }
-            }
-            if control.providersHere {
-                Divider()
-                if let workspace = host.workspace {
-                    Button("Unlink from \(workspace.workspaceName)") { Task { await control.unlink(host.id) } }
-                    if control.canDeleteWorkspace(host) {
-                        Button("Delete Machine…", role: .destructive) { deleting = host }
-                    }
-                    Toggle("Start when used", isOn: Binding(
-                        get: { workspace.startWhenUsed },
-                        set: { on in Task { await control.setWorkspaceOptions(host.id, startWhenUsed: on) } }))
-                    Toggle("Start for scheduled workflows", isOn: Binding(
-                        get: { workspace.startForSchedules ?? true },
-                        set: { on in Task { await control.setWorkspaceOptions(host.id, startForSchedules: on) } }))
-                    Picker("Stop when idle", selection: Binding(
-                        get: { workspace.stopWhenIdleMinutes ?? 0 },
-                        set: { minutes in Task { await control.setWorkspaceOptions(host.id, stopWhenIdleMinutes: minutes) } })) {
-                        ForEach(MachineProviderWords.idleChoices, id: \.minutes) { Text($0.label).tag($0.minutes) }
-                    }
-                } else {
-                    Button("Link to Provider…") { linking = host }.disabled(control.providers.isEmpty)
-                }
-            }
-            // Git access it uses of a Mac's, each taken back on its own (#1122).
-            if let lent = host.gitFrom, !lent.isEmpty {
-                Divider()
-                ForEach(lent.keys.sorted(), id: \.self) { server in
-                    Button(GitLendWords.revoke(server)) {
-                        Task { await control.revokeGit(host.id, from: lent[server]!, server: server) }
-                    }
-                }
-            }
-            Divider()
-            Button("Remove…") { removing = host }
-        } label: {
-            Image(systemName: "ellipsis.circle")
-        }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .accessibilityLabel("More for \(host.name)")
-    }
-
-    /// What Delete Machine… loses (L9): the workspace and its disk, and the host with its
-    /// agents, and whether it backs up first (#1815).
-    private func deleteWords(_ host: DaemonAPI.ControlMachine) -> String {
-        let agents = model.work.agents.filter { $0.host == host.id }.count
-        let workspace = host.workspace.map { "\($0.workspaceName) at \($0.providerName)" } ?? "The machine"
-        // An online host backs up first (#1815); an offline one keeps the backups it made.
-        let backup = host.answers ? " It is backed up first, and deleted once the backup is made."
-            : " It is offline, so it is not backed up first; the backups it made are kept."
-        return "\(workspace) and everything on its disk are deleted, and \(host.name) is removed from your machines"
-            + (agents == 0 ? "." : " with its \(agents == 1 ? "agent" : "\(agents) agents").") + backup
-    }
-
-    static func minutes(_ minutes: Int) -> String {
-        minutes == 60 ? "1 hour" : minutes % 60 == 0 ? "\(minutes / 60) hours" : "\(minutes) minutes"
-    }
-
-    /// "Claude (fix-login) and Codex (docs)".
-    static func list(_ names: [String]) -> String {
-        guard names.count > 1 else { return names.first ?? "" }
-        return names.dropLast().joined(separator: ", ") + " and " + names.last!
-    }
-
-    /// Stop's confirmation: who is working there, and when it starts again (#1004 FR-010).
-    private func stopWords(_ host: DaemonAPI.ControlMachine) -> String {
-        var words: [String] = []
-        if !stoppingNames.isEmpty {
-            words.append("\(Self.list(stoppingNames)) \(stoppingNames.count == 1 ? "is" : "are") working there. Stopping the machine stops them.")
-        }
-        if let workspace = host.workspace, let wake = OfflineWords.wakeLine(workspace) {
-            words.append("\(wake) again.")
-        }
-        return words.joined(separator: " ")
-    }
-
-    /// The host's workflows that run on a clock (L8): they don't run while it is stopped.
-    private func scheduledWorkflows(_ host: MachineRef) -> Int {
-        model.work.folders.filter { $0.host == host }
-            .flatMap { model.work.workflows(in: $0.folder.folder) }
-            .filter { !$0.isArchived && $0.isEnabled && !$0.workflow.schedules.isEmpty }
-            .count
-    }
-
-    private func thisMacLine(_ host: DaemonAPI.ControlMachine) -> String {
-        let folders = model.work.folders.filter { $0.host == host.id }.count
-        let working = model.work.agents.filter { $0.host == host.id && ($0.state == .running || $0.state == .starting) }.count
-        var parts = [host.platform.replacingOccurrences(of: " ", with: " · "), UpdateWords.version(host),
-                     count(folders, "folder")]
-        if working > 0 { parts.append("\(count(working, "agent")) working") }
-        if host.state != "online" { parts.insert(UpdateWords.state(host), at: 0) }
-        return ([parts.joined(separator: " · ")] + [UpdateWords.missing(host, controlVersion: control.status?.version)].compactMap { $0 })
-            .joined(separator: "\n")
-    }
-
-    private func unjoinedLine(_ tunnel: DaemonAPI.MachineTunnel) -> String {
-        tunnel.up
-            ? "Not joined yet · connects through an ssh tunnel, which is up"
-            : "Not joined yet · ssh tunnel down\(tunnel.problem.map { ": \($0)" } ?? "") · tried again by itself"
-    }
-
-    /// Its line, and what it may use of a Mac's (#1122) on one of its own.
-    private func line(_ host: DaemonAPI.ControlMachine) -> String {
-        let uses = GitLendWords.uses(host) { lender in
-            lender == control.thisMacHost?.id ? nil : (control.hosts.first { $0.id == lender }?.name ?? lender.rawValue)
-        }
-        return [baseLine(host), UpdateWords.missing(host, controlVersion: control.status?.version), uses]
-            .compactMap { $0 }.joined(separator: "\n")
-    }
-
-    private func baseLine(_ host: DaemonAPI.ControlMachine) -> String {
-        var parts: [String] = []
-        if host.state != "online" { parts.append(UpdateWords.state(host)) }
-        if !host.platform.isEmpty { parts.append(host.platform.replacingOccurrences(of: " ", with: " · ")) }
-        if !host.version.isEmpty { parts.append(UpdateWords.version(host)) }
-        if let workspace = host.workspace {
-            // Linked (#691, L2): where it runs, and what Agents does with it, on a line of its own.
-            parts.append("\(workspace.providerName): \(workspace.workspaceName)")
-            if host.state != "online", let cost = workspace.cost { parts.append(cost) }
-            var second: [String] = []
-            if let problem = workspace.problem { second.append(problem) }
-            if let minutes = workspace.stopWhenIdleMinutes { second.append("Stops after \(Self.minutes(minutes)) idle") }
-            if workspace.startWhenUsed { second.append("Starts when used") }
-            // Its wake-up call (#1004 FR-007), or that its schedule keeps it up (edge case).
-            if host.state != "online", let wake = OfflineWords.wakeLine(workspace) { second.append(wake) }
-            if host.state == "online", let up = OfflineWords.staysUpLine(workspace) { second.append(up) }
-            if !workspace.current { second.append("\(workspace.providerName) didn’t answer its last list") }
-            var lines = [parts.joined(separator: " · ")]
-            if !second.isEmpty { lines.append(second.joined(separator: " · ")) }
-            // L8: a host that stops when idle doesn't run its scheduled workflows while stopped,
-            // unless it is started for them (#1004 FR-008, FR-009, FR-011).
-            let started = (workspace.startForSchedules ?? true) && workspace.tellsSchedule == true
-            let scheduled = workspace.stopWhenIdleMinutes == nil || started ? 0 : scheduledWorkflows(host.id)
-            if scheduled > 0 {
-                lines.append("⚠ \(scheduled == 1 ? "1 scheduled workflow here doesn’t" : "\(scheduled) scheduled workflows here don’t") run while it is stopped.")
-            }
-            return lines.joined(separator: "\n")
-        }
-        if let tunnel = host.tunnel {
-            // Behind a bastion (#435): it dials through a session this Mac holds.
-            parts.append(tunnel.up ? "connects through an ssh tunnel"
-                                   : "ssh tunnel down\(tunnel.problem.map { ": \($0)" } ?? "")")
-        } else {
-            parts.append("connects out")
-        }
-        // The sign-in relay goes to this Mac's host through the control plane (T091), on
-        // any network (#1498).
-        parts.append("Sign-in relay goes to this Mac through the control plane")
-        return parts.joined(separator: " · ")
-    }
-}
+// MARK: - E · Auto-detect
 
 /// Auto-detect (#429, #656): where the folders picker looks on a host. It adds nothing.
 struct FolderDetectionCard: View {
