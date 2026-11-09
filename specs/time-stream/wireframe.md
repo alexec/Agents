@@ -239,33 +239,79 @@ queue. Each one goes in only if the backtest says it is better.
 
 ## 10. What renders it
 
-Decided: **Swift Charts** on the Mac window, because it is the platform library (AGENTS.md, "Libraries
-before our own code"), the window already uses it (`Shared/UI/UsageCharts.swift`, `TimeCharts.swift`), and
-it gives the axis, scrolling, hover and VoiceOver's audio graphs for free. Alex can overrule.
+Decided (#4171): **a SwiftUI `Canvas`** with our own paths on the Mac window, not Swift Charts, because the
+spike drew both from the same layout on real data, and Charts was slow to scroll, could not hold the labels at
+the left edge without building every mark again, gave VoiceOver nothing useful, and could not glow. `Canvas`
+is SwiftUI, so this is still the platform library (AGENTS.md, "Libraries before our own code"). Alex can
+overrule.
 
-| Part | Swift Charts mark |
+What the spike measured (29 epics, 263 dots, 2 Days and Week, a release build on this Mac):
+
+| | Swift Charts | `Canvas` |
+|---|---|---|
+| Looks, day and night | the same as `hifi-day.svg`; `.monotone` through 4 knots gives the S-curve fork and join | the same; one cubic curve for each fork and join |
+| A hover (live window, a state change each 8 ms) | 10 ms a tick | 12 ms a tick |
+| A scroll | 95–100 ms a step with `.chartScrollPosition` (10 frames a second), with or without sticky labels; synthetic trackpad events did not scroll it | 34 ms an update with a trackpad scroll while it draws the whole 7-day width; draw only the visible part to reach 60 |
+| A label held at the left edge (◀) | needs the scroll position in the marks, so every scroll builds all the marks again | the scroll offset is a number in the draw |
+| Night glow | only a wide, faint stroke under each line: no blur on a mark | a real blur (`GraphicsContext.addFilter(.blur)`) on each line and the releases line |
+| VoiceOver | its own elements are date ranges ("Nov 8 at 6 PM to Nov 10 at 4 PM"); our labels on the marks were lost. We would write the list ourselves anyway | `.accessibilityChildren`: the list of section 5, one row for each epic, in time order |
+| What we write ourselves | little | the hour axis, hit testing (60 lines), the accessibility list |
+
+| Part | Drawn with |
 |---|---|
-| A line, with its fork and join | `LineMark` series per epic, with points `(start, 0)`, `(start + 20 min, lane)`, …, `(end − 20 min, lane)`, `(end, 0)` and `.interpolationMethod(.monotone)`: the curves come from the points. The forecast part is a second series with a dashed `StrokeStyle`. |
-| A closed child, a forecast child | `PointMark`, filled or hollow (`.symbol` with a stroke) |
-| The band | `RectangleMark(xStart: P10, xEnd: P90, y: lane, height: 14)` at 13% opacity |
-| The releases line and Now | `RuleMark(y: 0)`, `RuleMark(x: now)` in red, with an annotation for its time |
-| A release | `PointMark` on y = 0, with an annotation: the tag in a black pill |
-| A label, "wait for Alex" | `.annotation(position: .topLeading)` on the first point of the line: a SwiftUI view |
+| A line, with its fork and join | one `Path`: a cubic curve from the releases line to the lane, a straight line, a cubic curve back. The forecast part is a second path with a dashed `StrokeStyle`. |
+| A closed child, a forecast child | a filled circle; a hollow circle filled with the plot colour |
+| The band | a rounded rectangle, P10 to P90, 14 pt high, at 13% opacity |
+| The releases line and Now | a line, solid to Now and dashed after; a red line with its time in a red pill |
+| A release | a ring on the releases line, its tag in a black pill under it |
+| A label, "wait for Alex" | resolved `Text`, drawn last, on a halo (section 12) |
 
-- **Range and Now:** `.chartXVisibleDomain(length:)` (1 day, 2 days, a week) and `.chartScrollableAxes(.horizontal)`,
-  with `.chartScrollPosition(x:)` set to Now − half the range when the page opens and when Now is clicked.
-- **Hover:** `.chartXSelection` and `.chartOverlay` find the nearest point; a popover shows its card. Click
-  opens the issue's page or the epic's Plan.
-- **Now moves:** a `TimelineView(.periodic(from: .now, by: 60))` around the chart.
-- **Size:** about 20 lines and 400 points in 2 days; Swift Charts draws that easily. Over a few thousand
-  points (the Week range with many epics), it hides the closed children's points and keeps the lines.
-- **If Swift Charts fights the design** (labels that collide, the curves), the fallback is a SwiftUI
-  `Canvas` with our own paths: the layout of section 9 is the same for both. The first spike decides, in
-  one day, on real data.
+- **Range and Now:** a horizontal `ScrollView` around the canvas, with `.scrollPosition` set when the page
+  opens and when Now is clicked, and `.onScrollGeometryChange` for the offset that holds the labels.
+- **Hover:** `.onContinuousHover` and our own hit test: the nearest dot within 10 pt, else the line within 8 pt
+  (the epic). Click opens the issue's page or the epic's Plan.
+- **Now moves:** a `TimelineView(.periodic(from: .now, by: 60))` around the canvas.
+- **Draw only what is seen:** the canvas is as wide as the visible range plus a screen on each side, and it
+  draws only the lines that overlap it.
 - **The web page, later:** SVG from Preact, as Lineage's graph is drawn today (`Web/src/model/lineage.ts`),
-  with the same `work/timeline` data and a TypeScript copy of the lanes. No new library.
+  with the same `work/timeline` data and a TypeScript copy of the lanes. The `Canvas` paths are the same
+  curves as the SVG's, so the two clients draw the same shapes. No new library.
 
 ## 11. Night mode
 
-Not drawn yet. It is the sci-fi version of the first wireframe: a dark plot, a soft glow on the lines, the
-releases line brightest. Same layout and marks as day mode, with `@Environment(\.colorScheme)`.
+Drawn in the spike: a dark navy plot, the forecast half a little lighter, each line and the releases line
+with a soft blur under it, the release tags in white pills. Same layout and marks as day mode, with
+`@Environment(\.colorScheme)`. The night colours are the system colours mixed 25% with white, so that each
+line keeps 3:1 on the dark plot.
+
+## 12. What the prototype found (#4171)
+
+The spike drew the Timeline on the Mac window from real data (29 epics in a week; the M10 forecast from
+`real.py`) and tried it at 1 Day, 2 Days and Week, day and night, 1,300 pt and 640 pt wide. These change the
+design above:
+
+1. **The plot scrolls up and down too.** 2 Days on real data takes 9 lanes on each side of the releases line:
+   about 600 pt. In a 550 pt window the lower lanes were cut off. The plot scrolls vertically and opens with
+   the releases line in the middle; the hour axis stays at the foot of the window.
+2. **A fork's curve is in points, not minutes.** At 2 Days, 20 minutes is 8 pt, so a fork to lane 9 (270 pt
+   away) is a vertical wall. The curve takes 12 pt + 4 pt for each lane, the same at every range.
+3. **The risers cross the labels.** A fork or join goes through the lanes between it and the releases line,
+   and through their labels. Labels are drawn last, on a halo of the plot colour at 85%, so they stay readable.
+4. **Open, for Alex: Week with Now at three quarters?** The forecast reaches about 1.5 days, so with Now in
+   the centre (Alex's decision, section 3) the right half of a week is almost empty. Putting Now at three
+   quarters for Week only would show 5 days of history and the whole forecast. 1 Day and 2 Days keep Now in
+   the centre either way.
+5. **Joins at the same time are one ring with a count.** Two forecast joins fell on the same minute (both "6:38
+   PM") and their rings covered each other. Rings within 6 pt of each other become one, with "2"; its hover
+   card lists both.
+6. **A narrow window shortens the labels.** At 640 pt, a label ran across Now and under the "wait for Alex"
+   pills, and a release pill covered the label of lane −1. A label ends before the next thing on its lane
+   (Now, a pill, a band): it drops the title first and keeps `#n · 6 of 8`. A release pill takes the side
+   of the releases line that has no label at that time.
+7. **Dots before the fork.** Some children closed before their epic was filed, so their dots sit on the line
+   before it leaves the releases line. Forking at the first child's start (section 7) fixes it; the layout
+   test checks that no dot is before its fork.
+8. **The join card says enough.** "Closes about 6:38 PM · 8 times in 10 between Sun 6:16 PM and Sun 8:59 PM ·
+   Past forecasts were off by ×2.2" read well, day and night. Keep it.
+9. **Not tried by hand:** a pinch (synthetic events do not make one), Reduce Motion (the spike has no
+   motion), and VoiceOver speaking (its tree was read by pid, not heard). The first story tries them.
