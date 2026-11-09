@@ -217,5 +217,36 @@ func (d *Daemon) standingPlan(ctx context.Context, method string, epic wire.Forg
 	for _, i := range items[:min(len(items), forgeListMost)] {
 		children = append(children, planChild{item: i})
 	}
+	if err := d.standingBlockers(ctx, epic, children); err != nil {
+		return wire.ForgeStanding{}, nil, err
+	}
 	return q, children, nil
+}
+
+// standingBlockers sets the blockers of a standing epic's children (#4200), which a list does
+// not read: on GitHub, one query for all of them. The other forges' children have none yet.
+func (d *Daemon) standingBlockers(ctx context.Context, epic wire.ForgeItem, children []planChild) error {
+	repo, _, ok := nodeOfRepo(epic.Node)
+	if !ok || repo.forge != "github" || len(children) == 0 {
+		return nil
+	}
+	gh, err := d.forgeGitHub()
+	if err != nil {
+		return err
+	}
+	numbers := make([]int, len(children))
+	for n, c := range children {
+		numbers[n] = refNumber(c.item.Node.Ref)
+	}
+	by, err := gh.Blockers(ctx, repo.path, numbers)
+	if err != nil {
+		return err
+	}
+	for n := range children {
+		for _, b := range by[numbers[n]] {
+			children[n].blockedBy = append(children[n].blockedBy,
+				planRef{node: forgeRepo{"github", strings.ToLower(b.Repo)}.issue(b.Number), open: b.Open})
+		}
+	}
+	return nil
 }

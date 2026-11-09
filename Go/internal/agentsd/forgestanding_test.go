@@ -2,6 +2,7 @@ package agentsd
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -83,8 +84,8 @@ func TestStandingMatchesAndOrder(t *testing.T) {
 }
 
 // #3661: forge/plan of an epic labelled standing returns its query's open issues of its own repo
-// in order, all in one step, with the query and no progress; the same plan again asks GitHub
-// nothing.
+// in order, all in one step, with the query, their blockers and no progress; the same plan again
+// asks GitHub nothing.
 func TestForgePlanOfAStandingEpic(t *testing.T) {
 	_, c, gh, _ := forgeDaemon(t)
 	gh.plan = githubmcp.Plan{Epic: planIssue(3659, "open", "epic", "Standing")}
@@ -94,6 +95,8 @@ func TestForgePlanOfAStandingEpic(t *testing.T) {
 		planIssue(13, "open", "bug"), planIssue(5, "open", "bug")
 	milestoned.Milestone, other.Repo = "Projects", "alexec/web"
 	gh.labeled = map[string][]githubmcp.Item{"bug": {low, planIssue(10, "open", "bug"), high, milestoned, planIssue(14, "open", "bug", "epic"), other}}
+	gh.blockers = map[int][]githubmcp.Ref{10: {{Repo: "alexec/Agents", Number: 11, Open: true}, {Repo: "alexec/web", Number: 2, Open: false}},
+		9: {{Repo: "alexec/web", Number: 3, Open: true}}}
 	epic := wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#3659"}
 	var plan wire.ForgePlan
 	json.Unmarshal(c.call(t, 1, "forge/plan", wire.ForgePlanRequest{Node: epic}), &plan)
@@ -104,6 +107,26 @@ func TestForgePlanOfAStandingEpic(t *testing.T) {
 			t.Errorf("child: %+v", ch)
 		}
 	}
+	// #4200: each child's blockers come from one read; an open one is said even when it is in the
+	// plan, which has one step.
+	blockers := func(n int) string {
+		var b []string
+		for _, r := range plan.Children[n].BlockedBy {
+			b = append(b, r.Ref)
+		}
+		b = append(b, "|")
+		for _, r := range plan.Children[n].BlockedOutside {
+			b = append(b, r.Ref)
+		}
+		return strings.Join(b, " ")
+	}
+	if len(plan.Children) == 3 && (blockers(0) != "|" || blockers(1) != "github:alexec/agents#11 github:alexec/web#2 | github:alexec/agents#11" ||
+		blockers(2) != "github:alexec/web#3 | github:alexec/web#3") {
+		t.Errorf("blockers: %q, %q, %q", blockers(0), blockers(1), blockers(2))
+	}
+	if len(gh.blocked) != 1 || fmt.Sprint(gh.blocked[0]) != "[11 10 9]" {
+		t.Errorf("blockers asked: %v", gh.blocked)
+	}
 	if strings.Join(got, " ") != "11 10 9" || len(plan.Steps) != 1 || len(plan.Steps[0].Nodes) != 3 || plan.Item.Progress != nil ||
 		plan.Item.Standing == nil || !*plan.Item.Standing || plan.Standing == nil || plan.Standing.Error != nil || plan.Standing.Lanes != 1 ||
 		deref(plan.Standing.Milestone) != "none" || strings.Join(plan.Standing.Labels, ",") != "bug" {
@@ -113,7 +136,7 @@ func TestForgePlanOfAStandingEpic(t *testing.T) {
 		t.Fatalf("searches: %q", searches)
 	}
 	json.Unmarshal(c.call(t, 2, "forge/plan", wire.ForgePlanRequest{Node: epic}), &plan)
-	if searches, _ := gh.asked(); gh.plans != 1 || len(searches) != 1 || plan.Standing == nil || len(plan.Children) != 3 {
+	if searches, _ := gh.asked(); gh.plans != 1 || len(searches) != 1 || len(gh.blocked) != 1 || plan.Standing == nil || len(plan.Children) != 3 {
 		t.Fatalf("again: %d plans, %q, %+v", gh.plans, searches, plan)
 	}
 
