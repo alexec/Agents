@@ -84,6 +84,9 @@ public extension DaemonAPI {
     /// `card` and `secret` are the names of secrets in Settings ▸ You ▸ Secrets, or where one is.
     struct OutsideAccount: Codable, Sendable, Hashable, Identifiable {
         public var service: String
+        /// What it is for and who uses it (#4164), so an agent can tell it from the other
+        /// accounts of the same service. nil on an account made before it.
+        public var description: String?
         public var address: String?
         public var plan: String?
         public var monthlyCostUsd: Double?
@@ -99,10 +102,11 @@ public extension DaemonAPI {
 
         public var id: String { service.lowercased() + "#" + (address ?? "").lowercased() }
 
-        public init(service: String, address: String? = nil, plan: String? = nil, monthlyCostUsd: Double? = nil,
+        public init(service: String, description: String? = nil, address: String? = nil, plan: String? = nil, monthlyCostUsd: Double? = nil,
                     card: String? = nil, secret: String? = nil, twoFactor: String? = nil, issue: String? = nil,
                     made: String? = nil, tokenExpires: String? = nil, notes: String? = nil, projects: [String]? = nil) {
             self.service = service
+            self.description = description
             self.address = address
             self.plan = plan
             self.monthlyCostUsd = monthlyCostUsd

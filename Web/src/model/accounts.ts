@@ -26,6 +26,13 @@ export function accountCost(a: OutsideAccount): string {
   return a.monthlyCostUsd === undefined ? "" : `${money(a.monthlyCostUsd)}/month`;
 }
 
+export const noDescription = "No description";
+
+/** The description (#4164), under the address; an account made before it has none. */
+export function accountAbout(a: OutsideAccount): string {
+  return a.description?.trim() || noDescription;
+}
+
 export function accountDetail(a: OutsideAccount): string {
   return [a.address, a.plan].filter((v) => v).join(" · ");
 }
@@ -53,7 +60,7 @@ export type AccountFields = Record<string, string>;
 
 export function accountFields(a: OutsideAccount): AccountFields {
   return {
-    service: a.service, address: a.address ?? "", plan: a.plan ?? "", cost: a.monthlyCostUsd === undefined ? "" : String(a.monthlyCostUsd),
+    service: a.service, description: a.description ?? "", address: a.address ?? "", plan: a.plan ?? "", cost: a.monthlyCostUsd === undefined ? "" : String(a.monthlyCostUsd),
     card: a.card ?? "", secret: a.secret ?? "", twoFactor: a.twoFactor ?? "", issue: a.issue ?? "", made: a.made ?? "",
     tokenExpires: a.tokenExpires ?? "", notes: a.notes ?? "", projects: (a.projects ?? []).join(", "),
   };
@@ -63,7 +70,7 @@ export function accountFields(a: OutsideAccount): AccountFields {
 export function accountOf(f: AccountFields): OutsideAccount {
   const v = (key: string) => (f[key] ?? "").trim() || undefined;
   const a: OutsideAccount = { service: v("service") ?? "" };
-  for (const key of ["address", "plan", "card", "secret", "twoFactor", "issue", "made", "tokenExpires", "notes"] as const) {
+  for (const key of ["description", "address", "plan", "card", "secret", "twoFactor", "issue", "made", "tokenExpires", "notes"] as const) {
     const value = v(key);
     if (value) a[key] = value;
   }

@@ -17579,6 +17579,10 @@
           "type": "string",
           "description": "The service, as its address: gitlab.com, aws.amazon.com."
         },
+        "description": {
+          "type": "string",
+          "description": "What it is for and who uses it, in one or two sentences, so an agent can tell it from the other accounts of the same service (#4164). Absent on an account made before it: the clients say No description."
+        },
         "address": {
           "type": "string",
           "description": "The address it signs in with."
