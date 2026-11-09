@@ -34,8 +34,11 @@ struct HostScenes: Scene {
 
     /// One for the app, made once: the scenes are made again on every change. None for a
     /// walk's window (run-app, `--walk`), which must not register the person's login items
-    /// from a build in a checkout, nor draw a second menu bar item.
-    @MainActor static let model: HostModel? = ControlConfig.walk == nil ? HostModel() : nil
+    /// from a build in a checkout, nor draw a second menu bar item; unless the walk gives
+    /// it a scratch root of its own (`AGENTS_ROOT`), whose jobs are that root's.
+    @MainActor static let model: HostModel? = ControlConfig.walk == nil || HostPaths.current.scratch ? HostModel() : nil
+    /// The first open (#4226), which the window runs while it has no control plane.
+    @MainActor static let firstOpen: FirstOpen? = model.map { FirstOpen(host: $0) }
 
     var body: some Scene {
         Window("This Mac's Host", id: Self.windowID) {
@@ -46,8 +49,8 @@ struct HostScenes: Scene {
         }
         .defaultSize(width: 680, height: 640)
         .windowResizability(.contentMinSize)
-        // The window opens with the app, not this one: the menu bar item, a first run with
-        // nothing chosen, or agents-host://pair brings it.
+        // The window opens with the app, not this one: the menu bar item or
+        // agents-host://pair brings it.
         .defaultLaunchBehavior(.suppressed)
 
         MenuBarExtra(isInserted: .constant(Self.model != nil)) {
@@ -60,8 +63,7 @@ struct HostScenes: Scene {
     }
 }
 
-/// The menu bar mark, and what opens the host's window: at a first run with nothing chosen
-/// yet (until #4226 does Run It Here with no question), and for agents-host://pair.
+/// The menu bar mark, and what opens the host's window for agents-host://pair.
 private struct HostMenuLabel: View {
     let model: HostModel
     @Environment(\.openWindow) private var openWindow
@@ -75,7 +77,6 @@ private struct HostMenuLabel: View {
                     asked = true
                     if model.settings.role == .runHere { model.showingPairing = true }
                 }
-                if model.settings.role == .none { asked = true }
             }
             .onChange(of: asked) {
                 guard asked else { return }

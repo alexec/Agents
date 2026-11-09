@@ -422,7 +422,7 @@ final class AgentsAppDelegate: NSObject, NSApplicationDelegate {
         NSWindow.allowsAutomaticWindowTabbing = false
     }
 
-    /// What takes a URL the app is opened with: agents-host://pair, from frame K2, which the
+    /// What takes a URL the app is opened with: agents-host://pair, which the
     /// host's scenes set (#4225). A `Window` scene is never handed a URL by `onOpenURL`.
     @MainActor static var opened: ((URL) -> Void)?
 

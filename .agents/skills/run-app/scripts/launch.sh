@@ -26,7 +26,7 @@ while [ $# -gt 0 ]; do
     --no-build)  BUILD=0 ;;
     --front)     FRONT=1 ;;          # bring the window to the front; steals focus
     --no-window) WINDOW=0 ;;         # the host and control plane only, for socket work
-    --first-run) FIRST_RUN=1 ;;      # the window unpaired, on frame K; pair it by hand with PAIR_CODE
+    --first-run) FIRST_RUN=1 ;;      # the window unpaired, on Connect this window; pair it by hand with PAIR_CODE
     --lan)       LAN=1 ;;            # the control plane at this Mac's LAN address, for a container
     --host-first) HOST_FIRST=1 ;;    # the host starts while the control plane is down, then it comes up (#113)
     --slug)      SLUG="$2"; shift ;;
@@ -242,7 +242,7 @@ if [ "$WINDOW" = 1 ]; then
   # The window pairs on its own (AGENTS_CONTROL), into a folder of its own in
   # its container (--walk), so it never takes the person's own window's pairing. env -i,
   # because `open` hands this session's environment to the app. --first-run leaves it
-  # unpaired, on frame K, with a code to paste into Connect….
+  # unpaired, on Connect this window, with a code to paste into Connect….
   OPEN_FLAGS=(-n)
   [ "$FRONT" = 1 ] || OPEN_FLAGS+=(-g)   # -g: launch behind whatever the person is doing
   if [ "$FIRST_RUN" = 1 ]; then

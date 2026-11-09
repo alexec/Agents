@@ -280,9 +280,9 @@ struct ContentView: View {
         OrgPolicyStrip(state: model.policyState)
         Group {
             if model.needsFirstRun {
-                // No control plane and nothing of the old way: one question, and no
-                // sidebar or toolbar until it is answered (058, frame A).
-                FirstRunView()
+                // No control plane yet: the first open sets one up on this Mac and pairs
+                // the window, with no sidebar or toolbar until it has (#4226).
+                FirstOpenView()
             } else if model.signIn.suspended {
                 // The organisation turned this person's access off: only that (#1002, FR-029).
                 SuspendedPage(device: "Mac")

@@ -155,8 +155,6 @@ targets:
         NSLocalNetworkUsageDescription: >-
           To find and reach your agents' control plane on this network.
         NSBonjourServices: [_agents-control._tcp]
-        # Where "Set one up on this Mac" sends the person (frame K).
-        AgentsHostDownloadURL: https://github.com/alexec/Agents/releases/latest
         # Exempt (#729): what is encrypted (HPKE for sealed pushes, and the P-256
         # agreement) is CryptoKit's, and TLS is the system's. The app's own SHA-256,
         # HMAC and HKDF hash and authenticate; its own P-256 arithmetic runs only on Linux.
@@ -656,8 +654,6 @@ targets:
         NSLocalNetworkUsageDescription: >-
           To find and reach your agents' control plane on this network.
         NSBonjourServices: [_agents-control._tcp]
-        # Where frame K's "Set one up on this Mac" sent the person; #4226 removes frame K.
-        AgentsHostDownloadURL: https://github.com/alexec/Agents/releases/latest
         # agents-host://pair: frame K2 asks for a code to be shown.
         CFBundleURLTypes:
           - CFBundleURLName: com.alexecollins.agents.host

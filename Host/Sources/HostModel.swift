@@ -728,6 +728,11 @@ final class HostModel {
         await refresh()
     }
 
+    /// Login Items no longer waits for the person on either job (#4226).
+    var loginItemsAllowed: Bool {
+        [LocalServices.Job.control, .daemon].allSatisfy { services.loginStatus($0) != .requiresApproval }
+    }
+
     private func start(_ job: LocalServices.Job) async -> Bool {
         switch await services.register(job) {
         case .enabled:
@@ -735,7 +740,7 @@ final class HostModel {
             return true
         case .needsApproval:
             needsApproval = true
-            problem = "Allow Agents Host in System Settings ▸ General ▸ Login Items, then try again."
+            problem = "Allow Agents in System Settings ▸ General ▸ Login Items."
             return false
         case .failed(let why):
             problem = why

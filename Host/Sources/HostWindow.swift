@@ -509,7 +509,7 @@ struct HostWindow: View {
     }
 }
 
-/// The code to pair a window or phone (frame L's *Pair a Window or Phone…*, and K2's Pair).
+/// The code to pair a window or phone (frame L's *Pair a Window or Phone…*).
 struct PairingSheet: View {
     @Environment(HostModel.self) private var model
     @Environment(\.dismiss) private var dismiss

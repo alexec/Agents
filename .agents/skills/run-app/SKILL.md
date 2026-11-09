@@ -93,8 +93,11 @@ with the same code (#113). The control plane is always given `--host-root $ROOT`
 `control/status` carries the host's join as `thisMacHost`.
 `--outside-checkout` opens a copy of the window from `$ROOT/app`, so its title does not start
 with the worktree's name, for pictures and videos (#1078).
-`--first-run` opens the window unpaired, on frame K, and prints `PAIR_CODE` to paste
-into **Connect…**. To walk Agents Host itself, open a scratch build of it with
+`--first-run` opens the window unpaired and prints `PAIR_CODE` to paste into **Connect…**.
+To walk the one app's first open itself (#4226), skip `launch.sh` and open the build with
+`--walk <name>` and `AGENTS_ROOT=<root>` (and `AGENTS_HOST_PORT`/`AGENTS_HOST_WEB_PORT` off
+18791/18792): with a scratch root the walk has the host model, sets up that root's jobs,
+and pairs itself; `stop.sh <root>` boots them out. To walk Agents Host itself, open a scratch build of it with
 `AGENTS_ROOT=$ROOT` (its plists and jobs are the root's, and `stop.sh` boots them out). Make
 more codes with `"$HOSTAPP/Contents/Helpers/agents-control" code --client
 --home $ROOT/control` (add `--browser` for a code the web remote pairs with: a browser's code

@@ -5,7 +5,7 @@ import SwiftUI
 /// work, and on to a paired phone or browser. It blocks nothing, ticks each step from
 /// what is really so, and goes once every step is done or it is dismissed.
 ///
-/// Before pairing, the window shows `FirstRunView` and nothing else, so the first step
+/// Before pairing, the window shows `FirstOpenView` and nothing else, so the first step
 /// is always ticked here: it says how far the person has come.
 struct GetStartedCard: View {
     @Environment(AppModel.self) private var model
@@ -73,7 +73,7 @@ struct GetStartedCard: View {
     @ViewBuilder private func action(for step: GetStarted.Step) -> some View {
         switch step {
         case .host:
-            // Always ticked here: before pairing, the window is `FirstRunView`.
+            // Always ticked here: before pairing, the window is `FirstOpenView`.
             EmptyView()
         case .runtime:
             Button("Install") { model.isOfferingInstall = true }
