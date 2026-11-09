@@ -170,6 +170,10 @@ final class WorkListState {
 final class WorkLists {
     /// Work ▸ Features (#3269): the features read, and the ones opened.
     let features = WorkFeaturesState()
+    #if os(macOS)
+    /// Work ▸ Timeline (#4173): the Mac's alone for now (remote: by design).
+    let timeline = WorkTimelineState()
+    #endif
     private var byKind: [WorkList.Kind: WorkListState] = [:]
 
     subscript(kind: WorkList.Kind) -> WorkListState {

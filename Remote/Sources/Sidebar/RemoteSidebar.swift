@@ -158,7 +158,7 @@ struct RemoteSidebar: View {
                 // Work (#3119, #3256): a row per list, as the window has them (#4004), above
                 // Status. No Features: it is Mac + web (#3269).
                 Section(isExpanded: $showsWork) {
-                    ForEach(WorkList.Kind.allCases.filter { $0 != .feature }) { kind in
+                    ForEach(WorkList.Kind.allCases.filter { $0 != .feature && $0 != .timeline }) { kind in
                         HStack { Text(kind.title); Spacer() }
                             .accessibilityHint(kind.sidebarHelp)
                             .activityIcon(kind.sidebarIcon).appText(.supporting).tag(SidebarItem.work(kind))

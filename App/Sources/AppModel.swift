@@ -6396,6 +6396,12 @@ final class AppModel {
         return forgeMachines.filter { narrows.contains($0.id) }
     }
 
+    /// The machines that draw Work ▸ Timeline (#4173), This Mac first.
+    var timelineMachines: [(id: MachineRef, name: String)] {
+        let draws = Set((controlPlaneHosts ?? []).filter { $0.has(Capability.workTimeline1) }.map(\.id))
+        return forgeMachines.filter { draws.contains($0.id) }
+    }
+
     /// The machines that read docs (#3321), this Mac first.
     var docsMachines: [(id: MachineRef, name: String)] {
         let mine = thisMacHostID
