@@ -393,3 +393,22 @@ func TestForgeTeamAreas(t *testing.T) {
 		t.Fatalf("a custom team field: %v", err)
 	}
 }
+
+// #4242: Blockers are each work item's predecessors, from one read of their links and one of
+// the predecessors' states; one with none says none.
+func TestBlockersAreThePredecessors(t *testing.T) {
+	f, b := forgeFake(t)
+	f.item(4, "Write the export", "User Story", "Active", dev, 4, nil)
+	f.link(4, relPredecessor, 3)
+	f.link(4, relPredecessor, 2)
+	by, err := b.Blockers(context.Background(), "acme/Web App", []int{4, 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []Ref{{"acme/web app", 3, true}, {"acme/web app", 2, false}}; !slices.Equal(by[4], want) || by[3] == nil || len(by[3]) != 0 {
+		t.Fatalf("blockers: %+v", by)
+	}
+	if by, err := b.Blockers(context.Background(), "acme/web app", nil); err != nil || len(by) != 0 {
+		t.Fatalf("none asked: %v %v", by, err)
+	}
+}

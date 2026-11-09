@@ -603,6 +603,68 @@ func (g *RealGitLab) Plan(ctx context.Context, project string, number int) (Plan
 	return p, nil
 }
 
+// BlockersMost bounds the issues one Blockers read asks about.
+const BlockersMost = 100
+
+// blockersQuery is the "blocked by" links of many of a project's work items at once (#4242).
+const blockersQuery = `query($path: ID!, $iids: [String!], $first: Int) { project(fullPath: $path) { workItems(iids: $iids, first: $first) { nodes { iid
+  widgets { __typename ... on WorkItemWidgetLinkedItems { linkedItems(first: 50) { nodes { linkType
+    workItem { iid state namespace { fullPath } } } } } } } } } }`
+
+// Blockers are the issues that block each of numbers in project (at most BlockersMost, each with
+// at most 50 blockers), in one GraphQL query (#4242): a standing epic's children come from a
+// list, which does not read links. A number that is not an issue has none.
+func (g *RealGitLab) Blockers(ctx context.Context, project string, numbers []int) (map[int][]Ref, error) {
+	out := map[int][]Ref{}
+	numbers = numbers[:min(len(numbers), BlockersMost)]
+	if len(numbers) == 0 {
+		return out, nil
+	}
+	iids := make([]string, len(numbers))
+	for n, i := range numbers {
+		iids[n] = strconv.Itoa(i)
+	}
+	var data struct {
+		Project *struct {
+			WorkItems struct {
+				Nodes []struct {
+					IID     string `json:"iid"`
+					Widgets []struct {
+						LinkedItems struct {
+							Nodes []struct {
+								LinkType string      `json:"linkType"`
+								WorkItem workItemRef `json:"workItem"`
+							} `json:"nodes"`
+						} `json:"linkedItems"`
+					} `json:"widgets"`
+				} `json:"nodes"`
+			} `json:"workItems"`
+		} `json:"project"`
+	}
+	if err := g.graphql(ctx, blockersQuery, map[string]any{"path": project, "iids": iids, "first": len(iids)}, &data); err != nil {
+		return nil, err
+	}
+	if data.Project == nil {
+		return nil, &GitLabError{Kind: NotFound, Message: "no project " + project}
+	}
+	for _, w := range data.Project.WorkItems.Nodes {
+		n, err := strconv.Atoi(w.IID)
+		if err != nil {
+			continue
+		}
+		by := []Ref{}
+		for _, cw := range w.Widgets {
+			for _, l := range cw.LinkedItems.Nodes {
+				if b, ok := l.WorkItem.ref(); ok && strings.EqualFold(l.LinkType, "is_blocked_by") {
+					by = append(by, b)
+				}
+			}
+		}
+		out[n] = by
+	}
+	return out, nil
+}
+
 // GroupBoard is a group board's scope (#3282): GET /groups/:group/boards/:id. GitLab's own
 // milestones "Any", "None", "Upcoming" and "Started" are not one milestone, so they scope
 // nothing here.

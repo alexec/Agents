@@ -3,6 +3,7 @@ package agentsd
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"slices"
 	"strconv"
 	"strings"
@@ -30,6 +31,22 @@ func (f *fakeForgeGitHub) Blockers(_ context.Context, _ string, numbers []int) (
 	defer f.mu.Unlock()
 	f.blocked = append(f.blocked, numbers)
 	return f.blockers, nil
+}
+
+// Blockers, on each forge's fake (#4242): the first asked about is blocked by an open issue and a
+// closed one, the rest by none.
+func (f *fakeForgeGitLab) Blockers(_ context.Context, project string, numbers []int) (map[int][]gitlabmcp.Ref, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.blocked = append(f.blocked, fmt.Sprint(project, numbers))
+	return map[int][]gitlabmcp.Ref{numbers[0]: {{Project: "Group/App", Number: 90, Open: true}, {Project: "ops/tool", Number: 91}}}, nil
+}
+
+func (f *fakeForgeLinear) Blockers(_ context.Context, identifiers []string) (map[string][]linearmcp.Ref, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.blocked = append(f.blocked, fmt.Sprint(identifiers))
+	return map[string][]linearmcp.Ref{identifiers[0]: {{Identifier: "OPS-1", Open: true}, {Identifier: "ENG-2"}}}, nil
 }
 
 func (f *fakeForgeGitLab) Plan(_ context.Context, project string, number int) (gitlabmcp.Plan, error) {

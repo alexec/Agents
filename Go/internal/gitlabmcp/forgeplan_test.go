@@ -3,6 +3,7 @@ package gitlabmcp
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -90,5 +91,38 @@ func TestListPathBoard(t *testing.T) {
 	p := listPath("group/app", SearchFilter{Label: "bug", Board: BoardScope{Labels: []string{"team-a"}, Milestone: "0.17"}}, "opened", "", 20)
 	if !strings.Contains(p, "labels=bug%2Cteam-a") || !strings.Contains(p, "milestone=0.17") {
 		t.Fatalf("path: %s", p)
+	}
+}
+
+// #4242: Blockers are many work items' "blocked by" links in one GraphQL query, by their iids.
+func TestBlockersReadManyWorkItems(t *testing.T) {
+	var asked []map[string]any
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Query     string         `json:"query"`
+			Variables map[string]any `json:"variables"`
+		}
+		body, _ := io.ReadAll(r.Body)
+		json.Unmarshal(body, &req)
+		asked = append(asked, req.Variables)
+		io.WriteString(w, `{"data":{"project":{"workItems":{"nodes":[
+ {"iid":"6","widgets":[{},{"linkedItems":{"nodes":[
+  {"linkType":"is_blocked_by","workItem":{"iid":"7","state":"OPEN","namespace":{"fullPath":"group/app"}}},
+  {"linkType":"blocks","workItem":{"iid":"8","state":"OPEN","namespace":{"fullPath":"group/app"}}},
+  {"linkType":"is_blocked_by","workItem":{"iid":"2","state":"CLOSED","namespace":{"fullPath":"group/lib"}}}]}}]},
+ {"iid":"9","widgets":[]}]}}}}`)
+	}))
+	t.Cleanup(s.Close)
+	g := NewRealGitLab(s.URL, func() string { return token }, nil)
+	g.sharing = 0
+	by, err := g.Blockers(context.Background(), "group/app", []int{6, 9})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(by[6]) != 2 || by[6][0] != (Ref{"group/app", 7, true}) || by[6][1] != (Ref{"group/lib", 2, false}) || by[9] == nil || len(by[9]) != 0 {
+		t.Fatalf("blockers: %+v", by)
+	}
+	if len(asked) != 1 || asked[0]["path"] != "group/app" || fmt.Sprint(asked[0]["iids"]) != "[6 9]" || asked[0]["first"] != float64(2) {
+		t.Fatalf("asked: %v", asked)
 	}
 }

@@ -85,6 +85,8 @@ type forgeGitLab interface {
 	Search(ctx context.Context, projects []string, f gitlabmcp.SearchFilter, after string, first int) (gitlabmcp.SearchPage, error)
 	ItemPage(ctx context.Context, project string, number int, mr bool, before string) (gitlabmcp.ItemDetail, error)
 	Plan(ctx context.Context, project string, number int) (gitlabmcp.Plan, error)
+	// Blockers are the blockers of a standing epic's children (#4242).
+	Blockers(ctx context.Context, project string, numbers []int) (map[int][]gitlabmcp.Ref, error)
 	GroupBoard(ctx context.Context, group string, id int) (gitlabmcp.BoardScope, error)
 	forgeGitLabWrites
 }
@@ -99,6 +101,8 @@ type forgeJira interface {
 	SetState(ctx context.Context, key string, closed bool) error
 	Transition(ctx context.Context, key, id string) error
 	Plan(ctx context.Context, key string) (jiramcp.Plan, error)
+	// Blockers are the blockers of a standing epic's children (#4242), by their keys.
+	Blockers(ctx context.Context, keys []string) (map[string][]jiramcp.Ref, error)
 	BoardFilter(ctx context.Context, board string) (string, error)
 }
 
@@ -107,6 +111,8 @@ type forgeLinear interface {
 	Search(ctx context.Context, teams []string, f linearmcp.SearchFilter, after string, first int) (linearmcp.SearchPage, error)
 	ItemPage(ctx context.Context, identifier, before string) (linearmcp.ItemDetail, error)
 	Plan(ctx context.Context, identifier string) (linearmcp.Plan, error)
+	// Blockers are the blockers of a standing epic's children (#4242), by their identifiers.
+	Blockers(ctx context.Context, identifiers []string) (map[string][]linearmcp.Ref, error)
 	forgeLinearWrites
 }
 

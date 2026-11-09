@@ -128,3 +128,16 @@ func TestThePlansWrites(t *testing.T) {
 		t.Fatal("a blocker with no owner")
 	}
 }
+
+// #4242: Blockers are each issue's dependencies, a call each.
+func TestBlockersAreEachIssuesDependencies(t *testing.T) {
+	_, fj := newPlanFake(t)
+	by, err := fj.Blockers(context.Background(), "acme/app", []int{2, 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(by) != 2 || len(by[2]) != 2 || by[2][0] != (Ref{Repo: "acme/app", Number: 3}) || by[2][1] != (Ref{Repo: "acme/lib", Number: 4, Open: true}) ||
+		by[3] == nil || len(by[3]) != 0 {
+		t.Fatalf("blockers: %+v", by)
+	}
+}

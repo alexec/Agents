@@ -188,6 +188,26 @@ func TestPlanIsTheChildrenWithTheirBlockers(t *testing.T) {
 	}
 }
 
+// #4242: Blockers are many issues' inward Blocks links, in one search by key.
+func TestBlockersSearchByKey(t *testing.T) {
+	f, j := newSite(t, true, func(path string, body map[string]any) any {
+		return map[string]any{"issues": []any{
+			restIssueJSON("ENG-5", "2026-11-01T10:00:00.000+0000", map[string]any{"issuelinks": []any{
+				map[string]any{"type": map[string]any{"name": "Blocks"}, "inwardIssue": map[string]any{"key": "ENG-4"}},
+				map[string]any{"type": map[string]any{"name": "Blocks"}, "outwardIssue": map[string]any{"key": "ENG-9"}},
+			}}),
+			restIssueJSON("ENG-6", "2026-11-01T10:00:00.000+0000", nil),
+		}, "isLast": true}
+	})
+	by, err := j.Blockers(context.Background(), []string{"ENG-5", "ENG-6"})
+	if err != nil || len(by["ENG-5"]) != 1 || by["ENG-5"][0] != (Ref{Key: "ENG-4", Open: true}) || len(by["ENG-6"]) != 0 {
+		t.Fatalf("%+v %v", by, err)
+	}
+	if _, ok := by["ENG-6"]; !ok || len(f.asked) != 1 || f.asked[0] != "POST /search/jql" || f.bodies[0]["jql"] != `key in ("ENG-5", "ENG-6")` {
+		t.Fatalf("by %+v, asked %q %v", by, f.asked, f.bodies)
+	}
+}
+
 // #3282: a board's issues are its filter's, in place of the projects', read from Jira
 // Software's API.
 func TestABoardIsItsFilter(t *testing.T) {

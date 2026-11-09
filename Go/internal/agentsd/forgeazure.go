@@ -37,6 +37,8 @@ type forgeAzureBoards interface {
 	SetState(ctx context.Context, project string, id int, closed bool) error
 	Transition(ctx context.Context, project string, id int, state string) error
 	Plan(ctx context.Context, project string, id int) (azureboardsmcp.Plan, error)
+	// Blockers are the predecessors of a standing epic's children (#4242).
+	Blockers(ctx context.Context, project string, ids []int) (map[int][]azureboardsmcp.Ref, error)
 	AddChild(ctx context.Context, project string, parent int, title string, labels []string, level string) (int, string, error)
 	SetParent(ctx context.Context, project string, id, parent int) error
 	SetBlockedBy(ctx context.Context, project string, id, blocker int, blocked bool) error

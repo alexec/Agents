@@ -316,6 +316,31 @@ const forgePlan = `query ForgePlan($id: String!) { issue(id: $id) { ` + forgeFie
   plan: children(first: 50) { nodes { ` + forgeFields + ` ` + forgeChildren + `
     inverseRelations(first: 20) { nodes { type issue { identifier state { type } } } } } } } }`
 
+// linearRelations is an issue's inverse relations: a "blocks" one's issue blocks it.
+type linearRelations struct {
+	InverseRelations struct {
+		Nodes []struct {
+			Type  string `json:"type"`
+			Issue *struct {
+				Identifier string `json:"identifier"`
+				State      *struct {
+					Type string `json:"type"`
+				} `json:"state"`
+			} `json:"issue"`
+		} `json:"nodes"`
+	} `json:"inverseRelations"`
+}
+
+func (r linearRelations) blockers() []Ref {
+	out := []Ref{}
+	for _, n := range r.InverseRelations.Nodes {
+		if n.Type == "blocks" && n.Issue != nil && n.Issue.Identifier != "" {
+			out = append(out, Ref{Identifier: n.Issue.Identifier, Open: n.Issue.State == nil || !isClosed(n.Issue.State.Type)})
+		}
+	}
+	return out
+}
+
 // Plan is the issue identifier names, its children (at most 50) and each one's blockers (at most
 // 20), in one query.
 func (l *RealLinear) Plan(ctx context.Context, identifier string) (Plan, error) {
@@ -325,17 +350,7 @@ func (l *RealLinear) Plan(ctx context.Context, identifier string) (Plan, error) 
 			Plan struct {
 				Nodes []struct {
 					forgeNode
-					InverseRelations struct {
-						Nodes []struct {
-							Type  string `json:"type"`
-							Issue *struct {
-								Identifier string `json:"identifier"`
-								State      *struct {
-									Type string `json:"type"`
-								} `json:"state"`
-							} `json:"issue"`
-						} `json:"nodes"`
-					} `json:"inverseRelations"`
+					linearRelations
 				} `json:"nodes"`
 			} `json:"plan"`
 		} `json:"issue"`
@@ -351,13 +366,47 @@ func (l *RealLinear) Plan(ctx context.Context, identifier string) (Plan, error) 
 		if c.Identifier == "" {
 			continue
 		}
-		child := PlanChild{Item: c.item(), BlockedBy: []Ref{}}
-		for _, r := range c.InverseRelations.Nodes {
-			if r.Type == "blocks" && r.Issue != nil && r.Issue.Identifier != "" {
-				child.BlockedBy = append(child.BlockedBy, Ref{Identifier: r.Issue.Identifier, Open: r.Issue.State == nil || !isClosed(r.Issue.State.Type)})
-			}
-		}
-		p.Children = append(p.Children, child)
+		p.Children = append(p.Children, PlanChild{Item: c.item(), BlockedBy: c.blockers()})
 	}
 	return p, nil
+}
+
+// BlockersMost bounds the issues one Blockers read asks about.
+const BlockersMost = 100
+
+// Blockers are the issues that block each of identifiers (at most BlockersMost, each with at
+// most 20 blockers), in one query of an aliased issue(id:) each (#4242): a standing epic's
+// children come from a list, which does not read relations. An identifier Linear does not have
+// has none.
+func (l *RealLinear) Blockers(ctx context.Context, identifiers []string) (map[string][]Ref, error) {
+	out := map[string][]Ref{}
+	identifiers = identifiers[:min(len(identifiers), BlockersMost)]
+	if len(identifiers) == 0 {
+		return out, nil
+	}
+	var q strings.Builder
+	q.WriteString("query(")
+	vars := map[string]any{}
+	for n, id := range identifiers {
+		if n > 0 {
+			q.WriteString(", ")
+		}
+		fmt.Fprintf(&q, "$i%d: String!", n)
+		vars[fmt.Sprintf("i%d", n)] = id
+	}
+	q.WriteString(") {")
+	for n := range identifiers {
+		fmt.Fprintf(&q, " i%d: issue(id: $i%d) { inverseRelations(first: 20) { nodes { type issue { identifier state { type } } } } }", n, n)
+	}
+	q.WriteString(" }")
+	var data map[string]*linearRelations
+	if err := l.query(ctx, q.String(), vars, &data); err != nil {
+		return nil, err
+	}
+	for n, id := range identifiers {
+		if r := data[fmt.Sprintf("i%d", n)]; r != nil {
+			out[id] = r.blockers()
+		}
+	}
+	return out, nil
 }
