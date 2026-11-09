@@ -19,8 +19,9 @@ import (
 // manageAccounts is manage_accounts (#3967): the person's outside accounts, from Settings ▸
 // You ▸ Accounts on the control plane. list (or find, with service) gives each account's id,
 // service and description only (#4164); get gives one account in full; add one, or import the
-// files of the old registry in ~/.agents/accounts/ (#3909) once.
-func (d *Daemon) manageAccounts(_ wire.UUID, args map[string]json.RawMessage) (string, error) {
+// files of the old registry in ~/.agents/accounts/ (#3909) once. An account that would replace one
+// with the same service and address waits for the person's yes (#4001); a new one goes in at once.
+func (d *Daemon) manageAccounts(agent wire.UUID, args map[string]json.RawMessage) (string, error) {
 	var call wire.MachineAccountsCall
 	action := strings.TrimSpace(argString(args, "action"))
 	switch action {
@@ -54,12 +55,142 @@ func (d *Daemon) manageAccounts(_ wire.UUID, args map[string]json.RawMessage) (s
 	default:
 		return "", Invalid("Nothing was done: action is list, get, add or import.")
 	}
-	listed, err := d.askAccounts(call)
+	if len(call.Add) == 0 {
+		listed, err := d.askAccounts(call)
+		if err != nil {
+			return "", err
+		}
+		return accountsNote(listed.Accounts, argString(args, "service"), argString(args, "project")), nil
+	}
+	have, err := d.askAccounts(wire.MachineAccountsCall{})
 	if err != nil {
 		return "", err
 	}
-	return accountsNote(listed.Accounts, argString(args, "service"), argString(args, "project"), action, len(call.Add)), nil
+	plan := planAccounts(have.Accounts, call.Add)
+	replace := false
+	if len(plan.changed) > 0 {
+		title := d.agentWho(agent) + " wants to replace an account"
+		if len(plan.changed) > 1 {
+			title = fmt.Sprintf("%s wants to replace %d accounts", d.agentWho(agent), len(plan.changed))
+		}
+		replace, err = d.personSaysYes(agent, title, replaceQuestion(plan.changed), "Replace")
+		if err != nil {
+			return "", err
+		}
+	}
+	send := plan.added
+	if replace {
+		for _, c := range plan.changed {
+			send = append(send, c.to)
+		}
+	}
+	listed := have
+	if len(send) > 0 {
+		if listed, err = d.askAccounts(wire.MachineAccountsCall{Add: send}); err != nil {
+			return "", err
+		}
+	}
+	return plan.note(replace) + accountsNote(listed.Accounts, argString(args, "service"), argString(args, "project")), nil
 }
+
+// accountsPlan is what an add or import does to the person's accounts: those that are new, those
+// that would replace one (and so wait for a yes), and how many are as they are already.
+type accountsPlan struct {
+	added   []wire.OutsideAccount
+	changed []accountChange
+	same    int
+}
+
+type accountChange struct {
+	from, to wire.OutsideAccount
+	fields   []string // "plan: Free → Pro", in the order of the account's fields
+}
+
+func planAccounts(have, add []wire.OutsideAccount) accountsPlan {
+	var plan accountsPlan
+	for _, a := range add {
+		i := slices.IndexFunc(have, func(h wire.OutsideAccount) bool {
+			return strings.EqualFold(h.Service, a.Service) && strings.EqualFold(deref(h.Address), deref(a.Address))
+		})
+		if i < 0 {
+			plan.added = append(plan.added, a)
+			continue
+		}
+		if fields := accountFields(have[i], a); len(fields) > 0 {
+			plan.changed = append(plan.changed, accountChange{from: have[i], to: a, fields: fields})
+		} else {
+			plan.same++
+		}
+	}
+	return plan
+}
+
+// accountFields is each field that differs, as "name: old → new", "(none)" for an absent value.
+func accountFields(from, to wire.OutsideAccount) []string {
+	fields := func(a wire.OutsideAccount) map[string]any {
+		var m map[string]any
+		raw, _ := json.Marshal(a)
+		_ = json.Unmarshal(raw, &m)
+		return m
+	}
+	old, now := fields(from), fields(to)
+	show := func(v any) string {
+		switch v := v.(type) {
+		case nil:
+			return "(none)"
+		case string:
+			return v
+		default:
+			raw, _ := json.Marshal(v)
+			return string(raw)
+		}
+	}
+	var out []string
+	for _, name := range []string{"service", "address", "description", "plan", "monthlyCostUsd", "card", "secret", "twoFactor", "issue", "made", "tokenExpires", "notes", "projects"} {
+		if a, b := show(old[name]), show(now[name]); a != b {
+			out = append(out, name+": "+a+" → "+b)
+		}
+	}
+	return out
+}
+
+func replaceQuestion(changed []accountChange) string {
+	var b strings.Builder
+	b.WriteString("Replace ")
+	if len(changed) == 1 {
+		b.WriteString("this account?")
+	} else {
+		fmt.Fprintf(&b, "these %d accounts?", len(changed))
+	}
+	for _, c := range changed {
+		b.WriteString("\n\n" + c.from.Service)
+		if c.from.Address != nil {
+			b.WriteString(" (" + *c.from.Address + ")")
+		}
+		for _, f := range c.fields {
+			b.WriteString("\n- " + f)
+		}
+	}
+	return b.String()
+}
+
+// note is the start of the tool's answer: what went in and what did not.
+func (p accountsPlan) note(replaced bool) string {
+	var said []string
+	if n := len(p.added); n > 0 {
+		said = append(said, fmt.Sprintf("Added %d.", n))
+	}
+	if n := len(p.changed); n > 0 && replaced {
+		said = append(said, fmt.Sprintf("Replaced %d.", n))
+	} else if n > 0 {
+		said = append(said, fmt.Sprintf("Kept %d as they were: the person said not to replace them.", n))
+	}
+	if p.same > 0 {
+		said = append(said, fmt.Sprintf("%d had no change.", p.same))
+	}
+	return strings.Join(said, " ") + " "
+}
+
 
 func (d *Daemon) askAccounts(call wire.MachineAccountsCall) (wire.OutsideAccounts, error) {
 	var listed wire.OutsideAccounts
@@ -151,14 +282,8 @@ type accountLine struct {
 const noDescription = "No description"
 
 // accountsNote is the accounts, a line each, those of service and project only when named.
-func accountsNote(all []wire.OutsideAccount, service, project, action string, added int) string {
+func accountsNote(all []wire.OutsideAccount, service, project string) string {
 	var b strings.Builder
-	switch action {
-	case "add":
-		b.WriteString("Added. ")
-	case "import":
-		fmt.Fprintf(&b, "Imported %d accounts. ", added)
-	}
 	service, project = strings.TrimSpace(service), strings.TrimSpace(project)
 	var rows []wire.OutsideAccount
 	for _, a := range all {

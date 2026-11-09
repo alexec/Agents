@@ -1,5 +1,5 @@
 // Work ▸ Features (#3269, spec 3265), as the window's WorkFeatures: each feature:<name> label
-// (forge/features) with its epic counts; opened, its open epics, each with its progress and its
+// (forge/features) with its epic counts, in the groups of FeatureGroup (#4115); opened, its open epics, each with its progress and its
 // lead, and its loose issues (the open issues with the label and no parent epic).
 import type { Agent, AgentState, ForgeFeature, ForgeItem, LineageNode } from "../protocol/generated";
 import { shortRef } from "./work";
@@ -18,13 +18,59 @@ export function featureCountWords(f: ForgeFeature): string {
  * says nothing, so none of its features is finished. */
 export const isFinished = (f: ForgeFeature) => f.open === 0 && f.issues === 0;
 
-/** The features as the list shows them (#3741): those with open work at the top, in their order, and
- * the finished ones in the Finished group at the bottom. */
-export const featureGroups = (features: readonly ForgeFeature[]) =>
-  ({ active: features.filter((f) => !isFinished(f)), finished: features.filter(isFinished) });
+/** The groups of the list, from the top (#4115): each feature is in the first one it matches. Needs
+ * you: a session on its work waits for Alex, a pull request waits for Alex's approval, or an issue is
+ * labelled alex-todo. In flight: a session that is not archived is labelled with one of its open
+ * issues or epics. Idle: open work and no session on it. Finished: no open epic and no open issue (#3741). */
+export type FeatureGroup = "needsYou" | "inFlight" | "idle" | "finished";
+export const featureGroupOrder: readonly FeatureGroup[] = ["needsYou", "inFlight", "idle", "finished"];
+
+/** A group's head: "Needs you", "Finished (7)". */
+export function groupWords(group: FeatureGroup, count: number): string {
+  switch (group) {
+    case "needsYou": return "Needs you";
+    case "inFlight": return "In flight";
+    case "idle": return "Idle";
+    case "finished": return finishedWords(count);
+  }
+}
+
+/** The sessions on a feature's work (#4115), of those this page knows: not archived, and labelled
+ * with the short ref of one of its open issues or epics (#3265, or ENG-5), as a lane and a lead label theirs. */
+export function featureSessions(feature: ForgeFeature, agents: readonly Agent[]): Agent[] {
+  const refs = new Set((feature.refs ?? []).map(shortRef));
+  if (refs.size === 0) return [];
+  return agents.filter((a) => a.state !== "archived" && (a.labels ?? []).some((l) => refs.has(l.value)));
+}
+
+function groupOf(f: ForgeFeature, sessions: readonly Agent[], approvals: ReadonlySet<string>): FeatureGroup {
+  if (isFinished(f)) return "finished";
+  if ((f.waiting ?? []).length > 0
+    || sessions.some((a) => a.state === "waitingOnUser" || (a.labels ?? []).some((l) => approvals.has(l.value)))) return "needsYou";
+  return sessions.length === 0 ? "idle" : "inFlight";
+}
+
+/** The features in their groups, as the list shows them (#4115): Needs you, In flight and Idle in
+ * their order, Idle the least recently updated first, and Finished at the bottom. */
+export function featureGroups(features: readonly ForgeFeature[], agents: readonly Agent[] = [], approvals: readonly string[] = []):
+  { group: FeatureGroup; features: ForgeFeature[] }[] {
+  const waiting = new Set(approvals.map((r) => `P${shortRef(r)}`));
+  const by = new Map<FeatureGroup, ForgeFeature[]>();
+  for (const f of features) {
+    const g = groupOf(f, featureSessions(f, agents), waiting);
+    by.set(g, [...by.get(g) ?? [], f]);
+  }
+  by.get("idle")?.sort((a, b) => (a.updatedAt ?? -Infinity) - (b.updatedAt ?? -Infinity));
+  return featureGroupOrder.flatMap((group) => { const list = by.get(group); return list ? [{ group, features: list }] : []; });
+}
+
+/** An In flight feature's sessions: "1 session", "3 sessions". */
+export const sessionWords = (count: number) => `${count} ${count === 1 ? "session" : "sessions"}`;
 
 /** The Finished group's head: "Finished (7)". */
 export const finishedWords = (count: number) => `Finished (${count})`;
+
+const union = (a: string[] | undefined, b: string[] | undefined) => !a ? b : !b ? a : [...a, ...b.filter((r) => !a.includes(r))];
 
 /** The features of several machines as one list, by name: the counts of one feature added up. Its
  * issues are unknown when one machine does not count them. */
@@ -39,6 +85,11 @@ export function mergeFeatures(lists: readonly (readonly ForgeFeature[])[]): Forg
     if (had.issues === undefined || f.issues === undefined) delete had.issues;
     else had.issues += f.issues;
     if (had.color === undefined && f.color !== undefined) had.color = f.color;
+    const refs = union(had.refs, f.refs);
+    if (refs) had.refs = refs;
+    const waiting = union(had.waiting, f.waiting);
+    if (waiting) had.waiting = waiting;
+    if (f.updatedAt !== undefined && (had.updatedAt === undefined || f.updatedAt > had.updatedAt)) had.updatedAt = f.updatedAt;
   }
   return [...by.values()].sort((a, b) => a.name.toLowerCase() < b.name.toLowerCase() ? -1 : a.name.toLowerCase() > b.name.toLowerCase() ? 1 : 0);
 }

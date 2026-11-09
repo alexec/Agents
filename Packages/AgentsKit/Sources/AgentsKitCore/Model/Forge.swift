@@ -598,29 +598,41 @@ public extension DaemonAPI {
 
     /// A feature: its label's name after `feature:`, with its colour; its epics, and the open ones;
     /// its open issues that are not epics (#3741), absent from a daemon that does not count them.
+    /// `refs` are its open issues' and open epics' lineage refs, `waiting` those labelled alex-todo,
+    /// and `updatedAt` the newest update of any of them (#4115).
     struct ForgeFeature: Codable, Sendable, Hashable {
         public var name: String
         public var color: String?
         public var epics: Int
         public var open: Int
         public var issues: Int?
+        public var refs: [String]?
+        public var waiting: [String]?
+        public var updatedAt: Date?
 
-        public init(name: String, color: String? = nil, epics: Int, open: Int, issues: Int? = nil) {
+        public init(name: String, color: String? = nil, epics: Int, open: Int, issues: Int? = nil, refs: [String]? = nil,
+                    waiting: [String]? = nil, updatedAt: Date? = nil) {
             self.name = name
             self.color = color
             self.epics = epics
             self.open = open
             self.issues = issues
+            self.refs = refs
+            self.waiting = waiting
+            self.updatedAt = updatedAt
         }
     }
 
-    /// The features, by name; `errors` says a forge that could not be read.
+    /// The features, by name; `approvals` are the open pull requests labelled needs-approval
+    /// (#4115); `errors` says a forge that could not be read.
     struct ForgeFeatures: Codable, Sendable, Hashable {
         public var features: [ForgeFeature]
+        public var approvals: [String]?
         public var errors: [ForgeListError]?
 
-        public init(features: [ForgeFeature] = [], errors: [ForgeListError]? = nil) {
+        public init(features: [ForgeFeature] = [], approvals: [String]? = nil, errors: [ForgeListError]? = nil) {
             self.features = features
+            self.approvals = approvals
             self.errors = errors
         }
     }

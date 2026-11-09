@@ -3,6 +3,7 @@ package agentsd
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -183,7 +184,10 @@ func TestForgeFeatureFilterAndFeatures(t *testing.T) {
 	gh.epics[0].LabelColors = map[string]string{"feature:work": "#1d76db"}
 	// #3741: the open issues that are not epics count under their feature; one with no epic adds no feature.
 	gh.open = []githubmcp.Item{planIssue(1, "open", "epic", "feature:work"), planIssue(5, "open", "bug", "feature:Work"),
-		planIssue(6, "open", "story", "feature:work"), planIssue(7, "open", "feature:docs"), planIssue(8, "open")}
+		planIssue(6, "open", "story", "feature:work", "alex-todo"), planIssue(7, "open", "feature:docs"), planIssue(8, "open")}
+	gh.open[2].UpdatedAt = "2026-11-02T10:00:00Z"
+	// #4115: the pull requests labelled needs-approval come with the features.
+	gh.reviews = []githubmcp.Item{{Repo: "alexec/agents", Number: 9, PR: true, State: "open", Title: "Groups", Labels: []string{"needs-approval"}}}
 	var out wire.ForgeFeatures
 	json.Unmarshal(c.call(t, 2, "forge/features", wire.ForgeFeaturesRequest{}), &out)
 	if len(out.Features) != 2 || out.Features[0].Name != "lineage" || out.Features[1].Name != "work" || out.Features[1].Epics != 2 ||
@@ -191,7 +195,20 @@ func TestForgeFeatureFilterAndFeatures(t *testing.T) {
 		out.Features[0].Issues == nil || *out.Features[0].Issues != 0 || out.Features[1].Issues == nil || *out.Features[1].Issues != 2 {
 		t.Fatalf("features: %+v", out)
 	}
-	if searches, _ := gh.asked(); !strings.Contains(searches[len(searches)-1], `label:"epic"`) || strings.Contains(searches[len(searches)-1], "is:open") {
+	searches, _ := gh.asked()
+	epics := slices.IndexFunc(searches, func(s string) bool { return strings.Contains(s, `label:"epic"`) })
+	if epics < 0 || strings.Contains(searches[epics], "is:open") {
 		t.Fatalf("searches: %q", searches)
+	}
+	// #4115: each feature's open issues and open epics, each once; those labelled alex-todo; the newest update.
+	work := out.Features[1]
+	if !slices.Equal(work.Refs, []string{"github:alexec/agents#1", "github:alexec/agents#5", "github:alexec/agents#6"}) ||
+		!slices.Equal(work.Waiting, []string{"github:alexec/agents#6"}) || work.UpdatedAt == nil ||
+		!slices.Equal(out.Features[0].Refs, []string{"github:alexec/agents#3"}) || len(out.Features[0].Waiting) != 0 ||
+		!slices.Equal(out.Approvals, []string{"github:alexec/agents#9"}) {
+		t.Fatalf("refs: %+v, approvals %q", out.Features, out.Approvals)
+	}
+	if lineage := out.Features[0].UpdatedAt; lineage == nil || *work.UpdatedAt <= *lineage {
+		t.Fatalf("updatedAt: %v, %v", work.UpdatedAt, lineage)
 	}
 }
