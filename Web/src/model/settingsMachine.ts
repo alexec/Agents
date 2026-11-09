@@ -5,7 +5,7 @@ import type { ControlMachine } from "../protocol/generated";
 import { hostAnswers } from "./capabilities";
 
 export const machineLabel = "Machine";
-export const noMachineYet = "No machine has joined this control plane yet. Add one in Settings ▸ Machines.";
+export const noMachineYet = "No machine has joined this control plane yet. Add one under Machines in the sidebar.";
 
 /** The machines a pane can speak to: the Mac alone when there is one, else each machine that answers. */
 export function settingsMachines(hosts: readonly ControlMachine[], macID: string): ControlMachine[] {

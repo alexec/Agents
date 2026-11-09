@@ -16,7 +16,7 @@ struct SettingsWindow: View {
     /// pane is chosen. Asked for when the window appears, when it is chosen, and whenever the app comes
     /// back to the front, which is when an edit made elsewhere shows.
     @State private var sharedSnapshot: DaemonAPI.SharedSnapshot?
-    @State private var machinesPage: MachinesPage = .list
+    @State private var machinesPage: MachinesPage = .thisMac
     /// A Skills, Personas or Workflows file has edits not saved: another pane asks first (#2745).
     @State private var unsaved = false
     @State private var leaving: UnsavedLeave?
@@ -64,10 +64,7 @@ struct SettingsWindow: View {
                 // A pane of this Mac's own things, with no host on this Mac (#1503): what is
                 // true, and what to do, over a pane that has nothing to show.
                 if model.noHostOnThisMac, isThisMacs {
-                    NoMacHostNotice {
-                        machinesPage = .list
-                        pane.wrappedValue = .machines
-                    }
+                    NoMacHostNotice()
                     Divider()
                 }
                 // Each setting states its fixed scope (#2410).
@@ -120,12 +117,8 @@ struct SettingsWindow: View {
                     model.agentConfigFileAsked = nil
                 }
             }
-            if asked == .machines {
-                // This Mac's own page when its page asked; another machine's settings are on
-                // the list, in its menu.
-                machinesPage = model.settingsMachineAsked == .mac && model.hasMacHost ? .thisMac : .list
-                model.settingsMachineAsked = nil
-            }
+            // This Mac's own page: another machine's settings are in its row's menu in the sidebar (#3975).
+            if asked == .machines { machinesPage = .thisMac }
         }
         .onChange(of: pane.wrappedValue) { _, chosen in
             if chosen == .agentConfiguration { Task { await refreshShared() } }
@@ -215,10 +208,10 @@ struct SettingsWindow: View {
         case .machines:
             if let control {
                 HStack(spacing: 0) {
-                    MachinesPageList(control: control, page: $machinesPage)
+                    MachinesPageList(page: $machinesPage)
                     switch machinesPage {
-                    case .list: ControlSettingsView(control: control, page: .hosts)
                     case .thisMac: FormColumn { MacSettingsView() }
+                    case .autoDetect: ControlSettingsView(control: control, page: .autoDetect)
                     }
                 }
             } else {
@@ -407,15 +400,15 @@ enum SettingsPane: String, Hashable, CaseIterable {
     }
 }
 
-/// Machines' pages (#1759): every machine, as Control plane ▸ Hosts listed them, and this
-/// Mac's own settings, as the Mac pane had them.
+/// Machines' pages (#1759): this Mac's own settings, as the Mac pane had them, and where the
+/// folders picker looks. The list of every machine went to the sidebar (#3975).
 enum MachinesPage: Hashable {
-    case list, thisMac
+    case thisMac, autoDetect
 
     var title: String {
         switch self {
-        case .list: "All Machines"
         case .thisMac: "This Mac"
+        case .autoDetect: ControlPage.autoDetect.title
         }
     }
 }
@@ -474,18 +467,14 @@ private final class SettingsGrowView: NSView {
 /// No host on this Mac (#1503): the control plane is elsewhere and lists only servers as
 /// hosts, so this Mac's runtimes and settings have nobody to keep them.
 private struct NoMacHostNotice: View {
-    let showHosts: () -> Void
-
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Label("This Mac is not one of your machines", systemImage: "exclamationmark.triangle")
                 .appText(.supporting).fontWeight(.semibold)
                 .tinted(.attention)
-            Text("This Mac’s runtimes and settings are kept only when it is one of your machines, and the control plane does not have it. Agents on your servers are not changed. To add this Mac, make a code in Machines ▸ Add by Code…, then paste it in Agents Host under Join one elsewhere.")
+            Text("This Mac’s runtimes and settings are kept only when it is one of your machines, and the control plane does not have it. Agents on your servers are not changed. To add this Mac, choose Register a Machine… in the sidebar’s Machines menu and make a code, then paste it in Agents Host under Join one elsewhere.")
                 .appText(.fine).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            Button("Show Machines", action: showHosts)
-                .controlSize(.small)
         }
         .frame(maxWidth: 560, alignment: .leading)
         .padding(16)
@@ -660,15 +649,14 @@ private struct RuntimePageList: View {
 
 /// Machines' pages (#1759): every machine, with its count, and this Mac's own settings.
 private struct MachinesPageList: View {
-    let control: ControlSettingsModel
     @Binding var page: MachinesPage
 
     var body: some View {
         PageList {
-            PageLine(title: MachinesPage.list.title, lit: page == .list, count: control.hosts.count,
-                     action: { page = .list })
             PageLine(title: MachinesPage.thisMac.title, lit: page == .thisMac, count: nil,
                      action: { page = .thisMac })
+            PageLine(title: MachinesPage.autoDetect.title, lit: page == .autoDetect, count: nil,
+                     action: { page = .autoDetect })
         }
     }
 }

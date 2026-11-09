@@ -7,7 +7,9 @@ import SwiftUI
 /// per folder's worktrees (#3627), the runtimes installed there (#3629), resources only
 /// when one is declared or held, and its processes (#3453). Read with
 /// `machine/usage` when it opens and every few seconds while it is open, never otherwise.
-/// The machine's settings stay in Settings ▸ Machines; Settings… goes there. The web page draws the same in Web/src/views/MachinePage.tsx.
+/// A machine a provider made has its provider's options and Unlink here, and one that uses a Mac's
+/// git access has Stop Lending (#3975: Settings ▸ Machines lists no machines now). This Mac's own
+/// settings stay in Settings ▸ Machines; Settings… goes there. The web page draws the same in Web/src/views/MachinePage.tsx.
 struct MachinePage: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openSettings) private var openSettings
@@ -30,12 +32,13 @@ struct MachinePage: View {
                         .foregroundStyle(offline ? StateTint.failure.style(or: .secondary) : AnyShapeStyle(.secondary))
                 }
                 Spacer(minLength: 0)
-                Button("Settings…") {
-                    model.settingsMachineAsked = host
-                    model.settingsPaneAsked = .machines
-                    openSettings()
+                if host == .mac {
+                    Button("Settings…") {
+                        model.settingsPaneAsked = .machines
+                        openSettings()
+                    }
+                    .help("\(name)’s sleep, backups and desktop control, in Settings ▸ Machines")
                 }
-                .help("\(name)’s sleep, backups and desktop control, in Settings ▸ Machines")
             }
             .padding(.horizontal, 24)
             .padding(.top, 24)
@@ -55,6 +58,9 @@ struct MachinePage: View {
                     } else {
                         summarySection
                         disksSection
+                    }
+                    if let row = model.hosts.controlRows[host] {
+                        MachineLinkSections(row: row)
                     }
                     if !offline {
                         MachineWorktreesSections(host: host)
@@ -190,6 +196,76 @@ struct MachinePage: View {
     }
 }
 
+/// What Settings ▸ Machines' menu had for one machine and its row's menu leaves out (#3975):
+/// a provider's options and Unlink (rare, so not in the row's menu; the wireframe's section 4),
+/// and Stop Lending for each git server it uses a Mac's access for (#1122).
+private struct MachineLinkSections: View {
+    @Environment(AppModel.self) private var model
+    let row: DaemonAPI.ControlMachine
+    @State private var unlinking = false
+
+    var body: some View {
+        if let workspace = row.workspace {
+            Section {
+                Toggle("Start when used", isOn: Binding(
+                    get: { workspace.startWhenUsed },
+                    set: { on in Task { await model.setMachineOptions(row.id, startWhenUsed: on) } }))
+                Toggle("Start for scheduled workflows", isOn: Binding(
+                    get: { workspace.startForSchedules ?? true },
+                    set: { on in Task { await model.setMachineOptions(row.id, startForSchedules: on) } }))
+                Picker("Stop when idle", selection: Binding(
+                    get: { workspace.stopWhenIdleMinutes ?? 0 },
+                    set: { minutes in Task { await model.setMachineOptions(row.id, stopWhenIdleMinutes: minutes) } })) {
+                    ForEach(MachineProviderWords.idleChoices, id: \.minutes) { Text($0.label).tag($0.minutes) }
+                }
+                Button("Unlink from \(workspace.workspaceName)…") { unlinking = true }
+            } header: {
+                Text("\(workspace.providerName): \(workspace.workspaceName)")
+            } footer: {
+                if let words = footer(workspace) { Text(words) }
+            }
+            .confirmationDialog("Unlink \(row.name) from \(workspace.workspaceName)?", isPresented: $unlinking,
+                                titleVisibility: .visible) {
+                Button("Unlink") { Task { await model.unlinkMachine(row.id) } }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("\(workspace.providerName) can no longer start or stop it.")
+            }
+        }
+        if let lent = row.gitFrom, !lent.isEmpty {
+            Section {
+                ForEach(lent.keys.sorted(), id: \.self) { server in
+                    Button(GitLendWords.revoke(server)) {
+                        Task { await model.stopLendingGit(row.id, from: lent[server]!, server: server) }
+                    }
+                }
+            } header: {
+                Text("Git access")
+            } footer: {
+                if let uses = GitLendWords.uses(row, name: { model.hosts.label($0) }) { Text(uses) }
+            }
+        }
+    }
+
+    /// When it starts again or stays up (#1004 FR-007), and the scheduled workflows it does
+    /// not run while stopped (L8), as its row in Settings ▸ Machines said.
+    private func footer(_ workspace: DaemonAPI.MachineWorkspace) -> String? {
+        var lines: [String] = []
+        if let problem = workspace.problem { lines.append(problem) }
+        if row.state != "online", let wake = OfflineWords.wakeLine(workspace) { lines.append(wake) }
+        if row.state == "online", let up = OfflineWords.staysUpLine(workspace) { lines.append(up) }
+        let started = (workspace.startForSchedules ?? true) && workspace.tellsSchedule == true
+        let scheduled = workspace.stopWhenIdleMinutes == nil || started ? 0 : model.work.folders.filter { $0.host == row.id }
+            .flatMap { model.work.workflows(in: $0.folder.folder) }
+            .filter { !$0.isArchived && $0.isEnabled && !$0.workflow.schedules.isEmpty }
+            .count
+        if scheduled > 0 {
+            lines.append("\(scheduled == 1 ? "1 scheduled workflow here doesn’t" : "\(scheduled) scheduled workflows here don’t") run while it is stopped.")
+        }
+        return lines.isEmpty ? nil : lines.joined(separator: "\n")
+    }
+}
+
 /// A machine's row under Machines in the sidebar (#3626): its name and its dot, and under it,
 /// in grey, the most urgent thing it needs (#3764). The dot and the line say only the machine's
 /// own state: its sessions do not roll up into it (#3973). Its menu and swipes start, stop,
@@ -205,7 +281,7 @@ struct MachineRow: View {
     @State private var removing = false
     /// Stop, asked first while agents work there, with who they are.
     @State private var stoppingNames: [String] = []
-    /// A sheet from its menu (#3979), as Settings ▸ Machines opens them.
+    /// A sheet from its menu (#3979), as Settings ▸ Machines opened them.
     @State private var sheet: MachineSheet?
     /// The control plane's model, for the sheets that need it, made as one opens.
     @State private var control: ControlSettingsModel?
@@ -253,6 +329,11 @@ struct MachineRow: View {
         }
         .contextMenu {
             Button("Open", action: open)
+            // This Mac's one item, as its row in Settings ▸ Machines had it (#656, #3975).
+            if let row, host == .mac {
+                Divider()
+                Button("Choose Folders…") { show(.folders) }.disabled(!row.answers)
+            }
             if let row, host != .mac {
                 // The items of Settings ▸ Machines' menu, moved here (#3979).
                 Divider()
@@ -310,8 +391,14 @@ struct MachineRow: View {
             Button("Stop") { Task { _ = await model.stopHost(host, confirmed: true) } }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("\(ControlHostsPage.list(stoppingNames)) \(stoppingNames.count == 1 ? "is" : "are") working there. Stopping the machine stops them.")
+            Text("\(MachineRow.list(stoppingNames)) \(stoppingNames.count == 1 ? "is" : "are") working there. Stopping the machine stops them.")
         }
+    }
+
+    /// "Claude (fix-login) and Codex (docs)".
+    static func list(_ names: [String]) -> String {
+        guard names.count > 1 else { return names.first ?? "" }
+        return names.dropLast().joined(separator: ", ") + " and " + names.last!
     }
 
     /// Stop asks only when sessions run there: the control plane says who.
@@ -346,7 +433,7 @@ struct MachineRow: View {
             case .processes: MachineProcessesSheet(host: row)
             case .folders:
                 if let control {
-                    ChooseFoldersSheet(host: host, hostName: row.name, paths: control.suggestedPaths)
+                    ChooseFoldersSheet(host: host, hostName: model.hosts.label(host), paths: control.suggestedPaths)
                         .task { await control.start() }
                 }
             case .update:
@@ -366,7 +453,7 @@ struct MachineRow: View {
 enum MachineSheet: String, Identifiable {
     case update, folders, backups, processes, link
     var id: String { rawValue }
-    /// Opened with the control plane's model, as in Settings ▸ Machines.
+    /// Opened with the control plane's model, as Settings ▸ Machines had them.
     var needsControl: Bool { self == .update || self == .folders || self == .link }
 }
 

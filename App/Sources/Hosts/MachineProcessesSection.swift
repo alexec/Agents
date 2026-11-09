@@ -166,7 +166,7 @@ enum ProcessWords {
     }
 }
 
-/// A machine's processes (#3453), from its menu in Settings ▸ Machines.
+/// A machine's processes (#3453), from its row's menu in the sidebar.
 struct MachineProcessesSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
