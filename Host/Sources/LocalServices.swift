@@ -64,6 +64,26 @@ struct LocalServices {
         return await register(job)
     }
 
+    /// `Agents Host --register-jobs`: each enabled login item is registered again from this
+    /// copy, with no window. launchd starts a job from the copy its login item was
+    /// registered from, and a copy moved aside does not change that (#4130), so ship.sh runs
+    /// this from the installed copy. It says what it did and exits 1 if one failed.
+    static let registerArgument = "--register-jobs"
+
+    static func registerFromCommandLine() -> Never {
+        Task {
+            let services = LocalServices(paths: .current)
+            var failed = false
+            for job in [Job.control, .daemon] where services.loginStatus(job) == .enabled {
+                let outcome = await services.registerAgain(job)
+                if case .failed(let why) = outcome { failed = true; print("\(services.label(job)): \(why)") }
+                else { print("\(services.label(job)): registered from \(Bundle.main.bundlePath)") }
+            }
+            exit(failed ? 1 : 0)
+        }
+        dispatchMain()
+    }
+
     func remove() async {
         await unregister(.control)
         await unregister(.daemon)

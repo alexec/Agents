@@ -54,7 +54,10 @@ Since 058 the Mac runs:
   launchd can start them from any copy that LaunchServices knows (#3451). Before the
   restart, the script unregisters every other copy that is on disk. launchd keeps the
   copy it found while that copy is on disk (#3521), so the script also moves aside the
-  copy the jobs run from, restarts them, and puts it back. Then it checks that both jobs
+  copy the jobs run from and restarts them. When a login item was registered from that
+  copy, launchd does not start it from another (#4130), so if the jobs do not come up on
+  the installed copy, the installed copy registers them again
+  (`Agents Host --register-jobs`). Then the copy goes back, and the script checks that both jobs
   run from `~/Applications`. `ship.sh --check-host` shows the copies and where
   the jobs run from, and changes nothing.
 - **The window**: the `AgentsStore` build, a client of the control plane. It runs from
