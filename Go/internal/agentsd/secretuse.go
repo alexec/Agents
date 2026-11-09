@@ -31,8 +31,9 @@ import (
 //
 // Only the control and device roles answer, or add and remove a grant (askBeforeUseAllowed).
 // The machine lock checks that an answer through the control plane comes from a client of
-// the person's lock (lockcheck.go). The Linux release key K, which takes a device-signed
-// approval, is #4058.
+// the person's lock (lockcheck.go). On Linux an answer that allows a use is also signed by
+// the answering client, and the control plane releases the value's key only for it
+// (#4058, secretrelease.go).
 
 // Answers to a secret's use.
 const (
@@ -89,6 +90,9 @@ func (d *Daemon) approveSecretUse(agent wire.UUID, name string, use wire.SecretU
 	ask := wire.RequestSecretUse{Name: name, Use: use, Place: place}
 	if d.isSessionSecret(agent, name) {
 		ask.SessionOnly = new(true)
+	}
+	if d.needsRelease(agent, name) {
+		ask.NeedsSignature = new(true)
 	}
 	id, ok := d.openSecretUseRequest(agent, ask)
 	if !ok {
@@ -232,6 +236,11 @@ func (d *Daemon) answerSecretUse(rec wire.Request, a *wire.RequestSecretUseAnswe
 	if summary == "" {
 		return wire.RequestUpdate{}, Invalid("The answer is once, session, always or deny.")
 	}
+	if a.Action != secretUseDeny {
+		if err := d.releaseForAnswer(rec, a); err != nil {
+			return wire.RequestUpdate{}, err
+		}
+	}
 	always := a.Action == secretUseAlways && !d.isSessionSecret(agent, ask.Name)
 	if always {
 		if err := d.changeGrant(ask.Name, ask.Use, ask.Place, true); err != nil {
@@ -294,6 +303,7 @@ func (d *Daemon) forgetSessionSecretUses(agent wire.UUID) {
 			delete(d.secretUseOnceLeft, k)
 		}
 	}
+	d.forgetReleased(sealedSessionStore(agent))
 }
 
 // changeGrant adds or takes away a grant: the record is sealed again, with its grants in
@@ -310,18 +320,14 @@ func (d *Daemon) changeGrant(name string, use wire.SecretUse, place string, add 
 	if !ok {
 		return Invalid("%s does not have Ask before use on this machine.", name)
 	}
-	value, err := d.openSealedSecret(sealedLocal, name, s)
-	if err != nil {
-		return Invalid("%s does not open on this machine, so its grants were left as they are.", name)
-	}
 	g := grantPlace(use, place)
 	grants := slices.DeleteFunc(slices.Clone(s.Grants), func(x string) bool { return x == g })
 	if add {
 		grants = append(grants, g)
 	}
-	sealed, err := d.sealSecret(sealedLocal, name, value, grants)
+	sealed, err := d.regrant(sealedLocal, name, s, grants)
 	if err != nil {
-		return Invalid("%s could not be sealed: %s", name, err.Error())
+		return Invalid("%s does not open on this machine, so its grants were left as they are.", name)
 	}
 	sealed.From, sealed.SetAt = s.From, s.SetAt
 	f.Secrets[name] = sealed
@@ -349,7 +355,7 @@ func (d *Daemon) secretGrants() wire.SecretGrants {
 		if len(s.Grants) == 0 {
 			continue
 		}
-		if _, err := d.openSealedSecret(sealedLocal, n, s); err != nil {
+		if _, err := d.openOuter(sealedLocal, n, s); err != nil {
 			continue
 		}
 		for _, g := range s.Grants {

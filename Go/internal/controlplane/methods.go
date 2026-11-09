@@ -1176,6 +1176,8 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 		return map[string]any{}, nil
 	case "machine/lockAdd", "machine/lockAgain", "machine/lockJoin", "machine/lockJoinReveal":
 		return m.hostLockMethod(ctx, host, method, params)
+	case wire.CallMachineSecretKey.Name, wire.CallMachineSecretRelease.Name:
+		return m.secretReleaseMethod(ctx, host, method, params)
 	case "attention/turn":
 		turn, err := require[wire.AttentionTurn](params, "AttentionTurn")
 		if err != nil {
