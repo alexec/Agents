@@ -305,6 +305,8 @@ struct AgentMenuItems: View {
                     .disabled(ids.last == agent.id || model.isStale)
             }
             BranchAgentButton(agent: agent)
+            // To another of the person's machines, with its unpushed work (#4037).
+            MoveToMachineButton(agent: agent)
             ArchiveAgentButton(agent: agent)
             // Deny an agent's ask to be archived (#773): the session stays.
             if agent.asksToArchive {

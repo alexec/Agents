@@ -53,6 +53,7 @@ struct RemoteApp: App {
                 .background(Paper.ground)
                 // Undo after Archive (#1534), for a few seconds, over the foot of whatever shows.
                 .modifier(ArchiveUndoOverlay())
+                .modifier(MoveToMachineAsk())
                 .environment(model)
                 // A new model on a new link once the phone pairs with a control plane.
                 .id(ObjectIdentifier(model))
@@ -496,6 +497,19 @@ private struct ArchiveUndoOverlay: ViewModifier {
                 }
             }
             .animation(.easeOut(duration: 0.2), value: model.archiveUndo?.id)
+    }
+}
+
+/// Move to Machine… from a session's menu (#4037), asked on the scene's root as Undo is: the
+/// menu, and perhaps its row, are gone by now.
+private struct MoveToMachineAsk: ViewModifier {
+    @Environment(RemoteModel.self) private var model
+
+    func body(content: Content) -> some View {
+        content.sheet(item: Binding(get: { model.movingToMachine }, set: { model.movingToMachine = $0 })) { agent in
+            RemoteMoveToMachineSheet(agent: agent)
+                .environment(model)
+        }
     }
 }
 

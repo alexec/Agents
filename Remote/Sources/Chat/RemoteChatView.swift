@@ -723,6 +723,8 @@ private struct ChatMenu: View, Equatable {
                     Label("Branch", systemImage: "arrow.triangle.branch")
                 }
                 .disabled(state.isStale)
+                // To another of the person's machines, with its unpushed work (#4037).
+                if let agent = model.work.agent(id) { MoveToMachineButton(agent: agent) }
                 if sizeClass != .regular {
                     Divider()
                     Button {

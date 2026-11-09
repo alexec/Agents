@@ -373,7 +373,7 @@ struct AgentRow: View {
                 Button("Branch") { Task { await model.fork(agent.id) } }
                 // To another of the person's machines, with its unpushed work (#3790).
                 if model.moveTargets(for: agent) != nil {
-                    Button("Move to Machine…") { movingToMachine = true }
+                    Button(MoveToMachineWords.menu) { movingToMachine = true }
                         .disabled(isActing)
                 }
                 Button("Archive") { Task { await model.archive(agent.id, andLeave: true) } }
