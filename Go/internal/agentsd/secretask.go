@@ -80,7 +80,6 @@ func (d *Daemon) askSecret(id wire.UUID, args map[string]json.RawMessage) (strin
 // secretNote is the words an agent reads for the answer to its ask_secret: the name and
 // where it is, never the value.
 func (d *Daemon) secretNote(agent wire.UUID, name string, action wire.AnswerElicitationRequestAction) string {
-	path := skillcatalog.SecretsPath(d.personalHome())
 	switch action {
 	case wire.AnswerElicitationRequestActionAccept:
 		if d.secretIsSealed(agent, name) {
@@ -97,8 +96,9 @@ func (d *Daemon) secretNote(agent wire.UUID, name string, action wire.AnswerElic
 				"Read it now, without printing it, from " + d.sessionSecretsPath(agent) + " (JSON; .secrets." + name + ".value). " +
 				"Never echo, cat or log it, and never write it into a file in the folder."
 		}
-		return name + " is saved in the person's secrets file, " + path + " (NAME=value lines, readable only by this user). " +
-			"Use it without printing it, for example `" + name + "=\"$(sed -n 's/^" + name + "=//p' " + path + ")\" your-command`, " +
+		return name + " is saved on this machine with Ask before use off. " +
+			"Use it without printing it, with `agents-secret " + name + "`, which asks agentsd for the value and records the read: " +
+			"for example `" + name + "=\"$(agents-secret " + name + ")\" your-command`, " +
 			"or as ${" + name + "} in a connector in .agents/mcp.json. Never echo, cat or log it, and never write it into a file in the folder."
 	case wire.AnswerElicitationRequestActionDecline:
 		return "They chose not to give " + name + ". Carry on without it, or say what you cannot do without it."
@@ -176,10 +176,15 @@ func (d *Daemon) saveSecret(name, value string, needsApproval bool) error {
 	if home == "" {
 		return errors.New("this machine has no personal home")
 	}
+	change := wire.SecretOperationWhatAdded
+	if secretIsSet(home, name) {
+		change = wire.SecretOperationWhatReplaced
+	}
 	if needsApproval {
 		if err := d.saveSealedSecret(home, name, value, "", true); err != nil {
 			return err
 		}
+		d.secretChanged("", name, change, true)
 		d.mcpChanged()
 		return nil
 	}
@@ -195,6 +200,7 @@ func (d *Daemon) saveSecret(name, value string, needsApproval bool) error {
 	if err := d.removeSealedSecret(home, name); err != nil {
 		return errors.New("sealed.json could not be written")
 	}
+	d.secretChanged("", name, change, true)
 	d.mcpChanged()
 	return nil
 }

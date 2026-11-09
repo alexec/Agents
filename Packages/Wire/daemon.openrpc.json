@@ -9419,6 +9419,11 @@
     {
       "name": "work/timeline",
       "x-capability": "work.timeline/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {

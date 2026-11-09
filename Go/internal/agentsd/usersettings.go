@@ -101,6 +101,14 @@ func (d *Daemon) toldUserSettings(params json.RawMessage) {
 
 // ApplyUserSettings writes what the control plane sent. Its errors never hold a secret.
 func (d *Daemon) ApplyUserSettings(u wire.MachineUserSettings) error {
+	// A person's Set, Replace… and Remove… in Settings ▸ Secrets (#4156), raised once the lock
+	// is let go. The control plane's audit has them already, from the person's own call.
+	var changes []secretChange
+	defer func() {
+		for _, c := range changes {
+			d.secretChanged("", c.name, c.what, false)
+		}
+	}()
 	d.userScopeMu.Lock()
 	defer d.userScopeMu.Unlock()
 	before := d.userMarkLocked()
@@ -160,6 +168,9 @@ func (d *Daemon) ApplyUserSettings(u wire.MachineUserSettings) error {
 		names, versions = before.Secrets, before.Versions
 	}
 	mark.Secrets, mark.Versions = names, versions
+	if err == nil && before.User == u.User {
+		changes = userSecretChanges(before, mark)
+	}
 	mark.About, mark.Waiting = secretsAbout(u.Secrets, names), u.Waiting
 	if err != nil {
 		mark.About = before.About

@@ -20,6 +20,7 @@ import { orgPolicyNotSaved } from "./ConsoleOrgPolicy";
 import { ReportsPage } from "./Reports";
 import { WorkList, WorkPage } from "./Work";
 import { WorkFeatures } from "./WorkFeatures";
+import { WorkTimeline } from "./WorkTimeline";
 import { DocPage, DocsList } from "./Docs";
 import { MachinePage } from "./MachinePage";
 import { machineNeed, machineNeedLine } from "./OfflineStrip";
@@ -216,6 +217,7 @@ export function PageView({ store, page, down }: { store: Store; page: NavPage; d
           : <WorkList key={page.draw.work} store={store} kind={page.draw.work} />)
         : page.draw.kind === "machine" ? <MachinePage key={page.draw.host} store={store} host={page.draw.host} />
         : page.draw.kind === "features" ? <WorkFeatures store={store} />
+        : page.draw.kind === "timeline" ? <WorkTimeline store={store} />
         // The person's secrets and cards (#1760), then a machine's for one session (#3548); were in Settings ▸ Machines.
         : page.draw.kind === "secrets" ? <><SecretsSection store={store} down={down} /><SessionSecretsSection store={store} down={down} /></>
         : page.draw.kind === "accounts" ? <AccountsSection store={store} down={down} />
