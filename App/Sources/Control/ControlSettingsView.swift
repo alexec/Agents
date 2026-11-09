@@ -130,6 +130,9 @@ struct ControlOverviewPage: View {
                     if control.isOnThisMac {
                         Button("Restart") { Task { await control.restart() } }.buttonStyle(.paper)
                     }
+                    #if !STORE_WINDOW
+                    ControlPlaneMoveButton(control: control)
+                    #endif
                 }
                 Divider()
                 ControlRow(dot: .none, title: "Reachable away from home",

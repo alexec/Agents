@@ -91,12 +91,9 @@ struct SettingsWindow: View {
         .task { await control?.start() }
         .onDisappear { control?.stop() }
         // Forget This Mac (#344) leaves no control plane to show; a new pairing brings one.
-        .onChange(of: model.needsFirstRun) { _, unpaired in
-            control?.stop()
-            control = unpaired ? nil : ControlConfig.endpoint.flatMap { ControlSettingsModel(endpoint: $0) }
-            if unpaired, pane.wrappedValue.needsControlPlane { pane.wrappedValue = .appearance }
-            if let control { Task { await control.start() } }
-        }
+        .onChange(of: model.needsFirstRun) { _, unpaired in remakeControl(unpaired: unpaired) }
+        // Moved to another control plane (#4228), never unpaired on the way.
+        .onChange(of: model.controlPlaneMoves) { remakeControl(unpaired: model.needsFirstRun) }
         // Asked for from elsewhere in the app: a link that names a Settings pane.
         .onChange(of: model.settingsPaneAsked, initial: true) { _, asked in
             guard let asked else { return }
@@ -126,6 +123,14 @@ struct SettingsWindow: View {
                 if pane.wrappedValue == .runtimes { await model.refreshRuntimes() }
             }
         }
+    }
+
+    /// The control plane's model for the window's pairing now, or none when it has none.
+    private func remakeControl(unpaired: Bool) {
+        control?.stop()
+        control = unpaired ? nil : ControlConfig.endpoint.flatMap { ControlSettingsModel(endpoint: $0) }
+        if unpaired, pane.wrappedValue.needsControlPlane { pane.wrappedValue = .appearance }
+        if let control { Task { await control.start() } }
     }
 
     /// Whether the rail lists a pane: those of the control plane need one. Machine Providers

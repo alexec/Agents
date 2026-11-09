@@ -137,6 +137,39 @@ enum ControlConfig {
         if let pin, pin.namesAControlPlane, !admitted(pin) { throw MachinePin.Refused(words: pin.refusal) }
     }
 
+    /// The pairing as it is on disk, for Connect to Another… (#4228) to put back when the
+    /// switch stops part way.
+    static func keptPairing() -> Data? { try? Data(contentsOf: membershipFile) }  // store-ok: the window's own container
+
+    /// The pairing with this Mac's own control plane, kept while the window is paired with
+    /// another (#4228), so Use This Mac Only goes back as the same client.
+    private static var herePairingFile: URL { folder.appendingPathComponent("control-client.here.json") }
+
+    static func keepHerePairing(_ pairing: Data?) {
+        guard let pairing else { return }
+        try? pairing.write(to: herePairingFile, options: .atomic)  // store-ok: the window's own container
+    }
+
+    /// The kept pairing with this Mac's own control plane, made the window's again; nil with none.
+    static func takeHerePairing() -> ControlMembership? {
+        guard let membership = ControlMembership.load(herePairingFile), membership.client != nil, membership.url != nil else { return nil }
+        try? FileManager.default.removeItem(at: membershipFile)  // store-ok: the window's own container
+        do {
+            try FileManager.default.moveItem(at: herePairingFile, to: membershipFile)  // store-ok: the window's own container
+        } catch {
+            return nil
+        }
+        return membership
+    }
+
+    static func putBack(_ pairing: Data?) {
+        if let pairing {
+            try? pairing.write(to: membershipFile, options: .atomic)  // store-ok: the window's own container
+        } else {
+            try? FileManager.default.removeItem(at: membershipFile)  // store-ok: the window's own container
+        }
+    }
+
     static func forget() {
         // Its machine-lock pins go with it (#3670), named by the control plane while it is known.
         LockPins(defaults: WindowDefaults.store, name: lockPinName).clearAll()
