@@ -262,6 +262,7 @@ type setupReader interface {
 	NewestPull(ctx context.Context, repo string) (*githubmcp.Newest, error)
 	LastRun(ctx context.Context, repo string) (*githubmcp.Newest, error)
 	AppReach(ctx context.Context, repo, slug string) (bool, int, error)
+	AppPermissions(ctx context.Context, owner, slug string) (map[string]string, error)
 }
 
 type setupBook struct {
