@@ -17,6 +17,9 @@ protocol WorkModel: AnyObject, Sendable {
     /// The machines that narrow their forges to a board (#3282), the home one first. None on the
     /// Remote: boards are the Mac's and the web page's (tier Mac + web).
     var boardMachines: [(id: MachineRef, name: String)] { get }
+    /// The machines that draw Work ▸ Timeline (`work/timeline`, #4173), the home one first. None on
+    /// the Remote: the Timeline is the Mac's (remote: by design).
+    var timelineMachines: [(id: MachineRef, name: String)] { get }
     /// The person's projects (#3283), for Work's Project filter: Mac + web, so the Remote has none.
     var workProjects: [WorkList.Project] { get }
     /// The machines that keep links, the home one first.
@@ -52,6 +55,7 @@ protocol WorkModel: AnyObject, Sendable {
 
 extension WorkModel {
     var workProjects: [WorkList.Project] { [] }
+    var timelineMachines: [(id: MachineRef, name: String)] { [] }
 
     /// The boards of every machine's folders' projects (#3282), each once, by url, the first
     /// name kept; none from a machine that cannot be read.

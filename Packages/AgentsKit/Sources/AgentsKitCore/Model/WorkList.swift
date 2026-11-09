@@ -8,7 +8,8 @@ public enum WorkList {
     /// Work's lists, in the order of its tabs, by the lineage kind each holds.
     public enum Kind: String, CaseIterable, Identifiable, Sendable, Hashable, Codable {
         /// Features (#3269) are the `feature:` labels on the epics, not a lineage kind: an epic opens as an issue.
-        case issue, pr, feature, milestone, release
+        /// Timeline (#4173) is the epics on a time axis, the Mac's alone for now (`WorkTimeline`).
+        case issue, pr, feature, milestone, release, timeline
 
         public var id: Self { self }
 
@@ -19,6 +20,7 @@ public enum WorkList {
             case .feature: "Features"
             case .milestone: "Milestones"
             case .release: "Releases"
+            case .timeline: "Timeline"
             }
         }
 
@@ -442,7 +444,7 @@ public enum WorkList {
 
     /// The Work list a node's page is in: an issue, a PR, a milestone or a release; nil for any other.
     public static func kind(of node: DaemonAPI.LineageNode) -> Kind? {
-        Kind(rawValue: node.kind).flatMap { $0 == .feature ? nil : $0 }
+        Kind(rawValue: node.kind).flatMap { $0 == .feature || $0 == .timeline ? nil : $0 }
     }
 
     /// A PR's checks: "Checks: 14 passing, 1 failing"; nil with none.

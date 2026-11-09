@@ -76,6 +76,10 @@ struct ConsistencyTests {
          why: "Agent Configuration draws what a runtime gets, and the chosen row, in the accent, as its approved frames do (054)"),
         (file: "App/Sources/Control/FirstRunView.swift", contains: "usual ? Color.accentColor",
          why: "the window's first run outlines its usual choice, Set one up on this Mac, in the accent, as approved frame K does (058)"),
+        (file: "Shared/UI/Work/WorkTimelineView.swift", contains: "static let palette: [Color]",
+         why: "Work ▸ Timeline colours each epic by its feature from the system colours (#4173); a feature is not a state"),
+        (file: "Shared/UI/Work/WorkTimelineView.swift", contains: "static let nowRed = Color.red",
+         why: "Work ▸ Timeline draws Now as a red line with its time in a red pill, as Calendar does (#4173)"),
     ]
 
     @Test func noCallSiteNamesAStateColourItself() async throws {

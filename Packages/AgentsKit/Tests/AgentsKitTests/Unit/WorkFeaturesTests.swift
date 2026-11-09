@@ -139,7 +139,7 @@ struct WorkFeaturesTests {
     }
 
     @Test func featuresIsAListOfItsOwnAndNoLineagePage() {
-        #expect(WorkList.Kind.allCases.map(\.title) == ["Issues", "Pull requests", "Features", "Milestones", "Releases"])
+        #expect(WorkList.Kind.allCases.map(\.title) == ["Issues", "Pull requests", "Features", "Milestones", "Releases", "Timeline"])
         #expect(!WorkList.Kind.feature.fromForge)
         #expect(WorkList.kind(of: Node(kind: "feature", ref: "work")) == nil)
     }

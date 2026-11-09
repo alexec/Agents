@@ -16,6 +16,10 @@ struct WorkView: View {
                 WorkItemPage(model: model, place: place).id(place)
             } else if place.kind == .feature {
                 WorkFeaturesPane(model: model, state: model.workLists.features)
+            } else if place.kind == .timeline {
+                #if os(macOS)
+                WorkTimelinePane(model: model, state: model.workLists.timeline)
+                #endif
             } else {
                 WorkListPane(model: model, kind: place.kind, list: model.workLists[place.kind]).id(place.kind)
             }
@@ -57,6 +61,7 @@ extension WorkList.Kind {
         case .feature: "sparkles"
         case .milestone: "flag"
         case .release: "shippingbox"
+        case .timeline: "timeline.selection"
         }
     }
 
@@ -67,6 +72,7 @@ extension WorkList.Kind {
         case .feature: "Each feature label on your epics, with its epics and their leads"
         case .milestone: "The milestones lineage knows, and what their work cost"
         case .release: "The releases lineage knows, and what went into each"
+        case .timeline: "Your epics in time: when each started, what closed, and when it is forecast to close"
         }
     }
 }
