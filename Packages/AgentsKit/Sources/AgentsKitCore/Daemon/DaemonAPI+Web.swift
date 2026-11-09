@@ -247,6 +247,8 @@ public extension DaemonAPI {
                 Row(Method.runtimesSignInFinish, params: RuntimeSignInFinish.self, result: RuntimeStatus.self,
                     kind: .hostRequest),
                 Row(Method.runtimesSignInKey, params: RuntimeSignInKey.self, result: RuntimeStatus.self, kind: .hostRequest),
+                // Update on a machine's runtime (#4174): the daemon takes it only for a copy that is there.
+                Row(Method.runtimesInstall, params: RuntimeRequest.self, result: RuntimeStatus.self, kind: .hostRequest),
                 // Reaches the Model By (#999), on the runtime's row.
                 Row(Method.runtimesSetDefaultAccount, params: DefaultAccountRequest.self, result: Empty.self,
                     kind: .hostRequest),

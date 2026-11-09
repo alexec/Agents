@@ -3,10 +3,11 @@ import SwiftUI
 
 /// The runtimes installed on a machine (#3629), as a section of its page: one line each, its
 /// version and, where the machine says, signed in. Only the installed ones (#3743): Status ▸ Runtimes
-/// lists every runtime. **Update** on This Mac, whose daemon installs from the app (048), and
-/// **Install** on the ones it can install, closed under Not installed: this page is where
-/// This Mac installs one after start-up. A server installs its runtimes when it is set up,
-/// and refuses an install from a client. **Sign In…** on This Mac opens the runtime's sign-in sheet.
+/// lists every runtime. **Update** when the app carries a newer copy, on This Mac, whose daemon
+/// installs from the app (048), and on a server (#4174, as the Remote's #4035). **Install** on the
+/// ones This Mac can install, closed under Not installed: this page is where This Mac installs one
+/// after start-up. A server installs its runtimes when it is set up, and refuses a new install
+/// from a client. **Sign In…** on This Mac opens the runtime's sign-in sheet.
 /// Accounts and allowances are the person's, not the machine's: they stay in Status.
 /// The web page draws the same in Web/src/views/MachinePage.tsx.
 struct MachineRuntimesSection: View {
@@ -75,6 +76,9 @@ struct MachineRuntimesSection: View {
                 }
                 .controlSize(.small)
             }
+        } else if status.outdated, status.runtime.install != nil, !status.availability.isInstalling {
+            Button("Update") { Task { await model.installRuntime(status.id, on: host) } }
+                .controlSize(.small)
         }
     }
 }
