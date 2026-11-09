@@ -30,3 +30,19 @@ export function secretUseWhere(use: RequestSecretUse): string {
 export function secretUseActions(use: RequestSecretUse): SecretUseAction[] {
   return use.sessionOnly ? ["once", "session", "deny"] : ["once", "session", "always", "deny"];
 }
+
+/** The method a signed answer names (#4058). */
+export const approveSecretUse = "secrets/approveUse";
+
+/** Whether an answer goes signed (#4149): it allows the use, on a Linux machine, which opens the value only then. */
+export function secretUseSigns(use: RequestSecretUse, action: SecretUseAction): boolean {
+  return use.needsSignature === true && action !== "deny";
+}
+
+/** What a signed answer signs, as Go's secretrelease.Approval reads it: the request and what it names. */
+export function secretUseApprovalParams(request: string, use: RequestSecretUse, action: SecretUseAction): string {
+  return JSON.stringify({ request, name: use.name, use: use.use, place: use.place, action });
+}
+
+/** The row's words when this page has no lock key to sign with: a person answers on a device that has one. */
+export const answerElsewhere = "Answer on the Mac or the Remote";

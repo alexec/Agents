@@ -23,3 +23,13 @@ test("a secret's use has four answers, and a session's own secret no Allow alway
 test("another request is not a secret's use", () => {
   assert.equal(words.secretUseOf({ source: "question", kind: "decide", detail: {} }), undefined);
 });
+
+test("a Linux machine's allow goes signed over what Go's Approval reads, and a deny does not (#4149)", () => {
+  const use = { name: "TOKEN", use: "ci", place: "alexec/agents", needsSignature: true };
+  assert.equal(words.secretUseSigns(use, "once"), true);
+  assert.equal(words.secretUseSigns(use, "deny"), false);
+  assert.equal(words.secretUseSigns({ ...use, needsSignature: undefined }, "always"), false);
+  assert.deepEqual(JSON.parse(words.secretUseApprovalParams("R-1", use, "session")),
+    { request: "R-1", name: "TOKEN", use: "ci", place: "alexec/agents", action: "session" });
+  assert.equal(words.answerElsewhere, "Answer on the Mac or the Remote");
+});

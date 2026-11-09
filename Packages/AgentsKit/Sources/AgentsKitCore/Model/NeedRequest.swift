@@ -113,12 +113,21 @@ public struct NeedRequest: Codable, Sendable, Hashable, Identifiable {
         public var place: String
         /// The session's own secret (#3548): Allow always is the same as Allow for this session.
         public var sessionOnly: Bool?
+        /// A Linux machine (#4058): an answer that allows the use goes signed with this
+        /// device's lock key (`LockChannel.secretUseApproval`), or the machine refuses it.
+        public var needsSignature: Bool?
 
-        public init(name: String, use: String, place: String, sessionOnly: Bool? = nil) {
+        public init(name: String, use: String, place: String, sessionOnly: Bool? = nil, needsSignature: Bool? = nil) {
             self.name = name
             self.use = use
             self.place = place
             self.sessionOnly = sessionOnly
+            self.needsSignature = needsSignature
+        }
+
+        /// Whether `action` goes signed: it allows the use, on a machine that asks for a signature.
+        public func signs(_ action: Action) -> Bool {
+            needsSignature == true && action != .deny
         }
 
         /// Where the value goes, as the row's grey line says it.
@@ -185,6 +194,9 @@ public extension DaemonAPI {
         public struct Answer: Codable, Sendable, Hashable {
             public struct SecretUse: Codable, Sendable, Hashable {
                 public var action: NeedRequest.Action
+                /// The answer signed with this device's lock key, for a request that says
+                /// needsSignature (#4058).
+                public var approval: LockDelivery?
             }
 
             public var secretUse: SecretUse?
@@ -193,9 +205,9 @@ public extension DaemonAPI {
         public var id: UUID
         public var answer: Answer
 
-        public init(id: UUID, secretUse action: NeedRequest.Action) {
+        public init(id: UUID, secretUse action: NeedRequest.Action, approval: LockDelivery? = nil) {
             self.id = id
-            answer = Answer(secretUse: .init(action: action))
+            answer = Answer(secretUse: .init(action: action, approval: approval))
         }
     }
 

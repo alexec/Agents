@@ -39,7 +39,30 @@ struct SecretUseRequestTests {
         #expect(sent["id"]?.stringValue == id.uuidString)
     }
 
-    @Test func theBannersNeedNamesTheRequest() throws {
+    /// #4149: a Linux machine's request says needsSignature, and an answer that allows the use
+    /// goes signed for that machine, over the params Go's secretrelease.Approval reads.
+    @Test func anAllowOnALinuxMachineGoesSigned() throws {
+        let linux = try request(#"{"secretUse":{"name":"TOKEN","use":"ci","place":"alexec/agents","needsSignature":true}}"#)
+        let use = try #require(linux.secretUse)
+        #expect(use.signs(.once) && use.signs(.always) && !use.signs(.deny))
+        #expect(try request(#"{"secretUse":{"name":"TOKEN","use":"ci","place":"a/b"}}"#).secretUse?.signs(.once) == false)
+
+        let device = LockSigningKey.ephemeral()
+        let approval = try LockChannel.secretUseApproval(device, to: "h-1", request: linux.id, use: use, action: .session)
+        #expect(approval.method == "secrets/approveUse")
+        let params = try JSONValue.parse(Data(approval.params.utf8))
+        #expect(params["request"]?.stringValue == linux.id.uuidString)
+        #expect(params["name"]?.stringValue == "TOKEN" && params["use"]?.stringValue == "ci")
+        #expect(params["place"]?.stringValue == "alexec/agents" && params["action"]?.stringValue == "session")
+        #expect(approval.lock.to == "h-1" && approval.lock.key == device.publicKey)
+        let signed = LockChannel.requestData(to: "h-1", at: approval.lock.at, method: approval.method, params: approval.params)
+        #expect(LockChannel.verify(device.publicKey, signed, approval.lock.sig))
+
+        let sent = try JSONValue.encoding(DaemonAPI.RequestsAnswer(id: linux.id, secretUse: .session, approval: approval))
+        #expect(sent["answer"]?["secretUse"]?["approval"]?["params"]?.stringValue == approval.params)
+    }
+
+        @Test func theBannersNeedNamesTheRequest() throws {
         let id = UUID()
         let decoded = try JSONDecoder().decode(NeedID.self, from: Data(#"{"request":"\#(id.uuidString)"}"#.utf8))
         #expect(decoded == .request(id))

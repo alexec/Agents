@@ -5,6 +5,8 @@
 // A secret's use (#4017) has no card: its title says which secret, its grey line the asker and
 // where the value goes, and its menu (a right click, a long press or the menu key) has Allow Once, Allow
 // for This Session, Allow Always and Deny, as the window's and the Remote's menus have.
+// A Linux machine's (#4149) opens the value only for an answer the page signs with its lock key;
+// a page with none offers only Deny, and its grey line says to answer on the Mac or the Remote.
 // Its mark is one for each kind (#4026), as NeedRequest.symbol is: unlike an approval's one shield,
 // it says what is asked. The step's hand taps: the raised hand is a session that needs the person.
 import type { Request as PersonRequest, RequestKind } from "../protocol/generated";
@@ -13,7 +15,7 @@ import { shortAgo } from "../model/activity";
 import { fromWireDate } from "../protocol/dates";
 import { go } from "../route";
 import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
-import { secretUseActions, secretUseOf, secretUseTitle, secretUseWhere, secretUseWords } from "../model/secretUse";
+import { answerElsewhere, secretUseActions, secretUseOf, secretUseSigns, secretUseTitle, secretUseWhere, secretUseWords } from "../model/secretUse";
 
 const kindWords: Record<RequestKind, string> = {
   decide: "Question", approve: "Approval", account: "Account", step: "Step for you", secret: "Secret",
@@ -58,12 +60,13 @@ export function RequestRow({ store, host, folder, request, place, chosen }: {
   const asker = request.askedBy as string;
   const since = fromWireDate(request.askedAt);
   const askerTitle = store.agent(host, asker)?.title;
-  const line = requestLine(request, askerTitle);
   const use = secretUseOf(request);
+  const unsigned = !!use && secretUseSigns(use, "once") && !store.machineLock.canSign();
+  const line = unsigned ? `${requestLine(request, askerTitle)} · ${answerElsewhere}` : requestLine(request, askerTitle);
   const open = () => go({ host, folder, session: asker });
   const menu = (): MenuItem[] => [
-    ...(use ? secretUseActions(use).map((action) => ({
-      label: secretUseWords[action], run: () => void store.answerSecretUse(host, request.id, action),
+    ...(use ? secretUseActions(use).filter((action) => !unsigned || !secretUseSigns(use, action)).map((action) => ({
+      label: secretUseWords[action], run: () => void store.answerSecretUse(host, request.id, action, use),
     })) : []),
     { label: "Open Session", run: open },
   ];
