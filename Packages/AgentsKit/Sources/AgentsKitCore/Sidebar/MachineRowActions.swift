@@ -64,3 +64,34 @@ public struct MachineRowActions: Equatable, Sendable {
         return words
     }
 }
+
+/// A machine row's icon (#4113): its shape says the kind, its colour the state, so the row
+/// needs no dot. The grey line under the row says why in words.
+public enum MachineIcon: Equatable, Sendable {
+    /// The accent: all is well.
+    case accent
+    /// Amber and pulsing: starting, stopping or being made.
+    case busy
+    /// Red: offline, its set-up failed, or a disk is low.
+    case failure
+    /// Amber: it needs an update.
+    case attention
+    /// Grey: stopped.
+    case stopped
+
+    /// The most urgent wins: busy, then red, then amber, then grey, then the accent.
+    public static func of(_ dot: MachineDot, diskLow: Bool) -> MachineIcon {
+        if dot == .busy { return .busy }
+        if dot == .offline || diskLow { return .failure }
+        switch dot {
+        case .attention: return .attention
+        case .stopped: return .stopped
+        default: return .accent
+        }
+    }
+
+    /// A laptop for This Mac, a cloud for a machine a provider made, a rack for a registered one.
+    public static func symbol(isThisMac: Bool, row: DaemonAPI.ControlMachine?) -> String {
+        isThisMac ? "laptopcomputer" : row?.workspace != nil ? "cloud" : "server.rack"
+    }
+}

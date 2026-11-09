@@ -31,6 +31,8 @@ struct RemoteSidebar: View {
     @AppStorage("showsActivity") private var showsStatus = true
     /// The Work group (#4004), open the first time.
     @AppStorage("showsWork") private var showsWork = true
+    /// Machines (#4034), open until folded, and kept so, as the window keeps it.
+    @AppStorage("showsMachines") private var showsMachines = true
     /// The smart groups turned off in Settings ▸ Sidebar (#846).
     @AppStorage(SidebarSmartRow.offDefaultsKey) private var smartOff = SidebarSmartRow.offAtFirst
     /// Settings (#846), opened from the sidebar's foot.
@@ -177,6 +179,18 @@ struct RemoteSidebar: View {
                     Text("Status")
                 }
 
+                // A row per machine (#4034), each its page, as the window's (#3973).
+                if !model.machines.isEmpty {
+                    Section(isExpanded: $showsMachines) {
+                        ForEach(model.machines, id: \.self) { host in
+                            RemoteMachineRow(host: host).tag(SidebarItem.machine(host))
+                        }
+                        NewMachineRow()
+                    } header: {
+                        Text("Machines")
+                    }
+                }
+
                 // Pinned, Needs You, Working, Unread: a group each across every folder
                 // and host (#495), headed and folding as a folder's is.
                 // A group turned off in Settings ▸ Sidebar is not drawn (#846).
@@ -204,8 +218,8 @@ struct RemoteSidebar: View {
             }
 
             // A server gone quiet greys its folders; this says why, once, as the window's
-            // sidebar foot does (#534).
-            let offline = servers.filter { model.hostIsOffline($0) }
+            // sidebar foot does (#534). Machines' rows say it while that group is open (#3764).
+            let offline = showsMachines && !model.machines.isEmpty ? [] : servers.filter { model.hostIsOffline($0) }
             if !offline.isEmpty {
                 Section {
                     ForEach(offline, id: \.self) { host in

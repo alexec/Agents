@@ -264,6 +264,16 @@ struct RemoteView: View {
         } message: {
             Text(model.problem ?? "")
         }
+        // New Machine the provider could not make (#4034): its reason, with Try Again.
+        .alert("Could not make a machine",
+               isPresented: Binding(get: { model.makeFailed != nil && model.problem == nil },
+                                    set: { if !$0 { model.makeFailed = nil } }),
+               presenting: model.makeFailed) { failure in
+            Button("Try Again") { Task { await model.newMachine(on: failure.provider) } }
+            Button("OK", role: .cancel) {}
+        } message: { failure in
+            Text(failure.reason)
+        }
         // Delete from a session's menu (#398), asked here: the menu is gone by now.
         .confirmationDialog(DeletionWords.confirmTitle(model.askingToDelete?.title),
                             isPresented: Binding(get: { model.askingToDelete != nil },
@@ -401,6 +411,7 @@ struct RemoteView: View {
         case .events: EventsListView().paperGround()
         case .resources: ResourcesListView().paperGround()
         case .runtimes: RuntimesView().paperGround()
+        case .machine(let host): RemoteMachinePage(host: host).paperGround()
         case .work: WorkView(model: model).paperGround()
         case .summary:
             SummaryPageView(pages: model.summaryPages, settings: model.dailySummarySettings,
