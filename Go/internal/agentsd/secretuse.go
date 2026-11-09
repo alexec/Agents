@@ -66,6 +66,10 @@ func grantPlace(use wire.SecretUse, place string) string { return string(use) + 
 
 // secretUseWords are what an agent reads when its use of a secret waits, or was refused.
 func secretUseWords(r wire.RequestSecretUse, id wire.UUID) string {
+	if r.Use == wire.SecretUseAccount {
+		return "Nothing was read yet: the account " + r.Name + " has Ask before use, and a person has not yet approved your " + accountCall(r) + " of it. " +
+			"Wait with wait_for_event, where: {\"request\": \"" + string(id) + "\"}, then call manage_accounts again."
+	}
 	if r.Use == wire.SecretUseMCP {
 		return "Nothing was sent to the MCP server " + r.Place + ": " + r.Name + " has Ask before use, and a person has not yet approved its use there. " +
 			"Wait with wait_for_event, where: {\"request\": \"" + string(id) + "\"}: once they allow it, the server connects from your next turn."
@@ -107,6 +111,11 @@ func (d *Daemon) askSecretUse(agent wire.UUID, name string, use wire.SecretUse, 
 	if d.needsRelease(agent, name) {
 		ask.NeedsSignature = new(true)
 	}
+	return d.holdOnUse(agent, ask, hold)
+}
+
+// holdOnUse opens ask's request, or finds the one open, and holds the call on it up to hold.
+func (d *Daemon) holdOnUse(agent wire.UUID, ask wire.RequestSecretUse, hold time.Duration) (string, error) {
 	id, ok := d.openSecretUseRequest(agent, ask)
 	if !ok {
 		return "", errors.New("this session cannot ask a person now")
@@ -150,6 +159,9 @@ func (d *Daemon) afterSecretUse(agent wire.UUID, ask wire.RequestSecretUse, id w
 	if rec := d.request(id); rec != nil && rec.State == wire.RequestStateOpen {
 		return secretUseWords(ask, id), nil
 	}
+	if ask.Use == wire.SecretUseAccount {
+		return "", errAccountUseDenied{ask.Name}
+	}
 	return "", errSecretUseDenied{ask.Name, ask.Place}
 }
 
@@ -174,7 +186,8 @@ func (d *Daemon) secretUseAllowed(agent wire.UUID, name string, use wire.SecretU
 		return true
 	}
 	d.secretUseMu.Unlock()
-	if d.isSessionSecret(agent, name) {
+	// An account's Allow Always is its Ask before use turned off (accountuse.go), not a grant.
+	if use == wire.SecretUseAccount || d.isSessionSecret(agent, name) {
 		return false
 	}
 	home := d.personalHome()
@@ -217,7 +230,8 @@ func (d *Daemon) openSecretUseRequest(agent wire.UUID, ask wire.RequestSecretUse
 	asker := agent
 	title := map[wire.SecretUse]string{wire.SecretUseFill: "Fill " + ask.Name + " on " + ask.Place,
 		wire.SecretUseCi:  "Set " + ask.Name + " as a CI secret in " + ask.Place,
-		wire.SecretUseMCP: "Send " + ask.Name + " to the MCP server " + ask.Place}[ask.Use]
+		wire.SecretUseMCP:     "Send " + ask.Name + " to the MCP server " + ask.Place,
+		wire.SecretUseAccount: "Read the account " + ask.Name}[ask.Use]
 	r := &wire.Request{ID: store.NewUUID(), Kind: wire.RequestKindApprove, Source: wire.RequestSourceSecretUse,
 		State: wire.RequestStateOpen, Title: title, Detail: wire.RequestDetail{SecretUse: &ask},
 		Folder: string(store.FolderURL(folderPath(a))), AskedBy: &asker,
@@ -245,6 +259,9 @@ func (d *Daemon) answerSecretUse(rec wire.Request, a *wire.RequestSecretUseAnswe
 	ask := *rec.Detail.SecretUse
 	if ask.Use == wire.SecretUseTerminal {
 		return d.answerTerminalUse(rec, a, by)
+	}
+	if ask.Use == wire.SecretUseAccount {
+		return d.answerAccountUse(rec, a, by)
 	}
 	if a.Action == secretUseHour {
 		return wire.RequestUpdate{}, Invalid("Allow for 1 Hour is for a terminal's request; this one takes once, session, always or deny.")

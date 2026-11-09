@@ -25,13 +25,14 @@ export function secretUseOf(request: PersonRequest): RequestSecretUse | undefine
 
 /** The row's title: the secret first, as the banner says it, so a narrow sidebar cuts the place, not the name. */
 export function secretUseTitle(use: RequestSecretUse): string {
-  return `Wants to use ${use.name}`;
+  return `Wants to ${use.use === "account" ? "read" : "use"} ${use.name}`;
 }
 
 /** Where the value goes, as the row's grey line says it. */
 export function secretUseWhere(use: RequestSecretUse): string {
   if (use.use === "ci") return `CI secret in ${use.place}`;
   if (use.use === "terminal") return `Terminal: ${use.place} · ${terminalCaveat}`;
+  if (use.use === "account") return `Account: manage_accounts ${use.call ?? "get"}`;
   return use.use === "mcp" ? `MCP server ${use.place}` : `Fill on ${use.place}`;
 }
 

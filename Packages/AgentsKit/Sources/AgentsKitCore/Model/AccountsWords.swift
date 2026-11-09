@@ -37,6 +37,18 @@ public enum AccountsWords {
 
     public static let noDescription = "No description"
 
+    /// Ask before use (#4163): nil is on, as agentsd reads it.
+    public static func asks(_ a: DaemonAPI.OutsideAccount) -> Bool { a.askBeforeUse != false }
+
+    /// Under the sheet's Ask before use toggle. The toggle and the row's mark are `AskBeforeUseWords`'.
+    public static func askHint(_ isOn: Bool) -> String {
+        isOn ? "An agent's read of it waits for your approval: Allow Once, for This Session, Always or Deny."
+            : "Every agent can read it with no approval."
+    }
+
+    /// The sheet's field for Ask before use: "off" when it is off, else none.
+    public static let askField = "askBeforeUse"
+
     /// The address and the plan, under the service.
     public static func detail(_ a: DaemonAPI.OutsideAccount) -> String {
         [a.address, a.plan].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
@@ -79,6 +91,7 @@ public enum AccountsWords {
         f["tokenExpires"] = a.tokenExpires
         f["notes"] = a.notes
         f["projects"] = a.projects?.joined(separator: ", ")
+        f[askField] = asks(a) ? nil : "off"
         return f
     }
 
@@ -94,6 +107,6 @@ public enum AccountsWords {
                                         monthlyCostUsd: v("cost").flatMap { Double($0.replacingOccurrences(of: "$", with: "")) },
                                         card: v("card"), secret: v("secret"), twoFactor: v("twoFactor"), issue: v("issue"),
                                         made: v("made"), tokenExpires: v("tokenExpires"), notes: v("notes"),
-                                        projects: projects.isEmpty ? nil : projects)
+                                        projects: projects.isEmpty ? nil : projects, askBeforeUse: f[askField] == "off" ? false : nil)
     }
 }

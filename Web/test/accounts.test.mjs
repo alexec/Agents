@@ -38,3 +38,11 @@ test("accounts: one made before descriptions says so (#4164)", () => {
   assert.equal(a.accountAbout(all[0]), "No description");
   assert.equal(a.accountAbout({ service: "x", description: " For tests. " }), "For tests.");
 });
+
+test("accounts: Ask before use is on at first, and the sheet keeps it off (#4163)", () => {
+  assert.equal(a.accountAsks({ service: "x" }), true);
+  const off = { service: "x", askBeforeUse: false };
+  assert.equal(a.accountAsks(off), false);
+  assert.deepEqual(a.accountOf(a.accountFields(off)), off);
+  assert.deepEqual(a.accountOf({ service: "x", askBeforeUse: "" }), { service: "x" });
+});

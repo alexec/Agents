@@ -21,7 +21,9 @@ import (
 // You ▸ Accounts on the control plane. list (or find, with service) gives each account's id,
 // service and description only (#4164); get gives one account in full; add one, or import the
 // files of the old registry in ~/.agents/accounts/ (#3909) once. An account that would replace one
-// with the same service and address waits for the person's yes (#4001); a new one goes in at once.
+// with the same service and address waits for the person's yes (#4001); a new one goes in at once,
+// with Ask before use on. A get of an account with Ask before use waits on a person (#4163,
+// accountuse.go).
 func (d *Daemon) manageAccounts(agent wire.UUID, args map[string]json.RawMessage) (string, error) {
 	var call wire.MachineAccountsCall
 	action := strings.TrimSpace(argString(args, "action"))
@@ -35,6 +37,13 @@ func (d *Daemon) manageAccounts(agent wire.UUID, args map[string]json.RawMessage
 		listed, err := d.askAccounts(call)
 		if err != nil {
 			return "", err
+		}
+		i := slices.IndexFunc(listed.Accounts, func(a wire.OutsideAccount) bool { return accountID(a) == strings.ToLower(id) })
+		if i >= 0 {
+			waiting, err := d.approveAccountUse(agent, listed.Accounts[i], "get")
+			if err != nil || waiting != "" {
+				return waiting, err
+			}
 		}
 		note, err := accountNote(d.withLastOps(listed.Accounts), id)
 		if err == nil {
@@ -77,6 +86,10 @@ func (d *Daemon) manageAccounts(agent wire.UUID, args map[string]json.RawMessage
 	have, err := d.askAccounts(wire.MachineAccountsCall{})
 	if err != nil {
 		return "", err
+	}
+	// An agent never turns Ask before use off (#4163): a new account asks, a replaced one keeps its own.
+	for i := range call.Add {
+		call.Add[i].AskBeforeUse = nil
 	}
 	plan := planAccounts(have.Accounts, call.Add)
 	replace := false
@@ -130,6 +143,7 @@ func planAccounts(have, add []wire.OutsideAccount) accountsPlan {
 			plan.added = append(plan.added, a)
 			continue
 		}
+		a.AskBeforeUse = have[i].AskBeforeUse
 		if fields := accountFields(have[i], a); len(fields) > 0 {
 			plan.changed = append(plan.changed, accountChange{from: have[i], to: a, fields: fields})
 		} else {
@@ -329,10 +343,12 @@ func accountID(a wire.OutsideAccount) string {
 }
 
 // accountLine is what list shows of an account: no address, plan, cost, secret, card or notes.
+// Asks is its Ask before use (#4163): a get of it waits on a person.
 type accountLine struct {
 	ID          string `json:"id"`
 	Service     string `json:"service"`
 	Description string `json:"description"`
+	Asks        bool   `json:"asksBeforeUse"`
 }
 
 const noDescription = "No description"
@@ -366,7 +382,7 @@ func accountsNote(all []wire.OutsideAccount, service, project string) string {
 	}
 	fmt.Fprintf(&b, "%d accounts (get one with its id for the rest):\n", len(rows))
 	for _, a := range rows {
-		row := accountLine{ID: accountID(a), Service: a.Service, Description: noDescription}
+		row := accountLine{ID: accountID(a), Service: a.Service, Description: noDescription, Asks: accountAsks(a)}
 		if a.Description != nil && strings.TrimSpace(*a.Description) != "" {
 			row.Description = *a.Description
 		}

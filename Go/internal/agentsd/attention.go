@@ -288,6 +288,9 @@ func secretUseWanted(u wire.RequestSecretUse) string {
 	if u.Use == wire.SecretUseCi {
 		return "Wants to use " + u.Name + " as a CI secret in " + u.Place
 	}
+	if u.Use == wire.SecretUseAccount {
+		return "Wants to read the account " + u.Name
+	}
 	if u.Use == wire.SecretUseTerminal {
 		return "Wants to print " + u.Name + " for " + u.Place + ". " + terminalCaveat
 	}

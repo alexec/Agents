@@ -8050,6 +8050,9 @@ type OutsideAccount struct {
 
 	// The projects that use it, by name. Absent or empty: all of them.
 	Projects []string `json:"projects,omitzero"`
+
+	// Ask before use (#4163): an agent's manage_accounts get of it waits on a person's approval, as a secret's use does (#4015). Absent is on, also for an account an agent adds; false is off, which a person sets, or Allow Always on its request does. Not sealed: kept with the account, and agentsd enforces it.
+	AskBeforeUse *bool `json:"askBeforeUse,omitzero"`
 }
 
 // The accounts part of the person's settings (#3967), and machine/accounts' answer.
@@ -10351,8 +10354,11 @@ type RequestSecretUse struct {
 
 	Use SecretUse `json:"use"`
 
-	// Where the value goes: the page's domain for a fill, owner/repo for CI, the server's name for an MCP server, and for terminal the name of the command that ran agents-secret, as that command says it.
+	// Where the value goes: the page's domain for a fill, owner/repo for CI, the server's name for an MCP server, for terminal the name of the command that ran agents-secret, as that command says it, and for account the account's id, as manage_accounts list gives it.
 	Place string `json:"place"`
+
+	// For account (#4163): the manage_accounts call that waits, such as get. name is then the account's service and address.
+	Call *string `json:"call,omitzero"`
 
 	// The secret is the session's own (#3548): Allow always is the same as Allow for this session.
 	SessionOnly *bool `json:"sessionOnly,omitzero"`
@@ -11199,13 +11205,14 @@ type SecretTerminalValue struct {
 	Words *string `json:"words,omitzero"`
 }
 
-// What agentsd does with a secret with Ask before use (#4015): fill types it into a page (fill_secret), ci sends it to GitHub (set_ci_secret), mcp adds it to an HTTP MCP server's header or URL on each request agentsd sends the server for a session (#4120). terminal (#4179) prints a secret that does not ask to `agents-secret NAME` run with no session's grant, such as from a terminal: agentsd cannot tell that caller from an agent that dropped its grant.
+// What agentsd does with a secret with Ask before use (#4015): fill types it into a page (fill_secret), ci sends it to GitHub (set_ci_secret), mcp adds it to an HTTP MCP server's header or URL on each request agentsd sends the server for a session (#4120). terminal (#4179) prints a secret that does not ask to `agents-secret NAME` run with no session's grant, such as from a terminal: agentsd cannot tell that caller from an agent that dropped its grant. account (#4163) is not a secret's use: manage_accounts reads an account with Ask before use; the request names the account, and Allow Always turns its Ask before use off.
 type SecretUse string
 
 const SecretUseFill SecretUse = "fill"
 const SecretUseCi SecretUse = "ci"
 const SecretUseMCP SecretUse = "mcp"
 const SecretUseTerminal SecretUse = "terminal"
+const SecretUseAccount SecretUse = "account"
 
 // control/secretsLeft (#1760, FR-026): to the person's own clients, when one of their machines was removed with secrets on it.
 type SecretsLeft struct {

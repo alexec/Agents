@@ -38,6 +38,15 @@ struct AccountsWordsTests {
         #expect(AccountsWords.account(["service": " x.com ", "plan": " "]) == DaemonAPI.OutsideAccount(service: "x.com"))
     }
 
+    /// Ask before use (#4163): nil is on, and the sheet keeps it off when it is off.
+    @Test func askBeforeUseIsOnAtFirst() {
+        #expect(AccountsWords.asks(DaemonAPI.OutsideAccount(service: "x")))
+        let off = DaemonAPI.OutsideAccount(service: "x", askBeforeUse: false)
+        #expect(!AccountsWords.asks(off))
+        #expect(AccountsWords.account(AccountsWords.fields(off)) == off)
+        #expect(AccountsWords.account(["service": "x"]).askBeforeUse == nil)
+    }
+
     /// An account made before descriptions (#4164) says so.
     @Test func anAccountWithNoDescriptionSaysSo() {
         #expect(AccountsWords.about(all[0]) == "No description")

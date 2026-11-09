@@ -11,6 +11,11 @@ test("a secret's use says which secret and where it goes, never its value (#4017
   assert.equal(words.secretUseTitle(fill), "Wants to use GITLAB_PASSWORD");
   assert.equal(words.secretUseWhere(fill), "Fill on gitlab.com");
   assert.equal(words.secretUseWhere({ name: "X", use: "ci", place: "alexec/agents" }), "CI secret in alexec/agents");
+  // #4163: an agent's read of an account with Ask before use, with a secret's answers.
+  const account = { name: "gitlab.com (a@example.com)", use: "account", place: "1a2b3c4d", call: "get" };
+  assert.equal(words.secretUseTitle(account), "Wants to read gitlab.com (a@example.com)");
+  assert.equal(words.secretUseWhere(account), "Account: manage_accounts get");
+  assert.deepEqual(words.secretUseActions(account), ["once", "session", "always", "deny"]);
 });
 
 test("a secret's use has four answers, and a session's own secret no Allow always", () => {

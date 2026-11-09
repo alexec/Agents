@@ -99,12 +99,15 @@ public extension DaemonAPI {
         public var notes: String?
         /// The projects that use it, by name; none is all of them.
         public var projects: [String]?
+        /// Ask before use (#4163): an agent's read of it waits on a person. nil is on; false is off.
+        public var askBeforeUse: Bool?
 
         public var id: String { service.lowercased() + "#" + (address ?? "").lowercased() }
 
         public init(service: String, description: String? = nil, address: String? = nil, plan: String? = nil, monthlyCostUsd: Double? = nil,
                     card: String? = nil, secret: String? = nil, twoFactor: String? = nil, issue: String? = nil,
-                    made: String? = nil, tokenExpires: String? = nil, notes: String? = nil, projects: [String]? = nil) {
+                    made: String? = nil, tokenExpires: String? = nil, notes: String? = nil, projects: [String]? = nil,
+                    askBeforeUse: Bool? = nil) {
             self.service = service
             self.description = description
             self.address = address
@@ -118,6 +121,7 @@ public extension DaemonAPI {
             self.tokenExpires = tokenExpires
             self.notes = notes
             self.projects = projects
+            self.askBeforeUse = askBeforeUse
         }
     }
 

@@ -7,8 +7,9 @@ import type { Store } from "../model/store";
 import type { JSONValue, OutsideAccount, OutsideAccounts } from "../protocol/generated";
 import { CallFailed } from "../wire/link";
 import { describe, methodNotFound } from "../model/errors";
-import { type AccountFields, accountAbout, accountCost, accountDetail, accountFields, accountOf, accountProjects, accountsFoot, accountsOf,
-  accountsTitle, expiresSoon, noSecrets, sameAccount } from "../model/accounts";
+import { type AccountFields, accountAbout, accountAskHint, accountAsks, accountCost, accountDetail, accountFields, accountOf, accountProjects,
+  accountsFoot, accountsOf, accountsTitle, askField, expiresSoon, noSecrets, sameAccount } from "../model/accounts";
+import { askBeforeUseWords } from "../model/askBeforeUse";
 import { Modal } from "./Modal";
 
 function sentence(error: unknown): string {
@@ -31,6 +32,7 @@ function AccountSheet({ editing, save, close }: { editing: OutsideAccount | null
   const problem = useSignal<string | null>(null);
   const busy = useSignal(false);
   const title = editing ? `Edit ${editing.service}` : "Add an Account";
+  const asks = fields.value[askField] !== "off";
   const submit = async () => {
     busy.value = true;
     problem.value = await save(accountOf(fields.value));
@@ -46,6 +48,12 @@ function AccountSheet({ editing, save, close }: { editing: OutsideAccount | null
             autofocus={i === 0} value={fields.value[key] ?? ""}
             onInput={(e) => (fields.value = { ...fields.value, [key]: (e.currentTarget as HTMLInputElement).value })} />
         ))}
+        <label>
+          <input type="checkbox" checked={asks}
+            onChange={(e) => (fields.value = { ...fields.value, [askField]: (e.currentTarget as HTMLInputElement).checked ? "" : "off" })} />
+          {" "}{askBeforeUseWords.toggle}
+        </label>
+        <p class="sheet-note">{accountAskHint(asks)}</p>
         <p class={problem.value ? "sheet-note failure" : "sheet-note"} role={problem.value ? "alert" : undefined}>{problem.value ?? noSecrets}</p>
         <div class="sheet-actions">
           <button type="button" onClick={close}>Cancel</button>
@@ -118,6 +126,7 @@ export function AccountsSection({ store, down }: { store: Store; down: boolean }
               <span class="hint">{accountDetail(a)}</span>
               <span class="hint">{accountCost(a)}</span>
               <p class="hint">{accountAbout(a)}</p>
+              {accountAsks(a) && <p class="hint">{askBeforeUseWords.asks}</p>}
               {soon && <p class="hint attention">{soon}</p>}
               <span class="row-actions">
                 <button type="button" disabled={down} onClick={() => { editing.value = a; }}>Edit…</button>
