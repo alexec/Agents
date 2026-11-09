@@ -12,8 +12,10 @@ import (
 //   - "integer": a positive integer;
 //   - "boolean": true or false;
 //   - "integers": a positive integer, or a list of them;
-//   - "refs": a list of issues, each matching Pattern (LooksLike is two of them, as
-//     `"#12" or "owner/name#12"`).
+//   - "refs": a list of references, each matching Pattern (LooksLike names them and gives an
+//     example, as `issues, as "#12" or "owner/name#12"`);
+//   - "ids": a string id matching Pattern, or a list of them (LooksLike is one, as
+//     "a work item's id, as 12").
 type Property struct {
 	Name        string
 	Kind        string
@@ -33,6 +35,9 @@ func (p Property) JSON() map[string]any {
 			items["pattern"] = p.Pattern.String()
 		}
 		return map[string]any{"type": "array", "items": items, "description": p.Description}
+	case "ids":
+		item := map[string]any{"type": "string", "pattern": p.Pattern.String()}
+		return map[string]any{"type": []string{"string", "array"}, "pattern": p.Pattern.String(), "items": item, "description": p.Description}
 	}
 	o := map[string]any{"type": p.Kind, "description": p.Description}
 	if p.Pattern != nil {
@@ -65,7 +70,7 @@ func (s Schema) Lookup(name string) (Property, bool) {
 }
 
 // Values are an event's checked arguments by name: a string, an int, a bool, an []int
-// ("integers") or a []string ("refs"). An argument not given is not there.
+// ("integers") or a []string ("refs" and "ids"). An argument not given is not there.
 type Values map[string]any
 
 // String is the string argument name, or "".
@@ -88,7 +93,7 @@ func (v Values) Ints(name string) []int {
 	return nil
 }
 
-// Strings is the "refs" argument name, or nil.
+// Strings is the "refs" or "ids" argument name, or nil.
 func (v Values) Strings(name string) []string { s, _ := v[name].([]string); return s }
 
 // Check reads raw (null or missing as {}) and checks it: no unknown keys, types, shapes. What
@@ -138,16 +143,36 @@ func (s Schema) Check(raw json.RawMessage) (Values, *Error) {
 		case "refs":
 			var list []string
 			if json.Unmarshal(value, &list) != nil || len(list) == 0 {
-				return nil, InvalidParams(`%s must be a list of issues, as %s`, key, p.LooksLike)
+				return nil, InvalidParams(`%s must be a list of %s`, key, p.LooksLike)
 			}
 			var refs []string
 			for _, ref := range list {
 				if p.Pattern != nil && !p.Pattern.MatchString(strings.TrimSpace(ref)) {
-					return nil, InvalidParams(`%s must be a list of issues, as %s, not %q`, key, p.LooksLike, ref)
+					return nil, InvalidParams(`%s must be a list of %s, not %q`, key, p.LooksLike, ref)
 				}
 				refs = append(refs, strings.TrimSpace(ref))
 			}
 			v[key] = refs
+		case "ids":
+			// One id, or a list of them (#3797): a lead waits on all its open children at once.
+			var list []string
+			if strings.HasPrefix(strings.TrimSpace(string(value)), "[") {
+				if json.Unmarshal(value, &list) != nil || len(list) == 0 {
+					return nil, InvalidParams("%s must be %s, or a list of them", key, p.LooksLike)
+				}
+			} else {
+				var text string
+				if json.Unmarshal(value, &text) != nil || string(value) == "null" {
+					return nil, InvalidParams("%s must be %s, or a list of them", key, p.LooksLike)
+				}
+				list = []string{text}
+			}
+			for _, text := range list {
+				if !p.Pattern.MatchString(text) {
+					return nil, InvalidParams("%s must be %s, or a list of them", key, p.LooksLike)
+				}
+			}
+			v[key] = list
 		case "integer":
 			i, ok := Positive(value)
 			if !ok {

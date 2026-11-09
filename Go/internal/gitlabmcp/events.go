@@ -2,14 +2,15 @@ package gitlabmcp
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // The MCP events (#1629) of a GitLab project's merge requests, pipelines and issues, in the
@@ -19,44 +20,36 @@ import (
 // daemon speaks. A merge request is a "pr" in names and data, as on GitHub.
 
 // event is one event as events/list gives it.
-type event struct {
-	name, title, description string
-	input                    schema
-	payload                  map[string]any
-}
-
-func (e event) json() map[string]any {
-	return map[string]any{"name": e.name, "title": e.title, "description": e.description, "delivery": []string{"poll"},
-		"inputSchema": e.input.json(), "payloadSchema": e.payload}
-}
+type event = mcpevents.Event
 
 // projectPattern is a project's path (group/name, with subgroups) or its numeric id.
 var projectPattern = regexp.MustCompile(`^([0-9]+|[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)+)$`)
 
 var (
-	projectProperty = property{name: "project", kind: "string",
-		description: "The GitLab project, by its path (group/name, subgroups too) or its id. Left out, the project this folder pushes to.",
-		pattern:     projectPattern, looksLike: "group/name or a project id"}
-	prProperty = property{name: "pr", kind: "integer", description: "Only this merge request, by number (its iid, as !12)."}
+	projectProperty = property{Name: "project", Kind: "string",
+		Description: "The GitLab project, by its path (group/name, subgroups too) or its id. Left out, the project this folder pushes to.",
+		Pattern:     projectPattern, LooksLike: "group/name or a project id"}
+	prProperty = property{Name: "pr", Kind: "integer", Description: "Only this merge request, by number (its iid, as !12)."}
 	// anyoneProperty opts into anyone's issue, comment or merge request (#728); left out, only the project's own people.
-	anyoneProperty = property{name: "anyone", kind: "boolean",
-		description: "true: from anyone, bots, forks and people outside the project too. Left out, only the project's members with Reporter access or more, never a bot, and for a merge request never one from a fork."}
+	anyoneProperty = property{Name: "anyone", Kind: "boolean",
+		Description: "true: from anyone, bots, forks and people outside the project too. Left out, only the project's members with Reporter access or more, never a bot, and for a merge request never one from a fork."}
 	// mineProperty is only the connection's owner's own merge requests (#2034), a fork's too.
-	mineProperty = property{name: "mine", kind: "boolean",
-		description: "true: only merge requests by the GitLab account this server is connected as, whatever anyone says."}
+	mineProperty = property{Name: "mine", Kind: "boolean",
+		Description: "true: only merge requests by the GitLab account this server is connected as, whatever anyone says."}
 	// anyProperty is every one in the project (#3797): a wait that names none sets it.
-	anyProperty = property{name: "any", kind: "boolean",
-		description: "true: every one in the project. A wait (not a workflow trigger) that names none, by the other arguments that say which, is refused without it. It is about which ones; anyone is about who."}
+	anyProperty = property{Name: "any", Kind: "boolean",
+		Description: "true: every one in the project. A wait (not a workflow trigger) that names none, by the other arguments that say which, is refused without it. It is about which ones; anyone is about who."}
 	// fixesProperty is the merge requests that close these issues (#3797): a lead knows a child's issue before its merge request.
-	fixesProperty = property{name: "fixes", kind: "refs",
-		description: `Only merge requests whose description closes one of these issues, as "#12" (this project's) or "group/project#12".`}
+	fixesProperty = property{Name: "fixes", Kind: "refs",
+		Description: `Only merge requests whose description closes one of these issues, as "#12" (this project's) or "group/project#12".`,
+		Pattern:     issueRefPattern, LooksLike: `issues, as "#12" or "group/project#12"`}
 )
 
 // ownMRs is what every merge request event says of whose merge requests it raises.
 const ownMRs = " Only merge requests from a branch of the project itself, not a fork, by its members with Reporter access or more, never a bot, unless anyone is true."
 
 func branchProperty(description string) property {
-	return property{name: "branch", kind: "string", description: description}
+	return property{Name: "branch", Kind: "string", Description: description}
 }
 
 func object(props map[string]any) map[string]any {
@@ -90,45 +83,45 @@ func namedInput() schema {
 var fixesSchema = map[string]any{"type": "array", "items": str}
 
 var events = append([]event{
-	{name: "checks.failed", title: "Pipeline failed",
-		description: "A merge request's pipeline finished failed: one event per pipeline and failure, so a pipeline retried that fails again is a new one. Jobs allowed to fail are not in failedJobs." + ownMRs,
-		input:       schema{projectProperty, branchProperty("Only pipelines of the merge request from this branch."), prProperty, fixesProperty, anyoneProperty, mineProperty, anyProperty},
-		payload: object(map[string]any{
+	{Name: "checks.failed", Title: "Pipeline failed",
+		Description: "A merge request's pipeline finished failed: one event per pipeline and failure, so a pipeline retried that fails again is a new one. Jobs allowed to fail are not in failedJobs." + ownMRs,
+		Input:       schema{projectProperty, branchProperty("Only pipelines of the merge request from this branch."), prProperty, fixesProperty, anyoneProperty, mineProperty, anyProperty},
+		Payload: object(map[string]any{
 			"pr": mrSchema(nil), "headSha": str,
 			"run":        object(map[string]any{"id": integer, "name": str, "url": str}),
 			"failedJobs": map[string]any{"type": "array", "items": object(map[string]any{"name": str, "url": str})},
 		})},
-	{name: "pr.opened", title: "Merge request opened",
-		description: "A merge request was opened, or a draft was marked ready: a merge request open and not a draft now that was not at the last poll. Drafts never count. Reopened, it is raised again." + ownMRs,
-		input:       mrInput(),
-		payload:     object(map[string]any{"pr": mrSchema(map[string]any{"author": str}), "openedAt": str})},
-	{name: "pr.merged", title: "Merge request merged", description: "A merge request was merged." + ownMRs,
-		input:   namedInput(),
-		payload: object(map[string]any{"pr": mrSchema(nil), "mergedAt": str, "mergeSha": str})},
-	{name: "pr.closed", title: "Merge request closed", description: "A merge request was closed without being merged." + ownMRs,
-		input:   namedInput(),
-		payload: object(map[string]any{"pr": mrSchema(nil), "closedAt": str})},
-	{name: "pr.conflicted", title: "Merge request in conflict",
-		description: "An open merge request began to conflict with its target branch, so it cannot merge until it is rebased. Once per conflict: it is raised again only after it merges cleanly and then conflicts anew." + ownMRs,
-		input:       namedInput(),
-		payload:     object(map[string]any{"pr": mrSchema(nil), "conflictedAt": str})},
+	{Name: "pr.opened", Title: "Merge request opened",
+		Description: "A merge request was opened, or a draft was marked ready: a merge request open and not a draft now that was not at the last poll. Drafts never count. Reopened, it is raised again." + ownMRs,
+		Input:       mrInput(),
+		Payload:     object(map[string]any{"pr": mrSchema(map[string]any{"author": str}), "openedAt": str})},
+	{Name: "pr.merged", Title: "Merge request merged", Description: "A merge request was merged." + ownMRs,
+		Input:   namedInput(),
+		Payload: object(map[string]any{"pr": mrSchema(nil), "mergedAt": str, "mergeSha": str})},
+	{Name: "pr.closed", Title: "Merge request closed", Description: "A merge request was closed without being merged." + ownMRs,
+		Input:   namedInput(),
+		Payload: object(map[string]any{"pr": mrSchema(nil), "closedAt": str})},
+	{Name: "pr.conflicted", Title: "Merge request in conflict",
+		Description: "An open merge request began to conflict with its target branch, so it cannot merge until it is rebased. Once per conflict: it is raised again only after it merges cleanly and then conflicts anew." + ownMRs,
+		Input:       namedInput(),
+		Payload:     object(map[string]any{"pr": mrSchema(nil), "conflictedAt": str})},
 	// For the person, not the project (#2034): what asks the connection's owner for something.
-	{name: "review.requested", title: "Review requested from me",
-		description: "The GitLab account this server is connected as was made a reviewer of an open merge request: once per request, so one taken off and put back is a new one. Anyone's merge request, a fork's too.",
-		input:       schema{projectProperty, prProperty},
-		payload:     object(map[string]any{"pr": mrSchema(map[string]any{"author": str}), "requestedAt": str})},
-	{name: "review.comment", title: "Merge request line commented on",
-		description: "Someone left a comment on a line of a merge request's diff, or answered in its thread. Its body is the first 4000 characters. Only comments by the project's members with Reporter access or more, never a bot, unless anyone is true; and only on the project's own merge requests.",
-		input:       namedInput(),
-		payload: object(map[string]any{"pr": mrSchema(nil), "commentedAt": str,
+	{Name: "review.requested", Title: "Review requested from me",
+		Description: "The GitLab account this server is connected as was made a reviewer of an open merge request: once per request, so one taken off and put back is a new one. Anyone's merge request, a fork's too.",
+		Input:       schema{projectProperty, prProperty},
+		Payload:     object(map[string]any{"pr": mrSchema(map[string]any{"author": str}), "requestedAt": str})},
+	{Name: "review.comment", Title: "Merge request line commented on",
+		Description: "Someone left a comment on a line of a merge request's diff, or answered in its thread. Its body is the first 4000 characters. Only comments by the project's members with Reporter access or more, never a bot, unless anyone is true; and only on the project's own merge requests.",
+		Input:       namedInput(),
+		Payload: object(map[string]any{"pr": mrSchema(nil), "commentedAt": str,
 			"comment": object(map[string]any{"id": integer, "author": str, "path": str, "line": integer, "body": str, "url": str})})},
 }, append(issueEvents(), assignedEvent)...)
 
 // assignedEvent is for the person, not the project (#2034): an issue given to the connection's owner.
-var assignedEvent = event{name: "issue.assigned", title: "Issue assigned to me",
-	description: "An open issue was assigned to the GitLab account this server is connected as: once per assignment, so one unassigned and assigned again is a new one. Anyone's issue.",
-	input:       schema{projectProperty, property{name: "issue", kind: "integer", description: "Only this issue, by number (its iid, as #12)."}},
-	payload: object(map[string]any{"issue": object(map[string]any{
+var assignedEvent = event{Name: "issue.assigned", Title: "Issue assigned to me",
+	Description: "An open issue was assigned to the GitLab account this server is connected as: once per assignment, so one unassigned and assigned again is a new one. Anyone's issue.",
+	Input:       schema{projectProperty, property{Name: "issue", Kind: "integer", Description: "Only this issue, by number (its iid, as #12)."}},
+	Payload: object(map[string]any{"issue": object(map[string]any{
 		"number": integer, "title": str, "author": str, "labels": map[string]any{"type": "array", "items": str}, "url": str,
 		"assignees": map[string]any{"type": "array", "items": str},
 	}), "assignedAt": str})}
@@ -138,7 +131,7 @@ func issueEvents() []event {
 		"number": integer, "title": str, "author": str, "labels": map[string]any{"type": "array", "items": str}, "url": str,
 		"assignees": map[string]any{"type": "array", "items": str},
 	})
-	issue := property{name: "issue", kind: "integers", description: "Only this issue, or these, by number (its iid, as #12)."}
+	issue := property{Name: "issue", Kind: "integers", Description: "Only this issue, or these, by number (its iid, as #12)."}
 	kinds := []struct {
 		kind                      IssueKind
 		title, description, label string
@@ -159,7 +152,7 @@ func issueEvents() []event {
 	}
 	out := make([]event, len(kinds))
 	for i, k := range kinds {
-		label := property{name: "label", kind: "string", description: k.label}
+		label := property{Name: "label", Kind: "string", Description: k.label}
 		input := schema{projectProperty, label, issue, anyoneProperty, anyProperty}
 		if k.kind == IssueOpened {
 			input = schema{projectProperty, label, anyoneProperty}
@@ -169,97 +162,43 @@ func issueEvents() []event {
 		for name, v := range k.payload {
 			payload[name] = v
 		}
-		out[i] = event{name: "issue." + string(k.kind), title: k.title, description: description, input: input, payload: object(payload)}
+		out[i] = event{Name: "issue." + string(k.kind), Title: k.title, Description: description, Input: input, Payload: object(payload)}
 	}
 	return out
 }
 
-func eventNamed(name string) (event, bool) {
-	for _, e := range events {
-		if e.name == name {
-			return e, true
-		}
-	}
-	return event{}, false
-}
+func eventNamed(name string) (event, bool) { return mcpevents.Named(events, name) }
 
 // EventNames is the events it declares, by name, in events/list's order.
-func EventNames() []string {
-	names := make([]string, len(events))
-	for i, e := range events {
-		names[i] = e.name
-	}
-	return names
-}
+func EventNames() []string { return mcpevents.Names(events) }
 
 // eventsList is events/list's answer.
-func eventsList() map[string]any {
-	list := make([]any, len(events))
-	for i, e := range events {
-		list[i] = e.json()
-	}
-	return map[string]any{"events": list}
-}
+func eventsList() map[string]any { return mcpevents.List(events) }
 
 // MARK: The cursor
 
 // cursor is where a poll has got to: a high-water time, and the ids already raised at exactly
 // that time, so events that share one time are neither lost nor raised twice. A client keeps
 // it as an opaque string (base64url of its JSON).
-type cursor struct {
-	Since string   `json:"since"`
-	IDs   []string `json:"ids"`
-}
+type cursor = mcpevents.Cursor
 
-func (c cursor) encoded() string {
-	if c.IDs == nil {
-		c.IDs = []string{}
-	}
-	data, _ := json.Marshal(c)
-	return base64.RawURLEncoding.EncodeToString(data)
-}
-
-func decodeCursor(raw json.RawMessage) (cursor, *rpcError) {
-	refused := invalidParams("cursor is not one this server gave")
-	var text string
-	if err := json.Unmarshal(raw, &text); err != nil {
-		return cursor{}, refused
-	}
-	data, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(text, "="))
-	if err != nil {
-		return cursor{}, refused
-	}
-	var c cursor
-	if json.Unmarshal(data, &c) != nil || normalized(c.Since) == "" {
-		return cursor{}, refused
-	}
-	c.Since = normalized(c.Since)
-	return c, nil
-}
+func decodeCursor(raw json.RawMessage) (cursor, *rpcError) { return polls.Decode(raw) }
 
 // MARK: Polling
 
 // candidate is something that may be raised: its id, its time (in timeLayout), and its data,
 // looked up only once it is taken; nil data skips it, though the cursor still moves past it.
-type candidate struct {
-	eventID string
-	time    string
-	data    func() (map[string]any, error)
-}
+type candidate = mcpevents.Candidate
 
 const (
-	maxEvents  = 100
+	maxEvents  = mcpevents.MaxEvents
 	nextPollMs = 30000
 )
 
-type pollParams struct {
-	Name      string          `json:"name"`
-	Arguments json.RawMessage `json:"arguments"`
-	Cursor    json.RawMessage `json:"cursor"`
-	MaxEvents *int            `json:"maxEvents"`
-}
+type pollParams = mcpevents.Params
 
-func (p pollParams) firstPoll() bool { return len(p.Cursor) == 0 || string(p.Cursor) == "null" }
+// polls is how it polls, with GitLab's times and errors.
+var polls = mcpevents.Poller{NextPollMs: nextPollMs, Normalize: normalized, Fail: eventsError}
 
 // Events answers events/list and events/poll over a GitLab.
 type Events struct {
@@ -276,15 +215,15 @@ func (s *Events) now() time.Time {
 
 // Poll answers events/poll's params.
 func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any, *rpcError) {
-	var p pollParams
-	if err := json.Unmarshal(raw, &p); err != nil {
-		return nil, invalidParams("params must be an object")
+	p, bad := mcpevents.ParseParams(raw)
+	if bad != nil {
+		return nil, bad
 	}
 	e, ok := eventNamed(p.Name)
 	if !ok {
-		return nil, &rpcError{Code: -32011, Message: fmt.Sprintf("no event %s; this server offers %s", p.Name, strings.Join(EventNames(), ", "))}
+		return nil, mcpevents.NoEvent(p.Name, EventNames())
 	}
-	a, bad := e.input.check(p.Arguments)
+	a, bad := check(e.Input, p.Arguments)
 	if bad != nil {
 		return nil, bad
 	}
@@ -301,16 +240,16 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 	}
 	// mine: the connection's owner's own open merge requests, asked once a poll (#2034).
 	var yours *Yours
-	if a.mine || e.name == "review.requested" || e.name == "issue.assigned" {
+	if a.mine || e.Name == "review.requested" || e.Name == "issue.assigned" {
 		y, err := s.GitLab.Yours(ctx, a.project)
 		if err != nil {
 			return nil, eventsError(err)
 		}
 		yours = &y
 	}
-	switch e.name {
+	switch e.Name {
 	case "review.requested":
-		return s.pollDiff(e.name, "requestedAt", a, p, func() ([]state, error) {
+		return s.pollDiff(e.Name, "requestedAt", a, p, func() ([]state, error) {
 			var out []state
 			for _, r := range yours.Reviews {
 				j := r.MR.json()
@@ -320,7 +259,7 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 			return out, nil
 		})
 	case "issue.assigned":
-		return s.pollDiff(e.name, "assignedAt", a, p, func() ([]state, error) {
+		return s.pollDiff(e.Name, "assignedAt", a, p, func() ([]state, error) {
 			var out []state
 			for _, i := range yours.Assigned {
 				if a.wantsIssue(i.Number) {
@@ -330,7 +269,7 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 			return out, nil
 		})
 	case "pr.conflicted":
-		return s.pollDiff(e.name, "conflictedAt", a, p, func() ([]state, error) {
+		return s.pollDiff(e.Name, "conflictedAt", a, p, func() ([]state, error) {
 			mrs, err := s.GitLab.OpenMRs(ctx, a.project)
 			var out []state
 			for _, m := range mrs {
@@ -345,7 +284,7 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 			return out, err
 		})
 	case "pr.opened":
-		return s.pollDiff(e.name, "openedAt", a, p, func() ([]state, error) {
+		return s.pollDiff(e.Name, "openedAt", a, p, func() ([]state, error) {
 			mrs, err := s.GitLab.OpenMRs(ctx, a.project)
 			var out []state
 			for _, m := range mrs {
@@ -361,88 +300,20 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 		})
 	}
 	return s.poll(e, p, func(since string) ([]candidate, Listed, error) {
-		return candidates(ctx, s.GitLab, e.name, a, yours, since)
+		return candidates(ctx, s.GitLab, e.Name, a, yours, since)
 	})
 }
 
-// poll is events/poll over a cursor: the first poll (no cursor) gives none and starts from
-// now; later ones give what is new since, oldest first, at most maxEvents, with hasMore and a
-// cursor that goes on from the last one taken. A poll that took all there was and was not
-// truncated goes on to the newest the listing saw, wanted or not (P20261020-1): a wait whose
-// filter drops everything would otherwise read all since its last event, every poll.
+// poll is events/poll over a cursor (mcpevents.Poller.Poll), from now on the first poll.
 func (s *Events) poll(e event, p pollParams, find func(since string) ([]candidate, Listed, error)) (map[string]any, *rpcError) {
-	limit := 50
-	if p.MaxEvents != nil {
-		limit = *p.MaxEvents
-	}
-	limit = min(maxEvents, max(1, limit))
-	if p.firstPoll() {
-		return map[string]any{"events": []any{}, "cursor": cursor{Since: timeString(s.now())}.encoded(),
-			"truncated": false, "hasMore": false, "nextPollMs": nextPollMs}, nil
-	}
-	c, bad := decodeCursor(p.Cursor)
-	if bad != nil {
-		return nil, bad
-	}
-	seen := map[string]bool{}
-	for _, id := range c.IDs {
-		seen[id] = true
-	}
-	found, listed, err := find(c.Since)
-	if err != nil {
-		return nil, eventsError(err)
-	}
-	var fresh []candidate
-	for _, f := range found {
-		if f.time > c.Since || (f.time == c.Since && !seen[f.eventID]) {
-			fresh = append(fresh, f)
-		}
-	}
-	sort.SliceStable(fresh, func(i, j int) bool {
-		if fresh[i].time == fresh[j].time {
-			return fresh[i].eventID < fresh[j].eventID
-		}
-		return fresh[i].time < fresh[j].time
-	})
-	taken := fresh[:min(limit, len(fresh))]
-	since := c.Since
-	if len(taken) > 0 {
-		since = taken[len(taken)-1].time
-	}
-	if !listed.Truncated && len(taken) == len(fresh) && listed.Newest > since {
-		since = listed.Newest
-	}
-	var ids []string
-	if since == c.Since {
-		ids = append(ids, c.IDs...)
-	}
-	for _, t := range taken {
-		if t.time == since && !contains(ids, t.eventID) {
-			ids = append(ids, t.eventID)
-		}
-	}
-	out := []any{}
-	for _, t := range taken {
-		data, err := t.data()
-		if err != nil {
-			return nil, eventsError(err)
-		}
-		if data != nil {
-			out = append(out, map[string]any{"eventId": t.eventID, "name": e.name, "timestamp": t.time, "data": data})
-		}
-	}
-	return map[string]any{"events": out, "cursor": cursor{Since: since, IDs: ids}.encoded(),
-		"truncated": listed.Truncated, "hasMore": len(fresh) > len(taken), "nextPollMs": nextPollMs}, nil
+	return polls.Poll(e.Name, p, func() string { return timeString(s.now()) },
+		func(since string) ([]candidate, mcpevents.Listed, error) {
+			found, listed, err := find(since)
+			return found, mcpevents.Listed{Truncated: listed.Truncated, Newest: listed.Newest}, err
+		})
 }
 
-func contains(list []string, s string) bool {
-	for _, x := range list {
-		if x == s {
-			return true
-		}
-	}
-	return false
-}
+func contains(list []string, s string) bool { return slices.Contains(list, s) }
 
 // state is a merge request and whether its state (in conflict, or open and ready) is on now;
 // nil keeps the one it had.
@@ -452,69 +323,23 @@ type state struct {
 	json map[string]any
 }
 
-// pollDiff raises an event for each merge request whose state is on now and was not at the
-// last poll: the cursor's ids are the merge requests that were on then. A first poll takes
-// those already on as known. A conflict has no time on GitLab, only a state, so pr.conflicted
-// diffs it; so does pr.opened, so a draft marked ready is raised as it is.
 func (s *Events) pollDiff(name, key string, a args, p pollParams, states func() ([]state, error)) (map[string]any, *rpcError) {
-	first := p.firstPoll()
-	c := cursor{}
-	if !first {
-		var bad *rpcError
-		if c, bad = decodeCursor(p.Cursor); bad != nil {
-			return nil, bad
-		}
-	}
-	limit := maxEvents
-	if !first {
-		limit = 50
-		if p.MaxEvents != nil {
-			limit = *p.MaxEvents
-		}
-		limit = min(maxEvents, max(1, limit))
-	}
-	mrs, err := states()
-	if err != nil {
-		return nil, eventsError(err)
-	}
-	was := map[string]bool{}
-	for _, id := range c.IDs {
-		was[id] = true
-	}
-	id := func(st state) string { return fmt.Sprintf("%s:%s:%d", name, a.project, st.mr.Number) }
-	var still, fresh []state
-	for _, st := range mrs {
-		if (a.pr != 0 && st.mr.Number != a.pr) || (a.branch != "" && st.mr.Branch != a.branch) || !a.closesOne(st.mr) {
-			continue
-		}
-		on := (st.on != nil && *st.on) || (st.on == nil && was[id(st)])
-		switch {
-		case on && was[id(st)]:
-			still = append(still, st)
-		case on:
-			fresh = append(fresh, st)
-		}
-	}
-	sort.SliceStable(fresh, func(i, j int) bool { return fresh[i].mr.Number < fresh[j].mr.Number })
-	taken := fresh[:min(limit, len(fresh))]
-	now := timeString(s.now())
-	ids := []string{}
-	for _, st := range append(still, taken...) {
-		ids = append(ids, id(st))
-	}
-	out := []any{}
 	root := "pr"
 	if strings.HasPrefix(name, "issue.") {
 		root = "issue" // issue.assigned (#2034)
 	}
-	if !first {
-		for _, t := range taken {
-			out = append(out, map[string]any{"eventId": id(t) + ":" + now, "name": name, "timestamp": now,
-				"data": map[string]any{root: t.json, key: now}})
+	return polls.Diff(name, key, p, func() string { return timeString(s.now()) }, func() ([]mcpevents.State, error) {
+		all, err := states()
+		var out []mcpevents.State
+		for _, st := range all {
+			if (a.pr != 0 && st.mr.Number != a.pr) || (a.branch != "" && st.mr.Branch != a.branch) || !a.closesOne(st.mr) {
+				continue
+			}
+			out = append(out, mcpevents.State{ID: fmt.Sprintf("%s:%s:%d", name, a.project, st.mr.Number), Number: st.mr.Number,
+				On: st.on, Data: map[string]any{root: st.json}})
 		}
-	}
-	return map[string]any{"events": out, "cursor": cursor{Since: now, IDs: ids}.encoded(), "truncated": false,
-		"hasMore": !first && len(fresh) > len(taken), "nextPollMs": nextPollMs}, nil
+		return out, err
+	})
 }
 
 // candidates finds what an event may raise at or after since.
@@ -542,8 +367,8 @@ func candidates(ctx context.Context, gl GitLab, name string, a args, yours *Your
 			if at == "" {
 				continue
 			}
-			list = append(list, candidate{eventID: name + ":" + project + ":" + it.ID, time: at,
-				data: func() (map[string]any, error) { return it.data(), nil }})
+			list = append(list, candidate{EventID: name + ":" + project + ":" + it.ID, Time: at,
+				Data: func() (map[string]any, error) { return it.data(), nil }})
 		}
 		return list, listed, nil
 	}
@@ -559,8 +384,8 @@ func candidates(ctx context.Context, gl GitLab, name string, a args, yours *Your
 			m := c.MR
 			if at := normalized(c.At); at != "" && (a.pr == 0 || m.Number == a.pr) && (a.branch == "" || m.Branch == a.branch) &&
 				a.closesOne(m) && a.byMe(m, yours) && (a.anyone || c.Trusted) {
-				list = append(list, candidate{eventID: fmt.Sprintf("review.comment:%s:%d", project, c.ID), time: at,
-					data: func() (map[string]any, error) { return c.data(), nil }})
+				list = append(list, candidate{EventID: fmt.Sprintf("review.comment:%s:%d", project, c.ID), Time: at,
+					Data: func() (map[string]any, error) { return c.data(), nil }})
 			}
 		}
 		return list, listed, nil
@@ -578,8 +403,8 @@ func candidates(ctx context.Context, gl GitLab, name string, a args, yours *Your
 			if at == "" {
 				continue
 			}
-			list = append(list, candidate{eventID: fmt.Sprintf("checks.failed:%s:%d:%s", project, pl.ID, at), time: at,
-				data: func() (map[string]any, error) {
+			list = append(list, candidate{EventID: fmt.Sprintf("checks.failed:%s:%d:%s", project, pl.ID, at), Time: at,
+				Data: func() (map[string]any, error) {
 					if a.pr != 0 && pl.MRNumber != 0 && pl.MRNumber != a.pr {
 						return nil, nil
 					}
@@ -603,8 +428,8 @@ func candidates(ctx context.Context, gl GitLab, name string, a args, yours *Your
 	if name == "pr.merged" {
 		for _, m := range merged {
 			if at := normalized(m.MergedAt); wanted(m.MR, m.Trusted) && at != "" {
-				list = append(list, candidate{eventID: fmt.Sprintf("pr.merged:%s:%d", project, m.MR.Number), time: at,
-					data: func() (map[string]any, error) {
+				list = append(list, candidate{EventID: fmt.Sprintf("pr.merged:%s:%d", project, m.MR.Number), Time: at,
+					Data: func() (map[string]any, error) {
 						return map[string]any{"pr": m.MR.json(), "mergedAt": m.MergedAt, "mergeSha": m.MergeSHA}, nil
 					}})
 			}
@@ -614,8 +439,8 @@ func candidates(ctx context.Context, gl GitLab, name string, a args, yours *Your
 	// Its close time in the id: a merge request reopened and closed again is a new event.
 	for _, c := range closed {
 		if at := normalized(c.ClosedAt); wanted(c.MR, c.Trusted) && at != "" {
-			list = append(list, candidate{eventID: fmt.Sprintf("pr.closed:%s:%d:%s", project, c.MR.Number, at), time: at,
-				data: func() (map[string]any, error) {
+			list = append(list, candidate{EventID: fmt.Sprintf("pr.closed:%s:%d:%s", project, c.MR.Number, at), Time: at,
+				Data: func() (map[string]any, error) {
 					return map[string]any{"pr": c.MR.json(), "closedAt": c.ClosedAt}, nil
 				}})
 		}

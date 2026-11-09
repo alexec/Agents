@@ -42,7 +42,7 @@ var (
 	// fixesProperty is the pull requests that close these issues (#3797): a lead knows a child's issue before its pull request.
 	fixesProperty = property{Name: "fixes", Kind: "refs",
 		Description: `Only pull requests whose description closes one of these issues, as "#12" (this repository's) or "owner/name#12".`,
-		Pattern:     issueRefPattern, LooksLike: `"#12" or "owner/name#12"`}
+		Pattern:     issueRefPattern, LooksLike: `issues, as "#12" or "owner/name#12"`}
 )
 
 // ownPRs is what every pull request event says of whose pull requests it raises.
