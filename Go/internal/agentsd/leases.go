@@ -306,6 +306,9 @@ func (d *Daemon) settle(events []leaseEvent) {
 		l := e.lease
 		waited := e.granted && e.waiter != nil && d.waitsForGrant(l.Holder, l.Resource)
 		raised := d.raiseLeaseEvent(e)
+		if e.granted {
+			d.watchSimulator(l)
+		}
 		switch {
 		case e.granted && e.waiter != nil && !waited && raised != nil:
 			d.record(l.Holder, runtimeNote("Leased "+l.DisplayName+" until "+clock(l.ExpiresAt)+"."))

@@ -37,8 +37,8 @@ const eventsBrief = "Wait for an event (checks passing, this Mac waking) with wa
 const leasesBrief = "Lease a shared resource with lease_resource before using it and release_resource " +
 	"the moment you are done. Keep leases short and extend them, and take several in the " +
 	"same order every time. A simulator, a browser and the screen (mouse, keyboard, front " +
-	"window) are for one agent at a time. If told you are in line, end your turn: a " +
-	"lease.granted event starts you again when it is yours."
+	"window) are for one agent at a time; lease a simulator by its UDID. If told " +
+	"you are in line, end your turn: a lease.granted event starts you again when it is yours."
 
 // endingBrief names the three ways a turn ends (#1801). Without it an agent learnt about
 // archiving only from archive_session's description, and one that had finished with
