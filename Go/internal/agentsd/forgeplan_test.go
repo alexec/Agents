@@ -25,6 +25,13 @@ func (f *fakeForgeGitHub) Plan(_ context.Context, repo string, number int) (gith
 	return f.plan, nil
 }
 
+func (f *fakeForgeGitHub) Blockers(_ context.Context, _ string, numbers []int) (map[int][]githubmcp.Ref, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.blocked = append(f.blocked, numbers)
+	return f.blockers, nil
+}
+
 func (f *fakeForgeGitLab) Plan(_ context.Context, project string, number int) (gitlabmcp.Plan, error) {
 	return gitlabmcp.Plan{Epic: gitlabmcp.Item{Project: project, Number: number, State: "open", Title: "GitLab epic", Labels: []string{"epic"},
 		SubTotal: 2, SubDone: 0},
@@ -60,7 +67,7 @@ func TestPlanOfPutsChildrenInSteps(t *testing.T) {
 		child("3", planRef{node("2"), false}, planRef{node("99"), true}, planRef{node("98"), false}),
 		child("5", planRef{node("6"), true}),
 		child("6", planRef{node("5"), true}),
-	})
+	}, false)
 	got := []string{}
 	for _, c := range p.Children {
 		got = append(got, c.Item.Node.Ref[len("github:a/b#"):]+"@"+strconv.FormatInt(c.Step, 10))
@@ -74,7 +81,7 @@ func TestPlanOfPutsChildrenInSteps(t *testing.T) {
 	if c := p.Children[1]; len(c.BlockedBy) != 3 || len(c.BlockedOutside) != 1 || c.BlockedOutside[0] != node("99") {
 		t.Fatalf("blockers: %+v", c)
 	}
-	if p := planOf(wire.ForgeItem{}, nil); p.Children == nil || p.Steps == nil {
+	if p := planOf(wire.ForgeItem{}, nil, false); p.Children == nil || p.Steps == nil {
 		t.Fatalf("an empty plan: %+v", p)
 	}
 }

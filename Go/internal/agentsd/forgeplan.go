@@ -133,7 +133,7 @@ func (d *Daemon) forgePlan(ctx context.Context, r wire.ForgePlanRequest) (wire.F
 		}
 		d.resolvedFromForge(items)
 	}
-	out := planOf(epic, children)
+	out := planOf(epic, children, standing != nil)
 	out.Standing = standing
 	// The lead is this machine's, read each time: it starts and ends more often than a plan changes.
 	out.Lead = d.leadOf(r.Node)
@@ -143,11 +143,14 @@ func (d *Daemon) forgePlan(ctx context.Context, r wire.ForgePlanRequest) (wire.F
 // planOf puts children in steps: a child's step is one more than the last step of the children
 // that block it, 1 for a child no other child blocks. A blocker outside the plan adds no step,
 // but an open one is said. Children in a loop, and those after them, share the step after the
-// rest, so a loop in the forge's links still shows every child.
-func planOf(epic wire.ForgeItem, children []planChild) wire.ForgePlan {
+// rest, so a loop in the forge's links still shows every child. A standing epic's plan is one
+// step (#3661, #4200): each child is in step 1, and each open blocker is said, in the plan or not.
+func planOf(epic wire.ForgeItem, children []planChild, oneStep bool) wire.ForgePlan {
 	in := map[wire.LineageNode]int{}
 	for n, c := range children {
-		in[c.item.Node] = n
+		if !oneStep {
+			in[c.item.Node] = n
+		}
 	}
 	step := make([]int, len(children))
 	for left := len(children); left > 0; {

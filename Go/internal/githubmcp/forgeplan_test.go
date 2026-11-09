@@ -74,3 +74,34 @@ func TestSearchQueryFeature(t *testing.T) {
 		t.Fatalf("query: %s", q)
 	}
 }
+
+// #4200: one query asks for each number's blockers by an alias; a number that is not an issue
+// has none; no numbers ask nothing.
+func TestBlockersReadsManyIssuesInOneQuery(t *testing.T) {
+	var queries []string
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Query string `json:"query"`
+		}
+		body, _ := io.ReadAll(r.Body)
+		json.Unmarshal(body, &req)
+		queries = append(queries, req.Query)
+		io.WriteString(w, `{"data":{"repository":{"i7":{"blockedBy":{"nodes":[{"number":8,"state":"OPEN","repository":{"nameWithOwner":"o/r"}},{}]}},
+ "i9":{"blockedBy":{"nodes":[]}},"i12":null}}}`)
+	}))
+	t.Cleanup(s.Close)
+	g := NewRealGitHub(s.URL, func() string { return "t" }, nil)
+	by, err := g.Blockers(context.Background(), "o/r", []int{7, 9, 12})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(queries) != 1 || !strings.Contains(queries[0], "i7: issue(number: 7) { blockedBy(first: 50)") || !strings.Contains(queries[0], "i12: issue(number: 12)") {
+		t.Fatalf("queries: %q", queries)
+	}
+	if len(by) != 2 || len(by[7]) != 1 || by[7][0] != (Ref{"o/r", 8, true}) || by[9] == nil || len(by[9]) != 0 {
+		t.Fatalf("blockers: %+v", by)
+	}
+	if by, err := g.Blockers(context.Background(), "o/r", nil); err != nil || len(by) != 0 || len(queries) != 1 {
+		t.Fatalf("none: %v %+v %d", err, by, len(queries))
+	}
+}

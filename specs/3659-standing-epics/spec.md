@@ -146,7 +146,10 @@ on every forge with no change to their clients. Alex can overrule.
 - Priority is the `priority:` labels only: `ForgeItem` has no priority field for Linear or Jira.
 - "The oldest" is the lowest issue number: `ForgeItem` has no creation date.
 - Only the epic's own repo, Linear team or Jira project is read.
-- Each child's `blockedBy` is empty for now: a list does not read blockers.
+- A list does not read blockers, so on GitHub one more query reads them for every child: an
+  aliased `issue(number:)` with `blockedBy(first: 50)` each (#4200). Because the plan is one
+  step, `blockedOutside` says each open blocker, also one that is in the plan. On the other
+  forges each child's `blockedBy` is still empty (#4242).
 
 ## The lead (#3663)
 

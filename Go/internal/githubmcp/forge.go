@@ -370,15 +370,7 @@ func (g *RealGitHub) Plan(ctx context.Context, repo string, number int) (Plan, e
 				SubIssues struct {
 					Nodes []struct {
 						gqlItem
-						BlockedBy struct {
-							Nodes []struct {
-								Number     int    `json:"number"`
-								State      string `json:"state"`
-								Repository struct {
-									NameWithOwner string `json:"nameWithOwner"`
-								} `json:"repository"`
-							} `json:"nodes"`
-						} `json:"blockedBy"`
+						BlockedBy gqlBlockers `json:"blockedBy"`
 					} `json:"nodes"`
 				} `json:"subIssues"`
 			} `json:"issue"`
@@ -399,13 +391,67 @@ func (g *RealGitHub) Plan(ctx context.Context, repo string, number int) (Plan, e
 		if c.Number < 1 || c.Repository.NameWithOwner == "" {
 			continue
 		}
-		child := PlanChild{Item: c.item(), BlockedBy: []Ref{}}
-		for _, b := range c.BlockedBy.Nodes {
-			if b.Number > 0 && b.Repository.NameWithOwner != "" {
-				child.BlockedBy = append(child.BlockedBy, Ref{Repo: b.Repository.NameWithOwner, Number: b.Number, Open: b.State != "CLOSED"})
-			}
-		}
-		p.Children = append(p.Children, child)
+		p.Children = append(p.Children, PlanChild{Item: c.item(), BlockedBy: c.BlockedBy.refs()})
 	}
 	return p, nil
+}
+
+// gqlBlockers is an issue's blockedBy, as GraphQL says it.
+type gqlBlockers struct {
+	Nodes []struct {
+		Number     int    `json:"number"`
+		State      string `json:"state"`
+		Repository struct {
+			NameWithOwner string `json:"nameWithOwner"`
+		} `json:"repository"`
+	} `json:"nodes"`
+}
+
+func (b gqlBlockers) refs() []Ref {
+	out := []Ref{}
+	for _, n := range b.Nodes {
+		if n.Number > 0 && n.Repository.NameWithOwner != "" {
+			out = append(out, Ref{Repo: n.Repository.NameWithOwner, Number: n.Number, Open: n.State != "CLOSED"})
+		}
+	}
+	return out
+}
+
+// BlockersMost bounds the issues one Blockers read asks about.
+const BlockersMost = 100
+
+// Blockers are the issues that block each of numbers in repo (at most BlockersMost, each with at
+// most 50 blockers), in one query of an aliased issue(number:) each (#4200): a standing epic's
+// children come from a search, which does not read blockers. A number that is not an issue has
+// none.
+func (g *RealGitHub) Blockers(ctx context.Context, repo string, numbers []int) (map[int][]Ref, error) {
+	owner, name, err := ownerName(repo)
+	if err != nil {
+		return nil, err
+	}
+	out := map[int][]Ref{}
+	numbers = numbers[:min(len(numbers), BlockersMost)]
+	if len(numbers) == 0 {
+		return out, nil
+	}
+	var q strings.Builder
+	q.WriteString("query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) {")
+	for _, n := range numbers {
+		fmt.Fprintf(&q, " i%d: issue(number: %d) { blockedBy(first: 50) { nodes { number state repository { nameWithOwner } } } }", n, n)
+	}
+	q.WriteString(" } }")
+	var data struct {
+		Repository map[string]*struct {
+			BlockedBy gqlBlockers `json:"blockedBy"`
+		} `json:"repository"`
+	}
+	if err := g.graphql(ctx, q.String(), map[string]any{"owner": owner, "name": name}, &data); err != nil {
+		return nil, err
+	}
+	for _, n := range numbers {
+		if i := data.Repository[fmt.Sprintf("i%d", n)]; i != nil {
+			out[n] = i.BlockedBy.refs()
+		}
+	}
+	return out, nil
 }

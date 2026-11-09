@@ -33,6 +33,9 @@ type fakeForgeGitHub struct {
 	open  []githubmcp.Item
 	plan  githubmcp.Plan
 	plans int
+	// blockers are what Blockers gives, and blocked the numbers it was asked about (#4200).
+	blockers map[int][]githubmcp.Ref
+	blocked  [][]int
 	// timeline is what Timeline gives, and timelines how often it was asked (#4172).
 	timeline  githubmcp.Timeline
 	timelines int
