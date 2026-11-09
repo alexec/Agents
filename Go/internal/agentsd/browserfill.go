@@ -92,7 +92,11 @@ func fillWords(msg string) ([]any, bool, string) {
 
 // secretFill is what one fill_secret call types, read before the lease.
 type secretFill struct {
-	name  string // the secret's name
+	name string // the secret's name
+	// agent and site are who fills it and the field's domain, for the record of the read
+	// (#4156): a generated value has no name, and no record.
+	agent wire.UUID
+	site  string
 	label string // the secret's name, and a card's part: what the agent is told was filled
 	value string
 	// hide is every value the call puts in the filter, by its label: for a card, all its
@@ -220,20 +224,21 @@ func fillSite(ctx context.Context, drive *browserDrive, args map[string]json.Raw
 }
 
 // approveFill holds a fill of a flagged secret on a person's approval for the field's
-// site (#4015). It says nothing when the fill may go on.
-func (d *Daemon) approveFill(ctx context.Context, agent wire.UUID, drive *browserDrive, fill secretFill, args map[string]json.RawMessage) (words string, isError bool) {
-	if !d.secretIsSealed(agent, fill.name) {
-		return "", false
-	}
+// site (#4015). It says nothing when the fill may go on, and gives the site, for the record
+// of the read (#4156): "" when an unflagged secret's field has none.
+func (d *Daemon) approveFill(ctx context.Context, agent wire.UUID, drive *browserDrive, fill secretFill, args map[string]json.RawMessage) (words string, isError bool, site string) {
 	site, err := fillSite(ctx, drive, args)
+	if !d.secretIsSealed(agent, fill.name) {
+		return "", false, site
+	}
 	if err != nil {
-		return "Nothing was filled: " + d.browser.Filter.Text(err.Error()), true
+		return "Nothing was filled: " + d.browser.Filter.Text(err.Error()), true, ""
 	}
 	waiting, err := d.approveSecretUse(agent, fill.name, wire.SecretUseFill, site)
 	if err != nil {
-		return "Nothing was filled: " + err.Error(), true
+		return "Nothing was filled: " + err.Error(), true, site
 	}
-	return waiting, false
+	return waiting, false, site
 }
 
 // fillSecret types the value into the field and masks it. The value is hidden by the
@@ -261,6 +266,10 @@ func (d *Daemon) fillSecret(ctx context.Context, drive *browserDrive, fill secre
 	}
 	if res.IsError {
 		return fillWords("Nothing was filled: " + f.Text(resultText(res)))
+	}
+	// Typed: the value is in the page, also when it is taken out again below.
+	if fill.name != "" {
+		d.secretRead(fill.agent, fill.name, wire.SecretOperationUseFill, strings.ToLower(fill.site))
 	}
 	masked := map[string]json.RawMessage{"function": rawString(maskField)}
 	for k, v := range field {

@@ -3,6 +3,7 @@ package controlplane
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"strings"
 	"time"
 
@@ -93,6 +94,42 @@ func (s *Service) auditAccountOps(host, user string, ops []wire.AccountOperation
 		}
 		actor := s.personActor(user)
 		s.auditWriter.Add(audit.Pending{Method: "machine/accounts", Action: action, Host: host,
+			Who: func() (wire.AuditActor, *string) { return actor, &target }})
+	}
+}
+
+// secretOpActions are the words of an entry for an operation on a secret (#4156).
+var secretOpActions = map[wire.SecretOperationWhat]string{
+	wire.SecretOperationWhatRead:     "Read a secret",
+	wire.SecretOperationWhatDenied:   "Denied a secret's use",
+	wire.SecretOperationWhatAdded:    "Added a secret",
+	wire.SecretOperationWhatReplaced: "Replaced a secret",
+	wire.SecretOperationWhatRemoved:  "Removed a secret",
+}
+
+// auditSecretOps queues an entry for each operation an agent on host did with its person's
+// secrets (#4156): the target is the name, the use and the place, and how many times in the
+// minute, never the value. The machine sends at most one per secret, session, place and
+// minute.
+func (s *Service) auditSecretOps(host, user string, ops []wire.SecretOperation) {
+	for _, op := range ops {
+		action, ok := secretOpActions[op.What]
+		if !ok || strings.TrimSpace(op.Name) == "" {
+			continue
+		}
+		parts := []string{op.Name}
+		if op.Use != nil && *op.Use != "" {
+			parts = append(parts, string(*op.Use))
+		}
+		if op.Place != nil && *op.Place != "" {
+			parts = append(parts, *op.Place)
+		}
+		if op.Count != nil && *op.Count > 1 {
+			parts = append(parts, strconv.FormatInt(*op.Count, 10)+" times")
+		}
+		target := strings.Join(parts, " · ")
+		actor := s.personActor(user)
+		s.auditWriter.Add(audit.Pending{Method: "machine/secretOps", Action: action, Host: host,
 			Who: func() (wire.AuditActor, *string) { return actor, &target }})
 	}
 }

@@ -52,6 +52,8 @@ type gitCredentialState struct {
 	credMu sync.Mutex
 	// credGrants is each grant, by the agent it is for.
 	credGrants map[string]wire.UUID
+	// commandGrants is each agents-secret grant, by the agent it is for (#4178).
+	commandGrants map[string]wire.UUID
 	// appReach is whether agents-loops is installed on a repository, by repository.
 	appReach map[string]reachRead
 	// appPush is whether agents-loops may write code on an owner's install, by owner.
@@ -172,8 +174,8 @@ func (d *Daemon) withGitHubCredential(env []string, agent wire.UUID, dir string)
 		return env
 	}
 	grant := string(store.NewUUID())
-	d.dropGitHubCredential(agent)
 	d.credMu.Lock()
+	dropGrants(d.credGrants, agent)
 	if d.credGrants == nil {
 		d.credGrants = map[string]wire.UUID{}
 	}
@@ -208,13 +210,20 @@ func (d *Daemon) withGitHubCredential(env []string, agent wire.UUID, dir string)
 	return env
 }
 
-// dropGitHubCredential takes back an agent's grant: its runtime has ended.
-func (d *Daemon) dropGitHubCredential(agent wire.UUID) {
+// dropCredentialGrants takes back an agent's grants, for gh and git and for agents-secret:
+// its runtime has ended.
+func (d *Daemon) dropCredentialGrants(agent wire.UUID) {
 	d.credMu.Lock()
 	defer d.credMu.Unlock()
-	for g, a := range d.credGrants {
+	dropGrants(d.credGrants, agent)
+	dropGrants(d.commandGrants, agent)
+}
+
+// dropGrants deletes agent's grants from grants. The caller holds credMu.
+func dropGrants(grants map[string]wire.UUID, agent wire.UUID) {
+	for g, a := range grants {
 		if a == agent {
-			delete(d.credGrants, g)
+			delete(grants, g)
 		}
 	}
 }

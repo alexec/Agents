@@ -15571,6 +15571,22 @@
       },
       "additionalProperties": false
     },
+    "MachineSecretOpsCall": {
+      "type": "object",
+      "description": "machine/secretOps (#4156): what a machine's agents did with its person's secrets, for the control plane's audit. At most one operation per secret, session, place and minute, with a count.",
+      "properties": {
+        "ops": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SecretOperation"
+          }
+        }
+      },
+      "required": [
+        "ops"
+      ],
+      "additionalProperties": false
+    },
     "MachineSessionCall": {
       "type": "object",
       "description": "machines/sessionCall, through machine/machines (#2927): an agent's read_session, message_session, stop_session, archive_session, or list_sessions and agent.ended wait status, on a session it started on another of the person's machines with start_session. The control plane sends that machine's agents/fromStarter, with call.from in its own words.",
@@ -24568,6 +24584,65 @@
         "needsApproval"
       ],
       "additionalProperties": false
+    },
+    "SecretOperation": {
+      "type": "object",
+      "description": "One read or change of a secret on a machine (#4156). Never the value, never its hint: only the name, and where it went.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "what": {
+          "$ref": "#/definitions/SecretOperationWhat"
+        },
+        "use": {
+          "$ref": "#/definitions/SecretOperationUse"
+        },
+        "place": {
+          "type": "string",
+          "description": "Where it went: the field's domain (fill), owner/repo (ci), the server's name (mcp, env), session (env, as a session's own variable), or agents-secret (command)."
+        },
+        "agent": {
+          "$ref": "#/definitions/UUID",
+          "description": "The session that read it. Left out for a change no session made."
+        },
+        "at": {
+          "$ref": "#/definitions/WireDate",
+          "description": "When; for a count, the first in its minute."
+        },
+        "count": {
+          "type": "integer",
+          "description": "How many times in the minute from at, when more than one."
+        }
+      },
+      "required": [
+        "name",
+        "what",
+        "at"
+      ],
+      "additionalProperties": false
+    },
+    "SecretOperationUse": {
+      "type": "string",
+      "enum": [
+        "fill",
+        "ci",
+        "mcp",
+        "env",
+        "command"
+      ],
+      "description": "How a secret was read (#4156): fill (fill_secret), ci (set_ci_secret), mcp (an HTTP MCP server's header or url, through agentsd, #4120), env (given to a session at its start: its own secrets as variables, or an MCP server's ${NAME} from secrets.env) or command (agents-secret NAME, printed for a session's own command, #4178)."
+    },
+    "SecretOperationWhat": {
+      "type": "string",
+      "enum": [
+        "read",
+        "denied",
+        "added",
+        "replaced",
+        "removed"
+      ],
+      "description": "What an operation on a secret was (#4156): read (an agent's use of it), denied (a person denied a use with Ask before use), or added, replaced or removed."
     },
     "SecretRelease": {
       "type": "object",

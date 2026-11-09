@@ -186,6 +186,9 @@ they are `machine.`.
 | `cost.allowance_back` | — | runtime, how | A runtime is back: `check` (the app's check passed), `person` (Mark available), `worked` (a turn on it worked), `time` (a rate limit's wait passed) or `another host` (a server said so). |
 | `account.read` | — | service, address, machine, agent | `manage_accounts` read an outside account: a `get`, or a `list` filtered to its service (#4157). A `list` with no service reads no account. Never a value of the account. |
 | `account.changed` | — | service, address, machine, agent, change | `manage_accounts` added an account (`change` is `added`) or put one in another's place (`edited`). |
+| `secret.read` | — | name, machine, agent, use, place | agentsd gave a session a secret (#4156). `use` is `fill` (`fill_secret`; `place` is the field's domain), `ci` (`set_ci_secret`; `owner/repo`), `mcp` (an HTTP MCP server's header or url, filled by agentsd on each request; the server's name) or `env` (given at the session's start: its own secrets as variables, `place` is `session`, and each MCP server's `${NAME}`, the server's name) or `command` (`agents-secret NAME`, #4178; `place` is `agents-secret`). Never the value or its hint. `secrets.env` is a plain file a runtime can read at any time: only what agentsd gives is recorded. |
+| `secret.denied` | — | name, machine, agent, use, place | A person denied a use of a secret with Ask before use. |
+| `secret.changed` | — | name, machine, change, agent | A secret was set (`change` is `added`), replaced (`replaced`) or removed (`removed`) on this machine: in Settings ▸ Secrets, by `ask_secret`, or as a session's own. `agent` is there for a session's own secret. |
 | `server.offline` | — | server | A server's connection dropped. Raised once, while the Agents window is open. |
 | `server.online` | — | server | A server that was offline is back. Raised once, while the Agents window is open. |
 | `system.restarted` | — | reason, down_since, down_for, down_for_text | Agents started again, on a Mac or a server. `reason` is `stopped` (a clean stop was recorded), `crashed` (it was alive and never said it stopped) or `first_start` (nothing was recorded). `down_since` is when it stopped or was last alive; `down_for` is the gap in seconds and `down_for_text` in words ("3 min", or "unknown"). See [Restarts](#restarts). |
@@ -422,6 +425,15 @@ It is read only.
   control plane of each, and it keeps "Listed accounts", "Added an account" or "Changed an
   account", with the account's service and address as the target and the machine's person as
   who did it. A `list` with no service is not kept.
+- **An agent's reads of a secret, and its changes** (#4156): agentsd tells the control plane
+  of each (`machine/secretOps`), and it keeps "Read a secret", "Denied a secret's use", "Added
+  a secret", "Replaced a secret" or "Removed a secret", with the target `NAME · use · place`
+  (`GITHUB_TOKEN · fill · github.com`) and the machine's person and the machine as who did it.
+  Reads are kept at most once per secret, session, place and minute, with the count
+  (`· 12 times`). A person's Set and Remove in Settings ▸ Secrets are their own entries ("Set a
+  secret", "Removed a secret", `user/setSecret` and `user/removeSecret`). Never a value. Each
+  machine also keeps each secret's last operation in `secret-ops.json`, for the names it holds,
+  and a removed secret's goes with it.
 - **How long**: 90 days by default. An admin picks 30, 90, 180 or 365 days in the pane
   (`control/setAuditDays`, 1 to 3,650); the menu marks the time set now. The control
   plane's hourly sweep deletes older entries, by day. A shorter time asks first, with how

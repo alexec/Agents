@@ -207,7 +207,8 @@ func (d *Daemon) setSessionSecret(agent wire.UUID, name, value, description stri
 	if f.Secrets == nil {
 		f.Secrets = map[string]sessionSecretValue{}
 	}
-	if old, had := f.Secrets[name]; had && old.Sealed != nil && entry.Sealed != nil {
+	old, had := f.Secrets[name]
+	if had && old.Sealed != nil && entry.Sealed != nil {
 		// A new value is not a new place: the grants stay (#4015).
 		if sealed, err := d.sealSecret(sealedSessionStore(agent), name, value, old.Sealed.Grants); err == nil {
 			entry.Sealed = &sealed
@@ -222,6 +223,7 @@ func (d *Daemon) setSessionSecret(agent wire.UUID, name, value, description stri
 		return Invalid("%s was not saved: the session's secrets file could not be written.", name)
 	}
 	log.Printf("session secrets: saved %s for %s", name, agent)
+	d.secretChanged(agent, name, map[bool]wire.SecretOperationWhat{false: wire.SecretOperationWhatAdded, true: wire.SecretOperationWhatReplaced}[had], true)
 	d.mcpChanged()
 	return nil
 }
@@ -229,19 +231,22 @@ func (d *Daemon) setSessionSecret(agent wire.UUID, name, value, description stri
 // removeSessionSecret takes one out now. The agent is told it expired, as after an archive.
 func (d *Daemon) removeSessionSecret(agent wire.UUID, name string) error {
 	d.sessionSecretsMu.Lock()
-	defer d.sessionSecretsMu.Unlock()
 	f := d.readSessionSecrets(agent)
 	if _, ok := f.Secrets[name]; !ok {
+		d.sessionSecretsMu.Unlock()
 		return nil
 	}
 	delete(f.Secrets, name)
 	if !slices.Contains(f.Expired, name) {
 		f.Expired = append(f.Expired, name)
 	}
-	if err := d.writeSessionSecretsLocked(agent, f); err != nil {
+	err := d.writeSessionSecretsLocked(agent, f)
+	d.sessionSecretsMu.Unlock()
+	if err != nil {
 		return &Error{Code: CodeInternal, Message: name + " was not removed: " + err.Error()}
 	}
 	log.Printf("session secrets: removed %s for %s", name, agent)
+	d.secretChanged(agent, name, wire.SecretOperationWhatRemoved, true)
 	d.mcpChanged()
 	return nil
 }

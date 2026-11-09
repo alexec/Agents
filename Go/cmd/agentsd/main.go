@@ -56,6 +56,10 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == "credential" {
 		os.Exit(agentsd.CredentialCommand(os.Args[2:], os.Getenv, os.Stdin, os.Stdout))
 	}
+	// A session's agents-secret NAME: a secret that does not ask, through this host (#4178).
+	if len(os.Args) > 1 && os.Args[1] == "secret" {
+		os.Exit(agentsd.SecretCommand(os.Args[2:], os.Getenv, os.Stdout, os.Stderr))
+	}
 	if len(os.Args) > 1 && os.Args[1] == "lock" {
 		os.Exit(lockCommand(os.Args[2:]))
 	}

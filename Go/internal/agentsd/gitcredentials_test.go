@@ -129,7 +129,7 @@ func TestAnAgentsGitAndGhAskForTheAppsToken(t *testing.T) {
 	}
 
 	// The runtime ended: its grant asks nothing.
-	d.dropGitHubCredential(agent)
+	d.dropCredentialGrants(agent)
 	if got := ask(); got != "" {
 		t.Fatalf("a dropped grant got %q", got)
 	}
