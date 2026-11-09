@@ -69,13 +69,17 @@ struct AccountSettingsView: View {
     }
 }
 
-/// Settings ▸ Machines ▸ This Mac (#846): whether this Mac stays awake, whether Agents Host updates
-/// itself (#2178), how long archived agents are kept, and its backups (#1810).
+/// Settings ▸ Machines ▸ This Mac (#846): first, whether Agents runs here and Remove Agents
+/// from This Mac (#4227); then whether this Mac stays awake, whether Agents updates itself
+/// (#2178), how long archived agents are kept, and its backups (#1810).
 struct MacSettingsView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
         Form {
+            #if !STORE_WINDOW
+            if let host = HostScenes.model { HostMacSection(host: host) }
+            #endif
             WakeSettingsSection()
             DesktopControlSettingsSection()
             SelfUpdateSection()

@@ -31,6 +31,12 @@ struct ControlClientsPage: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .sheet(isPresented: $pairingDevice) { PairDeviceSheet(control: control) }
+        // The menu bar item's Pair a Phone or iPad… (#4227).
+        .onChange(of: model.pairDeviceAsked, initial: true) { _, asked in
+            guard asked else { return }
+            model.pairDeviceAsked = false
+            pairingDevice = true
+        }
         .sheet(isPresented: $pairingMac) { CodeSheet(control: control, purpose: .mac).paperSheet() }
         .sheet(isPresented: $pairingBrowser) { CodeSheet(control: control, purpose: .browser).paperSheet() }
         .confirmationDialog(forgettingClient.map { "Forget \($0.name)?" } ?? "",

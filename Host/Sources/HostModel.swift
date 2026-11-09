@@ -4,8 +4,8 @@ import AppKit
 import Observation
 import UniformTypeIdentifiers
 
-/// What frame L shows and does (058, US2): this Mac's host, the single copy of the control
-/// plane when it runs here, where it keeps its store, and the code to pair a window or phone.
+/// This Mac's host (058, US2), in Settings since #4227: the single copy of the control
+/// plane when it runs here, where it keeps its store, and its login items.
 @MainActor
 @Observable
 final class HostModel {
@@ -48,37 +48,6 @@ final class HostModel {
     /// What the last Repair came to, in words.
     private(set) var repaired: String?
 
-    // MARK: The store, being edited
-
-    var storeDraft: StoreChoice
-    var bucketDraft: BucketPlace
-    var accessKeyDraft = ""
-    var secretDraft = ""
-
-    enum Check: Equatable {
-        case checking
-        case works
-        case failed(String)
-    }
-    private(set) var check: Check?
-
-    // MARK: Pairing
-
-    struct PairingCode: Identifiable, Equatable {
-        let id = UUID()
-        var text: String
-        var target: PairingTarget
-    }
-
-    /// What the code is for, which decides how it is shown and where it works. Each may
-    /// do everything once paired (#111).
-    enum PairingTarget: Hashable {
-        case window, phone, browser
-    }
-    var pairing: PairingCode?
-    var pairingTarget: PairingTarget = .window
-    var showingPairing = false
-
     /// The host code `runHere` made last: what the move tells devices, with its address,
     /// pin and key (T085).
     private(set) var lastHostCode: ControlCode?
@@ -87,12 +56,9 @@ final class HostModel {
         let settings = HostSettings.load(HostPaths.current)
         self.settings = settings
         problem = HostSettings.unreadableNote(HostPaths.current)
-        storeDraft = settings.store
-        bucketDraft = settings.bucket
-        if let keys = HostSecrets.bucketKeys(HostPaths.current) {
-            accessKeyDraft = keys.accessKey
-            secretDraft = keys.secretKey
-        }
+        // The control plane on this Mac keeps its store on this Mac (#4227): the keys of a
+        // bucket it was once given go.
+        HostSecrets.forgetBucketKeys(paths)
         Task { await registerOutdatedJobsAgain() }
         if !paths.scratch { SelfUpdateRelaunch.watch() }
     }
@@ -117,15 +83,6 @@ final class HostModel {
 
     var version: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
-    }
-
-    /// The store as the running copy uses it, as against the one being edited.
-    var storeIsSaved: Bool {
-        storeDraft == settings.store && (storeDraft == .thisMac || (bucketDraft == settings.bucket && keysMatchSaved))
-    }
-
-    private var keysMatchSaved: Bool {
-        HostSecrets.bucketKeys(paths) == HostSecrets.BucketKeys(accessKey: accessKeyDraft, secretKey: secretDraft)
     }
 
     // MARK: Looking
@@ -177,7 +134,7 @@ final class HostModel {
         daemonRunning = daemon != nil
         daemonPID = daemon
         hostJoin = daemon.flatMap { HostJoinFile.read(paths.hostLocations.controlJoinStatus, pid: $0) }
-        // Read again whenever the process is another one: a restart or a store switch.
+        // Read again whenever the process is another one: a restart, say.
         if let control, control != controlPID { runningSince = Self.started(control) }
         if control == nil { runningSince = nil }
         controlPID = control
@@ -295,7 +252,7 @@ final class HostModel {
         var said = reasons.joined(separator: " ")
         if !otherCopies.isEmpty {
             let places = otherCopies.map { $0.deletingLastPathComponent().path }.joined(separator: ", ")
-            said += " Agents Host is also in \(places): keep one copy, so its login items are this one’s."
+            said += " Agents is also in \(places): keep one copy, so its login items are this one’s."
         }
         return said
     }
@@ -386,6 +343,35 @@ final class HostModel {
         NSWorkspace.shared.activateFileViewerSelecting(logs)
     }
 
+    // MARK: Removing (#4227)
+
+    /// Both login items are gone: the app can go to the Trash.
+    private(set) var removed = false
+
+    /// **Remove Agents from This Mac…**: both jobs stopped and unregistered. A login item
+    /// follows its bundle, not its path, so one left registered keeps running from the
+    /// Trash, then fails at every start once the Trash is emptied (#4225). The records stay
+    /// where they are, and opening Agents again sets it up afresh.
+    func removeFromThisMac() async {
+        guard busy == nil else { return }
+        problem = nil
+        repaired = nil
+        busy = "Removing Agents from this Mac…"
+        defer { busy = nil }
+        await services.remove()
+        for job in [LocalServices.Job.control, .daemon] {
+            for _ in 0..<20 where await services.state(job).loaded { try? await Task.sleep(for: .milliseconds(250)) }
+        }
+        settings.role = .none
+        settings.save(paths)
+        await refresh()
+        if controlJob?.loaded == true || daemonJob?.loaded == true {
+            problem = "macOS still has a login item for Agents. Turn it off in System Settings ▸ General ▸ Login Items."
+        } else {
+            removed = true
+        }
+    }
+
     // MARK: Run it here
 
     /// The control plane and this Mac's host, both here, and the host enrolled with it.
@@ -397,11 +383,7 @@ final class HostModel {
             return
         }
         problem = nil
-        if storeDraft == .bucket {
-            guard await saveBucket() else { return }
-        }
         settings.role = .runHere
-        settings.store = storeDraft
         settings.save(paths)
         busy = "Starting the control plane…"
         defer { busy = nil }
@@ -597,22 +579,10 @@ final class HostModel {
             pruneStoresAside()
         }
         settings.forwardingUntil = nil
-        settings.store = .thisMac
         settings.receiving = true
         settings.save(paths)
         _ = await start(.control)
         return aside
-    }
-
-    /// On a bucket (T128): this Mac's copy stops forwarding and serves the bucket beside the
-    /// other machine's, with nothing kept aside.
-    func prepareSharedReturn() async {
-        await services.unregister(.control)
-        for _ in 0..<20 where await services.running(.control) != nil { try? await Task.sleep(for: .milliseconds(250)) }
-        settings.forwardingUntil = nil
-        settings.receiving = false
-        settings.save(paths)
-        _ = await start(.control)
     }
 
     /// Only the newest 2 stores set aside stay, and the keys set aside with them (#3671).
@@ -774,102 +744,6 @@ final class HostModel {
             problem = why
             return false
         }
-    }
-
-    // MARK: The store
-
-    private var draftKeys: HostSecrets.BucketKeys {
-        HostSecrets.BucketKeys(accessKey: accessKeyDraft.trimmingCharacters(in: .whitespaces),
-                               secretKey: secretDraft.trimmingCharacters(in: .whitespaces))
-    }
-
-    /// The start-up probe against the bucket as typed, before anything is saved (T058a).
-    func checkBucket() async {
-        check = .checking
-        let address = StoreAddress(.bucket, bucket: bucketDraft, paths: paths)
-        let result = await ControlTool.run(["store", "check"], paths: paths, settings: settings, key: false,
-                                           store: address, keys: draftKeys)
-        check = result.ok ? .works : .failed(result.problem)
-    }
-
-    /// The bucket's place in the settings and its keys in the keychain.
-    @discardableResult
-    private func saveBucket() async -> Bool {
-        guard bucketDraft.isComplete, !draftKeys.accessKey.isEmpty, !draftKeys.secretKey.isEmpty else {
-            problem = "Say the bucket and both keys first."
-            return false
-        }
-        do {
-            try HostSecrets.saveBucketKeys(draftKeys, paths)
-        } catch {
-            problem = "The keys could not be kept: \(error)"
-            return false
-        }
-        settings.bucket = bucketDraft
-        settings.save(paths)
-        return true
-    }
-
-    /// Switch Store… (T058b): stop the copy, copy every record across, point the copy at
-    /// the new store and start it. The old store is kept until the person removes it.
-    func switchStore() async {
-        guard busy == nil, settings.role == .runHere else { return }
-        problem = nil
-        let from = StoreAddress(settings.store, bucket: settings.bucket, paths: paths)
-        if storeDraft == .bucket {
-            guard await saveBucket() else { return }
-        }
-        let to = StoreAddress(storeDraft, bucket: bucketDraft, paths: paths)
-        guard from != to else { return }
-        busy = "Switching the store…"
-        defer { busy = nil }
-        await services.unregister(.control)
-        for _ in 0..<20 where await services.running(.control) != nil { try? await Task.sleep(for: .milliseconds(250)) }
-        // A folder store switched away from before is kept aside, so switching back to
-        // this Mac starts from an empty folder rather than a stale one.
-        if to.url == paths.folderStore.absoluteString, FileManager.default.fileExists(atPath: paths.folderStore.path) {
-            let aside = paths.controlHome.appendingPathComponent("store-before-\(Int(Date().timeIntervalSince1970))")
-            do {
-                try FileManager.default.moveItem(at: paths.folderStore, to: aside)
-            } catch {
-                // Copied over a stale store, records would mix (#212): stop, on the old store.
-                problem = "The old store on this Mac could not be kept aside, so the store was not switched: \(error.localizedDescription)"
-                _ = await start(.control)
-                await refresh()
-                return
-            }
-            pruneStoresAside()
-        }
-        let bucket = from.needsKeys ? from : to
-        let copied = await ControlTool.run(["store", "copy", "--from", from.url, "--to", to.url], paths: paths,
-                                           settings: settings, key: false, store: bucket)
-        if copied.ok {
-            settings.store = storeDraft
-            settings.save(paths)
-        } else {
-            problem = copied.problem
-        }
-        // Started again either way: on the new store, or on the old one after a failure.
-        _ = await start(.control)
-        try? await Task.sleep(for: .seconds(1))
-        await refresh()
-    }
-
-    // MARK: Pairing
-
-    /// A code to type into a window, a phone or a browser.
-    func makeCode() async {
-        pairing = nil
-        let target = pairingTarget
-        // A browser's code is good only through the page's own listener (071 R2).
-        let made = await ControlTool.run(["code", "--client", "--home", paths.controlHome.path]
-                                             + (target == .browser ? ["--browser"] : []),
-                                         paths: paths, settings: settings)
-        guard made.ok, let text = made.output.split(separator: "\n").last.map(String.init) else {
-            problem = made.problem.isEmpty ? "No code could be made." : made.problem
-            return
-        }
-        pairing = PairingCode(text: text, target: target)
     }
 }
 

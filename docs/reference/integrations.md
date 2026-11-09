@@ -212,7 +212,7 @@ Open issues: `is:open label:integration "control plane"`.
 
 | Integration | Clients that show it | State | Last checked | Where | Gaps |
 | --- | --- | --- | --- | --- | --- |
-| S3 or MinIO store | control plane, Mac | built | — | `Go/internal/controlplane/s3store/s3store.go`, `Host/Sources/StoreChoice.swift` | |
+| S3 or MinIO store | control plane | built | — | `Go/internal/controlplane/s3store/s3store.go`; not on the Mac since #4227 | |
 | KMS (local, HashiCorp Vault, Google Cloud KMS) | control plane | built | — | `Go/internal/controlplane/kms/kms.go` | |
 | Caddy with ACME | control plane | tested on a real account | 2026-10-18, Let's Encrypt certificates for control.agentloops.dev and views.agentloops.dev (`specs/058-control-plane/walks/1461.md`) | `deploy/` | |
 | Bonjour discovery | Mac, control plane | built | — | `Host/Sources/LocalServices.swift`, `Go/internal/controlplane/machine.go` | |

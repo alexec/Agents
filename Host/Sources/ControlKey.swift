@@ -2,18 +2,13 @@ import AgentsKitCore
 import Foundation
 import Security
 
-/// What Agents Host keeps secret (058, T056 and T058a): the control plane's private key,
-/// made once, and the bucket's keys when the store is in one. In the keychain, handed to
-/// `agents-control` only through inherited descriptors, and never written to disk.
+/// What Agents keeps secret (058, T056): the control plane's private key, made once. In the
+/// keychain, handed to `agents-control` only through an inherited descriptor, and never
+/// written to disk.
 ///
 /// A scratch set-up keeps them in 0600 files in its own root instead, so a walk never
 /// adds to the person's keychain.
 enum HostSecrets {
-    struct BucketKeys: Codable, Sendable, Equatable {
-        var accessKey: String
-        var secretKey: String
-    }
-
     private static let service = "com.alexecollins.agentshost"
 
     static func controlKey(_ paths: HostPaths) throws -> Data {
@@ -88,21 +83,17 @@ enum HostSecrets {
         }
     }
 
-    static func bucketKeys(_ paths: HostPaths) -> BucketKeys? {
-        let data = paths.scratch ? try? Data(contentsOf: bucketFile(paths)) : read(account: "bucket-keys")
-        return data.flatMap { try? JSONDecoder().decode(BucketKeys.self, from: $0) }
-    }
-
-    static func saveBucketKeys(_ keys: BucketKeys, _ paths: HostPaths) throws {
-        let data = try JSONEncoder().encode(keys)
+    /// The keys of a bucket the control plane once kept its store in (T058a), which it no
+    /// longer does (#4227): taken out of the keychain, or the scratch root.
+    static func forgetBucketKeys(_ paths: HostPaths) {
         if paths.scratch {
-            try StoreCoding.writeAtomically(data, to: bucketFile(paths), permissions: 0o600)
+            try? FileManager.default.removeItem(at: paths.controlHome.appendingPathComponent("bucket-keys.json"))
         } else {
-            try write(data, account: "bucket-keys")
+            let match: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,
+                                        kSecAttrAccount as String: "bucket-keys"]
+            SecItemDelete(match as CFDictionary)
         }
     }
-
-    private static func bucketFile(_ paths: HostPaths) -> URL { paths.controlHome.appendingPathComponent("bucket-keys.json") }
 
     // MARK: The keychain
 

@@ -654,10 +654,6 @@ targets:
         NSLocalNetworkUsageDescription: >-
           To find and reach your agents' control plane on this network.
         NSBonjourServices: [_agents-control._tcp]
-        # agents-host://pair: frame K2 asks for a code to be shown.
-        CFBundleURLTypes:
-          - CFBundleURLName: com.alexecollins.agents.host
-            CFBundleURLSchemes: [agents-host]
         ITSAppUsesNonExemptEncryption: false
     settings:
       base:

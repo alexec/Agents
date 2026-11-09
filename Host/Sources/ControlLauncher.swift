@@ -1,12 +1,11 @@
 import AgentsKitCore
 import Foundation
 
-/// Runs `agents-control` with its secrets on inherited descriptors (058, T056, T058a):
-/// the control plane's key on 3 and, for a bucket, its keys as JSON on 4. Nothing secret is
-/// in an argument, the environment, a plist or a file.
+/// Runs `agents-control` with its key on an inherited descriptor (058, T056): 3. Nothing
+/// secret is in an argument, the environment, a plist or a file. Its store is always the
+/// folder on this Mac (#4227).
 enum ControlTool {
     static let keyFD: Int32 = 3
-    static let bucketFD: Int32 = 4
 
     struct Result: Sendable {
         var status: Int32
@@ -20,25 +19,18 @@ enum ControlTool {
         }
     }
 
-    /// The arguments and environment for `store`, with the descriptors to hand over.
-    static func plan(_ arguments: [String], paths: HostPaths, settings: HostSettings, key: Bool = true,
-                     store: StoreAddress? = nil, keys given: HostSecrets.BucketKeys? = nil) throws -> (arguments: [String], environment: [String: String], secrets: [Int32: Data]) {
-        let address = store ?? StoreAddress(settings.store, bucket: settings.bucket, paths: paths)
+    /// The arguments and environment for a command, with the descriptor to hand over.
+    static func plan(_ arguments: [String], paths: HostPaths, settings: HostSettings, key: Bool = true) throws
+        -> (arguments: [String], environment: [String: String], secrets: [Int32: Data]) {
         var arguments = arguments
         var secrets: [Int32: Data] = [:]
         if key {
             secrets[keyFD] = try HostSecrets.controlKey(paths)
             arguments += ["--key-fd", String(keyFD)]
         }
-        if address.needsKeys {
-            guard let keys = given ?? HostSecrets.bucketKeys(paths) else { throw ControlService.Failure("the bucket's keys are not saved yet") }
-            secrets[bucketFD] = try JSONEncoder().encode(keys)
-            arguments += ["--store-credentials-fd", String(bucketFD)]
-        }
         // Only what agents-control needs: not the window's or a shell's variables, and
         // never this session's.
-        var environment = address.environment
-        environment["AGENTS_STORE"] = address.url
+        var environment = ["AGENTS_STORE": paths.folderStore.absoluteString]
         environment["HOME"] = NSHomeDirectory()
         environment["PATH"] = "/usr/bin:/bin:/usr/sbin:/sbin"
         #if DEBUG
@@ -48,11 +40,10 @@ enum ControlTool {
         return (arguments, environment, secrets)
     }
 
-    /// Runs one command to its end: `code`, `hosts`, `clients`, `store check`, `store copy`.
-    static func run(_ arguments: [String], paths: HostPaths, settings: HostSettings, key: Bool = true,
-                    store: StoreAddress? = nil, keys: HostSecrets.BucketKeys? = nil) async -> Result {
+    /// Runs one command to its end: `code`, `hosts`, `clients`, `handover`.
+    static func run(_ arguments: [String], paths: HostPaths, settings: HostSettings, key: Bool = true) async -> Result {
         do {
-            let planned = try plan(arguments, paths: paths, settings: settings, key: key, store: store, keys: keys)
+            let planned = try plan(arguments, paths: paths, settings: settings, key: key)
             return try await spawn(paths.agentsControl.path, planned.arguments, planned.environment, planned.secrets)
         } catch {
             return Result(status: -1, output: "", error: "\(error)")

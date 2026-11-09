@@ -336,8 +336,8 @@ There are two ordinary shapes.
 
 **On this Mac.** Agents Host, a free download from us that is not in the App Store, runs
 this Mac's machine and a single copy of the control plane, kept running by macOS with every
-window closed. Its store is a folder on this Mac by default, or a bucket of your own. This
-is the shape for one person at home.
+window closed. Its store is a folder on this Mac (a bucket is for a control plane in the
+cloud, #4227). This is the shape for one person at home.
 
 The cost is that the Mac is the control plane. While it sleeps, or is away from your
 network, no window or device can reach any of your agents, including those on servers.

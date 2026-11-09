@@ -5,8 +5,8 @@ import VisionKit
 
 /// What a device with no way to its Mac shows: never paired, or forgotten (security
 /// review, Phase 3). Sign-in comes first (#2097): the control plane's address, then its
-/// providers. **Use a Code Instead…** scans or pastes the code the control plane shows (Agents
-/// Host's Pair a Window or Phone…, or the window's Pair a Device), as a local owner with no
+/// providers. **Use a Code Instead…** scans or pastes the code the control plane shows (the
+/// Mac's Pair a Phone or iPad… in its menu bar, or Pair a Device in Settings), as a local owner with no
 /// sign-in provider does; an address with no provider on goes there by itself.
 struct PairingView: View {
     @Environment(RemoteModel.self) private var model
@@ -69,8 +69,8 @@ struct PairingView: View {
 
     @ViewBuilder private var code: some View {
         Text(noneOn ? SignInWords.noneOn
-             : "On your Mac, choose Pair a Window or Phone… in Agents Host, or Pair a Device in "
-               + "Agents ▸ Settings. Then scan the code it shows, or copy it and paste it here.")
+             : "On your Mac, choose Pair a Phone or iPad… in Agents’ menu bar item, or Pair a Device in "
+               + "Agents ▸ Settings. Then scan the code it shows.")
             .appText(.fine)
             .foregroundStyle(.secondary)
             .multilineTextAlignment(.center)

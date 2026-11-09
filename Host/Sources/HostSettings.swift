@@ -1,7 +1,7 @@
 import AgentsKitCore
 import Foundation
 
-/// What the person chose in frame L, kept in `~/.agents/settings/host.json` under this Mac's
+/// What the person chose for this Mac (frame L until #4227), kept in `~/.agents/settings/host.json` under this Mac's
 /// name (#1033), so the launcher (the same program, started by launchd) reads the same
 /// choice, and one file holds the role of each of the person's Macs.
 struct HostSettings: Codable, Sendable, Equatable {
@@ -15,8 +15,6 @@ struct HostSettings: Codable, Sendable, Equatable {
     }
 
     var role: Role = .none
-    var store: StoreChoice = .thisMac
-    var bucket = BucketPlace()
     /// Where the control plane went when it was moved off this Mac (T126, frame T), and
     /// when; and until when this Mac's copy forwards members that haven't heard.
     var movedTo: String?
@@ -38,12 +36,12 @@ struct HostSettings: Codable, Sendable, Equatable {
         paths.scratchRoot == nil ? LocalHostName.current : "hostSettings.\(paths.suffix)"
     }
 
-    /// Where settings that would not decode are kept (#205): a newer build's role or
-    /// store, say. The first such value is kept and never written over.
+    /// Where settings that would not decode are kept (#205): a newer build's role,
+    /// say. The first such value is kept and never written over.
     static func asideKey(_ paths: HostPaths) -> String { "\(key(paths)).unreadable" }
 
     /// `~/.agents/settings/host.json` (#1033): one entry per Mac, so the file can follow the
-    /// person and each Mac still keeps its own role. The bucket's keys stay in the keychain.
+    /// person and each Mac still keeps its own role.
     static var file: URL {
         StoreLocations.settings(inHome: URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true))
             .appendingPathComponent("host.json")
@@ -105,49 +103,5 @@ struct HostSettings: Codable, Sendable, Equatable {
             Self.write(old, Self.asideKey(paths), paths)
         }
         if let data = try? JSONEncoder().encode(self) { Self.write(data, Self.key(paths), paths) }
-    }
-}
-
-/// Where the single copy keeps what it remembers (058, FR-024a, T058a).
-enum StoreChoice: String, Codable, Sendable, CaseIterable {
-    case thisMac
-    case bucket
-}
-
-/// A bucket of the person's own. The keys are not here: they are in the keychain.
-struct BucketPlace: Codable, Sendable, Equatable {
-    var endpoint = ""
-    var bucket = ""
-    var prefix = "control"
-    var region = "us-east-1"
-
-    var isComplete: Bool { !bucket.trimmingCharacters(in: .whitespaces).isEmpty }
-
-    /// Anything but AWS itself is addressed path-style, as MinIO and most others want.
-    var pathStyle: Bool { !endpoint.isEmpty && !endpoint.contains("amazonaws.com") }
-}
-
-/// The address `agents-control` is given for a choice, and the environment beside it.
-struct StoreAddress: Equatable {
-    var url: String
-    var environment: [String: String]
-    var needsKeys: Bool
-
-    init(_ choice: StoreChoice, bucket: BucketPlace, paths: HostPaths) {
-        switch choice {
-        case .thisMac:
-            url = paths.folderStore.absoluteString
-            environment = [:]
-            needsKeys = false
-        case .bucket:
-            let prefix = bucket.prefix.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
-            url = "s3://\(bucket.bucket.trimmingCharacters(in: .whitespaces))" + (prefix.isEmpty ? "" : "/\(prefix)")
-            var env = ["AGENTS_STORE_REGION": bucket.region.isEmpty ? "us-east-1" : bucket.region]
-            let endpoint = bucket.endpoint.trimmingCharacters(in: .whitespaces)
-            if !endpoint.isEmpty { env["AGENTS_STORE_ENDPOINT"] = endpoint }
-            if bucket.pathStyle { env["AGENTS_STORE_PATH_STYLE"] = "1" }
-            environment = env
-            needsKeys = true
-        }
     }
 }

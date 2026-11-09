@@ -1,9 +1,9 @@
 import SwiftUI
 
 /// Agents (#4224, #4225): the window and this Mac's host in one Developer ID app, which
-/// isn't in the App Store, because it runs programs for the person's agents. The window,
-/// the host's window (frame L, until #4227 moves its controls into Settings) and a menu bar
-/// item; the work itself is in launch agents that keep running with the app closed.
+/// isn't in the App Store, because it runs programs for the person's agents. The window
+/// and a menu bar item; the work itself is in launch agents that keep running with the app
+/// closed.
 ///
 /// The same program is the control plane's launcher: started by launchd with
 /// `--launch-control`, it hands the key over and becomes `agents-control`. With
@@ -27,10 +27,10 @@ enum HostEntry {
     }
 }
 
-/// This Mac's host in the one app (#4225): its window, and the menu bar item that says the
-/// agents keep running with no window open.
+/// This Mac's host in the one app (#4225): the menu bar item, which says the agents keep
+/// running with no window open. Its controls are in Settings since #4227.
 struct HostScenes: Scene {
-    static let windowID = "host"
+    let app: AppModel
 
     /// One for the app, made once: the scenes are made again on every change. None for a
     /// walk's window (run-app, `--walk`), which must not register the person's login items
@@ -41,80 +41,72 @@ struct HostScenes: Scene {
     @MainActor static let firstOpen: FirstOpen? = model.map { FirstOpen(host: $0) }
 
     var body: some Scene {
-        Window("This Mac's Host", id: Self.windowID) {
-            if let model = Self.model {
-                HostWindow()
-                    .environment(model)
-            }
-        }
-        .defaultSize(width: 680, height: 640)
-        .windowResizability(.contentMinSize)
-        // The window opens with the app, not this one: the menu bar item or
-        // agents-host://pair brings it.
-        .defaultLaunchBehavior(.suppressed)
-
         MenuBarExtra(isInserted: .constant(Self.model != nil)) {
-            if let model = Self.model { HostMenu(model: model) }
+            if let model = Self.model { HostMenu(host: model, app: app) }
         } label: {
-            // Always drawn, so it is what opens the host's window when asked to, from
-            // anywhere: no view of that window is there to do it.
-            if let model = Self.model { HostMenuLabel(model: model) }
+            Image("MenuBarBlob")
         }
     }
 }
 
-/// The menu bar mark, and what opens the host's window for agents-host://pair.
-private struct HostMenuLabel: View {
-    let model: HostModel
-    @Environment(\.openWindow) private var openWindow
-    @State private var asked = false
-
-    var body: some View {
-        Image("MenuBarBlob")
-            .task {
-                AgentsAppDelegate.opened = { [model] url in
-                    guard url.host == "pair" else { return }
-                    asked = true
-                    if model.settings.role == .runHere { model.showingPairing = true }
-                }
-            }
-            .onChange(of: asked) {
-                guard asked else { return }
-                asked = false
-                openWindow(id: HostScenes.windowID)
-                NSApp.activate()
-            }
-    }
-}
-
+/// The menu bar item's menu (#4227): the window's counts, then what Agents Host's menu had.
 private struct HostMenu: View {
-    let model: HostModel
+    let host: HostModel
+    let app: AppModel
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
-        // The window opens from the Dock and the Window menu; #4227 adds Open Agents here.
-        Button("Open This Mac's Host") { openHost() }
-        if model.settings.role == .runHere {
-            Button("Pair a Window or Phone…") {
-                openHost()
-                model.showingPairing = true
+        Text(HostMenuWords.counts(working: working, needsYou: app.needsPersonCount))
+        Divider()
+        Button("Open Agents") {
+            NSApp.activate()
+            app.bringMainWindowForward(opening: openWindow)
+        }
+        if host.settings.role == .runHere {
+            Button("Pair a Phone or iPad…") {
+                app.settingsPaneAsked = .clients
+                app.pairDeviceAsked = true
+                showSettings()
             }
-            // The page in a browser on this Mac, paired the first time (#109); why not,
-            // in the window.
+            // The page in a browser on this Mac, paired the first time (#109); why not, in
+            // an alert.
             Button("Open in Browser") {
                 Task {
-                    await model.openInBrowser()
-                    if model.problem != nil { openHost() }
+                    await host.refresh()
+                    await host.openInBrowser()
+                    guard let why = host.problem else { return }
+                    NSApp.activate()
+                    let alert = NSAlert()
+                    alert.messageText = "Agents can’t open in a browser"
+                    alert.informativeText = why
+                    alert.runModal()
                 }
             }
         }
         Divider()
+        Button("Settings…") { showSettings() }
         Button("Quit Agents") { NSApp.terminate(nil) }
         Text("Your agents keep running after quitting.").font(.caption)
     }
 
-    private func openHost() {
-        openWindow(id: HostScenes.windowID)
+    /// Sessions working, in every folder, as the sidebar counts them.
+    private var working: Int {
+        app.liveFolders.reduce(0) { $0 + (app.counts(in: $1.key)[.running] ?? 0) }
+    }
+
+    private func showSettings() {
         NSApp.activate()
+        openSettings()
+    }
+}
+
+enum HostMenuWords {
+    /// "2 working · 1 needs you", or that nothing is.
+    static func counts(working: Int, needsYou: Int) -> String {
+        var parts: [String] = []
+        if working > 0 { parts.append("\(working) working") }
+        if needsYou > 0 { parts.append("\(needsYou) need\(needsYou == 1 ? "s" : "") you") }
+        return parts.isEmpty ? "No agents working" : parts.joined(separator: " · ")
     }
 }

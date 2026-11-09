@@ -113,7 +113,7 @@ Settings, or goes away:
 | **Pair a Window or Phone…** and its sheet | The pairing sheet that Settings already has (`PairDeviceSheet`). The "window" choice goes, because the window pairs itself; it stays for a window on *another* Mac |
 | CONTROL PLANE card: Where, Running at, **Restart** | Settings ▸ Control plane, which already shows **Restart** |
 | **Move to Another Machine…**, forwarding rows | Settings ▸ Control plane ▸ Move… (the same flow) |
-| Store: On this Mac / In a bucket, **Check**, **Switch Store…** | Settings ▸ Control plane ▸ Store |
+| Store: On this Mac / In a bucket, **Check**, **Switch Store…** | Gone (Alex, 2026-11-09, PR #4256): the store is always on this Mac. A person who wants it in the cloud runs the control plane there |
 | Diagnostics: **Copy**, **Save…**, **Show Logs** | **Help ▸ Diagnostics** (menu items) and Settings ▸ Machines ▸ This Mac |
 | Move strip (move an existing set-up) | Gone after migration (see below) |
 | Menu bar: Open Agents Host, Pair…, Open in Browser, Quit | The menu bar item above |
@@ -130,7 +130,6 @@ Also removed from the window: the first-run frames K and K2 (`FirstRunView`),
 Control plane
   ● On this Mac              [ Connect to Another… ]
     Running · 1 machine · 2 devices
-    Store: On this Mac ▾
     Serve Agents to browsers on this Mac   [on]
 ```
 

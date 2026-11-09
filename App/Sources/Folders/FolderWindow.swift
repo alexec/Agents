@@ -422,14 +422,6 @@ final class AgentsAppDelegate: NSObject, NSApplicationDelegate {
         NSWindow.allowsAutomaticWindowTabbing = false
     }
 
-    /// What takes a URL the app is opened with: agents-host://pair, which the
-    /// host's scenes set (#4225). A `Window` scene is never handed a URL by `onOpenURL`.
-    @MainActor static var opened: ((URL) -> Void)?
-
-    func application(_ application: NSApplication, open urls: [URL]) {
-        MainActor.assumeIsolated { urls.forEach { Self.opened?($0) } }
-    }
-
     @MainActor func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
         guard let model = Self.model, model.openFolderWindow != nil else { return nil }
         let menu = NSMenu()
