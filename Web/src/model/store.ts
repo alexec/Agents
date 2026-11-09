@@ -16,7 +16,7 @@ import type {
   PagesChangedNotification, PinsChangedNotification, PinView, ReviewPull, CheckSuggestion, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, PolicySetBy, RuntimeAllowances,
   GuardedChange, GuardedChangeReading, MachineJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Achievements, Multiplier,
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
-  BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, DailySummarySettings, SummaryPage, SummaryPageText, DesktopControlSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
+  BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, DailySummarySettings, SummaryPage, SummaryPageText, DesktopControlSettings, WakeSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
   PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, BudgetRequest, RemoveRequest, ClientPermissionSettings, PRCostComment,
   Connection, LineageNode, LineageSessionIssue, MoveToMachineAnswer, ProblemReport, ProblemReportRequest, Request as PersonRequest, RequestSecretUse, LockDelivery, RequestUpdate, ProviderID, StartedMachinePreview, FoldersFindRequest, FoundFolder } from "../protocol/generated";
 import { endedConnections, endedLine, hasEnded } from "./connectorSetup";
@@ -418,6 +418,10 @@ export class Work {
   /** Desktop control's own off-by-default switch (#3004, US2), for Settings: null until it has
    * said, or from a host too old to know the method, which leaves the section out. */
   readonly desktopControl = signal<DesktopControlSettings | null>(null);
+  /** The Mac's Sleep settings (#4066): how many finished sessions keep their runtime ready for a reply,
+   * and how long one with background processes is kept. Null until the Mac's host has said, or from a
+   * host too old to know the method, which leaves the section out. */
+  readonly wakeSettings = signal<WakeSettings | null>(null);
   /** The daily summary's Off / Summary control and its time (#3351), for Settings ▸ Workflows: null
    * until the Mac's host has said, or from a host too old to know the method, which leaves it out. */
   readonly dailySummary = signal<DailySummarySettings | null>(null);
@@ -2424,6 +2428,28 @@ export class Store extends Work {
       this.desktopControl.value = await this.link.call("desktopControl/set", { enabled }, this.macHostID.value);
     } catch (error) {
       this.desktopControl.value = before;
+      this.say(describe(error));
+    }
+  }
+
+  /** Settings ▸ Sleep (#4066), asked when Settings is shown. A host too old to know the method
+   * leaves the section out. */
+  loadWakeSettings(): void {
+    void this.link.call("wake/settings", {}, this.macHostID.value).then(
+      (settings) => { this.wakeSettings.value = settings; },
+      () => { /* too old to know the method: the section stays out. */ },
+    );
+  }
+
+  /** The person changed one of Sleep's pickers (#4066): the whole settings go, as the window sends them. */
+  async setWakeSettings(change: Partial<WakeSettings>): Promise<void> {
+    const before = this.wakeSettings.value;
+    if (!before) return;
+    this.wakeSettings.value = { ...before, ...change };
+    try {
+      this.wakeSettings.value = await this.link.call("wake/set", { ...before, ...change }, this.macHostID.value);
+    } catch (error) {
+      this.wakeSettings.value = before;
       this.say(describe(error));
     }
   }

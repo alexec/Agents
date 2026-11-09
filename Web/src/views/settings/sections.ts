@@ -20,6 +20,7 @@ import { NotificationsSection } from "./Notifications";
 import { PolicySection } from "./Policy";
 import { ProcessesSection } from "./Processes";
 import { SidebarGroupsSection } from "./SidebarGroups";
+import { SleepSection } from "./Sleep";
 import { PersonasConfigSection, SkillsConfigSection, WorkflowsConfigSection } from "../AgentConfigEditor";
 
 /** Settings' groups by subject (#2157, was by scope #1759): this browser, what agents may do (#2957), the machines
@@ -73,6 +74,8 @@ export const settingsSections: readonly SettingsSection[] = [
   // How you sign in on your Macs, iPhones and iPads (#995).
   { name: "signIns", scope: "controlPlane", order: 5, Section: SignInsSection },
   { name: "skills", scope: "agentConfiguration", order: 10, Section: SkillsConfigSection },
+  // The Mac's runtime pickers (#4066): Keep ready for a reply and Keep runtimes with background processes.
+  { name: "sleep", scope: "machines", order: 37, Section: SleepSection },
   // The control plane's version (#1748); the machines it lists are in the sidebar (#3975).
   { name: "version", scope: "controlPlane", order: 60, Section: VersionsSection },
   { name: "workflows", scope: "agentConfiguration", order: 30, Section: WorkflowsConfigSection },

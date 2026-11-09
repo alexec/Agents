@@ -37,6 +37,14 @@ struct WakeSettingsSection: View {
                         Text(Self.sessions(count)).tag(count)
                     }
                 }
+                // A runtime whose dev server, build or watcher still runs is kept longer (#4044, #4066).
+                Picker("Keep runtimes with background processes", selection: Binding(
+                    get: { model.wakeSettings?.backgroundHours ?? settings.backgroundHours },
+                    set: { hours in save { $0.backgroundHours = hours } })) {
+                    ForEach(WakeSettings.backgroundRange, id: \.self) { hours in
+                        Text(Self.label(hours)).tag(hours)
+                    }
+                }
             } header: {
                 Text("Sleep")
             } footer: {
@@ -46,7 +54,7 @@ struct WakeSettingsSection: View {
                           ? " On power, the Mac stays awake all the time, so scheduled workflows and new issues run while you are away. On battery, the rules above apply. A MacBook with its lid closed and no display sleeps anyway, and the screen still locks."
                           : "")
                      : "The Mac sleeps on its own schedule, including while an agent is working. The time above is kept for when you turn this back on.")
-                     + " The sessions you are most likely to reply to keep their agent running for up to 30 minutes, so the reply starts at once. They never keep the Mac awake.")
+                     + " " + WakeWords.runtimesFooter(backgroundHours: model.wakeSettings?.backgroundHours ?? settings.backgroundHours))
                     .appText(.fine)
                     .foregroundStyle(.secondary)
             }

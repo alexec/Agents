@@ -12860,6 +12860,8 @@ export interface Methods {
   "views/log": { params: ViewLogRequest; result: Empty };
   "views/read": { params: ViewReadRequest; result: ViewResource };
   "views/show": { params: ViewShowRequest; result: Empty };
+  "wake/set": { params: WakeSettings; result: WakeSettings };
+  "wake/settings": { params: Empty; result: WakeSettings };
   "workflows/approve": { params: WorkflowApproveRequest; result: WorkflowSummary };
   "workflows/archive": { params: WorkflowArchiveRequest; result: WorkflowSummary };
   "workflows/delete": { params: WorkflowRequest; result: Empty };
@@ -13261,6 +13263,8 @@ export const MethodTarget = {
   "views/log": "host",
   "views/read": "host",
   "views/show": "host",
+  "wake/set": "host",
+  "wake/settings": "host",
   "workflows/approve": "host",
   "workflows/archive": "host",
   "workflows/delete": "host",
