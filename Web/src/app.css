@@ -1935,7 +1935,7 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .simulator-screen { cursor: pointer; width: auto; height: auto; max-width: 100%; max-height: 75vh; align-self: center; border-radius: 18px; border: 1px solid var(--paper-rule); }
 /* A failed read keeps the last frame, dimmed, with why it is old; a failed list says why in the middle with Try Again (#1666). */
 .simulator-screen.stale { opacity: 0.4; }
-/* The Agent Browser tab (#3528): the machine's browser, drawn to fit, centred, as the window's pane draws it. */
+/* The Agent Browser (#3528), in its take-over tab (#4141): the machine's browser, drawn to fit, centred, as the window's pane draws it. */
 .agent-browser { display: flex; flex-direction: column; gap: 8px; height: 100%; min-height: 360px; }
 .agent-browser-bar { display: flex; align-items: center; gap: 6px; }
 .agent-browser-bar .link { min-width: 22px; font-size: 1.1em; }
@@ -2218,3 +2218,11 @@ dialog.sheet:has(.persona-sheet) { width: min(900px, calc(100vw - 32px)); max-he
 .multiplier-foot { text-align: center; display: flex; flex-direction: column; gap: 4px; }
 .multiplier-foot p { margin: 0; }
 @media (prefers-reduced-motion: reduce) { .badge.new, .multiplier-news span { animation: none; } }
+
+/* The take-over tab (#4141): the agent browser or a simulator on the whole page, a slim head over it,
+   and a hand-off's step between them. */
+.take-over-head h1 { flex: 0 1 auto; }
+.take-over-hand-off { padding: 8px 12px 0; }
+.take-over-page { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 8px 12px 12px; overflow: auto; }
+.take-over-page > .agent-browser { flex: 1; height: auto; min-height: 0; }
+.take-over-page .simulator-screen { max-height: calc(100vh - 140px); }

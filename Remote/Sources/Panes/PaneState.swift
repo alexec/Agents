@@ -6,10 +6,11 @@ import Observation
 ///
 /// No case for the Mac's Browser pane, on purpose, rather than one kept disabled. That
 /// browser shows the agent's local servers, which only listen on the Mac, and a pane that
-/// could never show anything is not offered (FR-030). `browser` is the Agent Browser: the
-/// browser on the session's machine, which agents drive (#3800).
+/// could never show anything is not offered (FR-030). The Agent Browser, the browser on
+/// the session's machine that agents drive (#3800), is not a pane either: it is taken over
+/// on its own (`TakeOverView`, #4141).
 enum Pane: String, CaseIterable, Identifiable, Hashable {
-    case page, files, changes, terminal, browser, exchanged, simulator
+    case page, files, changes, terminal, exchanged, simulator
 
     var id: String { rawValue }
 
@@ -19,7 +20,6 @@ enum Pane: String, CaseIterable, Identifiable, Hashable {
         case .files: "Files"
         case .changes: "Changes"
         case .terminal: "Terminal"
-        case .browser: "Browser"
         case .exchanged: "Exchanged"
         case .simulator: "Simulator"
         }

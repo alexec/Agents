@@ -133,6 +133,14 @@ struct RemoteApp: App {
             RemoteFolderScene(key: key)
                 .environment(model)
         }
+
+        // The agent browser or a simulator taken over on an iPad (#4141), from Open on a live
+        // tile or Open the page on a hand-off. One scene per session and source: opening one
+        // already open brings it forward.
+        WindowGroup(id: TakeOverKey.sceneID, for: TakeOverKey.self) { $key in
+            TakeOverView(key: key)
+                .environment(model)
+        }
     }
 }
 
@@ -209,7 +217,8 @@ struct RemoteView: View {
         // A label's chip, in a card or the chat, filters the sidebar by it (#3898). The
         // chat stays open; on a phone, Back shows the list it filtered.
         .environment(\.labelFilter, LabelFilter(query: model.sidebarSearch) { model.sidebarSearch = $0 })
-        // A folder shown alone on an iPhone (#1089), over every folder, with ‹ All.
+        // A folder shown alone on an iPhone (#1089), and over either the browser or a
+        // simulator taken over (#4141).
         .modifier(PhoneFolderCover())
         // Something picked, here or from a banner, a widget or a start, is shown; back to
         // the list on a phone puts it down, so the same row opens it again.
@@ -467,14 +476,17 @@ private struct PhoneFolder: Identifiable {
     var id: String { key.stored }
 }
 
-/// The folder an iPhone shows alone (#1089), over every folder, with ‹ All.
+/// The folder an iPhone shows alone (#1089), over every folder, with ‹ All; and the
+/// agent browser or a simulator taken over (#4141), over either. One modifier: the root's
+/// own chain is at the type checker's limit.
 private struct PhoneFolderCover: ViewModifier {
     @Environment(RemoteModel.self) private var model
 
     func body(content: Content) -> some View {
-        content.fullScreenCover(item: Binding(get: { model.phoneFolder.map(PhoneFolder.init) },
+        content.modifier(TakeOverCover()).fullScreenCover(item: Binding(get: { model.phoneFolder.map(PhoneFolder.init) },
                                               set: { model.phoneFolder = $0?.key })) { folder in
             RemoteFolderScene(key: folder.key, back: { model.phoneFolder = nil })
+                .modifier(TakeOverCover(overFolder: true))
                 .environment(model)
         }
     }

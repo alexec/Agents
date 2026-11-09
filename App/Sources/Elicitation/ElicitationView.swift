@@ -9,8 +9,8 @@ import SwiftUI
 /// none.
 struct ElicitationView: View {
     @Environment(AppModel.self) private var model
-    @Environment(SidebarFrame.self) private var frame
-    @Environment(\.windowHasInspector) private var hasInspector
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.inTakeOver) private var inTakeOver
     let request: ElicitationRequest
 
     @State private var values: [String: JSONValue] = [:]
@@ -34,9 +34,9 @@ struct ElicitationView: View {
                 }
                 if let handOff = request.handOff {
                     // A step on the page in the machine's browser (#3529): Open the page
-                    // shows it in the Agent Browser pane, beside this chat.
-                    HandOffCard(handOff: handOff, open: hasInspector ? openAgentBrowser : nil,
-                                elsewhere: "Open the page from the main window's Agent Browser (⌘9).",
+                    // takes it over in a window of its own (#4141); in that window, the page
+                    // is already open.
+                    HandOffCard(handOff: handOff, open: inTakeOver ? nil : openAgentBrowser, elsewhere: nil,
                                 host: model.answerRecipient(request.agentID), sending: sending != nil) { done, note in
                         send(done ? "done" : "cannot", .accept, content: ElicitationRequest.handOffAnswer(done: done, note: note))
                     }
@@ -99,10 +99,9 @@ struct ElicitationView: View {
         .onChange(of: request.id) { _, _ in step = 0 }
     }
 
-    /// The Agent Browser pane, beside this chat, at the agent's tab (#3528).
+    /// The agent browser, at the agent's tab, in a window of its own (#3528, #4141).
     private func openAgentBrowser() {
-        frame.pane = .agentBrowser
-        if !frame.isOpen { frame.open() }
+        openWindow(id: TakeOverKey.sceneID, value: TakeOverKey(agentID: request.agentID, source: .browser))
     }
 
     /// A form of several questions, one to a page.

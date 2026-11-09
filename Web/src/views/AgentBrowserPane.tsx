@@ -1,4 +1,4 @@
-// The Agent Browser tab (#3528, spike #3527; the window's AgentBrowserPane.swift): the browser on
+// The Agent Browser (#3528, spike #3527; the window's AgentBrowserPane.swift), in its take-over tab (#4141): the browser on
 // the session's machine, which agents drive, as a screencast from its host. The person sees each
 // page as the agent does and can click, scroll, type and paste in it. Frames come only while the
 // tab is on screen and the page is not hidden. The pane shows its own session's tab, and says when

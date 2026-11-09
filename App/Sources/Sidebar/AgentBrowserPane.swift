@@ -6,9 +6,10 @@ import SwiftUI
 ///
 /// Not the Browser pane, which is the person's own web view on this Mac. This one is a
 /// screencast of the machine's Chromium, where the agent works: the person sees each page
-/// as the agent does, and can scroll, click and type in it at any time. Frames come only
-/// while the pane is on screen. It shows this session's own tab (#3916), and says when
-/// another session's agent holds the browser.
+/// as the agent does, and can scroll, click and type in it at any time. It is drawn in a
+/// take-over window (`TakeOverWindow`, #4141), not the side column, and frames come while
+/// that window is open. It shows this session's own tab (#3916), and says when another
+/// session's agent holds the browser.
 struct AgentBrowserPane: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openWindow) private var openWindow

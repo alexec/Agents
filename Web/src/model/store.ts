@@ -271,7 +271,7 @@ export class Work {
    * never kept (FR-016).
    */
   readonly liveFrames = signal<Partial<Record<LiveSource, HeardLiveFrame>>>({});
-  /** Each host's browser as the Agent Browser tab shows it (#3528): its state, by host. */
+  /** Each host's browser as the Agent Browser shows it (#3528, #4141): its state, by host. */
   readonly browserStates = signal<Record<string, BrowserPageState>>({});
   /** The newest frame of the browser the tab watches (#3528). Replaced by the next, never kept. */
   readonly browserFrame = signal<{ host: string; frame: BrowserFrame } | null>(null);

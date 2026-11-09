@@ -3,6 +3,8 @@ import type { Store } from "./model/store";
 import type { Session } from "./session";
 import { Columns } from "./views/Columns";
 import { OtherControlPlane, Pairing, Suspended, Unsupported } from "./views/Pairing";
+import { TakeOverPage } from "./views/TakeOverPage";
+import { route } from "./route";
 
 export function App({ session, store }: { session: Session; store: Store }) {
   const state = session.state.value;
@@ -24,7 +26,14 @@ export function App({ session, store }: { session: Session; store: Store }) {
     case "wrongControlPlane":
       return <OtherControlPlane session={session} />;
     case "open":
-    case "down":
+    case "down": {
+      // A take-over tab (#4141): the agent browser or a simulator on the whole page, no columns.
+      const r = route.value;
+      if (r.takeOver && r.host && r.session) {
+        return <TakeOverPage key={`${r.host}|${r.session}|${r.takeOver}`} store={store} host={r.host} session={r.session}
+          source={r.takeOver} down={state.kind === "down"} />;
+      }
       return <Columns session={session} store={store} />;
+    }
   }
 }

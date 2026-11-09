@@ -9,8 +9,9 @@ struct HandOffCard: View {
     let handOff: ElicitationRequest.HandOff
     /// Opens the Agent Browser at the agent's tab; nil where this client cannot.
     let open: (@MainActor () -> Void)?
-    /// Said in place of Open the page, where `open` is nil.
-    let elsewhere: String
+    /// Said in place of Open the page, where `open` is nil; nil says nothing, as where the
+    /// page is open already (a take-over window, #4141).
+    let elsewhere: String?
     /// Who is told: "your Mac", or the agent's server.
     let host: String
     /// An answer is on the way: the card is held until the daemon takes it down.
@@ -33,7 +34,7 @@ struct HandOffCard: View {
                 Text(reason).appText(.reading)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            if open == nil {
+            if open == nil, let elsewhere {
                 Text(elsewhere).appText(.fine).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }

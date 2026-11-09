@@ -399,6 +399,36 @@ test("a folder's archive is in the address (#499)", async () => {
   }
 });
 
+test("a take-over tab is in the address, after its session (#4141)", async () => {
+  globalThis.location = { hash: "", pathname: "/", search: "" };
+  globalThis.addEventListener = () => {};
+  const opened = [];
+  globalThis.open = (url, target) => { opened.push([url, target]); return null; };
+  try {
+    const { openTakeOver, parseRoute, routeHash, takeOverURL } = await load("src/route.ts");
+    const hash = routeHash({ host: "mac", folder: "file:///w/a", session: "s", takeOver: "browser" });
+    assert.equal(hash, "#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/s/s/t/browser");
+    assert.deepEqual(parseRoute(hash), { host: "mac", folder: "file:///w/a", session: "s", takeOver: "browser" });
+    assert.deepEqual(parseRoute("#/h/mac/p/x/s/s/t/simulator").takeOver, "simulator");
+    assert.equal(parseRoute("#/h/mac/p/x/s/s/t/screen").takeOver, undefined, "only the browser or a simulator");
+    assert.equal(routeHash({ host: "mac", folder: "file:///w/a", session: "s", files: true, takeOver: "simulator" }),
+      "#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/s/s/t/simulator", "no files pane in it");
+    assert.equal(routeHash({ host: "mac", folder: "file:///w/a", takeOver: "browser" }), "#/h/mac/p/file%3A%2F%2F%2Fw%2Fa",
+      "none without a session");
+    assert.equal(takeOverURL("mac", "file:///w/a", "s", "simulator"), "/#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/s/s/t/simulator");
+    openTakeOver("mac", "file:///w/a", "s", "browser");
+    openTakeOver("mac", "file:///w/a", "s", "browser");
+    assert.deepEqual(opened, [
+      ["/#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/s/s/t/browser", "take-over-s-browser"],
+      ["/#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/s/s/t/browser", "take-over-s-browser"],
+    ], "Open again goes to the same tab");
+  } finally {
+    delete globalThis.location;
+    delete globalThis.addEventListener;
+    delete globalThis.open;
+  }
+});
+
 test("folds stored badly, or a storage that refuses, leave everything folded", async () => {
   const { Folds } = await load("src/model/folds.ts");
   const storage = new Memory();

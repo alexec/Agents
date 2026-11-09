@@ -137,19 +137,6 @@ struct SidebarView: View {
                 .opacity(frame.pane == .simulator ? 1 : 0)
                 .allowsHitTesting(frame.pane == .simulator)
             }
-            // The browser on the session's machine, which agents drive (#3528): frames come
-            // only while it is shown.
-            if shows(.agentBrowser, state) {
-                Group {
-                    if model.host(agent.host, has: Capability.browser1) {
-                        AgentBrowserPane(agent: agent, isVisible: frame.pane == .agentBrowser)
-                    } else {
-                        HostNeedsUpdateView()
-                    }
-                }
-                .opacity(frame.pane == .agentBrowser ? 1 : 0)
-                .allowsHitTesting(frame.pane == .agentBrowser)
-            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onChange(of: frame.pane, initial: true) { _, pane in state.opened.insert(pane) }

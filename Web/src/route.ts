@@ -1,6 +1,7 @@
 // Where the page is, in the URL's fragment (071 research R2): #/h/<host>/p/<folder>/s/<session>, or
 // /w/<workflow> for a workflow's page in the chat's place (#98), /ar/1 for the folder's archive (#499),
 // /rv/<kind:key> for a change waiting for an OK, on its Review page (#1472),
+// /s/<session>/t/<browser|simulator> for a tab that takes over the agent browser or a simulator (#4141),
 // The page is by section (#2141): #/ is the Overview, #/agents the sidebar with nothing chosen, and
 // #/<section>/<page> a page of another section (#/status/runtimes, #/reports/spend, #/settings/policy),
 // and #/<section>/<page>/<item> one item on it: #/work/pr/github%3Aalexec%2FAgents%2399 is PR #99 (#3119),
@@ -45,7 +46,12 @@ export interface Route {
   review?: string | undefined;
   /** This tab holds its folder alone (#1089): the sidebar is that folder's only. */
   alone?: boolean | undefined;
+  /** This tab takes over the session's agent browser or a simulator (#4141): Open on a live tile. */
+  takeOver?: TakeOver | undefined;
 }
+
+/** What a take-over tab shows (#4141). */
+export type TakeOver = "browser" | "simulator";
 
 /** The folder this tab holds alone (#1089), from the address it was opened at; undefined for every folder. */
 export interface AloneFolder { host: string; folder: string }
@@ -101,6 +107,7 @@ export function parseRoute(hash: string): Route {
       case "rv": route.review = value; break;
       case "o": route.alone = value === "1"; break;
       case "af": route.artifactFile = value; break;
+      case "t": if (value === "browser" || value === "simulator") route.takeOver = value; break;
     }
   }
   return route;
@@ -120,6 +127,10 @@ export function routeHash(route: Route, aloneIn: AloneFolder | undefined = alone
   else if (route.host && route.folder && route.workflow) parts.push("w", route.workflow);
   else if (route.host && route.folder && route.page) parts.push("pg", route.page);
   if (route.review) return "#/" + parts.map(encodeURIComponent).join("/");
+  if (route.host && route.folder && route.session && route.takeOver) {
+    parts.push("t", route.takeOver);
+    return "#/" + parts.map(encodeURIComponent).join("/");
+  }
   if (route.session && route.files) parts.push("f", "1");
   if (route.session && route.files && route.artifactFile) parts.push("af", route.artifactFile);
   if (route.host && route.folder && !route.session && !route.workflow && !route.page && route.compose) parts.push("n", "1");
@@ -176,6 +187,19 @@ globalThis.addEventListener?.("hashchange", () => {
 /** The address of a tab holding this folder alone (#1089): Open in New Tab on its heading. */
 export function aloneURL(host: string, folder: string): string {
   return location.pathname + location.search + routeHash({ host, folder: folder, compose: true, alone: true }, undefined);
+}
+
+/** The address of a tab that takes over the session's agent browser or a simulator (#4141). */
+export function takeOverURL(host: string, folder: string, session: string, source: TakeOver): string {
+  return location.pathname + location.search + routeHash({ host, folder, session, takeOver: source }, undefined);
+}
+
+/**
+ * Opens the take-over tab, or goes to it when it is open: one tab per session and source, by its
+ * window name, as the window keeps one window per session and source.
+ */
+export function openTakeOver(host: string, folder: string, session: string, source: TakeOver): void {
+  globalThis.open?.(takeOverURL(host, folder, session, source), `take-over-${session}-${source}`);
 }
 
 /** ‹ All: the tab shows every folder again, at the folder it held. */

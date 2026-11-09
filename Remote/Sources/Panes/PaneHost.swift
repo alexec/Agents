@@ -150,13 +150,6 @@ struct PaneView: View {
                     .id(agent.id)
             case .terminal:
                 TerminalPane(agent: agent)
-            case .browser:
-                // The browser on the session's machine (#3800); not on a host too old to have one.
-                if model.host(agent.host, has: Capability.browser1) {
-                    AgentBrowserPane(agent: agent)
-                } else {
-                    HostNeedsUpdateView()
-                }
             case .exchanged:
                 ArtifactsList()
             case .simulator:
