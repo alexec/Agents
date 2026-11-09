@@ -74,6 +74,10 @@ public extension DaemonAPI {
                 // Pause on touch's two answers (#3004, US3).
                 Row(Method.desktopControlResume, params: AgentRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.desktopControlTakeOver, params: AgentRequest.self, result: Empty.self, kind: .hostRequest),
+                // Settings ▸ Machines ▸ Sleep's two runtime pickers (#4066): the warm pool and how long a
+                // runtime with background processes is kept.
+                Row(Method.wakeSettings, params: Empty.self, result: WakeSettings.self, kind: .hostRequest),
+                Row(Method.wakeSet, params: WakeSettings.self, result: WakeSettings.self, kind: .hostRequest),
                 // The daily summary's Off / Summary control and its time (#3351), for Settings.
                 Row(Method.dailySummarySettings, params: Empty.self, result: DailySummarySettings.self, kind: .hostRequest),
                 Row(Method.dailySummarySetSettings, params: DailySummarySettings.self, result: DailySummarySettings.self,
