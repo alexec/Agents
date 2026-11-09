@@ -4668,7 +4668,7 @@ type ForgeDone struct {
 	Reran *int64 `json:"reran,omitzero"`
 }
 
-// A feature (#3267): name is its label's after feature:, with the label's colour where the forge gives one; epics counts its epics, open the open ones. issues counts its open issues that are not epics, of the newest 500 open issues (#3741); a feature with no open epic and no such issue is finished.
+// A feature (#3267): name is its label's after feature:, with the label's colour where the forge gives one; epics counts its epics, open the open ones. issues counts its open issues that are not epics, of the newest 500 open issues (#3741); a feature with no open epic and no such issue is finished. refs are the lineage refs of its open issues and open epics, waiting the ones labelled alex-todo, and updatedAt the newest update of any of them (#4115), so a client finds the sessions labelled #<n> for them and which wait for Alex.
 type ForgeFeature struct {
 	Name string `json:"name"`
 
@@ -4679,11 +4679,19 @@ type ForgeFeature struct {
 	Open int64 `json:"open"`
 
 	Issues *int64 `json:"issues,omitzero"`
+
+	Refs []string `json:"refs,omitzero"`
+
+	Waiting []string `json:"waiting,omitzero"`
+
+	UpdatedAt *Date `json:"updatedAt,omitzero"`
 }
 
-// forge/features (#3267): the feature:<name> labels of the epics (the issues labelled epic, open or closed, the newest 500), by name; errors says a forge that could not be read, as in ForgeList.
+// forge/features (#3267): the feature:<name> labels of the epics (the issues labelled epic, open or closed, the newest 500), by name; approvals are the lineage refs of the newest 100 open pull requests labelled needs-approval (#4115), so a client finds the sessions labelled P#<n> for them; errors says a forge that could not be read, as in ForgeList.
 type ForgeFeatures struct {
 	Features []ForgeFeature `json:"features"`
+
+	Approvals []string `json:"approvals,omitzero"`
 
 	Errors []ForgeListError `json:"errors,omitzero"`
 }

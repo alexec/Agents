@@ -9,11 +9,14 @@ import SwiftUI
 @Observable
 final class WorkFeaturesState {
     var features: [DaemonAPI.ForgeFeature]?
+    /// The open pull requests labelled needs-approval, of every machine (#4115).
+    var approvals: [String] = []
     var errors: [String] = []
     /// The features opened, by name in lower case.
     var opened: Set<String> = []
-    /// The Finished group opened (#3741); closed until a person opens it, unless every feature is in it.
-    var finishedOpen: Bool?
+    /// The groups a person opened or closed (#3741, #4115). Each is open until closed, except
+    /// Finished, which is closed until opened, unless every feature is in it.
+    var groupOpen: [WorkFeatures.Group: Bool] = [:]
     /// An opened feature's open issues, by name in lower case; absent while they are read.
     var items: [String: [DaemonAPI.ForgeItem]] = [:]
     var itemErrors: [String: [String]] = [:]
@@ -37,6 +40,7 @@ final class WorkFeaturesState {
         guard read != mine || features == nil else { return }
         read = mine
         features = nil
+        approvals = []
         errors = []
         items = [:]
         itemErrors = [:]
@@ -67,6 +71,7 @@ final class WorkFeaturesState {
             }
         }
         features = WorkFeatures.merge(got.map(\.list.features))
+        approvals = got.flatMap { $0.list.approvals ?? [] }
         for name in opened { await readItems(name, model: model) }
     }
 
@@ -116,8 +121,9 @@ final class WorkFeaturesState {
 
 /// Work ▸ Features (#3269, spec 3265), as the web page's `WorkFeatures`: a row per `feature:` label
 /// with its epic counts; opened, its open epics, each with its progress and lead, and its issues
-/// with no epic. A row opens the issue's page. The features with no open work are in a Finished
-/// group at the bottom, closed (#3741).
+/// with no epic. A row opens the issue's page. The features are in groups (#4115): Needs you, In
+/// flight (with its sessions) and Idle, and those with no open work in Finished at the bottom,
+/// closed (#3741).
 struct WorkFeaturesPane: View {
     let model: any WorkModel
     @Bindable var state: WorkFeaturesState
@@ -155,13 +161,15 @@ struct WorkFeaturesPane: View {
                 if features.isEmpty {
                     Text(WorkFeatures.noFeatures).foregroundStyle(.secondary)
                 }
-                let groups = WorkFeatures.groups(features)
-                ForEach(groups.active, id: \.name) { feature($0) }
-                if !groups.finished.isEmpty {
-                    let isOpen = state.finishedOpen ?? groups.active.isEmpty
-                    finishedRow(count: groups.finished.count, isOpen: isOpen)
+                let agents = model.workAgents
+                let groups = WorkFeatures.groups(features, agents: agents, approvals: state.approvals)
+                ForEach(groups, id: \.group) { entry in
+                    let isOpen = state.groupOpen[entry.group] ?? (entry.group != .finished || groups.count == 1)
+                    groupRow(entry.group, count: entry.features.count, isOpen: isOpen)
                     if isOpen {
-                        ForEach(groups.finished, id: \.name) { feature($0) }
+                        ForEach(entry.features, id: \.name) { f in
+                            feature(f, sessions: entry.group == .inFlight ? WorkFeatures.sessions(of: f, in: agents).count : nil)
+                        }
                     }
                 }
             }
@@ -172,36 +180,36 @@ struct WorkFeaturesPane: View {
     }
 
     @ViewBuilder
-    private func feature(_ feature: DaemonAPI.ForgeFeature) -> some View {
-        featureRow(feature)
+    private func feature(_ feature: DaemonAPI.ForgeFeature, sessions: Int?) -> some View {
+        featureRow(feature, sessions: sessions)
         if state.opened.contains(feature.name.lowercased()) {
             opened(feature)
         }
     }
 
-    /// The Finished group's head (#3741): the features with no open epic and no open issue.
-    private func finishedRow(count: Int, isOpen: Bool) -> some View {
+    /// A group's head (#3741, #4115): Needs you, In flight, Idle, or Finished with its count.
+    private func groupRow(_ group: WorkFeatures.Group, count: Int, isOpen: Bool) -> some View {
         Button {
-            state.finishedOpen = !isOpen
+            state.groupOpen[group] = !isOpen
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "chevron.right")
                     .rotationEffect(.degrees(isOpen ? 90 : 0))
                     .frame(width: 12)
-                Text(WorkFeatures.finishedWords(count)).fontWeight(.semibold)
+                Text(group.words(count)).fontWeight(.semibold)
                 Spacer(minLength: 0)
             }
-            .foregroundStyle(.secondary)
+            .foregroundStyle((group == .needsYou ? StateTint.attention : .none).style(or: .secondary))
             .padding(.top, 8).padding(.vertical, 3)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(WorkFeatures.finishedWords(count))
+        .accessibilityLabel(group.words(count))
         .accessibilityValue(isOpen ? "open" : "closed")
-        .help(isOpen ? "Fold the finished features" : "Show the features with no open epic or issue")
+        .help(isOpen ? "Fold \(group.words(count))" : "Show \(group.words(count))")
     }
 
-    private func featureRow(_ feature: DaemonAPI.ForgeFeature) -> some View {
+    private func featureRow(_ feature: DaemonAPI.ForgeFeature, sessions: Int?) -> some View {
         let isOpen = state.opened.contains(feature.name.lowercased())
         return Button {
             Task { await state.toggle(feature.name, model: model) }
@@ -216,13 +224,17 @@ struct WorkFeaturesPane: View {
                 }
                 Text(WorkFeatures.title(feature.name)).fontWeight(.semibold)
                 Spacer(minLength: 8)
+                if let sessions {
+                    Text(WorkFeatures.sessionWords(sessions)).monospacedDigit().foregroundStyle(.secondary)
+                }
                 Text(WorkFeatures.countWords(feature)).monospacedDigit().foregroundStyle(.secondary)
             }
             .padding(.vertical, 3)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(WorkFeatures.title(feature.name)), \(WorkFeatures.countWords(feature))")
+        .accessibilityLabel([WorkFeatures.title(feature.name), sessions.map(WorkFeatures.sessionWords), WorkFeatures.countWords(feature)]
+            .compactMap(\.self).joined(separator: ", "))
         .accessibilityValue(isOpen ? "open" : "closed")
         .help(isOpen ? "Fold \(feature.name)" : "Show \(feature.name)'s open epics and issues")
     }

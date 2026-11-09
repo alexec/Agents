@@ -114,10 +114,13 @@ func TestABoardNarrowsWorkToItsForge(t *testing.T) {
 	gh.mu.Lock()
 	gh.epics = nil
 	gh.mu.Unlock()
+	before, _ = gh.asked()
 	c.call(t, 9, "forge/features", wire.ForgeFeaturesRequest{Board: &webBoard.URL})
 	searches, _ = gh.asked()
-	if last := searches[len(searches)-1]; !strings.Contains(last, `label:"epic"`) || !strings.Contains(last, "project:acme/7") {
-		t.Fatalf("features search %q", last)
+	searches = searches[len(before):]
+	epics := slices.IndexFunc(searches, func(s string) bool { return strings.Contains(s, `label:"epic"`) })
+	if epics < 0 || !strings.Contains(searches[epics], "project:acme/7") {
+		t.Fatalf("features searches %q", searches)
 	}
 }
 

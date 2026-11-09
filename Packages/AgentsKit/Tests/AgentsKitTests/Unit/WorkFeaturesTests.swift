@@ -36,7 +36,7 @@ struct WorkFeaturesTests {
         #expect(WorkFeatures.countWords(.init(name: "work", epics: 2, open: 1, issues: 4)) == "2 epics · 1 open · 4 open issues")
     }
 
-    @Test func aFeatureWithNoOpenWorkIsFinished() {
+    @Test func aFeatureWithNoOpenWorkIsFinished() throws {
         let features: [DaemonAPI.ForgeFeature] = [
             .init(name: "browser", epics: 1, open: 0, issues: 0),
             .init(name: "lineage", epics: 2, open: 1, issues: 0),
@@ -44,9 +44,42 @@ struct WorkFeaturesTests {
             .init(name: "work", epics: 3, open: 0, issues: 2),
         ]
         let groups = WorkFeatures.groups(features)
-        #expect(groups.active.map(\.name) == ["lineage", "old", "work"])
-        #expect(groups.finished.map(\.name) == ["browser"])
+        try #require(groups.map(\.group) == [.idle, .finished])
+        #expect(groups[0].features.map(\.name) == ["lineage", "old", "work"])
+        #expect(groups[1].features.map(\.name) == ["browser"])
         #expect(WorkFeatures.finishedWords(7) == "Finished (7)")
+        #expect(WorkFeatures.Group.finished.words(7) == "Finished (7)")
+    }
+
+    /// #4115: each feature in the first group it matches, from the sessions labelled with its work.
+    @Test func featuresAreInNeedsYouInFlightIdleAndFinished() throws {
+        func feature(_ name: String, _ refs: [Int], waiting: [Int] = [], at: TimeInterval = 0, issues: Int = 1) -> DaemonAPI.ForgeFeature {
+            .init(name: name, epics: 1, open: 1, issues: issues, refs: refs.map { "github:alexec/Agents#\($0)" },
+                  waiting: waiting.map { "github:alexec/Agents#\($0)" }, updatedAt: day.addingTimeInterval(at))
+        }
+        let features = [
+            feature("asked", [10]), feature("approval", [20]), feature("todo", [30], waiting: [30]),
+            feature("busy", [40, 41]), feature("new", [50], at: 100), feature("old", [60], at: -100),
+            feature("stale", [70]), .init(name: "done", epics: 1, open: 0, issues: 0),
+        ]
+        let agents = [
+            agent(["#10"], state: .waitingOnUser), agent(["#20", "P#200"], state: .stopped),
+            agent(["#40"], state: .running), agent(["#41", "lead"], state: .finished), agent(["#40"], state: .archived),
+            agent(["#70"], state: .archived), agent(["#5"], state: .running),
+        ]
+        let groups = WorkFeatures.groups(features, agents: agents, approvals: ["github:alexec/Agents#200"])
+        try #require(groups.map(\.group) == [.needsYou, .inFlight, .idle, .finished])
+        #expect(groups[0].features.map(\.name) == ["asked", "approval", "todo"])
+        #expect(groups[1].features.map(\.name) == ["busy"])
+        #expect(groups[2].features.map(\.name) == ["old", "stale", "new"])
+        #expect(groups[3].features.map(\.name) == ["done"])
+        try #require(features.count == 8)
+        #expect(WorkFeatures.sessions(of: features[3], in: agents).count == 2)
+        #expect(WorkFeatures.sessionWords(1) == "1 session")
+        #expect(WorkFeatures.sessionWords(3) == "3 sessions")
+        // Without the approval, a stopped session that waits for it is still in flight.
+        #expect(WorkFeatures.groups([features[1]], agents: agents).map(\.group) == [.inFlight])
+        #expect(WorkFeatures.Group.allCases.map { $0.words(2) } == ["Needs you", "In flight", "Idle", "Finished (2)"])
     }
 
     @Test func severalMachinesFeaturesAddUpByName() throws {
@@ -61,6 +94,12 @@ struct WorkFeaturesTests {
         let counted = WorkFeatures.merge([[.init(name: "work", epics: 1, open: 0, issues: 1)], [.init(name: "work", epics: 1, open: 0, issues: 2)],
                                           [.init(name: "docs", epics: 1, open: 0, issues: 0)], [.init(name: "docs", epics: 1, open: 0)]])
         #expect(counted.map(\.issues) == [nil, 3])
+        let refs = WorkFeatures.merge([[.init(name: "work", epics: 1, open: 1, refs: ["a#1", "a#2"], waiting: ["a#2"], updatedAt: day)],
+                                       [.init(name: "work", epics: 1, open: 1, refs: ["a#2", "b#3"], updatedAt: day.addingTimeInterval(9))]])
+        try #require(refs.count == 1)
+        #expect(refs[0].refs == ["a#1", "a#2", "b#3"])
+        #expect(refs[0].waiting == ["a#2"])
+        #expect(refs[0].updatedAt == day.addingTimeInterval(9))
     }
 
     @Test func anOpenedFeatureShowsItsEpicsAndItsLooseIssues() throws {

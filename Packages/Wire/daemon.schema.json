@@ -10147,7 +10147,7 @@
     },
     "ForgeFeature": {
       "type": "object",
-      "description": "A feature (#3267): name is its label's after feature:, with the label's colour where the forge gives one; epics counts its epics, open the open ones. issues counts its open issues that are not epics, of the newest 500 open issues (#3741); a feature with no open epic and no such issue is finished.",
+      "description": "A feature (#3267): name is its label's after feature:, with the label's colour where the forge gives one; epics counts its epics, open the open ones. issues counts its open issues that are not epics, of the newest 500 open issues (#3741); a feature with no open epic and no such issue is finished. refs are the lineage refs of its open issues and open epics, waiting the ones labelled alex-todo, and updatedAt the newest update of any of them (#4115), so a client finds the sessions labelled #<n> for them and which wait for Alex.",
       "properties": {
         "name": {
           "type": "string"
@@ -10163,6 +10163,21 @@
         },
         "issues": {
           "type": "integer"
+        },
+        "refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "waiting": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "updatedAt": {
+          "$ref": "#/definitions/WireDate"
         }
       },
       "required": [
@@ -10174,12 +10189,18 @@
     },
     "ForgeFeatures": {
       "type": "object",
-      "description": "forge/features (#3267): the feature:<name> labels of the epics (the issues labelled epic, open or closed, the newest 500), by name; errors says a forge that could not be read, as in ForgeList.",
+      "description": "forge/features (#3267): the feature:<name> labels of the epics (the issues labelled epic, open or closed, the newest 500), by name; approvals are the lineage refs of the newest 100 open pull requests labelled needs-approval (#4115), so a client finds the sessions labelled P#<n> for them; errors says a forge that could not be read, as in ForgeList.",
       "properties": {
         "features": {
           "type": "array",
           "items": {
             "$ref": "#/definitions/ForgeFeature"
+          }
+        },
+        "approvals": {
+          "type": "array",
+          "items": {
+            "type": "string"
           }
         },
         "errors": {

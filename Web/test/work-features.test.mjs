@@ -30,9 +30,38 @@ test("a feature with no open work is finished", () => {
     { name: "old", epics: 1, open: 0 },
     { name: "work", epics: 3, open: 0, issues: 2 },
   ]);
-  assert.deepEqual(groups.active.map((x) => x.name), ["lineage", "old", "work"]);
-  assert.deepEqual(groups.finished.map((x) => x.name), ["browser"]);
+  assert.deepEqual(groups.map((g) => g.group), ["idle", "finished"]);
+  assert.deepEqual(groups[0].features.map((x) => x.name), ["lineage", "old", "work"]);
+  assert.deepEqual(groups[1].features.map((x) => x.name), ["browser"]);
   assert.equal(f.finishedWords(7), "Finished (7)");
+  assert.equal(f.groupWords("finished", 7), "Finished (7)");
+});
+
+// #4115: each feature in the first group it matches, from the sessions labelled with its work.
+test("features are in Needs you, In flight, Idle and Finished", () => {
+  const feature = (name, refs, { waiting = [], at = 0 } = {}) => ({
+    name, epics: 1, open: 1, issues: 1, refs: refs.map((n) => node(n).ref), waiting: waiting.map((n) => node(n).ref), updatedAt: at,
+  });
+  const features = [
+    feature("asked", [10]), feature("approval", [20]), feature("todo", [30], { waiting: [30] }),
+    feature("busy", [40, 41]), feature("new", [50], { at: 100 }), feature("old", [60], { at: -100 }),
+    feature("stale", [70]), { name: "done", epics: 1, open: 0, issues: 0 },
+  ];
+  const agents = [
+    agent("a", ["#10"], "waitingOnUser"), agent("b", ["#20", "P#200"], "stopped"),
+    agent("c", ["#40"], "running"), agent("d", ["#41", "lead"], "finished"), agent("e", ["#40"], "archived"),
+    agent("f", ["#70"], "archived"), agent("g", ["#5"], "running"),
+  ];
+  const groups = f.featureGroups(features, agents, [node(200).ref]);
+  assert.deepEqual(groups.map((g) => g.group), ["needsYou", "inFlight", "idle", "finished"]);
+  assert.deepEqual(groups.map((g) => g.features.map((x) => x.name)),
+    [["asked", "approval", "todo"], ["busy"], ["old", "stale", "new"], ["done"]]);
+  assert.equal(f.featureSessions(features[3], agents).length, 2);
+  assert.equal(f.sessionWords(1), "1 session");
+  assert.equal(f.sessionWords(3), "3 sessions");
+  // Without the approval, a stopped session that waits for it is still in flight.
+  assert.deepEqual(f.featureGroups([features[1]], agents).map((g) => g.group), ["inFlight"]);
+  assert.deepEqual(f.featureGroupOrder.map((g) => f.groupWords(g, 2)), ["Needs you", "In flight", "Idle", "Finished (2)"]);
 });
 
 test("several machines' features add up by name", () => {
@@ -45,6 +74,9 @@ test("several machines' features add up by name", () => {
   const counted = f.mergeFeatures([[{ name: "work", epics: 1, open: 0, issues: 1 }], [{ name: "work", epics: 1, open: 0, issues: 2 }],
     [{ name: "docs", epics: 1, open: 0, issues: 0 }], [{ name: "docs", epics: 1, open: 0 }]]);
   assert.deepEqual(counted.map((x) => x.issues), [undefined, 3]);
+  const refs = f.mergeFeatures([[{ name: "work", epics: 1, open: 1, refs: ["a#1", "a#2"], waiting: ["a#2"], updatedAt: 0 }],
+    [{ name: "work", epics: 1, open: 1, refs: ["a#2", "b#3"], updatedAt: 9 }]]);
+  assert.deepEqual([refs[0].refs, refs[0].waiting, refs[0].updatedAt], [["a#1", "a#2", "b#3"], ["a#2"], 9]);
 });
 
 test("an opened feature shows its epics and its loose issues", () => {

@@ -365,19 +365,27 @@ func (d *Daemon) jiraPlan(ctx context.Context, method, key string) (wire.ForgeIt
 // forgeFeatures are the features on the epics of r.folder, or of every folder: the newest epics,
 // open and closed (a closed epic keeps its labels), each counted under its feature:<name> label.
 // issues counts each feature's open issues that are not epics (#3741), from the newest open issues,
-// so a feature whose epics are closed but that has loose open work is not finished.
+// so a feature whose epics are closed but that has loose open work is not finished. refs, waiting
+// and updatedAt are its open issues and epics, and approvals the pull requests that wait for Alex
+// (#4115), so a client matches them with its sessions' labels.
 func (d *Daemon) forgeFeatures(ctx context.Context, r wire.ForgeFeaturesRequest) (wire.ForgeFeatures, error) {
 	out := wire.ForgeFeatures{Features: []wire.ForgeFeature{}}
 	by := map[string]*wire.ForgeFeature{}
 	loose := map[string]int64{}
+	open := map[string]*featureWork{}
 	// Bitbucket's issues have no epics (#3880): its feature:<name> components are features with
 	// open issues only.
 	bitbucket := map[string]string{}
 	err := d.featurePages(ctx, r, &out, wire.ForgeListRequest{State: new("open")}, func(i wire.ForgeItem) {
-		if i.Feature != nil && deref(i.Level) != "epic" {
-			loose[strings.ToLower(*i.Feature)]++
-			if _, _, ok := bitbucketOfNode(i.Node); ok && bitbucket[strings.ToLower(*i.Feature)] == "" {
-				bitbucket[strings.ToLower(*i.Feature)] = *i.Feature
+		if i.Feature == nil {
+			return
+		}
+		key := strings.ToLower(*i.Feature)
+		openWork(open, key).add(i)
+		if deref(i.Level) != "epic" {
+			loose[key]++
+			if _, _, ok := bitbucketOfNode(i.Node); ok && bitbucket[key] == "" {
+				bitbucket[key] = *i.Feature
 			}
 		}
 	})
@@ -403,6 +411,7 @@ func (d *Daemon) forgeFeatures(ctx context.Context, r wire.ForgeFeaturesRequest)
 		f.Epics++
 		if i.State == "open" {
 			f.Open++
+			openWork(open, strings.ToLower(*i.Feature)).add(i)
 		}
 	})
 	if err != nil {
@@ -413,11 +422,49 @@ func (d *Daemon) forgeFeatures(ctx context.Context, r wire.ForgeFeaturesRequest)
 			by[key] = &wire.ForgeFeature{Name: name, Issues: new(loose[key])}
 		}
 	}
-	for _, f := range by {
+	for key, f := range by {
+		if w := open[key]; w != nil {
+			f.Refs, f.Waiting, f.UpdatedAt = w.refs, w.waiting, new(w.at)
+		}
 		out.Features = append(out.Features, *f)
 	}
 	slices.SortFunc(out.Features, func(a, b wire.ForgeFeature) int {
 		return cmp.Or(cmp.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)), cmp.Compare(a.Name, b.Name))
 	})
+	// The pull requests that wait for Alex's approval (#3474). A forge with no pull requests, or
+	// none labelled so, has none: this read adds no error of its own to the features.
+	if prs, err := d.forgeList(ctx, true, wire.ForgeListRequest{Folder: r.Folder, State: new("open"), Label: new("needs-approval"),
+		Limit: new(int64(forgeListMost))}); err == nil {
+		for _, p := range prs.Items {
+			out.Approvals = append(out.Approvals, p.Node.Ref)
+		}
+	}
 	return out, nil
+}
+
+// featureWork is a feature's open issues and epics (#4115): each ref once, those labelled
+// alex-todo, and the newest update.
+type featureWork struct {
+	refs, waiting []string
+	seen          map[string]bool
+	at            wire.Date
+}
+
+func openWork(by map[string]*featureWork, key string) *featureWork {
+	if by[key] == nil {
+		by[key] = &featureWork{seen: map[string]bool{}}
+	}
+	return by[key]
+}
+
+func (w *featureWork) add(i wire.ForgeItem) {
+	if w.seen[i.Node.Ref] {
+		return
+	}
+	w.seen[i.Node.Ref] = true
+	w.refs = append(w.refs, i.Node.Ref)
+	if slices.ContainsFunc(i.Labels, func(l wire.ForgeLabel) bool { return strings.EqualFold(l.Name, "alex-todo") }) {
+		w.waiting = append(w.waiting, i.Node.Ref)
+	}
+	w.at = max(w.at, i.UpdatedAt)
 }
