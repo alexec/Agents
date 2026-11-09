@@ -22,7 +22,8 @@ import { askerFor } from "../model/asker";
 import { planOf } from "../model/plan";
 import { Markdown } from "../render/markdown";
 import { inputType, momentFromInput, momentToInput, placeholder } from "../model/formInputs";
-import { getIt, keeping, secretField } from "../model/secretAsk";
+import { descriptionField, getIt, keeping, secretField } from "../model/secretAsk";
+import { descriptionHint, descriptionLabel, descriptionPrompt } from "../model/userScope";
 import { handOffAnswer } from "../model/handOff";
 import { setPane } from "./files/paneState";
 import { replace, route } from "../route";
@@ -380,11 +381,12 @@ function ElicitationCard({ request, asker, hold, answer, active, openBrowser }: 
     const reason = "form" in request.mode ? request.mode.form._0.properties[0]?.title : undefined;
     body = <SecretField secret={request.secret} reason={reason} recipient={hold.recipient} inert={inert}
       save={button("save", "prominent")} decline={decline}
-      send={(typed, sessionOnly, ask) => (typed === null ? go("decline", "decline")
+      send={(typed, sessionOnly, ask, description) => (typed === null ? go("decline", "decline")
         : go("save", "accept", {
           [secretField]: typed,
           ...(sessionOnly ? { [sessionOnlyField]: true } : {}),
           ...(ask === null ? {} : { [needsApprovalField]: ask }),
+          [descriptionField]: description,
         }))} />;
   } else if ("url" in request.mode) {
     const url = request.mode.url._0;
@@ -533,9 +535,11 @@ function HandOffField({ handOff, inert, open, done, cannot, send }: {
 function SecretField({ secret, reason, recipient, inert, save, decline, send }: {
   secret: ElicitationSecret; reason: string | undefined; recipient: string; inert: boolean;
   save: AnswerButton; decline: AnswerButton;
-  send: (typed: string | null, sessionOnly: boolean, askBeforeUse: boolean | null) => void;
+  send: (typed: string | null, sessionOnly: boolean, askBeforeUse: boolean | null, description: string) => void;
 }) {
   const text = useSignal("");
+  // The agent's description (#4167), for the person to change.
+  const description = useSignal(secret.description ?? "");
   const sessionOnly = useSignal(false);
   const askBeforeUse = useSignal(true);
   const forSession = sessionOnly.value && secret.canBeSessionOnly === true;
@@ -555,10 +559,15 @@ function SecretField({ secret, reason, recipient, inert, save, decline, send }: 
           onKeyDown={(e) => {
             if (e.key === "Enter" && typed) {
               e.preventDefault();
-              send(typed, forSession, ask);
+              send(typed, forSession, ask, description.value.trim());
             }
           }} />
         <span class="quiet small">{forSession ? keepingForSession(recipient) : keeping(secret, recipient)}</span>
+      </label>
+      <label class="field">
+        <textarea aria-label={descriptionLabel} placeholder={descriptionPrompt} rows={2} disabled={inert} value={description.value}
+          onInput={(e) => (description.value = (e.currentTarget as HTMLTextAreaElement).value)} />
+        <span class="quiet small">{descriptionHint}</span>
       </label>
       {secret.canBeSessionOnly && (
         <label class="field check">
@@ -579,9 +588,9 @@ function SecretField({ secret, reason, recipient, inert, save, decline, send }: 
       )}
       <div class="form-row">
         <span class="spacer" />
-        <button class={decline.class} aria-disabled={decline.disabled} onClick={() => send(null, false, null)}>No thanks{decline.telling}</button>
+        <button class={decline.class} aria-disabled={decline.disabled} onClick={() => send(null, false, null, "")}>No thanks{decline.telling}</button>
         <button class={save.class} disabled={!typed} aria-disabled={save.disabled} data-default=""
-          onClick={() => send(typed, forSession, ask)}>Save securely{save.telling}</button>
+          onClick={() => send(typed, forSession, ask, description.value.trim())}>Save securely{save.telling}</button>
       </div>
     </>
   );

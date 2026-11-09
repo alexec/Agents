@@ -13,6 +13,18 @@ struct UserScopeWordsTests {
             == "Sam's box was removed with this secret on it: A. Change it where it was issued.")
     }
 
+    /// #4167: a secret's description under its name, the same as `about` in userScope.ts; an
+    /// empty field sends none.
+    @Test func aSecretsRowSaysWhatItIsFor() {
+        #expect(UserScopeWords.about(nil) == "No description")
+        #expect(UserScopeWords.about("  ") == "No description")
+        #expect(UserScopeWords.about(" A token for alexec/Agents. ") == "A token for alexec/Agents.")
+        #expect(UserScopeWords.description(" \n ") == nil)
+        #expect(UserScopeWords.description(" The shop. ") == "The shop.")
+        let answer = ElicitationRequest.secretAnswer("v", sessionOnly: false, description: "The shop.")
+        #expect(answer[ElicitationRequest.descriptionField] == .string("The shop."))
+    }
+
     /// #3531: a card is one JSON value of its parts, the same as `cardValue` in userScope.ts,
     /// which agentsd's fill_secret reads a part at a time.
     @Test func aCardIsOneValueOfItsParts() {

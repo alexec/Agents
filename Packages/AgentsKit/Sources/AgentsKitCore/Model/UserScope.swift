@@ -150,13 +150,17 @@ public extension DaemonAPI {
         public var kind: String?
         /// Ask before use (#4014): every envelope's associated data ends `|ask`. nil is off.
         public var needsApproval: Bool?
+        /// What it is for (#4167): not secret, and not sealed. nil has none.
+        public var description: String?
 
-        public init(name: String, version: Int, values: [String: Envelope], kind: String? = nil, needsApproval: Bool? = nil) {
+        public init(name: String, version: Int, values: [String: Envelope], kind: String? = nil, needsApproval: Bool? = nil,
+                    description: String? = nil) {
             self.name = name
             self.version = version
             self.values = values
             self.kind = kind
             self.needsApproval = needsApproval
+            self.description = description
         }
     }
 
@@ -187,6 +191,8 @@ public extension DaemonAPI {
         public var kind: String? = nil
         /// Ask before use (#4014), as the person's client last sealed it.
         public var needsApproval: Bool? = nil
+        /// What it is for (#4167), in clear beside the name.
+        public var description: String? = nil
 
         public var id: String { name }
         public var isCard: Bool { kind == CardSecret.kind }
@@ -314,6 +320,24 @@ public enum UserScopeWords {
     }
 
     public static let nameHint = "Capital letters, digits and _, such as GITHUB_TOKEN."
+
+    // A secret's description (#4167): not secret, and kept beside the name.
+    public static let descriptionLabel = "Description"
+    public static let descriptionPrompt = "What it is for: which account, which scopes, whose"
+    public static let descriptionHint = "Agents read the description to choose the right secret. It is not sealed: never put a value in it."
+    public static let noDescription = "No description"
+
+    /// The description under a secret's name, or No description.
+    public static func about(_ description: String?) -> String {
+        let text = (description ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? noDescription : text
+    }
+
+    /// What a sheet sends for its description field: nil when it is empty.
+    public static func description(_ typed: String) -> String? {
+        let text = typed.trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? nil : text
+    }
 
     // Card secrets (#3531).
     public static let addCard = "Add a Card…"

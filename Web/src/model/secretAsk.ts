@@ -6,6 +6,8 @@ import type { ElicitationSecret } from "../protocol/generated";
 
 /** The one field of a secret's form, as the host names it. */
 export const secretField = "value";
+/** The answer's description (#4167), as the person left it on the card: the host keeps it with the secret. */
+export const descriptionField = "description";
 
 /** Under the field: where it goes, and that the agent never sees it. */
 export function keeping(secret: ElicitationSecret, recipient: string): string {

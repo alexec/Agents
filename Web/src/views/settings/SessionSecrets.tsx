@@ -6,12 +6,13 @@ import { useEffect } from "preact/hooks";
 import type { SessionSecret, SessionSecrets, UUID } from "../../protocol/generated";
 import type { Store } from "../../model/store";
 import { describe } from "../../model/errors";
-import { isSecretName } from "../../model/userScope";
+import { about, describedAs, isSecretName } from "../../model/userScope";
 import { removeQuestion, sessionSecretWords, sessionsForSecrets } from "../../model/sessionSecrets";
 import { askBeforeUseHint, askBeforeUseWords } from "../../model/askBeforeUse";
 import { Capability } from "../../protocol/capabilities.generated";
 import { AskBeforeUseCheck } from "../AskBeforeUse";
 import { Modal } from "../Modal";
+import { SecretDescriptionField } from "../SecretDescription";
 import { useSettingsMachine } from "./SettingsMachine";
 
 const lists = signal<Record<string, SessionSecrets | null>>({});
@@ -56,7 +57,7 @@ export function SessionSecretsSection({ store, down }: { store: Store; down: boo
       {!list ? <p class="hint">Loading…</p> : list.secrets.length === 0 ? <p class="hint">{sessionSecretWords.none}</p> : null}
       {list?.secrets.map((s) => (
         <div class="setting" key={`${s.agentID}/${s.name}`}>
-          <span><code>{s.name}</code> <span class="faint small">{s.title}</span></span>
+          <span><code>{s.name}</code> <span class="faint small">{s.title}</span><br /><span class="faint small">{about(s.description)}</span></span>
           {offersAsk && (
             <label title={askBeforeUseHint(s.needsApproval === true)}>
               <input type="checkbox" checked={s.needsApproval === true} disabled={down}
@@ -94,6 +95,7 @@ function SessionSecretSheet({ store, host, offersAsk, close, saved }: {
   const value = useSignal("");
   // A new secret starts on (#4016, #4162).
   const ask = useSignal(true);
+  const description = useSignal("");
   const problem = useSignal<string | null>(null);
   const busy = useSignal(false);
   const chosen = name.value.trim();
@@ -102,7 +104,7 @@ function SessionSecretSheet({ store, host, offersAsk, close, saved }: {
     busy.value = true;
     try {
       saved(await store.link.call("secrets/sessionSet", { agentID: session.value, name: chosen, value: value.value,
-        ...(offersAsk && ask.value ? { needsApproval: true } : {}) }, host));
+        ...(offersAsk && ask.value ? { needsApproval: true } : {}), ...describedAs(description.value) }, host));
       value.value = "";
       close();
     } catch (error) {
@@ -126,6 +128,7 @@ function SessionSecretSheet({ store, host, offersAsk, close, saved }: {
           value={name.value} onInput={(e) => (name.value = (e.currentTarget as HTMLInputElement).value.toUpperCase())} />
         <input type="password" aria-label="Value" placeholder="Value" autocomplete="off" value={value.value}
           onInput={(e) => (value.value = (e.currentTarget as HTMLInputElement).value)} />
+        <SecretDescriptionField text={description} />
         {offersAsk && <AskBeforeUseCheck on={ask} />}
         <p class={problem.value ? "sheet-note failure" : "sheet-note"} role={problem.value ? "alert" : undefined}>
           {problem.value ?? sessionSecretWords.footer}

@@ -15,6 +15,14 @@ test("user scope: a secret's row says where it is, and a removed machine it was 
     "Sam's box was removed with these secrets on it: A, B. Change them where they were issued.");
 });
 
+test("user scope: a secret's row says what it is for, and an empty field sends none (#4167)", () => {
+  assert.equal(u.about(undefined), "No description");
+  assert.equal(u.about("  "), "No description");
+  assert.equal(u.about(" A token for alexec/Agents. "), "A token for alexec/Agents.");
+  assert.deepEqual(u.describedAs("  "), {});
+  assert.deepEqual(u.describedAs(" The shop. "), { description: "The shop." });
+});
+
 test("user scope: a secret's name is an environment variable's", () => {
   assert.equal(u.isSecretName("GITHUB_TOKEN"), true);
   assert.equal(u.isSecretName("github_token"), false);

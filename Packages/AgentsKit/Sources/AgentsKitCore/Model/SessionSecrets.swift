@@ -11,16 +11,19 @@ public struct SessionSecret: Codable, Sendable, Hashable, Identifiable {
     public var setAt: Date
     /// Ask before use (#4014): sealed in the session's file, never there as plain text.
     public var needsApproval: Bool?
+    /// What it is for (#4167).
+    public var description: String?
 
     public var id: String { "\(agentID.uuidString)/\(name)" }
     public var asksBeforeUse: Bool { needsApproval == true }
 
-    public init(agentID: UUID, title: String, name: String, setAt: Date, needsApproval: Bool? = nil) {
+    public init(agentID: UUID, title: String, name: String, setAt: Date, needsApproval: Bool? = nil, description: String? = nil) {
         self.agentID = agentID
         self.title = title
         self.name = name
         self.setAt = setAt
         self.needsApproval = needsApproval
+        self.description = description
     }
 }
 
@@ -39,12 +42,15 @@ public struct SessionSecretSetRequest: Codable, Sendable, Hashable {
     public var value: String
     /// Ask before use (#4014); nil is off.
     public var needsApproval: Bool?
+    /// What it is for (#4167); nil has none.
+    public var description: String?
 
-    public init(agentID: UUID, name: String, value: String, needsApproval: Bool? = nil) {
+    public init(agentID: UUID, name: String, value: String, needsApproval: Bool? = nil, description: String? = nil) {
         self.agentID = agentID
         self.name = name
         self.value = value
         self.needsApproval = needsApproval
+        self.description = description
     }
 }
 

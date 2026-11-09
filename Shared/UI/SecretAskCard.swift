@@ -19,6 +19,8 @@ struct SecretAskCard: View {
     @State private var text = ""
     @State private var sessionOnly = false
     @State private var askBeforeUse = true
+    /// The description (#4167): the agent's, for the person to change.
+    @State private var about: String
 
     /// What Save sends: the value, whether for this session only, and Ask before use (nil for a
     /// host that has no such flag).
@@ -26,10 +28,21 @@ struct SecretAskCard: View {
         var typed: String
         var sessionOnly: Bool
         var askBeforeUse: Bool?
+        /// As the person left it; "" takes the agent's out.
+        var description: String = ""
 
         var content: [String: JSONValue] {
-            ElicitationRequest.secretAnswer(typed, sessionOnly: sessionOnly, askBeforeUse: askBeforeUse)
+            ElicitationRequest.secretAnswer(typed, sessionOnly: sessionOnly, askBeforeUse: askBeforeUse, description: description)
         }
+    }
+
+    init(secret: ElicitationRequest.Secret, reason: String?, host: String, sending: Bool, send: @escaping @MainActor (Answer?) -> Void) {
+        self.secret = secret
+        self.reason = reason
+        self.host = host
+        self.sending = sending
+        self.send = send
+        _about = State(initialValue: secret.description ?? "")
     }
     @FocusState private var focused: Bool
 
@@ -62,6 +75,8 @@ struct SecretAskCard: View {
                 #endif
                 .focused($focused)
                 .onSubmit(save)
+                .disabled(sending)
+            SecretDescriptionField(text: $about)
                 .disabled(sending)
             Text(sessionOnly ? SessionSecretWords.keeping(on: host) : Self.keeping(secret, on: host))
                 .appText(.fine).foregroundStyle(.secondary)
@@ -97,7 +112,8 @@ struct SecretAskCard: View {
     private func save() {
         guard !typed.isEmpty, !sending else { return }
         send(Answer(typed: typed, sessionOnly: sessionOnly && secret.canBeSessionOnly,
-                    askBeforeUse: secret.canAskBeforeUse ? askBeforeUse : nil))
+                    askBeforeUse: secret.canAskBeforeUse ? askBeforeUse : nil,
+                    description: about.trimmingCharacters(in: .whitespacesAndNewlines)))
     }
 
     /// Under the field: where it goes, and that the agent never sees it.

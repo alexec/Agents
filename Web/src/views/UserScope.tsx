@@ -7,11 +7,12 @@ import type { UserSecretKind, UserSecretNames, UserSecretRow } from "../protocol
 import { CallFailed } from "../wire/link";
 import { sealSecret } from "../wire/sealing";
 import { describe, methodNotFound } from "../model/errors";
-import { addCard, addSecret, cardConfirm, cardKind, cardKindLabel, cardProblem, cardRule, cardValue, isSecretName, leftOn,
-  machines, nameHint, nextVersion, secretsFoot, secretsLeft, secretsTitle, tidyCard, waitingOn } from "../model/userScope";
+import { about, addCard, addSecret, cardConfirm, cardKind, cardKindLabel, cardProblem, cardRule, cardValue, describedAs,
+  isSecretName, leftOn, machines, nameHint, nextVersion, secretsFoot, secretsLeft, secretsTitle, tidyCard, waitingOn } from "../model/userScope";
 import { askBeforeUseWords } from "../model/askBeforeUse";
 import { AskBeforeUseCheck } from "./AskBeforeUse";
 import { Modal } from "./Modal";
+import { SecretDescriptionField } from "./SecretDescription";
 
 function sentence(error: unknown): string {
   if (error instanceof CallFailed && error.code === methodNotFound) return "This control plane does not keep settings for you yet. Update it.";
@@ -22,13 +23,13 @@ function sentence(error: unknown): string {
  * control plane never has it. kind is "card" for a card (#3531). Ask before use (#4016) is sealed into every
  * copy's associated data, so it is set here, on Add and Replace: no client can read a value back to seal it again. */
 async function setSecret(store: Store, name: string, value: string, replacing: UserSecretRow | null, ask: boolean,
-  kind?: UserSecretKind) {
+  description: string, kind?: UserSecretKind) {
   const version = nextVersion(replacing, Date.now());
   const { recipients, user } = await store.link.call("user/secretRecipients", {});
   // Only to the machines the lock names (#3491, D8): the control plane cannot add a key of its own.
   const values = await sealSecret(user ?? "", name, version, value, await store.signedRecipients(recipients), ask);
   await store.link.call("user/setSecret", { name: name as never, version, values, ...(kind ? { kind } : {}),
-    ...(ask ? { needsApproval: true } : {}) });
+    ...(ask ? { needsApproval: true } : {}), ...describedAs(description) });
 }
 
 function SecretSheet({ store, replacing, close }: { store: Store; replacing: UserSecretRow | null; close: () => void }) {
@@ -36,12 +37,13 @@ function SecretSheet({ store, replacing, close }: { store: Store; replacing: Use
   const value = useSignal("");
   // A new secret starts on (#4162); a replaced one keeps its own.
   const ask = useSignal(replacing ? replacing.needsApproval === true : true);
+  const description = useSignal(replacing?.description ?? "");
   const problem = useSignal<string | null>(null);
   const busy = useSignal(false);
   const save = async () => {
     busy.value = true;
     try {
-      await setSecret(store, name.value.trim(), value.value, replacing, ask.value);
+      await setSecret(store, name.value.trim(), value.value, replacing, ask.value, description.value);
       value.value = "";
       close();
     } catch (error) {
@@ -61,6 +63,7 @@ function SecretSheet({ store, replacing, close }: { store: Store; replacing: Use
         )}
         <input type="password" aria-label="Value" placeholder="Value" autocomplete="off" value={value.value}
           onInput={(e) => (value.value = (e.currentTarget as HTMLInputElement).value)} />
+        <SecretDescriptionField text={description} />
         <AskBeforeUseCheck on={ask} />
         <p class={problem.value ? "sheet-note failure" : "sheet-note"} role={problem.value ? "alert" : undefined}>{problem.value ?? nameHint}</p>
         <div class="sheet-actions">
@@ -83,6 +86,7 @@ function CardSheet({ store, replacing, close }: { store: Store; replacing: UserS
   const locked = useSignal(false);
   // A new card starts on (#4162); a replaced one keeps its own.
   const ask = useSignal(replacing ? replacing.needsApproval === true : true);
+  const description = useSignal(replacing?.description ?? "");
   const problem = useSignal<string | null>(null);
   const busy = useSignal(false);
   const save = async () => {
@@ -94,7 +98,7 @@ function CardSheet({ store, replacing, close }: { store: Store; replacing: UserS
     }
     busy.value = true;
     try {
-      await setSecret(store, name.value.trim(), cardValue(card), replacing, ask.value, cardKind);
+      await setSecret(store, name.value.trim(), cardValue(card), replacing, ask.value, description.value, cardKind);
       number.value = "";
       cvc.value = "";
       close();
@@ -127,6 +131,7 @@ function CardSheet({ store, replacing, close }: { store: Store; replacing: UserS
         {field("CVC", cvc, { type: "password", inputMode: "numeric" })}
         {field("Name on card", holder)}
         {field("Billing ZIP", zip)}
+        <SecretDescriptionField text={description} />
         <AskBeforeUseCheck on={ask} />
         <p class={problem.value ? "sheet-note failure" : "sheet-note"} role={problem.value ? "alert" : undefined}>{problem.value ?? nameHint}</p>
         <div class="sheet-actions">
@@ -148,6 +153,7 @@ function SecretItem({ row, replace, remove, down }: { row: UserSecretRow; replac
     <li class="user-secret">
       <code>{row.name}</code>
       {row.kind === cardKind && <span class="hint">{cardKindLabel}</span>}
+      <p class="hint">{about(row.description)}</p>
       <span class="hint">{machines(row)}</span>
       {row.needsApproval && <span class="hint"><span aria-hidden="true">✋ </span>{askBeforeUseWords.asks}</span>}
       {waiting && <p class="hint attention">{waiting}</p>}

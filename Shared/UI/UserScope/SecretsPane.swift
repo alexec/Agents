@@ -50,26 +50,27 @@ struct SecretsPane<Extra: View>: View {
         .task(id: control != nil) { await state.load(control) }
         .refreshable { await state.load(control) }
         .sheet(isPresented: $isAdding) {
-            SecretSheet(name: nil, asks: true) { name, value, ask in
-                await state.setSecret(name, value: value, askBeforeUse: ask, on: control)
+            SecretSheet(name: nil, asks: true, description: nil) { name, value, ask, description in
+                await state.setSecret(name, value: value, askBeforeUse: ask, description: description, on: control)
             }
             .paperSheet()
         }
         .sheet(isPresented: $isAddingCard) {
-            CardSheet(name: nil, asks: true) { name, value, ask in
-                await state.setSecret(name, value: value, kind: CardSecret.kind, askBeforeUse: ask, on: control)
+            CardSheet(name: nil, asks: true, description: nil) { name, value, ask, description in
+                await state.setSecret(name, value: value, kind: CardSecret.kind, askBeforeUse: ask, description: description, on: control)
             }
             .paperSheet()
         }
         .sheet(item: $replacing) { row in
             if row.isCard {
-                CardSheet(name: row.name, asks: row.asksBeforeUse) { name, value, ask in
-                    await state.setSecret(name, value: value, kind: CardSecret.kind, replacing: row, askBeforeUse: ask, on: control)
+                CardSheet(name: row.name, asks: row.asksBeforeUse, description: row.description) { name, value, ask, description in
+                    await state.setSecret(name, value: value, kind: CardSecret.kind, replacing: row, askBeforeUse: ask,
+                                          description: description, on: control)
                 }
                 .paperSheet()
             } else {
-                SecretSheet(name: row.name, asks: row.asksBeforeUse) { name, value, ask in
-                    await state.setSecret(name, value: value, replacing: row, askBeforeUse: ask, on: control)
+                SecretSheet(name: row.name, asks: row.asksBeforeUse, description: row.description) { name, value, ask, description in
+                    await state.setSecret(name, value: value, replacing: row, askBeforeUse: ask, description: description, on: control)
                 }
                 .paperSheet()
             }
@@ -106,6 +107,8 @@ struct SecretsPane<Extra: View>: View {
                         .fixedSize()
                         .accessibilityLabel("\(row.name) actions")
                     }
+                    Text(UserScopeWords.about(row.description)).appText(.fine).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text(UserScopeWords.machines(row)).appText(.fine).foregroundStyle(.secondary)
                     if row.asksBeforeUse {
                         Label(AskBeforeUseWords.asks, systemImage: "hand.raised")
@@ -142,21 +145,24 @@ extension SecretsPane where Extra == EmptyView {
 private struct SecretSheet: View {
     /// The secret replaced, or nil for a new one.
     let name: String?
-    /// Save, with the name, the value and Ask before use.
-    let save: (String, String, Bool) async -> String?
+    /// Save, with the name, the value, Ask before use and the description (#4167).
+    let save: (String, String, Bool, String?) async -> String?
 
     @Environment(\.dismiss) private var dismiss
     @State private var typedName = ""
     @State private var value = ""
     @State private var askBeforeUse: Bool
+    @State private var about: String
     @State private var problem: String?
     @State private var saving = false
 
     /// `asks`: Ask before use as the toggle starts: the replaced secret's, on for a new one (#4162).
-    init(name: String?, asks: Bool, save: @escaping (String, String, Bool) async -> String?) {
+    /// `description`: the replaced secret's, to change (#4167).
+    init(name: String?, asks: Bool, description: String?, save: @escaping (String, String, Bool, String?) async -> String?) {
         self.name = name
         self.save = save
         _askBeforeUse = State(initialValue: asks)
+        _about = State(initialValue: description ?? "")
     }
 
     private var chosen: String { name ?? typedName.trimmingCharacters(in: .whitespaces) }
@@ -172,6 +178,7 @@ private struct SecretSheet: View {
                         #endif
                 }
                 SecureField("Value", text: $value)
+                SecretDescriptionField(text: $about)
                 AskBeforeUseToggle(isOn: $askBeforeUse)
             } header: {
                 Text(name.map { "Replace \($0)" } ?? "Add a Secret")
@@ -185,7 +192,7 @@ private struct SecretSheet: View {
                 Button(name == nil ? "Add" : "Replace") {
                     Task {
                         saving = true
-                        problem = await save(chosen, value, askBeforeUse)
+                        problem = await save(chosen, value, askBeforeUse, UserScopeWords.description(about))
                         saving = false
                         if problem == nil { dismiss() }
                     }
@@ -208,8 +215,8 @@ private struct SecretSheet: View {
 private struct CardSheet: View {
     /// The card replaced, or nil for a new one.
     let name: String?
-    /// Save, with the name, the card's parts as one value and Ask before use.
-    let save: (String, String, Bool) async -> String?
+    /// Save, with the name, the card's parts as one value, Ask before use and the description (#4167).
+    let save: (String, String, Bool, String?) async -> String?
 
     @Environment(\.dismiss) private var dismiss
     @State private var typedName = ""
@@ -220,14 +227,17 @@ private struct CardSheet: View {
     @State private var zip = ""
     @State private var locked = false
     @State private var askBeforeUse: Bool
+    @State private var about: String
     @State private var problem: String?
     @State private var saving = false
 
     /// `asks`: Ask before use as the toggle starts: the replaced card's, on for a new one (#4162).
-    init(name: String?, asks: Bool, save: @escaping (String, String, Bool) async -> String?) {
+    /// `description`: the replaced card's, to change (#4167).
+    init(name: String?, asks: Bool, description: String?, save: @escaping (String, String, Bool, String?) async -> String?) {
         self.name = name
         self.save = save
         _askBeforeUse = State(initialValue: asks)
+        _about = State(initialValue: description ?? "")
     }
 
     private var chosen: String { name ?? typedName.trimmingCharacters(in: .whitespaces) }
@@ -257,6 +267,7 @@ private struct CardSheet: View {
                     .autocorrectionDisabled()
                 TextField("Billing ZIP", text: $zip, prompt: Text("ZIP or postal code"))
                     .autocorrectionDisabled()
+                SecretDescriptionField(text: $about)
                 AskBeforeUseToggle(isOn: $askBeforeUse)
             } header: {
                 Text(name.map { "Replace \($0)" } ?? "Add a Card")
@@ -274,7 +285,7 @@ private struct CardSheet: View {
                     }
                     Task {
                         saving = true
-                        problem = await save(chosen, card.value, askBeforeUse)
+                        problem = await save(chosen, card.value, askBeforeUse, UserScopeWords.description(about))
                         saving = false
                         if problem == nil { dismiss() }
                     }
@@ -289,5 +300,24 @@ private struct CardSheet: View {
         .frame(minWidth: 400)
         #endif
         .onDisappear { number = ""; cvc = "" }
+    }
+}
+
+/// A secret's Description field (#4167): one or two sentences, so it wraps rather than scrolls,
+/// with the words that it is not sealed. Add a Secret…, Add a Card…, Replace… and Add for a
+/// Session… draw it.
+struct SecretDescriptionField: View {
+    @Binding var text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            TextField(UserScopeWords.descriptionLabel, text: $text, prompt: Text(UserScopeWords.descriptionPrompt), axis: .vertical)
+                .lineLimit(1...3)
+                #if os(iOS)
+                .textInputAutocapitalization(.sentences)
+                #endif
+            Text(UserScopeWords.descriptionHint).appText(.fine).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }

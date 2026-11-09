@@ -17,6 +17,24 @@ export const agentConfigurationFollows = "Your other machines get this Mac's ins
 
 export const nameHint = "Capital letters, digits and _, such as GITHUB_TOKEN.";
 
+// A secret's description (#4167): not secret, and kept beside the name. As UserScopeWords.
+export const descriptionLabel = "Description";
+export const descriptionPrompt = "What it is for: which account, which scopes, whose";
+export const descriptionHint = "Agents read the description to choose the right secret. It is not sealed: never put a value in it.";
+export const noDescription = "No description";
+
+/** The description under a secret's name, or No description. */
+export function about(description: string | undefined): string {
+  const text = (description ?? "").trim();
+  return text || noDescription;
+}
+
+/** What a sheet sends for its description: nothing when it is empty. */
+export function describedAs(typed: string): { description?: string } {
+  const text = typed.trim();
+  return text ? { description: text } : {};
+}
+
 /** A secret's row: where it is. */
 export function machines(row: Pick<UserSecretRow, "machines">): string {
   const n = row.machines.length;
