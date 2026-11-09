@@ -52,6 +52,8 @@ type fakeForgeGitHub struct {
 	states map[int]string
 	// authors are ItemPage's author by number, when set (#3860); its head is then h<number>.
 	authors map[int]string
+	// labeled are what a list of a label gives, when set for that label (#3661).
+	labeled map[string][]githubmcp.Item
 }
 
 func (f *fakeForgeGitHub) Search(_ context.Context, repos []string, sf githubmcp.SearchFilter, after string, first int) (githubmcp.SearchPage, error) {
@@ -60,6 +62,9 @@ func (f *fakeForgeGitHub) Search(_ context.Context, repos []string, sf githubmcp
 	f.searches = append(f.searches, strings.Join(repos, ",")+" "+githubmcp.SearchQuery(repos, sf)+" after="+after)
 	if sf.Label == "epic" {
 		return githubmcp.SearchPage{Items: f.epics}, nil
+	}
+	if items, ok := f.labeled[sf.Label]; ok {
+		return githubmcp.SearchPage{Items: items}, nil
 	}
 	if f.open != nil && sf.Label == "" && sf.State == "open" && !sf.PRs {
 		return githubmcp.SearchPage{Items: f.open}, nil

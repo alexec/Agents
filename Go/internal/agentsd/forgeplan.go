@@ -53,6 +53,9 @@ func withHierarchy(i *wire.ForgeItem, parent *wire.LineageNode, total, done int)
 		if f, ok := featureName(name); ok && i.Feature == nil {
 			i.Feature = &f
 		}
+		if strings.EqualFold(name, standingLabel) {
+			i.Standing = new(true)
+		}
 	}
 	i.Parent = parent
 	if total > 0 {
@@ -89,8 +92,9 @@ func (d *Daemon) forgePlan(ctx context.Context, r wire.ForgePlanRequest) (wire.F
 	key, _ := json.Marshal([]any{method, r.Node.Ref})
 	var epic wire.ForgeItem
 	var children []planChild
+	var standing *wire.ForgeStanding
 	if a, ok := d.forgeCached(string(key)); ok && a.plan != nil {
-		epic, children = a.plan.epic, a.plan.children
+		epic, children, standing = a.plan.epic, a.plan.children, a.plan.standing
 	} else {
 		var err error
 		if identifier, ok := strings.CutPrefix(r.Node.Ref, "linear:"); ok && linearLabel.MatchString(identifier) {
@@ -113,7 +117,16 @@ func (d *Daemon) forgePlan(ctx context.Context, r wire.ForgePlanRequest) (wire.F
 		if err != nil {
 			return wire.ForgePlan{}, err
 		}
-		d.forgeRemember(string(key), forgeAnswer{plan: &forgePlanAnswer{epic: epic, children: children}})
+		// A standing epic's plan is its query's issues, not its sub-issues (#3661), and it has
+		// no "done of total".
+		if epic.Standing != nil && *epic.Standing {
+			var q wire.ForgeStanding
+			if q, children, err = d.standingPlan(ctx, method, epic); err != nil {
+				return wire.ForgePlan{}, err
+			}
+			standing, epic.Progress = &q, nil
+		}
+		d.forgeRemember(string(key), forgeAnswer{plan: &forgePlanAnswer{epic: epic, children: children, standing: standing}})
 		items := []wire.ForgeItem{epic}
 		for _, c := range children {
 			items = append(items, c.item)
@@ -121,6 +134,7 @@ func (d *Daemon) forgePlan(ctx context.Context, r wire.ForgePlanRequest) (wire.F
 		d.resolvedFromForge(items)
 	}
 	out := planOf(epic, children)
+	out.Standing = standing
 	// The lead is this machine's, read each time: it starts and ends more often than a plan changes.
 	out.Lead = d.leadOf(r.Node)
 	return out, nil

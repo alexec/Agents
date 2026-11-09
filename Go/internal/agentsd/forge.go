@@ -121,6 +121,8 @@ type forgeAnswer struct {
 type forgePlanAnswer struct {
 	epic     wire.ForgeItem
 	children []planChild
+	// standing is a standing epic's query (#3661), nil for any other epic.
+	standing *wire.ForgeStanding
 }
 
 type forgeBook struct {

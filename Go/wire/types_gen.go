@@ -4708,7 +4708,7 @@ type ForgeImageRequest struct {
 	URL string `json:"url"`
 }
 
-// An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for GitHub, GitLab, Linear and Jira (#3260), so one page draws each. node is its lineage node (kind issue or pr, ref github:alexec/Agents#12). state is open, closed or merged; status is the tracker's own name for its step, where its workflow has steps (a Jira status, as In Progress; one in Jira's Done category is closed). folder is a folder on this machine on its repo, to act from. labels have their #rrggbb colour where the forge gives one (#2956). The pull request's own fields: draft; checks is passing, failing, running or none; review is approved, changes_requested or review_required; mergeable is mergeable, conflicting or unknown; autoMerge says auto-merge is on. The hierarchy (#3267): parent is the issue it is a sub-issue (a Linear or GitLab child) of; level is epic, story, task or spike, from its labels; feature is the name of its feature:<name> label; progress is a parent's closed children of all of them, where the forge says it: in a GitHub list, and on an issue's own read.
+// An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for GitHub, GitLab, Linear and Jira (#3260), so one page draws each. node is its lineage node (kind issue or pr, ref github:alexec/Agents#12). state is open, closed or merged; status is the tracker's own name for its step, where its workflow has steps (a Jira status, as In Progress; one in Jira's Done category is closed). folder is a folder on this machine on its repo, to act from. labels have their #rrggbb colour where the forge gives one (#2956). The pull request's own fields: draft; checks is passing, failing, running or none; review is approved, changes_requested or review_required; mergeable is mergeable, conflicting or unknown; autoMerge says auto-merge is on. The hierarchy (#3267): parent is the issue it is a sub-issue (a Linear or GitLab child) of; level is epic, story, task or spike, from its labels; feature is the name of its feature:<name> label; progress is a parent's closed children of all of them, where the forge says it: in a GitHub list, and on an issue's own read. standing says it has the label standing: a standing epic, whose plan is a query (#3659).
 type ForgeItem struct {
 	Node LineageNode `json:"node"`
 
@@ -4751,6 +4751,8 @@ type ForgeItem struct {
 	Feature *string `json:"feature,omitzero"`
 
 	Progress *ForgeProgress `json:"progress,omitzero"`
+
+	Standing *bool `json:"standing,omitzero"`
 }
 
 // forge/issue and forge/pull (#3129): one item with its body (Markdown) and a page of its comments, the newest page first and at most 50, oldest first in the page; cursor is the page before it, absent at the first comment. A pull request's checks, review threads (line comments, in threads) and files changed come with it. head is a pull request's head commit, which forge/merge and forge/approve name (#3130); mergeMethods are the ways its repo allows, the repo's default first; start is the new-agent form for an issue. transitions are the moves an issue's workflow allows now (Jira, #3260), which forge/close takes in place of a close or a reopen.
@@ -4904,7 +4906,7 @@ type ForgeNodeRequest struct {
 	Node LineageNode `json:"node"`
 }
 
-// forge/plan (#3267): an epic and its plan. children are its sub-issues (at most 100), step by step, in the forge's order within a step. steps are the children of each step, the first first. lead is the session on this machine, not archived, that works on the epic in lineage (its label #<n>, or the Linear key) and is labelled lead.
+// forge/plan (#3267): an epic and its plan. children are its sub-issues (at most 100), step by step, in the forge's order within a step. steps are the children of each step, the first first. lead is the session on this machine, not archived, that works on the epic in lineage (its label #<n>, or the Linear key) and is labelled lead. standing is set only for a standing epic (#3661): its children are then the open issues of its query, not its sub-issues, at most 100, in order (priority, then the oldest), all in one step 1; its item has no progress.
 type ForgePlan struct {
 	Item ForgeItem `json:"item"`
 
@@ -4913,6 +4915,8 @@ type ForgePlan struct {
 	Steps []ForgePlanStep `json:"steps"`
 
 	Lead *ForgeLead `json:"lead,omitzero"`
+
+	Standing *ForgeStanding `json:"standing,omitzero"`
 }
 
 // A child of an epic in forge/plan (#3267). blockedBy are the issues it is blocked by, open or closed, in the plan or not. step is 1 for a child that no other child blocks, else one more than the last step of the children that block it; a blocker outside the plan adds no step, and children in a loop share the step after the rest. blockedOutside are its open blockers outside the plan (an issue of another epic). A forge with no dependencies (GitLab Free) puts every child in step 1.
@@ -4943,6 +4947,21 @@ type ForgeProgress struct {
 	Done int64 `json:"done"`
 
 	Total int64 `json:"total"`
+}
+
+// A standing epic's query (#3659, #3661), as the daemon read it from the standing block in the epic's body. labels: the issue has all of them; any: at least one of them; not: none of them; milestone: none, any or a milestone's name. lanes is how many lanes its lead runs at once, 1 when the block does not say. error says why there is no query: no block, a second block, or an unknown or bad field; with an error, the plan has no children.
+type ForgeStanding struct {
+	Labels []string `json:"labels"`
+
+	Any []string `json:"any"`
+
+	Not []string `json:"not"`
+
+	Milestone *string `json:"milestone,omitzero"`
+
+	Lanes int64 `json:"lanes"`
+
+	Error *string `json:"error,omitzero"`
 }
 
 // The new-agent form for an issue (#3130, Start Agent), as a view's agents/start-agent fills it (#834): the prompt, the session's labels, and a new worktree's name.
