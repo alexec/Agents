@@ -340,19 +340,23 @@ func (d *Daemon) installRuntime(c *Client, id string) (wire.RuntimeStatus, error
 		return wire.RuntimeStatus{}, &Error{Code: wire.FailureNotSupported,
 			Message: fmt.Sprintf("%s can’t be installed from here. Install it from %s.", r.Name, r.InstallPage)}
 	}
-	if c != nil && c.conn.Device() != "" {
-		return wire.RuntimeStatus{}, &Error{Code: wire.FailureNotSupported, Message: "Install " + r.Name + " from the Mac."}
-	}
 	d.instMu.Lock()
 	if d.installs[id] {
 		d.instMu.Unlock()
 		return d.statusOf(r), nil
 	}
 	path, _, _ := locateFor(r)
-	if installedAt(r, path) && !d.outdated(id, path) {
+	installed := installedAt(r, path)
+	if installed && !d.outdated(id, path) {
 		delete(d.states, id)
 		d.instMu.Unlock()
 		return d.statusOf(r), nil
+	}
+	// A device (the Remote, the web page) may update the app's own copy that is there
+	// (#4035), never install a new one.
+	if c != nil && c.conn.Device() != "" && !installed {
+		d.instMu.Unlock()
+		return wire.RuntimeStatus{}, &Error{Code: wire.FailureNotSupported, Message: "Install " + r.Name + " from the Mac."}
 	}
 	if d.installs == nil {
 		d.installs, d.states = map[string]bool{}, map[string]wire.RuntimeAvailability{}

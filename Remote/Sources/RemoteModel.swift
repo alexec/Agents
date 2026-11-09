@@ -2644,6 +2644,42 @@ final class RemoteModel {
         if host == .mac { await refreshRuntimes() } else { await refreshServerRuntimes(host) }
     }
 
+    /// Sign In… on a server's Claude or Codex (#4035), as the web page's (#3349): the machine
+    /// runs the runtime's own sign-in and gives the link to open here.
+    func runtimeSignInStart(_ runtimeID: String, on host: MachineRef) async throws -> DaemonAPI.RuntimeSignInStep {
+        try await client(for: DaemonAPI.Empty(), on: host)
+            .call(DaemonAPI.Method.runtimesSignInStart, DaemonAPI.RuntimeRequest(runtimeID: runtimeID),
+                  returning: DaemonAPI.RuntimeSignInStep.self)
+    }
+
+    /// The end of that sign-in: the code Claude's page gave, nothing for Codex, or cancel.
+    func runtimeSignInFinish(_ finish: DaemonAPI.RuntimeSignInFinish, on host: MachineRef) async throws {
+        _ = try await client(for: DaemonAPI.Empty(), on: host)
+            .call(DaemonAPI.Method.runtimesSignInFinish, finish, returning: RuntimeStatus.self)
+        await refreshMachineRuntimes(host)
+    }
+
+    /// An API key for the runtime, kept on the machine.
+    func runtimeSignInKey(_ runtimeID: String, key: String, on host: MachineRef) async throws {
+        _ = try await client(for: DaemonAPI.Empty(), on: host)
+            .call(DaemonAPI.Method.runtimesSignInKey, DaemonAPI.RuntimeSignInKey(runtimeID: runtimeID, key: key),
+                  returning: RuntimeStatus.self)
+        await refreshMachineRuntimes(host)
+    }
+
+    /// Update on a machine's runtime (#4035): the machine installs the app's newer copy over
+    /// the one it has. It says how that goes in runtime/changed.
+    func updateRuntime(_ runtimeID: String, on host: MachineRef) async {
+        do {
+            _ = try await client(for: DaemonAPI.Empty(), on: host)
+                .call(DaemonAPI.Method.runtimesInstall, DaemonAPI.RuntimeRequest(runtimeID: runtimeID),
+                      returning: RuntimeStatus.self)
+        } catch {
+            problem = sentence(for: error)
+        }
+        await refreshMachineRuntimes(host)
+    }
+
     /// A machine's CPU, memory and disks for its page (#3626), asked of the machine itself.
     func machineUsage(_ host: MachineRef) async throws -> DaemonAPI.MachineUsageState {
         try await client(for: DaemonAPI.Empty(), on: host)
