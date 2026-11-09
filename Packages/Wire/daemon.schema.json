@@ -8456,6 +8456,10 @@
         "canAskBeforeUse": {
           "type": "boolean",
           "description": "The host keeps it with Ask before use (#4014, #4016): on unless the answer's content has needsApproval false, which the card's toggle sends. Left out by an older host, which has no such flag."
+        },
+        "description": {
+          "type": "string",
+          "description": "The agent's description of the secret (#4167), for the person to change on the card. The answer's content has the person's under description; left out, the secret keeps the one it has."
         }
       },
       "required": [
@@ -15825,6 +15829,13 @@
           "items": {
             "$ref": "#/definitions/SealedUserSecret"
           }
+        },
+        "waiting": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/UserSecretAbout"
+          },
+          "description": "The user's secrets that are not sealed to this machine yet (#4167): what list_secrets says of them. Never a value."
         }
       },
       "required": [
@@ -24326,6 +24337,13 @@
         "needsApproval": {
           "type": "boolean",
           "description": "Ask before use (#4014), as the person's client sealed it: the associated data ends |ask when it is on, so a flag the control plane changed does not open. Left out is off."
+        },
+        "description": {
+          "type": "string",
+          "description": "A secret's description (#4167): one or two sentences on what it is and what it is for, such as which account and scopes. Not secret, and not sealed: the control plane may keep it. Never a value. Left out when it has none."
+        },
+        "kind": {
+          "$ref": "#/definitions/UserSecretKind"
         }
       },
       "required": [
@@ -25243,6 +25261,10 @@
         "needsApproval": {
           "type": "boolean",
           "description": "Ask before use (#4014): its value is sealed in the session's file, never there as plain text, and a person approves each use (#4015)."
+        },
+        "description": {
+          "type": "string",
+          "description": "A secret's description (#4167): one or two sentences on what it is and what it is for, such as which account and scopes. Not secret, and not sealed: the control plane may keep it. Never a value. Left out when it has none."
         }
       },
       "required": [
@@ -25286,6 +25308,10 @@
         "needsApproval": {
           "type": "boolean",
           "description": "Ask before use (#4014): kept sealed, and a person approves each use (#4015). Left out is off."
+        },
+        "description": {
+          "type": "string",
+          "description": "A secret's description (#4167): one or two sentences on what it is and what it is for, such as which account and scopes. Not secret, and not sealed: the control plane may keep it. Never a value. Left out when it has none."
         }
       },
       "required": [
@@ -29847,6 +29873,28 @@
       ],
       "additionalProperties": false
     },
+    "UserSecretAbout": {
+      "type": "object",
+      "description": "What a machine knows of one of its user's secrets that it has no copy of yet (#4167). Never a value.",
+      "properties": {
+        "name": {
+          "$ref": "#/definitions/UserSecretName"
+        },
+        "kind": {
+          "$ref": "#/definitions/UserSecretKind"
+        },
+        "description": {
+          "type": "string"
+        },
+        "needsApproval": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
     "UserSecretKind": {
       "type": "string",
       "enum": [
@@ -29929,6 +29977,10 @@
         "needsApproval": {
           "type": "boolean",
           "description": "Ask before use (#4014), as the person's client last sealed it. The machines check it: the associated data binds it."
+        },
+        "description": {
+          "type": "string",
+          "description": "A secret's description (#4167): one or two sentences on what it is and what it is for, such as which account and scopes. Not secret, and not sealed: the control plane may keep it. Never a value. Left out when it has none."
         }
       },
       "required": [
@@ -29961,6 +30013,10 @@
         "needsApproval": {
           "type": "boolean",
           "description": "Ask before use (#4014): when on, every envelope's associated data ends |ask (usersecret.v1|<person id>|<recipient>|<name>|<version>|ask), so the control plane cannot change it. Left out is off, and the associated data is as before."
+        },
+        "description": {
+          "type": "string",
+          "description": "A secret's description (#4167): one or two sentences on what it is and what it is for, such as which account and scopes. Not secret, and not sealed: the control plane may keep it. Never a value. Left out when it has none."
         }
       },
       "required": [

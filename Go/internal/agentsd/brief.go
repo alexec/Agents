@@ -228,7 +228,8 @@ func escalationBrief(runtimeID string) string {
 		"to undo. Do not ask " +
 		"about the next step of what I asked for, a report with nothing to choose, anything you " +
 		"can find out yourself, or the same thing twice. Ask for a missing secret (an API key, a " +
-		"token) with ask_secret, never in a question or a reply, where what is typed goes into the chat."
+		"token) with ask_secret, never in a question or a reply, where what is typed goes into the chat; " +
+		"call list_secrets first, and use the one I have given when its description fits."
 }
 
 // schedulingRemoved is the runtimes whose own scheduling tools the tool policy takes away

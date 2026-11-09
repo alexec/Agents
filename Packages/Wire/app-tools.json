@@ -265,7 +265,7 @@
     "title": "Ask the person a question"
   },
   {
-    "description": "Ask me for one secret, such as an API key or a token, when you need it and it is not set. I type it into a masked field; it is saved to my secrets file on this machine, and you get its name and where it is, never the value. Never ask for a secret with ask_question or in your reply: what is typed there goes into the chat.\n\nThe call waits up to 45 seconds, as ask_question does; if I have not answered by then, end your turn, and you are started again when I save it or say no. Do not ask again.\n\nUse the secret without printing it: never echo, cat or log it, and never write it into a file in the folder.",
+    "description": "Ask me for one secret, such as an API key or a token, when you need it and it is not set. Call list_secrets first: when I have given it already, use it, and do not ask again. I type it into a masked field; it is saved to my secrets file on this machine, and you get its name and where it is, never the value. Never ask for a secret with ask_question or in your reply: what is typed there goes into the chat.\n\nThe call waits up to 45 seconds, as ask_question does; if I have not answered by then, end your turn, and you are started again when I save it or say no. Do not ask again.\n\nUse the secret without printing it: never echo, cat or log it, and never write it into a file in the folder.",
     "inputSchema": {
       "properties": {
         "description": {
@@ -278,6 +278,10 @@
         },
         "reason": {
           "description": "What you need it for, in one sentence.",
+          "type": "string"
+        },
+        "secret_description": {
+          "description": "What the secret is and what it is for, in one or two sentences, so another agent can tell it from the others: which account, which scopes, whose it is. I can change it before I save. Never a value.",
           "type": "string"
         },
         "url": {
@@ -293,6 +297,20 @@
     },
     "name": "ask_secret",
     "title": "Ask the person for a secret"
+  },
+  {
+    "description": "List my secrets and this session's own secrets: each one's name, its description, its kind (card or none), whether it asks before use, and whether this machine has a copy. Never a value. It never waits on me. Call it before ask_secret, so you do not ask for a secret I have given already, and read the descriptions to choose the right one when two look the same. Use a secret by its name: with fill_secret or set_ci_secret, as ${NAME} in .agents/mcp.json, or as ask_secret's answer told you.",
+    "inputSchema": {
+      "properties": {
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "list_secrets",
+    "title": "List the person's secrets"
   },
   {
     "description": "When your turn ends with a report or a done reply and leaves one clear next step for the person, offer it as a prompt before you end the turn; not with a question waiting, nor when you archive. Call at most once; a later call replaces it. Use a 2–5 word label and the full prompt text.",

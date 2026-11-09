@@ -3486,6 +3486,11 @@ export interface ElicitationSecret {
    * such flag.
    */
   canAskBeforeUse?: boolean;
+  /**
+   * The agent's description of the secret (#4167), for the person to change on the card. The
+   * answer's content has the person's under description; left out, the secret keeps the one it has.
+   */
+  description?: string;
 }
 
 export interface Empty {}
@@ -6199,6 +6204,11 @@ export interface MachineUserSettings {
   user: string;
   settings: UserSettings;
   secrets: SealedUserSecret[];
+  /**
+   * The user's secrets that are not sealed to this machine yet (#4167): what list_secrets says of
+   * them. Never a value.
+   */
+  waiting?: UserSecretAbout[];
 }
 
 export interface MachineWorkspace {
@@ -9752,6 +9762,13 @@ export interface SealedUserSecret {
    * is on, so a flag the control plane changed does not open. Left out is off.
    */
   needsApproval?: boolean;
+  /**
+   * A secret's description (#4167): one or two sentences on what it is and what it is for, such as
+   * which account and scopes. Not secret, and not sealed: the control plane may keep it. Never a
+   * value. Left out when it has none.
+   */
+  description?: string;
+  kind?: UserSecretKind;
 }
 
 /** sealing/add (#3397). */
@@ -10138,6 +10155,12 @@ export interface SessionSecret {
    * and a person approves each use (#4015).
    */
   needsApproval?: boolean;
+  /**
+   * A secret's description (#4167): one or two sentences on what it is and what it is for, such as
+   * which account and scopes. Not secret, and not sealed: the control plane may keep it. Never a
+   * value. Left out when it has none.
+   */
+  description?: string;
 }
 
 /** secrets/sessionRemove (#3548): take one session's secret out now. */
@@ -10158,6 +10181,12 @@ export interface SessionSecretSetRequest {
    * Ask before use (#4014): kept sealed, and a person approves each use (#4015). Left out is off.
    */
   needsApproval?: boolean;
+  /**
+   * A secret's description (#4167): one or two sentences on what it is and what it is for, such as
+   * which account and scopes. Not secret, and not sealed: the control plane may keep it. Never a
+   * value. Left out when it has none.
+   */
+  description?: string;
 }
 
 /**
@@ -11626,6 +11655,17 @@ export interface UserSecret {
 }
 
 /**
+ * What a machine knows of one of its user's secrets that it has no copy of yet (#4167). Never a
+ * value.
+ */
+export interface UserSecretAbout {
+  name: UserSecretName;
+  kind?: UserSecretKind;
+  description?: string;
+  needsApproval?: boolean;
+}
+
+/**
  * What a secret holds, when it is more than one value (#3531). card: a payment card that has a
  * spend limit (locked to a merchant or category is recommended; Privacy.com or the same), as one
  * JSON object of number, expiry (MM/YY), cvc, name and zip. fill_secret fills it a part at a time.
@@ -11666,6 +11706,12 @@ export interface UserSecretRow {
    * associated data binds it.
    */
   needsApproval?: boolean;
+  /**
+   * A secret's description (#4167): one or two sentences on what it is and what it is for, such as
+   * which account and scopes. Not secret, and not sealed: the control plane may keep it. Never a
+   * value. Left out when it has none.
+   */
+  description?: string;
 }
 
 /**
@@ -11687,6 +11733,12 @@ export interface UserSecretSet {
    * change it. Left out is off, and the associated data is as before.
    */
   needsApproval?: boolean;
+  /**
+   * A secret's description (#4167): one or two sentences on what it is and what it is for, such as
+   * which account and scopes. Not secret, and not sealed: the control plane may keep it. Never a
+   * value. Left out when it has none.
+   */
+  description?: string;
 }
 
 /**
@@ -13575,7 +13627,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ElicitationSchema: { required: ["properties"], optional: ["title", "description"] },
   ElicitationSchemaProperty: { required: ["name", "isRequired", "kind"], optional: ["title", "description", "defaultValue"] },
   ElicitationSchemaPropertyChoice: { required: ["value", "title"], optional: ["description"] },
-  ElicitationSecret: { required: ["name", "isSet"], optional: ["url", "canBeSessionOnly", "canAskBeforeUse"] },
+  ElicitationSecret: { required: ["name", "isSet"], optional: ["url", "canBeSessionOnly", "canAskBeforeUse", "description"] },
   Empty: { required: [], optional: [] },
   EntryNotification: { required: ["agentID", "entry"], optional: ["index", "oversized"] },
   Event: { required: ["position", "name", "at", "count", "scope", "sentence", "details", "chainDepth", "consequences"], optional: ["lastAt", "publisher", "message", "actor"] },
@@ -13827,7 +13879,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineUsage: { required: ["cpuPercent", "cpuCount", "memoryUsed", "memoryTotal"], optional: [] },
   MachineUsageState: { required: ["machine", "disks"], optional: [] },
   MachineUser: { required: ["user", "kind", "name", "labels"], optional: ["capReachedUntil", "bots"] },
-  MachineUserSettings: { required: ["user", "settings", "secrets"], optional: [] },
+  MachineUserSettings: { required: ["user", "settings", "secrets"], optional: ["waiting"] },
   MachineWorkspace: { required: ["provider", "providerName", "workspace", "workspaceName", "workspaceState", "canStart", "canStop", "startWhenUsed", "current"], optional: ["hostState", "phase", "since", "problem", "stoppedBy", "stopWhenIdleMinutes", "cost", "startForSchedules", "tellsSchedule", "nextWorkflow", "nextWorkflowAt", "wakeAt"] },
   MachineWorkspaceCall: { required: ["agent", "method", "params"], optional: ["deliver"] },
   MachinesSummaryFacts: { required: ["machines"], optional: [] },
@@ -14131,7 +14183,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SealRecipient: { required: ["id", "name", "publicKey"], optional: ["owner"] },
   SealRecipients: { required: ["recipients"], optional: ["user"] },
   SealedEnvelope: { required: ["encapsulated", "ciphertext"], optional: [] },
-  SealedUserSecret: { required: ["name", "version", "sealed"], optional: ["needsApproval"] },
+  SealedUserSecret: { required: ["name", "version", "sealed"], optional: ["needsApproval", "description", "kind"] },
   SealingAdd: { required: ["items"], optional: [] },
   SealingAddItem: { required: ["item", "id", "version", "values"], optional: [] },
   SealingItem: { required: ["item", "id", "version", "mine", "missing"], optional: ["user", "kind", "vendor", "settings", "needsApproval"] },
@@ -14165,9 +14217,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SessionMoveIn: { required: ["upload", "folder", "from"], optional: ["carryOn"] },
   SessionMovedFrom: { required: ["machine", "at"], optional: [] },
   SessionNotice: { required: ["severity", "title"], optional: ["detail"] },
-  SessionSecret: { required: ["agentID", "title", "name", "setAt"], optional: ["needsApproval"] },
+  SessionSecret: { required: ["agentID", "title", "name", "setAt"], optional: ["needsApproval", "description"] },
   SessionSecretRemoveRequest: { required: ["agentID", "name"], optional: [] },
-  SessionSecretSetRequest: { required: ["agentID", "name", "value"], optional: ["needsApproval"] },
+  SessionSecretSetRequest: { required: ["agentID", "name", "value"], optional: ["needsApproval", "description"] },
   SessionSecrets: { required: ["secrets"], optional: [] },
   SessionsListRequest: { required: ["runtimeID", "cwd"], optional: [] },
   SetCeilingRequest: { required: ["agentID"], optional: ["ceiling", "tokenCeiling"] },
@@ -14315,10 +14367,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   UserPartHere: { required: ["part", "value"], optional: ["leftOut"] },
   UserPartRequest: { required: ["part"], optional: [] },
   UserSecret: { required: ["name", "value"], optional: [] },
+  UserSecretAbout: { required: ["name"], optional: ["kind", "description", "needsApproval"] },
   UserSecretNames: { required: ["secrets"], optional: [] },
   UserSecretRequest: { required: ["name"], optional: [] },
-  UserSecretRow: { required: ["name", "updated", "machines"], optional: ["kind", "leftOn", "version", "waiting", "needsApproval"] },
-  UserSecretSet: { required: ["name", "version", "values"], optional: ["kind", "needsApproval"] },
+  UserSecretRow: { required: ["name", "updated", "machines"], optional: ["kind", "leftOn", "version", "waiting", "needsApproval", "description"] },
+  UserSecretSet: { required: ["name", "version", "values"], optional: ["kind", "needsApproval", "description"] },
   UserSettings: { required: [], optional: ["mcpServers", "agentConfig", "agentConfigFiles", "runtimes", "costLimits", "notifications", "accounts", "policy", "updated"] },
   UserSettingsChanged: { required: [], optional: ["parts", "agentConfigFiles", "secrets"] },
   UserSettingsPart: { required: ["part", "value"], optional: [] },

@@ -113,6 +113,8 @@ struct SessionSecretsSection<Source: SessionSecretsSource>: View {
     private func label(_ secret: SessionSecret) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(secret.name).appText(.code)
+            Text(UserScopeWords.about(secret.description)).appText(.fine).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             Text(secret.title).appText(.fine).foregroundStyle(.secondary)
         }
     }
@@ -149,6 +151,7 @@ private struct SessionSecretSheet: View {
     @State private var session: UUID?
     @State private var name = ""
     @State private var value = ""
+    @State private var about = ""
     @State private var askBeforeUse = true
     @State private var problem: String?
     @State private var saving = false
@@ -173,6 +176,7 @@ private struct SessionSecretSheet: View {
                     .textInputAutocapitalization(.characters)
                     #endif
                 SecureField("Value", text: $value)
+                SecretDescriptionField(text: $about)
                 if offersAsk {
                     AskBeforeUseToggle(isOn: $askBeforeUse)
                 }
@@ -191,7 +195,8 @@ private struct SessionSecretSheet: View {
                     Task {
                         saving = true
                         problem = await save(SessionSecretSetRequest(agentID: session, name: chosen, value: value,
-                                                                     needsApproval: offersAsk && askBeforeUse ? true : nil))
+                                                                     needsApproval: offersAsk && askBeforeUse ? true : nil,
+                                                                     description: UserScopeWords.description(about)))
                         saving = false
                         if problem == nil { dismiss() }
                     }

@@ -81,6 +81,7 @@ func appToolCalls() []appTool {
 		{"hang_up", (*Daemon).hangUp},
 		{"ask_question", (*Daemon).askQuestion},
 		{"ask_secret", (*Daemon).askSecret},
+		{"list_secrets", (*Daemon).listSecrets},
 		{"list_sessions", (*Daemon).listSessions},
 		{"read_session", (*Daemon).readSession},
 		{"message_session", (*Daemon).messageSession},

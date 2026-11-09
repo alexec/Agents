@@ -233,7 +233,7 @@ func TestWarmRuntimeReusedOnlyWhenNothingChanged(t *testing.T) {
 	if n := startsIn(starts); n != 1 {
 		t.Fatalf("%d starts for two turns on the same start", n)
 	}
-	if err := d.setSessionSecret(id, "SOME_TOKEN", "x", false); err != nil {
+	if err := d.setSessionSecret(id, "SOME_TOKEN", "x", "", false); err != nil {
 		t.Fatal(err)
 	}
 	turn(3, "with a secret")

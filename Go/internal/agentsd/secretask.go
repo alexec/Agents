@@ -27,6 +27,10 @@ const sessionOnlyField = "sessionOnly"
 // needsApprovalField is the answer's Ask before use (#4014): left out is on.
 const needsApprovalField = "needsApproval"
 
+// descriptionField is the answer's description (#4167), as the person left it on the card:
+// left out, the secret keeps the one it has.
+const descriptionField = "description"
+
 var secretAskName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]{0,63}$`)
 
 // askSecret is ask_secret: the person asked for a secret, as a form held like ask_question's.
@@ -37,6 +41,10 @@ func (d *Daemon) askSecret(id wire.UUID, args map[string]json.RawMessage) (strin
 	}
 	if reason == "" {
 		return "", Invalid("Nothing was asked: say in `reason` what you need %s for.", name)
+	}
+	description, err := secretDescription(argString(args, "secret_description"))
+	if err != nil {
+		return "", Invalid("Nothing was asked: %s", err.Error())
 	}
 	home := d.personalHome()
 	if home == "" {
@@ -49,6 +57,9 @@ func (d *Daemon) askSecret(id wire.UUID, args map[string]json.RawMessage) (strin
 	sessionOnly, ask := true, d.keepsFlagged()
 	secret := wire.ElicitationSecret{Name: name, IsSet: secretIsSet(home, name),
 		CanBeSessionOnly: &sessionOnly, CanAskBeforeUse: &ask}
+	if description != "" {
+		secret.Description = &description
+	}
 	if u := strings.TrimSpace(argString(args, "url")); strings.HasPrefix(u, "https://") || strings.HasPrefix(u, "http://") {
 		secret.URL = &u
 	}
@@ -134,11 +145,24 @@ func (d *Daemon) saveAskedSecret(agent wire.UUID, s wire.ElicitationSecret, cont
 		return Invalid("%s has to be one line.", s.Name)
 	}
 	ask := askedNeedsApproval(content) && d.keepsFlagged()
+	description, given := text(value(content[descriptionField]))
+	if !given && s.Description != nil {
+		description = *s.Description
+	}
+	description, err := secretDescription(description)
+	if err != nil {
+		return err
+	}
 	if askedSessionOnly(content) {
-		return d.setSessionSecret(agent, s.Name, v, ask)
+		return d.setSessionSecret(agent, s.Name, v, description, ask)
 	}
 	if err := d.saveSecret(s.Name, v, ask); err != nil {
 		return Invalid("%s was not saved: %s", s.Name, err.Error())
+	}
+	if given || description != "" {
+		if err := setSecretDescription(d.personalHome(), s.Name, description); err != nil {
+			log.Printf("ask_secret: %s's description: %v", s.Name, err)
+		}
 	}
 	log.Printf("ask_secret: saved %s", s.Name)
 	return nil

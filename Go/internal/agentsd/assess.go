@@ -75,6 +75,7 @@ var appToolMethods = map[string]string{
 	"show_file":            "files/show",
 	"ask_question":         "questions/ask",
 	"ask_secret":           "secrets/ask",
+	"list_secrets":         "secrets/list",
 	"suggest_next_prompt":  "prompts/suggest",
 	"notify":               "people/notify",
 	"hang_up":              "calls/hangUp",

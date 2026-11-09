@@ -57,7 +57,7 @@ func TestTheCIToolsWriteTheRepositorysSettings(t *testing.T) {
 		}
 	}
 	const value = "sntrys_3706-not-real"
-	if err := d.setSessionSecret(a.ID, "SENTRY_TOKEN", value, false); err != nil {
+	if err := d.setSessionSecret(a.ID, "SENTRY_TOKEN", value, "", false); err != nil {
 		t.Fatal(err)
 	}
 

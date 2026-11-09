@@ -746,6 +746,16 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
   background: var(--paper-ground);
   color: inherit;
 }
+/* The secret card's Description (#4167), as its masked field. */
+.card .field textarea {
+  font: inherit;
+  padding: 5px 8px;
+  border: 1px solid var(--paper-rule);
+  border-radius: var(--radius-control);
+  background: var(--paper-ground);
+  color: inherit;
+  resize: vertical;
+}
 .card .asked { margin: 0; display: flex; align-items: baseline; gap: 4px; }
 /* An agent's ask_secret (#2885): the name, why and where, close together as on the window. */
 .card .secret { margin: 0; }
@@ -1537,6 +1547,8 @@ dialog.sheet:has(.settings-sheet) { width: min(760px, calc(100vw - 32px)); max-h
 }
 .sheet-note { margin: 10px 0 0; font-size: 0.75rem; opacity: 0.65; min-height: 2.6em; }
 .sheet-body .sheet-note { margin: 0; }
+/* A secret's Description (#4167): the sheet's own font, not a textarea's monospace. */
+.sheet-body textarea { font: inherit; resize: vertical; }
 .sheet-note.failure { color: var(--tint-failure); opacity: 1; }
 /* The Add Folder sheet's Project (#2671). */
 .new-folder-project { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -78,6 +79,17 @@ func (s Secrets) Value(name string) (string, bool) {
 }
 
 func (s Secrets) IsSet(name string) bool { _, ok := s.Value(name); return ok }
+
+// Names is each name set, once, in the file's order.
+func (s Secrets) Names() []string {
+	var out []string
+	for _, l := range s.lines {
+		if n, _, ok := assignment(l); ok && !slices.Contains(out, n) {
+			out = append(out, n)
+		}
+	}
+	return out
+}
 
 // Set replaces or appends one name; other lines stay in order.
 func (s *Secrets) Set(name, value string) {

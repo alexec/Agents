@@ -66,9 +66,9 @@ final class UserScopeState {
     /// the envelopes: the control plane never has it. `kind` is `card` for a card (#3531).
     /// `replacing` is the row replaced, for its version.
     /// `askBeforeUse` (#4016) is sealed into every copy's associated data, so the control plane
-    /// cannot change it.
+    /// cannot change it. `description` (#4167) goes beside the name, in clear.
     func setSecret(_ name: String, value: String, kind: String? = nil, replacing: DaemonAPI.UserSecretRow? = nil,
-                   askBeforeUse: Bool = false, on control: DaemonClient?) async -> String? {
+                   askBeforeUse: Bool = false, description: String? = nil, on control: DaemonClient?) async -> String? {
         guard let control else { return "The control plane can’t be reached." }
         do {
             let to = try await control.call(DaemonAPI.Method.userSecretRecipients, DaemonAPI.Empty(),
@@ -80,7 +80,7 @@ final class UserScopeState {
                                                       ask: askBeforeUse, to: recipients)
             _ = try await control.call(DaemonAPI.Method.userSetSecret,
                                        DaemonAPI.UserSecretSet(name: name, version: version, values: values, kind: kind,
-                                                               needsApproval: askBeforeUse ? true : nil))
+                                                               needsApproval: askBeforeUse ? true : nil, description: description))
             await load(control)
             return nil
         } catch {
