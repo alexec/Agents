@@ -74,6 +74,26 @@ test("the header counts and adds up", () => {
   assert.equal(p.progressWords(plan, 0, []), "1/3 done");
 });
 
+test("a standing epic's header has no end", () => {
+  const standing = { labels: ["bug"], any: [], not: [], lanes: 1 };
+  const plan = { item: item(1), children: [child(2, 1), child(3, 1)], steps: [], standing };
+  assert.equal(p.standingWords(plan, 1, [rollup(2, 4.1)]), "Standing · 1 running · 2 open · $4.10");
+  assert.equal(p.standingWords(plan, 0, []), "Standing · 2 open");
+  const full = { ...plan, children: Array.from({ length: 100 }, (_, i) => child(i + 2, 1)) };
+  assert.equal(p.standingWords(full, 0, []), "Standing · 100+ open");
+  assert.equal(p.standingWords({ ...plan, children: [], standing: { ...standing, error: "no standing block" } }, 0, []), "Standing");
+});
+
+test("a standing epic's query in words", () => {
+  const q = (extra) => ({ labels: [], any: [], not: [], lanes: 1, ...extra });
+  assert.equal(p.queryWords(q({ labels: ["bug"], milestone: "none" })), "Open issues labelled bug · no milestone · 1 lane at a time");
+  assert.equal(p.queryWords(q({ any: ["polish", "competitor"], not: ["wontfix"], milestone: "1.0", lanes: 2 })),
+    "Open issues labelled polish or competitor · not wontfix · milestone “1.0” · 2 lanes at a time");
+  assert.equal(p.queryWords(q({ labels: ["ui"], any: ["bug", "polish"], milestone: "any" })),
+    "Open issues labelled ui, and bug or polish · in a milestone · 1 lane at a time");
+  assert.equal(p.queryWords(q({})), "Open issues · 1 lane at a time");
+});
+
 test("the lead's words", () => {
   const lead = { session: "S", title: "Work pages lead", state: "running" };
   assert.equal(p.leadWords(lead, undefined), "Lead: “Work pages lead” (working)");

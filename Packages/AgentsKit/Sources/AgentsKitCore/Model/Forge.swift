@@ -45,12 +45,14 @@ public extension DaemonAPI {
         public var level: String?
         public var feature: String?
         public var progress: ForgeProgress?
+        /// It has the label `standing`: a standing epic, whose plan is a query (#3659).
+        public var standing: Bool?
 
         public init(node: LineageNode, title: String, state: String, url: String? = nil, folder: String? = nil,
                     labels: [ForgeLabel] = [], author: String? = nil, assignees: [String] = [], milestone: String? = nil,
                     updatedAt: Date, comments: Int = 0, draft: Bool? = nil, checks: String? = nil, review: String? = nil,
                     mergeable: String? = nil, autoMerge: Bool? = nil, parent: LineageNode? = nil, level: String? = nil,
-                    feature: String? = nil, progress: ForgeProgress? = nil, status: String? = nil) {
+                    feature: String? = nil, progress: ForgeProgress? = nil, status: String? = nil, standing: Bool? = nil) {
             self.node = node
             self.title = title
             self.state = state
@@ -72,6 +74,7 @@ public extension DaemonAPI {
             self.level = level
             self.feature = feature
             self.progress = progress
+            self.standing = standing
         }
     }
 
@@ -505,18 +508,45 @@ public extension DaemonAPI {
         }
     }
 
-    /// An epic and its plan: its children, step by step; the steps; and its lead, if any.
+    /// An epic and its plan: its children, step by step; the steps; and its lead, if any. A
+    /// standing epic's (#3661) has `standing`, and its children are its query's open issues, in
+    /// order, all in step 1.
     struct ForgePlan: Codable, Sendable, Hashable {
         public var item: ForgeItem
         public var children: [ForgePlanChild]
         public var steps: [ForgePlanStep]
         public var lead: ForgeLead?
+        public var standing: ForgeStanding?
 
-        public init(item: ForgeItem, children: [ForgePlanChild] = [], steps: [ForgePlanStep] = [], lead: ForgeLead? = nil) {
+        public init(item: ForgeItem, children: [ForgePlanChild] = [], steps: [ForgePlanStep] = [], lead: ForgeLead? = nil,
+                    standing: ForgeStanding? = nil) {
             self.item = item
             self.children = children
             self.steps = steps
             self.lead = lead
+            self.standing = standing
+        }
+    }
+
+    /// A standing epic's query (#3659, #3661), as the daemon read it from the epic's body: the
+    /// issue has all of `labels`, one of `any` and none of `not`; `milestone` is none, any or a
+    /// name; `lanes` its lead runs at once. `error` says why there is no query.
+    struct ForgeStanding: Codable, Sendable, Hashable {
+        public var labels: [String]
+        public var any: [String]
+        public var not: [String]
+        public var milestone: String?
+        public var lanes: Int
+        public var error: String?
+
+        public init(labels: [String] = [], any: [String] = [], not: [String] = [], milestone: String? = nil,
+                    lanes: Int = 1, error: String? = nil) {
+            self.labels = labels
+            self.any = any
+            self.not = not
+            self.milestone = milestone
+            self.lanes = lanes
+            self.error = error
         }
     }
 

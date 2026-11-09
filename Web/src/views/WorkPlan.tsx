@@ -5,7 +5,9 @@
 // the epic's folder) or Open lead. A row opens its issue's page. Where the machine writes to the
 // forge, the plan changes here too (#3271): Add child (a new issue, or one that is there) under the
 // steps, and each row's Blocked by menu of the other children; `wrote` reads the page again. An open
-// child also shows its estimate (#3560), from the page's lineage/estimate.
+// child also shows its estimate (#3560), from the page's lineage/estimate. A standing epic's plan
+// (#3662) is its query: the query in words, and its open issues in one list with no steps, Add child
+// or Blocked by; the header has no end.
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { AgentState, ForgeDone, ForgeItemDetail, ForgePlan, ForgePlanChild, LineageCostRollup, LineageEstimate, LineageLink } from "../protocol/generated";
@@ -16,7 +18,7 @@ import { doneWords, shortRef } from "../model/work";
 import { childEstimateWords, estimateRangeWords } from "../model/estimate";
 import {
   addChildRequest, blockedByRequest, blockedWords, blockerChoices, childLevels, leadStart, leadWords, markWords, namesIssue, planCostWords,
-  planMark, planPR, planSessions, planWorkWords, progressWords, stepTitle, type PlanMark,
+  planMark, planPR, planSessions, planWorkWords, progressWords, queryWords, standingWords, stepTitle, type PlanMark,
 } from "../model/epicPlan";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { offerStart } from "./NewAgent";
@@ -119,6 +121,36 @@ export function WorkPlan({ store, host, lineageHost, detail, asked, estimates = 
   };
   const names = namesIssue(newChild.value);
 
+  const row = (c: ForgePlanChild, p: ForgePlan) => {
+    const rollup = rollups.value[c.item.node.ref];
+    const pr = planPR(rollup);
+    const st = states(c);
+    const mark = planMark(c, pr, st);
+    const work = planWorkWords(pr, st) ?? blockedWords(c);
+    const cost = planCostWords(rollup);
+    const est = estimates.find((e) => e.node.ref === c.item.node.ref);
+    const estWords = est ? childEstimateWords(est) : undefined;
+    return (
+      <li key={c.item.node.ref} class="work-plan-item">
+        <button type="button" class="work-plan-row" title={`Open ${shortRef(c.item.node.ref)}'s page`}
+          onClick={() => go({ nav: "work", section: "issue", item: c.item.node.ref })}>
+          <span class={`work-plan-mark ${markClass[mark]}`} title={markWords[mark]} aria-label={markWords[mark]}>{mark}</span>
+          <span class="quiet work-plan-level">{c.item.level ?? ""}</span>
+          <span class="work-ref">{shortRef(c.item.node.ref)}</span>
+          <span class="work-plan-title"><ForgeTitle text={c.item.title} /></span>
+          {work && <span class="quiet small">{work}</span>}
+          {cost && <span class="quiet small work-plan-cost">{cost}</span>}
+          {est && estWords && <span class="quiet small work-plan-cost work-plan-estimate" title={estimateRangeWords(est)}>{estWords}</span>}
+        </button>
+        {writes && !p.standing && p.children.length > 1 && (
+          <button type="button" class="work-plan-blocked" disabled={busy.value} aria-label="Blocked by"
+            title={`Blocked by: which children ${shortRef(c.item.node.ref)} waits for`}
+            onClick={(e) => blockedByMenu(e, c, p)}>Blocked by ▾</button>
+        )}
+      </li>
+    );
+  };
+
   const p = plan.value;
   const running = p ? p.children.filter((c) => states(c).some(holdsRuntime)).length : 0;
   const lead = p?.lead;
@@ -135,54 +167,33 @@ export function WorkPlan({ store, host, lineageHost, detail, asked, estimates = 
                 ? <span class={lead.state === "waitingOnUser" ? "attention" : undefined}>
                   {leadWords(lead, store.agent(sessionHost(store.agents.value, lead.session.toUpperCase()) ?? "", lead.session.toUpperCase())?.title)}</span>
                 : <span class="quiet">No lead</span>}
-              <span class="quiet">{progressWords(p, running, Object.values(rollups.value))}</span>
+              <span class="quiet">{(p.standing ? standingWords : progressWords)(p, running, Object.values(rollups.value))}</span>
               {lead
                 ? <button type="button" disabled={!openLead} onClick={openLead} title="The lead's chat">Open lead</button>
                 : detail.start && p.item.state === "open" && <button type="button" class="prominent" onClick={startLead}
                   title="The new-session form in this epic's folder, filled in for a lead with the lead skill">Start lead</button>}
             </div>
             {said.value && <p class={said.value.failed ? "hint failure small" : "quiet small"} role="status">{said.value.words}</p>}
-            {p.children.length === 0 ? <p class="hint">No sub-issues yet.</p> : (
+            {p.standing && (p.standing.error
+              ? <p class="hint failure small" role="status">{p.standing.error}</p>
+              : <p class="quiet small" title="The standing block in this epic's body: its plan is this query, in priority order, then the oldest">
+                {queryWords(p.standing)}</p>)}
+            {p.children.length === 0 ? !p.standing?.error && <p class="hint">{p.standing ? "No open issues match its query." : "No sub-issues yet."}</p>
+              : p.standing ? (
+                <div class="work-plan-steps">
+                  <div class="work-plan-step"><ul>{p.children.map((c) => row(c, p))}</ul></div>
+                </div>
+              ) : (
               <div class="work-plan-steps">
                 {p.steps.map((s) => (
                   <div key={s.step} class="work-plan-step">
                     <h4 class="small">{stepTitle(s, p)}</h4>
-                    <ul>
-                      {p.children.filter((c) => c.step === s.step).map((c) => {
-                        const rollup = rollups.value[c.item.node.ref];
-                        const pr = planPR(rollup);
-                        const st = states(c);
-                        const mark = planMark(c, pr, st);
-                        const work = planWorkWords(pr, st) ?? blockedWords(c);
-                        const cost = planCostWords(rollup);
-                        const est = estimates.find((e) => e.node.ref === c.item.node.ref);
-                        const estWords = est ? childEstimateWords(est) : undefined;
-                        return (
-                          <li key={c.item.node.ref} class="work-plan-item">
-                            <button type="button" class="work-plan-row" title={`Open ${shortRef(c.item.node.ref)}'s page`}
-                              onClick={() => go({ nav: "work", section: "issue", item: c.item.node.ref })}>
-                              <span class={`work-plan-mark ${markClass[mark]}`} title={markWords[mark]} aria-label={markWords[mark]}>{mark}</span>
-                              <span class="quiet work-plan-level">{c.item.level ?? ""}</span>
-                              <span class="work-ref">{shortRef(c.item.node.ref)}</span>
-                              <span class="work-plan-title"><ForgeTitle text={c.item.title} /></span>
-                              {work && <span class="quiet small">{work}</span>}
-                              {cost && <span class="quiet small work-plan-cost">{cost}</span>}
-                              {est && estWords && <span class="quiet small work-plan-cost work-plan-estimate" title={estimateRangeWords(est)}>{estWords}</span>}
-                            </button>
-                            {writes && p.children.length > 1 && (
-                              <button type="button" class="work-plan-blocked" disabled={busy.value} aria-label="Blocked by"
-                                title={`Blocked by: which children ${shortRef(c.item.node.ref)} waits for`}
-                                onClick={(e) => blockedByMenu(e, c, p)}>Blocked by ▾</button>
-                            )}
-                          </li>
-                        );
-                      })}
-                    </ul>
+                    <ul>{p.children.filter((c) => c.step === s.step).map((c) => row(c, p))}</ul>
                   </div>
                 ))}
               </div>
             )}
-            {writes && p.item.state === "open" && (
+            {writes && !p.standing && p.item.state === "open" && (
               <form class="work-plan-add" onSubmit={(e) => { e.preventDefault(); addChild(); }}>
                 <input type="text" aria-label="Child" placeholder="New child's title, or #12 for an issue that is there"
                   value={newChild.value} onInput={(e) => { newChild.value = (e.target as HTMLInputElement).value; }} />

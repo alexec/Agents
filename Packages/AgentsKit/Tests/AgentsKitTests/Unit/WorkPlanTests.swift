@@ -99,6 +99,29 @@ struct WorkPlanTests {
         #expect(WorkPlan.progressWords(plan, running: 0, rollups: []) == "1/3 done")
     }
 
+    @Test func aStandingEpicsHeaderHasNoEnd() {
+        let plan = DaemonAPI.ForgePlan(item: .init(node: issue(1), title: "Bug lane", state: "open", updatedAt: day),
+                                       children: [child(2, step: 1), child(3, step: 1)], standing: .init(labels: ["bug"]))
+        let words = WorkPlan.standingWords(plan, running: 1, rollups: [rollup(2, usd: 4.1)])
+        #expect(words.hasPrefix("Standing · 1 running · 2 open · "))
+        #expect(words.hasSuffix("4.10"))
+        #expect(WorkPlan.standingWords(plan, running: 0, rollups: []) == "Standing · 2 open")
+        let full = DaemonAPI.ForgePlan(item: plan.item, children: (2...101).map { child($0, step: 1) }, standing: plan.standing)
+        #expect(WorkPlan.standingWords(full, running: 0, rollups: []) == "Standing · 100+ open")
+        let bad = DaemonAPI.ForgePlan(item: plan.item, standing: .init(error: "no standing block"))
+        #expect(WorkPlan.standingWords(bad, running: 0, rollups: []) == "Standing")
+    }
+
+    @Test func aStandingEpicsQueryInWords() {
+        #expect(WorkPlan.queryWords(.init(labels: ["bug"], milestone: "none"))
+            == "Open issues labelled bug · no milestone · 1 lane at a time")
+        #expect(WorkPlan.queryWords(.init(any: ["polish", "competitor"], not: ["wontfix"], milestone: "1.0", lanes: 2))
+            == "Open issues labelled polish or competitor · not wontfix · milestone “1.0” · 2 lanes at a time")
+        #expect(WorkPlan.queryWords(.init(labels: ["ui"], any: ["bug", "polish"], milestone: "any"))
+            == "Open issues labelled ui, and bug or polish · in a milestone · 1 lane at a time")
+        #expect(WorkPlan.queryWords(.init()) == "Open issues · 1 lane at a time")
+    }
+
     @Test func theLeadsWords() {
         let lead = DaemonAPI.ForgeLead(session: UUID(), title: "Work pages lead", state: .running)
         #expect(WorkPlan.leadWords(lead, title: nil) == "Lead: “Work pages lead” (working)")
