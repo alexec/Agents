@@ -14,6 +14,8 @@ enum HostEntry {
         if CommandLine.arguments.contains(DaemonLauncher.argument) { DaemonLauncher.run() }
         // What's wrong with the login items, for a bug report, with no window (#678).
         if CommandLine.arguments.contains(HostDiagnostics.argument) { HostDiagnostics.runFromCommandLine() }
+        // ship.sh: the login items again from this copy, so launchd runs it (#4130).
+        if CommandLine.arguments.contains(LocalServices.registerArgument) { LocalServices.registerFromCommandLine() }
         // With no window server to reach (an agent's sandbox, ssh, a launchd job outside
         // the login session), AppKit aborts in _RegisterApplication (#505): say why and stop.
         guard CGSessionCopyCurrentDictionary() != nil else {

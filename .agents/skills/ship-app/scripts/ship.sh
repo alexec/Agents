@@ -40,8 +40,10 @@
 # LaunchServices knows, such as an old Debug build in some checkout (#3451). launchd keeps
 # the copy it found while that copy is on disk, also when LaunchServices forgets it (#3521).
 # So the restart leaves LaunchServices only the installed copy, moves aside the copy the
-# jobs run from, restarts them, puts that copy back, and then checks that they run from
-# the installed one.
+# jobs run from, and restarts them. A job whose login item was registered from that copy
+# does not start from another (#4130), so when they do not come up on the installed copy,
+# that copy registers them again (`Agents Host --register-jobs`). The copy moved aside
+# goes back only then, and the restart checks that they run from the installed one.
 set -u
 setopt pipefail
 
@@ -108,8 +110,9 @@ running_copies() {
   done | sort -u
 }
 # launchd starts a job again from the copy it found, while that copy is on disk, even when
-# LaunchServices no longer has it (#3521). A copy that is not there makes launchd look
-# again, and it finds the installed one. The running processes keep their files.
+# LaunchServices no longer has it (#3521). The running processes keep their files. A copy
+# that is not there can make launchd look again; when the login item was registered from
+# it, the job does not start at all (78: EX_CONFIG) until it is registered again (#4130).
 typeset -a ASIDE
 move_aside_running_copies() {
   local copy
@@ -133,8 +136,29 @@ put_back_copies() {
 # Waits up to 30s for the jobs to run from the installed copy.
 wait_host_jobs_installed() {
   local i
-  for i in {1..15}; do host_jobs_installed >/dev/null && break; sleep 2; done
+  for i in {1..15}; do host_jobs_installed >/dev/null && break; sleep "${WAIT_STEP:-2}"; done
   host_jobs_installed
+}
+# The installed copy registers its login items again, so launchd starts them from it (#4130).
+register_jobs_from_installed() {
+  echo "$(date) registering the jobs again from $HOSTAPP_AT"
+  ${CLEAN[@]} "$HOSTAPP_AT/Contents/MacOS/Agents Host" --register-jobs
+}
+# With the other copies aside: restart the jobs, and when they do not come up on the
+# installed copy, register them again from it. The copies go back after that, also when
+# it failed: a job on the old copy is better than none.
+restart_host_jobs() {
+  local j ok=0
+  move_aside_running_copies
+  for j in $HOST_JOBS; do
+    if loaded $j; then launchctl kickstart -k $GUI/$j && echo "restarted $j"; fi
+  done
+  if ! wait_host_jobs_installed; then
+    register_jobs_from_installed
+    wait_host_jobs_installed || ok=1
+  fi
+  put_back_copies
+  return $ok
 }
 
 restart() { # live-folder sha delay
@@ -162,12 +186,7 @@ restart() { # live-folder sha delay
   mv "$LIVE/Agents Host.app" "$HOSTAPP_AT"
   echo "$(date) Agents Host $SHA at $HOSTAPP_AT"
   only_installed_host
-  move_aside_running_copies
-  for j in $HOST_JOBS; do
-    if loaded $j; then launchctl kickstart -k $GUI/$j && echo "restarted $j"; fi
-  done
-  wait_host_jobs_installed >/dev/null
-  put_back_copies
+  restart_host_jobs
   if (( HOSTUI )) || ! any_loaded $HOST_JOBS; then
     $CLEAN open "$HOSTAPP_AT"
     echo "opened Agents Host"
@@ -188,10 +207,7 @@ restart() { # live-folder sha delay
     # Something registered another copy again while this ran: once more, then give up.
     echo "$(date) the jobs do not run from $HOSTAPP_AT; unregistering and moving aside the other copies again"
     only_installed_host
-    move_aside_running_copies
-    for j in $HOST_JOBS; do loaded $j && launchctl kickstart -k $GUI/$j; done
-    wait_host_jobs_installed || wrong=1
-    put_back_copies
+    restart_host_jobs || wrong=1
   fi
   for j in $HOST_JOBS; do
     pid=$(job_pid $j)
