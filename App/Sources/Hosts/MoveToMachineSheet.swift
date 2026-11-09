@@ -38,14 +38,13 @@ struct MoveToMachineSheet: View {
     @State private var problem: String?
 
     private var targets: [MachineRef] { model.moveTargets(for: agent) ?? [] }
-    private var title: String { agent.title ?? "this session" }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Move “\(title)” to Another Machine")
+            Text(MoveToMachineWords.title(agent.title))
                 .appText(.reading).fontWeight(.semibold)
             if targets.isEmpty {
-                Text("No other machine is online. Start one under Machines in the sidebar, then try again.")
+                Text(MoveToMachineWords.noTargets)
                     .appText(.supporting).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
@@ -54,14 +53,14 @@ struct MoveToMachineSheet: View {
                         Text(model.hosts.label(host)).tag(Optional(host))
                     }
                 }
-                LabeledContent("Folder there") {
-                    TextField("The project’s folder there", text: $folder)
+                LabeledContent(MoveToMachineWords.folderLabel) {
+                    TextField(MoveToMachineWords.folderPlaceholder, text: $folder)
                         .textFieldStyle(.roundedBorder)
                 }
-                Text("Leave the folder empty to use this project’s folder on that machine, or give an absolute path, such as /home/me/project.")
+                Text(MoveToMachineWords.folderHelp)
                     .appText(.fine).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(whatGoes)
+                Text(MoveToMachineWords.whatGoes(stops: model.canStop(agent)))
                     .appText(.fine).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -70,7 +69,7 @@ struct MoveToMachineSheet: View {
                     .appText(.fine).tinted(.failure)
                     .fixedSize(horizontal: false, vertical: true)
             } else if moving {
-                Text("Moving…").appText(.fine).foregroundStyle(.secondary)
+                Text(MoveToMachineWords.moving).appText(.fine).foregroundStyle(.secondary)
             }
             HStack {
                 Spacer()
@@ -87,11 +86,6 @@ struct MoveToMachineSheet: View {
         .padding(20)
         .frame(width: 460)
         .onAppear { machine = machine ?? targets.first }
-    }
-
-    private var whatGoes: String {
-        let stops = model.canStop(agent) ? " Its turn stops here, and it carries on there." : ""
-        return "Its branch goes there with its uncommitted changes, and the session goes on there with this conversation.\(stops)"
     }
 
     private func move() async {

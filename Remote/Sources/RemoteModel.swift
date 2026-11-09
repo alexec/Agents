@@ -5239,6 +5239,39 @@ final class RemoteModel {
             problem = away(error, "that could not be sent.") ?? "That did not reach your Mac."
         }
     }
+    /// The session a menu's Move to Machine… is moving (#4037), asked at the root as Rename… is.
+    var movingToMachine: Agent?
+
+    /// The machines `agent` can move to (#3790), as the window's sheet lists them: the Machines
+    /// group's others that are online now, This Mac first. Nil when its host cannot move a
+    /// session, or is not answering.
+    func moveTargets(for agent: Agent) -> [MachineRef]? {
+        guard agent.state != .archived, !isStale(agent), host(agent.host, has: Capability.sessionsMove1) else { return nil }
+        return machines.filter { $0 != agent.host && !machineOffline($0) }
+    }
+
+    /// Moves `agent` to `machine`, into `folder` there, or the folder of its project there when
+    /// `folder` is empty (#3790). It answers once that machine has it; a chat open on it then
+    /// follows it to its folder there. Sent once: a move is not a call to send twice.
+    func moveToMachine(_ agent: Agent, machine: MachineRef, folder: String) async throws {
+        let folder = folder.trimmingCharacters(in: .whitespaces)
+        guard let id = machine == .mac ? controlHome : machine else { throw HostAway(host: machine) }
+        let request = DaemonAPI.MoveToMachineRequest(agentID: agent.id, machine: id.rawValue, machineName: machineName(machine),
+                                                     folder: folder.isEmpty ? nil : folder)
+        let answer = try await client(for: request, on: agent.host)
+            .callWhileAnswering(DaemonAPI.Method.agentsMoveToMachine, request, checkingEvery: .seconds(10))
+            .decode(DaemonAPI.MoveToMachineAnswer.self)
+        if selection == agent.id {
+            selectedKey = FolderKey(host: machine, folder: URL(fileURLWithPath: answer.folder))
+            selection = agent.id
+        }
+    }
+
+    /// What the sheet says when a move did not go.
+    func moveProblem(_ error: any Error) -> String {
+        away(error, "the session could not be moved.") ?? sentence(for: error)
+    }
+
     /// Branch from Here (#1658): a new session from just before one of the person's prompts,
     /// opened as Branch opens one, with that prompt in its bar to change and send. The words
     /// go in as the new session's draft, so its bar has them however it comes on screen.
@@ -5470,6 +5503,11 @@ final class RemoteModel {
             if arguments.contains("-archive-open") {
                 try? await Task.sleep(for: .seconds(2))
                 await archive(agent.id, andLeave: true)
+            }
+            // `-move-open`: then Move to Machine… from the chat's ···, for a walk (#4037).
+            if arguments.contains("-move-open") {
+                try? await Task.sleep(for: .seconds(2))
+                movingToMachine = work.agent(agent.id)
             }
         }
         // `-workflow` opens a workflow's page on the chosen folder, by its name.
