@@ -1,10 +1,14 @@
 package agentsd
 
 import (
+	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/alexec/agents/Go/internal/agentsd/skillcatalog"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -149,5 +153,108 @@ func TestAnUnreadableKeyGivesOneErrorForEverySecret(t *testing.T) {
 	}
 	if err := d.saveSealedSecret(home, "NEW_TOKEN", "new", "", false); err == nil || !strings.Contains(err.Error(), "does not read") {
 		t.Fatalf("%v", err)
+	}
+}
+
+// #4177: every write of a secret with the flag off goes to the sealed store, and a
+// secrets.env found at start is sealed into it and removed, at each start that finds one.
+// After a start, no file under the home holds a value as plain text.
+func TestNoSecretsEnvAfterAStart(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("AGENTS_PERSONAL_HOME", home)
+	path := skillcatalog.SecretsPath(home)
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("# mine\nOLD_TOKEN=old-4177-not-real\nKEPT_TOKEN=from-the-file\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	d, _ := start(t, root)
+	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("secrets.env is still there: %v", err)
+	}
+	if got := d.secrets(); got["OLD_TOKEN"] != "old-4177-not-real" || got["KEPT_TOKEN"] != "from-the-file" {
+		t.Fatalf("%v", got)
+	}
+	if s := readSealedSecrets(home).Secrets["OLD_TOKEN"]; !s.NoAsk {
+		t.Fatalf("a moved secret is flagged: %+v", s)
+	}
+
+	// Each writer keeps its value in the store, with the flag off.
+	if err := d.saveSecret("ASKED_BY_HAND", "asked-4177-not-real", false); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.setPlainSecrets(home, map[string]string{"MCP_TOKEN": "mcp-4177-not-real"}, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.saveSecret("FLAGGED_TOKEN", "flagged-4177-not-real", true); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.setNeedsApproval(wire.SecretNeedsApprovalRequest{Name: "FLAGGED_TOKEN", NeedsApproval: false}); err != nil {
+		t.Fatal(err)
+	}
+	// A write that is not the flag's own does not turn Ask before use off.
+	if err := d.saveSecret("STILL_ASKS", "asks-4177-not-real", true); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.setPlainSecrets(home, map[string]string{"STILL_ASKS": "asks-4177-newer"}, ""); err != nil {
+		t.Fatal(err)
+	}
+	if !isSealedSecret(home, "STILL_ASKS") {
+		t.Fatal("a plain write turned the flag off")
+	}
+	got := d.secrets()
+	for name, want := range map[string]string{"ASKED_BY_HAND": "asked-4177-not-real", "MCP_TOKEN": "mcp-4177-not-real",
+		"FLAGGED_TOKEN": "flagged-4177-not-real"} {
+		if got[name] != want {
+			t.Fatalf("%s: %q", name, got[name])
+		}
+	}
+	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("a write made secrets.env again")
+	}
+	if err := d.forgetPlainSecret(home, "MCP_TOKEN"); err != nil || secretIsSet(home, "MCP_TOKEN") {
+		t.Fatalf("forget: %v", err)
+	}
+	d.Shutdown()
+
+	// A file that comes back (a hand edit) is moved at the next start; the store's record
+	// of a name wins over the file's line, as every reader read it first.
+	os.WriteFile(path, []byte("KEPT_TOKEN=stale-line\nNEW_TOKEN=new-4177-not-real\n"), 0o600)
+	d2, _ := start(t, root)
+	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("secrets.env came back and stayed")
+	}
+	if got := d2.secrets(); got["KEPT_TOKEN"] != "from-the-file" || got["NEW_TOKEN"] != "new-4177-not-real" {
+		t.Fatalf("%v", got)
+	}
+	for _, v := range []string{"old-4177-not-real", "from-the-file", "asked-4177-not-real", "flagged-4177-not-real",
+		"asks-4177-newer", "new-4177-not-real", "stale-line"} {
+		assertNotUnder(t, home, v)
+		assertNotUnder(t, root, v)
+	}
+}
+
+// #4177: a start whose key does not read leaves secrets.env as it is, and its readers read
+// it until a start moves it.
+func TestAMoveWithNoKeyKeepsTheFile(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("AGENTS_PERSONAL_HOME", home)
+	path := skillcatalog.SecretsPath(home)
+	os.MkdirAll(filepath.Dir(path), 0o700)
+	os.WriteFile(path, []byte("OLD_TOKEN=old-value\n"), 0o600)
+	d, err := New(context.Background(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Shutdown()
+	d.HostKey = nil
+	d.MoveSecretsFile()
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("the file went with nothing to seal it: %v", err)
+	}
+	if got := d.secrets()["OLD_TOKEN"]; got != "old-value" {
+		t.Fatalf("%q", got)
 	}
 }

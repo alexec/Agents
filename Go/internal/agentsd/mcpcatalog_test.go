@@ -114,9 +114,8 @@ func TestAnMCPServerFoundAddedListedAndRemoved(t *testing.T) {
 
 	var set wire.MCPSetSecretAnswer
 	json.Unmarshal(c.call(t, 13, "mcp/set-secret", map[string]any{"name": "OTHER", "value": "v"}), &set)
-	secrets, _ := os.ReadFile(filepath.Join(home, ".agents-secrets", "secrets.env"))
-	if !set.Set || string(secrets) != "GITHUB_TOKEN=ghp_x\nOTHER=v\n" {
-		t.Fatalf("%q", secrets)
+	if secrets := d.secrets(); !set.Set || secrets["GITHUB_TOKEN"] != "ghp_x" || secrets["OTHER"] != "v" {
+		t.Fatalf("%v", secrets)
 	}
 	if e := c.callError(t, 14, "mcp/set-secret", map[string]any{"name": "no good", "value": "v"}); e.Code != wire.FailureCatalogRefused {
 		t.Fatalf("%+v", e)
@@ -180,7 +179,7 @@ func mcpEntryAt(path, name string) (any, bool, error) {
 }
 
 // Ports MCPAddByHandTests: a server typed on the sheet is connected to before anything is
-// written, then written as it answered, its secret to secrets.env.
+// written, then written as it answered, its secret to sealed.json.
 func TestAnMCPServerTypedVerifiedAndAdded(t *testing.T) {
 	self, _ := os.Executable()
 	t.Setenv("AGENTS_FAKE_MCP", "1")
@@ -203,8 +202,8 @@ func TestAnMCPServerTypedVerifiedAndAdded(t *testing.T) {
 	if added.Server == nil || added.Server.Run != wire.MCPRunKindCommand || !*added.Server.ByHand {
 		t.Fatalf("%+v", added)
 	}
-	if secrets, _ := os.ReadFile(filepath.Join(home, ".agents-secrets", "secrets.env")); string(secrets) != "TOKEN=t0p\n" {
-		t.Fatalf("%q", secrets)
+	if secrets := d.secrets(); secrets["TOKEN"] != "t0p" {
+		t.Fatalf("%v", secrets)
 	}
 	// The name is taken now.
 	json.Unmarshal(c.call(t, 3, "mcp/verify", map[string]any{"destination": personal, "server": local}), &v)

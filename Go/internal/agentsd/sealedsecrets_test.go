@@ -83,7 +83,6 @@ func TestAnAgentCannotClearTheFlag(t *testing.T) {
 	t.Setenv("AGENTS_PERSONAL_HOME", home)
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	path := skillcatalog.SecretsPath(home)
 	if err := d.saveSecret("GITLAB_PASSWORD", "the-persons", false); err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +90,7 @@ func TestAnAgentCannotClearTheFlag(t *testing.T) {
 	if err := d.saveSecret("GITLAB_PASSWORD", "an-agents", true); err != nil {
 		t.Fatal(err)
 	}
-	if skillcatalog.LoadSecrets(path).IsSet("GITLAB_PASSWORD") || !isSealedSecret(home, "GITLAB_PASSWORD") {
+	if d.plainSecrets(home).IsSet("GITLAB_PASSWORD") || !isSealedSecret(home, "GITLAB_PASSWORD") {
 		t.Fatal("an agent's write left the flag off")
 	}
 	for _, method := range []string{wire.CallSecretsSetNeedsApproval.Name, wire.CallMCPSetSecret.Name, wire.CallSecretsSessionSet.Name} {
@@ -108,16 +107,16 @@ func TestAnAgentCannotClearTheFlag(t *testing.T) {
 		Params: json.RawMessage(`{"name":"GITLAB_PASSWORD","needsApproval":false}`)})
 	d.dispatch(helper, message{JSONRPC: "2.0", Method: wire.CallMCPSetSecret.Name, ID: json.RawMessage(`2`),
 		Params: json.RawMessage(`{"name":"GITLAB_PASSWORD","value":"x","needsApproval":false}`)})
-	if skillcatalog.LoadSecrets(path).IsSet("GITLAB_PASSWORD") || !isSealedSecret(home, "GITLAB_PASSWORD") {
+	if d.plainSecrets(home).IsSet("GITLAB_PASSWORD") || !isSealedSecret(home, "GITLAB_PASSWORD") {
 		t.Fatal("an agent's connection turned the flag off")
 	}
 	// A person's client turns it off, which puts the plain line back, and on again.
 	c.call(t, 1, wire.CallSecretsSetNeedsApproval.Name, map[string]any{"name": "GITLAB_PASSWORD", "needsApproval": false})
-	if v, _ := skillcatalog.LoadSecrets(path).Value("GITLAB_PASSWORD"); v != "an-agents" || isSealedSecret(home, "GITLAB_PASSWORD") {
+	if v, _ := d.plainSecrets(home).Value("GITLAB_PASSWORD"); v != "an-agents" || isSealedSecret(home, "GITLAB_PASSWORD") {
 		t.Fatalf("off: %q", v)
 	}
 	c.call(t, 2, wire.CallSecretsSetNeedsApproval.Name, map[string]any{"name": "GITLAB_PASSWORD", "needsApproval": true})
-	if skillcatalog.LoadSecrets(path).IsSet("GITLAB_PASSWORD") || !isSealedSecret(home, "GITLAB_PASSWORD") {
+	if d.plainSecrets(home).IsSet("GITLAB_PASSWORD") || !isSealedSecret(home, "GITLAB_PASSWORD") {
 		t.Fatal("on: still plain")
 	}
 	assertNotUnder(t, home, "an-agents")
@@ -169,13 +168,12 @@ func TestYourSetupsFlagIsSealed(t *testing.T) {
 	d, c := start(t, root)
 	defer d.Shutdown()
 	d.SettingsDir = t.TempDir()
-	path := skillcatalog.SecretsPath(home)
 	send := func(secrets ...wire.SealedUserSecret) {
 		d.Told(wire.NotifyMachineUserSettings.Name, mustJSON(wire.MachineUserSettings{User: "sam", Secrets: secrets}))
 	}
 	send(flaggedSecret(t, public, "sam", "GITHUB_TOKEN", 1, "ghp_flagged", true))
-	if skillcatalog.LoadSecrets(path).IsSet("GITHUB_TOKEN") {
-		t.Fatal("a flagged secret of the person's is in secrets.env")
+	if d.plainSecrets(home).IsSet("GITHUB_TOKEN") {
+		t.Fatal("a flagged secret of the person's is read as plain")
 	}
 	if v, ok, _ := d.localSecret("", "GITHUB_TOKEN"); !ok || v != "ghp_flagged" {
 		t.Fatalf("%q", v)
@@ -195,25 +193,25 @@ func TestYourSetupsFlagIsSealed(t *testing.T) {
 	on := flaggedSecret(t, public, "sam", "GITHUB_TOKEN", 3, "ghp_flagged_by_cp", false)
 	on.NeedsApproval = new(true)
 	send(on)
-	if skillcatalog.LoadSecrets(path).IsSet("GITHUB_TOKEN") {
+	if d.plainSecrets(home).IsSet("GITHUB_TOKEN") {
 		t.Fatal("a flag the control plane turned off opened")
 	}
 	if v, _, _ := d.localSecret("", "GITHUB_TOKEN"); v == "ghp_flagged_by_cp" {
 		t.Fatal("a flag the control plane turned on opened")
 	}
 
-	// The person's client seals it with the flag off: back in secrets.env, out of sealed.json.
+	// The person's client seals it with the flag off: a plain record, no longer flagged.
 	send(flaggedSecret(t, public, "sam", "GITHUB_TOKEN", 4, "ghp_plain", false))
-	if v, _ := skillcatalog.LoadSecrets(path).Value("GITHUB_TOKEN"); v != "ghp_plain" || isSealedSecret(home, "GITHUB_TOKEN") {
+	if v, _ := d.plainSecrets(home).Value("GITHUB_TOKEN"); v != "ghp_plain" || isSealedSecret(home, "GITHUB_TOKEN") {
 		t.Fatalf("%q", v)
 	}
 	// Flagged again, then removed: gone from both.
 	send(flaggedSecret(t, public, "sam", "GITHUB_TOKEN", 5, "ghp_flagged_again", true))
-	if skillcatalog.LoadSecrets(path).IsSet("GITHUB_TOKEN") || !isSealedSecret(home, "GITHUB_TOKEN") {
+	if d.plainSecrets(home).IsSet("GITHUB_TOKEN") || !isSealedSecret(home, "GITHUB_TOKEN") {
 		t.Fatal("flagged again")
 	}
 	send()
-	if skillcatalog.LoadSecrets(path).IsSet("GITHUB_TOKEN") || isSealedSecret(home, "GITHUB_TOKEN") {
+	if d.plainSecrets(home).IsSet("GITHUB_TOKEN") || isSealedSecret(home, "GITHUB_TOKEN") {
 		t.Fatal("a removed secret stayed")
 	}
 }

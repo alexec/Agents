@@ -224,9 +224,12 @@ func TestThePersonsOwnMarketplaces(t *testing.T) {
 	if acme == nil || acme.TokenMissing || *acme.Token != "ACME_TOKEN" || !acme.Enabled {
 		t.Fatalf("%+v", list)
 	}
-	secrets, _ := os.ReadFile(filepath.Join(home, ".agents-secrets", "secrets.env"))
-	if info, _ := os.Stat(filepath.Join(home, ".agents-secrets", "secrets.env")); string(secrets) != "ACME_TOKEN=s3cret\n" || info.Mode().Perm() != 0o600 {
-		t.Fatalf("%q", secrets)
+	// The token is kept sealed, with Ask before use off (#4177): no secrets.env.
+	if got := d.secrets(); got["ACME_TOKEN"] != "s3cret" || isSealedSecret(home, "ACME_TOKEN") {
+		t.Fatalf("%v", got)
+	}
+	if _, err := os.Stat(skillcatalog.SecretsPath(home)); !os.IsNotExist(err) {
+		t.Fatal("secrets.env was written")
 	}
 	file, _ := os.ReadFile(filepath.Join(home, ".agents", "marketplaces.json"))
 	if string(file) != "{\n  \"marketplaces\" : [\n    {\n      \"format\" : \"mcp-registry\",\n      \"name\" : \"Acme\",\n      \"token\" : \"ACME_TOKEN\",\n      \"url\" : \"https://mcp.acme.example\"\n    }\n  ]\n}\n" {

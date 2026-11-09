@@ -130,6 +130,9 @@ func main() {
 			d.SetMember(member)
 		}
 	}
+	// No secrets.env (#4177): one found here, from before the update or written by hand, is
+	// sealed into sealed.json and removed, before any call can read it.
+	d.MoveSecretsFile()
 	safe.Go("socket", func() {
 		if err := d.ServeSocket(ctx, loc.Socket()); err != nil && ctx.Err() == nil {
 			log.Printf("socket: %v", err)
