@@ -16,8 +16,6 @@ this Mac, with **Agents Host**.
 - Agents, the window, on this Mac.
 - Agents Host, a free download from us. It is not in the App Store, because it runs
   programs for your agents.
-- If you want the control plane's store in a bucket rather than on this Mac: the bucket's
-  endpoint, name, region and an access key and secret for it. You can also switch later.
 
 ## Steps
 
@@ -64,26 +62,11 @@ The code works once, for five minutes. If it runs out, close the sheet and click
 again. You can also open the sheet from the Agents Host menu bar item, with **Pair a
 Window or Phone…**.
 
-### Keep the store in a bucket instead
-
-The control plane keeps what it remembers (paired windows and devices, and your hosts) in a
-folder on this Mac by default. In a bucket, it outlives this Mac, and copies elsewhere can
-share it later.
-
-1. In Agents Host, under **CONTROL PLANE**, set **Keeps its store** to **In a bucket**.
-2. Fill in **Endpoint**, **Bucket**, **Prefix**, **Region**, **Access key** and
-   **Secret**.
-3. Click **Check**. It says **Works, with safe concurrent writes** when the bucket can be
-   used.
-4. Click **Switch Store…**, then **Switch Store**.
-
-   The control plane stops for a moment while every record is copied across. Windows,
-   phones and hosts reconnect by themselves, and nothing needs pairing again. The old
-   store is kept. The bucket's keys are kept only in this Mac's keychain.
-
-To go back, set **Keeps its store** to **On this Mac** and click **Switch Store…** again.
-
 ## What to know
+
+- The control plane keeps what it remembers (paired windows and devices, and your
+  machines) in a folder on this Mac. To keep it in the cloud, run the control plane there:
+  see [Run the control plane in the cloud](run-the-control-plane-in-the-cloud.md).
 
 - While this Mac sleeps, or is off your network, no window or device can reach any of
   your agents, including agents on servers. They keep working, and you see them again when

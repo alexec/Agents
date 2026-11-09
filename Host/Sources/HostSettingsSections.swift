@@ -128,10 +128,10 @@ struct HostMacSection: View {
 
 /// Settings ▸ Control plane ▸ Overview, under the control plane's own card (#4227): what
 /// was the Host window's CONTROL PLANE card: moving the control plane to another machine
-/// and back, and where it keeps its store.
+/// and back. Its store is always on this Mac (#4227): a cloud one is a control plane run
+/// there, not this Mac's in a bucket.
 struct HostControlPlaneCards: View {
     let host: HostModel
-    @State private var confirmingSwitch = false
     @State private var confirmingRunHere = false
     @State private var movingMachine = false
     @State private var returning = false
@@ -154,11 +154,6 @@ struct HostControlPlaneCards: View {
                         returnRow(place)
                     }
                 }
-                SharedSectionLabel("Store")
-                storeCard
-                Text("The keys stay in this Mac’s keychain. In a bucket, what the control plane remembers outlives this Mac, and a copy elsewhere can share it later.")
-                    .appText(.supporting).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
             } else if host.settings.role == .joinElsewhere {
                 joinedCard
             }
@@ -166,11 +161,6 @@ struct HostControlPlaneCards: View {
         }
         .sheet(isPresented: $movingMachine) { MachineMoveSheet().environment(host) }
         .sheet(isPresented: $returning) { MachineReturnSheet().environment(host) }
-        .confirmationDialog("Switch where the control plane keeps its store?", isPresented: $confirmingSwitch) {
-            Button("Switch Store") { Task { await host.switchStore() } }
-        } message: {
-            Text("The control plane stops for a moment while every record is copied across. Windows, phones and machines reconnect by themselves. The old store is kept.")
-        }
         .confirmationDialog("Run the control plane on this Mac?", isPresented: $confirmingRunHere) {
             Button("Run It Here") { Task { await host.runHere() } }
         } message: {
@@ -267,74 +257,6 @@ struct HostControlPlaneCards: View {
         let left = status?.stillToHear.map(\.name) ?? []
         guard !left.isEmpty else { return "Everyone has heard where the control plane went." }
         return "\(ListFormatter.localizedString(byJoining: left)) will need pairing again."
-    }
-
-    // MARK: The store
-
-    private var storeCard: some View {
-        @Bindable var host = host
-        return ControlCard {
-            ControlRow(dot: .none, title: "Keeps its store", detail: host.settings.store == .bucket ? "In a bucket" : "On this Mac") {
-                Picker("Keeps its store", selection: $host.storeDraft) {
-                    Text("On this Mac").tag(StoreChoice.thisMac)
-                    Text("In a bucket").tag(StoreChoice.bucket)
-                }
-                .pickerStyle(.segmented).labelsHidden().fixedSize()
-            }
-            if host.storeDraft == .bucket {
-                Divider()
-                Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
-                    field("Endpoint", text: $host.bucketDraft.endpoint, prompt: "https://s3.eu-west-2.amazonaws.com")
-                    field("Bucket", text: $host.bucketDraft.bucket, prompt: "my-agents")
-                    field("Prefix", text: $host.bucketDraft.prefix, prompt: "control")
-                    field("Region", text: $host.bucketDraft.region, prompt: "us-east-1")
-                    field("Access key", text: $host.accessKeyDraft, prompt: "")
-                    GridRow {
-                        Text("Secret").foregroundStyle(.secondary).gridColumnAlignment(.trailing)
-                        SecureField("", text: $host.secretDraft).textFieldStyle(.roundedBorder).accessibilityLabel("Secret")
-                    }
-                    GridRow {
-                        Color.clear.frame(width: 1, height: 1)
-                        HStack {
-                            Button("Check") { Task { await host.checkBucket() } }
-                                .buttonStyle(.paper)
-                                .disabled(!host.bucketDraft.isComplete || host.check == .checking)
-                            checkLine
-                            Spacer()
-                            switchButton
-                        }
-                    }
-                }
-                .padding(16)
-            } else if !host.storeIsSaved {
-                Divider()
-                HStack { Spacer(); switchButton }.padding(.horizontal, 16).padding(.vertical, 12)
-            }
-        }
-    }
-
-    private var switchButton: some View {
-        Button("Switch Store…") { confirmingSwitch = true }
-            .buttonStyle(.link)
-            .disabled(host.storeIsSaved || host.busy != nil || (host.storeDraft == .bucket && host.check != .works))
-    }
-
-    @ViewBuilder
-    private var checkLine: some View {
-        switch host.check {
-        case .checking?: ProgressView().controlSize(.small)
-        case .works?: Label("Works, with safe concurrent writes", systemImage: "checkmark").tinted(.vouched)
-        case .failed(let why)?: Text(why).tinted(.failure).lineLimit(2).help(why)
-        case nil: EmptyView()
-        }
-    }
-
-    private func field(_ label: String, text: Binding<String>, prompt: String) -> some View {
-        GridRow {
-            Text(label).foregroundStyle(.secondary).gridColumnAlignment(.trailing)
-            TextField(label, text: text, prompt: Text(prompt)).textFieldStyle(.roundedBorder).labelsHidden()
-                .accessibilityLabel(label)
-        }
     }
 }
 

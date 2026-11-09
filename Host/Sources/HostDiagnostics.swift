@@ -40,7 +40,6 @@ struct HostDiagnostics {
         lines.append("Scratch set-up: \(paths.scratch ? "yes" : "no")")
         section("Settings")
         lines.append("Role: \(settings.role)")
-        lines.append("Store: \(settings.store)")
         lines.append("Web remote: \(settings.servesWebRemote ? "on" : "off")")
         if let moved = settings.movedTo { lines.append("Moved to: \(moved)") }
         if let from = settings.returnedFrom { lines.append("Returned from: \(from)") }
