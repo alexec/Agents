@@ -6609,10 +6609,29 @@ final class AppModel {
                 return
             }
             sent = await answerElicitation(request, action: .accept, content: content)
+        case "request":
+            guard let request = work.requests.first(where: { $0.id.uuidString == parts[1] }),
+                  let action = NeedRequest.Action(rawValue: quick.id) else {
+                note("banner: \(token) is over, nothing sent")
+                return
+            }
+            sent = await answerSecretUse(request, action)
         default:
             return
         }
         note("banner: \(token) \(quick.kind.rawValue) \(sent ? "answered" : "not sent")")
+    }
+
+    /// A person's answer to a secret's use (#4017), from its Needs you row or its banner: to
+    /// the host of the session that asked. Whether it went; why not is the problem.
+    @discardableResult
+    func answerSecretUse(_ request: NeedRequest, _ action: NeedRequest.Action) async -> Bool {
+        let answer = DaemonAPI.RequestsAnswer(id: request.id, secretUse: action)
+        return await attempt(on: host(ofAgent: request.askedBy)) {
+            let update = try await self.client(forAgent: request.askedBy)
+                .call(DaemonAPI.Method.requestsAnswer, answer, returning: DaemonAPI.RequestUpdate.self)
+            self.work.replaceRequests(self.work.requests.filter { $0.id != update.request.id })
+        }
     }
 
     // MARK: Forms

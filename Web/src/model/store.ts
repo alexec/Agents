@@ -1,6 +1,7 @@
 // What the page holds and what each notification means: AgentsModel (Client/AgentsModel.swift),
 // ported by hand for the notifications the web remote hears and held to Fixtures/web/reducer
 // (research R7). Nothing here decides anything; the hosts do.
+import type { SecretUseAction } from "./secretUse";
 import { preferencesSaid, sendPreferencesWith } from "./preferences";
 import { folderPath as hostedFolderPath, healthTally, personalServers } from "./hostedMCP";
 import type { ExportImportBusy } from "./exports";
@@ -2722,6 +2723,14 @@ export class Store extends Work {
     }, host);
     this.upsertFolder(summary, host);
     return summary;
+  }
+
+  /**
+   * A person's answer to a secret's use (#4017), from its Needs you row: to the host that asked.
+   * From the row's menu, so a refusal is said in `problem`; `requests/changed` takes the row away.
+   */
+  async answerSecretUse(host: string, request: string, action: SecretUseAction): Promise<void> {
+    await this.act("requests/answer", { id: request as never, answer: { secretUse: { action } } }, host);
   }
 
   /**

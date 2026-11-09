@@ -7411,7 +7411,7 @@ type Need struct {
 	Headline Headline `json:"headline"`
 }
 
-// NeedID (Attention/Need.swift): what is being answered, one key per kind. A notice (#2805) is what an agent told the person with `notify`: posted, never a Needs you row.
+// NeedID (Attention/Need.swift): what is being answered, one key per kind. A notice (#2805) is what an agent told the person with `notify`: posted, never a Needs you row. A request (#4017) is a Needs you request posted so a phone can answer it: today only a secret's use (#4015), whose banner has its four answers.
 type NeedID struct {
 	Permission *UUID `json:"permission,omitzero"`
 
@@ -7422,6 +7422,8 @@ type NeedID struct {
 	GuardedChange *NeedIDGuardedChange `json:"guardedChange,omitzero"`
 
 	Notice *string `json:"notice,omitzero"`
+
+	Request *UUID `json:"request,omitzero"`
 }
 
 type NeedIDReport struct {
@@ -7443,6 +7445,7 @@ const NeedKindElicitation NeedKind = "elicitation"
 const NeedKindReport NeedKind = "report"
 const NeedKindGuardedChange NeedKind = "guardedChange"
 const NeedKindNotice NeedKind = "notice"
+const NeedKindRequest NeedKind = "request"
 
 // folders/notCommitted (#3448): what in the folder's .agents Git ignores, so it stays on this machine and the project's other folders do not get it.
 type NotCommittedResponse struct {

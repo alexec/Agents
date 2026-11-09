@@ -2,6 +2,9 @@
 // as the window's and the Remote's RequestRowLabel (Shared/UI/ApprovalViews.swift). Its title is
 // what is asked; its grey line, the kind, who asked it and how many sessions it blocks; its time,
 // how long it has waited. A press opens the session that asked it, where its card takes the answer.
+// A secret's use (#4017) has no card: its title says which secret, its grey line the asker and
+// where the value goes, and its menu (a right click, a long press or the menu key) has Allow Once, Allow
+// for This Session, Allow Always and Deny, as the window's and the Remote's menus have.
 // Its mark is one for each kind (#4026), as NeedRequest.symbol is: unlike an approval's one shield,
 // it says what is asked. The step's hand taps: the raised hand is a session that needs the person.
 import type { Request as PersonRequest, RequestKind } from "../protocol/generated";
@@ -9,6 +12,8 @@ import type { Store } from "../model/store";
 import { shortAgo } from "../model/activity";
 import { fromWireDate } from "../protocol/dates";
 import { go } from "../route";
+import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
+import { secretUseActions, secretUseOf, secretUseTitle, secretUseWhere, secretUseWords } from "../model/secretUse";
 
 const kindWords: Record<RequestKind, string> = {
   decide: "Question", approve: "Approval", account: "Account", step: "Step for you", secret: "Secret",
@@ -17,7 +22,8 @@ const kindWords: Record<RequestKind, string> = {
 /** The grey line: the kind, the asker, and how many it blocks when more than one. */
 export function requestLine(request: PersonRequest, asker: string | undefined): string {
   const blocks = Math.max(request.waiters.length, request.askedBy === undefined ? 0 : 1);
-  return [kindWords[request.kind], asker, blocks > 1 ? `blocks ${blocks} sessions` : undefined]
+  const use = secretUseOf(request);
+  return [...(use ? [asker, secretUseWhere(use)] : [kindWords[request.kind], asker]), blocks > 1 ? `blocks ${blocks} sessions` : undefined]
     .filter(Boolean).join(" · ");
 }
 
@@ -51,15 +57,26 @@ export function RequestRow({ store, host, folder, request, place, chosen }: {
 }) {
   const asker = request.askedBy as string;
   const since = fromWireDate(request.askedAt);
-  const line = requestLine(request, store.agent(host, asker)?.title);
+  const askerTitle = store.agent(host, asker)?.title;
+  const line = requestLine(request, askerTitle);
+  const use = secretUseOf(request);
+  const open = () => go({ host, folder, session: asker });
+  const menu = (): MenuItem[] => [
+    ...(use ? secretUseActions(use).map((action) => ({
+      label: secretUseWords[action], run: () => void store.answerSecretUse(host, request.id, action),
+    })) : []),
+    { label: "Open Session", run: open },
+  ];
   return (
     <div class="nav-item">
       <button class={`row session approval${chosen ? " chosen" : ""}`} aria-current={chosen}
-        aria-description="waiting for your answer" title={line} onClick={() => go({ host, folder, session: asker })}>
+        aria-description="waiting for your answer" title={line} onClick={open}
+        onContextMenu={(e) => openContextMenu(e, menu())}
+        onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu()); }} {...holdForMenu(menu)}>
         <RequestMark kind={request.kind} />
         <span class="body">
           <span class="title placed">
-            <span class="name">{request.title}</span>
+            <span class="name">{use ? secretUseTitle(use) : request.title}</span>
             <span class="place"> {place}</span>
           </span>
           <span class="subtitle">{line}</span>
