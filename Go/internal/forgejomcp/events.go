@@ -174,13 +174,6 @@ func EventNames() []string { return mcpevents.Names(events) }
 // eventsList is events/list's answer.
 func eventsList() map[string]any { return mcpevents.List(events) }
 
-// MARK: The cursor
-
-// cursor is where a poll has got to: a high-water time, and the ids already raised at exactly
-// that time, so events that share one time are neither lost nor raised twice. A client keeps
-// it as an opaque string (base64url of its JSON).
-type cursor = mcpevents.Cursor
-
 // MARK: Polling
 
 // candidate is something that may be raised: its id, its time (in timeLayout), and its data,
