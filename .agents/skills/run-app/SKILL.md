@@ -354,6 +354,29 @@ echo '{"azureBoardsProjects": ["acme/Web Shop"]}' >$ROOT/shop/.agents/folder.jso
 $S/rpc.py $ROOT call folders/add "{\"folder\":\"file://$ROOT/shop\"}"
 ```
 
+## A fake Bitbucket and a fake Forgejo (#4136)
+
+`launch.sh --fake-bitbucket` starts `scripts/fake-bitbucket.py`, Bitbucket Cloud's REST API 2.0
+for the repository `acme/app` (its issues, pull requests, Pipelines runs and their logs), and
+gives the host `BITBUCKET_API_URL`. `launch.sh --fake-forgejo` starts `scripts/fake-forgejo.py`,
+a Forgejo 17 with the same repository (its issues and their dependencies, pull requests, reviews
+and Forgejo Actions runs). Both are in memory, with no outside account, and take any token but
+`wrong-token`. `launch.sh` prints `BITBUCKET_API_URL` and `BITBUCKET_REMOTE`, or `FORGEJO_URL`
+and `FORGEJO_REMOTE`. Connect each with a token, then add a folder with that remote: the host
+finds a Bitbucket repository only on `bitbucket.org` (and reads it at `BITBUCKET_API_URL`), and
+a Forgejo repository on the connection's host. Each script's own top comment says what it holds.
+`stop.sh` stops them.
+
+```sh
+eval "$($S/launch.sh --slug forges --fake-bitbucket --fake-forgejo)"
+$S/rpc.py $ROOT call connections/sign-in/token '{"provider":"bitbucket","token":"walk"}'
+$S/rpc.py $ROOT call connections/sign-in/token "{\"provider\":\"forgejo\",\"url\":\"$FORGEJO_URL\",\"token\":\"walk\"}"
+for f in bb:$BITBUCKET_REMOTE fj:$FORGEJO_REMOTE; do
+  git init -q $ROOT/${f%%:*} && git -C $ROOT/${f%%:*} remote add origin "${f#*:}"
+  $S/rpc.py $ROOT call folders/add "{\"folder\":\"file://$ROOT/${f%%:*}\"}"
+done
+```
+
 ## The Remote
 
 The Remote is built for the generic simulator:

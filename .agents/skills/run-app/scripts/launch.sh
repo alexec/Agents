@@ -40,7 +40,9 @@ while [ $# -gt 0 ]; do
     --outside-checkout) OUTSIDE=1 ;;  # open a copy of the window from the root, so its title names no worktree (#1078)
     --person)    PERSON="$2"; shift ;;   # the first name the window gives the person, in place of the Mac account's (#1078)
     --fake-azure-devops) FAKE_AZURE_DEVOPS=1 ;;  # Azure Repos and Azure Boards for the host (scripts/fake-azure-devops.py, #4063)
-    *) echo "usage: launch.sh [--slug NAME] [--config Debug|Live] [--seeded] [--no-build] [--front] [--no-window] [--first-run] [--lan] [--host-first] [--web-port N] [--env KEY=VALUE]… [--control-env KEY=VALUE]… [--appearance light|dark] [--app-arg ARG]… [--outside-checkout] [--person NAME] [--fake-azure-devops]" >&2; exit 2 ;;
+    --fake-bitbucket) FAKE_BITBUCKET=1 ;;  # Bitbucket Cloud for the host (scripts/fake-bitbucket.py, #4136)
+    --fake-forgejo) FAKE_FORGEJO=1 ;;      # a Forgejo for the host (scripts/fake-forgejo.py, #4136)
+    *) echo "usage: launch.sh [--slug NAME] [--config Debug|Live] [--seeded] [--no-build] [--front] [--no-window] [--first-run] [--lan] [--host-first] [--web-port N] [--env KEY=VALUE]… [--control-env KEY=VALUE]… [--appearance light|dark] [--app-arg ARG]… [--outside-checkout] [--person NAME] [--fake-azure-devops] [--fake-bitbucket] [--fake-forgejo]" >&2; exit 2 ;;
   esac
   shift
 done
@@ -117,19 +119,27 @@ mkdir -p "$ROOT/control"
 CLEAN=(env -i HOME="$HOME" USER="$USER" LOGNAME="$USER" TMPDIR="${TMPDIR:-/tmp}" LANG=en_US.UTF-8
        PATH="/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin")
 
-# --fake-azure-devops (#4063): the fake Azure DevOps on a free loopback port, its pid in the
-# root for stop.sh, and the host signed in to it by the secrets of a scratch personal home
-# (<root>/personal, or the one --env AGENTS_PERSONAL_HOME=… names), never the person's own.
+# start_fake NAME PROBE AUTH (#4063, #4136): scripts/fake-NAME.py on a free loopback port, its
+# pid in the root for stop.sh; it prints the fake's URL once PROBE (a path) answers to the
+# Authorization header AUTH.
+start_fake() {
+  local port url
+  port="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')"
+  url="http://127.0.0.1:$port"
+  "${CLEAN[@]}" nohup python3 "$REPO/.agents/skills/run-app/scripts/fake-$1.py" "$port" >"$ROOT/fake-$1.out" 2>&1 &
+  echo $! >"$ROOT/fake-$1.pid"
+  for _ in $(seq 1 50); do curl -fs -o /dev/null -H "Authorization: $3" "$url$2" && break; sleep 0.1; done
+  curl -fs -o /dev/null -H "Authorization: $3" "$url$2" \
+    || { echo "the fake $1 did not answer on $url — see $ROOT/fake-$1.out" >&2; return 1; }
+  echo "$url"
+}
+
+# --fake-azure-devops (#4063): the fake Azure DevOps, and the host signed in to it by the
+# secrets of a scratch personal home (<root>/personal, or the one --env AGENTS_PERSONAL_HOME=…
+# names), never the person's own.
 AZURE_DEVOPS_URL=""
 if [ "${FAKE_AZURE_DEVOPS:-0}" = 1 ]; then
-  ADO_PORT="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')"
-  AZURE_DEVOPS_URL="http://127.0.0.1:$ADO_PORT"
-  "${CLEAN[@]}" nohup python3 "$REPO/.agents/skills/run-app/scripts/fake-azure-devops.py" "$ADO_PORT" \
-    >"$ROOT/fake-azure-devops.out" 2>&1 &
-  echo $! >"$ROOT/fake-azure-devops.pid"
-  for _ in $(seq 1 50); do curl -fs -o /dev/null "$AZURE_DEVOPS_URL/acme/_apis/connectionData" && break; sleep 0.1; done
-  curl -fs -o /dev/null "$AZURE_DEVOPS_URL/acme/_apis/connectionData" \
-    || { echo "the fake Azure DevOps did not answer on $AZURE_DEVOPS_URL — see $ROOT/fake-azure-devops.out" >&2; exit 1; }
+  AZURE_DEVOPS_URL="$(start_fake azure-devops /acme/_apis/connectionData "Basic OndhbGs=")" || exit 1
   PERSONAL="$ROOT/personal"
   for kv in ${EXTRA_ENV[@]+"${EXTRA_ENV[@]}"}; do
     case "$kv" in AGENTS_PERSONAL_HOME=*) PERSONAL="${kv#AGENTS_PERSONAL_HOME=}" ;; esac
@@ -139,6 +149,19 @@ if [ "${FAKE_AZURE_DEVOPS:-0}" = 1 ]; then
   mkdir -p "$PERSONAL/.agents-secrets"
   printf 'AZURE_DEVOPS_URL=%s\nAZURE_DEVOPS_TOKEN=walk\n' "$AZURE_DEVOPS_URL" >>"$PERSONAL/.agents-secrets/secrets.env"
   chmod 600 "$PERSONAL/.agents-secrets/secrets.env"
+fi
+
+# --fake-bitbucket and --fake-forgejo (#4136): the fake Bitbucket Cloud, whose API the host reads
+# at BITBUCKET_API_URL, and the fake Forgejo, which a walk connects to by its URL. Neither signs
+# the host in: connect each with any token (the run-app skill says how).
+BITBUCKET_API_URL=""
+if [ "${FAKE_BITBUCKET:-0}" = 1 ]; then
+  BITBUCKET_API_URL="$(start_fake bitbucket /2.0/user "Bearer walk")/2.0" || exit 1
+  EXTRA_ENV+=(BITBUCKET_API_URL="$BITBUCKET_API_URL")
+fi
+FORGEJO_URL=""
+if [ "${FAKE_FORGEJO:-0}" = 1 ]; then
+  FORGEJO_URL="$(start_fake forgejo /api/v1/user "token walk")" || exit 1
 fi
 
 # The control plane: a single copy on a free loopback port, its store, key and certificate
@@ -275,4 +298,12 @@ EOF
 [ -z "$AZURE_DEVOPS_URL" ] || cat <<EOF
 AZURE_DEVOPS_URL=$AZURE_DEVOPS_URL
 AZURE_DEVOPS_REMOTE=$AZURE_DEVOPS_URL/acme/Web%20Shop/_git/shop
+EOF
+[ -z "$BITBUCKET_API_URL" ] || cat <<EOF
+BITBUCKET_API_URL=$BITBUCKET_API_URL
+BITBUCKET_REMOTE=https://bitbucket.org/acme/app.git
+EOF
+[ -z "$FORGEJO_URL" ] || cat <<EOF
+FORGEJO_URL=$FORGEJO_URL
+FORGEJO_REMOTE=$FORGEJO_URL/acme/app.git
 EOF
