@@ -214,7 +214,6 @@ func decodeCursor(raw json.RawMessage, folder string) (cursor, *rpcError) {
 // MARK: Polling
 
 const (
-	maxEvents = mcpevents.MaxEvents
 	// nextPollMs is the pace with IDLE on the folder (a quiet poll costs the server nothing)
 	// and without.
 	idlePollMs  = 10000

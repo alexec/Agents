@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -136,7 +135,6 @@ func eventsList() map[string]any { return mcpevents.List(events) }
 type candidate = mcpevents.Candidate
 
 const (
-	maxEvents = mcpevents.MaxEvents
 	// nextPollMs is a minute, as the jira and linear servers': Azure DevOps's rate limit is by
 	// use, and a poll reads each changed work item's updates or comments.
 	nextPollMs = 60000
@@ -225,8 +223,6 @@ func (s *Events) candidates(ctx context.Context, e event, a args, since string) 
 	}
 	return list, truncated, nil
 }
-
-func contains(list []string, s string) bool { return slices.Contains(list, s) }
 
 func containsFold(list []string, s string) bool {
 	for _, x := range list {

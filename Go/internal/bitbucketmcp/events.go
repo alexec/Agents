@@ -281,6 +281,9 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 	})
 }
 
+// poll is events/poll over a cursor (mcpevents.Poller.Poll). The first poll starts from the
+// start of this second: Bitbucket gives times to the microsecond, but a fake or a cache may give
+// them to the second, so a thing made in it would otherwise be older than the cursor.
 func (s *Events) poll(e event, p pollParams, find func(since string) ([]candidate, Listed, error)) (map[string]any, *rpcError) {
 	return polls.Poll(e.Name, p, func() string { return timeString(s.now().Truncate(time.Second)) },
 		func(since string) ([]candidate, mcpevents.Listed, error) {

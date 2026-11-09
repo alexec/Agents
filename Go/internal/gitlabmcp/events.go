@@ -304,6 +304,7 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 	})
 }
 
+// poll is events/poll over a cursor (mcpevents.Poller.Poll), from now on the first poll.
 func (s *Events) poll(e event, p pollParams, find func(since string) ([]candidate, Listed, error)) (map[string]any, *rpcError) {
 	return polls.Poll(e.Name, p, func() string { return timeString(s.now()) },
 		func(since string) ([]candidate, mcpevents.Listed, error) {

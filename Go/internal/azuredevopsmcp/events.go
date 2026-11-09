@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"slices"
 	"time"
 
 	"github.com/alexec/agents/Go/internal/mcpevents"
@@ -241,6 +240,9 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 	})
 }
 
+// poll is events/poll over a cursor (mcpevents.Poller.Poll). The first poll starts from the
+// start of this second: a thing made in it would otherwise be older than the cursor when a
+// listing gives times to the second.
 func (s *Events) poll(e event, p pollParams, find func(since string) ([]candidate, Listed, error)) (map[string]any, *rpcError) {
 	return polls.Poll(e.Name, p, func() string { return timeString(s.now().Truncate(time.Second)) },
 		func(since string) ([]candidate, mcpevents.Listed, error) {
@@ -248,8 +250,6 @@ func (s *Events) poll(e event, p pollParams, find func(since string) ([]candidat
 			return found, mcpevents.Listed{Truncated: listed.Truncated, Newest: listed.Newest}, err
 		})
 }
-
-func contains(list []string, s string) bool { return slices.Contains(list, s) }
 
 // state is a pull request and whether its state (in conflict, or open and ready) is on now;
 // nil keeps the one it had.

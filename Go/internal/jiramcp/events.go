@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"regexp"
-	"slices"
 	"strings"
 	"time"
 
@@ -129,7 +128,6 @@ type candidate struct {
 }
 
 const (
-	maxEvents = mcpevents.MaxEvents
 	// nextPollMs is a minute, as the linear server's: Jira Cloud's rate limit is by cost, and
 	// a site's Jira admin, who could set up webhooks instead, is often not the person.
 	nextPollMs = 60000
@@ -218,8 +216,6 @@ func (s *Events) candidates(ctx context.Context, e event, a args, since string) 
 	}
 	return list, truncated, nil
 }
-
-func contains(list []string, s string) bool { return slices.Contains(list, s) }
 
 func containsFold(list []string, s string) bool {
 	for _, x := range list {

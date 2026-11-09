@@ -135,7 +135,6 @@ func eventsList() map[string]any { return mcpevents.List(events) }
 type candidate = mcpevents.Candidate
 
 const (
-	maxEvents = mcpevents.MaxEvents
 	// nextPollMs is a minute, not the github server's 30 s: a personal key has 1500 requests an
 	// hour, and a wait on each of the four events costs three a poll.
 	nextPollMs = 60000
