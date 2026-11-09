@@ -219,6 +219,14 @@ func TestARealChromium(t *testing.T) {
 	if strings.Contains(v.UserAgent, "Headless") {
 		t.Fatal(v.UserAgent)
 	}
+	// It has no passkeys, so a page sees no WebAuthn (#4084).
+	webAuthn, err := chromedp.Run(p.store.(cdpStore).ctx, chromedp.Evaluate[string](`typeof PublicKeyCredential`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if webAuthn != "undefined" {
+		t.Fatal(webAuthn)
+	}
 	if out, _ := exec.Command("lsof", "-a", "-p", strconv.Itoa(p.pid), "-iTCP", "-sTCP:LISTEN", "-nP").Output(); strings.Contains(string(out), "*:") {
 		t.Fatalf("listens beyond 127.0.0.1:\n%s", out)
 	}
