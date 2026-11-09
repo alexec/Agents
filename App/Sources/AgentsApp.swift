@@ -82,6 +82,15 @@ struct AgentsApp: App {
         }
         .defaultSize(width: 720, height: 560)
 
+        // The agent browser or a simulator in a window of its own (#4141), from Open on a
+        // live tile or Open the page on a hand-off. One per session and source: opening one
+        // already open brings it forward.
+        WindowGroup(id: TakeOverKey.sceneID, for: TakeOverKey.self) { $key in
+            TakeOverWindow(key: key)
+                .environment(model)
+        }
+        .defaultSize(width: 1_024, height: 768)
+
         // The app's first Settings scene, and what gives it ⌘, and the menu item.
         // A scene rather than a page beside Spending, which Spending itself is not:
         // that one is read-only by construction, and a limit is the one number in

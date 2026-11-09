@@ -1,7 +1,7 @@
 // The files pane (071 US4; frame B): a fourth column from 1440, over the chat below that. Four
 // tabs: Files (the session's folder, browsed, a file opened), Changes (what the agent changed),
-// Page (a live page the agent shows), Exchanged (what the conversation handed over, #258), Simulator,
-// and Agent Browser (the machine's browser, #3528).
+// Page (a live page the agent shows), Exchanged (what the conversation handed over, #258) and Simulator.
+// The agent browser is not a tab here: Open on its live tile takes it over in a tab of its own (#4141).
 import { signal, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { Agent, DirectoryEntry } from "../protocol/generated";
@@ -18,15 +18,12 @@ import { fileToPin, nameOf, paneOf, pathOf, setPane, textShownAs, type Tab } fro
 import { LiveDocument } from "./LiveDocument";
 import { Exchanged } from "./Exchanged";
 import { SimulatorPane } from "./SimulatorPane";
-import { AgentBrowserPane } from "./AgentBrowserPane";
-import { words as browserWords } from "../model/machineBrowser";
 import { Capability } from "../protocol/capabilities.generated";
 import { hostNeedsUpdate } from "../model/capabilities";
 
 const tabs: { tab: Tab; label: string }[] = [
   { tab: "files", label: "Files" }, { tab: "changes", label: "Changes" }, { tab: "page", label: "Page" },
   { tab: "exchanged", label: "Exchanged" }, { tab: "simulator", label: "Simulator" },
-  { tab: "browser", label: browserWords.tab },
 ];
 
 /** Below 760 the page is the phone's one column at a time, and Files lists one folder at a time, as the Remote does. */
@@ -159,9 +156,6 @@ export function FilesPane({ store, host, session }: { store: Store; host: string
         {pane.tab === "exchanged" && <Exchanged store={store} host={host} session={session} />}
         {pane.tab === "simulator" && (store.has(host, Capability.simulators1)
           ? <SimulatorPane store={store} host={host} />
-          : <p class="hint">{hostNeedsUpdate}</p>)}
-        {pane.tab === "browser" && (store.has(host, Capability.browser1)
-          ? <AgentBrowserPane key={session} store={store} host={host} session={session} />
           : <p class="hint">{hostNeedsUpdate}</p>)}
       </div>
     </aside>

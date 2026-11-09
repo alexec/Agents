@@ -1347,7 +1347,7 @@ final class AppModel {
     /// the rest.
     @ObservationIgnored private var shellClients: [ShellKey: ShellClient] = [:]
     /// Each host's browser as this window watches it (#3528): one per host, shared by the
-    /// Agent Browser panes of every session on it.
+    /// take-over windows of every session on it (#4141).
     @ObservationIgnored private var machineBrowsers: [MachineRef: MachineBrowser] = [:]
     /// How many screens show each of those shells (#213).
     @ObservationIgnored private var shellScreens: [ShellKey: Int] = [:]
@@ -6123,12 +6123,12 @@ final class AppModel {
         _ = await send(report, to: agentID)
     }
 
-    /// What a host says about its browser (#3528): for the Agent Browser pane alone.
+    /// What a host says about its browser (#3528): for the agent browser's take-over window alone (#4141).
     private static let browserNotifications: Set<String> = [
         DaemonAPI.Notification.browserFrame, DaemonAPI.Notification.browserPageChanged,
     ]
 
-    /// The Agent Browser pane's view of the browser on a session's host (#3528), made once
+    /// The take-over window's view of the browser on a session's host (#3528), made once
     /// per host per window.
     func machineBrowser(for agentID: UUID) -> MachineBrowser {
         let host = host(ofAgent: agentID)

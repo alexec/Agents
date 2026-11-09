@@ -35,10 +35,17 @@ struct RemoteChatView: View {
     @Environment(\.sceneFolder) private var sceneFolder
     /// The folder's own shell (#418), in the ··· menu (#2808). Nil in a scene of its own.
     @Environment(\.openFolderTerminal) private var openFolderTerminal
+    @Environment(\.supportsMultipleWindows) private var supportsMultipleWindows
+    @Environment(\.openWindow) private var openWindow
 
     private var agent: Agent? { popped.map { model.work.agent($0.id) } ?? model.selectedAgent }
     /// This chat's page of the transcript: its scene's own, or the main scene's.
     private var page: AgentsModel { model.page(popped) }
+
+    /// Open on a live tile (#4141): a scene of its own on an iPad, a cover on an iPhone.
+    private var openTakeOver: OpenTakeOver {
+        OpenTakeOver(supportsMultipleWindows: supportsMultipleWindows, openWindow: openWindow, model: model)
+    }
 
     var body: some View {
         Group {
@@ -371,13 +378,13 @@ struct RemoteChatView: View {
             })
         }
         // It drives the screen, the browser or a simulator (#3004, #4140), as on the Mac: the
-        // live tile. Open shows the browser or the simulator in its pane until the take-over
-        // window (#4141).
+        // live tile. Open takes the browser or the simulator over in a scene of its own on an
+        // iPad, a full-screen cover on an iPhone (#4141).
         let liveFrames = page.liveFrames.filter { $0.value.frame.agentID == agent.id }
         if agent.state == .running, !liveFrames.isEmpty {
             cards.append(WaitingCard(id: "live:" + agent.id.uuidString) {
-                LiveTile(frames: liveFrames, open: { [model] source in
-                    model.panes.state(for: agent.id).show(source == .simulator ? .simulator : .browser)
+                LiveTile(frames: liveFrames, open: { [openTakeOver] source in
+                    openTakeOver(TakeOverKey(agentID: agent.id, source: source))
                 })
                 .chatColumn()
                 .transition(.opacity)

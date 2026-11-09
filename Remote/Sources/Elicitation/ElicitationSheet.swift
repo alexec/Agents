@@ -15,6 +15,9 @@ import SwiftUI
 /// question at a time by `FormPages`, the way the Mac pages it.
 struct ElicitationSheet: View {
     @Environment(RemoteModel.self) private var model
+    @Environment(\.supportsMultipleWindows) private var supportsMultipleWindows
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.inTakeOver) private var inTakeOver
     let request: ElicitationRequest
 
     /// What was tapped, while the answer is in flight — the same guard against a second
@@ -45,11 +48,11 @@ struct ElicitationSheet: View {
             }
 
             if let handOff = request.handOff {
-                // A step on the page in the machine's browser (#3529): Open the page opens the
-                // Agent Browser pane (#3800, #4038), as on the Mac and the web; a host too old
-                // to have one says so.
-                HandOffCard(handOff: handOff, open: model.agent(request.agentID, has: Capability.browser1) ? openAgentBrowser : nil,
-                            elsewhere: "This machine’s Agents is too old to show its browser here. Update it, then open the page.",
+                // A step on the page in the machine's browser (#3529): Open the page takes the
+                // agent browser over (#3800, #4038, #4141), as on the Mac and the web; a host too
+                // old to have one says so. In the take-over, the page is open already.
+                HandOffCard(handOff: handOff, open: inTakeOver || !model.agent(request.agentID, has: Capability.browser1) ? nil : openAgentBrowser,
+                            elsewhere: inTakeOver ? nil : "This machine’s Agents is too old to show its browser here. Update it, then open the page.",
                             host: model.answerRecipient(request.agentID), sending: chosen != nil) { done, note in
                     send(done ? "Done" : "Can't do it", action: .accept, content: ElicitationRequest.handOffAnswer(done: done, note: note))
                 }
@@ -82,7 +85,8 @@ struct ElicitationSheet: View {
     }
 
     private func openAgentBrowser() {
-        model.panes.state(for: request.agentID).show(.browser)
+        OpenTakeOver(supportsMultipleWindows: supportsMultipleWindows, openWindow: openWindow, model: model)(
+            TakeOverKey(agentID: request.agentID, source: .browser))
     }
 
     @ViewBuilder

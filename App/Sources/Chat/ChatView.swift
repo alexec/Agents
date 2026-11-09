@@ -389,15 +389,14 @@ struct ChatView: View {
             })
         }
         // It drives the screen, the browser or a simulator (#3004, #4140): the live tile, above
-        // any pause card. Open shows the browser or the simulator in its pane until the
-        // take-over window (#4141); a chat in a window of its own has no pane to open.
+        // any pause card. Open takes the browser or the simulator over in a window of its own
+        // (#4141), also from a chat in a window of its own.
         let liveFrames = model.work.liveFrames.filter { $0.value.frame.agentID == agent.id }
         if agent.state == .running, !liveFrames.isEmpty {
             cards.append(WaitingCard(id: "live:" + agent.id.uuidString) {
-                LiveTile(frames: liveFrames, open: hasInspector ? { [frame] source in
-                    frame.pane = source == .simulator ? .simulator : .agentBrowser
-                    if !frame.isOpen { frame.open() }
-                } : nil)
+                LiveTile(frames: liveFrames, open: { [openWindow] source in
+                    openWindow(id: TakeOverKey.sceneID, value: TakeOverKey(agentID: agent.id, source: source))
+                })
                 .chatColumn()
             })
         }

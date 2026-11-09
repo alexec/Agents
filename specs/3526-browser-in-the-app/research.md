@@ -138,10 +138,12 @@ server offers the Playwright tools to the agent (`browser_navigate`, `browser_sn
   `Input.dispatchMouseEvent`, `Input.dispatchKeyEvent` or `Input.insertText`.
 - A small bar over the stream has Back, Forward, Reload, the address, and Done when a
   hand-off is open.
-- **Mac:** the stream in the side pane, beside the chat, as a new pane next to Files,
-  Browser and Terminal. **Web:** the same view, in the same place. **Remote:** the same
-  stream in its Browser pane (Core since #3800; it was `remote: tier mac+web`). The
-  hand-off card is a question card (Core): on the Remote, Open the page opens that pane.
+- **Mac:** the stream in a window of its own, one per session (#4141; it was a side
+  pane, beside the chat, until then). **Web:** the same view, in a browser tab of its
+  own. **Remote:** the same stream in a scene of its own on an iPad and a full-screen
+  cover on an iPhone (Core since #3800; it was `remote: tier mac+web`). The hand-off
+  card is a question card (Core): Open the page, or Open on the chat's live tile
+  (#4140), opens that window, and the window shows the hand-off's Done and Can't do it.
 - **Through the control plane:** frames for a hosted folder go through the control plane
   like every other message. It routes them and keeps none (Principles 6 and 7), and TLS
   protects them in transit (Principle 8).

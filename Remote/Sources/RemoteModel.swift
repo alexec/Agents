@@ -112,6 +112,9 @@ final class RemoteModel {
     var folderScenes: [FolderKey: RemoteFolderState] = [:]
     /// The folder an iPhone shows alone, over the sidebar of every folder (#1089).
     var phoneFolder: FolderKey?
+    /// The agent browser or a simulator taken over on an iPhone (#4141), as a full-screen
+    /// cover; an iPad opens a scene of its own instead.
+    var takeOver: TakeOverKey?
     /// The folder whose own scene's start page the start form is for, while one is (#1089).
     var composingScene: FolderKey?
     /// Brings a folder's scene forward, or opens it: handed over by a view that has the
@@ -2912,7 +2915,7 @@ final class RemoteModel {
             // Read off the main actor, once, and applied there (#203).
             Task.detached(priority: .userInitiated) { [weak self] in
                 for await note in notes {
-                    // Its browser, for the Agent Browser pane alone (#3800).
+                    // Its browser, for the agent browser's take-over window alone (#4141) (#3800).
                     if Self.browserNotifications.contains(note.method) {
                         await self?.receivedBrowser(note.method, note.params, from: id)
                         continue
@@ -4749,12 +4752,12 @@ final class RemoteModel {
         }
     }
 
-    /// What a host says about its browser (#3800): for the Agent Browser pane alone.
+    /// What a host says about its browser (#3800): for the agent browser's take-over window alone (#4141).
     nonisolated private static let browserNotifications: Set<String> = [
         DaemonAPI.Notification.browserFrame, DaemonAPI.Notification.browserPageChanged,
     ]
 
-    /// The Agent Browser pane's view of the browser on a session's host (#3800), made once
+    /// The take-over window's view of the browser on a session's host (#3800), made once
     /// per host. Nil while that host cannot be reached from here.
     func machineBrowser(for agentID: UUID) -> MachineBrowser? {
         let host = work.agent(agentID)?.host ?? .mac

@@ -25,8 +25,7 @@ import { inputType, momentFromInput, momentToInput, placeholder } from "../model
 import { descriptionField, getIt, keeping, secretField } from "../model/secretAsk";
 import { descriptionHint, descriptionLabel, descriptionPrompt } from "../model/userScope";
 import { handOffAnswer } from "../model/handOff";
-import { setPane } from "./files/paneState";
-import { replace, route } from "../route";
+import { openTakeOver, route } from "../route";
 import { keepingForSession, sessionOnlyField, sessionSecretWords } from "../model/sessionSecrets";
 import { askBeforeUseHint, askBeforeUseWords, needsApprovalField } from "../model/askBeforeUse";
 
@@ -59,10 +58,12 @@ export interface WaitingCard { key: string; node: ComponentChildren }
  * The permission and question cards waiting in a session, for the chat to draw at its end. A hook rather than a component, so the cards can sit apart while what
  * they hold (an answer on its way, one answered elsewhere) is kept in one place.
  */
-export function useWaitingCards({ store, host, session, down = false }: {
+export function useWaitingCards({ store, host, session, down = false, handOffsOnly = false }: {
   store: Store; host: string; session: string;
   /** Its host is down: the answers are held, greyed, until it is back, as the window's are (#83). */
   down?: boolean;
+  /** Only the hand_to_person cards, with no Open the page: the take-over tab, where the page is open already (#4141). */
+  handOffsOnly?: boolean;
 }): WaitingCard[] {
   // A question taken away because its runtime went is said in the conversation first, then
   // withdrawn (RuntimeNote.questionWentUnanswered): that line, after it was asked, is the tell.
@@ -142,7 +143,7 @@ export function useWaitingCards({ store, host, session, down = false }: {
     }
   };
 
-  const cards = held.value.filter((c) => c.answered !== "here");
+  const cards = held.value.filter((c) => c.answered !== "here" && (!handOffsOnly || (c.kind === "elicitation" && c.request.handOff)));
   if (!cards.length) return [];
   const recipient = store.isMac(host) ? "your Mac" : store.hosts.value.find((h) => h.id === host)?.name ?? "the machine";
   // Who is asking, by title and runtime (#121).
@@ -159,10 +160,10 @@ export function useWaitingCards({ store, host, session, down = false }: {
           answer={(option) => send(card.request.id, option.optionID, (sendID) => store.link.call("permissions/answer",
             { permissionID: card.request.id, optionID: option.optionID, sendID }, host))} />
       : <ElicitationCard key={card.request.id} active={index === 0} request={card.request} asker={asker(card.request.agentID)}
-          openBrowser={() => {
-            // The Agent Browser tab beside the chat, at the agent's tab (#3528, #3529).
-            setPane(session, { tab: "browser" });
-            if (!route.peek().files) replace({ ...route.peek(), files: true });
+          // The agent browser in a tab of its own, at the agent's tab (#3529, #4141).
+          openBrowser={handOffsOnly ? undefined : () => {
+            const agent = store.agent(host, session);
+            openTakeOver(host, route.peek().folder ?? agent?.worktree?.folder ?? agent?.cwd ?? "", session, "browser");
           }}
           hold={{ answered: card.answered, chosen: card.chosen, recipient, down }}
           answer={(key, action, content) => send(card.request.id, key, (sendID) => store.link.call("elicitations/answer",
@@ -351,7 +352,9 @@ function defaultsOf(request: ElicitationRequest): Record<string, JSONValue> {
 
 function ElicitationCard({ request, asker, hold, answer, active, openBrowser }: {
   request: ElicitationRequest; asker: string | null; hold: Hold; answer: (key: string, action: Action, content: Record<string, JSONValue>) => void;
-  active: boolean; openBrowser: () => void;
+  active: boolean;
+  /** Open the page; none where the page is open already (#4141). */
+  openBrowser: (() => void) | undefined;
 }) {
   const card = useRef<HTMLElement>(null);
   useCardKeys(card, active);
@@ -372,7 +375,7 @@ function ElicitationCard({ request, asker, hold, answer, active, openBrowser }: 
 
   let body;
   if (request.handOff) {
-    // A step on the page in the machine's browser (#3529): Open the page shows it beside the chat.
+    // A step on the page in the machine's browser (#3529): Open the page shows it in a tab of its own (#4141).
     body = <HandOffField handOff={request.handOff} inert={inert} open={openBrowser}
       done={button("done")} cannot={button("cannot", "prominent")}
       send={(isDone, note) => go(isDone ? "done" : "cannot", "accept", handOffAnswer(isDone, note))} />;
@@ -486,7 +489,7 @@ interface AnswerButton { class: string | undefined; disabled: boolean; telling: 
  * line for what stopped the person. As the window's and the Remote's HandOffCard.
  */
 function HandOffField({ handOff, inert, open, done, cannot, send }: {
-  handOff: ElicitationHandOff; inert: boolean; open: () => void; done: AnswerButton; cannot: AnswerButton;
+  handOff: ElicitationHandOff; inert: boolean; open: (() => void) | undefined; done: AnswerButton; cannot: AnswerButton;
   send: (done: boolean, note: string) => void;
 }) {
   const saying = useSignal(false);
@@ -508,7 +511,7 @@ function HandOffField({ handOff, inert, open, done, cannot, send }: {
         </label>
       )}
       <div class="form-row">
-        {!saying.value && <button class="prominent" disabled={inert} data-default="" onClick={open}>Open the page</button>}
+        {!saying.value && open && <button class="prominent" disabled={inert} data-default="" onClick={open}>Open the page</button>}
         <span class="spacer" />
         {saying.value ? (
           <>

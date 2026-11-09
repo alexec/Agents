@@ -47,9 +47,9 @@ test("a tap focuses the hidden field inside the tap, and the host's editing fals
   assert.match(pane, /said\?\.editing === false/);
 });
 
-test("the tab says what the window's pane says", () => {
+test("the take-over tab says what the window's pane says (#4141)", () => {
   const swift = read("App/Sources/Sidebar/AgentBrowserPane.swift") + read("App/Sources/Sidebar/SidebarState.swift");
-  for (const said of [m.words.tab, m.words.stoppedTitle, m.words.stopped, m.words.failedTitle, m.words.failed,
+  for (const said of [m.words.stoppedTitle, m.words.stopped, m.words.failedTitle, m.words.failed,
     m.words.starting, m.words.loading]) {
     assert.ok(swift.includes(`"${said}"`), said);
   }

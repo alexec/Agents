@@ -12,7 +12,7 @@ import { backgroundAge, backgroundEnded, backgroundNoun, isRunning, subagentNoSt
 import { display, isPersonsAsk, isWorking, type ChatTurn, type Item } from "../model/turns";
 import { fromWireDate, toWireDate } from "../protocol/dates";
 import type { Agent, AppViewCall, BackgroundItem, ClientPermissionSettings, FileMentionDTO, FindMatch, FindResult, TranscriptEntry, TurnSummary, UUID } from "../protocol/generated";
-import { replace, route } from "../route";
+import { openTakeOver, replace, route } from "../route";
 import { useWaitingCards, type WaitingCard } from "./Cards";
 import { OfflineStrip } from "./OfflineStrip";
 import { resourcesAsked } from "./Resources";
@@ -476,12 +476,12 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     })),
     ...asked,
     // It drives the screen, the browser or a simulator (#3004, #4140): the live tile, above any
-    // pause card. Open shows the browser or the simulator in its pane until the take-over window (#4141).
+    // pause card. Open takes over the browser or the simulator in a tab of its own (#4141).
     ...(agent && agent.state === "running" ? [{
       key: `live:${agent.id}`,
       node: <LiveTile store={store} host={host} agentID={agent.id} open={(source) => {
-        setPane(agent.id, { tab: source === "simulator" ? "simulator" : "browser" });
-        if (!route.peek().files) replace({ ...route.peek(), files: true });
+        if (source === "screen") return;
+        openTakeOver(host, route.peek().folder ?? agent.worktree?.folder ?? agent.cwd, agent.id, source);
       }} />,
     }] : []),
     // Its drive_screen paused by the person's touch (#3004, US3): Resume or Take Over.
