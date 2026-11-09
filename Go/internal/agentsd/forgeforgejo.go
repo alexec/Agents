@@ -46,6 +46,8 @@ type forgeForgejo interface {
 	CommitPR(ctx context.Context, repo, sha string) (int, error)
 	CostComment(ctx context.Context, repo string, number int, id, mark, body string) (string, error)
 	Plan(ctx context.Context, repo string, number int) (forgejomcp.Plan, error)
+	// Blockers are the blockers of a standing epic's children (#4242).
+	Blockers(ctx context.Context, repo string, numbers []int) (map[int][]forgejomcp.Ref, error)
 	CreateIssue(ctx context.Context, repo, title string, labels []string) (int, string, error)
 	SetBlockedBy(ctx context.Context, repo string, number int, blockerRepo string, blockerNumber int, blocked bool) error
 }

@@ -3,6 +3,7 @@ package agentsd
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -19,6 +20,8 @@ type fakeForgeJira struct {
 	mu       sync.Mutex
 	searches []string
 	wrote    []string
+	// blocked are the keys Blockers was asked about (#4242).
+	blocked []string
 }
 
 func (f *fakeForgeJira) Search(_ context.Context, projects []string, sf jiramcp.SearchFilter, after string, _ int) (jiramcp.SearchPage, error) {
@@ -68,6 +71,13 @@ func (f *fakeForgeJira) SetState(_ context.Context, key string, closed bool) err
 
 func (f *fakeForgeJira) Transition(_ context.Context, key, id string) error {
 	return f.note("transition " + key + " " + id)
+}
+
+func (f *fakeForgeJira) Blockers(_ context.Context, keys []string) (map[string][]jiramcp.Ref, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.blocked = append(f.blocked, fmt.Sprint(keys))
+	return map[string][]jiramcp.Ref{strings.ToUpper(keys[0]): {{Key: "OPS-1", Open: true}, {Key: "PROJ-2"}}}, nil
 }
 
 func (f *fakeForgeJira) Plan(_ context.Context, key string) (jiramcp.Plan, error) {

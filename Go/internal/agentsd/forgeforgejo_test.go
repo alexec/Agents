@@ -25,6 +25,8 @@ type fakeForgeForgejo struct {
 	wrote    []string
 	// asked is what lineage asked (lineageforgejo_test.go).
 	asked []string
+	// blocked are the numbers Blockers was asked about (#4242).
+	blocked []string
 }
 
 func (f *fakeForgeForgejo) note(to *[]string, s string) {
@@ -101,6 +103,11 @@ func (f *fakeForgeForgejo) Approve(_ context.Context, repo string, number int, s
 func (f *fakeForgeForgejo) PRDiff(_ context.Context, repo string, number int) (map[string]any, error) {
 	return map[string]any{"files": []any{map[string]any{"path": "hello.txt", "change": "added", "additions": 1, "deletions": 0,
 		"hunks": []any{map[string]any{"oldStart": 0, "newStart": 1, "lines": []any{map[string]any{"kind": "added", "text": "hello"}}}}}}}, nil
+}
+
+func (f *fakeForgeForgejo) Blockers(_ context.Context, repo string, numbers []int) (map[int][]forgejomcp.Ref, error) {
+	f.note(&f.blocked, fmt.Sprint(repo, numbers))
+	return map[int][]forgejomcp.Ref{numbers[0]: {{Repo: "kim/Notes", Number: 9, PR: true, Open: true}, {Repo: "walkalex/App", Number: 5}}}, nil
 }
 
 func (f *fakeForgeForgejo) Plan(_ context.Context, repo string, number int) (forgejomcp.Plan, error) {

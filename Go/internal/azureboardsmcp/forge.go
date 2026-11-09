@@ -668,8 +668,27 @@ func (f *RealBoards) Plan(ctx context.Context, project string, id int) (Plan, er
 	if err != nil {
 		return Plan{}, err
 	}
-	var blockers []int
+	by, err := f.predecessors(ctx, org, children, states)
+	if err != nil {
+		return Plan{}, err
+	}
 	for _, c := range children {
+		pc := PlanChild{Item: f.forgeItem(org, c.workItemJSON, states(c.project(org))), BlockedBy: by[c.ID]}
+		p.Children = append(p.Children, pc)
+		p.Epic.SubTotal++
+		if pc.State == "closed" {
+			p.Epic.SubDone++
+		}
+	}
+	return p, nil
+}
+
+// predecessors are the work items that block each of items, its predecessors, with a read of
+// all of them at once for their states. A predecessor that cannot be read is left out.
+func (f *RealBoards) predecessors(ctx context.Context, org string, items []withRelations,
+	states func(string) map[string]map[string]string) (map[int][]Ref, error) {
+	var blockers []int
+	for _, c := range items {
 		for _, r := range c.Relations {
 			if n := r.linked(); r.Rel == relPredecessor && n > 0 && !slices.Contains(blockers, n) {
 				blockers = append(blockers, n)
@@ -680,29 +699,59 @@ func (f *RealBoards) Plan(ctx context.Context, project string, id int) (Plan, er
 	if len(blockers) > 0 {
 		list, err := f.orgItems(ctx, org, blockers, []string{fieldType, fieldState, fieldProject}, false)
 		if err != nil {
-			return Plan{}, err
+			return nil, err
 		}
 		for _, b := range list {
 			bp := b.project(org)
 			open[b.ID] = Ref{Project: bp, ID: b.ID, Open: !closedIn(states(bp), b.text(fieldType), b.text(fieldState))}
 		}
 	}
-	for _, c := range children {
-		pc := PlanChild{Item: f.forgeItem(org, c.workItemJSON, states(c.project(org)))}
+	out := map[int][]Ref{}
+	for _, c := range items {
 		for _, r := range c.Relations {
 			if n := r.linked(); r.Rel == relPredecessor && n > 0 {
 				if ref, ok := open[n]; ok {
-					pc.BlockedBy = append(pc.BlockedBy, ref)
+					out[c.ID] = append(out[c.ID], ref)
 				}
 			}
 		}
-		p.Children = append(p.Children, pc)
-		p.Epic.SubTotal++
-		if pc.State == "closed" {
-			p.Epic.SubDone++
-		}
 	}
-	return p, nil
+	return out, nil
+}
+
+// BlockersMost bounds the work items one Blockers read asks about: a batch.
+const BlockersMost = 200
+
+// Blockers are the predecessors of each of ids in project's organization (at most BlockersMost),
+// as Plan reads a child's (#4242): a read of their links, and one of the predecessors' states.
+// A standing epic's children come from a list, which does not read links. An id that cannot
+// be read has none.
+func (f *RealBoards) Blockers(ctx context.Context, project string, ids []int) (map[int][]Ref, error) {
+	org := orgOf(strings.ToLower(project))
+	ids = ids[:min(len(ids), BlockersMost)]
+	if len(ids) == 0 {
+		return map[int][]Ref{}, nil
+	}
+	items, err := f.orgItems(ctx, org, ids, nil, true)
+	if err != nil {
+		return nil, err
+	}
+	statesOf := map[string]map[string]map[string]string{}
+	states := func(p string) map[string]map[string]string {
+		if _, ok := statesOf[p]; !ok {
+			statesOf[p], _ = f.categories(ctx, p)
+		}
+		return statesOf[p]
+	}
+	by, err := f.predecessors(ctx, org, items, states)
+	if err != nil {
+		return nil, err
+	}
+	out := map[int][]Ref{}
+	for _, i := range items {
+		out[i.ID] = append([]Ref{}, by[i.ID]...)
+	}
+	return out, nil
 }
 
 // childTypes are the work item types a new child of a level is, the first the process has:

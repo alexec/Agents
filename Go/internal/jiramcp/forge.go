@@ -560,15 +560,57 @@ func (j *RealJira) Plan(ctx context.Context, key string) (Plan, error) {
 		if json.Unmarshal(raw, &r) != nil || json.Unmarshal(raw, &links) != nil {
 			continue
 		}
-		c := PlanChild{Item: r.item(site)}
-		for _, l := range links.Fields.IssueLinks {
-			if l.Type.Name == "Blocks" && l.InwardIssue != nil {
-				c.BlockedBy = append(c.BlockedBy, Ref{Key: l.InwardIssue.Key, Open: !l.InwardIssue.done()})
-			}
-		}
-		p.Children = append(p.Children, c)
+		p.Children = append(p.Children, PlanChild{Item: r.item(site), BlockedBy: links.blockers()})
 	}
 	return p, nil
+}
+
+func (l restLinks) blockers() []Ref {
+	var out []Ref
+	for _, link := range l.Fields.IssueLinks {
+		if link.Type.Name == "Blocks" && link.InwardIssue != nil {
+			out = append(out, Ref{Key: link.InwardIssue.Key, Open: !link.InwardIssue.done()})
+		}
+	}
+	return out
+}
+
+// BlockersMost bounds the issues one Blockers read asks about: a page of a search.
+const BlockersMost = perPage
+
+// Blockers are the issues that block each of keys (at most BlockersMost), from their Blocks
+// links, in one search by key (#4242): a standing epic's children come from a list, which does
+// not read links. A key Jira does not have has none.
+func (j *RealJira) Blockers(ctx context.Context, keys []string) (map[string][]Ref, error) {
+	out := map[string][]Ref{}
+	keys = keys[:min(len(keys), BlockersMost)]
+	if len(keys) == 0 {
+		return out, nil
+	}
+	quotedKeys := make([]string, len(keys))
+	for n, k := range keys {
+		quotedKeys[n] = quoted(k)
+	}
+	var answer struct {
+		Issues []struct {
+			Key string `json:"key"`
+			restLinks
+		} `json:"issues"`
+	}
+	body := map[string]any{"jql": "key in (" + strings.Join(quotedKeys, ", ") + ")", "fields": []string{"issuelinks"}, "maxResults": len(keys)}
+	path := "/search"
+	if j.Auth().Cloud {
+		path = "/search/jql"
+	}
+	if err := j.call(ctx, http.MethodPost, path, body, &answer); err != nil {
+		return nil, err
+	}
+	for _, i := range answer.Issues {
+		if i.Key != "" {
+			out[strings.ToUpper(i.Key)] = i.blockers()
+		}
+	}
+	return out, nil
 }
 
 // BoardFilter is the id of the filter a board shows (#3282), from Jira Software's

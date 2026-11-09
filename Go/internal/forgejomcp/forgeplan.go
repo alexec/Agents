@@ -92,16 +92,42 @@ func (f *RealForgejo) Plan(ctx context.Context, repo string, number int) (Plan, 
 		}
 		at := d.repo(repo)
 		child := PlanChild{Item: d.item(at), BlockedBy: []Ref{}}
-		blockers, err := f.dependencies(ctx, at, d.Number)
-		if err != nil {
+		if child.BlockedBy, err = f.blockers(ctx, at, d.Number); err != nil {
 			return Plan{}, err
-		}
-		for _, b := range blockers {
-			child.BlockedBy = append(child.BlockedBy, Ref{Repo: b.repo(at), Number: b.Number, PR: b.PullRequest != nil, Open: b.State != "closed"})
 		}
 		p.Children = append(p.Children, child)
 	}
 	return p, nil
+}
+
+// blockers are the issues and pull requests that repo's issue number depends on, as refs.
+func (f *RealForgejo) blockers(ctx context.Context, repo string, number int) ([]Ref, error) {
+	deps, err := f.dependencies(ctx, repo, number)
+	if err != nil {
+		return nil, err
+	}
+	out := []Ref{}
+	for _, b := range deps {
+		out = append(out, Ref{Repo: b.repo(repo), Number: b.Number, PR: b.PullRequest != nil, Open: b.State != "closed"})
+	}
+	return out, nil
+}
+
+// BlockersMost bounds the issues one Blockers read asks about.
+const BlockersMost = 100
+
+// Blockers are the issues that block each of numbers in repo (at most BlockersMost), a call
+// each, as Plan reads a child's (#4242): Forgejo reads one issue's dependencies at a time.
+func (f *RealForgejo) Blockers(ctx context.Context, repo string, numbers []int) (map[int][]Ref, error) {
+	out := map[int][]Ref{}
+	for _, n := range numbers[:min(len(numbers), BlockersMost)] {
+		by, err := f.blockers(ctx, repo, n)
+		if err != nil {
+			return nil, err
+		}
+		out[n] = by
+	}
+	return out, nil
 }
 
 // SetBlockedBy makes repo's issue number depend on blockerRepo's issue blockerNumber, or no
