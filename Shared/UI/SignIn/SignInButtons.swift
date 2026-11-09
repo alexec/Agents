@@ -1,5 +1,6 @@
 import AgentsKitCore
 import AuthenticationServices
+import Security
 import SwiftUI
 
 /// A button for each sign-in provider the control plane turned on (#995), each running its
@@ -59,6 +60,11 @@ struct SignInButtons: View {
             }
             ForEach(providers.turnedOn) { row in
                 switch row.provider {
+                case "apple" where !AppleSignIn.available:
+                    Text(SignInWords.appleNotInThisApp)
+                        .appText(.supporting)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 case "apple":
                     SignInWithAppleButton(.signIn) { request in
                         request.nonce = nonce
@@ -253,6 +259,20 @@ struct SignInButtons: View {
             }
         }
     }
+}
+
+/// Whether this app can open Apple's native sign-in sheet (#4279). The sheet needs the
+/// `com.apple.developer.applesignin` entitlement: the Remote has it; the one Mac app (#4224)
+/// has not, and the sheet fails there with AuthorizationError 1000.
+enum AppleSignIn {
+    static let available: Bool = {
+        #if os(macOS)
+        guard let task = SecTaskCreateFromSelf(nil) else { return false }
+        return SecTaskCopyValueForEntitlement(task, "com.apple.developer.applesignin" as CFString, nil) != nil
+        #else
+        return true
+        #endif
+    }()
 }
 
 /// The clipboard on the Mac and the Remote.

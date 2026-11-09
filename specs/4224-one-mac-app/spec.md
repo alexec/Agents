@@ -192,9 +192,12 @@ How (#4228):
     `CFBundleName`, which is Agents.
 - **Sign in with Apple:** the one app has no `com.apple.developer.applesignin`
   entitlement, which a Developer ID app gets only with a provisioning profile. The window
-  never called the native Apple sheet (`ASAuthorizationAppleIDProvider`), so nothing is
-  lost. #4228 adds the entitlement and a profile if its sign-in to agentloops.dev uses that
-  sheet.
+  did show the native Apple sheet (`SignInWithAppleButton` in `Shared/UI/SignIn`, when a
+  control plane turns Apple on), and it failed there with AuthorizationError 1000 (#4279).
+  Now the Mac shows a line in place of the button when the app has no entitlement, and
+  sends the person to **Sign in to agentloops.dev** (#4228), which signs in on the web.
+  An entitlement and a Developer ID profile for `com.alexecollins.agents.host` bring the
+  sheet back.
 - **Remove:**
   - the `AgentsStore` target;
   - `App/Agents-Store.entitlements` and `App/Info-Store.plist`;
