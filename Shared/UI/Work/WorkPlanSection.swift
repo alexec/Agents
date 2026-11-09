@@ -10,7 +10,8 @@ import SwiftUI
 /// An open child also shows its estimate (#3560), from the page's `lineage/estimate`.
 /// Where the machine writes to the forge, the plan changes here too (#3271): **Add child** (a new
 /// issue, or one that is there) under the steps, and each row's **Blocked by** menu of the other
-/// children; `wrote` reads the page again.
+/// children; `wrote` reads the page again. A standing epic's plan (#3662) is its query: the query in
+/// words, and its open issues in one list with no steps, Add child or Blocked by; the header has no end.
 struct WorkPlanSection: View {
     let model: any WorkModel
     let host: MachineRef
@@ -48,12 +49,16 @@ struct WorkPlanSection: View {
             Text("Plan").appText(.reading).fontWeight(.semibold)
             if let plan {
                 header(plan)
+                if let standing = plan.standing { query(standing) }
                 if plan.children.isEmpty {
-                    Text("No sub-issues yet.").foregroundStyle(.secondary)
+                    if plan.standing?.error == nil {
+                        Text(plan.standing == nil ? "No sub-issues yet." : "No open issues match its query.")
+                            .foregroundStyle(.secondary)
+                    }
                 } else {
                     steps(plan)
                 }
-                if writes, plan.item.state == "open" { addChild }
+                if writes, plan.item.state == "open", plan.standing == nil { addChild }
             } else if let problem {
                 Label(problem, systemImage: "exclamationmark.triangle").foregroundStyle(.secondary)
             } else {
@@ -77,7 +82,9 @@ struct WorkPlanSection: View {
             } else {
                 Text("No lead").foregroundStyle(.secondary)
             }
-            Text(WorkPlan.progressWords(plan, running: running, rollups: Array(rollups.values)))
+            Text(plan.standing == nil
+                 ? WorkPlan.progressWords(plan, running: running, rollups: Array(rollups.values))
+                 : WorkPlan.standingWords(plan, running: running, rollups: Array(rollups.values)))
                 .monospacedDigit().foregroundStyle(.secondary)
             if let lead = plan.lead {
                 Button("Open lead") { model.openWorkSession(lead.session) }
@@ -96,6 +103,19 @@ struct WorkPlanSection: View {
         }
     }
 
+    /// A standing epic's query in words, or why it has none.
+    @ViewBuilder
+    private func query(_ standing: DaemonAPI.ForgeStanding) -> some View {
+        if let error = standing.error {
+            Label(error, systemImage: "exclamationmark.triangle")
+                .foregroundStyle(StateTint.failure.style(or: .secondary))
+                .textSelection(.enabled)
+        } else {
+            Text(WorkPlan.queryWords(standing)).appText(.supporting).foregroundStyle(.secondary)
+                .help("The standing block in this epic's body: its plan is this query, in priority order, then the oldest")
+        }
+    }
+
     private func startLead(_ start: DaemonAPI.ForgeStart) {
         guard let folder = detail.item.folder else {
             said = ("No folder on this machine is on this issue's repo.", true)
@@ -111,16 +131,20 @@ struct WorkPlanSection: View {
     @ViewBuilder
     private func steps(_ plan: DaemonAPI.ForgePlan) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(plan.steps, id: \.step) { step in
-                Text(WorkPlan.stepTitle(step, in: plan))
-                    .appText(.supporting).fontWeight(.semibold).foregroundStyle(.secondary)
-                    .padding(.horizontal, 10).padding(.vertical, 6)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.quaternary.opacity(0.5))
-                ForEach(plan.children.filter { $0.step == step.step }, id: \.item.node) { child in
-                    HStack(spacing: 0) {
-                        row(child)
-                        if writes, plan.children.count > 1 { blockedByMenu(child, in: plan) }
+            if plan.standing != nil {
+                ForEach(plan.children, id: \.item.node) { child in row(child) }
+            } else {
+                ForEach(plan.steps, id: \.step) { step in
+                    Text(WorkPlan.stepTitle(step, in: plan))
+                        .appText(.supporting).fontWeight(.semibold).foregroundStyle(.secondary)
+                        .padding(.horizontal, 10).padding(.vertical, 6)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(.quaternary.opacity(0.5))
+                    ForEach(plan.children.filter { $0.step == step.step }, id: \.item.node) { child in
+                        HStack(spacing: 0) {
+                            row(child)
+                            if writes, plan.children.count > 1 { blockedByMenu(child, in: plan) }
+                        }
                     }
                 }
             }

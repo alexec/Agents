@@ -117,6 +117,43 @@ public enum WorkPlan {
         return parts.joined(separator: " · ")
     }
 
+    /// A standing epic's header figures (#3662), with no end: "Standing · 4 running · 31 open · $41.20".
+    /// The daemon reads at most 100 issues, so 100 is "100+ open"; a query with an error counts none.
+    public static func standingWords(_ plan: DaemonAPI.ForgePlan, running: Int,
+                                     rollups: [DaemonAPI.LineageCostRollup]) -> String {
+        var parts = ["Standing"]
+        if running > 0 { parts.append("\(running) running") }
+        let open = plan.children.filter { $0.item.state != "closed" }.count
+        if plan.standing?.error == nil { parts.append(open >= standingLimit ? "\(standingLimit)+ open" : "\(open) open") }
+        let total = sum(rollups.map(\.total))
+        if ReportValueWords.spent(total) { parts.append(ReportValueWords.cost(total)) }
+        return parts.joined(separator: " · ")
+    }
+
+    /// The most issues `forge/plan` reads for a standing epic's query.
+    static let standingLimit = 100
+
+    /// A standing epic's query in words (#3662): "Open issues labelled bug · no milestone · 1 lane at a time".
+    public static func queryWords(_ standing: DaemonAPI.ForgeStanding) -> String {
+        var parts: [String] = []
+        var first = "Open issues"
+        if !standing.labels.isEmpty { first += " labelled \(standing.labels.joined(separator: " and "))" }
+        if !standing.any.isEmpty {
+            first += standing.labels.isEmpty ? " labelled " : ", and "
+            first += standing.any.joined(separator: " or ")
+        }
+        parts.append(first)
+        if !standing.not.isEmpty { parts.append("not \(standing.not.joined(separator: " or "))") }
+        switch standing.milestone?.lowercased() {
+        case nil, "": break
+        case "none": parts.append("no milestone")
+        case "any": parts.append("in a milestone")
+        default: parts.append("milestone “\(standing.milestone ?? "")”")
+        }
+        parts.append(standing.lanes == 1 ? "1 lane at a time" : "\(standing.lanes) lanes at a time")
+        return parts.joined(separator: " · ")
+    }
+
     /// The costs added up, per currency.
     static func sum(_ costs: [DaemonAPI.LineageCost]) -> DaemonAPI.LineageCost {
         var out = DaemonAPI.LineageCost()

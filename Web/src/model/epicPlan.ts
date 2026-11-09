@@ -1,9 +1,10 @@
 // The Plan section on an epic's Work page (#3268, spec 3265), as the window's WorkPlan: its children
 // step by step (forge/plan), each with a mark, the PR and the sessions that work on it (from lineage,
 // lineage/walk and lineage/cost) and its cost; a header with the lead, the children done and running,
-// and the total cost; and the new-session form that Start lead fills in.
+// and the total cost; and the new-session form that Start lead fills in. A standing epic's plan
+// (#3662) is its query's open issues in one list, with no end.
 import type {
-  AgentState, ForgeAddChildRequest, ForgeBlockedByRequest, ForgeItem, ForgeLead, ForgePlan, ForgePlanChild, ForgePlanStep, ForgeStart,
+  AgentState, ForgeAddChildRequest, ForgeBlockedByRequest, ForgeItem, ForgeLead, ForgePlan, ForgePlanChild, ForgePlanStep, ForgeStanding, ForgeStart,
   LineageCost, LineageCostNode, LineageCostRollup, LineageLink, LineageNode,
 } from "../protocol/generated";
 import { costWords, spent } from "./value";
@@ -108,6 +109,36 @@ export function progressWords(plan: ForgePlan, running: number, rollups: Lineage
   if (running > 0) parts.push(`${running} running`);
   const total = sumCosts(rollups.map((r) => r.total));
   if (spent(total)) parts.push(costWords(total));
+  return parts.join(" · ");
+}
+
+/** The most issues forge/plan reads for a standing epic's query. */
+const standingLimit = 100;
+
+/** A standing epic's header figures (#3662), with no end: "Standing · 4 running · 31 open · $41.20".
+ * The daemon reads at most 100 issues, so 100 is "100+ open"; a query with an error counts none. */
+export function standingWords(plan: ForgePlan, running: number, rollups: LineageCostRollup[]): string {
+  const parts = ["Standing"];
+  if (running > 0) parts.push(`${running} running`);
+  const open = plan.children.filter((c) => c.item.state !== "closed").length;
+  if (!plan.standing?.error) parts.push(open >= standingLimit ? `${standingLimit}+ open` : `${open} open`);
+  const total = sumCosts(rollups.map((r) => r.total));
+  if (spent(total)) parts.push(costWords(total));
+  return parts.join(" · ");
+}
+
+/** A standing epic's query in words (#3662): "Open issues labelled bug · no milestone · 1 lane at a time". */
+export function queryWords(standing: ForgeStanding): string {
+  let first = "Open issues";
+  if (standing.labels.length > 0) first += ` labelled ${standing.labels.join(" and ")}`;
+  if (standing.any.length > 0) first += `${standing.labels.length > 0 ? ", and " : " labelled "}${standing.any.join(" or ")}`;
+  const parts = [first];
+  if (standing.not.length > 0) parts.push(`not ${standing.not.join(" or ")}`);
+  const milestone = standing.milestone ?? "";
+  if (milestone.toLowerCase() === "none") parts.push("no milestone");
+  else if (milestone.toLowerCase() === "any") parts.push("in a milestone");
+  else if (milestone) parts.push(`milestone “${milestone}”`);
+  parts.push(standing.lanes === 1 ? "1 lane at a time" : `${standing.lanes} lanes at a time`);
   return parts.join(" · ");
 }
 
