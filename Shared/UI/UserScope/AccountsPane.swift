@@ -118,14 +118,15 @@ private struct AccountSheet: View {
         #if os(iOS)
         // An iOS Form shows a field's prompt, not its label: the label goes before it.
         return LabeledContent(label) {
-            TextField(label, text: text, prompt: Text(prompt))
+            TextField(label, text: text, prompt: Text(prompt), axis: key == "description" ? .vertical : .horizontal)
                 .multilineTextAlignment(.trailing)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(key == "notes" || key == "description" ? .sentences : .never)
                 .keyboardType(key == "cost" ? .decimalPad : key == "address" ? .emailAddress : .default)
         }
         #else
-        return TextField(label, text: text, prompt: Text(prompt))
+        // A description is one or two sentences: it wraps rather than scrolls (#4164).
+        return TextField(label, text: text, prompt: Text(prompt), axis: key == "description" ? .vertical : .horizontal)
             .autocorrectionDisabled()
         #endif
     }

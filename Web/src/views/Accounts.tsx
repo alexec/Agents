@@ -116,8 +116,8 @@ export function AccountsSection({ store, down }: { store: Store; down: boolean }
             <li class="user-secret" key={`${a.service}#${a.address ?? ""}`}>
               <span>{a.service}</span>
               <span class="hint">{accountDetail(a)}</span>
-              <span class="hint">{accountAbout(a)}</span>
               <span class="hint">{accountCost(a)}</span>
+              <p class="hint">{accountAbout(a)}</p>
               {soon && <p class="hint attention">{soon}</p>}
               <span class="row-actions">
                 <button type="button" disabled={down} onClick={() => { editing.value = a; }}>Edit…</button>
