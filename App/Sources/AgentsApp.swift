@@ -107,8 +107,8 @@ struct AgentsApp: App {
         .windowResizability(.contentMinSize)
 
         #if !STORE_WINDOW
-        // This Mac's host (#4225): its window and the menu bar item, in the same app.
-        HostScenes()
+        // This Mac's host (#4225): the menu bar item, in the same app.
+        HostScenes(app: model)
         #endif
     }
 }

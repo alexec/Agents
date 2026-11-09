@@ -396,6 +396,16 @@ struct AgentsCommands: Commands {
                 .keyboardShortcut("?")
             Divider()
             Button("Report a Problem…") { requests.showsReportProblem = true }
+            #if !STORE_WINDOW
+            // Agents Host's diagnostics (#678, #4227), also in Settings ▸ Machines ▸ This Mac.
+            if let host = HostScenes.model {
+                Menu("Diagnostics") {
+                    Button("Copy Diagnostics") { Task { await host.copyDiagnostics() } }
+                    Button("Save Diagnostics…") { Task { await host.saveDiagnostics() } }
+                    Button("Show Logs") { host.showLogs() }
+                }
+            }
+            #endif
         }
     }
 

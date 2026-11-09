@@ -2443,6 +2443,8 @@ final class AppModel {
     /// A Settings pane to open on, asked for by a link elsewhere (052): read and cleared
     /// by the Settings window.
     var settingsPaneAsked: SettingsPane?
+    /// The menu bar item's Pair a Phone or iPad… (#4227): Clients opens its pairing sheet.
+    var pairDeviceAsked = false
 
     /// A file for Agent Configuration's editor to open, asked for by a workflow page's Edit
     /// File… (#2803): read and cleared by the editor's page for that kind and folder.

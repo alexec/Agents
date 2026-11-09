@@ -134,9 +134,9 @@ export function Pairing({ session }: { session: Session }) {
         <AskSignIn session={session} busy={busy} />
         {onThisMac() ? (
           <p>
-            Get a code from Agents on this Mac: in the window,{" "}
-            <strong>Settings ▸ Control plane ▸ Clients ▸ Add a Browser…</strong>, or in Agents Host,{" "}
-            <strong>Pair a Window or Phone… ▸ A browser on this Mac</strong>. Paste it here.
+            Get a code from Agents on this Mac:{" "}
+            <strong>Settings ▸ Control plane ▸ Clients ▸ Add a Browser…</strong>. Paste it here. Or choose{" "}
+            <strong>Open in Browser</strong> in Agents' menu bar item: it opens this page paired.
           </p>
         ) : (
           // The page on the control plane's own domain (#1459): any paired window or phone makes one.

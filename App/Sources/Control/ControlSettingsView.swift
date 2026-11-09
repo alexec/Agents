@@ -122,6 +122,9 @@ struct ControlOverviewPage: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             if control.isOnThisMac { ControlBrowserCard(control: control) }
+            #if !STORE_WINDOW
+            if let host = HostScenes.model { HostServeCard(host: host) }
+            #endif
             ControlCard {
                 ControlRow(dot: control.isReachable ? .online : .offline,
                            title: control.isOnThisMac ? "This Mac" : (control.status?.name ?? "Control plane"),
@@ -151,11 +154,15 @@ struct ControlOverviewPage: View {
                 } else if control.isOnThisMac, control.thisMacHost == nil, control.status?.thisMacHost == nil {
                     Divider()
                     ControlRow(dot: .attention, title: "This Mac as a machine",
-                               detail: "It isn’t running, so it has not joined. Open Agents Host: it says why, and Repair there starts it again.") {
-                        Text("Not running").appText(.reading).foregroundStyle(.secondary)
+                               detail: "It isn’t running, so it has not joined. Settings ▸ Machines ▸ This Mac says why, and Repair there starts it again.") {
+                        Button("Show") { model.settingsPaneAsked = .machines }.buttonStyle(.link)
                     }
                 }
             }
+            #if !STORE_WINDOW
+            // Agents Host's control plane controls (#4227): moving it, and its store.
+            if let host = HostScenes.model { HostControlPlaneCards(host: host) }
+            #endif
             if control.isOnThisMac {
                 Text("While this Mac sleeps, no window or device can reach any of your agents. Agents on other machines keep working.")
                     .appText(.supporting).foregroundStyle(.secondary)
@@ -250,7 +257,7 @@ struct ControlBrowserCard: View {
 
     private var detail: String {
         guard let web else { return BrowserOpening.offWords }
-        return web.served ? "\(web.summary) The first time, it pairs that browser too." : "\(web.summary) Try again in Agents Host."
+        return web.served ? "\(web.summary) The first time, it pairs that browser too." : "\(web.summary) Try Again is beside Serve Agents to browsers on this Mac."
     }
 }
 
@@ -422,10 +429,10 @@ struct CodeSheet: View {
         let anywhere = control.status?.publicWeb
         guard let web = control.status?.web else {
             if let anywhere { return "In any browser, open \(anywhere) and paste it in." }
-            return "Turn on Serve Agents to browsers on this Mac in Agents Host first."
+            return "Turn on Serve Agents to browsers on this Mac in Settings ▸ Control plane first."
         }
         let here = web.served ? "On this Mac, open \(web.address) and paste it in."
-            : "\(web.summary) Try again in Agents Host, then open \(web.address) on this Mac and paste it in."
+            : "\(web.summary) Press Try Again beside Serve Agents to browsers on this Mac in Settings ▸ Control plane, then open \(web.address) on this Mac and paste it in."
         guard let anywhere else { return here }
         return "In any browser, open \(anywhere) and paste it in. \(here)"
     }

@@ -4,8 +4,8 @@ import AppKit
 import Observation
 import UniformTypeIdentifiers
 
-/// What frame L shows and does (058, US2): this Mac's host, the single copy of the control
-/// plane when it runs here, where it keeps its store, and the code to pair a window or phone.
+/// This Mac's host (058, US2), in Settings since #4227: the single copy of the control
+/// plane when it runs here, where it keeps its store, and its login items.
 @MainActor
 @Observable
 final class HostModel {
@@ -61,23 +61,6 @@ final class HostModel {
         case failed(String)
     }
     private(set) var check: Check?
-
-    // MARK: Pairing
-
-    struct PairingCode: Identifiable, Equatable {
-        let id = UUID()
-        var text: String
-        var target: PairingTarget
-    }
-
-    /// What the code is for, which decides how it is shown and where it works. Each may
-    /// do everything once paired (#111).
-    enum PairingTarget: Hashable {
-        case window, phone, browser
-    }
-    var pairing: PairingCode?
-    var pairingTarget: PairingTarget = .window
-    var showingPairing = false
 
     /// The host code `runHere` made last: what the move tells devices, with its address,
     /// pin and key (T085).
@@ -295,7 +278,7 @@ final class HostModel {
         var said = reasons.joined(separator: " ")
         if !otherCopies.isEmpty {
             let places = otherCopies.map { $0.deletingLastPathComponent().path }.joined(separator: ", ")
-            said += " Agents Host is also in \(places): keep one copy, so its login items are this one’s."
+            said += " Agents is also in \(places): keep one copy, so its login items are this one’s."
         }
         return said
     }
@@ -384,6 +367,35 @@ final class HostModel {
             return
         }
         NSWorkspace.shared.activateFileViewerSelecting(logs)
+    }
+
+    // MARK: Removing (#4227)
+
+    /// Both login items are gone: the app can go to the Trash.
+    private(set) var removed = false
+
+    /// **Remove Agents from This Mac…**: both jobs stopped and unregistered. A login item
+    /// follows its bundle, not its path, so one left registered keeps running from the
+    /// Trash, then fails at every start once the Trash is emptied (#4225). The records stay
+    /// where they are, and opening Agents again sets it up afresh.
+    func removeFromThisMac() async {
+        guard busy == nil else { return }
+        problem = nil
+        repaired = nil
+        busy = "Removing Agents from this Mac…"
+        defer { busy = nil }
+        await services.remove()
+        for job in [LocalServices.Job.control, .daemon] {
+            for _ in 0..<20 where await services.state(job).loaded { try? await Task.sleep(for: .milliseconds(250)) }
+        }
+        settings.role = .none
+        settings.save(paths)
+        await refresh()
+        if controlJob?.loaded == true || daemonJob?.loaded == true {
+            problem = "macOS still has a login item for Agents. Turn it off in System Settings ▸ General ▸ Login Items."
+        } else {
+            removed = true
+        }
     }
 
     // MARK: Run it here
@@ -825,23 +837,6 @@ final class HostModel {
         _ = await start(.control)
         try? await Task.sleep(for: .seconds(1))
         await refresh()
-    }
-
-    // MARK: Pairing
-
-    /// A code to type into a window, a phone or a browser.
-    func makeCode() async {
-        pairing = nil
-        let target = pairingTarget
-        // A browser's code is good only through the page's own listener (071 R2).
-        let made = await ControlTool.run(["code", "--client", "--home", paths.controlHome.path]
-                                             + (target == .browser ? ["--browser"] : []),
-                                         paths: paths, settings: settings)
-        guard made.ok, let text = made.output.split(separator: "\n").last.map(String.init) else {
-            problem = made.problem.isEmpty ? "No code could be made." : made.problem
-            return
-        }
-        pairing = PairingCode(text: text, target: target)
     }
 }
 
