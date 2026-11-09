@@ -175,6 +175,27 @@ public enum LockChannel {
         return String(decoding: try encoder.encode(value), as: UTF8.self)
     }
 
+    /// The method a person's signed answer to a secret's use names (#4058).
+    public static let approveSecretUse = "secrets/approveUse"
+
+    /// What a person's answer to a secret's use signs (#4058): the request and what it names,
+    /// as Go's `secretrelease.Approval` reads it.
+    struct SecretUseApproval: Encodable {
+        var request: UUID
+        var name, use, place: String
+        var action: NeedRequest.Action
+    }
+
+    /// A person's answer to a secret's use on a Linux machine (#4149), signed by this device for
+    /// the machine `host`: the machine takes it to its control plane for the value's key.
+    public static func secretUseApproval(_ signer: LockSigningKey, to host: String, request: UUID,
+                                         use: NeedRequest.SecretUse, action: NeedRequest.Action,
+                                         at: Date = Date()) throws -> DaemonAPI.LockDelivery {
+        let text = try text(SecretUseApproval(request: request, name: use.name, use: use.use, place: use.place, action: action))
+        return DaemonAPI.LockDelivery(method: approveSecretUse, params: text,
+                                      lock: try sign(signer, to: host, method: approveSecretUse, params: text, at: at))
+    }
+
     /// A kept request signed by this device, as `machines/keep` carries it.
     public static func delivery(_ signer: LockSigningKey, to host: String, method: String, params: JSONValue) throws -> DaemonAPI.LockDelivery {
         let text = try text(params)

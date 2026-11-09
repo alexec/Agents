@@ -1978,8 +1978,19 @@ final class RemoteModel {
     /// the host of the session that asked. Whether it went; why not is the problem.
     @discardableResult
     func answerSecretUse(_ request: NeedRequest, _ action: NeedRequest.Action) async -> Bool {
-        let answer = DaemonAPI.RequestsAnswer(id: request.id, secretUse: action)
         let host = request.askedBy.flatMap { work.agent($0)?.host } ?? .mac
+        var approval: DaemonAPI.LockDelivery?
+        // A Linux machine opens the value only for an answer this device signed (#4149).
+        if let use = request.secretUse, use.signs(action) {
+            guard let signer = await lock.channelSigner(),
+                  let signed = try? LockChannel.secretUseApproval(signer.key, to: host.rawValue, request: request.id,
+                                                                  use: use, action: action) else {
+                problem = "Not sent — this machine opens the secret only for an answer your device signs, and this device is not in your lock. Answer on the Mac."
+                return false
+            }
+            approval = signed
+        }
+        let answer = DaemonAPI.RequestsAnswer(id: request.id, secretUse: action, approval: approval)
         do {
             let update = try await client(for: answer, on: host)
                 .call(DaemonAPI.Method.requestsAnswer, answer, returning: DaemonAPI.RequestUpdate.self)

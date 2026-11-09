@@ -47,7 +47,7 @@ func (d *Daemon) askSecret(id wire.UUID, args map[string]json.RawMessage) (strin
 		return "", err
 	}
 	path := skillcatalog.SecretsPath(home)
-	sessionOnly, ask := true, true
+	sessionOnly, ask := true, d.keepsFlagged()
 	secret := wire.ElicitationSecret{Name: name, IsSet: skillcatalog.LoadSecrets(path).IsSet(name) || isSealedSecret(home, name),
 		CanBeSessionOnly: &sessionOnly, CanAskBeforeUse: &ask}
 	if u := strings.TrimSpace(argString(args, "url")); strings.HasPrefix(u, "https://") || strings.HasPrefix(u, "http://") {
@@ -116,7 +116,8 @@ func askedSessionOnly(content map[string]wire.JSONValue) bool {
 
 // askedNeedsApproval is Ask before use for a typed answer (#4014): on, as for every secret an
 // agent adds, unless the person turned it off on the card (#4016), which only a person's
-// client answers.
+// client answers. A machine that cannot keep one (keepsFlagged) offered no toggle, so the
+// value is kept without the flag.
 func askedNeedsApproval(content map[string]wire.JSONValue) bool {
 	b, set := value(content[needsApprovalField]).(bool)
 	return !set || b
@@ -133,7 +134,7 @@ func (d *Daemon) saveAskedSecret(agent wire.UUID, s wire.ElicitationSecret, cont
 	if strings.ContainsAny(v, "\n\r\x00") {
 		return Invalid("%s has to be one line.", s.Name)
 	}
-	ask := askedNeedsApproval(content)
+	ask := askedNeedsApproval(content) && d.keepsFlagged()
 	if askedSessionOnly(content) {
 		return d.setSessionSecret(agent, s.Name, v, ask)
 	}

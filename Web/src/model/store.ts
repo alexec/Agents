@@ -1,7 +1,7 @@
 // What the page holds and what each notification means: AgentsModel (Client/AgentsModel.swift),
 // ported by hand for the notifications the web remote hears and held to Fixtures/web/reducer
 // (research R7). Nothing here decides anything; the hosts do.
-import type { SecretUseAction } from "./secretUse";
+import { answerElsewhere, approveSecretUse, type SecretUseAction, secretUseApprovalParams, secretUseSigns } from "./secretUse";
 import { preferencesSaid, sendPreferencesWith } from "./preferences";
 import { folderPath as hostedFolderPath, healthTally, personalServers } from "./hostedMCP";
 import type { ExportImportBusy } from "./exports";
@@ -18,10 +18,11 @@ import type {
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, DailySummarySettings, SummaryPage, SummaryPageText, DesktopControlSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
   PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, BudgetRequest, RemoveRequest, ClientPermissionSettings, PRCostComment,
-  Connection, LineageNode, LineageSessionIssue, MoveToMachineAnswer, ProblemReport, ProblemReportRequest, Request as PersonRequest, RequestUpdate, ProviderID, StartedMachinePreview, FoldersFindRequest, FoundFolder } from "../protocol/generated";
+  Connection, LineageNode, LineageSessionIssue, MoveToMachineAnswer, ProblemReport, ProblemReportRequest, Request as PersonRequest, RequestSecretUse, LockDelivery, RequestUpdate, ProviderID, StartedMachinePreview, FoldersFindRequest, FoundFolder } from "../protocol/generated";
 import { endedConnections, endedLine, hasEnded } from "./connectorSetup";
 import { parseQuery } from "./labels";
 import { Failure } from "../protocol/generated";
+import { signRequest } from "../wire/lockChannel";
 import { CallFailed, type Link } from "../wire/link";
 import { sealWork } from "../wire/sealing";
 import type { FolderGoneAsk } from "./missingFolder";
@@ -2729,8 +2730,19 @@ export class Store extends Work {
    * A person's answer to a secret's use (#4017), from its Needs you row: to the host that asked.
    * From the row's menu, so a refusal is said in `problem`; `requests/changed` takes the row away.
    */
-  async answerSecretUse(host: string, request: string, action: SecretUseAction): Promise<void> {
-    await this.act("requests/answer", { id: request as never, answer: { secretUse: { action } } }, host);
+  async answerSecretUse(host: string, request: string, action: SecretUseAction, use?: RequestSecretUse): Promise<void> {
+    let approval: LockDelivery | undefined;
+    // A Linux machine opens the value only for an answer this page signed with its lock key (#4149).
+    if (use && secretUseSigns(use, action)) {
+      const source = await this.machineLock.signer();
+      if (!source) {
+        this.say(`Not sent — this machine opens the secret only for an answer your device signs, and this page is not in your lock. ${answerElsewhere}.`);
+        return;
+      }
+      const params = secretUseApprovalParams(request, use, action);
+      approval = { method: approveSecretUse, params, lock: await signRequest(source.signer, host, approveSecretUse, params) };
+    }
+    await this.act("requests/answer", { id: request as never, answer: { secretUse: approval ? { action, approval } : { action } } }, host);
   }
 
   /**

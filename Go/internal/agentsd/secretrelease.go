@@ -30,11 +30,10 @@ import (
 // agentsd restarts; after a restart, the first use asks again. The release key's public
 // half is asked for at each run and kept in memory, never in a file an agent could change.
 
-// releaseLayerHere is whether this machine keeps the release layer: Linux, with
-// AGENTS_SECRET_RELEASE=1 until the clients sign their answers (#4017). Before that, no
-// answer could open a value sealed this way. The tests turn it off for the Mac's path and
-// on, by daemon, for this one (secretReleaseOn).
-var releaseLayerHere = goruntime.GOOS == "linux" && os.Getenv("AGENTS_SECRET_RELEASE") == "1"
+// releaseLayerHere is whether this machine keeps the release layer: Linux, unless
+// AGENTS_SECRET_RELEASE=0. The Mac, the Remote and the web page sign their answers (#4149).
+// The tests turn it off for the Mac's path and on, by daemon, for this one (secretReleaseOn).
+var releaseLayerHere = goruntime.GOOS == "linux" && os.Getenv("AGENTS_SECRET_RELEASE") != "0"
 
 // releaseAsk bounds a call to the control plane for the release key.
 const releaseAsk = 20 * time.Second
@@ -68,6 +67,17 @@ func (d *Daemon) releaseLayerOn() bool {
 		return *d.secretReleaseOn
 	}
 	return releaseLayerHere
+}
+
+// keepsFlagged is whether this machine can keep a secret with Ask before use: always, but a
+// machine with the release layer only when it has joined a control plane (errNoControlPlane).
+// The ask card offers the flag only then.
+func (d *Daemon) keepsFlagged() bool {
+	if !d.releaseLayerOn() {
+		return true
+	}
+	_, _, _, joined := d.lockIdentity()
+	return joined
 }
 
 // releaseAD binds a release layer to where it is kept and its name.
@@ -202,7 +212,7 @@ func (d *Daemon) releaseForAnswer(rec wire.Request, a *wire.RequestSecretUseAnsw
 	} else if a.Approval.Method != secretrelease.ApproveMethod || json.Unmarshal([]byte(a.Approval.Params), &approved) != nil {
 		return refuse(secretrelease.ErrNotApproval.Error())
 	}
-	if approved.Request != rec.ID || approved.Name != ask.Name || approved.Use != string(ask.Use) ||
+	if !strings.EqualFold(string(approved.Request), string(rec.ID)) || approved.Name != ask.Name || approved.Use != string(ask.Use) ||
 		approved.Place != ask.Place || approved.Action != a.Action {
 		return refuse("the signature is for another answer")
 	}

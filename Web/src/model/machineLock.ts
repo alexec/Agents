@@ -286,7 +286,14 @@ export class MachineLock {
     return { signer: { privateKey: this.key.pair.privateKey, publicRaw: this.key.publicRaw }, state };
   }
 
-  private async signingKey(): Promise<{ pair: CryptoKeyPair; publicRaw: Uint8Array }> {
+  /** Whether this page can sign as a client of its lock now: what a row reads, as signer() would say. */
+  canSign(): boolean {
+    if (this.device.value.kind !== "member" || !this.state || !this.key) return false;
+    const member = this.state.member(this.key.publicRaw);
+    return !!member && isClient(member);
+  }
+
+    private async signingKey(): Promise<{ pair: CryptoKeyPair; publicRaw: Uint8Array }> {
     if (this.key) return this.key;
     let pair = await this.link.lockKey();
     if (!pair) {

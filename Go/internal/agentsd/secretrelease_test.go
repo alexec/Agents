@@ -199,3 +199,30 @@ func TestOnLinuxAFlaggedValueOpensOnlyForASignedApproval(t *testing.T) {
 	}
 	answerUse(t, d, openSecretUse(t, d), secretUseDeny)
 }
+
+// #4149: a Linux machine with no control plane offers no Ask before use on the ask card, and
+// a typed answer is kept without the flag; once it has joined, the card offers it again.
+func TestALinuxMachineWithNoControlPlaneOffersNoAskBeforeUse(t *testing.T) {
+	_, _, d := fillSetUp(t, nil)
+	d.secretReleaseOn = new(true)
+	if d.keepsFlagged() {
+		t.Fatal("a machine with no control plane offers Ask before use")
+	}
+	agent := seeded(t, d, t.TempDir(), nil).ID
+	secret := wire.ElicitationSecret{Name: "GITLAB_TOKEN"}
+	if err := d.saveAskedSecret(agent, secret, map[string]wire.JSONValue{secretField: wire.JSONValue(`"` + filledValue + `"`)}); err != nil {
+		t.Fatalf("an answer with no flag offered: %v", err)
+	}
+	if isSealedSecret(d.personalHome(), "GITLAB_TOKEN") {
+		t.Fatal("the value was sealed with Ask before use")
+	}
+	if _, err := controllink.HostPrivateKey(d.HostKey); err != nil {
+		t.Fatal(err)
+	}
+	if err := (&controllink.Membership{Host: "h-1", Addresses: []string{}}).Save(d.Store.Loc.Root); err != nil {
+		t.Fatal(err)
+	}
+	if !d.keepsFlagged() {
+		t.Fatal("a machine that joined a control plane offers no Ask before use")
+	}
+}
