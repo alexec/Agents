@@ -24,6 +24,7 @@ import (
 //	                   sent to it to pair, with nothing to type
 //	/account           the control plane's address, Open in This Browser, Sign Out, Delete
 //	/account/open      a new code for this browser, then to the control plane
+//	/app/connect       the Mac app's sign-in (#4228, app.go): a code for the app, on agents://hosted
 //	/account/delete    the account and its store, once its name is typed
 //	/signout           the session ends
 //	/account/upgrade, /account/billing, /billing/webhook   with billing on (billing.go)
@@ -88,6 +89,8 @@ func (s *Service) pages(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.openIn(w, r, account)
+	case r.URL.Path == "/app/connect" && r.Method == http.MethodGet:
+		s.appConnect(w, r, account)
 	case r.URL.Path == "/account/delete" && r.Method == http.MethodPost:
 		s.deleteAccount(w, r, account)
 	case r.URL.Path == "/account/upgrade" && r.Method == http.MethodPost && s.billingOn(),
@@ -256,7 +259,12 @@ func (s *Service) callback(w http.ResponseWriter, r *http.Request) {
 		acc, made = got.account, got.made
 	}
 	s.sessions.start(w, acc.ID)
+	app := s.fromApp(w, r)
 	if !made {
+		if app {
+			s.toApp(w, r, acc.ID)
+			return
+		}
 		http.Redirect(w, r, "/account", http.StatusSeeOther)
 		return
 	}
@@ -267,7 +275,12 @@ func (s *Service) callback(w http.ResponseWriter, r *http.Request) {
 	if err := s.ownerSignsIn(ctx, acc); err != nil {
 		s.log(acc.ID + ": the first person's sign-in: " + err.Error())
 	}
-	// The browser that signed up is the first client: to its control plane, to pair.
+	// The app that signed up is the first client (#4228), or else this browser: to its
+	// control plane, to pair.
+	if app {
+		s.toApp(w, r, acc.ID)
+		return
+	}
 	s.openIn(w, r, acc.ID)
 }
 

@@ -1128,6 +1128,9 @@ final class AppModel {
     /// No control plane and nothing of the old way: the window asks how to work, and
     /// starts nothing until it is told (058, FR-017).
     private(set) var needsFirstRun = ControlConfig.needsFirstRun
+    /// Counts the window's moves from one control plane to another (#4228), which do not
+    /// pass through `needsFirstRun`: Settings makes its control plane's model again.
+    private(set) var controlPlaneMoves = 0
     /// The servers (037). This Mac is `client`, as it always was.
     let hosts = HostSet(locations: .default)
     /// The Export… or Import Agents… on its way, drawn as a busy sheet with Cancel (#2437).
@@ -3238,6 +3241,14 @@ final class AppModel {
         serverPicturesByHost[.mac] = nil
         needsFirstRun = false
         await stayConnected()
+    }
+
+    /// Connect to Another… or Use This Mac Only (#4228): from one control plane straight to
+    /// the next, with nothing of the first left dialling.
+    func moveControlPlane(to endpoint: ControlConfig.Endpoint) async {
+        leaveControlPlane()
+        controlPlaneMoves += 1
+        await adopt(endpoint)
     }
 
     /// Forget This Mac has gone through (#344): the control plane no longer knows this
