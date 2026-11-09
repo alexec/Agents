@@ -6083,6 +6083,14 @@ export interface MachineSchedule {
 }
 
 /**
+ * machine/secretOps (#4156): what a machine's agents did with its person's secrets, for the control
+ * plane's audit. At most one operation per secret, session, place and minute, with a count.
+ */
+export interface MachineSecretOpsCall {
+  ops: SecretOperation[];
+}
+
+/**
  * machines/sessionCall, through machine/machines (#2927): an agent's read_session, message_session,
  * stop_session, archive_session, or list_sessions and agent.ended wait status, on a session it
  * started on another of the person's machines with start_session. The control plane sends that
@@ -9866,6 +9874,49 @@ export interface SecretNeedsApprovalRequest {
   agentID?: UUID;
   needsApproval: boolean;
 }
+
+/**
+ * One read or change of a secret on a machine (#4156). Never the value, never its hint: only the
+ * name, and where it went.
+ */
+export interface SecretOperation {
+  name: string;
+  what: SecretOperationWhat;
+  use?: SecretOperationUse;
+  /**
+   * Where it went: the field's domain (fill), owner/repo (ci), the server's name (mcp, env), or
+   * session (env, as a session's own variable).
+   */
+  place?: string;
+  /** The session that read it. Left out for a change no session made. */
+  agent?: UUID;
+  /** When; for a count, the first in its minute. */
+  at: WireDate;
+  /** How many times in the minute from at, when more than one. */
+  count?: number;
+}
+
+/**
+ * How a secret was read (#4156): fill (fill_secret), ci (set_ci_secret), mcp (an HTTP MCP server's
+ * header or url, through agentsd, #4120) or env (given to a session at its start: its own secrets
+ * as variables, or an MCP server's ${NAME} from secrets.env).
+ */
+export type SecretOperationUse =
+  | "fill"
+  | "ci"
+  | "mcp"
+  | "env";
+
+/**
+ * What an operation on a secret was (#4156): read (an agent's use of it), denied (a person denied a
+ * use with Ask before use), or added, replaced or removed.
+ */
+export type SecretOperationWhat =
+  | "read"
+  | "denied"
+  | "added"
+  | "replaced"
+  | "removed";
 
 /**
  * machine/secretRelease (#4058): a Linux machine asks its control plane to open the release layer
@@ -13868,6 +13919,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineRelease: { required: ["version"], optional: [] },
   MachineRequest: { required: ["host"], optional: ["purge"] },
   MachineSchedule: { required: [], optional: ["at", "workflow"] },
+  MachineSecretOpsCall: { required: ["ops"], optional: [] },
   MachineSessionCall: { required: ["host", "call"], optional: [] },
   MachineSessionStart: { required: ["host", "start"], optional: [] },
   MachineStatus: { required: ["idle", "running"], optional: ["schedule"] },
@@ -14193,6 +14245,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SecretGrants: { required: ["grants"], optional: [] },
   SecretLeftOn: { required: ["host", "name", "at"], optional: [] },
   SecretNeedsApprovalRequest: { required: ["name", "needsApproval"], optional: ["agentID"] },
+  SecretOperation: { required: ["name", "what", "at"], optional: ["use", "place", "agent", "count"] },
   SecretRelease: { required: ["name", "encapsulated", "approval"], optional: [] },
   SecretReleaseKey: { required: ["publicKey"], optional: [] },
   SecretReleased: { required: ["key"], optional: [] },

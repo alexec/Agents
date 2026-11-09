@@ -176,10 +176,15 @@ func (d *Daemon) saveSecret(name, value string, needsApproval bool) error {
 	if home == "" {
 		return errors.New("this machine has no personal home")
 	}
+	change := wire.SecretOperationWhatAdded
+	if secretIsSet(home, name) {
+		change = wire.SecretOperationWhatReplaced
+	}
 	if needsApproval {
 		if err := d.saveSealedSecret(home, name, value, "", true); err != nil {
 			return err
 		}
+		d.secretChanged("", name, change, true)
 		d.mcpChanged()
 		return nil
 	}
@@ -195,6 +200,7 @@ func (d *Daemon) saveSecret(name, value string, needsApproval bool) error {
 	if err := d.removeSealedSecret(home, name); err != nil {
 		return errors.New("sealed.json could not be written")
 	}
+	d.secretChanged("", name, change, true)
 	d.mcpChanged()
 	return nil
 }

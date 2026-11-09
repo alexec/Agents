@@ -129,12 +129,17 @@ func TestFillSecretTypesTheValueAndNeverSaysIt(t *testing.T) {
 	if r.IsError || replyText(r) != "GITLAB_PASSWORD filled." {
 		t.Fatalf("%+v", r)
 	}
-	// Typed into the field the agent named, then masked there.
-	if got := page.asked(); len(got) != 2 || got[0] != "browser_type" || got[1] != "browser_evaluate" {
+	// The field's domain read, for the record of the read (#4156); typed into the field the
+	// agent named, then masked there.
+	if got := page.asked(); len(got) != 3 || got[0] != "browser_evaluate" || got[1] != "browser_type" || got[2] != "browser_evaluate" {
 		t.Fatal(got)
 	}
-	if page.value != filledValue || string(page.calls[0]["target"]) != `"e12"` || string(page.calls[1]["target"]) != `"e12"` {
-		t.Fatalf("%q %s", page.value, page.calls[1]["target"])
+	if page.value != filledValue || string(page.calls[1]["target"]) != `"e12"` || string(page.calls[2]["target"]) != `"e12"` {
+		t.Fatalf("%q %s", page.value, page.calls[2]["target"])
+	}
+	if read := secretEvents(d, "secret.read"); len(read) != 1 || read[0].Details["name"] != "GITLAB_PASSWORD" ||
+		read[0].Details["use"] != "fill" || read[0].Details["place"] != "shop.example.com" {
+		t.Fatalf("%+v", read)
 	}
 	// A page read has the value out.
 	if r := m.browserTool(3, "browser_snapshot", nil); strings.Contains(replyText(r), filledValue) ||
@@ -186,7 +191,7 @@ func TestAFieldThatCannotBeMaskedIsEmptiedAgain(t *testing.T) {
 	if !r.IsError || strings.Contains(replyText(r), filledValue) || !strings.Contains(replyText(r), "taken out again") {
 		t.Fatalf("%+v", r)
 	}
-	if got := page.asked(); len(got) != 3 || got[2] != "browser_type" || page.value != "" {
+	if got := page.asked(); len(got) != 4 || got[3] != "browser_type" || page.value != "" {
 		t.Fatal(got, page.value)
 	}
 }
@@ -197,7 +202,7 @@ func TestFillSecretPressesEnterAfterTheMask(t *testing.T) {
 	if r.IsError || replyText(r) != "GITLAB_PASSWORD filled, and Enter pressed." {
 		t.Fatalf("%+v", r)
 	}
-	if got := page.asked(); len(got) != 3 || got[2] != "browser_press_key" {
+	if got := page.asked(); len(got) != 4 || got[3] != "browser_press_key" {
 		t.Fatal(got)
 	}
 }

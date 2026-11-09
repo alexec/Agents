@@ -283,6 +283,9 @@ func (d *Daemon) answerSecretUse(rec wire.Request, a *wire.RequestSecretUseAnswe
 	if ask.Use == wire.SecretUseMCP {
 		d.secretProxyAnswered(agent, ask, a.Action, always)
 	}
+	if a.Action == secretUseDeny {
+		d.secretDenied(agent, ask.Name, ask.Use, ask.Place)
+	}
 	if !d.endRequest(rec.ID, wire.RequestStateAnswered, &summary, "", by) {
 		return wire.RequestUpdate{}, &Error{Code: wire.FailureNoSuchAgent, Message: "That request has ended already."}
 	}

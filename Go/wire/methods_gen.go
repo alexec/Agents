@@ -588,6 +588,7 @@ var CallMachineOrgRoutesApplied = Method[OrgRoutesApplied, Empty]{"machine/orgRo
 var CallMachinePolicyApplied = Method[PolicyApplied, Empty]{"machine/policyApplied"}
 var CallMachineProviderDraft = Method[MachineProviderDraftCall, JSONValue]{"machine/providerDraft"}
 var CallMachineSecretKey = Method[Empty, SecretReleaseKey]{"machine/secretKey"}
+var CallMachineSecretOps = Method[MachineSecretOpsCall, Empty]{"machine/secretOps"}
 var CallMachineSecretRelease = Method[SecretRelease, SecretReleased]{"machine/secretRelease"}
 var CallMachineStatus = Method[MachineStatus, Empty]{"machine/status"}
 var CallMachinesAnnounce = Method[MachineAnnounce, Admitted]{"machines/announce"}

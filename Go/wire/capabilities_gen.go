@@ -748,6 +748,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"machine/policyApplied", "host.policy/1"},
 	{"machine/providerDraft", "machine/1"},
 	{"machine/secretKey", "host.secret-release/1"},
+	{"machine/secretOps", "machine/1"},
 	{"machine/secretRelease", "host.secret-release/1"},
 	{"machine/status", "machine/1"},
 	{"machines/announce", "machines/1"},

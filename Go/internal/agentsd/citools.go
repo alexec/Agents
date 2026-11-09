@@ -132,6 +132,7 @@ func (d *Daemon) setCISecret(caller wire.UUID, args map[string]json.RawMessage) 
 	if err := gh.SetActionsSecret(ctx, repo, name, v); err != nil {
 		return "", ciWords(err, what, repo)
 	}
+	d.secretRead(caller, secret, wire.SecretOperationUseCi, strings.ToLower(repo))
 	return name + " is set as a CI secret in " + repo + ", from " + secret + ". Workflows read it as ${{ secrets." + name + " }}.", nil
 }
 

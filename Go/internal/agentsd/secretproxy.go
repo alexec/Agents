@@ -175,6 +175,9 @@ func (d *Daemon) secretProxyValues(p *secretProxy) (map[string]string, string) {
 		}
 		values[n] = v
 	}
+	for _, n := range p.flagged {
+		d.secretRead(p.agent, n, wire.SecretOperationUseMCP, p.server.Name)
+	}
 	return values, ""
 }
 
