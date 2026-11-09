@@ -21,6 +21,8 @@ struct SecretUseRequestTests {
         let ci = try request(#"{"secretUse":{"name":"TOKEN","use":"ci","place":"alexec/agents","sessionOnly":true}}"#)
         #expect(ci.line(asker: nil) == "CI secret in alexec/agents")
         #expect(ci.secretUse?.actions == [.once, .session, .deny])
+        let mcp = try request(#"{"secretUse":{"name":"NOTES_TOKEN","use":"mcp","place":"notes"}}"#)
+        #expect(mcp.line(asker: nil) == "MCP server notes")
         #expect(NeedRequest.Action.allCases.map(\.word) == ["Allow Once", "Allow for This Session", "Allow Always", "Deny"])
     }
 

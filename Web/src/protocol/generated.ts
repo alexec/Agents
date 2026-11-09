@@ -9108,7 +9108,10 @@ export type RequestKind =
 export interface RequestSecretUse {
   name: string;
   use: SecretUse;
-  /** Where the value goes: the page's domain for a fill, owner/repo for CI. */
+  /**
+   * Where the value goes: the page's domain for a fill, owner/repo for CI, the server's name for an
+   * MCP server.
+   */
   place: string;
   /**
    * The secret is the session's own (#3548): Allow always is the same as Allow for this session.
@@ -9732,7 +9735,7 @@ export interface SealingWork {
 export interface SecretGrant {
   name: string;
   use: SecretUse;
-  /** The page's domain for a fill, owner/repo for CI. */
+  /** The page's domain for a fill, owner/repo for CI, the server's name for an MCP server. */
   place: string;
 }
 
@@ -9805,11 +9808,13 @@ export interface SecretReleased {
 
 /**
  * What agentsd does with a secret with Ask before use (#4015): fill types it into a page
- * (fill_secret), ci sends it to GitHub (set_ci_secret).
+ * (fill_secret), ci sends it to GitHub (set_ci_secret), mcp adds it to an HTTP MCP server's header
+ * or URL on each request agentsd sends the server for a session (#4120).
  */
 export type SecretUse =
   | "fill"
-  | "ci";
+  | "ci"
+  | "mcp";
 
 /**
  * control/secretsLeft (#1760, FR-026): to the person's own clients, when one of their machines was
