@@ -56,17 +56,21 @@ Rules from Alex (2026-10-12/13) that are not in AGENTS.md:
   running lane to take another issue: a message to the agent that owns a branch is for
   its stuck PR only (conflicts, failing checks, behind, auto-merge off), never to widen
   a lane's work. A stack (#1777) is still one agent per PR.
-- **A standing bug lane** (#3212): always at least one. It takes the open bugs with no
-  milestone, `priority:high` first, then highest RICE, alongside the milestone lanes and
-  under the same area and open-PR limits. Bugs get no milestone and nothing is held for
-  a patch: there are no patch milestones and no `hold:v…` labels any more.
-- **Standing lanes for polish and competitor gaps** (#1570): always at least one. It
-  takes the open issues labelled `polish` or `competitor` with no milestone, highest
-  RICE first, after the milestone lanes and the bug lane and under the same area and
-  open-PR limits.
+- **The standing epics are the standing lanes** (#3659, #3664). The bug lane is the
+  standing epic #4207 (#3212): the open bugs with no milestone. Polish and competitor
+  gaps are the standing epic #4208 (#1570): the open issues labelled `polish` or
+  `competitor` with no milestone. Give each one's lead a place as you give a place to any
+  epic, always one lead each, running or queued: the bug lane's with the milestones'
+  epics, the polish epic's after them, under the same area and open-PR limits. The lead
+  runs the block's `lanes:` lanes and takes the query's issues in order (`priority:high`
+  first); never start a lane on one of their issues yourself. Bugs get no milestone and
+  nothing is held for a patch: there are no patch milestones and no `hold:v…` labels any
+  more. When places run short, pause a standing epic's lane before a milestone epic's
+  lane, but never a UI lane before a non-UI one.
   **Spare slots go to standing work too** (#1604): when no workable milestone issue can
-  fill a free slot (none open, all areas held, or all taken), start another standing
-  lane. Never give a standing lane a slot that a workable milestone issue can fill.
+  fill a free slot (none open, all areas held, or all taken), ask a standing epic's lead
+  to run one more lane (its `lanes:` is the Product Owner's and Alex's to raise). Never
+  give a standing epic a slot that a workable milestone issue can fill.
 - **A release is waiting** on issues labelled `priority:high` and `priority:medium`
   (#914): take them first, high before medium, and within each security, runtimes, then
   the rest (#1462). The five release reviews are paused until 1.0 (#3215), so these come
@@ -89,7 +93,7 @@ Rules from Alex (2026-10-12/13) that are not in AGENTS.md:
   ships. With more epics than places: the earliest milestone (by due date) first, then core usability
   (#2800), then RICE.
 - **Order of places** (#3212, #3465): `priority:high` first; then UI changes (below); then
-  the milestones' epics and the bug lane together; then `polish` and `competitor`; then the
+  the milestones' epics and the bug lane's epic together; then the polish and competitor epic; then the
   backlog by RICE.
 - **UI changes go early** (#2337): `priority:high` first, then UI changes (`App/Sources`,
   `Remote/Sources`, `Shared/UI`, `Web/src`), bugs first, from the milestone, the bug lane and the

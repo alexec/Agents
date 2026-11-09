@@ -155,10 +155,18 @@ until a lead can call `forge/plan`), runs at most `lanes` lanes, also waits on
 `issue.opened` and `issue.labelled` for the block's first label, and never closes the
 epic.
 
+## This folder's standing epics (#3664)
+
+The bug lane is #4207 and polish and competitor gaps is #4208, each with the block in the
+table above. AGENTS.md ("Standing epics are the standing lanes") and the Scrum Master
+persona give their leads places as any epic's.
+
+Decided: the two epics have no `feature:` label, because their query takes issues of every
+feature and they have no children to share one. Alex can overrule.
+
 ## Not in this spike
 
 - The Plan section on the Work page for a standing epic (Mac + web).
-- Moving AGENTS.md's bug-lane and polish-lane rules into the two standing epics.
 
 ## Direction (#3403)
 
