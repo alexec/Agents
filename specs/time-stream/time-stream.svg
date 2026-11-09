@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 560" font-family="SF Mono, Menlo, monospace" font-size="12">
+  <!-- Wireframe of the time stream. Made-up data. Time goes left to right; main is the trunk. -->
+  <defs>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="cone" x1="0" x2="1">
+      <stop offset="0" stop-color="#ffb347" stop-opacity="0.25"/>
+      <stop offset="1" stop-color="#ffb347" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="560" fill="#070b14"/>
+
+  <!-- Toolbar -->
+  <text x="24" y="30" fill="#cfe3ff" font-size="15">Work ▸ Timeline</text>
+  <g fill="#7f93b3">
+    <rect x="300" y="14" width="250" height="24" rx="5" fill="none" stroke="#2a3a55"/>
+    <text x="312" y="31">1 day · [2 days] · Week · Now</text>
+    <rect x="566" y="14" width="160" height="24" rx="5" fill="none" stroke="#2a3a55"/>
+    <text x="578" y="31">[✓] Predicted</text>
+    <rect x="742" y="14" width="190" height="24" rx="5" fill="none" stroke="#2a3a55"/>
+    <text x="754" y="31">Lines: [Epics] · Features</text>
+    <rect x="948" y="14" width="120" height="24" rx="5" fill="none" stroke="#2a3a55"/>
+    <text x="960" y="31">Board: All ▾</text>
+  </g>
+
+  <!-- Time axis -->
+  <g fill="#4d5f7d">
+    <text x="60" y="540">Oct 20</text><text x="230" y="540">Oct 27</text><text x="400" y="540">Nov 3</text>
+    <text x="640" y="540">Nov 10</text><text x="820" y="540">Nov 17</text><text x="1000" y="540">Nov 24</text>
+  </g>
+
+  <!-- Past half and future half -->
+  <rect x="620" y="50" width="580" height="470" fill="#0b1222" opacity="0.6"/>
+  <line x1="620" y1="50" x2="620" y2="520" stroke="#e8f1ff" stroke-width="1.5" stroke-dasharray="2 3"/>
+  <text x="628" y="66" fill="#e8f1ff">NOW · Nov 8</text>
+  <text x="1080" y="66" fill="#4d5f7d">predicted →</text>
+
+  <!-- The trunk: main -->
+  <line x1="20" y1="290" x2="620" y2="290" stroke="#9fd0ff" stroke-width="5" filter="url(#glow)"/>
+  <line x1="620" y1="290" x2="1180" y2="290" stroke="#9fd0ff" stroke-width="5" stroke-dasharray="10 6" opacity="0.5"/>
+  <text x="24" y="312" fill="#9fd0ff">Agents (releases)</text>
+
+  <!-- Releases: rings on the trunk -->
+  <g fill="none" stroke="#e8f1ff" stroke-width="2">
+    <circle cx="150" cy="290" r="9"/><circle cx="330" cy="290" r="9"/><circle cx="480" cy="290" r="9"/><circle cx="600" cy="290" r="9"/>
+  </g>
+  <g fill="#7f93b3" font-size="10">
+    <text x="136" y="318">v0.21</text><text x="316" y="318">v0.22</text><text x="466" y="318">v0.23</text><text x="586" y="318">v0.24</text>
+  </g>
+
+  <!-- Milestone due dates: ticks across the stream -->
+  <line x1="900" y1="80" x2="900" y2="510" stroke="#c38bff" stroke-dasharray="1 5"/>
+  <text x="906" y="508" fill="#c38bff" font-size="10">◆ Projects (due Nov 20)</text>
+
+  <!-- Epic A, done: forks, lands issues, joins back -->
+  <path d="M60 290 C110 290 110 200 160 200 L360 200 C410 200 410 290 460 290" fill="none" stroke="#5cf2c4" stroke-width="3" filter="url(#glow)"/>
+  <g fill="#5cf2c4"><circle cx="190" cy="200" r="4"/><circle cx="235" cy="200" r="4"/><circle cx="270" cy="200" r="4"/><circle cx="320" cy="200" r="4"/><circle cx="350" cy="200" r="4"/></g>
+  <circle cx="460" cy="290" r="6" fill="#5cf2c4"/>
+  <text x="170" y="190" fill="#5cf2c4">Secrets #4010 · 5 of 5 · $41 · joined Nov 1</text>
+
+  <!-- Epic B, running: forked, dots so far, predicted path and joining range -->
+  <path d="M300 290 C350 290 350 130 400 130 L620 130" fill="none" stroke="#ffb347" stroke-width="3" filter="url(#glow)"/>
+  <g fill="#ffb347"><circle cx="430" cy="130" r="4"/><circle cx="470" cy="130" r="4"/><circle cx="560" cy="130" r="4"/></g>
+  <circle cx="612" cy="130" r="5" fill="none" stroke="#ffb347" stroke-width="2"/>
+  <text x="410" y="120" fill="#ffb347">Azure DevOps #4060 · 3 of 7 · ◐ 1 running</text>
+  <path d="M620 130 L800 130 C850 130 850 290 900 290" fill="none" stroke="#ffb347" stroke-width="2" stroke-dasharray="6 5" opacity="0.7"/>
+  <g fill="none" stroke="#ffb347" opacity="0.7"><circle cx="660" cy="130" r="4"/><circle cx="710" cy="130" r="4"/><circle cx="770" cy="130" r="4"/></g>
+  <path d="M860 290 Q900 250 980 270 L980 310 Q900 330 860 290 Z" fill="url(#cone)"/>
+  <text x="845" y="350" fill="#ffb347" font-size="10">joins Nov 18 (80%: Nov 16–23)</text>
+
+  <!-- Epic C, running below the trunk -->
+  <path d="M420 290 C470 290 470 400 520 400 L620 400" fill="none" stroke="#6fa8ff" stroke-width="3" filter="url(#glow)"/>
+  <g fill="#6fa8ff"><circle cx="560" cy="400" r="4"/><circle cx="595" cy="400" r="4"/></g>
+  <path d="M620 400 L700 400 C750 400 750 290 800 290" fill="none" stroke="#6fa8ff" stroke-width="2" stroke-dasharray="6 5" opacity="0.7"/>
+  <g fill="none" stroke="#6fa8ff" opacity="0.7"><circle cx="650" cy="400" r="4"/></g>
+  <text x="500" y="425" fill="#6fa8ff">Time stream #—— · 2 of 3</text>
+  <text x="745" y="345" fill="#6fa8ff" font-size="10">joins Nov 14</text>
+
+  <!-- Epic D, predicted only: no child started yet, forks in the future -->
+  <path d="M700 290 C750 290 750 470 800 470 L1050 470 C1100 470 1100 290 1150 290" fill="none" stroke="#c38bff" stroke-width="2" stroke-dasharray="6 5" opacity="0.55"/>
+  <g fill="none" stroke="#c38bff" opacity="0.55"><circle cx="840" cy="470" r="4"/><circle cx="900" cy="470" r="4"/><circle cx="960" cy="470" r="4"/><circle cx="1010" cy="470" r="4"/></g>
+  <text x="810" y="460" fill="#c38bff">Projects #3990 · starts ~Nov 11 (after #4060's step 2)</text>
+
+  <!-- Epic E, closed as not planned: the line ends, it never joins -->
+  <path d="M120 290 C170 290 170 440 220 440 L300 440" fill="none" stroke="#7f93b3" stroke-width="2" opacity="0.6"/>
+  <circle cx="250" cy="440" r="4" fill="#7f93b3" opacity="0.6"/>
+  <text x="296" y="445" fill="#7f93b3">✕</text>
+  <text x="150" y="465" fill="#7f93b3" font-size="10">Graph of everything #3479 · not planned</text>
+
+  <!-- Hover card on a dot -->
+  <g>
+    <line x1="470" y1="130" x2="500" y2="80" stroke="#cfe3ff" stroke-width="0.8"/>
+    <rect x="500" y="56" width="300" height="48" rx="6" fill="#121b2e" stroke="#2a3a55"/>
+    <text x="510" y="74" fill="#cfe3ff">#4072 A folder added before the connection…</text>
+    <text x="510" y="92" fill="#7f93b3">merged Nov 6 · PR #4074 · 1.2 h · $3.10</text>
+  </g>
+</svg>
