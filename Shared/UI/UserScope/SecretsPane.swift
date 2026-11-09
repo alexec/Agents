@@ -50,13 +50,13 @@ struct SecretsPane<Extra: View>: View {
         .task(id: control != nil) { await state.load(control) }
         .refreshable { await state.load(control) }
         .sheet(isPresented: $isAdding) {
-            SecretSheet(name: nil, asks: false) { name, value, ask in
+            SecretSheet(name: nil, asks: true) { name, value, ask in
                 await state.setSecret(name, value: value, askBeforeUse: ask, on: control)
             }
             .paperSheet()
         }
         .sheet(isPresented: $isAddingCard) {
-            CardSheet(name: nil, asks: false) { name, value, ask in
+            CardSheet(name: nil, asks: true) { name, value, ask in
                 await state.setSecret(name, value: value, kind: CardSecret.kind, askBeforeUse: ask, on: control)
             }
             .paperSheet()
@@ -152,7 +152,7 @@ private struct SecretSheet: View {
     @State private var problem: String?
     @State private var saving = false
 
-    /// `asks`: Ask before use as the toggle starts: the replaced secret's, off for a new one.
+    /// `asks`: Ask before use as the toggle starts: the replaced secret's, on for a new one (#4162).
     init(name: String?, asks: Bool, save: @escaping (String, String, Bool) async -> String?) {
         self.name = name
         self.save = save
@@ -223,7 +223,7 @@ private struct CardSheet: View {
     @State private var problem: String?
     @State private var saving = false
 
-    /// `asks`: Ask before use as the toggle starts: the replaced card's, off for a new one.
+    /// `asks`: Ask before use as the toggle starts: the replaced card's, on for a new one (#4162).
     init(name: String?, asks: Bool, save: @escaping (String, String, Bool) async -> String?) {
         self.name = name
         self.save = save
