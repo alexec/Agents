@@ -220,6 +220,9 @@ func (d *Daemon) askQuestion(id wire.UUID, args map[string]json.RawMessage) (str
 	if !answered {
 		return formStillOpen, nil
 	}
+	if r.byMessage {
+		return answeredByMessage, nil
+	}
 	var said []wire.ElicitationAnswer
 	if r.action == wire.AnswerElicitationRequestActionAccept {
 		said = answers(schema, r.content, message)
