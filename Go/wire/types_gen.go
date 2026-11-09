@@ -32,6 +32,29 @@ type ACPProviderInfo struct {
 	Configured *bool `json:"configured,omitzero"`
 }
 
+// An account's newest operation (#4157), for the time ago its row shows.
+type AccountLastOp struct {
+	What AccountOperationWhat `json:"what"`
+
+	At Date `json:"at"`
+}
+
+// One read or change of an outside account by manage_accounts (#4157): a get, a list filtered to its service, or an add. Never a value of the account but its service and address.
+type AccountOperation struct {
+	What AccountOperationWhat `json:"what"`
+
+	Service string `json:"service"`
+
+	Address *string `json:"address,omitzero"`
+}
+
+// What an operation on an account was (#4157): read (by manage_accounts, or a read of its secret or card), added, or edited (it took another's place).
+type AccountOperationWhat string
+
+const AccountOperationWhatRead AccountOperationWhat = "read"
+const AccountOperationWhatAdded AccountOperationWhat = "added"
+const AccountOperationWhatEdited AccountOperationWhat = "edited"
+
 // An account added to a runtime (#840), beside the runtime's own sign-in, which is the Default account and is not one of these. The person picks one when they start a session.
 type AccountProfile struct {
 	// The host's own name for it. An agent keeps it as accountID.
@@ -6660,6 +6683,9 @@ type MacTerminalRequest struct {
 // machine/accounts (#3967), for an agent on a machine: its person's outside accounts, after add is added (one with the same service and address goes in its place).
 type MachineAccountsCall struct {
 	Add []OutsideAccount `json:"add,omitzero"`
+
+	// What manage_accounts did to the accounts (#4157): the control plane writes an audit entry for each.
+	Ops []AccountOperation `json:"ops,omitzero"`
 }
 
 // machines/announce, on an enrolment connection.
@@ -7964,6 +7990,12 @@ type OutsideAccount struct {
 
 	// The date it was made, YYYY-MM-DD.
 	Made *string `json:"made,omitzero"`
+
+	// When it was last changed (#4157): the control plane sets it when an account takes another's place. made stays. Absent for one never changed.
+	Edited *Date `json:"edited,omitzero"`
+
+	// Its newest operation (#4157): a read or change by manage_accounts, or a read of the secret or card it names, as the machine that answers knows it. The control plane does not store it.
+	LastOp *AccountLastOp `json:"lastOp,omitzero"`
 
 	// The date its token expires, YYYY-MM-DD.
 	TokenExpires *string `json:"tokenExpires,omitzero"`

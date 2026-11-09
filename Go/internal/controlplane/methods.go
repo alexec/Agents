@@ -1251,10 +1251,11 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 			return nil, err
 		}
 		user := m.s.ownerOf(host)
-		listed, changed, err := m.s.users.AddAccounts(ctx, user, request.Add)
+		listed, changed, err := m.s.users.AddAccounts(ctx, user, request.Add, time.Now())
 		if err != nil {
 			return nil, userFailure(err)
 		}
+		m.s.auditAccountOps(host, user, request.Ops)
 		if changed {
 			m.s.userChanged(user, []wire.UserSettingsPartName{wire.UserSettingsPartNameAccounts}, false, host)
 		}

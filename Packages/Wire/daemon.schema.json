@@ -61,6 +61,52 @@
       ],
       "additionalProperties": false
     },
+    "AccountLastOp": {
+      "type": "object",
+      "description": "An account's newest operation (#4157), for the time ago its row shows.",
+      "properties": {
+        "what": {
+          "$ref": "#/definitions/AccountOperationWhat"
+        },
+        "at": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "what",
+        "at"
+      ],
+      "additionalProperties": false
+    },
+    "AccountOperation": {
+      "type": "object",
+      "description": "One read or change of an outside account by manage_accounts (#4157): a get, a list filtered to its service, or an add. Never a value of the account but its service and address.",
+      "properties": {
+        "what": {
+          "$ref": "#/definitions/AccountOperationWhat"
+        },
+        "service": {
+          "type": "string"
+        },
+        "address": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "what",
+        "service"
+      ],
+      "additionalProperties": false
+    },
+    "AccountOperationWhat": {
+      "type": "string",
+      "enum": [
+        "read",
+        "added",
+        "edited"
+      ],
+      "description": "What an operation on an account was (#4157): read (by manage_accounts, or a read of its secret or card), added, or edited (it took another's place)."
+    },
     "AccountProfile": {
       "description": "An account added to a runtime (#840), beside the runtime's own sign-in, which is the Default account and is not one of these. The person picks one when they start a session.",
       "type": "object",
@@ -14937,6 +14983,13 @@
           "items": {
             "$ref": "#/definitions/OutsideAccount"
           }
+        },
+        "ops": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AccountOperation"
+          },
+          "description": "What manage_accounts did to the accounts (#4157): the control plane writes an audit entry for each."
         }
       },
       "additionalProperties": false
@@ -17681,6 +17734,14 @@
         "made": {
           "type": "string",
           "description": "The date it was made, YYYY-MM-DD."
+        },
+        "edited": {
+          "$ref": "#/definitions/WireDate",
+          "description": "When it was last changed (#4157): the control plane sets it when an account takes another's place. made stays. Absent for one never changed."
+        },
+        "lastOp": {
+          "$ref": "#/definitions/AccountLastOp",
+          "description": "Its newest operation (#4157): a read or change by manage_accounts, or a read of the secret or card it names, as the machine that answers knows it. The control plane does not store it."
         },
         "tokenExpires": {
           "type": "string",

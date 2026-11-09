@@ -461,6 +461,7 @@ func (d *Daemon) raiseAs(draft wire.EventDraft, actor *wire.AuditActor) wire.Eve
 		}
 	}
 	d.eventMu.Unlock()
+	d.noteSecretRead(e)
 	d.tellEvents(&e)
 	d.matchWaits(e)
 	d.fireWorkflows(e)
@@ -520,7 +521,7 @@ func eventGroup(name string) (wire.EventGroup, bool) {
 		return wire.EventGroupBranches, true
 	case "file":
 		return wire.EventGroupDropbox, true
-	case "mac", "machine", "person", "lease", "cost", "server":
+	case "mac", "machine", "person", "lease", "cost", "server", "account":
 		return wire.EventGroupMac, true
 	}
 	return "", false

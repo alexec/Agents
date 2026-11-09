@@ -107,3 +107,43 @@ func TestTheAuditTargetIsReadOffTheRoutersLock(t *testing.T) {
 		return len(list.Entries) == 1 && list.Entries[0].Target != nil && *list.Entries[0].Target == "A1"
 	}, "the stop kept")
 }
+
+// manage_accounts' reads and changes of an account are kept (#4157): one entry for each
+// operation the machine names, with the account's service and address, and nothing for a call
+// that names none.
+func TestAccountOperationsAreAudited(t *testing.T) {
+	t.Parallel()
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	box := p.hostWith("MACHINE-2", nil)
+	_, window := p.client("Test window")
+	address := "agents@example.com"
+	say := func(call wire.MachineAccountsCall) {
+		t.Helper()
+		params, _ := json.Marshal(call)
+		if _, err := p.s.methods.HostSaid(box.member.Host, "machine/accounts", params); err != nil {
+			t.Fatal(err)
+		}
+	}
+	say(wire.MachineAccountsCall{})
+	say(wire.MachineAccountsCall{Add: []wire.OutsideAccount{{Service: "gitlab.com", Address: &address}},
+		Ops: []wire.AccountOperation{{What: wire.AccountOperationWhatAdded, Service: "gitlab.com", Address: &address}}})
+	say(wire.MachineAccountsCall{Ops: []wire.AccountOperation{{What: wire.AccountOperationWhatRead, Service: "gitlab.com", Address: &address}}})
+
+	var list wire.AuditList
+	p.waitFor(func() bool {
+		list = wire.AuditList{}
+		json.Unmarshal(call(t, window, "", "audit/list", wire.AuditQuery{}), &list)
+		return len(list.Entries) == 2
+	}, "two entries")
+	actions := map[string]bool{}
+	for _, e := range list.Entries {
+		actions[e.Action] = true
+		if e.Method != "machine/accounts" || *e.Target != "gitlab.com · agents@example.com" || string(*e.Host) != box.member.Host ||
+			e.Actor.User != p.s.localOwner() {
+			t.Fatalf("%+v", e)
+		}
+	}
+	if !actions["Added an account"] || !actions["Listed accounts"] {
+		t.Fatal(actions)
+	}
+}
