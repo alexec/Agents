@@ -3,8 +3,8 @@ import SwiftUI
 
 /// An agent's `ask_secret` (#2885), drawn by the window's `ElicitationView` and the Remote's
 /// `ElicitationSheet` under their own "who asks" line: the secret's name, why, where to get
-/// it, and a masked field. What is typed goes to the host, which saves it to the person's
-/// secrets.env, or keeps it for this session only (#3548); the chat, the agent and every
+/// it, and a masked field. What is typed goes to the host, which seals it in the person's
+/// store, or keeps it for this session only (#3548); the chat, the agent and every
 /// other client get the name only. Ask before use (#4016) is on unless the person turns it off.
 struct SecretAskCard: View {
     let secret: ElicitationRequest.Secret

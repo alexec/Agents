@@ -58,7 +58,7 @@ server offers that, and forgets it itself. The row says **needs sign-in** again.
 
 ## Where the sign-in is kept
 
-In `~/.agents-secrets/mcp-sign-ins.json`, beside `secrets.env`, and like it readable only
+In `~/.agents-secrets/mcp-sign-ins.json`, beside your sealed secrets (`sealed.json`), and like them readable only
 by you. The folder is apart from `~/.agents` because `~/.agents` is settings that you can
 copy, sync or commit, and secrets are not settings. Never in `mcp.json`, so a folder's
 committed entry carries no one's sign-in. The app logs the server's name and what

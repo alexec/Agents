@@ -161,7 +161,7 @@ sandbox as the app's own views.
   that the server's own list of tools says the tool has a view. The app never calls a tool
   again to get its result: the view gets what the runtime passed on.
 - **Where the connection runs.** The daemon makes a connection of its own to the server, on
-  the host that runs the folder, with the secrets filled from `secrets.env` as for a
+  the host that runs the folder, with the secrets filled from your sealed store as for a
   session. A hosted server's views go through the host's one copy of it, the copy that the
   sessions use; the views keep it running for 2 minutes after their last request. It reads the server's tools and `ui://` resources (kept in `<root>/mcp-views/`, a
   day at most), the view's HTML, and the tools the view calls. Clients never connect to your

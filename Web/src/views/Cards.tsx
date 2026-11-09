@@ -528,7 +528,7 @@ function HandOffField({ handOff, inert, open, done, cannot, send }: {
 
 /**
  * An agent's ask_secret (#2885): its name, why, where to get it, and a masked field. What is
- * typed goes to the host, which saves it to the person's secrets.env, or keeps it for this
+ * typed goes to the host, which seals it in the person's store, or keeps it for this
  * session only (#3548); the chat, the agent and every other client get the name only. Ask before
  * use (#4016) is on unless the person turns it off. As the window's and the Remote's SecretAskCard.
  */

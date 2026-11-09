@@ -4647,7 +4647,7 @@ final class AppModel {
                                returning: DaemonAPI.MCPListAnswer.self)
     }
 
-    /// Write one name into `secrets.env`. The value is not kept here.
+    /// Seal one name into the host's store. The value is not kept here.
     func mcpSetSecret(name: String, value: String) async -> DaemonAPI.MCPCatalogError? {
         do {
             _ = try await macClient.call(DaemonAPI.Method.mcpSetSecret,

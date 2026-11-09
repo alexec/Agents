@@ -55,7 +55,7 @@ public struct SessionSecretSetRequest: Codable, Sendable, Hashable {
 }
 
 /// `secrets/setNeedsApproval` (#4014): a person turns Ask before use on or off for a secret of
-/// the machine's secrets.env, or for one session's (`agentID`). The person's own clients only.
+/// the machine's sealed store, or for one session's (`agentID`). The person's own clients only.
 public struct SecretNeedsApprovalRequest: Codable, Sendable, Hashable {
     public var name: String
     public var agentID: UUID?

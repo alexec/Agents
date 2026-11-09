@@ -15,10 +15,11 @@ Secrets**.
 
 A secret is a name and a value, such as `GITHUB_TOKEN`. The name uses capital letters,
 digits and `_`. Write `${GITHUB_TOKEN}` in an MCP server's `env` or `headers`, and each
-machine fills it in from `~/.agents-secrets/secrets.env`.
+machine fills it in from its sealed store, `~/.agents-secrets/sealed.json`, which only agentsd opens.
+A command of yours reads one with `agents-secret NAME`.
 
 - **Add a Secret…** keeps a new secret. **Replace…** gives it a new value. **Remove…** takes
-  it out of `secrets.env` on every machine of yours.
+  it out of the sealed store on every machine of yours.
 - No client can read a value back, you included.
 - Each row says how many machines have the secret.
 - When a machine of yours is removed, the secrets it had say so. Change each one where it

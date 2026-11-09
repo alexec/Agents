@@ -55,7 +55,7 @@ struct RemoveMCPServerSheet: View {
                 Text("\(keptSecret) stays, because another connector still names it.")
                     .appText(.fine).foregroundStyle(.secondary)
             } else if !server.secretNames.isEmpty {
-                Text("Its secrets stay in secrets.env.").appText(.fine).foregroundStyle(.secondary)
+                Text("Its secrets stay in your secrets.").appText(.fine).foregroundStyle(.secondary)
             }
             if let failure {
                 Text(failure).appText(.fine).foregroundStyle(SharedInk.attention)

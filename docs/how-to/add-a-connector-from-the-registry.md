@@ -1,7 +1,7 @@
 ---
 diataxis: how-to
 devices: [mac]
-description: Search the MCP Registry from the app, see exactly what would run, and add a connector for yourself or to a folder. Secrets stay in your own secrets.env.
+description: Search the MCP Registry from the app, see exactly what would run, and add a connector for yourself or to a folder. Secrets stay sealed in your own store.
 ---
 
 # Add a connector from the registry
@@ -10,7 +10,7 @@ You can find a connector (an MCP server) on a registry, [GitHub's](https://githu
 official [MCP Registry](https://registry.modelcontextprotocol.io), or one you added (see
 [Choose marketplaces](choose-marketplaces.md)), and add it without leaving the app, either for yourself, so every agent you start has it, or to one
 folder. The app shows the command or URL before anything is written. A secret is stored as
-`${NAME}` in `mcp.json`, and the value goes in your own `~/.agents-secrets/secrets.env`, which is
+`${NAME}` in `mcp.json`, and the value is sealed in your own `~/.agents-secrets/sealed.json`, which is
 never committed and never shown again.
 
 ## Before you start
@@ -37,10 +37,10 @@ never committed and never shown again.
    variable, and the entry that will be written, with `${NAME}` where a secret goes. Where
    there is more than one way to run it, **Run with** chooses, and the rest follows.
 4. Fill each required secret. **Add** stays unavailable until every one has a value, or is
-   already set. One that is already in `secrets.env` says so, and you can leave it or
+   already set. One that is already in your secrets says so, and you can leave it or
    replace it.
-5. Choose **Add**. The entry goes into `~/.agents/mcp.json`. The value goes into
-   `~/.agents-secrets/secrets.env`, created if it is missing, and readable only by you. The next
+5. Choose **Add**. The entry goes into `~/.agents/mcp.json`. The value is sealed into
+   `~/.agents-secrets/sealed.json`, created if it is missing, readable only by you, and opened only by agentsd. The next
    agent you start has the connector, with the name filled in.
 
 ## Add a connector to a folder
@@ -51,7 +51,7 @@ never committed and never shown again.
    holding them: each person sets their own.
 2. Choose **Add Connector…** there. The sheet is aimed at the folder.
 3. Search and add as above. The entry goes into `<folder>/.agents/mcp.json` with only
-   `${NAME}` in it. The value still goes into your `~/.agents-secrets/secrets.env`, not the folder.
+   `${NAME}` in it. The value is still sealed in your `~/.agents-secrets/sealed.json`, not the folder.
 
 A connector added from the sheet is approved as it goes in. One that arrives with a pull is
 listed as **waiting for your OK**, with the command it runs, and no agent is given it until
@@ -73,7 +73,7 @@ the new value is not shown again.
 the version it was added at), one added on the sheet by hand (**added by hand**, see
 [Add a connector by hand](add-a-connector-by-hand.md)), and one you wrote into `mcp.json`
 yourself (#2154). Confirming takes the entry out of `mcp.json`; the rest of the file stays as
-it is. The secret stays in `secrets.env` unless nothing else names it, in which case you can
+it is. The secret stays in your secrets unless nothing else names it, in which case you can
 tick **Also forget** that name. If another server still names it, the secret stays and the
 sheet says so.
 

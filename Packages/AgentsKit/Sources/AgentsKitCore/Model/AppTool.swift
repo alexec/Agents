@@ -45,7 +45,7 @@ public enum AppTool {
     public static let askQuestion = "ask_question"
 
     /// Ask the person for one named secret, typed into a masked card (#2885). The host saves
-    /// it to their secrets.env, and the agent gets its name and where it is, never the value.
+    /// it in their sealed store, and the agent gets its name and where it is, never the value.
     public static let askSecret = "ask_secret"
 
     /// Offer one optional prompt for the person to send next.

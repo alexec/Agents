@@ -51,7 +51,7 @@ release that was out when it started.
      token.
    - `BETTERSTACK_URL`: leave it out.
 
-   The values go in your own `~/.agents-secrets/secrets.env`, never in `mcp.json`.
+   The values go in your own secrets (**Settings ▸ You ▸ Secrets**), never in `mcp.json`.
 
 ## Start work from an incident
 

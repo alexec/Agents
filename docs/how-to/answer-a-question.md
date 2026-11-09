@@ -50,8 +50,8 @@ Whichever it is, the agent and its folder say **Needs you** until you answer.
    - **A secret.** An agent that needs an API key or a token asks for it by name, such as
      `OPENAI_API_KEY`, with a lock beside it, why it needs it and, when it knows, a link to
      where you get it. Paste it into the masked field and choose **Save securely**. It is
-     saved to your secrets on the machine that runs the agent (`~/.agents-secrets/secrets.env`),
-     and the agent gets its name, never the value; the chat shows only that it was saved.
+     sealed in your secrets on the machine that runs the agent (`~/.agents-secrets/sealed.json`),
+     and the agent gets its name and reads it with `agents-secret NAME`, never in the chat; the chat shows only that it was saved.
      **No thanks** tells the agent you did not give it. A notification of it has no **Reply**:
      open the conversation to answer it.
    - **A step on a page.** An agent that drives the app's browser can hand you one step it
