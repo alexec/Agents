@@ -6,9 +6,37 @@ devices: [mac, iphone, ipad, server]
 
 # Architecture
 
-Four views of Agents, from the outside in, in the style of the
+A wireframe first, then four views of Agents, from the outside in, in the style of the
 [C4 model](https://c4model.com): the system and its neighbours, the containers it is made
 of, the components inside the host daemon, and how they run as processes on a Mac.
+
+## At a glance
+
+![A wireframe of the screens, the control plane, the machines and the runtimes](../assets/architecture-wireframe.svg)
+
+Read the wireframe from the top (what you see) to the bottom (what does the work). The
+numbers are the blue pins.
+
+1. **Screens show; they run nothing.** The Mac window, the Remote on iPhone and iPad, and
+   the web page draw the same product. Windows and Android come soon. Each one asks a
+   machine for everything and passes on what you type and click.
+2. **The control plane is the switchboard.** It pairs each screen and each machine, and
+   sends each request to the machine it is for. Its store is a folder. It holds who is
+   paired and which machines there are, but nothing about the agents.
+3. **Everything connects out.** Screens and machines all dial the control plane. A machine
+   never has to be reachable, so a server behind a firewall works. The one shortcut: the
+   window on a Mac goes direct to that same Mac.
+4. **The host daemon does the work.** `agentsd` owns the agents on its machine. "Agents
+   and turns" is its heart: every change to an agent is announced from there, so every
+   screen agrees. The other parts talk, do the work around an agent, and remember it on
+   disk.
+5. **The agents are other people's runtimes.** Agents starts Claude Code, Codex and the
+   others, and drives them over ACP. They prompt their own model, and call back into
+   Agents for its own tools.
+6. **Work and Docs are what the agents work from.** Work is the issues, pull requests and
+   epics on every forge, in one list. Docs is the specs and docs, from a folder or from
+   Confluence, Notion or Drive. Lineage links each session to the issue, the doc and the
+   pull request it works on.
 
 ## System context
 
