@@ -16,8 +16,8 @@ public enum OlderPeer {
     public static func sentence(_ error: JSONRPCError, from part: Part, runs theirs: String?, app ours: String?) -> String? {
         guard error.code == JSONRPCError.invalidParams || error.code == JSONRPCError.methodNotFound,
               let theirs, let ours, isOlder(theirs, than: ours) else { return nil }
-        let who = part == .controlPlane ? "The control plane" : "This machine"
-        return "\(who) needs an update to do this. It runs Agents \(theirs); this app is \(ours)."
+        let who = part == .controlPlane ? "The control plane needs an update" : machineWords
+        return "\(who) to do this. It runs Agents \(theirs); this app is \(ours)."
     }
 
     /// Whether dotted version `a` is older than `b`, such as 0.17.0 than 0.18.0. A `-dev…` or
@@ -56,12 +56,40 @@ public enum OlderPeer {
     /// A refusal from the control plane in words: "needs an update" when it is older than this
     /// app, else its own message. The control plane's words stay in the log.
     public static func controlRefusal(_ error: JSONRPCError) -> String {
-        guard let words = sentence(error, from: .controlPlane, runs: controlVersion, app: appVersion) else {
+        guard !saysMachine(error), let words = sentence(error, from: .controlPlane, runs: controlVersion, app: appVersion) else {
             return error.message
         }
         log.notice("older control plane refused (\(error.code, privacy: .public)): \(error.message, privacy: .public)")
         return words
     }
+
+    /// Each machine's version as this app last read it in `machines/list` (#4101), by its id.
+    /// `home` is the machine this app calls `.mac`, when it has another id there.
+    public static func know(_ listed: [DaemonAPI.ControlMachine], home: MachineRef?) {
+        var versions = Dictionary(listed.map { ($0.id, $0.version) }, uniquingKeysWith: { a, _ in a })
+        if let home, home != .mac, let version = versions[home] { versions[.mac] = version }
+        machines.withLock { $0 = versions }
+    }
+
+    /// A machine's version as this app last read it, or nil when it has not been listed.
+    public static func version(of machine: MachineRef) -> String? { machines.withLock { $0[machine] } }
+
+    private static let machines = Mutex<[MachineRef: String]>([:])
+
+    /// A refusal from `machine` with "needs an update" for its message when that machine is
+    /// older than this app (#4101), else as it came. The machine's words stay in the log.
+    public static func machineRefusal(_ error: JSONRPCError, from machine: MachineRef,
+                                      app ours: String? = appVersion) -> JSONRPCError {
+        guard let words = sentence(error, from: .machine, runs: version(of: machine), app: ours) else { return error }
+        log.notice("older machine refused (\(error.code, privacy: .public)): \(error.message, privacy: .public)")
+        return JSONRPCError(code: error.code, message: words, data: error.data)
+    }
+
+    /// Whether a refusal's words are already a machine's "needs an update", so the control
+    /// plane's version does not take their place.
+    static func saysMachine(_ error: JSONRPCError) -> Bool { error.message.hasPrefix(machineWords) }
+
+    private static let machineWords = "This machine needs an update"
 
     private static let log = Logger(subsystem: "com.alexecollins.agents", category: "versions")
 }

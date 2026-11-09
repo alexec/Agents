@@ -36,8 +36,13 @@ public actor DaemonClient {
         self.lender = lender
     }
 
-    public init(link: any DaemonLink) {
+    /// The machine this client's calls go to, when it is one (#4101): a refusal from one older
+    /// than this app then says it needs an update. Nil for the control plane's own client.
+    private let machine: MachineRef?
+
+    public init(link: any DaemonLink, machine: MachineRef? = nil) {
         self.link = link
+        self.machine = machine
     }
 
     /// A connection that ended is not one: a host client the control plane dropped would
@@ -255,6 +260,16 @@ public actor DaemonClient {
     }
 
     private func unbounded(_ method: String, _ value: JSONValue?) async throws -> JSONValue {
+        do {
+            return try await asked(method, value)
+        } catch let error as JSONRPCError {
+            // The control plane's own methods are answered by it, not by the machine.
+            guard let machine, Capability.control[method] == nil else { throw error }
+            throw OlderPeer.machineRefusal(error, from: machine)
+        }
+    }
+
+    private func asked(_ method: String, _ value: JSONValue?) async throws -> JSONValue {
         do {
             return try await connected().call(method, value)
         } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.credentialWanted {

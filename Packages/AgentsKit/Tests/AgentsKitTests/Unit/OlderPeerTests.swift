@@ -2,6 +2,8 @@ import AgentsKitCore
 import Testing
 
 /// What the Mac and the Remote say when an older control plane or machine refuses a call (#4096).
+/// Serialized: the versions this app last read are kept once for the whole app.
+@Suite(.serialized)
 struct OlderPeerTests {
     private let notAProviderCreate = JSONRPCError(code: JSONRPCError.invalidParams,
                                                   message: "Those parameters are not a ProviderCreate.")
@@ -42,5 +44,40 @@ struct OlderPeerTests {
         #expect(!OlderPeer.isOlder("0.18.1-dev.3+gabc", than: "0.18.1"))
         #expect(OlderPeer.isOlder("0.18", than: "0.18.1"))
         #expect(!OlderPeer.isOlder("dev", than: "0.18.0"))
+    }
+
+    private func machine(_ id: String, _ version: String) -> DaemonAPI.ControlMachine {
+        DaemonAPI.ControlMachine(id: MachineRef(rawValue: id), name: id, platform: "linux", version: version,
+                                 state: "running", reach: "online", machineID: nil)
+    }
+
+    /// #4101: a host older than the app, behind a control plane of the same version.
+    @Test func anOlderMachinesRefusalNeedsAnUpdate() {
+        defer { OlderPeer.know([], home: nil) }
+        OlderPeer.know([machine("devbox", "0.17.0"), machine("home", "0.18.0")], home: MachineRef(rawValue: "home"))
+        let older = OlderPeer.machineRefusal(notAProviderCreate, from: MachineRef(rawValue: "devbox"), app: "0.18.0")
+        #expect(older.message == "This machine needs an update to do this. It runs Agents 0.17.0; this app is 0.18.0.")
+        #expect(older.code == JSONRPCError.invalidParams)
+        // The same version, the home machine by `.mac`, or one not listed: the machine's own words.
+        #expect(OlderPeer.machineRefusal(notAProviderCreate, from: MachineRef(rawValue: "home"), app: "0.18.0") == notAProviderCreate)
+        #expect(OlderPeer.machineRefusal(notAProviderCreate, from: .mac, app: "0.18.0") == notAProviderCreate)
+        #expect(OlderPeer.machineRefusal(notAProviderCreate, from: MachineRef(rawValue: "gone"), app: "0.18.0") == notAProviderCreate)
+    }
+
+    @Test func theHomeMachineIsKnownAsMac() {
+        defer { OlderPeer.know([], home: nil) }
+        OlderPeer.know([machine("home", "0.17.0")], home: MachineRef(rawValue: "home"))
+        #expect(OlderPeer.version(of: .mac) == "0.17.0")
+        let older = OlderPeer.machineRefusal(notAProviderCreate, from: .mac, app: "0.18.0")
+        #expect(older.message.hasPrefix("This machine needs an update"))
+    }
+
+    /// A machine's words are not replaced by the control plane's when both are older.
+    @Test func aMachinesWordsStay() {
+        defer { OlderPeer.know([], home: nil); OlderPeer.controlVersion = nil }
+        OlderPeer.know([machine("devbox", "0.17.0")], home: nil)
+        let older = OlderPeer.machineRefusal(notAProviderCreate, from: MachineRef(rawValue: "devbox"), app: "0.18.0")
+        OlderPeer.controlVersion = "0.0.1"
+        #expect(OlderPeer.controlRefusal(older) == older.message)
     }
 }

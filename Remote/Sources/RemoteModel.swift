@@ -343,7 +343,7 @@ final class RemoteModel {
         // Each request to the home host checked end to end once this device is in its lock (#3492),
         // and each line wrapped for it, as every other client's is (#3234).
         let lock = lock
-        client = DaemonClient(link: LockedLink(HomeLink(link), host: .mac) { await lock.channelSigner() })
+        client = DaemonClient(link: LockedLink(HomeLink(link), host: .mac) { await lock.channelSigner() }, machine: .mac)
         // A secret is sealed only to the machines the lock names (#3491, D8).
         userScope.lock = lock
         files = RemoteFiles(client: client)
@@ -2808,10 +2808,12 @@ final class RemoteModel {
         controlHome = status.homeHost
         controlStatus = status
         OlderPeer.controlVersion = status.version
+        OlderPeer.know(listed, home: status.homeHost)
         let others = listed.filter { $0.id != status.homeHost && $0.answers }
         for host in others {
             let lock = lock
-            let other = otherHosts[host.id] ?? DaemonClient(link: LockedLink(link.link(for: host.id), host: host.id) { await lock.channelSigner() })
+            let other = otherHosts[host.id] ?? DaemonClient(link: LockedLink(link.link(for: host.id), host: host.id) { await lock.channelSigner() },
+                                                         machine: host.id)
             otherHosts[host.id] = other
             if await other.isConnected { continue }
             reachableHosts.remove(host.id)
