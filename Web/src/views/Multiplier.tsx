@@ -10,7 +10,7 @@ import type { Store } from "../model/store";
 import type { Multiplier } from "../protocol/generated";
 import { achievementDay, achievementList } from "../model/achievements";
 import {
-  badgeGlyph, baselineLine, blobSize, crowdCount, crowdFill, crowdLayout, earnedBadges, emptyLayout, newsOf, oneDecimal, whole,
+  BLINK_CHANCE, badgeGlyph, baselineLine, blinkers, blobSize, crowdCount, crowdFill, crowdLayout, earnedBadges, emptyLayout, newsOf, oneDecimal, whole,
   type CrowdLayout,
 } from "../model/multiplier";
 import { BlobParts } from "./Huddle";
@@ -227,15 +227,15 @@ function Crowd({ multiplier }: { multiplier: number | undefined }) {
     for (let i = old; i < now; i++) popAt.current.set(i, at + (i - old) * step);
   }, [count.blobs]);
 
-  // A few at a time, now and then; you too, sometimes.
+  // A few at a time, now and then; you too, sometimes. Each Blob blinks as often as you do,
+  // so a crowd of one or two does not blink every tick (#4194).
   useEffect(() => {
     if (still) return;
     let timer = 0;
     const next = () => {
       timer = window.setTimeout(() => {
-        const blobs = Math.max(count.blobs, 1), n = 1 + Math.floor(Math.random() * 5);
-        setBlinking(new Set(Array.from({ length: n }, () => Math.floor(Math.random() * blobs))));
-        setYouBlink(Math.random() < 0.25);
+        setBlinking(blinkers(count.blobs));
+        setYouBlink(Math.random() < BLINK_CHANCE);
         timer = window.setTimeout(() => { setBlinking(new Set()); setYouBlink(false); next(); }, 140);
       }, 900);
     };

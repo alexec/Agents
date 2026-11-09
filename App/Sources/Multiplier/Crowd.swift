@@ -143,7 +143,8 @@ struct Crowd: View {
             : Color(hue: (210 + seed * 12) / 360, saturation: 0.28 - seed * 0.12, brightness: 1)
     }
 
-    /// A few at a time, now and then; you too, sometimes.
+    /// A few at a time, now and then; you too, sometimes. Each Blob blinks as often as you
+    /// do, so a crowd of one or two does not blink every tick (#4194).
     private func blink() async {
         blinking = []
         youBlink = false
@@ -151,13 +152,26 @@ struct Crowd: View {
         while !Task.isCancelled {
             try? await Task.sleep(for: .seconds(0.9))
             if Task.isCancelled { return }
-            let blobs = max(count.blobs, 1)
-            blinking = Set((0..<Int.random(in: 1...5)).map { _ in Int.random(in: 0..<blobs) })
-            youBlink = Double.random(in: 0..<1) < 0.25
+            blinking = Self.blinkers(of: count.blobs)
+            youBlink = Double.random(in: 0..<1) < Self.blinkChance
             try? await Task.sleep(for: .milliseconds(140))
             blinking = []
             youBlink = false
         }
+    }
+
+    /// How likely a Blob is to blink at each tick.
+    static let blinkChance = 0.25
+    /// The most Blobs that blink at one tick.
+    static let mostBlinking = 5
+
+    /// The Blobs that blink at one tick: each with `blinkChance`, at most `mostBlinking`.
+    static func blinkers(of blobs: Int) -> Set<Int> {
+        guard blobs > 0 else { return [] }
+        if blobs > mostBlinking * 4 {
+            return Set((0..<Int.random(in: 1...mostBlinking)).map { _ in Int.random(in: 0..<blobs) })
+        }
+        return Set((0..<blobs).filter { _ in Double.random(in: 0..<1) < blinkChance }.prefix(mostBlinking))
     }
 
     /// Your eyes look somewhere else now and then.
