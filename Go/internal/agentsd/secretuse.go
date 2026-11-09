@@ -243,6 +243,12 @@ func (d *Daemon) answerSecretUse(rec wire.Request, a *wire.RequestSecretUseAnswe
 		return wire.RequestUpdate{}, Invalid("This request takes a secretUse answer: once, session, always or deny.")
 	}
 	ask := *rec.Detail.SecretUse
+	if ask.Use == wire.SecretUseTerminal {
+		return d.answerTerminalUse(rec, a, by)
+	}
+	if a.Action == secretUseHour {
+		return wire.RequestUpdate{}, Invalid("Allow for 1 Hour is for a terminal's request; this one takes once, session, always or deny.")
+	}
 	if rec.AskedBy == nil {
 		return wire.RequestUpdate{}, Invalid("This request has no session.")
 	}
@@ -300,6 +306,7 @@ func (d *Daemon) answerSecretUse(rec wire.Request, a *wire.RequestSecretUseAnswe
 
 // secretUseEnded wakes the call held on a request that ended: answered or dropped.
 func (d *Daemon) secretUseEnded(id wire.UUID) {
+	d.terminalEnded(id)
 	d.secretUseMu.Lock()
 	held := d.secretUseHeld[id]
 	d.secretUseMu.Unlock()

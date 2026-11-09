@@ -1582,9 +1582,9 @@ final class AppModel {
 
     /// How many requests and sessions across every folder need the person: each open
     /// request (#3864), and the sessions under Needs you and Blocked that asked none; not
-    /// unread finishes (#1565). Drives the Dock badge.
+    /// unread finishes (#1565), and a terminal's agents-secret (#4179). Drives the Dock badge.
     var needsPersonCount: Int {
-        liveFolders.reduce(0) { $0 + work.attentionCount(in: $1.key) + work.requestBadgeShift(in: $1.key.folder) }
+        liveFolders.reduce(work.terminalRequests.count) { $0 + work.attentionCount(in: $1.key) + work.requestBadgeShift(in: $1.key.folder) }
     }
 
     /// The Blob's mood on the Dock tile (#1317), from the same groups the sidebar shows.

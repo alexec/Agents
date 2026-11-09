@@ -9203,7 +9203,8 @@ export interface RequestSecretUse {
   use: SecretUse;
   /**
    * Where the value goes: the page's domain for a fill, owner/repo for CI, the server's name for an
-   * MCP server.
+   * MCP server, and for terminal the name of the command that ran agents-secret, as that command
+   * says it.
    */
   place: string;
   /**
@@ -9221,10 +9222,12 @@ export interface RequestSecretUse {
 /**
  * A person's answer to a secret's use (#4015). once allows this use; session every use at this
  * place until the session ends or is archived; always adds a grant for this place, for every
- * session; deny refuses it. Only the control and device roles answer.
+ * session; hour (terminal only, #4179) allows every call of agents-secret NAME with no session's
+ * grant for one hour, kept in agentsd's memory only; deny refuses it. A terminal's use takes once,
+ * hour or deny. Only the control and device roles answer.
  */
 export interface RequestSecretUseAnswer {
-  action: "once" | "session" | "always" | "deny";
+  action: "once" | "session" | "always" | "hour" | "deny";
   /**
    * The answering client's signature of its answer (#4058), required when the request says
    * needsSignature and the action is not deny: method secrets/approveUse, params the JSON text
@@ -9900,7 +9903,8 @@ export interface SecretOperation {
  * How a secret was read (#4156): fill (fill_secret), ci (set_ci_secret), mcp (an HTTP MCP server's
  * header or url, through agentsd, #4120), env (given to a session at its start: its own secrets as
  * variables, or an MCP server's ${NAME} from secrets.env) or command (agents-secret NAME, printed
- * for a session's own command, #4178).
+ * for a session's own command, #4178, or for a call with no session's grant that a person allowed,
+ * with the place terminal, #4179).
  */
 export type SecretOperationUse =
   | "fill"
@@ -9952,14 +9956,40 @@ export interface SecretReleased {
 }
 
 /**
+ * secrets/terminalValue (#4179): agents-secret NAME with no session's grant, such as from a
+ * terminal.
+ */
+export interface SecretTerminalRequest {
+  name: string;
+  /**
+   * The name of the command that ran agents-secret, as it says it: the request's place. agentsd
+   * cannot check it.
+   */
+  command?: string;
+}
+
+/**
+ * secrets/terminalValue's answer: the value, when a person allowed it; else the open request it
+ * waits on, and the words to say while it waits. A denied call is an error.
+ */
+export interface SecretTerminalValue {
+  value?: string;
+  request?: UUID;
+  words?: string;
+}
+
+/**
  * What agentsd does with a secret with Ask before use (#4015): fill types it into a page
  * (fill_secret), ci sends it to GitHub (set_ci_secret), mcp adds it to an HTTP MCP server's header
- * or URL on each request agentsd sends the server for a session (#4120).
+ * or URL on each request agentsd sends the server for a session (#4120). terminal (#4179) prints a
+ * secret that does not ask to `agents-secret NAME` run with no session's grant, such as from a
+ * terminal: agentsd cannot tell that caller from an agent that dropped its grant.
  */
 export type SecretUse =
   | "fill"
   | "ci"
-  | "mcp";
+  | "mcp"
+  | "terminal";
 
 /**
  * control/secretsLeft (#1760, FR-026): to the person's own clients, when one of their machines was
@@ -14253,6 +14283,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SecretRelease: { required: ["name", "encapsulated", "approval"], optional: [] },
   SecretReleaseKey: { required: ["publicKey"], optional: [] },
   SecretReleased: { required: ["key"], optional: [] },
+  SecretTerminalRequest: { required: ["name"], optional: ["command"] },
+  SecretTerminalValue: { required: [], optional: ["value", "request", "words"] },
   SecretsLeft: { required: ["host", "name", "secrets"], optional: [] },
   SelfUpdate: { required: ["autoUpdate", "state", "running"], optional: ["release", "message"] },
   SelfUpdateSet: { required: ["autoUpdate"], optional: [] },

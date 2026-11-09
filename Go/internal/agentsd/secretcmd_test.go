@@ -13,8 +13,8 @@ import (
 
 // #4178: a session reads a secret that does not ask with agents-secret NAME, through agentsd.
 // Its environment holds a grant and no value; the value comes back exactly, and the read is
-// recorded with the session and the name. A flagged secret, a name that is not set, a dropped
-// grant and a call with no grant (a terminal) get words and no value.
+// recorded with the session and the name. A flagged secret, a name that is not set and a dropped
+// grant get words and no value; a call with no grant asks a person (secretterminal_test.go).
 func TestAgentsSecretReadsASecretThatDoesNotAsk(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("AGENTS_PERSONAL_HOME", home)
@@ -52,7 +52,7 @@ func TestAgentsSecretReadsASecretThatDoesNotAsk(t *testing.T) {
 
 	ask := func(name string, getenv func(string) string) (int, string, string) {
 		var out, errOut bytes.Buffer
-		code := SecretCommand([]string{name}, getenv, &out, &errOut)
+		code := SecretCommand([]string{name}, getenv, "", &out, &errOut)
 		return code, out.String(), errOut.String()
 	}
 	fromSession := func(k string) string { return lastEnv(env, k) }
@@ -80,18 +80,13 @@ func TestAgentsSecretReadsASecretThatDoesNotAsk(t *testing.T) {
 		t.Fatalf("the reads: %v", reads)
 	}
 
-	// A terminal has no grant.
-	if code, out, said := ask("PLAIN_KEY", func(string) string { return "" }); code != 1 || out != "" ||
-		!strings.Contains(said, "not a session of Agents") || !strings.Contains(said, "approval") {
-		t.Fatalf("a terminal: %d %q %q", code, out, said)
-	}
 	// The runtime ended: its grant asks nothing.
 	d.dropCredentialGrants(a.ID)
 	if code, out, said := ask("PLAIN_KEY", fromSession); code != 1 || out != "" || !strings.Contains(said, "grant") {
 		t.Fatalf("a dropped grant: %d %q %q", code, out, said)
 	}
 	var out, errOut bytes.Buffer
-	if code := SecretCommand(nil, fromSession, &out, &errOut); code != 2 || !strings.Contains(errOut.String(), "usage") {
+	if code := SecretCommand(nil, fromSession, "", &out, &errOut); code != 2 || !strings.Contains(errOut.String(), "usage") {
 		t.Fatalf("no name: %d %q", code, errOut.String())
 	}
 }

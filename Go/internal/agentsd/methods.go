@@ -68,6 +68,7 @@ func (d *Daemon) register() {
 	d.registerSessionSecrets()
 	d.registerSealedSecrets()
 	d.registerSecretUse()
+	d.registerSecretTerminal()
 	d.registerDesktopControlPause()
 	d.registerAuto()
 	d.registerMoves()

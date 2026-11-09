@@ -288,12 +288,20 @@ func secretUseWanted(u wire.RequestSecretUse) string {
 	if u.Use == wire.SecretUseCi {
 		return "Wants to use " + u.Name + " as a CI secret in " + u.Place
 	}
+	if u.Use == wire.SecretUseTerminal {
+		return "Wants to print " + u.Name + " for " + u.Place + ". " + terminalCaveat
+	}
 	return "Wants to use " + u.Name + " on " + u.Place
 }
 
 // secretUseAnswers is NeedRequest.SecretUse.actions: the row's answers, as the banner's
 // buttons. A session's own secret has no Allow always: it is the same as for this session.
 func secretUseAnswers(u wire.RequestSecretUse) []wire.QuickAnswer {
+	if u.Use == wire.SecretUseTerminal {
+		return []wire.QuickAnswer{{Kind: wire.QuickAnswerKindChoice, ID: secretUseOnce, Title: "Allow Once"},
+			{Kind: wire.QuickAnswerKindChoice, ID: secretUseHour, Title: "Allow for 1 Hour"},
+			{Kind: wire.QuickAnswerKindChoice, ID: secretUseDeny, Title: "Deny", IsDestructive: true}}
+	}
 	out := []wire.QuickAnswer{{Kind: wire.QuickAnswerKindChoice, ID: secretUseOnce, Title: "Allow Once"},
 		{Kind: wire.QuickAnswerKindChoice, ID: secretUseSession, Title: "Allow for This Session"}}
 	if u.SessionOnly == nil || !*u.SessionOnly {
@@ -412,6 +420,20 @@ func (d *Daemon) needs() []wire.Need {
 	// banner. Its Needs you row is the request's own.
 	for _, r := range d.listRequests(wire.RequestsListStateOpen, "") {
 		u := r.Detail.SecretUse
+		if u != nil && u.Use == wire.SecretUseTerminal && r.AskedBy == nil {
+			// A terminal's (#4179): no session, so the banner names the terminal.
+			id := wire.NeedID{Request: &r.ID}
+			t := token(id)
+			raised, ok := d.raisedAt[t]
+			if !ok {
+				raised = at
+				d.raisedAt[t], d.raisedNeed[t] = raised, id
+			}
+			ids = append(ids, id)
+			found = append(found, wire.Need{ID: id, Folder: wire.URL(r.Folder), Kind: wire.NeedKindRequest, RaisedAt: raised,
+				Headline: truncating(wire.Headline{H1: "Terminal", H2: u.Place, H3: secretUseWanted(*u), Answers: secretUseAnswers(*u)})})
+			continue
+		}
 		if u == nil || r.AskedBy == nil {
 			continue
 		}

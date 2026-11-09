@@ -56,9 +56,10 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == "credential" {
 		os.Exit(agentsd.CredentialCommand(os.Args[2:], os.Getenv, os.Stdin, os.Stdout))
 	}
-	// A session's agents-secret NAME: a secret that does not ask, through this host (#4178).
+	// agents-secret NAME: a secret that does not ask, through this host (#4178); from a
+	// terminal, with no session's grant, once a person allows it (#4179).
 	if len(os.Args) > 1 && os.Args[1] == "secret" {
-		os.Exit(agentsd.SecretCommand(os.Args[2:], os.Getenv, os.Stdout, os.Stderr))
+		os.Exit(agentsd.SecretCommand(os.Args[2:], os.Getenv, secretSocket(), os.Stdout, os.Stderr))
 	}
 	if len(os.Args) > 1 && os.Args[1] == "lock" {
 		os.Exit(lockCommand(os.Args[2:]))
@@ -477,6 +478,23 @@ func isTerminalFile(fi os.FileInfo) bool {
 	}
 	null, err := os.Stat(os.DevNull)
 	return err != nil || !os.SameFile(fi, null)
+}
+
+// secretSocket is the daemon.sock that a terminal's agents-secret asks (#4179): AGENTS_ROOT's,
+// else the ordinary root's, else an installed server's when only it has one.
+func secretSocket() string {
+	sock := store.At(parse(nil).root).Socket()
+	if os.Getenv("AGENTS_ROOT") != "" {
+		return sock
+	}
+	if _, err := os.Stat(sock); err != nil {
+		home, _ := os.UserHomeDir()
+		server := store.At(filepath.Join(home, ".agents-server", "root")).Socket()
+		if _, err := os.Stat(server); err == nil {
+			return server
+		}
+	}
+	return sock
 }
 
 // ordinaryRoot is StoreLocations.isStandard: the root a person's host uses, where an

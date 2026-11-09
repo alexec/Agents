@@ -23,7 +23,22 @@ struct SecretUseRequestTests {
         #expect(ci.secretUse?.actions == [.once, .session, .deny])
         let mcp = try request(#"{"secretUse":{"name":"NOTES_TOKEN","use":"mcp","place":"notes"}}"#)
         #expect(mcp.line(asker: nil) == "MCP server notes")
-        #expect(NeedRequest.Action.allCases.map(\.word) == ["Allow Once", "Allow for This Session", "Allow Always", "Deny"])
+        #expect(NeedRequest.Action.allCases.map(\.word) == ["Allow Once", "Allow for This Session", "Allow Always", "Allow for 1 Hour", "Deny"])
+    }
+
+    /// #4179: a terminal's agents-secret has no session; its answers are once, for 1 hour and
+    /// deny, and its grey line says the known gap.
+    @Test func aTerminalsRowSaysTheGap() throws {
+        let terminal = NeedRequest(id: UUID(), kind: .approve, source: "secretUse", title: "Print PLAIN_KEY in a terminal (zsh)",
+                                   detail: try JSONValue.parse(Data(#"{"secretUse":{"name":"PLAIN_KEY","use":"terminal","place":"zsh"}}"#.utf8)),
+                                   folder: URL(filePath: "/Users/someone/"), askedBy: nil, askedAt: Date(timeIntervalSince1970: 10))
+        #expect(terminal.isTerminal)
+        #expect(terminal.title(asker: nil) == "Wants to use PLAIN_KEY")
+        #expect(terminal.line(asker: nil) == "Terminal: zsh · Agents cannot tell a terminal from an agent outside its session.")
+        #expect(terminal.secretUse?.actions == [.once, .hour, .deny])
+        #expect(try request(#"{"secretUse":{"name":"T","use":"fill","place":"a.com"}}"#).isTerminal == false)
+        let sent = try JSONValue.encoding(DaemonAPI.RequestsAnswer(id: terminal.id, secretUse: .hour))
+        #expect(sent["answer"]?["secretUse"]?["action"]?.stringValue == "hour")
     }
 
     @Test func anotherRequestKeepsItsOwnTitle() throws {

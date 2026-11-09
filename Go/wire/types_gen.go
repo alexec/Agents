@@ -10317,7 +10317,7 @@ type RequestSecretUse struct {
 
 	Use SecretUse `json:"use"`
 
-	// Where the value goes: the page's domain for a fill, owner/repo for CI, the server's name for an MCP server.
+	// Where the value goes: the page's domain for a fill, owner/repo for CI, the server's name for an MCP server, and for terminal the name of the command that ran agents-secret, as that command says it.
 	Place string `json:"place"`
 
 	// The secret is the session's own (#3548): Allow always is the same as Allow for this session.
@@ -10327,7 +10327,7 @@ type RequestSecretUse struct {
 	NeedsSignature *bool `json:"needsSignature,omitzero"`
 }
 
-// A person's answer to a secret's use (#4015). once allows this use; session every use at this place until the session ends or is archived; always adds a grant for this place, for every session; deny refuses it. Only the control and device roles answer.
+// A person's answer to a secret's use (#4015). once allows this use; session every use at this place until the session ends or is archived; always adds a grant for this place, for every session; hour (terminal only, #4179) allows every call of agents-secret NAME with no session's grant for one hour, kept in agentsd's memory only; deny refuses it. A terminal's use takes once, hour or deny. Only the control and device roles answer.
 type RequestSecretUseAnswer struct {
 	Action string `json:"action"`
 
@@ -11111,7 +11111,7 @@ type SecretOperation struct {
 	Count *int64 `json:"count,omitzero"`
 }
 
-// How a secret was read (#4156): fill (fill_secret), ci (set_ci_secret), mcp (an HTTP MCP server's header or url, through agentsd, #4120), env (given to a session at its start: its own secrets as variables, or an MCP server's ${NAME} from secrets.env) or command (agents-secret NAME, printed for a session's own command, #4178).
+// How a secret was read (#4156): fill (fill_secret), ci (set_ci_secret), mcp (an HTTP MCP server's header or url, through agentsd, #4120), env (given to a session at its start: its own secrets as variables, or an MCP server's ${NAME} from secrets.env) or command (agents-secret NAME, printed for a session's own command, #4178, or for a call with no session's grant that a person allowed, with the place terminal, #4179).
 type SecretOperationUse string
 
 const SecretOperationUseFill SecretOperationUse = "fill"
@@ -11148,12 +11148,30 @@ type SecretReleased struct {
 	Key Data `json:"key"`
 }
 
-// What agentsd does with a secret with Ask before use (#4015): fill types it into a page (fill_secret), ci sends it to GitHub (set_ci_secret), mcp adds it to an HTTP MCP server's header or URL on each request agentsd sends the server for a session (#4120).
+// secrets/terminalValue (#4179): agents-secret NAME with no session's grant, such as from a terminal.
+type SecretTerminalRequest struct {
+	Name string `json:"name"`
+
+	// The name of the command that ran agents-secret, as it says it: the request's place. agentsd cannot check it.
+	Command *string `json:"command,omitzero"`
+}
+
+// secrets/terminalValue's answer: the value, when a person allowed it; else the open request it waits on, and the words to say while it waits. A denied call is an error.
+type SecretTerminalValue struct {
+	Value *string `json:"value,omitzero"`
+
+	Request *UUID `json:"request,omitzero"`
+
+	Words *string `json:"words,omitzero"`
+}
+
+// What agentsd does with a secret with Ask before use (#4015): fill types it into a page (fill_secret), ci sends it to GitHub (set_ci_secret), mcp adds it to an HTTP MCP server's header or URL on each request agentsd sends the server for a session (#4120). terminal (#4179) prints a secret that does not ask to `agents-secret NAME` run with no session's grant, such as from a terminal: agentsd cannot tell that caller from an agent that dropped its grant.
 type SecretUse string
 
 const SecretUseFill SecretUse = "fill"
 const SecretUseCi SecretUse = "ci"
 const SecretUseMCP SecretUse = "mcp"
+const SecretUseTerminal SecretUse = "terminal"
 
 // control/secretsLeft (#1760, FR-026): to the person's own clients, when one of their machines was removed with secrets on it.
 type SecretsLeft struct {

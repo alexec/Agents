@@ -592,7 +592,8 @@ private struct RemoteCheckSuggestionRow: View {
 /// One request to the person under Needs You (#3864), the window's `RequestListRow`: a tap
 /// opens the session that asked it, where its card takes the answer. A secret's use (#4017)
 /// has no card: Allow Once is a leading swipe, Deny a trailing one, and the long press has
-/// all its answers, as an approval's row has.
+/// all its answers, as an approval's row has. A terminal's agents-secret (#4179) has no session
+/// to open: its long press has Allow Once, Allow for 1 Hour and Deny.
 private struct RemoteRequestRow: View {
     @Environment(RemoteModel.self) private var model
     let request: NeedRequest
@@ -600,28 +601,34 @@ private struct RemoteRequestRow: View {
 
     var body: some View {
         if let id = request.askedBy {
-            RequestRowLabel(request: request, asker: model.work.agent(id)?.title, place: place)
-                .tag(SidebarItem.session(id))
-                .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                    if request.secretUse != nil {
-                        Button(NeedRequest.Action.once.word, systemImage: "checkmark") { answerNow(.once) }
-                            .tint(Paper.accent)
-                    }
-                }
-                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    if request.secretUse != nil {
-                        Button(NeedRequest.Action.deny.word, systemImage: "xmark") { answerNow(.deny) }
-                            .tint(StateTint.failure.color)
-                    }
-                }
-                .contextMenu {
-                    if let use = request.secretUse {
-                        ForEach(use.actions, id: \.self) { action in
-                            Button(action.word, role: action == .deny ? .destructive : nil) { answerNow(action) }
-                        }
-                    }
-                }
+            answers(RequestRowLabel(request: request, asker: model.work.agent(id)?.title, place: place)
+                .tag(SidebarItem.session(id)))
+        } else if request.isTerminal {
+            answers(RequestRowLabel(request: request, place: place))
         }
+    }
+
+    private func answers(_ row: some View) -> some View {
+        row
+            .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                if request.secretUse != nil {
+                    Button(NeedRequest.Action.once.word, systemImage: "checkmark") { answerNow(.once) }
+                        .tint(Paper.accent)
+                }
+            }
+            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                if request.secretUse != nil {
+                    Button(NeedRequest.Action.deny.word, systemImage: "xmark") { answerNow(.deny) }
+                        .tint(StateTint.failure.color)
+                }
+            }
+            .contextMenu {
+                if let use = request.secretUse {
+                    ForEach(use.actions, id: \.self) { action in
+                        Button(action.word, role: action == .deny ? .destructive : nil) { answerNow(action) }
+                    }
+                }
+            }
     }
 
     private func answerNow(_ action: NeedRequest.Action) {

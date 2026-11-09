@@ -35,7 +35,7 @@ import { endedLine } from "../model/connectorSetup";
 import { updatedLine } from "../model/updated";
 import { namedRelative, workflowSummary } from "../model/workflows";
 import { fromWireDate, toWireDate } from "../protocol/dates";
-import type { Agent, AgentsExportRequest, ControlMachine, FolderSummary, WorkflowSummary } from "../protocol/generated";
+import type { Agent, AgentsExportRequest, ControlMachine, FolderSummary, Request as PersonRequest, WorkflowSummary } from "../protocol/generated";
 import { alone, aloneURL, go, route, showAll } from "../route";
 import { onThisMac } from "../place";
 import { browserName, type Session } from "../session";
@@ -550,8 +550,13 @@ function SmartFold({ row, store, folders, places, query, linkDown, downSince }: 
       .map((tree): SmartLine => ({ ...(found.get(tree.agent) ?? keptPlace!), kind: "session", agent: tree.agent, tree }));
   }
   // Each request to the person, each folder's, before the sessions (#3864). A search matches the title.
-  const requests = row !== "needsYou" ? [] : folders.flatMap((placed) => store.personRequestsIn(placed.host.id, placed.folder.folder.folder)
-    .map((request) => ({ folder: placed, request })));
+  // A terminal's agents-secret (#4179) is in no folder: each machine's are listed with the rest.
+  const hostsHere = [...new Map(folders.map((placed) => [placed.host.id, placed.host])).values()];
+  const requests: { host: Placed["host"]; folder?: Placed; request: PersonRequest }[] = row !== "needsYou" ? [] : [
+    ...hostsHere.flatMap((host) => store.terminalRequests(host.id).map((request) => ({ host, request }))),
+    ...folders.flatMap((placed) => store.personRequestsIn(placed.host.id, placed.folder.folder.folder)
+      .map((request) => ({ host: placed.host, folder: placed, request }))),
+  ].sort((a, b) => a.request.askedAt - b.request.askedAt);
   const asked = parsed ? requests.filter(({ request }) => request.title.toLowerCase().includes(query.toLowerCase())) : requests;
   count += requests.length;
   // What waits for an OK, each folder's, after the sessions (#773).
@@ -584,11 +589,11 @@ function SmartFold({ row, store, folders, places, query, linkDown, downSince }: 
         {updated && <span class="updated">{updated}</span>}
         {count > 0 && <span class={`count${row === "needsYou" ? " needs" : ""}`}>{count}</span>}
       </summary>
-      {open && asked.map(({ folder: placed, request }) => {
-        const host = placed.host.id;
-        return <RequestRow key={`${host}|${request.id}`} store={store} host={host} folder={placed.folder.folder.folder} request={request}
-          place={placeOf(places, placed.host, placed.folder, store.macHostID.value)}
-          chosen={r.host === host && r.session === request.askedBy} />;
+      {open && asked.map(({ host: on, folder: placed, request }) => {
+        const host = on.id;
+        return <RequestRow key={`${host}|${request.id}`} store={store} host={host} folder={placed?.folder.folder.folder ?? ""} request={request}
+          place={placed ? placeOf(places, placed.host, placed.folder, store.macHostID.value) : ""}
+          chosen={!!request.askedBy && r.host === host && r.session === request.askedBy} />;
       })}
       {open && lines.map((line) => {
         const host = line.host.id;
