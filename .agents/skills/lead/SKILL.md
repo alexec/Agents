@@ -1,6 +1,6 @@
 ---
 name: lead
-description: Lead one epic from start to end (#3265) - read its plan (the sub-issues and their "blocked by" links), start a lane for each child whose blockers are closed, wait on events, file the new children that the lanes find, and close the epic with a summary when all its children are closed. Writes no code. Use when a session is started on an issue labelled `epic` (Start lead, or the Scrum Master), or when Alex asks for a lead on an epic.
+description: Lead one epic from start to end (#3265) - read its plan (the sub-issues and their "blocked by" links), start a lane for each child whose blockers are closed, wait on events, file the new children that the lanes find, and close the epic with a summary when all its children are closed. A standing epic (#3659) has a query as its plan and never closes. Writes no code. Use when a session is started on an issue labelled `epic` (Start lead, or the Scrum Master), or when Alex asks for a lead on an epic.
 ---
 
 # Lead
@@ -10,6 +10,10 @@ You lead one epic: a parent issue labelled `epic` whose sub-issues are its plan
 children, in the order that its "blocked by" links give. You own the plan: you keep it
 true while the work goes on. You write no code and decide no features: Alex and the
 Product Owner do.
+
+An epic with the label `standing` as well as `epic` is a **standing epic** (#3659,
+`specs/3659-standing-epics/spec.md`): its plan is a query in its body, not sub-issues,
+and it never closes. Do steps 1 to 4 as "Standing epics", below, says. Never do step 5.
 
 ## Starting a lead
 
@@ -135,6 +139,81 @@ When all the children are closed:
    that. Say what was left out and where it went.
 4. Archive the lanes you started that are not archived yet (their work is merged or
    closed), then archive yourself with `archive_session` and no id.
+
+## Standing epics
+
+A standing epic is a work stream, such as the bug lane or the lane for `polish` and
+`competitor` (#1570, #3212). Its body has one `standing` block:
+
+````markdown
+```standing
+labels: bug
+milestone: none
+lanes: 1
+```
+````
+
+**Read the plan (step 1).** `forge/plan` gives the query's issues as the plan's children,
+in order, and the block as `standing` (#3661). Until the lead can call it, read the
+query with `gh`. Change the block into a search: `labels: a, b` is `label:a label:b`,
+`any: a, b` is `label:a,b`, `not: a` is `-label:a`, `milestone: none` is
+`no:milestone`, `milestone: <name>` is `milestone:"<name>"`.
+
+```zsh
+gh issue view $epic --json body -q .body   # the standing block
+gh issue list --limit 100 --json number,title,labels,assignees \
+  --search "is:open -label:epic label:bug no:milestone"
+```
+
+- **The order:** `priority:high`, then `priority:medium`, then no priority, then
+  `priority:low`; in each, the lowest number first (the spec's order, which the forge's
+  priority already holds; no RICE of your own).
+- **Ready** is an issue with no open blocker (`dependencies/blocked_by`, as in step 1).
+- **No block, a second block or an unknown field** (`forge/plan` says it in
+  `standing.error`): start no lanes. Say it in a comment on the epic once, and ask the
+  Product Owner or Alex to fix the block. Wait again.
+
+**Start the lanes (step 2).** Run at most `lanes` lanes at once (the block's `lanes:`,
+else 1), and never more than the folder's lane limit. Count the lanes you started that
+have not ended. Take the ready issues from the top of the order that are not taken, as
+step 2 says, until that count is `lanes`. Take an issue only in the AGENTS.md order: a
+`priority:high` issue or a UI change before the rest. When places run short, the
+Scrum Master pauses a standing epic's lane before a milestone epic's lane: do not start
+it again until a lane ends.
+
+**Wait (step 3).** Also wake when new work comes into the query. One `where` serves all
+the events of a wait, and each event takes only the keys it has. So name the lanes'
+PRs with `fixes`, and the query with `label`: the block's first `labels:` label, else
+its first `any:` label. Do not set `issue`: it would narrow `issue.labelled` to the
+lanes' own issues. A wait takes one label, so the time limit catches the issues of the
+other labels.
+
+```json
+{"events": ["pr.merged", "checks.failed", "pr.conflicted",
+            "issue.opened", "issue.labelled", "issue.closed"],
+ "where": {"fixes": ["#<issue of a lane>", …], "label": "bug"},
+ "until_minutes": 60}
+```
+
+With no lane running, `fixes` names nothing: leave it out, and `label` names the wait.
+
+When you start again:
+
+- **`issue.opened` or `issue.labelled`:** read the query again. When the issue is in it
+  and a lane place is free, start its lane. Else wait again.
+- **`issue.closed` or `pr.merged`:** read the query again and fill a free place. An
+  issue closed that no lane had changes nothing more.
+- **An empty query:** start nothing and wait again. An empty query is not the end of the
+  epic.
+
+**Keep the plan true (step 4).** A new issue that a lane finds is not a sub-issue. File
+it with the labels that put it in the query (a bug: `bug`, no milestone), or in the
+epic that it serves. Do not add sub-issues to a standing epic. Do not change its block:
+the query is the Product Owner's and Alex's.
+
+**Never close it.** Do not close a standing epic, also when its query is empty and no
+lane runs. Do not post a closing summary. Stay until Alex or the Scrum Master stops
+you. When you are stopped, archive the lanes you started whose work is merged or closed.
 
 ## Reports
 
