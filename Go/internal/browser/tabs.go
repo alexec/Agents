@@ -30,6 +30,10 @@ type Tabs struct {
 
 	mu    sync.Mutex
 	known map[target.ID]bool
+	// emulated is each tab with a device profile (device.go, #4086), and hints the
+	// browser's own user agent, as a page read it.
+	emulated map[target.ID]*emulated
+	hints    uaHints
 }
 
 // FollowTabs connects to the browser at endpoint. created hears each new page tab, with
@@ -84,6 +88,7 @@ func FollowTabs(endpoint string, created func(tab, opener target.ID), destroyed 
 			if err != nil {
 				return
 			}
+			t.forget(ev.TargetID, nil)
 			destroyed(ev.TargetID)
 		}
 	}()
@@ -134,7 +139,7 @@ func (t *Tabs) Open(address string) (target.ID, error) {
 	return made.TargetID, nil
 }
 
-// Close stops following the tabs, and leaves them open.
+// Close stops following the tabs, and leaves them open, with no device profile.
 func (t *Tabs) Close() { t.cancel() }
 
 // tabLine is one line of @playwright/mcp's browser_tabs list: "- 0: (current) [title](url)".

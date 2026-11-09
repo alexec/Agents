@@ -99,6 +99,9 @@ var browserTools = sync.OnceValues(func() ([]json.RawMessage, map[string]bool) {
 	// The app's own capture of a shown value (#4028), the same.
 	names[captureSecretName] = true
 	out = append(out, captureSecretTool)
+	// The app's own device profile (#4086), the same.
+	names[emulateDeviceName] = true
+	out = append(out, emulateDeviceTool)
 	// The hand-off to the person (#3529), the same.
 	names[handToPersonName] = true
 	out = append(out, handToPersonTool)
@@ -242,6 +245,13 @@ func (d *Daemon) driveBrowser(ctx context.Context, agent wire.UUID, name string,
 			return failed(refusal)
 		}
 	}
+	var device *browser.Device
+	if name == emulateDeviceName {
+		var refusal string
+		if device, refusal = emulateDeviceCheck(args); refusal != "" {
+			return failed(refusal)
+		}
+	}
 	reply, err := d.leaseResource(agent, browserLeaseName)
 	if err != nil {
 		return failed(browserWords(err))
@@ -284,6 +294,10 @@ func (d *Daemon) driveBrowser(ctx context.Context, agent wire.UUID, name string,
 	}
 	if name == captureSecretName {
 		return d.captureSecret(ctx, drive, args)
+	}
+	if name == emulateDeviceName {
+		said, isError := d.emulateDevice(agent, device)
+		return []any{map[string]any{"type": "text", "text": said}}, isError, said
 	}
 	if refusal := d.browserRefusal(ctx, drive, name, args); refusal != "" {
 		return failed(refusal)
