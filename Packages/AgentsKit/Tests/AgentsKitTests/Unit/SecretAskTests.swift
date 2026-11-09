@@ -39,7 +39,7 @@ struct SecretAskTests {
         #expect(asks.secret?.canAskBeforeUse == true)
         #expect(ElicitationRequest.secretAnswer("v", sessionOnly: false, askBeforeUse: false)
             == ["value": .string("v"), "needsApproval": .bool(false)])
-        #expect(AskBeforeUseWords.hint(false) == "Every session on the machine can read it, as $NAME and from a file.")
+        #expect(AskBeforeUseWords.hint(false) == "Every session on the machine can read it with no approval, as $NAME and from a file.")
         #expect(SessionSecretWords.keeping(on: "your Mac")
             == "Kept on your Mac for this session only, and deleted when it is archived. The agent gets its name, never the value.")
         let secret = SessionSecret(agentID: UUID(), title: "Sign up to the shop", name: "SHOP_PASSWORD", setAt: Date())

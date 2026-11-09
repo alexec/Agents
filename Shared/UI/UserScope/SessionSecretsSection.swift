@@ -141,7 +141,7 @@ struct SessionSecretsSection<Source: SessionSecretsSource>: View {
 /// Add for a Session…: which session, a name and a value. The value is never shown again.
 private struct SessionSecretSheet: View {
     let sessions: [Agent]
-    /// The host keeps Ask before use (#4016); a person's secret starts off.
+    /// The host keeps Ask before use (#4016); a new secret starts on (#4162).
     let offersAsk: Bool
     let save: (SessionSecretSetRequest) async -> String?
 
@@ -149,7 +149,7 @@ private struct SessionSecretSheet: View {
     @State private var session: UUID?
     @State private var name = ""
     @State private var value = ""
-    @State private var askBeforeUse = false
+    @State private var askBeforeUse = true
     @State private var problem: String?
     @State private var saving = false
 
