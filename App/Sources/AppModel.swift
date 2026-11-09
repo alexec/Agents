@@ -1031,7 +1031,7 @@ final class AppModel {
         userScope.lock = lock
         // On `controlLink` itself, not a link of its own (#445): a second connection that
         // nothing else knew of was never let go of, so a wedged one stayed for good.
-        if let controlLink { client = DaemonClient(link: hostLink(.mac, through: controlLink)) }
+        if let controlLink { client = DaemonClient(link: hostLink(.mac, through: controlLink), machine: .mac) }
         // From the start, not once connected: a banner tapped to launch the app arrives
         // before then, and was dropped (#1055).
         notifier.open = { [weak self] agentID, line in
@@ -3230,7 +3230,7 @@ final class AppModel {
     func adopt(_ endpoint: ControlConfig.Endpoint) async {
         guard let link = ControlConfig.link(endpoint) else { return }
         controlLink = link
-        client = DaemonClient(link: hostLink(.mac, through: link))
+        client = DaemonClient(link: hostLink(.mac, through: link), machine: .mac)
         keptHost = nil
         // Made with the client just replaced, they would ask it for ever (#62).
         serverFilesByHost[.mac] = nil
@@ -3987,6 +3987,7 @@ final class AppModel {
         else { return }
         controlPlaneHosts = listed
         OlderPeer.controlVersion = status.version
+        OlderPeer.know(listed, home: ThisMacHost.resolve(listed))
         if let controlKey = Self.controlKey {
             KeptThisMacHost.keep(from: listed, controlKey: controlKey, in: WindowDefaults.store)
             keptHost = KeptThisMacHost.read(controlKey: controlKey, from: WindowDefaults.store)
@@ -4027,7 +4028,8 @@ final class AppModel {
     /// local socket when it is on this Mac (#1118), else through the control plane.
     private func reach(_ host: DaemonAPI.ControlMachine, through controlLink: ControlLink) async {
         let server = controlHosts[host.id]
-            ?? DaemonClient(link: hostLink(host.id, through: controlLink, onThisMac: host.machineID == MachineID.current))
+            ?? DaemonClient(link: hostLink(host.id, through: controlLink, onThisMac: host.machineID == MachineID.current),
+                            machine: host.id)
         controlHosts[host.id] = server
         guard await !server.isConnected else { return }
         guard (try? await server.connect(startIfNeeded: false, timeout: .seconds(5))) != nil else { return }

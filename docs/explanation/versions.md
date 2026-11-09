@@ -75,8 +75,11 @@ know. Then it gets `-32601` (method not found) or `-32602` (invalid params), wit
 part's own words, such as "Those parameters are not a ProviderCreate." When that part is
 older than the client, the client says **The control plane needs an update to do this. It
 runs Agents 0.17.0; this app is 0.18.0.** instead (#4096), and the Mac and the Remote keep
-the part's words in the log. On the web page it says **This machine needs an update…**
-for a host older than the page; the control plane serves the page, so it is never older.
+the part's words in the log. For a host older than the client, each client says **This
+machine needs an update to do this. It runs Agents ‹theirs›; this app is ‹ours›.** (#4101):
+the Mac and the Remote by the host each call goes to, with that host's version from
+`machines/list`; the web page by the call's route, and it says "this page". The control
+plane serves the page, so on the web it is never older.
 When the part is the same version or newer, the client shows the part's words: then it is
 a fault, not a version.
 
