@@ -6989,6 +6989,12 @@ export interface OrgRoutesMine {
 export interface OutsideAccount {
   /** The service, as its address: gitlab.com, aws.amazon.com. */
   service: string;
+  /**
+   * What it is for and who uses it, in one or two sentences, so an agent can tell it from the other
+   * accounts of the same service (#4164). Absent on an account made before it: the clients say No
+   * description.
+   */
+  description?: string;
   /** The address it signs in with. */
   address?: string;
   /** Free, Pro… */
@@ -13698,7 +13704,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   OrgRoutesApplied: { required: ["routes"], optional: [] },
   OrgRoutesLeft: { required: ["host", "name", "user", "routes"], optional: [] },
   OrgRoutesMine: { required: ["routes"], optional: [] },
-  OutsideAccount: { required: ["service"], optional: ["address", "plan", "monthlyCostUsd", "card", "secret", "twoFactor", "issue", "made", "tokenExpires", "notes", "projects"] },
+  OutsideAccount: { required: ["service"], optional: ["description", "address", "plan", "monthlyCostUsd", "card", "secret", "twoFactor", "issue", "made", "tokenExpires", "notes", "projects"] },
   OutsideAccounts: { required: ["accounts"], optional: [] },
   PagesChangedNotification: { required: ["folder", "folders"], optional: [] },
   PassThroughName: { required: ["name"], optional: ["runtime", "setBy"] },

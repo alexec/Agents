@@ -7911,6 +7911,9 @@ type OutsideAccount struct {
 	// The service, as its address: gitlab.com, aws.amazon.com.
 	Service string `json:"service"`
 
+	// What it is for and who uses it, in one or two sentences, so an agent can tell it from the other accounts of the same service (#4164). Absent on an account made before it: the clients say No description.
+	Description *string `json:"description,omitzero"`
+
 	// The address it signs in with.
 	Address *string `json:"address,omitzero"`
 

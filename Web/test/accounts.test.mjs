@@ -29,7 +29,12 @@ test("accounts: a token that expires soon is marked", () => {
 });
 
 test("accounts: the sheet's fields go both ways", () => {
-  const x = { service: "aws.amazon.com", monthlyCostUsd: 12.5, projects: ["Agents", "Web"] };
+  const x = { service: "aws.amazon.com", description: "The agents' own AWS account.", monthlyCostUsd: 12.5, projects: ["Agents", "Web"] };
   assert.deepEqual(a.accountOf(a.accountFields(x)), x);
   assert.deepEqual(a.accountOf({ service: " x.com ", plan: " " }), { service: "x.com" });
+});
+
+test("accounts: one made before descriptions says so (#4164)", () => {
+  assert.equal(a.accountAbout(all[0]), "No description");
+  assert.equal(a.accountAbout({ service: "x", description: " For tests. " }), "For tests.");
 });

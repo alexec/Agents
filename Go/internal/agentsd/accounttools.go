@@ -1,6 +1,8 @@
 package agentsd
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,18 +17,32 @@ import (
 )
 
 // manageAccounts is manage_accounts (#3967): the person's outside accounts, from Settings ▸
-// You ▸ Accounts on the control plane. list (or find, with service), add one, or import the files
-// of the old registry in ~/.agents/accounts/ (#3909) once.
+// You ▸ Accounts on the control plane. list (or find, with service) gives each account's id,
+// service and description only (#4164); get gives one account in full; add one, or import the
+// files of the old registry in ~/.agents/accounts/ (#3909) once.
 func (d *Daemon) manageAccounts(_ wire.UUID, args map[string]json.RawMessage) (string, error) {
 	var call wire.MachineAccountsCall
 	action := strings.TrimSpace(argString(args, "action"))
 	switch action {
 	case "", "list":
+	case "get":
+		id := strings.TrimSpace(argString(args, "id"))
+		if id == "" {
+			return "", Invalid("Nothing was done: give the account's id, as list gives it.")
+		}
+		listed, err := d.askAccounts(call)
+		if err != nil {
+			return "", err
+		}
+		return accountNote(listed.Accounts, id)
 	case "add":
 		var a wire.OutsideAccount
 		raw, ok := args["account"]
 		if !ok || json.Unmarshal(raw, &a) != nil || strings.TrimSpace(a.Service) == "" {
 			return "", Invalid("Nothing was done: give the account, with its service.")
+		}
+		if a.Description == nil || strings.TrimSpace(*a.Description) == "" {
+			return "", Invalid("Nothing was done: give the account a description, so that another agent can tell it from the other accounts of %s.", a.Service)
 		}
 		call.Add = []wire.OutsideAccount{a}
 	case "import":
@@ -36,7 +52,7 @@ func (d *Daemon) manageAccounts(_ wire.UUID, args map[string]json.RawMessage) (s
 		}
 		call.Add = found
 	default:
-		return "", Invalid("Nothing was done: action is list, add or import.")
+		return "", Invalid("Nothing was done: action is list, get, add or import.")
 	}
 	listed, err := d.askAccounts(call)
 	if err != nil {
@@ -114,6 +130,26 @@ func fromOld(old map[string]any) wire.OutsideAccount {
 	return a
 }
 
+// accountID is an account's id (#4164): from its service and address, which name it on the control
+// plane too (usersettings.accountIndex), so it needs no field of its own and does not show the address.
+func accountID(a wire.OutsideAccount) string {
+	address := ""
+	if a.Address != nil {
+		address = *a.Address
+	}
+	sum := sha256.Sum256([]byte(strings.ToLower(a.Service) + "#" + strings.ToLower(address)))
+	return hex.EncodeToString(sum[:4])
+}
+
+// accountLine is what list shows of an account: no address, plan, cost, secret, card or notes.
+type accountLine struct {
+	ID          string `json:"id"`
+	Service     string `json:"service"`
+	Description string `json:"description"`
+}
+
+const noDescription = "No description"
+
 // accountsNote is the accounts, a line each, those of service and project only when named.
 func accountsNote(all []wire.OutsideAccount, service, project, action string, added int) string {
 	var b strings.Builder
@@ -140,16 +176,36 @@ func accountsNote(all []wire.OutsideAccount, service, project, action string, ad
 		}
 		return b.String() + "There are no accounts."
 	}
-	total := 0.0
-	fmt.Fprintf(&b, "%d accounts:\n", len(rows))
+	fmt.Fprintf(&b, "%d accounts (get one with its id for the rest):\n", len(rows))
 	for _, a := range rows {
-		line, _ := json.Marshal(a)
+		row := accountLine{ID: accountID(a), Service: a.Service, Description: noDescription}
+		if a.Description != nil && strings.TrimSpace(*a.Description) != "" {
+			row.Description = *a.Description
+		}
+		line, _ := json.Marshal(row)
 		b.Write(line)
 		b.WriteByte('\n')
-		if a.MonthlyCostUsd != nil {
-			total += *a.MonthlyCostUsd
-		}
 	}
-	fmt.Fprintf(&b, "$%s a month.", strconv.FormatFloat(total, 'f', -1, 64))
-	return b.String()
+	return strings.TrimSuffix(b.String(), "\n")
+}
+
+// accountNote is the account with the id, in full, with its id.
+func accountNote(all []wire.OutsideAccount, id string) (string, error) {
+	for _, a := range all {
+		if accountID(a) != strings.ToLower(id) {
+			continue
+		}
+		raw, err := json.Marshal(a)
+		if err != nil {
+			return "", err
+		}
+		var full map[string]any
+		if err := json.Unmarshal(raw, &full); err != nil {
+			return "", err
+		}
+		full["id"] = accountID(a)
+		line, err := json.Marshal(full)
+		return string(line), err
+	}
+	return "", Invalid("Nothing was done: there is no account with the id %s. list gives the ids.", id)
 }

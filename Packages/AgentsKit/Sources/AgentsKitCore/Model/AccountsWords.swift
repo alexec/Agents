@@ -29,6 +29,14 @@ public enum AccountsWords {
         a.monthlyCostUsd.map { "\(money($0))/month" } ?? ""
     }
 
+    /// The description (#4164), under the address; an account made before it has none.
+    public static func about(_ a: DaemonAPI.OutsideAccount) -> String {
+        let text = (a.description ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? noDescription : text
+    }
+
+    public static let noDescription = "No description"
+
     /// The address and the plan, under the service.
     public static func detail(_ a: DaemonAPI.OutsideAccount) -> String {
         [a.address, a.plan].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
@@ -59,6 +67,7 @@ public enum AccountsWords {
     /// The sheet's fields of an account.
     public static func fields(_ a: DaemonAPI.OutsideAccount) -> [String: String] {
         var f: [String: String] = ["service": a.service]
+        f["description"] = a.description
         f["address"] = a.address
         f["plan"] = a.plan
         f["cost"] = a.monthlyCostUsd.map { $0 == $0.rounded() ? String(Int($0)) : String($0) }
@@ -81,7 +90,7 @@ public enum AccountsWords {
         }
         let projects = (v("projects") ?? "").split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-        return DaemonAPI.OutsideAccount(service: v("service") ?? "", address: v("address"), plan: v("plan"),
+        return DaemonAPI.OutsideAccount(service: v("service") ?? "", description: v("description"), address: v("address"), plan: v("plan"),
                                         monthlyCostUsd: v("cost").flatMap { Double($0.replacingOccurrences(of: "$", with: "")) },
                                         card: v("card"), secret: v("secret"), twoFactor: v("twoFactor"), issue: v("issue"),
                                         made: v("made"), tokenExpires: v("tokenExpires"), notes: v("notes"),

@@ -100,7 +100,7 @@
   {
     "name": "manage_accounts",
     "title": "The person's outside accounts",
-    "description": "The person's outside accounts (gitlab.com, AWS, Slack and the like), as Settings ▸ You ▸ Accounts in the app keeps them for every machine of theirs. Before you make an account on a service, list with service to find out whether there is one already, and use it. When you make one, add it. An account holds no secret: card and secret are the names of secrets in Settings ▸ You ▸ Secrets (or where one is), never a value; a value that looks like a token, a key or a card number is refused. add puts an account with the same service and address in place of the old one. import adds the old registry's files in ~/.agents/accounts/ on this machine, once.",
+    "description": "The person's outside accounts (gitlab.com, AWS, Slack and the like), as Settings ▸ You ▸ Accounts in the app keeps them for every machine of theirs. Before you make an account on a service, list with service to find out whether there is one already, and use it. list gives each account's id, service and description only; get with its id gives the whole account. When you make one, add it, with a description. An account holds no secret: card and secret are the names of secrets in Settings ▸ You ▸ Secrets (or where one is), never a value; a value that looks like a token, a key or a card number is refused. add puts an account with the same service and address in place of the old one. import adds the old registry's files in ~/.agents/accounts/ on this machine, once.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -112,10 +112,11 @@
           "type": "string",
           "enum": [
             "list",
+            "get",
             "add",
             "import"
           ],
-          "description": "list (the default), add or import."
+          "description": "list (the default), get, add or import."
         },
         "service": {
           "type": "string",
@@ -125,6 +126,10 @@
           "type": "string",
           "description": "For list: only the accounts this project uses, by its name (an account with no projects is for all)."
         },
+        "id": {
+          "type": "string",
+          "description": "For get: the account's id, as list gives it."
+        },
         "account": {
           "type": "object",
           "description": "For add: the account.",
@@ -132,6 +137,10 @@
             "service": {
               "type": "string",
               "description": "The service, as its address: gitlab.com, aws.amazon.com."
+            },
+            "description": {
+              "type": "string",
+              "description": "What the account is for and who uses it, in one or two sentences, so that another agent can tell it from the other accounts of the same service: \"The agents' own gitlab.com account, for the GitLab integration tests. Not Alex's.\" Never a secret."
             },
             "address": {
               "type": "string",
@@ -182,7 +191,8 @@
             }
           },
           "required": [
-            "service"
+            "service",
+            "description"
           ]
         }
       },

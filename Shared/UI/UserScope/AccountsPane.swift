@@ -82,6 +82,8 @@ struct AccountsPane: View {
                 .accessibilityLabel("\(account.service) actions")
             }
             Text(AccountsWords.detail(account)).appText(.fine).foregroundStyle(.secondary)
+            Text(AccountsWords.about(account)).appText(.fine).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             if let soon = AccountsWords.expiresSoon(account, now: Date()) {
                 Text(soon).appText(.fine).tinted(.attention)
             }
@@ -119,7 +121,7 @@ private struct AccountSheet: View {
             TextField(label, text: text, prompt: Text(prompt))
                 .multilineTextAlignment(.trailing)
                 .autocorrectionDisabled()
-                .textInputAutocapitalization(key == "notes" ? .sentences : .never)
+                .textInputAutocapitalization(key == "notes" || key == "description" ? .sentences : .never)
                 .keyboardType(key == "cost" ? .decimalPad : key == "address" ? .emailAddress : .default)
         }
         #else
@@ -133,6 +135,7 @@ private struct AccountSheet: View {
             Section {
                 field("Service", "service", "gitlab.com")
                 field("Address", "address", "name@example.com")
+                field("Description", "description", "What it is for, and who uses it")
                 field("Plan", "plan", "Free")
                 field("Monthly cost (USD)", "cost", "0")
                 field("Card", "card", "The card's name in Secrets")
