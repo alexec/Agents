@@ -119,10 +119,14 @@ type secretRecord struct {
 	Description string `json:"description,omitempty"`
 	// Sealed is each recipient's envelope (m:<machine> or c:<client>), as the person's
 	// client sealed it (#3397). Nothing here opens one.
-	Sealed   map[string]wire.SealedEnvelope `json:"sealed,omitempty"`
-	Updated  string                         `json:"updated"`
-	Machines []string                       `json:"machines,omitempty"`
-	LeftOn   []wire.SecretLeftOn            `json:"leftOn,omitempty"`
+	Sealed  map[string]wire.SealedEnvelope `json:"sealed,omitempty"`
+	Updated string                         `json:"updated"`
+	// Created is when the name was first set (#4158): a Replace… keeps it, and a set after a
+	// removal starts it again. Empty for one set before it was kept. Never a hint: the
+	// machines' hints stay in the control plane's memory.
+	Created  string              `json:"created,omitempty"`
+	Machines []string            `json:"machines,omitempty"`
+	LeftOn   []wire.SecretLeftOn `json:"leftOn,omitempty"`
 }
 
 func checkUser(user string) error {
@@ -467,8 +471,12 @@ func (b *Book) SetSecret(ctx context.Context, user string, set wire.UserSecretSe
 		if set.Kind != nil {
 			kind = string(*set.Kind)
 		}
+		created := r.Created
+		if r.Sealed == nil {
+			created = b.stamp()
+		}
 		r = secretRecord{Name: name, Version: set.Version, Kind: kind, NeedsApproval: set.NeedsApproval != nil && *set.NeedsApproval,
-			Description: description, Sealed: sealed, Updated: b.stamp(), Machines: r.Machines}
+			Description: description, Sealed: sealed, Updated: b.stamp(), Created: created, Machines: r.Machines}
 		return records.Encode(r)
 	})
 }
@@ -615,6 +623,9 @@ func (b *Book) Names(ctx context.Context, user string, machines []string) ([]wir
 		if r.Description != "" {
 			row.Description = new(r.Description)
 		}
+		if r.Created != "" {
+			row.Created = new(r.Created)
+		}
 		for _, m := range r.Machines {
 			row.Machines = append(row.Machines, wire.MachineRef(m))
 		}
@@ -623,6 +634,8 @@ func (b *Book) Names(ctx context.Context, user string, machines []string) ([]wir
 				row.Waiting = append(row.Waiting, wire.MachineRef(strings.TrimPrefix(recipient, "m:")))
 			}
 		}
+		// One copy only opens: not backed up (#4158).
+		row.BackedUp = new(len(row.Machines) != 1 || len(row.Waiting) > 0)
 		rows = append(rows, row)
 	}
 	sort.Slice(rows, func(i, j int) bool { return rows[i].Name < rows[j].Name })

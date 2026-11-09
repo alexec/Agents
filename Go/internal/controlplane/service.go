@@ -149,6 +149,8 @@ type Service struct {
 	keyBook
 	// The Multiplier of each person, by their lineage objects' tags (#3903).
 	multiplierBook
+	// Each machine's hints and the newest operation on each secret (#4158): memory only.
+	secretInfoBook
 	origin  string
 	copyID  string
 	records *records.Records

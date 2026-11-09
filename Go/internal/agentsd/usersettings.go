@@ -107,6 +107,8 @@ func (d *Daemon) ApplyUserSettings(u wire.MachineUserSettings) error {
 		for _, c := range changes {
 			d.secretChanged("", c.name, c.what, false)
 		}
+		// What this machine holds now, with each hint and last operation (#4158).
+		go d.tellSecretsHeld()
 	}()
 	d.userScopeMu.Lock()
 	defer d.userScopeMu.Unlock()
@@ -142,7 +144,7 @@ func (d *Daemon) ApplyUserSettings(u wire.MachineUserSettings) error {
 	if partSent(s.Policy) {
 		note(wire.UserSettingsPartNamePolicy, d.applyYoursFromControlPlane(s.Policy))
 	}
-	opened, flagged, versions, kept := d.openUserSecrets(u, before)
+	opened, flagged, versions, kept, hints := d.openUserSecrets(u, before)
 	names, err := d.syncUserSecrets(home, opened, flagged, before.Secrets, kept)
 	for i := range opened {
 		opened[i].Value = ""
@@ -155,6 +157,15 @@ func (d *Daemon) ApplyUserSettings(u wire.MachineUserSettings) error {
 		names, versions = before.Secrets, before.Versions
 	}
 	mark.Secrets, mark.Versions = names, versions
+	if err == nil {
+		// A name kept as it is here keeps its hint (#4158).
+		for n, h := range readSecretHints(home) {
+			if _, opened := hints[n]; !opened {
+				hints[n] = h
+			}
+		}
+		writeSecretHints(home, hints, names)
+	}
 	if err == nil && before.User == u.User {
 		changes = userSecretChanges(before, mark)
 	}
@@ -408,11 +419,12 @@ func (d *Daemon) applyYoursFromControlPlane(raw wire.JSONValue) error {
 // the values, those with Ask before use apart (#4014), the version of each, and the names to
 // keep as they are in the file, those whose version here is newer than the one sent. One
 // that does not open is left out: a flag the control plane changed does not open.
-func (d *Daemon) openUserSecrets(u wire.MachineUserSettings, before userSettingsSyncState) (plain, flagged []wire.UserSecret, versions map[string]int64, kept []string) {
+func (d *Daemon) openUserSecrets(u wire.MachineUserSettings, before userSettingsSyncState) (plain, flagged []wire.UserSecret, versions map[string]int64, kept []string, hints map[string]secretHintRecord) {
 	d.orgRouteMu.Lock()
 	id := d.identityLocked()
 	d.orgRouteMu.Unlock()
 	versions = map[string]int64{}
+	hints = map[string]secretHintRecord{}
 	for _, s := range u.Secrets {
 		name := string(s.Name)
 		if had := before.Versions[name]; s.Version < had && slices.Contains(before.Secrets, name) {
@@ -433,6 +445,7 @@ func (d *Daemon) openUserSecrets(u wire.MachineUserSettings, before userSettings
 			continue
 		}
 		opened := wire.UserSecret{Name: s.Name, Value: string(value)}
+		hints[name] = secretHintRecord{Version: s.Version, Hint: secretHint(opened.Value, s.Kind)}
 		clear(value)
 		if ask {
 			flagged = append(flagged, opened)
@@ -441,7 +454,7 @@ func (d *Daemon) openUserSecrets(u wire.MachineUserSettings, before userSettings
 		}
 		versions[name] = s.Version
 	}
-	return plain, flagged, versions, kept
+	return plain, flagged, versions, kept, hints
 }
 
 // secretsAbout is what list_secrets says of each sent secret that this machine keeps (#4167).
