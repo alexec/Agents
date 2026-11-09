@@ -1260,6 +1260,14 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 			m.s.userChanged(user, []wire.UserSettingsPartName{wire.UserSettingsPartNameAccounts}, false, host)
 		}
 		return listed, nil
+	case "machine/secretOps":
+		// What the machine's agents did with its person's secrets (#4156): the audit keeps each.
+		request, err := require[wire.MachineSecretOpsCall](params, "MachineSecretOpsCall")
+		if err != nil {
+			return nil, err
+		}
+		m.s.auditSecretOps(host, m.s.ownerOf(host), request.Ops)
+		return wire.Empty{}, nil
 	case "machine/machines", "machine/providerDraft", "machine/status", "machine/installProgress":
 		if m.s.providers == nil {
 			if method == "machine/status" || method == "machine/installProgress" {

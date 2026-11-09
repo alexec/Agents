@@ -181,6 +181,9 @@ var controlActions = map[string]string{
 	// The read API (#2019): each writes its own entry, naming the token, never its value.
 	"readApi/made":    "Made a read API token",
 	"readApi/revoked": "Revoked a read API token",
+	// A person's secrets (#4156): the target is the secret's name, never its value.
+	"user/setSecret":    "Set a secret",
+	"user/removeSecret": "Removed a secret",
 }
 
 // Action is what a call is in words, and whether the audit keeps it at all. toHost is a

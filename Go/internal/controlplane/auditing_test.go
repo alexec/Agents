@@ -3,6 +3,7 @@ package controlplane
 import (
 	"context"
 	"encoding/json"
+	"maps"
 	"strings"
 	"sync"
 	"testing"
@@ -145,5 +146,50 @@ func TestAccountOperationsAreAudited(t *testing.T) {
 	}
 	if !actions["Added an account"] || !actions["Listed accounts"] {
 		t.Fatal(actions)
+	}
+}
+
+// A machine's reads and changes of its person's secrets are kept (#4156): one entry for each
+// operation it names, with the name, the use, the place and the count, never a value.
+func TestSecretOperationsAreAudited(t *testing.T) {
+	t.Parallel()
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	box := p.hostWith("MACHINE-2", nil)
+	_, window := p.client("Test window")
+	fill, mcp := wire.SecretOperationUseFill, wire.SecretOperationUseMCP
+	github, linear := "github.com", "linear"
+	twelve := int64(12)
+	at := wire.DateOf(time.Now())
+	params, _ := json.Marshal(wire.MachineSecretOpsCall{Ops: []wire.SecretOperation{
+		{Name: "GITHUB_TOKEN", What: wire.SecretOperationWhatRead, Use: &fill, Place: &github, At: at},
+		{Name: "LINEAR_KEY", What: wire.SecretOperationWhatRead, Use: &mcp, Place: &linear, Count: &twelve, At: at},
+		{Name: "LINEAR_KEY", What: wire.SecretOperationWhatDenied, Use: &mcp, Place: &linear, At: at},
+		{Name: "NEW_TOKEN", What: wire.SecretOperationWhatAdded, At: at},
+		{Name: "", What: wire.SecretOperationWhatRead, At: at},
+	}})
+	if _, err := p.s.methods.HostSaid(box.member.Host, "machine/secretOps", params); err != nil {
+		t.Fatal(err)
+	}
+	var list wire.AuditList
+	p.waitFor(func() bool {
+		list = wire.AuditList{}
+		json.Unmarshal(call(t, window, "", "audit/list", wire.AuditQuery{}), &list)
+		return len(list.Entries) == 4
+	}, "four entries")
+	got := map[string]string{}
+	for _, e := range list.Entries {
+		if e.Method != "machine/secretOps" || string(*e.Host) != box.member.Host || e.Actor.User != p.s.localOwner() {
+			t.Fatalf("%+v", e)
+		}
+		got[*e.Target] = e.Action
+	}
+	want := map[string]string{
+		"GITHUB_TOKEN · fill · github.com":     "Read a secret",
+		"LINEAR_KEY · mcp · linear · 12 times": "Read a secret",
+		"LINEAR_KEY · mcp · linear":            "Denied a secret's use",
+		"NEW_TOKEN":                            "Added a secret",
+	}
+	if !maps.Equal(got, want) {
+		t.Fatal(got)
 	}
 }

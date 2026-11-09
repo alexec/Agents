@@ -277,7 +277,8 @@ func (d *Daemon) driveBrowser(ctx context.Context, agent wire.UUID, name string,
 		return failed("The browser did not start: " + browserWords(err))
 	}
 	if name == fillSecretName {
-		if words, isError := d.approveFill(ctx, agent, drive, fill, args); words != "" {
+		words, isError, site := d.approveFill(ctx, agent, drive, fill, args)
+		if words != "" {
 			return []any{map[string]any{"type": "text", "text": words}}, isError, words
 		}
 		if fill.released {
@@ -287,6 +288,7 @@ func (d *Daemon) driveBrowser(ctx context.Context, agent wire.UUID, name string,
 				return failed(cmp.Or(refusal, "Nothing was filled: "+fill.name+" did not open."))
 			}
 		}
+		fill.agent, fill.site = agent, site
 		return d.fillSecret(ctx, drive, fill, args)
 	}
 	if name == generateSecretName {

@@ -2630,6 +2630,27 @@
       }
     },
     {
+      "name": "machine/secretOps",
+      "x-capability": "machine/1",
+      "description": "A host, for its agents (#4156): what they did with its person's secrets. The control plane writes an audit entry for each: Read a secret, Denied a secret's use, Added a secret, Replaced a secret or Removed a secret, with the name, the use and the place as the target. Never a value.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineSecretOpsCall"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "machine/secretRelease",
       "x-capability": "host.secret-release/1",
       "description": "A Linux machine, on its channel 0 (#4058): the key for one value's release layer, for an approval a client of the machine's person's lock signed to this machine (secrets/approveUse) within the last 10 minutes, for that name. The control plane refuses one it has seen before, and never sees the value.",

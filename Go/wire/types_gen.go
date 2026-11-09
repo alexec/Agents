@@ -6964,6 +6964,11 @@ type MachineSchedule struct {
 	Workflow *string `json:"workflow,omitzero"`
 }
 
+// machine/secretOps (#4156): what a machine's agents did with its person's secrets, for the control plane's audit. At most one operation per secret, session, place and minute, with a count.
+type MachineSecretOpsCall struct {
+	Ops []SecretOperation `json:"ops"`
+}
+
 // machines/sessionCall, through machine/machines (#2927): an agent's read_session, message_session, stop_session, archive_session, or list_sessions and agent.ended wait status, on a session it started on another of the person's machines with start_session. The control plane sends that machine's agents/fromStarter, with call.from in its own words.
 type MachineSessionCall struct {
 	Host string `json:"host"`
@@ -11084,6 +11089,44 @@ type SecretNeedsApprovalRequest struct {
 
 	NeedsApproval bool `json:"needsApproval"`
 }
+
+// One read or change of a secret on a machine (#4156). Never the value, never its hint: only the name, and where it went.
+type SecretOperation struct {
+	Name string `json:"name"`
+
+	What SecretOperationWhat `json:"what"`
+
+	Use *SecretOperationUse `json:"use,omitzero"`
+
+	// Where it went: the field's domain (fill), owner/repo (ci), the server's name (mcp, env), or session (env, as a session's own variable).
+	Place *string `json:"place,omitzero"`
+
+	// The session that read it. Left out for a change no session made.
+	Agent *UUID `json:"agent,omitzero"`
+
+	// When; for a count, the first in its minute.
+	At Date `json:"at"`
+
+	// How many times in the minute from at, when more than one.
+	Count *int64 `json:"count,omitzero"`
+}
+
+// How a secret was read (#4156): fill (fill_secret), ci (set_ci_secret), mcp (an HTTP MCP server's header or url, through agentsd, #4120) or env (given to a session at its start: its own secrets as variables, or an MCP server's ${NAME} from secrets.env).
+type SecretOperationUse string
+
+const SecretOperationUseFill SecretOperationUse = "fill"
+const SecretOperationUseCi SecretOperationUse = "ci"
+const SecretOperationUseMCP SecretOperationUse = "mcp"
+const SecretOperationUseEnv SecretOperationUse = "env"
+
+// What an operation on a secret was (#4156): read (an agent's use of it), denied (a person denied a use with Ask before use), or added, replaced or removed.
+type SecretOperationWhat string
+
+const SecretOperationWhatRead SecretOperationWhat = "read"
+const SecretOperationWhatDenied SecretOperationWhat = "denied"
+const SecretOperationWhatAdded SecretOperationWhat = "added"
+const SecretOperationWhatReplaced SecretOperationWhat = "replaced"
+const SecretOperationWhatRemoved SecretOperationWhat = "removed"
 
 // machine/secretRelease (#4058): a Linux machine asks its control plane to open the release layer of one value with Ask before use, for a person's signed approval. encapsulated is the HPKE encapsulated key the machine sealed the value's key with (DHKEM X25519, HKDF-SHA256, AES-256-GCM, info agents-secret-release/1); the control plane answers with the 32 bytes exported with the context "sealedsecret.release.v1|" then name. It never sees the value, which is also sealed to the machine's key.
 type SecretRelease struct {

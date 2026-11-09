@@ -27,6 +27,8 @@ type Daemon struct {
 
 	// accountOps is each account's last operation, and each secret's last read (#4157).
 	accountOps accountOpBook
+	// secretOps is each secret's last operation, and the reads waiting for the audit (#4156).
+	secretOps secretOpBook
 
 	// erasures is the queue of runtime copies of deleted agents to erase (#1001).
 	erasures eraser

@@ -185,7 +185,9 @@ func (d *Daemon) mcpServersFor(id wire.UUID) []sdk.McpServer {
 	// hosted one swapped for its route on this endpoint (#488), and each http one with a
 	// secret that asks before use for its route through agentsd (#4120).
 	if a != nil {
-		entries := d.secretProxySwapped(d.sessionEntries(folderPath(a), id), port, token, id)
+		entries := d.sessionEntries(folderPath(a), id)
+		d.noteStartSecrets(id, entries)
+		entries = d.secretProxySwapped(entries, port, token, id)
 		servers = append(servers, d.hostedSwapped(entries, port, token, a.RuntimeID)...)
 	}
 	return servers

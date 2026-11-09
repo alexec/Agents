@@ -521,7 +521,7 @@ func eventGroup(name string) (wire.EventGroup, bool) {
 		return wire.EventGroupBranches, true
 	case "file":
 		return wire.EventGroupDropbox, true
-	case "mac", "machine", "person", "lease", "cost", "server", "account":
+	case "mac", "machine", "person", "lease", "cost", "server", "account", "secret":
 		return wire.EventGroupMac, true
 	}
 	return "", false
