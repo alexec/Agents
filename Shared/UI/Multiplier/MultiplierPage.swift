@@ -1,29 +1,44 @@
 import AgentsKitCore
 import SwiftUI
 
-/// The detail with nothing picked (#3904, in place of #145's page): the Multiplier, the
-/// work of how many engineers the agents did in the last 7 days (the number alone), the
-/// crowd of them over it (#3985), three big numbers under it, the person's bests in one line (#3988), and the
-/// earned achievements as badges (#3987). A show-off page: nothing else, and the key hints
-/// in one small line.
-///
-/// The numbers count to each new value (about 1 s), from the last values this window
-/// showed when it opens. When a PR merges or a revert does, a line says so and fades; a new
-/// best week says that instead.
-/// Under Reduce Motion they change with no count and no line.
-/// The page's row, first under Usage (#3986): the way back to it from a session or a page.
+/// The page's row: first under Usage on the Mac (#3986), first under Status on the Remote
+/// (#4116). The way back to it from a session or a page.
 struct MultiplierRow: View {
+    static let help = "The work of how many engineers your agents did in the last 7 days"
+
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
             Text("Multiplier").foregroundStyle(.primary)
             Spacer()
         }
-        .help("The work of how many engineers your agents did in the last 7 days")
+        .help(Self.help)
     }
 }
 
+/// The detail with nothing picked (#3904, in place of #145's page): the Multiplier, the
+/// work of how many engineers the agents did in the last 7 days (the number alone), the
+/// crowd of them over it (#3985), three big numbers under it, the person's bests in one line (#3988), and the
+/// earned achievements as badges (#3987). A show-off page: nothing else, and on the Mac the
+/// key hints in one small line.
+///
+/// The numbers count to each new value (about 1 s), from the last values this app
+/// showed when it opens. When a PR merges or a revert does, a line says so and fades; a new
+/// best week says that instead.
+/// Under Reduce Motion they change with no count and no line.
+///
+/// Drawn by the Mac window and the Remote (#4116): each passes in its own figures.
 struct MultiplierPage: View {
-    @Environment(AppModel.self) private var model
+    /// The host's Multiplier; nil until it has said, or from a host too old to know it.
+    let multiplier: DaemonAPI.Multiplier?
+    let achievements: Achievements?
+    /// The agents with a turn starting or running, so "agents now" moves as they do, with
+    /// no wait for a merge.
+    let agentsWorking: Int
+    /// The key hints under the page (the Mac's); nil draws none.
+    var hints: String?
+    /// Asks the host again, each time the page opens.
+    let refresh: () async -> Void
+
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// What the page showed last, so the next open counts from there (the first, from 0).
     @AppStorage("hero.multiplier", store: WindowDefaults.store) private var lastMultiplier = 0.0
@@ -35,13 +50,13 @@ struct MultiplierPage: View {
     @State private var shown = MultiplierFigures()
     @State private var news: MultiplierNews?
 
-    private var multiplier: DaemonAPI.Multiplier? { model.work.multiplier }
-
-    /// This window's agents with a turn starting or running, so "agents now" moves as they
-    /// do, with no wait for a merge.
-    private var agentsWorking: Int {
-        model.agents.count { $0.state == .starting || $0.state == .running }
-    }
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    /// An iPhone, or an iPad in a narrow split: the numbers closer together.
+    private var compact: Bool { sizeClass == .compact }
+    #else
+    private let compact = false
+    #endif
 
     private var target: MultiplierFigures {
         MultiplierFigures(multiplier: multiplier?.multiplier ?? 0, prsMerged: Double(multiplier?.prsMerged ?? 0),
@@ -63,7 +78,7 @@ struct MultiplierPage: View {
             Spacer()
             footer
         }
-        .padding(24)
+        .padding(compact ? 16 : 24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             shown = MultiplierFigures(multiplier: lastMultiplier, prsMerged: lastPRs,
@@ -73,7 +88,7 @@ struct MultiplierPage: View {
         }
         .onChange(of: target) { _, figures in show(figures) }
         .onChange(of: multiplier) { old, new in announce(from: old, to: new) }
-        .task { await model.refreshMultiplier() }
+        .task { await refresh() }
     }
 
     private var figures: some View {
@@ -84,15 +99,15 @@ struct MultiplierPage: View {
             CountingText(value: shown.multiplier, digits: 1, suffix: "×")
                 .appFigure(.hero)
                 .padding(.top, 8)
-                .padding(.bottom, 56)
-            HStack(alignment: .top, spacing: 72) {
+                .padding(.bottom, compact ? 32 : 56)
+            HStack(alignment: .top, spacing: compact ? 24 : 72) {
                 stat(shown.prsMerged, "PRs merged")
                 stat(shown.engineerHours, "engineer-hours")
                 stat(shown.agentsWorking, "agents now")
             }
             bests
                 .padding(.top, 32)
-            EarnedBadges(achievements: model.work.achievements)
+            EarnedBadges(achievements: achievements)
                 .padding(.top, 28)
             Group {
                 if let news {
@@ -158,7 +173,7 @@ struct MultiplierPage: View {
                 .foregroundStyle(.secondary)
             bests
                 .padding(.top, 16)
-            EarnedBadges(achievements: model.work.achievements)
+            EarnedBadges(achievements: achievements)
                 .padding(.top, 24)
         }
         .lineLimit(1)
@@ -170,7 +185,9 @@ struct MultiplierPage: View {
             if let baseline = multiplier?.baseline {
                 Text(baseline.shownLine)
             }
-            Text("⌘0 Multiplier · ⌘N new session · ↑↓ move · ⌘F find")
+            if let hints {
+                Text(hints)
+            }
         }
         .appText(.fine)
         .foregroundStyle(.secondary)

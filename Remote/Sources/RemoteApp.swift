@@ -196,7 +196,7 @@ struct RemoteView: View {
                     } else if let activity = model.openActivity {
                         activityPage(activity)
                     } else {
-                        NothingPickedPage()
+                        NothingPickedPage().paperGround()
                     }
                 }
                 .navigationDestination(for: RemoteRoute.self) { page($0) }
@@ -413,6 +413,7 @@ struct RemoteView: View {
         case .resources: ResourcesListView().paperGround()
         case .runtimes: RuntimesView().paperGround()
         case .machine(let host): RemoteMachinePage(host: host).paperGround()
+        case .multiplier: RemoteMultiplierPage().paperGround()
         case .work: WorkView(model: model).paperGround()
         case .summary:
             SummaryPageView(pages: model.summaryPages, settings: model.dailySummarySettings,
@@ -513,15 +514,22 @@ private struct MoveToMachineAsk: ViewModifier {
     }
 }
 
-/// The detail with nothing picked (#2090): what the Mac's window says, in the Remote's words.
-/// Leaving a session comes here on an iPad, and never to New session.
+/// The detail with nothing picked (#2090): the Multiplier page (#4116), as the Mac's window
+/// and the web page have it. Leaving a session comes here on an iPad, and never to New session.
 struct NothingPickedPage: View {
     var body: some View {
-        ContentUnavailableView {
-            Label("Nothing selected", systemImage: "sidebar.left")
-        } description: {
-            Text("Pick a session to read it, or New Session to start one.")
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        RemoteMultiplierPage()
+    }
+}
+
+/// The shared Multiplier page (#4116) with the Remote's figures, from the Mac's host.
+struct RemoteMultiplierPage: View {
+    @Environment(RemoteModel.self) private var model
+
+    var body: some View {
+        MultiplierPage(multiplier: model.work.multiplier, achievements: model.work.achievements,
+                       agentsWorking: model.agentsWorking, refresh: { await model.refreshMultiplier() })
+            .navigationTitle("Multiplier")
+            .toolbarTitleDisplayMode(.inline)
     }
 }
