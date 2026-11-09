@@ -55,6 +55,9 @@ def locked():
     return "CGSSessionScreenIsLocked" in out
 
 
+# A walk's own folder, where the window's walk socket is: in Application Support since the
+# window is one app with the host (#4225), and in the App Store window's container before.
+WALKS = os.path.expanduser("~/Library/Application Support/Agents/walks")
 CONTAINER = os.path.expanduser(
     "~/Library/Containers/com.alexecollins.agents.store/Data/Library/Application Support/Agents/walks")
 
@@ -69,7 +72,9 @@ class Walk:
             # Only a scratch root: the person's window has no --walk and no socket.
             if not name.startswith("run-") or not root.startswith("/tmp/"):
                 raise SystemExit(f"walk.py walks a scratch root (/tmp/run-<slug>) or remote, not {root}")
-            target = os.path.join(CONTAINER, name, "walk.sock")
+            target = os.path.join(WALKS, name, "walk.sock")
+            if not os.path.exists(target) and os.path.exists(os.path.join(CONTAINER, name, "walk.sock")):
+                target = os.path.join(CONTAINER, name, "walk.sock")
             link = os.path.join(root, "walk.sock")
             where = root
         if os.path.realpath(link) != os.path.realpath(target):

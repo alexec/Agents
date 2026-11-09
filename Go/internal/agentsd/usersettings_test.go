@@ -1,6 +1,7 @@
 package agentsd
 
 import (
+	"fmt"
 	"encoding/base64"
 	"encoding/json"
 	"os"
@@ -48,26 +49,28 @@ func TestUserSettingsGoIntoTheMachinesFiles(t *testing.T) {
 	if !strings.Contains(read(d.SettingsDir, "sandbox.json"), `"claude":"on"`) {
 		t.Fatal(read(d.SettingsDir, "sandbox.json"))
 	}
-	secrets := read(home, ".agents-secrets", "secrets.env")
-	if !strings.Contains(secrets, "GITHUB_TOKEN=ghp_sams") || !strings.Contains(secrets, "MINE=kept") || strings.Contains(secrets, "OTHERS") {
-		t.Fatal("secrets.env")
+	// Kept sealed (#4177), with the person's own line from before kept as well.
+	secrets := fmt.Sprint(d.secrets())
+	if !strings.Contains(secrets, "GITHUB_TOKEN:ghp_sams") || !strings.Contains(secrets, "MINE:kept") || strings.Contains(secrets, "OTHERS") {
+		t.Fatal("secrets")
 	}
+	assertNotUnder(t, home, "ghp_sams")
 	// An older version, which a control plane could send back, is refused: the newer stays.
 	sent.Secrets = []wire.SealedUserSecret{sealedSecret(t, public, "sam", "GITHUB_TOKEN", 2, "ghp_rotated")}
 	d.Told(wire.NotifyMachineUserSettings.Name, mustJSON(sent))
 	sent.Secrets = []wire.SealedUserSecret{sealedSecret(t, public, "sam", "GITHUB_TOKEN", 1, "ghp_sams")}
 	d.Told(wire.NotifyMachineUserSettings.Name, mustJSON(sent))
-	if secrets := read(home, ".agents-secrets", "secrets.env"); !strings.Contains(secrets, "GITHUB_TOKEN=ghp_rotated") {
+	if secrets := fmt.Sprint(d.secrets()); !strings.Contains(secrets, "GITHUB_TOKEN:ghp_rotated") {
 		t.Fatal("an older version was taken")
 	}
 	// Sealed as another person's, it does not open.
 	sent.Secrets = []wire.SealedUserSecret{sealedSecret(t, public, "sam", "GITHUB_TOKEN", 2, "ghp_rotated"),
 		sealedSecret(t, public, "kim", "KIMS_TOKEN", 1, "ghp_kims")}
 	d.Told(wire.NotifyMachineUserSettings.Name, mustJSON(sent))
-	if secrets := read(home, ".agents-secrets", "secrets.env"); strings.Contains(secrets, "ghp_kims") {
+	if secrets := fmt.Sprint(d.secrets()); strings.Contains(secrets, "ghp_kims") {
 		t.Fatal("another person's secret opened")
 	}
-	if info, _ := os.Stat(filepath.Join(home, ".agents-secrets", "secrets.env")); info.Mode().Perm() != 0o600 {
+	if info, _ := os.Stat(sealedSecretsPath(home)); info.Mode().Perm() != 0o600 {
 		t.Fatal(info.Mode())
 	}
 	mark := read(root, userSettingsSyncFile)
@@ -92,8 +95,8 @@ func TestUserSettingsGoIntoTheMachinesFiles(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(home, ".agents", "skills", "release")); !os.IsNotExist(err) {
 		t.Fatal("the skill is still there")
 	}
-	if secrets := read(home, ".agents-secrets", "secrets.env"); strings.Contains(secrets, "GITHUB_TOKEN") || !strings.Contains(secrets, "MINE=kept") {
-		t.Fatal("secrets.env after")
+	if secrets := fmt.Sprint(d.secrets()); strings.Contains(secrets, "GITHUB_TOKEN") || !strings.Contains(secrets, "MINE:kept") {
+		t.Fatal("secrets after")
 	}
 	c.call(t, 4, "cost/setLimits", map[string]any{"dailyTokens": 1})
 }

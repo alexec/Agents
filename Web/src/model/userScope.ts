@@ -5,8 +5,8 @@ import type { SecretsLeft, UserSecretRow } from "../protocol/generated";
 
 export const secretsTitle = "Secrets";
 export const addSecret = "Add a Secret…";
-export const secretsFoot = "A secret is sealed in this app to each of your own machines, and goes into ~/.agents-secrets/secrets.env "
-  + "there; the control plane cannot open it. Write ${NAME} for it in an MCP server's env or headers. Nobody can read it back, "
+export const secretsFoot = "A secret is sealed in this app to each of your own machines, and only agentsd opens it "
+  + "there; the control plane cannot. Write ${NAME} for it in an MCP server's env or headers. Nobody can read it back, "
   + "you included: to change it, replace it.";
 export const thisMacOnly = "This Mac's";
 

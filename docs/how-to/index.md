@@ -120,7 +120,7 @@ something particular done.
   skill… search, and adding your own, such as your company's MCP registry.
 - [Add a connector from the registry](add-a-connector-from-the-registry.md): search
   GitHub's MCP registry or another, see what would run, and add it for yourself or to a folder. Secrets stay
-  in your own `secrets.env`.
+  sealed in your own store.
 - [Add a connector by hand](add-a-connector-by-hand.md): a local command or a remote
   URL that is not on the registry, verified to answer before anything is written.
 - [Share one copy of a local connector](share-one-copy-of-a-local-connector.md): mark a

@@ -3,7 +3,8 @@
 forge/* reads them over Jira's REST API version 2 (/search/jql, /issue/<key> with renderedFields,
 its transitions, its children) and the writes the pages make (a comment, labels, a transition), kept in memory
 so the next read shows them. Scratch data only. Point a run-app host at it with a scratch
-AGENTS_PERSONAL_HOME whose .agents-secrets/secrets.env says
+AGENTS_PERSONAL_HOME whose secrets (a .agents-secrets/secrets.env that the host moves into its
+sealed store at start, #4177) say
 
     JIRA_URL=http://127.0.0.1:<port>
     JIRA_EMAIL=walk@example.com

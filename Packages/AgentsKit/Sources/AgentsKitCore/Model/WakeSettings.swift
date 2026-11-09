@@ -73,6 +73,15 @@ public enum WakeWords {
         return "Until \(day), \(time)"
     }
 
+    /// Sleep's footer for its two runtime pickers (#4066), as the web page's `sleepFooter` says it: the warm
+    /// pool keeps a finished runtime 10 minutes (#4044), one with background processes the hours chosen.
+    public static func runtimesFooter(backgroundHours: Int) -> String {
+        let hours = backgroundHours == 1 ? "1 hour" : "\(backgroundHours) hours"
+        return "The sessions you are most likely to reply to keep their agent running for 10 minutes after their "
+            + "turn ends, so the reply starts at once. An agent whose background processes still run (a dev server, "
+            + "a build, a watcher) is kept for \(hours), then ended with them. Neither keeps the Mac awake."
+    }
+
     /// The sidebar row while the hold is for the power, not for an agent (#992).
     public static let onPowerLine = "Awake while on power"
 

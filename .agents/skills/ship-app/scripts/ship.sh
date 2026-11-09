@@ -1,14 +1,16 @@
 #!/bin/zsh
-# Build main and install Agents Host, the Mac window and the Remote.
+# Build main and install Agents (the Mac window and this Mac's host, one app since #4225)
+# and the Remote.
 #
-# The Mac install runs by default. Pass --no-mac to leave Agents Host, the window and the
-# login-item jobs alone. A development run and a merge wave do not run this script.
+# The Mac install runs by default. Pass --no-mac to leave Agents and the login-item jobs
+# alone. A development run and a merge wave do not run this script.
 #
-# Agents Host is swapped in at ~/Applications/Agents Host.app, where its Login Items point,
-# and launchd restarts both jobs from it. The window runs from a copy in
-# ~/Applications/AgentsLive/<sha>-<time>/, never from build/DD-store: every build in the
-# main checkout writes over that. The relaunch is this file detached (`--restart`), because
-# the host it restarts is usually the one running the session that started it.
+# Agents is swapped in at ~/Applications/Agents.app, where its Login Items point, and launchd
+# restarts both jobs from it. It is staged in ~/Applications/AgentsLive/<sha>-<time>/ first,
+# never moved from build/DD-host: every build in the main checkout writes over that. The
+# relaunch is this file detached (`--restart`), because the host it restarts is usually the
+# one running the session that started it. Agents Host's copy (~/Applications/Agents
+# Host.app) and the App Store window's (a live copy) go, the first time.
 #
 # A device install is detached the same way (`--install-device`), one per device, and does
 # not wait on or delay the Mac relaunch: a locked phone or a flaky connection retries every
@@ -24,7 +26,7 @@
 #   ship.sh                 install the Mac apps and Remote (the default)
 #   ship.sh --no-mac        skip the Mac install and restart
 #   ship.sh --install-mac   accepted as an alias for the default
-#   ship.sh --no-build      reuse build/DD-host, build/DD-store and build/DD-ios as they are
+#   ship.sh --no-build      reuse build/DD-host and build/DD-ios as they are
 #   ship.sh --no-linux      skip rebuilding the Linux hosts in App/Resources/servers
 #   ship.sh --no-devices    skip the iPhone/iPad
 #   ship.sh --device UDID   only this device (repeatable)
@@ -33,7 +35,7 @@
 #                           nothing is built or installed
 #   ship.sh --build-only    build in this checkout (a worktree's copy builds the worktree),
 #                           check the products are optimised, and stop: nothing is installed
-#   ship.sh --check-host    say which copies of Agents Host macOS knows and whether the jobs
+#   ship.sh --check-host    say which copies of Agents macOS knows and whether the jobs
 #                           run from the installed one; nothing is changed (#3451)
 #
 # The jobs name their app by bundle id only, so launchd can start them from any copy that
@@ -47,10 +49,12 @@
 set -u
 setopt pipefail
 
-HOSTAPP_AT=$HOME/Applications/"Agents Host.app"
+HOSTAPP_AT=$HOME/Applications/Agents.app
+# Where Agents Host was installed before it became Agents (#4225).
+OLD_HOSTAPP_AT=$HOME/Applications/"Agents Host.app"
 ROOT="$HOME/Library/Application Support/Agents"
 GUI=gui/$(id -u)
-# Agents Host's two jobs.
+# Agents' two jobs.
 HOST_JOBS=(com.alexecollins.agentshost.control com.alexecollins.agentshost.daemon)
 STORE_ID=com.alexecollins.agents.store
 HOST_ID=com.alexecollins.agents.host
@@ -58,7 +62,6 @@ LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchSe
 
 loaded() { launchctl print $GUI/$1 >/dev/null 2>&1 }
 job_pid() { launchctl print $GUI/$1 2>/dev/null | awk '/^\tpid = /{print $3; exit}' }
-any_loaded() { local j; for j in "$@"; do loaded $j && return 0; done; return 1 }
 # "pid bundle" for each app running from a live copy with this bundle id.
 live_apps() {
   local pid cmd bundle
@@ -69,7 +72,7 @@ live_apps() {
     done
 }
 
-# Every copy of Agents Host that LaunchServices has, also ones that are gone.
+# Every copy of Agents that LaunchServices has, also ones that are gone.
 host_copies() {
   $LSREGISTER -dump Bundle 2>/dev/null | awk -v id=$HOST_ID '
     /^-----/ { path = "" }
@@ -171,35 +174,30 @@ restart() { # live-folder sha delay
     PATH=/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin LANG=en_US.UTF-8)
   local pid cmd j
 
-  # Agents Host: the new bundle in place of the old, then launchd starts each job again
-  # from it. Its window, if open, is reopened on the new build.
-  local HOSTUI=0
+  # Agents: the new bundle in place of the old, then launchd starts each job again from it,
+  # and the window opens on the new build. Agents Host's copy goes aside as an old one does.
   # By exact command line: a grep for the path would find the grep itself.
   ps -axww -o pid=,command= | while read -r pid cmd; do
-    [[ $cmd == "$HOSTAPP_AT/Contents/MacOS/Agents Host" ]] || continue
-    echo "quitting Agents Host window $pid"; HOSTUI=1; kill -TERM $pid
+    [[ $cmd == "$HOSTAPP_AT/Contents/MacOS/Agents Host" || $cmd == "$OLD_HOSTAPP_AT/Contents/MacOS/Agents Host" ]] || continue
+    echo "quitting Agents $pid"; kill -TERM $pid
   done
-  if [[ -d $HOSTAPP_AT ]]; then
-    mkdir -p $HOME/Applications/AgentsLive
-    mv "$HOSTAPP_AT" "$HOME/Applications/AgentsLive/host-before-$SHA-$(date +%H%M%S).app"
-  fi
-  mv "$LIVE/Agents Host.app" "$HOSTAPP_AT"
-  echo "$(date) Agents Host $SHA at $HOSTAPP_AT"
+  mkdir -p $HOME/Applications/AgentsLive
+  local before
+  for before in $HOSTAPP_AT $OLD_HOSTAPP_AT; do
+    [[ -d $before ]] && mv "$before" "$HOME/Applications/AgentsLive/host-before-$SHA-$(date +%H%M%S)-${before:t:r:gs/ /-/}.app"
+  done
+  mv "$LIVE/Agents.app" "$HOSTAPP_AT"
+  echo "$(date) Agents $SHA at $HOSTAPP_AT"
   only_installed_host
   restart_host_jobs
-  if (( HOSTUI )) || ! any_loaded $HOST_JOBS; then
-    $CLEAN open "$HOSTAPP_AT"
-    echo "opened Agents Host"
-  fi
 
-  # The window: quit the store build's, open the new one. It finds the control plane
-  # with the pairing in its container.
+  # The App Store window, from before #4225: the one app is the window now.
   live_apps $STORE_ID | while read -r pid cmd; do
-    echo "quitting window $pid"; kill -TERM $pid
+    echo "quitting the App Store window $pid"; kill -TERM $pid
     for i in {1..50}; do kill -0 $pid 2>/dev/null || break; sleep 0.2; done
   done
-  echo "$(date) opening window $SHA"
-  $CLEAN open "$LIVE/Agents.app"
+  echo "$(date) opening Agents $SHA"
+  $CLEAN open "$HOSTAPP_AT"
 
   sleep 8
   local wrong=0
@@ -213,7 +211,7 @@ restart() { # live-folder sha delay
     pid=$(job_pid $j)
     [[ -n $pid ]] && echo "$j CLAUDE vars: $(ps eww -p $pid | tr ' ' '\n' | grep -c ^CLAUDE)"
   done
-  echo "window: $(ps -axww -o pid=,command= | grep -E "^ *[0-9]+ $LIVE/Agents.app/Contents/MacOS/Agents$")"
+  echo "window: $(ps -axww -o pid=,command= | grep -F "$HOSTAPP_AT/Contents/MacOS/Agents Host" | grep -v -e --launch -e grep)"
 
   # Earlier copies nothing runs from any more. The daemon keeps its own copy of the
   # helper in the root, so no agent needs these.
@@ -224,8 +222,8 @@ restart() { # live-folder sha delay
     echo "removing $old"; rm -rf "$old"
   done
   if (( wrong )); then
-    echo "$(date) FAILED: Agents Host's jobs do not run from $HOSTAPP_AT (#3451); see ship.sh --check-host"
-    osascript -e 'display notification "Its jobs run from another copy. See /tmp/main-restart-all-'$SHA'.log" with title "Agents Host did not restart from the installed app"' 2>/dev/null
+    echo "$(date) FAILED: Agents' jobs do not run from $HOSTAPP_AT (#3451); see ship.sh --check-host"
+    osascript -e 'display notification "Its jobs run from another copy. See /tmp/main-restart-all-'$SHA'.log" with title "Agents did not restart from the installed app"' 2>/dev/null
     exit 1
   fi
   echo "$(date) done"
@@ -351,8 +349,7 @@ fi
 SHA=$(git -C "$REPO" rev-parse --short HEAD)
 LOGS=/tmp/ship-app-$SHA; (( BUILD_ONLY )) && LOGS+=-build-only; mkdir -p $LOGS
 CONFIG=Live
-HOSTAPP=$REPO/build/DD-host/Build/Products/$CONFIG/"Agents Host.app"
-STOREAPP=$REPO/build/DD-store/Build/Products/$CONFIG/Agents.app
+HOSTAPP=$REPO/build/DD-host/Build/Products/$CONFIG/Agents.app
 IOSAPP=$REPO/build/DD-ios/Build/Products/$CONFIG-iphoneos/Agents.app
 echo "$( (( BUILD_ONLY )) && echo "build only, $REPO" || echo "main, $REPO") $SHA  logs $LOGS"
 if [[ -n $(git -C "$REPO" --no-optional-locks status --porcelain --untracked-files=no) ]]; then
@@ -402,11 +399,10 @@ if (( BUILD )); then
   # of its own; packages and compiled outputs come from the shared build cache.
   run xcodegen xcodegen generate
   if (( MAC )); then
-    # The Linux hosts a server is given, which Agents Host carries and its control plane
+    # The Linux hosts a server is given, which Agents carries and its control plane
     # serves: gitignored build outputs, so stale until rebuilt here.
     (( LINUX )) && run build-linux scripts/build-linux-agentsd.sh
     run build-host scripts/build-cache.sh xcodebuild -scheme AgentsHost -configuration $CONFIG -destination 'platform=macOS' -derivedDataPath build/DD-host $XFLAGS build
-    run build-window scripts/build-cache.sh xcodebuild -scheme AgentsStore -configuration $CONFIG -destination 'platform=macOS' -derivedDataPath build/DD-store $XFLAGS build
   fi
   if (( DEVICES )); then
     run build-ios scripts/build-cache.sh xcodebuild -scheme Remote -configuration $CONFIG -destination 'generic/platform=iOS' -derivedDataPath build/DD-ios -allowProvisioningUpdates $XFLAGS build
@@ -420,7 +416,7 @@ debug_parts() { # bundle...
   for b in "$@"; do [[ -d $b ]] && find "$b" \( -name '*.debug.dylib' -o -name '__preview.dylib' \) -print; done
 }
 typeset -a BUILT
-(( MAC )) && BUILT+=("$HOSTAPP" "$STOREAPP")
+(( MAC )) && BUILT+=("$HOSTAPP")
 (( DEVICES )) && BUILT+=("$IOSAPP")
 if [[ -n $(debug_parts $BUILT) ]]; then
   echo "these builds are not optimised (Debug parts in them); not shipping:" >&2
@@ -444,19 +440,18 @@ if (( DEVICES )); then
 fi
 
 if (( MAC )); then
-  [[ -d $HOSTAPP && -d $STOREAPP ]] || { echo "no Mac build in $REPO/build/DD-host and build/DD-store" >&2; exit 1; }
+  [[ -d $HOSTAPP ]] || { echo "no Mac build in $REPO/build/DD-host" >&2; exit 1; }
   if ps -axww -o command= | grep -E -q '[s]hip\.sh --restart|[m]ain-restart-all-.*\.sh'; then
     echo "another session's restart is already pending: $(ps -axww -o command= | grep -E '[s]hip\.sh --restart|[m]ain-restart-all-')" >&2
     echo "not queueing a second one" >&2; exit 1
   fi
   # A folder of its own each time, never written again: what is running is never
-  # what a build or a later ship is writing. Agents Host moves on from here into place.
+  # what a build or a later ship is writing. Agents moves on from here into place.
   LIVE=$HOME/Applications/AgentsLive/$SHA-$(date +%Y%m%d-%H%M%S)
   mkdir -p $LIVE.partial
-  ditto $STOREAPP $LIVE.partial/Agents.app && ditto $HOSTAPP "$LIVE.partial/Agents Host.app" \
+  ditto $HOSTAPP $LIVE.partial/Agents.app \
     && codesign --verify --deep --strict $LIVE.partial/Agents.app 2>/dev/null \
-    && codesign --verify --deep --strict "$LIVE.partial/Agents Host.app" 2>/dev/null \
-    && ! codesign -dv "$LIVE.partial/Agents Host.app/Contents/Helpers/agentsd" 2>&1 | grep -q 'TeamIdentifier=not set' \
+    && ! codesign -dv "$LIVE.partial/Agents.app/Contents/Helpers/agentsd" 2>&1 | grep -q 'TeamIdentifier=not set' \
     || { echo "the Mac builds are not signed by the team (built with CODE_SIGNING_ALLOWED=NO?); rebuild without --no-build" >&2
          rm -rf $LIVE.partial; exit 1; }
   mv $LIVE.partial $LIVE

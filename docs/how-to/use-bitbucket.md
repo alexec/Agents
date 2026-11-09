@@ -75,7 +75,7 @@ The set-up adds it for you. To add it to another folder:
 3. It asks for nothing: it reads the Bitbucket connection. Without a connection, name your
    token by hand in the entry's `env` in `.agents/mcp.json`: `"BITBUCKET_TOKEN":
    "${BITBUCKET_TOKEN}"` (and `"BITBUCKET_EMAIL": "${BITBUCKET_EMAIL}"` for an API token),
-   with the values in your own `~/.agents-secrets/secrets.env`, never in `mcp.json`.
+   with the values in your own secrets (**Settings ▸ You ▸ Secrets**), never in `mcp.json`.
    `BITBUCKET_TOKEN`, when it is set, is used before the connection.
 
 The connector finds the repository from the folder's git remote (`origin` first). A tool or

@@ -47,7 +47,7 @@ RUNS=${RUNS:-3}
 # Budgets in ms, for a Debug build on this Mac.
 B_WINDOW=1500; B_LIST=2000; B_SWITCH=150; B_CHAT=500
 
-pid_of() { pgrep -f "Agents.app/Contents/MacOS/Agents --walk run-$SLUG( |$)" | head -1 || true; }
+pid_of() { pgrep -f "Agents.app/Contents/MacOS/Agents( Host)? --walk run-$SLUG( |$)" | head -1 || true; }
 perf_lines() { /usr/bin/log show --last "${2:-2m}" --style compact \
   --predicate "processID == $1 AND category == \"perf\"" 2>/dev/null | grep -o 'perf .*' || true; }
 median() { sort -n | awk '{a[NR]=$1} END {if (NR==0) print "-"; else print a[int((NR+1)/2)]}'; }

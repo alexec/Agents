@@ -229,7 +229,7 @@ class Video:
         self.client = Client(self.root)
         # Agents call the person by the Mac account's first name; on camera it is a made-up one.
         self.rpc("person/set", {"name": "Sam"})
-        self.host_app = REPO / "build/DD/Build/Products/Debug/Agents Host.app"
+        self.host_app = REPO / "build/DD/Build/Products/Debug/Agents.app"
         self.stopping = False
         threading.Thread(target=self._permissions, daemon=True).start()
 
@@ -420,7 +420,7 @@ class Video:
 
     def opened_url(self):
         """The address Open in Browser wrote, in place of opening a browser (#109)."""
-        path = (Path.home() / "Library/Containers/com.alexecollins.agents.store/Data/Library/Application Support"
+        path = (Path.home() / "Library/Application Support"
                 / f"Agents/walks/run-vid-{self.scene.ID}/opened-url")
         return path.read_text().strip() if path.exists() else None
 

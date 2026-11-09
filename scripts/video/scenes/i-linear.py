@@ -195,7 +195,7 @@ def run(v):
     v.press("Open")  # the project's row: its Connectors page, Tasks first
     v.press("Linear…")
     v.sleep(v.takes["connect"]["duration"])
-    hand_off = Path.home() / "Library/Containers/com.alexecollins.agents.store/Data/Library/Application Support" \
+    hand_off = Path.home() / "Library/Application Support" \
         / f"Agents/walks/run-vid-{v.scene.ID}/sign-in.json"
     hand_off.unlink(missing_ok=True)
     v.press("=Continue on linear.app")

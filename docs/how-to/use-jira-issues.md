@@ -37,7 +37,7 @@ page, choose **Connect Jira…** in the Tasks slot or on **Settings ▸ You ▸ 
 - **Atlassian Cloud** signs in on atlassian.com, where you choose the site. The machine keeps
   the token and renews it. Atlassian has no public apps, so the machine needs the Agents app's
   client ID and secret from the Atlassian developer console, in your
-  `~/.agents-secrets/secrets.env` as `ATLASSIAN_CLIENT_ID` and `ATLASSIAN_CLIENT_SECRET`. The
+  secrets (**Settings ▸ You ▸ Secrets**) as `ATLASSIAN_CLIENT_ID` and `ATLASSIAN_CLIENT_SECRET`. The
   app has the callback `https://oauth.agentloops.dev/oauth/callback` and these scopes:
   `read:jira-work`, `read:jira-user`, `read:confluence-content.all`,
   `read:confluence-space.summary`, `search:confluence`, `read:me` and `offline_access`. Without
@@ -67,7 +67,7 @@ Add Atlassian's own server from the registry, or by hand with the URL
    ```
 
    **Without the connection**, give the server a token by hand. It goes before the connection.
-   Keep the values in `~/.agents-secrets/secrets.env`, and name them in the entry:
+   Keep the values in your secrets (**Settings ▸ You ▸ Secrets**), and name them in the entry:
 
    ```json
    { "mcpServers": { "jira": { "command": "jira-mcp", "hosted": true,

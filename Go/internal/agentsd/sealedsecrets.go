@@ -1,6 +1,7 @@
 package agentsd
 
 import (
+	"cmp"
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
@@ -40,13 +41,14 @@ import (
 //
 // The associated data binds where it is kept, its name, the flag and its grants (#4015's
 // "Allow always" places), so a record moved or changed by hand does not open. Turning the
-// flag on takes the plain line out, turning it off puts it back.
+// flag on or off seals the record again, with the other flag.
 //
 // The store also keeps secrets with the flag off (#4176, the spike #4168): the machine's
 // seal only, with no release layer on Linux, so one opens with no approval and a Linux
 // machine with no control plane keeps it. agentsd opens them once each time the store
-// changes and keeps the values in its memory (plainStoreSecrets); every reader of
-// secrets.env reads them first.
+// changes and keeps the values in its memory (plainStoreSecrets). Since #4177 every write
+// goes to the store, and agentsd moves a secrets.env it finds at start (MoveSecretsFile);
+// the readers read one not moved yet after the store.
 //
 //	~/.agents-secrets/sealed.json   0600, {"v":1,"secrets":{NAME:{sealed,grants,noAsk,from,setAt}}}
 //	sessions/<agent>.json           a session's flagged secret, its "sealed" in place of "value"
@@ -406,8 +408,8 @@ func (d *Daemon) localSecret(agent wire.UUID, name string) (value string, ok, ex
 	return v, ok, expired
 }
 
-// saveSealedSecret keeps value in sealed.json, and out of secrets.env: flagged when ask, else
-// with the flag off (#4176). Grants already made for that name are kept: a new value is not
+// saveSealedSecret keeps value in sealed.json, the only place for a person's secrets (#4177),
+// and out of any secrets.env not moved yet: flagged when ask, else with the flag off (#4176). Grants already made for that name are kept: a new value is not
 // a new place.
 func (d *Daemon) saveSealedSecret(home, name, value, from string, ask bool) error {
 	d.sealedSecretsMu.Lock()
@@ -432,80 +434,222 @@ func (d *Daemon) saveSealedSecret(home, name, value, from string, ask bool) erro
 		return errors.New("sealed.json could not be written")
 	}
 	// The plain line goes after the sealed one is kept: never neither.
-	return removePlainSecret(home, name)
+	return removePlainSecrets(home, name)
 }
 
-// removeSealedSecret takes a flagged one out, as the plain line it replaces is.
-func (d *Daemon) removeSealedSecret(home, name string) error {
+// setPlainSecrets keeps each of values in sealed.json with the flag off (#4177), in one
+// write, and takes their lines out of any secrets.env. A name kept with the flag on stays
+// flagged, with its grants, and takes the new value: a write that is not the flag's own
+// never turns Ask before use off.
+func (d *Daemon) setPlainSecrets(home string, values map[string]string, from string) error {
+	if len(values) == 0 {
+		return nil
+	}
 	d.sealedSecretsMu.Lock()
 	defer d.sealedSecretsMu.Unlock()
 	f := readSealedSecrets(home)
-	if _, ok := f.Secrets[name]; !ok {
-		return nil
+	if f.Secrets == nil {
+		f.Secrets = map[string]sealedValue{}
 	}
-	delete(f.Secrets, name)
-	return writeSealedSecrets(home, f)
+	names := make([]string, 0, len(values))
+	for name, value := range values {
+		var s sealedValue
+		var err error
+		had, ok := f.Secrets[name]
+		if ok && !had.NoAsk {
+			s, err = d.sealSecret(sealedLocal, name, value, had.Grants)
+		} else {
+			s, err = d.sealPlainSecret(sealedLocal, name, value)
+		}
+		if err != nil {
+			return fmt.Errorf("%s could not be sealed: %w", name, err)
+		}
+		s.From = cmp.Or(from, had.From)
+		f.Secrets[name] = s
+		names = append(names, name)
+	}
+	if err := writeSealedSecrets(home, f); err != nil {
+		return errors.New("sealed.json could not be written")
+	}
+	return removePlainSecrets(home, names...)
 }
 
-func removePlainSecret(home, name string) error {
+// forgetPlainSecret takes out name with the flag off: its record in sealed.json and any line
+// in secrets.env. One with the flag on stays.
+func (d *Daemon) forgetPlainSecret(home, name string) error {
+	d.sealedSecretsMu.Lock()
+	f := readSealedSecrets(home)
+	var err error
+	if s, ok := f.Secrets[name]; ok && s.NoAsk {
+		delete(f.Secrets, name)
+		if writeSealedSecrets(home, f) != nil {
+			err = errors.New("sealed.json could not be written")
+		}
+	}
+	d.sealedSecretsMu.Unlock()
+	if err != nil {
+		return err
+	}
+	return removePlainSecrets(home, name)
+}
+
+// MoveSecretsFile moves a secrets.env it finds into sealed.json, at each start (#4177, the
+// spike #4168's answer 5): each line is sealed with the flag off, the store is written
+// safely, and then the file goes. A name the store keeps already keeps the store's record,
+// which every reader read first (#4176). A start that stops between the two writes does the
+// move again, with the same result. The file is left as it is when it does not read or this
+// machine's key does not, and the readers still read it until the next start moves it.
+func (d *Daemon) MoveSecretsFile() {
+	home := d.personalHome()
+	if home == "" {
+		return
+	}
+	path := skillcatalog.SecretsPath(home)
+	if _, err := os.Lstat(path); err != nil {
+		return
+	}
+	n, err := d.moveSecretsFile(home, path)
+	if err != nil {
+		log.Printf("sealed secrets: %s was not moved into sealed.json: %v", path, err)
+		return
+	}
+	log.Printf("sealed secrets: moved %d secrets from %s into sealed.json, and removed the file", n, path)
+	d.mcpChanged()
+}
+
+func (d *Daemon) moveSecretsFile(home, path string) (int, error) {
+	env, err := skillcatalog.LoadSecretsForChange(path)
+	if err != nil {
+		return 0, err
+	}
+	d.sealedSecretsMu.Lock()
+	defer d.sealedSecretsMu.Unlock()
+	f := readSealedSecrets(home)
+	if f.Secrets == nil {
+		f.Secrets = map[string]sealedValue{}
+	}
+	moved := 0
+	for _, name := range env.Names() {
+		if _, kept := f.Secrets[name]; kept {
+			continue
+		}
+		value, _ := env.Value(name)
+		s, err := d.sealPlainSecret(sealedLocal, name, value)
+		if err != nil {
+			return 0, fmt.Errorf("%s could not be sealed: %w", name, err)
+		}
+		f.Secrets[name] = s
+		moved++
+	}
+	if moved > 0 {
+		if err := writeSealedSecrets(home, f); err != nil {
+			return 0, errors.New("sealed.json could not be written")
+		}
+	}
+	// The file goes after the store is kept: never neither.
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return 0, err
+	}
+	return moved, nil
+}
+
+// removePlainSecrets takes names out of a secrets.env that has not been moved yet.
+func removePlainSecrets(home string, names ...string) error {
 	path := skillcatalog.SecretsPath(home)
 	env, err := skillcatalog.LoadSecretsForChange(path)
 	if err != nil {
 		return err
 	}
-	if !env.IsSet(name) {
+	if !slices.ContainsFunc(names, env.IsSet) {
 		return nil
 	}
-	env.Remove(name)
+	for _, name := range names {
+		env.Remove(name)
+	}
 	if err := env.Save(path); err != nil {
 		return errors.New("secrets.env could not be written")
 	}
 	return nil
 }
 
-// syncUserSealed keeps the flagged secrets of the person's (Settings ▸ You ▸ Secrets) (#4014): each one sent flagged is sealed
-// here, one sent plain loses any sealed copy, and one the sync sealed before and no longer
-// sends goes. kept are names whose newer version here stays as it is.
-func (d *Daemon) syncUserSealed(home string, flagged, plain []wire.UserSecret, kept []string) error {
+// syncUserSecrets keeps the secrets of the person's (Settings ▸ You ▸ Secrets) in sealed.json
+// (#4014, #4177): each one sent is sealed here, flagged or with the flag off as sent, and
+// one the control plane sent before (before) or the sync sealed before, and no longer sends,
+// goes. kept are names whose newer version here stays as it is. A secret the person set here
+// by hand, under a name the control plane never sent, is left alone. It gives the names now
+// from the control plane.
+func (d *Daemon) syncUserSecrets(home string, plain, flagged []wire.UserSecret, before, kept []string) ([]string, error) {
+	if len(plain) == 0 && len(flagged) == 0 && len(before) == 0 && len(kept) == 0 {
+		return []string{}, nil
+	}
+	if home == "" {
+		return nil, errors.New("this machine has no personal home")
+	}
 	d.sealedSecretsMu.Lock()
 	defer d.sealedSecretsMu.Unlock()
 	f := readSealedSecrets(home)
-	before := len(f.Secrets)
 	if f.Secrets == nil {
 		f.Secrets = map[string]sealedValue{}
 	}
+	names := []string{}
 	sent := map[string]bool{}
-	changed := false
-	for _, s := range flagged {
+	seal := func(s wire.UserSecret, ask bool) error {
 		name := string(s.Name)
-		if !secretNameHere.MatchString(name) {
-			continue
+		if !secretNameHere.MatchString(name) || strings.ContainsAny(s.Value, "\n\r\x00") {
+			return nil
 		}
-		sealed, err := d.sealSecret(sealedLocal, name, s.Value, f.Secrets[name].Grants)
+		var sealed sealedValue
+		var err error
+		if ask {
+			sealed, err = d.sealSecret(sealedLocal, name, s.Value, f.Secrets[name].Grants)
+		} else {
+			sealed, err = d.sealPlainSecret(sealedLocal, name, s.Value)
+		}
 		if err != nil {
 			return fmt.Errorf("%s could not be sealed: %w", name, err)
 		}
 		sealed.From = sealedFromUser
 		f.Secrets[name] = sealed
 		sent[name] = true
-		changed = true
-	}
-	for _, s := range plain {
-		if _, ok := f.Secrets[string(s.Name)]; ok {
-			delete(f.Secrets, string(s.Name))
-			changed = true
-		}
-	}
-	for name, s := range f.Secrets {
-		if s.From == sealedFromUser && !sent[name] && !slices.Contains(kept, name) {
-			delete(f.Secrets, name)
-			changed = true
-		}
-	}
-	if !changed && before == len(f.Secrets) {
+		names = append(names, name)
 		return nil
 	}
-	return writeSealedSecrets(home, f)
+	for _, s := range plain {
+		if err := seal(s, false); err != nil {
+			return nil, err
+		}
+	}
+	for _, s := range flagged {
+		if err := seal(s, true); err != nil {
+			return nil, err
+		}
+	}
+	for _, name := range kept {
+		if !sent[name] {
+			sent[name] = true
+			names = append(names, name)
+		}
+	}
+	gone := slices.Clone(before)
+	for name, s := range f.Secrets {
+		if s.From == sealedFromUser {
+			gone = append(gone, name)
+		}
+	}
+	for _, name := range gone {
+		if !sent[name] {
+			delete(f.Secrets, name)
+		}
+	}
+	if err := writeSealedSecrets(home, f); err != nil {
+		return nil, errors.New("sealed.json could not be written")
+	}
+	// The plain lines go after the sealed ones are kept: never neither.
+	if err := removePlainSecrets(home, append(names, before...)...); err != nil {
+		return nil, err
+	}
+	sort.Strings(names)
+	return names, nil
 }
 
 // setNeedsApproval is secrets/setNeedsApproval: a person's client turns the flag on or off.
@@ -552,18 +696,8 @@ func (d *Daemon) setNeedsApproval(r wire.SecretNeedsApprovalRequest) error {
 		}
 		return nil
 	}
-	path := skillcatalog.SecretsPath(home)
-	env, err := skillcatalog.LoadSecretsForChange(path)
-	if err != nil {
+	if err := d.saveSealedSecret(home, r.Name, v, "", false); err != nil {
 		return Invalid("%s was not changed: %s", r.Name, err.Error())
-	}
-	env.Set(r.Name, v)
-	if err := env.Save(path); err != nil {
-		return Invalid("%s was not changed: secrets.env could not be written.", r.Name)
-	}
-	// The plain line is written first: never neither.
-	if err := d.removeSealedSecret(home, r.Name); err != nil {
-		return Invalid("%s was not changed: sealed.json could not be written.", r.Name)
 	}
 	log.Printf("sealed secrets: %s turned off Ask before use", r.Name)
 	d.mcpChanged()

@@ -408,7 +408,8 @@ extension FocusedValues {
     @Entry var folderWindow: FolderWindowState?
 }
 
-/// The Dock's menu (#1089): each folder, to open in a window of its own; no window tabs (#2384).
+/// The Dock's menu (#1089): each folder, to open in a window of its own; no window tabs (#2384);
+/// and the URLs the app is opened with (#4225).
 final class AgentsAppDelegate: NSObject, NSApplicationDelegate {
     /// The app's model, handed over when the app starts.
     @MainActor static weak var model: AppModel?
@@ -419,6 +420,14 @@ final class AgentsAppDelegate: NSObject, NSApplicationDelegate {
     /// they left a blank row at its end (#2384).
     @MainActor func applicationWillFinishLaunching(_ notification: Notification) {
         NSWindow.allowsAutomaticWindowTabbing = false
+    }
+
+    /// What takes a URL the app is opened with: agents-host://pair, from frame K2, which the
+    /// host's scenes set (#4225). A `Window` scene is never handed a URL by `onOpenURL`.
+    @MainActor static var opened: ((URL) -> Void)?
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        MainActor.assumeIsolated { urls.forEach { Self.opened?($0) } }
     }
 
     @MainActor func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {

@@ -9396,6 +9396,11 @@
     {
       "name": "wake/set",
       "x-capability": "wake/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -9416,6 +9421,11 @@
     {
       "name": "wake/settings",
       "x-capability": "wake/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {

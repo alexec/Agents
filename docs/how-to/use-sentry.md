@@ -53,7 +53,7 @@ that saw it (#3585).
    - `SENTRY_URL`: leave it out for sentry.io in the US. Use `https://de.sentry.io` for the
      EU, or your own Sentry's address.
 
-   The values go in your own `~/.agents-secrets/secrets.env`, never in `mcp.json`.
+   The values go in your own secrets (**Settings ▸ You ▸ Secrets**), never in `mcp.json`.
 
 ## File a bug from a new issue
 

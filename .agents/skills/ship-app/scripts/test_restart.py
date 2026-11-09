@@ -84,8 +84,8 @@ class RestartHostJobs(unittest.TestCase):
         self.tmp = pathlib.Path(tempfile.mkdtemp(prefix="ship-restart-test-"))
         self.home = self.tmp / "home"
         self.fake = self.tmp / "fake"
-        self.installed = self.home / "Applications" / "Agents Host.app"
-        self.dev = self.tmp / "checkout" / "build" / "DD-host" / "Build" / "Products" / "Live" / "Agents Host.app"
+        self.installed = self.home / "Applications" / "Agents.app"
+        self.dev = self.tmp / "checkout" / "build" / "DD-host" / "Build" / "Products" / "Live" / "Agents.app"
         for app in (self.installed, self.dev):
             (app / "Contents" / "Helpers").mkdir(parents=True)
         write(self.installed / "Contents" / "MacOS" / "Agents Host", HOST, 0o755)

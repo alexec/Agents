@@ -242,7 +242,7 @@ it is merged. **Work at Once** also holds the project's limits on agents that ot
 [Add a skill from a catalogue](../how-to/add-a-skill-from-a-catalogue.md).
 
 A folder's connectors (MCP servers) live in `.agents/mcp.json`, on that same page. The file is committed, so it names each secret as `${NAME}` and never
-holds the value. Each person sets their own in `~/.agents-secrets/secrets.env`, a folder apart from `~/.agents` and readable only by them, because `~/.agents` is settings a person may copy or commit and a secret is not. A connector added from
+holds the value. Each person sets their own, kept sealed in `~/.agents-secrets/sealed.json`, a folder apart from `~/.agents` and readable only by them, which only agentsd opens, because `~/.agents` is settings a person may copy or commit and a secret is not. A connector added from
 the sheet is approved as it goes in. One that arrives with a pull waits, marked **waiting
 for your OK**, until you choose **Approve**; no agent is given it before that. Where you and
 the folder both have a connector of the same name, agents in the folder get the folder's. A

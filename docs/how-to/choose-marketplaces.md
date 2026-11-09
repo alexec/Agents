@@ -42,10 +42,10 @@ What you turn off is saved in `~/.agents/marketplaces.json` as `off`.
    - for connectors, a file on this machine instead: choose **A file on this machine** and
      type its path, such as `~/team/connectors.json`. See [A marketplace that is a file](#a-marketplace-that-is-a-file).
 3. If the registry needs a token, type a name for it, such as `ACME_MCP_TOKEN`, and the
-   token. The value goes into `~/.agents-secrets/secrets.env` and is never shown again. The app
+   token. The value is sealed in `~/.agents-secrets/sealed.json` and is never shown again. The app
    sends it as `Authorization: Bearer …` to that address only.
 4. Choose **Add**. It is in the menu at once, and saved in `~/.agents/marketplaces.json`.
-   **Remove** takes it out again. The token's value stays in `secrets.env`.
+   **Remove** takes it out again. The token's value stays in your secrets.
 
 A skills repository can be private: the app reads a private one through `gh`, so it works
 when `gh` is signed in on this Mac with access to the repository, and says the repository
@@ -67,7 +67,7 @@ same shape:
 
 `format` is `mcp-registry`, `skills.sh`, `github-skills` or `file`. They are listed when the sheet
 adds to that folder, marked **folder**, and they start **off**. A committed file could
-otherwise send a token from your `secrets.env` to any address it names. Turn one on, and
+otherwise send a token from your secrets to any address it names. Turn one on, and
 that choice is saved as `on` in your own `~/.agents/marketplaces.json`, not in the folder.
 Edit the folder's list in the file itself.
 
@@ -95,7 +95,7 @@ marketplace, carried by the host, does that.
 
 ## If something is wrong
 
-- **TOKEN not set** on a row: the token is named, but `secrets.env` has no value for it.
+- **TOKEN not set** on a row: the token is named, but your secrets have no value for it.
   Set it with the app's **Set…** on a connector that uses it, or in the file.
 - **Every marketplace is off**: turn one on in **Manage Marketplaces…**.
 - **marketplaces.json could not be read**: what it adds is left out, and the app writes

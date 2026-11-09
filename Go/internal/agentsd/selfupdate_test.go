@@ -20,7 +20,7 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// Agents Host updates itself (#2178): the release is downloaded and checked, put in place
+// Agents updates itself (#2178): the release is downloaded and checked, put in place
 // only between turns, and refused when its signature or checksum is wrong.
 
 type selfUpdateRig struct {
@@ -32,20 +32,20 @@ type selfUpdateRig struct {
 	told     []wire.SelfUpdate
 }
 
-// newSelfUpdateRig is an Agents Host.app at 0.11.0 in a folder of its own, and a release
+// newSelfUpdateRig is an Agents.app at 0.11.0 in a folder of its own, and a release
 // 0.12.0 served as GitHub serves one.
 func newSelfUpdateRig(t *testing.T, zip []byte) *selfUpdateRig {
 	t.Helper()
 	dir := t.TempDir()
-	r := &selfUpdateRig{app: filepath.Join(dir, "Agents Host.app")}
+	r := &selfUpdateRig{app: filepath.Join(dir, appName)}
 	os.MkdirAll(r.app, 0o755)
 	os.WriteFile(filepath.Join(r.app, "which"), []byte("old"), 0o644)
 	sum := sha256.Sum256(zip)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		switch req.URL.Path {
 		case "/v0.12.0/SHA256SUMS":
-			w.Write([]byte(hex.EncodeToString(sum[:]) + "  Agents-Host-0.12.0.zip\n"))
-		case "/v0.12.0/Agents-Host-0.12.0.zip":
+			w.Write([]byte(hex.EncodeToString(sum[:]) + "  Agents-0.12.0.zip\n"))
+		case "/v0.12.0/Agents-0.12.0.zip":
 			w.Write(zip)
 		default:
 			http.NotFound(w, req)
@@ -57,7 +57,7 @@ func newSelfUpdateRig(t *testing.T, zip []byte) *selfUpdateRig {
 	u.ctx, u.pause = t.Context(), 5*time.Millisecond
 	u.turns = func() int { return int(r.turns.Load()) }
 	u.unpack = func(zip, out string) error {
-		next := filepath.Join(out, "Agents Host.app")
+		next := filepath.Join(out, appName)
 		os.MkdirAll(next, 0o755)
 		return os.WriteFile(filepath.Join(next, "which"), []byte("new"), 0o644)
 	}
@@ -101,7 +101,7 @@ func (r *selfUpdateRig) restarted(t *testing.T) {
 }
 
 func (r *selfUpdateRig) leftovers() []string {
-	m, _ := filepath.Glob(filepath.Join(filepath.Dir(r.app), ".Agents Host.update-*"))
+	m, _ := filepath.Glob(filepath.Join(filepath.Dir(r.app), updateFolderPrefix+"*"))
 	return m
 }
 
@@ -125,7 +125,7 @@ func TestSelfUpdateWaitsForTheTurnToEnd(t *testing.T) {
 		t.Fatalf("%v", r.leftovers())
 	}
 	// One swap, so the app was never missing: the old copy is where the new one was.
-	if m := r.mark(t); m.Old != filepath.Join("new", "Agents Host.app") {
+	if m := r.mark(t); m.Old != filepath.Join("new", appName) {
 		t.Fatalf("not swapped in one step: %+v", m)
 	}
 	if keep, back := r.settle("0.12.0"); len(keep) != 1 || back {
@@ -178,7 +178,7 @@ func TestSelfUpdateWithNoSwapTakesTwoRenames(t *testing.T) {
 // A cut between the two renames leaves no app; the next start puts the old copy back (#2710).
 func TestSelfUpdateCutBetweenRenamesPutsTheOldCopyBack(t *testing.T) {
 	r := newSelfUpdateRig(t, []byte("zip"))
-	work := filepath.Join(filepath.Dir(r.app), ".Agents Host.update-cut")
+	work := filepath.Join(filepath.Dir(r.app), updateFolderPrefix+"cut")
 	os.MkdirAll(work, 0o755)
 	if err := writeSelfUpdateMark(work, selfUpdateMarkFile{From: "0.11.0", To: "0.12.0", Old: "old.app"}); err != nil {
 		t.Fatal(err)
@@ -238,7 +238,7 @@ func TestSelfUpdateRollsBackACopyThatDoesNotStayUp(t *testing.T) {
 func TestSelfUpdateStartTakesAwayWhatItNoLongerNeeds(t *testing.T) {
 	r := newSelfUpdateRig(t, []byte("zip"))
 	r.updated(t)
-	os.MkdirAll(filepath.Join(filepath.Dir(r.app), ".Agents Host.update-cut", "new"), 0o755)
+	os.MkdirAll(filepath.Join(filepath.Dir(r.app), updateFolderPrefix+"cut", "new"), 0o755)
 	if keep, back := r.settle("0.11.0"); len(keep) != 0 || back || len(r.leftovers()) != 0 {
 		t.Fatalf("%v %v %v", keep, back, r.leftovers())
 	}
@@ -337,13 +337,55 @@ func TestSelfUpdateNeverAsksForAnAdministrator(t *testing.T) {
 }
 
 func TestEnclosingApp(t *testing.T) {
-	if got := enclosingApp("/Users/a/Applications/Agents Host.app/Contents/Helpers/agentsd"); got != "/Users/a/Applications/Agents Host.app" {
+	if got := enclosingApp("/Users/a/Applications/Agents.app/Contents/Helpers/agentsd"); got != "/Users/a/Applications/Agents.app" {
 		t.Fatal(got)
 	}
 	if got := enclosingApp("/usr/local/bin/agentsd"); got != "" {
 		t.Fatal(got)
 	}
-	if sumFor("ABC  x\n"+strings.Repeat("a", 64)+"  Agents-Host-1.0.0.zip\n", "Agents-Host-1.0.0.zip") != strings.Repeat("a", 64) {
+	if sumFor("ABC  x\n"+strings.Repeat("a", 64)+"  Agents-1.0.0.zip\n", "Agents-1.0.0.zip") != strings.Repeat("a", 64) {
 		t.Fatal("sum")
+	}
+}
+
+// Agents Host's copy takes Agents' name once (#4225), and only when nothing else has it.
+func TestTakeNewName(t *testing.T) {
+	dir := t.TempDir()
+	old := filepath.Join(dir, oldAppName)
+	os.MkdirAll(old, 0o755)
+	now, moved := takeNewName(old, os.Rename)
+	if !moved || now != filepath.Join(dir, appName) {
+		t.Fatalf("not renamed: %s %v", now, moved)
+	}
+	if _, err := os.Stat(old); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("the old name is still there")
+	}
+	// The new name: nothing to do.
+	if again, moved := takeNewName(now, os.Rename); moved || again != now {
+		t.Fatalf("renamed again: %s", again)
+	}
+	// Another Agents.app beside it, such as the App Store window: it keeps its name.
+	os.MkdirAll(old, 0o755)
+	if kept, moved := takeNewName(old, os.Rename); moved || kept != old {
+		t.Fatalf("took the name of the app beside it: %s", kept)
+	}
+	// A rename that fails leaves it where it is.
+	os.RemoveAll(now)
+	if kept, moved := takeNewName(old, func(a, b string) error { return errors.New("busy") }); moved || kept != old {
+		t.Fatalf("%s %v", kept, moved)
+	}
+}
+
+// Agents Host's update folder, from an update to the first release named Agents, is still
+// settled from Agents.app (#4225).
+func TestSelfUpdateSettlesAgentsHostsUpdateFolder(t *testing.T) {
+	r := newSelfUpdateRig(t, []byte("zip"))
+	work := filepath.Join(filepath.Dir(r.app), oldUpdateFolderPrefix+"x")
+	os.MkdirAll(filepath.Join(work, "new"), 0o755)
+	if err := writeSelfUpdateMark(work, selfUpdateMarkFile{From: "0.11.0", To: "0.12.0", Old: filepath.Join("new", oldAppName)}); err != nil {
+		t.Fatal(err)
+	}
+	if keep, back := r.settle("0.12.0"); len(keep) != 1 || keep[0] != work || back {
+		t.Fatalf("Agents Host's update folder was not kept for the new copy's first start: %v %v", keep, back)
 	}
 }

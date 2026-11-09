@@ -88,7 +88,7 @@ asks the person whose sign-in email is that email.
    Configuration ▸ Connectors ▸ Add Connector…**, or **Change… ▸ Slack…** in the connectors
    set-up's **Messaging** slot).
 2. It asks for `SLACK_BOT_TOKEN`, the `xoxb-` token, and `SLACK_APP_TOKEN`, the `xapp-`
-   token. Their values go to `~/.agents-secrets/secrets.env`.
+   token. Their values are sealed in `~/.agents-secrets/sealed.json`.
 3. Choose **Add**. The entry it writes runs `slack-mcp` hosted, one copy on the host:
 
    ```json

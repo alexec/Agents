@@ -180,7 +180,7 @@ extension DaemonAPI {
     // MARK: By hand (#305)
 
     /// One env variable or header typed on the sheet. A secret's value goes to the person's
-    /// `secrets.env` as `secretName`, and the entry holds `${secretName}`. An empty secret
+    /// the sealed store as `secretName`, and the entry holds `${secretName}`. An empty secret
     /// value keeps the one already set under that name.
     public struct MCPHandValue: Codable, Hashable, Sendable {
         public var name: String

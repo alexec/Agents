@@ -51,8 +51,8 @@ Add Linear's own server from the registry, or by hand with the URL
    { "mcpServers": { "linear": { "command": "linear-mcp", "hosted": true } } }
    ```
 
-   With a personal API key, put the key in your own `~/.agents-secrets/secrets.env`
-   (`LINEAR_API_KEY=lin_api_…`), not in the folder, and name it in the entry:
+   With a personal API key, put the key in your own secrets
+   (**Settings ▸ You ▸ Secrets**, as `LINEAR_API_KEY`), not in the folder, and name it in the entry:
    `"env": { "LINEAR_API_KEY": "${LINEAR_API_KEY}" }`.
 
 2. In **Project Settings ▸ Agent Configuration ▸ Connectors**, choose **Approve** on

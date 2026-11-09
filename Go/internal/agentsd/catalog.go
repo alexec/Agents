@@ -398,14 +398,12 @@ func (d *Daemon) marketplacesAdd(r wire.MarketplaceAddRequest) (wire.Marketplace
 		t := strings.TrimSpace(*r.Token)
 		token = &t
 		if r.TokenValue != nil && *r.TokenValue != "" {
-			secretsPath := skillcatalog.SecretsPath(d.personalHome())
-			secrets, err := skillcatalog.LoadSecretsForChange(secretsPath)
-			if err != nil {
-				return wire.MarketplacesListAnswer{}, marketplaceRefusal(err.Error())
+			home := d.personalHome()
+			if home == "" {
+				return wire.MarketplacesListAnswer{}, marketplaceRefusal("This machine has no personal home to keep the token in.")
 			}
-			secrets.Set(t, *r.TokenValue)
-			if err := secrets.Save(secretsPath); err != nil {
-				return wire.MarketplacesListAnswer{}, marketplaceRefusal("secrets.env could not be written: " + err.Error())
+			if err := d.setPlainSecrets(home, map[string]string{t: *r.TokenValue}, ""); err != nil {
+				return wire.MarketplacesListAnswer{}, marketplaceRefusal("The token was not kept: " + err.Error())
 			}
 		}
 	}
@@ -420,7 +418,7 @@ func (d *Daemon) marketplacesAdd(r wire.MarketplaceAddRequest) (wire.Marketplace
 }
 
 // marketplacesRemove takes out one of the person's own; the token's value stays in
-// secrets.env, where something else may use it.
+// this machine's store, where something else may use it.
 func (d *Daemon) marketplacesRemove(id string) (wire.MarketplacesListAnswer, error) {
 	path, f, err := d.marketplaceFile()
 	if err != nil {

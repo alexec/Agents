@@ -2,7 +2,15 @@ import AgentsKitCore
 import AppKit
 import SwiftUI
 
+#if STORE_WINDOW
+/// The App Store window's entry, until #4224's removal child deletes that target. The one
+/// app's is `HostEntry` (#4225), which also runs the launchers.
 @main
+enum StoreEntry {
+    static func main() { AgentsApp.main() }
+}
+#endif
+
 struct AgentsApp: App {
     @State private var model = AppModel()
     /// The Dock's menu of folders (#1089).
@@ -88,5 +96,10 @@ struct AgentsApp: App {
         }
         .defaultSize(width: SettingsWindow.size.width, height: SettingsWindow.size.height)
         .windowResizability(.contentMinSize)
+
+        #if !STORE_WINDOW
+        // This Mac's host (#4225): its window and the menu bar item, in the same app.
+        HostScenes()
+        #endif
     }
 }

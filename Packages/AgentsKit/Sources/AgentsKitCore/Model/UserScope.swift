@@ -274,8 +274,8 @@ public enum UserScopeWords {
     public static let thisMacOnly = "This Mac's"
     public static let addSecret = "Add a Secret…"
 
-    public static let secretsFoot = "A secret is sealed in this app to each of your own machines, and goes into ~/.agents-secrets/secrets.env "
-        + "there; the control plane cannot open it. Write ${NAME} for it in an MCP server's env or headers. Nobody can read it back, "
+    public static let secretsFoot = "A secret is sealed in this app to each of your own machines, and only agentsd opens it "
+        + "there; the control plane cannot. Write ${NAME} for it in an MCP server's env or headers. Nobody can read it back, "
         + "you included: to change it, replace it."
 
     /// Under a secret that one of the person's machines has no copy of yet (#3397).
@@ -392,7 +392,7 @@ public struct CardSecret: Codable, Sendable, Hashable {
         return nil
     }
 
-    /// The secret's value: one line of JSON, so it fits a NAME=value line of secrets.env.
+    /// The secret's value: one line of JSON, so it fits one record of the sealed store.
     public var value: String {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]

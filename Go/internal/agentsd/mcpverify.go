@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/url"
 	"regexp"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -460,21 +459,8 @@ func (d *Daemon) mcpAddByHand(r wire.MCPAddByHandRequest) (wire.MCPAddAnswer, er
 		return wire.MCPAddAnswer{}, mcpRefusal(&mcpcatalog.Error{Why: wire.MCPCatalogError{NameTaken: &wire.MCPCatalogErrorNameTaken{Name: name}}})
 	}
 	if len(v.built.newSecrets) > 0 {
-		secretsPath := skillcatalog.SecretsPath(home)
-		env, err := skillcatalog.LoadSecretsForChange(secretsPath)
-		if err != nil {
+		if err := d.setPlainSecrets(home, v.built.newSecrets, ""); err != nil {
 			return wire.MCPAddAnswer{}, mcpRefusal(mcpcatalog.Failed(err.Error()))
-		}
-		keys := make([]string, 0, len(v.built.newSecrets))
-		for k := range v.built.newSecrets {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		for _, k := range keys {
-			env.Set(k, v.built.newSecrets[k])
-		}
-		if err := env.Save(secretsPath); err != nil {
-			return wire.MCPAddAnswer{}, mcpRefusal(mcpcatalog.Failed("secrets.env could not be written"))
 		}
 	}
 	if err := mcpcatalog.Upsert(path, name, v.built.entry); err != nil {
