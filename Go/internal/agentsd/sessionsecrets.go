@@ -46,6 +46,8 @@ type sessionSecretValue struct {
 	// Sealed is a flagged one's value (#4014), in place of Value: sealedsecrets.go.
 	Sealed *sealedValue `json:"sealed,omitempty"`
 	SetAt  wire.Date    `json:"setAt"`
+	// Description is what it is for (#4167): not secret, so it is there in clear.
+	Description string `json:"description,omitempty"`
 }
 
 func (d *Daemon) sessionSecretsDir() string {
@@ -173,8 +175,8 @@ func (d *Daemon) sessionSecretEnv(agent wire.UUID) []string {
 }
 
 // setSessionSecret keeps one secret for a session that is not archived; needsApproval keeps
-// it sealed (#4014).
-func (d *Daemon) setSessionSecret(agent wire.UUID, name, value string, needsApproval bool) error {
+// it sealed (#4014). description is what it is for (#4167), checked by secretDescription.
+func (d *Daemon) setSessionSecret(agent wire.UUID, name, value, description string, needsApproval bool) error {
 	a := d.Store.Agent(agent)
 	if a == nil {
 		return &Error{Code: CodeNoSuchAgent, Message: "That session is gone."}
@@ -191,14 +193,14 @@ func (d *Daemon) setSessionSecret(agent wire.UUID, name, value string, needsAppr
 	if strings.ContainsAny(value, "\n\r\x00") {
 		return Invalid("%s has to be one line.", name)
 	}
-	entry := sessionSecretValue{Value: value, SetAt: now()}
+	entry := sessionSecretValue{Value: value, SetAt: now(), Description: description}
 	if needsApproval {
 		sealed, err := d.sealSecret(sealedSessionStore(agent), name, value, nil)
 		if err != nil {
 			log.Printf("session secrets: %s for %s: %v", name, agent, err)
 			return Invalid("%s was not saved: it could not be sealed on this machine.", name)
 		}
-		entry = sessionSecretValue{Sealed: &sealed, SetAt: sealed.SetAt}
+		entry = sessionSecretValue{Sealed: &sealed, SetAt: sealed.SetAt, Description: description}
 	}
 	d.sessionSecretsMu.Lock()
 	f := d.readSessionSecrets(agent)
@@ -325,6 +327,9 @@ func (d *Daemon) sessionSecretList() wire.SessionSecrets {
 		}
 		for n, v := range d.readSessionSecrets(wire.UUID(id)).Secrets {
 			row := wire.SessionSecret{AgentID: a.ID, Title: agentTitle(a), Name: n, SetAt: v.SetAt}
+			if v.Description != "" {
+				row.Description = new(v.Description)
+			}
 			if v.Sealed != nil {
 				row.NeedsApproval = new(true)
 			}
@@ -351,7 +356,11 @@ func (d *Daemon) registerSessionSecrets() {
 	})
 	On(d, wire.CallSecretsSessionSet, func(_ context.Context, _ *Client, in wire.SessionSecretSetRequest) (wire.SessionSecrets, error) {
 		ask := in.NeedsApproval != nil && *in.NeedsApproval
-		if err := d.setSessionSecret(in.AgentID, strings.TrimSpace(in.Name), strings.TrimSpace(in.Value), ask); err != nil {
+		description, err := secretDescription(aboutText(in.Description))
+		if err != nil {
+			return wire.SessionSecrets{}, err
+		}
+		if err := d.setSessionSecret(in.AgentID, strings.TrimSpace(in.Name), strings.TrimSpace(in.Value), description, ask); err != nil {
 			return wire.SessionSecrets{}, err
 		}
 		return d.sessionSecretList(), nil
@@ -380,13 +389,13 @@ func (d *Daemon) setSessionNeedsApproval(agent wire.UUID, name string, on bool) 
 		if err != nil {
 			return Invalid("%s was not changed: it could not be sealed on this machine.", name)
 		}
-		f.Secrets[name] = sessionSecretValue{Sealed: &sealed, SetAt: v.SetAt}
+		f.Secrets[name] = sessionSecretValue{Sealed: &sealed, SetAt: v.SetAt, Description: v.Description}
 	case !on && v.Sealed != nil:
 		plain, err := d.openSealedSecret(sealedSessionStore(agent), name, *v.Sealed)
 		if err != nil {
 			return Invalid("%s does not open on this machine, so it was left as it is.", name)
 		}
-		f.Secrets[name] = sessionSecretValue{Value: plain, SetAt: v.SetAt}
+		f.Secrets[name] = sessionSecretValue{Value: plain, SetAt: v.SetAt, Description: v.Description}
 	default:
 		return nil
 	}

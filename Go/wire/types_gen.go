@@ -3938,6 +3938,9 @@ type ElicitationSecret struct {
 
 	// The host keeps it with Ask before use (#4014, #4016): on unless the answer's content has needsApproval false, which the card's toggle sends. Left out by an older host, which has no such flag.
 	CanAskBeforeUse *bool `json:"canAskBeforeUse,omitzero"`
+
+	// The agent's description of the secret (#4167), for the person to change on the card. The answer's content has the person's under description; left out, the secret keeps the one it has.
+	Description *string `json:"description,omitzero"`
 }
 
 type Empty struct {
@@ -7045,6 +7048,9 @@ type MachineUserSettings struct {
 	Settings UserSettings `json:"settings"`
 
 	Secrets []SealedUserSecret `json:"secrets"`
+
+	// The user's secrets that are not sealed to this machine yet (#4167): what list_secrets says of them. Never a value.
+	Waiting []UserSecretAbout `json:"waiting,omitzero"`
 }
 
 type MachineWorkspace struct {
@@ -10950,6 +10956,11 @@ type SealedUserSecret struct {
 
 	// Ask before use (#4014), as the person's client sealed it: the associated data ends |ask when it is on, so a flag the control plane changed does not open. Left out is off.
 	NeedsApproval *bool `json:"needsApproval,omitzero"`
+
+	// A secret's description (#4167): one or two sentences on what it is and what it is for, such as which account and scopes. Not secret, and not sealed: the control plane may keep it. Never a value. Left out when it has none.
+	Description *string `json:"description,omitzero"`
+
+	Kind *UserSecretKind `json:"kind,omitzero"`
 }
 
 // sealing/add (#3397).
@@ -11354,6 +11365,9 @@ type SessionSecret struct {
 
 	// Ask before use (#4014): its value is sealed in the session's file, never there as plain text, and a person approves each use (#4015).
 	NeedsApproval *bool `json:"needsApproval,omitzero"`
+
+	// A secret's description (#4167): one or two sentences on what it is and what it is for, such as which account and scopes. Not secret, and not sealed: the control plane may keep it. Never a value. Left out when it has none.
+	Description *string `json:"description,omitzero"`
 }
 
 // secrets/sessionRemove (#3548): take one session's secret out now.
@@ -11373,6 +11387,9 @@ type SessionSecretSetRequest struct {
 
 	// Ask before use (#4014): kept sealed, and a person approves each use (#4015). Left out is off.
 	NeedsApproval *bool `json:"needsApproval,omitzero"`
+
+	// A secret's description (#4167): one or two sentences on what it is and what it is for, such as which account and scopes. Not secret, and not sealed: the control plane may keep it. Never a value. Left out when it has none.
+	Description *string `json:"description,omitzero"`
 }
 
 // secrets/sessionList (#3548): every secret this machine keeps for one session only, by session title then name. No value.
@@ -13183,6 +13200,17 @@ type UserSecret struct {
 	Value string `json:"value"`
 }
 
+// What a machine knows of one of its user's secrets that it has no copy of yet (#4167). Never a value.
+type UserSecretAbout struct {
+	Name UserSecretName `json:"name"`
+
+	Kind *UserSecretKind `json:"kind,omitzero"`
+
+	Description *string `json:"description,omitzero"`
+
+	NeedsApproval *bool `json:"needsApproval,omitzero"`
+}
+
 // What a secret holds, when it is more than one value (#3531). card: a payment card that has a spend limit (locked to a merchant or category is recommended; Privacy.com or the same), as one JSON object of number, expiry (MM/YY), cvc, name and zip. fill_secret fills it a part at a time. Left out for a plain value.
 type UserSecretKind string
 
@@ -13222,6 +13250,9 @@ type UserSecretRow struct {
 
 	// Ask before use (#4014), as the person's client last sealed it. The machines check it: the associated data binds it.
 	NeedsApproval *bool `json:"needsApproval,omitzero"`
+
+	// A secret's description (#4167): one or two sentences on what it is and what it is for, such as which account and scopes. Not secret, and not sealed: the control plane may keep it. Never a value. Left out when it has none.
+	Description *string `json:"description,omitzero"`
 }
 
 // user/setSecret (#1760, FR-025, #3397): a secret as the person's client sealed it to each recipient of user/secretRecipients, info com.alexecollins.agents.usersecret.v1, associated data usersecret.v1|<person id>|<recipient>|<name>|<version>. version is above the kept one: the kept one plus one, or for a name the client has none of, the time in milliseconds, above a removed one's. The control plane never has the value.
@@ -13237,6 +13268,9 @@ type UserSecretSet struct {
 
 	// Ask before use (#4014): when on, every envelope's associated data ends |ask (usersecret.v1|<person id>|<recipient>|<name>|<version>|ask), so the control plane cannot change it. Left out is off, and the associated data is as before.
 	NeedsApproval *bool `json:"needsApproval,omitzero"`
+
+	// A secret's description (#4167): one or two sentences on what it is and what it is for, such as which account and scopes. Not secret, and not sealed: the control plane may keep it. Never a value. Left out when it has none.
+	Description *string `json:"description,omitzero"`
 }
 
 // user/settings (#1760, #2410): the person's settings that follow them to each of their machines. An omitted part has no value yet, but does not make that setting machine-local. The control plane does not read inside a part.

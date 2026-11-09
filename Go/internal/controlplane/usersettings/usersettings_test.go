@@ -429,3 +429,53 @@ func TestAskBeforeUseIsCarriedAsTheClientSaidIt(t *testing.T) {
 		t.Fatalf("%+v %v", items, err)
 	}
 }
+
+// #4167: a secret's description is kept beside its name, in clear, and goes to the clients'
+// rows, to each machine with its copy, and to a machine with no copy yet as one it waits for.
+func TestASecretsDescriptionIsKeptBesideItsName(t *testing.T) {
+	ctx := context.Background()
+	b := New(store.NewMemory(), nil, "")
+	box, other := newRecipient(t, "m:box"), newRecipient(t, "m:other")
+	set := sealed(t, "sam", "GITHUB_TOKEN", 1, "hunter2", box)
+	set.Description = new("  A token for alexec/Agents: contents, read and write.  ")
+	if err := b.SetSecret(ctx, "sam", set, allowing(box)); err != nil {
+		t.Fatal(err)
+	}
+	const want = "A token for alexec/Agents: contents, read and write."
+	rows, err := b.Names(ctx, "sam", nil)
+	if err != nil || len(rows) != 1 || rows[0].Description == nil || *rows[0].Description != want {
+		t.Fatalf("%+v %v", rows, err)
+	}
+	got, _, err := b.Delivery(ctx, "sam", box.id)
+	if err != nil || len(got.Secrets) != 1 || got.Secrets[0].Description == nil || *got.Secrets[0].Description != want || len(got.Waiting) != 0 {
+		t.Fatalf("%+v %v", got, err)
+	}
+	got, _, err = b.Delivery(ctx, "sam", other.id)
+	if err != nil || len(got.Secrets) != 0 || len(got.Waiting) != 1 || got.Waiting[0].Name != "GITHUB_TOKEN" ||
+		got.Waiting[0].Description == nil || *got.Waiting[0].Description != want {
+		t.Fatalf("%+v %v", got, err)
+	}
+	// Set again with none, it has none.
+	if err := b.SetSecret(ctx, "sam", sealed(t, "sam", "GITHUB_TOKEN", 2, "hunter3", box), allowing(box)); err != nil {
+		t.Fatal(err)
+	}
+	if rows, _ := b.Names(ctx, "sam", nil); rows[0].Description != nil {
+		t.Fatalf("still described: %+v", rows[0])
+	}
+}
+
+// #4167: a description is not sealed, so one that looks like a value, or is more than a line
+// or two, is refused.
+func TestASecretsDescriptionThatLooksLikeAValueIsRefused(t *testing.T) {
+	ctx := context.Background()
+	b := New(store.NewMemory(), nil, "")
+	box := newRecipient(t, "m:box")
+	for _, d := range []string{"the token is ghp_abcdefghijklmnopqrstuvwxyz0123456789", "card 4111 1111 1111 1111",
+		"two\nlines", strings.Repeat("a", MaxSecretDescription+1)} {
+		set := sealed(t, "sam", "GITHUB_TOKEN", 1, "hunter2", box)
+		set.Description = new(d)
+		if err := b.SetSecret(ctx, "sam", set, allowing(box)); !errors.Is(err, ErrInvalid) {
+			t.Errorf("%q: %v", d, err)
+		}
+	}
+}

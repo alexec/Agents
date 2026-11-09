@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/alexec/agents/Go/wire"
 )
@@ -19,6 +20,28 @@ import (
 // PEM key. As scripts/accounts.sh check had it (#3909).
 var looksSecret = regexp.MustCompile(`(glpat-|dop_v1_|xox[abp]-|xapp-|ghp_|github_pat_|AKIA[0-9A-Z]{12}` +
 	`|-----BEGIN|\b(?:\d[ -]?){13,19}\b)`)
+
+// MaxSecretDescription is the longest description a secret keeps (#4167), in characters:
+// one or two sentences.
+const MaxSecretDescription = 300
+
+// CheckSecretDescription is a secret's description (#4167), trimmed, or an error when it is
+// too long, more than one line, or looks like a secret: it is kept in clear, beside the name.
+func CheckSecretDescription(d *string) (string, error) {
+	if d == nil {
+		return "", nil
+	}
+	text := strings.TrimSpace(*d)
+	switch {
+	case utf8.RuneCountInString(text) > MaxSecretDescription:
+		return "", fmt.Errorf("%w: A secret's description is at most %d characters.", ErrInvalid, MaxSecretDescription)
+	case strings.ContainsAny(text, "\n\r\x00"):
+		return "", fmt.Errorf("%w: A secret's description is one line.", ErrInvalid)
+	case looksSecret.MatchString(text):
+		return "", fmt.Errorf("%w: The description looks like a secret. Say what the secret is for, never its value.", ErrInvalid)
+	}
+	return text, nil
+}
 
 // checkAccounts is the accounts part, refused when it is not an OutsideAccounts, an account
 // has no service, or a value looks like a secret.

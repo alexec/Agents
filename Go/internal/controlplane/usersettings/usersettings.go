@@ -114,6 +114,9 @@ type secretRecord struct {
 	// and not the control plane's to change: each envelope's associated data binds it, so a
 	// machine opens nothing whose flag differs from what the client sealed.
 	NeedsApproval bool `json:"needsApproval,omitempty"`
+	// Description is what the secret is for (#4167), as the person or an agent wrote it. Not
+	// secret: it is kept beside the name, not sealed.
+	Description string `json:"description,omitempty"`
 	// Sealed is each recipient's envelope (m:<machine> or c:<client>), as the person's
 	// client sealed it (#3397). Nothing here opens one.
 	Sealed   map[string]wire.SealedEnvelope `json:"sealed,omitempty"`
@@ -431,6 +434,10 @@ func (b *Book) SetSecret(ctx context.Context, user string, set wire.UserSecretSe
 	if set.Kind != nil && *set.Kind != wire.UserSecretKindCard {
 		return fmt.Errorf("%w: a secret's kind is card, or left out", ErrInvalid)
 	}
+	description, err := CheckSecretDescription(set.Description)
+	if err != nil {
+		return err
+	}
 	key := secretKey(user, name)
 	if names, err := b.liveNames(ctx, user); err != nil {
 		return err
@@ -461,7 +468,7 @@ func (b *Book) SetSecret(ctx context.Context, user string, set wire.UserSecretSe
 			kind = string(*set.Kind)
 		}
 		r = secretRecord{Name: name, Version: set.Version, Kind: kind, NeedsApproval: set.NeedsApproval != nil && *set.NeedsApproval,
-			Sealed: sealed, Updated: b.stamp(), Machines: r.Machines}
+			Description: description, Sealed: sealed, Updated: b.stamp(), Machines: r.Machines}
 		return records.Encode(r)
 	})
 }
@@ -605,6 +612,9 @@ func (b *Book) Names(ctx context.Context, user string, machines []string) ([]wir
 		if r.NeedsApproval {
 			row.NeedsApproval = new(true)
 		}
+		if r.Description != "" {
+			row.Description = new(r.Description)
+		}
 		for _, m := range r.Machines {
 			row.Machines = append(row.Machines, wire.MachineRef(m))
 		}
@@ -663,7 +673,7 @@ func (b *Book) Work(ctx context.Context, user, client string, recipients []wire.
 // Delivery is machine/userSettings for a machine of user's: the settings, and each secret as
 // the person's client sealed it to recipient, the machine. Only for that user's own
 // machine's link (FR-025). A secret with no copy for it is left out, and named in waiting
-// as <name>|<version>.
+// as <name>|<version>; the machine is told of it, with no value, in out.Waiting (#4167).
 // Nothing here opens a secret.
 func (b *Book) Delivery(ctx context.Context, user, recipient string) (out wire.MachineUserSettings, waiting []string, err error) {
 	settings, err := b.Settings(ctx, user)
@@ -682,12 +692,25 @@ func (b *Book) Delivery(ctx context.Context, user, recipient string) (out wire.M
 		if r.Sealed == nil {
 			continue
 		}
+		var kind *wire.UserSecretKind
+		if r.Kind != "" {
+			kind = new(wire.UserSecretKind(r.Kind))
+		}
+		var description *string
+		if r.Description != "" {
+			description = new(r.Description)
+		}
 		e, ok := r.Sealed[recipient]
 		if !ok {
 			waiting = append(waiting, fmt.Sprintf("%s|%d", r.Name, r.Version))
+			about := wire.UserSecretAbout{Name: wire.UserSecretName(r.Name), Kind: kind, Description: description}
+			if r.NeedsApproval {
+				about.NeedsApproval = new(true)
+			}
+			out.Waiting = append(out.Waiting, about)
 			continue
 		}
-		s := wire.SealedUserSecret{Name: wire.UserSecretName(r.Name), Version: r.Version, Sealed: e}
+		s := wire.SealedUserSecret{Name: wire.UserSecretName(r.Name), Version: r.Version, Sealed: e, Kind: kind, Description: description}
 		if r.NeedsApproval {
 			s.NeedsApproval = new(true)
 		}

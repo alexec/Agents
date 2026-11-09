@@ -48,6 +48,11 @@ type userSettingsSyncState struct {
 	// Versions is the version of each secret opened here (#3397): an older one, which a
 	// control plane could send back after the person changed it, is refused.
 	Versions map[string]int64 `json:"versions,omitempty"`
+	// About is what list_secrets says of each secret in Secrets (#4167): its kind, description
+	// and Ask before use, as the control plane sent them. Waiting is the person's secrets that
+	// are not sealed to this machine yet. Never a value.
+	About   []wire.UserSecretAbout `json:"about,omitempty"`
+	Waiting []wire.UserSecretAbout `json:"waiting,omitempty"`
 	// The agentConfig files written, relative to ~/.agents, so a persona or skill the
 	// control plane no longer sends is taken away again.
 	Files []string `json:"files,omitempty"`
@@ -155,6 +160,10 @@ func (d *Daemon) ApplyUserSettings(u wire.MachineUserSettings) error {
 		names, versions = before.Secrets, before.Versions
 	}
 	mark.Secrets, mark.Versions = names, versions
+	mark.About, mark.Waiting = secretsAbout(u.Secrets, names), u.Waiting
+	if err != nil {
+		mark.About = before.About
+	}
 	b, _ := diskjson.Marshal(mark)
 	if err := store.WriteAtomically(d.userSettingsSyncPath(), b, 0o644); err != nil {
 		problems = append(problems, err.Error())
@@ -438,6 +447,18 @@ func (d *Daemon) openUserSecrets(u wire.MachineUserSettings, before userSettings
 		versions[name] = s.Version
 	}
 	return plain, flagged, versions, kept
+}
+
+// secretsAbout is what list_secrets says of each sent secret that this machine keeps (#4167).
+func secretsAbout(sent []wire.SealedUserSecret, kept []string) []wire.UserSecretAbout {
+	var out []wire.UserSecretAbout
+	for _, s := range sent {
+		if !slices.Contains(kept, string(s.Name)) {
+			continue
+		}
+		out = append(out, wire.UserSecretAbout{Name: s.Name, Kind: s.Kind, Description: s.Description, NeedsApproval: s.NeedsApproval})
+	}
+	return out
 }
 
 // writeSecrets writes the secrets into ~/.agents-secrets/secrets.env and takes out those
