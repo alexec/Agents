@@ -15,10 +15,12 @@ import (
 
 // Ask before use (#4015, the spike #4013): each use of a flagged secret waits on a person.
 // The uses are only agentsd's own: fill_secret types the value into a page, set_ci_secret
-// sends it to GitHub. A use is a Needs you request of kind approve that names the secret,
-// the session and the place (the field's domain, owner/repo), never the value. The call is
-// held as ask_question's is (formHoldLimit); after the hold the agent waits on the request
-// with wait_for_event and calls again.
+// sends it to GitHub, and an HTTP MCP server's ${NAME} is filled on each request agentsd
+// sends the server for a session (secretproxy.go, #4120). A use is a Needs you request of
+// kind approve that names the secret, the session and the place (the field's domain,
+// owner/repo, the server's name), never the value. A tool's call is held as ask_question's
+// is (formHoldLimit); after the hold the agent waits on the request with wait_for_event and
+// calls again. An MCP server's request is never held: a start never waits on a person.
 //
 // The answers:
 //
@@ -58,11 +60,16 @@ func secretUseKey(agent wire.UUID, name string, use wire.SecretUse, place string
 	return string(sessionKey(agent)) + "|" + name + "|" + grantPlace(use, place)
 }
 
-// grantPlace is a place as the sealed record keeps it: fill:<domain>, ci:<owner/repo>.
+// grantPlace is a place as the sealed record keeps it: fill:<domain>, ci:<owner/repo>,
+// mcp:<server>.
 func grantPlace(use wire.SecretUse, place string) string { return string(use) + ":" + place }
 
 // secretUseWords are what an agent reads when its use of a secret waits, or was refused.
 func secretUseWords(r wire.RequestSecretUse, id wire.UUID) string {
+	if r.Use == wire.SecretUseMCP {
+		return "Nothing was sent to the MCP server " + r.Place + ": " + r.Name + " has Ask before use, and a person has not yet approved its use there. " +
+			"Wait with wait_for_event, where: {\"request\": \"" + string(id) + "\"}: once they allow it, the server connects from your next turn."
+	}
 	what := map[wire.SecretUse]string{wire.SecretUseFill: "fill_secret", wire.SecretUseCi: "set_ci_secret"}[r.Use]
 	return "Nothing was used yet: " + r.Name + " has Ask before use, and a person has not yet approved its use at " + r.Place +
 		". Wait with wait_for_event, where: {\"request\": \"" + string(id) + "\"}, then call " + what + " again."
@@ -79,6 +86,12 @@ func (e errSecretUseDenied) Error() string {
 // "" when it may; the words to give the agent when the request is still open; or an
 // errSecretUseDenied.
 func (d *Daemon) approveSecretUse(agent wire.UUID, name string, use wire.SecretUse, place string) (string, error) {
+	return d.askSecretUse(agent, name, use, place, formHoldLimit)
+}
+
+// askSecretUse is approveSecretUse, the call held up to hold on its request: none at all
+// for an MCP server's request.
+func (d *Daemon) askSecretUse(agent wire.UUID, name string, use wire.SecretUse, place string, hold time.Duration) (string, error) {
 	// A domain and a GitHub repo are the same in any case.
 	place = strings.ToLower(strings.TrimSpace(place))
 	if place == "" {
@@ -114,12 +127,15 @@ func (d *Daemon) approveSecretUse(agent wire.UUID, name string, use wire.SecretU
 	if rec := d.request(id); rec != nil && rec.State != wire.RequestStateOpen {
 		return d.afterSecretUse(agent, ask, id)
 	}
-	hold := time.NewTimer(formHoldLimit)
-	defer hold.Stop()
+	if hold <= 0 {
+		return secretUseWords(ask, id), nil
+	}
+	timer := time.NewTimer(hold)
+	defer timer.Stop()
 	select {
 	case <-held:
 		return d.afterSecretUse(agent, ask, id)
-	case <-hold.C:
+	case <-timer.C:
 		return secretUseWords(ask, id), nil
 	case <-d.ctx.Done():
 		return secretUseWords(ask, id), nil
@@ -200,7 +216,8 @@ func (d *Daemon) openSecretUseRequest(agent wire.UUID, ask wire.RequestSecretUse
 	at := now()
 	asker := agent
 	title := map[wire.SecretUse]string{wire.SecretUseFill: "Fill " + ask.Name + " on " + ask.Place,
-		wire.SecretUseCi: "Set " + ask.Name + " as a CI secret in " + ask.Place}[ask.Use]
+		wire.SecretUseCi:  "Set " + ask.Name + " as a CI secret in " + ask.Place,
+		wire.SecretUseMCP: "Send " + ask.Name + " to the MCP server " + ask.Place}[ask.Use]
 	r := &wire.Request{ID: store.NewUUID(), Kind: wire.RequestKindApprove, Source: wire.RequestSourceSecretUse,
 		State: wire.RequestStateOpen, Title: title, Detail: wire.RequestDetail{SecretUse: &ask},
 		Folder: string(store.FolderURL(folderPath(a))), AskedBy: &asker,
@@ -263,6 +280,9 @@ func (d *Daemon) answerSecretUse(rec wire.Request, a *wire.RequestSecretUseAnswe
 		}
 	}
 	d.secretUseMu.Unlock()
+	if ask.Use == wire.SecretUseMCP {
+		d.secretProxyAnswered(agent, ask, a.Action, always)
+	}
 	if !d.endRequest(rec.ID, wire.RequestStateAnswered, &summary, "", by) {
 		return wire.RequestUpdate{}, &Error{Code: wire.FailureNoSuchAgent, Message: "That request has ended already."}
 	}
@@ -290,6 +310,7 @@ func (d *Daemon) secretUseEnded(id wire.UUID) {
 
 // forgetSessionSecretUses drops what a person allowed an archived session.
 func (d *Daemon) forgetSessionSecretUses(agent wire.UUID) {
+	d.forgetSecretProxy(agent)
 	prefix := string(sessionKey(agent)) + "|"
 	d.secretUseMu.Lock()
 	defer d.secretUseMu.Unlock()
@@ -372,11 +393,11 @@ func validGrant(g wire.SecretGrant) error {
 	if !secretAskName.MatchString(g.Name) {
 		return Invalid("A secret's name is letters, digits and underscores, e.g. GITLAB_PASSWORD.")
 	}
-	if g.Use != wire.SecretUseFill && g.Use != wire.SecretUseCi {
-		return Invalid("A grant's use is fill or ci.")
+	if g.Use != wire.SecretUseFill && g.Use != wire.SecretUseCi && g.Use != wire.SecretUseMCP {
+		return Invalid("A grant's use is fill, ci or mcp.")
 	}
 	if strings.TrimSpace(g.Place) == "" || strings.ContainsAny(g.Place, " \t\n") {
-		return Invalid("A grant's place is a domain for a fill, or owner/repo for CI.")
+		return Invalid("A grant's place is a domain for a fill, owner/repo for CI, or the server's name for an MCP server.")
 	}
 	return nil
 }

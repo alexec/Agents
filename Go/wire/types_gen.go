@@ -10244,7 +10244,7 @@ type RequestSecretUse struct {
 
 	Use SecretUse `json:"use"`
 
-	// Where the value goes: the page's domain for a fill, owner/repo for CI.
+	// Where the value goes: the page's domain for a fill, owner/repo for CI, the server's name for an MCP server.
 	Place string `json:"place"`
 
 	// The secret is the session's own (#3548): Allow always is the same as Allow for this session.
@@ -10979,7 +10979,7 @@ type SecretGrant struct {
 
 	Use SecretUse `json:"use"`
 
-	// The page's domain for a fill, owner/repo for CI.
+	// The page's domain for a fill, owner/repo for CI, the server's name for an MCP server.
 	Place string `json:"place"`
 }
 
@@ -11031,11 +11031,12 @@ type SecretReleased struct {
 	Key Data `json:"key"`
 }
 
-// What agentsd does with a secret with Ask before use (#4015): fill types it into a page (fill_secret), ci sends it to GitHub (set_ci_secret).
+// What agentsd does with a secret with Ask before use (#4015): fill types it into a page (fill_secret), ci sends it to GitHub (set_ci_secret), mcp adds it to an HTTP MCP server's header or URL on each request agentsd sends the server for a session (#4120).
 type SecretUse string
 
 const SecretUseFill SecretUse = "fill"
 const SecretUseCi SecretUse = "ci"
+const SecretUseMCP SecretUse = "mcp"
 
 // control/secretsLeft (#1760, FR-026): to the person's own clients, when one of their machines was removed with secrets on it.
 type SecretsLeft struct {

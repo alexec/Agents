@@ -147,6 +147,7 @@ func (d *Daemon) stopAppTools() {
 		delete(d.appTokens, t)
 	}
 	d.appMu.Unlock()
+	d.dropSecretProxies(nil, true)
 	if srv != nil {
 		srv.Close()
 	}
@@ -180,9 +181,11 @@ func (d *Daemon) mcpServersFor(id wire.UUID) []sdk.McpServer {
 		Url:     "http://127.0.0.1:" + strconv.Itoa(port) + appToolsPath,
 		Headers: []sdk.HttpHeader{{Name: "Authorization", Value: "Bearer " + token}}}}}
 	// Then the folder's approved servers and the person's own (SessionServers.plan), each
-	// hosted one swapped for its route on this endpoint (#488).
+	// hosted one swapped for its route on this endpoint (#488), and each http one with a
+	// secret that asks before use for its route through agentsd (#4120).
 	if a != nil {
-		servers = append(servers, d.hostedSwapped(d.sessionEntries(folderPath(a), id), port, token, a.RuntimeID)...)
+		entries := d.secretProxySwapped(d.sessionEntries(folderPath(a), id), port, token, id)
+		servers = append(servers, d.hostedSwapped(entries, port, token, a.RuntimeID)...)
 	}
 	return servers
 }
@@ -203,6 +206,7 @@ func (d *Daemon) dropAppTokens(id wire.UUID) {
 	for _, t := range dropped {
 		d.hostedRelease(t)
 	}
+	d.dropSecretProxies(dropped, false)
 }
 
 func bearer(h string) string {
@@ -233,6 +237,10 @@ func (d *Daemon) serveAppTools(w http.ResponseWriter, r *http.Request) {
 	}
 	if strings.HasPrefix(r.URL.Path, hostedPathPrefix) {
 		d.serveHosted(w, r)
+		return
+	}
+	if strings.HasPrefix(r.URL.Path, secretProxyPathPrefix) {
+		d.serveSecretProxy(w, r)
 		return
 	}
 	if r.URL.Path == githubCredentialPath {

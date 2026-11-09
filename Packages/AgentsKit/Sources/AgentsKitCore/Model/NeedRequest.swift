@@ -106,10 +106,10 @@ public struct NeedRequest: Codable, Sendable, Hashable, Identifiable {
     /// The wire's `RequestSecretUse`: the secret's name, never its value, and where agentsd
     /// puts the value.
     public struct SecretUse: Codable, Sendable, Hashable {
-        /// fill (fill_secret) or ci (set_ci_secret).
+        /// fill (fill_secret), ci (set_ci_secret) or mcp (an HTTP MCP server's header, #4120).
         public var use: String
         public var name: String
-        /// The page's domain for a fill, owner/repo for CI.
+        /// The page's domain for a fill, owner/repo for CI, the server's name for MCP.
         public var place: String
         /// The session's own secret (#3548): Allow always is the same as Allow for this session.
         public var sessionOnly: Bool?
@@ -123,7 +123,11 @@ public struct NeedRequest: Codable, Sendable, Hashable, Identifiable {
 
         /// Where the value goes, as the row's grey line says it.
         public var `where`: String {
-            use == "ci" ? "CI secret in \(place)" : "Fill on \(place)"
+            switch use {
+            case "ci": "CI secret in \(place)"
+            case "mcp": "MCP server \(place)"
+            default: "Fill on \(place)"
+            }
         }
 
         /// The answers a person can give, in the order the row and the banner show them.

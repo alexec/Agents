@@ -22,7 +22,8 @@ export function secretUseTitle(use: RequestSecretUse): string {
 
 /** Where the value goes, as the row's grey line says it. */
 export function secretUseWhere(use: RequestSecretUse): string {
-  return use.use === "ci" ? `CI secret in ${use.place}` : `Fill on ${use.place}`;
+  if (use.use === "ci") return `CI secret in ${use.place}`;
+  return use.use === "mcp" ? `MCP server ${use.place}` : `Fill on ${use.place}`;
 }
 
 /** The answers, in order. A session's own secret has no Allow always: it is the same as for this session. */

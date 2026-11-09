@@ -247,6 +247,11 @@ func (d *Daemon) atlassianApp() (id, secret string) {
 	if id == "" || secret == "" {
 		kept := d.secrets()
 		id, secret = kept[connections.AtlassianClientIDName], kept[connections.AtlassianClientSecretName]
+		// One with Ask before use is not agentsd's own (#4120): a person approves each use
+		// for a session, and Connect Jira has none.
+		if home := d.personalHome(); home != "" && (isSealedSecret(home, connections.AtlassianClientIDName) || isSealedSecret(home, connections.AtlassianClientSecretName)) {
+			log.Printf("connections: the Atlassian app's %s or %s has Ask before use, so Connect Jira does not use it: turn Ask before use off for it", connections.AtlassianClientIDName, connections.AtlassianClientSecretName)
+		}
 	}
 	return strings.TrimSpace(id), strings.TrimSpace(secret)
 }
