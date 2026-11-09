@@ -328,7 +328,7 @@ func (d *Daemon) startBrowserCast(agent wire.UUID) {
 		if agent != "" {
 			d.followBrowserTabs(endpoint)
 		}
-		cast, err = browser.Watch(endpoint, tab, width, height,
+		cast, err = browser.Watch(endpoint, tab, width, height, d.sessionDevice(agent),
 			func(f browser.Frame) { d.browserFrame(gen, f) },
 			func(p browser.Page) { d.browserPage(gen, p) },
 			func() { d.browserCastEnded(gen) })

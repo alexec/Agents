@@ -37,6 +37,8 @@ type browserTabState struct {
 	driver wire.UUID
 	// usedTurn is each agent that has used the browser in its turn now.
 	usedTurn map[wire.UUID]bool
+	// devices is each session's device profile (browserdevice.go, #4086).
+	devices map[wire.UUID]*browser.Device
 }
 
 // sessionKey is a session's id as these records and the watches keep it: a client may
@@ -52,7 +54,7 @@ func (d *Daemon) followBrowserTabs(endpoint string) {
 	}
 	old := d.tabs
 	d.tabs, d.tabsEndpoint = nil, ""
-	d.tabOwner, d.ownTabs = nil, nil
+	d.tabOwner, d.ownTabs, d.devices = nil, nil, nil
 	d.tabsMu.Unlock()
 	if old != nil {
 		old.Close()
@@ -79,7 +81,7 @@ func (d *Daemon) stopFollowingBrowserTabs() {
 	d.tabsMu.Lock()
 	t := d.tabs
 	d.tabs, d.tabsEndpoint = nil, ""
-	d.tabOwner, d.ownTabs = nil, nil
+	d.tabOwner, d.ownTabs, d.devices = nil, nil, nil
 	d.tabsMu.Unlock()
 	if t != nil {
 		t.Close()
@@ -93,7 +95,7 @@ func (d *Daemon) browserTabsEnded(t *browser.Tabs) {
 		return
 	}
 	d.tabs, d.tabsEndpoint = nil, ""
-	d.tabOwner, d.ownTabs = nil, nil
+	d.tabOwner, d.ownTabs, d.devices = nil, nil, nil
 	d.tabsMu.Unlock()
 }
 
@@ -111,6 +113,7 @@ func (d *Daemon) browserTabCreated(tab, opener target.ID) {
 	}
 	d.ownTabLocked(owner, tab)
 	d.tabsMu.Unlock()
+	d.giveTabDevice(owner, tab)
 	d.sessionTabChanged(owner)
 }
 
@@ -124,7 +127,9 @@ func (d *Daemon) browserTabClosed(tab target.ID) {
 	delete(d.tabOwner, tab)
 	d.ownTabs[owner] = slices.DeleteFunc(d.ownTabs[owner], func(t target.ID) bool { return t == tab })
 	if len(d.ownTabs[owner]) == 0 {
+		// Its tabs all closed: the session's next tab starts as a desktop browser again.
 		delete(d.ownTabs, owner)
+		delete(d.devices, owner)
 	}
 	d.tabsMu.Unlock()
 	d.sessionTabChanged(owner)
@@ -172,6 +177,7 @@ func (d *Daemon) openSessionTab(agent wire.UUID, address string) error {
 	d.tabsMu.Lock()
 	d.ownTabLocked(agent, tab)
 	d.tabsMu.Unlock()
+	d.giveTabDevice(agent, tab)
 	d.sessionTabChanged(sessionKey(agent))
 	return nil
 }
