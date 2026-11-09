@@ -1,8 +1,6 @@
 package forgejomcp
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -11,6 +9,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // failed_log (#3761, decided in #3754): the end of each failed job's log in a Forgejo Actions
@@ -29,13 +29,6 @@ const logLines = 300
 // logBytes is how much of a log's end is asked for: the logs take a Range, and a log can be
 // tens of MB.
 const logBytes = 4 << 20
-
-// tailSlack is how many lines before the last logLines are kept too, for those at the end
-// that are nothing once cleaned.
-const tailSlack = 100
-
-// maxLogLine is how much of one line of a log is kept: its start.
-const maxLogLine = 16 << 10
 
 // The versions with the routes failed_log reads.
 const (
@@ -60,48 +53,13 @@ func plain(text string) string {
 
 // logTail is the last n lines of a log as it is read, cleaned, without the trailing lines
 // that are nothing once cleaned; with partial, the first line is dropped, as it is the end of
-// one the range cut. The log is never held whole: the lines are kept in a ring.
+// one the range cut (mcpevents.LogTail).
 func logTail(r io.Reader, n int, partial bool) (string, error) {
-	br := bufio.NewReaderSize(r, 64<<10)
-	ring := make([][]byte, n+tailSlack)
-	next, count := 0, 0
-	var line []byte
-	for {
-		chunk, err := br.ReadSlice('\n')
-		if len(line) < maxLogLine {
-			line = append(line, chunk[:min(len(chunk), maxLogLine-len(line))]...)
-		}
-		if err == bufio.ErrBufferFull {
-			continue
-		}
-		if len(chunk) > 0 && chunk[len(chunk)-1] == '\n' || (err == io.EOF && len(line) > 0) {
-			if partial {
-				partial = false
-			} else {
-				ring[next] = append(ring[next][:0], bytes.TrimSuffix(line, []byte("\n"))...)
-				next, count = (next+1)%len(ring), count+1
-			}
-			line = line[:0]
-		}
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return "", &ForgejoError{Kind: Failed, Message: "Forgejo: " + err.Error()}
-		}
+	tail, err := mcpevents.LogTail(r, n, partial, plain)
+	if err != nil {
+		return "", &ForgejoError{Kind: Failed, Message: "Forgejo: " + err.Error()}
 	}
-	kept := min(count, len(ring))
-	lines := make([]string, 0, kept)
-	for i := range kept {
-		lines = append(lines, strings.TrimSuffix(plain(string(ring[(next-kept+i+len(ring))%len(ring)])), "\r"))
-	}
-	for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
-		lines = lines[:len(lines)-1]
-	}
-	if len(lines) > n {
-		lines = lines[len(lines)-n:]
-	}
-	return strings.Join(lines, "\n"), nil
+	return tail, nil
 }
 
 // forge is which server and version answers: Forgejo's version is 17.0.1+gitea-1.22.0,
