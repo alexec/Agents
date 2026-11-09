@@ -28,8 +28,10 @@ func TestTheSetUpReads(t *testing.T) {
 	if n, err := ado.LastChecks(ctx, repo); err != nil || n.Number != 31 || n.Title != "CI 2026.11.31" || n.Outcome != "failed" || n.URL == "" {
 		t.Fatalf("checks: %+v %v", n, err)
 	}
-	f.set(func() { f.builds = append(f.builds, obj{"id": 32, "buildNumber": "2026.11.32", "status": "inProgress", "queueTime": at(3),
-		"definition": obj{"name": "CI"}, "repository": obj{"id": "repo-guid"}}) })
+	f.set(func() {
+		f.builds = append(f.builds, obj{"id": 32, "buildNumber": "2026.11.32", "status": "inProgress", "queueTime": at(3),
+			"definition": obj{"name": "CI"}, "repository": obj{"id": "repo-guid"}})
+	})
 	if n, err := ado.LastChecks(ctx, repo); err != nil || n.Outcome != "running" || n.At != at(3) ||
 		n.URL != f.server.URL+"/acme/Web%20App/_build/results?buildId=32" {
 		t.Fatalf("a running build: %+v %v", n, err)
