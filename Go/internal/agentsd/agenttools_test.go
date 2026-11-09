@@ -180,3 +180,49 @@ func TestAFormLeftOpenBringsItsAnswerLater(t *testing.T) {
 		t.Fatalf("the answer is not the end of the turn that asked: %s", b)
 	}
 }
+
+// The person writes instead of answering: the question cards go, a held ask_question
+// says so, and a form left open is named ahead of the message.
+func TestAMessageDismissesTheQuestions(t *testing.T) {
+	fakeRuntimes(t)
+	was := formHoldLimit
+	formHoldLimit = 300 * time.Millisecond
+	defer func() { formHoldLimit = was }()
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	a := seeded(t, d, t.TempDir(), func(a *wire.Agent) { a.State, a.EndedReason = wire.AgentStateRunning, nil })
+	m := appClient(t, d, a.ID)
+	m.post("initialize", map[string]any{}, 1)
+	l := d.live(a.ID)
+	l.mu.Lock()
+	l.inTurn = true
+	l.mu.Unlock()
+	question := map[string]any{"title": "Pick a colour", "questions": []any{map[string]any{"id": "colour", "prompt": "Which colour?",
+		"options": []any{map[string]any{"id": "red", "label": "Red"}}}}}
+	if text, _ := m.tool(2, "ask_question", question); text != formStillOpen {
+		t.Fatal(text)
+	}
+	formHoldLimit = time.Minute
+	answered := make(chan string, 1)
+	go func() { text, _ := m.tool(3, "ask_question", question); answered <- text }()
+	var pending []wire.ElicitationRequest
+	waitFor(t, "both forms", func() bool {
+		json.Unmarshal(c.call(t, 1, "elicitations/pending", nil), &pending)
+		return len(pending) == 2
+	})
+	c.call(t, 2, "agents/prompt", map[string]any{"agentID": a.ID, "text": "Blue, please."})
+	if text := <-answered; text != answeredByMessage {
+		t.Fatal(text)
+	}
+	json.Unmarshal(c.call(t, 3, "elicitations/pending", nil), &pending)
+	if len(pending) != 0 {
+		t.Fatalf("the cards are still up: %+v", pending)
+	}
+	if s := d.Store.Agent(a.ID).State; s != wire.AgentStateRunning {
+		t.Fatalf("%s", s)
+	}
+	q := d.Store.Agent(a.ID).QueuedPrompts
+	if len(q) != 1 || q[0].Preface == nil || !strings.Contains(*q[0].Preface, "instead of answering your question \"Pick a colour\"") {
+		t.Fatalf("%+v", q)
+	}
+}

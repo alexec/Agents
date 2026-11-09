@@ -39,6 +39,8 @@ type pendingElicitation struct {
 type elicitationReply struct {
 	action  wire.AnswerElicitationRequestAction
 	content map[string]wire.JSONValue
+	// byMessage is a cancel because the person sent a message instead (dismissQuestions).
+	byMessage bool
 }
 
 func cancelled() elicitationReply {
@@ -222,6 +224,46 @@ func (l *live) closeForms(every bool) {
 		pe.reply <- cancelled()
 		l.d.formDown(l.id, pe.req.ID)
 	}
+}
+
+// dismissedByMessage is the record's line for a question taken down by the person's message.
+const dismissedByMessage = "You sent a message instead of answering"
+
+// dismissQuestions takes down the agent's questions (ask_question and the runtime's own
+// forms, not ask_secret or hand_to_person) when the person sends a message instead of
+// answering: the message is the answer. A held call hears cancel, with byMessage; a form
+// left open goes quietly, and its title comes back to say what the message answers.
+func (l *live) dismissQuestions() (left []string) {
+	l.mu.Lock()
+	var pes []*pendingElicitation
+	for id, pe := range l.elicitations {
+		if pe.req.Secret != nil || pe.req.HandOff != nil || pe.req.Mode.Form == nil {
+			continue
+		}
+		pes = append(pes, pe)
+		delete(l.elicitations, id)
+	}
+	l.mu.Unlock()
+	sort.Slice(pes, func(i, j int) bool { return pes[i].req.AskedAt < pes[j].req.AskedAt })
+	for _, pe := range pes {
+		l.d.endRequest(pe.req.ID, wire.RequestStateDropped, nil, wire.RequestDroppedWhyByPerson, nil)
+		l.d.record(l.id, wire.TranscriptEntryKind{ElicitationAnswered: &wire.TranscriptEntryKindElicitationAnswered{ID: pe.req.ID,
+			Summary: dismissedByMessage}})
+		if pe.left {
+			title := "your question"
+			if pe.req.Message != nil && strings.TrimSpace(*pe.req.Message) != "" {
+				title = "your question \"" + strings.TrimSpace(*pe.req.Message) + "\""
+			}
+			left = append(left, title)
+		} else {
+			pe.reply <- elicitationReply{action: wire.AnswerElicitationRequestActionCancel, byMessage: true}
+		}
+		l.d.formDown(l.id, pe.req.ID)
+	}
+	if len(pes) > 0 && !l.asking() {
+		l.d.moveIf(l.id, wire.AgentStateWaitingOnUser, wire.AgentStateRunning)
+	}
+	return left
 }
 
 func (d *Daemon) everyLive() []*live {

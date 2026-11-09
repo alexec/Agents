@@ -179,6 +179,14 @@ func (d *Daemon) prompt(r wire.PromptRequest) error {
 			p := "(Your wait for " + waitLabel(w) + " was cancelled by this message. Wait again if you still need to.)"
 			preface = &p
 		}
+		// And its questions: the person wrote instead of answering, so the cards go.
+		for _, q := range d.live(a.ID).dismissQuestions() {
+			p := "(This message was sent instead of answering " + q + ", which is closed now. Take the message as the answer.)"
+			if preface != nil {
+				p = *preface + "\n\n" + p
+			}
+			preface = &p
+		}
 	}
 	if r.Voice != nil && *r.Voice {
 		p := voicePreface
