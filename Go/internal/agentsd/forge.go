@@ -73,6 +73,8 @@ type forgeGitHub interface {
 	// Tags and Compare say what a waiting deploy of a tag ships (#3587).
 	Tags(ctx context.Context, repo string) ([]string, error)
 	Compare(ctx context.Context, repo, base, head string) ([]githubmcp.Commit, error)
+	// Timeline is the epics and releases work/timeline reads (#4172).
+	Timeline(ctx context.Context, repo, since string) (githubmcp.Timeline, error)
 	forgeGitHubWrites
 }
 
@@ -111,6 +113,8 @@ type forgeAnswer struct {
 	list *wire.ForgeList
 	item *wire.ForgeItemDetail
 	plan *forgePlanAnswer
+	// timeline is a repo's read for work/timeline (#4172).
+	timeline *githubmcp.Timeline
 }
 
 // forgePlanAnswer is an epic and its children as the forge said them (#3267).

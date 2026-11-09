@@ -52,6 +52,7 @@ func (d *Daemon) register() {
 	d.registerLineage()
 	d.registerLineageSessions()
 	d.registerForge()
+	d.registerWorkTimeline()
 	d.registerDocs()
 	d.registerDevices()
 	d.registerAllowances()

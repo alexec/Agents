@@ -30522,6 +30522,228 @@
       ],
       "additionalProperties": false
     },
+    "WorkTimeline": {
+      "type": "object",
+      "description": "work/timeline (#4172, specs/time-stream/wireframe.md sections 4, 7 to 9): the epics of a project whose work overlaps from to to, each with its children, its segments and, while open, its forecast (M10); and the releases published in the window. timeZone is the working clock's: this host's, an IANA name, absent when it has none. backtest is how the forecast did on the epics whose work ended in the last 30 days, run again at most once a day; absent when there are too few. errors are the forges that could not be read, as forge/issues says them.",
+      "properties": {
+        "epics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WorkTimelineEpic"
+          }
+        },
+        "releases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WorkTimelineRelease"
+          }
+        },
+        "timeZone": {
+          "type": "string"
+        },
+        "backtest": {
+          "$ref": "#/definitions/WorkTimelineBacktest"
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "epics",
+        "releases"
+      ],
+      "additionalProperties": false
+    },
+    "WorkTimelineBacktest": {
+      "type": "object",
+      "description": "work/timeline's backtest (#4172): the forecast stopped just after 25, 50, 75 and 90% of each past segment's children closed, made from what had ended before that moment, and set against the real close. error is the median of forecast/actual or actual/forecast, whichever is more than 1 (×2.2 says off by a factor of 2.2). cuts is how many forecasts it made, of epics segments; holds how many closes fell in P10 to P90. width is the factor that widens the band around P50 (in log terms) until it holds 8 in 10 of them; each forecast's band is already widened by it. at is when it ran.",
+      "properties": {
+        "error": {
+          "type": "number"
+        },
+        "width": {
+          "type": "number"
+        },
+        "cuts": {
+          "type": "integer"
+        },
+        "holds": {
+          "type": "integer"
+        },
+        "epics": {
+          "type": "integer"
+        },
+        "at": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "error",
+        "width",
+        "cuts",
+        "holds",
+        "epics",
+        "at"
+      ],
+      "additionalProperties": false
+    },
+    "WorkTimelineChild": {
+      "type": "object",
+      "description": "A child of an epic in work/timeline (#4172). stateReason is completed or not_planned, where the forge says it. startedAt is the earliest of the first session linked to it in lineage, the opening of the first pull request that closes it, and its close; absent while nothing has started it. waitsForPerson: it is open and labelled alex-todo or needs-account, so it is not forecast. forecastAt is an open child's forecast close: its epic's P50 shared out along the line, in the order of the children.",
+      "properties": {
+        "item": {
+          "$ref": "#/definitions/ForgeItem"
+        },
+        "stateReason": {
+          "type": "string"
+        },
+        "createdAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "startedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "closedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "waitsForPerson": {
+          "type": "boolean"
+        },
+        "forecastAt": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "item",
+        "createdAt"
+      ],
+      "additionalProperties": false
+    },
+    "WorkTimelineEpic": {
+      "type": "object",
+      "description": "An epic in work/timeline (#4172). children are its sub-issues (at most 100). segments are its lines, the first first: a segment starts at its first child's start (absent when none has started) and ends at its last child's close (absent while one is open); a child filed after a segment ended starts a new one. forecast is the open segment's close, absent when it has no child to forecast or there is too little history.",
+      "properties": {
+        "item": {
+          "$ref": "#/definitions/ForgeItem"
+        },
+        "stateReason": {
+          "type": "string"
+        },
+        "createdAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "closedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WorkTimelineChild"
+          }
+        },
+        "segments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WorkTimelineSegment"
+          }
+        },
+        "forecast": {
+          "$ref": "#/definitions/WorkTimelineForecast"
+        }
+      },
+      "required": [
+        "item",
+        "createdAt",
+        "children",
+        "segments"
+      ],
+      "additionalProperties": false
+    },
+    "WorkTimelineForecast": {
+      "type": "object",
+      "description": "An open epic's forecast in work/timeline (#4172, M10): mid is the P50 of its close, low to high the band (P10 to P90, widened by the backtest's width) that holds the close 8 times in 10. waits says that children wait for a person: the line stops there and does not join, and mid is when the rest close.",
+      "properties": {
+        "low": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "mid": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "high": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "waits": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "low",
+        "mid",
+        "high"
+      ],
+      "additionalProperties": false
+    },
+    "WorkTimelineRelease": {
+      "type": "object",
+      "description": "A release in work/timeline (#4172): its tag, when it was published, on which repo (owner/name).",
+      "properties": {
+        "tag": {
+          "type": "string"
+        },
+        "at": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "repo": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "tag",
+        "at",
+        "repo"
+      ],
+      "additionalProperties": false
+    },
+    "WorkTimelineRequest": {
+      "type": "object",
+      "description": "work/timeline (#4172): the epics of a project (its id, from a folder's .agents/folder.json) whose work overlaps from to to.",
+      "properties": {
+        "project": {
+          "type": "string"
+        },
+        "from": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "to": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "project",
+        "from",
+        "to"
+      ],
+      "additionalProperties": false
+    },
+    "WorkTimelineSegment": {
+      "type": "object",
+      "description": "A line of an epic in work/timeline (#4172): from its first child's start to its last child's close.",
+      "properties": {
+        "startedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "closedAt": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "additionalProperties": false
+    },
     "Workflow": {
       "type": "object",
       "properties": {

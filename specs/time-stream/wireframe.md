@@ -119,6 +119,13 @@ M9 ×2.52, **M10 ×2.22**. M9 adds 20% more children even to an epic that is 46 
 was forecast for the next afternoon). The simulation is random, so a figure moves by about ±0.05 from run to
 run.
 
+**Measured again on the span (#4172, 2026-11-08):** from the first child's start (here the opening of the
+first PR that closes it, else its close) to the last child's close, as section 7 says, not filed to closed.
+On 21 closed epics, cut at 25/50/75/90% (69 test points): M8 ×1.94, **M10 ×1.99**, M9 ×2.22. M10's P10–P90
+held 46 of 69 (67%), so the host widens the band by the width factor its backtest finds. The host's
+`work/timeline` runs this backtest in Go (`Go/internal/lineage/forecast.go`) at most once a day; on
+`backtest.py`'s own filed-to-closed data it gives ×2.16 where `backtest.py` gives ×2.19.
+
 **Why calendar time is hard:** 83% of an epic's life is in a few gaps longer than 3 h. They start mostly
 at 20:00–21:00 and 06:00–07:00 Pacific, and children close mostly from 14:00 to 21:00 Pacific. The work
 follows the day (Alex's hours and approvals), not a steady rate. #3557's estimates are good for the agents'
