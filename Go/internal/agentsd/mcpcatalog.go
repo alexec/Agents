@@ -133,7 +133,7 @@ func (d *Daemon) mcpRegistry(m *wire.Marketplace) mcpcatalog.Registry {
 	}
 	r.Base = m.URL
 	if m.Token != nil && d.personalHome() != "" {
-		r.Token, _ = skillcatalog.LoadSecrets(skillcatalog.SecretsPath(d.personalHome())).Value(*m.Token)
+		r.Token, _ = d.plainSecrets(d.personalHome()).Value(*m.Token)
 	}
 	return r
 }
@@ -240,7 +240,7 @@ func (d *Daemon) mcpPreview(ctx context.Context, r wire.MCPPreviewRequest) wire.
 	}
 	secrets := skillcatalog.Secrets{}
 	if home := d.personalHome(); home != "" {
-		secrets = skillcatalog.LoadSecrets(skillcatalog.SecretsPath(home))
+		secrets = d.plainSecrets(home)
 	}
 	if o, ours := mcpcatalog.OursByID(r.Result.ID); ours && (market == nil || market.ID == mcpcatalog.AgentsMarketplace) {
 		return d.stageMCPPreview(r, mcpcatalog.BuildOurs(o, secrets.IsSet), o.ID, "")

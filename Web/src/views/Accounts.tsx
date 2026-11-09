@@ -7,7 +7,7 @@ import type { Store } from "../model/store";
 import type { JSONValue, OutsideAccount, OutsideAccounts } from "../protocol/generated";
 import { CallFailed } from "../wire/link";
 import { describe, methodNotFound } from "../model/errors";
-import { type AccountFields, accountCost, accountDetail, accountFields, accountOf, accountProjects, accountsFoot, accountsOf,
+import { type AccountFields, accountAbout, accountCost, accountDetail, accountFields, accountOf, accountProjects, accountsFoot, accountsOf,
   accountsTitle, expiresSoon, noSecrets, sameAccount } from "../model/accounts";
 import { Modal } from "./Modal";
 
@@ -17,7 +17,8 @@ function sentence(error: unknown): string {
 }
 
 const FIELDS: [key: string, label: string, hint: string][] = [
-  ["service", "Service", "gitlab.com"], ["address", "Address", "name@example.com"], ["plan", "Plan", "Free"],
+  ["service", "Service", "gitlab.com"], ["address", "Address", "name@example.com"],
+  ["description", "Description", "What it is for, and who uses it"], ["plan", "Plan", "Free"],
   ["cost", "Monthly cost (USD)", "0"], ["card", "Card", "The card's name in Secrets"], ["secret", "Secret", "The token's name in Secrets"],
   ["twoFactor", "Two-factor", "TOTP, passkey, SMS"], ["issue", "Issue", "#12"], ["made", "Made", "YYYY-MM-DD"],
   ["tokenExpires", "Token expires", "YYYY-MM-DD"], ["projects", "Projects", "None is all, else names with commas"],
@@ -116,6 +117,7 @@ export function AccountsSection({ store, down }: { store: Store; down: boolean }
               <span>{a.service}</span>
               <span class="hint">{accountDetail(a)}</span>
               <span class="hint">{accountCost(a)}</span>
+              <p class="hint">{accountAbout(a)}</p>
               {soon && <p class="hint attention">{soon}</p>}
               <span class="row-actions">
                 <button type="button" disabled={down} onClick={() => { editing.value = a; }}>Edit…</button>

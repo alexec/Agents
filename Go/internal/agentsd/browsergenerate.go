@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/alexec/agents/Go/internal/agentsd/skillcatalog"
 )
 
 // generate_secret (#4000): agentsd makes a strong password, saves it in Settings ▸ Secrets
@@ -279,7 +278,7 @@ func (d *Daemon) generateSecretCheck(args map[string]json.RawMessage) string {
 	if home == "" {
 		return "Nothing was made: this machine has no personal home to keep secrets in."
 	}
-	if string(args["replace"]) != "true" && (skillcatalog.LoadSecrets(skillcatalog.SecretsPath(home)).IsSet(name) || isSealedSecret(home, name)) {
+	if string(args["replace"]) != "true" && secretIsSet(home, name) {
 		return "Nothing was made: " + name + " exists. Fill it with fill_secret, or set replace to true on a change-password page."
 	}
 	if _, err := parsePasswordRules(argString(args, "rules"), pinLength(args)); err != nil {

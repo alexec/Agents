@@ -26,6 +26,18 @@ test("the crowd has a place for each Blob, back rows drawn first, and you smalle
   assert.deepEqual(m.crowdLayout(0, 820, 170), m.emptyLayout);
 });
 
+test("each Blob blinks about one tick in four, so a crowd of one does not blink every tick (#4194)", () => {
+  let one = 0;
+  for (let i = 0; i < 4000; i++) one += m.blinkers(1).size;
+  assert.ok(one > 800 && one < 1200, `one Blob blinked in ${one} of 4000 ticks`);
+  assert.equal(m.blinkers(0).size, 0);
+  for (let i = 0; i < 200; i++) {
+    assert.ok(m.blinkers(12).size <= m.MOST_BLINKING);
+    const big = m.blinkers(1000);
+    assert.ok(big.size >= 1 && big.size <= m.MOST_BLINKING);
+  }
+});
+
 const baseline = { prsPerWeek: 1.4, hoursPerWeek: 40, source: "DX 2025" };
 const at = (prsMerged, multiplier, more = {}) => ({ prsMerged, reverts: 0, multiplier, agentsWorking: 0, since: 0, baseline, ...more });
 const pr = { kind: "pr", ref: "github:alexec/agents#1234" };

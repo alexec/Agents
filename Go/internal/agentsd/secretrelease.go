@@ -254,6 +254,17 @@ func (d *Daemon) releaseForAnswer(rec wire.Request, a *wire.RequestSecretUseAnsw
 
 // keepReleased keeps an opened value in agentsd's memory, which it makes private first.
 func (d *Daemon) keepReleased(storeName, name string, plain []byte, value string) {
+	d.keepMemoryPrivateOnce()
+	d.secretReleaseMu.Lock()
+	defer d.secretReleaseMu.Unlock()
+	if d.secretReleased == nil {
+		d.secretReleased = map[string]releasedSecret{}
+	}
+	d.secretReleased[releasedKey(storeName, name)] = releasedSecret{layer: sha256.Sum256(plain), value: value}
+}
+
+// keepMemoryPrivateOnce makes agentsd's memory private before it first keeps an opened value.
+func (d *Daemon) keepMemoryPrivateOnce() {
 	d.secretReleaseMu.Lock()
 	defer d.secretReleaseMu.Unlock()
 	if !d.secretPrivateSet {
@@ -262,10 +273,6 @@ func (d *Daemon) keepReleased(storeName, name string, plain []byte, value string
 		}
 		d.secretPrivateSet = true
 	}
-	if d.secretReleased == nil {
-		d.secretReleased = map[string]releasedSecret{}
-	}
-	d.secretReleased[releasedKey(storeName, name)] = releasedSecret{layer: sha256.Sum256(plain), value: value}
 }
 
 // forgetReleased drops what a store's values opened to: a session's, when it is archived.

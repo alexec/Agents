@@ -12,7 +12,8 @@ import Foundation
 /// Once the channel is open, what the machine says unasked (`agent/changed`, a question card)
 /// is taken only with its MAC too (#3541). A transport with no channel opens one again when
 /// the machine refuses a request as not in its lock: the machine took its lock after the
-/// transport opened (#3642).
+/// transport opened (#3642), or the lock was made after it (#4134): with no lock key yet, the
+/// transport is wrapped all the same, so that refusal opens one.
 /// The web page's is `Web/src/wire/link.ts`.
 public struct LockedLink: DaemonLink {
     public typealias Source = @Sendable () async -> LockChannel.Signer?
@@ -33,9 +34,9 @@ public struct LockedLink: DaemonLink {
 
     public func transport() async throws -> any LineTransport {
         let transport = try await inner.transport()
-        guard let signer = await source() else { return transport }
+        let signer = await source()
         let locked = LockedTransport(inner: transport, signer: signer, host: host, source: source)
-        await locked.open(within: 15)
+        if signer != nil { await locked.open(within: 15) }
         return locked
     }
 }
@@ -48,8 +49,9 @@ final class LockedTransport: LineTransport, @unchecked Sendable {
     private let host: String
     private let source: LockedLink.Source
     private let lock = NSLock()
-    /// The lock key and lock of the last hello: a later one reads them again.
-    private var signer: LockChannel.Signer
+    /// The lock key and lock of the last hello: a later one reads them again. None before the
+    /// lock exists: the transport is the plain one until a refusal finds one (#4134).
+    private var signer: LockChannel.Signer?
     private var required: Bool
     private var channel: LockChannel.Channel?
     /// A hello is on its way again, after a refusal (#3642).
@@ -64,12 +66,12 @@ final class LockedTransport: LineTransport, @unchecked Sendable {
     private let continuation: AsyncThrowingStream<String, any Error>.Continuation
     private var pump: Task<Void, Never>?
 
-    init(inner: any LineTransport, signer: LockChannel.Signer, host: String, source: @escaping LockedLink.Source) {
+    init(inner: any LineTransport, signer: LockChannel.Signer?, host: String, source: @escaping LockedLink.Source) {
         self.inner = inner
         self.signer = signer
         self.host = host
         self.source = source
-        required = LockChannel.names(signer.state, host: host)
+        required = signer.map { LockChannel.names($0.state, host: host) } ?? false
         var c: AsyncThrowingStream<String, any Error>.Continuation!
         stream = AsyncThrowingStream(bufferingPolicy: .unbounded) { c = $0 }
         continuation = c
@@ -85,8 +87,8 @@ final class LockedTransport: LineTransport, @unchecked Sendable {
 
     /// `lock/hello`: the channel, when the machine answers as one its lock names in time.
     func open(within seconds: Double) async {
-        let (key, id) = lock.withLock { (signer.key, helloID) }
-        guard let hello = try? LockChannel.hello(key), let params = try? JSONValue.encoding(hello.params),
+        let (key, id) = lock.withLock { (signer?.key, helloID) }
+        guard let key, let hello = try? LockChannel.hello(key), let params = try? JSONValue.encoding(hello.params),
               let line = try? JSONRPCCodec.encode(.request(id: id, method: DaemonAPI.Method.lockHello, params: params)) else { return }
         let reply: JSONRPCMessage? = await withCheckedContinuation { wait in
             lock.withLock {
@@ -137,7 +139,7 @@ final class LockedTransport: LineTransport, @unchecked Sendable {
     /// line after it, a notification too (#3541).
     private func finish(_ reply: JSONRPCMessage) {
         lock.withLock {
-            guard let hello, case .success(_, let result) = reply,
+            guard let hello, let signer, case .success(_, let result) = reply,
                   let answer = try? result.decode(DaemonAPI.LockHelloReply.self) else { return }
             channel = try? LockChannel.finish(hello, state: signer.state, host: host, reply: answer)
         }
@@ -164,7 +166,7 @@ final class LockedTransport: LineTransport, @unchecked Sendable {
                 try channel.sealThen(line) { try inner.write(line: $0) }
                 return
             }
-            if !host.isEmpty, keptMethods.contains(method), let params,
+            if !host.isEmpty, keptMethods.contains(method), let signer, let params,
                let text = try? LockChannel.text(params),
                let signature = try? LockChannel.sign(signer.key, to: host, method: method, params: text),
                let signed = try? LockChannel.text(signature), let idText = try? LockChannel.text(id),

@@ -70,6 +70,13 @@ type Cast struct {
 	mu     sync.Mutex
 	width  int64
 	height int64
+	// device is the profile the watched session's tabs have (#4086): the page is laid out
+	// at its size, not the pane's, and drawn to fit the pane. nil for none.
+	device *Device
+	// sized is whether the cast's session on its tab set the page's size. Chromium keeps one
+	// size for a tab, and drops it when the session that set one detaches, so a cast of a
+	// device leaves the size to the device's own session (Tabs.Emulate).
+	sized bool
 	tab    target.ID
 	// pinned is true for a cast of one named tab: it does not follow new tabs.
 	pinned  bool
@@ -82,13 +89,13 @@ type Cast struct {
 }
 
 // Watch starts a screencast of tab, or of the newest tab when tab is "", of the browser at
-// endpoint, laid out at width by height. frame hears each frame, page each change of
+// endpoint, laid out at width by height, or at device's size when it is not nil. frame hears each frame, page each change of
 // address or title, and closed once, when the browser goes away (not after Close).
-func Watch(endpoint string, tab target.ID, width, height int64, frame func(Frame), page func(Page), closed func()) (*Cast, error) {
+func Watch(endpoint string, tab target.ID, width, height int64, device *Device, frame func(Frame), page func(Page), closed func()) (*Cast, error) {
 	alloc, cancelAlloc := remote.NewAllocator(context.Background(), endpoint, remote.NoModifyURL)
 	root, cancelRoot := chromedp.NewContext(alloc)
 	c := &Cast{frame: frame, page: page, closed: closed, root: root,
-		cancelRoot: func() { cancelRoot(); cancelAlloc() }, pinned: tab != ""}
+		cancelRoot: func() { cancelRoot(); cancelAlloc() }, pinned: tab != "", device: device}
 	c.width, c.height = clampSide(width), clampSide(height)
 	// chromedp ties the connection's life to the context of its first call, so that one
 	// is root itself, with no time limit; the browser is on this machine.
@@ -160,8 +167,8 @@ func (c *Cast) attach(tab target.ID) error {
 		c.stopTab()
 	}
 	ctx, cancel := chromedp.NewContext(c.root, chromedp.WithTargetID(tab), chromedp.WithDetachOnCancel())
-	c.tab, c.tabCtx, c.stopTab = tab, ctx, cancel
-	w, h := c.width, c.height
+	c.tab, c.tabCtx, c.stopTab, c.sized = tab, ctx, cancel, false
+	w, h, d := c.width, c.height, c.device
 	c.mu.Unlock()
 
 	// The first call attaches, with no time limit, as it ties the tab's context to its own.
@@ -183,7 +190,7 @@ func (c *Cast) attach(tab target.ID) error {
 			c.frame(f)
 		}
 	}()
-	if err := c.start(ctx, w, h); err != nil {
+	if err := c.start(ctx, w, h, d); err != nil {
 		cancel()
 		return err
 	}
@@ -191,14 +198,28 @@ func (c *Cast) attach(tab target.ID) error {
 	return nil
 }
 
-// start lays the page out at w by h and asks for frames of that size.
-func (c *Cast) start(ctx context.Context, w, h int64) error {
+// start lays the page out at w by h, unless the tab is a device, and asks for frames that
+// fit w by h.
+func (c *Cast) start(ctx context.Context, w, h int64, d *Device) error {
 	call, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	if _, err := chromedp.Call(call, emulation.SetDeviceMetricsOverride,
-		emulation.SetDeviceMetricsOverrideParams{Width: w, Height: h, DeviceScaleFactor: 1}); err != nil {
-		return err
+	c.mu.Lock()
+	sized := c.sized
+	c.sized = d == nil
+	c.mu.Unlock()
+	if d == nil {
+		if _, err := chromedp.Call(call, emulation.SetDeviceMetricsOverride,
+			emulation.SetDeviceMetricsOverrideParams{Width: w, Height: h, DeviceScaleFactor: 1}); err != nil {
+			return err
+		}
+	} else if sized {
+		// Given up before the device's session sets its own: see SetDevice.
+		if _, err := chromedp.Call(call, emulation.ClearDeviceMetricsOverride, cdp.Empty{}); err != nil {
+			return err
+		}
 	}
+	// A screencast that runs already is not started again: it ends first.
+	_, _ = chromedp.Call(call, page.StopScreencast, cdp.Empty{})
 	quality := int64(60)
 	_, err := chromedp.Call(call, page.StartScreencast, page.StartScreencastParams{
 		Format: page.StartScreencastFormatJpeg, Quality: &quality, MaxWidth: w, MaxHeight: h, EveryNthFrame: 1})
@@ -351,13 +372,28 @@ func (c *Cast) Ack(n int64) {
 func (c *Cast) Resize(width, height int64) error {
 	c.mu.Lock()
 	c.width, c.height = clampSide(width), clampSide(height)
+	w, h, d := c.width, c.height, c.device
+	c.mu.Unlock()
+	ctx, err := c.tabContext()
+	if err != nil {
+		return err
+	}
+	return c.start(ctx, w, h, d)
+}
+
+// SetDevice says the tab is now device, or at the pane's size again with nil (#4086). Call
+// it before Tabs.Emulate gives the tab a device, and after it takes one away: the cast gives
+// up its size first, or takes it back after.
+func (c *Cast) SetDevice(device *Device) error {
+	c.mu.Lock()
+	c.device = device
 	w, h := c.width, c.height
 	c.mu.Unlock()
 	ctx, err := c.tabContext()
 	if err != nil {
 		return err
 	}
-	return c.start(ctx, w, h)
+	return c.start(ctx, w, h, device)
 }
 
 // Input sends the person's input to the page. After a click is released it says whether

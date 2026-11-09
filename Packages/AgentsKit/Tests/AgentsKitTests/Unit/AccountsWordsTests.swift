@@ -32,8 +32,15 @@ struct AccountsWordsTests {
     }
 
     @Test func theSheetsFieldsGoBothWays() {
-        let a = DaemonAPI.OutsideAccount(service: "aws.amazon.com", monthlyCostUsd: 12.5, projects: ["Agents", "Web"])
+        let a = DaemonAPI.OutsideAccount(service: "aws.amazon.com", description: "The agents' own AWS account.", monthlyCostUsd: 12.5,
+                                         projects: ["Agents", "Web"])
         #expect(AccountsWords.account(AccountsWords.fields(a)) == a)
         #expect(AccountsWords.account(["service": " x.com ", "plan": " "]) == DaemonAPI.OutsideAccount(service: "x.com"))
+    }
+
+    /// An account made before descriptions (#4164) says so.
+    @Test func anAccountWithNoDescriptionSaysSo() {
+        #expect(AccountsWords.about(all[0]) == "No description")
+        #expect(AccountsWords.about(DaemonAPI.OutsideAccount(service: "x", description: " For tests. ")) == "For tests.")
     }
 }
