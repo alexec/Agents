@@ -72,3 +72,39 @@ func TestSearchFilterFeature(t *testing.T) {
 		t.Fatalf("filter: %s", one)
 	}
 }
+
+// #4242: Blockers are many issues' "blocks" inverse relations, in one query of an aliased
+// issue(id:) each; one Linear does not have has none.
+func TestBlockersReadManyIssues(t *testing.T) {
+	var queries []string
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Query     string         `json:"query"`
+			Variables map[string]any `json:"variables"`
+		}
+		body, _ := io.ReadAll(r.Body)
+		json.Unmarshal(body, &req)
+		queries = append(queries, req.Query)
+		if req.Variables["i0"] != "ENG-7" || req.Variables["i1"] != "ENG-404" {
+			io.WriteString(w, `{"data":{}}`)
+			return
+		}
+		io.WriteString(w, `{"data":{"i0":{"inverseRelations":{"nodes":[
+ {"type":"blocks","issue":{"identifier":"ENG-6","state":{"type":"completed"}}},
+ {"type":"related","issue":{"identifier":"ENG-9","state":{"type":"started"}}},
+ {"type":"blocks","issue":{"identifier":"OPS-1","state":{"type":"started"}}}]}},"i1":null}}`)
+	}))
+	t.Cleanup(s.Close)
+	l := NewRealLinear(s.URL, func() string { return "Bearer t" })
+	l.sharing = 0
+	by, err := l.Blockers(context.Background(), []string{"ENG-7", "ENG-404"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b := by["ENG-7"]; len(b) != 2 || b[0] != (Ref{"ENG-6", false}) || b[1] != (Ref{"OPS-1", true}) {
+		t.Fatalf("blockers: %+v", by)
+	}
+	if _, ok := by["ENG-404"]; ok || len(queries) != 1 || !strings.Contains(queries[0], "i1: issue(id: $i1)") {
+		t.Fatalf("by %+v, queries %q", by, queries)
+	}
+}

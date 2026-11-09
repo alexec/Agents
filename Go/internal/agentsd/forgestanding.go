@@ -217,35 +217,124 @@ func (d *Daemon) standingPlan(ctx context.Context, method string, epic wire.Forg
 	for _, i := range items[:min(len(items), forgeListMost)] {
 		children = append(children, planChild{item: i})
 	}
-	if err := d.standingBlockers(ctx, epic, children); err != nil {
+	if err := d.standingBlockers(ctx, method, epic, children); err != nil {
 		return wire.ForgeStanding{}, nil, err
 	}
 	return q, children, nil
 }
 
-// standingBlockers sets the blockers of a standing epic's children (#4200), which a list does
-// not read: on GitHub, one query for all of them. The other forges' children have none yet.
-func (d *Daemon) standingBlockers(ctx context.Context, epic wire.ForgeItem, children []planChild) error {
-	repo, _, ok := nodeOfRepo(epic.Node)
-	if !ok || repo.forge != "github" || len(children) == 0 {
+// standingBlockers sets the blockers of a standing epic's children, which a list does not read:
+// one read for all of them on each forge (#4200, #4242). The children are on the epic's own repo,
+// project or team, so they are read where the epic is. Forgejo reads a child's at a time.
+func (d *Daemon) standingBlockers(ctx context.Context, method string, epic wire.ForgeItem, children []planChild) error {
+	if len(children) == 0 {
 		return nil
 	}
-	gh, err := d.forgeGitHub()
-	if err != nil {
-		return err
+	set := func(n int, node wire.LineageNode, open bool) {
+		children[n].blockedBy = append(children[n].blockedBy, planRef{node: node, open: open})
 	}
 	numbers := make([]int, len(children))
 	for n, c := range children {
 		numbers[n] = refNumber(c.item.Node.Ref)
 	}
-	by, err := gh.Blockers(ctx, repo.path, numbers)
-	if err != nil {
-		return err
+	keys := make([]string, len(children))
+	for n, c := range children {
+		_, keys[n], _ = strings.Cut(c.item.Node.Ref, ":")
 	}
-	for n := range children {
-		for _, b := range by[numbers[n]] {
-			children[n].blockedBy = append(children[n].blockedBy,
-				planRef{node: forgeRepo{"github", strings.ToLower(b.Repo)}.issue(b.Number), open: b.Open})
+	switch {
+	case strings.HasPrefix(epic.Node.Ref, "linear:"):
+		l, err := d.forgeLinear()
+		if err != nil {
+			return err
+		}
+		by, err := l.Blockers(ctx, keys)
+		if err != nil {
+			return err
+		}
+		for n := range children {
+			for _, b := range by[keys[n]] {
+				set(n, wire.LineageNode{Kind: lineage.KindIssue, Ref: "linear:" + b.Identifier}, b.Open)
+			}
+		}
+	case strings.HasPrefix(epic.Node.Ref, "jira:"):
+		j, err := d.forgeJira()
+		if err != nil {
+			return err
+		}
+		by, err := j.Blockers(ctx, keys)
+		if err != nil {
+			return err
+		}
+		for n := range children {
+			for _, b := range by[strings.ToUpper(keys[n])] {
+				set(n, wire.LineageNode{Kind: lineage.KindIssue, Ref: "jira:" + b.Key}, b.Open)
+			}
+		}
+	default:
+		if project, _, ok := boardsOfNode(epic.Node); ok {
+			b, err := d.forgeAzureBoards()
+			if err != nil {
+				return err
+			}
+			by, err := b.Blockers(ctx, project, numbers)
+			if err != nil {
+				return err
+			}
+			for n := range children {
+				for _, r := range by[numbers[n]] {
+					set(n, boardsNode(r.Project, r.ID), r.Open)
+				}
+			}
+			return nil
+		}
+		if repo, _, ok := forgejoOfNode(epic.Node); ok {
+			fj, named, _, err := d.forgejoOf(ctx, method, repo)
+			if err != nil {
+				return err
+			}
+			by, err := fj.Blockers(ctx, named, numbers)
+			if err != nil {
+				return err
+			}
+			for n := range children {
+				for _, b := range by[numbers[n]] {
+					set(n, forgejoNode(b.Repo, b.Number, b.PR), b.Open)
+				}
+			}
+			return nil
+		}
+		repo, _, ok := nodeOfRepo(epic.Node)
+		switch {
+		case !ok:
+			return nil
+		case repo.forge == "gitlab":
+			gl, project, _, err := d.gitlabOf(ctx, method, repo)
+			if err != nil {
+				return err
+			}
+			by, err := gl.Blockers(ctx, project, numbers)
+			if err != nil {
+				return err
+			}
+			for n := range children {
+				for _, b := range by[numbers[n]] {
+					set(n, forgeRepo{"gitlab", strings.ToLower(b.Project)}.issue(b.Number), b.Open)
+				}
+			}
+		case repo.forge == "github":
+			gh, err := d.forgeGitHub()
+			if err != nil {
+				return err
+			}
+			by, err := gh.Blockers(ctx, repo.path, numbers)
+			if err != nil {
+				return err
+			}
+			for n := range children {
+				for _, b := range by[numbers[n]] {
+					set(n, forgeRepo{"github", strings.ToLower(b.Repo)}.issue(b.Number), b.Open)
+				}
+			}
 		}
 	}
 	return nil

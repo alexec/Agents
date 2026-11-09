@@ -20,6 +20,8 @@ type fakeForgeBoards struct {
 	mu       sync.Mutex
 	searches []string
 	wrote    []string
+	// blocked are the ids Blockers was asked about (#4242).
+	blocked []string
 }
 
 const boardsProjectName = "acme/web app"
@@ -80,6 +82,13 @@ func (f *fakeForgeBoards) SetState(_ context.Context, project string, id int, cl
 
 func (f *fakeForgeBoards) Transition(_ context.Context, project string, id int, state string) error {
 	return f.note(fmt.Sprintf("state %s#%d %s", project, id, state))
+}
+
+func (f *fakeForgeBoards) Blockers(_ context.Context, project string, ids []int) (map[int][]azureboardsmcp.Ref, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.blocked = append(f.blocked, fmt.Sprint(project, ids))
+	return map[int][]azureboardsmcp.Ref{ids[0]: {{Project: "acme/Ops", ID: 90, Open: true}, {Project: boardsProjectName, ID: 91}}}, nil
 }
 
 func (f *fakeForgeBoards) Plan(_ context.Context, project string, id int) (azureboardsmcp.Plan, error) {

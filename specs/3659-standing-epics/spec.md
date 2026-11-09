@@ -146,10 +146,16 @@ on every forge with no change to their clients. Alex can overrule.
 - Priority is the `priority:` labels only: `ForgeItem` has no priority field for Linear or Jira.
 - "The oldest" is the lowest issue number: `ForgeItem` has no creation date.
 - Only the epic's own repo, Linear team or Jira project is read.
-- A list does not read blockers, so on GitHub one more query reads them for every child: an
-  aliased `issue(number:)` with `blockedBy(first: 50)` each (#4200). Because the plan is one
-  step, `blockedOutside` says each open blocker, also one that is in the plan. On the other
-  forges each child's `blockedBy` is still empty (#4242).
+- A list does not read blockers, so one more read on the epic's forge reads them for every
+  child (#4200, #4242). Because the plan is one step, `blockedOutside` says each open blocker,
+  also one that is in the plan.
+  - GitHub: one GraphQL query, an aliased `issue(number:)` with `blockedBy(first: 50)` each.
+  - GitLab: one GraphQL query, `workItems(iids:)` with the `LINKED_ITEMS` widget's
+    `is_blocked_by` links (GitLab Premium's; on Free, none blocks).
+  - Forgejo: `/issues/:n/dependencies` for each child, as an epic's plan reads them.
+  - Linear: one GraphQL query, an aliased `issue(id:)` with its `blocks` inverse relations each.
+  - Jira: one search, `key in (…)`, with each issue's Blocks links.
+  - Azure Boards: one batch read of the children's links, and one of their predecessors' states.
 
 ## The lead (#3663)
 

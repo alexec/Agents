@@ -1,6 +1,7 @@
 package agentsd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -147,5 +148,70 @@ func TestForgePlanOfAStandingEpic(t *testing.T) {
 	json.Unmarshal(c.call(t, 3, "forge/plan", wire.ForgePlanRequest{Node: wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#3700"}}), &plan)
 	if plan.Standing == nil || plan.Standing.Error == nil || len(plan.Children) != 0 || plan.Children == nil || len(plan.Steps) != 0 {
 		t.Fatalf("no block: %+v", plan)
+	}
+}
+
+// #4242: a standing epic's children say their blockers on GitLab, Forgejo, Linear, Jira and
+// Azure Boards, from one read on the epic's own forge, as on GitHub.
+func TestStandingBlockersOnEveryForge(t *testing.T) {
+	children := func(refs ...string) []planChild {
+		var out []planChild
+		for _, r := range refs {
+			out = append(out, planChild{item: wire.ForgeItem{Node: wire.LineageNode{Kind: "issue", Ref: r}}})
+		}
+		return out
+	}
+	said := func(cs []planChild) string {
+		var out []string
+		for _, c := range cs {
+			var b []string
+			for _, r := range c.blockedBy {
+				b = append(b, fmt.Sprintf("%s:%v", r.node.Ref, r.open))
+			}
+			out = append(out, strings.Join(b, " "))
+		}
+		return strings.Join(out, "|")
+	}
+	check := func(name string, d *Daemon, epic string, cs []planChild, want string) {
+		t.Helper()
+		if err := d.standingBlockers(context.Background(), "forge/plan", wire.ForgeItem{Node: wire.LineageNode{Kind: "issue", Ref: epic}}, cs); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if got := said(cs); got != want {
+			t.Errorf("%s: %q, want %q", name, got, want)
+		}
+	}
+
+	d, _, _, gl, ln, _ := allForgesDaemon(t)
+	check("GitLab", d, "gitlab:group/app#5", children("gitlab:group/app#7", "gitlab:group/app#8"),
+		"gitlab:group/app#90:true gitlab:ops/tool#91:false|")
+	check("Linear", d, "linear:ENG-5", children("linear:ENG-6", "linear:ENG-9"), "linear:OPS-1:true linear:ENG-2:false|")
+	if fmt.Sprint(gl.blocked) != "[Group/App[7 8]]" || fmt.Sprint(ln.blocked) != "[[ENG-6 ENG-9]]" {
+		t.Errorf("asked GitLab %q, Linear %q", gl.blocked, ln.blocked)
+	}
+
+	d, _, j, _ := jiraDaemon(t)
+	check("Jira", d, "jira:PROJ-7", children("jira:PROJ-8", "jira:PROJ-9"), "jira:OPS-1:true jira:PROJ-2:false|")
+	if fmt.Sprint(j.blocked) != "[[PROJ-8 PROJ-9]]" {
+		t.Errorf("asked Jira %q", j.blocked)
+	}
+
+	d, _, b, _ := boardsDaemon(t)
+	check("Azure Boards", d, "azureboards:acme/web app#12", children("azureboards:acme/web app#13", "azureboards:acme/web app#14"),
+		"azureboards:acme/ops#90:true azureboards:acme/web app#91:false|")
+	if fmt.Sprint(b.blocked) != "[acme/web app[13 14]]" {
+		t.Errorf("asked Azure Boards %q", b.blocked)
+	}
+
+	d, _, fj, _ := forgejoDaemon(t)
+	check("Forgejo", d, "forgejo:walkalex/app#1", children("forgejo:walkalex/app#2", "forgejo:walkalex/app#3"),
+		"forgejo:kim/notes#9:true forgejo:walkalex/app#5:false|")
+	if fmt.Sprint(fj.blocked) != "[walkalex/App[2 3]]" {
+		t.Errorf("asked Forgejo %q", fj.blocked)
+	}
+	// A forge the epic is on but no folder here is: the read says why.
+	if err := d.standingBlockers(context.Background(), "forge/plan", wire.ForgeItem{Node: wire.LineageNode{Kind: "issue", Ref: "forgejo:kim/notes#1"}},
+		children("forgejo:kim/notes#2")); err == nil || !strings.Contains(err.Error(), "forge/plan") {
+		t.Errorf("Forgejo with no folder: %v", err)
 	}
 }

@@ -293,6 +293,8 @@ type fakeForgeGitLab struct {
 	mu       sync.Mutex
 	searches []string
 	items    []string
+	// blocked are the numbers Blockers was asked about (#4242).
+	blocked []string
 	// wrote are the writes asked for (#3130).
 	wrote []string
 }
@@ -340,6 +342,8 @@ type fakeForgeLinear struct {
 	mu       sync.Mutex
 	searches []string
 	key      string
+	// blocked are the identifiers Blockers was asked about (#4242).
+	blocked []string
 	// wrote are the writes asked for (#3130).
 	wrote []string
 }
