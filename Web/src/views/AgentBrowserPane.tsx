@@ -2,17 +2,26 @@
 // the session's machine, which agents drive, as a screencast from its host. The person sees each
 // page as the agent does and can click, scroll, type and paste in it. Frames come only while the
 // tab is on screen and the page is not hidden. The pane shows its own session's tab, and says when
-// another session's agent holds the browser (#3916).
+// another session's agent holds the browser (#3916). On a touch screen a tap focuses a hidden field,
+// so the keyboard opens inside the tap, as Safari asks; it closes when the host says the tap was not
+// in a field that takes text (#4088, the Remote's #4091).
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { Store } from "../model/store";
 import type { BrowserInputRequest, BrowserNavigateAction, UUID } from "../protocol/generated";
 import { describe } from "../model/errors";
-import { keyInput, modifiers, otherHolder, pagePoint, stopped, words } from "../model/machineBrowser";
+import { keyInput, modifiers, otherHolder, pagePoint, stopped, touchTyped, words } from "../model/machineBrowser";
 import { openAgentLink } from "../model/agentLink";
+
+/** A key event with no name the page can take: the field's input event says what it typed. */
+const unnamed = (e: KeyboardEvent) => e.isComposing || e.key === "Unidentified" || e.keyCode === 229;
 
 export function AgentBrowserPane({ store, host, session }: { store: Store; host: string; session: string }) {
   const area = useRef<HTMLDivElement>(null);
+  /** The hidden field a touch screen's keyboard types into (#4088). */
+  const keys = useRef<HTMLTextAreaElement>(null);
+  /** The newest press came from a finger, not a mouse or a pen. */
+  const touch = useRef(false);
   const size = useSignal<{ width: number; height: number } | null>(null);
   const hidden = useSignal(document.hidden);
   const typed = useSignal("");
@@ -86,8 +95,14 @@ export function AgentBrowserPane({ store, host, session }: { store: Store; host:
     while (outbox.current.length > 0) {
       const next = outbox.current.shift()!;
       try {
-        await store.link.call("browser/input", next, host);
+        const said = await store.link.call("browser/input", next, host);
         problem.value = null;
+        // A tap outside a field closes the keyboard; an older host says nothing, which keeps it.
+        const field = keys.current;
+        if (next.kind === "mouse" && next.type === "mouseReleased" && said?.editing === false
+          && field && document.activeElement === field) {
+          area.current?.focus({ preventScroll: true });
+        }
       } catch (error) {
         // Input queued behind a failure is not sent later, out of context.
         outbox.current = [];
@@ -151,8 +166,11 @@ export function AgentBrowserPane({ store, host, session }: { store: Store; host:
         <button type="button" class="link" title="Go to this session" onClick={() => openAgentLink(holder.id)}>{holder.title}</button> {words.using}
       </p>}
       <div ref={area} class="agent-browser-page" tabIndex={0} aria-label="The page in the machine's browser"
+        onPointerDown={(e) => { touch.current = e.pointerType === "touch"; }}
         onMouseDown={(e) => {
-          (e.currentTarget as HTMLDivElement).focus();
+          // Only a field focused inside the tap opens the keyboard; the host's answer comes too late.
+          if (touch.current && keys.current) keys.current.focus({ preventScroll: true });
+          else (e.currentTarget as HTMLDivElement).focus();
           held.current = button(e);
           mouse(e, "mousePressed", held.current);
           e.preventDefault();
@@ -173,11 +191,13 @@ export function AgentBrowserPane({ store, host, session }: { store: Store; host:
           if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "v") return;
           // Other ⌘ shortcuts stay the page's own (a new tab, a reload).
           if (e.metaKey) return;
+          // A key the keyboard does not name (predictive text, a composition) comes as input.
+          if (unnamed(e)) return;
           e.preventDefault();
           send(keyInput(e, true));
         }}
         onKeyUp={(e) => {
-          if (e.metaKey) return;
+          if (e.metaKey || unnamed(e)) return;
           send(keyInput(e, false));
         }}
         onPaste={(e) => {
@@ -185,6 +205,19 @@ export function AgentBrowserPane({ store, host, session }: { store: Store; host:
           e.preventDefault();
           if (text) send({ kind: "text", text });
         }}>
+        <textarea ref={keys} class="agent-browser-keys" aria-hidden="true" tabIndex={-1}
+          autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck={false}
+          onInput={(e) => {
+            const field = e.currentTarget as HTMLTextAreaElement;
+            const typed = e as InputEvent;
+            if (typed.isComposing) return;
+            for (const input of touchTyped(typed.inputType, typed.data)) send(input);
+            field.value = "";
+          }}
+          onCompositionEnd={(e) => {
+            if (e.data) send({ kind: "text", text: e.data });
+            (e.currentTarget as HTMLTextAreaElement).value = "";
+          }} />
         {frame ? <img class="agent-browser-frame" alt="" draggable={false} src={`data:image/jpeg;base64,${frame.image}`} />
           : !answered.value ? <p class="hint"><span class="spinner" /> {words.loading}</p>
           : state.status === "running" && state.noTab ? <div class="agent-browser-note"><strong>{words.noTabTitle}</strong><p>{words.noTab}</p></div>
