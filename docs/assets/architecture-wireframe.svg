@@ -1,0 +1,290 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1360" viewBox="0 0 1200 1360" role="img" aria-label="Wireframe of the Agents architecture">
+<defs>
+<style>
+  :root { --ink:#2b2b2b; --soft:#8a8a8a; --line:#d9d9d9; --fill:#f5f5f3; --note:#2f6fdb; }
+  
+  
+  
+  
+  svg { width:100%; height:auto; display:block; background:#fff; border:1px solid var(--line); border-radius:14px; }
+  svg text { font-family: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, sans-serif; fill:var(--ink); }
+  .box   { fill:#fff;        stroke:var(--ink); stroke-width:1.6; }
+  .soft  { fill:var(--fill); stroke:var(--ink); stroke-width:1.2; }
+  .ghost { fill:none; stroke:var(--soft); stroke-width:1.2; stroke-dasharray:6 5; }
+  .bar   { fill:var(--line); }
+  .bar2  { fill:#ececec; }
+  .h     { font-size:17px; font-weight:700; }
+  .h2    { font-size:14px; font-weight:700; }
+  .t     { font-size:13px; }
+  .s     { font-size:11.5px; fill:var(--soft); }
+  .zone  { font-size:12px; font-weight:700; letter-spacing:.12em; fill:var(--soft); }
+  .wire  { fill:none; stroke:var(--ink); stroke-width:1.5; marker-end:url(#arrow); }
+  .wireD { fill:none; stroke:var(--soft); stroke-width:1.4; stroke-dasharray:5 4; marker-end:url(#arrowS); }
+  .pin   { fill:var(--note); }
+  .pinT  { fill:#fff; font-size:12px; font-weight:700; text-anchor:middle; }
+  .noteT { fill:var(--note); font-size:12px; }
+  
+  
+  
+  
+  
+</style>
+  <marker id="arrow"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2b2b2b"/></marker>
+  <marker id="arrowS" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8a8a8a"/></marker>
+</defs>
+
+<!-- ============ ZONE 1: SCREENS ============ -->
+<text class="zone" x="30" y="34">SCREENS · THEY SHOW, THEY RUN NOTHING</text>
+
+<!-- person -->
+<circle cx="70" cy="110" r="17" class="box"/>
+<path d="M40,175 Q70,130 100,175 Z" class="box"/>
+<text class="h2" x="70" y="200" text-anchor="middle">You</text>
+
+<!-- Mac window (laptop) -->
+<rect x="150" y="56" width="330" height="190" rx="10" class="box"/>
+<rect x="150" y="56" width="330" height="22" rx="10" class="soft"/>
+<circle cx="166" cy="67" r="4" class="bar"/><circle cx="180" cy="67" r="4" class="bar"/><circle cx="194" cy="67" r="4" class="bar"/>
+<rect x="160" y="88" width="90" height="148" rx="4" class="soft"/>
+<text class="s" x="168" y="106">Sessions</text>
+<text class="h2" x="168" y="128">Work</text>
+<text class="h2" x="168" y="148">Docs</text>
+<rect x="168" y="162" width="64" height="9" rx="4" class="bar2"/>
+<rect x="168" y="180" width="50" height="9" rx="4" class="bar2"/>
+<rect x="262" y="98"  width="150" height="12" rx="6" class="bar2"/>
+<rect x="300" y="120" width="168" height="12" rx="6" class="bar"/>
+<rect x="262" y="142" width="180" height="12" rx="6" class="bar2"/>
+<rect x="262" y="164" width="120" height="30" rx="6" class="ghost"/>
+<text class="s" x="270" y="183">question card</text>
+<rect x="262" y="210" width="206" height="18" rx="9" class="box"/>
+<path d="M130,246 L500,246 L516,262 L114,262 Z" class="soft"/>
+<text class="h2" x="315" y="288" text-anchor="middle">Mac window</text>
+<text class="s"  x="315" y="305" text-anchor="middle">part of the Agents app</text>
+
+<!-- Phone -->
+<rect x="560" y="56" width="104" height="206" rx="18" class="box"/>
+<rect x="592" y="64" width="40" height="8" rx="4" class="bar"/>
+<rect x="572" y="86"  width="80" height="10" rx="5" class="bar"/>
+<rect x="572" y="106" width="64" height="10" rx="5" class="bar2"/>
+<rect x="572" y="126" width="72" height="10" rx="5" class="bar2"/>
+<rect x="572" y="146" width="56" height="10" rx="5" class="bar2"/>
+<rect x="572" y="176" width="80" height="34" rx="6" class="ghost"/>
+<rect x="572" y="226" width="80" height="16" rx="8" class="box"/>
+<text class="h2" x="612" y="288" text-anchor="middle">Remote</text>
+<text class="s"  x="612" y="305" text-anchor="middle">iPhone and iPad</text>
+
+<!-- Browser -->
+<rect x="700" y="56" width="330" height="206" rx="10" class="box"/>
+<rect x="700" y="56" width="330" height="28" rx="10" class="soft"/>
+<circle cx="716" cy="70" r="4" class="bar"/><circle cx="730" cy="70" r="4" class="bar"/><circle cx="744" cy="70" r="4" class="bar"/>
+<rect x="762" y="62" width="200" height="16" rx="8" class="box"/>
+<text class="s" x="774" y="74">localhost:8792</text>
+<rect x="712" y="96" width="90" height="154" rx="4" class="soft"/>
+<text class="s" x="720" y="114">Sessions</text>
+<text class="h2" x="720" y="136">Work</text>
+<text class="h2" x="720" y="156">Docs</text>
+<rect x="720" y="170" width="60" height="9" rx="4" class="bar2"/>
+<rect x="814" y="106" width="140" height="12" rx="6" class="bar2"/>
+<rect x="850" y="128" width="168" height="12" rx="6" class="bar"/>
+<rect x="814" y="150" width="170" height="12" rx="6" class="bar2"/>
+<rect x="814" y="226" width="204" height="18" rx="9" class="box"/>
+<text class="h2" x="865" y="288" text-anchor="middle">Web page</text>
+<text class="s"  x="865" y="305" text-anchor="middle">any browser</text>
+
+<!-- Coming soon: Windows and Android -->
+<rect x="1056" y="64" width="120" height="80" rx="8" class="ghost"/>
+<rect x="1102" y="88" width="13" height="13" class="bar"/><rect x="1117" y="88" width="13" height="13" class="bar"/>
+<rect x="1102" y="103" width="13" height="13" class="bar"/><rect x="1117" y="103" width="13" height="13" class="bar"/>
+<text class="h2" x="1116" y="162" text-anchor="middle">Windows</text>
+<text class="s"  x="1116" y="178" text-anchor="middle">coming soon</text>
+<rect x="1090" y="194" width="52" height="68" rx="12" class="ghost"/>
+<rect x="1104" y="214" width="24" height="16" rx="8" class="bar"/>
+<text class="h2" x="1116" y="288" text-anchor="middle">Android</text>
+<text class="s"  x="1116" y="305" text-anchor="middle">coming soon</text>
+
+<!-- pin 1 -->
+<circle cx="1180" cy="40" r="12" class="pin"/><text class="pinT" x="1180" y="44">1</text>
+
+<!-- arrows: screens connect out to the control plane -->
+<path class="wire" d="M315,315 L470,392"/>
+<path class="wire" d="M612,315 L604,392"/>
+<path class="wire" d="M865,315 L740,392"/>
+<text class="s" x="880" y="352">every screen connects out</text>
+
+<!-- ============ ZONE 2: CONTROL PLANE ============ -->
+<text class="zone" x="30" y="380">THE SWITCHBOARD</text>
+
+<rect x="330" y="398" width="540" height="130" rx="14" class="box"/>
+<text class="h" x="356" y="428">Control plane</text>
+<text class="s" x="476" y="428">agents-control · on your Mac or in the cloud</text>
+<!-- switchboard sketch: plugs on the left (screens) and the right (machines) -->
+<g>
+  <circle cx="380" cy="462" r="6" class="soft"/><circle cx="380" cy="486" r="6" class="soft"/><circle cx="380" cy="510" r="6" class="soft"/>
+  <circle cx="560" cy="470" r="6" class="soft"/><circle cx="560" cy="502" r="6" class="soft"/>
+  <path d="M386,462 C470,462 470,470 554,470" fill="none" stroke="#8a8a8a" stroke-width="1.3"/>
+  <path d="M386,486 C470,486 470,470 554,470" fill="none" stroke="#8a8a8a" stroke-width="1.3"/>
+  <path d="M386,510 C470,510 470,502 554,502" fill="none" stroke="#8a8a8a" stroke-width="1.3"/>
+  <text class="s" x="348" y="526" text-anchor="middle"></text>
+</g>
+<text class="t" x="590" y="462">Pairs each screen and machine</text>
+<text class="t" x="590" y="484">Sends each request to its machine</text>
+<text class="t" x="590" y="506">Sends each update to every screen</text>
+
+<!-- store -->
+<ellipse cx="985" cy="430" rx="62" ry="12" class="soft"/>
+<path d="M923,430 L923,494 A62,12 0 0 0 1047,494 L1047,430" class="soft"/>
+<ellipse cx="985" cy="430" rx="62" ry="12" class="soft"/>
+<text class="h2" x="985" y="462" text-anchor="middle">Its store</text>
+<text class="s"  x="985" y="480" text-anchor="middle">a folder</text>
+<path class="wire" d="M870,463 L918,463"/>
+<text class="s" x="985" y="522" text-anchor="middle">who is paired, which machines</text>
+<text class="s" x="985" y="538" text-anchor="middle">nothing about agents</text>
+
+<!-- pin 2 -->
+<circle cx="330" cy="398" r="12" class="pin"/><text class="pinT" x="330" y="402">2</text>
+
+<!-- arrows: machines connect out, up to the control plane -->
+<path class="wire" d="M470,600 L520,532"/>
+<path class="wire" d="M1030,600 L860,520"/>
+<text class="s" x="560" y="575">machines connect out too: nothing connects in</text>
+
+<!-- direct link: Mac window to its own Mac -->
+<path class="wireD" d="M150,200 C40,260 30,520 90,640"/>
+<text class="s" x="22" y="430" transform="rotate(-90 22 430)">same Mac: the window goes direct</text>
+
+<!-- ============ ZONE 3: MACHINES ============ -->
+<text class="zone" x="30" y="585">MACHINES · WHERE AGENTS RUN</text>
+
+<!-- Your Mac -->
+<rect x="70" y="604" width="830" height="556" rx="16" class="box"/>
+<text class="h" x="94" y="634">Your Mac</text>
+
+<!-- Agents app strip -->
+<rect x="94" y="650" width="782" height="40" rx="8" class="soft"/>
+<rect x="106" y="662" width="16" height="16" rx="3" class="box"/>
+<text class="h2" x="132" y="675">Agents app</text>
+<text class="t"  x="222" y="675">menu bar + the window · installs the daemon and the control plane, makes pairing codes</text>
+<path class="wire" d="M480,690 L480,712"/>
+<text class="s" x="490" y="706">launchd keeps them running</text>
+
+<!-- agentsd -->
+<rect x="94" y="716" width="782" height="424" rx="12" class="box"/>
+<text class="h" x="116" y="744">Host daemon</text>
+<text class="s" x="232" y="744">agentsd · Go · the same program on macOS and Linux</text>
+
+<!-- what agents work from: Work and Docs -->
+<text class="zone" x="116" y="776">WHAT AGENTS WORK FROM</text>
+<rect x="116" y="786" width="350" height="84" rx="10" class="box" stroke-width="2.4"/>
+<text class="h" x="132" y="812">Work</text>
+<text class="t" x="132" y="834">issues, pull requests, epics and their plans</text>
+<text class="s" x="132" y="856">GitHub · GitLab · Bitbucket · Azure · Forgejo · Linear · Jira</text>
+<rect x="526" y="786" width="328" height="84" rx="10" class="box" stroke-width="2.4"/>
+<text class="h" x="542" y="812">Docs</text>
+<text class="t" x="542" y="834">the specs and docs an agent builds from</text>
+<text class="s" x="542" y="856">a folder's docs/ and specs/ · Confluence · Notion · Drive</text>
+<path d="M466,828 L526,828" fill="none" stroke="#2b2b2b" stroke-width="1.5" stroke-dasharray="3 3"/>
+<text class="s" x="496" y="820" text-anchor="middle">lineage</text>
+
+<!-- group: talks -->
+<text class="zone" x="116" y="900">TALKS</text>
+<rect x="116" y="910" width="170" height="52" rx="8" class="soft"/>
+<text class="h2" x="128" y="932">Control uplink</text>
+<text class="s"  x="128" y="950">one line out</text>
+<rect x="116" y="972" width="170" height="52" rx="8" class="soft"/>
+<text class="h2" x="128" y="994">Daemon server</text>
+<text class="s"  x="128" y="1012">JSON-RPC to every screen</text>
+
+<!-- group: runs agents -->
+<text class="zone" x="310" y="900">RUNS AGENTS</text>
+<rect x="310" y="910" width="170" height="52" rx="8" class="box" stroke-width="2.4"/>
+<text class="h2" x="322" y="932">Agents and turns</text>
+<text class="s"  x="322" y="950">the heart: status, queues</text>
+<rect x="310" y="972" width="170" height="52" rx="8" class="soft"/>
+<text class="h2" x="322" y="994">ACP sessions</text>
+<text class="s"  x="322" y="1012">starts and drives runtimes</text>
+<rect x="310" y="1034" width="170" height="52" rx="8" class="soft"/>
+<text class="h2" x="322" y="1056">App tools</text>
+<text class="s"  x="322" y="1074">mcp__agents__* for agents</text>
+<rect x="310" y="1096" width="170" height="34" rx="8" class="soft"/>
+<text class="h2" x="322" y="1118">Shells</text>
+<text class="s"  x="372" y="1118">terminals</text>
+
+<!-- group: around the work -->
+<text class="zone" x="504" y="900">AROUND THE WORK</text>
+<rect x="504" y="910" width="170" height="52" rx="8" class="soft"/>
+<text class="h2" x="516" y="932">Workflows, events</text>
+<text class="s"  x="516" y="950">schedules, triggers, waits</text>
+<rect x="504" y="972" width="170" height="52" rx="8" class="soft"/>
+<text class="h2" x="516" y="994">Folders, files, git</text>
+<text class="s"  x="516" y="1012">worktrees, changes</text>
+<rect x="504" y="1034" width="170" height="52" rx="8" class="soft"/>
+<text class="h2" x="516" y="1056">Leases, wake</text>
+<text class="s"  x="516" y="1074">one at a time, Mac awake</text>
+<rect x="504" y="1096" width="170" height="34" rx="8" class="soft"/>
+<text class="h2" x="516" y="1118">MCP clients</text>
+<text class="s"  x="604" y="1118">polls</text>
+
+<!-- group: installs, remembers -->
+<text class="zone" x="698" y="900">INSTALLS, REMEMBERS</text>
+<rect x="698" y="910" width="156" height="52" rx="8" class="soft"/>
+<text class="h2" x="710" y="932">Installers</text>
+<text class="s"  x="710" y="950">runtimes, skills, MCP</text>
+<rect x="698" y="972" width="156" height="52" rx="8" class="soft"/>
+<text class="h2" x="710" y="994">Stores</text>
+<text class="s"  x="710" y="1012">JSON files, logs</text>
+<path class="wire" d="M776,1024 L776,1048"/>
+<ellipse cx="776" cy="1058" rx="66" ry="10" class="soft"/>
+<path d="M710,1058 L710,1118 A66,10 0 0 0 842,1118 L842,1058" class="soft"/>
+<ellipse cx="776" cy="1058" rx="66" ry="10" class="soft"/>
+<text class="h2" x="776" y="1088" text-anchor="middle">Host data</text>
+<text class="s"  x="776" y="1106" text-anchor="middle">transcripts, ~/.agents</text>
+
+<!-- pins 3, 4 and 6 -->
+<circle cx="70" cy="604" r="12" class="pin"/><text class="pinT" x="70" y="608">3</text>
+<circle cx="94" cy="716" r="12" class="pin"/><text class="pinT" x="94" y="720">4</text>
+<circle cx="116" cy="786" r="12" class="pin"/><text class="pinT" x="116" y="790">6</text>
+
+<!-- Linux server -->
+<rect x="930" y="604" width="240" height="250" rx="16" class="box"/>
+<text class="h" x="952" y="634">A Linux server</text>
+<text class="s" x="952" y="652">or a second Mac</text>
+<rect x="952" y="672" width="196" height="64" rx="10" class="soft"/>
+<text class="h2" x="966" y="698">Host daemon</text>
+<text class="s"  x="966" y="718">the same agentsd</text>
+<ellipse cx="1050" cy="766" rx="66" ry="10" class="soft"/>
+<path d="M984,766 L984,816 A66,10 0 0 0 1116,816 L1116,766" class="soft"/>
+<ellipse cx="1050" cy="766" rx="66" ry="10" class="soft"/>
+<text class="h2" x="1050" y="796" text-anchor="middle">Host data</text>
+<text class="s"  x="1050" y="890" text-anchor="middle">add more machines the same way:</text>
+<text class="s"  x="1050" y="906" text-anchor="middle">every screen sees them at once</text>
+
+<!-- ============ ZONE 4: OUTSIDE ============ -->
+<text class="zone" x="30" y="1206">THE AGENTS THEMSELVES</text>
+
+<path class="wire" d="M298,1140 L298,1224"/>
+<text class="s" x="308" y="1186">ACP sessions start one runtime per agent, over stdio</text>
+
+<g>
+  <rect x="70"  y="1228" width="104" height="44" rx="22" class="box"/><text class="h2" x="122" y="1255" text-anchor="middle">Claude Code</text>
+  <rect x="184" y="1228" width="84"  height="44" rx="22" class="box"/><text class="h2" x="226" y="1255" text-anchor="middle">Codex</text>
+  <rect x="278" y="1228" width="90"  height="44" rx="22" class="box"/><text class="h2" x="323" y="1255" text-anchor="middle">Copilot</text>
+  <rect x="378" y="1228" width="100" height="44" rx="22" class="box"/><text class="h2" x="428" y="1255" text-anchor="middle">OpenCode</text>
+  <rect x="488" y="1228" width="84"  height="44" rx="22" class="box"/><text class="h2" x="530" y="1255" text-anchor="middle">Cursor</text>
+  <rect x="582" y="1228" width="72"  height="44" rx="22" class="box"/><text class="h2" x="618" y="1255" text-anchor="middle">Grok</text>
+</g>
+<text class="t" x="70" y="1300">Runtimes. Agents never talks to a model: each runtime prompts its own provider,</text>
+<text class="t" x="70" y="1320">and calls back for the app tools over MCP.</text>
+<path class="wire" d="M664,1250 L720,1250"/>
+<path d="M728,1266 C708,1266 708,1234 734,1236 C740,1216 776,1216 784,1232 C806,1224 822,1246 806,1266 Z" class="ghost"/>
+<text class="s" x="766" y="1288" text-anchor="middle">model providers</text>
+
+<!-- other neighbours -->
+<text class="zone" x="880" y="1206">ALSO REACHED</text>
+<rect x="880" y="1220" width="138" height="36" rx="8" class="ghost"/><text class="t" x="949" y="1243" text-anchor="middle">Forges · git</text>
+<rect x="1030" y="1220" width="138" height="36" rx="8" class="ghost"/><text class="t" x="1099" y="1243" text-anchor="middle">MCP servers</text>
+<rect x="880" y="1266" width="138" height="36" rx="8" class="ghost"/><text class="t" x="949" y="1289" text-anchor="middle">Package registries</text>
+<rect x="1030" y="1266" width="138" height="36" rx="8" class="ghost"/><text class="t" x="1099" y="1289" text-anchor="middle">APNs · phone alerts</text>
+
+<!-- pin 5 -->
+<circle cx="70" cy="1228" r="12" class="pin"/><text class="pinT" x="70" y="1232">5</text>
+</svg>
