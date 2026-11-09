@@ -58,6 +58,26 @@ export function crowdLayout(blobs: number, width: number, height: number): Crowd
   return { places, drawingOrder, youScale: Math.min(Math.max(0.065, cell * 1.15 / blobSize.width), 0.135) };
 }
 
+/** How likely a Blob is to blink at each tick, as `Crowd.blinkChance`; yours too. */
+export const BLINK_CHANCE = 0.25;
+/** The most Blobs that blink at one tick, as `Crowd.mostBlinking`. */
+export const MOST_BLINKING = 5;
+
+/**
+ * The Blobs that blink at one tick, as `Crowd.blinkers`: each with `BLINK_CHANCE`, at most
+ * `MOST_BLINKING`, so a crowd of one or two does not blink every tick (#4194).
+ */
+export function blinkers(blobs: number, random: () => number = Math.random): Set<number> {
+  if (blobs <= 0) return new Set();
+  if (blobs > MOST_BLINKING * 4) {
+    const n = 1 + Math.floor(random() * MOST_BLINKING);
+    return new Set(Array.from({ length: n }, () => Math.floor(random() * blobs)));
+  }
+  const chosen: number[] = [];
+  for (let i = 0; i < blobs; i++) if (random() < BLINK_CHANCE) chosen.push(i);
+  return new Set(chosen.slice(0, MOST_BLINKING));
+}
+
 /** A light blue a little different for each engineer, as `Crowd.fill`. */
 export function crowdFill(seed: number, dark: boolean): string {
   return dark ? hsb(212 + seed * 10, 0.46 - seed * 0.13, 0.91 + seed * 0.03) : hsb(210 + seed * 12, 0.28 - seed * 0.12, 1);
