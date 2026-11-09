@@ -130,6 +130,7 @@ type Daemon struct {
 	botBook
 	setupBook
 	forgeBook
+	timelineBook
 	orgPolicyState
 	orgRouteState
 	teamPeopleCache

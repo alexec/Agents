@@ -9407,6 +9407,26 @@
       }
     },
     {
+      "name": "work/timeline",
+      "x-capability": "work.timeline/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/WorkTimelineRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/WorkTimeline"
+        }
+      }
+    },
+    {
       "name": "workflow/changed",
       "x-capability": "workflow/1",
       "tags": [

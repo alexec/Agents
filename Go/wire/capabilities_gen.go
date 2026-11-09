@@ -177,6 +177,7 @@ const CapUser1 = "user/1"
 const CapUser2 = "user/2"
 const CapViews1 = "views/1"
 const CapWake1 = "wake/1"
+const CapWorkTimeline1 = "work.timeline/1"
 const CapWorkflow1 = "workflow/1"
 const CapWorkflows1 = "workflows/1"
 const CapWorktrees1 = "worktrees/1"
@@ -535,6 +536,7 @@ var HostCapabilities = pairs([][2]string{
 	{"wake/set", "wake/1"},
 	{"wake/settings", "wake/1"},
 	{"wake/state", "wake/1"},
+	{"work/timeline", "work.timeline/1"},
 	{"workflows/approve", "workflows/1"},
 	{"workflows/archive", "workflows/1"},
 	{"workflows/delete", "workflows/1"},
