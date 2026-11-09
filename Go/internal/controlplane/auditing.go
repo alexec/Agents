@@ -60,6 +60,43 @@ func (s *Service) auditTo(actor wire.AuditActor, method, action, target string) 
 	s.auditWriter.Add(audit.Pending{Method: method, Action: action, Who: func() (wire.AuditActor, *string) { return actor, &target }})
 }
 
+// personActor is a person with no client: an agent on one of their machines did it.
+func (s *Service) personActor(user string) wire.AuditActor {
+	actor := wire.AuditActor{User: user}
+	if user == s.localOwner() {
+		name := audit.LocalOwnerName
+		actor.UserName = &name
+	} else if name := s.personName(user); name != "" {
+		actor.UserName = &name
+	}
+	return actor
+}
+
+// accountOpActions are the words of an entry for an operation on an account (#4157).
+var accountOpActions = map[wire.AccountOperationWhat]string{
+	wire.AccountOperationWhatRead:   "Listed accounts",
+	wire.AccountOperationWhatAdded:  "Added an account",
+	wire.AccountOperationWhatEdited: "Changed an account",
+}
+
+// auditAccountOps queues an entry for each operation an agent on host did to its person's
+// accounts (#4157): the target is the account's service and address, never a value of it.
+func (s *Service) auditAccountOps(host, user string, ops []wire.AccountOperation) {
+	for _, op := range ops {
+		action, ok := accountOpActions[op.What]
+		if !ok || strings.TrimSpace(op.Service) == "" {
+			continue
+		}
+		target := op.Service
+		if op.Address != nil && *op.Address != "" {
+			target += " · " + *op.Address
+		}
+		actor := s.personActor(user)
+		s.auditWriter.Add(audit.Pending{Method: "machine/accounts", Action: action, Host: host,
+			Who: func() (wire.AuditActor, *string) { return actor, &target }})
+	}
+}
+
 func (s *Service) startAudit() {
 	go s.followAuditSinks()
 	s.router.SetAudit(func(from Caller) *wire.AuditActor {

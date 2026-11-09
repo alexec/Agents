@@ -184,6 +184,8 @@ they are `machine.`.
 | `cost.limit_reached` | — | limit, agent | A spending limit was reached. When it is an agent's, it also carries `labels`, `runtime` and `started_by`. See [Settings and the Resources page](settings.md). |
 | `cost.allowance_out` | — | runtime, until, retry_after, reason | A runtime's allowance ran out, its credit was used up, or it failed. `until` is the time the provider gave, when it gave one; `retry_after` is when the app next checks it. See [Keep going when a runtime runs out](../how-to/keep-going-when-a-runtime-runs-out.md). |
 | `cost.allowance_back` | — | runtime, how | A runtime is back: `check` (the app's check passed), `person` (Mark available), `worked` (a turn on it worked), `time` (a rate limit's wait passed) or `another host` (a server said so). |
+| `account.read` | — | service, address, machine, agent | `manage_accounts` read an outside account: a `get`, or a `list` filtered to its service (#4157). A `list` with no service reads no account. Never a value of the account. |
+| `account.changed` | — | service, address, machine, agent, change | `manage_accounts` added an account (`change` is `added`) or put one in another's place (`edited`). |
 | `server.offline` | — | server | A server's connection dropped. Raised once, while the Agents window is open. |
 | `server.online` | — | server | A server that was offline is back. Raised once, while the Agents window is open. |
 | `system.restarted` | — | reason, down_since, down_for, down_for_text | Agents started again, on a Mac or a server. `reason` is `stopped` (a clean stop was recorded), `crashed` (it was alive and never said it stopped) or `first_start` (nothing was recorded). `down_since` is when it stopped or was last alive; `down_for` is the gap in seconds and `down_for_text` in words ("3 min", or "unknown"). See [Restarts](#restarts). |
@@ -416,6 +418,10 @@ It is read only.
   pair, forget or remove a client or a machine; lend a sign-in or git access; change a
   machine provider. Reads, prompts and presence are not kept. An entry is written when
   the control plane passes the call on, so a call that the host refuses is kept too.
+- **An agent's reads and changes of an outside account** (#4157): `manage_accounts` tells the
+  control plane of each, and it keeps "Listed accounts", "Added an account" or "Changed an
+  account", with the account's service and address as the target and the machine's person as
+  who did it. A `list` with no service is not kept.
 - **How long**: 90 days by default. An admin picks 30, 90, 180 or 365 days in the pane
   (`control/setAuditDays`, 1 to 3,650); the menu marks the time set now. The control
   plane's hourly sweep deletes older entries, by day. A shorter time asks first, with how

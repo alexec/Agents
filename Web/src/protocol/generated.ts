@@ -122,6 +122,31 @@ export interface ACPProviderInfo {
   configured?: boolean;
 }
 
+/** An account's newest operation (#4157), for the time ago its row shows. */
+export interface AccountLastOp {
+  what: AccountOperationWhat;
+  at: WireDate;
+}
+
+/**
+ * One read or change of an outside account by manage_accounts (#4157): a get, a list filtered to
+ * its service, or an add. Never a value of the account but its service and address.
+ */
+export interface AccountOperation {
+  what: AccountOperationWhat;
+  service: string;
+  address?: string;
+}
+
+/**
+ * What an operation on an account was (#4157): read (by manage_accounts, or a read of its secret or
+ * card), added, or edited (it took another's place).
+ */
+export type AccountOperationWhat =
+  | "read"
+  | "added"
+  | "edited";
+
 /**
  * An account added to a runtime (#840), beside the runtime's own sign-in, which is the Default
  * account and is not one of these. The person picks one when they start a session.
@@ -5792,6 +5817,11 @@ export interface MacTerminalRequest {
  */
 export interface MachineAccountsCall {
   add?: OutsideAccount[];
+  /**
+   * What manage_accounts did to the accounts (#4157): the control plane writes an audit entry for
+   * each.
+   */
+  ops?: AccountOperation[];
 }
 
 /** machines/announce, on an enrolment connection. */
@@ -7050,6 +7080,16 @@ export interface OutsideAccount {
   issue?: string;
   /** The date it was made, YYYY-MM-DD. */
   made?: string;
+  /**
+   * When it was last changed (#4157): the control plane sets it when an account takes another's
+   * place. made stays. Absent for one never changed.
+   */
+  edited?: WireDate;
+  /**
+   * Its newest operation (#4157): a read or change by manage_accounts, or a read of the secret or
+   * card it names, as the machine that answers knows it. The control plane does not store it.
+   */
+  lastOp?: AccountLastOp;
   /** The date its token expires, YYYY-MM-DD. */
   tokenExpires?: string;
   /** Where the password is, the account's name and the like. Never a secret. */
@@ -13316,6 +13356,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ACPAuthMethod: { required: ["id"], optional: ["name", "description", "_meta"] },
   ACPPromptCapabilities: { required: [], optional: ["image", "audio", "embeddedContext"] },
   ACPProviderInfo: { required: ["id"], optional: ["name", "protocol", "configured"] },
+  AccountLastOp: { required: ["what", "at"], optional: [] },
+  AccountOperation: { required: ["what", "service"], optional: ["address"] },
   AccountProfile: { required: ["id", "runtimeID", "name", "reach", "addedAt", "signedIn"], optional: ["signedInAs", "signInCommand", "source", "isDefault", "setBy"] },
   AccountRequest: { required: ["runtimeID", "accountID"], optional: [] },
   Achievements: { required: ["earned"], optional: [] },
@@ -13801,7 +13843,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MCPViewsForgetRequest: { required: ["destination", "name"], optional: [] },
   MacPathRequest: { required: ["path"], optional: ["app"] },
   MacTerminalRequest: { required: [], optional: ["path"] },
-  MachineAccountsCall: { required: [], optional: ["add"] },
+  MachineAccountsCall: { required: [], optional: ["add", "ops"] },
   MachineAnnounce: { required: ["publicKey", "name", "platform", "version", "machineID"], optional: ["implementation"] },
   MachineBotKey: { required: ["host"], optional: ["copy", "drop"] },
   MachineCatalog: { required: ["items"], optional: [] },
@@ -13897,7 +13939,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   OrgRoutesApplied: { required: ["routes"], optional: [] },
   OrgRoutesLeft: { required: ["host", "name", "user", "routes"], optional: [] },
   OrgRoutesMine: { required: ["routes"], optional: [] },
-  OutsideAccount: { required: ["service"], optional: ["description", "address", "plan", "monthlyCostUsd", "card", "secret", "twoFactor", "issue", "made", "tokenExpires", "notes", "projects"] },
+  OutsideAccount: { required: ["service"], optional: ["description", "address", "plan", "monthlyCostUsd", "card", "secret", "twoFactor", "issue", "made", "edited", "lastOp", "tokenExpires", "notes", "projects"] },
   OutsideAccounts: { required: ["accounts"], optional: [] },
   PagesChangedNotification: { required: ["folder", "folders"], optional: [] },
   PassThroughName: { required: ["name"], optional: ["runtime", "setBy"] },

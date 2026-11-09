@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/alexec/agents/Go/wire"
@@ -92,19 +93,32 @@ func (b *Book) Accounts(ctx context.Context, user string) (wire.OutsideAccounts,
 }
 
 // AddAccounts adds each account to the person's, or puts it in place of the one with the same
-// service and address. It says whether anything changed.
-func (b *Book) AddAccounts(ctx context.Context, user string, add []wire.OutsideAccount) (wire.OutsideAccounts, bool, error) {
+// service and address. It says whether anything changed. An account that takes another's place
+// keeps its made and, when it differs, is edited now (#4157). No lastOp is stored: a machine
+// gives it.
+func (b *Book) AddAccounts(ctx context.Context, user string, add []wire.OutsideAccount, now time.Time) (wire.OutsideAccounts, bool, error) {
 	part, err := b.Accounts(ctx, user)
 	if err != nil || len(add) == 0 {
 		return part, false, err
 	}
 	for _, a := range add {
+		a.LastOp = nil
 		i := accountIndex(part.Accounts, a)
 		if i < 0 {
+			a.Edited = nil
 			part.Accounts = append(part.Accounts, a)
-		} else {
-			part.Accounts[i] = a
+			continue
 		}
+		have := part.Accounts[i]
+		if a.Made == nil {
+			a.Made = have.Made
+		}
+		a.Edited = have.Edited
+		if !sameAccount(have, a) {
+			at := wire.DateOf(now)
+			a.Edited = &at
+		}
+		part.Accounts[i] = a
 	}
 	raw, err := json.Marshal(part)
 	if err != nil {
@@ -112,6 +126,14 @@ func (b *Book) AddAccounts(ctx context.Context, user string, add []wire.OutsideA
 	}
 	changed, err := b.SetPart(ctx, user, wire.UserSettingsPartNameAccounts, raw)
 	return part, changed, err
+}
+
+// sameAccount is whether two accounts are the same, but for when they were last changed.
+func sameAccount(a, b wire.OutsideAccount) bool {
+	a.Edited, a.LastOp, b.Edited, b.LastOp = nil, nil, nil, nil
+	x, _ := json.Marshal(a)
+	y, _ := json.Marshal(b)
+	return bytes.Equal(x, y)
 }
 
 func accountIndex(accounts []wire.OutsideAccount, a wire.OutsideAccount) int {

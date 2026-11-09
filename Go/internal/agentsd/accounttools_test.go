@@ -6,9 +6,11 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/alexec/agents/Go/wire"
 )
@@ -179,5 +181,116 @@ func TestPlanAccounts(t *testing.T) {
 	}
 	if note := plan.note(false); note != "Added 1. Kept 1 as they were: the person said not to replace them. 1 had no change. " {
 		t.Fatal(note)
+	}
+}
+
+// manage_accounts records each read and change of an account (#4157): an event, an operation
+// for the control plane's audit, and the account's last operation, which a later read of its
+// secret moves on. A list with no service reads no account.
+func TestManageAccountsRecordsEachOperation(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	a := seeded(t, d, t.TempDir(), func(a *wire.Agent) { a.State, a.EndedReason, a.RuntimeID = wire.AgentStateRunning, nil, "claude" })
+	m := appClient(t, d, a.ID)
+	m.post("initialize", map[string]any{}, 1)
+
+	var mu sync.Mutex
+	var accounts []wire.OutsideAccount
+	var ops [][]wire.AccountOperation
+	d.SetControlAsk(func(_ context.Context, method string, params any) (json.RawMessage, error) {
+		call, ok := params.(wire.MachineAccountsCall)
+		if !ok {
+			return json.RawMessage(`{}`), nil
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		accounts = append(accounts, call.Add...)
+		if len(call.Ops) > 0 {
+			ops = append(ops, call.Ops)
+		}
+		return json.Marshal(wire.OutsideAccounts{Accounts: accounts})
+	})
+	told := func() [][]wire.AccountOperation {
+		mu.Lock()
+		defer mu.Unlock()
+		return slices.Clone(ops)
+	}
+	events := func(name string) []wire.Event {
+		d.eventMu.Lock()
+		defer d.eventMu.Unlock()
+		var out []wire.Event
+		for _, e := range d.eventList {
+			if e.Name == name {
+				out = append(out, e)
+			}
+		}
+		return out
+	}
+
+	m.tool(2, "manage_accounts", map[string]any{"action": "add",
+		"account": map[string]any{"service": "gitlab.com", "address": "a@example.com", "description": "Agents CI", "secret": "GITLAB_TOKEN"}})
+	changed := events("account.changed")
+	if len(changed) != 1 || changed[0].Details["change"] != "added" || changed[0].Details["service"] != "gitlab.com" ||
+		changed[0].Details["address"] != "a@example.com" || changed[0].Details["agent"] != string(a.ID) || changed[0].Details["machine"] == "" {
+		t.Fatalf("%+v", changed)
+	}
+	if got := told(); len(got) != 1 || got[0][0].What != wire.AccountOperationWhatAdded || *got[0][0].Address != "a@example.com" {
+		t.Fatalf("%+v", got)
+	}
+
+	m.tool(3, "manage_accounts", map[string]any{"action": "list"})
+	if len(events("account.read")) != 0 || len(told()) != 1 {
+		t.Fatal("a list with no service read an account")
+	}
+	m.tool(4, "manage_accounts", map[string]any{"action": "list", "service": "gitlab"})
+	if read := events("account.read"); len(read) != 1 || read[0].Details["service"] != "gitlab.com" || len(told()) != 2 ||
+		told()[1][0].What != wire.AccountOperationWhatRead {
+		t.Fatalf("%+v %+v", read, told())
+	}
+
+	mu.Lock()
+	gitlab := accountID(accounts[0])
+	mu.Unlock()
+	var got wire.OutsideAccount
+	get := func(id int) {
+		t.Helper()
+		text, _ := m.tool(id, "manage_accounts", map[string]any{"action": "get", "id": gitlab})
+		got = wire.OutsideAccount{}
+		if err := json.Unmarshal([]byte(text), &got); err != nil || got.LastOp == nil {
+			t.Fatal(text, err)
+		}
+	}
+	get(5)
+	if got.LastOp.What != wire.AccountOperationWhatRead || len(told()) != 3 {
+		t.Fatalf("%+v", got.LastOp)
+	}
+
+	// A read of its secret, later than the account's own, is its last operation.
+	later := wire.DateOf(nowFunc().Add(time.Hour))
+	d.raise(wire.EventDraft{Name: "secret.read", At: later, Scope: macScope(), Sentence: "A secret was read.",
+		Details: map[string]string{"name": "GITLAB_TOKEN", "use": "fill", "place": "gitlab.com"}})
+	d.raise(wire.EventDraft{Name: "secret.read", At: later + 60, Scope: macScope(), Sentence: "A secret was read.",
+		Details: map[string]string{"name": "OTHER_TOKEN"}})
+	get(6)
+	if got.LastOp.What != wire.AccountOperationWhatRead || got.LastOp.At != later {
+		t.Fatalf("%+v, not %v", got.LastOp, later)
+	}
+
+	// The record is kept on disk, for the next start.
+	raw, err := os.ReadFile(filepath.Join(d.Store.Loc.Root, "account-ops.json"))
+	if err != nil || !strings.Contains(string(raw), "GITLAB_TOKEN") || strings.Contains(string(raw), "Agents CI") {
+		t.Fatal(string(raw), err)
+	}
+}
+
+// The record keeps the newest accountOpsMost of each kind.
+func TestTrimOldest(t *testing.T) {
+	m := map[string]wire.Date{}
+	for i := range accountOpsMost + 3 {
+		m[strconv.Itoa(i)] = wire.Date(i)
+	}
+	trimOldest(m, func(at wire.Date) wire.Date { return at })
+	if _, ok := m["2"]; len(m) != accountOpsMost || ok || m["3"] != 3 {
+		t.Fatal(len(m))
 	}
 }

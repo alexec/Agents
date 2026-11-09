@@ -25,6 +25,9 @@ type Daemon struct {
 	requests      requestStore
 	requestActors map[wire.UUID]*wire.AuditActor
 
+	// accountOps is each account's last operation, and each secret's last read (#4157).
+	accountOps accountOpBook
+
 	// erasures is the queue of runtime copies of deleted agents to erase (#1001).
 	erasures eraser
 

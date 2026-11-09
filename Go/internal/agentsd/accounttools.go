@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"slices"
@@ -35,7 +36,13 @@ func (d *Daemon) manageAccounts(agent wire.UUID, args map[string]json.RawMessage
 		if err != nil {
 			return "", err
 		}
-		return accountNote(listed.Accounts, id)
+		note, err := accountNote(d.withLastOps(listed.Accounts), id)
+		if err == nil {
+			d.accountsDone(agent, readOps(slices.DeleteFunc(listed.Accounts, func(a wire.OutsideAccount) bool {
+				return accountID(a) != strings.ToLower(id)
+			})))
+		}
+		return note, err
 	case "add":
 		var a wire.OutsideAccount
 		raw, ok := args["account"]
@@ -60,7 +67,12 @@ func (d *Daemon) manageAccounts(agent wire.UUID, args map[string]json.RawMessage
 		if err != nil {
 			return "", err
 		}
-		return accountsNote(listed.Accounts, argString(args, "service"), argString(args, "project")), nil
+		// A list with no service reads no account (#4157): only one filtered to the account's.
+		service, project := argString(args, "service"), argString(args, "project")
+		if strings.TrimSpace(service) != "" {
+			d.accountsDone(agent, readOps(accountsOf(listed.Accounts, service, project)))
+		}
+		return accountsNote(listed.Accounts, service, project), nil
 	}
 	have, err := d.askAccounts(wire.MachineAccountsCall{})
 	if err != nil {
@@ -86,9 +98,11 @@ func (d *Daemon) manageAccounts(agent wire.UUID, args map[string]json.RawMessage
 	}
 	listed := have
 	if len(send) > 0 {
-		if listed, err = d.askAccounts(wire.MachineAccountsCall{Add: send}); err != nil {
+		ops := plan.ops(replace)
+		if listed, err = d.askAccounts(wire.MachineAccountsCall{Add: send, Ops: ops}); err != nil {
 			return "", err
 		}
+		d.noteAccountOps(agent, ops)
 	}
 	return plan.note(replace) + accountsNote(listed.Accounts, argString(args, "service"), argString(args, "project")), nil
 }
@@ -174,6 +188,49 @@ func replaceQuestion(changed []accountChange) string {
 	return b.String()
 }
 
+// ops are the operations an add or import did: each new account, and each replaced one.
+func (p accountsPlan) ops(replaced bool) []wire.AccountOperation {
+	var ops []wire.AccountOperation
+	for _, a := range p.added {
+		ops = append(ops, wire.AccountOperation{What: wire.AccountOperationWhatAdded, Service: a.Service, Address: a.Address})
+	}
+	if replaced {
+		for _, c := range p.changed {
+			ops = append(ops, wire.AccountOperation{What: wire.AccountOperationWhatEdited, Service: c.to.Service, Address: c.to.Address})
+		}
+	}
+	return ops
+}
+
+func readOps(accounts []wire.OutsideAccount) []wire.AccountOperation {
+	var ops []wire.AccountOperation
+	for _, a := range accounts {
+		ops = append(ops, wire.AccountOperation{What: wire.AccountOperationWhatRead, Service: a.Service, Address: a.Address})
+	}
+	return ops
+}
+
+// accountsDone records reads that went by a call that changed nothing, and tells the control
+// plane, for its audit. The answer is given already: a failure here is only logged.
+func (d *Daemon) accountsDone(agent wire.UUID, ops []wire.AccountOperation) {
+	if len(ops) == 0 {
+		return
+	}
+	d.noteAccountOps(agent, ops)
+	if _, err := d.askAccounts(wire.MachineAccountsCall{Ops: ops}); err != nil {
+		log.Printf("manage_accounts: the control plane was not told of %d reads: %v", len(ops), err)
+	}
+}
+
+// withLastOps is the accounts, each with its last operation as this machine knows it.
+func (d *Daemon) withLastOps(all []wire.OutsideAccount) []wire.OutsideAccount {
+	out := slices.Clone(all)
+	for i := range out {
+		out[i].LastOp = d.accountLastOp(out[i])
+	}
+	return out
+}
+
 // note is the start of the tool's answer: what went in and what did not.
 func (p accountsPlan) note(replaced bool) string {
 	var said []string
@@ -190,7 +247,6 @@ func (p accountsPlan) note(replaced bool) string {
 	}
 	return strings.Join(said, " ") + " "
 }
-
 
 func (d *Daemon) askAccounts(call wire.MachineAccountsCall) (wire.OutsideAccounts, error) {
 	var listed wire.OutsideAccounts
@@ -281,9 +337,8 @@ type accountLine struct {
 
 const noDescription = "No description"
 
-// accountsNote is the accounts, a line each, those of service and project only when named.
-func accountsNote(all []wire.OutsideAccount, service, project string) string {
-	var b strings.Builder
+// accountsOf is the accounts of service and project, each only when named.
+func accountsOf(all []wire.OutsideAccount, service, project string) []wire.OutsideAccount {
 	service, project = strings.TrimSpace(service), strings.TrimSpace(project)
 	var rows []wire.OutsideAccount
 	for _, a := range all {
@@ -295,6 +350,14 @@ func accountsNote(all []wire.OutsideAccount, service, project string) string {
 		}
 		rows = append(rows, a)
 	}
+	return rows
+}
+
+// accountsNote is the accounts, a line each, those of service and project only when named.
+func accountsNote(all []wire.OutsideAccount, service, project string) string {
+	var b strings.Builder
+	service = strings.TrimSpace(service)
+	rows := accountsOf(all, service, project)
 	if len(rows) == 0 {
 		if service != "" {
 			return b.String() + "There is no account for " + service + "."
