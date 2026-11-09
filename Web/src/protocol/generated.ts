@@ -12094,6 +12094,14 @@ export interface WakeState {
 }
 
 /**
+ * machine/pairWebPage (#4214): the web page's address with a one-time browser code after #code=,
+ * for the agent browser to open.
+ */
+export interface WebPagePairing {
+  url: string;
+}
+
+/**
  * clients/webPushKey (#1486): the control plane's VAPID public key, X9.63, base64url without
  * padding, as pushManager.subscribe takes it. None when this control plane sends no Web Push.
  */
@@ -14543,6 +14551,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WaitingAgent: { required: ["agentID", "title", "folder", "status"], optional: [] },
   WakeSettings: { required: ["keepsAwake", "graceHours", "warmRuntimes", "awakeOnPower"], optional: ["backgroundHours"] },
   WakeState: { required: ["isHolding", "agentsInFlight", "heldBackByBattery", "onPower"], optional: ["batteryPercent", "since", "graceUntil"] },
+  WebPagePairing: { required: ["url"], optional: [] },
   WebPushKey: { required: [], optional: ["publicKey"] },
   WebPushSubscription: { required: [], optional: ["endpoint", "p256dh", "auth"] },
   WebRemoteStatus: { required: ["port", "served"], optional: ["reason", "detail"] },

@@ -13669,6 +13669,11 @@ type WakeState struct {
 	OnPower bool `json:"onPower"`
 }
 
+// machine/pairWebPage (#4214): the web page's address with a one-time browser code after #code=, for the agent browser to open.
+type WebPagePairing struct {
+	URL string `json:"url"`
+}
+
 // clients/webPushKey (#1486): the control plane's VAPID public key, X9.63, base64url without padding, as pushManager.subscribe takes it. None when this control plane sends no Web Push.
 type WebPushKey struct {
 	PublicKey *string `json:"publicKey,omitzero"`

@@ -2519,6 +2519,27 @@
       }
     },
     {
+      "name": "machine/pairWebPage",
+      "x-capability": "host.web-pairing/1",
+      "description": "A machine, on its channel 0 (#4214): a one-time browser code for the agent browser that this machine's agentsd launched, as the web page's address with #code=. Only a machine on the control plane's own Mac, while the web page is served; the code is its person's.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/WebPagePairing"
+        }
+      }
+    },
+    {
       "name": "machine/policy",
       "x-capability": "host.policy/1",
       "description": "To a machine that says host.policy/1, on its channel 0, at each join and within 5 seconds of each change (#998, FR-006). A machine says host.policy/1 only once it keeps and follows the policy; one without it is sent nothing.",
