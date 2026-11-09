@@ -36,6 +36,9 @@ func TestMain(m *testing.M) {
 		<-f.conn.Done()
 		return
 	}
+	// The sealed-secret tests are the Mac's path on every system; a test of the Linux release
+	// layer turns it on for its daemon (releaseOn).
+	releaseLayerHere = false
 	// No test asks the person's gh about merged pull requests unless it says so.
 	findGH = func() string { return "" }
 	// Nor asks the forge for an issue's milestone (#2935): a test sets issueLookup.

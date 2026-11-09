@@ -436,7 +436,7 @@ struct FolderListView: View {
         }
         .sendToHostSheet(requests)
         .bringBackSheet(requests)
-        // The sheet Settings ▸ Machines ▸ Add a Machine… shows (#503, #2755).
+        // The sheet Register a Machine… shows (#503, #2755).
         .sheet(isPresented: Binding(get: { addingMachine != nil }, set: { if !$0 { addingMachine = nil } })) {
             if let control = addingMachine {
                 AddMachineSheet(control: control)

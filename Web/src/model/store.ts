@@ -1,6 +1,7 @@
 // What the page holds and what each notification means: AgentsModel (Client/AgentsModel.swift),
 // ported by hand for the notifications the web remote hears and held to Fixtures/web/reducer
 // (research R7). Nothing here decides anything; the hosts do.
+import type { SecretUseAction } from "./secretUse";
 import { preferencesSaid, sendPreferencesWith } from "./preferences";
 import { folderPath as hostedFolderPath, healthTally, personalServers } from "./hostedMCP";
 import type { ExportImportBusy } from "./exports";
@@ -17,7 +18,7 @@ import type {
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, DailySummarySettings, SummaryPage, SummaryPageText, DesktopControlSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
   PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, BudgetRequest, RemoveRequest, ClientPermissionSettings, PRCostComment,
-  Connection, LineageNode, LineageSessionIssue, MoveToMachineAnswer, ProblemReport, ProblemReportRequest, Request as PersonRequest, RequestUpdate, ProviderID, StartedMachinePreview } from "../protocol/generated";
+  Connection, LineageNode, LineageSessionIssue, MoveToMachineAnswer, ProblemReport, ProblemReportRequest, Request as PersonRequest, RequestUpdate, ProviderID, StartedMachinePreview, FoldersFindRequest, FoundFolder } from "../protocol/generated";
 import { endedConnections, endedLine, hasEnded } from "./connectorSetup";
 import { parseQuery } from "./labels";
 import { Failure } from "../protocol/generated";
@@ -2606,6 +2607,31 @@ export class Store extends Work {
     return summary;
   }
 
+  /** Where Choose Folders… looks on a machine (#4122), as the window's: the control plane's auto-detect paths, none with it off. */
+  async folderPaths(): Promise<string[]> {
+    const status = await this.link.call("control/status", {}).catch(() => null);
+    const detection = status?.folderDetection;
+    return detection?.enabled ? detection.paths : [];
+  }
+
+  /** The git repositories under `paths` on `host`, or the `folders` typed, as they stand there (#4122). It throws when the host can't be asked. */
+  findFolders(host: string, request: FoldersFindRequest): Promise<FoundFolder[]> {
+    return this.link.call("folders/find", request, host);
+  }
+
+  /** Choose Folders…' Add (#4122): each folder added on `host`; answers why each that failed was not, by folder. */
+  async addFolders(host: string, folders: readonly string[]): Promise<Record<string, string>> {
+    const failed: Record<string, string> = {};
+    for (const folder of folders) {
+      try {
+        this.upsertFolder(await this.link.call("folders/add", { folder: folder as never }, host), host);
+      } catch (error) {
+        failed[folder] = describe(error);
+      }
+    }
+    return failed;
+  }
+
   /**
    * Clones `url` into the host's home folder and adds it (027, #115). Answers once the clone
    * has finished; the row meanwhile comes from `clone/changed`.
@@ -2697,6 +2723,14 @@ export class Store extends Work {
     }, host);
     this.upsertFolder(summary, host);
     return summary;
+  }
+
+  /**
+   * A person's answer to a secret's use (#4017), from its Needs you row: to the host that asked.
+   * From the row's menu, so a refusal is said in `problem`; `requests/changed` takes the row away.
+   */
+  async answerSecretUse(host: string, request: string, action: SecretUseAction): Promise<void> {
+    await this.act("requests/answer", { id: request as never, answer: { secretUse: { action } } }, host);
   }
 
   /**

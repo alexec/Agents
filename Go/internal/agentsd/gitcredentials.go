@@ -27,7 +27,9 @@ import (
 //   - a `gh` first on its PATH that asks this host for the current token at each call and
 //     runs the real gh with it in GH_TOKEN, for that one call;
 //   - git's credential helper for https://github.com set to `agentsd credential`, which asks
-//     the same, in place of the person's own helpers.
+//     the same, in place of the person's own helpers, then the person's own gh, which git asks
+//     when ours has no answer: the App cannot push to the repository's owner (#4077), or the
+//     host does not know the grant.
 //
 // The token is the bot's installation token when the person's bot is installed on the
 // repository's owner (#3858), else the person's user token of agents-loops. It is never in
@@ -52,8 +54,10 @@ type gitCredentialState struct {
 	credGrants map[string]wire.UUID
 	// appReach is whether agents-loops is installed on a repository, by repository.
 	appReach map[string]reachRead
-	botOnce  sync.Once
-	bots     *connections.BotTokens
+	// appPush is whether agents-loops may write code on an owner's install, by owner.
+	appPush map[string]reachRead
+	botOnce sync.Once
+	bots    *connections.BotTokens
 	// credentialSelf is the agentsd that git and gh run; a test gives a stand-in.
 	credentialSelf string
 }
@@ -112,6 +116,35 @@ func (d *Daemon) appReaches(ctx context.Context, repo, token string) bool {
 	return installed
 }
 
+// appPushes is whether the person's agents-loops install on owner may write code, kept a
+// while (#4077): GitHub refuses a push with the App's user token when the App has no Contents
+// write, although the person has. A failed read is a yes: the push then says why it failed.
+func (d *Daemon) appPushes(ctx context.Context, owner, token string) bool {
+	key := strings.ToLower(owner)
+	d.credMu.Lock()
+	r, ok := d.appPush[key]
+	d.credMu.Unlock()
+	if ok && time.Since(r.at) < appReachTTL {
+		return r.installed
+	}
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	perms, err := d.setupReader(token).AppPermissions(ctx, owner, connections.GitHubAppSlug)
+	pushes := err != nil || perms["contents"] == "write"
+	if err != nil {
+		log.Printf("credentials: could not read what %s may do on %s: %v", connections.GitHubAppSlug, owner, err)
+	} else if !pushes {
+		log.Printf("credentials: %s may not write code on %s; git uses the person's own gh", connections.GitHubAppSlug, owner)
+	}
+	d.credMu.Lock()
+	if d.appPush == nil {
+		d.appPush = map[string]reachRead{}
+	}
+	d.appPush[key] = reachRead{installed: pushes, at: time.Now()}
+	d.credMu.Unlock()
+	return pushes
+}
+
 // withGitHubCredential is env for agent's runtime in dir with gh and git asking this host
 // for the App's token, or env as it was when the App does not reach dir's repository.
 func (d *Daemon) withGitHubCredential(env []string, agent wire.UUID, dir string) []string {
@@ -150,15 +183,22 @@ func (d *Daemon) withGitHubCredential(env []string, agent wire.UUID, dir string)
 	// A token the host itself was started with is the person's, and would win over ours.
 	env = without(env, "GH_TOKEN", "GITHUB_TOKEN", credentialURLEnv, credentialGrantEnv)
 	env = append(env, credentialURLEnv+"=http://127.0.0.1:"+strconv.Itoa(port)+githubCredentialPath, credentialGrantEnv+"="+grant)
-	env = withGitConfig(env,
-		// The empty helper first: the person's own helpers, which answer with their own token,
-		// are not asked.
-		"credential.https://github.com.helper", "",
-		"credential.https://github.com.helper", "!"+shellQuote(self)+" credential",
-		// So the helper is told the repository, and its owner picks the bot's install.
-		"credential.https://github.com.useHttpPath", "true")
 	bin := filepath.Join(d.Store.Loc.Root, "runtimes", "github")
-	if gh := lookPath(env, "gh", bin); gh != "" {
+	gh := lookPath(env, "gh", bin)
+	helpers := []string{
+		// The empty helper first: the person's own helpers, which answer with their own token,
+		// are not asked before ours.
+		"credential.https://github.com.helper", "",
+		"credential.https://github.com.helper", "!" + shellQuote(self) + " credential",
+	}
+	if gh != "" {
+		// Asked only when ours has no answer (#4077).
+		helpers = append(helpers, "credential.https://github.com.helper", "!"+shellQuote(gh)+" auth git-credential")
+	}
+	env = withGitConfig(env, append(helpers,
+		// So the helper is told the repository, and its owner picks the bot's install.
+		"credential.https://github.com.useHttpPath", "true")...)
+	if gh != "" {
 		if err := writeGHShim(bin, self, gh); err != nil {
 			log.Printf("credentials: could not write gh: %v", err)
 		} else {
@@ -203,8 +243,10 @@ func (d *Daemon) serveGitHubCredential(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	token, _ := d.githubTokenFor(r.Context(), owner)
-	if token == "" {
+	token, bot := d.githubTokenFor(r.Context(), owner)
+	// git's ask (use=git) gets no token the App cannot push with, so git asks the person's own
+	// gh next (#4077). The bot always has Contents write (connections.BotPermissions).
+	if token == "" || r.URL.Query().Get("use") == "git" && !bot && owner != "" && !d.appPushes(r.Context(), owner, token) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
@@ -250,16 +292,18 @@ func lookPath(env []string, name, skip string) string {
 	return ""
 }
 
-// writeGHShim writes bin/gh: the real gh, with the token this host has now in GH_TOKEN for
-// that one call. When the host does not answer, gh runs as the person's own login, as before.
+// writeGHShim writes bin/gh: the real gh run by `agentsd credential gh`, with the token this
+// host has now in GH_TOKEN for that one call, and again as the person's own login when GitHub
+// refuses the App (#4077). With no agentsd there, or when the host does not answer, gh runs as
+// the person's own login, as before.
 func writeGHShim(bin, agentsd, gh string) error {
 	if err := os.MkdirAll(bin, 0o700); err != nil {
 		return err
 	}
 	script := "#!/bin/sh\n" +
-		"# gh as the GitHub App (#3926): Agents writes this file. The token is asked at each call, never kept.\n" +
-		"if token=$(" + shellQuote(agentsd) + " credential token) && [ -n \"$token\" ]; then\n" +
-		"\tGH_TOKEN=$token\n\texport GH_TOKEN\n" +
+		"# gh as the GitHub App (#3926, #4077): Agents writes this file. The token is asked at each call, never kept.\n" +
+		"if [ -x " + shellQuote(agentsd) + " ]; then\n" +
+		"\texec " + shellQuote(agentsd) + " credential gh " + shellQuote(gh) + " \"$@\"\n" +
 		"fi\n" +
 		"exec " + shellQuote(gh) + " \"$@\"\n"
 	path := filepath.Join(bin, "gh")

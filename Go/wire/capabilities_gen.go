@@ -81,6 +81,7 @@ const CapHostPolicyLayers1 = "host.policy-layers/1"
 const CapHostPolicy1 = "host.policy/1"
 const CapHostSecretApproval1 = "host.secret-approval/1"
 const CapHostSecretGrants1 = "host.secret-grants/1"
+const CapHostSecretRelease1 = "host.secret-release/1"
 const CapHostSessionSecrets1 = "host.session-secrets/1"
 const CapHostSuspend1 = "host.suspend/1"
 const CapHostTeam1 = "host.team/1"
@@ -744,6 +745,8 @@ var ControlCapabilities = pairs([][2]string{
 	{"machine/orgRoutesApplied", "host.org-routes/2"},
 	{"machine/policyApplied", "host.policy/1"},
 	{"machine/providerDraft", "machine/1"},
+	{"machine/secretKey", "host.secret-release/1"},
+	{"machine/secretRelease", "host.secret-release/1"},
 	{"machine/status", "machine/1"},
 	{"machines/announce", "machines/1"},
 	{"machines/approveJoin", "hosts.join/1"},

@@ -2161,7 +2161,7 @@ final class AppModel {
     }
 
     /// Whether this Mac's host keeps Ask before use (#4014): it offers the toggle (#4016).
-    var macHostAsksBeforeUse: Bool { host(macHostElsewhere ?? .mac, has: Capability.hostSecretApproval1) }
+    var sessionHostAsksBeforeUse: Bool { host(macHostElsewhere ?? .mac, has: Capability.hostSecretApproval1) }
 
     /// Turn Ask before use on or off for a session's secret (#4016): the list after, or why not.
     func setSessionSecretAsksBeforeUse(_ secret: SessionSecret, _ on: Bool) async -> Result<SessionSecrets?, Error> {
@@ -2442,9 +2442,6 @@ final class AppModel {
     /// A Settings pane to open on, asked for by a link elsewhere (052): read and cleared
     /// by the Settings window.
     var settingsPaneAsked: SettingsPane?
-    /// The machine Settings ▸ Machines opens on, asked for by its page's Settings… (#3626):
-    /// read and cleared with `settingsPaneAsked`.
-    var settingsMachineAsked: MachineRef?
 
     /// A file for Agent Configuration's editor to open, asked for by a workflow page's Edit
     /// File… (#2803): read and cleared by the editor's page for that kind and folder.
@@ -3779,9 +3776,13 @@ final class AppModel {
     }
 
     private func machineCall(_ method: String, _ host: MachineRef) async {
+        await controlCall(method, DaemonAPI.MachineRequest(host: host))
+    }
+
+    private func controlCall(_ method: String, _ params: some Encodable & Sendable) async {
         guard let controlRequests else { return }
         do {
-            _ = try await controlRequests.call(method, DaemonAPI.MachineRequest(host: host))
+            _ = try await controlRequests.call(method, params)
             await syncControlHosts(controlRequests)
         } catch let error as JSONRPCError {
             problem = HostProblem.controlRefusal(error)
@@ -3827,9 +3828,30 @@ final class AppModel {
                                          returning: DaemonAPI.StartedMachinePreview.self)
     }
 
-    /// Check Again on a machine's row (#3979), as Settings ▸ Machines has it.
+    /// Check Again on a machine's row (#3979), as Settings ▸ Machines had it.
     func checkAgain(_ host: MachineRef) async {
         await machineCall(DaemonAPI.Method.hostsCheckAgain, host)
+    }
+
+    /// Unlink on a machine's page (#3975): its provider can no longer start or stop it.
+    func unlinkMachine(_ host: MachineRef) async {
+        await machineCall(DaemonAPI.Method.hostsUnlink, host)
+    }
+
+    /// Start when used, Start for scheduled workflows and Stop when idle on a machine's page
+    /// (#3975), as Settings ▸ Machines' menu had them. `stopWhenIdleMinutes` 0 turns it off.
+    func setMachineOptions(_ host: MachineRef, startWhenUsed: Bool? = nil, stopWhenIdleMinutes: Int? = nil,
+                           startForSchedules: Bool? = nil) async {
+        await controlCall(DaemonAPI.Method.hostsSetMachineOptions,
+                          DaemonAPI.MachineOptions(host: host, startWhenUsed: startWhenUsed,
+                                                   stopWhenIdleMinutes: stopWhenIdleMinutes,
+                                                   startForSchedules: startForSchedules))
+    }
+
+    /// Stop Lending on a machine's page (#1122, #3975): it stops using a Mac's git access for one server.
+    func stopLendingGit(_ host: MachineRef, from: MachineRef, server: String) async {
+        await controlCall(DaemonAPI.Method.hostsLendGit,
+                          DaemonAPI.LendGit(host: host, from: from, server: server, allowed: false))
     }
 
     /// Approve or Deny on a machine's card (#994): a refusal is the window's alert.
@@ -6609,10 +6631,29 @@ final class AppModel {
                 return
             }
             sent = await answerElicitation(request, action: .accept, content: content)
+        case "request":
+            guard let request = work.requests.first(where: { $0.id.uuidString == parts[1] }),
+                  let action = NeedRequest.Action(rawValue: quick.id) else {
+                note("banner: \(token) is over, nothing sent")
+                return
+            }
+            sent = await answerSecretUse(request, action)
         default:
             return
         }
         note("banner: \(token) \(quick.kind.rawValue) \(sent ? "answered" : "not sent")")
+    }
+
+    /// A person's answer to a secret's use (#4017), from its Needs you row or its banner: to
+    /// the host of the session that asked. Whether it went; why not is the problem.
+    @discardableResult
+    func answerSecretUse(_ request: NeedRequest, _ action: NeedRequest.Action) async -> Bool {
+        let answer = DaemonAPI.RequestsAnswer(id: request.id, secretUse: action)
+        return await attempt(on: host(ofAgent: request.askedBy)) {
+            let update = try await self.client(forAgent: request.askedBy)
+                .call(DaemonAPI.Method.requestsAnswer, answer, returning: DaemonAPI.RequestUpdate.self)
+            self.work.replaceRequests(self.work.requests.filter { $0.id != update.request.id })
+        }
     }
 
     // MARK: Forms
@@ -6839,3 +6880,6 @@ struct FolderGoneAsk: Identifiable, Equatable {
 
 /// Work (#3119) is drawn by `Shared/UI/Work`, for the window and the Remote (#3256).
 extension AppModel: WorkModel {}
+
+/// Settings ▸ You ▸ Secrets ▸ For One Session (#3548), through this Mac's host.
+extension AppModel: SessionSecretsSource {}

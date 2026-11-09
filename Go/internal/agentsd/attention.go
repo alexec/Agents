@@ -117,6 +117,8 @@ func token(id wire.NeedID) string {
 		return "guarded:" + store.FolderPath(id.GuardedChange.Folder) + ":" + id.GuardedChange.Path
 	case id.Notice != nil:
 		return "notice:" + *id.Notice
+	case id.Request != nil:
+		return "request:" + string(*id.Request)
 	}
 	return ""
 }
@@ -280,6 +282,26 @@ func permissionAnswers(r wire.PermissionRequest) []wire.QuickAnswer {
 	return out
 }
 
+// secretUseWanted is a secret use's line on its banner: the secret's name, never its
+// value, and where the value goes.
+func secretUseWanted(u wire.RequestSecretUse) string {
+	if u.Use == wire.SecretUseCi {
+		return "Wants to use " + u.Name + " as a CI secret in " + u.Place
+	}
+	return "Wants to use " + u.Name + " on " + u.Place
+}
+
+// secretUseAnswers is NeedRequest.SecretUse.actions: the row's answers, as the banner's
+// buttons. A session's own secret has no Allow always: it is the same as for this session.
+func secretUseAnswers(u wire.RequestSecretUse) []wire.QuickAnswer {
+	out := []wire.QuickAnswer{{Kind: wire.QuickAnswerKindChoice, ID: secretUseOnce, Title: "Allow Once"},
+		{Kind: wire.QuickAnswerKindChoice, ID: secretUseSession, Title: "Allow for This Session"}}
+	if u.SessionOnly == nil || !*u.SessionOnly {
+		out = append(out, wire.QuickAnswer{Kind: wire.QuickAnswerKindChoice, ID: secretUseAlways, Title: "Allow Always"})
+	}
+	return append(out, wire.QuickAnswer{Kind: wire.QuickAnswerKindChoice, ID: secretUseDeny, Title: "Deny", IsDestructive: true})
+}
+
 // formAnswers is QuickAnswer.answers(for:) for a form of one page whose question is a
 // string: its two to four choices, or one free reply. A secret has none (#2885): a
 // notification's reply is typed in clear, so it is answered on its masked card.
@@ -384,6 +406,18 @@ func (d *Daemon) needs() []wire.Need {
 			}
 			found = append(found, wire.Need{ID: id, AgentID: c.AskedIn, Folder: fileURL(folder, true), Kind: wire.NeedKindGuardedChange,
 				RaisedAt: raised, Headline: truncating(wire.Headline{H1: filepath.Base(folder), H2: title, H3: guardedHeadline(c)})})
+		}
+	}
+	// A secret's use waiting on a person (#4017): posted, so a phone answers it from its
+	// banner. Its Needs you row is the request's own.
+	for _, r := range d.listRequests(wire.RequestsListStateOpen, "") {
+		u := r.Detail.SecretUse
+		if u == nil || r.AskedBy == nil {
+			continue
+		}
+		if a := d.Store.Agent(*r.AskedBy); a != nil && !archived[folderPath(a)] {
+			id := r.ID
+			need(wire.NeedID{Request: &id}, a, wire.NeedKindRequest, secretUseWanted(*u), secretUseAnswers(*u))
 		}
 	}
 	// What an agent told the person (#2805): posted as a need is, never a Needs you row.

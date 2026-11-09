@@ -3,6 +3,7 @@ package bitbucketmcp
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -336,4 +337,114 @@ func TestBaseURL(t *testing.T) {
 	same(t, BaseURL(""), "https://api.bitbucket.org/2.0/")
 	same(t, BaseURL("http://localhost:3000"), "http://localhost:3000/")
 	same(t, BaseURL("api.example.com/2.0/"), "https://api.example.com/2.0/")
+}
+
+// #3797: every event about one pull request names it by pr, branch, fixes or mine, or takes
+// any; an issue event takes one issue or a list of them.
+func TestEventsListGivesWhichArgumentsNameOne(t *testing.T) {
+	named := map[string]bool{"checks.failed": true, "pr.merged": true, "pr.closed": true, "pr.conflicted": true, "review.comment": true}
+	for _, e := range eventsList()["events"].([]any) {
+		e := e.(map[string]any)
+		name := e["name"].(string)
+		props := e["inputSchema"].(map[string]any)["properties"].(map[string]any)
+		_, hasMine := props["mine"]
+		_, hasFixes := props["fixes"]
+		_, hasAny := props["any"]
+		if hasMine != named[name] || hasFixes != named[name] {
+			t.Fatalf("%s: mine %v, fixes %v", name, hasMine, hasFixes)
+		}
+		if want := named[name] || name == "issue.closed" || name == "issue.commented" || name == "issue.labelled"; hasAny != want {
+			t.Fatalf("%s: any %v", name, hasAny)
+		}
+		if issue, ok := props["issue"].(map[string]any); ok {
+			if list := fmt.Sprint(issue["type"]) == "[integer array]"; list != (name != "issue.assigned") {
+				t.Fatalf("%s: issue %v", name, issue)
+			}
+		}
+		if strings.HasPrefix(name, "pr.") || name == "checks.failed" || name == "review.comment" {
+			pr := e["payloadSchema"].(map[string]any)["properties"].(map[string]any)["pr"].(map[string]any)["properties"].(map[string]any)
+			if _, ok := pr["fixes"]; !ok {
+				t.Fatalf("%s: no fixes in pr", name)
+			}
+		}
+	}
+	for _, ref := range []string{"#12", "acme/app#12"} {
+		if !issueRefPattern.MatchString(ref) {
+			t.Fatalf("refused %s", ref)
+		}
+	}
+	for _, ref := range []string{"12", "app#12", "#0", "acme/app#", "a/b/c#1"} {
+		if issueRefPattern.MatchString(ref) {
+			t.Fatalf("took %s", ref)
+		}
+	}
+}
+
+func TestUnknownArgumentSaysWhatItTakes(t *testing.T) {
+	f := newFake(t)
+	_, err := newPoller(t, f, "pr.merged", map[string]any{"sha": "x"}).try()
+	if err == nil || err.Code != -32602 || err.Message != "unknown argument sha; takes repo, branch, pr, fixes, anyone, mine, any" {
+		t.Fatalf("unknown: %v", err)
+	}
+	for _, bad := range []map[string]any{{"fixes": []any{"12"}}, {"fixes": []any{}}, {"fixes": "#12"}, {"any": "yes"}} {
+		if _, err := newPoller(t, f, "pr.merged", bad).try(); err == nil || err.Code != -32602 {
+			t.Fatalf("%v: %v", bad, err)
+		}
+	}
+	for _, bad := range []any{[]any{}, []any{1, "2"}, []any{0}, "3"} {
+		if _, err := newPoller(t, f, "issue.closed", map[string]any{"issue": bad}).try(); err == nil || err.Code != -32602 {
+			t.Fatalf("issue %v: %v", bad, err)
+		}
+	}
+}
+
+// #3797: a lead knows the issue a lane's pull request fixes before it is opened, so fixes
+// narrows by the issues a description closes, "#12" being the repository's own; mine is the
+// owner's pull request also once it is merged and no longer open.
+func TestFixesAndMineNarrowMergedPullRequests(t *testing.T) {
+	f := newFake(t)
+	fixes := newPoller(t, f, "pr.merged", map[string]any{"fixes": []any{"#37"}})
+	full := newPoller(t, f, "pr.merged", map[string]any{"fixes": []any{"ACME/App#37", "other/repo#37"}})
+	mine := newPoller(t, f, "pr.merged", map[string]any{"mine": true})
+	all := newPoller(t, f, "pr.merged", map[string]any{"any": true})
+	for _, p := range []*poller{fixes, full, mine, all} {
+		p.poll()
+	}
+	f.set(func() {
+		f.pulls = []obj{
+			pull(1, "a", alex, obj{"description": "Closes #37.", "state": "MERGED", "updated_on": at(1)}),
+			pull(2, "b", dev, obj{"description": "Fixes other/repo#37", "state": "MERGED", "updated_on": at(1)}),
+			pull(3, "c", dev, obj{"state": "MERGED", "updated_on": at(1)}),
+		}
+		for n := 1; n <= 3; n++ {
+			f.activity[n] = []obj{{"update": obj{"state": "MERGED", "date": at(1)}}}
+		}
+	})
+	id := func(n int) string { return fmt.Sprintf("pr.merged:%s:%d", repo, n) }
+	ids, result := fixes.poll()
+	same(t, ids, []string{id(1)})
+	same(t, data(t, result, 0)["pr"].(map[string]any)["fixes"], []string{"#37"})
+	ids, _ = full.poll()
+	same(t, ids, []string{id(1), id(2)})
+	ids, _ = mine.poll()
+	same(t, ids, []string{id(1)})
+	ids, _ = all.poll()
+	same(t, ids, []string{id(1), id(2), id(3)})
+}
+
+// #3797: a lead waits on all its open children at once.
+func TestIssueTakesAList(t *testing.T) {
+	f := newFake(t)
+	listed := newPoller(t, f, "issue.closed", map[string]any{"issue": []any{3, 4}, "anyone": true})
+	notListed := newPoller(t, f, "issue.closed", map[string]any{"issue": 2, "anyone": true})
+	listed.poll()
+	notListed.poll()
+	f.set(func() {
+		f.issues = []obj{issue(3, dev, obj{"state": "resolved", "created_on": at(-5), "updated_on": at(1)})}
+		f.changes[3] = []obj{{"id": 30, "user": alex, "created_on": at(1), "changes": obj{"state": obj{"old": "open", "new": "resolved"}}}}
+	})
+	ids, _ := listed.poll()
+	same(t, ids, []string{"issue.closed:acme/app:3:" + timeString(start.Add(60e9))})
+	ids, _ = notListed.poll()
+	same(t, ids, []string(nil))
 }

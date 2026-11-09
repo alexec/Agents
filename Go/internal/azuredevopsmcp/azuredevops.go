@@ -20,6 +20,8 @@ type PR struct {
 	URL    string
 	// Fixes is the work items its description says it closes (#2349), where the list read it.
 	Fixes []string
+	// AuthorID is who opened it, for mine on a pull request no longer active (#3797); not in its JSON.
+	AuthorID string
 }
 
 func (p PR) json() map[string]any {

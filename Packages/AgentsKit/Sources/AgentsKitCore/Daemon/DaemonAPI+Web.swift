@@ -226,6 +226,8 @@ public extension DaemonAPI {
                 Row(Method.pinsList, params: Empty.self, result: [FolderPins].self, kind: .hostRequest),
                 Row(Method.requestsList, params: RequestsListRequest.self, result: RequestsListResult.self,
                     kind: .hostRequest),
+                // A secret's use answered from its Needs you row (#4017).
+                Row(Method.requestsAnswer, params: RequestsAnswer.self, result: RequestUpdate.self, kind: .hostRequest),
                 Row(Method.pinsRead, params: PinReadRequest.self, result: FileReading.self, kind: .hostRequest),
                 // A view drawn in the chat (#187): its resource, and what it asks of its server.
                 Row(Method.viewsRead, params: ViewReadRequest.self, result: ViewResource.self, kind: .hostRequest),
@@ -393,6 +395,8 @@ public extension DaemonAPI {
                 // as the window's folders column has them.
                 Row(Method.filesBrowse, params: FilesBrowseRequest.self, result: DirectoryListing.self, kind: .hostRequest),
                 Row(Method.foldersAdd, params: AddFolderRequest.self, result: FolderSummary.self, kind: .hostRequest),
+                // Choose Folders… on a machine's row (#4122): the git repositories under its auto-detect paths.
+                Row(Method.foldersFind, params: FoldersFindRequest.self, result: [FoundFolder].self, kind: .hostRequest),
                 Row(Method.foldersClone, params: CloneRequest.self, result: FolderSummary.self, kind: .hostRequest),
                 Row(Method.foldersClones, params: Empty.self, result: [CloneSummary].self, kind: .hostRequest),
                 // Archive… on a folder's menu (#668), as the window's folder menu has it.
@@ -466,6 +470,8 @@ public extension DaemonAPI {
                 Row(Method.providersMakeDefault, params: ProviderRequest.self, result: Empty.self, kind: .controlRequest),
                 // Add as Machine… on a workspace (#3365): installed over the control plane's ssh.
                 Row(Method.hostsInstall, params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                // Update… on a machine's row (#4122): updated over the control plane's ssh, as installed.
+                Row(Method.hostsUpdate, params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
                 Row(Method.hostsSetMachineOptions, params: MachineOptions.self, result: ControlMachine.self,
                     kind: .controlRequest),
                 // Start a Machine from a Repository (#1809): the provider's form, then the machine.

@@ -332,6 +332,9 @@ final class RemoteModel {
     var workHistory = LineageHistory<WorkPlace>()
     /// Each Work list's filters, sort and rows (#3257), so a page goes through its list and Back finds it as left.
     let workLists = WorkLists()
+    /// The person's settings and the names of their secrets (#1760), for Settings ▸ You ▸ Secrets
+    /// (#4032), fed from the control plane's watch.
+    let userScope = UserScopeState()
     /// What `control/status` last said: its version and capabilities, for Settings (#1748).
     private(set) var controlStatus: DaemonAPI.ControlStatus?
 
@@ -341,6 +344,8 @@ final class RemoteModel {
         // and each line wrapped for it, as every other client's is (#3234).
         let lock = lock
         client = DaemonClient(link: LockedLink(HomeLink(link), host: .mac) { await lock.channelSigner() })
+        // A secret is sealed only to the machines the lock names (#3491, D8).
+        userScope.lock = lock
         files = RemoteFiles(client: client)
         pictures = PhonePictures(files: files)
         // From the start, not once connected: a banner tapped to launch or wake the app
@@ -1341,6 +1346,51 @@ final class RemoteModel {
                                                       returning: DailySummarySettings.self)
     }
 
+    // MARK: Secrets for one session (#3548, #4032), on the Mac's host
+
+    func sessionSecrets() async -> SessionSecrets? {
+        try? await client.call(DaemonAPI.Method.secretsSessionList, DaemonAPI.Empty(), returning: SessionSecrets.self)
+    }
+
+    func setSessionSecret(_ request: SessionSecretSetRequest) async -> Result<SessionSecrets, Error> {
+        do {
+            return .success(try await client.call(DaemonAPI.Method.secretsSessionSet, request, returning: SessionSecrets.self))
+        } catch {
+            return .failure(error)
+        }
+    }
+
+    var sessionHostAsksBeforeUse: Bool { host(.mac, has: Capability.hostSecretApproval1) }
+
+    func setSessionSecretAsksBeforeUse(_ secret: SessionSecret, _ on: Bool) async -> Result<SessionSecrets?, Error> {
+        do {
+            _ = try await client.call(DaemonAPI.Method.secretsSetNeedsApproval,
+                                      SecretNeedsApprovalRequest(name: secret.name, agentID: secret.agentID, needsApproval: on),
+                                      returning: DaemonAPI.Empty.self)
+            return .success(await sessionSecrets())
+        } catch {
+            return .failure(error)
+        }
+    }
+
+    /// Take a session's secret out now: its agent is told it expired.
+    func removeSessionSecret(_ secret: SessionSecret) async -> SessionSecrets? {
+        do {
+            return try await client.call(DaemonAPI.Method.secretsSessionRemove,
+                                         SessionSecretRemoveRequest(agentID: secret.agentID, name: secret.name),
+                                         returning: SessionSecrets.self)
+        } catch {
+            problem = sentence(for: error)
+            return nil
+        }
+    }
+
+    /// The Mac's sessions that can take a secret for one session: not archived, latest first.
+    var sessionsForSecrets: [Agent] {
+        work.agents.filter { $0.host == .mac && $0.state != .archived }
+            .sorted { $0.lastActivityAt > $1.lastActivityAt }
+    }
+
     /// The daily summary's saved pages (#3721), from the Mac's host.
     func refreshSummaryPages() async {
         summaryPages = (try? await client.call(DaemonAPI.Method.summariesList, DaemonAPI.Empty(),
@@ -1924,6 +1974,24 @@ final class RemoteModel {
     /// Approve or Deny from a row's long press, of the version the row shows.
     func settleApproval(_ approval: Approval, _ action: Approval.Action, for key: FolderKey) async {
         if let why = await answerApproval(approval, action, digest: approval.digest, note: nil, for: key) { problem = why }
+    }
+
+    /// A person's answer to a secret's use (#4017), from its Needs you row or its banner: to
+    /// the host of the session that asked. Whether it went; why not is the problem.
+    @discardableResult
+    func answerSecretUse(_ request: NeedRequest, _ action: NeedRequest.Action) async -> Bool {
+        let answer = DaemonAPI.RequestsAnswer(id: request.id, secretUse: action)
+        let host = request.askedBy.flatMap { work.agent($0)?.host } ?? .mac
+        do {
+            let update = try await client(for: answer, on: host)
+                .call(DaemonAPI.Method.requestsAnswer, answer, returning: DaemonAPI.RequestUpdate.self)
+            work.replaceRequests(work.requests.filter { $0.id != update.request.id })
+            publishAttention()
+            return true
+        } catch {
+            problem = sentence(for: error)
+            return false
+        }
     }
 
     /// Deny a session's ask to be archived (#773): the mark goes and the session stays.
@@ -2655,6 +2723,7 @@ final class RemoteModel {
                         }
                         if await self.people.heard(change.method, change.params, on: control) { continue }
                         if self.signIn.heard(change.method, change.params) { continue }
+                        if await self.userScope.heard(change.method, change.params, on: control) { continue }
                         if await self.lock.heard(change.method, change.params, on: control) {
                             // A machine just added to the lock may now be sealed to (#3491, D8).
                             if change.method == DaemonAPI.Notification.controlLockChanged { await Self.sealWaiting(on: control, lock: self.lock) }
@@ -4764,6 +4833,9 @@ final class RemoteModel {
                 return false
             }
             sent = await answer(request, action: .accept, content: content)
+        case .secretUse(let request):
+            guard let action = NeedRequest.Action(rawValue: quick.id) else { return false }
+            sent = await answerSecretUse(request, action)
         case nil:
             note("banner: \(token) is over, nothing sent, in \(ContinuousClock.now - began)")
             return false
@@ -4782,6 +4854,7 @@ final class RemoteModel {
     private enum BannerQuestion {
         case permission(PermissionRequest)
         case elicitation(ElicitationRequest)
+        case secretUse(NeedRequest)
     }
 
     /// The question a banner's token names, while it is still asked.
@@ -4793,6 +4866,8 @@ final class RemoteModel {
             return work.permissions.first { $0.id.uuidString == parts[1] }.map(BannerQuestion.permission)
         case "elicitation":
             return work.elicitations.first { $0.id.uuidString == parts[1] }.map(BannerQuestion.elicitation)
+        case "request":
+            return work.requests.first { $0.id.uuidString == parts[1] && $0.secretUse != nil }.map(BannerQuestion.secretUse)
         default:
             return nil
         }
@@ -5538,3 +5613,6 @@ extension RemoteModel {
 
 /// Work (#3256): `RemoteModel+Work.swift`. Declared here, as Sendable conformance must be.
 extension RemoteModel: WorkModel {}
+
+/// Settings ▸ You ▸ Secrets ▸ For One Session (#4032), through the Mac's host.
+extension RemoteModel: SessionSecretsSource {}

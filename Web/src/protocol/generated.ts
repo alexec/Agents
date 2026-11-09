@@ -6477,21 +6477,25 @@ export interface Need {
 
 /**
  * NeedID (Attention/Need.swift): what is being answered, one key per kind. A notice (#2805) is what
- * an agent told the person with `notify`: posted, never a Needs you row.
+ * an agent told the person with `notify`: posted, never a Needs you row. A request (#4017) is a
+ * Needs you request posted so a phone can answer it: today only a secret's use (#4015), whose
+ * banner has its four answers.
  */
 export type NeedID =
   | { permission: UUID }
   | { elicitation: UUID }
   | { report: { agentID: UUID; at: WireDate } }
   | { guardedChange: { folder: URLString; path: string } }
-  | { notice: string };
+  | { notice: string }
+  | { request: UUID };
 
 export type NeedKind =
   | "permission"
   | "elicitation"
   | "report"
   | "guardedChange"
-  | "notice";
+  | "notice"
+  | "request";
 
 /**
  * folders/notCommitted (#3448): what in the folder's .agents Git ignores, so it stays on this
@@ -9110,6 +9114,12 @@ export interface RequestSecretUse {
    * The secret is the session's own (#3548): Allow always is the same as Allow for this session.
    */
   sessionOnly?: boolean;
+  /**
+   * The machine is Linux (#4058): the value opens only with the release key its control plane
+   * keeps, which the control plane gives only for an approval the person's client signed. An answer
+   * that allows the use carries approval; one without it is refused.
+   */
+  needsSignature?: boolean;
 }
 
 /**
@@ -9119,6 +9129,15 @@ export interface RequestSecretUse {
  */
 export interface RequestSecretUseAnswer {
   action: "once" | "session" | "always" | "deny";
+  /**
+   * The answering client's signature of its answer (#4058), required when the request says
+   * needsSignature and the action is not deny: method secrets/approveUse, params the JSON text
+   * {"request":<the request's id>,"name","use","place","action"} as the request names them, and a
+   * LockSignature to this machine by the client's lock key. The machine checks it against its lock
+   * and sends it to the control plane, which gives the release key only for a fresh one it has not
+   * seen.
+   */
+  approval?: LockDelivery;
 }
 
 export type RequestSource =
@@ -9751,6 +9770,37 @@ export interface SecretNeedsApprovalRequest {
   name: string;
   agentID?: UUID;
   needsApproval: boolean;
+}
+
+/**
+ * machine/secretRelease (#4058): a Linux machine asks its control plane to open the release layer
+ * of one value with Ask before use, for a person's signed approval. encapsulated is the HPKE
+ * encapsulated key the machine sealed the value's key with (DHKEM X25519, HKDF-SHA256, AES-256-GCM,
+ * info agents-secret-release/1); the control plane answers with the 32 bytes exported with the
+ * context "sealedsecret.release.v1|" then name. It never sees the value, which is also sealed to
+ * the machine's key.
+ */
+export interface SecretRelease {
+  name: string;
+  encapsulated: Base64;
+  approval: LockDelivery;
+}
+
+/**
+ * machine/secretKey (#4058): the public half of this machine's release key, X25519, 32 bytes. The
+ * control plane makes the key pair the first time a machine asks, keeps the private half sealed by
+ * its keeper, and gives it to nobody.
+ */
+export interface SecretReleaseKey {
+  publicKey: Base64;
+}
+
+/**
+ * The answer to machine/secretRelease (#4058): the key that opens the release layer of one value,
+ * which the machine uses once and does not keep.
+ */
+export interface SecretReleased {
+  key: Base64;
 }
 
 /**
@@ -12321,6 +12371,7 @@ export interface Methods {
   "folders/clone": { params: CloneRequest; result: FolderSummary };
   "folders/clones": { params: Empty; result: CloneSummary[] };
   "folders/delete": { params: FolderRequest; result: Empty };
+  "folders/find": { params: FoldersFindRequest; result: FoundFolder[] };
   "folders/keepGuardedChange": { params: GuardedChangeRequest; result: FolderSummary };
   "folders/list": { params: FoldersListRequest; result: FolderSummary[] };
   "folders/notCommitted": { params: FolderRequest; result: NotCommittedResponse };
@@ -12400,6 +12451,7 @@ export interface Methods {
   "machines/startEnroll": { params: MachineEnroll; result: ControlCodeShown };
   "machines/stop": { params: MachineStop; result: ControlMachine };
   "machines/unlink": { params: MachineRequest; result: ControlMachine };
+  "machines/update": { params: MachineUpdate; result: JSONValue };
   "marketplaces/list": { params: MarketplacesListRequest; result: MarketplacesListAnswer };
   "mcp/health": { params: Empty; result: MCPHealthSnapshot };
   "mcp/health/check": { params: MCPHealthCheckRequest; result: MCPHealthSnapshot };
@@ -12496,6 +12548,7 @@ export interface Methods {
   "reports/usage": { params: ReportQuery; result: UsageReport };
   "reports/value": { params: ReportQuery; result: ReportValue };
   "reports/views": { params: Empty; result: ReportViews };
+  "requests/answer": { params: RequestsAnswer; result: RequestUpdate };
   "requests/list": { params: RequestsList; result: RequestsListResult };
   "resources/snapshot": { params: Empty; result: LeaseSnapshot };
   "reviews/dismiss": { params: ReviewDismissRequest; result: Empty };
@@ -12719,6 +12772,7 @@ export const MethodTarget = {
   "folders/clone": "host",
   "folders/clones": "host",
   "folders/delete": "host",
+  "folders/find": "host",
   "folders/keepGuardedChange": "host",
   "folders/list": "host",
   "folders/notCommitted": "host",
@@ -12798,6 +12852,7 @@ export const MethodTarget = {
   "machines/startEnroll": "control",
   "machines/stop": "control",
   "machines/unlink": "control",
+  "machines/update": "control",
   "marketplaces/list": "host",
   "mcp/health": "host",
   "mcp/health/check": "host",
@@ -12894,6 +12949,7 @@ export const MethodTarget = {
   "reports/usage": "control",
   "reports/value": "control",
   "reports/views": "control",
+  "requests/answer": "host",
   "requests/list": "host",
   "resources/snapshot": "host",
   "reviews/dismiss": "host",
@@ -13829,8 +13885,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RequestDetail: { required: [], optional: ["elicitation", "secretUse"] },
   RequestForge: { required: ["provider", "repo", "item", "number", "url", "label", "checklist", "seenAt"], optional: ["screenshots", "author", "updatedAt"] },
   RequestFormAnswer: { required: ["action"], optional: ["content"] },
-  RequestSecretUse: { required: ["name", "use", "place"], optional: ["sessionOnly"] },
-  RequestSecretUseAnswer: { required: ["action"], optional: [] },
+  RequestSecretUse: { required: ["name", "use", "place"], optional: ["sessionOnly", "needsSignature"] },
+  RequestSecretUseAnswer: { required: ["action"], optional: ["approval"] },
   RequestUpdate: { required: ["request"], optional: [] },
   RequestWaiter: { required: ["agent", "since"], optional: [] },
   RequestsAnswer: { required: ["id", "answer"], optional: [] },
@@ -13891,6 +13947,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SecretGrants: { required: ["grants"], optional: [] },
   SecretLeftOn: { required: ["host", "name", "at"], optional: [] },
   SecretNeedsApprovalRequest: { required: ["name", "needsApproval"], optional: ["agentID"] },
+  SecretRelease: { required: ["name", "encapsulated", "approval"], optional: [] },
+  SecretReleaseKey: { required: ["publicKey"], optional: [] },
+  SecretReleased: { required: ["key"], optional: [] },
   SecretsLeft: { required: ["host", "name", "secrets"], optional: [] },
   SelfUpdate: { required: ["autoUpdate", "state", "running"], optional: ["release", "message"] },
   SelfUpdateSet: { required: ["autoUpdate"], optional: [] },

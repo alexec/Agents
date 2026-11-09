@@ -4042,6 +4042,11 @@
     {
       "name": "folders/find",
       "x-capability": "folders/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -7182,6 +7187,7 @@
     {
       "name": "requests/answer",
       "x-capability": "requests/1",
+      "tags": [{ "name": "web" }],
       "paramStructure": "by-name",
       "params": [
         {

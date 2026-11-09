@@ -32,16 +32,21 @@ func invalidParams(format string, args ...any) *rpcError {
 	return &rpcError{Code: -32602, Message: fmt.Sprintf(format, args...)}
 }
 
-// property is one argument of an event: a string or a boolean.
+// property is one argument of an event: a string, a boolean, or one or a list of work
+// items' ids.
 type property struct {
 	name        string
-	kind        string // "string" or "boolean"
+	kind        string // "string", "boolean" or "ids"
 	description string
 	pattern     *regexp.Regexp
 	looksLike   string
 }
 
 func (p property) json() map[string]any {
+	if p.kind == "ids" {
+		item := map[string]any{"type": "string", "pattern": p.pattern.String()}
+		return map[string]any{"type": []string{"string", "array"}, "pattern": p.pattern.String(), "items": item, "description": p.description}
+	}
 	o := map[string]any{"type": p.kind, "description": p.description}
 	if p.pattern != nil {
 		o["pattern"] = p.pattern.String()
@@ -73,8 +78,21 @@ func (s schema) lookup(name string) (property, bool) {
 // args are an event's checked arguments.
 type args struct {
 	area, kind, label string
-	issue             int
-	anyone            bool
+	issues            []int
+	anyone, all       bool
+}
+
+// wantsIssue is whether the work item with id n is one asked for: any, when none is.
+func (a args) wantsIssue(n int) bool {
+	if len(a.issues) == 0 {
+		return true
+	}
+	for _, i := range a.issues {
+		if i == n {
+			return true
+		}
+	}
+	return false
 }
 
 // check reads raw (null or missing as {}) and checks it: no unknown keys, types, shapes.
@@ -106,7 +124,34 @@ func (s schema) check(raw json.RawMessage) (args, *rpcError) {
 			if err := json.Unmarshal(value, &b); err != nil || string(value) == "null" {
 				return a, invalidParams("%s must be true or false", key)
 			}
-			a.anyone = b
+			if key == "any" {
+				a.all = b
+			} else {
+				a.anyone = b
+			}
+			continue
+		}
+		if p.kind == "ids" {
+			// One id, or a list of them (#3797): a lead waits on all its open children at once.
+			var list []string
+			if strings.HasPrefix(strings.TrimSpace(string(value)), "[") {
+				if json.Unmarshal(value, &list) != nil || len(list) == 0 {
+					return a, invalidParams("%s must be %s, or a list of them", key, p.looksLike)
+				}
+			} else {
+				var text string
+				if json.Unmarshal(value, &text) != nil || string(value) == "null" {
+					return a, invalidParams("%s must be %s, or a list of them", key, p.looksLike)
+				}
+				list = []string{text}
+			}
+			for _, text := range list {
+				if !p.pattern.MatchString(text) {
+					return a, invalidParams("%s must be %s, or a list of them", key, p.looksLike)
+				}
+				n, _ := strconv.Atoi(text)
+				a.issues = append(a.issues, n)
+			}
 			continue
 		}
 		var text string
@@ -123,8 +168,6 @@ func (s schema) check(raw json.RawMessage) (args, *rpcError) {
 			a.kind = text
 		case "label":
 			a.label = text
-		case "issue":
-			a.issue, _ = strconv.Atoi(text)
 		}
 	}
 	return a, nil
@@ -146,12 +189,15 @@ func (e event) json() map[string]any {
 var (
 	areaProperty = property{name: "area", kind: "string",
 		description: `Only work items in this area path or under it, as Web App\Team. Left out, every area of the project.`}
-	typeProperty = property{name: "type", kind: "string", description: "Only work items of this type, as Bug or User Story."}
-	issueProperty = property{name: "issue", kind: "string", description: "Only this work item, by its id, as 12.",
+	typeProperty  = property{name: "type", kind: "string", description: "Only work items of this type, as Bug or User Story."}
+	issueProperty = property{name: "issue", kind: "ids", description: `Only this work item, or these, by its id, as "12" or ["12", "13"].`,
 		pattern: regexp.MustCompile(`^[1-9][0-9]{0,9}$`), looksLike: "a work item's id, as 12"}
 	// anyoneProperty opts into anyone's work item, comment or tag (#728); left out, only people.
 	anyoneProperty = property{name: "anyone", kind: "boolean",
 		description: "true: by anyone, build services and other bots too. Left out, only people, never a bot."}
+	// anyProperty is every work item in the project (#3797): a wait that names none sets it.
+	anyProperty = property{name: "any", kind: "boolean",
+		description: "true: every work item in the project. A wait (not a workflow trigger) that names none, by issue or label, is refused without it. It is about which ones; anyone is about who."}
 )
 
 func object(props map[string]any) map[string]any {
@@ -186,7 +232,7 @@ var events = func() []event {
 	out := make([]event, len(kinds))
 	for i, k := range kinds {
 		label := property{name: "label", kind: "string", description: k.label}
-		input := schema{areaProperty, typeProperty, label, issueProperty, anyoneProperty}
+		input := schema{areaProperty, typeProperty, label, issueProperty, anyoneProperty, anyProperty}
 		if k.kind == Opened {
 			input = schema{areaProperty, typeProperty, label, anyoneProperty}
 		}
@@ -400,7 +446,7 @@ func (s *Events) candidates(ctx context.Context, e event, a args, since string) 
 		if a.kind != "" && !strings.EqualFold(w.Type, a.kind) {
 			continue
 		}
-		if a.issue != 0 && w.ID != a.issue {
+		if !a.wantsIssue(w.ID) {
 			continue
 		}
 		// Assigned to the token's owner is theirs, by anyone (#2034).

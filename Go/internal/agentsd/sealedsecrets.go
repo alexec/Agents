@@ -31,8 +31,11 @@ import (
 //
 // It is sealed with AES-256-GCM under a key made from this machine's key with HKDF. On a Mac
 // that key is in a Keychain item only agentsd's signature reads (controllink.HostKeyFor), so
-// an agent can read sealed.json and cannot open it. On Linux the key is a 0600 file; the
-// second layer under the control plane's release key comes after this (#4014's stack).
+// an agent can read sealed.json and cannot open it. On Linux the key is a 0600 file an agent
+// can read, so the value is first sealed to the release key that only the control plane
+// keeps (#4058, secretrelease), and that layer then to the machine's key: it opens only once
+// the control plane released its key for a person's signed approval (secretrelease.go). A
+// Linux machine with no control plane keeps no flagged value.
 //
 // The associated data binds where it is kept, its name and its grants (#4015's "Allow
 // always" places), so a record moved or changed by hand does not open. Being sealed is the
@@ -54,10 +57,11 @@ const (
 
 type sealedSecretsState struct {
 	sealedSecretsMu sync.Mutex
+	releaseState
 }
 
 type sealedSecretsFile struct {
-	V       int                     `json:"v"`
+	V       int                    `json:"v"`
 	Secrets map[string]sealedValue `json:"secrets,omitempty"`
 }
 
@@ -65,9 +69,12 @@ type sealedSecretsFile struct {
 type sealedValue struct {
 	Sealed []byte `json:"sealed"`
 	// Grants are the places a person allowed always (#4015), bound into the associated data.
-	Grants []string  `json:"grants,omitempty"`
-	From   string    `json:"from,omitempty"`
-	SetAt  wire.Date `json:"setAt"`
+	Grants []string `json:"grants,omitempty"`
+	// Release says what the machine's key seals is the value's release layer (#4058), not
+	// the value: it opens only with the key the control plane releases.
+	Release bool      `json:"release,omitempty"`
+	From    string    `json:"from,omitempty"`
+	SetAt   wire.Date `json:"setAt"`
 }
 
 func sealedSecretsPath(home string) string {
@@ -77,10 +84,15 @@ func sealedSecretsPath(home string) string {
 // sealedSessionStore is a session's store in the associated data.
 func sealedSessionStore(agent wire.UUID) string { return "session:" + string(agent) }
 
-// sealedSecretAD is what each seal binds: the store, the name, the flag and the grants.
-func sealedSecretAD(storeName, name string, grants []string) []byte {
+// sealedSecretAD is what each seal binds: the store, the name, the flag, the grants and
+// whether it holds a release layer.
+func sealedSecretAD(storeName, name string, grants []string, release bool) []byte {
 	g, _ := json.Marshal(grants)
-	return fmt.Appendf(nil, "sealedsecret.v1|%s|%s|ask|%s", storeName, name, g)
+	ad := fmt.Appendf(nil, "sealedsecret.v1|%s|%s|ask|%s", storeName, name, g)
+	if release {
+		ad = append(ad, "|release"...)
+	}
+	return ad
 }
 
 // sealingKey is this machine's key for its flagged secrets, made from its own key (made
@@ -96,49 +108,88 @@ func (d *Daemon) sealingKey() ([]byte, error) {
 	return hkdf.Key(sha256.New, private, nil, sealedSecretsInfo, 32)
 }
 
+// sealSecret seals value: to the machine's key, and on Linux first to the release key.
 func (d *Daemon) sealSecret(storeName, name, value string, grants []string) (sealedValue, error) {
-	key, err := d.sealingKey()
-	if err != nil {
-		return sealedValue{}, err
+	plain := []byte(value)
+	release := d.releaseLayerOn()
+	if release {
+		layer, err := d.sealReleaseLayer(storeName, name, value)
+		if err != nil {
+			return sealedValue{}, err
+		}
+		plain, _ = json.Marshal(layer)
 	}
-	defer clear(key)
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return sealedValue{}, err
-	}
-	gcm, err := cipher.NewGCM(block)
+	return d.sealOuter(storeName, name, plain, grants, release)
+}
+
+// sealOuter is the seal to the machine's key, of the value or of its release layer.
+func (d *Daemon) sealOuter(storeName, name string, plain []byte, grants []string, release bool) (sealedValue, error) {
+	gcm, err := d.sealingGCM()
 	if err != nil {
 		return sealedValue{}, err
 	}
 	grants = sortedGrants(grants)
 	nonce := make([]byte, gcm.NonceSize())
 	rand.Read(nonce)
-	return sealedValue{Sealed: gcm.Seal(nonce, nonce, []byte(value), sealedSecretAD(storeName, name, grants)),
-		Grants: grants, SetAt: now()}, nil
+	return sealedValue{Sealed: gcm.Seal(nonce, nonce, plain, sealedSecretAD(storeName, name, grants, release)),
+		Grants: grants, Release: release, SetAt: now()}, nil
 }
 
-func (d *Daemon) openSealedSecret(storeName, name string, s sealedValue) (string, error) {
+func (d *Daemon) sealingGCM() (cipher.AEAD, error) {
 	key, err := d.sealingKey()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer clear(key)
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	gcm, err := cipher.NewGCM(block)
+	return cipher.NewGCM(block)
+}
+
+// openOuter opens the seal to the machine's key: the value, or its release layer. It says
+// the record is whole (its grants are the ones sealed) without the value on Linux.
+func (d *Daemon) openOuter(storeName, name string, s sealedValue) ([]byte, error) {
+	gcm, err := d.sealingGCM()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if len(s.Sealed) < gcm.NonceSize() {
-		return "", errors.New("not a sealed value")
+		return nil, errors.New("not a sealed value")
 	}
-	plain, err := gcm.Open(nil, s.Sealed[:gcm.NonceSize()], s.Sealed[gcm.NonceSize():], sealedSecretAD(storeName, name, s.Grants))
+	plain, err := gcm.Open(nil, s.Sealed[:gcm.NonceSize()], s.Sealed[gcm.NonceSize():], sealedSecretAD(storeName, name, s.Grants, s.Release))
 	if err != nil {
-		return "", errors.New("it does not open with this machine's key")
+		return nil, errors.New("it does not open with this machine's key")
 	}
-	return string(plain), nil
+	return plain, nil
+}
+
+// openSealedSecret is the value. A value with a release layer opens only once a person's
+// signed approval released its key in this run of agentsd (releaseSealed).
+func (d *Daemon) openSealedSecret(storeName, name string, s sealedValue) (string, error) {
+	plain, err := d.openOuter(storeName, name, s)
+	if err != nil {
+		return "", err
+	}
+	if !s.Release {
+		return string(plain), nil
+	}
+	if v, ok := d.releasedValue(storeName, name, plain); ok {
+		return v, nil
+	}
+	return "", errNotReleased
+}
+
+// regrant seals a record again with other grants: on Linux its release layer as it is, so
+// a grant changes with no release.
+func (d *Daemon) regrant(storeName, name string, s sealedValue, grants []string) (sealedValue, error) {
+	plain, err := d.openOuter(storeName, name, s)
+	if err != nil {
+		return sealedValue{}, err
+	}
+	defer clear(plain)
+	return d.sealOuter(storeName, name, plain, grants, s.Release)
 }
 
 func sortedGrants(g []string) []string {
@@ -356,6 +407,9 @@ func (d *Daemon) setNeedsApproval(r wire.SecretNeedsApprovalRequest) error {
 	}
 	v, ok := d.sealedLocalSecret(home, r.Name)
 	if !ok {
+		if s, sealed := readSealedSecrets(home).Secrets[r.Name]; sealed && s.Release {
+			return Invalid("%s was left as it is: on this machine it opens only for a use a person approved on one of their devices. Approve a use first, or set its value again with Ask before use off.", r.Name)
+		}
 		if isSealedSecret(home, r.Name) {
 			return Invalid("%s does not open on this machine, so it was left as it is.", r.Name)
 		}

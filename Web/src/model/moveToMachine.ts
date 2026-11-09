@@ -18,4 +18,4 @@ export function whatGoes(stops: boolean): string {
 }
 
 export const folderHelp = "Leave the folder empty to use this project’s folder on that machine, or give an absolute path, such as /home/me/project.";
-export const noTargets = "No other machine is online. Start one in Settings ▸ Machines, then try again.";
+export const noTargets = "No other machine is online. Start one under Machines in the sidebar, then try again.";

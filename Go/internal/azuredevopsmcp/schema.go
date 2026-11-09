@@ -21,16 +21,20 @@ func invalidParams(format string, args ...any) *rpcError {
 	return &rpcError{Code: -32602, Message: fmt.Sprintf(format, args...)}
 }
 
-// property is one argument of an event: a string, a positive integer or a boolean.
+// property is one argument of an event: a string, a positive integer, a boolean, or a list
+// of work item references.
 type property struct {
 	name        string
-	kind        string // "string", "integer" or "boolean"
+	kind        string // "string", "integer", "boolean" or "refs"
 	description string
 	pattern     *regexp.Regexp
 	looksLike   string
 }
 
 func (p property) json() map[string]any {
+	if p.kind == "refs" {
+		return map[string]any{"type": "array", "items": map[string]any{"type": "string", "pattern": workItemRefPattern.String()}, "description": p.description}
+	}
 	o := map[string]any{"type": p.kind, "description": p.description}
 	if p.pattern != nil {
 		o["pattern"] = p.pattern.String()
@@ -64,7 +68,34 @@ func (s schema) lookup(name string) (property, bool) {
 type args struct {
 	repo, branch, pipeline string
 	pr, run                int
-	anyone, mine           bool
+	fixes                  []string
+	anyone, mine, all      bool
+}
+
+// workItemRefPattern is a work item as fixes takes it: "#12" (#3797).
+var workItemRefPattern = regexp.MustCompile(`^#[1-9][0-9]*$`)
+
+// closesOne is whether m's description closes one of the work items fixes asks for (#3797):
+// any pull request, when fixes is not given.
+func (a args) closesOne(m PR) bool {
+	if len(a.fixes) == 0 {
+		return true
+	}
+	for _, f := range m.Fixes {
+		if contains(a.fixes, f) {
+			return true
+		}
+	}
+	return false
+}
+
+// byMe is whether m is the token's owner's, when mine asks for only theirs (#3797): one of
+// their active pull requests, or one they opened, completed or abandoned now.
+func (a args) byMe(m PR, yours *Yours) bool {
+	if !a.mine {
+		return true
+	}
+	return yours != nil && (yours.owns(m.Number) || m.AuthorID != "" && strings.EqualFold(m.AuthorID, yours.ID))
 }
 
 // check reads raw (null or missing as {}) and checks it: no unknown keys, types, shapes.
@@ -109,14 +140,28 @@ func (s schema) check(raw json.RawMessage) (args, *rpcError) {
 			} else {
 				a.pr = int(i)
 			}
+		case "refs":
+			var list []string
+			if json.Unmarshal(value, &list) != nil || len(list) == 0 {
+				return a, invalidParams(`%s must be a list of work items, as "#12"`, key)
+			}
+			for _, ref := range list {
+				if !workItemRefPattern.MatchString(strings.TrimSpace(ref)) {
+					return a, invalidParams(`%s must be a list of work items, as "#12", not %q`, key, ref)
+				}
+				a.fixes = append(a.fixes, strings.TrimSpace(ref))
+			}
 		case "boolean":
 			var b bool
 			if err := json.Unmarshal(value, &b); err != nil || string(value) == "null" {
 				return a, invalidParams("%s must be true or false", key)
 			}
-			if key == "mine" {
+			switch key {
+			case "mine":
 				a.mine = b
-			} else {
+			case "any":
+				a.all = b
+			default:
 				a.anyone = b
 			}
 		default:

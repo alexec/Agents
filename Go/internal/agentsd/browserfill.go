@@ -99,6 +99,9 @@ type secretFill struct {
 	// parts, so none of them comes back once the card is in the page.
 	hide  map[string]string
 	codes map[string]string // a card's CVC, hidden as a whole number
+	// released is a value that opens only once a person's signed approval releases it
+	// (#4058): it is read after the approval.
+	released bool
 }
 
 // cardParts are a card secret's parts as fill_secret names them (#3531).
@@ -144,6 +147,9 @@ func (d *Daemon) fillSecretValue(agent wire.UUID, args map[string]json.RawMessag
 	home := d.personalHome()
 	if home == "" {
 		return fill, "Nothing was filled: this machine has no personal home to keep secrets in."
+	}
+	if d.releasePending(agent, name) {
+		return secretFill{name: name, label: name, released: true}, ""
 	}
 	v, ok, expired := d.localSecret(agent, name)
 	if expired && (!ok || v == "") {

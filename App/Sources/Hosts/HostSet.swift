@@ -47,7 +47,7 @@ final class HostSet {
 
     /// What an action aimed at this Mac's own things says when the control plane lists no
     /// host on this Mac (#1503): there is none to ask, which is not one that does not answer.
-    static let noMacHostProblem = "This Mac is not one of your machines, so that didn’t happen. This Mac’s runtimes and settings are kept only when it is one. To add it, make a code in Settings ▸ Machines ▸ Add by Code…, then paste it in Agents Host under Join one elsewhere."
+    static let noMacHostProblem = "This Mac is not one of your machines, so that didn’t happen. This Mac’s runtimes and settings are kept only when it is one. To add it, choose Register a Machine… in the sidebar’s Machines menu and make a code, then paste it in Agents Host under Join one elsewhere."
 
     /// Why a button aimed at `id` does nothing now, in a tooltip's few words.
     func offlineHelp(_ id: MachineRef) -> String {

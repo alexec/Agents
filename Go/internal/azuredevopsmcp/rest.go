@@ -396,7 +396,8 @@ func (f *RealAzureDevOps) prURL(repo string, number int) string {
 }
 
 func (f *RealAzureDevOps) pr(repo string, p pullJSON) PR {
-	return PR{Number: p.ID, Title: p.Title, Branch: branch(p.SourceRefName), URL: f.prURL(repo, p.ID), Fixes: closingRefs(p.Description)}
+	return PR{Number: p.ID, Title: p.Title, Branch: branch(p.SourceRefName), URL: f.prURL(repo, p.ID), Fixes: closingRefs(p.Description),
+		AuthorID: p.CreatedBy.ID}
 }
 
 // trustedPR says whether a pull request is the repository's own: its branch in the

@@ -146,7 +146,7 @@ struct AgentsCommands: Commands {
             Button("New Machine") { Task { await model.newMachine() } }
                 .keyboardShortcut("m", modifiers: [.command, .shift])
                 .disabled(model.needsFirstRun || ControlConfig.endpoint == nil)
-            // As Settings ▸ Machines has it (#2755); a machine joins a control plane, so
+            // As Register a Machine… in the sidebar's Machines menu (#2755); a machine joins a control plane, so
             // with none (the window is at first run) there is nothing to add it to.
             Button(AddMachine.Words.menuItem) { requests.folderSheet = .addMachine }
                 .keyboardShortcut("o", modifiers: [.command, .control])

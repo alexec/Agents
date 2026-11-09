@@ -1,7 +1,8 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Settings (#846): this app alone (Voice; Live Activities, which only a phone or an iPad has
+/// Settings (#846): You first, as on the Mac (#3998): Secrets and For One Session, and Accounts,
+/// which are Core (#4032, #4033); this app alone (Voice; Live Activities, which only a phone or an iPad has
 /// (#1657); and Sidebar, kept on the Mac's host and the same on every client: #1033, #2079), and
 /// Help. Control plane, machine, user and agent configuration settings are Mac + web (#2796,
 /// #2798): the Remote does not have them, but for Agents ▸ Policy (#2957) and the daily
@@ -13,6 +14,20 @@ struct RemoteSettings: View {
     var body: some View {
         NavigationStack {
             Form {
+                // The person's own, on every machine of theirs (#3998), as the Mac's Settings ▸ You.
+                Section(SettingsScope.you.title) {
+                    NavigationLink {
+                        RemoteSecretsPage()
+                    } label: {
+                        Label(UserScopeWords.secretsTitle, systemImage: "key")
+                    }
+                    NavigationLink {
+                        RemoteAccountsPage()
+                    } label: {
+                        Label(AccountsWords.title, systemImage: "person.crop.rectangle.stack")
+                    }
+                }
+                .paperListRow()
                 Section(SettingsScope.thisApp.title) {
                     SettingsPageLink("Voice", systemImage: "waveform") { VoiceSettingsSection() }
                     // The notice limits are rules of Agents ▸ Policy now (#2957, FR-023).
@@ -55,5 +70,30 @@ struct RemoteSettings: View {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
         }
+    }
+}
+
+/// Settings ▸ You ▸ Secrets (#4032): the person's secrets through the control plane, then the
+/// Mac's secrets for one session through its host, as the window's `SecretsView`.
+private struct RemoteSecretsPage: View {
+    @Environment(RemoteModel.self) private var model
+
+    var body: some View {
+        // Read when the page opens: the control plane's client is not observed.
+        SecretsPane(control: model.controlPlane, state: model.userScope) { SessionSecretsSection(model: model) }
+            .navigationTitle(UserScopeWords.secretsTitle)
+            .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+/// Settings ▸ You ▸ Accounts (#4033): the person's outside accounts through the control plane, as
+/// the window's `AccountsView`.
+private struct RemoteAccountsPage: View {
+    @Environment(RemoteModel.self) private var model
+
+    var body: some View {
+        AccountsPane(control: model.controlPlane, state: model.userScope)
+            .navigationTitle(AccountsWords.title)
+            .navigationBarTitleDisplayMode(.inline)
     }
 }

@@ -94,12 +94,18 @@ func (d *Daemon) setCISecret(caller wire.UUID, args map[string]json.RawMessage) 
 	if !secretAskName.MatchString(secret) {
 		return "", Invalid("Nothing was set: secret is the name of a secret you asked for with ask_secret, e.g. SENTRY_AUTH_TOKEN.")
 	}
-	v, ok, expired := d.localSecret(caller, secret)
-	if expired && (!ok || v == "") {
-		return "", Invalid("Nothing was set: %s was for this session only and has expired. Ask me for it again with ask_secret.", secret)
-	}
-	if !ok || v == "" {
-		return "", Invalid("Nothing was set: %s is not set. Ask me for it with ask_secret, then call set_ci_secret again.", secret)
+	// A value that opens only for a signed approval is read after it (#4058).
+	released := d.releasePending(caller, secret)
+	var v string
+	if !released {
+		var ok, expired bool
+		v, ok, expired = d.localSecret(caller, secret)
+		if expired && (!ok || v == "") {
+			return "", Invalid("Nothing was set: %s was for this session only and has expired. Ask me for it again with ask_secret.", secret)
+		}
+		if !ok || v == "" {
+			return "", Invalid("Nothing was set: %s is not set. Ask me for it with ask_secret, then call set_ci_secret again.", secret)
+		}
 	}
 	repo, gh, err := d.ciRepo(caller, args, what)
 	if err != nil {
@@ -113,6 +119,12 @@ func (d *Daemon) setCISecret(caller wire.UUID, args map[string]json.RawMessage) 
 		}
 		if waiting != "" {
 			return waiting, nil
+		}
+	}
+	if released {
+		var ok bool
+		if v, ok, _ = d.localSecret(caller, secret); !ok || v == "" {
+			return "", Invalid("Nothing was set: %s did not open.", secret)
 		}
 	}
 	ctx, cancel := context.WithTimeout(d.ctx, ciToolTimeout)

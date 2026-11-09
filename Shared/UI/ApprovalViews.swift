@@ -43,7 +43,8 @@ struct ApprovalRowLabel: View {
 }
 
 /// One request to the person in Needs You (#3864): what is asked, as its title, then its
-/// kind, who asked it and how many sessions it blocks, and how long it has waited. Drawn as
+/// kind, who asked it and how many sessions it blocks, and how long it has waited. A
+/// secret's use (#4017) says which secret, who wants it and where its value goes; never the value. Drawn as
 /// an approval's row is, its mark in the attention tint. Unlike an approval's, the mark is
 /// one for each kind (`NeedRequest.symbol`, #4026), so it says what is asked; the web's
 /// RequestRow.tsx draws the same marks. The window and the Remote both draw it.
@@ -62,7 +63,7 @@ struct RequestRowLabel: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
-                    Text(request.title)
+                    Text(request.title(asker: asker))
                         .appText(.supporting)
                         .lineLimit(1)
                     if let place {

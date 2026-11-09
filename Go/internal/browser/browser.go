@@ -23,6 +23,8 @@ import (
 	"syscall"
 	"time"
 
+	cdpbrowser "github.com/chromedp/cdproto/browser"
+	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/chromedp"
 	"github.com/chromedp/chromedp/remote"
 )
@@ -337,8 +339,39 @@ func locateChromium(t Toolset, env []string) (string, error) {
 
 // launchChromium starts Chromium with chromedp: headless, the kept profile, its debugging
 // port on 127.0.0.1 and a port the system picks, so only this machine reaches it and the
-// address has the browser's random id in its path.
+// address has the browser's random id in its path. Its user agent says Chrome, not
+// HeadlessChrome (#4060).
 func launchChromium(exe, profile string, env []string) (*process, error) {
+	if ua, ok := userAgents.Load(exe); ok {
+		p, _, err := startChromium(exe, profile, env, ua.(string))
+		return p, err
+	}
+	p, ua, err := startChromium(exe, profile, env, "")
+	if err != nil || !strings.Contains(ua, "HeadlessChrome/") {
+		return p, err
+	}
+	// The first start of this Chromium learns its user agent; the next starts use it.
+	headed := headedUserAgent(ua)
+	userAgents.Store(exe, headed)
+	p.stop()
+	<-p.done
+	p, _, err = startChromium(exe, profile, env, headed)
+	return p, err
+}
+
+// userAgents is each Chromium's user agent as a headed Chrome, by its executable.
+var userAgents sync.Map
+
+// headedUserAgent is a headless Chromium's user agent as a headed Chrome says it. A
+// checkout's bot check (Paddle's /pay, #4019) refuses HeadlessChrome; Sec-CH-UA and
+// navigator.webdriver say nothing of headless already.
+func headedUserAgent(ua string) string {
+	return strings.Replace(ua, "HeadlessChrome/", "Chrome/", 1)
+}
+
+// startChromium starts Chromium, with userAgent when it is not empty, and says the user
+// agent it has.
+func startChromium(exe, profile string, env []string, userAgent string) (*process, string, error) {
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.ExecPath(exe),
 		chromedp.UserDataDir(profile),
@@ -354,6 +387,9 @@ func launchChromium(exe, profile string, env []string) (*process, error) {
 		// dropCaches empties every cache before the next start.
 		chromedp.Flag("disk-cache-size", strconv.Itoa(diskCacheBytes)),
 	)
+	if userAgent != "" {
+		opts = append(opts, chromedp.UserAgent(userAgent))
+	}
 	allocCtx, cancelAlloc := chromedp.NewExecAllocator(context.Background(), opts...)
 	ctx, cancelCtx := chromedp.NewContext(allocCtx)
 	stop := func() {
@@ -368,19 +404,24 @@ func launchChromium(exe, profile string, env []string) (*process, error) {
 	started := func(context.Context, *chromedp.Target) (chromedp.Void, error) { return chromedp.Void{}, nil }
 	if _, err := chromedp.Run(ctx, chromedp.Action[chromedp.Void](started)); err != nil {
 		stop()
-		return nil, err
+		return nil, "", err
 	}
 	b := chromedp.FromContext(ctx).Browser
 	if b == nil || b.Process() == nil {
 		stop()
-		return nil, errors.New("chromedp has no browser process")
+		return nil, "", errors.New("chromedp has no browser process")
+	}
+	version, err := chromedp.CallBrowser(ctx, cdpbrowser.GetVersion, cdp.Empty{})
+	if err != nil {
+		stop()
+		return nil, "", err
 	}
 	endpoint, err := activePort(profile)
 	if err != nil {
 		stop()
-		return nil, err
+		return nil, "", err
 	}
-	return &process{endpoint: endpoint, pid: b.Process().Pid, done: ctx.Done(), stop: stop, store: cdpStore{ctx}}, nil
+	return &process{endpoint: endpoint, pid: b.Process().Pid, done: ctx.Done(), stop: stop, store: cdpStore{ctx}}, version.UserAgent, nil
 }
 
 // activePort is the CDP address Chromium wrote in its profile's DevToolsActivePort:

@@ -326,8 +326,8 @@ trigger is:
   `fixes`, in one wait. A key that none of them takes is refused. A key that two of them
   take goes to both: `branch` on `pr.merged` means a PR *from* that branch.
 - **It names what it waits for** (#3797). This applies to a wait on an event about one
-  thing, on a server whose event takes `any`: today the `github`, `forgejo` and `gitlab`
-  servers. The wait names the thing, or it sets `any: true` to wake on every one. A wait
+  thing, on a server whose event takes `any`: today the `github`, `forgejo`, `gitlab`,
+  `bitbucket`, `azuredevops` and `azureboards` servers (#3821). The wait names the thing, or it sets `any: true` to wake on every one. A wait
   that does neither is refused, with the words that say what to set: *github's pr.merged:
   Name the PR (`pr`, `branch`, `fixes` or `mine`), or set `any: true` to wake on every PR
   in the repo.* `any` is about *which* ones. It is not `anyone`, which is about *who*.
@@ -338,7 +338,7 @@ trigger is:
   | --- | --- | --- |
   | `pr.merged`, `pr.closed`, `pr.conflicted`, `pr.commented`, `pr.reviewed`, `pr.labelled`, `pr.unlabelled`, `review.posted`, `review.comment` | `pr`, `branch`, `fixes` or `mine` | yes |
   | `checks.failed`, `checks.passed` | `pr`, `branch`, `fixes` or `mine` | yes |
-  | `run.completed` | `run`, `branch` or `workflow` | yes |
+  | `run.completed` | `run`, `branch`, `workflow` or `pipeline` (Azure DevOps) | yes |
   | `issue.closed`, `issue.commented`, `issue.labelled` | `issue` or `label` | yes |
   | `branch.moved` (the app's) | `branch` | yes |
 
@@ -346,9 +346,12 @@ trigger is:
   it. `issue.assigned` and `review.requested` are not checked, because they are only the
   connected account's. Only the keys that a server offers are named: GitHub's
   `pr.commented` has no `branch`. `fixes` is a list of issues, `"#12"` (the repo's own) or
-  `"owner/repo#12"`. It matches a PR whose body closes one of them, so a lead can wait on
-  a child's PR before the PR exists. `issue` takes one number or a list. `mine` is the
-  connected account's own PRs, merged or closed ones too.
+  `"owner/repo#12"` (`"group/project#12"` on GitLab, `"workspace/name#12"` on Bitbucket,
+  only `"#12"`, a work item, on Azure DevOps). It matches a PR whose body closes one of
+  them, so a lead can wait on a child's PR before the PR exists. `issue` takes one number
+  or a list (on Azure Boards, a work item's id as a string, `"12"`, or a list of them).
+  `mine` is the connected account's own PRs, merged or closed ones too. Every PR's payload
+  carries its `fixes`.
 - **It subscribes for as long as it waits**, from now, sharing a workflow's subscription
   when they ask for the same thing. When it is answered, times out or is cancelled, the
   subscription ends unless a workflow or another wait still holds it. A restart keeps it.

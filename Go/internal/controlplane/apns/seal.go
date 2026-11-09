@@ -113,6 +113,9 @@ func Token(id wire.NeedID) string {
 	case id.Notice != nil:
 		// What an agent told the person (#2805): the host's id, a string as Swift keeps it.
 		return "notice:" + *id.Notice
+	case id.Request != nil:
+		// A Needs you request posted for its banner (#4017).
+		return "request:" + strings.ToUpper(string(*id.Request))
 	}
 	return ""
 }

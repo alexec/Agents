@@ -35,8 +35,8 @@ it and no port needs opening. See [Folders, hosts and worktrees](../explanation/
 
 ### Run a command on the server
 
-1. In the window, open **Settings ▸ Machines**.
-2. Click **Add a Machine…**. With **Run a command** chosen, the sheet shows one command,
+1. In the window's sidebar, open the **Machines** header's menu and choose
+   **Register a Machine…** (on the web page, **Add a Machine…**). With **Run a command** chosen, the sheet shows one command,
    which works once.
 3. Click **Copy**.
 4. On the server, as the user your agents should run as, paste the command into a shell
@@ -49,7 +49,7 @@ it and no port needs opening. See [Folders, hosts and worktrees](../explanation/
 
    The sheet says **devbox joined.** and lists the git repositories it found on the server,
    unticked (see [Choose its folders](#choose-its-folders)). The server is listed under
-   **Machines**, and has a heading of its own in the folders list.
+   **Machines** in the sidebar, and has a heading of its own in the folders list.
 
 The host then installs Claude by itself, into `~/.agents-server/tools`, from the pins
 the control plane gives with the host (#1312). This takes about a minute and 500 MB. Until
@@ -67,7 +67,7 @@ you**, with the same code: click **Approve**. See
 
 ### Or add it over ssh
 
-1. In **Settings ▸ Machines**, click **Add a Machine…**, then choose
+1. In the sidebar's **Machines** menu, choose **Register a Machine…**, then choose
    **Over ssh**.
 2. In **Server**, type the server. The box offers the hosts in your `~/.ssh/config`, each with
    the `user@host` ssh resolves it to; choose one, or type any `user@host`,
@@ -179,8 +179,8 @@ own, its git asks this Mac for one, through the control plane, over https only.
    The clone, pull or push goes on. This Mac answers from its own git (the Keychain,
    `gh auth git-credential` and the like). The credential is used for that one git command
    and is not kept on the server or logged. A push uses the same approval.
-2. To take it back, in **Settings ▸ Machines**, open the server's `···` menu
-   and choose **Stop Lending Git Access for github.com**. On a phone or the web page, it is
+2. To take it back, open the server's page from **Machines** in the sidebar, and under
+   **Git access** choose **Stop Lending Git Access for github.com**. On a phone or the web page, it is
    **Settings ▸ Git access**.
 
 Git fails at once, and says why, when this Mac is not connected or has no git access to that
@@ -191,7 +191,8 @@ own access and asks nothing.
 
 A second Mac joins the same way, with Agents Host.
 
-1. In **Settings ▸ Machines**, click **Add by Code…**, then **Copy**.
+1. In the sidebar's **Machines** menu, choose **Register a Machine…**, then **Another Mac**,
+   then **Copy**.
 2. On the other Mac, install and open Agents Host. Under **Join one elsewhere**, paste the
    code and click **Join**.
 
@@ -200,8 +201,8 @@ A second Mac joins the same way, with Agents Host.
 
 ### Remove a server
 
-1. In **Settings ▸ Machines**, find the server, open its `···` menu and choose
-   **Remove…**, then **Remove**.
+1. Under **Machines** in the sidebar, right-click the server and choose
+   **Remove ‹name›…**, then **Remove**. A swipe to the left on its row does the same.
 
    It stops connecting, and every window and device stops seeing it. Its agents are left
    running where they are, and `~/.agents-server` on the server is not touched.
@@ -222,8 +223,8 @@ it, and they appear under its heading.
 
 If the server loses its network, or the host stops, **Machines** marks it offline and its
 folders go grey. Agents already working there keep working. The host reconnects by
-itself when it can, and you see everything that happened meanwhile. **Check again**, in
-its `···` menu, asks at once.
+itself when it can, and you see everything that happened meanwhile. **Check Again**, in
+its row's menu in the sidebar, asks at once.
 
 A server linked to a provider's workspace shows **Stopped** instead when its workspace is
 stopped, with **Start** on its row and over its chats on every screen.
@@ -231,9 +232,9 @@ stopped, with **Start** on its row and over its chats on every screen.
 ## Updating a server
 
 A server whose host is older than the control plane needs says **Needs an update** in
-**Settings ▸ Control plane ▸ Hosts**. To update it over ssh:
+its row under **Machines** in the sidebar. To update it over ssh:
 
-1. Click the server's **···**, then **Update…**.
+1. Right-click the server's row, then choose **Update…**.
 2. In **Server**, type the server as you reach it over ssh, as when you added it. Give a key
    if the control plane needs one. The control plane keeps neither from the install, so you
    give them again.
