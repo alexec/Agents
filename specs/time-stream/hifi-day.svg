@@ -1,0 +1,245 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="744" viewBox="0 0 1440 744" font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif">
+<defs>
+<filter id="sh" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#1D1D1F" flood-opacity="0.16"/></filter>
+<filter id="pop" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#1D1D1F" flood-opacity="0.18"/></filter>
+<clipPath id="win"><rect width="1440" height="744" rx="12"/></clipPath>
+<clipPath id="plot"><rect x="248" y="52" width="1192" height="692"/></clipPath>
+<symbol id="issue" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="2" fill="currentColor"/></symbol>
+<symbol id="pr" viewBox="0 0 16 16"><circle cx="4" cy="3.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="4" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="12" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M4 5.1v5.8M12 10.9V6.5a2 2 0 0 0-2-2H7.5M9 3l-1.6 1.5L9 6" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+<symbol id="sparkles" viewBox="0 0 16 16"><path d="M6.5 2.5l1.2 3.3 3.3 1.2-3.3 1.2-1.2 3.3-1.2-3.3L2 7l3.3-1.2zM12 9.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></symbol>
+<symbol id="flag" viewBox="0 0 16 16"><path d="M3.5 14V2.5M3.5 3h8.5l-2 3 2 3H3.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+<symbol id="box" viewBox="0 0 16 16"><path d="M2.5 5l5.5-2.5L13.5 5v6.5L8 14l-5.5-2.5zM2.5 5L8 7.5 13.5 5M8 7.5V14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></symbol>
+<symbol id="timeline" viewBox="0 0 16 16"><path d="M1.5 9h13M3 9c2 0 2-5 4-5h3c2 0 2 5 4 5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="4" r="1.3" fill="currentColor"/></symbol>
+<symbol id="person" viewBox="0 0 16 16"><circle cx="8" cy="5" r="2.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M3 14c.6-2.8 2.6-4.2 5-4.2s4.4 1.4 5 4.2" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+<symbol id="plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+<symbol id="chev" viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</defs>
+<rect x="20" y="20" width="1400" height="704" rx="12" fill="none" filter="url(#sh)"/>
+<g clip-path="url(#win)">
+<rect width="1440" height="744" fill="#FFFFFF"/>
+<rect width="248" height="744" fill="#F3F3F5"/><line x1="248" y1="0" x2="248" y2="744" stroke="#E2E2E6"/>
+<circle cx="22" cy="26" r="6" fill="#FF5F57"/>
+<circle cx="42" cy="26" r="6" fill="#FEBC2E"/>
+<circle cx="62" cy="26" r="6" fill="#28C840"/>
+<g transform="translate(16 56)"><rect width="216" height="30" rx="7" fill="#FFFFFF" stroke="#DCDCE0"/><use href="#plus" x="10" y="7" width="16" height="16" color="#3C3C43"/><text x="34" y="20" font-size="13" fill="#1D1D1F">New Session</text></g>
+<text x="18" y="112" font-size="11" font-weight="600" fill="#8E8E93">Work</text>
+<use href="#issue" x="20" y="127" width="16" height="16" color="#007AFF"/><text x="44" y="140" font-size="13" fill="#3C3C43">Issues</text>
+<use href="#pr" x="20" y="155" width="16" height="16" color="#007AFF"/><text x="44" y="168" font-size="13" fill="#3C3C43">Pull requests</text>
+<use href="#sparkles" x="20" y="183" width="16" height="16" color="#007AFF"/><text x="44" y="196" font-size="13" fill="#3C3C43">Features</text>
+<use href="#flag" x="20" y="211" width="16" height="16" color="#007AFF"/><text x="44" y="224" font-size="13" fill="#3C3C43">Milestones</text>
+<use href="#box" x="20" y="239" width="16" height="16" color="#007AFF"/><text x="44" y="252" font-size="13" fill="#3C3C43">Releases</text>
+<rect x="10" y="262" width="228" height="26" rx="6" fill="#007AFF"/>
+<use href="#timeline" x="20" y="267" width="16" height="16" color="#FFFFFF"/><text x="44" y="280" font-size="13" fill="#FFFFFF">Timeline</text>
+<use href="#chev" x="16" y="307" width="10" height="10" color="#8E8E93" transform="rotate(-90 21 312)"/><text x="30" y="316" font-size="11" font-weight="600" fill="#8E8E93">Your setup</text>
+<use href="#chev" x="16" y="333" width="10" height="10" color="#8E8E93" transform="rotate(-90 21 338)"/><text x="30" y="342" font-size="11" font-weight="600" fill="#8E8E93">Machines</text>
+<use href="#chev" x="16" y="359" width="10" height="10" color="#8E8E93" transform="rotate(-90 21 364)"/><text x="30" y="368" font-size="11" font-weight="600" fill="#8E8E93">Usage</text>
+<use href="#chev" x="16" y="385" width="10" height="10" color="#8E8E93" transform="rotate(-90 21 390)"/><text x="30" y="394" font-size="11" font-weight="600" fill="#8E8E93">Agents</text>
+<use href="#chev" x="16" y="411" width="10" height="10" color="#8E8E93" transform="rotate(-90 21 416)"/><text x="30" y="420" font-size="11" font-weight="600" fill="#8E8E93">Agents-web</text>
+<rect x="248" y="0" width="1192" height="52" fill="#FFFFFF"/><line x1="248" y1="52" x2="1440" y2="52" stroke="#E5E5EA"/>
+<text x="268" y="24" font-size="15" font-weight="700" fill="#1D1D1F">Timeline</text><text x="268" y="40" font-size="11" fill="#8E8E93">alexec/Agents · 18 epics</text>
+<g transform="translate(880 13)"><rect width="210" height="26" rx="7" fill="#EEEEF0"/><rect x="72" y="2" width="66" height="22" rx="5.5" fill="#FFFFFF" stroke="#D8D8DC" stroke-width=".5"/><text x="36" y="17.5" font-size="12" fill="#3C3C43" text-anchor="middle">1 Day</text><text x="105" y="17.5" font-size="12" font-weight="600" fill="#1D1D1F" text-anchor="middle">2 Days</text><text x="174" y="17.5" font-size="12" fill="#3C3C43" text-anchor="middle">Week</text></g>
+<g transform="translate(1102 13)"><rect width="52" height="26" rx="7" fill="#EEEEF0"/><text x="26" y="17.5" font-size="12" fill="#1D1D1F" text-anchor="middle">Now</text></g>
+<g transform="translate(1166 13)"><rect width="106" height="26" rx="7" fill="#EEEEF0"/><rect x="8" y="7" width="12" height="12" rx="3" fill="#007AFF"/><path d="M10.5 13l2.2 2.2 4-4.4" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><text x="28" y="17.5" font-size="12" fill="#1D1D1F">Forecast</text></g>
+<g transform="translate(1284 13)"><rect width="124" height="26" rx="7" fill="#EEEEF0"/><text x="12" y="17.5" font-size="12" fill="#1D1D1F">Board: All</text><use href="#chev" x="102" y="8" width="10" height="10" color="#3C3C43"/></g>
+<g clip-path="url(#plot)">
+<rect x="844.0" y="52" width="596.0" height="692" fill="#F7F8FA"/>
+<line x1="296.0" y1="92" x2="296.0" y2="644" stroke="#EDEDF0"/>
+<text x="300.0" y="662" font-size="11" fill="#8E8E93" font-weight="400">6 pm</text>
+<line x1="367.0" y1="92" x2="367.0" y2="644" stroke="#EDEDF0"/>
+<text x="371.0" y="662" font-size="11" fill="#8E8E93" font-weight="400">9 pm</text>
+<line x1="438.0" y1="92" x2="438.0" y2="644" stroke="#D1D1D6"/>
+<text x="442.0" y="662" font-size="11" fill="#1D1D1F" font-weight="600">Sun 8 Nov</text>
+<line x1="509.0" y1="92" x2="509.0" y2="644" stroke="#EDEDF0"/>
+<text x="513.0" y="662" font-size="11" fill="#8E8E93" font-weight="400">3 am</text>
+<line x1="580.0" y1="92" x2="580.0" y2="644" stroke="#EDEDF0"/>
+<text x="584.0" y="662" font-size="11" fill="#8E8E93" font-weight="400">6 am</text>
+<line x1="651.0" y1="92" x2="651.0" y2="644" stroke="#EDEDF0"/>
+<text x="655.0" y="662" font-size="11" fill="#8E8E93" font-weight="400">9 am</text>
+<line x1="722.0" y1="92" x2="722.0" y2="644" stroke="#EDEDF0"/>
+<text x="726.0" y="662" font-size="11" fill="#8E8E93" font-weight="400">12 pm</text>
+<line x1="793.0" y1="92" x2="793.0" y2="644" stroke="#EDEDF0"/>
+<text x="797.0" y="662" font-size="11" fill="#8E8E93" font-weight="400">3 pm</text>
+<line x1="864.0" y1="92" x2="864.0" y2="644" stroke="#EDEDF0"/>
+<text x="868.0" y="662" font-size="11" fill="#8E8E93" font-weight="400">6 pm</text>
+<line x1="935.0" y1="92" x2="935.0" y2="644" stroke="#EDEDF0"/>
+<text x="939.0" y="662" font-size="11" fill="#8E8E93" font-weight="400">9 pm</text>
+<line x1="1006.0" y1="92" x2="1006.0" y2="644" stroke="#D1D1D6"/>
+<text x="1010.0" y="662" font-size="11" fill="#1D1D1F" font-weight="600">Mon 9 Nov</text>
+<line x1="1077.0" y1="92" x2="1077.0" y2="644" stroke="#EDEDF0"/>
+<text x="1081.0" y="662" font-size="11" fill="#8E8E93" font-weight="400">3 am</text>
+<line x1="1148.0" y1="92" x2="1148.0" y2="644" stroke="#EDEDF0"/>
+<text x="1152.0" y="662" font-size="11" fill="#8E8E93" font-weight="400">6 am</text>
+<line x1="1219.0" y1="92" x2="1219.0" y2="644" stroke="#EDEDF0"/>
+<text x="1223.0" y="662" font-size="11" fill="#8E8E93" font-weight="400">9 am</text>
+<line x1="1290.0" y1="92" x2="1290.0" y2="644" stroke="#EDEDF0"/>
+<text x="1294.0" y="662" font-size="11" fill="#8E8E93" font-weight="400">12 pm</text>
+<line x1="1361.0" y1="92" x2="1361.0" y2="644" stroke="#EDEDF0"/>
+<text x="1365.0" y="662" font-size="11" fill="#8E8E93" font-weight="400">3 pm</text>
+<text x="856.0" y="86" font-size="11" font-weight="600" fill="#8E8E93" letter-spacing=".4">FORECAST</text><text x="832.0" y="86" font-size="11" font-weight="600" fill="#8E8E93" letter-spacing=".4" text-anchor="end">DONE</text>
+<line x1="256" y1="374" x2="844.0" y2="374" stroke="#AEAEB2" stroke-width="3" stroke-linecap="round"/><line x1="844.0" y1="374" x2="1432" y2="374" stroke="#C7C7CC" stroke-width="3" stroke-dasharray="7 6"/>
+<circle cx="681.1" cy="374" r="7" fill="#FFFFFF" stroke="#1D1D1F" stroke-width="2"/><rect x="651.1" y="386" width="60" height="18" rx="9" fill="#1D1D1F"/><text x="681.1" y="399" font-size="11" font-weight="600" fill="#FFFFFF" text-anchor="middle">v0.18.0</text>
+<path d="M256.0 344 L844.0 344" fill="none" stroke="#32ADE6" stroke-width="2.5" stroke-linecap="round"/>
+<rect x="908.1" y="337" width="503.9" height="14" rx="7" fill="#32ADE6" fill-opacity=".13"/>
+<path d="M844.0 344 L977.0 344" fill="none" stroke="#32ADE6" stroke-width="1.8" stroke-dasharray="4 4" stroke-linecap="round"/>
+<circle cx="872.9" cy="344" r="3.5" fill="#FFFFFF" stroke="#32ADE6" stroke-width="1.5"/>
+<circle cx="892.1" cy="344" r="3.5" fill="#FFFFFF" stroke="#32ADE6" stroke-width="1.5"/>
+<circle cx="916.1" cy="344" r="3.5" fill="#FFFFFF" stroke="#32ADE6" stroke-width="1.5"/>
+<circle cx="934.5" cy="344" r="3.5" fill="#FFFFFF" stroke="#32ADE6" stroke-width="1.5"/>
+<circle cx="963.0" cy="344" r="3.5" fill="#FFFFFF" stroke="#32ADE6" stroke-width="1.5"/>
+<g transform="translate(985.0 334)"><rect width="126" height="20" rx="10" fill="#FFF4E5" stroke="#FFB340" stroke-width=".8"/><use href="#person" x="7" y="3" width="14" height="14" color="#C46A00"/><text x="24" y="14" font-size="11" fill="#9A5200">2 wait for Alex</text></g>
+<path d="M256.0 404 L844.0 404" fill="none" stroke="#30B0C7" stroke-width="2.5" stroke-linecap="round"/>
+<rect x="882.2" y="397" width="529.8" height="14" rx="7" fill="#30B0C7" fill-opacity=".13"/>
+<path d="M844.0 404 L923.1 404" fill="none" stroke="#30B0C7" stroke-width="1.8" stroke-dasharray="4 4" stroke-linecap="round"/>
+<circle cx="870.8" cy="404" r="3.5" fill="#FFFFFF" stroke="#30B0C7" stroke-width="1.5"/>
+<circle cx="886.6" cy="404" r="3.5" fill="#FFFFFF" stroke="#30B0C7" stroke-width="1.5"/>
+<circle cx="909.1" cy="404" r="3.5" fill="#FFFFFF" stroke="#30B0C7" stroke-width="1.5"/>
+<g transform="translate(931.1 394)"><rect width="126" height="20" rx="10" fill="#FFF4E5" stroke="#FFB340" stroke-width=".8"/><use href="#person" x="7" y="3" width="14" height="14" color="#C46A00"/><text x="24" y="14" font-size="11" fill="#9A5200">1 wait for Alex</text></g>
+<path d="M256.0 314 L844.0 314" fill="none" stroke="#5856D6" stroke-width="2.5" stroke-linecap="round"/>
+<rect x="847.6" y="307" width="70.9" height="14" rx="7" fill="#5856D6" fill-opacity=".13"/>
+<path d="M844.0 314 L879.0 314" fill="none" stroke="#5856D6" stroke-width="1.8" stroke-dasharray="4 4" stroke-linecap="round"/>
+<circle cx="865.0" cy="314" r="3.5" fill="#FFFFFF" stroke="#5856D6" stroke-width="1.5"/>
+<g transform="translate(887.0 304)"><rect width="132" height="20" rx="10" fill="#FFF4E5" stroke="#FFB340" stroke-width=".8"/><use href="#person" x="7" y="3" width="14" height="14" color="#C46A00"/><text x="24" y="14" font-size="11" fill="#9A5200">13 wait for Alex</text></g>
+<path d="M256.0 434 L844.0 434" fill="none" stroke="#FF2D55" stroke-width="2.5" stroke-linecap="round"/>
+<rect x="847.9" y="427" width="71.7" height="14" rx="7" fill="#FF2D55" fill-opacity=".13"/>
+<path d="M844.0 434 L865.7 434 C865.7 434 865.7 374 865.7 374" fill="none" stroke="#FF2D55" stroke-width="1.8" stroke-dasharray="4 4" stroke-linecap="round"/><circle cx="865.7" cy="374" r="5" fill="#FFFFFF" stroke="#FF2D55" stroke-width="2"/>
+<circle cx="865.7" cy="434" r="3.5" fill="#FFFFFF" stroke="#FF2D55" stroke-width="1.5"/>
+<circle cx="819.9" cy="434" r="4" fill="#FF2D55" stroke="#FFFFFF" stroke-width="1.5"><title>#3821 bitbucket-mcp and azuredevops-mcp: any, fixes and mine on their events, as the other forges have (#3797)</title></circle>
+<circle cx="641.6" cy="434" r="4" fill="#FF2D55" stroke="#FFFFFF" stroke-width="1.5"><title>#3853 Azure DevOps and Bitbucket logins in Settings ▸ Account, so the Team section tells the person&#x27;s team from others</title></circle>
+<circle cx="433.7" cy="434" r="4" fill="#FF2D55" stroke="#FFFFFF" stroke-width="1.5"><title>#3879 Lineage for Bitbucket: its pull requests, issues and components as nodes, and what lineage asks Bitbucket</title></circle>
+<circle cx="458.0" cy="434" r="4" fill="#FF2D55" stroke="#FFFFFF" stroke-width="1.5"><title>#3880 Bitbucket in Work ▸ Features, from an issue&#x27;s component</title></circle>
+<circle cx="400.6" cy="434" r="4" fill="#FF2D55" stroke="#FFFFFF" stroke-width="1.5"><title>#3938 A list narrowed to a board still lists Bitbucket issues: narrowToBoard does not clear the Bitbucket repositories</title></circle>
+<circle cx="410.8" cy="434" r="4" fill="#FF2D55" stroke="#FFFFFF" stroke-width="1.5"><title>#3939 Work ▸ Features lists Azure Boards epics, also narrowed to an Azure Boards board</title></circle>
+<circle cx="673.5" cy="434" r="4" fill="#FF2D55" stroke="#FFFFFF" stroke-width="1.5"><title>#3952 Lineage for Azure Repos: its pull requests as nodes, and what lineage asks Azure DevOps</title></circle>
+<circle cx="432.2" cy="434" r="4" fill="#FF2D55" stroke="#FFFFFF" stroke-width="1.5"><title>#4055 A Pull requests list narrowed to another forge&#x27;s board still lists Azure Repos pull requests</title></circle>
+<circle cx="449.2" cy="434" r="4" fill="#FF2D55" stroke="#FFFFFF" stroke-width="1.5"><title>#4063 run-app: a fake Azure DevOps (Azure Repos and Azure Boards) for walks on a scratch app</title></circle>
+<circle cx="731.7" cy="434" r="4" fill="#FF2D55" stroke="#FFFFFF" stroke-width="1.5"><title>#4072 A folder added before its forge is connected never lists its pull requests until the host restarts (Azure DevOps, Forgejo, GitLab)</title></circle>
+<circle cx="708.6" cy="434" r="4" fill="#FF2D55" stroke="#FFFFFF" stroke-width="1.5"><title>#4098 The azuredevops server&#x27;s own views: Pull requests and a pull request&#x27;s page, with Team by the Azure DevOps login</title></circle>
+<circle cx="775.6" cy="434" r="4" fill="#FF2D55" stroke="#FFFFFF" stroke-width="1.5"><title>#4107 Lineage on an Azure DevOps Server under a path prefix, and the fake Azure DevOps&#x27;s lineage reads</title></circle>
+<circle cx="799.0" cy="434" r="4" fill="#FF2D55" stroke="#FFFFFF" stroke-width="1.5"><title>#4128 The diff sheet says &quot;Open on GitHub&quot; for an Azure DevOps or Bitbucket pull request</title></circle>
+<circle cx="820.7" cy="434" r="4" fill="#FF2D55" stroke="#FFFFFF" stroke-width="1.5"><title>#4136 run-app: a fake Bitbucket and a fake Forgejo for walks on a scratch app</title></circle>
+<path d="M256.0 284 L844.0 284" fill="none" stroke="#FF9500" stroke-width="2.5" stroke-linecap="round"/>
+<rect x="912.2" y="277" width="499.8" height="14" rx="7" fill="#FF9500" fill-opacity=".13"/>
+<path d="M844.0 284 L978.2 284 C1040.1 284 1040.1 374 1102.0 374" fill="none" stroke="#FF9500" stroke-width="1.8" stroke-dasharray="4 4" stroke-linecap="round"/><circle cx="1102.0" cy="374" r="5" fill="#FFFFFF" stroke="#FF9500" stroke-width="2"/>
+<circle cx="874.2" cy="284" r="3.5" fill="#FFFFFF" stroke="#FF9500" stroke-width="1.5"/>
+<circle cx="896.1" cy="284" r="3.5" fill="#FFFFFF" stroke="#FF9500" stroke-width="1.5"/>
+<circle cx="920.3" cy="284" r="3.5" fill="#FFFFFF" stroke="#FF9500" stroke-width="1.5"/>
+<circle cx="942.7" cy="284" r="3.5" fill="#FFFFFF" stroke="#FF9500" stroke-width="1.5"/>
+<circle cx="978.2" cy="284" r="3.5" fill="#FFFFFF" stroke="#FF9500" stroke-width="1.5"/>
+<path d="M256.0 464 L373.9 464 C382.9 464 382.9 374 391.9 374" fill="none" stroke="#FF9500" stroke-width="2.5" stroke-linecap="round"/><circle cx="391.9" cy="374" r="5" fill="#FF9500" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="391.8" cy="464" r="4" fill="#FF9500" stroke="#FFFFFF" stroke-width="1.5"><title>#3721 Daily summary: its own Summary row and page on the Mac, the Remote and the web</title></circle>
+<path d="M256.0 254 L336.6 254 C345.6 254 345.6 374 354.6 374" fill="none" stroke="#AF52DE" stroke-width="2.5" stroke-linecap="round"/><circle cx="354.6" cy="374" r="5" fill="#AF52DE" stroke="#FFFFFF" stroke-width="1.5"/>
+<path d="M256.0 494 L844.0 494" fill="none" stroke="#007AFF" stroke-width="2.5" stroke-linecap="round"/>
+<g transform="translate(866.0 484)"><rect width="126" height="20" rx="10" fill="#FFF4E5" stroke="#FFB340" stroke-width=".8"/><use href="#person" x="7" y="3" width="14" height="14" color="#C46A00"/><text x="24" y="14" font-size="11" fill="#9A5200">1 wait for Alex</text></g>
+<circle cx="586.5" cy="494" r="4" fill="#007AFF" stroke="#FFFFFF" stroke-width="1.5"><title>#3860 Agent identity: this repo&#x27;s agents post as a bot and Alex approves with real reviews</title></circle>
+<circle cx="368.8" cy="494" r="4" fill="#007AFF" stroke="#FFFFFF" stroke-width="1.5"><title>#3926 Agent identity: agents&#x27; gh and git use the App&#x27;s token through a credential helper</title></circle>
+<path d="M256.0 224 L621.3 224 C630.3 224 630.3 374 639.3 374" fill="none" stroke="#C69200" stroke-width="2.5" stroke-linecap="round"/><circle cx="639.3" cy="374" r="5" fill="#C69200" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="279.2" cy="224" r="4" fill="#C69200" stroke="#FFFFFF" stroke-width="1.5"><title>#3863 Needs you: the daemon keeps requests and wakes the sessions that wait on them</title></circle>
+<circle cx="311.6" cy="224" r="4" fill="#C69200" stroke="#FFFFFF" stroke-width="1.5"><title>#3864 Needs you: one row per request on the Mac, the Remote and the web</title></circle>
+<circle cx="304.3" cy="224" r="4" fill="#C69200" stroke="#FFFFFF" stroke-width="1.5"><title>#3865 Needs you: alex-todo, needs-account and needs-approval items become requests</title></circle>
+<circle cx="631.5" cy="224" r="4" fill="#C69200" stroke="#FFFFFF" stroke-width="1.5"><title>#4026 Needs You: request marks are not the same on the web, and a step&#x27;s hand looks like a session that needs you</title></circle>
+<path d="M256.0 524 L701.4 524 C710.4 524 710.4 374 719.4 374" fill="none" stroke="#34C759" stroke-width="2.5" stroke-linecap="round"/><circle cx="719.4" cy="374" r="5" fill="#34C759" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="554.1" cy="524" r="4" fill="#34C759" stroke="#FFFFFF" stroke-width="1.5"><title>#3898 Session search: click a label chip to filter by it, and a hint that names label:</title></circle>
+<circle cx="682.7" cy="524" r="4" fill="#34C759" stroke="#FFFFFF" stroke-width="1.5"><title>#3899 Session search: #&lt;n&gt; finds the sessions on an issue, its sub-issues and their PRs</title></circle>
+<circle cx="719.1" cy="524" r="4" fill="#34C759" stroke="#FFFFFF" stroke-width="1.5"><title>#3900 Session search: an epic&#x27;s results grouped under each child issue</title></circle>
+<path d="M256.0 194 L844.0 194" fill="none" stroke="#34C759" stroke-width="2.5" stroke-linecap="round"/>
+<rect x="861.3" y="187" width="334.1" height="14" rx="7" fill="#34C759" fill-opacity=".13"/>
+<path d="M844.0 194 L893.0 194" fill="none" stroke="#34C759" stroke-width="1.8" stroke-dasharray="4 4" stroke-linecap="round"/>
+<circle cx="867.0" cy="194" r="3.5" fill="#FFFFFF" stroke="#34C759" stroke-width="1.5"/>
+<circle cx="879.0" cy="194" r="3.5" fill="#FFFFFF" stroke="#34C759" stroke-width="1.5"/>
+<g transform="translate(901.0 184)"><rect width="126" height="20" rx="10" fill="#FFF4E5" stroke="#FFB340" stroke-width=".8"/><use href="#person" x="7" y="3" width="14" height="14" color="#C46A00"/><text x="24" y="14" font-size="11" fill="#9A5200">3 wait for Alex</text></g>
+<circle cx="313.4" cy="194" r="4" fill="#34C759" stroke="#FFFFFF" stroke-width="1.5"><title>#3913 AGENTS.md: a lane that hands Alex a step files an automation issue under the autonomy epic</title></circle>
+<circle cx="314.7" cy="194" r="4" fill="#34C759" stroke="#FFFFFF" stroke-width="1.5"><title>#3906 Spike: read SMS and phone codes with no person (forwarding to this Mac, or a number that reaches email)</title></circle>
+<circle cx="323.3" cy="194" r="4" fill="#34C759" stroke="#FFFFFF" stroke-width="1.5"><title>#3907 Spike: CAPTCHAs and bot checks (Okta, Azure): what drive_screen in a real browser passes, what stays human</title></circle>
+<circle cx="335.4" cy="194" r="2.5" fill="#C7C7CC" stroke="#FFFFFF" stroke-width="1.5"><title>#3914 SMS code reader: a tool that waits for an SMS from a sender and prints only the code</title></circle>
+<circle cx="389.0" cy="194" r="4" fill="#34C759" stroke="#FFFFFF" stroke-width="1.5"><title>#3915 Rewrite the ## What Alex does lists and the sign-up skill to hold only what still needs Alex</title></circle>
+<circle cx="333.8" cy="194" r="4" fill="#34C759" stroke="#FFFFFF" stroke-width="1.5"><title>#4000 generate_secret: make a strong password for a page field, save it as a secret, fill it unseen</title></circle>
+<circle cx="356.6" cy="194" r="4" fill="#34C759" stroke="#FFFFFF" stroke-width="1.5"><title>#4007 make_secret: an agent makes a random password it never sees, saved for fill_secret</title></circle>
+<circle cx="425.1" cy="194" r="4" fill="#34C759" stroke="#FFFFFF" stroke-width="1.5"><title>#4019 Paddle checkout refuses the agents&#x27; browser at its /pay preflight (Fastmail sign-up)</title></circle>
+<circle cx="399.6" cy="194" r="4" fill="#34C759" stroke="#FFFFFF" stroke-width="1.5"><title>#4028 capture_secret: save a value a page shows once (app password, API token) as a secret, unseen</title></circle>
+<circle cx="448.5" cy="194" r="4" fill="#34C759" stroke="#FFFFFF" stroke-width="1.5"><title>#4048 Ready-made workflows: update the person&#x27;s unedited copy when the ready-made version changes</title></circle>
+<circle cx="791.7" cy="194" r="4" fill="#34C759" stroke="#FFFFFF" stroke-width="1.5"><title>#4060 Browser: do not show as headless Chrome to checkouts (Paddle /pay preflight)</title></circle>
+<circle cx="560.1" cy="194" r="4" fill="#34C759" stroke="#FFFFFF" stroke-width="1.5"><title>#4071 Workflows: say when a ready-made copy was updated, and offer a newer version for an edited copy</title></circle>
+<circle cx="708.3" cy="194" r="4" fill="#34C759" stroke="#FFFFFF" stroke-width="1.5"><title>#4075 Workflows: take a newer ready-made version into an edited copy</title></circle>
+<path d="M256.0 554 L844.0 554" fill="none" stroke="#A2845E" stroke-width="2.5" stroke-linecap="round"/>
+<rect x="847.5" y="547" width="70.7" height="14" rx="7" fill="#A2845E" fill-opacity=".13"/>
+<path d="M844.0 554 L865.4 554 C865.4 554 865.4 374 865.4 374" fill="none" stroke="#A2845E" stroke-width="1.8" stroke-dasharray="4 4" stroke-linecap="round"/><circle cx="865.4" cy="374" r="5" fill="#FFFFFF" stroke="#A2845E" stroke-width="2"/>
+<circle cx="865.4" cy="554" r="3.5" fill="#FFFFFF" stroke="#A2845E" stroke-width="1.5"/>
+<circle cx="277.6" cy="554" r="4" fill="#A2845E" stroke="#FFFFFF" stroke-width="1.5"><title>#3972 Machines: make a machine with no name or options (machine-N, default provider, last-used options)</title></circle>
+<circle cx="351.6" cy="554" r="4" fill="#A2845E" stroke="#FFFFFF" stroke-width="1.5"><title>#3973 Mac sidebar: machine rows with a status dot, icon, menu, swipes and New Machine</title></circle>
+<circle cx="308.8" cy="554" r="4" fill="#A2845E" stroke="#FFFFFF" stroke-width="1.5"><title>#3974 Web: machine rows in the Machines section with a status dot, menu, swipes and New Machine</title></circle>
+<circle cx="836.7" cy="554" r="4" fill="#A2845E" stroke="#FFFFFF" stroke-width="1.5"><title>#3975 Settings: the machine list goes; Machine Providers keeps Make Default (Mac and web)</title></circle>
+<circle cx="783.9" cy="554" r="4" fill="#A2845E" stroke="#FFFFFF" stroke-width="1.5"><title>#3979 Machines in the sidebar, part 2: New Machine on ▸, last-used options, Make Default, unpushed work on Delete, the full menu</title></circle>
+<circle cx="814.1" cy="554" r="4" fill="#A2845E" stroke="#FFFFFF" stroke-width="1.5"><title>#4122 Web: Update…, Choose Folders… and Link to Provider… in a machine row&#x27;s menu</title></circle>
+<path d="M256.0 164 L620.8 164 C629.8 164 629.8 374 638.8 374" fill="none" stroke="#FF3B30" stroke-width="2.5" stroke-linecap="round"/><circle cx="638.8" cy="374" r="5" fill="#FF3B30" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="302.2" cy="164" r="4" fill="#FF3B30" stroke="#FFFFFF" stroke-width="1.5"><title>#3985 Multiplier page: the crowd, one Blob for each engineer (the Multiplier&#x27;s N), above the number</title></circle>
+<circle cx="350.1" cy="164" r="4" fill="#FF3B30" stroke="#FFFFFF" stroke-width="1.5"><title>#3986 Multiplier page: a way back, from a Multiplier row in Usage and View ▸ Multiplier (⌘0)</title></circle>
+<circle cx="368.6" cy="164" r="4" fill="#FF3B30" stroke="#FFFFFF" stroke-width="1.5"><title>#3987 Multiplier page: the earned achievements as badges, in place of the Achievements page on the Mac</title></circle>
+<circle cx="385.3" cy="164" r="4" fill="#FF3B30" stroke="#FFFFFF" stroke-width="1.5"><title>#3988 Multiplier page: personal bests, best week and most agents at once</title></circle>
+<circle cx="638.4" cy="164" r="4" fill="#FF3B30" stroke="#FFFFFF" stroke-width="1.5"><title>#3990 Web: the Multiplier page, as the Mac window has it, in place of the web&#x27;s Achievements page</title></circle>
+<circle cx="554.5" cy="164" r="4" fill="#FF3B30" stroke="#FFFFFF" stroke-width="1.5"><title>#3991 Multiplier: the baseline and its line are a setting (Settings ▸ Cost ▸ Multiplier)</title></circle>
+<path d="M345.1 374 C354.1 374 354.1 584 363.1 584 L666.3 584 C675.3 584 675.3 374 684.3 374" fill="none" stroke="#FF9500" stroke-width="2.5" stroke-linecap="round"/><circle cx="684.3" cy="374" r="5" fill="#FF9500" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="403.4" cy="584" r="4" fill="#FF9500" stroke="#FFFFFF" stroke-width="1.5"><title>#4009 forge/image: the daemon gets a forge page&#x27;s image bytes, allowlisted hosts and a size cap (GitHub first)</title></circle>
+<circle cx="555.3" cy="584" r="4" fill="#FF9500" stroke="#FFFFFF" stroke-width="1.5"><title>#4010 Work page images on the Mac and the Remote, through forge/image</title></circle>
+<circle cx="645.9" cy="584" r="4" fill="#FF9500" stroke="#FFFFFF" stroke-width="1.5"><title>#4011 Work page images on the web, through forge/image</title></circle>
+<path d="M345.3 374 C354.3 374 354.3 134 363.3 134 L844.0 134" fill="none" stroke="#AF52DE" stroke-width="2.5" stroke-linecap="round"/>
+<rect x="862.2" y="127" width="215.5" height="14" rx="7" fill="#AF52DE" fill-opacity=".13"/>
+<path d="M844.0 134 L880.6 134 C880.6 134 880.6 374 880.6 374" fill="none" stroke="#AF52DE" stroke-width="1.8" stroke-dasharray="4 4" stroke-linecap="round"/><circle cx="880.6" cy="374" r="5" fill="#FFFFFF" stroke="#AF52DE" stroke-width="2"/>
+<circle cx="867.8" cy="134" r="3.5" fill="#FFFFFF" stroke="#AF52DE" stroke-width="1.5"/>
+<circle cx="880.6" cy="134" r="3.5" fill="#FFFFFF" stroke="#AF52DE" stroke-width="1.5"/>
+<circle cx="389.7" cy="134" r="4" fill="#AF52DE" stroke="#FFFFFF" stroke-width="1.5"><title>#4013 Spike: where a secret that asks before use lives, so an agent&#x27;s shell cannot read it</title></circle>
+<circle cx="415.0" cy="134" r="4" fill="#AF52DE" stroke="#FFFFFF" stroke-width="1.5"><title>#4014 Secrets: an Ask before use flag, sealed, on for agent-added secrets, changed only by a person</title></circle>
+<circle cx="751.5" cy="134" r="4" fill="#AF52DE" stroke="#FFFFFF" stroke-width="1.5"><title>#4015 Secrets: fill_secret, set_ci_secret and the environment wait on an approval for a secret that asks before use</title></circle>
+<circle cx="763.4" cy="134" r="4" fill="#AF52DE" stroke="#FFFFFF" stroke-width="1.5"><title>#4016 Secrets: an Ask before use toggle on the Secrets pages and the ask card</title></circle>
+<circle cx="819.8" cy="134" r="4" fill="#AF52DE" stroke="#FFFFFF" stroke-width="1.5"><title>#4017 Needs you: approve or deny an agent&#x27;s use of a secret, on the Mac, the Remote and the web</title></circle>
+<circle cx="832.7" cy="134" r="4" fill="#AF52DE" stroke="#FFFFFF" stroke-width="1.5"><title>#4058 Secrets: on Linux, a release key on the control plane opens a secret that asks before use, only for a signed approval</title></circle>
+<path d="M374.5 374 C383.5 374 383.5 614 392.5 614 L844.0 614" fill="none" stroke="#007AFF" stroke-width="2.5" stroke-linecap="round"/>
+<rect x="880.2" y="607" width="531.8" height="14" rx="7" fill="#007AFF" fill-opacity=".13"/>
+<path d="M844.0 614 L912.0 614 C920.6 614 920.6 374 929.2 374" fill="none" stroke="#007AFF" stroke-width="1.8" stroke-dasharray="4 4" stroke-linecap="round"/><circle cx="929.2" cy="374" r="5" fill="#FFFFFF" stroke="#007AFF" stroke-width="2"/>
+<circle cx="871.6" cy="614" r="3.5" fill="#FFFFFF" stroke="#007AFF" stroke-width="1.5"/>
+<circle cx="888.3" cy="614" r="3.5" fill="#FFFFFF" stroke="#007AFF" stroke-width="1.5"/>
+<circle cx="912.0" cy="614" r="3.5" fill="#FFFFFF" stroke="#007AFF" stroke-width="1.5"/>
+<circle cx="777.7" cy="614" r="4" fill="#007AFF" stroke="#FFFFFF" stroke-width="1.5"><title>#4031 Tiers: Secrets, Accounts, Machines, runtime sign-in, Clone Git URL and Move to Machine are Core (#4030)</title></circle>
+<circle cx="797.4" cy="614" r="4" fill="#007AFF" stroke="#FFFFFF" stroke-width="1.5"><title>#4032 Remote: Settings ▸ You ▸ Secrets and For One Session</title></circle>
+<circle cx="825.5" cy="614" r="4" fill="#007AFF" stroke="#FFFFFF" stroke-width="1.5"><title>#4033 Remote: Settings ▸ You ▸ Accounts</title></circle>
+<circle cx="782.2" cy="614" r="4" fill="#007AFF" stroke="#FFFFFF" stroke-width="1.5"><title>#4036 Remote: Add Folder… and Clone Git URL… on a machine</title></circle>
+<circle cx="640.0" cy="614" r="4" fill="#007AFF" stroke="#FFFFFF" stroke-width="1.5"><title>#4038 Remote: the hand-off card says to use the Mac, but the Remote has the Agent Browser pane</title></circle>
+<path d="M803.3 374 C812.3 374 812.3 464 821.3 464 L844.0 464" fill="none" stroke="#00A89D" stroke-width="2.5" stroke-linecap="round"/>
+<rect x="882.5" y="457" width="529.5" height="14" rx="7" fill="#00A89D" fill-opacity=".13"/>
+<path d="M844.0 464 L913.1 464 C921.8 464 921.8 374 930.6 374" fill="none" stroke="#00A89D" stroke-width="1.8" stroke-dasharray="4 4" stroke-linecap="round"/><circle cx="930.6" cy="374" r="5" fill="#FFFFFF" stroke="#00A89D" stroke-width="2"/>
+<circle cx="871.9" cy="464" r="3.5" fill="#FFFFFF" stroke="#00A89D" stroke-width="1.5"/>
+<circle cx="889.3" cy="464" r="3.5" fill="#FFFFFF" stroke="#00A89D" stroke-width="1.5"/>
+<circle cx="913.1" cy="464" r="3.5" fill="#FFFFFF" stroke="#00A89D" stroke-width="1.5"/>
+<path d="M842.6 374 C851.6 374 851.6 254 860.6 254 L844.0 254" fill="none" stroke="#AF52DE" stroke-width="2.5" stroke-linecap="round"/>
+<text x="262.0" y="336" font-size="12" stroke="#FFFFFF" stroke-width="4" stroke-linejoin="round" paint-order="stroke"><tspan fill="#32ADE6" font-weight="600">← 1.0 public release (App Review, docs…</tspan><tspan fill="#8E8E93"> #1347 · 0 of 7</tspan></text>
+<text x="262.0" y="396" font-size="12" stroke="#FFFFFF" stroke-width="4" stroke-linejoin="round" paint-order="stroke"><tspan fill="#30B0C7" font-weight="600">← agentloops.dev is where everyone sign…</tspan><tspan fill="#8E8E93"> #3392 · 8 of 12</tspan></text>
+<text x="262.0" y="306" font-size="12" stroke="#FFFFFF" stroke-width="4" stroke-linejoin="round" paint-order="stroke"><tspan fill="#5856D6" font-weight="600">← every integration works on a real acc…</tspan><tspan fill="#8E8E93"> #3420 · 2 of 16</tspan></text>
+<text x="262.0" y="426" font-size="12" stroke="#FFFFFF" stroke-width="4" stroke-linejoin="round" paint-order="stroke"><tspan fill="#FF2D55" font-weight="600">← more git hosts (Forgejo, Gitea, Bitbu…</tspan><tspan fill="#8E8E93"> #3606 · 46 of 47</tspan></text>
+<text x="262.0" y="276" font-size="12" stroke="#FFFFFF" stroke-width="4" stroke-linejoin="round" paint-order="stroke"><tspan fill="#FF9500" font-weight="600">← standing epics, a plan from a query t…</tspan><tspan fill="#8E8E93"> #3659 · 0 of 5</tspan></text>
+<text x="262.0" y="456" font-size="12" stroke="#FFFFFF" stroke-width="4" stroke-linejoin="round" paint-order="stroke"><tspan fill="#FF9500" font-weight="600">← Daily summary about the person, not a…</tspan><tspan fill="#8E8E93"> #3719 · 3 of 3</tspan></text>
+<text x="262.0" y="246" font-size="12" stroke="#FFFFFF" stroke-width="4" stroke-linejoin="round" paint-order="stroke"><tspan fill="#AF52DE" font-weight="600">← wait for files to arrive or go (file.…</tspan><tspan fill="#8E8E93"> #3794 · 2 of 2</tspan></text>
+<text x="262.0" y="486" font-size="12" stroke="#FFFFFF" stroke-width="4" stroke-linejoin="round" paint-order="stroke"><tspan fill="#007AFF" font-weight="600">← agents act on a forge as their own id…</tspan><tspan fill="#8E8E93"> #3855 · 8 of 9</tspan></text>
+<text x="262.0" y="216" font-size="12" stroke="#FFFFFF" stroke-width="4" stroke-linejoin="round" paint-order="stroke"><tspan fill="#C69200" font-weight="600">← Needs you lists every request to a pe…</tspan><tspan fill="#8E8E93"> #3861 · 5 of 5</tspan></text>
+<text x="262.0" y="516" font-size="12" stroke="#FFFFFF" stroke-width="4" stroke-linejoin="round" paint-order="stroke"><tspan fill="#34C759" font-weight="600">← find a project&#x27;s sessions by label, i…</tspan><tspan fill="#8E8E93"> #3897 · 3 of 3</tspan></text>
+<text x="262.0" y="186" font-size="12" stroke="#FFFFFF" stroke-width="4" stroke-linejoin="round" paint-order="stroke"><tspan fill="#34C759" font-weight="600">← full autonomy, agents do the steps th…</tspan><tspan fill="#8E8E93"> #3905 · 16 of 21</tspan></text>
+<text x="262.0" y="546" font-size="12" stroke="#FFFFFF" stroke-width="4" stroke-linejoin="round" paint-order="stroke"><tspan fill="#A2845E" font-weight="600">← machines in the sidebar, managed like…</tspan><tspan fill="#8E8E93"> #3971 · 6 of 7</tspan></text>
+<text x="262.0" y="156" font-size="12" stroke="#FFFFFF" stroke-width="4" stroke-linejoin="round" paint-order="stroke"><tspan fill="#FF3B30" font-weight="600">← more on the Multiplier page (the Hudd…</tspan><tspan fill="#8E8E93"> #3984 · 6 of 6</tspan></text>
+<text x="367.1" y="576" font-size="12" stroke="#FFFFFF" stroke-width="4" stroke-linejoin="round" paint-order="stroke"><tspan fill="#FF9500" font-weight="600">images in issue and PR pages</tspan><tspan fill="#8E8E93"> #4008 · 3 of 3</tspan></text>
+<text x="367.3" y="126" font-size="12" stroke="#FFFFFF" stroke-width="4" stroke-linejoin="round" paint-order="stroke"><tspan fill="#AF52DE" font-weight="600">a secret can ask a person before an a…</tspan><tspan fill="#8E8E93"> #4012 · 6 of 8</tspan></text>
+<text x="396.5" y="606" font-size="12" stroke="#FFFFFF" stroke-width="4" stroke-linejoin="round" paint-order="stroke"><tspan fill="#007AFF" font-weight="600">day-to-day coding from the Remote (se…</tspan><tspan fill="#8E8E93"> #4030 · 5 of 8</tspan></text>
+<text x="825.3" y="456" font-size="12" stroke="#FFFFFF" stroke-width="4" stroke-linejoin="round" paint-order="stroke"><tspan fill="#00A89D" font-weight="600">one live tile in the chat for what an…</tspan><tspan fill="#8E8E93"> #4138 · 0 of 3</tspan></text>
+<text x="864.6" y="246" font-size="12" stroke="#FFFFFF" stroke-width="4" stroke-linejoin="round" paint-order="stroke"><tspan fill="#AF52DE" font-weight="600">secrets and accounts show their last…</tspan><tspan fill="#8E8E93"> #4155 · 0 of 0</tspan></text>
+<line x1="844.0" y1="96" x2="844.0" y2="644" stroke="#FF3B30" stroke-width="1.5"/><circle cx="844.0" cy="96" r="4" fill="#FF3B30"/><rect x="814.0" y="648" width="60" height="20" rx="10" fill="#FF3B30"/><text x="844.0" y="662" font-size="11" font-weight="600" fill="#FFFFFF" text-anchor="middle">5:09 PM</text>
+<g filter="url(#pop)"><rect x="883.4" y="414" width="330" height="128" rx="10" fill="#FFFFFF" stroke="#E5E5EA"/></g><path d="M871.4 380 L901.4 414" stroke="#D1D1D6" stroke-width="1"/><text x="899.4" y="438" font-size="13" font-weight="600" fill="#1D1D1F">machines in the sidebar, managed like…</text><text x="899.4" y="458" font-size="12" fill="#3C3C43">#3971 · 6 of 7 done · 1 left</text><text x="899.4" y="484" font-size="12" fill="#1D1D1F">Closes about <tspan font-weight="600">6 pm</tspan></text><text x="899.4" y="502" font-size="12" fill="#3C3C43">8 times in 10: 5:18 PM – Sun 8:17 PM</text><text x="899.4" y="526" font-size="11" fill="#8E8E93">From 18 past epics · off by ×2.2 on average</text>
+</g>
+<line x1="248" y1="692" x2="1440" y2="692" stroke="#E5E5EA"/>
+<circle cx="277" cy="706" r="4" fill="#007AFF"/>
+<text x="296" y="710" font-size="11" fill="#6E6E73">Issue closed</text>
+<circle cx="405.8" cy="706" r="3.5" fill="#fff" stroke="#007AFF" stroke-width="1.5"/>
+<text x="424.8" y="710" font-size="11" fill="#6E6E73">Forecast</text>
+<rect x="500.0" y="699" width="22" height="14" rx="7" fill="#007AFF" fill-opacity=".13"/>
+<text x="528.0" y="710" font-size="11" fill="#6E6E73">8 times in 10</text>
+<circle cx="644.2" cy="706" r="5" fill="#fff" stroke="#1D1D1F" stroke-width="2"/>
+<text x="663.2" y="710" font-size="11" fill="#6E6E73">Release</text>
+<line x1="741.0" y1="698" x2="741.0" y2="714" stroke="#FF3B30" stroke-width="1.5"/>
+<text x="760.0" y="710" font-size="11" fill="#6E6E73">Now</text>
+</g></svg>
