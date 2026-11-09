@@ -665,10 +665,13 @@ final class RemoteModel {
             case .machine:
                 // A machine's page (#4034), as the window's Machines group opens it.
                 openActivity = newValue
-            case .multiplier, .spending, .tokens, .time,
+            case .multiplier:
+                // The Multiplier page (#4116), from its row under Status.
+                openActivity = newValue
+            case .spending, .tokens, .time,
                  .folderMCPServers, .docs:
-                // Usage, a folder's connectors and Docs are Mac + web (#2798, #3321), and
-                // the Multiplier page the Mac's (#3986): the Remote opens none of them.
+                // Usage, a folder's connectors and Docs are Mac + web (#2798, #3321): the
+                // Remote opens none of them.
                 break
             }
         }
@@ -1395,6 +1398,29 @@ final class RemoteModel {
     func refreshSummaryPages() async {
         summaryPages = (try? await client.call(DaemonAPI.Method.summariesList, DaemonAPI.Empty(),
                                                returning: [SummaryPage].self)) ?? []
+    }
+
+    /// The Multiplier (#4116), from the Mac's host, as the window asks it: on each catch-up
+    /// and each time the page opens, then heard on `multiplier/changed`. With a control plane
+    /// that host counts all the person's machines (#3903). A host too old to know the method
+    /// leaves it nil, and the page says `— ×`.
+    func refreshMultiplier() async {
+        guard let multiplier = try? await client.call(DaemonAPI.Method.multiplierState, DaemonAPI.Empty(),
+                                                      returning: DaemonAPI.Multiplier.self) else { return }
+        work.replaceMultiplier(multiplier)
+    }
+
+    /// The achievements (#984), for the Multiplier page's badges (#4116), from the Mac's host;
+    /// then heard on `achievements/changed`.
+    func refreshAchievements() async {
+        guard let achievements = try? await client.call(DaemonAPI.Method.achievementsState, DaemonAPI.Empty(),
+                                                        returning: Achievements.self) else { return }
+        work.replaceAchievements(achievements)
+    }
+
+    /// The agents with a turn starting or running, for the Multiplier page's "agents now".
+    var agentsWorking: Int {
+        work.agents.count { $0.state == .starting || $0.state == .running }
     }
 
     /// One saved page of the daily summary (#3721); reading the newest marks it read.
@@ -2905,6 +2931,10 @@ final class RemoteModel {
                         || note.method == DaemonAPI.Notification.mcpHostedChanged
                         || note.method == DaemonAPI.Notification.eventsChanged
                         || note.method == DaemonAPI.Notification.backupsChanged { continue }
+                    // The Multiplier and the achievements are the Mac's host's, which counts
+                    // every machine (#3903, #4116): another's would put its own over them.
+                    if note.method == DaemonAPI.Notification.multiplierChanged
+                        || note.method == DaemonAPI.Notification.achievementsChanged { continue }
                     guard let update = AgentsModel.read(note.method, note.params, showing: shown.id,
                                                          alsoShowing: shown.also) else { continue }
                     let added = await self?.work.addsFolder(update, from: id) ?? false
@@ -3250,7 +3280,10 @@ final class RemoteModel {
         // The Summary row (#3721): shown only while the daily summary is on, with its newest page.
         async let dailySummary: Void = refreshDailySummarySettings()
         async let summaries: Void = refreshSummaryPages()
-        _ = await (dailySummary, summaries)
+        // The Multiplier page (#4116), on the iPad's empty detail as well as its row.
+        async let multiplier: Void = refreshMultiplier()
+        async let achievements: Void = refreshAchievements()
+        _ = await (dailySummary, summaries, multiplier, achievements)
         if let pendingNeed {
             self.pendingNeed = nil
             if let agentID = agentID(forNeedToken: pendingNeed) { open(agentID) } else { openUnheld(needToken: pendingNeed) }

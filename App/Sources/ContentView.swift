@@ -173,7 +173,11 @@ struct ContentView: View {
                                                  set: { model.selection = $0 }))
                 .paperGround()
         } else {
-            MultiplierPage().paperGround()
+            MultiplierPage(multiplier: model.work.multiplier, achievements: model.work.achievements,
+                           agentsWorking: model.agents.count { $0.state == .starting || $0.state == .running },
+                           hints: "⌘0 Multiplier · ⌘N new session · ↑↓ move · ⌘F find",
+                           refresh: { await model.refreshMultiplier() })
+                .paperGround()
         }
     }
 

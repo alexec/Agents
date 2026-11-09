@@ -10,7 +10,7 @@ import UIKit
 ///
 /// The rules are the Mac's own, from `SidebarFolderFold`, `SidebarSmartRow`,
 /// `SidebarOrder` and `SidebarFolds` in AgentsKitCore: the same groups, order, pins and
-/// folds, kept the same way. Usage, connectors and folder management are Mac + web (#2798). The views are this device's: on an iPad the list sits beside
+/// folds, kept the same way. Usage, connectors and folder management are Mac + web (#2798); the Multiplier is first under Status (#4116). The views are this device's: on an iPad the list sits beside
 /// what it picked; on an iPhone it is the screen the app opens on and a pick is pushed
 /// over it. Swipe actions and a long press stand in for the Mac's context menus.
 struct RemoteSidebar: View {
@@ -171,6 +171,9 @@ struct RemoteSidebar: View {
                 // groups, as the window has them (#495). Plain titles beside their icons
                 // in the accent (#155). It folds, as a folder does.
                 Section(isExpanded: $showsStatus) {
+                    // The Multiplier page (#4116), first, as the window has it first under Usage.
+                    MultiplierRow().accessibilityHint(MultiplierRow.help)
+                        .activityIcon("multiply.circle").appText(.supporting).tag(SidebarItem.multiplier)
                     EventsRow().activityIcon("list.bullet.rectangle").appText(.supporting).tag(SidebarItem.events)
                     ResourcesRow().activityIcon("square.stack.3d.up").appText(.supporting).tag(SidebarItem.resources)
                     RuntimesRow().activityIcon("cpu", warns: runtimesFailing)

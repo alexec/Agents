@@ -42,6 +42,8 @@ private actor FakeState {
     private(set) var agents: [Agent] = Canned.agents
     private(set) var permissions: [PermissionRequest] = [Canned.question]
     private(set) var forms: [ElicitationRequest] = [Canned.form]
+    private var multiplierAsks = 0
+    private var merged = false
 
     func hold(_ connection: JSONRPCConnection) {
         self.connection = connection
@@ -149,6 +151,16 @@ private actor FakeState {
                 await change(request?.agentID) { $0.rename(to: request.flatMap { Agent.cleanedTitle($0.title) }) }
                 return .success(.object([:]))
 
+            // The Multiplier page (#4116): 3.2×, then a merge 4 s after the page asks (the
+            // second ask: the first is the catch-up's), or `— ×` with `-fakeMultiplier none`.
+            case DaemonAPI.Method.multiplierState:
+                multiplierAsks += 1
+                if multiplierAsks == 2, !Canned.noMultiplier { Task { await merge() } }
+                return .success(try JSONValue.encoding(Canned.multiplier(merged: merged)))
+
+            case DaemonAPI.Method.achievementsState:
+                return .success(try JSONValue.encoding(Canned.achievements))
+
             default:
                 return .failure(JSONRPCError(code: -32601, message: "Not in the fake: \(method)"))
             }
@@ -188,6 +200,13 @@ private actor FakeState {
         await tell(DaemonAPI.Notification.agentChanged, try? JSONValue.encoding(agents[index]))
     }
 
+    /// A PR merges while the Multiplier page is open (#4116), for its rising line.
+    private func merge() async {
+        try? await Task.sleep(for: .seconds(4))
+        merged = true
+        await tell(DaemonAPI.Notification.multiplierChanged, try? JSONValue.encoding(Canned.multiplier(merged: true)))
+    }
+
     func askSomething() async {
         guard let agent = agents.first(where: { $0.state == .running }) else { return }
         let question = PermissionRequest(
@@ -207,5 +226,28 @@ private actor FakeState {
     /// an actor, so this is a hop rather than a call.
     private func tell(_ method: String, _ params: JSONValue?) async {
         try? connection?.notify(method, params)
+    }
+}
+
+/// The Multiplier page's figures (#4116), all scratch.
+private extension Canned {
+    static let noMultiplier = UserDefaults.standard.string(forKey: "fakeMultiplier") == "none"
+
+    static func multiplier(merged: Bool) -> DaemonAPI.Multiplier {
+        let baseline = DaemonAPI.MultiplierBaseline(prsPerWeek: 1.4, hoursPerWeek: 40, source: "DX 2025")
+        let since = Date().addingTimeInterval(-7 * 86_400)
+        if noMultiplier { return DaemonAPI.Multiplier(since: since, baseline: baseline) }
+        return DaemonAPI.Multiplier(prsMerged: merged ? 5 : 4, multiplier: merged ? 3.6 : 3.2,
+                                    engineerHours: merged ? 143 : 128, agentsWorking: 2, since: since,
+                                    baseline: baseline,
+                                    changedBy: merged ? DaemonAPI.LineageNode(kind: "pr", ref: "github:example/shop#1234") : nil,
+                                    bestWeek: 4.1, mostAtOnce: 9)
+    }
+
+    static var achievements: Achievements {
+        if noMultiplier { return Achievements() }
+        let day = Date().addingTimeInterval(-3 * 86_400)
+        return Achievements(earned: [Achievement.firstAgent, .firstPairing, .firstRemoteAnswer, .firstLandedPR]
+            .map { EarnedAchievement(id: $0.rawValue, at: day) })
     }
 }
