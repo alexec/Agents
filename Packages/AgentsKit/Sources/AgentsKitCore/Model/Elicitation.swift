@@ -19,7 +19,7 @@ public struct ElicitationRequest: Codable, Hashable, Sendable, Identifiable {
     public var scope: Scope
     public var askedAt: Date
     /// An agent's `ask_secret` (#2885): the form's one field is drawn masked, and the host
-    /// saves what is typed to the person's secrets.env. Nil for every other form.
+    /// seals what is typed in the person's store. Nil for every other form.
     public var secret: Secret?
     /// An agent's `hand_to_person` (#3529): one step the person does on the page in the
     /// machine's browser. The form is one choice, Done or Can't do it; a client that shows

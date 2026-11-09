@@ -21,14 +21,14 @@ enum AgentsPlace: Equatable {
         case .you:
             "Yours, in ~/.agents. Every agent you start gets them, in every folder."
         case .folder:
-            "This folder's, in its .agents folder. It is committed, so everyone who clones the folder gets it. Secrets stay in your own secrets.env."
+            "This folder's, in its .agents folder. It is committed, so everyone who clones the folder gets it. Secrets stay sealed in your own store."
         }
     }
 
     var mcpNote: String {
         switch self {
         case .you:
-            "In ~/.agents/mcp.json. A secret is named here and kept in ~/.agents-secrets/secrets.env."
+            "In ~/.agents/mcp.json. A secret is named here and sealed in your own store."
         case .folder:
             "In .agents/mcp.json, committed with the folder. Secrets aren't: it names them, and each person sets their own."
         }

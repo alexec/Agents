@@ -71,7 +71,7 @@ The set-up adds it for you. To add it to another folder:
 3. It asks for nothing: it reads the Forgejo connection. Without a connection, name your
    token by hand in the entry's `env` in `.agents/mcp.json`: `"FORGEJO_TOKEN":
    "${FORGEJO_TOKEN}"` (and `"FORGEJO_URL": "${FORGEJO_URL}"` for your own Forgejo or Gitea),
-   with the values in your own `~/.agents-secrets/secrets.env`, never in `mcp.json`.
+   with the values in your own secrets (**Settings ▸ You ▸ Secrets**), never in `mcp.json`.
    `FORGEJO_TOKEN`, when it is set, is used before the connection.
 
 The connector finds the repository from the folder's git remote (`origin` first). A tool or

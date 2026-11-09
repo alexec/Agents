@@ -112,7 +112,7 @@ Mac.
 | `~/.agents/summaries/` | Daily summaries | The newest 3 | On write |
 | `~/.agents/checks/suggestions.json` | Daily-check findings | 50 findings, 200 dismissals | On write |
 | `~/.agents-secrets` | Secrets, connections and machine provider secrets (see [Security overview](security-overview.md#where-secrets-live)) | Until you remove them | — |
-| `~/.agents-secrets/sealed.json` | Secrets with Ask before use, sealed to this machine (#4014) | Until you remove them, or turn the flag off (then they go back to `secrets.env`) | — |
+| `~/.agents-secrets/sealed.json` | Every secret of yours on this machine, sealed to it (#4014, #4177), with Ask before use on or off | Until you remove them | — |
 | `~/.agents-secrets/sessions/<agent>.json` | Secrets for one session | The values go when the agent is archived; the file goes when it is deleted | On archive and delete; leftovers at start |
 
 ## In each folder

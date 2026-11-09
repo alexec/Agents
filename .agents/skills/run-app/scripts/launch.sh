@@ -146,6 +146,7 @@ if [ "${FAKE_AZURE_DEVOPS:-0}" = 1 ]; then
   done
   [ "$PERSONAL" = "$HOME" ] && { echo "refusing: --fake-azure-devops writes secrets into AGENTS_PERSONAL_HOME, and $HOME is the person's own" >&2; exit 1; }
   [ "$PERSONAL" = "$ROOT/personal" ] && EXTRA_ENV+=(AGENTS_PERSONAL_HOME="$PERSONAL")
+  # agentsd moves this secrets.env into its sealed store at start and deletes it (#4177).
   mkdir -p "$PERSONAL/.agents-secrets"
   printf 'AZURE_DEVOPS_URL=%s\nAZURE_DEVOPS_TOKEN=walk\n' "$AZURE_DEVOPS_URL" >>"$PERSONAL/.agents-secrets/secrets.env"
   chmod 600 "$PERSONAL/.agents-secrets/secrets.env"

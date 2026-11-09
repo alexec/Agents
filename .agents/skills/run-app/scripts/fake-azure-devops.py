@@ -22,7 +22,8 @@ azureboardsmcp fake_test.go). Scratch data only, kept in memory: a walk makes no
   cost comment, posted in a closed thread and edited (a comment's PATCH).
 
 run-app starts it with `launch.sh --fake-azure-devops` and gives the host a scratch
-AGENTS_PERSONAL_HOME whose .agents-secrets/secrets.env says
+AGENTS_PERSONAL_HOME whose secrets (a .agents-secrets/secrets.env that the host moves into
+its sealed store at start, #4177) say
 
     AZURE_DEVOPS_URL=http://127.0.0.1:<port>
     AZURE_DEVOPS_TOKEN=walk

@@ -49,9 +49,9 @@ extension DaemonAPI {
         public var format: MarketplaceFormat
         /// The registry's base URL, skills.sh's, or `owner/repo` for a GitHub repository.
         public var url: String
-        /// The name in `~/.agents-secrets/secrets.env` whose value is sent as a bearer token.
+        /// The name in the sealed store whose value is sent as a bearer token.
         public var token: String?
-        /// The token is named and has no value in `secrets.env`.
+        /// The token is named and has no value in the sealed store.
         public var tokenMissing: Bool
         public var origin: MarketplaceOrigin
         public var enabled: Bool
@@ -99,9 +99,9 @@ extension DaemonAPI {
         public var name: String
         public var format: MarketplaceFormat
         public var url: String
-        /// The `secrets.env` name for a token, if the marketplace needs one.
+        /// The sealed store's name for a token, if the marketplace needs one.
         public var token: String?
-        /// Its value, written to `secrets.env` and never shown again.
+        /// Its value, sealed in the store and never shown again.
         public var tokenValue: String?
         public init(name: String, format: MarketplaceFormat, url: String, token: String? = nil, tokenValue: String? = nil) {
             self.name = name; self.format = format; self.url = url; self.token = token; self.tokenValue = tokenValue

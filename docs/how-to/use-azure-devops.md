@@ -41,7 +41,7 @@ and Jira's issues are: see [Use Azure Boards work items](use-azure-boards.md).
    - `AZURE_DEVOPS_URL`: leave it out for Azure DevOps Services. For your own server, give
      the address of its collections, such as `https://server/tfs`.
 
-   The values go in your own `~/.agents-secrets/secrets.env`, never in `mcp.json`.
+   The values go in your own secrets (**Settings ▸ You ▸ Secrets**), never in `mcp.json`.
 
 The connector finds the repository from the folder's git remote (`origin` first). A tool or
 an event can name another one with `repo`, as `organization/project/name` (on a server,

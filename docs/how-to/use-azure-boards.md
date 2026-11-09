@@ -39,7 +39,7 @@ issue's key.
      `collection/project`), such as `acme/Web App`. Leave it out when the folder's git
      remote is on Azure DevOps Repos: the connector then uses that remote's project.
 
-   The values go in your own `~/.agents-secrets/secrets.env`, never in `mcp.json`.
+   The values go in your own secrets (**Settings ▸ You ▸ Secrets**), never in `mcp.json`.
 
 ## The tools
 

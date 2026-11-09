@@ -28,8 +28,8 @@ the sheet shows the tools it listed.
    - **Local command**: the **Command**, and the **Arguments** on one line, quoted as in
      a shell (`--dir "/a b"`). **Add variable** adds an environment variable.
    - **Remote URL**: the **URL**. **Add header** adds a header, such as `Authorization`.
-5. Tick **Secret** on a variable or header that holds a key or token. Its value goes into
-   your own `~/.agents-secrets/secrets.env`, and the entry in `mcp.json` holds `${NAME}`, the same
+5. Tick **Secret** on a variable or header that holds a key or token. Its value is sealed in
+   your own `~/.agents-secrets/sealed.json`, and the entry in `mcp.json` holds `${NAME}`, the same
    way a registry add does. The line under it shows the name. A variable's secret has the
    variable's own name. A header's has the server's and the header's, such as
    `MY_API_AUTHORIZATION`. Leave the value empty to use one that is already set under that

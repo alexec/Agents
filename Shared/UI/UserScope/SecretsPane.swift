@@ -83,7 +83,7 @@ struct SecretsPane<Extra: View>: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: { _ in
-            Text("It is taken out of secrets.env on every machine of yours.")
+            Text("It is taken out of the sealed store on every machine of yours.")
         }
     }
 

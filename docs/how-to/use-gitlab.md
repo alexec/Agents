@@ -97,7 +97,7 @@ write the entry:
 
 It reads the GitLab connection. Instead, you can set `GITLAB_TOKEN` (an access token with
 the `api` scope) and `GITLAB_URL` (your GitLab) in the entry's `env`. When `GITLAB_TOKEN`
-is set, it goes first. Keep the token in your own `~/.agents-secrets/secrets.env` and name
+is set, it goes first. Keep the token in your own secrets (**Settings ▸ You ▸ Secrets**) and name
 it in the entry as `${GITLAB_TOKEN}`, so that it is never in the folder.
 
 ## See merge requests, issues and pipelines
