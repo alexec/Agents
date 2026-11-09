@@ -62,7 +62,7 @@ func TestAskingForASecret(t *testing.T) {
 		"content": map[string]any{"value": value + "\n", "needsApproval": false}})
 	text := <-answered
 	path := skillcatalog.SecretsPath(home)
-	if !strings.HasPrefix(text, "OPENAI_API_KEY is saved in the person's secrets file, "+path) || strings.Contains(text, value) {
+	if !strings.Contains(text, "`agents-secret OPENAI_API_KEY`") || strings.Contains(text, "sed ") || strings.Contains(text, value) {
 		t.Fatal(text)
 	}
 	if got, _ := skillcatalog.LoadSecrets(path).Value("OPENAI_API_KEY"); got != value {

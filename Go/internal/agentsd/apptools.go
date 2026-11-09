@@ -250,6 +250,10 @@ func (d *Daemon) serveAppTools(w http.ResponseWriter, r *http.Request) {
 		d.serveGitHubCredential(w, r)
 		return
 	}
+	if r.URL.Path == secretCommandPath {
+		d.serveSecretValue(w, r)
+		return
+	}
 	if r.URL.Path != appToolsPath {
 		w.WriteHeader(http.StatusNotFound)
 		return

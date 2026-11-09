@@ -24600,7 +24600,7 @@
         },
         "place": {
           "type": "string",
-          "description": "Where it went: the field's domain (fill), owner/repo (ci), the server's name (mcp, env), or session (env, as a session's own variable)."
+          "description": "Where it went: the field's domain (fill), owner/repo (ci), the server's name (mcp, env), session (env, as a session's own variable), or agents-secret (command)."
         },
         "agent": {
           "$ref": "#/definitions/UUID",
@@ -24628,9 +24628,10 @@
         "fill",
         "ci",
         "mcp",
-        "env"
+        "env",
+        "command"
       ],
-      "description": "How a secret was read (#4156): fill (fill_secret), ci (set_ci_secret), mcp (an HTTP MCP server's header or url, through agentsd, #4120) or env (given to a session at its start: its own secrets as variables, or an MCP server's ${NAME} from secrets.env)."
+      "description": "How a secret was read (#4156): fill (fill_secret), ci (set_ci_secret), mcp (an HTTP MCP server's header or url, through agentsd, #4120), env (given to a session at its start: its own secrets as variables, or an MCP server's ${NAME} from secrets.env) or command (agents-secret NAME, printed for a session's own command, #4178)."
     },
     "SecretOperationWhat": {
       "type": "string",

@@ -474,7 +474,7 @@ func (d *Daemon) releaseWarm(l *live, why string, background []acp.Command, inTu
 	}
 	// As the session's watch does for one of its own: it sees the session is not ours.
 	d.dropStandIn(l.id)
-	d.dropGitHubCredential(l.id)
+	d.dropCredentialGrants(l.id)
 	d.dropAppTokens(l.id)
 	if a := d.Store.Agent(l.id); a != nil && orgRouteOf(a.AccountID) != "" {
 		d.sweepOrgAccountFolders()

@@ -286,6 +286,9 @@ func toolsBrief(browser, screen, bot, github bool) string {
 		"- docs_search, then docs_read: find the docs for your work, in this folder and its docs connectors.",
 		"- estimate_issue: say what an issue or an epic will cost and take.",
 		"- manage_accounts: my outside accounts (gitlab.com, AWS…): find one before you make one, and add the one you make.",
+		"- agents-secret NAME, a command on your PATH: the value of one of my secrets that does not ask before use, for your own command, " +
+			"as in NAME=\"$(agents-secret NAME)\" your-command; never print it. agentsd records each read. " +
+			"A secret with Ask before use is refused: use the tool that puts it where it goes for you.",
 		"- list_machines, then start_session with machine: work on another of my machines. bring_back " +
 			"brings its branch back here. move_session moves a session there with its unpushed work. " +
 			"start_machine, stop_machine, make_machine and delete_machine control the machines.",
