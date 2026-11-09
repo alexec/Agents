@@ -91,11 +91,8 @@ private struct HostMenu: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        Button("Open Agents") {
-            openWindow(id: MainWindow.sceneID)
-            NSApp.activate()
-        }
-        Button("This Mac's Host…") { openHost() }
+        // The window opens from the Dock and the Window menu; #4227 adds Open Agents here.
+        Button("Open This Mac's Host") { openHost() }
         if model.settings.role == .runHere {
             Button("Pair a Window or Phone…") {
                 openHost()
