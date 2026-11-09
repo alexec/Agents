@@ -96,6 +96,7 @@ public enum Capability {
     public static let lineageSessions1 = "lineage.sessions/1"
     public static let lineage1 = "lineage/1"
     public static let links1 = "links/1"
+    public static let liveFrame1 = "live.frame/1"
     public static let liveactivity1 = "liveactivity/1"
     public static let lockJoin1 = "lock-join/1"
     public static let lockReset1 = "lock-reset/1"
@@ -584,6 +585,7 @@ public enum Capability {
         "files/changed": "files/1",
         "folder/changed": "folder/1",
         "folder/removed": "folder/1",
+        "live/frame": "live.frame/1",
         "mcp/healthChanged": "mcp/1",
         "mcp/hostedChanged": "mcp/1",
         "modes/changed": "modes/1",

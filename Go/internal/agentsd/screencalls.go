@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -172,7 +171,6 @@ func (d *Daemon) screenDriveFor(agent wire.UUID) (*driveProcess, error) {
 	}
 	p := &driveProcess{cmd: cmd, stdin: stdin, replies: make(chan driveReply, 1), done: make(chan struct{})}
 	go p.read(bufio.NewReader(stdout), func() { d.pauseScreen(agent) })
-	safe.Go("live tile", func() { d.watchLive(agent, p) })
 	d.drives[agent] = p
 	return p, nil
 }

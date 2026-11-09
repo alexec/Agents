@@ -5231,6 +5231,40 @@ export interface LiveBoard {
 }
 
 /**
+ * A live tile's frame of what an agent drives (#4138, #4139): the Mac's screen, the session's tab
+ * of the machine's browser, or a simulator. Sent only while the agent drives it (a call on it in
+ * the last 10 seconds) and only to the connections whose presence/report is active and shows that
+ * agent; never recorded, never replayed (as FR-016 of #3004).
+ */
+export interface LiveFrame {
+  source: LiveSource;
+  agentID: UUID;
+  /** Base64 JPEG. Absent while the screen is locked, or when no picture could be taken. */
+  image?: string;
+  /** The Mac's screen is locked: the tile says so and shows no picture. */
+  locked?: boolean;
+  /**
+   * What the agent last did on it, in words, such as Clicked Save in TextEdit. Absent when the
+   * source says nothing.
+   */
+  narration?: string;
+  capturedAt: WireDate;
+  /** The picture's width in pixels, when the source says it. */
+  width?: number;
+  /** The picture's height in pixels, when the source says it. */
+  height?: number;
+}
+
+/**
+ * What a live tile shows (#4139): the Mac's screen (drive_screen), the machine's browser (browser_*
+ * tools) or a simulator.
+ */
+export type LiveSource =
+  | "screen"
+  | "browser"
+  | "simulator";
+
+/**
  * A person's machine lock (#3399, specs/3399-machine-lock): its chain of entries, the root first.
  * lock/get, and machine/lock to a machine.
  */
@@ -13842,6 +13876,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ListedSkill: { required: ["name", "folder"], optional: ["description", "managed"] },
   LiveAgent: { required: ["host", "hostName", "owner", "ownerName", "bot", "agent", "runtime", "state"], optional: ["waitsOnOthers", "workflow", "since", "costToDate", "heardAt"] },
   LiveBoard: { required: ["agents"], optional: [] },
+  LiveFrame: { required: ["source", "agentID", "capturedAt"], optional: ["image", "locked", "narration", "width", "height"] },
   Lock: { required: ["person", "entries"], optional: [] },
   LockAdd: { required: ["entries"], optional: [] },
   LockBody: { required: ["v", "kind", "person", "signer", "at", "key"], optional: ["previous", "sealingKey", "id", "name", "clientKind", "expires", "sealed"] },

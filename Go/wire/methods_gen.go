@@ -402,6 +402,7 @@ var NotifyEventsChanged = Notification[EventsChange]{"events/changed"}
 var NotifyFilesChanged = Notification[FilesChangedNotification]{"files/changed"}
 var NotifyFolderChanged = Notification[FolderSummary]{"folder/changed"}
 var NotifyFolderRemoved = Notification[FolderRemovedNotification]{"folder/removed"}
+var NotifyLiveFrame = Notification[LiveFrame]{"live/frame"}
 var NotifyMCPHealthChanged = Notification[MCPHealthSnapshot]{"mcp/healthChanged"}
 var NotifyMCPHostedChanged = Notification[HostedMCPSnapshot]{"mcp/hostedChanged"}
 var NotifyModesChanged = Notification[map[string]JSONValue]{"modes/changed"}

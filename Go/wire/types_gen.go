@@ -5892,6 +5892,37 @@ type LiveBoard struct {
 	Agents []LiveAgent `json:"agents"`
 }
 
+// A live tile's frame of what an agent drives (#4138, #4139): the Mac's screen, the session's tab of the machine's browser, or a simulator. Sent only while the agent drives it (a call on it in the last 10 seconds) and only to the connections whose presence/report is active and shows that agent; never recorded, never replayed (as FR-016 of #3004).
+type LiveFrame struct {
+	Source LiveSource `json:"source"`
+
+	AgentID UUID `json:"agentID"`
+
+	// Base64 JPEG. Absent while the screen is locked, or when no picture could be taken.
+	Image *string `json:"image,omitzero"`
+
+	// The Mac's screen is locked: the tile says so and shows no picture.
+	Locked *bool `json:"locked,omitzero"`
+
+	// What the agent last did on it, in words, such as Clicked Save in TextEdit. Absent when the source says nothing.
+	Narration *string `json:"narration,omitzero"`
+
+	CapturedAt Date `json:"capturedAt"`
+
+	// The picture's width in pixels, when the source says it.
+	Width *int64 `json:"width,omitzero"`
+
+	// The picture's height in pixels, when the source says it.
+	Height *int64 `json:"height,omitzero"`
+}
+
+// What a live tile shows (#4139): the Mac's screen (drive_screen), the machine's browser (browser_* tools) or a simulator.
+type LiveSource string
+
+const LiveSourceScreen LiveSource = "screen"
+const LiveSourceBrowser LiveSource = "browser"
+const LiveSourceSimulator LiveSource = "simulator"
+
 // A person's machine lock (#3399, specs/3399-machine-lock): its chain of entries, the root first. lock/get, and machine/lock to a machine.
 type Lock struct {
 	Person string `json:"person"`

@@ -10,6 +10,7 @@ import (
 	"github.com/chromedp/cdproto/target"
 
 	"github.com/alexec/agents/Go/internal/browser"
+	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -26,6 +27,10 @@ import (
 // browserAckWait is how long a frame waits for a watcher's browser/ack before the host
 // acks it itself, so one watcher that stopped drawing does not freeze the others.
 const browserAckWait = 3 * time.Second
+
+// browserTilePace is how soon the host acks a frame that only live tiles got (#4139): no
+// window watches the tab, so nobody else acks it, and a tile needs no more than this.
+const browserTilePace = 250 * time.Millisecond
 
 // browserWatch is who watches the machine's browser and the casts they share.
 type browserWatch struct {
@@ -58,6 +63,10 @@ type browserScreen struct {
 	// last is the newest frame, for a watcher that joins on a page that does not change:
 	// Chromium sends a frame only when the page does.
 	last *wire.BrowserFrame
+	// driver is the agent that drives the tab (a browser_* call in the last
+	// liveDriveWindow, #4139), as its own clients name it; "" for none. A driven screen is
+	// cast for the live tile also when no window watches it.
+	driver wire.UUID
 }
 
 type browserWatcher struct {
@@ -197,12 +206,12 @@ func (w *browserWatch) screenOfGenLocked(gen int) (*browserScreen, wire.UUID) {
 func (w *browserWatch) resetLocked(sc *browserScreen) *browser.Cast {
 	cast := sc.cast
 	w.gens++
-	*sc = browserScreen{gen: w.gens}
+	*sc = browserScreen{gen: w.gens, driver: sc.driver}
 	return cast
 }
 
-// dropScreenIfUnwatchedLocked drops agent's screen when nobody watches it, and returns
-// its cast to close. Under bw.mu.
+// dropScreenIfUnwatchedLocked drops agent's screen when nobody watches it and no agent
+// drives it, and returns its cast to close. Under bw.mu.
 func (w *browserWatch) dropScreenIfUnwatchedLocked(agent wire.UUID) *browser.Cast {
 	for _, v := range w.watchers {
 		if v.agent == agent {
@@ -210,7 +219,7 @@ func (w *browserWatch) dropScreenIfUnwatchedLocked(agent wire.UUID) *browser.Cas
 		}
 	}
 	sc := w.screens[agent]
-	if sc == nil {
+	if sc == nil || sc.driver != "" {
 		return nil
 	}
 	delete(w.screens, agent)
@@ -291,7 +300,8 @@ func (d *Daemon) browserCast(c *Client) (*browser.Cast, error) {
 }
 
 // startBrowserCast starts the cast that the watchers of agent's tab share, at the size of
-// the one that asked last, unless one runs or starts already, or the session has no tab.
+// the one that asked last, or for a driven tab that no window watches, at the size the page
+// has (#4139), unless one runs or starts already, or the session has no tab.
 func (d *Daemon) startBrowserCast(agent wire.UUID) {
 	w := &d.bw
 	w.mu.Lock()
@@ -307,7 +317,7 @@ func (d *Daemon) startBrowserCast(agent wire.UUID) {
 			newest, width, height = id, v.width, v.height
 		}
 	}
-	if newest < 0 {
+	if newest < 0 && sc.driver == "" {
 		w.mu.Unlock()
 		return
 	}
@@ -384,11 +394,56 @@ func (d *Daemon) browserFrame(gen int, f browser.Frame) {
 	n := wire.BrowserFrame{Image: wire.Data(f.JPEG), Ack: f.Ack, Width: f.Width, Height: f.Height}
 	sc.pending, sc.last = f.Ack, &n
 	cs := w.clientsLocked(agent)
+	driver := sc.driver
 	w.mu.Unlock()
 	for _, c := range cs {
 		Notify(c, wire.NotifyBrowserFrame, n)
 	}
-	time.AfterFunc(browserAckWait, func() { d.ackBrowserFrame(agent, f.Ack) })
+	wait := browserAckWait
+	if driver != "" {
+		width, height := int64(f.Width), int64(f.Height)
+		tiled := d.sendLive(wire.LiveFrame{Source: wire.LiveSourceBrowser, AgentID: driver, Image: liveImage(f.JPEG),
+			Width: &width, Height: &height})
+		if tiled && len(cs) == 0 {
+			// Only tiles have it, and they do not ack.
+			wait = browserTilePace
+		}
+	}
+	time.AfterFunc(wait, func() { d.ackBrowserFrame(agent, f.Ack) })
+}
+
+// browserDrove is a browser_* call of agent's (#4139): its session's tab is cast for the
+// live tile from now until liveDriveWindow after its last call, also when no window
+// watches it. The cast starts when the session has a tab and the browser runs.
+func (d *Daemon) browserDrove(agent wire.UUID) {
+	if d.browser == nil {
+		return
+	}
+	key := sessionKey(agent)
+	d.drove(agent, wire.LiveSourceBrowser, func() { d.browserDriveEnded(key) })
+	w := &d.bw
+	w.mu.Lock()
+	w.screenLocked(key).driver = agent
+	w.mu.Unlock()
+	safe.Go("browser tile", func() { d.startBrowserCast(key) })
+}
+
+// browserDriveEnded is liveDriveWindow since agent's last browser call: its tab's cast ends
+// unless a window watches it.
+func (d *Daemon) browserDriveEnded(agent wire.UUID) {
+	w := &d.bw
+	w.mu.Lock()
+	sc := w.screens[agent]
+	if sc == nil || sc.driver == "" || d.isDriving(sc.driver, wire.LiveSourceBrowser) {
+		w.mu.Unlock()
+		return
+	}
+	sc.driver = ""
+	cast := w.dropScreenIfUnwatchedLocked(agent)
+	w.mu.Unlock()
+	if cast != nil {
+		go cast.Close()
+	}
 }
 
 // ackBrowserFrame asks Chromium for the next frame of agent's screen once a watcher drew
