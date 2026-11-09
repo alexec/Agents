@@ -180,12 +180,12 @@ func TestOnLinuxAFlaggedValueOpensOnlyForASignedApproval(t *testing.T) {
 	}
 
 	// Always, signed: a grant, and the value in memory until a restart.
+	page.value = ""
 	done = fillAsync(m, 3)
 	r = openSecretUse(t, d)
 	if _, err := d.answerSecretUse(r, signedAnswer(t, phone, r, secretUseAlways), nil); err != nil {
 		t.Fatal(err)
 	}
-	page.value = ""
 	if got := replyOf(t, done); got.IsError || page.value != filledValue || len(d.secretGrants().Grants) != 1 {
 		t.Fatalf("%+v %q", got, page.value)
 	}
