@@ -132,7 +132,6 @@ struct HostMacSection: View {
 /// there, not this Mac's in a bucket.
 struct HostControlPlaneCards: View {
     let host: HostModel
-    @State private var confirmingRunHere = false
     @State private var movingMachine = false
     @State private var returning = false
     @State private var confirmingStop = false
@@ -154,18 +153,14 @@ struct HostControlPlaneCards: View {
                         returnRow(place)
                     }
                 }
-            } else if host.settings.role == .joinElsewhere {
-                joinedCard
+            } else if host.settings.role == .joinElsewhere, let place = host.settings.movedTo {
+                // Joined by a code is Use This Mac Only's, beside the control plane's row (#4228).
+                movedCard(place)
             }
             HostOutcome(host: host)
         }
         .sheet(isPresented: $movingMachine) { MachineMoveSheet().environment(host) }
         .sheet(isPresented: $returning) { MachineReturnSheet().environment(host) }
-        .confirmationDialog("Run the control plane on this Mac?", isPresented: $confirmingRunHere) {
-            Button("Run It Here") { Task { await host.runHere() } }
-        } message: {
-            Text("This Mac starts a control plane of its own and reports to it. Your iPhone, iPad and browsers must pair again.")
-        }
         .confirmationDialog("Stop forwarding?", isPresented: $confirmingStop) {
             Button("Stop Forwarding", role: .destructive) { Task { await host.stopForwarding() } }
         } message: {
@@ -181,27 +176,19 @@ struct HostControlPlaneCards: View {
 
     // MARK: Joined elsewhere (frame T)
 
-    private var joinedCard: some View {
+    private func movedCard(_ place: String) -> some View {
         ControlCard {
-            if let place = host.settings.movedTo {
-                ControlRow(dot: host.daemonRunning ? .online : .attention, title: "This Mac moved its control plane",
-                           detail: movedLine(place)) {
-                    // Frame U: the way back (T127).
-                    Button("Run It Here Again…") { returning = true }
-                        .buttonStyle(.paper).disabled(host.busy != nil)
-                }
-                if let until = host.settings.forwardingUntil {
-                    Divider()
-                    ControlRow(dot: .attention, title: "Forwarding from \(host.controlURL)",
-                               detail: Self.forwardingLine(until, host.forwarding)) {
-                        Button("Stop Forwarding…") { confirmingStop = true }.buttonStyle(.paper)
-                    }
-                }
-            } else {
-                ControlRow(dot: host.daemonRunning ? .online : .attention, title: "This Mac reports here",
-                           detail: host.daemonRunning ? "This Mac runs its own agents for this control plane." : "Joining…") {
-                    Button("Run It Here…") { confirmingRunHere = true }
-                        .buttonStyle(.paper).disabled(host.busy != nil)
+            ControlRow(dot: host.daemonRunning ? .online : .attention, title: "This Mac moved its control plane",
+                       detail: movedLine(place)) {
+                // Frame U: the way back (T127).
+                Button("Run It Here Again…") { returning = true }
+                    .buttonStyle(.paper).disabled(host.busy != nil)
+            }
+            if let until = host.settings.forwardingUntil {
+                Divider()
+                ControlRow(dot: .attention, title: "Forwarding from \(host.controlURL)",
+                           detail: Self.forwardingLine(until, host.forwarding)) {
+                    Button("Stop Forwarding…") { confirmingStop = true }.buttonStyle(.paper)
                 }
             }
         }
