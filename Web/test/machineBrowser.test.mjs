@@ -29,6 +29,24 @@ test("a key is named as the page names it, with text only when it types", () => 
   assert.equal(m.modifiers({ altKey: true, ctrlKey: false, metaKey: true, shiftKey: true }), 13);
 });
 
+test("what a touch keyboard types reaches the page as text and keys (#4088)", () => {
+  assert.deepEqual(m.touchTyped("insertText", "é"), [{ kind: "text", text: "é" }]);
+  assert.deepEqual(m.touchTyped("insertText", null), []);
+  const back = m.touchTyped("deleteContentBackward", null);
+  assert.deepEqual(back.map((k) => [k.type, k.key, k.keyCode]), [["keyDown", "Backspace", 8], ["keyUp", "Backspace", 8]]);
+  const enter = m.touchTyped("insertLineBreak", null);
+  assert.equal(enter[0].key, "Enter");
+  assert.equal(enter[0].text, "\r");
+  assert.equal(enter[1].text, undefined);
+  assert.deepEqual(m.touchTyped("formatBold", null), []);
+});
+
+test("a tap focuses the hidden field inside the tap, and the host's editing false closes it (#4088)", () => {
+  const pane = read("Web/src/views/AgentBrowserPane.tsx");
+  assert.match(pane, /if \(touch\.current && keys\.current\) keys\.current\.focus/);
+  assert.match(pane, /said\?\.editing === false/);
+});
+
 test("the tab says what the window's pane says", () => {
   const swift = read("App/Sources/Sidebar/AgentBrowserPane.swift") + read("App/Sources/Sidebar/SidebarState.swift");
   for (const said of [m.words.tab, m.words.stoppedTitle, m.words.stopped, m.words.failedTitle, m.words.failed,

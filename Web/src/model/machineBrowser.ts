@@ -53,6 +53,33 @@ export function keyInput(e: { key: string; code: string; keyCode: number; altKey
   };
 }
 
+/**
+ * What a touch screen's keyboard typed into the pane's hidden field (#4088), as the page takes it:
+ * text as text, a delete as Backspace, a new line as Enter. Nothing for what the page has no key for.
+ */
+export function touchTyped(inputType: string, data: string | null): BrowserInputRequest[] {
+  const key = (name: string, keyCode: number, text?: string): BrowserInputRequest[] => [
+    { kind: "key", type: "keyDown", key: name, code: name, keyCode, ...(text ? { text } : {}), modifiers: 0 },
+    { kind: "key", type: "keyUp", key: name, code: name, keyCode, modifiers: 0 },
+  ];
+  switch (inputType) {
+    case "insertText":
+    case "insertReplacementText":
+    case "insertFromPaste":
+    case "insertFromDrop":
+      return data ? [{ kind: "text", text: data }] : [];
+    case "insertLineBreak":
+    case "insertParagraph":
+      return key("Enter", 13, "\r");
+    case "deleteContentBackward":
+      return key("Backspace", 8);
+    case "deleteContentForward":
+      return key("Delete", 46);
+    default:
+      return [];
+  }
+}
+
 /** The state shown before the host has said one. */
 export const stopped: BrowserPageState = { status: "stopped" };
 
