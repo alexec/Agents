@@ -28,6 +28,20 @@ export function accountCost(a: OutsideAccount): string {
 
 export const noDescription = "No description";
 
+/** Ask before use (#4163): absent is on, as agentsd reads it. */
+export function accountAsks(a: OutsideAccount): boolean {
+  return a.askBeforeUse !== false;
+}
+
+/** Under the sheet's Ask before use toggle, as the window's AccountsWords.askHint. */
+export function accountAskHint(on: boolean): string {
+  return on ? "An agent's read of it waits for your approval: Allow Once, for This Session, Always or Deny."
+    : "Every agent can read it with no approval.";
+}
+
+/** The sheet's field for Ask before use: "off" when it is off, else none. */
+export const askField = "askBeforeUse";
+
 /** The description (#4164), under the address; an account made before it has none. */
 export function accountAbout(a: OutsideAccount): string {
   return a.description?.trim() || noDescription;
@@ -63,6 +77,7 @@ export function accountFields(a: OutsideAccount): AccountFields {
     service: a.service, description: a.description ?? "", address: a.address ?? "", plan: a.plan ?? "", cost: a.monthlyCostUsd === undefined ? "" : String(a.monthlyCostUsd),
     card: a.card ?? "", secret: a.secret ?? "", twoFactor: a.twoFactor ?? "", issue: a.issue ?? "", made: a.made ?? "",
     tokenExpires: a.tokenExpires ?? "", notes: a.notes ?? "", projects: (a.projects ?? []).join(", "),
+    ...(accountAsks(a) ? {} : { [askField]: "off" }),
   };
 }
 
@@ -78,5 +93,6 @@ export function accountOf(f: AccountFields): OutsideAccount {
   if (v("cost") && !Number.isNaN(cost)) a.monthlyCostUsd = cost;
   const projects = (v("projects") ?? "").split(",").map((p) => p.trim()).filter((p) => p);
   if (projects.length) a.projects = projects;
+  if (f[askField] === "off") a.askBeforeUse = false;
   return a;
 }

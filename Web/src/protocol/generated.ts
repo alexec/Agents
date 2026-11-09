@@ -7138,6 +7138,13 @@ export interface OutsideAccount {
   notes?: string;
   /** The projects that use it, by name. Absent or empty: all of them. */
   projects?: string[];
+  /**
+   * Ask before use (#4163): an agent's manage_accounts get of it waits on a person's approval, as a
+   * secret's use does (#4015). Absent is on, also for an account an agent adds; false is off, which
+   * a person sets, or Allow Always on its request does. Not sealed: kept with the account, and
+   * agentsd enforces it.
+   */
+  askBeforeUse?: boolean;
 }
 
 /** The accounts part of the person's settings (#3967), and machine/accounts' answer. */
@@ -9237,10 +9244,15 @@ export interface RequestSecretUse {
   use: SecretUse;
   /**
    * Where the value goes: the page's domain for a fill, owner/repo for CI, the server's name for an
-   * MCP server, and for terminal the name of the command that ran agents-secret, as that command
-   * says it.
+   * MCP server, for terminal the name of the command that ran agents-secret, as that command says
+   * it, and for account the account's id, as manage_accounts list gives it.
    */
   place: string;
+  /**
+   * For account (#4163): the manage_accounts call that waits, such as get. name is then the
+   * account's service and address.
+   */
+  call?: string;
   /**
    * The secret is the session's own (#3548): Allow always is the same as Allow for this session.
    */
@@ -10017,13 +10029,16 @@ export interface SecretTerminalValue {
  * (fill_secret), ci sends it to GitHub (set_ci_secret), mcp adds it to an HTTP MCP server's header
  * or URL on each request agentsd sends the server for a session (#4120). terminal (#4179) prints a
  * secret that does not ask to `agents-secret NAME` run with no session's grant, such as from a
- * terminal: agentsd cannot tell that caller from an agent that dropped its grant.
+ * terminal: agentsd cannot tell that caller from an agent that dropped its grant. account (#4163)
+ * is not a secret's use: manage_accounts reads an account with Ask before use; the request names
+ * the account, and Allow Always turns its Ask before use off.
  */
 export type SecretUse =
   | "fill"
   | "ci"
   | "mcp"
-  | "terminal";
+  | "terminal"
+  | "account";
 
 /**
  * control/secretsLeft (#1760, FR-026): to the person's own clients, when one of their machines was
@@ -14066,7 +14081,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   OrgRoutesApplied: { required: ["routes"], optional: [] },
   OrgRoutesLeft: { required: ["host", "name", "user", "routes"], optional: [] },
   OrgRoutesMine: { required: ["routes"], optional: [] },
-  OutsideAccount: { required: ["service"], optional: ["description", "address", "plan", "monthlyCostUsd", "card", "secret", "twoFactor", "issue", "made", "edited", "lastOp", "tokenExpires", "notes", "projects"] },
+  OutsideAccount: { required: ["service"], optional: ["description", "address", "plan", "monthlyCostUsd", "card", "secret", "twoFactor", "issue", "made", "edited", "lastOp", "tokenExpires", "notes", "projects", "askBeforeUse"] },
   OutsideAccounts: { required: ["accounts"], optional: [] },
   PagesChangedNotification: { required: ["folder", "folders"], optional: [] },
   PassThroughName: { required: ["name"], optional: ["runtime", "setBy"] },
@@ -14258,7 +14273,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RequestDetail: { required: [], optional: ["elicitation", "secretUse"] },
   RequestForge: { required: ["provider", "repo", "item", "number", "url", "label", "checklist", "seenAt"], optional: ["screenshots", "author", "updatedAt"] },
   RequestFormAnswer: { required: ["action"], optional: ["content"] },
-  RequestSecretUse: { required: ["name", "use", "place"], optional: ["sessionOnly", "needsSignature"] },
+  RequestSecretUse: { required: ["name", "use", "place"], optional: ["call", "sessionOnly", "needsSignature"] },
   RequestSecretUseAnswer: { required: ["action"], optional: ["approval"] },
   RequestUpdate: { required: ["request"], optional: [] },
   RequestWaiter: { required: ["agent", "since"], optional: [] },

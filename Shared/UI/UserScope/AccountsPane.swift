@@ -84,6 +84,9 @@ struct AccountsPane: View {
             Text(AccountsWords.detail(account)).appText(.fine).foregroundStyle(.secondary)
             Text(AccountsWords.about(account)).appText(.fine).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            if AccountsWords.asks(account) {
+                Label(AskBeforeUseWords.asks, systemImage: "hand.raised").appText(.fine).foregroundStyle(.secondary)
+            }
             if let soon = AccountsWords.expiresSoon(account, now: Date()) {
                 Text(soon).appText(.fine).tinted(.attention)
             }
@@ -100,6 +103,27 @@ struct AccountsPane: View {
         let failed = await state.set(.accounts, to: value, on: control)
         if adding == nil { problem = failed }
         return failed
+    }
+}
+
+/// Ask before use (#4163) on Add Account… and Edit…: on at first. As `AskBeforeUseToggle`, with
+/// an account's words under it.
+private struct AccountAskToggle: View {
+    @Binding var fields: [String: String]
+
+    var body: some View {
+        let isOn = Binding(get: { fields[AccountsWords.askField] != "off" },
+                           set: { fields[AccountsWords.askField] = $0 ? nil : "off" })
+        VStack(alignment: .leading, spacing: 2) {
+            Toggle(AskBeforeUseWords.toggle, isOn: isOn)
+                #if os(macOS)
+                .toggleStyle(.checkbox)
+                #endif
+                .appText(.supporting)
+            Text(AccountsWords.askHint(isOn.wrappedValue))
+                .appText(.fine).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }
 
@@ -147,6 +171,7 @@ private struct AccountSheet: View {
                 field("Token expires", "tokenExpires", "YYYY-MM-DD")
                 field("Projects", "projects", "None is all, else names with commas")
                 field("Notes", "notes", "Where the password is")
+                AccountAskToggle(fields: $fields)
             } header: {
                 Text(account == nil ? "Add an Account" : "Edit \(account!.service)")
             } footer: {

@@ -51,6 +51,12 @@ func TestAccountsNote(t *testing.T) {
 		!strings.Contains(note, noDescription) {
 		t.Fatal(note)
 	}
+	// Each says whether it asks before use (#4163): absent is on.
+	all[1].AskBeforeUse = new(false)
+	if note := accountsNote(all, "", ""); !strings.Contains(note, `"service":"gitlab.com","description":"`+about+`","asksBeforeUse":true`) ||
+		!strings.Contains(note, `"service":"aws.amazon.com","description":"No description","asksBeforeUse":false`) {
+		t.Fatal(note)
+	}
 	if note := accountsNote(all, "digitalocean", ""); note != "There is no account for digitalocean." {
 		t.Fatal(note)
 	}
@@ -250,6 +256,7 @@ func TestManageAccountsRecordsEachOperation(t *testing.T) {
 
 	mu.Lock()
 	gitlab := accountID(accounts[0])
+	accounts[0].AskBeforeUse = new(false) // as a person turns it off: get does not wait (#4163)
 	mu.Unlock()
 	var got wire.OutsideAccount
 	get := func(id int) {
@@ -292,5 +299,117 @@ func TestTrimOldest(t *testing.T) {
 	trimOldest(m, func(at wire.Date) wire.Date { return at })
 	if _, ok := m["2"]; len(m) != accountOpsMost || ok || m["3"] != 3 {
 		t.Fatal(len(m))
+	}
+}
+
+// #4163: an account an agent adds asks before use, and the agent cannot turn it off; a get of it
+// waits on a person, with a secret's answers. Deny is an error; once reads once; always turns
+// the account's Ask before use off, so the next get does not wait.
+func TestAGetOfAnAccountThatAsksWaitsOnAPerson(t *testing.T) {
+	was := formHoldLimit
+	formHoldLimit = 2 * time.Second
+	defer func() { formHoldLimit = was }()
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	a := seeded(t, d, t.TempDir(), func(a *wire.Agent) { a.State, a.EndedReason, a.RuntimeID = wire.AgentStateRunning, nil, "claude" })
+	m := appClient(t, d, a.ID)
+	m.post("initialize", map[string]any{}, 1)
+
+	var mu sync.Mutex
+	var accounts []wire.OutsideAccount
+	d.SetControlAsk(func(_ context.Context, method string, params any) (json.RawMessage, error) {
+		call, ok := params.(wire.MachineAccountsCall)
+		if !ok {
+			return json.RawMessage(`{}`), nil
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		for _, add := range call.Add {
+			if i := slices.IndexFunc(accounts, func(h wire.OutsideAccount) bool { return accountID(h) == accountID(add) }); i >= 0 {
+				accounts[i] = add
+			} else {
+				accounts = append(accounts, add)
+			}
+		}
+		return json.Marshal(wire.OutsideAccounts{Accounts: accounts})
+	})
+	stored := func() wire.OutsideAccount {
+		mu.Lock()
+		defer mu.Unlock()
+		return accounts[0]
+	}
+
+	m.tool(2, "manage_accounts", map[string]any{"action": "add",
+		"account": map[string]any{"service": "gitlab.com", "address": "a@example.com", "description": "Agents CI", "askBeforeUse": false}})
+	if !accountAsks(stored()) {
+		t.Fatal("an agent turned Ask before use off")
+	}
+	if text, _ := m.tool(3, "manage_accounts", map[string]any{"action": "list"}); !strings.Contains(text, `"asksBeforeUse":true`) {
+		t.Fatal(text)
+	}
+	id := accountID(stored())
+	get := func(n int) string {
+		text, _ := m.tool(n, "manage_accounts", map[string]any{"action": "get", "id": id})
+		return text
+	}
+
+	// The hold ends: the answer names the request, and says nothing of the account but its name.
+	if text := get(4); !strings.Contains(text, "Wait with wait_for_event") || strings.Contains(text, "Agents CI") {
+		t.Fatal(text)
+	}
+	r := openSecretUse(t, d)
+	if u := r.Detail.SecretUse; r.Kind != wire.RequestKindApprove || u.Use != wire.SecretUseAccount || u.Place != id ||
+		u.Name != "gitlab.com (a@example.com)" || u.Call == nil || *u.Call != "get" {
+		t.Fatalf("%+v %+v", r, u)
+	}
+	if needs := requestNeeds(d); len(needs) != 1 || len(needs[0].Headline.Answers) != 4 ||
+		needs[0].Headline.H3 != "Wants to read the account gitlab.com (a@example.com)" {
+		t.Fatalf("%+v", needs)
+	}
+
+	// Deny: the held call fails with words that say so.
+	denied := make(chan string, 1)
+	go func() {
+		text, failed := m.tool(5, "manage_accounts", map[string]any{"action": "get", "id": id})
+		if !failed {
+			text = "not failed: " + text
+		}
+		denied <- text
+	}()
+	waitFor(t, "the held call", func() bool {
+		d.secretUseMu.Lock()
+		defer d.secretUseMu.Unlock()
+		return len(d.secretUseHeld) == 1
+	})
+	answerUse(t, d, r, secretUseDeny)
+	if text := <-denied; !strings.HasPrefix(text, "A person denied") {
+		t.Fatal(text)
+	}
+
+	// Once: this get, and no other.
+	done := make(chan string, 1)
+	go func() { done <- get(6) }()
+	answerUse(t, d, openSecretUse(t, d), secretUseOnce)
+	if text := <-done; !strings.Contains(text, "Agents CI") {
+		t.Fatal(text)
+	}
+	if text := get(7); !strings.Contains(text, "Wait with wait_for_event") {
+		t.Fatal("once allowed a second get:", text)
+	}
+
+	// Always: Ask before use goes off in the person's settings.
+	answerUse(t, d, openSecretUse(t, d), secretUseAlways)
+	if accountAsks(stored()) {
+		t.Fatal("always left Ask before use on")
+	}
+	if text := get(8); !strings.Contains(text, "Agents CI") {
+		t.Fatal(text)
+	}
+
+	// A replace keeps the account's own Ask before use.
+	off := stored()
+	plan := planAccounts([]wire.OutsideAccount{off}, []wire.OutsideAccount{{Service: "gitlab.com", Address: off.Address, Plan: new("Pro")}})
+	if len(plan.changed) != 1 || plan.changed[0].to.AskBeforeUse == nil || *plan.changed[0].to.AskBeforeUse {
+		t.Fatalf("%+v", plan)
 	}
 }

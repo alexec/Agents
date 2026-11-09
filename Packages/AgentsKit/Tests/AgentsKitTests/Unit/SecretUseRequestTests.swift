@@ -23,6 +23,11 @@ struct SecretUseRequestTests {
         #expect(ci.secretUse?.actions == [.once, .session, .deny])
         let mcp = try request(#"{"secretUse":{"name":"NOTES_TOKEN","use":"mcp","place":"notes"}}"#)
         #expect(mcp.line(asker: nil) == "MCP server notes")
+        // #4163: an agent's read of an account with Ask before use, with a secret's answers.
+        let account = try request(#"{"secretUse":{"name":"gitlab.com (a@example.com)","use":"account","place":"1a2b3c4d","call":"get"}}"#)
+        #expect(account.title(asker: "Sign up") == "Wants to read gitlab.com (a@example.com)")
+        #expect(account.line(asker: "Sign up") == "Sign up · Account: manage_accounts get")
+        #expect(account.secretUse?.actions == [.once, .session, .always, .deny])
         #expect(NeedRequest.Action.allCases.map(\.word) == ["Allow Once", "Allow for This Session", "Allow Always", "Allow for 1 Hour", "Deny"])
     }
 
