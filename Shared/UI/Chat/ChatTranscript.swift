@@ -299,6 +299,10 @@ struct ChatTranscript: View {
                 .padding(.top, -slackMargin)
             }
             .scrollPosition($position)
+            // A drag down on the chat takes the keyboard down with it, as in Messages, so
+            // the turns above can be read without first putting the keyboard away (#4267).
+            // The Mac has no on-screen keyboard, so there it does nothing.
+            .scrollDismissesKeyboard(.interactively)
             .environment(\.highlightedEntry, highlightedEntry)
             // The pane knows where turns start, not the lines in them: a line lit in a long
             // turn says where it is, and the pane goes to it (#2860).
