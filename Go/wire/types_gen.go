@@ -11098,7 +11098,7 @@ type SecretOperation struct {
 
 	Use *SecretOperationUse `json:"use,omitzero"`
 
-	// Where it went: the field's domain (fill), owner/repo (ci), the server's name (mcp, env), or session (env, as a session's own variable).
+	// Where it went: the field's domain (fill), owner/repo (ci), the server's name (mcp, env), session (env, as a session's own variable), or agents-secret (command).
 	Place *string `json:"place,omitzero"`
 
 	// The session that read it. Left out for a change no session made.
@@ -11111,13 +11111,14 @@ type SecretOperation struct {
 	Count *int64 `json:"count,omitzero"`
 }
 
-// How a secret was read (#4156): fill (fill_secret), ci (set_ci_secret), mcp (an HTTP MCP server's header or url, through agentsd, #4120) or env (given to a session at its start: its own secrets as variables, or an MCP server's ${NAME} from secrets.env).
+// How a secret was read (#4156): fill (fill_secret), ci (set_ci_secret), mcp (an HTTP MCP server's header or url, through agentsd, #4120), env (given to a session at its start: its own secrets as variables, or an MCP server's ${NAME} from secrets.env) or command (agents-secret NAME, printed for a session's own command, #4178).
 type SecretOperationUse string
 
 const SecretOperationUseFill SecretOperationUse = "fill"
 const SecretOperationUseCi SecretOperationUse = "ci"
 const SecretOperationUseMCP SecretOperationUse = "mcp"
 const SecretOperationUseEnv SecretOperationUse = "env"
+const SecretOperationUseCommand SecretOperationUse = "command"
 
 // What an operation on a secret was (#4156): read (an agent's use of it), denied (a person denied a use with Ask before use), or added, replaced or removed.
 type SecretOperationWhat string

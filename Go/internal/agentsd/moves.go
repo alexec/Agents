@@ -405,7 +405,7 @@ func (d *Daemon) releaseRuntime(id wire.UUID) {
 	l.session = nil
 	if s != nil {
 		d.dropStandIn(id)
-		d.dropGitHubCredential(id)
+		d.dropCredentialGrants(id)
 	}
 	l.mu.Unlock()
 	if s != nil {
