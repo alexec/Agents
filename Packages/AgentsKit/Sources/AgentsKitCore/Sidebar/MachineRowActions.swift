@@ -45,10 +45,53 @@ public struct MachineRowActions: Equatable, Sendable {
                                  delete: true)
     }
 
-    /// Delete's question: it always asks, and says how many sessions stop.
-    public static func deleteMessage(_ row: DaemonAPI.ControlMachine, sessions: Int) -> String {
+    /// Delete's question: it always asks, says how many sessions stop, and names the worktrees
+    /// on it with work not pushed (#3979), as the machine said them; nil while it is asked.
+    public static func deleteMessage(_ row: DaemonAPI.ControlMachine, sessions: Int,
+                                     preview: DaemonAPI.StartedMachinePreview? = nil, asking: Bool = false) -> String {
         let at = row.workspace.map { "\($0.providerName) deletes" } ?? "Its provider deletes"
         let stop = sessions == 0 ? "" : sessions == 1 ? " 1 session on it stops." : " \(sessions) sessions on it stop."
-        return "\(at) this machine and its disk.\(stop)"
+        var words = "\(at) this machine and its disk.\(stop)"
+        if asking {
+            words += " Asking \(row.name) what work on it is not pushed…"
+        } else if let unknown = preview?.unknown {
+            words += " " + unknown
+        } else if let work = preview?.unpushed, !work.isEmpty {
+            let count = work.count == 1 ? "1 worktree has" : "\(work.count) worktrees have"
+            words += " \(count) work not pushed, which is lost:\n"
+                + work.map { "\($0.folder.lastPathComponent) · \(PeopleWords.unpushedWords($0))" }.joined(separator: "\n")
+        }
+        return words
+    }
+}
+
+/// A machine row's icon (#4113): its shape says the kind, its colour the state, so the row
+/// needs no dot. The grey line under the row says why in words.
+public enum MachineIcon: Equatable, Sendable {
+    /// The accent: all is well.
+    case accent
+    /// Amber and pulsing: starting, stopping or being made.
+    case busy
+    /// Red: offline, its set-up failed, or a disk is low.
+    case failure
+    /// Amber: it needs an update.
+    case attention
+    /// Grey: stopped.
+    case stopped
+
+    /// The most urgent wins: busy, then red, then amber, then grey, then the accent.
+    public static func of(_ dot: MachineDot, diskLow: Bool) -> MachineIcon {
+        if dot == .busy { return .busy }
+        if dot == .offline || diskLow { return .failure }
+        switch dot {
+        case .attention: return .attention
+        case .stopped: return .stopped
+        default: return .accent
+        }
+    }
+
+    /// A laptop for This Mac, a cloud for a machine a provider made, a rack for a registered one.
+    public static func symbol(isThisMac: Bool, row: DaemonAPI.ControlMachine?) -> String {
+        isThisMac ? "laptopcomputer" : row?.workspace != nil ? "cloud" : "server.rack"
     }
 }

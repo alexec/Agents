@@ -45,7 +45,7 @@ struct MoveToMachineSheet: View {
             Text("Move “\(title)” to Another Machine")
                 .appText(.reading).fontWeight(.semibold)
             if targets.isEmpty {
-                Text("No other machine is online. Start one in Settings ▸ Machines, then try again.")
+                Text("No other machine is online. Start one under Machines in the sidebar, then try again.")
                     .appText(.supporting).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else {

@@ -7411,7 +7411,7 @@ type Need struct {
 	Headline Headline `json:"headline"`
 }
 
-// NeedID (Attention/Need.swift): what is being answered, one key per kind. A notice (#2805) is what an agent told the person with `notify`: posted, never a Needs you row.
+// NeedID (Attention/Need.swift): what is being answered, one key per kind. A notice (#2805) is what an agent told the person with `notify`: posted, never a Needs you row. A request (#4017) is a Needs you request posted so a phone can answer it: today only a secret's use (#4015), whose banner has its four answers.
 type NeedID struct {
 	Permission *UUID `json:"permission,omitzero"`
 
@@ -7422,6 +7422,8 @@ type NeedID struct {
 	GuardedChange *NeedIDGuardedChange `json:"guardedChange,omitzero"`
 
 	Notice *string `json:"notice,omitzero"`
+
+	Request *UUID `json:"request,omitzero"`
 }
 
 type NeedIDReport struct {
@@ -7443,6 +7445,7 @@ const NeedKindElicitation NeedKind = "elicitation"
 const NeedKindReport NeedKind = "report"
 const NeedKindGuardedChange NeedKind = "guardedChange"
 const NeedKindNotice NeedKind = "notice"
+const NeedKindRequest NeedKind = "request"
 
 // folders/notCommitted (#3448): what in the folder's .agents Git ignores, so it stays on this machine and the project's other folders do not get it.
 type NotCommittedResponse struct {
@@ -9454,6 +9457,9 @@ type ProviderSummary struct {
 	// The caller may start machines from it (#1761): they are in its group. Absent from an older control plane, which lets everyone.
 	MayUse *bool `json:"mayUse,omitzero"`
 
+	// New Machine makes the caller's machines on it (#3979): the one they made a machine on last or chose with Make Default, or else the first one added. True on one provider at most; absent from an older control plane.
+	Default *bool `json:"default,omitzero"`
+
 	// The machine that carries it: runs its server and keeps its secrets (#3398). Absent for one made before, which must be added again.
 	Machine *MachineRef `json:"machine,omitzero"`
 
@@ -10238,16 +10244,22 @@ type RequestSecretUse struct {
 
 	Use SecretUse `json:"use"`
 
-	// Where the value goes: the page's domain for a fill, owner/repo for CI.
+	// Where the value goes: the page's domain for a fill, owner/repo for CI, the server's name for an MCP server.
 	Place string `json:"place"`
 
 	// The secret is the session's own (#3548): Allow always is the same as Allow for this session.
 	SessionOnly *bool `json:"sessionOnly,omitzero"`
+
+	// The machine is Linux (#4058): the value opens only with the release key its control plane keeps, which the control plane gives only for an approval the person's client signed. An answer that allows the use carries approval; one without it is refused.
+	NeedsSignature *bool `json:"needsSignature,omitzero"`
 }
 
 // A person's answer to a secret's use (#4015). once allows this use; session every use at this place until the session ends or is archived; always adds a grant for this place, for every session; deny refuses it. Only the control and device roles answer.
 type RequestSecretUseAnswer struct {
 	Action string `json:"action"`
+
+	// The answering client's signature of its answer (#4058), required when the request says needsSignature and the action is not deny: method secrets/approveUse, params the JSON text {"request":<the request's id>,"name","use","place","action"} as the request names them, and a LockSignature to this machine by the client's lock key. The machine checks it against its lock and sends it to the control plane, which gives the release key only for a fresh one it has not seen.
+	Approval *LockDelivery `json:"approval,omitzero"`
 }
 
 type RequestSource string
@@ -10967,7 +10979,7 @@ type SecretGrant struct {
 
 	Use SecretUse `json:"use"`
 
-	// The page's domain for a fill, owner/repo for CI.
+	// The page's domain for a fill, owner/repo for CI, the server's name for an MCP server.
 	Place string `json:"place"`
 }
 
@@ -11000,11 +11012,31 @@ type SecretNeedsApprovalRequest struct {
 	NeedsApproval bool `json:"needsApproval"`
 }
 
-// What agentsd does with a secret with Ask before use (#4015): fill types it into a page (fill_secret), ci sends it to GitHub (set_ci_secret).
+// machine/secretRelease (#4058): a Linux machine asks its control plane to open the release layer of one value with Ask before use, for a person's signed approval. encapsulated is the HPKE encapsulated key the machine sealed the value's key with (DHKEM X25519, HKDF-SHA256, AES-256-GCM, info agents-secret-release/1); the control plane answers with the 32 bytes exported with the context "sealedsecret.release.v1|" then name. It never sees the value, which is also sealed to the machine's key.
+type SecretRelease struct {
+	Name string `json:"name"`
+
+	Encapsulated Data `json:"encapsulated"`
+
+	Approval LockDelivery `json:"approval"`
+}
+
+// machine/secretKey (#4058): the public half of this machine's release key, X25519, 32 bytes. The control plane makes the key pair the first time a machine asks, keeps the private half sealed by its keeper, and gives it to nobody.
+type SecretReleaseKey struct {
+	PublicKey Data `json:"publicKey"`
+}
+
+// The answer to machine/secretRelease (#4058): the key that opens the release layer of one value, which the machine uses once and does not keep.
+type SecretReleased struct {
+	Key Data `json:"key"`
+}
+
+// What agentsd does with a secret with Ask before use (#4015): fill types it into a page (fill_secret), ci sends it to GitHub (set_ci_secret), mcp adds it to an HTTP MCP server's header or URL on each request agentsd sends the server for a session (#4120).
 type SecretUse string
 
 const SecretUseFill SecretUse = "fill"
 const SecretUseCi SecretUse = "ci"
+const SecretUseMCP SecretUse = "mcp"
 
 // control/secretsLeft (#1760, FR-026): to the person's own clients, when one of their machines was removed with secrets on it.
 type SecretsLeft struct {

@@ -18,8 +18,11 @@ public enum NeedID: Hashable, Sendable, Codable {
     /// What an agent told the person with `notify` (#2805): the host's id for it. Posted
     /// as a need is, but asks nothing, so never a Needs you row or a widget's.
     case notice(String)
+    /// A Needs you request (#4017), posted so a phone can answer it: a secret's use, whose
+    /// banner has its answers. Its row is the request's own, so it is never a second row.
+    case request(UUID)
 
-    private enum CodingKeys: String, CodingKey { case permission, elicitation, report, guardedChange, notice }
+    private enum CodingKeys: String, CodingKey { case permission, elicitation, report, guardedChange, notice, request }
     private struct Report: Codable { var agentID: UUID; var at: Date }
     private struct Guarded: Codable { var folder: URL; var path: String }
 
@@ -37,6 +40,8 @@ public enum NeedID: Hashable, Sendable, Codable {
             self = .guardedChange(g.folder, g.path)
         } else if c.contains(.notice) {
             self = .notice(try c.decode(String.self, forKey: .notice))
+        } else if c.contains(.request) {
+            self = .request(try c.decode(UUID.self, forKey: .request))
         } else {
             throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath,
                                                     debugDescription: "a need id names what is asked"))
@@ -52,6 +57,7 @@ public enum NeedID: Hashable, Sendable, Codable {
         case .guardedChange(let folder, let path):
             try c.encode(Guarded(folder: folder, path: path), forKey: .guardedChange)
         case .notice(let id): try c.encode(id, forKey: .notice)
+        case .request(let id): try c.encode(id, forKey: .request)
         }
     }
 
@@ -63,6 +69,7 @@ public enum NeedID: Hashable, Sendable, Codable {
         case .report(let agentID, let at): return "report:\(agentID.uuidString):\(at.timeIntervalSinceReferenceDate)"
         case .guardedChange(let folder, let path): return "guarded:\(folder.path):\(path)"
         case .notice(let id): return "notice:\(id)"
+        case .request(let id): return "request:\(id.uuidString)"
         }
     }
 
@@ -114,6 +121,8 @@ public struct Need: Hashable, Sendable, Codable, Identifiable {
         case permission, elicitation, report, guardedChange
         /// What an agent told the person (#2805): posted, never a Needs you row.
         case notice
+        /// A Needs you request posted for its banner (#4017): its row is the request's.
+        case request
     }
 
     public var id: NeedID

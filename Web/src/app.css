@@ -1946,6 +1946,17 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .provider-sheet { max-width: 560px; }
 .provider-sheet .token-form textarea { font: inherit; font-family: var(--font-mono); font-size: 0.75rem; }
 .provider-sheet .token-form label.setting { flex-direction: row; justify-content: space-between; align-items: center; }
+/* Choose Folders… and Link to Provider… on a machine's row (#4122). */
+.choose-folders .found-folders { list-style: none; margin: 0 0 8px; padding: 8px 10px; max-height: 240px; overflow-y: auto;
+  border: 1px solid var(--paper-rule); border-radius: 8px; }
+.choose-folders .found-folders li + li { margin-top: 6px; }
+.choose-folders .found-folders label, .provider-sheet .link-choices label { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.choose-folders .found-folders .path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.connect-sheet .token-form.inline { flex-direction: row; }
+.connect-sheet .token-form.inline input { flex: 1; font-family: var(--font-mono); }
+.provider-sheet .link-choices { max-height: 280px; overflow-y: auto; margin: 0 0 8px; }
+.provider-sheet .link-choices fieldset { border: 0; margin: 0 0 8px; padding: 0; }
+.provider-sheet .link-choices fieldset label { padding: 2px 0 2px 12px; }
 /* Console ▸ Sign-In (#1002): a provider's actions in a row, and its domains and SCIM under it. */
 .org-actions { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 8px 0 4px; }
 .org-domains, .org-scim { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--paper-rule); }

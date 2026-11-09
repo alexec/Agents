@@ -21,6 +21,9 @@ export type LinkOutcome = { linked: true } | { needsTrust: string } | { failed: 
 /** What Add as Machine… came to: installed under a name, a host key to look at first, or why not. */
 export type InstallOutcome = { added: string } | { needsTrust: string } | { failed: string };
 
+/** What Update… came to (#4122): updated, a host key to look at first, or why not. */
+export type UpdateOutcome = { updated: string } | { needsTrust: string } | { failed: string };
+
 export class Providers {
   /** As last listed; null before the first list. */
   readonly list = signal<ProviderSummary[] | null>(null);
@@ -81,6 +84,17 @@ export class Providers {
   async setGroup(provider: string, group: string | null): Promise<string | null> {
     try {
       await this.caller.call("providers/setGroup", group ? { provider: provider as ProviderID, group } : { provider: provider as ProviderID });
+      return null;
+    } catch (error) {
+      return describe(error);
+    }
+  }
+
+  /** Make Default (#3979): New Machine uses this provider, until a machine is made on another. The new list comes as control/providersChanged. */
+  async makeDefault(id: string): Promise<string | null> {
+    try {
+      await this.caller.call("providers/makeDefault", { id: id as ProviderID });
+      this.list.value = (this.list.value ?? []).map((p) => ({ ...p, default: p.id === id }));
       return null;
     } catch (error) {
       return describe(error);
@@ -148,6 +162,24 @@ export class Providers {
       return { added: joined };
     } catch (error) {
       if (!(error instanceof LinkDown)) this.linkOnJoin.delete(asked);
+      return { failed: describe(error) };
+    }
+  }
+
+  /**
+   * Update… on a machine that needs it (#4122), as the window's: the control plane reaches
+   * `destination` over its own ssh, checks it is `host`, copies its version of Agents there and
+   * starts it again. `trust` is the host key's fingerprint, when the person said it is the one the
+   * machine shows.
+   */
+  async update(host: string, destination: string, trust?: string): Promise<UpdateOutcome> {
+    try {
+      const answer = await this.caller.call("machines/update", {
+        host: host as MachineRef, destination, ...(trust ? { trust } : {}),
+      }) as { needsTrust?: string; name?: string } | null;
+      if (answer?.needsTrust) return { needsTrust: answer.needsTrust };
+      return { updated: answer?.name || destination };
+    } catch (error) {
       return { failed: describe(error) };
     }
   }

@@ -23,7 +23,7 @@ extension AppModel {
         lendGit(host: ask.host, from: ask.from, server: ask.server, allowed: allowed)
     }
 
-    /// Settings ▸ Machines: a host stops using a Mac's git access for a server.
+    /// A machine's page (#3975): a host stops using a Mac's git access for a server.
     func lendGit(host: MachineRef, from: MachineRef, server: String, allowed: Bool) {
         guard let control = controlPlaneClient() else { return }
         Task {

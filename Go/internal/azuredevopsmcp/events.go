@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/alexec/agents/Go/internal/mcpevents"
@@ -35,6 +37,13 @@ var (
 	// mineProperty is only the token's owner's own pull requests (#2034), a fork's too.
 	mineProperty = property{Name: "mine", Kind: "boolean",
 		Description: "true: only pull requests by the Azure DevOps account whose token this server has, whatever anyone says."}
+	// anyProperty is every one in the repository (#3797): a wait that names none sets it.
+	anyProperty = property{Name: "any", Kind: "boolean",
+		Description: "true: every one in the repository. A wait (not a workflow trigger) that names none, by the other arguments that say which, is refused without it. It is about which ones; anyone is about who."}
+	// fixesProperty is the pull requests that close these work items (#3797): a lead knows a child's work item before its pull request.
+	fixesProperty = property{Name: "fixes", Kind: "refs",
+		Description: `Only pull requests whose description closes one of these work items, as "#12" (AB#12 in a description is #12).`,
+		Pattern:     workItemRefPattern, LooksLike: `work items, as "#12"`}
 )
 
 // ownPRs is what every pull request event says of whose pull requests it raises.
@@ -51,7 +60,7 @@ func object(props map[string]any) map[string]any {
 var str, integer = map[string]any{"type": "string"}, map[string]any{"type": "integer"}
 
 func prSchema(extra map[string]any) map[string]any {
-	props := map[string]any{"number": integer, "title": str, "branch": str, "url": str}
+	props := map[string]any{"number": integer, "title": str, "branch": str, "url": str, "fixes": fixesSchema}
 	for k, v := range extra {
 		props[k] = v
 	}
@@ -60,6 +69,13 @@ func prSchema(extra map[string]any) map[string]any {
 
 func prInput() schema {
 	return schema{repoProperty, branchProperty("Only the pull request from this branch."), prProperty, anyoneProperty}
+}
+
+// namedInput is prInput for an event about one pull request: it names it by fixes or mine
+// too, or takes any (#3797).
+func namedInput() schema {
+	return schema{repoProperty, branchProperty("Only the pull request from this branch."), prProperty, fixesProperty,
+		anyoneProperty, mineProperty, anyProperty}
 }
 
 // fixesSchema is a pull request's fixes: the work items its description closes, "#12" (#2349).
@@ -71,7 +87,7 @@ var fixesSchema = map[string]any{"type": "array", "items": str}
 var events = []event{
 	{Name: "checks.failed", Title: "Checks failed",
 		Description: "An open pull request's checks failed at its head commit: an Azure Pipelines build of it (its build validation, or any pipeline it triggers), a build of its branch at that commit (a CI trigger's), or the newest status that another service set on it (failed or error). One event per commit and failure time, so a build run again that fails again is a new one. failedJobs are the failed builds and statuses; run is the first failed build (get_build_log reads its failed steps), or the first failed status with id 0 when no build failed." + ownPRs,
-		Input:       schema{repoProperty, branchProperty("Only checks of the pull request from this branch."), prProperty, anyoneProperty, mineProperty},
+		Input:       schema{repoProperty, branchProperty("Only checks of the pull request from this branch."), prProperty, fixesProperty, anyoneProperty, mineProperty, anyProperty},
 		Payload: object(map[string]any{
 			"pr": prSchema(nil), "headSha": str,
 			"run":        object(map[string]any{"id": integer, "name": str, "url": str}),
@@ -79,7 +95,7 @@ var events = []event{
 		})},
 	{Name: "checks.passed", Title: "Checks passed",
 		Description: "One of an open pull request's checks passed at its head commit: an Azure Pipelines build of it or of its branch at that commit, or the newest status of one context that another service set on it. One event per build or status, so a lane waiting on CI going green wakes without polling. run is the build (id 0 for a status)." + ownPRs,
-		Input:       schema{repoProperty, branchProperty("Only checks of the pull request from this branch."), prProperty, anyoneProperty, mineProperty},
+		Input:       schema{repoProperty, branchProperty("Only checks of the pull request from this branch."), prProperty, fixesProperty, anyoneProperty, mineProperty, anyProperty},
 		Payload: object(map[string]any{
 			"pr": prSchema(nil), "headSha": str,
 			"run": object(map[string]any{"id": integer, "name": str, "url": str}),
@@ -90,7 +106,7 @@ var events = []event{
 		Input: schema{repoProperty,
 			property{Name: "pipeline", Kind: "string", Description: "Only builds of this pipeline, by its name, as release."},
 			branchProperty("Only builds of this branch or tag, as main or v0.16.0."),
-			property{Name: "run", Kind: "integer", Description: "Only this build, by its id."}, anyoneProperty},
+			property{Name: "run", Kind: "integer", Description: "Only this build, by its id."}, anyoneProperty, anyProperty},
 		Payload: object(map[string]any{
 			"run": object(map[string]any{"id": integer, "name": str, "number": str, "event": str, "branch": str, "headSha": str,
 				"url": str, "conclusion": str, "actor": str}),
@@ -99,16 +115,16 @@ var events = []event{
 	{Name: "pr.opened", Title: "Pull request opened",
 		Description: "A pull request was opened, or a draft was published: a pull request active and not a draft now that was not at the last poll. Drafts never count. Reactivated, it is raised again." + ownPRs,
 		Input:       prInput(),
-		Payload:     object(map[string]any{"pr": prSchema(map[string]any{"author": str, "fixes": fixesSchema}), "openedAt": str})},
+		Payload:     object(map[string]any{"pr": prSchema(map[string]any{"author": str}), "openedAt": str})},
 	{Name: "pr.merged", Title: "Pull request merged", Description: "A pull request was completed: merged into its target." + ownPRs,
-		Input:   prInput(),
-		Payload: object(map[string]any{"pr": prSchema(map[string]any{"fixes": fixesSchema}), "mergedAt": str, "mergeSha": str})},
+		Input:   namedInput(),
+		Payload: object(map[string]any{"pr": prSchema(nil), "mergedAt": str, "mergeSha": str})},
 	{Name: "pr.closed", Title: "Pull request closed", Description: "A pull request was abandoned: closed without being merged." + ownPRs,
-		Input:   prInput(),
-		Payload: object(map[string]any{"pr": prSchema(map[string]any{"fixes": fixesSchema}), "closedAt": str})},
+		Input:   namedInput(),
+		Payload: object(map[string]any{"pr": prSchema(nil), "closedAt": str})},
 	{Name: "pr.conflicted", Title: "Pull request in conflict",
 		Description: "An active pull request began to conflict with its target branch, so it cannot merge until it is rebased. Once per conflict: it is raised again only after it merges cleanly and then conflicts anew." + ownPRs,
-		Input:       append(prInput(), mineProperty),
+		Input:       namedInput(),
 		Payload:     object(map[string]any{"pr": prSchema(nil), "conflictedAt": str})},
 	// For the person, not the repository (#2034): what asks the token's owner for something.
 	{Name: "review.requested", Title: "Review requested from me",
@@ -117,7 +133,7 @@ var events = []event{
 		Payload:     object(map[string]any{"pr": prSchema(map[string]any{"author": str}), "requestedAt": str})},
 	{Name: "review.comment", Title: "Pull request line commented on",
 		Description: "Someone left a comment on a line of a pull request's diff, or answered in its thread. Its body is the first 4000 characters; comment.threadId is the thread to answer in with reply_to_pull_request_comment. The 50 newest active pull requests are read, and those closed since. Never a bot's comment, unless anyone is true; and only on the repository's own pull requests.",
-		Input:       prInput(),
+		Input:       namedInput(),
 		Payload: object(map[string]any{"pr": prSchema(nil), "commentedAt": str,
 			"comment": object(map[string]any{"id": integer, "threadId": integer, "author": str, "path": str, "line": integer, "body": str, "url": str})})},
 }
@@ -209,8 +225,8 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 			prs, err := s.AzureDevOps.OpenPRs(ctx, a.repo)
 			var out []state
 			for _, m := range prs {
-				if yours != nil {
-					if yours.owns(m.PR.Number) {
+				if a.mine {
+					if a.byMe(m.PR, yours) {
 						out = append(out, state{mr: m.PR, on: m.Conflicts, json: m.PR.json()})
 					}
 				} else if a.anyone || m.Trusted {
@@ -240,9 +256,6 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 	})
 }
 
-// poll is events/poll over a cursor (mcpevents.Poller.Poll). The first poll starts from the
-// start of this second: a thing made in it would otherwise be older than the cursor when a
-// listing gives times to the second.
 func (s *Events) poll(e event, p pollParams, find func(since string) ([]candidate, Listed, error)) (map[string]any, *rpcError) {
 	return polls.Poll(e.Name, p, func() string { return timeString(s.now().Truncate(time.Second)) },
 		func(since string) ([]candidate, mcpevents.Listed, error) {
@@ -250,6 +263,8 @@ func (s *Events) poll(e event, p pollParams, find func(since string) ([]candidat
 			return found, mcpevents.Listed{Truncated: listed.Truncated, Newest: listed.Newest}, err
 		})
 }
+
+func contains(list []string, s string) bool { return slices.Contains(list, s) }
 
 // state is a pull request and whether its state (in conflict, or open and ready) is on now;
 // nil keeps the one it had.
@@ -261,11 +276,14 @@ type state struct {
 
 func (s *Events) pollDiff(name, key string, a args, p pollParams, states func() ([]state, error)) (map[string]any, *rpcError) {
 	root := "pr"
+	if strings.HasPrefix(name, "issue.") {
+		root = "issue" // issue.assigned (#2034)
+	}
 	return polls.Diff(name, key, p, func() string { return timeString(s.now()) }, func() ([]mcpevents.State, error) {
 		all, err := states()
 		var out []mcpevents.State
 		for _, st := range all {
-			if (a.pr != 0 && st.mr.Number != a.pr) || (a.branch != "" && st.mr.Branch != a.branch) {
+			if (a.pr != 0 && st.mr.Number != a.pr) || (a.branch != "" && st.mr.Branch != a.branch) || !a.closesOne(st.mr) {
 				continue
 			}
 			out = append(out, mcpevents.State{ID: fmt.Sprintf("%s:%s:%d", name, a.repo, st.mr.Number), Number: st.mr.Number,
@@ -278,13 +296,11 @@ func (s *Events) pollDiff(name, key string, a args, p pollParams, states func() 
 // candidates finds what an event may raise at or after since.
 func candidates(ctx context.Context, f AzureDevOps, name string, a args, yours *Yours, since string) ([]candidate, Listed, error) {
 	repo := a.repo
-	// mine: the owner's own pull request, trusted or not; else the trust filter (#728).
+	// mine: the owner's own pull request, active or completed or abandoned, trusted or not;
+	// else the trust filter (#728, #3797). fixes narrows every one by the work items it closes.
 	wanted := func(m PR, trusted bool) bool {
-		who := a.anyone || trusted
-		if yours != nil {
-			who = yours.owns(m.Number)
-		}
-		return (a.pr == 0 || m.Number == a.pr) && (a.branch == "" || m.Branch == a.branch) && who
+		return (a.pr == 0 || m.Number == a.pr) && (a.branch == "" || m.Branch == a.branch) && a.closesOne(m) &&
+			(a.mine && a.byMe(m, yours) || !a.mine && (a.anyone || trusted))
 	}
 	switch name {
 	case "run.completed":
@@ -308,7 +324,10 @@ func candidates(ctx context.Context, f AzureDevOps, name string, a args, yours *
 		}
 		var list []candidate
 		for _, c := range comments {
-			if at := normalized(c.At); at != "" && wanted(c.PR, c.Trusted) {
+			// Trust is the commenter's; mine only narrows the pull request (#3797).
+			m := c.PR
+			if at := normalized(c.At); at != "" && (a.pr == 0 || m.Number == a.pr) && (a.branch == "" || m.Branch == a.branch) &&
+				a.closesOne(m) && a.byMe(m, yours) && (a.anyone || c.Trusted) {
 				list = append(list, candidate{EventID: fmt.Sprintf("review.comment:%s:%d:%d:%d", repo, c.PR.Number, c.ThreadID, c.ID), Time: at,
 					Data: func() (map[string]any, error) { return c.data(), nil }})
 			}

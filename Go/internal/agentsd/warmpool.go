@@ -185,6 +185,8 @@ func (d *Daemon) warmKey(a *wire.Agent) string {
 	}
 	k["servers"] = servers
 	k["secrets"] = d.sessionSecretEnv(a.ID)
+	// A server a person allowed after it was refused connects at a new start (#4120).
+	k["secretProxy"] = d.secretProxyStart(a.ID)
 	b, _ := json.Marshal(k)
 	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:])

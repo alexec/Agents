@@ -18,7 +18,8 @@ var testSchema = Schema{
 	{Name: "repo", Kind: "string", Pattern: regexp.MustCompile(`^[a-z]+/[a-z]+$`), LooksLike: "owner/name"},
 	{Name: "pr", Kind: "integer"},
 	{Name: "issue", Kind: "integers"},
-	{Name: "fixes", Kind: "refs", Pattern: regexp.MustCompile(`^#[0-9]+$`), LooksLike: `"#12"`},
+	{Name: "fixes", Kind: "refs", Pattern: regexp.MustCompile(`^#[0-9]+$`), LooksLike: `issues, as "#12"`},
+	{Name: "item", Kind: "ids", Pattern: regexp.MustCompile(`^[1-9][0-9]*$`), LooksLike: "an id, as 12"},
 	{Name: "anyone", Kind: "boolean"},
 }
 
@@ -33,6 +34,12 @@ func TestCheckReadsEachKind(t *testing.T) {
 	if v, _ := testSchema.Check(json.RawMessage(`{"issue":7}`)); len(v.Ints("issue")) != 1 || v.Ints("issue")[0] != 7 {
 		t.Fatalf("one integer is a list of one: %v", v)
 	}
+	if v, _ := testSchema.Check(json.RawMessage(`{"item":"7"}`)); len(v.Strings("item")) != 1 {
+		t.Fatalf("one id is a list of one: %v", v)
+	}
+	if v, _ := testSchema.Check(json.RawMessage(`{"item":["7","8"]}`)); len(v.Strings("item")) != 2 {
+		t.Fatalf("ids: %v", v)
+	}
 	if v, bad := testSchema.Check(nil); bad != nil || len(v) != 0 {
 		t.Fatalf("no arguments: %v %v", v, bad)
 	}
@@ -42,7 +49,7 @@ func TestCheckRefusesInOrder(t *testing.T) {
 	for raw, want := range map[string]string{
 		`[]`:                  "arguments must be an object",
 		`{"zz":1,"repo":"x"}`: "repo must look like owner/name",
-		`{"zz":1}`:            "unknown argument zz; takes repo, pr, issue, fixes, anyone",
+		`{"zz":1}`:            "unknown argument zz; takes repo, pr, issue, fixes, item, anyone",
 		`{"pr":"3"}`:          "pr must be a positive integer",
 		`{"pr":0}`:            "pr must be a positive integer",
 		`{"issue":[]}`:        "issue must be a positive integer or a list of them",
@@ -50,6 +57,8 @@ func TestCheckRefusesInOrder(t *testing.T) {
 		`{"fixes":"#12"}`:     `fixes must be a list of issues, as "#12"`,
 		`{"anyone":null}`:     "anyone must be true or false",
 		`{"repo":7}`:          "repo must be a string",
+		`{"item":"x"}`:        "item must be an id, as 12, or a list of them",
+		`{"item":[]}`:         "item must be an id, as 12, or a list of them",
 	} {
 		_, bad := testSchema.Check(json.RawMessage(raw))
 		if bad == nil || bad.Code != -32602 || bad.Message != want {

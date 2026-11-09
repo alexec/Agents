@@ -34,8 +34,8 @@ async function setSecret(store: Store, name: string, value: string, replacing: U
 function SecretSheet({ store, replacing, close }: { store: Store; replacing: UserSecretRow | null; close: () => void }) {
   const name = useSignal(replacing?.name ?? "");
   const value = useSignal("");
-  // A person's secret starts off; a replaced one keeps its own.
-  const ask = useSignal(replacing?.needsApproval === true);
+  // A new secret starts on (#4162); a replaced one keeps its own.
+  const ask = useSignal(replacing ? replacing.needsApproval === true : true);
   const problem = useSignal<string | null>(null);
   const busy = useSignal(false);
   const save = async () => {
@@ -81,7 +81,8 @@ function CardSheet({ store, replacing, close }: { store: Store; replacing: UserS
   const holder = useSignal("");
   const zip = useSignal("");
   const locked = useSignal(false);
-  const ask = useSignal(replacing?.needsApproval === true);
+  // A new card starts on (#4162); a replaced one keeps its own.
+  const ask = useSignal(replacing ? replacing.needsApproval === true : true);
   const problem = useSignal<string | null>(null);
   const busy = useSignal(false);
   const save = async () => {

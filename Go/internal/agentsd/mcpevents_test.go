@@ -533,6 +533,14 @@ func TestUnnamedWaitWordsSayOnlyTheKeysTheServerOffers(t *testing.T) {
 	if w := unnamedWaitWords("issue.closed", map[string][]string{}, json.RawMessage(`{"properties":{"issue":{},"label":{},"any":{}}}`)); w != "Name the issue (`issue` or `label`), or set `any: true` to wake on every issue in the repo." {
 		t.Fatal(w)
 	}
+	// Azure DevOps names a build by its pipeline, not a workflow (#3821).
+	pipelines := json.RawMessage(`{"properties":{"pipeline":{},"branch":{},"run":{},"any":{}}}`)
+	if w := unnamedWaitWords("run.completed", map[string][]string{"pipeline": {"release"}}, pipelines); w != "" {
+		t.Fatal(w)
+	}
+	if w := unnamedWaitWords("run.completed", map[string][]string{}, pipelines); w != "Name the run (`run`, `branch` or `pipeline`), or set `any: true` to wake on every run in the repo." {
+		t.Fatal(w)
+	}
 	// A server that offers no any yet (a forge added since) waits as before.
 	if w := unnamedWaitWords("pr.merged", map[string][]string{}, json.RawMessage(`{"properties":{"pr":{}}}`)); w != "" {
 		t.Fatal(w)

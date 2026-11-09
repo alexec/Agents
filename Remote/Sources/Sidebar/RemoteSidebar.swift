@@ -31,6 +31,8 @@ struct RemoteSidebar: View {
     @AppStorage("showsActivity") private var showsStatus = true
     /// The Work group (#4004), open the first time.
     @AppStorage("showsWork") private var showsWork = true
+    /// Machines (#4034), open until folded, and kept so, as the window keeps it.
+    @AppStorage("showsMachines") private var showsMachines = true
     /// The smart groups turned off in Settings ▸ Sidebar (#846).
     @AppStorage(SidebarSmartRow.offDefaultsKey) private var smartOff = SidebarSmartRow.offAtFirst
     /// Settings (#846), opened from the sidebar's foot.
@@ -177,6 +179,18 @@ struct RemoteSidebar: View {
                     Text("Status")
                 }
 
+                // A row per machine (#4034), each its page, as the window's (#3973).
+                if !model.machines.isEmpty {
+                    Section(isExpanded: $showsMachines) {
+                        ForEach(model.machines, id: \.self) { host in
+                            RemoteMachineRow(host: host).tag(SidebarItem.machine(host))
+                        }
+                        NewMachineRow()
+                    } header: {
+                        Text("Machines")
+                    }
+                }
+
                 // Pinned, Needs You, Working, Unread: a group each across every folder
                 // and host (#495), headed and folding as a folder's is.
                 // A group turned off in Settings ▸ Sidebar is not drawn (#846).
@@ -204,8 +218,8 @@ struct RemoteSidebar: View {
             }
 
             // A server gone quiet greys its folders; this says why, once, as the window's
-            // sidebar foot does (#534).
-            let offline = servers.filter { model.hostIsOffline($0) }
+            // sidebar foot does (#534). Machines' rows say it while that group is open (#3764).
+            let offline = showsMachines && !model.machines.isEmpty ? [] : servers.filter { model.hostIsOffline($0) }
             if !offline.isEmpty {
                 Section {
                     ForEach(offline, id: \.self) { host in
@@ -260,6 +274,12 @@ struct RemoteSidebar: View {
         .background(Paper.sidebar)
         .toolbarBackground(Paper.sidebar, for: .navigationBar)
         .navigationTitle("Agents")
+        // Add Folder… and Clone Git URL… on a machine (#4036), as the window's File menu.
+        .toolbar {
+            if !model.needsPairing {
+                ToolbarItem(placement: .primaryAction) { NewFolderMenu() }
+            }
+        }
         .sheet(isPresented: $showsSettings) { RemoteSettings() }
         .searchable(text: Bindable(model).sidebarSearch, prompt: SessionSearchWords.prompt)
         .task(id: query) {
@@ -570,7 +590,9 @@ private struct RemoteCheckSuggestionRow: View {
 }
 
 /// One request to the person under Needs You (#3864), the window's `RequestListRow`: a tap
-/// opens the session that asked it, where its card takes the answer.
+/// opens the session that asked it, where its card takes the answer. A secret's use (#4017)
+/// has no card: Allow Once is a leading swipe, Deny a trailing one, and the long press has
+/// all its answers, as an approval's row has.
 private struct RemoteRequestRow: View {
     @Environment(RemoteModel.self) private var model
     let request: NeedRequest
@@ -580,7 +602,30 @@ private struct RemoteRequestRow: View {
         if let id = request.askedBy {
             RequestRowLabel(request: request, asker: model.work.agent(id)?.title, place: place)
                 .tag(SidebarItem.session(id))
+                .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                    if request.secretUse != nil {
+                        Button(NeedRequest.Action.once.word, systemImage: "checkmark") { answerNow(.once) }
+                            .tint(Paper.accent)
+                    }
+                }
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    if request.secretUse != nil {
+                        Button(NeedRequest.Action.deny.word, systemImage: "xmark") { answerNow(.deny) }
+                            .tint(StateTint.failure.color)
+                    }
+                }
+                .contextMenu {
+                    if let use = request.secretUse {
+                        ForEach(use.actions, id: \.self) { action in
+                            Button(action.word, role: action == .deny ? .destructive : nil) { answerNow(action) }
+                        }
+                    }
+                }
         }
+    }
+
+    private func answerNow(_ action: NeedRequest.Action) {
+        Task { await model.answerSecretUse(request, action) }
     }
 }
 

@@ -1,6 +1,7 @@
 // What the page holds and what each notification means: AgentsModel (Client/AgentsModel.swift),
 // ported by hand for the notifications the web remote hears and held to Fixtures/web/reducer
 // (research R7). Nothing here decides anything; the hosts do.
+import { answerElsewhere, approveSecretUse, type SecretUseAction, secretUseApprovalParams, secretUseSigns } from "./secretUse";
 import { preferencesSaid, sendPreferencesWith } from "./preferences";
 import { folderPath as hostedFolderPath, healthTally, personalServers } from "./hostedMCP";
 import type { ExportImportBusy } from "./exports";
@@ -17,10 +18,11 @@ import type {
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, DailySummarySettings, SummaryPage, SummaryPageText, DesktopControlSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
   PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, BudgetRequest, RemoveRequest, ClientPermissionSettings, PRCostComment,
-  Connection, LineageNode, LineageSessionIssue, MoveToMachineAnswer, ProblemReport, ProblemReportRequest, Request as PersonRequest, RequestUpdate } from "../protocol/generated";
+  Connection, LineageNode, LineageSessionIssue, MoveToMachineAnswer, ProblemReport, ProblemReportRequest, Request as PersonRequest, RequestSecretUse, LockDelivery, RequestUpdate, ProviderID, StartedMachinePreview, FoldersFindRequest, FoundFolder } from "../protocol/generated";
 import { endedConnections, endedLine, hasEnded } from "./connectorSetup";
 import { parseQuery } from "./labels";
 import { Failure } from "../protocol/generated";
+import { signRequest } from "../wire/lockChannel";
 import { CallFailed, type Link } from "../wire/link";
 import { sealWork } from "../wire/sealing";
 import type { FolderGoneAsk } from "./missingFolder";
@@ -1168,6 +1170,8 @@ export class Work {
   readonly hostsBeingStarted = signal<readonly string[]>([]);
   /** The machines New Machine is making (#3974), by name; "" while the control plane has not named it yet. */
   readonly machinesMaking = signal<readonly string[]>([]);
+  /** A New Machine the provider refused (#3979): its reason, with Try Again on the provider it asked. */
+  readonly makeFailed = signal<{ reason: string; provider: string | undefined } | null>(null);
 
   /** Prompts and starts the control plane keeps for a stopped workspace (#691 US3), every host's. */
   readonly kept = signal<readonly KeptRequest[]>([]);
@@ -2518,9 +2522,11 @@ export class Store extends Work {
     }
   }
 
-  /** New Machine (#3974): the default provider makes `machine-N` with its defaults, with no questions.
-   * Its row says Making until the machine joins; a make that fails says the provider's reason. */
-  async makeMachine(): Promise<void> {
+  /** New Machine (#3974): the default provider makes `machine-N` with the options used last on it, with no
+   * questions; New Machine on names another provider, which is then the default (#3979). Its row says Making
+   * until the machine joins; a make that fails says the provider's reason, with Try Again. */
+  async makeMachine(provider?: string): Promise<void> {
+    this.makeFailed.value = null;
     const making = "";
     this.machinesMaking.value = [...this.machinesMaking.value, making];
     const drop = (name: string) => {
@@ -2528,16 +2534,33 @@ export class Store extends Work {
       if (at >= 0) this.machinesMaking.value = this.machinesMaking.value.filter((_, i) => i !== at);
     };
     try {
-      const made = await this.link.call("providers/create", {});
+      const made = await this.link.call("providers/create", provider ? { id: provider as ProviderID } : {});
       drop(making);
-      if (made.workspace.state === "failed") { this.say(made.workspace.reason || `Could not make ${made.workspace.name}.`); return; }
+      if (made.workspace.state === "failed") {
+        this.makeFailed.value = { reason: made.workspace.reason || `Could not make ${made.workspace.name}.`, provider };
+        return;
+      }
       this.machinesMaking.value = [...this.machinesMaking.value, made.workspace.name];
       // A row is drawn for it until a machine of that name joins, or ten minutes at most.
       setTimeout(() => drop(made.workspace.name), 10 * 60_000);
     } catch (error) {
       drop(making);
+      this.makeFailed.value = { reason: describe(error), provider };
+    }
+  }
+
+  /** Check Again on a machine's row (#3979): the control plane asks it how it is now. */
+  async checkAgain(host: string): Promise<void> {
+    try {
+      await this.link.call("machines/checkAgain", { host: host as MachineRef });
+    } catch (error) {
       this.say(describe(error));
     }
+  }
+
+  /** Delete's question (#3979): the worktrees on the machine with work not pushed; null when it can't be asked. */
+  async deletePreview(host: string): Promise<StartedMachinePreview | null> {
+    return this.link.call("machines/deletePreview", { host: host as MachineRef }).catch(() => null);
   }
 
   /** Delete… on a machine a provider made (#3974): the provider deletes it, then the host goes as Remove does. */
@@ -2583,6 +2606,31 @@ export class Store extends Work {
     const summary = await this.act("folders/add", params, host);
     if (summary) this.upsertFolder(summary, host);
     return summary;
+  }
+
+  /** Where Choose Folders… looks on a machine (#4122), as the window's: the control plane's auto-detect paths, none with it off. */
+  async folderPaths(): Promise<string[]> {
+    const status = await this.link.call("control/status", {}).catch(() => null);
+    const detection = status?.folderDetection;
+    return detection?.enabled ? detection.paths : [];
+  }
+
+  /** The git repositories under `paths` on `host`, or the `folders` typed, as they stand there (#4122). It throws when the host can't be asked. */
+  findFolders(host: string, request: FoldersFindRequest): Promise<FoundFolder[]> {
+    return this.link.call("folders/find", request, host);
+  }
+
+  /** Choose Folders…' Add (#4122): each folder added on `host`; answers why each that failed was not, by folder. */
+  async addFolders(host: string, folders: readonly string[]): Promise<Record<string, string>> {
+    const failed: Record<string, string> = {};
+    for (const folder of folders) {
+      try {
+        this.upsertFolder(await this.link.call("folders/add", { folder: folder as never }, host), host);
+      } catch (error) {
+        failed[folder] = describe(error);
+      }
+    }
+    return failed;
   }
 
   /**
@@ -2676,6 +2724,25 @@ export class Store extends Work {
     }, host);
     this.upsertFolder(summary, host);
     return summary;
+  }
+
+  /**
+   * A person's answer to a secret's use (#4017), from its Needs you row: to the host that asked.
+   * From the row's menu, so a refusal is said in `problem`; `requests/changed` takes the row away.
+   */
+  async answerSecretUse(host: string, request: string, action: SecretUseAction, use?: RequestSecretUse): Promise<void> {
+    let approval: LockDelivery | undefined;
+    // A Linux machine opens the value only for an answer this page signed with its lock key (#4149).
+    if (use && secretUseSigns(use, action)) {
+      const source = await this.machineLock.signer();
+      if (!source) {
+        this.say(`Not sent — this machine opens the secret only for an answer your device signs, and this page is not in your lock. ${answerElsewhere}.`);
+        return;
+      }
+      const params = secretUseApprovalParams(request, use, action);
+      approval = { method: approveSecretUse, params, lock: await signRequest(source.signer, host, approveSecretUse, params) };
+    }
+    await this.act("requests/answer", { id: request as never, answer: { secretUse: approval ? { action, approval } : { action } } }, host);
   }
 
   /**

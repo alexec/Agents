@@ -12,7 +12,7 @@ public enum AskBeforeUseWords {
     /// Under the toggle when it is on.
     public static let on = "Only fill_secret, set_ci_secret and HTTP MCP servers can use it. It is not in $NAME or in a file."
     /// Under the toggle when it is off.
-    public static let off = "Every session on the machine can read it, as $NAME and from a file."
+    public static let off = "Every session on the machine can read it with no approval, as $NAME and from a file."
 
     public static func hint(_ isOn: Bool) -> String { isOn ? on : off }
 }

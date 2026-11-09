@@ -42,7 +42,7 @@ var (
 	// fixesProperty is the merge requests that close these issues (#3797): a lead knows a child's issue before its merge request.
 	fixesProperty = property{Name: "fixes", Kind: "refs",
 		Description: `Only merge requests whose description closes one of these issues, as "#12" (this project's) or "group/project#12".`,
-		Pattern:     issueRefPattern, LooksLike: `"#12" or "group/project#12"`}
+		Pattern:     issueRefPattern, LooksLike: `issues, as "#12" or "group/project#12"`}
 )
 
 // ownMRs is what every merge request event says of whose merge requests it raises.

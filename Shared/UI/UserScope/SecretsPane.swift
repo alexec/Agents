@@ -6,7 +6,8 @@ import SwiftUI
 /// draws the same in `Web/src/views/UserScope.tsx`. A card (#3531) is a secret of its own kind.
 /// Ask before use (#4016) is sealed with the value, so it is set on Add and Replace, which seal it
 /// again: no client can read a value back to seal it with a new flag.
-/// `extra` is what a client draws after them: the window's secrets for one session (#3548).
+/// `extra` is what a client draws after them: the Mac's secrets for one session (#3548). The window
+/// and the Remote (#4032) draw it.
 struct SecretsPane<Extra: View>: View {
     /// The control plane, or nil while it cannot be reached.
     let control: DaemonClient?
@@ -49,13 +50,13 @@ struct SecretsPane<Extra: View>: View {
         .task(id: control != nil) { await state.load(control) }
         .refreshable { await state.load(control) }
         .sheet(isPresented: $isAdding) {
-            SecretSheet(name: nil, asks: false) { name, value, ask in
+            SecretSheet(name: nil, asks: true) { name, value, ask in
                 await state.setSecret(name, value: value, askBeforeUse: ask, on: control)
             }
             .paperSheet()
         }
         .sheet(isPresented: $isAddingCard) {
-            CardSheet(name: nil, asks: false) { name, value, ask in
+            CardSheet(name: nil, asks: true) { name, value, ask in
                 await state.setSecret(name, value: value, kind: CardSecret.kind, askBeforeUse: ask, on: control)
             }
             .paperSheet()
@@ -151,7 +152,7 @@ private struct SecretSheet: View {
     @State private var problem: String?
     @State private var saving = false
 
-    /// `asks`: Ask before use as the toggle starts: the replaced secret's, off for a new one.
+    /// `asks`: Ask before use as the toggle starts: the replaced secret's, on for a new one (#4162).
     init(name: String?, asks: Bool, save: @escaping (String, String, Bool) async -> String?) {
         self.name = name
         self.save = save
@@ -195,7 +196,9 @@ private struct SecretSheet: View {
             .rowButtons()
         }
         .paperForm()
+        #if os(macOS)
         .frame(minWidth: 360)
+        #endif
         .onDisappear { value = "" }
     }
 }
@@ -220,7 +223,7 @@ private struct CardSheet: View {
     @State private var problem: String?
     @State private var saving = false
 
-    /// `asks`: Ask before use as the toggle starts: the replaced card's, off for a new one.
+    /// `asks`: Ask before use as the toggle starts: the replaced card's, on for a new one (#4162).
     init(name: String?, asks: Bool, save: @escaping (String, String, Bool) async -> String?) {
         self.name = name
         self.save = save
@@ -282,7 +285,9 @@ private struct CardSheet: View {
             .rowButtons()
         }
         .paperForm()
+        #if os(macOS)
         .frame(minWidth: 400)
+        #endif
         .onDisappear { number = ""; cvc = "" }
     }
 }

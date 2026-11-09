@@ -49,6 +49,7 @@ func (p *Providers) record(id string) (ProviderRecord, bool) {
 // of their groups, with only the workspaces of their own machines and those on none.
 func (p *Providers) SummariesFor(person string) []ProviderSummary {
 	admin := p.isAdmin(person)
+	chosen := p.defaultProvider(person)
 	out := []ProviderSummary{}
 	for _, s := range p.Summaries() {
 		r, ok := p.record(string(s.ID))
@@ -57,6 +58,9 @@ func (p *Providers) SummariesFor(person string) []ProviderSummary {
 		}
 		mayUse := p.MayUse(person, r)
 		s.MayUse = &mayUse
+		if string(s.ID) == chosen {
+			s.Default = new(true)
+		}
 		if !admin && p.hooks.OwnerOf != nil {
 			mine := []MachineInfo{}
 			for _, w := range s.Workspaces {

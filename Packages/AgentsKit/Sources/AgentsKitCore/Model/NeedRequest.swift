@@ -83,16 +83,89 @@ public struct NeedRequest: Codable, Sendable, Hashable, Identifiable {
         }
     }
 
-    /// The grey line after the kind: the asker, and how many it blocks when more than one.
+    /// The grey line after the kind: the asker, and how many it blocks when more than one. A
+    /// secret's use (#4017) says the asker and where the value goes: its title says what is asked.
     public func line(asker: String?) -> String {
-        [kindWord, asker, blocks > 1 ? "blocks \(blocks) sessions" : nil]
+        let parts: [String?] = secretUse.map { [asker, $0.where] } ?? [kindWord, asker]
+        return (parts + [blocks > 1 ? "blocks \(blocks) sessions" : nil])
             .compactMap { $0 }.joined(separator: " · ")
+    }
+
+    /// The row's title: what is asked. A secret's use (#4017) names the secret first, as its
+    /// banner does, so a narrow sidebar cuts the place and not the name.
+    public func title(asker: String?) -> String {
+        secretUse.map { "Wants to use \($0.name)" } ?? title
+    }
+
+    /// A use of a secret with Ask before use (#4015): its detail, when it is one.
+    public var secretUse: SecretUse? {
+        guard source == "secretUse", let use = try? detail["secretUse"]?.decode(SecretUse.self) else { return nil }
+        return use
+    }
+
+    /// The wire's `RequestSecretUse`: the secret's name, never its value, and where agentsd
+    /// puts the value.
+    public struct SecretUse: Codable, Sendable, Hashable {
+        /// fill (fill_secret), ci (set_ci_secret) or mcp (an HTTP MCP server's header, #4120).
+        public var use: String
+        public var name: String
+        /// The page's domain for a fill, owner/repo for CI, the server's name for MCP.
+        public var place: String
+        /// The session's own secret (#3548): Allow always is the same as Allow for this session.
+        public var sessionOnly: Bool?
+        /// A Linux machine (#4058): an answer that allows the use goes signed with this
+        /// device's lock key (`LockChannel.secretUseApproval`), or the machine refuses it.
+        public var needsSignature: Bool?
+
+        public init(name: String, use: String, place: String, sessionOnly: Bool? = nil, needsSignature: Bool? = nil) {
+            self.name = name
+            self.use = use
+            self.place = place
+            self.sessionOnly = sessionOnly
+            self.needsSignature = needsSignature
+        }
+
+        /// Whether `action` goes signed: it allows the use, on a machine that asks for a signature.
+        public func signs(_ action: Action) -> Bool {
+            needsSignature == true && action != .deny
+        }
+
+        /// Where the value goes, as the row's grey line says it.
+        public var `where`: String {
+            switch use {
+            case "ci": "CI secret in \(place)"
+            case "mcp": "MCP server \(place)"
+            default: "Fill on \(place)"
+            }
+        }
+
+        /// The answers a person can give, in the order the row and the banner show them.
+        public var actions: [Action] {
+            sessionOnly == true ? [.once, .session, .deny] : Action.allCases
+        }
+    }
+
+    /// The wire's `RequestSecretUseAnswer.action`.
+    public enum Action: String, Codable, Sendable, CaseIterable {
+        case once, session, always, deny
+
+        /// The words on the row's menu, its swipes and the banner's buttons.
+        public var word: String {
+            switch self {
+            case .once: "Allow Once"
+            case .session: "Allow for This Session"
+            case .always: "Allow Always"
+            case .deny: "Deny"
+            }
+        }
     }
 }
 
 public extension DaemonAPI.Method {
     /// The open requests to a person (#3863), every folder's.
     static let requestsList = "requests/list"
+    /// A person's answer to a request (#3863): today the clients send only a secret's use (#4017).
+    static let requestsAnswer = "requests/answer"
 }
 
 public extension DaemonAPI.Notification {
@@ -114,6 +187,28 @@ public extension DaemonAPI {
 
     struct RequestsListResult: Codable, Sendable, Hashable {
         public var requests: [NeedRequest]
+    }
+
+    /// `requests/answer`'s params: the answer to a secret's use (#4017).
+    struct RequestsAnswer: Codable, Sendable, Hashable {
+        public struct Answer: Codable, Sendable, Hashable {
+            public struct SecretUse: Codable, Sendable, Hashable {
+                public var action: NeedRequest.Action
+                /// The answer signed with this device's lock key, for a request that says
+                /// needsSignature (#4058).
+                public var approval: LockDelivery?
+            }
+
+            public var secretUse: SecretUse?
+        }
+
+        public var id: UUID
+        public var answer: Answer
+
+        public init(id: UUID, secretUse action: NeedRequest.Action, approval: LockDelivery? = nil) {
+            self.id = id
+            answer = Answer(secretUse: .init(action: action, approval: approval))
+        }
     }
 
     /// `requests/changed`'s params, and what `requests/answer` and `requests/drop` answer.

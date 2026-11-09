@@ -109,7 +109,7 @@ export const providerWords = {
   editSecret: "Leave empty to keep the one it has.",
   removeTitle: (name: string) => `Remove ${name}?`,
   removeNote: "Its machines stay as they are, unlinked: nothing here can start or stop them any more.",
-  noHosts: "No machine to link: add one in Settings ▸ Machines, with Add a Machine…, or start one from a repository.",
+  noHosts: "No machine to link: add one with Add a Machine… in the sidebar’s Machines menu, or start one from a repository.",
   notAHostYet: "Not joined yet, and it gives no ssh destination: add it with the command from Add a Machine…, then Link to Machine….",
   addAsMachine: "Add as Machine…",
   addAsMachineHelp: "Installs Agents on it over ssh, and links the machine to it.",

@@ -226,7 +226,7 @@ handover also leaves out `v1/keys/` (`storecopy.go:21,25`).
 | `v1/runs/<day>/<hash>.json` | Workflow trigger claims | 7 days; **no per-day cap** | hourly |
 | `v1/reports/views/<user>.json` | Saved report views | 50 | person removal |
 | `v1/providers/<id>.json` | Machine providers | **No cap. Tombstones are never swept.** | — |
-| `v1/machine-names/<person>.json` | The person's machine-N counter (#3972) | 1 per person, one number | — (a number is never used again) |
+| `v1/machine-names/<person>.json` | The person's machine-N counter (#3972), the provider New Machine uses and the options used last on each provider (#3979) | 1 per person: one number, one provider id, one set of options per provider | — (a number is never used again) |
 | `v1/tunnels/<id>.json` | Server reverse tunnels | unjoined 15 minutes | on use |
 | `v1/policy.json`, `v1/policy/versions/` | Org policy and old versions | 64 KiB; 100 versions | on write |
 | `v1/governance/machines/`, `v1/governance/approvals/` | Installed servers and skills; approvals | 500 items; 1,000 approvals, **no expiry** | — |

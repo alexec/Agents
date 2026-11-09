@@ -337,6 +337,15 @@ func (d *Daemon) marketplacesList(kind *wire.CatalogKind, dest *wire.SkillDestin
 	// so nothing is searched, previewed or added from it.
 	listed := slices.DeleteFunc(skillcatalog.ListMarketplaces(kind, personal, folder, secrets.IsSet, os.Getenv),
 		func(m wire.Marketplace) bool { return !d.marketplaceAllowed(m.ID, m.URL) })
+	// A token with Ask before use is not a marketplace's (#4120): only fill_secret,
+	// set_ci_secret and an http MCP server use one, for a session a person approves.
+	for _, m := range listed {
+		if problem == nil && m.Token != nil && m.TokenMissing && home != "" && isSealedSecret(home, *m.Token) {
+			s := *m.Token + " has Ask before use, so the marketplace " + m.Name + " does not use it: a person approves each use for a session, " +
+				"and a search has none. Turn Ask before use off for " + *m.Token + " in Settings ▸ Secrets to use it here."
+			problem = &s
+		}
+	}
 	return wire.MarketplacesListAnswer{Marketplaces: listed, Problem: problem}
 }
 

@@ -18,10 +18,14 @@ import (
 // draft (experimental-ext-triggers-events), which the Agents daemon speaks. A work item is the
 // event's issue, and its tags are its labels.
 
-// issueID is a work item's id as the issue argument gives it (its pattern makes it one).
-func issueID(text string) int {
-	id, _ := strconv.Atoi(text)
-	return id
+// issueIDs are work items' ids as the issue argument gives them (its pattern makes each one).
+func issueIDs(texts []string) []int {
+	var ids []int
+	for _, text := range texts {
+		id, _ := strconv.Atoi(text)
+		ids = append(ids, id)
+	}
+	return ids
 }
 
 // rpcError is a JSON-RPC error answer: its code, message and optional data.
@@ -41,8 +45,21 @@ type schema = mcpevents.Schema
 // args are an event's checked arguments.
 type args struct {
 	area, kind, label string
-	issue             int
-	anyone            bool
+	issues            []int
+	anyone, all       bool
+}
+
+// wantsIssue is whether the work item with id n is one asked for: any, when none is.
+func (a args) wantsIssue(n int) bool {
+	if len(a.issues) == 0 {
+		return true
+	}
+	for _, i := range a.issues {
+		if i == n {
+			return true
+		}
+	}
+	return false
 }
 
 // check reads raw (null or missing as {}) and checks it: no unknown keys, types, shapes.
@@ -51,7 +68,7 @@ func check(s schema, raw json.RawMessage) (args, *rpcError) {
 	if bad != nil {
 		return args{}, bad
 	}
-	return args{area: strings.TrimSuffix(v.String("area"), `\`), kind: v.String("type"), label: v.String("label"), issue: issueID(v.String("issue")), anyone: v.Bool("anyone")}, nil
+	return args{area: strings.TrimSuffix(v.String("area"), `\`), kind: v.String("type"), label: v.String("label"), issues: issueIDs(v.Strings("issue")), anyone: v.Bool("anyone"), all: v.Bool("any")}, nil
 }
 
 // event is one event as events/list gives it, and the kind of activity it reads.
@@ -64,11 +81,14 @@ var (
 	areaProperty = property{Name: "area", Kind: "string",
 		Description: `Only work items in this area path or under it, as Web App\Team. Left out, every area of the project.`}
 	typeProperty  = property{Name: "type", Kind: "string", Description: "Only work items of this type, as Bug or User Story."}
-	issueProperty = property{Name: "issue", Kind: "string", Description: "Only this work item, by its id, as 12.",
+	issueProperty = property{Name: "issue", Kind: "ids", Description: `Only this work item, or these, by its id, as "12" or ["12", "13"].`,
 		Pattern: regexp.MustCompile(`^[1-9][0-9]{0,9}$`), LooksLike: "a work item's id, as 12"}
 	// anyoneProperty opts into anyone's work item, comment or tag (#728); left out, only people.
 	anyoneProperty = property{Name: "anyone", Kind: "boolean",
 		Description: "true: by anyone, build services and other bots too. Left out, only people, never a bot."}
+	// anyProperty is every work item in the project (#3797): a wait that names none sets it.
+	anyProperty = property{Name: "any", Kind: "boolean",
+		Description: "true: every work item in the project. A wait (not a workflow trigger) that names none, by issue or label, is refused without it. It is about which ones; anyone is about who."}
 )
 
 func object(props map[string]any) map[string]any {
@@ -103,7 +123,7 @@ var events = func() []event {
 	out := make([]event, len(kinds))
 	for i, k := range kinds {
 		label := property{Name: "label", Kind: "string", Description: k.label}
-		input := schema{areaProperty, typeProperty, label, issueProperty, anyoneProperty}
+		input := schema{areaProperty, typeProperty, label, issueProperty, anyoneProperty, anyProperty}
 		if k.kind == Opened {
 			input = schema{areaProperty, typeProperty, label, anyoneProperty}
 		}
@@ -200,7 +220,7 @@ func (s *Events) candidates(ctx context.Context, e event, a args, since string) 
 		if a.kind != "" && !strings.EqualFold(w.Type, a.kind) {
 			continue
 		}
-		if a.issue != 0 && w.ID != a.issue {
+		if !a.wantsIssue(w.ID) {
 			continue
 		}
 		// Assigned to the token's owner is theirs, by anyone (#2034).

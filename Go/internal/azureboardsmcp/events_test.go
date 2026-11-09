@@ -3,6 +3,7 @@ package azureboardsmcp
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -215,6 +216,38 @@ func TestAreaTypeLabelAndIssueNarrow(t *testing.T) {
 	same(t, ids, []string{"issue.commented:12/81"})
 }
 
+// A lead waits on all its open children at once (#3797).
+func TestIssueTakesAList(t *testing.T) {
+	f := newFake(t)
+	both := newPoller(t, f, "issue.commented", map[string]any{"issue": []any{"11", "13"}, "any": true})
+	both.poll(0)
+	f.item(11, "One", "Bug", "New", alex, 1, nil)
+	f.item(12, "Two", "Bug", "New", alex, 2, nil)
+	f.item(13, "Three", "Bug", "New", alex, 3, nil)
+	f.comment(11, 82, alex, 7, "on 11")
+	f.comment(12, 83, alex, 8, "on 12")
+	f.comment(13, 84, alex, 9, "on 13")
+	ids, _ := both.poll(0)
+	same(t, ids, []string{"issue.commented:11/82", "issue.commented:13/84"})
+}
+
+// #3797: issue.closed, issue.commented and issue.labelled take any and a list of issues; the
+// others take neither.
+func TestEventsListGivesWhichArgumentsNameOne(t *testing.T) {
+	for _, e := range eventsList()["events"].([]any) {
+		e := e.(map[string]any)
+		name := e["name"].(string)
+		props := e["inputSchema"].(map[string]any)["properties"].(map[string]any)
+		named := name == "issue.closed" || name == "issue.commented" || name == "issue.labelled"
+		if _, hasAny := props["any"]; hasAny != named {
+			t.Fatalf("%s: any %v", name, hasAny)
+		}
+		if issue, ok := props["issue"].(map[string]any); ok && fmt.Sprint(issue["type"]) != "[string array]" {
+			t.Fatalf("%s: issue %v", name, issue)
+		}
+	}
+}
+
 func TestEventsAtOneTimeAreNeitherLostNorRaisedTwice(t *testing.T) {
 	f := newFake(t)
 	p := newPoller(t, f, "issue.opened", nil)
@@ -239,7 +272,10 @@ func TestArgumentsAreChecked(t *testing.T) {
 		{`{"name":"issue.reopened"}`, "no event issue.reopened"},
 		{`{"name":"issue.opened","arguments":{"project":"Web"}}`, "unknown argument project; takes area, type, label, anyone"},
 		{`{"name":"issue.opened","arguments":{"issue":"1"}}`, "unknown argument issue"},
-		{`{"name":"issue.labelled","arguments":{"issue":"ENG-1"}}`, "issue must look like a work item's id"},
+		{`{"name":"issue.labelled","arguments":{"issue":"ENG-1"}}`, "issue must be a work item's id, as 12, or a list of them"},
+		{`{"name":"issue.closed","arguments":{"issue":[]}}`, "issue must be a work item's id, as 12, or a list of them"},
+		{`{"name":"issue.closed","arguments":{"issue":12}}`, "issue must be a work item's id, as 12, or a list of them"},
+		{`{"name":"issue.closed","arguments":{"any":"yes"}}`, "any must be true or false"},
 		{`{"name":"issue.assigned","arguments":{"label":"x"}}`, "unknown argument label"},
 		{`{"name":"issue.closed","arguments":{"anyone":"yes"}}`, "anyone must be true or false"},
 		{`{"name":"issue.closed","cursor":"nope"}`, "cursor is not one this server gave"},

@@ -24,7 +24,8 @@ import (
 // The person's and the folder's MCP servers, as SessionServers hands them to a session on
 // the Swift host: <home>/.agents/mcp.json and <folder>/.agents/mcp.json, read afresh each
 // session; ${NAME} filled from <home>/.agents-secrets/secrets.env, a server still missing
-// one left out; a folder's server only once the person approved it as it stands
+// one left out (an http one's flagged ${NAME} goes through agentsd, secretproxy.go); a
+// folder's server only once the person approved it as it stands
 // (<root>/mcp-approvals.json), every entry there at the first start approved. The app's
 // own server goes first, then the folder's, then the person's; the first of a name wins.
 
@@ -34,6 +35,9 @@ type mcpEntry struct {
 	raw    json.RawMessage
 	kind   wire.MCPTransportName
 	hosted bool
+	// flagged is the ${NAME}s with Ask before use an http server's url and headers keep
+	// unfilled: agentsd fills them on each request (secretproxy.go, #4120).
+	flagged []string
 }
 
 type mcpBook struct {
@@ -204,6 +208,26 @@ func fill(text string, secrets map[string]string, missing *[]string) string {
 	})
 }
 
+// filledServerFlagged is filledServer, an http server's ${NAME} that flagged says has Ask
+// before use kept as it is (#4120), and those names. A stdio or sse server with one is
+// missing it.
+func filledServerFlagged(s sdk.McpServer, secrets map[string]string, flagged func(string) bool) (out sdk.McpServer, missing, names []string) {
+	if s.Http != nil && flagged != nil {
+		flaggedNames(s.Http.Url, flagged, &names)
+		for _, h := range s.Http.Headers {
+			flaggedNames(h.Value, flagged, &names)
+		}
+		if len(names) > 0 {
+			secrets = maps.Clone(secrets)
+			for _, n := range names {
+				secrets[n] = "${" + n + "}"
+			}
+		}
+	}
+	out, missing = filledServer(s, secrets)
+	return out, missing, names
+}
+
 func filledServer(s sdk.McpServer, secrets map[string]string) (sdk.McpServer, []string) {
 	var missing []string
 	switch {
@@ -320,7 +344,7 @@ func (d *Daemon) mcpApprovalsLocked() (approved map[string]string, begun, unread
 
 // folderServers is folderContribution: approved entries, with secrets filled; the names
 // waiting and those missing a secret.
-func (d *Daemon) folderMCP(folder string, secrets map[string]string) (servers []mcpEntry, waiting, missing []string, problem string) {
+func (d *Daemon) folderMCP(folder string, secrets map[string]string, flagged func(string) bool) (servers []mcpEntry, waiting, missing []string, problem string) {
 	entries, problem := readMCPFile(filepath.Join(folder, ".agents", "mcp.json"))
 	d.mcpMu.Lock()
 	approved, _, _ := d.mcpApprovalsLocked()
@@ -330,32 +354,32 @@ func (d *Daemon) folderMCP(folder string, secrets map[string]string) (servers []
 			waiting = append(waiting, e.name)
 			continue
 		}
-		s, gone := filledServer(e.server, secrets)
+		s, gone, names := filledServerFlagged(e.server, secrets, flagged)
 		if len(gone) > 0 {
 			missing = append(missing, e.name)
 			log.Printf("session servers: %s left out: missing secret %s", e.name, strings.Join(gone, ", "))
 			continue
 		}
-		e.server = s
+		e.server, e.flagged = s, names
 		servers = append(servers, e)
 	}
 	return
 }
 
-func (d *Daemon) personalMCP(secrets map[string]string) (servers []mcpEntry, missing []string, problem string) {
+func (d *Daemon) personalMCP(secrets map[string]string, flagged func(string) bool) (servers []mcpEntry, missing []string, problem string) {
 	home := d.personalHome()
 	if home == "" {
 		return nil, nil, ""
 	}
 	entries, problem := readMCPFile(filepath.Join(home, ".agents", "mcp.json"))
 	for _, e := range entries {
-		s, gone := filledServer(e.server, secrets)
+		s, gone, names := filledServerFlagged(e.server, secrets, flagged)
 		if len(gone) > 0 {
 			missing = append(missing, e.name)
 			log.Printf("session servers: %s left out: missing secret %s", e.name, strings.Join(gone, ", "))
 			continue
 		}
-		e.server = s
+		e.server, e.flagged = s, names
 		servers = append(servers, e)
 	}
 	return
@@ -380,12 +404,18 @@ func (d *Daemon) sessionMCP(folder string) []sdk.McpServer {
 }
 
 // sessionEntries is sessionMCP's servers, signed in, with the file each came from. An
-// agent's own secrets for this session only (#3548) fill its ${NAME} first.
+// agent's own secrets for this session only (#3548) fill its ${NAME} first. For an agent,
+// an http server's ${NAME} with Ask before use stays for agentsd to fill (secretproxy.go);
+// with no agent, its server is left out.
 func (d *Daemon) sessionEntries(folder string, agent wire.UUID) []sessionEntry {
 	secrets := d.secrets()
 	maps.Copy(secrets, d.sessionSecretValues(agent))
-	folderEntries, _, _, _ := d.folderMCP(folder, secrets)
-	personal, _, _ := d.personalMCP(secrets)
+	var flagged func(string) bool
+	if agent != "" {
+		flagged = func(name string) bool { return d.secretIsSealed(agent, name) }
+	}
+	folderEntries, _, _, _ := d.folderMCP(folder, secrets, flagged)
+	personal, _, _ := d.personalMCP(secrets, flagged)
 	var out []sessionEntry
 	seen := map[string]bool{appServerName: true}
 	f := folder

@@ -47,7 +47,7 @@ func (d *Daemon) askSecret(id wire.UUID, args map[string]json.RawMessage) (strin
 		return "", err
 	}
 	path := skillcatalog.SecretsPath(home)
-	sessionOnly, ask := true, true
+	sessionOnly, ask := true, d.keepsFlagged()
 	secret := wire.ElicitationSecret{Name: name, IsSet: skillcatalog.LoadSecrets(path).IsSet(name) || isSealedSecret(home, name),
 		CanBeSessionOnly: &sessionOnly, CanAskBeforeUse: &ask}
 	if u := strings.TrimSpace(argString(args, "url")); strings.HasPrefix(u, "https://") || strings.HasPrefix(u, "http://") {
@@ -75,7 +75,9 @@ func (d *Daemon) secretNote(agent wire.UUID, name string, action wire.AnswerElic
 	case wire.AnswerElicitationRequestActionAccept:
 		if d.secretIsSealed(agent, name) {
 			return name + " is saved with Ask before use: it is sealed on this machine, and it is not in your environment " +
-				"or in a file you can read. Use it with fill_secret or set_ci_secret, which put it where it goes for you. " +
+				"or in a file you can read. Use it with fill_secret or set_ci_secret, which put it where it goes for you, " +
+				"or as ${" + name + "} in the url or a header of an http server in .agents/mcp.json, which agentsd fills on each request from your next start; " +
+				"a stdio server never gets it. " +
 				"A person approves each use: the call waits for them, or tells you which request to wait on with wait_for_event."
 		}
 		if _, ok, _ := d.sessionSecret(agent, name); ok {
@@ -114,7 +116,8 @@ func askedSessionOnly(content map[string]wire.JSONValue) bool {
 
 // askedNeedsApproval is Ask before use for a typed answer (#4014): on, as for every secret an
 // agent adds, unless the person turned it off on the card (#4016), which only a person's
-// client answers.
+// client answers. A machine that cannot keep one (keepsFlagged) offered no toggle, so the
+// value is kept without the flag.
 func askedNeedsApproval(content map[string]wire.JSONValue) bool {
 	b, set := value(content[needsApprovalField]).(bool)
 	return !set || b
@@ -131,7 +134,7 @@ func (d *Daemon) saveAskedSecret(agent wire.UUID, s wire.ElicitationSecret, cont
 	if strings.ContainsAny(v, "\n\r\x00") {
 		return Invalid("%s has to be one line.", s.Name)
 	}
-	ask := askedNeedsApproval(content)
+	ask := askedNeedsApproval(content) && d.keepsFlagged()
 	if askedSessionOnly(content) {
 		return d.setSessionSecret(agent, s.Name, v, ask)
 	}

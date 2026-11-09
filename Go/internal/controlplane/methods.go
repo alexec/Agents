@@ -99,6 +99,7 @@ var own = methodSet(
 	"groups/setRole",
 	"machines/approveJoin",
 	"machines/checkAgain",
+	"machines/deletePreview",
 	"machines/denyJoin",
 	"machines/detect",
 	"machines/install",
@@ -629,6 +630,21 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 			return nil, fail(noSuchHost, "No machine is called %s.", host)
 		}
 		return map[string]any{}, nil
+	case "machines/deletePreview":
+		// Delete's question (#3979): the worktrees on the machine with work not pushed.
+		request, err := require[wire.MachineRequest](params, "MachineRequest")
+		if err != nil {
+			return nil, err
+		}
+		host, err := m.ownHostNamed(from, string(request.Host))
+		if err != nil {
+			return nil, err
+		}
+		h := m.records.Host(host)
+		if h == nil {
+			return nil, fail(noSuchHost, "No machine is called %s.", host)
+		}
+		return m.unpushedOn(*h, from), nil
 	case "machines/lastHeard":
 		request, err := require[wire.MachineRequest](params, "MachineRequest")
 		if err != nil {
@@ -1160,6 +1176,8 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 		return map[string]any{}, nil
 	case "machine/lockAdd", "machine/lockAgain", "machine/lockJoin", "machine/lockJoinReveal":
 		return m.hostLockMethod(ctx, host, method, params)
+	case wire.CallMachineSecretKey.Name, wire.CallMachineSecretRelease.Name:
+		return m.secretReleaseMethod(ctx, host, method, params)
 	case "attention/turn":
 		turn, err := require[wire.AttentionTurn](params, "AttentionTurn")
 		if err != nil {

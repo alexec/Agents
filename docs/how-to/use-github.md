@@ -77,6 +77,22 @@ session's runtime ends; no token is in the environment or in a file. In a folder
 does not reach, and with a personal access token, the agent's `gh` and `git` use your own
 login, as before. A push over SSH always uses your own key.
 
+GitHub lets the App's user token do only what the `agents-loops` App's install may do (#4077).
+When the App may not do a thing that you may do, your own login does it:
+
+- When GitHub refuses the agent's `gh` with "Resource not accessible by integration" (for
+  example, `gh run rerun` needs the App's **Actions** permission to be read and write), the
+  agent's `gh` runs the command again once, with your own `gh` login, and says so. It does
+  not run it again when the first run printed a result or read its input from stdin.
+- When the App's install on the repository's owner may not write code (its **Contents**
+  permission is not read and write), `agentsd credential` gives git no token, and git asks
+  your own `gh auth git-credential` next. Git also asks it when the host does not know the
+  session's grant, for example after the host restarted.
+
+To make the agents' posts show the App's badge for these too, give the `agents-loops` App
+**Contents**, **Pull requests** and **Actions** read and write on github.com, and accept the
+new permissions on its install.
+
 The App and the bot have no Workflows permission, so GitHub refuses their push of a change to
 `.github/workflows/`. Push such a change from your own terminal.
 

@@ -329,7 +329,7 @@ enum ProjectSettingsWords {
     }
 
     static let addOnAnotherMachine = "Add on Another Machine…"
-    static let noOtherMachine = "Every machine you have has a folder of this project. Add a machine in Settings ▸ Machines first."
+    static let noOtherMachine = "Every machine you have has a folder of this project. Add a machine under Machines in the sidebar first."
     static let notConnected = "not connected to this Mac"
     static let noControlPlane = "Connect to a control plane to see the project's folders on your other machines."
 

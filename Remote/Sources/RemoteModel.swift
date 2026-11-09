@@ -332,6 +332,9 @@ final class RemoteModel {
     var workHistory = LineageHistory<WorkPlace>()
     /// Each Work list's filters, sort and rows (#3257), so a page goes through its list and Back finds it as left.
     let workLists = WorkLists()
+    /// The person's settings and the names of their secrets (#1760), for Settings ▸ You ▸ Secrets
+    /// (#4032), fed from the control plane's watch.
+    let userScope = UserScopeState()
     /// What `control/status` last said: its version and capabilities, for Settings (#1748).
     private(set) var controlStatus: DaemonAPI.ControlStatus?
 
@@ -341,6 +344,8 @@ final class RemoteModel {
         // and each line wrapped for it, as every other client's is (#3234).
         let lock = lock
         client = DaemonClient(link: LockedLink(HomeLink(link), host: .mac) { await lock.channelSigner() })
+        // A secret is sealed only to the machines the lock names (#3491, D8).
+        userScope.lock = lock
         files = RemoteFiles(client: client)
         pictures = PhonePictures(files: files)
         // From the start, not once connected: a banner tapped to launch or wake the app
@@ -657,11 +662,13 @@ final class RemoteModel {
                 openWorkflow = nil
                 openReview = nil
                 openArchive = true
+            case .machine:
+                // A machine's page (#4034), as the window's Machines group opens it.
+                openActivity = newValue
             case .multiplier, .spending, .tokens, .time,
-                 .folderMCPServers, .docs, .machine:
-                // Usage, a folder's connectors, Docs and a machine's page are Mac + web
-                // (#2798, #3321, #3626), and the Multiplier page the Mac's (#3986):
-                // the Remote opens none of them.
+                 .folderMCPServers, .docs:
+                // Usage, a folder's connectors and Docs are Mac + web (#2798, #3321), and
+                // the Multiplier page the Mac's (#3986): the Remote opens none of them.
                 break
             }
         }
@@ -1339,6 +1346,51 @@ final class RemoteModel {
                                                       returning: DailySummarySettings.self)
     }
 
+    // MARK: Secrets for one session (#3548, #4032), on the Mac's host
+
+    func sessionSecrets() async -> SessionSecrets? {
+        try? await client.call(DaemonAPI.Method.secretsSessionList, DaemonAPI.Empty(), returning: SessionSecrets.self)
+    }
+
+    func setSessionSecret(_ request: SessionSecretSetRequest) async -> Result<SessionSecrets, Error> {
+        do {
+            return .success(try await client.call(DaemonAPI.Method.secretsSessionSet, request, returning: SessionSecrets.self))
+        } catch {
+            return .failure(error)
+        }
+    }
+
+    var sessionHostAsksBeforeUse: Bool { host(.mac, has: Capability.hostSecretApproval1) }
+
+    func setSessionSecretAsksBeforeUse(_ secret: SessionSecret, _ on: Bool) async -> Result<SessionSecrets?, Error> {
+        do {
+            _ = try await client.call(DaemonAPI.Method.secretsSetNeedsApproval,
+                                      SecretNeedsApprovalRequest(name: secret.name, agentID: secret.agentID, needsApproval: on),
+                                      returning: DaemonAPI.Empty.self)
+            return .success(await sessionSecrets())
+        } catch {
+            return .failure(error)
+        }
+    }
+
+    /// Take a session's secret out now: its agent is told it expired.
+    func removeSessionSecret(_ secret: SessionSecret) async -> SessionSecrets? {
+        do {
+            return try await client.call(DaemonAPI.Method.secretsSessionRemove,
+                                         SessionSecretRemoveRequest(agentID: secret.agentID, name: secret.name),
+                                         returning: SessionSecrets.self)
+        } catch {
+            problem = sentence(for: error)
+            return nil
+        }
+    }
+
+    /// The Mac's sessions that can take a secret for one session: not archived, latest first.
+    var sessionsForSecrets: [Agent] {
+        work.agents.filter { $0.host == .mac && $0.state != .archived }
+            .sorted { $0.lastActivityAt > $1.lastActivityAt }
+    }
+
     /// The daily summary's saved pages (#3721), from the Mac's host.
     func refreshSummaryPages() async {
         summaryPages = (try? await client.call(DaemonAPI.Method.summariesList, DaemonAPI.Empty(),
@@ -1924,6 +1976,35 @@ final class RemoteModel {
         if let why = await answerApproval(approval, action, digest: approval.digest, note: nil, for: key) { problem = why }
     }
 
+    /// A person's answer to a secret's use (#4017), from its Needs you row or its banner: to
+    /// the host of the session that asked. Whether it went; why not is the problem.
+    @discardableResult
+    func answerSecretUse(_ request: NeedRequest, _ action: NeedRequest.Action) async -> Bool {
+        let host = request.askedBy.flatMap { work.agent($0)?.host } ?? .mac
+        var approval: DaemonAPI.LockDelivery?
+        // A Linux machine opens the value only for an answer this device signed (#4149).
+        if let use = request.secretUse, use.signs(action) {
+            guard let signer = await lock.channelSigner(),
+                  let signed = try? LockChannel.secretUseApproval(signer.key, to: host.rawValue, request: request.id,
+                                                                  use: use, action: action) else {
+                problem = "Not sent — this machine opens the secret only for an answer your device signs, and this device is not in your lock. Answer on the Mac."
+                return false
+            }
+            approval = signed
+        }
+        let answer = DaemonAPI.RequestsAnswer(id: request.id, secretUse: action, approval: approval)
+        do {
+            let update = try await client(for: answer, on: host)
+                .call(DaemonAPI.Method.requestsAnswer, answer, returning: DaemonAPI.RequestUpdate.self)
+            work.replaceRequests(work.requests.filter { $0.id != update.request.id })
+            publishAttention()
+            return true
+        } catch {
+            problem = sentence(for: error)
+            return false
+        }
+    }
+
     /// Deny a session's ask to be archived (#773): the mark goes and the session stays.
     func keepSession(_ agent: Agent) async {
         let denial = ArchiveActions.denial(for: agent)
@@ -2424,6 +2505,162 @@ final class RemoteModel {
     }
 
 
+    // MARK: Machines (#4034), as the window's Machines group (#3973)
+
+    /// The Machines group's rows: This Mac first, then every other machine the control plane
+    /// lists. None against a bridge with no control plane.
+    var machines: [MachineRef] {
+        guard let home = controlHome, !controlHosts.isEmpty else { return [] }
+        return [.mac] + controlHosts.map(\.id).filter { $0 != home && $0 != .mac }
+    }
+
+    /// A machine's row as `machines/list` last said it; This Mac's is the home host's.
+    func machineRow(_ host: MachineRef) -> DaemonAPI.ControlMachine? {
+        host == .mac ? controlHosts.first { $0.id == controlHome } : controlHost(host)
+    }
+
+    /// A machine's name in the group: This Mac, or the name the control plane gave it.
+    func machineName(_ host: MachineRef) -> String {
+        guard host != .mac, let row = controlHost(host) else { return host == .mac ? "This Mac" : host.rawValue }
+        return row.name.isEmpty ? host.rawValue : row.name
+    }
+
+    /// Whether the machine answers calls now, as its row last said.
+    func machineOffline(_ host: MachineRef) -> Bool {
+        machineRow(host).map { !$0.answers } ?? false
+    }
+
+    /// Each other machine's disks, as it last said them (#3628), for its row's red and its page.
+    private(set) var serverDisks: [MachineRef: DiskState] = [:]
+
+    private func receivedDisk(_ state: DiskState?, from host: MachineRef) {
+        serverDisks[host] = state
+    }
+
+    /// What the machine says of its disks now, as it joins (#3628).
+    private func refreshServerDisk(_ host: MachineRef) async {
+        guard let other = otherHosts[host],
+              let state = try? await other.call(DaemonAPI.Method.diskState, Optional<String>.none, returning: DiskState.self)
+        else { return }
+        serverDisks[host] = state
+    }
+
+    /// A machine's most urgent need, as its row says it (#3764).
+    func need(of host: MachineRef) -> MachineNeed? {
+        MachineNeed.most(row: machineRow(host), offline: machineOffline(host),
+                         runtimes: runtimes(on: host), disks: diskAlarms(host))
+    }
+
+    /// Whether a disk on the machine is low or almost full, as its page says (#3626).
+    /// Not while it is offline: what its disks last said is old, and its line says why it is quiet.
+    func diskWarns(_ host: MachineRef) -> Bool {
+        !machineOffline(host) && diskAlarms(host).contains { $0.level != .ok }
+    }
+
+    private func diskAlarms(_ host: MachineRef) -> [DiskAlarm] {
+        host == .mac ? work.disk.alarms : serverDisks[host]?.alarms ?? []
+    }
+
+    /// The providers New Machine can use (#3979), for the Machines header's menu.
+    private(set) var machineProviders: [DaemonAPI.ProviderSummary] = []
+
+    /// A New Machine the provider could not make, with its reason, and Try Again.
+    var makeFailed: MachineMakeFailure?
+
+    /// Stop on a machine's row (#3973). Unconfirmed while agents work there, the control plane
+    /// says who they are, and they are returned for the question; nil once it is stopping or refused.
+    func stopHost(_ host: MachineRef, confirmed: Bool = false) async -> [String]? {
+        guard let control = controlPlane else {
+            problem = "The control plane isn’t answering, so \(machineName(host)) could not be stopped."
+            return nil
+        }
+        do {
+            _ = try await control.call(DaemonAPI.Method.hostsStop,
+                                       DaemonAPI.MachineStop(host: host, confirmRunning: confirmed ? true : nil))
+        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.agentsWorking {
+            let names = error.data?["running"]?.arrayValue?.compactMap(\.stringValue) ?? []
+            if !names.isEmpty { return names }
+            problem = sentence(for: error)
+        } catch {
+            problem = sentence(for: error)
+        }
+        return nil
+    }
+
+    /// Delete… on a machine a provider made (#3973): the provider deletes it, then the host goes.
+    func deleteMachine(_ host: MachineRef) async {
+        await machineCall(DaemonAPI.Method.hostsDeleteMachine, host)
+    }
+
+    /// Remove… on a registered machine (#3973): Agents forgets it; the computer stays.
+    func removeMachine(_ host: MachineRef) async {
+        await machineCall(DaemonAPI.Method.hostsRemove, host)
+    }
+
+    private func machineCall(_ method: String, _ host: MachineRef) async {
+        guard let control = controlPlane else {
+            problem = "The control plane isn’t answering."
+            return
+        }
+        do {
+            _ = try await control.call(method, DaemonAPI.MachineRequest(host: host))
+            controlHosts.removeAll { $0.id == host }
+        } catch {
+            problem = sentence(for: error)
+        }
+    }
+
+    /// Delete's question (#3979): the worktrees on the machine with work not pushed. Nil when
+    /// the control plane can't say.
+    func deletePreview(_ host: MachineRef) async -> DaemonAPI.StartedMachinePreview? {
+        try? await controlPlane?.call(DaemonAPI.Method.hostsDeletePreview, DaemonAPI.MachineRequest(host: host),
+                                      returning: DaemonAPI.StartedMachinePreview.self)
+    }
+
+    /// New Machine (#3973): the default provider makes `machine-N` with the options used last,
+    /// with no questions; New Machine on ▸ names the provider, which is then the default (#3979).
+    func newMachine(on provider: ProviderID? = nil) async {
+        guard let control = controlPlane else {
+            problem = "The control plane isn’t answering, so no machine can be made."
+            return
+        }
+        do {
+            let made = try await control.call(DaemonAPI.Method.providersCreate, DaemonAPI.ProviderRequest(id: provider),
+                                              returning: DaemonAPI.ProviderCreated.self)
+            if made.workspace.state == "failed" {
+                makeFailed = MachineMakeFailure(reason: made.workspace.reason ?? "\(made.workspace.name) could not be made.",
+                                                provider: provider)
+            }
+        } catch {
+            makeFailed = MachineMakeFailure(reason: sentence(for: error), provider: provider)
+        }
+        await loadMachineProviders()
+    }
+
+    private func heardProviders(_ params: JSONValue?) {
+        guard let listed = try? params?["providers"]?.decode([DaemonAPI.ProviderSummary].self) else { return }
+        machineProviders = listed.filter { $0.capabilities.contains("create") && $0.usable }
+    }
+
+    func loadMachineProviders() async {
+        guard let control = controlPlane,
+              let answer = try? await control.call(DaemonAPI.Method.providersList, DaemonAPI.Empty()),
+              let listed = try? answer["providers"]?.decode([DaemonAPI.ProviderSummary].self)
+        else { return }
+        machineProviders = listed.filter { $0.capabilities.contains("create") && $0.usable }
+    }
+
+    /// A machine's runtimes, asked again as its page opens (#3629).
+    func refreshMachineRuntimes(_ host: MachineRef) async {
+        if host == .mac { await refreshRuntimes() } else { await refreshServerRuntimes(host) }
+    }
+
+    /// A machine's CPU, memory and disks for its page (#3626), asked of the machine itself.
+    func machineUsage(_ host: MachineRef) async throws -> DaemonAPI.MachineUsageState {
+        try await client(for: DaemonAPI.Empty(), on: host)
+            .call(DaemonAPI.Method.machineUsage, DaemonAPI.Empty(), returning: DaemonAPI.MachineUsageState.self)
+    }
+
     /// A host's git asking to use a Mac's git access (#1122), not answered here yet. Any
     /// client may answer it; the control plane takes the first answer.
     var gitLendAsk: GitLendAsk? {
@@ -2483,6 +2720,7 @@ final class RemoteModel {
                     backoff.connected()
                     self?.controlPlane = control
                     await self?.syncOtherHosts(control, link: link)
+                    await self?.loadMachineProviders()
                     await self?.loadKept(control)
                     await self?.people.connected(control)
                     await self?.signIn.connected(control)
@@ -2496,6 +2734,7 @@ final class RemoteModel {
                         }
                         if await self.people.heard(change.method, change.params, on: control) { continue }
                         if self.signIn.heard(change.method, change.params) { continue }
+                        if await self.userScope.heard(change.method, change.params, on: control) { continue }
                         if await self.lock.heard(change.method, change.params, on: control) {
                             // A machine just added to the lock may now be sealed to (#3491, D8).
                             if change.method == DaemonAPI.Notification.controlLockChanged { await Self.sealWaiting(on: control, lock: self.lock) }
@@ -2504,6 +2743,11 @@ final class RemoteModel {
                         if change.method == DaemonAPI.Notification.controlKeptChanged
                             || change.method == DaemonAPI.Notification.controlKeptDelivered {
                             await self.heardKept(change.method, change.params)
+                            continue
+                        }
+                        if change.method == DaemonAPI.Notification.controlProvidersChanged {
+                            // The Machines group's New Machine row and its default (#4034).
+                            self.heardProviders(change.params)
                             continue
                         }
                         guard change.method == DaemonAPI.Notification.controlHostChanged else { continue }
@@ -2594,6 +2838,7 @@ final class RemoteModel {
                 work.replaceAgents(agents, from: id)
             }
             await refreshServerRuntimes(id)
+            await refreshServerDisk(id)
             await machineBrowsers[id]?.rewatchIfWatching()
             let notes = other.notifications()
             let shown = work.shown
@@ -2612,10 +2857,13 @@ final class RemoteModel {
                         await self?.received(note.method, note.params, fromOther: id)
                         continue
                     }
-                    // Settings ▸ Backups is the Mac's (#1810); a machine's disks are on its
-                    // page, which the Remote does not have (#3628).
-                    if note.method == DaemonAPI.Notification.diskChanged
-                        || note.method == DaemonAPI.Notification.resourcesChanged
+                    // A machine's disks, for its row and its page (#4034).
+                    if note.method == DaemonAPI.Notification.diskChanged {
+                        await self?.receivedDisk(try? note.params?.decode(DiskState.self), from: id)
+                        continue
+                    }
+                    // Settings ▸ Backups is the Mac's (#1810).
+                    if note.method == DaemonAPI.Notification.resourcesChanged
                         || note.method == DaemonAPI.Notification.mcpHostedChanged
                         || note.method == DaemonAPI.Notification.eventsChanged
                         || note.method == DaemonAPI.Notification.backupsChanged { continue }
@@ -3660,6 +3908,53 @@ final class RemoteModel {
         }
     }
 
+    /// The machines a folder can be added to (#4036): this Mac first, then each other host
+    /// of the control plane, as the sidebar heads them.
+    var folderMachines: [HostSection] {
+        let sections = hostSections
+        return sections.isEmpty ? [HostSection(id: .mac, title: "This Mac", offline: false)] : sections
+    }
+
+    /// What is in a folder on `host` (#4036), for Add Folder's picker: `files/browse`, as
+    /// the window's server folder sheet reads it.
+    func browse(_ path: String, on host: MachineRef) async throws -> DirectoryListing {
+        let request = DaemonAPI.FilesBrowseRequest(path: path)
+        return try await client(for: request, on: host).call(DaemonAPI.Method.filesBrowse, request,
+                                                             returning: DirectoryListing.self)
+    }
+
+    /// A folder on `host` added as a folder (#115, #4036), to its default project, and opened.
+    /// Answers why not, or nil.
+    func addFolder(_ folder: URL, on host: MachineRef) async -> String? {
+        await takeNewFolder(on: host) { client in
+            try await client.call(DaemonAPI.Method.foldersAdd, DaemonAPI.AddFolderRequest(folder: folder, project: nil),
+                                  returning: DaemonAPI.FolderSummary.self)
+        }
+    }
+
+    /// A Git URL cloned into `host`'s home folder and added as a folder (027, #4036), then
+    /// opened. The daemon answers once the clone has finished. Answers why not, or nil.
+    func cloneFolder(_ url: String, on host: MachineRef) async -> String? {
+        await takeNewFolder(on: host) { client in
+            try await client.call(DaemonAPI.Method.foldersClone, DaemonAPI.CloneRequest(url: url),
+                                  returning: DaemonAPI.FolderSummary.self)
+        }
+    }
+
+    private func takeNewFolder(on host: MachineRef,
+                               _ call: (DaemonClient) async throws -> DaemonAPI.FolderSummary) async -> String? {
+        do {
+            let target = try client(for: Optional<String>.none, on: host)
+            var summary = try await call(target)
+            summary.host = host
+            work.upsert(summary)
+            sidebarItem = .folder(summary.key)
+            return nil
+        } catch {
+            return away(error, "the folder could not be added.") ?? sentence(for: error)
+        }
+    }
+
 
     /// What today has cost and what the reader will allow. The phone shows limits
     /// and never sets them. A daemon too old to know the method leaves this nil, and
@@ -4549,6 +4844,9 @@ final class RemoteModel {
                 return false
             }
             sent = await answer(request, action: .accept, content: content)
+        case .secretUse(let request):
+            guard let action = NeedRequest.Action(rawValue: quick.id) else { return false }
+            sent = await answerSecretUse(request, action)
         case nil:
             note("banner: \(token) is over, nothing sent, in \(ContinuousClock.now - began)")
             return false
@@ -4567,6 +4865,7 @@ final class RemoteModel {
     private enum BannerQuestion {
         case permission(PermissionRequest)
         case elicitation(ElicitationRequest)
+        case secretUse(NeedRequest)
     }
 
     /// The question a banner's token names, while it is still asked.
@@ -4578,6 +4877,8 @@ final class RemoteModel {
             return work.permissions.first { $0.id.uuidString == parts[1] }.map(BannerQuestion.permission)
         case "elicitation":
             return work.elicitations.first { $0.id.uuidString == parts[1] }.map(BannerQuestion.elicitation)
+        case "request":
+            return work.requests.first { $0.id.uuidString == parts[1] && $0.secretUse != nil }.map(BannerQuestion.secretUse)
         default:
             return nil
         }
@@ -5323,3 +5624,6 @@ extension RemoteModel {
 
 /// Work (#3256): `RemoteModel+Work.swift`. Declared here, as Sendable conformance must be.
 extension RemoteModel: WorkModel {}
+
+/// Settings ▸ You ▸ Secrets ▸ For One Session (#4032), through the Mac's host.
+extension RemoteModel: SessionSecretsSource {}

@@ -369,6 +369,10 @@ struct ContentView: View {
             case .problem:
                 Button("OK") {}
                     .keyboardShortcut(.defaultAction)
+            case .makeFailed(let failure):
+                Button("Try Again") { Task { await model.newMachine(on: failure.provider) } }
+                    .keyboardShortcut(.defaultAction)
+                Button("OK", role: .cancel) {}
             case .folderGone(let ask):
                 // The ways on (#119). What was typed goes with Continue; Cancel leaves it
                 // in the bar.
@@ -420,6 +424,7 @@ enum WindowAlert: Identifiable {
     case lendGit(GitLendAsk)
     case problem(AlertWords)
     case folderGone(FolderGoneAsk)
+    case makeFailed(MachineMakeFailure)
 
     var id: String {
         switch self {
@@ -427,6 +432,7 @@ enum WindowAlert: Identifiable {
         case .lendGit(let ask): "lend-git-\(ask.id)"
         case .problem(let words): "problem-\(words.id)"
         case .folderGone(let ask): "folder-gone-\(ask.id)"
+        case .makeFailed(let failure): "make-failed-\(failure.id)"
         }
     }
 
@@ -436,6 +442,7 @@ enum WindowAlert: Identifiable {
         case .lendGit(let ask): ask.title
         case .problem: "Could not finish that"
         case .folderGone: "This agent’s folder isn’t there"
+        case .makeFailed: "Could not make the machine"
         }
     }
 
@@ -446,6 +453,7 @@ enum WindowAlert: Identifiable {
         case .lendGit(let ask): ask.message
         case .problem(let words): words.text
         case .folderGone(let ask): ask.message + " What you typed is still in the prompt."
+        case .makeFailed(let failure): failure.reason
         }
     }
 
@@ -454,6 +462,7 @@ enum WindowAlert: Identifiable {
         if let ask = model.signInLendAsk { return .lend(ask) }
         if let ask = model.gitLendAsk { return .lendGit(ask) }
         if let ask = model.folderGone { return .folderGone(ask) }
+        if let failure = model.makeFailed { return .makeFailed(failure) }
         return model.problem.map { .problem(AlertWords(text: $0)) }
     }
 
@@ -469,6 +478,15 @@ enum WindowAlert: Identifiable {
         case .lendGit: break
         case .problem(let words): if model.problem == words.text { model.dismissProblem() }
         case .folderGone(let ask): if model.folderGone == ask { model.folderGone = nil }
+        case .makeFailed(let failure): if model.makeFailed == failure { model.makeFailed = nil }
         }
     }
+}
+
+/// A New Machine the provider refused (#3979): its reason, and the provider Try Again asks
+/// again (nil for the default one).
+struct MachineMakeFailure: Identifiable, Equatable {
+    let id = UUID()
+    let reason: String
+    let provider: ProviderID?
 }

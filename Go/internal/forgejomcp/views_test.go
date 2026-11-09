@@ -120,6 +120,10 @@ func TestEachViewHasAToolThatFeedsItAndAPage(t *testing.T) {
 		if uri != issuesURI && !strings.Contains(html, "const prPage") {
 			t.Errorf("%s has no pull request page in it", uri)
 		}
+		// Its diff names its forge, so the app's diff says Open on Forgejo (#4128).
+		if uri != issuesURI && !strings.Contains(html, `site: "Forgejo"`) {
+			t.Errorf("%s asks the app's diff with no site: it says Open on GitHub", uri)
+		}
 		// Every tool a page calls is one this server has.
 		for _, called := range []string{"show_pull_requests", "show_pull_request", "show_pull_request_diff", "failed_log", "retry_pipeline",
 			"comment_on_pull_request", "approve_pull_request", "merge_pull_request", "show_issues", "show_issue_details"} {

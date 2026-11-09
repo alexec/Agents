@@ -97,7 +97,7 @@ const prPage = (ui, repo, back) => {
     try { diff = await ui.call("show_pull_request_diff", { repo: repo() || pr.repo, number: pr.number }); }
     catch (e) { say("Couldn't load the diff: " + e.message, true); return; }
     try {
-      await request("agents/open-diff", { title: `#${pr.number} ${pr.title}`, url: diff.url, files: diff.files, cut: !!diff.cut,
+      await request("agents/open-diff", { title: `#${pr.number} ${pr.title}`, url: diff.url, site: "Bitbucket", files: diff.files, cut: !!diff.cut,
         ...(path ? { path } : {}) });
       say("");
     } catch (e) {

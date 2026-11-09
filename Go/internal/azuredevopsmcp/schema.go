@@ -2,6 +2,8 @@ package azuredevopsmcp
 
 import (
 	"encoding/json"
+	"regexp"
+	"strings"
 
 	"github.com/alexec/agents/Go/internal/mcpevents"
 )
@@ -25,7 +27,34 @@ type schema = mcpevents.Schema
 type args struct {
 	repo, branch, pipeline string
 	pr, run                int
-	anyone, mine           bool
+	fixes                  []string
+	anyone, mine, all      bool
+}
+
+// workItemRefPattern is a work item as fixes takes it: "#12" (#3797).
+var workItemRefPattern = regexp.MustCompile(`^#[1-9][0-9]*$`)
+
+// closesOne is whether m's description closes one of the work items fixes asks for (#3797):
+// any pull request, when fixes is not given.
+func (a args) closesOne(m PR) bool {
+	if len(a.fixes) == 0 {
+		return true
+	}
+	for _, f := range m.Fixes {
+		if contains(a.fixes, f) {
+			return true
+		}
+	}
+	return false
+}
+
+// byMe is whether m is the token's owner's, when mine asks for only theirs (#3797): one of
+// their active pull requests, or one they opened, completed or abandoned now.
+func (a args) byMe(m PR, yours *Yours) bool {
+	if !a.mine {
+		return true
+	}
+	return yours != nil && (yours.owns(m.Number) || m.AuthorID != "" && strings.EqualFold(m.AuthorID, yours.ID))
 }
 
 // check reads raw (null or missing as {}) and checks it: no unknown keys, types, shapes.
@@ -35,5 +64,6 @@ func check(s schema, raw json.RawMessage) (args, *rpcError) {
 		return args{}, bad
 	}
 	return args{repo: v.String("repo"), branch: v.String("branch"), pipeline: v.String("pipeline"),
-		pr: v.Int("pr"), run: v.Int("run"), anyone: v.Bool("anyone"), mine: v.Bool("mine")}, nil
+		pr: v.Int("pr"), run: v.Int("run"), fixes: v.Strings("fixes"),
+		anyone: v.Bool("anyone"), mine: v.Bool("mine"), all: v.Bool("any")}, nil
 }

@@ -81,6 +81,11 @@ final class AppModel {
     /// A send refused because the agent's folder has gone (#119), with the ways on. Said
     /// in the window's alert instead of `problem`, and the words stay in the bar.
     var folderGone: FolderGoneAsk?
+    /// A New Machine the provider refused (#3979), said in the window's alert with Try Again.
+    var makeFailed: MachineMakeFailure?
+    /// The machine providers New Machine can use, as the control plane last listed them for
+    /// this person (#3979): the Machines header's New Machine on ▸.
+    private(set) var machineProviders: [DaemonAPI.ProviderSummary] = []
     /// A runtime of this Mac's that refused for want of a sign-in: the window answers
     /// with its sign-in sheet rather than an error nobody can act on.
     var signInRuntimeID: String?
@@ -2156,7 +2161,7 @@ final class AppModel {
     }
 
     /// Whether this Mac's host keeps Ask before use (#4014): it offers the toggle (#4016).
-    var macHostAsksBeforeUse: Bool { host(macHostElsewhere ?? .mac, has: Capability.hostSecretApproval1) }
+    var sessionHostAsksBeforeUse: Bool { host(macHostElsewhere ?? .mac, has: Capability.hostSecretApproval1) }
 
     /// Turn Ask before use on or off for a session's secret (#4016): the list after, or why not.
     func setSessionSecretAsksBeforeUse(_ secret: SessionSecret, _ on: Bool) async -> Result<SessionSecrets?, Error> {
@@ -2437,9 +2442,6 @@ final class AppModel {
     /// A Settings pane to open on, asked for by a link elsewhere (052): read and cleared
     /// by the Settings window.
     var settingsPaneAsked: SettingsPane?
-    /// The machine Settings ▸ Machines opens on, asked for by its page's Settings… (#3626):
-    /// read and cleared with `settingsPaneAsked`.
-    var settingsMachineAsked: MachineRef?
 
     /// A file for Agent Configuration's editor to open, asked for by a workflow page's Edit
     /// File… (#2803): read and cleared by the editor's page for that kind and folder.
@@ -3664,6 +3666,11 @@ final class AppModel {
                         case DaemonAPI.Notification.controlHostChanged:
                             self?.hostCameOnline(note.params)
                             await self?.syncControlHosts(control)
+                        case DaemonAPI.Notification.controlProvidersChanged:
+                            // The Machines header's New Machine on ▸ and its default (#3979).
+                            if let listed = try? note.params?["providers"]?.decode([DaemonAPI.ProviderSummary].self) {
+                                self?.machineProviders = listed.filter { $0.capabilities.contains("create") && $0.usable }
+                            }
                         case DaemonAPI.Notification.controlThisMacHostChanged:
                             // The join file changed and the host list may not have (#303).
                             await self?.refreshMacHostJoin(control)
@@ -3769,9 +3776,13 @@ final class AppModel {
     }
 
     private func machineCall(_ method: String, _ host: MachineRef) async {
+        await controlCall(method, DaemonAPI.MachineRequest(host: host))
+    }
+
+    private func controlCall(_ method: String, _ params: some Encodable & Sendable) async {
         guard let controlRequests else { return }
         do {
-            _ = try await controlRequests.call(method, DaemonAPI.MachineRequest(host: host))
+            _ = try await controlRequests.call(method, params)
             await syncControlHosts(controlRequests)
         } catch let error as JSONRPCError {
             problem = HostProblem.controlRefusal(error)
@@ -3781,20 +3792,66 @@ final class AppModel {
     }
 
     /// New Machine (#3973): the default provider makes `machine-N` with its defaults, with no
-    /// questions (#3972). A make that fails says the provider's reason.
-    func newMachine() async {
+    /// questions (#3972); New Machine on ▸ names the provider, which is then the default
+    /// (#3979). Either takes the options used last on that provider. A make that fails says
+    /// the provider's reason, with Try Again.
+    func newMachine(on provider: ProviderID? = nil) async {
         guard let controlRequests else { return }
         do {
-            let made = try await controlRequests.call(DaemonAPI.Method.providersCreate, DaemonAPI.Empty(),
+            let made = try await controlRequests.call(DaemonAPI.Method.providersCreate, DaemonAPI.ProviderRequest(id: provider),
                                                       returning: DaemonAPI.ProviderCreated.self)
             if made.workspace.state == "failed" {
-                problem = made.workspace.reason ?? "\(made.workspace.name) could not be made."
+                makeFailed = MachineMakeFailure(reason: made.workspace.reason ?? "\(made.workspace.name) could not be made.",
+                                                provider: provider)
             }
         } catch let error as JSONRPCError {
-            problem = HostProblem.controlRefusal(error)
+            makeFailed = MachineMakeFailure(reason: HostProblem.controlRefusal(error), provider: provider)
         } catch {
             problem = "The control plane can’t be reached, so no machine can be made."
         }
+        await loadMachineProviders()
+    }
+
+    /// The providers New Machine can use (#3979), for the Machines header's menu.
+    func loadMachineProviders() async {
+        guard let controlRequests,
+              let answer = try? await controlRequests.call(DaemonAPI.Method.providersList, DaemonAPI.Empty()),
+              let listed = try? answer["providers"]?.decode([DaemonAPI.ProviderSummary].self)
+        else { return }
+        machineProviders = listed.filter { $0.capabilities.contains("create") && $0.usable }
+    }
+
+    /// Delete's question on a machine's row (#3979): the worktrees on it with work not
+    /// pushed. Nil when the control plane can't say (an older one).
+    func deletePreview(_ host: MachineRef) async -> DaemonAPI.StartedMachinePreview? {
+        try? await controlRequests?.call(DaemonAPI.Method.hostsDeletePreview, DaemonAPI.MachineRequest(host: host),
+                                         returning: DaemonAPI.StartedMachinePreview.self)
+    }
+
+    /// Check Again on a machine's row (#3979), as Settings ▸ Machines had it.
+    func checkAgain(_ host: MachineRef) async {
+        await machineCall(DaemonAPI.Method.hostsCheckAgain, host)
+    }
+
+    /// Unlink on a machine's page (#3975): its provider can no longer start or stop it.
+    func unlinkMachine(_ host: MachineRef) async {
+        await machineCall(DaemonAPI.Method.hostsUnlink, host)
+    }
+
+    /// Start when used, Start for scheduled workflows and Stop when idle on a machine's page
+    /// (#3975), as Settings ▸ Machines' menu had them. `stopWhenIdleMinutes` 0 turns it off.
+    func setMachineOptions(_ host: MachineRef, startWhenUsed: Bool? = nil, stopWhenIdleMinutes: Int? = nil,
+                           startForSchedules: Bool? = nil) async {
+        await controlCall(DaemonAPI.Method.hostsSetMachineOptions,
+                          DaemonAPI.MachineOptions(host: host, startWhenUsed: startWhenUsed,
+                                                   stopWhenIdleMinutes: stopWhenIdleMinutes,
+                                                   startForSchedules: startForSchedules))
+    }
+
+    /// Stop Lending on a machine's page (#1122, #3975): it stops using a Mac's git access for one server.
+    func stopLendingGit(_ host: MachineRef, from: MachineRef, server: String) async {
+        await controlCall(DaemonAPI.Method.hostsLendGit,
+                          DaemonAPI.LendGit(host: host, from: from, server: server, allowed: false))
     }
 
     /// Approve or Deny on a machine's card (#994): a refusal is the window's alert.
@@ -6574,10 +6631,41 @@ final class AppModel {
                 return
             }
             sent = await answerElicitation(request, action: .accept, content: content)
+        case "request":
+            guard let request = work.requests.first(where: { $0.id.uuidString == parts[1] }),
+                  let action = NeedRequest.Action(rawValue: quick.id) else {
+                note("banner: \(token) is over, nothing sent")
+                return
+            }
+            sent = await answerSecretUse(request, action)
         default:
             return
         }
         note("banner: \(token) \(quick.kind.rawValue) \(sent ? "answered" : "not sent")")
+    }
+
+    /// A person's answer to a secret's use (#4017), from its Needs you row or its banner: to
+    /// the host of the session that asked. Whether it went; why not is the problem.
+    @discardableResult
+    func answerSecretUse(_ request: NeedRequest, _ action: NeedRequest.Action) async -> Bool {
+        let host = host(ofAgent: request.askedBy)
+        var approval: DaemonAPI.LockDelivery?
+        // A Linux machine opens the value only for an answer this Mac signed (#4149).
+        if let use = request.secretUse, use.signs(action) {
+            guard let signer = await lock.channelSigner(),
+                  let signed = try? LockChannel.secretUseApproval(signer.key, to: host.rawValue, request: request.id,
+                                                                  use: use, action: action) else {
+                problem = "Not sent — this machine opens the secret only for an answer your device signs, and this Mac is not in your lock. Answer on the Remote."
+                return false
+            }
+            approval = signed
+        }
+        let answer = DaemonAPI.RequestsAnswer(id: request.id, secretUse: action, approval: approval)
+        return await attempt(on: host) {
+            let update = try await self.client(forAgent: request.askedBy)
+                .call(DaemonAPI.Method.requestsAnswer, answer, returning: DaemonAPI.RequestUpdate.self)
+            self.work.replaceRequests(self.work.requests.filter { $0.id != update.request.id })
+        }
     }
 
     // MARK: Forms
@@ -6804,3 +6892,6 @@ struct FolderGoneAsk: Identifiable, Equatable {
 
 /// Work (#3119) is drawn by `Shared/UI/Work`, for the window and the Remote (#3256).
 extension AppModel: WorkModel {}
+
+/// Settings ▸ You ▸ Secrets ▸ For One Session (#3548), through this Mac's host.
+extension AppModel: SessionSecretsSource {}

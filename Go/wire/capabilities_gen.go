@@ -81,6 +81,7 @@ const CapHostPolicyLayers1 = "host.policy-layers/1"
 const CapHostPolicy1 = "host.policy/1"
 const CapHostSecretApproval1 = "host.secret-approval/1"
 const CapHostSecretGrants1 = "host.secret-grants/1"
+const CapHostSecretRelease1 = "host.secret-release/1"
 const CapHostSessionSecrets1 = "host.session-secrets/1"
 const CapHostSuspend1 = "host.suspend/1"
 const CapHostTeam1 = "host.team/1"
@@ -744,12 +745,15 @@ var ControlCapabilities = pairs([][2]string{
 	{"machine/orgRoutesApplied", "host.org-routes/2"},
 	{"machine/policyApplied", "host.policy/1"},
 	{"machine/providerDraft", "machine/1"},
+	{"machine/secretKey", "host.secret-release/1"},
+	{"machine/secretRelease", "host.secret-release/1"},
 	{"machine/status", "machine/1"},
 	{"machines/announce", "machines/1"},
 	{"machines/approveJoin", "hosts.join/1"},
 	{"machines/botKey", "connections.botkey/1"},
 	{"machines/checkAgain", "machines/1"},
 	{"machines/deleteMachine", "machines/1"},
+	{"machines/deletePreview", "machines/1"},
 	{"machines/denyJoin", "hosts.join/1"},
 	{"machines/detect", "machines/1"},
 	{"machines/dropKept", "machines/1"},
@@ -819,6 +823,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"providers/draftSigned", "providers/1"},
 	{"providers/draftStart", "providers/1"},
 	{"providers/list", "providers/1"},
+	{"providers/makeDefault", "providers/1"},
 	{"providers/options", "providers/1"},
 	{"providers/refresh", "providers/1"},
 	{"providers/remove", "providers/1"},

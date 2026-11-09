@@ -1,13 +1,28 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Settings ▸ Secrets ▸ For One Session (#3548): this Mac's secrets for one session only,
+/// Where Settings ▸ You ▸ Secrets ▸ For One Session reads and writes (#3548): the window's model
+/// and the Remote's, each through the Mac's host it reaches (#4032).
+@MainActor
+protocol SessionSecretsSource: AnyObject {
+    /// Nil from a host too old to know the method.
+    func sessionSecrets() async -> SessionSecrets?
+    func setSessionSecret(_ request: SessionSecretSetRequest) async -> Result<SessionSecrets, Error>
+    func setSessionSecretAsksBeforeUse(_ secret: SessionSecret, _ on: Bool) async -> Result<SessionSecrets?, Error>
+    func removeSessionSecret(_ secret: SessionSecret) async -> SessionSecrets?
+    /// The sessions on that host that can take a secret for one session: not archived, latest first.
+    var sessionsForSecrets: [Agent] { get }
+    /// Whether that host keeps Ask before use (#4014): it offers the toggle (#4016).
+    var sessionHostAsksBeforeUse: Bool { get }
+}
+
+/// Settings ▸ Secrets ▸ For One Session (#3548): the Mac's secrets for one session only,
 /// each with the session it belongs to and a Remove, and Add for a Session…. Only that
-/// session's agent can use one, and this Mac's host deletes it when the session is archived.
-/// Each has an Ask before use toggle (#4016). The web page draws the same in
-/// `Web/src/views/settings/SessionSecrets.tsx`.
-struct SessionSecretsSection: View {
-    @Environment(AppModel.self) private var model
+/// session's agent can use one, and the Mac's host deletes it when the session is archived.
+/// Each has an Ask before use toggle (#4016). The window and the Remote (#4032) draw it; the web
+/// page draws the same in `Web/src/views/settings/SessionSecrets.tsx`.
+struct SessionSecretsSection<Source: SessionSecretsSource>: View {
+    let model: Source
     @State private var list: SessionSecrets?
     @State private var loaded = false
     @State private var isAdding = false
@@ -23,27 +38,62 @@ struct SessionSecretsSection: View {
                         Text(SessionSecretWords.none).foregroundStyle(.secondary)
                     }
                     ForEach(list.secrets) { secret in
+                        #if os(macOS)
                         HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(secret.name).appText(.code)
-                                Text(secret.title).appText(.fine).foregroundStyle(.secondary)
-                            }
+                            label(secret)
                             Spacer()
-                            if model.macHostAsksBeforeUse {
+                            if model.sessionHostAsksBeforeUse {
                                 Toggle(AskBeforeUseWords.toggle, isOn: asksBeforeUse(secret))
                                     .toggleStyle(.checkbox)
                                     .appText(.supporting)
                                     .help(AskBeforeUseWords.hint(secret.asksBeforeUse))
                             }
-                            Button("Remove…", role: .destructive) { removing = secret }
-                                .accessibilityLabel("Remove \(secret.name) from \(secret.title)")
+                            remove(secret)
                         }
+                        #else
+                        // A phone's switch is too wide to share the name's line: it goes under it.
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                label(secret)
+                                Spacer()
+                                remove(secret)
+                            }
+                            if model.sessionHostAsksBeforeUse {
+                                Toggle(AskBeforeUseWords.toggle, isOn: asksBeforeUse(secret))
+                                    .appText(.supporting)
+                            }
+                        }
+                        #endif
                     }
                     if let problem {
                         Text(problem).appText(.fine).tinted(.failure)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                    // The sheet and the question hang on one row: on a Section, iOS gives each row its own,
+                    // and the Remote's Settings closed at Add for a Session… (#4032).
                     Button(SessionSecretWords.add) { isAdding = true }
+                        .sheet(isPresented: $isAdding) {
+                            SessionSecretSheet(sessions: model.sessionsForSecrets, offersAsk: model.sessionHostAsksBeforeUse) { request in
+                                switch await model.setSessionSecret(request) {
+                                case .success(let after):
+                                    self.list = after
+                                    return nil
+                                case .failure(let error):
+                                    return UserScopeWords.refusal(error)
+                                }
+                            }
+                            .paperSheet()
+                        }
+                        .confirmationDialog(removing.map(SessionSecretWords.removeQuestion) ?? "",
+                                            isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
+                                            titleVisibility: .visible, presenting: removing) { secret in
+                            Button("Remove", role: .destructive) {
+                                Task { if let after = await model.removeSessionSecret(secret) { self.list = after } }
+                            }
+                            Button("Cancel", role: .cancel) {}
+                        } message: { _ in
+                            Text(SessionSecretWords.removeMessage)
+                        }
                 } else {
                     ProgressView().controlSize(.small)
                 }
@@ -57,29 +107,19 @@ struct SessionSecretsSection: View {
                 list = await model.sessionSecrets()
                 loaded = true
             }
-            .sheet(isPresented: $isAdding) {
-                SessionSecretSheet(sessions: model.sessionsForSecrets, offersAsk: model.macHostAsksBeforeUse) { request in
-                    switch await model.setSessionSecret(request) {
-                    case .success(let after):
-                        list = after
-                        return nil
-                    case .failure(let error):
-                        return UserScopeWords.refusal(error)
-                    }
-                }
-                .paperSheet()
-            }
-            .confirmationDialog(removing.map(SessionSecretWords.removeQuestion) ?? "",
-                                isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
-                                titleVisibility: .visible, presenting: removing) { secret in
-                Button("Remove", role: .destructive) {
-                    Task { if let after = await model.removeSessionSecret(secret) { list = after } }
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: { _ in
-                Text(SessionSecretWords.removeMessage)
-            }
         }
+    }
+
+    private func label(_ secret: SessionSecret) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(secret.name).appText(.code)
+            Text(secret.title).appText(.fine).foregroundStyle(.secondary)
+        }
+    }
+
+    private func remove(_ secret: SessionSecret) -> some View {
+        Button("Remove…", role: .destructive) { removing = secret }
+            .accessibilityLabel("Remove \(secret.name) from \(secret.title)")
     }
 
     /// A row's Ask before use: the host seals it or puts it back, then the list is read again.
@@ -101,7 +141,7 @@ struct SessionSecretsSection: View {
 /// Add for a Session…: which session, a name and a value. The value is never shown again.
 private struct SessionSecretSheet: View {
     let sessions: [Agent]
-    /// The host keeps Ask before use (#4016); a person's secret starts off.
+    /// The host keeps Ask before use (#4016); a new secret starts on (#4162).
     let offersAsk: Bool
     let save: (SessionSecretSetRequest) async -> String?
 
@@ -109,7 +149,7 @@ private struct SessionSecretSheet: View {
     @State private var session: UUID?
     @State private var name = ""
     @State private var value = ""
-    @State private var askBeforeUse = false
+    @State private var askBeforeUse = true
     @State private var problem: String?
     @State private var saving = false
 
@@ -129,6 +169,9 @@ private struct SessionSecretSheet: View {
                 }
                 TextField("Name", text: $name, prompt: Text("SHOP_PASSWORD"))
                     .autocorrectionDisabled()
+                    #if os(iOS)
+                    .textInputAutocapitalization(.characters)
+                    #endif
                 SecureField("Value", text: $value)
                 if offersAsk {
                     AskBeforeUseToggle(isOn: $askBeforeUse)
@@ -159,7 +202,9 @@ private struct SessionSecretSheet: View {
             .rowButtons()
         }
         .paperForm()
+        #if os(macOS)
         .frame(minWidth: 400)
+        #endif
         .onAppear { session = session ?? sessions.first?.id }
         .onDisappear { value = "" }
     }

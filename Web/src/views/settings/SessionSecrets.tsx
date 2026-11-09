@@ -92,8 +92,8 @@ function SessionSecretSheet({ store, host, offersAsk, close, saved }: {
   const session = useSignal<UUID | null>(sessions[0]?.id ?? null);
   const name = useSignal("");
   const value = useSignal("");
-  // A person's secret starts off (#4016).
-  const ask = useSignal(false);
+  // A new secret starts on (#4016, #4162).
+  const ask = useSignal(true);
   const problem = useSignal<string | null>(null);
   const busy = useSignal(false);
   const chosen = name.value.trim();

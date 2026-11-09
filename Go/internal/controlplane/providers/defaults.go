@@ -27,10 +27,14 @@ func machineNamesKey(person string) string {
 }
 
 // machineNames is v1/machine-names/<person>.json: the number the person's next machine-N
-// takes. It only goes up, so a number is never used again, also after its machine is
-// deleted or renamed.
+// takes, and what New Machine makes it with (#3979). Next only goes up, so a number is
+// never used again, also after its machine is deleted or renamed.
 type machineNames struct {
 	Next int `json:"next"`
+	// The provider New Machine uses: the one made on last, or chosen with Make Default.
+	Default string `json:"default,omitempty"`
+	// The options each provider made a machine with last, by provider id.
+	Options map[string]json.RawMessage `json:"options,omitempty"`
 }
 
 // keptFailedMakes is how many makes that failed a provider keeps as rows, newest last.
@@ -43,8 +47,9 @@ type failedMake struct {
 	person string
 }
 
-// defaultProvider is the person's default provider: the first one added that they may
-// make machines from. One added before addedAt was kept comes first, by name.
+// defaultProvider is the person's default provider: the one they made a machine on last or
+// chose with Make Default (#3979), or else the first one added that they may make machines
+// from. One added before addedAt was kept comes first, by name.
 func (p *Providers) defaultProvider(person string) string {
 	p.mu.Lock()
 	held := make([]ProviderRecord, 0, len(p.providers))
@@ -54,8 +59,15 @@ func (p *Providers) defaultProvider(person string) string {
 	p.mu.Unlock()
 	var mayMake []ProviderRecord
 	for _, r := range held {
-		if (r.Forgotten == nil || !*r.Forgotten) && contains(r.Capabilities, "create") && p.sees(person, r) && p.MayUse(person, r) {
+		if p.mayMakeOn(person, r) {
 			mayMake = append(mayMake, r)
+		}
+	}
+	if chosen := p.choices(person).Default; chosen != "" {
+		for _, r := range mayMake {
+			if r.ID == chosen {
+				return chosen
+			}
 		}
 	}
 	sort.Slice(mayMake, func(i, j int) bool {
@@ -75,6 +87,99 @@ func (p *Providers) defaultProvider(person string) string {
 		return ""
 	}
 	return mayMake[0].ID
+}
+
+// mayMakeOn says the person may make machines on the provider.
+func (p *Providers) mayMakeOn(person string, r ProviderRecord) bool {
+	return (r.Forgotten == nil || !*r.Forgotten) && contains(r.Capabilities, "create") && p.sees(person, r) && p.MayUse(person, r)
+}
+
+// makeDefault is providers/makeDefault (#3979): New Machine uses the provider for the
+// person until they make a machine on another one.
+func (p *Providers) makeDefault(person, id string) error {
+	r, ok := p.record(id)
+	if !ok || !p.sees(person, r) {
+		return invalid("There is no such provider.")
+	}
+	if !p.mayMakeOn(person, r) {
+		return invalid("%s can’t make machines for you.", r.Name)
+	}
+	if err := p.changeChoices(person, func(c *machineNames) { c.Default = id }); err != nil {
+		return err
+	}
+	p.changed()
+	return nil
+}
+
+// lastOptions is what the person made a machine on the provider with last, or nil.
+func (p *Providers) lastOptions(person, id string) any {
+	raw, ok := p.choices(person).Options[id]
+	if !ok {
+		return nil
+	}
+	var v any
+	if json.Unmarshal(raw, &v) != nil {
+		return nil
+	}
+	return v
+}
+
+// madeOn keeps the provider and the options a make used (#3979), for the next New Machine.
+func (p *Providers) madeOn(person, id string, options json.RawMessage) {
+	err := p.changeChoices(person, func(c *machineNames) {
+		c.Default = id
+		if len(options) > 0 && string(options) != "null" {
+			if c.Options == nil {
+				c.Options = map[string]json.RawMessage{}
+			}
+			c.Options[id] = options
+		}
+	})
+	if err != nil {
+		p.log("workspace: could not keep the options " + id + " made a machine with: " + errorWords(err))
+	}
+}
+
+// choices is the person's v1/machine-names record; empty when there is none or it can't be read.
+func (p *Providers) choices(person string) machineNames {
+	names := machineNames{Next: 1}
+	object, err := p.store.Get(context.Background(), machineNamesKey(person))
+	if err != nil || object == nil {
+		return names
+	}
+	_ = json.Unmarshal(object.Data, &names)
+	return names
+}
+
+// changeChoices changes the person's v1/machine-names record, again when another write got there first.
+func (p *Providers) changeChoices(person string, change func(*machineNames)) error {
+	key := machineNamesKey(person)
+	ctx := context.Background()
+	for range 5 {
+		names := machineNames{Next: 1}
+		when := store.Absent
+		object, err := p.store.Get(ctx, key)
+		if err != nil {
+			return err
+		}
+		if object != nil {
+			if err := json.Unmarshal(object.Data, &names); err != nil {
+				return err
+			}
+			when = store.Matching(object.ETag)
+		}
+		change(&names)
+		data, _ := json.Marshal(names)
+		if _, err := p.store.Put(ctx, key, data, when); err != nil {
+			var conflict *store.ConflictError
+			if errors.As(err, &conflict) {
+				continue
+			}
+			return err
+		}
+		return nil
+	}
+	return fail(CodeInternalError, "Could not keep what New Machine makes. Try again.")
 }
 
 // defaultOptions is the provider's New Machine form filled with its defaults: each field's
@@ -112,36 +217,19 @@ func (p *Providers) nextName(person, provider string) (string, error) {
 		}
 	}
 	p.mu.Unlock()
-	key := machineNamesKey(person)
-	ctx := context.Background()
-	for range 5 {
-		names := machineNames{Next: 1}
-		when := store.Absent
-		object, err := p.store.Get(ctx, key)
-		if err != nil {
-			return "", err
-		}
-		if object != nil {
-			if err := json.Unmarshal(object.Data, &names); err != nil {
-				return "", err
-			}
-			when = store.Matching(object.ETag)
-		}
-		n := max(names.Next, 1)
+	name := ""
+	err := p.changeChoices(person, func(c *machineNames) {
+		n := max(c.Next, 1)
 		for taken[fmt.Sprintf("machine-%d", n)] {
 			n++
 		}
-		data, _ := json.Marshal(machineNames{Next: n + 1})
-		if _, err := p.store.Put(ctx, key, data, when); err != nil {
-			var conflict *store.ConflictError
-			if errors.As(err, &conflict) {
-				continue
-			}
-			return "", err
-		}
-		return fmt.Sprintf("machine-%d", n), nil
+		c.Next = n + 1
+		name = fmt.Sprintf("machine-%d", n)
+	})
+	if err != nil {
+		return "", err
 	}
-	return "", fail(CodeInternalError, "Could not choose a name for the machine. Try again.")
+	return name, nil
 }
 
 // failed keeps a make that failed as a row of the provider's, the oldest gone past
