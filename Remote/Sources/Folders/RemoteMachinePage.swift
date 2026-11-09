@@ -3,7 +3,7 @@ import SwiftUI
 
 /// One machine's page (#4034), as the window's (#3626) and the web page's: a summary first,
 /// its CPU, memory and worst disk on one line (#3743), then its disks, then the runtimes
-/// installed there (#3629). Read with `machine/usage` as it opens and every few seconds while
+/// installed there (#3629), with Sign In… and Update (#4035). Read with `machine/usage` as it opens and every few seconds while
 /// it is open, never otherwise. Its worktrees, resources and processes, and its settings,
 /// stay on the Mac and the web page.
 struct RemoteMachinePage: View {
@@ -12,6 +12,8 @@ struct RemoteMachinePage: View {
 
     @State private var usage: DaemonAPI.MachineUsageState?
     @State private var failure: String?
+    /// The runtime whose Sign In… is open.
+    @State private var signingIn: Runtime?
 
     private var name: String { model.machineName(host) }
     private var offline: Bool { model.machineOffline(host) }
@@ -60,19 +62,22 @@ struct RemoteMachinePage: View {
                     if runtimes.isEmpty {
                         Text("None installed here yet.").foregroundStyle(.secondary)
                     }
-                    ForEach(runtimes) { status in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(status.runtime.name)
-                            Text(status.machineLine).appText(.fine).foregroundStyle(.secondary)
-                        }
-                        .accessibilityElement(children: .combine)
-                    }
+                    ForEach(runtimes) { status in runtimeRow(status) }
                 }
             }
         }
         .appText(.supporting)
         .navigationTitle(name)
-        .task(id: host) { await model.refreshMachineRuntimes(host) }
+        .task(id: host) {
+            await model.refreshMachineRuntimes(host)
+            // A tap on a row that says a runtime needs sign-in comes here: Sign In… opens (#4035).
+            if case .signIn = model.need(of: host), let first = model.runtimes(on: host).first(where: offersSignIn) {
+                signingIn = first.runtime
+            }
+        }
+        .sheet(item: $signingIn) { runtime in
+            RuntimeSignInSheet(host: host, runtime: runtime)
+        }
         .task(id: host) {
             usage = nil
             failure = nil
@@ -82,6 +87,41 @@ struct RemoteMachinePage: View {
                 try? await Task.sleep(for: .seconds(3))
             }
         }
+    }
+
+    /// A runtime's line (#3629), with **Sign In…** on a server's Claude or Codex that is not
+    /// signed in, and **Update** when the app carries a newer copy (#4035), as the window's and
+    /// the web page's. This Mac's runtimes sign in on the Mac, which the line says.
+    private func runtimeRow(_ status: RuntimeStatus) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(status.runtime.name)
+                Text(status.machineLine).appText(.fine).foregroundStyle(.secondary)
+                if host == .mac, status.needsSignIn {
+                    Text(RuntimeSignInWords.onTheMac).appText(.fine).foregroundStyle(.secondary)
+                }
+            }
+            .accessibilityElement(children: .combine)
+            let update = status.outdated && status.runtime.install != nil && !status.availability.isInstalling
+            if offersSignIn(status) || update {
+                HStack(spacing: 8) {
+                    if offersSignIn(status) {
+                        Button("Sign In…") { signingIn = status.runtime }
+                    }
+                    if update {
+                        Button("Update") { Task { await model.updateRuntime(status.id, on: host) } }
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+        }
+    }
+
+    /// Whether Sign In… is offered here: a server's Claude or Codex, not signed in, on a machine
+    /// that signs in from a client (#3349). This Mac's daemon refuses it.
+    private func offersSignIn(_ status: RuntimeStatus) -> Bool {
+        host != .mac && status.signIn != nil && status.needsSignIn && model.host(host, has: Capability.runtimesSignIn1)
     }
 
     /// "Is this machine OK?" in one line (#3743): CPU, memory and the worst disk, in its tint.

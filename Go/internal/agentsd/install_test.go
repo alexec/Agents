@@ -138,7 +138,12 @@ func waitInstalled(t *testing.T, c *conn, id string) wire.RuntimeStatus {
 func TestInstallTheAppsOwnCopies(t *testing.T) {
 	_, bundle := fakeVendors(t)
 	d, c := start(t, t.TempDir())
-	d.serveInstall(filepath.Join(t.TempDir(), "tools"), bundle)
+	tools := filepath.Join(t.TempDir(), "tools")
+	d.serveInstall(tools, bundle)
+	// A device's connection may not install one that is not there.
+	if _, err := d.installRuntime(&Client{conn: deviceConn{newConn()}}, "codex"); err == nil {
+		t.Fatal("a device installed")
+	}
 
 	for i, id := range []string{"codex", "opencode"} {
 		var s wire.RuntimeStatus
@@ -164,9 +169,23 @@ func TestInstallTheAppsOwnCopies(t *testing.T) {
 			t.Fatalf("codex listed as %+v", s)
 		}
 	}
-	// A device's connection may not install.
-	if _, err := d.installRuntime(&Client{conn: deviceConn{newConn()}}, "codex"); err == nil {
-		t.Fatal("a device installed")
+	// A device's connection may update the copy that is there (#4035): an older one is current.
+	current := filepath.Join(tools, "codex", "current")
+	pinned, _ := os.Readlink(current)
+	old := filepath.Join(tools, "codex", "old")
+	if err := os.Rename(filepath.Join(tools, "codex", pinned), old); err != nil {
+		t.Fatal(err)
+	}
+	os.Remove(current)
+	os.Symlink("old", current)
+	if s := d.statusOf(runtimeByID("codex")); !s.Outdated {
+		t.Fatalf("an older copy listed as %+v", s)
+	}
+	if s, err := d.installRuntime(&Client{conn: deviceConn{newConn()}}, "codex"); err != nil || s.Availability.Installing == nil {
+		t.Fatalf("a device's update: %+v %v", s.Availability, err)
+	}
+	if end := waitInstalled(t, c, "codex"); end.Availability.Available == nil || end.Outdated {
+		t.Fatalf("updated to %+v", end)
 	}
 }
 
