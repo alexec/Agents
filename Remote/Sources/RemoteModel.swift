@@ -348,6 +348,9 @@ final class RemoteModel {
         userScope.lock = lock
         files = RemoteFiles(client: client)
         pictures = PhonePictures(files: files)
+        #if DEBUG
+        WalkNotify.model = work
+        #endif
         // From the start, not once connected: a banner tapped to launch or wake the app
         // arrives before then, and was dropped (#1045).
         notifier.open = { [weak self] agentID, line in

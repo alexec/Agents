@@ -1,5 +1,4 @@
 import CoreGraphics
-import Darwin
 import Foundation
 import Observation
 
@@ -164,29 +163,6 @@ public final class MachineBrowser {
 public struct PageEditing: Hashable, Sendable {
     public var inField: Bool
     public var click: Int
-}
-
-/// When a session's Agent Browser pane opens by itself (#3916): when its agent starts to
-/// use the browser. The host moves the agent's `browserUsedAt` at the first browser call of
-/// each turn that uses it; a pane opens for a use newer than the last one it acted on, or,
-/// when it has acted on none, newer than when this client started, so a launch does not
-/// open the pane of every session that used the browser once.
-public enum BrowserUse {
-    /// When the kernel started this client's process: not the first read of this, which
-    /// may come after the use it is compared with.
-    public static let clientStarted: Date = {
-        var info = kinfo_proc()
-        var size = MemoryLayout<kinfo_proc>.stride
-        var name: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid()]
-        guard sysctl(&name, 4, &info, &size, nil, 0) == 0 else { return Date() }
-        let start = info.kp_proc.p_un.__p_starttime
-        return Date(timeIntervalSince1970: Double(start.tv_sec) + Double(start.tv_usec) / 1_000_000)
-    }()
-
-    public static func opensPane(usedAt: Date?, seen: Date?, since started: Date = clientStarted) -> Bool {
-        guard let usedAt else { return false }
-        return usedAt > (seen ?? started)
-    }
 }
 
 /// A key on a Mac keyboard as the page's key events name it (#3528): the DOM `key` and

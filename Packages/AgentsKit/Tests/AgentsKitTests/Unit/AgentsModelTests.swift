@@ -463,37 +463,63 @@ struct AgentsModelTests {
                 "while a method nobody knows is still passed on")
     }
 
-    /// The live tile (#3004, US4): one frame, the watched chat's, replaced by the next and
-    /// dropped when the chat changes; another agent's is not read past its agentID.
-    @Test func theLiveTileKeepsOnlyTheWatchedChatsLatestFrame() throws {
+    /// The live tile (#3004, #4140): one frame per source, the watched chat's, replaced by the
+    /// next of its source and dropped when the chat changes; another agent's is not read past
+    /// its agentID. A host from before live/frame still fills the screen's.
+    @Test func theLiveTileKeepsOnlyTheWatchedChatsLatestFrames() throws {
         let model = AgentsModel()
         let id = UUID(), other = UUID()
         model.watching = id
         let first = DesktopControlLiveFrame(agentID: id, image: "ZmFrZQ==", narration: "Clicked Save in TextEdit.",
                                             capturedAt: Date())
         #expect(model.apply(DaemonAPI.Notification.desktopControlLiveFrame, try notification(first)))
-        #expect(model.liveFrame == first)
-        #expect(model.liveFrame?.imageData == Data("fake".utf8))
-        #expect(DesktopControlLiveFrame.isFresh(heardAt: model.liveFrameHeardAt, now: Date()))
-        #expect(!DesktopControlLiveFrame.isFresh(heardAt: model.liveFrameHeardAt,
-                                                 now: Date().addingTimeInterval(DesktopControlLiveFrame.staleAfter)))
+        #expect(model.liveFrames[.screen]?.frame == LiveFrame(first))
+        #expect(model.liveFrames[.screen]?.frame.imageData == Data("fake".utf8))
+        let heard = try #require(model.liveFrames[.screen])
+        #expect(heard.isFresh(at: Date()))
+        #expect(!heard.isFresh(at: Date().addingTimeInterval(DesktopControlLiveFrame.staleAfter)))
 
-        let locked = DesktopControlLiveFrame(agentID: id, locked: true, narration: "Typed into TextEdit.", capturedAt: Date())
-        model.apply(DaemonAPI.Notification.desktopControlLiveFrame, try notification(locked))
-        #expect(model.liveFrame == locked)
-        #expect(model.liveFrame?.imageData == nil, "no picture while the screen is locked")
+        let locked = LiveFrame(source: .screen, agentID: id, locked: true, narration: "Typed into TextEdit.",
+                               capturedAt: Date())
+        #expect(model.apply(DaemonAPI.Notification.liveFrame, try notification(locked)))
+        #expect(model.liveFrames[.screen]?.frame == locked)
+        #expect(model.liveFrames[.screen]?.frame.imageData == nil, "no picture while the screen is locked")
 
-        let theirs = DesktopControlLiveFrame(agentID: other, image: "ZmFrZQ==", capturedAt: Date())
-        let read = AgentsModel.read(DaemonAPI.Notification.desktopControlLiveFrame, try notification(theirs), showing: id)
+        let page = LiveFrame(source: .browser, agentID: id, image: "ZmFrZQ==", title: "Example Domain",
+                             capturedAt: Date(), width: 1280, height: 800)
+        model.apply(DaemonAPI.Notification.liveFrame, try notification(page))
+        #expect(model.liveFrames[.browser]?.frame == page)
+        #expect(model.liveFrames[.screen]?.frame == locked, "a browser frame leaves the screen's")
+        #expect(LiveTiles.shown(model.liveFrames, chosen: nil, now: Date())?.frame == page, "the newest is in front")
+        #expect(LiveTiles.shown(model.liveFrames, chosen: .screen, now: Date())?.frame == locked)
+
+        let theirs = LiveFrame(source: .browser, agentID: other, image: "ZmFrZQ==", capturedAt: Date())
+        let read = AgentsModel.read(DaemonAPI.Notification.liveFrame, try notification(theirs), showing: id)
         guard case .skipped = read else {
             Issue.record("another agent's frame was read: \(String(describing: read))")
             return
         }
-        model.apply(DaemonAPI.Notification.desktopControlLiveFrame, try notification(theirs))
-        #expect(model.liveFrame == locked, "another agent's frame is not this chat's")
+        model.apply(DaemonAPI.Notification.liveFrame, try notification(theirs))
+        #expect(model.liveFrames[.browser]?.frame == page, "another agent's frame is not this chat's")
 
         model.watching = other
-        #expect(model.liveFrame == nil)
+        #expect(model.liveFrames.isEmpty)
+    }
+
+    /// One tile for two sources (#4140): the newest fresh one, unless the person chose another
+    /// that is still fresh; a stale one is left out.
+    @Test func theLiveTileShowsTheNewestFreshSource() {
+        let id = UUID(), now = Date()
+        func heard(_ source: LiveSource, _ ago: TimeInterval) -> HeardLiveFrame {
+            HeardLiveFrame(frame: LiveFrame(source: source, agentID: id, capturedAt: now), heardAt: now - ago)
+        }
+        let frames: [LiveSource: HeardLiveFrame] = [.screen: heard(.screen, 5), .browser: heard(.browser, 1),
+                                                    .simulator: heard(.simulator, 60)]
+        #expect(LiveTiles.fresh(frames, now: now).map(\.frame.source) == [.browser, .screen])
+        #expect(LiveTiles.shown(frames, chosen: nil, now: now)?.frame.source == .browser)
+        #expect(LiveTiles.shown(frames, chosen: .screen, now: now)?.frame.source == .screen)
+        #expect(LiveTiles.shown(frames, chosen: .simulator, now: now)?.frame.source == .browser, "a stale choice gives way")
+        #expect(LiveTiles.shown([:], chosen: nil, now: now) == nil)
     }
 
     @Test func archivedFoldersAreKeptApartFromLiveOnes() {

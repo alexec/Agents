@@ -5,10 +5,10 @@ import { answerElsewhere, approveSecretUse, isTerminalRequest, type SecretUseAct
 import { preferencesSaid, sendPreferencesWith } from "./preferences";
 import { folderPath as hostedFolderPath, healthTally, personalServers } from "./hostedMCP";
 import type { ExportImportBusy } from "./exports";
-import type { HeardLiveFrame } from "./desktopControl";
+import { fromDesktopControl, type HeardLiveFrame } from "./liveTile";
 import { batch, computed, signal, type ReadonlySignal, type Signal } from "@preact/signals";
 import type {
-  Agent, AgentRemovedNotification, ResumingNotification, BrowserFrame, BrowserPageState, DesktopControlLiveFrame, ControlMachine, MachineRef, MachineWorkspace, ElicitationNotification, ElicitationRequest, EntryNotification,
+  Agent, AgentRemovedNotification, ResumingNotification, BrowserFrame, BrowserPageState, DesktopControlLiveFrame, LiveFrame, LiveSource, ControlMachine, MachineRef, MachineWorkspace, ElicitationNotification, ElicitationRequest, EntryNotification,
   PermissionNotification, PermissionRequest, FolderSummary, HelperLimits, DiskThresholds, NotCommittedResponse, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, FolderRemovedNotification, DraftOptionsNotification, JSONValue, Methods, AccountProfile, RuntimeAccount, RuntimeSignInStep, RuntimeStatus,
   StartRequest, UUID, AutoMappings, AutoPreview, AutoPreviewRequest, AutoSettings, ClientPermissionMode, Levels, ModelLevel, PermissionLevel, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, DiskState, StoreNotes,
@@ -266,10 +266,11 @@ export class Work {
   protected transcriptLoads = 0;
 
   /**
-   * The live tile's latest frame (#3004, US4, `desktopControl/liveFrame`): one, since a host sends
-   * frames only to the page showing that agent. Replaced by the next, never kept (FR-016).
+   * The live tile's latest frame of each source (#3004, #4140, `live/frame`): a host sends frames
+   * only to the page with that agent's chat in front. Each is replaced by the next of its source,
+   * never kept (FR-016).
    */
-  readonly liveFrame = signal<HeardLiveFrame | null>(null);
+  readonly liveFrames = signal<Partial<Record<LiveSource, HeardLiveFrame>>>({});
   /** Each host's browser as the Agent Browser tab shows it (#3528): its state, by host. */
   readonly browserStates = signal<Record<string, BrowserPageState>>({});
   /** The newest frame of the browser the tab watches (#3528). Replaced by the next, never kept. */
@@ -690,8 +691,15 @@ export class Work {
       case "browser/pageChanged":
         this.browserStates.value = { ...this.browserStates.peek(), [host]: params as BrowserPageState };
         return true;
+      case "live/frame": {
+        const frame = params as LiveFrame;
+        this.liveFrames.value = { ...this.liveFrames.peek(), [frame.source]: { host, frame, heardAt: Date.now() } };
+        return true;
+      }
+      // A host from before live/frame: its screen frames.
       case "desktopControl/liveFrame":
-        this.liveFrame.value = { host, frame: params as DesktopControlLiveFrame, heardAt: Date.now() };
+        this.liveFrames.value = { ...this.liveFrames.peek(),
+          screen: { host, frame: fromDesktopControl(params as DesktopControlLiveFrame), heardAt: Date.now() } };
         return true;
       case "agent/showFile": {
         const note = params as ShowFileNotification;

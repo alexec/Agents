@@ -5,13 +5,11 @@
 // sidebar is the root list, as the iPhone Remote's is (#226), and what it picks takes its place,
 // with ‹ Agents back to it. Above it all, the bar of sections (#2141): this is Agents; the Overview
 // and every other section take the place of the sidebar and the chat.
-import { effect, untracked } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { Store } from "../model/store";
 import { folderKey } from "../model/groups";
 import { replace, route } from "../route";
-import { panes, pathOf, setPane, textShownAs } from "./files/paneState";
-import { browserUseMoved } from "../model/machineBrowser";
+import { pathOf, setPane, textShownAs } from "./files/paneState";
 import type { Session } from "../session";
 import { Banner } from "./Banner";
 import { Chat } from "./Chat";
@@ -80,24 +78,6 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
     else setPane(shown.agentID, { tab: "files", file: shown.path, fileLine: shown.line, last: shown.path });
     if (!route.peek().files) replace({ ...route.peek(), files: true });
   }, [shown?.at, r.session]);
-  // An agent that begins to use the browser opens its session's pane at the Agent Browser (#3916),
-  // without going to that session: open at once when it is the one shown, else when it next is.
-  useEffect(() => {
-    const seen = new Map<string, number | undefined>();
-    const watchUse = effect(() => {
-      const moved = browserUseMoved(seen, Object.values(store.agents.value).flat());
-      untracked(() => { for (const id of moved) setPane(id, { tab: "browser", toOpen: true }); });
-    });
-    const open = effect(() => {
-      const shownSession = route.value.session;
-      if (!shownSession || !panes.value[shownSession]?.toOpen) return;
-      untracked(() => {
-        setPane(shownSession, { toOpen: false });
-        if (!route.peek().files) replace({ ...route.peek(), files: true });
-      });
-    });
-    return () => { watchUse(); open(); };
-  }, []);
   return (
     <div class={`app depth-${depth}${r.files && r.session ? " files-open" : ""}${down ? " down" : ""}`}>
       {down && <Banner session={session} />}

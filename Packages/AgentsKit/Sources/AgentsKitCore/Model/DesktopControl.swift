@@ -48,8 +48,9 @@ public struct DesktopControlLiveFrame: Codable, Sendable, Hashable {
         return Data(base64Encoded: image)
     }
 
-    /// How long a frame stands for the screen after it is heard: the host sends one at least
-    /// every 5 seconds while it holds the lease, so none for this long means it was let go.
+    /// How long a live frame stands for its source after it is heard (#4140): the host sends
+    /// frames while the agent drives it and stops 10 seconds after its last call, so none for
+    /// this long means the agent stopped.
     /// Counted on this client's clock from when it heard the frame, never from `capturedAt`,
     /// the Mac's clock, which a phone's may differ from.
     public static let staleAfter: TimeInterval = 15

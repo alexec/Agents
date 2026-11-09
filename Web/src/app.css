@@ -521,6 +521,11 @@ button.link.reading:hover { text-decoration: underline; }
 .desktop-tile p { margin: 0; }
 .desktop-tile-picture { display: block; width: 100%; height: auto; border-radius: var(--radius-control); border: 1px solid var(--paper-rule); }
 .desktop-tile-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 120px; padding: 20px; text-align: center; background: var(--paper-well); border-radius: var(--radius-control); }
+.live-tile-head { display: flex; align-items: center; gap: 8px; }
+.live-tile-name { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.live-tile-icon { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; }
+.live-tile-switch button { display: inline-flex; align-items: center; padding: 3px 9px; }
+.live-tile .desktop-tile-picture { width: auto; max-width: 100%; max-height: 320px; margin: 0 auto; }
 .wait-card p { margin: 0; }
 .wait-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .wait-card-title { display: flex; align-items: center; gap: 7px; min-width: 0; }

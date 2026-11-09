@@ -394,7 +394,7 @@ func (d *Daemon) browserFrame(gen int, f browser.Frame) {
 	n := wire.BrowserFrame{Image: wire.Data(f.JPEG), Ack: f.Ack, Width: f.Width, Height: f.Height}
 	sc.pending, sc.last = f.Ack, &n
 	cs := w.clientsLocked(agent)
-	driver := sc.driver
+	driver, title := sc.driver, sc.title
 	w.mu.Unlock()
 	for _, c := range cs {
 		Notify(c, wire.NotifyBrowserFrame, n)
@@ -403,7 +403,7 @@ func (d *Daemon) browserFrame(gen int, f browser.Frame) {
 	if driver != "" {
 		width, height := int64(f.Width), int64(f.Height)
 		tiled := d.sendLive(wire.LiveFrame{Source: wire.LiveSourceBrowser, AgentID: driver, Image: liveImage(f.JPEG),
-			Width: &width, Height: &height})
+			Width: &width, Height: &height, Title: optional(title)})
 		if tiled && len(cs) == 0 {
 			// Only tiles have it, and they do not ack.
 			wait = browserTilePace

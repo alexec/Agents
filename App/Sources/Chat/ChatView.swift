@@ -104,11 +104,6 @@ struct ChatView: View {
             }
         }
         .onChange(of: agent?.id) { views.tearDownAll() }
-        // The Agent Browser pane opens when this session's agent starts to use the browser
-        // (#3916): at once when it is on screen, else when the person comes back to it.
-        .onChange(of: BrowserUseKey(agent: agent?.id, usedAt: agent?.browserUsedAt), initial: true) { _, key in
-            openAgentBrowserIfUsed(key)
-        }
         .onChange(of: requests.wantsChatFind) {
             guard requests.wantsChatFind, popped == nil else { return }
             requests.wantsChatFind = false
@@ -131,15 +126,6 @@ struct ChatView: View {
         }
         // A view read when the link dropped may never be answered: read it again (#978).
         .onChange(of: model.isConnected) { if model.isConnected { views.reconnected() } }
-    }
-
-    private func openAgentBrowserIfUsed(_ key: BrowserUseKey) {
-        guard let id = key.agent else { return }
-        let state = states.state(for: id)
-        defer { state.browserUseSeen = key.usedAt ?? state.browserUseSeen }
-        guard BrowserUse.opensPane(usedAt: key.usedAt, seen: state.browserUseSeen) else { return }
-        frame.pane = .agentBrowser
-        if !frame.isOpen { frame.open() }
     }
 
     /// Branch from Here (#1658), on a prompt in the chat or in the Prompts list: as Branch,
@@ -402,11 +388,17 @@ struct ChatView: View {
                     .help(selectedHostOffline ? offlineHelp : "")
             })
         }
-        // It drives the Mac's screen (#3004, US4): the live tile, above any pause card.
-        if agent.state == .running, let frame = model.work.liveFrame, frame.agentID == agent.id {
+        // It drives the screen, the browser or a simulator (#3004, #4140): the live tile, above
+        // any pause card. Open shows the browser or the simulator in its pane until the
+        // take-over window (#4141); a chat in a window of its own has no pane to open.
+        let liveFrames = model.work.liveFrames.filter { $0.value.frame.agentID == agent.id }
+        if agent.state == .running, !liveFrames.isEmpty {
             cards.append(WaitingCard(id: "live:" + agent.id.uuidString) {
-                DesktopControlTile(frame: frame, heardAt: model.work.liveFrameHeardAt)
-                    .chatColumn()
+                LiveTile(frames: liveFrames, open: hasInspector ? { [frame] source in
+                    frame.pane = source == .simulator ? .simulator : .agentBrowser
+                    if !frame.isOpen { frame.open() }
+                } : nil)
+                .chatColumn()
             })
         }
         // Its drive_screen paused by the person's touch (#3004, US3): Resume or Take Over.
@@ -457,10 +449,4 @@ struct ChatView: View {
             .background(Paper.ground, ignoresSafeAreaEdges: [])
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { formHeight = $0 }
     }
-}
-
-/// A session and its agent's last use of the machine's browser (#3916).
-private struct BrowserUseKey: Equatable {
-    var agent: UUID?
-    var usedAt: Date?
 }

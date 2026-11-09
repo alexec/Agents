@@ -184,10 +184,11 @@ func TestABrowserCallCastsTheTabForTheChatInFront(t *testing.T) {
 	if gen < 0 {
 		t.Fatal("a driven tab has no screen")
 	}
+	d.browserPage(gen, browser.Page{URL: "https://example.com/", Title: "Example Domain"})
 	d.browserFrame(gen, browser.Frame{JPEG: []byte("jpeg"), Ack: 3, Width: 1280, Height: 720})
 	f := nextLive(t, front, 2*time.Second)
 	if f == nil || f.Source != wire.LiveSourceBrowser || f.AgentID != a.ID || f.Image == nil || *f.Image != "anBlZw==" ||
-		f.Width == nil || *f.Width != 1280 {
+		f.Width == nil || *f.Width != 1280 || f.Title == nil || *f.Title != "Example Domain" {
 		t.Fatalf("no live frame of the tab: %+v", f)
 	}
 	if f := nextLive(t, behind, 200*time.Millisecond); f != nil {

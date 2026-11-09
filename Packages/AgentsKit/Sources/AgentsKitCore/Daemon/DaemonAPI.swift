@@ -532,6 +532,9 @@ public enum DaemonAPI {
         public static let agentEntry = "agent/entry"
         /// The live tile's frame for an agent holding the screen (#3004, US4).
         public static let desktopControlLiveFrame = "desktopControl/liveFrame"
+        /// A live tile's frame of what an agent drives: the screen, the browser or a
+        /// simulator (#4139, #4140).
+        public static let liveFrame = "live/frame"
         /// A frame of the machine's browser's page, and its state, to the clients that
         /// watch it (#3528).
         public static let browserFrame = "browser/frame"

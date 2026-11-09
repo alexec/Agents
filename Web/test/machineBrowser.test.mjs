@@ -55,20 +55,6 @@ test("the tab says what the window's pane says", () => {
   }
 });
 
-test("the pane opens when an agent's browserUsedAt moves on, never at its first sight (#3916)", () => {
-  const seen = new Map();
-  const a = "8A3C1E2F-0000-4000-8000-000000000001";
-  const b = "8A3C1E2F-0000-4000-8000-000000000002";
-  assert.deepEqual(m.browserUseMoved(seen, [{ id: a, browserUsedAt: 100 }, { id: b }]), [], "the page loading opens nothing");
-  assert.deepEqual(m.browserUseMoved(seen, [{ id: a, browserUsedAt: 100 }, { id: b }]), [], "the same value opens nothing");
-  assert.deepEqual(m.browserUseMoved(seen, [{ id: a, browserUsedAt: 200 }, { id: b }]), [a], "a newer value opens it");
-  assert.deepEqual(m.browserUseMoved(seen, [{ id: a, browserUsedAt: 200 }, { id: b, browserUsedAt: 50 }]), [b],
-    "a first value for an agent already seen opens it");
-  assert.deepEqual(m.browserUseMoved(seen, [{ id: a, browserUsedAt: 150 }]), [], "an older value opens nothing");
-  const c = "8A3C1E2F-0000-4000-8000-000000000003";
-  assert.deepEqual(m.browserUseMoved(seen, [{ id: c, browserUsedAt: 300 }]), [], "a session first seen later is only recorded");
-});
-
 test("the pane says which other session holds the browser, and nothing for its own (#3916)", () => {
   const own = "8a3c1e2f-0000-4000-8000-000000000001";
   const other = "8A3C1E2F-0000-4000-8000-000000000002";

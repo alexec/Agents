@@ -12897,6 +12897,10 @@
           "type": "string",
           "description": "What the agent last did on it, in words, such as Clicked Save in TextEdit. Absent when the source says nothing."
         },
+        "title": {
+          "type": "string",
+          "description": "The source by name, for the tile's head (#4140): the page's title, or the simulator's name. Absent for the screen, and before a page has a title."
+        },
         "capturedAt": {
           "$ref": "#/definitions/WireDate"
         },

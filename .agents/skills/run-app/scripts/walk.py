@@ -22,6 +22,7 @@
     walk.py ROOT key return|escape|right|pageup|end|a… [--mods cmd,shift]   a key to the window
     walk.py ROOT info TEXT                       the match and what is above it: class, actions
     walk.py ROOT views [DEPTH] | layers [DEPTH] --view CLASS[#N]   when a shot or press goes wrong
+    walk.py ROOT notify METHOD [PARAMS_JSON]     a host's notification, as if the host sent it (#4140)
     walk.py ROOT wait TEXT [SECONDS]             until TEXT is on the window (exit 1 if not)
     walk.py ROOT gone TEXT [SECONDS]             until TEXT has left it
 
@@ -194,6 +195,9 @@ def main(argv):
         args["text"], args["path"] = positional[0], positional[1:]
     elif verb == "key":
         args["key"] = positional[0]
+    elif verb == "notify":
+        args["method"] = positional[0]
+        args["params"] = json.loads(positional[1]) if len(positional) > 1 else None
     elif positional:
         args["text"] = positional[0]
     reply = walk.call(verb, **args)
