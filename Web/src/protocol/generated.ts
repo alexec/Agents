@@ -12853,6 +12853,7 @@ export interface Methods {
   "runtimes/accounts": { params: Empty; result: RuntimeAccount[] };
   "runtimes/addAccount": { params: AddAccountRequest; result: AccountProfile };
   "runtimes/allowances": { params: string | null; result: RuntimeAllowances };
+  "runtimes/install": { params: RuntimeRequest; result: RuntimeStatus };
   "runtimes/list": { params: Empty; result: RuntimeStatus[] };
   "runtimes/markAvailable": { params: MarkRuntimeAvailable; result: RuntimeAllowances };
   "runtimes/removeAccount": { params: AccountRequest; result: UUID[] };
@@ -13255,6 +13256,7 @@ export const MethodTarget = {
   "runtimes/accounts": "host",
   "runtimes/addAccount": "host",
   "runtimes/allowances": "host",
+  "runtimes/install": "host",
   "runtimes/list": "host",
   "runtimes/markAvailable": "host",
   "runtimes/removeAccount": "host",

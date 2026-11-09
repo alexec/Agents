@@ -235,6 +235,7 @@
 :is(.with-sidebar, .sub-app) .settings-body :is(.machine-runtimes, .resources) li { padding: 6px 8px; border-bottom: 1px solid var(--paper-rule); }
 :is(.with-sidebar, .sub-app) .settings-body :is(.machine-runtimes, .resources) li p { margin: 0; }
 :is(.with-sidebar, .sub-app) .settings-body .machine-runtimes li { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 8px; }
+:is(.with-sidebar, .sub-app) .settings-body .machine-runtimes .row-actions { display: flex; gap: 8px; }
 
 /* A machine's worktrees (#3627): the page's rows, a section per folder, in its column. */
 :is(.with-sidebar, .sub-app) .settings-body .worktrees { max-width: 420px; }

@@ -50,3 +50,13 @@ test("the detail is closed under rows that say how much (#3743)", async () => {
   assert.equal(r.isInstalled(status({ missing: { lookedIn: [] } })), false);
   assert.equal(r.isInstalled(status({ installFailed: { reason: "x" } })), false);
 });
+
+test("a runtime's row offers Update when the app carries a newer copy, and none is going (#4174)", async () => {
+  const r = await load("src/model/runtimes.ts");
+  const status = (outdated, availability, recipe = true) =>
+    ({ runtime: { id: "x", name: "X", ...(recipe ? { install: { steps: [] } } : {}) }, availability, outdated });
+  assert.equal(r.offersUpdate(status(true, { available: { path: "/p" } })), true);
+  assert.equal(r.offersUpdate(status(false, { available: { path: "/p" } })), false, "up to date");
+  assert.equal(r.offersUpdate(status(true, { installing: {} })), false, "already updating");
+  assert.equal(r.offersUpdate(status(true, { available: { path: "/p" } }, false)), false, "no recipe");
+});

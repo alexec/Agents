@@ -3042,6 +3042,23 @@ export class Store extends Work {
     this.noteRuntime(host, await this.link.call("runtimes/signInKey", { runtimeID, key }, host));
   }
 
+  /**
+   * Update on a machine's runtime (#4174, as the Remote's #4035): the machine installs the app's newer copy over the one it
+   * has. The page is not told runtime/changed, so it reads the machine's list again until the install is over.
+   */
+  async updateRuntime(host: string, runtimeID: string): Promise<void> {
+    const status = await this.act("runtimes/install", { runtimeID }, host);
+    if (!status) return;
+    this.noteRuntime(host, status);
+    for (let tries = 0; tries < 200; tries++) {
+      const now = (this.runtimes.peek()[host] ?? []).find((r) => r.runtime.id === runtimeID);
+      if (!now || !("installing" in now.availability)) return;
+      await new Promise((resolve) => setTimeout(resolve, 3_000));
+      const list = await this.link.call("runtimes/list", {}, host).catch(() => null);
+      if (list) this.runtimes.value = { ...this.runtimes.value, [host]: sortedRuntimes(list) };
+    }
+  }
+
   /** One runtime's status, in place of the one the page had. */
   private noteRuntime(host: string, status: RuntimeStatus): void {
     const list = this.runtimes.value[host] ?? [];

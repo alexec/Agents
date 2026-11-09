@@ -4806,8 +4806,18 @@ final class AppModel {
 
     /// Install a missing runtime on this Mac (048). Answers at once; the rest arrives on
     /// `runtime/changed`, which refreshes the list, so every view drawing a runtime moves
-    /// with it and the new-agent menu has it the moment it is there.
-    func installRuntime(_ runtimeID: String) async {
+    /// with it and the new-agent menu has it the moment it is there. On a server, only an
+    /// update of the copy it has (#4174, as the Remote's #4035): its daemon refuses a new one.
+    func installRuntime(_ runtimeID: String, on host: MachineRef = .mac) async {
+        guard host == .mac else {
+            await attempt {
+                _ = try await self.client(for: host).call(DaemonAPI.Method.runtimesInstall,
+                                                         DaemonAPI.RuntimeRequest(runtimeID: runtimeID),
+                                                         returning: RuntimeStatus.self)
+            }
+            await refreshServerRuntimes(host)
+            return
+        }
         await attempt {
             let status = try await self.macClient.call(DaemonAPI.Method.runtimesInstall,
                                                     DaemonAPI.RuntimeRequest(runtimeID: runtimeID),

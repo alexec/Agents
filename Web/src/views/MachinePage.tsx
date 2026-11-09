@@ -16,7 +16,7 @@ import { chooseSettingsMachine } from "./settings/SettingsMachine";
 import { WorktreesList } from "./Worktrees";
 import { Resources } from "./Resources";
 import { RuntimeSignInDialog } from "./RuntimeSignInDialog";
-import { isInstalled, machineRuntimeLine, offersMachineSignIn, signInOnTheMac } from "../model/runtimes";
+import { isInstalled, machineRuntimeLine, offersMachineSignIn, offersUpdate, signInOnTheMac } from "../model/runtimes";
 import type { RuntimeStatus } from "../protocol/generated";
 import { forCleanup, pageLine, tally, worktreesIntro } from "../model/worktrees";
 
@@ -125,9 +125,10 @@ function MachineWorktrees({ store, host }: { store: Store; host: string }) {
   );
 }
 
-/** The runtimes installed on the machine (#3629), one line each: its version and whether it is signed in, and Sign In…
- * on a server's Claude or Codex (#3349). Only the installed ones (#3743): Status ▸ Runtimes lists every runtime. A server installs
- * its runtimes when it is set up, and the daemon takes an install only from the Mac, so there is no Install here.
+/** The runtimes installed on the machine (#3629), one line each: its version and whether it is signed in, Sign In…
+ * on a server's Claude or Codex (#3349), and Update when the app carries a newer copy (#4174), as the Remote's (#4035).
+ * Only the installed ones (#3743): Status ▸ Runtimes lists every runtime. A server installs its runtimes when it is set up,
+ * and the daemon takes a new install only from the Mac, so there is no Install here.
  * Accounts and allowances are the person’s: Status ▸ Runtimes. */
 function MachineRuntimes({ store, host, name }: { store: Store; host: string; name: string }) {
   const [signingIn, setSigningIn] = useState<RuntimeStatus | null>(null);
@@ -141,8 +142,15 @@ function MachineRuntimes({ store, host, name }: { store: Store; host: string; na
           {runtimes.map((status) => (
             <li key={status.runtime.id}>
               <p><span class="strong">{status.runtime.name}</span>{" "}<span class="quiet small">{machineRuntimeLine(status)}</span></p>
-              {offersMachineSignIn(status) && signs && (
-                <button type="button" onClick={() => setSigningIn(status)}>Sign In…</button>
+              {((offersMachineSignIn(status) && signs) || offersUpdate(status)) && (
+                <span class="row-actions">
+                  {offersMachineSignIn(status) && signs && (
+                    <button type="button" onClick={() => setSigningIn(status)}>Sign In…</button>
+                  )}
+                  {offersUpdate(status) && (
+                    <button type="button" onClick={() => void store.updateRuntime(host, status.runtime.id)}>Update</button>
+                  )}
+                </span>
               )}
               {"needsSignIn" in status.availability && store.isMac(host) && <p class="quiet small">{signInOnTheMac}</p>}
             </li>

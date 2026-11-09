@@ -193,6 +193,11 @@ export function isInstalled(status: RuntimeStatus): boolean {
   return !("missing" in status.availability) && !("installFailed" in status.availability);
 }
 
+/** Whether a runtime's row on its machine's page offers Update (#4174): the app carries a newer copy it can install, and none is going. */
+export function offersUpdate(status: RuntimeStatus): boolean {
+  return status.outdated && status.runtime.install != null && !("installing" in status.availability);
+}
+
 /**
  * One runtime on Status ▸ Runtimes (#3631): shown once, not once per machine. Its accounts,
  * allowances and Reaches the Model By are read on its home machine: the Mac when it lists the
