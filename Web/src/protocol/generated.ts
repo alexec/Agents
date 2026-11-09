@@ -12860,6 +12860,7 @@ export interface Methods {
   "views/log": { params: ViewLogRequest; result: Empty };
   "views/read": { params: ViewReadRequest; result: ViewResource };
   "views/show": { params: ViewShowRequest; result: Empty };
+  "work/timeline": { params: WorkTimelineRequest; result: WorkTimeline };
   "workflows/approve": { params: WorkflowApproveRequest; result: WorkflowSummary };
   "workflows/archive": { params: WorkflowArchiveRequest; result: WorkflowSummary };
   "workflows/delete": { params: WorkflowRequest; result: Empty };
@@ -13261,6 +13262,7 @@ export const MethodTarget = {
   "views/log": "host",
   "views/read": "host",
   "views/show": "host",
+  "work/timeline": "host",
   "workflows/approve": "host",
   "workflows/archive": "host",
   "workflows/delete": "host",

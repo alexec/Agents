@@ -25,6 +25,7 @@ export type PageDraw =
   | { kind: "report"; section: Section }
   | { kind: "work"; work: WorkKind }
   | { kind: "features" }
+  | { kind: "timeline" }
   | { kind: "docs" }
   | { kind: "machine"; host: string }
   | { kind: "secrets" }
@@ -55,9 +56,11 @@ export const navPages: Record<NavSection, readonly NavPage[]> = {
   // Every issue and pull request from the forges, with lineage on top, and the milestones and releases
   // lineage knows (#3119). The page's id is the lineage kind, so #/work/pr/<ref> is a PR's page.
   // Features (#3269) after Pull requests: the feature:<name> labels on the epics, not a lineage kind.
+  // Timeline (#4206) after Releases: the epics in time, from work/timeline.
   work: workKinds.flatMap((k): NavPage[] => [
     { id: k, title: workKindTitle[k], group: "Work", draw: { kind: "work", work: k } },
     ...k === "pr" ? [{ id: "features", title: "Features", group: "Work", draw: { kind: "features" } } satisfies NavPage] : [],
+    ...k === "release" ? [{ id: "timeline", title: "Timeline", group: "Work", draw: { kind: "timeline" } } satisfies NavPage] : [],
   ]),
   // The folders' docs and the docs connectors' (#3321, spec 3319), one page; #/docs/<ref> is a doc's page.
   docs: [{ id: "docs", title: "Docs", group: "Docs", draw: { kind: "docs" } }],
