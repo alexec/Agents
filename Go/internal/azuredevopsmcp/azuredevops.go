@@ -149,11 +149,15 @@ type CompletedBuild struct {
 	Trusted                               bool
 }
 
-func (b CompletedBuild) data() map[string]any {
+// data is run.completed's payload; deploys are what the build says it deployed (#3820).
+func (b CompletedBuild) data(deploys []string) map[string]any {
+	if deploys == nil {
+		deploys = []string{}
+	}
 	return map[string]any{"run": map[string]any{
 		"id": b.ID, "name": b.Name, "number": b.Number, "event": b.Reason, "branch": b.Branch, "headSha": b.HeadSHA,
 		"url": b.URL, "conclusion": b.Result, "actor": b.Actor,
-	}, "completedAt": b.At}
+	}, "completedAt": b.At, "deploys": deploys}
 }
 
 // ReviewComment is a comment on a line of a pull request's diff, or an answer in its thread.
@@ -210,6 +214,12 @@ type AzureDevOps interface {
 	// CompletedBuilds are the builds that finished at or after since, of pipeline (its name),
 	// branch (or tag) and run (a build's id) when each is set, in any order.
 	CompletedBuilds(ctx context.Context, repo, pipeline, branch string, run int, since string) (builds []CompletedBuild, listed Listed, err error)
+	// BuildDeploys are what a build's jobs say they deployed (#3820): the message of each
+	// warning with the code deploy (##vso[task.logissue type=warning;code=deploy]<ref>).
+	BuildDeploys(ctx context.Context, repo string, build int) ([]string, error)
+	// WaitingDeploys are builds waiting for an environment's approvals (#3820): only
+	// pipeline's and branch's when each is set.
+	WaitingDeploys(ctx context.Context, repo, pipeline, branch string) ([]WaitingDeploy, error)
 	// ReviewComments are the comments on pull requests' diffs made at or after since.
 	ReviewComments(ctx context.Context, repo, since string) (comments []ReviewComment, listed Listed, err error)
 	// Yours is what the token's owner has in the repository (#2034).

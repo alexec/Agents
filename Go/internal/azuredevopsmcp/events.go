@@ -81,8 +81,8 @@ func namedInput() schema {
 // fixesSchema is a pull request's fixes: the work items its description closes, "#12" (#2349).
 var fixesSchema = map[string]any{"type": "array", "items": str}
 
-// events are the events this server offers, in the gitlab server's order, and checks.passed
-// and run.completed as the github server's (#3805, #3810); the gitlab server's issue events
+// events are the events this server offers, in the gitlab server's order, and checks.passed,
+// run.completed and deploy.waiting as the github server's (#3805, #3810, #3820); the gitlab server's issue events
 // are the tracker's here.
 var events = []event{
 	{Name: "checks.failed", Title: "Checks failed",
@@ -102,7 +102,7 @@ var events = []event{
 		})},
 	// A build no pull request owns, as main's or a tag's, as the github server's (#3444, #3810).
 	{Name: "run.completed", Title: "Pipeline build finished",
-		Description: "An Azure Pipelines build of the repository finished, whatever started it (a push, a tag, a person, a schedule) and whatever its result (succeeded, failed, canceled, partiallySucceeded): one event per build and finish time, so a build run again is a new one. For a build no pull request owns, such as main's or a tag's release; a pull request's own builds are checks.failed and checks.passed. run.name is its pipeline's name, run.number its build number, run.event what started it (manual, individualCI, batchedCI, schedule, pullRequest…). Only builds asked for by a person, never a bot (a build service), and never a fork's pull request's, unless anyone is true.",
+		Description: "An Azure Pipelines build of the repository finished, whatever started it (a push, a tag, a person, a schedule) and whatever its result (succeeded, failed, canceled, partiallySucceeded): one event per build and finish time, so a build run again is a new one. For a build no pull request owns, such as main's or a tag's release; a pull request's own builds are checks.failed and checks.passed. run.name is its pipeline's name, run.number its build number, run.event what started it (manual, individualCI, batchedCI, schedule, pullRequest…). Only builds asked for by a person, never a bot (a build service), and never a fork's pull request's, unless anyone is true. deploys is what its jobs say they deployed: the message of each warning with the code deploy, <target>:<id>/<version>, as testflight:<bundle id>/<build> from ##vso[task.logissue type=warning;code=deploy]testflight:com.example.app/42.",
 		Input: schema{repoProperty,
 			property{Name: "pipeline", Kind: "string", Description: "Only builds of this pipeline, by its name, as release."},
 			branchProperty("Only builds of this branch or tag, as main or v0.16.0."),
@@ -111,6 +111,22 @@ var events = []event{
 			"run": object(map[string]any{"id": integer, "name": str, "number": str, "event": str, "branch": str, "headSha": str,
 				"url": str, "conclusion": str, "actor": str}),
 			"completedAt": str,
+			// What the build deployed, as its jobs say with ##vso[task.logissue type=warning;code=deploy]<target>:<id>/<version> (#3820).
+			"deploys": map[string]any{"type": "array", "items": str},
+		})},
+	// A deploy held by an environment's approvals, as the github server's (#3587, #3820).
+	{Name: "deploy.waiting", Title: "Deploy waiting for approval",
+		Description: "An Azure Pipelines build is waiting for an approver of an environment's Approvals check, as a release pipeline's deployment job to production: one event per build and set of pending approvals, so the next stage it waits on is a new one. Each of environments is one pending approval, by its id, named by the stage it holds. reviewers are its approvers that have not answered; canApprove says whether the Azure DevOps account whose token this server has may answer every one. Answer it on Azure DevOps. Only builds asked for by a person, never a bot (a build service), and never a fork's pull request's, unless anyone is true.",
+		Input: schema{repoProperty,
+			property{Name: "pipeline", Kind: "string", Description: "Only builds of this pipeline, by its name, as release."},
+			branchProperty("Only builds of this branch or tag, as main or v0.16.0."), anyoneProperty},
+		Payload: object(map[string]any{
+			"run": object(map[string]any{"id": integer, "name": str, "number": str, "event": str, "branch": str, "headSha": str,
+				"url": str, "actor": str}),
+			"environments": map[string]any{"type": "array", "items": object(map[string]any{"id": str, "name": str, "url": str})},
+			"reviewers":    map[string]any{"type": "array", "items": str},
+			"canApprove":   map[string]any{"type": "boolean"},
+			"waitingSince": str,
 		})},
 	{Name: "pr.opened", Title: "Pull request opened",
 		Description: "A pull request was opened, or a draft was published: a pull request active and not a draft now that was not at the last poll. Drafts never count. Reactivated, it is raised again." + ownPRs,
@@ -313,10 +329,29 @@ func candidates(ctx context.Context, f AzureDevOps, name string, a args, yours *
 		for _, b := range builds {
 			if b.At != "" && (a.anyone || b.Trusted) {
 				list = append(list, candidate{EventID: fmt.Sprintf("run.completed:%s:%d:%s", repo, b.ID, b.At), Time: b.At,
-					Data: func() (map[string]any, error) { return b.data(), nil }})
+					Data: func() (map[string]any, error) {
+						deploys, err := f.BuildDeploys(ctx, repo, b.ID)
+						if err != nil {
+							return nil, err
+						}
+						return b.data(deploys), nil
+					}})
 			}
 		}
 		return list, listed, nil
+	case "deploy.waiting":
+		waiting, err := f.WaitingDeploys(ctx, repo, a.pipeline, a.branch)
+		if err != nil {
+			return nil, Listed{}, err
+		}
+		var list []candidate
+		for _, w := range waiting {
+			if w.Since != "" && (a.anyone || w.Build.Trusted) {
+				list = append(list, candidate{EventID: "deploy.waiting:" + repo + ":" + w.key(), Time: w.Since,
+					Data: func() (map[string]any, error) { return w.data(), nil }})
+			}
+		}
+		return list, Listed{}, nil
 	case "review.comment":
 		comments, listed, err := f.ReviewComments(ctx, repo, since)
 		if err != nil {
