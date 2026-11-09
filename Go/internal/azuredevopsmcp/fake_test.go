@@ -39,6 +39,7 @@ type fakeAzureDevOps struct {
 	iterations map[int][]obj // pull request → its pushes; none for one of one push
 	builds     []obj
 	timeline   map[int][]obj // build → its records
+	approvals  []obj         // the project's pending approvals
 	logs       map[int]string
 	changes    map[int][]obj     // pull request → the files its newest push changes
 	fileDiffs  []obj             // what filediffs answers
@@ -306,6 +307,11 @@ func (f *fakeAzureDevOps) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		w.WriteHeader(http.StatusNotFound)
 		_, _ = w.Write([]byte(`{"message":"The requested build could not be found."}`))
+	case p == "/acme/Web App/_apis/pipelines/approvals":
+		if q.Get("state") != "pending" || q.Get("$expand") != "steps,permissions" {
+			f.t.Errorf("approvals %v", q)
+		}
+		list(f.approvals)
 	case timelinePath.MatchString(p):
 		reply(obj{"records": f.timeline[n(timelinePath.FindStringSubmatch(p))]})
 	case logPath.MatchString(p):

@@ -14,14 +14,14 @@ import (
 // The events over the fake Azure DevOps: the gitlab server's names, the trust filter (#728),
 // and each one raised once from what Azure DevOps says.
 
-func TestTheEventsAreTheGitLabServersPullRequestEventsChecksPassedAndRunCompleted(t *testing.T) {
+func TestTheEventsAreTheGitLabServersPullRequestEventsChecksPassedRunCompletedAndDeployWaiting(t *testing.T) {
 	var want []string
 	for _, name := range gitlabmcp.EventNames() {
 		if !strings.HasPrefix(name, "issue.") {
 			want = append(want, name)
 		}
 		if name == "checks.failed" {
-			want = append(want, "checks.passed", "run.completed")
+			want = append(want, "checks.passed", "run.completed", "deploy.waiting")
 		}
 	}
 	same(t, EventNames(), want)
@@ -265,7 +265,7 @@ func TestRunCompletedForABuildNoPullRequestOwns(t *testing.T) {
 	same(t, ids, []string{id(51), id(52)})
 	same(t, data(t, result, 0), map[string]any{"run": map[string]any{"id": 51, "name": "release", "number": "2026.11.51",
 		"event": "manual", "branch": "v0.16.0", "headSha": "sha51", "url": "https://ado.test/acme/Web%20App/_build/results?buildId=51",
-		"conclusion": "failed", "actor": "alex@acme.test"}, "completedAt": done})
+		"conclusion": "failed", "actor": "alex@acme.test"}, "completedAt": done, "deploys": []string{}})
 	same(t, data(t, result, 1)["run"].(map[string]any)["branch"], "main")
 	ids, _ = release.poll()
 	same(t, ids, []string{id(51)})
@@ -285,6 +285,101 @@ func TestRunCompletedForABuildNoPullRequestOwns(t *testing.T) {
 	same(t, ids, []string{"run.completed:acme/Web App/app:52:" + timeString(start.Add(300e9))})
 	ids, _ = one.poll()
 	same(t, ids, []string(nil))
+}
+
+func TestRunCompletedSaysWhatTheBuildDeployed(t *testing.T) {
+	f := newFake(t)
+	p := newPoller(t, f, "run.completed", nil)
+	p.poll()
+	tag := branchBuild(61, "main", "sha61", "release", "succeeded", 1)
+	tag["sourceBranch"], tag["reason"], tag["requestedFor"] = "refs/tags/v1.2.0", "manual", alex
+	deploy := func(message string) obj {
+		return obj{"type": "warning", "message": message, "data": obj{"type": "warning", "code": "deploy"}}
+	}
+	f.set(func() {
+		f.builds = []obj{tag}
+		f.timeline[61] = []obj{
+			{"id": "stage", "type": "Stage", "name": "Ship"},
+			{"id": "upload", "parentId": "stage", "type": "Task", "name": "Upload", "issues": []any{
+				deploy("testflight:com.example.app/42"),
+				deploy("testflight:com.example.app/42"), // once
+				deploy("not a ref"),
+				obj{"type": "warning", "message": "appstore:com.example.app/1.2.0"}, // no code
+				obj{"type": "error", "message": "cloudrun:p/r/s/s-1", "data": obj{"code": "deploy"}},
+			}},
+			{"id": "submit", "parentId": "stage", "type": "Task", "name": "Submit", "issues": []any{deploy(" appstore:com.example.app/1.2.0 ")}},
+		}
+	})
+	_, result := p.poll()
+	same(t, data(t, result, 0)["deploys"], []string{"testflight:com.example.app/42", "appstore:com.example.app/1.2.0"})
+}
+
+func TestDeployWaitingIsABuildHeldByAnApproval(t *testing.T) {
+	f := newFake(t)
+	p := newPoller(t, f, "deploy.waiting", nil)
+	release := newPoller(t, f, "deploy.waiting", map[string]any{"pipeline": "Release", "branch": "v1.2.0"})
+	anyone := newPoller(t, f, "deploy.waiting", map[string]any{"anyone": true})
+	for _, w := range []*poller{p, release, anyone} {
+		w.poll()
+	}
+	tag := branchBuild(71, "main", "sha71", "release", "", 0)
+	tag["status"], tag["sourceBranch"], tag["reason"], tag["requestedFor"] = "inProgress", "refs/tags/v1.2.0", "manual", alex
+	nightly := branchBuild(72, "main", "sha72", "nightly", "", 0)
+	nightly["status"], nightly["requestedFor"] = "inProgress", builder
+	other := branchBuild(73, "main", "sha73", "release", "", 0)
+	other["repository"] = obj{"id": "another-repo"}
+	approval := func(id string, build, created int, permissions any, approvers ...obj) obj {
+		steps := []any{}
+		for _, a := range approvers {
+			steps = append(steps, obj{"status": "pending", "assignedApprover": a})
+		}
+		return obj{"id": id, "status": "pending", "createdOn": at(created), "permissions": permissions, "steps": steps,
+			"pipeline": obj{"id": "1", "name": "release", "owner": obj{"id": build, "name": "2026.11.1"}}}
+	}
+	group := obj{"id": "g", "displayName": "[Web App]\\Release Approvers", "isContainer": true}
+	f.set(func() {
+		f.builds = []obj{tag, nightly, other}
+		f.approvals = []obj{
+			approval("AAA-1", 71, 2, "view, update", dev, group),
+			approval("aaa-0", 71, 1, 3, dev),
+			approval("bbb", 72, 1, "view", dev),
+			approval("ccc", 73, 1, 3, dev),
+		}
+		f.timeline[71] = []obj{
+			{"id": "s1", "type": "Stage", "name": "Staging"},
+			{"id": "c1", "parentId": "s1", "type": "Checkpoint", "name": "Checkpoint"},
+			{"id": "aaa-0", "parentId": "c1", "type": "Checkpoint.Approval", "name": "Checkpoint.Approval"},
+			{"id": "s2", "type": "Stage", "name": "Production"},
+			{"id": "c2", "parentId": "s2", "type": "Checkpoint", "name": "Checkpoint"},
+			{"id": "aaa-1", "parentId": "c2", "type": "Checkpoint.Approval", "name": "Checkpoint.Approval"},
+		}
+	})
+	ids, result := p.poll()
+	key := "deploy.waiting:acme/Web App/app:71:aaa-0,AAA-1"
+	same(t, ids, []string{key})
+	url := "https://ado.test/acme/Web%20App/_build/results?buildId=71"
+	same(t, data(t, result, 0), map[string]any{
+		"run": map[string]any{"id": 71, "name": "release", "number": "2026.11.71", "event": "manual", "branch": "v1.2.0",
+			"headSha": "sha71", "url": url, "actor": "alex@acme.test"},
+		"environments": []any{
+			map[string]any{"id": "aaa-0", "name": "Staging", "url": url},
+			map[string]any{"id": "AAA-1", "name": "Production", "url": url},
+		},
+		"reviewers":  []string{"dev@acme.test", "[Web App]\\Release Approvers"},
+		"canApprove": true, "waitingSince": timeString(start.Add(120e9)),
+	})
+	ids, _ = release.poll()
+	same(t, ids, []string{key})
+	ids, result = anyone.poll()
+	same(t, ids, []string{"deploy.waiting:acme/Web App/app:72:bbb", key}) // by when each began to wait
+	same(t, data(t, result, 0)["canApprove"], false)
+	same(t, data(t, result, 0)["environments"].([]any)[0].(map[string]any)["name"], "") // no timeline yet
+	ids, _ = p.poll()
+	same(t, ids, []string(nil))
+	// Staging approved: the wait on Production alone is a new one.
+	f.set(func() { f.approvals = f.approvals[:1]; f.approvals[0]["createdOn"] = at(4) })
+	ids, _ = p.poll()
+	same(t, ids, []string{"deploy.waiting:acme/Web App/app:71:AAA-1"})
 }
 
 func TestReviewCommentIsALineOfTheDiff(t *testing.T) {

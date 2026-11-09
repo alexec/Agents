@@ -562,31 +562,16 @@ func combined(builds []buildJSON) string {
 
 // buildLog is a build's failed steps and the end of each one's log.
 func (f *RealAzureDevOps) buildLog(ctx context.Context, repo string, build int) (map[string]any, error) {
-	var timeline struct {
-		Records []struct {
-			ID       string `json:"id"`
-			ParentID string `json:"parentId"`
-			Type     string `json:"type"`
-			Name     string `json:"name"`
-			Result   string `json:"result"`
-			Log      *struct {
-				ID int `json:"id"`
-			} `json:"log"`
-			Issues []struct {
-				Type    string `json:"type"`
-				Message string `json:"message"`
-			} `json:"issues"`
-		} `json:"records"`
-	}
-	if err := f.get(ctx, api(fmt.Sprintf("%sbuild/builds/%d/timeline", projectPath(repo), build), nil), false, &timeline); err != nil {
+	records, err := f.timeline(ctx, repo, build)
+	if err != nil {
 		return nil, err
 	}
 	names := map[string]string{}
-	for _, r := range timeline.Records {
+	for _, r := range records {
 		names[r.ID] = r.Name
 	}
 	steps := []any{}
-	for _, r := range timeline.Records {
+	for _, r := range records {
 		if r.Type != "Task" || r.Result != "failed" {
 			continue
 		}

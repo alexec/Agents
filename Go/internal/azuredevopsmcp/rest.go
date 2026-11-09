@@ -931,15 +931,20 @@ func (f *RealAzureDevOps) CompletedBuilds(ctx context.Context, repo, pipeline, b
 			(branch != "" && b.ref() != branch && b.SourceBranch != branch) {
 			continue
 		}
-		head := b.SourceVer
-		if sha := b.TriggerInfo["pr.sourceSha"]; sha != "" {
-			head = sha
-		}
-		out = append(out, CompletedBuild{ID: b.ID, Name: b.Definition.Name, Number: b.BuildNumber, Reason: b.Reason, Branch: b.ref(),
-			HeadSHA: head, URL: b.Links.Web.Href, Result: b.Result, Actor: b.RequestedFor.name(), At: normalized(b.FinishTime),
-			Trusted: !b.fromFork() && b.RequestedFor.ID != "" && !isBot(b.RequestedFor)})
+		out = append(out, completed(b))
 	}
 	return out, listed, nil
+}
+
+// completed is a build as run.completed and deploy.waiting give it.
+func completed(b buildJSON) CompletedBuild {
+	head := b.SourceVer
+	if sha := b.TriggerInfo["pr.sourceSha"]; sha != "" {
+		head = sha
+	}
+	return CompletedBuild{ID: b.ID, Name: b.Definition.Name, Number: b.BuildNumber, Reason: b.Reason, Branch: b.ref(),
+		HeadSHA: head, URL: b.Links.Web.Href, Result: b.Result, Actor: b.RequestedFor.name(), At: normalized(b.FinishTime),
+		Trusted: !b.fromFork() && b.RequestedFor.ID != "" && !isBot(b.RequestedFor)}
 }
 
 // threads are a pull request's threads, shared as listings are.

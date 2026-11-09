@@ -18,7 +18,7 @@ import (
 
 // Instructions are the server's words.
 const Instructions = "This repository's pull requests and their Azure Pipelines builds on Azure DevOps, as events polled as the person whose token this server has: " +
-	"checks.failed (a build of a pull request's head commit failed), checks.passed, run.completed (a build of any trigger, as main's or a tag's), pr.opened, pr.merged, pr.closed (abandoned), pr.conflicted, review.requested, " +
+	"checks.failed (a build of a pull request's head commit failed), checks.passed, run.completed (a build of any trigger, as main's or a tag's, with what it deployed), deploy.waiting (a build held by an environment's approvals), pr.opened, pr.merged, pr.closed (abandoned), pr.conflicted, review.requested, " +
 	"review.comment (a comment on a line of a pull request's diff). " +
 	"list_pull_requests, get_pull_request and get_checks read them, and get_build_log reads a failed build's failed steps; " +
 	"comment_on_pull_request comments. " +

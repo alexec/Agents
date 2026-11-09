@@ -80,10 +80,24 @@ here too:
   started by hand. `pipeline` (its name), `branch` (a branch or tag, as `main` or `v0.16.0`)
   and `run` (a build's id) narrow it. `run.conclusion` is Azure DevOps's result
   (`succeeded`, `failed`, `canceled`, `partiallySucceeded`); a build run again is a new event.
+  `deploys` is what the build says it deployed (see below).
+- `deploy.waiting`: a build waits for an approver of an environment's **Approvals** check, as
+  a deployment job to `production`. Each of `environments` is one pending approval, named by
+  the stage it holds; `reviewers` are its approvers who have not answered, and `canApprove`
+  says whether the token's owner may answer. The next stage it waits on is a new event.
+  `pipeline` and `branch` narrow it. Answer it on Azure DevOps.
 - `pr.opened`, `pr.merged` (completed), `pr.closed` (abandoned), `pr.conflicted`.
 - `review.requested`: for you, the token's owner: you are a reviewer and have not voted.
 - `review.comment`: a comment on a line of a pull request's diff. `comment.threadId` is
   the thread to answer in.
+
+A build says what it deployed with a warning whose code is `deploy` and whose message is
+the deploy's ref, `<target>:<id>/<version>`, as GitHub Actions' `::notice title=deploy::`
+(a build tag cannot hold a colon):
+
+```yaml
+- bash: echo "##vso[task.logissue type=warning;code=deploy]testflight:com.example.app/$(Build.BuildId)"
+```
 
 Unless an event's `anyone` is true, a bot (a build service) and a pull request from a fork
 never count. Azure DevOps lets only a project's members open a pull request or comment on
