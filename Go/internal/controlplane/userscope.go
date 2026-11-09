@@ -64,6 +64,7 @@ func (m *Methods) userMethod(ctx context.Context, method string, params json.Raw
 		if err != nil {
 			return nil, err
 		}
+		m.s.addSecretInfo(user, rows)
 		return wire.UserSecretNames{Secrets: rows}, nil
 	case "user/secretRecipients":
 		return wire.SealRecipients{Recipients: m.s.userRecipients(user), User: &user}, nil

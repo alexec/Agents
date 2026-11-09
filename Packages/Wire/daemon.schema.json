@@ -15625,14 +15625,43 @@
       },
       "additionalProperties": false
     },
+    "MachineSecretHeld": {
+      "type": "object",
+      "description": "One of the person's secrets that a machine holds a copy of (#4158), as it sends it with machine/secretOps: its version, its hint and its last operation there. Never the value.",
+      "properties": {
+        "name": {
+          "$ref": "#/definitions/UserSecretName"
+        },
+        "version": {
+          "type": "integer"
+        },
+        "hint": {
+          "type": "string",
+          "description": "The value's last 4 characters (#4158), from a machine that holds a copy: only for a value of 16 characters or more, and a card's is the last 4 of its number. Left out otherwise. The control plane passes it to the person's own clients and never writes it to its store."
+        },
+        "lastOp": {
+          "$ref": "#/definitions/SecretLastOp"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
     "MachineSecretOpsCall": {
       "type": "object",
-      "description": "machine/secretOps (#4156): what a machine's agents did with its person's secrets, for the control plane's audit. At most one operation per secret, session, place and minute, with a count.",
+      "description": "machine/secretOps (#4156): what a machine's agents did with its person's secrets, for the control plane's audit. At most one operation per secret, session, place and minute, with a count. held, when there, is every one of the person's secrets the machine holds a copy of (#4158), in place of what it sent before.",
       "properties": {
         "ops": {
           "type": "array",
           "items": {
             "$ref": "#/definitions/SecretOperation"
+          }
+        },
+        "held": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MachineSecretHeld"
           }
         }
       },
@@ -24605,6 +24634,23 @@
       ],
       "additionalProperties": false
     },
+    "SecretLastOp": {
+      "type": "object",
+      "description": "A secret's last operation (#4158): what it was and when, the newest any machine reported. No session, no place, no value.",
+      "properties": {
+        "what": {
+          "$ref": "#/definitions/SecretOperationWhat"
+        },
+        "at": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "what",
+        "at"
+      ],
+      "additionalProperties": false
+    },
     "SecretLeftOn": {
       "type": "object",
       "description": "A machine that was removed with a secret on it (#1760, FR-026): change the secret where it was issued.",
@@ -25430,6 +25476,21 @@
         },
         "setAt": {
           "$ref": "#/definitions/WireDate"
+        },
+        "created": {
+          "$ref": "#/definitions/WireDate",
+          "description": "When the name was first set for the session (#4158); a new value does not change it."
+        },
+        "hint": {
+          "type": "string",
+          "description": "The value's last 4 characters (#4158), from a machine that holds a copy: only for a value of 16 characters or more, and a card's is the last 4 of its number. Left out otherwise. The control plane passes it to the person's own clients and never writes it to its store."
+        },
+        "lastOp": {
+          "$ref": "#/definitions/SecretLastOp"
+        },
+        "backedUp": {
+          "type": "boolean",
+          "description": "Always false (#4158): a secret for one session is on this machine only."
         },
         "needsApproval": {
           "type": "boolean",
@@ -30129,6 +30190,22 @@
             "$ref": "#/definitions/MachineRef"
           },
           "description": "The machines it was sent to."
+        },
+        "created": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the name was first set (#4158); Replace… does not change it. Left out for one set before it was kept."
+        },
+        "hint": {
+          "type": "string",
+          "description": "The value's last 4 characters (#4158), from a machine that holds a copy: only for a value of 16 characters or more, and a card's is the last 4 of its number. Left out otherwise. The control plane passes it to the person's own clients and never writes it to its store."
+        },
+        "lastOp": {
+          "$ref": "#/definitions/SecretLastOp"
+        },
+        "backedUp": {
+          "type": "boolean",
+          "description": "False when one copy only opens (#4158): machines has one and waiting is empty."
         },
         "leftOn": {
           "type": "array",

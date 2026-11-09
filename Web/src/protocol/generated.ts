@@ -6122,11 +6122,30 @@ export interface MachineSchedule {
 }
 
 /**
+ * One of the person's secrets that a machine holds a copy of (#4158), as it sends it with
+ * machine/secretOps: its version, its hint and its last operation there. Never the value.
+ */
+export interface MachineSecretHeld {
+  name: UserSecretName;
+  version?: number;
+  /**
+   * The value's last 4 characters (#4158), from a machine that holds a copy: only for a value of 16
+   * characters or more, and a card's is the last 4 of its number. Left out otherwise. The control
+   * plane passes it to the person's own clients and never writes it to its store.
+   */
+  hint?: string;
+  lastOp?: SecretLastOp;
+}
+
+/**
  * machine/secretOps (#4156): what a machine's agents did with its person's secrets, for the control
- * plane's audit. At most one operation per secret, session, place and minute, with a count.
+ * plane's audit. At most one operation per secret, session, place and minute, with a count. held,
+ * when there, is every one of the person's secrets the machine holds a copy of (#4158), in place of
+ * what it sent before.
  */
 export interface MachineSecretOpsCall {
   ops: SecretOperation[];
+  held?: MachineSecretHeld[];
 }
 
 /**
@@ -9907,6 +9926,15 @@ export interface SecretGrants {
 }
 
 /**
+ * A secret's last operation (#4158): what it was and when, the newest any machine reported. No
+ * session, no place, no value.
+ */
+export interface SecretLastOp {
+  what: SecretOperationWhat;
+  at: WireDate;
+}
+
+/**
  * A machine that was removed with a secret on it (#1760, FR-026): change the secret where it was
  * issued.
  */
@@ -10287,6 +10315,17 @@ export interface SessionSecret {
   title: string;
   name: string;
   setAt: WireDate;
+  /** When the name was first set for the session (#4158); a new value does not change it. */
+  created?: WireDate;
+  /**
+   * The value's last 4 characters (#4158), from a machine that holds a copy: only for a value of 16
+   * characters or more, and a card's is the last 4 of its number. Left out otherwise. The control
+   * plane passes it to the person's own clients and never writes it to its store.
+   */
+  hint?: string;
+  lastOp?: SecretLastOp;
+  /** Always false (#4158): a secret for one session is on this machine only. */
+  backedUp?: boolean;
   /**
    * Ask before use (#4014): its value is sealed in the session's file, never there as plain text,
    * and a person approves each use (#4015).
@@ -11830,6 +11869,20 @@ export interface UserSecretRow {
   updated: string;
   /** The machines it was sent to. */
   machines: MachineRef[];
+  /**
+   * When the name was first set (#4158); Replace… does not change it. Left out for one set before
+   * it was kept.
+   */
+  created?: string;
+  /**
+   * The value's last 4 characters (#4158), from a machine that holds a copy: only for a value of 16
+   * characters or more, and a card's is the last 4 of its number. Left out otherwise. The control
+   * plane passes it to the person's own clients and never writes it to its store.
+   */
+  hint?: string;
+  lastOp?: SecretLastOp;
+  /** False when one copy only opens (#4158): machines has one and waiting is empty. */
+  backedUp?: boolean;
   /** Machines removed with it on them, since it was last set. */
   leftOn?: SecretLeftOn[];
   version?: number;
@@ -14023,7 +14076,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineRelease: { required: ["version"], optional: [] },
   MachineRequest: { required: ["host"], optional: ["purge"] },
   MachineSchedule: { required: [], optional: ["at", "workflow"] },
-  MachineSecretOpsCall: { required: ["ops"], optional: [] },
+  MachineSecretHeld: { required: ["name"], optional: ["version", "hint", "lastOp"] },
+  MachineSecretOpsCall: { required: ["ops"], optional: ["held"] },
   MachineSessionCall: { required: ["host", "call"], optional: [] },
   MachineSessionStart: { required: ["host", "start"], optional: [] },
   MachineStatus: { required: ["idle", "running"], optional: ["schedule"] },
@@ -14347,6 +14401,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SecretGrant: { required: ["name", "use", "place"], optional: [] },
   SecretGrantChange: { required: ["grant"], optional: [] },
   SecretGrants: { required: ["grants"], optional: [] },
+  SecretLastOp: { required: ["what", "at"], optional: [] },
   SecretLeftOn: { required: ["host", "name", "at"], optional: [] },
   SecretNeedsApprovalRequest: { required: ["name", "needsApproval"], optional: ["agentID"] },
   SecretOperation: { required: ["name", "what", "at"], optional: ["use", "place", "agent", "count"] },
@@ -14376,7 +14431,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SessionMoveIn: { required: ["upload", "folder", "from"], optional: ["carryOn"] },
   SessionMovedFrom: { required: ["machine", "at"], optional: [] },
   SessionNotice: { required: ["severity", "title"], optional: ["detail"] },
-  SessionSecret: { required: ["agentID", "title", "name", "setAt"], optional: ["needsApproval", "description"] },
+  SessionSecret: { required: ["agentID", "title", "name", "setAt"], optional: ["created", "hint", "lastOp", "backedUp", "needsApproval", "description"] },
   SessionSecretRemoveRequest: { required: ["agentID", "name"], optional: [] },
   SessionSecretSetRequest: { required: ["agentID", "name", "value"], optional: ["needsApproval", "description"] },
   SessionSecrets: { required: ["secrets"], optional: [] },
@@ -14529,7 +14584,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   UserSecretAbout: { required: ["name"], optional: ["kind", "description", "needsApproval"] },
   UserSecretNames: { required: ["secrets"], optional: [] },
   UserSecretRequest: { required: ["name"], optional: [] },
-  UserSecretRow: { required: ["name", "updated", "machines"], optional: ["kind", "leftOn", "version", "waiting", "needsApproval", "description"] },
+  UserSecretRow: { required: ["name", "updated", "machines"], optional: ["kind", "created", "hint", "lastOp", "backedUp", "leftOn", "version", "waiting", "needsApproval", "description"] },
   UserSecretSet: { required: ["name", "version", "values"], optional: ["kind", "needsApproval", "description"] },
   UserSettings: { required: [], optional: ["mcpServers", "agentConfig", "agentConfigFiles", "runtimes", "costLimits", "notifications", "accounts", "policy", "updated"] },
   UserSettingsChanged: { required: [], optional: ["parts", "agentConfigFiles", "secrets"] },

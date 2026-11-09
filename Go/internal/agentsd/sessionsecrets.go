@@ -48,6 +48,10 @@ type sessionSecretValue struct {
 	SetAt  wire.Date    `json:"setAt"`
 	// Description is what it is for (#4167): not secret, so it is there in clear.
 	Description string `json:"description,omitempty"`
+	// Created is when the name was first set; a new value keeps it. Hint is the value's last
+	// 4, from secretHint (#4158).
+	Created *wire.Date `json:"created,omitempty"`
+	Hint    string     `json:"hint,omitempty"`
 }
 
 func (d *Daemon) sessionSecretsDir() string {
@@ -208,6 +212,10 @@ func (d *Daemon) setSessionSecret(agent wire.UUID, name, value, description stri
 		f.Secrets = map[string]sessionSecretValue{}
 	}
 	old, had := f.Secrets[name]
+	entry.Hint, entry.Created = secretHint(value, nil), new(entry.SetAt)
+	if had && old.Created != nil {
+		entry.Created = old.Created
+	}
 	if had && old.Sealed != nil && entry.Sealed != nil {
 		// A new value is not a new place: the grants stay (#4015).
 		if sealed, err := d.sealSecret(sealedSessionStore(agent), name, value, old.Sealed.Grants); err == nil {
@@ -331,7 +339,17 @@ func (d *Daemon) sessionSecretList() wire.SessionSecrets {
 			continue
 		}
 		for n, v := range d.readSessionSecrets(wire.UUID(id)).Secrets {
-			row := wire.SessionSecret{AgentID: a.ID, Title: agentTitle(a), Name: n, SetAt: v.SetAt}
+			// On this machine only, so never backed up (#4158).
+			row := wire.SessionSecret{AgentID: a.ID, Title: agentTitle(a), Name: n, SetAt: v.SetAt, Created: v.Created, BackedUp: new(false)}
+			if row.Created == nil {
+				row.Created = new(v.SetAt)
+			}
+			if v.Hint != "" {
+				row.Hint = new(v.Hint)
+			}
+			if op, ok := d.secretLastOp(n); ok {
+				row.LastOp = &wire.SecretLastOp{What: op.What, At: op.At}
+			}
 			if v.Description != "" {
 				row.Description = new(v.Description)
 			}
@@ -394,13 +412,13 @@ func (d *Daemon) setSessionNeedsApproval(agent wire.UUID, name string, on bool) 
 		if err != nil {
 			return Invalid("%s was not changed: it could not be sealed on this machine.", name)
 		}
-		f.Secrets[name] = sessionSecretValue{Sealed: &sealed, SetAt: v.SetAt, Description: v.Description}
+		f.Secrets[name] = sessionSecretValue{Sealed: &sealed, SetAt: v.SetAt, Description: v.Description, Created: v.Created, Hint: v.Hint}
 	case !on && v.Sealed != nil:
 		plain, err := d.openSealedSecret(sealedSessionStore(agent), name, *v.Sealed)
 		if err != nil {
 			return Invalid("%s does not open on this machine, so it was left as it is.", name)
 		}
-		f.Secrets[name] = sessionSecretValue{Value: plain, SetAt: v.SetAt, Description: v.Description}
+		f.Secrets[name] = sessionSecretValue{Value: plain, SetAt: v.SetAt, Description: v.Description, Created: v.Created, Hint: v.Hint}
 	default:
 		return nil
 	}

@@ -1270,7 +1270,9 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 		if err != nil {
 			return nil, err
 		}
-		m.s.auditSecretOps(host, m.s.ownerOf(host), request.Ops)
+		owner := m.s.ownerOf(host)
+		m.s.auditSecretOps(host, owner, request.Ops)
+		m.s.noteSecretInfo(host, owner, request.Ops, request.Held, request.Held != nil)
 		return wire.Empty{}, nil
 	case "machine/machines", "machine/providerDraft", "machine/status", "machine/installProgress":
 		if m.s.providers == nil {

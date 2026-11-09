@@ -433,7 +433,11 @@ It is read only.
   (`· 12 times`). A person's Set and Remove in Settings ▸ Secrets are their own entries ("Set a
   secret", "Removed a secret", `user/setSecret` and `user/removeSecret`). Never a value. Each
   machine also keeps each secret's last operation in `secret-ops.json`, for the names it holds,
-  and a removed secret's goes with it.
+  and a removed secret's goes with it. It sends that last operation, and the hint of each copy
+  (the last 4 of a value of 16 characters or more, or of a card's number), with what it holds
+  (`machine/secretOps`, `held`; #4158). The control plane keeps both in memory only and puts
+  them on the person's own rows (`user/secretNames`: `hint`, `lastOp`, `created`,
+  `backedUp`). The store never has a hint.
 - **How long**: 90 days by default. An admin picks 30, 90, 180 or 365 days in the pane
   (`control/setAuditDays`, 1 to 3,650); the menu marks the time set now. The control
   plane's hourly sweep deletes older entries, by day. A shorter time asks first, with how

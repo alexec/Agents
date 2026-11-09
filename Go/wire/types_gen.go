@@ -6998,9 +6998,23 @@ type MachineSchedule struct {
 	Workflow *string `json:"workflow,omitzero"`
 }
 
-// machine/secretOps (#4156): what a machine's agents did with its person's secrets, for the control plane's audit. At most one operation per secret, session, place and minute, with a count.
+// One of the person's secrets that a machine holds a copy of (#4158), as it sends it with machine/secretOps: its version, its hint and its last operation there. Never the value.
+type MachineSecretHeld struct {
+	Name UserSecretName `json:"name"`
+
+	Version *int64 `json:"version,omitzero"`
+
+	// The value's last 4 characters (#4158), from a machine that holds a copy: only for a value of 16 characters or more, and a card's is the last 4 of its number. Left out otherwise. The control plane passes it to the person's own clients and never writes it to its store.
+	Hint *string `json:"hint,omitzero"`
+
+	LastOp *SecretLastOp `json:"lastOp,omitzero"`
+}
+
+// machine/secretOps (#4156): what a machine's agents did with its person's secrets, for the control plane's audit. At most one operation per secret, session, place and minute, with a count. held, when there, is every one of the person's secrets the machine holds a copy of (#4158), in place of what it sent before.
 type MachineSecretOpsCall struct {
 	Ops []SecretOperation `json:"ops"`
+
+	Held []MachineSecretHeld `json:"held,omitzero"`
 }
 
 // machines/sessionCall, through machine/machines (#2927): an agent's read_session, message_session, stop_session, archive_session, or list_sessions and agent.ended wait status, on a session it started on another of the person's machines with start_session. The control plane sends that machine's agents/fromStarter, with call.from in its own words.
@@ -11111,6 +11125,13 @@ type SecretGrants struct {
 	Grants []SecretGrant `json:"grants"`
 }
 
+// A secret's last operation (#4158): what it was and when, the newest any machine reported. No session, no place, no value.
+type SecretLastOp struct {
+	What SecretOperationWhat `json:"what"`
+
+	At Date `json:"at"`
+}
+
 // A machine that was removed with a secret on it (#1760, FR-026): change the secret where it was issued.
 type SecretLeftOn struct {
 	Host MachineRef `json:"host"`
@@ -11497,6 +11518,17 @@ type SessionSecret struct {
 	Name string `json:"name"`
 
 	SetAt Date `json:"setAt"`
+
+	// When the name was first set for the session (#4158); a new value does not change it.
+	Created *Date `json:"created,omitzero"`
+
+	// The value's last 4 characters (#4158), from a machine that holds a copy: only for a value of 16 characters or more, and a card's is the last 4 of its number. Left out otherwise. The control plane passes it to the person's own clients and never writes it to its store.
+	Hint *string `json:"hint,omitzero"`
+
+	LastOp *SecretLastOp `json:"lastOp,omitzero"`
+
+	// Always false (#4158): a secret for one session is on this machine only.
+	BackedUp *bool `json:"backedUp,omitzero"`
 
 	// Ask before use (#4014): its value is sealed in the session's file, never there as plain text, and a person approves each use (#4015).
 	NeedsApproval *bool `json:"needsApproval,omitzero"`
@@ -13374,6 +13406,17 @@ type UserSecretRow struct {
 
 	// The machines it was sent to.
 	Machines []MachineRef `json:"machines"`
+
+	// When the name was first set (#4158); Replace… does not change it. Left out for one set before it was kept.
+	Created *string `json:"created,omitzero"`
+
+	// The value's last 4 characters (#4158), from a machine that holds a copy: only for a value of 16 characters or more, and a card's is the last 4 of its number. Left out otherwise. The control plane passes it to the person's own clients and never writes it to its store.
+	Hint *string `json:"hint,omitzero"`
+
+	LastOp *SecretLastOp `json:"lastOp,omitzero"`
+
+	// False when one copy only opens (#4158): machines has one and waiting is empty.
+	BackedUp *bool `json:"backedUp,omitzero"`
 
 	// Machines removed with it on them, since it was last set.
 	LeftOn []SecretLeftOn `json:"leftOn,omitzero"`
