@@ -102,6 +102,9 @@ var browserTools = sync.OnceValues(func() ([]json.RawMessage, map[string]bool) {
 	// The app's own device profile (#4086), the same.
 	names[emulateDeviceName] = true
 	out = append(out, emulateDeviceTool)
+	// The web page, paired (#4214), the same.
+	names[pairWebPageName] = true
+	out = append(out, pairWebPageTool)
 	// The hand-off to the person (#3529), the same.
 	names[handToPersonName] = true
 	out = append(out, handToPersonTool)
@@ -299,6 +302,9 @@ func (d *Daemon) driveBrowser(ctx context.Context, agent wire.UUID, name string,
 	}
 	if name == captureSecretName {
 		return d.captureSecret(ctx, drive, args)
+	}
+	if name == pairWebPageName {
+		return d.pairWebPage(ctx, drive)
 	}
 	if name == emulateDeviceName {
 		said, isError := d.emulateDevice(agent, device)

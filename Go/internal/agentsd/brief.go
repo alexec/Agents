@@ -309,7 +309,8 @@ func toolsBrief(browser, screen, bot, github bool) string {
 			"- fill_secret: type one of my secrets into a field on the page. Never type a secret with browser_type. "+
 				"For a secret with Ask before use it waits on my approval; when it names a request, wait for it with wait_for_event, then call it again.",
 			"- generate_secret: make a new account's password, save it as one of my secrets and type it into the field. Never make a password yourself.",
-			"- capture_secret: save a value the page shows once (an app password, an API token) as one of my secrets. Never read it with browser_snapshot first.")
+			"- capture_secret: save a value the page shows once (an app password, an API token) as one of my secrets. Never read it with browser_snapshot first.",
+			"- pair_web_page: open the app's web page in the browser, paired as me, for a step only the web page does (Connectors, Settings). Never ask me for a pairing code.")
 		if !bot {
 			lines = append(lines, "- "+handToPersonName+": give me one step on the page that only I can do, such as a CAPTCHA or a sign-in.")
 		}

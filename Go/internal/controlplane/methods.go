@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"net/url"
 	"os"
 	"slices"
 	"sort"
@@ -1088,6 +1089,7 @@ var startsWork = methodSet(
 	"backups/upload",
 	"git/credential",
 	"links/check",
+	"machine/pairWebPage",
 	"tunnel/open",
 	"workflows/claimRun",
 	"workflows/trigger",
@@ -1174,6 +1176,8 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 	case "machine/orgRoutesAgain":
 		m.s.orgRoutesAgain(host)
 		return map[string]any{}, nil
+	case wire.CallMachinePairWebPage.Name:
+		return m.pairWebPage(ctx, host)
 	case "machine/lockAdd", "machine/lockAgain", "machine/lockJoin", "machine/lockJoinReveal":
 		return m.hostLockMethod(ctx, host, method, params)
 	case wire.CallMachineSecretKey.Name, wire.CallMachineSecretRelease.Name:
@@ -1666,3 +1670,28 @@ func readJoinFile(file string) *MachineJoinStatus {
 	return &MachineJoinStatus{Member: read.Status.Member, Connected: read.Status.Connected, Problem: read.Status.Problem,
 		At: dateOf(read.Status.At)}
 }
+
+// pairWebPage is a one-time browser code for the agent browser that host's agentsd launched
+// (#4214), as the web page's address with #code=, so an agent can use the web page with no
+// person. Only the machine on this control plane's own Mac may ask, while the page is
+// served: its browser is the one that reaches localhost. The code is the machine's
+// person's, as a code from Open in Browser is, and like any browser code it pairs only
+// from the page.
+func (m *Methods) pairWebPage(ctx context.Context, host string) (*wire.WebPagePairing, error) {
+	settings, record := m.records.Settings(), m.records.Host(host)
+	if m.s.cfg.Hosted || settings == nil || record == nil || record.MachineID == nil || *record.MachineID != settings.MachineID {
+		return nil, fail(notSupported, "Only the machine this control plane runs on pairs its browser with the web page.")
+	}
+	port := m.s.WebPort()
+	if port == 0 {
+		return nil, fail(notSupported, "This control plane serves no web page.")
+	}
+	shown, err := m.s.codes.Issue(withCodeOwner(ctx, m.s.ownerOf(host)), false, true, webPageCodeLifetime)
+	if err != nil {
+		return nil, err
+	}
+	return &wire.WebPagePairing{URL: web.OriginFor(port) + "/#code=" + url.QueryEscape(shown.Text)}, nil
+}
+
+// webPageCodeLifetime is how long pairWebPage's code works: the agent browser opens it at once.
+const webPageCodeLifetime = 2 * time.Minute
