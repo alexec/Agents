@@ -265,6 +265,9 @@ func (d *Daemon) driveBrowser(ctx context.Context, agent wire.UUID, name string,
 	if d.driveBrowserAs(agent) {
 		d.markBrowserUsed(agent)
 	}
+	// Its tab is the chat's live tile while it drives, and for liveDriveWindow after (#4139).
+	d.browserDrove(agent)
+	defer d.browserDrove(agent)
 	if name == handToPersonName {
 		// The person drives: no Playwright is needed for it.
 		said, isError := d.handToPerson(agent, args)

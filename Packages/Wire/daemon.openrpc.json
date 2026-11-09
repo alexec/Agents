@@ -5122,6 +5122,22 @@
       }
     },
     {
+      "name": "live/frame",
+      "x-capability": "live.frame/1",
+      "description": "A live tile's frame (#4139): what an agent drives (source screen, browser or simulator), sent only within 10 seconds of the agent's last call on it, and only to the connections whose presence/report is active and shows that agent. Never recorded. desktopControl/liveFrame goes on beside it until every client reads this one.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LiveFrame"
+          }
+        }
+      ]
+    },
+    {
       "name": "lock/hello",
       "x-capability": "host.lock/3",
       "description": "A client opens a checked channel to this machine (#3492, specs/3399-machine-lock D6): the machine checks the client's signing key against its person's lock and answers with its own key, and from then on every request and answer on the channel carries an HMAC and a count. Once the machine holds a lock, it refuses a request on a channel from the control plane that has no HMAC from a channel opened this way, or no signature of a key in the lock (LockSignature), except the few the control plane asks for itself.",

@@ -163,3 +163,48 @@ func TestAWatcherWhoJoinsSeesTheLastFrame(t *testing.T) {
 	}
 	close(late.in)
 }
+
+// A browser call makes the session's tab a live tile (#4139): its frames go as live/frame
+// to the client with the chat in front, though no window watches it, and the screen is let
+// go liveDriveWindow after the last call.
+func TestABrowserCallCastsTheTabForTheChatInFront(t *testing.T) {
+	old := liveDriveWindow.Swap(int64(300 * time.Millisecond))
+	t.Cleanup(func() { liveDriveWindow.Store(old) })
+	d, front := start(t, t.TempDir())
+	behind := newConn()
+	go d.Accept(behind)
+	t.Cleanup(func() { close(behind.in) })
+	a := seeded(t, d, t.TempDir(), func(a *wire.Agent) {})
+	front.call(t, 1, "presence/report", map[string]any{"active": true, "showing": a.ID})
+	behind.call(t, 1, "presence/report", map[string]any{"active": false, "showing": a.ID})
+
+	d.browserDrove(a.ID)
+	key := sessionKey(a.ID)
+	gen := screenGen(d, key)
+	if gen < 0 {
+		t.Fatal("a driven tab has no screen")
+	}
+	d.browserFrame(gen, browser.Frame{JPEG: []byte("jpeg"), Ack: 3, Width: 1280, Height: 720})
+	f := nextLive(t, front, 2*time.Second)
+	if f == nil || f.Source != wire.LiveSourceBrowser || f.AgentID != a.ID || f.Image == nil || *f.Image != "anBlZw==" ||
+		f.Width == nil || *f.Width != 1280 {
+		t.Fatalf("no live frame of the tab: %+v", f)
+	}
+	if f := nextLive(t, behind, 200*time.Millisecond); f != nil {
+		t.Fatalf("a client not in front got a live frame: %+v", f)
+	}
+	if f := nextBrowserFrame(front, 100*time.Millisecond); f != nil {
+		t.Fatal("a client that does not watch heard browser/frame")
+	}
+
+	deadline := time.Now().Add(3 * time.Second)
+	for screenGen(d, key) >= 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("the tab's screen outlived the drive")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if f := nextLive(t, front, 100*time.Millisecond); f != nil {
+		t.Fatalf("a live frame after the drive: %+v", f)
+	}
+}

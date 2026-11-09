@@ -96,6 +96,7 @@ const CapLineageEstimate1 = "lineage.estimate/1"
 const CapLineageSessions1 = "lineage.sessions/1"
 const CapLineage1 = "lineage/1"
 const CapLinks1 = "links/1"
+const CapLiveFrame1 = "live.frame/1"
 const CapLiveactivity1 = "liveactivity/1"
 const CapLockJoin1 = "lock-join/1"
 const CapLockReset1 = "lock-reset/1"
@@ -585,6 +586,7 @@ var HostCapabilities = pairs([][2]string{
 	{"files/changed", "files/1"},
 	{"folder/changed", "folder/1"},
 	{"folder/removed", "folder/1"},
+	{"live/frame", "live.frame/1"},
 	{"mcp/healthChanged", "mcp/1"},
 	{"mcp/hostedChanged", "mcp/1"},
 	{"modes/changed", "modes/1"},
@@ -643,6 +645,7 @@ var HostNotifications = set([]string{
 	"files/changed",
 	"folder/changed",
 	"folder/removed",
+	"live/frame",
 	"mcp/healthChanged",
 	"mcp/hostedChanged",
 	"modes/changed",

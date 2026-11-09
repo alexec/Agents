@@ -121,6 +121,7 @@ type Daemon struct {
 	achievementBook
 	afterTurnState
 	attentionState
+	liveTileState
 	worktreeState
 	recoveryState
 	backupState
