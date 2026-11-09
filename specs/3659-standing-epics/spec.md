@@ -148,11 +148,15 @@ on every forge with no change to their clients. Alex can overrule.
 - Only the epic's own repo, Linear team or Jira project is read.
 - Each child's `blockedBy` is empty for now: a list does not read blockers.
 
+## The lead (#3663)
+
+The `lead` skill's "Standing epics" section works one: it reads the query (with `gh`
+until a lead can call `forge/plan`), runs at most `lanes` lanes, also waits on
+`issue.opened` and `issue.labelled` for the block's first label, and never closes the
+epic.
+
 ## Not in this spike
 
-- The lead skill's steps for a standing epic: it never closes the epic, and it waits on
-  `issue.opened` and `issue.labeled` as well. That is a change to the `lead` skill, after
-  #3661.
 - The Plan section on the Work page for a standing epic (Mac + web).
 - Moving AGENTS.md's bug-lane and polish-lane rules into the two standing epics.
 
