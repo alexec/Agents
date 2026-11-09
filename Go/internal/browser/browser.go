@@ -340,7 +340,7 @@ func locateChromium(t Toolset, env []string) (string, error) {
 // launchChromium starts Chromium with chromedp: headless, the kept profile, its debugging
 // port on 127.0.0.1 and a port the system picks, so only this machine reaches it and the
 // address has the browser's random id in its path. Its user agent says Chrome, not
-// HeadlessChrome (#4060).
+// HeadlessChrome (#4060). It has no WebAuthn, as it cannot do passkeys (#4084).
 func launchChromium(exe, profile string, env []string) (*process, error) {
 	if ua, ok := userAgents.Load(exe); ok {
 		p, _, err := startChromium(exe, profile, env, ua.(string))
@@ -386,6 +386,11 @@ func startChromium(exe, profile string, env []string, userAgent string) (*proces
 		// The profile's bound (#3727): the HTTP cache stays under this while it runs, and
 		// dropCaches empties every cache before the next start.
 		chromedp.Flag("disk-cache-size", strconv.Itoa(diskCacheBytes)),
+		// The agents' browser has no passkeys (#4084): headless, it has no window for the
+		// passkey dialog and no Touch ID. With WebAuthn off in Blink, PublicKeyCredential
+		// is not there, so a page does not wait on a dialog nobody sees; agents use a
+		// password and TOTP (#3908). Only the flag, no script in pages.
+		chromedp.Flag("disable-blink-features", "WebAuth"),
 	)
 	if userAgent != "" {
 		opts = append(opts, chromedp.UserAgent(userAgent))
