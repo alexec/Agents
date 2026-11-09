@@ -112,7 +112,7 @@ func TestATagAddedIsLabelledOncePerTag(t *testing.T) {
 	p.poll(0)
 	f.update(5, dev, 1, map[string][2]any{fieldTags: {"ui", "ui; agent; Urgent"}})
 	f.update(5, dev, 2, map[string][2]any{fieldTags: {"ui; agent; Urgent", "agent"}}) // removed only
-	f.update(5, builder, 3, map[string][2]any{fieldTags: {"agent", "agent; ci"}})    // a bot's
+	f.update(5, builder, 3, map[string][2]any{fieldTags: {"agent", "agent; ci"}})     // a bot's
 	ids, result := p.poll(0)
 	same(t, ids, []string{"issue.labelled:5/2/agent", "issue.labelled:5/2/urgent"})
 	if d := data(result)[0]; d["label"] != "agent" || d["by"] != "dev@acme.test" || d["labelledAt"] != "2026-11-06T12:01:00.000Z" {

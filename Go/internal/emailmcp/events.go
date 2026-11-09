@@ -2,7 +2,6 @@ package emailmcp
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 
 	"github.com/emersion/go-imap/v2"
 )
@@ -21,17 +22,11 @@ import (
 // message's id, folder, senders, recipients, subject and date: never its text, which an agent
 // reads with read_message, marked as outside content.
 
-// rpcError is a JSON-RPC error answer.
-type rpcError struct {
-	Code    int            `json:"code"`
-	Message string         `json:"message"`
-	Data    map[string]any `json:"data,omitempty"`
-}
-
-func (e *rpcError) Error() string { return e.Message }
+// rpcError is a JSON-RPC error answer: its code, message and optional data.
+type rpcError = mcpevents.Error
 
 func invalidParams(format string, args ...any) *rpcError {
-	return &rpcError{Code: -32602, Message: fmt.Sprintf(format, args...)}
+	return mcpevents.InvalidParams(format, args...)
 }
 
 // EventName is the one event.
@@ -206,24 +201,12 @@ type cursor struct {
 	UID      uint32 `json:"uid"`
 }
 
-func (c cursor) encoded() string {
-	data, _ := json.Marshal(c)
-	return base64.RawURLEncoding.EncodeToString(data)
-}
+func (c cursor) encoded() string { return mcpevents.EncodeCursor(c) }
 
 func decodeCursor(raw json.RawMessage, folder string) (cursor, *rpcError) {
-	refused := invalidParams("cursor is not one this server gave")
-	var text string
-	if err := json.Unmarshal(raw, &text); err != nil {
-		return cursor{}, refused
-	}
-	data, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(text, "="))
-	if err != nil {
-		return cursor{}, refused
-	}
 	var c cursor
-	if json.Unmarshal(data, &c) != nil || c.Validity == 0 || c.Folder != folder {
-		return cursor{}, refused
+	if !mcpevents.DecodeCursor(raw, &c) || c.Validity == 0 || c.Folder != folder {
+		return cursor{}, mcpevents.RefusedCursor()
 	}
 	return c, nil
 }
@@ -231,19 +214,12 @@ func decodeCursor(raw json.RawMessage, folder string) (cursor, *rpcError) {
 // MARK: Polling
 
 const (
-	maxEvents = 100
+	maxEvents = mcpevents.MaxEvents
 	// nextPollMs is the pace with IDLE on the folder (a quiet poll costs the server nothing)
 	// and without.
 	idlePollMs  = 10000
 	plainPollMs = 60000
 )
-
-type pollParams struct {
-	Name      string          `json:"name"`
-	Arguments json.RawMessage `json:"arguments"`
-	Cursor    json.RawMessage `json:"cursor"`
-	MaxEvents *int            `json:"maxEvents"`
-}
 
 // Events answers events/poll over a Mailbox, with Watchers (which may be nil) to know when
 // a folder is quiet.
@@ -263,22 +239,18 @@ type quiet struct {
 
 // Poll answers events/poll's params.
 func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any, *rpcError) {
-	var p pollParams
-	if err := json.Unmarshal(raw, &p); err != nil {
-		return nil, invalidParams("params must be an object")
+	p, bad := mcpevents.ParseParams(raw)
+	if bad != nil {
+		return nil, bad
 	}
 	if p.Name != EventName {
-		return nil, &rpcError{Code: -32011, Message: fmt.Sprintf("no event %s; this server offers %s", p.Name, EventName)}
+		return nil, mcpevents.NoEvent(p.Name, EventNames())
 	}
 	a, bad := checkArgs(p.Arguments)
 	if bad != nil {
 		return nil, bad
 	}
-	limit := 50
-	if p.MaxEvents != nil {
-		limit = *p.MaxEvents
-	}
-	limit = min(maxEvents, max(1, limit))
+	limit := p.Limit()
 
 	watch := s.Watchers.Folder(a.folder)
 	changes, live := watch.State()
@@ -290,7 +262,7 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 		return map[string]any{"events": events, "cursor": c.encoded(), "truncated": false, "hasMore": more, "nextPollMs": pace}
 	}
 
-	if len(p.Cursor) == 0 || string(p.Cursor) == "null" {
+	if p.FirstPoll() {
 		mark, err := s.Mailbox.Mark(ctx, a.folder)
 		if err != nil {
 			return nil, eventsError(err)
