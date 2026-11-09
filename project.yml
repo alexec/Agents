@@ -165,7 +165,12 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.store
         CODE_SIGN_ENTITLEMENTS: App/Agents-Store.entitlements
-        PRODUCT_NAME: Agents
+        # Not Agents, which the one app is (#4225): both are built into one build/DD, where
+        # the second Agents.app wrote over the first. The person still sees CFBundleName.
+        PRODUCT_NAME: Agents Store
+        # Its own @main (StoreEntry). The one app's is HostEntry (#4225), until #4224's
+        # removal child deletes this target.
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) STORE_WINDOW
         SDKROOT: macosx
         SUPPORTED_PLATFORMS: macosx
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
@@ -430,6 +435,11 @@ targets:
     # The web remote (071, #473) is not checked in: built here, before it is copied in.
     # With no Node it is left empty and Agents Host builds without its web page.
     preBuildScripts:
+      # Every window preference in WindowDefaults (#1029): a scratch copy shares the
+      # bundle id, so a key in the standard domain lands in the person's window.
+      - name: Check window defaults
+        script: python3 "$SRCROOT/scripts/check-window-defaults.py"
+        basedOnDependencyAnalysis: false
       - name: Build the web remote
         script: sh "$SRCROOT/scripts/web.sh" dist
         basedOnDependencyAnalysis: false
@@ -506,6 +516,10 @@ targets:
     # Carried into Contents/Helpers and signed here, not by a copy phase, which would try
     # to strip it (a Go binary is already stripped, and strip refuses it).
     postBuildScripts:
+      # The voice's models, copied into Resources/Voice (#2322).
+      - name: Carry the voice
+        script: sh "$SRCROOT/scripts/voice-models.sh" --carry
+        basedOnDependencyAnalysis: false
       - name: Carry the Go control plane
         script: sh "$SRCROOT/scripts/go-control.sh" --carry
         basedOnDependencyAnalysis: false
@@ -559,17 +573,23 @@ targets:
         basedOnDependencyAnalysis: false
     sources:
       - path: Host/Sources
-      # The pairing sheet's QR code, drawn as the window draws it.
-      - path: App/Sources/Settings/QRCode.swift
+      # The window (#4225): one app with the host, so it links all of AgentsKit. "The
+      # window starts no agent program" stays a rule in its code (the daemon owns agents),
+      # but no sandbox enforces it now.
+      - path: App/Sources
+      # Its icon, the menu bar mark (both drawn by design/logo/blob/final/make.sh) and its
+      # Acknowledgements. servers and toolsets are folders of their own, below.
+      - path: App/Resources
+        excludes:
+          - servers
+          - toolsets
+      - path: Shared/UI
       - path: Host/AgentsHost.entitlements
         buildPhase: none
       # The privacy manifest (#729): the required-reason APIs it uses, no data collected, no
-      # tracking.
+      # tracking. The host's holds every reason the window's does, and more.
       - path: Host/PrivacyInfo.xcprivacy
         buildPhase: resources
-      # The happy Blob (#1237): the app icon, as the window's, and the menu bar mark, both
-      # drawn by design/logo/blob/final/make.sh.
-      - path: Host/Resources/Assets.xcassets
       # The two launch agents Run it here registers (T055). SMAppService reads them from
       # here and nowhere else.
       - path: Host/LaunchAgents
@@ -594,6 +614,10 @@ targets:
         product: AgentsKit
       - package: AgentsKit
         product: AgentsKitCore
+      - package: SwiftTerm
+      - package: CodeText
+      - package: Yams
+      - package: FluidAudio
       # agentsd's reader of its callers' code signatures (#1138, slice C), which it
       # looks for beside itself: without it the host's socket is open to every caller.
       - target: agents-peer
@@ -615,32 +639,50 @@ targets:
     info:
       path: Host/Info.plist
       properties:
-        CFBundleDisplayName: Agents Host
-        CFBundleName: Agents Host
+        # One app, Agents (#4224): the window, the menu bar item and this Mac's host.
+        CFBundleDisplayName: Agents
+        CFBundleName: Agents
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleShortVersionString: $(MARKETING_VERSION)
         LSApplicationCategoryType: public.app-category.developer-tools
         LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
         NSHumanReadableCopyright: © 2026 Alex Collins
-        # A menu bar item and one window; no Dock tile.
-        LSUIElement: true
-        # agents-host://pair: the App Store window's K2 asks for a code to be shown.
+        NSMicrophoneUsageDescription: >-
+          So you can say what you want done instead of typing it, and talk to your
+          agents in voice mode. No audio is kept.
+        NSSpeechRecognitionUsageDescription: >-
+          So what you say becomes the words in the prompt. It is recognised on this Mac
+          where this Mac can do it.
+        NSLocalNetworkUsageDescription: >-
+          To find and reach your agents' control plane on this network.
+        NSBonjourServices: [_agents-control._tcp]
+        # Where frame K's "Set one up on this Mac" sent the person; #4226 removes frame K.
+        AgentsHostDownloadURL: https://github.com/alexec/Agents/releases/latest
+        # agents-host://pair: frame K2 asks for a code to be shown.
         CFBundleURLTypes:
           - CFBundleURLName: com.alexecollins.agents.host
             CFBundleURLSchemes: [agents-host]
         ITSAppUsesNonExemptEncryption: false
     settings:
       base:
+        # Agents Host's bundle ID (#4224): agentsd's self-update moves every install of
+        # Agents Host to this app with no step from the person.
         PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.host
         CODE_SIGN_ENTITLEMENTS: Host/AgentsHost.entitlements
-        PRODUCT_NAME: Agents Host
+        PRODUCT_NAME: Agents
+        # Still Agents Host's program name (#4225): each login item was registered with
+        # BundleProgram Contents/MacOS/Agents Host, and launchd runs that path in whatever
+        # bundle a self-update puts in place. The person sees CFBundleName, never this.
+        EXECUTABLE_NAME: Agents Host
         SDKROOT: macosx
         SUPPORTED_PLATFORMS: macosx
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ENABLE_PREVIEWS: YES
         GENERATE_INFOPLIST_FILE: NO
         ENABLE_HARDENED_RUNTIME: YES
-        # The web remote's build reads Web/ and writes Web/dist, which a sandboxed script
-        # phase may not.
+        # The web remote's build reads Web/ and writes Web/dist, and the defaults check reads
+        # the sources, which a sandboxed script phase may not.
         ENABLE_USER_SCRIPT_SANDBOXING: NO
       # The GitHub release (#669): Release signs it with Developer ID, outside the App Store.
       configs:

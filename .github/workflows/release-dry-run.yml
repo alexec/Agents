@@ -44,7 +44,7 @@ env:
   VERSION: 0.0.0
 
 jobs:
-  # As release.yml's linux job: Agents Host carries the Linux agentsd and the MCP servers.
+  # As release.yml's linux job: Agents carries the Linux agentsd and the MCP servers.
   linux:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -105,7 +105,7 @@ jobs:
 
       # An empty build cache of the run's own: the point of this job (#2773). Nothing is
       # restored into it and nothing is saved from it.
-      - name: Archive and package Agents Host (dry run, cold cache)
+      - name: Archive and package Agents (dry run, cold cache)
         run: |
           export AGENTS_BUILD_CACHE="$RUNNER_TEMP/build-cache"
           test ! -e "$AGENTS_BUILD_CACHE"

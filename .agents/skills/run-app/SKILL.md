@@ -10,8 +10,9 @@ pieces, as on the real Mac:
 - **this Mac's host**, `agentsd`, owns the agents. The root it is pointed at *is* its
   identity: its lock, its socket, its agents;
 - **the control plane**, `agents-control`, which the host dials out to;
-- **the window**, the sandboxed App Store build (`AgentsStore`), a client of the control
-  plane like the phone. It starts nothing.
+- **the window**, the one app, Agents (`AgentsHost`, #4225), a client of the control
+  plane like the phone. It starts nothing; with `--walk` it has no menu bar item and no
+  host window, so it never touches the Mac's own login items.
 
 That is the whole basis of this skill: you get all three of your own, so nothing you
 do reaches the user's agents, and nothing of theirs reaches yours. The helpers come
@@ -48,7 +49,7 @@ $S/stop.sh $ROOT                                  # must print clean
 ```
 
 `launch.sh` builds with `xcodegen generate`, then `xcodebuild -scheme AgentsHost`
-and `-scheme AgentsStore`, one after the other, into the one `build/DD`, with `-skipPackagePluginValidation`. Skip the build with `--no-build` when
+into `build/DD`, with `-skipPackagePluginValidation`. Skip the build with `--no-build` when
 nothing has changed since the last one. The build log is at
 `/tmp/run-<slug>-build.log`.
 
@@ -97,8 +98,7 @@ into **Connect…**. To walk Agents Host itself, open a scratch build of it with
 `AGENTS_ROOT=$ROOT` (its plists and jobs are the root's, and `stop.sh` boots them out). Make
 more codes with `"$HOSTAPP/Contents/Helpers/agents-control" code --client
 --home $ROOT/control` (add `--browser` for a code the web remote pairs with: a browser's code
-works only through the loopback listener, and any other only over TLS), where `HOSTAPP` is `build/DD/Build/Products/Debug/Agents
-Host.app`.
+works only through the loopback listener, and any other only over TLS), where `HOSTAPP` is `build/DD/Build/Products/Debug/Agents.app`.
 
 ## Rules that are not optional
 

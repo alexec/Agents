@@ -66,3 +66,4 @@ What agents learnt about this repo: its code, tools, process and decisions. One 
 - [TOTP for agent sign-ins](totp-for-agent-sign-ins.md) — scripts/totp.sh <service>, seeds in ~/.agents/secrets/<service>-totp; otpauth, not pyotp/pquerna (stale)
 - [Remote walk: pair first, machine lock](remote-walk-machine-lock.md) — pair the phone before extra hosts join; approve with walk.py "=Approve"; re-pair loses the lock
 - [go fmt rewrites other files](go-fmt-rewrites-other-files.md) — Go/scripts/go.sh fmt touches files on main that are not gofmt-clean; restore them
+- [The one app's program keeps its old name](one-app-program-keeps-agents-host-name.md) — Agents.app runs Contents/MacOS/Agents Host (#4225); match both names in pgrep

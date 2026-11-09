@@ -52,7 +52,7 @@ for plist in "$ROOT"/com.alexecollins.agentshost.*.scratch-*.plist "$ROOT"/contr
   fi
 done
 
-for pid in $(pgrep -f "Agents.app/Contents/MacOS/Agents --walk $WALK( |$)" || true); do
+for pid in $(pgrep -f "Agents.app/Contents/MacOS/Agents( Host)? --walk $WALK( |$)" || true); do
   echo "quitting window $pid"
   kill "$pid" 2>/dev/null || true
 done
@@ -66,13 +66,17 @@ stop_pid "$(tr -d '[:space:]' 2>/dev/null < "$ROOT/fake-forgejo.pid" || true)" f
 # Runtimes and MCP helpers the host started carry the root in their argv or environment.
 for pid in $(pgrep -f "AGENTS_ROOT.*$ROOT" || true); do kill "$pid" 2>/dev/null || true; done
 
-# The window's pairing for this walk, in its container.
+# The window's pairing for this walk: in Application Support since the window is one app
+# with the host (#4225), and in the App Store window's container before.
+rm -rf "$HOME/Library/Application Support/Agents/walks/$WALK"
 rm -rf "$HOME/Library/Containers/com.alexecollins.agents.store/Data/Library/Application Support/Agents/walks/$WALK"
 # And its defaults, a domain of its own (#1029); a window still quitting is caught by the
 # next launch's sweep, since its walk folder has gone.
-WALK_DEFAULTS="$HOME/Library/Containers/com.alexecollins.agents.store/Data/Library/Preferences/com.alexecollins.agents.store.walk.$WALK"
-defaults delete "$WALK_DEFAULTS" >/dev/null 2>&1 || true
-rm -f "$WALK_DEFAULTS.plist"
+for WALK_DEFAULTS in "$HOME/Library/Preferences/com.alexecollins.agents.host.walk.$WALK" \
+  "$HOME/Library/Containers/com.alexecollins.agents.store/Data/Library/Preferences/com.alexecollins.agents.store.walk.$WALK"; do
+  defaults delete "$WALK_DEFAULTS" >/dev/null 2>&1 || true
+  rm -f "$WALK_DEFAULTS.plist"
+done
 
 if [ "$KEEP" = 0 ]; then
   rm -rf "$ROOT"

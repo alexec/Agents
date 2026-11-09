@@ -18,7 +18,7 @@ import (
 )
 
 // registerSelfUpdate serves selfUpdate/status and selfUpdate/set on a Mac whose host runs
-// from an Agents Host.app (#2178). A test's host serves neither: it is in no bundle a
+// from an Agents.app (#2178). A test's host serves neither: it is in no bundle a
 // release could replace.
 func (d *Daemon) registerSelfUpdate() {
 	if testing.Testing() {
@@ -35,11 +35,22 @@ func (d *Daemon) registerSelfUpdate() {
 	if app == "" {
 		return
 	}
+	// A release's copy of Agents Host takes Agents' name once (#4225); a development
+	// build keeps the name ship.sh gave it. Every job runs from the old path until it
+	// restarts, so all of them start again from the new one.
+	if _, release := releaseVersion(buildinfo.Version); release {
+		if _, moved := takeNewName(app, os.Rename); moved {
+			if err := restartLaunchAgents(); err != nil {
+				log.Printf("self-update: Agents has its new name; quit and open Agents to run it: %v", err)
+			}
+			return
+		}
+	}
 	file := filepath.Join(d.Store.Loc.Root, selfUpdateFile)
 	keep, back := settleSelfUpdates(app, buildinfo.Version, file, exchangePaths)
 	if back {
 		if err := restartLaunchAgents(); err != nil {
-			log.Printf("self-update: the old copy is back; quit and open Agents Host to run it: %v", err)
+			log.Printf("self-update: the old copy is back; quit and open Agents to run it: %v", err)
 		}
 		return
 	}
@@ -58,7 +69,7 @@ func (d *Daemon) registerSelfUpdate() {
 	u.unpack, u.verify, u.version, u.restart = dittoUnpack, verifyRelease, bundleVersion, restartLaunchAgents
 	if u.status.State != wire.SelfUpdateStateCannot {
 		if team, _ := signingOf(app); team == "" {
-			why := "This copy of Agents Host is not signed by a team, so it does not update itself."
+			why := "This copy of Agents is not signed by a team, so it does not update itself."
 			u.status.State, u.status.Message = wire.SelfUpdateStateCannot, &why
 		}
 	}
@@ -119,7 +130,7 @@ func verifyRelease(next, running string) error {
 	return nil
 }
 
-// restartLaunchAgents starts each of Agents Host's launch agents again, this host last:
+// restartLaunchAgents starts each of Agents' launch agents again, this host last:
 // launchd runs what is in the bundle now. It is started by launchd as
 // <prefix>.daemon, and the others are <prefix>.control and <prefix>.relay.
 func restartLaunchAgents() error {
