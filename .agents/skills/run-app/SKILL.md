@@ -224,6 +224,7 @@ $S/walk.py $ROOT wait "P00 seeded live 0" 10    # until it is there (gone: until
 $S/walk.py $ROOT size 1500 900                  # the window's frame, for wide-window walks
 $S/walk.py $ROOT menu Session                   # a menu's items; menu Session Stop chooses one
 $S/walk.py $ROOT dock /tmp/run-mychange-dock.png # the icon the app gives the Dock tile, and its badge (#1317)
+$S/walk.py $ROOT notify live/frame '{"source":"browser",…}'  # a host's notification, as if the host sent it (#4140): a live tile's frames while nobody is at the Mac
 ```
 
 `walk.py` with no arguments lists every command, `--window N` for another window, `--first`

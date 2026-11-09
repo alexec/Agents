@@ -5248,6 +5248,11 @@ export interface LiveFrame {
    * source says nothing.
    */
   narration?: string;
+  /**
+   * The source by name, for the tile's head (#4140): the page's title, or the simulator's name.
+   * Absent for the screen, and before a page has a title.
+   */
+  title?: string;
   capturedAt: WireDate;
   /** The picture's width in pixels, when the source says it. */
   width?: number;
@@ -13457,6 +13462,7 @@ export interface Notifications {
   "files/changed": FilesChangedNotification;
   "folder/changed": FolderSummary;
   "folder/removed": FolderRemovedNotification;
+  "live/frame": LiveFrame;
   "mcp/healthChanged": MCPHealthSnapshot;
   "mcp/hostedChanged": HostedMCPSnapshot;
   "modes/changed": Record<string, JSONValue>;
@@ -13912,7 +13918,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ListedSkill: { required: ["name", "folder"], optional: ["description", "managed"] },
   LiveAgent: { required: ["host", "hostName", "owner", "ownerName", "bot", "agent", "runtime", "state"], optional: ["waitsOnOthers", "workflow", "since", "costToDate", "heardAt"] },
   LiveBoard: { required: ["agents"], optional: [] },
-  LiveFrame: { required: ["source", "agentID", "capturedAt"], optional: ["image", "locked", "narration", "width", "height"] },
+  LiveFrame: { required: ["source", "agentID", "capturedAt"], optional: ["image", "locked", "narration", "title", "width", "height"] },
   Lock: { required: ["person", "entries"], optional: [] },
   LockAdd: { required: ["entries"], optional: [] },
   LockBody: { required: ["v", "kind", "person", "signer", "at", "key"], optional: ["previous", "sealingKey", "id", "name", "clientKind", "expires", "sealed"] },

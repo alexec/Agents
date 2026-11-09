@@ -5907,6 +5907,9 @@ type LiveFrame struct {
 	// What the agent last did on it, in words, such as Clicked Save in TextEdit. Absent when the source says nothing.
 	Narration *string `json:"narration,omitzero"`
 
+	// The source by name, for the tile's head (#4140): the page's title, or the simulator's name. Absent for the screen, and before a page has a title.
+	Title *string `json:"title,omitzero"`
+
 	CapturedAt Date `json:"capturedAt"`
 
 	// The picture's width in pixels, when the source says it.

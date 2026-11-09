@@ -28,6 +28,9 @@ enum WalkCommands {
         // Voice mode with no microphone and no sound (#2322).
         case "voice":
             return VoiceWalk.perform(request)
+        // A host's notification, as if the host had sent it (#4140).
+        case "notify":
+            return WalkNotify.perform(request)
         case "ping":
             return ["ok": true, "pid": Int(getpid())]
         case "windows":

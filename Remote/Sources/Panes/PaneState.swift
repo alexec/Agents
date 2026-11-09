@@ -70,9 +70,6 @@ final class PaneState {
     var shells: [Int] = [0]
     /// The tab on top.
     var frontShell = 0
-    /// The agent's last use of the machine's browser that the Agent Browser pane opened
-    /// for, or saw (#3916): the pane opens again only for a newer one.
-    var browserUseSeen: Date?
 
     /// Run from a reply types into shell 0 (#1681): its tab goes in front, and back into
     /// the tabs when it was closed, so the command is seen going in.

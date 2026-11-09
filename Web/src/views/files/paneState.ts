@@ -24,11 +24,6 @@ export interface PaneState {
   line?: number | undefined;
   /** The changed file open under Changes. */
   changed?: string | undefined;
-  /**
-   * The pane is to open when this session is next shown (#3916): its agent began to use the
-   * browser while the person was elsewhere, or before the pane could open.
-   */
-  toOpen?: boolean | undefined;
 }
 
 export const panes = signal<Record<string, PaneState>>({});

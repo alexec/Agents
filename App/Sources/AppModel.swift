@@ -1050,6 +1050,7 @@ final class AppModel {
         notifier.answer = { [weak self] token, quick, typed in await self?.answerFromBanner(token, quick, typed: typed) }
         #if DEBUG
         openFromLaunchArguments()
+        WalkNotify.model = work
         #endif
     }
     /// Every host the control plane has besides this Mac's, each with a client of its own

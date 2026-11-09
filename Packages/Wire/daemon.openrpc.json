@@ -5124,6 +5124,11 @@
     {
       "name": "live/frame",
       "x-capability": "live.frame/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "description": "A live tile's frame (#4139): what an agent drives (source screen, browser or simulator), sent only within 10 seconds of the agent's last call on it, and only to the connections whose presence/report is active and shows that agent. Never recorded. desktopControl/liveFrame goes on beside it until every client reads this one.",
       "x-notification": true,
       "paramStructure": "by-name",

@@ -77,8 +77,7 @@ struct MachineBrowserTests {
         #expect(old.editing == nil)
     }
 
-    /// #3916: a session's pane shows its own tab, says who else holds the browser, and
-    /// opens when its agent starts to use it.
+    /// #3916: a session's pane shows its own tab and says who else holds the browser.
     @Test func aPaneSaysWhoElseHoldsTheBrowser() {
         let me = UUID(), other = UUID()
         #expect(DaemonAPI.BrowserPageState(status: .running, holder: other).otherHolder(than: me) == other)
@@ -86,21 +85,6 @@ struct MachineBrowserTests {
         #expect(DaemonAPI.BrowserPageState(status: .running).otherHolder(than: me) == nil)
         #expect(DaemonAPI.BrowserPageState(status: .running, noTab: true).sessionHasNoTab)
         #expect(!DaemonAPI.BrowserPageState(status: .stopped, noTab: true).sessionHasNoTab)
-    }
-
-    @Test func thePaneOpensForANewerUseOfTheBrowser() {
-        let started = Date(timeIntervalSince1970: 1000)
-        let before = started.addingTimeInterval(-60), after = started.addingTimeInterval(60)
-        // A use from before this client started opens nothing; one after it does.
-        #expect(!BrowserUse.opensPane(usedAt: before, seen: nil, since: started))
-        #expect(BrowserUse.opensPane(usedAt: after, seen: nil, since: started))
-        #expect(!BrowserUse.opensPane(usedAt: nil, seen: nil, since: started))
-        // Once seen, only a newer one: a pane the person closed stays closed for this turn.
-        #expect(!BrowserUse.opensPane(usedAt: after, seen: after, since: started))
-        #expect(BrowserUse.opensPane(usedAt: after.addingTimeInterval(1), seen: after, since: started))
-        // This client started when its process did, before anything here read it.
-        #expect(BrowserUse.clientStarted < Date())
-        #expect(Date().timeIntervalSince(BrowserUse.clientStarted) < 24 * 3600)
     }
 
     @Test func anAgentKeepsWhenItUsedTheBrowser() throws {

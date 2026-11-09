@@ -50,7 +50,7 @@ import { BackToList } from "./BackToList";
 import { comingBackDescription, footStatusWords } from "../model/status";
 import { ArchiveCard } from "./ArchiveCard";
 import { DesktopControlPauseCard } from "./DesktopControlPauseCard";
-import { DesktopControlTile } from "./DesktopControlTile";
+import { LiveTile } from "./LiveTile";
 import { showsThoughts, shownItems } from "../model/thoughts";
 import { hasTurnInFlight, promptPlaceholder, willQueue } from "../model/promptWords";
 import { eventCarryOnPrompt, eventWaitLine, eventWaitMinutes, eventWaitSummaryLines, eventWaitTime, leaseMark, lineCarryOnPrompt, lineResource, triggerURL } from "../model/rowLines";
@@ -475,10 +475,14 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       node: <div class="cards"><GuardedChangeCard store={store} host={host} folder={folder} change={change} down={down} /></div>,
     })),
     ...asked,
-    // It drives the Mac's screen (#3004, US4): the live tile, above any pause card.
+    // It drives the screen, the browser or a simulator (#3004, #4140): the live tile, above any
+    // pause card. Open shows the browser or the simulator in its pane until the take-over window (#4141).
     ...(agent && agent.state === "running" ? [{
       key: `live:${agent.id}`,
-      node: <DesktopControlTile store={store} host={host} agentID={agent.id} />,
+      node: <LiveTile store={store} host={host} agentID={agent.id} open={(source) => {
+        setPane(agent.id, { tab: source === "simulator" ? "simulator" : "browser" });
+        if (!route.peek().files) replace({ ...route.peek(), files: true });
+      }} />,
     }] : []),
     // Its drive_screen paused by the person's touch (#3004, US3): Resume or Take Over.
     ...(agent?.desktopControlPause ? [{

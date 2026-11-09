@@ -370,12 +370,17 @@ struct RemoteChatView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             })
         }
-        // It drives the Mac's screen (#3004, US4), as on the Mac: the live tile.
-        if agent.state == .running, let frame = page.liveFrame, frame.agentID == agent.id {
+        // It drives the screen, the browser or a simulator (#3004, #4140), as on the Mac: the
+        // live tile. Open shows the browser or the simulator in its pane until the take-over
+        // window (#4141).
+        let liveFrames = page.liveFrames.filter { $0.value.frame.agentID == agent.id }
+        if agent.state == .running, !liveFrames.isEmpty {
             cards.append(WaitingCard(id: "live:" + agent.id.uuidString) {
-                DesktopControlTile(frame: frame, heardAt: page.liveFrameHeardAt)
-                    .chatColumn()
-                    .transition(.opacity)
+                LiveTile(frames: liveFrames, open: { [model] source in
+                    model.panes.state(for: agent.id).show(source == .simulator ? .simulator : .browser)
+                })
+                .chatColumn()
+                .transition(.opacity)
             })
         }
         // Its drive_screen paused by the person's touch (#3004, US3), as on the Mac.

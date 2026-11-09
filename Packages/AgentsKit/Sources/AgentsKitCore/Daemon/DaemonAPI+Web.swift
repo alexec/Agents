@@ -645,6 +645,7 @@ public extension DaemonAPI {
                 Row(Notification.agentEntry, params: EntryNotification.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.desktopControlLiveFrame, params: DesktopControlLiveFrame.self, result: Empty.self,
                     kind: .hostNotification),
+                Row(Notification.liveFrame, params: LiveFrame.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.browserFrame, params: BrowserFrame.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.browserPageChanged, params: BrowserPageState.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.agentRemoved, params: AgentRemovedNotification.self, result: Empty.self,

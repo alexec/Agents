@@ -1,7 +1,7 @@
 // The browser on the session's machine, which agents drive (#3528, spike #3527): what the Agent
 // Browser tab says, where a click lands in the page, and what a key says to it. The window's
 // AgentBrowserPane.swift and MachineBrowser.swift say the same.
-import type { Agent, BrowserInputRequest, BrowserPageState } from "../protocol/generated";
+import type { BrowserInputRequest, BrowserPageState } from "../protocol/generated";
 
 export const words = {
   tab: "Agent Browser",
@@ -90,21 +90,4 @@ export const stopped: BrowserPageState = { status: "stopped" };
 export function otherHolder(state: BrowserPageState, session: string): { id: string; title: string } | null {
   if (!state.holder || state.holder.toLowerCase() === session.toLowerCase()) return null;
   return { id: state.holder, title: state.holderTitle || words.anotherSession };
-}
-
-/**
- * The sessions whose agent began to use the browser since `seen` last saw them (#3916): their
- * browserUsedAt moved on. An agent seen for the first time is only recorded, so a page that loads
- * opens no pane. `seen` keeps each agent's last value, for the page's lifetime.
- */
-export function browserUseMoved(seen: Map<string, number | undefined>, agents: Iterable<Agent>): string[] {
-  const moved: string[] = [];
-  for (const agent of agents) {
-    const now = agent.browserUsedAt;
-    const before = seen.get(agent.id);
-    const known = seen.has(agent.id);
-    seen.set(agent.id, now);
-    if (known && now !== undefined && (before === undefined || now > before)) moved.push(agent.id);
-  }
-  return moved;
 }
