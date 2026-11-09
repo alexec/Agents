@@ -336,8 +336,8 @@ func (d *Daemon) answerForgeRequest(ctx context.Context, rec wire.Request, a wir
 		if err != nil {
 			return wire.RequestUpdate{}, err
 		}
-		// Another's PR, as the agents' bot's (#3860): a real review of the head commit, which the
-		// agent bot check and a required review count. The person's own PR takes no review from
+		// Another's PR, as the agents' bot's (#3860): a real review of the head commit, which
+		// GitHub's approval rule and a required review count. The person's own PR takes no review from
 		// them, so there it is the person's own comment, with no <!-- agent --> mark.
 		if c, ok := d.githubConnection(); ok && c.Login != "" && page.Author != "" && page.Head != "" && !strings.EqualFold(page.Author, c.Login) {
 			_, err = gh.ReviewPR(ctx, f.Repo, number, page.Head, action == "approve", note)
