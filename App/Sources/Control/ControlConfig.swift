@@ -1,10 +1,9 @@
 import AgentsKitCore
 import Foundation
 
-/// Where the window's control plane is (058, US1, frame K): only ever elsewhere, reached
-/// over a WebSocket with this window's own key, kept in the keychain on this Mac only
-/// (#1031). No host is run from here and there is no old way: Agents Host does all of
-/// that. This Mac's own host is also reached directly, over its socket in the app group
+/// Where the window's control plane is (058, US1): reached over a WebSocket with this
+/// window's own key, kept in the keychain on this Mac only (#1031), also when it runs on
+/// this Mac, where the first open pairs the window by itself (#4226). This Mac's own host is also reached directly, over its socket in the app group
 /// (#1118, `localLink`).
 enum ControlConfig {
     enum Endpoint {
@@ -144,7 +143,7 @@ enum ControlConfig {
         try? FileManager.default.removeItem(at: membershipFile)  // store-ok: the window's own container
     }
 
-    /// Connect to a control plane (frames C and K2): say who this window is with the code,
+    /// Connect to a control plane (frame C, and the first open, #4226): say who this window is with the code,
     /// then keep what it was told. What the window may do is the code's.
     static func pair(with code: ControlCode) async throws -> ControlMembership {
         try refuseUnpinned { $0.admits(code) }

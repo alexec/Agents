@@ -1,6 +1,5 @@
 # Publishes Agents on GitHub when a version tag is pushed (#669, #4225): `git tag v0.2.0 &&
-# git push origin v0.2.0` makes the release the store window's "Set one up on this Mac"
-# opens (AgentsHostDownloadURL, releases/latest).
+# git push origin v0.2.0` makes the release at releases/latest.
 #
 # The release carries:
 #   Agents-<version>.dmg                   signed with Developer ID, notarized, stapled

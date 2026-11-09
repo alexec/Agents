@@ -61,12 +61,6 @@ struct SettingsWindow: View {
                          shows: shows, warning: warning)
             Divider()
             VStack(alignment: .leading, spacing: 0) {
-                // A pane of this Mac's own things, with no host on this Mac (#1503): what is
-                // true, and what to do, over a pane that has nothing to show.
-                if model.noHostOnThisMac, isThisMacs {
-                    NoMacHostNotice()
-                    Divider()
-                }
                 // Each setting states its fixed scope (#2410).
                 if let scope = scopeOnEveryMachine {
                     ScopeLine(onEveryMachine: scope)
@@ -132,11 +126,6 @@ struct SettingsWindow: View {
                 if pane.wrappedValue == .runtimes { await model.refreshRuntimes() }
             }
         }
-    }
-
-    /// A pane of this Mac's own things is showing: one of them, or Machines ▸ This Mac.
-    private var isThisMacs: Bool {
-        pane.wrappedValue.isThisMacs || (pane.wrappedValue == .machines && (control == nil || machinesPage == .thisMac))
     }
 
     /// Whether the rail lists a pane: those of the control plane need one. Machine Providers
@@ -324,16 +313,6 @@ enum SettingsPane: String, Hashable, CaseIterable {
     /// outside accounts (#3967): Settings ▸ You (#3998), from the sidebar's Your setup (#3632).
     case connectors, secrets, accounts
 
-    /// A pane of what this Mac's host keeps: its runtimes, settings, cost and resources.
-    /// Machines is one only on its This Mac page.
-    var isThisMacs: Bool {
-        switch self {
-        case .runtimes, .agentConfiguration, .spending, .resources, .browser: true
-        case .appearance, .sidebar, .agentsPolicy, .voice, .account, .machines, .controlPlane, .providers, .clients, .people, .bots, .groups,
-             .channels, .signIn, .signIns, .policy, .connectors, .secrets, .accounts: false
-        }
-    }
-
     /// A pane drawn only with a control plane to show: a window left on one moves away when
     /// the Mac is forgotten (#2258).
     var needsControlPlane: Bool {
@@ -461,24 +440,6 @@ private final class SettingsGrowView: NSView {
         if window.contentMinSize.width < floor.width || window.contentMinSize.height < floor.height {
             window.contentMinSize = floor
         }
-    }
-}
-
-/// No host on this Mac (#1503): the control plane is elsewhere and lists only servers as
-/// hosts, so this Mac's runtimes and settings have nobody to keep them.
-private struct NoMacHostNotice: View {
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Label("This Mac is not one of your machines", systemImage: "exclamationmark.triangle")
-                .appText(.supporting).fontWeight(.semibold)
-                .tinted(.attention)
-            Text("This Mac’s runtimes and settings are kept only when it is one of your machines, and the control plane does not have it. Agents on your servers are not changed. To add this Mac, choose Register a Machine… in the sidebar’s Machines menu and make a code, then paste it in Agents Host under Join one elsewhere.")
-                .appText(.fine).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: 560, alignment: .leading)
-        .padding(16)
-        .accessibilityElement(children: .contain)
     }
 }
 

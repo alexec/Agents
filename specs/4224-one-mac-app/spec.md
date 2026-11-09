@@ -214,6 +214,11 @@ not the control plane. Alex can overrule.
 
 - The first-run line when macOS asks for approval in Login Items: can the app wait for it
   and then carry on by itself? (Lane B finds out.)
+
+  **Answer (#4226): yes.** While the line shows, the app reads both login items'
+  `SMAppService` status every 2 seconds, and runs the first open again once neither asks
+  for approval. A walk cannot make macOS ask (a scratch set-up's jobs are `launchctl`
+  ones, not login items), so this was not seen on a real install.
 - Uninstall: does dragging Agents to the Trash leave the launch agents registered? If it
   does, do we need **Settings ▸ Machines ▸ This Mac ▸ Remove Agents from This Mac…**?
   (Lane A finds out.)
