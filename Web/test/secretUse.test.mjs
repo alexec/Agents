@@ -33,3 +33,13 @@ test("a Linux machine's allow goes signed over what Go's Approval reads, and a d
     { request: "R-1", name: "TOKEN", use: "ci", place: "alexec/agents", action: "session" });
   assert.equal(words.answerElsewhere, "Answer on the Mac or the Remote");
 });
+
+test("a terminal's agents-secret has no session: once, for 1 hour or deny, and its line says the gap (#4179)", () => {
+  const terminal = { ...request({ name: "PLAIN_KEY", use: "terminal", place: "zsh" }), askedBy: undefined };
+  assert.equal(words.isTerminalRequest(terminal), true);
+  assert.equal(words.isTerminalRequest({ ...terminal, askedBy: "A-1" }), false);
+  assert.equal(words.isTerminalRequest(request({ name: "X", use: "fill", place: "a.com" })), false);
+  const use = words.secretUseOf(terminal);
+  assert.deepEqual(words.secretUseActions(use).map((a) => words.secretUseWords[a]), ["Allow Once", "Allow for 1 Hour", "Deny"]);
+  assert.equal(words.secretUseWhere(use), "Terminal: zsh · Agents cannot tell a terminal from an agent outside its session.");
+});

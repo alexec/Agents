@@ -70,11 +70,11 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
             // With a group off, its sessions go to the next one they fit (#846): a pass
             // over the live sessions, not the shelf's sums, which are for all four.
             return agents(in: work, folders: folders, on: on).count
-                + (self == .needsYou ? folders.reduce(0) { $0 + Self.ownApprovals(in: work, $1).count
+                + (self == .needsYou ? folders.reduce(work.terminalRequests.count) { $0 + Self.ownApprovals(in: work, $1).count
                     + work.requests(in: $1.folder).count } : 0)
                 + pulls(in: work, folders: folders).count + suggestions(in: work, folders: folders).count
         }
-        return folders.reduce(0) { total, key in
+        return folders.reduce(self == .needsYou ? work.terminalRequests.count : 0) { total, key in
             let shelf = work.shelf(key)
             if self == .pinned {
                 return total + Self.pinnedSessions(in: work, key).count + Self.pinnedWorkflows(in: work, key).count
@@ -286,17 +286,18 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
 
     /// The open requests to the person in the folders named, each with its folder (#3864):
     /// only Needs You lists them, oldest first, before its sessions. A search matches the
-    /// title and the kind.
+    /// title and the kind. A terminal's (#4179) is in no folder: its folder is the personal
+    /// home, which names no place.
     @MainActor
     public func requests(in work: AgentsModel, folders: [FolderKey], query: String = "")
         -> [(folder: FolderKey, request: NeedRequest)] {
         guard self == .needsYou else { return [] }
         let words = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return folders.flatMap { key in
-            work.requests(in: key.folder)
-                .filter { words.isEmpty || "\($0.title) \($0.kindWord)".lowercased().contains(words) }
-                .map { (folder: key, request: $0) }
-        }
+        let terminal = work.terminalRequests.map { (folder: FolderKey(folder: $0.folder), request: $0) }
+        return (terminal + folders.flatMap { key in
+            work.requests(in: key.folder).map { (folder: key, request: $0) }
+        })
+        .filter { words.isEmpty || "\($0.request.title) \($0.request.kindWord)".lowercased().contains(words) }
         .sorted { $0.request.askedAt < $1.request.askedAt }
     }
 

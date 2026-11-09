@@ -7,8 +7,16 @@ export type SecretUseAction = RequestSecretUseAnswer["action"];
 
 /** The words on the row's menu, as the banner's buttons say them. */
 export const secretUseWords: Record<SecretUseAction, string> = {
-  once: "Allow Once", session: "Allow for This Session", always: "Allow Always", deny: "Deny",
+  once: "Allow Once", session: "Allow for This Session", always: "Allow Always", hour: "Allow for 1 Hour", deny: "Deny",
 };
+
+/** The known gap (#4179), as agentsd's banner and NeedRequest.SecretUse.terminalCaveat say it. */
+export const terminalCaveat = "Agents cannot tell a terminal from an agent outside its session.";
+
+/** A terminal's agents-secret NAME (#4179): a secret's use that no session asked. */
+export function isTerminalRequest(request: PersonRequest): boolean {
+  return request.askedBy === undefined && secretUseOf(request)?.use === "terminal";
+}
 
 /** A request's secret use, when it is one. */
 export function secretUseOf(request: PersonRequest): RequestSecretUse | undefined {
@@ -23,11 +31,14 @@ export function secretUseTitle(use: RequestSecretUse): string {
 /** Where the value goes, as the row's grey line says it. */
 export function secretUseWhere(use: RequestSecretUse): string {
   if (use.use === "ci") return `CI secret in ${use.place}`;
+  if (use.use === "terminal") return `Terminal: ${use.place} · ${terminalCaveat}`;
   return use.use === "mcp" ? `MCP server ${use.place}` : `Fill on ${use.place}`;
 }
 
-/** The answers, in order. A session's own secret has no Allow always: it is the same as for this session. */
+/** The answers, in order. A session's own secret has no Allow always: it is the same as for this session.
+ * A terminal's are once, for 1 hour and deny (#4179). */
 export function secretUseActions(use: RequestSecretUse): SecretUseAction[] {
+  if (use.use === "terminal") return ["once", "hour", "deny"];
   return use.sessionOnly ? ["once", "session", "deny"] : ["once", "session", "always", "deny"];
 }
 

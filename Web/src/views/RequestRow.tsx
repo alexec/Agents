@@ -7,6 +7,8 @@
 // for This Session, Allow Always and Deny, as the window's and the Remote's menus have.
 // A Linux machine's (#4149) opens the value only for an answer the page signs with its lock key;
 // a page with none offers only Deny, and its grey line says to answer on the Mac or the Remote.
+// A terminal's agents-secret (#4179) has no session to open: a press opens its menu, with Allow Once,
+// Allow for 1 Hour and Deny, and its grey line says that Agents cannot tell a terminal from an agent.
 // Its mark is one for each kind (#4026), as NeedRequest.symbol is: unlike an approval's one shield,
 // it says what is asked. The step's hand taps: the raised hand is a session that needs the person.
 import type { Request as PersonRequest, RequestKind } from "../protocol/generated";
@@ -15,7 +17,7 @@ import { shortAgo } from "../model/activity";
 import { fromWireDate } from "../protocol/dates";
 import { go } from "../route";
 import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
-import { answerElsewhere, secretUseActions, secretUseOf, secretUseSigns, secretUseTitle, secretUseWhere, secretUseWords } from "../model/secretUse";
+import { answerElsewhere, isTerminalRequest, secretUseActions, secretUseOf, secretUseSigns, secretUseTitle, secretUseWhere, secretUseWords } from "../model/secretUse";
 
 const kindWords: Record<RequestKind, string> = {
   decide: "Question", approve: "Approval", account: "Account", step: "Step for you", secret: "Secret",
@@ -63,17 +65,18 @@ export function RequestRow({ store, host, folder, request, place, chosen }: {
   const use = secretUseOf(request);
   const unsigned = !!use && secretUseSigns(use, "once") && !store.machineLock.canSign();
   const line = unsigned ? `${requestLine(request, askerTitle)} · ${answerElsewhere}` : requestLine(request, askerTitle);
+  const terminal = isTerminalRequest(request);
   const open = () => go({ host, folder, session: asker });
   const menu = (): MenuItem[] => [
     ...(use ? secretUseActions(use).filter((action) => !unsigned || !secretUseSigns(use, action)).map((action) => ({
       label: secretUseWords[action], run: () => void store.answerSecretUse(host, request.id, action, use),
     })) : []),
-    { label: "Open Session", run: open },
+    ...(terminal ? [] : [{ label: "Open Session", run: open }]),
   ];
   return (
     <div class="nav-item">
       <button class={`row session approval${chosen ? " chosen" : ""}`} aria-current={chosen}
-        aria-description="waiting for your answer" title={line} onClick={open}
+        aria-description="waiting for your answer" title={line} onClick={terminal ? (e) => openContextMenu(e, menu()) : open}
         onContextMenu={(e) => openContextMenu(e, menu())}
         onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu()); }} {...holdForMenu(menu)}>
         <RequestMark kind={request.kind} />

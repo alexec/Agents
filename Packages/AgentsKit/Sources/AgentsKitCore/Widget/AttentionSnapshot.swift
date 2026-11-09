@@ -191,6 +191,8 @@ public struct AttentionSnapshot: Codable, Hashable, Sendable {
                   newestNeed[agentID].map({ $0.raisedAt < need.raisedAt }) ?? true else { continue }
             newestNeed[agentID] = need
         }
+        // A terminal's agents-secret (#4179) is in no folder.
+        total += model.terminalRequests.count
         for summary in model.liveFolders {
             // Requests, not sessions (#3864): one for each open request, less its asker.
             total += model.attentionCount(in: summary.folder.folder) + model.requestBadgeShift(in: summary.folder.folder)

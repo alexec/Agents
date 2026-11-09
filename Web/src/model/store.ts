@@ -1,7 +1,7 @@
 // What the page holds and what each notification means: AgentsModel (Client/AgentsModel.swift),
 // ported by hand for the notifications the web remote hears and held to Fixtures/web/reducer
 // (research R7). Nothing here decides anything; the hosts do.
-import { answerElsewhere, approveSecretUse, type SecretUseAction, secretUseApprovalParams, secretUseSigns } from "./secretUse";
+import { answerElsewhere, approveSecretUse, isTerminalRequest, type SecretUseAction, secretUseApprovalParams, secretUseSigns } from "./secretUse";
 import { preferencesSaid, sendPreferencesWith } from "./preferences";
 import { folderPath as hostedFolderPath, healthTally, personalServers } from "./hostedMCP";
 import type { ExportImportBusy } from "./exports";
@@ -3391,6 +3391,11 @@ export class Store extends Work {
     const key = folderKey(folder);
     return (this.personRequests.value[host] ?? []).filter((r) => folderKey(r.folder) === key
       && r.askedBy !== undefined && (this.agent(host, r.askedBy)?.state ?? "archived") !== "archived");
+  }
+
+  /** A machine's open requests from a terminal's agents-secret (#4179): no session asked them, so no folder lists them. */
+  terminalRequests(host: string): PersonRequest[] {
+    return (this.personRequests.value[host] ?? []).filter(isTerminalRequest);
   }
 
   /** A folder's pull requests waiting for the person's approval (#3330), newest first. */

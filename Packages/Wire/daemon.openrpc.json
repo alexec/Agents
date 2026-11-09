@@ -8293,6 +8293,27 @@
       }
     },
     {
+      "name": "secrets/terminalValue",
+      "x-capability": "host.secret-terminal/1",
+      "description": "agents-secret NAME with no session's grant, such as from a terminal (#4179): the value of this machine's secret with Ask before use off, once a person allowed it. A call with no allow opens a Needs you request (secretUse, use terminal) and is held up to 45 seconds on it; while it stays open the answer names it, and the same call again waits on the same request. Allow for 1 Hour is kept in agentsd's memory only. A secret with Ask before use is refused. Any process of this machine's account may call it on daemon.sock: agentsd cannot tell a terminal from an agent that dropped its grant, which the request's words say.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SecretTerminalRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SecretTerminalValue"
+        }
+      }
+    },
+    {
       "name": "selfUpdate/changed",
       "x-capability": "host.update/1",
       "description": "A Mac's host, when how it updates Agents Host changes (#2178).",

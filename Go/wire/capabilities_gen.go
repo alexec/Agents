@@ -82,6 +82,7 @@ const CapHostPolicy1 = "host.policy/1"
 const CapHostSecretApproval1 = "host.secret-approval/1"
 const CapHostSecretGrants1 = "host.secret-grants/1"
 const CapHostSecretRelease1 = "host.secret-release/1"
+const CapHostSecretTerminal1 = "host.secret-terminal/1"
 const CapHostSessionSecrets1 = "host.session-secrets/1"
 const CapHostSuspend1 = "host.suspend/1"
 const CapHostTeam1 = "host.team/1"
@@ -492,6 +493,7 @@ var HostCapabilities = pairs([][2]string{
 	{"secrets/sessionRemove", "host.session-secrets/1"},
 	{"secrets/sessionSet", "host.session-secrets/1"},
 	{"secrets/setNeedsApproval", "host.secret-approval/1"},
+	{"secrets/terminalValue", "host.secret-terminal/1"},
 	{"selfUpdate/set", "host.update/1"},
 	{"selfUpdate/status", "host.update/1"},
 	{"sessions/adopt", "sessions/1"},

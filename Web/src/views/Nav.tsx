@@ -43,7 +43,8 @@ import type { Session } from "../session";
 
 /**
  * How many requests and sessions need the person, across every folder: Agents' count in the bar.
- * Requests, not sessions (#3864): each open request, and each session needing the person that asked none.
+ * Requests, not sessions (#3864): each open request, and each session needing the person that asked none;
+ * a terminal's agents-secret too (#4179).
  */
 export function needsYouCount(store: Store): number {
   const requests = store.hosts.value.flatMap((h) => (store.folders.value[h.id] ?? [])
@@ -53,7 +54,9 @@ export function needsYouCount(store: Store): number {
   const sessions = needingYou(placedSessions(store.hosts.value, store.folders.value,
     (h, f) => store.folderView(h, f).headings.flatMap((x) => x.agents)))
     .filter((p) => !askers.has(`${p.host.id}|${p.agent.id}`));
-  return requests.length + sessions.length;
+  // A terminal's agents-secret (#4179) is in no folder.
+  const terminal = store.hosts.value.reduce((n, h) => n + store.terminalRequests(h.id).length, 0);
+  return requests.length + sessions.length + terminal;
 }
 
 function countOf(store: Store, section: NavSection, admin: boolean | null): number {

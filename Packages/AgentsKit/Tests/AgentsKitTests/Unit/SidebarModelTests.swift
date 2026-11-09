@@ -394,6 +394,24 @@ struct SidebarModelTests {
         #expect(SidebarSmartRow.needsYou.count(in: model, folders: [key]) == 2)
     }
 
+    /// A terminal's agents-secret (#4179) has no session and no folder of the sidebar: Needs
+    /// You lists it and counts it anyway, and a search finds it by its title.
+    @Test func needsYouListsATerminalsRequest() throws {
+        let model = AgentsModel()
+        let terminal = NeedRequest(id: UUID(), kind: .approve, source: "secretUse", title: "Print PLAIN_KEY in a terminal (zsh)",
+                                   detail: try JSONValue.parse(Data(#"{"secretUse":{"name":"PLAIN_KEY","use":"terminal","place":"zsh"}}"#.utf8)),
+                                   folder: URL(filePath: "/Users/someone/", directoryHint: .isDirectory), askedBy: nil,
+                                   askedAt: Date(timeIntervalSince1970: 10))
+        model.replaceRequests([terminal])
+
+        #expect(terminal.isTerminal)
+        #expect(SidebarSmartRow.needsYou.requests(in: model, folders: [key]).map(\.request.id) == [terminal.id])
+        #expect(SidebarSmartRow.needsYou.requests(in: model, folders: []).map(\.request.id) == [terminal.id])
+        #expect(SidebarSmartRow.needsYou.count(in: model, folders: [key]) == 1)
+        #expect(SidebarSmartRow.needsYou.isShown(in: model, folders: [key], query: "PLAIN_KEY"))
+        #expect(SidebarSmartRow.needsYou.requests(in: model, folders: [key], query: "port").isEmpty)
+    }
+
     /// Needs You holds everything waiting for an OK (#773): a session asking to be archived
     /// as its own row (Approve Archiving is gone), and every other kind of approval as a row
     /// of its own, counted with the sessions and found by a search.

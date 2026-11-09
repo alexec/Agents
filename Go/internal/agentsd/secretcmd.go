@@ -28,7 +28,7 @@ import (
 // agentsd prints the value of a secret with Ask before use off, and records each read with
 // the session and the name (secret.read, use command). A secret with Ask before use is
 // refused: #4013's rule is that a flagged value never goes into a process of the user. A call
-// with no grant (a terminal) is refused for now; #4179 makes it ask a person.
+// with no grant (a terminal) asks a person through daemon.sock (secretterminal.go, #4179).
 
 const (
 	secretCommandPath = "/secrets/value"
@@ -41,19 +41,18 @@ const (
 
 // SecretCommand is `agentsd secret NAME`, run as `agents-secret NAME`: it writes the value to
 // out, exactly, with no newline, so `$(agents-secret NAME)` and a pipe get the value alone.
-// What went wrong goes to errOut, and the exit code is 1.
-func SecretCommand(args []string, getenv func(string) string, out, errOut io.Writer) int {
+// What went wrong goes to errOut, and the exit code is 1. With no session's grant it asks
+// agentsd on socket, which asks a person.
+func SecretCommand(args []string, getenv func(string) string, socket string, out, errOut io.Writer) int {
 	if len(args) != 1 || args[0] == "" || strings.HasPrefix(args[0], "-") {
 		fmt.Fprintln(errOut, "usage: agents-secret NAME\n"+
-			"Prints the value of a secret with Ask before use off, for a session of Agents. agentsd records each read.")
+			"Prints the value of a secret with Ask before use off, for a session of Agents; from a terminal, once a person allows it. agentsd records each read.")
 		return 2
 	}
 	name := args[0]
 	base, grant := getenv(secretURLEnv), getenv(secretGrantEnv)
 	if base == "" || grant == "" {
-		fmt.Fprintln(errOut, "agents-secret: "+name+": this is not a session of Agents, so agentsd does not give the value. "+
-			"A call from a terminal will ask a person for approval (#4179); until then, read it from a session.")
-		return 1
+		return terminalSecretCommand(socket, name, out, errOut)
 	}
 	u, err := url.Parse(base)
 	if err != nil {

@@ -97,6 +97,9 @@ public struct NeedRequest: Codable, Sendable, Hashable, Identifiable {
         secretUse.map { "Wants to use \($0.name)" } ?? title
     }
 
+    /// A terminal's `agents-secret NAME` (#4179): a secret's use with no session.
+    public var isTerminal: Bool { askedBy == nil && secretUse?.isTerminal == true }
+
     /// A use of a secret with Ask before use (#4015): its detail, when it is one.
     public var secretUse: SecretUse? {
         guard source == "secretUse", let use = try? detail["secretUse"]?.decode(SecretUse.self) else { return nil }
@@ -106,10 +109,12 @@ public struct NeedRequest: Codable, Sendable, Hashable, Identifiable {
     /// The wire's `RequestSecretUse`: the secret's name, never its value, and where agentsd
     /// puts the value.
     public struct SecretUse: Codable, Sendable, Hashable {
-        /// fill (fill_secret), ci (set_ci_secret) or mcp (an HTTP MCP server's header, #4120).
+        /// fill (fill_secret), ci (set_ci_secret), mcp (an HTTP MCP server's header, #4120) or
+        /// terminal (`agents-secret NAME` with no session's grant, #4179).
         public var use: String
         public var name: String
-        /// The page's domain for a fill, owner/repo for CI, the server's name for MCP.
+        /// The page's domain for a fill, owner/repo for CI, the server's name for MCP, the
+        /// command that ran agents-secret for a terminal, as it says it.
         public var place: String
         /// The session's own secret (#3548): Allow always is the same as Allow for this session.
         public var sessionOnly: Bool?
@@ -130,24 +135,33 @@ public struct NeedRequest: Codable, Sendable, Hashable, Identifiable {
             needsSignature == true && action != .deny
         }
 
-        /// Where the value goes, as the row's grey line says it.
+        /// A terminal's (#4179): agentsd cannot tell its caller from an agent outside its session.
+        public var isTerminal: Bool { use == "terminal" }
+
+        /// Where the value goes, as the row's grey line says it. A terminal's says the known gap.
         public var `where`: String {
             switch use {
             case "ci": "CI secret in \(place)"
             case "mcp": "MCP server \(place)"
+            case "terminal": "Terminal: \(place) · \(Self.terminalCaveat)"
             default: "Fill on \(place)"
             }
         }
 
-        /// The answers a person can give, in the order the row and the banner show them.
+        /// The known gap (#4179), as agentsd's banner says it.
+        public static let terminalCaveat = "Agents cannot tell a terminal from an agent outside its session."
+
+        /// The answers a person can give, in the order the row and the banner show them. A
+        /// terminal's are once, for 1 hour and deny (#4179).
         public var actions: [Action] {
-            sessionOnly == true ? [.once, .session, .deny] : Action.allCases
+            if isTerminal { return [.once, .hour, .deny] }
+            return sessionOnly == true ? [.once, .session, .deny] : [.once, .session, .always, .deny]
         }
     }
 
     /// The wire's `RequestSecretUseAnswer.action`.
     public enum Action: String, Codable, Sendable, CaseIterable {
-        case once, session, always, deny
+        case once, session, always, hour, deny
 
         /// The words on the row's menu, its swipes and the banner's buttons.
         public var word: String {
@@ -155,6 +169,7 @@ public struct NeedRequest: Codable, Sendable, Hashable, Identifiable {
             case .once: "Allow Once"
             case .session: "Allow for This Session"
             case .always: "Allow Always"
+            case .hour: "Allow for 1 Hour"
             case .deny: "Deny"
             }
         }

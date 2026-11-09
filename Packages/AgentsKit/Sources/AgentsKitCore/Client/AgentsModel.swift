@@ -998,6 +998,10 @@ public final class AgentsModel {
         }
     }
 
+    /// The open requests of a terminal's `agents-secret NAME` (#4179): no session asked them,
+    /// so no folder lists them; Needs You lists them with the rest.
+    public var terminalRequests: [NeedRequest] { requests.filter(\.isTerminal) }
+
     /// What one folder's requests change in the Dock badge and the Remote's (#3864): they
     /// count requests, not sessions, so one for each request, less each asker counted already.
     public func requestBadgeShift(in folder: URL) -> Int {

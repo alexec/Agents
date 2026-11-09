@@ -145,7 +145,9 @@ struct SmartFold: View {
 /// One request to the person under Needs You (#3864): a click opens the session that asked
 /// it, where its card takes the answer. A secret's use (#4017) has no card: its menu has Allow
 /// Once, Allow for This Session, Allow Always and Deny, Allow Once is a leading swipe and Deny a
-/// trailing one, as an approval's row has (#3763).
+/// trailing one, as an approval's row has (#3763). A terminal's agents-secret (#4179) has no
+/// session to open: its menu has Allow Once, Allow for 1 Hour and Deny, and its grey line says
+/// that Agents cannot tell a terminal from an agent outside its session.
 private struct RequestListRow: View {
     @Environment(AppModel.self) private var model
     /// In a folder's own window, how it opens what is picked (#1090).
@@ -160,35 +162,61 @@ private struct RequestListRow: View {
                 .help(request.line(asker: model.work.agent(id)?.title))
                 .sidebarInk(item)
                 .tag(item)
-                .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                    if request.secretUse != nil {
-                        SwipeAction { await model.answerSecretUse(request, .once) } label: {
-                            Label(NeedRequest.Action.once.word, systemImage: "checkmark")
-                        }
-                        .tint(Paper.accent)
-                    }
-                }
-                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    if request.secretUse != nil {
-                        SwipeAction { await model.answerSecretUse(request, .deny) } label: {
-                            Label(NeedRequest.Action.deny.word, systemImage: "xmark")
-                        }
-                        .tint(StateTint.failure.color)
-                    }
-                }
+                .modifier(SecretUseAnswers(request: request))
                 .contextMenu {
-                    if let use = request.secretUse {
-                        ForEach(use.actions, id: \.self) { action in
-                            Button(action.word, role: action == .deny ? .destructive : nil) {
-                                Task { await model.answerSecretUse(request, action) }
-                            }
-                        }
-                        Divider()
-                    }
+                    SecretUseMenu(request: request)
+                    if request.secretUse != nil { Divider() }
                     Button("Open Session") {
                         if let windowOpen { windowOpen(item) } else { model.sidebarItem = item }
                     }
                 }
+        } else if request.isTerminal {
+            RequestRowLabel(request: request, place: place)
+                .help(request.line(asker: nil))
+                .modifier(SecretUseAnswers(request: request))
+                .contextMenu { SecretUseMenu(request: request) }
+        }
+    }
+}
+
+/// A secret's use's swipes: Allow Once leading, Deny trailing.
+private struct SecretUseAnswers: ViewModifier {
+    @Environment(AppModel.self) private var model
+    let request: NeedRequest
+
+    func body(content: Content) -> some View {
+        content
+            .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                if request.secretUse != nil {
+                    SwipeAction { await model.answerSecretUse(request, .once) } label: {
+                        Label(NeedRequest.Action.once.word, systemImage: "checkmark")
+                    }
+                    .tint(Paper.accent)
+                }
+            }
+            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                if request.secretUse != nil {
+                    SwipeAction { await model.answerSecretUse(request, .deny) } label: {
+                        Label(NeedRequest.Action.deny.word, systemImage: "xmark")
+                    }
+                    .tint(StateTint.failure.color)
+                }
+            }
+    }
+}
+
+/// A secret's use's answers, in its menu.
+private struct SecretUseMenu: View {
+    @Environment(AppModel.self) private var model
+    let request: NeedRequest
+
+    var body: some View {
+        if let use = request.secretUse {
+            ForEach(use.actions, id: \.self) { action in
+                Button(action.word, role: action == .deny ? .destructive : nil) {
+                    Task { await model.answerSecretUse(request, action) }
+                }
+            }
         }
     }
 }
