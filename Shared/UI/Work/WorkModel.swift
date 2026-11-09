@@ -42,6 +42,8 @@ protocol WorkModel: AnyObject, Sendable {
     func workSessionState(_ id: UUID) -> AgentState?
     /// The session that leads an epic, of those this app knows (#3269, Work ▸ Features); nil with none.
     func workLead(of epic: DaemonAPI.LineageNode) -> Agent?
+    /// The sessions this app knows, of every machine (#4115, Work ▸ Features's groups).
+    var workAgents: [Agent] { get }
     /// Show a session's chat.
     func openWorkSession(_ id: UUID)
     /// The new-session form in a folder, filled in. Why it did not open, or nil.

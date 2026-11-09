@@ -2,29 +2,33 @@
 // (forge/features on each machine) with its epic counts; opened, its open epics (forge/issues with the
 // feature), each with its progress and its lead, and its issues with no epic. A row opens the issue's page.
 // The Board menu (#3282) narrows both reads to one board, on the machines that know boards. The
-// features with no open work are in a Finished group at the bottom, closed (#3741).
+// features are in groups (#4115): Needs you, In flight (with its sessions) and Idle, and those with
+// no open work in Finished at the bottom, closed (#3741).
 import { signal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import { useEffect } from "preact/hooks";
-import type { ForgeFeature, ForgeItem } from "../protocol/generated";
+import type { Agent, ForgeFeature, ForgeItem } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { describe } from "../model/errors";
 import { boardChoices, boardName, errorWords, labelColor, noForgeHere, shortRef, withBoard } from "../model/work";
 import { boardHosts, boards, forgeHosts, listHosts, loadBoards } from "../model/workLists";
 import { Choice } from "./Work";
 import {
-  epicLead, epicProgressWords, featureCountWords, featureGroups, featureTitle, finishedWords, leadRowWords, mergeFeatures, noFeatures,
-  nothingOpen, openedFeature,
+  type FeatureGroup, epicLead, epicProgressWords, featureCountWords, featureGroups, featureSessions, featureTitle, groupWords, leadRowWords,
+  mergeFeatures, noFeatures, nothingOpen, openedFeature, sessionWords,
 } from "../model/workFeatures";
 import { go } from "../route";
 import { ForgeTitle } from "../render/ForgeTitle";
 
 // The list's state lives for the tab, so Back from an epic's page finds it as it was left.
 const features = signal<ForgeFeature[] | null>(null);
+/** The open pull requests labelled needs-approval, of every machine (#4115). */
+const approvals = signal<string[]>([]);
 const errors = signal<string[]>([]);
 const opened = signal<ReadonlySet<string>>(new Set());
-/** The Finished group opened (#3741); closed until a person opens it, unless every feature is in it. */
-const finishedOpen = signal<boolean | undefined>(undefined);
+/** The groups a person opened or closed (#3741, #4115). Each is open until closed, except Finished,
+ * which is closed until opened, unless every feature is in it. */
+const groupOpen = signal<Readonly<Partial<Record<FeatureGroup, boolean>>>>({});
 const items = signal<Readonly<Record<string, { items: ForgeItem[]; errors: string[] }>>>({});
 const asked = signal(0);
 /** The board chosen, by its url; empty for all. */
@@ -39,6 +43,7 @@ async function loadFeatures(store: Store) {
   if (read === key && features.value !== null) return;
   read = key;
   features.value = null;
+  approvals.value = [];
   errors.value = [];
   items.value = {};
   const got = await Promise.all(hosts.map(async (h) => {
@@ -51,6 +56,7 @@ async function loadFeatures(store: Store) {
   if (asked.value !== mine || board.value !== on) return;
   errors.value = got.flatMap(({ host, list }) => (list.errors ?? []).map((e) => errorWords(e, hosts.length > 1 ? host.name : undefined)));
   features.value = mergeFeatures(got.map(({ list }) => list.features));
+  approvals.value = got.flatMap(({ list }) => list.approvals ?? []);
   for (const name of opened.value) void readItems(store, name);
 }
 
@@ -104,41 +110,45 @@ export function WorkFeatures({ store }: { store: Store }) {
   );
 }
 
-/** The features with open work, then the Finished group (#3741), closed. */
+/** The features in their groups (#4115): Needs you, In flight, Idle, then Finished (#3741), closed. */
 function FeatureGroups({ store, list }: { store: Store; list: ForgeFeature[] }) {
-  const { active, finished } = featureGroups(list);
-  const isOpen = finishedOpen.value ?? active.length === 0;
+  const agents = Object.values(store.agents.value).flat();
+  const groups = featureGroups(list, agents, approvals.value);
   return (
     <>
-      <ul class="work-rows">
-        {active.map((f) => <FeatureRow key={f.name} store={store} feature={f} />)}
-      </ul>
-      {finished.length > 0 && (
-        <>
-          <button type="button" class="work-feature-head work-finished-head" aria-expanded={isOpen}
-            onClick={() => { finishedOpen.value = !isOpen; }}
-            title={isOpen ? "Fold the finished features" : "Show the features with no open epic or issue"}>
-            <span class="chevron" aria-hidden="true">{isOpen ? "▾" : "▸"}</span>
-            <span class="work-title">{finishedWords(finished.length)}</span>
-          </button>
-          {isOpen && (
-            <ul class="work-rows">
-              {finished.map((f) => <FeatureRow key={f.name} store={store} feature={f} />)}
-            </ul>
-          )}
-        </>
-      )}
+      {groups.map(({ group, features: shown }) => {
+        const isOpen = groupOpen.value[group] ?? (group !== "finished" || groups.length === 1);
+        const words = groupWords(group, shown.length);
+        const mark = group === "finished" ? " work-finished-head" : group === "needsYou" ? " attention" : "";
+        return (
+          <div key={group}>
+            <button type="button" class={`work-feature-head work-group-head${mark}`} aria-expanded={isOpen}
+              onClick={() => { groupOpen.value = { ...groupOpen.value, [group]: !isOpen }; }}
+              title={isOpen ? `Fold ${words}` : `Show ${words}`}>
+              <span class="chevron" aria-hidden="true">{isOpen ? "▾" : "▸"}</span>
+              <span class="work-title">{words}</span>
+            </button>
+            {isOpen && (
+              <ul class="work-rows">
+                {shown.map((f) => (
+                  <FeatureRow key={f.name} store={store} feature={f} agents={agents}
+                    sessions={group === "inFlight" ? featureSessions(f, agents).length : undefined} />
+                ))}
+              </ul>
+            )}
+          </div>
+        );
+      })}
     </>
   );
 }
 
-function FeatureRow({ store, feature }: { store: Store; feature: ForgeFeature }) {
+function FeatureRow({ store, feature, agents, sessions }: { store: Store; feature: ForgeFeature; agents: Agent[]; sessions: number | undefined }) {
   const key = feature.name.toLowerCase();
   const isOpen = opened.value.has(key);
   const read = items.value[key];
   const dot = labelColor(feature.color);
   const shown = read ? openedFeature(read.items) : undefined;
-  const agents = Object.values(store.agents.value).flat();
   return (
     <li>
       <button type="button" class="work-feature-head" aria-expanded={isOpen} onClick={() => toggle(store, feature.name)}
@@ -146,6 +156,7 @@ function FeatureRow({ store, feature }: { store: Store; feature: ForgeFeature })
         <span class="chevron" aria-hidden="true">{isOpen ? "▾" : "▸"}</span>
         {dot && <span class="dot" style={{ background: dot }} aria-hidden="true" />}
         <span class="work-title">{featureTitle(feature.name)}</span>
+        {sessions !== undefined && <span class="counts small">{sessionWords(sessions)}</span>}
         <span class="counts small">{featureCountWords(feature)}</span>
       </button>
       {isOpen && (

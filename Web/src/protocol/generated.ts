@@ -4059,7 +4059,9 @@ export interface ForgeDone {
  * A feature (#3267): name is its label's after feature:, with the label's colour where the forge
  * gives one; epics counts its epics, open the open ones. issues counts its open issues that are not
  * epics, of the newest 500 open issues (#3741); a feature with no open epic and no such issue is
- * finished.
+ * finished. refs are the lineage refs of its open issues and open epics, waiting the ones labelled
+ * alex-todo, and updatedAt the newest update of any of them (#4115), so a client finds the sessions
+ * labelled #<n> for them and which wait for Alex.
  */
 export interface ForgeFeature {
   name: string;
@@ -4067,14 +4069,20 @@ export interface ForgeFeature {
   epics: number;
   open: number;
   issues?: number;
+  refs?: string[];
+  waiting?: string[];
+  updatedAt?: WireDate;
 }
 
 /**
  * forge/features (#3267): the feature:<name> labels of the epics (the issues labelled epic, open or
- * closed, the newest 500), by name; errors says a forge that could not be read, as in ForgeList.
+ * closed, the newest 500), by name; approvals are the lineage refs of the newest 100 open pull
+ * requests labelled needs-approval (#4115), so a client finds the sessions labelled P#<n> for them;
+ * errors says a forge that could not be read, as in ForgeList.
  */
 export interface ForgeFeatures {
   features: ForgeFeature[];
+  approvals?: string[];
   errors?: ForgeListError[];
 }
 
@@ -13567,8 +13575,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeDiffFile: { required: ["path", "change", "additions", "deletions", "hunks"], optional: ["previousPath", "note"] },
   ForgeDiffHunk: { required: ["oldStart", "newStart", "lines"], optional: [] },
   ForgeDone: { required: [], optional: ["url", "auto", "reran"] },
-  ForgeFeature: { required: ["name", "epics", "open"], optional: ["color", "issues"] },
-  ForgeFeatures: { required: ["features"], optional: ["errors"] },
+  ForgeFeature: { required: ["name", "epics", "open"], optional: ["color", "issues", "refs", "waiting", "updatedAt"] },
+  ForgeFeatures: { required: ["features"], optional: ["approvals", "errors"] },
   ForgeFeaturesRequest: { required: [], optional: ["folder", "board"] },
   ForgeImage: { required: ["mimeType", "data"], optional: [] },
   ForgeImageRequest: { required: ["url"], optional: [] },

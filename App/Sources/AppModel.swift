@@ -6458,6 +6458,8 @@ final class AppModel {
 
     func workLead(of epic: DaemonAPI.LineageNode) -> Agent? { WorkFeatures.lead(of: epic, in: work.agents) }
 
+    var workAgents: [Agent] { work.agents }
+
     /// A page of the lineage nodes of a kind (#3118), from the control plane: Work's figures; nil
     /// with no control plane.
     func reportNodes(_ query: DaemonAPI.ReportNodesQuery) async throws -> DaemonAPI.ReportNodes? {
