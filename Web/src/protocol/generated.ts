@@ -4117,7 +4117,8 @@ export interface ForgeImageRequest {
  * on. The hierarchy (#3267): parent is the issue it is a sub-issue (a Linear or GitLab child) of;
  * level is epic, story, task or spike, from its labels; feature is the name of its feature:<name>
  * label; progress is a parent's closed children of all of them, where the forge says it: in a
- * GitHub list, and on an issue's own read.
+ * GitHub list, and on an issue's own read. standing says it has the label standing: a standing
+ * epic, whose plan is a query (#3659).
  */
 export interface ForgeItem {
   node: LineageNode;
@@ -4141,6 +4142,7 @@ export interface ForgeItem {
   level?: string;
   feature?: string;
   progress?: ForgeProgress;
+  standing?: boolean;
 }
 
 /**
@@ -4301,13 +4303,16 @@ export interface ForgeNodeRequest {
  * forge/plan (#3267): an epic and its plan. children are its sub-issues (at most 100), step by
  * step, in the forge's order within a step. steps are the children of each step, the first first.
  * lead is the session on this machine, not archived, that works on the epic in lineage (its label
- * #<n>, or the Linear key) and is labelled lead.
+ * #<n>, or the Linear key) and is labelled lead. standing is set only for a standing epic (#3661):
+ * its children are then the open issues of its query, not its sub-issues, at most 100, in order
+ * (priority, then the oldest), all in one step 1; its item has no progress.
  */
 export interface ForgePlan {
   item: ForgeItem;
   children: ForgePlanChild[];
   steps: ForgePlanStep[];
   lead?: ForgeLead;
+  standing?: ForgeStanding;
 }
 
 /**
@@ -4340,6 +4345,22 @@ export interface ForgePlanStep {
 export interface ForgeProgress {
   done: number;
   total: number;
+}
+
+/**
+ * A standing epic's query (#3659, #3661), as the daemon read it from the standing block in the
+ * epic's body. labels: the issue has all of them; any: at least one of them; not: none of them;
+ * milestone: none, any or a milestone's name. lanes is how many lanes its lead runs at once, 1 when
+ * the block does not say. error says why there is no query: no block, a second block, or an unknown
+ * or bad field; with an error, the plan has no children.
+ */
+export interface ForgeStanding {
+  labels: string[];
+  any: string[];
+  not: string[];
+  milestone?: string;
+  lanes: number;
+  error?: string;
 }
 
 /**
@@ -13572,7 +13593,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeFeaturesRequest: { required: [], optional: ["folder", "board"] },
   ForgeImage: { required: ["mimeType", "data"], optional: [] },
   ForgeImageRequest: { required: ["url"], optional: [] },
-  ForgeItem: { required: ["node", "title", "state", "labels", "assignees", "updatedAt", "comments"], optional: ["status", "url", "folder", "author", "milestone", "draft", "checks", "review", "mergeable", "autoMerge", "parent", "level", "feature", "progress"] },
+  ForgeItem: { required: ["node", "title", "state", "labels", "assignees", "updatedAt", "comments"], optional: ["status", "url", "folder", "author", "milestone", "draft", "checks", "review", "mergeable", "autoMerge", "parent", "level", "feature", "progress", "standing"] },
   ForgeItemDetail: { required: ["item", "body", "comments"], optional: ["cursor", "checks", "reviewThreads", "filesChanged", "head", "mergeMethods", "start", "transitions"] },
   ForgeItemRequest: { required: ["node"], optional: ["cursor"] },
   ForgeLabel: { required: ["name"], optional: ["color"] },
@@ -13587,11 +13608,12 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeLogins: { required: [], optional: ["github", "gitlab", "linear", "jira", "forgejo", "bitbucket", "azureDevOps"] },
   ForgeMergeRequest: { required: ["node", "sha"], optional: ["method", "auto"] },
   ForgeNodeRequest: { required: ["node"], optional: [] },
-  ForgePlan: { required: ["item", "children", "steps"], optional: ["lead"] },
+  ForgePlan: { required: ["item", "children", "steps"], optional: ["lead", "standing"] },
   ForgePlanChild: { required: ["item", "blockedBy", "step"], optional: ["blockedOutside"] },
   ForgePlanRequest: { required: ["node"], optional: [] },
   ForgePlanStep: { required: ["step", "nodes"], optional: [] },
   ForgeProgress: { required: ["done", "total"], optional: [] },
+  ForgeStanding: { required: ["labels", "any", "not", "lanes"], optional: ["milestone", "error"] },
   ForgeStart: { required: ["prompt", "labels"], optional: ["worktree"] },
   ForgeTransition: { required: ["id", "name"], optional: ["category"] },
   FoundFolder: { required: ["folder", "exists", "isRepository", "isFolder"], optional: ["typed"] },

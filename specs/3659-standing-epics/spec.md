@@ -136,6 +136,18 @@ In the daemon:
   `-label:` and `label:a,b` to `searchIssues`.
 - The order is a pure function of the items, tested by itself.
 
+## As built (#3661)
+
+Decided: the daemon reads the list with `forge/issues` on the epic's folder, narrowed on the
+forge by the block's first label, and applies the rest of the query itself, at most 5 pages of
+100. The per-forge filters in the table above are not used yet, because one read works the same
+on every forge with no change to their clients. Alex can overrule.
+
+- Priority is the `priority:` labels only: `ForgeItem` has no priority field for Linear or Jira.
+- "The oldest" is the lowest issue number: `ForgeItem` has no creation date.
+- Only the epic's own repo, Linear team or Jira project is read.
+- Each child's `blockedBy` is empty for now: a list does not read blockers.
+
 ## Not in this spike
 
 - The lead skill's steps for a standing epic: it never closes the epic, and it waits on
