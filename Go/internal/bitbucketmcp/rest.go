@@ -437,7 +437,8 @@ type pullJSON struct {
 }
 
 func (p pullJSON) pr() PR {
-	return PR{Number: p.ID, Title: p.Title, Branch: p.Source.Branch.Name, URL: p.Links.HTML.Href, Fixes: closingRefs(p.Description)}
+	return PR{Number: p.ID, Title: p.Title, Branch: p.Source.Branch.Name, URL: p.Links.HTML.Href, Fixes: closingRefs(p.Description),
+		Author: p.Author.name()}
 }
 
 // fork says whether its branch is in another repository.

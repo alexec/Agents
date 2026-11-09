@@ -3,6 +3,7 @@ package azuredevopsmcp
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 	"testing"
@@ -435,4 +436,65 @@ func TestBuildServicesAndGroupsAreBots(t *testing.T) {
 	if isBot(identity{DisplayName: "Robot Smith", UniqueName: "robot@acme.test", Descriptor: "aad.x"}) {
 		t.Error("a person is a bot")
 	}
+}
+
+// #3797: every event about one pull request names it by pr, branch, fixes or mine, or takes
+// any; run.completed takes any too.
+func TestEventsListGivesWhichArgumentsNameOne(t *testing.T) {
+	named := map[string]bool{"checks.failed": true, "checks.passed": true, "pr.merged": true, "pr.closed": true,
+		"pr.conflicted": true, "review.comment": true}
+	for _, e := range eventsList()["events"].([]any) {
+		e := e.(map[string]any)
+		name := e["name"].(string)
+		props := e["inputSchema"].(map[string]any)["properties"].(map[string]any)
+		_, hasMine := props["mine"]
+		_, hasFixes := props["fixes"]
+		_, hasAny := props["any"]
+		if hasMine != named[name] || hasFixes != named[name] {
+			t.Fatalf("%s: mine %v, fixes %v", name, hasMine, hasFixes)
+		}
+		if want := named[name] || name == "run.completed"; hasAny != want {
+			t.Fatalf("%s: any %v", name, hasAny)
+		}
+		if strings.HasPrefix(name, "pr.") || strings.HasPrefix(name, "checks.") || name == "review.comment" {
+			pr := e["payloadSchema"].(map[string]any)["properties"].(map[string]any)["pr"].(map[string]any)["properties"].(map[string]any)
+			if _, ok := pr["fixes"]; !ok {
+				t.Fatalf("%s: no fixes in pr", name)
+			}
+		}
+	}
+	for _, bad := range []map[string]any{{"fixes": []any{"12"}}, {"fixes": []any{}}, {"fixes": "#12"}, {"fixes": []any{"acme/app#12"}}, {"any": "yes"}} {
+		raw, _ := json.Marshal(map[string]any{"name": "pr.merged", "arguments": bad})
+		if _, err := (&Events{AzureDevOps: newFake(t).azureDevOps()}).Poll(context.Background(), raw); err == nil || err.Code != -32602 {
+			t.Fatalf("%v: %v", bad, err)
+		}
+	}
+}
+
+// #3797: a lead knows the work item a lane's pull request fixes before it is opened, so fixes
+// narrows by the work items a description closes; mine is the owner's pull request also once
+// it is completed and no longer active.
+func TestFixesAndMineNarrowMergedPullRequests(t *testing.T) {
+	f := newFake(t)
+	fixes := newPoller(t, f, "pr.merged", map[string]any{"fixes": []any{"#37"}})
+	mine := newPoller(t, f, "pr.merged", map[string]any{"mine": true})
+	all := newPoller(t, f, "pr.merged", map[string]any{"any": true})
+	for _, p := range []*poller{fixes, mine, all} {
+		p.poll()
+	}
+	f.set(func() {
+		f.pulls = []obj{
+			pull(1, "a", alex, obj{"description": "Fixes AB#37.", "status": "completed", "closedDate": at(1)}),
+			pull(2, "b", dev, obj{"description": "Closes #38", "status": "completed", "closedDate": at(1)}),
+			pull(3, "c", dev, obj{"status": "completed", "closedDate": at(1)}),
+		}
+	})
+	id := func(n int) string { return fmt.Sprintf("pr.merged:acme/Web App/app:%d", n) }
+	ids, result := fixes.poll()
+	same(t, ids, []string{id(1)})
+	same(t, data(t, result, 0)["pr"].(map[string]any)["fixes"], []string{"#37"})
+	ids, _ = mine.poll()
+	same(t, ids, []string{id(1)})
+	ids, _ = all.poll()
+	same(t, ids, []string{id(1), id(2), id(3)})
 }
