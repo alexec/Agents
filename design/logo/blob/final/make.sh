@@ -48,10 +48,10 @@ for MOOD in asleep quizzical; do
   echo "$SVG$BODY<rect width=\"1024\" height=\"1024\" rx=\"230\" fill=\"url(#g)\"/>$(face 28 $MOOD)</svg>" > tile-$MOOD.svg
 done
 
-# Agents Host's menu bar mark: a template of outline, eyes and smile in one colour, so it
+# The menu bar mark (Agents Host's, in the one app since #4225): a template of outline, eyes and smile in one colour, so it
 # follows a light or dark menu bar; the eyes and smile cut through, the outline and smile
 # heavier to hold at 18 pt
-echo "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"-340 -330 680 660\" width=\"19\" height=\"18\"><path d=\"$BLOB\" fill=\"none\" stroke=\"#000\" stroke-width=\"72\" stroke-linejoin=\"round\"/><g fill=\"#000\">$EYES</g><path d=\"M-72 80 Q0 160 72 80\" fill=\"none\" stroke=\"#000\" stroke-width=\"56\" stroke-linecap=\"round\"/></svg>" > "$ROOT/Host/Resources/Assets.xcassets/MenuBarBlob.imageset/menu-bar.svg"
+echo "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"-340 -330 680 660\" width=\"19\" height=\"18\"><path d=\"$BLOB\" fill=\"none\" stroke=\"#000\" stroke-width=\"72\" stroke-linejoin=\"round\"/><g fill=\"#000\">$EYES</g><path d=\"M-72 80 Q0 160 72 80\" fill=\"none\" stroke=\"#000\" stroke-width=\"56\" stroke-linecap=\"round\"/></svg>" > "$ROOT/App/Resources/Assets.xcassets/MenuBarBlob.imageset/menu-bar.svg"
 
 # Quick Look fills transparency white, so render with AppKit instead
 swiftc -O -o /tmp/blob-render render.swift
@@ -59,14 +59,13 @@ render() { # svg size out
   /tmp/blob-render "$1" "$2" "$3"
 }
 
-# the Mac app and Agents Host, which has the same icon (#1237)
-for MAC in "$ROOT/App/Resources/Assets.xcassets/AppIcon.appiconset" "$ROOT/Host/Resources/Assets.xcassets/AppIcon.appiconset"; do
+# the Mac app: one since #4225, so one icon set (#1237)
+MAC="$ROOT/App/Resources/Assets.xcassets/AppIcon.appiconset"
 for s in 16 32 128 256 512; do
   one=mac.svg; [ $s -le 32 ] && one=mac-small.svg
   two=mac.svg; [ $s -le 16 ] && two=mac-small.svg
   render $one $s "$MAC/icon_${s}x${s}.png"
   render $two $((s*2)) "$MAC/icon_${s}x${s}@2x.png"
-done
 done
 
 # iOS wants no alpha: through JPEG and back drops it

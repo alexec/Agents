@@ -47,8 +47,9 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-HOSTAPP="$REPO/build/DD/Build/Products/$CONFIG/Agents Host.app"
+# One app since #4225: the window, and the helpers this script runs as its launch agents would.
 APP="$REPO/build/DD/Build/Products/$CONFIG/Agents.app"
+HOSTAPP="$APP"
 
 [ -n "$SLUG" ] || SLUG="$(printf '%04x' $((RANDOM % 65536)))"
 case "$SLUG" in *[!A-Za-z0-9_-]*) echo "a slug is letters, digits, - and _" >&2; exit 2 ;; esac
@@ -88,12 +89,10 @@ fi
 
 if [ "$BUILD" = 1 ]; then
   echo "building…" >&2
-  # One after the other: the schemes share SwiftPM state. Through the shared build cache
+  # Through the shared build cache
   # (scripts/build-cache.sh), so a fresh worktree reuses what other builds compiled.
   ( cd "$REPO" && xcodegen generate >/dev/null \
     && scripts/build-cache.sh xcodebuild -scheme AgentsHost -destination 'platform=macOS' -configuration "$CONFIG" \
-         -derivedDataPath build/DD -skipPackagePluginValidation build \
-    && scripts/build-cache.sh xcodebuild -scheme AgentsStore -destination 'platform=macOS' -configuration "$CONFIG" \
          -derivedDataPath build/DD -skipPackagePluginValidation build ) >/tmp/run-$SLUG-build.log 2>&1 \
     || { echo "build failed — tail /tmp/run-$SLUG-build.log" >&2; tail -30 /tmp/run-$SLUG-build.log >&2; exit 1; }
 fi
@@ -259,7 +258,7 @@ if [ "$WINDOW" = 1 ]; then
   fi
   "${CLEAN[@]}" open "${OPEN_FLAGS[@]}" "$APP" --args --walk "run-$SLUG" -ApplePersistenceIgnoreState YES ${APP_ARGS[@]+"${APP_ARGS[@]}"}
   for _ in $(seq 1 100); do
-    APP_PID="$(pgrep -f "Agents.app/Contents/MacOS/Agents --walk run-$SLUG( |$)" | head -1 || true)"
+    APP_PID="$(pgrep -f "Agents.app/Contents/MacOS/Agents( Host)? --walk run-$SLUG( |$)" | head -1 || true)"
     [ -n "$APP_PID" ] && break
     sleep 0.1
   done

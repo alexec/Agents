@@ -1,8 +1,12 @@
 #!/bin/zsh
-# Build Agents Host for a GitHub release (#669): signed with Developer ID, notarized and
-# stapled, in a .dmg and a .zip, beside the Linux agentsd as tarballs and a SHA256SUMS. The zip
-# is for Macs that may not mount a disk image (#675: CyberArk, no hdiutil): unzip, then move the
-# app to ~/Applications, which needs no admin rights.
+# Build Agents for a GitHub release (#669, #4225): the window and this Mac's host in one app,
+# signed with Developer ID, notarized and stapled, in a .dmg and a .zip, beside the Linux agentsd
+# as tarballs and a SHA256SUMS. The zip is for Macs that may not mount a disk image (#675:
+# CyberArk, no hdiutil): unzip, then move the app to ~/Applications, which needs no admin rights.
+#
+# Agents was Agents Host (#4224). An Agents Host updates itself from Agents-Host-<version>.zip
+# and wants an Agents Host.app in it, so the release also carries the same app under that name;
+# once it runs, it renames itself Agents.app (agentsd, takeNewName).
 #
 #   scripts/release-host.sh 0.2.0 [build]        everything, into build/release/
 #   scripts/release-host.sh --dry-run 0.2.0      ad-hoc signed, not notarized: proves the
@@ -13,7 +17,7 @@
 #   - ASC_KEY_ID, ASC_ISSUER_ID and ASC_KEY_PATH (the App Store Connect key's .p8), for
 #     notarytool.
 # The Linux agentsd (Go, #1136) has to be in App/Resources/servers already
-# (scripts/build-linux-agentsd.sh, or the release workflow's linux job): Agents Host carries
+# (scripts/build-linux-agentsd.sh, or the release workflow's linux job): Agents carries
 # it for servers, and the release offers it on its own for Linux hosts.
 set -euo pipefail
 
@@ -44,7 +48,7 @@ signing=()
 (( dry )) && signing=(CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- PROVISIONING_PROFILE_SPECIFIER=
     CODE_SIGN_ENTITLEMENTS= OTHER_CODE_SIGN_FLAGS=)
 
-print "archiving Agents Host $version ($build)…"
+print "archiving Agents $version ($build)…"
 $xcodebuild archive -project Agents.xcodeproj -scheme AgentsHost -configuration Release \
     -destination 'generic/platform=macOS' -archivePath $out/AgentsHost.xcarchive \
     -skipPackagePluginValidation -skipMacroValidation \
@@ -54,10 +58,10 @@ $xcodebuild archive -project Agents.xcodeproj -scheme AgentsHost -configuration 
     exit 1
 }
 
-app="$out/export/Agents Host.app"
+app="$out/export/Agents.app"
 if (( dry )); then
     mkdir -p $out/export
-    ditto "$out/AgentsHost.xcarchive/Products/Applications/Agents Host.app" "$app"
+    ditto "$out/AgentsHost.xcarchive/Products/Applications/Agents.app" "$app"
 else
     cat > $out/export.plist <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -79,17 +83,17 @@ fi
 # What the bundle must hold, signed: the helpers, the MCP servers it ships (#700) and the
 # Linux agentsd.
 for helper in agentsd agents-control github-mcp linear-mcp gitlab-mcp email-mcp jira-mcp slack-mcp googlechat-mcp whatsapp-mcp sentry-mcp betterstack-mcp forgejo-mcp bitbucket-mcp azuredevops-mcp azureboards-mcp workspace-commands; do
-    [[ -e "$app/Contents/Helpers/$helper" ]] || { print -u2 "Agents Host has no Helpers/$helper"; exit 1 }
+    [[ -e "$app/Contents/Helpers/$helper" ]] || { print -u2 "Agents has no Helpers/$helper"; exit 1 }
 done
 codesign --verify --deep --strict "$app"
 print "signed: $(codesign -dvv "$app" 2>&1 | sed -n 's/^Authority=//p' | head -1)"
 
-dmg=$out/Agents-Host-$version.dmg
+dmg=$out/Agents-$version.dmg
 stage=$out/dmg
 mkdir -p $stage
-ditto "$app" "$stage/Agents Host.app"
+ditto "$app" "$stage/Agents.app"
 ln -s /Applications $stage/Applications
-hdiutil create -quiet -volname "Agents Host" -srcfolder $stage -fs HFS+ -format UDZO $dmg
+hdiutil create -quiet -volname "Agents" -srcfolder $stage -fs HFS+ -format UDZO $dmg
 rm -rf $stage
 
 if (( ! dry )); then
@@ -103,7 +107,13 @@ if (( ! dry )); then
     # Notarizing the image notarized the app inside it: staple its ticket for the zip too.
     xcrun stapler staple "$app"
 fi
-ditto -c -k --keepParent "$app" $out/Agents-Host-$version.zip
+ditto -c -k --keepParent "$app" $out/Agents-$version.zip
+# For an Agents Host's self-update: the same app, signed and stapled, under the old name.
+bridge=$out/bridge
+mkdir -p $bridge
+ditto "$app" "$bridge/Agents Host.app"
+ditto -c -k --keepParent "$bridge/Agents Host.app" $out/Agents-Host-$version.zip
+rm -rf $bridge
 
 for arch in x86_64 aarch64; do
     # The MCP servers Agents ships (#700) go beside it: a Linux host puts them in its bin/.
