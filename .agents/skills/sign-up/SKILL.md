@@ -109,6 +109,8 @@ the tab with `browser_close` when done.
   2FA method, the issue, the date made, when the token expires, the projects that use it
   (none: all) and notes. Never a secret value, a password or a card number: the control
   plane refuses one that looks like a token, a key or a card number.
+  To change an account, give all its fields again: an add that replaces one asks the person
+  first (#4001), and a field left out is lost.
 - **Tracker:** the account's row in Settings ▸ You ▸ Accounts (`manage_accounts`) and its notes.
   No secrets.
 
