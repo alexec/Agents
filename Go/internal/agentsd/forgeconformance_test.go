@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"slices"
 	"strconv"
@@ -31,8 +32,9 @@ import (
 // where the forge has them), and the same checks on every row. A new forge gets its row and
 // passes it before it gets its own tests.
 //
-// The checks of ForgeItemDetail.actions, authorAvatar and stateReason come with the tasks that
-// put them on the wire (#4327's tasks 10, 12 and 14).
+// ForgeList.forges and ForgeItemDetail.actions are checked here since #4361; the checks of
+// authorAvatar and stateReason come with the tasks that put them on the wire (#4327's tasks 12
+// and 14).
 
 type conformRow struct {
 	name string
@@ -660,6 +662,15 @@ func TestForgeConformance(t *testing.T) {
 					t.Errorf("%s by ones: %v, want %v", method, conformNodes(one), conformNodes(all[prs]))
 				}
 			}
+			// The list says the forge's capabilities (#4361).
+			var page wire.ForgeList
+			method := map[bool]string{false: "forge/issues", true: "forge/pulls"}[caps.PRs && !caps.Issues]
+			if err := json.Unmarshal(c.call(t, 990, method, wire.ForgeListRequest{State: new("all")}), &page); err != nil {
+				t.Fatal(err)
+			}
+			if want := []wire.ForgeCapabilities{caps.wire(f.Name())}; !reflect.DeepEqual(page.Forges, want) {
+				t.Errorf("%s forges = %+v, want %+v", method, page.Forges, want)
+			}
 			// Issues and PRs agree with the kinds that List returns.
 			if caps.Issues != (len(all[false]) > 0) || caps.PRs != (len(all[true]) > 0) {
 				t.Errorf("caps say issues=%v prs=%v; the lists gave %d and %d", caps.Issues, caps.PRs, len(all[false]), len(all[true]))
@@ -690,6 +701,12 @@ func TestForgeConformance(t *testing.T) {
 						conformModel(t, caps, m)
 					}
 					refs[i.Node.Kind+" "+i.State] = r
+					// 5. actions follows the state, on the item's page.
+					var page wire.ForgeItemDetail
+					if err := json.Unmarshal(c.call(t, 991, itemMethod(i.Node.Kind), wire.ForgeItemRequest{Node: i.Node}), &page); err != nil {
+						t.Fatal(err)
+					}
+					conformItemActions(t, caps, i, page.Actions)
 				}
 			}
 
@@ -768,6 +785,43 @@ func conformModel(t *testing.T, caps forgeCaps, i wire.ForgeItem) {
 		if caps.LabelColors && !labelColor.MatchString(deref(l.Color)) {
 			t.Errorf("%v: label %s's colour is %q, not #rrggbb", i.Node, l.Name, deref(l.Color))
 		}
+	}
+}
+
+// conformItemActions checks an item page's actions against caps and the item's state: a merged
+// pull request has no merge and no reopen, a closed item has reopen and not close, and an open
+// one the reverse.
+func conformItemActions(t *testing.T, caps forgeCaps, i wire.ForgeItem, actions []wire.ForgeAction) {
+	t.Helper()
+	if actions == nil {
+		t.Errorf("%v: no actions", i.Node)
+	}
+	a := caps.Issue
+	if i.Node.Kind == lineage.KindPR {
+		a = caps.PR
+	}
+	for _, name := range actions {
+		if n := string(name); n != actionAddChild && n != actionBlockedBy && !a.on(n) {
+			t.Errorf("%v: actions has %s, which caps say no to", i.Node, n)
+		}
+	}
+	has := func(n wire.ForgeAction) bool { return slices.Contains(actions, n) }
+	switch i.State {
+	case "merged":
+		if has(wire.ForgeActionMerge) || has(wire.ForgeActionReopen) || has(wire.ForgeActionClose) {
+			t.Errorf("%v (merged): actions %v", i.Node, actions)
+		}
+	case "closed":
+		if has(wire.ForgeActionClose) || has(wire.ForgeActionMerge) || has(wire.ForgeActionReopen) != a.Reopen {
+			t.Errorf("%v (closed): actions %v", i.Node, actions)
+		}
+	case "open":
+		if has(wire.ForgeActionReopen) || has(wire.ForgeActionClose) != a.Close || has(wire.ForgeActionMerge) != a.Merge {
+			t.Errorf("%v (open): actions %v", i.Node, actions)
+		}
+	}
+	if i.Node.Kind == lineage.KindPR && (has(wire.ForgeActionAddChild) || has(wire.ForgeActionBlockedBy)) {
+		t.Errorf("%v: a pull request with a plan's actions %v", i.Node, actions)
 	}
 }
 
