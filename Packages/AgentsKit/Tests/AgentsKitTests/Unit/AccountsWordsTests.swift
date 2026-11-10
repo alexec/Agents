@@ -16,6 +16,17 @@ struct AccountsWordsTests {
         #expect(AccountsWords.projects(all) == ["Agents", "Other"])
     }
 
+    /// #4190: only a control plane that says user/3 takes the accounts part.
+    @Test func anOlderControlPlaneIsSentNoAccounts() {
+        var status = DaemonAPI.ControlStatus(name: "c", version: "0.17.0", homeHost: nil, machineID: "m")
+        #expect(AccountsWords.refusal(nil) == nil)
+        #expect(AccountsWords.refusal(status) == "The control plane needs an update to do this.")
+        status.capabilities = [Capability.user1, Capability.user2]
+        #expect(AccountsWords.refusal(status) == AccountsWords.planeNeedsUpdate)
+        status.capabilities?.append(Capability.user3)
+        #expect(AccountsWords.refusal(status) == nil)
+    }
+
     @Test func theFootAddsUpTheCost() {
         #expect(AccountsWords.foot(all) == "3 accounts, $20.50 a month.")
         #expect(AccountsWords.foot([]) == "0 accounts, $0 a month.")

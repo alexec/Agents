@@ -20,6 +20,8 @@ struct AccountsPane: View {
     @State private var isAdding = false
     @State private var removing: DaemonAPI.OutsideAccount?
     @State private var problem: String?
+    /// The control plane's `control/status`, for its capabilities (#4190); nil until it comes.
+    @State private var status: DaemonAPI.ControlStatus?
 
     private var all: [DaemonAPI.OutsideAccount] {
         (try? state.settings?.accounts?.decode(DaemonAPI.OutsideAccounts.self))?.accounts ?? []
@@ -37,33 +39,28 @@ struct AccountsPane: View {
                 }
                 .paperListRow()
             }
-            if let only, all.contains(where: { AccountsWords.secretName($0) != nil }) {
+            // An older control plane refuses the accounts part, so the pane offers none (#4190).
+            if let refusal = AccountsWords.refusal(status) {
                 Section {
-                    Label(SecretInfoWords.onlyMachineLine(only, names: machineNames), systemImage: "exclamationmark.triangle")
-                        .appText(.supporting).tinted(.attention)
+                    Text(refusal).appText(.supporting).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .paperListRow()
-            }
-            Section {
-                let projects = AccountsWords.projects(all)
-                if !projects.isEmpty {
-                    Picker("Project", selection: $project) {
-                        Text("All").tag("")
-                        ForEach(projects, id: \.self) { Text($0).tag($0) }
+            } else if status != nil {
+                if let only, all.contains(where: { AccountsWords.secretName($0) != nil }) {
+                    Section {
+                        Label(SecretInfoWords.onlyMachineLine(only, names: machineNames), systemImage: "exclamationmark.triangle")
+                            .appText(.supporting).tinted(.attention)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
+                    .paperListRow()
                 }
-                ForEach(shown) { account in row(account, secrets: secrets, oneMachine: only != nil) }
-                Button("Add Account…") { isAdding = true }
-                    .disabled(control == nil)
-            } footer: {
-                Text(AccountsWords.foot(shown)).appText(.fine).foregroundStyle(.secondary)
+                accounts(shown, secrets: secrets, oneMachine: only != nil)
             }
-            .paperListRow()
         }
         .paperForm()
-        .task(id: control != nil) { await state.load(control) }
-        .refreshable { await state.load(control) }
+        .task(id: control != nil) { await load() }
+        .refreshable { await load() }
         .sheet(isPresented: $isAdding) {
             AccountSheet(account: nil) { await save(adding: $0, replacing: nil) }.paperSheet()
         }
@@ -78,6 +75,32 @@ struct AccountsPane: View {
         } message: { _ in
             Text("Only the record goes. The account itself, and its secrets, stay.")
         }
+    }
+
+    private func accounts(_ shown: [DaemonAPI.OutsideAccount], secrets: [DaemonAPI.UserSecretRow], oneMachine: Bool) -> some View {
+        Section {
+            let projects = AccountsWords.projects(all)
+            if !projects.isEmpty {
+                Picker("Project", selection: $project) {
+                    Text("All").tag("")
+                    ForEach(projects, id: \.self) { Text($0).tag($0) }
+                }
+            }
+            ForEach(shown) { account in row(account, secrets: secrets, oneMachine: oneMachine) }
+            Button("Add Account…") { isAdding = true }
+                .disabled(control == nil)
+        } footer: {
+            Text(AccountsWords.foot(shown)).appText(.fine).foregroundStyle(.secondary)
+        }
+        .paperListRow()
+    }
+
+    /// The control plane's capabilities first, then the person's settings.
+    private func load() async {
+        if let control {
+            status = try? await control.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self)
+        }
+        await state.load(control)
     }
 
     private func row(_ account: DaemonAPI.OutsideAccount, secrets: [DaemonAPI.UserSecretRow], oneMachine: Bool) -> some View {
