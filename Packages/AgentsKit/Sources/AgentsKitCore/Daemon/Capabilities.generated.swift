@@ -116,6 +116,7 @@ public enum Capability {
     public static let machines1 = "machines/1"
     public static let mailbox1 = "mailbox/1"
     public static let marketplaces1 = "marketplaces/1"
+    public static let mcpToolLevels1 = "mcp.tool-levels/1"
     public static let mcp1 = "mcp/1"
     public static let messagesReply1 = "messages.reply/1"
     public static let messages1 = "messages/1"
@@ -409,10 +410,12 @@ public enum Capability {
         "mcp/preview": "mcp/1",
         "mcp/remove": "mcp/1",
         "mcp/set-secret": "mcp/1",
+        "mcp/setToolLevel": "mcp.tool-levels/1",
         "mcp/sign-in": "mcp/1",
         "mcp/sign-in/cancel": "mcp/1",
         "mcp/sign-in/wait": "mcp/1",
         "mcp/sign-out": "mcp/1",
+        "mcp/tools": "mcp.tool-levels/1",
         "mcp/verify": "mcp/1",
         "messages/conversations": "messages/1",
         "messages/read": "messages/1",

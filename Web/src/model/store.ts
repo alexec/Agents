@@ -11,7 +11,7 @@ import type {
   Agent, AgentRemovedNotification, ResumingNotification, BrowserFrame, BrowserPageState, DesktopControlLiveFrame, LiveFrame, LiveSource, ControlMachine, MachineRef, MachineWorkspace, ElicitationNotification, ElicitationRequest, EntryNotification,
   PermissionNotification, PermissionRequest, FolderSummary, HelperLimits, DiskThresholds, NotCommittedResponse, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, FolderRemovedNotification, DraftOptionsNotification, JSONValue, Methods, AccountProfile, RuntimeAccount, RuntimeSignInStep, RuntimeStatus,
-  StartRequest, UUID, AutoMappings, AutoPreview, AutoPreviewRequest, AutoSettings, ClientPermissionMode, Levels, ModelLevel, PermissionLevel, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, DiskState, StoreNotes,
+  StartRequest, UUID, AutoMappings, AutoPreview, AutoPreviewRequest, AutoSettings, ClientPermissionMode, Levels, ModelLevel, PermissionLevel, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, MCPToolsAnswer, ConnectorToolLevel, DiskState, StoreNotes,
   CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ReviewPull, CheckSuggestion, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, PolicySetBy, RuntimeAllowances,
   GuardedChange, GuardedChangeReading, MachineJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Achievements, Multiplier,
@@ -3134,6 +3134,21 @@ export class Store extends Work {
       .then(() => undefined, (error: unknown) => describe(error));
     if (why === undefined) await this.checkMCPHealth(host, folder);
     return why;
+  }
+
+  /** A connector's tools with Allow, Ask or Off for each (#4099); its refusal's words when the host refuses. */
+  async connectorTools(host: string, name: string, folder?: string): Promise<MCPToolsAnswer | string> {
+    const destination = folder === undefined ? { kind: "personal" } : { kind: "folder", folder: hostedFolderPath(folder) };
+    return this.link.call("mcp/tools", { destination: destination as never, name }, host)
+      .then((answer) => answer, (error: unknown) => describe(error));
+  }
+
+  /** One tool's level, or with no tool the switch for every tool that writes; no level clears it (#4099). */
+  async setConnectorToolLevel(host: string, name: string, tool: string | undefined, level: ConnectorToolLevel | undefined,
+    folder?: string): Promise<MCPToolsAnswer | string> {
+    const destination = folder === undefined ? { kind: "personal" } : { kind: "folder", folder: hostedFolderPath(folder) };
+    return this.link.call("mcp/setToolLevel", { destination: destination as never, name, ...(tool === undefined ? {} : { tool }), ...(level === undefined ? {} : { level }) }, host)
+      .then((answer) => answer, (error: unknown) => describe(error));
   }
 
   async markRuntimeAvailable(host: string, credentialKey: string): Promise<void> {

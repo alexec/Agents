@@ -35,6 +35,7 @@ func LooserRules(approved, next wire.PolicyRules) []wire.PolicyRuleName {
 		{wire.PolicyRuleNameMarketplacesAllowed, looserList(marketplacesAllowed(approved), marketplacesAllowed(next))},
 		{wire.PolicyRuleNameMarketplacesCustomServers, looserScalar(customServers(approved), customServers(next), func(v string) float64 { return float64(CustomServersOrder(v)) })},
 		{wire.PolicyRuleNameEnvironment, looserList(environmentPassThrough(approved), environmentPassThrough(next))},
+		{wire.PolicyRuleNameConnectorTools, looserConnectorTools(approved.ConnectorTools, next.ConnectorTools)},
 	}
 	var out []wire.PolicyRuleName
 	for _, c := range checks {
@@ -72,6 +73,7 @@ var ruleTitles = map[wire.PolicyRuleName]string{
 	wire.PolicyRuleNameMarketplacesAllowed:       "Marketplaces",
 	wire.PolicyRuleNameMarketplacesCustomServers: "Connectors added by hand",
 	wire.PolicyRuleNameEnvironment:               "Variables agents get",
+	wire.PolicyRuleNameConnectorTools:            "Connector tools",
 }
 
 // looserScalar reports whether next is looser than approved for one scalar rule: approved

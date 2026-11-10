@@ -1,7 +1,8 @@
 // Every MCP server in one mcp.json and how each is doing (#753), as the window's MCPServersView and
 // the Remote's MCPServersListView: the person's own under Machines, a project's on its own page from
 // its row in the sidebar, read in one of its folders (#3407). A folder's page opens with its set-up (#1336), and Connectors with
-// the person's connections. Read-only but for Check Now and Remove… (#2154): servers are edited in Settings.
+// the person's connections. Read-only but for Check Now, Remove… (#2154) and each tool's Allow, Ask or Off (#4099):
+// servers are edited in Settings.
 import { useState } from "preact/hooks";
 import type { Store } from "../model/store";
 import type { MCPLevels } from "../protocol/generated";
@@ -10,6 +11,7 @@ import {
   notRemoved, notRemovedOffline, personalServers, folderEmpty, folderIntro, folderServers, removesCommitted, removesWords,
 } from "../model/hostedMCP";
 import { BackToList } from "./BackToList";
+import { ConnectorTools } from "./ConnectorTools";
 import { ConnectorSetupSection } from "./ConnectorSetup";
 import { go } from "../route";
 import { Capability } from "../protocol/capabilities.generated";
@@ -22,6 +24,15 @@ export function MCPServersList({ store, host, folder }: { store: Store; host: st
   const problem = fileProblem(snapshot, folder);
   const [checking, setChecking] = useState(false);
   const [removeProblem, setRemoveProblem] = useState<string | undefined>();
+  // The connectors whose Tools are open (#4099), on a host that has them.
+  const [toolsOpen, setToolsOpen] = useState<ReadonlySet<string>>(new Set());
+  const hasTools = store.has(host, Capability.mcpToolLevels1);
+  const toggleTools = (name: string) => {
+    const next = new Set(toolsOpen);
+    if (next.has(name)) next.delete(name);
+    else next.add(name);
+    setToolsOpen(next);
+  };
   const checkable = servers.some((s) => !s.hosted);
   // Every connector (#2154), one written by hand in mcp.json too; asked first, as the window's sheet.
   // A server's is named (#2266); the Mac's is not.
@@ -56,8 +67,13 @@ export function MCPServersList({ store, host, folder }: { store: Store; host: st
                 <p class="quiet small">{healthLine(server)}</p>
                 {error && <p class={tone === "failing" ? "small failure" : "quiet small"}>{error}</p>}
                 <ConnectorLevels levels={server.levels} />
+                {hasTools && (
+                  <button class="small" aria-expanded={toolsOpen.has(server.name)} title="Allow, Ask or Off for each of its tools"
+                    onClick={() => toggleTools(server.name)}>{toolsOpen.has(server.name) ? "Hide Tools" : "Tools"}</button>
+                )}{" "}
                 <button class="small" disabled={!store.hostIsOnline(host)} title={`Take ${server.name} out of its mcp.json`}
                   onClick={() => void remove(server.name)}>Remove…</button>
+                {hasTools && toolsOpen.has(server.name) && <ConnectorTools store={store} host={host} name={server.name} folder={folder} />}
               </li>
             );
           })}

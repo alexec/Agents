@@ -40,6 +40,7 @@ Mac window passes to a server with `policy/applyYours`.
 | `environment` | `{passThrough: [name]}` | The variable names that a person's own pass-through list can name; `*` at the end allowed. A runtime now gets agentsd's whole environment, so the list no longer cuts what a launch receives; an org account still takes the runtime's own variables out. |
 | `notices` | `{antigravityTerms?: show \| accepted \| refuse}` | Google's terms notice for Antigravity (#999): `show` (as absent), `accepted` (your organisation reviewed the terms; members see no notice, and the Policy pane says so), `refuse` (Antigravity is refused). Console ▸ Policy names them **Show the notice**, **Reviewed by your organisation** and **Do not allow**. |
 | `stopAll` | `{on, by, at, note?}` | The kill switch. Only `policy/stopAll` changes it. |
+| `connectorTools` | `{<connector>: {writes?, tools?: {<tool>: allow \| ask \| off}}}` | Only in your layer and a folder's (#4099). **Allow**, **Ask** or **Off** for each tool of a connector, by the connector's name; `writes` is one level for each tool that writes and that `tools` does not name. A tool no layer names is **Ask** when it writes and **Allow** when it only reads. A tool writes unless its annotations say `readOnlyHint: true`, or when they say `destructiveHint: true`. Tighter is later: Allow, Ask, Off. See [Connector tools](#connector-tools). |
 | `requireFollowing` | `true` | The control plane refuses to start work on a machine that has not kept this version. |
 | `groups` | `{}` | Empty. A place for later layers, which can only make a rule tighter. |
 
@@ -59,6 +60,29 @@ nothing is kept.
 **Raises.** `policy/raise` gives one person a higher budget for today (UTC). A person has at
 most one raise each day; the newest one is kept. Raises of past days are removed at the next
 change. A person sees only their own raises.
+
+## Connector tools
+
+The `connectorTools` rule (#4099) is set on a connector's **Tools** list (Settings ▸ Agent
+Configuration ▸ Connectors, or the folder's), not in Agents ▸ Policy, which shows it read
+only. `mcp/tools` gives a connector's tools as its last health check's `tools/list` gave them,
+each with the level in force, the destination layer's own level and the cap of the layers
+above; `mcp/setToolLevel` sets one tool's level, or with no tool the `writes` switch, in your
+layer (a connector of yours) or in the folder's `.agents/policy.json` (one of the folder's).
+Only the person's own clients can call it: never an agent.
+
+How a level is kept:
+
+| Runtime | Off | Allow and Ask |
+|---|---|---|
+| Claude | `disallowedTools` on `session/new`: `mcp__<connector>__<tool>` | A permission request for an Allow tool is allowed with no card; an Ask tool shows the card. |
+| Copilot | `--deny-tool <connector>(<tool>)` | The same |
+| OpenCode | `tools: {<connector>_<tool>: false}` in `OPENCODE_CONFIG_CONTENT` | The same |
+| The others | A permission request for an Off tool is refused, and the chat shows **Stopped by a policy**, the rule and where to change it. | The same |
+
+A runtime that uses a tool without asking (a mode such as Bypass Permissions) and has no deny
+list of its own is not stopped by an Off level. A runtime starts again at its next turn when
+its Off tools change.
 
 ## The signature
 

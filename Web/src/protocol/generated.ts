@@ -2533,6 +2533,15 @@ export type ConnectorSlotState =
   | "noRemote"
   | "skipped";
 
+/**
+ * What agents may do with one tool of a connector (#4099): allow (use it without asking), ask (ask
+ * the person first) or off (never use it). A layer can only move a tool towards off.
+ */
+export type ConnectorToolLevel =
+  | "allow"
+  | "ask"
+  | "off";
+
 export interface ConnectorWorkflow {
   id: string;
   name: string;
@@ -5802,6 +5811,20 @@ export interface MCPSetSecretRequest {
   needsApproval?: boolean;
 }
 
+/**
+ * Sets the level of one tool of a connector, or of all its tools that write, in the destination's
+ * layer: yours for personal, the folder's .agents/policy.json for a folder (#4099).
+ */
+export interface MCPSetToolLevelRequest {
+  destination: SkillDestination;
+  /** The connector's name. */
+  name: string;
+  /** The tool's name. Absent: the switch for every tool that writes. */
+  tool?: string;
+  /** Absent: the layer sets nothing for it, and the default applies. */
+  level?: ConnectorToolLevel;
+}
+
 export interface MCPSignInAnswer {
   flowID?: UUID;
   authorizationURL?: string;
@@ -5848,6 +5871,46 @@ export interface MCPSignOutAnswer {
 
 export interface MCPSignOutRequest {
   target: MCPSignInTarget;
+}
+
+/** One tool of a connector, as tools/list gave it, with its level (#4099). */
+export interface MCPToolRow {
+  name: string;
+  title?: string;
+  /**
+   * Its annotations do not say it is read only (readOnlyHint), or say it is destructive
+   * (destructiveHint).
+   */
+  writes: boolean;
+  /**
+   * The level in force: the tightest of every layer, or the default (ask for a tool that writes,
+   * allow for one that only reads).
+   */
+  level: ConnectorToolLevel;
+  /** What the destination's layer sets for this tool itself. Absent: nothing. */
+  own?: ConnectorToolLevel;
+  /** The tightest level of the layers above the destination's; a menu dims what is looser. */
+  cap?: ConnectorToolLevel;
+  /** For example "Your policy: at most Ask". */
+  capLine?: string;
+}
+
+export interface MCPToolsAnswer {
+  name: string;
+  tools: MCPToolRow[];
+  /** The destination layer's switch for every tool that writes. Absent: not set. */
+  writes?: ConnectorToolLevel;
+  writesCap?: ConnectorToolLevel;
+  writesCapLine?: string;
+  /**
+   * Why there is no list of tools: the connector has not answered a check yet, or did not answer.
+   */
+  problem?: string;
+}
+
+export interface MCPToolsRequest {
+  destination: SkillDestination;
+  name: string;
 }
 
 export type MCPTransportName =
@@ -8138,6 +8201,17 @@ export interface PolicyBudgets {
 }
 
 /**
+ * The levels a layer sets for one connector's tools (#4099). A tool's own level comes before the
+ * layer's writes switch.
+ */
+export interface PolicyConnectorRule {
+  /** The level of every tool that writes and that tools does not name. */
+  writes?: ConnectorToolLevel;
+  /** A level for each tool, by its name. */
+  tools?: Record<string, ConnectorToolLevel>;
+}
+
+/**
  * policy/effective (#2957): the rules for an agent in folder, or, with no folder, outside any
  * folder layer.
  */
@@ -8322,7 +8396,8 @@ export type PolicyRuleName =
   | "runtimes"
   | "marketplaces.allowed"
   | "marketplaces.customServers"
-  | "environment";
+  | "environment"
+  | "connectorTools";
 
 /**
  * The rules a layer sets (#2957, data-model.md "PolicyRules"): the same shape on the organisation,
@@ -8341,6 +8416,11 @@ export interface PolicyRules {
   runtimes?: Record<string, PolicyRuntimeRule>;
   marketplaces?: PolicyMarketplaces;
   environment?: PolicyEnvironment;
+  /**
+   * The level of each connector's tools, by the connector's name (#4099). A tool no layer names is
+   * ask when it writes and allow when it only reads.
+   */
+  connectorTools?: Record<string, PolicyConnectorRule>;
 }
 
 /** One allowed runtime in a policy (#998). */
@@ -13380,6 +13460,8 @@ export interface Methods {
   "mcp/health/check": { params: MCPHealthCheckRequest; result: MCPHealthSnapshot };
   "mcp/hosted": { params: Empty; result: HostedMCPSnapshot };
   "mcp/remove": { params: MCPRemoveRequest; result: MCPRemoveAnswer };
+  "mcp/setToolLevel": { params: MCPSetToolLevelRequest; result: MCPToolsAnswer };
+  "mcp/tools": { params: MCPToolsRequest; result: MCPToolsAnswer };
   "messages/conversations": { params: MessagesConversationsRequest; result: MessagesConversations };
   "messages/read": { params: MessagesReadRequest; result: MessagesRead };
   "messages/reply": { params: MessagesReplyRequest; result: MessagesReplied };
@@ -13798,6 +13880,8 @@ export const MethodTarget = {
   "mcp/health/check": "host",
   "mcp/hosted": "host",
   "mcp/remove": "host",
+  "mcp/setToolLevel": "host",
+  "mcp/tools": "host",
   "messages/conversations": "host",
   "messages/read": "host",
   "messages/reply": "host",
@@ -14545,6 +14629,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MCPServerHealth: { required: ["name", "transport", "hosted", "check"], optional: ["live", "checkedAt", "lastError", "tools", "levels", "folder"] },
   MCPSetSecretAnswer: { required: ["set"], optional: [] },
   MCPSetSecretRequest: { required: ["name", "value"], optional: ["needsApproval"] },
+  MCPSetToolLevelRequest: { required: ["destination", "name"], optional: ["tool", "level"] },
   MCPSignInAnswer: { required: [], optional: ["flowID", "authorizationURL", "needsClient", "callback", "error"] },
   MCPSignInClient: { required: ["id"], optional: ["secret"] },
   MCPSignInFlowRequest: { required: ["flowID"], optional: [] },
@@ -14552,6 +14637,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MCPSignInWaitAnswer: { required: ["status"], optional: [] },
   MCPSignOutAnswer: { required: [], optional: ["error"] },
   MCPSignOutRequest: { required: ["target"], optional: [] },
+  MCPToolRow: { required: ["name", "writes", "level"], optional: ["title", "own", "cap", "capLine"] },
+  MCPToolsAnswer: { required: ["name", "tools"], optional: ["writes", "writesCap", "writesCapLine", "problem"] },
+  MCPToolsRequest: { required: ["destination", "name"], optional: [] },
   MCPTriggerFailure: { required: ["code", "message", "since"], optional: [] },
   MCPTriggerStatus: { required: ["name", "state"], optional: ["server", "lastPolledAt", "lastEventAt", "missedSince", "failure", "retryAt"] },
   MCPVariable: { required: ["name", "description", "kind", "required", "alreadySet"], optional: ["placeholder"] },
@@ -14741,6 +14829,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PolicyAskForMore: { required: [], optional: ["why"] },
   PolicyBehindMachine: { required: ["host", "name"], optional: [] },
   PolicyBudgets: { required: ["allowUnmetered", "raises"], optional: ["daily", "dailyTokens", "perAgent", "perAgentTokens"] },
+  PolicyConnectorRule: { required: [], optional: ["writes", "tools"] },
   PolicyEffectiveRequest: { required: [], optional: ["folder"] },
   PolicyEnvironment: { required: ["passThrough"], optional: ["runtimes"] },
   PolicyFolderRequest: { required: ["folder"], optional: [] },
@@ -14758,7 +14847,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PolicyRefuseMore: { required: ["request"], optional: [] },
   PolicyRuleBudgets: { required: [], optional: ["perAgent", "daily", "perAgentTokens", "dailyTokens"] },
   PolicyRuleLine: { required: ["rule", "title", "words"], optional: [] },
-  PolicyRules: { required: [], optional: ["permissionMode", "permissionRequests", "sandbox", "budgets", "helpers", "workflows", "noticeLimits", "archiveMyChats", "runtimes", "marketplaces", "environment"] },
+  PolicyRules: { required: [], optional: ["permissionMode", "permissionRequests", "sandbox", "budgets", "helpers", "workflows", "noticeLimits", "archiveMyChats", "runtimes", "marketplaces", "environment", "connectorTools"] },
   PolicyRuntimeRule: { required: [], optional: ["models", "reach"] },
   PolicySet: { required: ["policy"], optional: ["rev"] },
   PolicySetBy: { required: ["by", "rule", "words"], optional: ["layer"] },

@@ -12,7 +12,7 @@ test("every rule of the spec has a row in one of the five sections", () => {
   assert.deepEqual(new Set(p.rows.map((r) => r.rule)), new Set(["permissionMode", "permissionRequests", "sandbox",
     "budgets.perAgent", "budgets.daily", "budgets.perAgentTokens", "budgets.dailyTokens", "helpers.mostRunning",
     "helpers.mostNotArchived", "workflows.mostOn", "noticeLimits.burst", "noticeLimits.waitMinutes", "archiveMyChats",
-    "runtimes", "marketplaces.allowed", "marketplaces.customServers", "environment"]));
+    "runtimes", "marketplaces.allowed", "marketplaces.customServers", "environment", "connectorTools"]));
   assert.deepEqual(p.sections.map((s) => p.sectionTitles[s]), ["Permissions", "Money", "Work at once", "Your attention", "Tools"]);
 });
 

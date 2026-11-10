@@ -2821,6 +2821,13 @@ const ConnectorSlotStateRefused ConnectorSlotState = "refused"
 const ConnectorSlotStateNoRemote ConnectorSlotState = "noRemote"
 const ConnectorSlotStateSkipped ConnectorSlotState = "skipped"
 
+// What agents may do with one tool of a connector (#4099): allow (use it without asking), ask (ask the person first) or off (never use it). A layer can only move a tool towards off.
+type ConnectorToolLevel string
+
+const ConnectorToolLevelAllow ConnectorToolLevel = "allow"
+const ConnectorToolLevelAsk ConnectorToolLevel = "ask"
+const ConnectorToolLevelOff ConnectorToolLevel = "off"
+
 type ConnectorWorkflow struct {
 	ID string `json:"id"`
 
@@ -6582,6 +6589,20 @@ type MCPSetSecretRequest struct {
 	NeedsApproval *bool `json:"needsApproval,omitzero"`
 }
 
+// Sets the level of one tool of a connector, or of all its tools that write, in the destination's layer: yours for personal, the folder's .agents/policy.json for a folder (#4099).
+type MCPSetToolLevelRequest struct {
+	Destination SkillDestination `json:"destination"`
+
+	// The connector's name.
+	Name string `json:"name"`
+
+	// The tool's name. Absent: the switch for every tool that writes.
+	Tool *string `json:"tool,omitzero"`
+
+	// Absent: the layer sets nothing for it, and the default applies.
+	Level *ConnectorToolLevel `json:"level,omitzero"`
+}
+
 type MCPSignInAnswer struct {
 	FlowID *UUID `json:"flowID,omitzero"`
 
@@ -6657,6 +6678,50 @@ type MCPSignOutAnswer struct {
 
 type MCPSignOutRequest struct {
 	Target MCPSignInTarget `json:"target"`
+}
+
+// One tool of a connector, as tools/list gave it, with its level (#4099).
+type MCPToolRow struct {
+	Name string `json:"name"`
+
+	Title *string `json:"title,omitzero"`
+
+	// Its annotations do not say it is read only (readOnlyHint), or say it is destructive (destructiveHint).
+	Writes bool `json:"writes"`
+
+	// The level in force: the tightest of every layer, or the default (ask for a tool that writes, allow for one that only reads).
+	Level ConnectorToolLevel `json:"level"`
+
+	// What the destination's layer sets for this tool itself. Absent: nothing.
+	Own *ConnectorToolLevel `json:"own,omitzero"`
+
+	// The tightest level of the layers above the destination's; a menu dims what is looser.
+	Cap *ConnectorToolLevel `json:"cap,omitzero"`
+
+	// For example "Your policy: at most Ask".
+	CapLine *string `json:"capLine,omitzero"`
+}
+
+type MCPToolsAnswer struct {
+	Name string `json:"name"`
+
+	Tools []MCPToolRow `json:"tools"`
+
+	// The destination layer's switch for every tool that writes. Absent: not set.
+	Writes *ConnectorToolLevel `json:"writes,omitzero"`
+
+	WritesCap *ConnectorToolLevel `json:"writesCap,omitzero"`
+
+	WritesCapLine *string `json:"writesCapLine,omitzero"`
+
+	// Why there is no list of tools: the connector has not answered a check yet, or did not answer.
+	Problem *string `json:"problem,omitzero"`
+}
+
+type MCPToolsRequest struct {
+	Destination SkillDestination `json:"destination"`
+
+	Name string `json:"name"`
 }
 
 type MCPTransportName string
@@ -9120,6 +9185,15 @@ type PolicyBudgets struct {
 	Raises []BudgetRaise `json:"raises"`
 }
 
+// The levels a layer sets for one connector's tools (#4099). A tool's own level comes before the layer's writes switch.
+type PolicyConnectorRule struct {
+	// The level of every tool that writes and that tools does not name.
+	Writes *ConnectorToolLevel `json:"writes,omitzero"`
+
+	// A level for each tool, by its name.
+	Tools map[string]ConnectorToolLevel `json:"tools,omitzero"`
+}
+
 // policy/effective (#2957): the rules for an agent in folder, or, with no folder, outside any folder layer.
 type PolicyEffectiveRequest struct {
 	Folder *URL `json:"folder,omitzero"`
@@ -9288,6 +9362,7 @@ const PolicyRuleNameRuntimes PolicyRuleName = "runtimes"
 const PolicyRuleNameMarketplacesAllowed PolicyRuleName = "marketplaces.allowed"
 const PolicyRuleNameMarketplacesCustomServers PolicyRuleName = "marketplaces.customServers"
 const PolicyRuleNameEnvironment PolicyRuleName = "environment"
+const PolicyRuleNameConnectorTools PolicyRuleName = "connectorTools"
 
 // The rules a layer sets (#2957, data-model.md "PolicyRules"): the same shape on the organisation, your and a folder's layer (FR-002). Every field is optional: absent sets nothing.
 type PolicyRules struct {
@@ -9313,6 +9388,9 @@ type PolicyRules struct {
 	Marketplaces *PolicyMarketplaces `json:"marketplaces,omitzero"`
 
 	Environment *PolicyEnvironment `json:"environment,omitzero"`
+
+	// The level of each connector's tools, by the connector's name (#4099). A tool no layer names is ask when it writes and allow when it only reads.
+	ConnectorTools map[string]PolicyConnectorRule `json:"connectorTools,omitzero"`
 }
 
 // One allowed runtime in a policy (#998).

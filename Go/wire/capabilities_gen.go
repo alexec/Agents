@@ -115,6 +115,7 @@ const CapMachine1 = "machine/1"
 const CapMachines1 = "machines/1"
 const CapMailbox1 = "mailbox/1"
 const CapMarketplaces1 = "marketplaces/1"
+const CapMcpToolLevels1 = "mcp.tool-levels/1"
 const CapMcp1 = "mcp/1"
 const CapMessagesReply1 = "messages.reply/1"
 const CapMessages1 = "messages/1"
@@ -408,10 +409,12 @@ var HostCapabilities = pairs([][2]string{
 	{"mcp/preview", "mcp/1"},
 	{"mcp/remove", "mcp/1"},
 	{"mcp/set-secret", "mcp/1"},
+	{"mcp/setToolLevel", "mcp.tool-levels/1"},
 	{"mcp/sign-in", "mcp/1"},
 	{"mcp/sign-in/cancel", "mcp/1"},
 	{"mcp/sign-in/wait", "mcp/1"},
 	{"mcp/sign-out", "mcp/1"},
+	{"mcp/tools", "mcp.tool-levels/1"},
 	{"mcp/verify", "mcp/1"},
 	{"messages/conversations", "messages/1"},
 	{"messages/read", "messages/1"},

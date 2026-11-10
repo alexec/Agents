@@ -149,6 +149,7 @@ func Resolve(layers []Layer) wire.EffectivePolicy {
 					}
 					return r.Environment.PassThrough, true
 				}),
+			resolveConnectorTools(layers),
 		},
 		FoldersWithRules: []wire.PolicyFolderWithRules{},
 		Behind:           []wire.PolicyBehindMachine{},

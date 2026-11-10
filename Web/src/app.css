@@ -1763,6 +1763,11 @@ button.plain:hover { opacity: 1; }
   background: color-mix(in srgb, currentColor 7%, transparent); }
 .connector-levels span.reached { color: var(--accent); opacity: 1;
   background: color-mix(in srgb, var(--accent) 14%, transparent); }
+/* A connector's tools, each with Allow, Ask or Off (#4099), as the window's ConnectorToolsList. */
+.connector-tools { margin: 8px 0 0 16px; }
+.connector-tools ul { list-style: none; margin: 0; padding: 0; }
+.connector-tool { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+.connector-tool select { margin-left: auto; }
 
 /* A folder's Connectors set-up and the Connect sheet (#1336): the connection card, the slots in the
    window's grid, each with its mark (a tick once it read, a dashed circle when skipped), and the events. */
