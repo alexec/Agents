@@ -36,8 +36,8 @@ devices keep working without pairing again, and your servers become hosts.
 3. Click **Done**.
 
 Nothing is copied. Agents Host's host takes over the earlier app's folder where it is, and
-the control plane's store starts on this Mac. To keep it in a bucket instead, see
-[Set up Agents on this Mac](set-up-on-this-mac.md#keep-the-store-in-a-bucket-instead).
+the control plane's store starts on this Mac. For a store in a bucket, see
+[Copies and the store](../explanation/control-plane.md#copies-and-the-store).
 
 ### A server that could not be reached
 
