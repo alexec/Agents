@@ -43,8 +43,9 @@ Two identities follow from the epic's design:
 **Question 1: can all of them work with contents, pull requests, issues and checks only?
 No.** The read views and the events also need **Commit statuses: read** and **Actions:
 read**; `rerun_failed` and `actions_run_trigger` need **Actions: write**. The rest of the
-table (deploys, secrets, variables, environments, new repositories, teams, workflow files)
-needs the permissions that the epic forbids for a bot.
+table (deploys, secrets, variables, environments, new repositories, teams) needs the
+permissions that the epic forbids for a bot. Workflow files need **Workflows: write**, which
+the bot has since #4291.
 
 ### The bot's manifest
 
@@ -55,7 +56,8 @@ needs the permissions that the epic forbids for a bot.
   "issues": "write",
   "checks": "read",
   "statuses": "read",
-  "actions": "write"
+  "actions": "write",
+  "workflows": "write"
 },
 "default_events": []
 ```
@@ -72,20 +74,24 @@ Decided: **Checks: read, not write**, because no tool makes a check run. Alex ca
 
 Decided: the tools that need a forbidden permission (`set_ci_secret`, `set_ci_variable`,
 `set_environment_gate`, `make_app_repository`, deploy Approve and Reject, `merge_pr` and
-`review_pr` in the hosted views, teams, workflow files) **keep the person's user token** of
+`review_pr` in the hosted views, teams) **keep the person's user token** of
 `agents-loops`, and never use the bot. They are person actions already, or tools that the app
 gates. GitHub limits a user token to the person's rights (question 3), so this gives the
 agents no more than the person. Alex can overrule.
 
 With the bot, these upstream tools fail with "Resource not accessible by integration", and
-that is correct: `create_repository`, `fork_repository`, `get_teams`, `get_team_members`, and a
-`push_files` or `create_or_update_file` under `.github/workflows/`. The test of the epic's
+that is correct: `create_repository`, `fork_repository`, `get_teams` and `get_team_members`. The test of the epic's
 acceptance criterion "Small, fixed permissions" reads the manifest and fails on any key that
 is not in the list above.
 
-**A cost for this repo:** with no Workflows permission, a bot cannot change
-`.github/workflows/`. The `ci-speed` skill and every lane that edits CI must push as the
-person. This is the intent: a bot that can change a workflow can change the required check.
+**Workflows: write (Alex, 2026-11-09, #4291).** The spike left Workflows out, because a bot
+that can change a workflow can change the required check. Then a lane that changed
+`.github/workflows/` could not push as the bot (#4290), and had to push as the person. Now
+the bot has Workflows: write, so the `ci-speed` skill and every lane that edits CI push as
+the bot. A bot's PR still merges only after a person approves it (`main`'s ruleset,
+*Require approval of changes not attributed to a person*), so a changed workflow still
+waits for a person. A bot made before #4291 gets the permission on github.com: on its App's
+**Permissions & events**, set Workflows to Read and write, then accept it on the install.
 
 ### The `agents-loops` App (user tokens)
 
