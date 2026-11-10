@@ -218,11 +218,8 @@ func (d *Daemon) changeAgent(id wire.UUID, moveOn bool, edit func(a *wire.Agent)
 }
 
 func (d *Daemon) folderChanged(folder string) {
-	for _, s := range d.folders(true) {
-		if store.FolderPath(s.Folder.Folder) == folder {
-			Broadcast(d, wire.NotifyFolderChanged, s)
-			return
-		}
+	if s, ok := d.folderSummary(folder); ok {
+		Broadcast(d, wire.NotifyFolderChanged, s)
 	}
 }
 

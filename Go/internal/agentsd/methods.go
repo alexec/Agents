@@ -296,6 +296,39 @@ func (d *Daemon) folders(includeArchived bool) []wire.FolderSummary {
 	return out
 }
 
+// folderSummary is one folder's summary, built from its own record and agents alone:
+// dress and markHelperLimits run once for it, not once for every folder as folders(true)
+// would, to throw away all but one (#4504, #4506). False when the folder is tracked by
+// neither a record nor an agent.
+func (d *Daemon) folderSummary(folder string) (wire.FolderSummary, bool) {
+	var record wire.Folder
+	found := false
+	for _, p := range d.Store.Folders() {
+		if store.FolderPath(p.Folder) == folder {
+			record = p
+			found = true
+			break
+		}
+	}
+	var agents []wire.Agent
+	for _, a := range d.Store.Agents() {
+		if folderPath(&a) == folder {
+			agents = append(agents, a)
+		}
+	}
+	if !found && len(agents) == 0 {
+		return wire.FolderSummary{}, false
+	}
+	records := map[string]wire.Folder{}
+	if found {
+		records[folder] = record
+	}
+	s := summary(folder, records, agents)
+	d.dress(&s)
+	d.markHelperLimits(&s)
+	return s, true
+}
+
 func folderPath(a *wire.Agent) string {
 	if a.Worktree != nil && a.Worktree.Folder != "" {
 		return store.FolderPath(a.Worktree.Folder)

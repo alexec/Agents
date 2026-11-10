@@ -35,11 +35,11 @@ type folderState struct {
 
 // summaryFor is the summary of one folder, or false.
 func (d *Daemon) summaryFor(folder string) (wire.FolderSummary, bool) {
-	real := resolved(folder)
-	for _, s := range d.folders(true) {
-		if f := store.FolderPath(s.Folder.Folder); f == folder || f == real {
-			return s, true
-		}
+	if s, ok := d.folderSummary(folder); ok {
+		return s, true
+	}
+	if real := resolved(folder); real != folder {
+		return d.folderSummary(real)
 	}
 	return wire.FolderSummary{}, false
 }

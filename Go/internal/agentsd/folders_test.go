@@ -2,8 +2,10 @@ package agentsd
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -128,6 +130,63 @@ func TestNoChatFolder(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(d.PersonalHome, ".agents", "chat")); !os.IsNotExist(err) {
 		t.Fatalf("~/.agents/chat made: %v", err)
+	}
+}
+
+// #4506: folderChanged says one folder's summary, the same row folders(true) would make
+// for it, not a summary of every folder.
+func TestFolderChangedSummaryMatchesFolders(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	root := t.TempDir()
+	const n = 4
+	records := make([]wire.Folder, n)
+	for i := range records {
+		dir := filepath.Join(root, fmt.Sprintf("folder-%d", i))
+		if err := os.Mkdir(dir, 0o750); err != nil {
+			t.Fatal(err)
+		}
+		records[i] = wire.Folder{Folder: store.FolderURL(dir), AddedAt: now()}
+	}
+	if err := d.Store.SaveFolders(records); err != nil {
+		t.Fatal(err)
+	}
+	target := store.FolderPath(records[2].Folder)
+	var liveID wire.UUID
+	for i := range n * 3 {
+		dir := store.FolderPath(records[i%n].Folder)
+		a := seeded(t, d, dir, nil)
+		if dir == target {
+			liveID = a.ID
+		}
+	}
+	d.change(liveID, func(a *wire.Agent) { a.Title = nil })
+	var got wire.FolderSummary
+	c.until(t, "folder/changed", func(method string, params json.RawMessage) bool {
+		if method != wire.NotifyFolderChanged.Name {
+			return false
+		}
+		var s wire.FolderSummary
+		json.Unmarshal(params, &s)
+		if store.FolderPath(s.Folder.Folder) != target {
+			return false
+		}
+		got = s
+		return true
+	})
+	var want wire.FolderSummary
+	found := false
+	for _, s := range d.folders(true) {
+		if store.FolderPath(s.Folder.Folder) == target {
+			want, found = s, true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("folders(true) has no row for the target folder")
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("folder/changed:\n%+v\nfolders(true):\n%+v", got, want)
 	}
 }
 
