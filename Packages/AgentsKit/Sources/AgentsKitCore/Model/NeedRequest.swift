@@ -41,6 +41,9 @@ public struct NeedRequest: Codable, Sendable, Hashable, Identifiable {
     /// A summary for the row; never a secret's value.
     public var answer: String?
     public var droppedWhy: String?
+    /// Later (#4233): still open, and its sessions still wait, but out of Needs you, its
+    /// counts and its notices until it comes back. Nil when it is not deferred.
+    public var deferred: Deferral?
 
     public init(id: UUID, kind: Kind, source: String, state: State = .open, title: String,
                 detail: JSONValue = .object([:]), folder: URL, askedBy: UUID?, waiters: [Waiter] = [],
@@ -56,6 +59,96 @@ public struct NeedRequest: Codable, Sendable, Hashable, Identifiable {
         self.waiters = waiters
         self.askedAt = askedAt
     }
+
+    /// The wire's `RequestDeferral` (#4233): it comes back at `until`, or when the person is
+    /// next at the Mac, whichever is first.
+    public struct Deferral: Codable, Sendable, Hashable {
+        public var until: Date?
+        public var atMac: Bool?
+        /// When it was deferred.
+        public var at: Date
+        public var by: DaemonAPI.AuditActor?
+
+        public init(until: Date? = nil, atMac: Bool? = nil, at: Date, by: DaemonAPI.AuditActor? = nil) {
+            self.until = until
+            self.atMac = atMac
+            self.at = at
+            self.by = by
+        }
+
+        /// When it comes back, as its row in Later says it: "Back at 18:00", "Back tomorrow at
+        /// 09:00", "At my Mac", or both.
+        public func back(now: Date = .now, calendar: Calendar = .current) -> String {
+            let mac = atMac == true ? "at my Mac" : nil
+            guard let until else { return "At my Mac" }
+            let time = until.formatted(Date.FormatStyle(date: .omitted, time: .shortened, calendar: calendar,
+                                                        timeZone: calendar.timeZone))
+            let day: String = if calendar.isDate(until, inSameDayAs: now) {
+                "at \(time)"
+            } else if let next = calendar.date(byAdding: .day, value: 1, to: now), calendar.isDate(until, inSameDayAs: next) {
+                "tomorrow at \(time)"
+            } else {
+                "on " + until.formatted(Date.FormatStyle(calendar: calendar, timeZone: calendar.timeZone)
+                    .weekday(.abbreviated).day().month(.abbreviated)) + " at \(time)"
+            }
+            return (["Back \(day)"] + [mac].compactMap { $0 }).joined(separator: " or ")
+        }
+    }
+
+    /// Later's choices (#4234), in the order its menu lists them: hours on from now (Alex,
+    /// 2026-11-10: 1h, 4h, 8h, 1d), then At my Mac.
+    public enum Later: String, CaseIterable, Sendable {
+        case hour, fourHours, eightHours, day, atMac
+
+        /// The timed ones, as the request's card has them.
+        public static let timed: [Later] = [.hour, .fourHours, .eightHours, .day]
+
+        /// The words on the row's menu.
+        public var word: String {
+            switch self {
+            case .hour: "In 1 Hour"
+            case .fourHours: "In 4 Hours"
+            case .eightHours: "In 8 Hours"
+            case .day: "In 1 Day"
+            case .atMac: "At My Mac"
+            }
+        }
+
+        /// The card's button: 1h, 4h, 8h, 1d.
+        public var short: String {
+            switch self {
+            case .hour: "1h"
+            case .fourHours: "4h"
+            case .eightHours: "8h"
+            case .day: "1d"
+            case .atMac: "At my Mac"
+            }
+        }
+
+        /// How long from now; nil for At my Mac, which waits for the person.
+        public var hours: Int? {
+            switch self {
+            case .hour: 1
+            case .fourHours: 4
+            case .eightHours: 8
+            case .day: 24
+            case .atMac: nil
+            }
+        }
+
+        /// When it comes back, from `now`.
+        public func until(from now: Date = .now) -> Date? {
+            hours.map { now.addingTimeInterval(TimeInterval($0) * 3600) }
+        }
+
+        /// What `requests/defer` takes for it.
+        public func params(id: UUID, now: Date = .now) -> DaemonAPI.RequestsDefer {
+            self == .atMac ? .init(id: id, atMac: true) : .init(id: id, until: until(from: now))
+        }
+    }
+
+    /// Whether it is in Later (#4233).
+    public var isDeferred: Bool { deferred != nil }
 
     /// How many sessions wait on it: at least its asker.
     public var blocks: Int { max(waiters.count, askedBy == nil ? 0 : 1) }

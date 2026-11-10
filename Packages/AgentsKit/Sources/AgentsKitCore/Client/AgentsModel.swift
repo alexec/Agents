@@ -990,8 +990,19 @@ public final class AgentsModel {
     }
 
     /// One folder's open requests whose asker this client holds and has not archived, oldest
-    /// first: Needs You's rows (#3864).
+    /// first: Needs You's rows (#3864). Not the deferred ones, which are Later's (#4234).
     public func requests(in folder: URL) -> [NeedRequest] {
+        openRequests(in: folder).filter { !$0.isDeferred }
+    }
+
+    /// One folder's deferred requests (#4234): the Later group's rows, in no count.
+    public func laterRequests(in folder: URL) -> [NeedRequest] {
+        openRequests(in: folder).filter(\.isDeferred)
+    }
+
+    /// One folder's open requests, deferred or not, whose asker this client holds and has
+    /// not archived: each stands for its asker, in Needs You or in Later.
+    public func openRequests(in folder: URL) -> [NeedRequest] {
         let key = Folder.standardize(folder)
         return requests.filter { request in
             Folder.standardize(request.folder) == key
@@ -1000,15 +1011,18 @@ public final class AgentsModel {
     }
 
     /// The open requests of a terminal's `agents-secret NAME` (#4179): no session asked them,
-    /// so no folder lists them; Needs You lists them with the rest.
-    public var terminalRequests: [NeedRequest] { requests.filter(\.isTerminal) }
+    /// so no folder lists them; Needs You lists them with the rest. Not the deferred ones.
+    public var terminalRequests: [NeedRequest] { requests.filter { $0.isTerminal && !$0.isDeferred } }
+
+    /// A terminal's deferred requests (#4234), for Later.
+    public var laterTerminalRequests: [NeedRequest] { requests.filter { $0.isTerminal && $0.isDeferred } }
 
     /// What one folder's requests change in the Dock badge and the Remote's (#3864): they
     /// count requests, not sessions, so one for each request, less each asker counted already.
+    /// A deferred request counts nothing, and its asker neither (#4234).
     public func requestBadgeShift(in folder: URL) -> Int {
-        let open = requests(in: folder)
-        let askers = Set(open.compactMap(\.askedBy))
-        return open.count - askers.count { id in byID[id].map(wantsALook) ?? false }
+        let askers = Set(openRequests(in: folder).compactMap(\.askedBy))
+        return requests(in: folder).count - askers.count { id in byID[id].map(wantsALook) ?? false }
     }
 
     public func replacePins(_ listed: [FolderPins]) {

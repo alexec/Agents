@@ -6824,6 +6824,27 @@ final class AppModel {
         }
     }
 
+    /// Later on a request (#4234), from its Needs you row or its card: to the host of the
+    /// session that asked. It stays open, in Later, until it comes back.
+    @discardableResult
+    func deferRequest(_ request: NeedRequest, _ params: DaemonAPI.RequestsDefer) async -> Bool {
+        await changeRequest(request, DaemonAPI.Method.requestsDefer, params)
+    }
+
+    /// Bring back now (#4234): out of Later, to the top of Needs you.
+    @discardableResult
+    func undeferRequest(_ request: NeedRequest) async -> Bool {
+        await changeRequest(request, DaemonAPI.Method.requestsUndefer, DaemonAPI.RequestsUndefer(id: request.id))
+    }
+
+    private func changeRequest(_ request: NeedRequest, _ method: String, _ params: some Encodable & Sendable) async -> Bool {
+        await attempt(on: host(ofAgent: request.askedBy)) {
+            let update = try await self.client(forAgent: request.askedBy)
+                .call(method, params, returning: DaemonAPI.RequestUpdate.self)
+            self.work.apply(.requestChanged(update.request))
+        }
+    }
+
     // MARK: Forms
 
     /// Whether the answer went, as `answer(_:optionID:)` (#86).
