@@ -1,0 +1,242 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1000" viewBox="0 0 1500 1000" font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif">
+    <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#20242A" flood-opacity="0.14"/>
+    </filter>
+    <symbol id="open" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="8" r="2" fill="currentColor"/></symbol>
+    <symbol id="done" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5.3 8.2l1.8 1.8 3.6-3.8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="notplanned" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M4 12L12 4" stroke="currentColor" stroke-width="1.4"/></symbol>
+    <symbol id="pr" viewBox="0 0 16 16"><circle cx="4" cy="3.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="4" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="12" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M4 5.1v5.8M12 10.9V6.5a2 2 0 0 0-2-2H7.5M9 3l-1.6 1.5L9 6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="merged" viewBox="0 0 16 16"><circle cx="4" cy="3.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="4" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="12" cy="8" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M4 5.1v5.8M4.8 5a5 5 0 0 0 5.6 3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="prclosed" viewBox="0 0 16 16"><circle cx="4" cy="3.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="4" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M4 5.1v5.8M10 3l4 4M14 3l-4 4M12 9.5v1.4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="bubble" viewBox="0 0 16 16"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></symbol>
+    <symbol id="search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+    <symbol id="refresh" viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v2.5h-2.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="chev" viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="tick" viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="spark" viewBox="0 0 16 16"><path d="M8 2l1.4 4.6L14 8l-4.6 1.4L8 14l-1.4-4.6L2 8l4.6-1.4z" fill="currentColor"/></symbol>
+  
+    <symbol id="cross" viewBox="0 0 16 16"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="dot" viewBox="0 0 16 16"><circle cx="8" cy="8" r="3.5" fill="currentColor"/></symbol>
+    <symbol id="warn" viewBox="0 0 16 16"><path d="M8 2.2L14.3 13.5H1.7z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M8 6.5v3.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="11.6" r=".8" fill="currentColor"/></symbol>
+    <symbol id="spin" viewBox="0 0 16 16"><path d="M8 2a6 6 0 1 1-6 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="check" viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="board" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M6 3v10M10 3v10" stroke="currentColor" stroke-width="1.3"/></symbol>
+    <symbol id="folder" viewBox="0 0 16 16"><path d="M2 4.5h4l1.5 1.5H14v6.5H2z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
+    <symbol id="back" viewBox="0 0 16 16"><path d="M10 3L5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="fwd" viewBox="0 0 16 16"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  </defs>
+
+  <rect width="1500" height="1000" fill="#E7EAEE"/>
+  <text x="24.0" y="34.0" font-size="15" fill="#1C1D20" font-weight="600">Work lists (#4330): the Remote, iPhone and iPad</text>
+  <text x="24.0" y="54.0" font-size="12" fill="#5B616B">The same Shared/UI views as the Mac. iPhone: the compact row; iPad: the wide row. No Board ▾ on the Remote (tier Mac + web, #3282).</text>
+  <g transform="translate(24,76)" filter="url(#shadow)">
+  <rect x="0.0" y="0.0" width="364.0" height="790.0" rx="44" fill="#1C1D20" />
+  <rect x="10.0" y="10.0" width="344.0" height="770.0" rx="36" fill="#FFFFFF" />
+  <rect x="132.0" y="22.0" width="100.0" height="28.0" rx="14" fill="#1C1D20" />
+  <use href="#back" x="22.0" y="62.0" width="18" height="18" color="#0A6CDB"/>
+  <text x="42.0" y="76.0" font-size="15" fill="#0A6CDB">Work</text>
+  <text x="24.0" y="112.0" font-size="28" fill="#1C1D20" font-weight="700">Issues</text>
+  <rect x="24.0" y="126.0" width="316.0" height="34.0" rx="10" fill="#EFF0F2" />
+  <use href="#search" x="32.0" y="135.0" width="16" height="16" color="#8A9099"/>
+  <text x="54.0" y="147.5" font-size="14" fill="#8A9099">Filter issues</text>
+  <clipPath id="clip24"><rect x="10" y="168" width="344" height="34"/></clipPath><g clip-path="url(#clip24)">
+  <rect x="24.0" y="172.0" width="138.4" height="28.0" rx="14.0" fill="#DCE9FB" />
+  <text x="38.0" y="190.5" font-size="12.5" fill="#0A6CDB" font-weight="500">Project: Agents</text>
+  <use href="#chev" x="140.4" y="181.0" width="10" height="10" color="#0A6CDB"/>
+  <rect x="168.4" y="172.0" width="68.0" height="28.0" rx="14.0" fill="#EFF0F2" />
+  <text x="182.4" y="190.5" font-size="12.5" fill="#1C1D20">Open</text>
+  <use href="#chev" x="214.4" y="181.0" width="10" height="10" color="#5B616B"/>
+  <rect x="242.4" y="172.0" width="70.2" height="28.0" rx="14.0" fill="#EFF0F2" />
+  <text x="256.4" y="190.5" font-size="12.5" fill="#1C1D20">Label</text>
+  <use href="#chev" x="290.7" y="181.0" width="10" height="10" color="#5B616B"/>
+  <rect x="318.7" y="172.0" width="91.2" height="28.0" rx="14.0" fill="#EFF0F2" />
+  <text x="332.7" y="190.5" font-size="12.5" fill="#1C1D20">Assignee</text>
+  <use href="#chev" x="387.9" y="181.0" width="10" height="10" color="#5B616B"/>
+  <rect x="415.9" y="172.0" width="68.0" height="28.0" rx="14.0" fill="#EFF0F2" />
+  <text x="429.9" y="190.5" font-size="12.5" fill="#1C1D20">Repo</text>
+  <use href="#chev" x="461.9" y="181.0" width="10" height="10" color="#5B616B"/>
+  </g>
+  <use href="#open" x="24.0" y="226.0" width="16" height="16" color="#1A7F37"/>
+  <text x="50.0" y="239.0" font-size="14" fill="#1C1D20" font-weight="600">Work look: wireframe the Issues and Pull</text>
+  <text x="50.0" y="258.0" font-size="14" fill="#1C1D20" font-weight="600">requests lists</text>
+  <rect x="50.0" y="268.0" width="42.2" height="18.0" rx="9" fill="#FBCA04" stroke="#FBCA04" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="71.1" y="281.0" font-size="11" fill="#7A6200" font-weight="500" text-anchor="middle">spike</text>
+  <rect x="97.2" y="268.0" width="86.9" height="18.0" rx="9" fill="#1D76DB" stroke="#1D76DB" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="140.7" y="281.0" font-size="11" fill="#145AA8" text-anchor="middle">feature:<tspan font-weight="600">work</tspan></text>
+  <text x="50.0" y="303.0" font-size="12" fill="#5B616B">#4330 · 3 h · alexec · $0.38</text>
+  <text x="340.0" y="303.0" font-size="12" fill="#5B616B" text-anchor="end">2</text>
+  <use href="#bubble" x="315.3" y="291.0" width="15" height="15" color="#5B616B"/>
+  <path d="M50.0 320.0H354.0" stroke="#EEF0F3"/>
+  <rect x="8.0" y="324.0" width="348.0" height="79.0" rx="0" fill="#E5E8EC" />
+  <use href="#open" x="24.0" y="332.0" width="16" height="16" color="#1A7F37"/>
+  <text x="50.0" y="345.0" font-size="14" fill="#1C1D20" font-weight="600">Sidebar: Work as a folding group</text>
+  <rect x="50.0" y="355.0" width="84.8" height="18.0" rx="9" fill="#3FB6B8" stroke="#3FB6B8" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="92.4" y="368.0" font-size="11" fill="#0E6466" font-weight="500" text-anchor="middle">enhancement</text>
+  <rect x="139.8" y="355.0" width="44.3" height="18.0" rx="9" fill="#0E8A16" stroke="#0E8A16" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="162.0" y="368.0" font-size="11" fill="#0B6B12" font-weight="500" text-anchor="middle">polish</text>
+  <text x="50.0" y="390.0" font-size="12" fill="#5B616B">#4004 · 2 d · alexec · $1.20</text>
+  <text x="340.0" y="390.0" font-size="12" fill="#5B616B" text-anchor="end">7</text>
+  <use href="#bubble" x="315.3" y="378.0" width="15" height="15" color="#5B616B"/>
+  <path d="M50.0 407.0H354.0" stroke="#EEF0F3"/>
+  <use href="#open" x="24.0" y="419.0" width="16" height="16" color="#1A7F37"/>
+  <text x="50.0" y="432.0" font-size="14" fill="#1C1D20" font-weight="600">Machine lock: recovery key after the</text>
+  <text x="50.0" y="451.0" font-size="14" fill="#1C1D20" font-weight="600">card was skipped</text>
+  <rect x="50.0" y="461.0" width="33.6" height="18.0" rx="9" fill="#D73A4A" stroke="#D73A4A" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="66.8" y="474.0" font-size="11" fill="#A3202F" font-weight="500" text-anchor="middle">bug</text>
+  <rect x="88.6" y="461.0" width="81.1" height="18.0" rx="9" fill="#D93F0B" stroke="#D93F0B" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="129.2" y="474.0" font-size="11" fill="#9E2E08" text-anchor="middle">priority:<tspan font-weight="600">high</tspan></text>
+  <text x="50.0" y="496.0" font-size="12" fill="#5B616B">#4299 · 4 d · alexec</text>
+  <path d="M50.0 513.0H354.0" stroke="#EEF0F3"/>
+  <use href="#open" x="24.0" y="525.0" width="16" height="16" color="#1A7F37"/>
+  <text x="50.0" y="538.0" font-size="14" fill="#1C1D20" font-weight="600">Forge: one interface for every forge</text>
+  <rect x="50.0" y="548.0" width="40.1" height="18.0" rx="9" fill="#C5DEF5" stroke="#C5DEF5" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="70.1" y="561.0" font-size="11" fill="#2F5F8F" font-weight="500" text-anchor="middle">task</text>
+  <rect x="95.1" y="548.0" width="86.9" height="18.0" rx="9" fill="#1D76DB" stroke="#1D76DB" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="138.6" y="561.0" font-size="11" fill="#145AA8" text-anchor="middle">feature:<tspan font-weight="600">work</tspan></text>
+  <rect x="187.1" y="548.0" width="62.9" height="18.0" rx="9" fill="#5319E7" stroke="#5319E7" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="218.5" y="561.0" font-size="11" fill="#3E12AD" text-anchor="middle">area:<tspan font-weight="600">wire</tspan></text>
+  <rect x="255.0" y="548.0" width="40.1" height="18.0" rx="9" fill="#EDEFF2" stroke="#D6DAE0" />
+  <text x="275.0" y="561.0" font-size="11" fill="#4A5059" font-weight="500" text-anchor="middle">docs</text>
+  <rect x="300.1" y="548.0" width="35.7" height="18.0" rx="9" fill="#5319E7" stroke="#5319E7" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="317.9" y="561.0" font-size="11" fill="#3E12AD" font-weight="500" text-anchor="middle">epic</text>
+  <text x="50.0" y="583.0" font-size="12" fill="#5B616B">#4329 · 5 d · alexec · $0.95</text>
+  <text x="340.0" y="583.0" font-size="12" fill="#5B616B" text-anchor="end">1</text>
+  <use href="#bubble" x="315.3" y="571.0" width="15" height="15" color="#5B616B"/>
+  <use href="#spin" x="128.0" y="610.0" width="14" height="14" color="#8A9099"/>
+  <text x="148.0" y="622.0" font-size="12" fill="#5B616B">Loading more…</text>
+  </g>
+  <g transform="translate(412,76)" filter="url(#shadow)">
+  <rect x="0.0" y="0.0" width="364.0" height="790.0" rx="44" fill="#1C1D20" />
+  <rect x="10.0" y="10.0" width="344.0" height="770.0" rx="36" fill="#FFFFFF" />
+  <rect x="132.0" y="22.0" width="100.0" height="28.0" rx="14" fill="#1C1D20" />
+  <use href="#back" x="22.0" y="62.0" width="18" height="18" color="#0A6CDB"/>
+  <text x="42.0" y="76.0" font-size="15" fill="#0A6CDB">Work</text>
+  <text x="24.0" y="112.0" font-size="28" fill="#1C1D20" font-weight="700">Pull requests</text>
+  <rect x="24.0" y="126.0" width="316.0" height="34.0" rx="10" fill="#EFF0F2" />
+  <use href="#search" x="32.0" y="135.0" width="16" height="16" color="#8A9099"/>
+  <text x="54.0" y="147.5" font-size="14" fill="#8A9099">Filter pull requests</text>
+  <clipPath id="clip412"><rect x="10" y="168" width="344" height="34"/></clipPath><g clip-path="url(#clip412)">
+  <rect x="24.0" y="172.0" width="68.0" height="28.0" rx="14.0" fill="#EFF0F2" />
+  <text x="38.0" y="190.5" font-size="12.5" fill="#1C1D20">Open</text>
+  <use href="#chev" x="70.0" y="181.0" width="10" height="10" color="#5B616B"/>
+  <rect x="98.0" y="172.0" width="70.2" height="28.0" rx="14.0" fill="#EFF0F2" />
+  <text x="112.0" y="190.5" font-size="12.5" fill="#1C1D20">Label</text>
+  <use href="#chev" x="146.2" y="181.0" width="10" height="10" color="#5B616B"/>
+  <rect x="174.2" y="172.0" width="91.2" height="28.0" rx="14.0" fill="#EFF0F2" />
+  <text x="188.2" y="190.5" font-size="12.5" fill="#1C1D20">Assignee</text>
+  <use href="#chev" x="243.5" y="181.0" width="10" height="10" color="#5B616B"/>
+  <rect x="271.5" y="172.0" width="68.0" height="28.0" rx="14.0" fill="#EFF0F2" />
+  <text x="285.5" y="190.5" font-size="12.5" fill="#1C1D20">Sort</text>
+  <use href="#chev" x="317.5" y="181.0" width="10" height="10" color="#5B616B"/>
+  </g>
+  <use href="#pr" x="24.0" y="226.0" width="16" height="16" color="#1A7F37"/>
+  <text x="50.0" y="239.0" font-size="14" fill="#1C1D20" font-weight="600">Work look: the shared parts (#4328)</text>
+  <rect x="50.0" y="249.0" width="42.2" height="18.0" rx="9" fill="#FBCA04" stroke="#FBCA04" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="71.1" y="262.0" font-size="11" fill="#7A6200" font-weight="500" text-anchor="middle">spike</text>
+  <text x="50.0" y="284.0" font-size="12" fill="#5B616B">#4349 · 1 d · agents-bot · $0.61</text>
+  <text x="340.0" y="284.0" font-size="12" fill="#5B616B" text-anchor="end">3</text>
+  <use href="#bubble" x="315.3" y="272.0" width="15" height="15" color="#5B616B"/>
+  <path d="M50.0 301.0H354.0" stroke="#EEF0F3"/>
+  <use href="#pr" x="24.0" y="313.0" width="16" height="16" color="#1A7F37"/>
+  <text x="50.0" y="326.0" font-size="14" fill="#1C1D20" font-weight="600">slack server: follow the messaging</text>
+  <text x="50.0" y="345.0" font-size="14" fill="#1C1D20" font-weight="600">contract</text>
+  <rect x="50.0" y="355.0" width="84.8" height="18.0" rx="9" fill="#3FB6B8" stroke="#3FB6B8" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="92.4" y="368.0" font-size="11" fill="#0E6466" font-weight="500" text-anchor="middle">enhancement</text>
+  <text x="50.0" y="390.0" font-size="12" fill="#5B616B">#4376 · 6 h · agents-bot · $2.10</text>
+  <text x="340.0" y="390.0" font-size="12" fill="#5B616B" text-anchor="end">1</text>
+  <use href="#bubble" x="315.3" y="378.0" width="15" height="15" color="#5B616B"/>
+  <path d="M50.0 407.0H354.0" stroke="#EEF0F3"/>
+  <use href="#pr" x="24.0" y="419.0" width="16" height="16" color="#6E7781"/>
+  <text x="50.0" y="432.0" font-size="14" fill="#1C1D20" font-weight="600">Sidebar: Runtimes icon in the warning</text>
+  <text x="50.0" y="451.0" font-size="14" fill="#1C1D20" font-weight="600">colour</text>
+  <rect x="50.0" y="461.0" width="44.3" height="18.0" rx="9" fill="#0E8A16" stroke="#0E8A16" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="72.1" y="474.0" font-size="11" fill="#0B6B12" font-weight="500" text-anchor="middle">polish</text>
+  <text x="50.0" y="496.0" font-size="12" fill="#5B616B">#4372 · Draft · 2 h · $0.20</text>
+  <path d="M50.0 513.0H354.0" stroke="#EEF0F3"/>
+  <use href="#merged" x="24.0" y="525.0" width="16" height="16" color="#8250DF"/>
+  <text x="50.0" y="538.0" font-size="14" fill="#1C1D20" font-weight="600">Wire: label colours (#2956)</text>
+  <rect x="50.0" y="548.0" width="84.8" height="18.0" rx="9" fill="#3FB6B8" stroke="#3FB6B8" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="92.4" y="561.0" font-size="11" fill="#0E6466" font-weight="500" text-anchor="middle">enhancement</text>
+  <rect x="139.8" y="548.0" width="62.9" height="18.0" rx="9" fill="#5319E7" stroke="#5319E7" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="171.3" y="561.0" font-size="11" fill="#3E12AD" text-anchor="middle">area:<tspan font-weight="600">wire</tspan></text>
+  <text x="50.0" y="583.0" font-size="12" fill="#5B616B">#2960 · merged 2 w · $0.95</text>
+  <text x="340.0" y="583.0" font-size="12" fill="#5B616B" text-anchor="end">2</text>
+  <use href="#bubble" x="315.3" y="571.0" width="15" height="15" color="#5B616B"/>
+  <path d="M50.0 600.0H354.0" stroke="#EEF0F3"/>
+  <use href="#prclosed" x="24.0" y="612.0" width="16" height="16" color="#CF222E"/>
+  <text x="50.0" y="625.0" font-size="14" fill="#1C1D20" font-weight="600">Mac Table for Work lists</text>
+  <rect x="50.0" y="635.0" width="84.8" height="18.0" rx="9" fill="#3FB6B8" stroke="#3FB6B8" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="92.4" y="648.0" font-size="11" fill="#0E6466" font-weight="500" text-anchor="middle">enhancement</text>
+  <text x="50.0" y="670.0" font-size="12" fill="#5B616B">#4291 · closed 5 d</text>
+  <text x="340.0" y="670.0" font-size="12" fill="#5B616B" text-anchor="end">1</text>
+  <use href="#bubble" x="315.3" y="658.0" width="15" height="15" color="#5B616B"/>
+  </g>
+  <text x="24.0" y="890.0" font-size="12" fill="#5B616B">iPhone: search is .searchable in the navigation bar; the menus are one row of capsules that scroll sideways</text>
+  <text x="24.0" y="908.0" font-size="12" fill="#5B616B">(Project first, Sort last). A set filter is an accent capsule. Pull to refresh; the next page loads at the end.</text>
+  <text x="24.0" y="926.0" font-size="12" fill="#5B616B">A tap opens the item page (push); the row shows pressed (grey) as it goes, and Back scrolls to it.</text>
+  <text x="24.0" y="944.0" font-size="12" fill="#5B616B">The phone row has no checks glyph or review word: they are on the item page. 'Draft', 'merged', 'closed' stay on line 2.</text>
+  <g transform="translate(800,76)" filter="url(#shadow)">
+  <rect x="0.0" y="0.0" width="676.0" height="360.0" rx="26" fill="#1C1D20" />
+  <rect x="10.0" y="10.0" width="656.0" height="340.0" rx="18" fill="#FFFFFF" />
+  <use href="#back" x="26.0" y="30.0" width="16" height="16" color="#0A6CDB"/>
+  <text x="44.0" y="43.0" font-size="13" fill="#0A6CDB">Work</text>
+  <text x="338.0" y="43.0" font-size="14" fill="#1C1D20" font-weight="600" text-anchor="middle">Issues</text>
+  <use href="#refresh" x="632.0" y="30.0" width="16" height="16" color="#0A6CDB"/>
+  <path d="M10.0 58.0H666.0" stroke="#E0E3E7"/>
+  <rect x="24.0" y="70.0" width="190.0" height="26.0" rx="7" fill="#F0F1F3" stroke="#D6DAE0" />
+  <use href="#search" x="32.0" y="75.0" width="16" height="16" color="#8A9099"/>
+  <text x="54.0" y="87.5" font-size="12.5" fill="#8A9099">Filter issues</text>
+  <text x="228.0" y="88.0" font-size="12" fill="#1C1D20">Project</text>
+  <use href="#chev" x="279.0" y="79.0" width="10" height="10" color="#5B616B"/>
+  <text x="301.0" y="88.0" font-size="12" fill="#1C1D20">Open</text>
+  <use href="#chev" x="331.9" y="79.0" width="10" height="10" color="#5B616B"/>
+  <text x="353.9" y="88.0" font-size="12" fill="#0A6CDB" font-weight="500">Label: bug</text>
+  <use href="#chev" x="414.9" y="79.0" width="10" height="10" color="#0A6CDB"/>
+  <text x="436.9" y="88.0" font-size="12" fill="#1C1D20">Assignee</text>
+  <use href="#chev" x="490.1" y="79.0" width="10" height="10" color="#5B616B"/>
+  <text x="606.0" y="88.0" font-size="12" fill="#1C1D20">Sort</text>
+  <use href="#chev" x="636.9" y="79.0" width="10" height="10" color="#5B616B"/>
+  <path d="M10.0 106.0H666.0" stroke="#E0E3E7"/>
+  <use href="#open" x="26.0" y="120.0" width="16" height="16" color="#1A7F37"/>
+  <text x="52.0" y="133.0" font-size="13" fill="#1C1D20" font-weight="600">Machine lock: recovery key after the card was skipped</text>
+  <rect x="417.4" y="121.0" width="33.6" height="18.0" rx="9" fill="#D73A4A" stroke="#D73A4A" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="434.2" y="134.0" font-size="11" fill="#A3202F" font-weight="500" text-anchor="middle">bug</text>
+  <rect x="456.9" y="121.0" width="81.1" height="18.0" rx="9" fill="#D93F0B" stroke="#D93F0B" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="497.5" y="134.0" font-size="11" fill="#9E2E08" text-anchor="middle">priority:<tspan font-weight="600">high</tspan></text>
+  <text x="52.0" y="153.0" font-size="11.5" fill="#5B616B">#4299 · opened 4 d ago by alexec</text>
+  <path d="M50.0 164.0H654.0" stroke="#EEF0F3"/>
+  <use href="#open" x="26.0" y="176.0" width="16" height="16" color="#1A7F37"/>
+  <text x="52.0" y="189.0" font-size="13" fill="#1C1D20" font-weight="600">Work look: wireframe the Issues and Pull requests lists</text>
+  <rect x="416.0" y="177.0" width="33.6" height="18.0" rx="9" fill="#D73A4A" stroke="#D73A4A" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="432.8" y="190.0" font-size="11" fill="#A3202F" font-weight="500" text-anchor="middle">bug</text>
+  <circle cx="640" cy="185" r="10" fill="#7C5CC4"/>
+  <text x="640.0" y="189.0" font-size="11" fill="#FFF" font-weight="600" text-anchor="middle">A</text>
+  <text x="616.0" y="190.0" font-size="12" fill="#5B616B" text-anchor="end">2</text>
+  <use href="#bubble" x="591.3" y="177.0" width="16" height="16" color="#5B616B"/>
+  <text x="52.0" y="209.0" font-size="11.5" fill="#5B616B">#4330 · opened 3 h ago by alexec · <tspan fill="#8250DF">✦</tspan> Claude · $0.38</text>
+  <path d="M50.0 220.0H654.0" stroke="#EEF0F3"/>
+  <use href="#open" x="26.0" y="232.0" width="16" height="16" color="#1A7F37"/>
+  <text x="52.0" y="245.0" font-size="13" fill="#1C1D20" font-weight="600">Sidebar: Work as a folding group</text>
+  <rect x="268.3" y="233.0" width="33.6" height="18.0" rx="9" fill="#D73A4A" stroke="#D73A4A" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="285.1" y="246.0" font-size="11" fill="#A3202F" font-weight="500" text-anchor="middle">bug</text>
+  <rect x="307.9" y="233.0" width="44.3" height="18.0" rx="9" fill="#0E8A16" stroke="#0E8A16" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="330.0" y="246.0" font-size="11" fill="#0B6B12" font-weight="500" text-anchor="middle">polish</text>
+  <circle cx="640" cy="241" r="10" fill="#2E8B57"/>
+  <text x="640.0" y="245.0" font-size="11" fill="#FFF" font-weight="600" text-anchor="middle">B</text>
+  <circle cx="630" cy="241" r="10" fill="#7C5CC4" stroke="#FFF" stroke-width="1.5"/>
+  <text x="630.0" y="245.0" font-size="11" fill="#FFF" font-weight="600" text-anchor="middle">A</text>
+  <text x="606.0" y="246.0" font-size="12" fill="#5B616B" text-anchor="end">7</text>
+  <use href="#bubble" x="581.3" y="233.0" width="16" height="16" color="#5B616B"/>
+  <text x="52.0" y="265.0" font-size="11.5" fill="#5B616B">#4004 · <tspan fill="#8A9099">In Progress</tspan> · opened 2 d ago by alexec · <tspan fill="#8250DF">✦</tspan> Codex · $1.20</text>
+  </g>
+  <text x="800.0" y="466.0" font-size="12" fill="#5B616B">iPad (regular width): the wide row and the filter bar of the Mac,</text>
+  <text x="800.0" y="484.0" font-size="12" fill="#5B616B">in the content under the navigation bar; Refresh is a bar button</text>
+  <text x="800.0" y="502.0" font-size="12" fill="#5B616B">and pull to refresh. Menus show 'Label: bug' when set, as on the Mac.</text>
+  <text x="800.0" y="520.0" font-size="12" fill="#5B616B"></text>
+  <text x="800.0" y="538.0" font-size="12" fill="#5B616B">Width under 700 pt (Split View, Slide Over): the iPhone layout.</text>
+  <text x="800.0" y="556.0" font-size="12" fill="#5B616B"></text>
+  <text x="800.0" y="574.0" font-size="12" fill="#5B616B">No persistent selection on the Remote: a tap opens the page.</text>
+  <text x="800.0" y="592.0" font-size="12" fill="#5B616B">With a keyboard on iPad: ↑ ↓ select, Return opens, as on the Mac.</text>
+  <text x="800.0" y="610.0" font-size="12" fill="#5B616B">The avatars show on the iPad row (it is the wide row).</text>
+</svg>
