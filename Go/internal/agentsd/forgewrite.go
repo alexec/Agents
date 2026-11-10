@@ -118,17 +118,15 @@ func (d *Daemon) registerForgeWrites() {
 }
 
 // forgeTarget is the item a write is on, and the forge to write it with: a forge on the
-// interface (#4329), with its ref there; or, of the forges not yet on it, one of jira (with its
-// key, in identifier) or boards (with its project and its id, in number).
+// interface (#4329), with its ref there; or the one forge not yet on it, boards (with its
+// project and its id, in number).
 type forgeTarget struct {
-	number     int
-	pr         bool
-	forge      Forge
-	ref        forgeRef
-	project    string
-	jira       forgeJira
-	boards     forgeAzureBoards
-	identifier string
+	number  int
+	pr      bool
+	forge   Forge
+	ref     forgeRef
+	project string
+	boards  forgeAzureBoards
 }
 
 // forgeTargetOf is node's forge, or why there is none. prOnly refuses an issue; every forge with
@@ -139,13 +137,6 @@ func (d *Daemon) forgeTargetOf(ctx context.Context, method string, node wire.Lin
 	}
 	if f, ref, ok := d.forgeOwning(node); ok {
 		return forgeTarget{forge: f, ref: ref, pr: ref.pr()}, nil
-	}
-	if key, ok := strings.CutPrefix(node.Ref, "jira:"); ok && node.Kind == lineage.KindIssue && linearLabel.MatchString(key) {
-		j, err := d.forgeJira()
-		if err != nil {
-			return forgeTarget{}, err
-		}
-		return forgeTarget{jira: j, identifier: key}, nil
 	}
 	if project, id, ok := boardsOfNode(node); ok {
 		b, err := d.forgeAzureBoards()
@@ -183,8 +174,6 @@ func (d *Daemon) forgeComment(ctx context.Context, r wire.ForgeCommentRequest) (
 		var done wire.ForgeDone
 		done, err = t.forge.Comment(ctx, t.ref, body)
 		url, err = deref(done.URL), forgeCannotErr(method, t.forge, err)
-	case t.jira != nil:
-		url, err = t.jira.Comment(ctx, t.identifier, body)
 	case t.boards != nil:
 		url, err = t.boards.Comment(ctx, t.project, t.number, body)
 	}
@@ -229,8 +218,6 @@ func (d *Daemon) forgeLabel(ctx context.Context, r wire.ForgeLabelRequest) (wire
 	switch {
 	case t.forge != nil:
 		err = forgeCannotErr(method, t.forge, t.forge.SetLabels(ctx, t.ref, add, remove))
-	case t.jira != nil:
-		err = t.jira.SetLabels(ctx, t.identifier, add, remove)
 	case t.boards != nil:
 		err = t.boards.SetTags(ctx, t.project, t.number, add, remove)
 	}
@@ -256,8 +243,6 @@ func (d *Daemon) forgeLabels(ctx context.Context, r wire.ForgeNodeRequest) (wire
 	var names []string
 	var colors map[string]string
 	switch {
-	case t.jira != nil:
-		names, colors, err = t.jira.Labels(ctx, t.identifier)
 	case t.boards != nil:
 		names, colors, err = t.boards.Labels(ctx, t.project, t.number)
 	}
@@ -282,18 +267,10 @@ func (d *Daemon) forgeClose(ctx context.Context, r wire.ForgeCloseRequest) (wire
 		d.forgeWrote()
 		return wire.ForgeDone{}, nil
 	}
-	if transition != "" && t.jira == nil && t.boards == nil {
-		return wire.ForgeDone{}, Invalid("%s: only a Jira issue or an Azure Boards work item moves by a transition", method)
-	}
-	switch {
-	case transition != "" && t.boards != nil:
+	if transition != "" {
 		err = t.boards.Transition(ctx, t.project, t.number, transition)
-	case transition != "":
-		err = t.jira.Transition(ctx, t.identifier, transition)
-	case t.boards != nil:
+	} else {
 		err = t.boards.SetState(ctx, t.project, t.number, closed)
-	case t.jira != nil:
-		err = t.jira.SetState(ctx, t.identifier, closed)
 	}
 	if err != nil {
 		return wire.ForgeDone{}, err

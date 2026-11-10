@@ -35,10 +35,10 @@ import (
 // call per project, as GitLab has no list across chosen projects. Linear (#3209, #4357) is read
 // with the Linear connection, issues only, of the teams the folders' .agents/folder.json name in
 // "linearTeams": one query for every team; when no folder names one, of the whole workspace,
-// as the Linear connector's view lists it (#3311) (linearForge). Jira (#3260) is read with the jira connector's
-// sign-in (JIRA_URL, JIRA_EMAIL and JIRA_API_TOKEN in the secrets) through jiramcp.RealJira,
-// issues only, of the projects the folders' .agents/folder.json name in "jiraProjects": one
-// search for every project. Azure Boards (#3815) is read the same way, of the projects the
+// as the Linear connector's view lists it (#3311) (linearForge). Jira (#3260, #4358) is read with
+// the jira connector's sign-in (JIRA_URL, JIRA_EMAIL and JIRA_API_TOKEN in the secrets) through
+// jiramcp.RealJira, issues only, of the projects the folders' .agents/folder.json name in
+// "jiraProjects": one search for every project (jiraForge). Azure Boards (#3815) is read the same way, of the projects the
 // folders name in "azureBoardsProjects" (forgeazure.go). Forgejo (#3753, #4354) is read with the
 // host's Forgejo connection, only on its own Forgejo, a call per repository (forgejoForge).
 // Bitbucket Cloud (#3786, #4355) is read with the host's Bitbucket connection, a call per
@@ -302,29 +302,6 @@ func (d *Daemon) forgeList(ctx context.Context, prs bool, r wire.ForgeListReques
 		p.forge = name
 		pages = append(pages, p)
 	}
-	if (len(sources.projects) > 0 || board != nil && board.jira != "") && !slices.Contains(cursor.Done, "jira") {
-		p := forgePage{forge: "jira"}
-		j, err := d.forgeJira()
-		f := jiramcp.SearchFilter{State: state, Label: deref(r.Label),
-			Assignee: deref(r.Assignee), Query: deref(r.Query), Feature: deref(r.Feature)}
-		if err == nil && board != nil {
-			f.Filter, err = j.BoardFilter(ctx, board.jira)
-		}
-		if err == nil {
-			var page jiramcp.SearchPage
-			page, err = j.Search(ctx, sources.projects, f, cursor.Jira, limit)
-			for _, i := range page.Items {
-				folder, named := sources.projectFolder[i.Project]
-				if !named && board != nil {
-					folder = board.home
-				}
-				p.items = append(p.items, jiraItemOf(i, folder))
-			}
-			p.cursors, p.next = page.Cursors, page.Next
-		}
-		p.err = err
-		pages = append(pages, p)
-	}
 	if len(sources.boards) > 0 && !slices.Contains(cursor.Done, "azureboards") {
 		pages = append(pages, d.boardsPage(ctx, sources, board, azureboardsmcp.SearchFilter{State: state, Label: deref(r.Label),
 			Assignee: deref(r.Assignee), Query: deref(r.Query), Feature: deref(r.Feature)}, cursor.Boards, limit))
@@ -394,32 +371,24 @@ func mergeForgePages(pages []forgePage, from forgeCursor, limit int) ([]wire.For
 	return items, next, more
 }
 
-// forgeSources are what a list reads of the forges not yet on the interface: the Jira projects
-// and the Azure Boards projects, each once, with a folder on each to act from.
+// forgeSources are what a list reads of the forge not yet on the interface: the Azure Boards
+// projects, each once, with a folder on each to act from.
 type forgeSources struct {
-	projects      []string
-	folderOf      map[forgeRepo]string
-	projectFolder map[string]string
+	folderOf map[forgeRepo]string
 	// boards is the Azure Boards projects (#3815), organization/project.
 	boards       []string
 	boardsFolder map[string]string
 }
 
 func (s forgeSources) key() []any {
-	return []any{s.projects, s.boards}
+	return []any{s.boards}
 }
 
 func (d *Daemon) forgeSources(ctx context.Context, prs bool, folders []string) forgeSources {
-	s := forgeSources{folderOf: map[forgeRepo]string{}, projectFolder: map[string]string{}, boardsFolder: map[string]string{}}
+	s := forgeSources{folderOf: map[forgeRepo]string{}, boardsFolder: map[string]string{}}
 	for _, f := range folders {
 		if prs {
 			continue
-		}
-		for _, project := range d.folderJiraProjects(f) {
-			if _, seen := s.projectFolder[project]; !seen {
-				s.projectFolder[project] = f
-				s.projects = append(s.projects, project)
-			}
 		}
 		for _, project := range d.folderBoardsProjects(f) {
 			if _, seen := s.boardsFolder[project]; !seen {
@@ -428,7 +397,6 @@ func (d *Daemon) forgeSources(ctx context.Context, prs bool, folders []string) f
 			}
 		}
 	}
-	slices.Sort(s.projects)
 	slices.Sort(s.boards)
 	return s
 }
@@ -556,8 +524,6 @@ func (d *Daemon) forgeItem(ctx context.Context, kind string, r wire.ForgeItemReq
 	if f, ref, ok := d.forgeOwning(r.Node); ok {
 		out, err = f.Item(ctx, ref, deref(r.Cursor))
 		err = forgeCannotErr(method, f, err)
-	} else if key, ok := strings.CutPrefix(r.Node.Ref, "jira:"); ok && kind == lineage.KindIssue && linearLabel.MatchString(key) {
-		out, err = d.jiraItem(ctx, method, key, deref(r.Cursor))
 	} else if project, id, ok := boardsOfNode(r.Node); ok && kind == lineage.KindIssue {
 		out, err = d.boardsItem(ctx, method, project, id, deref(r.Cursor))
 	} else {
@@ -588,31 +554,6 @@ func (d *Daemon) gitlabOf(ctx context.Context, method string, repo forgeRepo) (f
 		return nil, "", "", Invalid("%s: %s is not on the connected GitLab, %s", method, repo.path, root)
 	}
 	return d.forgeGitLab(root), project, folder, nil
-}
-
-func (d *Daemon) jiraItem(ctx context.Context, method, key, cursor string) (wire.ForgeItemDetail, error) {
-	j, err := d.forgeJira()
-	if err != nil {
-		return wire.ForgeItemDetail{}, err
-	}
-	p, err := j.ItemPage(ctx, key, cursor)
-	if err != nil {
-		var je *jiramcp.JiraError
-		if errors.As(err, &je) && je.Kind == jiramcp.NotFound {
-			return wire.ForgeItemDetail{}, Invalid("%s: %v", method, err)
-		}
-		return wire.ForgeItemDetail{}, err
-	}
-	out := wire.ForgeItemDetail{Item: jiraItemOf(p.Item, d.jiraFolder(p.Project)), Body: p.Body, Comments: []wire.ForgeComment{},
-		Cursor: optional(p.Before), Transitions: []wire.ForgeTransition{}}
-	out.Start = forgeStartOf(out.Item)
-	for _, c := range p.Thread {
-		out.Comments = append(out.Comments, forgeCommentOf(c.Author, c.Body, c.At, c.URL, c.Bot))
-	}
-	for _, t := range p.Transitions {
-		out.Transitions = append(out.Transitions, wire.ForgeTransition{ID: t.ID, Name: t.Name, Category: optional(t.Category)})
-	}
-	return out, nil
 }
 
 func forgeCommentOf(author, body, at, url string, bot bool) wire.ForgeComment {
