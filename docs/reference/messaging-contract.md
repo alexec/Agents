@@ -196,8 +196,8 @@ gives no unread state leaves `unread` out. Alex can overrule.
 
 Decided: a server reads history from its service where the service allows it. Where it does
 not (WhatsApp's Cloud API; Google Chat without `chat.app.messages.readonly`), the server keeps
-a **bounded store** of the messages that it received, as the WhatsApp server keeps the last
-day now, and pages that, because the bounded-data rule says every store has a limit. A
+a **bounded store** of the messages that it received, as the WhatsApp server does (#4341: the
+newest 2,000 for 30 days, both ways, in `~/.agents/whatsapp/`), and pages that, because the bounded-data rule says every store has a limit. A
 server says nothing about where its history ends: the last page has no `cursor`. Alex can
 overrule.
 

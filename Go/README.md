@@ -476,8 +476,16 @@ signed webhook. `WHATSAPP_TOKEN` (a system user's token), `WHATSAPP_PHONE_NUMBER
 - **Tools:** `send_message`, `ask_question` (reply buttons for up to three options, a list
   for up to ten; each option's id is `agents|<question>|<option>`, and the first press is
   `question.answered`), `send_template` (an approved template: the only message Meta takes
-  more than 24 hours after the person last wrote) and `read_messages`, the inbox, marked as
-  outside content. A refusal for the 24-hour window says to use `send_template`.
+  more than 24 hours after the person last wrote), and the messaging contract's
+  `list_conversations` and `read_messages` (#4341, `docs/reference/messaging-contract.md`,
+  `_meta` `"agents/messaging": 1`: a conversation is a person's number, newest first, by
+  cursor, marked as outside content; `read_messages` still takes `from` for
+  `conversation`). A refusal for the 24-hour window says to use `send_template`.
+- **The store:** the Cloud API reads no history, so each message the webhook keeps and each
+  message the number sends goes to `~/.agents/whatsapp/<phone number id>.json`
+  (`WHATSAPP_STORE_DIR`): the newest 2,000 for 30 days, at most 4 MB of text, written to a
+  temporary file and moved into place under a lock, so every copy of the server adds to it and
+  reads all of it. A file that cannot be read is kept aside as `.unreadable.json`.
 
 The tests run it against a fake Cloud API over HTTP and signed webhook calls (`fake_test.go`;
 `WHATSAPP_API_URL` points a real run at one). Agents Host carries it

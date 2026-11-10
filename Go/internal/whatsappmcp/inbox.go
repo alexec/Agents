@@ -23,7 +23,8 @@ import (
 // order so that every events/poll, each with its own cursor, reads the same list. The server
 // serves the webhook itself, checks each call's signature with the app's secret, and answers
 // at once; Meta sends a call again until it is answered, so a message already in the inbox
-// is not kept twice. The inbox keeps the newest maxKept for keptFor.
+// is not kept twice. The inbox keeps the newest maxKept for keptFor, for the events; each new
+// message also goes to the Store, which read_messages reads (#4341).
 
 const (
 	maxKept = 1000
@@ -214,6 +215,8 @@ type Inbox struct {
 	// Seen is told of each new item as it comes, to mark it read. It runs on its own, so the
 	// webhook answers at once.
 	Seen func(context.Context, Item)
+	// Store is where each new message is kept for read_messages: NewInbox's is in memory.
+	Store *Store
 
 	mu       sync.Mutex
 	items    []Item
@@ -227,7 +230,7 @@ type Inbox struct {
 
 // NewInbox is an inbox; boot tells a cursor of this run from one of an earlier run.
 func NewInbox(account func() (Account, error), logger *slog.Logger) *Inbox {
-	return &Inbox{Account: account, Logger: logger, boot: time.Now().UTC().Format("20060102T150405.000000000"),
+	return &Inbox{Account: account, Logger: logger, Store: &Store{Logger: logger}, boot: time.Now().UTC().Format("20060102T150405.000000000"),
 		ctx: context.Background(), listened: make(chan struct{})}
 }
 
@@ -326,15 +329,15 @@ func (in *Inbox) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "the signature does not match", http.StatusUnauthorized)
 			return
 		}
-		in.keep(parse(body, a.PhoneNumberID))
+		in.keep(a.PhoneNumberID, parse(body, a.PhoneNumberID))
 		w.WriteHeader(http.StatusOK)
 	default:
 		http.Error(w, "GET or POST", http.StatusMethodNotAllowed)
 	}
 }
 
-// keep puts new items in the inbox, and tells Seen of each.
-func (in *Inbox) keep(got []Item) {
+// keep puts new items in the inbox and number's store, and tells Seen of each.
+func (in *Inbox) keep(number string, got []Item) {
 	kept := []Item{}
 	in.mu.Lock()
 	for _, it := range got {
@@ -349,6 +352,13 @@ func (in *Inbox) keep(got []Item) {
 	in.trim(time.Now())
 	ctx := in.ctx
 	in.mu.Unlock()
+	stored := make([]Stored, 0, len(kept))
+	for _, it := range kept {
+		stored = append(stored, Stored{ID: it.ID, Person: it.From.WaID, Name: it.From.Name, At: it.At, Text: it.Text, ReplyTo: it.ReplyTo})
+	}
+	if err := in.Store.Add(number, stored...); err != nil && in.Logger != nil {
+		in.Logger.Warn("whatsapp-mcp: keep a message for read_messages", "err", err)
+	}
 	if in.Seen == nil {
 		return
 	}
@@ -421,20 +431,6 @@ func (in *Inbox) After(seq uint64, limit int) ([]Item, bool, error) {
 		out = append(out, it)
 	}
 	return out, false, in.failure
-}
-
-// Newest is the newest messages, newest first, at most limit; only one person's when from is
-// set.
-func (in *Inbox) Newest(from string, limit int) []Item {
-	in.mu.Lock()
-	defer in.mu.Unlock()
-	out := []Item{}
-	for i := len(in.items) - 1; i >= 0 && len(out) < limit; i-- {
-		if from == "" || in.items[i].From.WaID == from {
-			out = append(out, in.items[i])
-		}
-	}
-	return out
 }
 
 // Failure is the webhook's failure, nil when it listens.

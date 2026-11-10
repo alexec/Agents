@@ -2,8 +2,9 @@
 // (Go/cmd/googlechat-mcp): one WhatsApp Business number on Meta's Cloud API. What people send
 // it comes by Meta's webhook, which the server serves itself (the Cloud API has no pull), and
 // is raised as the polled events message.received and question.answered; tools send a text, a
-// question with its options as buttons or a list, and an approved template, and read the last
-// day's messages. Each event names its sender, so it acts only for a person who linked their
+// question with its options as buttons or a list, and an approved template, and list and read
+// the conversations of the messaging contract (#4341) from a bounded store of what it received
+// and sent. Each event names its sender, so it acts only for a person who linked their
 // WhatsApp number (#1762). Its secrets are named as ${WHATSAPP_TOKEN} and so on in
 // `.agents/mcp.json`, so their values stay in ~/.agents-secrets/secrets.env.
 //
@@ -15,6 +16,7 @@
 //	WHATSAPP_APP_SECRET              the Meta app's secret, which signs each webhook call
 //	WHATSAPP_VERIFY_TOKEN            a word of your own, given to Meta when the webhook is set up
 //	WHATSAPP_WEBHOOK_ADDR            where the webhook listens; 127.0.0.1:8797 when left out
+//	WHATSAPP_STORE_DIR               where the store of messages is; ~/.agents/whatsapp when left out
 //	WHATSAPP_API_URL                 for a fake on this machine: where the Graph API is
 package main
 
@@ -47,6 +49,10 @@ func main() {
 	meta := &whatsappmcp.Meta{Account: account}
 	inbox := whatsappmcp.NewInbox(account, logger)
 	inbox.Seen = whatsappmcp.MarkRead(meta, logger)
+	// Every copy of the server (one for each session) shares the store's file.
+	if dir := whatsappmcp.DefaultStoreDir(os.Getenv); dir != "" {
+		inbox.Store = &whatsappmcp.Store{Dir: dir, Logger: logger}
+	}
 	// The webhook listens from the start when the account is set, so Meta's check of it, when
 	// it is set up, finds it; otherwise the first poll after the secrets are saved starts it.
 	if _, err := account(); err == nil {
