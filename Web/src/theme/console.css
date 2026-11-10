@@ -114,7 +114,7 @@
 }
 
 /* The console's buttons: one height, small corners; the primary in the accent; danger in the failure tint. The Events rows' buttons and a plan's rows are text (#3241, #3268). */
-.console button:not(.link):not(.sort):not(.sub-app-row):not(.nav-item):not(.event-open):not(.event-waiting):not(.event-stop):not(.work-plan-row):not(.work-feature-head):not(.work-feature-row), .person-list .confirm button {
+.console button:not(.link):not(.sort):not(.sub-app-row):not(.nav-item):not(.event-open):not(.event-waiting):not(.event-stop):not(.work-plan-row):not(.work-feature-head):not(.work-feature-row):not(.work-item-row):not(.work-menu-button):not(.work-refresh):not(.work-mini-row):not([role=menuitemradio]), .person-list .confirm button {
   min-height: var(--console-control); border-radius: var(--radius-console); padding: 0 12px; }
 .console button.prominent { font-weight: 600; }
 .console button.destructive, .console button.danger, .person-list button.danger { color: var(--tint-failure);

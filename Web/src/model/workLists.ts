@@ -17,7 +17,11 @@ import {
 const lineagePages = 5;
 
 /** A machine's page of a forge list, and the cursor to its next. */
-export interface HostList { host: string; items: ForgeItem[]; cursor?: string | undefined; errors: ForgeListError[] }
+export interface HostList {
+  host: string; items: ForgeItem[]; cursor?: string | undefined; errors: ForgeListError[];
+  /** The refs of the items carried from the last read for a forge this read could not reach, shown dimmed (#4392). */
+  stale?: string[] | undefined;
+}
 
 export interface WorkListState {
   kind: WorkKind;
@@ -26,6 +30,8 @@ export interface WorkListState {
   projects: Signal<readonly WorkProject[]>;
   sort: Signal<WorkSort>;
   lists: Signal<HostList[] | null>;
+  /** A read runs: the rows read before stay (#4392), and Refresh spins. */
+  loading: Signal<boolean>;
   lineage: Signal<ReportNode[]>;
   lineageCursor: Signal<string | undefined>;
   problem: Signal<string | null>;
@@ -47,7 +53,7 @@ export function workList(kind: WorkKind): WorkListState {
   let l = lists.get(kind);
   if (!l) {
     l = {
-      kind, filter: signal(anyFilter), projects: signal([]), sort: signal<WorkSort>("updated"), lists: signal(null), lineage: signal([]),
+      kind, filter: signal(anyFilter), projects: signal([]), sort: signal<WorkSort>("updated"), lists: signal(null), loading: signal(false), lineage: signal([]),
       lineageCursor: signal(undefined), problem: signal(null), more: signal(false), asked: signal(0), opened: signal(undefined),
       read: undefined,
     };
@@ -121,6 +127,16 @@ export function askKey(store: Store, l: WorkListState): string {
   return [forgeState(state), board, nodesSort(l), listHosts(store, board).map((h) => h.id).join(","), l.asked.value].join("|");
 }
 
+/** A read with errors keeps, dimmed under the error (#4392), the items of the last read from each forge it could not reach
+ * (all of them when the machine itself failed, forge ""), unless the new read has them. */
+export function carryStale(got: HostList, had: HostList | undefined): HostList {
+  if (!had || got.errors.length === 0) return got;
+  const failed = new Set(got.errors.map((e) => e.forge));
+  const fresh = new Set(got.items.map((i) => i.node.ref));
+  const kept = had.items.filter((i) => !fresh.has(i.node.ref) && (failed.has("") || failed.has(i.node.ref.slice(0, i.node.ref.indexOf(":")))));
+  return kept.length === 0 ? got : { ...got, items: [...got.items, ...kept], stale: kept.map((i) => i.node.ref) };
+}
+
 /** Read the list for what it is asked, unless it was read for that already. */
 export async function loadList(store: Store, l: WorkListState): Promise<void> {
   const mine = askKey(store, l);
@@ -131,28 +147,35 @@ export async function loadList(store: Store, l: WorkListState): Promise<void> {
   const sort = nodesSort(l);
   const { state, board } = l.filter.peek();
   const hosts = listHosts(store, board);
-  l.lists.value = null;
-  l.lineage.value = [];
+  // The rows read before stay until the new ones come (#4392): a first read shows placeholders, a refresh the rows.
+  const before = l.lists.peek() ?? [];
+  l.loading.value = true;
   l.problem.value = null;
-  // Lineage first, so the rows come with their figures; a control plane that does not list nodes gives none.
-  const known = await readLineage(store, kind, sort).catch((e: unknown) => {
-    if (current() && !(e instanceof CallFailed && e.code === -32601) && !fromForge(kind)) l.problem.value = describe(e);
-    return { nodes: [] as ReportNode[], cursor: undefined };
-  });
-  if (!current()) return;
-  l.lineage.value = known.nodes;
-  l.lineageCursor.value = known.cursor;
-  if (!fromForge(kind)) { l.lists.value = []; return; }
-  const method = kind === "issue" ? "forge/issues" : "forge/pulls";
-  const read = await Promise.all(hosts.map(async (h): Promise<HostList> => {
-    try {
-      const got = await store.link.call(method, forgeListRequest(forgeState(state), board), h.id);
-      return { host: h.id, items: got.items, cursor: got.cursor, errors: got.errors ?? [] };
-    } catch (e) {
-      return { host: h.id, items: [], errors: [{ forge: "", message: describe(e) }] };
-    }
-  }));
-  if (current()) l.lists.value = read;
+  try {
+    // Lineage first, so the rows come with their figures; a control plane that does not list nodes gives none.
+    const known = await readLineage(store, kind, sort).catch((e: unknown) => {
+      if (current() && !(e instanceof CallFailed && e.code === -32601) && !fromForge(kind)) l.problem.value = describe(e);
+      return { nodes: [] as ReportNode[], cursor: undefined };
+    });
+    if (!current()) return;
+    if (!fromForge(kind)) { l.lineage.value = known.nodes; l.lineageCursor.value = known.cursor; l.lists.value = []; return; }
+    const method = kind === "issue" ? "forge/issues" : "forge/pulls";
+    const read = await Promise.all(hosts.map(async (h): Promise<HostList> => {
+      const had = before.find((b) => b.host === h.id);
+      try {
+        const got = await store.link.call(method, forgeListRequest(forgeState(state), board), h.id);
+        return carryStale({ host: h.id, items: got.items, cursor: got.cursor, errors: got.errors ?? [] }, had);
+      } catch (e) {
+        return carryStale({ host: h.id, items: [], errors: [{ forge: "", message: describe(e) }] }, had);
+      }
+    }));
+    if (!current()) return;
+    l.lineage.value = known.nodes;
+    l.lineageCursor.value = known.cursor;
+    l.lists.value = read;
+  } finally {
+    if (current()) l.loading.value = false;
+  }
 }
 
 /** More: the next page of each machine's list, or of lineage's. */

@@ -225,7 +225,13 @@ func (d *Daemon) deviceFlow(p wire.ConnectionProvider) *connections.DeviceFlow {
 	if p == wire.ConnectionProviderGitlab {
 		return connections.NewGitLabFlow()
 	}
-	return connections.NewGitHubFlow()
+	f := connections.NewGitHubFlow()
+	// A walk's fixture GitHub (AGENTS_TEST_GITHUB_URL) checks a token too, so a scratch root can
+	// connect GitHub with connections/sign-in/token and read the fixture's issues (#4391).
+	if e := d.catalogEndpoints(); !e.IsLive() {
+		f.Base, f.API = e.Web+"/", e.API+"/"
+	}
+	return f
 }
 
 func (d *Daemon) codeFlow(p wire.ConnectionProvider) *connections.CodeFlow {

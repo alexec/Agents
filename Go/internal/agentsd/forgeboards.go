@@ -2,7 +2,6 @@ package agentsd
 
 import (
 	"context"
-	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -90,6 +89,8 @@ type forgeBoard struct {
 	// group and id are a GitLab group board's, and site the GitLab it is on.
 	group, site string
 	id          int
+	// linear is a Linear board's team, by key.
+	linear string
 	// jira is a Jira board's id.
 	jira string
 	// azureProject and azureTeam are an Azure Boards board's: organization/project in lower
@@ -101,16 +102,14 @@ func (b *forgeBoard) key() []any {
 	if b == nil {
 		return nil
 	}
-	return []any{b.project, b.group, b.site, b.id, b.jira, b.azureProject, b.azureTeam, b.azureSite}
+	return []any{b.project, b.group, b.site, b.id, b.linear, b.jira, b.azureProject, b.azureTeam, b.azureSite}
 }
 
 // narrowToBoard keeps of s only what is on the board's forge, and says what to read there.
 func narrowToBoard(s *forgeSources, b wire.ProjectBoard, in []string, prs bool) *forgeBoard {
 	board := &forgeBoard{forge: string(*b.Forge), home: in[0]}
 	key := deref(b.Key)
-	azureDevOps, azureDevOpsErr := s.azureDevOps, s.azureDevOpsErr
-	s.teams, s.projects, s.workspace = nil, nil, false
-	s.azureDevOps, s.azureDevOpsErr = nil, nil
+	s.projects = nil
 	boards := s.boards
 	s.boards = nil
 	switch *b.Forge {
@@ -123,12 +122,8 @@ func narrowToBoard(s *forgeSources, b wire.ProjectBoard, in []string, prs bool) 
 		board.group, board.site = group, deref(b.Site)
 		board.id, _ = strconv.Atoi(number)
 	case wire.ConnectionProviderLinear:
-		if !prs {
-			s.teams = []string{key}
-			if _, named := s.teamFolder[key]; !named {
-				s.linearHome = board.home
-			}
-		}
+		// Linear is on the forge interface: linearForge.List reads the board's team.
+		board.linear = key
 	case wire.ConnectionProviderAtlassian:
 		if !prs {
 			board.jira = key
@@ -139,19 +134,12 @@ func narrowToBoard(s *forgeSources, b wire.ProjectBoard, in []string, prs bool) 
 			break
 		}
 		project := strings.ToLower(key[:at])
+		board.azureProject, board.azureTeam, board.azureSite = project, key[at+1:], deref(b.Site)
 		if prs {
-			// The pull requests of the project's repositories, on the Azure DevOps the board is on (#4055).
-			s.azureDevOpsErr = azureDevOpsErr
-			if root, err := url.Parse(s.azureDevOpsRoot); err == nil && strings.EqualFold(root.Host, deref(b.Site)) {
-				for _, repo := range azureDevOps {
-					if strings.HasPrefix(strings.ToLower(repo), project+"/") {
-						s.azureDevOps = append(s.azureDevOps, repo)
-					}
-				}
-			}
+			// Azure Repos is on the forge interface: azureDevOpsForge.List reads the pull requests
+			// of the project's repositories, on the Azure DevOps the board is on (#4055).
 			break
 		}
-		board.azureProject, board.azureTeam, board.azureSite = project, key[at+1:], deref(b.Site)
 		s.boards = []string{project}
 		if !slices.Contains(boards, project) {
 			// No folder names the project: its work items act from the board's first folder.

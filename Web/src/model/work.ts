@@ -11,6 +11,7 @@ import { costWords, nodeName, spent } from "./value";
 import { lineageUrl } from "./lineage";
 import { timeWords } from "./time";
 import { folderPathOf } from "./projectSettings";
+import { ago } from "./connectorSetup";
 
 /** Work's lists, in the order of its tabs, by the lineage kind each holds. */
 export type WorkKind = "issue" | "pr" | "milestone" | "release";
@@ -48,6 +49,10 @@ export interface WorkRow {
   /** The folder on host the forge read was for (#3283): its project is the row's. */
   folder?: string | undefined;
   draft?: boolean | undefined;
+  /** The forge's comment count, its checks' summary and its review (a PR's); none from lineage alone. */
+  comments?: number | undefined;
+  checks?: string | undefined;
+  review?: string | undefined;
   lineage?: ReportNode | undefined;
 }
 
@@ -93,7 +98,7 @@ export function forgeRow(item: ForgeItem, host: string, lineage?: ReportNode): W
   return {
     node: item.node, title: item.title, state: item.state, status: item.status, labels: item.labels, repo: repoOf(item.node.ref),
     author: item.author, assignees: item.assignees, milestone: item.milestone, updated: unix(item.updatedAt),
-    url: item.url, host, folder: item.folder, draft: item.draft, lineage,
+    url: item.url, host, folder: item.folder, draft: item.draft, comments: item.comments, checks: item.checks, review: item.review, lineage,
   };
 }
 
@@ -302,7 +307,9 @@ export function lineageWords(n: ReportNode | undefined): string | undefined {
 /** A forge that could not be read: "GitHub on Studio: not connected". */
 export function errorWords(e: ForgeListError, machine: string | undefined): string {
   const forge = forgeTitle[e.forge] ?? e.forge;
-  return `${forge}${machine ? ` on ${machine}` : ""}: ${e.message}`;
+  // A forge's message can name the forge already: "Forgejo: Get …".
+  const message = forge && e.message.startsWith(`${forge}: `) ? e.message.slice(forge.length + 2) : e.message;
+  return `${forge}${machine ? ` on ${machine}` : ""}: ${message}`;
 }
 
 export const forgeTitle: Record<string, string> = { github: "GitHub", gitlab: "GitLab", linear: "Linear", jira: "Jira",
@@ -340,7 +347,6 @@ export function labelInk(color: string | undefined): string | undefined {
 /** A label's colour as CSS: "#d73a4a" of "d73a4a"; undefined when the forge gave none. */
 export const labelColor = (color: string | undefined) => labelInk(color) ? `#${color!.replace(/^#/, "")}` : undefined;
 
-export const noAgentYet = "No agent yet";
 export const noWork = (kind: WorkKind) => kind === "milestone" ? "No milestones that an agent worked on yet."
   : kind === "release" ? "No releases that an agent worked on yet."
   : `No ${workKindTitle[kind].toLowerCase()} match.`;
@@ -365,13 +371,6 @@ const reviewTitle: Record<string, string> = {
   approved: "Approved", changes_requested: "Changes requested", review_required: "Review required",
 };
 export const reviewWords = (review: string | undefined) => review ? `Review: ${reviewTitle[review] ?? review.replaceAll("_", " ")}` : undefined;
-
-/** The people line of a page: "by alexec · assigned to bob · milestone 0.14". */
-export function peopleWords(item: Pick<ForgeItem, "author" | "assignees" | "milestone">): string {
-  const parts = [...item.author ? [`by ${item.author}`] : [], ...item.assignees.length > 0 ? [`assigned to ${item.assignees.join(", ")}`] : [],
-    ...item.milestone ? [`milestone ${item.milestone}`] : []];
-  return parts.join(" · ");
-}
 
 export const notReadHere = "No machine could read this from its forge.";
 
@@ -407,3 +406,127 @@ export function doneWords(method: string, done: ForgeDone, reopened = false, mov
 
 /** Close or Reopen, by the item's state. */
 export const closeTitle = (state: string) => state === "open" ? "Close" : "Reopen";
+
+// The shared parts of Work's look (#4392, specs/4328-work-look/parts.md): the state icon, the row's second
+// line, the label chip's colours, the avatar's colour and the empty states, as Shared/UI's (#4391).
+
+/** A row's state glyph (parts.md section 1). A closed issue is done until the wire says not planned (#4398). */
+export type StateGlyph = "issue-open" | "issue-done" | "issue-dropped" | "pr-open" | "pr-draft" | "pr-merged" | "pr-closed";
+
+export function stateGlyph(kind: string, state: string, draft?: boolean, notPlanned?: boolean): StateGlyph | undefined {
+  if (kind === "pr") {
+    if (state === "merged") return "pr-merged";
+    if (state === "closed") return "pr-closed";
+    return state === "open" ? draft ? "pr-draft" : "pr-open" : undefined;
+  }
+  if (kind !== "issue") return undefined;
+  if (state === "open") return "issue-open";
+  return state === "closed" ? notPlanned ? "issue-dropped" : "issue-done" : undefined;
+}
+
+/** What a screen reader says for a glyph: colour is never the only sign. */
+export const stateGlyphWords: Record<StateGlyph, string> = {
+  "issue-open": "Open issue", "issue-done": "Closed issue", "issue-dropped": "Closed issue, not planned",
+  "pr-open": "Open pull request", "pr-draft": "Draft pull request", "pr-merged": "Merged pull request", "pr-closed": "Closed pull request",
+};
+
+/** "2 h", "5 min", "3 d", "now": an age for the phone's short line. */
+export function shortAge(seconds: number): string {
+  if (seconds < 60) return "now";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} min`;
+  if (seconds < 86_400) return `${Math.floor(seconds / 3600)} h`;
+  return `${Math.floor(seconds / 86_400)} d`;
+}
+
+/** A row's second line (parts.md section 2), wide and on a phone: "#12 · In Review · updated 2 hours ago by alexec ·
+ * 2 sessions · $0.42" and "#12 · 2 h · alexec · $0.42". The wire has no created or closed time yet (#4398), so the age
+ * is the last update's. With no lineage the line ends after the author. */
+export function rowLine(row: WorkRow, now: number): { wide: string; short: string } {
+  const ref = titleSaysRef(row) ? [] : [shortRef(row.node.ref)];
+  const status = row.status ? [row.status] : [];
+  const age = row.updated > 0 ? Math.max(0, now / 1000 - row.updated) : undefined;
+  const by = row.author ? ` by ${row.author}` : "";
+  const when = age === undefined ? row.author ? [`by ${row.author}`] : [] : [`updated ${ago(new Date(row.updated * 1000), new Date(now))}${by}`];
+  const figures = lineageWords(row.lineage);
+  const cost = row.lineage && spent(row.lineage.cost.total) ? [costWords(row.lineage.cost.total)] : [];
+  return {
+    wide: [...ref, ...status, ...when, ...figures ? [figures] : []].join(" · "),
+    short: [...ref, ...status, ...age === undefined ? [] : [shortAge(age)], ...row.author ? [row.author] : [], ...cost].join(" · "),
+  };
+}
+
+/** A PR's checks as a glyph on the row: passing, failing or running; none for none. */
+export function checksGlyph(checks: string | undefined): { mark: string; words: string; tone: string } | undefined {
+  switch (checks) {
+    case "passing": return { mark: "✓", words: "Checks passing", tone: "good" };
+    case "failing": return { mark: "✗", words: "Checks failing", tone: "bad" };
+    case "running": case "pending": return { mark: "●", words: "Checks running", tone: "running" };
+    default: return undefined;
+  }
+}
+
+/** A PR's review as the row's word: only the two that ask for something. */
+export const rowReviewWords = (review: string | undefined) =>
+  review === "approved" ? "Approved" : review === "changes_requested" ? "Changes requested" : undefined;
+
+/** A scoped label's two parts, "feature" and "work" of "feature:work"; undefined for a plain one. */
+export function labelScope(name: string): [string, string] | undefined {
+  const at = name.indexOf(":");
+  return at > 0 && at < name.length - 1 ? [name.slice(0, at + 1), name.slice(at + 1)] : undefined;
+}
+
+type RGB = [number, number, number];
+const rgbOf = (hex: string): RGB => { const v = parseInt(hex.replace(/^#/, ""), 16); return [(v >> 16) & 255, (v >> 8) & 255, v & 255]; };
+const hexOf = (c: RGB) => `#${c.map((x) => Math.round(Math.min(255, Math.max(0, x))).toString(16).padStart(2, "0")).join("")}`;
+const mix = (a: RGB, b: RGB, t: number): RGB => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+const luminance = (c: RGB) => {
+  const [r, g, b] = c.map((x) => { const s = x / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; }) as RGB;
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+/** WCAG's contrast of two colours, 1 to 21. */
+export function contrast(a: RGB, b: RGB): number {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/** The light and dark grounds a chip sits on: the Paper palette's raised colours. */
+const grounds: Record<"light" | "dark", RGB> = { light: [255, 255, 255], dark: [38, 40, 44] };
+
+/** A label chip's colours on a ground (parts.md section 3): the fill at 18 %, the border at 60 %, and the text the
+ * colour darkened (light) or lightened (dark) until it has 4.5:1 to the fill. Undefined for a label with no colour. */
+export function chipColours(color: string | undefined, scheme: "light" | "dark"): { fill: string; border: string; ink: string } | undefined {
+  const css = labelColor(color);
+  if (!css) return undefined;
+  const c = rgbOf(css), ground = grounds[scheme];
+  const fill = mix(ground, c, 0.18);
+  const toward: RGB = scheme === "light" ? [0, 0, 0] : [255, 255, 255];
+  let ink = c;
+  for (let t = 0.05; contrast(ink, fill) < 4.5 && t <= 1; t += 0.05) ink = mix(c, toward, t);
+  return { fill: hexOf(fill), border: hexOf(mix(ground, c, 0.6)), ink: hexOf(ink) };
+}
+
+/** An avatar's colour with no image (parts.md section 6), picked from the login so one person keeps one colour. */
+export function avatarHue(login: string): number {
+  let h = 0;
+  for (const ch of login) h = (h * 31 + ch.codePointAt(0)!) % 360;
+  return h;
+}
+
+/** Whether a filter other than State is set, so an empty list says "match" and offers Clear filters. */
+export const filtered = (f: WorkFilter) => !!(f.project || f.repo || f.label || f.assignee || f.text.trim() || f.board);
+
+/** The filters cleared, keeping the State. */
+export const clearedFilter = (f: WorkFilter): WorkFilter => ({ ...anyFilter, state: f.state });
+
+/** An empty list's words (parts.md section 7): with a filter, "No issues match"; with none, "No open issues" and
+ * where they come from. */
+export function emptyWords(kind: WorkKind, state: WorkState, filter: boolean, repos: readonly string[]): { title: string; line?: string } {
+  if (!fromForge(kind)) return { title: noWork(kind) };
+  const things = workKindTitle[kind].toLowerCase();
+  if (filter) return { title: `No ${things} match` };
+  const word = state === "all" ? "" : `${state} `;
+  const where = repos.length === 1 ? repoName(repos[0]!) : "your forges";
+  return { title: `No ${word}${things}`, line: `${workKindTitle[kind]} on ${where} show here.` };
+}
+
+export const connectForge = (kind: WorkKind) => `Connect a forge to see ${kind === "pr" ? "pull requests" : "issues"}`;

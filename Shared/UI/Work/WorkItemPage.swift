@@ -23,6 +23,7 @@ struct WorkItemPage: View {
     @State private var estimateRange = false
     @State private var pipeline: [Pipeline.Step] = []
     @State private var asked = 0
+    @State private var width: CGFloat = 0
 
     private var node: DaemonAPI.LineageNode { place.node ?? .init(kind: place.kind.rawValue, ref: "") }
 
@@ -33,37 +34,33 @@ struct WorkItemPage: View {
         return machines.first?.id
     }
 
+    /// The side panel goes beside the page on a wide one, and under the header on a narrow one (#4391).
+    private var narrow: Bool { compact || (width > 0 && width < WorkSidePanel<EmptyView>.narrowUnder) }
+
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                header
-                if let detail, model.forgeWrites(on: detail.host) {
-                    WorkItemActions(model: model, host: detail.host, detail: detail.got, wrote: { Task { await reread() } })
+            Group {
+                if narrow {
+                    VStack(alignment: .leading, spacing: 16) {
+                        header
+                        if let detail { panel(detail.got, compact: true) }
+                        main
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 16) {
+                        header
+                        HStack(alignment: .top, spacing: 24) {
+                            VStack(alignment: .leading, spacing: 16) { main }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            if let detail { panel(detail.got, compact: false) }
+                        }
+                    }
                 }
-                if let forgeProblem {
-                    Label(forgeProblem, systemImage: "exclamationmark.triangle").foregroundStyle(.secondary)
-                } else if place.kind.fromForge, detail == nil {
-                    ProgressView()
-                }
-                #if os(macOS)
-                // An epic's plan (#3268): Mac + web, so not on the Remote (#2796).
-                if let detail, WorkPlan.hasPlan(detail.got.item) {
-                    WorkPlanSection(model: model, host: detail.host, lineageHost: lineageHost, detail: detail.got, asked: asked,
-                                    estimates: estimate?.children ?? [],
-                                    writes: model.forgeWrites(on: detail.host), wrote: { Task { await reread() } })
-                }
-                #endif
-                if let detail { bodyAndComments(detail.got, on: detail.host) }
-                #if os(macOS)
-                // The docs it names and those like it (#3322): Mac + web, so not on the Remote (#2796).
-                if let detail, detail.got.item.node.kind == "issue" || detail.got.item.node.kind == "pr" {
-                    WorkDocsSection(item: detail.got.item, text: detail.got.body, asked: asked)
-                }
-                #endif
             }
             .padding(compact ? 16 : 20)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .onGeometryChange(for: CGFloat.self, of: \.size.width) { width = $0 }
         #if os(iOS)
         .refreshable { asked += 1 }
         #endif
@@ -72,6 +69,106 @@ struct WorkItemPage: View {
         #if os(macOS)
         .workTask(id: pipelineAsk) { await loadPipeline() }
         #endif
+    }
+
+    @ViewBuilder
+    private var main: some View {
+        if let detail, model.forgeWrites(on: detail.host) {
+            WorkItemActions(model: model, host: detail.host, detail: detail.got, wrote: { Task { await reread() } })
+        }
+        if let forgeProblem {
+            WorkErrorStrip(lines: [forgeProblem]) { asked += 1 }
+        } else if place.kind.fromForge, detail == nil {
+            ProgressView()
+        }
+        #if os(macOS)
+        // An epic's plan (#3268): Mac + web, so not on the Remote (#2796).
+        if let detail, WorkPlan.hasPlan(detail.got.item) {
+            WorkPlanSection(model: model, host: detail.host, lineageHost: lineageHost, detail: detail.got, asked: asked,
+                            estimates: estimate?.children ?? [],
+                            writes: model.forgeWrites(on: detail.host), wrote: { Task { await reread() } })
+        }
+        #endif
+        if let detail { bodyAndComments(detail.got, on: detail.host) }
+        #if os(macOS)
+        // The docs it names and those like it (#3322): Mac + web, so not on the Remote (#2796).
+        if let detail, detail.got.item.node.kind == "issue" || detail.got.item.node.kind == "pr" {
+            WorkDocsSection(item: detail.got.item, text: detail.got.body, asked: asked)
+        }
+        #endif
+    }
+
+    // MARK: Side panel
+
+    /// Assignees, Labels, Milestone, Repo, Project and Linked (#4391, parts.md section 5), as the
+    /// wire has them now: avatars, the children and the pull requests that fix it come with #4363 and #4373.
+    private func panel(_ got: DaemonAPI.ForgeItemDetail, compact: Bool) -> some View {
+        let item = got.item
+        return WorkSidePanel(compact: compact) {
+            WorkSideSection(title: "Assignees") {
+                if item.assignees.isEmpty {
+                    WorkSideNone(words: "No one")
+                } else {
+                    ForEach(item.assignees, id: \.self) { WorkSidePerson(login: $0) }
+                }
+            }
+            WorkSideSection(title: "Labels") {
+                if item.labels.isEmpty {
+                    WorkSideNone(words: "None")
+                } else {
+                    WrappingHStack(spacing: 4) {
+                        ForEach(item.labels, id: \.name) { label in
+                            WorkLabelChip(label: label, pick: pickLabel)
+                        }
+                    }
+                }
+            }
+            WorkSideSection(title: "Milestone") {
+                if let milestone = item.milestone {
+                    Label(milestone, systemImage: "flag")
+                } else {
+                    WorkSideNone(words: "None")
+                }
+            }
+            WorkSideSection(title: "Repo") {
+                Text(WorkList.repoName(WorkList.repo(of: item.node.ref))).lineLimit(1).textSelection(.enabled)
+            }
+            if let projectName {
+                WorkSideSection(title: "Project") { Text(projectName).lineLimit(1) }
+            }
+            if item.parent != nil || item.progress != nil {
+                WorkSideSection(title: "Linked") {
+                    if let parent = item.parent {
+                        WorkSideLinked(node: parent) {
+                            if let kind = WorkList.kind(of: parent) { model.showWork(WorkPlace(kind: kind, ref: parent.ref)) }
+                        }
+                    }
+                    if let progress = item.progress {
+                        ProgressView(value: Double(progress.done), total: Double(max(progress.total, 1)))
+                        Text("\(progress.done) of \(progress.total) closed").appText(.fine).foregroundStyle(.secondary).monospacedDigit()
+                    }
+                }
+            }
+        }
+    }
+
+    /// A chip on the panel opens the list with that label (Mac); on a phone the chips are words.
+    private var pickLabel: ((String) -> Void)? {
+        #if os(macOS)
+        { [model, place] name in
+            let list = model.workLists[place.kind]
+            list.filter.label = name
+            model.showWork(WorkPlace(kind: place.kind))
+        }
+        #else
+        nil
+        #endif
+    }
+
+    private var projectName: String? {
+        let projects = model.workProjects
+        guard projects.count > 1, let detail else { return nil }
+        return WorkList.project(ofFolder: detail.got.item.folder, on: detail.host, in: projects)?.name
     }
 
     private struct LineageAsk: Equatable {
@@ -97,17 +194,8 @@ struct WorkItemPage: View {
 
     // MARK: Header
 
-    /// The project the item was read for (#3283), when the person has more than one: with one, the
-    /// page says nothing new.
-    private var projectWords: String? {
-        let projects = model.workProjects
-        guard projects.count > 1, let detail else { return nil }
-        return WorkList.project(ofFolder: detail.got.item.folder, on: detail.host, in: projects).map { WorkList.projectWords($0.name) }
-    }
-
     private var header: some View {
         let item = detail?.got.item
-        let labels = item?.labels ?? []
         let url = item?.url.flatMap(URL.init(string:)) ?? WorkList.url(node)
         let title = item?.title ?? ReportValueWords.name(node)
         return VStack(alignment: .leading, spacing: 6) {
@@ -130,16 +218,15 @@ struct WorkItemPage: View {
                     }
                 }
             }
-            WrappingHStack(spacing: 6) {
-                WorkStatePill(state: item?.state ?? "", draft: item?.draft ?? false, status: item?.status)
-                ForEach(labels, id: \.name) { WorkLabelChip(label: $0) }
-            }
-            // On a phone the ref takes the line, and "Open on …" goes under it.
+            // The state, the ref, who opened it and the comments; the rest is the side panel's (#4391).
             (compact ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4)) : AnyLayout(HStackLayout(spacing: 6))) {
-                Text(([node.ref] + [item.map(WorkList.peopleWords), projectWords].compactMap { $0 }.filter { !$0.isEmpty })
-                    .joined(separator: " · "))
+                HStack(spacing: 6) {
+                    WorkStatePill(state: item?.state ?? "", draft: item?.draft ?? false, status: item?.status)
+                    Text(([node.ref] + [item?.author.map { "by \($0)" }, item.flatMap { $0.comments > 0 ? commentsWords($0.comments) : nil }]
+                        .compactMap { $0 }).joined(separator: " · "))
                     .appText(.supporting).foregroundStyle(.secondary)
                     .textSelection(.enabled)
+                }
                 if let url {
                     Button(WorkList.openOnWords(node.ref)) { openURL(url) }.linkStyle()
                 }
@@ -164,6 +251,8 @@ struct WorkItemPage: View {
             }
         }
     }
+
+    private func commentsWords(_ n: Int) -> String { n == 1 ? "1 comment" : "\(n) comments" }
 
     /// "Estimate: about $3.20, 45K output tokens, 2h 10m of work (from 31 closed stories)", and for
     /// an epic what its closed children spent. The range is its help on the Mac; on the Remote a
@@ -266,12 +355,12 @@ struct WorkItemPage: View {
                     .linkStyle()
                     .disabled(olderLoading)
             }
-            ForEach(Array(got.comments.enumerated()), id: \.offset) { _, c in
-                VStack(alignment: .leading, spacing: 4) {
-                    Divider()
-                    Text("\(c.author)\(c.bot == true ? " (bot)" : "") · \(c.at.formatted(.relative(presentation: .named)))")
-                        .appText(.fine).foregroundStyle(.secondary)
-                    MarkdownText(markdown: ForgeMarkdown.markdown(c.body), remoteImage: image(on: host))
+            // Each on the timeline's line, with its avatar (#4391).
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(got.comments.enumerated()), id: \.offset) { _, c in
+                    WorkCommentView(comment: c) {
+                        MarkdownText(markdown: ForgeMarkdown.markdown(c.body), remoteImage: image(on: host))
+                    }
                 }
             }
         }

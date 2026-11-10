@@ -15,8 +15,8 @@ test("each group's sections are in their subject's order", () => {
   assert.deepEqual(names("agents"), ["agentsPolicy"]);
   assert.deepEqual(names("machines"), ["recoveryKey", "gitAccess", "backups", "desktopControl", "sleep", "serverBackups", "processes", "agentRuntimes", "browser"]);
   assert.deepEqual(names("agentConfiguration"), ["skills", "personas", "workflows"]);
-  assert.deepEqual(names("controlPlane", "admin"), ["signIns", "forgeLogins", "people", "bots", "groups", "channels", "signInProviders", "policy", "providers", "version"]);
-  assert.deepEqual(names("controlPlane", "member"), ["signIns", "forgeLogins", "people", "groups", "channels", "policy", "providers", "version"]);
+  assert.deepEqual(names("controlPlane", "admin"), ["signIns", "forgeLogins", "people", "clients", "bots", "groups", "channels", "signInProviders", "policy", "providers", "version"]);
+  assert.deepEqual(names("controlPlane", "member"), ["signIns", "forgeLogins", "people", "clients", "groups", "channels", "policy", "providers", "version"]);
 });
 
 test("Connect to Another… is in Control plane, before Version, only where the page may ask for it (#4257)", () => {

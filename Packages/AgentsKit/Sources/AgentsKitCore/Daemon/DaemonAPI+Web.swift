@@ -458,6 +458,10 @@ public extension DaemonAPI {
                 Row(Method.controlStatus, params: Empty.self, result: ControlStatus.self, kind: .controlRequest),
                 Row(Method.hostsList, params: Empty.self, result: [ControlMachine].self, kind: .controlRequest),
                 Row(Method.clientsForgetSelf, params: Empty.self, result: Empty.self, kind: .controlRequest),
+                // Settings ▸ Control plane ▸ Clients (#4253): who is paired, and a code for one more.
+                Row(Method.clientsList, params: Empty.self, result: [ClientRecord].self, kind: .controlRequest),
+                Row(Method.clientsStartPairing, params: JSONValue.self, result: ControlCodeShown.self, kind: .controlRequest),
+                Row(Method.clientsStopPairing, params: Empty.self, result: Empty.self, kind: .controlRequest),
                 // Web Push to this browser (#1486): the control plane's key, and the page's subscription.
                 Row(Method.clientsWebPushKey, params: Empty.self, result: JSONValue.self, kind: .controlRequest),
                 Row(Method.clientsSetWebPush, params: JSONValue.self, result: Empty.self, kind: .controlRequest),
@@ -715,6 +719,7 @@ public extension DaemonAPI {
                 // An ad-hoc dictionary from ControlRouter.described: a `ControlMachine`'s state, and
                 // its `workspace` (#691) when it is linked.
                 Row(Notification.controlHostChanged, params: JSONValue.self, result: Empty.self, kind: .controlNotification),
+                Row(Notification.controlClientChanged, params: JSONValue.self, result: Empty.self, kind: .controlNotification),
                 Row(Notification.controlKeptChanged, params: KeptList.self, result: Empty.self, kind: .controlNotification),
                 Row(Notification.controlProvidersChanged, params: JSONValue.self, result: Empty.self,
                     kind: .controlNotification),
