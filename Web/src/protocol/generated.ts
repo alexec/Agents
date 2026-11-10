@@ -5293,6 +5293,19 @@ export interface LineageSessionMatch {
 }
 
 /**
+ * A session's state in the lineage graph (#4273): working, in a turn; waiting, on an event, CI or a
+ * timer; needs-you, on a person (a question or an approval); stopped, not running and not archived;
+ * archived; deleted, when the node keeps no title.
+ */
+export type LineageSessionState =
+  | "working"
+  | "waiting"
+  | "needs-you"
+  | "stopped"
+  | "archived"
+  | "deleted";
+
+/**
  * The sessions on this machine that lineage links to the issue, to its sub-issues or to their PRs,
  * each once, on the first issue in issues they came by. limited says there were more sub-issues or
  * sessions than are counted.
@@ -5315,6 +5328,36 @@ export interface LineageSessions {
  */
 export interface LineageSessionsRequest {
   number: number;
+}
+
+/**
+ * A session node's change of state, and when (#4275). Only the ref, the state and the time: no
+ * title or text (principle 7).
+ */
+export interface LineageStateChange {
+  node: LineageNode;
+  state: LineageSessionState;
+  at: WireDate;
+}
+
+/**
+ * lineage/sync (#4275): what changed in a machine's lineage since its last send: links started or
+ * ended (each whole, as the machine has it now), and its sessions' changes of state. reset starts
+ * the control plane's copy of the links again from this send, the first of a whole send; the states
+ * are kept.
+ */
+export interface LineageSync {
+  links?: LineageLink[];
+  states?: LineageStateChange[];
+  reset?: boolean;
+}
+
+/**
+ * lineage/sync's answer (#4275). full: the control plane has no copy of this machine's links (a new
+ * or moved control plane), so the machine sends them all again, the first with reset.
+ */
+export interface LineageSyncAnswer {
+  full?: boolean;
 }
 
 export interface ListCursor {
@@ -14637,6 +14680,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineageSessionMatch: { required: ["agentID", "on"], optional: [] },
   LineageSessions: { required: ["matches"], optional: ["issues", "limited"] },
   LineageSessionsRequest: { required: ["number"], optional: [] },
+  LineageStateChange: { required: ["node", "state", "at"], optional: [] },
+  LineageSync: { required: [], optional: ["links", "states", "reset"] },
+  LineageSyncAnswer: { required: [], optional: ["full"] },
   ListCursor: { required: ["lastActivityAt", "id"], optional: ["archivedAt"] },
   ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID", "after", "query", "project"] },
   ListedSkill: { required: ["name", "folder"], optional: ["description", "managed"] },

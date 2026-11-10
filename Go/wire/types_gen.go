@@ -5922,6 +5922,16 @@ type LineageSessionMatch struct {
 	On LineageNode `json:"on"`
 }
 
+// A session's state in the lineage graph (#4273): working, in a turn; waiting, on an event, CI or a timer; needs-you, on a person (a question or an approval); stopped, not running and not archived; archived; deleted, when the node keeps no title.
+type LineageSessionState string
+
+const LineageSessionStateWorking LineageSessionState = "working"
+const LineageSessionStateWaiting LineageSessionState = "waiting"
+const LineageSessionStateNeedsYou LineageSessionState = "needs-you"
+const LineageSessionStateStopped LineageSessionState = "stopped"
+const LineageSessionStateArchived LineageSessionState = "archived"
+const LineageSessionStateDeleted LineageSessionState = "deleted"
+
 // The sessions on this machine that lineage links to the issue, to its sub-issues or to their PRs, each once, on the first issue in issues they came by. limited says there were more sub-issues or sessions than are counted.
 type LineageSessions struct {
 	Matches []LineageSessionMatch `json:"matches"`
@@ -5935,6 +5945,29 @@ type LineageSessions struct {
 // lineage/sessions (#3899): a session search for #<number> asks for the sessions on that issue, on the issues part-of it (its sub-issues, at most 100) and on the PRs that fix them. The issue is #<number> in the forge repo of each of this machine's folders.
 type LineageSessionsRequest struct {
 	Number int64 `json:"number"`
+}
+
+// A session node's change of state, and when (#4275). Only the ref, the state and the time: no title or text (principle 7).
+type LineageStateChange struct {
+	Node LineageNode `json:"node"`
+
+	State LineageSessionState `json:"state"`
+
+	At Date `json:"at"`
+}
+
+// lineage/sync (#4275): what changed in a machine's lineage since its last send: links started or ended (each whole, as the machine has it now), and its sessions' changes of state. reset starts the control plane's copy of the links again from this send, the first of a whole send; the states are kept.
+type LineageSync struct {
+	Links []LineageLink `json:"links,omitzero"`
+
+	States []LineageStateChange `json:"states,omitzero"`
+
+	Reset *bool `json:"reset,omitzero"`
+}
+
+// lineage/sync's answer (#4275). full: the control plane has no copy of this machine's links (a new or moved control plane), so the machine sends them all again, the first with reset.
+type LineageSyncAnswer struct {
+	Full *bool `json:"full,omitzero"`
 }
 
 type ListCursor struct {

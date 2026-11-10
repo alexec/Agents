@@ -111,6 +111,9 @@ type Store interface {
 	Links(n wire.LineageNode) wire.LineageLinks
 	// Walk is the graph within depth links of a node, either way.
 	Walk(n wire.LineageNode, depth int) wire.LineageGraph
+	// All is every link kept, oldest start first: a machine's whole send to its control
+	// plane (#4275).
+	All() []wire.LineageLink
 	// Prune drops what is past the bounds now, not only at open or on a long append
 	// (#3649), and says how many links it dropped.
 	Prune() int
@@ -125,6 +128,12 @@ var (
 
 // maxRef bounds a ref, so one line stays small.
 const maxRef = 512
+
+// CheckNode says what is wrong with a node's kind or ref, or nil.
+func CheckNode(n wire.LineageNode) error { return checkNode(n) }
+
+// CheckWord says what is wrong with a relationship or a source, or nil.
+func CheckWord(what, w string) error { return checkWord(what, w) }
 
 func checkNode(n wire.LineageNode) error {
 	if !kindPattern.MatchString(n.Kind) {
@@ -250,12 +259,21 @@ func (f *Files) index() {
 	}
 }
 
-// prune drops the ended links past KeepEnded, then the oldest past MostLinks, ended ones
-// first. It says whether it dropped any.
+// prune drops what Bound drops. It says whether it dropped any.
 func (f *Files) prune() bool {
-	oldest := wire.DateOf(f.now().Add(-KeepEnded))
-	kept := f.links[:0:0]
-	for _, l := range f.links {
+	kept := Bound(f.links, f.now())
+	dropped := len(kept) != len(f.links)
+	f.links = kept
+	return dropped
+}
+
+// Bound is links, oldest start first, within the bounds at now: the ended links past
+// KeepEnded go, then the oldest past MostLinks, ended ones first. The control plane's copy
+// of a machine's links (#4275) is bounded by it too. links is not changed.
+func Bound(links []wire.LineageLink, now time.Time) []wire.LineageLink {
+	oldest := wire.DateOf(now.Add(-KeepEnded))
+	kept := links[:0:0]
+	for _, l := range links {
 		if l.EndedAt == nil || *l.EndedAt >= oldest {
 			kept = append(kept, l)
 		}
@@ -278,9 +296,7 @@ func (f *Files) prune() bool {
 		}
 		kept = left
 	}
-	dropped := len(kept) != len(f.links)
-	f.links = kept
-	return dropped
+	return kept
 }
 
 func encode(l line) []byte {
@@ -446,6 +462,12 @@ func (f *Files) Links(n wire.LineageNode) wire.LineageLinks {
 		out.Limited = &t
 	}
 	return out
+}
+
+func (f *Files) All() []wire.LineageLink {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]wire.LineageLink(nil), f.links...)
 }
 
 func (f *Files) Walk(n wire.LineageNode, depth int) wire.LineageGraph {

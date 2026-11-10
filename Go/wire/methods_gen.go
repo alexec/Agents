@@ -578,6 +578,7 @@ var CallGroupsRemove = Method[GroupRequest, Empty]{"groups/remove"}
 var CallGroupsSet = Method[GroupSet, Group]{"groups/set"}
 var CallGroupsSetRole = Method[GroupRoleSet, Group]{"groups/setRole"}
 var CallHandoverStatus = Method[Empty, HandoverStatus]{"handover/status"}
+var CallLineageSync = Method[LineageSync, LineageSyncAnswer]{"lineage/sync"}
 var CallLinksApprove = Method[ChannelLinkDecide, Empty]{"links/approve"}
 var CallLinksCheck = Method[ChannelSender, ChannelLinkChecked]{"links/check"}
 var CallLinksDeny = Method[ChannelLinkDecide, Empty]{"links/deny"}

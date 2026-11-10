@@ -488,6 +488,8 @@ func (d *Daemon) noteLineage(before *wire.Agent, a wire.Agent) {
 	if a.Purpose != nil {
 		return
 	}
+	// Its state, for the control plane's copy (#4275).
+	d.noteSessionState(&a)
 	var was wire.Agent
 	if before != nil {
 		was = *before

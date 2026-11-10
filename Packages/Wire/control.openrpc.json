@@ -2137,6 +2137,27 @@
       }
     },
     {
+      "name": "lineage/sync",
+      "x-capability": "lineage.graph/1",
+      "description": "A host, on its channel 0 (#4275): its lineage links and its sessions' changes of state since its last send, a few seconds after each, for the control plane's merged copy. Only refs, states and times.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LineageSync"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LineageSyncAnswer"
+        }
+      }
+    },
+    {
       "name": "links/approve",
       "x-capability": "links/1",
       "tags": [
