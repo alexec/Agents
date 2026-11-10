@@ -371,3 +371,21 @@ test("the filters and the sort go in the address and back, only what is not the 
   assert.deepEqual(w.parseWorkQuery("state=merged&board=x", "pr"), { filter: { ...w.anyFilter, state: "merged" }, sort: "updated" });
   assert.equal(w.parseWorkQuery("board=x", "issue").filter.board, "x");
 });
+
+test("a next page a forge could not read keeps the rows and the cursor, and says so at the end (#4395)", async () => {
+  const lists = await load("src/model/workLists.ts");
+  const l = lists.workList("pr");
+  l.lists.value = [{ host: "mac", items: [item(1)], cursor: "next", errors: [] }];
+  let answer = { items: [], errors: [{ forge: "github", message: "GitHub said 502" }] };
+  const store = { link: { call: async () => answer } };
+  await lists.loadMore(store, l);
+  assert.equal(l.moreFailed.value, "GitHub said 502");
+  assert.equal(l.lists.value[0].cursor, "next");
+  assert.equal(l.lists.value[0].items.length, 1);
+  assert.equal(l.problem.value, null, "not the strip over the rows");
+  answer = { items: [item(2)], errors: [] };
+  await lists.loadMore(store, l);
+  assert.equal(l.moreFailed.value, null);
+  assert.equal(l.lists.value[0].items.length, 2);
+  assert.equal(l.lists.value[0].cursor, undefined);
+});

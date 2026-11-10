@@ -190,11 +190,18 @@ export async function loadMore(store: Store, l: WorkListState): Promise<void> {
     if (fromForge(l.kind)) {
       const method = l.kind === "issue" ? "forge/issues" : "forge/pulls";
       const { state, board } = l.filter.peek();
+      // A forge that could not read its next page says so in errors: the rows and the cursor stay, so Try again reads it again.
+      const failed: string[] = [];
       l.lists.value = await Promise.all((l.lists.peek() ?? []).map(async (h) => {
         if (!h.cursor) return h;
         const got = await store.link.call(method, forgeListRequest(forgeState(state), board, h.cursor), h.host);
+        if (got.items.length === 0 && (got.errors ?? []).length > 0) {
+          failed.push(...got.errors!.map((e) => e.message));
+          return h;
+        }
         return { ...h, items: [...h.items, ...got.items], cursor: got.cursor, errors: got.errors ?? [] };
       }));
+      if (failed.length > 0) l.moreFailed.value = failed.join("; ");
     } else if (l.lineageCursor.peek()) {
       const next = await readLineage(store, l.kind, nodesSort(l), l.lineageCursor.peek());
       l.lineage.value = [...l.lineage.peek(), ...next.nodes];

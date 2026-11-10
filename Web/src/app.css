@@ -2171,7 +2171,7 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
   background: hsl(var(--hue) 55% 45%); color: #fff; font-weight: 600; line-height: 1; }
 .work-item-rows li.stale { opacity: 0.5; }
 /* The lists (#4395, lists.md): a row is a link; the selected row (the focus) has a 2 px accent ring on the light accent fill. */
-a.work-row { text-decoration: none; color: inherit; }
+a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
 .work-item-rows a.work-row:focus-visible, .work-item-rows a.work-row:focus { outline: 2px solid var(--accent); outline-offset: -2px;
   background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .work-item-rows a.work-row:focus:not(:focus-visible) { outline: none; background: none; }

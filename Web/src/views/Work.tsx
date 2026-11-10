@@ -158,7 +158,9 @@ export function WorkList({ store, kind }: { store: Store; kind: WorkKind }) {
               words={(id) => offeredProjects.find((p) => p.id === id)?.name ?? allProjects} onChange={(project) => set({ project })} />
           )}
           {fromForge(kind) && <FilterMenu label="State" always value={state} choices={stateChoices} onPick={(v) => set({ state: v as WorkState })} />}
-          <Choice label="Repo" value={filter_.repo} options={offered.repos} words={repoName} onChange={(repo) => set({ repo })} />
+          {(offered.repos.length > 1 || filter_.repo) && (
+            <Choice label="Repo" value={filter_.repo} options={offered.repos} words={repoName} onChange={(repo) => set({ repo })} />
+          )}
           <Choice label="Label" value={filter_.label} options={offered.labels} onChange={(label) => set({ label })} />
           {fromForge(kind) && <Choice label="Assignee" value={filter_.assignee} options={offered.assignees} onChange={(assignee) => set({ assignee })} />}
           {kind === "issue" && (
