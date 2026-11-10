@@ -26,7 +26,7 @@ Do the steps for each provider that you want. You can do one, two or all three.
 - A Google Cloud project, for Google.
 - A GitHub account or organisation that owns the GitHub App, for GitHub.
 - The bundle ids of your build. They are `PRODUCT_BUNDLE_IDENTIFIER` in `project.yml`:
-  `com.alexecollins.agents.store` for the Mac window (the `AgentsStore` target) and
+  `com.alexecollins.agents.host` for the Mac app (the `AgentsHost` target) and
   `com.alexecollins.agents.remote` for the Remote. If you changed them, use your ids in the
   steps below.
 
@@ -40,19 +40,28 @@ ids of their own.
 
 1. In the Apple Developer account, open **Certificates, Identifiers & Profiles ▸
    Identifiers**.
-2. Open the App ID of the Mac window (`com.alexecollins.agents.store`). Turn on the **Sign
+2. Open the App ID of the Mac app (`com.alexecollins.agents.host`). Turn on the **Sign
    in with Apple** capability, and save. Do the same for the App ID of the Remote
-   (`com.alexecollins.agents.remote`).
+   (`com.alexecollins.agents.remote`). Make sure that the identifier is exactly the bundle
+   id, with no dot at the end.
 3. Make the provisioning profiles of the two targets again, so that they have the new
    capability. Turning on the capability makes the profiles that exist invalid.
+4. For the Mac app, make a **macOS App Development** profile named `Agents Development`, with
+   your Mac as its device, and install it. The `Live` build (what `ship-app` installs) is
+   signed with it (#4283).
+
+Apple does not give Sign in with Apple to a **Developer ID** app: a Developer ID profile
+does not have the entitlement, even when the App ID has the capability. So the Mac app
+that a release makes (Developer ID) cannot open Apple's sheet, and it shows a line in place
+of the Apple button (#4279). Only a development build of the Mac app has it.
 
 You do not need a **Services ID**. A Services ID is for Sign in with Apple on a web page,
 and the web page pairs from a code shown on a signed-in client.
 
 ### Add the entitlement
 
-The entitlements of the Mac window and of the Remote have this key already (#2507). Make
-sure that it is there:
+The entitlements of the Mac app's `Live` build and of the Remote have this key already
+(#2507, #4283). Make sure that it is there:
 
 ```xml
 <key>com.apple.developer.applesignin</key>
@@ -63,7 +72,8 @@ sure that it is there:
 
 The files are:
 
-- `App/Agents-Store.entitlements` (the Mac window),
+- `Host/AgentsHost-Live.entitlements` (the Mac app's `Live` build; not
+  `Host/AgentsHost.entitlements`, which the Developer ID release uses),
 - `Remote/Remote.entitlements` (the Remote),
 - `Remote/Remote-AppStore.entitlements` (the Remote's App Store build).
 

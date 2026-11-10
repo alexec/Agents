@@ -20,7 +20,9 @@ var (
 	AppGoogleClientIDs []string
 	// AppAppleAudiences are the bundle ids a native Sign in with Apple names as aud, and the
 	// Services id.
-	AppAppleAudiences = []string{"com.alexecollins.agents.store", "com.alexecollins.agents.remote"}
+	// The one Mac app (com.alexecollins.agents.host, #4224) has it only in its Live build
+	// (#4283): Apple does not give the entitlement to a Developer ID app.
+	AppAppleAudiences = []string{"com.alexecollins.agents.host", "com.alexecollins.agents.store", "com.alexecollins.agents.remote"}
 	// AppAppleEnabled says the app has the Sign in with Apple capability: on the two App
 	// IDs and in the entitlements since #2507. The web pairs from a code, so there is no
 	// Services id.

@@ -584,6 +584,8 @@ targets:
       - path: Shared/UI
       - path: Host/AgentsHost.entitlements
         buildPhase: none
+      - path: Host/AgentsHost-Live.entitlements
+        buildPhase: none
       # The privacy manifest (#729): the required-reason APIs it uses, no data collected, no
       # tracking. The host's holds every reason the window's does, and more.
       - path: Host/PrivacyInfo.xcprivacy
@@ -682,6 +684,14 @@ targets:
           CODE_SIGN_STYLE: Manual
           CODE_SIGN_IDENTITY: Developer ID Application
           OTHER_CODE_SIGN_FLAGS: --timestamp
+        # Sign in with Apple in what ship-app installs (#4283): Apple gives the entitlement to
+        # a development profile, never to a Developer ID one, so only Live has it. The profile
+        # "Agents Development" names Alex's Mac; Debug (scratch walks) stays as it was.
+        Live:
+          CODE_SIGN_ENTITLEMENTS: Host/AgentsHost-Live.entitlements
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: Apple Development
+          PROVISIONING_PROFILE_SPECIFIER: Agents Development
 
   # agentsd's folder watch on a Mac (#1138): one for each folder it watches, saying
   # what FSEvents says changed, which Go cannot hear without cgo.

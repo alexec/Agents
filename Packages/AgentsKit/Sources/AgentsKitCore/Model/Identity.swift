@@ -394,11 +394,11 @@ public enum SignInWords {
     public static let organisationsTitle = "Allowed GitHub organisations"
     public static let organisationsFoot = "A GitHub sign-in must be in one of these. "
         + "It does not let anyone join with no invite."
-    /// In place of the Apple button in an app with no `applesignin` entitlement (#4279): the
-    /// one Mac app (#4224) is a Developer ID app with no provisioning profile, and Apple's sheet
-    /// fails there with AuthorizationError 1000.
-    public static let appleNotInThisApp = "This Mac app cannot use Sign in with Apple yet. "
-        + "Use another sign-in, or Settings ▸ Control plane ▸ Connect to Another… ▸ Sign in to agentloops.dev."
+    /// In place of the Apple button in an app with no `applesignin` entitlement (#4279): Apple
+    /// gives it to no Developer ID app, so the one Mac app (#4224) has it only in a development
+    /// build (#4283), and Apple's sheet fails without it with AuthorizationError 1000.
+    public static let appleNotInThisApp = "This build of the Mac app cannot use Sign in with Apple. "
+        + "Use another sign-in, or a code from a Mac that is signed in."
     public static let noneOn = "No sign-in provider is turned on for this control plane. Use a pairing code."
 
     /// After the client's name: "Sam’s iPhone wants to sign in as you."
