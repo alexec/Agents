@@ -30,9 +30,16 @@ struct ElicitationView: View {
     var body: some View {
         GlassEffectContainer(spacing: 10) {
             VStack(alignment: .leading, spacing: 12) {
-                // Who is asking, by title and runtime (#121).
-                if let asker = model.work.askerLine(request.agentID) {
-                    Text(asker).appText(.fine).foregroundStyle(.secondary)
+                // Who is asking, by title and runtime (#121); Later at its end (#4234), on a
+                // card that is a request to the person.
+                let needRequest = model.work.requests.first { $0.id == request.id }
+                let asker = model.work.askerLine(request.agentID)
+                if asker != nil || needRequest != nil {
+                    HStack(spacing: 8) {
+                        if let asker { Text(asker).appText(.fine).foregroundStyle(.secondary) }
+                        Spacer(minLength: 0)
+                        if let needRequest { RequestCardLater(request: needRequest) }
+                    }
                 }
                 if let because {
                     // The question stays in view; the answers give way to the reason.

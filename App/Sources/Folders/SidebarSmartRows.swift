@@ -64,6 +64,9 @@ struct SmartFold: View {
                         CheckSuggestionListRow(suggestion: item.suggestion, folder: item.folder,
                                                place: place(of: item.folder))
                     }
+                    LaterRows(requests: row.laterRequests(in: model.work, folders: folders, query: query)) {
+                        place(of: $0)
+                    }
                 }
             }
         } header: {
@@ -154,27 +157,80 @@ private struct RequestListRow: View {
     @Environment(\.windowOpen) private var windowOpen
     let request: NeedRequest
     let place: String?
+    /// Pick a Time… from its Later menu (#4234).
+    @State private var picking = false
 
     var body: some View {
-        if let id = request.askedBy {
-            let item = SidebarItem.session(id)
-            RequestRowLabel(request: request, asker: model.work.agent(id)?.title, place: place)
-                .help(request.line(asker: model.work.agent(id)?.title))
-                .sidebarInk(item)
-                .tag(item)
-                .modifier(SecretUseAnswers(request: request))
-                .contextMenu {
-                    SecretUseMenu(request: request)
-                    if request.secretUse != nil { Divider() }
-                    Button("Open Session") {
-                        if let windowOpen { windowOpen(item) } else { model.sidebarItem = item }
+        Group {
+            if let id = request.askedBy {
+                let item = SidebarItem.session(id)
+                RequestRowLabel(request: request, asker: model.work.agent(id)?.title, place: place)
+                    .help(request.line(asker: model.work.agent(id)?.title))
+                    .sidebarInk(item)
+                    .tag(item)
+                    .modifier(SecretUseAnswers(request: request))
+                    .contextMenu {
+                        SecretUseMenu(request: request)
+                        if request.secretUse != nil { Divider() }
+                        Button("Open Session") {
+                            if let windowOpen { windowOpen(item) } else { model.sidebarItem = item }
+                        }
+                        Divider()
+                        RequestLaterMenu(request: request) { picking = true }
                     }
+            } else if request.isTerminal {
+                RequestRowLabel(request: request, place: place)
+                    .help(request.line(asker: nil))
+                    .modifier(SecretUseAnswers(request: request))
+                    .contextMenu {
+                        SecretUseMenu(request: request)
+                        Divider()
+                        RequestLaterMenu(request: request) { picking = true }
+                    }
+            }
+        }
+        .sheet(isPresented: $picking) { RequestTimePicker(request: request) }
+    }
+}
+
+/// Needs You's folded Later group (#4234), at its end: its heading folds it, and says how
+/// many; its rows are the deferred requests, each saying when it comes back. In no count.
+private struct LaterRows: View {
+    let requests: [(folder: FolderKey, request: NeedRequest)]
+    let place: (FolderKey) -> String?
+    /// Folded at first, and kept as it was left, in this copy's own defaults.
+    @AppStorage("sidebar.needsYou.laterOpen", store: WindowDefaults.store) private var open = false
+
+    var body: some View {
+        if !requests.isEmpty {
+            HStack(spacing: 6) {
+                Image(systemName: "chevron.right")
+                    .imageScale(.small)
+                    .rotationEffect(.degrees(open ? 90 : 0))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 16)
+                Text("Later")
+                    .lineLimit(1)
+                    .foregroundStyle(.secondary)
+                Text("\(requests.count)")
+                    .monospacedDigit()
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 4)
+            }
+            .appText(.supporting)
+            .contentShape(Rectangle())
+            .onTapGesture { withAnimation(.snappy) { open.toggle() } }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Later, \(requests.count)")
+            .accessibilityValue(open ? "unfolded" : "folded")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { open.toggle() }
+            if open {
+                ForEach(requests, id: \.request.id) { item in
+                    RequestListRow(request: item.request, place: place(item.folder))
                 }
-        } else if request.isTerminal {
-            RequestRowLabel(request: request, place: place)
-                .help(request.line(asker: nil))
-                .modifier(SecretUseAnswers(request: request))
-                .contextMenu { SecretUseMenu(request: request) }
+            }
         }
     }
 }

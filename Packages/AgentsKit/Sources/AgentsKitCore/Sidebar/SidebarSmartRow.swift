@@ -190,12 +190,15 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
                         on: Set<SidebarSmartRow> = all) -> Bool {
         guard on.contains(self) else { return false }
         if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            // Later alone keeps Needs You drawn, at no count, so it can be answered (#4234).
             return count(in: work, folders: folders, on: on) > 0
+                || !laterRequests(in: work, folders: folders).isEmpty
         }
         return !agents(in: work, folders: folders, query: query, on: on).isEmpty
             || !workflows(in: work, folders: folders, query: query).isEmpty
             || !approvals(in: work, folders: folders, query: query).isEmpty
             || !requests(in: work, folders: folders, query: query).isEmpty
+            || !laterRequests(in: work, folders: folders, query: query).isEmpty
             || !pulls(in: work, folders: folders, query: query).isEmpty
             || !suggestions(in: work, folders: folders, query: query).isEmpty
     }
@@ -301,11 +304,29 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
         .sorted { $0.request.askedAt < $1.request.askedAt }
     }
 
+    /// The deferred requests in the folders named, each with its folder (#4234): Needs You's
+    /// folded Later group, at its end, the soonest back first, then At my Mac. A search
+    /// matches as for `requests`.
+    @MainActor
+    public func laterRequests(in work: AgentsModel, folders: [FolderKey], query: String = "")
+        -> [(folder: FolderKey, request: NeedRequest)] {
+        guard self == .needsYou else { return [] }
+        let words = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let terminal = work.laterTerminalRequests.map { (folder: FolderKey(folder: $0.folder), request: $0) }
+        return (terminal + folders.flatMap { key in
+            work.laterRequests(in: key.folder).map { (folder: key, request: $0) }
+        })
+        .filter { words.isEmpty || "\($0.request.title) \($0.request.kindWord)".lowercased().contains(words) }
+        .sorted { ($0.request.deferred?.until ?? .distantFuture, $0.request.askedAt)
+            < ($1.request.deferred?.until ?? .distantFuture, $1.request.askedAt) }
+    }
+
     /// The sessions of one folder that asked an open request (#3864): Needs You lists its
-    /// requests' rows for each, and not a session row too.
+    /// requests' rows for each, and not a session row too. A deferred request's asker is in
+    /// Later, as its request's row, and not in Needs You (#4234).
     @MainActor
     public static func askers(in work: AgentsModel, _ key: FolderKey) -> Set<UUID> {
-        Set(work.requests(in: key.folder).compactMap(\.askedBy))
+        Set(work.openRequests(in: key.folder).compactMap(\.askedBy))
     }
 
     /// What one folder's requests change in Needs You's count and the badge (#3864): one for
