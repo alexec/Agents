@@ -51,6 +51,31 @@ public enum ConnectAnother {
         public let words: String
     }
 
+    /// `control/connectAnother` and `control/connectWanted` (#4257): a client of the control
+    /// plane on this Mac asks its window to connect, with a client code or by the sign-in to
+    /// agentloops.dev.
+    public struct Request: Codable, Hashable, Sendable {
+        public var code: String?
+        public var hosted: Bool?
+
+        public init(code: String? = nil, hosted: Bool? = nil) {
+            self.code = code
+            self.hosted = hosted
+        }
+    }
+
+    /// `control/connectReport` and `control/connectReported` (#4257): where the window is in
+    /// a connect a client asked for, or why it stopped.
+    public struct Report: Codable, Hashable, Sendable {
+        public var step: String?
+        public var problem: String?
+
+        public init(step: String? = nil, problem: String? = nil) {
+            self.step = step
+            self.problem = problem
+        }
+    }
+
     public enum Words {
         public static let connect = "Connect to Another…"
         public static let useThisMacOnly = "Use This Mac Only"
@@ -81,5 +106,7 @@ public enum ConnectAnother {
         public static let joining = "Joining this Mac…"
         public static let startingHere = "Starting the control plane on this Mac…"
         public static let noMachineCode = "The control plane made no code for this Mac."
+        /// A browser asked for the sign-in to agentloops.dev (#4257): it opens in the window.
+        public static let signingInHere = "Sign in to agentloops.dev in Agents on this Mac."
     }
 }

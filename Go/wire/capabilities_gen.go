@@ -38,6 +38,7 @@ const CapConnectionsEmail1 = "connections.email/1"
 const CapConnections1 = "connections/1"
 const CapConnectorsSetup1 = "connectors.setup/1"
 const CapConsole1 = "console/1"
+const CapControlConnectAnother1 = "control.connect-another/1"
 const CapControlRotate1 = "control.rotate/1"
 const CapControl1 = "control/1"
 const CapCost1 = "cost/1"
@@ -711,6 +712,8 @@ var ControlCapabilities = pairs([][2]string{
 	{"console/live", "console/1"},
 	{"console/stopAgent", "console/1"},
 	{"console/teamWorkflows", "console/1"},
+	{"control/connectAnother", "control.connect-another/1"},
+	{"control/connectReport", "control.connect-another/1"},
 	{"control/ping", "control/1"},
 	{"control/rotate", "control.rotate/1"},
 	{"control/setAuditDays", "events.audit/1"},
@@ -900,6 +903,8 @@ var ControlCapabilities = pairs([][2]string{
 	{"control/budgetRequested", "policy.ask/1"},
 	{"control/capReached", "bots/1"},
 	{"control/clientChanged", "control/1"},
+	{"control/connectReported", "control.connect-another/1"},
+	{"control/connectWanted", "control.connect-another/1"},
 	{"control/cutOff", "org-identity/1"},
 	{"control/governanceRequested", "governance/1"},
 	{"control/groupsChanged", "groups/1"},
@@ -954,6 +959,8 @@ var ControlNotifications = set([]string{
 	"control/budgetRequested",
 	"control/capReached",
 	"control/clientChanged",
+	"control/connectReported",
+	"control/connectWanted",
 	"control/cutOff",
 	"control/governanceRequested",
 	"control/groupsChanged",

@@ -39,6 +39,7 @@ public enum Capability {
     public static let connections1 = "connections/1"
     public static let connectorsSetup1 = "connectors.setup/1"
     public static let console1 = "console/1"
+    public static let controlConnectAnother1 = "control.connect-another/1"
     public static let controlRotate1 = "control.rotate/1"
     public static let control1 = "control/1"
     public static let cost1 = "cost/1"
@@ -653,6 +654,8 @@ public enum Capability {
         "console/live": "console/1",
         "console/stopAgent": "console/1",
         "console/teamWorkflows": "console/1",
+        "control/connectAnother": "control.connect-another/1",
+        "control/connectReport": "control.connect-another/1",
         "control/ping": "control/1",
         "control/rotate": "control.rotate/1",
         "control/setAuditDays": "events.audit/1",
@@ -842,6 +845,8 @@ public enum Capability {
         "control/budgetRequested": "policy.ask/1",
         "control/capReached": "bots/1",
         "control/clientChanged": "control/1",
+        "control/connectReported": "control.connect-another/1",
+        "control/connectWanted": "control.connect-another/1",
         "control/cutOff": "org-identity/1",
         "control/governanceRequested": "governance/1",
         "control/groupsChanged": "groups/1",

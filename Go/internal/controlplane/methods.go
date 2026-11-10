@@ -79,6 +79,8 @@ var own = methodSet(
 	"clients/startPairing",
 	"clients/stopPairing",
 	"clients/webPushKey",
+	"control/connectAnother",
+	"control/connectReport",
 	"control/rotate",
 	"control/setAuditDays",
 	"control/setFolderDetection",
@@ -558,6 +560,8 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return m.governanceMethod(ctx, method, params, from)
 	case "readApi/list", "readApi/make", "readApi/revoke":
 		return m.readAPIMethod(ctx, method, params, from)
+	case "control/connectAnother", "control/connectReport":
+		return m.connectAnotherMethod(method, params, from)
 	case "control/rotate":
 		return wire.Empty{}, m.s.rotate(ctx, from)
 	case "control/setFolderDetection":

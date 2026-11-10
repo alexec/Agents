@@ -500,6 +500,8 @@ public extension DaemonAPI {
                 Row(Method.auditSetSinks, params: AuditSinks.self, result: AuditSinksState.self, kind: .controlRequest),
                 // Rotate Control Key… in Settings ▸ People (#997).
                 Row(Method.controlRotate, params: Empty.self, result: Empty.self, kind: .controlRequest),
+                // Connect to Another… on the page this Mac serves (#4257).
+                Row(Method.controlConnectAnother, params: ConnectAnother.Request.self, result: Empty.self, kind: .controlRequest),
                 // Reports (#1811): usage, cost and time by person, folder and machine.
                 Row(Method.reportsUsage, params: ReportQuery.self, result: UsageReport.self, kind: .controlRequest),
                 Row(Method.reportsExport, params: ReportQuery.self, result: ReportExport.self, kind: .controlRequest),
@@ -745,6 +747,8 @@ public extension DaemonAPI {
                 Row(Notification.controlOrgRoutesChanged, params: Empty.self, result: Empty.self,
                     kind: .controlNotification),
                 Row(Notification.controlSealingWanted, params: Empty.self, result: Empty.self,
+                    kind: .controlNotification),
+                Row(Notification.controlConnectReported, params: ConnectAnother.Report.self, result: Empty.self,
                     kind: .controlNotification),
                 Row(Notification.controlGovernanceRequested, params: CatalogRequest.self, result: Empty.self,
                     kind: .controlNotification),

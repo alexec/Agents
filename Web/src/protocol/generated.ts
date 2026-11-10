@@ -1997,6 +1997,35 @@ export interface ConfigOption {
   options?: ConfigChoice[] | ConfigChoiceGroup[];
 }
 
+/**
+ * Connect to Another… asked by a client of the control plane on this Mac (#4257): the Mac's window
+ * does it, as its own Connect to Another… does (#4228). Either code, a client code from Pair a Mac
+ * on another control plane, or hosted, which opens the window's sign-in to agentloops.dev.
+ */
+export interface ConnectAnotherRequest {
+  /** A client code from Settings ▸ Clients ▸ Pair a Mac… on the other control plane. */
+  code?: string;
+  /**
+   * Sign in to agentloops.dev in the window on this Mac: Hosted sends the client code to the app
+   * only (agents://hosted).
+   */
+  hosted?: boolean;
+}
+
+/**
+ * Where the Mac's window is in a Connect to Another… a client asked for (#4257), told to the
+ * person's clients as control/connectReported. One of step or problem.
+ */
+export interface ConnectReport {
+  /**
+   * What the window does now, in its words (Pairing…, Joining…, or that the sign-in is open on this
+   * Mac).
+   */
+  step?: string;
+  /** Why it stopped. This Mac is as it was. */
+  problem?: string;
+}
+
 /** The person's sign-in to one provider, as the host keeps it. Never its tokens. */
 export interface Connection {
   provider: ConnectionProvider;
@@ -12788,6 +12817,7 @@ export interface Methods {
   "console/live": { params: Empty; result: LiveBoard };
   "console/stopAgent": { params: ConsoleStopAgent; result: Empty };
   "console/teamWorkflows": { params: Empty; result: TeamWorkflows };
+  "control/connectAnother": { params: ConnectAnotherRequest; result: Empty };
   "control/rotate": { params: Empty; result: Empty };
   "control/setAuditDays": { params: AuditDays; result: AuditDays };
   "control/status": { params: Empty; result: ControlStatus };
@@ -13193,6 +13223,7 @@ export const MethodTarget = {
   "console/live": "control",
   "console/stopAgent": "control",
   "console/teamWorkflows": "control",
+  "control/connectAnother": "control",
   "control/rotate": "control",
   "control/setAuditDays": "control",
   "control/status": "control",
@@ -13517,6 +13548,7 @@ export interface Notifications {
   "clone/changed": CloneNotification;
   "control/budgetRequested": BudgetRequest;
   "control/capReached": CapReached;
+  "control/connectReported": ConnectReport;
   "control/governanceRequested": CatalogRequest;
   "control/groupsChanged": GroupsChanged;
   "control/hostChanged": JSONValue;
@@ -13730,6 +13762,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConfigChoice: { required: ["value", "name"], optional: ["description", "setBy"] },
   ConfigChoiceGroup: { required: ["options"], optional: ["name", "group"] },
   ConfigOption: { required: ["id", "name", "type"], optional: ["description", "category", "currentValue", "options"] },
+  ConnectAnotherRequest: { required: [], optional: ["code", "hosted"] },
+  ConnectReport: { required: [], optional: ["step", "problem"] },
   Connection: { required: ["provider", "state", "connectedAt"], optional: ["login", "installURL", "workspace", "expiresAt", "byToken", "newest"] },
   ConnectionBot: { required: ["made"], optional: ["name", "slug", "owner", "installURL", "appURL", "installations", "keyOn", "message"] },
   ConnectionBotCompleteRequest: { required: ["state"], optional: ["code", "error"] },
