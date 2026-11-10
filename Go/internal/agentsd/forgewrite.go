@@ -119,7 +119,7 @@ func (d *Daemon) registerForgeWrites() {
 }
 
 // forgeTarget is the item a write is on, and the forge to write it with: a forge on the
-// interface (#4329), with its ref there; or, of the forges not yet on it, one of forgejo,
+// interface (#4329), with its ref there; or, of the forges not yet on it, one of
 // bitbucket or azureDevOps (with its repository there, in project), linear (with its identifier), jira (with its key, in identifier) or
 // boards (with its project and its id, in number).
 type forgeTarget struct {
@@ -131,7 +131,6 @@ type forgeTarget struct {
 	linear      forgeLinear
 	jira        forgeJira
 	boards      forgeAzureBoards
-	forgejo     forgeForgejo
 	bitbucket   forgeBitbucket
 	azureDevOps forgeAzureDevOps
 	identifier  string
@@ -165,13 +164,6 @@ func (d *Daemon) forgeTargetOf(ctx context.Context, method string, node wire.Lin
 			return forgeTarget{}, err
 		}
 		return forgeTarget{boards: b, project: project, number: id}, nil
-	}
-	if repo, number, ok := forgejoOfNode(node); ok {
-		fj, named, _, err := d.forgejoOf(ctx, method, repo)
-		if err != nil {
-			return forgeTarget{}, err
-		}
-		return forgeTarget{forgejo: fj, project: named, number: number, pr: node.Kind == lineage.KindPR}, nil
 	}
 	if repo, number, ok := bitbucketOfNode(node); ok {
 		bb, named, _, err := d.bitbucketOf(ctx, method, repo)
@@ -222,8 +214,6 @@ func (d *Daemon) forgeComment(ctx context.Context, r wire.ForgeCommentRequest) (
 		url, err = t.jira.Comment(ctx, t.identifier, body)
 	case t.boards != nil:
 		url, err = t.boards.Comment(ctx, t.project, t.number, body)
-	case t.forgejo != nil:
-		url, err = t.forgejo.Comment(ctx, t.project, t.number, body)
 	case t.bitbucket != nil:
 		url, err = t.bitbucket.Comment(ctx, t.project, t.number, t.pr, body)
 	case t.azureDevOps != nil:
@@ -276,8 +266,6 @@ func (d *Daemon) forgeLabel(ctx context.Context, r wire.ForgeLabelRequest) (wire
 		err = t.jira.SetLabels(ctx, t.identifier, add, remove)
 	case t.boards != nil:
 		err = t.boards.SetTags(ctx, t.project, t.number, add, remove)
-	case t.forgejo != nil:
-		err = t.forgejo.SetLabels(ctx, t.project, t.number, add, remove)
 	case t.bitbucket != nil && t.pr:
 		err = Invalid("%s: %s", method, bitbucketmcp.NoPRLabels)
 	case t.bitbucket != nil:
@@ -313,8 +301,6 @@ func (d *Daemon) forgeLabels(ctx context.Context, r wire.ForgeNodeRequest) (wire
 		names, colors, err = t.jira.Labels(ctx, t.identifier)
 	case t.boards != nil:
 		names, colors, err = t.boards.Labels(ctx, t.project, t.number)
-	case t.forgejo != nil:
-		names, colors, err = t.forgejo.RepoLabels(ctx, t.project)
 	case t.bitbucket != nil && t.pr:
 		err = Invalid("forge/labels: %s", bitbucketmcp.NoPRLabels)
 	case t.bitbucket != nil:
@@ -357,8 +343,6 @@ func (d *Daemon) forgeClose(ctx context.Context, r wire.ForgeCloseRequest) (wire
 		err = t.jira.SetState(ctx, t.identifier, closed)
 	case t.linear != nil:
 		err = t.linear.SetState(ctx, t.identifier, closed)
-	case t.forgejo != nil:
-		err = t.forgejo.SetState(ctx, t.project, t.number, closed)
 	case t.bitbucket != nil:
 		err = t.bitbucket.SetState(ctx, t.project, t.number, t.pr, closed)
 	case t.azureDevOps != nil:
@@ -393,13 +377,6 @@ func (d *Daemon) forgeMerge(ctx context.Context, r wire.ForgeMergeRequest) (wire
 		d.forgeWrote()
 		return done, nil
 	}
-	if t.forgejo != nil {
-		if err := d.forgejoMerge(ctx, method, t, r.Sha, how, auto); err != nil {
-			return wire.ForgeDone{}, err
-		}
-		d.forgeWrote()
-		return wire.ForgeDone{Auto: optionalTrue(auto)}, nil
-	}
 	if t.bitbucket != nil {
 		if err := d.bitbucketMerge(ctx, method, t, r.Sha, how, auto); err != nil {
 			return wire.ForgeDone{}, err
@@ -429,8 +406,6 @@ func (d *Daemon) forgeApprove(ctx context.Context, r wire.ForgeApproveRequest) (
 		var done wire.ForgeDone
 		done, err = t.forge.Approve(ctx, t.ref, r.Sha)
 		url, err = deref(done.URL), forgeCannotErr(method, t.forge, err)
-	case t.forgejo != nil:
-		url, err = t.forgejo.Approve(ctx, t.project, t.number, r.Sha)
 	case t.bitbucket != nil:
 		url, err = t.bitbucket.Approve(ctx, t.project, t.number, r.Sha)
 	case t.azureDevOps != nil:
@@ -479,9 +454,6 @@ func (d *Daemon) forgeRerun(ctx context.Context, r wire.ForgeNodeRequest) (wire.
 		d.forgeWrote()
 		return done, nil
 	}
-	if t.forgejo != nil {
-		return wire.ForgeDone{}, Invalid("%s: %s", method, forgejoNoChecksAPI)
-	}
 	if t.bitbucket != nil {
 		return d.bitbucketRerun(ctx, method, t, r.Node.Ref)
 	}
@@ -498,9 +470,6 @@ func (d *Daemon) forgeLog(ctx context.Context, r wire.ForgeLogRequest) (wire.For
 	if t.forge != nil {
 		out, err := t.forge.Log(ctx, t.ref, check)
 		return out, forgeCannotErr(method, t.forge, err)
-	}
-	if t.forgejo != nil {
-		return wire.ForgeLog{Text: forgejoNoChecksAPI + "."}, nil
 	}
 	if t.bitbucket != nil {
 		return bitbucketLog(ctx, t, check)
@@ -519,8 +488,6 @@ func (d *Daemon) forgeDiff(ctx context.Context, r wire.ForgeNodeRequest) (wire.F
 	}
 	var out map[string]any
 	switch {
-	case t.forgejo != nil:
-		out, err = t.forgejo.PRDiff(ctx, t.project, t.number)
 	case t.bitbucket != nil:
 		out, err = t.bitbucket.PRDiff(ctx, t.project, t.number)
 	case t.azureDevOps != nil:

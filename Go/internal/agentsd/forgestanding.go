@@ -391,22 +391,6 @@ func (d *Daemon) standingBlockers(ctx context.Context, method string, epic wire.
 			}
 			return nil
 		}
-		if repo, _, ok := forgejoOfNode(epic.Node); ok {
-			fj, named, _, err := d.forgejoOf(ctx, method, repo)
-			if err != nil {
-				return err
-			}
-			by, err := fj.Blockers(ctx, named, numbers)
-			if err != nil {
-				return err
-			}
-			for n := range children {
-				for _, b := range by[numbers[n]] {
-					set(n, forgejoNode(b.Repo, b.Number, b.PR), b.Open)
-				}
-			}
-			return nil
-		}
 	}
 	return nil
 }
