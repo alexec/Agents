@@ -73,12 +73,12 @@ func (d *Daemon) askSecret(id wire.UUID, args map[string]json.RawMessage) (strin
 	if !answered {
 		return formStillOpen, nil
 	}
-	return d.secretNote(id, name, r.action), nil
+	return d.secretNote(id, name, r.action, r.reason), nil
 }
 
 // secretNote is the words an agent reads for the answer to its ask_secret: the name and
-// where it is, never the value.
-func (d *Daemon) secretNote(agent wire.UUID, name string, action wire.AnswerElicitationRequestAction) string {
+// where it is, never the value. A reason (#4039) is why they declined, in their words.
+func (d *Daemon) secretNote(agent wire.UUID, name string, action wire.AnswerElicitationRequestAction, reason string) string {
 	switch action {
 	case wire.AnswerElicitationRequestActionAccept:
 		if d.secretIsSealed(agent, name) {
@@ -100,7 +100,13 @@ func (d *Daemon) secretNote(agent wire.UUID, name string, action wire.AnswerElic
 			"for example `" + name + "=\"$(agents-secret " + name + ")\" your-command`, " +
 			"or as ${" + name + "} in a connector in .agents/mcp.json. Never echo, cat or log it, and never write it into a file in the folder."
 	case wire.AnswerElicitationRequestActionDecline:
+		if reason != "" {
+			return "They chose not to give " + name + ", and said: " + reason
+		}
 		return "They chose not to give " + name + ". Carry on without it, or say what you cannot do without it."
+	}
+	if reason != "" {
+		return "They cancelled, gave no " + name + ", and said: " + reason
 	}
 	return "They cancelled, and gave no " + name + "."
 }

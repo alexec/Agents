@@ -6827,14 +6827,17 @@ final class AppModel {
     @discardableResult
     func answerElicitation(_ request: ElicitationRequest,
                            action: DaemonAPI.AnswerElicitationRequest.Action,
-                           content: [String: JSONValue] = [:]) async -> Bool {
+                           content: [String: JSONValue] = [:], reason: String? = nil) async -> Bool {
         let sendID = UUID()
+        // An empty reason is No thanks (#4039).
+        let reason = reason?.trimmingCharacters(in: .whitespacesAndNewlines)
         let sent = await attempt {
             try await self.client(forAgent: request.agentID).call(DaemonAPI.Method.elicitationsAnswer,
                                        DaemonAPI.AnswerElicitationRequest(requestID: request.id,
                                                                           action: action,
                                                                           content: content,
-                                                                          sendID: sendID))
+                                                                          sendID: sendID,
+                                                                          reason: reason?.isEmpty == false ? reason : nil))
         }
         await refreshElicitations()
         return sent

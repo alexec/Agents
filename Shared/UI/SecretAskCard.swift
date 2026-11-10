@@ -16,6 +16,8 @@ struct SecretAskCard: View {
     let sending: Bool
     /// Save or No thanks (nil).
     let send: @MainActor (Answer?) -> Void
+    /// No, because… (#4039): the client asks why in place of the card.
+    let because: @MainActor () -> Void
     @State private var text = ""
     @State private var sessionOnly = false
     @State private var askBeforeUse = true
@@ -36,11 +38,13 @@ struct SecretAskCard: View {
         }
     }
 
-    init(secret: ElicitationRequest.Secret, reason: String?, host: String, sending: Bool, send: @escaping @MainActor (Answer?) -> Void) {
+    init(secret: ElicitationRequest.Secret, reason: String?, host: String, sending: Bool,
+         because: @escaping @MainActor () -> Void, send: @escaping @MainActor (Answer?) -> Void) {
         self.secret = secret
         self.reason = reason
         self.host = host
         self.sending = sending
+        self.because = because
         self.send = send
         _about = State(initialValue: secret.description ?? "")
     }
@@ -98,6 +102,9 @@ struct SecretAskCard: View {
                 Spacer(minLength: 0)
                 // No Escape: in the chat, an Escape meant for something else would decline it.
                 Button("No thanks") { send(nil) }
+                    .buttonStyle(.paper)
+                    .disabled(sending)
+                Button(DeclineReasonField.opener, action: because)
                     .buttonStyle(.paper)
                     .disabled(sending)
                 Button("Save securely", action: save)
