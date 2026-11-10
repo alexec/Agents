@@ -87,6 +87,8 @@ type forgeGitLab interface {
 	Plan(ctx context.Context, project string, number int) (gitlabmcp.Plan, error)
 	// Blockers are the blockers of a standing epic's children (#4242).
 	Blockers(ctx context.Context, project string, numbers []int) (map[int][]gitlabmcp.Ref, error)
+	// Parents are the parents of a standing epic's issues, for parent: none (#4335).
+	Parents(ctx context.Context, project string, numbers []int) (map[int]gitlabmcp.Ref, error)
 	GroupBoard(ctx context.Context, group string, id int) (gitlabmcp.BoardScope, error)
 	forgeGitLabWrites
 }

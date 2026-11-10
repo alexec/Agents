@@ -57,11 +57,11 @@ Rules from Alex (2026-10-12/13) that are not in AGENTS.md:
   its stuck PR only (conflicts, failing checks, behind, auto-merge off), never to widen
   a lane's work. A stack (#1777) is still one agent per PR.
 - **The standing epics are the standing lanes** (#3659, #3664). The bug lane is the
-  standing epic #4207 (#3212): the open bugs with no milestone. Polish and competitor
-  gaps are the standing epic #4208 (#1570): the open issues labelled `polish` or
-  `competitor` with no milestone. Give each one's lead a place as you give a place to any
+  standing epic #4207 (#3212): the open bugs with no milestone. Enhancements with no
+  parent are the standing epic #4208 (#1570, #4335): the open enhancements with no
+  milestone that are no epic's sub-issue, polish and competitor gaps included. Give each one's lead a place as you give a place to any
   epic, always one lead each, running or queued: the bug lane's with the milestones'
-  epics, the polish epic's after them, under the same area and open-PR limits. The lead
+  epics, #4208's after them, under the same area and open-PR limits. The lead
   runs the block's `lanes:` lanes and takes the query's issues in order (`priority:high`
   first); never start a lane on one of their issues yourself. Bugs get no milestone and
   nothing is held for a patch: there are no patch milestones and no `hold:v…` labels any
@@ -93,7 +93,7 @@ Rules from Alex (2026-10-12/13) that are not in AGENTS.md:
   ships. With more epics than places: the earliest milestone (by due date) first, then core usability
   (#2800), then RICE.
 - **Order of places** (#3212, #3465): `priority:high` first; then UI changes (below); then
-  the milestones' epics and the bug lane's epic together; then the polish and competitor epic; then the
+  the milestones' epics and the bug lane's epic together; then the epic for enhancements with no parent; then the
   backlog by RICE.
 - **UI changes go early** (#2337): `priority:high` first, then UI changes (`App/Sources`,
   `Remote/Sources`, `Shared/UI`, `Web/src`), bugs first, from the milestone, the bug lane and the

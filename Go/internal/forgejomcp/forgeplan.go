@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 )
 
@@ -61,6 +62,11 @@ func (f *RealForgejo) dependencies(ctx context.Context, repo string, number int)
 		}
 	}
 	return out, nil
+}
+
+// epic says it has the label epic.
+func (j dependencyJSON) epic() bool {
+	return slices.ContainsFunc(j.Labels, func(l labelJSON) bool { return strings.EqualFold(strings.TrimSpace(l.Name), "epic") })
 }
 
 func (j dependencyJSON) repo(asked string) string {
@@ -126,6 +132,29 @@ func (f *RealForgejo) Blockers(ctx context.Context, repo string, numbers []int) 
 			return nil, err
 		}
 		out[n] = by
+	}
+	return out, nil
+}
+
+// Parents are the epic of each of numbers in repo that has one (at most BlockersMost), a call
+// each (#4335): the first open issue labelled epic that depends on it (/issues/:n/blocks), as an
+// epic's children are the issues it depends on. A number with none is not in the answer.
+func (f *RealForgejo) Parents(ctx context.Context, repo string, numbers []int) (map[int]Ref, error) {
+	out := map[int]Ref{}
+	for _, n := range numbers[:min(len(numbers), BlockersMost)] {
+		for page := 1; page <= planChildrenMost/perPage; page++ {
+			var list []dependencyJSON
+			if err := f.get(ctx, query(fmt.Sprintf("%s/issues/%d/blocks", repoPath(repo), n), page), false, &list); err != nil {
+				return nil, err
+			}
+			if i := slices.IndexFunc(list, func(b dependencyJSON) bool { return b.PullRequest == nil && b.epic() }); i >= 0 {
+				out[n] = Ref{Repo: list[i].repo(repo), Number: list[i].Number, Open: list[i].State != "closed"}
+				break
+			}
+			if len(list) < perPage {
+				break
+			}
+		}
 	}
 	return out, nil
 }
