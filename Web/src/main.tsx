@@ -36,3 +36,8 @@ document.addEventListener("visibilitychange", () => {
 });
 // And so does the network coming back, as the window and the Remote do on a network change (#82).
 addEventListener("online", () => session.link.retryNow());
+// A code put in the address of a page already open changes only its fragment (#4129): load the
+// page again, so the code is taken as at the start.
+addEventListener("hashchange", () => {
+  if (location.hash.startsWith("#code=")) location.reload();
+});
