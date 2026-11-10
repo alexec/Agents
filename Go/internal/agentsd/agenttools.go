@@ -152,7 +152,9 @@ func (d *Daemon) asker(id wire.UUID, notWorking string) (*live, error) {
 	l.mu.Lock()
 	inTurn := l.inTurn
 	l.mu.Unlock()
-	if !inTurn {
+	// A call from a runtime working on its own, ahead of any word of it (#4323), begins
+	// that turn.
+	if !inTurn && !l.beginUnprompted() {
 		return nil, &Error{Code: -32600, Message: notWorking}
 	}
 	return l, nil

@@ -95,6 +95,10 @@ type live struct {
 	denied string
 	// lastUpdate is when the runtime last sent a session/update (opencoderefusal.go).
 	lastUpdate atomic.Int64
+	// unprompted is whether the turn in flight is the runtime's own, begun with no prompt
+	// (unprompted.go, #4323), and quiet the timer that ends it when nothing more comes.
+	unprompted bool
+	quiet      *time.Timer
 	// warm is what its runtime started with, and pool its place in the warm pool
 	// (warmpool.go, #4044).
 	warm warmStart
@@ -565,6 +569,12 @@ func (l *live) turn() bool {
 	l.turnSeq++
 	l.inTurn, l.prompting, l.stopped, l.reported, l.showedFile = true, false, false, false, false
 	l.heldBlock = nil
+	// A prompt takes over from the runtime's own turn (#4323): its end is this turn's.
+	l.unprompted = false
+	if l.quiet != nil {
+		l.quiet.Stop()
+		l.quiet = nil
+	}
 	noSession := l.session == nil
 	early := l.stopEarly
 	l.stopEarly = false
@@ -1204,6 +1214,10 @@ func (l *live) Update(n sdk.SessionNotification) {
 	d := l.d
 	l.lastUpdate.Store(time.Now().UnixNano())
 	u := n.Update
+	// The runtime working with no prompt in flight is a turn of its own (#4323).
+	if !beginsWork(u) || !l.beginUnprompted() {
+		l.heard()
+	}
 	// What a message chunk held back goes before any other update (#1001).
 	if u.AgentMessageChunk == nil {
 		l.flushHeld()
@@ -1339,6 +1353,10 @@ func (l *live) Update(n sdk.SessionNotification) {
 		d.change(l.id, func(a *wire.Agent) { a.Usage = &usage })
 		if usage.Cost != nil {
 			d.bankSessionCost(l.id, *usage.Cost)
+		}
+		// The result of a cycle the runtime began itself ends its turn (#4323).
+		if endsCycle(uu.Meta) {
+			l.endUnprompted(wire.AgentStateFinished, wire.EndedReasonEndTurn)
 		}
 	case u.SessionInfoUpdate != nil:
 		// A typed failure (052): the turn's, kept for its end; between turns, said.
@@ -1566,6 +1584,25 @@ func (l *live) cancel() {
 	l.mu.Lock()
 	l.stops++
 	s, stop, seq := l.session, l.stop, l.turnSeq
+	if l.unprompted {
+		// The runtime's own turn (#4323): no prompt waits to end it, so it ends here.
+		l.mu.Unlock()
+		if s != nil {
+			ctx, c := context.WithTimeout(context.Background(), 5*time.Second)
+			_ = s.Cancel(ctx)
+			c()
+		}
+		l.mu.Lock()
+		for _, pp := range l.pending {
+			select {
+			case pp.answer <- "":
+			default:
+			}
+		}
+		l.mu.Unlock()
+		l.endUnprompted(wire.AgentStateStopped, wire.EndedReasonCancelled)
+		return
+	}
 	if l.running && !l.inTurn {
 		// Kicked, but the turn has not begun: turn would clear stopped (#3621).
 		l.stopEarly = true
@@ -1843,6 +1880,10 @@ func (l *live) open(ctx context.Context, a *wire.Agent, quiet bool) bool {
 			d.dropCredentialGrants(l.id)
 		}
 		l.mu.Unlock()
+		// A runtime gone in a turn of its own ends it (#4323).
+		if ours {
+			l.endUnprompted(wire.AgentStateStopped, wire.EndedReasonProcessDied)
+		}
 		// A new process is a new MCP server, with a token of its own.
 		if ours {
 			d.dropAppTokens(l.id)
