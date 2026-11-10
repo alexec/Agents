@@ -167,7 +167,7 @@ admin (read and write), or a classic one with the `codespace` scope.
    codespace's ssh host itself, with the provider's token (#3347).
 
 A codespace has no ssh port of its own, so ssh still goes through `gh`. When the machine that
-runs the control plane has no `gh`, the provider's card says "needs gh for ssh". It can make a codespace from a repository, but it can't install
+runs the control plane has no `gh`, the provider's card says "needs gh for ssh". It can make a codespace from a repository, or from GitHub's blank template, `github/codespaces-blank`, when you give no repository, but it can't install
 Agents on its first boot: add it with **Add as Host…** on the Mac.
 
 Through its CLI, install `gh` and sign it in.
