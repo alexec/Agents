@@ -1308,6 +1308,10 @@
             "$ref": "#/definitions/JSONValue"
           }
         },
+        "reason": {
+          "description": "Why the person declined, in their words (#4039): only with decline or cancel. The agent reads it.",
+          "type": "string"
+        },
         "sendID": {
           "$ref": "#/definitions/UUID"
         }

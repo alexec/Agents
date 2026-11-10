@@ -23,6 +23,8 @@ struct ElicitationSheet: View {
     /// What was tapped, while the answer is in flight — the same guard against a second
     /// tap that `PermissionSheet` makes, and for the same reason.
     @State private var chosen: String?
+    /// No, because… (#4039): the decline being explained, by its title, while the sheet asks why.
+    @State private var because: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -32,7 +34,7 @@ struct ElicitationSheet: View {
                     Text(asker).appText(.fine).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                if request.secret == nil && request.handOff == nil {
+                if (request.secret == nil && request.handOff == nil) || because != nil {
                     MarkdownText(markdown: request.title)
                         .appText(.reading).fontWeight(.semibold)
                         .fixedSize(horizontal: false, vertical: true)
@@ -47,7 +49,14 @@ struct ElicitationSheet: View {
                 }
             }
 
-            if let handOff = request.handOff {
+            if let because {
+                // The question stays in view; the answers give way to the reason.
+                DeclineReasonField(host: model.answerRecipient(request.agentID), sending: chosen != nil,
+                                   back: { self.because = nil }) { reason in
+                    send(because, action: .decline, reason: reason)
+                }
+                .disabled(isStale)
+            } else if let handOff = request.handOff {
                 // A step on the page in the machine's browser (#3529): Open the page takes the
                 // agent browser over (#3800, #4038, #4141), as on the Mac and the web; a host too
                 // old to have one says so. In the take-over, the page is open already.
@@ -61,7 +70,8 @@ struct ElicitationSheet: View {
                 // A masked field of its own (#2885), kept on screen while it goes, so
                 // what was typed is still there if it did not.
                 SecretAskCard(secret: secret, reason: request.secretReason,
-                              host: model.answerRecipient(request.agentID), sending: chosen != nil) { answer in
+                              host: model.answerRecipient(request.agentID), sending: chosen != nil,
+                              because: { because = "No thanks" }) { answer in
                     if let answer {
                         send("Save", action: .accept, content: answer.content)
                     } else {
@@ -82,6 +92,7 @@ struct ElicitationSheet: View {
         // (033, #723).
         .chatColumn()
         .animation(.snappy(duration: 0.2), value: chosen)
+        .onChange(of: request.id) { _, _ in because = nil }
     }
 
     private func openAgentBrowser() {
@@ -96,9 +107,9 @@ struct ElicitationSheet: View {
             if let choice = Self.oneTapChoice(in: schema) {
                 oneTap(schema, choice)
             } else {
-                FormPages(request: request, schema: schema) { what, action, content in
+                FormPages(request: request, schema: schema, send: { what, action, content in
                     send(what, action: action, content: content)
-                }
+                }, because: { because = "No thanks" })
                 .disabled(isStale)
             }
         case .url(let link):
@@ -194,8 +205,13 @@ struct ElicitationSheet: View {
         model.isStale(on: model.work.agent(request.agentID)?.host ?? .mac)
     }
 
+    /// The decline, one tap, and No, because… beside it to say why first (#4039).
+    @ViewBuilder
     private func declineButton(_ title: String = "No thanks") -> some View {
         Button { send(title, action: .decline) } label: { label(title, note: nil) }
+            .buttonStyle(.paper)
+            .controlSize(.large)
+        Button { because = title } label: { label(DeclineReasonField.opener, note: nil) }
             .buttonStyle(.paper)
             .controlSize(.large)
     }
@@ -206,13 +222,13 @@ struct ElicitationSheet: View {
 
     private func send(_ what: String,
                       action: DaemonAPI.AnswerElicitationRequest.Action,
-                      content: [String: JSONValue] = [:]) {
+                      content: [String: JSONValue] = [:], reason: String? = nil) {
         chosen = what
         Task {
             // Left showing what was sent. What becomes of it arrives as the daemon
             // withdrawing the question, which takes this whole view away. An answer
             // that did not go gives the buttons back, so it can be given again.
-            if !(await model.answer(request, action: action, content: content)) { chosen = nil }
+            if !(await model.answer(request, action: action, content: content, reason: reason)) { chosen = nil }
         }
     }
 }

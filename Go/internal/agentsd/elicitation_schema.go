@@ -512,8 +512,17 @@ func outcomeSummary(action wire.AnswerElicitationRequestAction) string {
 const answeredByMessage = "They did not answer the form: they sent you a message instead, and the form is closed. " +
 	"End your turn to read the message; it is their answer. Do not ask again."
 
-// askQuestionNote is DaemonCore.askQuestionNote: the words an agent reads for an answer.
-func askQuestionNote(action wire.AnswerElicitationRequestAction, said []wire.ElicitationAnswer) string {
+// declinedBecause heads the reason in the record's bubble (#4039).
+func declinedBecause(action wire.AnswerElicitationRequestAction) string {
+	if action == wire.AnswerElicitationRequestActionDecline {
+		return "You declined the agent's form, because"
+	}
+	return "You closed the agent's form, because"
+}
+
+// askQuestionNote is DaemonCore.askQuestionNote: the words an agent reads for an answer. A
+// reason (#4039) is why they declined, in their words.
+func askQuestionNote(action wire.AnswerElicitationRequestAction, said []wire.ElicitationAnswer, reason string) string {
 	switch action {
 	case wire.AnswerElicitationRequestActionAccept:
 		if len(said) == 0 {
@@ -525,7 +534,13 @@ func askQuestionNote(action wire.AnswerElicitationRequestAction, said []wire.Eli
 		}
 		return strings.Join(lines, "\n")
 	case wire.AnswerElicitationRequestActionDecline:
+		if reason != "" {
+			return "They declined: " + reason
+		}
 		return "They skipped the questions."
+	}
+	if reason != "" {
+		return "They cancelled: " + reason
 	}
 	return "They cancelled."
 }

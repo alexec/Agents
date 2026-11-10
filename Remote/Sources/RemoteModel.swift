@@ -4894,8 +4894,10 @@ final class RemoteModel {
     @discardableResult
     func answer(_ request: ElicitationRequest,
                 action: DaemonAPI.AnswerElicitationRequest.Action,
-                content: [String: JSONValue] = [:]) async -> Bool {
+                content: [String: JSONValue] = [:], reason: String? = nil) async -> Bool {
         let host = work.agent(request.agentID)?.host ?? .mac
+        // An empty reason is No thanks (#4039).
+        let reason = reason?.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !isStale(on: host) else {
             problem = notAnswering(host, "that could not be sent.")
             return false
@@ -4903,7 +4905,8 @@ final class RemoteModel {
         do {
             try await sendOnce(DaemonAPI.Method.elicitationsAnswer,
                                DaemonAPI.AnswerElicitationRequest(requestID: request.id, action: action,
-                                                                  content: content, sendID: UUID()))
+                                                                  content: content, sendID: UUID(),
+                                                                  reason: reason?.isEmpty == false ? reason : nil))
             return true
         } catch {
             // The daemon refuses an answer that does not fit the shape the agent asked

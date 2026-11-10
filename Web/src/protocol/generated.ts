@@ -616,6 +616,11 @@ export interface AnswerElicitationRequest {
   requestID: UUID;
   action: AnswerElicitationRequestAction;
   content: Record<string, JSONValue>;
+  /**
+   * Why the person declined, in their words (#4039): only with decline or cancel. The agent reads
+   * it.
+   */
+  reason?: string;
   sendID?: UUID;
 }
 
@@ -13966,7 +13971,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AllowanceState: { required: ["credentialKey", "entryID", "status", "since", "changedAt", "learnedFrom", "spent", "rateLimitStreak"], optional: ["lastRateLimit", "reading", "weeks", "modelsOut"] },
   AllowanceStateModelOut: { required: ["model", "since", "retryAfter"], optional: ["name"] },
   AnnounceReply: { required: ["device"], optional: [] },
-  AnswerElicitationRequest: { required: ["requestID", "action", "content"], optional: ["sendID"] },
+  AnswerElicitationRequest: { required: ["requestID", "action", "content"], optional: ["reason", "sendID"] },
   AnswerRequest: { required: ["permissionID", "optionID"], optional: ["sendID"] },
   AnswerSandboxRequest: { required: ["agentID", "carryOn"], optional: [] },
   AppViewCall: { required: ["id", "server", "tool", "resourceUri", "state"], optional: ["arguments", "result", "reason", "pinnable"] },

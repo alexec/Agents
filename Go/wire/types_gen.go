@@ -651,6 +651,9 @@ type AnswerElicitationRequest struct {
 
 	Content map[string]JSONValue `json:"content"`
 
+	// Why the person declined, in their words (#4039): only with decline or cancel. The agent reads it.
+	Reason *string `json:"reason,omitzero"`
+
 	SendID *UUID `json:"sendID,omitzero"`
 }
 

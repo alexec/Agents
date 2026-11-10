@@ -24,6 +24,8 @@ struct ElicitationView: View {
     /// a double click or a repeated ⌘1 is not a second answer, and the button that
     /// sent it says so. Put back if it did not go (#86).
     @State private var sending: String?
+    /// No, because… (#4039): the decline being explained, by its key, while the card asks why.
+    @State private var because: String?
 
     var body: some View {
         GlassEffectContainer(spacing: 10) {
@@ -32,7 +34,14 @@ struct ElicitationView: View {
                 if let asker = model.work.askerLine(request.agentID) {
                     Text(asker).appText(.fine).foregroundStyle(.secondary)
                 }
-                if let handOff = request.handOff {
+                if let because {
+                    // The question stays in view; the answers give way to the reason.
+                    MarkdownText(markdown: request.title).appText(.reading).fontWeight(.semibold)
+                    DeclineReasonField(host: model.answerRecipient(request.agentID), sending: sending != nil,
+                                       back: { self.because = nil }) { reason in
+                        send(because, .decline, reason: reason)
+                    }
+                } else if let handOff = request.handOff {
                     // A step on the page in the machine's browser (#3529): Open the page
                     // takes it over in a window of its own (#4141); in that window, the page
                     // is already open.
@@ -43,7 +52,8 @@ struct ElicitationView: View {
                 } else if let secret = request.secret {
                     // A masked field of its own (#2885), never the form's open one.
                     SecretAskCard(secret: secret, reason: request.secretReason,
-                                  host: model.answerRecipient(request.agentID), sending: sending != nil) { answer in
+                                  host: model.answerRecipient(request.agentID), sending: sending != nil,
+                                  because: { because = "no thanks" }) { answer in
                         if let answer {
                             send("save", .accept, content: answer.content)
                         } else {
@@ -82,6 +92,9 @@ struct ElicitationView: View {
                             .buttonStyle(.paper)
                             .keyboardShortcut("2")
                             .modifier(Held(sending: sending, key: "gave up"))
+                            Button(DeclineReasonField.opener) { because = "gave up" }
+                            .buttonStyle(.paper)
+                            .modifier(Held(sending: sending))
                         }
                     }
                 }
@@ -96,7 +109,10 @@ struct ElicitationView: View {
         .onAppear { fillInDefaults() }
         // A second question arriving while the first is still on screen starts at
         // its own first page, not wherever the last one was left.
-        .onChange(of: request.id) { _, _ in step = 0 }
+        .onChange(of: request.id) { _, _ in
+            step = 0
+            because = nil
+        }
     }
 
     /// The agent browser, at the agent's tab, in a window of its own (#3528, #4141).
@@ -156,6 +172,9 @@ struct ElicitationView: View {
             Button { send("decline", .decline) } label: { pending("No thanks", "decline") }
             .buttonStyle(.paper)
             .modifier(Held(sending: sending, key: "decline"))
+            Button(DeclineReasonField.opener) { because = "decline" }
+            .buttonStyle(.paper)
+            .modifier(Held(sending: sending))
             // Always offered, on every page but the last. Clicking an option turns
             // the page by itself, so here Next is mostly the way past a question
             // that a click cannot answer: a boolean left alone, an optional box left
@@ -371,6 +390,11 @@ struct ElicitationView: View {
                              index: single.choices.count + (single.property.isRequired ? 0 : 1)) {
                     send("decline", .decline)
                 }
+                // Saying why is a second step, so No thanks stays one click (#4039).
+                answerButton(title: DeclineReasonField.opener, description: nil, key: "because", prominent: false,
+                             index: single.choices.count + (single.property.isRequired ? 1 : 2)) {
+                    because = "decline"
+                }
             }
         }
     }
@@ -425,14 +449,14 @@ struct ElicitationView: View {
 
     /// Sends the answer once, holding the card until it has gone.
     private func send(_ key: String, _ action: DaemonAPI.AnswerElicitationRequest.Action,
-                      content: [String: JSONValue] = [:]) {
+                      content: [String: JSONValue] = [:], reason: String? = nil) {
         // Two key presses can land before the held card is drawn.
         guard sending == nil else { return }
         sending = key
         Task {
             // Left showing what was sent: the daemon withdrawing the question is what
             // takes this card away.
-            if !(await model.answerElicitation(request, action: action, content: content)) { sending = nil }
+            if !(await model.answerElicitation(request, action: action, content: content, reason: reason)) { sending = nil }
         }
     }
 
