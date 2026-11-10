@@ -38,6 +38,26 @@ ids of their own.
 
 ### Make the ids
 
+`scripts/apple-capability.sh` does these steps in one run, through the App Store Connect API
+(#4284). It finds or registers the App ID, turns on the capability, makes again the profiles
+that the change made invalid, makes the profiles that you name, and installs them. Run it first
+with `--dry-run`: it prints what it would change and changes nothing.
+
+```sh
+scripts/apple-capability.sh com.alexecollins.agents.host sign-in-with-apple --dry-run \
+    --profile "MAC_APP_DIRECT:Agents Developer ID" \
+    --profile "MAC_APP_DEVELOPMENT:Agents Development"
+scripts/apple-capability.sh com.alexecollins.agents.remote sign-in-with-apple --dry-run
+```
+
+Then run it again without `--dry-run`. It shows the same list and asks for `yes` before it
+changes the account. An agent never runs it for real on its own: it shows Alex the dry run's
+output in a form, and runs it, with `print yes |` before it, only after Alex approves. The
+script makes each App ID its own primary App ID. To group the Mac app with the Remote's App ID,
+as #4283 did, use the developer site (step 2 below).
+
+To do the steps by hand:
+
 1. In the Apple Developer account, open **Certificates, Identifiers & Profiles ▸
    Identifiers**.
 2. Open the App ID of the Mac app (`com.alexecollins.agents.host`). Turn on the **Sign
