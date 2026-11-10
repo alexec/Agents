@@ -1,0 +1,229 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1000" viewBox="0 0 1440 1000" font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif">
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#20242A" flood-opacity="0.14"/>
+    </filter>
+    <symbol id="open" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="8" r="2" fill="currentColor"/></symbol>
+    <symbol id="done" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5.3 8.2l1.8 1.8 3.6-3.8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="notplanned" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M4 12L12 4" stroke="currentColor" stroke-width="1.4"/></symbol>
+    <symbol id="pr" viewBox="0 0 16 16"><circle cx="4" cy="3.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="4" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="12" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M4 5.1v5.8M12 10.9V6.5a2 2 0 0 0-2-2H7.5M9 3l-1.6 1.5L9 6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="tag" viewBox="0 0 16 16"><path d="M2.5 2.5h5.5l5.5 5.5-5.5 5.5-5.5-5.5z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="5.5" cy="5.5" r="1" fill="currentColor"/></symbol>
+    <symbol id="flag" viewBox="0 0 16 16"><path d="M3.5 14V2.5M3.5 3h8.5l-2 3 2 3H3.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="gear" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.2" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M3.6 12.4L5 11M11 5l1.4-1.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="warn" viewBox="0 0 16 16"><path d="M8 2.2L14.3 13.5H1.7z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M8 6.5v3.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="11.6" r=".8" fill="currentColor"/></symbol>
+    <symbol id="refresh" viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v2.5h-2.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="chev" viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="chevr" viewBox="0 0 10 10"><path d="M3.5 2l3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="up" viewBox="0 0 16 16"><path d="M3.5 10L8 5.5l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="down" viewBox="0 0 16 16"><path d="M3.5 6L8 10.5l4.5-4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="back" viewBox="0 0 16 16"><path d="M10 3L5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="fwd" viewBox="0 0 16 16"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="ext" viewBox="0 0 16 16"><path d="M9 3h4v4M13 3L7.5 8.5M11 9.5V13H3V5h3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="more" viewBox="0 0 16 16"><circle cx="3.5" cy="8" r="1.3" fill="currentColor"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/><circle cx="12.5" cy="8" r="1.3" fill="currentColor"/></symbol>
+    <symbol id="spark" viewBox="0 0 16 16"><path d="M8 2l1.4 4.6L14 8l-4.6 1.4L8 14l-1.4-4.6L2 8l4.6-1.4z" fill="currentColor"/></symbol>
+    <symbol id="doc" viewBox="0 0 16 16"><path d="M4 2h5.5L12.5 5v9H4z M9.5 2v3h3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
+    <symbol id="link" viewBox="0 0 16 16"><path d="M6.5 9.5l3-3M7 4.5l1-1a2.5 2.5 0 0 1 3.5 3.5l-1 1M9 11.5l-1 1A2.5 2.5 0 0 1 4.5 9l1-1" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+    <symbol id="sidebar" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M6 3v10" stroke="currentColor" stroke-width="1.3"/></symbol>
+  
+    <symbol id="tick" viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="cross" viewBox="0 0 16 16"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="dot" viewBox="0 0 16 16"><circle cx="8" cy="8" r="3.5" fill="currentColor"/></symbol>
+    <symbol id="skip" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 8h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+    <symbol id="merged" viewBox="0 0 16 16"><circle cx="4.5" cy="3.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="4.5" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="11.5" cy="8" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M4.5 5.1v5.8M4.5 5.5c0 2.5 2.5 2.5 5.4 2.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="prclosed" viewBox="0 0 16 16"><circle cx="4" cy="3.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="4" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="12" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M4 5.1v5.8M12 10.9V8M10.3 3l3.4 3.4M13.7 3l-3.4 3.4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="files" viewBox="0 0 16 16"><path d="M3.5 2h6l3 3v9h-9z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8 6.5v4M6 8.5h4M6 12h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="eye" viewBox="0 0 16 16"><path d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="8" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.3"/></symbol>
+    <symbol id="commit" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M1.5 8h3.9M10.6 8h3.9" stroke="currentColor" stroke-width="1.4"/></symbol>
+    <symbol id="thread" viewBox="0 0 16 16"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
+    <symbol id="branch" viewBox="0 0 16 16"><circle cx="4.5" cy="3.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="4.5" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="11.5" cy="5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M4.5 5.1v5.8M11.5 6.6c0 3-7 2-7 4.3" fill="none" stroke="currentColor" stroke-width="1.3"/></symbol>
+    <symbol id="clock" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.8" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 4.8V8l2.2 1.6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="image" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="5.5" cy="6.5" r="1.2" fill="currentColor"/><path d="M2.5 12l3.5-3.5 2.5 2.5 2-2 3 3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
+    <symbol id="lines" viewBox="0 0 16 16"><path d="M3 4h10M3 8h10M3 12h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+  </defs>
+  <rect width="1440" height="1000" fill="#E7EAEE"/>
+  <text x="24" y="34" font-size="15" fill="#1C1D20" font-weight="600">Pull request page (#4332): the Mac window</text>
+  <text x="24" y="54" font-size="12" fill="#5B616B">With the shared parts of #4328 and the issue page of #4331. Orange numbers are the notes in pull-request.md. Scratch data. Paper palette, light mode.</text>
+  <g transform="translate(24,76)" filter="url(#shadow)">
+  <rect x="0" y="0" width="1180" height="900" rx="12" fill="#FFFFFF"/>
+  <path d="M12 0h1156a12 12 0 0 1 12 12v40H0V12A12 12 0 0 1 12 0z" fill="#F6F7F8"/>
+  <path d="M0 52H1180" stroke="#E0E3E7" stroke-width="1"/>
+  <circle cx="20" cy="20" r="6" fill="#FF5F57"/>
+  <circle cx="40" cy="20" r="6" fill="#FEBC2E"/>
+  <circle cx="60" cy="20" r="6" fill="#28C840"/>
+  <use href="#sidebar" x="84" y="18" width="16" height="16" color="#5B616B"/>
+  <use href="#back" x="116" y="18" width="16" height="16" color="#5B616B"/>
+  <use href="#fwd" x="136" y="18" width="16" height="16" color="#C7CCD3"/>
+  <text x="166" y="32" font-size="14" fill="#5B616B">Pull requests</text>
+  <use href="#chevr" x="260" y="22" width="10" height="10" color="#8A9099"/>
+  <text x="276" y="32" font-size="14" fill="#1C1D20" font-weight="600">#4402</text>
+  <circle cx="100" cy="64" r="9" fill="#B35900"/>
+  <text x="100" y="68" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">1</text>
+  <use href="#up" x="1012" y="18" width="16" height="16" color="#5B616B"/>
+  <text x="1056" y="31" font-size="12.5" fill="#5B616B" text-anchor="middle">2 of 9</text>
+  <use href="#down" x="1084" y="18" width="16" height="16" color="#5B616B"/>
+  <circle cx="998" cy="64" r="9" fill="#B35900"/>
+  <text x="998" y="68" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">2</text>
+  <rect x="1130" y="14" width="28" height="24" rx="6" fill="#EDEFF2"/>
+  <use href="#refresh" x="1136" y="18" width="16" height="16" color="#4A5059"/>
+  <circle cx="1144" cy="64" r="9" fill="#B35900"/>
+  <text x="1144" y="68" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">3</text>
+  <text x="24" y="92" font-size="21" fill="#1C1D20" font-weight="600">Work look: wireframe the pull request page <tspan font-weight="400" fill="#5B616B">#4402</tspan></text>
+  <circle cx="10" cy="84" r="9" fill="#B35900"/>
+  <text x="10" y="88" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">4</text>
+  <rect x="1020" y="72" width="136" height="28" rx="6" fill="#FFFFFF" stroke="#C7CCD3"/>
+  <use href="#files" x="1030" y="79.0" width="14" height="14" color="#1C1D20"/>
+  <text x="1050" y="90.5" font-size="12.5" fill="#1C1D20" font-weight="500">Files changed  6</text>
+  <circle cx="1006" cy="86" r="9" fill="#B35900"/>
+  <text x="1006" y="90" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">5</text>
+  <rect x="24" y="112" width="66.2" height="24" rx="12.0" fill="#1A7F37"/>
+  <use href="#pr" x="32" y="117.0" width="14" height="14" color="#FFF"/>
+  <text x="50" y="128.5" font-size="12.5" fill="#FFF" font-weight="600">Open</text>
+  <text x="100.24000000000001" y="129" font-size="12.5" fill="#5B616B"><tspan font-weight="600" fill="#1C1D20">claude-agent</tspan> wants to merge 3 commits into <tspan font-family="SF Mono, Menlo, monospace" fill="#1C1D20">main</tspan> from <tspan font-family="SF Mono, Menlo, monospace" fill="#1C1D20">agents/4332-work-look-wireframe</tspan> · 4 comments</text>
+  <circle cx="10" cy="124" r="9" fill="#B35900"/>
+  <text x="10" y="128" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">6</text>
+  <use href="#ext" x="1040" y="117" width="14" height="14" color="#0A6CDB"/>
+  <text x="1156" y="129" font-size="12.5" fill="#0A6CDB" text-anchor="end">Open on GitHub</text>
+  <circle cx="1026" cy="124" r="9" fill="#B35900"/>
+  <text x="1026" y="128" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">7</text>
+  <path d="M24 152H1156" stroke="#E0E3E7" stroke-width="1"/>
+  <circle cx="38" cy="188" r="14" fill="#C2410C"/>
+  <text x="38" y="192.48" font-size="11.9" fill="#FFF" font-weight="600" text-anchor="middle">C</text>
+  <rect x="68" y="172" width="788" height="110" rx="6" fill="#FFFFFF" stroke="#E0E3E7"/>
+  <path d="M68 178a6 6 0 0 1 6-6h776a6 6 0 0 1 6 6v28H68z" fill="#F6F7F8"/>
+  <path d="M68 206H856" stroke="#E0E3E7" stroke-width="1"/>
+  <text x="80" y="193.5" font-size="12" fill="#5B616B"><tspan font-weight="600" fill="#1C1D20">claude-agent</tspan> <tspan fill="#5B616B">opened 2 h ago</tspan></text>
+  <use href="#more" x="830" y="181" width="16" height="16" color="#8A9099"/>
+  <text x="80" y="230" font-size="13.5" fill="#1C1D20">Wireframe the pull request page with the shared parts of #4328:</text>
+  <text x="80" y="250" font-size="13.5" fill="#1C1D20">checks, review state, the diff link, Merge, Approve and Rerun.</text>
+  <text x="80" y="270" font-size="13.5" fill="#1C1D20">Fixes #4332.</text>
+  <path d="M38 282V326" stroke="#E0E3E7" stroke-width="2"/>
+  <circle cx="38" cy="304" r="11" fill="#F6F7F8" stroke="#E0E3E7"/>
+  <use href="#commit" x="31" y="297" width="14" height="14" color="#5B616B"/>
+  <text x="60" y="308.5" font-size="12" fill="#5B616B"><tspan font-weight="600" fill="#1C1D20">claude-agent</tspan> added 3 commits · 1 h ago</text>
+  <path d="M38 312V356" stroke="#E0E3E7" stroke-width="2"/>
+  <circle cx="38" cy="334" r="11" fill="#F6F7F8" stroke="#E0E3E7"/>
+  <use href="#tag" x="31" y="327" width="14" height="14" color="#5B616B"/>
+  <text x="60" y="338.5" font-size="12" fill="#5B616B"><tspan font-weight="600" fill="#1C1D20">alexec</tspan> added <tspan fill="#A33008">needs-approval</tspan> · 50 min ago</text>
+  <circle cx="38" cy="376" r="14" fill="#7C5CC4"/>
+  <text x="38" y="380.48" font-size="11.9" fill="#FFF" font-weight="600" text-anchor="middle">A</text>
+  <rect x="68" y="360" width="788" height="70" rx="6" fill="#FFFFFF" stroke="#E0E3E7"/>
+  <path d="M68 366a6 6 0 0 1 6-6h776a6 6 0 0 1 6 6v28H68z" fill="#F6F7F8"/>
+  <path d="M68 394H856" stroke="#E0E3E7" stroke-width="1"/>
+  <text x="80" y="381.5" font-size="12" fill="#5B616B"><tspan font-weight="600" fill="#1C1D20">alexec</tspan> <tspan fill="#5B616B">reviewed · 30 min ago</tspan></text>
+  <use href="#more" x="830" y="369" width="16" height="16" color="#8A9099"/>
+  <text x="80" y="418" font-size="13.5" fill="#1C1D20">Two line comments on the iPhone board, then it is good.</text>
+  <rect x="80" y="428" width="764" height="30" rx="6" fill="#F6F7F8"/>
+  <use href="#thread" x="88" y="436" width="14" height="14" color="#5B616B"/>
+  <text x="108" y="447.5" font-size="12" fill="#5B616B">2 line comments on pull-request-remote.svg · 1 resolved</text>
+  <text x="832" y="447.5" font-size="12" fill="#0A6CDB" text-anchor="end">Open on GitHub</text>
+  <path d="M38 464V508" stroke="#E0E3E7" stroke-width="2"/>
+  <circle cx="38" cy="486" r="11" fill="#F6F7F8" stroke="#E0E3E7"/>
+  <use href="#tick" x="31" y="479" width="14" height="14" color="#5B616B"/>
+  <text x="60" y="490.5" font-size="12" fill="#5B616B"><tspan font-weight="600" fill="#1C1D20">alexec</tspan> approved these changes · 10 min ago</text>
+  <circle cx="10" cy="190" r="9" fill="#B35900"/>
+  <text x="10" y="194" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">8</text>
+  <circle cx="10" cy="300" r="9" fill="#B35900"/>
+  <text x="10" y="304" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">9</text>
+  <path d="M38 508V534" stroke="#E0E3E7" stroke-width="2"/>
+  <rect x="68" y="534" width="788" height="188" rx="8" fill="#FFFFFF" stroke="#1A7F37"/>
+  <circle cx="92" cy="556.0" r="12" fill="#1A7F37" fill-opacity=".12"/>
+  <use href="#tick" x="84" y="548.0" width="16" height="16" color="#1A7F37"/>
+  <text x="114" y="554.0" font-size="13" fill="#1C1D20" font-weight="600">Approved</text>
+  <text x="114" y="570.0" font-size="11.5" fill="#5B616B">alexec approved these changes</text>
+  <path d="M68 578H856" stroke="#EEF0F3" stroke-width="1"/>
+  <circle cx="92" cy="600.0" r="12" fill="#1A7F37" fill-opacity=".12"/>
+  <use href="#tick" x="84" y="592.0" width="16" height="16" color="#1A7F37"/>
+  <text x="114" y="598.0" font-size="13" fill="#1C1D20" font-weight="600">All checks passed</text>
+  <text x="114" y="614.0" font-size="11.5" fill="#5B616B">14 passed, 1 skipped</text>
+  <text x="840" y="604.0" font-size="12" fill="#0A6CDB" text-anchor="end">Show all</text>
+  <path d="M68 622H856" stroke="#EEF0F3" stroke-width="1"/>
+  <circle cx="92" cy="644.0" r="12" fill="#1A7F37" fill-opacity=".12"/>
+  <use href="#tick" x="84" y="636.0" width="16" height="16" color="#1A7F37"/>
+  <text x="114" y="642.0" font-size="13" fill="#1C1D20" font-weight="600">No conflicts with main</text>
+  <text x="114" y="658.0" font-size="11.5" fill="#5B616B">It can merge.</text>
+  <path d="M68 666H856" stroke="#EEF0F3" stroke-width="1"/>
+  <rect x="84" y="678" width="160.0" height="28" rx="6" fill="#1A7F37"/>
+  <path d="M216.0 683V701" stroke="#FFFFFF66" stroke-width="1"/>
+  <use href="#chev" x="225.0" y="687.0" width="10" height="10" color="#FFF"/>
+  <text x="96" y="696.5" font-size="12.5" fill="#FFF" font-weight="500">Squash and merge</text>
+  <rect x="254.0" y="678" width="84" height="28" rx="6" fill="#FFFFFF" stroke="#C7CCD3"/>
+  <use href="#tick" x="264.0" y="685.0" width="14" height="14" color="#1C1D20"/>
+  <text x="284.0" y="696.5" font-size="12.5" fill="#1C1D20" font-weight="500">Approve</text>
+  <circle cx="38" cy="582" r="14" fill="#1A7F37"/>
+  <use href="#pr" x="30" y="574" width="16" height="16" color="#FFF"/>
+  <circle cx="10" cy="582" r="9" fill="#B35900"/>
+  <text x="10" y="586" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">10</text>
+  <circle cx="38" cy="760" r="14" fill="#7C5CC4"/>
+  <text x="38" y="764.48" font-size="11.9" fill="#FFF" font-weight="600" text-anchor="middle">A</text>
+  <rect x="68" y="742" width="788" height="128" rx="8" fill="#FFFFFF" stroke="#E0E3E7"/>
+  <rect x="80" y="754" width="764" height="64" rx="6" fill="#FFFFFF" stroke="#C7CCD3"/>
+  <text x="92" y="776" font-size="13" fill="#8A9099">Comment, in Markdown</text>
+  <rect x="612" y="830" width="132" height="28" rx="6" fill="#FFFFFF" stroke="#C7CCD3"/>
+  <text x="624" y="848.5" font-size="12.5" fill="#1C1D20" font-weight="500">Close pull request</text>
+  <rect x="752" y="830" width="96" height="28" rx="6" fill="#0A6CDB"/>
+  <text x="764" y="848.5" font-size="12.5" fill="#FFF" font-weight="500">Comment</text>
+  <circle cx="10" cy="782" r="9" fill="#B35900"/>
+  <text x="10" y="786" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">11</text>
+  <text x="886" y="182" font-size="11.5" fill="#5B616B" font-weight="600">Reviewers</text>
+  <circle cx="895" cy="200" r="9" fill="#7C5CC4"/>
+  <text x="895" y="202.88" font-size="7.6" fill="#FFF" font-weight="600" text-anchor="middle">A</text>
+  <text x="910" y="204.5" font-size="12.5" fill="#1C1D20">alexec</text>
+  <use href="#tick" x="1140" y="193" width="14" height="14" color="#1A7F37"/>
+  <circle cx="895" cy="222" r="9" fill="#2F7D5B"/>
+  <text x="895" y="224.88" font-size="7.6" fill="#FFF" font-weight="600" text-anchor="middle">G</text>
+  <text x="910" y="226.5" font-size="12.5" fill="#1C1D20">github-actions</text>
+  <use href="#dot" x="1140" y="215" width="14" height="14" color="#9A6700"/>
+  <circle cx="976" cy="178" r="9" fill="#B35900"/>
+  <text x="976" y="182" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">13</text>
+  <path d="M886 242H1156" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="886" y="264" font-size="11.5" fill="#5B616B" font-weight="600">Assignees</text>
+  <text x="886" y="286" font-size="12.5" fill="#8A9099">No one</text>
+  <path d="M886 302H1156" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="886" y="324" font-size="11.5" fill="#5B616B" font-weight="600">Labels</text>
+  <use href="#gear" x="1140" y="313" width="14" height="14" color="#8A9099"/>
+  <rect x="886" y="334" width="77.3" height="18" rx="9" fill="#A2EEEF" stroke="#A2EEEF" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="924.7" y="347" font-size="11" fill="#1E6F70" font-weight="500" text-anchor="middle">enhancement</text>
+  <rect x="969.34" y="334" width="41.7" height="18" rx="9" fill="#FBCA04" stroke="#FBCA04" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="990.2" y="347" font-size="11" fill="#7A6000" font-weight="500" text-anchor="middle">spike</text>
+  <rect x="886" y="358" width="95.2" height="18" rx="9" fill="#D93F0B" stroke="#D93F0B" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="933.6" y="371" font-size="11" fill="#A33008" font-weight="500" text-anchor="middle">needs-approval</text>
+  <path d="M886 388H1156" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="886" y="410" font-size="11.5" fill="#5B616B" font-weight="600">Milestone</text>
+  <text x="886" y="432" font-size="12.5" fill="#8A9099">None</text>
+  <path d="M886 448H1156" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="886" y="470" font-size="11.5" fill="#5B616B" font-weight="600">Branch</text>
+  <use href="#branch" x="886" y="481" width="14" height="14" color="#5B616B"/>
+  <text x="906" y="492" font-size="12" fill="#1C1D20">agents/4332-work-look…</text>
+  <text x="906" y="510" font-size="11.5" fill="#5B616B">into main · +412 −18 · 6 files</text>
+  <circle cx="872" cy="466" r="9" fill="#B35900"/>
+  <text x="872" y="470" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">14</text>
+  <path d="M886 524H1156" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="886" y="546" font-size="11.5" fill="#5B616B" font-weight="600">Linked</text>
+  <use href="#done" x="886" y="557" width="14" height="14" color="#8250DF"/>
+  <text x="906" y="568" font-size="12" fill="#1C1D20">#4332 Work look: wireframe…</text>
+  <text x="906" y="585" font-size="11.5" fill="#5B616B">Closes it when it merges</text>
+  <circle cx="872" cy="542" r="9" fill="#B35900"/>
+  <text x="872" y="546" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">15</text>
+  <path d="M886 598H1156" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="886" y="620" font-size="11.5" fill="#5B616B" font-weight="600">Lineage</text>
+  <use href="#spark" x="886" y="631" width="14" height="14" color="#C2410C"/>
+  <text x="906" y="642" font-size="12.5" fill="#1C1D20">Claude · $1.84</text>
+  <circle cx="911" cy="656" r="3.5" fill="#1A7F37"/>
+  <text x="920" y="660" font-size="12" fill="#0A6CDB">Work look: PR page</text>
+  <text x="886" y="680" font-size="11.5" fill="#5B616B">CI run 4m · not yet released</text>
+  <circle cx="872" cy="616" r="9" fill="#B35900"/>
+  <text x="872" y="620" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">16</text>
+  <path d="M886 694H1156" stroke="#EEF0F3" stroke-width="1"/>
+  <circle cx="872" cy="248" r="9" fill="#B35900"/>
+  <text x="872" y="252" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">12</text>
+  </g>
+  <g transform="translate(1228,640)" filter="url(#shadow)">
+  <rect x="0" y="0" width="196" height="150" rx="8" fill="#FFFFFF" stroke="#E0E3E7"/>
+  <text x="14" y="26" font-size="13" fill="#1C1D20">Squash and merge ✓</text>
+  <text x="14" y="54" font-size="13" fill="#1C1D20">Create a merge commit</text>
+  <text x="14" y="82" font-size="13" fill="#1C1D20">Rebase and merge</text>
+  <path d="M8 98H188" stroke="#E0E3E7" stroke-width="1"/>
+  <text x="14" y="124" font-size="13" fill="#1C1D20">Merge when checks pass</text>
+  </g>
+  <text x="1228" y="628" font-size="12" fill="#5B616B" font-weight="600">The Merge ▾ menu (note 10)</text>
+</svg>
