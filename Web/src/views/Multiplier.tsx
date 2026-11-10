@@ -10,7 +10,7 @@ import type { Store } from "../model/store";
 import type { Multiplier } from "../protocol/generated";
 import { achievementDay, achievementList } from "../model/achievements";
 import {
-  BLINK_CHANCE, badgeGlyph, baselineLine, blinkers, blobSize, crowdCount, crowdFill, crowdLayout, earnedBadges, emptyLayout, newsOf, oneDecimal, whole,
+  BLINK_CHANCE, badgeGlyph, baselineLine, blinkers, blobSize, crowdCount, crowdFill, crowdLayout, earnedBadges, emptyLayout, emptyWords, newsOf, oneDecimal, whole,
   type CrowdLayout,
 } from "../model/multiplier";
 import { BlobParts } from "./Huddle";
@@ -105,6 +105,7 @@ export function MultiplierPage({ store }: { store: Store }) {
   });
   const news = useNews(multiplier);
   const counted = multiplier?.multiplier !== undefined;
+  const words = multiplier && emptyWords(multiplier);
   const bests = multiplier?.bestWeek !== undefined && (
     <p class="multiplier-bests">
       Best week <strong>{oneDecimal(shown.bestWeek)}×</strong>
@@ -133,8 +134,8 @@ export function MultiplierPage({ store }: { store: Store }) {
         ) : (
           <>
             <p class="multiplier-hero empty">— ×</p>
-            <p>No merged work in the last 7 days.</p>
-            <p class="quiet small">Your number starts when an agent’s first PR merges.</p>
+            {words && <p>{words.big}</p>}
+            {words?.small && <p class="quiet small">{words.small}</p>}
             {bests}
             <EarnedBadges achievements={achievements} />
           </>

@@ -25,10 +25,13 @@ public extension DaemonAPI {
         public var bestWeek: Double?
         /// The most of the host's agents in a turn at the same time, ever (#3988).
         public var mostAtOnce: Int?
+        /// When the person's first counted merge or merged revert happened (#4250). Nil: their
+        /// agents have not merged a PR yet, as far as the record goes (90 days on a host).
+        public var firstMergeAt: Date?
 
         public init(prsMerged: Int = 0, reverts: Int = 0, multiplier: Double? = nil, engineerHours: Double? = nil,
                     agentsWorking: Int = 0, since: Date, baseline: MultiplierBaseline, changedBy: LineageNode? = nil,
-                    bestWeek: Double? = nil, mostAtOnce: Int? = nil) {
+                    bestWeek: Double? = nil, mostAtOnce: Int? = nil, firstMergeAt: Date? = nil) {
             self.prsMerged = prsMerged
             self.reverts = reverts
             self.multiplier = multiplier
@@ -39,6 +42,18 @@ public extension DaemonAPI {
             self.changedBy = changedBy
             self.bestWeek = bestWeek
             self.mostAtOnce = mostAtOnce
+            self.firstMergeAt = firstMergeAt
+        }
+
+        /// The words under `— ×` when nothing is counted (#4250): for a person whose agents have
+        /// not merged a PR yet, a start, not a failure; else, that the last 7 days had none.
+        /// `small` is nil when it would say the person's own line, which the page shows anyway.
+        public var emptyWords: (big: String, small: String?) {
+            guard firstMergeAt == nil else { return ("No merged work in the last 7 days.", nil) }
+            let small = baseline.line == nil
+                ? "Each PR your agents merge counts against an engineer’s \(baseline.prsPerWeek.formatted(.number.precision(.fractionLength(1)))) PRs a week."
+                : nil
+            return ("Your first merged PR starts the count.", small)
         }
     }
 

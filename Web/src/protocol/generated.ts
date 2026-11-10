@@ -6999,6 +6999,12 @@ export interface Multiplier {
    * record. Absent when none has run.
    */
   mostAtOnce?: number;
+  /**
+   * When the person's first counted merge or merged revert happened (#4250), in the record the host
+   * keeps (90 days of ended work) or the control plane's. Absent: their agents have not merged a PR
+   * yet, and the page says their first one starts the count.
+   */
+  firstMergeAt?: WireDate;
 }
 
 /**
@@ -14807,7 +14813,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MoveRequest: { required: ["agentID", "removeLeft", "discardChanges"], optional: ["target"] },
   MoveToMachineAnswer: { required: ["folder", "carriesOn"], optional: [] },
   MoveToMachineRequest: { required: ["agentID", "machine"], optional: ["machineName", "folder"] },
-  Multiplier: { required: ["prsMerged", "reverts", "agentsWorking", "since", "baseline"], optional: ["multiplier", "engineerHours", "changedBy", "bestWeek", "mostAtOnce"] },
+  Multiplier: { required: ["prsMerged", "reverts", "agentsWorking", "since", "baseline"], optional: ["multiplier", "engineerHours", "changedBy", "bestWeek", "mostAtOnce", "firstMergeAt"] },
   MultiplierBaseline: { required: ["prsPerWeek", "hoursPerWeek", "source"], optional: ["line"] },
   MultiplierCountParams: { required: [], optional: ["timeZone", "prsPerWeek"] },
   NativeSetting: { required: [], optional: ["options", "sandbox", "clientPermission"] },

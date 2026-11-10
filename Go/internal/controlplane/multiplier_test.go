@@ -48,7 +48,7 @@ func TestMultiplierCountsThePersonsMachines(t *testing.T) {
 		return m
 	}
 
-	if m := count(mac.member.Host); m.PrsMerged != 0 || m.Multiplier != nil || m.Baseline.PrsPerWeek != 1.4 {
+	if m := count(mac.member.Host); m.PrsMerged != 0 || m.Multiplier != nil || m.Baseline.PrsPerWeek != 1.4 || m.FirstMergeAt != nil {
 		t.Fatalf("nothing merged: %+v", m)
 	}
 	// Five on the Mac, two more and one both heard on the mini; Bea's are hers.
@@ -77,6 +77,18 @@ func TestMultiplierCountsThePersonsMachines(t *testing.T) {
 	send(mac.member.Host, first)
 	if m := count(mac.member.Host); m.BestWeek == nil || *m.BestWeek < 0.7 {
 		t.Fatalf("a best week: %+v", m)
+	}
+	if m := count(mac.member.Host); m.FirstMergeAt == nil || *m.FirstMergeAt != old {
+		t.Fatalf("first merge %v, want %v (#4250)", m.FirstMergeAt, old)
+	}
+	// Cara merged one 30 days ago and none this week: not this week, but not never.
+	month := wire.DateOf(time.Now().Add(-30 * 24 * time.Hour))
+	cara := p.machine(p.invite(admin, "Cara", wire.UserRoleMember), "CARAS-MAC")
+	once := pr(12, "merged")
+	once.EndedAt, once.LastAt = &month, month
+	send(cara.member.Host, once)
+	if c := count(cara.member.Host); c.PrsMerged != 0 || c.Multiplier != nil || c.FirstMergeAt == nil || *c.FirstMergeAt != month {
+		t.Fatalf("merged a month ago: %+v", c)
 	}
 	if b := count(beas.member.Host); b.PrsMerged != 2 {
 		t.Fatalf("Bea's: %+v", b)

@@ -7893,6 +7893,9 @@ type Multiplier struct {
 
 	// The most of this machine's agents in a turn at the same time, ever (#3988): the time history's record. Absent when none has run.
 	MostAtOnce *int64 `json:"mostAtOnce,omitzero"`
+
+	// When the person's first counted merge or merged revert happened (#4250), in the record the host keeps (90 days of ended work) or the control plane's. Absent: their agents have not merged a PR yet, and the page says their first one starts the count.
+	FirstMergeAt *Date `json:"firstMergeAt,omitzero"`
 }
 
 // What the Multiplier compares with (#3902), so that no client keeps its own copy: an engineer with no AI in 2025.
