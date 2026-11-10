@@ -8,7 +8,7 @@ description: Add the azureboards connector with a personal access token, so that
 
 Agents talks to Azure Boards through its own `azureboards` connector (#3804), an MCP server
 in the shape of the jira and linear ones: Azure Boards is a tracker. It works with Azure
-DevOps Services (`dev.azure.com`) and with your own Azure DevOps Server. Agents Host carries
+DevOps Services (`dev.azure.com`) and with your own Azure DevOps Server. Agents on the Mac carries
 it, and every Linux host installs it beside agentsd.
 
 It is a connector of its own, not part of the azuredevops one, so you can use Azure Boards

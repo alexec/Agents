@@ -238,7 +238,7 @@ The service keeps nothing for a signed-in browser: a session is a signed cookie 
 invites its sign-in used, the account and its sign-in link. It does not delete the
 account's machines. It leaves the operator's backups of it, and Stripe's own records.
 
-## Agents Host on the Mac
+## Agents on the Mac
 
 | Store | What it keeps | How long, how large |
 | --- | --- | --- |

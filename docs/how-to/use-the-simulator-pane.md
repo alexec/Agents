@@ -54,7 +54,7 @@ the Mac.
 
 - **Xcode on the session's Mac.** Without it the pane says **Xcode is not on this Mac, so it
   has no simulators.** Taps and **Home** use the Xcode that the Mac has selected.
-- **Agents Host on that Mac.** It carries the helper that sends taps. A host without it
+- **Agents on that Mac.** It carries the helper that sends taps. A host without it
   says **This host cannot touch a simulator: agents-watch is not beside agentsd.** You can
   still boot a simulator and see its screen.
 - **A host that has the pane.** An older host says **This host needs an update to do

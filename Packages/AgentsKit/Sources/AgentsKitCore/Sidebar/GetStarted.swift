@@ -17,7 +17,7 @@ public enum GetStarted {
 
         public var title: String {
             switch self {
-            case .host: "Pair this window with Agents Host"
+            case .host: "Set up Agents on this Mac"
             case .runtime: "Install an agent runtime"
             case .folder: "Add a folder"
             case .firstAgent: "Start your first agent"
@@ -28,7 +28,7 @@ public enum GetStarted {
         /// What the step is about, in one line, under its title while it is not done.
         public var how: String {
             switch self {
-            case .host: "Agents Host runs your agents on this Mac."
+            case .host: "Agents runs your agents on this Mac, also with the window closed."
             case .runtime: "Claude, Codex or another coding CLI, signed in."
             case .folder: "A folder you work in."
             case .firstAgent: "Say what you want done and let it run a turn."

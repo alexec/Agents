@@ -7,7 +7,7 @@ description: Set up a Google Chat app for Agents, so that a person can start an 
 # Use Google Chat
 
 The `googlechat` connector brings a Google Chat app to your agents (#1016). It is
-`googlechat-mcp`, a small server that Agents ships. Agents Host carries it, and every Linux
+`googlechat-mcp`, a small server that Agents ships. Agents on the Mac carries it, and every Linux
 host installs it beside agentsd.
 
 - **The events:** `message.received`, a person wrote to the app (a direct message, or a message

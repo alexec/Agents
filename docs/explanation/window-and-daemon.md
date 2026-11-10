@@ -1,62 +1,90 @@
 ---
 diataxis: explanation
-description: Why your agents keep working when the window is closed, what Agents Host does, and what happens to your agents when the Mac restarts.
+description: Why your agents keep working when the window is closed, what runs in the background on your Mac, and what happens to your agents when the Mac restarts.
 ---
 
 # The window and the host
 
-On a Mac, Agents is two apps. The window, **Agents**, is the one you see, and it comes from
-the App Store. The agents themselves belong to a host: on your Mac, that is **Agents
-Host**, a separate download that runs in the background. This page explains why it is
-built that way, and what it means for an agent that is working when you close the window
-or restart the Mac.
+On a Mac, Agents is one app, **Agents**. It is a download signed by us, not an App Store
+app. It has the window that you see, and it runs this Mac's host in the background. The
+agents belong to the host, not to the window. This page explains why it is built that
+way, and what it means for an agent that is working when you close the window or restart
+the Mac.
 
 ## Who owns an agent
 
-The host owns every agent. On your Mac, Agents Host runs a helper called the daemon, which
-starts each agent's runtime, holds the conversation, writes down everything that happens,
-and keeps each agent's record on disk. It is the only thing that writes those records. A
-Linux server you add runs the same daemon, and owns the agents on it in the same way.
+The host owns every agent. On your Mac, the host is a helper called the daemon,
+`agentsd`. It starts each agent's runtime, holds the conversation, writes down everything
+that happens, and keeps each agent's record on disk. It is the only thing that writes
+those records. A Linux server you add runs the same daemon, and owns the agents on it in
+the same way.
 
 The window owns nothing. It connects to your control plane (see
 [The control plane](control-plane.md)), shows you what your hosts hold, and passes on what
-you type and click. This Mac's own host it reaches directly, over a local socket, so it
-still works with that host when the control plane is away. Your iPhone and iPad do the same thing. Because nothing lives in the
-window, closing it loses nothing, and a window on another Mac sees exactly what this one
-does.
+you type and click. It reaches this Mac's own host directly, over a local socket, so it
+still works with that host when the control plane is away. Your iPhone and iPad do the
+same thing through the control plane. Because nothing lives in the window, closing it
+loses nothing, and a window on another Mac sees exactly what this one does.
 
 ## The window starts nothing
 
-The window runs in the App Store's sandbox. It starts no program of its own, keeps nothing
-running in the background, and reads no file you did not hand it. Everything that needs a
-real machine is asked of a host, through the control plane or, for this Mac's host, directly: starting an agent, a terminal,
-reading and writing files, git, installing and signing in runtimes, and your shared skills
-and instructions in `~/.agents`.
+The window starts no agent program of its own. This is a rule in the code: the daemon
+owns the agents. Everything that needs a machine is asked of a host, through the control
+plane or, for this Mac's host, directly: starting an agent, a terminal, reading and
+writing files, git, installing and signing in runtimes, and your shared skills and
+instructions in `~/.agents`.
 
 That is true of this Mac too. A folder on this Mac is on this Mac's host, and the window
-reaches its files the same way it reaches a server's. A folder you pick or drop for such a
-folder is passed to the host by its path; the window does not keep access to it.
-**Reveal in Finder** and opening a file in another app are offered only for folders on this
-Mac, and the host does them for the window.
+reaches its files the same way it reaches a server's. **Reveal in Finder** and opening a
+file in another app are offered only for folders on this Mac.
 
-If no control plane is set up, the window opens on one question, **Where should your agents
-run?**, and offers **Set one up on this Mac** or **Connect to a control plane**. See
+## The first open
+
+When you open Agents for the first time, it asks no question and needs no code. It does
+these steps itself:
+
+1. It makes the control key.
+2. It registers two launch agents with macOS: a control plane on this Mac, and this Mac's
+   host, `agentsd`.
+3. It starts them.
+4. It joins this Mac's host to that control plane.
+5. The window pairs itself with the control plane. You copy and paste nothing.
+
+Then the window opens on the empty session list. If a step fails, the window shows one
+line with **Try Again** and **Show Details** in place of the list. When macOS asks you to approve the login
+items, the line says so and has **Open Login Items**. See
 [Set up Agents on this Mac](../how-to/set-up-on-this-mac.md).
 
-## What Agents Host does
+Later, you can connect this Mac to another control plane, Hosted at agentloops.dev or one
+that you run, in **Settings ▸ Control plane ▸ Connect to Another…**. See
+[The control plane](control-plane.md#where-to-run-it).
 
-Agents Host is signed by us and installed outside the App Store, because running agents
-means starting programs, which an App Store app may not do. It lives in the menu bar and
-has one window.
+## What runs in the background
 
-It registers two background jobs with macOS: this Mac's host, and, if you chose **Run the
-control plane here**, a single copy of the control plane. macOS keeps both running whether
-or not any window is open, and starts them again when you log in. They show under **Login
-Items** in System Settings as Agents Host. Quitting Agents Host itself stops neither: your
-agents keep running.
+macOS keeps the two launch agents running whether or not the window is open, and starts
+them again when you log in. They show under **Login Items** in System Settings as Agents.
+When the control plane runs somewhere else, only this Mac's host runs here.
+
+Agents also has a menu bar item. It shows how many agents work and how many need you, and
+has **Open Agents**, **Pair a Phone or iPad…**, **Open in Browser**, **Settings…** and
+**Quit Agents**. Quitting Agents closes the window and the menu bar item. It stops neither
+launch agent: your agents keep running. At login, macOS starts the launch agents and the
+menu bar item, but not the window.
+
+**Settings ▸ Machines ▸ This Mac** shows the state of both login items, with **Repair** and
+**Open Login Items**, and has **Copy Diagnostics**, **Save Diagnostics…** and **Show Logs**.
+The same diagnostics are in **Help ▸ Diagnostics**.
 
 The host does not stop when it has nothing to do. It is always there for the next window
 or phone that connects, and for a workflow's next scheduled run.
+
+### Removing Agents
+
+The two login items follow the app, not its path. If you move Agents to the Trash, they
+keep running from the Trash, and after you empty it, macOS cannot start them but keeps
+them in Login Items. So first use **Settings ▸ Machines ▸ This Mac ▸ Remove Agents from
+This Mac…**. It stops both jobs and removes both login items. Then quit Agents and move it
+to the Trash. Your sessions and folders stay on disk.
 
 ## Closing the window
 
@@ -64,7 +92,7 @@ Close the window, or quit Agents, while an agent is working. The host is still h
 that agent, so it carries on. It can still ask you a question, and the question waits on
 the host for you. Any window or device connected to your control plane can answer it.
 
-When you open Agents again, it connects to the control plane and picks up where it was,
+When you open the window again, it connects to the control plane and picks up where it was,
 without starting anything. A finished agent you haven't read is in its group, such as
 **Done**, with its summary and an unread mark. Opening it clears the mark and nothing moves.
 
@@ -87,7 +115,7 @@ device can reach any of your agents, including those on servers.
 
 ## Restarting the Mac
 
-Restarting the Mac, logging out, an update to Agents Host and a crash all end the host,
+Restarting the Mac, logging out, an update to Agents and a crash all end the host,
 and every runtime it started ends with it. Nothing that was written down is lost: the
 conversation, the cost, what you had queued, and what you had half typed into the prompt
 are all still there.

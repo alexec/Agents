@@ -131,7 +131,7 @@ struct ControlOverviewPage: View {
                            chip: control.isOnThisMac ? "you are here" : nil,
                            detail: runningLine) {
                     if control.isOnThisMac {
-                        Button("Restart") { Task { await control.restart() } }.buttonStyle(.paper)
+                        Button("Restart") { Task { await restart() } }.buttonStyle(.paper)
                     }
                     #if !STORE_WINDOW
                     ControlPlaneMoveButton(control: control)
@@ -194,6 +194,14 @@ struct ControlOverviewPage: View {
                 }
             }
         }
+    }
+
+    /// The control plane on this Mac is a login item of this app's host side (#4230).
+    private func restart() async {
+        #if !STORE_WINDOW
+        if let host = HostScenes.model { await host.restartControl(); await control.refresh(); return }
+        #endif
+        await control.restart()
     }
 
     private var reachableLine: String {

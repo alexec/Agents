@@ -238,7 +238,7 @@ var driveScreenActions = map[string]bool{"screenshot": true, "click": true, "typ
 
 // desktopControlAccessibilityWords is drive_screen's refusal while Accessibility is not
 // granted: the rule, and where to grant it.
-const desktopControlAccessibilityWords = "Nothing was driven: Agents Host needs the Accessibility permission. " +
+const desktopControlAccessibilityWords = "Nothing was driven: Agents needs the Accessibility permission. " +
 	"Grant it in System Settings ▸ Privacy & Security ▸ Accessibility."
 
 // desktopControlGate is drive_screen's entry gate (#3004, US2): Off, then Accessibility,

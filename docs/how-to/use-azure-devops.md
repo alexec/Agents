@@ -9,7 +9,7 @@ description: Add the azuredevops connector with a personal access token, so that
 Agents talks to Azure DevOps Repos through its own `azuredevops` connector (#2829), an MCP
 server in the shape of the gitlab one. It works with Azure DevOps Services
 (`dev.azure.com` and the older `*.visualstudio.com` addresses) and with your own Azure DevOps
-Server. Agents Host carries it, and every Linux host installs it beside agentsd.
+Server. Agents on the Mac carries it, and every Linux host installs it beside agentsd.
 
 It has tools to read pull requests and their builds, to read a failed build's log, and to
 comment, and it has events that start a workflow or a wait. With the Azure DevOps connection

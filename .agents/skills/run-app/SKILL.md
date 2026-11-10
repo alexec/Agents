@@ -11,13 +11,17 @@ pieces, as on the real Mac:
   identity: its lock, its socket, its agents;
 - **the control plane**, `agents-control`, which the host dials out to;
 - **the window**, the one app, Agents (`AgentsHost`, #4225), a client of the control
-  plane like the phone. It starts nothing; with `--walk` it has no menu bar item and no
-  host window, so it never touches the Mac's own login items.
+  plane like the phone. It starts no agent; with `--walk` it has no menu bar item, so it
+  never touches the Mac's own login items.
+
+On a real Mac, Agents is one app (#4224): its window, its menu bar item, and the two
+launch agents it registers (the control plane and this Mac's host). There is no second
+app to open, and no Agents Host window.
 
 That is the whole basis of this skill: you get all three of your own, so nothing you
 do reaches the user's agents, and nothing of theirs reaches yours. The helpers come
-out of a scratch build of Agents Host; Agents Host itself is not run (its launch
-agents are the real Mac's).
+out of the scratch build of Agents; `launch.sh` runs them by hand on your root, and never
+registers them as login items (the real Mac's are the user's).
 
 **Test your own change. Do not hand the user a list of steps to walk.** Almost
 everything the window can do, the socket can do too, with no screen involved.
@@ -72,9 +76,9 @@ change needs both; a `Packages/AgentsKit` change needs its tests filtered by
 Then it:
 1. starts `agents-control serve --home $ROOT/control` on a free loopback port, with
    no Bonjour (its log is `$ROOT/control/control.log`), serving the web remote (071) from
-   this checkout's `Web/dist` (built by Agents Host's build, not checked in) on another free
+   this checkout's `Web/dist` (built by the `AgentsHost` build, not checked in) on another free
    loopback port, printed as `WEB_URL` (never the live 8792);
-2. starts `agentsd --control-code <host code>` on `$ROOT`, as Agents Host's launch agent
+2. starts `agentsd --control-code <host code>` on `$ROOT`, as the app's launch agent
    would, with this session's `CLAUDE_*` and `AGENTS_*` taken out of its environment;
 3. opens the window with `AGENTS_CONTROL=<client code>` and `--walk run-<slug>`: it
    pairs by itself, into `walks/run-<slug>/` in its container, so it never touches the
@@ -82,12 +86,12 @@ Then it:
 
 `--no-window` leaves the window out, for work the socket proves on its own.
 It runs the `agents-control` and `agentsd` the build carries (Go, the only ones since #1314),
-as Agents Host does, and says which on stderr.
+as the app's launch agents do, and says which on stderr.
 `CONTROL_BIN=<path>` and `AGENTSD_BIN=<path>` run others in their place, such as a Go one
 built from the tree: `GOOS=darwin Go/scripts/go.sh build -o out/darwin/agents-control
 ./cmd/agents-control`, then `CONTROL_BIN=$PWD/Go/out/darwin/agents-control launch.sh …`.
 `--host-first` starts the host while the control plane is down, with the host code left in
-its root as Agents Host leaves it, waits until it has failed to join (`HOST_FIRST_WAIT`
+its root as the app leaves it, waits until it has failed to join (`HOST_FIRST_WAIT`
 seconds more, 5 by default), then starts the control plane and waits for the host to join
 with the same code (#113). The control plane is always given `--host-root $ROOT`, so
 `control/status` carries the host's join as `thisMacHost`.
@@ -97,8 +101,9 @@ with the worktree's name, for pictures and videos (#1078).
 To walk the one app's first open itself (#4226), skip `launch.sh` and open the build with
 `--walk <name>` and `AGENTS_ROOT=<root>` (and `AGENTS_HOST_PORT`/`AGENTS_HOST_WEB_PORT` off
 18791/18792): with a scratch root the walk has the host model, sets up that root's jobs,
-and pairs itself; `stop.sh <root>` boots them out. To walk Agents Host itself, open a scratch build of it with
-`AGENTS_ROOT=$ROOT` (its plists and jobs are the root's, and `stop.sh` boots them out). Make
+and pairs itself; `stop.sh <root>` boots them out. The host side's controls (Settings ▸ Machines ▸ This Mac, the menu bar item) are walked
+the same way: open the scratch build with `AGENTS_ROOT=$ROOT` (its plists and jobs are the
+root's, and `stop.sh` boots them out). Make
 more codes with `"$HOSTAPP/Contents/Helpers/agents-control" code --client
 --home $ROOT/control` (add `--browser` for a code the web remote pairs with: a browser's code
 works only through the loopback listener, and any other only over TLS), where `HOSTAPP` is `build/DD/Build/Products/Debug/Agents.app`.
@@ -106,7 +111,7 @@ works only through the loopback listener, and any other only over TLS), where `H
 ## Rules that are not optional
 
 1. **Never `pkill -f agentsd` or `agents-control`, never `killall Agents`.** This
-   session is hosted by the user's own Agents Host and its daemon. The only helpers
+   session is hosted by the user's own Agents app and its daemon. The only helpers
    you may kill are the pids in *your* root's `daemon.lock` and
    `control/control.pid`, which is what `stop.sh` does.
 2. **Always stop what you started**, including when the test failed or you are
@@ -502,7 +507,7 @@ scratch app left on disk is one too: 264 `/tmp/run-*` items and four worktrees' 
    ```
 
 5. After the last walk or screenshot you need, unless you will launch again in this turn,
-   delete the worktree's own build output: the scratch `Agents.app` and Agents Host in
+   delete the worktree's own build output: the scratch `Agents.app` in
    `build/DD`, about 2 GB a worktree, and 17 lanes' of it filled the disk (#2346). Do not
    wait for the lane to end: a rebuild from the shared cache is fast (#234), and a lane
    that must walk again after review rebuilds. Never in the main checkout, whose

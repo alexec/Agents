@@ -20,7 +20,7 @@ it. It is `email-mcp`, a small server that Agents ships. It reads one mailbox ov
 - **The Mail page** (`show_mail`): the folders, a folder's newest messages, and a message's
   text, with **Mark Read** and **Move**.
 
-Agents Host carries `email-mcp`, and every Linux host installs it beside agentsd.
+Agents on the Mac carries `email-mcp`, and every Linux host installs it beside agentsd.
 
 ## Before you start
 

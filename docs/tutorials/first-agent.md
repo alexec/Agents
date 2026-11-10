@@ -17,7 +17,7 @@ how every agent in the app works.
 
 ## Before you start
 
-- A Mac, and an invitation to the Agents alpha on TestFlight.
+- A Mac.
 - One coding agent signed in on this Mac. This tutorial uses **Claude Code**, signed in
   with `claude` and `/login` in Terminal. The app talks to Claude through a small adapter:
   it runs it with your own Node if you have one, and otherwise installs its own copy in
@@ -26,28 +26,25 @@ how every agent in the app works.
 
 ## 1. Install and open Agents
 
-On a Mac, Agents is two apps: **Agents** is the window you work in, and **Agents Host**
-runs your agents.
+On a Mac, Agents is one app. The window you work in and the part that runs your agents
+are in it.
 
-1. Open the invitation to the Agents alpha in **TestFlight**, and click **Install**. Open
-   Agents.
-2. The window opens on **Where should your agents run?** Under **Set one up on this Mac**,
-   click **Get Agents Host…**. Download Agents Host, drag it into `~/Applications`, and
-   open it. [Set up Agents on this Mac](../how-to/set-up-on-this-mac.md) says more about
-   this step.
-3. Agents Host asks **Where should this Mac's agents report?** Click **Run It Here**.
-   Agents Host starts this Mac's agents and its control plane, and keeps them running with
-   its window closed.
+1. Download Agents from the latest release on GitHub,
+   [github.com/alexec/Agents/releases/latest](https://github.com/alexec/Agents/releases/latest).
+   Open `Agents-<version>.dmg`, and drag Agents into `~/Applications`.
+   [Set up Agents on this Mac](../how-to/set-up-on-this-mac.md) says more about this step.
+2. Open Agents. It asks no question. It says **Setting up Agents on this Mac…**, starts
+   this Mac's host and its control plane, and pairs the window. They keep running when you
+   close the window or quit Agents.
 
-After a moment the window says **Agents Host is running on this Mac**. Click **Pair**:
-Agents Host shows a code, and the window asks for it. Type or paste the code and click
-**Connect**.
+   If macOS asks you to allow Agents in **Login Items**, click **Open Login Items**, turn
+   Agents on, and come back. Agents continues by itself.
 
 You should see the Agents window, with a **Get started** card at the top of the sidebar.
 It is a checklist from here to your first agent, and each step ticks itself when it is
 done:
 
-1. **Pair this window with Agents Host**: done already.
+1. The first step, which pairs this window, is done already.
 2. **Install an agent runtime**: if it is not ticked, click **Install**. A sheet lists every
    runtime the app knows and whether it is on this Mac. If Claude's row says **Not on this
    Mac**, click **Install** on it and wait for it to finish. You need none of the others for

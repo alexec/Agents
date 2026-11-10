@@ -84,7 +84,7 @@ address and no name ([Privacy](../../privacy.md#the-hosted-service)).
 | Company | Service | What it gets |
 | --- | --- | --- |
 | Apple | TestFlight, and the App Store | Delivers the Mac window and the Remote. What Apple keeps about a tester or a buyer is under Apple's terms. Agents adds nothing to it. |
-| GitHub | Releases | Delivers Agents Host. |
+| GitHub | Releases | Delivers Agents for the Mac. |
 | GitHub | Pages | Serves this docs site. |
 
 ## Related

@@ -14,7 +14,7 @@ make Agents do not see your data and do not sell it.
 
 ## What stays on your machines
 
-- **Your Mac:** Agents Host keeps its records in `~/.agents` and the folders of your
+- **Your Mac:** Agents keeps its records in `~/.agents` and the folders of your
   folders: conversations, workflows, labels, usage numbers and settings. It keeps tokens and
   passwords in the Mac's Keychain.
 - **Feature counts (#2165):** each machine counts how many times a day each feature (a

@@ -7,7 +7,7 @@ description: Connect Bitbucket with an Atlassian API token or an access token an
 # Use Bitbucket
 
 Agents talks to Bitbucket Cloud through its own `bitbucket` connector (#2828), an MCP
-server in the shape of the gitlab one, on Bitbucket's REST API 2.0. Agents Host carries
+server in the shape of the gitlab one, on Bitbucket's REST API 2.0. Agents on the Mac carries
 it, and every Linux host installs it beside agentsd. It is for Bitbucket Cloud
 (bitbucket.org) only, not Bitbucket Data Center.
 

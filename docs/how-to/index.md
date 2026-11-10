@@ -10,12 +10,12 @@ something particular done.
 
 ### Setting up
 
-- [Set up Agents on this Mac](set-up-on-this-mac.md): install Agents Host, run your
-  agents and the control plane here, and pair the window.
+- [Set up Agents on this Mac](set-up-on-this-mac.md): install Agents, which runs your
+  agents and the control plane here and pairs its window by itself.
 - [Connect a window or phone](connect-a-window-or-phone.md): pair another Mac, an iPhone,
-  an iPad or a browser, change what it may do, and forget it.
+  an iPad or a browser, connect this Mac to another control plane, and forget a client.
 - [Use Agents in a browser](use-agents-in-a-browser.md): open Agents in Safari or Chrome on
-  the Mac that runs Agents Host, pair it once, and forget it.
+  the Mac that runs Agents, pair it once, and forget it.
 - [Sign in with Google, Apple or GitHub](sign-in-with-google-apple-or-github.md): pair a
   client with no code, and turn those sign-ins on for your control plane.
 - [Set up Google, Apple and GitHub sign-in for your own build](set-up-sign-in-for-your-own-build.md):
@@ -41,15 +41,16 @@ something particular done.
 - [Run the control plane as several copies](run-several-copies.md): over one bucket,
   behind a load balancer, so it stays up when your Mac sleeps.
 - [Move an existing set-up across](move-an-existing-set-up.md): bring the earlier app's
-  agents, devices and servers to a control plane, once.
+  agents to Agents, pair its devices again, and add its servers as machines.
 - [Back up and restore a machine](back-up-and-restore.md): keep a fixed number of backups
   of a machine's agents and conversations in a folder, and restore one on a new machine.
 - [Back up and restore a control plane](back-up-a-control-plane.md): its store, key,
   secrets key and certificate in one folder, restored so that every device stays paired.
-- [Release Agents Host](release-agents-host.md): publish the Developer ID download on
-  GitHub by tagging main, and set up its signing secrets once.
-- [Fix Agents Host when it won't start](fix-agents-host-not-starting.md): see why a login
-  item isn't running, Repair it, and send diagnostics with a report.
+- [Release Agents](release-agents-host.md): publish the Mac's Developer ID download on
+  GitHub and the iPhone and iPad app on TestFlight by tagging main, and set up the signing
+  secrets once.
+- [Fix Agents when it won't start](fix-agents-host-not-starting.md): see why a login
+  item isn't running, Repair it, send diagnostics with a report, and remove Agents.
 
 ### Folders
 

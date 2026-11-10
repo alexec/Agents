@@ -215,7 +215,7 @@ public extension DaemonAPI {
             if served { return "At \(address), for a browser on this Mac only." }
             switch reason {
             case Self.portInUse: return "Not serving: port \(port) is in use by another app."
-            case Self.build: return "Not serving: this copy of Agents Host’s web app is damaged or missing."
+            case Self.build: return "Not serving: this copy of the Agents web app is damaged or missing."
             default: return "Not serving: port \(port) couldn’t be opened\(detail.map { " (\($0))" } ?? "")."
             }
         }

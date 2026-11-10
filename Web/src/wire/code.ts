@@ -1,4 +1,4 @@
-// A client code, as the Mac window and Agents Host show it (058 data-model.md "Code"):
+// A client code, as Agents on the Mac shows it (058 data-model.md "Code"):
 // agents-control:2:c:operator:<key>:<secret>:<url>:<pin>:<name>
 // The fourth field was a grant; every client may do everything now (#111), and it isn't read.
 // The browser uses the key and the secret, and ignores the address and the pin: it always

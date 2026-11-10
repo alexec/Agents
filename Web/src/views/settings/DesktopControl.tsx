@@ -17,7 +17,7 @@ export function DesktopControlSection({ store }: { store: Store }) {
       </label>
       <p class="hint">
         {settings.enabled
-          ? "An agent can click, type and read the screen of any app on this Mac, not only the sandboxed browser. macOS will ask you to grant Agents Host the Accessibility permission the first time an agent tries."
+          ? "An agent can click, type and read the screen of any app on this Mac, not only the sandboxed browser. macOS will ask you to grant Agents the Accessibility permission the first time an agent tries."
           : "Off by default. An agent cannot click, type or read the screen of any other app until you turn this on."}
       </p>
     </section>

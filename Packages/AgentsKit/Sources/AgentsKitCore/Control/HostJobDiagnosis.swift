@@ -134,7 +134,7 @@ public enum HostJobFailure: Sendable, Equatable {
         case .needsApproval:
             return "\(name) is waiting to be allowed in System Settings ▸ General ▸ Login Items."
         case .staleRegistration:
-            return "\(name)’s login item is out of date with this copy of Agents Host. Repair registers it again."
+            return "\(name)’s login item is out of date with this copy of Agents. Repair registers it again."
         case .couldNotStart(let exit):
             return "macOS couldn’t start \(lowered(name))\(exit.map { " (last exit \($0))" } ?? ""). Repair registers it again; if that doesn’t help, something on this Mac is blocking it."
         case .keepsStopping(let exit):

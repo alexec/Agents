@@ -196,7 +196,7 @@ struct LocalServices {
         if let root = environment["AGENTS_TEST_TRUST_ROOT"] { variables["AGENTS_TEST_TRUST_ROOT"] = root }
         #endif
         guard FileManager.default.isExecutableFile(atPath: arguments[0]) else {
-            return .failed("This copy of Agents Host has no \(URL(fileURLWithPath: arguments[0]).lastPathComponent) in it.")
+            return .failed("This copy of Agents has no \(URL(fileURLWithPath: arguments[0]).lastPathComponent) in it.")
         }
         let folder = switch job {
         case .control: paths.controlHome

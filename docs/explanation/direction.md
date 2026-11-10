@@ -47,6 +47,21 @@ them. A change that cannot agree says why, and which principle it leaves out.
   what the service must keep. A customer's own key (BYOK) is the first enterprise option.
   End-to-end encryption is a product choice, for later.
 
+### What the Mac download leaves out
+
+The one Mac app (#4224) keeps Principle 1 and leaves out parts of Principles 2 and 3. Alex
+decided this on 2026-11-09.
+
+- **Principle 1 is kept.** The control plane on a Mac is for that one person only. The web
+  page is still a full client.
+- **Principle 2: Hosted is not the default way in for the Mac download.** When a person
+  opens Agents on a Mac, the default is a control plane on that Mac, because Alex wants it
+  to work with nothing remote. Hosted is still the default for a person who starts in a
+  browser. The person can connect Hosted, or a self-hosted control plane, later in
+  **Settings ▸ Control plane ▸ Connect to Another…**.
+- **Principle 3: the single-user Mac shape has no sign-in.** That shape has one person, who
+  owns the Mac. The person signs in when they connect Hosted or a self-hosted control plane.
+
 ## From nothing to working
 
 The path a new person takes must be short, and must need only a browser. These are its steps, in order:
@@ -85,9 +100,9 @@ organisations it serves, changes.
 
 | Shape | Who runs the control plane | Organisations on it | For |
 |---|---|---|---|
-| **Hosted** (the default) | Us, at agentloops.dev | Many, one per account | Anyone who wants to start in a browser, alone or as a team |
+| **Hosted** (the default in a browser) | Us, at agentloops.dev | Many, one per account | Anyone who wants to start in a browser, alone or as a team |
 | **Self-hosted** (on-premises, or in your own cloud account) | You, as a container on your own hosting | One | A team or a company that keeps everything in its own account |
-| **Single user on a Mac** (an option) | Agents Host on your Mac | One, with one person | One developer who wants the control plane at home |
+| **Single user on a Mac** (the Mac download's default, #4224) | Agents on your Mac | One, with one person | One developer who wants the control plane at home |
 
 - In every shape, the agents run on the customer's own machines. "Hosted" means that we run
   the control plane, not the agents.

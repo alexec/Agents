@@ -17,7 +17,7 @@ names its issue.
 - **The control plane routes and remembers little.** It knows who is paired and which
   machines there are. Agents, conversations, files and runtime sign-ins stay on the machine
   that runs them.
-- **Machines never escalate.** Agents Host and `agentsd` run as the machine's user. On a Mac
+- **Machines never escalate.** Agents and `agentsd` run as the machine's user. On a Mac
   they are the user's own login items (`SMAppService.agent`). On Linux they are a
   `systemctl --user` service. Nothing asks for admin rights, and nothing installs a
   privileged helper. A machine provider's start script for Google Compute Engine runs as
@@ -38,7 +38,7 @@ names its issue.
 
 ## Sign-in
 
-- **The local owner** signs in with the codes that Agents Host and `agents-control` make. No
+- **The local owner** signs in with the codes that Agents and `agents-control` make. No
   outside account is needed, also on a control plane on the internet.
 - **Google and Apple** (T2, #995). The control plane checks the ID token against the
   provider's keys, its issuer, audience and expiry, and a nonce bound to that control
@@ -190,7 +190,7 @@ An organisation will be able to require a sandbox by policy (T5, below).
 | A secret with Ask before use (#4014) | `~/.agents-secrets/sealed.json`, mode 0600, sealed under a key made from the machine's key, which is in the Keychain: an agent can read the file but cannot open it | The same, but the machine's key is a 0600 file, so the value is first sealed to a release key whose private half only the control plane keeps (#4058). The control plane gives the key for one value only for an approval that the answering device signed with its lock key, in the last 10 minutes, once; it never sees the value. agentsd keeps the opened value in memory only (not dumpable) until it restarts. A Linux machine with no control plane keeps no secret with Ask before use, and its ask card does not offer it. The Mac, the Remote and the web page sign their answers with the lock key (#4149); a web page with no lock key leaves the answer to the Mac or the Remote. `AGENTS_SECRET_RELEASE=0` in agentsd's environment turns the layer off. |
 | A machine provider's tokens and keys, on the machine that carries it (#3398) | `~/.agents-secrets/provider-secrets.json`, mode 0600 | The same |
 | The machine's own key | A file of mode 0600 in its data folder | The same |
-| The control plane's key | Keychain (Agents Host), or a file of mode 0600 | A file of mode 0600, or sealed in the store by KMS |
+| The control plane's key | Keychain (Agents), or a file of mode 0600 | A file of mode 0600, or sealed in the store by KMS |
 
 An iPhone or iPad keeps its own key in the Secure Enclave where it has one, else in the
 Keychain, on this device only.
@@ -217,7 +217,7 @@ them as they pass.
 | Log | Where | What it holds | Size |
 | --- | --- | --- | --- |
 | `daemon.log` | `~/Library/Logs/Agents` on a Mac, `$XDG_STATE_HOME/agents/logs` on Linux | What the machine did | Rolls at 4 MB, keeps one older file |
-| `control.log` | Agents Host's log folder, or the container's output in the cloud | Joins, people, keys, sign-in changes, refused connections with their address | Rolls at 4 MB, keeps one older file |
+| `control.log` | Agents' log folder, or the container's output in the cloud | Joins, people, keys, sign-in changes, refused connections with their address | Rolls at 4 MB, keeps one older file |
 | `machine-relay.log` | The Mac's log folder | The sign-in relay (what was asked and how it was answered) | 1 MB |
 | `app-tools.jsonl` | Each agent's folder | Every call to the app's own tools, with a `token` argument left out and answers cut to 2,000 characters | Deleted with the agent |
 
@@ -234,11 +234,11 @@ bytes). The report of a turn says its last message redacted as well.
 Redaction does not catch:
 
 - text that is not a known shape, such as a password in plain words;
-- what a runtime writes to its standard error, and what Agents Host writes to `daemon.log`;
+- what a runtime writes to its standard error, and what Agents writes to `daemon.log`;
 - the runtimes' own session files (see [Erasure](data-and-retention.md#erasure)).
 
 `control.log` cuts out codes, `Bearer` tokens, `token=`, `secret=` and `password=`
-values, and the same known token shapes (#1001). Agents Host's diagnostics bundle masks codes, secrets, tokens, passwords, keys, and
+values, and the same known token shapes (#1001). Agents' diagnostics bundle (Help ▸ Diagnostics) masks codes, secrets, tokens, passwords, keys, and
 long base64 and hex strings.
 
 ## The web page

@@ -7,7 +7,7 @@ description: Set up a WhatsApp Business number for Agents, so that a person can 
 # Use WhatsApp
 
 The `whatsapp` connector brings a WhatsApp Business number to your agents (#1352). It is
-`whatsapp-mcp`, a small server that Agents ships. Agents Host carries it, and every Linux
+`whatsapp-mcp`, a small server that Agents ships. Agents on the Mac carries it, and every Linux
 host installs it beside agentsd.
 
 - **The events:** `message.received`, a person wrote to the number, with the text; and

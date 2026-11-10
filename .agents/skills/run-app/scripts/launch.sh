@@ -97,7 +97,7 @@ if [ "$BUILD" = 1 ]; then
     || { echo "build failed — tail /tmp/run-$SLUG-build.log" >&2; tail -30 /tmp/run-$SLUG-build.log >&2; exit 1; }
 fi
 
-# The Go ones the build carries (#1312), as Agents Host runs them; the only ones since #1314.
+# The Go ones the build carries (#1312), as the app runs them; the only ones since #1314.
 HELPERS="$HOSTAPP/Contents/Helpers"
 CONTROL="$HELPERS/agents-control"
 AGENTSD="$HELPERS/agentsd"
@@ -167,7 +167,7 @@ fi
 # The control plane: a single copy on a free loopback port, its store, key and certificate
 # in <root>/control, and no Bonjour, so no window on the network finds it.
 PORT="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')"
-# The web remote (071): Web/dist, as Agents Host's build left it, on a free loopback port of the root's own,
+# The web remote (071): Web/dist, as the AgentsHost build left it, on a free loopback port of the root's own,
 # never the live 8792, so a scratch browser's key is bound to a scratch origin.
 WEB_PORT="${WEB_PORT:-$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')}"
 URL="https://127.0.0.1:$PORT"
@@ -180,7 +180,7 @@ fi
 # The Linux hosts a server is given (scripts/build-linux-agentsd.sh), when built.
 SERVERS=()
 [ -d "$REPO/App/Resources/servers" ] && SERVERS=(AGENTS_CONTROL_SERVERS="$REPO/App/Resources/servers")
-# --host-root: the host's join is in control/status, as on Agents Host's copy (#113).
+# --host-root: the host's join is in control/status, as on the app's copy (#113).
 start_control() {
   "${CLEAN[@]}" ${SSH_AUTH_SOCK:+SSH_AUTH_SOCK="$SSH_AUTH_SOCK"} AGENTS_CONTROL_URL="$URL" AGENTS_CONTROL_NAME="run-$SLUG" \
     ${SERVERS[@]+"${SERVERS[@]}"} ${CONTROL_ENV[@]+"${CONTROL_ENV[@]}"} \
@@ -201,13 +201,13 @@ code() { "${CLEAN[@]}" "$CONTROL_TOOL" code "$@" --home "$ROOT/control" | head -
 
 if [ "$HOST_FIRST" = 1 ]; then
   # #113: the code is made, the control plane stops, and the host starts with the code
-  # left in its root, as Agents Host leaves it. It fails to join and keeps trying.
+  # left in its root, as the app leaves it. It fails to join and keeps trying.
   code --host >"$ROOT/control-join-code"
   kill "$(cat "$ROOT/control/control.pid")"
   for _ in $(seq 1 50); do curl -sk --max-time 1 "https://127.0.0.1:$PORT/healthz" >/dev/null 2>&1 || break; sleep 0.1; done
 fi
 
-# This Mac's host, as Agents Host's launch agent runs it, on the root. Not `env -i`: a
+# This Mac's host, as the app's launch agent runs it, on the root. Not `env -i`: a
 # runtime started without the person's environment cannot sign in. Only what would leak
 # this session into it goes: CLAUDE_* and the hosting app's AGENTS_*.
 STRIP=()

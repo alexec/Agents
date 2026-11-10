@@ -90,7 +90,7 @@ because the control plane cannot open the key.
   that is not in the lock yet gets its copy once its person approves it. An app's key is
   not in the lock: a control plane that is compromised or misused could give out an app
   key of its own, and get a copy sealed to it.
-- **Agents Host runs as the member.** Hosts never escalate. A member who reads the
+- **This Mac's host runs as the member.** Hosts never escalate. A member who reads the
   machine's memory with a debugger while a request is sent can find a key that is open
   there. Sealing keeps keys out of files, logs, messages and the runtime's environment. It
   does not keep them from the member's own account.

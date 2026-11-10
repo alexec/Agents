@@ -108,8 +108,8 @@ struct OrgPolicyWordsTests {
         #expect(refusal?.line == "Set by your organisation. Your organisation does not allow Codex.")
         // noPolicy and mustJoin say what to do, with no title.
         let lost = JSONRPCError(code: -32076, message: "x",
-                                data: ["reason": "noPolicy", "words": "Agents Host has no policy from your organisation. Connect to the network."])
-        #expect(DaemonAPI.PolicyRefusal(error: lost)?.line == "Agents Host has no policy from your organisation. Connect to the network.")
+                                data: ["reason": "noPolicy", "words": "Agents has no policy from your organisation. Connect to the network."])
+        #expect(DaemonAPI.PolicyRefusal(error: lost)?.line == "Agents has no policy from your organisation. Connect to the network.")
         #expect(DaemonAPI.PolicyRefusal(error: JSONRPCError(code: -32602, message: "no")) == nil)
     }
 
@@ -164,8 +164,8 @@ struct OrgPolicyWordsTests {
         #expect(stopped.startsNothing)
         #expect(stopped.composerReason == "Set by your organisation. Your organisation has stopped all agent work.")
         let lost = DaemonAPI.PolicyState(noPolicy: true, refusal: .init(reason: "noPolicy",
-            words: "Agents Host has no policy from your organisation. Connect to the network."))
-        #expect(lost.composerReason == "Agents Host has no policy from your organisation. Connect to the network.")
+            words: "Agents has no policy from your organisation. Connect to the network."))
+        #expect(lost.composerReason == "Agents has no policy from your organisation. Connect to the network.")
     }
 
     @Test func addByHandAndPassThroughNamesAreMarked() throws {

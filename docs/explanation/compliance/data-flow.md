@@ -22,7 +22,7 @@ flowchart LR
     web["Client: web page in a browser"]
     control["Control plane: agents-control, self-hosted or control.agentloops.dev"]
     store[("Control plane store: a folder or a bucket")]
-    agentsd["Machine: Agents Host and agentsd, on a Mac or Linux"]
+    agentsd["Machine: agentsd, in Agents on a Mac, or on Linux"]
     data[("Host data: records, transcripts, logs")]
     runtime["Runtime: Claude Code, Codex and others"]
     apns["Apple Push Notification service"]

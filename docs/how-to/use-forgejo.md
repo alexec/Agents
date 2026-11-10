@@ -8,7 +8,7 @@ description: Connect Forgejo with an access token and add the forgejo connector,
 
 Agents talks to Forgejo and Gitea through its own `forgejo` connector (#1753), an MCP
 server in the shape of the gitlab one. Forgejo and Gitea have the same REST API, so one
-connector is for both: Codeberg, your own Forgejo, or your own Gitea. Agents Host carries
+connector is for both: Codeberg, your own Forgejo, or your own Gitea. Agents on the Mac carries
 it, and every Linux host installs it beside agentsd.
 
 It has tools to read pull requests, their checks and issues, and a failed job's log, and to

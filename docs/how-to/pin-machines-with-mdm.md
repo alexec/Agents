@@ -25,11 +25,11 @@ any other key is still used, but that key is ignored, and the machine's log says
 - It joins, and pairs with, only the pinned control plane. A code or an address of another
   control plane is refused with "Set by your organisation. This Mac may join
   control.acme.dev only."
-- On the Mac, **Run it here** in Agents Host is refused: a control plane of its own is
-  another control plane. In the window, **Forget This Mac…** is refused while the window
+- On the Mac, Agents starts no control plane of its own, at first open or with **Use This
+  Mac Only**: a control plane of its own is another control plane. In the window, **Forget This Mac…** is refused while the window
   is paired with the pinned control plane.
 - With **Must join**, until the machine has joined the pinned control plane, it starts no
-  agent, shell or workflow. Agents Host shows "Your organisation requires this Mac to join
+  agent, shell or workflow. Settings ▸ Machines ▸ This Mac shows "Your organisation requires this Mac to join
   control.acme.dev." Each client says the same when it asks for work. A workflow's trigger
   is let go, not kept: nothing runs by itself once the machine has joined.
 
@@ -54,8 +54,8 @@ stronger, because nobody else can have it.
 
 ## Pin a Mac
 
-Agents Host and the window read their own preferences domains:
-`com.alexecollins.agents.host` and `com.alexecollins.agents.store`. One profile sets both.
+Agents reads its preferences domain, `com.alexecollins.agents.host`. An older window from
+the App Store reads `com.alexecollins.agents.store`. One profile sets both.
 Only the values that the profile forces count. A person's own `defaults write` pins
 nothing.
 
@@ -119,10 +119,11 @@ nothing.
     ```
 
 2. Push it with your MDM to the Macs that use Agents.
-3. On a Mac, quit Agents Host and open it again, or wait for its next start. Agents Host
+3. On a Mac, quit Agents and open it again, or wait for its next start. Agents
    reads the profile at each start of the machine.
-4. Join as usual: paste a machine code of the pinned control plane in Agents Host, under
-   **Join one elsewhere**. See [Add a machine](add-a-machine.md) for codes.
+4. Join as usual: in **Settings ▸ Control plane**, click **Connect to Another…**, then
+   **Use a Code…**, and paste a code from **Pair a Mac…** on the pinned control plane. See
+   [Add a machine](add-a-machine.md) for codes.
 
 ## Pin a Linux server
 
@@ -155,7 +156,7 @@ When both are there, the file wins over a Mac's profile.
 
 ## What this does not protect against
 
-`agentsd` and Agents Host run as the user of the machine, and never ask for admin rights.
+`agentsd` and Agents run as the user of the machine, and never ask for admin rights.
 They read the profile and the file, and never write them. A user who changes the program
 can avoid the pin. The pin stops mistakes and ordinary use, as the policy does. See
 [Organisation policy](../explanation/organisation-policy.md).

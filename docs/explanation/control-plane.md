@@ -13,8 +13,7 @@ built around it.
 
 ## Machines, clients and the control plane
 
-A **machine** runs agents. Your Mac is one, once Agents Host is installed on
-it. A Linux server is another, and so is a second Mac. A machine owns its agents: it starts
+A **machine** runs agents. Your Mac is one, once Agents is installed on it. A Linux server is another, and so is a second Mac. A machine owns its agents: it starts
 their runtimes, holds their conversations and keeps their records on its own disk.
 
 A **client** is a screen: the Agents window on a Mac, Agents on an iPhone or iPad, or a
@@ -37,7 +36,7 @@ plane, and nothing connects in to a machine.
                       ┌───────────────────────── CLIENTS ──────────────────────────┐
                       │                                                            │
                       │   Agents window (Mac)              Agents (iPhone, iPad)   │
-                      │   sandboxed, runs nothing          a browser on this Mac   │
+                      │   runs no agent                    a browser on this Mac   │
                       │   each may do everything                                   │
                       └─────────────┬──────────────────────────────┬───────────────┘
                                     │ wss://, paired by code       │ wss://
@@ -60,8 +59,8 @@ plane, and nothing connects in to a machine.
                │ by a join code                │                              │
 ┌──────────────┴────────────┐   ┌──────────────┴────────────┐   ┌─────────────┴──────────────┐
 │ MACHINE: this Mac            │   │ MACHINE: another Mac         │   │ MACHINE: a Linux server       │
-│ Agents Host               │   │ Agents Host,              │   │ agentsd, installed over    │
-│  ├ agentsd                │   │ Join one elsewhere        │   │ ssh or by one command      │
+│ Agents (one app)          │   │ Agents, connected to      │   │ agentsd, installed over    │
+│  ├ agentsd                │   │ another control plane     │   │ ssh or by one command      │
 │  └ agents-control, if the │   │  └ agentsd                │   │                            │
 │    control plane runs here│   │                           │   │                            │
 │ folders, agents,         │   │ folders, agents,         │   │ folders, agents,          │
@@ -102,7 +101,7 @@ itself, and can't speak as another. An agent's own connection to its machine sti
 only its tools, and anything else on the Mac reaches nothing.
 
 You can forget a client in **Settings ▸ Control plane ▸ Clients**; forgetting cuts it off at
-once, at home and away. Any client may be forgotten, the last one too: Agents Host, on the
+once, at home and away. Any client may be forgotten, the last one too: Agents, on the
 control plane's own Mac, can always make a new code.
 
 Older builds keep working. A record, a code or a channel still carries the word `grant`,
@@ -235,11 +234,11 @@ the Console page and the MDM pin come in later steps of #998.
 
 ## A browser on this Mac
 
-Agents Host's copy of the control plane has a second, smaller listener: plain HTTP on the
-loopback address only, at **http://localhost:8792**. It serves the web page, which is
-built into Agents Host and checked against a list of its files' hashes, and takes the
-page's WebSocket. Nothing else on the network can reach it, and **Serve Agents to browsers
-on this Mac** in Agents Host turns it off.
+The control plane on a Mac has a second, smaller listener: plain HTTP on the loopback
+address only, at **http://localhost:8792**. It serves the web page, which is built into
+Agents and checked against a list of its files' hashes, and takes the page's WebSocket.
+Nothing else on the network can reach it, and **Serve Agents to browsers on this Mac** in
+**Settings ▸ Control plane** turns it off.
 
 A browser that pairs there becomes a client of the **browser** kind, with a key of its own
 that script can use but not read. A browser key works only on that listener, and a window's
@@ -298,8 +297,8 @@ client, those through the control plane too, so every other screen sees the same
 window still uses the control plane for every other machine, for pairing, and for the
 control plane's own settings.
 
-The socket is in a folder that only Agents and Agents Host can reach (their shared app
-group), and is named by the control plane's key, so a second control plane on the same Mac
+The socket is in a folder that only Agents can reach (its app group), and is named by
+the control plane's key, so a second control plane on the same Mac
 has a socket of its own. When it is not there, the window goes through the control plane as
 before. The iPhone, the iPad and a browser always go through the control plane for now.
 
@@ -307,7 +306,8 @@ before. The iPhone, the iPad and a browser always go through the control plane f
 
 The control plane itself remembers little: the clients, the machines, the
 codes it has handed out, and which of its copies is holding each machine's connection. That
-is its **store**. It is either a folder or an S3-compatible bucket. Nothing else,
+is its **store**. It is either a folder or an S3-compatible bucket. On a Mac, it is always
+a folder on that Mac. Nothing else,
 no database, is needed. Your agents and their conversations are not in it: they stay on
 their machines.
 
@@ -334,10 +334,11 @@ see [Back up and restore a control plane](../how-to/back-up-a-control-plane.md).
 
 There are two ordinary shapes.
 
-**On this Mac.** Agents Host, a free download from us that is not in the App Store, runs
-this Mac's machine and a single copy of the control plane, kept running by macOS with every
-window closed. Its store is a folder on this Mac (a bucket is for a control plane in the
-cloud, #4227). This is the shape for one person at home.
+**On this Mac.** This is what Agents does when you first open it. Agents is a free
+download from us, not in the App Store. It runs this Mac's machine and a single copy of the
+control plane, kept running by macOS with every window closed. Its store is always a folder
+on this Mac (a bucket is for a control plane in the cloud, #4227). This is the shape for
+one person at home, and it needs no sign-in (#4224).
 
 The cost is that the Mac is the control plane. While it sleeps, or is away from your
 network, no window or device can reach any of your agents, including those on servers.
@@ -350,6 +351,14 @@ balancer that passes WebSockets through. If one copy stops, the clients and mach
 on it reconnect to another within seconds. This is the shape for staying up while your Mac
 sleeps. The copies are for staying up, not for load: the control plane is sized for one
 person, with a handful of screens and up to about twenty machines.
+
+**Connect to another one later.** In **Settings ▸ Control plane ▸ Connect to Another…**,
+choose **Sign In to agentloops.dev** for Hosted, or **Use a Code…** for a control plane that
+you run. The code is a client code from that control plane's **Settings ▸ Clients ▸ Pair a
+Mac…**. This Mac's machine then joins that control plane, the window pairs with it, and
+the control plane on this Mac stops. Your sessions stay on this Mac, and its records are
+not copied. **Use This Mac Only** in the same place goes back: it starts the control plane
+on this Mac again, with the store it had.
 
 Either way it is yours. Nothing passes through a service we run, and the control plane has
 one address, a name, that every code carries.
@@ -377,8 +386,8 @@ when the network returns.
 A machine that has not joined yet tries the same way. Its join code is spent only by a join
 that worked, so a first try that fails, because the control plane isn't up yet or its
 address doesn't resolve yet, is tried again on the same backoff, and at once on a wake or
-a network change. Until it joins, Agents Host and **Settings ▸ Control plane** say
-**Couldn't join the control plane**, with the reason. The address in every code is this
+a network change. Until it joins, **Settings ▸ Machines ▸ This Mac** and **Settings ▸
+Control plane** say **Couldn't join the control plane**, with the reason. The address in every code is this
 Mac's Bonjour name (System Settings ▸ General ▸ Sharing ▸ Local hostname), the one other
 machines on the network can resolve, not its Unix host name, which a managed Mac may set
 to something nothing answers for. A request for a machine that is offline is refused at once with
@@ -444,12 +453,9 @@ phone reached only the Mac, through a separate bridge, and saw only the Mac's fo
 What you could reach depended on which screen you held, and pairing, permissions and
 routing lived in three places.
 
-It also meant none of the apps could be in the App Store. An App Store app runs in a
-sandbox: it may not start helpers of its own, keep programs running in the background, run
-ssh or git, or read folders you did not hand it. The Mac window did all of those.
-
-Putting one service in the middle fixes both. The apps become screens and nothing else, so
-they fit in the sandbox. Everything that needs a real machine happens on a machine: agents,
+Putting one service in the middle fixes this. The apps become screens and nothing else,
+and the iPhone and iPad app fits in the App Store's sandbox. On a Mac, the window and this
+Mac's machine are one app again (#4224), but the window still starts no agent. Everything that needs a real machine happens on a machine: agents,
 terminals, files, git, installing runtimes, signing them in. And because machines connect out
 and clients connect in, a server behind a home router or a firewall joins without any port
 being opened to it.
