@@ -370,6 +370,11 @@ enum WalkCommands {
     /// for a control SwiftUI leaves out of the tree it hands out (#1078: the pills over the
     /// prompt). A click would not do: a window that is not key keeps a button's first click.
     private static func pressAt(_ window: NSWindow, _ point: CGPoint) throws -> [String: Any] {
+        // A web view's page is out of this process's tree: a click, handed to the web view (#4137).
+        if let view = window.contentView?.superview?.hitTest(CGPoint(x: point.x, y: window.frame.height - point.y)),
+           WalkEvents.webView(at: view) != nil {
+            return ["ok": true, "did": try WalkEvents.click(window, at: point, count: 1)]
+        }
         let onScreen = window.convertPoint(toScreen: CGPoint(x: point.x, y: window.frame.height - point.y))
         guard let root = window.contentView?.superview,
               let hit = root.accessibilityHitTest(onScreen) as? NSObject else {
