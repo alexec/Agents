@@ -1,7 +1,7 @@
 // The order runtimes are listed in, as RuntimeCatalog.sortedByName (AgentsKitCore) has it (#154):
 // alphabetical by the name shown, case-insensitive and as the person's language would, the id
 // breaking a tie. A host on an older build still answers in its catalog's order.
-import type { AccountProfile, Agent, AllowanceReading, AllowanceState, OrgPolicy, PolicySetBy, RuntimeAllowancesRow, RuntimeStatus } from "../protocol/generated";
+import type { AccountProfile, Agent, AllowanceReading, AllowanceState, OrgPolicy, PolicySetBy, RuntimeAllowances, RuntimeAllowancesRow, RuntimeStatus } from "../protocol/generated";
 import { line, runtimeName, tokens } from "./orgPolicy";
 import { fromWireDate } from "../protocol/dates";
 import { fromOrganisation, noPlanLimit, requires, routeMissing, routeRemoved } from "./orgAccounts";
@@ -95,14 +95,44 @@ export function runtimeRuns(runtimes: RuntimeStatus[]): { available: RuntimeStat
 
 /**
  * The sidebar's Runtimes row (#379), RuntimeTally (AgentsKitCore): how many runtimes can start a
- * turn now, out of how many are installed. Installed is found on the host, whether or not it can
- * start; one that is not there, or is still being installed, was never in. Undefined until a host
- * has listed its runtimes: not yet known is not none.
+ * turn now, out of how many are installed, and the available ones nearly used up (#3956). Installed
+ * is found on the host, whether or not it can start; one that is not there, or is still being
+ * installed, was never in. Undefined until a host has listed its runtimes: not yet known is not none.
+ * `allowancesOf` is the allowances of the host a runtime is read from.
  */
-export function runtimeTally(runtimes: readonly RuntimeStatus[]): { working: number; total: number } | undefined {
+export function runtimeTally(runtimes: readonly RuntimeStatus[],
+  allowancesOf: (runtimeID: string) => RuntimeAllowances | undefined = () => undefined): RuntimeTally | undefined {
   if (runtimes.length === 0) return undefined;
   const installed = runtimes.filter((r) => "available" in r.availability || "needsSignIn" in r.availability || "failed" in r.availability);
-  return { working: installed.filter((r) => "available" in r.availability && !r.isOut).length, total: installed.length };
+  const low = installed.filter((r) => "available" in r.availability).flatMap((r): LowAllowance[] => {
+    const allowances = allowancesOf(r.runtime.id);
+    const reading = allowances && ownRow(allowances.rows, r.runtime.id)?.state.reading;
+    if (!allowances || !reading) return [];
+    if (reading.resetsAt !== undefined && fromWireDate(reading.resetsAt).getTime() <= fromWireDate(allowances.at).getTime()) return [];
+    const used = reading.spent ? 1 : reading.used;
+    if (used !== undefined) return used >= lowUsed ? [{ runtimeID: r.runtime.id, left: 1 - used }] : [];
+    return reading.nearlySpent ? [{ runtimeID: r.runtime.id }] : [];
+  });
+  return { working: installed.filter((r) => "available" in r.availability && !r.isOut).length, total: installed.length, low };
+}
+
+export interface RuntimeTally { working: number; total: number; low: LowAllowance[] }
+
+/** One runtime with little allowance left: `left` from 0 to 1, none when it said nearly used up and no amount. */
+export interface LowAllowance { runtimeID: string; left?: number }
+
+/** Used from here on is low: less than 10% left (Alex, #3956), not the Runtimes bar's 80%. RuntimeTally.lowUsed. */
+export const lowUsed = 0.9;
+
+/**
+ * The grey line under Status ▸ Runtimes (#3956), RuntimeTally.lowWords: `Claude: 8% left`, `Claude: nearly used up`,
+ * or for two or more `Claude, Codex: low allowance`. Undefined when nothing is low, or none work: then the red wins.
+ */
+export function lowWords(tally: RuntimeTally | undefined): string | undefined {
+  const one = tally?.low[0];
+  if (!tally || tally.working === 0 || !one) return undefined;
+  if (tally.low.length > 1) return `${tally.low.map((l) => runtimeName(l.runtimeID)).join(", ")}: low allowance`;
+  return one.left === undefined ? `${runtimeName(one.runtimeID)}: nearly used up` : `${runtimeName(one.runtimeID)}: ${Math.round(one.left * 100)}% left`;
 }
 
 /** The name the account picker gives a runtime's own sign-in (#840, #999), AccountProfile.defaultName. */

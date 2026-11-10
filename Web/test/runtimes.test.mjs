@@ -66,8 +66,25 @@ test("runtimes: the Runtimes row counts working out of installed (#379)", () => 
   const installing = { runtime: { id: "cursor", name: "Cursor" }, availability: { installing: {} } };
   assert.equal(r.runtimeTally([]), undefined, "not yet listed is not none");
   assert.deepEqual(r.runtimeTally([status("claude", "Claude"), { ...status("grok", "Grok"), isOut: true }, signedOut,
-    status("opencode", "OpenCode", false), installing]), { working: 1, total: 3 });
-  assert.deepEqual(r.runtimeTally([{ ...status("claude", "Claude"), isOut: true }, signedOut]), { working: 0, total: 2 });
+    status("opencode", "OpenCode", false), installing]), { working: 1, total: 3, low: [] });
+  assert.deepEqual(r.runtimeTally([{ ...status("claude", "Claude"), isOut: true }, signedOut]), { working: 0, total: 2, low: [] });
+});
+
+// Less than 10% left (#3956), as RuntimeTallyTests: the grey line under Status ▸ Runtimes.
+test("runtimes: an allowance below 10% left is low, and the line names it (#3956)", () => {
+  const at = Date.UTC(2026, 10, 10) / 1000 - 978307200;
+  const allowances = (readings) => ({ at, rows: Object.entries(readings).map(([id, reading]) =>
+    ({ credentialKey: `${id}:sign-in`, state: { reading: { spent: false, nearlySpent: false, at, ...reading } } })) });
+  const two = [status("claude", "Claude"), status("codex", "Codex")];
+  const words = (list, readings) => r.lowWords(r.runtimeTally(list, () => allowances(readings)));
+  assert.equal(words(two, { claude: { used: 0.92 } }), "Claude: 8% left");
+  assert.equal(words(two, { claude: { used: 0.85 } }), undefined, "80% used is not low");
+  assert.equal(words(two, { claude: { nearlySpent: true } }), "Claude: nearly used up");
+  assert.equal(words([...two, status("grok", "Grok")], { claude: { used: 0.95 }, codex: { spent: true } }), "Claude, Codex: low allowance");
+  assert.equal(words(two, { claude: { used: 0.95, resetsAt: at - 60 } }), undefined, "a reading that has reset");
+  assert.equal(words([{ ...status("claude", "Claude"), isOut: true }], { claude: { spent: true } }), undefined, "none working stays red");
+  assert.equal(words([status("claude", "Claude", false)], { claude: { used: 0.95 } }), undefined, "not available");
+  assert.equal(r.lowWords(r.runtimeTally(two)), undefined, "no allowances read");
 });
 
 // Several accounts per runtime (#840): an added account's row is its own, under the runtime's.

@@ -1301,8 +1301,9 @@ dialog.image-viewer::backdrop { background: rgb(0 0 0 / 0.45); }
 .sub-app .settings-body .settings-scope { margin-bottom: 20px; }
 .sub-app .settings-body .scope-head { font-size: 0.875rem; font-weight: 600; margin: 8px 8px 4px; }
 .sub-app-row { display: flex; justify-content: space-between; align-items: center; }
-/* A machine's need under its row (#3764), as the window's grey line. */
-.machine-need { padding: 0 20px 6px; margin-top: -6px; font-size: 0.75rem; line-height: 1.35; }
+/* A machine's need under its row (#3764), and Status ▸ Runtimes' low allowance (#3956), as the window's grey line. */
+.sub-app-row .attention { color: var(--tint-attention); }
+.machine-need, .page-need { padding: 0 20px 6px; margin-top: -6px; font-size: 0.75rem; line-height: 1.35; }
 .machine-need .foot-start { margin-left: 6px; font-size: inherit; }
 /* A machine's row (#3974), as the window's MachineRow: the icon, ··· on hover, and a swipe on a touch screen. */
 .machine-row { position: relative; overflow: hidden; touch-action: pan-y; }
