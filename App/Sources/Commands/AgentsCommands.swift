@@ -211,6 +211,7 @@ struct AgentsCommands: Commands {
                 }
             }
             Button("Docs") { model.showDocs(model.docsHistory.current ?? DocsPlace()) }
+            Button(MessagesList.title) { model.sidebarItem = .messages }
             // The page the window opens to (#3986). ⌘1…n are the inspector panes, so ⌘0 is
             // next to them; Actual Size keeps it while a Markdown page is in front.
             Button("Multiplier") { model.showMultiplier() }

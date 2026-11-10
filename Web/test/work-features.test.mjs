@@ -114,6 +114,6 @@ test("the lead says its state", () => {
 });
 
 test("Work lists Features after Pull requests", () => {
-  assert.deepEqual(nav.navPages.work.map((p) => p.title), ["Issues", "Pull requests", "Features", "Milestones", "Releases"]);
+  assert.deepEqual(nav.navPages.work.map((p) => p.title), ["Issues", "Pull requests", "Features", "Milestones", "Releases", "Timeline"]);
   assert.deepEqual(nav.navPages.work[2].draw, { kind: "features" });
 });

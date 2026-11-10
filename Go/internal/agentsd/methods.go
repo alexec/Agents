@@ -51,6 +51,7 @@ func (d *Daemon) register() {
 	d.registerCost()
 	d.registerLineage()
 	d.registerLineageSessions()
+	d.registerLineageFigures()
 	d.registerForge()
 	d.registerMessages()
 	d.registerWorkTimeline()

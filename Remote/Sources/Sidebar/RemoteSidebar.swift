@@ -1082,6 +1082,11 @@ private struct FolderMenuItems: View {
             }
         }
         ShowHiddenViewsButton(summary: summary)
+        // Work at Once, Sessions and Policy (#2798 kept the rest of it on the Mac and the web).
+        Button(RemoteProjectSettingsWords.menuItem, systemImage: "gearshape") {
+            model.projectSettingsFolder = summary.key
+        }
+        .disabled(model.hostIsOffline(summary.host))
         // To the top of the sidebar, as the window's Pin.
         Button {
             Task { await model.setPinned(!summary.folder.isPinned, for: summary) }

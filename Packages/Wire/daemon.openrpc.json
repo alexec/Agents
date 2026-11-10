@@ -5037,6 +5037,26 @@
       }
     },
     {
+      "name": "lineage/figures",
+      "x-capability": "lineage.figures/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LineageNodeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LineageFigures"
+        }
+      }
+    },
+    {
       "name": "lineage/link",
       "x-capability": "lineage/1",
       "paramStructure": "by-name",

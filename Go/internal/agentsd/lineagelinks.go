@@ -378,7 +378,7 @@ func (d *Daemon) connectedRepo(folder string) forgeRepo {
 }
 
 // connectedForgejoRepo is folder's repo on the connected Forgejo, as the Work pages find it
-// (forgejoSources), or none.
+// (forgejoForge.Sources), or none.
 func (d *Daemon) connectedForgejoRepo(folder string) forgeRepo {
 	c, root := d.forgejoRoot()
 	if root == "" {

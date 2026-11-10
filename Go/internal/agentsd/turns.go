@@ -38,6 +38,9 @@ type live struct {
 	stop         context.CancelFunc
 	// inTurn is whether a turn is in flight: a form is asked only in one.
 	inTurn bool
+	// stopEarly is a stop that came after kick and before the turn began (#3621): turn
+	// ends that turn stopped instead of clearing it.
+	stopEarly bool
 	// prompting is whether the turn's words are with the runtime; a stop before then is
 	// kept in stopped, and the turn ends there instead of sending them.
 	prompting, stopped bool
@@ -448,6 +451,7 @@ func (l *live) kick() {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if !l.running {
+		l.stopEarly = false
 		l.running = l.d.goAfterTurn("agent "+string(l.id), l.run)
 	}
 }
@@ -559,8 +563,14 @@ func (l *live) turn() bool {
 	l.inTurn, l.prompting, l.stopped, l.reported, l.showedFile = true, false, false, false, false
 	l.heldBlock = nil
 	noSession := l.session == nil
+	early := l.stopEarly
+	l.stopEarly = false
 	l.mu.Unlock()
 	defer cancel()
+	// Stopped before the turn began: it ends cancelled, as a stop while it got ready.
+	if early {
+		cancel()
+	}
 	defer func() {
 		l.mu.Lock()
 		l.inTurn, l.prompting = false, false
@@ -1549,6 +1559,10 @@ func (l *live) cancel() {
 	l.mu.Lock()
 	l.stops++
 	s, stop, seq := l.session, l.stop, l.turnSeq
+	if l.running && !l.inTurn {
+		// Kicked, but the turn has not begun: turn would clear stopped (#3621).
+		l.stopEarly = true
+	}
 	if l.inTurn && !l.prompting {
 		// Not with the runtime yet: session/cancel would find no turn to end.
 		l.stopped = true

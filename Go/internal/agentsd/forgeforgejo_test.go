@@ -3,7 +3,6 @@ package agentsd
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -269,10 +268,8 @@ func TestForgeWritesOnAForgejoItem(t *testing.T) {
 	if e := c.callError(t, 8, "forge/rerun", wire.ForgeNodeRequest{Node: pr}); e == nil || !strings.Contains(e.Message, "open the check on Forgejo") {
 		t.Fatalf("rerun: %v", e)
 	}
-	var log wire.ForgeLog
-	json.Unmarshal(c.call(t, 9, "forge/log", wire.ForgeLogRequest{Node: pr}), &log)
-	if !strings.Contains(log.Text, "open the check on Forgejo") {
-		t.Fatalf("log: %+v", log)
+	if e := c.callError(t, 9, "forge/log", wire.ForgeLogRequest{Node: pr}); e == nil || !strings.Contains(e.Message, "open the check on Forgejo") {
+		t.Fatalf("log: %v", e)
 	}
 	var labels wire.ForgeLabels
 	json.Unmarshal(c.call(t, 10, "forge/labels", wire.ForgeNodeRequest{Node: issue}), &labels)
@@ -396,10 +393,11 @@ func TestForgePlanWritesOnAForgejoEpic(t *testing.T) {
 
 // A list narrowed to a board has no Forgejo items: Forgejo's API cannot read its project boards.
 func TestABoardLeavesForgejoOut(t *testing.T) {
-	s := forgeSources{forgejo: []string{"walkalex/App"}, forgejoErr: errors.New("elsewhere")}
-	narrowToBoard(&s, wire.ProjectBoard{Forge: new(wire.ConnectionProviderGithub), Key: new("alexec/1")}, []string{"/f"}, false)
-	if s.forgejo != nil || s.forgejoErr != nil {
-		t.Fatalf("sources: %+v", s)
+	d, _, fj, _ := forgejoDaemon(t)
+	scope := forgejoScope{root: "http://localhost:3753/", repos: []string{"walkalex/App"}}
+	p, err := forgejoForge{d: d}.List(context.Background(), scope, forgeFilter{Board: &forgeBoard{forge: "forgejo"}}, "", 10)
+	if err != nil || len(p.items) > 0 || len(fj.searches) > 0 {
+		t.Fatalf("a board's list: %+v, %v, searched %v", p, err, fj.searches)
 	}
 }
 

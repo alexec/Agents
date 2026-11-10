@@ -4,7 +4,7 @@
 // name. g then a letter goes to a section, when the focus is not in a field.
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
-import type { ComponentChildren } from "preact";
+import { Fragment, type ComponentChildren } from "preact";
 import type { Store } from "../model/store";
 import { go, route, sectionOf, usageAsked } from "../route";
 import { gated, groupedPages, machinePages, navPages, navTitle, openPage, pagesShown, sectionKeys, sectionsShown, usagePaneTitle, usagePanes,
@@ -22,6 +22,7 @@ import { WorkList, WorkPage } from "./Work";
 import { WorkFeatures } from "./WorkFeatures";
 import { WorkTimeline } from "./WorkTimeline";
 import { DocPage, DocsList } from "./Docs";
+import { ConversationPage, MessagesList } from "./Messages";
 import { MachinePage } from "./MachinePage";
 import { machineNeed, machineNeedLine } from "./OfflineStrip";
 import { MachineRow, MakingRow } from "./MachineRow";
@@ -40,6 +41,7 @@ import { DataTable } from "./DataTable";
 import { PageTitle, PersonMenu, SearchBox } from "./TopBar";
 import { pageCrumbs } from "../model/crumbs";
 import { MultiplierPage } from "./Multiplier";
+import { lowWords, runtimeTally, setupRuntimes } from "../model/runtimes";
 import type { Session } from "../session";
 
 /**
@@ -120,10 +122,24 @@ export function NavBar({ store, session }: { store: Store; session: Session }) {
   );
 }
 
+/** Status ▸ Runtimes' grey line (#3956), as the window's Runtimes row: each runtime read on the machine the page reads it on. */
+function runtimesLowWords(store: Store): string | undefined {
+  const all = setupRuntimes(store.hosts.value, store.macHostID.value, store.runtimes.value);
+  const home = new Map(all.map((r) => [r.status.runtime.id, r.home]));
+  return lowWords(runtimeTally(all.map((r) => r.status), (id) => store.runtimeAllowances.value[home.get(id) ?? ""]));
+}
+
+const isRuntimesPage = (page: NavPage) => page.draw.kind === "activity" && page.draw.page === "runtimes";
+
 /** A page's mark beside its row in the list: a count, or that it is not saved. */
 function PageMark({ store, page }: { store: Store; page: NavPage }) {
   // Status ▸ Secrets and Accounts (#4161): the newest operation's age, and a dot when one is not backed up.
   if (page.draw.kind === "statusList") return <StatusListMark store={store} list={page.draw.list} />;
+  // Status ▸ Runtimes (#3956): an allowance below 10% left, in the warning tint, as the window's orange Runtimes icon.
+  if (isRuntimesPage(page)) {
+    const words = runtimesLowWords(store);
+    if (words) return <span class="small attention" title={words} aria-hidden="true">●</span>;
+  }
   if (page.id === "requests" && requestCount(store) > 0) return <span class="sub-app-count">{requestCount(store)}</span>;
   if (page.id === "reportPolicy" && policyNotSaved(store)) return <span class="quiet small attention">Not saved</span>;
   if (page.id === "policy" && orgPolicyNotSaved(store)) return <span class="quiet small attention">Not saved</span>;
@@ -145,6 +161,12 @@ function MachineNeedLine({ store, host }: { store: Store; host: string }) {
   return (
     <p class="machine-need quiet small" role="status">{machineNeedLine(need, row)}</p>
   );
+}
+
+/** Under Status ▸ Runtimes (#3956), in grey: `Claude: 8% left`. Nothing when no allowance is low, or none work. */
+function RuntimesLowLine({ store }: { store: Store }) {
+  const words = runtimesLowWords(store);
+  return words ? <p class="page-need quiet small" role="status">{words}</p> : null;
 }
 
 /** A section's list of pages on the left, the page open on the right. */
@@ -186,11 +208,14 @@ export function SectionPage({ store, section, down }: { store: Store; section: E
                   <MachineNeedLine store={store} host={p.draw.host} />
                 </MachineRow>
               ) : (
-                <button key={p.id} type="button" class={`sub-app-row${p.id === open?.id ? " on" : ""}`}
-                  aria-current={p.id === open?.id ? "page" : undefined} onClick={() => go({ nav: section, section: p.id })}>
-                  {p.title}
-                  <PageMark store={store} page={p} />
-                </button>
+                <Fragment key={p.id}>
+                  <button type="button" class={`sub-app-row${p.id === open?.id ? " on" : ""}`}
+                    aria-current={p.id === open?.id ? "page" : undefined} onClick={() => go({ nav: section, section: p.id })}>
+                    {p.title}
+                    <PageMark store={store} page={p} />
+                  </button>
+                  {isRuntimesPage(p) && <RuntimesLowLine store={store} />}
+                </Fragment>
               ))}
               {machinesHead(group) && makingRows(store.machinesMaking.value, store.hosts.value)
                 .map((name, i) => <MakingRow key={`making-${i}`} name={name} />)}
@@ -231,7 +256,10 @@ export function PageView({ store, page, down }: { store: Store; page: NavPage; d
         : page.draw.kind === "statusList" ? <StatusSecretsPage store={store} list={page.draw.list} />
         : page.draw.kind === "docs" ? (route.value.item
           ? <DocPage key={route.value.item} store={store} docRef={route.value.item} />
-          : <DocsList store={store} />) : null}
+          : <DocsList store={store} />)
+        : page.draw.kind === "messages" ? (route.value.item
+          ? <ConversationPage key={route.value.item} store={store} conversationKey={route.value.item} />
+          : <MessagesList store={store} />) : null}
     </Framed>
   );
 }

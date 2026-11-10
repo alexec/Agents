@@ -6,12 +6,12 @@ import type { ActivityPage } from "../route";
 import { reportSections, type Section } from "./console";
 import { workKinds, workKindTitle, type WorkKind } from "./work";
 
-export type NavSection = "overview" | "agents" | "work" | "docs" | "machines" | "workflows" | "reports" | "requests" | "people" | "status" | "settings";
+export type NavSection = "overview" | "agents" | "work" | "docs" | "messages" | "machines" | "workflows" | "reports" | "requests" | "people" | "status" | "settings";
 
-export const navSections: readonly NavSection[] = ["overview", "agents", "work", "docs", "machines", "workflows", "reports", "requests", "people", "status", "settings"];
+export const navSections: readonly NavSection[] = ["overview", "agents", "work", "docs", "messages", "machines", "workflows", "reports", "requests", "people", "status", "settings"];
 
 export const navTitle: Record<NavSection, string> = {
-  overview: "Overview", agents: "Agents", work: "Work", docs: "Docs", machines: "Machines", workflows: "Workflows", reports: "Reports",
+  overview: "Overview", agents: "Agents", work: "Work", docs: "Docs", messages: "Messages", machines: "Machines", workflows: "Workflows", reports: "Reports",
   requests: "Requests", people: "People", status: "Status", settings: "Settings",
 };
 
@@ -27,6 +27,7 @@ export type PageDraw =
   | { kind: "features" }
   | { kind: "timeline" }
   | { kind: "docs" }
+  | { kind: "messages" }
   | { kind: "machine"; host: string }
   | { kind: "secrets" }
   | { kind: "accounts" }
@@ -65,6 +66,8 @@ export const navPages: Record<NavSection, readonly NavPage[]> = {
   ]),
   // The folders' docs and the docs connectors' (#3321, spec 3319), one page; #/docs/<ref> is a doc's page.
   docs: [{ id: "docs", title: "Docs", group: "Docs", draw: { kind: "docs" } }],
+  // The messaging connectors' conversations, read only (#4344), one page; #/messages/<key> is a conversation's.
+  messages: [{ id: "messages", title: "Messages", group: "Messages", draw: { kind: "messages" } }],
   machines: [
     { id: "machines", title: "Machines", group: "Machines", draw: { kind: "machines" } },
   ],

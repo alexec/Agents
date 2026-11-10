@@ -8,7 +8,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/alexec/agents/Go/internal/gitlabmcp"
 	"github.com/alexec/agents/Go/internal/jiramcp"
 	"github.com/alexec/agents/Go/internal/lineage"
 	"github.com/alexec/agents/Go/internal/linearmcp"
@@ -106,14 +105,8 @@ func (d *Daemon) forgePlan(ctx context.Context, r wire.ForgePlanRequest) (wire.F
 			epic, children, err = d.jiraPlan(ctx, method, key)
 		} else if project, id, ok := boardsOfNode(r.Node); ok {
 			epic, children, err = d.boardsPlan(ctx, method, project, id)
-		} else if repo, number, ok := forgejoOfNode(r.Node); ok {
-			epic, children, err = d.forgejoPlan(ctx, method, repo, number)
-		} else if _, _, ok := bitbucketOfNode(r.Node); ok {
-			return wire.ForgePlan{}, Invalid("%s: %s", method, bitbucketNoPlan)
-		} else if repo, number, ok := nodeOfRepo(r.Node); !ok {
-			return wire.ForgePlan{}, Invalid("%s: %s is not an issue on GitHub, GitLab, Forgejo, Linear, Jira or Azure Boards", method, r.Node.Ref)
 		} else {
-			epic, children, err = d.gitlabPlan(ctx, method, repo, number)
+			return wire.ForgePlan{}, Invalid("%s: %s is not an issue on GitHub, GitLab, Forgejo, Linear, Jira or Azure Boards", method, r.Node.Ref)
 		}
 		if err != nil {
 			return wire.ForgePlan{}, err
@@ -234,31 +227,6 @@ func (d *Daemon) leadOf(epic wire.LineageNode) *wire.ForgeLead {
 		return nil
 	}
 	return &wire.ForgeLead{Session: best.ID, Title: best.Title, State: best.State}
-}
-
-func (d *Daemon) gitlabPlan(ctx context.Context, method string, repo forgeRepo, number int) (wire.ForgeItem, []planChild, error) {
-	gl, project, folder, err := d.gitlabOf(ctx, method, repo)
-	if err != nil {
-		return wire.ForgeItem{}, nil, err
-	}
-	p, err := gl.Plan(ctx, project, number)
-	if err != nil {
-		if gitlabmcp.IsNotFound(err) {
-			return wire.ForgeItem{}, nil, Invalid("%s: %v", method, err)
-		}
-		return wire.ForgeItem{}, nil, err
-	}
-	epic := gitlabItemOf(p.Epic, folder)
-	var children []planChild
-	for _, c := range p.Children {
-		child := forgeRepo{"gitlab", strings.ToLower(c.Project)}
-		pc := planChild{item: gitlabItemOf(c.Item, d.repoFolder(child))}
-		for _, b := range c.BlockedBy {
-			pc.blockedBy = append(pc.blockedBy, planRef{node: forgeRepo{"gitlab", strings.ToLower(b.Project)}.issue(b.Number), open: b.Open})
-		}
-		children = append(children, pc)
-	}
-	return epic, children, nil
 }
 
 func (d *Daemon) linearPlan(ctx context.Context, method, identifier string) (wire.ForgeItem, []planChild, error) {
