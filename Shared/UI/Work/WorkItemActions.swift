@@ -37,7 +37,7 @@ struct WorkMergeBox: View {
                     WorkStateIcon(kind: "pr", state: "open", draft: item.draft == true, onFill: true)
                         .appText(.fine)
                         .frame(width: 26, height: 26)
-                        .background(Circle().fill((item.draft == true ? WorkLook.Tone.grey : .green).color))
+                        .background(Circle().fill((item.draft == true ? WorkLook.Glyph.prDraft : .prOpen).tone.color))
                 } content: {
                     content
                 }
@@ -171,7 +171,7 @@ struct WorkMergeBox: View {
             .disabled(methods.count < 2 && waits)
         }
         .buttonStyle(.borderedProminent)
-        .tint(waits ? Color.accentColor : WorkLook.Tone.green.color)
+        .tint(waits ? Paper.accent : WorkLook.Glyph.prOpen.tone.color)
         .fixedSize()
     }
 
@@ -212,8 +212,8 @@ struct WorkMergeBox: View {
 
     static func tint(_ sign: WorkLook.MergeSign) -> Color? {
         switch sign {
-        case .pass: WorkLook.Tone.green.color
-        case .fail: WorkLook.Tone.red.color
+        case .pass: WorkLook.Glyph.prOpen.tone.color
+        case .fail: WorkLook.Glyph.prClosed.tone.color
         case .wait: amber
         case .info: nil
         }
