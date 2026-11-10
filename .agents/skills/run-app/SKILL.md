@@ -255,6 +255,11 @@ key, and no traffic lights. A web view (a pinned MCP App, an HTML page, the brow
 draws in its own process: the render asks it for its picture first and draws that in its
 place (#3854). `--render` takes the window's own render either way.
 
+A web view's page is not in the tree the socket reads, so `find` and `press TEXT` do not see
+it. Press in it by a point of the shot: `click --x X --y Y` (or `press --x X --y Y`) hands the
+click to the web view itself, so it works with the window behind or the screen locked
+(#4137): a view's pull request, its Files tab, then **Show Diff** opens the diff sheet.
+
 ```sh
 $S/shot.sh $ROOT out.png            # window server capture, behind the user's window; unlocked only
 swift $S/ui.swift windows <APP_PID> # window ids, sizes, names, on|off this Space

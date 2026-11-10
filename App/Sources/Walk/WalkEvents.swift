@@ -1,6 +1,7 @@
 #if DEBUG
 import AppKit
 import Foundation
+import WebKit
 
 /// A click or a key made in process (#1172), for what has no accessibility action: a
 /// SwiftUI tap gesture (a folder's heading folds on one), Return in the prompt. The event
@@ -13,6 +14,19 @@ enum WalkEvents {
         guard let frameView = window.contentView?.superview else { throw WalkError("no window to click") }
         let local = CGPoint(x: point.x, y: window.frame.height - point.y)
         guard let view = frameView.hitTest(local) else { throw WalkError("nothing at \(Int(point.x)),\(Int(point.y))") }
+        // A web view (a view's page, the diff sheet, an HTML page) takes a window's first
+        // click only when the window is key (#4137): `acceptsFirstMouse` says no, so the
+        // window keeps the click. It is handed to the web view itself, which sends it on to
+        // its page.
+        if let web = webView(at: view) {
+            for click in 1...max(1, count) {
+                guard let down = mouse(.leftMouseDown, at: local, in: window, count: click),
+                      let up = mouse(.leftMouseUp, at: local, in: window, count: click) else { throw WalkError("no event") }
+                web.mouseDown(with: down)
+                web.mouseUp(with: up)
+            }
+            return "clicked \(web.className) at \(Int(point.x)),\(Int(point.y)), handed to it; active \(NSApp.isActive), key \(window.isKeyWindow)"
+        }
         for click in 1...max(1, count) {
             guard let down = mouse(.leftMouseDown, at: local, in: window, count: click),
                   let up = mouse(.leftMouseUp, at: local, in: window, count: click) else { throw WalkError("no event") }
@@ -26,6 +40,16 @@ enum WalkEvents {
             }
         }
         return "clicked \(view.className) at \(Int(point.x)),\(Int(point.y)); active \(NSApp.isActive), key \(window.isKeyWindow)"
+    }
+
+    /// The web view the view is, or is in.
+    static func webView(at view: NSView) -> WKWebView? {
+        var current: NSView? = view
+        while let next = current {
+            if let web = next as? WKWebView { return web }
+            current = next.superview
+        }
+        return nil
     }
 
     private static func mouse(_ type: NSEvent.EventType, at point: CGPoint, in window: NSWindow, count: Int) -> NSEvent? {
