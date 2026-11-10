@@ -12,9 +12,11 @@ import (
 // children are the epic's sub-issues, asked again filedRecheck later, a walk from the
 // session reaches the epic and its children.
 func TestLineageSessionOpensTheIssuesItFiles(t *testing.T) {
-	was := filedRecheck
-	filedRecheck = 50 * time.Millisecond
-	defer func() { filedRecheck = was }()
+	// The second ask is due when the test says, after the forge has the parents (#3965):
+	// a 50 ms timer fired before setParent on a busy runner, and asked too early.
+	due := make(chan struct{})
+	filedRecheckDue = due
+	defer func() { filedRecheckDue = nil }()
 	d, _ := start(t, t.TempDir())
 	defer d.Shutdown()
 	folder := t.TempDir()
@@ -57,6 +59,7 @@ func TestLineageSessionOpensTheIssuesItFiles(t *testing.T) {
 	// The children are made the epic's sub-issues; the second ask links them.
 	forge.setParent(repo.issue(2).Ref, repo.issue(1).Ref)
 	forge.setParent(repo.issue(3).Ref, repo.issue(1).Ref)
+	close(due)
 	for deadline := time.Now().Add(5 * time.Second); ; {
 		if forge.times(repo.issue(2).Ref) >= 2 && forge.times(repo.issue(3).Ref) >= 2 {
 			break
