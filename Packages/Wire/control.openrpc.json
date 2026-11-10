@@ -1261,6 +1261,90 @@
       }
     },
     {
+      "name": "control/planeMove",
+      "x-capability": "control.plane-move/1",
+      "description": "A person asks the window on their Mac to do one step of moving the control plane to another machine, or back (#4255): the control plane tells the person's Mac windows control/planeMoveWanted, and the window whose Mac it concerns does it with its own control key and says how it stands with control/planeMoveReport. Refused when no window of the person's is connected. Admins only.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/PlaneMoveAsk"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "control/planeMoveReport",
+      "x-capability": "control.plane-move/1",
+      "description": "The window on a Mac says how a move of the control plane stands (#4255); the control plane tells the person's clients control/planeMoveReported. From a Mac's window only.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/PlaneMoveReport"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "control/planeMoveReported",
+      "x-capability": "control.plane-move/1",
+      "description": "To the person's clients: how a move of the control plane stands on the Mac that does it (#4255).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/PlaneMoveReport"
+          }
+        }
+      ]
+    },
+    {
+      "name": "control/planeMoveWanted",
+      "x-capability": "control.plane-move/1",
+      "description": "To the person's Mac windows: a client asked for a step of a move of the control plane (#4255). Only the window whose Mac it concerns acts on it.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/PlaneMoveAsk"
+          }
+        }
+      ]
+    },
+    {
       "name": "control/policyChanged",
       "x-capability": "policy/1",
       "description": "To every person's clients when the policy changes (#998).",

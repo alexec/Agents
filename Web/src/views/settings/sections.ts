@@ -20,6 +20,7 @@ import { ForgeLoginsSection } from "./ForgeLogins";
 import { GitAccessSection } from "./GitAccess";
 import { VersionsSection } from "./Machines";
 import { NotificationsSection } from "./Notifications";
+import { PlaneMoveSection } from "./PlaneMove";
 import { PolicySection } from "./Policy";
 import { ProcessesSection } from "./Processes";
 import { RecoveryKeySection } from "./RecoveryKey";
@@ -71,6 +72,8 @@ export const settingsSections: readonly SettingsSection[] = [
   // Who belongs to the control plane, and their machines and clients (#994).
   { name: "people", scope: "controlPlane", order: 10, Section: PeopleSection },
   { name: "personas", scope: "agentConfiguration", order: 20, Section: PersonasConfigSection },
+  // Move to Another Machine…, its forwarding rows and Run It Here Again… (#4255): the window on the Mac does them.
+  { name: "planeMove", scope: "controlPlane", order: 2, Section: PlaneMoveSection, shows: (store) => store.canMovePlane.value },
   // Organisation Policy (#2957, was Policy): the organisation's rules, read only, and the kill switch for an admin (#998).
   { name: "policy", scope: "controlPlane", order: 45, Section: PolicySection },
   // What runs on each machine, with its CPU and memory (#3453).

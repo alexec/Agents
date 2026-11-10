@@ -8937,6 +8937,134 @@ type PlanState string
 const PlanStateCurrent PlanState = "current"
 const PlanStateWithdrawn PlanState = "withdrawn"
 
+// What a client asks of a move of the control plane (#4255), as the Mac window's sheets do it: status says how it stands; move and return open Move to Another Machine… and Run It Here Again…; the rest are the sheets' buttons and the overview's.
+type PlaneMoveAction string
+
+const PlaneMoveActionStatus PlaneMoveAction = "status"
+const PlaneMoveActionMove PlaneMoveAction = "move"
+const PlaneMoveActionReturn PlaneMoveAction = "return"
+const PlaneMoveActionSaveKey PlaneMoveAction = "saveKey"
+const PlaneMoveActionUseKey PlaneMoveAction = "useKey"
+const PlaneMoveActionContinue PlaneMoveAction = "continue"
+const PlaneMoveActionBack PlaneMoveAction = "back"
+const PlaneMoveActionCheck PlaneMoveAction = "check"
+const PlaneMoveActionAnnounce PlaneMoveAction = "announce"
+const PlaneMoveActionWithdraw PlaneMoveAction = "withdraw"
+const PlaneMoveActionMoveNow PlaneMoveAction = "moveNow"
+const PlaneMoveActionCancel PlaneMoveAction = "cancel"
+const PlaneMoveActionClose PlaneMoveAction = "close"
+const PlaneMoveActionStopForwarding PlaneMoveAction = "stopForwarding"
+const PlaneMoveActionStopReturnForwarding PlaneMoveAction = "stopReturnForwarding"
+const PlaneMoveActionDismiss PlaneMoveAction = "dismiss"
+
+// control/planeMove and control/planeMoveWanted (#4255): a client asks the window on the Mac that moves the control plane to do one step. The window does it with this Mac's control key, which never leaves the Mac.
+type PlaneMoveAsk struct {
+	Action PlaneMoveAction `json:"action"`
+
+	// With check on a move: where the other machine's control plane is, its https address; with no scheme, https.
+	Address *string `json:"address,omitzero"`
+}
+
+// Where a move a client asked for is, as the Mac window's sheet would draw it (#4255), in its words.
+type PlaneMoveFlow struct {
+	// Move to Another Machine… or Run It Here Again….
+	Kind string `json:"kind"`
+
+	// The sheet's frame: key and check (P, Q or V), told (R or W), moving (S or X).
+	Step string `json:"step"`
+
+	Title string `json:"title"`
+
+	// The line under the title.
+	Lead *string `json:"lead,omitzero"`
+
+	// Where the control plane goes, or comes back from.
+	Address *string `json:"address,omitzero"`
+
+	// The checks (key, check) or the stages (moving), in order.
+	Lines []PlaneMoveLine `json:"lines,omitzero"`
+
+	// Who has heard where it goes (told).
+	Members []PlaneMoveMember `json:"members,omitzero"`
+
+	// How many know, in words (told).
+	Knowing *string `json:"knowing,omitzero"`
+
+	// Run It Here Again…: the other machine holds another key, so this Mac takes it first (Use Key…).
+	OtherKey *bool `json:"otherKey,omitzero"`
+
+	// Every check passed: Tell Everyone may be asked.
+	Checked *bool `json:"checked,omitzero"`
+
+	// A check or a step runs on the Mac now.
+	Busy *bool `json:"busy,omitzero"`
+
+	// The other end serves now: Cancel can't undo it.
+	Taken *bool `json:"taken,omitzero"`
+
+	// A stage failed: Close, not Cancel.
+	Failed *bool `json:"failed,omitzero"`
+
+	Problem *string `json:"problem,omitzero"`
+}
+
+// One check or stage of a move (#4255).
+type PlaneMoveLine struct {
+	Label string `json:"label"`
+
+	State string `json:"state"`
+
+	// Why it failed, or a note under it.
+	Note *string `json:"note,omitzero"`
+}
+
+// A window, phone or machine of the control plane, and whether it knows where the control plane goes (#4255).
+type PlaneMoveMember struct {
+	Name string `json:"name"`
+
+	// What it is, and when it last connected, in words.
+	Kind string `json:"kind"`
+
+	State string `json:"state"`
+
+	Note *string `json:"note,omitzero"`
+}
+
+// control/planeMoveReport and control/planeMoveReported (#4255): how a move of the control plane stands on the Mac that does it, in the Mac window's words: Settings ▸ Control plane ▸ Overview's rows, and the sheet a client opened.
+type PlaneMoveReport struct {
+	// The Mac whose window says it.
+	Mac string `json:"mac"`
+
+	Rows []PlaneMoveRow `json:"rows"`
+
+	Flow *PlaneMoveFlow `json:"flow,omitzero"`
+
+	// Why an overview step (Stop Forwarding) failed.
+	Problem *string `json:"problem,omitzero"`
+}
+
+// A row of the control plane's move card (#4255): Move to Another Machine, This Mac moved its control plane, a forwarding row, or the way back's.
+type PlaneMoveRow struct {
+	Kind string `json:"kind"`
+
+	Title string `json:"title"`
+
+	Detail string `json:"detail"`
+
+	// Its dot is orange.
+	Attention *bool `json:"attention,omitzero"`
+
+	// Its button's words.
+	Button *string `json:"button,omitzero"`
+
+	Action *PlaneMoveAction `json:"action,omitzero"`
+
+	Disabled *bool `json:"disabled,omitzero"`
+
+	// Asked before the action, as Stop forwarding?'s message.
+	Confirm *string `json:"confirm,omitzero"`
+}
+
 type PluginApproveRequest struct {
 	Plugin URL `json:"plugin"`
 

@@ -304,7 +304,7 @@ func TestEveryClientMethodChecksTheOwner(t *testing.T) {
 		"people/setRole": true, "people/remove": true, "people/removePreview": true, "people/forViews": true,
 		"people/setForgeLogins": true, "machines/joinRequests": true, "machines/approveJoin": true,
 		"machines/denyJoin": true, "control/rotate": true,
-		"control/connectAnother": true, "control/connectReport": true,
+		"control/connectAnother": true, "control/connectReport": true, "control/planeMove": true, "control/planeMoveReport": true,
 		"providers/list": true, "providers/refresh": true, "providers/add": true, "providers/update": true,
 		"providers/remove": true, "providers/options": true, "providers/runtimes": true, "providers/draftStart": true,
 		"providers/draftAnswer": true, "providers/draftCancel": true, "providers/draftSigned": true, "providers/create": true, "providers/makeDefault": true, "machines/listKept": true,

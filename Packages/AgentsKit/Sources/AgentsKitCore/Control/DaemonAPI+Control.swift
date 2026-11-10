@@ -43,6 +43,12 @@ public extension DaemonAPI.Method {
     static let controlConnectAnother = "control/connectAnother"
     /// `ConnectAnother.Report` → `Empty`: the window says where it is in that connect.
     static let controlConnectReport = "control/connectReport"
+    /// `PlaneMove.Ask` → `Empty` (#4255): a client asks the window on the Mac that moves the
+    /// control plane to do one step of Move to Another Machine… or Run It Here Again…; an
+    /// admin's only.
+    static let controlPlaneMove = "control/planeMove"
+    /// `PlaneMove.Report` → `Empty`: the window says how that move stands.
+    static let controlPlaneMoveReport = "control/planeMoveReport"
     /// A host, on its channel 0 (T091): a tunnel to the host that lends it a sign-in.
     static let tunnelOpen = "tunnel/open"
     /// On the Mac's host (T091): start relaying a runtime's sign-in, and say what a server
@@ -109,6 +115,11 @@ public extension DaemonAPI.Notification {
     static let controlConnectWanted = "control/connectWanted"
     /// `ConnectAnother.Report`: where the window is in that connect, to the person's clients.
     static let controlConnectReported = "control/connectReported"
+    /// `PlaneMove.Ask`: a client asked for a step of a move of the control plane (#4255);
+    /// only the window whose Mac it concerns does it.
+    static let controlPlaneMoveWanted = "control/planeMoveWanted"
+    /// `PlaneMove.Report`: how that move stands, to the person's clients.
+    static let controlPlaneMoveReported = "control/planeMoveReported"
 }
 
 public extension DaemonAPI {

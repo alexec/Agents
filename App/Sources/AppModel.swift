@@ -3792,6 +3792,9 @@ final class AppModel {
                         case DaemonAPI.Notification.controlConnectWanted:
                             // The page this Mac serves asked for Connect to Another… (#4257).
                             if let self { Task { await ConnectAnotherWanted.heard(note.params, on: control, model: self) } }
+                        case DaemonAPI.Notification.controlPlaneMoveWanted:
+                            // A page asked for a step of Move to Another Machine… or Run It Here Again… (#4255).
+                            Task { await PlaneMoveWanted.heard(note.params, on: control) }
                         default:
                             break
                         }
