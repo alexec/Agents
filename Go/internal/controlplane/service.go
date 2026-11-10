@@ -1639,6 +1639,15 @@ type readGate struct {
 	mu      sync.Mutex
 	last    time.Time
 	running *gateRead
+	// now is time.Now when nil; a test holds it still, under mu (#3930).
+	now func() time.Time
+}
+
+func (g *readGate) clock() time.Time {
+	if g.now == nil {
+		return time.Now()
+	}
+	return g.now()
 }
 
 type gateRead struct {
@@ -1655,7 +1664,7 @@ func (g *readGate) read(read func() error) (ran bool, err error) {
 		<-r.done
 		return true, r.err
 	}
-	if !g.last.IsZero() && time.Since(g.last) < g.every {
+	if !g.last.IsZero() && g.clock().Sub(g.last) < g.every {
 		g.mu.Unlock()
 		return false, nil
 	}
@@ -1664,7 +1673,7 @@ func (g *readGate) read(read func() error) (ran bool, err error) {
 	g.mu.Unlock()
 	r.err = read()
 	g.mu.Lock()
-	g.running, g.last = nil, time.Now()
+	g.running, g.last = nil, g.clock()
 	g.mu.Unlock()
 	close(r.done)
 	return true, r.err

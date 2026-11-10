@@ -47,8 +47,12 @@ func TestUnknownIDsReadTheStoreOnce(t *testing.T) {
 	t.Parallel()
 	st := &countingStore{Store: store.NewMemory()}
 	p := startPlane(t, st, controllink.NewPrivateKey())
-	// Past the window of any read Start made.
-	time.Sleep(readAgainEvery)
+	// The gate's clock stands still past the window of any read Start made, so both
+	// crowds are within one window however long they take under load (#3930).
+	still := time.Now().Add(readAgainEvery)
+	p.s.reads.mu.Lock()
+	p.s.reads.now = func() time.Time { return still }
+	p.s.reads.mu.Unlock()
 	crowd := func() {
 		var wg sync.WaitGroup
 		for i := range 200 {
