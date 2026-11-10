@@ -38,6 +38,8 @@ type Item struct {
 	// State is open, or closed for a status in the Done category; Status is the status's own
 	// name, as In Progress.
 	State, Status, Title, URL, Author, UpdatedAt string
+	// AuthorAvatar is the author's picture, its 48x48; "" for none (#4363).
+	AuthorAvatar string
 	// Milestone is the first fix version: the closest Jira has to a release (#3260).
 	Milestone string
 	Labels    []string
@@ -60,8 +62,8 @@ type SearchPage struct {
 
 // Comment is a comment on an issue, as Markdown.
 type Comment struct {
-	Author, Body, At, URL string
-	Bot                   bool
+	Author, Avatar, Body, At, URL string
+	Bot                           bool
 }
 
 // Transition is a move the issue's workflow allows now: its id, its name (as Start Progress)
@@ -113,7 +115,7 @@ func (r restIssue) item(site string) Item {
 		i.State = "closed"
 	}
 	if base.Creator != nil {
-		i.Author = base.Creator.Name
+		i.Author, i.AuthorAvatar = base.Creator.Name, base.Creator.Avatar
 	}
 	if base.Assignee != "" {
 		i.Assignees = append(i.Assignees, base.Assignee)
@@ -333,7 +335,7 @@ func (j *RealJira) ItemPage(ctx context.Context, key, before string) (ItemDetail
 	start := max(0, end-forgeComments)
 	for _, c := range all[start:end] {
 		author := c.Author.person()
-		d.Thread = append(d.Thread, Comment{Author: author.name(), Body: markdown(rendered[c.ID], c.Body), At: normalized(c.Created),
+		d.Thread = append(d.Thread, Comment{Author: author.name(), Avatar: author.avatar(), Body: markdown(rendered[c.ID], c.Body), At: normalized(c.Created),
 			URL: d.URL + "?focusedCommentId=" + url.QueryEscape(c.ID), Bot: author != nil && author.App})
 	}
 	if start > 0 {

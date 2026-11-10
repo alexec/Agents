@@ -69,15 +69,18 @@ func (f *fakeBoards) set(change func()) {
 }
 
 var (
-	alex    = obj{"id": "a1", "displayName": "Alex", "uniqueName": "alex@acme.test", "descriptor": "aad.YWxleA"}
-	dev     = obj{"id": "d2", "displayName": "Dev", "uniqueName": "dev@acme.test", "descriptor": "aad.ZGV2"}
+	alex = obj{"id": "a1", "displayName": "Alex", "uniqueName": "alex@acme.test", "descriptor": "aad.YWxleA"}
+	dev  = obj{"id": "d2", "displayName": "Dev", "uniqueName": "dev@acme.test", "descriptor": "aad.ZGV2",
+		"imageUrl": "https://dev.azure.com/acme/_apis/GraphProfile/MemberAvatars/aad.ZGV2"}
 	builder = obj{"id": "b3", "displayName": "Project Collection Build Service (acme)", "uniqueName": `Build\acme`, "descriptor": "svc.YnVpbGQ"}
 )
 
 var start = time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC)
 
 // at is start and n minutes, as Azure DevOps writes a time: seven places of a second.
-func at(n int) string { return start.Add(time.Duration(n) * time.Minute).Format("2006-01-02T15:04:05.0000000Z") }
+func at(n int) string {
+	return start.Add(time.Duration(n) * time.Minute).Format("2006-01-02T15:04:05.0000000Z")
+}
 
 // item puts a work item in the fake, made by by at minute n, and is it.
 func (f *fakeBoards) item(id int, title, kind, state string, by obj, n int, extra obj) *fakeItem {

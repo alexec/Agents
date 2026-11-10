@@ -14,7 +14,7 @@ import (
 const forgeSearchAnswer = `{"data":{"issues":{"pageInfo":{"hasNextPage":true,"endCursor":"end"},"edges":[
  {"cursor":"c1","node":{"identifier":"ENG-4","title":"Sync the billing export","url":"https://linear.app/a/issue/ENG-4",
   "updatedAt":"2026-11-01T10:00:00.000Z","team":{"key":"ENG"},"state":{"type":"started"},"projectMilestone":{"name":"Beta"},
-  "labels":{"nodes":[{"name":"Bug","color":"#EB5757"}]},"assignee":{"displayName":"alex"},"creator":{"displayName":"kim"},
+  "labels":{"nodes":[{"name":"Bug","color":"#EB5757"}]},"assignee":{"displayName":"alex"},"creator":{"displayName":"kim","avatarUrl":"https://public.linear.app/k/avatar"},
   "botActor":null,"commentCount":{"nodes":[{},{}]}}},
  {"cursor":"c2","node":{"identifier":"OPS-1","title":"Rotate keys","url":"u","updatedAt":"2026-11-01T09:00:00.000Z",
   "team":{"key":"OPS"},"state":{"type":"canceled"},"projectMilestone":null,"labels":{"nodes":[]},"assignee":null,
@@ -25,7 +25,7 @@ const forgeItemAnswer = `{"data":{"issue":{"identifier":"ENG-4","title":"Sync th
  "team":{"key":"ENG"},"state":{"type":"completed"},"labels":{"nodes":[]},"commentCount":{"nodes":[{}]},"description":"The body.",
  "comments":{"pageInfo":{"hasNextPage":true,"endCursor":"older"},"nodes":[
   {"body":"Newest.","createdAt":"2026-11-01T10:02:00.000Z","url":"c2","user":null,"botActor":{"name":"GitHub"}},
-  {"body":"Oldest.","createdAt":"2026-11-01T10:01:00.000Z","url":"c1","user":{"displayName":"kim"}}]}}}}`
+  {"body":"Oldest.","createdAt":"2026-11-01T10:01:00.000Z","url":"c1","user":{"displayName":"kim","avatarUrl":"https://public.linear.app/k/avatar"}}]}}}}`
 
 func forgeLinear(t *testing.T) (*RealLinear, *[]map[string]any) {
 	var mu sync.Mutex
@@ -80,7 +80,7 @@ func TestForgeSearchListsManyTeamsInOneQuery(t *testing.T) {
 		t.Fatalf("page: %+v", p)
 	}
 	i := p.Items[0]
-	if i.Identifier != "ENG-4" || i.Team != "ENG" || i.State != "open" || i.Milestone != "Beta" || i.Author != "kim" || i.Comments != 2 ||
+	if i.Identifier != "ENG-4" || i.Team != "ENG" || i.State != "open" || i.Milestone != "Beta" || i.Author != "kim" || i.AuthorAvatar != "https://public.linear.app/k/avatar" || i.Comments != 2 ||
 		i.LabelColors["Bug"] != "#eb5757" || len(i.Assignees) != 1 {
 		t.Fatalf("first: %+v", i)
 	}
@@ -116,7 +116,7 @@ func TestForgeItemPage(t *testing.T) {
 	if d.Body != "The body." || d.State != "closed" || d.Before != "older" || len(d.Thread) != 2 {
 		t.Fatalf("detail: %+v", d)
 	}
-	if d.Thread[0].Body != "Oldest." || d.Thread[0].Author != "kim" || d.Thread[1].Author != "GitHub" || !d.Thread[1].Bot {
+	if d.Thread[0].Body != "Oldest." || d.Thread[0].Author != "kim" || d.Thread[0].Avatar != "https://public.linear.app/k/avatar" || d.Thread[1].Avatar != "" || d.Thread[1].Author != "GitHub" || !d.Thread[1].Bot {
 		t.Fatalf("thread: %+v", d.Thread)
 	}
 	if _, err := l.ItemPage(context.Background(), "ENG-404", ""); err == nil {

@@ -181,6 +181,7 @@ func TestForgeSearch(t *testing.T) {
 	i := page.Items[0]
 	if i.Project != "acme/web app" || i.State != "open" || i.Status != "Active" || i.Type != "Bug" || i.Parent != 1 ||
 		!slices.Equal(i.Assignees, []string{"alex@acme.test"}) || i.Author != "dev@acme.test" ||
+		i.AuthorAvatar != "https://dev.azure.com/acme/_apis/GraphProfile/MemberAvatars/aad.ZGV2" ||
 		i.URL != f.server.URL+"/acme/web%20app/_workitems/edit/3" || i.UpdatedAt != normalized(at(3)) {
 		t.Fatalf("item: %+v", i)
 	}
@@ -264,7 +265,7 @@ func TestForgeItemPage(t *testing.T) {
 		t.Fatalf("page: %+v", d)
 	}
 	if len(d.Thread) != 2 || d.Thread[0].Body != "Hi **there**" || d.Thread[0].Author != "dev@acme.test" ||
-		d.Thread[1].Body != "**Built.**" || !d.Thread[1].Bot {
+		d.Thread[0].Avatar != "https://dev.azure.com/acme/_apis/GraphProfile/MemberAvatars/aad.ZGV2" || d.Thread[1].Body != "**Built.**" || !d.Thread[1].Bot {
 		t.Fatalf("comments: %+v", d.Thread)
 	}
 	want := []Transition{{"Active", "Active", "indeterminate"}, {"Closed", "Closed", "done"}, {"Removed", "Removed", "done"}}

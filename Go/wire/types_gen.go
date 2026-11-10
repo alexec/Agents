@@ -4700,9 +4700,11 @@ type ForgeCloseRequest struct {
 	Transition *string `json:"transition,omitzero"`
 }
 
-// A comment on an issue or a pull request (#3129), as Markdown. bot says a bot or an app wrote it.
+// A comment on an issue or a pull request (#3129), as Markdown. bot says a bot or an app wrote it. avatar is the author's picture, a URL that only forge/image reads (#4363); none when the forge gives none.
 type ForgeComment struct {
 	Author string `json:"author"`
+
+	Avatar *string `json:"avatar,omitzero"`
 
 	Body string `json:"body"`
 
@@ -4819,7 +4821,7 @@ type ForgeImageRequest struct {
 	URL string `json:"url"`
 }
 
-// An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for GitHub, GitLab, Linear and Jira (#3260), so one page draws each. node is its lineage node (kind issue or pr, ref github:alexec/Agents#12). state is open, closed or merged; status is the tracker's own name for its step, where its workflow has steps (a Jira status, as In Progress; one in Jira's Done category is closed). folder is a folder on this machine on its repo, to act from. labels have their #rrggbb colour where the forge gives one (#2956). The pull request's own fields: draft; checks is passing, failing, running or none; review is approved, changes_requested or review_required; mergeable is mergeable, conflicting or unknown; autoMerge says auto-merge is on. The hierarchy (#3267): parent is the issue it is a sub-issue (a Linear or GitLab child) of; level is epic, story, task or spike, from its labels; feature is the name of its feature:<name> label; progress is a parent's closed children of all of them, where the forge says it: in a GitHub list, and on an issue's own read. standing says it has the label standing: a standing epic, whose plan is a query (#3659).
+// An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for GitHub, GitLab, Linear and Jira (#3260), so one page draws each. node is its lineage node (kind issue or pr, ref github:alexec/Agents#12). state is open, closed or merged; status is the tracker's own name for its step, where its workflow has steps (a Jira status, as In Progress; one in Jira's Done category is closed). folder is a folder on this machine on its repo, to act from. labels have their #rrggbb colour where the forge gives one (#2956). The pull request's own fields: draft; checks is passing, failing, running or none; review is approved, changes_requested or review_required; mergeable is mergeable, conflicting or unknown; autoMerge says auto-merge is on. The hierarchy (#3267): parent is the issue it is a sub-issue (a Linear or GitLab child) of; level is epic, story, task or spike, from its labels; feature is the name of its feature:<name> label; progress is a parent's closed children of all of them, where the forge says it: in a GitHub list, and on an issue's own read. standing says it has the label standing: a standing epic, whose plan is a query (#3659). authorAvatar is the author's picture, a URL that only forge/image reads (#4363), where the forge gives one (ForgeCapabilities.avatars).
 type ForgeItem struct {
 	Node LineageNode `json:"node"`
 
@@ -4836,6 +4838,8 @@ type ForgeItem struct {
 	Labels []ForgeLabel `json:"labels"`
 
 	Author *string `json:"author,omitzero"`
+
+	AuthorAvatar *string `json:"authorAvatar,omitzero"`
 
 	Assignees []string `json:"assignees"`
 

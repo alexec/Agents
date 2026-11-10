@@ -101,7 +101,8 @@ func (f *fakeBitbucket) set(change func()) {
 
 func person(n int, nickname string) obj {
 	return obj{"type": "user", "uuid": "{" + strconv.Itoa(n) + "}", "account_id": "a-" + nickname, "nickname": nickname,
-		"display_name": strings.ToUpper(nickname[:1]) + nickname[1:]}
+		"display_name": strings.ToUpper(nickname[:1]) + nickname[1:],
+		"links":        obj{"avatar": obj{"href": "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/a-" + nickname + "/48"}}}
 }
 
 var (

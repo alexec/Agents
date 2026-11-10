@@ -65,8 +65,9 @@ func newSite(t *testing.T, cloud bool, answer func(path string, body map[string]
 }
 
 var (
-	alexUser = map[string]any{"accountId": "u1", "displayName": "Alex", "emailAddress": "alex@example.com", "accountType": "atlassian"}
-	appUser  = map[string]any{"accountId": "app1", "displayName": "Automation for Jira", "accountType": "app"}
+	alexUser = map[string]any{"accountId": "u1", "displayName": "Alex", "emailAddress": "alex@example.com", "accountType": "atlassian",
+		"avatarUrls": map[string]any{"16x16": "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/u1/16", "48x48": "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/u1/48"}}
+	appUser = map[string]any{"accountId": "app1", "displayName": "Automation for Jira", "accountType": "app"}
 )
 
 func restIssueJSON(key, created string, extra map[string]any) map[string]any {

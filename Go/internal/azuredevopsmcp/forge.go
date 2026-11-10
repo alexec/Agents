@@ -40,8 +40,10 @@ type Item struct {
 	Number int
 	// State is open, closed or merged.
 	State, Title, URL, Author, UpdatedAt string
-	Labels                               []string
-	Comments                             int
+	// AuthorAvatar is the author's picture, on the organization; "" for none (#4363).
+	AuthorAvatar string
+	Labels       []string
+	Comments     int
 	// Checks is passing, failing, running or none, Review is approved, changes_requested,
 	// review_required or "", Mergeable is mergeable, conflicting or unknown. A list says no
 	// Checks; one read on its own does.
@@ -60,8 +62,8 @@ type SearchPage struct {
 
 // Comment is a comment on a pull request, as Markdown.
 type Comment struct {
-	Author, Body, At, URL string
-	Bot                   bool
+	Author, Avatar, Body, At, URL string
+	Bot                           bool
 }
 
 // CheckRun is the newest Azure Pipelines build of a pipeline for the pull request, or the
@@ -93,7 +95,7 @@ type forgePullJSON struct {
 }
 
 func (f *RealAzureDevOps) item(repo string, p forgePullJSON) Item {
-	i := Item{Repo: repo, Number: p.ID, Title: p.Title, URL: f.prURL(repo, p.ID), Author: p.CreatedBy.name(), UpdatedAt: p.updated(),
+	i := Item{Repo: repo, Number: p.ID, Title: p.Title, URL: f.prURL(repo, p.ID), Author: p.CreatedBy.name(), AuthorAvatar: p.CreatedBy.ImageURL, UpdatedAt: p.updated(),
 		Labels: p.labels(), Draft: p.IsDraft, AutoMerge: p.AutoCompleteSetBy != nil, Review: p.review(), Mergeable: "unknown"}
 	switch p.Status {
 	case "active":
@@ -499,7 +501,7 @@ func (f *RealAzureDevOps) ItemPage(ctx context.Context, repo string, number int,
 			if c.IsDeleted || c.CommentType == "system" || strings.TrimSpace(c.Content) == "" {
 				continue
 			}
-			all = append(all, Comment{Author: c.Author.name(), Body: c.Content, At: c.PublishedDate,
+			all = append(all, Comment{Author: c.Author.name(), Avatar: c.Author.ImageURL, Body: c.Content, At: c.PublishedDate,
 				URL: fmt.Sprintf("%s?discussionId=%d", f.prURL(repo, number), t.ID), Bot: isBot(c.Author)})
 		}
 	}

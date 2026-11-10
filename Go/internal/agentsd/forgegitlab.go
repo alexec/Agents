@@ -35,6 +35,7 @@ func (gitlabForge) Caps() forgeCaps {
 		PR: forgeActions{Comment: true, Label: true, Close: true, Reopen: true, Merge: true, AutoMerge: true, Approve: true,
 			Rerun: true, Log: true, Diff: true},
 		LabelColors:  true,
+		Avatars:      true,
 		CommentCount: "exact",
 		Plan:         true,
 		Reasons: map[string]string{
@@ -154,7 +155,7 @@ func (g gitlabForge) Item(ctx context.Context, r forgeRef, cursor string) (wire.
 	}
 	out := wire.ForgeItemDetail{Item: gitlabItemOf(p.Item, folder), Body: p.Body, Comments: []wire.ForgeComment{}}
 	for _, c := range p.Thread {
-		out.Comments = append(out.Comments, forgeCommentOf(c.Author, c.Body, c.At, c.URL, c.Bot))
+		out.Comments = append(out.Comments, forgeCommentOf(c.Author, c.Avatar, c.Body, c.At, c.URL, c.Bot))
 	}
 	out.Cursor = optional(p.Before)
 	if p.MR {

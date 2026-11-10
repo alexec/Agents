@@ -3,6 +3,7 @@ package agentsd
 import (
 	"container/list"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +13,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/azuredevopsmcp"
+	"github.com/alexec/agents/Go/internal/forgejomcp"
+	"github.com/alexec/agents/Go/internal/gitlabmcp"
+	"github.com/alexec/agents/Go/internal/jiramcp"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -43,7 +48,8 @@ var forgeImageTypes = map[string]bool{"image/png": true, "image/jpeg": true, "im
 // Each later forge adds one, with its hosts and its auth.
 type forgeImageHost interface {
 	// allows says that u is one of this forge's image URLs, for the first read and each redirect.
-	allows(u *url.URL) bool
+	// d says which GitLab, Forgejo, Azure DevOps or Jira is connected: a self-hosted one's own root.
+	allows(d *Daemon, u *url.URL) bool
 	// authorize adds the forge's token to req when req's host needs it, and only then.
 	authorize(d *Daemon, req *http.Request)
 }
@@ -61,11 +67,43 @@ var githubImageHosts = map[string]bool{
 	"avatars.githubusercontent.com":             true,
 }
 
-func (githubImages) allows(u *url.URL) bool {
+// publicHost is u's host, in lower case, when u is https on the default port with no user; else "".
+func publicHost(u *url.URL) string {
 	if u.Scheme != "https" || u.User != nil || u.Port() != "" {
+		return ""
+	}
+	return strings.ToLower(u.Hostname())
+}
+
+// onRoot says that u is on the root of a self-hosted forge: its scheme, host and port, with no
+// user. A local Forgejo can be on http.
+func onRoot(u *url.URL, root string) bool {
+	r, err := url.Parse(root)
+	if err != nil || r.Host == "" || u.User != nil {
 		return false
 	}
-	host := strings.ToLower(u.Hostname())
+	return strings.EqualFold(u.Scheme, r.Scheme) && strings.EqualFold(u.Host, r.Host)
+}
+
+// pathUnder says that u's path is prefix and at least one more segment, with no dot segment.
+func pathUnder(u *url.URL, prefix string) bool {
+	rest, ok := strings.CutPrefix(u.Path, prefix)
+	if !ok || rest == "" {
+		return false
+	}
+	for _, p := range strings.Split(rest, "/") {
+		if p == "." || p == ".." {
+			return false
+		}
+	}
+	return true
+}
+
+func (githubImages) allows(_ *Daemon, u *url.URL) bool {
+	host := publicHost(u)
+	if host == "" {
+		return false
+	}
 	if githubImageHosts[host] {
 		return true
 	}
@@ -118,8 +156,140 @@ func (githubImages) authorize(d *Daemon, req *http.Request) {
 	}
 }
 
-// forgeImageHosts are the forges whose images are read, GitHub first.
-var forgeImageHosts = []forgeImageHost{githubImages{}}
+// publicAvatars are the avatar hosts that need no token, for every forge that gives them (#4363):
+// Gravatar (GitLab, Forgejo, Bitbucket and Jira Cloud can give one), Atlassian's avatar host
+// (Bitbucket's and Jira Cloud's), and Linear's public uploads. They are one host, not one per
+// forge, because Atlassian's Gravatar URL names Atlassian's host as its default, and a redirect
+// goes only to a host of the same list.
+type publicAvatars struct{}
+
+func (publicAvatars) allows(_ *Daemon, u *url.URL) bool {
+	switch host := publicHost(u); {
+	case host == "secure.gravatar.com" || host == "www.gravatar.com":
+		return pathUnder(u, "/avatar/")
+	case strings.HasPrefix(host, "avatar-management--avatars.") && strings.HasSuffix(host, ".prod.public.atl-paas.net"):
+		return pathUnder(u, "/")
+	case host == "public.linear.app":
+		return pathUnder(u, "/")
+	}
+	return false
+}
+
+func (publicAvatars) authorize(*Daemon, *http.Request) {}
+
+// gitlabImages are a GitLab's user avatars (#4363): gitlab.com's, and the connected GitLab's on
+// its own root. An avatar is public, so no token goes.
+type gitlabImages struct{}
+
+func (gitlabImages) allows(d *Daemon, u *url.URL) bool {
+	if !pathUnder(u, "/uploads/-/system/user/avatar/") {
+		return false
+	}
+	if publicHost(u) == "gitlab.com" {
+		return true
+	}
+	c, ok := d.gitlabConnection()
+	return ok && c.URL != "" && onRoot(u, gitlabmcp.BaseURL(c.URL))
+}
+
+func (gitlabImages) authorize(*Daemon, *http.Request) {}
+
+// forgejoImages are a Forgejo's avatars (#4363): Codeberg's, and the connected Forgejo's on its
+// own root; /avatars/ are uploaded, /avatar/ made from the e-mail. They are public: no token goes.
+type forgejoImages struct{}
+
+func (forgejoImages) allows(d *Daemon, u *url.URL) bool {
+	if !pathUnder(u, "/avatars/") && !pathUnder(u, "/avatar/") {
+		return false
+	}
+	if publicHost(u) == "codeberg.org" {
+		return true
+	}
+	c, ok := d.forgejoConnection()
+	return ok && c.URL != "" && onRoot(u, forgejomcp.BaseURL(c.URL))
+}
+
+func (forgejoImages) authorize(*Daemon, *http.Request) {}
+
+// azureImages are an Azure DevOps identity's picture (#4363), for Azure Repos and Azure Boards:
+// /<organization>/_apis/GraphProfile/MemberAvatars/<descriptor> or _api/_common/identityImage, on
+// dev.azure.com, an organization's visualstudio.com, or the connected Azure DevOps Server. It
+// needs the token, as the API does.
+type azureImages struct{}
+
+func azureImagePath(u *url.URL) bool {
+	return strings.Contains(u.Path, "/_apis/GraphProfile/MemberAvatars/") || strings.HasSuffix(u.Path, "/_api/_common/identityImage")
+}
+
+// azureImageRoot is the root of the Azure DevOps that u is on, or "".
+func (d *Daemon) azureImageRoot(u *url.URL) string {
+	host := publicHost(u)
+	if host == "dev.azure.com" || strings.HasSuffix(host, ".visualstudio.com") {
+		return azuredevopsmcp.DefaultBase
+	}
+	_, boards := d.azureBoardsSignIn()
+	for _, root := range append(d.azureDevOpsRoots(), azuredevopsmcp.BaseURL(boards)) {
+		if onRoot(u, root) {
+			return root
+		}
+	}
+	return ""
+}
+
+func (azureImages) allows(d *Daemon, u *url.URL) bool {
+	return azureImagePath(u) && d.azureImageRoot(u) != ""
+}
+
+// authorize sends the token for the Azure DevOps the image is on: Azure Repos', else Azure Boards'.
+func (azureImages) authorize(d *Daemon, req *http.Request) {
+	root := d.azureImageRoot(req.URL)
+	if root == "" || !azureImagePath(req.URL) {
+		return
+	}
+	token := d.azureDevOpsToken(root)
+	if token == "" {
+		if t, base := d.azureBoardsSignIn(); azuredevopsmcp.BaseURL(base) == root {
+			token = t
+		}
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(":"+token)))
+	}
+}
+
+// jiraImages are Jira Data Center's avatars, on the signed-in site's /secure/useravatar (#4363),
+// with its sign-in; Jira Cloud's are on Atlassian's avatar host (publicAvatars).
+type jiraImages struct{}
+
+func (d *Daemon) jiraImageAuth(u *url.URL) (jiramcp.Auth, bool) {
+	secrets := d.secrets()
+	auth := jiramcp.TokenAuth(secrets["JIRA_URL"], secrets["JIRA_EMAIL"], secrets["JIRA_API_TOKEN"])
+	ok := auth.Site != "" && auth.Header != "" && onRoot(u, auth.Site) && u.Path == strings.TrimSuffix(siteURLPath(auth.Site), "/")+"/secure/useravatar"
+	return auth, ok
+}
+
+// siteURLPath is the path of a site's root: a Jira Data Center can be under a context path.
+func siteURLPath(site string) string {
+	if u, err := url.Parse(site); err == nil {
+		return u.Path
+	}
+	return ""
+}
+
+func (jiraImages) allows(d *Daemon, u *url.URL) bool {
+	_, ok := d.jiraImageAuth(u)
+	return ok
+}
+
+func (jiraImages) authorize(d *Daemon, req *http.Request) {
+	if auth, ok := d.jiraImageAuth(req.URL); ok {
+		req.Header.Set("Authorization", auth.Header)
+	}
+}
+
+// forgeImageHosts are the forges whose images are read, GitHub first. Bitbucket's and Linear's
+// avatars are on publicAvatars' hosts.
+var forgeImageHosts = []forgeImageHost{githubImages{}, publicAvatars{}, gitlabImages{}, forgejoImages{}, azureImages{}, jiraImages{}}
 
 type forgeImageCache struct {
 	mu    sync.Mutex
@@ -173,9 +343,9 @@ func (d *Daemon) registerForgeImage() {
 }
 
 // forgeImageOf is the forge whose image u is, or nil.
-func forgeImageOf(u *url.URL) forgeImageHost {
+func (d *Daemon) forgeImageOf(u *url.URL) forgeImageHost {
 	for _, h := range forgeImageHosts {
-		if h.allows(u) {
+		if h.allows(d, u) {
 			return h
 		}
 	}
@@ -187,7 +357,7 @@ func (d *Daemon) forgeImage(ctx context.Context, raw string) (wire.ForgeImage, e
 	if err != nil || !u.IsAbs() {
 		return wire.ForgeImage{}, errors.New("forge/image: not a URL")
 	}
-	forge := forgeImageOf(u)
+	forge := d.forgeImageOf(u)
 	if forge == nil {
 		return wire.ForgeImage{}, fmt.Errorf("forge/image: %s is not a forge's image host", u.Hostname())
 	}
@@ -213,7 +383,7 @@ func (d *Daemon) forgeImage(ctx context.Context, raw string) (wire.ForgeImage, e
 			if len(via) >= forgeImageRedirects {
 				return errors.New("too many redirects")
 			}
-			if !forge.allows(next.URL) {
+			if !forge.allows(d, next.URL) {
 				return fmt.Errorf("a redirect to %s, not a forge's image host", next.URL.Hostname())
 			}
 			return nil

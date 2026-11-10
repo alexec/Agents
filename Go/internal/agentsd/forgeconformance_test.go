@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -60,15 +62,15 @@ type conformGitHub struct {
 
 var conformGitHubItems = []githubmcp.Item{
 	{Repo: "alexec/agents", Number: 4, PR: true, State: "merged", Title: "Merged", URL: "https://github.com/alexec/agents/pull/4",
-		Author: "alexec", Labels: []string{"enhancement"}, LabelColors: map[string]string{"enhancement": "#a2eeef"},
+		Author: "alexec", AuthorAvatar: "https://avatars.githubusercontent.com/u/1?v=4", Labels: []string{"enhancement"}, LabelColors: map[string]string{"enhancement": "#a2eeef"},
 		UpdatedAt: "2026-11-04T10:00:00Z", Comments: 1},
 	{Repo: "alexec/agents", Number: 3, PR: true, State: "open", Title: "Open", URL: "https://github.com/alexec/agents/pull/3",
-		Author: "alexec", Labels: []string{"bug"}, LabelColors: map[string]string{"bug": "#d73a4a"}, Assignees: []string{"alexec"},
+		Author: "alexec", AuthorAvatar: "https://avatars.githubusercontent.com/u/1?v=4", Labels: []string{"bug"}, LabelColors: map[string]string{"bug": "#d73a4a"}, Assignees: []string{"alexec"},
 		UpdatedAt: "2026-11-03T10:00:00Z", Checks: "failing"},
 	{Repo: "alexec/agents", Number: 2, State: "closed", Title: "Closed", URL: "https://github.com/alexec/agents/issues/2",
-		Author: "alexec", UpdatedAt: "2026-11-02T10:00:00Z"},
+		Author: "alexec", AuthorAvatar: "https://avatars.githubusercontent.com/u/1?v=4", UpdatedAt: "2026-11-02T10:00:00Z"},
 	{Repo: "alexec/agents", Number: 1, State: "open", Title: "Open issue", URL: "https://github.com/alexec/agents/issues/1",
-		Author: "alexec", Labels: []string{"task", "feature:work"}, LabelColors: map[string]string{"task": "#c5def5", "feature:work": "#1d76db"},
+		Author: "alexec", AuthorAvatar: "https://avatars.githubusercontent.com/u/1?v=4", Labels: []string{"task", "feature:work"}, LabelColors: map[string]string{"task": "#c5def5", "feature:work": "#1d76db"},
 		UpdatedAt: "2026-11-01T10:00:00Z", Comments: 2},
 }
 
@@ -96,7 +98,7 @@ func (g conformGitHub) ItemPage(_ context.Context, _ string, number int, _ strin
 	for _, i := range conformGitHubItems {
 		if i.Number == number {
 			d := githubmcp.ItemDetail{Item: i, Body: "The body.",
-				Thread: []githubmcp.Comment{{Author: "alexec", Body: "A comment.", At: i.UpdatedAt}}}
+				Thread: []githubmcp.Comment{{Author: "alexec", Avatar: "https://avatars.githubusercontent.com/u/1?v=4", Body: "A comment.", At: i.UpdatedAt}}}
 			if i.PR {
 				d.Head, d.MergeMethods = "abc", []string{"squash"}
 				d.CheckRuns = []githubmcp.Check{{Name: "test", State: "failing", URL: "https://github.com/alexec/agents/actions/runs/7"}}
@@ -140,15 +142,15 @@ type conformGitLab struct {
 
 var conformGitLabItems = []gitlabmcp.Item{
 	{Project: "Group/App", Number: 4, MR: true, State: "merged", Title: "Merged", URL: "https://gitlab.com/Group/App/-/merge_requests/4",
-		Author: "kim", Labels: []string{"enhancement"}, LabelColors: map[string]string{"enhancement": "#a2eeef"},
+		Author: "kim", AuthorAvatar: "https://gitlab.com/uploads/-/system/user/avatar/7/avatar.png", Labels: []string{"enhancement"}, LabelColors: map[string]string{"enhancement": "#a2eeef"},
 		UpdatedAt: "2026-11-04T10:00:00Z", Comments: 1},
 	{Project: "Group/App", Number: 3, MR: true, State: "open", Title: "Open", URL: "https://gitlab.com/Group/App/-/merge_requests/3",
-		Author: "kim", Labels: []string{"bug"}, LabelColors: map[string]string{"bug": "#d9534f"}, Assignees: []string{"kim"},
+		Author: "kim", AuthorAvatar: "https://gitlab.com/uploads/-/system/user/avatar/7/avatar.png", Labels: []string{"bug"}, LabelColors: map[string]string{"bug": "#d9534f"}, Assignees: []string{"kim"},
 		UpdatedAt: "2026-11-03T10:00:00Z", Checks: "failing"},
 	{Project: "Group/App", Number: 2, State: "closed", Title: "Closed", URL: "https://gitlab.com/Group/App/-/issues/2",
-		Author: "kim", UpdatedAt: "2026-11-02T10:00:00Z"},
+		Author: "kim", AuthorAvatar: "https://gitlab.com/uploads/-/system/user/avatar/7/avatar.png", UpdatedAt: "2026-11-02T10:00:00Z"},
 	{Project: "Group/App", Number: 1, State: "open", Title: "Open issue", URL: "https://gitlab.com/Group/App/-/issues/1",
-		Author: "kim", Labels: []string{"task"}, LabelColors: map[string]string{"task": "#c5def5"},
+		Author: "kim", AuthorAvatar: "https://gitlab.com/uploads/-/system/user/avatar/7/avatar.png", Labels: []string{"task"}, LabelColors: map[string]string{"task": "#c5def5"},
 		UpdatedAt: "2026-11-01T10:00:00Z", Comments: 2},
 }
 
@@ -176,7 +178,7 @@ func (g conformGitLab) ItemPage(_ context.Context, _ string, number int, mr bool
 	for _, i := range conformGitLabItems {
 		if i.Number == number && i.MR == mr {
 			d := gitlabmcp.ItemDetail{Item: i, Body: "The body.",
-				Thread: []gitlabmcp.Comment{{Author: "kim", Body: "A comment.", At: i.UpdatedAt}}}
+				Thread: []gitlabmcp.Comment{{Author: "kim", Avatar: "https://gitlab.com/uploads/-/system/user/avatar/7/avatar.png", Body: "A comment.", At: i.UpdatedAt}}}
 			if i.MR {
 				d.Head, d.Pipeline = "abc", 7
 				d.CheckRuns = []gitlabmcp.Check{{Name: "test: unit", State: "failing"}}
@@ -216,15 +218,15 @@ type conformForgejo struct {
 
 var conformForgejoItems = []forgejomcp.Item{
 	{Repo: "walkalex/App", Number: 4, PR: true, State: "merged", Title: "Merged", URL: "http://localhost:3753/walkalex/App/pulls/4",
-		Author: "kim", Labels: []string{"enhancement"}, LabelColors: map[string]string{"enhancement": "#a2eeef"},
+		Author: "kim", AuthorAvatar: "http://localhost:3753/avatars/k", Labels: []string{"enhancement"}, LabelColors: map[string]string{"enhancement": "#a2eeef"},
 		UpdatedAt: "2026-11-04T10:00:00Z", Comments: 1},
 	{Repo: "walkalex/App", Number: 3, PR: true, State: "open", Title: "Open", URL: "http://localhost:3753/walkalex/App/pulls/3",
-		Author: "kim", Labels: []string{"bug"}, LabelColors: map[string]string{"bug": "#ee0701"}, Assignees: []string{"kim"},
+		Author: "kim", AuthorAvatar: "http://localhost:3753/avatars/k", Labels: []string{"bug"}, LabelColors: map[string]string{"bug": "#ee0701"}, Assignees: []string{"kim"},
 		UpdatedAt: "2026-11-03T10:00:00Z", Checks: "failing"},
 	{Repo: "walkalex/App", Number: 2, State: "closed", Title: "Closed", URL: "http://localhost:3753/walkalex/App/issues/2",
-		Author: "kim", UpdatedAt: "2026-11-02T10:00:00Z"},
+		Author: "kim", AuthorAvatar: "http://localhost:3753/avatars/k", UpdatedAt: "2026-11-02T10:00:00Z"},
 	{Repo: "walkalex/App", Number: 1, State: "open", Title: "Open issue", URL: "http://localhost:3753/walkalex/App/issues/1",
-		Author: "kim", Labels: []string{"task"}, LabelColors: map[string]string{"task": "#c5def5"},
+		Author: "kim", AuthorAvatar: "http://localhost:3753/avatars/k", Labels: []string{"task"}, LabelColors: map[string]string{"task": "#c5def5"},
 		UpdatedAt: "2026-11-01T10:00:00Z", Comments: 2},
 }
 
@@ -252,7 +254,7 @@ func (g conformForgejo) ItemPage(_ context.Context, _ string, number int, pr boo
 	for _, i := range conformForgejoItems {
 		if i.Number == number && i.PR == pr {
 			d := forgejomcp.ItemDetail{Item: i, Body: "The body.",
-				Thread: []forgejomcp.Comment{{Author: "kim", Body: "A comment.", At: i.UpdatedAt}}}
+				Thread: []forgejomcp.Comment{{Author: "kim", Avatar: "http://localhost:3753/avatars/k", Body: "A comment.", At: i.UpdatedAt}}}
 			if i.PR {
 				d.Head = "abc"
 				d.CheckRuns = []forgejomcp.CheckRun{{Name: "ci / test", State: "failing"}}
@@ -292,13 +294,13 @@ type conformBitbucket struct {
 
 var conformBitbucketItems = []bitbucketmcp.Item{
 	{Repo: "walkalex/App", Number: 4, PR: true, State: "merged", Title: "Merged", URL: "https://bitbucket.org/walkalex/App/pull-requests/4",
-		Author: "kim", UpdatedAt: "2026-11-04T10:00:00Z", Comments: 1},
+		Author: "kim", AuthorAvatar: "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/k/48", UpdatedAt: "2026-11-04T10:00:00Z", Comments: 1},
 	{Repo: "walkalex/App", Number: 3, PR: true, State: "open", Title: "Open", URL: "https://bitbucket.org/walkalex/App/pull-requests/3",
-		Author: "kim", Assignees: []string{"kim"}, UpdatedAt: "2026-11-03T10:00:00Z", Checks: "failing"},
+		Author: "kim", AuthorAvatar: "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/k/48", Assignees: []string{"kim"}, UpdatedAt: "2026-11-03T10:00:00Z", Checks: "failing"},
 	{Repo: "walkalex/App", Number: 2, State: "closed", Title: "Closed", URL: "https://bitbucket.org/walkalex/App/issues/2",
-		Author: "kim", Labels: []string{"bug"}, UpdatedAt: "2026-11-02T10:00:00Z"},
+		Author: "kim", AuthorAvatar: "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/k/48", Labels: []string{"bug"}, UpdatedAt: "2026-11-02T10:00:00Z"},
 	{Repo: "walkalex/App", Number: 1, State: "open", Title: "Open issue", URL: "https://bitbucket.org/walkalex/App/issues/1",
-		Author: "kim", Labels: []string{"task", "feature:Export"}, UpdatedAt: "2026-11-01T10:00:00Z"},
+		Author: "kim", AuthorAvatar: "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/k/48", Labels: []string{"task", "feature:Export"}, UpdatedAt: "2026-11-01T10:00:00Z"},
 }
 
 func (g conformBitbucket) Search(_ context.Context, _ []string, sf bitbucketmcp.SearchFilter, after string, first int) (bitbucketmcp.SearchPage, error) {
@@ -325,7 +327,7 @@ func (g conformBitbucket) ItemPage(_ context.Context, _ string, number int, pr b
 	for _, i := range conformBitbucketItems {
 		if i.Number == number && i.PR == pr {
 			d := bitbucketmcp.ItemDetail{Item: i, Body: "The body.",
-				Thread: []bitbucketmcp.Comment{{Author: "kim", Body: "A comment.", At: i.UpdatedAt}}}
+				Thread: []bitbucketmcp.Comment{{Author: "kim", Avatar: "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/k/48", Body: "A comment.", At: i.UpdatedAt}}}
 			if i.PR {
 				d.Head = "abc"
 				d.CheckRuns = []bitbucketmcp.CheckRun{{Name: "Pipeline #12", State: "failing", Run: 12}}
@@ -361,9 +363,9 @@ type conformAzureDevOps struct {
 
 var conformAzureDevOpsItems = []azuredevopsmcp.Item{
 	{Repo: "acme/Web App/App", Number: 4, State: "merged", Title: "Merged", URL: "https://dev.azure.com/acme/Web%20App/_git/App/pullrequest/4",
-		Author: "kim@example.com", UpdatedAt: "2026-11-04T10:00:00Z"},
+		Author: "kim@example.com", AuthorAvatar: "https://dev.azure.com/acme/_apis/GraphProfile/MemberAvatars/aad.aw0", UpdatedAt: "2026-11-04T10:00:00Z"},
 	{Repo: "acme/Web App/App", Number: 3, State: "open", Title: "Open", URL: "https://dev.azure.com/acme/Web%20App/_git/App/pullrequest/3",
-		Author: "kim@example.com", Labels: []string{"ui"}, UpdatedAt: "2026-11-03T10:00:00Z", Checks: "failing"},
+		Author: "kim@example.com", AuthorAvatar: "https://dev.azure.com/acme/_apis/GraphProfile/MemberAvatars/aad.aw0", Labels: []string{"ui"}, UpdatedAt: "2026-11-03T10:00:00Z", Checks: "failing"},
 }
 
 func (g conformAzureDevOps) Search(_ context.Context, _ []string, sf azuredevopsmcp.SearchFilter, after string, first int) (azuredevopsmcp.SearchPage, error) {
@@ -389,7 +391,7 @@ func (g conformAzureDevOps) ItemPage(_ context.Context, _ string, number int, _ 
 	for _, i := range conformAzureDevOpsItems {
 		if i.Number == number {
 			return azuredevopsmcp.ItemDetail{Item: i, Body: "The body.", Head: "abc",
-				Thread:    []azuredevopsmcp.Comment{{Author: "kim@example.com", Body: "A comment.", At: i.UpdatedAt}},
+				Thread:    []azuredevopsmcp.Comment{{Author: "kim@example.com", Avatar: "https://dev.azure.com/acme/_apis/GraphProfile/MemberAvatars/aad.aw0", Body: "A comment.", At: i.UpdatedAt}},
 				CheckRuns: []azuredevopsmcp.CheckRun{{Name: "ci", State: "failing", Build: 70}}}, nil
 		}
 	}
@@ -420,9 +422,9 @@ type conformLinear struct {
 }
 
 var conformLinearItems = []linearmcp.Item{
-	{Identifier: "ENG-2", Team: "ENG", State: "closed", Title: "Closed", URL: "https://linear.app/acme/issue/ENG-2", Author: "kim",
+	{Identifier: "ENG-2", Team: "ENG", State: "closed", Title: "Closed", URL: "https://linear.app/acme/issue/ENG-2", Author: "kim", AuthorAvatar: "https://public.linear.app/k/avatar",
 		UpdatedAt: "2026-11-02T10:00:00Z"},
-	{Identifier: "ENG-1", Team: "ENG", State: "open", Title: "Open issue", URL: "https://linear.app/acme/issue/ENG-1", Author: "kim",
+	{Identifier: "ENG-1", Team: "ENG", State: "open", Title: "Open issue", URL: "https://linear.app/acme/issue/ENG-1", Author: "kim", AuthorAvatar: "https://public.linear.app/k/avatar",
 		Labels: []string{"task", "feature:Export"}, LabelColors: map[string]string{"task": "#c5def5", "feature:Export": "#1d76db"},
 		Assignees: []string{"kim"}, UpdatedAt: "2026-11-01T10:00:00Z", Comments: 2},
 }
@@ -450,7 +452,7 @@ func (g conformLinear) ItemPage(_ context.Context, identifier, _ string) (linear
 	for _, i := range conformLinearItems {
 		if i.Identifier == identifier {
 			return linearmcp.ItemDetail{Item: i, Body: "The body.",
-				Thread: []linearmcp.Comment{{Author: "kim", Body: "A comment.", At: i.UpdatedAt}}}, nil
+				Thread: []linearmcp.Comment{{Author: "kim", Avatar: "https://public.linear.app/k/avatar", Body: "A comment.", At: i.UpdatedAt}}}, nil
 		}
 	}
 	return linearmcp.ItemDetail{}, &linearmcp.LinearError{Kind: linearmcp.NotFound, Message: "Linear issue " + identifier + " was not found"}
@@ -486,9 +488,9 @@ type conformJira struct {
 
 var conformJiraItems = []jiramcp.Item{
 	{Key: "PROJ-2", Project: "PROJ", State: "closed", Status: "Done", Title: "Closed", URL: "https://acme.atlassian.net/browse/PROJ-2",
-		Author: "Kim", UpdatedAt: "2026-11-02T10:00:00.000Z"},
+		Author: "Kim", AuthorAvatar: "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/k/48", UpdatedAt: "2026-11-02T10:00:00.000Z"},
 	{Key: "PROJ-1", Project: "PROJ", State: "open", Status: "To Do", Title: "Open issue", URL: "https://acme.atlassian.net/browse/PROJ-1",
-		Author: "Kim", Labels: []string{"billing"}, Assignees: []string{"Kim"}, UpdatedAt: "2026-11-01T10:00:00.000Z", Comments: 2},
+		Author: "Kim", AuthorAvatar: "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/k/48", Labels: []string{"billing"}, Assignees: []string{"Kim"}, UpdatedAt: "2026-11-01T10:00:00.000Z", Comments: 2},
 }
 
 func (g conformJira) Search(_ context.Context, _ []string, sf jiramcp.SearchFilter, after string, first int) (jiramcp.SearchPage, error) {
@@ -514,7 +516,7 @@ func (g conformJira) ItemPage(_ context.Context, key, _ string) (jiramcp.ItemDet
 	for _, i := range conformJiraItems {
 		if i.Key == key {
 			return jiramcp.ItemDetail{Item: i, Body: "The body.",
-				Thread:      []jiramcp.Comment{{Author: "Kim", Body: "A comment.", At: i.UpdatedAt}},
+				Thread:      []jiramcp.Comment{{Author: "Kim", Avatar: "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/k/48", Body: "A comment.", At: i.UpdatedAt}},
 				Transitions: []jiramcp.Transition{{ID: "31", Name: "Done", Category: "done"}}}, nil
 		}
 	}
@@ -553,9 +555,9 @@ type conformBoards struct {
 
 var conformBoardsItems = []azureboardsmcp.Item{
 	{ID: 2, Project: "acme/web", Type: "Task", State: "closed", Status: "Done", Title: "Closed",
-		URL: "https://dev.azure.com/acme/web/_workitems/edit/2", Author: "Kim", UpdatedAt: "2026-11-02T10:00:00.000Z"},
+		URL: "https://dev.azure.com/acme/web/_workitems/edit/2", Author: "Kim", AuthorAvatar: "https://dev.azure.com/acme/_apis/GraphProfile/MemberAvatars/aad.aw0", UpdatedAt: "2026-11-02T10:00:00.000Z"},
 	{ID: 1, Project: "acme/web", Type: "Task", State: "open", Status: "To Do", Title: "Open work item",
-		URL: "https://dev.azure.com/acme/web/_workitems/edit/1", Author: "Kim", Labels: []string{"billing"},
+		URL: "https://dev.azure.com/acme/web/_workitems/edit/1", Author: "Kim", AuthorAvatar: "https://dev.azure.com/acme/_apis/GraphProfile/MemberAvatars/aad.aw0", Labels: []string{"billing"},
 		Assignees: []string{"Kim"}, UpdatedAt: "2026-11-01T10:00:00.000Z", Comments: 2},
 }
 
@@ -582,7 +584,7 @@ func (g conformBoards) ItemPage(_ context.Context, project string, id int, _ str
 	for _, i := range conformBoardsItems {
 		if i.ID == id && i.Project == project {
 			return azureboardsmcp.ItemDetail{Item: i, Body: "The description.",
-				Thread:      []azureboardsmcp.ForgeComment{{Author: "Kim", Body: "A comment.", At: i.UpdatedAt}},
+				Thread:      []azureboardsmcp.ForgeComment{{Author: "Kim", Avatar: "https://dev.azure.com/acme/_apis/GraphProfile/MemberAvatars/aad.aw0", Body: "A comment.", At: i.UpdatedAt}},
 				Transitions: []azureboardsmcp.Transition{{ID: "Done", Name: "Done", Category: "done"}}}, nil
 		}
 	}
@@ -698,7 +700,7 @@ func TestForgeConformance(t *testing.T) {
 					}
 					// 3. The model is filled.
 					for _, m := range []wire.ForgeItem{i, detail.Item} {
-						conformModel(t, caps, m)
+						conformModel(t, d, caps, m)
 					}
 					refs[i.Node.Kind+" "+i.State] = r
 					// 5. actions follows the state, on the item's page.
@@ -707,6 +709,7 @@ func TestForgeConformance(t *testing.T) {
 						t.Fatal(err)
 					}
 					conformItemActions(t, caps, i, page.Actions)
+					conformAvatars(t, d, caps, page)
 				}
 			}
 
@@ -770,7 +773,7 @@ func conformActions(f Forge, r forgeRef) map[string]func(context.Context) error 
 	}
 }
 
-func conformModel(t *testing.T, caps forgeCaps, i wire.ForgeItem) {
+func conformModel(t *testing.T, d *Daemon, caps forgeCaps, i wire.ForgeItem) {
 	t.Helper()
 	if i.Labels == nil || i.Assignees == nil {
 		t.Errorf("%v: labels %v, assignees %v", i.Node, i.Labels, i.Assignees)
@@ -785,6 +788,34 @@ func conformModel(t *testing.T, caps forgeCaps, i wire.ForgeItem) {
 		if caps.LabelColors && !labelColor.MatchString(deref(l.Color)) {
 			t.Errorf("%v: label %s's colour is %q, not #rrggbb", i.Node, l.Name, deref(l.Color))
 		}
+	}
+	if caps.Avatars {
+		conformAvatar(t, d, fmt.Sprint(i.Node), i.AuthorAvatar)
+	}
+}
+
+// conformAvatars checks that each comment on an item's page has an avatar that forge/image
+// reads, when the forge says it gives avatars.
+func conformAvatars(t *testing.T, d *Daemon, caps forgeCaps, page wire.ForgeItemDetail) {
+	t.Helper()
+	if !caps.Avatars {
+		return
+	}
+	for n, c := range page.Comments {
+		conformAvatar(t, d, fmt.Sprintf("%v comment %d", page.Item.Node, n), c.Avatar)
+	}
+}
+
+// conformAvatar checks that avatar is set and that forge/image allows its host (#4363).
+func conformAvatar(t *testing.T, d *Daemon, what string, avatar *string) {
+	t.Helper()
+	u, err := url.Parse(deref(avatar))
+	if err != nil || deref(avatar) == "" {
+		t.Errorf("%s: no avatar", what)
+		return
+	}
+	if d.forgeImageOf(u) == nil {
+		t.Errorf("%s: forge/image does not read the avatar %s", what, u)
 	}
 }
 

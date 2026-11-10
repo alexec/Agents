@@ -15,7 +15,7 @@ import (
 
 const searchAnswer = `{"data":{"search":{"pageInfo":{"hasNextPage":true,"endCursor":"Y3Vyc29y"},"edges":[
  {"cursor":"YzE=","node":{"__typename":"PullRequest","number":12,"title":"Forge reads","url":"https://github.com/o/r/pull/12","pullState":"MERGED",
-  "updatedAt":"2026-11-01T10:00:00Z","author":{"login":"alexec","__typename":"User"},"repository":{"nameWithOwner":"o/r"},
+  "updatedAt":"2026-11-01T10:00:00Z","author":{"login":"alexec","__typename":"User","avatarUrl":"https://avatars.githubusercontent.com/u/1142830?v=4"},"repository":{"nameWithOwner":"o/r"},
   "labels":{"nodes":[{"name":"enhancement","color":"A2EEEF"},{"name":"odd","color":"red"}]},
   "assignees":{"nodes":[{"login":"alexec"}]},"milestone":{"title":"0.16"},"commentCount":{"totalCount":3},
   "isDraft":true,"mergeable":"CONFLICTING","reviewDecision":"APPROVED","autoMergeRequest":{"enabledAt":"x"},
@@ -31,7 +31,7 @@ const itemAnswer = `{"data":{"repository":{"issueOrPullRequest":{"__typename":"I
  "author":{"login":"kim","__typename":"User"},"repository":{"nameWithOwner":"o/r"},"labels":{"nodes":[{"name":"bug","color":"d73a4a"}]},
  "assignees":{"nodes":[]},"milestone":null,"commentCount":{"totalCount":51},"body":"It is off by one.",
  "comments":{"pageInfo":{"hasPreviousPage":true,"startCursor":"b2xkZXI="},"nodes":[
-  {"author":{"login":"dependabot","__typename":"Bot"},"body":"Bumped.","createdAt":"2026-11-01T08:01:00Z","url":"c1"},
+  {"author":{"login":"dependabot","__typename":"Bot","avatarUrl":"https://avatars.githubusercontent.com/in/29110?v=4"},"body":"Bumped.","createdAt":"2026-11-01T08:01:00Z","url":"c1"},
   {"author":null,"body":"Ghost.","createdAt":"2026-11-01T08:02:00Z","url":"c2"}]}}}}}`
 
 const pullAnswer = `{"data":{"repository":{"issueOrPullRequest":{"__typename":"PullRequest","number":12,"title":"Forge reads",
@@ -98,7 +98,7 @@ func TestSearchListsManyReposInOneCall(t *testing.T) {
 		t.Fatalf("page: %+v", p)
 	}
 	first, b := p.Items[0], p.Items[1]
-	if first.Repo != "o/r" || first.Number != 12 || !first.PR || first.State != "merged" || first.Author != "alexec" || first.Milestone != "0.16" ||
+	if first.Repo != "o/r" || first.Number != 12 || !first.PR || first.State != "merged" || first.Author != "alexec" || first.AuthorAvatar != "https://avatars.githubusercontent.com/u/1142830?v=4" || first.Milestone != "0.16" ||
 		first.Comments != 3 || len(first.Assignees) != 1 || !first.Draft || !first.AutoMerge || first.Checks != "failing" || first.Review != "approved" ||
 		first.Mergeable != "conflicting" || first.LabelColors["enhancement"] != "#a2eeef" || len(first.Labels) != 2 {
 		t.Fatalf("first: %+v", first)
@@ -139,7 +139,7 @@ func TestItemPage(t *testing.T) {
 	if i.PR || i.State != "closed" || i.Body != "It is off by one." || i.Before != "b2xkZXI=" || i.Comments != 51 || i.CheckRuns != nil {
 		t.Fatalf("issue: %+v", i)
 	}
-	if got := i.Thread; len(got) != 2 || !got[0].Bot || got[0].Author != "dependabot" || got[1].Author != "" || got[1].Body != "Ghost." {
+	if got := i.Thread; len(got) != 2 || !got[0].Bot || got[0].Author != "dependabot" || got[0].Avatar != "https://avatars.githubusercontent.com/in/29110?v=4" || got[1].Author != "" || got[1].Avatar != "" || got[1].Body != "Ghost." {
 		t.Fatalf("comments: %+v", got)
 	}
 	if _, ok := a.all()[0]["before"]; ok {

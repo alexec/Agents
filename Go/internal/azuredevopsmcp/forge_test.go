@@ -34,6 +34,7 @@ func TestSearchListsPullRequestsByState(t *testing.T) {
 		t.Errorf("url %s", three.URL)
 	}
 	same(t, []any{two.Draft, two.Mergeable, two.Review, two.Author}, []any{true, "conflicting", "changes_requested", "dev@acme.test"})
+	same(t, []any{two.AuthorAvatar, three.AuthorAvatar}, []any{"https://dev.azure.com/acme/_apis/GraphProfile/MemberAvatars/aad.ZGV2", ""})
 
 	closed, err := ado.Search(ctx, []string{repo}, SearchFilter{State: "closed"}, "", 50)
 	if err != nil {
@@ -88,7 +89,8 @@ func TestItemPageReadsAPullRequest(t *testing.T) {
 		t.Fatal(err)
 	}
 	same(t, d.Body, "Fixes #12")
-	if len(d.Thread) != 2 || d.Thread[0].Author != "renovate@acme.test" || !d.Thread[0].Bot || d.Thread[1].Body != "Looks good" {
+	if len(d.Thread) != 2 || d.Thread[0].Author != "renovate@acme.test" || !d.Thread[0].Bot || d.Thread[1].Body != "Looks good" ||
+		d.Thread[1].Avatar != "https://dev.azure.com/acme/_apis/GraphProfile/MemberAvatars/aad.ZGV2" {
 		t.Fatalf("thread %+v", d.Thread)
 	}
 	same(t, []any{d.ReviewThreads, d.FilesChanged, d.Head, d.Checks, d.AutoMerge, d.Comments, d.Before}, []any{1, 1, "sha3", "failing", true, 2, ""})

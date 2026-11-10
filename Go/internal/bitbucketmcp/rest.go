@@ -356,6 +356,12 @@ type user struct {
 	AccountID   string `json:"account_id"`
 	Nickname    string `json:"nickname"`
 	DisplayName string `json:"display_name"`
+	// Links.Avatar is the person's picture, on Atlassian's avatar host or Gravatar (#4363).
+	Links struct {
+		Avatar struct {
+			Href string `json:"href"`
+		} `json:"avatar"`
+	} `json:"links"`
 }
 
 // name is how an event names a person: their nickname, else their display name.
@@ -367,6 +373,14 @@ func (u *user) name() string {
 		return u.Nickname
 	}
 	return u.DisplayName
+}
+
+// avatar is the person's picture, "" for none.
+func (u *user) avatar() string {
+	if u == nil {
+		return ""
+	}
+	return u.Links.Avatar.Href
 }
 
 // id is how Bitbucket's paths name a person: their account id, else their uuid.
