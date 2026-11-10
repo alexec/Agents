@@ -532,6 +532,29 @@ func (d *Daemon) macHereLocked(at time.Time) bool {
 	return ok && mac.active && at.Sub(mac.heardAt) < macIdle
 }
 
+// raiseAgain shows a need again as a new one (#4298): its banner, its alert and its place at the
+// top of Needs you, when it was first raised reAlertInterval ago or more. A call that is made again
+// on a request a person has not answered asks for it again, so the person sees the card, rather
+// than the call waiting on one that nobody can find.
+func (d *Daemon) raiseAgain(id wire.NeedID) {
+	t := token(id)
+	d.attentionMu.Lock()
+	raised, ok := d.raisedAt[t]
+	again := ok && now().Time().Sub(raised.Time()) >= reAlertInterval
+	if again {
+		delete(d.raisedAt, t)
+		delete(d.raisedNeed, t)
+		delete(d.deliveries, t)
+		delete(d.announced, t)
+		delete(d.forwarded, t)
+	}
+	d.attentionMu.Unlock()
+	if again {
+		log.Printf("attention: %s raised again", t)
+		d.reconsider()
+	}
+}
+
 // reconsider is DaemonCore.reconsider on a server: for every outstanding need, the
 // ladder's first, second and last rungs, and attention/changed for what moved.
 func (d *Daemon) reconsider() {
