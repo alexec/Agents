@@ -1,12 +1,17 @@
 import AgentsKitCore
 import SwiftUI
 
-/// The Mac's resources, read-only (#116): what the person declared, with each one's
-/// description and "2 of 3 held", then anything held or awaited. Declaring, editing
-/// and ending leases stay on the Mac (036 FR-011): a declaration is a short form with
-/// numbers in it, made once, and the Mac is where builds and screens are.
-struct ResourcesListView: View {
+/// The Mac's resources, read-only (#116), as sections of This Mac's page (#4027), as the
+/// window's and the web page's are of each machine's (#3629): what the person declared, with
+/// each one's description and "2 of 3 held", then anything else held or awaited. Only This
+/// Mac's: the Remote reads the home Mac's leases alone. Declaring, editing and ending leases
+/// stay on the Mac (036 FR-011): a declaration is a short form with numbers in it, made
+/// once, and the Mac is where builds and screens are.
+struct ResourcesSections: View {
     @Environment(RemoteModel.self) private var model
+
+    /// The id the page scrolls to when a chat's lease line opens it.
+    static let top = "resources"
 
     private var resources: [DaemonAPI.ResourceState] { model.work.leases?.resources ?? [] }
     private var declared: [DaemonAPI.ResourceState] { resources.filter { $0.declared != nil } }
@@ -16,30 +21,23 @@ struct ResourcesListView: View {
     }
 
     var body: some View {
-        List {
-            Section {
-                if declared.isEmpty {
-                    Text("Nothing declared. Declare resources in Settings \u{25B8} Resources on the Mac.")
-                        .foregroundStyle(.secondary)
-                }
-                ForEach(declared) { ResourceListRow(state: $0, at: model.work.leases?.at ?? Date()) }
-                    .paperListRow()
-            } header: {
-                Text("Declared")
-            } footer: {
-                Text("Agents lease these whenever the description applies.")
+        Section {
+            if declared.isEmpty {
+                Text("Nothing declared. Declare resources in Settings \u{25B8} Resources on the Mac.")
+                    .foregroundStyle(.secondary)
             }
-            Section("Held now") {
-                if busy.isEmpty { Text("Nothing else is held.").foregroundStyle(.secondary) }
+            ForEach(declared) { ResourceListRow(state: $0, at: model.work.leases?.at ?? Date()) }
+        } header: {
+            Text("Resources")
+        } footer: {
+            Text("Agents lease these whenever the description applies.")
+        }
+        .id(Self.top)
+        if !busy.isEmpty {
+            Section("Also held") {
                 ForEach(busy) { ResourceListRow(state: $0, at: model.work.leases?.at ?? Date()) }
-                    .paperListRow()
             }
         }
-        .listStyle(.insetGrouped)
-        .scrollContentBackground(.hidden)
-        .background(Paper.ground)
-        .navigationTitle("Resources")
-        .shows([.leases])
     }
 }
 
@@ -74,28 +72,5 @@ private struct ResourceListRow: View {
 
     private func name(_ id: UUID) -> String {
         LeaseWords.agentName(model.work.agent(id)?.title)
-    }
-}
-
-/// The way in, under Activity: the title alone (#587), how much is held said to VoiceOver.
-struct ResourcesRow: View {
-    @Environment(RemoteModel.self) private var model
-
-    private var counts: String? {
-        guard let resources = model.work.leases?.resources else { return nil }
-        let held = resources.reduce(0) { $0 + $1.holds.count }
-        let waiting = resources.reduce(0) { $0 + $1.line.count }
-        guard held + waiting > 0 else { return nil }
-        return "\(held) held \u{00B7} \(waiting) waiting"
-    }
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text("Resources")
-            Spacer()
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityValue(counts ?? "")
-        .accessibilityHint("Opens Resources")
     }
 }

@@ -117,16 +117,12 @@ func (d *Daemon) registerForgeWrites() {
 	})
 }
 
-// forgeTarget is the item a write is on, and the forge to write it with: a forge on the
-// interface (#4329), with its ref there; or the one forge not yet on it, boards (with its
-// project and its id, in number).
+// forgeTarget is the item a write is on, and the forge on the interface (#4329) to write it
+// with, with its ref there.
 type forgeTarget struct {
-	number  int
-	pr      bool
-	forge   Forge
-	ref     forgeRef
-	project string
-	boards  forgeAzureBoards
+	pr    bool
+	forge Forge
+	ref   forgeRef
 }
 
 // forgeTargetOf is node's forge, or why there is none. prOnly refuses an issue; every forge with
@@ -137,13 +133,6 @@ func (d *Daemon) forgeTargetOf(ctx context.Context, method string, node wire.Lin
 	}
 	if f, ref, ok := d.forgeOwning(node); ok {
 		return forgeTarget{forge: f, ref: ref, pr: ref.pr()}, nil
-	}
-	if project, id, ok := boardsOfNode(node); ok {
-		b, err := d.forgeAzureBoards()
-		if err != nil {
-			return forgeTarget{}, err
-		}
-		return forgeTarget{boards: b, project: project, number: id}, nil
 	}
 	return forgeTarget{}, Invalid("%s: %s is not an issue or a pull request on GitHub, GitLab, Forgejo, Bitbucket, Azure DevOps, Linear, Jira or Azure Boards", method, node.Ref)
 }
@@ -168,20 +157,12 @@ func (d *Daemon) forgeComment(ctx context.Context, r wire.ForgeCommentRequest) (
 	if err != nil {
 		return wire.ForgeDone{}, err
 	}
-	var url string
-	switch {
-	case t.forge != nil:
-		var done wire.ForgeDone
-		done, err = t.forge.Comment(ctx, t.ref, body)
-		url, err = deref(done.URL), forgeCannotErr(method, t.forge, err)
-	case t.boards != nil:
-		url, err = t.boards.Comment(ctx, t.project, t.number, body)
-	}
+	done, err := t.forge.Comment(ctx, t.ref, body)
 	if err != nil {
-		return wire.ForgeDone{}, err
+		return wire.ForgeDone{}, forgeCannotErr(method, t.forge, err)
 	}
 	d.forgeWrote()
-	return wire.ForgeDone{URL: optional(url)}, nil
+	return wire.ForgeDone{URL: done.URL}, nil
 }
 
 // labelNames are the names given, trimmed, each once, or why not.
@@ -215,14 +196,8 @@ func (d *Daemon) forgeLabel(ctx context.Context, r wire.ForgeLabelRequest) (wire
 	if err != nil {
 		return wire.ForgeDone{}, err
 	}
-	switch {
-	case t.forge != nil:
-		err = forgeCannotErr(method, t.forge, t.forge.SetLabels(ctx, t.ref, add, remove))
-	case t.boards != nil:
-		err = t.boards.SetTags(ctx, t.project, t.number, add, remove)
-	}
-	if err != nil {
-		return wire.ForgeDone{}, err
+	if err := t.forge.SetLabels(ctx, t.ref, add, remove); err != nil {
+		return wire.ForgeDone{}, forgeCannotErr(method, t.forge, err)
 	}
 	d.forgeWrote()
 	return wire.ForgeDone{}, nil
@@ -233,23 +208,11 @@ func (d *Daemon) forgeLabels(ctx context.Context, r wire.ForgeNodeRequest) (wire
 	if err != nil {
 		return wire.ForgeLabels{}, err
 	}
-	if t.forge != nil {
-		labels, err := t.forge.Labels(ctx, t.ref)
-		if err != nil {
-			return wire.ForgeLabels{}, forgeCannotErr("forge/labels", t.forge, err)
-		}
-		return wire.ForgeLabels{Labels: labels}, nil
-	}
-	var names []string
-	var colors map[string]string
-	switch {
-	case t.boards != nil:
-		names, colors, err = t.boards.Labels(ctx, t.project, t.number)
-	}
+	labels, err := t.forge.Labels(ctx, t.ref)
 	if err != nil {
-		return wire.ForgeLabels{}, err
+		return wire.ForgeLabels{}, forgeCannotErr("forge/labels", t.forge, err)
 	}
-	return wire.ForgeLabels{Labels: forgeLabelsOf(names, colors)}, nil
+	return wire.ForgeLabels{Labels: labels}, nil
 }
 
 func (d *Daemon) forgeClose(ctx context.Context, r wire.ForgeCloseRequest) (wire.ForgeDone, error) {
@@ -260,20 +223,8 @@ func (d *Daemon) forgeClose(ctx context.Context, r wire.ForgeCloseRequest) (wire
 	}
 	transition := strings.TrimSpace(deref(r.Transition))
 	closed := r.Reopen == nil || !*r.Reopen
-	if t.forge != nil {
-		if err := t.forge.SetState(ctx, t.ref, closed, transition); err != nil {
-			return wire.ForgeDone{}, forgeCannotErr(method, t.forge, err)
-		}
-		d.forgeWrote()
-		return wire.ForgeDone{}, nil
-	}
-	if transition != "" {
-		err = t.boards.Transition(ctx, t.project, t.number, transition)
-	} else {
-		err = t.boards.SetState(ctx, t.project, t.number, closed)
-	}
-	if err != nil {
-		return wire.ForgeDone{}, err
+	if err := t.forge.SetState(ctx, t.ref, closed, transition); err != nil {
+		return wire.ForgeDone{}, forgeCannotErr(method, t.forge, err)
 	}
 	d.forgeWrote()
 	return wire.ForgeDone{}, nil

@@ -10,13 +10,15 @@ struct WorkStateIcon: View {
     var draft = false
     /// The forge's `not_planned`, where it gives one: a ring with a slash.
     var stateReason: String?
+    /// White, on a fill of the state's colour (the item page's pill, #4400).
+    var onFill = false
     /// White on a selected row in a key window, as the row's text.
     @Environment(\.backgroundProminence) private var prominence
 
     var body: some View {
         if let glyph = WorkLook.glyph(kind: kind, state: state, draft: draft, stateReason: stateReason) {
             symbol(glyph)
-                .foregroundStyle(prominence == .increased ? Color.white : glyph.tone.color)
+                .foregroundStyle(onFill || prominence == .increased ? Color.white : glyph.tone.color)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(glyph.accessibilityLabel)
         } else {

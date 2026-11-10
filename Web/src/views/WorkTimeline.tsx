@@ -13,7 +13,7 @@ import { describe } from "../model/errors";
 import { boardChoices, boardName, withBoard, type WorkProject } from "../model/work";
 import { boards, forgeHosts, loadBoards } from "../model/workLists";
 import {
-  Axis, colourIndex, dotWords, epicOf, errorWords, fitLabel, figures, hit, isOpen, joinCardWords, joins, label, landed as landedRefs, lanes,
+  Axis, colourIndex, dotWords, epicOf, errorWords, fitLabel, hit, isOpen, joinCardWords, joins, label, labelText, landed as landedRefs, lanes,
   layout, labelRoom, lineWords, mergeTimelines, noEpics, noMachine, noProject, overlapping, rangeSpan, rangeTitle, rangeWindow, releaseWords,
   riser, spoken, timelineLines, timelineRanges, waitWords, zoomed, type Interval, type TimelineHit, type TimelineLine, type TimelineRange,
 } from "../model/workTimeline";
@@ -442,16 +442,16 @@ class Drawing {
       const words = fitLabel(l, room, measure);
       if (words) {
         const arrow = cutLeft ? "← " : "";
-        const w = measure(arrow + words);
+        const w = measure(arrow + labelText(words));
         labels.push({ x: x - 3, y: yl - 17, w: w + 6, h: 16 });
         out.push(
           <g key={`label ${l.id}`} class="timeline-label">
             <rect class="halo" x={x - 3} y={yl - 17} width={w + 6} height={16} rx={3} />
             <text x={x} y={yl - 9} dy="0.35em">
               {arrow && <tspan class="faint">{arrow}</tspan>}
-              {words === label(l)
-                ? <><tspan style={{ fill: c }} class="name">{l.title}</tspan><tspan class="faint">{`  ${figures(l)}`}</tspan></>
-                : <tspan class="faint">{words}</tspan>}
+              {words.title
+                ? <><tspan style={{ fill: c }} class="name">{words.title}</tspan><tspan class="faint">{`  ${words.figures}`}</tspan></>
+                : <tspan class="faint">{words.figures}</tspan>}
             </text>
           </g>,
         );

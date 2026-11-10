@@ -99,7 +99,9 @@ export class Session {
       if (linked && state.kind === "unpaired") {
         log("pair.fromLink");
         void this.pair(linked);
-        return;
+        // A code that isn't one leaves the page on the pairing form, with pair's words (#4129), not
+        // on "Connecting…".
+        if (parseCode(linked)) return;
       }
       if (state.kind === "forgotten") {
         this.wasForgotten.value = !this.forgettingMyself;

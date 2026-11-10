@@ -78,7 +78,7 @@ func (d *Daemon) boardIn(folders []string, url string) (wire.ProjectBoard, []str
 	return board, in, len(in) > 0
 }
 
-// forgeBoard is what a list narrowed to a board reads, beside its sources.
+// forgeBoard is what a list narrowed to a board reads.
 type forgeBoard struct {
 	// forge is the board's forge, as the forge interface names it (#4329): github, …
 	forge string
@@ -105,12 +105,10 @@ func (b *forgeBoard) key() []any {
 	return []any{b.project, b.group, b.site, b.id, b.linear, b.jira, b.azureProject, b.azureTeam, b.azureSite}
 }
 
-// narrowToBoard keeps of s only what is on the board's forge, and says what to read there.
-func narrowToBoard(s *forgeSources, b wire.ProjectBoard, in []string, prs bool) *forgeBoard {
+// narrowToBoard says what to read of the board's forge, of in, the folders of its project.
+func narrowToBoard(b wire.ProjectBoard, in []string, prs bool) *forgeBoard {
 	board := &forgeBoard{forge: string(*b.Forge), home: in[0]}
 	key := deref(b.Key)
-	boards := s.boards
-	s.boards = nil
 	switch *b.Forge {
 	case wire.ConnectionProviderGithub:
 		// GitHub is on the forge interface: forgeList keeps only its scope.
@@ -131,17 +129,13 @@ func narrowToBoard(s *forgeSources, b wire.ProjectBoard, in []string, prs bool) 
 		if at < 0 {
 			break
 		}
-		project := strings.ToLower(key[:at])
-		board.azureProject, board.azureTeam, board.azureSite = project, key[at+1:], deref(b.Site)
-		if prs {
-			// Azure Repos is on the forge interface: azureDevOpsForge.List reads the pull requests
-			// of the project's repositories, on the Azure DevOps the board is on (#4055).
-			break
-		}
-		s.boards = []string{project}
-		if !slices.Contains(boards, project) {
-			// No folder names the project: its work items act from the board's first folder.
-			s.boardsFolder[project] = board.home
+		board.azureProject, board.azureTeam, board.azureSite = strings.ToLower(key[:at]), key[at+1:], deref(b.Site)
+		if !prs {
+			// Azure Boards is on the forge interface, by the name azureboards: azureBoardsForge.List
+			// reads the work items under the team's area paths. A pull requests list is Azure Repos':
+			// azureDevOpsForge.List reads the pull requests of the project's repositories, on the
+			// Azure DevOps the board is on (#4055).
+			board.forge = "azureboards"
 		}
 	}
 	return board

@@ -570,8 +570,11 @@ final class RemoteModel {
     private(set) var keptInUnread: UUID?
     /// Whether `keptInUnread` had a file to see when opened, so For Review keeps it (#3194).
     private(set) var keptHadFile = false
+    /// A chat's lease line asked for This Mac's resources (#4027): its page scrolls to them
+    /// once, then clears this.
+    var resourcesAsked = false
     /// One of the pages about all the work, from the sidebar's Activity (#226): Events,
-    /// Resources, Runtimes or Spending. Nil, or one of those.
+    /// Runtimes or Spending, or a machine's page. Nil, or one of those.
     var openActivity: SidebarItem? {
         didSet {
             if openActivity != nil, selectedKey != nil { selectedKey = nil }

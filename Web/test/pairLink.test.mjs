@@ -26,6 +26,22 @@ test("a code in the fragment is taken, and the address replaced without it", asy
   assert.deepEqual(replaced, ["/"]);
 });
 
+// A code as `agents-control code` prints it: a 65-byte key and a 32-byte secret, so it parses.
+const b64 = (bytes) => Buffer.from(bytes).toString("base64url");
+const printed = ["agents-control", "2", "c", "-", b64([4, ...new Array(64).fill(1)]), b64(new Array(32).fill(2)),
+  "https%3A%2F%2Fmac.local%3A8790", "PIN", "Alex%E2%80%99s%20Mac"].join(":");
+
+test("a code put in the fragment as it is printed, not escaped, is taken as it is (#4129)", async () => {
+  const { linkedCode, replaced } = await open("#code=" + printed);
+  assert.equal(linkedCode, printed);
+  assert.deepEqual(replaced, ["/"]);
+});
+
+test("the same code, escaped, is taken decoded", async () => {
+  const { linkedCode } = await open("#code=" + encodeURIComponent(printed));
+  assert.equal(linkedCode, printed);
+});
+
 test("a route, or no fragment at all, is left alone", async () => {
   for (const hash of ["", "#/h/mac/p/x", "#/", "#code="]) {
     const { linkedCode, replaced } = await open(hash);
