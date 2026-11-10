@@ -1,0 +1,95 @@
+import AgentsKitCore
+import SwiftUI
+
+/// A Work list's empty, loading and error states (#4391, parts.md section 7).
+
+/// The first read: placeholder rows, a grey circle and two grey bars each, with no spinner in the middle.
+struct WorkPlaceholderRows: View {
+    var count = WorkLook.placeholderRows
+
+    var body: some View {
+        ForEach(0 ..< count, id: \.self) { i in
+            HStack(alignment: .top, spacing: 8) {
+                Circle().frame(width: 14, height: 14).padding(.top, 2)
+                VStack(alignment: .leading, spacing: 6) {
+                    RoundedRectangle(cornerRadius: 3).frame(height: 11).frame(maxWidth: i.isMultiple(of: 2) ? 360 : 280)
+                    RoundedRectangle(cornerRadius: 3).frame(width: 180, height: 9)
+                }
+            }
+            .foregroundStyle(Paper.wash)
+            .padding(.vertical, 5)
+            .redacted(reason: .placeholder)
+            .modifier(WorkShimmer())
+            .accessibilityHidden(true)
+        }
+    }
+}
+
+/// A slow shimmer over the placeholders.
+private struct WorkShimmer: ViewModifier {
+    @State private var dim = false
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(dim ? 0.55 : 1)
+            .animation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true), value: dim)
+            .onAppear { dim = true }
+    }
+}
+
+/// An empty list in the middle: the page's glyph, the title ("No open issues"), one line under
+/// it, and a button where there is one (Clear filters, Settings ▸ Connectors).
+struct WorkEmptyState: View {
+    let symbol: String
+    let title: String
+    var line: String?
+    var action: (title: String, run: () -> Void)?
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: symbol)
+                // The empty state's own glyph, larger than any text step: a marked decorative glyph.
+                .font(.system(size: 28))
+                .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
+            Text(title).appText(.reading).fontWeight(.semibold)
+            if let line {
+                Text(line).appText(.supporting).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            }
+            if let action {
+                Button(action.title, action: action.run).buttonStyle(.paper).padding(.top, 4)
+            }
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// What the forges said when a read failed: a strip above the list (not in place of it), a
+/// warning glyph, the forge's words, one line each, and Try again.
+struct WorkErrorStrip: View {
+    let lines: [String]
+    var retry: (() -> Void)?
+
+    var body: some View {
+        if !lines.isEmpty {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(Color(light: 0x9A6700, dark: 0xD29922))
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(lines, id: \.self) { Text($0).lineLimit(1).truncationMode(.tail).help($0) }
+                }
+                .appText(.supporting)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                if let retry {
+                    Button(WorkLook.tryAgain, action: retry).buttonStyle(.paper)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(RoundedRectangle(cornerRadius: Paper.Radius.control).fill(Color(light: 0xFFF8C5, dark: 0x2F2A1A)))
+            .overlay(RoundedRectangle(cornerRadius: Paper.Radius.control).strokeBorder(Color(light: 0xD4A72C, dark: 0x6B5A1E)))
+        }
+    }
+}
