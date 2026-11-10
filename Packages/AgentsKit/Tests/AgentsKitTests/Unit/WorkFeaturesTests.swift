@@ -47,8 +47,7 @@ struct WorkFeaturesTests {
         try #require(groups.map(\.group) == [.idle, .finished])
         #expect(groups[0].features.map(\.name) == ["lineage", "old", "work"])
         #expect(groups[1].features.map(\.name) == ["browser"])
-        #expect(WorkFeatures.finishedWords(7) == "Finished (7)")
-        #expect(WorkFeatures.Group.finished.words(7) == "Finished (7)")
+        #expect(WorkFeatures.Group.finished.words == "Finished")
     }
 
     /// #4115: each feature in the first group it matches, from the sessions labelled with its work.
@@ -79,7 +78,7 @@ struct WorkFeaturesTests {
         #expect(WorkFeatures.sessionWords(3) == "3 sessions")
         // Without the approval, a stopped session that waits for it is still in flight.
         #expect(WorkFeatures.groups([features[1]], agents: agents).map(\.group) == [.inFlight])
-        #expect(WorkFeatures.Group.allCases.map { $0.words(2) } == ["Needs you", "In flight", "Idle", "Finished (2)"])
+        #expect(WorkFeatures.Group.allCases.map { $0.words } == ["Needs you", "In flight", "Idle", "Finished"])
     }
 
     @Test func severalMachinesFeaturesAddUpByName() throws {
@@ -113,8 +112,8 @@ struct WorkFeaturesTests {
         ])
         try #require(shown.epics.map(\.node.ref) == ["github:alexec/Agents#3100", "github:alexec/Agents#3265"])
         #expect(shown.loose.map(\.node.ref) == ["github:alexec/Agents#3131"])
-        #expect(WorkFeatures.progressWords(shown.epics[1]) == "1/6")
-        #expect(WorkFeatures.progressWords(issue(1, level: "epic")) == "0/0")
+        #expect(WorkFeatures.progressWords(shown.epics[1]) == "1 of 6")
+        #expect(WorkFeatures.progressWords(issue(1, level: "epic")) == "0 of 0")
     }
 
     @Test func theLeadIsTheLiveSessionLabelledLeadAndTheEpic() {
@@ -133,9 +132,29 @@ struct WorkFeaturesTests {
 
     @Test func theLeadSaysItsState() {
         #expect(WorkFeatures.leadWords(nil) == "—")
-        #expect(WorkFeatures.leadWords(.running) == "● lead running")
+        #expect(WorkFeatures.leadWords(.running) == "● lead working")
         #expect(WorkFeatures.leadWords(.waitingOnUser) == "● lead needs you")
         #expect(WorkFeatures.leadWords(.stopped) == "lead stopped")
+    }
+
+    @Test func aFeaturesBarIsItsEpicsDone() {
+        let work = DaemonAPI.ForgeFeature(name: "work", epics: 2, open: 1)
+        #expect(WorkFeatures.epicsDone(work) == 0.5)
+        #expect(WorkFeatures.epicsDoneWords(work) == "1 of 2 epics done")
+        #expect(WorkFeatures.epicsDoneWords(.init(name: "runtimes", epics: 1, open: 1)) == "0 of 1 epic done")
+        #expect(WorkFeatures.epicsDone(.init(name: "none", epics: 0, open: 0)) == nil)
+    }
+
+    @Test func aNeedsYouFeatureSaysWhatWaits() {
+        let work = DaemonAPI.ForgeFeature(name: "work", epics: 2, open: 1, waiting: ["github:alexec/Agents#4290"])
+        let lane = agent(["#4333", "P#4405"], state: .finished)
+        #expect(WorkFeatures.needsWords(work, sessions: [lane], approvals: ["github:alexec/Agents#4405"]) == "P#4405 waits for your approval")
+        #expect(WorkFeatures.needsWords(work, sessions: [lane], approvals: []) == "#4290 waits for you")
+        var asking = agent(["#4333"], state: .waitingOnUser)
+        asking.title = "Work look: epic page"
+        let idle = DaemonAPI.ForgeFeature(name: "work", epics: 2, open: 1)
+        #expect(WorkFeatures.needsWords(idle, sessions: [asking], approvals: []) == "“Work look: epic page” needs you")
+        #expect(WorkFeatures.needsWords(idle, sessions: [lane], approvals: []) == nil)
     }
 
     @Test func featuresIsAListOfItsOwnAndNoLineagePage() {
