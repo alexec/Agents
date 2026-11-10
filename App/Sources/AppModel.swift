@@ -208,6 +208,7 @@ final class AppModel {
             machinePage = nil
             showsWork = false
             showsDocs = false
+            showsMessages = false
             showsSummary = false
             // The same rule as picking a folder: what you picked is what you see,
             // and a conversation or a workflow left open underneath would be waiting
@@ -233,6 +234,7 @@ final class AppModel {
             machinePage = nil
             showsWork = false
             showsDocs = false
+            showsMessages = false
             showsSummary = false
             selection = nil
             openWorkflow = nil
@@ -257,6 +259,7 @@ final class AppModel {
             machinePage = nil
             showsWork = false
             showsDocs = false
+            showsMessages = false
             showsSummary = false
             selection = nil
             openWorkflow = nil
@@ -278,6 +281,7 @@ final class AppModel {
             machinePage = nil
             showsWork = false
             showsDocs = false
+            showsMessages = false
             showsSummary = false
             selection = nil
             openWorkflow = nil
@@ -299,6 +303,7 @@ final class AppModel {
             machinePage = nil
             showsWork = false
             showsDocs = false
+            showsMessages = false
             showsSummary = false
             selection = nil
             openWorkflow = nil
@@ -320,6 +325,7 @@ final class AppModel {
             machinePage = nil
             showsWork = false
             showsDocs = false
+            showsMessages = false
             showsSummary = false
             selection = nil
             openWorkflow = nil
@@ -335,6 +341,7 @@ final class AppModel {
             guard machinePage != nil, machinePage != oldValue else { return }
             showsWork = false
             showsDocs = false
+            showsMessages = false
             showsSummary = false
             showsSpending = false
             showsEvents = false
@@ -356,6 +363,7 @@ final class AppModel {
         didSet {
             guard showsWork, showsWork != oldValue else { return }
             showsDocs = false
+            showsMessages = false
             showsSummary = false
             showsSpending = false
             showsEvents = false
@@ -385,12 +393,38 @@ final class AppModel {
             showsTokens = false
             machinePage = nil
             showsWork = false
+            showsMessages = false
             selection = nil
             openWorkflow = nil
             folderPage = nil
             composing = false
         }
     }
+
+    /// Whether the window is showing Messages (#4344): the messaging connectors' conversations, read only,
+    /// and a conversation's messages. A page like Docs, and not persisted for the same reason.
+    var showsMessages = false {
+        didSet {
+            guard showsMessages, showsMessages != oldValue else { return }
+            showsSummary = false
+            showsSpending = false
+            showsEvents = false
+            showsRuntimes = false
+            statusSecretsPage = nil
+            showsTime = false
+            showsTokens = false
+            machinePage = nil
+            showsWork = false
+            showsDocs = false
+            selection = nil
+            openWorkflow = nil
+            folderPage = nil
+            composing = false
+        }
+    }
+
+    /// The Messages page's list and the conversation open on it, kept while the window is open.
+    let messagesList = MessagesListState()
 
     /// Whether the window is showing the Summary page (#3721): the daily summary's newest saved
     /// page, from the Summary row at the top of the sidebar. A page like Docs, and not persisted
@@ -407,6 +441,7 @@ final class AppModel {
             machinePage = nil
             showsWork = false
             showsDocs = false
+            showsMessages = false
             selection = nil
             openWorkflow = nil
             folderPage = nil
@@ -488,6 +523,7 @@ final class AppModel {
         machinePage = nil
         showsWork = false
         showsDocs = false
+        showsMessages = false
         showsSummary = false
         if let agent = agents.first(where: { $0.id == agentID }) {
             pendingOpen = nil
@@ -513,6 +549,7 @@ final class AppModel {
         machinePage = nil
         showsWork = false
         showsDocs = false
+        showsMessages = false
         showsSummary = false
         // Not listed yet: settling the selection would pick another, so it waits (#1055).
         pendingOpen = liveFolders.contains { $0.key == key } ? nil : .folder(key)
@@ -561,6 +598,7 @@ final class AppModel {
             if showsTime { return .time }
             if showsWork { return .work(workPlace.kind) }
             if showsDocs { return .docs }
+            if showsMessages { return .messages }
             if showsSummary { return .summary }
             // Nothing else open is the Multiplier page (#3986), as the detail draws it.
             guard let key = selectedFolderKey else { return selection == nil && !composing ? .multiplier : nil }
@@ -588,6 +626,7 @@ final class AppModel {
                 machinePage = nil
                 showsWork = false
                 showsDocs = false
+                showsMessages = false
                 showsSummary = false
                 select(key)
                 openWorkflow = id
@@ -612,6 +651,8 @@ final class AppModel {
                 showWork(workPlace.kind == kind ? workPlace : WorkPlace(kind: kind))
             case .docs:
                 showDocs(docsHistory.current ?? DocsPlace())
+            case .messages:
+                showsMessages = true
             case .summary:
                 showsSummary = true
             case .resources:
@@ -637,6 +678,7 @@ final class AppModel {
                 machinePage = nil
                 showsWork = false
                 showsDocs = false
+                showsMessages = false
                 showsSummary = false
                 showFolder(key)
             case nil:
@@ -660,6 +702,7 @@ final class AppModel {
         machinePage = nil
         showsWork = false
         showsDocs = false
+        showsMessages = false
         showsSummary = false
         showNothing()
     }
@@ -675,6 +718,7 @@ final class AppModel {
         machinePage = nil
         showsWork = false
         showsDocs = false
+        showsMessages = false
         showsSummary = false
         select(key)
         folderPage = page
@@ -705,6 +749,7 @@ final class AppModel {
         machinePage = nil
         showsWork = false
         showsDocs = false
+        showsMessages = false
         showsSummary = false
         select(key)
         // A new session in it (#366): the folder's own page is where a session starts,
@@ -942,6 +987,7 @@ final class AppModel {
         machinePage = nil
         showsWork = false
         showsDocs = false
+        showsMessages = false
         showsSummary = false
         select(key)
         openPin = path
@@ -6493,6 +6539,15 @@ final class AppModel {
             .sorted { ($0.id == mine ? 0 : 1, $0.name) < ($1.id == mine ? 0 : 1, $1.name) }
     }
 
+    /// The machines that read messages (#4344), this Mac first.
+    var messagesMachines: [(id: MachineRef, name: String)] {
+        let mine = thisMacHostID
+        return (controlPlaneHosts ?? [])
+            .filter { $0.has(Capability.messages1) && $0.state != "offline" }
+            .map { (id: $0.id, name: $0.id == mine ? "This Mac" : $0.name) }
+            .sorted { ($0.id == mine ? 0 : 1, $0.name) < ($1.id == mine ? 0 : 1, $1.name) }
+    }
+
     /// Open in Files on a doc's page (#3321): the file as its folder's own page, as a pinned page
     /// opens. The folder as this window knows it, so the page finds it; false when it knows none.
     func showDocFile(_ path: String, folder: String, on host: MachineRef) -> Bool {
@@ -6507,6 +6562,12 @@ final class AppModel {
     /// One of Docs' reads (#3321): `docs/list`, `docs/search` or `docs/read`, on a machine.
     func docs<R: Decodable & Sendable>(_ method: String, _ params: some Encodable & Sendable, returning: R.Type,
                                        on host: MachineRef) async throws -> R {
+        try await client(for: host).call(method, params, returning: R.self)
+    }
+
+    /// One of Messages' reads (#4344): `messages/conversations` or `messages/read`, on a machine.
+    func messages<R: Decodable & Sendable>(_ method: String, _ params: some Encodable & Sendable, returning: R.Type,
+                                           on host: MachineRef) async throws -> R {
         try await client(for: host).call(method, params, returning: R.self)
     }
 

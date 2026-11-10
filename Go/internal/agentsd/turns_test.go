@@ -18,6 +18,7 @@ import (
 	sdk "github.com/coder/acp-go-sdk"
 
 	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
+	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -563,6 +564,27 @@ func TestStopEndsTheTurnCancelled(t *testing.T) {
 	c.call(t, 3, "agents/archive", map[string]any{"agentID": id})
 	if a := d.Store.Agent(id); a.State != wire.AgentStateArchived || a.ArchivedAt == nil {
 		t.Fatalf("archived %+v", a.State)
+	}
+}
+
+// A stop after kick and before the turn begins is not lost (#3621): under load the run
+// loop's goroutine starts late, and turn cleared the stop and worked on.
+func TestAStopBeforeTheTurnBeginsHolds(t *testing.T) {
+	fakeRuntimes(t)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	a := seeded(t, d, t.TempDir(), func(a *wire.Agent) {
+		a.QueuedPrompts = []wire.QueuedPrompt{{ID: store.NewUUID(), Text: "wait for me", From: wire.PromptOriginPerson}}
+	})
+	l := d.live(a.ID)
+	l.mu.Lock()
+	l.running = true // kicked; its goroutine has not begun
+	l.mu.Unlock()
+	c.call(t, 1, "agents/stop", map[string]any{"agentID": a.ID})
+	d.goAfterTurn("agent "+string(a.ID), l.run)
+	waitFor(t, "stopped", func() bool { return d.Store.Agent(a.ID).State == wire.AgentStateStopped })
+	if got := d.Store.Agent(a.ID); *got.EndedReason != wire.EndedReasonCancelled {
+		t.Fatalf("ended %s", *got.EndedReason)
 	}
 }
 

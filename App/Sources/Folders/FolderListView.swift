@@ -200,6 +200,11 @@ struct FolderListView: View {
                         .activityIcon(SummaryRowLabel.systemImage)
                         .appText(.supporting).sidebarInk(.summary).tag(SidebarItem.summary)
                 }
+                // Messages (#4344): the messaging connectors' conversations, the last row above Work.
+                HStack { Text(MessagesList.title).foregroundStyle(.primary); Spacer() }
+                    .help(MessagesList.sidebarHelp)
+                    .activityIcon("bubble.left.and.bubble.right")
+                    .appText(.supporting).sidebarInk(.messages).tag(SidebarItem.messages)
             }
 
             // Work (#3119): a row per list (#4004), as the web's Work section has them; an item's

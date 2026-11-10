@@ -675,7 +675,7 @@ final class RemoteModel {
                 // The Multiplier page (#4116), from its row under Status.
                 openActivity = newValue
             case .spending, .tokens, .time,
-                 .folderMCPServers, .docs:
+                 .folderMCPServers, .docs, .messages:
                 // Usage, a folder's connectors and Docs are Mac + web (#2798, #3321): the
                 // Remote opens none of them.
                 break
@@ -3981,6 +3981,28 @@ final class RemoteModel {
                                                 DaemonAPI.SetPinnedRequest(folder: summary.folder.folder, pinned: pinned),
                                                 returning: DaemonAPI.FolderSummary.self)
             changed.host = host
+            work.upsert(changed)
+        } catch {
+            problem = sentence(for: error)
+        }
+    }
+
+    /// The folder whose Project Settings page is open (#2798 reversed for Work at Once,
+    /// Sessions and Policy), asked at the root as Move to Machine… is: the menu is gone by now.
+    var projectSettingsFolder: FolderKey?
+
+    /// A folder's helper limits and switches (#64), written into its `.agents/folder.json` by
+    /// its own machine, as the window's Project Settings ▸ Work at Once and Sessions set them.
+    func setHelperLimits(_ limits: HelperLimits, for key: FolderKey) async {
+        guard let target = hostClient(key.host) else {
+            problem = "\(hostLabel(key.host)) can't be reached now."
+            return
+        }
+        do {
+            var changed = try await target.call(DaemonAPI.Method.foldersSetHelperLimits,
+                                                DaemonAPI.SetHelperLimitsRequest(folder: key.folder, limits: limits),
+                                                returning: DaemonAPI.FolderSummary.self)
+            changed.host = key.host
             work.upsert(changed)
         } catch {
             problem = sentence(for: error)

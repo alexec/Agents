@@ -4,13 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/alexec/agents/Go/internal/azuredevopsmcp"
+	"github.com/alexec/agents/Go/internal/bitbucketmcp"
+	"github.com/alexec/agents/Go/internal/connections"
+	"github.com/alexec/agents/Go/internal/forgejomcp"
 	"github.com/alexec/agents/Go/internal/githubmcp"
+	"github.com/alexec/agents/Go/internal/gitlabmcp"
 	"github.com/alexec/agents/Go/internal/lineage"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -31,6 +38,10 @@ type conformRow struct {
 
 var conformRows = []conformRow{
 	{name: "github", daemon: conformGitHubDaemon},
+	{name: "gitlab", daemon: conformGitLabDaemon},
+	{name: "forgejo", daemon: conformForgejoDaemon},
+	{name: "bitbucket", daemon: conformBitbucketDaemon},
+	{name: "azuredevops", daemon: conformAzureDevOpsDaemon},
 }
 
 // conformGitHub is GitHub with four items on alexec/agents, which pages by its cursor.
@@ -110,6 +121,286 @@ func conformGitHubDaemon(t *testing.T) (*Daemon, *conn) {
 	d, c, gh, _ := forgeDaemon(t)
 	fake := conformGitHub{gh}
 	d.newForgeGitHub = func(string) forgeGitHub { return fake }
+	return d, c
+}
+
+// conformGitLab is GitLab with four items on Group/App, which pages by its cursor.
+type conformGitLab struct {
+	*fakeForgeGitLab
+}
+
+var conformGitLabItems = []gitlabmcp.Item{
+	{Project: "Group/App", Number: 4, MR: true, State: "merged", Title: "Merged", URL: "https://gitlab.com/Group/App/-/merge_requests/4",
+		Author: "kim", Labels: []string{"enhancement"}, LabelColors: map[string]string{"enhancement": "#a2eeef"},
+		UpdatedAt: "2026-11-04T10:00:00Z", Comments: 1},
+	{Project: "Group/App", Number: 3, MR: true, State: "open", Title: "Open", URL: "https://gitlab.com/Group/App/-/merge_requests/3",
+		Author: "kim", Labels: []string{"bug"}, LabelColors: map[string]string{"bug": "#d9534f"}, Assignees: []string{"kim"},
+		UpdatedAt: "2026-11-03T10:00:00Z", Checks: "failing"},
+	{Project: "Group/App", Number: 2, State: "closed", Title: "Closed", URL: "https://gitlab.com/Group/App/-/issues/2",
+		Author: "kim", UpdatedAt: "2026-11-02T10:00:00Z"},
+	{Project: "Group/App", Number: 1, State: "open", Title: "Open issue", URL: "https://gitlab.com/Group/App/-/issues/1",
+		Author: "kim", Labels: []string{"task"}, LabelColors: map[string]string{"task": "#c5def5"},
+		UpdatedAt: "2026-11-01T10:00:00Z", Comments: 2},
+}
+
+func (g conformGitLab) Search(_ context.Context, _ []string, sf gitlabmcp.SearchFilter, after string, first int) (gitlabmcp.SearchPage, error) {
+	var kept []gitlabmcp.Item
+	for _, i := range conformGitLabItems {
+		open := i.State == "open"
+		if i.MR == sf.MRs && (sf.State == "all" || (sf.State == "closed") != open) {
+			kept = append(kept, i)
+		}
+	}
+	from, _ := strconv.Atoi(after)
+	var page gitlabmcp.SearchPage
+	for n := from; n < len(kept) && len(page.Items) < first; n++ {
+		page.Items = append(page.Items, kept[n])
+		page.Cursors = append(page.Cursors, strconv.Itoa(n+1))
+	}
+	if end := from + len(page.Items); end < len(kept) {
+		page.Next = strconv.Itoa(end)
+	}
+	return page, nil
+}
+
+func (g conformGitLab) ItemPage(_ context.Context, _ string, number int, mr bool, _ string) (gitlabmcp.ItemDetail, error) {
+	for _, i := range conformGitLabItems {
+		if i.Number == number && i.MR == mr {
+			d := gitlabmcp.ItemDetail{Item: i, Body: "The body.",
+				Thread: []gitlabmcp.Comment{{Author: "kim", Body: "A comment.", At: i.UpdatedAt}}}
+			if i.MR {
+				d.Head, d.Pipeline = "abc", 7
+				d.CheckRuns = []gitlabmcp.Check{{Name: "test: unit", State: "failing"}}
+			}
+			return d, nil
+		}
+	}
+	return gitlabmcp.ItemDetail{}, &gitlabmcp.GitLabError{Kind: gitlabmcp.NotFound, Message: "not found on GitLab"}
+}
+
+func (g conformGitLab) Plan(_ context.Context, _ string, _ int) (gitlabmcp.Plan, error) {
+	return gitlabmcp.Plan{Epic: conformGitLabItems[3]}, nil
+}
+
+// conformGitLabDaemon is a daemon with one folder on Group/App on the connected gitlab.com.
+func conformGitLabDaemon(t *testing.T) (*Daemon, *conn) {
+	t.Helper()
+	t.Setenv("AGENTS_PERSONAL_HOME", t.TempDir())
+	d, c := start(t, t.TempDir())
+	t.Cleanup(d.Shutdown)
+	file := &connections.File{Path: filepath.Join(t.TempDir(), ".agents-secrets", connections.FileName)}
+	d.connStoreFor = func() (connections.Store, error) { return file, nil }
+	fake := conformGitLab{&fakeForgeGitLab{}}
+	d.newForgeGitLab = func(string, string) forgeGitLab { return fake }
+	c.call(t, 100, "folders/add", map[string]any{"folder": "file://" + gitFolder(t, "git@gitlab.com:Group/App.git")})
+	if err := file.Put(connections.Connection{Provider: connections.GitLab, Login: "kim", Access: "gloas-secret", URL: connections.GitLabCom,
+		AccessExpiresAt: time.Now().Add(time.Hour), ConnectedAt: time.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	return d, c
+}
+
+// conformForgejo is Forgejo with four items on walkalex/App, which pages by its cursor.
+type conformForgejo struct {
+	*fakeForgeForgejo
+}
+
+var conformForgejoItems = []forgejomcp.Item{
+	{Repo: "walkalex/App", Number: 4, PR: true, State: "merged", Title: "Merged", URL: "http://localhost:3753/walkalex/App/pulls/4",
+		Author: "kim", Labels: []string{"enhancement"}, LabelColors: map[string]string{"enhancement": "#a2eeef"},
+		UpdatedAt: "2026-11-04T10:00:00Z", Comments: 1},
+	{Repo: "walkalex/App", Number: 3, PR: true, State: "open", Title: "Open", URL: "http://localhost:3753/walkalex/App/pulls/3",
+		Author: "kim", Labels: []string{"bug"}, LabelColors: map[string]string{"bug": "#ee0701"}, Assignees: []string{"kim"},
+		UpdatedAt: "2026-11-03T10:00:00Z", Checks: "failing"},
+	{Repo: "walkalex/App", Number: 2, State: "closed", Title: "Closed", URL: "http://localhost:3753/walkalex/App/issues/2",
+		Author: "kim", UpdatedAt: "2026-11-02T10:00:00Z"},
+	{Repo: "walkalex/App", Number: 1, State: "open", Title: "Open issue", URL: "http://localhost:3753/walkalex/App/issues/1",
+		Author: "kim", Labels: []string{"task"}, LabelColors: map[string]string{"task": "#c5def5"},
+		UpdatedAt: "2026-11-01T10:00:00Z", Comments: 2},
+}
+
+func (g conformForgejo) Search(_ context.Context, _ []string, sf forgejomcp.SearchFilter, after string, first int) (forgejomcp.SearchPage, error) {
+	var kept []forgejomcp.Item
+	for _, i := range conformForgejoItems {
+		open := i.State == "open"
+		if i.PR == sf.PRs && (sf.State == "all" || (sf.State == "closed") != open) {
+			kept = append(kept, i)
+		}
+	}
+	from, _ := strconv.Atoi(after)
+	var page forgejomcp.SearchPage
+	for n := from; n < len(kept) && len(page.Items) < first; n++ {
+		page.Items = append(page.Items, kept[n])
+		page.Cursors = append(page.Cursors, strconv.Itoa(n+1))
+	}
+	if end := from + len(page.Items); end < len(kept) {
+		page.Next = strconv.Itoa(end)
+	}
+	return page, nil
+}
+
+func (g conformForgejo) ItemPage(_ context.Context, _ string, number int, pr bool, _ string) (forgejomcp.ItemDetail, error) {
+	for _, i := range conformForgejoItems {
+		if i.Number == number && i.PR == pr {
+			d := forgejomcp.ItemDetail{Item: i, Body: "The body.",
+				Thread: []forgejomcp.Comment{{Author: "kim", Body: "A comment.", At: i.UpdatedAt}}}
+			if i.PR {
+				d.Head = "abc"
+				d.CheckRuns = []forgejomcp.CheckRun{{Name: "ci / test", State: "failing"}}
+			}
+			return d, nil
+		}
+	}
+	return forgejomcp.ItemDetail{}, &forgejomcp.ForgejoError{Kind: forgejomcp.NotFound, Message: "not found on Forgejo"}
+}
+
+func (g conformForgejo) Plan(_ context.Context, _ string, _ int) (forgejomcp.Plan, error) {
+	return forgejomcp.Plan{Epic: conformForgejoItems[3]}, nil
+}
+
+// conformForgejoDaemon is a daemon with one folder on walkalex/App on the connected Forgejo.
+func conformForgejoDaemon(t *testing.T) (*Daemon, *conn) {
+	t.Helper()
+	t.Setenv("AGENTS_PERSONAL_HOME", t.TempDir())
+	d, c := start(t, t.TempDir())
+	t.Cleanup(d.Shutdown)
+	file := &connections.File{Path: filepath.Join(t.TempDir(), ".agents-secrets", connections.FileName)}
+	d.connStoreFor = func() (connections.Store, error) { return file, nil }
+	fake := conformForgejo{&fakeForgeForgejo{}}
+	d.newForgeForgejo = func(string, string) forgeForgejo { return fake }
+	c.call(t, 100, "folders/add", map[string]any{"folder": "file://" + gitFolder(t, "http://localhost:3753/walkalex/App.git")})
+	if err := file.Put(connections.Connection{Provider: connections.Forgejo, Login: "walkalex", Access: "forgejo-secret",
+		URL: "http://localhost:3753/", ConnectedAt: time.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	return d, c
+}
+
+// conformBitbucket is Bitbucket Cloud with four items on walkalex/App, which pages by its cursor.
+type conformBitbucket struct {
+	*fakeForgeBitbucket
+}
+
+var conformBitbucketItems = []bitbucketmcp.Item{
+	{Repo: "walkalex/App", Number: 4, PR: true, State: "merged", Title: "Merged", URL: "https://bitbucket.org/walkalex/App/pull-requests/4",
+		Author: "kim", UpdatedAt: "2026-11-04T10:00:00Z", Comments: 1},
+	{Repo: "walkalex/App", Number: 3, PR: true, State: "open", Title: "Open", URL: "https://bitbucket.org/walkalex/App/pull-requests/3",
+		Author: "kim", Assignees: []string{"kim"}, UpdatedAt: "2026-11-03T10:00:00Z", Checks: "failing"},
+	{Repo: "walkalex/App", Number: 2, State: "closed", Title: "Closed", URL: "https://bitbucket.org/walkalex/App/issues/2",
+		Author: "kim", Labels: []string{"bug"}, UpdatedAt: "2026-11-02T10:00:00Z"},
+	{Repo: "walkalex/App", Number: 1, State: "open", Title: "Open issue", URL: "https://bitbucket.org/walkalex/App/issues/1",
+		Author: "kim", Labels: []string{"task", "feature:Export"}, UpdatedAt: "2026-11-01T10:00:00Z"},
+}
+
+func (g conformBitbucket) Search(_ context.Context, _ []string, sf bitbucketmcp.SearchFilter, after string, first int) (bitbucketmcp.SearchPage, error) {
+	var kept []bitbucketmcp.Item
+	for _, i := range conformBitbucketItems {
+		open := i.State == "open"
+		if i.PR == sf.PRs && (sf.State == "all" || (sf.State == "closed") != open) {
+			kept = append(kept, i)
+		}
+	}
+	from, _ := strconv.Atoi(after)
+	var page bitbucketmcp.SearchPage
+	for n := from; n < len(kept) && len(page.Items) < first; n++ {
+		page.Items = append(page.Items, kept[n])
+		page.Cursors = append(page.Cursors, strconv.Itoa(n+1))
+	}
+	if end := from + len(page.Items); end < len(kept) {
+		page.Next = strconv.Itoa(end)
+	}
+	return page, nil
+}
+
+func (g conformBitbucket) ItemPage(_ context.Context, _ string, number int, pr bool, _ string) (bitbucketmcp.ItemDetail, error) {
+	for _, i := range conformBitbucketItems {
+		if i.Number == number && i.PR == pr {
+			d := bitbucketmcp.ItemDetail{Item: i, Body: "The body.",
+				Thread: []bitbucketmcp.Comment{{Author: "kim", Body: "A comment.", At: i.UpdatedAt}}}
+			if i.PR {
+				d.Head = "abc"
+				d.CheckRuns = []bitbucketmcp.CheckRun{{Name: "Pipeline #12", State: "failing", Run: 12}}
+			}
+			return d, nil
+		}
+	}
+	return bitbucketmcp.ItemDetail{}, &bitbucketmcp.BitbucketError{Kind: bitbucketmcp.NotFound, Message: "not found on Bitbucket"}
+}
+
+// conformBitbucketDaemon is a daemon with one folder on walkalex/App on Bitbucket Cloud.
+func conformBitbucketDaemon(t *testing.T) (*Daemon, *conn) {
+	t.Helper()
+	t.Setenv("AGENTS_PERSONAL_HOME", t.TempDir())
+	d, c := start(t, t.TempDir())
+	t.Cleanup(d.Shutdown)
+	file := &connections.File{Path: filepath.Join(t.TempDir(), ".agents-secrets", connections.FileName)}
+	d.connStoreFor = func() (connections.Store, error) { return file, nil }
+	fake := conformBitbucket{&fakeForgeBitbucket{}}
+	d.newForgeBitbucket = func(string, string, string) forgeBitbucket { return fake }
+	c.call(t, 100, "folders/add", map[string]any{"folder": "file://" + gitFolder(t, "git@bitbucket.org:walkalex/App.git")})
+	if err := file.Put(connections.BitbucketConnection(connections.BitbucketAPI, "me@example.com", "bb-secret", "walkalex", time.Now())); err != nil {
+		t.Fatal(err)
+	}
+	return d, c
+}
+
+// conformAzureDevOps is Azure Repos with two pull requests on acme/Web App/App, which pages by
+// its cursor. It has no issues: Azure Boards has them.
+type conformAzureDevOps struct {
+	*fakeForgeAzureDevOps
+}
+
+var conformAzureDevOpsItems = []azuredevopsmcp.Item{
+	{Repo: "acme/Web App/App", Number: 4, State: "merged", Title: "Merged", URL: "https://dev.azure.com/acme/Web%20App/_git/App/pullrequest/4",
+		Author: "kim@example.com", UpdatedAt: "2026-11-04T10:00:00Z"},
+	{Repo: "acme/Web App/App", Number: 3, State: "open", Title: "Open", URL: "https://dev.azure.com/acme/Web%20App/_git/App/pullrequest/3",
+		Author: "kim@example.com", Labels: []string{"ui"}, UpdatedAt: "2026-11-03T10:00:00Z", Checks: "failing"},
+}
+
+func (g conformAzureDevOps) Search(_ context.Context, _ []string, sf azuredevopsmcp.SearchFilter, after string, first int) (azuredevopsmcp.SearchPage, error) {
+	var kept []azuredevopsmcp.Item
+	for _, i := range conformAzureDevOpsItems {
+		if sf.State == "all" || (sf.State == "closed") != (i.State == "open") {
+			kept = append(kept, i)
+		}
+	}
+	from, _ := strconv.Atoi(after)
+	var page azuredevopsmcp.SearchPage
+	for n := from; n < len(kept) && len(page.Items) < first; n++ {
+		page.Items = append(page.Items, kept[n])
+		page.Cursors = append(page.Cursors, strconv.Itoa(n+1))
+	}
+	if end := from + len(page.Items); end < len(kept) {
+		page.Next = strconv.Itoa(end)
+	}
+	return page, nil
+}
+
+func (g conformAzureDevOps) ItemPage(_ context.Context, _ string, number int, _ string) (azuredevopsmcp.ItemDetail, error) {
+	for _, i := range conformAzureDevOpsItems {
+		if i.Number == number {
+			return azuredevopsmcp.ItemDetail{Item: i, Body: "The body.", Head: "abc",
+				Thread:    []azuredevopsmcp.Comment{{Author: "kim@example.com", Body: "A comment.", At: i.UpdatedAt}},
+				CheckRuns: []azuredevopsmcp.CheckRun{{Name: "ci", State: "failing", Build: 70}}}, nil
+		}
+	}
+	return azuredevopsmcp.ItemDetail{}, &azuredevopsmcp.AzureDevOpsError{Kind: azuredevopsmcp.NotFound, Message: "not found on Azure DevOps"}
+}
+
+// conformAzureDevOpsDaemon is a daemon with one folder on acme/Web App/App on Azure DevOps.
+func conformAzureDevOpsDaemon(t *testing.T) (*Daemon, *conn) {
+	t.Helper()
+	t.Setenv("AGENTS_PERSONAL_HOME", t.TempDir())
+	d, c := start(t, t.TempDir())
+	t.Cleanup(d.Shutdown)
+	file := &connections.File{Path: filepath.Join(t.TempDir(), ".agents-secrets", connections.FileName)}
+	d.connStoreFor = func() (connections.Store, error) { return file, nil }
+	fake := conformAzureDevOps{&fakeForgeAzureDevOps{}}
+	d.newForgeAzureDevOps = func(string, string) forgeAzureDevOps { return fake }
+	c.call(t, 100, "folders/add", map[string]any{"folder": "file://" + gitFolder(t, "https://acme@dev.azure.com/acme/Web%20App/_git/App")})
+	if err := file.Put(connections.AzureDevOpsConnection(connections.AzureDevOpsServices, "acme", "ado-secret", "Agents Test", time.Now())); err != nil {
+		t.Fatal(err)
+	}
 	return d, c
 }
 

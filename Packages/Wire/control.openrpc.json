@@ -416,6 +416,11 @@
     {
       "name": "clients/list",
       "x-capability": "clients/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "description": "devices/list, from a Remote of before the control plane, is answered the same; devices/startPairing as clients/startPairing, devices/forget with DeviceForget as clients/forget (daemon.openrpc.json has the host's own devices/list and devices/forget).",
       "paramStructure": "by-name",
       "params": [
@@ -529,6 +534,11 @@
     {
       "name": "clients/startPairing",
       "x-capability": "clients/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -549,6 +559,11 @@
     {
       "name": "clients/stopPairing",
       "x-capability": "clients/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -740,6 +755,11 @@
     {
       "name": "control/clientChanged",
       "x-capability": "control/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "x-notification": true,
       "paramStructure": "by-name",
       "params": [

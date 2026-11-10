@@ -1301,8 +1301,9 @@ dialog.image-viewer::backdrop { background: rgb(0 0 0 / 0.45); }
 .sub-app .settings-body .settings-scope { margin-bottom: 20px; }
 .sub-app .settings-body .scope-head { font-size: 0.875rem; font-weight: 600; margin: 8px 8px 4px; }
 .sub-app-row { display: flex; justify-content: space-between; align-items: center; }
-/* A machine's need under its row (#3764), as the window's grey line. */
-.machine-need { padding: 0 20px 6px; margin-top: -6px; font-size: 0.75rem; line-height: 1.35; }
+/* A machine's need under its row (#3764), and Status ▸ Runtimes' low allowance (#3956), as the window's grey line. */
+.sub-app-row .attention { color: var(--tint-attention); }
+.machine-need, .page-need { padding: 0 20px 6px; margin-top: -6px; font-size: 0.75rem; line-height: 1.35; }
 .machine-need .foot-start { margin-left: 6px; font-size: inherit; }
 /* A machine's row (#3974), as the window's MachineRow: the icon, ··· on hover, and a swipe on a touch screen. */
 .machine-row { position: relative; overflow: hidden; touch-action: pan-y; }
@@ -2041,6 +2042,18 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .docs-match { display: flex; gap: 8px; text-align: left; }
 .docs-line { min-width: 3em; text-align: right; opacity: 0.6; font-variant-numeric: tabular-nums; }
 .docs-text { margin-top: 12px; }
+/* Messages (#4344): a conversation's row, and its messages as plain text. */
+.messages-source { width: 1.2em; text-align: center; opacity: 0.7; }
+.messages-row .work-row-head { flex-wrap: nowrap; }
+.messages-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; font-weight: normal; }
+.messages-row.unread .messages-title { font-weight: 600; }
+.messages-unread { color: var(--accent); white-space: nowrap; }
+.messages-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.messages-rows { list-style: none; margin: 8px 0; padding: 0; }
+.messages-message { padding: 8px 0; border-bottom: 1px solid var(--paper-rule); }
+.messages-head { display: flex; gap: 8px; align-items: baseline; }
+.messages-original { margin-left: auto; }
+.messages-text { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .work-label { display: inline-block; padding: 0 7px; border: 1px solid var(--paper-rule); border-radius: 99px; font-size: 0.8em; line-height: 1.6; }
 .work-state { display: inline-block; padding: 0 7px; border-radius: 99px; font-size: 0.8em; line-height: 1.6; color: #fff; background: #59636e; }
 .work-state.open { background: #1f883d; }

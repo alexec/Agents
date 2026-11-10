@@ -259,7 +259,7 @@ func (p accountsPlan) note(replaced bool) string {
 	if n := len(p.changed); n > 0 && replaced {
 		said = append(said, fmt.Sprintf("Replaced %d.", n))
 	} else if n > 0 {
-		said = append(said, fmt.Sprintf("Kept %d as they were: the person said not to replace them.", n))
+		said = append(said, fmt.Sprintf("Kept %d as they were: the person did not say Replace.", n))
 	}
 	if p.same > 0 {
 		said = append(said, fmt.Sprintf("%d had no change.", p.same))

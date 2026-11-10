@@ -1,0 +1,320 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1380" height="1880" viewBox="0 0 1380 1880" font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif">
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#20242A" flood-opacity="0.14"/>
+    </filter>
+    <symbol id="open" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="8" r="2" fill="currentColor"/></symbol>
+    <symbol id="done" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5.3 8.2l1.8 1.8 3.6-3.8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="notplanned" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M4 12L12 4" stroke="currentColor" stroke-width="1.4"/></symbol>
+    <symbol id="pr" viewBox="0 0 16 16"><circle cx="4" cy="3.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="4" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="12" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M4 5.1v5.8M12 10.9V6.5a2 2 0 0 0-2-2H7.5M9 3l-1.6 1.5L9 6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="tag" viewBox="0 0 16 16"><path d="M2.5 2.5h5.5l5.5 5.5-5.5 5.5-5.5-5.5z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="5.5" cy="5.5" r="1" fill="currentColor"/></symbol>
+    <symbol id="flag" viewBox="0 0 16 16"><path d="M3.5 14V2.5M3.5 3h8.5l-2 3 2 3H3.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="gear" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.2" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M3.6 12.4L5 11M11 5l1.4-1.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="warn" viewBox="0 0 16 16"><path d="M8 2.2L14.3 13.5H1.7z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M8 6.5v3.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="11.6" r=".8" fill="currentColor"/></symbol>
+    <symbol id="refresh" viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v2.5h-2.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="chev" viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="chevr" viewBox="0 0 10 10"><path d="M3.5 2l3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="up" viewBox="0 0 16 16"><path d="M3.5 10L8 5.5l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="down" viewBox="0 0 16 16"><path d="M3.5 6L8 10.5l4.5-4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="back" viewBox="0 0 16 16"><path d="M10 3L5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="fwd" viewBox="0 0 16 16"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="ext" viewBox="0 0 16 16"><path d="M9 3h4v4M13 3L7.5 8.5M11 9.5V13H3V5h3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="more" viewBox="0 0 16 16"><circle cx="3.5" cy="8" r="1.3" fill="currentColor"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/><circle cx="12.5" cy="8" r="1.3" fill="currentColor"/></symbol>
+    <symbol id="spark" viewBox="0 0 16 16"><path d="M8 2l1.4 4.6L14 8l-4.6 1.4L8 14l-1.4-4.6L2 8l4.6-1.4z" fill="currentColor"/></symbol>
+    <symbol id="doc" viewBox="0 0 16 16"><path d="M4 2h5.5L12.5 5v9H4z M9.5 2v3h3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
+    <symbol id="link" viewBox="0 0 16 16"><path d="M6.5 9.5l3-3M7 4.5l1-1a2.5 2.5 0 0 1 3.5 3.5l-1 1M9 11.5l-1 1A2.5 2.5 0 0 1 4.5 9l1-1" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+    <symbol id="sidebar" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M6 3v10" stroke="currentColor" stroke-width="1.3"/></symbol>
+    <symbol id="tick" viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="cross" viewBox="0 0 16 16"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="dot" viewBox="0 0 16 16"><circle cx="8" cy="8" r="3.5" fill="currentColor"/></symbol>
+    <symbol id="skip" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 8h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+    <symbol id="merged" viewBox="0 0 16 16"><circle cx="4.5" cy="3.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="4.5" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="11.5" cy="8" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M4.5 5.1v5.8M4.5 5.5c0 2.5 2.5 2.5 5.4 2.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="prclosed" viewBox="0 0 16 16"><circle cx="4" cy="3.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="4" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="12" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M4 5.1v5.8M12 10.9V8M10.3 3l3.4 3.4M13.7 3l-3.4 3.4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="files" viewBox="0 0 16 16"><path d="M3.5 2h6l3 3v9h-9z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8 6.5v4M6 8.5h4M6 12h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="eye" viewBox="0 0 16 16"><path d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="8" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.3"/></symbol>
+    <symbol id="commit" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M1.5 8h3.9M10.6 8h3.9" stroke="currentColor" stroke-width="1.4"/></symbol>
+    <symbol id="thread" viewBox="0 0 16 16"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
+    <symbol id="branch" viewBox="0 0 16 16"><circle cx="4.5" cy="3.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="4.5" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="11.5" cy="5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M4.5 5.1v5.8M11.5 6.6c0 3-7 2-7 4.3" fill="none" stroke="currentColor" stroke-width="1.3"/></symbol>
+    <symbol id="clock" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.8" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 4.8V8l2.2 1.6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="image" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="5.5" cy="6.5" r="1.2" fill="currentColor"/><path d="M2.5 12l3.5-3.5 2.5 2.5 2-2 3 3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
+    <symbol id="lines" viewBox="0 0 16 16"><path d="M3 4h10M3 8h10M3 12h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+    <symbol id="bubble" viewBox="0 0 16 16"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></symbol>
+    <symbol id="search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+    <symbol id="spin" viewBox="0 0 16 16"><path d="M8 2a6 6 0 1 1-6 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="check" viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="board" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M6 3v10M10 3v10" stroke="currentColor" stroke-width="1.3"/></symbol>
+    <symbol id="folder" viewBox="0 0 16 16"><path d="M2 4.5h4l1.5 1.5H14v6.5H2z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
+    <symbol id="box" viewBox="0 0 16 16"><path d="M8 1.8l5.6 3v6.4L8 14.2l-5.6-3V4.8z M2.4 4.8L8 7.8l5.6-3M8 7.8v6.4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
+    <symbol id="stream" viewBox="0 0 16 16"><path d="M1.5 11h13M3.5 11c1.5 0 1.5-5 3-5h3c1.5 0 1.5 5 3 5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+    <symbol id="epic" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 2a6 6 0 0 1 6 6H8z" fill="currentColor"/></symbol>
+  </defs>
+  <rect x="0" y="0" width="1380" height="1880" rx="0" fill="#E7EAEE"/>
+  <text x="24" y="34" font-size="15" fill="#1C1D20" font-weight="600">Milestones and Releases (#4334): the web page, wide and 390 px</text>
+  <text x="24" y="54" font-size="12" fill="#5B616B">Web/src/views/Work.tsx with the same parts in CSS, at the break points of #4328 (700 px and 900 px). Scratch data.</text>
+  <g transform="translate(24,76)" filter="url(#shadow)">
+  <rect x="0" y="0" width="1280" height="760" rx="10" fill="#FFFFFF"/>
+  <rect x="0" y="0" width="1280" height="40" rx="0" fill="#EEF0F3"/>
+  <rect x="120" y="8" width="640" height="24" rx="12" fill="#FFFFFF"/>
+  <text x="136" y="25" font-size="12" fill="#5B616B" font-family="SF Mono, Menlo, monospace">agents.local/#/work/releases/alexec%2FAgents/v0.42.0</text>
+  <rect x="0" y="40" width="220" height="720" rx="0" fill="#F6F7F8"/>
+  <text x="20" y="72" font-size="11" fill="#8A9099" font-weight="600">WORK</text>
+  <use href="#open" x="22" y="91" width="16" height="16" color="#0A6CDB"/>
+  <text x="46" y="104" font-size="13.5" fill="#1C1D20">Issues</text>
+  <use href="#pr" x="22" y="125" width="16" height="16" color="#0A6CDB"/>
+  <text x="46" y="138" font-size="13.5" fill="#1C1D20">Pull requests</text>
+  <use href="#spark" x="22" y="159" width="16" height="16" color="#0A6CDB"/>
+  <text x="46" y="172" font-size="13.5" fill="#1C1D20">Features</text>
+  <use href="#flag" x="22" y="193" width="16" height="16" color="#0A6CDB"/>
+  <text x="46" y="206" font-size="13.5" fill="#1C1D20">Milestones</text>
+  <rect x="10" y="220" width="200" height="30" rx="6" fill="#DCEBFC"/>
+  <use href="#box" x="22" y="227" width="16" height="16" color="#0A6CDB"/>
+  <text x="46" y="240" font-size="13.5" fill="#0A6CDB" font-weight="600">Releases</text>
+  <use href="#stream" x="22" y="261" width="16" height="16" color="#0A6CDB"/>
+  <text x="46" y="274" font-size="13.5" fill="#1C1D20">Timeline</text>
+  <text x="244" y="74" font-size="13" fill="#5B616B">Releases / 0.42.0</text>
+  <rect x="1234" y="56" width="28" height="26" rx="6" fill="#EDEFF2"/>
+  <use href="#refresh" x="1240" y="61" width="16" height="16" color="#4A5059"/>
+  <text x="244" y="110" font-size="22" fill="#1C1D20" font-weight="600">0.42.0</text>
+  <rect x="328" y="94" width="48.0" height="18" rx="9" fill="#1A7F37" fill-opacity="0.14"/>
+  <rect x="328" y="94" width="48.0" height="18" rx="9" fill="none" stroke="#1A7F37" stroke-width="0.8"/>
+  <text x="334" y="107" font-size="12" fill="#0E451E" font-weight="500">Latest</text>
+  <text x="1256" y="108" font-size="12.5" fill="#0A6CDB" text-anchor="end">Open on GitHub</text>
+  <text x="244" y="136" font-size="12.5" fill="#5B616B"><tspan font-weight="600" fill="#1C1D20">alexec</tspan> released this 2 h ago · <tspan font-family="SF Mono, Menlo, monospace">v0.41.0…v0.42.0</tspan> · 23 pull requests</text>
+  <path d="M244 152L1256 152" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <rect x="244" y="168" width="740" height="200" rx="6" fill="#FFFFFF" stroke="#E0E3E7" stroke-width="1"/>
+  <text x="260" y="196" font-size="15" fill="#1C1D20" font-weight="600">Milestones finished</text>
+  <text x="260" y="220" font-size="13.5" fill="#1C1D20">•  Lineage and value     •  Work ▸ Timeline</text>
+  <text x="260" y="252" font-size="15" fill="#1C1D20" font-weight="600">What's new</text>
+  <text x="260" y="276" font-size="13.5" fill="#1C1D20">•  Work ▸ Timeline: the epics on a time axis, with Now in the centre (#4173)</text>
+  <text x="260" y="298" font-size="13.5" fill="#1C1D20">•  Forge: one interface for every forge (#4352)</text>
+  <text x="260" y="330" font-size="15" fill="#1C1D20" font-weight="600">Fixes</text>
+  <text x="260" y="354" font-size="13.5" fill="#1C1D20">•  The Remote's sidebar keeps its place after a reconnect (#4296)</text>
+  <text x="244" y="396" font-size="11" fill="#8A9099" font-weight="600">PULL REQUESTS IN THIS RELEASE</text>
+  <rect x="244" y="406" width="200" height="28" rx="7" fill="#FFFFFF" stroke="#C7CCD3" stroke-width="1"/>
+  <use href="#search" x="252" y="413.0" width="14" height="14" color="#8A9099"/>
+  <text x="272" y="424.5" font-size="12.5" fill="#8A9099">Filter pull requests</text>
+  <path d="M244 446L984 446" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <use href="#merged" x="256" y="457" width="16" height="16" color="#8250DF"/>
+  <text x="282" y="470" font-size="13.5" fill="#1C1D20" font-weight="600">Work ▸ Timeline: the epics in time on the Mac</text>
+  <rect x="624.1" y="457" width="72.5" height="18" rx="9" fill="#A2EEEF" fill-opacity="0.14"/>
+  <rect x="624.1" y="457" width="72.5" height="18" rx="9" fill="none" stroke="#A2EEEF" stroke-width="0.8"/>
+  <text x="630.1" y="470" font-size="11" fill="#598283" font-weight="500">enhancement</text>
+  <text x="282" y="490" font-size="12" fill="#5B616B">#4188 · merged 1 d ago · <tspan fill="#C2410C">✦</tspan> Claude · $4.10</text>
+  <path d="M244 504L984 504" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <use href="#merged" x="256" y="515" width="16" height="16" color="#8250DF"/>
+  <text x="282" y="528" font-size="13.5" fill="#1C1D20" font-weight="600">Forge interface: Forge, forgeCaps and the registry</text>
+  <rect x="661.3" y="515" width="34.0" height="18" rx="9" fill="#C5DEF5" fill-opacity="0.14"/>
+  <rect x="661.3" y="515" width="34.0" height="18" rx="9" fill="none" stroke="#C5DEF5" stroke-width="0.8"/>
+  <text x="667.3" y="528" font-size="11" fill="#6C7A86" font-weight="500">task</text>
+  <text x="282" y="548" font-size="12" fill="#5B616B">#4411 · merged 5 h ago · <tspan fill="#C2410C">✦</tspan> Codex · $2.35</text>
+  <path d="M244 562L984 562" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <use href="#merged" x="256" y="573" width="16" height="16" color="#8250DF"/>
+  <text x="282" y="586" font-size="13.5" fill="#1C1D20" font-weight="600">Remote: the sidebar keeps its place after a reconnect</text>
+  <rect x="683.5" y="573" width="28.5" height="18" rx="9" fill="#D73A4A" fill-opacity="0.14"/>
+  <rect x="683.5" y="573" width="28.5" height="18" rx="9" fill="none" stroke="#D73A4A" stroke-width="0.8"/>
+  <text x="689.5" y="586" font-size="11" fill="#761F28" font-weight="500">bug</text>
+  <text x="282" y="606" font-size="12" fill="#5B616B">#4296 · merged 7 h ago · <tspan fill="#C2410C">✦</tspan> Claude · $0.62</text>
+  <path d="M244 620L984 620" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <rect x="534" y="634" width="160" height="30" rx="6" fill="#FFFFFF" stroke="#C7CCD3" stroke-width="1"/>
+  <text x="614" y="654" font-size="12.5" fill="#1C1D20" font-weight="500" text-anchor="middle">Load more</text>
+  <text x="1014" y="178" font-size="12" fill="#5B616B" font-weight="600">Tag</text>
+  <text x="1014" y="200" font-size="12.5" fill="#1C1D20"><tspan font-family="SF Mono, Menlo, monospace">v0.42.0</tspan> · bf6f4dd</text>
+  <path d="M1014 216L1244 216" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <text x="1014" y="238" font-size="12" fill="#5B616B" font-weight="600">Milestones finished</text>
+  <text x="1014" y="260" font-size="12.5" fill="#1C1D20">⚑ Lineage and value</text>
+  <text x="1014" y="280" font-size="12.5" fill="#1C1D20">⚑ Work ▸ Timeline</text>
+  <path d="M1014 296L1244 296" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <text x="1014" y="318" font-size="12" fill="#5B616B" font-weight="600">Pipeline</text>
+  <text x="1014" y="340" font-size="12.5" fill="#1C1D20">✓ CI run 14m</text>
+  <text x="1014" y="360" font-size="12.5" fill="#1C1D20">✓ TestFlight · build 512</text>
+  <path d="M1014 376L1244 376" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <text x="1014" y="398" font-size="12" fill="#5B616B" font-weight="600">Assets</text>
+  <text x="1014" y="420" font-size="12.5" fill="#1C1D20">3 files · Open on GitHub</text>
+  <path d="M1014 436L1244 436" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <text x="1014" y="458" font-size="12" fill="#5B616B" font-weight="600">Lineage</text>
+  <text x="1014" y="480" font-size="12.5" fill="#1C1D20"><tspan fill="#C2410C">✦</tspan> Claude, Codex · $18.40</text>
+  <text x="1014" y="500" font-size="12.5" fill="#1C1D20">41 sessions</text>
+  <path d="M1014 516L1244 516" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  </g>
+  <circle cx="1284" cy="64" r="9" fill="#B35900"/>
+  <text x="1284" y="68" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">50</text>
+  <g transform="translate(36,900)" filter="url(#shadow)">
+  <rect x="-12" y="-12" width="414" height="868" rx="54" fill="#1C1D20"/>
+  <rect x="0" y="0" width="390" height="844" rx="44" fill="#FFFFFF"/>
+  <rect x="133.0" y="11" width="124" height="36" rx="18" fill="#1C1D20"/>
+  <text x="34" y="34" font-size="15" fill="#1C1D20" font-weight="600">9:41</text>
+  <rect x="0" y="50" width="390" height="44" rx="0" fill="#F6F7F8"/>
+  <text x="16" y="77" font-size="15" fill="#1C1D20" font-weight="600">☰  Agents</text>
+  <use href="#refresh" x="352" y="64" width="18" height="18" color="#4A5059"/>
+  <text x="20" y="132" font-size="28" fill="#1C1D20" font-weight="700">Milestones</text>
+  <rect x="16" y="148" width="358" height="34" rx="7" fill="#FFFFFF" stroke="#C7CCD3" stroke-width="1"/>
+  <use href="#search" x="24" y="158.0" width="14" height="14" color="#8A9099"/>
+  <text x="44" y="169.5" font-size="12.5" fill="#8A9099">Filter milestones</text>
+  <rect x="16" y="192" width="131.5" height="30" rx="15" fill="#DCEBFC"/>
+  <text x="28" y="212" font-size="13" fill="#0A6CDB" font-weight="500">Project: Agents</text>
+  <use href="#chev" x="127.5" y="202" width="10" height="10" color="#0A6CDB"/>
+  <rect x="155.5" y="192" width="60.0" height="30" rx="15" fill="#EEF0F3"/>
+  <text x="167.5" y="212" font-size="13" fill="#1C1D20">Open</text>
+  <use href="#chev" x="195.5" y="202" width="10" height="10" color="#8A9099"/>
+  <rect x="223.5" y="192" width="60.0" height="30" rx="15" fill="#EEF0F3"/>
+  <text x="235.5" y="212" font-size="13" fill="#1C1D20">Repo</text>
+  <use href="#chev" x="263.5" y="202" width="10" height="10" color="#8A9099"/>
+  <rect x="291.5" y="192" width="60.0" height="30" rx="15" fill="#EEF0F3"/>
+  <text x="303.5" y="212" font-size="13" fill="#1C1D20">Sort</text>
+  <use href="#chev" x="331.5" y="202" width="10" height="10" color="#8A9099"/>
+  <use href="#flag" x="16" y="248" width="16" height="16" color="#1A7F37"/>
+  <text x="42" y="262" font-size="15" fill="#1C1D20" font-weight="600">Projects</text>
+  <text x="374" y="262" font-size="13" fill="#5B616B" font-weight="600" text-anchor="end">72%</text>
+  <rect x="42" y="274" width="332" height="6" rx="3.0" fill="#E0E3E7"/>
+  <rect x="42" y="274" width="238.625" height="6" rx="3.0" fill="#1A7F37"/>
+  <text x="42" y="300" font-size="13" fill="#5B616B"><tspan fill="#5B616B">Fri 14 Nov</tspan> · 18 open · $41.20</text>
+  <path d="M16 316L390 316" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <use href="#flag" x="16" y="332" width="16" height="16" color="#1A7F37"/>
+  <text x="42" y="346" font-size="15" fill="#1C1D20" font-weight="600">Channels</text>
+  <text x="374" y="346" font-size="13" fill="#5B616B" font-weight="600" text-anchor="end">29%</text>
+  <rect x="42" y="358" width="332" height="6" rx="3.0" fill="#E0E3E7"/>
+  <rect x="42" y="358" width="96.38709677419355" height="6" rx="3.0" fill="#1A7F37"/>
+  <text x="42" y="384" font-size="13" fill="#5B616B"><tspan fill="#5B616B">Fri 21 Nov</tspan> · 22 open · $8.10</text>
+  <path d="M16 400L390 400" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <use href="#flag" x="16" y="416" width="16" height="16" color="#1A7F37"/>
+  <text x="42" y="430" font-size="15" fill="#1C1D20" font-weight="600">Runtime assessments</text>
+  <text x="374" y="430" font-size="13" fill="#5B616B" font-weight="600" text-anchor="end">22%</text>
+  <rect x="42" y="442" width="332" height="6" rx="3.0" fill="#E0E3E7"/>
+  <rect x="42" y="442" width="73.77777777777777" height="6" rx="3.0" fill="#1A7F37"/>
+  <text x="42" y="468" font-size="13" fill="#5B616B"><tspan fill="#5B616B">Fri 28 Nov</tspan> · 7 open · $1.90</text>
+  <path d="M16 484L390 484" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <use href="#flag" x="16" y="500" width="16" height="16" color="#1A7F37"/>
+  <text x="42" y="514" font-size="15" fill="#1C1D20" font-weight="600">Lineage and value</text>
+  <text x="374" y="514" font-size="13" fill="#5B616B" font-weight="600" text-anchor="end">98%</text>
+  <rect x="42" y="526" width="332" height="6" rx="3.0" fill="#E0E3E7"/>
+  <rect x="42" y="526" width="323.9024390243902" height="6" rx="3.0" fill="#1A7F37"/>
+  <text x="42" y="552" font-size="13" fill="#5B616B"><tspan fill="#CF222E">Past due by 2 days</tspan> · 1 open · $63.75</text>
+  <path d="M16 568L390 568" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <use href="#flag" x="16" y="584" width="16" height="16" color="#1A7F37"/>
+  <text x="42" y="598" font-size="15" fill="#1C1D20" font-weight="600">1.0 Public release</text>
+  <text x="374" y="598" font-size="13" fill="#5B616B" font-weight="600" text-anchor="end">28%</text>
+  <rect x="42" y="610" width="332" height="6" rx="3.0" fill="#E0E3E7"/>
+  <rect x="42" y="610" width="92.65116279069767" height="6" rx="3.0" fill="#1A7F37"/>
+  <text x="42" y="636" font-size="13" fill="#5B616B"><tspan fill="#8A9099">No due date</tspan> · 31 open · $12.40</text>
+  <path d="M16 652L390 652" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  </g>
+  <g transform="translate(476,900)" filter="url(#shadow)">
+  <rect x="-12" y="-12" width="414" height="868" rx="54" fill="#1C1D20"/>
+  <rect x="0" y="0" width="390" height="844" rx="44" fill="#FFFFFF"/>
+  <rect x="133.0" y="11" width="124" height="36" rx="18" fill="#1C1D20"/>
+  <text x="34" y="34" font-size="15" fill="#1C1D20" font-weight="600">9:41</text>
+  <rect x="0" y="50" width="390" height="44" rx="0" fill="#F6F7F8"/>
+  <text x="16" y="77" font-size="15" fill="#1C1D20" font-weight="600">☰  Agents</text>
+  <use href="#refresh" x="352" y="64" width="18" height="18" color="#4A5059"/>
+  <text x="20" y="116" font-size="13" fill="#5B616B">Milestones / Projects</text>
+  <text x="20" y="150" font-size="26" fill="#1C1D20" font-weight="700">Projects</text>
+  <rect x="20" y="164" width="63.5" height="24" rx="12" fill="#1A7F37"/>
+  <use href="#flag" x="28" y="169" width="14" height="14" color="#FFF"/>
+  <text x="46" y="180.5" font-size="12.5" fill="#FFF" font-weight="600">Open</text>
+  <text x="93.5" y="181" font-size="13" fill="#5B616B">Due Fri 14 Nov · 72%</text>
+  <rect x="20" y="202" width="350" height="8" rx="4.0" fill="#E0E3E7"/>
+  <rect x="20" y="202" width="251.5625" height="8" rx="4.0" fill="#1A7F37"/>
+  <rect x="16" y="222" width="358" height="90" rx="8" fill="#F6F7F8"/>
+  <text x="30" y="250" font-size="14" fill="#1C1D20">Released in</text>
+  <text x="360" y="250" font-size="14" fill="#5B616B" text-anchor="end">0.41.0, 0.42.0</text>
+  <text x="30" y="294" font-size="14" fill="#1C1D20">Lineage</text>
+  <text x="360" y="294" font-size="14" fill="#5B616B" text-anchor="end"><tspan fill="#C2410C">✦</tspan> $41.20 · 37 sessions</text>
+  <path d="M30 268L374 268" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <rect x="16" y="326" width="79.5" height="30" rx="15" fill="#DCEBFC"/>
+  <text x="28" y="346" font-size="13" fill="#0A6CDB" font-weight="500">18 Open</text>
+  <use href="#chev" x="75.5" y="336" width="10" height="10" color="#0A6CDB"/>
+  <rect x="103.5" y="326" width="92.5" height="30" rx="15" fill="#EEF0F3"/>
+  <text x="115.5" y="346" font-size="13" fill="#1C1D20">Kind: All</text>
+  <use href="#chev" x="176.0" y="336" width="10" height="10" color="#8A9099"/>
+  <rect x="204.0" y="326" width="66.5" height="30" rx="15" fill="#EEF0F3"/>
+  <text x="216.0" y="346" font-size="13" fill="#1C1D20">Label</text>
+  <use href="#chev" x="250.5" y="336" width="10" height="10" color="#8A9099"/>
+  <rect x="278.5" y="326" width="60.0" height="30" rx="15" fill="#EEF0F3"/>
+  <text x="290.5" y="346" font-size="13" fill="#1C1D20">Sort</text>
+  <use href="#chev" x="318.5" y="336" width="10" height="10" color="#8A9099"/>
+  <use href="#open" x="16" y="382" width="16" height="16" color="#1A7F37"/>
+  <text x="42" y="396" font-size="14.5" fill="#1C1D20" font-weight="600">Projects: a folder can join two pro…</text>
+  <rect x="42" y="404" width="72.5" height="18" rx="9" fill="#A2EEEF" fill-opacity="0.14"/>
+  <rect x="42" y="404" width="72.5" height="18" rx="9" fill="none" stroke="#A2EEEF" stroke-width="0.8"/>
+  <text x="48" y="417" font-size="11" fill="#598283" font-weight="500">enhancement</text>
+  <rect x="118.5" y="404" width="100.0" height="18" rx="9" fill="#1D76DB" fill-opacity="0.14"/>
+  <rect x="118.5" y="404" width="100.0" height="18" rx="9" fill="none" stroke="#1D76DB" stroke-width="0.8"/>
+  <text x="124.5" y="417" font-size="11" fill="#0F4078" font-weight="500">feature:projects</text>
+  <text x="42" y="442" font-size="13" fill="#5B616B">#4371</text>
+  <path d="M16 456L390 456" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <use href="#pr" x="16" y="470" width="16" height="16" color="#1A7F37"/>
+  <text x="42" y="484" font-size="14.5" fill="#1C1D20" font-weight="600">Projects: the project picker in New…</text>
+  <rect x="42" y="492" width="72.5" height="18" rx="9" fill="#A2EEEF" fill-opacity="0.14"/>
+  <rect x="42" y="492" width="72.5" height="18" rx="9" fill="none" stroke="#A2EEEF" stroke-width="0.8"/>
+  <text x="48" y="505" font-size="11" fill="#598283" font-weight="500">enhancement</text>
+  <text x="42" y="530" font-size="13" fill="#5B616B">#4388</text>
+  <path d="M16 544L390 544" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <use href="#open" x="16" y="558" width="16" height="16" color="#1A7F37"/>
+  <text x="42" y="572" font-size="14.5" fill="#1C1D20" font-weight="600">Projects: Settings ▸ Projects lists…</text>
+  <rect x="42" y="580" width="39.5" height="18" rx="9" fill="#0E8A16" fill-opacity="0.14"/>
+  <rect x="42" y="580" width="39.5" height="18" rx="9" fill="none" stroke="#0E8A16" stroke-width="0.8"/>
+  <text x="48" y="593" font-size="11" fill="#074B0C" font-weight="500">story</text>
+  <rect x="85.5" y="580" width="100.0" height="18" rx="9" fill="#1D76DB" fill-opacity="0.14"/>
+  <rect x="85.5" y="580" width="100.0" height="18" rx="9" fill="none" stroke="#1D76DB" stroke-width="0.8"/>
+  <text x="91.5" y="593" font-size="11" fill="#0F4078" font-weight="500">feature:projects</text>
+  <text x="42" y="618" font-size="13" fill="#5B616B">#4360</text>
+  <path d="M16 632L390 632" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <use href="#done" x="16" y="646" width="16" height="16" color="#8250DF"/>
+  <text x="42" y="660" font-size="14.5" fill="#1C1D20" font-weight="600">Projects: the project store and its…</text>
+  <rect x="42" y="668" width="34.0" height="18" rx="9" fill="#C5DEF5" fill-opacity="0.14"/>
+  <rect x="42" y="668" width="34.0" height="18" rx="9" fill="none" stroke="#C5DEF5" stroke-width="0.8"/>
+  <text x="48" y="681" font-size="11" fill="#6C7A86" font-weight="500">task</text>
+  <text x="42" y="706" font-size="13" fill="#5B616B">#4301</text>
+  <path d="M16 720L390 720" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  </g>
+  <g transform="translate(916,900)" filter="url(#shadow)">
+  <rect x="-12" y="-12" width="414" height="868" rx="54" fill="#1C1D20"/>
+  <rect x="0" y="0" width="390" height="844" rx="44" fill="#FFFFFF"/>
+  <rect x="133.0" y="11" width="124" height="36" rx="18" fill="#1C1D20"/>
+  <text x="34" y="34" font-size="15" fill="#1C1D20" font-weight="600">9:41</text>
+  <rect x="0" y="50" width="390" height="44" rx="0" fill="#F6F7F8"/>
+  <text x="16" y="77" font-size="15" fill="#1C1D20" font-weight="600">☰  Agents</text>
+  <use href="#refresh" x="352" y="64" width="18" height="18" color="#4A5059"/>
+  <text x="20" y="132" font-size="28" fill="#1C1D20" font-weight="700">Releases</text>
+  <rect x="16" y="148" width="358" height="34" rx="7" fill="#FFFFFF" stroke="#C7CCD3" stroke-width="1"/>
+  <use href="#search" x="24" y="158.0" width="14" height="14" color="#8A9099"/>
+  <text x="44" y="169.5" font-size="12.5" fill="#8A9099">Filter releases</text>
+  <use href="#box" x="16" y="210" width="16" height="16" color="#6E7781"/>
+  <text x="42" y="224" font-size="15" fill="#1C1D20" font-weight="600">0.43.0</text>
+  <rect x="99.5" y="211" width="39.5" height="18" rx="9" fill="#6E7781" fill-opacity="0.14"/>
+  <rect x="99.5" y="211" width="39.5" height="18" rx="9" fill="none" stroke="#6E7781" stroke-width="0.8"/>
+  <text x="105.5" y="224" font-size="11" fill="#3C4146" font-weight="500">Draft</text>
+  <text x="42" y="248" font-size="13" fill="#5B616B">draft · saved 30 min ago · 6 PRs · $3.10</text>
+  <path d="M16 264L390 264" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <use href="#box" x="16" y="280" width="16" height="16" color="#1C1D20"/>
+  <text x="42" y="294" font-size="15" fill="#1C1D20" font-weight="600">0.42.0</text>
+  <rect x="99.5" y="281" width="45.0" height="18" rx="9" fill="#1A7F37" fill-opacity="0.14"/>
+  <rect x="99.5" y="281" width="45.0" height="18" rx="9" fill="none" stroke="#1A7F37" stroke-width="0.8"/>
+  <text x="105.5" y="294" font-size="11" fill="#0E451E" font-weight="500">Latest</text>
+  <use href="#tick" x="354" y="282" width="14" height="14" color="#1A7F37"/>
+  <text x="42" y="318" font-size="13" fill="#5B616B">2 h · 23 PRs · $18.40</text>
+  <path d="M16 334L390 334" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <use href="#box" x="16" y="350" width="16" height="16" color="#1C1D20"/>
+  <text x="42" y="364" font-size="15" fill="#1C1D20" font-weight="600">0.41.0</text>
+  <use href="#tick" x="354" y="352" width="14" height="14" color="#1A7F37"/>
+  <text x="42" y="388" font-size="13" fill="#5B616B">1 d · 31 PRs · $26.05</text>
+  <path d="M16 404L390 404" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <use href="#box" x="16" y="420" width="16" height="16" color="#1C1D20"/>
+  <text x="42" y="434" font-size="15" fill="#1C1D20" font-weight="600">0.40.0</text>
+  <use href="#tick" x="354" y="422" width="14" height="14" color="#1A7F37"/>
+  <text x="42" y="458" font-size="13" fill="#5B616B">2 d · 27 PRs · $22.80</text>
+  <path d="M16 474L390 474" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <use href="#box" x="16" y="490" width="16" height="16" color="#1C1D20"/>
+  <text x="42" y="504" font-size="15" fill="#1C1D20" font-weight="600">0.40.0-rc.1</text>
+  <rect x="140.8" y="491" width="72.5" height="18" rx="9" fill="#9A6700" fill-opacity="0.14"/>
+  <rect x="140.8" y="491" width="72.5" height="18" rx="9" fill="none" stroke="#9A6700" stroke-width="0.8"/>
+  <text x="146.8" y="504" font-size="11" fill="#543800" font-weight="500">Pre-release</text>
+  <text x="42" y="528" font-size="13" fill="#5B616B">3 d · 4 PRs · $1.20</text>
+  <path d="M16 544L390 544" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <text x="20" y="576" font-size="12" fill="#8A9099">A row is a link: ⌘-click opens it in a new tab.</text>
+  </g>
+  <circle cx="236" cy="888" r="9" fill="#B35900"/>
+  <text x="236" y="892" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">51</text>
+  <circle cx="676" cy="888" r="9" fill="#B35900"/>
+  <text x="676" y="892" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">52</text>
+</svg>

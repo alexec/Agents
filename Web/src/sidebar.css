@@ -358,6 +358,9 @@ button.prominent.destructive { background: var(--tint-failure); border-color: va
 .invite-code .code-text { font-family: var(--font-mono); padding: 6px 8px; border: 1px solid var(--paper-rule);
   border-radius: var(--radius-control); background: var(--paper-ground); user-select: all; overflow-wrap: anywhere; }
 .sheet .remove-lines { padding-left: 18px; min-height: 0; }
+/* Settings ▸ Control plane ▸ Clients (#4253): its three buttons, and the device code dark on light whatever the theme. */
+.settings-body .pair-buttons { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 8px; }
+.invite-code .pair-qr { width: 220px; height: 220px; align-self: center; padding: 10px; background: white; border-radius: 8px; }
 /* Add a machine without a code (#994): the command to run, Copy, and what happens next. */
 .with-sidebar .settings-body .join-command { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
 .with-sidebar .settings-body .join-command-line { display: flex; align-items: flex-start; gap: 6px; }
