@@ -1,70 +1,161 @@
 import AgentsKitCore
 import SwiftUI
 
-/// The actions on a pull request's Work page (#3130), as the GitHub, GitLab and Linear views have
-/// them: Merge, Approve, Rerun, the failed checks' logs, Show Diff, Close or Reopen and Labels. Each
-/// goes to the machine that read the item (`forge/*`), as the person: their own click, so no
-/// approval card. `wrote` reads the page again after a write. An issue's actions are in its page's
-/// parts (#4400): Start Agent in the header, the status menu in the state pill's place, Labels on
-/// the side panel's gear, and Close or Reopen in the comment box.
-struct WorkItemActions: View {
+/// A pull request's merge box (#4406, pull-request.md note 10): a bordered box at the end of the
+/// timeline (at the top of a narrow page) with a row for the review, the checks and conflicts,
+/// each with a glyph in its state's colour, then Merge ▾, Approve and Rerun failed. The checks
+/// list opens with Show all, and is open from the start when a check failed; a failed check has
+/// Log (`forge/log`). Each write goes to the machine that read the item, as the person: their own
+/// click, so no approval card. `wrote` reads the page again after a write.
+struct WorkMergeBox: View {
     let model: any WorkModel
-    @Environment(\.openURL) private var openURL
     let host: MachineRef
     let detail: DaemonAPI.ForgeItemDetail
+    let box: WorkLook.MergeBox
+    /// A machine of the person's writes to the forge: else the rows only, and why no buttons.
+    let writes: Bool
+    var compact = false
     let wrote: () -> Void
 
+    @Environment(\.openURL) private var openURL
     @State private var busy: String?
     @State private var said: (words: String, failed: Bool)?
-    @State private var labelChoices: [DaemonAPI.ForgeLabel]?
     @State private var log: WorkLog?
-    @State private var diff: AppViewDiff?
+    @State private var showsChecks: Bool?
 
     private var item: DaemonAPI.ForgeItem { detail.item }
     private var node: DaemonAPI.LineageNode { item.node }
+    private var checks: [DaemonAPI.ForgeCheck] { WorkLook.checksInOrder(detail.checks ?? []) }
+    private var checksOpen: Bool { showsChecks ?? box.checksOpen }
 
     var body: some View {
+        Group {
+            if compact {
+                content
+            } else {
+                WorkTimelineEntry {
+                    WorkStateIcon(kind: "pr", state: "open", draft: item.draft == true, onFill: true)
+                        .appText(.fine)
+                        .frame(width: 26, height: 26)
+                        .background(Circle().fill((item.draft == true ? WorkLook.Tone.grey : .green).color))
+                } content: {
+                    content
+                }
+            }
+        }
+        .sheet(item: $log) { log in WorkLogSheet(log: log) }
+    }
+
+    private var content: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(box.rows, id: \.kind) { row in
+                rowView(row)
+                if row.kind == .checks, checksOpen, !checks.isEmpty { checksList }
+                Divider()
+            }
+            buttons.padding(12)
+        }
+        .background(RoundedRectangle(cornerRadius: Paper.Radius.card).fill(Paper.raised))
+        .overlay(RoundedRectangle(cornerRadius: Paper.Radius.card).strokeBorder(Self.tint(box.border) ?? Paper.rule,
+                                                                               lineWidth: box.border == .info ? 1 : 1.5))
+        .clipShape(RoundedRectangle(cornerRadius: Paper.Radius.card))
+    }
+
+    private func rowView(_ row: WorkLook.MergeRow) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Image(systemName: Self.symbol(row))
+                .foregroundStyle(Self.tint(row.sign).map(AnyShapeStyle.init) ?? AnyShapeStyle(.secondary))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(row.title).appText(.reading).fontWeight(.semibold)
+                if let line = row.line {
+                    Text(line).appText(.supporting).foregroundStyle(.secondary).monospacedDigit()
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if row.kind == .checks, !checks.isEmpty {
+                Button(checksOpen ? "Hide" : "Show all") { showsChecks = !checksOpen }
+                    .linkStyle()
+                    .appText(.supporting)
+            }
+        }
+        .padding(12)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// One line per check: its glyph, its name, and Log on a failed one (Details, its page on
+    /// the forge, on the others that have one).
+    private var checksList: some View {
         VStack(alignment: .leading, spacing: 6) {
-            // Wraps, so a phone's narrow page keeps every action.
-            WrappingHStack(spacing: 8) {
-                pullActions
-                if let transitions = detail.transitions {
-                    WorkStatusMenu(item: item, transitions: transitions) { transition in
-                        act(DaemonAPI.Method.forgeClose, DaemonAPI.ForgeCloseRequest(node: node, transition: transition))
-                    }
-                } else if item.state == "open" || item.state == "closed" {
-                    Button(WorkList.closeTitle(item.state)) {
-                        act(DaemonAPI.Method.forgeClose,
-                            DaemonAPI.ForgeCloseRequest(node: node, reopen: item.state == "open" ? nil : true))
+            ForEach(Array(checks.enumerated()), id: \.offset) { _, check in
+                HStack(spacing: 8) {
+                    Image(systemName: Self.checkSymbol(check.state))
+                        .foregroundStyle(Self.tint(Self.checkSign(check.state)).map(AnyShapeStyle.init) ?? AnyShapeStyle(.secondary))
+                        .frame(width: 16)
+                        .accessibilityLabel(check.state)
+                    Text(check.name).lineLimit(1).truncationMode(.middle)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if check.state == "failing", writes {
+                        Button("Log") { Task { await readLog(check.name) } }
+                            .linkStyle()
+                            .help("The end of this check's log")
+                    } else if let url = check.url.flatMap(URL.init(string:)) {
+                        Button("Details") { openURL(url) }.linkStyle()
                     }
                 }
-                if WorkList.takesLabels(node) { labelsMenu }
-                if busy != nil { ProgressView().controlSize(.small) }
+                .appText(.supporting)
             }
-            .disabled(busy != nil)
-            #if os(iOS)
-            .buttonStyle(.bordered)
-            #endif
-            if !WorkList.failedChecks(detail).isEmpty { failedChecks }
+        }
+        .padding(.leading, 38).padding(.trailing, 12).padding(.bottom, 12)
+    }
+
+    @ViewBuilder
+    private var buttons: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if !writes {
+                Text(WorkLook.noWriter(node.ref)).appText(.supporting).foregroundStyle(.secondary)
+            } else if item.draft == true {
+                Text(WorkLook.readyOnForge(node.ref)).appText(.supporting).foregroundStyle(.secondary)
+            } else {
+                WrappingHStack(spacing: 8) {
+                    if box.merges, let head = detail.head { mergeButton(head) }
+                    if box.resolve, let url = item.url.flatMap(URL.init(string:)) {
+                        Button(WorkLook.resolveOnForge(node.ref)) { openURL(url.appendingPathComponent("conflicts")) }
+                    }
+                    if box.approves, let head = detail.head {
+                        Button("Approve", systemImage: "checkmark") {
+                            act(DaemonAPI.Method.forgeApprove, DaemonAPI.ForgeApproveRequest(node: node, sha: head))
+                        }
+                    }
+                    if box.reruns {
+                        Button("Rerun failed", systemImage: "arrow.clockwise") {
+                            act(DaemonAPI.Method.forgeRerun, DaemonAPI.ForgeNodeRequest(node: node))
+                        }
+                    }
+                    if busy != nil { ProgressView().controlSize(.small) }
+                }
+                .disabled(busy != nil)
+                #if os(iOS)
+                .buttonStyle(.bordered)
+                #endif
+            }
             if let said {
                 Text(said.words).appText(.supporting).foregroundStyle((said.failed ? StateTint.failure : .none).style(or: .secondary))
                     .textSelection(.enabled)
             }
         }
-        .sheet(item: $log) { log in WorkLogSheet(log: log) }
-        .sheet(item: $diff) { diff in
-            AppViewDiffPage(diff: diff, openLink: { openURL($0) })
-        }
     }
 
-    // MARK: A pull request's
-
-    @ViewBuilder
-    private var pullActions: some View {
-        if item.state == "open", let head = detail.head {
-            let methods = detail.mergeMethods ?? []
-            let waits = WorkList.mergeWaits(detail)
-            Menu(WorkList.mergeButton(methods.first, waits: waits)) {
+    /// Merge ▾: the repo's first method (Merge when checks pass while they run), the menu the
+    /// others, then Merge when checks pass. Green when it merges now, the accent while it waits.
+    private func mergeButton(_ head: String) -> some View {
+        let methods = detail.mergeMethods ?? []
+        let waits = box.waits
+        // A Menu with a primary action draws grey on the Mac whatever its tint: a prominent
+        // button and a menu beside it, as one split button.
+        return HStack(spacing: 1) {
+            Button(WorkLook.mergeMain(methods, waits: waits)) { merge(head, methods.first, auto: waits) }
+            Menu {
                 ForEach(methods.dropFirst(), id: \.self) { method in
                     Button(WorkList.mergeButton(method, waits: waits)) { merge(head, method, auto: waits) }
                 }
@@ -72,33 +163,20 @@ struct WorkItemActions: View {
                     Divider()
                     Button("Merge when checks pass") { merge(head, methods.first, auto: true) }
                 }
-            } primaryAction: {
-                merge(head, methods.first, auto: waits)
+            } label: {
+                Image(systemName: "chevron.down").imageScale(.small)
             }
-            .fixedSize()
-            Button("Approve") {
-                act(DaemonAPI.Method.forgeApprove, DaemonAPI.ForgeApproveRequest(node: node, sha: head))
-            }
+            .menuIndicator(.hidden)
+            .accessibilityLabel("More ways to merge")
+            .disabled(methods.count < 2 && waits)
         }
-        if item.state == "open", !WorkList.failedChecks(detail).isEmpty {
-            Button("Rerun failed") { act(DaemonAPI.Method.forgeRerun, DaemonAPI.ForgeNodeRequest(node: node)) }
-        }
-        Button("Show Diff") { Task { await showDiff() } }
+        .buttonStyle(.borderedProminent)
+        .tint(waits ? Color.accentColor : WorkLook.Tone.green.color)
+        .fixedSize()
     }
 
     private func merge(_ head: String, _ method: DaemonAPI.ForgeMergeMethod?, auto: Bool) {
         act(DaemonAPI.Method.forgeMerge, DaemonAPI.ForgeMergeRequest(node: node, sha: head, method: method, auto: auto ? true : nil))
-    }
-
-    private var failedChecks: some View {
-        WrappingHStack(spacing: 6) {
-            Text("Failed:").appText(.supporting).foregroundStyle(.secondary)
-            ForEach(WorkList.failedChecks(detail), id: \.name) { check in
-                Button("\(check.name) log") { Task { await readLog(check.name) } }
-                    .linkStyle()
-                    .help("The end of this check's log")
-            }
-        }
     }
 
     private func readLog(_ check: String) async {
@@ -113,62 +191,126 @@ struct WorkItemActions: View {
         }
     }
 
-    private func showDiff() async {
-        busy = DaemonAPI.Method.forgeDiff
-        defer { busy = nil }
-        do {
-            let got = try await model.forge(DaemonAPI.Method.forgeDiff, DaemonAPI.ForgeNodeRequest(node: node),
-                                            returning: DaemonAPI.ForgeDiff.self, on: host)
-            diff = got.appViewDiff(title: "\(WorkList.shortRef(node.ref)) \(item.title)", site: WorkList.forgeName(node.ref))
-        } catch {
-            said = (WorkList.failureWords(error), true)
-        }
-    }
-
-    // MARK: Labels
-
-    private var labelsMenu: some View {
-        Menu("Labels") {
-            if let labelChoices {
-                if labelChoices.isEmpty { Text("No labels") }
-                ForEach(labelChoices, id: \.name) { label in
-                    let on = item.labels.contains { $0.name == label.name }
-                    Toggle(label.name, isOn: Binding(get: { on }, set: { add in
-                        act(DaemonAPI.Method.forgeLabel,
-                            DaemonAPI.ForgeLabelRequest(node: node, add: add ? [label.name] : nil, remove: add ? nil : [label.name]))
-                    }))
-                }
-            } else {
-                Text("Loading…")
-            }
-        }
-        .fixedSize()
-        .workTask(id: node) { await loadLabels() }
-    }
-
-    private func loadLabels() async {
-        do {
-            labelChoices = try await model.forge(DaemonAPI.Method.forgeLabels, DaemonAPI.ForgeNodeRequest(node: node),
-                                                 returning: DaemonAPI.ForgeLabels.self, on: host).labels
-        } catch {
-            labelChoices = []
-        }
-    }
-
-    // MARK: Writing
-
     private func act(_ method: String, _ params: some Encodable & Sendable) {
         Task {
             busy = method
             defer { busy = nil }
             do {
                 let done = try await model.forge(method, params, returning: DaemonAPI.ForgeDone.self, on: host)
-                let close = params as? DaemonAPI.ForgeCloseRequest
-                said = (WorkList.doneWords(method, done, reopened: close?.reopen == true, moved: close?.transition != nil), false)
+                said = (WorkList.doneWords(method, done), false)
                 wrote()
             } catch {
                 said = (WorkList.failureWords(error), true)
             }
+        }
+    }
+
+    // MARK: Glyphs and colours
+
+    /// Amber: waiting on a person or a run, as GitHub draws it.
+    static let amber = Color(light: 0x9A6700, dark: 0xD29922)
+
+    static func tint(_ sign: WorkLook.MergeSign) -> Color? {
+        switch sign {
+        case .pass: WorkLook.Tone.green.color
+        case .fail: WorkLook.Tone.red.color
+        case .wait: amber
+        case .info: nil
+        }
+    }
+
+    static func symbol(_ row: WorkLook.MergeRow) -> String {
+        switch (row.kind, row.sign) {
+        case (.draft, _): "doc"
+        case (.autoMerge, _): "clock"
+        case (.review, .wait): "eye"
+        case (.conflicts, .fail): "exclamationmark.triangle.fill"
+        case (_, .fail): "xmark.circle.fill"
+        case (_, .wait): "circle.fill"
+        default: "checkmark.circle.fill"
+        }
+    }
+
+    static func checkSign(_ state: String) -> WorkLook.MergeSign {
+        switch state {
+        case "passing": .pass
+        case "failing": .fail
+        case "running": .wait
+        default: .info
+        }
+    }
+
+    static func checkSymbol(_ state: String) -> String {
+        switch state {
+        case "passing": "checkmark"
+        case "failing": "xmark"
+        case "running": "circle.fill"
+        default: "minus.circle"
+        }
+    }
+}
+
+/// Files changed 6 (#4406, pull-request.md note 5): a bordered button at the title's trailing end
+/// (a full-width row on a narrow page) that opens the diff (`forge/diff`) as a sheet.
+struct WorkFilesChanged: View {
+    let model: any WorkModel
+    let host: MachineRef
+    let detail: DaemonAPI.ForgeItemDetail
+    var compact = false
+
+    @Environment(\.openURL) private var openURL
+    @State private var diff: AppViewDiff?
+    @State private var loading = false
+    @State private var problem: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if compact {
+                Button { Task { await showDiff() } } label: {
+                    HStack {
+                        Label("Files changed", systemImage: "doc.on.doc")
+                        Spacer()
+                        if loading { ProgressView().controlSize(.small) }
+                        if let n = detail.filesChanged { Text("\(n)").foregroundStyle(.secondary).monospacedDigit() }
+                        Image(systemName: "chevron.right").foregroundStyle(.tertiary).accessibilityHidden(true)
+                    }
+                    .appText(.supporting)
+                    .padding(.horizontal, 12).padding(.vertical, 10)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .background(RoundedRectangle(cornerRadius: Paper.Radius.card).fill(Paper.well))
+            } else {
+                Button { Task { await showDiff() } } label: {
+                    HStack(spacing: 6) {
+                        Label(WorkLook.filesChanged(detail.filesChanged), systemImage: "doc.on.doc")
+                        if loading { ProgressView().controlSize(.small) }
+                    }
+                }
+                .buttonStyle(.bordered)
+                .help("The pull request's diff")
+            }
+            if let problem {
+                Text(problem).appText(.supporting).foregroundStyle(StateTint.failure.style(or: .secondary))
+            }
+        }
+        .disabled(loading)
+        .sheet(item: $diff) { diff in
+            AppViewDiffPage(diff: diff, openLink: { openURL($0) })
+        }
+    }
+
+    private func showDiff() async {
+        loading = true
+        problem = nil
+        defer { loading = false }
+        let item = detail.item
+        do {
+            let got = try await model.forge(DaemonAPI.Method.forgeDiff, DaemonAPI.ForgeNodeRequest(node: item.node),
+                                            returning: DaemonAPI.ForgeDiff.self, on: host)
+            diff = got.appViewDiff(title: "\(WorkList.shortRef(item.node.ref)) \(item.title)", site: WorkList.forgeName(item.node.ref))
+        } catch {
+            problem = WorkList.failureWords(error)
         }
     }
 }
@@ -272,14 +414,17 @@ struct WorkLabelsPicker: View {
 
 /// The comment box at the end of an item's timeline (#3130, #4400 note 11): the person's glyph
 /// and a Markdown field, then Close issue (Close with comment, with text in the field) or Reopen
-/// issue, and Comment (⌘↩). A pull request's close, and a tracker with a status menu, have Comment
-/// only. What a write did, or why not, is the line under the buttons.
+/// issue, and Comment (⌘↩); on a pull request Close pull request or Reopen pull request (#4406). A
+/// merged pull request, and a tracker with a status menu, have Comment only. What a write did, or
+/// why not, is the line under the buttons.
 struct WorkCommentBox: View {
     let model: any WorkModel
     let host: MachineRef
     let node: DaemonAPI.LineageNode
-    /// open or closed: the issue's close is here; nil when it is not (a pull request, a tracker's status).
+    /// open or closed: the item's close is here; nil when it is not (a merged pull request, a tracker's status).
     var closes: String?
+    /// What Close and Reopen name: issue, or pull request.
+    var noun = "issue"
     /// A narrow page: no avatar column, so the box takes the width.
     var compact = false
     /// What the page's last write did, under the buttons.
@@ -339,14 +484,17 @@ struct WorkCommentBox: View {
     }
 
     /// Close issue, or Close with comment when the field has text: as on GitHub, so a close can
-    /// say why. Close as not planned comes with `forge/close`'s reason (#4400, task 5).
+    /// say why. Close as not planned comes with `forge/close`'s reason (#4400, task 5); a pull
+    /// request has none.
     @ViewBuilder
     private func closeButton(_ state: String) -> some View {
         if state == "open" {
-            Button(empty ? "Close issue" : "Close with comment", systemImage: "checkmark.circle") { Task { await close(reopen: false) } }
-                .help("Close it as completed")
+            Button(empty ? "Close \(noun)" : "Close with comment", systemImage: noun == "issue" ? "checkmark.circle" : "xmark.circle") {
+                Task { await close(reopen: false) }
+            }
+            .help(noun == "issue" ? "Close it as completed" : "Close it without merging")
         } else {
-            Button(empty ? "Reopen issue" : "Reopen with comment", systemImage: "arrow.uturn.backward.circle") {
+            Button(empty ? "Reopen \(noun)" : "Reopen with comment", systemImage: "arrow.uturn.backward.circle") {
                 Task { await close(reopen: true) }
             }
         }
