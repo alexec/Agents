@@ -2751,9 +2751,26 @@ final class AppModel {
 
     /// What Auto would pick now for the draft, on the draft's machine.
     func refreshDraftAutoPreview() async {
-        guard isAutoDraft, let cwd = draftCwd else { draftAutoPreview = nil; return }
+        guard isAutoDraft, let cwd = draftCwd else { draftAutoPreview = nil; draftCommands = []; return }
         let request = AutoPreviewRequest(cwd: cwd, levels: draftLevels, sandbox: draftSandbox, needs: draftAttachmentNeeds)
         draftAutoPreview = try? await draftHostClient.call(DaemonAPI.Method.autoPreview, request, returning: AutoPreview.self)
+        await loadDraftAutoCommands(runtimeID: draftAutoPreview?.runtimeID, cwd: cwd)
+    }
+
+    /// Auto has no commands of its own, so the "/" picker borrows the skills of the
+    /// runtime Auto would use right now (#2658): without this, Auto's prompt bar never
+    /// offers a skill to complete, though a named runtime's always does.
+    private func loadDraftAutoCommands(runtimeID: String?, cwd: URL) async {
+        guard let runtimeID else { draftCommands = []; return }
+        guard let response = try? await draftHostClient.callWithin(StartPageAsks.patience(for: DaemonAPI.Method.agentsOptions),
+                                                                    DaemonAPI.Method.agentsOptions,
+                                                                    DaemonAPI.OptionsRequest(runtimeID: runtimeID, cwd: cwd,
+                                                                                             mcpServers: draftServers),
+                                                                    returning: DaemonAPI.OptionsResponse.self) else { return }
+        letGo(draft: response.draftID)
+        // Stale when Auto has since picked a different runtime, moved on, or left Auto.
+        guard isAutoDraft, draftAutoPreview?.runtimeID == runtimeID else { return }
+        draftCommands = response.commands
     }
 
     /// A value chosen on the form (#2658): kept for the next runtime too, and on a named one
