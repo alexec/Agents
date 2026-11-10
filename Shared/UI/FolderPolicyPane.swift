@@ -8,10 +8,17 @@ import SwiftUI
 /// here for **Allow**. The machine resolves the layers (`policy/effective`) and keeps the file
 /// (`policy/folder`, `policy/setFolder`). The web page's is the folder list in
 /// `Web/src/views/settings/AgentsPolicy.tsx`.
+///
+/// One view for the Mac's Project Settings ▸ Policy and the Remote's Project Settings page.
 struct FolderPolicyPane: View {
-    @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     let summary: DaemonAPI.FolderSummary
+    /// The folder's machine, or nil while it can't be reached.
+    let host: DaemonClient?
+    /// Moves when the machine says a layer changed (`policy/effectiveChanged`).
+    let revision: Int
+    /// The folder's machine is offline: the rows are drawn, not changed.
+    let offline: Bool
 
     /// The rules for an agent in this folder, every layer resolved, with the cap above it.
     @State private var effective: DaemonAPI.EffectivePolicy?
@@ -21,11 +28,11 @@ struct FolderPolicyPane: View {
     @State private var problem: String?
     @State private var isSaving = false
 
-    private var host: DaemonClient { model.client(for: summary.host) }
     private var folder: String { summary.folder.folder.absoluteString }
 
     private struct Reload: Hashable {
         var folder: String
+        var connected: Bool
         var revision: Int
         var waiting: [GuardedChange]
     }
@@ -34,7 +41,10 @@ struct FolderPolicyPane: View {
         Form {
             Section {
                 VStack(alignment: .leading, spacing: 6) {
+                    #if os(macOS)
+                    // The Remote's page has it as its navigation title.
                     Text(PolicyLayersWords.title).appText(.title).fontWeight(.semibold)
+                    #endif
                     Text(PolicyLayersWords.folderIntro)
                         .appText(.fine).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -52,7 +62,11 @@ struct FolderPolicyPane: View {
             // A change from outside the app that loosens a rule waits for your OK (FR-016).
             if let pending = layer?.pending {
                 Section {
+                    #if os(macOS)
                     GuardedChangeQuestion(change: pending, key: summary.key, leaving: { dismiss() })
+                    #else
+                    GuardedChangeQuestion(change: pending, key: summary.key)
+                    #endif
                 }
                 .paperListRow()
             }
@@ -62,7 +76,7 @@ struct FolderPolicyPane: View {
                         ForEach(PolicyLayersWords.rows(in: section)) { row in
                             PolicyRuleRow(row: row, rule: effective.rules.first { $0.rule == row.rule },
                                           yours: PolicyLayersWords.value(layer.rules, row.rule),
-                                          editable: !isSaving && !model.hosts.isOffline(summary.host),
+                                          editable: !isSaving && !offline && host != nil,
                                           yourValue: yourWords(row)) { value in
                                 Task { await save(row.rule, value) }
                             }
@@ -81,7 +95,8 @@ struct FolderPolicyPane: View {
             }
         }
         .paperForm()
-        .task(id: Reload(folder: folder, revision: model.policyRevision, waiting: summary.guardedChanges ?? [])) { await load() }
+        .refreshable { await load() }
+        .task(id: Reload(folder: folder, connected: host != nil, revision: revision, waiting: summary.guardedChanges ?? [])) { await load() }
     }
 
     /// Your value for a row, or its default when no layer above the folder sets it.
@@ -93,6 +108,7 @@ struct FolderPolicyPane: View {
     }
 
     private func load() async {
+        guard let host else { return }
         do {
             effective = try await host.call(DaemonAPI.Method.policyEffective, DaemonAPI.PolicyEffectiveRequest(folder: folder),
                                             returning: DaemonAPI.EffectivePolicy.self)
@@ -107,7 +123,7 @@ struct FolderPolicyPane: View {
     }
 
     private func save(_ rule: String, _ value: JSONValue?) async {
-        guard let layer else { return }
+        guard let layer, let host else { return }
         isSaving = true
         defer { isSaving = false }
         let rules = PolicyLayersWords.setting(layer.rules, rule, to: value)

@@ -127,7 +127,10 @@ Project Settings — Agents
   folder. The page says "Written in ~/Agents on This Mac. Commit it so that your other
   folders get it." Folders that do not use Git (a Jira project with no repository) each
   keep their own copy, and the page lists the folders that differ.
-- **The Remote** keeps no settings pages (#2798). It opens neither page.
+- **The Remote** opens one Project Settings page from a folder's menu (Alex, 2026-11-09):
+  Work at Once, Sessions and Policy, which a person changes while agents run, and Folder
+  Settings ▸ General to read. General's editing, Tools, Agent Configuration, Disk Space and
+  Not Committed stay on the Mac and the web page (#2798).
 - The sheet's menu item and shortcut (**File ▸ Project Settings…**, ⌥⌘,) do not change,
   except for the name. **Folder Settings…** is in the group's **Folders** list.
 
@@ -231,7 +234,8 @@ same time after slice 3.
   This is because the repository already shares those files between clones.
 - Decided: the sidebar and New Session are **Core** (all three clients), because the
   session list and starting a session are Core. Project Settings, limits, boards and Work
-  are **Mac + web**, because folder management is Mac + web (#2798).
+  are **Mac + web**, because folder management is Mac + web (#2798). Alex, 2026-11-09:
+  Work at Once, Sessions and Policy are **Core**, on one page of the Remote.
 - Decided: the Remote does not get a Project picker, because #2798 removed folder
   management from it on purpose. It is not a bug.
 - Decided: the control plane counts the limits for a project, and a machine without it

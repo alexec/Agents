@@ -3987,6 +3987,28 @@ final class RemoteModel {
         }
     }
 
+    /// The folder whose Project Settings page is open (#2798 reversed for Work at Once,
+    /// Sessions and Policy), asked at the root as Move to Machine… is: the menu is gone by now.
+    var projectSettingsFolder: FolderKey?
+
+    /// A folder's helper limits and switches (#64), written into its `.agents/folder.json` by
+    /// its own machine, as the window's Project Settings ▸ Work at Once and Sessions set them.
+    func setHelperLimits(_ limits: HelperLimits, for key: FolderKey) async {
+        guard let target = hostClient(key.host) else {
+            problem = "\(hostLabel(key.host)) can't be reached now."
+            return
+        }
+        do {
+            var changed = try await target.call(DaemonAPI.Method.foldersSetHelperLimits,
+                                                DaemonAPI.SetHelperLimitsRequest(folder: key.folder, limits: limits),
+                                                returning: DaemonAPI.FolderSummary.self)
+            changed.host = key.host
+            work.upsert(changed)
+        } catch {
+            problem = sentence(for: error)
+        }
+    }
+
     /// The machines a folder can be added to (#4036): this Mac first, then each other host
     /// of the control plane, as the sidebar heads them.
     var folderMachines: [HostSection] {

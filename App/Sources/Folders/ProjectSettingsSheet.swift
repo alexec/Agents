@@ -53,8 +53,8 @@ enum ProjectSettingsPane: String, Hashable, CaseIterable, Identifiable {
         switch self {
         case .general: "General"
         case .tools: "Tools"
-        case .workAtOnce: "Work at Once"
-        case .sessions: "Sessions"
+        case .workAtOnce: HelperLimitWords.workAtOnce
+        case .sessions: HelperLimitWords.sessions
         case .policy: PolicyLayersWords.title
         default: page?.title ?? ""
         }
@@ -256,7 +256,8 @@ struct ProjectSettingsSheet: View {
                                    waiting: waitingPlugins > 0 ? [.plugins] : [],
                                    refresh: { await refreshSnapshot() }, unsaved: $unsaved)
         } else if chosen == .policy, let summary {
-            FolderPolicyPane(summary: summary)
+            FolderPolicyPane(summary: summary, host: model.client(for: summary.host), revision: model.policyRevision,
+                             offline: model.hosts.isOffline(summary.host))
         } else if chosen == .tools, let summary {
             ProjectToolsPane(summary: summary)
         } else if let summary {
@@ -560,10 +561,15 @@ private struct ProjectToolsPane: View {
 }
 
 /// How many helpers the project's sessions may have at once (#64): running and not archived
-/// from the policy, queued, and what they may do by themselves.
+/// from the policy, queued, and what they may do by themselves. The Remote's Project Settings
+/// page has the same rows (`RemoteProjectSettings`).
 private struct ProjectWorkAtOncePane: View {
     @Environment(AppModel.self) private var model
     let summary: DaemonAPI.FolderSummary
+
+    private var limits: HelperLimits { summary.folder.helperLimits ?? HelperLimits() }
+    private var offline: Bool { model.hosts.isOffline(summary.host) }
+    private func save(_ limits: HelperLimits) async { await model.setHelperLimits(limits, for: summary.key) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -571,43 +577,37 @@ private struct ProjectWorkAtOncePane: View {
             Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 14, verticalSpacing: 12) {
                 // Rules of the policy now (#2957, FR-015, FR-023): what applies here, and where
                 // to change it. Project Settings ▸ Policy sets this project's own.
-                settingsRow("Helpers") {
+                settingsRow(HelperLimitWords.helpers) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("\(summary.helperLimits.running) running, \(summary.helperLimits.notArchived) not archived")
+                        Text(HelperLimitWords.helpersNow(running: summary.helperLimits.running,
+                                                         notArchived: summary.helperLimits.notArchived))
                             .monospacedDigit()
                         if let mark = summary.helperLimitsSetBy { OrgPolicyLine(mark: mark) }
-                        settingsNote("Set in Settings ▸ Agents ▸ Policy, or for this project in Policy. "
-                                     + "They count across all the project's folders, on every machine. A lead doesn't count; "
-                                     + "the sessions it starts do.")
+                        settingsNote(HelperLimitWords.helpersNote)
                     }
                 }
-                settingsRow("Helpers queued") {
+                settingsRow(HelperLimitWords.queued) {
                     VStack(alignment: .leading, spacing: 6) {
-                        HelperLimitPicker(summary: summary, key: \.queued, standard: HelperLimit.defaultQueued,
-                                          maximum: HelperLimit.maximumQueued)
-                        settingsNote("How many more sessions that other sessions started may wait to start, "
-                                     + "oldest first, when a place frees. Agents can't change this. "
-                                     + "Saved in .agents/folder.json.")
+                        HelperLimitPicker(limits: limits, key: \.queued, standard: HelperLimit.defaultQueued,
+                                          maximum: HelperLimit.maximumQueued, disabled: offline, save: save)
+                        settingsNote(HelperLimitWords.queuedNote)
                     }
                 }
-                settingsRow("Allowance spent") {
+                settingsRow(HelperLimitWords.allowance) {
                     VStack(alignment: .leading, spacing: 6) {
-                        HelperLimitSwitch(summary: summary, title: "Helpers continue when the allowance is back",
+                        HelperLimitSwitch(limits: limits, title: HelperLimitWords.allowanceSwitch, disabled: offline,
                                           isOn: { $0.continueWhenBack == true },
-                                          set: { $0.continueWhenBack = $1 ? true : nil })
-                        settingsNote("A session started by a session waits for the allowance and carries on "
-                                     + "when it is back, as if you had chosen Continue. Off, it stops until you do.")
+                                          set: { $0.continueWhenBack = $1 ? true : nil }, save: save)
+                        settingsNote(HelperLimitWords.allowanceNote)
                     }
                 }
-                settingsRow("Other machines") {
+                settingsRow(HelperLimitWords.otherMachines) {
                     VStack(alignment: .leading, spacing: 6) {
                         // Only the person sets it, here (#2928).
-                        HelperLimitSwitch(summary: summary, title: "Agents may start sessions on my other machines without asking",
+                        HelperLimitSwitch(limits: limits, title: HelperLimitWords.otherMachinesSwitch, disabled: offline,
                                           isOn: { $0.agentsMayStartOnMachines == true },
-                                          set: { $0.agentsMayStartOnMachines = $1 ? true : nil })
-                        settingsNote("On, a session here may start a session on another of your machines without "
-                                     + "asking you first. The new session's chat still says which session started it, "
-                                     + "and from which machine. Off, it asks you each time.")
+                                          set: { $0.agentsMayStartOnMachines = $1 ? true : nil }, save: save)
+                        settingsNote(HelperLimitWords.otherMachinesNote)
                     }
                 }
             }
@@ -621,81 +621,34 @@ private struct ProjectSessionsPane: View {
     @Environment(AppModel.self) private var model
     let summary: DaemonAPI.FolderSummary
 
+    private var limits: HelperLimits { summary.folder.helperLimits ?? HelperLimits() }
+    private var offline: Bool { model.hosts.isOffline(summary.host) }
+    private func save(_ limits: HelperLimits) async { await model.setHelperLimits(limits, for: summary.key) }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             SettingsPaneTitle(title: ProjectSettingsPane.sessions.title, note: writtenIn(summary, model: model))
             Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 14, verticalSpacing: 12) {
-                settingsRow("Helpers archived") {
+                settingsRow(HelperLimitWords.archived) {
                     VStack(alignment: .leading, spacing: 6) {
-                        HelperLimitSwitch(summary: summary, title: "Sessions may archive the sessions they started",
+                        HelperLimitSwitch(limits: limits, title: HelperLimitWords.archivedSwitch, disabled: offline,
                                           isOn: { $0.mayArchive },
-                                          set: { $0.agentsMayArchive = $1 == HelperLimit.defaultAgentsMayArchive ? nil : $1 })
-                        settingsNote("A session may archive only sessions it started, once their turn has ended, "
-                                     + "and never your own sessions. Off, it asks you instead. You can bring any of them back.")
+                                          set: { $0.agentsMayArchive = $1 == HelperLimit.defaultAgentsMayArchive ? nil : $1 },
+                                          save: save)
+                        settingsNote(HelperLimitWords.archivedNote)
                     }
                 }
-                settingsRow("Pull request merged") {
+                settingsRow(HelperLimitWords.merged) {
                     VStack(alignment: .leading, spacing: 6) {
-                        HelperLimitSwitch(summary: summary, title: "Archive a session when its pull request merges",
+                        HelperLimitSwitch(limits: limits, title: HelperLimitWords.mergedSwitch, disabled: offline,
                                           isOn: { $0.archivesWhenMerged },
-                                          set: { $0.archiveWhenMerged = $1 == HelperLimit.defaultArchiveWhenMerged ? nil : $1 })
-                        settingsNote("A session in a worktree is archived when the pull request from its branch merges, "
-                                     + "once its turn has ended and its worktree has nothing uncommitted. Any other session "
-                                     + "gets a line in its chat. This needs the github or gitlab connector in this folder. "
-                                     + "You can bring any of them back.")
+                                          set: { $0.archiveWhenMerged = $1 == HelperLimit.defaultArchiveWhenMerged ? nil : $1 },
+                                          save: save)
+                        settingsNote(HelperLimitWords.mergedNote)
                     }
                 }
             }
             .appText(.supporting)
         }
-    }
-}
-
-/// One helper limit (#64) as a menu of the numbers it may be, its default marked and
-/// choosing it putting the folder back to the default.
-private struct HelperLimitPicker: View {
-    @Environment(AppModel.self) private var model
-    let summary: DaemonAPI.FolderSummary
-    let key: WritableKeyPath<HelperLimits, Int?>
-    let standard: Int
-    let maximum: Int
-    var minimum = 1
-
-    var body: some View {
-        let kept = summary.folder.helperLimits ?? HelperLimits()
-        let current = kept[keyPath: key] ?? standard
-        Picker("", selection: Binding(get: { current }, set: { chosen in
-            var limits = kept
-            limits[keyPath: key] = chosen == standard ? nil : chosen
-            Task { await model.setHelperLimits(limits, for: summary.key) }
-        })) {
-            ForEach(Array(Swift.min(minimum, current)...Swift.max(maximum, current)), id: \.self) { number in
-                Text(number == standard ? "\(number) (default)" : "\(number)").tag(number)
-            }
-        }
-        .labelsHidden()
-        .fixedSize()
-        .disabled(model.hosts.isOffline(summary.host))
-    }
-}
-
-/// One of the helpers' switches in `.agents/folder.json`, back to nil when it is the default.
-private struct HelperLimitSwitch: View {
-    @Environment(AppModel.self) private var model
-    let summary: DaemonAPI.FolderSummary
-    let title: String
-    let isOn: (HelperLimits) -> Bool
-    let set: (inout HelperLimits, Bool) -> Void
-
-    var body: some View {
-        let kept = summary.folder.helperLimits ?? HelperLimits()
-        Toggle(title, isOn: Binding(get: { isOn(kept) }, set: { on in
-            var limits = kept
-            set(&limits, on)
-            Task { await model.setHelperLimits(limits, for: summary.key) }
-        }))
-        .toggleStyle(.switch)
-        .controlSize(.small)
-        .disabled(model.hosts.isOffline(summary.host))
     }
 }
