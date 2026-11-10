@@ -4,6 +4,16 @@ import Foundation
 public enum AccountsWords {
     public static let title = "Accounts"
     public static let noSecrets = "No secret goes here: give a card or a token by its name in Secrets."
+    /// In place of the pane when the control plane does not have it (#4190), as the web page's.
+    public static let planeNeedsUpdate = "The control plane needs an update to do this."
+
+    /// What the pane says in place of Accounts (#4190, #4100): the control plane takes the
+    /// accounts part of `user/setSettings` only from `user/3`, so an older one, which refuses it,
+    /// is sent nothing. Nil when it has it, and while its `control/status` has not come yet.
+    public static func refusal(_ status: DaemonAPI.ControlStatus?) -> String? {
+        guard let status else { return nil }
+        return status.capabilities?.contains(Capability.user3) == true ? nil : planeNeedsUpdate
+    }
 
     /// The accounts a project uses: those that name it and those that name none.
     public static func of(_ all: [DaemonAPI.OutsideAccount], project: String) -> [DaemonAPI.OutsideAccount] {
