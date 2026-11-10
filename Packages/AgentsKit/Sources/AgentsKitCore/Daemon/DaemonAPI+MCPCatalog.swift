@@ -19,10 +19,13 @@ extension DaemonAPI.Method {
     public static let mcpSignInWait = "mcp/sign-in/wait"
     public static let mcpSignInCancel = "mcp/sign-in/cancel"
     public static let mcpSignOut = "mcp/sign-out"
+    /// A connector's tools with Allow, Ask or Off for each, and setting one (#4099).
+    public static let mcpTools = "mcp/tools"
+    public static let mcpSetToolLevel = "mcp/setToolLevel"
 
     public static let mcpCatalogMethods: [String] = [
         mcpPreview, mcpAdd, mcpList, mcpApprove, mcpSetSecret, mcpRemove, mcpVerify, mcpAddByHand,
-        mcpSignIn, mcpSignInWait, mcpSignInCancel, mcpSignOut, mcpForgetViews,
+        mcpSignIn, mcpSignInWait, mcpSignInCancel, mcpSignOut, mcpForgetViews, mcpTools, mcpSetToolLevel,
     ]
 }
 
@@ -409,6 +412,79 @@ extension DaemonAPI {
         public init(destination: SkillDestination, name: String) {
             self.destination = destination
             self.name = name
+        }
+    }
+
+    /// `mcp/tools` (#4099): one connector's tools, as a destination's layer sees them.
+    public struct MCPToolsRequest: Codable, Sendable, Hashable {
+        public var destination: SkillDestination
+        public var name: String
+        public init(destination: SkillDestination, name: String) {
+            self.destination = destination
+            self.name = name
+        }
+    }
+
+    /// `mcp/setToolLevel` (#4099): one tool's level, or with no tool the switch for every tool
+    /// that writes, in the destination's layer; no level clears it.
+    public struct MCPSetToolLevelRequest: Codable, Sendable, Hashable {
+        public var destination: SkillDestination
+        public var name: String
+        public var tool: String?
+        public var level: ConnectorToolLevel?
+        public init(destination: SkillDestination, name: String, tool: String? = nil, level: ConnectorToolLevel? = nil) {
+            self.destination = destination
+            self.name = name
+            self.tool = tool
+            self.level = level
+        }
+    }
+
+    /// One tool of a connector, as tools/list gave it, with its level (#4099).
+    public struct MCPToolRow: Codable, Sendable, Hashable, Identifiable {
+        public var name: String
+        public var title: String?
+        /// Its annotations do not say it only reads, or say it is destructive.
+        public var writes: Bool
+        /// The level in force: the tightest of every layer, or the default.
+        public var level: ConnectorToolLevel
+        /// What the destination's layer sets for this tool itself.
+        public var own: ConnectorToolLevel?
+        /// The tightest level of the layers above; a menu dims what is looser.
+        public var cap: ConnectorToolLevel?
+        /// For example "Your policy: at most Ask".
+        public var capLine: String?
+        public var id: String { name }
+        public init(name: String, title: String? = nil, writes: Bool, level: ConnectorToolLevel,
+                    own: ConnectorToolLevel? = nil, cap: ConnectorToolLevel? = nil, capLine: String? = nil) {
+            self.name = name
+            self.title = title
+            self.writes = writes
+            self.level = level
+            self.own = own
+            self.cap = cap
+            self.capLine = capLine
+        }
+    }
+
+    /// `mcp/tools` and `mcp/setToolLevel`'s answer (#4099).
+    public struct MCPToolsAnswer: Codable, Sendable, Hashable {
+        public var name: String
+        public var tools: [MCPToolRow]
+        /// The destination layer's switch for every tool that writes.
+        public var writes: ConnectorToolLevel?
+        public var writesCap: ConnectorToolLevel?
+        public var writesCapLine: String?
+        /// Why there is no list of tools yet.
+        public var problem: String?
+        public init(name: String, tools: [MCPToolRow], writes: ConnectorToolLevel? = nil, writesCap: ConnectorToolLevel? = nil,
+                    writesCapLine: String? = nil, problem: String? = nil) {
+            self.name = name
+            self.tools = tools
+            self.writes = writes
+            self.writesCap = writesCap
+            self.writesCapLine = writesCapLine
+            self.problem = problem
         }
     }
 

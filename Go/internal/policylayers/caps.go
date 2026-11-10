@@ -44,7 +44,7 @@ func capPhrase(rule wire.PolicyRuleName, words string) string {
 	switch rule {
 	case wire.PolicyRuleNameRuntimes, wire.PolicyRuleNameMarketplacesAllowed, wire.PolicyRuleNameEnvironment:
 		return "only " + words
-	case wire.PolicyRuleNameArchiveMyChats, wire.PolicyRuleNameMarketplacesCustomServers:
+	case wire.PolicyRuleNameArchiveMyChats, wire.PolicyRuleNameMarketplacesCustomServers, wire.PolicyRuleNameConnectorTools:
 		return words
 	}
 	return "at most " + words

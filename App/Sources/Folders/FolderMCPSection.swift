@@ -110,108 +110,125 @@ private struct FolderMCPRow: View {
     @State private var replacing = false
     @State private var removing = false
     @State private var signingIn = false
+    @State private var showingTools = false
 
     private var setSecrets: [String] {
         server.secretNames.filter { !server.missingSecrets.contains($0) }
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: icon)
-                .appText(.reading)
-                .foregroundStyle((isWaiting || !server.missingSecrets.isEmpty || needsSignIn ? StateTint.attention : StateTint.none).style(or: .secondary))
-                .accessibilityLabel(isWaiting ? "Waiting for your OK" : "Connector")
-                .padding(.top, 1)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: icon)
+                    .appText(.reading)
+                    .foregroundStyle((isWaiting || !server.missingSecrets.isEmpty || needsSignIn ? StateTint.attention : StateTint.none).style(or: .secondary))
+                    .accessibilityLabel(isWaiting ? "Waiting for your OK" : "Connector")
+                    .padding(.top, 1)
 
-            VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Text(server.name).appText(.reading).fontWeight(.semibold).lineLimit(1)
+                        if let managed = server.managed {
+                            SharedChip(text: managed.byHand ? "added by hand" : "registry", tone: .source)
+                        }
+                        if isWaiting { SharedChip(text: "waiting for your OK", tone: .attention) }
+                        ForEach(server.missingSecrets, id: \.self) { name in
+                            SharedChip(text: "\(name) not set", tone: .attention)
+                        }
+                        if needsSignIn { SharedChip(text: "needs sign-in", tone: .attention) }
+                        if server.signIn == .signedIn { SharedChip(text: "signed in", tone: .source) }
+                        if let views = viewsWord { SharedChip(text: views, tone: .source) }
+                    }
+                    Text(detail).appText(.supporting).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                    if let note {
+                        Text(note).appText(.supporting).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if !isWaiting {
+                        // Allow, Ask or Off for each of its tools (#4099).
+                        Button { showingTools.toggle() } label: {
+                            Label("Tools", systemImage: showingTools ? "chevron.down" : "chevron.right")
+                                .appText(.supporting)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                        .help("Allow, Ask or Off for each of its tools")
+                    }
+                }
+
+                Spacer(minLength: 8)
+
                 HStack(spacing: 6) {
-                    Text(server.name).appText(.reading).fontWeight(.semibold).lineLimit(1)
-                    if let managed = server.managed {
-                        SharedChip(text: managed.byHand ? "added by hand" : "registry", tone: .source)
-                    }
-                    if isWaiting { SharedChip(text: "waiting for your OK", tone: .attention) }
-                    ForEach(server.missingSecrets, id: \.self) { name in
-                        SharedChip(text: "\(name) not set", tone: .attention)
-                    }
-                    if needsSignIn { SharedChip(text: "needs sign-in", tone: .attention) }
-                    if server.signIn == .signedIn { SharedChip(text: "signed in", tone: .source) }
-                    if let views = viewsWord { SharedChip(text: views, tone: .source) }
-                }
-                Text(detail).appText(.supporting).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
-                if let note {
-                    Text(note).appText(.supporting).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-
-            Spacer(minLength: 8)
-
-            HStack(spacing: 6) {
-                Button("Show entry") {
-                    if !file.isEmpty { SharedFiles.open(file) }
-                }
-                .buttonStyle(.paper)
-                .appText(.fine)
-                if !server.missingSecrets.isEmpty {
-                    Button("Set…") {
-                        replacing = false
-                        setting = server.missingSecrets
+                    Button("Show entry") {
+                        if !file.isEmpty { SharedFiles.open(file) }
                     }
                     .buttonStyle(.paper)
                     .appText(.fine)
-                }
-                if !setSecrets.isEmpty {
-                    Button("Replace…") {
-                        replacing = true
-                        setting = setSecrets
-                    }
-                    .buttonStyle(.paper)
-                    .appText(.fine)
-                }
-                if needsSignIn {
-                    Button("Sign in…") { signingIn = true }
+                    if !server.missingSecrets.isEmpty {
+                        Button("Set…") {
+                            replacing = false
+                            setting = server.missingSecrets
+                        }
                         .buttonStyle(.paper)
                         .appText(.fine)
-                }
-                if server.signIn == .signedIn {
-                    Button("Sign out") {
-                        Task {
-                            failed(await model.mcpSignOut(signInTarget))
-                            changed()
-                        }
                     }
-                    .buttonStyle(.paper)
-                    .appText(.fine)
-                }
-                if case .folder(let folder) = place, case .waiting(let digest, _) = server.approval {
-                    Button("Approve") {
-                        Task {
-                            if let error = await model.approveFolderMCP(server.name, digest: digest, in: folder) {
-                                failed(MCPCatalogWords.sentence(error))
-                            } else {
-                                failed(nil)
+                    if !setSecrets.isEmpty {
+                        Button("Replace…") {
+                            replacing = true
+                            setting = setSecrets
+                        }
+                        .buttonStyle(.paper)
+                        .appText(.fine)
+                    }
+                    if needsSignIn {
+                        Button("Sign in…") { signingIn = true }
+                            .buttonStyle(.paper)
+                            .appText(.fine)
+                    }
+                    if server.signIn == .signedIn {
+                        Button("Sign out") {
+                            Task {
+                                failed(await model.mcpSignOut(signInTarget))
                                 changed()
                             }
                         }
+                        .buttonStyle(.paper)
+                        .appText(.fine)
                     }
-                    .buttonStyle(.paper)
-                    .appText(.fine)
-                }
-                if server.views != nil {
-                    // Its views asked Show or Don't Show (#191): ask again next time.
-                    Button("Ask Again") {
-                        Task {
-                            if await model.forgetMCPViews(server.name, at: place.destination) { changed() }
+                    if case .folder(let folder) = place, case .waiting(let digest, _) = server.approval {
+                        Button("Approve") {
+                            Task {
+                                if let error = await model.approveFolderMCP(server.name, digest: digest, in: folder) {
+                                    failed(MCPCatalogWords.sentence(error))
+                                } else {
+                                    failed(nil)
+                                    changed()
+                                }
+                            }
                         }
+                        .buttonStyle(.paper)
+                        .appText(.fine)
                     }
-                    .buttonStyle(.paper)
-                    .appText(.fine)
-                    .help("Ask Show or Don't Show again the next time one of its views is drawn")
+                    if server.views != nil {
+                        // Its views asked Show or Don't Show (#191): ask again next time.
+                        Button("Ask Again") {
+                            Task {
+                                if await model.forgetMCPViews(server.name, at: place.destination) { changed() }
+                            }
+                        }
+                        .buttonStyle(.paper)
+                        .appText(.fine)
+                        .help("Ask Show or Don't Show again the next time one of its views is drawn")
+                    }
+                    // Every one (#2154): one written by hand in mcp.json too.
+                    Button("Remove…") { removing = true }
+                        .buttonStyle(.paper)
+                        .appText(.fine)
                 }
-                // Every one (#2154): one written by hand in mcp.json too.
-                Button("Remove…") { removing = true }
-                    .buttonStyle(.paper)
-                    .appText(.fine)
+            }
+            if showingTools {
+                ConnectorToolsList(name: server.name, place: place)
+                    .padding(.leading, 28)
             }
         }
         .padding(.horizontal, 16)

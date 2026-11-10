@@ -176,6 +176,9 @@ public extension DaemonAPI {
                     kind: .hostRequest),
                 // Remove… on a Connectors page (#2154).
                 Row(Method.mcpRemove, params: MCPRemoveRequest.self, result: MCPRemoveAnswer.self, kind: .hostRequest),
+                // Allow, Ask or Off for each tool of a connector (#4099).
+                Row(Method.mcpTools, params: MCPToolsRequest.self, result: MCPToolsAnswer.self, kind: .hostRequest),
+                Row(Method.mcpSetToolLevel, params: MCPSetToolLevelRequest.self, result: MCPToolsAnswer.self, kind: .hostRequest),
                 // The person's connections (#1335) and a folder's Connectors set-up (#1336).
                 Row(Method.connectionsList, params: Empty.self, result: ConnectionsList.self, kind: .hostRequest),
                 Row(Method.connectionsSignIn, params: ConnectionProviderRequest.self, result: ConnectionSignIn.self,

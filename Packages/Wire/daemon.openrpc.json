@@ -5665,6 +5665,32 @@
       }
     },
     {
+      "name": "mcp/setToolLevel",
+      "x-capability": "mcp.tool-levels/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Sets Allow, Ask or Off for one tool of a connector, or for all its tools that write, in the destination's layer (#4099), and answers the connector's tools again.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MCPSetToolLevelRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/MCPToolsAnswer"
+        }
+      }
+    },
+    {
       "name": "mcp/sign-in",
       "x-capability": "mcp/1",
       "paramStructure": "by-name",
@@ -5741,6 +5767,32 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/MCPSignOutAnswer"
+        }
+      }
+    },
+    {
+      "name": "mcp/tools",
+      "x-capability": "mcp.tool-levels/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "A connector's tools, as its last check's tools/list gave them, each with its level in the destination's layer and the level in force (#4099).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MCPToolsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/MCPToolsAnswer"
         }
       }
     },

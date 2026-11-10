@@ -1417,6 +1417,10 @@ func (l *live) Permission(ctx context.Context, p sdk.RequestPermissionRequest) s
 	if d.isBot() {
 		return l.refuseForBot(req)
 	}
+	// A connector's tool is answered by its level (#4099): Allow and Off before a card.
+	if option, ok := l.toolLevelAnswer(req); ok {
+		return option
+	}
 	// Always-approve answers before a card, for Cursor, Grok and OpenCode (061). A request
 	// with no allow option still waits for the person.
 	if a := d.Store.Agent(l.id); a != nil && d.agentAlwaysApproves(a) {
@@ -1753,6 +1757,7 @@ func (l *live) open(ctx context.Context, a *wire.Agent, quiet bool) bool {
 	}
 	sandbox, why := d.resolveSandbox(a.RuntimeID, a.SandboxOverride, a.StartedByAgent)
 	launch, meta := withSandbox(launch, agentSessionMeta(a), a.RuntimeID, sandbox)
+	launch, meta = withToolLevels(launch, meta, a.RuntimeID, d.offTools(a))
 	brief := d.briefFor(a)
 	compatibilityMeta := withSystemPrompt(meta, a.RuntimeID, brief)
 	if launch, err = withBriefFile(launch, a.RuntimeID, d.Store.Loc.Agent(string(l.id)), brief); err != nil {

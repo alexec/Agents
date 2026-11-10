@@ -23,6 +23,7 @@ var knownPolicyRuleFields = map[string]bool{
 	"runtimes":           true,
 	"marketplaces":       true,
 	"environment":        true,
+	"connectorTools":     true,
 }
 
 var loggedUnknown sync.Map
@@ -125,6 +126,9 @@ func validateRules(r wire.PolicyRules) error {
 		if err := noEmptyName("environment.passThrough", r.Environment.PassThrough); err != nil {
 			return err
 		}
+	}
+	if err := validateConnectorTools(r.ConnectorTools); err != nil {
+		return err
 	}
 	if r.Runtimes != nil {
 		for id, rule := range r.Runtimes {

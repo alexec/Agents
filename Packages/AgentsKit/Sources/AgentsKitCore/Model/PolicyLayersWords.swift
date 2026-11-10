@@ -238,6 +238,8 @@ public enum PolicyLayersWords {
         Row(rule: "marketplaces.customServers", title: "Connectors added by hand", section: .tools,
             kind: .list, unset: "Allowed"),
         Row(rule: "environment", title: "Variables agents get", section: .tools, kind: .list, unset: "Each runtime’s own"),
+        Row(rule: "connectorTools", title: "Connector tools", section: .tools, kind: .list,
+            unset: "Ask before a tool that writes"),
     ]
 
     public static func rows(in section: Section) -> [Row] { rows.filter { $0.section == section } }

@@ -5746,6 +5746,15 @@
         "skipped"
       ]
     },
+    "ConnectorToolLevel": {
+      "type": "string",
+      "enum": [
+        "allow",
+        "ask",
+        "off"
+      ],
+      "description": "What agents may do with one tool of a connector (#4099): allow (use it without asking), ask (ask the person first) or off (never use it). A layer can only move a tool towards off."
+    },
     "ConnectorWorkflow": {
       "type": "object",
       "properties": {
@@ -14756,6 +14765,32 @@
       ],
       "additionalProperties": false
     },
+    "MCPSetToolLevelRequest": {
+      "type": "object",
+      "description": "Sets the level of one tool of a connector, or of all its tools that write, in the destination's layer: yours for personal, the folder's .agents/policy.json for a folder (#4099).",
+      "properties": {
+        "destination": {
+          "$ref": "#/definitions/SkillDestination"
+        },
+        "name": {
+          "type": "string",
+          "description": "The connector's name."
+        },
+        "tool": {
+          "type": "string",
+          "description": "The tool's name. Absent: the switch for every tool that writes."
+        },
+        "level": {
+          "$ref": "#/definitions/ConnectorToolLevel",
+          "description": "Absent: the layer sets nothing for it, and the default applies."
+        }
+      },
+      "required": [
+        "destination",
+        "name"
+      ],
+      "additionalProperties": false
+    },
     "MCPSignInAnswer": {
       "type": "object",
       "properties": {
@@ -14980,6 +15015,93 @@
       },
       "required": [
         "target"
+      ],
+      "additionalProperties": false
+    },
+    "MCPToolRow": {
+      "type": "object",
+      "description": "One tool of a connector, as tools/list gave it, with its level (#4099).",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "writes": {
+          "type": "boolean",
+          "description": "Its annotations do not say it is read only (readOnlyHint), or say it is destructive (destructiveHint)."
+        },
+        "level": {
+          "$ref": "#/definitions/ConnectorToolLevel",
+          "description": "The level in force: the tightest of every layer, or the default (ask for a tool that writes, allow for one that only reads)."
+        },
+        "own": {
+          "$ref": "#/definitions/ConnectorToolLevel",
+          "description": "What the destination's layer sets for this tool itself. Absent: nothing."
+        },
+        "cap": {
+          "$ref": "#/definitions/ConnectorToolLevel",
+          "description": "The tightest level of the layers above the destination's; a menu dims what is looser."
+        },
+        "capLine": {
+          "type": "string",
+          "description": "For example \"Your policy: at most Ask\"."
+        }
+      },
+      "required": [
+        "name",
+        "writes",
+        "level"
+      ],
+      "additionalProperties": false
+    },
+    "MCPToolsAnswer": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MCPToolRow"
+          }
+        },
+        "writes": {
+          "$ref": "#/definitions/ConnectorToolLevel",
+          "description": "The destination layer's switch for every tool that writes. Absent: not set."
+        },
+        "writesCap": {
+          "$ref": "#/definitions/ConnectorToolLevel"
+        },
+        "writesCapLine": {
+          "type": "string"
+        },
+        "problem": {
+          "type": "string",
+          "description": "Why there is no list of tools: the connector has not answered a check yet, or did not answer."
+        }
+      },
+      "required": [
+        "name",
+        "tools"
+      ],
+      "additionalProperties": false
+    },
+    "MCPToolsRequest": {
+      "type": "object",
+      "properties": {
+        "destination": {
+          "$ref": "#/definitions/SkillDestination"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "destination",
+        "name"
       ],
       "additionalProperties": false
     },
@@ -20265,6 +20387,24 @@
       ],
       "additionalProperties": false
     },
+    "PolicyConnectorRule": {
+      "type": "object",
+      "description": "The levels a layer sets for one connector's tools (#4099). A tool's own level comes before the layer's writes switch.",
+      "properties": {
+        "writes": {
+          "$ref": "#/definitions/ConnectorToolLevel",
+          "description": "The level of every tool that writes and that tools does not name."
+        },
+        "tools": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/ConnectorToolLevel"
+          },
+          "description": "A level for each tool, by its name."
+        }
+      },
+      "additionalProperties": false
+    },
     "PolicyEffectiveRequest": {
       "type": "object",
       "description": "policy/effective (#2957): the rules for an agent in folder, or, with no folder, outside any folder layer.",
@@ -20619,7 +20759,8 @@
         "runtimes",
         "marketplaces.allowed",
         "marketplaces.customServers",
-        "environment"
+        "environment",
+        "connectorTools"
       ],
       "description": "One rule a policy layer can set (#2957, data-model.md \"EffectiveRule\")."
     },
@@ -20663,6 +20804,13 @@
         },
         "environment": {
           "$ref": "#/definitions/PolicyEnvironment"
+        },
+        "connectorTools": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/PolicyConnectorRule"
+          },
+          "description": "The level of each connector's tools, by the connector's name (#4099). A tool no layer names is ask when it writes and allow when it only reads."
         }
       },
       "additionalProperties": false
