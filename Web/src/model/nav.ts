@@ -66,7 +66,7 @@ export const navPages: Record<NavSection, readonly NavPage[]> = {
   ]),
   // The folders' docs and the docs connectors' (#3321, spec 3319), one page; #/docs/<ref> is a doc's page.
   docs: [{ id: "docs", title: "Docs", group: "Docs", draw: { kind: "docs" } }],
-  // The messaging connectors' conversations, read only (#4344), one page; #/messages/<key> is a conversation's.
+  // The messaging connectors' conversations (#4344), with a reply (#4345), one page; #/messages/<key> is a conversation's.
   messages: [{ id: "messages", title: "Messages", group: "Messages", draw: { kind: "messages" } }],
   machines: [
     { id: "machines", title: "Machines", group: "Machines", draw: { kind: "machines" } },

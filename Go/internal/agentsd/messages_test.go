@@ -16,7 +16,8 @@ import (
 
 // fakeMessagingMCP is a server that follows the messaging contract (#4338) over streamable
 // HTTP: list_conversations pages its conversations (newest first) by an offset cursor, and
-// read_messages gives two messages of any conversation.
+// read_messages gives two messages of any conversation. A slack one also has reply (#4345),
+// which gives back what it sent; the email one, as the real one, cannot send.
 func fakeMessagingMCP(t *testing.T, source string, conversations []wire.MessagingConversation) *httptest.Server {
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodDelete {
@@ -31,6 +32,8 @@ func fakeMessagingMCP(t *testing.T, source string, conversations []wire.Messagin
 					Cursor       string `json:"cursor"`
 					Limit        int    `json:"limit"`
 					Conversation string `json:"conversation"`
+					Thread       string `json:"thread"`
+					Text         string `json:"text"`
 				} `json:"arguments"`
 			} `json:"params"`
 		}
@@ -43,10 +46,14 @@ func fakeMessagingMCP(t *testing.T, source string, conversations []wire.Messagin
 		meta := map[string]any{"agents/messaging": 1}
 		switch m.Method {
 		case "tools/list":
-			result = map[string]any{"tools": []any{
+			tools := []any{
 				map[string]any{"name": "list_conversations", "inputSchema": map[string]any{"type": "object"}, "_meta": meta},
 				map[string]any{"name": "read_messages", "inputSchema": map[string]any{"type": "object", "required": []string{"conversation"}}, "_meta": meta},
-			}}
+			}
+			if source == "slack" {
+				tools = append(tools, map[string]any{"name": "reply", "inputSchema": map[string]any{"type": "object"}, "_meta": meta})
+			}
+			result = map[string]any{"tools": tools}
 		case "tools/call":
 			a := m.Params.Arguments
 			switch m.Params.Name {
@@ -54,6 +61,10 @@ func fakeMessagingMCP(t *testing.T, source string, conversations []wire.Messagin
 				from, _ := strconv.Atoi(a.Cursor)
 				to := min(len(conversations), from+a.Limit)
 				page := wire.MessagingConversations{Conversations: conversations[from:to]}
+				if source == "slack" {
+					as := "the Slack bot @agents"
+					page.ReplyAs = &as
+				}
 				if to < len(conversations) {
 					next := strconv.Itoa(to)
 					page.Cursor = &next
@@ -67,6 +78,13 @@ func fakeMessagingMCP(t *testing.T, source string, conversations []wire.Messagin
 						{ID: "m2", Conversation: a.Conversation, Sender: sender, Time: "2026-11-09T10:01:00Z", Text: "second"},
 						{ID: "m1", Conversation: a.Conversation, Sender: sender, Time: "2026-11-09T10:00:00Z", Text: "first"},
 					}}}
+			case "reply":
+				sent := wire.MessagingMessage{ID: "m3", Conversation: a.Conversation, Sender: wire.ChannelSender{Channel: source, Identity: "UBOT"},
+					Time: "2026-11-09T10:02:00Z", Text: a.Text}
+				if a.Thread != "" {
+					sent.Thread = &a.Thread
+				}
+				result = map[string]any{"content": []any{}, "structuredContent": sent}
 			}
 		}
 		b, _ := json.Marshal(result)
@@ -132,6 +150,10 @@ func TestMessagesMergeEveryContractConnector(t *testing.T) {
 			if m.Folder != folder || m.Server != m.Conversation.Source {
 				t.Fatalf("conversation: %+v", m)
 			}
+			// Only the connector with a reply tool says who a reply goes as (#4345).
+			if (m.Server == "slack") != (m.ReplyAs != nil) || m.ReplyAs != nil && *m.ReplyAs != "the Slack bot @agents" {
+				t.Fatalf("replyAs: %+v", m)
+			}
 			ids = append(ids, m.Conversation.ID)
 		}
 		if cursor = page.Cursor; cursor == nil || id > 10 {
@@ -159,6 +181,26 @@ func TestMessagesMergeEveryContractConnector(t *testing.T) {
 	}
 	if e := c.callError(t, 23, "messages/conversations", map[string]any{"cursor": "nope!"}); e == nil || e.Code != CodeInvalidParams {
 		t.Fatalf("a bad cursor: %+v", e)
+	}
+
+	// messages/reply (#4345) sends by the connector's reply tool, and gives what it sent; a
+	// connector with no reply tool, a reply with no text and a connector that is not one say so.
+	var replied wire.MessagesReplied
+	json.Unmarshal(c.call(t, 30, "messages/reply", map[string]any{"server": "slack", "folder": folder, "conversation": "C5",
+		"thread": "1.2", "text": "On it."}), &replied)
+	if replied.Server != "slack" || replied.Folder != folder || replied.Conversation != "C5" || replied.Message.ID != "m3" ||
+		replied.Message.Text != "On it." || replied.Message.Thread == nil || *replied.Message.Thread != "1.2" {
+		t.Fatalf("reply: %+v", replied)
+	}
+	if e := c.callError(t, 31, "messages/reply", map[string]any{"server": "email", "folder": folder, "conversation": "T4", "text": "hi"}); e == nil ||
+		e.Code != CodeServer || e.Message != "email: It can't send a reply." {
+		t.Fatalf("no reply tool: %+v", e)
+	}
+	if e := c.callError(t, 32, "messages/reply", map[string]any{"server": "slack", "folder": folder, "conversation": "C5", "text": "  "}); e == nil || e.Code != CodeInvalidParams {
+		t.Fatalf("no text: %+v", e)
+	}
+	if e := c.callError(t, 33, "messages/reply", map[string]any{"server": "kb", "folder": folder, "conversation": "C5", "text": "hi"}); e == nil || e.Code != CodeInvalidParams {
+		t.Fatalf("not a messaging connector: %+v", e)
 	}
 }
 

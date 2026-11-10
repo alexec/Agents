@@ -195,6 +195,7 @@ func AddTools(server *mcp.Server, e *Events) {
 		})
 
 	addMessagingTools(server, e)
+	addReplyTool(server, e)
 }
 
 func threadOf(m *chat.Message, asked string) string {

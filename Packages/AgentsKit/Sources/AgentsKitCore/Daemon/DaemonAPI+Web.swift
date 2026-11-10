@@ -289,10 +289,11 @@ public extension DaemonAPI {
                 Row(Method.forgeImage, params: ForgeImageRequest.self, result: ForgeImage.self, kind: .hostRequest),
                 Row(Method.forgeAddChild, params: ForgeAddChildRequest.self, result: ForgeDone.self, kind: .hostRequest),
                 Row(Method.forgeBlockedBy, params: ForgeBlockedByRequest.self, result: ForgeDone.self, kind: .hostRequest),
-                // The Messages page's reads (#4343, #4344).
+                // The Messages page's reads and its reply (#4343, #4344, #4345).
                 Row(Method.messagesConversations, params: MessagesConversationsRequest.self, result: MessagesConversations.self,
                     kind: .hostRequest),
                 Row(Method.messagesRead, params: MessagesReadRequest.self, result: MessagesRead.self, kind: .hostRequest),
+                Row(Method.messagesReply, params: MessagesReplyRequest.self, result: MessagesReplied.self, kind: .hostRequest),
                 // Work ▸ Timeline on the web page (#4206).
                 Row(Method.workTimeline, params: WorkTimelineRequest.self, result: WorkTimeline.self, kind: .hostRequest),
                 Row(Method.docsList, params: DocsListRequest.self, result: DocsList.self, kind: .hostRequest),

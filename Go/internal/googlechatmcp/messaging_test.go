@@ -69,13 +69,13 @@ func TestTheContractToolsSayTheyFollowIt(t *testing.T) {
 			if v != float64(ContractVersion) {
 				t.Fatalf("%s: version %v", tl.Name, v)
 			}
-			if tl.Annotations == nil || !tl.Annotations.ReadOnlyHint {
-				t.Fatalf("%s is not read-only", tl.Name)
+			if tl.Annotations == nil || tl.Annotations.ReadOnlyHint != (tl.Name != "reply") {
+				t.Fatalf("%s: read-only is %v", tl.Name, tl.Annotations)
 			}
 			marked[tl.Name] = true
 		}
 	}
-	if len(marked) != 2 || !marked["list_conversations"] || !marked["read_messages"] {
+	if len(marked) != 3 || !marked["list_conversations"] || !marked["read_messages"] || !marked["reply"] {
 		t.Fatalf("marked: %v", marked)
 	}
 }
@@ -290,5 +290,36 @@ func TestReadMessagesReadsTheInboxWhenTheAppMayNot(t *testing.T) {
 		if c.ID == "spaces/DM1" && (c.Title != "Sam" || c.LastActivity == nil) {
 			t.Fatalf("the direct message: %+v", c)
 		}
+	}
+}
+
+// reply (#4345) posts the person's reply as the Chat app, in a thread when one is given, gives
+// the sent message as read_messages does, and keeps it for read_messages; the list says who a
+// reply goes as.
+func TestReplyPostsAsTheChatApp(t *testing.T) {
+	f := newFakeGoogle(t)
+	s, _ := contractSession(t, f)
+
+	var list wire.MessagingConversations
+	callContract(t, s, "list_conversations", map[string]any{}, &list)
+	if deref(list.ReplyAs) != ReplyAs {
+		t.Fatalf("replyAs: %+v", list)
+	}
+
+	var sent wire.MessagingMessage
+	callContract(t, s, "reply", map[string]any{"conversation": "spaces/AAA", "thread": "spaces/AAA/threads/t9", "text": " On it. "}, &sent)
+	_, posted, _ := f.snapshot()
+	if len(posted) != 1 || posted[0]["text"] != "On it." || posted[0]["thread"].(map[string]any)["name"] != "spaces/AAA/threads/t9" {
+		t.Fatalf("posted: %v", posted)
+	}
+	if sent.ID != posted[0]["_name"] || sent.Conversation != "spaces/AAA" || sent.Text != "On it." || deref(sent.Thread) != "spaces/AAA/threads/t9" ||
+		sent.Sender.Identity != "users/app" || deref(sent.Sender.Name) != "Chat app" || sent.Time == "" {
+		t.Fatalf("reply: %+v", sent)
+	}
+	if r := callContract(t, s, "reply", map[string]any{"conversation": "spaces/AAA", "text": "  "}, nil); !r.IsError {
+		t.Fatalf("no text: %+v", r)
+	}
+	if r := callContract(t, s, "reply", map[string]any{"conversation": "rooms/x", "text": "hi"}, nil); !r.IsError {
+		t.Fatalf("not a space: %+v", r)
 	}
 }
