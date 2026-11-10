@@ -37,8 +37,8 @@ type Workspace struct {
 	people   map[string]person
 }
 
-// self is who the bot is.
-type self struct{ team, user string }
+// self is who the bot is, and its workspace's address (https://<team>.slack.com/).
+type self struct{ team, user, url string }
 
 // person is a Slack user's name and email, as users.info said them, and when.
 type person struct {
@@ -86,7 +86,7 @@ func (w *Workspace) whoami(ctx context.Context) (self, error) {
 	if err != nil {
 		return self{}, said(err)
 	}
-	w.self = &self{team: r.TeamID, user: r.UserID}
+	w.self = &self{team: r.TeamID, user: r.UserID, url: r.URL}
 	return *w.self, nil
 }
 
@@ -155,7 +155,7 @@ func said(err error) error {
 	case "missing_scope":
 		return fmt.Errorf("slack: the app is missing the scope %s; add it under OAuth & Permissions and reinstall the app", e.Needed)
 	case "channel_not_found":
-		return fmt.Errorf("slack: no such channel, or the bot cannot see it: list_channels lists the ones it is in")
+		return fmt.Errorf("slack: no such channel, or the bot cannot see it: list_conversations lists the ones it is in")
 	case "not_in_channel":
 		return fmt.Errorf("slack: the bot is not in that channel: invite it with /invite @<the app>")
 	case "thread_not_found", "message_not_found":

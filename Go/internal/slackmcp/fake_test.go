@@ -22,7 +22,8 @@ import (
 type fakeSlack struct {
 	t      *testing.T
 	server *httptest.Server
-	// answers is a method's answer; ok:true when it has none.
+	// answers is a method's answer, or a func(url.Values) any of the call's form; ok:true
+	// when it has none.
 	answers map[string]any
 
 	mu    sync.Mutex
@@ -39,8 +40,8 @@ const (
 
 func newFakeSlack(t *testing.T) *fakeSlack {
 	f := &fakeSlack{t: t, calls: map[string][]url.Values{}, envelopes: make(chan map[string]any, 16), answers: map[string]any{
-		"auth.test":  map[string]any{"ok": true, "team_id": fakeTeam, "user_id": fakeBot},
-		"users.info": map[string]any{"ok": true, "user": map[string]any{"id": "U2", "name": "sam", "profile": map[string]any{"display_name": "Sam", "email": "Sam@Example.com"}}},
+		"auth.test":        map[string]any{"ok": true, "team_id": fakeTeam, "user_id": fakeBot},
+		"users.info":       map[string]any{"ok": true, "user": map[string]any{"id": "U2", "name": "sam", "profile": map[string]any{"display_name": "Sam", "email": "Sam@Example.com"}}},
 		"chat.postMessage": map[string]any{"ok": true, "channel": "C1", "ts": "1762300000.000100"},
 	}}
 	upgrader := websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}
@@ -65,6 +66,9 @@ func newFakeSlack(t *testing.T) *fakeSlack {
 		}
 		if !ok {
 			answer = map[string]any{"ok": true}
+		}
+		if f, ok := answer.(func(url.Values) any); ok {
+			answer = f(r.Form)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(answer)

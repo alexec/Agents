@@ -406,8 +406,11 @@ pace is 3 s and a poll costs Slack nothing. A cursor from an earlier run starts 
   `question.answered` (`question`, `channel`). Neither has a message's text. Each has a
   `sender` (`slack`, `team/user`, and the name and email from `users.info`) for a channel
   link (#1762). Edits, deletions, joins and bots' messages are left out.
-- **Tools:** `list_channels`, `read_messages` (its text inside
-  `<untrusted-content source="slack">`), `send_message` and `ask_question` (the options as
+- **Tools:** `list_channels`; the messaging contract's `list_conversations` and
+  `read_messages` (#4339, `docs/reference/messaging-contract.md`, `_meta`
+  `"agents/messaging": 1`: newest first, by cursor, the text inside
+  `<untrusted-content source="slack">`; `read_messages` still takes `channel` for
+  `conversation`); `send_message` and `ask_question` (the options as
   buttons in an `actions` block, `agents-question:<id>`; the first press is the answer, and
   `chat.update` puts who answered in their place). No `@channel`, `@here` or `@everyone`.
 
