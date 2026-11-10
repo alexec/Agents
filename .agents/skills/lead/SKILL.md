@@ -142,8 +142,8 @@ When all the children are closed:
 
 ## Standing epics
 
-A standing epic is a work stream, such as the bug lane or the lane for `polish` and
-`competitor` (#1570, #3212). Its body has one `standing` block:
+A standing epic is a work stream, such as the bug lane or the lane for enhancements
+with no parent (#1570, #3212, #4335). Its body has one `standing` block:
 
 ````markdown
 ```standing
@@ -157,7 +157,8 @@ lanes: 1
 in order, and the block as `standing` (#3661). Until the lead can call it, read the
 query with `gh`. Change the block into a search: `labels: a, b` is `label:a label:b`,
 `any: a, b` is `label:a,b`, `not: a` is `-label:a`, `milestone: none` is
-`no:milestone`, `milestone: <name>` is `milestone:"<name>"`.
+`no:milestone`, `milestone: <name>` is `milestone:"<name>"`, `parent: none` is
+`no:parent-issue` (#4335).
 
 ```zsh
 gh issue view $epic --json body -q .body   # the standing block
@@ -184,7 +185,7 @@ it again until a lane ends.
 **Wait (step 3).** Also wake when new work comes into the query. One `where` serves all
 the events of a wait, and each event takes only the keys it has. So name the lanes'
 PRs with `fixes`, and the query with `label`: the block's first `labels:` label, else
-its first `any:` label. Do not set `issue`: it would narrow `issue.labelled` to the
+its first `any:` label (for #4208, `enhancement`). Do not set `issue`: it would narrow `issue.labelled` to the
 lanes' own issues. A wait takes one label, so the time limit catches the issues of the
 other labels.
 

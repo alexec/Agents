@@ -54,6 +54,12 @@ func (f *planFake) serve(w http.ResponseWriter, r *http.Request) {
 		out = []obj{dep("acme/app", 3, "closed", false), dep("acme/lib", 4, "open", false)}
 	case p == "repos/acme/lib/issues/4/dependencies" && r.URL.Query().Get("page") == "1":
 		out = []obj{dep("acme/other", 9, "open", false)}
+	case p == "repos/acme/app/issues/2/blocks" && r.URL.Query().Get("page") == "1":
+		epic := dep("acme/app", 1, "closed", false)
+		epic["labels"] = []obj{{"id": 1, "name": "Epic"}}
+		out = []obj{dep("acme/app", 6, "open", false), dep("acme/app", 7, "open", true), epic}
+	case p == "repos/acme/app/issues/3/blocks" && r.URL.Query().Get("page") == "1":
+		out = []obj{dep("acme/app", 6, "open", false)}
 	case p == "repos/acme/app/issues" && r.Method == http.MethodPost:
 		out = obj{"number": 12, "title": "New", "state": "open", "html_url": "https://fj.test/acme/app/issues/12", "user": alex}
 	case strings.HasSuffix(p, "/labels") || strings.HasSuffix(p, "/dependencies"):
@@ -139,5 +145,18 @@ func TestBlockersAreEachIssuesDependencies(t *testing.T) {
 	if len(by) != 2 || len(by[2]) != 2 || by[2][0] != (Ref{Repo: "acme/app", Number: 3}) || by[2][1] != (Ref{Repo: "acme/lib", Number: 4, Open: true}) ||
 		by[3] == nil || len(by[3]) != 0 {
 		t.Fatalf("blockers: %+v", by)
+	}
+}
+
+// #4335: an issue's parent is the first epic, open or closed, that depends on it, a call each; an
+// issue that blocks only issues that are not epics has none.
+func TestParentsAreTheEpicsThatDependOnEachIssue(t *testing.T) {
+	_, fj := newPlanFake(t)
+	parents, err := fj.Parents(context.Background(), "acme/app", []int{2, 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(parents) != 1 || parents[2] != (Ref{Repo: "acme/app", Number: 1}) {
+		t.Fatalf("parents: %+v", parents)
 	}
 }

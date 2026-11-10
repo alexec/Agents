@@ -27,6 +27,8 @@ type fakeForgeForgejo struct {
 	asked []string
 	// blocked are the numbers Blockers was asked about (#4242).
 	blocked []string
+	// parented are the numbers Parents was asked about (#4335).
+	parented []string
 }
 
 func (f *fakeForgeForgejo) note(to *[]string, s string) {
@@ -108,6 +110,11 @@ func (f *fakeForgeForgejo) PRDiff(_ context.Context, repo string, number int) (m
 func (f *fakeForgeForgejo) Blockers(_ context.Context, repo string, numbers []int) (map[int][]forgejomcp.Ref, error) {
 	f.note(&f.blocked, fmt.Sprint(repo, numbers))
 	return map[int][]forgejomcp.Ref{numbers[0]: {{Repo: "kim/Notes", Number: 9, PR: true, Open: true}, {Repo: "walkalex/App", Number: 5}}}, nil
+}
+
+func (f *fakeForgeForgejo) Parents(_ context.Context, repo string, numbers []int) (map[int]forgejomcp.Ref, error) {
+	f.note(&f.parented, fmt.Sprint(repo, numbers))
+	return map[int]forgejomcp.Ref{numbers[0]: {Repo: "walkalex/App", Number: 1, Open: true}}, nil
 }
 
 func (f *fakeForgeForgejo) Plan(_ context.Context, repo string, number int) (forgejomcp.Plan, error) {

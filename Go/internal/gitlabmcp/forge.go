@@ -665,6 +665,58 @@ func (g *RealGitLab) Blockers(ctx context.Context, project string, numbers []int
 	return out, nil
 }
 
+// parentsQuery is the parent of many of a project's work items at once (#4335).
+const parentsQuery = `query($path: ID!, $iids: [String!], $first: Int) { project(fullPath: $path) { workItems(iids: $iids, first: $first) { nodes { iid
+  widgets { __typename ... on WorkItemWidgetHierarchy { parent { iid state namespace { fullPath } } } } } } } }`
+
+// Parents are the parent of each of numbers in project that has one (at most BlockersMost), in
+// one GraphQL query (#4335): a standing epic's parent: none, as GitLab's REST lists do not say an
+// issue's parent. A number that is not an issue, or has no parent, is not in the answer.
+func (g *RealGitLab) Parents(ctx context.Context, project string, numbers []int) (map[int]Ref, error) {
+	out := map[int]Ref{}
+	numbers = numbers[:min(len(numbers), BlockersMost)]
+	if len(numbers) == 0 {
+		return out, nil
+	}
+	iids := make([]string, len(numbers))
+	for n, i := range numbers {
+		iids[n] = strconv.Itoa(i)
+	}
+	var data struct {
+		Project *struct {
+			WorkItems struct {
+				Nodes []struct {
+					IID     string `json:"iid"`
+					Widgets []struct {
+						Parent *workItemRef `json:"parent"`
+					} `json:"widgets"`
+				} `json:"nodes"`
+			} `json:"workItems"`
+		} `json:"project"`
+	}
+	if err := g.graphql(ctx, parentsQuery, map[string]any{"path": project, "iids": iids, "first": len(iids)}, &data); err != nil {
+		return nil, err
+	}
+	if data.Project == nil {
+		return nil, &GitLabError{Kind: NotFound, Message: "no project " + project}
+	}
+	for _, w := range data.Project.WorkItems.Nodes {
+		n, err := strconv.Atoi(w.IID)
+		if err != nil {
+			continue
+		}
+		for _, pw := range w.Widgets {
+			if pw.Parent == nil {
+				continue
+			}
+			if p, ok := pw.Parent.ref(); ok {
+				out[n] = p
+			}
+		}
+	}
+	return out, nil
+}
+
 // GroupBoard is a group board's scope (#3282): GET /groups/:group/boards/:id. GitLab's own
 // milestones "Any", "None", "Upcoming" and "Started" are not one milestone, so they scope
 // nothing here.

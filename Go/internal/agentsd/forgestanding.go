@@ -13,7 +13,7 @@ import (
 )
 
 // Standing epics (#3659, #3661): an epic labelled standing as well as epic has a query, not
-// sub-issues, as its plan, and never closes (the bug lane, the polish lane). The query is a
+// sub-issues, as its plan, and never closes (the bug lane, the lane for enhancements with no parent). The query is a
 // fenced standing block in the epic's body (specs/3659-standing-epics/spec.md); forge/plan
 // returns its open issues in order, as one step.
 
@@ -25,14 +25,22 @@ const standingLabel = "standing"
 const standingPages = 5
 
 // standingFields are the fields a standing block can say.
-var standingFields = []string{"labels", "any", "not", "milestone", "lanes"}
+var standingFields = []string{"labels", "any", "not", "milestone", "parent", "lanes"}
+
+// standingQuery is a standing block as read: the wire's query, and parent: none (#4335), which
+// takes only issues that are no other issue's sub-issue. The wire does not say parent yet.
+type standingQuery struct {
+	wire.ForgeStanding
+	noParent bool
+}
 
 // standingOf reads the standing block in an epic's body. A body with no block, a second block,
 // or an unknown or bad field gives a query with Error set.
-func standingOf(body string) wire.ForgeStanding {
-	out := wire.ForgeStanding{Labels: []string{}, Any: []string{}, Not: []string{}, Lanes: 1}
-	fail := func(format string, a ...any) wire.ForgeStanding {
-		return wire.ForgeStanding{Labels: []string{}, Any: []string{}, Not: []string{}, Lanes: 1, Error: new(fmt.Sprintf(format, a...))}
+func standingOf(body string) standingQuery {
+	out := standingQuery{ForgeStanding: wire.ForgeStanding{Labels: []string{}, Any: []string{}, Not: []string{}, Lanes: 1}}
+	fail := func(format string, a ...any) standingQuery {
+		return standingQuery{ForgeStanding: wire.ForgeStanding{Labels: []string{}, Any: []string{}, Not: []string{}, Lanes: 1,
+			Error: new(fmt.Sprintf(format, a...))}}
 	}
 	var block []string
 	blocks, in := 0, false
@@ -86,6 +94,11 @@ func standingOf(body string) wire.ForgeStanding {
 				value = strings.ToLower(value)
 			}
 			out.Milestone = &value
+		case "parent":
+			if !strings.EqualFold(value, "none") {
+				return fail("the standing block's parent is %q; it is none", value)
+			}
+			out.noParent = true
 		case "lanes":
 			n, err := strconv.Atoi(value)
 			if err != nil || n < 1 {
@@ -109,8 +122,9 @@ func standingList(s string) []string {
 }
 
 // standingMatches says the query takes i: an open issue that is not an epic, with the query's
-// labels and milestone.
-func standingMatches(q wire.ForgeStanding, i wire.ForgeItem) bool {
+// labels and milestone. parent: none is said by standingParentless, as GitLab's and Forgejo's
+// lists do not read an issue's parent.
+func standingMatches(q standingQuery, i wire.ForgeItem) bool {
 	if i.Node.Kind != lineage.KindIssue || i.State != "open" || deref(i.Level) == "epic" || hasLabel(i, "epic") {
 		return false
 	}
@@ -185,11 +199,11 @@ func (d *Daemon) standingPlan(ctx context.Context, method string, epic wire.Forg
 	}
 	q := standingOf(detail.Body)
 	if q.Error != nil {
-		return q, nil, nil
+		return q.ForgeStanding, nil, nil
 	}
 	if deref(epic.Folder) == "" {
 		q.Error = new("no folder on this machine is on the epic's repo")
-		return q, nil, nil
+		return q.ForgeStanding, nil, nil
 	}
 	list := wire.ForgeListRequest{Folder: epic.Folder, State: new("open"), Limit: new(int64(forgeListMost))}
 	if len(q.Labels) > 0 {
@@ -213,6 +227,11 @@ func (d *Daemon) standingPlan(ctx context.Context, method string, epic wire.Forg
 		list.Cursor = page.Cursor
 	}
 	standingOrder(items)
+	if q.noParent {
+		if items, err = d.standingParentless(ctx, method, epic, items); err != nil {
+			return wire.ForgeStanding{}, nil, err
+		}
+	}
 	children := []planChild{}
 	for _, i := range items[:min(len(items), forgeListMost)] {
 		children = append(children, planChild{item: i})
@@ -220,7 +239,76 @@ func (d *Daemon) standingPlan(ctx context.Context, method string, epic wire.Forg
 	if err := d.standingBlockers(ctx, method, epic, children); err != nil {
 		return wire.ForgeStanding{}, nil, err
 	}
-	return q, children, nil
+	return q.ForgeStanding, children, nil
+}
+
+// standingParentsMost is how many issues one read of their parents asks about, as GitLab's and
+// Forgejo's BlockersMost.
+const standingParentsMost = 100
+
+// standingParentless keeps the items, in order, that are no issue's sub-issue (#4335), at most
+// forgeListMost. GitHub's, Linear's, Jira's and Azure Boards' lists say each issue's parent;
+// GitLab's and Forgejo's do not, so their parents are read a page at a time, only until
+// forgeListMost are kept.
+func (d *Daemon) standingParentless(ctx context.Context, method string, epic wire.ForgeItem, items []wire.ForgeItem) ([]wire.ForgeItem, error) {
+	out := []wire.ForgeItem{}
+	for len(items) > 0 && len(out) < forgeListMost {
+		page := items[:min(len(items), standingParentsMost)]
+		items = items[len(page):]
+		if err := d.standingParents(ctx, method, epic, page); err != nil {
+			return nil, err
+		}
+		for _, i := range page {
+			if i.Parent == nil {
+				out = append(out, i)
+			}
+		}
+	}
+	return out[:min(len(out), forgeListMost)], nil
+}
+
+// standingParents sets the parent of each of items on GitLab and Forgejo, whose lists do not
+// read it: one GraphQL query on GitLab, and on Forgejo a call for each, for the epic that
+// depends on it. The items are on the epic's own repo or project.
+func (d *Daemon) standingParents(ctx context.Context, method string, epic wire.ForgeItem, items []wire.ForgeItem) error {
+	numbers := make([]int, len(items))
+	for n, i := range items {
+		numbers[n] = refNumber(i.Node.Ref)
+	}
+	if repo, _, ok := forgejoOfNode(epic.Node); ok {
+		fj, named, _, err := d.forgejoOf(ctx, method, repo)
+		if err != nil {
+			return err
+		}
+		parents, err := fj.Parents(ctx, named, numbers)
+		if err != nil {
+			return err
+		}
+		for n := range items {
+			if p, ok := parents[numbers[n]]; ok {
+				items[n].Parent = new(forgejoNode(p.Repo, p.Number, false))
+			}
+		}
+		return nil
+	}
+	repo, _, ok := nodeOfRepo(epic.Node)
+	if !ok || repo.forge != "gitlab" {
+		return nil
+	}
+	gl, project, _, err := d.gitlabOf(ctx, method, repo)
+	if err != nil {
+		return err
+	}
+	parents, err := gl.Parents(ctx, project, numbers)
+	if err != nil {
+		return err
+	}
+	for n := range items {
+		if p, ok := parents[numbers[n]]; ok {
+			items[n].Parent = new(forgeRepo{"gitlab", strings.ToLower(p.Project)}.issue(p.Number))
+		}
+	}
+	return nil
 }
 
 // standingBlockers sets the blockers of a standing epic's children, which a list does not read:

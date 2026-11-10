@@ -126,3 +126,34 @@ func TestBlockersReadManyWorkItems(t *testing.T) {
 		t.Fatalf("asked: %v", asked)
 	}
 }
+
+// #4335: Parents are many work items' parents in one GraphQL query, by their iids; one with no
+// parent is not in the answer.
+func TestParentsReadManyWorkItems(t *testing.T) {
+	var asked []map[string]any
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Query     string         `json:"query"`
+			Variables map[string]any `json:"variables"`
+		}
+		body, _ := io.ReadAll(r.Body)
+		json.Unmarshal(body, &req)
+		asked = append(asked, req.Variables)
+		io.WriteString(w, `{"data":{"project":{"workItems":{"nodes":[
+ {"iid":"6","widgets":[{},{"parent":{"iid":"3","state":"OPEN","namespace":{"fullPath":"group/app"}}}]},
+ {"iid":"9","widgets":[{"parent":null}]}]}}}}`)
+	}))
+	t.Cleanup(s.Close)
+	g := NewRealGitLab(s.URL, func() string { return token }, nil)
+	g.sharing = 0
+	parents, err := g.Parents(context.Background(), "group/app", []int{6, 9})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(parents) != 1 || parents[6] != (Ref{"group/app", 3, true}) {
+		t.Fatalf("parents: %+v", parents)
+	}
+	if len(asked) != 1 || asked[0]["path"] != "group/app" || fmt.Sprint(asked[0]["iids"]) != "[6 9]" || asked[0]["first"] != float64(2) {
+		t.Fatalf("asked: %v", asked)
+	}
+}

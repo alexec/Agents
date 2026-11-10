@@ -42,6 +42,15 @@ func (f *fakeForgeGitLab) Blockers(_ context.Context, project string, numbers []
 	return map[int][]gitlabmcp.Ref{numbers[0]: {{Project: "Group/App", Number: 90, Open: true}, {Project: "ops/tool", Number: 91}}}, nil
 }
 
+// Parents, on GitLab's and Forgejo's fakes (#4335): the first asked about is a child of the
+// epic #5, the rest have no parent.
+func (f *fakeForgeGitLab) Parents(_ context.Context, project string, numbers []int) (map[int]gitlabmcp.Ref, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.parented = append(f.parented, fmt.Sprint(project, numbers))
+	return map[int]gitlabmcp.Ref{numbers[0]: {Project: "Group/App", Number: 5, Open: true}}, nil
+}
+
 func (f *fakeForgeLinear) Blockers(_ context.Context, identifiers []string) (map[string][]linearmcp.Ref, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

@@ -48,6 +48,8 @@ type forgeForgejo interface {
 	Plan(ctx context.Context, repo string, number int) (forgejomcp.Plan, error)
 	// Blockers are the blockers of a standing epic's children (#4242).
 	Blockers(ctx context.Context, repo string, numbers []int) (map[int][]forgejomcp.Ref, error)
+	// Parents are the epics of a standing epic's issues, for parent: none (#4335).
+	Parents(ctx context.Context, repo string, numbers []int) (map[int]forgejomcp.Ref, error)
 	CreateIssue(ctx context.Context, repo, title string, labels []string) (int, string, error)
 	SetBlockedBy(ctx context.Context, repo string, number int, blockerRepo string, blockerNumber int, blocked bool) error
 }

@@ -295,6 +295,8 @@ type fakeForgeGitLab struct {
 	items    []string
 	// blocked are the numbers Blockers was asked about (#4242).
 	blocked []string
+	// parented are the numbers Parents was asked about (#4335).
+	parented []string
 	// wrote are the writes asked for (#3130).
 	wrote []string
 }

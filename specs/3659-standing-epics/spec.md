@@ -71,6 +71,7 @@ lanes: 1
 | `any` | the issue has at least one of these labels | no filter |
 | `not` | the issue has none of these labels | no filter |
 | `milestone` | `none`, `any`, or a milestone's name | no filter |
+| `parent` | `none`: the issue is no other issue's sub-issue (#4335) | no filter |
 | `lanes` | how many lanes the lead runs at once, 1 or more | 1 |
 
 - Lists are comma-separated. Field names and label names are not case-sensitive.
@@ -84,7 +85,7 @@ The two standing epics of this repo:
 | Epic | Block |
 |---|---|
 | Bug lane | `labels: bug` · `milestone: none` |
-| Polish and competitor gaps | `any: polish, competitor` · `milestone: none` |
+| Enhancements with no parent (#4335) | `labels: enhancement` · `milestone: none` · `parent: none` |
 
 ### On each forge
 
@@ -96,6 +97,7 @@ The two standing epics of this repo:
 | `not` | `-label:a` | `not[labels]=a` | `labels: {every: {name: {nin}}}` | `labels not in (a)` |
 | `milestone: none` | `no:milestone` | `milestone=None` | `projectMilestone: {null: true}` | `fixVersion is EMPTY` |
 | `milestone: <name>` | `milestone:"<name>"` | `milestone=<name>` | `projectMilestone.name` | `fixVersion = "<name>"` |
+| `parent: none` | `no:parent-issue` | the hierarchy widget's `parent` (none in the REST list) | `parent: {null: true}` | `parent is EMPTY` |
 | epics left out | `-label:epic` | `not[labels]=epic` | no children (`children: {length: 0}`) and no `epic` label | `issuetype != Epic AND labels != epic` |
 
 - Forgejo uses GitHub's form (its issue search takes labels and milestones). Azure
@@ -157,6 +159,23 @@ on every forge with no change to their clients. Alex can overrule.
   - Jira: one search, `key in (…)`, with each issue's Blocks links.
   - Azure Boards: one batch read of the children's links, and one of their predecessors' states.
 
+### `parent: none` (#4335)
+
+The daemon applies `parent: none` itself, after the other fields and the order, as it does the
+rest of the query. It keeps at most 100 issues.
+
+- GitHub, Linear, Jira and Azure Boards: their lists already say each issue's parent
+  (GitHub's `parent`, Linear's `parent`, Jira's `parent` field, Azure Boards'
+  `System.Parent`), so nothing more is read.
+- GitLab: its REST list does not say the parent. One GraphQL query, `workItems(iids:)` with
+  the `HIERARCHY` widget's `parent`, reads it for 100 issues at a time, until 100 issues
+  with no parent are kept.
+- Forgejo: it has no sub-issues; an epic's children are the issues it depends on. An issue
+  has a parent when an issue labelled `epic`, open or closed, depends on it
+  (`/issues/:n/blocks`), a call for each issue, 100 at a time, as for its blockers.
+- `ForgeStanding` on the wire does not say `parent` yet, so the Work page's query in words
+  leaves it out (a follow-up issue).
+
 ## The lead (#3663)
 
 The `lead` skill's "Standing epics" section works one: it reads the query (with `gh`
@@ -166,8 +185,8 @@ epic.
 
 ## This folder's standing epics (#3664)
 
-The bug lane is #4207 and polish and competitor gaps is #4208, each with the block in the
-table above. AGENTS.md ("Standing epics are the standing lanes") and the Scrum Master
+The bug lane is #4207 and enhancements with no parent is #4208 (polish and competitor
+gaps until #4335), each with the block in the table above. AGENTS.md ("Standing epics are the standing lanes") and the Scrum Master
 persona give their leads places as any epic's.
 
 Decided: the two epics have no `feature:` label, because their query takes issues of every
