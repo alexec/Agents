@@ -290,6 +290,9 @@ var roles = map[imap.MailboxAttr]string{
 	imap.MailboxAttrJunk: "junk", imap.MailboxAttrArchive: "archive",
 }
 
+// junkNames are the names, in lower case, that mail servers give a junk folder with no role.
+var junkNames = []string{"junk", "spam", "junk mail", "junk e-mail", "junk email", "bulk mail"}
+
 // Folders is every folder that holds messages, with its counts. It is kept for foldersFor,
 // and dropped when a message is marked or moved, so show_mail on every Back, folder change
 // and Refresh does not ask the server again (#1847).
@@ -314,12 +317,20 @@ func (m *Mailbox) Folders(ctx context.Context) ([]Folder, error) {
 }
 
 // folders asks the server for the folders and their counts: in one LIST when it offers
-// LIST-STATUS (RFC 5819, in IMAP4rev2), or else a STATUS for each.
+// LIST-STATUS (RFC 5819, in IMAP4rev2), or else a STATUS for each. Where the server takes
+// RETURN (SPECIAL-USE) (RFC 6154), it asks for the roles too, which some servers give only then.
 func folders(c *imapclient.Client) ([]Folder, error) {
 	counts := &imap.StatusOptions{NumMessages: true, NumUnseen: true}
-	var options *imap.ListOptions
-	if c.Caps().Has(imap.CapListStatus) || c.Caps().Has(imap.CapIMAP4rev2) {
-		options = &imap.ListOptions{ReturnStatus: counts}
+	caps := c.Caps()
+	options := &imap.ListOptions{}
+	if caps.Has(imap.CapListStatus) || caps.Has(imap.CapIMAP4rev2) {
+		options.ReturnStatus = counts
+	}
+	if caps.Has(imap.CapIMAP4rev2) || caps.Has(imap.CapSpecialUse) && caps.Has(imap.CapListExtended) {
+		options.ReturnSpecialUse = true
+	}
+	if options.ReturnStatus == nil && !options.ReturnSpecialUse {
+		options = nil
 	}
 	list, err := c.List("", "*", options).Collect()
 	if err != nil {
@@ -341,6 +352,9 @@ func folders(c *imapclient.Client) ([]Folder, error) {
 			if r, ok := roles[a]; ok {
 				f.Role = r
 			}
+		}
+		if f.Role == "" && slices.Contains(junkNames, strings.ToLower(l.Mailbox)) {
+			f.Role = "junk" // a server without SPECIAL-USE, or one that names no role
 		}
 		status := l.Status
 		if status == nil {

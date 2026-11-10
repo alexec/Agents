@@ -379,7 +379,8 @@ the IMAP server, the user and an app password), or `EMAIL_IMAP_URL`, `EMAIL_USER
 `imap://` with STARTTLS, and `imap+insecure://` on this machine only, for a fake.
 
 - **Event** `email.received`, polled: arguments `from`, `to`, `subject` (globs, such as
-  `*@gitlab.com`) and `folder` (INBOX when left out). Its data is the message's id, folder,
+  `*@gitlab.com`) and `folder` (INBOX and the Junk folder when left out, #3912; the Junk folder
+  is the one whose role is `\Junk`, or with no role, one named Junk or Spam). Its data is the message's id, folder,
   from, to, subject and date, never its text. IDLE holds each folder asked about (four at
   most), so a quiet poll asks the server nothing and the pace is 10 s; with no IDLE, 60 s.
 - **Tools:** `list_folders`, `list_messages`, `search_messages`, `read_message` (its text

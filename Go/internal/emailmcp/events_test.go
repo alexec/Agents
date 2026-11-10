@@ -102,6 +102,49 @@ func TestReceivedInAnotherFolderAndPages(t *testing.T) {
 	}
 }
 
+// With no folder, the event hears the Junk folder too (#3912): a sign-up code the server
+// took for spam still comes, and a cursor goes on in both folders.
+func TestReceivedHearsJunkByDefault(t *testing.T) {
+	f := newFakeMail(t, nil)
+	// The in-memory server keeps no role, so this is found by its name; a real server says \Junk.
+	if err := f.user.Create("Spam", nil); err != nil {
+		t.Fatal(err)
+	}
+	f.deliver("Spam", plain("old@example.com", fakeUser, "Before", "old"))
+	s := &Events{Mailbox: f.mailbox()}
+	_, c := mustPoll(t, s, nil, "")
+	_, inboxOnly := mustPoll(t, s, map[string]any{"folder": "INBOX"}, "")
+
+	f.deliver("Spam", plain("noreply@example.com", fakeUser, "Your code", "Your code is 482913."))
+	f.deliver("INBOX", plain("a@example.com", fakeUser, "Inbox", "inbox"))
+	events, c := mustPoll(t, s, nil, c)
+	if len(events) != 2 {
+		t.Fatalf("INBOX and Junk: %v", events)
+	}
+	if data := events[1].(map[string]any)["data"].(map[string]any); data["folder"] != "Spam" || data["subject"] != "Your code" {
+		t.Fatalf("the Junk mail: %v", data)
+	}
+	if events, _ := mustPoll(t, s, nil, c); len(events) != 0 {
+		t.Fatalf("raised twice: %v", events)
+	}
+	if events, _ := mustPoll(t, s, map[string]any{"folder": "INBOX"}, inboxOnly); len(events) != 1 {
+		t.Fatalf("folder INBOX leaves Junk out: %v", events)
+	}
+	// A full page in INBOX leaves Junk for the next poll.
+	f.deliver("INBOX", plain("a@example.com", fakeUser, "one", "1"))
+	f.deliver("INBOX", plain("a@example.com", fakeUser, "two", "2"))
+	f.deliver("Spam", plain("a@example.com", fakeUser, "three", "3"))
+	raw, _ := json.Marshal(map[string]any{"name": EventName, "cursor": c, "maxEvents": 2})
+	r, err := s.Poll(context.Background(), raw)
+	if err != nil || len(r["events"].([]any)) != 2 || r["hasMore"] != true {
+		t.Fatalf("page one: %v %v", r, err)
+	}
+	events, _ = mustPoll(t, s, nil, r["cursor"].(string))
+	if len(events) != 1 || events[0].(map[string]any)["data"].(map[string]any)["subject"] != "three" {
+		t.Fatalf("page two: %v", events)
+	}
+}
+
 func TestIDLETellsAQuietPollToAskNothing(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
