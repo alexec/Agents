@@ -174,7 +174,8 @@ struct WorkTimelineTests {
         #expect(joins.last?.lines.count == 2 && joins.last?.forecast == true)
     }
 
-    @Test func aLabelDropsItsTitleBeforeTheNextThingOnItsLane() {
+    @Test func aLabelRunsTheWholeLinePastNow() {
+        // Alex, 2026-11-10: the label is as long as the line, not cut at Now or the band.
         let forecast = DaemonAPI.WorkTimelineForecast(low: Self.h(3), mid: Self.h(5), high: Self.h(8))
         let timeline = DaemonAPI.WorkTimeline(epics: [
             Self.epic(19, [Self.child(60, started: -1, forecast: 5)], segments: [(-1, nil)], forecast: forecast),
@@ -182,12 +183,26 @@ struct WorkTimelineTests {
         let line = WorkTimeline.lines(timeline, now: Self.now)[0]
         let measure: (String) -> Double = { Double($0.count) * 6 }
         let x = Self.axis.x(line.start)
-        // Now is 20 pt on: room for nothing.
-        let room = WorkTimeline.labelRoom(line, from: x, axis: Self.axis, now: Self.now)
-        #expect(room == 14)
-        #expect(WorkTimeline.label(line, room: room, measure: measure) == nil)
+        let room = WorkTimeline.labelRoom(line, from: x, axis: Self.axis)
+        #expect(room == Self.axis.x(line.end) - x)
+        #expect(room == 120)
+        #expect(WorkTimeline.label(line, room: room, measure: measure)?.text == "Issue…  #19 · 0 of 1")
         #expect(WorkTimeline.label(line, room: 80, measure: measure)?.text == "#19 · 0 of 1")
+        #expect(WorkTimeline.label(line, room: 10, measure: measure) == nil)
         #expect(WorkTimeline.label(line, room: .infinity, measure: measure)?.text == "Issue 19  #19 · 0 of 1")
+    }
+
+    @Test func aDotIsOnTheStretchOfItsLineThatIsOnItsLane() {
+        // Alex, 2026-11-10: no dot on the fork's or the join's curve, off the line.
+        let timeline = DaemonAPI.WorkTimeline(epics: [
+            Self.epic(24, [Self.child(70, closed: -30), Self.child(71, started: -10, closed: -6),
+                           Self.child(72, started: -9, closed: -2)], segments: [(-10, -2)]),
+        ])
+        let line = WorkTimeline.layout(WorkTimeline.lines(timeline, now: Self.now), axis: Self.axis, labelWidth: { _ in 10 })[0]
+        let r = WorkTimeline.riser(line.lane)
+        let from = Self.axis.x(line.start) + r, to = Self.axis.x(line.end) - r
+        let xs = line.dots.map { WorkTimeline.dotX($0, on: line, axis: Self.axis) }
+        #expect(xs == [from, Self.axis.x(Self.h(-6)), to])
     }
 
     @Test func aLongTitleIsCutWithAnEllipsisSoTheLabelFitsItsLine() {
@@ -198,7 +213,7 @@ struct WorkTimelineTests {
         let measure: (String) -> Double = { Double($0.count) * 6 }
         let x = Self.axis.x(line.start)
         // A closed line: the label stops at its end, not after it.
-        let room = WorkTimeline.labelRoom(line, from: x, axis: Self.axis, now: Self.now)
+        let room = WorkTimeline.labelRoom(line, from: x, axis: Self.axis)
         #expect(room == Self.axis.x(line.end) - x)
         // "Issue 19  #19 · 1 of 1" is 22 characters; 20 keep "Issue…" and the figures.
         let words = WorkTimeline.label(line, room: 20 * 6, measure: measure)

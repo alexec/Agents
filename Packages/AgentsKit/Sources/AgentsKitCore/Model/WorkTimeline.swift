@@ -401,6 +401,16 @@ public enum WorkTimeline {
         }
     }
 
+    /// Where a dot is drawn: at its time, held to the stretch of the line that is on its lane, so
+    /// no dot is on the fork's or the join's curve, off the line (Alex, 2026-11-10).
+    public static func dotX(_ dot: Dot, on line: Line, axis: Axis) -> Double {
+        let r = riser(line.lane)
+        let sx = axis.x(line.start), ex = max(axis.x(line.end), sx)
+        let from = sx + r
+        let to = line.how == .joined || line.how == .forecast ? max(ex - r, from) : max(ex, from)
+        return min(max(axis.x(dot.at), from), to)
+    }
+
     /// The lanes in use, above and below: the plot is as tall as the higher of the two sides.
     public static func lanes(_ lines: [Line]) -> (above: Int, below: Int) {
         (lines.map(\.lane).filter { $0 > 0 }.max() ?? 0, -(lines.map(\.lane).filter { $0 < 0 }.min() ?? 0))
@@ -433,16 +443,10 @@ public enum WorkTimeline {
         return out
     }
 
-    /// How far a line's label may run from `x` before the next thing on its lane: Now, its band or
-    /// its pill (section 12, item 6), and never past the line's own end.
-    public static func labelRoom(_ line: Line, from x: Double, axis: Axis, now: Date) -> Double {
-        var stops: [Double] = []
-        let nowX = axis.x(now)
-        if nowX > x, line.end > now { stops.append(nowX) }
-        if let band = line.band { stops.append(axis.x(band.start)) }
-        if case .waits = line.how { stops.append(axis.x(line.end)) }
-        let ahead = stops.filter { $0 > x }.min().map { $0 - x - 6 } ?? .infinity
-        return min(ahead, axis.x(line.end) - x)
+    /// How far a line's label may run from `x`: the whole line, to its end (Alex, 2026-11-10). It
+    /// runs past Now and over its band, on its halo; a pill where the line waits is after its end.
+    public static func labelRoom(_ line: Line, from x: Double, axis: Axis) -> Double {
+        axis.x(line.end) - x
     }
 
     /// What a label says: the name, whole or cut short with "…", or "" for none; then the figures.
@@ -502,7 +506,7 @@ public enum WorkTimeline {
         var best: (Double, Hit)?
         for line in lines {
             for dot in line.dots {
-                let d = hypot(axis.x(dot.at) - point.x, y(line.lane) - point.y)
+                let d = hypot(dotX(dot, on: line, axis: axis) - point.x, y(line.lane) - point.y)
                 if d <= 10, d < best?.0 ?? .infinity { best = (d, .dot(line, dot)) }
             }
         }

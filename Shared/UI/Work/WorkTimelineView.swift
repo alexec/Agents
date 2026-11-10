@@ -11,7 +11,6 @@ import SwiftUI
 @Observable
 final class WorkTimelineState {
     var range: WorkTimeline.Range = .twoDays
-    var forecast = true
     /// The project, by id; "" until one is picked, then the first one.
     var project = ""
     /// The board the epics are narrowed to (#3282), by its url; "" for every board.
@@ -147,7 +146,7 @@ struct WorkTimelinePane: View {
         var at: CGPoint
     }
 
-    nonisolated static let laneHeight: Double = 30
+    nonisolated static let laneHeight: Double = 60
     nonisolated static let axisHeight: Double = 26
 
     var body: some View {
@@ -176,8 +175,8 @@ struct WorkTimelinePane: View {
     // MARK: The bar
 
     /// The filter bar (parts.md section 4, milestones.md notes 31 and 32): Project and Board as
-    /// compact menus and the title line at the leading edge; the range, Now and Forecast at the
-    /// trailing edge, where Sort is on a list. Refresh is the toolbar's.
+    /// compact menus and the title line at the leading edge; the range and Now at the trailing edge,
+    /// where Sort is on a list. Refresh is the toolbar's. The forecast is always drawn (Alex, 2026-11-10).
     private var bar: some View {
         HStack(spacing: 14) {
             if projects.count > 1 {
@@ -194,6 +193,8 @@ struct WorkTimelinePane: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.tail)
+                    .help(state.timeline?.backtest.map { "The forecast after now. \(WorkTimeline.errorWords($0))." }
+                        ?? "The forecast after now")
             }
             Spacer(minLength: 0)
             Picker("Range", selection: $state.range) {
@@ -206,11 +207,6 @@ struct WorkTimelinePane: View {
             Button("Now") { goToNow() }
                 .buttonStyle(.bordered)
                 .help("Back to now")
-            Toggle("Forecast", isOn: $state.forecast)
-                .toggleStyle(.checkbox)
-                .fixedSize()
-                .help(state.timeline?.backtest.map { "The forecast after now. \(WorkTimeline.errorWords($0))." }
-                    ?? "The forecast after now")
         }
     }
 
@@ -225,7 +221,7 @@ struct WorkTimelinePane: View {
     /// "Agents · 6 epics in these 2 days", once a read has drawn something.
     private var title: String? {
         guard let timeline = state.timeline, !projects.isEmpty else { return nil }
-        let lines = WorkTimeline.lines(timeline, now: .now, forecast: state.forecast)
+        let lines = WorkTimeline.lines(timeline, now: .now)
         // With the Project menu beside it, the menu names the project.
         return WorkTimeline.titleWords(project: projects.count > 1 ? "" : projectName, epics: WorkTimeline.epicCount(lines, in: state.range.window(now: state.anchor)),
                                        range: state.range)
@@ -276,7 +272,7 @@ struct WorkTimelinePane: View {
             let content = state.content
             let axis = WorkTimeline.Axis(interval: content, width: visible * content.duration / state.range.span)
             let lines = WorkTimeline.layout(
-                WorkTimeline.overlapping(WorkTimeline.lines(timeline, now: now, forecast: state.forecast), content),
+                WorkTimeline.overlapping(WorkTimeline.lines(timeline, now: now), content),
                 axis: axis, labelWidth: { Self.measure($0.label) })
             let lanes = WorkTimeline.lanes(lines)
             let sides = Double(max(lanes.above, lanes.below, 2))
@@ -368,6 +364,7 @@ struct WorkTimelinePane: View {
 
     private func canvas(_ drawing: Drawing, timeline: DaemonAPI.WorkTimeline) -> some View {
         Canvas { context, _ in drawing.draw(&context) }
+            .overlay { working(drawing) }
             .overlay { pulses(drawing) }
             .overlay(alignment: .topLeading) {
                 if let hover {
@@ -419,6 +416,18 @@ struct WorkTimelinePane: View {
         }
     }
 
+    /// An epic worked on now: its open line is drawn twice as thick, and a glow under it breathes;
+    /// with Reduce Motion, the thick line alone. One clock for every working line (#1653).
+    @ViewBuilder
+    private func working(_ drawing: Drawing) -> some View {
+        if !reduceMotion, drawing.lines.contains(where: drawing.isWorking) {
+            TimelineView(.animation(minimumInterval: 1.0 / 30)) { context in
+                Canvas { gc, _ in drawing.drawWorking(&gc, at: context.date) }
+            }
+            .allowsHitTesting(false)
+        }
+    }
+
     private func open(_ hit: WorkTimeline.Hit) {
         switch hit {
         case .dot(_, let dot):
@@ -440,8 +449,9 @@ struct WorkTimelinePane: View {
 
     // MARK: The hover card
 
-    /// A mini row (milestones.md note 33): the state glyph, the title, the label chips where the
-    /// wire has them (#4428), and line 2. A join of several lines has a row for each.
+    /// A mini row (milestones.md note 33) on three lines (Alex, 2026-11-10): the state glyph and the
+    /// title; the label chips where the wire has them (#4428); then the prediction. A join of
+    /// several lines has a row for each.
     private func card(_ hit: WorkTimeline.Hit, drawing: Drawing) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             switch hit {
@@ -478,12 +488,17 @@ struct WorkTimelinePane: View {
 
     private func miniRow(glyph: AnyView, title: String, labels: [DaemonAPI.ForgeLabel], line: String) -> some View {
         let chips = WorkLook.shownLabels(labels, limit: WorkLook.rowChips)
-        return VStack(alignment: .leading, spacing: 3) {
+        return VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 glyph
                 Text(title).appText(.supporting).fontWeight(.semibold).lineLimit(1).truncationMode(.tail)
-                ForEach(chips.shown, id: \.name) { WorkLabelChip(label: $0) }
-                WorkMoreChips(count: chips.more)
+            }
+            if !chips.shown.isEmpty {
+                HStack(spacing: 4) {
+                    ForEach(chips.shown, id: \.name) { WorkLabelChip(label: $0) }
+                    WorkMoreChips(count: chips.more)
+                }
+                .padding(.leading, 22)
             }
             Text(line).appText(.fine).foregroundStyle(.secondary).lineLimit(1).padding(.leading, 22)
         }
@@ -525,15 +540,14 @@ private struct Drawing {
 
     /// The system colours for the features; the last, grey, for an epic with none.
     static let palette: [Color] = [.blue, .purple, .pink, Color.orange, Color.green, .teal, .indigo, .mint, .brown, .cyan, Color.red, .gray]
-    /// Now: a red line with its time in a red pill, as in Calendar.
-    static let nowRed = Color.red
+    /// Now: a grey line with its time in a grey pill (Alex, 2026-11-10).
+    static let nowGrey = Color(white: 0.55)
     /// Where a line stops for the person: the colour of what waits on them.
     static let waits = StateTint.attention.color ?? .primary
     static let navy = Color(red: 0.05, green: 0.08, blue: 0.16)
-    static let navyAhead = Color(red: 0.08, green: 0.12, blue: 0.22)
 
+    /// One background before and after Now (Alex, 2026-11-10).
     var plot: Color { night ? Self.navy : .white }
-    var ahead: Color { night ? Self.navyAhead : Color(white: 0.965) }
     var ink: Color { night ? Color(white: 0.85) : Color(white: 0.45) }
     var faint: Color { night ? Color(white: 0.6) : Color(white: 0.55) }
 
@@ -551,7 +565,6 @@ private struct Drawing {
     func draw(_ gc: inout GraphicsContext) {
         let nowX = axis.x(now)
         gc.fill(Path(CGRect(x: 0, y: 0, width: axis.width, height: height)), with: .color(plot))
-        gc.fill(Path(CGRect(x: nowX, y: 0, width: max(axis.width - nowX, 0), height: height)), with: .color(ahead))
         let shown = lines.filter { axis.x($0.start) <= seen.upperBound && axis.x(max($0.end, $0.band?.end ?? $0.end)) >= seen.lowerBound }
 
         // The bands under everything (8 times in 10).
@@ -569,7 +582,7 @@ private struct Drawing {
 
         // The lines.
         for line in shown {
-            stroke(&gc, path(line), colour: colour(line), width: 2, nowX: nowX, glow: night)
+            stroke(&gc, path(line), colour: colour(line), width: isWorking(line) ? 4 : 2, nowX: nowX, glow: night)
         }
 
         // The joins on the releases line.
@@ -580,7 +593,7 @@ private struct Drawing {
             let r = join.lines.count > 1 ? 9.0 : 6.0
             let ring = Path(ellipseIn: CGRect(x: x - r, y: trunk - r, width: 2 * r, height: 2 * r))
             if join.forecast {
-                gc.fill(ring, with: .color(ahead))
+                gc.fill(ring, with: .color(plot))
                 gc.stroke(ring, with: .color(colour), style: StrokeStyle(lineWidth: 2, dash: [3, 2]))
             } else {
                 gc.fill(ring, with: .color(colour))
@@ -604,17 +617,17 @@ private struct Drawing {
         for line in shown {
             let c = colour(line)
             for dot in line.dots {
-                let x = axis.x(dot.at)
+                let x = WorkTimeline.dotX(dot, on: line, axis: axis)
                 let r = dot.closed ? 4.0 : 3.5
                 let circle = Path(ellipseIn: CGRect(x: x - r, y: y(line.lane) - r, width: 2 * r, height: 2 * r))
                 if dot.closed {
                     gc.fill(circle, with: .color(dot.notPlanned ? faint : c))
                 } else {
-                    gc.fill(circle, with: .color(ahead))
+                    gc.fill(circle, with: .color(plot))
                     gc.stroke(circle, with: .color(c), lineWidth: 1.5)
                 }
             }
-            if line.working > 0, line.start <= now, line.end >= now {
+            if isWorking(line) {
                 // ◐: a ring at Now, its left half filled.
                 let rect = CGRect(x: nowX - 5, y: y(line.lane) - 5, width: 10, height: 10)
                 gc.fill(Path(ellipseIn: rect), with: .color(plot))
@@ -638,11 +651,11 @@ private struct Drawing {
 
         if loading { drawPlaceholders(&gc) }
 
-        // Now: a red line.
+        // Now: a grey line.
         var nowLine = Path()
         nowLine.move(to: CGPoint(x: nowX, y: 0))
         nowLine.addLine(to: CGPoint(x: nowX, y: height))
-        gc.stroke(nowLine, with: .color(Self.nowRed), lineWidth: 1.5)
+        gc.stroke(nowLine, with: .color(Self.nowGrey), lineWidth: 1.5)
 
         // Last, on a halo: the labels, the pills that wait for the person, the arrows at the edges.
         let left = offset, right = offset + visible
@@ -661,7 +674,7 @@ private struct Drawing {
             guard endX >= left || line.open, startX <= right else { continue }
             let cutLeft = startX < left + 8
             let x = cutLeft ? left + 8 : startX
-            let room = WorkTimeline.labelRoom(line, from: x, axis: axis, now: now) - (cutLeft ? 14 : 0)
+            let room = WorkTimeline.labelRoom(line, from: x, axis: axis) - (cutLeft ? 14 : 0)
             if let words = WorkTimeline.label(line, room: room, measure: WorkTimelinePane.measure) {
                 let arrow = cutLeft ? "← " : ""
                 let text: Text = words.title.isEmpty
@@ -766,7 +779,7 @@ private struct Drawing {
         gc.draw(resolved, at: at)
     }
 
-    /// The hour axis at the foot, and Now's time in a red pill, as in Calendar.
+    /// The hour axis at the foot, and Now's time in a grey pill.
     func drawAxis(_ gc: inout GraphicsContext) {
         gc.fill(Path(CGRect(x: 0, y: 0, width: axis.width, height: WorkTimelinePane.axisHeight)), with: .color(plot))
         let calendar = Calendar.current
@@ -784,7 +797,21 @@ private struct Drawing {
             gc.draw(Text(words).stepped(.fine).fontWeight(midnight ? .semibold : .regular).foregroundStyle(faint),
                     at: CGPoint(x: x, y: 15))
         }
-        pill(&gc, now.formatted(date: .omitted, time: .shortened), at: CGPoint(x: axis.x(now), y: 13), fill: Self.nowRed, text: .white)
+        pill(&gc, now.formatted(date: .omitted, time: .shortened), at: CGPoint(x: axis.x(now), y: 13), fill: Self.nowGrey, text: .white)
+    }
+
+    /// A child of the line is worked on now, and the line is open at Now.
+    func isWorking(_ line: WorkTimeline.Line) -> Bool {
+        line.working > 0 && line.start <= now && line.end >= now
+    }
+
+    /// The working lines' glow: wider than the line, breathing once in 1.6 s.
+    func drawWorking(_ gc: inout GraphicsContext, at time: Date) {
+        let phase = 0.5 + 0.5 * sin(time.timeIntervalSinceReferenceDate * 2 * .pi / 1.6)
+        for line in lines where isWorking(line) && axis.x(line.start) <= seen.upperBound && axis.x(line.end) >= seen.lowerBound {
+            gc.stroke(path(line), with: .color(colour(line).opacity(0.1 + 0.3 * phase)),
+                      style: StrokeStyle(lineWidth: 4 + 8 * phase, lineCap: .round))
+        }
     }
 
     /// The dots that landed: a ring that grows and fades over a second.
@@ -795,7 +822,8 @@ private struct Drawing {
                 let t = time.timeIntervalSince(seen)
                 guard t >= 0, t < 1 else { continue }
                 let r = 4 + 10 * t
-                let ring = Path(ellipseIn: CGRect(x: axis.x(dot.at) - r, y: y(line.lane) - r, width: 2 * r, height: 2 * r))
+                let x = WorkTimeline.dotX(dot, on: line, axis: axis)
+                let ring = Path(ellipseIn: CGRect(x: x - r, y: y(line.lane) - r, width: 2 * r, height: 2 * r))
                 gc.stroke(ring, with: .color(colour(line).opacity(1 - t)), lineWidth: 2)
             }
         }
