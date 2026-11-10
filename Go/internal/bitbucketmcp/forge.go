@@ -44,9 +44,11 @@ type Item struct {
 	PR     bool
 	// State is open, closed or merged.
 	State, Title, URL, Author, Milestone, UpdatedAt string
-	Labels                                          []string
-	Assignees                                       []string
-	Comments                                        int
+	// AuthorAvatar is the author's picture, on Atlassian's avatar host or Gravatar; "" for none (#4363).
+	AuthorAvatar string
+	Labels       []string
+	Assignees    []string
+	Comments     int
 	// A pull request's: Checks is passing, failing, running or none, Review is approved,
 	// changes_requested, review_required or "", Mergeable is mergeable, conflicting or unknown.
 	// A list says only Draft and Review; one read on its own says the rest.
@@ -65,8 +67,8 @@ type SearchPage struct {
 
 // Comment is a comment on an item, as Markdown.
 type Comment struct {
-	Author, Body, At, URL string
-	Bot                   bool
+	Author, Avatar, Body, At, URL string
+	Bot                           bool
 }
 
 // CheckRun is one commit status of a pull request's head: State is passing, failing or running.
@@ -109,7 +111,7 @@ type forgePullJSON struct {
 const forgePullFields = pullFields + ",%2Bvalues.participants"
 
 func (p forgePullJSON) item(repo string) Item {
-	i := Item{Repo: repo, Number: p.ID, PR: true, Title: p.Title, URL: p.Links.HTML.Href, Author: p.Author.name(), UpdatedAt: p.UpdatedOn,
+	i := Item{Repo: repo, Number: p.ID, PR: true, Title: p.Title, URL: p.Links.HTML.Href, Author: p.Author.name(), AuthorAvatar: p.Author.avatar(), UpdatedAt: p.UpdatedOn,
 		Comments: p.CommentCount, Labels: []string{}, Assignees: []string{}, Draft: p.Draft, Mergeable: "unknown"}
 	switch p.State {
 	case "OPEN":
@@ -147,7 +149,7 @@ func (p forgePullJSON) review() string {
 
 // forgeItem is an issue as a list says it.
 func (i issueJSON) forgeItem(repo string) Item {
-	it := Item{Repo: repo, Number: i.ID, Title: i.Title, URL: i.Links.HTML.Href, Author: i.Reporter.name(), UpdatedAt: i.UpdatedOn,
+	it := Item{Repo: repo, Number: i.ID, Title: i.Title, URL: i.Links.HTML.Href, Author: i.Reporter.name(), AuthorAvatar: i.Reporter.avatar(), UpdatedAt: i.UpdatedOn,
 		Labels: i.labels(), Assignees: i.issue().Assignees, State: "open"}
 	if closedStates[i.State] {
 		it.State = "closed"
@@ -432,7 +434,7 @@ func (b *RealBitbucket) ItemPage(ctx context.Context, repo string, number int, p
 		if c.User != nil {
 			by = *c.User
 		}
-		d.Thread = append(d.Thread, Comment{Author: by.name(), Body: c.Content.Raw, At: c.CreatedOn, URL: c.Links.HTML.Href, Bot: isBot(by.name(), by.Type)})
+		d.Thread = append(d.Thread, Comment{Author: by.name(), Avatar: by.avatar(), Body: c.Content.Raw, At: c.CreatedOn, URL: c.Links.HTML.Href, Bot: isBot(by.name(), by.Type)})
 	}
 	if !pr {
 		return d, nil

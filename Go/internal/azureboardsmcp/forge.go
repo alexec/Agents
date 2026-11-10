@@ -43,9 +43,11 @@ type Item struct {
 	// State is open, or closed for a state of the Completed or Removed category; Status is
 	// the state's own name, as Active; Type is its type, as User Story.
 	State, Status, Type, Title, URL, Author, UpdatedAt string
-	Labels                                             []string
-	Assignees                                          []string
-	Comments                                           int
+	// AuthorAvatar is the author's picture, on the organization; "" for none (#4363).
+	AuthorAvatar string
+	Labels       []string
+	Assignees    []string
+	Comments     int
 	// Parent is the work item it is a child of, 0 for none; SubTotal and SubDone are its
 	// children and the closed ones, where the read says them (a plan's).
 	Parent            int
@@ -63,8 +65,8 @@ type SearchPage struct {
 
 // ForgeComment is a comment on a work item, as Markdown.
 type ForgeComment struct {
-	Author, Body, At, URL string
-	Bot                   bool
+	Author, Avatar, Body, At, URL string
+	Bot                           bool
 }
 
 // Transition is a state the work item can move to: its name (which is its id too), and the
@@ -151,8 +153,9 @@ func category(c string) string {
 func (f *RealBoards) forgeItem(org string, w workItemJSON, states map[string]map[string]string) Item {
 	project := w.project(org)
 	kind, state := w.text(fieldType), w.text(fieldState)
+	author := w.who(fieldCreatedBy).person()
 	i := Item{ID: w.ID, Project: project, State: "open", Status: state, Type: kind, Title: w.text(fieldTitle),
-		URL: f.webURL(project, w.ID), Author: w.who(fieldCreatedBy).person().name(), UpdatedAt: normalized(w.text(fieldChanged)),
+		URL: f.webURL(project, w.ID), Author: author.name(), AuthorAvatar: author.avatar(), UpdatedAt: normalized(w.text(fieldChanged)),
 		Labels: tags(w.text(fieldTags)), Assignees: []string{}, Comments: w.number(fieldComments), Parent: w.number(fieldParent)}
 	if closedIn(states, kind, state) {
 		i.State = "closed"
@@ -491,7 +494,7 @@ func (f *RealBoards) ItemPage(ctx context.Context, project string, id int, befor
 			body = markdown(body)
 		}
 		p := c.CreatedBy.person()
-		d.Thread = append(d.Thread, ForgeComment{Author: p.name(), Body: body, At: normalized(c.CreatedDate), URL: d.URL, Bot: p != nil && p.Bot})
+		d.Thread = append(d.Thread, ForgeComment{Author: p.name(), Avatar: p.avatar(), Body: body, At: normalized(c.CreatedDate), URL: d.URL, Bot: p != nil && p.Bot})
 	}
 	d.Before = list.Next
 	return d, nil

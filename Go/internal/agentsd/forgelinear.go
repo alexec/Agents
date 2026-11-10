@@ -32,6 +32,7 @@ func (linearForge) Caps() forgeCaps {
 		Issues:      true,
 		Issue:       forgeActions{Comment: true, Label: true, Close: true, Reopen: true},
 		LabelColors: true,
+		Avatars:     true,
 		// Linear does not count an issue's comments: a list reads at most 50.
 		CommentCount: "capped", CommentsMost: 50,
 		Plan: true, BlockedBy: true, AddChild: true,
@@ -153,7 +154,7 @@ func (l linearForge) Item(ctx context.Context, r forgeRef, cursor string) (wire.
 	out := wire.ForgeItemDetail{Item: linearItemOf(p.Item, l.d.linearFolder(p.Team)), Body: p.Body, Comments: []wire.ForgeComment{}, Cursor: optional(p.Before)}
 	out.Start = linearStart(out.Item)
 	for _, c := range p.Thread {
-		out.Comments = append(out.Comments, forgeCommentOf(c.Author, c.Body, c.At, c.URL, c.Bot))
+		out.Comments = append(out.Comments, forgeCommentOf(c.Author, c.Avatar, c.Body, c.At, c.URL, c.Bot))
 	}
 	return out, nil
 }

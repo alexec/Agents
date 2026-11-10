@@ -20,6 +20,9 @@ type Person struct {
 	// Customer says it is a Jira Service Management customer, not one of the site's users:
 	// accountType "customer". It is the Linear server's guest.
 	Customer bool
+	// Avatar is the person's picture: on Atlassian's avatar host or Gravatar (Jira Cloud), or on
+	// the site (Data Center's /secure/useravatar); "" for none (#4363).
+	Avatar string
 }
 
 // trusted says whether p is one of the site's own (#728): a user, never a customer or an app.
@@ -30,6 +33,13 @@ func (p *Person) name() string {
 		return ""
 	}
 	return p.Name
+}
+
+func (p *Person) avatar() string {
+	if p == nil {
+		return ""
+	}
+	return p.Avatar
 }
 
 // Issue is an issue as the events name it.

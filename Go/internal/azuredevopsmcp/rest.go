@@ -314,6 +314,9 @@ type identity struct {
 	UniqueName  string `json:"uniqueName"`
 	Descriptor  string `json:"descriptor"`
 	IsContainer bool   `json:"isContainer"`
+	// ImageURL is the person's picture, on the organization (dev.azure.com/<org>/_apis/…), which
+	// needs the token (#4363).
+	ImageURL string `json:"imageUrl"`
 }
 
 // name is how an identity is named: its sign-in name, else its display name.

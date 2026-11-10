@@ -193,6 +193,9 @@ func TestTheForgeItemPageReadsAnIssueAndAPullRequest(t *testing.T) {
 	if d.Body != "As **Markdown**" || len(d.Thread) != 1 || d.Thread[0].Body != "page 2" || !d.Thread[0].Bot || d.Before != "1" {
 		t.Fatalf("an issue's page: %+v", d)
 	}
+	if d.AuthorAvatar != "https://fj.test/avatars/a1" || d.Thread[0].Avatar != "" {
+		t.Fatalf("avatars: %q %q", d.AuthorAvatar, d.Thread[0].Avatar)
+	}
 	first, err := fj.ItemPage(ctx, "acme/app", 7, false, d.Before)
 	if err != nil || first.Thread[0].Body != "page 1" || first.Before != "" {
 		t.Fatalf("the first page of comments: %+v %v", first, err)

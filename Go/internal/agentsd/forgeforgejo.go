@@ -135,6 +135,7 @@ func (forgejoForge) Caps() forgeCaps {
 		PR: forgeActions{Comment: true, Label: true, Close: true, Reopen: true, Merge: true, AutoMerge: true, Approve: true,
 			Diff: true},
 		LabelColors:  true,
+		Avatars:      true,
 		CommentCount: "exact",
 		Plan:         true, BlockedBy: true, AddChild: true,
 		Reasons: map[string]string{
@@ -240,7 +241,7 @@ func (g forgejoForge) Item(ctx context.Context, r forgeRef, cursor string) (wire
 	}
 	out := wire.ForgeItemDetail{Item: forgejoItemOf(p.Item, folder), Body: p.Body, Comments: []wire.ForgeComment{}, Cursor: optional(p.Before)}
 	for _, c := range p.Thread {
-		out.Comments = append(out.Comments, forgeCommentOf(c.Author, c.Body, c.At, c.URL, c.Bot))
+		out.Comments = append(out.Comments, forgeCommentOf(c.Author, c.Avatar, c.Body, c.At, c.URL, c.Bot))
 	}
 	if !p.PR {
 		out.Start = forgejoStart(out.Item, r.Number)
@@ -489,7 +490,7 @@ func (d *Daemon) forgeForgejo(c connections.Connection, root string) forgeForgej
 // forgejoItemOf is a Forgejo item in the one model, from folder.
 func forgejoItemOf(i forgejomcp.Item, folder string) wire.ForgeItem {
 	out := wire.ForgeItem{Node: forgejoNode(i.Repo, i.Number, i.PR), Title: i.Title, State: i.State, URL: optional(i.URL),
-		Folder: optional(folder), Labels: forgeLabelsOf(i.Labels, i.LabelColors), Author: optional(i.Author), Assignees: i.Assignees,
+		Folder: optional(folder), Labels: forgeLabelsOf(i.Labels, i.LabelColors), Author: optional(i.Author), AuthorAvatar: optional(i.AuthorAvatar), Assignees: i.Assignees,
 		Milestone: optional(i.Milestone), UpdatedAt: forgeDate(i.UpdatedAt), Comments: int64(i.Comments)}
 	if out.Assignees == nil {
 		out.Assignees = []string{}

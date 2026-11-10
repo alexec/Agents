@@ -29,10 +29,12 @@ type Item struct {
 	PR     bool
 	// State is open, closed or merged.
 	State, Title, URL, Author, Milestone, UpdatedAt string
-	Labels                                          []string
-	LabelColors                                     map[string]string
-	Assignees                                       []string
-	Comments                                        int
+	// AuthorAvatar is the author's picture (avatars.githubusercontent.com), "" for none (#4363).
+	AuthorAvatar string
+	Labels       []string
+	LabelColors  map[string]string
+	Assignees    []string
+	Comments     int
 	// A pull request's: Checks is passing, failing, running or none; Review is approved,
 	// changes_requested, review_required or ""; Mergeable is mergeable, conflicting or unknown.
 	Draft, AutoMerge          bool
@@ -55,8 +57,8 @@ type SearchPage struct {
 
 // Comment is a comment on an item, as Markdown.
 type Comment struct {
-	Author, Body, At, URL string
-	Bot                   bool
+	Author, Avatar, Body, At, URL string
+	Bot                           bool
 }
 
 // Check is one of a pull request's checks: State is passing, failing, running or skipped.
@@ -80,7 +82,7 @@ type ItemDetail struct {
 
 // itemFields are what an issue and a pull request both say, in a search and on their own. Their
 // states are of two types, so each has its own name: issueState and pullState.
-const itemFields = `number title url updatedAt author { login __typename } repository { nameWithOwner }
+const itemFields = `number title url updatedAt author { login __typename avatarUrl } repository { nameWithOwner }
   ` + labelFields + ` assignees(first: 20) { nodes { login } } milestone { title } commentCount: comments { totalCount }`
 
 // issueFields are an issue's own: its parent and how many of its sub-issues are closed (#3267).
@@ -97,7 +99,7 @@ const searchQuery = `query($q: String!, $first: Int!, $after: String) {
 
 // commentFields are the newest page of an item's comments, before $before.
 const commentFields = `comments(last: 50, before: $before) { pageInfo { hasPreviousPage startCursor }
-  nodes { author { login __typename } body createdAt url } }`
+  nodes { author { login __typename avatarUrl } body createdAt url } }`
 
 const itemQuery = `query($owner: String!, $name: String!, $number: Int!, $before: String) {
   repository(owner: $owner, name: $name) { issueOrPullRequest(number: $number) {
@@ -155,7 +157,7 @@ type gqlItem struct {
 
 func (n gqlItem) item() Item {
 	i := Item{Repo: n.Repository.NameWithOwner, Number: n.Number, PR: n.Typename == "PullRequest",
-		State: strings.ToLower(n.IssueState + n.PullState), Title: n.Title, URL: n.URL, Author: n.Author.login(), UpdatedAt: n.UpdatedAt,
+		State: strings.ToLower(n.IssueState + n.PullState), Title: n.Title, URL: n.URL, Author: n.Author.login(), AuthorAvatar: n.Author.avatar(), UpdatedAt: n.UpdatedAt,
 		Comments: n.CommentCount.TotalCount, Assignees: []string{}}
 	if i.State != "merged" && i.State != "closed" {
 		i.State = "open"
@@ -312,7 +314,7 @@ func (g *RealGitHub) ItemPage(ctx context.Context, repo string, number int, befo
 		d.Repo = repo
 	}
 	for _, c := range n.Comments.Nodes {
-		d.Thread = append(d.Thread, Comment{Author: c.Author.login(), Body: c.Body, At: c.CreatedAt, URL: c.URL, Bot: c.Author.isBot()})
+		d.Thread = append(d.Thread, Comment{Author: c.Author.login(), Avatar: c.Author.avatar(), Body: c.Body, At: c.CreatedAt, URL: c.URL, Bot: c.Author.isBot()})
 	}
 	if n.Comments.PageInfo.HasPreviousPage {
 		d.Before = n.Comments.PageInfo.StartCursor

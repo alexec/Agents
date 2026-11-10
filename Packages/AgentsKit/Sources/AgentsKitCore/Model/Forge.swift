@@ -29,6 +29,8 @@ public extension DaemonAPI {
         public var folder: String?
         public var labels: [ForgeLabel]
         public var author: String?
+        /// The author's picture, a URL that only `forge/image` reads (#4363).
+        public var authorAvatar: String?
         public var assignees: [String]
         /// The wire's, for the standing epics' queries; the app does not show it (#3878).
         public var milestone: String?
@@ -53,7 +55,8 @@ public extension DaemonAPI {
                     labels: [ForgeLabel] = [], author: String? = nil, assignees: [String] = [], milestone: String? = nil,
                     updatedAt: Date, comments: Int = 0, draft: Bool? = nil, checks: String? = nil, review: String? = nil,
                     mergeable: String? = nil, autoMerge: Bool? = nil, parent: LineageNode? = nil, level: String? = nil,
-                    feature: String? = nil, progress: ForgeProgress? = nil, status: String? = nil, standing: Bool? = nil) {
+                    feature: String? = nil, progress: ForgeProgress? = nil, status: String? = nil, standing: Bool? = nil,
+                    authorAvatar: String? = nil) {
             self.node = node
             self.title = title
             self.state = state
@@ -62,6 +65,7 @@ public extension DaemonAPI {
             self.folder = folder
             self.labels = labels
             self.author = author
+            self.authorAvatar = authorAvatar
             self.assignees = assignees
             self.milestone = milestone
             self.updatedAt = updatedAt
@@ -188,16 +192,19 @@ public extension DaemonAPI {
         }
     }
 
-    /// A comment, as Markdown. `bot` says a bot or an app wrote it.
+    /// A comment, as Markdown. `bot` says a bot or an app wrote it; `avatar` is the author's
+    /// picture, a URL that only `forge/image` reads (#4363).
     struct ForgeComment: Codable, Sendable, Hashable {
         public var author: String
+        public var avatar: String?
         public var body: String
         public var at: Date
         public var url: String?
         public var bot: Bool?
 
-        public init(author: String, body: String, at: Date, url: String? = nil, bot: Bool? = nil) {
+        public init(author: String, body: String, at: Date, url: String? = nil, bot: Bool? = nil, avatar: String? = nil) {
             self.author = author
+            self.avatar = avatar
             self.body = body
             self.at = at
             self.url = url

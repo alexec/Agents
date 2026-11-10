@@ -33,6 +33,7 @@ func (jiraForge) Caps() forgeCaps {
 	return forgeCaps{
 		Issues:       true,
 		Issue:        forgeActions{Comment: true, Label: true, Close: true, Reopen: true, Transition: true},
+		Avatars:      true,
 		CommentCount: "exact",
 		Plan:         true,
 		Reasons: map[string]string{
@@ -154,7 +155,7 @@ func (j jiraForge) Item(ctx context.Context, r forgeRef, cursor string) (wire.Fo
 		Cursor: optional(p.Before), Transitions: []wire.ForgeTransition{}}
 	out.Start = jiraStart(out.Item)
 	for _, c := range p.Thread {
-		out.Comments = append(out.Comments, forgeCommentOf(c.Author, c.Body, c.At, c.URL, c.Bot))
+		out.Comments = append(out.Comments, forgeCommentOf(c.Author, c.Avatar, c.Body, c.At, c.URL, c.Bot))
 	}
 	for _, t := range p.Transitions {
 		out.Transitions = append(out.Transitions, wire.ForgeTransition{ID: t.ID, Name: t.Name, Category: optional(t.Category)})

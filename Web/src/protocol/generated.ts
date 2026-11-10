@@ -4117,9 +4117,12 @@ export interface ForgeCloseRequest {
 
 /**
  * A comment on an issue or a pull request (#3129), as Markdown. bot says a bot or an app wrote it.
+ * avatar is the author's picture, a URL that only forge/image reads (#4363); none when the forge
+ * gives none.
  */
 export interface ForgeComment {
   author: string;
+  avatar?: string;
   body: string;
   at: WireDate;
   url?: string;
@@ -4257,7 +4260,8 @@ export interface ForgeImageRequest {
  * level is epic, story, task or spike, from its labels; feature is the name of its feature:<name>
  * label; progress is a parent's closed children of all of them, where the forge says it: in a
  * GitHub list, and on an issue's own read. standing says it has the label standing: a standing
- * epic, whose plan is a query (#3659).
+ * epic, whose plan is a query (#3659). authorAvatar is the author's picture, a URL that only
+ * forge/image reads (#4363), where the forge gives one (ForgeCapabilities.avatars).
  */
 export interface ForgeItem {
   node: LineageNode;
@@ -4268,6 +4272,7 @@ export interface ForgeItem {
   folder?: string;
   labels: ForgeLabel[];
   author?: string;
+  authorAvatar?: string;
   assignees: string[];
   milestone?: string;
   updatedAt: WireDate;
@@ -6978,6 +6983,12 @@ export interface Multiplier {
    * record. Absent when none has run.
    */
   mostAtOnce?: number;
+  /**
+   * When the person's first counted merge or merged revert happened (#4250), in the record the host
+   * keeps (90 days of ended work) or the control plane's. Absent: their agents have not merged a PR
+   * yet, and the page says their first one starts the count.
+   */
+  firstMergeAt?: WireDate;
 }
 
 /**
@@ -14537,7 +14548,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeCapabilities: { required: ["forge", "issues", "pulls", "labelColors", "avatars", "stateReason", "commentCount"], optional: ["commentsMost"] },
   ForgeCheck: { required: ["name", "state"], optional: ["url"] },
   ForgeCloseRequest: { required: ["node"], optional: ["reopen", "transition"] },
-  ForgeComment: { required: ["author", "body", "at"], optional: ["url", "bot"] },
+  ForgeComment: { required: ["author", "body", "at"], optional: ["avatar", "url", "bot"] },
   ForgeCommentRequest: { required: ["node", "body"], optional: [] },
   ForgeDiff: { required: ["files", "cut"], optional: ["url"] },
   ForgeDiffFile: { required: ["path", "change", "additions", "deletions", "hunks"], optional: ["previousPath", "note"] },
@@ -14548,7 +14559,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeFeaturesRequest: { required: [], optional: ["folder", "board"] },
   ForgeImage: { required: ["mimeType", "data"], optional: [] },
   ForgeImageRequest: { required: ["url"], optional: [] },
-  ForgeItem: { required: ["node", "title", "state", "labels", "assignees", "updatedAt", "comments"], optional: ["status", "url", "folder", "author", "milestone", "draft", "checks", "review", "mergeable", "autoMerge", "parent", "level", "feature", "progress", "standing"] },
+  ForgeItem: { required: ["node", "title", "state", "labels", "assignees", "updatedAt", "comments"], optional: ["status", "url", "folder", "author", "authorAvatar", "milestone", "draft", "checks", "review", "mergeable", "autoMerge", "parent", "level", "feature", "progress", "standing"] },
   ForgeItemDetail: { required: ["item", "body", "comments"], optional: ["cursor", "checks", "reviewThreads", "filesChanged", "head", "mergeMethods", "start", "transitions", "actions"] },
   ForgeItemRequest: { required: ["node"], optional: ["cursor"] },
   ForgeLabel: { required: ["name"], optional: ["color"] },
@@ -14779,7 +14790,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MoveRequest: { required: ["agentID", "removeLeft", "discardChanges"], optional: ["target"] },
   MoveToMachineAnswer: { required: ["folder", "carriesOn"], optional: [] },
   MoveToMachineRequest: { required: ["agentID", "machine"], optional: ["machineName", "folder"] },
-  Multiplier: { required: ["prsMerged", "reverts", "agentsWorking", "since", "baseline"], optional: ["multiplier", "engineerHours", "changedBy", "bestWeek", "mostAtOnce"] },
+  Multiplier: { required: ["prsMerged", "reverts", "agentsWorking", "since", "baseline"], optional: ["multiplier", "engineerHours", "changedBy", "bestWeek", "mostAtOnce", "firstMergeAt"] },
   MultiplierBaseline: { required: ["prsPerWeek", "hoursPerWeek", "source"], optional: ["line"] },
   MultiplierCountParams: { required: [], optional: ["timeZone", "prsPerWeek"] },
   NativeSetting: { required: [], optional: ["options", "sandbox", "clientPermission"] },

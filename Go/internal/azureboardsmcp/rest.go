@@ -296,6 +296,8 @@ type identity struct {
 	UniqueName  string `json:"uniqueName"`
 	Descriptor  string `json:"descriptor"`
 	IsContainer bool   `json:"isContainer"`
+	// ImageURL is the person's picture, on the organization, which needs the token (#4363).
+	ImageURL string `json:"imageUrl"`
 }
 
 // person is an identity as who did something: its sign-in name, else its display name.
@@ -307,7 +309,7 @@ func (i identity) person() *Person {
 	if i.UniqueName != "" && !strings.Contains(i.UniqueName, `\`) {
 		name = i.UniqueName
 	}
-	return &Person{ID: i.ID, Name: name, DisplayName: i.DisplayName, Bot: isBot(i)}
+	return &Person{ID: i.ID, Name: name, DisplayName: i.DisplayName, Bot: isBot(i), Avatar: i.ImageURL}
 }
 
 // The fields a work item is read with.

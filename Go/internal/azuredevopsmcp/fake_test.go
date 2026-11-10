@@ -78,8 +78,9 @@ func (f *fakeAzureDevOps) set(change func()) {
 }
 
 var (
-	alex     = obj{"id": "a1", "displayName": "Alex", "uniqueName": "alex@acme.test", "descriptor": "aad.YWxleA"}
-	dev      = obj{"id": "d2", "displayName": "Dev", "uniqueName": "dev@acme.test", "descriptor": "aad.ZGV2"}
+	alex = obj{"id": "a1", "displayName": "Alex", "uniqueName": "alex@acme.test", "descriptor": "aad.YWxleA"}
+	dev  = obj{"id": "d2", "displayName": "Dev", "uniqueName": "dev@acme.test", "descriptor": "aad.ZGV2",
+		"imageUrl": "https://dev.azure.com/acme/_apis/GraphProfile/MemberAvatars/aad.ZGV2"}
 	builder  = obj{"id": "b3", "displayName": "Project Collection Build Service (acme)", "uniqueName": `Build\acme`, "descriptor": "svc.YnVpbGQ"}
 	renovate = obj{"id": "r4", "displayName": "renovate-bot", "uniqueName": "renovate@acme.test", "descriptor": "aad.cmVu"}
 )
