@@ -98,8 +98,8 @@ machines' copies of one node add up, as each banked its own turns.
 - **Lead time:** the median of the issues' lead times, each from the first work on the issue
   or its PRs (`firstAt`) to its last PR merged (`endedAt`).
 - **Unlinked:** the turns with no issue or PR.
-- **Issues and Milestones:** each one's cost (its own and its PRs'), how its PRs ended, its
-  waste and lead time, the most costly first, at most 100 each. On the Mac a GitHub one is a
+- **Issues and Releases:** each one's cost (its own and its PRs'), how its PRs ended, its
+  waste and lead time, the most costly first, at most 100 each. Milestones went with #3878. On the Mac a GitHub one is a
   link.
 - **The range:** a node counts when it last changed in the range, with all of its cost: a
   node's total is not kept by the day.
@@ -128,7 +128,7 @@ machines' copies of one node add up, as each banked its own turns.
   helper with no links of its own banks under its parent's. A turn with no link stays on
   its session. Each node's total is in `<root>/lineage-cost.json`, at most 5,000 nodes, 90
   days after the last change. `lineage/cost` adds them up to a PR, an issue (with the PRs
-  that fix it), a milestone or a project, with the waste: the PRs closed without a merge
+  that fix it), a release or a project, with the waste: the PRs closed without a merge
   and the merged reverts. The nodes that changed go with each `usage/rollup` (`work`).
 - **A merged pull request can say what it cost** (#2352). When the folder's
   `.agents/folder.json` says `prCostComment` (`tokens` or `cost`; off is the default), the

@@ -66,7 +66,7 @@ export function workList(kind: WorkKind): WorkListState {
 
 export const forgeState = (s: WorkState) => s === "open" ? "open" : s === "all" ? "all" : "closed";
 
-/** An issue's or a PR's lineage is joined by ref, in any order; a milestone's or a release's list is lineage's own. */
+/** An issue's or a PR's lineage is joined by ref, in any order; a release's list is lineage's own. */
 export const nodesSort = (l: WorkListState): ReportNodesSort => !fromForge(l.kind) && l.sort.value === "cost" ? "cost" : "newest";
 
 export const forgeHosts = (store: Store) => store.hosts.value.filter((h) => hostAnswers(h.state) && store.has(h.id, Capability.forge1));
@@ -96,13 +96,13 @@ export function allRows(l: WorkListState): WorkRow[] {
   return fromForge(l.kind) ? mergeForge(l.lists.value ?? [], l.lineage.value) : l.lineage.value.map(lineageRow);
 }
 
-/** Each project with the repos its folders read (#3283); none for milestones and releases, which lineage alone
- * lists, with no folder. */
+/** Each project with the repos its folders read (#3283); none for releases, which lineage alone lists, with
+ * no folder. */
 export function listProjects(l: WorkListState): WorkProjectRepos[] {
   return fromForge(l.kind) ? projectRepos(l.projects.value, l.lists.value ?? []) : [];
 }
 
-/** The rows as the list shows them: filtered and sorted. Milestones and releases have no state in v1. */
+/** The rows as the list shows them: filtered and sorted. Releases have no state in v1. */
 export function shownRows(l: WorkListState): WorkRow[] {
   return sortRows(filterRows(allRows(l), fromForge(l.kind) ? l.filter.value : { ...l.filter.value, state: "all" }, listProjects(l)),
     l.sort.value);

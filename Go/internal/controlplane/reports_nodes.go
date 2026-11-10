@@ -14,7 +14,7 @@ import (
 )
 
 // reports/nodes (#3118): the lineage nodes of one kind in a scope, as Work ▸ Issues, Pull
-// requests, Milestones and Releases list them (#3100). It reads the machines' nodes as
+// requests and Releases list them (#3100). It reads the machines' nodes as
 // reports/value does (scopeLineage), so a call reads no more of the store, and it rolls
 // each row up the same way. Title, state and labels are what the machines' resolve caches
 // sent (resolved): the control plane holds no forge token, so it never asks a forge.
@@ -59,9 +59,9 @@ func decodeNodesCursor(s string) (nodesCursor, bool) {
 // nodesReport is reports/nodes for the scope the caller asks for.
 func (s *Service) nodesReport(ctx context.Context, q wire.ReportNodesQuery, user string) (wire.ReportNodes, error) {
 	switch q.Kind {
-	case lineage.KindIssue, lineage.KindPR, lineage.KindMilestone, lineage.KindRelease:
+	case lineage.KindIssue, lineage.KindPR, lineage.KindRelease:
 	default:
-		return wire.ReportNodes{}, fail(invalidParams, "Say a kind: issue, pr, milestone or release.")
+		return wire.ReportNodes{}, fail(invalidParams, "Say a kind: issue, pr or release.")
 	}
 	order := wire.ReportNodesSortNewest
 	if q.Sort != nil {
@@ -199,9 +199,8 @@ func nodeState(r wire.ReportNode) string {
 }
 
 // nodeRows is a row for each node of kind, rolled up as reports/value rolls up its rows: an
-// issue with the PRs that fix it (also an issue only its PRs name), a PR on its own, a
-// milestone with its issues and PRs and the PRs that fix those issues, and a release with its
-// PRs and the issues those PRs fix.
+// issue with the PRs that fix it (also an issue only its PRs name), a PR on its own, and a
+// release with its PRs and the issues those PRs fix.
 func nodeRows(nodes []wire.LineageCostNode, kind string) []wire.ReportNode {
 	byNode := map[wire.LineageNode]wire.LineageCostNode{}
 	issues := map[string]wire.LineageCostNode{}
@@ -236,7 +235,7 @@ func nodeRows(nodes []wire.LineageCostNode, kind string) []wire.ReportNode {
 		}
 		for _, m := range n.PartOf {
 			members[m] = append(members[m], n)
-			if lineage.PartOfKind(m) == kind {
+			if kind == lineage.KindRelease && lineage.IsReleaseRef(m) {
 				add(m)
 			}
 		}
@@ -258,13 +257,6 @@ func nodeRows(nodes []wire.LineageCostNode, kind string) []wire.ReportNode {
 			parts = issueParts(ref)
 		case lineage.KindPR:
 			parts = []wire.LineageCostNode{byNode[of]}
-		case lineage.KindMilestone:
-			parts = dedupParts(members[ref], func(n wire.LineageCostNode) []wire.LineageCostNode {
-				if n.Node.Kind != lineage.KindIssue {
-					return nil
-				}
-				return fixers[n.Node.Ref]
-			})
 		case lineage.KindRelease:
 			parts = dedupParts(members[ref], func(n wire.LineageCostNode) []wire.LineageCostNode {
 				var fixed []wire.LineageCostNode

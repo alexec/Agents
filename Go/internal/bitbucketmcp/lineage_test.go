@@ -15,7 +15,6 @@ func TestLineageAsks(t *testing.T) {
 		f.pulls = []obj{pull(2, "a", alex, obj{"title": "Add a", "state": "MERGED"}), pull(3, "b", alex, obj{"state": "DECLINED"})}
 		f.issues = []obj{issue(1, alex, obj{"title": "Lineage asks Bitbucket", "state": "open", "component": obj{"name": "api"},
 			"milestone": obj{"id": 7, "name": "0.2 Lineage"}}), issue(4, alex, obj{"state": "resolved"})}
-		f.milestones = []obj{{"id": 7, "name": "0.2 Lineage"}, {"id": 8, "name": "0.3 Later"}}
 		f.commits["v0.2.0"] = obj{"hash": "961a", "date": "2026-11-07T13:17:47+00:00"}
 		f.compares["v0.2.0..v0.1.0"] = []obj{{"hash": "961a", "message": "Merged in a (pull request #2)\n\nAdd a"},
 			{"hash": "77b0", "message": "Fix b"}, {"hash": "5c3d", "message": "Start"}}
@@ -30,10 +29,10 @@ func TestLineageAsks(t *testing.T) {
 		pr     bool
 		want   string
 	}{
-		{2, true, "{Add a merged [] 0}"},
-		{3, true, "{PR 3 closed [] 0}"},
-		{1, false, "{Lineage asks Bitbucket open [bug api] 7}"},
-		{4, false, "{Issue 4 closed [bug] 0}"},
+		{2, true, "{Add a merged []}"},
+		{3, true, "{PR 3 closed []}"},
+		{1, false, "{Lineage asks Bitbucket open [bug api]}"},
+		{4, false, "{Issue 4 closed [bug]}"},
 	} {
 		if n, err := bb.Node(ctx, repo, c.number, c.pr); err != nil || fmt.Sprint(n) != c.want {
 			t.Errorf("#%d (pr %v): %+v %v, want %s", c.number, c.pr, n, err, c.want)
@@ -41,12 +40,6 @@ func TestLineageAsks(t *testing.T) {
 	}
 	if _, err := bb.Node(ctx, repo, 9, false); !IsNotFound(err) {
 		t.Errorf("an issue not there: %v", err)
-	}
-	if n, err := bb.MilestoneNode(ctx, repo, 7); err != nil || fmt.Sprint(n) != "{0.2 Lineage  [] 0}" {
-		t.Errorf("a milestone: %+v %v", n, err)
-	}
-	if m, err := bb.Milestones(ctx, repo); err != nil || fmt.Sprint(m) != "[{7 0.2 Lineage} {8 0.3 Later}]" {
-		t.Errorf("the milestones: %+v %v", m, err)
 	}
 	if at, err := bb.CommitTime(ctx, repo, "v0.2.0"); err != nil || at.UTC().Format("2006-01-02T15:04:05Z") != "2026-11-07T13:17:47Z" {
 		t.Errorf("a tag's commit time: %v %v", at, err)

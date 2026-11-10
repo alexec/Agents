@@ -2,9 +2,9 @@ import Foundation
 
 /// Reports ▸ Value (#2351): what the work cost and what it delivered, added up on the control
 /// plane from the lineage nodes each machine sends (#2350): cost per merged PR, per issue and
-/// per milestone, waste and lead time.
+/// per release, waste and lead time.
 public extension DaemonAPI {
-    /// A node of the lineage graph (#2348): an issue, a PR, a session, a milestone. `ref` names it
+    /// A node of the lineage graph (#2348): an issue, a PR, a session, a release. `ref` names it
     /// apart from any tracker, as `github:alexec/agents#12` or `linear:ENG-4`.
     struct LineageNode: Codable, Sendable, Hashable {
         public var kind: String
@@ -41,7 +41,7 @@ public extension DaemonAPI {
         }
     }
 
-    /// One issue or milestone on Reports ▸ Value: its cost from every machine in the scope, and
+    /// One issue or release on Reports ▸ Value: its cost from every machine in the scope, and
     /// how its PRs ended.
     struct ReportValueRow: Codable, Sendable, Hashable, Identifiable {
         public var node: LineageNode
@@ -73,7 +73,7 @@ public extension DaemonAPI {
     /// without a merge and merged reverts, `unlinked` the turns with no issue or PR.
     /// `leadTimeSeconds` is the median of the issues'. The lists are the most costly first, at
     /// most 100 each. `releases` (#3023) is a row per release: the PRs part-of it and the
-    /// issues those PRs fix, the same way as a milestone.
+    /// issues those PRs fix.
     struct ReportValue: Codable, Sendable, Hashable {
         public var range: ReportRange
         public var scope: ReportScope
@@ -88,14 +88,13 @@ public extension DaemonAPI {
         public var failedChecks: Int
         public var leadTimeSeconds: Double?
         public var issues: [ReportValueRow]
-        public var milestones: [ReportValueRow]
         public var releases: [ReportValueRow]
         public var limited: Bool?
 
         public init(range: ReportRange, scope: ReportScope, total: LineageCost = .init(), waste: LineageCost = .init(),
                     unlinked: LineageCost = .init(), perMergedPR: [String: Decimal] = [:], prsMerged: Int = 0,
                     prsClosed: Int = 0, prsReverted: Int = 0, failedChecks: Int = 0, leadTimeSeconds: Double? = nil,
-                    issues: [ReportValueRow] = [], milestones: [ReportValueRow] = [], releases: [ReportValueRow] = [],
+                    issues: [ReportValueRow] = [], releases: [ReportValueRow] = [],
                     limited: Bool? = nil) {
             self.range = range
             self.scope = scope
@@ -109,7 +108,6 @@ public extension DaemonAPI {
             self.failedChecks = failedChecks
             self.leadTimeSeconds = leadTimeSeconds
             self.issues = issues
-            self.milestones = milestones
             self.releases = releases
             self.limited = limited
         }

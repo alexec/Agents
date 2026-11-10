@@ -31,6 +31,7 @@ func TestReportsNodesListsEachKind(t *testing.T) {
 	}
 	issue := node("issue", "github:o/r#1", 1, "s1")
 	issue.FirstAt = at(10 * time.Hour)
+	// A milestone, as a host before #3878 sends it: no row adds it up.
 	issue.PartOf = []string{"github:o/r/milestone/1"}
 	issue.Resolved = &wire.LineageResolved{Title: "Old title", State: str("open")}
 	issue.LastAt = wire.DateOf(now.Add(-time.Hour))
@@ -86,10 +87,6 @@ func TestReportsNodesListsEachKind(t *testing.T) {
 	}
 	if got := list(admin, wire.ReportNodesQuery{Kind: "pr", Scope: org, State: str("closed")}); len(got.Nodes) != 1 ||
 		got.Nodes[0].Node.Ref != "github:o/r#3" {
-		t.Fatalf("%+v", got)
-	}
-	if got := list(admin, wire.ReportNodesQuery{Kind: "milestone", Scope: org}); len(got.Nodes) != 1 ||
-		got.Nodes[0].Cost.Total.Cost["USD"] != 10 {
 		t.Fatalf("%+v", got)
 	}
 	// The merged PR and the issue it fixes, from both machines.

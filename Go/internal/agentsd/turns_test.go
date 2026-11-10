@@ -42,8 +42,8 @@ func TestMain(m *testing.M) {
 	releaseLayerHere = false
 	// No test asks the person's gh about merged pull requests unless it says so.
 	findGH = func() string { return "" }
-	// Nor asks the forge for an issue's milestone (#2935): a test sets issueLookup.
-	milestoneLookup = func(context.Context, string, forgeRepo, int) (issueOnForge, error) {
+	// Nor asks the forge for an issue's parent (#3582): a test sets issueLookup.
+	parentLookup = func(context.Context, string, forgeRepo, int) (issueOnForge, error) {
 		return issueOnForge{}, errNoForgeInTests
 	}
 	// Nor erases a deleted agent's runtime copy (#1001): that starts the runtime.

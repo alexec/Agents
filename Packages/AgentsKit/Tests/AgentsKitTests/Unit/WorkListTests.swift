@@ -198,19 +198,19 @@ struct WorkListTests {
         linear.node = Node(kind: "issue", ref: "linear:OPS-2")
         linear.repo = "linear"
         #expect(WorkList.Row(linear).repo == "linear:OPS")
-        #expect(WorkList.repo(of: "github:alexec/Agents/milestone/15") == "github:alexec/Agents")
+        #expect(WorkList.repo(of: "github:alexec/Agents/release/v0.14.0") == "github:alexec/Agents")
         #expect(WorkList.shortRef("github:alexec/Agents#12") == "#12")
         #expect(WorkList.shortRef("linear:ENG-4") == "ENG-4")
         #expect(WorkList.openOnWords("gitlab:g/r!4") == "Open on GitLab")
     }
 
-    @Test func aMilestoneLineageAloneKnows() {
+    @Test func aReleaseLineageAloneKnows() {
         var n = node(0, 2)
-        n.node = Node(kind: "milestone", ref: "github:alexec/Agents/milestone/15")
-        n.resolved = .init(title: "0.14 Lineage")
+        n.node = Node(kind: "release", ref: "github:alexec/Agents/release/v0.14.0")
         let row = WorkList.Row(n)
-        #expect(row.title == "0.14 Lineage")
-        #expect(row.url?.absoluteString == "https://github.com/alexec/Agents/milestone/15")
+        #expect(row.title == "alexec/Agents release v0.14.0")
+        #expect(WorkList.titleSaysRef(row.title, row.node.ref))
+        #expect(row.url?.absoluteString == "https://github.com/alexec/Agents/releases/tag/v0.14.0")
     }
 
     @Test func aLabelsInkReadsOnItsColour() {
@@ -226,19 +226,22 @@ struct WorkPageTests {
     typealias Node = DaemonAPI.LineageNode
     let issue = Node(kind: "issue", ref: "github:alexec/Agents#12")
     let pr = Node(kind: "pr", ref: "github:alexec/Agents#34")
-    let milestone = Node(kind: "milestone", ref: "github:alexec/Agents/milestone/15")
+    let release = Node(kind: "release", ref: "github:alexec/Agents/release/v0.14.0")
     let session = Node(kind: "session", ref: "session:S1")
     let at = Date(timeIntervalSince1970: 0)
 
     @Test func aNodesPageIsInItsKindsList() {
-        #expect(WorkList.kind(of: milestone) == .milestone)
+        #expect(WorkList.kind(of: release) == .release)
+        // #3878: Work has no Milestones list.
+        #expect(WorkList.kind(of: Node(kind: "milestone", ref: "github:alexec/Agents/milestone/15")) == nil)
         #expect(WorkList.kind(of: session) == nil)
     }
 
     @Test func peopleInWords() {
         let item = DaemonAPI.ForgeItem(node: pr, title: "T", state: "open", author: "alexec", assignees: ["bob"],
                                        milestone: "0.14", updatedAt: at)
-        #expect(WorkList.peopleWords(item) == "by alexec · assigned to bob · milestone 0.14")
+        // The forge's milestone is not shown (#3878).
+        #expect(WorkList.peopleWords(item) == "by alexec · assigned to bob")
     }
 
     /// #3130: the page's actions say what each does, as the web page's do.

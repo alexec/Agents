@@ -132,16 +132,16 @@ test("refs: repo, short name, and the forge to open on", () => {
   assert.equal(w.repoOf("linear:ENG-4"), "linear:ENG");
   assert.equal(w.repoName("linear:ENG"), "Linear · ENG");
   assert.equal(w.lineageRow(node(0, 0, { node: { kind: "issue", ref: "linear:OPS-2" }, repo: "linear" })).repo, "linear:OPS");
-  assert.equal(w.repoOf("github:alexec/Agents/milestone/15"), "github:alexec/Agents");
+  assert.equal(w.repoOf("github:alexec/Agents/release/v0.14.0"), "github:alexec/Agents");
   assert.equal(w.shortRef("github:alexec/Agents#12"), "#12");
   assert.equal(w.shortRef("linear:ENG-4"), "ENG-4");
   assert.equal(w.openOnWords("gitlab:g/r!4"), "Open on GitLab");
 });
 
-test("a milestone lineage alone knows", () => {
-  const row = w.lineageRow({ ...node(0, 2), node: { kind: "milestone", ref: "github:alexec/Agents/milestone/15" }, resolved: { title: "0.14 Lineage" } });
+test("a release lineage alone knows", () => {
+  const row = w.lineageRow({ ...node(0, 2), node: { kind: "release", ref: "github:alexec/Agents/release/v0.14.0" }, resolved: { title: "0.14 Lineage" } });
   assert.equal(row.title, "0.14 Lineage");
-  assert.equal(row.url, "https://github.com/alexec/Agents/milestone/15");
+  assert.equal(row.url, "https://github.com/alexec/Agents/releases/tag/v0.14.0");
 });
 
 test("a label's ink reads on its colour", () => {
@@ -151,8 +151,9 @@ test("a label's ink reads on its colour", () => {
   assert.equal(w.labelColor(undefined), undefined);
 });
 
-test("an issue, a PR, a milestone or a release has a page; a session has none", () => {
-  assert.equal(w.hasPage({ kind: "milestone", ref: "github:alexec/Agents/milestone/15" }), true);
+test("an issue, a PR or a release has a page; a milestone (#3878) and a session have none", () => {
+  assert.equal(w.hasPage({ kind: "release", ref: "github:alexec/Agents/release/v0.14.0" }), true);
+  assert.equal(w.hasPage({ kind: "milestone", ref: "github:alexec/Agents/milestone/15" }), false);
   assert.equal(w.hasPage({ kind: "session", ref: "session:S1" }), false);
 });
 
@@ -163,11 +164,10 @@ test("a PR's checks and review in words", () => {
   assert.equal(w.reviewWords("changes_requested"), "Review: Changes requested");
 });
 
-test("a milestone's and a release's short name", () => {
-  assert.equal(w.shortRef("github:example/shop/milestone/2"), "milestone 2");
+test("a release's short name", () => {
   assert.equal(w.shortRef("github:example/shop/release/v1.2.0"), "v1.2.0");
-  assert.equal(w.titleSaysRef({ title: "example/shop milestone 2", node: { kind: "milestone", ref: "github:example/shop/milestone/2" } }), true);
-  assert.equal(w.titleSaysRef({ title: "1.2 Checkout", node: { kind: "milestone", ref: "github:example/shop/milestone/2" } }), false);
+  assert.equal(w.titleSaysRef({ title: "example/shop release v1.2.0", node: { kind: "release", ref: "github:example/shop/release/v1.2.0" } }), true);
+  assert.equal(w.titleSaysRef({ title: "1.2 Checkout", node: { kind: "release", ref: "github:example/shop/release/v1.2.0" } }), false);
 });
 
 // #3130: the page's actions say what each does, as WorkListTests has it on the window.
@@ -264,7 +264,7 @@ test("a project has the repos its folders read on every machine, and the Project
 });
 
 // Work's look (#4392, specs/4328-work-look/parts.md): the state icon, the row's line, the chip's colours, the empty states.
-test("a row's state icon is the state's glyph, with words, and none for a milestone (#4392)", () => {
+test("a row's state icon is the state's glyph, with words, and none for a release (#4392)", () => {
   assert.equal(w.stateGlyph("issue", "open"), "issue-open");
   assert.equal(w.stateGlyph("issue", "closed"), "issue-done");
   assert.equal(w.stateGlyph("issue", "closed", false, true), "issue-dropped");
@@ -272,7 +272,7 @@ test("a row's state icon is the state's glyph, with words, and none for a milest
   assert.equal(w.stateGlyph("pr", "open"), "pr-open");
   assert.equal(w.stateGlyph("pr", "merged"), "pr-merged");
   assert.equal(w.stateGlyph("pr", "closed"), "pr-closed");
-  assert.equal(w.stateGlyph("milestone", "open"), undefined);
+  assert.equal(w.stateGlyph("release", "open"), undefined);
   assert.equal(w.stateGlyphWords["pr-merged"], "Merged pull request");
 });
 

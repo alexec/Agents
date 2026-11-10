@@ -3,7 +3,7 @@ import SwiftUI
 
 /// The glyph at the start of a Work row (#4391, parts.md section 1): an issue's or a pull request's
 /// state in the forge's colour, with words for a screen reader, so the colour is never the only
-/// sign. A milestone or a release, which have no state of their own, show their kind's glyph in grey.
+/// sign. A release, which has no state of its own, shows its kind's glyph in grey.
 struct WorkStateIcon: View {
     let kind: String
     let state: String

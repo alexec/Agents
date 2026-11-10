@@ -1,7 +1,7 @@
 // Work (#3119, spec 3100): every issue and pull request across the person's folders and forges, from
 // forge/issues and forge/pulls on each machine, one row per ref, with what lineage knows about it
-// (reports/nodes: cost, sessions, lead time) on top. Milestones and releases come from reports/nodes
-// alone in v1. As WorkList has it on the window.
+// (reports/nodes: cost, sessions, lead time) on top. Releases come from reports/nodes alone in v1. As
+// WorkList has it on the window.
 import type {
   ForgeCheck, ForgeDone, ForgeItem, ForgeItemDetail, ForgeLabel, ForgeListError, ForgeListRequest, ForgeMergeMethod,
   LineageNode, ProjectBoard, ReportNode,
@@ -14,10 +14,10 @@ import { folderPathOf } from "./projectSettings";
 import { ago } from "./connectorSetup";
 
 /** Work's lists, in the order of its tabs, by the lineage kind each holds. */
-export type WorkKind = "issue" | "pr" | "milestone" | "release";
-export const workKinds: readonly WorkKind[] = ["issue", "pr", "milestone", "release"];
+export type WorkKind = "issue" | "pr" | "release";
+export const workKinds: readonly WorkKind[] = ["issue", "pr", "release"];
 export const workKindTitle: Record<WorkKind, string> = {
-  issue: "Issues", pr: "Pull requests", milestone: "Milestones", release: "Releases",
+  issue: "Issues", pr: "Pull requests", release: "Releases",
 };
 
 /** Whether a kind's list is read from the forges (issues and PRs), not only from lineage. */
@@ -40,7 +40,6 @@ export interface WorkRow {
   repo: string;
   author?: string | undefined;
   assignees: string[];
-  milestone?: string | undefined;
   /** Seconds since 1970, for sorting; 0 when not known. */
   updated: number;
   url?: string | undefined;
@@ -64,7 +63,7 @@ export function repoOf(ref: string): string {
   const [, forge, id = ""] = scheme;
   if (forge === "linear") return /^([A-Z][A-Z0-9]*)-\d+$/.test(id) ? `linear:${id.replace(/-\d+$/, "")}` : "linear";
   if (forge === "jira") return forge;
-  const cut = id.search(/[#!]|\/milestone\/|\/release\//);
+  const cut = id.search(/[#!]|\/release\//);
   return cut < 0 ? ref : `${forge}:${id.slice(0, cut)}`;
 }
 
@@ -82,13 +81,13 @@ export function refNumber(ref: string): number {
   return m ? Number(m[1]) : 0;
 }
 
-/** "#12", "!45", "ENG-4", "milestone 2" or "v0.14.0": a row's short name in its repo. */
+/** "#12", "!45", "ENG-4" or "v0.14.0": a row's short name in its repo. */
 export function shortRef(ref: string): string {
-  const m = /([#!]\d+)$/.exec(ref) ?? /\/(milestone\/.+)$/.exec(ref) ?? /\/release\/(.+)$/.exec(ref);
-  return m ? m[1]!.replace("milestone/", "milestone ") : nodeName({ kind: "", ref });
+  const m = /([#!]\d+)$/.exec(ref) ?? /\/release\/(.+)$/.exec(ref);
+  return m ? m[1]! : nodeName({ kind: "", ref });
 }
 
-/** Whether a row's title says its short name already, as a milestone lineage could not resolve does. */
+/** Whether a row's title says its short name already, as a release lineage could not resolve does. */
 export const titleSaysRef = (row: Pick<WorkRow, "title" | "node">) => row.title.endsWith(shortRef(row.node.ref));
 
 const unix = (at: number) => fromWireDate(at as never).getTime() / 1000;
@@ -97,7 +96,7 @@ const unix = (at: number) => fromWireDate(at as never).getTime() / 1000;
 export function forgeRow(item: ForgeItem, host: string, lineage?: ReportNode): WorkRow {
   return {
     node: item.node, title: item.title, state: item.state, status: item.status, labels: item.labels, repo: repoOf(item.node.ref),
-    author: item.author, assignees: item.assignees, milestone: item.milestone, updated: unix(item.updatedAt),
+    author: item.author, assignees: item.assignees, updated: unix(item.updatedAt),
     url: item.url, host, folder: item.folder, draft: item.draft, comments: item.comments, checks: item.checks, review: item.review, lineage,
   };
 }
@@ -105,7 +104,7 @@ export function forgeRow(item: ForgeItem, host: string, lineage?: ReportNode): W
 /** A lineage node's repo: lineage says "linear" for every Linear issue, Work its team (#3311). */
 const repoOfNode = (n: ReportNode) => n.repo && n.repo !== "linear" ? n.repo : repoOf(n.node.ref);
 
-/** A row lineage alone knows: a milestone, a release, or an item no forge listed. */
+/** A row lineage alone knows: a release, or an item no forge listed. */
 export function lineageRow(n: ReportNode): WorkRow {
   return {
     node: n.node, title: n.resolved?.title ?? nodeName(n.node), state: n.resolved?.state ?? (n.outcome === "merged" ? "merged" : ""),
@@ -347,15 +346,14 @@ export function labelInk(color: string | undefined): string | undefined {
 /** A label's colour as CSS: "#d73a4a" of "d73a4a"; undefined when the forge gave none. */
 export const labelColor = (color: string | undefined) => labelInk(color) ? `#${color!.replace(/^#/, "")}` : undefined;
 
-export const noWork = (kind: WorkKind) => kind === "milestone" ? "No milestones that an agent worked on yet."
-  : kind === "release" ? "No releases that an agent worked on yet."
+export const noWork = (kind: WorkKind) => kind === "release" ? "No releases that an agent worked on yet."
   : `No ${workKindTitle[kind].toLowerCase()} match.`;
-export const lineageOnlyNote = "Lineage lists a milestone or a release once an agent works on one of its issues or pull requests.";
+export const lineageOnlyNote = "Lineage lists a release once an agent works on one of its issues or pull requests.";
 export const noForgeHere = "No machine reads issues and pull requests yet. Update Agents on a machine to see them.";
 
-// The page of one issue, PR, milestone or release (#3119): its checks and its review.
+// The page of one issue, PR or release (#3119): its checks and its review.
 
-/** Whether a node has a page of its own in Work: an issue, a PR, a milestone or a release. */
+/** Whether a node has a page of its own in Work: an issue, a PR or a release. */
 export const hasPage = (n: LineageNode): n is LineageNode & { kind: WorkKind } => (workKinds as readonly string[]).includes(n.kind);
 
 /** A PR's checks: "14 passing, 1 failing, 2 running"; undefined with none. */

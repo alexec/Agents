@@ -1,5 +1,7 @@
 # Work look: Milestones, Releases and Timeline (#4334)
 
+> **#3878 removed forge milestones from the app:** the Milestones list, a milestone's page, a release's *Milestones finished* and the milestone figures below are gone. The Releases and Timeline parts stand.
+
 **Status:** draft for Alex. **Epic:** #4327, step 2. **Builds on:** [parts.md](parts.md) (#4328), [lists.md](lists.md) (#4330), [issue.md](issue.md) (#4331) and [pull-request.md](pull-request.md) (#4332). **Clients:** the Mac window, the Remote (iPhone and iPad), the web page (wide and 390 px). **Feature:** `feature:work`.
 
 This spike makes no product code. It puts the shared parts on three Work pages, and says only what each page adds:

@@ -21,7 +21,7 @@ type lineageBook struct {
 	lineageLinker
 	costLedgerBook
 	prCommentBook
-	issueMilestoneBook
+	issueParentBook
 	releaseTagsBook
 	lineageResolveBook
 }

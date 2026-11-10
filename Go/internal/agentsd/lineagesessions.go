@@ -18,7 +18,7 @@ import (
 // along those links only, one way, so a session's other issues do not come in, as a walk's would.
 //
 // It also says the issues, for a search for an epic to group its sessions under (#3900): the
-// issue first, then its sub-issues in the forge's order (lineagemilestone.go keeps it; by number
+// issue first, then its sub-issues in the forge's order (lineageparent.go keeps it; by number
 // for any it has not said), each with its title from the resolve cache. A session on two of them
 // is on the first.
 

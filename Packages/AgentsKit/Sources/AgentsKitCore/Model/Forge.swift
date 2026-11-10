@@ -30,6 +30,7 @@ public extension DaemonAPI {
         public var labels: [ForgeLabel]
         public var author: String?
         public var assignees: [String]
+        /// The wire's, for the standing epics' queries; the app does not show it (#3878).
         public var milestone: String?
         public var updatedAt: Date
         public var comments: Int

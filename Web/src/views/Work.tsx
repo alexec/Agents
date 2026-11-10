@@ -1,7 +1,7 @@
-// Work ▸ Issues, Pull requests, Milestones and Releases (#3119, spec 3100), as the window's WorkView:
-// every issue and pull request from forge/issues and forge/pulls on each machine, one row per ref, with
-// what lineage knows (reports/nodes: sessions, cost, lead time) under its title; the milestones and
-// releases lineage knows. A row opens its page.
+// Work ▸ Issues, Pull requests and Releases (#3119, spec 3100), as the window's WorkView: every issue
+// and pull request from forge/issues and forge/pulls on each machine, one row per ref, with what
+// lineage knows (reports/nodes: sessions, cost, lead time) under its title; the releases lineage
+// knows. A row opens its page.
 import { effect, useSignal } from "@preact/signals";
 import { Fragment, type ComponentChildren } from "preact";
 import { useEffect, useMemo, useRef } from "preact/hooks";
@@ -268,7 +268,7 @@ function WorkRowView({ row, several, dim, pick, open }: { row: WorkRow; several:
   );
 }
 
-/** The page of one issue, PR, milestone or release (#3119): the item from its forge (forge/issue,
+/** The page of one issue, PR or release (#3119): the item from its forge (forge/issue,
  * forge/pull) on the first machine that reads it. An issue's and a pull request's actions (#3130,
  * WorkActions) go to the machine that read it. */
 export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; ref: string }) {
@@ -325,7 +325,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
   useEffect(() => {
     let current = true;
     pipeline.value = [];
-    if (!lineageHost || kind === "milestone") return;
+    if (!lineageHost) return;
     void store.link.call("lineage/walk", { node, depth: pipelineDepth }, lineageHost)
       .then((g) => { if (current) pipeline.value = pipelineSteps(node, g); }, () => {});
     return () => { current = false; };
@@ -409,9 +409,6 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
           </SideSection>
           <SideSection title="Labels">
             {labels.length === 0 ? <span class="quiet">None</span> : <span class="work-chips">{labels.map((l) => <LabelChip key={l.name} label={l} />)}</span>}
-          </SideSection>
-          <SideSection title="Milestone">
-            {item.milestone ? <span><span aria-hidden="true">⚑ </span>{item.milestone}</span> : <span class="quiet">None</span>}
           </SideSection>
           <SideSection title="Repo">
             <span>{repoName(repoOf(ref))}</span>

@@ -13,7 +13,7 @@ import (
 )
 
 // What lineage asks (#3844), against a stand-in Forgejo whose answers are a scratch Forgejo
-// 17's, cut down: a merged pull request, an issue with a milestone, a milestone, a release's
+// 17's, cut down: a merged pull request, an issue, a release's
 // compare, a commit's pull request, and the cost comment posted, edited and posted again.
 func TestLineageAsks(t *testing.T) {
 	var mu sync.Mutex
@@ -22,8 +22,6 @@ func TestLineageAsks(t *testing.T) {
 		"GET repos/walkalex/app/issues/2": `{"title":"Add a","state":"closed","labels":[],"milestone":null,` +
 			`"pull_request":{"merged":true,"merged_at":"2026-11-07T13:17:48Z"}}`,
 		"GET repos/walkalex/app/issues/1":                `{"title":"Lineage asks Forgejo","state":"open","labels":[{"name":"bug"}],"milestone":{"id":1,"title":"0.2 Lineage"},"pull_request":null}`,
-		"GET repos/walkalex/app/milestones/1":            `{"id":1,"title":"0.2 Lineage","state":"open"}`,
-		"GET repos/walkalex/app/milestones":              `[{"id":1,"title":"0.2 Lineage"}]`,
 		"GET repos/walkalex/app/git/commits/v0.2.0":      `{"sha":"961a","commit":{"committer":{"date":"2026-11-07T13:17:47Z"}}}`,
 		"GET repos/walkalex/app/compare/v0.1.0...v0.2.0": `{"commits":[{"sha":"961a","commit":{"message":"Add a (#2)\n"}}]}`,
 		"GET repos/walkalex/app/commits/961a/pull":       `{"number":2}`,
@@ -55,17 +53,11 @@ func TestLineageAsks(t *testing.T) {
 	fj := NewRealForgejo(server.URL, func() string { return token }, nil)
 	ctx := context.Background()
 
-	if n, err := fj.Node(ctx, "walkalex/app", 2); err != nil || fmt.Sprint(n) != "{Add a merged [] 0}" {
+	if n, err := fj.Node(ctx, "walkalex/app", 2); err != nil || fmt.Sprint(n) != "{Add a merged []}" {
 		t.Errorf("a merged pull request: %+v %v", n, err)
 	}
-	if n, err := fj.Node(ctx, "walkalex/app", 1); err != nil || fmt.Sprint(n) != "{Lineage asks Forgejo open [bug] 1}" {
+	if n, err := fj.Node(ctx, "walkalex/app", 1); err != nil || fmt.Sprint(n) != "{Lineage asks Forgejo open [bug]}" {
 		t.Errorf("an issue: %+v %v", n, err)
-	}
-	if n, err := fj.MilestoneNode(ctx, "walkalex/app", 1); err != nil || n.Title != "0.2 Lineage" || n.State != "open" {
-		t.Errorf("a milestone: %+v %v", n, err)
-	}
-	if ms, err := fj.Milestones(ctx, "walkalex/app"); err != nil || fmt.Sprint(ms) != "[{1 0.2 Lineage}]" {
-		t.Errorf("the milestones: %+v %v", ms, err)
 	}
 	if at, err := fj.CommitTime(ctx, "walkalex/app", "v0.2.0"); err != nil || !at.Equal(time.Date(2026, 11, 7, 13, 17, 47, 0, time.UTC)) {
 		t.Errorf("a tag's time: %v %v", at, err)
@@ -99,8 +91,5 @@ func TestLineageAsks(t *testing.T) {
 		`PATCH repos/walkalex/app/issues/comments/6 {"body":"new"}`, `POST repos/walkalex/app/issues/3/comments {"body":"new"}`}
 	if fmt.Sprint(writes) != fmt.Sprint(want) {
 		t.Errorf("wrote\n%v\nwant\n%v", writes, want)
-	}
-	if !strings.Contains(strings.Join(asked, "\n"), "GET repos/walkalex/app/milestones all") {
-		t.Errorf("the milestones were not asked with state=all: %v", asked)
 	}
 }

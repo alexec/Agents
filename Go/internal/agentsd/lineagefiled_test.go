@@ -22,7 +22,7 @@ func TestLineageSessionOpensTheIssuesItFiles(t *testing.T) {
 	folder := t.TempDir()
 	repo := forgeRepo{"github", "alexec/agents"}
 	d.repos = map[string]forgeRepo{folder: repo}
-	forge := &fakeMilestones{of: map[string]int{repo.issue(1).Ref: 0, repo.issue(2).Ref: 0, repo.issue(3).Ref: 0}, asked: map[string]int{}}
+	forge := &fakeParents{known: map[string]bool{repo.issue(1).Ref: true, repo.issue(2).Ref: true, repo.issue(3).Ref: true}, asked: map[string]int{}}
 	d.issueLookup = forge.lookup
 	a := seeded(t, d, folder, func(*wire.Agent) {})
 	l := &live{d: d, id: a.ID}
@@ -49,7 +49,7 @@ func TestLineageSessionOpensTheIssuesItFiles(t *testing.T) {
 	d.noteIssueFiled(l, call("c4", "gh issue view 9", `{"command":"gh issue view 9"}`, "https://github.com/alexec/Agents/issues/9"))
 	d.noteIssueFiled(l, call("c5", "mcp__github__issue_write", `{"method":"update","issue_number":8}`, `{"url":"https://github.com/alexec/Agents/issues/8"}`))
 
-	settleMilestones(t, d)
+	settleParents(t, d)
 	s := sessionNode(a.ID)
 	wantLinks(t, active(d, s),
 		s.Ref+" opens "+repo.issue(1).Ref+" (agent)",
@@ -69,7 +69,7 @@ func TestLineageSessionOpensTheIssuesItFiles(t *testing.T) {
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	settleMilestones(t, d)
+	settleParents(t, d)
 	wantLinks(t, active(d, repo.issue(1)),
 		s.Ref+" opens "+repo.issue(1).Ref+" (agent)",
 		repo.issue(2).Ref+" part-of "+repo.issue(1).Ref+" (forge)",

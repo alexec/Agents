@@ -172,6 +172,29 @@ func TestEndedLinksGoAfterKeepEnded(t *testing.T) {
 	}
 }
 
+// A milestone's links, from a build before #3878, go when the store opens: a link to one,
+// and its shipped-in link to a release.
+func TestOpenDropsMilestoneLinks(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "lineage.jsonl")
+	f := openAt(t, path, t0)
+	m := wire.LineageNode{Kind: removedKindMilestone, Ref: "github:alexec/Agents/milestone/15"}
+	release := wire.LineageNode{Kind: KindRelease, Ref: "github:alexec/Agents/release/v0.14.0"}
+	link(t, f, session("a"), issue("1"), RelWorksOn, t0)
+	link(t, f, issue("1"), m, RelPartOf, t0)
+	link(t, f, m, release, "shipped-in", t0)
+	f.Close()
+	again := openAt(t, path, t0)
+	if got := again.Links(issue("1")).Links; len(got) != 1 || got[0].From != session("a") {
+		t.Fatalf("%+v", got)
+	}
+	if got := again.Links(release).Links; len(got) != 0 {
+		t.Fatalf("%+v", got)
+	}
+	if data, _ := os.ReadFile(path); strings.Contains(string(data), "milestone") {
+		t.Fatalf("the file still holds a milestone: %s", data)
+	}
+}
+
 // A store left open drops an ended link on Prune once it is KeepEnded old, file and all
 // (#3649): an idle machine does not wait for its next start.
 func TestPruneDropsEndedLinksWhileOpen(t *testing.T) {

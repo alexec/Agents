@@ -43,7 +43,7 @@ final class WorkListState {
 
     var ask: Ask { Ask(state: filter.state.forge, sort: nodesSort, asked: asked, board: filter.board) }
 
-    /// An issue's or a PR's lineage is joined by ref, in any order; a milestone's or a release's list is lineage's own.
+    /// An issue's or a PR's lineage is joined by ref, in any order; a release's list is lineage's own.
     private var nodesSort: DaemonAPI.ReportNodesSort { !kind.fromForge && sort == .cost ? .cost : .newest }
 
     var all: [WorkList.Row] {
@@ -54,12 +54,12 @@ final class WorkListState {
     /// The rows as the list shows them: filtered and sorted.
     var rows: [WorkList.Row] {
         var f = filter
-        // Milestones and releases have no state in v1.
+        // Releases have no state in v1.
         if !kind.fromForge { f.state = .all }
         return WorkList.sort(WorkList.filter(all, f, projects: projectRepos), by: sort)
     }
 
-    /// Each project with the repos its folders read (#3283); none for milestones and releases,
+    /// Each project with the repos its folders read (#3283); none for releases,
     /// which lineage alone lists, with no folder.
     var projectRepos: [(project: WorkList.Project, repos: Set<String>)] {
         kind.fromForge ? WorkList.projectRepos(projects, lists: (lists ?? []).map { (host: $0.host, items: $0.list.items) }) : []

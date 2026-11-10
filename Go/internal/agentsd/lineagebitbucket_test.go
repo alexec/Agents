@@ -19,17 +19,7 @@ func (f *fakeForgeBitbucket) Node(_ context.Context, repo string, number int, pr
 	if pr {
 		return bitbucketmcp.Node{Title: "Add a", State: "merged", Labels: []string{}}, nil
 	}
-	return bitbucketmcp.Node{Title: "Lineage asks Bitbucket", State: "open", Labels: []string{"bug", "api"}, Milestone: 3}, nil
-}
-
-func (f *fakeForgeBitbucket) MilestoneNode(_ context.Context, repo string, id int) (bitbucketmcp.Node, error) {
-	f.note(&f.asked, fmt.Sprintf("milestone %s/%d", repo, id))
-	return bitbucketmcp.Node{Title: "0.2 Lineage", Labels: []string{}}, nil
-}
-
-func (f *fakeForgeBitbucket) Milestones(_ context.Context, repo string) ([]bitbucketmcp.Milestone, error) {
-	f.note(&f.asked, "milestones "+repo)
-	return []bitbucketmcp.Milestone{{ID: 3, Title: "0.2 Lineage"}, {ID: 4, Title: "0.3 Later"}}, nil
+	return bitbucketmcp.Node{Title: "Lineage asks Bitbucket", State: "open", Labels: []string{"bug", "api"}}, nil
 }
 
 func (f *fakeForgeBitbucket) CommitTime(_ context.Context, repo, ref string) (time.Time, error) {
@@ -99,7 +89,7 @@ func TestLineageOnABitbucketFolder(t *testing.T) {
 	// A Pipelines run builds the pull request; its node says pipelines, not GitHub's actions.
 	d.lineageCIEvent(wire.Event{Name: "checks.failed", Details: map[string]string{"payload": `{"pr":{"number":8,` +
 		`"url":"https://bitbucket.org/walkalex/App/pull-requests/8"},"run":{"id":12}}`}})
-	settleMilestones(t, d)
+	settleParents(t, d)
 	if !active(d, pr)["bitbucket:walkalex/app/pipelines/12 builds "+pr.Ref+" (forge)"] {
 		t.Errorf("the run: %v", active(d, pr))
 	}
@@ -112,38 +102,32 @@ func TestLineageOnABitbucketFolder(t *testing.T) {
 }
 
 // #3879: lineage asks the connected Bitbucket, by its connection, for a node's title and state,
-// an issue's milestone, a release's pull requests and milestones, and the cost comment.
+// a release's pull requests, and the cost comment.
 func TestLineageAsksBitbucket(t *testing.T) {
 	d, _, bb, _ := bitbucketDaemon(t)
 	repo := forgeRepo{"bitbucket", "walkalex/app"}
 	folder := bitbucketFolder(t, d)
 	ctx := context.Background()
 
-	// A node's title and state: a merged pull request, an issue's kind and component, a milestone with no state.
+	// A node's title and state: a merged pull request, and an issue's kind and component.
 	pr, issue := repo.pr(8), repo.issue(7)
 	d.resolveNode(ctx, pr)
 	d.resolveNode(ctx, issue)
-	d.resolveNode(ctx, repo.milestone(3))
-	for n, want := range map[wire.LineageNode]string{pr: "Add a merged []", issue: "Lineage asks Bitbucket open [bug api]", repo.milestone(3): "0.2 Lineage  []"} {
+	for n, want := range map[wire.LineageNode]string{pr: "Add a merged []", issue: "Lineage asks Bitbucket open [bug api]"} {
 		e := d.resolveCache[n]
 		if got := fmt.Sprintf("%s %s %v", e.resolved.Title, deref(e.resolved.State), e.resolved.Labels); !e.ok || got != want {
 			t.Errorf("%s resolved %q (ok %v), want %q", n.Ref, got, e.ok, want)
 		}
 	}
 
-	// An issue's milestone.
-	d.askIssueMilestone(milestoneJob{folder, repo, 7})
-	wantLinks(t, active(d, issue), issue.Ref+" part-of bitbucket:walkalex/app/milestone/3 (forge)")
-
-	// A release: the merge title's (pull request #8), another commit's pull request asked, the milestone by its version.
+	// A release: the merge title's (pull request #8), another commit's pull request asked.
 	if !d.linkRelease(ctx, folder, repo, "v0.2.0", "v0.1.0") {
 		t.Fatal("the release is not done")
 	}
 	release := repo.release("v0.2.0")
 	wantLinks(t, active(d, release),
 		pr.Ref+" part-of "+release.Ref+" (forge)",
-		"bitbucket:walkalex/app#9 part-of "+release.Ref+" (forge)",
-		"bitbucket:walkalex/app/milestone/3 shipped-in "+release.Ref+" (forge)")
+		"bitbucket:walkalex/app#9 part-of "+release.Ref+" (forge)")
 
 	// The cost comment, by the connection.
 	asks, _ := d.connectionAsks("bitbucket")
@@ -151,8 +135,8 @@ func TestLineageAsksBitbucket(t *testing.T) {
 		t.Fatalf("the cost comment: %q %v", id, err)
 	}
 
-	want := []string{"node walkalex/App#8 pr=true", "node walkalex/App#7 pr=false", "milestone walkalex/App/3", "node walkalex/App#7 pr=false",
-		"time walkalex/App v0.2.0", "compare walkalex/App v0.1.0...v0.2.0", "pull of walkalex/App bbb", "milestones walkalex/App",
+	want := []string{"node walkalex/App#8 pr=true", "node walkalex/App#7 pr=false",
+		"time walkalex/App v0.2.0", "compare walkalex/App v0.1.0...v0.2.0", "pull of walkalex/App bbb",
 		"cost walkalex/App#8 id= true"}
 	if fmt.Sprint(bb.asked) != fmt.Sprint(want) {
 		t.Errorf("Bitbucket was asked\n%v\nwant\n%v", bb.asked, want)

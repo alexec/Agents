@@ -1,8 +1,8 @@
 import Foundation
 
-/// `reports/nodes` (#3118): the lineage nodes of one kind in a scope (issues, PRs, milestones
-/// or releases), with their cost, sessions and lead time, filtered, sorted and in pages of at
-/// most 100. The data behind Work ▸ Issues, Pull requests, Milestones and Releases (#3100).
+/// `reports/nodes` (#3118): the lineage nodes of one kind in a scope (issues, PRs or
+/// releases), with their cost, sessions and lead time, filtered, sorted and in pages of at
+/// most 100. The data behind Work ▸ Issues, Pull requests and Releases (#3100).
 public extension DaemonAPI {
     /// How `reports/nodes` sorts: the last change first (the default), the most cost or waste
     /// first, or the longest lead time first (nodes with none last).
@@ -10,7 +10,7 @@ public extension DaemonAPI {
         case newest, cost, waste, leadTime
     }
 
-    /// `reports/nodes`' question. `kind` is issue, pr, milestone or release. `state` is open,
+    /// `reports/nodes`' question. `kind` is issue, pr or release. `state` is open,
     /// closed or merged; `repo` a ref prefix (`github:alexec/Agents`); `since` is on the node's
     /// last change. `limit` is 1 to 100, 50 when nil; `cursor` is the last page's.
     struct ReportNodesQuery: Codable, Sendable, Hashable {

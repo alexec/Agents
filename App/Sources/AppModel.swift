@@ -357,7 +357,7 @@ final class AppModel {
     }
 
     /// Whether the window is showing Work (#3119): every issue and pull request from the forges,
-    /// with lineage on top, and the milestones and releases lineage knows. A page like Cost, and
+    /// with lineage on top, and the releases lineage knows. A page like Cost, and
     /// not persisted for the same reason.
     var showsWork = false {
         didSet {

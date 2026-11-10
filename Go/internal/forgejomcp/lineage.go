@@ -12,27 +12,19 @@ import (
 )
 
 // What the daemon's lineage asks Forgejo (#3844), as it asks gh and glab for GitHub and GitLab:
-// a node's title and state, an issue's milestone, a release's commits, pull requests and
-// milestones, and the cost comment on a merged pull request. Issues and pull requests share
-// Forgejo's issue API, so one call says either. A milestone is named by its id.
+// a node's title and state, a release's commits and pull requests, and the cost comment on a
+// merged pull request. Issues and pull requests share Forgejo's issue API, so one call says
+// either.
 
-// Node is an issue's, a pull request's or a milestone's title, state (open, closed or merged)
-// and labels, and an issue's milestone id, 0 for none.
+// Node is an issue's or a pull request's title, state (open, closed or merged) and labels.
 type Node struct {
-	Title     string
-	State     string
-	Labels    []string
-	Milestone int
+	Title  string
+	State  string
+	Labels []string
 }
 
 // Commit is one commit of a compare: its sha and message.
 type Commit struct{ SHA, Message string }
-
-// Milestone is one milestone of a repository: its id and title.
-type Milestone struct {
-	ID    int
-	Title string
-}
 
 // Node is an issue or a pull request: a merged pull request's state is merged.
 func (f *RealForgejo) Node(ctx context.Context, repo string, number int) (Node, error) {
@@ -43,9 +35,6 @@ func (f *RealForgejo) Node(ctx context.Context, repo string, number int) (Node, 
 		PullRequest *struct {
 			Merged bool `json:"merged"`
 		} `json:"pull_request"`
-		Milestone *struct {
-			ID int `json:"id"`
-		} `json:"milestone"`
 	}
 	if err := f.get(ctx, fmt.Sprintf("%s/issues/%d", repoPath(repo), number), false, &j); err != nil {
 		return Node{}, err
@@ -57,41 +46,7 @@ func (f *RealForgejo) Node(ctx context.Context, repo string, number int) (Node, 
 	if j.PullRequest != nil && j.PullRequest.Merged {
 		n.State = "merged"
 	}
-	if j.Milestone != nil {
-		n.Milestone = j.Milestone.ID
-	}
 	return n, nil
-}
-
-// MilestoneNode is a milestone's title and state, by its id.
-func (f *RealForgejo) MilestoneNode(ctx context.Context, repo string, id int) (Node, error) {
-	var j struct {
-		Title string `json:"title"`
-		State string `json:"state"`
-	}
-	if err := f.get(ctx, fmt.Sprintf("%s/milestones/%d", repoPath(repo), id), false, &j); err != nil {
-		return Node{}, err
-	}
-	if j.Title == "" {
-		return Node{}, errors.New("Forgejo did not say its title")
-	}
-	return Node{Title: j.Title, State: j.State}, nil
-}
-
-// Milestones is every milestone of repo, open and closed.
-func (f *RealForgejo) Milestones(ctx context.Context, repo string) ([]Milestone, error) {
-	list, _, err := all[struct {
-		ID    int    `json:"id"`
-		Title string `json:"title"`
-	}](ctx, f, repoPath(repo)+"/milestones?state=all")
-	if err != nil {
-		return nil, err
-	}
-	out := make([]Milestone, 0, len(list))
-	for _, m := range list {
-		out = append(out, Milestone{m.ID, m.Title})
-	}
-	return out, nil
 }
 
 // CommitTime is the commit time of a tag, a branch or a sha.

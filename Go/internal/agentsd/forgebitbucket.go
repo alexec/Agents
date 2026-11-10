@@ -45,8 +45,6 @@ type forgeBitbucket interface {
 	FailedLog(ctx context.Context, repo string, run int, step string) (string, error)
 	// What lineage asks (lineagebitbucket.go).
 	Node(ctx context.Context, repo string, number int, pr bool) (bitbucketmcp.Node, error)
-	MilestoneNode(ctx context.Context, repo string, id int) (bitbucketmcp.Node, error)
-	Milestones(ctx context.Context, repo string) ([]bitbucketmcp.Milestone, error)
 	CommitTime(ctx context.Context, repo, ref string) (time.Time, error)
 	Compare(ctx context.Context, repo, base, head string) ([]bitbucketmcp.Commit, error)
 	CommitPR(ctx context.Context, repo, sha string) (int, error)

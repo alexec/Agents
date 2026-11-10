@@ -235,7 +235,7 @@ func (d *Daemon) refreshCostLinksLocked() {
 			switch {
 			case c.Node.Kind == lineage.KindPR && l.Rel == lineage.RelFixes && l.To.Kind == lineage.KindIssue:
 				fixes = append(fixes, l.To.Ref)
-			case l.Rel == lineage.RelPartOf && (l.To.Kind == lineage.KindMilestone || l.To.Kind == lineage.KindRelease):
+			case l.Rel == lineage.RelPartOf && l.To.Kind == lineage.KindRelease:
 				partOf = append(partOf, l.To.Ref)
 			}
 		}
@@ -270,7 +270,7 @@ func startsWork(n wire.LineageNode, l wire.LineageLink) bool {
 	return false
 }
 
-// refreshCostResolvedLocked puts on each issue, PR and milestone node the title, state and
+// refreshCostResolvedLocked puts on each issue and PR node the title, state and
 // labels the resolve cache has for it (#3118), for reports/nodes, and on an issue its level,
 // feature, area and epic (#3562), marking the nodes whose answer changed unsent. A level,
 // feature, area or epic once known is kept: the cache forgets, and a closed issue keeps them.

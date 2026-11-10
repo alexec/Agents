@@ -5599,7 +5599,7 @@ type LineageCost struct {
 	WaitingSeconds float64 `json:"waitingSeconds"`
 }
 
-// One node's banked cost on a machine (#2350), whole, with what its rollups need: the repo or tracker its ref is in, the issues a PR fixes (ended links too: a PR closed without a merge still counts against its issue, as waste), the milestones it is part of, and how a PR ended. A session's own cost is its turns that had no active link.
+// One node's banked cost on a machine (#2350), whole, with what its rollups need: the repo or tracker its ref is in, the issues a PR fixes (ended links too: a PR closed without a merge still counts against its issue, as waste), the releases it is part of, and how a PR ended. A session's own cost is its turns that had no active link.
 type LineageCostNode struct {
 	Node LineageNode `json:"node"`
 
@@ -5611,7 +5611,7 @@ type LineageCostNode struct {
 	// A PR's issues, by ref.
 	Fixes []string `json:"fixes,omitzero"`
 
-	// The milestones it is part of, by ref.
+	// The releases it is part of, by ref.
 	PartOf []string `json:"partOf,omitzero"`
 
 	// A PR's end: merged, closed (without a merge: waste) or reverted (a merged revert: waste). Absent while open. The list is open.
@@ -5653,7 +5653,7 @@ type LineageCostNode struct {
 	Estimate *LineageEstimateKept `json:"estimate,omitzero"`
 }
 
-// lineage/cost (#2350): a node's cost rolled up. own is what was banked on the node itself. total adds its parts: an issue's PRs (the PRs that fix it); a milestone's issues, their PRs and the PRs part of it; a repo's every node (kind repo, ref github:alexec/agents). waste is the parts' PRs closed without a merge or reverted. unlinked is the parts' sessions: turns with no active link. parts is the nodes added up, newest first, at most 500; limited says there are more.
+// lineage/cost (#2350): a node's cost rolled up. own is what was banked on the node itself. total adds its parts: an issue's PRs (the PRs that fix it); a release's PRs and the issues they fix; a repo's every node (kind repo, ref github:alexec/agents). waste is the parts' PRs closed without a merge or reverted. unlinked is the parts' sessions: turns with no active link. parts is the nodes added up, newest first, at most 500; limited says there are more.
 type LineageCostRollup struct {
 	Node LineageNode `json:"node"`
 
@@ -5792,7 +5792,7 @@ type LineageEstimateRequest struct {
 	StartAt *Date `json:"startAt,omitzero"`
 }
 
-// lineage/figures (#4427): a milestone's or a release's Lineage panel on its Work page, from this machine's totals. cost is its rollup's total, as lineage/cost's. sessions is how many sessions worked on it and its parts, each once; running is how many of them run now (starting, running or waiting on the person). runtimes is the runtimes of the sessions this machine has, the most sessions first. A milestone has releasedIn: the releases that took its issues (and its PRs that fix none of them), each item in the first release that took it, the oldest release first; and finishedIn, the newest of them, once the milestone is closed. A release has milestonesFinished: the milestones shipped in it (by title) and the closed milestones whose last release is this one; and leadTimeSeconds, from the first work on its parts to its tag. limited says the rollup had more parts than it counts. Another kind of node is refused.
+// lineage/figures (#4427): a release's Lineage panel on its Work page, from this machine's totals. cost is its rollup's total, as lineage/cost's. sessions is how many sessions worked on it and its parts, each once; running is how many of them run now (starting, running or waiting on the person). runtimes is the runtimes of the sessions this machine has, the most sessions first. leadTimeSeconds is from the first work on its parts to its tag (#3878 removed the milestone figures). limited says the rollup had more parts than it counts. Another kind of node is refused.
 type LineageFigures struct {
 	Node LineageNode `json:"node"`
 
@@ -5803,13 +5803,6 @@ type LineageFigures struct {
 	Running int64 `json:"running"`
 
 	Runtimes []LineageRuntimeCount `json:"runtimes"`
-
-	ReleasedIn []LineageReleaseTook `json:"releasedIn,omitzero"`
-
-	// A closed milestone's last release.
-	FinishedIn *LineageNode `json:"finishedIn,omitzero"`
-
-	MilestonesFinished []LineageMilestoneFinished `json:"milestonesFinished,omitzero"`
 
 	LeadTimeSeconds *float64 `json:"leadTimeSeconds,omitzero"`
 
@@ -5862,14 +5855,7 @@ type LineageLinks struct {
 	Limited *bool `json:"limited,omitzero"`
 }
 
-// A milestone a release finished (#4427), with its title when the host has resolved it.
-type LineageMilestoneFinished struct {
-	Milestone LineageNode `json:"milestone"`
-
-	Title *string `json:"title,omitzero"`
-}
-
-// A node in the lineage graph (#2348). kind is what it is: issue, pr, session, workflow-run, commit, file, branch or milestone, and the list is open. ref names it apart from any tracker, as <scheme>:<id>: github:alexec/Agents#123, gitlab:group/repo!45, linear:ENG-4, jira:ABC-9, session:<agent id>.
+// A node in the lineage graph (#2348). kind is what it is: issue, pr, session, workflow-run, commit, file, branch or release, and the list is open. ref names it apart from any tracker, as <scheme>:<id>: github:alexec/Agents#123, gitlab:group/repo!45, linear:ENG-4, jira:ABC-9, session:<agent id>.
 type LineageNode struct {
 	Kind string `json:"kind"`
 
@@ -5883,16 +5869,7 @@ type LineageNodeRequest struct {
 	Depth *int64 `json:"depth,omitzero"`
 }
 
-// A release that took a milestone's items, its tag, and how many items it took (#4427).
-type LineageReleaseTook struct {
-	Release LineageNode `json:"release"`
-
-	Tag string `json:"tag"`
-
-	Items int64 `json:"items"`
-}
-
-// A node's title, state and labels from its connector (#3089), resolved and cached on the daemon so a lineage renderer shows "Fix flaky test" rather than its ref. state is open, closed or merged (a pull request's; an issue's is open or closed); absent when the connector does not say. labels is empty when it has none. Resolved for a GitHub or GitLab issue or pull request only; Linear, milestones and releases are not resolved yet.
+// A node's title, state and labels from its connector (#3089), resolved and cached on the daemon so a lineage renderer shows "Fix flaky test" rather than its ref. state is open, closed or merged (a pull request's; an issue's is open or closed); absent when the connector does not say. labels is empty when it has none. Resolved for a GitHub or GitLab issue or pull request only; Linear and releases are not resolved yet.
 type LineageResolved struct {
 	Title string `json:"title"`
 
@@ -10433,7 +10410,7 @@ type ReportFormat string
 const ReportFormatCsv ReportFormat = "csv"
 const ReportFormatJsonl ReportFormat = "jsonl"
 
-// One row of reports/nodes (#3118): an issue, PR, milestone or release, its cost rolled up from every machine in the scope as reports/value adds it up. own is what was banked on the node itself; total adds its parts (an issue's PRs; a milestone's or release's issues and PRs); waste is the parts' PRs closed without a merge or reverted. sessions is how many sessions worked on it and its parts, each once. leadTimeSeconds is from the first work on it to its last PR merged, absent before a merge. resolved is the newest title, state and labels any machine sent; absent when none had them.
+// One row of reports/nodes (#3118): an issue, PR or release, its cost rolled up from every machine in the scope as reports/value adds it up. own is what was banked on the node itself; total adds its parts (an issue's PRs; a release's issues and PRs); waste is the parts' PRs closed without a merge or reverted. sessions is how many sessions worked on it and its parts, each once. leadTimeSeconds is from the first work on it to its last PR merged, absent before a merge. resolved is the newest title, state and labels any machine sent; absent when none had them.
 type ReportNode struct {
 	Node LineageNode `json:"node"`
 
@@ -10488,9 +10465,9 @@ type ReportNodes struct {
 	Unresolved int64 `json:"unresolved"`
 }
 
-// reports/nodes (#3118): the lineage nodes of one kind in a scope, with filters and pages. The scope is as reports/value's. state is open, closed or merged, from the node's resolved state (a PR with none falls back to its outcome); milestones and releases have no state in v1. repo is a ref prefix (github:alexec/Agents). since is on the node's last change. limit is 1 to 100, 50 when absent. cursor is the last page's, opaque.
+// reports/nodes (#3118): the lineage nodes of one kind in a scope, with filters and pages. The scope is as reports/value's. state is open, closed or merged, from the node's resolved state (a PR with none falls back to its outcome); releases have no state in v1. repo is a ref prefix (github:alexec/Agents). since is on the node's last change. limit is 1 to 100, 50 when absent. cursor is the last page's, opaque.
 type ReportNodesQuery struct {
-	// issue, pr, milestone or release.
+	// issue, pr or release.
 	Kind string `json:"kind"`
 
 	State *string `json:"state,omitzero"`
@@ -10646,7 +10623,7 @@ type ReportScopes struct {
 	Admin bool `json:"admin"`
 }
 
-// reports/value (#2351): what the work in a scope cost and what it delivered, from the lineage nodes that the scope's machines send (#2350). A node is in the range when it last changed in it, with its whole cost. total is the work on issues and PRs; waste is the PRs closed without a merge and merged reverts; unlinked is the turns with no issue or PR. perMergedPR is total by the PRs merged, by currency. leadTimeSeconds is the median of the issues' lead times. issues, milestones and releases (#3023) are the most costly first, at most 100 each; limited says there are more.
+// reports/value (#2351): what the work in a scope cost and what it delivered, from the lineage nodes that the scope's machines send (#2350). A node is in the range when it last changed in it, with its whole cost. total is the work on issues and PRs; waste is the PRs closed without a merge and merged reverts; unlinked is the turns with no issue or PR. perMergedPR is total by the PRs merged, by currency. leadTimeSeconds is the median of the issues' lead times. issues and releases (#3023) are the most costly first, at most 100 each; limited says there are more.
 type ReportValue struct {
 	Range ReportRange `json:"range"`
 
@@ -10678,15 +10655,13 @@ type ReportValue struct {
 
 	Issues []ReportValueRow `json:"issues"`
 
-	Milestones []ReportValueRow `json:"milestones"`
-
-	// One row per release (#3023): the PRs part-of it and the issues those PRs fix, the same way as a milestone.
+	// One row per release (#3023): the PRs part-of it and the issues those PRs fix.
 	Releases []ReportValueRow `json:"releases"`
 
 	Limited *bool `json:"limited,omitzero"`
 }
 
-// One issue or milestone on Reports ▸ Value (#2351): its cost rolled up from every machine in the scope, as lineage/cost adds it up, and how its PRs ended.
+// One issue or release on Reports ▸ Value (#2351): its cost rolled up from every machine in the scope, as lineage/cost adds it up, and how its PRs ended.
 type ReportValueRow struct {
 	Node LineageNode `json:"node"`
 
