@@ -50,7 +50,11 @@ func (m *Methods) userMethod(ctx context.Context, method string, params json.Raw
 	book := m.s.users
 	switch method {
 	case "user/settings":
-		return book.Settings(ctx, user)
+		settings, err := book.Settings(ctx, user)
+		if err == nil {
+			m.s.addAccountInfo(user, &settings)
+		}
+		return settings, err
 	case "user/setAgentConfigFile":
 		return nil, agentConfigFileRefused()
 	case "user/secretNames":

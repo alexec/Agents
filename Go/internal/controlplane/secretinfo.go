@@ -1,6 +1,7 @@
 package controlplane
 
 import (
+	"encoding/json"
 	"strings"
 	"sync"
 
@@ -27,6 +28,8 @@ type secretInfoBook struct {
 	secretHints map[string]map[string]map[string]secretHint
 	// secretLast is each name's newest operation, by person, then name.
 	secretLast map[string]map[string]wire.SecretLastOp
+	// accountLast is each account's newest operation, by person, then service and address.
+	accountLast map[string]map[string]wire.AccountLastOp
 }
 
 // noteSecretInfo keeps what host, a machine of user's, sent: its operations, and when held is
@@ -107,5 +110,71 @@ func (s *Service) addSecretInfo(user string, rows []wire.UserSecretRow) {
 				break
 			}
 		}
+	}
+}
+
+// accountKey is an account's service and address, as the machines' operations name it.
+func accountKey(service string, address *string) string {
+	key := strings.ToLower(strings.TrimSpace(service)) + "#"
+	if address != nil {
+		key += strings.ToLower(strings.TrimSpace(*address))
+	}
+	return key
+}
+
+// noteAccountOps keeps the newest operation on each of user's accounts (#4160), at the time
+// the machine said it. As a secret's, it stays in this copy's memory only.
+func (s *Service) noteAccountOps(user string, ops []wire.AccountOperation, at wire.Date) {
+	if user == "" || len(ops) == 0 {
+		return
+	}
+	b := &s.secretInfoBook
+	b.secretInfoMu.Lock()
+	defer b.secretInfoMu.Unlock()
+	if b.accountLast == nil {
+		b.accountLast = map[string]map[string]wire.AccountLastOp{}
+	}
+	last := b.accountLast[user]
+	if last == nil {
+		last = map[string]wire.AccountLastOp{}
+		b.accountLast[user] = last
+	}
+	for _, op := range ops {
+		key := accountKey(op.Service, op.Address)
+		if _, ok := last[key]; !ok && len(last) >= secretInfoMost {
+			continue
+		}
+		last[key] = wire.AccountLastOp{What: op.What, At: at}
+	}
+}
+
+// addAccountInfo puts each account's last operation on the person's settings (#4160): the
+// newest of its own and a read of the secret or card it names.
+func (s *Service) addAccountInfo(user string, settings *wire.UserSettings) {
+	var part wire.OutsideAccounts
+	if len(settings.Accounts) == 0 || json.Unmarshal(settings.Accounts, &part) != nil {
+		return
+	}
+	b := &s.secretInfoBook
+	b.secretInfoMu.Lock()
+	for i := range part.Accounts {
+		a := &part.Accounts[i]
+		a.LastOp = nil
+		if op, ok := b.accountLast[user][accountKey(a.Service, a.Address)]; ok {
+			a.LastOp = new(op)
+		}
+		for _, name := range []*string{a.Secret, a.Card} {
+			if name == nil {
+				continue
+			}
+			op, ok := b.secretLast[user][strings.TrimSpace(*name)]
+			if ok && op.What == wire.SecretOperationWhatRead && (a.LastOp == nil || op.At > a.LastOp.At) {
+				a.LastOp = &wire.AccountLastOp{What: wire.AccountOperationWhatRead, At: op.At}
+			}
+		}
+	}
+	b.secretInfoMu.Unlock()
+	if raw, err := json.Marshal(part); err == nil {
+		settings.Accounts = raw
 	}
 }

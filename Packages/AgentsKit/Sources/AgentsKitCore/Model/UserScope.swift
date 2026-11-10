@@ -95,6 +95,10 @@ public extension DaemonAPI {
         public var twoFactor: String?
         public var issue: String?
         public var made: String?
+        /// When it was last changed (#4157), by an agent's add or an Edit…; nil for one never changed.
+        public var edited: Date?
+        /// Its newest operation (#4157), as user/settings gives it (#4160); the control plane drops it on a set.
+        public var lastOp: AccountLastOp?
         public var tokenExpires: String?
         public var notes: String?
         /// The projects that use it, by name; none is all of them.
@@ -111,8 +115,10 @@ public extension DaemonAPI {
         public init(service: String, description: String? = nil, address: String? = nil, plan: String? = nil, monthlyCostUsd: Double? = nil,
                     card: String? = nil, secret: String? = nil, twoFactor: String? = nil, issue: String? = nil,
                     made: String? = nil, tokenExpires: String? = nil, notes: String? = nil, projects: [String]? = nil,
-                    askBeforeUse: Bool? = nil) {
+                    askBeforeUse: Bool? = nil, edited: Date? = nil, lastOp: AccountLastOp? = nil) {
             self.service = service
+            self.edited = edited
+            self.lastOp = lastOp
             self.description = description
             self.address = address
             self.plan = plan
@@ -141,6 +147,17 @@ public extension DaemonAPI {
     }
 
     /// The accounts part.
+    /// An account's newest operation (#4157): `read`, `added` or `edited`, by an agent.
+    struct AccountLastOp: Codable, Sendable, Hashable {
+        public var what: String
+        public var at: Date
+
+        public init(what: String, at: Date) {
+            self.what = what
+            self.at = at
+        }
+    }
+
     struct OutsideAccounts: Codable, Sendable, Hashable {
         public var accounts: [OutsideAccount]
 

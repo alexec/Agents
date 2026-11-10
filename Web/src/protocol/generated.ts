@@ -7197,12 +7197,15 @@ export interface OutsideAccount {
   made?: string;
   /**
    * When it was last changed (#4157): the control plane sets it when an account takes another's
-   * place. made stays. Absent for one never changed.
+   * place, by manage_accounts or a client's Edit… (#4160). made stays. Absent for one never
+   * changed.
    */
   edited?: WireDate;
   /**
    * Its newest operation (#4157): a read or change by manage_accounts, or a read of the secret or
-   * card it names, as the machine that answers knows it. The control plane does not store it.
+   * card it names, as the machine that answers knows it. The control plane does not store it: it
+   * keeps the newest the machines said in memory and puts it on user/settings (#4160), and drops
+   * one a client sends.
    */
   lastOp?: AccountLastOp;
   /** The date its token expires, YYYY-MM-DD. */

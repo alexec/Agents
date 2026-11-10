@@ -2,6 +2,7 @@ package usersettings
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -52,4 +53,42 @@ func TestAccounts(t *testing.T) {
 	if _, err := b.SetPart(ctx, "ana", wire.UserSettingsPartNameAccounts, []byte(`{"accounts":[{"plan":"Free"}]}`)); !errors.Is(err, ErrInvalid) {
 		t.Fatal(err)
 	}
+}
+
+// An Edit… on a client (user/setSettings) is edited as an add is, and keeps no lastOp (#4160).
+func TestSetAccountsStampsEdited(t *testing.T) {
+	ctx := context.Background()
+	b := localBook(t, store.NewMemory())
+	at := time.Date(2026, 11, 9, 9, 0, 0, 0, time.UTC)
+	b.now = func() time.Time { return at }
+	set := func(json string) wire.OutsideAccount {
+		t.Helper()
+		if _, err := b.SetPart(ctx, "ana", wire.UserSettingsPartNameAccounts, []byte(json)); err != nil {
+			t.Fatal(err)
+		}
+		kept, _ := b.Accounts(ctx, "ana")
+		return kept.Accounts[0]
+	}
+	if a := set(`{"accounts":[{"service":"gitlab.com","plan":"Free","made":"2026-10-19","lastOp":{"what":"read","at":1}}]}`); a.Edited != nil || a.LastOp != nil {
+		t.Fatalf("new: %+v", a)
+	}
+	if a := set(`{"accounts":[{"service":"gitlab.com","plan":"Free","made":"2026-10-19"}]}`); a.Edited != nil {
+		t.Fatalf("the same: %+v", a)
+	}
+	edited := at
+	if a := set(`{"accounts":[{"service":"gitlab.com","plan":"Pro"}]}`); a.Edited == nil || !a.Edited.Time().Equal(edited) || *a.Made != "2026-10-19" {
+		t.Fatalf("edited: %+v", a)
+	}
+	at = at.Add(time.Hour)
+	if a := set(`{"accounts":[{"service":"gitlab.com","plan":"Pro","made":"2026-10-19","edited":` + jsonDate(edited) + `}]}`); !a.Edited.Time().Equal(edited) {
+		t.Fatalf("sent back unchanged: %+v", a)
+	}
+	if a := set(`{"accounts":[{"service":"gitlab.com","plan":"Team","made":"2026-10-19","edited":` + jsonDate(edited) + `}]}`); !a.Edited.Time().Equal(at) {
+		t.Fatalf("edited again: %+v", a)
+	}
+}
+
+func jsonDate(t time.Time) string {
+	raw, _ := json.Marshal(wire.DateOf(t))
+	return string(raw)
 }

@@ -227,6 +227,9 @@ func (b *Book) SetPart(ctx context.Context, user string, part wire.UserSettingsP
 		}
 		s.AgentConfigFiles = nil
 		slot := partOf(&s, part)
+		if part == wire.UserSettingsPartNameAccounts && !removing {
+			parsed = canonical(stampAccounts(*slot, parsed, b.now()))
+		}
 		if string(canonical(*slot)) == string(parsed) {
 			return nil, nil
 		}
