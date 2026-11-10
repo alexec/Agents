@@ -883,13 +883,6 @@ struct RemoteFolderFold: View {
                     heading(isOpen)
                 }
             }
-            // The few Recently archived sessions it shows, while it is open by hand (#2731):
-            // not because a search unfolded it, since the search brings its own matches.
-            .task(id: folds.isOpen(key)) {
-                if folds.isOpen(key) {
-                    _ = await model.loadArchived(in: key, limit: SidebarFolderFold.recentArchivedShown)
-                } else { model.letGoOfArchived(in: key.folder) }
-            }
         }
     }
 
@@ -933,15 +926,6 @@ struct RemoteFolderFold: View {
             ForEach(SidebarTree.rows(issue.sessions, in: model.work, folds: folds)) { row in
                 SidebarSessionRow(agent: row.agent, place: SidebarProjects.machineMark(of: row.agent, in: group) { model.hostLabel($0) },
                                   tree: row, folds: folds, isNested: true)
-            }
-        }
-        if !fold.recentArchived.isEmpty {
-            let recentOpen = folds.isOpen(key, .recentArchivedSessions)
-            SidebarFoldRow(title: "Recently archived sessions", count: fold.recentArchived.count, isOpen: recentOpen) {
-                folds.set(key, .recentArchivedSessions, open: !recentOpen)
-            }
-            ForEach(FoldedRow.rows(recentOpen ? fold.recentArchived : [], in: .recentArchivedSessions)) { row in
-                SidebarSessionRow(agent: row.item, isNested: true)
             }
         }
     }

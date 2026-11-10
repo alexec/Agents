@@ -179,35 +179,6 @@ struct SidebarModelTests {
         #expect(open.archivedShown(showingAll: false).count == 15)
     }
 
-    @Test func sessionsFoldKeepsTheThreeNewestArchivedSessions() {
-        let model = AgentsModel()
-        let archived = (0..<5).map { agent(api, .archived, "archived \($0)", at: Double($0)) }
-        model.replaceAgents(archived + [agent(api, .running, "live", at: 10)])
-        let fold = SidebarFolderFold(key, label: "api", in: model, isOpen: true)
-        #expect(fold.recentArchived(now: t0).map(\.id) == archived.suffix(3).reversed().map(\.id))
-
-        let empty = SidebarFolderFold(FolderKey(host: .mac, folder: web), label: "web", in: model, isOpen: true)
-        #expect(empty.recentArchived.isEmpty)
-    }
-
-    @Test func recentlyArchivedHoldsOnlyTheLastDaysArchived() {
-        let model = AgentsModel()
-        let day = SidebarFolderFold.recentArchivedWithin
-        let archived = [-day - 60, -day + 60, -10].map { agent(api, .archived, "archived \($0)", at: $0) }
-        model.replaceAgents(archived)
-        let fold = SidebarFolderFold(key, label: "api", in: model, isOpen: true)
-        #expect(fold.recentArchived(now: t0).map(\.id) == [archived[2].id, archived[1].id])
-        #expect(fold.recentArchived(now: t0.addingTimeInterval(day)).isEmpty)
-    }
-
-    @Test func aSearchListsArchivedMatchesOnceNotInTheRecentFold() {
-        let model = AgentsModel()
-        model.replaceAgents((0..<5).map { agent(api, .archived, "login \($0)", at: Double($0)) })
-        let searched = SidebarFolderFold(key, label: "api", in: model, query: "login", isOpen: false)
-        #expect(searched.recentArchived.isEmpty)
-        #expect(searched.archivedShown(showingAll: false).count == 5)
-    }
-
     @Test func foldersAreThisMacsThenEachServersInHostOrder() {
         let gpu = MachineRef(rawValue: "gpu00001")
         let stray = MachineRef(rawValue: "stray001")
