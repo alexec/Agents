@@ -1,4 +1,5 @@
 ---
+diataxis: explanation
 description: What planning means in Agents, the three questions it answers, and how the figures earn trust.
 ---
 
