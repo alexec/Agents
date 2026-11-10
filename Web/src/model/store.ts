@@ -18,7 +18,8 @@ import type {
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ConnectAnotherRequest, ConnectReport, ControlPerson, DailySummarySettings, SummaryPage, SummaryPageText, DesktopControlSettings, WakeSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
   PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, BudgetRequest, RemoveRequest, ClientPermissionSettings, PRCostComment,
-  Connection, LineageNode, LineageSessionIssue, MoveToMachineAnswer, ProblemReport, ProblemReportRequest, Request as PersonRequest, RequestSecretUse, LockDelivery, RequestUpdate, ProviderID, StartedMachinePreview, FoldersFindRequest, FoundFolder } from "../protocol/generated";
+  Connection, LineageNode, LineageSessionIssue, MoveToMachineAnswer, ProblemReport, ProblemReportRequest, Request as PersonRequest, RequestSecretUse, LockDelivery, RequestUpdate, ProviderID, StartedMachinePreview, FoldersFindRequest, FoundFolder,
+  OutsideAccount, OutsideAccounts, UserSecretRow } from "../protocol/generated";
 import { endedConnections, endedLine, hasEnded } from "./connectorSetup";
 import { parseQuery } from "./labels";
 import { Failure } from "../protocol/generated";
@@ -536,6 +537,9 @@ export class Work {
   }
   /** Counts each control/userSettingsChanged (#1760): Settings ▸ You ▸ Secrets loads again when it moves. */
   readonly userScopeChanges = signal(0);
+  /** Status ▸ Secrets and Status ▸ Accounts (#4161): the person's secret rows and accounts, read when the Status section
+   * opens and again on each control/userSettingsChanged. Null until read. */
+  readonly userScopeStatus = signal<{ secrets: UserSecretRow[]; accounts: OutsideAccount[] } | null>(null);
   /**
    * The organisation's policy in force (#998): from policy/mine when Settings ▸ Policy loads it, and from each
    * control/policyChanged and control/stopAll. Null until either; a view with no policy when none is set.
@@ -1348,6 +1352,16 @@ export class Store extends Work {
       if (kind === "workflows" && folder !== undefined) await this.loadWorkflows(host, folder);
       return null;
     } catch (error) { return describe(error); }
+  }
+
+  /** Reads Status ▸ Secrets and Status ▸ Accounts' lists into userScopeStatus (#4161). */
+  async loadUserScopeStatus() {
+    try {
+      const [names, settings] = await Promise.all([this.link.call("user/secretNames", {}), this.link.call("user/settings", {})]);
+      this.userScopeStatus.value = { secrets: names.secrets, accounts: (settings.accounts as OutsideAccounts | undefined)?.accounts ?? [] };
+    } catch {
+      // A control plane with no user scope: the pages say there is nothing yet.
+    }
   }
 
   constructor(readonly link: Link) {

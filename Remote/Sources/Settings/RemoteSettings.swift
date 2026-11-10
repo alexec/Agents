@@ -98,3 +98,28 @@ private struct RemoteAccountsPage: View {
             .navigationBarTitleDisplayMode(.inline)
     }
 }
+
+/// Status ▸ Secrets and Status ▸ Accounts (#4161), as the window's: what happened last to each of the
+/// person's secrets or outside accounts, read only. A tap opens Settings ▸ You ▸ Secrets or Accounts
+/// over it.
+struct RemoteStatusSecretsPage: View {
+    let kind: StatusSecretsKind
+    @Environment(RemoteModel.self) private var model
+    @State private var editing = false
+
+    var body: some View {
+        StatusSecretsPage(kind: kind, control: model.controlPlane, state: model.userScope) { _ in editing = true }
+            .navigationTitle(kind.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $editing) {
+                NavigationStack {
+                    Group {
+                        if kind == .secrets { RemoteSecretsPage() } else { RemoteAccountsPage() }
+                    }
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) { Button("Done") { editing = false } }
+                    }
+                }
+            }
+    }
+}

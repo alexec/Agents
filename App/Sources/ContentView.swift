@@ -106,6 +106,8 @@ struct ContentView: View {
             EventsView().paperGround()
         } else if model.showsRuntimes {
             RuntimesView().paperGround()
+        } else if let kind = model.statusSecretsPage {
+            StatusSecretsView(kind: kind).id(kind).paperGround()
         } else if let host = model.machinePage {
             // A page of its own per machine, so one machine's readings never show on another's.
             MachinePage(host: host).id(host).paperGround()
@@ -185,7 +187,7 @@ struct ContentView: View {
     /// the selected folder, with an agent chosen or none, but not under the pages
     /// about all the work, which are no folder's.
     private var folderForTerminal: DaemonAPI.FolderSummary? {
-        guard terminal.isOpen, !model.showsEvents, !model.showsRuntimes,
+        guard terminal.isOpen, !model.showsEvents, !model.showsRuntimes, model.statusSecretsPage == nil,
               model.machinePage == nil,
               !model.showsSpending, !model.showsTokens, !model.showsTime,
               !model.showsWork, !model.showsDocs, !model.showsSummary, let folder = model.selectedFolderSummary, folder.exists else { return nil }
@@ -201,7 +203,7 @@ struct ContentView: View {
     /// that chain is open.
     private var showsChat: Bool {
         model.selection != nil && !model.showsEvents
-            && !model.showsRuntimes && model.machinePage == nil
+            && !model.showsRuntimes && model.statusSecretsPage == nil && model.machinePage == nil
             && !model.showsSpending && !model.showsTime && !model.showsWork && !model.showsDocs
             && !model.showsSummary && model.openWorkflow == nil
             && model.folderPage == nil && model.openPin == nil

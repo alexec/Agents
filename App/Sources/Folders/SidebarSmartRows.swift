@@ -509,11 +509,13 @@ private struct ActivityIcon: ViewModifier {
     /// Red when the page has something wrong to say (#587): the row has no figure at its
     /// end to colour, which is only a session's.
     var warns = false
+    /// The warning's tint: the attention orange for a page that only warns (#4161).
+    var tint: StateTint = .failure
 
     func body(content: Content) -> some View {
         HStack(spacing: 6) {
             Image(systemName: systemImage)
-                .sidebarMark(warns ? StateTint.failure.style(or: .primary) : AnyShapeStyle(Paper.accent))
+                .sidebarMark(warns ? tint.style(or: .primary) : AnyShapeStyle(Paper.accent))
                 .frame(width: 16)
                 .accessibilityHidden(true)
             content
@@ -522,7 +524,7 @@ private struct ActivityIcon: ViewModifier {
 }
 
 extension View {
-    func activityIcon(_ systemImage: String, warns: Bool = false) -> some View {
-        modifier(ActivityIcon(systemImage: systemImage, warns: warns))
+    func activityIcon(_ systemImage: String, warns: Bool = false, tint: StateTint = .failure) -> some View {
+        modifier(ActivityIcon(systemImage: systemImage, warns: warns, tint: tint))
     }
 }

@@ -226,6 +226,14 @@ struct FolderListView: View {
                     .appText(.supporting).sidebarInk(.runtimes).tag(SidebarItem.runtimes)
                 EventsRow().activityIcon("list.bullet.rectangle")
                     .appText(.supporting).sidebarInk(.events).tag(SidebarItem.events)
+                // What happened last to the person's secrets and accounts (#4161): the newest's age,
+                // and the mark in the warning tint when one is not backed up.
+                ForEach([StatusSecretsKind.secrets, .accounts], id: \.self) { kind in
+                    let item: SidebarItem = kind == .secrets ? .secretsStatus : .accountsStatus
+                    StatusSecretsRow(kind: kind, state: model.userScope)
+                        .activityIcon(kind.systemImage, warns: StatusSecretsWords.warns(model.userScope.statusLines(kind)), tint: .attention)
+                        .appText(.supporting).sidebarInk(item).tag(item)
+                }
             } header: {
                 Text("Status").appText(.supporting)
             }

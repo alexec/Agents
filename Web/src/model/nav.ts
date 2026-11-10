@@ -30,6 +30,7 @@ export type PageDraw =
   | { kind: "machine"; host: string }
   | { kind: "secrets" }
   | { kind: "accounts" }
+  | { kind: "statusList"; list: "secrets" | "accounts" }
   | { kind: "multiplier" }
   | { kind: "usage" | "machines" | "workflows" | "settings" };
 
@@ -85,6 +86,9 @@ export const navPages: Record<NavSection, readonly NavPage[]> = {
   status: [
     { id: "runtimes", title: "Runtimes", group: "Status", draw: { kind: "activity", page: "runtimes" } },
     { id: "events", title: "Events", group: "Status", draw: { kind: "activity", page: "events" } },
+    // What happened last to the person's secrets and accounts (#4161): read only, a press opens Settings ▸ You.
+    { id: "secrets", title: "Secrets", group: "Status", draw: { kind: "statusList", list: "secrets" } },
+    { id: "accounts", title: "Accounts", group: "Status", draw: { kind: "statusList", list: "accounts" } },
   ],
   // You first (#3998), as the window's Settings rail: the person's own connectors, their secrets and cards, which go to every
   // machine of theirs (#3632), and their outside accounts (#3967), kept and sent as their secrets are. Was Your setup.

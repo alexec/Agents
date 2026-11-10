@@ -653,7 +653,7 @@ final class RemoteModel {
                 openWorkflow = nil
                 openArchive = false
                 openReview = id
-            case .resources, .events, .runtimes, .summary:
+            case .resources, .events, .runtimes, .summary, .secretsStatus, .accountsStatus:
                 openActivity = newValue
             case .work(let kind):
                 // The list's row: its list, or the place in it still open (#4004).
@@ -2792,6 +2792,8 @@ final class RemoteModel {
                     await self?.loadKept(control)
                     await self?.people.connected(control)
                     await self?.signIn.connected(control)
+                    // Status ▸ Secrets and Accounts' rows say when the newest operation was (#4161).
+                    await self?.userScope.load(control)
                     if let client = RemoteControl.membership?.client { await self?.lock.connected(control, client: client) }
                     await Self.sealWaiting(on: control, lock: self?.lock)
                     for await change in control.notifications() {

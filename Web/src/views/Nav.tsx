@@ -32,6 +32,7 @@ import { addMachineWords } from "../model/addMachine";
 import { SettingsPage } from "./Settings";
 import { SecretsSection } from "./UserScope";
 import { AccountsSection } from "./Accounts";
+import { StatusListMark, StatusSecretsPage, useUserScopeStatus } from "./StatusSecrets";
 import { SessionSecretsSection } from "./settings/SessionSecrets";
 import { WorkflowRow } from "./WorkflowRow";
 import { BackToList } from "./BackToList";
@@ -121,6 +122,8 @@ export function NavBar({ store, session }: { store: Store; session: Session }) {
 
 /** A page's mark beside its row in the list: a count, or that it is not saved. */
 function PageMark({ store, page }: { store: Store; page: NavPage }) {
+  // Status ▸ Secrets and Accounts (#4161): the newest operation's age, and a dot when one is not backed up.
+  if (page.draw.kind === "statusList") return <StatusListMark store={store} list={page.draw.list} />;
   if (page.id === "requests" && requestCount(store) > 0) return <span class="sub-app-count">{requestCount(store)}</span>;
   if (page.id === "reportPolicy" && policyNotSaved(store)) return <span class="quiet small attention">Not saved</span>;
   if (page.id === "policy" && orgPolicyNotSaved(store)) return <span class="quiet small attention">Not saved</span>;
@@ -153,6 +156,7 @@ export function SectionPage({ store, section, down }: { store: Store; section: E
   const open = openPage(section, r.section, admin, more);
   const list = pagesShown(section, admin, open?.id, more);
   const registering = useSignal(false);
+  useUserScopeStatus(store, section === "status");
   // The Machines header (#3974): + makes a machine with no questions; its menu also registers one.
   const machinesHead = (group: string) => section === "machines" && group === "Machines";
   // With two or more providers, New Machine names the default, and New Machine on ‹name› makes it on another (#3979).
@@ -224,6 +228,7 @@ export function PageView({ store, page, down }: { store: Store; page: NavPage; d
         // The person's secrets and cards (#1760), then a machine's for one session (#3548); were in Settings ▸ Machines.
         : page.draw.kind === "secrets" ? <><SecretsSection store={store} down={down} /><SessionSecretsSection store={store} down={down} /></>
         : page.draw.kind === "accounts" ? <AccountsSection store={store} down={down} />
+        : page.draw.kind === "statusList" ? <StatusSecretsPage store={store} list={page.draw.list} />
         : page.draw.kind === "docs" ? (route.value.item
           ? <DocPage key={route.value.item} store={store} docRef={route.value.item} />
           : <DocsList store={store} />) : null}
