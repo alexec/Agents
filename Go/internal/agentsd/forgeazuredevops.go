@@ -3,6 +3,7 @@ package agentsd
 import (
 	"context"
 	"errors"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -20,7 +21,7 @@ import (
 // sign-in (AZURE_DEVOPS_TOKEN and AZURE_DEVOPS_URL in the secrets), else the Azure DevOps
 // connection's (#3802), each only on its own Azure DevOps. A pull request is the node
 // azuredevops:organization/project/repo#12, in lower case. The issues are Azure Boards' work
-// items (forgeazure.go).
+// items (forgeazure.go). azureDevOpsForge's Caps say so.
 //
 // A pull request's tags are its labels. Rerun failed runs each failed Azure Pipelines build of
 // the pull request again: its failed jobs.
@@ -110,49 +111,305 @@ func (d *Daemon) azureDevOpsRepoAt(ctx context.Context, folder string) (root, re
 	return root, repo
 }
 
-// azureDevOpsSources adds to s the repositories of the folders on Azure DevOps that a token
-// here is for, all on one Azure DevOps: the first such folder's. A folder whose Azure DevOps
-// has no token here leaves a reason.
-func (d *Daemon) azureDevOpsSources(ctx context.Context, s *forgeSources, folders []string) {
-	unsigned := false
-	for _, f := range folders {
-		if onGitHubOrGitLab(d.folderRepo(f)) {
-			continue
-		}
-		root, repo := d.azureDevOpsRepoAt(ctx, f)
-		if repo == "" {
-			continue
-		}
-		if d.azureDevOpsToken(root) == "" || (s.azureDevOpsRoot != "" && root != s.azureDevOpsRoot) {
-			unsigned = true
-			continue
-		}
-		key := forgeRepo{"azuredevops", strings.ToLower(repo)}
-		if _, seen := s.folderOf[key]; seen {
-			continue
-		}
-		s.azureDevOpsRoot = root
-		s.folderOf[key] = f
-		s.azureDevOps = append(s.azureDevOps, repo)
-	}
-	slices.Sort(s.azureDevOps)
-	if unsigned && len(s.azureDevOps) == 0 {
-		s.azureDevOpsErr = errors.New(azuredevopsmcp.NotConnected)
+// azureDevOpsNoIssues is why Azure Repos has no issue, plan or transition: its issues are Azure
+// Boards' work items.
+const azureDevOpsNoIssues = "Azure Repos has pull requests only: its issues are Azure Boards' work items"
+
+// azureDevOpsForge is Azure Repos on the forge interface (#4329, #4356): the pull requests of
+// the folders on Azure DevOps, through forgeAzureDevOps. Its Caps say it has no issues, so no
+// plan.
+type azureDevOpsForge struct {
+	forgeNone
+	d *Daemon
+}
+
+func (azureDevOpsForge) Name() string { return "azuredevops" }
+
+func (azureDevOpsForge) Caps() forgeCaps {
+	return forgeCaps{
+		PRs: true,
+		PR: forgeActions{Comment: true, Label: true, Close: true, Reopen: true, Merge: true, AutoMerge: true, Approve: true,
+			Rerun: true, Log: true, Diff: true},
+		// A pull request's comment count is on its own page only.
+		CommentCount: "detail",
+		Reasons: map[string]string{
+			actionTransition: "only a Jira issue or an Azure Boards work item moves by a transition",
+			actionPlan:       azureDevOpsNoIssues,
+			actionAddChild:   azureDevOpsNoIssues,
+			actionBlockedBy:  azureDevOpsNoIssues,
+		},
 	}
 }
 
-// azureDevOpsPage is the Azure DevOps page of a list of pull requests.
-func (d *Daemon) azureDevOpsPage(ctx context.Context, s forgeSources, f azuredevopsmcp.SearchFilter, after string, limit int) forgePage {
-	p := forgePage{forge: "azuredevops", err: s.azureDevOpsErr}
-	if p.err != nil {
-		return p
+// Owns is azuredevops:organization/project/repo#12, a pull request.
+func (azureDevOpsForge) Owns(node wire.LineageNode) (forgeRef, bool) {
+	repo, number, ok := azureDevOpsOfNode(node)
+	if !ok {
+		return forgeRef{}, false
 	}
-	page, err := d.forgeAzureDevOps(s.azureDevOpsRoot).Search(ctx, s.azureDevOps, f, after, limit)
+	return forgeRef{Node: node, Repo: repo, Number: number}, true
+}
+
+// azureDevOpsScope is the repositories on Azure DevOps that a list of pull requests reads,
+// organization/project/name as their folders' remotes say them, all at root, each with a folder
+// to act from (by its name in lower case). unsigned is why none is read: no token here for the
+// folders' Azure DevOps.
+type azureDevOpsScope struct {
+	root     string
+	repos    []string
+	folderOf map[string]string
+	unsigned error
+}
+
+func (s azureDevOpsScope) Key() []any { return []any{s.root, s.repos} }
+
+// Empty is false with unsigned, so that a board's list, which says nothing of folders left out,
+// still says that its Azure DevOps has no token here (#4055).
+func (s azureDevOpsScope) Empty() bool { return len(s.repos) == 0 && s.unsigned == nil }
+
+// Sources is the repositories of the folders on Azure DevOps that a token here is for, all on
+// one Azure DevOps: the first such folder's. A folder whose Azure DevOps has no token here
+// leaves a reason. An issues list reads none: Azure Boards has the issues.
+func (a azureDevOpsForge) Sources(ctx context.Context, folders []string, prs bool) (forgeScope, error) {
+	s := azureDevOpsScope{folderOf: map[string]string{}}
+	if !prs {
+		return s, nil
+	}
+	unsigned := false
+	for _, f := range folders {
+		if onGitHubOrGitLab(a.d.folderRepo(f)) {
+			continue
+		}
+		root, repo := a.d.azureDevOpsRepoAt(ctx, f)
+		if repo == "" {
+			continue
+		}
+		if a.d.azureDevOpsToken(root) == "" || (s.root != "" && root != s.root) {
+			unsigned = true
+			continue
+		}
+		if _, seen := s.folderOf[strings.ToLower(repo)]; seen {
+			continue
+		}
+		s.root = root
+		s.folderOf[strings.ToLower(repo)] = f
+		s.repos = append(s.repos, repo)
+	}
+	slices.Sort(s.repos)
+	if unsigned && len(s.repos) == 0 {
+		s.unsigned = errors.New(azuredevopsmcp.NotConnected)
+		return s, s.unsigned
+	}
+	return s, nil
+}
+
+// List is a call for each repository, as Azure DevOps has no list across repositories. A
+// board's list is of the repositories of its project, on the Azure DevOps it is on (#4055).
+func (a azureDevOpsForge) List(ctx context.Context, scope forgeScope, f forgeFilter, cursor string, limit int) (forgePage, error) {
+	s, _ := scope.(azureDevOpsScope)
+	if s.unsigned != nil {
+		return forgePage{}, s.unsigned
+	}
+	repos := s.repos
+	if f.Board != nil {
+		repos = nil
+		if root, err := url.Parse(s.root); err == nil && f.Board.azureProject != "" && strings.EqualFold(root.Host, f.Board.azureSite) {
+			for _, repo := range s.repos {
+				if strings.HasPrefix(strings.ToLower(repo), f.Board.azureProject+"/") {
+					repos = append(repos, repo)
+				}
+			}
+		}
+	}
+	if !f.PRs || len(repos) == 0 {
+		return forgePage{}, nil
+	}
+	sf := azuredevopsmcp.SearchFilter{State: f.State, Label: f.Label, Assignee: f.Assignee, Query: f.Query, Feature: f.Feature}
+	page, err := a.d.forgeAzureDevOps(s.root).Search(ctx, repos, sf, cursor, limit)
+	var p forgePage
 	for _, i := range page.Items {
-		p.items = append(p.items, azureDevOpsItemOf(i, s.folderOf[forgeRepo{"azuredevops", strings.ToLower(i.Repo)}]))
+		p.items = append(p.items, azureDevOpsItemOf(i, s.folderOf[strings.ToLower(i.Repo)]))
 	}
-	p.cursors, p.next, p.err = page.Cursors, page.Next, err
-	return p
+	p.cursors, p.next = page.Cursors, page.Next
+	return p, err
+}
+
+// of is the Azure DevOps of r's repository, the repository as its folder's remote says it, and
+// that folder.
+func (a azureDevOpsForge) of(ctx context.Context, method string, r forgeRef) (forgeAzureDevOps, string, string, error) {
+	return a.d.azureDevOpsOf(ctx, method, r.Repo)
+}
+
+func (a azureDevOpsForge) Item(ctx context.Context, r forgeRef, cursor string) (wire.ForgeItemDetail, error) {
+	method := itemMethod(r.Node.Kind)
+	ado, named, folder, err := a.of(ctx, method, r)
+	if err != nil {
+		return wire.ForgeItemDetail{}, err
+	}
+	p, err := ado.ItemPage(ctx, named, r.Number, cursor)
+	if err != nil {
+		if azuredevopsmcp.IsNotFound(err) {
+			return wire.ForgeItemDetail{}, Invalid("%s: %v", method, err)
+		}
+		return wire.ForgeItemDetail{}, err
+	}
+	out := wire.ForgeItemDetail{Item: azureDevOpsItemOf(p.Item, folder), Body: p.Body, Comments: []wire.ForgeComment{}, Cursor: optional(p.Before),
+		Checks: []wire.ForgeCheck{}}
+	for _, c := range p.Thread {
+		out.Comments = append(out.Comments, forgeCommentOf(c.Author, c.Body, c.At, c.URL, c.Bot))
+	}
+	for _, c := range p.CheckRuns {
+		out.Checks = append(out.Checks, wire.ForgeCheck{Name: c.Name, State: c.State, URL: optional(c.URL)})
+	}
+	out.ReviewThreads, out.FilesChanged = new(int64(p.ReviewThreads)), new(int64(p.FilesChanged))
+	out.Head = optional(p.Head)
+	// The merge menu is a nicety: a page still reads when the branch's policy cannot be read.
+	if p.State == "open" {
+		if methods, err := ado.MergeMethods(ctx, named, r.Number); err == nil {
+			out.MergeMethods = mergeMethodsOf(methods)
+		}
+	}
+	return out, nil
+}
+
+// Labels are what a pull request's labels can be: the repository's tags.
+func (a azureDevOpsForge) Labels(ctx context.Context, r forgeRef) ([]wire.ForgeLabel, error) {
+	ado, named, _, err := a.of(ctx, "forge/labels", r)
+	if err != nil {
+		return nil, err
+	}
+	names, err := ado.RepoLabels(ctx, named)
+	if err != nil {
+		return nil, err
+	}
+	return forgeLabelsOf(names, nil), nil
+}
+
+func (a azureDevOpsForge) Diff(ctx context.Context, r forgeRef) (wire.ForgeDiff, error) {
+	ado, named, _, err := a.of(ctx, "forge/diff", r)
+	if err != nil {
+		return wire.ForgeDiff{}, err
+	}
+	out, err := ado.PRDiff(ctx, named, r.Number)
+	if err != nil {
+		return wire.ForgeDiff{}, err
+	}
+	return diffOf(out)
+}
+
+// Log is the end of the failed steps' logs of a pull request's failed builds, or of the build
+// of the check named.
+func (a azureDevOpsForge) Log(ctx context.Context, r forgeRef, check string) (wire.ForgeLog, error) {
+	ado, named, _, err := a.of(ctx, "forge/log", r)
+	if err != nil {
+		return wire.ForgeLog{}, err
+	}
+	builds, err := azureDevOpsFailedBuilds(ctx, ado, named, r.Number, check)
+	if err != nil {
+		return wire.ForgeLog{}, err
+	}
+	if len(builds) == 0 {
+		if check != "" {
+			return wire.ForgeLog{Text: check + " is not an Azure Pipelines build: its log is on its own page."}, nil
+		}
+		return wire.ForgeLog{Text: "No failed Azure Pipelines build."}, nil
+	}
+	var parts []string
+	for _, b := range builds {
+		text, err := ado.FailedLog(ctx, named, b)
+		if err != nil {
+			return wire.ForgeLog{}, err
+		}
+		parts = append(parts, text)
+	}
+	return wire.ForgeLog{Text: strings.Join(parts, "\n\n")}, nil
+}
+
+func (a azureDevOpsForge) Comment(ctx context.Context, r forgeRef, body string) (wire.ForgeDone, error) {
+	ado, named, _, err := a.of(ctx, "forge/comment", r)
+	if err != nil {
+		return wire.ForgeDone{}, err
+	}
+	link, err := ado.Comment(ctx, named, r.Number, body)
+	return wire.ForgeDone{URL: optional(link)}, err
+}
+
+func (a azureDevOpsForge) SetLabels(ctx context.Context, r forgeRef, add, remove []string) error {
+	ado, named, _, err := a.of(ctx, "forge/label", r)
+	if err != nil {
+		return err
+	}
+	return ado.SetLabels(ctx, named, r.Number, add, remove)
+}
+
+func (a azureDevOpsForge) SetState(ctx context.Context, r forgeRef, closed bool, transition string) error {
+	if transition != "" {
+		return cannot(actionTransition)
+	}
+	ado, named, _, err := a.of(ctx, "forge/close", r)
+	if err != nil {
+		return err
+	}
+	return ado.SetState(ctx, named, r.Number, closed)
+}
+
+// Merge completes a pull request by the method asked for, or the first its target branch
+// allows; with auto, once its policies pass.
+func (a azureDevOpsForge) Merge(ctx context.Context, r forgeRef, sha, how string, auto bool) (wire.ForgeDone, error) {
+	const method = "forge/merge"
+	ado, named, _, err := a.of(ctx, method, r)
+	if err != nil {
+		return wire.ForgeDone{}, err
+	}
+	methods, err := ado.MergeMethods(ctx, named, r.Number)
+	if err != nil {
+		return wire.ForgeDone{}, err
+	}
+	if len(methods) == 0 {
+		return wire.ForgeDone{}, Invalid("%s: the target branch's policy allows no merge type here: complete it on Azure DevOps", method)
+	}
+	if how == "" {
+		how = methods[0]
+	}
+	if !slices.Contains(methods, how) {
+		return wire.ForgeDone{}, Invalid("%s: this branch merges by %s", method, strings.Join(methods, " or "))
+	}
+	if err := ado.Merge(ctx, named, r.Number, sha, how, auto); err != nil {
+		return wire.ForgeDone{}, err
+	}
+	return wire.ForgeDone{Auto: optionalTrue(auto)}, nil
+}
+
+func (a azureDevOpsForge) Approve(ctx context.Context, r forgeRef, sha string) (wire.ForgeDone, error) {
+	ado, named, _, err := a.of(ctx, "forge/approve", r)
+	if err != nil {
+		return wire.ForgeDone{}, err
+	}
+	link, err := ado.Approve(ctx, named, r.Number, sha)
+	return wire.ForgeDone{URL: optional(link)}, err
+}
+
+// Rerun runs each failed build of a pull request again: its failed jobs.
+func (a azureDevOpsForge) Rerun(ctx context.Context, r forgeRef) (wire.ForgeDone, error) {
+	const method = "forge/rerun"
+	ado, named, _, err := a.of(ctx, method, r)
+	if err != nil {
+		return wire.ForgeDone{}, err
+	}
+	builds, err := azureDevOpsFailedBuilds(ctx, ado, named, r.Number, "")
+	if err != nil {
+		return wire.ForgeDone{}, err
+	}
+	if len(builds) == 0 {
+		return wire.ForgeDone{}, Invalid("%s: %s has no failed Azure Pipelines build to rerun; another service's status runs again on its own page", method, r.Node.Ref)
+	}
+	var link string
+	for _, b := range builds {
+		if link, err = ado.RetryBuild(ctx, named, b); err != nil {
+			return wire.ForgeDone{}, err
+		}
+	}
+	return wire.ForgeDone{URL: optional(link), Reran: new(int64(len(builds)))}, nil
 }
 
 // azureDevOpsOf is the Azure DevOps of a folder on repo, repo as its folder's remote says it,
@@ -184,38 +441,6 @@ func (d *Daemon) forgeAzureDevOps(root string) forgeAzureDevOps {
 	return azuredevopsmcp.NewRealAzureDevOps(root, func() string { return token }, nil)
 }
 
-// azureDevOpsItem is a pull request on Azure DevOps.
-func (d *Daemon) azureDevOpsItem(ctx context.Context, method, repo string, number int, cursor string) (wire.ForgeItemDetail, error) {
-	ado, named, folder, err := d.azureDevOpsOf(ctx, method, repo)
-	if err != nil {
-		return wire.ForgeItemDetail{}, err
-	}
-	p, err := ado.ItemPage(ctx, named, number, cursor)
-	if err != nil {
-		if azuredevopsmcp.IsNotFound(err) {
-			return wire.ForgeItemDetail{}, Invalid("%s: %v", method, err)
-		}
-		return wire.ForgeItemDetail{}, err
-	}
-	out := wire.ForgeItemDetail{Item: azureDevOpsItemOf(p.Item, folder), Body: p.Body, Comments: []wire.ForgeComment{}, Cursor: optional(p.Before),
-		Checks: []wire.ForgeCheck{}}
-	for _, c := range p.Thread {
-		out.Comments = append(out.Comments, forgeCommentOf(c.Author, c.Body, c.At, c.URL, c.Bot))
-	}
-	for _, c := range p.CheckRuns {
-		out.Checks = append(out.Checks, wire.ForgeCheck{Name: c.Name, State: c.State, URL: optional(c.URL)})
-	}
-	out.ReviewThreads, out.FilesChanged = new(int64(p.ReviewThreads)), new(int64(p.FilesChanged))
-	out.Head = optional(p.Head)
-	// The merge menu is a nicety: a page still reads when the branch's policy cannot be read.
-	if p.State == "open" {
-		if methods, err := ado.MergeMethods(ctx, named, number); err == nil {
-			out.MergeMethods = mergeMethodsOf(methods)
-		}
-	}
-	return out, nil
-}
-
 // azureDevOpsItemOf is an Azure Repos pull request in the one model, from folder.
 func azureDevOpsItemOf(i azuredevopsmcp.Item, folder string) wire.ForgeItem {
 	return wire.ForgeItem{Node: azureDevOpsNode(i.Repo, i.Number), Title: i.Title, State: i.State, URL: optional(i.URL),
@@ -224,29 +449,10 @@ func azureDevOpsItemOf(i azuredevopsmcp.Item, folder string) wire.ForgeItem {
 		Checks: optional(i.Checks), Review: optional(i.Review), Mergeable: optional(i.Mergeable)}
 }
 
-// azureDevOpsMerge completes a pull request by the method asked for, or the first its target
-// branch allows.
-func (d *Daemon) azureDevOpsMerge(ctx context.Context, method string, t forgeTarget, sha, how string, auto bool) error {
-	methods, err := t.azureDevOps.MergeMethods(ctx, t.project, t.number)
-	if err != nil {
-		return err
-	}
-	if len(methods) == 0 {
-		return Invalid("%s: the target branch's policy allows no merge type here: complete it on Azure DevOps", method)
-	}
-	if how == "" {
-		how = methods[0]
-	}
-	if !slices.Contains(methods, how) {
-		return Invalid("%s: this branch merges by %s", method, strings.Join(methods, " or "))
-	}
-	return t.azureDevOps.Merge(ctx, t.project, t.number, sha, how, auto)
-}
-
 // azureDevOpsFailedBuilds are the Azure Pipelines builds of a pull request's failed checks, or
 // of the check named only, when one is.
-func azureDevOpsFailedBuilds(ctx context.Context, t forgeTarget, only string) ([]int, error) {
-	p, err := t.azureDevOps.ItemPage(ctx, t.project, t.number, "")
+func azureDevOpsFailedBuilds(ctx context.Context, ado forgeAzureDevOps, repo string, number int, only string) ([]int, error) {
+	p, err := ado.ItemPage(ctx, repo, number, "")
 	if err != nil {
 		return nil, err
 	}
@@ -258,47 +464,4 @@ func azureDevOpsFailedBuilds(ctx context.Context, t forgeTarget, only string) ([
 		builds = append(builds, c.Build)
 	}
 	return builds, nil
-}
-
-// azureDevOpsRerun runs each failed build of a pull request again: its failed jobs.
-func (d *Daemon) azureDevOpsRerun(ctx context.Context, method string, t forgeTarget, ref string) (wire.ForgeDone, error) {
-	builds, err := azureDevOpsFailedBuilds(ctx, t, "")
-	if err != nil {
-		return wire.ForgeDone{}, err
-	}
-	if len(builds) == 0 {
-		return wire.ForgeDone{}, Invalid("%s: %s has no failed Azure Pipelines build to rerun; another service's status runs again on its own page", method, ref)
-	}
-	var url string
-	for _, b := range builds {
-		if url, err = t.azureDevOps.RetryBuild(ctx, t.project, b); err != nil {
-			return wire.ForgeDone{}, err
-		}
-	}
-	d.forgeWrote()
-	return wire.ForgeDone{URL: optional(url), Reran: new(int64(len(builds)))}, nil
-}
-
-// azureDevOpsLog is the end of the failed steps' logs of a pull request's failed builds, or of
-// the build of the check named.
-func azureDevOpsLog(ctx context.Context, t forgeTarget, check string) (wire.ForgeLog, error) {
-	builds, err := azureDevOpsFailedBuilds(ctx, t, check)
-	if err != nil {
-		return wire.ForgeLog{}, err
-	}
-	if len(builds) == 0 {
-		if check != "" {
-			return wire.ForgeLog{Text: check + " is not an Azure Pipelines build: its log is on its own page."}, nil
-		}
-		return wire.ForgeLog{Text: "No failed Azure Pipelines build."}, nil
-	}
-	var parts []string
-	for _, b := range builds {
-		text, err := t.azureDevOps.FailedLog(ctx, t.project, b)
-		if err != nil {
-			return wire.ForgeLog{}, err
-		}
-		parts = append(parts, text)
-	}
-	return wire.ForgeLog{Text: strings.Join(parts, "\n\n")}, nil
 }
