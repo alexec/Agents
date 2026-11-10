@@ -345,6 +345,15 @@ public enum MachineLock {
             return recovery == key
         }
 
+        /// The key is a client of the lock, but for another client id than `client` (#4292). A
+        /// new sign-in pairs a device again with a new id, and a machine refuses a channel whose
+        /// member is not the client the control plane names, so the device needs a key of its
+        /// own for the new id. A member with no id, or no client yet, names nobody else.
+        public func namesAnotherClient(_ key: Data, client: String?) -> Bool {
+            guard let member = members[key], member.isClient, let id = member.id, let client else { return false }
+            return id.caseInsensitiveCompare(client) != .orderedSame
+        }
+
         /// Takes one entry when it passes the checks.
         public mutating func add(_ entry: DaemonAPI.LockEntry) throws(Failure) {
             let i = hashes.count
@@ -688,6 +697,12 @@ public struct LockSigningKey: Sendable {
         }
         if try keychain.add(representation, account: account) { return made }
         // Made by another call at the same moment: that one is the key.
+        return try load(account: account, accessGroup: accessGroup)
+    }
+
+    /// The key for `account` when one is kept there; nil, and nothing made, when none is.
+    public static func existing(account: String, accessGroup: String? = nil) throws -> LockSigningKey? {
+        guard try DeviceKey.Keychain(accessGroup: accessGroup).read(account: account) != nil else { return nil }
         return try load(account: account, accessGroup: accessGroup)
     }
 
