@@ -21,8 +21,8 @@ The first time you open it, it sets them up with no question.
 
 ### Install Agents
 
-1. Download Agents from the latest release on GitHub,
-   [github.com/alexec/Agents/releases/latest](https://github.com/alexec/Agents/releases/latest).
+1. Download Agents, a free download from us. It is not in the Mac App Store, because it
+   runs programs for your agents.
 
    The release has `Agents-<version>.dmg` and `Agents-<version>.zip`, with the same app in
    them. Neither needs admin rights. If your Mac does not open a disk image (because of a

@@ -40,15 +40,10 @@ file in another app are offered only for folders on this Mac.
 
 ## The first open
 
-When you open Agents for the first time, it asks no question and needs no code. It does
-these steps itself:
-
-1. It makes the control key.
-2. It registers two launch agents with macOS: a control plane on this Mac, and this Mac's
-   host, `agentsd`.
-3. It starts them.
-4. It joins this Mac's host to that control plane.
-5. The window pairs itself with the control plane. You copy and paste nothing.
+When you open Agents for the first time, it asks no question and needs no code. It makes
+the control key, and registers two launch agents with macOS: a control plane on this Mac,
+and this Mac's host, `agentsd`. It starts them, and joins this Mac's host to that control
+plane. Then the window pairs itself with the control plane, so you copy and paste nothing.
 
 Then the window opens on the empty session list. If a step fails, the window shows one
 line with **Try Again** and **Show Details** in place of the list. When macOS asks you to approve the login

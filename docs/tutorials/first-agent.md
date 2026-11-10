@@ -29,8 +29,7 @@ how every agent in the app works.
 On a Mac, Agents is one app. The window you work in and the part that runs your agents
 are in it.
 
-1. Download Agents from the latest release on GitHub,
-   [github.com/alexec/Agents/releases/latest](https://github.com/alexec/Agents/releases/latest).
+1. Download Agents, a free download from us.
    Open `Agents-<version>.dmg`, and drag Agents into `~/Applications`.
    [Set up Agents on this Mac](../how-to/set-up-on-this-mac.md) says more about this step.
 2. Open Agents. It asks no question. It says **Setting up Agents on this Mac…**, starts
