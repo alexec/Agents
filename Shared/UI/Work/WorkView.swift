@@ -102,85 +102,74 @@ private struct WorkListPane: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            filters.padding(.horizontal, 16).padding(.vertical, 8)
-            Divider()
+            if compact {
+                filters.padding(.horizontal, 16).padding(.vertical, 6)
+            } else {
+                filters.padding(.horizontal, 16).padding(.vertical, 8)
+                Divider()
+            }
             content
         }
+        #if os(iOS)
+        // On a phone the search is the navigation bar's; the menus scroll under it.
+        .modifier(PhoneSearch(on: compact, text: $list.filter.text, prompt: WorkLook.searchPrompt(kind)))
+        #else
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                WorkRefreshButton(running: list.lists == nil || list.loadingMore) { list.asked += 1 }
+            }
+        }
+        #endif
         .workTask(id: list.ask) { await list.load(model: model) }
         .onChange(of: model.workProjects, initial: true) { _, projects in list.projects = projects }
     }
 
-    /// One row of them on the Mac and an iPad; on a phone the choices scroll sideways over
-    /// the words to filter by.
-    @ViewBuilder
+    /// The filter bar (#4391): the search field, then a compact menu per filter. Project and
+    /// Board come first and last, where they show.
     private var filters: some View {
-        if compact {
-            VStack(alignment: .leading, spacing: 8) {
-                ScrollView(.horizontal) {
-                    HStack(spacing: 12) { choices }
-                }
-                .scrollIndicators(.hidden)
-                filterField
-            }
-        } else {
-            HStack(spacing: 12) {
-                choices
-                filterField
-                Button("Refresh") { list.asked += 1 }
-                    .linkStyle()
-            }
-        }
-    }
-
-    private var filterField: some View {
-        TextField("Filter", text: $list.filter.text)
-            .textFieldStyle(.roundedBorder)
-            .accessibilityLabel("Filter by words")
+        WorkFilterBar(kind: kind, text: $list.filter.text, compact: compact) { choices }
     }
 
     @ViewBuilder
     private var choices: some View {
         let offered = WorkList.choices(list.all)
-        if kind.fromForge {
-            named("State", list.filter.state.title) {
-                Picker("State", selection: $list.filter.state) {
-                    ForEach(kind.states, id: \.self) { Text($0.title).tag($0) }
-                }
-            }
-        }
         project
+        if kind.fromForge {
+            WorkFilterMenu(name: "State", selection: $list.filter.state, options: kind.states, words: \.title, compact: compact)
+        }
         choice("Repo", any: "All", selection: $list.filter.repo, options: offered.repos, words: WorkList.repoName)
         choice("Label", any: "Any", selection: $list.filter.label, options: offered.labels)
         if kind.fromForge {
             choice("Assignee", any: "Any", selection: $list.filter.assignee, options: offered.assignees)
         }
+        WorkFilterMenu(name: "Sort", selection: $list.sort, options: kind.sorts, words: \.title, compact: compact, named: true)
         #if os(macOS)
         // Boards are the Mac's and the web page's (#3282, tier Mac + web): the machines narrow to one as they read.
         if kind == .issue, !list.boards.isEmpty || !list.filter.board.isEmpty {
-            WorkBoardPicker(selection: $list.filter.board, boards: list.boards)
+            WorkFilterMenu(name: "Board", selection: $list.filter.board, options: boardOptions, words: { WorkList.boardName($0, in: list.boards) },
+                           any: "", anyWords: "All")
         }
         #endif
-        named("Sort", list.sort.title) {
-            Picker("Sort", selection: $list.sort) {
-                ForEach(kind.sorts, id: \.self) { Text($0.title).tag($0) }
-            }
-        }
     }
+
+    #if os(macOS)
+    /// The boards read, and the one picked when the machines no longer list it.
+    private var boardOptions: [String] {
+        let urls = list.boards.map(\.url)
+        let picked = list.filter.board
+        return picked.isEmpty || urls.contains(picked) ? urls : urls + [picked]
+    }
+    #endif
 
     /// The Project filter (#3283): All projects, then each project whose folders read something.
     /// With one project it is not there, so a person with one sees Work as before.
     @ViewBuilder
     private var project: some View {
         let projects = list.projectRepos.map(\.project)
-        let picked = list.filter.project
-        if projects.count > 1 || !picked.isEmpty {
-            let name = picked.isEmpty ? WorkList.allProjects : projects.first { $0.id == picked }?.name ?? WorkList.allProjects
-            named("Project", name) {
-                Picker("Project", selection: $list.filter.project) {
-                    Text(WorkList.allProjects).tag("")
-                    ForEach(projects) { Text($0.name).tag($0.id) }
-                }
-            }
+        if projects.count > 1 || !list.filter.project.isEmpty {
+            WorkFilterMenu(name: "Project", selection: $list.filter.project, options: projects.map(\.id),
+                           words: { id in projects.first { $0.id == id }?.name ?? WorkList.allProjects },
+                           any: "", anyWords: WorkList.allProjects, compact: compact)
         }
     }
 
@@ -188,164 +177,109 @@ private struct WorkListPane: View {
     private func choice(_ label: String, any: String, selection: Binding<String>, options: [String],
                         words: @escaping (String) -> String = { $0 }) -> some View {
         if !options.isEmpty || !selection.wrappedValue.isEmpty {
-            let value = selection.wrappedValue
-            named(label, value.isEmpty ? any : words(value)) {
-                Picker(label, selection: selection) {
-                    Text(any).tag("")
-                    ForEach(options, id: \.self) { Text(words($0)).tag($0) }
-                }
-            }
+            WorkFilterMenu(name: label, selection: selection, options: options, words: words, any: "", anyWords: any, compact: compact)
         }
-    }
-
-    /// A choice as the Mac draws it, its name beside its menu; on the Remote, whose menu shows
-    /// only the value, a button that says both ("Label: Any") and opens the choices.
-    @ViewBuilder
-    private func named(_ label: String, _ value: String, @ViewBuilder picker: () -> some View) -> some View {
-        #if os(iOS)
-        Menu { picker() } label: {
-            Text("\(label): \(value)").appText(.supporting).lineLimit(1)
-        }
-        .menuStyle(.button)
-        .buttonStyle(.bordered)
-        .fixedSize()
-        #else
-        picker().fixedSize()
-        #endif
     }
 
     @ViewBuilder
     private var content: some View {
+        let lines = [list.problem].compactMap { $0 } + errors
         if kind.fromForge, model.forgeMachines.isEmpty {
-            message(WorkList.noForgeHere)
+            WorkEmptyState(symbol: kind.sidebarIcon, title: WorkLook.emptyTitle(kind, state: list.filter.state, filtered: false),
+                           line: WorkList.noForgeHere)
         } else if list.lists == nil {
-            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            // The first read: placeholder rows, no spinner in the middle.
+            List { WorkPlaceholderRows() }.listStyle(.inset).disabled(true)
         } else {
             let shown = list.rows
-            let several = Set(list.all.map(\.repo)).count > 1
-            ScrollViewReader { reader in
-                List {
-                    ForEach([list.problem].compactMap { $0 } + errors, id: \.self) { line in
-                        Label(line, systemImage: "exclamationmark.triangle").foregroundStyle(.secondary)
-                    }
-                    if shown.isEmpty {
-                        Text(WorkList.noWork(kind)).foregroundStyle(.secondary)
-                    }
-                    ForEach(shown) { row in
-                        Button {
-                            list.opened = row.id
-                            model.showWork(WorkPlace(kind: kind, ref: row.id, fromList: true))
-                        } label: {
-                            WorkRowView(row: row, several: several, compact: compact)
-                        }
-                        .buttonStyle(.plain)
-                        .id(row.id)
-                    }
-                    if list.hasMore {
-                        Button(list.loadingMore ? "Loading…" : "More") { Task { await list.loadMore(model: model) } }
-                            .linkStyle()
-                            .disabled(list.loadingMore)
-                    }
-                    if !kind.fromForge {
-                        Text(WorkList.lineageOnlyNote).appText(.fine).foregroundStyle(.tertiary)
+            if shown.isEmpty {
+                VStack(spacing: 0) {
+                    if list.all.isEmpty, !lines.isEmpty {
+                        // Nothing read: the strip in the middle, in place of the list.
+                        WorkErrorStrip(lines: lines) { list.asked += 1 }
+                            .frame(maxWidth: 640)
+                            .padding(24)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        WorkErrorStrip(lines: lines) { list.asked += 1 }.padding(.horizontal, 16).padding(.top, 8)
+                        empty
                     }
                 }
-                .listStyle(.inset)
                 #if os(iOS)
                 .refreshable { list.asked += 1 }
                 #endif
-                // Back from an item's page: the list where it was left, at the row last opened.
-                .onAppear { if let opened = list.opened { reader.scrollTo(opened, anchor: .center) } }
+            } else {
+                rowsList(shown, lines: lines)
             }
         }
     }
 
-    private func message(_ text: String) -> some View {
-        Text(text)
-            .appText(.supporting)
-            .foregroundStyle(.secondary)
-            .multilineTextAlignment(.center)
-            .padding(24)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
-/// A row: its short ref, title, state and labels, and what lineage knows about it.
-private struct WorkRowView: View {
-    let row: WorkList.Row
-    let several: Bool
-    var compact = false
-
-    var body: some View {
-        if compact { stacked } else { inline }
+    /// The empty list: "No open issues" with a line under it, or "No issues match" with Clear filters.
+    private var empty: some View {
+        let filtered = WorkLook.narrows(list.filter)
+        return WorkEmptyState(symbol: kind.sidebarIcon, title: WorkLook.emptyTitle(kind, state: list.filter.state, filtered: filtered),
+                              line: filtered ? nil : kind.fromForge ? WorkLook.emptyLine(kind, repos: Array(Set(list.all.map(\.repo))))
+                                  : WorkList.lineageOnlyNote,
+                              action: filtered ? (WorkLook.clearFilters, { list.filter = WorkLook.cleared(list.filter) }) : nil)
     }
 
-    /// On a phone: the title on lines of its own, its state and labels wrapping under it.
-    private var stacked: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                if !WorkList.titleSaysRef(row.title, row.node.ref) {
-                    Text(WorkList.shortRef(row.node.ref)).foregroundStyle(.tint).monospacedDigit()
+    private func rowsList(_ shown: [WorkList.Row], lines: [String]) -> some View {
+        let several = Set(list.all.map(\.repo)).count > 1
+        return ScrollViewReader { reader in
+            List {
+                if !lines.isEmpty {
+                    WorkErrorStrip(lines: lines) { list.asked += 1 }.listRowSeparator(.hidden)
                 }
-                Text.forgeTitle(row.title).fontWeight(.semibold).lineLimit(2)
-            }
-            WrappingHStack(spacing: 4) {
-                WorkStatePill(state: row.state, draft: row.draft, status: row.status)
-                ForEach(row.labels, id: \.name) { WorkLabelChip(label: $0) }
-                if several {
-                    Text(WorkList.repoName(row.repo)).appText(.fine).foregroundStyle(.secondary)
+                ForEach(shown) { row in
+                    Button {
+                        list.opened = row.id
+                        model.showWork(WorkPlace(kind: kind, ref: row.id, fromList: true))
+                    } label: {
+                        WorkItemRow(row: row, several: several, compact: compact, pick: pick)
+                    }
+                    .buttonStyle(.plain)
+                    .id(row.id)
+                }
+                if list.hasMore {
+                    Button(list.loadingMore ? "Loading…" : "More") { Task { await list.loadMore(model: model) } }
+                        .linkStyle()
+                        .disabled(list.loadingMore)
+                }
+                if !kind.fromForge {
+                    Text(WorkList.lineageOnlyNote).appText(.fine).foregroundStyle(.tertiary)
                 }
             }
-            figures
+            .listStyle(.inset)
+            #if os(iOS)
+            .refreshable { list.asked += 1 }
+            #endif
+            // Back from an item's page: the list where it was left, at the row last opened.
+            .onAppear { if let opened = list.opened { reader.scrollTo(opened, anchor: .center) } }
         }
-        .padding(.vertical, 3)
-        .contentShape(Rectangle())
     }
 
-    private var figures: some View {
-        let figures = WorkList.lineageWords(row.lineage)
-        return Text(figures ?? WorkList.noAgentYet)
-            .appText(.fine)
-            .foregroundStyle(figures == nil ? .tertiary : .secondary)
-            .monospacedDigit()
-    }
-
-    private var inline: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                if !WorkList.titleSaysRef(row.title, row.node.ref) {
-                    Text(WorkList.shortRef(row.node.ref)).foregroundStyle(.tint).monospacedDigit()
-                }
-                Text.forgeTitle(row.title).fontWeight(.semibold).lineLimit(1)
-                WorkStatePill(state: row.state, draft: row.draft, status: row.status)
-                ForEach(row.labels, id: \.name) { WorkLabelChip(label: $0) }
-                if several {
-                    Text(WorkList.repoName(row.repo)).appText(.fine).foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 0)
-            }
-            figures
-        }
-        .padding(.vertical, 3)
-        .contentShape(Rectangle())
+    /// A click on a chip sets the Label filter to it (Mac); on a phone a tap opens the row.
+    private var pick: ((String) -> Void)? {
+        #if os(macOS)
+        { list.filter.label = $0 }
+        #else
+        nil
+        #endif
     }
 }
 
-/// A label in its forge's colour (#2956).
-struct WorkLabelChip: View {
-    let label: DaemonAPI.ForgeLabel
+#if os(iOS)
+/// The phone's search field in the navigation bar; on an iPad the bar's own field stays.
+private struct PhoneSearch: ViewModifier {
+    let on: Bool
+    @Binding var text: String
+    let prompt: String
 
-    var body: some View {
-        let rgb = WorkList.rgb(label.color)
-        Text(label.name)
-            .appText(.fine)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 1)
-            .foregroundStyle(rgb == nil ? Color.primary : WorkList.isLight(label.color) ? Color.black : Color.white)
-            .background(Capsule().fill(rgb.map { c in Color(red: c.r, green: c.g, blue: c.b) } ?? Color.clear))
-            .overlay(Capsule().strokeBorder(rgb == nil ? Color.secondary.opacity(0.4) : Color.clear))
+    func body(content: Content) -> some View {
+        if on { content.searchable(text: $text, prompt: prompt) } else { content }
     }
 }
+#endif
 
 /// The state as a word in a pill: open, closed, merged or draft; or the tracker's own status (a
 /// Jira status, #3260), in the colour of the state it is in.

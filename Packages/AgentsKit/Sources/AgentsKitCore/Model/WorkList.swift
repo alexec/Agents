@@ -77,13 +77,19 @@ public enum WorkList {
         public var folder: String?
         public var draft: Bool
         public var lineage: DaemonAPI.ReportNode?
+        /// How many comments it has (0 when the forge did not say), and a pull request's checks
+        /// and review (#4391), for the row's trailing edge.
+        public var comments: Int
+        public var checks: String?
+        public var review: String?
 
         public var id: String { node.ref }
 
         public init(node: DaemonAPI.LineageNode, title: String, state: String, labels: [DaemonAPI.ForgeLabel] = [],
                     repo: String, author: String? = nil, assignees: [String] = [], milestone: String? = nil,
                     updated: Date, url: URL? = nil, host: MachineRef? = nil, folder: String? = nil, draft: Bool = false,
-                    lineage: DaemonAPI.ReportNode? = nil, status: String? = nil) {
+                    lineage: DaemonAPI.ReportNode? = nil, status: String? = nil, comments: Int = 0, checks: String? = nil,
+                    review: String? = nil) {
             self.node = node
             self.title = title
             self.state = state
@@ -99,6 +105,9 @@ public enum WorkList {
             self.folder = folder
             self.draft = draft
             self.lineage = lineage
+            self.comments = comments
+            self.checks = checks
+            self.review = review
         }
 
         /// A row from the forge's item, with its lineage when there is any.
@@ -107,7 +116,7 @@ public enum WorkList {
                       author: item.author, assignees: item.assignees, milestone: item.milestone, updated: item.updatedAt,
                       url: item.url.flatMap(URL.init(string:)), host: host, folder: item.folder, draft: item.draft ?? false,
                       lineage: lineage,
-                      status: item.status)
+                      status: item.status, comments: item.comments, checks: item.checks, review: item.review)
         }
 
         /// A row lineage alone knows: a milestone, a release.
