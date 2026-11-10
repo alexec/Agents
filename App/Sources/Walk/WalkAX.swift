@@ -121,13 +121,28 @@ struct WalkAX {
 
     // MARK: acting
 
+    /// Pressed through the action, or the newer method where the element has its own. Not
+    /// pressed (so the walk tries its parent) when the newer method is only
+    /// `NSAccessibilityElement`'s, which forwards to an `accessibilityPerformAction:` the
+    /// element does not have, and throws (#4219).
     func press() -> Bool {
-        if actionNames.contains("AXPress") {
-            let selector = NSSelectorFromString("accessibilityPerformAction:")
-            unsafeBitCast(object.method(for: selector), to: Act.self)(object, selector, "AXPress" as NSString)
+        let perform = NSSelectorFromString("accessibilityPerformAction:")
+        let performs = object.responds(to: perform)
+        if performs, actionNames.contains("AXPress") {
+            unsafeBitCast(object.method(for: perform), to: Act.self)(object, perform, "AXPress" as NSString)
             return true
         }
+        guard performs || !Self.forwardsPress(object) else { return false }
         return flag("accessibilityPerformPress") ?? false
+    }
+
+    /// The element's `accessibilityPerformPress` is `NSAccessibilityElement`'s own, which
+    /// only calls `accessibilityPerformAction:`.
+    static func forwardsPress(_ object: NSObject) -> Bool {
+        let selector = NSSelectorFromString("accessibilityPerformPress")
+        guard object is NSAccessibilityElement,
+              let base = class_getMethodImplementation(NSAccessibilityElement.self, selector) else { return false }
+        return object.method(for: selector) == base
     }
 
     /// A flag set (`AXSelected`, `AXDisclosing`) where the element has it. Not read back:
