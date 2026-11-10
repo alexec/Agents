@@ -8,6 +8,10 @@
 # change: nothing runs. The container is Linux, so a failure only macOS has (CI's
 # `go-darwin`) still shows only in CI.
 #
+# When Go/internal/agentsd changes, its hot-path benchmarks (#4505) then run once each,
+# without -race, so a change to that path shows its cost before a push; compare it with
+# the baseline in Go/internal/agentsd/hotpath_bench_test.go.
+#
 # Lease "build" first. Usage: scripts/go-changed.sh [base]   (default origin/main)
 set -euo pipefail
 
@@ -37,3 +41,6 @@ fi
 echo "go-changed: ${pkgs[*]}"
 Go/scripts/go.sh vet "${pkgs[@]}"
 Go/scripts/go.sh test -race "${pkgs[@]}"
+if grep -qE '^Go/internal/agentsd/[^/]*$' <<<"$changed" || [ "${pkgs[*]}" = ./... ]; then
+	Go/scripts/go.sh test -run '^$' -bench '^Benchmark(ChangeAgent|Folders)$' -benchtime=1x -benchmem ./internal/agentsd
+fi
