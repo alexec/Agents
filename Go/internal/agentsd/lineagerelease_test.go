@@ -34,18 +34,6 @@ func TestSortVersionTags(t *testing.T) {
 	}
 }
 
-func TestMilestoneVersionOf(t *testing.T) {
-	for tag, want := range map[string]string{
-		"v0.14.0": "0.14",
-		"v0.14.1": "0.14.1",
-		"v1.0.0":  "1.0",
-	} {
-		if got := milestoneVersionOf(tag); got != want {
-			t.Errorf("%s: got %q, want %q", tag, got, want)
-		}
-	}
-}
-
 func TestSquashPRNumber(t *testing.T) {
 	if n, ok := squashPRNumber("github", "Lineage: release nodes (#3023)\n\nbody"); !ok || n != 3023 {
 		t.Fatalf("github: got %d, %v", n, ok)
@@ -104,28 +92,16 @@ func TestCommitPRNumberOf(t *testing.T) {
 	}
 }
 
-func TestMilestonesOf(t *testing.T) {
-	gh, err := milestonesOf("github", []byte(`[{"number":15,"title":"0.14 Lineage and value"}]`))
-	if err != nil || len(gh) != 1 || gh[0].Number != 15 || gh[0].Title != "0.14 Lineage and value" {
-		t.Fatalf("github: %+v, %v", gh, err)
-	}
-	gl, err := milestonesOf("gitlab", []byte(`[{"iid":4,"title":"0.14.1 Bug fixes"}]`))
-	if err != nil || len(gl) != 1 || gl[0].Number != 4 {
-		t.Fatalf("gitlab: %+v, %v", gl, err)
-	}
-}
-
 // fakeReleases is a fake forge for the release linker: tags, each tag's commit time, the
-// commits a compare names, each commit's PR when its title has no number, and the
-// milestones, with how often each was asked.
+// commits a compare names, and each commit's PR when its title has no number, with how often
+// each was asked.
 type fakeReleases struct {
 	mu         sync.Mutex
 	tags       []string
 	commitTime map[string]time.Time
 	compares   map[string][]compareCommit // key: base+".."+head
 	commitPRs  map[string]int             // by sha, for a commit with no number in its title
-	milestones []forgeMilestone
-	asked      map[string]int // by kind: "compare", "commitPR", "milestones"
+	asked      map[string]int // by kind: "compare", "commitPR"
 }
 
 func (f *fakeReleases) tagsOf(string) ([]string, error) {
@@ -154,18 +130,9 @@ func (f *fakeReleases) commitPR(_ context.Context, _ string, _ forgeRepo, sha st
 	return f.commitPRs[sha], nil
 }
 
-func (f *fakeReleases) ms(_ context.Context, _ string, _ forgeRepo) ([]forgeMilestone, error) {
-	f.mu.Lock()
-	f.asked["milestones"]++
-	f.mu.Unlock()
-	return f.milestones, nil
-}
-
 // #3023: the first tag in a repo links no PR, as there is no earlier one to compare since;
 // a later tag links the PRs of the commits since the one before it, from a squash title's
-// "(#n)" or, when it has none, the forge's commits/<sha>/pulls; a milestone whose title
-// starts with the tag's version (a .0 patch dropped) is shipped-in it. Each tag is done
-// once: a second check asks the forge nothing more.
+// "(#n)" or, when it has none, the forge's commits/<sha>/pulls. Each tag is done once: a second check asks the forge nothing more.
 func TestLinksReleasesFromTags(t *testing.T) {
 	d, _ := start(t, t.TempDir())
 	defer d.Shutdown()
@@ -182,11 +149,10 @@ func TestLinksReleasesFromTags(t *testing.T) {
 			},
 		},
 		commitPRs:  map[string]int{"s2": 3024},
-		milestones: []forgeMilestone{{Number: 15, Title: "0.14 Lineage and value"}},
 		asked:      map[string]int{},
 	}
-	d.releaseTags, d.releaseCommitTime, d.releaseCompare, d.releaseCommitPR, d.releaseMilestones =
-		forge.tagsOf, forge.time, forge.compare, forge.commitPR, forge.ms
+	d.releaseTags, d.releaseCommitTime, d.releaseCompare, d.releaseCommitPR =
+		forge.tagsOf, forge.time, forge.compare, forge.commitPR
 
 	d.checkReleaseTagsForFolder(context.Background(), "/folder", repo)
 	d.lineageSettle(5 * time.Second)
@@ -194,12 +160,11 @@ func TestLinksReleasesFromTags(t *testing.T) {
 	rel013 := repo.release("v0.13.0")
 	rel014 := repo.release("v0.14.0")
 	// v0.13.0 is the first tag: it links no PR (there is nothing before it to compare
-	// since), and the only milestone's title matches v0.14.0, not it.
+	// since).
 	wantLinks(t, active(d, rel013))
 	wantLinks(t, active(d, rel014),
 		"github:alexec/agents#3023 part-of "+rel014.Ref+" (forge)",
-		"github:alexec/agents#3024 part-of "+rel014.Ref+" (forge)",
-		"github:alexec/agents/milestone/15 shipped-in "+rel014.Ref+" (forge)")
+		"github:alexec/agents#3024 part-of "+rel014.Ref+" (forge)")
 	for _, l := range d.lineage().Links(rel014).Links {
 		if l.To == rel014 && l.At != wire.DateOf(t014) {
 			t.Errorf("link at %v, want the tag's commit time %v", l.At, t014)
@@ -207,7 +172,7 @@ func TestLinksReleasesFromTags(t *testing.T) {
 	}
 
 	// Done once: asking again finds nothing new to ask the forge for.
-	before := map[string]int{"compare": forge.asked["compare"], "commitPR": forge.asked["commitPR"], "milestones": forge.asked["milestones"]}
+	before := map[string]int{"compare": forge.asked["compare"], "commitPR": forge.asked["commitPR"]}
 	d.checkReleaseTagsForFolder(context.Background(), "/folder", repo)
 	d.lineageSettle(5 * time.Second)
 	if forge.asked["compare"] != before["compare"] || forge.asked["commitPR"] != before["commitPR"] {

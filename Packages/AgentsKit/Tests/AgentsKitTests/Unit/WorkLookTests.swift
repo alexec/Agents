@@ -17,7 +17,7 @@ struct WorkLookTests {
         #expect(WorkLook.glyph(kind: "pr", state: "open", draft: true) == .prDraft)
         #expect(WorkLook.glyph(kind: "pr", state: "merged") == .prMerged)
         #expect(WorkLook.glyph(kind: "pr", state: "closed") == .prClosed)
-        #expect(WorkLook.glyph(kind: "milestone", state: "open") == nil)
+        #expect(WorkLook.glyph(kind: "release", state: "open") == nil)
         #expect(WorkLook.glyph(kind: "issue", state: "") == nil)
     }
 
@@ -157,7 +157,7 @@ struct WorkLookTests {
         #expect(WorkLook.emptyTitle(.pr, state: .merged, filtered: false) == "No merged pull requests")
         #expect(WorkLook.emptyTitle(.issue, state: .all, filtered: false) == "No issues")
         #expect(WorkLook.emptyTitle(.issue, state: .open, filtered: true) == "No issues match")
-        #expect(WorkLook.emptyTitle(.milestone, state: .open, filtered: false) == "No milestones")
+        #expect(WorkLook.emptyTitle(.release, state: .open, filtered: false) == "No releases")
         #expect(WorkLook.emptyLine(.issue, repos: ["github:alexec/Agents"]) == "Issues on alexec/Agents show here.")
         #expect(WorkLook.emptyLine(.pr, repos: []) == "Pull requests from your folders’ repos show here.")
     }

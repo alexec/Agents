@@ -21,7 +21,7 @@ const glyphPaths: Record<StateGlyph, ComponentChildren> = {
     <path d="M4 5.25v5.5M12 10.75V8.5M10.4 3.4l3.2 3.2M13.6 3.4l-3.2 3.2" /></>,
 };
 
-/** One glyph in the state's colour (section 1), with its words for a screen reader; nothing for a milestone or a release. */
+/** One glyph in the state's colour (section 1), with its words for a screen reader; nothing for a release. */
 export function StateIcon({ kind, state, draft, size = 16 }: { kind: string; state: string; draft?: boolean | undefined; size?: number }) {
   const glyph = stateGlyph(kind, state, draft);
   if (!glyph) return null;

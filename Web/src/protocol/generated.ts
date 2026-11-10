@@ -4947,8 +4947,8 @@ export interface LineageCost {
 /**
  * One node's banked cost on a machine (#2350), whole, with what its rollups need: the repo or
  * tracker its ref is in, the issues a PR fixes (ended links too: a PR closed without a merge still
- * counts against its issue, as waste), the milestones it is part of, and how a PR ended. A
- * session's own cost is its turns that had no active link.
+ * counts against its issue, as waste), the releases it is part of, and how a PR ended. A session's
+ * own cost is its turns that had no active link.
  */
 export interface LineageCostNode {
   node: LineageNode;
@@ -4960,7 +4960,7 @@ export interface LineageCostNode {
   banked: LineageCost;
   /** A PR's issues, by ref. */
   fixes?: string[];
-  /** The milestones it is part of, by ref. */
+  /** The releases it is part of, by ref. */
   partOf?: string[];
   /**
    * A PR's end: merged, closed (without a merge: waste) or reverted (a merged revert: waste).
@@ -5011,10 +5011,10 @@ export interface LineageCostNode {
 
 /**
  * lineage/cost (#2350): a node's cost rolled up. own is what was banked on the node itself. total
- * adds its parts: an issue's PRs (the PRs that fix it); a milestone's issues, their PRs and the PRs
- * part of it; a repo's every node (kind repo, ref github:alexec/agents). waste is the parts' PRs
- * closed without a merge or reverted. unlinked is the parts' sessions: turns with no active link.
- * parts is the nodes added up, newest first, at most 500; limited says there are more.
+ * adds its parts: an issue's PRs (the PRs that fix it); a release's PRs and the issues they fix; a
+ * repo's every node (kind repo, ref github:alexec/agents). waste is the parts' PRs closed without a
+ * merge or reverted. unlinked is the parts' sessions: turns with no active link. parts is the nodes
+ * added up, newest first, at most 500; limited says there are more.
  */
 export interface LineageCostRollup {
   node: LineageNode;
@@ -5152,16 +5152,12 @@ export interface LineageEstimateRequest {
 }
 
 /**
- * lineage/figures (#4427): a milestone's or a release's Lineage panel on its Work page, from this
- * machine's totals. cost is its rollup's total, as lineage/cost's. sessions is how many sessions
- * worked on it and its parts, each once; running is how many of them run now (starting, running or
- * waiting on the person). runtimes is the runtimes of the sessions this machine has, the most
- * sessions first. A milestone has releasedIn: the releases that took its issues (and its PRs that
- * fix none of them), each item in the first release that took it, the oldest release first; and
- * finishedIn, the newest of them, once the milestone is closed. A release has milestonesFinished:
- * the milestones shipped in it (by title) and the closed milestones whose last release is this one;
- * and leadTimeSeconds, from the first work on its parts to its tag. limited says the rollup had
- * more parts than it counts. Another kind of node is refused.
+ * lineage/figures (#4427): a release's Lineage panel on its Work page, from this machine's totals.
+ * cost is its rollup's total, as lineage/cost's. sessions is how many sessions worked on it and its
+ * parts, each once; running is how many of them run now (starting, running or waiting on the
+ * person). runtimes is the runtimes of the sessions this machine has, the most sessions first.
+ * leadTimeSeconds is from the first work on its parts to its tag (#3878 removed the milestone
+ * figures). limited says the rollup had more parts than it counts. Another kind of node is refused.
  */
 export interface LineageFigures {
   node: LineageNode;
@@ -5169,10 +5165,6 @@ export interface LineageFigures {
   sessions: number;
   running: number;
   runtimes: LineageRuntimeCount[];
-  releasedIn?: LineageReleaseTook[];
-  /** A closed milestone's last release. */
-  finishedIn?: LineageNode;
-  milestonesFinished?: LineageMilestoneFinished[];
   leadTimeSeconds?: number;
   limited?: boolean;
 }
@@ -5231,15 +5223,9 @@ export interface LineageLinks {
   states?: LineageSessionState[];
 }
 
-/** A milestone a release finished (#4427), with its title when the host has resolved it. */
-export interface LineageMilestoneFinished {
-  milestone: LineageNode;
-  title?: string;
-}
-
 /**
  * A node in the lineage graph (#2348). kind is what it is: issue, pr, session, workflow-run,
- * commit, file, branch or milestone, and the list is open. ref names it apart from any tracker, as
+ * commit, file, branch or release, and the list is open. ref names it apart from any tracker, as
  * <scheme>:<id>: github:alexec/Agents#123, gitlab:group/repo!45, linear:ENG-4, jira:ABC-9,
  * session:<agent id>.
  */
@@ -5257,19 +5243,12 @@ export interface LineageNodeRequest {
   depth?: number;
 }
 
-/** A release that took a milestone's items, its tag, and how many items it took (#4427). */
-export interface LineageReleaseTook {
-  release: LineageNode;
-  tag: string;
-  items: number;
-}
-
 /**
  * A node's title, state and labels from its connector (#3089), resolved and cached on the daemon so
  * a lineage renderer shows "Fix flaky test" rather than its ref. state is open, closed or merged (a
  * pull request's; an issue's is open or closed); absent when the connector does not say. labels is
- * empty when it has none. Resolved for a GitHub or GitLab issue or pull request only; Linear,
- * milestones and releases are not resolved yet.
+ * empty when it has none. Resolved for a GitHub or GitLab issue or pull request only; Linear and
+ * releases are not resolved yet.
  */
 export interface LineageResolved {
   title: string;
@@ -9471,13 +9450,12 @@ export type ReportFormat =
   | "jsonl";
 
 /**
- * One row of reports/nodes (#3118): an issue, PR, milestone or release, its cost rolled up from
- * every machine in the scope as reports/value adds it up. own is what was banked on the node
- * itself; total adds its parts (an issue's PRs; a milestone's or release's issues and PRs); waste
- * is the parts' PRs closed without a merge or reverted. sessions is how many sessions worked on it
- * and its parts, each once. leadTimeSeconds is from the first work on it to its last PR merged,
- * absent before a merge. resolved is the newest title, state and labels any machine sent; absent
- * when none had them.
+ * One row of reports/nodes (#3118): an issue, PR or release, its cost rolled up from every machine
+ * in the scope as reports/value adds it up. own is what was banked on the node itself; total adds
+ * its parts (an issue's PRs; a release's issues and PRs); waste is the parts' PRs closed without a
+ * merge or reverted. sessions is how many sessions worked on it and its parts, each once.
+ * leadTimeSeconds is from the first work on it to its last PR merged, absent before a merge.
+ * resolved is the newest title, state and labels any machine sent; absent when none had them.
  */
 export interface ReportNode {
   node: LineageNode;
@@ -9526,12 +9504,12 @@ export interface ReportNodes {
 /**
  * reports/nodes (#3118): the lineage nodes of one kind in a scope, with filters and pages. The
  * scope is as reports/value's. state is open, closed or merged, from the node's resolved state (a
- * PR with none falls back to its outcome); milestones and releases have no state in v1. repo is a
- * ref prefix (github:alexec/Agents). since is on the node's last change. limit is 1 to 100, 50 when
- * absent. cursor is the last page's, opaque.
+ * PR with none falls back to its outcome); releases have no state in v1. repo is a ref prefix
+ * (github:alexec/Agents). since is on the node's last change. limit is 1 to 100, 50 when absent.
+ * cursor is the last page's, opaque.
  */
 export interface ReportNodesQuery {
-  /** issue, pr, milestone or release. */
+  /** issue, pr or release. */
   kind: string;
   state?: string;
   repo?: string;
@@ -9673,8 +9651,8 @@ export interface ReportScopes {
  * nodes that the scope's machines send (#2350). A node is in the range when it last changed in it,
  * with its whole cost. total is the work on issues and PRs; waste is the PRs closed without a merge
  * and merged reverts; unlinked is the turns with no issue or PR. perMergedPR is total by the PRs
- * merged, by currency. leadTimeSeconds is the median of the issues' lead times. issues, milestones
- * and releases (#3023) are the most costly first, at most 100 each; limited says there are more.
+ * merged, by currency. leadTimeSeconds is the median of the issues' lead times. issues and releases
+ * (#3023) are the most costly first, at most 100 each; limited says there are more.
  */
 export interface ReportValue {
   range: ReportRange;
@@ -9693,17 +9671,13 @@ export interface ReportValue {
   cycleTimeSeconds?: number;
   estimateError?: ReportEstimateError;
   issues: ReportValueRow[];
-  milestones: ReportValueRow[];
-  /**
-   * One row per release (#3023): the PRs part-of it and the issues those PRs fix, the same way as a
-   * milestone.
-   */
+  /** One row per release (#3023): the PRs part-of it and the issues those PRs fix. */
   releases: ReportValueRow[];
   limited?: boolean;
 }
 
 /**
- * One issue or milestone on Reports ▸ Value (#2351): its cost rolled up from every machine in the
+ * One issue or release on Reports ▸ Value (#2351): its cost rolled up from every machine in the
  * scope, as lineage/cost adds it up, and how its PRs ended.
  */
 export interface ReportValueRow {
@@ -14661,15 +14635,13 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineageEstimateKept: { required: ["at", "matches"], optional: ["matchedBy", "cost", "outputTokens", "workingSeconds"] },
   LineageEstimateRange: { required: ["median", "p10", "p90"], optional: [] },
   LineageEstimateRequest: { required: ["node"], optional: ["startAt"] },
-  LineageFigures: { required: ["node", "cost", "sessions", "running", "runtimes"], optional: ["releasedIn", "finishedIn", "milestonesFinished", "leadTimeSeconds", "limited"] },
+  LineageFigures: { required: ["node", "cost", "sessions", "running", "runtimes"], optional: ["leadTimeSeconds", "limited"] },
   LineageGraph: { required: ["nodes", "links"], optional: ["limited", "resolving", "resolved", "states"] },
   LineageLink: { required: ["from", "to", "rel", "source", "at"], optional: ["endedAt"] },
   LineageLinkRequest: { required: ["from", "to", "rel", "source"], optional: [] },
   LineageLinks: { required: ["links"], optional: ["limited", "states"] },
-  LineageMilestoneFinished: { required: ["milestone"], optional: ["title"] },
   LineageNode: { required: ["kind", "ref"], optional: [] },
   LineageNodeRequest: { required: ["node"], optional: ["depth"] },
-  LineageReleaseTook: { required: ["release", "tag", "items"], optional: [] },
   LineageResolved: { required: ["title"], optional: ["state", "labels"] },
   LineageRuntimeCount: { required: ["runtimeID", "sessions"], optional: [] },
   LineageSessionIssue: { required: ["node"], optional: ["title"] },
@@ -15042,7 +15014,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ReportScope: { required: ["kind"], optional: ["group"] },
   ReportScopeOption: { required: ["scope", "name"], optional: [] },
   ReportScopes: { required: ["scopes", "admin"], optional: [] },
-  ReportValue: { required: ["range", "scope", "total", "waste", "unlinked", "perMergedPR", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "issues", "milestones", "releases"], optional: ["leadTimeSeconds", "cycleTimeSeconds", "estimateError", "limited"] },
+  ReportValue: { required: ["range", "scope", "total", "waste", "unlinked", "perMergedPR", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "issues", "releases"], optional: ["leadTimeSeconds", "cycleTimeSeconds", "estimateError", "limited"] },
   ReportValueRow: { required: ["node", "total", "waste", "prsMerged", "prsClosed", "prsReverted", "failedChecks"], optional: ["leadTimeSeconds", "cycleTimeSeconds", "level"] },
   ReportView: { required: ["id", "name", "page", "scope", "range"], optional: ["by"] },
   ReportViewID: { required: ["id"], optional: [] },

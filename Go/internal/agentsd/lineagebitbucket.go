@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/bitbucketmcp"
 	"github.com/alexec/agents/Go/internal/lineage"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -14,20 +13,15 @@ import (
 // is on (bitbucketOf). Each has the shape of its gh and glab default (forgeAsks).
 //
 // Bitbucket says no parent issue, so a Bitbucket issue gets none. An issue's labels are its kind
-// and component. A milestone is bitbucket:workspace/repo/milestone/<id>, and has no state.
+// and component.
 
-// bitbucketResolveNode is an issue's, a pull request's or a milestone's title, state and labels.
+// bitbucketResolveNode is an issue's or a pull request's title, state and labels.
 func (d *Daemon) bitbucketResolveNode(ctx context.Context, _ string, repo forgeRepo, kind string, n int) (wire.LineageResolved, error) {
 	bb, named, _, err := d.bitbucketOf(ctx, "lineage", repo.path)
 	if err != nil {
 		return wire.LineageResolved{}, err
 	}
-	var got bitbucketmcp.Node
-	if kind == lineage.KindMilestone {
-		got, err = bb.MilestoneNode(ctx, named, n)
-	} else {
-		got, err = bb.Node(ctx, named, n, kind == lineage.KindPR)
-	}
+	got, err := bb.Node(ctx, named, n, kind == lineage.KindPR)
 	if err != nil {
 		return wire.LineageResolved{}, err
 	}
@@ -36,16 +30,6 @@ func (d *Daemon) bitbucketResolveNode(ctx context.Context, _ string, repo forgeR
 		r.State = &got.State
 	}
 	return r, nil
-}
-
-// bitbucketIssue is an issue's milestone.
-func (d *Daemon) bitbucketIssue(ctx context.Context, _ string, repo forgeRepo, n int) (issueOnForge, error) {
-	bb, named, _, err := d.bitbucketOf(ctx, "lineage", repo.path)
-	if err != nil {
-		return issueOnForge{}, err
-	}
-	got, err := bb.Node(ctx, named, n, false)
-	return issueOnForge{milestone: got.Milestone}, err
 }
 
 // bitbucketCommitTime is the commit time of a tag or sha.
@@ -81,23 +65,6 @@ func (d *Daemon) bitbucketCommitPR(ctx context.Context, _ string, repo forgeRepo
 		return 0, err
 	}
 	return bb.CommitPR(ctx, named, sha)
-}
-
-// bitbucketMilestones is every milestone of repo, by its id.
-func (d *Daemon) bitbucketMilestones(ctx context.Context, _ string, repo forgeRepo) ([]forgeMilestone, error) {
-	bb, named, _, err := d.bitbucketOf(ctx, "lineage", repo.path)
-	if err != nil {
-		return nil, err
-	}
-	found, err := bb.Milestones(ctx, named)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]forgeMilestone, 0, len(found))
-	for _, m := range found {
-		out = append(out, forgeMilestone{m.ID, m.Title})
-	}
-	return out, nil
 }
 
 // bitbucketCostComment posts the cost comment, or edits the one r.ID names or the one the pull

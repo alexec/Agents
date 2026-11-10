@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Work (#3119, spec 3100), as the web page's Work section: Issues and Pull requests from every
 /// machine's forges (`forge/issues`, `forge/pulls`), one row per ref, with what lineage knows
-/// (`reports/nodes`) under each title; Milestones and Releases from lineage alone. A row opens the
+/// (`reports/nodes`) under each title; Releases from lineage alone. A row opens the
 /// item's page; Back and Forward go along the places, as a browser's. One view for the Mac's
 /// window and the Remote (#3256): on a phone the filters scroll sideways and a row wraps.
 struct WorkView: View {
@@ -82,7 +82,6 @@ extension WorkList.Kind {
         case .issue: "smallcircle.filled.circle"
         case .pr: "arrow.triangle.pull"
         case .feature: "sparkles"
-        case .milestone: "flag"
         case .release: "shippingbox"
         case .timeline: "timeline.selection"
         }
@@ -93,7 +92,6 @@ extension WorkList.Kind {
         case .issue: "Every issue in your folders’ repos, and what agents spent on each"
         case .pr: "Every pull request in your folders’ repos, and what agents spent on each"
         case .feature: "Each feature label on your epics, with its epics and their leads"
-        case .milestone: "The milestones lineage knows, and what their work cost"
         case .release: "The releases lineage knows, and what went into each"
         case .timeline: "Your epics in time: when each started, what closed, and when it is forecast to close"
         }

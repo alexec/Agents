@@ -2042,7 +2042,7 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .agent-config-sync { display: grid; gap: 3px; margin-bottom: 12px; }
 .agent-config-sync p { margin: 0; }
 .agent-config-project { min-width: min(760px, 90vw); max-height: 85vh; overflow: auto; }
-/* Work (#3119): the lists of issues, pull requests, milestones and releases, a row each, and its page. */
+/* Work (#3119): the lists of issues, pull requests and releases, a row each, and its page. */
 .work-filters { display: flex; gap: 8px 12px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
 .work-filters label { display: inline-flex; gap: 4px; align-items: center; }
 .work-filters input[type="search"] { flex: 1 1 160px; min-width: 0; }

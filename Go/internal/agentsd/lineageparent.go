@@ -1,7 +1,6 @@
 package agentsd
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -18,135 +17,110 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// Each issue is part of its milestone (#2935), so a milestone's cost adds up (#2350):
+// Each issue is part of its parent (#3582), so a walk from an epic reaches its children:
 //
-//   - For each forge issue the host knows (a session's #n, a PR's fixes), it asks the forge
-//     for the issue's milestone, with the person's own gh or glab in the folder (Forgejo and
-//     Bitbucket: its connection, lineageforgejo.go, lineagebitbucket.go), and links the issue part-of the milestone, source forge.
-//     A milestone is github:<owner>/<repo>/milestone/<number>,
-//     gitlab:<group>/<project>/milestone/<iid>, forgejo:<owner>/<repo>/milestone/<id>, or
-//     bitbucket:<workspace>/<repo>/milestone/<id>.
-//   - The answer is kept milestoneRecheck: an issue named again after that is asked again.
-//     When its milestone is another one now, the old link ends and a new one starts; with
-//     none, the link ends.
-//   - The same answer says the issue's parent (a GitHub sub-issue's epic, #3582): the issue
-//     is part-of its parent, source forge, and a parent's sub-issues (at most
-//     subIssuesMax) are each part-of it, so a walk from an epic reaches its children. A
-//     move or a removal ends the old link as for a milestone. GitLab's and Forgejo's REST
-//     APIs say no parent, so their issues get none.
+//   - For each GitHub issue the host knows (a session's #n, a PR's fixes), it asks GitHub for
+//     the issue's parent (a sub-issue's epic) and its sub-issues, with the person's own gh in
+//     the folder. The issue is part-of its parent, source forge, and each of its sub-issues (at
+//     most subIssuesMax) is part-of it. GitLab's, Forgejo's and Bitbucket's APIs say no parent,
+//     so lineage does not ask them.
+//   - The answer is kept parentRecheck: an issue named again after that is asked again. When
+//     its parent is another one now, the old link ends and a new one starts; with none, the
+//     link ends.
 //   - Bounded: one lookup at a time, on its own goroutine so the linker never waits on the
-//     forge; at most milestoneLookupsHeld wait, each issue once, and milestonesCached
-//     answers are kept.
+//     forge; at most parentLookupsHeld wait, each issue once, and parentsCached answers are
+//     kept.
 //
-// Decided: the host asks the forge, and the GitHub and GitLab servers add nothing to the
-// pr.* events, because a session's #n label comes with no event, and the host asks gh and
-// glab already for the cost comment (#2352).
+// #3878 removed the milestone an issue is part of (#2935): Work has no milestones now.
+//
+// Decided: the host asks the forge, and the GitHub server adds nothing to the pr.* events,
+// because a session's #n label comes with no event, and the host asks gh already for the cost
+// comment (#2352).
 
 const (
-	milestoneRecheck     = time.Hour
-	milestoneLookupsHeld = 256
-	milestonesCached     = 2_000
+	parentRecheck     = time.Hour
+	parentLookupsHeld = 256
+	parentsCached     = 2_000
 	// subIssuesMax bounds the sub-issues of one parent that are linked: one page of the forge's.
 	subIssuesMax = 100
 )
 
-// issueOnForge is what the forge says of an issue: its milestone's number (GitLab: its
-// iid), 0 for none; the issue it is a sub-issue of, the zero node for none; and its own
-// sub-issues.
+// issueOnForge is what the forge says of an issue: the issue it is a sub-issue of, the zero
+// node for none; and its own sub-issues.
 type issueOnForge struct {
-	milestone int
-	parent    wire.LineageNode
-	children  []wire.LineageNode
+	parent   wire.LineageNode
+	children []wire.LineageNode
 }
 
-// milestoneLookup asks the forge for an issue's milestone, parent and sub-issues. Tests set
-// it, or a daemon's issueLookup.
-var milestoneLookup = forgeIssue
+// parentLookup asks the forge for an issue's parent and sub-issues. Tests set it, or a
+// daemon's issueLookup.
+var parentLookup = forgeIssue
 
 type issueLookup func(ctx context.Context, folder string, repo forgeRepo, n int) (issueOnForge, error)
 
-type issueMilestoneBook struct {
+type issueParentBook struct {
 	issueMu      sync.Mutex
 	issueOnce    sync.Once
-	issueJobs    chan milestoneJob
+	issueJobs    chan parentJob
 	issueWaiting map[wire.LineageNode]bool
 	// issueAsked is when each issue was asked; a failed lookup waits as long, leaving its links.
 	issueAsked map[wire.LineageNode]time.Time
-	// issueLookup, when set, is asked in place of milestoneLookup.
+	// issueLookup, when set, is asked in place of parentLookup.
 	issueLookup issueLookup
 	// subIssues is each parent's sub-issues in the forge's order, as it last said them: the
 	// epic's order a search for it groups its sessions in (#3900). Kept as long as issueAsked.
 	subIssues map[wire.LineageNode][]wire.LineageNode
 }
 
-type milestoneJob struct {
+type parentJob struct {
 	folder string
 	repo   forgeRepo
 	n      int
 }
 
-func (r forgeRepo) milestone(n int) wire.LineageNode {
-	return wire.LineageNode{Kind: lineage.KindMilestone, Ref: r.forge + ":" + r.path + "/milestone/" + strconv.Itoa(n)}
-}
-
-// noteIssueMilestone asks, unless it asked within milestoneRecheck, for an issue's
-// milestone, and links the issue to it: on a forge lineage asks (forgeKind.cli).
-func (d *Daemon) noteIssueMilestone(folder string, repo forgeRepo, n int) {
-	if !repo.asks() || n <= 0 {
+// noteIssueParent asks, unless it asked within parentRecheck, for a GitHub issue's parent
+// and sub-issues, and links them.
+func (d *Daemon) noteIssueParent(folder string, repo forgeRepo, n int) {
+	if repo.forge != "github" || n <= 0 {
 		return
 	}
 	issue := repo.issue(n)
 	d.issueMu.Lock()
 	defer d.issueMu.Unlock()
-	if at, ok := d.issueAsked[issue]; ok && nowFunc().Sub(at) < milestoneRecheck || d.issueWaiting[issue] {
+	if at, ok := d.issueAsked[issue]; ok && nowFunc().Sub(at) < parentRecheck || d.issueWaiting[issue] {
 		return
 	}
 	d.issueOnce.Do(func() {
-		d.issueJobs = make(chan milestoneJob, milestoneLookupsHeld)
+		d.issueJobs = make(chan parentJob, parentLookupsHeld)
 		jobs := d.issueJobs
-		safe.Go("lineage milestones", func() {
+		safe.Go("lineage parents", func() {
 			for j := range jobs {
-				d.askIssueMilestone(j)
+				d.askIssueParent(j)
 			}
 		})
 	})
 	select {
-	case d.issueJobs <- milestoneJob{folder, repo, n}:
+	case d.issueJobs <- parentJob{folder, repo, n}:
 		if d.issueWaiting == nil {
 			d.issueWaiting = map[wire.LineageNode]bool{}
 		}
 		d.issueWaiting[issue] = true
 	default:
-		log.Printf("lineage: %d milestone lookups wait; %s was not asked", milestoneLookupsHeld, issue.Ref)
+		log.Printf("lineage: %d parent lookups wait; %s was not asked", parentLookupsHeld, issue.Ref)
 	}
 }
 
-func (d *Daemon) askIssueMilestone(j milestoneJob) {
+func (d *Daemon) askIssueParent(j parentJob) {
 	issue := j.repo.issue(j.n)
-	ask := milestoneLookup
-	if c, ok := d.connectionAsks(j.repo.forge); ok {
-		ask = c.issue
-	}
+	ask := parentLookup
 	if d.issueLookup != nil {
 		ask = d.issueLookup
 	}
 	got, err := ask(context.Background(), j.folder, j.repo, j.n)
-	m := got.milestone
 	if err != nil {
-		log.Printf("lineage: the milestone of %s: %v", issue.Ref, err)
+		log.Printf("lineage: the parent of %s: %v", issue.Ref, err)
 	} else {
 		d.lineageDo(func() {
-			to := wire.LineageNode{}
-			if m > 0 {
-				to = j.repo.milestone(m)
-			}
-			d.endLinks(issue, func(l wire.LineageLink) bool {
-				return l.From == issue && l.Rel == lineage.RelPartOf && l.To.Kind == lineage.KindMilestone &&
-					l.Source == lineage.SourceForge && l.To != to
-			})
-			if m > 0 {
-				d.link(issue, to, lineage.RelPartOf, lineage.SourceForge)
-			}
 			d.endLinks(issue, func(l wire.LineageLink) bool {
 				return l.From == issue && l.Rel == lineage.RelPartOf && l.To.Kind == lineage.KindIssue &&
 					l.Source == lineage.SourceForge && l.To != got.parent
@@ -158,12 +132,8 @@ func (d *Daemon) askIssueMilestone(j milestoneJob) {
 				d.link(child, issue, lineage.RelPartOf, lineage.SourceForge)
 			}
 		})
-		if m > 0 {
-			// Its title, for Work's Milestones (reports/nodes), which no walk asks for.
-			d.resolveSoon(j.repo.milestone(m))
-		}
 	}
-	// After the links are given: no longer waiting means they are in the linker's work.
+// After the links are given: no longer waiting means they are in the linker's work.
 	d.issueMu.Lock()
 	defer d.issueMu.Unlock()
 	delete(d.issueWaiting, issue)
@@ -180,7 +150,7 @@ func (d *Daemon) askIssueMilestone(j milestoneJob) {
 	if d.issueAsked == nil {
 		d.issueAsked = map[wire.LineageNode]time.Time{}
 	}
-	if len(d.issueAsked) >= milestonesCached {
+	if len(d.issueAsked) >= parentsCached {
 		d.dropOldestAnswerLocked()
 	}
 	d.issueAsked[issue] = nowFunc()
@@ -216,32 +186,27 @@ func (d *Daemon) repoFolder(repo forgeRepo) string {
 	return ""
 }
 
-// forgeIssue asks gh or glab, in folder, for an issue's milestone and parent, and, when it
-// has sub-issues, for them.
+// forgeIssue asks gh, in folder, for a GitHub issue's parent, and, when it has sub-issues,
+// for them.
 func forgeIssue(ctx context.Context, folder string, repo forgeRepo, n int) (issueOnForge, error) {
-	var exe, path string
-	switch repo.forge {
-	case "github":
-		exe, path = forgeCLI("gh"), fmt.Sprintf("repos/%s/issues/%d", repo.path, n)
-	case "gitlab":
-		exe, path = forgeCLI("glab"), fmt.Sprintf("projects/%s/issues/%d", url.PathEscape(repo.path), n)
-	default:
-		return issueOnForge{}, fmt.Errorf("no issues on %s", repo.forge)
+	if repo.forge != "github" {
+		return issueOnForge{}, fmt.Errorf("no parents on %s", repo.forge)
 	}
+	exe := forgeCLI("gh")
 	if exe == "" {
-		return issueOnForge{}, errors.New("gh or glab is not installed")
+		return issueOnForge{}, errors.New("gh is not installed")
 	}
-	out, err := runForgeCLI(ctx, exe, folder, nil, "api", path)
+	out, err := runForgeCLI(ctx, exe, folder, nil, "api", fmt.Sprintf("repos/%s/issues/%d", repo.path, n))
 	if err != nil {
 		return issueOnForge{}, err
 	}
 	got, subIssues, err := issueOnForgeOf(out)
-	if err != nil || subIssues == 0 || repo.forge != "github" {
+	if err != nil || subIssues == 0 {
 		return got, err
 	}
 	out, err = runForgeCLI(ctx, exe, folder, nil, "api", fmt.Sprintf("repos/%s/issues/%d/sub_issues?per_page=%d", repo.path, n, subIssuesMax))
 	if err != nil {
-		// The milestone and parent stand; the sub-issues are asked the next time.
+		// The parent stands; the sub-issues are asked the next time.
 		log.Printf("lineage: the sub-issues of %s: %v", repo.issue(n).Ref, err)
 		return got, nil
 	}
@@ -249,13 +214,9 @@ func forgeIssue(ctx context.Context, folder string, repo forgeRepo, n int) (issu
 	return got, err
 }
 
-// issueOnForgeOf is an issue as the forge's API says it: its milestone and parent, and how
-// many sub-issues it has.
+// issueOnForgeOf is an issue as GitHub's API says it: its parent, and how many sub-issues it
+// has.
 func issueOnForgeOf(out []byte) (issueOnForge, int, error) {
-	m, err := issueMilestoneOf(out)
-	if err != nil {
-		return issueOnForge{}, 0, err
-	}
 	var issue struct {
 		ParentIssueURL string `json:"parent_issue_url"`
 		SubIssues      struct {
@@ -265,7 +226,7 @@ func issueOnForgeOf(out []byte) (issueOnForge, int, error) {
 	if err := json.Unmarshal(out, &issue); err != nil {
 		return issueOnForge{}, 0, fmt.Errorf("the forge did not say the issue: %v", err)
 	}
-	got := issueOnForge{milestone: m}
+	got := issueOnForge{}
 	if repo, n, ok := issueOfAPIURL(issue.ParentIssueURL); ok {
 		got.parent = repo.issue(n)
 	}
@@ -337,30 +298,6 @@ func forgejoOfURLOn(raw, root, sep string) (forgeRepo, int, bool) {
 		return forgeRepo{}, 0, false
 	}
 	return forgeRepo{"forgejo", repoPath(repo)}, n, true
-}
-
-// issueMilestoneOf is the milestone of an issue as the forge's API says it: number on
-// GitHub, iid on GitLab, 0 for none.
-func issueMilestoneOf(out []byte) (int, error) {
-	var issue struct {
-		Milestone *struct {
-			Number int `json:"number"`
-			IID    int `json:"iid"`
-		} `json:"milestone"`
-	}
-	dec := json.NewDecoder(bytes.NewReader(out))
-	if err := dec.Decode(&issue); err != nil {
-		return 0, fmt.Errorf("the forge did not say the issue: %v", err)
-	}
-	switch m := issue.Milestone; {
-	case m == nil:
-		return 0, nil
-	case m.Number > 0:
-		return m.Number, nil
-	case m.IID > 0:
-		return m.IID, nil
-	}
-	return 0, errors.New("the forge did not say the milestone's number")
 }
 
 // issueOfNode is the repo and number of a forge issue node: github:o/r#12, forgejo:o/r#12,

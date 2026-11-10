@@ -357,8 +357,8 @@ function AdoptionPane({ store, scope, initial }: { store: Store; scope: ReportSc
 }
 
 /** Reports ▸ Value (#2351): what the work cost and delivered, from the machines' lineage nodes:
- * cost per merged pull request, waste and lead time, then each issue, milestone and release
- * (#3023), the most costly first. */
+ * cost per merged pull request, waste and lead time, then each issue and release (#3023), the
+ * most costly first. */
 function ValuePane({ store, scope, initial }: { store: Store; scope: ReportScope | undefined; initial?: Initial | undefined }) {
   const range = useSignal<ReportRange>(initial?.range ?? "month");
   const value = useSignal<ReportValue | null>(null);
@@ -378,7 +378,7 @@ function ValuePane({ store, scope, initial }: { store: Store; scope: ReportScope
     });
   }, [range.value, scope && scopeKey(scope)]);
   const shown = value.value?.range === range.value && sameScope(value.value.scope, asked.scope) ? value.value : null;
-  // An issue, a milestone or a release opens its Work page (#3088), its lineage and its forge's link there.
+  // An issue or a release opens its Work page (#3088), its lineage and its forge's link there.
   const row = (r: ReportValueRow) => {
     const n = r.node;
     return (
@@ -410,8 +410,6 @@ function ValuePane({ store, scope, initial }: { store: Store; scope: ReportScope
           </ul>
           {shown.issues.length > 0 && <h3>Issues</h3>}
           {shown.issues.length > 0 && <ul class="report-list">{shown.issues.map(row)}</ul>}
-          {shown.milestones.length > 0 && <h3>Milestones</h3>}
-          {shown.milestones.length > 0 && <ul class="report-list">{shown.milestones.map(row)}</ul>}
           {shown.releases.length > 0 && <h3>Releases</h3>}
           {shown.releases.length > 0 && <ul class="report-list">{shown.releases.map(row)}</ul>}
           {shown.limited && <p class="quiet small">The 100 most costly of each.</p>}

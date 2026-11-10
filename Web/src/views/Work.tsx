@@ -1,7 +1,7 @@
-// Work ▸ Issues, Pull requests, Milestones and Releases (#3119, spec 3100), as the window's WorkView:
-// every issue and pull request from forge/issues and forge/pulls on each machine, one row per ref, with
-// what lineage knows (reports/nodes: sessions, cost, lead time) under its title; the milestones and
-// releases lineage knows. A row opens its page.
+// Work ▸ Issues, Pull requests and Releases (#3119, spec 3100), as the window's WorkView: every issue
+// and pull request from forge/issues and forge/pulls on each machine, one row per ref, with what
+// lineage knows (reports/nodes: sessions, cost, lead time) under its title; the releases lineage
+// knows. A row opens its page.
 import { effect, useSignal } from "@preact/signals";
 import { Fragment, type ComponentChildren } from "preact";
 import { useEffect, useMemo, useRef } from "preact/hooks";
@@ -272,11 +272,11 @@ function WorkRowView({ row, several, dim, pick, open }: { row: WorkRow; several:
   );
 }
 
-/** The page of one issue, PR, milestone or release (#3119): the item from its forge (forge/issue,
+/** The page of one issue, PR or release (#3119): the item from its forge (forge/issue,
  * forge/pull) on the first machine that reads it. An issue's page is in the Work look (#4402,
  * specs/4328-work-look/issue.md), as the window's WorkItemPage (#4400): the page's bar (the place, ↑ 3 of 42 ↓,
  * Refresh), the header with Start Agent, one timeline (the body, then the comments), the comment box with Close or
- * Reopen, and the side panel (Assignees, Labels with its gear, Milestone, Repo, Linked, Lineage, Docs). A pull
+ * Reopen, and the side panel (Assignees, Labels with its gear, Repo, Linked, Lineage, Docs). A pull
  * request keeps its actions row (#4408 redoes it). Its writes (#3130) go to the machine that read it. */
 export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; ref: string }) {
   const node = useMemo(() => ({ kind, ref }), [kind, ref]);
@@ -344,7 +344,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
   useEffect(() => {
     let current = true;
     pipeline.value = [];
-    if (!lineageHost || kind === "milestone") return;
+    if (!lineageHost) return;
     void store.link.call("lineage/walk", { node, depth: pipelineDepth }, lineageHost)
       .then((g) => { if (current) pipeline.value = pipelineSteps(node, g); }, () => {});
     return () => { current = false; };
@@ -531,10 +531,6 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
               <WorkLabelsPicker store={store} host={detail.value.host} node={item.node} has={item.labels} close={() => { pickingLabels.value = false; }}
                 pick={(name, add) => void act("forge/label", { node: item.node, ...add ? { add: [name] } : { remove: [name] } })} />
             )}
-          </SideSection>
-          <SideSection title="Milestone">
-            {loading && !row ? <span class="bar" /> : (item?.milestone ?? row?.milestone)
-              ? <span><span aria-hidden="true">⚑ </span>{item?.milestone ?? row?.milestone}</span> : <span class="quiet">None</span>}
           </SideSection>
           <SideSection title="Repo"><span>{repoName(repoOf(ref))}</span></SideSection>
           {project && <SideSection title="Project"><span>{project.name}</span></SideSection>}

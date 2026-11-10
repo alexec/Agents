@@ -35,6 +35,7 @@ func TestReportsValueAddsUpTheWork(t *testing.T) {
 	}
 	issue := node("issue", "github:o/r#1", 1)
 	issue.FirstAt = at(10 * time.Hour)
+	// A milestone, as a host before #3878 sends it: no row adds it up.
 	issue.PartOf = []string{"github:o/r/milestone/1"}
 	merged := node("pr", "github:o/r#2", 4)
 	merged.Fixes, merged.Outcome, merged.EndedAt, merged.FailedChecks = []string{"github:o/r#1"}, str("merged"), at(time.Hour), n64(2)
@@ -82,9 +83,6 @@ func TestReportsValueAddsUpTheWork(t *testing.T) {
 	if lead := org.Issues[0].LeadTimeSeconds; lead == nil || *lead < 18.9*3600 || *lead > 19.1*3600 ||
 		org.LeadTimeSeconds == nil || *org.LeadTimeSeconds != *lead {
 		t.Fatalf("%v %v", lead, org.LeadTimeSeconds)
-	}
-	if len(org.Milestones) != 1 || org.Milestones[0].Total.Cost["USD"] != 10 || org.Milestones[0].PrsMerged != 1 {
-		t.Fatalf("%+v", org.Milestones)
 	}
 	// The release has only the merged PR and the issue it fixes: 4 (the PR) + 1 + 2 (the
 	// issue, from both machines), not the closed PR, which is not part-of it.

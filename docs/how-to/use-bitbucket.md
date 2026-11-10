@@ -238,13 +238,11 @@ the members of the workspace instead.
   branch and to the issues its description closes, and a failed Pipelines run builds it. A
   page's Lineage tab, and an issue's Lineage line, show them.
 - **Lineage asks Bitbucket** with the Bitbucket connection, about the repositories of the
-  folders on it: an issue's, a pull request's and a milestone's title and state (a declined
-  pull request is closed), an issue's milestone, a version tag's pull requests (from
-  `(pull request #12)` at the end of a merge or squash commit's title, or else the commit's
-  pull request) and the milestone whose name starts with its version, and the cost comment
-  on a merged pull request (when the folder's `prCostComment` says so). An issue's labels
-  are its kind and component. Bitbucket has no parent issues, and its milestones have no
-  state. A doc's address is `/src/HEAD/<path>`, on the main branch.
+  folders on it: an issue's and a pull request's title and state (a declined pull request is
+  closed), a version tag's pull requests (from `(pull request #12)` at the end of a merge or
+  squash commit's title, or else the commit's pull request), and the cost comment on a
+  merged pull request (when the folder's `prCostComment` says so). An issue's labels are its
+  kind and component. Bitbucket has no parent issues. A doc's address is `/src/HEAD/<path>`, on the main branch.
 - **Not yet:** an epic's plan and the Board filter.
 
 ## See also

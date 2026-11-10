@@ -55,8 +55,8 @@ export const navPages: Record<NavSection, readonly NavPage[]> = {
     adminPage("live", "Live Now", "Agents"),
     { id: "projects", title: "Projects", group: "Agents", draw: { kind: "console", id: "projects" } },
   ],
-  // Every issue and pull request from the forges, with lineage on top, and the milestones and releases
-  // lineage knows (#3119). The page's id is the lineage kind, so #/work/pr/<ref> is a PR's page.
+  // Every issue and pull request from the forges, with lineage on top, and the releases lineage knows
+  // (#3119). The page's id is the lineage kind, so #/work/pr/<ref> is a PR's page.
   // Features (#3269) after Pull requests: the feature:<name> labels on the epics, not a lineage kind.
   // Timeline (#4206) after Releases: the epics in time, from work/timeline.
   work: workKinds.flatMap((k): NavPage[] => [

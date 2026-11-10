@@ -2,14 +2,14 @@ import Foundation
 
 /// Work (#3119, spec 3100): every issue and pull request across the person's folders and forges,
 /// from `forge/issues` and `forge/pulls` on each machine, one row per ref, with what lineage knows
-/// about it (`reports/nodes`: cost, sessions, lead time) on top. Milestones and releases come from
+/// about it (`reports/nodes`: cost, sessions, lead time) on top. Releases come from
 /// `reports/nodes` alone in v1. The web page's `model/work.ts` is the same.
 public enum WorkList {
     /// Work's lists, in the order of its tabs, by the lineage kind each holds.
     public enum Kind: String, CaseIterable, Identifiable, Sendable, Hashable, Codable {
         /// Features (#3269) are the `feature:` labels on the epics, not a lineage kind: an epic opens as an issue.
         /// Timeline (#4173) is the epics on a time axis, the Mac's alone for now (`WorkTimeline`).
-        case issue, pr, feature, milestone, release, timeline
+        case issue, pr, feature, release, timeline
 
         public var id: Self { self }
 
@@ -18,13 +18,12 @@ public enum WorkList {
             case .issue: "Issues"
             case .pr: "Pull requests"
             case .feature: "Features"
-            case .milestone: "Milestones"
             case .release: "Releases"
             case .timeline: "Timeline"
             }
         }
 
-        /// Issues and PRs are read from the forges; milestones and releases from lineage alone;
+        /// Issues and PRs are read from the forges; releases from lineage alone;
         /// features from the forges' labels, as a list of their own.
         public var fromForge: Bool { self == .issue || self == .pr }
 
@@ -68,7 +67,6 @@ public enum WorkList {
         public var repo: String
         public var author: String?
         public var assignees: [String]
-        public var milestone: String?
         public var updated: Date
         public var url: URL?
         /// The machine the forge read came from, to read the item again on.
@@ -86,7 +84,7 @@ public enum WorkList {
         public var id: String { node.ref }
 
         public init(node: DaemonAPI.LineageNode, title: String, state: String, labels: [DaemonAPI.ForgeLabel] = [],
-                    repo: String, author: String? = nil, assignees: [String] = [], milestone: String? = nil,
+                    repo: String, author: String? = nil, assignees: [String] = [],
                     updated: Date, url: URL? = nil, host: MachineRef? = nil, folder: String? = nil, draft: Bool = false,
                     lineage: DaemonAPI.ReportNode? = nil, status: String? = nil, comments: Int = 0, checks: String? = nil,
                     review: String? = nil) {
@@ -98,7 +96,6 @@ public enum WorkList {
             self.repo = repo
             self.author = author
             self.assignees = assignees
-            self.milestone = milestone
             self.updated = updated
             self.url = url
             self.host = host
@@ -113,13 +110,13 @@ public enum WorkList {
         /// A row from the forge's item, with its lineage when there is any.
         public init(_ item: DaemonAPI.ForgeItem, on host: MachineRef, lineage: DaemonAPI.ReportNode? = nil) {
             self.init(node: item.node, title: item.title, state: item.state, labels: item.labels, repo: WorkList.repo(of: item.node.ref),
-                      author: item.author, assignees: item.assignees, milestone: item.milestone, updated: item.updatedAt,
+                      author: item.author, assignees: item.assignees, updated: item.updatedAt,
                       url: item.url.flatMap(URL.init(string:)), host: host, folder: item.folder, draft: item.draft ?? false,
                       lineage: lineage,
                       status: item.status, comments: item.comments, checks: item.checks, review: item.review)
         }
 
-        /// A row lineage alone knows: a milestone, a release.
+        /// A row lineage alone knows: a release.
         public init(_ n: DaemonAPI.ReportNode) {
             self.init(node: n.node, title: n.resolved?.title ?? ReportValueWords.name(n.node),
                       state: n.resolved?.state ?? (n.outcome == "merged" ? "merged" : ""),
@@ -140,7 +137,7 @@ public enum WorkList {
             return "linear:\(id[..<dash])"
         }
         if forge == "jira" { return forge }
-        guard let cut = id.range(of: #"[#!]|/milestone/|/release/"#, options: .regularExpression) else { return ref }
+        guard let cut = id.range(of: #"[#!]|/release/"#, options: .regularExpression) else { return ref }
         return "\(forge):\(id[..<cut.lowerBound])"
     }
 
@@ -170,19 +167,16 @@ public enum WorkList {
         return Int(ref[range].dropFirst()) ?? 0
     }
 
-    /// "#12", "!45", "ENG-4", "milestone 2" or "v0.14.0": a row's short name in its repo.
+    /// "#12", "!45", "ENG-4" or "v0.14.0": a row's short name in its repo.
     public static func shortRef(_ ref: String) -> String {
         if let range = ref.range(of: #"[#!]\d+$"#, options: .regularExpression) { return String(ref[range]) }
-        if let range = ref.range(of: #"/milestone/.+$"#, options: .regularExpression) {
-            return "milestone " + ref[range].dropFirst("/milestone/".count)
-        }
         if let range = ref.range(of: #"/release/.+$"#, options: .regularExpression) {
             return String(ref[range].dropFirst("/release/".count))
         }
         return ReportValueWords.name(DaemonAPI.LineageNode(kind: "", ref: ref))
     }
 
-    /// Whether a title says its short name already, as a milestone lineage could not resolve does.
+    /// Whether a title says its short name already, as a release lineage could not resolve does.
     public static func titleSaysRef(_ title: String, _ ref: String) -> Bool { title.hasSuffix(shortRef(ref)) }
 
     /// The items of every machine, one row per ref (the last updated copy), each with its lineage by ref.
@@ -440,18 +434,17 @@ public enum WorkList {
     public static let noAgentYet = "No agent yet"
     public static func noWork(_ kind: Kind) -> String {
         switch kind {
-        case .milestone: "No milestones that an agent worked on yet."
         case .release: "No releases that an agent worked on yet."
         default: "No \(kind.title.lowercased()) match."
         }
     }
-    public static let lineageOnlyNote = "Lineage lists a milestone or a release once an agent works on one of its issues or pull requests."
+    public static let lineageOnlyNote = "Lineage lists a release once an agent works on one of its issues or pull requests."
     public static let noForgeHere = "No machine reads issues and pull requests yet. Update Agents on a machine to see them."
 
-    // The page of one issue, PR, milestone or release (#3119): its links grouped by relation, its
+    // The page of one issue, PR or release (#3119): its links grouped by relation, its
     // checks, its review and its cost.
 
-    /// The Work list a node's page is in: an issue, a PR, a milestone or a release; nil for any other.
+    /// The Work list a node's page is in: an issue, a PR or a release; nil for any other.
     public static func kind(of node: DaemonAPI.LineageNode) -> Kind? {
         Kind(rawValue: node.kind).flatMap { $0 == .feature || $0 == .timeline ? nil : $0 }
     }
@@ -500,12 +493,11 @@ public enum WorkList {
         }
     }
 
-    /// "by alexec · assigned to bob · milestone 0.14".
+    /// "by alexec · assigned to bob".
     public static func peopleWords(_ item: DaemonAPI.ForgeItem) -> String {
         var parts: [String] = []
         if let author = item.author { parts.append("by \(author)") }
         if !item.assignees.isEmpty { parts.append("assigned to \(item.assignees.joined(separator: ", "))") }
-        if let milestone = item.milestone { parts.append("milestone \(milestone)") }
         return parts.joined(separator: " · ")
     }
 

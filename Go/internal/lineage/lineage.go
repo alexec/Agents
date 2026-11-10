@@ -37,7 +37,6 @@ const (
 	KindCommit      = "commit"
 	KindFile        = "file"
 	KindBranch      = "branch"
-	KindMilestone   = "milestone"
 	KindWorkflow    = "workflow"
 	KindRelease     = "release"
 	// KindDoc is a doc behind the work (#3308): a file under specs/ or docs/, or a docs page.
@@ -60,8 +59,6 @@ const (
 	RelReviews = "reviews"
 	RelCloses  = "closes"
 	RelPartOf  = "part-of"
-	// RelShippedIn is a milestone shipped in a release (#3023).
-	RelShippedIn = "shipped-in"
 	// RelReads and RelLinksTo are a session that read a doc, or named it in what it said (#3308).
 	RelReads   = "reads"
 	RelLinksTo = "links-to"
@@ -81,7 +78,7 @@ const (
 	SourceHelper = "helper"
 	SourceAgent  = "agent"
 	SourcePerson = "person"
-	// SourceForge is a link the forge says, such as an issue part-of its milestone (#2935).
+	// SourceForge is a link the forge says, such as an issue part-of its parent epic (#3582).
 	SourceForge = "forge"
 	// SourceHealth is a link a health source says, such as Sentry's release of an issue (#3585).
 	SourceHealth = "health"
@@ -284,12 +281,19 @@ func (f *Files) index() {
 	}
 }
 
-// prune drops the ended links past KeepEnded, then the oldest past MostLinks, ended ones
-// first. It says whether it dropped any.
+// removedKindMilestone is the kind of a forge milestone's node, which #3878 removed: prune
+// drops each link from or to one, and a milestone's shipped-in link to its release.
+const removedKindMilestone = "milestone"
+
+// prune drops the links of a removed kind, the ended links past KeepEnded, then the oldest
+// past MostLinks, ended ones first. It says whether it dropped any.
 func (f *Files) prune() bool {
 	oldest := wire.DateOf(f.now().Add(-KeepEnded))
 	kept := f.links[:0:0]
 	for _, l := range f.links {
+		if l.From.Kind == removedKindMilestone || l.To.Kind == removedKindMilestone {
+			continue
+		}
 		if l.EndedAt == nil || *l.EndedAt >= oldest {
 			kept = append(kept, l)
 		}

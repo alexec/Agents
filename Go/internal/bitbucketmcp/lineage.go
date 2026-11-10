@@ -12,28 +12,20 @@ import (
 )
 
 // What the daemon's lineage asks Bitbucket Cloud (#3879), as it asks Forgejo (#3844) and gh and
-// glab for GitHub and GitLab: a node's title and state, an issue's milestone, a release's
-// commits, pull requests and milestones, and the cost comment on a merged pull request.
-// Bitbucket numbers issues and pull requests apart, so a node says which it is. A milestone is
-// named by its id; Bitbucket's milestones have no state.
+// glab for GitHub and GitLab: a node's title and state, a release's commits and pull
+// requests, and the cost comment on a merged pull request. Bitbucket numbers issues and pull
+// requests apart, so a node says which it is.
 
-// Node is an issue's, a pull request's or a milestone's title, state (open, closed or merged)
-// and labels (an issue's kind and component), and an issue's milestone id, 0 for none.
+// Node is an issue's or a pull request's title, state (open, closed or merged) and labels (an
+// issue's kind and component).
 type Node struct {
-	Title     string
-	State     string
-	Labels    []string
-	Milestone int
+	Title  string
+	State  string
+	Labels []string
 }
 
 // Commit is one commit of a compare: its sha and message.
 type Commit struct{ SHA, Message string }
-
-// Milestone is one milestone of a repository: its id and title.
-type Milestone struct {
-	ID    int
-	Title string
-}
 
 // Node is an issue, or with pr a pull request: a merged pull request's state is merged, and a
 // declined or superseded one's closed.
@@ -51,44 +43,11 @@ func (b *RealBitbucket) Node(ctx context.Context, repo string, number int, pr bo
 			return Node{}, err
 		}
 		n = Node{Title: i.Title, State: i.forgeItem(repo).State, Labels: i.labels()}
-		if i.Milestone != nil {
-			n.Milestone = i.Milestone.ID
-		}
 	}
 	if n.Title == "" {
 		return Node{}, errors.New("Bitbucket did not say its title")
 	}
 	return n, nil
-}
-
-// MilestoneNode is a milestone's title, by its id.
-func (b *RealBitbucket) MilestoneNode(ctx context.Context, repo string, id int) (Node, error) {
-	var j struct {
-		Name string `json:"name"`
-	}
-	if err := b.get(ctx, fmt.Sprintf("%s/milestones/%d", repoPath(repo), id), false, &j); err != nil {
-		return Node{}, err
-	}
-	if j.Name == "" {
-		return Node{}, errors.New("Bitbucket did not say its name")
-	}
-	return Node{Title: j.Name, Labels: []string{}}, nil
-}
-
-// Milestones is every milestone of repo.
-func (b *RealBitbucket) Milestones(ctx context.Context, repo string) ([]Milestone, error) {
-	list, _, err := all[struct {
-		ID   int    `json:"id"`
-		Name string `json:"name"`
-	}](ctx, b, repoPath(repo)+"/milestones", false)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]Milestone, 0, len(list))
-	for _, m := range list {
-		out = append(out, Milestone{m.ID, m.Name})
-	}
-	return out, nil
 }
 
 // CommitTime is the time of a tag's, a branch's or a sha's commit: Bitbucket says only its

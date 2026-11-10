@@ -10,7 +10,7 @@ Planning is the product theme (`feature:planning`, Alex, 2026-11-10) that answer
 ## The three questions
 
 - **What do we do next?** The plan is in the forge: epics, their sub-issues and the "blocked by" links between them (`specs/3265-work-plans/spec.md`, #3265). The Product Owner ranks with RICE, the Scrum Master gives places in a fixed order, and the Work pages show the plan as steps.
-- **What will it cost, and when does it land?** An **estimate** sizes one issue or epic from closed issues like it (#3557). A **forecast** says when an epic or a milestone lands and what the coming weeks cost, from the daily throughput and the burn rate, with no per-issue size (#4533).
+- **What will it cost, and when does it land?** An **estimate** sizes one issue or epic from closed issues like it (#3557). A **forecast** says when an epic lands and what the coming weeks cost, from the daily throughput and the burn rate, with no per-issue size (#4533).
 - **What did it deliver?** Reports ▸ Value says what the work cost, the PRs merged, the waste, and the lead and cycle times (#2351). It is the record the first two questions are checked against.
 
 ## What the figures come from
@@ -26,7 +26,7 @@ Every figure comes from the cost on the links (#2350): each turn's dollars, toke
 
 ## Where it shows
 
-Estimates and forecasts show on Work's issue, epic and milestone pages on every client, as one line under the title. Reports are on the web page only, where other people's data goes (#3224); the Mac window is for the person's own usage. A plan that moves, such as an epic past twice its estimate or a milestone whose forecast passes its due date, comes to the person as a notice.
+Estimates and forecasts show on Work's issue and epic pages on every client, as one line under the title. Reports are on the web page only, where other people's data goes (#3224); the Mac window is for the person's own usage. A plan that moves, such as an epic past twice its estimate, comes to the person as a notice.
 
 ## What is not planning
 

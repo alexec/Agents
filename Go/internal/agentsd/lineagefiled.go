@@ -20,7 +20,7 @@ import (
 //     `created issue #12`: its issue is on its `--repo`, or else on the folder's Forgejo
 //     repository.
 //   - The issue is asked of the forge at once and again filedRecheck later
-//     (lineagemilestone.go), for its milestone, its parent and its sub-issues: an epic's
+//     (lineageparent.go), for its parent and its sub-issues: an epic's
 //     children are often filed, and made its sub-issues, just after it.
 
 const (
@@ -193,7 +193,7 @@ func (d *Daemon) noteFiledIssues(id wire.UUID, issues []wire.LineageNode) {
 			if folder == "" {
 				folder = own
 			}
-			d.noteIssueMilestone(folder, repo, n)
+			d.noteIssueParent(folder, repo, n)
 			d.askIssueAgain(folder, repo, n)
 		}
 	})
@@ -214,6 +214,6 @@ func (d *Daemon) askIssueAgain(folder string, repo forgeRepo, n int) {
 		d.issueMu.Lock()
 		delete(d.issueAsked, repo.issue(n))
 		d.issueMu.Unlock()
-		d.noteIssueMilestone(folder, repo, n)
+		d.noteIssueParent(folder, repo, n)
 	})
 }

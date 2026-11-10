@@ -21,8 +21,7 @@ import (
 )
 
 // Release nodes from tags (#3023, part 1): the graph stopped at "merged"; this links a PR
-// part-of the release that shipped it, and a milestone shipped-in the release whose title
-// starts with its version, so the graph and the cost rollup reach "got to people".
+// part-of the release that shipped it, so the graph and the cost rollup reach "got to people".
 //
 //   - Kind release, ref github:<owner>/<repo>/release/<tag> (GitLab: gitlab:<group>/<project>/release/<tag>;
 //     Forgejo: forgejo:<owner>/<repo>/release/<tag>, Bitbucket: bitbucket:<workspace>/<repo>/release/<tag>,
@@ -65,13 +64,12 @@ type releaseTagsFile struct {
 type releaseTagsBook struct {
 	releaseMu   sync.Mutex
 	releaseFile *releaseTagsFile
-	// releaseTags, releaseCommitTime, releaseCompare, releaseCommitPR and releaseMilestones,
-	// when set, are asked in place of the package defaults; only tests set them.
+	// releaseTags, releaseCommitTime, releaseCompare and releaseCommitPR, when set,
+	// are asked in place of the package defaults; only tests set them.
 	releaseTags       func(folder string) ([]string, error)
 	releaseCommitTime func(ctx context.Context, folder string, repo forgeRepo, ref string) (time.Time, error)
 	releaseCompare    func(ctx context.Context, folder string, repo forgeRepo, base, head string) ([]compareCommit, error)
 	releaseCommitPR   func(ctx context.Context, folder string, repo forgeRepo, sha string) (int, error)
-	releaseMilestones func(ctx context.Context, folder string, repo forgeRepo) ([]forgeMilestone, error)
 }
 
 func (r forgeRepo) release(tag string) wire.LineageNode {
@@ -150,7 +148,7 @@ func (d *Daemon) checkReleaseTagsEveryHour() {
 // checkReleaseTags looks at every folder with a repo on a forge lineage asks for a tag not yet linked.
 func (d *Daemon) checkReleaseTags(ctx context.Context) {
 	for _, folder := range d.folderPaths() {
-		// A release's commits and milestones are asked by the forge's CLI (forgeKind.cli).
+		// A release's commits are asked by the forge's CLI (forgeKind.cli).
 		repo := d.folderRepo(folder)
 		if !repo.asks() {
 			continue
@@ -189,13 +187,12 @@ func (d *Daemon) checkReleaseTagsForFolder(ctx context.Context, folder string, r
 }
 
 // linkRelease links tag's release node: its PRs (the commits since prev, when there is
-// one) part-of it, and any milestone whose title starts with its version shipped-in it. It
-// says whether the release is done: not when the forge could not say its commits, so the
+// one) part-of it. It says whether the release is done: not when the forge could not say its commits, so the
 // next hour tries again.
 func (d *Daemon) linkRelease(ctx context.Context, folder string, repo forgeRepo, tag, prev string) bool {
-	commitTime, compare, milestones := forgeCommitTime, forgeCompareCommits, forgeMilestones
+	commitTime, compare := forgeCommitTime, forgeCompareCommits
 	if c, ok := d.connectionAsks(repo.forge); ok {
-		commitTime, compare, milestones = c.commitTime, c.compare, c.milestones
+		commitTime, compare = c.commitTime, c.compare
 	}
 	if d.releaseCommitTime != nil {
 		commitTime = d.releaseCommitTime
@@ -217,20 +214,6 @@ func (d *Daemon) linkRelease(ctx context.Context, folder string, repo forgeRepo,
 			ok = false
 		} else {
 			d.linkReleaseCommits(ctx, folder, repo, release, at, commits)
-		}
-	}
-	if d.releaseMilestones != nil {
-		milestones = d.releaseMilestones
-	}
-	found, err := milestones(ctx, folder, repo)
-	if err != nil {
-		log.Printf("lineage: the milestones of %s: %v", repo.path, err)
-	} else {
-		version := milestoneVersionOf(tag)
-		for _, m := range found {
-			if strings.HasPrefix(m.Title, version) {
-				d.lineageDo(func() { d.linkAt(repo.milestone(m.Number), release, lineage.RelShippedIn, lineage.SourceForge, at) })
-			}
 		}
 	}
 	return ok
@@ -309,19 +292,6 @@ func versionOf(tag string) [3]int {
 	return v
 }
 
-// milestoneVersionOf is the version a milestone's title must start with to match tag: the
-// tag without its leading v, a .0 patch dropped, as this repo names its minor milestones
-// (v0.14.0 matches "0.14 Lineage and value"; v0.14.1 matches "0.14.1 Bug fixes").
-func milestoneVersionOf(tag string) string {
-	version := strings.TrimPrefix(tag, "v")
-	if v := versionOf(tag); v[2] == 0 {
-		if i := strings.LastIndex(version, "."); i >= 0 {
-			return version[:i]
-		}
-	}
-	return version
-}
-
 // sortVersionTags sorts tags by version, lowest first.
 // keepNewestTags is tags sorted, the newest releaseTagsKept of them.
 func keepNewestTags(tags []string) []string {
@@ -349,12 +319,6 @@ func versionLess(a, b [3]int) bool {
 type compareCommit struct {
 	SHA     string
 	Message string
-}
-
-// forgeMilestone is one milestone the forge's list named: its number (GitLab: iid) and title.
-type forgeMilestone struct {
-	Number int
-	Title  string
 }
 
 var (
@@ -553,57 +517,4 @@ func commitPRNumberOf(forge string, out []byte) (int, error) {
 		return list[0].IID, nil
 	}
 	return 0, fmt.Errorf("no commits on %s", forge)
-}
-
-// forgeMilestones is every milestone of repo, open and closed, asked of gh or glab in folder.
-func forgeMilestones(ctx context.Context, folder string, repo forgeRepo) ([]forgeMilestone, error) {
-	var exe, path string
-	switch repo.forge {
-	case "github":
-		exe, path = forgeCLI("gh"), fmt.Sprintf("repos/%s/milestones?state=all&per_page=100", repo.path)
-	case "gitlab":
-		exe, path = forgeCLI("glab"), fmt.Sprintf("projects/%s/milestones?state=all&per_page=100", url.PathEscape(repo.path))
-	default:
-		return nil, fmt.Errorf("no milestones on %s", repo.forge)
-	}
-	if exe == "" {
-		return nil, errors.New("gh or glab is not installed")
-	}
-	out, err := runForgeCLI(ctx, exe, folder, nil, "api", path)
-	if err != nil {
-		return nil, err
-	}
-	return milestonesOf(repo.forge, out)
-}
-
-func milestonesOf(forge string, out []byte) ([]forgeMilestone, error) {
-	switch forge {
-	case "github":
-		var list []struct {
-			Number int    `json:"number"`
-			Title  string `json:"title"`
-		}
-		if err := json.Unmarshal(out, &list); err != nil {
-			return nil, err
-		}
-		out2 := make([]forgeMilestone, 0, len(list))
-		for _, m := range list {
-			out2 = append(out2, forgeMilestone{m.Number, m.Title})
-		}
-		return out2, nil
-	case "gitlab":
-		var list []struct {
-			IID   int    `json:"iid"`
-			Title string `json:"title"`
-		}
-		if err := json.Unmarshal(out, &list); err != nil {
-			return nil, err
-		}
-		out2 := make([]forgeMilestone, 0, len(list))
-		for _, m := range list {
-			out2 = append(out2, forgeMilestone{m.IID, m.Title})
-		}
-		return out2, nil
-	}
-	return nil, fmt.Errorf("no milestones on %s", forge)
 }

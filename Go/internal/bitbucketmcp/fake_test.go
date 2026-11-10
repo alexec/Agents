@@ -59,9 +59,8 @@ type fakeBitbucket struct {
 	// request's git diff, by its number (the views, #3866).
 	defaultMerge string
 	diffs        map[int]string
-	// milestones, commits (by sha or tag), each compare's commits ("head..base", given two to a
+	// commits (by sha or tag), each compare's commits ("head..base", given two to a
 	// page by a token, as Bitbucket's) and each commit's pull requests, for lineage (#3879).
-	milestones  []obj
 	commits     map[string]obj
 	compares    map[string][]obj
 	commitPulls map[string][]obj
@@ -174,8 +173,6 @@ var (
 	stepsPath         = regexp.MustCompile(`^` + root + `/pipelines/([0-9]+)/steps$`)
 	branchPath        = regexp.MustCompile(`^` + root + `/refs/branches/([^/]+)$`)
 	logPath           = regexp.MustCompile(`^` + root + `/pipelines/([0-9]+)/steps/(\{[^/]+\})/log$`)
-	milestonesPath    = regexp.MustCompile(`^` + root + `/milestones$`)
-	milestonePath     = regexp.MustCompile(`^` + root + `/milestones/([0-9]+)$`)
 	commitPath        = regexp.MustCompile(`^` + root + `/commit/([^/]+)$`)
 	commitPullsPath   = regexp.MustCompile(`^` + root + `/commit/([^/]+)/pullrequests$`)
 	commitsPath       = regexp.MustCompile(`^` + root + `/commits$`)
@@ -395,16 +392,6 @@ func (f *fakeBitbucket) serve(w http.ResponseWriter, r *http.Request) {
 		// Another host's name, as Bitbucket's file store has: Go keeps the token on a redirect to the same one.
 		store := strings.Replace(f.storage.URL, "127.0.0.1", "localhost", 1)
 		http.Redirect(w, r, store+"/logs/"+url.PathEscape(uuid), http.StatusTemporaryRedirect)
-	case milestonesPath.MatchString(p):
-		page(f.milestones)
-	case milestonePath.MatchString(p):
-		for _, m := range f.milestones {
-			if m["id"] == n(milestonePath.FindStringSubmatch(p)) {
-				reply(m)
-				return
-			}
-		}
-		notFound()
 	case commitPullsPath.MatchString(p):
 		if list, ok := f.commitPulls[commitPullsPath.FindStringSubmatch(p)[1]]; ok {
 			page(list)

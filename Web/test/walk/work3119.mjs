@@ -66,9 +66,9 @@ try {
   await sleep(400);
   await page.shot(`${out}/web-no-agent.png`);
 
-  await page.eval(`location.hash = "#/work/milestone"`);
+  await page.eval(`location.hash = "#/work/release"`);
   await sleep(2500);
-  await page.shot(`${out}/web-milestones.png`);
+  await page.shot(`${out}/web-releases.png`);
 } finally {
   await chrome.close();
 }

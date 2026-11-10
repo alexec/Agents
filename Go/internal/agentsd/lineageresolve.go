@@ -18,14 +18,13 @@ import (
 
 // A node's title, state and labels from its connector (#3089): github:owner/repo#12 becomes
 // its real title rather than a guess from the ref, for lineage/walk's answer. Resolved with
-// the person's own gh or glab, in a folder signed in to the node's repo, as the milestone
-// lookup already does (lineagemilestone.go, #2935). Resolved on demand, not polled: a
+// the person's own gh or glab, in a folder signed in to the node's repo, as the parent
+// lookup already does (lineageparent.go). Resolved on demand, not polled: a
 // lineage walk is read far less often than a sidebar list, so each node is asked again only
 // when it is walked again after resolveRecheck, and never when no folder is signed in to ask
 // with. Linear and releases are not resolved yet; a GitHub, GitLab, Forgejo or Bitbucket
-// issue, pull request or milestone is, and an Azure Repos pull request (Forgejo's, Bitbucket's
-// and Azure DevOps's by their connections, connectionAsks). A milestone is sent to be resolved when an issue's milestone is found
-// (lineagemilestone.go), as no walk asks for it before Work lists it.
+// issue or pull request is, and an Azure Repos pull request (Forgejo's, Bitbucket's and Azure
+// DevOps's by their connections, connectionAsks).
 //
 // Never on the walk's own path (#3102): a walk answers at once with what the cache holds
 // (a node past resolveRecheck keeps its old answer while it is asked again), and the nodes it
@@ -173,7 +172,7 @@ func (d *Daemon) resolveSettle(wait time.Duration) {
 }
 
 // resolveNode asks for n's title, state and labels and caches them; the answer is not ok when
-// n is not an issue, pull request or milestone of a forge lineage asks (askedNode), or no
+// n is not an issue or pull request of a forge lineage asks (askedNode), or no
 // folder is signed in to ask with.
 func (d *Daemon) resolveNode(ctx context.Context, n wire.LineageNode) {
 	repo, num, ok := askedNode(n)
@@ -224,9 +223,8 @@ func (d *Daemon) dropOldestResolvedLocked() {
 	delete(d.resolveCache, oldest)
 }
 
-// nodeOfRepo is the repo and number of an issue, pull request or milestone node of a forge
-// lineage asks by its CLI (forgeKind.cli): github:o/r#12, gitlab:g/p!4, github:o/r/milestone/3
-// (GitLab: the milestone's iid). The Work pages ask the other forges by their own nodes first.
+// nodeOfRepo is the repo and number of an issue or pull request node of a forge lineage
+// asks by its CLI (forgeKind.cli): github:o/r#12, gitlab:g/p!4. The Work pages ask the other forges by their own nodes first.
 func nodeOfRepo(n wire.LineageNode) (forgeRepo, int, bool) {
 	repo, i, ok := askedNode(n)
 	if k, _ := kindOf(repo.forge); !ok || k.cli == "" {
@@ -236,9 +234,9 @@ func nodeOfRepo(n wire.LineageNode) (forgeRepo, int, bool) {
 }
 
 // askedNode is nodeOfRepo on any forge lineage asks, by its CLI or its connection:
-// forgejo:o/r#12, bitbucket:w/r#12 and forgejo:o/r/milestone/3 (the milestone's id) too.
+// forgejo:o/r#12 and bitbucket:w/r#12 too.
 func askedNode(n wire.LineageNode) (forgeRepo, int, bool) {
-	if n.Kind != lineage.KindIssue && n.Kind != lineage.KindPR && n.Kind != lineage.KindMilestone {
+	if n.Kind != lineage.KindIssue && n.Kind != lineage.KindPR {
 		return forgeRepo{}, 0, false
 	}
 	forge, rest, ok := strings.Cut(n.Ref, ":")
@@ -247,10 +245,7 @@ func askedNode(n wire.LineageNode) (forgeRepo, int, bool) {
 	}
 	k, _ := kindOf(forge)
 	sep := "#"
-	switch n.Kind {
-	case lineage.KindMilestone:
-		sep = "/milestone/"
-	case lineage.KindPR:
+	if n.Kind == lineage.KindPR {
 		sep = k.prMark
 	}
 	path, num, ok := strings.Cut(rest, sep)
@@ -261,8 +256,8 @@ func askedNode(n wire.LineageNode) (forgeRepo, int, bool) {
 	return forgeRepo{forge, path}, i, true
 }
 
-// forgeResolveNode asks gh or glab, in folder, for an issue's, pull request's or milestone's
-// title, state and labels.
+// forgeResolveNode asks gh or glab, in folder, for an issue's or pull request's title,
+// state and labels.
 func forgeResolveNode(ctx context.Context, folder string, repo forgeRepo, kind string, n int) (wire.LineageResolved, error) {
 	var exe, path string
 	switch {
@@ -274,11 +269,6 @@ func forgeResolveNode(ctx context.Context, folder string, repo forgeRepo, kind s
 		exe, path = forgeCLI("glab"), fmt.Sprintf("projects/%s/issues/%d", url.PathEscape(repo.path), n)
 	case repo.forge == "gitlab" && kind == lineage.KindPR:
 		exe, path = forgeCLI("glab"), fmt.Sprintf("projects/%s/merge_requests/%d", url.PathEscape(repo.path), n)
-	case repo.forge == "github" && kind == lineage.KindMilestone:
-		exe, path = forgeCLI("gh"), fmt.Sprintf("repos/%s/milestones/%d", repo.path, n)
-	case repo.forge == "gitlab" && kind == lineage.KindMilestone:
-		// GitLab's milestones/:id takes the global id; a node has the iid, which the list filters by.
-		exe, path = forgeCLI("glab"), fmt.Sprintf("projects/%s/milestones?iids[]=%d", url.PathEscape(repo.path), n)
 	default:
 		return wire.LineageResolved{}, fmt.Errorf("no %s on %s", kind, repo.forge)
 	}
@@ -303,23 +293,20 @@ type forgeIssueOrPR struct {
 	Labels   []json.RawMessage `json:"labels"`
 }
 
-// resolvedOf is a node's title, state and labels from the forge's own JSON for it: an object,
-// or for a GitLab milestone a list of the one. state is normalized to open, closed or merged:
-// GitLab's issues say "opened" for open and its milestones "active", and a GitHub pull
+// resolvedOf is a node's title, state and labels from the forge's own JSON for it, an object.
+// state is normalized to open, closed or merged: GitLab's issues say "opened" for open, and a
+// GitHub pull
 // request's own state says only open or closed, merged_at telling merged apart from closed.
 func resolvedOf(kind string, out []byte) (wire.LineageResolved, error) {
 	var j forgeIssueOrPR
-	var list []forgeIssueOrPR
-	if json.Unmarshal(out, &list) == nil && len(list) > 0 {
-		j = list[0]
-	} else if err := json.Unmarshal(out, &j); err != nil {
+	if err := json.Unmarshal(out, &j); err != nil {
 		j = forgeIssueOrPR{}
 	}
 	if j.Title == "" {
 		return wire.LineageResolved{}, errors.New("the forge did not say its title")
 	}
 	state := j.State
-	if state == "opened" || state == "active" {
+	if state == "opened" {
 		state = "open"
 	}
 	if kind == lineage.KindPR && j.MergedAt != nil && *j.MergedAt != "" {

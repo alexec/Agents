@@ -1,6 +1,6 @@
 // The #2351 walk of Reports ▸ Value on a scratch control plane whose store holds a machine's
 // lineage nodes (v1/lineage/<host>.json): the headline, waste and lead time, then each issue and
-// milestone. Shots go to <out dir>.
+// release. Shots go to <out dir>.
 //
 //   node Web/test/walk/value2351.mjs <WEB_URL> <browser code> <out dir>
 
@@ -23,7 +23,7 @@ try {
   await page.waitFor(`${pane}?.textContent.includes("on issues and pull requests") || ${pane}?.textContent.includes("No work on issues")`, 20_000);
   const said = (await page.text(".reports-pane")).replace(/\s+/g, " ");
   check(said.includes("a merged pull request") && said.includes("wasted"), `the headline and the waste: ${said.slice(0, 240)}`);
-  check(said.includes("Issues") && said.includes("Milestones"), "the issues and the milestones");
+  check(said.includes("Issues") && !said.includes("Milestones"), "the issues, and no milestones (#3878)");
   await page.shot(`${out}/web-value.png`);
 } finally {
   await chrome.close();

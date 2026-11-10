@@ -32,6 +32,7 @@ public extension DaemonAPI {
         /// The author's picture, a URL that only `forge/image` reads (#4363).
         public var authorAvatar: String?
         public var assignees: [String]
+        /// The wire's, for the standing epics' queries; the app does not show it (#3878).
         public var milestone: String?
         public var updatedAt: Date
         public var comments: Int

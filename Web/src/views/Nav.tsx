@@ -244,7 +244,8 @@ export function PageView({ store, page, down }: { store: Store; page: NavPage; d
         : page.draw.kind === "machines" ? (admin === true ? <MachinesPage store={store} down={down} /> : <YourMachines store={store} />)
         : page.draw.kind === "workflows" ? <AllWorkflows store={store} down={down} />
         : page.draw.kind === "usage" ? <Usage store={store} />
-        : page.draw.kind === "work" ? (route.value.item
+        // An item of a list Work no longer has (#/work/milestone/<ref>, #3878) opens the Work default's list.
+        : page.draw.kind === "work" ? (route.value.item && route.value.section === page.id
           ? <WorkPage key={route.value.item} store={store} kind={page.draw.work} ref={route.value.item} />
           : <WorkList key={page.draw.work} store={store} kind={page.draw.work} />)
         : page.draw.kind === "machine" ? <MachinePage key={page.draw.host} store={store} host={page.draw.host} />
