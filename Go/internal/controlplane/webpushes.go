@@ -68,7 +68,7 @@ func webPushFor(d notices.RelayDelivery, s records.WebPushSubscription) (webpush
 	if d.Headline == nil {
 		return webpush.Push{}, errors.New("a browser gets no withdrawal")
 	}
-	item := wire.ControlPushItem{NeedID: d.NeedID, Alert: d.Alert}
+	item := wire.ControlPushItem{NeedID: d.NeedID, Alert: d.Alert, Timely: d.Timely}
 	full := apns.Truncated(*d.Headline)
 	bare := full
 	bare.Answers = nil
@@ -79,11 +79,13 @@ func webPushFor(d notices.RelayDelivery, s records.WebPushSubscription) (webpush
 	// A topic is at most 32 base64url characters: a newer push for the need replaces one
 	// the push service still holds.
 	topic := base64.RawURLEncoding.EncodeToString(sum[:24])
+	// The person's booking's holder asks (#4268): the push service wakes the browser now.
+	timely := d.Timely != nil && *d.Timely
 	for _, headline := range tries {
 		item.Headline = headline
 		payload, _ := json.Marshal(item)
 		if len(payload) <= webpush.MaxPayload {
-			return webpush.Push{Subscription: webPushOf(&s), Payload: payload, Urgent: item.Alert, Topic: topic}, nil
+			return webpush.Push{Subscription: webPushOf(&s), Payload: payload, Urgent: item.Alert || timely, Topic: topic}, nil
 		}
 	}
 	return webpush.Push{}, errors.New("too big for Web Push")

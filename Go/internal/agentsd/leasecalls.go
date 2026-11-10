@@ -160,6 +160,10 @@ func (d *Daemon) resolveResource(given string) (wire.ResourceName, wire.Resource
 	if name == browser.Resource {
 		return name, "browser", browser.DisplayName, true
 	}
+	if isPersonLease(name) {
+		p, display := d.personLease()
+		return p, "named", display, true
+	}
 	if udid := simulatorLease(name); udid != "" {
 		// One lease for each simulator, whether the agent names it with simulator: or not.
 		return wire.ResourceName(simulatorLeasePrefix + strings.ToLower(udid)), "simulator", "Simulator " + udid, true
@@ -189,6 +193,7 @@ func (d *Daemon) leaseResource(agent wire.UUID, args map[string]json.RawMessage)
 			}
 		}
 	}
+	by := leaseBy(args["by"], now().Time())
 	wait := true
 	if raw, ok := args["wait"]; ok {
 		json.Unmarshal(raw, &wait)
@@ -245,8 +250,7 @@ func (d *Daemon) leaseResource(agent wire.UUID, args map[string]json.RawMessage)
 			place = j + 1
 			queued = wait
 		} else if wait {
-			e.Line = append(e.Line, waiter{AgentID: agent, AskedAt: t, Minutes: minutes})
-			place = len(e.Line)
+			place = joinLine(e, waiter{AgentID: agent, AskedAt: t, Minutes: minutes, By: by})
 			queued = true
 		}
 	}
@@ -453,7 +457,7 @@ func (d *Daemon) listResources(agent wire.UUID, _ map[string]json.RawMessage) (s
 			continue
 		}
 		label := string(s.Name) + " — " + s.DisplayName
-		if s.Kind == "named" {
+		if s.Kind == "named" && !isPersonLease(s.Name) {
 			label = s.DisplayName + " (named by an agent)"
 		}
 		gone := ""

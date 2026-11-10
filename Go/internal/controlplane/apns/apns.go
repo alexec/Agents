@@ -163,6 +163,9 @@ type Push struct {
 	// An alert the extension opens (and may buzz), or a background push the app wakes for:
 	// a move that must not buzz, or a withdrawal.
 	Alert bool
+	// An alert the person's booking's holder asked (#4268): Time Sensitive, so it comes
+	// through Focus.
+	Timely bool
 	// apns-collapse-id: a later push for the same need replaces the banner.
 	CollapseID string
 	Sealed     wire.SealedEnvelope
@@ -202,6 +205,9 @@ func (p Push) Payload() []byte {
 	aps := map[string]any{"content-available": 1}
 	if p.Alert {
 		aps = map[string]any{"alert": map[string]string{"title": Title}, "sound": "default", "mutable-content": 1}
+		if p.Timely {
+			aps["interruption-level"] = "time-sensitive"
+		}
 	}
 	return mustJSON(map[string]any{"aps": aps, "agents": wire.ControlPush{Sealed: p.Sealed}})
 }

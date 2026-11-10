@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
@@ -66,6 +67,8 @@ type waiter struct {
 	AgentID wire.UUID  `json:"agentID"`
 	AskedAt wire.Date  `json:"askedAt"`
 	Minutes *int64     `json:"minutes,omitempty"`
+	// By is when its step stops mattering (#4268): the line is in this order, none last.
+	By     *wire.Date `json:"by,omitempty"`
 	WaitID  *wire.UUID `json:"waitID,omitempty"`
 }
 
@@ -114,6 +117,8 @@ type leaseState struct {
 	book      *leaseBook
 	declared  []wire.DeclaredResource
 	leaseTick *time.Timer
+	// personHolder is who holds the person's booking (#4268), read by the needs.
+	personHolder atomic.Pointer[wire.UUID]
 }
 
 func resourceName(given string) (wire.ResourceName, bool) {
@@ -167,7 +172,9 @@ func (d *Daemon) loadLeases() []leaseEvent {
 	for _, r := range d.declared {
 		events = append(events, d.setRules(r.Name, rulesOf(r))...)
 	}
-	return append(events, d.lapse(now().Time())...)
+	events = append(events, d.lapse(now().Time())...)
+	d.notePersonHolder()
+	return events
 }
 
 func rulesOf(r wire.DeclaredResource) leaseRules {
@@ -272,6 +279,7 @@ func (d *Daemon) nextDeadline() (time.Time, bool) {
 // Called with leaseMu held.
 func (d *Daemon) leasesChanged() {
 	d.saveLeases()
+	d.notePersonHolder()
 	snap := d.leaseSnapshot()
 	safe.Go("resources/changed", func() { Broadcast(d, wire.NotifyResourcesChanged, snap) })
 	// The Agent Browser panes say which session holds the browser (#3916).
@@ -472,6 +480,11 @@ func (d *Daemon) leaseSnapshot() wire.LeaseSnapshot {
 		rows = append(rows, row(b, "browser", browser.DisplayName, false, nil))
 		drawn[b] = true
 	}
+	// The person's booking (#4268): named, so a client from before it reads it as any other.
+	if p, display := d.personLease(); !drawn[p] {
+		rows = append(rows, row(p, "named", display, false, nil))
+		drawn[p] = true
+	}
 	for name, e := range d.book.Entries {
 		if !drawn[name] {
 			rows = append(rows, row(name, e.Kind, e.DisplayName, e.Kind != "named", nil))
@@ -504,7 +517,8 @@ func declaredProblem(r wire.DeclaredResource) string {
 	switch {
 	case strings.TrimSpace(r.DisplayName) == "":
 		return "Give it a name."
-	case r.Name == "screen" || strings.HasPrefix(string(r.Name), "simulator:") || strings.HasPrefix(string(r.Name), "browser:"):
+	case r.Name == "screen" || strings.HasPrefix(string(r.Name), "simulator:") || strings.HasPrefix(string(r.Name), "browser:") ||
+		isPersonLease(r.Name):
 		return r.DisplayName + " is found on the Mac by itself; choose another name."
 	case strings.TrimSpace(r.Description) == "":
 		return "Say what it is for, so agents know when to take it."
