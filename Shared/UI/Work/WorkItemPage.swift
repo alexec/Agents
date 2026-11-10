@@ -209,10 +209,12 @@ struct WorkItemPage: View {
             if narrow {
                 titleLine(title)
                 stateLine
+                if isEpic { leadButton.frame(maxWidth: .infinity) }
                 if let start = startOffer { startButton(start).frame(maxWidth: .infinity) }
             } else {
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
                     titleLine(title).frame(maxWidth: .infinity, alignment: .leading)
+                    if isEpic { leadButton }
                     if let start = startOffer { startButton(start) }
                     if let detail, detail.got.item.node.kind == "pr" {
                         WorkFilesChanged(model: model, host: detail.host, detail: detail.got)
@@ -249,6 +251,13 @@ struct WorkItemPage: View {
                 WorkPagePill(kind: node.kind, state: item?.state ?? row?.state ?? "", draft: item?.draft ?? row?.draft ?? false,
                              status: item?.status ?? row?.status)
             }
+            if item?.standing == true {
+                // A standing epic never closes (#3662, epic.md note 16).
+                Text("Standing").appText(.fine).fontWeight(.medium).foregroundStyle(.secondary)
+                    .padding(.horizontal, 8).padding(.vertical, 2)
+                    .background(Capsule().fill(Paper.well))
+                    .overlay(Capsule().strokeBorder(Paper.rule))
+            }
             Text(stateWords).appText(.supporting).foregroundStyle(.secondary).lineLimit(narrow ? 2 : 1).textSelection(.enabled)
             Spacer(minLength: 8)
             if let url {
@@ -284,10 +293,62 @@ struct WorkItemPage: View {
     }
 
     /// Start Agent: on an open issue whose read gives a `start` (one in a folder), when a machine
-    /// of the person's can write. A closed one has none (#4400, states).
+    /// of the person's can write. A closed one has none (#4400, states); an epic has Start lead in
+    /// its place (#4416).
     private var startOffer: DaemonAPI.ForgeStart? {
-        guard isIssue, writes, item?.state == "open" else { return nil }
+        guard isIssue, !isEpic, writes, item?.state == "open" else { return nil }
         return detail?.got.start
+    }
+
+    /// An epic's page (#3268): it has a Plan, and Start lead or Open lead in the header.
+    private var isEpic: Bool { item.map(WorkPlan.hasPlan) ?? false }
+
+    /// An epic's one action (epic.md note 1): with a lead, Open lead (bordered, with a dot for its
+    /// state), which opens its chat; with none, on an open epic a machine writes to, Start lead
+    /// (prominent), the new-session form in the epic's folder filled in for the lead skill.
+    @ViewBuilder
+    private var leadButton: some View {
+        if let lead = model.workLead(of: node) {
+            Button { model.openWorkSession(lead.id) } label: {
+                HStack(spacing: 6) {
+                    Label("Open lead", systemImage: "person")
+                    Circle().fill(leadDot(lead.state)).frame(width: 7, height: 7).accessibilityHidden(true)
+                }
+                .frame(maxWidth: narrow ? .infinity : nil)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(compact ? .large : .regular)
+            .help("The lead's chat")
+            .accessibilityValue(WorkPlan.leadWords(lead.state))
+        } else if writes, item?.state == "open", let start = detail?.got.start {
+            Button { startLead(start) } label: {
+                Label("Start lead", systemImage: "sparkle").frame(maxWidth: narrow ? .infinity : nil)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(compact ? .large : .regular)
+            .help("The new-session form in this epic's folder, filled in for a lead with the lead skill")
+        }
+    }
+
+    private func leadDot(_ state: AgentState) -> Color {
+        switch state {
+        case .waitingOnUser: Color(light: 0x9A6700, dark: 0xD29922)
+        case .starting, .running: WorkLook.Tone.green.color
+        default: Color.secondary.opacity(0.5)
+        }
+    }
+
+    private func startLead(_ start: DaemonAPI.ForgeStart) {
+        guard let detail else { return }
+        guard let folder = detail.got.item.folder else {
+            said = ("No folder on this machine is on this issue's repo.", true)
+            return
+        }
+        let lead = WorkPlan.leadStart(start, url: detail.got.item.url)
+        let offer = AppViewStart(prompt: lead.prompt, labels: lead.labels, worktree: lead.worktree)
+        if let why = model.offerStart(offer, in: FolderKey(host: detail.host, folder: URL(fileURLWithPath: folder))) {
+            said = (why, true)
+        }
     }
 
     private func startButton(_ start: DaemonAPI.ForgeStart) -> some View {
@@ -432,7 +493,9 @@ struct WorkItemPage: View {
         }
         if writes {
             WorkCommentBox(model: model, host: host, node: got.item.node,
-                           closes: got.transitions == nil && ["open", "closed"].contains(got.item.state) ? got.item.state : nil,
+                           // A standing epic never closes (epic.md note 16).
+                           closes: got.transitions == nil && got.item.standing != true && ["open", "closed"].contains(got.item.state)
+                               ? got.item.state : nil,
                            noun: isIssue ? "issue" : "pull request",
                            compact: narrow, said: said) { words, failed in
                 said = (words, failed)

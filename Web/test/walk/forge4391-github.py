@@ -4,7 +4,9 @@ requests in every state (open, closed, draft, merged, closed unmerged), with lab
 labels, more than three labels, assignees, comment counts, a pull request's checks and review, a
 long title, and an issue (#12) with comments by two people and a bot; for the pull request page
 (#4406), each pull request's checks one by one, a pull request with conflicts (#24) and one with
-auto-merge on (#25). Scratch data only. Point a
+auto-merge on (#25); for the epic page (#4416), the epic #10 with sub-issues in three steps: #12
+waits for #11 (closed, so step 1 starts folded), #13 and #17 wait for #12, and #17 is also blocked by
+#16, outside the plan. Scratch data only. Point a
 run-app host at it with --env AGENTS_TEST_GITHUB_URL=http://127.0.0.1:<port>, and connect GitHub with
 rpc.py call connections/sign-in/token '{"provider":"github","token":"walk"}'.
 
@@ -24,7 +26,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 REPO = "example/shop"
-LABELS = {"bug": "d73a4a", "story": "0e8a16", "spike": "fbca04", "epic": "3e4b9e", "feature:checkout": "1d76db",
+LABELS = {"bug": "d73a4a", "story": "0e8a16", "spike": "fbca04", "task": "5319e7", "epic": "3e4b9e", "feature:checkout": "1d76db",
           "feature:search": "006b75", "priority:high": "b60205", "area:cart": "c5def5", "docs": "0075ca",
           "needs-approval": "d93f0b", "good first issue": "7057ff"}
 START = datetime.datetime.now(datetime.timezone.utc)
@@ -36,7 +38,7 @@ def ago(minutes):
 
 ITEMS = {
     12: {"title": "Pay part with a gift card, the rest by card", "state": "OPEN", "labels": ["story", "feature:checkout"],
-         "author": "sam", "assignees": ["sam", "robin"], "at": 20, "parent": 10, "comments": [
+         "author": "sam", "assignees": ["sam", "robin"], "at": 20, "parent": 10, "blockedBy": [11], "comments": [
              ("robin", "User", "Which provider gives us partial captures? I looked at two; only one has them.", 180),
              ("github-actions", "Bot", "Labelled `story` from the issue form.", 170),
              ("sam", "User", "Use the one with **partial captures**. I wrote the spike's answer in the spec.", 20)],
@@ -45,6 +47,10 @@ ITEMS = {
          "at": 300, "body": "Shoppers pay with a gift card at checkout."},
     11: {"title": "Gift card balances in the store's API", "state": "CLOSED", "labels": ["story", "feature:checkout"],
          "author": "robin", "at": 2 * 1440, "parent": 10},
+    13: {"title": "Show a gift card's balance in the cart", "state": "OPEN", "labels": ["story", "feature:checkout"],
+         "author": "robin", "at": 50, "parent": 10, "blockedBy": [12]},
+    17: {"title": "Refund a gift card payment to the card", "state": "OPEN", "labels": ["task", "feature:checkout"],
+         "author": "kai", "at": 70, "parent": 10, "blockedBy": [12, 16]},
     14: {"title": "Review stars cut off on phones narrower than 375 points when the product name is long and wraps",
          "state": "OPEN", "labels": ["bug", "priority:high", "area:cart", "feature:search", "good first issue"],
          "author": "kai", "assignees": ["kai"], "at": 95, "commentCount": 3},
@@ -155,7 +161,8 @@ class Handler(BaseHTTPRequestHandler):
             if n not in ITEMS:
                 return self.answer(200, {"data": {"repository": {"issue": None}}})
             epic = node(n)
-            epic["subIssues"] = {"nodes": [{**node(k), "blockedBy": {"nodes": []}}
+            epic["subIssues"] = {"nodes": [{**node(k), "blockedBy": {"nodes": [
+                {"number": b, "state": ITEMS[b]["state"], "repository": {"nameWithOwner": REPO}} for b in c.get("blockedBy", [])]}}
                                            for k, c in ITEMS.items() if c.get("parent") == n]}
             return self.answer(200, {"data": {"repository": {"issue": epic}}})
         if "issueOrPullRequest" in q:

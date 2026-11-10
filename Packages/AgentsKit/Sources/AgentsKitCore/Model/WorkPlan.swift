@@ -6,13 +6,14 @@ import Foundation
 /// done and running, and the total cost; and the new-session form that Start lead fills in.
 public enum WorkPlan {
     /// A child's mark: closed; a lane runs or a PR is open; a question waits or a check failed;
-    /// waiting for its step; blocked by an open issue outside the plan.
+    /// waiting for its step; blocked by an open issue outside the plan. In the Work look (#4416)
+    /// it is a glyph in colour before line 2's words; the state icon says open or closed.
     public enum Mark: String, Sendable, CaseIterable {
-        case done = "✓"
-        case working = "◐"
-        case attention = "⚠"
-        case waiting = "○"
-        case blocked = "⊘"
+        case done
+        case working
+        case attention
+        case waiting
+        case blocked
 
         public var words: String {
             switch self {
@@ -65,28 +66,46 @@ public enum WorkPlan {
         return .waiting
     }
 
-    /// What works on a child: "● lane running · PR #3266 open"; nil with nothing.
-    public static func workWords(pr: DaemonAPI.LineageCostNode?, states: [AgentState]) -> String? {
-        var parts: [String] = []
-        if states.contains(.waitingOnUser) {
-            parts.append("● lane needs you")
-        } else if states.contains(where: \.holdsRuntime) {
-            parts.append("● lane running")
+    /// A child's line 2 after its number (#4416, epic.md note 7): what works on it, by its mark.
+    /// *Working · “Work look: epic page”* (the lane's title), *Working · P#4411 open*, *Needs you ·
+    /// its lane asks a question*, *Needs you · 1 failed check*, *Waiting for #4329*, *Blocked by
+    /// #4100, outside the plan*, *merged P#4390 · 6 h ago*; nil for an open child with nothing on it.
+    public static func lineWords(_ child: DaemonAPI.ForgePlanChild, mark: Mark, pr: DaemonAPI.LineageCostNode?,
+                                 states: [AgentState], lane: String?, in plan: DaemonAPI.ForgePlan,
+                                 now: Date = Date()) -> String? {
+        let prRef = pr.map { "P" + WorkList.shortRef($0.node.ref) }
+        switch mark {
+        case .done:
+            guard let pr, let prRef, let outcome = pr.outcome else { return nil }
+            let age = WorkLook.ageWords(now.timeIntervalSince(pr.lastAt))
+            return "\(outcome) \(prRef) · \(age == "now" ? "now" : "\(age) ago")"
+        case .attention:
+            if states.contains(.waitingOnUser) { return "Needs you · its lane asks a question" }
+            let failed = pr?.failedChecks ?? 0
+            return "Needs you · \(failed == 1 ? "1 failed check" : "\(failed) failed checks")"
+        case .working:
+            if states.contains(where: \.holdsRuntime), let lane { return "Working · “\(lane)”" }
+            return ["Working", prRef.map { "\($0) open" }].compactMap { $0 }.joined(separator: " · ")
+        case .blocked:
+            return blockedWords(child)
+        case .waiting:
+            let open = Set(plan.children.filter { $0.item.state != "closed" }.map(\.item.node))
+            let waits = child.blockedBy.filter { open.contains($0) }
+            guard !waits.isEmpty else { return nil }
+            return "Waiting for \(waits.map { WorkList.shortRef($0.ref) }.joined(separator: ", "))"
         }
-        if let pr {
-            var words = "PR \(WorkList.shortRef(pr.node.ref)) \(pr.outcome ?? "open")"
-            if pr.outcome == nil, let failed = pr.failedChecks, failed > 0 {
-                words += failed == 1 ? " · 1 failed check" : " · \(failed) failed checks"
-            }
-            parts.append(words)
-        }
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
-    /// The open issues outside the plan that block a child: "blocked by #17"; nil with none.
+    /// The open issues outside the plan that block a child: "Blocked by #17, outside the plan"; nil with none.
     public static func blockedWords(_ child: DaemonAPI.ForgePlanChild) -> String? {
         guard child.item.state != "closed", let outside = child.blockedOutside, !outside.isEmpty else { return nil }
-        return "blocked by \(outside.map { WorkList.shortRef($0.ref) }.joined(separator: ", "))"
+        return "Blocked by \(outside.map { WorkList.shortRef($0.ref) }.joined(separator: ", ")), outside the plan"
+    }
+
+    /// An open child's estimate on its row, with no cost yet: "~$0.60", else "~2h 10m"; nil with no figures.
+    public static func estimateWords(_ e: DaemonAPI.LineageEstimate) -> String? {
+        if let money = moneyWords(e.cost.map { $0.mapValues(\.median) } ?? [:]) { return "~" + money }
+        return e.workingSeconds.map { "~" + TimeChart.words($0.median) }
     }
 
     /// A child's cost, or nil with nothing spent.
@@ -106,28 +125,78 @@ public enum WorkPlan {
         return "Step \(step.step) · waits for \(waits.map { WorkList.shortRef($0.ref) }.joined(separator: ", "))"
     }
 
-    /// The header's figures: "5/7 done · 1 running · $41.20".
+    /// The header's figures (epic.md note 3): "4 of 9 done · 2 running · $3.09 spent · about
+    /// $4.70 to go". To go is the open children's estimates added up; it goes with none.
     public static func progressWords(_ plan: DaemonAPI.ForgePlan, running: Int,
-                                     rollups: [DaemonAPI.LineageCostRollup]) -> String {
+                                     rollups: [DaemonAPI.LineageCostRollup],
+                                     estimates: [DaemonAPI.LineageEstimate] = []) -> String {
         let done = plan.children.filter { $0.item.state == "closed" }.count
-        var parts = ["\(done)/\(plan.children.count) done"]
+        var parts = ["\(done) of \(plan.children.count) done"]
         if running > 0 { parts.append("\(running) running") }
         let total = sum(rollups.map(\.total))
-        if ReportValueWords.spent(total) { parts.append(ReportValueWords.cost(total)) }
+        if ReportValueWords.spent(total) { parts.append("\(ReportValueWords.cost(total)) spent") }
+        let open = Set(plan.children.filter { $0.item.state != "closed" }.map(\.item.node))
+        var toGo: [String: Double] = [:]
+        for e in estimates where open.contains(e.node) {
+            for (currency, range) in e.cost ?? [:] { toGo[currency, default: 0] += range.median }
+        }
+        if let money = moneyWords(toGo) { parts.append("about \(money) to go") }
         return parts.joined(separator: " · ")
     }
 
-    /// A standing epic's header figures (#3662), with no end: "Standing · 4 running · 31 open · $41.20".
-    /// The daemon reads at most 100 issues, so 100 is "100+ open"; a query with an error counts none.
+    /// A standing epic's header figures (#3662, epic.md note 17), with no end: "14 open · 1 running
+    /// · $6.40 spent". The daemon reads at most 100 issues, so 100 is "100+ open"; a query with an
+    /// error counts none.
     public static func standingWords(_ plan: DaemonAPI.ForgePlan, running: Int,
                                      rollups: [DaemonAPI.LineageCostRollup]) -> String {
-        var parts = ["Standing"]
-        if running > 0 { parts.append("\(running) running") }
+        var parts: [String] = []
         let open = plan.children.filter { $0.item.state != "closed" }.count
         if plan.standing?.error == nil { parts.append(open >= standingLimit ? "\(standingLimit)+ open" : "\(open) open") }
+        if running > 0 { parts.append("\(running) running") }
         let total = sum(rollups.map(\.total))
-        if ReportValueWords.spent(total) { parts.append(ReportValueWords.cost(total)) }
+        if ReportValueWords.spent(total) { parts.append("\(ReportValueWords.cost(total)) spent") }
         return parts.joined(separator: " · ")
+    }
+
+    /// The share of the plan's bar (epic.md note 3): done (purple), running (green); the rest is grey.
+    public static func bar(_ plan: DaemonAPI.ForgePlan, running: Int) -> (done: Double, running: Double) {
+        let total = plan.children.count
+        guard total > 0 else { return (0, 0) }
+        let done = plan.children.filter { $0.item.state == "closed" }.count
+        return (Double(done) / Double(total), Double(min(running, total - done)) / Double(total))
+    }
+
+    /// A step's band at its trailing end (epic.md note 5): "3 of 5 done"; a step that is all
+    /// done adds what it cost, "1 of 1 done · $0.90".
+    public static func stepWords(_ step: DaemonAPI.ForgePlanStep, in plan: DaemonAPI.ForgePlan,
+                                 rollups: [DaemonAPI.LineageNode: DaemonAPI.LineageCostRollup]) -> String {
+        let children = plan.children.filter { $0.step == step.step }
+        let done = children.filter { $0.item.state == "closed" }.count
+        var words = "\(done) of \(children.count) done"
+        if done == children.count {
+            let total = sum(children.compactMap { rollups[$0.item.node]?.total })
+            if ReportValueWords.spent(total) { words += " · \(ReportValueWords.cost(total))" }
+        }
+        return words
+    }
+
+    /// A step whose children are all closed starts folded (epic.md note 5).
+    public static func startsFolded(_ step: DaemonAPI.ForgePlanStep, in plan: DaemonAPI.ForgePlan) -> Bool {
+        let children = plan.children.filter { $0.step == step.step }
+        return !children.isEmpty && children.allSatisfy { $0.item.state == "closed" }
+    }
+
+    /// The rows a standing epic shows before *9 more* (epic.md note 18).
+    public static let standingShown = 10
+
+    /// *9 more*: the rows of a standing epic's list past the first ten; nil with none.
+    public static func moreWords(_ count: Int) -> String? {
+        count > standingShown ? "\(count - standingShown) more" : nil
+    }
+
+    /// A child's `priority:` label, for a standing epic's row (epic.md note 18).
+    public static func priority(_ item: DaemonAPI.ForgeItem) -> DaemonAPI.ForgeLabel? {
+        item.labels.first { $0.name.lowercased().hasPrefix("priority:") }
     }
 
     /// The most issues `forge/plan` reads for a standing epic's query.
@@ -154,6 +223,17 @@ public enum WorkPlan {
         return parts.joined(separator: " · ")
     }
 
+    /// A standing epic's query after its labels, which show as chips (epic.md note 17): "· no
+    /// milestone · 1 lane at a time", "· or polish, competitor · not wontfix · 2 lanes at a time".
+    public static func queryRestWords(_ standing: DaemonAPI.ForgeStanding) -> String {
+        var parts: [String] = []
+        if !standing.any.isEmpty { parts.append((standing.labels.isEmpty ? "" : "and ") + standing.any.joined(separator: " or ")) }
+        let words = queryWords(standing)
+        // The words after the first part, the labels' (milestone, lanes and not), as queryWords says them.
+        parts += words.components(separatedBy: " · ").dropFirst()
+        return parts.map { "· " + $0 }.joined(separator: " ")
+    }
+
     /// The costs added up, per currency.
     static func sum(_ costs: [DaemonAPI.LineageCost]) -> DaemonAPI.LineageCost {
         var out = DaemonAPI.LineageCost()
@@ -168,19 +248,24 @@ public enum WorkPlan {
         return out
     }
 
-    /// The lead in the header: "Lead: “Work pages lead” (working)".
-    public static func leadWords(_ lead: DaemonAPI.ForgeLead, title: String?) -> String {
-        let state: String
-        switch lead.state {
-        case .starting: state = "starting"
-        case .running: state = "working"
-        case .waitingOnUser: state = "needs you"
-        case .finished: state = "waiting"
-        case .stopped: state = "stopped"
-        case .queued: state = "queued"
-        case .archived: state = "archived"
+    /// The lead's state in words (epic.md note 4): working, needs you, waiting, stopped.
+    public static func leadWords(_ state: AgentState) -> String {
+        switch state {
+        case .starting: return "starting"
+        case .running: return "working"
+        case .waitingOnUser: return "needs you"
+        case .finished: return "waiting"
+        case .stopped: return "stopped"
+        case .queued: return "queued"
+        case .archived: return "archived"
         }
-        return "Lead: “\(title ?? lead.title ?? "A session")” (\(state))"
+    }
+
+    /// Money per currency: "$4.70", "$4.70 + €1.00"; nil with none.
+    static func moneyWords(_ cost: [String: Double]) -> String? {
+        let priced = cost.filter { $0.value > 0 }.sorted { $0.key < $1.key }
+        guard !priced.isEmpty else { return nil }
+        return priced.map { $0.value.formatted(.currency(code: $0.key).precision(.fractionLength(2))) }.joined(separator: " + ")
     }
 
     // MARK: Changing the plan (#3271)
