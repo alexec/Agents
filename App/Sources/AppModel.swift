@@ -3688,6 +3688,9 @@ final class AppModel {
                         case DaemonAPI.Notification.controlThisMacHostChanged:
                             // The join file changed and the host list may not have (#303).
                             await self?.refreshMacHostJoin(control)
+                        case DaemonAPI.Notification.controlConnectWanted:
+                            // The page this Mac serves asked for Connect to Another… (#4257).
+                            if let self { Task { await ConnectAnotherWanted.heard(note.params, on: control, model: self) } }
                         default:
                             break
                         }

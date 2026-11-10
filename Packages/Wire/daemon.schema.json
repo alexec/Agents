@@ -4885,6 +4885,36 @@
       "additionalProperties": false,
       "description": "ConfigOption (Model/Options.swift), as its encode(to:) writes it: `type` is the kind's wire name, and `options` is a flat list for one unnamed group, else the groups."
     },
+    "ConnectAnotherRequest": {
+      "type": "object",
+      "description": "Connect to Another… asked by a client of the control plane on this Mac (#4257): the Mac's window does it, as its own Connect to Another… does (#4228). Either code, a client code from Pair a Mac on another control plane, or hosted, which opens the window's sign-in to agentloops.dev.",
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "A client code from Settings ▸ Clients ▸ Pair a Mac… on the other control plane."
+        },
+        "hosted": {
+          "type": "boolean",
+          "description": "Sign in to agentloops.dev in the window on this Mac: Hosted sends the client code to the app only (agents://hosted)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "ConnectReport": {
+      "type": "object",
+      "description": "Where the Mac's window is in a Connect to Another… a client asked for (#4257), told to the person's clients as control/connectReported. One of step or problem.",
+      "properties": {
+        "step": {
+          "type": "string",
+          "description": "What the window does now, in its words (Pairing…, Joining…, or that the sign-in is open on this Mac)."
+        },
+        "problem": {
+          "type": "string",
+          "description": "Why it stopped. This Mac is as it was."
+        }
+      },
+      "additionalProperties": false
+    },
     "Connection": {
       "type": "object",
       "description": "The person's sign-in to one provider, as the host keeps it. Never its tokens.",

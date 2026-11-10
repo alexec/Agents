@@ -222,7 +222,10 @@ How (#4228):
 - **Remote:** copy only. "Agents Host" becomes "Agents" in `PairingView`. The App Store
   record becomes iOS only.
 - **Web:** copy only. "Agents Host" becomes "Agents" in pairing, the Mac host notice and
-  Desktop control. The page that this Mac serves does not change.
+  Desktop control. The page that this Mac serves gets **Connect to Another…** in Settings ▸
+  Control plane (#4257): it asks the window on this Mac (`control/connectAnother`), which
+  does what its own sheet does and says each step back (`control/connectReported`). It has
+  no **Use This Mac Only**: once connected, the control plane that serves the page is stopped.
 
 ## Open questions
 

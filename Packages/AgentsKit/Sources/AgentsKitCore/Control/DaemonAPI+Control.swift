@@ -29,6 +29,11 @@ public extension DaemonAPI.Method {
     /// `Empty` → `Empty`, an admin's only (#997): a new control key; members take it as
     /// they connect again, with no new pairing.
     static let controlRotate = "control/rotate"
+    /// `ConnectAnother.Request` → `Empty` (#4257): a client asks the window on the control
+    /// plane's Mac to connect it to another; an admin's only.
+    static let controlConnectAnother = "control/connectAnother"
+    /// `ConnectAnother.Report` → `Empty`: the window says where it is in that connect.
+    static let controlConnectReport = "control/connectReport"
     /// A host, on its channel 0 (T091): a tunnel to the host that lends it a sign-in.
     static let tunnelOpen = "tunnel/open"
     /// On the Mac's host (T091): start relaying a runtime's sign-in, and say what a server
@@ -90,6 +95,11 @@ public extension DaemonAPI.Notification {
     static let controlTunnelChanged = "control/tunnelChanged"
     /// To a device on the old way, after the move (058, T085): `ControlMoved`.
     static let controlMoved = "control/moved"
+    /// `ConnectAnother.Request`: a client asked for Connect to Another… (#4257); only the
+    /// window whose Mac runs the control plane does it.
+    static let controlConnectWanted = "control/connectWanted"
+    /// `ConnectAnother.Report`: where the window is in that connect, to the person's clients.
+    static let controlConnectReported = "control/connectReported"
 }
 
 public extension DaemonAPI {

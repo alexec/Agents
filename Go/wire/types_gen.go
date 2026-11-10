@@ -2363,6 +2363,24 @@ type ConfigOption struct {
 	Options JSONValue `json:"options,omitzero"`
 }
 
+// Connect to Another… asked by a client of the control plane on this Mac (#4257): the Mac's window does it, as its own Connect to Another… does (#4228). Either code, a client code from Pair a Mac on another control plane, or hosted, which opens the window's sign-in to agentloops.dev.
+type ConnectAnotherRequest struct {
+	// A client code from Settings ▸ Clients ▸ Pair a Mac… on the other control plane.
+	Code *string `json:"code,omitzero"`
+
+	// Sign in to agentloops.dev in the window on this Mac: Hosted sends the client code to the app only (agents://hosted).
+	Hosted *bool `json:"hosted,omitzero"`
+}
+
+// Where the Mac's window is in a Connect to Another… a client asked for (#4257), told to the person's clients as control/connectReported. One of step or problem.
+type ConnectReport struct {
+	// What the window does now, in its words (Pairing…, Joining…, or that the sign-in is open on this Mac).
+	Step *string `json:"step,omitzero"`
+
+	// Why it stopped. This Mac is as it was.
+	Problem *string `json:"problem,omitzero"`
+}
+
 // The person's sign-in to one provider, as the host keeps it. Never its tokens.
 type Connection struct {
 	Provider ConnectionProvider `json:"provider"`
