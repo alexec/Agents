@@ -5079,6 +5079,32 @@ export interface LineageEstimateRequest {
 }
 
 /**
+ * lineage/figures (#4427): a milestone's or a release's Lineage panel on its Work page, from this
+ * machine's totals. cost is its rollup's total, as lineage/cost's. sessions is how many sessions
+ * worked on it and its parts, each once; running is how many of them run now (starting, running or
+ * waiting on the person). runtimes is the runtimes of the sessions this machine has, the most
+ * sessions first. A milestone has releasedIn: the releases that took its issues (and its PRs that
+ * fix none of them), each item in the first release that took it, the oldest release first; and
+ * finishedIn, the newest of them, once the milestone is closed. A release has milestonesFinished:
+ * the milestones shipped in it (by title) and the closed milestones whose last release is this one;
+ * and leadTimeSeconds, from the first work on its parts to its tag. limited says the rollup had
+ * more parts than it counts. Another kind of node is refused.
+ */
+export interface LineageFigures {
+  node: LineageNode;
+  cost: LineageCost;
+  sessions: number;
+  running: number;
+  runtimes: LineageRuntimeCount[];
+  releasedIn?: LineageReleaseTook[];
+  /** A closed milestone's last release. */
+  finishedIn?: LineageNode;
+  milestonesFinished?: LineageMilestoneFinished[];
+  leadTimeSeconds?: number;
+  limited?: boolean;
+}
+
+/**
  * lineage/walk (#2348): the nodes the walk reached and the links it went along. limited says the
  * walk stopped at its limit on nodes, so there is more. resolved is each node's title, state and
  * labels from its connector, by ref, for the nodes a connector could resolve (#3089). resolving
@@ -5128,6 +5154,12 @@ export interface LineageLinks {
   limited?: boolean;
 }
 
+/** A milestone a release finished (#4427), with its title when the host has resolved it. */
+export interface LineageMilestoneFinished {
+  milestone: LineageNode;
+  title?: string;
+}
+
 /**
  * A node in the lineage graph (#2348). kind is what it is: issue, pr, session, workflow-run,
  * commit, file, branch or milestone, and the list is open. ref names it apart from any tracker, as
@@ -5148,6 +5180,13 @@ export interface LineageNodeRequest {
   depth?: number;
 }
 
+/** A release that took a milestone's items, its tag, and how many items it took (#4427). */
+export interface LineageReleaseTook {
+  release: LineageNode;
+  tag: string;
+  items: number;
+}
+
 /**
  * A node's title, state and labels from its connector (#3089), resolved and cached on the daemon so
  * a lineage renderer shows "Fix flaky test" rather than its ref. state is open, closed or merged (a
@@ -5159,6 +5198,12 @@ export interface LineageResolved {
   title: string;
   state?: string;
   labels?: string[];
+}
+
+/** A runtime of lineage/figures' sessions, and how many of them it ran (#4427). */
+export interface LineageRuntimeCount {
+  runtimeID: string;
+  sessions: number;
 }
 
 /**
@@ -14270,13 +14315,17 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineageEstimateKept: { required: ["at", "matches"], optional: ["matchedBy", "cost", "outputTokens", "workingSeconds"] },
   LineageEstimateRange: { required: ["median", "p10", "p90"], optional: [] },
   LineageEstimateRequest: { required: ["node"], optional: ["startAt"] },
+  LineageFigures: { required: ["node", "cost", "sessions", "running", "runtimes"], optional: ["releasedIn", "finishedIn", "milestonesFinished", "leadTimeSeconds", "limited"] },
   LineageGraph: { required: ["nodes", "links"], optional: ["limited", "resolving", "resolved"] },
   LineageLink: { required: ["from", "to", "rel", "source", "at"], optional: ["endedAt"] },
   LineageLinkRequest: { required: ["from", "to", "rel", "source"], optional: [] },
   LineageLinks: { required: ["links"], optional: ["limited"] },
+  LineageMilestoneFinished: { required: ["milestone"], optional: ["title"] },
   LineageNode: { required: ["kind", "ref"], optional: [] },
   LineageNodeRequest: { required: ["node"], optional: ["depth"] },
+  LineageReleaseTook: { required: ["release", "tag", "items"], optional: [] },
   LineageResolved: { required: ["title"], optional: ["state", "labels"] },
+  LineageRuntimeCount: { required: ["runtimeID", "sessions"], optional: [] },
   LineageSessionIssue: { required: ["node"], optional: ["title"] },
   LineageSessionMatch: { required: ["agentID", "on"], optional: [] },
   LineageSessions: { required: ["matches"], optional: ["issues", "limited"] },
