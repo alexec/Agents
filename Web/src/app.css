@@ -2244,13 +2244,14 @@ a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
 /* A read failed after one came: the strip under the header, the last read dimmed under it. */
 .work-item-grid:has(> .work-problem) > :is(.work-side, .work-main) { opacity: 0.5; }
 .work-page-bar { gap: 6px; }
-.work-place { display: inline-flex; gap: 6px; align-items: baseline; min-width: 0; white-space: nowrap; }
+.work-place { display: inline-flex; gap: 6px; align-items: baseline; min-width: 0; margin-right: auto; white-space: nowrap; }
 .work-place a { color: inherit; opacity: 0.7; text-decoration: none; }
 .work-place a:hover { opacity: 1; text-decoration: underline; }
 .work-place .back { display: none; }
 .work-place .sep { opacity: 0.4; }
 .work-place .here { font-weight: 600; font-variant-numeric: tabular-nums; }
 .work-page-bar .work-stepper { font-variant-numeric: tabular-nums; }
+.work-page-bar > :not(.work-place) { margin-left: 0; }
 .work-page-bar .work-stepper + .work-refresh, .work-page-bar .work-open-icon + .work-refresh { margin-left: 0; }
 .work-stepper .short-line, .work-open-icon, .narrow-only, .work-page-byline .short-line { display: none; }
 .work-open-icon { place-items: center; width: 28px; height: 28px; margin-left: auto; color: inherit; border-radius: var(--radius-control); }
@@ -2273,7 +2274,7 @@ a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
 .work-page-head.placeholder h2 .bar { height: 22px; width: 60%; }
 .work-state.placeholder { color: transparent; background: var(--paper-wash); }
 .work-side .value > .bar { width: 6em; }
-.work-comment.placeholder .work-avatar { background: var(--paper-wash); }
+.work-comment.placeholder .work-avatar { width: 28px; height: 28px; background: var(--paper-wash); }
 @media (prefers-reduced-motion: no-preference) {
   .work-item-page.loading .bar, .work-item-page.loading .work-state.placeholder { animation: work-shimmer 1.6s ease-in-out infinite alternate; }
 }
@@ -2288,8 +2289,8 @@ a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
 .work-side-section .value { min-width: 0; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
 /* The gear on Labels (note 12): faint until the pointer is on the section, so a keyboard and a screen reader find it. */
 .work-gear { display: inline-grid; place-items: center; width: 22px; height: 22px; margin-left: auto; padding: 0; border: none; border-radius: var(--radius-control);
-  background: none; color: inherit; cursor: pointer; opacity: 0.35; }
-.work-gear svg { fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; }
+  background: none; color: inherit; cursor: pointer; opacity: 0.35; margin-block: -4px; }
+.work-gear svg { fill: none; stroke: currentColor; }
 .work-side-section:hover .work-gear, .work-gear:focus-visible, .work-gear[aria-expanded=true] { opacity: 1; }
 .work-gear:hover { background: var(--paper-wash); }
 @media (hover: none) { .work-gear { opacity: 1; width: 32px; height: 32px; } }
@@ -2302,6 +2303,7 @@ a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
   color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .work-labels-choices button:hover, .work-labels-choices button:focus-visible { background: var(--paper-wash); outline: none; }
 .work-labels-choices .tick { width: 1em; flex: none; }
+.work-labels-choices [aria-checked=true]::before { content: none; }
 .work-labels-choices .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .work-label-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--paper-wash); border: 1px solid var(--paper-rule); }
 .work-person { display: inline-flex; gap: 6px; align-items: center; }
@@ -2337,27 +2339,6 @@ a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
   .work-item-grid > .work-side.people > .work-side-section:first-child { border-top: none; padding-top: 0; }
   .work-labels-picker { left: auto; right: 0; }
 }
-/* The phone's page (under 700 px, as an iPhone): ‹ Issues, 3/42 and Open on GitHub's icon in the bar; the short state
-   line; Start Agent full width; the avatar in each box's header, so the box takes the width. */
-@container (max-width: 699px) {
-  .work-place .back { display: inline; }
-  .work-place .sep { display: none; }
-  .work-place .here { flex: 1; text-align: center; }
-  .work-stepper .wide-line, .work-page-byline .wide-line, .work-open-on, .wide-only { display: none; }
-  .work-stepper .short-line, .work-page-byline .short-line { display: inline; }
-  .work-open-icon { display: inline-grid; }
-  .work-page-bar .work-stepper { margin-left: auto; }
-  .work-page-bar .work-stepper + .work-open-icon { margin-left: 0; }
-  .narrow-only { display: block; margin-bottom: 12px; }
-  .narrow-only .work-start { width: 100%; padding: 8px; }
-  .work-timeline::before { display: none; }
-  .work-timeline > .work-comment > .work-avatar { display: none; }
-  .work-comment-small-avatar { display: inline-flex; margin-right: 6px; vertical-align: middle; }
-  .work-timeline .work-event { padding-left: 0; }
-  .work-comment-box { grid-template-columns: minmax(0, 1fr); }
-  .work-comment-me { display: none; }
-  .work-side.links .work-side-section h3 { text-transform: uppercase; letter-spacing: 0.04em; }
-}
 /* The timeline (section 6; notes 8 to 10): a line down the leading edge through the avatars, each box with a hairline
    border; an event a small grey line with its icon on the line. */
 .work-item-page .work-timeline { position: relative; display: flex; flex-direction: column; gap: 14px; margin-top: 4px; }
@@ -2366,7 +2347,8 @@ a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
 .work-comment > .work-avatar { box-shadow: 0 0 0 3px var(--paper-ground); }
 .work-comment-small-avatar { display: none; }
 .work-comment-main { flex: 1; min-width: 0; }
-.work-comment-main > p { margin: 5px 0 6px; display: flex; align-items: center; flex-wrap: wrap; }
+.work-comment-main > p { margin: 5px 0 6px; display: flex; align-items: center; flex-wrap: wrap; column-gap: 6px; }
+.work-comment-main > p .work-bot { margin-left: 0; }
 .work-comment-body { padding: 4px 12px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-raised); overflow-wrap: anywhere; }
 .work-comment-body .bar { margin: 10px 0; }
 .work-bot { margin-left: 6px; padding: 0 5px; border: 1px solid var(--paper-rule); border-radius: 99px; font-size: 0.8em; opacity: 0.8; }
@@ -2385,6 +2367,25 @@ a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
 .work-close-mark.open { color: #8250df; }
 .work-comment-box p { margin: 0; }
 .work-no-writes { margin: 16px 0 0; }
+/* The phone's page (under 700 px, as an iPhone): ‹ Issues, 3/42 and Open on GitHub's icon in the bar; the short state
+   line; Start Agent full width; the avatar in each box's header, so the box takes the width. */
+@container (max-width: 699px) {
+  .work-place .back { display: inline; }
+  .work-place .sep { display: none; }
+  .work-stepper .wide-line, .work-page-byline .wide-line, .work-open-on, .wide-only { display: none; }
+  .work-stepper .short-line, .work-page-byline .short-line { display: inline; }
+  .work-open-icon { display: inline-grid; }
+  .work-page-bar .work-stepper + .work-open-icon { margin-left: 0; }
+  .narrow-only { display: block; margin-bottom: 12px; }
+  .narrow-only .work-start { width: 100%; padding: 8px; }
+  .work-timeline::before { display: none; }
+  .work-timeline > .work-comment > .work-avatar { display: none; }
+  .work-comment-small-avatar { display: inline-flex; }
+  .work-timeline .work-event { padding-left: 0; }
+  .work-comment-box { grid-template-columns: minmax(0, 1fr); }
+  .work-comment-me { display: none; }
+  .work-side.links .work-side-section h3 { text-transform: uppercase; letter-spacing: 0.04em; }
+}
 @media (prefers-color-scheme: dark) {
   .work-state.with-glyph.open { background: #238636; }
   .work-state.with-glyph.closed, .work-state.with-glyph.merged { background: #8957e5; }

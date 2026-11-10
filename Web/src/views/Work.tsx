@@ -307,6 +307,12 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
     let current = true;
     if (!fromForge(kind)) return;
     reading.value = true;
+    // A page opened from an address reads before the machines have said what they do: placeholders until one that
+    // reads the forge comes, and "no machine" only once none came.
+    if (forgeHosts.length === 0) {
+      const none = setTimeout(() => { if (current) { forgeProblem.value = noForgeHere; reading.value = false; } }, 4000);
+      return () => { current = false; clearTimeout(none); };
+    }
     void (async () => {
       let last: string | null = null;
       for (const h of forgeHosts) {
@@ -318,7 +324,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
           last = describe(e);
         }
       }
-      if (current) forgeProblem.value = forgeHosts.length === 0 ? noForgeHere : last ?? notReadHere;
+      if (current) forgeProblem.value = last ?? notReadHere;
     })().finally(() => { if (current) reading.value = false; });
     return () => { current = false; };
   }, [kind, ref, forgeHosts.map((h) => h.id).join(","), asked.value]);
@@ -640,8 +646,9 @@ function SideSection({ title, edit, editing, children }: { title: string; edit?:
       <h3>{title}{edit && (
         <button type="button" class="work-gear" aria-label={`Edit ${title.toLowerCase()}`} title={`Edit ${title.toLowerCase()}`} aria-expanded={editing === true}
           onClick={edit}>
-          <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.25" />
-            <path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4" /></svg>
+          {/* A cog: its teeth are a dashed ring round a ring. */}
+          <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.7" stroke-width="2.4" stroke-dasharray="2.24 2.24" />
+            <circle cx="8" cy="8" r="4.3" stroke-width="1.6" /><circle cx="8" cy="8" r="1.4" stroke-width="1.3" /></svg>
         </button>
       )}</h3>
       <div class="value">{children}</div>

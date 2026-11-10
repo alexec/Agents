@@ -4,7 +4,7 @@
 // on either. Each goes to the machine that read the item (forge/*), as the person: their own click,
 // so no approval card. `wrote` reads the page again.
 import { signal, useSignal } from "@preact/signals";
-import { useEffect, useMemo } from "preact/hooks";
+import { useEffect, useMemo, useRef } from "preact/hooks";
 import type { ForgeDone, ForgeItemDetail, ForgeLabel, ForgeMergeMethod, LineageNode } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { describe } from "../model/errors";
@@ -237,15 +237,22 @@ export function WorkLabelsPicker({ store, host, node, has, close, pick }: {
     });
     return () => { current = false; };
   }, [node.ref, host]);
+  const at = useRef<HTMLDivElement>(null);
+  // Escape, or a click outside it and its gear, closes it.
   useEffect(() => {
     const escape = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); close(); } };
+    const away = (e: Event) => {
+      const t = e.target as Element | null;
+      if (!at.current?.contains(t) && !t?.closest?.(".work-gear")) close();
+    };
     addEventListener("keydown", escape);
-    return () => removeEventListener("keydown", escape);
+    addEventListener("pointerdown", away);
+    return () => { removeEventListener("keydown", escape); removeEventListener("pointerdown", away); };
   }, []);
   const words = text.value.trim().toLowerCase();
   const shown = (choices.value ?? []).filter((l) => !words || l.name.toLowerCase().includes(words));
   return (
-    <div class="popover work-labels-picker" role="dialog" aria-label="Labels">
+    <div class="popover work-labels-picker" role="dialog" aria-label="Labels" ref={at}>
       <input type="search" placeholder="Filter labels" aria-label="Filter labels" value={text.value} autoFocus
         onInput={(e) => { text.value = e.currentTarget.value; }} />
       <div class="work-labels-choices" role="group" aria-label="Labels">
