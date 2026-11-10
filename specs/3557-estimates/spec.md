@@ -123,6 +123,30 @@ Decided: an epic's estimate at its start counts the children its plan has now, b
 
 Decided: an app tool (`estimate_issue`, method `issues/estimate`), not the daemon posting the line on the epic, because the lead already writes the summary and other agents (the Product Owner, when it files an epic) can ask for an estimate too. Alex can overrule.
 
+## A size at filing (#4532)
+
+The review of 2026-11-10 (`.agents/reviews/estimates/2026-11-10-estimates-review.md`) backtested, leave-one-out on 573 closed issues, every label refinement the decision above did not try (`area:` and `feature:` multipliers, the last 30 of the class, the mean, the geometric mean). Each gives ×1.64 to ×1.70. The labels have no more to give; a new input must come from filing time.
+
+- **The input.** From 2026-11-10, every agent that files an issue (Alex, 2026-11-10; AGENTS.md, "Plans") sets one `size:` label (`size:XS`, `S`, `M`, `L`, `XL`) on each issue it files, from the points rubric in `.agents/personas/product-owner.md`: the clients it changes, a new screen or control (an approval wait), an integration or an outside account, a spec or a decision first, a wire change. An epic gets no size. The size is set once and never changed, so it is an input, not an actual.
+- **Nothing reads it yet.** `lineage/estimate` keeps type + level until the backtest below keeps `size:`. No product code changes for this spike until then.
+
+### The backtest, when 100 sized issues have closed
+
+- **When:** when 100 issues that have a `size:` label, are not epics, and closed with a PR that fixes them, are in `lineage-cost.json` with a kept estimate (#3561). The #4533 lead checks the count each time it wakes (`gh issue list --state closed --label size:<n>` for each size, against the store) and starts a lane on #4532 again at 100.
+- **Method:** the one above. Estimate each sized closed issue from the issues merged before its start, and take the median of `max(est/actual, actual/est)` for dollars and working time.
+- **The rules to compare,** on the same 100 issues:
+  1. today's chain: type + level → type → all;
+  2. type + level + size → type + level → type → all;
+  3. size → all (the size without the labels);
+  4. today's chain, then the class median times the size's ratio (the median actual of that size over the median actual of all sized issues, leave-one-out), for when a size has too few matches.
+- **Also say:** the error and within ×2 per size; whether the median actual rises from XS to XL (Spearman's correlation of size and actual); the P10–P90 coverage of each rule; and how many issues each rule could estimate with at least 5 matches.
+- **The rule that decides:** keep `size:` as a match key beside type and level (rule 2, or 4 when rule 2 has too few matches) only when it gives a median dollar error under ×1.6 **and** under today's chain on the same issues. Otherwise drop the label and the rubric, and say so here.
+- **The result goes here,** under this heading, with the table, a `Decided:` line, and a task for `Go/internal/lineage/estimate.go` when the size is kept.
+
+Decided: a points rubric, not the Product Owner's judgement of S to XL, because points give the same size for the same issue whoever files it, so the backtest measures the inputs and not the filer's mood. Alex can overrule.
+Decided: no backfill of the open issues, because a size set after the work started is not an input at filing, and the folder closes about 50 issues a day, so 100 sized issues close in a few days to two weeks. Alex can overrule.
+Decided: an epic gets no size, because its estimate is the sum of its children's. Alex can overrule.
+
 ## What the backtest does not cover
 
 - **6 days of history.** The store starts on 2026-10-30. These numbers will change as history grows. Story 4 (estimate against actual) keeps track of them.

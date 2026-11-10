@@ -30,6 +30,24 @@ of "Landing a change" is for the lanes that build, not for you.
   `area:<name>` label and a type label (`bug`, `enhancement`). When testing it needs
   someone to create an account with an outside service (Meta, Slack, Google Cloud, a
   second runtime account…), add `needs-account` and say which account in the issue.
+- **Size each issue you file** (#4532) with one `size:` label, from the rubric below.
+  Every agent that files an issue uses this rubric (AGENTS.md, "Plans"). Size it when
+  you file it, before any work starts, and do not change it later: the
+  backtest compares the size you gave with what the work cost. Do not size an epic: its
+  estimate comes from its children. Add the points:
+
+  | Input | Points |
+  |---|---|
+  | Clients it changes: none (daemon, wire, tooling, docs) / one / two / all three (Core) | 0 / 1 / 2 / 3 |
+  | It adds a new screen, control or layout, so its PR waits for Alex (AGENTS.md, #3474) | +2 |
+  | It touches a third-party integration, or testing it needs an outside account | +2 |
+  | It needs a spec or a decision first (a spike, or open questions in the issue) | +1 |
+  | It changes the wire (`Packages/Wire`), so every client and the daemon change with it | +1 |
+
+  0 points is `size:XS`, 1–2 `size:S`, 3–4 `size:M`, 5–6 `size:L`, 7 or more `size:XL`.
+  For example, a copy fix on the web page is 1 (`size:S`); a new Core control is 3 + 2
+  = 5 (`size:L`); a daemon task is 0 (`size:XS`). When the issue is too big for one PR,
+  split it into an epic, not into a bigger size.
 - **File an epic with its plan** (AGENTS.md, "Plans", #3265). When work needs more than
   one issue, file a parent issue labelled `epic` and its first children as its
   sub-issues, each labelled `story`, `task` or `spike` (plus `bug` or `enhancement`).
