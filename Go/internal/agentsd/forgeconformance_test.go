@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/bitbucketmcp"
 	"github.com/alexec/agents/Go/internal/connections"
 	"github.com/alexec/agents/Go/internal/forgejomcp"
 	"github.com/alexec/agents/Go/internal/githubmcp"
@@ -38,6 +39,7 @@ var conformRows = []conformRow{
 	{name: "github", daemon: conformGitHubDaemon},
 	{name: "gitlab", daemon: conformGitLabDaemon},
 	{name: "forgejo", daemon: conformForgejoDaemon},
+	{name: "bitbucket", daemon: conformBitbucketDaemon},
 }
 
 // conformGitHub is GitHub with four items on alexec/agents, which pages by its cursor.
@@ -267,6 +269,74 @@ func conformForgejoDaemon(t *testing.T) (*Daemon, *conn) {
 	c.call(t, 100, "folders/add", map[string]any{"folder": "file://" + gitFolder(t, "http://localhost:3753/walkalex/App.git")})
 	if err := file.Put(connections.Connection{Provider: connections.Forgejo, Login: "walkalex", Access: "forgejo-secret",
 		URL: "http://localhost:3753/", ConnectedAt: time.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	return d, c
+}
+
+// conformBitbucket is Bitbucket Cloud with four items on walkalex/App, which pages by its cursor.
+type conformBitbucket struct {
+	*fakeForgeBitbucket
+}
+
+var conformBitbucketItems = []bitbucketmcp.Item{
+	{Repo: "walkalex/App", Number: 4, PR: true, State: "merged", Title: "Merged", URL: "https://bitbucket.org/walkalex/App/pull-requests/4",
+		Author: "kim", UpdatedAt: "2026-11-04T10:00:00Z", Comments: 1},
+	{Repo: "walkalex/App", Number: 3, PR: true, State: "open", Title: "Open", URL: "https://bitbucket.org/walkalex/App/pull-requests/3",
+		Author: "kim", Assignees: []string{"kim"}, UpdatedAt: "2026-11-03T10:00:00Z", Checks: "failing"},
+	{Repo: "walkalex/App", Number: 2, State: "closed", Title: "Closed", URL: "https://bitbucket.org/walkalex/App/issues/2",
+		Author: "kim", Labels: []string{"bug"}, UpdatedAt: "2026-11-02T10:00:00Z"},
+	{Repo: "walkalex/App", Number: 1, State: "open", Title: "Open issue", URL: "https://bitbucket.org/walkalex/App/issues/1",
+		Author: "kim", Labels: []string{"task", "feature:Export"}, UpdatedAt: "2026-11-01T10:00:00Z"},
+}
+
+func (g conformBitbucket) Search(_ context.Context, _ []string, sf bitbucketmcp.SearchFilter, after string, first int) (bitbucketmcp.SearchPage, error) {
+	var kept []bitbucketmcp.Item
+	for _, i := range conformBitbucketItems {
+		open := i.State == "open"
+		if i.PR == sf.PRs && (sf.State == "all" || (sf.State == "closed") != open) {
+			kept = append(kept, i)
+		}
+	}
+	from, _ := strconv.Atoi(after)
+	var page bitbucketmcp.SearchPage
+	for n := from; n < len(kept) && len(page.Items) < first; n++ {
+		page.Items = append(page.Items, kept[n])
+		page.Cursors = append(page.Cursors, strconv.Itoa(n+1))
+	}
+	if end := from + len(page.Items); end < len(kept) {
+		page.Next = strconv.Itoa(end)
+	}
+	return page, nil
+}
+
+func (g conformBitbucket) ItemPage(_ context.Context, _ string, number int, pr bool, _ string) (bitbucketmcp.ItemDetail, error) {
+	for _, i := range conformBitbucketItems {
+		if i.Number == number && i.PR == pr {
+			d := bitbucketmcp.ItemDetail{Item: i, Body: "The body.",
+				Thread: []bitbucketmcp.Comment{{Author: "kim", Body: "A comment.", At: i.UpdatedAt}}}
+			if i.PR {
+				d.Head = "abc"
+				d.CheckRuns = []bitbucketmcp.CheckRun{{Name: "Pipeline #12", State: "failing", Run: 12}}
+			}
+			return d, nil
+		}
+	}
+	return bitbucketmcp.ItemDetail{}, &bitbucketmcp.BitbucketError{Kind: bitbucketmcp.NotFound, Message: "not found on Bitbucket"}
+}
+
+// conformBitbucketDaemon is a daemon with one folder on walkalex/App on Bitbucket Cloud.
+func conformBitbucketDaemon(t *testing.T) (*Daemon, *conn) {
+	t.Helper()
+	t.Setenv("AGENTS_PERSONAL_HOME", t.TempDir())
+	d, c := start(t, t.TempDir())
+	t.Cleanup(d.Shutdown)
+	file := &connections.File{Path: filepath.Join(t.TempDir(), ".agents-secrets", connections.FileName)}
+	d.connStoreFor = func() (connections.Store, error) { return file, nil }
+	fake := conformBitbucket{&fakeForgeBitbucket{}}
+	d.newForgeBitbucket = func(string, string, string) forgeBitbucket { return fake }
+	c.call(t, 100, "folders/add", map[string]any{"folder": "file://" + gitFolder(t, "git@bitbucket.org:walkalex/App.git")})
+	if err := file.Put(connections.BitbucketConnection(connections.BitbucketAPI, "me@example.com", "bb-secret", "walkalex", time.Now())); err != nil {
 		t.Fatal(err)
 	}
 	return d, c
