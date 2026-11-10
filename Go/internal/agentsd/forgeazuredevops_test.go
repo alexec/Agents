@@ -284,8 +284,7 @@ func TestABoardNarrowsAzureReposToItsProject(t *testing.T) {
 		folderOf: map[string]string{}}
 	list := func(b wire.ProjectBoard, prs bool) (forgePage, error) {
 		ado.searches = nil
-		s := forgeSources{boardsFolder: map[string]string{}}
-		board := narrowToBoard(&s, b, []string{"/f"}, prs)
+		board := narrowToBoard(b, []string{"/f"}, prs)
 		return azureDevOpsForge{d: d}.List(context.Background(), scope, forgeFilter{PRs: prs, Board: board}, "", 10)
 	}
 	if p, err := list(wire.ProjectBoard{Forge: new(wire.ConnectionProviderGithub), Key: new("alexec/1")}, true); err != nil || len(p.items) > 0 || len(ado.searches) > 0 {

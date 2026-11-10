@@ -318,51 +318,22 @@ func (d *Daemon) standingBlockers(ctx context.Context, method string, epic wire.
 	if len(children) == 0 {
 		return nil
 	}
-	set := func(n int, node wire.LineageNode, open bool) {
-		children[n].blockedBy = append(children[n].blockedBy, planRef{node: node, open: open})
-	}
-	numbers := make([]int, len(children))
-	for n, c := range children {
-		numbers[n] = refNumber(c.item.Node.Ref)
-	}
-	if f, _, ok := d.forgeOwning(epic.Node); ok {
-		refs := make([]forgeRef, len(children))
-		for n, c := range children {
-			if refs[n], ok = f.Owns(c.item.Node); !ok {
-				return Invalid("%s: %s is not on the forge %s is on", method, c.item.Node.Ref, epic.Node.Ref)
-			}
-		}
-		by, err := f.Blockers(ctx, refs)
-		if err != nil {
-			return forgeCannotErr(method, f, err)
-		}
-		for n := range children {
-			children[n].blockedBy = append(children[n].blockedBy, by[refs[n]]...)
-		}
+	f, _, ok := d.forgeOwning(epic.Node)
+	if !ok {
 		return nil
 	}
-	keys := make([]string, len(children))
+	refs := make([]forgeRef, len(children))
 	for n, c := range children {
-		_, keys[n], _ = strings.Cut(c.item.Node.Ref, ":")
-	}
-	switch {
-	default:
-		if project, _, ok := boardsOfNode(epic.Node); ok {
-			b, err := d.forgeAzureBoards()
-			if err != nil {
-				return err
-			}
-			by, err := b.Blockers(ctx, project, numbers)
-			if err != nil {
-				return err
-			}
-			for n := range children {
-				for _, r := range by[numbers[n]] {
-					set(n, boardsNode(r.Project, r.ID), r.Open)
-				}
-			}
-			return nil
+		if refs[n], ok = f.Owns(c.item.Node); !ok {
+			return Invalid("%s: %s is not on the forge %s is on", method, c.item.Node.Ref, epic.Node.Ref)
 		}
+	}
+	by, err := f.Blockers(ctx, refs)
+	if err != nil {
+		return forgeCannotErr(method, f, err)
+	}
+	for n := range children {
+		children[n].blockedBy = append(children[n].blockedBy, by[refs[n]]...)
 	}
 	return nil
 }
