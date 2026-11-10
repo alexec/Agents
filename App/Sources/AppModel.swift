@@ -1068,8 +1068,18 @@ final class AppModel {
     /// The GitHub sign-ins waiting for this person's Approve (#995).
     let signIn = SignInState()
     /// This window's place in the person's machine lock, and the clients asking to join it (#3490).
-    let lock = LockState(pins: LockPins(defaults: WindowDefaults.store, name: ControlConfig.lockPinName),
-                         name: Host.current().localizedName ?? "A Mac", kind: .mac, account: ControlConfig.lockAccount)
+    let lock: LockState = {
+        let lock = LockState(pins: LockPins(defaults: WindowDefaults.store, name: ControlConfig.lockPinName),
+                             name: Host.current().localizedName ?? "A Mac", kind: .mac, account: ControlConfig.lockAccount)
+        // This Mac's own host joins the lock with an invite from the window, not a card (#4248).
+        if let host = HostScenes.model {
+            let locations = host.paths.hostLocations
+            lock.ownHost = LockState.OwnHost(
+                id: { ControlMembership.load(locations.controlHostMembership)?.host?.rawValue },
+                keepInvite: { try MachineLock.keepInvite($0, pin: $1, in: locations) })
+        }
+        return lock
+    }()
     /// The settings and secrets that follow the person to their machines (#1760).
     let userScope = UserScopeState()
     /// Hosts whose Start was pressed here and not answered yet.
