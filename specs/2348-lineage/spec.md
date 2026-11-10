@@ -35,7 +35,7 @@ A graph that links the parts of the SDLC. The host keeps it. The other slices fi
 ## The store
 
 - **One interface,** `lineage.Store` in `Go/internal/lineage`: `Link`, `End`, `Links`,
-  `Walk`, `Close`. A graph database can replace the files behind it (Alex, 2026-10-22).
+  `Walk`, `SetState` (#4274), `Prune`, `Close`. A graph database can replace the files behind it (Alex, 2026-10-22).
 - **Files:** `<root>/lineage.jsonl` on each machine.
   - Each change is one line, written with one write to an `O_APPEND` file: a link started
     (`{"link": …}`) or a link ended (`{"end": {from, to, rel}, "at": …}`).
@@ -393,6 +393,45 @@ The health stage of the outer loop (spec `3579-outer-loop`), in
   label: the ready-made **File a bug from Sentry** labels its session with the bug it filed
   or commented on) `reports` the health signal, source `agent`. A walk from the bug
   reaches the health signal (1), its release (2) and the release's PRs (3).
+
+## Session state (#4274)
+
+Part of the epic #4273 (one lineage graph on the control plane, with session state). Each
+machine records the state of its session nodes in its own `lineage.jsonl`, so the graph
+says which sessions work, wait or need a person now, and for how long they did. No client
+draws it yet; the control plane's copy and the Mac and web reads come in later children.
+
+- **The states** (`LineageSessionStateName`):
+
+  | State | Means |
+  | --- | --- |
+  | `working` | in a turn, or starting one (agent `starting` or `running`) |
+  | `waiting` | waits on an event (`wait_for_event`), a block (`check_again`, a wait on other agents) not cleared, or a place to start (`queued`) |
+  | `needs-you` | waits on a person: a question or an approval (`waitingOnUser`) |
+  | `stopped` | not running, not archived, and no wait the host knows (`finished`, `stopped`) |
+  | `archived` | archived |
+  | `deleted` | deleted; the node keeps no title (lineage keeps none for a session) |
+
+  A state a newer build adds reads as `stopped`.
+- **When.** The host (`Go/internal/agentsd/lineagestate.go`) works out a session's state
+  from its record each time the record changes (`change`, and a record made new: a start,
+  a helper, a pick-up, a restore), and writes a change only when the state moved: a turn's
+  start and end, a question or an approval, a wait, a stop and an archive. A delete writes
+  `deleted`. A writer agent (`purpose`) is not in lineage. The store also writes nothing
+  when the node is in that state already, so a restart does not repeat one.
+- **The store.** `lineage.Store.SetState(node, state, at)`. One line each:
+  `{"state": {"node": …, "state": "working"}, "at": …}`. A rewrite writes the changes
+  after the links.
+- **Bounds.** A change is kept 90 days, except each node's latest, whatever its age, so an
+  old session still says it is archived. At most 20,000 changes are kept; past that, the
+  oldest that are not a node's latest go first.
+- **The wire.** `lineage/links` says a session node's changes in `states`
+  (`LineageSessionState {state, at}`), newest first, at most 500: the first is its state
+  now. `lineage/walk` says the state now of each node it reaches in `states`, by ref.
+- **Decided: `waiting` only where the host knows of the wait** (the issue's open question),
+  because the host keeps `wait_for_event`, `check_again` and the waits on other agents for
+  every runtime alike. A runtime that waits in its own way, with none of them, reads as
+  `stopped`. Alex can overrule.
 
 ## Clients
 

@@ -483,6 +483,7 @@ func (d *Daemon) noteLineage(before *wire.Agent, a wire.Agent) {
 	if a.Purpose != nil {
 		return
 	}
+	d.noteSessionState(before, a)
 	var was wire.Agent
 	if before != nil {
 		was = *before

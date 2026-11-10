@@ -5809,7 +5809,7 @@ type LineageFigures struct {
 	Limited *bool `json:"limited,omitzero"`
 }
 
-// lineage/walk (#2348): the nodes the walk reached and the links it went along. limited says the walk stopped at its limit on nodes, so there is more. resolved is each node's title, state and labels from its connector, by ref, for the nodes a connector could resolve (#3089). resolving says some nodes are still being resolved in the background, so walk again shortly for them (#3102).
+// lineage/walk (#2348): the nodes the walk reached and the links it went along. limited says the walk stopped at its limit on nodes, so there is more. resolved is each node's title, state and labels from its connector, by ref, for the nodes a connector could resolve (#3089). resolving says some nodes are still being resolved in the background, so walk again shortly for them (#3102). states is the current state of each session node in it that has one, by ref (#4274).
 type LineageGraph struct {
 	Nodes []LineageNode `json:"nodes"`
 
@@ -5820,6 +5820,8 @@ type LineageGraph struct {
 	Resolving *bool `json:"resolving,omitzero"`
 
 	Resolved map[string]LineageResolved `json:"resolved,omitzero"`
+
+	States map[string]LineageSessionState `json:"states,omitzero"`
 }
 
 // A typed link in the lineage graph (#2348): from works-on, opens, fixes, started, reviews, closes or part-of to. source is how the host knows it: start, branch, pr-body, helper, agent, person or forge. at is when it started; endedAt is set when it stops being active (a PR merged, a session archived). Both lists are open: a host keeps a relationship or a source it does not know.
@@ -5848,11 +5850,13 @@ type LineageLinkRequest struct {
 	Source string `json:"source"`
 }
 
-// The links of a node, newest first (#2348), or the links lineage/end ended. limited says there are more than the answer holds.
+// The links of a node, newest first (#2348), or the links lineage/end ended. limited says there are more than the answer holds. states is a session node's changes of state, newest first, so the first is its state now (#4274); absent for a node that is not a session, or a session with none recorded.
 type LineageLinks struct {
 	Links []LineageLink `json:"links"`
 
 	Limited *bool `json:"limited,omitzero"`
+
+	States []LineageSessionState `json:"states,omitzero"`
 }
 
 // A node in the lineage graph (#2348). kind is what it is: issue, pr, session, workflow-run, commit, file, branch or release, and the list is open. ref names it apart from any tracker, as <scheme>:<id>: github:alexec/Agents#123, gitlab:group/repo!45, linear:ENG-4, jira:ABC-9, session:<agent id>.
@@ -5897,6 +5901,43 @@ type LineageSessionMatch struct {
 	AgentID UUID `json:"agentID"`
 
 	On LineageNode `json:"on"`
+}
+
+// A change of a session node's state, as its machine recorded it (#4274): state is what it changed to, at is when. The machine keeps the changes of the last 90 days, and each session's latest whatever its age.
+type LineageSessionState struct {
+	State LineageSessionStateName `json:"state"`
+
+	At Date `json:"at"`
+}
+
+// A session's state in lineage (#4274): working is in a turn (or starting one); waiting waits on an event, CI, a timer or a place to start; needs-you waits on a person, for a question or an approval; stopped is not running and not archived; archived is archived; deleted is deleted, and the node keeps no title. A state this build does not know reads as stopped.
+type LineageSessionStateName string
+
+const LineageSessionStateNameWorking LineageSessionStateName = "working"
+const LineageSessionStateNameWaiting LineageSessionStateName = "waiting"
+const LineageSessionStateNameNeedsYou LineageSessionStateName = "needs-you"
+const LineageSessionStateNameStopped LineageSessionStateName = "stopped"
+const LineageSessionStateNameArchived LineageSessionStateName = "archived"
+const LineageSessionStateNameDeleted LineageSessionStateName = "deleted"
+
+// UnmarshalJSON reads a value this build does not know as "stopped".
+func (v *LineageSessionStateName) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	switch LineageSessionStateName(s) {
+	case LineageSessionStateNameWorking,
+		LineageSessionStateNameWaiting,
+		LineageSessionStateNameNeedsYou,
+		LineageSessionStateNameStopped,
+		LineageSessionStateNameArchived,
+		LineageSessionStateNameDeleted:
+		*v = LineageSessionStateName(s)
+	default:
+		*v = LineageSessionStateNameStopped
+	}
+	return nil
 }
 
 // The sessions on this machine that lineage links to the issue, to its sub-issues or to their PRs, each once, on the first issue in issues they came by. limited says there were more sub-issues or sessions than are counted.

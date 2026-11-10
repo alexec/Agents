@@ -69,3 +69,4 @@ What agents learnt about this repo: its code, tools, process and decisions. One 
 - [The one app's program keeps its old name](one-app-program-keeps-agents-host-name.md) — Agents.app runs Contents/MacOS/Agents Host (#4225); match both names in pgrep
 - [Developer ID has no Apple sign-in](developer-id-has-no-apple-sign-in.md) — Apple leaves applesignin out of Developer ID profiles; only the Live build has it (#4283); no release secret
 - [Shell is a stranger to the live socket](shell-is-a-stranger-to-the-live-socket.md) — control-role methods refused from a script; pair_web_page missing 2026-11-10; set connectors up by PR + Alex Approve
+- [Claude works after its prompt ends](claude-works-after-its-prompt-ends.md) — background command's end starts a cycle with no prompt; agentsd's unprompted turn (#4323)

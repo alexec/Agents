@@ -5169,7 +5169,7 @@ export interface LineageFigures {
  * walk stopped at its limit on nodes, so there is more. resolved is each node's title, state and
  * labels from its connector, by ref, for the nodes a connector could resolve (#3089). resolving
  * says some nodes are still being resolved in the background, so walk again shortly for them
- * (#3102).
+ * (#3102). states is the current state of each session node in it that has one, by ref (#4274).
  */
 export interface LineageGraph {
   nodes: LineageNode[];
@@ -5177,6 +5177,7 @@ export interface LineageGraph {
   limited?: boolean;
   resolving?: boolean;
   resolved?: Record<string, LineageResolved>;
+  states?: Record<string, LineageSessionState>;
 }
 
 /**
@@ -5207,11 +5208,14 @@ export interface LineageLinkRequest {
 
 /**
  * The links of a node, newest first (#2348), or the links lineage/end ended. limited says there are
- * more than the answer holds.
+ * more than the answer holds. states is a session node's changes of state, newest first, so the
+ * first is its state now (#4274); absent for a node that is not a session, or a session with none
+ * recorded.
  */
 export interface LineageLinks {
   links: LineageLink[];
   limited?: boolean;
+  states?: LineageSessionState[];
 }
 
 /**
@@ -5270,6 +5274,30 @@ export interface LineageSessionMatch {
   agentID: UUID;
   on: LineageNode;
 }
+
+/**
+ * A change of a session node's state, as its machine recorded it (#4274): state is what it changed
+ * to, at is when. The machine keeps the changes of the last 90 days, and each session's latest
+ * whatever its age.
+ */
+export interface LineageSessionState {
+  state: LineageSessionStateName;
+  at: WireDate;
+}
+
+/**
+ * A session's state in lineage (#4274): working is in a turn (or starting one); waiting waits on an
+ * event, CI, a timer or a place to start; needs-you waits on a person, for a question or an
+ * approval; stopped is not running and not archived; archived is archived; deleted is deleted, and
+ * the node keeps no title. A state this build does not know reads as stopped.
+ */
+export type LineageSessionStateName =
+  | "working"
+  | "waiting"
+  | "needs-you"
+  | "stopped"
+  | "archived"
+  | "deleted";
 
 /**
  * The sessions on this machine that lineage links to the issue, to its sub-issues or to their PRs,
@@ -14597,16 +14625,17 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineageEstimateRange: { required: ["median", "p10", "p90"], optional: [] },
   LineageEstimateRequest: { required: ["node"], optional: ["startAt"] },
   LineageFigures: { required: ["node", "cost", "sessions", "running", "runtimes"], optional: ["leadTimeSeconds", "limited"] },
-  LineageGraph: { required: ["nodes", "links"], optional: ["limited", "resolving", "resolved"] },
+  LineageGraph: { required: ["nodes", "links"], optional: ["limited", "resolving", "resolved", "states"] },
   LineageLink: { required: ["from", "to", "rel", "source", "at"], optional: ["endedAt"] },
   LineageLinkRequest: { required: ["from", "to", "rel", "source"], optional: [] },
-  LineageLinks: { required: ["links"], optional: ["limited"] },
+  LineageLinks: { required: ["links"], optional: ["limited", "states"] },
   LineageNode: { required: ["kind", "ref"], optional: [] },
   LineageNodeRequest: { required: ["node"], optional: ["depth"] },
   LineageResolved: { required: ["title"], optional: ["state", "labels"] },
   LineageRuntimeCount: { required: ["runtimeID", "sessions"], optional: [] },
   LineageSessionIssue: { required: ["node"], optional: ["title"] },
   LineageSessionMatch: { required: ["agentID", "on"], optional: [] },
+  LineageSessionState: { required: ["state", "at"], optional: [] },
   LineageSessions: { required: ["matches"], optional: ["issues", "limited"] },
   LineageSessionsRequest: { required: ["number"], optional: [] },
   ListCursor: { required: ["lastActivityAt", "id"], optional: ["archivedAt"] },
