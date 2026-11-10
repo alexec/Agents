@@ -25,31 +25,51 @@ struct WorkTimelineEntry<Marker: View, Content: View>: View {
 
 /// A comment on the timeline: an avatar on the line, the author (semibold), "commented 20 min ago"
 /// with the exact time as its help, a "bot" capsule for a bot, and the body in a box with a
-/// hairline border.
+/// hairline border. On a narrow page (#4400) the avatar goes into the header, 20 points, and the
+/// box takes the width. `words` says what in place of "commented 20 min ago" (the body's "opened
+/// this").
 struct WorkCommentView<Body: View>: View {
     let comment: DaemonAPI.ForgeComment
+    var words: String?
+    var compact = false
     @ViewBuilder var markdown: Body
 
     var body: some View {
-        WorkTimelineEntry {
-            WorkAvatar(login: comment.author, side: WorkTimelineEntry<EmptyView, EmptyView>.column)
-        } content: {
+        if compact {
             VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 6) {
-                    Text(comment.author).appText(.fine).fontWeight(.semibold)
-                    if comment.bot == true { WorkBotCapsule() }
-                    Text(WorkLook.commentedWords(comment.at))
-                        .appText(.fine).foregroundStyle(.secondary)
-                        .help(comment.at.formatted(date: .abbreviated, time: .shortened))
+                header
+                box
+            }
+            .padding(.bottom, 14)
+        } else {
+            WorkTimelineEntry {
+                WorkAvatar(login: comment.author, side: WorkTimelineEntry<EmptyView, EmptyView>.column)
+            } content: {
+                VStack(alignment: .leading, spacing: 6) {
+                    header.padding(.top, 5)
+                    box
                 }
-                .padding(.top, 5)
-                markdown
-                    .padding(12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(RoundedRectangle(cornerRadius: Paper.Radius.card).fill(Paper.raised))
-                    .overlay(RoundedRectangle(cornerRadius: Paper.Radius.card).strokeBorder(Paper.rule))
             }
         }
+    }
+
+    private var header: some View {
+        HStack(spacing: 6) {
+            if compact { WorkAvatar(login: comment.author, side: 20) }
+            Text(comment.author).appText(.fine).fontWeight(.semibold)
+            if comment.bot == true { WorkBotCapsule() }
+            Text(words ?? WorkLook.commentedWords(comment.at))
+                .appText(.fine).foregroundStyle(.secondary)
+                .help(words == nil ? comment.at.formatted(date: .abbreviated, time: .shortened) : "")
+        }
+    }
+
+    private var box: some View {
+        markdown
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: Paper.Radius.card).fill(Paper.raised))
+            .overlay(RoundedRectangle(cornerRadius: Paper.Radius.card).strokeBorder(Paper.rule))
     }
 }
 

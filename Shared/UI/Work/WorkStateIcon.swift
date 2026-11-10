@@ -8,11 +8,13 @@ struct WorkStateIcon: View {
     let kind: String
     let state: String
     var draft = false
+    /// White, on a fill of the state's colour (the item page's pill, #4400).
+    var onFill = false
 
     var body: some View {
         if let glyph = WorkLook.glyph(kind: kind, state: state, draft: draft) {
             symbol(glyph)
-                .foregroundStyle(glyph.tone.color)
+                .foregroundStyle(onFill ? .white : glyph.tone.color)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(glyph.accessibilityLabel)
         } else {
