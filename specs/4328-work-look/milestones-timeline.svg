@@ -1,0 +1,270 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1680" height="980" viewBox="0 0 1680 980" font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif">
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#20242A" flood-opacity="0.14"/>
+    </filter>
+    <symbol id="open" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="8" r="2" fill="currentColor"/></symbol>
+    <symbol id="done" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5.3 8.2l1.8 1.8 3.6-3.8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="notplanned" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M4 12L12 4" stroke="currentColor" stroke-width="1.4"/></symbol>
+    <symbol id="pr" viewBox="0 0 16 16"><circle cx="4" cy="3.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="4" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="12" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M4 5.1v5.8M12 10.9V6.5a2 2 0 0 0-2-2H7.5M9 3l-1.6 1.5L9 6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="tag" viewBox="0 0 16 16"><path d="M2.5 2.5h5.5l5.5 5.5-5.5 5.5-5.5-5.5z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="5.5" cy="5.5" r="1" fill="currentColor"/></symbol>
+    <symbol id="flag" viewBox="0 0 16 16"><path d="M3.5 14V2.5M3.5 3h8.5l-2 3 2 3H3.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="gear" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.2" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M3.6 12.4L5 11M11 5l1.4-1.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="warn" viewBox="0 0 16 16"><path d="M8 2.2L14.3 13.5H1.7z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M8 6.5v3.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="11.6" r=".8" fill="currentColor"/></symbol>
+    <symbol id="refresh" viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v2.5h-2.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="chev" viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="chevr" viewBox="0 0 10 10"><path d="M3.5 2l3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="up" viewBox="0 0 16 16"><path d="M3.5 10L8 5.5l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="down" viewBox="0 0 16 16"><path d="M3.5 6L8 10.5l4.5-4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="back" viewBox="0 0 16 16"><path d="M10 3L5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="fwd" viewBox="0 0 16 16"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="ext" viewBox="0 0 16 16"><path d="M9 3h4v4M13 3L7.5 8.5M11 9.5V13H3V5h3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="more" viewBox="0 0 16 16"><circle cx="3.5" cy="8" r="1.3" fill="currentColor"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/><circle cx="12.5" cy="8" r="1.3" fill="currentColor"/></symbol>
+    <symbol id="spark" viewBox="0 0 16 16"><path d="M8 2l1.4 4.6L14 8l-4.6 1.4L8 14l-1.4-4.6L2 8l4.6-1.4z" fill="currentColor"/></symbol>
+    <symbol id="doc" viewBox="0 0 16 16"><path d="M4 2h5.5L12.5 5v9H4z M9.5 2v3h3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
+    <symbol id="link" viewBox="0 0 16 16"><path d="M6.5 9.5l3-3M7 4.5l1-1a2.5 2.5 0 0 1 3.5 3.5l-1 1M9 11.5l-1 1A2.5 2.5 0 0 1 4.5 9l1-1" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+    <symbol id="sidebar" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M6 3v10" stroke="currentColor" stroke-width="1.3"/></symbol>
+    <symbol id="tick" viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="cross" viewBox="0 0 16 16"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="dot" viewBox="0 0 16 16"><circle cx="8" cy="8" r="3.5" fill="currentColor"/></symbol>
+    <symbol id="skip" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 8h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+    <symbol id="merged" viewBox="0 0 16 16"><circle cx="4.5" cy="3.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="4.5" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="11.5" cy="8" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M4.5 5.1v5.8M4.5 5.5c0 2.5 2.5 2.5 5.4 2.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="prclosed" viewBox="0 0 16 16"><circle cx="4" cy="3.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="4" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="12" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M4 5.1v5.8M12 10.9V8M10.3 3l3.4 3.4M13.7 3l-3.4 3.4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="files" viewBox="0 0 16 16"><path d="M3.5 2h6l3 3v9h-9z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8 6.5v4M6 8.5h4M6 12h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="eye" viewBox="0 0 16 16"><path d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="8" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.3"/></symbol>
+    <symbol id="commit" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M1.5 8h3.9M10.6 8h3.9" stroke="currentColor" stroke-width="1.4"/></symbol>
+    <symbol id="thread" viewBox="0 0 16 16"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
+    <symbol id="branch" viewBox="0 0 16 16"><circle cx="4.5" cy="3.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="4.5" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="11.5" cy="5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M4.5 5.1v5.8M11.5 6.6c0 3-7 2-7 4.3" fill="none" stroke="currentColor" stroke-width="1.3"/></symbol>
+    <symbol id="clock" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.8" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 4.8V8l2.2 1.6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="image" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="5.5" cy="6.5" r="1.2" fill="currentColor"/><path d="M2.5 12l3.5-3.5 2.5 2.5 2-2 3 3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
+    <symbol id="lines" viewBox="0 0 16 16"><path d="M3 4h10M3 8h10M3 12h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+    <symbol id="bubble" viewBox="0 0 16 16"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></symbol>
+    <symbol id="search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+    <symbol id="spin" viewBox="0 0 16 16"><path d="M8 2a6 6 0 1 1-6 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="check" viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="board" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M6 3v10M10 3v10" stroke="currentColor" stroke-width="1.3"/></symbol>
+    <symbol id="folder" viewBox="0 0 16 16"><path d="M2 4.5h4l1.5 1.5H14v6.5H2z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
+    <symbol id="box" viewBox="0 0 16 16"><path d="M8 1.8l5.6 3v6.4L8 14.2l-5.6-3V4.8z M2.4 4.8L8 7.8l5.6-3M8 7.8v6.4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
+    <symbol id="stream" viewBox="0 0 16 16"><path d="M1.5 11h13M3.5 11c1.5 0 1.5-5 3-5h3c1.5 0 1.5 5 3 5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+    <symbol id="epic" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 2a6 6 0 0 1 6 6H8z" fill="currentColor"/></symbol>
+  </defs>
+  <rect x="0" y="0" width="1680" height="980" rx="0" fill="#E7EAEE"/>
+  <text x="24" y="34" font-size="15" fill="#1C1D20" font-weight="600">Timeline (#4334): the Mac window and the web page at 390 px</text>
+  <text x="24" y="54" font-size="12" fill="#5B616B">What works stays (#4170, specs/time-stream/): the plot, the lines, the forecast. The bar, the hover card and the states take the shared parts. Not on the Remote (Alex, by design). Scratch data.</text>
+  <g transform="translate(24,76)" filter="url(#shadow)">
+  <rect x="0" y="0" width="1180" height="860" rx="12" fill="#FFFFFF"/>
+  <path d="M12 0h1156a12 12 0 0 1 12 12v40H0V12A12 12 0 0 1 12 0z" fill="#F6F7F8"/>
+  <path d="M0 52L1180 52" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <circle cx="20" cy="20" r="6" fill="#FF5F57"/>
+  <circle cx="40" cy="20" r="6" fill="#FEBC2E"/>
+  <circle cx="60" cy="20" r="6" fill="#28C840"/>
+  <use href="#sidebar" x="84" y="18" width="16" height="16" color="#5B616B"/>
+  <use href="#back" x="116" y="18" width="16" height="16" color="#5B616B"/>
+  <use href="#fwd" x="136" y="18" width="16" height="16" color="#C7CCD3"/>
+  <text x="166" y="32" font-size="14" fill="#1C1D20" font-weight="600">Timeline</text>
+  <rect x="1130" y="14" width="28" height="24" rx="6" fill="#EDEFF2"/>
+  <use href="#refresh" x="1136" y="18" width="16" height="16" color="#4A5059"/>
+  <circle cx="1144" cy="64" r="9" fill="#B35900"/>
+  <text x="1144" y="68" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">30</text>
+  <text x="24" y="92" font-size="21" fill="#1C1D20" font-weight="600">Timeline</text>
+  <text x="124" y="92" font-size="13" fill="#5B616B">alexec/Agents · 6 epics in these 2 days</text>
+  <text x="24" y="127" font-size="12.5" fill="#0A6CDB" font-weight="500">Project: Agents</text>
+  <use href="#chev" x="123.80000000000001" y="119" width="10" height="10" color="#0A6CDB"/>
+  <text x="149.8" y="127" font-size="12.5" fill="#5B616B">Board</text>
+  <use href="#chev" x="187.0" y="119" width="10" height="10" color="#8A9099"/>
+  <circle cx="18" cy="104" r="9" fill="#B35900"/>
+  <text x="18" y="108" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">31</text>
+  <rect x="780" y="108" width="210" height="26" rx="7" fill="#EEF0F3"/>
+  <rect x="850" y="110" width="70" height="22" rx="6" fill="#FFFFFF" stroke="#E0E3E7" stroke-width="1"/>
+  <text x="815" y="125" font-size="12" fill="#1C1D20" text-anchor="middle">1 Day</text>
+  <text x="885" y="125" font-size="12" fill="#1C1D20" font-weight="600" text-anchor="middle">2 Days</text>
+  <text x="955" y="125" font-size="12" fill="#1C1D20" text-anchor="middle">Week</text>
+  <rect x="1002" y="107" width="42.8" height="28" rx="6" fill="#FFFFFF" stroke="#C7CCD3" stroke-width="1"/>
+  <text x="1014" y="125.5" font-size="12.5" fill="#1C1D20" font-weight="500">Now</text>
+  <rect x="1070" y="113" width="16" height="16" rx="4" fill="#0A6CDB"/>
+  <use href="#tick" x="1071" y="114" width="14" height="14" color="#FFF"/>
+  <text x="1092" y="126" font-size="12.5" fill="#1C1D20">Forecast</text>
+  <circle cx="766" cy="104" r="9" fill="#B35900"/>
+  <text x="766" y="108" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">32</text>
+  <path d="M0 148L1180 148" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <rect x="540" y="190" width="600" height="560" rx="0" fill="#F6F7F8"/>
+  <path d="M40 190L40 750" stroke="#EEF0F2" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <path d="M140 190L140 750" stroke="#EEF0F2" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <path d="M240 190L240 750" stroke="#EEF0F2" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <path d="M340 190L340 750" stroke="#EEF0F2" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <path d="M440 190L440 750" stroke="#EEF0F2" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <path d="M540 190L540 750" stroke="#EEF0F2" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <path d="M640 190L640 750" stroke="#EEF0F2" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <path d="M740 190L740 750" stroke="#EEF0F2" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <path d="M840 190L840 750" stroke="#EEF0F2" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <path d="M940 190L940 750" stroke="#EEF0F2" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <path d="M1040 190L1040 750" stroke="#EEF0F2" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <path d="M40 470.0L1140 470.0" stroke="#B8BDC4" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <circle cx="300" cy="470.0" r="7" fill="#FFFFFF" stroke="#1C1D20" stroke-width="2.5"/>
+  <rect x="270" y="480.0" width="60" height="20" rx="10" fill="#1C1D20"/>
+  <text x="300" y="494.0" font-size="11" fill="#FFF" font-weight="600" text-anchor="middle">v0.41.0</text>
+  <circle cx="470" cy="470.0" r="7" fill="#FFFFFF" stroke="#1C1D20" stroke-width="2.5"/>
+  <rect x="440" y="480.0" width="60" height="20" rx="10" fill="#1C1D20"/>
+  <text x="470" y="494.0" font-size="11" fill="#FFF" font-weight="600" text-anchor="middle">v0.42.0</text>
+  <path d="M130 470.0 C150 470.0 140 260.0 160 260.0 L540 260.0" stroke="#AF52DE" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <circle cx="220" cy="260.0" r="4.5" fill="#AF52DE"/>
+  <circle cx="300" cy="260.0" r="4.5" fill="#AF52DE"/>
+  <circle cx="370" cy="260.0" r="4.5" fill="#AF52DE"/>
+  <circle cx="460" cy="260.0" r="4.5" fill="#AF52DE"/>
+  <circle cx="510" cy="260.0" r="4.5" fill="#AF52DE"/>
+  <rect x="670" y="254.0" width="140" height="12" rx="6" fill="#AF52DE" fill-opacity="0.15"/>
+  <path d="M540 260.0 L730 260.0 C750 260.0 740 470.0 760 470.0" stroke="#AF52DE" stroke-width="2" fill="none" stroke-linecap="round" stroke-dasharray="5 5"/>
+  <circle cx="635.0" cy="260.0" r="4.5" fill="#FFFFFF" stroke="#AF52DE" stroke-width="2"/>
+  <circle cx="760" cy="470.0" r="6" fill="#FFFFFF" stroke="#AF52DE" stroke-width="2.5"/>
+  <text x="164" y="252.0" font-size="12.5" fill="#AF52DE" font-weight="600">Work look: the look of every Work page <tspan fill="#8A9099">#4327 · 5 of 9</tspan></text>
+  <path d="M220 470.0 C240 470.0 230 330.0 250 330.0 L540 330.0" stroke="#34C759" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <circle cx="340" cy="330.0" r="4.5" fill="#34C759"/>
+  <circle cx="495" cy="330.0" r="4.5" fill="#34C759"/>
+  <rect x="740" y="324.0" width="140" height="12" rx="6" fill="#34C759" fill-opacity="0.15"/>
+  <path d="M540 330.0 L800 330.0 C820 330.0 810 470.0 830 470.0" stroke="#34C759" stroke-width="2" fill="none" stroke-linecap="round" stroke-dasharray="5 5"/>
+  <circle cx="670.0" cy="330.0" r="4.5" fill="#FFFFFF" stroke="#34C759" stroke-width="2"/>
+  <circle cx="830" cy="470.0" r="6" fill="#FFFFFF" stroke="#34C759" stroke-width="2.5"/>
+  <text x="254" y="322.0" font-size="12.5" fill="#34C759" font-weight="600">forge interface <tspan fill="#8A9099">#4352 · 2 of 6</tspan></text>
+  <path d="M40 400.0 L540 400.0" stroke="#007AFF" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <circle cx="130" cy="400.0" r="4.5" fill="#007AFF"/>
+  <circle cx="200" cy="400.0" r="4.5" fill="#007AFF"/>
+  <circle cx="280" cy="400.0" r="4.5" fill="#007AFF"/>
+  <circle cx="340" cy="400.0" r="4.5" fill="#007AFF"/>
+  <circle cx="420" cy="400.0" r="4.5" fill="#007AFF"/>
+  <circle cx="480" cy="400.0" r="4.5" fill="#007AFF"/>
+  <rect x="620" y="394.0" width="140" height="12" rx="6" fill="#007AFF" fill-opacity="0.15"/>
+  <path d="M540 400.0 L680 400.0 C700 400.0 690 470.0 710 470.0" stroke="#007AFF" stroke-width="2" fill="none" stroke-linecap="round" stroke-dasharray="5 5"/>
+  <circle cx="610.0" cy="400.0" r="4.5" fill="#FFFFFF" stroke="#007AFF" stroke-width="2"/>
+  <circle cx="710" cy="470.0" r="6" fill="#FFFFFF" stroke="#007AFF" stroke-width="2.5"/>
+  <text x="84" y="392.0" font-size="12.5" fill="#007AFF" font-weight="600">← Projects: folders, repos and people <tspan fill="#8A9099">#4250 · 11 of 16</tspan></text>
+  <path d="M40 540.0 L400 540.0" stroke="#FF2D55" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M400 540.0 C420 540.0 410 470.0 430 470.0" stroke="#FF2D55" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <circle cx="430" cy="470.0" r="6" fill="#FF2D55"/>
+  <circle cx="160" cy="540.0" r="4.5" fill="#FF2D55"/>
+  <circle cx="240" cy="540.0" r="4.5" fill="#FF2D55"/>
+  <circle cx="340" cy="540.0" r="4.5" fill="#FF2D55"/>
+  <circle cx="400" cy="540.0" r="4.5" fill="#FF2D55"/>
+  <text x="84" y="532.0" font-size="12.5" fill="#FF2D55" font-weight="600">← more git hosts <tspan fill="#8A9099">#3606 · 46 of 47</tspan></text>
+  <path d="M40 610.0 L540 610.0" stroke="#5856D6" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <circle cx="180" cy="610.0" r="4.5" fill="#5856D6"/>
+  <path d="M540 610.0 L580 610.0" stroke="#5856D6" stroke-width="2" fill="none" stroke-linecap="round" stroke-dasharray="5 5"/>
+  <rect x="584" y="599.0" width="120" height="22" rx="11" fill="#FF9500"/>
+  <text x="644" y="614.0" font-size="11.5" fill="#FFF" font-weight="600" text-anchor="middle">3 wait for Alex</text>
+  <text x="84" y="602.0" font-size="12.5" fill="#5856D6" font-weight="600">← every integration on a real account <tspan fill="#8A9099">#3420 · 2 of 16</tspan></text>
+  <path d="M160 470.0 C180 470.0 170 680.0 190 680.0 L540 680.0" stroke="#FF9500" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <circle cx="270" cy="680.0" r="4.5" fill="#FF9500"/>
+  <circle cx="390" cy="680.0" r="4.5" fill="#FF9500"/>
+  <circle cx="500" cy="680.0" r="4.5" fill="#FF9500"/>
+  <rect x="800" y="674.0" width="140" height="12" rx="6" fill="#FF9500" fill-opacity="0.15"/>
+  <path d="M540 680.0 L860 680.0 C880 680.0 870 470.0 890 470.0" stroke="#FF9500" stroke-width="2" fill="none" stroke-linecap="round" stroke-dasharray="5 5"/>
+  <circle cx="700.0" cy="680.0" r="4.5" fill="#FFFFFF" stroke="#FF9500" stroke-width="2"/>
+  <circle cx="890" cy="470.0" r="6" fill="#FFFFFF" stroke="#FF9500" stroke-width="2.5"/>
+  <text x="194" y="672.0" font-size="12.5" fill="#FF9500" font-weight="600">full autonomy <tspan fill="#8A9099">#3905 · 16 of 21</tspan></text>
+  <path d="M540 190L540 750" stroke="#FF3B30" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <rect x="512" y="754" width="56" height="20" rx="10" fill="#FF3B30"/>
+  <text x="540" y="768" font-size="11" fill="#FFF" font-weight="600" text-anchor="middle">2:40 pm</text>
+  <text x="90" y="768" font-size="11.5" fill="#8A9099" text-anchor="middle">6 am</text>
+  <text x="190" y="768" font-size="11.5" fill="#8A9099" text-anchor="middle">8 am</text>
+  <text x="290" y="768" font-size="11.5" fill="#8A9099" text-anchor="middle">10 am</text>
+  <text x="390" y="768" font-size="11.5" fill="#8A9099" text-anchor="middle">12 pm</text>
+  <text x="490" y="768" font-size="11.5" fill="#8A9099" text-anchor="middle">2 pm</text>
+  <text x="590" y="768" font-size="11.5" fill="#8A9099" text-anchor="middle">4 pm</text>
+  <text x="690" y="768" font-size="11.5" fill="#8A9099" text-anchor="middle">6 pm</text>
+  <text x="790" y="768" font-size="11.5" fill="#8A9099" text-anchor="middle">8 pm</text>
+  <text x="890" y="768" font-size="11.5" fill="#8A9099" text-anchor="middle">10 pm</text>
+  <rect x="740" y="488.0" width="340" height="82" rx="8" fill="#FFFFFF" stroke="#E0E3E7" stroke-width="1"/>
+  <use href="#epic" x="752" y="500.0" width="16" height="16" color="#1A7F37"/>
+  <text x="776" y="513.0" font-size="13" fill="#1C1D20" font-weight="600">Projects: folders, repos and people</text>
+  <rect x="776" y="522.0" width="34.0" height="18" rx="9" fill="#3E4B9E" fill-opacity="0.14"/>
+  <rect x="776" y="522.0" width="34.0" height="18" rx="9" fill="none" stroke="#3E4B9E" stroke-width="0.8"/>
+  <text x="782" y="535.0" font-size="11" fill="#222956" font-weight="500">epic</text>
+  <rect x="816" y="522.0" width="100.0" height="18" rx="9" fill="#1D76DB" fill-opacity="0.14"/>
+  <rect x="816" y="522.0" width="100.0" height="18" rx="9" fill="none" stroke="#1D76DB" stroke-width="0.8"/>
+  <text x="822" y="535.0" font-size="11" fill="#0F4078" font-weight="500">feature:projects</text>
+  <text x="776" y="558.0" font-size="11.5" fill="#5B616B">#4250 · 11 of 16 · closes about 5 pm · 3–9 pm, 8 in 10</text>
+  <circle cx="1090" cy="500" r="9" fill="#B35900"/>
+  <text x="1090" y="504" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">33</text>
+  <circle cx="510" cy="492" r="9" fill="#B35900"/>
+  <text x="510" y="496" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">34</text>
+  <circle cx="730" cy="610" r="9" fill="#B35900"/>
+  <text x="730" y="614" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">35</text>
+  <path d="M0 806L1180 806" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <circle cx="46" cy="834" r="5" fill="#0A6CDB"/>
+  <text x="72" y="838" font-size="12.5" fill="#5B616B">Issue closed</text>
+  <circle cx="236" cy="834" r="5" fill="#FFF" stroke="#0A6CDB" stroke-width="2"/>
+  <text x="262" y="838" font-size="12.5" fill="#5B616B">Forecast</text>
+  <rect x="420" y="828" width="24" height="12" rx="6" fill="#0A6CDB" fill-opacity="0.15"/>
+  <text x="452" y="838" font-size="12.5" fill="#5B616B">8 times in 10</text>
+  <circle cx="616" cy="834" r="6" fill="#FFF" stroke="#1C1D20" stroke-width="2.5"/>
+  <text x="642" y="838" font-size="12.5" fill="#5B616B">Release</text>
+  <path d="M806 824L806 844" stroke="#FF3B30" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <text x="832" y="838" font-size="12.5" fill="#5B616B">Now</text>
+  </g>
+  <g transform="translate(1250,88)" filter="url(#shadow)">
+  <rect x="-12" y="-12" width="414" height="868" rx="54" fill="#1C1D20"/>
+  <rect x="0" y="0" width="390" height="844" rx="44" fill="#FFFFFF"/>
+  <rect x="133.0" y="11" width="124" height="36" rx="18" fill="#1C1D20"/>
+  <text x="34" y="34" font-size="15" fill="#1C1D20" font-weight="600">9:41</text>
+  <rect x="0" y="50" width="390" height="44" rx="0" fill="#F6F7F8"/>
+  <text x="16" y="77" font-size="15" fill="#1C1D20" font-weight="600">☰  Agents</text>
+  <use href="#refresh" x="352" y="64" width="18" height="18" color="#4A5059"/>
+  <text x="20" y="132" font-size="28" fill="#1C1D20" font-weight="700">Timeline</text>
+  <circle cx="150" cy="122" r="9" fill="#B35900"/>
+  <text x="150" y="126" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">36</text>
+  <rect x="16" y="148" width="131.5" height="30" rx="15" fill="#DCEBFC"/>
+  <text x="28" y="168" font-size="13" fill="#0A6CDB" font-weight="500">Project: Agents</text>
+  <use href="#chev" x="127.5" y="158" width="10" height="10" color="#0A6CDB"/>
+  <rect x="155.5" y="148" width="73.0" height="30" rx="15" fill="#EEF0F3"/>
+  <text x="167.5" y="168" font-size="13" fill="#1C1D20">2 Days</text>
+  <use href="#chev" x="208.5" y="158" width="10" height="10" color="#8A9099"/>
+  <rect x="236.5" y="148" width="66.5" height="30" rx="15" fill="#EEF0F3"/>
+  <text x="248.5" y="168" font-size="13" fill="#1C1D20">Board</text>
+  <use href="#chev" x="283.0" y="158" width="10" height="10" color="#8A9099"/>
+  <text x="20" y="208" font-size="11" fill="#FF3B30" font-weight="700">NOW · 2:40 PM</text>
+  <path d="M0 216L390 216" stroke="#FF3B30" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <rect x="16" y="232" width="4" height="62" rx="2" fill="#007AFF"/>
+  <text x="30" y="250" font-size="14" fill="#1C1D20" font-weight="600">Projects: folders, repos and peop…</text>
+  <rect x="30" y="260" width="200" height="6" rx="3.0" fill="#E0E3E7"/>
+  <rect x="30" y="260" width="137.5" height="6" rx="3.0" fill="#007AFF"/>
+  <text x="240" y="267" font-size="12" fill="#5B616B">11 of 16</text>
+  <text x="30" y="288" font-size="12" fill="#5B616B">#4250 · closes about 5 pm · 3–9 pm</text>
+  <path d="M16 302L374 302" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <rect x="16" y="312" width="4" height="62" rx="2" fill="#AF52DE"/>
+  <text x="30" y="330" font-size="14" fill="#1C1D20" font-weight="600">Work look: the look of every Work…</text>
+  <rect x="30" y="340" width="200" height="6" rx="3.0" fill="#E0E3E7"/>
+  <rect x="30" y="340" width="111.11111111111111" height="6" rx="3.0" fill="#AF52DE"/>
+  <text x="240" y="347" font-size="12" fill="#5B616B">5 of 9</text>
+  <text x="30" y="368" font-size="12" fill="#5B616B">#4327 · closes about 6 pm · 4–11 pm</text>
+  <path d="M16 382L374 382" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <rect x="16" y="392" width="4" height="62" rx="2" fill="#34C759"/>
+  <text x="30" y="410" font-size="14" fill="#1C1D20" font-weight="600">forge interface</text>
+  <rect x="30" y="420" width="200" height="6" rx="3.0" fill="#E0E3E7"/>
+  <rect x="30" y="420" width="66.66666666666666" height="6" rx="3.0" fill="#34C759"/>
+  <text x="240" y="427" font-size="12" fill="#5B616B">2 of 6</text>
+  <text x="30" y="448" font-size="12" fill="#5B616B">#4352 · closes about 9 pm · tonight–tomorrow</text>
+  <path d="M16 462L374 462" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <rect x="16" y="472" width="4" height="62" rx="2" fill="#FF9500"/>
+  <text x="30" y="490" font-size="14" fill="#1C1D20" font-weight="600">full autonomy</text>
+  <rect x="30" y="500" width="200" height="6" rx="3.0" fill="#E0E3E7"/>
+  <rect x="30" y="500" width="152.38095238095238" height="6" rx="3.0" fill="#FF9500"/>
+  <text x="240" y="507" font-size="12" fill="#5B616B">16 of 21</text>
+  <text x="30" y="528" font-size="12" fill="#5B616B">#3905 · closes about 11 pm · tomorrow</text>
+  <path d="M16 542L374 542" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <rect x="16" y="552" width="4" height="62" rx="2" fill="#5856D6"/>
+  <text x="30" y="570" font-size="14" fill="#1C1D20" font-weight="600">every integration on a real accou…</text>
+  <rect x="30" y="580" width="200" height="6" rx="3.0" fill="#E0E3E7"/>
+  <rect x="30" y="580" width="25.0" height="6" rx="3.0" fill="#5856D6"/>
+  <text x="240" y="587" font-size="12" fill="#5B616B">2 of 16</text>
+  <text x="30" y="608" font-size="12" fill="#5B616B">#3420 · <tspan fill="#C25E00">3 wait for Alex</tspan></text>
+  <path d="M16 622L374 622" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <rect x="16" y="632" width="4" height="62" rx="2" fill="#FF2D55"/>
+  <text x="30" y="650" font-size="14" fill="#1C1D20" font-weight="600">more git hosts</text>
+  <rect x="30" y="660" width="200" height="6" rx="3.0" fill="#E0E3E7"/>
+  <rect x="30" y="660" width="195.74468085106383" height="6" rx="3.0" fill="#FF2D55"/>
+  <text x="240" y="667" font-size="12" fill="#5B616B">46 of 47</text>
+  <text x="30" y="688" font-size="12" fill="#5B616B">#3606 · joined 9:40 am</text>
+  <path d="M16 702L374 702" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <text x="20" y="732" font-size="12" fill="#8A9099">Under 700 px the plot is a list of the epics, in the</text>
+  <text x="20" y="750" font-size="12" fill="#8A9099">order they close. A tap opens the epic's Plan.</text>
+  </g>
+</svg>

@@ -1,0 +1,310 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1320" height="1440" viewBox="0 0 1320 1440" font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif">
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#20242A" flood-opacity="0.14"/>
+    </filter>
+    <symbol id="open" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="8" r="2" fill="currentColor"/></symbol>
+    <symbol id="done" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5.3 8.2l1.8 1.8 3.6-3.8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="notplanned" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M4 12L12 4" stroke="currentColor" stroke-width="1.4"/></symbol>
+    <symbol id="pr" viewBox="0 0 16 16"><circle cx="4" cy="3.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="4" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="12" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M4 5.1v5.8M12 10.9V6.5a2 2 0 0 0-2-2H7.5M9 3l-1.6 1.5L9 6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="tag" viewBox="0 0 16 16"><path d="M2.5 2.5h5.5l5.5 5.5-5.5 5.5-5.5-5.5z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="5.5" cy="5.5" r="1" fill="currentColor"/></symbol>
+    <symbol id="flag" viewBox="0 0 16 16"><path d="M3.5 14V2.5M3.5 3h8.5l-2 3 2 3H3.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="gear" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.2" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M3.6 12.4L5 11M11 5l1.4-1.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="warn" viewBox="0 0 16 16"><path d="M8 2.2L14.3 13.5H1.7z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M8 6.5v3.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="11.6" r=".8" fill="currentColor"/></symbol>
+    <symbol id="refresh" viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v2.5h-2.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="chev" viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="chevr" viewBox="0 0 10 10"><path d="M3.5 2l3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="up" viewBox="0 0 16 16"><path d="M3.5 10L8 5.5l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="down" viewBox="0 0 16 16"><path d="M3.5 6L8 10.5l4.5-4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="back" viewBox="0 0 16 16"><path d="M10 3L5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="fwd" viewBox="0 0 16 16"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="ext" viewBox="0 0 16 16"><path d="M9 3h4v4M13 3L7.5 8.5M11 9.5V13H3V5h3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="more" viewBox="0 0 16 16"><circle cx="3.5" cy="8" r="1.3" fill="currentColor"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/><circle cx="12.5" cy="8" r="1.3" fill="currentColor"/></symbol>
+    <symbol id="spark" viewBox="0 0 16 16"><path d="M8 2l1.4 4.6L14 8l-4.6 1.4L8 14l-1.4-4.6L2 8l4.6-1.4z" fill="currentColor"/></symbol>
+    <symbol id="doc" viewBox="0 0 16 16"><path d="M4 2h5.5L12.5 5v9H4z M9.5 2v3h3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
+    <symbol id="link" viewBox="0 0 16 16"><path d="M6.5 9.5l3-3M7 4.5l1-1a2.5 2.5 0 0 1 3.5 3.5l-1 1M9 11.5l-1 1A2.5 2.5 0 0 1 4.5 9l1-1" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+    <symbol id="sidebar" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M6 3v10" stroke="currentColor" stroke-width="1.3"/></symbol>
+    <symbol id="tick" viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="cross" viewBox="0 0 16 16"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="dot" viewBox="0 0 16 16"><circle cx="8" cy="8" r="3.5" fill="currentColor"/></symbol>
+    <symbol id="skip" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 8h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+    <symbol id="merged" viewBox="0 0 16 16"><circle cx="4.5" cy="3.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="4.5" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="11.5" cy="8" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M4.5 5.1v5.8M4.5 5.5c0 2.5 2.5 2.5 5.4 2.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="prclosed" viewBox="0 0 16 16"><circle cx="4" cy="3.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="4" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="12" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M4 5.1v5.8M12 10.9V8M10.3 3l3.4 3.4M13.7 3l-3.4 3.4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="files" viewBox="0 0 16 16"><path d="M3.5 2h6l3 3v9h-9z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8 6.5v4M6 8.5h4M6 12h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="eye" viewBox="0 0 16 16"><path d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="8" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.3"/></symbol>
+    <symbol id="commit" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M1.5 8h3.9M10.6 8h3.9" stroke="currentColor" stroke-width="1.4"/></symbol>
+    <symbol id="thread" viewBox="0 0 16 16"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
+    <symbol id="branch" viewBox="0 0 16 16"><circle cx="4.5" cy="3.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="4.5" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="11.5" cy="5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M4.5 5.1v5.8M11.5 6.6c0 3-7 2-7 4.3" fill="none" stroke="currentColor" stroke-width="1.3"/></symbol>
+    <symbol id="clock" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.8" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 4.8V8l2.2 1.6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="image" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="5.5" cy="6.5" r="1.2" fill="currentColor"/><path d="M2.5 12l3.5-3.5 2.5 2.5 2-2 3 3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
+    <symbol id="lines" viewBox="0 0 16 16"><path d="M3 4h10M3 8h10M3 12h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+    <symbol id="bubble" viewBox="0 0 16 16"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></symbol>
+    <symbol id="search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+    <symbol id="spin" viewBox="0 0 16 16"><path d="M8 2a6 6 0 1 1-6 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="check" viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="board" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M6 3v10M10 3v10" stroke="currentColor" stroke-width="1.3"/></symbol>
+    <symbol id="folder" viewBox="0 0 16 16"><path d="M2 4.5h4l1.5 1.5H14v6.5H2z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
+    <symbol id="box" viewBox="0 0 16 16"><path d="M8 1.8l5.6 3v6.4L8 14.2l-5.6-3V4.8z M2.4 4.8L8 7.8l5.6-3M8 7.8v6.4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
+    <symbol id="stream" viewBox="0 0 16 16"><path d="M1.5 11h13M3.5 11c1.5 0 1.5-5 3-5h3c1.5 0 1.5 5 3 5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+    <symbol id="epic" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 2a6 6 0 0 1 6 6H8z" fill="currentColor"/></symbol>
+  </defs>
+  <rect x="0" y="0" width="1320" height="1440" rx="0" fill="#E7EAEE"/>
+  <text x="24" y="34" font-size="15" fill="#1C1D20" font-weight="600">Milestones, Releases and Timeline (#4334): the states, on the Mac window</text>
+  <text x="24" y="54" font-size="12" fill="#5B616B">The Remote and the web page show the same states in their own layout. Numbers match the States table in milestones.md.</text>
+  <g transform="translate(24,76)" filter="url(#shadow)">
+  <rect x="0" y="0" width="410" height="300" rx="10" fill="#FFFFFF"/>
+  <rect x="0" y="0" width="410" height="32" rx="0" fill="#F6F7F8"/>
+  <path d="M0 32L410 32" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <text x="12" y="21" font-size="12" fill="#1C1D20" font-weight="600">Milestones · loading, first read</text>
+  <circle cx="394" cy="16" r="9" fill="#B35900"/>
+  <text x="394" y="20" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">S1</text>
+  <circle cx="24" cy="60" r="8" fill="#E6E8EB"/>
+  <rect x="42" y="52" width="203.50000000000003" height="10" rx="5" fill="#E6E8EB"/>
+  <rect x="42" y="70" width="129.5" height="8" rx="4" fill="#EEF0F2"/>
+  <circle cx="24" cy="106" r="8" fill="#E6E8EB"/>
+  <rect x="42" y="98" width="203.50000000000003" height="10" rx="5" fill="#E6E8EB"/>
+  <rect x="42" y="116" width="129.5" height="8" rx="4" fill="#EEF0F2"/>
+  <circle cx="24" cy="152" r="8" fill="#E6E8EB"/>
+  <rect x="42" y="144" width="203.50000000000003" height="10" rx="5" fill="#E6E8EB"/>
+  <rect x="42" y="162" width="129.5" height="8" rx="4" fill="#EEF0F2"/>
+  <circle cx="24" cy="198" r="8" fill="#E6E8EB"/>
+  <rect x="42" y="190" width="203.50000000000003" height="10" rx="5" fill="#E6E8EB"/>
+  <rect x="42" y="208" width="129.5" height="8" rx="4" fill="#EEF0F2"/>
+  <circle cx="24" cy="244" r="8" fill="#E6E8EB"/>
+  <rect x="42" y="236" width="203.50000000000003" height="10" rx="5" fill="#E6E8EB"/>
+  <rect x="42" y="254" width="129.5" height="8" rx="4" fill="#EEF0F2"/>
+  </g>
+  <g transform="translate(454,76)" filter="url(#shadow)">
+  <rect x="0" y="0" width="410" height="300" rx="10" fill="#FFFFFF"/>
+  <rect x="0" y="0" width="410" height="32" rx="0" fill="#F6F7F8"/>
+  <path d="M0 32L410 32" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <text x="12" y="21" font-size="12" fill="#1C1D20" font-weight="600">Milestones · empty, no filter</text>
+  <circle cx="394" cy="16" r="9" fill="#B35900"/>
+  <text x="394" y="20" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">S2</text>
+  <use href="#flag" x="191.0" y="110" width="28" height="28" color="#8A9099"/>
+  <text x="205.0" y="170" font-size="15" fill="#1C1D20" font-weight="600" text-anchor="middle">No open milestones</text>
+  <text x="205.0" y="192" font-size="12.5" fill="#5B616B" text-anchor="middle">Milestones on alexec/Agents show here.</text>
+  </g>
+  <g transform="translate(884,76)" filter="url(#shadow)">
+  <rect x="0" y="0" width="410" height="300" rx="10" fill="#FFFFFF"/>
+  <rect x="0" y="0" width="410" height="32" rx="0" fill="#F6F7F8"/>
+  <path d="M0 32L410 32" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <text x="12" y="21" font-size="12" fill="#1C1D20" font-weight="600">Milestones · no forge here has milestones</text>
+  <circle cx="394" cy="16" r="9" fill="#B35900"/>
+  <text x="394" y="20" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">S3</text>
+  <use href="#flag" x="191.0" y="90" width="28" height="28" color="#8A9099"/>
+  <text x="205.0" y="150" font-size="15" fill="#1C1D20" font-weight="600" text-anchor="middle">Linear and Jira have no milestones</text>
+  <text x="205.0" y="172" font-size="12.5" fill="#5B616B" text-anchor="middle">Milestones come from GitHub, GitLab, Forgejo</text>
+  <text x="205.0" y="190" font-size="12.5" fill="#5B616B" text-anchor="middle">and Bitbucket repos in your projects.</text>
+  <rect x="120.0" y="210" width="155.2" height="28" rx="6" fill="#FFFFFF" stroke="#C7CCD3" stroke-width="1"/>
+  <text x="132.0" y="228.5" font-size="12.5" fill="#1C1D20" font-weight="500">Settings ▸ Connectors</text>
+  </g>
+  <g transform="translate(24,406)" filter="url(#shadow)">
+  <rect x="0" y="0" width="410" height="300" rx="10" fill="#FFFFFF"/>
+  <rect x="0" y="0" width="410" height="32" rx="0" fill="#F6F7F8"/>
+  <path d="M0 32L410 32" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <text x="12" y="21" font-size="12" fill="#1C1D20" font-weight="600">Milestones · error, with rows</text>
+  <circle cx="394" cy="16" r="9" fill="#B35900"/>
+  <text x="394" y="20" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">S4</text>
+  <rect x="12" y="44" width="386" height="36" rx="6" fill="#FFF4E5" stroke="#F0C27A" stroke-width="1"/>
+  <use href="#warn" x="22" y="54" width="16" height="16" color="#9A6700"/>
+  <text x="44" y="67" font-size="12.5" fill="#1C1D20">GitHub said 401 Bad credentials</text>
+  <text x="386" y="67" font-size="12.5" fill="#0A6CDB" font-weight="500" text-anchor="end">Try again</text>
+  <g opacity="0.45">
+  <use href="#flag" x="12" y="104" width="16" height="16" color="#1A7F37"/>
+  <text x="38" y="117" font-size="14" fill="#1C1D20" font-weight="600">Projects</text>
+  <text x="107.6" y="117" font-size="12.5" fill="#8A9099"></text>
+  <rect x="190" y="110" width="140" height="6" rx="3.0" fill="#E0E3E7"/>
+  <rect x="190" y="110" width="100.625" height="6" rx="3.0" fill="#1A7F37"/>
+  <text x="394" y="117" font-size="12.5" fill="#5B616B" font-weight="600" text-anchor="end">72%</text>
+  <text x="38" y="138" font-size="12" fill="#5B616B"><tspan fill="#5B616B">Due Fri 14 Nov</tspan> · 18 open · 46 closed · <tspan fill="#C2410C">✦</tspan> $41.20</text>
+  <path d="M0 154L410 154" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <use href="#flag" x="12" y="166" width="16" height="16" color="#1A7F37"/>
+  <text x="38" y="179" font-size="14" fill="#1C1D20" font-weight="600">Channels</text>
+  <text x="107.6" y="179" font-size="12.5" fill="#8A9099"></text>
+  <rect x="190" y="172" width="140" height="6" rx="3.0" fill="#E0E3E7"/>
+  <rect x="190" y="172" width="40.645161290322584" height="6" rx="3.0" fill="#1A7F37"/>
+  <text x="394" y="179" font-size="12.5" fill="#5B616B" font-weight="600" text-anchor="end">29%</text>
+  <text x="38" y="200" font-size="12" fill="#5B616B"><tspan fill="#5B616B">Due Fri 21 Nov</tspan> · 22 open · 9 closed · <tspan fill="#C2410C">✦</tspan> $8.10</text>
+  <path d="M0 216L410 216" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <use href="#flag" x="12" y="228" width="16" height="16" color="#1A7F37"/>
+  <text x="38" y="241" font-size="14" fill="#1C1D20" font-weight="600">Runtime assessments</text>
+  <text x="192.3" y="241" font-size="12.5" fill="#8A9099"></text>
+  <rect x="190" y="234" width="140" height="6" rx="3.0" fill="#E0E3E7"/>
+  <rect x="190" y="234" width="31.11111111111111" height="6" rx="3.0" fill="#1A7F37"/>
+  <text x="394" y="241" font-size="12.5" fill="#5B616B" font-weight="600" text-anchor="end">22%</text>
+  <text x="38" y="262" font-size="12" fill="#5B616B"><tspan fill="#5B616B">Due Fri 28 Nov</tspan> · 7 open · 2 closed · <tspan fill="#C2410C">✦</tspan> $1.90</text>
+  <path d="M0 278L410 278" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  </g>
+  </g>
+  <g transform="translate(454,406)" filter="url(#shadow)">
+  <rect x="0" y="0" width="410" height="300" rx="10" fill="#FFFFFF"/>
+  <rect x="0" y="0" width="410" height="32" rx="0" fill="#F6F7F8"/>
+  <path d="M0 32L410 32" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <text x="12" y="21" font-size="12" fill="#1C1D20" font-weight="600">Milestones · past due, no due date, closed</text>
+  <circle cx="394" cy="16" r="9" fill="#B35900"/>
+  <text x="394" y="20" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">S5</text>
+  <use href="#flag" x="12" y="52" width="16" height="16" color="#1A7F37"/>
+  <text x="38" y="65" font-size="14" fill="#1C1D20" font-weight="600">Lineage and value</text>
+  <text x="176.9" y="65" font-size="12.5" fill="#8A9099"></text>
+  <rect x="190" y="58" width="140" height="6" rx="3.0" fill="#E0E3E7"/>
+  <rect x="190" y="58" width="136.58536585365854" height="6" rx="3.0" fill="#1A7F37"/>
+  <text x="394" y="65" font-size="12.5" fill="#5B616B" font-weight="600" text-anchor="end">98%</text>
+  <text x="38" y="86" font-size="12" fill="#5B616B"><tspan fill="#CF222E">Past due by 2 days</tspan> · 1 open · 40 closed · <tspan fill="#C2410C">✦</tspan> $63.75</text>
+  <path d="M0 102L410 102" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <use href="#flag" x="12" y="114" width="16" height="16" color="#1A7F37"/>
+  <text x="38" y="127" font-size="14" fill="#1C1D20" font-weight="600">1.0 Public release</text>
+  <text x="184.6" y="127" font-size="12.5" fill="#8A9099"></text>
+  <rect x="190" y="120" width="140" height="6" rx="3.0" fill="#E0E3E7"/>
+  <rect x="190" y="120" width="39.06976744186046" height="6" rx="3.0" fill="#1A7F37"/>
+  <text x="394" y="127" font-size="12.5" fill="#5B616B" font-weight="600" text-anchor="end">28%</text>
+  <text x="38" y="148" font-size="12" fill="#5B616B"><tspan fill="#8A9099">No due date</tspan> · 31 open · 12 closed · <tspan fill="#C2410C">✦</tspan> $12.40</text>
+  <path d="M0 164L410 164" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <use href="#flag" x="12" y="176" width="16" height="16" color="#8250DF"/>
+  <text x="38" y="189" font-size="14" fill="#1C1D20" font-weight="600">Voice mode</text>
+  <text x="123.0" y="189" font-size="12.5" fill="#8A9099"></text>
+  <rect x="190" y="182" width="140" height="6" rx="3.0" fill="#E0E3E7"/>
+  <rect x="190" y="182" width="140.0" height="6" rx="3.0" fill="#8250DF"/>
+  <text x="394" y="189" font-size="12.5" fill="#5B616B" font-weight="600" text-anchor="end">100%</text>
+  <text x="38" y="210" font-size="12" fill="#5B616B"><tspan fill="#5B616B">Closed 3 d ago</tspan> · 0 open · 38 closed · <tspan fill="#C2410C">✦</tspan> $51.10</text>
+  <path d="M0 226L410 226" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <text x="12" y="254" font-size="12" fill="#8A9099">State: All shows open and closed together;</text>
+  <text x="12" y="272" font-size="12" fill="#8A9099">a closed one has the purple flag and bar.</text>
+  </g>
+  <g transform="translate(884,406)" filter="url(#shadow)">
+  <rect x="0" y="0" width="410" height="300" rx="10" fill="#FFFFFF"/>
+  <rect x="0" y="0" width="410" height="32" rx="0" fill="#F6F7F8"/>
+  <path d="M0 32L410 32" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <text x="12" y="21" font-size="12" fill="#1C1D20" font-weight="600">Milestone page · closed</text>
+  <circle cx="394" cy="16" r="9" fill="#B35900"/>
+  <text x="394" y="20" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">S6</text>
+  <text x="16" y="66" font-size="17" fill="#1C1D20" font-weight="600">Auto runtime and voice mode</text>
+  <rect x="16" y="78" width="77.2" height="24" rx="12" fill="#8250DF"/>
+  <use href="#flag" x="24" y="83" width="14" height="14" color="#FFF"/>
+  <text x="42" y="94.5" font-size="12.5" fill="#FFF" font-weight="600">Closed</text>
+  <text x="103.2" y="95" font-size="12.5" fill="#5B616B">Closed 3 d ago · 38 closed</text>
+  <rect x="16" y="116" width="378" height="8" rx="4.0" fill="#E0E3E7"/>
+  <rect x="16" y="116" width="378" height="8" rx="4.0" fill="#8250DF"/>
+  <text x="16" y="150" font-size="12.5" fill="#5B616B">Finished in 0.40.0</text>
+  <use href="#done" x="28" y="171" width="16" height="16" color="#8250DF"/>
+  <text x="54" y="184" font-size="13.5" fill="#1C1D20" font-weight="600">Voice mode: push to talk</text>
+  <text x="54" y="204" font-size="12" fill="#5B616B">#3840 · closed 4 d ago · $3.20</text>
+  <path d="M16 218L394 218" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <use href="#notplanned" x="28" y="229" width="16" height="16" color="#6E7781"/>
+  <text x="54" y="242" font-size="13.5" fill="#1C1D20" font-weight="600">Voice mode on the Remote</text>
+  <text x="54" y="262" font-size="12" fill="#5B616B">#3851 · closed 5 d ago · not planned</text>
+  <path d="M16 276L394 276" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  </g>
+  <g transform="translate(24,736)" filter="url(#shadow)">
+  <rect x="0" y="0" width="410" height="300" rx="10" fill="#FFFFFF"/>
+  <rect x="0" y="0" width="410" height="32" rx="0" fill="#F6F7F8"/>
+  <path d="M0 32L410 32" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <text x="12" y="21" font-size="12" fill="#1C1D20" font-weight="600">Releases · draft, pre-release, latest</text>
+  <circle cx="394" cy="16" r="9" fill="#B35900"/>
+  <text x="394" y="20" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">S7</text>
+  <use href="#box" x="12" y="52" width="16" height="16" color="#6E7781"/>
+  <text x="38" y="65" font-size="14" fill="#1C1D20" font-weight="600">0.43.0</text>
+  <rect x="92.2" y="52" width="39.5" height="18" rx="9" fill="#6E7781" fill-opacity="0.14"/>
+  <rect x="92.2" y="52" width="39.5" height="18" rx="9" fill="none" stroke="#6E7781" stroke-width="0.8"/>
+  <text x="98.2" y="65" font-size="11" fill="#3C4146" font-weight="500">Draft</text>
+  <text x="38" y="86" font-size="12" fill="#5B616B"><tspan font-family="SF Mono, Menlo, monospace">v0.43.0</tspan> · draft · saved 30 min ago · 6 pull requests · <tspan fill="#C2410C">✦</tspan> $3.10</text>
+  <text x="394" y="68" font-size="12.5" fill="#8A9099" text-anchor="end">Not published</text>
+  <path d="M0 102L410 102" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <use href="#box" x="12" y="114" width="16" height="16" color="#1C1D20"/>
+  <text x="38" y="127" font-size="14" fill="#1C1D20" font-weight="600">0.40.0-rc.1</text>
+  <rect x="130.7" y="114" width="72.5" height="18" rx="9" fill="#9A6700" fill-opacity="0.14"/>
+  <rect x="130.7" y="114" width="72.5" height="18" rx="9" fill="none" stroke="#9A6700" stroke-width="0.8"/>
+  <text x="136.7" y="127" font-size="11" fill="#543800" font-weight="500">Pre-release</text>
+  <text x="38" y="148" font-size="12" fill="#5B616B"><tspan font-family="SF Mono, Menlo, monospace">v0.40.0-rc.1</tspan> · released 3 d ago · 4 pull requests · <tspan fill="#C2410C">✦</tspan> $1.20</text>
+  <path d="M0 164L410 164" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <use href="#box" x="12" y="176" width="16" height="16" color="#1C1D20"/>
+  <text x="38" y="189" font-size="14" fill="#1C1D20" font-weight="600">0.42.0</text>
+  <rect x="92.2" y="176" width="45.0" height="18" rx="9" fill="#1A7F37" fill-opacity="0.14"/>
+  <rect x="92.2" y="176" width="45.0" height="18" rx="9" fill="none" stroke="#1A7F37" stroke-width="0.8"/>
+  <text x="98.2" y="189" font-size="11" fill="#0E451E" font-weight="500">Latest</text>
+  <text x="38" y="210" font-size="12" fill="#5B616B"><tspan font-family="SF Mono, Menlo, monospace">v0.42.0</tspan> · released 2 h ago · 23 pull requests · <tspan fill="#C2410C">✦</tspan> $18.40</text>
+  <use href="#tick" x="300" y="180" width="14" height="14" color="#1A7F37"/>
+  <text x="394" y="192" font-size="12.5" fill="#5B616B" text-anchor="end">TestFlight</text>
+  <path d="M0 226L410 226" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <text x="12" y="254" font-size="12" fill="#8A9099">A draft shows only to a machine that can write</text>
+  <text x="12" y="272" font-size="12" fill="#8A9099">to the repo; it is first, before the newest.</text>
+  </g>
+  <g transform="translate(454,736)" filter="url(#shadow)">
+  <rect x="0" y="0" width="410" height="300" rx="10" fill="#FFFFFF"/>
+  <rect x="0" y="0" width="410" height="32" rx="0" fill="#F6F7F8"/>
+  <path d="M0 32L410 32" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <text x="12" y="21" font-size="12" fill="#1C1D20" font-weight="600">Release page · no notes, pipeline running</text>
+  <circle cx="394" cy="16" r="9" fill="#B35900"/>
+  <text x="394" y="20" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">S8</text>
+  <text x="16" y="66" font-size="17" fill="#1C1D20" font-weight="600">0.43.0</text>
+  <rect x="84" y="52" width="72.5" height="18" rx="9" fill="#9A6700" fill-opacity="0.14"/>
+  <rect x="84" y="52" width="72.5" height="18" rx="9" fill="none" stroke="#9A6700" stroke-width="0.8"/>
+  <text x="90" y="65" font-size="11" fill="#543800" font-weight="500">Pre-release</text>
+  <text x="16" y="92" font-size="12.5" fill="#5B616B">alexec released this 5 min ago · 6 pull requests</text>
+  <rect x="16" y="106" width="378" height="54" rx="6" fill="#F6F7F8"/>
+  <text x="205.0" y="138" font-size="12.5" fill="#8A9099" text-anchor="middle">No release notes.</text>
+  <text x="16" y="186" font-size="12" fill="#5B616B" font-weight="600">Pipeline</text>
+  <use href="#dot" x="16" y="196" width="14" height="14" color="#9A6700"/>
+  <text x="36" y="208" font-size="12.5" fill="#1C1D20">CI run · running 6m</text>
+  <use href="#dot" x="16" y="218" width="14" height="14" color="#8A9099"/>
+  <text x="36" y="230" font-size="12.5" fill="#5B616B">TestFlight · waits for the CI run</text>
+  </g>
+  <g transform="translate(884,736)" filter="url(#shadow)">
+  <rect x="0" y="0" width="410" height="300" rx="10" fill="#FFFFFF"/>
+  <rect x="0" y="0" width="410" height="32" rx="0" fill="#F6F7F8"/>
+  <path d="M0 32L410 32" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <text x="12" y="21" font-size="12" fill="#1C1D20" font-weight="600">Releases · empty</text>
+  <circle cx="394" cy="16" r="9" fill="#B35900"/>
+  <text x="394" y="20" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">S9</text>
+  <use href="#box" x="191.0" y="100" width="28" height="28" color="#8A9099"/>
+  <text x="205.0" y="160" font-size="15" fill="#1C1D20" font-weight="600" text-anchor="middle">No releases yet</text>
+  <text x="205.0" y="182" font-size="12.5" fill="#5B616B" text-anchor="middle">A tag with a release on alexec/Agents shows here.</text>
+  </g>
+  <g transform="translate(24,1066)" filter="url(#shadow)">
+  <rect x="0" y="0" width="410" height="300" rx="10" fill="#FFFFFF"/>
+  <rect x="0" y="0" width="410" height="32" rx="0" fill="#F6F7F8"/>
+  <path d="M0 32L410 32" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <text x="12" y="21" font-size="12" fill="#1C1D20" font-weight="600">Timeline · loading</text>
+  <circle cx="394" cy="16" r="12" fill="#B35900"/>
+  <text x="394" y="20" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">S10</text>
+  <path d="M16 166L394 166" stroke="#E6E8EB" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <rect x="60" y="76" width="240" height="8" rx="4" fill="#E6E8EB"/>
+  <rect x="30" y="116" width="210" height="8" rx="4" fill="#E6E8EB"/>
+  <rect x="100" y="206" width="280" height="8" rx="4" fill="#E6E8EB"/>
+  <rect x="40" y="246" width="160" height="8" rx="4" fill="#E6E8EB"/>
+  <path d="M260 40L260 290" stroke="#FF3B30" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <text x="205.0" y="290" font-size="11.5" fill="#8A9099" text-anchor="middle">The lanes shimmer; Now is drawn at once.</text>
+  </g>
+  <g transform="translate(454,1066)" filter="url(#shadow)">
+  <rect x="0" y="0" width="410" height="300" rx="10" fill="#FFFFFF"/>
+  <rect x="0" y="0" width="410" height="32" rx="0" fill="#F6F7F8"/>
+  <path d="M0 32L410 32" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <text x="12" y="21" font-size="12" fill="#1C1D20" font-weight="600">Timeline · no epic in these 2 days</text>
+  <circle cx="394" cy="16" r="12" fill="#B35900"/>
+  <text x="394" y="20" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">S11</text>
+  <path d="M16 166L394 166" stroke="#B8BDC4" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <path d="M205.0 40L205.0 290" stroke="#FF3B30" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <rect x="60" y="92" width="290" height="56" rx="8" fill="#FFFFFF" stroke="#E0E3E7" stroke-width="1"/>
+  <text x="205.0" y="114" font-size="13.5" fill="#1C1D20" font-weight="600" text-anchor="middle">No epic in these 2 days</text>
+  <text x="205.0" y="134" font-size="12" fill="#5B616B" text-anchor="middle">The last one joined 4 d ago.</text>
+  <rect x="129.0" y="196" width="105.2" height="28" rx="6" fill="#FFFFFF" stroke="#C7CCD3" stroke-width="1"/>
+  <text x="141.0" y="214.5" font-size="12.5" fill="#1C1D20" font-weight="500">Show the week</text>
+  </g>
+  <g transform="translate(884,1066)" filter="url(#shadow)">
+  <rect x="0" y="0" width="410" height="300" rx="10" fill="#FFFFFF"/>
+  <rect x="0" y="0" width="410" height="32" rx="0" fill="#F6F7F8"/>
+  <path d="M0 32L410 32" stroke="#E0E3E7" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <text x="12" y="21" font-size="12" fill="#1C1D20" font-weight="600">Timeline · no project, or an error</text>
+  <circle cx="394" cy="16" r="12" fill="#B35900"/>
+  <text x="394" y="20" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">S12</text>
+  <use href="#stream" x="191.0" y="60" width="28" height="28" color="#8A9099"/>
+  <text x="205.0" y="116" font-size="15" fill="#1C1D20" font-weight="600" text-anchor="middle">No project to draw</text>
+  <text x="205.0" y="138" font-size="12.5" fill="#5B616B" text-anchor="middle">The Timeline draws a project's epics. Add a</text>
+  <text x="205.0" y="156" font-size="12.5" fill="#5B616B" text-anchor="middle">folder to a project in Settings ▸ Projects.</text>
+  <rect x="12" y="196" width="386" height="36" rx="6" fill="#FFF4E5" stroke="#F0C27A" stroke-width="1"/>
+  <use href="#warn" x="22" y="206" width="16" height="16" color="#9A6700"/>
+  <text x="44" y="219" font-size="12.5" fill="#1C1D20">MacBook: work/timeline timed out</text>
+  <text x="386" y="219" font-size="12.5" fill="#0A6CDB" font-weight="500" text-anchor="end">Try again</text>
+  <text x="205.0" y="260" font-size="11.5" fill="#8A9099" text-anchor="middle">An error: the strip over the last plot, dimmed.</text>
+  </g>
+</svg>
