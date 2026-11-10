@@ -87,9 +87,17 @@ func TestTheFrontOffersTheEventAndTools(t *testing.T) {
 	for _, tl := range tools {
 		names = append(names, tl.(map[string]any)["name"].(string))
 	}
-	want := []string{"list_folders", "list_messages", "mark_read", "move_message", "read_message", "search_messages", "show_mail"}
+	want := []string{"list_conversations", "list_folders", "list_messages", "mark_read", "move_message", "read_message", "read_messages",
+		"search_messages", "show_mail"}
 	if !reflect.DeepEqual(names, want) {
 		t.Fatalf("tools: %v", names)
+	}
+	for _, tl := range tools {
+		meta, _ := tl.(map[string]any)["_meta"].(map[string]any)
+		name := tl.(map[string]any)["name"].(string)
+		if follows := meta[ContractMeta] == float64(ContractVersion); follows != (name == "list_conversations" || name == "read_messages") {
+			t.Fatalf("%s's _meta: %v", name, meta)
+		}
 	}
 	for _, name := range names {
 		if strings.Contains(name, "send") || strings.Contains(name, "reply") || strings.Contains(name, "delete") {
@@ -102,6 +110,35 @@ func TestTheFrontOffersTheEventAndTools(t *testing.T) {
 		t.Fatalf("list_messages: %v", listedMessages)
 	}
 	id := listedMessages[0].(map[string]any)["id"].(string)
+
+	conversations := tool(20, "list_conversations", map[string]any{})["structuredContent"].(map[string]any)
+	list := conversations["conversations"].([]any)
+	if len(list) != 1 || conversations["cursor"] != nil {
+		t.Fatalf("list_conversations: %v", conversations)
+	}
+	conv := list[0].(map[string]any)
+	if conv["source"] != "email" || conv["kind"] != "thread" || conv["title"] != "Your sign-in code" || conv["unread"] != float64(1) ||
+		conv["lastActivity"] != "2026-10-20T09:30:00Z" {
+		t.Fatalf("a conversation: %v", conv)
+	}
+	thread := tool(21, "read_messages", map[string]any{"conversation": conv["id"]})
+	got := thread["structuredContent"].(map[string]any)
+	msgs := got["messages"].([]any)
+	if got["untrusted"] != true || got["conversation"] != conv["id"] || len(msgs) != 1 {
+		t.Fatalf("read_messages: %v", got)
+	}
+	msg := msgs[0].(map[string]any)
+	sender := msg["sender"].(map[string]any)
+	if msg["id"] != id || !strings.HasPrefix(msg["text"].(string), "Your code is 482913.") || msg["time"] != "2026-10-20T09:30:00Z" ||
+		sender["channel"] != "email" || sender["identity"] != "gitlab@mg.gitlab.com" || sender["name"] != "GitLab" ||
+		sender["dkim"].(map[string]any)["result"] != "none" {
+		t.Fatalf("a message: %v", msg)
+	}
+	if text := thread["content"].([]any)[0].(map[string]any)["text"].(string); strings.Count(text, "</untrusted-content>") != 1 ||
+		!strings.Contains(text, Untrusted+"\n<untrusted-content source=\"email\"") {
+		t.Fatalf("read_messages text:\n%s", text)
+	}
+
 	read := tool(6, "read_message", map[string]any{"id": id})
 	body := read["structuredContent"].(map[string]any)["body"].(map[string]any)
 	if body["untrusted"] != true || body["source"] != "email" || !strings.HasPrefix(body["text"].(string), "Your code is 482913.") {
