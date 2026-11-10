@@ -200,7 +200,8 @@ func TestTheFrontOffersTheEventsAndTools(t *testing.T) {
 	defer cancel()
 	f := newFakeGoogle(t)
 	g := f.google()
-	front := &Front{Events: &Events{Inbox: NewInbox(g, nil), Context: ctx}, Upstream: NewServer("test", g), Version: "test",
+	ev := &Events{Inbox: NewInbox(g, nil), Context: ctx}
+	front := &Front{Events: ev, Upstream: NewServer("test", ev), Version: "test",
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
 	clientIn, frontOut := io.Pipe()
 	frontIn, clientOut := io.Pipe()
@@ -261,7 +262,7 @@ func TestTheFrontOffersTheEventsAndTools(t *testing.T) {
 	for _, tl := range tools {
 		names = append(names, tl.(map[string]any)["name"].(string))
 	}
-	if want := []string{"ask_question", "list_spaces", "send_message"}; !reflect.DeepEqual(names, want) {
+	if want := []string{"ask_question", "list_conversations", "list_spaces", "read_messages", "send_message"}; !reflect.DeepEqual(names, want) {
 		t.Fatalf("tools: %v", names)
 	}
 

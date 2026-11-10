@@ -8,13 +8,17 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	chat "google.golang.org/api/chat/v1"
 )
 
 // The inbox (#1016): what the app was sent, pulled from its Pub/Sub subscription by one loop
 // and kept in order, so that every events/poll, each with its own cursor, reads the same
 // list. Pub/Sub is a queue, not a log: a message is acknowledged once it is in the inbox, and
-// the inbox keeps the newest maxKept for keptFor. The loop starts at the first poll, so a
-// server no workflow listens to leaves the subscription alone.
+// the inbox keeps the newest maxKept for keptFor. The loop starts at the first poll, or the
+// first read of a conversation, so a server nobody listens to or reads leaves the subscription
+// alone. The inbox is also the bounded store that read_messages pages when the Chat API does
+// not let the app read a space (#4342): what people sent the app, and what the app posted.
 
 const (
 	maxKept  = 1000
@@ -30,6 +34,9 @@ const (
 	Message Kind = "message"
 	// Answer: a person pressed an option on a question the app asked (ask_question).
 	Answer Kind = "answer"
+	// Sent: the app posted a message (send_message, ask_question). It is no event: it is kept
+	// so that a conversation read from the inbox has both sides.
+	Sent Kind = "sent"
 )
 
 // Person is who did it, as the Chat API names them.
@@ -301,6 +308,73 @@ func (in *Inbox) After(seq uint64, limit int) ([]Item, bool, error) {
 	}
 	return out, false, in.failure
 }
+
+// Posted keeps a message the app posted, in the space and thread it went to.
+func (in *Inbox) Posted(space, thread string, m *chat.Message, text string) {
+	if m == nil || m.Name == "" {
+		return
+	}
+	it := Item{ID: m.Name, Kind: Sent, At: time.Now(), Space: space, Thread: threadOf(m, thread), Message: m.Name, Text: text,
+		From: Person{Name: "users/app", Type: "BOT"}}
+	if m.Sender != nil && m.Sender.Name != "" {
+		it.From = Person{Name: m.Sender.Name, DisplayName: m.Sender.DisplayName, Type: m.Sender.Type}
+	}
+	if t, err := time.Parse(time.RFC3339Nano, m.CreateTime); err == nil {
+		it.At = t
+	}
+	in.mu.Lock()
+	defer in.mu.Unlock()
+	in.seq++
+	it.Seq = in.seq
+	in.items = append(in.items, it)
+	in.trim(time.Now())
+}
+
+// Conversation is the messages kept of a space, or of one thread of it, the newest first: at
+// most limit, older than before when it is not 0, and whether there are older ones.
+func (in *Inbox) Conversation(space, thread string, before uint64, limit int) ([]Item, bool) {
+	in.mu.Lock()
+	defer in.mu.Unlock()
+	out := []Item{}
+	for i := len(in.items) - 1; i >= 0; i-- {
+		it := in.items[i]
+		if before != 0 && it.Seq >= before || it.Kind == Answer || it.Space != space || thread != "" && it.Thread != thread {
+			continue
+		}
+		if len(out) == limit {
+			return out, true
+		}
+		out = append(out, it)
+	}
+	return out, false
+}
+
+// Latest is the newest message kept of a space, and false when none is.
+func (in *Inbox) Latest(space string) (Item, bool) {
+	in.mu.Lock()
+	defer in.mu.Unlock()
+	for i := len(in.items) - 1; i >= 0; i-- {
+		if it := in.items[i]; it.Space == space && it.Kind != Answer {
+			return it, true
+		}
+	}
+	return Item{}, false
+}
+
+// Person is the newest person who wrote in a space, for a direct message's title.
+func (in *Inbox) Person(space string) (Person, bool) {
+	in.mu.Lock()
+	defer in.mu.Unlock()
+	for i := len(in.items) - 1; i >= 0; i-- {
+		if it := in.items[i]; it.Space == space && it.Kind != Sent && it.From.DisplayName != "" {
+			return it.From, true
+		}
+	}
+	return Person{}, false
+}
+
+// Boot tells a cursor of this run from one of an earlier run.
+func (in *Inbox) Boot() string { return in.boot }
 
 // Failure is the last pull's failure, nil when it worked.
 func (in *Inbox) Failure() error {

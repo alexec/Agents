@@ -18,7 +18,8 @@ import (
 // The Google Chat server's tools (#1016): list the spaces the app is in, post a message as
 // the app, and ask a question with its options as buttons, whose answer comes back as the
 // event question.answered. The app can post only where a person added it, so a space it is not
-// in cannot be reached. Nothing reads a space's history: the app sees only what is sent to it.
+// in cannot be reached. list_conversations and read_messages are the messaging contract's
+// (messaging.go, #4342); what the app posts is kept in the inbox for them.
 
 const (
 	maxText    = 4000
@@ -99,8 +100,9 @@ func checkText(name, text string) (string, error) {
 	return text, nil
 }
 
-// AddTools puts the tools on server.
-func AddTools(server *mcp.Server, g *Google) {
+// AddTools puts the tools on server; e's inbox keeps what they post.
+func AddTools(server *mcp.Server, e *Events) {
+	g := e.Inbox.Google
 	readOnly := &mcp.ToolAnnotations{ReadOnlyHint: true}
 	notDestructive := false
 	openWorld := true
@@ -142,6 +144,7 @@ func AddTools(server *mcp.Server, g *Google) {
 			if err != nil {
 				return nil, err
 			}
+			e.Inbox.Posted(space, thread, posted, text)
 			return structured(map[string]any{"message": posted.Name, "thread": threadOf(posted, thread)}), nil
 		})
 
@@ -187,8 +190,11 @@ func AddTools(server *mcp.Server, g *Google) {
 			if err != nil {
 				return nil, err
 			}
+			e.Inbox.Posted(space, thread, posted, question)
 			return structured(map[string]any{"question": id, "message": posted.Name, "thread": threadOf(posted, thread)}), nil
 		})
+
+	addMessagingTools(server, e)
 }
 
 func threadOf(m *chat.Message, asked string) string {

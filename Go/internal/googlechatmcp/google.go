@@ -16,53 +16,75 @@ import (
 
 // Google is the two APIs, with Google's own clients (google.golang.org/api, which the module
 // already carries): Pub/Sub, to pull the app's events and acknowledge them, and the Chat API,
-// to list the app's spaces and post and edit its messages. Both sign in as the app's service
-// account. The account is read at each call, so a key saved after the server started is used.
+// to list the app's spaces, post and edit its messages, and read a space's messages. All sign
+// in as the app's service account. The account is read at each call, so a key saved after the
+// server started is used.
 type Google struct {
 	Account func() (Account, error)
 
 	mu      sync.Mutex
 	key     string
 	chat    *chat.Service
+	reader  *chat.Service
 	pubsub  *pubsub.Service
 	account Account
+	// refusedHistory is when the Chat API last refused to read messages: the app has no
+	// chat.app.messages.readonly, which a Workspace admin approves (#4342).
+	refusedHistory time.Time
 }
+
+// historyRetry is how long a refusal to read messages is believed, before the server asks again.
+const historyRetry = 10 * time.Minute
 
 // services are the clients for the account as it is now, made again when it changed.
 func (g *Google) services(ctx context.Context) (*chat.Service, *pubsub.Service, Account, error) {
+	c, _, p, a, err := g.clients(ctx)
+	return c, p, a, err
+}
+
+// clients are services, with the Chat API client that reads messages as the app
+// (chat.app.messages.readonly) in the middle.
+func (g *Google) clients(ctx context.Context) (*chat.Service, *chat.Service, *pubsub.Service, Account, error) {
 	a, err := g.Account()
 	if err != nil {
-		return nil, nil, Account{}, err
+		return nil, nil, nil, Account{}, err
 	}
 	key := string(a.Credentials) + "\x00" + a.Subscription + "\x00" + a.ChatURL + "\x00" + a.PubSubURL
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if g.chat != nil && g.key == key {
-		return g.chat, g.pubsub, g.account, nil
+		return g.chat, g.reader, g.pubsub, g.account, nil
 	}
 	// The services keep the context only to sign in; a call's own context ends the call.
 	background := context.WithoutCancel(ctx)
 	chatOptions := []option.ClientOption{option.WithScopes(chat.ChatBotScope)}
+	readerOptions := []option.ClientOption{option.WithScopes(chat.ChatAppMessagesReadonlyScope)}
 	pubsubOptions := []option.ClientOption{option.WithScopes(pubsub.PubsubScope)}
 	if a.ChatURL != "" || a.PubSubURL != "" {
 		plain := option.WithHTTPClient(&http.Client{Timeout: 2 * time.Minute})
 		chatOptions = []option.ClientOption{plain, option.WithEndpoint(a.ChatURL)}
+		readerOptions = chatOptions
 		pubsubOptions = []option.ClientOption{plain, option.WithEndpoint(a.PubSubURL)}
 	} else {
 		creds := option.WithAuthCredentialsJSON(option.ServiceAccount, a.Credentials)
 		chatOptions = append(chatOptions, creds)
+		readerOptions = append(readerOptions, creds)
 		pubsubOptions = append(pubsubOptions, creds)
 	}
 	c, err := chat.NewService(background, chatOptions...)
 	if err != nil {
-		return nil, nil, Account{}, fmt.Errorf("the Chat API client: %w", err)
+		return nil, nil, nil, Account{}, fmt.Errorf("the Chat API client: %w", err)
+	}
+	r, err := chat.NewService(background, readerOptions...)
+	if err != nil {
+		return nil, nil, nil, Account{}, fmt.Errorf("the Chat API client: %w", err)
 	}
 	p, err := pubsub.NewService(background, pubsubOptions...)
 	if err != nil {
-		return nil, nil, Account{}, fmt.Errorf("the Pub/Sub client: %w", err)
+		return nil, nil, nil, Account{}, fmt.Errorf("the Pub/Sub client: %w", err)
 	}
-	g.key, g.chat, g.pubsub, g.account = key, c, p, a
-	return c, p, a, nil
+	g.key, g.chat, g.reader, g.pubsub, g.account, g.refusedHistory = key, c, r, p, a, time.Time{}
+	return c, r, p, a, nil
 }
 
 // Received is one Pub/Sub message: its id, when it was published, its data, and the id to
@@ -113,36 +135,89 @@ func (g *Google) Ack(ctx context.Context, ackIDs []string) error {
 	return apiError("Pub/Sub", err)
 }
 
-// Space is a space the app is in.
+// Space is a space the app is in: LastActive is its newest message's time (RFC 3339) and URI
+// the space in Google Chat, when the Chat API gives them.
 type Space struct {
 	Name, DisplayName, Type string
+	LastActive, URI         string
 }
 
 // Spaces lists the spaces the app is in, at most limit.
 func (g *Google) Spaces(ctx context.Context, limit int) ([]Space, error) {
-	c, _, _, err := g.services(ctx)
-	if err != nil {
-		return nil, err
-	}
 	out := []Space{}
 	token := ""
 	for len(out) < limit {
-		call := c.Spaces.List().PageSize(int64(min(100, limit-len(out)))).Context(ctx)
-		if token != "" {
-			call = call.PageToken(token)
-		}
-		page, err := call.Do()
+		page, next, err := g.SpacesPage(ctx, min(100, limit-len(out)), token)
 		if err != nil {
-			return nil, apiError("the Chat API", err)
+			return nil, err
 		}
-		for _, s := range page.Spaces {
-			out = append(out, Space{Name: s.Name, DisplayName: s.DisplayName, Type: s.SpaceType})
-		}
-		if token = page.NextPageToken; token == "" {
+		out = append(out, page...)
+		if token = next; token == "" {
 			break
 		}
 	}
 	return out, nil
+}
+
+// SpacesPage is one page of the spaces the app is in, at most size, after token, and the
+// next page's token ("" on the last).
+func (g *Google) SpacesPage(ctx context.Context, size int, token string) ([]Space, string, error) {
+	c, _, _, err := g.services(ctx)
+	if err != nil {
+		return nil, "", err
+	}
+	call := c.Spaces.List().PageSize(int64(size)).Context(ctx)
+	if token != "" {
+		call = call.PageToken(token)
+	}
+	page, err := call.Do()
+	if err != nil {
+		return nil, "", apiError("the Chat API", err)
+	}
+	out := make([]Space, 0, len(page.Spaces))
+	for _, s := range page.Spaces {
+		out = append(out, Space{Name: s.Name, DisplayName: s.DisplayName, Type: s.SpaceType, LastActive: s.LastActiveTime, URI: s.SpaceUri})
+	}
+	return out, page.NextPageToken, nil
+}
+
+// ErrNoHistory is the Chat API's refusal to read a space's messages as the app: it has no
+// chat.app.messages.readonly, which a Workspace admin approves once.
+var ErrNoHistory = errors.New("the Chat app cannot read a space's messages: a Workspace admin has not approved chat.app.messages.readonly")
+
+// Messages is one page of a space's messages as the app, the newest first: at most size, in
+// thread only when it is a thread's name, after token; and the next page's token. It is
+// ErrNoHistory when the app may not read them, and stays so for historyRetry without asking.
+func (g *Google) Messages(ctx context.Context, space, thread string, size int, token string) ([]*chat.Message, string, error) {
+	_, r, _, _, err := g.clients(ctx)
+	if err != nil {
+		return nil, "", err
+	}
+	g.mu.Lock()
+	refused := !g.refusedHistory.IsZero() && time.Since(g.refusedHistory) < historyRetry
+	g.mu.Unlock()
+	if refused {
+		return nil, "", ErrNoHistory
+	}
+	call := r.Spaces.Messages.List(space).OrderBy("createTime DESC").PageSize(int64(size)).Context(ctx)
+	if thread != "" {
+		call = call.Filter("thread.name = " + thread)
+	}
+	if token != "" {
+		call = call.PageToken(token)
+	}
+	page, err := call.Do()
+	var refusal *googleapi.Error
+	if errors.As(err, &refusal) && (refusal.Code == http.StatusForbidden || refusal.Code == http.StatusUnauthorized) {
+		g.mu.Lock()
+		g.refusedHistory = time.Now()
+		g.mu.Unlock()
+		return nil, "", ErrNoHistory
+	}
+	if err != nil {
+		return nil, "", apiError("the Chat API", err)
+	}
+	return page.Messages, page.NextPageToken, nil
 }
 
 // Post posts a message as the app in space, in thread when it is a thread's name.

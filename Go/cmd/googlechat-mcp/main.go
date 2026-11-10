@@ -45,9 +45,10 @@ func main() {
 	google := &googlechatmcp.Google{Account: func() (googlechatmcp.Account, error) { return googlechatmcp.AccountFrom(os.Getenv) }}
 	inbox := googlechatmcp.NewInbox(google, logger)
 	inbox.Answered = googlechatmcp.MarkAnswered(google, logger)
+	events := &googlechatmcp.Events{Inbox: inbox, Context: ctx}
 	front := &googlechatmcp.Front{
-		Events:   &googlechatmcp.Events{Inbox: inbox, Context: ctx},
-		Upstream: googlechatmcp.NewServer(buildinfo.Version, google), Version: buildinfo.Version, Logger: logger,
+		Events:   events,
+		Upstream: googlechatmcp.NewServer(buildinfo.Version, events), Version: buildinfo.Version, Logger: logger,
 	}
 	// A signal ends it at once: the front would otherwise wait on stdin.
 	go func() {
