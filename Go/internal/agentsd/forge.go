@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"maps"
 	"net/http"
 	"os"
 	"slices"
@@ -181,23 +182,59 @@ func (d *Daemon) registerForge() {
 	d.registerForgeImage()
 }
 
-// forgeCursor is a list's cursor, one per forge, so a page goes on where each forge stopped.
-// Done are the forges whose list has ended.
+// forgeCursor is a list's cursor, one per forge by its name, so a page goes on where each forge
+// stopped. Done are the forges whose list has ended. Its JSON is flat, {"github": "…", "done":
+// […]}, so a cursor from a daemon before the map (#4360) still reads.
 type forgeCursor struct {
-	GitHub      string   `json:"github,omitempty"`
-	GitLab      string   `json:"gitlab,omitempty"`
-	Linear      string   `json:"linear,omitempty"`
-	Jira        string   `json:"jira,omitempty"`
-	Boards      string   `json:"azureboards,omitempty"`
-	Forgejo     string   `json:"forgejo,omitempty"`
-	Bitbucket   string   `json:"bitbucket,omitempty"`
-	AzureDevOps string   `json:"azuredevops,omitempty"`
-	Done        []string `json:"done,omitempty"`
+	At   map[string]string
+	Done []string
 }
 
-func (c *forgeCursor) of(forge string) *string {
-	return map[string]*string{"github": &c.GitHub, "gitlab": &c.GitLab, "linear": &c.Linear, "jira": &c.Jira, "azureboards": &c.Boards, "forgejo": &c.Forgejo,
-		"bitbucket": &c.Bitbucket, "azuredevops": &c.AzureDevOps}[forge]
+// set is where forge goes on from; "" is from its start.
+func (c *forgeCursor) set(forge, at string) {
+	if at == "" {
+		delete(c.At, forge)
+		return
+	}
+	if c.At == nil {
+		c.At = map[string]string{}
+	}
+	c.At[forge] = at
+}
+
+func (c forgeCursor) MarshalJSON() ([]byte, error) {
+	m := map[string]any{}
+	for forge, at := range c.At {
+		if at != "" {
+			m[forge] = at
+		}
+	}
+	if len(c.Done) > 0 {
+		m["done"] = c.Done
+	}
+	return json.Marshal(m)
+}
+
+func (c *forgeCursor) UnmarshalJSON(b []byte) error {
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(b, &m); err != nil {
+		return err
+	}
+	*c = forgeCursor{}
+	for k, v := range m {
+		if k == "done" {
+			if err := json.Unmarshal(v, &c.Done); err != nil {
+				return err
+			}
+			continue
+		}
+		var at string
+		if err := json.Unmarshal(v, &at); err != nil {
+			return err
+		}
+		c.set(k, at)
+	}
+	return nil
 }
 
 func (c forgeCursor) text() *string {
@@ -295,7 +332,7 @@ func (d *Daemon) forgeList(ctx context.Context, prs bool, r wire.ForgeListReques
 		}
 		p := forgePage{err: m.err}
 		if p.err == nil {
-			p, p.err = m.forge.List(ctx, m.scope, filter, *cursor.of(name), limit)
+			p, p.err = m.forge.List(ctx, m.scope, filter, cursor.At[name], limit)
 		}
 		p.forge = name
 		pages = append(pages, p)
@@ -345,20 +382,19 @@ func mergeForgePages(pages []forgePage, from forgeCursor, limit int) ([]wire.For
 		items = append(items, pages[best].items[taken[best]])
 		taken[best]++
 	}
-	next := forgeCursor{GitHub: from.GitHub, GitLab: from.GitLab, Linear: from.Linear, Jira: from.Jira, Boards: from.Boards, Forgejo: from.Forgejo,
-		Bitbucket: from.Bitbucket, AzureDevOps: from.AzureDevOps, Done: slices.Clone(from.Done)}
+	next := forgeCursor{At: maps.Clone(from.At), Done: slices.Clone(from.Done)}
 	more := false
 	for n, p := range pages {
 		switch {
 		case p.err != nil:
 		case taken[n] == len(p.items) && p.next == "":
 			next.Done = append(next.Done, p.forge)
-			*next.of(p.forge) = ""
+			next.set(p.forge, "")
 			continue
 		case taken[n] == len(p.items):
-			*next.of(p.forge) = p.next
+			next.set(p.forge, p.next)
 		case taken[n] > 0 && taken[n] <= len(p.cursors):
-			*next.of(p.forge) = p.cursors[taken[n]-1]
+			next.set(p.forge, p.cursors[taken[n]-1])
 		}
 		more = more || p.err == nil
 	}
@@ -483,16 +519,13 @@ func (d *Daemon) forgeItem(ctx context.Context, kind string, r wire.ForgeItemReq
 	if a, ok := d.forgeCached(string(key)); ok && a.item != nil {
 		return *a.item, nil
 	}
-	var out wire.ForgeItemDetail
-	var err error
-	if f, ref, ok := d.forgeOwning(r.Node); ok {
-		out, err = f.Item(ctx, ref, deref(r.Cursor))
-		err = forgeCannotErr(method, f, err)
-	} else {
+	f, ref, ok := d.forgeOwning(r.Node)
+	if !ok {
 		return wire.ForgeItemDetail{}, Invalid("%s: %s is not an issue or a pull request on GitHub, GitLab, Forgejo, Bitbucket, Azure DevOps, Linear, Jira or Azure Boards", method, r.Node.Ref)
 	}
+	out, err := f.Item(ctx, ref, deref(r.Cursor))
 	if err != nil {
-		return wire.ForgeItemDetail{}, err
+		return wire.ForgeItemDetail{}, forgeCannotErr(method, f, err)
 	}
 	d.forgeRemember(string(key), forgeAnswer{item: &out})
 	d.resolvedFromForge([]wire.ForgeItem{out.Item})

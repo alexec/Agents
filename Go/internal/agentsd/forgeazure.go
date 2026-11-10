@@ -3,6 +3,7 @@ package agentsd
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/url"
 	"regexp"
 	"slices"
@@ -307,7 +308,7 @@ func (a azureBoardsForge) Item(ctx context.Context, r forgeRef, cursor string) (
 	}
 	out := wire.ForgeItemDetail{Item: boardsItemOf(p.Item, a.d.boardsFolder(p.Project)), Body: p.Body, Comments: []wire.ForgeComment{},
 		Cursor: optional(p.Before), Transitions: []wire.ForgeTransition{}}
-	out.Start = forgeStartOf(out.Item)
+	out.Start = boardsStart(out.Item)
 	for _, c := range p.Thread {
 		out.Comments = append(out.Comments, forgeCommentOf(c.Author, c.Body, c.At, c.URL, c.Bot))
 	}
@@ -497,4 +498,17 @@ func boardsItemID(ref string) (int, bool) {
 	}
 	n, _ := strconv.Atoi(m[1] + m[2])
 	return n, n > 0
+}
+
+// boardsStart is the new-agent form for an Azure Boards work item, labelled AB#<id>, the mention
+// that links a pull request to it.
+func boardsStart(i wire.ForgeItem) *wire.ForgeStart {
+	_, id, ok := boardsOfNode(i.Node)
+	if !ok {
+		return nil
+	}
+	key := "AB#" + strconv.Itoa(id)
+	return &wire.ForgeStart{Prompt: fmt.Sprintf("%s: %s\n\nWork on this Azure Boards work item: %s\n\n"+
+		"Name %s in the pull request's title, so Azure Boards links it.", key, i.Title, deref(i.URL), key),
+		Labels: []string{key}, Worktree: optional(strconv.Itoa(id) + " " + i.Title)}
 }
