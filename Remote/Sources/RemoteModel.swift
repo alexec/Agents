@@ -2040,6 +2040,34 @@ final class RemoteModel {
         }
     }
 
+    /// Later on a request (#4235), from its Needs you row's swipe or long press: to the host
+    /// of the session that asked. It stays open, in Later, until it comes back.
+    @discardableResult
+    func deferRequest(_ request: NeedRequest, _ later: NeedRequest.Later) async -> Bool {
+        await changeRequest(request, DaemonAPI.Method.requestsDefer, later.params(id: request.id))
+    }
+
+    /// Bring Back Now (#4235): out of Later, to the top of Needs you.
+    @discardableResult
+    func undeferRequest(_ request: NeedRequest) async -> Bool {
+        await changeRequest(request, DaemonAPI.Method.requestsUndefer, DaemonAPI.RequestsUndefer(id: request.id))
+    }
+
+    private func changeRequest(_ request: NeedRequest, _ method: String,
+                               _ params: some Encodable & Sendable) async -> Bool {
+        let host = request.askedBy.flatMap { work.agent($0)?.host } ?? .mac
+        do {
+            let update = try await client(for: params, on: host)
+                .call(method, params, returning: DaemonAPI.RequestUpdate.self)
+            work.apply(.requestChanged(update.request))
+            publishAttention()
+            return true
+        } catch {
+            problem = sentence(for: error)
+            return false
+        }
+    }
+
     /// Deny a session's ask to be archived (#773): the mark goes and the session stays.
     func keepSession(_ agent: Agent) async {
         let denial = ArchiveActions.denial(for: agent)
