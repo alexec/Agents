@@ -54,6 +54,7 @@ struct RemoteApp: App {
                 // Undo after Archive (#1534), for a few seconds, over the foot of whatever shows.
                 .modifier(ArchiveUndoOverlay())
                 .modifier(MoveToMachineAsk())
+                .modifier(ProjectSettingsAsk())
                 .environment(model)
                 // A new model on a new link once the phone pairs with a control plane.
                 .id(ObjectIdentifier(model))
@@ -86,6 +87,19 @@ struct RemoteApp: App {
                     for _ in 0..<50 {
                         if let folder = model.folders.first(where: { $0.name == args[at + 1] }) {
                             model.phoneFolder = folder.key
+                            return
+                        }
+                        try? await Task.sleep(for: .milliseconds(200))
+                    }
+                }
+                // A folder's Project Settings… (2026-11-09), from the same long press.
+                .task {
+                    let args = ProcessInfo.processInfo.arguments
+                    guard args.contains("-walk"), let at = args.firstIndex(of: "-projectSettings"),
+                          at + 1 < args.count else { return }
+                    for _ in 0..<50 {
+                        if let folder = model.folders.first(where: { $0.name == args[at + 1] }) {
+                            model.projectSettingsFolder = folder.key
                             return
                         }
                         try? await Task.sleep(for: .milliseconds(200))

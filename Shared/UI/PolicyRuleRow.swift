@@ -108,9 +108,17 @@ struct PolicyRuleRow: View {
                 .disabled(looser)
             }
         } label: {
+            #if os(macOS)
             Text(yours.map(words) ?? notSetWords).lineLimit(1)
+            #else
+            // A folder's "Same as yours (…)" is long: on an iPhone it wraps, not pushes the
+            // row off the screen.
+            Text(yours.map(words) ?? notSetWords).lineLimit(3).multilineTextAlignment(.trailing)
+            #endif
         }
+        #if os(macOS)
         .fixedSize()
+        #endif
         .disabled(!editable)
         .accessibilityLabel(row.title)
         .accessibilityValue(yours.map(words) ?? notSetWords)
