@@ -89,6 +89,62 @@ func TestForgeImageReadsAGitHubAttachment(t *testing.T) {
 	}
 }
 
+// #4522: a pr-shots.sh screenshot, a github.com blob link with raw=true, follows GitHub's
+// redirects (blob, then raw, then raw.githubusercontent.com) with the token on each, as a
+// private repo needs; a /raw/ link is read too.
+func TestForgeImageReadsAGitHubBlobLink(t *testing.T) {
+	blob := "https://github.com/alexec/Agents/blob/screenshots/pr-4520/mac-ready.png?raw=true"
+	raw := "https://github.com/alexec/Agents/raw/screenshots/pr-4520/mac-ready.png"
+	file := "https://raw.githubusercontent.com/alexec/Agents/screenshots/pr-4520/mac-ready.png"
+	c, web := imageDaemon(t, map[string]func() *http.Response{
+		blob: redirectTo(raw),
+		raw:  redirectTo(file),
+		file: imageAnswer("image/png", pngBytes),
+	})
+	var image wire.ForgeImage
+	json.Unmarshal(c.call(t, 1, "forge/image", wire.ForgeImageRequest{URL: blob}), &image)
+	if image.MimeType != "image/png" || !bytes.Equal(image.Data, pngBytes) {
+		t.Fatalf("image: %s, %d bytes", image.MimeType, len(image.Data))
+	}
+	json.Unmarshal(c.call(t, 2, "forge/image", wire.ForgeImageRequest{URL: raw}), &image)
+	if image.MimeType != "image/png" {
+		t.Fatalf("raw image: %s", image.MimeType)
+	}
+	asked := web.requests()
+	want := []string{blob, raw, file, raw, file}
+	if len(asked) != len(want) {
+		t.Fatalf("asked %q", asked)
+	}
+	for i := range want {
+		if asked[i] != want[i]+" auth=Bearer ghu_secret" {
+			t.Fatalf("asked %q", asked)
+		}
+	}
+}
+
+// #4522: a blob link without raw=true is GitHub's HTML page, and a repo path with a missing or
+// dot segment is not a file; all are refused with no request made.
+func TestForgeImageRefusesOtherGitHubRepoPaths(t *testing.T) {
+	c, web := imageDaemon(t, nil)
+	for i, u := range []string{
+		"https://github.com/alexec/Agents/blob/main/x.png",
+		"https://github.com/alexec/Agents/blob/main/x.png?raw=1",
+		"https://github.com/alexec/Agents/raw/main",
+		"https://github.com/alexec/Agents/raw/main/",
+		"https://github.com/alexec/Agents/raw//x.png",
+		"https://github.com/alexec/Agents/raw/main/../../../x.png",
+		"https://github.com/alexec/Agents/raw/main/%2e%2e/x.png",
+		"https://github.com/alexec/Agents/tree/main/x.png",
+	} {
+		if msg := c.callErr(t, 1+i, "forge/image", wire.ForgeImageRequest{URL: u}); msg == "" {
+			t.Fatalf("%s: no error", u)
+		}
+	}
+	if asked := web.requests(); len(asked) != 0 {
+		t.Fatalf("asked %q", asked)
+	}
+}
+
 // #4009: a host off the list, a github.com page that is not an image path, plain http and a
 // redirect off the list are refused; the first three with no request made.
 func TestForgeImageRefusesHostsOffTheList(t *testing.T) {

@@ -49,7 +49,8 @@ type forgeImageHost interface {
 }
 
 // githubImages are GitHub's image hosts: attachments on github.com (user-attachments and a
-// repo's assets), and the githubusercontent.com hosts they redirect to.
+// repo's assets), a repo's file on github.com (blob with raw=true, or raw; pr-shots.sh's
+// screenshots, #4522), and the githubusercontent.com hosts they redirect to.
 type githubImages struct{}
 
 // githubImageHosts are read at any path; github.com only at its image paths.
@@ -79,7 +80,30 @@ func (githubImages) allows(u *url.URL) bool {
 	case len(parts) >= 4 && parts[0] != "" && parts[1] != "" && parts[2] == "assets" && parts[3] != "":
 		return true
 	}
+	// /<owner>/<repo>/blob/<ref>/<path>?raw=true, or /<owner>/<repo>/raw/<ref>/<path>: GitHub
+	// redirects both to raw.githubusercontent.com. A blob without raw=true is the HTML page.
+	switch githubRepoFile(u) {
+	case "raw":
+		return true
+	case "blob":
+		return u.Query().Get("raw") == "true"
+	}
 	return false
+}
+
+// githubRepoFile is "blob" or "raw" when u's path is /<owner>/<repo>/<blob|raw>/<ref>/<path>,
+// every segment set and none a dot segment, else "".
+func githubRepoFile(u *url.URL) string {
+	parts := strings.Split(strings.TrimPrefix(u.Path, "/"), "/")
+	if len(parts) < 5 || (parts[2] != "blob" && parts[2] != "raw") {
+		return ""
+	}
+	for _, p := range parts {
+		if p == "" || p == "." || p == ".." {
+			return ""
+		}
+	}
+	return parts[2]
 }
 
 // authorize sends the GitHub connection's token to github.com (a private repo's attachment) and
