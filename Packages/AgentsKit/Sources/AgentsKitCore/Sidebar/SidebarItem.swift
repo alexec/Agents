@@ -48,6 +48,11 @@ public enum SidebarItem: Hashable, Sendable {
     /// accounts, and a line per machine (#3631). The person's connectors, secrets and outside
     /// accounts are settings, in Settings ▸ You (#3998).
     case runtimes
+    /// Status ▸ Secrets (#4161): what happened last to each of the person's secrets, newest first.
+    /// Status only: a press opens the secret in Settings ▸ You ▸ Secrets. Core: every client.
+    case secretsStatus
+    /// Status ▸ Accounts (#4161): the same for the person's outside accounts.
+    case accountsStatus
     /// One machine's page (#3626): its CPU, memory and disks, from its row under Machines.
     /// Mac + web: the Remote has no row for it (#2796).
     case machine(MachineRef)

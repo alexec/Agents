@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="760" viewBox="0 0 820 760" font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <defs>
+    <symbol id="warn" viewBox="0 0 16 16">
+      <path d="M8 1.5 L15 14 H1 Z" fill="#C2620A" stroke="#C2620A" stroke-width="1" stroke-linejoin="round"/>
+      <rect x="7.3" y="5.5" width="1.4" height="4.6" rx="0.7" fill="#fff"/><circle cx="8" cy="12" r="0.85" fill="#fff"/>
+    </symbol>
+    <symbol id="key" viewBox="0 0 16 16">
+      <circle cx="5" cy="8" r="3.4" fill="none" stroke="#1F5FC8" stroke-width="1.4"/>
+      <path d="M8.4 8 H15 M13 8 V11 M10.8 8 V10" fill="none" stroke="#1F5FC8" stroke-width="1.4"/>
+    </symbol>
+    <symbol id="person" viewBox="0 0 16 16">
+      <circle cx="8" cy="5" r="3" fill="none" stroke="#1F5FC8" stroke-width="1.4"/>
+      <path d="M2.5 15 C2.5 11 5 9.5 8 9.5 C11 9.5 13.5 11 13.5 15" fill="none" stroke="#1F5FC8" stroke-width="1.4"/>
+    </symbol>
+    <symbol id="chev" viewBox="0 0 8 14"><path d="M1.5 1.5 L6.5 7 L1.5 12.5" fill="none" stroke="#B5BAC1" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  </defs>
+  <rect width="820" height="760" fill="#D9DDE2"/>
+
+  <!-- Phone 1: the sidebar -->
+  <rect x="30" y="20" width="360" height="720" rx="48" fill="#1C1D20"/>
+  <rect x="40" y="30" width="340" height="700" rx="40" fill="#F7F8F9"/>
+  <rect x="160" y="42" width="100" height="28" rx="14" fill="#1C1D20"/>
+  <text x="72" y="62" font-size="14" font-weight="600" fill="#1C1D20">9:41</text>
+  <text x="60" y="122" font-size="30" font-weight="700" fill="#1C1D20">Agents</text>
+
+  <text x="60" y="166" font-size="13" font-weight="600" fill="#6B7078">STATUS</text>
+  <rect x="56" y="176" width="308" height="200" rx="12" fill="#FFFFFF"/>
+  <g font-size="16" fill="#1C1D20">
+    <text x="96" y="208">Events</text><use href="#chev" x="344" y="196" width="8" height="14"/>
+    <line x1="96" y1="226" x2="364" y2="226" stroke="#DDE1E6"/>
+    <text x="96" y="258">Runtimes</text><use href="#chev" x="344" y="246" width="8" height="14"/>
+    <line x1="96" y1="276" x2="364" y2="276" stroke="#DDE1E6"/>
+    <use href="#key" x="68" y="294" width="18" height="18"/>
+    <circle cx="84" cy="295" r="4.5" fill="#C2620A" stroke="#fff" stroke-width="1.5"/>
+    <text x="96" y="308">Secrets</text>
+    <text x="334" y="308" font-size="14" fill="#8A8F97" text-anchor="end">5 min ago</text><use href="#chev" x="344" y="296" width="8" height="14"/>
+    <line x1="96" y1="326" x2="364" y2="326" stroke="#DDE1E6"/>
+    <use href="#person" x="68" y="344" width="18" height="18"/>
+    <circle cx="84" cy="345" r="4.5" fill="#C2620A" stroke="#fff" stroke-width="1.5"/>
+    <text x="96" y="358">Accounts</text>
+    <text x="334" y="358" font-size="14" fill="#8A8F97" text-anchor="end">5 min ago</text><use href="#chev" x="344" y="346" width="8" height="14"/>
+  </g>
+  <g fill="none" stroke="#1F5FC8" stroke-width="1.5">
+    <rect x="68" y="195" width="18" height="15" rx="3"/>
+    <rect x="70" y="245" width="14" height="14" rx="2"/>
+  </g>
+
+  <text x="60" y="414" font-size="13" font-weight="600" fill="#6B7078">NEEDS YOU</text>
+  <rect x="56" y="424" width="308" height="52" rx="12" fill="#FFFFFF"/>
+  <text x="76" y="456" font-size="16" fill="#1C1D20">Fix the shop sign-in</text>
+
+  <!-- Phone 2: Status ▸ Secrets -->
+  <rect x="430" y="20" width="360" height="720" rx="48" fill="#1C1D20"/>
+  <rect x="440" y="30" width="340" height="700" rx="40" fill="#F7F8F9"/>
+  <rect x="560" y="42" width="100" height="28" rx="14" fill="#1C1D20"/>
+  <text x="472" y="62" font-size="14" font-weight="600" fill="#1C1D20">9:41</text>
+  <text x="458" y="100" font-size="17" fill="#1F5FC8">‹ Agents</text>
+  <text x="460" y="140" font-size="30" font-weight="700" fill="#1C1D20">Secrets</text>
+
+  <rect x="456" y="160" width="308" height="420" rx="12" fill="#FFFFFF"/>
+  <g font-size="15" fill="#1C1D20">
+    <text x="474" y="190" font-family="'SF Mono', Menlo, monospace" font-size="14">OPENAI_API_KEY</text>
+    <text x="748" y="190" font-size="13" fill="#8A8F97" text-anchor="end">5 min ago</text>
+    <text x="474" y="210" font-size="13" fill="#6B7078">••••Zq9w · read by fill_secret</text>
+    <use href="#warn" x="474" y="218" width="13" height="13"/>
+    <text x="492" y="229" font-size="13" fill="#C2620A">Not backed up: only on devbox</text>
+    <line x1="474" y1="244" x2="764" y2="244" stroke="#DDE1E6"/>
+
+    <text x="474" y="272" font-family="'SF Mono', Menlo, monospace" font-size="14">SHOP_PASSWORD</text>
+    <text x="748" y="272" font-size="13" fill="#8A8F97" text-anchor="end">20 min ago</text>
+    <text x="474" y="292" font-size="13" fill="#6B7078">•••• · read by fill_secret</text>
+    <use href="#warn" x="474" y="300" width="13" height="13"/>
+    <text x="492" y="311" font-size="13" fill="#C2620A">Not backed up: one session, this Mac</text>
+    <line x1="474" y1="326" x2="764" y2="326" stroke="#DDE1E6"/>
+
+    <text x="474" y="354" font-family="'SF Mono', Menlo, monospace" font-size="14">GITHUB_TOKEN</text>
+    <text x="748" y="354" font-size="13" fill="#8A8F97" text-anchor="end">2 h ago</text>
+    <text x="474" y="374" font-size="13" fill="#6B7078">••••ab12 · read by set_ci_secret</text>
+    <line x1="474" y1="390" x2="764" y2="390" stroke="#DDE1E6"/>
+
+    <text x="474" y="418" font-family="'SF Mono', Menlo, monospace" font-size="14">SHOP_CARD</text>
+    <text x="748" y="418" font-size="13" fill="#8A8F97" text-anchor="end">2 d ago</text>
+    <text x="474" y="438" font-size="13" fill="#6B7078">••••4242 · replaced</text>
+    <line x1="474" y1="454" x2="764" y2="454" stroke="#DDE1E6"/>
+
+    <text x="474" y="482" font-family="'SF Mono', Menlo, monospace" font-size="14">NPM_PIN</text>
+    <text x="748" y="482" font-size="13" fill="#8A8F97" text-anchor="end">12 d ago</text>
+    <text x="474" y="502" font-size="13" fill="#6B7078">•••• · given from secrets.env</text>
+    <line x1="474" y1="518" x2="764" y2="518" stroke="#DDE1E6"/>
+    <text x="474" y="554" fill="#1F5FC8">Edit in Settings ▸ You ▸ Secrets</text>
+  </g>
+  <text x="460" y="606" font-size="12" fill="#8A8F97">Tap a secret to open it in Settings ▸ You.</text>
+  <rect x="550" y="712" width="120" height="5" rx="2.5" fill="#1C1D20"/>
+  <rect x="150" y="712" width="120" height="5" rx="2.5" fill="#1C1D20"/>
+</svg>

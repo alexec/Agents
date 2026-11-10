@@ -202,6 +202,7 @@ final class AppModel {
             guard showsSpending, showsSpending != oldValue else { return }
             showsEvents = false
             showsRuntimes = false
+            statusSecretsPage = nil
             showsTime = false
             showsTokens = false
             machinePage = nil
@@ -226,6 +227,7 @@ final class AppModel {
             guard showsEvents, showsEvents != oldValue else { return }
             showsSpending = false
             showsRuntimes = false
+            statusSecretsPage = nil
             showsTime = false
             showsTokens = false
             machinePage = nil
@@ -248,7 +250,29 @@ final class AppModel {
         didSet {
             guard showsRuntimes, showsRuntimes != oldValue else { return }
             showsSpending = false
+            statusSecretsPage = nil
             showsEvents = false
+            showsTime = false
+            showsTokens = false
+            machinePage = nil
+            showsWork = false
+            showsDocs = false
+            showsSummary = false
+            selection = nil
+            openWorkflow = nil
+            folderPage = nil
+            composing = false
+        }
+    }
+
+    /// Status ▸ Secrets or Status ▸ Accounts (#4161): what happened last to each of the person's
+    /// secrets or outside accounts. A page like Runtimes, and not persisted for the same reason.
+    var statusSecretsPage: StatusSecretsKind? {
+        didSet {
+            guard statusSecretsPage != nil, statusSecretsPage != oldValue else { return }
+            showsSpending = false
+            showsEvents = false
+            showsRuntimes = false
             showsTime = false
             showsTokens = false
             machinePage = nil
@@ -270,6 +294,7 @@ final class AppModel {
             showsSpending = false
             showsEvents = false
             showsRuntimes = false
+            statusSecretsPage = nil
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -290,6 +315,7 @@ final class AppModel {
             showsSpending = false
             showsEvents = false
             showsRuntimes = false
+            statusSecretsPage = nil
             showsTime = false
             machinePage = nil
             showsWork = false
@@ -313,6 +339,7 @@ final class AppModel {
             showsSpending = false
             showsEvents = false
             showsRuntimes = false
+            statusSecretsPage = nil
             showsTime = false
             showsTokens = false
             selection = nil
@@ -333,6 +360,7 @@ final class AppModel {
             showsSpending = false
             showsEvents = false
             showsRuntimes = false
+            statusSecretsPage = nil
             showsTime = false
             showsTokens = false
             machinePage = nil
@@ -352,6 +380,7 @@ final class AppModel {
             showsSpending = false
             showsEvents = false
             showsRuntimes = false
+            statusSecretsPage = nil
             showsTime = false
             showsTokens = false
             machinePage = nil
@@ -372,6 +401,7 @@ final class AppModel {
             showsSpending = false
             showsEvents = false
             showsRuntimes = false
+            statusSecretsPage = nil
             showsTime = false
             showsTokens = false
             machinePage = nil
@@ -452,6 +482,7 @@ final class AppModel {
         showsSpending = false
         showsEvents = false
         showsRuntimes = false
+        statusSecretsPage = nil
         showsTime = false
         showsTokens = false
         machinePage = nil
@@ -476,6 +507,7 @@ final class AppModel {
         showsSpending = false
         showsEvents = false
         showsRuntimes = false
+        statusSecretsPage = nil
         showsTime = false
         showsTokens = false
         machinePage = nil
@@ -522,6 +554,7 @@ final class AppModel {
         get {
             if showsEvents { return .events }
             if showsRuntimes { return .runtimes }
+            if let statusSecretsPage { return statusSecretsPage == .secrets ? .secretsStatus : .accountsStatus }
             if let machinePage { return .machine(machinePage) }
             if showsSpending { return .spending }
             if showsTokens { return .tokens }
@@ -549,6 +582,7 @@ final class AppModel {
                 showsSpending = false
                 showsEvents = false
                 showsRuntimes = false
+                statusSecretsPage = nil
                 showsTime = false
                 showsTokens = false
                 machinePage = nil
@@ -587,12 +621,17 @@ final class AppModel {
                 showEvents()
             case .runtimes:
                 showRuntimes()
+            case .secretsStatus:
+                statusSecretsPage = .secrets
+            case .accountsStatus:
+                statusSecretsPage = .accounts
             case .machine(let host):
                 machinePage = host
             case .folder(let key):
                 showsSpending = false
                 showsEvents = false
                 showsRuntimes = false
+                statusSecretsPage = nil
                 showsTime = false
                 showsTokens = false
                 machinePage = nil
@@ -615,6 +654,7 @@ final class AppModel {
         showsSpending = false
         showsEvents = false
         showsRuntimes = false
+        statusSecretsPage = nil
         showsTime = false
         showsTokens = false
         machinePage = nil
@@ -629,6 +669,7 @@ final class AppModel {
         showsSpending = false
         showsEvents = false
         showsRuntimes = false
+        statusSecretsPage = nil
         showsTime = false
         showsTokens = false
         machinePage = nil
@@ -658,6 +699,7 @@ final class AppModel {
         showsSpending = false
         showsEvents = false
         showsRuntimes = false
+        statusSecretsPage = nil
         showsTime = false
         showsTokens = false
         machinePage = nil
@@ -894,6 +936,7 @@ final class AppModel {
         showsSpending = false
         showsEvents = false
         showsRuntimes = false
+        statusSecretsPage = nil
         showsTime = false
         showsTokens = false
         machinePage = nil
@@ -3653,6 +3696,8 @@ final class AppModel {
                     await self?.loadKept(control)
                     await self?.people.connected(control)
                     await self?.signIn.connected(control)
+                    // Status ▸ Secrets and Accounts' rows say when the newest operation was (#4161).
+                    await self?.userScope.load(control)
                     if let client = ControlConfig.client { await self?.lock.connected(control, client: client) }
                     await Self.sealWaiting(on: control, lock: self?.lock)
                     for await note in control.notifications() {

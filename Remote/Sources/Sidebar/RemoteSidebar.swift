@@ -178,6 +178,13 @@ struct RemoteSidebar: View {
                     ResourcesRow().activityIcon("square.stack.3d.up").appText(.supporting).tag(SidebarItem.resources)
                     RuntimesRow().activityIcon("cpu", warns: runtimesFailing)
                         .appText(.supporting).tag(SidebarItem.runtimes)
+                    // What happened last to the person's secrets and accounts (#4161), as the window's.
+                    ForEach([StatusSecretsKind.secrets, .accounts], id: \.self) { kind in
+                        StatusSecretsRow(kind: kind, state: model.userScope)
+                            .activityIcon(kind.systemImage, warns: StatusSecretsWords.warns(model.userScope.statusLines(kind)),
+                                          tint: .attention)
+                            .appText(.supporting).tag(kind == .secrets ? SidebarItem.secretsStatus : .accountsStatus)
+                    }
                 } header: {
                     Text("Status")
                 }
@@ -1009,10 +1016,11 @@ private struct SidebarFoldRow: View {
 private extension View {
     /// Red when the page has something wrong to say (#587): the row has no figure at its
     /// end to colour, which is only a session's.
-    func activityIcon(_ systemImage: String, warns: Bool = false) -> some View {
+    /// `tint` is the attention orange for a page that only warns (#4161).
+    func activityIcon(_ systemImage: String, warns: Bool = false, tint: StateTint = .failure) -> some View {
         HStack(spacing: 8) {
             Image(systemName: systemImage)
-                .sidebarMark(warns ? StateTint.failure.style(or: .primary) : AnyShapeStyle(Paper.accent))
+                .sidebarMark(warns ? tint.style(or: .primary) : AnyShapeStyle(Paper.accent))
                 .frame(width: 20)
                 .accessibilityHidden(true)
             self

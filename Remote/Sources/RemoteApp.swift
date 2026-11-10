@@ -421,6 +421,8 @@ struct RemoteView: View {
         case .events: EventsListView().paperGround()
         case .resources: ResourcesListView().paperGround()
         case .runtimes: RuntimesView().paperGround()
+        case .secretsStatus: RemoteStatusSecretsPage(kind: .secrets).paperGround()
+        case .accountsStatus: RemoteStatusSecretsPage(kind: .accounts).paperGround()
         case .machine(let host): RemoteMachinePage(host: host).paperGround()
         case .multiplier: RemoteMultiplierPage().paperGround()
         case .work: WorkView(model: model).paperGround()

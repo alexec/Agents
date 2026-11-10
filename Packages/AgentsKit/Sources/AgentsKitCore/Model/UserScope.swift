@@ -101,6 +101,10 @@ public extension DaemonAPI {
         public var projects: [String]?
         /// Ask before use (#4163): an agent's read of it waits on a person. nil is on; false is off.
         public var askBeforeUse: Bool?
+        /// When it last took another's place (#4157); the control plane sets it. nil for one never changed.
+        public var edited: Date? = nil
+        /// Its newest operation, as a machine knows it (#4157); the control plane does not keep it.
+        public var lastOp: AccountLastOp? = nil
 
         public var id: String { service.lowercased() + "#" + (address ?? "").lowercased() }
 
@@ -122,6 +126,29 @@ public extension DaemonAPI {
             self.notes = notes
             self.projects = projects
             self.askBeforeUse = askBeforeUse
+        }
+    }
+
+    /// An account's newest operation (#4157): `read`, `added` or `edited`, and when.
+    struct AccountLastOp: Codable, Sendable, Hashable {
+        public var what: String
+        public var at: Date
+
+        public init(what: String, at: Date) {
+            self.what = what
+            self.at = at
+        }
+    }
+
+    /// A secret's last operation (#4158): `read`, `denied`, `added`, `replaced` or `removed`, and
+    /// when, the newest any machine reported. No session, no place, no value.
+    struct SecretLastOp: Codable, Sendable, Hashable {
+        public var what: String
+        public var at: Date
+
+        public init(what: String, at: Date) {
+            self.what = what
+            self.at = at
         }
     }
 
@@ -197,6 +224,14 @@ public extension DaemonAPI {
         public var needsApproval: Bool? = nil
         /// What it is for (#4167), in clear beside the name.
         public var description: String? = nil
+        /// When the name was first set (#4158); Replace… does not change it.
+        public var created: String? = nil
+        /// The value's last 4 (#4158), from a machine that holds a copy; nil for a short value.
+        public var hint: String? = nil
+        /// The newest operation any machine reported (#4158).
+        public var lastOp: SecretLastOp? = nil
+        /// False when only one copy opens (#4158): one machine, none waiting.
+        public var backedUp: Bool? = nil
 
         public var id: String { name }
         public var isCard: Bool { kind == CardSecret.kind }
