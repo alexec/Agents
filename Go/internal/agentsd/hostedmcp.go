@@ -48,8 +48,9 @@ import (
 //     status keeps its last line.
 //
 // Logged: the server's name and a word, never its command, arguments, environment or any
-// body (054 FR-023). Views go through this copy too (hostedviews.go, #1341); event
-// subscriptions still run their own copy on this host.
+// body (054 FR-023). Views and event subscriptions go through this copy too (hostedviews.go,
+// #1341; hostedevents.go, #4516). Each start says its pid, and ends a process still left
+// from the start before.
 
 const (
 	hostedLimit      = 8
@@ -103,6 +104,9 @@ type hostedServer struct {
 	log         *hostedLog
 	// viewOnly are the tools only a view may call, as its tools/list last said (#1341).
 	viewOnly map[string]bool
+	// heard are the users told each notification the server sends (#4516): its event
+	// subscriptions, by user.
+	heard map[string]func(method string)
 }
 
 type hostedPool struct {
@@ -272,6 +276,7 @@ func (d *Daemon) hostedRelease(user string) {
 	d.hostedMu.Lock()
 	defer d.hostedMu.Unlock()
 	for _, h := range d.hostedByKey {
+		delete(h.heard, user)
 		if h.users[user] {
 			delete(h.users, user)
 			if len(h.users) == 0 {
@@ -503,6 +508,12 @@ func (d *Daemon) hostedReady(h *hostedServer) (json.RawMessage, *Error) {
 
 func (d *Daemon) hostedStart(h *hostedServer) (json.RawMessage, *Error) {
 	d.hostedMu.Lock()
+	// A process left from the start before is ended first: one copy at a time (#4516).
+	if h.cmd != nil {
+		log.Printf("hosted mcp: %s stopping its old copy (pid %d) to start again", h.key.name, h.cmd.Process.Pid)
+		hostedEnd(h.cmd, h.in)
+		h.cmd, h.in = nil, nil
+	}
 	h.generation++
 	generation := h.generation
 	h.state = wire.HostedMCPStateStarting
@@ -677,6 +688,10 @@ func (d *Daemon) hostedHeard(h *hostedServer, generation int, line []byte) {
 		if len(m.ID) > 0 && string(m.ID) != "null" {
 			d.hostedWriteLocked(h, map[string]any{"jsonrpc": "2.0", "id": m.ID,
 				"error": map[string]any{"code": CodeMethodNotFound, "message": "Not passed on by the app."}})
+			return
+		}
+		for _, heard := range h.heard {
+			safe.Go("hosted mcp", func() { heard(m.Method) })
 		}
 		return
 	}

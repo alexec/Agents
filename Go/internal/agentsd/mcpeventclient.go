@@ -5,11 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"time"
-
-	sdk "github.com/coder/acp-go-sdk"
 
 	"github.com/alexec/agents/Go/wire"
 )
@@ -180,6 +179,9 @@ type mcpEventConns struct {
 	// heard is told which server said its events changed.
 	heard   func(key string)
 	timeout time.Duration
+	// hosted is the way to a hosted entry's one copy (#4516): errHostedTooMany when the host
+	// has no room, and the connection runs its own copy.
+	hosted func(s eventServer, heard func(string)) (mcpConn, error)
 }
 
 func newMCPEventConns(heard func(string)) *mcpEventConns {
@@ -188,7 +190,8 @@ func newMCPEventConns(heard func(string)) *mcpEventConns {
 
 // with runs body with a connected client of the server, connecting first if none is. A
 // session the server has forgotten is opened again, once.
-func (p *mcpEventConns) with(key string, s sdk.McpServer, cwd string, body func(*mcpEventConn) error) error {
+func (p *mcpEventConns) with(s eventServer, body func(*mcpEventConn) error) error {
+	key := s.pool()
 	p.mu.Lock()
 	c := p.held[key]
 	if c == nil {
@@ -204,7 +207,7 @@ func (p *mcpEventConns) with(key string, s sdk.McpServer, cwd string, body func(
 	defer c.mu.Unlock()
 	for attempt := 0; ; attempt++ {
 		if c.c == nil {
-			if err := p.connect(key, c, s, cwd); err != nil {
+			if err := p.connect(key, c, s); err != nil {
 				p.forget(key, c)
 				return err
 			}
@@ -220,15 +223,33 @@ func (p *mcpEventConns) with(key string, s sdk.McpServer, cwd string, body func(
 	}
 }
 
-func (p *mcpEventConns) connect(key string, c *mcpEventConn, s sdk.McpServer, cwd string) error {
+// connect opens c: through the host's copy for a hosted entry, else a copy of its own. A
+// connection still open is ended first, so a server never has two copies here (#4516).
+func (p *mcpEventConns) connect(key string, c *mcpEventConn, es eventServer) error {
 	heard := func(method string) {
 		if method == mcpEventsChanged && p.heard != nil {
 			p.heard(key)
 		}
 	}
+	if c.c != nil {
+		c.c.end()
+		c.c = nil
+	}
+	s := es.filled
+	if es.hosted && p.hosted != nil {
+		hc, err := p.hosted(es, heard)
+		if err == nil {
+			c.c = hc
+		} else if !errors.Is(err, errHostedTooMany) {
+			return err
+		} else {
+			log.Printf("mcp events: %s runs a copy of its own: %d hosted servers are in use", es.name, hostedLimit)
+		}
+	}
 	switch {
+	case c.c != nil:
 	case s.Stdio != nil:
-		sc, err := startStdioMCP(s.Stdio, cwd)
+		sc, err := startStdioMCP(s.Stdio, es.cwd)
 		if err != nil {
 			return err
 		}
