@@ -21,6 +21,7 @@ control/status
   },
   "capabilities": [
     "attention/1",
+    "attention/2",
     "audit.sinks/1",
     "backups.store/1",
     "bots/1",
@@ -67,6 +68,7 @@ control/status
     "projects.sessions/1",
     "projects/1",
     "providers/1",
+    "providers/2",
     "readapi/1",
     "reports.nodes/1",
     "reports.scope/1",
@@ -234,6 +236,7 @@ control/status
   },
   "capabilities": [
     "attention/1",
+    "attention/2",
     "audit.sinks/1",
     "backups.store/1",
     "bots/1",
@@ -280,6 +283,7 @@ control/status
     "projects.sessions/1",
     "projects/1",
     "providers/1",
+    "providers/2",
     "readapi/1",
     "reports.nodes/1",
     "reports.scope/1",

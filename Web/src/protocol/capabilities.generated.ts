@@ -15,6 +15,7 @@ export const Capability = {
   approvals1: "approvals/1",
   artifact1: "artifact/1",
   attention1: "attention/1",
+  attention2: "attention/2",
   auditSinks1: "audit.sinks/1",
   auto1: "auto/1",
   backupsStore1: "backups.store/1",
@@ -138,6 +139,7 @@ export const Capability = {
   projects1: "projects/1",
   providersCarry1: "providers.carry/1",
   providers1: "providers/1",
+  providers2: "providers/2",
   readapi1: "readapi/1",
   relay1: "relay/1",
   reportsNodes1: "reports.nodes/1",
@@ -624,7 +626,7 @@ export const HostCapabilities: Readonly<Record<string, Capability>> = {
 
 /** The capability of each method and notification in control.openrpc.json. */
 export const ControlCapabilities: Readonly<Record<string, Capability>> = {
-  "attention/need": "attention/1",
+  "attention/need": "attention/2",
   "attention/turn": "liveactivity/1",
   "audit/export": "events.audit/1",
   "audit/list": "events.audit/1",
@@ -772,7 +774,7 @@ export const ControlCapabilities: Readonly<Record<string, Capability>> = {
   "projects/setBoards": "projects.boards/1",
   "projects/setSlot": "projects/1",
   "providers/add": "providers/1",
-  "providers/create": "providers/1",
+  "providers/create": "providers/2",
   "providers/draftAnswer": "providers/1",
   "providers/draftCancel": "providers/1",
   "providers/draftSigned": "providers/1",
@@ -896,6 +898,9 @@ export const DeclaredCapabilities: Readonly<Record<string, readonly Capability[]
   client: [
     "client.wire/1",
     "client.team/1",
+  ],
+  control: [
+    "attention/1",
   ],
   host: [
     "host.wire/1",
