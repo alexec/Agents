@@ -64,8 +64,6 @@ func (d *Daemon) planTargetOf(ctx context.Context, method string, node wire.Line
 		return forgeTarget{}, forgeCannotErr(method, t.forge, cannot(actionPlan))
 	case t.jira != nil:
 		return forgeTarget{}, Invalid("%s: a Jira plan is changed in Jira, not yet here", method)
-	case t.gitlab != nil:
-		return forgeTarget{}, Invalid("%s: a GitLab plan is changed on GitLab, not yet here", method)
 	}
 	return t, nil
 }
@@ -85,6 +83,10 @@ func (d *Daemon) forgeAddChild(ctx context.Context, r wire.ForgeAddChildRequest)
 	t, err := d.planTargetOf(ctx, method, r.Node)
 	if err != nil {
 		return wire.ForgeDone{}, err
+	}
+	// A forge that adds no child says so before the plan is read for the new child's labels.
+	if t.forge != nil && !t.forge.Caps().AddChild {
+		return wire.ForgeDone{}, forgeCannotErr(method, t.forge, cannot(actionAddChild))
 	}
 	if issue != "" && t.forge != nil {
 		done, err := t.forge.AddChild(ctx, t.ref, forgeChild{Issue: issue})
@@ -204,6 +206,9 @@ func (d *Daemon) forgeBlockedBy(ctx context.Context, r wire.ForgeBlockedByReques
 	t, err := d.planTargetOf(ctx, method, r.Node)
 	if err != nil {
 		return wire.ForgeDone{}, err
+	}
+	if t.forge != nil && !t.forge.Caps().BlockedBy {
+		return wire.ForgeDone{}, forgeCannotErr(method, t.forge, cannot(actionBlockedBy))
 	}
 	// Every blocker is checked before the first write, so a wrong one changes nothing.
 	type blocker struct {

@@ -277,6 +277,10 @@ func (d *Daemon) forgeList(ctx context.Context, prs bool, r wire.ForgeListReques
 			continue
 		}
 		s, err := f.Sources(ctx, folders, prs)
+		if board != nil {
+			// A board's list is of the board's own projects: it says nothing of folders left out.
+			err = nil
+		}
 		if s == nil || s.Empty() && err == nil {
 			continue
 		}
@@ -299,23 +303,6 @@ func (d *Daemon) forgeList(ctx context.Context, prs bool, r wire.ForgeListReques
 			p, p.err = m.forge.List(ctx, m.scope, filter, *cursor.of(name), limit)
 		}
 		p.forge = name
-		pages = append(pages, p)
-	}
-	if (len(sources.gitlab) > 0 || sources.gitlabErr != nil) && !slices.Contains(cursor.Done, "gitlab") {
-		p := forgePage{forge: "gitlab", err: sources.gitlabErr}
-		f := gitlabmcp.SearchFilter{MRs: prs, State: state,
-			Label: deref(r.Label), Assignee: deref(r.Assignee), Query: deref(r.Query), Feature: deref(r.Feature)}
-		if p.err == nil && board != nil {
-			f.Board, p.err = d.forgeGitLab(sources.root).GroupBoard(ctx, board.group, board.id)
-		}
-		if p.err == nil {
-			var page gitlabmcp.SearchPage
-			page, p.err = d.forgeGitLab(sources.root).Search(ctx, sources.gitlab, f, cursor.GitLab, limit)
-			for _, i := range page.Items {
-				p.items = append(p.items, gitlabItemOf(i, sources.folderOf[forgeRepo{"gitlab", strings.ToLower(i.Project)}]))
-			}
-			p.cursors, p.next = page.Cursors, page.Next
-		}
 		pages = append(pages, p)
 	}
 	if (len(sources.forgejo) > 0 || sources.forgejoErr != nil) && !slices.Contains(cursor.Done, "forgejo") {
@@ -441,13 +428,10 @@ func mergeForgePages(pages []forgePage, from forgeCursor, limit int) ([]wire.For
 	return items, next, more
 }
 
-// forgeSources are what a list reads of the forges not yet on the interface: the GitLab projects on the connected
-// GitLab, the Linear teams and the Jira projects, each once, with a folder on each to act from.
+// forgeSources are what a list reads of the forges not yet on the interface: the Linear teams,
+// the Jira projects and the others' repositories, each once, with a folder on each to act from.
 type forgeSources struct {
-	gitlab    []string
-	root      string
-	gitlabErr error
-	teams     []string
+	teams []string
 	// workspace is the whole Linear workspace, when no folder names a team (#3311); its
 	// issues act from linearHome.
 	workspace     bool
@@ -478,30 +462,12 @@ type forgeSources struct {
 }
 
 func (s forgeSources) key() []any {
-	return []any{s.root, s.gitlab, s.teams, s.workspace, s.linearHome, s.projects, s.boards, s.forgejoRoot, s.forgejo, s.bitbucketRoot, s.bitbucket, s.azureDevOpsRoot, s.azureDevOps}
+	return []any{s.teams, s.workspace, s.linearHome, s.projects, s.boards, s.forgejoRoot, s.forgejo, s.bitbucketRoot, s.bitbucket, s.azureDevOpsRoot, s.azureDevOps}
 }
 
 func (d *Daemon) forgeSources(ctx context.Context, prs bool, folders []string) forgeSources {
 	s := forgeSources{folderOf: map[forgeRepo]string{}, teamFolder: map[string]string{}, projectFolder: map[string]string{}, boardsFolder: map[string]string{}}
-	gl, glConnected := d.gitlabConnection()
-	if glConnected && gl.Usable(nowFunc()) {
-		s.root = gitlabmcp.BaseURL(gl.URL)
-	}
-	elsewhere := false
 	for _, f := range folders {
-		repo := d.folderRepo(f)
-		if _, seen := s.folderOf[repo]; repo.path != "" && !seen {
-			// GitHub is on the forge interface: githubForge.Sources reads its repos.
-			if repo.forge == "gitlab" {
-				// Only a project on the connected GitLab: its token is for nowhere else.
-				if root, project := d.gitlabProjectAt(ctx, f, gl.URL); s.root != "" && root == s.root {
-					s.folderOf[repo] = f
-					s.gitlab = append(s.gitlab, project)
-				} else {
-					elsewhere = true
-				}
-			}
-		}
 		if prs {
 			continue
 		}
@@ -532,17 +498,9 @@ func (d *Daemon) forgeSources(ctx context.Context, prs bool, folders []string) f
 	if !prs && len(s.teams) == 0 && d.linearConnected() && !d.anyLinearTeams() {
 		s.workspace, s.linearHome = true, d.linearHome()
 	}
-	slices.Sort(s.gitlab)
 	slices.Sort(s.teams)
 	slices.Sort(s.projects)
 	slices.Sort(s.boards)
-	if len(s.gitlab) == 0 && elsewhere {
-		// A page still says why GitLab's folders are not in it.
-		s.gitlabErr = errors.New(gitlabmcp.NotConnected)
-		if s.root != "" {
-			s.gitlabErr = errors.New("GitLab is connected at " + s.root + ", and no folder here is on it")
-		}
-	}
 	return s
 }
 
@@ -681,10 +639,8 @@ func (d *Daemon) forgeItem(ctx context.Context, kind string, r wire.ForgeItemReq
 		out, err = d.bitbucketItem(ctx, method, kind, repo, number, deref(r.Cursor))
 	} else if repo, number, ok := azureDevOpsOfNode(r.Node); ok {
 		out, err = d.azureDevOpsItem(ctx, method, repo, number, deref(r.Cursor))
-	} else if repo, number, ok := nodeOfRepo(r.Node); !ok {
-		return wire.ForgeItemDetail{}, Invalid("%s: %s is not an issue or a pull request on GitHub, GitLab, Forgejo, Bitbucket, Azure DevOps, Linear, Jira or Azure Boards", method, r.Node.Ref)
 	} else {
-		out, err = d.gitlabItem(ctx, method, kind, repo, number, deref(r.Cursor))
+		return wire.ForgeItemDetail{}, Invalid("%s: %s is not an issue or a pull request on GitHub, GitLab, Forgejo, Bitbucket, Azure DevOps, Linear, Jira or Azure Boards", method, r.Node.Ref)
 	}
 	if err != nil {
 		return wire.ForgeItemDetail{}, err
@@ -711,41 +667,6 @@ func (d *Daemon) gitlabOf(ctx context.Context, method string, repo forgeRepo) (f
 		return nil, "", "", Invalid("%s: %s is not on the connected GitLab, %s", method, repo.path, root)
 	}
 	return d.forgeGitLab(root), project, folder, nil
-}
-
-// gitlabItem is an issue or merge request on the connected GitLab.
-func (d *Daemon) gitlabItem(ctx context.Context, method, kind string, repo forgeRepo, number int, cursor string) (wire.ForgeItemDetail, error) {
-	gl, project, folder, err := d.gitlabOf(ctx, method, repo)
-	if err != nil {
-		return wire.ForgeItemDetail{}, err
-	}
-	p, err := gl.ItemPage(ctx, project, number, kind == lineage.KindPR, cursor)
-	if err != nil {
-		if gitlabmcp.IsNotFound(err) {
-			return wire.ForgeItemDetail{}, Invalid("%s: %v", method, err)
-		}
-		return wire.ForgeItemDetail{}, err
-	}
-	out := wire.ForgeItemDetail{Item: gitlabItemOf(p.Item, folder), Body: p.Body, Comments: []wire.ForgeComment{}}
-	for _, c := range p.Thread {
-		out.Comments = append(out.Comments, forgeCommentOf(c.Author, c.Body, c.At, c.URL, c.Bot))
-	}
-	out.Cursor = optional(p.Before)
-	if p.MR {
-		out.Checks = []wire.ForgeCheck{}
-		for _, c := range p.CheckRuns {
-			out.Checks = append(out.Checks, wire.ForgeCheck{Name: c.Name, State: c.State, URL: optional(c.URL)})
-		}
-		out.ReviewThreads, out.FilesChanged = new(int64(p.ReviewThreads)), new(int64(p.FilesChanged))
-		out.Head = optional(p.Head)
-		// The merge menu is a nicety: a page still reads when GitLab does not say the project's.
-		if methods, err := gl.MergeMethods(ctx, project); err == nil {
-			out.MergeMethods = mergeMethodsOf(methods)
-		}
-	} else {
-		out.Start = forgeStartOf(out.Item)
-	}
-	return out, nil
 }
 
 func (d *Daemon) linearItem(ctx context.Context, method, identifier, cursor string) (wire.ForgeItemDetail, error) {

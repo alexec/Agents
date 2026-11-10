@@ -119,16 +119,14 @@ func (d *Daemon) registerForgeWrites() {
 }
 
 // forgeTarget is the item a write is on, and the forge to write it with: a forge on the
-// interface (#4329), with its ref there; or, of the forges not yet on it, one of gitlab
-// (with its project there), forgejo, bitbucket or azureDevOps (with its repository there, in project), linear (with its identifier), jira (with its key, in identifier) or
+// interface (#4329), with its ref there; or, of the forges not yet on it, one of forgejo,
+// bitbucket or azureDevOps (with its repository there, in project), linear (with its identifier), jira (with its key, in identifier) or
 // boards (with its project and its id, in number).
 type forgeTarget struct {
-	repo        forgeRepo
 	number      int
 	pr          bool
 	forge       Forge
 	ref         forgeRef
-	gitlab      forgeGitLab
 	project     string
 	linear      forgeLinear
 	jira        forgeJira
@@ -189,17 +187,7 @@ func (d *Daemon) forgeTargetOf(ctx context.Context, method string, node wire.Lin
 		}
 		return forgeTarget{azureDevOps: ado, project: named, number: number, pr: true}, nil
 	}
-	repo, number, ok := nodeOfRepo(node)
-	if !ok {
-		return forgeTarget{}, Invalid("%s: %s is not an issue or a pull request on GitHub, GitLab, Forgejo, Bitbucket, Azure DevOps, Linear, Jira or Azure Boards", method, node.Ref)
-	}
-	t := forgeTarget{repo: repo, number: number, pr: node.Kind == lineage.KindPR}
-	gl, project, _, err := d.gitlabOf(ctx, method, repo)
-	if err != nil {
-		return forgeTarget{}, err
-	}
-	t.gitlab, t.project = gl, project
-	return t, nil
+	return forgeTarget{}, Invalid("%s: %s is not an issue or a pull request on GitHub, GitLab, Forgejo, Bitbucket, Azure DevOps, Linear, Jira or Azure Boards", method, node.Ref)
 }
 
 // forgeWrote forgets every answer kept, so the page's next read shows the write.
@@ -240,8 +228,6 @@ func (d *Daemon) forgeComment(ctx context.Context, r wire.ForgeCommentRequest) (
 		url, err = t.bitbucket.Comment(ctx, t.project, t.number, t.pr, body)
 	case t.azureDevOps != nil:
 		url, err = t.azureDevOps.Comment(ctx, t.project, t.number, body)
-	case t.gitlab != nil:
-		err = t.gitlab.Comment(ctx, t.project, t.number, t.pr, body)
 	}
 	if err != nil {
 		return wire.ForgeDone{}, err
@@ -298,8 +284,6 @@ func (d *Daemon) forgeLabel(ctx context.Context, r wire.ForgeLabelRequest) (wire
 		err = t.bitbucket.SetLabels(ctx, t.project, t.number, add, remove)
 	case t.azureDevOps != nil:
 		err = t.azureDevOps.SetLabels(ctx, t.project, t.number, add, remove)
-	case t.gitlab != nil:
-		err = t.gitlab.SetLabels(ctx, t.project, t.number, t.pr, add, remove)
 	}
 	if err != nil {
 		return wire.ForgeDone{}, err
@@ -337,8 +321,6 @@ func (d *Daemon) forgeLabels(ctx context.Context, r wire.ForgeNodeRequest) (wire
 		names, err = t.bitbucket.RepoLabels(ctx, t.project)
 	case t.azureDevOps != nil:
 		names, err = t.azureDevOps.RepoLabels(ctx, t.project)
-	case t.gitlab != nil:
-		names, colors, err = t.gitlab.ProjectLabels(ctx, t.project)
 	}
 	if err != nil {
 		return wire.ForgeLabels{}, err
@@ -381,8 +363,6 @@ func (d *Daemon) forgeClose(ctx context.Context, r wire.ForgeCloseRequest) (wire
 		err = t.bitbucket.SetState(ctx, t.project, t.number, t.pr, closed)
 	case t.azureDevOps != nil:
 		err = t.azureDevOps.SetState(ctx, t.project, t.number, closed)
-	case t.gitlab != nil:
-		err = t.gitlab.SetState(ctx, t.project, t.number, t.pr, closed)
 	}
 	if err != nil {
 		return wire.ForgeDone{}, err
@@ -427,24 +407,7 @@ func (d *Daemon) forgeMerge(ctx context.Context, r wire.ForgeMergeRequest) (wire
 		d.forgeWrote()
 		return wire.ForgeDone{}, nil
 	}
-	if t.azureDevOps != nil {
-		if err := d.azureDevOpsMerge(ctx, method, t, r.Sha, how, auto); err != nil {
-			return wire.ForgeDone{}, err
-		}
-		d.forgeWrote()
-		return wire.ForgeDone{Auto: optionalTrue(auto)}, nil
-	}
-	methods, err := t.gitlab.MergeMethods(ctx, t.project)
-	if err != nil {
-		return wire.ForgeDone{}, err
-	}
-	if how == "" {
-		how = methods[0]
-	}
-	if !slices.Contains(methods, how) {
-		return wire.ForgeDone{}, Invalid("%s: this project merges by %s", method, strings.Join(methods, " or "))
-	}
-	if err := t.gitlab.Merge(ctx, t.project, t.number, r.Sha, how == "squash", auto); err != nil {
+	if err := d.azureDevOpsMerge(ctx, method, t, r.Sha, how, auto); err != nil {
 		return wire.ForgeDone{}, err
 	}
 	d.forgeWrote()
@@ -472,8 +435,6 @@ func (d *Daemon) forgeApprove(ctx context.Context, r wire.ForgeApproveRequest) (
 		url, err = t.bitbucket.Approve(ctx, t.project, t.number, r.Sha)
 	case t.azureDevOps != nil:
 		url, err = t.azureDevOps.Approve(ctx, t.project, t.number, r.Sha)
-	case t.gitlab != nil:
-		_, err = t.gitlab.Approve(ctx, t.project, t.number, r.Sha)
 	}
 	if err != nil {
 		return wire.ForgeDone{}, err
@@ -524,23 +485,7 @@ func (d *Daemon) forgeRerun(ctx context.Context, r wire.ForgeNodeRequest) (wire.
 	if t.bitbucket != nil {
 		return d.bitbucketRerun(ctx, method, t, r.Node.Ref)
 	}
-	if t.azureDevOps != nil {
-		return d.azureDevOpsRerun(ctx, method, t, r.Node.Ref)
-	}
-	p, err := t.gitlab.ItemPage(ctx, t.project, t.number, true, "")
-	if err != nil {
-		return wire.ForgeDone{}, err
-	}
-	if p.Pipeline == 0 {
-		return wire.ForgeDone{}, Invalid("%s: %s has no pipeline to retry", method, r.Node.Ref)
-	}
-	out, err := t.gitlab.RetryPipeline(ctx, t.project, p.Pipeline)
-	if err != nil {
-		return wire.ForgeDone{}, err
-	}
-	d.forgeWrote()
-	url, _ := out["url"].(string)
-	return wire.ForgeDone{URL: optional(url), Reran: new(int64(1))}, nil
+	return d.azureDevOpsRerun(ctx, method, t, r.Node.Ref)
 }
 
 func (d *Daemon) forgeLog(ctx context.Context, r wire.ForgeLogRequest) (wire.ForgeLog, error) {
@@ -560,22 +505,7 @@ func (d *Daemon) forgeLog(ctx context.Context, r wire.ForgeLogRequest) (wire.For
 	if t.bitbucket != nil {
 		return bitbucketLog(ctx, t, check)
 	}
-	if t.azureDevOps != nil {
-		return azureDevOpsLog(ctx, t, check)
-	}
-	p, err := t.gitlab.ItemPage(ctx, t.project, t.number, true, "")
-	if err != nil {
-		return wire.ForgeLog{}, err
-	}
-	if p.Pipeline == 0 {
-		return wire.ForgeLog{}, Invalid("%s: %s has no pipeline", method, r.Node.Ref)
-	}
-	// A GitLab check is "stage: job"; its log is the job's.
-	if _, job, ok := strings.Cut(check, ": "); ok {
-		check = job
-	}
-	text, err := t.gitlab.FailedLog(ctx, t.project, p.Pipeline, check)
-	return wire.ForgeLog{Text: text}, err
+	return azureDevOpsLog(ctx, t, check)
 }
 
 func (d *Daemon) forgeDiff(ctx context.Context, r wire.ForgeNodeRequest) (wire.ForgeDiff, error) {
@@ -595,8 +525,6 @@ func (d *Daemon) forgeDiff(ctx context.Context, r wire.ForgeNodeRequest) (wire.F
 		out, err = t.bitbucket.PRDiff(ctx, t.project, t.number)
 	case t.azureDevOps != nil:
 		out, err = t.azureDevOps.PRDiff(ctx, t.project, t.number)
-	case t.gitlab != nil:
-		out, err = t.gitlab.MRDiff(ctx, t.project, t.number)
 	}
 	if err != nil {
 		return wire.ForgeDiff{}, err
