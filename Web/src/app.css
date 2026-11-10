@@ -2170,6 +2170,24 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .work-avatar { flex: none; display: inline-grid; place-items: center; border-radius: 50%; box-shadow: 0 0 0 1.5px var(--paper-raised);
   background: hsl(var(--hue) 55% 45%); color: #fff; font-weight: 600; line-height: 1; }
 .work-item-rows li.stale { opacity: 0.5; }
+/* The lists (#4395, lists.md): a row is a link; the selected row (the focus) has a 2 px accent ring on the light accent fill. */
+a.work-row { text-decoration: none; color: inherit; }
+.work-item-rows a.work-row:focus-visible, .work-item-rows a.work-row:focus { outline: 2px solid var(--accent); outline-offset: -2px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.work-item-rows a.work-row:focus:not(:focus-visible) { outline: none; background: none; }
+.work-menus { flex: 1 1 auto; min-width: 0; }
+.work-sort { margin-left: auto; }
+.work-clear { gap: 5px; opacity: 0.8; }
+.work-clear span { font-size: 0.8em; }
+.work-filters .work-refresh { margin-left: 4px; }
+/* The end of the list: Loading more…, Load more, Could not load more. with Try again, or the count. */
+.work-list-end { display: flex; gap: 10px; align-items: center; justify-content: center; padding: 12px 8px; }
+.work-list-end button { font-size: inherit; }
+.work-spinner { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid currentColor; border-right-color: transparent;
+  animation: work-spin 1s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .work-spinner { animation-duration: 3s; } }
+.work-error .buttons { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.work-error.middle { flex-wrap: wrap; }
 /* The phone's row (under 700 px): the title on two lines, every chip under it, the short line, no avatars. */
 @container (max-width: 699px) {
   .work-item-row .work-row-head { flex-wrap: wrap; }
@@ -2188,6 +2206,9 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
   .work-list > .work-filters .work-menus { order: 3; flex: 1 0 100%; overflow-x: auto; scrollbar-width: none; }
   .work-list > .work-filters .work-menu-button { border: 1px solid var(--paper-rule); border-radius: 99px; padding: 3px 10px; }
   .work-list > .work-filters .work-refresh { margin-left: 0; }
+  /* As the iPhone's capsules: Board is the last before Sort, and no Clear (the empty list has Clear filters). */
+  .work-list > .work-filters .work-clear { display: none; }
+  .work-list > .work-filters .work-sort { margin-left: 0; }
 }
 /* A first read: six placeholder rows with a slow shimmer. */
 .work-placeholder .dot { flex: none; width: 16px; height: 16px; border-radius: 50%; background: var(--paper-wash); }

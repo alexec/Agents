@@ -36,6 +36,8 @@ export interface WorkListState {
   lineageCursor: Signal<string | undefined>;
   problem: Signal<string | null>;
   more: Signal<boolean>;
+  /** What a page after the first said when it did not load (lists.md section 5): "Could not load more." at the end. */
+  moreFailed: Signal<string | null>;
   asked: Signal<number>;
   /** The row whose page was opened last, which the list scrolls to when it is shown again. */
   opened: Signal<string | undefined>;
@@ -54,7 +56,7 @@ export function workList(kind: WorkKind): WorkListState {
   if (!l) {
     l = {
       kind, filter: signal(anyFilter), projects: signal([]), sort: signal<WorkSort>("updated"), lists: signal(null), loading: signal(false), lineage: signal([]),
-      lineageCursor: signal(undefined), problem: signal(null), more: signal(false), asked: signal(0), opened: signal(undefined),
+      lineageCursor: signal(undefined), problem: signal(null), more: signal(false), moreFailed: signal(null), asked: signal(0), opened: signal(undefined),
       read: undefined,
     };
     lists.set(kind, l);
@@ -151,6 +153,7 @@ export async function loadList(store: Store, l: WorkListState): Promise<void> {
   const before = l.lists.peek() ?? [];
   l.loading.value = true;
   l.problem.value = null;
+  l.moreFailed.value = null;
   try {
     // Lineage first, so the rows come with their figures; a control plane that does not list nodes gives none.
     const known = await readLineage(store, kind, sort).catch((e: unknown) => {
@@ -178,9 +181,11 @@ export async function loadList(store: Store, l: WorkListState): Promise<void> {
   }
 }
 
-/** More: the next page of each machine's list, or of lineage's. */
+/** The next page (Load more, or the end of the list in view) of each machine's list, or of lineage's. */
 export async function loadMore(store: Store, l: WorkListState): Promise<void> {
+  if (l.more.peek()) return;
   l.more.value = true;
+  l.moreFailed.value = null;
   try {
     if (fromForge(l.kind)) {
       const method = l.kind === "issue" ? "forge/issues" : "forge/pulls";
@@ -196,7 +201,7 @@ export async function loadMore(store: Store, l: WorkListState): Promise<void> {
       l.lineageCursor.value = next.cursor;
     }
   } catch (e) {
-    l.problem.value = describe(e);
+    l.moreFailed.value = describe(e);
   } finally {
     l.more.value = false;
   }
@@ -216,7 +221,7 @@ export async function nextAfter(store: Store, kind: WorkKind, ref: string): Prom
     const before = shownRows(l).length;
     await loadMore(store, l);
     next = neighbours(ref, shownRows(l))?.next;
-    if (shownRows(l).length === before || l.problem.peek()) break;
+    if (shownRows(l).length === before || l.moreFailed.peek()) break;
   }
   return next;
 }

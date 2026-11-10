@@ -443,7 +443,8 @@ export function shortAge(seconds: number): string {
  * is the last update's. With no lineage the line ends after the author. */
 export function rowLine(row: WorkRow, now: number): { wide: string; short: string } {
   const ref = titleSaysRef(row) ? [] : [shortRef(row.node.ref)];
-  const status = row.status ? [row.status] : [];
+  // A draft says so in grey after its number (lists.md section 2), as its grey glyph does.
+  const status = [...row.draft && row.state === "open" ? ["Draft"] : [], ...row.status ? [row.status] : []];
   const age = row.updated > 0 ? Math.max(0, now / 1000 - row.updated) : undefined;
   const by = row.author ? ` by ${row.author}` : "";
   const when = age === undefined ? row.author ? [`by ${row.author}`] : [] : [`updated ${ago(new Date(row.updated * 1000), new Date(now))}${by}`];
@@ -527,6 +528,74 @@ export function emptyWords(kind: WorkKind, state: WorkState, filter: boolean, re
   const word = state === "all" ? "" : `${state} `;
   const where = repos.length === 1 ? repoName(repos[0]!) : "your forges";
   return { title: `No ${word}${things}`, line: `${workKindTitle[kind]} on ${where} show here.` };
+}
+
+/** The filters that are set, as an empty list says them (lists.md section 5): "Label: bug · Assignee: alexec"; the
+ * project's and the board's names when given. Undefined when nothing narrows. */
+export function setFilters(f: WorkFilter, project?: string, board?: string): string | undefined {
+  const text = f.text.trim();
+  const parts = [
+    ...text ? [`“${text}”`] : [],
+    ...f.project ? [`Project: ${project ?? f.project}`] : [],
+    ...f.repo ? [`Repo: ${repoName(f.repo)}`] : [],
+    ...f.label ? [`Label: ${f.label}`] : [],
+    ...f.assignee ? [`Assignee: ${f.assignee}`] : [],
+    ...f.board ? [`Board: ${board ?? f.board}`] : [],
+  ];
+  return parts.length === 0 ? undefined : parts.join(" · ");
+}
+
+/** One item of a kind, or many: "1 issue", "128 issues", "50+ issues" while more pages are there (lists.md section 5;
+ * the forges give no total yet, #4397). */
+export function countWords(kind: WorkKind, n: number, more = false): string {
+  const noun = workKindTitle[kind].toLowerCase();
+  return `${n}${more ? "+" : ""} ${n === 1 && !more ? noun.slice(0, -1) : noun}`;
+}
+
+/** The footer while the next page loads: "Loading more… · 50 shown". */
+export const loadingMore = (shown: number) => `Loading more… · ${shown} shown`;
+
+/** A page after the first that did not load: one line at the end, and Try again. */
+export const couldNotLoadMore = "Could not load more.";
+
+/** The middle of a list that read nothing: "Could not read issues", then what the forge said. */
+export const couldNotRead = (kind: WorkKind) => `Could not read ${workKindTitle[kind].toLowerCase()}`;
+
+/** Whether what a forge said is about its credential, so the error offers Settings ▸ Connectors too. */
+export function credentialProblem(message: string): boolean {
+  const m = message.toLowerCase();
+  return ["401", "403", "bad credentials", "unauthorized", "not connected", "token", "sign in", "signed in"].some((w) => m.includes(w));
+}
+
+/** The filters and the sort in the address (lists.md section 4), "project=agents&label=bug&sort=newest", so a link or a
+ * reload keeps them: only what is not the default. */
+export function workQuery(f: WorkFilter, sort: WorkSort): string {
+  const q = new URLSearchParams();
+  if (f.text.trim()) q.set("q", f.text);
+  if (f.project) q.set("project", f.project);
+  if (f.state !== anyFilter.state) q.set("state", f.state);
+  if (f.repo) q.set("repo", f.repo);
+  if (f.label) q.set("label", f.label);
+  if (f.assignee) q.set("assignee", f.assignee);
+  if (f.board) q.set("board", f.board);
+  if (sort !== "updated") q.set("sort", sort);
+  return q.toString();
+}
+
+/** The filters and the sort an address says; what it leaves out is the default. A word it does not know is left out. */
+export function parseWorkQuery(query: string, kind: WorkKind): { filter: WorkFilter; sort: WorkSort } {
+  const q = new URLSearchParams(query);
+  const state = q.get("state");
+  const states: readonly string[] = kind === "pr" ? ["open", "merged", "closed", "all"] : ["open", "closed", "all"];
+  const sort = q.get("sort");
+  return {
+    filter: {
+      state: state && states.includes(state) ? state as WorkState : anyFilter.state,
+      project: q.get("project") ?? "", repo: q.get("repo") ?? "", label: q.get("label") ?? "", assignee: q.get("assignee") ?? "",
+      text: q.get("q") ?? "", board: kind === "issue" ? q.get("board") ?? "" : "",
+    },
+    sort: sort && sort in workSortTitle ? sort as WorkSort : "updated",
+  };
 }
 
 export const connectForge = (kind: WorkKind) => `Connect a forge to see ${kind === "pr" ? "pull requests" : "issues"}`;
