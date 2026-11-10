@@ -10,6 +10,8 @@ Nothing here needs doing; it is for understanding.
 
 - [Direction](direction.md): what Agents is for, the three ways to run it, how one
   organisation's data is kept apart, and where data lives and is backed up.
+- [Planning](planning.md): what to do next, what it will cost and when it lands, and what
+  it delivered, and how estimates and forecasts earn trust.
 - [Why Agents](why-agents.md): why you would run your coding agents here, alongside the
   editor you already use, and when something else is better.
 - [The control plane](control-plane.md): hosts, clients, copies and the store, where to
