@@ -456,7 +456,8 @@ export class Work {
    */
   readonly plane = signal<{ machineID: string; homeHost?: string | undefined; thisMacHost?: MachineJoinStatus | undefined;
     name?: string; version?: string; required?: RequiredCapabilities | undefined; capabilities?: string[] | undefined;
-    startedAt?: WireDate | undefined; web?: WebRemoteStatus | undefined; restartable?: boolean | undefined } | null>(null);
+    startedAt?: WireDate | undefined; web?: WebRemoteStatus | undefined; restartable?: boolean | undefined;
+    publicWeb?: string | undefined } | null>(null);
   /** Whether the control plane said `capability` (#1748), from `control/status`: false until it has said its list. */
   planeHas(capability: string): boolean {
     return this.plane.value?.capabilities?.includes(capability) ?? false;
@@ -515,6 +516,8 @@ export class Work {
   readonly linksChanges = signal(0);
   /** Goes up on control/projectsChanged (#2317), so Console ▸ Projects loads again (#2671). */
   readonly projectsChanges = signal(0);
+  /** Counts each control/clientChanged: a pairing code's dialog (#4253) names the client it let in. */
+  readonly clientChanges = signal(0);
   /** Counts each control/peopleChanged (#994): Settings ▸ People loads its list again when it moves. */
   readonly peopleChanges = signal(0);
   /**
@@ -1456,6 +1459,10 @@ export class Store extends Work {
         this.linksChanges.value += 1;
         return;
       }
+      if (method === "control/clientChanged") {
+        this.clientChanges.value += 1;
+        return;
+      }
       if (method === "control/peopleChanged") {
         void this.loadPeople().then(() => Promise.all([this.loadLinkRequests(), this.loadRemoveRequests()]))
           .then(() => { this.peopleChanges.value += 1; });
@@ -1620,7 +1627,7 @@ export class Store extends Work {
     if (!status) return;
     this.plane.value = { machineID: status.machineID, homeHost: status.homeHost, thisMacHost: status.thisMacHost,
       name: status.name, version: status.version, required: status.required, capabilities: status.capabilities,
-      startedAt: status.startedAt, web: status.web, restartable: status.restartable };
+      startedAt: status.startedAt, web: status.web, restartable: status.restartable, publicWeb: status.publicWeb };
     this.person.value = status.person ?? null;
     this.joinCommand.value = status.joinCommand || null;
     knowPublicViews(status.publicViews);
