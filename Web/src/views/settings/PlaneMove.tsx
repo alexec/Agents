@@ -54,8 +54,7 @@ function PlaneMoveDialog({ flow, down, ask }: { flow: PlaneMoveFlow; down: boole
       <form class="sheet-body plane-move-sheet" onSubmit={(e) => {
         e.preventDefault();
         const main = buttons.find((b) => b.prominent && !b.disabled);
-        if (flow.kind === "move" && flow.step === "check" && !flow.checked) check();
-        else if (main) ask(main.action);
+        if (main) ask(main.action);
       }}>
         <h2>{flow.title}</h2>
         {flow.lead && <p class="sheet-note">{flow.lead}</p>}
@@ -79,7 +78,8 @@ function PlaneMoveDialog({ flow, down, ask }: { flow: PlaneMoveFlow; down: boole
         {flow.kind === "move" && flow.step === "check" && (
           <div class="plane-move-address">
             <input type="url" aria-label="Address" placeholder="agents.example.com" spellcheck={false} autocomplete="off"
-              value={typed} onInput={(e) => setTyped(e.currentTarget.value)} autoFocus />
+              value={typed} onInput={(e) => setTyped(e.currentTarget.value)} autoFocus
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); check(); } }} />
             <button type="button" disabled={down || !typed.trim() || !!flow.busy} onClick={check}>Check</button>
           </div>
         )}
@@ -95,7 +95,7 @@ function PlaneMoveDialog({ flow, down, ask }: { flow: PlaneMoveFlow; down: boole
         {flow.lines && flow.lines.length > 0 && (
           <ul class="plane-move-lines">
             {flow.lines.map((line) => (
-              <li key={line.label} class={isBad(line) ? "bad" : line.state}>
+              <li key={line.label} class={`line-${isBad(line) ? "bad" : line.state}`}>
                 <span class="mark" aria-hidden="true">{lineMark(line)}</span>
                 <span>
                   {line.label}
@@ -108,7 +108,7 @@ function PlaneMoveDialog({ flow, down, ask }: { flow: PlaneMoveFlow; down: boole
         {flow.step === "told" && (flow.members ? (
           <ul class="plane-move-members">
             {flow.members.map((member) => (
-              <li key={member.name} class={member.state}>
+              <li key={member.name} class={`member-${member.state}`}>
                 <span>{member.name}<span class="hint">{member.kind}</span></span>
                 <span>{memberState(member)}{member.note && <span class="hint">{member.note}</span>}</span>
               </li>

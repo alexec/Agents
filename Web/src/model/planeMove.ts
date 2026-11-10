@@ -5,7 +5,7 @@
 import type { PlaneMoveFlow, PlaneMoveLine, PlaneMoveMember } from "../protocol/generated";
 
 export const planeMoveWords = {
-  head: "Where it runs",
+  head: "Move",
   // Frame P: the key, sealed in the other machine's store over ssh, and that machine started empty.
   keyStep: "1 · Give the other machine this control plane's key",
   keySave: "Save the key. Before the control plane there first starts, seal the key in its store. The key goes in over ssh, so it's never written on that machine:",
