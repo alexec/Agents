@@ -1275,6 +1275,9 @@ dialog.image-viewer::backdrop { background: rgb(0 0 0 / 0.45); }
 .sub-app .settings-body .person-org { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 0 8px; }
 .sub-app .settings-body button.invite { margin: 4px 8px; }
 .sub-app .settings-body .hint.attention { color: var(--tint-attention); }
+/* A secret's last 4 and its not-backed-up line (#4159). */
+.secret-hint { margin-inline-start: 6px; }
+.secret-warning { color: var(--tint-attention); }
 .sub-app .settings-body .join-command { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
 .sub-app .settings-body .join-command-line { display: flex; align-items: flex-start; gap: 6px; }
 .sub-app .settings-body .join-command .code-text { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 0.6875rem;

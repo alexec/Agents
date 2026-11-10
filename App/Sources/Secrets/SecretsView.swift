@@ -10,7 +10,8 @@ struct SecretsView: View {
 
     var body: some View {
         // Through the window's own connection, which hears when they change (#1760).
-        SecretsPane(control: model.controlRequests, state: model.userScope) { SessionSecretsSection(model: model) }
+        SecretsPane(control: model.controlRequests, state: model.userScope,
+                    machineNames: SecretInfoWords.names(model.controlPlaneHosts ?? [], thisMac: model.thisMacHostID)) { SessionSecretsSection(model: model) }
             .frame(maxWidth: 560)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .navigationTitle(UserScopeWords.secretsTitle)
