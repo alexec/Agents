@@ -195,6 +195,18 @@ export function brokenWords(device: { forked: boolean; why: string }): string {
   return device.forked ? "The lock changed in a way your devices did not sign." : `Your lock does not check: ${device.why}.`;
 }
 
+/**
+ * The key is a client of the lock, but for another client id than `client` (#4320, as #4292 on
+ * the Mac): a new sign-in gives this page a new id, and a machine refuses a channel whose member
+ * is not the client the control plane names, so the page needs a key of its own for the new id.
+ * A member with no id, or no client yet, names nobody else.
+ */
+export function namesAnotherClient(state: LockState, key: Uint8Array, client: string): boolean {
+  const member = state.member(key);
+  if (!member || !isClient(member) || !member.id || !client) return false;
+  return member.id.toUpperCase() !== client.toUpperCase();
+}
+
 export class MachineLock {
   readonly device = signal<ThisDevice>({ kind: "unknown" });
   /** The signer's cards: other devices of this person that ask to join. */
@@ -293,7 +305,7 @@ export class MachineLock {
     return !!member && isClient(member);
   }
 
-    private async signingKey(): Promise<{ pair: CryptoKeyPair; publicRaw: Uint8Array }> {
+  private async signingKey(): Promise<{ pair: CryptoKeyPair; publicRaw: Uint8Array }> {
     if (this.key) return this.key;
     let pair = await this.link.lockKey();
     if (!pair) {
@@ -325,12 +337,19 @@ export class MachineLock {
   private async step(): Promise<void> {
     const record = await this.link.keyRecord();
     if (!record) return;
+    // A new sign-in is a new client id (#4320): the key kept may be another than the one in memory.
+    if (this.client && this.client !== record.client.toUpperCase()) this.key = null;
     this.client = record.client.toUpperCase();
     this.control = record.control;
     if (this.keepsPins) prunePins(pinName(this.control));
-    const { pair, publicRaw } = await this.signingKey();
+    let { pair, publicRaw } = await this.signingKey();
     let read = await this.checked();
     if (!read) return;
+    if (namesAnotherClient(read.state, publicRaw, this.client)) {
+      ({ pair, publicRaw } = await this.renew(read.state));
+      read = await this.checked();
+      if (!read) return;
+    }
     if (read.lock.entries.length === 0) {
       const root = await sign(pair.privateKey, publicRaw, {
         kind: "root", person: read.lock.person, at: this.now(), key: b64(publicRaw), id: this.client, clientKind: "web",
@@ -375,6 +394,38 @@ export class MachineLock {
       return;
     }
     await this.join(publicRaw);
+  }
+
+  /**
+   * The lock names this page's key for its id before a new sign-in (#4320): machines refuse its
+   * channels, and a key is in the lock only once. The old key, still a signer, signs a new key in
+   * for the new id, so no other device approves it, and the page keeps the new key. When that
+   * fails, the new key asks to join as a new device does.
+   */
+  private async renew(state: LockState): Promise<{ pair: CryptoKeyPair; publicRaw: Uint8Array }> {
+    const old = await this.signingKey();
+    const made = await makeSigningKey();
+    try {
+      for (let tries = 0; ; tries++) {
+        const read = tries === 0 ? { state } : await this.checked();
+        if (!read || !read.state.signer(old.publicRaw)) break;
+        const entry = await sign(old.pair.privateKey, old.publicRaw, {
+          kind: "addClient", person: read.state.person, previous: b64(read.state.head), at: this.now(), key: b64(made.publicRaw),
+          id: this.client, clientKind: "web",
+        });
+        try {
+          await this.link.call("lock/add", { entries: [entry] });
+          break;
+        } catch (error) {
+          if (!isChangedElsewhere(error) || tries > 0) throw error;
+        }
+      }
+    } catch (error) {
+      this.say(error);
+    }
+    await this.link.saveLockKey(made.pair);
+    this.key = { pair: made.pair, publicRaw: made.publicRaw };
+    return this.key;
   }
 
   private async join(publicRaw: Uint8Array): Promise<void> {
