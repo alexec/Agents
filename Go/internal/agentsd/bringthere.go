@@ -44,29 +44,28 @@ func (d *Daemon) bringBackTool(caller wire.UUID, args map[string]json.RawMessage
 	if b.changes {
 		what += ", with its uncommitted changes,"
 	}
-	yes, err := d.personSaysYes(me.ID, d.agentWho(me.ID)+" wants to bring back a branch from "+b.machine,
-		fmt.Sprintf("Bring %s back from %s on %s into %s?", what, b.folder, b.machine, shortPath(b.path)), "Bring it back")
-	if err != nil {
-		return "", err
-	}
-	if !yes {
-		return "Nothing was brought back: the person said no, or didn’t answer.", nil
-	}
-	done, err := d.bringFromThere(me, b)
-	if err != nil {
-		code, msg := errMessage(err)
-		return "", &Error{Code: code, Message: b.branch + " was not brought back from " + b.machine + ": " + msg}
-	}
-	out := fmt.Sprintf("%s already had every commit of %s on %s.", shortPath(b.path), b.branch, b.machine)
-	if len(done.Moved) > 0 {
-		out = fmt.Sprintf("Brought %s back from %s on %s: it moved forward in %s.", b.branch, b.folder, b.machine, shortPath(b.path))
-	}
-	if done.Applied {
-		out += " The uncommitted changes from " + b.machine + " are in " + shortPath(b.path) + "."
-	} else if b.changes {
-		out += " " + b.folder + " had no uncommitted changes."
-	}
-	return out, nil
+	return d.personSaysYes(me.ID, d.agentWho(me.ID)+" wants to bring back a branch from "+b.machine,
+		fmt.Sprintf("Bring %s back from %s on %s into %s?", what, b.folder, b.machine, shortPath(b.path)), "Bring it back",
+		func(yes bool) (string, error) {
+			if !yes {
+				return "Nothing was brought back: the person said no, or didn’t answer.", nil
+			}
+			done, err := d.bringFromThere(me, b)
+			if err != nil {
+				code, msg := errMessage(err)
+				return "", &Error{Code: code, Message: b.branch + " was not brought back from " + b.machine + ": " + msg}
+			}
+			out := fmt.Sprintf("%s already had every commit of %s on %s.", shortPath(b.path), b.branch, b.machine)
+			if len(done.Moved) > 0 {
+				out = fmt.Sprintf("Brought %s back from %s on %s: it moved forward in %s.", b.branch, b.folder, b.machine, shortPath(b.path))
+			}
+			if done.Applied {
+				out += " The uncommitted changes from " + b.machine + " are in " + shortPath(b.path) + "."
+			} else if b.changes {
+				out += " " + b.folder + " had no uncommitted changes."
+			}
+			return out, nil
+		})
 }
 
 // branchToBring is what bring_back is to bring, or why it can't: checked before the card,

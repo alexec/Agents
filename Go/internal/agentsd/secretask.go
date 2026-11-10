@@ -69,7 +69,7 @@ func (d *Daemon) askSecret(id wire.UUID, args map[string]json.RawMessage) (strin
 	req := wire.ElicitationRequest{ID: store.NewUUID(), AgentID: id, Message: &name, Secret: &secret,
 		Mode: wire.ElicitationRequestMode{Form: &wire.ElicitationRequestModeForm{Value: schema}}, Scope: wire.ElicitationRequestScopeSession,
 		AskedAt: now()}
-	r, answered := l.holdAskedForm(req)
+	r, answered := l.holdAskedForm(req, nil)
 	if !answered {
 		return formStillOpen, nil
 	}

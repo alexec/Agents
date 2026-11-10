@@ -98,14 +98,18 @@ func (d *Daemon) moveSessionTool(caller wire.UUID, args map[string]json.RawMessa
 	if !d.agentsMayStartOnMachines(folderPath(me)) {
 		ask := fmt.Sprintf("Move %s to %s, with %s and its uncommitted changes, into %s there? It goes on there with this conversation.",
 			sessionWords(target, self), machine, b.branch, folder)
-		yes, err := d.personSaysYes(caller, d.agentWho(caller)+" wants to move a session to "+machine, ask, "Move it")
-		if err != nil {
-			return "", err
-		}
-		if !yes {
-			return "Nothing was moved: the person said no, or didn’t answer.", nil
-		}
+		return d.personSaysYes(caller, d.agentWho(caller)+" wants to move a session to "+machine, ask, "Move it", func(yes bool) (string, error) {
+			if !yes {
+				return "Nothing was moved: the person said no, or didn’t answer.", nil
+			}
+			return d.moveThere(caller, target, self, machine, folder, b)
+		})
 	}
+	return d.moveThere(caller, target, self, machine, folder, b)
+}
+
+// moveThere is move_session once it may move (#4261: also after a late yes).
+func (d *Daemon) moveThere(caller wire.UUID, target *wire.Agent, self bool, machine, folder string, b sendingBranch) (string, error) {
 	order := machineMove{machine: machine, folder: folder, asker: caller}
 	if self {
 		d.machineMoves.Store(caller, order)
