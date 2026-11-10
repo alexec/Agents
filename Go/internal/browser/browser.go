@@ -18,6 +18,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -71,13 +72,15 @@ type Machine struct {
 	// lock: the clients that watch the page are told (#3528).
 	Changed func(running bool)
 
-	// launch starts Chromium and says how to reach it; a test gives its own.
-	launch func(exe, profile string, env []string) (*process, error)
+	// launch starts Chromium, headed or not, and says how to reach it; a test gives its own.
+	launch func(exe, profile string, env []string, headed bool) (*process, error)
 	// locate is the Chromium that the toolset installed; a test gives its own.
 	locate func(t Toolset, env []string) (string, error)
 
 	mu       sync.Mutex
 	running  *process
+	// headed is whether the next start has a window (Headed): until the browser stops.
+	headed   bool
 	toolset  Toolset
 	lastUsed time.Time
 	stopLoop chan struct{}
@@ -91,6 +94,8 @@ type process struct {
 	pid      int
 	done     <-chan struct{}
 	stop     func()
+	// headed is whether it has a window (off-screen), not headless.
+	headed bool
 	// store is its cookies, for Settings ▸ Browser (sites.go).
 	store cookieStore
 }
@@ -159,7 +164,14 @@ func (m *Machine) Endpoint(progress func(string)) (string, error) {
 	m.endLeftover()
 	dropCaches(m.Profile)
 	progress("Starting the browser")
-	p, err := m.launch(exe, m.Profile, env)
+	headed := m.headed && canHead(env)
+	p, err := m.launch(exe, m.Profile, env, headed)
+	if err != nil && headed {
+		// A window it cannot open is no reason to have no browser: headless, as always.
+		log.Printf("browser: Chromium did not start with a window (%v); starting it headless", err)
+		m.headed = false
+		p, err = m.launch(exe, m.Profile, env, false)
+	}
 	if err != nil {
 		return "", fmt.Errorf("the browser did not start: %w", err)
 	}
@@ -169,8 +181,48 @@ func (m *Machine) Endpoint(progress func(string)) (string, error) {
 	m.running = p
 	m.startLoop()
 	m.changed(true)
-	log.Printf("browser: Chromium (pid %d) started with the profile in %s", p.pid, m.Profile)
+	how := "headless"
+	if p.headed {
+		how = "with a window off-screen"
+	}
+	log.Printf("browser: Chromium (pid %d) started %s, with the profile in %s", p.pid, how, m.Profile)
 	return p.endpoint, nil
+}
+
+// Headed makes the browser have a window, off-screen, until it stops (#4272): a site whose
+// bot check refuses headless Chrome (ChecksBots). A headless Chromium that runs now stops,
+// with its cookies kept, and the next Endpoint starts it headed, at a new address. It says
+// whether it stopped one. Where no window can open (a Linux machine with no display), the
+// browser stays headless.
+func (m *Machine) Headed() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.stopped || !canHead(m.environment()) {
+		return false
+	}
+	restarted := false
+	if m.running != nil && !m.running.headed {
+		m.stopLocked()
+		restarted = true
+	}
+	m.headed = true
+	return restarted
+}
+
+// canHead is whether Chromium can open a window here: a Mac, or a display in env.
+func canHead(env []string) bool {
+	if runtime.GOOS == "darwin" {
+		return true
+	}
+	for _, kv := range env {
+		if v, ok := strings.CutPrefix(kv, "DISPLAY="); ok && v != "" {
+			return true
+		}
+		if v, ok := strings.CutPrefix(kv, "WAYLAND_DISPLAY="); ok && v != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // Toolset is Node and @playwright/mcp as the last start installed them: what drives the
@@ -235,6 +287,8 @@ func (m *Machine) stopLocked() {
 	m.running.stop()
 	log.Printf("browser: Chromium (pid %d) stopped", m.running.pid)
 	m.running = nil
+	// The next start is headless again, unless a site asks for a window (Headed).
+	m.headed = false
 	// The pages are gone, and every value filled into them with the pages.
 	m.Filter.Forget()
 	os.Remove(m.pidFile())
@@ -340,22 +394,27 @@ func locateChromium(t Toolset, env []string) (string, error) {
 // launchChromium starts Chromium with chromedp: headless, the kept profile, its debugging
 // port on 127.0.0.1 and a port the system picks, so only this machine reaches it and the
 // address has the browser's random id in its path. Its user agent says Chrome, not
-// HeadlessChrome (#4060). It has no WebAuthn, as it cannot do passkeys (#4084).
-func launchChromium(exe, profile string, env []string) (*process, error) {
-	if ua, ok := userAgents.Load(exe); ok {
-		p, _, err := startChromium(exe, profile, env, ua.(string))
+// HeadlessChrome (#4060). It has no WebAuthn, as it cannot do passkeys (#4084). Headed
+// (#4272), it has a window off-screen instead, and its own user agent.
+func launchChromium(exe, profile string, env []string, headed bool) (*process, error) {
+	if headed {
+		p, _, err := startChromium(exe, profile, env, "", true)
 		return p, err
 	}
-	p, ua, err := startChromium(exe, profile, env, "")
+	if ua, ok := userAgents.Load(exe); ok {
+		p, _, err := startChromium(exe, profile, env, ua.(string), false)
+		return p, err
+	}
+	p, ua, err := startChromium(exe, profile, env, "", false)
 	if err != nil || !strings.Contains(ua, "HeadlessChrome/") {
 		return p, err
 	}
 	// The first start of this Chromium learns its user agent; the next starts use it.
-	headed := headedUserAgent(ua)
-	userAgents.Store(exe, headed)
+	asChrome := headedUserAgent(ua)
+	userAgents.Store(exe, asChrome)
 	p.stop()
 	<-p.done
-	p, _, err = startChromium(exe, profile, env, headed)
+	p, _, err = startChromium(exe, profile, env, asChrome, false)
 	return p, err
 }
 
@@ -369,9 +428,9 @@ func headedUserAgent(ua string) string {
 	return strings.Replace(ua, "HeadlessChrome/", "Chrome/", 1)
 }
 
-// startChromium starts Chromium, with userAgent when it is not empty, and says the user
-// agent it has.
-func startChromium(exe, profile string, env []string, userAgent string) (*process, string, error) {
+// startChromium starts Chromium, with userAgent when it is not empty and a window when
+// headed, and says the user agent it has.
+func startChromium(exe, profile string, env []string, userAgent string, headed bool) (*process, string, error) {
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.ExecPath(exe),
 		chromedp.UserDataDir(profile),
@@ -395,6 +454,9 @@ func startChromium(exe, profile string, env []string, userAgent string) (*proces
 	if userAgent != "" {
 		opts = append(opts, chromedp.UserAgent(userAgent))
 	}
+	if headed {
+		opts = append(opts, headedOptions...)
+	}
 	allocCtx, cancelAlloc := chromedp.NewExecAllocator(context.Background(), opts...)
 	ctx, cancelCtx := chromedp.NewContext(allocCtx)
 	stop := func() {
@@ -416,6 +478,9 @@ func startChromium(exe, profile string, env []string, userAgent string) (*proces
 		stop()
 		return nil, "", errors.New("chromedp has no browser process")
 	}
+	if headed {
+		moveOffScreen(ctx)
+	}
 	version, err := chromedp.CallBrowser(ctx, cdpbrowser.GetVersion, cdp.Empty{})
 	if err != nil {
 		stop()
@@ -426,7 +491,37 @@ func startChromium(exe, profile string, env []string, userAgent string) (*proces
 		stop()
 		return nil, "", err
 	}
-	return &process{endpoint: endpoint, pid: b.Process().Pid, done: ctx.Done(), stop: stop, store: cdpStore{ctx}}, version.UserAgent, nil
+	return &process{endpoint: endpoint, pid: b.Process().Pid, done: ctx.Done(), stop: stop, headed: headed, store: cdpStore{ctx}}, version.UserAgent, nil
+}
+
+// moveOffScreen puts the first tab's window far off every screen. A Mac moves a window that
+// opens off-screen back onto it (window-position is not enough there), but not one moved
+// after it opened. A window that does not move stays where it is: it says so in the log.
+func moveOffScreen(ctx context.Context) {
+	w, err := chromedp.Call(ctx, cdpbrowser.GetWindowForTarget, cdpbrowser.GetWindowForTargetParams{})
+	if err == nil {
+		far := int64(offScreen)
+		_, err = chromedp.CallBrowser(ctx, cdpbrowser.SetWindowBounds,
+			cdpbrowser.SetWindowBoundsParams{WindowID: w.WindowID, Bounds: &cdpbrowser.Bounds{Left: &far, Top: &far}})
+	}
+	if err != nil {
+		log.Printf("browser: couldn't move the window off-screen: %v", err)
+	}
+}
+
+// offScreen is where a headed window goes, left and top: beyond any screen.
+const offScreen = -32000
+
+// headedOptions are a headed Chromium's (#4272): a real window, so a bot check sees no
+// headless difference, placed far off every screen, so nobody sees it on this machine's
+// screen; people watch it by the screencast, as before. The browser still says it is
+// automated: no flag here hides navigator.webdriver or changes the user agent. The
+// default options already keep an occluded window painting at full speed.
+var headedOptions = []chromedp.ExecAllocatorOption{
+	chromedp.Flag("headless", false),
+	chromedp.Flag("hide-scrollbars", false),
+	chromedp.Flag("window-position", fmt.Sprintf("%d,%d", offScreen, offScreen)),
+	chromedp.WindowSize(1280, 800),
 }
 
 // activePort is the CDP address Chromium wrote in its profile's DevToolsActivePort:

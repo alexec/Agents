@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -23,6 +24,7 @@ type fake struct {
 	m        *Machine
 	installs atomic.Int32
 	launches atomic.Int32
+	headed   atomic.Int32
 	stops    atomic.Int32
 	crash    chan struct{}
 	busy     atomic.Bool
@@ -53,11 +55,14 @@ func newFake(t *testing.T) *fake {
 		}
 		return "", errors.New("no PLAYWRIGHT_BROWSERS_PATH")
 	}
-	f.m.launch = func(exe, profile string, env []string) (*process, error) {
+	f.m.launch = func(exe, profile string, env []string, headed bool) (*process, error) {
 		n := f.launches.Add(1)
+		if headed {
+			f.headed.Add(1)
+		}
 		f.crash = make(chan struct{})
 		return &process{endpoint: "ws://127.0.0.1:9222/devtools/browser/" + string(rune('a'+n-1)), pid: 1000 + int(n),
-			done: f.crash, stop: func() { f.stops.Add(1) }}, nil
+			done: f.crash, stop: func() { f.stops.Add(1) }, headed: headed}, nil
 	}
 	t.Cleanup(f.m.Shutdown)
 	return f
@@ -117,6 +122,80 @@ func TestItStopsWhenIdleAndNotLeased(t *testing.T) {
 	}
 	if _, err := os.Stat(f.m.pidFile()); !os.IsNotExist(err) {
 		t.Fatal("pid file left", err)
+	}
+}
+
+// A site that checks for bots starts the browser again with a window (#4272), with no
+// second start while it is headed, and the start after it stops is headless again.
+func TestHeadedStartsItAgainWithAWindow(t *testing.T) {
+	f := newFake(t)
+	if runtime.GOOS != "darwin" {
+		f.m.Env = func() []string { return []string{"PATH=/usr/bin:/bin", "DISPLAY=:0"} }
+	}
+	mustStart(t, f.m)
+	if !f.m.Headed() || f.m.Running() || f.stops.Load() != 1 {
+		t.Fatal("the headless browser did not stop")
+	}
+	end, err := f.m.Endpoint(nil)
+	if err != nil || end != "ws://127.0.0.1:9222/devtools/browser/b" || f.headed.Load() != 1 {
+		t.Fatal(end, err, f.headed.Load())
+	}
+	if f.m.Headed() || f.stops.Load() != 1 {
+		t.Fatal("a headed browser started again")
+	}
+	f.m.Stop()
+	mustStart(t, f.m)
+	if f.launches.Load() != 3 || f.headed.Load() != 1 {
+		t.Fatal("the start after a stop was not headless", f.headed.Load())
+	}
+}
+
+// With no display, there is no window: the browser stays as it is.
+func TestHeadedNeedsADisplay(t *testing.T) {
+	if runtime.GOOS == "darwin" {
+		t.Skip("a Mac always has a window server")
+	}
+	f := newFake(t)
+	mustStart(t, f.m)
+	if f.m.Headed() || !f.m.Running() {
+		t.Fatal("stopped with no display")
+	}
+}
+
+// A headed start that fails starts it headless.
+func TestAFailedHeadedStartIsHeadless(t *testing.T) {
+	f := newFake(t)
+	f.m.Env = func() []string { return []string{"PATH=/usr/bin:/bin", "DISPLAY=:0"} }
+	launch := f.m.launch
+	f.m.launch = func(exe, profile string, env []string, headed bool) (*process, error) {
+		if headed {
+			return nil, errors.New("no window")
+		}
+		return launch(exe, profile, env, headed)
+	}
+	f.m.Headed()
+	if _, err := f.m.Endpoint(nil); err != nil || f.launches.Load() != 1 {
+		t.Fatal(err, f.launches.Load())
+	}
+}
+
+func TestChecksBots(t *testing.T) {
+	for url, want := range map[string]bool{
+		"https://dash.cloudflare.com/login":        true,
+		"https://signup.live.com/":                 true,
+		"https://login.microsoftonline.com/common": true,
+		"https://sandbox-buy.paddle.com/checkout":  true,
+		"dash.cloudflare.com/login":                true,
+		"https://DASH.Cloudflare.COM":              true,
+		"https://example.com/?next=cloudflare.com": false,
+		"https://notcloudflare.com/":               false,
+		"https://github.com/":                      false,
+		"about:blank":                              false,
+		"":                                         false,
+	} {
+		if ChecksBots(url) != want {
+			t.Errorf("%q: want %v", url, want)
+		}
 	}
 }
 
@@ -204,7 +283,7 @@ func TestARealChromium(t *testing.T) {
 		t.Skip("set AGENTS_TEST_CHROMIUM to a Chromium to start a real one")
 	}
 	profile := t.TempDir()
-	p, err := launchChromium(exe, profile, os.Environ())
+	p, err := launchChromium(exe, profile, os.Environ(), false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,6 +317,45 @@ func TestARealChromium(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(profile, "Default")); err != nil {
 		t.Fatal("the profile was not kept", err)
+	}
+}
+
+// TestARealHeadedChromium starts the Chromium in AGENTS_TEST_CHROMIUM headed (#4272), and
+// checks that its window is off every screen and that it says the Chrome it is.
+func TestARealHeadedChromium(t *testing.T) {
+	exe := os.Getenv("AGENTS_TEST_CHROMIUM")
+	if exe == "" {
+		t.Skip("set AGENTS_TEST_CHROMIUM to a Chromium to start a real one")
+	}
+	p, err := launchChromium(exe, t.TempDir(), os.Environ(), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer p.stop()
+	ctx := p.store.(cdpStore).ctx
+	v, err := chromedp.CallBrowser(ctx, cdpbrowser.GetVersion, cdp.Empty{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(v.UserAgent, "Headless") || !p.headed {
+		t.Fatal(v.UserAgent)
+	}
+	if url := os.Getenv("AGENTS_TEST_BOT_CHECK"); url != "" {
+		// One page that checks, opened once, with no sign-in: its title after the check.
+		// A 403 with a challenge still loads; only a page that does not load fails here.
+		if _, err := chromedp.Run(ctx, chromedp.Navigate(url)); err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(15 * time.Second)
+		page, err := chromedp.Run(ctx, chromedp.Evaluate[[]any](`[document.title, location.href, navigator.webdriver, document.body.innerText.slice(0, 300)]`))
+		t.Logf("%s: %v (err %v)", url, page, err)
+	}
+	where, err := chromedp.Run(ctx, chromedp.Evaluate[[]float64](`[window.screenX, window.screenY, window.outerWidth]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(where) != 3 || where[0] > -1000 && where[1] > -1000 || where[2] < 1000 {
+		t.Fatalf("the window is not off-screen: %v", where)
 	}
 }
 
