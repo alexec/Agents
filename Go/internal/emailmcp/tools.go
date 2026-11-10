@@ -12,7 +12,8 @@ import (
 
 // The email server's tools (#1780): list the folders, list and search a folder's messages
 // (no text), read one message (its text marked as outside content), mark one read or
-// unread, and move one. Nothing sends, answers or deletes mail: sending is publishing, and
+// unread, and move one; and the messaging contract's list_conversations and read_messages,
+// a folder's threads and one thread's mail (messaging.go). Nothing sends, answers or deletes mail: sending is publishing, and
 // comes later, if at all, to an allowlist or with the person's approval per mail.
 
 type listArgs struct {
@@ -189,6 +190,8 @@ func AddTools(server *mcp.Server, m *Mailbox) {
 			}
 			return structured(map[string]any{"id": id, "folder": folder}), nil
 		})
+
+	addMessagingTools(server, m)
 }
 
 func orEmpty(list []string) []string {

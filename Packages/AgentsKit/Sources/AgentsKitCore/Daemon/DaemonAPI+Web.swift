@@ -232,6 +232,9 @@ public extension DaemonAPI {
                     kind: .hostRequest),
                 // A secret's use answered from its Needs you row (#4017).
                 Row(Method.requestsAnswer, params: RequestsAnswer.self, result: RequestUpdate.self, kind: .hostRequest),
+                // Later and Bring back now on a Needs you row (#4233).
+                Row(Method.requestsDefer, params: RequestsDefer.self, result: RequestUpdate.self, kind: .hostRequest),
+                Row(Method.requestsUndefer, params: RequestsUndefer.self, result: RequestUpdate.self, kind: .hostRequest),
                 Row(Method.pinsRead, params: PinReadRequest.self, result: FileReading.self, kind: .hostRequest),
                 // A view drawn in the chat (#187): its resource, and what it asks of its server.
                 Row(Method.viewsRead, params: ViewReadRequest.self, result: ViewResource.self, kind: .hostRequest),
@@ -286,6 +289,9 @@ public extension DaemonAPI {
                 Row(Method.forgeImage, params: ForgeImageRequest.self, result: ForgeImage.self, kind: .hostRequest),
                 Row(Method.forgeAddChild, params: ForgeAddChildRequest.self, result: ForgeDone.self, kind: .hostRequest),
                 Row(Method.forgeBlockedBy, params: ForgeBlockedByRequest.self, result: ForgeDone.self, kind: .hostRequest),
+                // The Messages page's reads (#4343); its Swift models come with the page (#4344).
+                Row("messages/conversations", params: JSONValue.self, result: JSONValue.self, kind: .hostRequest),
+                Row("messages/read", params: JSONValue.self, result: JSONValue.self, kind: .hostRequest),
                 // Work ▸ Timeline on the web page (#4206).
                 Row(Method.workTimeline, params: WorkTimelineRequest.self, result: WorkTimeline.self, kind: .hostRequest),
                 Row(Method.docsList, params: DocsListRequest.self, result: DocsList.self, kind: .hostRequest),

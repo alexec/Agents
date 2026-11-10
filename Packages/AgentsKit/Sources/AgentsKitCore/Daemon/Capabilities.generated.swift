@@ -115,6 +115,7 @@ public enum Capability {
     public static let mailbox1 = "mailbox/1"
     public static let marketplaces1 = "marketplaces/1"
     public static let mcp1 = "mcp/1"
+    public static let messages1 = "messages/1"
     public static let modes1 = "modes/1"
     public static let multiplier1 = "multiplier/1"
     public static let mute1 = "mute/1"
@@ -152,6 +153,7 @@ public enum Capability {
     public static let reportsValue1 = "reports.value/1"
     public static let reportsViews1 = "reports.views/1"
     public static let reports1 = "reports/1"
+    public static let requestsDefer1 = "requests.defer/1"
     public static let requests1 = "requests/1"
     public static let resourcesLeases1 = "resources.leases/1"
     public static let resources1 = "resources/1"
@@ -408,6 +410,8 @@ public enum Capability {
         "mcp/sign-in/wait": "mcp/1",
         "mcp/sign-out": "mcp/1",
         "mcp/verify": "mcp/1",
+        "messages/conversations": "messages/1",
+        "messages/read": "messages/1",
         "modes/remembered": "modes/1",
         "multiplier/state": "multiplier/1",
         "options/remembered": "options/1",
@@ -462,8 +466,10 @@ public enum Capability {
         "reports/features": "features/1",
         "reports/problem": "reports.problem/1",
         "requests/answer": "requests/1",
+        "requests/defer": "requests.defer/1",
         "requests/drop": "requests/1",
         "requests/list": "requests/1",
+        "requests/undefer": "requests.defer/1",
         "resources/declare": "resources/1",
         "resources/end": "resources.leases/1",
         "resources/lease": "resources.leases/1",

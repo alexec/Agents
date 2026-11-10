@@ -16,7 +16,14 @@ host installs it beside agentsd.
   [Start a workflow from an MCP event](start-a-workflow-from-an-mcp-event.md).
 - **The tools:** `send_message`, a text as the number; `ask_question`, a question with a
   button for each option (a list for more than three); `send_template`, a template that
-  WhatsApp approved; and `read_messages`, what people sent the number in the last day.
+  WhatsApp approved; and `list_conversations` and `read_messages`, the people the number
+  wrote with and their messages, both ways, newest first (the
+  [messaging contract](../reference/messaging-contract.md)).
+
+WhatsApp gives no history, so the server keeps its own: each message the webhook gets and
+each message the number sends, the newest 2,000 for 30 days (4 MB of text at most), in
+`~/.agents/whatsapp/<phone number id>.json` (`WHATSAPP_STORE_DIR` puts it somewhere else).
+A message from before the server ran, or older than that, is not there.
 
 ## The 24-hour window
 

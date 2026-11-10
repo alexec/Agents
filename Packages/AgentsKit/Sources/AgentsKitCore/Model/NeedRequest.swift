@@ -187,6 +187,11 @@ public extension DaemonAPI.Method {
     static let requestsList = "requests/list"
     /// A person's answer to a request (#3863): today the clients send only a secret's use (#4017).
     static let requestsAnswer = "requests/answer"
+    /// Later (#4233): out of Needs you, the counts and the notices until a time, or until
+    /// the person is next at the Mac.
+    static let requestsDefer = "requests/defer"
+    /// Bring back now (#4233).
+    static let requestsUndefer = "requests/undefer"
 }
 
 public extension DaemonAPI.Notification {
@@ -230,6 +235,25 @@ public extension DaemonAPI {
             self.id = id
             answer = Answer(secretUse: .init(action: action, approval: approval))
         }
+    }
+
+    /// `requests/defer`'s params (#4233): until, atMac or both; until is after now.
+    struct RequestsDefer: Codable, Sendable, Hashable {
+        public var id: UUID
+        public var until: Date?
+        public var atMac: Bool?
+
+        public init(id: UUID, until: Date? = nil, atMac: Bool? = nil) {
+            self.id = id
+            self.until = until
+            self.atMac = atMac
+        }
+    }
+
+    /// `requests/undefer`'s params (#4233).
+    struct RequestsUndefer: Codable, Sendable, Hashable {
+        public var id: UUID
+        public init(id: UUID) { self.id = id }
     }
 
     /// `requests/changed`'s params, and what `requests/answer` and `requests/drop` answer.

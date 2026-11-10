@@ -6468,6 +6468,79 @@ export interface MessageSender {
 }
 
 /**
+ * One conversation in messages/conversations (#4343): the connector it is on (server, its name in
+ * mcp.json, and a folder that reaches it, which messages/read takes) and the conversation as the
+ * connector's list_conversations gave it.
+ */
+export interface MessagesConversation {
+  server: string;
+  folder: string;
+  conversation: MessagingConversation;
+}
+
+/**
+ * messages/conversations (#4343): a page of the conversations of every connector in the Messaging
+ * slot that follows the messaging contract, merged by lastActivity, the newest first. cursor is the
+ * next page, absent at the end. errors says a connector that failed or did not answer in time, and
+ * the conversations of the others still come.
+ */
+export interface MessagesConversations {
+  conversations: MessagesConversation[];
+  cursor?: string;
+  errors?: MessagesError[];
+}
+
+/**
+ * messages/conversations (#4343): the conversations of every folder's messaging connectors on this
+ * machine, or of one folder's. limit is 1 to 100, 20 when not said; cursor is the last page's.
+ * unread: only the conversations with unread messages.
+ */
+export interface MessagesConversationsRequest {
+  folder?: string;
+  cursor?: string;
+  limit?: number;
+  unread?: boolean;
+}
+
+/**
+ * A connector messages/conversations could not read (#4343): its name in mcp.json, a folder that
+ * reaches it, and why, in a sentence.
+ */
+export interface MessagesError {
+  server: string;
+  folder: string;
+  message: string;
+}
+
+/**
+ * messages/read (#4343): one page of a conversation's messages, newest first, as the connector's
+ * read_messages gave it. cursor gives the older page; absent on the last. untrusted is always true:
+ * every text is outside content.
+ */
+export interface MessagesRead {
+  server: string;
+  folder: string;
+  conversation: string;
+  messages: MessagingMessage[];
+  cursor?: string;
+  untrusted: boolean;
+}
+
+/**
+ * messages/read (#4343): a conversation from messages/conversations, by its server, folder and id.
+ * cursor is the last page's; thread: only that thread's messages; limit is 1 to 100, 20 when not
+ * said.
+ */
+export interface MessagesReadRequest {
+  server: string;
+  folder: string;
+  conversation: string;
+  cursor?: string;
+  thread?: string;
+  limit?: number;
+}
+
+/**
  * One conversation in a messaging contract server's list_conversations (#4338,
  * docs/reference/messaging-contract.md): a channel, a space, a direct chat or a mail thread. source
  * is the service (slack, email, googlechat, whatsapp, or the server's own word), the same word as
@@ -9341,6 +9414,11 @@ export interface Request {
   /** A summary for the row; never a secret's value. */
   answer?: string;
   droppedWhy?: RequestDroppedWhy;
+  /**
+   * Later (#4233): the request is still open, but out of Needs you, the counts and the notices
+   * until it comes back. Absent when it is not deferred; an answer or a drop clears it.
+   */
+  deferred?: RequestDeferral;
 }
 
 /**
@@ -9373,6 +9451,18 @@ export interface RequestChecklistAnswer {
 export interface RequestChecklistLine {
   text: string;
   done: boolean;
+}
+
+/**
+ * When a deferred request comes back (#4233): at until, or when the person is next at the Mac
+ * (atMac: the Mac's presence changes from not here to here), whichever is first.
+ */
+export interface RequestDeferral {
+  until?: WireDate;
+  atMac?: boolean;
+  /** When it was deferred. */
+  at: WireDate;
+  by?: AuditActor;
 }
 
 /** The part of a request that depends on its source. */
@@ -9500,6 +9590,13 @@ export interface RequestsAnswer {
   answer: RequestAnswer;
 }
 
+/** Later (#4233): until, atMac or both; until is after now. */
+export interface RequestsDefer {
+  id: UUID;
+  until?: WireDate;
+  atMac?: boolean;
+}
+
 export interface RequestsDrop {
   id: UUID;
   why?: RequestDroppedWhy;
@@ -9520,6 +9617,11 @@ export type RequestsListState =
   | "open"
   | "ended"
   | "all";
+
+/** Bring back now (#4233). */
+export interface RequestsUndefer {
+  id: UUID;
+}
 
 /**
  * What the control plane needs of a peer to route for it (#1748): a host without each of host is
@@ -13073,6 +13175,8 @@ export interface Methods {
   "mcp/health/check": { params: MCPHealthCheckRequest; result: MCPHealthSnapshot };
   "mcp/hosted": { params: Empty; result: HostedMCPSnapshot };
   "mcp/remove": { params: MCPRemoveRequest; result: MCPRemoveAnswer };
+  "messages/conversations": { params: MessagesConversationsRequest; result: MessagesConversations };
+  "messages/read": { params: MessagesReadRequest; result: MessagesRead };
   "modes/remembered": { params: Empty; result: Record<string, JSONValue> };
   "multiplier/state": { params: Empty; result: Multiplier };
   "options/remembered": { params: RememberedOptionsRequest; result: ConfigOption[] };
@@ -13165,7 +13269,9 @@ export interface Methods {
   "reports/value": { params: ReportQuery; result: ReportValue };
   "reports/views": { params: Empty; result: ReportViews };
   "requests/answer": { params: RequestsAnswer; result: RequestUpdate };
+  "requests/defer": { params: RequestsDefer; result: RequestUpdate };
   "requests/list": { params: RequestsList; result: RequestsListResult };
+  "requests/undefer": { params: RequestsUndefer; result: RequestUpdate };
   "resources/snapshot": { params: Empty; result: LeaseSnapshot };
   "reviews/dismiss": { params: ReviewDismissRequest; result: Empty };
   "reviews/open": { params: ReviewOpenRequest; result: Empty };
@@ -13482,6 +13588,8 @@ export const MethodTarget = {
   "mcp/health/check": "host",
   "mcp/hosted": "host",
   "mcp/remove": "host",
+  "messages/conversations": "host",
+  "messages/read": "host",
   "modes/remembered": "host",
   "multiplier/state": "host",
   "options/remembered": "host",
@@ -13574,7 +13682,9 @@ export const MethodTarget = {
   "reports/value": "control",
   "reports/views": "control",
   "requests/answer": "host",
+  "requests/defer": "host",
   "requests/list": "host",
+  "requests/undefer": "host",
   "resources/snapshot": "host",
   "reviews/dismiss": "host",
   "reviews/open": "host",
@@ -14287,6 +14397,12 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MarketplacesListAnswer: { required: ["marketplaces"], optional: ["problem"] },
   MarketplacesListRequest: { required: [], optional: ["kind", "destination"] },
   MessageSender: { required: ["agentID", "title"], optional: [] },
+  MessagesConversation: { required: ["server", "folder", "conversation"], optional: [] },
+  MessagesConversations: { required: ["conversations"], optional: ["cursor", "errors"] },
+  MessagesConversationsRequest: { required: [], optional: ["folder", "cursor", "limit", "unread"] },
+  MessagesError: { required: ["server", "folder", "message"], optional: [] },
+  MessagesRead: { required: ["server", "folder", "conversation", "messages", "untrusted"], optional: ["cursor"] },
+  MessagesReadRequest: { required: ["server", "folder", "conversation"], optional: ["cursor", "thread", "limit"] },
   MessagingConversation: { required: ["source", "id", "title", "kind"], optional: ["unread", "lastActivity", "link"] },
   MessagingConversations: { required: ["conversations"], optional: ["cursor"] },
   MessagingListRequest: { required: [], optional: ["cursor", "limit", "unread"] },
@@ -14523,11 +14639,12 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ReportViewID: { required: ["id"], optional: [] },
   ReportViews: { required: ["views"], optional: [] },
   ReportedEdit: { required: ["path", "newText", "toolCallID", "index", "entryIndex", "replaceAll", "at"], optional: ["oldText"] },
-  Request: { required: ["id", "kind", "source", "state", "title", "detail", "folder", "waiters", "askedAt"], optional: ["askedBy", "forge", "answeredAt", "answeredBy", "answer", "droppedWhy"] },
+  Request: { required: ["id", "kind", "source", "state", "title", "detail", "folder", "waiters", "askedAt"], optional: ["askedBy", "forge", "answeredAt", "answeredBy", "answer", "droppedWhy", "deferred"] },
   RequestAnswer: { required: [], optional: ["form", "checklist", "approval", "secretUse"] },
   RequestApprovalAnswer: { required: ["action"], optional: ["note"] },
   RequestChecklistAnswer: { required: ["done"], optional: [] },
   RequestChecklistLine: { required: ["text", "done"], optional: [] },
+  RequestDeferral: { required: ["at"], optional: ["until", "atMac", "by"] },
   RequestDetail: { required: [], optional: ["elicitation", "secretUse"] },
   RequestForge: { required: ["provider", "repo", "item", "number", "url", "label", "checklist", "seenAt"], optional: ["screenshots", "author", "updatedAt"] },
   RequestFormAnswer: { required: ["action"], optional: ["content"] },
@@ -14536,9 +14653,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RequestUpdate: { required: ["request"], optional: [] },
   RequestWaiter: { required: ["agent", "since"], optional: [] },
   RequestsAnswer: { required: ["id", "answer"], optional: [] },
+  RequestsDefer: { required: ["id"], optional: ["until", "atMac"] },
   RequestsDrop: { required: ["id"], optional: ["why"] },
   RequestsList: { required: [], optional: ["state", "folder"] },
   RequestsListResult: { required: ["requests"], optional: [] },
+  RequestsUndefer: { required: ["id"], optional: [] },
   RequiredCapabilities: { required: ["host", "client"], optional: [] },
   ResourceState: { required: ["name", "kind", "displayName", "isGone", "line", "endingSoon"], optional: ["holds", "lease", "places", "declared"] },
   ResumingNotification: { required: ["agentID", "isResuming"], optional: [] },

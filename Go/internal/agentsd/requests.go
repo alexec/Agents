@@ -31,6 +31,8 @@ var (
 type requestStore struct {
 	mu   sync.Mutex
 	byID map[wire.UUID]*wire.Request
+	// timer brings back the deferred requests whose time has come (#4233).
+	timer *time.Timer
 }
 
 func (d *Daemon) requestsDir() string { return filepath.Join(d.Store.Loc.Root, "requests") }
@@ -54,6 +56,7 @@ func (d *Daemon) loadRequests() {
 	}
 	d.requests.mu.Unlock()
 	d.pruneRequests(time.Now())
+	d.armRequestTimer() // one due while the host was down comes back at once
 	t := time.NewTicker(time.Hour)
 	d.goLoop("request pruner", func(ctx context.Context) {
 		defer t.Stop()
@@ -148,6 +151,10 @@ func copyRequest(r *wire.Request) wire.Request {
 		f.Checklist = append([]wire.RequestChecklistLine{}, r.Forge.Checklist...)
 		c.Forge = &f
 	}
+	if r.Deferred != nil {
+		def := *r.Deferred
+		c.Deferred = &def
+	}
 	return c
 }
 
@@ -229,6 +236,7 @@ func (d *Daemon) endRequest(id wire.UUID, state wire.RequestState, answer *strin
 	}
 	at := now()
 	r.State, r.AnsweredAt, r.AnsweredBy = state, &at, by
+	r.Deferred = nil // an end clears Later (#4233)
 	if state == wire.RequestStateAnswered {
 		r.Answer = answer
 	} else {
@@ -271,7 +279,7 @@ func (d *Daemon) raiseRequestEvent(name string, r wire.Request, extra map[string
 		}
 	}
 	sentence := map[string]string{"request.opened": "A request was opened: ", "request.answered": "A request was answered: ",
-		"request.dropped": "A request was dropped: "}[name] + r.Title
+		"request.dropped": "A request was dropped: ", "request.deferred": "A request was deferred: "}[name] + r.Title
 	d.raiseAs(wire.EventDraft{Name: name, At: now(), Scope: folderScope(store.FolderPath(wire.URL(r.Folder))), Sentence: sentence, Details: details}, by)
 }
 
@@ -447,4 +455,5 @@ func (d *Daemon) registerRequests() {
 	On(d, wire.CallRequestsDrop, func(ctx context.Context, c *Client, r wire.RequestsDrop) (wire.RequestUpdate, error) {
 		return d.dropRequest(r, c.actor())
 	})
+	d.registerRequestDefer()
 }

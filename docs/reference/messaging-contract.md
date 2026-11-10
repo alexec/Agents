@@ -118,6 +118,24 @@ daemon and the clients never look into it. An answer with no `cursor` is the las
 cursor that the server cannot read any more (too old, its store moved on) is a tool error
 that says so, and the caller starts again with no cursor.
 
+## How the daemon reads it
+
+Each machine's daemon has two methods for the Messages page (#4343,
+`Go/internal/agentsd/messages.go`):
+
+- **`messages/conversations`** calls `list_conversations` on every connector in the Messaging
+  slot that follows the contract, in the folders' and the person's `mcp.json`. It merges the
+  answers by `lastActivity`, newest first, one page at a time, with a cursor for each
+  connector, as the forge lists merge forges. The daemon leaves out a connector that does
+  not follow the contract and says nothing. It also leaves out a connector that fails or does
+  not answer in 15 seconds, and gives that connector's error in `errors`. The other
+  connectors' conversations still come.
+- **`messages/read`** calls `read_messages` on the connector that lists the conversation,
+  named by its `server` and `folder`.
+
+The clients merge the machines' answers, one copy per conversation. The control plane only
+relays them and never stores message text (`docs/explanation/direction.md`).
+
 ## Who sent it: the sender
 
 `sender` is the same `ChannelSender` that a message event carries for a channel link (#1762,
@@ -158,10 +176,12 @@ The epic's open questions, settled for version 1.
 ### Mail: a conversation is a thread
 
 Decided: a mail conversation is a **thread**, made from `References` and `In-Reply-To` (and
-the subject when a mail has neither), `kind: thread`, because that is what a person reads
+the subject when a reply, `Re: …`, has neither), `kind: thread`, because that is what a person reads
 as one conversation, and a folder holds thousands of unrelated mails. The folder is a
 filter: the email server's `list_conversations` takes an optional `folder` (`INBOX` when left
-out) and lists the threads whose newest mail is in it. Alex can overrule.
+out) and lists the threads that have mail in it, by its newest mail there. `read_messages`
+gives the thread's mail in that folder and in the Sent folder, so the person's own answers
+are in it (#4340). Alex can overrule.
 
 ### Unread state: the service's own
 
@@ -176,8 +196,8 @@ gives no unread state leaves `unread` out. Alex can overrule.
 
 Decided: a server reads history from its service where the service allows it. Where it does
 not (WhatsApp's Cloud API; Google Chat without `chat.app.messages.readonly`), the server keeps
-a **bounded store** of the messages that it received, as the WhatsApp server keeps the last
-day now, and pages that, because the bounded-data rule says every store has a limit. A
+a **bounded store** of the messages that it received, as the WhatsApp server does (#4341: the
+newest 2,000 for 30 days, both ways, in `~/.agents/whatsapp/`), and pages that, because the bounded-data rule says every store has a limit. A
 server says nothing about where its history ends: the last page has no `cursor`. Alex can
 overrule.
 

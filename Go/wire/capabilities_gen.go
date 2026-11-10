@@ -114,6 +114,7 @@ const CapMachines1 = "machines/1"
 const CapMailbox1 = "mailbox/1"
 const CapMarketplaces1 = "marketplaces/1"
 const CapMcp1 = "mcp/1"
+const CapMessages1 = "messages/1"
 const CapModes1 = "modes/1"
 const CapMultiplier1 = "multiplier/1"
 const CapMute1 = "mute/1"
@@ -151,6 +152,7 @@ const CapReportsScope1 = "reports.scope/1"
 const CapReportsValue1 = "reports.value/1"
 const CapReportsViews1 = "reports.views/1"
 const CapReports1 = "reports/1"
+const CapRequestsDefer1 = "requests.defer/1"
 const CapRequests1 = "requests/1"
 const CapResourcesLeases1 = "resources.leases/1"
 const CapResources1 = "resources/1"
@@ -407,6 +409,8 @@ var HostCapabilities = pairs([][2]string{
 	{"mcp/sign-in/wait", "mcp/1"},
 	{"mcp/sign-out", "mcp/1"},
 	{"mcp/verify", "mcp/1"},
+	{"messages/conversations", "messages/1"},
+	{"messages/read", "messages/1"},
 	{"modes/remembered", "modes/1"},
 	{"multiplier/state", "multiplier/1"},
 	{"options/remembered", "options/1"},
@@ -461,8 +465,10 @@ var HostCapabilities = pairs([][2]string{
 	{"reports/features", "features/1"},
 	{"reports/problem", "reports.problem/1"},
 	{"requests/answer", "requests/1"},
+	{"requests/defer", "requests.defer/1"},
 	{"requests/drop", "requests/1"},
 	{"requests/list", "requests/1"},
+	{"requests/undefer", "requests.defer/1"},
 	{"resources/declare", "resources/1"},
 	{"resources/end", "resources.leases/1"},
 	{"resources/lease", "resources.leases/1"},
