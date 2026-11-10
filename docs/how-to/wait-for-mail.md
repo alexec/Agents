@@ -91,11 +91,19 @@ Each argument is optional:
 | `from` | Only mail from a sender whose address matches, such as `*@gitlab.com`. `*` is any text, `?` one character; case does not matter. |
 | `to` | Only mail to an address that matches. |
 | `subject` | Only mail whose whole subject matches, such as `*verification code*`. |
-| `folder` | The folder to watch. `INBOX` when left out. |
+| `folder` | The folder to watch. When left out, `INBOX` and the Junk folder, so a code the server took for spam still comes (#3912). |
 
 The server holds an IMAP IDLE connection on each folder that is watched (four at most), so a
 mail is seen in about ten seconds and a quiet mailbox costs the mail server nothing. A server
 without IDLE is asked once a minute.
+
+## Wait for a code from a script
+
+`scripts/mail-code.py` in this repo waits for a code without the connector (#3912): it runs
+`email-mcp` itself, with `EMAIL_PASSWORD` from the secrets, and prints only the code or the
+link. Run `scripts/mail-code.py start --from '*@gitlab.com'` before the mail is sent, then
+`scripts/mail-code.py code --from '*@gitlab.com'` (or `link --from … --host …`). The
+`sign-up` skill uses it.
 
 ## When it does not work
 
