@@ -7044,7 +7044,12 @@ struct FolderGoneAsk: Identifiable, Equatable {
 }
 
 /// Work (#3119) is drawn by `Shared/UI/Work`, for the window and the Remote (#3256).
-extension AppModel: WorkModel {}
+extension AppModel: WorkModel {
+    func askWorkConnectors() -> Bool {
+        settingsPaneAsked = .connectors
+        return true
+    }
+}
 
 /// Settings ▸ You ▸ Secrets ▸ For One Session (#3548), through this Mac's host.
 extension AppModel: SessionSecretsSource {}

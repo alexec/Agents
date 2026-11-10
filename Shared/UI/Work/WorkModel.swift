@@ -51,10 +51,14 @@ protocol WorkModel: AnyObject, Sendable {
     func openWorkSession(_ id: UUID)
     /// The new-session form in a folder, filled in. Why it did not open, or nil.
     func offerStart(_ start: AppViewStart, in key: FolderKey) -> String?
+    /// Ask Settings to show Connectors (#4393), for a forge whose credential was refused; false
+    /// where the app has no such pane, and the list offers only Try again.
+    func askWorkConnectors() -> Bool
 }
 
 extension WorkModel {
     var workProjects: [WorkList.Project] { [] }
+    func askWorkConnectors() -> Bool { false }
     var timelineMachines: [(id: MachineRef, name: String)] { [] }
 
     /// The boards of every machine's folders' projects (#3282), each once, by url, the first

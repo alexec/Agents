@@ -18,10 +18,14 @@ final class WorkListState {
     var boards: [DaemonAPI.ProjectBoard] = []
     var lineageCursor: String?
     var problem: String?
+    /// Why the last page after the first did not load: one line at the end of the list, and Try again.
+    var pageProblem: String?
     var loadingMore = false
     var asked = 0
     /// The row whose page was opened last, which the list scrolls to when it is shown again.
     var opened: String?
+    /// The selected row on the Mac (lists.md section 2): ↑ and ↓ move it, Return opens it.
+    var selected: String?
     /// What the rows were read for; the list reads them again only when that changes.
     private var read: Ask?
 
@@ -73,7 +77,7 @@ final class WorkListState {
             let before = rows.count
             await loadMore(model: model)
             if let next = neighbours(of: ref)?.next { return next }
-            if rows.count == before || problem != nil { break }
+            if rows.count == before || pageProblem != nil { break }
         }
         return nil
     }
@@ -102,6 +106,7 @@ final class WorkListState {
         lists = nil
         lineage = []
         problem = nil
+        pageProblem = nil
         do {
             let known = try await readLineage(model)
             guard ask == mine else { return }
@@ -142,6 +147,7 @@ final class WorkListState {
 
     func loadMore(model: any WorkModel) async {
         loadingMore = true
+        pageProblem = nil
         defer { loadingMore = false }
         do {
             if kind.fromForge {
@@ -160,7 +166,7 @@ final class WorkListState {
                 lineageCursor = page.cursor
             }
         } catch {
-            problem = ReportValueWords.sentence(error)
+            pageProblem = ReportValueWords.sentence(error)
         }
     }
 }
