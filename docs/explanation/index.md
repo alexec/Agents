@@ -28,7 +28,7 @@ Nothing here needs doing; it is for understanding.
 - [Policy layers](policy-layers.md): how the Organisation, You and Folder layers decide what
   agents may do, and why each layer can only make a rule tighter.
 - [The window and the host](window-and-daemon.md): why agents keep working when the
-  window is closed, what Agents Host does, and what happens when the Mac restarts.
+  window is closed, what this Mac's host does, and what happens when the Mac restarts.
 - [Why agents' own tools are taken away](scoped-tools.md): what a runtime loses in the
   app's sessions, what it keeps, and why your own setup is untouched.
 - [Views in a conversation](views.md): how a tool's `ui://` view is drawn on every device,

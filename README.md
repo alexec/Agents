@@ -18,27 +18,29 @@ by themselves on a schedule or when something happens.
 
 ## Setting it up
 
-On a Mac, Agents is two apps:
+On a Mac, Agents is one app, **Agents**: a download signed by us (Developer ID), not in
+the Mac App Store (#4224). It has the window, and it runs this Mac's agents and a control
+plane in the background, as two launch agents that macOS keeps running. The window starts
+no agent: it is a screen onto your agents, as the iPhone and iPad app is.
 
-- **Agents**, the window, built for the App Store. It runs in the sandbox and starts
-  nothing: it is a screen onto your agents, as the iPhone and iPad app is.
-- **Agents Host**, a download signed by us and installed outside the App Store. It runs
-  this Mac's agents, and optionally the control plane every window, phone and server
-  connects to, kept running by macOS.
+The first time you open Agents, it sets everything up with no question and no code: it
+makes the control key, registers and starts the two launch agents, joins this Mac's host to
+the control plane, and pairs the window. Closing or quitting the window stops no agent.
 
-Beside the window and the iPhone and iPad app, Agents Host serves Agents as a web page for
-a browser on this Mac, at `http://localhost:8792`. **View ▸ Open in Browser** in the window,
-or **Open in Browser** in Agents Host, opens it and pairs that browser the first time. See
+Beside the window and the iPhone and iPad app, Agents serves itself as a web page for a
+browser on this Mac, at `http://localhost:8792`. **View ▸ Open in Browser** in the window,
+or **Open in Browser** in the menu bar, opens it and pairs that browser the first time. See
 [Use Agents in a browser](https://docs.agentloops.dev/how-to/use-agents-in-a-browser/).
 
-The control plane is yours: on your Mac through Agents Host, or as several copies of
-`agents-control` in containers on hosting you rent, sharing an S3-compatible bucket. A
-Linux server becomes a host by running one command the window shows. See
+The control plane is yours: on your Mac, which is the default, or Hosted at agentloops.dev,
+or as several copies of `agents-control` in containers on hosting you rent, sharing an
+S3-compatible bucket. **Settings ▸ Control plane ▸ Connect to Another…** connects this Mac
+to another one. A Linux server becomes a host by running one command the window shows. See
 [Set up Agents on this Mac](https://docs.agentloops.dev/how-to/set-up-on-this-mac/)
 and [The control plane](https://docs.agentloops.dev/explanation/control-plane/).
 
-Neither app is in the App Store yet. The alpha is on TestFlight, and Agents Host is its
-own download. Building from source, below, is for working on Agents.
+The iPhone and iPad app is not in the App Store yet; its alpha is on TestFlight. The Mac
+app is its own download. Building from source, below, is for working on Agents.
 
 ## Build and run
 
@@ -51,20 +53,19 @@ The schemes:
 
 | Scheme | What it builds |
 |---|---|
-| `AgentsStore` | the App Store window: sandboxed, no helpers, reaches everything through a control plane |
-| `AgentsHost` | Agents Host, carrying `agentsd` and `agents-control` (Go, built from `Go/`) |
+| `AgentsHost` | the Mac app, Agents (`Agents.app`): the window, with `agentsd` and `agents-control` (Go, built from `Go/`) |
 | `Remote` | the iPhone and iPad app |
 
 The web page lives in `Web/`: Preact and TypeScript, bundled by esbuild. Its build,
-`Web/dist`, is not checked in: Agents Host's build makes it with the Node in
-`Web/.node-version`, writes a `MANIFEST` of hashes, and carries it. Without that Node, Agents
-Host still builds, with a warning, and serves no web page. Its protocol types,
+`Web/dist`, is not checked in: the `AgentsHost` build makes it with the Node in
+`Web/.node-version`, writes a `MANIFEST` of hashes, and carries it. Without that Node, the
+Mac app still builds, with a warning, and serves no web page. Its protocol types,
 `Web/src/protocol/generated.ts`, are generated from `Packages/Wire` and checked in.
 `scripts/web.sh` does all of it:
 
 ```sh
 scripts/wire.sh gen    # regenerate the Go and TypeScript types after changing Packages/Wire
-scripts/web.sh build   # build Web/dist (needs the Node in Web/.node-version); Agents Host's build runs it
+scripts/web.sh build   # build Web/dist (needs the Node in Web/.node-version); the `AgentsHost` build runs it
 scripts/web.sh check   # what CI checks: types fresh, dist matching its manifest, and with Node, the tests
 ```
 
@@ -74,7 +75,6 @@ Swift, or a built `Web/dist` is out of date with its source.
 From the command line:
 
 ```sh
-xcodebuild -scheme AgentsStore -destination 'platform=macOS' -skipPackagePluginValidation build
 xcodebuild -scheme AgentsHost -destination 'platform=macOS' -skipPackagePluginValidation build
 xcodebuild -scheme Remote -destination 'generic/platform=iOS Simulator' -skipPackagePluginValidation build
 swift test --package-path Packages/AgentsKit
@@ -82,7 +82,7 @@ Go/scripts/go.sh test ./...
 ```
 
 Build the schemes one after another, not at once. `agentsd` and `agents-control` are Go
-(`Go/`, see `Go/README.md`): Agents Host's build makes them with Go in a container, so it
+(`Go/`, see `Go/README.md`): the `AgentsHost` build makes them with Go in a container, so it
 needs Docker running (or Go installed). The Linux programs are built the same way:
 `scripts/build-linux-agentsd.sh` for a server's host; the control plane's container builds
 its own (`deploy/Containerfile`). `deploy/` runs three copies of the control plane over
@@ -101,26 +101,26 @@ tree-sitter C grammars are the exception, and stay quiet with `-w`.
 ## The daemon
 
 The window runs nothing. The agents belong to a helper, `agentsd`, which is a host of the
-control plane. Agents Host carries it at `Contents/Helpers/agentsd` and registers it with
+control plane. Agents carries it at `Contents/Helpers/agentsd` and registers it with
 macOS as a launch agent, so it runs with every window closed, starts at login, and never
 exits for being idle. On a Linux server the same daemon lives in `~/.agents-server`.
 
 The rest of this section is about the root every daemon keeps.
 
 ```sh
-# Is it running? (Agents Host's launch agent)
+# Is it running? (the launch agent that Agents registers)
 launchctl print gui/$(id -u)/com.alexecollins.agentshost.daemon | grep -E 'state|pid'
 
 # Everything it owns
 ls ~/Library/Application\ Support/Agents/
-#   daemon.sock   the window, Agents Host and the Remote's bridge connect here
+#   daemon.sock   the app connects here
 #                 (agents' own tools are served on a loopback http port instead)
 #   daemon.lock   flock, held by the one daemon
 #   agents/<uuid>/agent.json        the record, written whole on every change
 #   agents/<uuid>/transcript.jsonl  appended as things happen, never rewritten
 #   folders.json                   only what a folder cannot tell us: archived, added
 
-# Its logs: daemon.log (what it has been doing), mcp-logs/, Agents Host's
+# Its logs: daemon.log (what it has been doing), mcp-logs/, the app's
 # control.log and host.out, and the window's crashes/
 ls ~/Library/Logs/Agents/
 
@@ -131,13 +131,13 @@ ls ~/Library/Logs/Agents/
 ls ~/Library/Caches/com.alexecollins.agents/
 
 # By hand, as a host of a control plane, on a root of its own
-AGENTS_ROOT=/tmp/agents-branch "./build/DD-machine/Build/Products/Debug/Agents Host.app/Contents/Helpers/agentsd" \
+AGENTS_ROOT=/tmp/agents-branch "./build/DD-machine/Build/Products/Debug/Agents.app/Contents/Helpers/agentsd" \
   --control-code '<host code>'
 ```
 
 Nothing is stored anywhere else, and the daemon is the only writer. To start again from
-nothing, stop Agents Host's jobs (its window's Stop, or `launchctl bootout` of both), and
-delete that directory.
+nothing, stop both jobs (**Settings ▸ Machines ▸ This Mac ▸ Remove Agents from This Mac…**,
+or `launchctl bootout` of both), and delete that directory.
 
 ## A second copy, beside the first
 
@@ -230,7 +230,7 @@ To check what each runtime advertises against what the app does with it:
 
 The **Runtime check** workflow (`.agents/workflows/nightly-runtimes.md`, #39) does
 this, once per release (#1462), and more, for each runtime with a new release: `scripts/nightly-runtimes.py` re-pins
-it in a tree of its own, builds Agents Host, runs the AgentsKit runtime tests, the
+it in a tree of its own, builds the Mac app, runs the AgentsKit runtime tests, the
 handshake and the tools check, and has one real turn through a scratch `agentsd` on the
 cheapest model the runtime offers. A pinned runtime that passes becomes a pull request on
 `nightly/runtime-<id>`; one that fails becomes an issue naming the step. It tests on this
@@ -293,7 +293,7 @@ out. It never touches the folder, a worktree no session names, or a busy agent's
 It too arrives turned off.
 
 **Crash reports** (`.agents/workflows/crash-reports.md`, #392) runs once a day at 07:00. It
-reads the crash reports of Agents, Agents Host, `agentsd` and `agents-control` written on
+reads the crash reports of Agents (also under its old name, Agents Host), `agentsd` and `agents-control` written on
 this Mac since its last run, with the window's crash notes and any of the Remote's reports
 already on the Mac, and files a `bug` issue for each distinct stack nothing tracks yet, or
 comments on the open one with the new count. It marks each crash live or scratch, changes

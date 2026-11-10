@@ -13,7 +13,7 @@ Sentry tells you when your app crashes or throws an error. Agents uses it in two
   `https://mcp.sentry.dev/mcp`). It has the tools: search issues and events, read a stack
   trace, a release or a trace, and ask Seer for a fix. You sign in to Sentry; you give no
   token.
-- **Sentry events** is `sentry-mcp`, a small server that Agents ships. Agents Host carries
+- **Sentry events** is `sentry-mcp`, a small server that Agents ships. Agents on the Mac carries
   it, and every Linux host installs it beside agentsd. It has the events and no tools:
   - `health.issue_new`: Sentry saw an issue for the first time.
   - `health.issue_regressed`: an issue that was resolved came back. Each time it comes back

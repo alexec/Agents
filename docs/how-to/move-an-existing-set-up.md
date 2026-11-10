@@ -1,88 +1,50 @@
 ---
 diataxis: how-to
 devices: [mac, iphone, ipad, server]
-description: Move the agents, paired devices and servers of the earlier Agents app on this Mac to a control plane, once, keeping everything.
+description: Bring the agents of the earlier Agents app on this Mac to Agents, pair your devices again, and add your servers as machines.
 ---
 
 # Move an existing set-up across
 
 The earlier Agents app ran its own daemon on this Mac, paired your iPhone and iPad itself,
-and reached your servers over ssh. Agents Host moves all of that to a control plane on this
-Mac, once, when you choose. Your agents and their conversations stay where they are, your
-devices keep working without pairing again, and your servers become hosts.
+and reached your servers over ssh. Agents now has a control plane and runs this Mac's host
+(`agentsd`) for you. When you open it, this Mac's host takes over the earlier app's agents
+where they are, so your agents and their conversations stay. Your devices pair again, and
+your servers join as machines.
+
+Agents no longer has a **Move Across…** step that moves devices and servers for you
+(#4227). Do the steps below instead.
+
+To move a control plane that already runs on this Mac to a server, see
+[Move the control plane from your Mac](run-the-control-plane-in-the-cloud.md#move-the-control-plane-from-your-mac).
 
 ## Before you start
 
-- No agent in the middle of a turn. The move refuses to start while one is working.
-- Your iPhone and iPad at hand, and still able to reach this Mac the earlier way (the
-  earlier app's bridge running), so that each can be told where the control plane is.
-- ssh from this Mac to each server still working, as the earlier app used it.
+- No agent in the middle of a turn.
+- Your iPhone and iPad at hand.
+- ssh from this Mac to each server still works.
 
 ## Steps
 
-### Move
+### Start Agents
 
-1. Install Agents Host and open it. At the top of its window it says **You have agents from
-   the earlier Agents app on this Mac.** Click **Move Across…**.
-2. The sheet, **Move to a control plane on this Mac**, lists what is kept: your agents and
-   their conversations, which stay on this Mac as this Mac's host; each paired device,
-   which keeps working without pairing again; and each server, which is added as a host.
-   Click **Move Across**.
+1. Quit the earlier Agents app, so that its daemon stops.
+2. Install Agents and open it. See [Set up Agents on this Mac](set-up-on-this-mac.md).
 
-   It steps through **Letting the earlier app's agents go…**, **Starting the control plane
-   and this Mac's host…**, **Moving your devices…**, and **Adding devbox as a host…** for
-   each server. It ends with **Moved. Your devices are told where the control plane is the
-   next time they connect.**, and a line for each server.
-3. Click **Done**.
+   Agents sets up a control plane and this Mac's host, and the window pairs itself. This
+   Mac's host uses the earlier app's folder where it is, and copies nothing. Every agent is
+   listed with its history, under this Mac in the folders list.
 
-Nothing is copied. Agents Host's host takes over the earlier app's folder where it is, and
-the control plane's store starts on this Mac. For a store in a bucket, see
-[Copies and the store](../explanation/control-plane.md#copies-and-the-store).
+### Pair your iPhone and iPad again
 
-### A server that could not be reached
+A device that the earlier app paired does not know the new control plane. Pair each one
+again with a code. See
+[Connect a window or phone](connect-a-window-or-phone.md#connect-an-iphone-or-ipad).
 
-A server joins over your own ssh from this Mac, as the earlier app reached it. If it could
-not be reached, the sheet says **devbox couldn't be reached over ssh**, with the reason, and
-shows a command. Run that command on the server, as the user your agents run as, and it
-joins. If the command has run out, add the server afresh; see
-[Add a machine](add-a-machine.md).
+### Add your servers
 
-### Pair the window
-
-1. Open Agents, the window. It says **Agents Host is running on this Mac**. Click
-   **Pair**.
-2. In Agents Host, click **Copy**. In the window, paste the code under **CODE** and click
-   **Connect**.
-
-   Every agent is listed, with its history, under **THIS MAC**, and each server under its
-   own heading.
-
-### Bring your iPhone and iPad across
-
-1. On each iPhone and iPad, at home, open Agents.
-
-   It connects the earlier way once, is told where the control plane is, and connects
-   there from then on, with the key it paired with. It now sees every host.
-
-A device moved across may do everything a window may, on your servers too, as every paired
-client may; see [Connect a window or phone](connect-a-window-or-phone.md).
-
-## If it doesn't work
-
-If the move cannot go on, the sheet says **Nothing has changed:** and why. Fix the cause,
-then click **Try Again**.
-
-- **an agent is working. Let its turn finish, then try again.** Wait for the turn to end,
-  or stop the agent in the earlier app.
-- **the earlier Agents app's daemon didn't stop. Quit Agents, then try again.** Quit the
-  earlier app, then click **Try Again**.
-
-## What to know
-
-- The move happens once. Afterwards Agents Host no longer offers it.
-- If the earlier app had no paired devices and no servers, there is nothing to move:
-  quit the earlier app, then choose **Run It Here** in Agents Host, and this Mac's host
-  takes over its agents where they are.
+Each server joins the control plane as a machine. Add it with a command that you run on
+the server, or over your own ssh from this Mac. See [Add a machine](add-a-machine.md).
 
 ## Related
 

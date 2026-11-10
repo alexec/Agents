@@ -623,7 +623,7 @@ func TestABuildThatDoesNotMatchItsManifestLeavesTheListenerOff(t *testing.T) {
 	if !log.has("web: not serving, app.js does not match its manifest") {
 		t.Errorf("log: %v", log.all)
 	}
-	if Summary(status) != "Not serving: this copy of Agents Host’s web app is damaged or missing." {
+	if Summary(status) != "Not serving: this copy of the Agents web app is damaged or missing." {
 		t.Errorf("summary: %s", Summary(status))
 	}
 }

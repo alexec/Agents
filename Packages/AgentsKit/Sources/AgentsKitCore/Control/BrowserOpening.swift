@@ -27,7 +27,7 @@ public enum BrowserOpening {
         return .pair
     }
 
-    public static let offWords = "Not serving: Serve Agents to browsers on this Mac is off in Agents Host."
+    public static let offWords = "Not serving: Serve Agents to browsers on this Mac is off in Settings ▸ Control plane."
 
     /// The page, carrying `code` in its fragment. Everything but letters, digits and `-._~`
     /// is escaped, so the code's own `:` and `%` come back whole from `decodeURIComponent`.

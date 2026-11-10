@@ -13,7 +13,7 @@ browser seals the key to each machine (#3397): the control plane keeps only what
 open. See [Org keys and gateways](../explanation/org-keys-and-gateways.md) for why.
 
 **Not on machines yet.** The Console keeps routes, sends them to machines and keeps the two
-policy rules below. Agents Host uses a route, and refuses a person's own sign-in under
+policy rules below. This Mac's host uses a route, and refuses a person's own sign-in under
 **Org key or gateway only**, from a later release (#999, slice 2). Until then, each runtime
 uses each person's own sign-in.
 

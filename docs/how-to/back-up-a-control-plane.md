@@ -46,19 +46,20 @@ only `v1/hosts/` gets the folder renamed. A restore of an older backup puts its
 A change made while the backup runs can be missed. A change made after the backup is lost
 with the restore.
 
-## On a Mac (Agents Host)
+## On a Mac (Agents)
 
-The control plane's folder is `~/Library/Application Support/Agents Control`. Agents Host
+The control plane's folder is `~/Library/Application Support/Agents Control`. Agents
 keeps the control key in the keychain, not in that folder.
 
 ### Back up
 
-1. In Agents Host, choose **Move to Another Machine…**, then click **Save Key…** and save
+1. In Agents, open **Settings ▸ Control plane**, click **Move…** beside **Move to Another
+   Machine**, then click **Save Key…** and save
    `control-key`. Close the sheet; nothing moves.
 2. In Terminal, give the key to the backup, then delete the file:
 
    ```sh
-   control="/Applications/Agents Host.app/Contents/Helpers/agents-control"
+   control="/Applications/Agents.app/Contents/Helpers/agents-control"
    "$control" backup --home ~/Library/Application\ Support/Agents\ Control \
        --to /Volumes/Backup/agents-control-$(date +%F) --key-fd 3 3< control-key
    rm control-key
@@ -68,24 +69,21 @@ keeps the control key in the keychain, not in that folder.
    tls/key.pem into /Volumes/Backup/agents-control-2026-10-21`. Give a new folder each
    time: a backup never goes over another.
 
-If the store is in a bucket, the bucket keeps the records. The backup still copies them,
-and it holds what is beside the store.
-
 ### Restore on a new Mac
 
-Do this before Agents Host starts the control plane on the new Mac for the first time. On a
-Mac that has run one already, quit Agents Host and move its `Agents Control` folder aside.
+Do this before Agents starts the control plane on the new Mac for the first time. On a
+Mac that has run one already, quit Agents and move its `Agents Control` folder aside.
 
-1. Install Agents Host, but do not open it yet.
+1. Install Agents, but do not open it yet.
 2. In Terminal:
 
    ```sh
-   control="/Applications/Agents Host.app/Contents/Helpers/agents-control"
+   control="/Applications/Agents.app/Contents/Helpers/agents-control"
    "$control" restore --from /Volumes/Backup/agents-control-2026-10-21 \
        --home ~/Library/Application\ Support/Agents\ Control
    ```
 
-3. Open Agents Host. When it starts, it puts the restored `control-key` into the keychain
+3. Open Agents. When it starts, it puts the restored `control-key` into the keychain
    and deletes the file.
 
 Your windows, phones, iPads and machines connect again with the pairings they have. They

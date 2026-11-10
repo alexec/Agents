@@ -19,7 +19,7 @@ is shown as not supported yet.
 ## Before you start
 
 - A folder with a connector that offers events. The github server (`github-mcp`) ships
-  with Agents Host and the Linux host, and needs the host's GitHub connection: the GitHub
+  with Agents on the Mac and the Linux host, and needs the host's GitHub connection: the GitHub
   App `agents-loops`, signed in with a code on github.com (#1335), and installed on the
   repository. On the folder's **Connectors** page, press **Connect GitHub…** and type the
   code on github.com (#1336). Once a slot has read from GitHub, the page adds the github

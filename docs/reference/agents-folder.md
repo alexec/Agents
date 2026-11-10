@@ -39,11 +39,11 @@ do not sync (#2410).
 | `sandbox.json` | The command sandbox of each runtime | **Settings ▸ Agent Runtimes** |
 | `modes.json` | The mode last chosen for each runtime | The start form |
 | `display.json` | Your display choices, the same on every client: how much of a turn shows, the smart groups that are off, whether Archived folders, Status and Usage are open, the new-session form's runtime and choices, and the marketplace last chosen | Any client |
-| `host.json` | The role of each of your Macs in Agents Host (its store, bucket and web remote), one entry per Mac, by its local host name. The bucket's keys stay in the keychain. | Agents Host |
+| `host.json` | The role of each of your Macs (its control plane here or elsewhere, and its web remote), one entry per Mac, by its local host name. | Agents |
 
 A file you change by hand counts at once, without a restart. A file that cannot be read is
 set aside as `<name>.corrupt-<time>`, and the setting goes back to its default. For
-`host.json`, the file is left as it is, and Agents Host starts with the defaults until you
+`host.json`, the file is left as it is, and Agents starts with the defaults until you
 mend the file or remove it.
 
 `limits.json`, `workflow-limit.json` and `runtime-environment.json` are not read now. On
@@ -84,8 +84,8 @@ not be able to change them:
   second disk or a synced folder in **Settings ▸ Machines ▸ This Mac ▸ Backups**, or, on a
   server, back up to the control plane
   ([Back up and restore a machine](../how-to/back-up-and-restore.md)).
-- **The control plane's folder** (Agents Host): `~/Library/Application Support/Agents Control`.
-  It holds the store (unless it is a bucket), `secrets-key` and the certificate in `tls/`.
+- **The control plane's folder** (Agents): `~/Library/Application Support/Agents Control`.
+  It holds the store, `secrets-key` and the certificate in `tls/`.
   The control key is in the keychain. To back them up together, and restore
   them on a new Mac, see [Back up and restore a control plane](../how-to/back-up-a-control-plane.md).
 - **Caches and logs:** the system's cache and log folders. You can delete them at any time.

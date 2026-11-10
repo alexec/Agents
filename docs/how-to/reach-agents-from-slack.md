@@ -33,7 +33,7 @@ asks the person whose sign-in email is that email.
 ## Before you start
 
 - A Slack workspace where you can make and install an app.
-- Agents Host carries `slack-mcp`, and every Linux host installs it beside agentsd.
+- Agents on the Mac carries `slack-mcp`, and every Linux host installs it beside agentsd.
 
 ## Make the Slack app
 

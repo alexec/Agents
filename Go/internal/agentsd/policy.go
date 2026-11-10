@@ -43,8 +43,8 @@ const (
 const (
 	orgSetBy          = "Set by your organisation."
 	orgStopAllWords   = "Your organisation has stopped all agent work."
-	orgNoPolicyWords  = "Agents Host has no policy from your organisation. Connect to the network."
-	orgUpdateWords    = "Update Agents Host to follow your organisation's policy."
+	orgNoPolicyWords  = "Agents has no policy from your organisation. Connect to the network."
+	orgUpdateWords    = "Update Agents to follow your organisation's policy."
 	orgUnmeteredWords = "Your organisation cannot measure this runtime's use."
 )
 

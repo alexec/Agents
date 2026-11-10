@@ -615,8 +615,8 @@ final class ControlSettingsModel {
     }
 
     func restart() async {
-        // The control plane on this Mac is Agents Host's to restart.
-        problem = "Restart the control plane from Agents Host."
+        // The control plane on this Mac is the host side's to restart (ControlSettingsView).
+        problem = "Restart the control plane from Agents on this Mac."
         return
     }
 

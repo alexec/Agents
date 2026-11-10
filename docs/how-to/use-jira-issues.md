@@ -17,7 +17,7 @@ Two connectors (MCP servers) work together:
   `issue.assigned`. A workflow or a wait can use them. See
   [Start a workflow from an MCP event](start-a-workflow-from-an-mcp-event.md).
 
-Agents Host carries `jira-mcp`, and every Linux host installs it beside agentsd. It works with
+Agents on the Mac carries `jira-mcp`, and every Linux host installs it beside agentsd. It works with
 Jira Cloud and with Jira Data Center.
 
 ## Before you start

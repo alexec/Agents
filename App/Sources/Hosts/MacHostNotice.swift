@@ -7,7 +7,7 @@ import Foundation
 /// process is down, it is up and has no membership, it enrolled and its uplink is down,
 /// or all of that is fine and this window lost its own way to it.
 enum MacHostNotice: Equatable {
-    /// The process is not reporting a join. Open Agents Host.
+    /// The process is not reporting a join. Settings ▸ Machines ▸ This Mac says why.
     case notRunning
     /// The process is up and has no membership. `problem` is the reason it gave.
     case notJoined(problem: String?)
@@ -57,17 +57,17 @@ enum MacHostNotice: Equatable {
     var detail: String {
         switch self {
         case .notRunning:
-            "Open Agents Host. It says why, Repair there starts it again, and Copy Diagnostics there is what to send with a report."
+            "Settings ▸ Machines ▸ This Mac says why, Repair there starts it again, and Copy Diagnostics there is what to send with a report."
         case .notJoined(let problem):
             if let problem, !problem.isEmpty {
-                "It’s running, and it has no membership. \(Self.sentence(problem)) Open Agents Host and press Try Again there."
+                "It’s running, and it has no membership. \(Self.sentence(problem)) Press Try Again in Settings ▸ Machines ▸ This Mac."
             } else {
-                "It’s running, and it still needs to join. Open Agents Host and press Try Again there."
+                "It’s running, and it still needs to join. Press Try Again in Settings ▸ Machines ▸ This Mac."
             }
         case .notAnswering:
             "What’s listed is what it last said. The window is trying again by itself."
         case .uplinkFailing(let problem):
-            "It’s running, and its link to the control plane keeps failing. \(Self.sentence(problem)) It’s trying again by itself; Agents Host’s Copy Diagnostics says more."
+            "It’s running, and its link to the control plane keeps failing. \(Self.sentence(problem)) It’s trying again by itself; Help ▸ Diagnostics says more."
         case .windowLost:
             "This Mac and the control plane are both up. What’s listed is what the window last heard, and it’s reconnecting by itself."
         }
@@ -77,9 +77,9 @@ enum MacHostNotice: Equatable {
     var action: String {
         switch self {
         case .notRunning:
-            "This Mac isn’t running as a machine, so that didn’t happen. Open Agents Host."
+            "This Mac isn’t running as a machine, so that didn’t happen. Settings ▸ Machines ▸ This Mac says why."
         case .notJoined:
-            "This Mac hasn’t joined the control plane, so that didn’t happen. Open Agents Host and press Try Again there."
+            "This Mac hasn’t joined the control plane, so that didn’t happen. Press Try Again in Settings ▸ Machines ▸ This Mac."
         case .notAnswering:
             "This Mac isn’t answering, so that didn’t happen. The window is trying again by itself; Try Again tries now."
         case .uplinkFailing:
@@ -93,9 +93,9 @@ enum MacHostNotice: Equatable {
     func strip(since: String?) -> String {
         switch self {
         case .notRunning:
-            "This Mac isn’t running as a machine\(Self.since(since)). Open Agents Host. Nothing here can change until it is."
+            "This Mac isn’t running as a machine\(Self.since(since)). Settings ▸ Machines ▸ This Mac says why. Nothing here can change until it is."
         case .notJoined:
-            "This Mac hasn’t joined the control plane\(Self.since(since)). Open Agents Host and press Try Again there. Nothing here can change until it has."
+            "This Mac hasn’t joined the control plane\(Self.since(since)). Press Try Again in Settings ▸ Machines ▸ This Mac. Nothing here can change until it has."
         case .notAnswering:
             OfflineWords.line(host: .mac, name: "This Mac", since: since)
         case .uplinkFailing(let problem):

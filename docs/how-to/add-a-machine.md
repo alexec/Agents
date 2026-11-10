@@ -189,15 +189,16 @@ own access and asks nothing.
 
 ### Add another Mac
 
-A second Mac joins the same way, with Agents Host.
+A second Mac joins with a code from Pair a Mac. Its window pairs and its host joins in one step.
 
-1. In the sidebar's **Machines** menu, choose **Register a Machine…**, then **Another Mac**,
-   then **Copy**.
-2. On the other Mac, install and open Agents Host. Under **Join one elsewhere**, paste the
-   code and click **Join**.
+1. In the window on the first Mac, open **Settings ▸ Clients**, click **Pair a Mac…**, and
+   copy the code.
+2. On the other Mac, install and open Agents. Open **Settings ▸ Control plane**, click
+   **Connect to Another…**, then **Use a Code…**. Paste the code, click **Next**, and then
+   **Connect**.
 
-   Agents Host says **This Mac runs its agents for a control plane elsewhere.** It runs no
-   control plane of its own. Its folders appear under its own heading in every window.
+   The other Mac runs its agents for the control plane on the first Mac. Its own control
+   plane stops. Its folders appear under its own heading in every window.
 
 ### Remove a server
 

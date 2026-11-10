@@ -1,4 +1,4 @@
-// Where this page is: the one Agents Host serves on this Mac at localhost (071), or the one on
+// Where this page is: the one Agents serves on this Mac at localhost (071), or the one on
 // the control plane's own domain (#1459), which a browser anywhere opens. And where its MCP Apps
 // views' sandbox proxy is (#187): another origin than the page's, which MCP Apps needs. On this
 // Mac that is the listener's address, 127.0.0.1; on the domain, a second name in front of the

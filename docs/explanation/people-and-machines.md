@@ -11,7 +11,7 @@ has their own clients, and each machine (a machine or a workspace) belongs to on
 ## The local owner
 
 The first person on a control plane is the **local owner**. They sign in with the control
-plane's own key: the codes Agents Host and `agents-control` make are theirs. They are an
+plane's own key: the codes Agents and `agents-control` make are theirs. They are an
 **admin**, and they own everything that was there before people came. A control plane
 with one person works as it did. Nothing asks them to sign in anywhere, and no account
 outside is needed.

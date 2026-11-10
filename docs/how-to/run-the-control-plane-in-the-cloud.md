@@ -6,7 +6,7 @@ description: Run the control plane on a machine you rent, at your own domain wit
 
 # Run the control plane in the cloud
 
-The control plane that Agents Host runs on your Mac can only be reached while the Mac is
+The control plane that Agents runs on your Mac can only be reached while the Mac is
 awake and online. Run it on a machine you rent instead, at a domain of your own, and it is
 always there. Windows, phones and hosts reach it at one address from anywhere. Its
 certificate comes from Let's Encrypt, so it is trusted like any website's, and codes carry
@@ -346,10 +346,10 @@ The first code comes from the machine. After that, every code comes from a paire
 
    It prints a code, which works once, for five minutes. Its eighth field is `-`: it
    carries no pin, because the certificate is publicly trusted.
-2. In Agents on your Mac, choose **Connect…** under **Connect to a control plane**,
-   paste the code under **CODE**, and click **Connect**.
+2. In Agents on your Mac, open **Settings ▸ Control plane**, click **Connect to
+   Another…**, then **Use a Code…**. Paste the code, click **Next**, and then **Connect**.
 
-   The window is paired. It has no hosts yet.
+   The window is paired, and this Mac's host joins with it.
 
 Pair your iPhone and iPad from that window, as in
 [Connect a window or phone](connect-a-window-or-phone.md).
@@ -405,23 +405,18 @@ server, and its Claude sign-in.
 
 ### Enrol your Mac
 
-Your Mac becomes a host of the control plane in the cloud with Agents Host.
+Your Mac becomes a host of the control plane in the cloud when you connect it, as in
+[Pair your first window](#pair-your-first-window). The window pairs and this Mac's host
+joins in one step. The Mac's folders appear under its own heading in every window.
 
-1. In the window, open **Settings ▸ Machines**, click **Add by Code…**, then
-   **Copy**.
-2. On the Mac, open Agents Host. Under **Join one elsewhere**, paste the code and click
-   **Join**.
-
-   Agents Host says **This Mac runs its agents for a control plane elsewhere.** The Mac's
-   folders appear under its own heading in every window.
-
-If Agents Host already runs a control plane on this Mac with hosts and devices paired to
-it, joining one elsewhere starts afresh: those devices pair again. To move an existing
+If Agents already runs a control plane on this Mac with hosts and devices paired to
+it, **Connect to Another…** starts afresh: those devices pair again, and the control plane
+on this Mac stops. **Use This Mac Only**, in the same place, starts it again as it was. To move an existing
 control plane across and keep what is paired, see the next section.
 
 ### Move the control plane from your Mac
 
-If Agents Host already runs the control plane on your Mac, you can move it to the machine
+If Agents already runs the control plane on your Mac, you can move it to the machine
 and keep every window, phone and host paired. The machine gets this Mac's control plane
 key, so everything that is paired trusts it. Agents keep working while it moves.
 
@@ -445,8 +440,8 @@ first.
    AGENTS_CONTROL_RECEIVE=1
    ```
 
-3. In Agents Host on your Mac, click **Move to Another Machine…**. The sheet opens at
-   step 1.
+3. In Agents on your Mac, open **Settings ▸ Control plane** and click **Move…** beside
+   **Move to Another Machine**. The sheet opens at step 1.
 4. Click **Save Key…**, and save the key as `control-key`. Then seal the key in the
    machine's store, with the key piped in over ssh, so that it is never written on the
    machine:
@@ -483,7 +478,7 @@ first.
    machine takes over, this Mac's host goes there, and this Mac forwards anyone
    who still comes to it.
 
-When the move is done, Agents Host says **Joined** and the machine's address. Windows,
+When the move is done, Settings ▸ Control plane says **Joined** and the machine's address. Windows,
 phones and hosts connect to the machine in a few seconds, and nothing pairs again. This
 Mac's copy of the control plane keeps running only to send members on to the machine, for
 30 days. It does this again after the Mac restarts.
@@ -494,7 +489,7 @@ with this setting waits for a move and does not start a store of its own.
 
 #### Bring it back to your Mac
 
-1. In Agents Host, click **Run It Here Again…**. The sheet checks both ends: the machine
+1. In Agents, open **Settings ▸ Control plane** and click **Run It Here Again…**. The sheet checks both ends: the machine
    answers and holds this control plane's key, and this Mac's copy is ready and empty.
 2. Only if the machine made a key of its own (it started with an empty store and no key
    sealed), the sheet says so. Then write that key to a file on your Mac, piped out over
@@ -505,7 +500,7 @@ with this setting waits for a move and does not start a store of its own.
        run --rm -T control key export --key-fd 1' > control-key)
    ```
 
-   Click **Use Key…** in the sheet, choose the file, and then delete the file. Agents Host
+   Click **Use Key…** in the sheet, choose the file, and then delete the file. Agents
    keeps the Mac's earlier key aside in the keychain. Only a shell on the machine can
    export the key: no request to the control plane gives it out. After a move from your
    Mac, the machine holds this Mac's key, and you do not do this step.

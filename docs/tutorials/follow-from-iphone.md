@@ -19,7 +19,7 @@ agent started and finished from the phone without going back to the Mac.
 
 - You have finished [Your first agent](first-agent.md), so your Mac has a folder with an
   agent in it.
-- Agents Host runs on your Mac, and the Agents window is paired with it. See
+- Agents runs on your Mac. See
   [Set up Agents on this Mac](../how-to/set-up-on-this-mac.md).
 - Your iPhone and your Mac are on the same Wi-Fi network.
 - Your invitation to the Agents alpha on TestFlight, and the **TestFlight** app on your
@@ -27,8 +27,8 @@ agent started and finished from the phone without going back to the Mac.
 
 ## 1. Put Agents on your iPhone
 
-Agents is not in the App Store yet. The alpha is on TestFlight, the same build as the Mac
-window.
+On the iPhone and iPad, the Agents alpha is on TestFlight. On the Mac, Agents is a
+download of its own, which you installed in the first tutorial.
 
 1. On your iPhone, open **TestFlight**, choose **Agents**, and tap **Install**.
 2. Open Agents.
@@ -37,12 +37,13 @@ You should see Agents open on your phone and say **Connect to your agents**.
 
 ## 2. Show a code on your Mac
 
-The phone reaches your agents through your control plane, the one Agents Host runs on
-your Mac. Only a device you have paired can reach it, and you pair it once, by scanning a
+The phone reaches your agents through your control plane, the one Agents runs on your
+Mac. Only a device you have paired can reach it, and you pair it once, by scanning a
 code.
 
 In the Agents window on your Mac, open **Settings ▸ Control plane**, click **Show** beside
-**Clients**, and click **Pair a Device…**.
+**Clients**, and click **Pair a Device…**. **Pair a Phone or iPad…** in the Agents menu bar
+item opens the same code.
 
 You should see a code to scan, good for five minutes.
 

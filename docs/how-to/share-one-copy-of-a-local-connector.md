@@ -21,7 +21,7 @@ In the folder's `.agents/mcp.json`, or your own `~/.agents/mcp.json`, add
 ```
 
 `github-mcp` is one of the connectors Agents ships: a single binary beside the app's own
-`agentsd`, in Agents Host on a Mac and in `~/.agents-server/bin` on a Linux host, which the
+`agentsd`, in Agents on a Mac and in `~/.agents-server/bin` on a Linux host, which the
 app puts first on the PATH of every server it starts. Named by its bare name, the same entry
 runs on any host, with nothing else installed there.
 
@@ -40,7 +40,7 @@ approved again, in **Project Settings ▸ Agent Configuration ▸ Connectors**, 
 - **Started again when it stops.** A copy that exits while in use is started again after
   1 second, then 2, 4 and so on up to a minute, and back to 1 second once it has run a
   minute. Agents keep their sessions across a restart.
-- **Ended with the app.** Stopping or restarting Agents Host ends every hosted copy; the
+- **Ended with the app.** Stopping or restarting this Mac's host ends every hosted copy; the
   next call starts it again. Keep nothing in the server's memory that it cannot rebuild.
 - **At most eight** hosted servers in use on a host at once. A ninth runs in each session
   as an ordinary local server, and the app's log says why.

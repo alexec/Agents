@@ -18,7 +18,7 @@ Two connectors (MCP servers) work together:
   wait can use them. See
   [Start a workflow from an MCP event](start-a-workflow-from-an-mcp-event.md).
 
-Agents Host carries `linear-mcp`, and every Linux host installs it beside agentsd.
+Agents on the Mac carries `linear-mcp`, and every Linux host installs it beside agentsd.
 
 ## Before you start
 

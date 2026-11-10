@@ -8,7 +8,7 @@ description: The terms for using Agents, its docs site, the hosted service and i
 
 Last changed: 4 November 2026.
 
-These terms are for the Agents apps (the Mac app, Agents Host, the Remote on iPhone and
+These terms are for the Agents apps (the Mac app, the Remote on iPhone and
 iPad, and the web page), this docs site, the hosted service, and the videos of Agents on
 YouTube. If you use them, you agree to these terms.
 

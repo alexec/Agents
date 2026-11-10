@@ -19,7 +19,7 @@ one grey line that says what it is, and a button that does it.
 
 | Step | Ticked when | Button |
 | --- | --- | --- |
-| **Pair this window with Agents Host** | This window is paired with a control plane. Before that, the window shows only its first-run screen, so on the card this step is always ticked. | None |
+| **Set up Agents on this Mac** | This window is paired with a control plane. Before that, the window shows only its first open, so on the card this step is always ticked. | None |
 | **Install an agent runtime** | A runtime on this Mac is installed and is not known to be signed out. A runtime is known to be signed out only after a call to it is refused. | **Install**: opens the **Install your agents** sheet. |
 | **Add a folder** | The window has a folder. | **Add Folder…** |
 | **Start your first agent** | An agent has run a turn to its end. | **New Agent**: opens the new session page of the folder you last started in, ready to type. It is dimmed until there is a folder. |

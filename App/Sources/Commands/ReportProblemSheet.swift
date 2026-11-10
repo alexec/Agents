@@ -109,7 +109,7 @@ struct ReportProblemSheet: View {
             do {
                 report = try await model.problemReport(request)
             } catch {
-                failure = "This Mac’s Agents Host could not make the report: \(error.localizedDescription)"
+                failure = "Agents on this Mac could not make the report: \(error.localizedDescription)"
             }
         }
     }

@@ -135,7 +135,7 @@ must install the App before GitHub tells the App about its members.
 
 ## Build again
 
-Build Agents Host, the Mac window and the Remote again. Agents Host's control plane has the
+Build Agents and the Remote again. The control plane in Agents has the
 ids from `config.go`, and the window and the Remote have the entitlement.
 
 You can also give the ids to a control plane that you start yourself, with no new build of
@@ -159,7 +159,7 @@ on](sign-in-with-google-apple-or-github.md#turn-a-provider-on).
 ## Check that it works
 
 1. In **Settings ▸ Control plane ▸ Sign-in**, make sure that no provider says "This build
-   has no … yet". If one does, its id did not get into the control plane: build Agents Host
+   has no … yet". If one does, its id did not get into the control plane: build Agents
    again, or check the environment variable.
 2. Turn the provider on.
 3. On a paired client, open **Settings ▸ Account** on the Mac, or **Settings ▸ Sign-ins** on

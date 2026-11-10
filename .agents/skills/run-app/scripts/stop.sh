@@ -39,7 +39,7 @@ stop_pid() { # pid program-name what
   fi
 }
 
-# A scratch Agents Host on this root (AGENTS_ROOT=$ROOT) leaves launchd jobs of its own,
+# A scratch Agents app on this root (AGENTS_ROOT=$ROOT) leaves launchd jobs of its own,
 # labelled by the root's hash, their plists in $ROOT, $ROOT/control or $ROOT/host. They are
 # KeepAlive, so they go first: a helper killed before its job is booted out is started
 # again at once. Only labels whose plist is in this root are touched.

@@ -58,12 +58,12 @@ plane sends notifications to phones itself, through **APNs**.
 
 | Container | Code | Technology | What it does |
 | --- | --- | --- | --- |
-| Mac window | `App/`, `Shared/UI` | macOS app, SwiftUI, App Store sandbox | A client. Starts nothing; asks a host for everything. |
+| Mac window | `App/`, `Shared/UI` | The window of the macOS app Agents, SwiftUI | A client. Starts no agent; asks a host for everything. |
 | Remote | `Remote/`, `Shared/UI` | iOS and iPadOS app, SwiftUI, with a widget | A client, on the phone and the iPad. |
 | Web page | `Web/` | TypeScript single-page app | A client, served by the control plane on `localhost:8792`. |
-| Agents Host | `Host/` | macOS menu bar app | Installs the daemon and the control plane, registers them with launchd, makes pairing codes. |
+| Agents (the Mac app) | `Host/`, `App/` | macOS app with a menu bar item, a Developer ID download | Carries the daemon and the control plane, registers them with launchd, and pairs its own window. One app with the Mac window. |
 | Control plane | `Go/cmd/agents-control`, `Go/internal/controlplane` | Go server, `agents-control` | Pairs clients, routes each request to its host, sends updates to clients. `:8791` wss, `:8792` loopback http. |
-| Control plane store | | A folder or an S3 bucket | Who is paired, which hosts there are, unused codes, settings. Nothing about agents. |
+| Control plane store | | A folder (on a Mac, always a folder on that Mac), or an S3 bucket in the cloud | Who is paired, which hosts there are, unused codes, settings. Nothing about agents. |
 | Host daemon | `Go/cmd/agentsd`, `Go/internal/agentsd` | Go daemon, `agentsd`, macOS and Linux | Owns agents, terminals, files, git and workflows on its host. Serves the agents MCP tools. |
 | Host data | | Files on the host | Agent records and transcripts in `~/Library/Application Support/Agents`; the person's settings in `~/.agents/settings`, and shared skills and instructions in `~/.agents` ([the `~/.agents` folder](../reference/agents-folder.md)); a folder's own `.agents/`. |
 
@@ -103,8 +103,8 @@ reach without cgo: `agents-peer` (callers' code signatures) and `agents-watch` (
 This is how the containers above run on a Mac. A solid arrow means one program starts
 another. A dashed arrow is a connection, pointing the way it is made.
 
-**Agents Host** registers two login items, and launchd runs them whether Agents Host is
-open or not:
+**Agents** registers two login items, and launchd runs them whether the app is open or
+not. Quitting Agents stops neither:
 
 | launchd job | Program |
 | --- | --- |
@@ -125,7 +125,7 @@ with it:
 - **MCP servers for events**: stdio servers in `.agents/mcp.json` that a workflow triggers
   on, polled by the daemon.
 - **Short-lived helpers**: git, runtime installers, ssh to install on a server, the Claude
-  Keychain sign-in, and opening files and Finder for the sandboxed window.
+  Keychain sign-in.
 
 The agents MCP tools are not a process. The daemon serves them at
 `http://127.0.0.1:<port>/mcp/agents`, with a token for each session (#185). An http MCP

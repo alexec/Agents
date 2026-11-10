@@ -12,7 +12,7 @@ what you should know about the connection.
 
 ## The work stays on the hosts
 
-Your agents belong to hosts: your Mac with Agents Host, and any server you have added (see
+Your agents belong to hosts: your Mac with Agents, and any server you have added (see
 [The window and the host](window-and-daemon.md)). The phone and the iPad connect to your
 control plane, as the Mac window does, and reach every host through it (see
 [The control plane](control-plane.md)). They read the same conversations, and what you do
@@ -36,8 +36,7 @@ get one:
 
 - In the Mac window, **Settings ▸ Control plane ▸ Clients ▸ Pair a Device…** shows a code
   to scan with Agents on the device.
-- In Agents Host on the Mac that runs the control plane, **Pair a Window or Phone…** with
-  **An iPhone or iPad** chosen shows the code as text, to copy and paste into the device.
+- In the menu bar on the Mac, **Pair a Phone or iPad…** opens the same pairing.
 
 A code works once, for five minutes. The device keeps a key of its own, and proves it holds
 that key each time it connects. A device that has not paired says **Connect to your
@@ -110,11 +109,12 @@ paired.
 In **Settings ▸ Control plane ▸ Clients** on the Mac, **Forget…** cuts a device off at
 once, on every copy of the control plane. Its next
 attempt to connect is refused. To use it again, pair it again with a new code. Any client
-may be forgotten from any other, the last one too; Agents Host can always make a new code.
+may be forgotten from any other, the last one too; Agents, on the Mac that runs the control
+plane, can always make a new code.
 
 ## A browser on this Mac
 
-A browser is one more client. Agents Host serves Agents as a web page at
+A browser is one more client. The Agents app on a Mac serves Agents as a web page at
 **http://localhost:8792**, and a browser on the same Mac pairs with a code, as a phone
 does, from **Add a Browser…**. A control plane in the cloud serves the same page at its
 own address, for a browser anywhere (#1459). It may do everything the window may; its page shows what
@@ -132,10 +132,10 @@ elsewhere can use it, waits on issue #61. See
 
 ## Devices paired before the control plane
 
-An iPhone or iPad paired with the earlier Agents app on your Mac keeps working after you
-move that set-up across to a control plane, without pairing again. The next time it
-connects the old way, it is told where the control plane is, and connects there from then
-on. See [Move an existing set-up across](../how-to/move-an-existing-set-up.md).
+An iPhone or iPad paired with an Agents app from before the control plane (058) does not
+move across by itself: the move strip that did this is gone (#4227). Pair it again with
+**Pair a Phone or iPad…** in the menu bar. See
+[Move an existing set-up across](../how-to/move-an-existing-set-up.md).
 
 ## Related
 

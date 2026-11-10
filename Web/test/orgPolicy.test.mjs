@@ -66,8 +66,8 @@ test("a mark and a policyRefused error say the line", () => {
   const refusal = o.refusalOf(new CallFailed(-32076, "x", { reason: "policy", rule: "runtimes", words: "Your organisation does not allow Gemini." }));
   assert.equal(refusal.rule, "runtimes");
   assert.equal(o.refusalLine(refusal), "Set by your organisation. Your organisation does not allow Gemini.");
-  assert.equal(o.refusalLine({ reason: "noPolicy", words: "Agents Host has no policy from your organisation. Connect to the network." }),
-    "Agents Host has no policy from your organisation. Connect to the network.");
+  assert.equal(o.refusalLine({ reason: "noPolicy", words: "Agents has no policy from your organisation. Connect to the network." }),
+    "Agents has no policy from your organisation. Connect to the network.");
   assert.equal(o.refusalOf(new CallFailed(-32602, "no")), null);
   assert.equal(o.refusalOf(new Error("no")), null);
 });
@@ -203,9 +203,9 @@ test("the warnings say what the policy refuses before it is saved", () => {
   assert.deepEqual(o.warnings(policy({ budgets: { daily: 5, allowUnmetered: ["grok"], raises: [] } }), []),
     ["The budget refuses Antigravity and Cursor: their turns report neither a cost nor tokens. Allow them by name to keep them."]);
   assert.deepEqual(o.warnings(policy(), [machine("Sam’s Mac", ["host.policy/1"]), machine("old-box", [])]),
-    ["1 machine does not follow policy: old-box. Update Agents Host on it."]);
+    ["1 machine does not follow policy: old-box. Update Agents on it."]);
   assert.deepEqual(o.warnings(policy({ requireFollowing: true }), [machine("a", []), machine("b", undefined)]),
-    ["2 machines do not follow policy and will start no agent: a, b. Update Agents Host on them."]);
+    ["2 machines do not follow policy and will start no agent: a, b. Update Agents on them."]);
 });
 
 test("Console ▸ Machines says whether each machine follows the policy", () => {
@@ -226,8 +226,8 @@ test("a host's policy state says why the composer cannot send, as on the Mac and
   assert.equal(o.startsNothing(stopped), true);
   assert.equal(o.composerReason(stopped), "Set by your organisation. Your organisation has stopped all agent work.");
   const lost = { stopAll: false, noPolicy: true,
-    refusal: { reason: "noPolicy", words: "Agents Host has no policy from your organisation. Connect to the network." } };
-  assert.equal(o.composerReason(lost), "Agents Host has no policy from your organisation. Connect to the network.");
+    refusal: { reason: "noPolicy", words: "Agents has no policy from your organisation. Connect to the network." } };
+  assert.equal(o.composerReason(lost), "Agents has no policy from your organisation. Connect to the network.");
 });
 
 test("the organisation's budgets are rows on Cost, as on the Mac and the Remote", () => {

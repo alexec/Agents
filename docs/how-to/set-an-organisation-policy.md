@@ -19,7 +19,7 @@ A control plane with no policy works as before. Nothing is capped until an admin
 - You are an admin of the control plane. The local owner is an admin.
 - You use the web page. Console ▸ Policy is on the web page only. The Mac and the Remote
   show the policy, read only, and give admins the kill switch.
-- Your machines run this version of Agents Host or later. A machine that is older does not
+- Your machines run this version of Agents or later. A machine that is older does not
   follow the policy. Console ▸ Machines says **Does not follow policy** under it.
 
 ## Set the rules
@@ -66,7 +66,7 @@ Choose **Console ▸ Machines**. Under each machine's version:
 - **Follows policy v4**: the machine has this version of the policy.
 - **Has v3 of v4**: the machine has an older version. It gets the new one when it connects.
 - **Has no policy yet**: the machine follows policies, but has not said that it has this one.
-- **Does not follow policy**: the machine is too old. Update Agents Host on it.
+- **Does not follow policy**: the machine is too old. Update Agents on it.
 
 ## Read the policy on any client
 
