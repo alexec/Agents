@@ -12507,6 +12507,60 @@
       ],
       "additionalProperties": false
     },
+    "LineageFigures": {
+      "type": "object",
+      "description": "lineage/figures (#4427): a milestone's or a release's Lineage panel on its Work page, from this machine's totals. cost is its rollup's total, as lineage/cost's. sessions is how many sessions worked on it and its parts, each once; running is how many of them run now (starting, running or waiting on the person). runtimes is the runtimes of the sessions this machine has, the most sessions first. A milestone has releasedIn: the releases that took its issues (and its PRs that fix none of them), each item in the first release that took it, the oldest release first; and finishedIn, the newest of them, once the milestone is closed. A release has milestonesFinished: the milestones shipped in it (by title) and the closed milestones whose last release is this one; and leadTimeSeconds, from the first work on its parts to its tag. limited says the rollup had more parts than it counts. Another kind of node is refused.",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "cost": {
+          "$ref": "#/definitions/LineageCost"
+        },
+        "sessions": {
+          "type": "integer"
+        },
+        "running": {
+          "type": "integer"
+        },
+        "runtimes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LineageRuntimeCount"
+          }
+        },
+        "releasedIn": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LineageReleaseTook"
+          }
+        },
+        "finishedIn": {
+          "$ref": "#/definitions/LineageNode",
+          "description": "A closed milestone's last release."
+        },
+        "milestonesFinished": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LineageMilestoneFinished"
+          }
+        },
+        "leadTimeSeconds": {
+          "type": "number"
+        },
+        "limited": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "node",
+        "cost",
+        "sessions",
+        "running",
+        "runtimes"
+      ],
+      "additionalProperties": false
+    },
     "LineageGraph": {
       "type": "object",
       "description": "lineage/walk (#2348): the nodes the walk reached and the links it went along. limited says the walk stopped at its limit on nodes, so there is more. resolved is each node's title, state and labels from its connector, by ref, for the nodes a connector could resolve (#3089). resolving says some nodes are still being resolved in the background, so walk again shortly for them (#3102).",
@@ -12618,6 +12672,22 @@
       ],
       "additionalProperties": false
     },
+    "LineageMilestoneFinished": {
+      "type": "object",
+      "description": "A milestone a release finished (#4427), with its title when the host has resolved it.",
+      "properties": {
+        "milestone": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "milestone"
+      ],
+      "additionalProperties": false
+    },
     "LineageNode": {
       "type": "object",
       "description": "A node in the lineage graph (#2348). kind is what it is: issue, pr, session, workflow-run, commit, file, branch or milestone, and the list is open. ref names it apart from any tracker, as <scheme>:<id>: github:alexec/Agents#123, gitlab:group/repo!45, linear:ENG-4, jira:ABC-9, session:<agent id>.",
@@ -12651,6 +12721,27 @@
       ],
       "additionalProperties": false
     },
+    "LineageReleaseTook": {
+      "type": "object",
+      "description": "A release that took a milestone's items, its tag, and how many items it took (#4427).",
+      "properties": {
+        "release": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "tag": {
+          "type": "string"
+        },
+        "items": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "release",
+        "tag",
+        "items"
+      ],
+      "additionalProperties": false
+    },
     "LineageResolved": {
       "type": "object",
       "description": "A node's title, state and labels from its connector (#3089), resolved and cached on the daemon so a lineage renderer shows \"Fix flaky test\" rather than its ref. state is open, closed or merged (a pull request's; an issue's is open or closed); absent when the connector does not say. labels is empty when it has none. Resolved for a GitHub or GitLab issue or pull request only; Linear, milestones and releases are not resolved yet.",
@@ -12670,6 +12761,23 @@
       },
       "required": [
         "title"
+      ],
+      "additionalProperties": false
+    },
+    "LineageRuntimeCount": {
+      "type": "object",
+      "description": "A runtime of lineage/figures' sessions, and how many of them it ran (#4427).",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        },
+        "sessions": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "runtimeID",
+        "sessions"
       ],
       "additionalProperties": false
     },

@@ -5735,6 +5735,30 @@ type LineageEstimateRequest struct {
 	StartAt *Date `json:"startAt,omitzero"`
 }
 
+// lineage/figures (#4427): a milestone's or a release's Lineage panel on its Work page, from this machine's totals. cost is its rollup's total, as lineage/cost's. sessions is how many sessions worked on it and its parts, each once; running is how many of them run now (starting, running or waiting on the person). runtimes is the runtimes of the sessions this machine has, the most sessions first. A milestone has releasedIn: the releases that took its issues (and its PRs that fix none of them), each item in the first release that took it, the oldest release first; and finishedIn, the newest of them, once the milestone is closed. A release has milestonesFinished: the milestones shipped in it (by title) and the closed milestones whose last release is this one; and leadTimeSeconds, from the first work on its parts to its tag. limited says the rollup had more parts than it counts. Another kind of node is refused.
+type LineageFigures struct {
+	Node LineageNode `json:"node"`
+
+	Cost LineageCost `json:"cost"`
+
+	Sessions int64 `json:"sessions"`
+
+	Running int64 `json:"running"`
+
+	Runtimes []LineageRuntimeCount `json:"runtimes"`
+
+	ReleasedIn []LineageReleaseTook `json:"releasedIn,omitzero"`
+
+	// A closed milestone's last release.
+	FinishedIn *LineageNode `json:"finishedIn,omitzero"`
+
+	MilestonesFinished []LineageMilestoneFinished `json:"milestonesFinished,omitzero"`
+
+	LeadTimeSeconds *float64 `json:"leadTimeSeconds,omitzero"`
+
+	Limited *bool `json:"limited,omitzero"`
+}
+
 // lineage/walk (#2348): the nodes the walk reached and the links it went along. limited says the walk stopped at its limit on nodes, so there is more. resolved is each node's title, state and labels from its connector, by ref, for the nodes a connector could resolve (#3089). resolving says some nodes are still being resolved in the background, so walk again shortly for them (#3102).
 type LineageGraph struct {
 	Nodes []LineageNode `json:"nodes"`
@@ -5781,6 +5805,13 @@ type LineageLinks struct {
 	Limited *bool `json:"limited,omitzero"`
 }
 
+// A milestone a release finished (#4427), with its title when the host has resolved it.
+type LineageMilestoneFinished struct {
+	Milestone LineageNode `json:"milestone"`
+
+	Title *string `json:"title,omitzero"`
+}
+
 // A node in the lineage graph (#2348). kind is what it is: issue, pr, session, workflow-run, commit, file, branch or milestone, and the list is open. ref names it apart from any tracker, as <scheme>:<id>: github:alexec/Agents#123, gitlab:group/repo!45, linear:ENG-4, jira:ABC-9, session:<agent id>.
 type LineageNode struct {
 	Kind string `json:"kind"`
@@ -5795,6 +5826,15 @@ type LineageNodeRequest struct {
 	Depth *int64 `json:"depth,omitzero"`
 }
 
+// A release that took a milestone's items, its tag, and how many items it took (#4427).
+type LineageReleaseTook struct {
+	Release LineageNode `json:"release"`
+
+	Tag string `json:"tag"`
+
+	Items int64 `json:"items"`
+}
+
 // A node's title, state and labels from its connector (#3089), resolved and cached on the daemon so a lineage renderer shows "Fix flaky test" rather than its ref. state is open, closed or merged (a pull request's; an issue's is open or closed); absent when the connector does not say. labels is empty when it has none. Resolved for a GitHub or GitLab issue or pull request only; Linear, milestones and releases are not resolved yet.
 type LineageResolved struct {
 	Title string `json:"title"`
@@ -5802,6 +5842,13 @@ type LineageResolved struct {
 	State *string `json:"state,omitzero"`
 
 	Labels []string `json:"labels,omitzero"`
+}
+
+// A runtime of lineage/figures' sessions, and how many of them it ran (#4427).
+type LineageRuntimeCount struct {
+	RuntimeID string `json:"runtimeID"`
+
+	Sessions int64 `json:"sessions"`
 }
 
 // One heading of a search for an epic (#3900): the epic or one of its sub-issues, and its title, absent while the host has not resolved it.
