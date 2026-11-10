@@ -31,14 +31,14 @@ try {
 
   if (issue) {
     await page.eval(`location.hash = "#/work/issue/" + encodeURIComponent("github:example/shop#50")`);
-    await page.waitFor(`document.querySelector(".work-docs .work-row")`, 30_000);
+    await page.waitFor(`document.querySelector(".work-docs .work-doc-row")`, 30_000);
     await sleep(1500);
-    const rows = await text(".work-docs .work-row");
+    const rows = await text(".work-docs .work-doc-row");
     ok(`the Docs section names the spec first: ${rows.join(" | ")}`, rows[0]?.startsWith("specs/gift-cards/spec.md"));
-    ok("then the docs like its title", rows.length > 1 && (await page.eval(has("Also like this"))));
+    ok("then the docs like its title", rows.length > 1 && (await page.eval(has("Like it"))));
     await page.eval(`document.querySelector(".work-docs").scrollIntoView({ block: "center" })`);
     await shot("web-work-docs");
-    await page.eval(`document.querySelector(".work-docs .work-row").click()`);
+    await page.eval(`document.querySelector(".work-docs .work-doc-row").click()`);
     await page.waitFor(`location.hash.startsWith("#/docs/") && ${has("Start Agent")}`, 20_000);
     ok("a row opens the doc's page", decodeURIComponent((await page.eval("location.hash")).slice(7)) === spec);
   } else {

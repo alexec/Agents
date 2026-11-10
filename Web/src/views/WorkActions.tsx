@@ -144,34 +144,126 @@ export function WorkActions({ store, host, detail, wrote }: {
   );
 }
 
-/** A comment box under an item's comments (#3130): Markdown, sent as the person. */
-export function WorkCommentBox({ store, host, node, wrote }: { store: Store; host: string; node: LineageNode; wrote: () => void }) {
+/** The comment box at the end of the timeline (#3130; #4402 note 11): the person's glyph, a Markdown field, then Close
+ * issue (Close with comment, with text in the field) or Reopen issue beside Comment (⌘↩). `closes` is the item's state
+ * when its close is here (an issue with no tracker's status); a pull request's is in its actions row (#4408 moves it).
+ * What a write did, or why not, is the line under the buttons. */
+export function WorkCommentBox({ store, host, node, closes, noun = "issue", said, wrote }: {
+  store: Store; host: string; node: LineageNode; closes?: string | undefined; noun?: string;
+  said?: { words: string; failed: boolean } | null | undefined; wrote: (words: string, failed: boolean) => void;
+}) {
   const text = useSignal("");
   const sending = useSignal(false);
-  const failure = useSignal<string | null>(null);
-  const send = async () => {
-    sending.value = true;
-    failure.value = null;
+  const empty = !text.value.trim();
+  const comment = async (): Promise<boolean> => {
     try {
       await store.link.call("forge/comment", { node, body: text.value }, host);
       text.value = "";
-      wrote();
+      wrote(doneWords("forge/comment", {} as ForgeDone), false);
+      return true;
     } catch (e) {
-      failure.value = describe(e);
+      wrote(describe(e), true);
+      return false;
+    }
+  };
+  const send = async (close?: "close" | "reopen") => {
+    if (sending.value) return;
+    sending.value = true;
+    try {
+      // The comment first, when there is one, then the close or the reopen.
+      if (!empty && !await comment()) return;
+      if (!close) return;
+      const reopen = close === "reopen";
+      const done = await store.link.call("forge/close", { node, ...reopen ? { reopen: true } : {} }, host);
+      wrote(doneWords("forge/close", done, reopen), false);
+    } catch (e) {
+      wrote(describe(e), true);
     } finally {
       sending.value = false;
     }
   };
+  const closeWords = closes === "open" ? (empty ? `Close ${noun}` : "Close with comment") : (empty ? `Reopen ${noun}` : "Reopen with comment");
   return (
-    <form class="work-comment-box" onSubmit={(e) => { e.preventDefault(); void send(); }}>
-      <textarea aria-label="New comment" rows={3} value={text.value} placeholder="Comment, in Markdown"
-        onInput={(e) => { text.value = e.currentTarget.value; }}
-        onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void send(); } }} />
-      <div class="work-actions-bar">
-        {failure.value && <span class="hint failure small">{failure.value}</span>}
-        <span class="spacer" />
-        <button type="submit" disabled={sending.value || !text.value.trim()}>{sending.value ? "Sending…" : "Comment"}</button>
+    <form class="work-comment-box" onSubmit={(e) => { e.preventDefault(); if (!empty) void send(); }}>
+      {/* The person's avatar comes with the forge's login for them (#4363); a person's glyph till then. */}
+      <span class="work-comment-me" aria-hidden="true">
+        <svg width="28" height="28" viewBox="0 0 28 28"><circle cx="14" cy="14" r="14" /><circle cx="14" cy="11" r="4.5" class="cut" />
+          <path d="M6 23.5a9 9 0 0 1 16 0" class="cut" /></svg>
+      </span>
+      <div class="work-comment-box-main">
+        <textarea aria-label="New comment" rows={4} value={text.value} placeholder="Comment, in Markdown"
+          onInput={(e) => { text.value = e.currentTarget.value; }}
+          onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); if (!empty) void send(); } }} />
+        <div class="work-actions-bar">
+          {sending.value && <span class="work-spinner" aria-label="Sending" />}
+          <span class="spacer" />
+          {(closes === "open" || closes === "closed") && (
+            <button type="button" disabled={sending.value} onClick={() => void send(closes === "open" ? "close" : "reopen")}
+              title={closes === "open" ? (noun === "issue" ? "Close it as completed" : "Close it without merging") : undefined}>
+              <span aria-hidden="true" class={`work-close-mark ${closes}`}>{closes === "open" ? "✓" : "↺"}</span>{closeWords}</button>
+          )}
+          <button type="submit" class="prominent" disabled={sending.value || empty} title="Comment (⌘↩)">Comment</button>
+        </div>
+        {said && <p class={said.failed ? "hint failure small" : "quiet small"} role="status">{said.words}</p>}
       </div>
     </form>
+  );
+}
+
+/** A tracker's status in the state pill's place (#3260; #4402 note 6): the status in its state's colour, its menu the
+ * moves its workflow allows now. */
+export function WorkStatusMenu({ state, status, transitions, busy, move }: {
+  state: string; status: string | undefined; transitions: readonly { id: string; name: string }[]; busy: boolean; move: (id: string) => void;
+}) {
+  const menu = (event: MouseEvent) => openContextMenu(event, transitions.map((t): MenuItem => ({ label: t.name, run: () => move(t.id) })));
+  return (
+    <button type="button" class={`work-state work-status-menu ${state}`} disabled={busy || transitions.length === 0} onClick={menu}
+      title={transitions.length === 0 ? "No moves" : "Move it by its workflow"}>{status ?? "Status"} <span aria-hidden="true">▾</span></button>
+  );
+}
+
+/** The labels picker (#4402 note 12), from the gear on the side panel's Labels: a popover with a filter field and a
+ * tick on each label the item has (forge/labels); a click adds the label or takes it off. */
+export function WorkLabelsPicker({ store, host, node, has, close, pick }: {
+  store: Store; host: string; node: LineageNode; has: readonly ForgeLabel[]; close: () => void; pick: (name: string, add: boolean) => void;
+}) {
+  const choices = useSignal<ForgeLabel[] | null>(null);
+  const failed = useSignal<string | null>(null);
+  const text = useSignal("");
+  useEffect(() => {
+    let current = true;
+    store.link.call("forge/labels", { node }, host).then((r) => { if (current) choices.value = r.labels; }, (e) => {
+      if (current) { choices.value = []; failed.value = describe(e); }
+    });
+    return () => { current = false; };
+  }, [node.ref, host]);
+  useEffect(() => {
+    const escape = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); close(); } };
+    addEventListener("keydown", escape);
+    return () => removeEventListener("keydown", escape);
+  }, []);
+  const words = text.value.trim().toLowerCase();
+  const shown = (choices.value ?? []).filter((l) => !words || l.name.toLowerCase().includes(words));
+  return (
+    <div class="popover work-labels-picker" role="dialog" aria-label="Labels">
+      <input type="search" placeholder="Filter labels" aria-label="Filter labels" value={text.value} autoFocus
+        onInput={(e) => { text.value = e.currentTarget.value; }} />
+      <div class="work-labels-choices" role="group" aria-label="Labels">
+        {choices.value === null ? <span class="quiet small">Loading…</span>
+          : failed.value ? <span class="hint failure small">{failed.value}</span>
+          : shown.length === 0 ? <span class="quiet small">{choices.value.length === 0 ? "No labels" : "No label matches"}</span>
+          : shown.map((l) => {
+            const on = has.some((x) => x.name === l.name);
+            return (
+              <button key={l.name} type="button" role="menuitemcheckbox" aria-checked={on} title={on ? "Take it off" : "Add it"}
+                onClick={() => pick(l.name, !on)}>
+                <span class="tick" aria-hidden="true">{on ? "✓" : ""}</span>
+                <span class="work-label-dot" style={l.color ? { background: `#${l.color.replace(/^#/, "")}` } : undefined} aria-hidden="true" />
+                <span class="name">{l.name}</span>
+              </button>
+            );
+          })}
+      </div>
+    </div>
   );
 }

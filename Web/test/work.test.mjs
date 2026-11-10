@@ -389,3 +389,21 @@ test("a next page a forge could not read keeps the rows and the cursor, and says
   assert.equal(l.lists.value[0].items.length, 2);
   assert.equal(l.lists.value[0].cursor, undefined);
 });
+
+// The issue page's words (#4402), as WorkItemPage's on the window (#4400).
+test("the state line says who opened it, when it was updated and how many comments, wide and narrow", () => {
+  const now = new Date("2026-11-10T12:00:00Z");
+  const updated = new Date("2026-11-10T10:00:00Z");
+  assert.deepEqual(w.pageStateWords({ author: "alexec", updated, comments: 4 }, now),
+    { wide: "alexec opened this · updated 2 hours ago · 4 comments", short: "alexec · 2 h · 4 comments" });
+  assert.deepEqual(w.pageStateWords({ author: "sam", updated, comments: 1 }, now).wide, "sam opened this · updated 2 hours ago · 1 comment");
+  assert.deepEqual(w.pageStateWords({ comments: 0 }, now), { wide: "", short: "" });
+});
+
+test("the 390 px bar says 3/42, and Lineage says the cost and the sessions", () => {
+  assert.equal(w.shortPositionWords({ position: 3, count: 42 }, false), "3/42");
+  assert.equal(w.shortPositionWords({ position: 3, count: 42 }, true), "3/42+");
+  assert.equal(w.lineageCountWords("$0.42", 1), "$0.42 · 1 session");
+  assert.equal(w.lineageCountWords(undefined, 2), "2 sessions");
+  assert.equal(w.lineageCountWords(undefined, 0), "");
+});

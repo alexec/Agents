@@ -408,33 +408,37 @@ export function WorkDocs({ store, itemRef, title, body, asked }: { store: Store;
 
   if (hosts.length === 0) return null;
   const g = got.value;
+  // A section of the page's side panel (#4402): the panel is narrow, so the title goes under the doc's name.
   const row = (doc: Doc) => {
     const beside = titleBeside(doc);
     return (
       <li key={doc.ref} data-ref={doc.ref}>
-        <button type="button" class="work-row docs-row" title={doc.ref} onClick={() => go({ nav: "docs", section: "docs", item: doc.ref })}>
-          <span class="work-row-head">
-            <span class={doc.path ? "docs-path" : "work-title"}>{shortForm(doc)}</span>
-            {beside && <span class="quiet docs-beside">{beside}</span>}
+        <button type="button" class="work-doc-row" title={doc.ref} onClick={() => go({ nav: "docs", section: "docs", item: doc.ref })}>
+          <span aria-hidden="true" class="quiet">▤</span>
+          <span class="work-doc-words">
+            <span class={doc.path ? "docs-path" : undefined}>{shortForm(doc)}</span>
+            {beside && <span class="quiet small">{beside}</span>}
           </span>
         </button>
       </li>
     );
   };
   return (
-    <section class="work-docs" aria-label="Docs">
+    <section class="work-side-section work-docs" aria-label="Docs">
       <h3>Docs</h3>
-      {!g ? <p class="hint">Finding its docs…</p>
-        : g.linked.length === 0 && g.related.length === 0 ? <p class="hint">No doc names this, and none is like it.</p>
-        : (
-          <>
-            {g.linked.length > 0 && <ul class="work-rows">{g.linked.map(row)}</ul>}
-            {g.related.length > 0 && <>
-              <p class="quiet small">{g.linked.length === 0 ? "Like this" : "Also like this"}</p>
-              <ul class="work-rows">{g.related.map(row)}</ul>
-            </>}
-          </>
-        )}
+      <div class="value">
+        {!g ? <span class="quiet">Finding its docs…</span>
+          : g.linked.length === 0 && g.related.length === 0 ? <span class="quiet">None</span>
+          : (
+            <>
+              {g.linked.length > 0 && <ul class="work-doc-rows">{g.linked.map(row)}</ul>}
+              {g.related.length > 0 && <>
+                <span class="quiet small">Like it</span>
+                <ul class="work-doc-rows">{g.related.map(row)}</ul>
+              </>}
+            </>
+          )}
+      </div>
     </section>
   );
 }

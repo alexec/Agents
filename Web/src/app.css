@@ -2228,48 +2228,169 @@ a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
 .work-error .mark { color: var(--tint-attention); }
 .work-error .words { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .work-error.middle { margin: 48px auto; max-width: 520px; }
-/* An item's page: the header, then the body and the side panel beside it (wide) or under the header (narrow). */
+/* An item's page (#4402, specs/4328-work-look/issue.md), as the window's WorkItemPage (#4400): the page's bar, the header
+   with Start Agent, the timeline and the comment box, and the side panel: a 240 px column over 900 px; rows under the
+   header under it, with Linked, Lineage and Docs at the end. Under 700 px, the phone's page. */
 .work-item-page { container-type: inline-size; }
 .work-item-grid { display: grid; grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: "bar" "head" "people" "main" "links"; column-gap: 24px; }
+  grid-template-areas: "bar" "head" "problem" "people" "main" "links" "none"; column-gap: 24px; }
 .work-item-grid > .work-page-bar { grid-area: bar; }
 .work-item-grid > .work-page-head { grid-area: head; }
+.work-item-grid > .work-problem { grid-area: problem; }
 .work-item-grid > .work-side.people { grid-area: people; }
 .work-item-grid > .work-main { grid-area: main; min-width: 0; }
 .work-item-grid > .work-side.links { grid-area: links; }
-.work-page-bar .work-stepper + .work-refresh { margin-left: 0; }
-.work-page-byline { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; margin: 4px 0 8px; }
+.work-item-grid > .work-could-not { grid-area: none; }
+/* A read failed after one came: the strip under the header, the last read dimmed under it. */
+.work-item-grid:has(> .work-problem) > :is(.work-side, .work-main) { opacity: 0.5; }
+.work-page-bar { gap: 6px; }
+.work-place { display: inline-flex; gap: 6px; align-items: baseline; min-width: 0; white-space: nowrap; }
+.work-place a { color: inherit; opacity: 0.7; text-decoration: none; }
+.work-place a:hover { opacity: 1; text-decoration: underline; }
+.work-place .back { display: none; }
+.work-place .sep { opacity: 0.4; }
+.work-place .here { font-weight: 600; font-variant-numeric: tabular-nums; }
+.work-page-bar .work-stepper { font-variant-numeric: tabular-nums; }
+.work-page-bar .work-stepper + .work-refresh, .work-page-bar .work-open-icon + .work-refresh { margin-left: 0; }
+.work-stepper .short-line, .work-open-icon, .narrow-only, .work-page-byline .short-line { display: none; }
+.work-open-icon { place-items: center; width: 28px; height: 28px; margin-left: auto; color: inherit; border-radius: var(--radius-control); }
+.work-open-glyph { flex: none; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.work-title-line { display: flex; gap: 12px; align-items: flex-start; }
+.work-title-line h2 { flex: 1; min-width: 0; margin: 0 0 4px; font-weight: 600; overflow-wrap: anywhere; }
+.work-page-head .work-ref { font-weight: normal; opacity: 0.6; }
+.work-start { display: inline-flex; gap: 6px; align-items: center; justify-content: center; white-space: nowrap; }
+.work-page-byline { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; margin: 4px 0 12px; }
+.work-open-on { display: inline-flex; gap: 4px; align-items: center; margin-left: auto; white-space: nowrap; }
+.work-state.with-glyph { display: inline-flex; gap: 4px; align-items: center; padding: 2px 10px 2px 8px; font-size: 0.9em; font-weight: 500; }
+.work-state.with-glyph .work-state-icon { --state: #fff; }
+.work-state.with-glyph.open { background: #1a7f37; }
+.work-state.with-glyph.closed, .work-state.with-glyph.merged { background: #8250df; }
+.work-status-menu { border: none; cursor: pointer; font: inherit; font-size: 0.9em; padding: 2px 10px; }
+.work-status-menu:disabled { cursor: default; opacity: 0.7; }
+/* Placeholders while the page reads (section 7): grey bars with a slow shimmer, no spinner. */
+.work-item-page .bar { display: block; height: 10px; margin: 4px 0; border-radius: 5px; background: var(--paper-wash); width: 100%; }
+.work-item-page .bar.short { width: 40%; }
+.work-page-head.placeholder h2 .bar { height: 22px; width: 60%; }
+.work-state.placeholder { color: transparent; background: var(--paper-wash); }
+.work-side .value > .bar { width: 6em; }
+.work-comment.placeholder .work-avatar { background: var(--paper-wash); }
+@media (prefers-reduced-motion: no-preference) {
+  .work-item-page.loading .bar, .work-item-page.loading .work-state.placeholder { animation: work-shimmer 1.6s ease-in-out infinite alternate; }
+}
+/* Nothing read: in the middle, the warning glyph, Could not read #4331, the forge's words, Try again and Open on GitHub. */
+.work-could-not { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 60px 16px; text-align: center; }
+.work-could-not p { margin: 0; }
+.work-could-not .mark { font-size: 28px; opacity: 0.6; }
+.work-could-not .buttons { display: flex; gap: 12px; align-items: center; margin-top: 6px; }
 .work-side { display: flex; flex-direction: column; font-size: 0.875rem; }
-.work-side .work-side-section { margin: 0; padding: 6px 0; border-top: 1px solid var(--paper-rule); display: flex; gap: 12px; align-items: baseline; }
-.work-side-section h3 { flex: none; width: 6.5em; margin: 0; font-size: 0.8em; font-weight: 600; opacity: 0.65; }
+.work-side .work-side-section { margin: 0; padding: 6px 0; border-top: 1px solid var(--paper-rule); display: flex; gap: 12px; align-items: baseline; position: relative; }
+.work-side-section h3 { flex: none; display: flex; align-items: center; gap: 4px; width: 6.5em; margin: 0; font-size: 0.8em; font-weight: 600; color: color-mix(in srgb, currentColor 65%, transparent); }
 .work-side-section .value { min-width: 0; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+/* The gear on Labels (note 12): faint until the pointer is on the section, so a keyboard and a screen reader find it. */
+.work-gear { display: inline-grid; place-items: center; width: 22px; height: 22px; margin-left: auto; padding: 0; border: none; border-radius: var(--radius-control);
+  background: none; color: inherit; cursor: pointer; opacity: 0.35; }
+.work-gear svg { fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; }
+.work-side-section:hover .work-gear, .work-gear:focus-visible, .work-gear[aria-expanded=true] { opacity: 1; }
+.work-gear:hover { background: var(--paper-wash); }
+@media (hover: none) { .work-gear { opacity: 1; width: 32px; height: 32px; } }
+.work-labels-picker { position: absolute; top: 28px; left: 0; z-index: 40; display: flex; flex-direction: column; gap: 6px; width: 240px; max-width: calc(100vw - 32px);
+  padding: 8px; box-sizing: border-box; }
+.work-labels-picker input[type=search] { padding: 5px 8px; border: 1px solid var(--paper-rule); border-radius: var(--radius-control); background: var(--paper-raised);
+  color: inherit; font: inherit; }
+.work-labels-choices { display: flex; flex-direction: column; max-height: 280px; overflow-y: auto; }
+.work-labels-choices button { display: flex; gap: 8px; align-items: center; padding: 5px 6px; border: none; border-radius: var(--radius-control); background: none;
+  color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.work-labels-choices button:hover, .work-labels-choices button:focus-visible { background: var(--paper-wash); outline: none; }
+.work-labels-choices .tick { width: 1em; flex: none; }
+.work-labels-choices .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.work-label-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--paper-wash); border: 1px solid var(--paper-rule); }
 .work-person { display: inline-flex; gap: 6px; align-items: center; }
 .work-mini-row { display: inline-flex; gap: 6px; align-items: center; padding: 2px 0; background: none; border: none; color: inherit; font: inherit;
   cursor: pointer; text-align: left; }
 .work-mini-row:hover { text-decoration: underline; }
+.work-progress { display: flex; flex-direction: column; gap: 2px; width: 100%; }
+.work-progress progress { width: 100%; height: 6px; }
+.work-session { display: inline-flex; gap: 6px; align-items: center; max-width: 100%; padding: 1px 0; border: none; background: none; color: var(--accent);
+  font: inherit; text-align: left; cursor: pointer; }
+.work-session:disabled { color: inherit; opacity: 0.6; cursor: default; }
+.work-session .dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: color-mix(in srgb, currentColor 40%, transparent); }
+.work-session .dot.runs { background: #1a7f37; }
+.work-session .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.work-doc-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; width: 100%; }
+.work-doc-row { display: flex; gap: 6px; align-items: baseline; width: 100%; padding: 2px 0; border: none; background: none; color: inherit; font: inherit;
+  text-align: left; cursor: pointer; }
+.work-doc-row:hover .docs-path, .work-doc-row:hover .work-doc-words > :first-child { text-decoration: underline; }
+.work-doc-words { display: flex; flex-direction: column; min-width: 0; }
+.work-doc-words > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .work-item-grid > .work-side.links { margin-top: 16px; }
-.work-item-grid > .work-side.people { margin-bottom: 8px; border-bottom: 1px solid var(--paper-rule); }
+.work-item-grid > .work-side.people { margin-bottom: 12px; border-bottom: 1px solid var(--paper-rule); }
 @container (min-width: 900px) {
-  .work-item-grid { grid-template-columns: minmax(0, 1fr) 240px; grid-template-rows: auto auto auto auto 1fr;
-    grid-template-areas: "bar bar" "head head" "main people" "main links" "main ."; }
+  .work-item-grid { grid-template-columns: minmax(0, 1fr) 240px; grid-template-rows: auto auto auto auto auto 1fr;
+    grid-template-areas: "bar bar" "head head" "problem problem" "main people" "main links" "main ."; }
+  .work-item-grid > .work-could-not { grid-column: 1 / -1; }
   .work-item-grid > .work-side.links { margin-top: 0; }
   .work-item-grid > .work-side.people { margin-bottom: 0; border-bottom: none; }
   .work-side-section { flex-direction: column; gap: 6px; padding: 10px 0; }
-  .work-side-section h3 { width: auto; }
+  .work-side-section h3 { width: 100%; }
   .work-side-section .value { flex-direction: column; align-items: flex-start; }
   .work-side-section .value > .work-chips { flex-direction: row; }
   .work-item-grid > .work-side.people > .work-side-section:first-child { border-top: none; padding-top: 0; }
+  .work-labels-picker { left: auto; right: 0; }
 }
-/* A comment on the timeline (section 6): a line down the leading edge through the avatars, the body in a box. */
-.work-comments { position: relative; display: flex; flex-direction: column; gap: 14px; padding-left: 0; }
-.work-comments::before { content: ""; position: absolute; left: 13px; top: 0; bottom: 0; width: 2px; background: var(--paper-rule); }
-.work-comments > .link { align-self: flex-start; margin-left: 40px; }
-.work-comment { position: relative; display: flex; gap: 12px; align-items: flex-start; }
-.work-comment .work-avatar { box-shadow: 0 0 0 3px var(--paper-ground); }
+/* The phone's page (under 700 px, as an iPhone): ‹ Issues, 3/42 and Open on GitHub's icon in the bar; the short state
+   line; Start Agent full width; the avatar in each box's header, so the box takes the width. */
+@container (max-width: 699px) {
+  .work-place .back { display: inline; }
+  .work-place .sep { display: none; }
+  .work-place .here { flex: 1; text-align: center; }
+  .work-stepper .wide-line, .work-page-byline .wide-line, .work-open-on, .wide-only { display: none; }
+  .work-stepper .short-line, .work-page-byline .short-line { display: inline; }
+  .work-open-icon { display: inline-grid; }
+  .work-page-bar .work-stepper { margin-left: auto; }
+  .work-page-bar .work-stepper + .work-open-icon { margin-left: 0; }
+  .narrow-only { display: block; margin-bottom: 12px; }
+  .narrow-only .work-start { width: 100%; padding: 8px; }
+  .work-timeline::before { display: none; }
+  .work-timeline > .work-comment > .work-avatar { display: none; }
+  .work-comment-small-avatar { display: inline-flex; margin-right: 6px; vertical-align: middle; }
+  .work-timeline .work-event { padding-left: 0; }
+  .work-comment-box { grid-template-columns: minmax(0, 1fr); }
+  .work-comment-me { display: none; }
+  .work-side.links .work-side-section h3 { text-transform: uppercase; letter-spacing: 0.04em; }
+}
+/* The timeline (section 6; notes 8 to 10): a line down the leading edge through the avatars, each box with a hairline
+   border; an event a small grey line with its icon on the line. */
+.work-item-page .work-timeline { position: relative; display: flex; flex-direction: column; gap: 14px; margin-top: 4px; }
+.work-timeline::before { content: ""; position: absolute; left: 13px; top: 0; bottom: 0; width: 2px; background: var(--paper-rule); }
+.work-comment { position: relative; display: flex; gap: 10px; align-items: flex-start; }
+.work-comment > .work-avatar { box-shadow: 0 0 0 3px var(--paper-ground); }
+.work-comment-small-avatar { display: none; }
 .work-comment-main { flex: 1; min-width: 0; }
-.work-comment-main > p { margin: 4px 0 6px; }
+.work-comment-main > p { margin: 5px 0 6px; display: flex; align-items: center; flex-wrap: wrap; }
 .work-comment-body { padding: 4px 12px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-raised); overflow-wrap: anywhere; }
+.work-comment-body .bar { margin: 10px 0; }
 .work-bot { margin-left: 6px; padding: 0 5px; border: 1px solid var(--paper-rule); border-radius: 99px; font-size: 0.8em; opacity: 0.8; }
+.work-event { position: relative; display: flex; gap: 10px; align-items: center; }
+.work-event .mark { flex: none; display: inline-grid; place-items: center; width: 22px; height: 22px; margin: 0 3px; border-radius: 50%; background: var(--paper-well);
+  font-size: 12px; box-shadow: 0 0 0 3px var(--paper-ground); }
+.work-event .mark.closed { background: #8250df; color: #fff; }
+/* The comment box (note 11): the person's glyph on the timeline's column, the field, then Close issue and Comment. */
+.work-comment-box { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; margin-top: 16px; }
+.work-comment-me svg { display: block; fill: var(--paper-wash); }
+.work-comment-me svg .cut { fill: var(--paper-ground); stroke: none; }
+.work-comment-box-main { display: grid; gap: 6px; }
+.work-comment-box textarea { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card);
+  background: var(--paper-raised); color: inherit; font: inherit; resize: vertical; }
+.work-comment-box .work-actions-bar button { display: inline-flex; gap: 6px; align-items: center; }
+.work-close-mark.open { color: #8250df; }
+.work-comment-box p { margin: 0; }
+.work-no-writes { margin: 16px 0 0; }
+@media (prefers-color-scheme: dark) {
+  .work-state.with-glyph.open { background: #238636; }
+  .work-state.with-glyph.closed, .work-state.with-glyph.merged { background: #8957e5; }
+  .work-session .dot.runs { background: #3fb950; }
+  .work-close-mark.open { color: #a371f7; }
+}
 /* The page's actions (#3130): a row of buttons, the merge button split for its other methods. */
 .work-actions { margin-top: 8px; }
 .work-actions-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -2278,8 +2399,6 @@ a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
 .split-button { display: inline-flex; }
 .split-button > button:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; }
 .split-button > button:last-child { border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: 1px; padding: 0 8px; }
-.work-comment-box { display: grid; gap: 6px; margin-top: 12px; }
-.work-comment-box textarea { width: 100%; box-sizing: border-box; font: inherit; resize: vertical; }
 dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
 .work-log { display: grid; gap: 8px; min-width: 0; }
 .work-log header { display: flex; align-items: center; }
