@@ -36,7 +36,7 @@ struct ElicitationView: View {
                 let asker = model.work.askerLine(request.agentID)
                 if asker != nil || needRequest != nil {
                     HStack(spacing: 8) {
-                        if let asker { Text(asker).appText(.fine).foregroundStyle(.secondary) }
+                        if let asker { Text(asker).appText(.fine).foregroundStyle(.secondary).lineLimit(1) }
                         Spacer(minLength: 0)
                         if let needRequest { RequestCardLater(request: needRequest) }
                     }

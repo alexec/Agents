@@ -422,8 +422,8 @@ struct SidebarModelTests {
         #expect(SidebarSmartRow.needsYou.count(in: model, folders: [key]) == 1)
     }
 
-    /// Later's choices (#4232): an hour on; 18:00, or 18:00 tomorrow once it is past; 09:00
-    /// tomorrow; At my Mac, no time. Its row says when it comes back.
+    /// Later's choices (#4234): 1h, 4h, 8h and 1d on from now; At my Mac, no time. Its row
+    /// says when it comes back.
     @Test func laterChoicesAndWhenItComesBack() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = try #require(TimeZone(identifier: "America/Los_Angeles"))
@@ -431,11 +431,12 @@ struct SidebarModelTests {
             calendar.date(from: DateComponents(year: 2026, month: 11, day: day, hour: hour))!
         }
         let noon = at(10, 12)
-        #expect(NeedRequest.Later.hour.until(from: noon, calendar: calendar) == at(10, 13))
-        #expect(NeedRequest.Later.evening.until(from: noon, calendar: calendar) == at(10, 18))
-        #expect(NeedRequest.Later.evening.until(from: at(10, 19), calendar: calendar) == at(11, 18))
-        #expect(NeedRequest.Later.morning.until(from: at(10, 1), calendar: calendar) == at(11, 9))
-        #expect(NeedRequest.Later.atMac.until(from: noon, calendar: calendar) == nil)
+        #expect(NeedRequest.Later.timed.map(\.short) == ["1h", "4h", "8h", "1d"])
+        #expect(NeedRequest.Later.hour.until(from: noon) == at(10, 13))
+        #expect(NeedRequest.Later.fourHours.until(from: noon) == at(10, 16))
+        #expect(NeedRequest.Later.eightHours.until(from: noon) == at(10, 20))
+        #expect(NeedRequest.Later.day.until(from: noon) == at(11, 12))
+        #expect(NeedRequest.Later.atMac.until(from: noon) == nil)
         #expect(NeedRequest.Later.atMac.params(id: UUID(), now: noon).atMac == true)
 
         #expect(NeedRequest.Deferral(atMac: true, at: noon).back(now: noon, calendar: calendar) == "At my Mac")

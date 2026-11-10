@@ -95,41 +95,55 @@ public struct NeedRequest: Codable, Sendable, Hashable, Identifiable {
         }
     }
 
-    /// Later's choices (#4232), in the order its menu lists them; Pick a time… is the last,
-    /// and a client draws it itself.
+    /// Later's choices (#4234), in the order its menu lists them: hours on from now (Alex,
+    /// 2026-11-10: 1h, 4h, 8h, 1d), then At my Mac.
     public enum Later: String, CaseIterable, Sendable {
-        case hour, evening, morning, atMac
+        case hour, fourHours, eightHours, day, atMac
 
-        /// The words on the menu.
+        /// The timed ones, as the request's card has them.
+        public static let timed: [Later] = [.hour, .fourHours, .eightHours, .day]
+
+        /// The words on the row's menu.
         public var word: String {
             switch self {
             case .hour: "In 1 Hour"
-            case .evening: "This Evening"
-            case .morning: "Tomorrow Morning"
+            case .fourHours: "In 4 Hours"
+            case .eightHours: "In 8 Hours"
+            case .day: "In 1 Day"
             case .atMac: "At My Mac"
             }
         }
 
-        /// When it comes back, from `now`: in one hour; at 18:00, or 18:00 tomorrow once it is
-        /// later than that; at 09:00 tomorrow. Nil for At my Mac, which waits for the person.
-        public func until(from now: Date = .now, calendar: Calendar = .current) -> Date? {
-            func at(_ hour: Int, daysOn: Int) -> Date? {
-                calendar.date(byAdding: .day, value: daysOn, to: calendar.startOfDay(for: now))
-                    .flatMap { calendar.date(bySettingHour: hour, minute: 0, second: 0, of: $0) }
-            }
+        /// The card's button: 1h, 4h, 8h, 1d.
+        public var short: String {
             switch self {
-            case .hour: return now.addingTimeInterval(3600)
-            case .evening:
-                if let today = at(18, daysOn: 0), today > now { return today }
-                return at(18, daysOn: 1)
-            case .morning: return at(9, daysOn: 1)
-            case .atMac: return nil
+            case .hour: "1h"
+            case .fourHours: "4h"
+            case .eightHours: "8h"
+            case .day: "1d"
+            case .atMac: "At my Mac"
             }
         }
 
+        /// How long from now; nil for At my Mac, which waits for the person.
+        public var hours: Int? {
+            switch self {
+            case .hour: 1
+            case .fourHours: 4
+            case .eightHours: 8
+            case .day: 24
+            case .atMac: nil
+            }
+        }
+
+        /// When it comes back, from `now`.
+        public func until(from now: Date = .now) -> Date? {
+            hours.map { now.addingTimeInterval(TimeInterval($0) * 3600) }
+        }
+
         /// What `requests/defer` takes for it.
-        public func params(id: UUID, now: Date = .now, calendar: Calendar = .current) -> DaemonAPI.RequestsDefer {
-            self == .atMac ? .init(id: id, atMac: true) : .init(id: id, until: until(from: now, calendar: calendar))
+        public func params(id: UUID, now: Date = .now) -> DaemonAPI.RequestsDefer {
+            self == .atMac ? .init(id: id, atMac: true) : .init(id: id, until: until(from: now))
         }
     }
 

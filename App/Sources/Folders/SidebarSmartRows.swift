@@ -157,39 +157,34 @@ private struct RequestListRow: View {
     @Environment(\.windowOpen) private var windowOpen
     let request: NeedRequest
     let place: String?
-    /// Pick a Time… from its Later menu (#4234).
-    @State private var picking = false
 
     var body: some View {
-        Group {
-            if let id = request.askedBy {
-                let item = SidebarItem.session(id)
-                RequestRowLabel(request: request, asker: model.work.agent(id)?.title, place: place)
-                    .help(request.line(asker: model.work.agent(id)?.title))
-                    .sidebarInk(item)
-                    .tag(item)
-                    .modifier(SecretUseAnswers(request: request))
-                    .contextMenu {
-                        SecretUseMenu(request: request)
-                        if request.secretUse != nil { Divider() }
-                        Button("Open Session") {
-                            if let windowOpen { windowOpen(item) } else { model.sidebarItem = item }
-                        }
-                        Divider()
-                        RequestLaterMenu(request: request) { picking = true }
+        if let id = request.askedBy {
+            let item = SidebarItem.session(id)
+            RequestRowLabel(request: request, asker: model.work.agent(id)?.title, place: place)
+                .help(request.line(asker: model.work.agent(id)?.title))
+                .sidebarInk(item)
+                .tag(item)
+                .modifier(SecretUseAnswers(request: request))
+                .contextMenu {
+                    SecretUseMenu(request: request)
+                    if request.secretUse != nil { Divider() }
+                    Button("Open Session") {
+                        if let windowOpen { windowOpen(item) } else { model.sidebarItem = item }
                     }
-            } else if request.isTerminal {
-                RequestRowLabel(request: request, place: place)
-                    .help(request.line(asker: nil))
-                    .modifier(SecretUseAnswers(request: request))
-                    .contextMenu {
-                        SecretUseMenu(request: request)
-                        Divider()
-                        RequestLaterMenu(request: request) { picking = true }
-                    }
-            }
+                    Divider()
+                    RequestLaterMenu(request: request)
+                }
+        } else if request.isTerminal {
+            RequestRowLabel(request: request, place: place)
+                .help(request.line(asker: nil))
+                .modifier(SecretUseAnswers(request: request))
+                .contextMenu {
+                    SecretUseMenu(request: request)
+                    Divider()
+                    RequestLaterMenu(request: request)
+                }
         }
-        .sheet(isPresented: $picking) { RequestTimePicker(request: request) }
     }
 }
 
