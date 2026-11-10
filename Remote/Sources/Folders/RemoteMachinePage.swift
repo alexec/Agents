@@ -3,8 +3,9 @@ import SwiftUI
 
 /// One machine's page (#4034), as the window's (#3626) and the web page's: a summary first,
 /// its CPU, memory and worst disk on one line (#3743), then its disks, then the runtimes
-/// installed there (#3629), with Sign In… and Update (#4035). Read with `machine/usage` as it opens and every few seconds while
-/// it is open, never otherwise. Its worktrees, resources and processes, and its settings,
+/// installed there (#3629), with Sign In… and Update (#4035), and This Mac's resources (#4027).
+/// Read with `machine/usage` as it opens and every few seconds while it is open, never
+/// otherwise. Its worktrees and processes, its settings, and another machine's resources,
 /// stay on the Mac and the web page.
 struct RemoteMachinePage: View {
     @Environment(RemoteModel.self) private var model
@@ -22,52 +23,60 @@ struct RemoteMachinePage: View {
     var body: some View {
         let row = model.machineRow(host)
         let words = model.need(of: host).map { MachineNeedWords.line($0, name: name, row: row) }
-        List {
-            Section {
-                Text(words ?? (offline ? "Offline" : "Online"))
-                    .foregroundStyle(offline ? StateTint.failure.style(or: .secondary) : AnyShapeStyle(.secondary))
-                if offline {
-                    Text("\(name) is offline, so it can’t say how it is doing now.").foregroundStyle(.secondary)
-                } else if !answersUsage {
-                    Text("Update Agents on \(name) to see its CPU, memory and disks here.").foregroundStyle(.secondary)
-                } else if let usage {
-                    summary(usage)
-                } else if let failure {
-                    Text(failure).foregroundStyle(.secondary)
-                } else {
-                    ProgressView()
-                }
-            }
-            if !offline, let usage {
-                Section("Disks") {
-                    if usage.disks.isEmpty {
-                        Text("No disk looked at yet. \(name) looks every minute.").foregroundStyle(.secondary)
+        ScrollViewReader { proxy in
+            List {
+                Section {
+                    Text(words ?? (offline ? "Offline" : "Online"))
+                        .foregroundStyle(offline ? StateTint.failure.style(or: .secondary) : AnyShapeStyle(.secondary))
+                    if offline {
+                        Text("\(name) is offline, so it can’t say how it is doing now.").foregroundStyle(.secondary)
+                    } else if !answersUsage {
+                        Text("Update Agents on \(name) to see its CPU, memory and disks here.").foregroundStyle(.secondary)
+                    } else if let usage {
+                        summary(usage)
+                    } else if let failure {
+                        Text(failure).foregroundStyle(.secondary)
+                    } else {
+                        ProgressView()
                     }
-                    ForEach(usage.disks.sorted { $0.level > $1.level }) { disk in
-                        LabeledContent {
-                            VStack(alignment: .trailing, spacing: 2) {
-                                Text(DiskSpace.freeWords(disk.reading)).monospacedDigit()
-                                Text(DiskSpace.levelWords(disk.level))
-                                    .foregroundStyle(Self.tint(disk.level).style(or: .secondary))
+                }
+                if !offline, let usage {
+                    Section("Disks") {
+                        if usage.disks.isEmpty {
+                            Text("No disk looked at yet. \(name) looks every minute.").foregroundStyle(.secondary)
+                        }
+                        ForEach(usage.disks.sorted { $0.level > $1.level }) { disk in
+                            LabeledContent {
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    Text(DiskSpace.freeWords(disk.reading)).monospacedDigit()
+                                    Text(DiskSpace.levelWords(disk.level))
+                                        .foregroundStyle(Self.tint(disk.level).style(or: .secondary))
+                                }
+                            } label: {
+                                Text(disk.reading.volume)
                             }
-                        } label: {
-                            Text(disk.reading.volume)
                         }
                     }
                 }
-            }
-            if !offline {
-                Section("Runtimes") {
-                    let runtimes = model.runtimes(on: host).filter(\.isInstalled)
-                    if runtimes.isEmpty {
-                        Text("None installed here yet.").foregroundStyle(.secondary)
+                if !offline {
+                    Section("Runtimes") {
+                        let runtimes = model.runtimes(on: host).filter(\.isInstalled)
+                        if runtimes.isEmpty {
+                            Text("None installed here yet.").foregroundStyle(.secondary)
+                        }
+                        ForEach(runtimes) { status in runtimeRow(status) }
                     }
-                    ForEach(runtimes) { status in runtimeRow(status) }
                 }
+                // The Remote reads the home Mac's leases alone (#4027).
+                if host == .mac { ResourcesSections() }
             }
+            .onAppear { scrollToResources(proxy) }
+            .onChange(of: model.resourcesAsked) { scrollToResources(proxy) }
+            .onChange(of: model.work.leases?.resources.count) { scrollToResources(proxy) }
         }
         .appText(.supporting)
         .navigationTitle(name)
+        .shows(host == .mac ? [.leases] : [])
         .task(id: host) {
             await model.refreshMachineRuntimes(host)
             // A tap on a row that says a runtime needs sign-in comes here: Sign In… opens (#4035).
@@ -116,6 +125,13 @@ struct RemoteMachinePage: View {
                 .controlSize(.small)
             }
         }
+    }
+
+    /// To the Resources sections, once, when a chat's lease line opened the page (#4027).
+    private func scrollToResources(_ proxy: ScrollViewProxy) {
+        guard host == .mac, model.resourcesAsked, model.work.leases != nil else { return }
+        withAnimation { proxy.scrollTo(ResourcesSections.top, anchor: .top) }
+        model.resourcesAsked = false
     }
 
     /// Whether Sign In… is offered here: a server's Claude or Codex, not signed in, on a machine

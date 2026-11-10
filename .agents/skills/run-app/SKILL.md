@@ -255,6 +255,11 @@ key, and no traffic lights. A web view (a pinned MCP App, an HTML page, the brow
 draws in its own process: the render asks it for its picture first and draws that in its
 place (#3854). `--render` takes the window's own render either way.
 
+A web view's page is not in the tree the socket reads, so `find` and `press TEXT` do not see
+it. Press in it by a point of the shot: `click --x X --y Y` (or `press --x X --y Y`) hands the
+click to the web view itself, so it works with the window behind or the screen locked
+(#4137): a view's pull request, its Files tab, then **Show Diff** opens the diff sheet.
+
 ```sh
 $S/shot.sh $ROOT out.png            # window server capture, behind the user's window; unlocked only
 swift $S/ui.swift windows <APP_PID> # window ids, sizes, names, on|off this Space
@@ -430,10 +435,16 @@ context menus and feel stay with the user on a device. A fake device
 
 ## The web remote in a browser (071)
 
-`WEB_URL` is the scratch control plane's web remote. Walk it in headless Chrome with a
-throwaway profile, never Alex's own browser (it draws on a locked screen too, #1172): `node Web/test/walk/cdp.mjs` is a dependency-free
-DevTools client (launch, open, set the viewport, press by accessible name, type, screenshot,
-read the console and network). Pair it with a code made as above (`code --client --browser`).
+`WEB_URL` is the scratch control plane's web remote. Walk it by hand with the app's own
+browser, the `browser_*` tools (they take the `browser` lease themselves; it draws on a
+locked screen too), never Alex's own browser: `browser_navigate` to `<WEB_URL>#code=<code>`,
+with a code made as above (`code --client --browser`), put in as it prints or escaped
+(#4129). The page pairs and opens Overview; `browser_snapshot`, `browser_click` and
+`browser_take_screenshot` walk it. Its profile is kept and shared, but each launch's
+`WEB_URL` is a new port, so a new origin with no key. `browser_close` when done.
+For a scripted walk, use headless Chrome with a throwaway profile: `node Web/test/walk/cdp.mjs`
+is a dependency-free DevTools client (launch, open, set the viewport, press by accessible
+name, type, screenshot, read the console and network), and `parity.mjs` below runs on it.
 Safari is walked only with Alex's go-ahead, asked with the question tool; on a locked screen its WebDriver session timed out (#1172, with Alex's Safari open), so a locked walk is headless Chrome.
 **Open in Browser** (#109) in a walk's window opens no browser: it writes the address, with
 `#code=…` when it pairs, to `walks/run-<slug>/opened-url` in the window's container, and takes
@@ -461,7 +472,8 @@ the pictures, not the walk, so take a set that shows the change as a person meet
   example empty, filled, while it works, an error, and a sheet or a card open. Take each
   state on every client that draws it: the Mac window (`$S/walk.py $ROOT shot`, or
   `$S/shot.sh $ROOT`), the Remote in the walk simulator (`$S/walk.py remote shot`, with
-  `key escape` first) and the web page in headless Chrome (`cdp.mjs`'s screenshot). The
+  `key escape` first) and the web page in the app's browser (`browser_take_screenshot`) or headless Chrome
+  (`cdp.mjs`'s screenshot). The
   iPad (`AGENTS_WALK_SIM`) only when the change draws differently there. A client that
   does not have the change gets no shot; the PR says why, as its parity line does.
 - **Name each file `<client>-<state>.png`**, with `mac`, `remote`, `ipad` or `web` and a
@@ -492,7 +504,8 @@ lane: a headless Chrome from one web walk ran for 20 hours after its PR merged (
 scratch app left on disk is one too: 264 `/tmp/run-*` items and four worktrees' builds of
 0.7–7 GB each were found waiting on CI and review (#2400).
 
-1. For every headless Chrome from `Web/test/walk/cdp.mjs`: `await chrome.close()`. Its
+1. For every page you opened with the `browser_*` tools: `browser_close`. For every headless
+   Chrome from `Web/test/walk/cdp.mjs`: `await chrome.close()`. Its
    profile, `/tmp/run-<slug>-chrome*`, goes in step 3.
 2. If you started the walk simulator: `$S/remote.sh down`. It uninstalls the Remote too.
 3. For every root you launched: `$S/stop.sh $ROOT`. It must print `clean`. It removes the

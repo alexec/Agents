@@ -72,7 +72,8 @@ struct WorkItemRow: View {
             HStack(spacing: 6) {
                 secondLine
                 Spacer(minLength: 4)
-                trailing
+                // No checks glyph or review word on a phone: the item's page has them (lists.md section 3).
+                comments
             }
         }
     }
@@ -93,6 +94,11 @@ struct WorkItemRow: View {
             Text(review).appText(.fine).foregroundStyle(row.review == "changes_requested" ? WorkLook.Tone.red.color : .secondary)
                 .lineLimit(1)
         }
+        comments
+    }
+
+    @ViewBuilder
+    private var comments: some View {
         if let n = WorkLook.commentsWords(row.comments) {
             Label(n, systemImage: "bubble.left")
                 .labelStyle(.titleAndIcon)

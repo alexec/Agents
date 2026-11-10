@@ -225,7 +225,7 @@ export function joins(lines: readonly TimelineLine[], axis: Axis, within = 6): T
 }
 
 /** How far a line's label may run from `x` before the next thing on its lane: Now, its band or its
- * pill (section 12, item 6). Infinity when nothing is in the way. */
+ * pill (section 12, item 6), and never past the line's own end. */
 export function labelRoom(line: TimelineLine, x: number, axis: Axis, now: number): number {
   const stops: number[] = [];
   const nowX = axis.x(now);
@@ -233,13 +233,39 @@ export function labelRoom(line: TimelineLine, x: number, axis: Axis, now: number
   if (line.band) stops.push(axis.x(line.band.start));
   if (line.how.how === "waits") stops.push(axis.x(line.end));
   const ahead = stops.filter((s) => s > x);
-  return ahead.length === 0 ? Infinity : Math.min(...ahead) - x - 6;
+  return Math.min(ahead.length === 0 ? Infinity : Math.min(...ahead) - x - 6, axis.x(line.end) - x);
 }
 
-/** The label that fits `room`: the whole one, then the figures alone, then nothing. */
-export function fitLabel(line: TimelineLine, room: number, measure: (s: string) => number): string | undefined {
-  if (measure(label(line)) <= room) return label(line);
-  if (measure(figures(line)) <= room) return figures(line);
+/** What a label says: the name, whole or cut short with "…", or "" for none; then the figures. */
+export interface LabelWords {
+  title: string;
+  figures: string;
+}
+
+/** A label's words as one string. */
+export const labelText = (w: LabelWords) => (w.title ? `${w.title}  ${w.figures}` : w.figures);
+
+/** The label that fits `room`: the whole one, then the name cut short with "…" before the figures,
+ * then the figures alone, then nothing. */
+export function fitLabel(line: TimelineLine, room: number, measure: (s: string) => number): LabelWords | undefined {
+  const f = figures(line);
+  if (measure(label(line)) <= room) return { title: line.title, figures: f };
+  const title = Array.from(line.title);
+  let best: string | undefined;
+  let low = 1;
+  let high = title.length - 1;
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    const cut = title.slice(0, mid).join("").trim();
+    if (cut && measure(`${cut}…  ${f}`) <= room) {
+      best = `${cut}…`;
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+  if (best) return { title: best, figures: f };
+  if (measure(f) <= room) return { title: "", figures: f };
   return undefined;
 }
 

@@ -2,6 +2,7 @@ package agentsd
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -428,7 +429,7 @@ func TestForgeIssuesMergesEveryForgeByTime(t *testing.T) {
 		t.Fatalf("Linear item: %+v", l)
 	}
 	cursor, _ := cursorOf(list.Cursor)
-	if cursor.GitHub != "Y3Vyc29y" || cursor.GitLab != "gl-1" || cursor.Linear != "" || !slices.Equal(cursor.Done, []string{"linear"}) {
+	if cursor.At["github"] != "Y3Vyc29y" || cursor.At["gitlab"] != "gl-1" || cursor.At["linear"] != "" || !slices.Equal(cursor.Done, []string{"linear", "jira", "azureboards"}) {
 		t.Fatalf("cursor: %+v", cursor)
 	}
 
@@ -552,8 +553,23 @@ func TestMergeForgePagesKeepsAFailedForgesPlace(t *testing.T) {
 		{forge: "github", items: []wire.ForgeItem{{UpdatedAt: at("2026-11-01T10:00:00Z")}}, cursors: []string{"g1"}},
 		{forge: "gitlab", err: errors.New("GitLab: HTTP 500")},
 	}
-	items, next, more := mergeForgePages(pages, forgeCursor{GitLab: "was"}, 10)
-	if len(items) != 1 || more || next.GitLab != "was" || !slices.Equal(next.Done, []string{"github"}) {
+	items, next, more := mergeForgePages(pages, forgeCursor{At: map[string]string{"gitlab": "was"}}, 10)
+	if len(items) != 1 || more || next.At["gitlab"] != "was" || !slices.Equal(next.Done, []string{"github"}) {
 		t.Fatalf("%v %+v %v", items, next, more)
+	}
+}
+
+// A cursor that an earlier daemon gave, with a field per forge, still reads (#4360), and one the
+// map gives has the same keys.
+func TestForgeCursorReadsAnEarlierDaemons(t *testing.T) {
+	was := base64.RawURLEncoding.EncodeToString([]byte(`{"github":"g1","azureboards":"b2","done":["jira"]}`))
+	c, err := cursorOf(&was)
+	if err != nil || c.At["github"] != "g1" || c.At["azureboards"] != "b2" || len(c.At) != 2 || !slices.Equal(c.Done, []string{"jira"}) {
+		t.Fatalf("%+v %v", c, err)
+	}
+	c.set("github", "")
+	b, _ := json.Marshal(c)
+	if string(b) != `{"azureboards":"b2","done":["jira"]}` {
+		t.Fatalf("%s", b)
 	}
 }

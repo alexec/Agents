@@ -117,18 +117,11 @@ func (d *Daemon) registerForgeWrites() {
 	})
 }
 
-// forgeTarget is the item a write is on, and the forge to write it with: a forge on the
-// interface (#4329), with its ref there; or, of the forges not yet on it, one of jira (with its
-// key, in identifier) or boards (with its project and its id, in number).
+// forgeTarget is the item a write is on, and the forge on the interface (#4329) to write it
+// with, with its ref there.
 type forgeTarget struct {
-	number     int
-	pr         bool
-	forge      Forge
-	ref        forgeRef
-	project    string
-	jira       forgeJira
-	boards     forgeAzureBoards
-	identifier string
+	forge Forge
+	ref   forgeRef
 }
 
 // forgeTargetOf is node's forge, or why there is none. prOnly refuses an issue; every forge with
@@ -138,21 +131,7 @@ func (d *Daemon) forgeTargetOf(ctx context.Context, method string, node wire.Lin
 		return forgeTarget{}, Invalid("%s: %s is not a pull request", method, node.Ref)
 	}
 	if f, ref, ok := d.forgeOwning(node); ok {
-		return forgeTarget{forge: f, ref: ref, pr: ref.pr()}, nil
-	}
-	if key, ok := strings.CutPrefix(node.Ref, "jira:"); ok && node.Kind == lineage.KindIssue && linearLabel.MatchString(key) {
-		j, err := d.forgeJira()
-		if err != nil {
-			return forgeTarget{}, err
-		}
-		return forgeTarget{jira: j, identifier: key}, nil
-	}
-	if project, id, ok := boardsOfNode(node); ok {
-		b, err := d.forgeAzureBoards()
-		if err != nil {
-			return forgeTarget{}, err
-		}
-		return forgeTarget{boards: b, project: project, number: id}, nil
+		return forgeTarget{forge: f, ref: ref}, nil
 	}
 	return forgeTarget{}, Invalid("%s: %s is not an issue or a pull request on GitHub, GitLab, Forgejo, Bitbucket, Azure DevOps, Linear, Jira or Azure Boards", method, node.Ref)
 }
@@ -177,22 +156,12 @@ func (d *Daemon) forgeComment(ctx context.Context, r wire.ForgeCommentRequest) (
 	if err != nil {
 		return wire.ForgeDone{}, err
 	}
-	var url string
-	switch {
-	case t.forge != nil:
-		var done wire.ForgeDone
-		done, err = t.forge.Comment(ctx, t.ref, body)
-		url, err = deref(done.URL), forgeCannotErr(method, t.forge, err)
-	case t.jira != nil:
-		url, err = t.jira.Comment(ctx, t.identifier, body)
-	case t.boards != nil:
-		url, err = t.boards.Comment(ctx, t.project, t.number, body)
-	}
+	done, err := t.forge.Comment(ctx, t.ref, body)
 	if err != nil {
-		return wire.ForgeDone{}, err
+		return wire.ForgeDone{}, forgeCannotErr(method, t.forge, err)
 	}
 	d.forgeWrote()
-	return wire.ForgeDone{URL: optional(url)}, nil
+	return wire.ForgeDone{URL: done.URL}, nil
 }
 
 // labelNames are the names given, trimmed, each once, or why not.
@@ -226,16 +195,8 @@ func (d *Daemon) forgeLabel(ctx context.Context, r wire.ForgeLabelRequest) (wire
 	if err != nil {
 		return wire.ForgeDone{}, err
 	}
-	switch {
-	case t.forge != nil:
-		err = forgeCannotErr(method, t.forge, t.forge.SetLabels(ctx, t.ref, add, remove))
-	case t.jira != nil:
-		err = t.jira.SetLabels(ctx, t.identifier, add, remove)
-	case t.boards != nil:
-		err = t.boards.SetTags(ctx, t.project, t.number, add, remove)
-	}
-	if err != nil {
-		return wire.ForgeDone{}, err
+	if err := t.forge.SetLabels(ctx, t.ref, add, remove); err != nil {
+		return wire.ForgeDone{}, forgeCannotErr(method, t.forge, err)
 	}
 	d.forgeWrote()
 	return wire.ForgeDone{}, nil
@@ -246,25 +207,11 @@ func (d *Daemon) forgeLabels(ctx context.Context, r wire.ForgeNodeRequest) (wire
 	if err != nil {
 		return wire.ForgeLabels{}, err
 	}
-	if t.forge != nil {
-		labels, err := t.forge.Labels(ctx, t.ref)
-		if err != nil {
-			return wire.ForgeLabels{}, forgeCannotErr("forge/labels", t.forge, err)
-		}
-		return wire.ForgeLabels{Labels: labels}, nil
-	}
-	var names []string
-	var colors map[string]string
-	switch {
-	case t.jira != nil:
-		names, colors, err = t.jira.Labels(ctx, t.identifier)
-	case t.boards != nil:
-		names, colors, err = t.boards.Labels(ctx, t.project, t.number)
-	}
+	labels, err := t.forge.Labels(ctx, t.ref)
 	if err != nil {
-		return wire.ForgeLabels{}, err
+		return wire.ForgeLabels{}, forgeCannotErr("forge/labels", t.forge, err)
 	}
-	return wire.ForgeLabels{Labels: forgeLabelsOf(names, colors)}, nil
+	return wire.ForgeLabels{Labels: labels}, nil
 }
 
 func (d *Daemon) forgeClose(ctx context.Context, r wire.ForgeCloseRequest) (wire.ForgeDone, error) {
@@ -275,28 +222,8 @@ func (d *Daemon) forgeClose(ctx context.Context, r wire.ForgeCloseRequest) (wire
 	}
 	transition := strings.TrimSpace(deref(r.Transition))
 	closed := r.Reopen == nil || !*r.Reopen
-	if t.forge != nil {
-		if err := t.forge.SetState(ctx, t.ref, closed, transition); err != nil {
-			return wire.ForgeDone{}, forgeCannotErr(method, t.forge, err)
-		}
-		d.forgeWrote()
-		return wire.ForgeDone{}, nil
-	}
-	if transition != "" && t.jira == nil && t.boards == nil {
-		return wire.ForgeDone{}, Invalid("%s: only a Jira issue or an Azure Boards work item moves by a transition", method)
-	}
-	switch {
-	case transition != "" && t.boards != nil:
-		err = t.boards.Transition(ctx, t.project, t.number, transition)
-	case transition != "":
-		err = t.jira.Transition(ctx, t.identifier, transition)
-	case t.boards != nil:
-		err = t.boards.SetState(ctx, t.project, t.number, closed)
-	case t.jira != nil:
-		err = t.jira.SetState(ctx, t.identifier, closed)
-	}
-	if err != nil {
-		return wire.ForgeDone{}, err
+	if err := t.forge.SetState(ctx, t.ref, closed, transition); err != nil {
+		return wire.ForgeDone{}, forgeCannotErr(method, t.forge, err)
 	}
 	d.forgeWrote()
 	return wire.ForgeDone{}, nil
@@ -418,44 +345,10 @@ func mergeMethodsOf(methods []string) []wire.ForgeMergeMethod {
 	return out
 }
 
-// forgeStartOf is the new-agent form for an issue (Start Agent), as the GitHub issues view fills it
-// (#834): the prompt names the issue and how to read it, and the session is labelled with it.
-func forgeStartOf(i wire.ForgeItem) *wire.ForgeStart {
-	if i.Node.Kind != lineage.KindIssue {
-		return nil
-	}
-	url := deref(i.URL)
-	if identifier, ok := strings.CutPrefix(i.Node.Ref, "linear:"); ok {
-		return &wire.ForgeStart{Prompt: fmt.Sprintf("%s: %s\n\nWork on this Linear issue: %s", identifier, i.Title, url),
-			Labels: []string{identifier}, Worktree: optional(identifier + " " + i.Title)}
-	}
-	if key, ok := strings.CutPrefix(i.Node.Ref, "jira:"); ok {
-		return &wire.ForgeStart{Prompt: fmt.Sprintf("%s: %s\n\nWork on this Jira issue: %s", key, i.Title, url),
-			Labels: []string{key}, Worktree: optional(key + " " + i.Title)}
-	}
-	if _, id, ok := boardsOfNode(i.Node); ok {
-		key := "AB#" + strconv.Itoa(id)
-		return &wire.ForgeStart{Prompt: fmt.Sprintf("%s: %s\n\nWork on this Azure Boards work item: %s\n\n"+
-			"Name %s in the pull request's title, so Azure Boards links it.", key, i.Title, url, key),
-			Labels: []string{key}, Worktree: optional(strconv.Itoa(id) + " " + i.Title)}
-	}
-	if _, n, ok := forgejoOfNode(i.Node); ok {
-		return forgejoStart(i, n)
-	}
-	if _, n, ok := bitbucketOfNode(i.Node); ok {
-		return bitbucketStart(i, n)
-	}
-	repo, n, ok := nodeOfRepo(i.Node)
-	if !ok {
-		return nil
-	}
-	prompt := fmt.Sprintf("#%d: %s\n\nWork on this GitLab issue: %s", n, i.Title, url)
-	if repo.forge == "github" {
-		on := " --repo " + repo.path
-		prompt = fmt.Sprintf("#%d: %s\n\nWork on this GitHub issue (`gh issue view %d%s`).\n\n"+
-			"First assign it to yourself: `gh issue edit %d%s --add-assignee @me`.", n, i.Title, n, on, n, on)
-	}
-	return &wire.ForgeStart{Prompt: prompt, Labels: []string{"#" + strconv.Itoa(n)}, Worktree: optional(strconv.Itoa(n) + " " + i.Title)}
+// numberedStart is the new-agent form for an issue a forge numbers (#12), with its prompt: the
+// session is labelled with the number (#834).
+func numberedStart(prompt string, n int, title string) *wire.ForgeStart {
+	return &wire.ForgeStart{Prompt: prompt, Labels: []string{"#" + strconv.Itoa(n)}, Worktree: optional(strconv.Itoa(n) + " " + title)}
 }
 
 func optionalTrue(b bool) *bool {

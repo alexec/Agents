@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -12,12 +13,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/azureboardsmcp"
 	"github.com/alexec/agents/Go/internal/azuredevopsmcp"
 	"github.com/alexec/agents/Go/internal/bitbucketmcp"
 	"github.com/alexec/agents/Go/internal/connections"
 	"github.com/alexec/agents/Go/internal/forgejomcp"
 	"github.com/alexec/agents/Go/internal/githubmcp"
 	"github.com/alexec/agents/Go/internal/gitlabmcp"
+	"github.com/alexec/agents/Go/internal/jiramcp"
 	"github.com/alexec/agents/Go/internal/lineage"
 	"github.com/alexec/agents/Go/internal/linearmcp"
 	"github.com/alexec/agents/Go/wire"
@@ -44,6 +47,8 @@ var conformRows = []conformRow{
 	{name: "bitbucket", daemon: conformBitbucketDaemon},
 	{name: "azuredevops", daemon: conformAzureDevOpsDaemon},
 	{name: "linear", daemon: conformLinearDaemon},
+	{name: "jira", daemon: conformJiraDaemon},
+	{name: "azureboards", daemon: conformBoardsDaemon},
 }
 
 // conformGitHub is GitHub with four items on alexec/agents, which pages by its cursor.
@@ -468,6 +473,137 @@ func conformLinearDaemon(t *testing.T) (*Daemon, *conn) {
 		AccessExpiresAt: time.Now().Add(time.Hour), ConnectedAt: time.Now()}); err != nil {
 		t.Fatal(err)
 	}
+	return d, c
+}
+
+// conformJira is Jira with two issues in the project PROJ, which pages by its cursor. It has no
+// pull requests.
+type conformJira struct {
+	*fakeForgeJira
+}
+
+var conformJiraItems = []jiramcp.Item{
+	{Key: "PROJ-2", Project: "PROJ", State: "closed", Status: "Done", Title: "Closed", URL: "https://acme.atlassian.net/browse/PROJ-2",
+		Author: "Kim", UpdatedAt: "2026-11-02T10:00:00.000Z"},
+	{Key: "PROJ-1", Project: "PROJ", State: "open", Status: "To Do", Title: "Open issue", URL: "https://acme.atlassian.net/browse/PROJ-1",
+		Author: "Kim", Labels: []string{"billing"}, Assignees: []string{"Kim"}, UpdatedAt: "2026-11-01T10:00:00.000Z", Comments: 2},
+}
+
+func (g conformJira) Search(_ context.Context, _ []string, sf jiramcp.SearchFilter, after string, first int) (jiramcp.SearchPage, error) {
+	var kept []jiramcp.Item
+	for _, i := range conformJiraItems {
+		if sf.State == "all" || (sf.State == "closed") != (i.State == "open") {
+			kept = append(kept, i)
+		}
+	}
+	from, _ := strconv.Atoi(after)
+	var page jiramcp.SearchPage
+	for n := from; n < len(kept) && len(page.Items) < first; n++ {
+		page.Items = append(page.Items, kept[n])
+		page.Cursors = append(page.Cursors, strconv.Itoa(n+1))
+	}
+	if end := from + len(page.Items); end < len(kept) {
+		page.Next = strconv.Itoa(end)
+	}
+	return page, nil
+}
+
+func (g conformJira) ItemPage(_ context.Context, key, _ string) (jiramcp.ItemDetail, error) {
+	for _, i := range conformJiraItems {
+		if i.Key == key {
+			return jiramcp.ItemDetail{Item: i, Body: "The body.",
+				Thread:      []jiramcp.Comment{{Author: "Kim", Body: "A comment.", At: i.UpdatedAt}},
+				Transitions: []jiramcp.Transition{{ID: "31", Name: "Done", Category: "done"}}}, nil
+		}
+	}
+	return jiramcp.ItemDetail{}, &jiramcp.JiraError{Kind: jiramcp.NotFound, Message: "Jira: Issue does not exist"}
+}
+
+func (g conformJira) Plan(_ context.Context, key string) (jiramcp.Plan, error) {
+	return jiramcp.Plan{Epic: conformJiraItems[1]}, nil
+}
+
+// conformJiraDaemon is a daemon with the jira connector's sign-in and one folder, on no forge,
+// whose .agents/folder.json names the project PROJ.
+func conformJiraDaemon(t *testing.T) (*Daemon, *conn) {
+	t.Helper()
+	home := t.TempDir()
+	t.Setenv("AGENTS_PERSONAL_HOME", home)
+	d, c := start(t, t.TempDir())
+	t.Cleanup(d.Shutdown)
+	fake := conformJira{&fakeForgeJira{}}
+	d.newForgeJira = func(jiramcp.Auth) forgeJira { return fake }
+	folder := gitFolder(t, "")
+	os.MkdirAll(filepath.Join(folder, ".agents"), 0o755)
+	os.WriteFile(filepath.Join(folder, ".agents", "folder.json"), []byte(`{"jiraProjects": ["PROJ"]}`), 0o644)
+	c.call(t, 100, "folders/add", map[string]any{"folder": "file://" + folder})
+	os.MkdirAll(filepath.Join(home, ".agents-secrets"), 0o700)
+	os.WriteFile(filepath.Join(home, ".agents-secrets", "secrets.env"),
+		[]byte("JIRA_URL=https://acme.atlassian.net/\nJIRA_EMAIL=kim@acme.com\nJIRA_API_TOKEN=tok\n"), 0o600)
+	return d, c
+}
+
+// conformBoards is Azure Boards with two work items in the project acme/web, which pages by its
+// cursor. It has no pull requests.
+type conformBoards struct {
+	*fakeForgeBoards
+}
+
+var conformBoardsItems = []azureboardsmcp.Item{
+	{ID: 2, Project: "acme/web", Type: "Task", State: "closed", Status: "Done", Title: "Closed",
+		URL: "https://dev.azure.com/acme/web/_workitems/edit/2", Author: "Kim", UpdatedAt: "2026-11-02T10:00:00.000Z"},
+	{ID: 1, Project: "acme/web", Type: "Task", State: "open", Status: "To Do", Title: "Open work item",
+		URL: "https://dev.azure.com/acme/web/_workitems/edit/1", Author: "Kim", Labels: []string{"billing"},
+		Assignees: []string{"Kim"}, UpdatedAt: "2026-11-01T10:00:00.000Z", Comments: 2},
+}
+
+func (g conformBoards) Search(_ context.Context, _ []string, sf azureboardsmcp.SearchFilter, after string, first int) (azureboardsmcp.SearchPage, error) {
+	var kept []azureboardsmcp.Item
+	for _, i := range conformBoardsItems {
+		if sf.State == "all" || (sf.State == "closed") != (i.State == "open") {
+			kept = append(kept, i)
+		}
+	}
+	from, _ := strconv.Atoi(after)
+	var page azureboardsmcp.SearchPage
+	for n := from; n < len(kept) && len(page.Items) < first; n++ {
+		page.Items = append(page.Items, kept[n])
+		page.Cursors = append(page.Cursors, strconv.Itoa(n+1))
+	}
+	if end := from + len(page.Items); end < len(kept) {
+		page.Next = strconv.Itoa(end)
+	}
+	return page, nil
+}
+
+func (g conformBoards) ItemPage(_ context.Context, project string, id int, _ string) (azureboardsmcp.ItemDetail, error) {
+	for _, i := range conformBoardsItems {
+		if i.ID == id && i.Project == project {
+			return azureboardsmcp.ItemDetail{Item: i, Body: "The description.",
+				Thread:      []azureboardsmcp.ForgeComment{{Author: "Kim", Body: "A comment.", At: i.UpdatedAt}},
+				Transitions: []azureboardsmcp.Transition{{ID: "Done", Name: "Done", Category: "done"}}}, nil
+		}
+	}
+	return azureboardsmcp.ItemDetail{}, &azureboardsmcp.BoardsError{Kind: azureboardsmcp.NotFound, Message: "Azure Boards: no work item"}
+}
+
+// conformBoardsDaemon is a daemon with the azuredevops connector's sign-in and one folder, on no
+// forge, whose .agents/folder.json names the project acme/web.
+func conformBoardsDaemon(t *testing.T) (*Daemon, *conn) {
+	t.Helper()
+	home := t.TempDir()
+	t.Setenv("AGENTS_PERSONAL_HOME", home)
+	d, c := start(t, t.TempDir())
+	t.Cleanup(d.Shutdown)
+	fake := conformBoards{&fakeForgeBoards{}}
+	d.newForgeAzureBoards = func(string, string) forgeAzureBoards { return fake }
+	folder := gitFolder(t, "")
+	os.MkdirAll(filepath.Join(folder, ".agents"), 0o755)
+	os.WriteFile(filepath.Join(folder, ".agents", "folder.json"), []byte(`{"azureBoardsProjects": ["acme/web"]}`), 0o644)
+	c.call(t, 100, "folders/add", map[string]any{"folder": "file://" + folder})
+	os.MkdirAll(filepath.Join(home, ".agents-secrets"), 0o700)
+	os.WriteFile(filepath.Join(home, ".agents-secrets", "secrets.env"),
+		[]byte("AZURE_DEVOPS_URL=https://dev.azure.com/\nAZURE_DEVOPS_TOKEN=tok\n"), 0o600)
 	return d, c
 }
 

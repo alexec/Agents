@@ -63,10 +63,11 @@ struct WorkSideSection<Content: View>: View {
                     Text(title).appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
                     Spacer(minLength: 0)
                     if let edit {
+                        // Faint until the pointer is on the section, never hidden: VoiceOver and
+                        // the keyboard find a control at no opacity only by chance (#4400).
                         Button(action: edit) { Image(systemName: "gearshape") }
                             .buttonStyle(.plain)
-                            .foregroundStyle(.secondary)
-                            .opacity(hovered ? 1 : 0)
+                            .foregroundStyle(hovered ? AnyShapeStyle(.secondary) : AnyShapeStyle(.quaternary))
                             .help("Edit \(title.lowercased())")
                             .accessibilityLabel("Edit \(title.lowercased())")
                     }

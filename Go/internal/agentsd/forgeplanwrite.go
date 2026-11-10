@@ -59,11 +59,8 @@ func (d *Daemon) planTargetOf(ctx context.Context, method string, node wire.Line
 	if err != nil {
 		return forgeTarget{}, err
 	}
-	switch {
-	case t.forge != nil && !t.forge.Caps().Plan:
+	if !t.forge.Caps().Plan {
 		return forgeTarget{}, forgeCannotErr(method, t.forge, cannot(actionPlan))
-	case t.jira != nil:
-		return forgeTarget{}, Invalid("%s: a Jira plan is changed in Jira, not yet here", method)
 	}
 	return t, nil
 }
@@ -85,19 +82,16 @@ func (d *Daemon) forgeAddChild(ctx context.Context, r wire.ForgeAddChildRequest)
 		return wire.ForgeDone{}, err
 	}
 	// A forge that adds no child says so before the plan is read for the new child's labels.
-	if t.forge != nil && !t.forge.Caps().AddChild {
+	if !t.forge.Caps().AddChild {
 		return wire.ForgeDone{}, forgeCannotErr(method, t.forge, cannot(actionAddChild))
 	}
-	if issue != "" && t.forge != nil {
+	if issue != "" {
 		done, err := t.forge.AddChild(ctx, t.ref, forgeChild{Issue: issue})
 		if err != nil {
 			return wire.ForgeDone{}, forgeCannotErr(method, t.forge, err)
 		}
 		d.forgeWrote()
 		return done, nil
-	}
-	if issue != "" {
-		return d.addExistingChild(ctx, method, t, r.Node, issue)
 	}
 	// A new child is in the epic's feature (#3265): the epic's page has just read its plan, so this
 	// read is the kept one.
@@ -112,37 +106,13 @@ func (d *Daemon) forgeAddChild(ctx context.Context, r wire.ForgeAddChildRequest)
 	if f := plan.Item.Feature; f != nil {
 		labels = append(labels, featurePrefix+*f)
 	}
-	var url string
-	if t.forge != nil {
-		var done wire.ForgeDone
-		done, err = t.forge.AddChild(ctx, t.ref, forgeChild{Title: title, Labels: labels, Level: level})
-		url, err = deref(done.URL), forgeCannotErr(method, t.forge, err)
-	} else if t.boards != nil {
-		// The level is the work item's type too, as its process names it.
-		_, url, err = t.boards.AddChild(ctx, t.project, t.number, title, labels, level)
-	}
+	done, err := t.forge.AddChild(ctx, t.ref, forgeChild{Title: title, Labels: labels, Level: level})
 	// A new issue that did not become a child is still made: forget the kept answers either way.
 	d.forgeWrote()
 	if err != nil {
-		return wire.ForgeDone{}, err
+		return wire.ForgeDone{}, forgeCannotErr(method, t.forge, err)
 	}
-	return wire.ForgeDone{URL: optional(url)}, nil
-}
-
-// addExistingChild moves the work item that ref names under the Azure Boards epic t.
-func (d *Daemon) addExistingChild(ctx context.Context, method string, t forgeTarget, epic wire.LineageNode, ref string) (wire.ForgeDone, error) {
-	id, ok := boardsItemID(ref)
-	if !ok {
-		return wire.ForgeDone{}, Invalid("%s: %q is not a work item: give its id, such as 12 or AB#12, or its page", method, ref)
-	}
-	if id == t.number {
-		return wire.ForgeDone{}, Invalid("%s: an epic is not its own child", method)
-	}
-	if err := t.boards.SetParent(ctx, t.project, id, t.number); err != nil {
-		return wire.ForgeDone{}, err
-	}
-	d.forgeWrote()
-	return wire.ForgeDone{}, nil
+	return wire.ForgeDone{URL: done.URL}, nil
 }
 
 // forgejoIssueOf is the repository and number ref names on the connected Forgejo: #12 is in
@@ -164,6 +134,12 @@ func (d *Daemon) forgejoIssueOf(ref, repo string) (string, int, bool) {
 	return strings.ToLower(repo), n, true
 }
 
+// forgeLinker is a forge whose links reach only some of its issues: Links says r may be blocked
+// by blocker (an Azure Boards link is within an organization).
+type forgeLinker interface {
+	Links(r, blocker forgeRef) bool
+}
+
 func (d *Daemon) forgeBlockedBy(ctx context.Context, r wire.ForgeBlockedByRequest) (wire.ForgeDone, error) {
 	const method = "forge/blocked-by"
 	if len(r.Add)+len(r.Remove) == 0 {
@@ -176,13 +152,12 @@ func (d *Daemon) forgeBlockedBy(ctx context.Context, r wire.ForgeBlockedByReques
 	if err != nil {
 		return wire.ForgeDone{}, err
 	}
-	if t.forge != nil && !t.forge.Caps().BlockedBy {
+	if !t.forge.Caps().BlockedBy {
 		return wire.ForgeDone{}, forgeCannotErr(method, t.forge, cannot(actionBlockedBy))
 	}
 	// Every blocker is checked before the first write, so a wrong one changes nothing.
 	type blocker struct {
 		ref     forgeRef
-		number  int
 		blocked bool
 	}
 	var todo []blocker
@@ -194,31 +169,21 @@ func (d *Daemon) forgeBlockedBy(ctx context.Context, r wire.ForgeBlockedByReques
 			if b == r.Node {
 				return wire.ForgeDone{}, Invalid("%s: an issue does not block itself", method)
 			}
-			project, id, onBoards := boardsOfNode(b)
-			switch {
-			case b.Kind != lineage.KindIssue:
+			if b.Kind != lineage.KindIssue {
 				return wire.ForgeDone{}, Invalid("%s: %s is not an issue", method, b.Ref)
-			case t.forge != nil:
-				ref, ok := t.forge.Owns(b)
-				if !ok {
-					return wire.ForgeDone{}, Invalid("%s: %s is not on the forge %s is on", method, b.Ref, r.Node.Ref)
-				}
-				todo = append(todo, blocker{ref: ref, blocked: list.blocked})
-			// A link is within an organization.
-			case t.boards != nil && onBoards && boardsOrg(project) == boardsOrg(t.project):
-				todo = append(todo, blocker{number: id, blocked: list.blocked})
-			default:
+			}
+			ref, ok := t.forge.Owns(b)
+			if l, links := t.forge.(forgeLinker); ok && links {
+				ok = l.Links(t.ref, ref)
+			}
+			if !ok {
 				return wire.ForgeDone{}, Invalid("%s: %s is not on the forge %s is on", method, b.Ref, r.Node.Ref)
 			}
+			todo = append(todo, blocker{ref: ref, blocked: list.blocked})
 		}
 	}
 	for _, b := range todo {
-		if t.forge != nil {
-			err = forgeCannotErr(method, t.forge, t.forge.SetBlockedBy(ctx, t.ref, b.ref, b.blocked))
-		} else {
-			err = t.boards.SetBlockedBy(ctx, t.project, t.number, b.number, b.blocked)
-		}
-		if err != nil {
+		if err = forgeCannotErr(method, t.forge, t.forge.SetBlockedBy(ctx, t.ref, b.ref, b.blocked)); err != nil {
 			break
 		}
 	}

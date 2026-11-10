@@ -142,7 +142,7 @@ struct HostControlPlaneCards: View {
             if host.settings.role == .runHere {
                 ControlCard {
                     ControlRow(dot: .none, title: "Move to Another Machine",
-                               detail: "To a server you run, with every machine, window and phone kept. This Mac forwards them there for a while.") {
+                               detail: Self.moveDetail) {
                         // Frame O: the control plane moved off this Mac, everyone kept (T126).
                         Button("Move…") { movingMachine = true }
                             .buttonStyle(.paper)
@@ -174,12 +174,14 @@ struct HostControlPlaneCards: View {
         .hostLooking(host)
     }
 
+    static let moveDetail = "To a server you run, with every machine, window and phone kept. This Mac forwards them there for a while."
+
     // MARK: Joined elsewhere (frame T)
 
     private func movedCard(_ place: String) -> some View {
         ControlCard {
             ControlRow(dot: host.daemonRunning ? .online : .attention, title: "This Mac moved its control plane",
-                       detail: movedLine(place)) {
+                       detail: Self.movedLine(place, host: host)) {
                 // Frame U: the way back (T127).
                 Button("Run It Here Again…") { returning = true }
                     .buttonStyle(.paper).disabled(host.busy != nil)
@@ -194,7 +196,7 @@ struct HostControlPlaneCards: View {
         }
     }
 
-    private func movedLine(_ place: String) -> String {
+    static func movedLine(_ place: String, host: HostModel) -> String {
         var parts = ["Joined \(place)"]
         if let at = host.settings.movedAt { parts.append("moved \(at.formatted(date: .omitted, time: .shortened))") }
         parts.append("this Mac is a machine there")
@@ -204,11 +206,8 @@ struct HostControlPlaneCards: View {
     // MARK: Came back (frame Y)
 
     private func returnRow(_ place: String) -> some View {
-        let name = URL(string: place)?.host ?? place
-        let until = host.settings.returnForwardingUntil.map { " until \($0.formatted(date: .long, time: .omitted))" } ?? ""
-        return ControlRow(dot: host.returnForwardingDone ? .online : .attention,
-                          title: host.returnForwardingDone ? "Everyone has heard. You can take \(name) down." : "\(name) forwards here\(until)",
-                          detail: host.returnForwardingDone ? "" : returnLine) {
+        ControlRow(dot: host.returnForwardingDone ? .online : .attention, title: Self.returnTitle(place, host: host),
+                   detail: host.returnForwardingDone ? "" : Self.returnLine(host)) {
             if host.returnForwardingDone {
                 Button("Dismiss") { host.dismissReturn() }.buttonStyle(.paper)
             } else {
@@ -217,19 +216,25 @@ struct HostControlPlaneCards: View {
         }
     }
 
-    private var returnLine: String {
+    static func returnTitle(_ place: String, host: HostModel) -> String {
+        let name = URL(string: place)?.host ?? place
+        let until = host.settings.returnForwardingUntil.map { " until \($0.formatted(date: .long, time: .omitted))" } ?? ""
+        return host.returnForwardingDone ? "Everyone has heard. You can take \(name) down." : "\(name) forwards here\(until)"
+    }
+
+    static func returnLine(_ host: HostModel) -> String {
         guard let left = host.returnForwarding?.stillToHear, !left.isEmpty else { return "Then you can take that machine down." }
         return "\(left.count) still to hear: \(Self.names(left)). Then you can take that machine down."
     }
 
-    private static func forwardingLine(_ until: Date, _ status: HandoverStatus?) -> String {
+    static func forwardingLine(_ until: Date, _ status: HandoverStatus?) -> String {
         let date = "until \(until.formatted(date: .long, time: .omitted))"
         guard let status else { return date }
         guard !status.stillToHear.isEmpty else { return "\(date) · everyone has heard" }
         return "\(date) · \(status.stillToHear.count) still to hear: \(names(status.stillToHear))"
     }
 
-    private static func names(_ left: [HandoverStatus.Member]) -> String {
+    static func names(_ left: [HandoverStatus.Member]) -> String {
         left.map { member in
             var said = member.id == MachineRef.mac.rawValue ? "This Mac" : member.name
             if member.online != true, let seen = member.lastSeen {
@@ -240,7 +245,7 @@ struct HostControlPlaneCards: View {
         .joined(separator: "; ")
     }
 
-    private static func stopMessage(_ status: HandoverStatus?) -> String {
+    static func stopMessage(_ status: HandoverStatus?) -> String {
         let left = status?.stillToHear.map(\.name) ?? []
         guard !left.isEmpty else { return "Everyone has heard where the control plane went." }
         return "\(ListFormatter.localizedString(byJoining: left)) will need pairing again."

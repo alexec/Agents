@@ -19,7 +19,7 @@ import type {
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ConnectAnotherRequest, ConnectReport, ControlPerson, DailySummarySettings, SummaryPage, SummaryPageText, DesktopControlSettings, WakeSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
   PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, BudgetRequest, RemoveRequest, ClientPermissionSettings, PRCostComment,
   Connection, LineageNode, LineageSessionIssue, MoveToMachineAnswer, ProblemReport, ProblemReportRequest, Request as PersonRequest, RequestSecretUse, LockDelivery, RequestUpdate, ProviderID, StartedMachinePreview, FoldersFindRequest, FoundFolder,
-  OutsideAccount, OutsideAccounts, UserSecretRow, WebRemoteStatus, WireDate } from "../protocol/generated";
+  OutsideAccount, OutsideAccounts, PlaneMoveAsk, PlaneMoveReport, UserSecretRow, WebRemoteStatus, WireDate } from "../protocol/generated";
 import { endedConnections, endedLine, hasEnded } from "./connectorSetup";
 import { parseQuery } from "./labels";
 import { Failure } from "../protocol/generated";
@@ -423,6 +423,9 @@ export class Work {
   /** Where the window on this Mac is in a Connect to Another… asked for here (#4257), from
    * control/connectReported: null until it says. */
   readonly connectReport = signal<ConnectReport | null>(null);
+  /** How Move to Another Machine… and Run It Here Again… stand on the Mac that does them (#4255), in its window's
+   * words, from control/planeMoveReported: null until a window has said. */
+  readonly planeMoveReport = signal<PlaneMoveReport | null>(null);
   /** The Mac's Sleep settings (#4066): how many finished sessions keep their runtime ready for a reply,
    * and how long one with background processes is kept. Null until the Mac's host has said, or from a
    * host too old to know the method, which leaves the section out. */
@@ -1509,6 +1512,10 @@ export class Store extends Work {
         this.userScopeChanges.value += 1;
         return;
       }
+      if (method === "control/planeMoveReported") {
+        this.planeMoveReport.value = (params as PlaneMoveReport | null) ?? null;
+        return;
+      }
       if (method === "control/connectReported") {
         this.connectReport.value = (params as ConnectReport | null) ?? null;
         return;
@@ -1632,6 +1639,10 @@ export class Store extends Work {
     this.joinCommand.value = status.joinCommand || null;
     knowPublicViews(status.publicViews);
     this.knowVersions();
+    // The window on the Mac that moves the control plane says its rows, if one is open (#4255).
+    if (this.planeHas(Capability.controlPlaneMove1) && status.person?.role === "admin") {
+      this.askPlaneMove({ action: "status" }).catch(() => {});
+    }
   }
 
   /** Machines waiting to join (#994); a control plane before it has none to say. */
@@ -2491,6 +2502,18 @@ export class Store extends Work {
     const web = await this.link.call("control/retryWeb", {});
     const plane = this.plane.value;
     if (plane) this.plane.value = { ...plane, web };
+  }
+
+  /** Move to Another Machine… and Run It Here Again… (#4255): there is a window on a Mac to do them, and the person
+   * is an admin. */
+  readonly canMovePlane: ReadonlySignal<boolean> = computed(() =>
+    this.planeHas(Capability.controlPlaneMove1) && this.person.value?.role === "admin"
+    && !!this.planeMoveReport.value && (this.planeMoveReport.value.rows.length > 0 || !!this.planeMoveReport.value.flow));
+
+  /** One step of a move of the control plane (#4255): the window on the Mac does it with its own key, and says how it
+   * stands as control/planeMoveReported. */
+  async askPlaneMove(ask: PlaneMoveAsk): Promise<void> {
+    await this.link.call("control/planeMove", ask);
   }
 
   /** Connect to Another… (#4257): the window on this Mac does it, and says each step as control/connectReported. */

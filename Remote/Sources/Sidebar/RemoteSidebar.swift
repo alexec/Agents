@@ -176,7 +176,6 @@ struct RemoteSidebar: View {
                     MultiplierRow().accessibilityHint(MultiplierRow.help)
                         .activityIcon("multiply.circle").appText(.supporting).tag(SidebarItem.multiplier)
                     EventsRow().activityIcon("list.bullet.rectangle").appText(.supporting).tag(SidebarItem.events)
-                    ResourcesRow().activityIcon("square.stack.3d.up").appText(.supporting).tag(SidebarItem.resources)
                     RuntimesRow().activityIcon("cpu", warns: runtimesTally.map { $0.noneWorking || $0.isLow } ?? false,
                                                tint: runtimesTally?.isLow == true ? .attention : .failure)
                         .appText(.supporting).tag(SidebarItem.runtimes)

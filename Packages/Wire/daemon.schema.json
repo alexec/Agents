@@ -19795,6 +19795,261 @@
         "withdrawn"
       ]
     },
+    "PlaneMoveAction": {
+      "type": "string",
+      "description": "What a client asks of a move of the control plane (#4255), as the Mac window's sheets do it: status says how it stands; move and return open Move to Another Machine… and Run It Here Again…; the rest are the sheets' buttons and the overview's.",
+      "enum": [
+        "status",
+        "move",
+        "return",
+        "saveKey",
+        "useKey",
+        "continue",
+        "back",
+        "check",
+        "announce",
+        "withdraw",
+        "moveNow",
+        "cancel",
+        "close",
+        "stopForwarding",
+        "stopReturnForwarding",
+        "dismiss"
+      ]
+    },
+    "PlaneMoveAsk": {
+      "type": "object",
+      "description": "control/planeMove and control/planeMoveWanted (#4255): a client asks the window on the Mac that moves the control plane to do one step. The window does it with this Mac's control key, which never leaves the Mac.",
+      "properties": {
+        "action": {
+          "$ref": "#/definitions/PlaneMoveAction"
+        },
+        "address": {
+          "type": "string",
+          "description": "With check on a move: where the other machine's control plane is, its https address; with no scheme, https."
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "additionalProperties": false
+    },
+    "PlaneMoveFlow": {
+      "type": "object",
+      "description": "Where a move a client asked for is, as the Mac window's sheet would draw it (#4255), in its words.",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "move",
+            "return"
+          ],
+          "description": "Move to Another Machine… or Run It Here Again…."
+        },
+        "step": {
+          "type": "string",
+          "enum": [
+            "key",
+            "check",
+            "told",
+            "moving"
+          ],
+          "description": "The sheet's frame: key and check (P, Q or V), told (R or W), moving (S or X)."
+        },
+        "title": {
+          "type": "string"
+        },
+        "lead": {
+          "type": "string",
+          "description": "The line under the title."
+        },
+        "address": {
+          "type": "string",
+          "description": "Where the control plane goes, or comes back from."
+        },
+        "lines": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PlaneMoveLine"
+          },
+          "description": "The checks (key, check) or the stages (moving), in order."
+        },
+        "members": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PlaneMoveMember"
+          },
+          "description": "Who has heard where it goes (told)."
+        },
+        "knowing": {
+          "type": "string",
+          "description": "How many know, in words (told)."
+        },
+        "otherKey": {
+          "type": "boolean",
+          "description": "Run It Here Again…: the other machine holds another key, so this Mac takes it first (Use Key…)."
+        },
+        "checked": {
+          "type": "boolean",
+          "description": "Every check passed: Tell Everyone may be asked."
+        },
+        "busy": {
+          "type": "boolean",
+          "description": "A check or a step runs on the Mac now."
+        },
+        "taken": {
+          "type": "boolean",
+          "description": "The other end serves now: Cancel can't undo it."
+        },
+        "failed": {
+          "type": "boolean",
+          "description": "A stage failed: Close, not Cancel."
+        },
+        "problem": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "step",
+        "title"
+      ],
+      "additionalProperties": false
+    },
+    "PlaneMoveLine": {
+      "type": "object",
+      "description": "One check or stage of a move (#4255).",
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "waiting",
+            "yes",
+            "no",
+            "todo",
+            "doing",
+            "done",
+            "failed",
+            "warning"
+          ]
+        },
+        "note": {
+          "type": "string",
+          "description": "Why it failed, or a note under it."
+        }
+      },
+      "required": [
+        "label",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "PlaneMoveMember": {
+      "type": "object",
+      "description": "A window, phone or machine of the control plane, and whether it knows where the control plane goes (#4255).",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "description": "What it is, and when it last connected, in words."
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "knows",
+            "cantFollow",
+            "notYet"
+          ]
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "PlaneMoveReport": {
+      "type": "object",
+      "description": "control/planeMoveReport and control/planeMoveReported (#4255): how a move of the control plane stands on the Mac that does it, in the Mac window's words: Settings ▸ Control plane ▸ Overview's rows, and the sheet a client opened.",
+      "properties": {
+        "mac": {
+          "type": "string",
+          "description": "The Mac whose window says it."
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PlaneMoveRow"
+          }
+        },
+        "flow": {
+          "$ref": "#/definitions/PlaneMoveFlow"
+        },
+        "problem": {
+          "type": "string",
+          "description": "Why an overview step (Stop Forwarding) failed."
+        }
+      },
+      "required": [
+        "mac",
+        "rows"
+      ],
+      "additionalProperties": false
+    },
+    "PlaneMoveRow": {
+      "type": "object",
+      "description": "A row of the control plane's move card (#4255): Move to Another Machine, This Mac moved its control plane, a forwarding row, or the way back's.",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "move",
+            "moved",
+            "forwarding",
+            "returned"
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "detail": {
+          "type": "string"
+        },
+        "attention": {
+          "type": "boolean",
+          "description": "Its dot is orange."
+        },
+        "button": {
+          "type": "string",
+          "description": "Its button's words."
+        },
+        "action": {
+          "$ref": "#/definitions/PlaneMoveAction"
+        },
+        "disabled": {
+          "type": "boolean"
+        },
+        "confirm": {
+          "type": "string",
+          "description": "Asked before the action, as Stop forwarding?'s message."
+        }
+      },
+      "required": [
+        "kind",
+        "title",
+        "detail"
+      ],
+      "additionalProperties": false
+    },
     "PluginApproveRequest": {
       "type": "object",
       "properties": {

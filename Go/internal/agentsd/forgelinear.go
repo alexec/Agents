@@ -3,6 +3,7 @@ package agentsd
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 
@@ -150,7 +151,7 @@ func (l linearForge) Item(ctx context.Context, r forgeRef, cursor string) (wire.
 		return wire.ForgeItemDetail{}, linearNotFound(method, err)
 	}
 	out := wire.ForgeItemDetail{Item: linearItemOf(p.Item, l.d.linearFolder(p.Team)), Body: p.Body, Comments: []wire.ForgeComment{}, Cursor: optional(p.Before)}
-	out.Start = forgeStartOf(out.Item)
+	out.Start = linearStart(out.Item)
 	for _, c := range p.Thread {
 		out.Comments = append(out.Comments, forgeCommentOf(c.Author, c.Body, c.At, c.URL, c.Bot))
 	}
@@ -276,4 +277,11 @@ func (l linearForge) SetBlockedBy(ctx context.Context, r, blocker forgeRef, bloc
 // linearNode is a Linear issue's node.
 func linearNode(identifier string) wire.LineageNode {
 	return wire.LineageNode{Kind: lineage.KindIssue, Ref: "linear:" + identifier}
+}
+
+// linearStart is the new-agent form for a Linear issue, labelled with its identifier (ENG-12).
+func linearStart(i wire.ForgeItem) *wire.ForgeStart {
+	identifier := strings.TrimPrefix(i.Node.Ref, "linear:")
+	return &wire.ForgeStart{Prompt: fmt.Sprintf("%s: %s\n\nWork on this Linear issue: %s", identifier, i.Title, deref(i.URL)),
+		Labels: []string{identifier}, Worktree: optional(identifier + " " + i.Title)}
 }
