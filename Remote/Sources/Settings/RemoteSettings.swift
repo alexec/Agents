@@ -93,7 +93,8 @@ private struct RemoteAccountsPage: View {
     @Environment(RemoteModel.self) private var model
 
     var body: some View {
-        AccountsPane(control: model.controlPlane, state: model.userScope)
+        AccountsPane(control: model.controlPlane, state: model.userScope,
+                     machineNames: SecretInfoWords.names(model.controlHosts))
             .navigationTitle(AccountsWords.title)
             .navigationBarTitleDisplayMode(.inline)
     }

@@ -4,13 +4,15 @@
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
-import type { JSONValue, OutsideAccount, OutsideAccounts } from "../protocol/generated";
+import type { JSONValue, OutsideAccount, OutsideAccounts, UserSecretRow } from "../protocol/generated";
 import { CallFailed } from "../wire/link";
 import { describe, methodNotFound } from "../model/errors";
-import { type AccountFields, accountAbout, accountAskHint, accountAsks, accountCost, accountDetail, accountFields, accountOf, accountProjects,
+import { type AccountFields, accountAbout, accountHint, accountLine, accountNotBackedUp, accountSecretName, accountAskHint, accountAsks, accountCost, accountDetail, accountFields, accountOf, accountProjects,
   accountsFoot, accountsOf, accountsRefusal, accountsTitle, askField, expiresSoon, noSecrets, sameAccount } from "../model/accounts";
 import { askBeforeUseWords } from "../model/askBeforeUse";
+import { machineNames, onlyMachine, onlyMachineLine } from "../model/secretInfo";
 import { Modal } from "./Modal";
+import { SecretInfoLine } from "./SecretInfoLine";
 
 function sentence(error: unknown): string {
   if (error instanceof CallFailed && error.code === methodNotFound) return "This control plane does not keep settings for you yet. Update it.";
@@ -66,6 +68,7 @@ function AccountSheet({ editing, save, close }: { editing: OutsideAccount | null
 
 export function AccountsSection({ store, down }: { store: Store; down: boolean }) {
   const all = useSignal<OutsideAccount[]>([]);
+  const secrets = useSignal<UserSecretRow[]>([]);
   const problem = useSignal<string | null>(null);
   const project = useSignal("");
   const adding = useSignal(false);
@@ -74,6 +77,8 @@ export function AccountsSection({ store, down }: { store: Store; down: boolean }
     try {
       const settings = await store.link.call("user/settings", {});
       all.value = (settings.accounts as OutsideAccounts | undefined)?.accounts ?? [];
+      // The Secrets rows give each account's last 4 and whether its secret is backed up (#4160).
+      secrets.value = await store.link.call("user/secretNames", {}).then((r) => r.secrets, () => []);
       problem.value = null;
     } catch (error) {
       problem.value = sentence(error);
@@ -114,10 +119,15 @@ export function AccountsSection({ store, down }: { store: Store; down: boolean }
   const projects = accountProjects(all.value);
   const shown = accountsOf(all.value, project.value);
   const now = Date.now();
+  const rows = secrets.value;
+  const names = machineNames(store.hosts.value);
+  const only = onlyMachine(rows);
   return (
     <section aria-labelledby="settings-accounts">
       <h3 class="section-head" id="settings-accounts">{accountsTitle}</h3>
       {problem.value && <p class="hint">{problem.value}</p>}
+      {only && all.value.some((a) => accountSecretName(a) !== null) &&
+        <p class="hint attention"><span aria-hidden="true">⚠ </span>{onlyMachineLine(only, names)}</p>}
       {projects.length > 0 && (
         <label>
           Project{" "}
@@ -130,14 +140,18 @@ export function AccountsSection({ store, down }: { store: Store; down: boolean }
       <ul class="user-secrets">
         {shown.map((a) => {
           const soon = expiresSoon(a, now);
+          const warning = only ? null : accountNotBackedUp(a, rows, names);
           return (
             <li class="user-secret" key={`${a.service}#${a.address ?? ""}`}>
               <span>{a.service}</span>
               <span class="hint">{accountDetail(a)}</span>
               <span class="hint">{accountCost(a)}</span>
+              <code class="hint secret-hint">{accountHint(a, rows)}</code>
               <p class="hint">{accountAbout(a)}</p>
+              <SecretInfoLine parts={accountLine(a)} />
               {accountAsks(a) && <p class="hint">{askBeforeUseWords.asks}</p>}
               {soon && <p class="hint attention">{soon}</p>}
+              {warning && <p class="hint attention"><span aria-hidden="true">⚠ </span>{warning}</p>}
               <span class="row-actions">
                 <button type="button" disabled={down} onClick={() => { editing.value = a; }}>Edit…</button>
                 <button type="button" class="destructive" disabled={down} onClick={() => void remove(a)}>Remove…</button>

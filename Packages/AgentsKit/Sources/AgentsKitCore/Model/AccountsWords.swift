@@ -68,6 +68,65 @@ public enum AccountsWords {
         return days <= 30 ? "Its token expires on \(day)." : nil
     }
 
+    /// The secret an account names (#4160): its token, else its card.
+    public static func secretName(_ a: DaemonAPI.OutsideAccount) -> String? {
+        [a.secret, a.card].compactMap { $0?.trimmingCharacters(in: .whitespaces) }.first { !$0.isEmpty }
+    }
+
+    /// At the end of the first line (#4160): the last 4 of the secret it names, as its row in
+    /// Secrets has them; "no secret" when it names none; "not in Secrets" when Secrets has no
+    /// such name (a secret kept somewhere else).
+    public static func hint(_ a: DaemonAPI.OutsideAccount, rows: [DaemonAPI.UserSecretRow]) -> String {
+        guard let name = secretName(a) else { return "no secret" }
+        guard let row = rows.first(where: { $0.name == name }) else { return "not in Secrets" }
+        return SecretInfoWords.hint(row.hint)
+    }
+
+    /// The line under an account (#4160): "Made 9 d ago · Edited 1 d ago · Used 2 h ago", and
+    /// "Token expires in 45 d" while that is more than 30 days away (nearer, its own line says it).
+    public static func line(_ a: DaemonAPI.OutsideAccount, now: Date = Date(), timeZone: TimeZone = .current) -> [SecretInfoWords.Part] {
+        var parts: [SecretInfoWords.Part] = []
+        if let made = a.made, let day = dayFormat.date(from: made) {
+            let days = Int(now.timeIntervalSince(day) / 86_400)
+            parts.append(.init(text: days < 1 ? "Made today" : "Made \(days) d ago", help: "Made \(made)"))
+        }
+        if let edited = a.edited {
+            parts.append(.init(text: "Edited \(SecretInfoWords.age(edited, now: now))",
+                               help: "Edited \(SecretInfoWords.stamp(edited, timeZone: timeZone))"))
+        }
+        parts.append(used(a.lastOp, now: now, timeZone: timeZone))
+        if let day = a.tokenExpires, let at = dayFormat.date(from: day) {
+            let days = Int((at.timeIntervalSince(now) / 86_400).rounded(.up))
+            if days > 30 { parts.append(.init(text: "Token expires in \(days) d", help: "Its token expires on \(day)")) }
+        }
+        return parts
+    }
+
+    /// "Used 2 h ago": an agent's manage_accounts call that names it, or a read of its secret or
+    /// card, whichever is newer; "Never used" for none.
+    public static func used(_ last: DaemonAPI.AccountLastOp?, now: Date = Date(), timeZone: TimeZone = .current) -> SecretInfoWords.Part {
+        guard let last else { return .init(text: "Never used") }
+        let when = SecretInfoWords.stamp(last.at, timeZone: timeZone)
+        let help = switch last.what {
+        case "added": "Added by an agent \(when)"
+        case "edited": "Changed by an agent \(when)"
+        default: "Read \(when)"
+        }
+        return .init(text: "Used \(SecretInfoWords.age(last.at, now: now))", help: help)
+    }
+
+    /// Under an account whose key or card one copy only opens (#4160): "Its key, AWS_SECRET_KEY,
+    /// is only on devbox. Not backed up." Nil while a machine waits for a copy.
+    public static func notBackedUp(_ a: DaemonAPI.OutsideAccount, rows: [DaemonAPI.UserSecretRow],
+                                   names: [String: String] = [:]) -> String? {
+        for (kind, name) in [("key", a.secret), ("card", a.card)] {
+            guard let name = name?.trimmingCharacters(in: .whitespaces), let row = rows.first(where: { $0.name == name }),
+                  row.backedUp == false, row.waiting?.isEmpty ?? true, let id = row.machines.first else { continue }
+            return "Its \(kind), \(name), is only on \(names[id] ?? "one machine"). Not backed up."
+        }
+        return nil
+    }
+
     private static let dayFormat: DateFormatter = {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")

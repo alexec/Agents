@@ -128,6 +128,45 @@ func (b *Book) AddAccounts(ctx context.Context, user string, add []wire.OutsideA
 	return part, changed, err
 }
 
+// stampAccounts is the accounts part to keep, from what was kept (#4160): no lastOp, which a
+// machine gives; an account that takes another's place keeps its made, and its edited unless
+// it differs, when it is edited now. So an Edit… on a client is edited as an add is.
+func stampAccounts(had, value json.RawMessage, now time.Time) json.RawMessage {
+	var old, part wire.OutsideAccounts
+	if json.Unmarshal(value, &part) != nil {
+		return value
+	}
+	_ = json.Unmarshal(had, &old)
+	for i, a := range part.Accounts {
+		a.LastOp = nil
+		j := accountIndex(old.Accounts, a)
+		if j < 0 {
+			a.Edited = nil
+			part.Accounts[i] = a
+			continue
+		}
+		have := old.Accounts[j]
+		if a.Made == nil {
+			a.Made = have.Made
+		}
+		// AddAccounts stamps its own time; a client sends back the edited it read.
+		stamped := a.Edited != nil && (have.Edited == nil || *a.Edited != *have.Edited)
+		switch {
+		case sameAccount(have, a):
+			a.Edited = have.Edited
+		case !stamped:
+			at := wire.DateOf(now)
+			a.Edited = &at
+		}
+		part.Accounts[i] = a
+	}
+	raw, err := json.Marshal(part)
+	if err != nil {
+		return value
+	}
+	return raw
+}
+
 // sameAccount is whether two accounts are the same, but for when they were last changed.
 func sameAccount(a, b wire.OutsideAccount) bool {
 	a.Edited, a.LastOp, b.Edited, b.LastOp = nil, nil, nil, nil

@@ -5,11 +5,15 @@ import SwiftUI
 /// Slack…), the accounts part of their settings, which the control plane keeps and sends to each
 /// machine of theirs as it does their secrets (#1760). A record holds no secret, only the name of
 /// one in Settings ▸ You ▸ Secrets. Agents read and add them with manage_accounts. The window and
-/// the Remote (#4033) draw it; the web page draws the same in `Web/src/views/Accounts.tsx`.
+/// the Remote (#4033) draw it; the web page draws the same in `Web/src/views/Accounts.tsx`. Each
+/// row has the last 4 of the secret it names, when it was made, edited and last used, and a
+/// warning when that secret is not backed up (#4160), as the Secrets rows have (#4159).
 struct AccountsPane: View {
     /// The control plane, or nil while it cannot be reached.
     let control: DaemonClient?
     let state: UserScopeState
+    /// Each of the person's machines' names, by id, for the not-backed-up warning.
+    var machineNames: [String: String] = [:]
 
     @State private var project = ""
     @State private var editing: DaemonAPI.OutsideAccount?
@@ -23,10 +27,20 @@ struct AccountsPane: View {
 
     var body: some View {
         let shown = AccountsWords.of(all, project: project)
+        let secrets = state.secrets?.secrets ?? []
+        let only = SecretInfoWords.onlyMachine(secrets)
         Form {
             if let problem = problem ?? state.problem {
                 Section {
                     Text(problem).appText(.supporting).tinted(.failure)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .paperListRow()
+            }
+            if let only, all.contains(where: { AccountsWords.secretName($0) != nil }) {
+                Section {
+                    Label(SecretInfoWords.onlyMachineLine(only, names: machineNames), systemImage: "exclamationmark.triangle")
+                        .appText(.supporting).tinted(.attention)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .paperListRow()
@@ -39,7 +53,7 @@ struct AccountsPane: View {
                         ForEach(projects, id: \.self) { Text($0).tag($0) }
                     }
                 }
-                ForEach(shown) { account in row(account) }
+                ForEach(shown) { account in row(account, secrets: secrets, oneMachine: only != nil) }
                 Button("Add Account…") { isAdding = true }
                     .disabled(control == nil)
             } footer: {
@@ -66,12 +80,13 @@ struct AccountsPane: View {
         }
     }
 
-    private func row(_ account: DaemonAPI.OutsideAccount) -> some View {
+    private func row(_ account: DaemonAPI.OutsideAccount, secrets: [DaemonAPI.UserSecretRow], oneMachine: Bool) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack {
                 Text(account.service)
                 Spacer()
                 Text(AccountsWords.cost(account)).foregroundStyle(.secondary).monospacedDigit()
+                Text(AccountsWords.hint(account, rows: secrets)).appText(.code).foregroundStyle(.secondary)
                 Menu {
                     Button("Edit…") { editing = account }
                     Button("Remove…", role: .destructive) { removing = account }
@@ -84,11 +99,16 @@ struct AccountsPane: View {
             Text(AccountsWords.detail(account)).appText(.fine).foregroundStyle(.secondary)
             Text(AccountsWords.about(account)).appText(.fine).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            SecretInfoLine(parts: AccountsWords.line(account))
             if AccountsWords.asks(account) {
                 Label(AskBeforeUseWords.asks, systemImage: "hand.raised").appText(.fine).foregroundStyle(.secondary)
             }
             if let soon = AccountsWords.expiresSoon(account, now: Date()) {
                 Text(soon).appText(.fine).tinted(.attention)
+            }
+            if !oneMachine, let warning = AccountsWords.notBackedUp(account, rows: secrets, names: machineNames) {
+                Text("⚠ " + warning).appText(.fine).tinted(.attention)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

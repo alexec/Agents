@@ -79,3 +79,41 @@ func TestSecretRowInfoAndNoHintInTheStore(t *testing.T) {
 		}
 	}
 }
+
+// #4160: an account's last operation on user/settings is the newest of its own and a read of
+// the secret or card it names.
+func TestAccountInfo(t *testing.T) {
+	t.Parallel()
+	s := &Service{}
+	addr := "agents@example.com"
+	s.noteAccountOps("ana", []wire.AccountOperation{{What: wire.AccountOperationWhatRead, Service: "GitLab.com", Address: &addr}}, 100)
+	s.noteSecretInfo("box", "ana", []wire.SecretOperation{
+		{Name: "GITLAB_TOKEN", What: wire.SecretOperationWhatRead, At: 200},
+		{Name: "CARD", What: wire.SecretOperationWhatReplaced, At: 300},
+	}, nil, false)
+	settings := wire.UserSettings{Accounts: json.RawMessage(`{"accounts":[
+		{"service":"gitlab.com","address":"agents@example.com"},
+		{"service":"gitlab.com","address":"agents@example.com","secret":"GITLAB_TOKEN","card":"CARD"},
+		{"service":"slack.com","card":"CARD","lastOp":{"what":"added","at":5}}]}`)}
+	s.addAccountInfo("ana", &settings)
+	var got wire.OutsideAccounts
+	if err := json.Unmarshal(settings.Accounts, &got); err != nil {
+		t.Fatal(err)
+	}
+	if a := got.Accounts[0].LastOp; a == nil || a.At != 100 || a.What != wire.AccountOperationWhatRead {
+		t.Fatalf("its own: %+v", a)
+	}
+	if a := got.Accounts[1].LastOp; a == nil || a.At != 200 {
+		t.Fatalf("its secret's read: %+v", a)
+	}
+	if a := got.Accounts[2].LastOp; a != nil {
+		t.Fatalf("a replace is no use, and a sent lastOp goes: %+v", a)
+	}
+	other := wire.UserSettings{Accounts: settings.Accounts}
+	s.addAccountInfo("bo", &other)
+	var theirs wire.OutsideAccounts
+	json.Unmarshal(other.Accounts, &theirs)
+	if theirs.Accounts[0].LastOp != nil {
+		t.Fatal("another person's")
+	}
+}

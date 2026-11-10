@@ -1261,6 +1261,7 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 			return nil, userFailure(err)
 		}
 		m.s.auditAccountOps(host, user, request.Ops)
+		m.s.noteAccountOps(user, request.Ops, wire.DateOf(time.Now()))
 		if changed {
 			m.s.userChanged(user, []wire.UserSettingsPartName{wire.UserSettingsPartNameAccounts}, false, host)
 		}
