@@ -142,8 +142,9 @@ Everything else is refused with `notInLock` (-32104). A machine with no lock yet
 it took before, so nothing stops working until the person has a lock. A device that is not
 in the lock yet is refused until one of the person's other devices approves it.
 
-**When every device is lost** (#3493): the first device of a lock shows a **recovery key**
-once, for a password manager. Typed on a new device (**Use Recovery Key**), it adds that
+**When every device is lost** (#3493): the first device of a lock offers a **recovery key**
+once the lock has a machine other than this Mac's own host (#4248), and shows it once, for a
+password manager. Typed on a new device (**Use Recovery Key**), it adds that
 device to the lock. With no recovery key either, **Start a New Lock** drops the old lock and
 signs a new one; each machine refuses the new lock until you run `agentsd lock reset` in its
 shell, and then asks to join it. Only the machine's own account can reset its lock: the

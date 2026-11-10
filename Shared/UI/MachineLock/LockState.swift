@@ -17,6 +17,10 @@ import Observation
 /// Machines (#3491, D3, D8): a machine that asks is shown the same way and approved with an
 /// addMachine; a host code made here carries an invite this client put on the lock; and a
 /// secret is sealed only to a machine whose key its owner's lock names.
+///
+/// This Mac's own host (#4248): the window that makes the root puts an invite for it in the
+/// same lock/add and keeps it in the host's root, as a join code would, so the host adds
+/// itself and nobody compares digits between two parts of one app.
 @MainActor @Observable
 final class LockState {
     /// This device's place in the lock.
@@ -51,13 +55,22 @@ final class LockState {
         case none
         /// Shown once, just after it was made.
         case show(String)
-        /// The lock has one client, and the person neither saved nor skipped a key here.
+        /// The lock has one client and a machine that is not this Mac's own host, and the
+        /// person neither saved nor skipped a key here.
         case offer
     }
 
     private(set) var place: Place = .unknown
     /// The recovery key made here, kept only in memory until the person saved or skipped it.
     private var recoveryShown: String?
+    /// This Mac's own host, on the Mac window only (#4248): its id, and where its invite goes.
+    struct OwnHost {
+        var id: () -> String?
+        var keepInvite: (_ invite: Data, _ pin: MachineLock.Pin) throws -> Void
+    }
+    var ownHost: OwnHost?
+    /// The own host's id, read at each connection: the recovery card leaves it out.
+    private var ownHostID: String?
     /// A recovery step in flight: Make Recovery Key, Use, or Start a New Lock.
     private(set) var recoveryBusy = false
     /// The lock as this device last checked it, kept with the pin so a channel to a machine
@@ -109,12 +122,15 @@ final class LockState {
     }
 
     /// The recovery key's card now: the key just made, or an offer to make one while the lock
-    /// has only this client (a key shown before is gone once the app closes).
+    /// has only this client (a key shown before is gone once the app closes). With nothing in
+    /// the lock but this device and its own host there is nothing a key could get back, so the
+    /// offer waits for another machine (#4248); another client is a way back of its own (D4).
     var recoveryCard: RecoveryCard {
         guard place == .member, let state = checked else { return .none }
         if let recoveryShown { return .show(recoveryShown) }
         let clients = state.members.values.filter(\.isClient).count
-        return clients <= 1 && !pins.recoveryDone(state.person) ? .offer : .none
+        let machines = state.members.values.contains { $0.kind == .addMachine && $0.id != ownHostID }
+        return clients <= 1 && machines && !pins.recoveryDone(state.person) ? .offer : .none
     }
 
     /// I Saved It, or Skip: not asked again on this device.
@@ -202,6 +218,7 @@ final class LockState {
     /// The control plane answered. One with no lock does not know the methods: nothing shows.
     func connected(_ control: DaemonClient, client: UUID) async {
         self.client = client.uuidString
+        ownHostID = ownHost?.id()
         pins.pruneOthers()
         await refresh(control)
         settled = true
@@ -396,18 +413,27 @@ final class LockState {
         place = .asking(request: started.request, digits: nil)
     }
 
-    /// The root, and the recovery key with it in the same lock/add (D4): the key is shown once.
+    /// The root, and in the same lock/add an invite for this Mac's own host (#4248, D3). The
+    /// invite is kept in the host's root before the lock is sent, so the host has it when the
+    /// control plane sends the lock; when it cannot be kept, the host asks to join as before.
+    /// No recovery key yet: the card offers one once another machine joins.
     private func putRoot(_ root: DaemonAPI.LockBody, on control: DaemonClient, key: LockSigningKey) async throws {
         let rootEntry = try MachineLock.sign(root, after: nil, with: key)
         var state = MachineLock.State()
         try state.add(rootEntry)
-        let made = try MachineLock.makeRecovery()
-        let recovery = DaemonAPI.LockBody(kind: .recovery, person: state.person, key: made.publicKey, sealed: made.sealed)
-        let recoveryEntry = try MachineLock.sign(recovery, after: state, with: key)
-        _ = try await control.call(DaemonAPI.Method.lockAdd, DaemonAPI.LockAdd(entries: [rootEntry, recoveryEntry]),
+        var entries = [rootEntry]
+        if let ownHost {
+            let invite = MachineLock.inviteKey()
+            let body = DaemonAPI.LockBody(kind: .invite, person: state.person, key: invite.publicKey.x963Representation,
+                                          expires: Date().addingTimeInterval(Self.inviteLifetime))
+            let entry = try MachineLock.sign(body, after: state, with: key)
+            var after = state
+            try after.add(entry)
+            if (try? ownHost.keepInvite(invite.rawRepresentation, after.pin)) != nil { entries.append(entry) }
+        }
+        _ = try await control.call(DaemonAPI.Method.lockAdd, DaemonAPI.LockAdd(entries: entries),
                                    returning: DaemonAPI.LockHead.self)
         place = .member
-        recoveryShown = made.text
     }
 
     /// This device's own request, once a signer sent its nonce: show ours, and the digits.
