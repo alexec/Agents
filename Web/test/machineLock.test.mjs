@@ -99,7 +99,8 @@ function controlPlane(person = "alex") {
       const said = [];
       const link = {
         call: (method, params) => plane.answer(client, name, kind, method, structuredClone(params)),
-        keyRecord: async () => ({ client }),
+        // A new sign-in (#4320) sets entry.client to the new id.
+        keyRecord: async () => ({ client: entry.client }),
         lockKey: async () => keys.pair,
         saveLockKey: async (pair) => { keys.pair = pair; },
       };
@@ -215,6 +216,48 @@ test("the first browser makes the root; a second asks, compares digits and is ap
   assert.equal(state.membersOf("addClient")[1].clientKind, "web");
   assert.deepEqual(mac.said, []);
   assert.deepEqual(web.said, []);
+});
+
+test("after a new sign-in, the old key signs in a new key for the new client id (#4320)", async () => {
+  const plane = controlPlane();
+  const web = plane.connect("AAAA-1111", "A browser");
+  await web.lock.run();
+  assert.equal(web.lock.device.value.kind, "member");
+  const old = web.keys.pair;
+  const oldRaw = new Uint8Array(await crypto.subtle.exportKey("raw", old.publicKey));
+  const first = await m.check(plane.lock.entries);
+  assert.equal(model.namesAnotherClient(first, oldRaw, "AAAA-1111"), false);
+  assert.equal(model.namesAnotherClient(first, oldRaw, "aaaa-1111"), false);
+  assert.equal(model.namesAnotherClient(first, oldRaw, ""), false);
+  assert.equal(model.namesAnotherClient(first, oldRaw, "CCCC-3333"), true);
+  // A key the lock does not name is not "another client's": it asks to join.
+  const stranger = await signer();
+  assert.equal(model.namesAnotherClient(first, stranger.publicRaw, "CCCC-3333"), false);
+
+  // signIn/ask gives the page a new client id, and keeps its lock key.
+  web.client = "CCCC-3333";
+  const count = plane.lock.entries.length;
+  await web.lock.run();
+  await wait();
+  assert.equal(web.lock.device.value.kind, "member");
+  assert.notEqual(web.keys.pair, old);
+  assert.equal(plane.lock.entries.length, count + 1);
+  const state = await m.check(plane.lock.entries);
+  const newRaw = new Uint8Array(await crypto.subtle.exportKey("raw", web.keys.pair.publicKey));
+  assert.equal(state.member(newRaw)?.id, "CCCC-3333");
+  assert.ok(state.signer(newRaw));
+  assert.equal(model.namesAnotherClient(state, newRaw, "CCCC-3333"), false);
+  // No other device approved it: the page asked nobody.
+  assert.equal(plane.calls.filter((c) => c.method === "lock/join").length, 0);
+  const signed = await web.lock.signer();
+  assert.deepEqual(signed?.signer.publicRaw, newRaw);
+  assert.deepEqual(web.said, []);
+
+  // A root with no id (an older lock) names nobody else.
+  const bare = await m.check([await m.sign(stranger.pair.privateKey, stranger.publicRaw, {
+    kind: "root", person: "alex", at: m.wireNow(), key: b64(stranger.publicRaw), clientKind: "web",
+  })]);
+  assert.equal(model.namesAnotherClient(bare, stranger.publicRaw, "CCCC-3333"), false);
 });
 
 test("another signer sees that one is comparing; a deny ends the ask, and Ask Again asks anew", async () => {
