@@ -609,6 +609,8 @@ jobs:
       - name: Vet
         run: go vet ./...
       - name: Test
+        # `shell: bash` adds `-o pipefail`, so main's `go test` into `tee` still fails (#4385).
+        shell: bash
         run: |
           if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF" == refs/heads/main ]]; then
             go test -race -coverprofile=coverage.out ./... | tee "$RUNNER_TEMP/go-coverage-tests.txt"
@@ -720,6 +722,9 @@ jobs:
       - run: npm run build
       - run: npm run check
       - name: Test with coverage
+        # `shell: bash` adds `-o pipefail`: without it the step took `tee`'s exit, and a
+        # failing web test left the job green (#4385).
+        shell: bash
         run: |
           mkdir -p coverage/v8
           NODE_V8_COVERAGE=coverage/v8 node --experimental-test-coverage \
