@@ -121,6 +121,8 @@ struct ContentView: View {
             WorkView(model: model).paperGround()
         } else if model.showsDocs {
             DocsView().paperGround()
+        } else if model.showsMessages {
+            MessagesView(list: model.messagesList).paperGround()
         } else if model.showsSummary {
             SummaryPageView(pages: model.summaryPages, settings: model.dailySummarySettings,
                             read: { await model.readSummaryPage($0) },
@@ -190,7 +192,7 @@ struct ContentView: View {
         guard terminal.isOpen, !model.showsEvents, !model.showsRuntimes, model.statusSecretsPage == nil,
               model.machinePage == nil,
               !model.showsSpending, !model.showsTokens, !model.showsTime,
-              !model.showsWork, !model.showsDocs, !model.showsSummary, let folder = model.selectedFolderSummary, folder.exists else { return nil }
+              !model.showsWork, !model.showsDocs, !model.showsMessages, !model.showsSummary, let folder = model.selectedFolderSummary, folder.exists else { return nil }
         return folder
     }
 
@@ -204,7 +206,7 @@ struct ContentView: View {
     private var showsChat: Bool {
         model.selection != nil && !model.showsEvents
             && !model.showsRuntimes && model.statusSecretsPage == nil && model.machinePage == nil
-            && !model.showsSpending && !model.showsTime && !model.showsWork && !model.showsDocs
+            && !model.showsSpending && !model.showsTime && !model.showsWork && !model.showsDocs && !model.showsMessages
             && !model.showsSummary && model.openWorkflow == nil
             && model.folderPage == nil && model.openPin == nil
     }

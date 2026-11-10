@@ -22,6 +22,7 @@ import { WorkList, WorkPage } from "./Work";
 import { WorkFeatures } from "./WorkFeatures";
 import { WorkTimeline } from "./WorkTimeline";
 import { DocPage, DocsList } from "./Docs";
+import { ConversationPage, MessagesList } from "./Messages";
 import { MachinePage } from "./MachinePage";
 import { machineNeed, machineNeedLine } from "./OfflineStrip";
 import { MachineRow, MakingRow } from "./MachineRow";
@@ -255,7 +256,10 @@ export function PageView({ store, page, down }: { store: Store; page: NavPage; d
         : page.draw.kind === "statusList" ? <StatusSecretsPage store={store} list={page.draw.list} />
         : page.draw.kind === "docs" ? (route.value.item
           ? <DocPage key={route.value.item} store={store} docRef={route.value.item} />
-          : <DocsList store={store} />) : null}
+          : <DocsList store={store} />)
+        : page.draw.kind === "messages" ? (route.value.item
+          ? <ConversationPage key={route.value.item} store={store} conversationKey={route.value.item} />
+          : <MessagesList store={store} />) : null}
     </Framed>
   );
 }

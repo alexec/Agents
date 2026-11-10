@@ -289,9 +289,10 @@ public extension DaemonAPI {
                 Row(Method.forgeImage, params: ForgeImageRequest.self, result: ForgeImage.self, kind: .hostRequest),
                 Row(Method.forgeAddChild, params: ForgeAddChildRequest.self, result: ForgeDone.self, kind: .hostRequest),
                 Row(Method.forgeBlockedBy, params: ForgeBlockedByRequest.self, result: ForgeDone.self, kind: .hostRequest),
-                // The Messages page's reads (#4343); its Swift models come with the page (#4344).
-                Row("messages/conversations", params: JSONValue.self, result: JSONValue.self, kind: .hostRequest),
-                Row("messages/read", params: JSONValue.self, result: JSONValue.self, kind: .hostRequest),
+                // The Messages page's reads (#4343, #4344).
+                Row(Method.messagesConversations, params: MessagesConversationsRequest.self, result: MessagesConversations.self,
+                    kind: .hostRequest),
+                Row(Method.messagesRead, params: MessagesReadRequest.self, result: MessagesRead.self, kind: .hostRequest),
                 // Work ▸ Timeline on the web page (#4206).
                 Row(Method.workTimeline, params: WorkTimelineRequest.self, result: WorkTimeline.self, kind: .hostRequest),
                 Row(Method.docsList, params: DocsListRequest.self, result: DocsList.self, kind: .hostRequest),
