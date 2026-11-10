@@ -30,8 +30,12 @@ const (
 	filedIssuesMax = 20
 )
 
-// filedRecheck is how long after an issue is filed it is asked again. Tests set it.
+// filedRecheck is how long after an issue is filed it is asked again.
 var filedRecheck = 5 * time.Minute
+
+// filedRecheckDue, when a test closes it, makes each filed issue's second ask due at once,
+// so the test, not a timer, says when the forge has changed (#3965). Nil in the daemon.
+var filedRecheckDue chan struct{}
 
 var (
 	// issueCreateCommand lets flags stand before the command, as fj's --host and tea's --login.
@@ -205,6 +209,7 @@ func (d *Daemon) askIssueAgain(folder string, repo forgeRepo, n int) {
 		case <-ctx.Done():
 			return
 		case <-wait.C:
+		case <-filedRecheckDue:
 		}
 		d.issueMu.Lock()
 		delete(d.issueAsked, repo.issue(n))
