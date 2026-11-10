@@ -21,6 +21,10 @@ final class WorkTimelineState {
     var anchor = Date.now
     var timeline: DaemonAPI.WorkTimeline?
     var problem: String?
+    /// A read runs: the toolbar's Refresh spins.
+    var reading = false
+    /// The last read got nothing: the plot is the read before it, dimmed under the strip (S12).
+    var stale = false
     var asked = 0
     /// Now was clicked: the plot scrolls back to it.
     var nowAsked = 0
@@ -57,9 +61,12 @@ final class WorkTimelineState {
         let mine = ask
         guard read != mine || timeline == nil else { return }
         read = mine
+        reading = true
+        defer { if ask == mine { reading = false } }
         let projects = projects(model: model)
         guard let project = projects.first(where: { $0.id == self.project }) ?? projects.first else {
             timeline = .init()
+            stale = false
             return
         }
         if self.project != project.id { self.project = project.id }
@@ -101,6 +108,10 @@ final class WorkTimelineState {
             }
         }
         guard ask == mine else { return }
+        problem = failed.isEmpty ? nil : failed.joined(separator: "\n")
+        // Every machine failed: the last plot stays, dimmed under the strip.
+        stale = got.isEmpty && !failed.isEmpty && timeline != nil
+        if stale { return }
         var merged = WorkTimeline.merge(got)
         if let epics { merged.epics = merged.epics.filter { epics.contains($0.item.node.ref) } }
         // A child that closed since the last read of the same window lands: its dot pulses once.
@@ -112,7 +123,6 @@ final class WorkTimelineState {
                 landed[child.item.node.ref] = seen
             }
         }
-        problem = failed.isEmpty ? nil : failed.joined(separator: "\n")
         timeline = merged
     }
 }
@@ -146,6 +156,11 @@ struct WorkTimelinePane: View {
             Divider()
             content
         }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                WorkRefreshButton(running: state.reading) { state.asked += 1 }
+            }
+        }
         .workTask(id: state.ask) { await state.load(model: model) }
         // Read again every five minutes, so closes land while the page is open.
         .task(id: state.project) {
@@ -160,8 +175,27 @@ struct WorkTimelinePane: View {
 
     // MARK: The bar
 
+    /// The filter bar (parts.md section 4, milestones.md notes 31 and 32): Project and Board as
+    /// compact menus and the title line at the leading edge; the range, Now and Forecast at the
+    /// trailing edge, where Sort is on a list. Refresh is the toolbar's.
     private var bar: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 14) {
+            if projects.count > 1 {
+                WorkFilterMenu(name: "Project", selection: $state.project, options: projects.map(\.id),
+                               words: { id in projects.first { $0.id == id }?.name ?? id }, named: true)
+            }
+            if !state.boards.isEmpty || !state.board.isEmpty {
+                WorkFilterMenu(name: "Board", selection: $state.board, options: boardOptions,
+                               words: { WorkList.boardName($0, in: state.boards) }, any: "", anyWords: "All boards")
+            }
+            if let title {
+                Text(title)
+                    .appText(.supporting)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            Spacer(minLength: 0)
             Picker("Range", selection: $state.range) {
                 ForEach(WorkTimeline.Range.allCases) { Text($0.title).tag($0) }
             }
@@ -170,26 +204,31 @@ struct WorkTimelinePane: View {
             .fixedSize()
             .onChange(of: state.range) { goToNow() }
             Button("Now") { goToNow() }
+                .buttonStyle(.bordered)
                 .help("Back to now")
             Toggle("Forecast", isOn: $state.forecast)
                 .toggleStyle(.checkbox)
                 .fixedSize()
                 .help(state.timeline?.backtest.map { "The forecast after now. \(WorkTimeline.errorWords($0))." }
                     ?? "The forecast after now")
-            if projects.count > 1 {
-                Picker("Project", selection: $state.project) {
-                    ForEach(projects) { Text($0.name).tag($0.id) }
-                }
-                .fixedSize()
-            }
-            if !state.boards.isEmpty || !state.board.isEmpty {
-                WorkBoardPicker(selection: $state.board, boards: state.boards)
-            }
-            Spacer(minLength: 0)
-            Button("Refresh") { state.asked += 1 }
-                .linkStyle()
-                .fixedSize()
         }
+    }
+
+    /// The boards read, and the one picked when the machines no longer list it.
+    private var boardOptions: [String] {
+        let urls = state.boards.map(\.url)
+        return state.board.isEmpty || urls.contains(state.board) ? urls : urls + [state.board]
+    }
+
+    private var projectName: String { projects.first { $0.id == state.project }?.name ?? "" }
+
+    /// "Agents · 6 epics in these 2 days", once a read has drawn something.
+    private var title: String? {
+        guard let timeline = state.timeline, !projects.isEmpty else { return nil }
+        let lines = WorkTimeline.lines(timeline, now: .now, forecast: state.forecast)
+        // With the Project menu beside it, the menu names the project.
+        return WorkTimeline.titleWords(project: projects.count > 1 ? "" : projectName, epics: WorkTimeline.epicCount(lines, in: state.range.window(now: state.anchor)),
+                                       range: state.range)
     }
 
     private func goToNow() {
@@ -202,42 +241,36 @@ struct WorkTimelinePane: View {
     @ViewBuilder
     private var content: some View {
         if model.timelineMachines.isEmpty {
-            message(WorkTimeline.noMachine)
-        } else if let timeline = state.timeline {
-            if projects.isEmpty {
-                message(WorkTimeline.noProject)
-            } else {
-                VStack(spacing: 0) {
-                    ForEach(problems(timeline), id: \.self) { line in
-                        Label(line, systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 16).padding(.vertical, 4)
-                    }
-                    TimelineView(.periodic(from: .now, by: 60)) { context in
-                        plot(timeline, now: context.date)
-                    }
-                }
-            }
+            WorkEmptyState(symbol: WorkList.Kind.timeline.sidebarIcon, title: "No machine draws the timeline",
+                           line: WorkTimeline.noMachine)
+        } else if state.timeline != nil, projects.isEmpty {
+            // S12: no project to draw.
+            WorkEmptyState(symbol: WorkList.Kind.timeline.sidebarIcon, title: WorkTimeline.noProject,
+                           line: WorkTimeline.noProjectLine)
         } else {
-            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            // S10: before the first read, the releases line and Now draw at once, and grey lanes shimmer.
+            let timeline = state.timeline ?? .init()
+            VStack(spacing: 0) {
+                let lines = problems(timeline)
+                if !lines.isEmpty {
+                    WorkErrorStrip(lines: lines) { state.asked += 1 }
+                        .padding(.horizontal, 16).padding(.vertical, 8)
+                }
+                // Once a minute; while the first read runs, often, so the grey lanes shimmer.
+                let loading = state.timeline == nil
+                TimelineView(.animation(minimumInterval: loading && !reduceMotion ? 1.0 / 20 : 60)) { context in
+                    plot(timeline, now: context.date, loading: loading)
+                }
+                .opacity(state.stale ? 0.5 : 1)
+            }
         }
     }
 
     private func problems(_ timeline: DaemonAPI.WorkTimeline) -> [String] {
-        [state.problem].compactMap { $0 } + (timeline.errors ?? [])
+        (state.problem.map { $0.components(separatedBy: "\n") } ?? []) + (timeline.errors ?? [])
     }
 
-    private func message(_ text: String) -> some View {
-        Text(text)
-            .appText(.supporting)
-            .foregroundStyle(.secondary)
-            .multilineTextAlignment(.center)
-            .padding(24)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private func plot(_ timeline: DaemonAPI.WorkTimeline, now: Date) -> some View {
+    private func plot(_ timeline: DaemonAPI.WorkTimeline, now: Date, loading: Bool) -> some View {
         GeometryReader { geo in
             let visible = max(geo.size.width, 1)
             let content = state.content
@@ -250,7 +283,7 @@ struct WorkTimelinePane: View {
             let height = max((2 * sides + 2) * Self.laneHeight, geo.size.height - Self.axisHeight)
             let drawing = Drawing(lines: lines, releases: timeline.releases, backtest: timeline.backtest, axis: axis,
                                   now: now, trunk: height / 2, height: height, offset: offset, visible: visible,
-                                  night: scheme == .dark, project: projects.first { $0.id == state.project }?.name ?? "")
+                                  night: scheme == .dark, project: projectName, loading: loading)
             ScrollView(.horizontal) {
                 VStack(spacing: 0) {
                     ScrollView(.vertical) {
@@ -285,16 +318,33 @@ struct WorkTimelinePane: View {
                 }
             })
             .overlay {
-                if lines.isEmpty {
-                    Text(WorkTimeline.noEpics)
-                        .appText(.supporting)
-                        .foregroundStyle(.secondary)
-                        .padding(8)
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
-                        .allowsHitTesting(false)
+                // S11: no line in the window itself; the margin on each side is only for the scroll.
+                if !loading, WorkTimeline.overlapping(lines, state.range.window(now: state.anchor)).isEmpty {
+                    emptyCard(timeline, now: now)
                 }
             }
         }
+    }
+
+    /// S11: no epic in the window. The releases line and Now stay; the card says when the last one
+    /// joined, when the read knows, and offers the week.
+    private func emptyCard(_ timeline: DaemonAPI.WorkTimeline, now: Date) -> some View {
+        let window = state.range.window(now: state.anchor)
+        let joined = WorkTimeline.lastJoined(timeline, before: window.start)
+        return VStack(spacing: 6) {
+            Text(WorkTimeline.noEpicsWords(state.range)).appText(.supporting).fontWeight(.semibold)
+            if let joined {
+                Text(WorkTimeline.lastJoinedWords(joined, now: now)).appText(.fine).foregroundStyle(.secondary)
+            }
+            if state.range != .week {
+                Button(WorkTimeline.showTheWeek) { state.range = .week }
+                    .buttonStyle(.paper)
+                    .padding(.top, 2)
+            }
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: Paper.Radius.control).fill(Paper.raised))
+        .overlay(RoundedRectangle(cornerRadius: Paper.Radius.control).strokeBorder(Paper.rule))
     }
 
     /// A scroll the page makes: the offset is known at once, as a scroll geometry change does
@@ -390,33 +440,62 @@ struct WorkTimelinePane: View {
 
     // MARK: The hover card
 
+    /// A mini row (milestones.md note 33): the state glyph, the title, the label chips where the
+    /// wire has them (#4428), and line 2. A join of several lines has a row for each.
     private func card(_ hit: WorkTimeline.Hit, drawing: Drawing) -> some View {
-        let lines: [String] = switch hit {
-        case .dot(_, let dot): WorkTimeline.dotWords(dot, now: drawing.now)
-        case .line(let line): WorkTimeline.lineWords(line, backtest: drawing.backtest, now: drawing.now)
-        case .join(let join):
-            join.lines.flatMap { id -> [String] in
-                guard let line = drawing.lines.first(where: { $0.id == id }) else { return [] }
-                return line.how == .forecast
-                    ? ["\(line.number) \(line.title)"] + WorkTimeline.joinWords(line, backtest: drawing.backtest, now: drawing.now)
-                    : WorkTimeline.lineWords(line, backtest: drawing.backtest, now: drawing.now)
-            }
-        case .release(let release):
-            [release.tag, "Released \(release.at.formatted(date: .abbreviated, time: .shortened))"]
-        }
-        return VStack(alignment: .leading, spacing: 2) {
-            ForEach(Array(lines.enumerated()), id: \.offset) { i, line in
-                Text(line)
-                    .appText(i == 0 ? .supporting : .fine)
-                    .fontWeight(i == 0 ? .semibold : .regular)
-                    .foregroundStyle(i == 0 ? .primary : .secondary)
+        VStack(alignment: .leading, spacing: 8) {
+            switch hit {
+            case .dot(_, let dot):
+                let child = self.child(dot.ref)
+                miniRow(glyph: dotGlyph(dot), title: dot.title, labels: child?.item.labels ?? [],
+                        line: WorkTimeline.dotLine(dot, now: drawing.now))
+            case .line(let line):
+                lineRow(line, drawing: drawing)
+            case .join(let join):
+                ForEach(join.lines, id: \.self) { id in
+                    if let line = drawing.lines.first(where: { $0.id == id }) { lineRow(line, drawing: drawing) }
+                }
+            case .release(let release):
+                miniRow(glyph: AnyView(Image(systemName: WorkList.Kind.release.sidebarIcon).foregroundStyle(.secondary)
+                            .accessibilityHidden(true)),
+                        title: release.tag, labels: [], line: WorkTimeline.releaseLine(release, now: drawing.now))
             }
         }
-        .frame(maxWidth: 320, alignment: .leading)
-        .padding(8)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
-        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.separator))
+        .frame(maxWidth: 360, alignment: .leading)
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: Paper.Radius.control).fill(Paper.raised))
+        .overlay(RoundedRectangle(cornerRadius: Paper.Radius.control).strokeBorder(Paper.rule))
         .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func lineRow(_ line: WorkTimeline.Line, drawing: Drawing) -> some View {
+        let epic = state.timeline?.epics.first { $0.item.node.ref == line.epic.ref }
+        let glyph = AnyView(WorkStateIcon(kind: "issue", state: epic?.item.state ?? (line.open ? "open" : "closed"),
+                                          stateReason: epic?.stateReason))
+        return miniRow(glyph: glyph, title: line.title, labels: epic?.item.labels ?? [],
+                       line: WorkTimeline.lineLine(line, now: drawing.now))
+    }
+
+    private func miniRow(glyph: AnyView, title: String, labels: [DaemonAPI.ForgeLabel], line: String) -> some View {
+        let chips = WorkLook.shownLabels(labels, limit: WorkLook.rowChips)
+        return VStack(alignment: .leading, spacing: 3) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                glyph
+                Text(title).appText(.supporting).fontWeight(.semibold).lineLimit(1).truncationMode(.tail)
+                ForEach(chips.shown, id: \.name) { WorkLabelChip(label: $0) }
+                WorkMoreChips(count: chips.more)
+            }
+            Text(line).appText(.fine).foregroundStyle(.secondary).lineLimit(1).padding(.leading, 22)
+        }
+    }
+
+    /// A child's glyph: open, done, or not planned (a ring with a slash).
+    private func dotGlyph(_ dot: WorkTimeline.Dot) -> AnyView {
+        AnyView(WorkStateIcon(kind: "issue", state: dot.closed ? "closed" : "open", stateReason: dot.notPlanned ? "not_planned" : nil))
+    }
+
+    private func child(_ ref: String) -> DaemonAPI.WorkTimelineChild? {
+        state.timeline?.epics.lazy.flatMap(\.children).first { $0.item.node.ref == ref }
     }
 
     /// The labels' step, as the canvas resolves it.
@@ -441,6 +520,8 @@ private struct Drawing {
     var visible: Double
     var night: Bool
     var project: String
+    /// Before the first read (S10): grey lanes that shimmer with the clock.
+    var loading = false
 
     /// The system colours for the features; the last, grey, for an epic with none.
     static let palette: [Color] = [.blue, .purple, .pink, Color.orange, Color.green, .teal, .indigo, .mint, .brown, .cyan, Color.red, .gray]
@@ -555,6 +636,8 @@ private struct Drawing {
             }
         }
 
+        if loading { drawPlaceholders(&gc) }
+
         // Now: a red line.
         var nowLine = Path()
         nowLine.move(to: CGPoint(x: nowX, y: 0))
@@ -621,6 +704,16 @@ private struct Drawing {
                  fill: night ? .white : .black, text: night ? .black : .white)
         }
 
+    }
+
+    /// S10: a grey bar on each of the first lanes, in the window, its grey breathing with the clock.
+    func drawPlaceholders(_ gc: inout GraphicsContext) {
+        let phase = 0.5 + 0.5 * sin(now.timeIntervalSinceReferenceDate * .pi / 1.1)
+        let grey = Paper.wash.opacity(0.55 + 0.45 * phase)
+        for (lane, from, width) in [(1, 0.12, 0.42), (-1, 0.28, 0.36), (2, 0.36, 0.3), (-2, 0.08, 0.26)] {
+            let rect = CGRect(x: offset + visible * from, y: y(lane) - 4, width: visible * width, height: 8)
+            gc.fill(Path(roundedRect: rect, cornerRadius: 4), with: .color(grey))
+        }
     }
 
     /// A line's path: a cubic curve up from the releases line, along its lane, and a curve back

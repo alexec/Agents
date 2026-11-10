@@ -8,9 +8,11 @@ struct WorkStateIcon: View {
     let kind: String
     let state: String
     var draft = false
+    /// The forge's `not_planned`, where it gives one: a ring with a slash.
+    var stateReason: String?
 
     var body: some View {
-        if let glyph = WorkLook.glyph(kind: kind, state: state, draft: draft) {
+        if let glyph = WorkLook.glyph(kind: kind, state: state, draft: draft, stateReason: stateReason) {
             symbol(glyph)
                 .foregroundStyle(glyph.tone.color)
                 .accessibilityElement(children: .ignore)
