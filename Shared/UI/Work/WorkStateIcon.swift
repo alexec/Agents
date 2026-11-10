@@ -8,11 +8,13 @@ struct WorkStateIcon: View {
     let kind: String
     let state: String
     var draft = false
+    /// The forge's `not_planned`, where it gives one: a ring with a slash.
+    var stateReason: String?
     /// White on a selected row in a key window, as the row's text.
     @Environment(\.backgroundProminence) private var prominence
 
     var body: some View {
-        if let glyph = WorkLook.glyph(kind: kind, state: state, draft: draft) {
+        if let glyph = WorkLook.glyph(kind: kind, state: state, draft: draft, stateReason: stateReason) {
             symbol(glyph)
                 .foregroundStyle(prominence == .increased ? Color.white : glyph.tone.color)
                 .accessibilityElement(children: .ignore)

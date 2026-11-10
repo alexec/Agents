@@ -178,6 +178,15 @@ public enum WorkTimeline {
             }
         }
 
+        /// The range in words, after "in": "6 epics in these 2 days".
+        public var these: String {
+            switch self {
+            case .day: "these 24 hours"
+            case .twoDays: "these 2 days"
+            case .week: "these 7 days"
+            }
+        }
+
         /// Where Now is, from the left edge, as a share of the width.
         public var nowAt: Double { self == .week ? 0.75 : 0.5 }
 
@@ -506,41 +515,69 @@ public enum WorkTimeline {
     /// "3 wait for you": the pill where a line stops for the person.
     public static func waitWords(_ count: Int) -> String { "\(count) wait\(count == 1 ? "s" : "") for you" }
 
-    /// The hover card on a forecast join (section 12, item 8).
-    public static func joinWords(_ line: Line, backtest: DaemonAPI.WorkTimelineBacktest?, now: Date,
-                                 calendar: Calendar = .current) -> [String] {
-        var out = ["Closes about \(time(line.end, now: now, calendar: calendar))"]
-        if let band = line.band {
-            out.append("8 times in 10 between \(time(band.start, now: now, calendar: calendar)) and \(time(band.end, now: now, calendar: calendar))")
-        }
-        if let backtest { out.append(errorWords(backtest)) }
-        return out
-    }
-
     /// "Past forecasts were off by ×2.2".
     public static func errorWords(_ backtest: DaemonAPI.WorkTimelineBacktest) -> String {
         "Past forecasts were off by ×\(backtest.error.formatted(.number.precision(.fractionLength(1))))"
     }
 
-    /// The hover card on a dot.
-    public static func dotWords(_ dot: Dot, now: Date, calendar: Calendar = .current) -> [String] {
-        let when = time(dot.at, now: now, calendar: calendar)
-        let state = dot.closed ? (dot.notPlanned ? "Closed as not planned \(when)" : "Closed \(when)") : "Closes about \(when)"
-        return ["\(dot.number) \(dot.title)", state]
+    /// The hover card is a mini row (Work look, milestones.md note 33): a glyph, the title, and
+    /// this second line. On a child's dot: "#4301 · closed 2 h ago", "#4301 · closes about 5:00 PM".
+    public static func dotLine(_ dot: Dot, now: Date, calendar: Calendar = .current) -> String {
+        let state = dot.closed
+            ? "\(dot.notPlanned ? "closed as not planned" : "closed") \(agoWords(dot.at, now: now))"
+            : "closes about \(time(dot.at, now: now, calendar: calendar))"
+        return "\(dot.number) · \(state)"
     }
 
-    /// The hover card on a line.
-    public static func lineWords(_ line: Line, backtest: DaemonAPI.WorkTimelineBacktest?, now: Date,
-                                 calendar: Calendar = .current) -> [String] {
-        var out = ["\(line.number) \(line.title)", "\(line.done) of \(line.total) done"]
+    /// On an epic's line or its join: "#4250 · 11 of 16 · closes about 5:00 PM · 3:00 PM–9:00 PM, 8 in 10".
+    public static func lineLine(_ line: Line, now: Date, calendar: Calendar = .current) -> String {
+        var out = [line.figures]
         switch line.how {
-        case .joined: out.append("Closed \(time(line.end, now: now, calendar: calendar))")
-        case .dropped: out.append("Closed as not planned")
-        case .forecast: out += joinWords(line, backtest: backtest, now: now, calendar: calendar)
-        case .waits(let n): out.append(waitWords(n).prefix(1).uppercased() + waitWords(n).dropFirst())
-        case .open: out.append("Open")
+        case .joined: out.append("closed \(agoWords(line.end, now: now))")
+        case .dropped: out.append("closed as not planned")
+        case .forecast:
+            out.append("closes about \(time(line.end, now: now, calendar: calendar))")
+            if let band = line.band {
+                out.append("\(time(band.start, now: now, calendar: calendar))–\(time(band.end, now: now, calendar: calendar)), 8 in 10")
+            }
+        case .waits(let n): out.append(waitWords(n))
+        case .open: out.append("open")
         }
-        return out
+        return out.joined(separator: " · ")
+    }
+
+    /// On a release's pill: "alexec/Agents · released 3 h ago".
+    public static func releaseLine(_ release: DaemonAPI.WorkTimelineRelease, now: Date) -> String {
+        "\(release.repo) · released \(agoWords(release.at, now: now))"
+    }
+
+    /// "2 h ago", or "just now".
+    static func agoWords(_ date: Date, now: Date) -> String {
+        let age = WorkLook.ageWords(now.timeIntervalSince(date))
+        return age == "now" ? "just now" : "\(age) ago"
+    }
+
+    /// The title line above the plot (note 32): "Agents · 6 epics in these 2 days".
+    public static func titleWords(project: String, epics: Int, range: Range) -> String {
+        let count = "\(epics) epic\(epics == 1 ? "" : "s") in \(range.these)"
+        return project.isEmpty ? count : "\(project) · \(count)"
+    }
+
+    /// The epics with a line in `window`, each once.
+    public static func epicCount(_ lines: [Line], in window: DateInterval) -> Int {
+        Set(overlapping(lines, window).map(\.epic.ref)).count
+    }
+
+    /// When the last line before `date` joined, for the empty card (S11); nil when the read has none.
+    public static func lastJoined(_ timeline: DaemonAPI.WorkTimeline, before date: Date) -> Date? {
+        timeline.epics.flatMap(\.segments).compactMap(\.closedAt).filter { $0 < date }.max()
+    }
+
+    /// The empty card (S11): "No epic in these 2 days", and "The last one joined 4 d ago." when known.
+    public static func noEpicsWords(_ range: Range) -> String { "No epic in \(range.these)" }
+
+    public static func lastJoinedWords(_ date: Date, now: Date) -> String {
+        "The last one joined \(agoWords(date, now: now))."
     }
 
     /// What VoiceOver reads, a row per line in time order (section 5): "Azure DevOps, 3 of 7 done,
@@ -573,7 +610,9 @@ public enum WorkTimeline {
         return out
     }
 
-    public static let noEpics = "No epic has work in this time. An epic is drawn once one of its children starts."
-    public static let noProject = "Timeline shows a project’s epics. Add a folder to a project to see them."
+    public static let showTheWeek = "Show the week"
+    /// S12: no project to draw.
+    public static let noProject = "No project to draw"
+    public static let noProjectLine = "Timeline shows a project’s epics. Add a folder to a project to see them."
     public static let noMachine = "No machine draws the timeline yet. Update Agents on a machine to see it."
 }

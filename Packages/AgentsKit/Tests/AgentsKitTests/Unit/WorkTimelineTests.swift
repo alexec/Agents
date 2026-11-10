@@ -222,15 +222,49 @@ struct WorkTimelineTests {
                       forecast: forecast),
         ])
         let line = WorkTimeline.lines(timeline, now: Self.now)[0]
-        let words = WorkTimeline.joinWords(line, backtest: backtest, now: Self.now, calendar: calendar)
-        try #require(words.count == 3)
-        #expect(words[0].hasPrefix("Closes about "))
-        #expect(words[1].hasPrefix("8 times in 10 between "))
-        #expect(words[2] == "Past forecasts were off by ×2.2")
+        let words = WorkTimeline.lineLine(line, now: Self.now, calendar: calendar)
+        #expect(words.hasPrefix("#22 · 1 of 2 · closes about "))
+        #expect(words.hasSuffix(", 8 in 10"))
+        #expect(WorkTimeline.errorWords(backtest) == "Past forecasts were off by ×2.2")
         let spoken = WorkTimeline.spoken([line], now: Self.now, calendar: calendar)
         #expect(spoken.first?.words.hasPrefix("Issue 22, 1 of 2 done, closes about ") == true)
         #expect(WorkTimeline.waitWords(3) == "3 wait for you")
         #expect(WorkTimeline.waitWords(1) == "1 waits for you")
+    }
+
+    @Test func theHoverCardIsAMiniRow() throws {
+        let timeline = DaemonAPI.WorkTimeline(epics: [
+            Self.epic(30, [Self.child(31, started: -5, closed: -2), Self.child(32, started: -5, closed: -1, reason: "not_planned")],
+                      segments: [(-5, -1)]),
+            Self.epic(33, [Self.child(34, started: -3), Self.child(35, waits: true)], segments: [(-3, nil)]),
+        ])
+        let lines = WorkTimeline.lines(timeline, now: Self.now)
+        let joined = try #require(lines.first { $0.number == "#30" })
+        #expect(WorkTimeline.lineLine(joined, now: Self.now) == "#30 · 2 of 2 · closed 1 h ago")
+        #expect(joined.dots.map { WorkTimeline.dotLine($0, now: Self.now) }
+            == ["#31 · closed 2 h ago", "#32 · closed as not planned 1 h ago"])
+        let waits = try #require(lines.first { $0.number == "#33" })
+        #expect(WorkTimeline.lineLine(waits, now: Self.now) == "#33 · 0 of 2 · 1 waits for you")
+        let release = DaemonAPI.WorkTimelineRelease(tag: "v1", at: Self.h(-3), repo: "alexec/Agents")
+        #expect(WorkTimeline.releaseLine(release, now: Self.now) == "alexec/Agents · released 3 h ago")
+        #expect(WorkTimeline.releaseLine(.init(tag: "v2", at: Self.now, repo: "a/b"), now: Self.now) == "a/b · released just now")
+    }
+
+    @Test func theTitleLineAndTheEmptyCardSayTheRange() {
+        #expect(WorkTimeline.titleWords(project: "Agents", epics: 6, range: .twoDays) == "Agents · 6 epics in these 2 days")
+        #expect(WorkTimeline.titleWords(project: "", epics: 1, range: .day) == "1 epic in these 24 hours")
+        #expect(WorkTimeline.noEpicsWords(.week) == "No epic in these 7 days")
+        let timeline = DaemonAPI.WorkTimeline(epics: [
+            Self.epic(40, [Self.child(41, closed: -100)], segments: [(-120, -100)]),
+            Self.epic(42, [Self.child(43, closed: -96)], segments: [(-110, -96)]),
+            Self.epic(44, [Self.child(45, started: -2)], segments: [(-2, nil)]),
+        ])
+        let joined = WorkTimeline.lastJoined(timeline, before: Self.h(-24))
+        #expect(joined == Self.h(-96))
+        #expect(WorkTimeline.lastJoinedWords(Self.h(-96), now: Self.now) == "The last one joined 4 d ago.")
+        #expect(WorkTimeline.lastJoined(timeline, before: Self.h(-200)) == nil)
+        let lines = WorkTimeline.lines(timeline, now: Self.now)
+        #expect(WorkTimeline.epicCount(lines, in: WorkTimeline.Range.twoDays.window(now: Self.now)) == 1)
     }
 
     @Test func machinesMergeEachEpicAndReleaseOnce() {
