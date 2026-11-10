@@ -7,7 +7,7 @@ import type { ProviderID } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { describe } from "../model/errors";
 import {
-  createRequest, formFields, machineName, machineWords as words, makers, nameSuffix, repositoryOf, type FormField,
+  createRequest, formFields, machineName, machineWords as words, makers, nameSuffix, repositoryDefault, repositoryOf, type FormField,
 } from "../model/machineFromRepository";
 import { addMachineWords, validMachineName } from "../model/addMachine";
 import { Modal } from "./Modal";
@@ -20,6 +20,7 @@ export function MachineDialog({ store, close, machine = false, picked }: {
   const [typedName, setTypedName] = useState("");
   const [provider, setProvider] = useState(picked ?? "");
   const [fields, setFields] = useState<FormField[]>([]);
+  const [blank, setBlank] = useState<string | undefined>();
   const [suffix] = useState(nameSuffix);
   const [step, setStep] = useState<{ kind: "asking" } | { kind: "starting" } | { kind: "said"; words: string; failed?: true }>({ kind: "asking" });
   useEffect(() => { if (providers === null) void store.providers.load(); }, []);
@@ -30,8 +31,8 @@ export function MachineDialog({ store, close, machine = false, picked }: {
     if (!chosen) return;
     let live = true;
     void store.link.call("providers/options", { id: chosen as ProviderID })
-      .then((o) => { if (live) setFields(formFields(o.schema)); })
-      .catch(() => { if (live) setFields([]); });
+      .then((o) => { if (live) { setFields(formFields(o.schema)); setBlank(repositoryDefault(o.schema)); } })
+      .catch(() => { if (live) { setFields([]); setBlank(undefined); } });
     return () => { live = false; };
   }, [chosen]);
   const repository = repositoryOf(text);
@@ -79,6 +80,7 @@ export function MachineDialog({ store, close, machine = false, picked }: {
                 autocomplete="off" autocapitalize="off" spellcheck={false}
                 onInput={(e) => setText((e.target as HTMLInputElement).value)} />
             </label>
+            {machine && !typed && blank && <p class="small quiet">{words.blankNote(choices.find((p) => p.id === chosen)?.name ?? "The provider", blank)}</p>}
             {(!machine || typed) && <p class={`small ${repository || !typed ? "quiet" : "failure"}`}>{words.repositoryNote(repository, typed)}</p>}
             <label>Provider
               <select value={chosen} disabled={busy || done} onChange={(e) => setProvider((e.target as HTMLSelectElement).value)}>

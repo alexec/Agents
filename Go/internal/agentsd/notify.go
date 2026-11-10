@@ -274,9 +274,9 @@ func (d *Daemon) notify(id wire.UUID, args map[string]json.RawMessage) (string, 
 // it goes somewhere new: the computer, when reconsider sends it to the window, or a device,
 // when the control plane says so (notices/delivered). A notice no longer posted is not
 // recorded: its chat was opened, so the line is in front of the person already. Nor is a
-// pause notice: no notify line in the chat says it.
+// pause or push notice (#4079): no notify line in the chat says it.
 func (d *Daemon) noticeWentTo(id string, to wire.NoticeDevice) {
-	if strings.HasPrefix(id, pauseNoticePrefix) {
+	if strings.HasPrefix(id, pauseNoticePrefix) || strings.HasPrefix(id, pushNoticePrefix) {
 		return
 	}
 	d.attentionMu.Lock()

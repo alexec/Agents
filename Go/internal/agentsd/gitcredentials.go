@@ -58,15 +58,21 @@ type gitCredentialState struct {
 	appReach map[string]reachRead
 	// appPush is whether agents-loops may write code on an owner's install, by owner.
 	appPush map[string]reachRead
-	botOnce sync.Once
-	bots    *connections.BotTokens
+	// pushTold is each owner whose notice that the App may not push is posted (#4079).
+	pushTold map[string]bool
+	// pushBriefs is the brief's line for an agent whose App may not push (#4079), by agent.
+	pushBriefs map[wire.UUID]string
+	botOnce    sync.Once
+	bots       *connections.BotTokens
 	// credentialSelf is the agentsd that git and gh run; a test gives a stand-in.
 	credentialSelf string
 }
 
 type reachRead struct {
 	installed bool
-	at        time.Time
+	// missing is the permissions in appNeeds that the install has not, for appPush.
+	missing []string
+	at      time.Time
 }
 
 func (d *Daemon) botTokens() *connections.BotTokens {
@@ -122,29 +128,44 @@ func (d *Daemon) appReaches(ctx context.Context, repo, token string) bool {
 // while (#4077): GitHub refuses a push with the App's user token when the App has no Contents
 // write, although the person has. A failed read is a yes: the push then says why it failed.
 func (d *Daemon) appPushes(ctx context.Context, owner, token string) bool {
+	pushes, _ := d.appWrites(ctx, owner, token, false)
+	return pushes
+}
+
+// appWrites is appPushes and the install's permissions that a lane needs and does not have
+// (appNeeds), by name; fresh reads them again, not from what is kept.
+func (d *Daemon) appWrites(ctx context.Context, owner, token string, fresh bool) (bool, []string) {
 	key := strings.ToLower(owner)
 	d.credMu.Lock()
 	r, ok := d.appPush[key]
 	d.credMu.Unlock()
-	if ok && time.Since(r.at) < appReachTTL {
-		return r.installed
+	if ok && !fresh && time.Since(r.at) < appReachTTL {
+		return r.installed, r.missing
 	}
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	perms, err := d.setupReader(token).AppPermissions(ctx, owner, connections.GitHubAppSlug)
 	pushes := err != nil || perms["contents"] == "write"
+	var missing []string
 	if err != nil {
 		log.Printf("credentials: could not read what %s may do on %s: %v", connections.GitHubAppSlug, owner, err)
-	} else if !pushes {
-		log.Printf("credentials: %s may not write code on %s; git uses the person's own gh", connections.GitHubAppSlug, owner)
+	} else {
+		for _, p := range appNeeds {
+			if perms[p.key] != "write" {
+				missing = append(missing, p.name)
+			}
+		}
+		if !pushes {
+			log.Printf("credentials: %s may not write code on %s; git uses the person's own gh", connections.GitHubAppSlug, owner)
+		}
 	}
 	d.credMu.Lock()
 	if d.appPush == nil {
 		d.appPush = map[string]reachRead{}
 	}
-	d.appPush[key] = reachRead{installed: pushes, at: time.Now()}
+	d.appPush[key] = reachRead{installed: pushes, missing: missing, at: time.Now()}
 	d.credMu.Unlock()
-	return pushes
+	return pushes, missing
 }
 
 // withGitHubCredential is env for agent's runtime in dir with gh and git asking this host
@@ -160,6 +181,9 @@ func (d *Daemon) withGitHubCredential(env []string, agent wire.UUID, dir string)
 	token, bot := d.githubTokenFor(ctx, owner)
 	if token == "" || !bot && !d.appReaches(ctx, repo, token) {
 		return env
+	}
+	if !bot {
+		d.checkAppPush(ctx, agent, owner, token)
 	}
 	self := d.credentialSelf
 	if self == "" {
@@ -217,6 +241,7 @@ func (d *Daemon) dropCredentialGrants(agent wire.UUID) {
 	defer d.credMu.Unlock()
 	dropGrants(d.credGrants, agent)
 	dropGrants(d.commandGrants, agent)
+	delete(d.pushBriefs, agent)
 }
 
 // dropGrants deletes agent's grants from grants. The caller holds credMu.

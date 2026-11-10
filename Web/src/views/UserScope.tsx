@@ -8,8 +8,10 @@ import { CallFailed } from "../wire/link";
 import { sealSecret } from "../wire/sealing";
 import { describe, methodNotFound } from "../model/errors";
 import { about, addCard, addSecret, cardConfirm, cardKind, cardKindLabel, cardProblem, cardRule, cardValue, describedAs,
-  isSecretName, leftOn, machines, nameHint, nextVersion, secretsFoot, secretsLeft, secretsTitle, tidyCard, waitingOn } from "../model/userScope";
+  isSecretName, leftOn, nameHint, nextVersion, secretsFoot, secretsLeft, secretsTitle, tidyCard, waitingOn } from "../model/userScope";
 import { askBeforeUseWords } from "../model/askBeforeUse";
+import { hint, machineNames, notBackedUp, onlyMachine, onlyMachineLine, rowLine } from "../model/secretInfo";
+import { SecretInfoLine } from "./SecretInfoLine";
 import { AskBeforeUseCheck } from "./AskBeforeUse";
 import { Modal } from "./Modal";
 import { SecretDescriptionField } from "./SecretDescription";
@@ -146,18 +148,22 @@ function CardSheet({ store, replacing, close }: { store: Store; replacing: UserS
   );
 }
 
-function SecretItem({ row, replace, remove, down }: { row: UserSecretRow; replace: () => void; remove: () => void; down: boolean }) {
+function SecretItem({ row, replace, remove, down, names, oneMachine }: { row: UserSecretRow; replace: () => void;
+  remove: () => void; down: boolean; names: Record<string, string>; oneMachine: boolean }) {
   const left = leftOn(row);
   const waiting = waitingOn(row);
+  const warning = oneMachine ? null : notBackedUp(row, names);
   return (
     <li class="user-secret">
       <code>{row.name}</code>
       {row.kind === cardKind && <span class="hint">{cardKindLabel}</span>}
+      <code class="hint secret-hint" aria-label={row.hint ? `Ends in ${row.hint}` : "Value hidden"}>{hint(row.hint)}</code>
       <p class="hint">{about(row.description)}</p>
-      <span class="hint">{machines(row)}</span>
+      <SecretInfoLine parts={rowLine(row)} />
       {row.needsApproval && <span class="hint"><span aria-hidden="true">✋ </span>{askBeforeUseWords.asks}</span>}
       {waiting && <p class="hint attention">{waiting}</p>}
       {left && <p class="hint attention">{left}</p>}
+      {warning && <p class="hint attention"><span aria-hidden="true">⚠ </span>{warning}</p>}
       <span class="row-actions">
         <button type="button" disabled={down} onClick={replace}>Replace…</button>
         <button type="button" class="destructive" disabled={down} onClick={remove}>Remove…</button>
@@ -199,6 +205,9 @@ export function SecretsSection({ store, down }: { store: Store; down: boolean })
     await load();
   };
   const left = store.secretsLeft.value;
+  const rows = names.value?.secrets ?? [];
+  const hostNames = machineNames(store.hosts.value);
+  const only = onlyMachine(rows);
   return (
     <section aria-labelledby="settings-secrets">
       <h3 class="section-head" id="settings-secrets">{secretsTitle}</h3>
@@ -209,9 +218,11 @@ export function SecretsSection({ store, down }: { store: Store; down: boolean })
           <button type="button" onClick={() => { store.secretsLeft.value = null; }}>OK</button>
         </div>
       )}
+      {only && <p class="hint attention"><span aria-hidden="true">⚠ </span>{onlyMachineLine(only, hostNames)}</p>}
       <ul class="user-secrets">
-        {(names.value?.secrets ?? []).map((row) => (
-          <SecretItem key={row.name} row={row} down={down} replace={() => { replacing.value = row; }} remove={() => void remove(row.name)} />
+        {rows.map((row) => (
+          <SecretItem key={row.name} row={row} down={down} names={hostNames} oneMachine={only !== null}
+            replace={() => { replacing.value = row; }} remove={() => void remove(row.name)} />
         ))}
       </ul>
       <button type="button" disabled={down} onClick={() => { adding.value = true; }}>{addSecret}</button>

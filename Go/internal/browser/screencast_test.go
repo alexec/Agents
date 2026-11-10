@@ -96,7 +96,7 @@ func TestACastOfARealChromium(t *testing.T) {
 		t.Skip("AGENTS_TEST_CHROMIUM names no Chromium")
 	}
 	profile := t.TempDir()
-	p, err := launchChromium(exe, profile, append(os.Environ(), "HOME="+t.TempDir()))
+	p, err := launchChromium(exe, profile, append(os.Environ(), "HOME="+t.TempDir()), false)
 	if err != nil {
 		t.Fatal(err)
 	}

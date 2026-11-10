@@ -7,16 +7,20 @@ import SwiftUI
 /// Ask before use (#4016) is sealed with the value, so it is set on Add and Replace, which seal it
 /// again: no client can read a value back to seal it with a new flag.
 /// `extra` is what a client draws after them: the Mac's secrets for one session (#3548). The window
-/// and the Remote (#4032) draw it.
+/// and the Remote (#4032) draw it. Each row has its last 4, when it was added and last used, and
+/// a warning when it is not backed up (#4159).
 struct SecretsPane<Extra: View>: View {
     /// The control plane, or nil while it cannot be reached.
     let control: DaemonClient?
     let state: UserScopeState
+    /// Each of the person's machines' names, by id, for the not-backed-up warning.
+    let machineNames: [String: String]
     let extra: Extra
 
-    init(control: DaemonClient?, state: UserScopeState, @ViewBuilder extra: () -> Extra) {
+    init(control: DaemonClient?, state: UserScopeState, machineNames: [String: String] = [:], @ViewBuilder extra: () -> Extra) {
         self.control = control
         self.state = state
+        self.machineNames = machineNames
         self.extra = extra()
     }
 
@@ -40,6 +44,14 @@ struct SecretsPane<Extra: View>: View {
                     Text(UserScopeWords.secretsLeft(left)).appText(.supporting).tinted(.attention)
                         .fixedSize(horizontal: false, vertical: true)
                     Button("OK") { state.left = nil }
+                }
+                .paperListRow()
+            }
+            if let only = SecretInfoWords.onlyMachine(state.secrets?.secrets ?? []) {
+                Section {
+                    Label(SecretInfoWords.onlyMachineLine(only, names: machineNames), systemImage: "exclamationmark.triangle")
+                        .appText(.supporting).tinted(.attention)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .paperListRow()
             }
@@ -89,6 +101,7 @@ struct SecretsPane<Extra: View>: View {
 
     private var secretsSection: some View {
         let rows: [DaemonAPI.UserSecretRow] = state.secrets?.secrets ?? []
+        let oneMachine = SecretInfoWords.onlyMachine(rows) != nil
         return Section {
             ForEach(rows) { row in
                 VStack(alignment: .leading, spacing: 2) {
@@ -98,6 +111,8 @@ struct SecretsPane<Extra: View>: View {
                             Text(UserScopeWords.cardKind).appText(.fine).foregroundStyle(.secondary)
                         }
                         Spacer()
+                        Text(SecretInfoWords.hint(row.hint)).appText(.code).foregroundStyle(.secondary)
+                            .accessibilityLabel(row.hint.map { "Ends in \($0)" } ?? "Value hidden")
                         Menu {
                             Button("Replace…") { replacing = row }
                             Button("Remove…", role: .destructive) { removing = row }
@@ -109,7 +124,7 @@ struct SecretsPane<Extra: View>: View {
                     }
                     Text(UserScopeWords.about(row.description)).appText(.fine).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                    Text(UserScopeWords.machines(row)).appText(.fine).foregroundStyle(.secondary)
+                    SecretInfoLine(parts: SecretInfoWords.line(row))
                     if row.asksBeforeUse {
                         Label(AskBeforeUseWords.asks, systemImage: "hand.raised")
                             .appText(.fine).foregroundStyle(.secondary)
@@ -120,6 +135,10 @@ struct SecretsPane<Extra: View>: View {
                     }
                     if let left = UserScopeWords.leftOn(row) {
                         Text(left).appText(.fine).tinted(.attention)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if !oneMachine, let warning = SecretInfoWords.notBackedUp(row, names: machineNames) {
+                        Text("⚠ " + warning).appText(.fine).tinted(.attention)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -136,8 +155,34 @@ struct SecretsPane<Extra: View>: View {
 }
 
 extension SecretsPane where Extra == EmptyView {
-    init(control: DaemonClient?, state: UserScopeState) {
-        self.init(control: control, state: state) { EmptyView() }
+    init(control: DaemonClient?, state: UserScopeState, machineNames: [String: String] = [:]) {
+        self.init(control: control, state: state, machineNames: machineNames) { EmptyView() }
+    }
+}
+
+/// A secret's line (#4159): "On 3 machines · Added 27 d ago · Used 2 h ago". On the Mac a hover
+/// on a part gives its date and time; on iOS a long press on the line gives them all.
+struct SecretInfoLine: View {
+    let parts: [SecretInfoWords.Part]
+
+    var body: some View {
+        #if os(macOS)
+        HStack(spacing: 0) {
+            ForEach(Array(parts.enumerated()), id: \.offset) { index, part in
+                if index > 0 { Text(" · ") }
+                Text(part.text).help(part.help ?? "")
+            }
+        }
+        .appText(.fine).foregroundStyle(.secondary)
+        #else
+        Text(SecretInfoWords.joined(parts)).appText(.fine).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .contextMenu {
+                ForEach(parts.compactMap(\.help), id: \.self) { help in
+                    Text(help)
+                }
+            }
+        #endif
     }
 }
 

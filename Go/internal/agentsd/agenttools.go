@@ -161,6 +161,16 @@ func (d *Daemon) asker(id wire.UUID, notWorking string) (*live, error) {
 // askQuestion is ask_question: the person asked, as a form held like the runtime's own, and the
 // call answered with what they said.
 func (d *Daemon) askQuestion(id wire.UUID, args map[string]json.RawMessage) (string, error) {
+	note, answered, err := d.askForm(id, args, nil)
+	if err == nil && !answered {
+		return formStillOpen, nil
+	}
+	return note, err
+}
+
+// askForm is askQuestion, false when the form is left open after formHoldLimit; its answer
+// then goes to late when it is not nil (#4261), and as a prompt when it is.
+func (d *Daemon) askForm(id wire.UUID, args map[string]json.RawMessage, late func(note string)) (string, bool, error) {
 	title := strings.TrimSpace(argString(args, "title"))
 	var raw []struct {
 		ID            string `json:"id"`
@@ -172,13 +182,13 @@ func (d *Daemon) askQuestion(id wire.UUID, args map[string]json.RawMessage) (str
 		} `json:"options"`
 	}
 	if json.Unmarshal(args["questions"], &raw) != nil || len(raw) == 0 {
-		return "", Invalid("Nothing was asked: send at least one question in `questions`.")
+		return "", false, Invalid("Nothing was asked: send at least one question in `questions`.")
 	}
 	var props []wire.ElicitationSchemaProperty
 	for _, q := range raw {
 		qid, prompt := strings.TrimSpace(q.ID), strings.TrimSpace(q.Prompt)
 		if qid == "" || prompt == "" {
-			return "", Invalid("Nothing was asked: each question needs an `id` and a `prompt`.")
+			return "", false, Invalid("Nothing was asked: each question needs an `id` and a `prompt`.")
 		}
 		var choices []wire.ElicitationSchemaPropertyChoice
 		for _, o := range q.Options {
@@ -203,7 +213,7 @@ func (d *Daemon) askQuestion(id wire.UUID, args map[string]json.RawMessage) (str
 	}
 	l, err := d.asker(id, "A question can only be asked while this agent is working.")
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	schema := wire.ElicitationSchema{Properties: props}
 	var message *string
@@ -216,16 +226,16 @@ func (d *Daemon) askQuestion(id wire.UUID, args map[string]json.RawMessage) (str
 	req := wire.ElicitationRequest{ID: store.NewUUID(), AgentID: id, Message: message,
 		Mode: wire.ElicitationRequestMode{Form: &wire.ElicitationRequestModeForm{Value: schema}}, Scope: wire.ElicitationRequestScopeSession,
 		AskedAt: now()}
-	r, answered := l.holdAskedForm(req)
+	r, answered := l.holdAskedForm(req, late)
 	if !answered {
-		return formStillOpen, nil
+		return "", false, nil
 	}
 	if r.byMessage {
-		return answeredByMessage, nil
+		return answeredByMessage, true, nil
 	}
 	var said []wire.ElicitationAnswer
 	if r.action == wire.AnswerElicitationRequestActionAccept {
 		said = answers(schema, r.content, message)
 	}
-	return askQuestionNote(r.action, said), nil
+	return askQuestionNote(r.action, said), true, nil
 }

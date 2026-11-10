@@ -93,7 +93,9 @@ You set this up once, as the Apple Developer account's Account Holder.
 
    **A change that adds an entitlement makes the profiles again.** When a pull request adds a
    capability to an App Store target (Sign in with Apple did, #2507), make that target's
-   profile again in the developer site, install it, and update the `release` environment in
+   profile again and install it with `scripts/apple-capability.sh <bundle-id> <capability>`
+   (#4284; `--dry-run` first, and a real run only after Alex approves it by a form, because it
+   changes the Apple Developer account), and update the `release` environment in
    the same change: `scripts/release-secrets.sh --store …`, or
    `base64 -i <profile> | gh secret set PROFILE_… --env release`. Say so in the pull request.
    Setting the secrets is Alex's to approve.
@@ -172,5 +174,6 @@ the commit it will tag: `gh workflow run release-dry-run.yml -f ref=<sha>`.
 - **An upload is refused as a duplicate:** that build number is taken for the version. Run
   the workflow again: the new run number is a new build.
 - **"PROFILE_… has no …, which ….entitlements asks for":** the profile in that secret was
-  made before the entitlement was added. Make it again in the developer site, install it, run
+  made before the entitlement was added. Make it again and install it with
+  `scripts/apple-capability.sh` (Alex approves the real run by a form), run
   `scripts/release-secrets.sh --store …`, then run the **release** workflow again with the tag.

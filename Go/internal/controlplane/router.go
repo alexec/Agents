@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/controllink"
-	"github.com/alexec/agents/Go/internal/machinelock"
 	"github.com/alexec/agents/Go/internal/controlplane/notices"
 	"github.com/alexec/agents/Go/internal/controlplane/providers"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
+	"github.com/alexec/agents/Go/internal/machinelock"
 	"github.com/alexec/agents/Go/wire"
 	"github.com/coder/websocket"
 )
@@ -834,8 +834,8 @@ type hostFrame struct {
 	// tails is a fan-out frame's l: each channel's lock member, "" for none (#3541).
 	tails []string
 	msg   string
-	close    bool
-	open     bool
+	close bool
+	open  bool
 }
 
 // readHostFrame is ControlWire.readHost. Lines this side writes put m last, so the fast
@@ -1721,12 +1721,18 @@ func (r *Router) HoldToOwners() {
 
 // TellPerson tells every session of a person here what only they are told.
 func (r *Router) TellPerson(person, method string, params any) {
+	r.TellPersonClients(person, method, params, func(string) bool { return true })
+}
+
+// TellPersonClients is TellPerson to only the person's clients that `to` takes, and says
+// how many sessions it told.
+func (r *Router) TellPersonClients(person, method string, params any, to func(client string) bool) int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	line := wrap("", notification(method, params))
 	sent := 0
 	for id, s := range r.clients {
-		if s.wrapped && s.caller.Person == person {
+		if s.wrapped && s.caller.Person == person && to(s.caller.Client) {
 			r.writeLocked(id, line)
 			sent++
 		}
@@ -1734,6 +1740,7 @@ func (r *Router) TellPerson(person, method string, params any) {
 	if r.sent != nil {
 		r.sent(method, sent)
 	}
+	return sent
 }
 
 // broadcastHostLocked tells a machine's change only to the sessions that reach it.

@@ -2,8 +2,8 @@ import Foundation
 
 /// Add a Machine… (#2131): one sheet, reached from Settings ▸ Machines, Connectors set-up ▸
 /// Where agents run and a provider's New Machine…, with three ways in. A provider first, as a
-/// browser-only person gets any machine that way; then a server, by one command; then
-/// another machine, by a code. The web page's `addMachine.ts` is the same.
+/// browser-only person gets any machine that way; then a server, by one command; then a
+/// machine that runs agentsd by hand, by a machine code. Another Mac pairs by Pair a Mac… (#4285). The web page's `addMachine.ts` is the same.
 public enum AddMachine {
     public enum Way: String, CaseIterable, Identifiable, Sendable {
         case provider, server, code
@@ -26,7 +26,7 @@ public enum AddMachine {
             switch way {
             case .provider: "From a machine provider"
             case .server: "A server"
-            case .code: "Another Mac"
+            case .code: "By code"
             }
         }
 
@@ -36,7 +36,7 @@ public enum AddMachine {
             case .provider: "A new machine from Docker, DigitalOcean, Codespaces, Coder and the others. It joins by itself."
             case .server: ssh ? "Run one command on it, or install it over ssh. It connects out, so nothing has to reach it."
                 : "Run one command on it. It connects out, so nothing has to reach it."
-            case .code: "Give it a code to join with. It works once."
+            case .code: "For a machine that runs agentsd by hand. For another Mac, use Settings ▸ Clients ▸ Pair a Mac… on this Mac."
             }
         }
 
@@ -83,6 +83,6 @@ public enum WhereAgentsRun {
     }
 
     public static let hereNote = "This folder is here."
-    public static let addMachineNote = "From a provider, a server or another Mac."
+    public static let addMachineNote = "From a provider, a server or a code."
     public static let addProviderNote = "Docker, DigitalOcean, Codespaces, Coder and the others. " + AddMachine.Words.providersYours
 }

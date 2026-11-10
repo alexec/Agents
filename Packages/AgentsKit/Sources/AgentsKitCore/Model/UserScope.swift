@@ -140,18 +140,6 @@ public extension DaemonAPI {
         }
     }
 
-    /// A secret's last operation (#4158): `read`, `denied`, `added`, `replaced` or `removed`, and
-    /// when, the newest any machine reported. No session, no place, no value.
-    struct SecretLastOp: Codable, Sendable, Hashable {
-        public var what: String
-        public var at: Date
-
-        public init(what: String, at: Date) {
-            self.what = what
-            self.at = at
-        }
-    }
-
     /// The accounts part.
     struct OutsideAccounts: Codable, Sendable, Hashable {
         public var accounts: [OutsideAccount]
@@ -209,6 +197,18 @@ public extension DaemonAPI {
         public var at: String
     }
 
+    /// A secret's last operation (#4158): what it was and when. No session, no place, no value.
+    struct SecretLastOp: Codable, Sendable, Hashable {
+        /// `read`, `denied`, `added`, `replaced` or `removed`.
+        public var what: String
+        public var at: Date
+
+        public init(what: String, at: Date) {
+            self.what = what
+            self.at = at
+        }
+    }
+
     /// One row of `user/secretNames`: never a value.
     struct UserSecretRow: Codable, Sendable, Hashable, Identifiable {
         public var name: String
@@ -224,13 +224,13 @@ public extension DaemonAPI {
         public var needsApproval: Bool? = nil
         /// What it is for (#4167), in clear beside the name.
         public var description: String? = nil
-        /// When the name was first set (#4158); Replace… does not change it.
+        /// When the name was first set (#4158); Replace… keeps it. Nil for one set before it was kept.
         public var created: String? = nil
         /// The value's last 4 (#4158), from a machine that holds a copy; nil for a short value.
         public var hint: String? = nil
-        /// The newest operation any machine reported (#4158).
+        /// Its newest operation on any machine (#4158).
         public var lastOp: SecretLastOp? = nil
-        /// False when only one copy opens (#4158): one machine, none waiting.
+        /// False when one copy only opens (#4158).
         public var backedUp: Bool? = nil
 
         public var id: String { name }

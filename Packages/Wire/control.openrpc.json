@@ -748,6 +748,90 @@
       ]
     },
     {
+      "name": "control/connectAnother",
+      "x-capability": "control.connect-another/1",
+      "description": "A person asks the window on the Mac that runs this control plane to connect it to another (#4257): the control plane tells the person's clients control/connectWanted, and the window with this control plane on its Mac does it. Refused by a control plane that is not on a Mac, and when no window of the person's is connected. Admins only.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ConnectAnotherRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "control/connectReport",
+      "x-capability": "control.connect-another/1",
+      "description": "The window on this Mac says where it is in a Connect to Another… a client asked for (#4257); the control plane tells the person's clients control/connectReported.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ConnectReport"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "control/connectReported",
+      "x-capability": "control.connect-another/1",
+      "description": "To the person's clients: where the window on this Mac is in a Connect to Another… (#4257). After the last step this control plane stops.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ConnectReport"
+          }
+        }
+      ]
+    },
+    {
+      "name": "control/connectWanted",
+      "x-capability": "control.connect-another/1",
+      "description": "To the person's clients: a client asked for Connect to Another… (#4257). Only the window whose Mac runs this control plane acts on it.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ConnectAnotherRequest"
+          }
+        }
+      ]
+    },
+    {
       "name": "control/cutOff",
       "x-capability": "org-identity/1",
       "description": "To every client of a person their org provider suspended (#1002, D13), then their sockets close with 4403 suspended.",
@@ -2230,7 +2314,7 @@
     },
     {
       "name": "machine/accounts",
-      "x-capability": "machine/1",
+      "x-capability": "machine.accounts/1",
       "description": "A host, for an agent there (#3967): its person's outside accounts, with add added.",
       "paramStructure": "by-name",
       "params": [
@@ -2282,7 +2366,7 @@
       "result": {
         "name": "result",
         "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
+          "$ref": "daemon.schema.json#/definitions/MachineHelloAnswer"
         }
       }
     },
@@ -5968,7 +6052,7 @@
     },
     {
       "name": "user/setSettings",
-      "x-capability": "user/1",
+      "x-capability": "user/3",
       "tags": [
         {
           "name": "web"

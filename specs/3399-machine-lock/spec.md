@@ -300,6 +300,11 @@ A QR code (the phone scans the browser) is a later choice.
   `invite`, and the invite's key goes in `AGENTS_JOIN_TOKEN`. The provider runs on the
   customer's machine (#3398), so the key does not go through the control plane.
 
+Decided: the Mac window that makes the root puts an invite for this Mac's own host in the
+same `lock/add`, and keeps it in the host's root as a join code would (Alex, 2026-11-09,
+#4248). The code never goes through the control plane, so the host adds itself with no
+digits to compare between two parts of one app.
+
 Decided: a machine that a provider starts with no client there (a schedule, a workflow)
 waits for approval, with a notice on every client ("Approve the new machine dev-3?"),
 because a standing invite that lasts for hours is a key that a machine could steal. This
@@ -307,10 +312,13 @@ leaves nothing out of P5.
 
 ### D4. Recovery when every signer is lost
 
-Decided: when the root is made, the client shows a **recovery key**: a 128-bit secret, as
-a line of words, shown once, to keep in a password manager. Its public half is a signer.
-To use it, the person types it on a new client, which then adds itself. The client asks
-again until the person has saved it or added a second device. The person can skip it.
+Decided: a client offers to make a **recovery key**: a 128-bit secret, as a line of words,
+shown once, to keep in a password manager. Its public half is a signer. To use it, the
+person types it on a new client, which then adds itself. The client offers it while it is
+the lock's only client and the lock names a machine other than this Mac's own host, until
+the person has saved it or skipped it (Alex, 2026-11-09, #4248). With only this Mac and its
+own host, a lost Mac loses nothing that a key could get back, so the first open asks
+nothing; a second client is a way back of its own, so it ends the offer.
 
 Decided: with no signer and no recovery key, the person **starts a new lock**. Each machine
 then joins again: a provider makes its machines again, and on a machine of their own the

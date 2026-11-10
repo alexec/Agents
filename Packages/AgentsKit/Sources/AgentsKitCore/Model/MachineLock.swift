@@ -528,6 +528,20 @@ public enum MachineLock {
         return fields.joined(separator: ":")
     }
 
+    /// Keeps an invite in a host's root (#4248, D3) as its join code would: the file that Go's
+    /// `controllink.SaveLockInvite` writes, 0600. The host signs its own addMachine with it,
+    /// and pins the lock from it, when the control plane sends the lock.
+    public static func keepInvite(_ invite: Data, pin: Pin, in locations: StoreLocations) throws {
+        struct File: Encodable { let key: Data, person: String, count: Int, head: Data }
+        let data = try JSONEncoder().encode(File(key: invite, person: pin.person, count: pin.count, head: pin.head))
+        let file = locations.lockInvite
+        let made = file.deletingLastPathComponent().appendingPathComponent(".\(file.lastPathComponent).tmp")
+        guard FileManager.default.createFile(atPath: made.path, contents: data, attributes: [.posixPermissions: 0o600]) else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+        guard rename(made.path, file.path) == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+    }
+
     static func base64URL(_ data: Data) -> String {
         data.base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: "=", with: "")

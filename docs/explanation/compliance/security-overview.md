@@ -99,8 +99,11 @@ signs nothing in it.
   worktrees, a backup, and a clone for a new workspace. Nothing that starts an agent, runs a
   command or reads a file.
 - **A new device or machine** joins the lock only when one of the person's devices approves
-  it, with six digits that both screens show and that the control plane cannot choose.
-- **A recovery key** (#3493) is made with the lock and shown once, to keep in a password
+  it, with six digits that both screens show and that the control plane cannot choose, or
+  with an invite that a device puts in its join code. The Mac window gives its own host such
+  an invite, on this Mac's disk, when it makes the lock (#4248).
+- **A recovery key** (#3493) is offered once the lock has a machine other than this Mac's own
+  host (#4248), and shown once, to keep in a password
   manager: 128 random bits as 32 letters and digits. It is a key of the lock, so a person who
   lost every device types it on a new one, which adds itself. The lock holds the key's
   private half sealed (AES-256-GCM) under a key made from those bits, which the control plane

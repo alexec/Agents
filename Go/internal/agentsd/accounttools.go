@@ -92,17 +92,21 @@ func (d *Daemon) manageAccounts(agent wire.UUID, args map[string]json.RawMessage
 		call.Add[i].AskBeforeUse = nil
 	}
 	plan := planAccounts(have.Accounts, call.Add)
-	replace := false
 	if len(plan.changed) > 0 {
 		title := d.agentWho(agent) + " wants to replace an account"
 		if len(plan.changed) > 1 {
 			title = fmt.Sprintf("%s wants to replace %d accounts", d.agentWho(agent), len(plan.changed))
 		}
-		replace, err = d.personSaysYes(agent, title, replaceQuestion(plan.changed), "Replace")
-		if err != nil {
-			return "", err
-		}
+		return d.personSaysYes(agent, title, replaceQuestion(plan.changed), "Replace", func(replace bool) (string, error) {
+			return d.addAccounts(agent, have, plan, replace, args)
+		})
 	}
+	return d.addAccounts(agent, have, plan, false, args)
+}
+
+// addAccounts sends what an add or import adds, with the accounts it replaces when replace (#4261:
+// also after a late yes).
+func (d *Daemon) addAccounts(agent wire.UUID, have wire.OutsideAccounts, plan accountsPlan, replace bool, args map[string]json.RawMessage) (string, error) {
 	send := plan.added
 	if replace {
 		for _, c := range plan.changed {
@@ -112,6 +116,7 @@ func (d *Daemon) manageAccounts(agent wire.UUID, args map[string]json.RawMessage
 	listed := have
 	if len(send) > 0 {
 		ops := plan.ops(replace)
+		var err error
 		if listed, err = d.askAccounts(wire.MachineAccountsCall{Add: send, Ops: ops}); err != nil {
 			return "", err
 		}
@@ -267,6 +272,9 @@ func (d *Daemon) askAccounts(call wire.MachineAccountsCall) (wire.OutsideAccount
 	ask := d.askControl.Load()
 	if ask == nil {
 		return listed, &Error{Code: wire.FailureNotSupported, Message: "This machine isn’t on a control plane, so it has no accounts."}
+	}
+	if !d.controlHas(wire.CapMachineAccounts1) {
+		return listed, &Error{Code: wire.FailureNotSupported, Message: "Nothing was done: the control plane needs an update to do this."}
 	}
 	out, err := (*ask)(d.ctx, wire.CallMachineAccounts.Name, call)
 	var refused *controllink.AskError

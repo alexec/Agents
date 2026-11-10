@@ -8,7 +8,7 @@ import type { JSONValue, OutsideAccount, OutsideAccounts } from "../protocol/gen
 import { CallFailed } from "../wire/link";
 import { describe, methodNotFound } from "../model/errors";
 import { type AccountFields, accountAbout, accountAskHint, accountAsks, accountCost, accountDetail, accountFields, accountOf, accountProjects,
-  accountsFoot, accountsOf, accountsTitle, askField, expiresSoon, noSecrets, sameAccount } from "../model/accounts";
+  accountsFoot, accountsOf, accountsRefusal, accountsTitle, askField, expiresSoon, noSecrets, sameAccount } from "../model/accounts";
 import { askBeforeUseWords } from "../model/askBeforeUse";
 import { Modal } from "./Modal";
 
@@ -101,6 +101,16 @@ export function AccountsSection({ store, down }: { store: Store; down: boolean }
     const failed = await save(null, a);
     if (failed) store.say(failed);
   };
+  // An older control plane refuses the accounts part, so the page offers none (#4100).
+  const refusal = accountsRefusal(store.plane.value);
+  if (refusal || !store.plane.value) {
+    return (
+      <section aria-labelledby="settings-accounts">
+        <h3 class="section-head" id="settings-accounts">{accountsTitle}</h3>
+        {refusal && <p class="hint">{refusal}</p>}
+      </section>
+    );
+  }
   const projects = accountProjects(all.value);
   const shown = accountsOf(all.value, project.value);
   const now = Date.now();

@@ -112,10 +112,16 @@ struct SessionSecretsSection<Source: SessionSecretsSource>: View {
 
     private func label(_ secret: SessionSecret) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(secret.name).appText(.code)
+            HStack {
+                Text(secret.name).appText(.code)
+                Text(SecretInfoWords.hint(secret.hint)).appText(.code).foregroundStyle(.secondary)
+                    .accessibilityLabel(secret.hint.map { "Ends in \($0)" } ?? "Value hidden")
+            }
             Text(UserScopeWords.about(secret.description)).appText(.fine).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            Text(secret.title).appText(.fine).foregroundStyle(.secondary)
+            SecretInfoLine(parts: SecretInfoWords.line(secret))
+            Text("⚠ " + SecretInfoWords.sessionNotBackedUp).appText(.fine).tinted(.attention)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

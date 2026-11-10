@@ -39,6 +39,7 @@ public enum Capability {
     public static let connections1 = "connections/1"
     public static let connectorsSetup1 = "connectors.setup/1"
     public static let console1 = "console/1"
+    public static let controlConnectAnother1 = "control.connect-another/1"
     public static let controlRotate1 = "control.rotate/1"
     public static let control1 = "control/1"
     public static let cost1 = "cost/1"
@@ -90,6 +91,7 @@ public enum Capability {
     public static let hostUpdate1 = "host.update/1"
     public static let hostUserSettings1 = "host.user-settings/1"
     public static let hostUserSettings2 = "host.user-settings/2"
+    public static let hostUserSettings3 = "host.user-settings/3"
     public static let hostWebPairing1 = "host.web-pairing/1"
     public static let hostWire1 = "host.wire/1"
     public static let hostsJoin1 = "hosts.join/1"
@@ -104,6 +106,7 @@ public enum Capability {
     public static let lockReset1 = "lock-reset/1"
     public static let lock1 = "lock/1"
     public static let mac1 = "mac/1"
+    public static let machineAccounts1 = "machine.accounts/1"
     public static let machineUsage1 = "machine.usage/1"
     public static let machine1 = "machine/1"
     public static let machines1 = "machines/1"
@@ -179,6 +182,7 @@ public enum Capability {
     public static let usage1 = "usage/1"
     public static let user1 = "user/1"
     public static let user2 = "user/2"
+    public static let user3 = "user/3"
     public static let views1 = "views/1"
     public static let wake1 = "wake/1"
     public static let workTimeline1 = "work.timeline/1"
@@ -503,7 +507,7 @@ public enum Capability {
         "sessions/delete": "sessions/1",
         "sessions/list": "sessions/1",
         "settings/passThrough": "host.policy/1",
-        "settings/userPart": "host.user-settings/1",
+        "settings/userPart": "host.user-settings/3",
         "shell/attach": "shell/1",
         "shell/close": "shell/1",
         "shell/detach": "shell/1",
@@ -650,6 +654,8 @@ public enum Capability {
         "console/live": "console/1",
         "console/stopAgent": "console/1",
         "console/teamWorkflows": "console/1",
+        "control/connectAnother": "control.connect-another/1",
+        "control/connectReport": "control.connect-another/1",
         "control/ping": "control/1",
         "control/rotate": "control.rotate/1",
         "control/setAuditDays": "events.audit/1",
@@ -683,7 +689,7 @@ public enum Capability {
         "lock/joinRequests": "lock-join/1",
         "lock/joinReveal": "lock-join/1",
         "lock/reset": "lock-reset/1",
-        "machine/accounts": "machine/1",
+        "machine/accounts": "machine.accounts/1",
         "machine/hello": "machine/1",
         "machine/lockAdd": "host.lock/2",
         "machine/lockAgain": "host.lock/4",
@@ -831,7 +837,7 @@ public enum Capability {
         "user/setAgentConfigFile": "user/1",
         "user/setPolicy": "host.policy-layers/1",
         "user/setSecret": "user/2",
-        "user/setSettings": "user/1",
+        "user/setSettings": "user/3",
         "user/settings": "user/1",
         "workflows/claimRun": "bots/1",
         "workflows/fire": "events.team/1",
@@ -839,6 +845,8 @@ public enum Capability {
         "control/budgetRequested": "policy.ask/1",
         "control/capReached": "bots/1",
         "control/clientChanged": "control/1",
+        "control/connectReported": "control.connect-another/1",
+        "control/connectWanted": "control.connect-another/1",
         "control/cutOff": "org-identity/1",
         "control/governanceRequested": "governance/1",
         "control/groupsChanged": "groups/1",
@@ -906,6 +914,7 @@ public enum Capability {
             "host.session-secrets/1",
             "host.desktop-control/1",
             "host.org-routes/2",
+            "host.user-settings/1",
             "host.user-settings/2",
             "host.lock/1",
             "host.lock/2",

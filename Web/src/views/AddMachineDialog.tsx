@@ -1,5 +1,5 @@
 // Add a Machine… (#2131), the window's and the Remote's: a provider first, then a server by one
-// command, then another Mac by a code. A browser has no ssh, so a server is added by its command.
+// command, then a machine by a code. A browser has no ssh, so a server is added by its command.
 // Reached from Settings ▸ Machines and Connectors set-up ▸ Where agents run.
 import { useEffect, useState } from "preact/hooks";
 import { useSignal } from "@preact/signals";
@@ -73,7 +73,7 @@ export function AddMachineDialog({ store, close, start = { kind: "choose" } }: {
   );
 }
 
-/** A server's one command, or another Mac's code: `machines/startEnroll`, with Copy, and who joined with it. */
+/** A server's one command, or a machine's code: `machines/startEnroll`, with Copy, and who joined with it. */
 function EnrollCode({ store, command, close }: { store: Store; command: boolean; close: () => void }) {
   const shown = useSignal<ControlCodeShown | null>(null);
   const problem = useSignal<string | null>(null);

@@ -38,6 +38,7 @@ const CapConnectionsEmail1 = "connections.email/1"
 const CapConnections1 = "connections/1"
 const CapConnectorsSetup1 = "connectors.setup/1"
 const CapConsole1 = "console/1"
+const CapControlConnectAnother1 = "control.connect-another/1"
 const CapControlRotate1 = "control.rotate/1"
 const CapControl1 = "control/1"
 const CapCost1 = "cost/1"
@@ -89,6 +90,7 @@ const CapHostTeam1 = "host.team/1"
 const CapHostUpdate1 = "host.update/1"
 const CapHostUserSettings1 = "host.user-settings/1"
 const CapHostUserSettings2 = "host.user-settings/2"
+const CapHostUserSettings3 = "host.user-settings/3"
 const CapHostWebPairing1 = "host.web-pairing/1"
 const CapHostWire1 = "host.wire/1"
 const CapHostsJoin1 = "hosts.join/1"
@@ -103,6 +105,7 @@ const CapLockJoin1 = "lock-join/1"
 const CapLockReset1 = "lock-reset/1"
 const CapLock1 = "lock/1"
 const CapMac1 = "mac/1"
+const CapMachineAccounts1 = "machine.accounts/1"
 const CapMachineUsage1 = "machine.usage/1"
 const CapMachine1 = "machine/1"
 const CapMachines1 = "machines/1"
@@ -178,6 +181,7 @@ const CapTunnel1 = "tunnel/1"
 const CapUsage1 = "usage/1"
 const CapUser1 = "user/1"
 const CapUser2 = "user/2"
+const CapUser3 = "user/3"
 const CapViews1 = "views/1"
 const CapWake1 = "wake/1"
 const CapWorkTimeline1 = "work.timeline/1"
@@ -502,7 +506,7 @@ var HostCapabilities = pairs([][2]string{
 	{"sessions/delete", "sessions/1"},
 	{"sessions/list", "sessions/1"},
 	{"settings/passThrough", "host.policy/1"},
-	{"settings/userPart", "host.user-settings/1"},
+	{"settings/userPart", "host.user-settings/3"},
 	{"shell/attach", "shell/1"},
 	{"shell/close", "shell/1"},
 	{"shell/detach", "shell/1"},
@@ -708,6 +712,8 @@ var ControlCapabilities = pairs([][2]string{
 	{"console/live", "console/1"},
 	{"console/stopAgent", "console/1"},
 	{"console/teamWorkflows", "console/1"},
+	{"control/connectAnother", "control.connect-another/1"},
+	{"control/connectReport", "control.connect-another/1"},
 	{"control/ping", "control/1"},
 	{"control/rotate", "control.rotate/1"},
 	{"control/setAuditDays", "events.audit/1"},
@@ -741,7 +747,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"lock/joinRequests", "lock-join/1"},
 	{"lock/joinReveal", "lock-join/1"},
 	{"lock/reset", "lock-reset/1"},
-	{"machine/accounts", "machine/1"},
+	{"machine/accounts", "machine.accounts/1"},
 	{"machine/hello", "machine/1"},
 	{"machine/lockAdd", "host.lock/2"},
 	{"machine/lockAgain", "host.lock/4"},
@@ -889,7 +895,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"user/setAgentConfigFile", "user/1"},
 	{"user/setPolicy", "host.policy-layers/1"},
 	{"user/setSecret", "user/2"},
-	{"user/setSettings", "user/1"},
+	{"user/setSettings", "user/3"},
 	{"user/settings", "user/1"},
 	{"workflows/claimRun", "bots/1"},
 	{"workflows/fire", "events.team/1"},
@@ -897,6 +903,8 @@ var ControlCapabilities = pairs([][2]string{
 	{"control/budgetRequested", "policy.ask/1"},
 	{"control/capReached", "bots/1"},
 	{"control/clientChanged", "control/1"},
+	{"control/connectReported", "control.connect-another/1"},
+	{"control/connectWanted", "control.connect-another/1"},
 	{"control/cutOff", "org-identity/1"},
 	{"control/governanceRequested", "governance/1"},
 	{"control/groupsChanged", "groups/1"},
@@ -951,6 +959,8 @@ var ControlNotifications = set([]string{
 	"control/budgetRequested",
 	"control/capReached",
 	"control/clientChanged",
+	"control/connectReported",
+	"control/connectWanted",
 	"control/cutOff",
 	"control/governanceRequested",
 	"control/groupsChanged",
@@ -1019,6 +1029,7 @@ var DeclaredCapabilities = map[string][]string{
 		"host.session-secrets/1",
 		"host.desktop-control/1",
 		"host.org-routes/2",
+		"host.user-settings/1",
 		"host.user-settings/2",
 		"host.lock/1",
 		"host.lock/2",

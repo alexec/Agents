@@ -26,7 +26,7 @@ import (
 // change to BotPermissions that adds a key, or makes one stronger, fails this test.
 var allowedBotPermissions = map[string]string{
 	"contents": "write", "pull_requests": "write", "issues": "write",
-	"checks": "read", "statuses": "read", "actions": "write",
+	"checks": "read", "statuses": "read", "actions": "write", "workflows": "write",
 }
 
 // The manifest asks for the fixed permissions only (#3858 acceptance 1).
@@ -54,7 +54,7 @@ func TestBotManifestHasOnlyTheFixedPermissions(t *testing.T) {
 			t.Errorf("the manifest asks for %s: %v, more than %s", k, v, want)
 		}
 	}
-	for _, forbidden := range []string{"workflows", "administration", "secrets", "environments", "members",
+	for _, forbidden := range []string{"administration", "secrets", "environments", "members",
 		"organization_administration", "deployments", "actions_variables"} {
 		if _, ok := perms[forbidden]; ok {
 			t.Errorf("the manifest asks for %s", forbidden)

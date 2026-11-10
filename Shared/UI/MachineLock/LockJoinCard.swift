@@ -199,7 +199,8 @@ struct ThisDeviceLockCard: View {
 }
 
 /// The recovery key on a device in the lock (#3493, D4): shown once after it is made, to keep
-/// in a password manager; or an offer to make one while the lock has only this device. The web
+/// in a password manager; or an offer to make one while this is the lock's only client and it has
+/// a machine other than this Mac's own host (#4248). The web
 /// page's is `RecoveryKeyCard` in `Web/src/views/LockJoins.tsx`.
 struct RecoveryKeyCard: View {
     let card: LockState.RecoveryCard

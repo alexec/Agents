@@ -27,6 +27,7 @@ control/status
     "clients/1",
     "connections.botkey/1",
     "console/1",
+    "control.connect-another/1",
     "control.rotate/1",
     "control/1",
     "events.audit/1",
@@ -54,6 +55,7 @@ control/status
     "lock-join/1",
     "lock-reset/1",
     "lock/1",
+    "machine.accounts/1",
     "machine/1",
     "machines/1",
     "multiplier/1",
@@ -82,7 +84,8 @@ control/status
     "summary.machines/1",
     "tunnel/1",
     "user/1",
-    "user/2"
+    "user/2",
+    "user/3"
   ],
   "required": {
     "host": [
@@ -240,6 +243,7 @@ control/status
     "clients/1",
     "connections.botkey/1",
     "console/1",
+    "control.connect-another/1",
     "control.rotate/1",
     "control/1",
     "events.audit/1",
@@ -267,6 +271,7 @@ control/status
     "lock-join/1",
     "lock-reset/1",
     "lock/1",
+    "machine.accounts/1",
     "machine/1",
     "machines/1",
     "multiplier/1",
@@ -295,7 +300,8 @@ control/status
     "summary.machines/1",
     "tunnel/1",
     "user/1",
-    "user/2"
+    "user/2",
+    "user/3"
   ],
   "required": {
     "host": [

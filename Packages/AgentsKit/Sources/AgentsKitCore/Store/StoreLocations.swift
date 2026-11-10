@@ -249,6 +249,8 @@ public struct StoreLocations: Sendable {
     /// A host of a control plane elsewhere (058): what enrolling told it, and its own key.
     /// Written by the daemon given `--control-code`, or by the window's Run a Host Here.
     public var controlHostMembership: URL { root.appendingPathComponent("control-host.json") }
+    /// The invite this host joins the lock with (#3491, #4248), Go's `controllink.LockInviteFile`.
+    public var lockInvite: URL { root.appendingPathComponent("lock-invite.json") }
     /// Where the control plane went, once this root's set-up has moved to it (058, T085):
     /// told to every device that connects the old way.
     public var controlMoved: URL { root.appendingPathComponent("control-moved.json") }
