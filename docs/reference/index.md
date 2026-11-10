@@ -35,6 +35,8 @@ something up, not for reading through.
   Events page.
 - [Channels](channels.md): channel identities linked to people, so a chat or email message
   acts only as the person who approved it.
+- [Messaging contract](messaging-contract.md): the tools and shapes that a messaging MCP
+  server gives, so that the Messages page can read it.
 - [Groups](groups.md): groups of people, and the machine providers each group may start
 - [Policy](policy.md): the organisation's policy, its rules, its signature and its methods
   machines from.

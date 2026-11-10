@@ -7352,6 +7352,96 @@ type MessageSender struct {
 	Title string `json:"title"`
 }
 
+// One conversation in a messaging contract server's list_conversations (#4338, docs/reference/messaging-contract.md): a channel, a space, a direct chat or a mail thread. source is the service (slack, email, googlechat, whatsapp, or the server's own word), the same word as ChannelSender.channel. unread is the service's own count of unread messages; absent when the service does not say. lastActivity is the newest message's time.
+type MessagingConversation struct {
+	Source string `json:"source"`
+
+	// The server's id for the conversation, which read_messages and reply take. Opaque to the daemon and the clients.
+	ID string `json:"id"`
+
+	Title string `json:"title"`
+
+	Kind MessagingConversationKind `json:"kind"`
+
+	Unread *int64 `json:"unread,omitzero"`
+
+	LastActivity *string `json:"lastActivity,omitzero"`
+
+	// The conversation on the service's own site or app. Absent when it has none.
+	Link *URL `json:"link,omitzero"`
+}
+
+// channel: a channel or space that many people read. direct: a chat with one person or a small group. thread: a mail thread (References and In-Reply-To).
+type MessagingConversationKind string
+
+const MessagingConversationKindChannel MessagingConversationKind = "channel"
+const MessagingConversationKindDirect MessagingConversationKind = "direct"
+const MessagingConversationKindThread MessagingConversationKind = "thread"
+
+// list_conversations' structuredContent (#4338): the conversations, newest lastActivity first. cursor is absent on the last page.
+type MessagingConversations struct {
+	Conversations []MessagingConversation `json:"conversations"`
+
+	Cursor *string `json:"cursor,omitzero"`
+}
+
+// list_conversations' input (#4338). cursor is a page's cursor from the last answer; limit is at most 100, 20 when left out. unread: only the conversations with unread messages. A server may take more inputs of its own, each optional (the email server's folder).
+type MessagingListRequest struct {
+	Cursor *string `json:"cursor,omitzero"`
+
+	Limit *int64 `json:"limit,omitzero"`
+
+	Unread *bool `json:"unread,omitzero"`
+}
+
+// One message in read_messages' structuredContent (#4338). text is outside content: the result says so (untrusted), and a client draws it as plain text, never as markup. thread is the id of the message that starts its thread; absent when it is in no thread. link is the message on the service's own site or app.
+type MessagingMessage struct {
+	ID string `json:"id"`
+
+	Conversation string `json:"conversation"`
+
+	Sender ChannelSender `json:"sender"`
+
+	Time string `json:"time"`
+
+	Text string `json:"text"`
+
+	Thread *string `json:"thread,omitzero"`
+
+	Link *URL `json:"link,omitzero"`
+}
+
+// read_messages' structuredContent (#4338): one page of a conversation's messages, newest first. cursor gives the older page; absent on the last. untrusted is always true: every text is outside content.
+type MessagingMessages struct {
+	Conversation string `json:"conversation"`
+
+	Messages []MessagingMessage `json:"messages"`
+
+	Cursor *string `json:"cursor,omitzero"`
+
+	Untrusted bool `json:"untrusted"`
+}
+
+// read_messages' input (#4338): a conversation's id from list_conversations, and a page's cursor from the last answer. thread: only that thread's messages. limit is at most 100, 20 when left out. A server may take more inputs of its own, each optional.
+type MessagingReadRequest struct {
+	Conversation string `json:"conversation"`
+
+	Cursor *string `json:"cursor,omitzero"`
+
+	Thread *string `json:"thread,omitzero"`
+
+	Limit *int64 `json:"limit,omitzero"`
+}
+
+// reply's input (#4338, a later story): the conversation, the thread to answer in (absent: the conversation itself), and the text.
+type MessagingReplyRequest struct {
+	Conversation string `json:"conversation"`
+
+	Thread *string `json:"thread,omitzero"`
+
+	Text string `json:"text"`
+}
+
 // One messaging connector in the Messaging slot (#1787): its name in mcp.json, what it is in words (Slack, Email, Google Chat, or its name), its one real read (a list of its channels, folders or spaces) and the events it declares.
 type MessagingServer struct {
 	Name string `json:"name"`

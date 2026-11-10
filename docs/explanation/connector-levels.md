@@ -94,8 +94,31 @@ keep coming when no agent runs. Each one reads a connection that you made once o
 If you add GitHub's own server next to the GitHub connector that Agents makes, the app
 leaves both. It does not offer to replace one with the other, because you may want both.
 
+## A contract or in-process
+
+The app draws some pages natively from what connectors know: the Work pages from the forges,
+the Messages page from the messaging servers. There are two ways to get that data, and each
+one fits a different case (Alex, 2026-11-09).
+
+- **A contract over MCP, when the model is small and the providers are many.** Each server
+  gives the same tools, with the same input and the same `structuredContent`, and the daemon
+  calls them over MCP. Messaging is this case (#4337): a conversation and a message have few
+  fields, and Discord, Telegram, Teams, Signal and iMessage all have community servers. A
+  server from anyone that follows the contract shows on the page with no change in Agents,
+  and channels stay MCP servers, not adapters (#1223). The contract is
+  [Messaging contract](../reference/messaging-contract.md).
+- **In-process, when the model is large and we write every provider.** The daemon calls each
+  provider's Go package directly. The forges are this case (#3100, #3129): checks, merge
+  rules, boards, plans and typed writes are a large model, there are few forges, and Agents
+  writes the code for each one. A contract that large would be hard for anyone else to
+  follow, so it would give nothing that the Go packages do not.
+
+A new kind of page asks the same two questions: how large is the model, and who writes the
+providers?
+
 ## See also
 
+- [Messaging contract](../reference/messaging-contract.md)
 - [Use GitHub](../how-to/use-github.md)
 - [Use GitLab](../how-to/use-gitlab.md)
 - [Use Linear issues](../how-to/use-linear-issues.md)
