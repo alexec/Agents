@@ -62,6 +62,11 @@
       "description": "The host keeps org routes as an admin's client sealed them to its own key (#3397, specs/3397-client-sealing): it opens each with associated data orgroute.v3, refuses a lower seal version than it holds, shows a route it has no copy of as waiting, makes its own token from a cloud credential, and answers machine/orgRouteCheck. The control plane sends machine/orgRoutes only to a host that says it. Declared: its methods are the control plane's (control.openrpc.json)."
     },
     {
+      "name": "host.user-settings/1",
+      "by": "host",
+      "description": "The host writes machine/userSettings into its files (#1760). Declared since settings/userPart took host.user-settings/3 (#4100), so a control plane still pushes to it."
+    },
+    {
       "name": "host.user-settings/2",
       "by": "host",
       "description": "The host opens its person's secrets as their client sealed them to its own key (#3397), with associated data usersecret.v1, and refuses a lower version than it holds. Only a host that says it is sent its secrets in machine/userSettings. Declared: machine/userSettings is the control plane's (control.openrpc.json)."
@@ -8483,7 +8488,7 @@
     },
     {
       "name": "settings/userPart",
-      "x-capability": "host.user-settings/1",
+      "x-capability": "host.user-settings/3",
       "description": "A part of the user settings as this machine has it (#1760), for Use This Mac's under You. This machine also writes machine/userSettings into its files.",
       "paramStructure": "by-name",
       "params": [

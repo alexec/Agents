@@ -53,6 +53,20 @@ func TestStatusAndHostsSayCapabilities(t *testing.T) {
 	}
 }
 
+// machine/hello is answered with the control plane's list (#4100), so a host asks
+// machine/accounts only of one that has machine.accounts/1.
+func TestHelloIsAnsweredWithTheControlPlanesCapabilities(t *testing.T) {
+	t.Parallel()
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	box := p.host("MACHINE-3")
+	params, _ := json.Marshal(wire.MachineHello{Version: "0.6.0", Platform: "linux aarch64", MachineID: "MACHINE-3"})
+	result, err := p.s.methods.HostSaid(box.member.Host, "machine/hello", params)
+	answer, ok := result.(wire.MachineHelloAnswer)
+	if err != nil || !ok || !wire.Has(answer.Capabilities, wire.CapMachineAccounts1) || !wire.Has(answer.Capabilities, wire.CapUser3) {
+		t.Fatalf("%#v, %v", result, err)
+	}
+}
+
 // A host whose list lacks a required capability needs an update, and is online again once
 // it says one that has the set.
 func TestAHostWithoutTheRequiredSetNeedsAnUpdate(t *testing.T) {

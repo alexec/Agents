@@ -268,6 +268,9 @@ func (d *Daemon) askAccounts(call wire.MachineAccountsCall) (wire.OutsideAccount
 	if ask == nil {
 		return listed, &Error{Code: wire.FailureNotSupported, Message: "This machine isn’t on a control plane, so it has no accounts."}
 	}
+	if !d.controlHas(wire.CapMachineAccounts1) {
+		return listed, &Error{Code: wire.FailureNotSupported, Message: "Nothing was done: the control plane needs an update to do this."}
+	}
 	out, err := (*ask)(d.ctx, wire.CallMachineAccounts.Name, call)
 	var refused *controllink.AskError
 	if errors.As(err, &refused) {

@@ -1,8 +1,20 @@
 // Settings ▸ You ▸ Accounts (#3967): the words and sums, as the window's AccountsWords.
 import type { OutsideAccount } from "../protocol/generated";
+import { Capability } from "../protocol/capabilities.generated";
+import { planeNeedsUpdate } from "./capabilities";
 
 export const accountsTitle = "Accounts";
 export const noSecrets = "No secret goes here: give a card or a token by its name in Secrets.";
+
+/**
+ * What the page says in place of Accounts (#4100): the control plane takes the accounts part of
+ * `user/setSettings` only from `user/3`, so an older one, which refuses it, is sent nothing.
+ * Null when it has it, and while its list (`control/status`) has not come yet.
+ */
+export function accountsRefusal(plane: { capabilities?: string[] | undefined } | null): string | null {
+  if (!plane) return null;
+  return plane.capabilities?.includes(Capability.user3) ? null : planeNeedsUpdate;
+}
 
 /** The accounts a project uses: those that name it and those that name none. */
 export function accountsOf(all: OutsideAccount[], project: string): OutsideAccount[] {

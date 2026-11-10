@@ -6830,6 +6830,12 @@ type MachineHello struct {
 	Capabilities []string `json:"capabilities,omitzero"`
 }
 
+// The control plane's answer to machine/hello (#4100): what it can do, so the host asks only what it answers, such as machine/accounts with machine.accounts/1. An older control plane answers {}: no list, so the host asks it nothing new.
+type MachineHelloAnswer struct {
+	// The control plane's capabilities (#1748), as control/status says them to a client.
+	Capabilities []string `json:"capabilities,omitzero"`
+}
+
 // One workspace, as its provider last listed it. `state` is running, starting, stopping, stopped or unknown; or failed, for a make that failed, with the provider's `reason` (#3972).
 type MachineInfo struct {
 	ID string `json:"id"`

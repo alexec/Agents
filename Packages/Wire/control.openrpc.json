@@ -2230,7 +2230,7 @@
     },
     {
       "name": "machine/accounts",
-      "x-capability": "machine/1",
+      "x-capability": "machine.accounts/1",
       "description": "A host, for an agent there (#3967): its person's outside accounts, with add added.",
       "paramStructure": "by-name",
       "params": [
@@ -2282,7 +2282,7 @@
       "result": {
         "name": "result",
         "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
+          "$ref": "daemon.schema.json#/definitions/MachineHelloAnswer"
         }
       }
     },
@@ -5968,7 +5968,7 @@
     },
     {
       "name": "user/setSettings",
-      "x-capability": "user/1",
+      "x-capability": "user/3",
       "tags": [
         {
           "name": "web"

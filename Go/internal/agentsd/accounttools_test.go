@@ -108,6 +108,7 @@ func TestAddingAnAccountAsksBeforeReplacing(t *testing.T) {
 	var mu sync.Mutex
 	var accounts []wire.OutsideAccount
 	writes := 0
+	d.SetControlCapabilities(func() []string { return []string{wire.CapMachineAccounts1} })
 	d.SetControlAsk(func(_ context.Context, method string, params any) (json.RawMessage, error) {
 		if method == wire.CallUserSetPolicy.Name {
 			return json.RawMessage(`{}`), nil
@@ -203,6 +204,7 @@ func TestManageAccountsRecordsEachOperation(t *testing.T) {
 	var mu sync.Mutex
 	var accounts []wire.OutsideAccount
 	var ops [][]wire.AccountOperation
+	d.SetControlCapabilities(func() []string { return []string{wire.CapMachineAccounts1} })
 	d.SetControlAsk(func(_ context.Context, method string, params any) (json.RawMessage, error) {
 		call, ok := params.(wire.MachineAccountsCall)
 		if !ok {
@@ -317,6 +319,7 @@ func TestAGetOfAnAccountThatAsksWaitsOnAPerson(t *testing.T) {
 
 	var mu sync.Mutex
 	var accounts []wire.OutsideAccount
+	d.SetControlCapabilities(func() []string { return []string{wire.CapMachineAccounts1} })
 	d.SetControlAsk(func(_ context.Context, method string, params any) (json.RawMessage, error) {
 		call, ok := params.(wire.MachineAccountsCall)
 		if !ok {
@@ -411,5 +414,29 @@ func TestAGetOfAnAccountThatAsksWaitsOnAPerson(t *testing.T) {
 	plan := planAccounts([]wire.OutsideAccount{off}, []wire.OutsideAccount{{Service: "gitlab.com", Address: off.Address, Plan: new("Pro")}})
 	if len(plan.changed) != 1 || plan.changed[0].to.AskBeforeUse == nil || *plan.changed[0].to.AskBeforeUse {
 		t.Fatalf("%+v", plan)
+	}
+}
+
+// manage_accounts asks machine/accounts only of a control plane that said machine.accounts/1
+// (#4100): an older one, or one that has not answered machine/hello yet, is asked nothing.
+func TestAskAccountsNeedsTheCapability(t *testing.T) {
+	d := &Daemon{}
+	asked := 0
+	ask := askControl(func(_ context.Context, method string, _ any) (json.RawMessage, error) {
+		asked++
+		return json.RawMessage(`{"accounts":[{"service":"gitlab.com"}]}`), nil
+	})
+	d.askControl.Store(&ask)
+	for _, list := range [][]string{nil, {}, {wire.CapMachine1, wire.CapUser2}} {
+		d.SetControlCapabilities(func() []string { return list })
+		_, err := d.askAccounts(wire.MachineAccountsCall{})
+		if err == nil || !strings.Contains(err.Error(), "the control plane needs an update to do this") || asked != 0 {
+			t.Fatalf("%v: %v, asked %d", list, err, asked)
+		}
+	}
+	d.SetControlCapabilities(func() []string { return []string{wire.CapMachineAccounts1} })
+	listed, err := d.askAccounts(wire.MachineAccountsCall{})
+	if err != nil || asked != 1 || len(listed.Accounts) != 1 {
+		t.Fatal(listed, err, asked)
 	}
 }

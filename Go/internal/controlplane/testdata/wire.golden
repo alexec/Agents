@@ -54,6 +54,7 @@ control/status
     "lock-join/1",
     "lock-reset/1",
     "lock/1",
+    "machine.accounts/1",
     "machine/1",
     "machines/1",
     "multiplier/1",
@@ -82,7 +83,8 @@ control/status
     "summary.machines/1",
     "tunnel/1",
     "user/1",
-    "user/2"
+    "user/2",
+    "user/3"
   ],
   "required": {
     "host": [
@@ -267,6 +269,7 @@ control/status
     "lock-join/1",
     "lock-reset/1",
     "lock/1",
+    "machine.accounts/1",
     "machine/1",
     "machines/1",
     "multiplier/1",
@@ -295,7 +298,8 @@ control/status
     "summary.machines/1",
     "tunnel/1",
     "user/1",
-    "user/2"
+    "user/2",
+    "user/3"
   ],
   "required": {
     "host": [

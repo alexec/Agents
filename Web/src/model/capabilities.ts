@@ -6,6 +6,8 @@ import { DeclaredCapabilities } from "../protocol/capabilities.generated";
 
 /** Beside a feature that the host does not have. */
 export const hostNeedsUpdate = "This machine needs an update to do this.";
+/** In place of a feature that the control plane does not have (#4100). */
+export const planeNeedsUpdate = "The control plane needs an update to do this.";
 
 /**
  * Whether a host in `state` answers calls: `online`, or `needsUpdate`, which is connected and

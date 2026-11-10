@@ -50,6 +50,9 @@ type Uplink struct {
 	OnRefused func(reason string)
 	tunnels  map[string]chan *channel
 	asks     map[int64]chan askReply // Ask's requests on channel 0, by id, until answered
+	// control is what the control plane said it can do in its answer to machine/hello
+	// (#4100): nil until it answers on this link, empty from one older than the answer.
+	control atomic.Pointer[[]string]
 	// Lend is where this host's relay for a runtime listens on loopback, for a tunnel the
 	// control plane opens to it (the lending Mac's end, T091); 0 when it lends none.
 	Lend func(runtime string) int
@@ -252,7 +255,7 @@ func (u *Uplink) Run(ctx context.Context) {
 		u.mu.Unlock()
 		hello := u.Hello
 		hello.Host = new(wire.MachineRef(u.Member.Host))
-		u.Tell("machine/hello", hello)
+		u.hello(ctx, hello)
 		log.Printf("uplink: connected to the control plane as %s", u.Member.Host)
 		if u.OnChange != nil {
 			u.OnChange(true, "")
@@ -270,6 +273,7 @@ func (u *Uplink) Run(ctx context.Context) {
 		u.channels = nil
 		u.out = nil
 		u.mu.Unlock()
+		u.control.Store(nil)
 		for _, c := range open {
 			c.end(false)
 		}
@@ -360,12 +364,45 @@ func (offline) Error() string { return "this host is not connected to its contro
 
 var errOffline = offline{}
 
-// Tell sends a request on channel 0 whose answer nothing waits for (machine/hello).
+// Tell sends a request on channel 0 whose answer nothing waits for.
 func (u *Uplink) Tell(method string, params any) {
 	id := u.nextID.Add(1)
 	p, _ := json.Marshal(params)
 	m, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": id, "method": method, "params": json.RawMessage(p)})
 	_ = u.write(channelLine(0, string(m)))
+}
+
+// hello says machine/hello, the link's first line, and keeps the capabilities that the
+// control plane answers with (#4100), without holding up the link while it waits.
+func (u *Uplink) hello(ctx context.Context, hello MachineHello) {
+	u.control.Store(nil)
+	id, wait, err := u.request("machine/hello", hello)
+	if err != nil {
+		return
+	}
+	safe.Go("uplink hello answer", func() {
+		defer u.forget(id)
+		select {
+		case r := <-wait:
+			var answer wire.MachineHelloAnswer
+			if r.err == nil {
+				_ = json.Unmarshal(r.result, &answer)
+			}
+			list := append([]string{}, answer.Capabilities...)
+			u.control.Store(&list)
+		case <-time.After(askWait):
+		case <-ctx.Done():
+		}
+	})
+}
+
+// ControlCapabilities is what the control plane said it can do when this link came up
+// (#4100); nil while it has not said, or when not connected.
+func (u *Uplink) ControlCapabilities() []string {
+	if list := u.control.Load(); list != nil {
+		return *list
+	}
+	return nil
 }
 
 // AskError is the control plane's error answer to Ask, as it said it.
@@ -390,23 +427,11 @@ const askWait = 2 * time.Minute
 // result, an *AskError when the control plane refused it, or an error when it is not
 // connected or did not answer.
 func (u *Uplink) Ask(ctx context.Context, method string, params any) (json.RawMessage, error) {
-	id := u.nextID.Add(1)
-	p, err := json.Marshal(params)
+	id, wait, err := u.request(method, params)
 	if err != nil {
 		return nil, err
 	}
-	m, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": id, "method": method, "params": json.RawMessage(p)})
-	wait := make(chan askReply, 1)
-	u.mu.Lock()
-	if u.asks == nil {
-		u.asks = map[int64]chan askReply{}
-	}
-	u.asks[id] = wait
-	u.mu.Unlock()
-	defer func() { u.mu.Lock(); delete(u.asks, id); u.mu.Unlock() }()
-	if err := u.write(channelLine(0, string(m))); err != nil {
-		return nil, err
-	}
+	defer u.forget(id)
 	select {
 	case r := <-wait:
 		if r.err != nil {
@@ -418,6 +443,35 @@ func (u *Uplink) Ask(ctx context.Context, method string, params any) (json.RawMe
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
+}
+
+// request sends a request on channel 0 and gives the channel its answer comes on; the
+// caller forgets the id when it stops waiting.
+func (u *Uplink) request(method string, params any) (int64, chan askReply, error) {
+	id := u.nextID.Add(1)
+	p, err := json.Marshal(params)
+	if err != nil {
+		return 0, nil, err
+	}
+	m, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": id, "method": method, "params": json.RawMessage(p)})
+	wait := make(chan askReply, 1)
+	u.mu.Lock()
+	if u.asks == nil {
+		u.asks = map[int64]chan askReply{}
+	}
+	u.asks[id] = wait
+	u.mu.Unlock()
+	if err := u.write(channelLine(0, string(m))); err != nil {
+		u.forget(id)
+		return 0, nil, err
+	}
+	return id, wait, nil
+}
+
+func (u *Uplink) forget(id int64) {
+	u.mu.Lock()
+	delete(u.asks, id)
+	u.mu.Unlock()
 }
 
 // answered hands a reply on channel 0 to the Ask waiting for it; false when it is not one.
