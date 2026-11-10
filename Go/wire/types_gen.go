@@ -4602,6 +4602,23 @@ type FoldersListRequest struct {
 	IncludeArchived bool `json:"includeArchived"`
 }
 
+// A write or a read that an item's page offers (#4329, #4361): forge/comment, forge/label, forge/close (a close, a reopen or a transition), forge/merge (now, or with auto), forge/approve, forge/rerun, forge/log, forge/diff, forge/add-child and forge/blocked-by.
+type ForgeAction string
+
+const ForgeActionComment ForgeAction = "comment"
+const ForgeActionLabel ForgeAction = "label"
+const ForgeActionClose ForgeAction = "close"
+const ForgeActionReopen ForgeAction = "reopen"
+const ForgeActionTransition ForgeAction = "transition"
+const ForgeActionMerge ForgeAction = "merge"
+const ForgeActionAutoMerge ForgeAction = "autoMerge"
+const ForgeActionApprove ForgeAction = "approve"
+const ForgeActionRerun ForgeAction = "rerun"
+const ForgeActionLog ForgeAction = "log"
+const ForgeActionDiff ForgeAction = "diff"
+const ForgeActionAddChild ForgeAction = "addChild"
+const ForgeActionBlockedBy ForgeAction = "blockedBy"
+
 // forge/add-child (#3271): add a child to an epic's plan: a new issue (title, with level story, task, spike or bug) or one that is there (issue: #12, owner/repo#12, its URL, or a Linear key such as ENG-4). A new child gets the level's label and the epic's feature: label. GitHub and Linear.
 type ForgeAddChildRequest struct {
 	Node LineageNode `json:"node"`
@@ -4639,6 +4656,25 @@ type ForgeBoardsRequest struct {
 	Folder *string `json:"folder,omitzero"`
 }
 
+// What one forge on a list's page fills (#4329, #4361), so a client hides what it does not: issues and pulls say it has them; labelColors that its labels have a #rrggbb colour; avatars that its items have authorAvatar; stateReason that its closed issues have stateReason. commentCount says how to read ForgeItem.comments: exact; capped at commentsMost (show 50+ there); or detail, only on an item's own page (hide it on the row).
+type ForgeCapabilities struct {
+	Forge string `json:"forge"`
+
+	Issues bool `json:"issues"`
+
+	Pulls bool `json:"pulls"`
+
+	LabelColors bool `json:"labelColors"`
+
+	Avatars bool `json:"avatars"`
+
+	StateReason bool `json:"stateReason"`
+
+	CommentCount ForgeCommentCount `json:"commentCount"`
+
+	CommentsMost *int64 `json:"commentsMost,omitzero"`
+}
+
 // One of a pull request's checks (#3129): a check run or a commit status. state is passing, failing, running or skipped; url is its page on the forge.
 type ForgeCheck struct {
 	Name string `json:"name"`
@@ -4669,6 +4705,13 @@ type ForgeComment struct {
 
 	Bot *bool `json:"bot,omitzero"`
 }
+
+// How a forge counts an item's comments (#4329): exact; capped at the forge's commentsMost (Linear's 50); or detail, only on an item's own page (Bitbucket issues, Azure Repos), so a list's count is 0.
+type ForgeCommentCount string
+
+const ForgeCommentCountExact ForgeCommentCount = "exact"
+const ForgeCommentCountCapped ForgeCommentCount = "capped"
+const ForgeCommentCountDetail ForgeCommentCount = "detail"
 
 // forge/comment (#3130): a comment, as Markdown, on an issue or a pull request, as the person whose machine it is.
 type ForgeCommentRequest struct {
@@ -4816,7 +4859,7 @@ type ForgeItem struct {
 	Standing *bool `json:"standing,omitzero"`
 }
 
-// forge/issue and forge/pull (#3129): one item with its body (Markdown) and a page of its comments, the newest page first and at most 50, oldest first in the page; cursor is the page before it, absent at the first comment. A pull request's checks, review threads (line comments, in threads) and files changed come with it. head is a pull request's head commit, which forge/merge and forge/approve name (#3130); mergeMethods are the ways its repo allows, the repo's default first; start is the new-agent form for an issue. transitions are the moves an issue's workflow allows now (Jira, #3260), which forge/close takes in place of a close or a reopen.
+// forge/issue and forge/pull (#3129): one item with its body (Markdown) and a page of its comments, the newest page first and at most 50, oldest first in the page; cursor is the page before it, absent at the first comment. A pull request's checks, review threads (line comments, in threads) and files changed come with it. head is a pull request's head commit, which forge/merge and forge/approve name (#3130); mergeMethods are the ways its repo allows, the repo's default first; start is the new-agent form for an issue. transitions are the moves an issue's workflow allows now (Jira, #3260), which forge/close takes in place of a close or a reopen. actions are what the item's page offers now, from its forge and its state (#4361): a merged pull request has no merge and no reopen, a closed item no close; absent from an earlier daemon, when the page shows what it did before.
 type ForgeItemDetail struct {
 	Item ForgeItem `json:"item"`
 
@@ -4839,6 +4882,8 @@ type ForgeItemDetail struct {
 	Start *ForgeStart `json:"start,omitzero"`
 
 	Transitions []ForgeTransition `json:"transitions,omitzero"`
+
+	Actions []ForgeAction `json:"actions,omitzero"`
 }
 
 // forge/issue and forge/pull (#3129): the item's lineage node, and for an older page of its comments the cursor of the page after it.
@@ -4878,13 +4923,15 @@ type ForgeLead struct {
 	State AgentState `json:"state"`
 }
 
-// forge/issues and forge/pulls (#3129): a page of items, the last updated first. cursor is the next page, absent at the end. errors says a forge that could not be read (not connected, a rate limit), and the items of the others still come.
+// forge/issues and forge/pulls (#3129): a page of items, the last updated first. cursor is the next page, absent at the end. errors says a forge that could not be read (not connected, a rate limit), and the items of the others still come. forges says what each forge on the page fills (#4361); absent from an earlier daemon.
 type ForgeList struct {
 	Items []ForgeItem `json:"items"`
 
 	Cursor *string `json:"cursor,omitzero"`
 
 	Errors []ForgeListError `json:"errors,omitzero"`
+
+	Forges []ForgeCapabilities `json:"forges,omitzero"`
 }
 
 // A forge forge/issues or forge/pulls could not read (#3129): forge is github, gitlab or linear.

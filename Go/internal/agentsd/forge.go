@@ -339,6 +339,12 @@ func (d *Daemon) forgeList(ctx context.Context, prs bool, r wire.ForgeListReques
 	}
 	var more bool
 	out.Items, cursor, more = mergeForgePages(pages, cursor, limit)
+	// What each forge with an item on the page fills, so a client draws its rows (#4361).
+	for _, m := range moved {
+		if slices.ContainsFunc(out.Items, func(i wire.ForgeItem) bool { _, ok := m.forge.Owns(i.Node); return ok }) {
+			out.Forges = append(out.Forges, m.forge.Caps().wire(m.forge.Name()))
+		}
+	}
 	for _, p := range pages {
 		if p.err != nil {
 			out.Errors = append(out.Errors, wire.ForgeListError{Forge: p.forge, Message: p.err.Error()})
@@ -527,6 +533,7 @@ func (d *Daemon) forgeItem(ctx context.Context, kind string, r wire.ForgeItemReq
 	if err != nil {
 		return wire.ForgeItemDetail{}, forgeCannotErr(method, f, err)
 	}
+	out.Actions = f.Caps().itemActions(out)
 	d.forgeRemember(string(key), forgeAnswer{item: &out})
 	d.resolvedFromForge([]wire.ForgeItem{out.Item})
 	return out, nil
