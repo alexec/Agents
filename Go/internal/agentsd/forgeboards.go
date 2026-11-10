@@ -81,6 +81,8 @@ func (d *Daemon) boardIn(folders []string, url string) (wire.ProjectBoard, []str
 
 // forgeBoard is what a list narrowed to a board reads, beside its sources.
 type forgeBoard struct {
+	// forge is the board's forge, as the forge interface names it (#4329): github, …
+	forge string
 	// home is the folder an item acts from when no folder names its team or project.
 	home string
 	// project is a GitHub board's <owner>/<number>.
@@ -104,17 +106,18 @@ func (b *forgeBoard) key() []any {
 
 // narrowToBoard keeps of s only what is on the board's forge, and says what to read there.
 func narrowToBoard(s *forgeSources, b wire.ProjectBoard, in []string, prs bool) *forgeBoard {
-	board := &forgeBoard{home: in[0]}
+	board := &forgeBoard{forge: string(*b.Forge), home: in[0]}
 	key := deref(b.Key)
-	repos, gitlab, azureDevOps, azureDevOpsErr := s.repos, s.gitlab, s.azureDevOps, s.azureDevOpsErr
-	s.repos, s.gitlab, s.teams, s.projects, s.workspace, s.gitlabErr = nil, nil, nil, nil, false, nil
+	gitlab, azureDevOps, azureDevOpsErr := s.gitlab, s.azureDevOps, s.azureDevOpsErr
+	s.gitlab, s.teams, s.projects, s.workspace, s.gitlabErr = nil, nil, nil, false, nil
 	s.forgejo, s.forgejoErr, s.bitbucket, s.bitbucketErr = nil, nil, nil, nil
 	s.azureDevOps, s.azureDevOpsErr = nil, nil
 	boards := s.boards
 	s.boards = nil
 	switch *b.Forge {
 	case wire.ConnectionProviderGithub:
-		s.repos, board.project = repos, key
+		// GitHub is on the forge interface: forgeList keeps only its scope.
+		board.project = key
 	case wire.ConnectionProviderGitlab:
 		group, number, _ := strings.Cut(key, "#")
 		board.group = group

@@ -118,14 +118,16 @@ func (d *Daemon) registerForgeWrites() {
 	})
 }
 
-// forgeTarget is the item a write is on, and the forge to write it with: one of github, gitlab
+// forgeTarget is the item a write is on, and the forge to write it with: a forge on the
+// interface (#4329), with its ref there; or, of the forges not yet on it, one of gitlab
 // (with its project there), forgejo, bitbucket or azureDevOps (with its repository there, in project), linear (with its identifier), jira (with its key, in identifier) or
 // boards (with its project and its id, in number).
 type forgeTarget struct {
 	repo        forgeRepo
 	number      int
 	pr          bool
-	github      forgeGitHub
+	forge       Forge
+	ref         forgeRef
 	gitlab      forgeGitLab
 	project     string
 	linear      forgeLinear
@@ -141,6 +143,9 @@ type forgeTarget struct {
 func (d *Daemon) forgeTargetOf(ctx context.Context, method string, node wire.LineageNode, prOnly bool) (forgeTarget, error) {
 	if prOnly && node.Kind != lineage.KindPR {
 		return forgeTarget{}, Invalid("%s: %s is not a pull request", method, node.Ref)
+	}
+	if f, ref, ok := d.forgeOwning(node); ok {
+		return forgeTarget{forge: f, ref: ref, pr: ref.pr()}, nil
 	}
 	if identifier, ok := strings.CutPrefix(node.Ref, "linear:"); ok && node.Kind == lineage.KindIssue && linearLabel.MatchString(identifier) {
 		l, err := d.forgeLinear()
@@ -189,19 +194,11 @@ func (d *Daemon) forgeTargetOf(ctx context.Context, method string, node wire.Lin
 		return forgeTarget{}, Invalid("%s: %s is not an issue or a pull request on GitHub, GitLab, Forgejo, Bitbucket, Azure DevOps, Linear, Jira or Azure Boards", method, node.Ref)
 	}
 	t := forgeTarget{repo: repo, number: number, pr: node.Kind == lineage.KindPR}
-	if repo.forge == "gitlab" {
-		gl, project, _, err := d.gitlabOf(ctx, method, repo)
-		if err != nil {
-			return forgeTarget{}, err
-		}
-		t.gitlab, t.project = gl, project
-		return t, nil
-	}
-	gh, err := d.forgeGitHub()
+	gl, project, _, err := d.gitlabOf(ctx, method, repo)
 	if err != nil {
 		return forgeTarget{}, err
 	}
-	t.github = gh
+	t.gitlab, t.project = gl, project
 	return t, nil
 }
 
@@ -227,6 +224,10 @@ func (d *Daemon) forgeComment(ctx context.Context, r wire.ForgeCommentRequest) (
 	}
 	var url string
 	switch {
+	case t.forge != nil:
+		var done wire.ForgeDone
+		done, err = t.forge.Comment(ctx, t.ref, body)
+		url, err = deref(done.URL), forgeCannotErr(method, t.forge, err)
 	case t.linear != nil:
 		url, err = t.linear.Comment(ctx, t.identifier, body)
 	case t.jira != nil:
@@ -241,10 +242,6 @@ func (d *Daemon) forgeComment(ctx context.Context, r wire.ForgeCommentRequest) (
 		url, err = t.azureDevOps.Comment(ctx, t.project, t.number, body)
 	case t.gitlab != nil:
 		err = t.gitlab.Comment(ctx, t.project, t.number, t.pr, body)
-	default:
-		var out map[string]any
-		out, err = t.github.CommentOnPR(ctx, t.repo.path, t.number, body)
-		url, _ = out["url"].(string)
 	}
 	if err != nil {
 		return wire.ForgeDone{}, err
@@ -285,6 +282,8 @@ func (d *Daemon) forgeLabel(ctx context.Context, r wire.ForgeLabelRequest) (wire
 		return wire.ForgeDone{}, err
 	}
 	switch {
+	case t.forge != nil:
+		err = forgeCannotErr(method, t.forge, t.forge.SetLabels(ctx, t.ref, add, remove))
 	case t.linear != nil:
 		err = t.linear.SetLabels(ctx, t.identifier, add, remove)
 	case t.jira != nil:
@@ -301,8 +300,6 @@ func (d *Daemon) forgeLabel(ctx context.Context, r wire.ForgeLabelRequest) (wire
 		err = t.azureDevOps.SetLabels(ctx, t.project, t.number, add, remove)
 	case t.gitlab != nil:
 		err = t.gitlab.SetLabels(ctx, t.project, t.number, t.pr, add, remove)
-	default:
-		err = t.github.SetLabels(ctx, t.repo.path, t.number, add, remove)
 	}
 	if err != nil {
 		return wire.ForgeDone{}, err
@@ -315,6 +312,13 @@ func (d *Daemon) forgeLabels(ctx context.Context, r wire.ForgeNodeRequest) (wire
 	t, err := d.forgeTargetOf(ctx, "forge/labels", r.Node, false)
 	if err != nil {
 		return wire.ForgeLabels{}, err
+	}
+	if t.forge != nil {
+		labels, err := t.forge.Labels(ctx, t.ref)
+		if err != nil {
+			return wire.ForgeLabels{}, forgeCannotErr("forge/labels", t.forge, err)
+		}
+		return wire.ForgeLabels{Labels: labels}, nil
 	}
 	var names []string
 	var colors map[string]string
@@ -335,8 +339,6 @@ func (d *Daemon) forgeLabels(ctx context.Context, r wire.ForgeNodeRequest) (wire
 		names, err = t.azureDevOps.RepoLabels(ctx, t.project)
 	case t.gitlab != nil:
 		names, colors, err = t.gitlab.ProjectLabels(ctx, t.project)
-	default:
-		names, colors, err = t.github.RepoLabels(ctx, t.repo.path)
 	}
 	if err != nil {
 		return wire.ForgeLabels{}, err
@@ -351,10 +353,17 @@ func (d *Daemon) forgeClose(ctx context.Context, r wire.ForgeCloseRequest) (wire
 		return wire.ForgeDone{}, err
 	}
 	transition := strings.TrimSpace(deref(r.Transition))
+	closed := r.Reopen == nil || !*r.Reopen
+	if t.forge != nil {
+		if err := t.forge.SetState(ctx, t.ref, closed, transition); err != nil {
+			return wire.ForgeDone{}, forgeCannotErr(method, t.forge, err)
+		}
+		d.forgeWrote()
+		return wire.ForgeDone{}, nil
+	}
 	if transition != "" && t.jira == nil && t.boards == nil {
 		return wire.ForgeDone{}, Invalid("%s: only a Jira issue or an Azure Boards work item moves by a transition", method)
 	}
-	closed := r.Reopen == nil || !*r.Reopen
 	switch {
 	case transition != "" && t.boards != nil:
 		err = t.boards.Transition(ctx, t.project, t.number, transition)
@@ -374,8 +383,6 @@ func (d *Daemon) forgeClose(ctx context.Context, r wire.ForgeCloseRequest) (wire
 		err = t.azureDevOps.SetState(ctx, t.project, t.number, closed)
 	case t.gitlab != nil:
 		err = t.gitlab.SetState(ctx, t.project, t.number, t.pr, closed)
-	default:
-		err = t.github.SetState(ctx, t.repo.path, t.number, closed)
 	}
 	if err != nil {
 		return wire.ForgeDone{}, err
@@ -398,6 +405,14 @@ func (d *Daemon) forgeMerge(ctx context.Context, r wire.ForgeMergeRequest) (wire
 		how = string(*r.Method)
 	}
 	auto := r.Auto != nil && *r.Auto
+	if t.forge != nil {
+		done, err := t.forge.Merge(ctx, t.ref, r.Sha, how, auto)
+		if err != nil {
+			return wire.ForgeDone{}, forgeCannotErr(method, t.forge, err)
+		}
+		d.forgeWrote()
+		return done, nil
+	}
 	if t.forgejo != nil {
 		if err := d.forgejoMerge(ctx, method, t, r.Sha, how, auto); err != nil {
 			return wire.ForgeDone{}, err
@@ -419,40 +434,21 @@ func (d *Daemon) forgeMerge(ctx context.Context, r wire.ForgeMergeRequest) (wire
 		d.forgeWrote()
 		return wire.ForgeDone{Auto: optionalTrue(auto)}, nil
 	}
-	if t.gitlab != nil {
-		methods, err := t.gitlab.MergeMethods(ctx, t.project)
-		if err != nil {
-			return wire.ForgeDone{}, err
-		}
-		if how == "" {
-			how = methods[0]
-		}
-		if !slices.Contains(methods, how) {
-			return wire.ForgeDone{}, Invalid("%s: this project merges by %s", method, strings.Join(methods, " or "))
-		}
-		if err := t.gitlab.Merge(ctx, t.project, t.number, r.Sha, how == "squash", auto); err != nil {
-			return wire.ForgeDone{}, err
-		}
-		d.forgeWrote()
-		return wire.ForgeDone{Auto: optionalTrue(auto)}, nil
-	}
-	if how == "" {
-		p, err := t.github.ItemPage(ctx, t.repo.path, t.number, "")
-		if err != nil {
-			return wire.ForgeDone{}, err
-		}
-		if len(p.MergeMethods) == 0 {
-			return wire.ForgeDone{}, Invalid("%s: %s allows no merge method", method, t.repo.path)
-		}
-		how = p.MergeMethods[0]
-	}
-	out, err := t.github.MergeBy(ctx, t.repo.path, t.number, r.Sha, how, auto)
+	methods, err := t.gitlab.MergeMethods(ctx, t.project)
 	if err != nil {
 		return wire.ForgeDone{}, err
 	}
+	if how == "" {
+		how = methods[0]
+	}
+	if !slices.Contains(methods, how) {
+		return wire.ForgeDone{}, Invalid("%s: this project merges by %s", method, strings.Join(methods, " or "))
+	}
+	if err := t.gitlab.Merge(ctx, t.project, t.number, r.Sha, how == "squash", auto); err != nil {
+		return wire.ForgeDone{}, err
+	}
 	d.forgeWrote()
-	url, _ := out["url"].(string)
-	return wire.ForgeDone{URL: optional(url), Auto: optionalTrue(auto)}, nil
+	return wire.ForgeDone{Auto: optionalTrue(auto)}, nil
 }
 
 func (d *Daemon) forgeApprove(ctx context.Context, r wire.ForgeApproveRequest) (wire.ForgeDone, error) {
@@ -466,6 +462,10 @@ func (d *Daemon) forgeApprove(ctx context.Context, r wire.ForgeApproveRequest) (
 	}
 	var url string
 	switch {
+	case t.forge != nil:
+		var done wire.ForgeDone
+		done, err = t.forge.Approve(ctx, t.ref, r.Sha)
+		url, err = deref(done.URL), forgeCannotErr(method, t.forge, err)
 	case t.forgejo != nil:
 		url, err = t.forgejo.Approve(ctx, t.project, t.number, r.Sha)
 	case t.bitbucket != nil:
@@ -474,10 +474,6 @@ func (d *Daemon) forgeApprove(ctx context.Context, r wire.ForgeApproveRequest) (
 		url, err = t.azureDevOps.Approve(ctx, t.project, t.number, r.Sha)
 	case t.gitlab != nil:
 		_, err = t.gitlab.Approve(ctx, t.project, t.number, r.Sha)
-	default:
-		var out map[string]any
-		out, err = t.github.ReviewPR(ctx, t.repo.path, t.number, r.Sha, true, "")
-		url, _ = out["url"].(string)
 	}
 	if err != nil {
 		return wire.ForgeDone{}, err
@@ -508,24 +504,19 @@ func failedRuns(checks []forgeCheckLink, only string) []int {
 
 type forgeCheckLink struct{ name, state, url string }
 
-// githubFailedRuns reads the pull request now, not from the cache: its head may have moved.
-func githubFailedRuns(ctx context.Context, t forgeTarget, only string) ([]int, error) {
-	p, err := t.github.ItemPage(ctx, t.repo.path, t.number, "")
-	if err != nil {
-		return nil, err
-	}
-	var checks []forgeCheckLink
-	for _, c := range p.CheckRuns {
-		checks = append(checks, forgeCheckLink{c.Name, c.State, c.URL})
-	}
-	return failedRuns(checks, only), nil
-}
-
 func (d *Daemon) forgeRerun(ctx context.Context, r wire.ForgeNodeRequest) (wire.ForgeDone, error) {
 	const method = "forge/rerun"
 	t, err := d.forgeTargetOf(ctx, method, r.Node, true)
 	if err != nil {
 		return wire.ForgeDone{}, err
+	}
+	if t.forge != nil {
+		done, err := t.forge.Rerun(ctx, t.ref)
+		if err != nil {
+			return wire.ForgeDone{}, forgeCannotErr(method, t.forge, err)
+		}
+		d.forgeWrote()
+		return done, nil
 	}
 	if t.forgejo != nil {
 		return wire.ForgeDone{}, Invalid("%s: %s", method, forgejoNoChecksAPI)
@@ -536,39 +527,20 @@ func (d *Daemon) forgeRerun(ctx context.Context, r wire.ForgeNodeRequest) (wire.
 	if t.azureDevOps != nil {
 		return d.azureDevOpsRerun(ctx, method, t, r.Node.Ref)
 	}
-	if t.gitlab != nil {
-		p, err := t.gitlab.ItemPage(ctx, t.project, t.number, true, "")
-		if err != nil {
-			return wire.ForgeDone{}, err
-		}
-		if p.Pipeline == 0 {
-			return wire.ForgeDone{}, Invalid("%s: %s has no pipeline to retry", method, r.Node.Ref)
-		}
-		out, err := t.gitlab.RetryPipeline(ctx, t.project, p.Pipeline)
-		if err != nil {
-			return wire.ForgeDone{}, err
-		}
-		d.forgeWrote()
-		url, _ := out["url"].(string)
-		return wire.ForgeDone{URL: optional(url), Reran: new(int64(1))}, nil
-	}
-	runs, err := githubFailedRuns(ctx, t, "")
+	p, err := t.gitlab.ItemPage(ctx, t.project, t.number, true, "")
 	if err != nil {
 		return wire.ForgeDone{}, err
 	}
-	if len(runs) == 0 {
-		return wire.ForgeDone{}, Invalid("%s: %s has no failed Actions run to rerun", method, r.Node.Ref)
+	if p.Pipeline == 0 {
+		return wire.ForgeDone{}, Invalid("%s: %s has no pipeline to retry", method, r.Node.Ref)
 	}
-	var url string
-	for _, run := range runs {
-		out, err := t.github.RerunFailed(ctx, t.repo.path, run)
-		if err != nil {
-			return wire.ForgeDone{}, err
-		}
-		url, _ = out["url"].(string)
+	out, err := t.gitlab.RetryPipeline(ctx, t.project, p.Pipeline)
+	if err != nil {
+		return wire.ForgeDone{}, err
 	}
 	d.forgeWrote()
-	return wire.ForgeDone{URL: optional(url), Reran: new(int64(len(runs)))}, nil
+	url, _ := out["url"].(string)
+	return wire.ForgeDone{URL: optional(url), Reran: new(int64(1))}, nil
 }
 
 func (d *Daemon) forgeLog(ctx context.Context, r wire.ForgeLogRequest) (wire.ForgeLog, error) {
@@ -578,6 +550,10 @@ func (d *Daemon) forgeLog(ctx context.Context, r wire.ForgeLogRequest) (wire.For
 		return wire.ForgeLog{}, err
 	}
 	check := strings.TrimSpace(deref(r.Check))
+	if t.forge != nil {
+		out, err := t.forge.Log(ctx, t.ref, check)
+		return out, forgeCannotErr(method, t.forge, err)
+	}
 	if t.forgejo != nil {
 		return wire.ForgeLog{Text: forgejoNoChecksAPI + "."}, nil
 	}
@@ -587,43 +563,29 @@ func (d *Daemon) forgeLog(ctx context.Context, r wire.ForgeLogRequest) (wire.For
 	if t.azureDevOps != nil {
 		return azureDevOpsLog(ctx, t, check)
 	}
-	if t.gitlab != nil {
-		p, err := t.gitlab.ItemPage(ctx, t.project, t.number, true, "")
-		if err != nil {
-			return wire.ForgeLog{}, err
-		}
-		if p.Pipeline == 0 {
-			return wire.ForgeLog{}, Invalid("%s: %s has no pipeline", method, r.Node.Ref)
-		}
-		// A GitLab check is "stage: job"; its log is the job's.
-		if _, job, ok := strings.Cut(check, ": "); ok {
-			check = job
-		}
-		text, err := t.gitlab.FailedLog(ctx, t.project, p.Pipeline, check)
-		return wire.ForgeLog{Text: text}, err
-	}
-	runs, err := githubFailedRuns(ctx, t, check)
+	p, err := t.gitlab.ItemPage(ctx, t.project, t.number, true, "")
 	if err != nil {
 		return wire.ForgeLog{}, err
 	}
-	if len(runs) == 0 {
-		return wire.ForgeLog{Text: "No failed Actions run."}, nil
+	if p.Pipeline == 0 {
+		return wire.ForgeLog{}, Invalid("%s: %s has no pipeline", method, r.Node.Ref)
 	}
-	var parts []string
-	for _, run := range runs {
-		text, err := t.github.FailedLog(ctx, t.repo.path, run, check)
-		if err != nil {
-			return wire.ForgeLog{}, err
-		}
-		parts = append(parts, text)
+	// A GitLab check is "stage: job"; its log is the job's.
+	if _, job, ok := strings.Cut(check, ": "); ok {
+		check = job
 	}
-	return wire.ForgeLog{Text: strings.Join(parts, "\n\n")}, nil
+	text, err := t.gitlab.FailedLog(ctx, t.project, p.Pipeline, check)
+	return wire.ForgeLog{Text: text}, err
 }
 
 func (d *Daemon) forgeDiff(ctx context.Context, r wire.ForgeNodeRequest) (wire.ForgeDiff, error) {
 	t, err := d.forgeTargetOf(ctx, "forge/diff", r.Node, true)
 	if err != nil {
 		return wire.ForgeDiff{}, err
+	}
+	if t.forge != nil {
+		diff, err := t.forge.Diff(ctx, t.ref)
+		return diff, forgeCannotErr("forge/diff", t.forge, err)
 	}
 	var out map[string]any
 	switch {
@@ -635,12 +597,15 @@ func (d *Daemon) forgeDiff(ctx context.Context, r wire.ForgeNodeRequest) (wire.F
 		out, err = t.azureDevOps.PRDiff(ctx, t.project, t.number)
 	case t.gitlab != nil:
 		out, err = t.gitlab.MRDiff(ctx, t.project, t.number)
-	default:
-		out, err = t.github.PRDiff(ctx, t.repo.path, t.number, "")
 	}
 	if err != nil {
 		return wire.ForgeDiff{}, err
 	}
+	return diffOf(out)
+}
+
+// diffOf is a connector's diff on the wire.
+func diffOf(out map[string]any) (wire.ForgeDiff, error) {
 	// The connectors' diff is the views' agents/open-diff's (#1341), which is this one's shape.
 	b, err := json.Marshal(out)
 	if err != nil {

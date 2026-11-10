@@ -325,6 +325,22 @@ func (d *Daemon) standingBlockers(ctx context.Context, method string, epic wire.
 	for n, c := range children {
 		numbers[n] = refNumber(c.item.Node.Ref)
 	}
+	if f, _, ok := d.forgeOwning(epic.Node); ok {
+		refs := make([]forgeRef, len(children))
+		for n, c := range children {
+			if refs[n], ok = f.Owns(c.item.Node); !ok {
+				return Invalid("%s: %s is not on the forge %s is on", method, c.item.Node.Ref, epic.Node.Ref)
+			}
+		}
+		by, err := f.Blockers(ctx, refs)
+		if err != nil {
+			return forgeCannotErr(method, f, err)
+		}
+		for n := range children {
+			children[n].blockedBy = append(children[n].blockedBy, by[refs[n]]...)
+		}
+		return nil
+	}
 	keys := make([]string, len(children))
 	for n, c := range children {
 		_, keys[n], _ = strings.Cut(c.item.Node.Ref, ":")
@@ -392,36 +408,20 @@ func (d *Daemon) standingBlockers(ctx context.Context, method string, epic wire.
 			return nil
 		}
 		repo, _, ok := nodeOfRepo(epic.Node)
-		switch {
-		case !ok:
+		if !ok || repo.forge != "gitlab" {
 			return nil
-		case repo.forge == "gitlab":
-			gl, project, _, err := d.gitlabOf(ctx, method, repo)
-			if err != nil {
-				return err
-			}
-			by, err := gl.Blockers(ctx, project, numbers)
-			if err != nil {
-				return err
-			}
-			for n := range children {
-				for _, b := range by[numbers[n]] {
-					set(n, forgeRepo{"gitlab", strings.ToLower(b.Project)}.issue(b.Number), b.Open)
-				}
-			}
-		case repo.forge == "github":
-			gh, err := d.forgeGitHub()
-			if err != nil {
-				return err
-			}
-			by, err := gh.Blockers(ctx, repo.path, numbers)
-			if err != nil {
-				return err
-			}
-			for n := range children {
-				for _, b := range by[numbers[n]] {
-					set(n, forgeRepo{"github", strings.ToLower(b.Repo)}.issue(b.Number), b.Open)
-				}
+		}
+		gl, project, _, err := d.gitlabOf(ctx, method, repo)
+		if err != nil {
+			return err
+		}
+		by, err := gl.Blockers(ctx, project, numbers)
+		if err != nil {
+			return err
+		}
+		for n := range children {
+			for _, b := range by[numbers[n]] {
+				set(n, forgeRepo{"gitlab", strings.ToLower(b.Project)}.issue(b.Number), b.Open)
 			}
 		}
 	}
