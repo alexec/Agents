@@ -16,7 +16,6 @@ import (
 	"github.com/alexec/agents/Go/internal/azuredevopsmcp"
 	"github.com/alexec/agents/Go/internal/bitbucketmcp"
 	"github.com/alexec/agents/Go/internal/connections"
-	"github.com/alexec/agents/Go/internal/forgejomcp"
 	"github.com/alexec/agents/Go/internal/githubmcp"
 	"github.com/alexec/agents/Go/internal/gitlabmcp"
 	"github.com/alexec/agents/Go/internal/jiramcp"
@@ -42,8 +41,8 @@ import (
 // sign-in (JIRA_URL, JIRA_EMAIL and JIRA_API_TOKEN in the secrets) through jiramcp.RealJira,
 // issues only, of the projects the folders' .agents/folder.json name in "jiraProjects": one
 // search for every project. Azure Boards (#3815) is read the same way, of the projects the
-// folders name in "azureBoardsProjects" (forgeazure.go). Forgejo (#3753) is read with the
-// host's Forgejo connection, only on its own Forgejo, a call per repository (forgeforgejo.go).
+// folders name in "azureBoardsProjects" (forgeazure.go). Forgejo (#3753, #4354) is read with the
+// host's Forgejo connection, only on its own Forgejo, a call per repository (forgejoForge).
 // Bitbucket Cloud (#3786) is read with the host's Bitbucket connection, a call per repository
 // (forgebitbucket.go). Azure Repos (#3803) is read with the Azure DevOps token here, pull
 // requests only, a call per repository (forgeazuredevops.go).
@@ -305,10 +304,6 @@ func (d *Daemon) forgeList(ctx context.Context, prs bool, r wire.ForgeListReques
 		p.forge = name
 		pages = append(pages, p)
 	}
-	if (len(sources.forgejo) > 0 || sources.forgejoErr != nil) && !slices.Contains(cursor.Done, "forgejo") {
-		pages = append(pages, d.forgejoPage(ctx, sources, forgejomcp.SearchFilter{PRs: prs, State: state, Label: deref(r.Label),
-			Assignee: deref(r.Assignee), Query: deref(r.Query), Feature: deref(r.Feature)}, cursor.Forgejo, limit))
-	}
 	if (len(sources.bitbucket) > 0 || sources.bitbucketErr != nil) && !slices.Contains(cursor.Done, "bitbucket") {
 		pages = append(pages, d.bitbucketPage(ctx, sources, bitbucketmcp.SearchFilter{PRs: prs, State: state, Label: deref(r.Label),
 			Assignee: deref(r.Assignee), Query: deref(r.Query), Feature: deref(r.Feature)}, cursor.Bitbucket, limit))
@@ -443,12 +438,6 @@ type forgeSources struct {
 	// boards is the Azure Boards projects (#3815), organization/project.
 	boards       []string
 	boardsFolder map[string]string
-	// forgejo is the repositories on the connected Forgejo at forgejoRoot (#3753), owner/repo.
-	forgejo     []string
-	forgejoRoot string
-	// forgejoConn is the connection read with forgejoRoot.
-	forgejoConn connections.Connection
-	forgejoErr  error
 	// bitbucket is the repositories on Bitbucket Cloud (#3786), workspace/repo, read at
 	// bitbucketRoot, the connection's API.
 	bitbucket     []string
@@ -462,7 +451,7 @@ type forgeSources struct {
 }
 
 func (s forgeSources) key() []any {
-	return []any{s.teams, s.workspace, s.linearHome, s.projects, s.boards, s.forgejoRoot, s.forgejo, s.bitbucketRoot, s.bitbucket, s.azureDevOpsRoot, s.azureDevOps}
+	return []any{s.teams, s.workspace, s.linearHome, s.projects, s.boards, s.bitbucketRoot, s.bitbucket, s.azureDevOpsRoot, s.azureDevOps}
 }
 
 func (d *Daemon) forgeSources(ctx context.Context, prs bool, folders []string) forgeSources {
@@ -490,7 +479,6 @@ func (d *Daemon) forgeSources(ctx context.Context, prs bool, folders []string) f
 			}
 		}
 	}
-	d.forgejoSources(ctx, &s, folders)
 	d.bitbucketSources(ctx, &s, folders)
 	if prs {
 		d.azureDevOpsSources(ctx, &s, folders)
@@ -633,8 +621,6 @@ func (d *Daemon) forgeItem(ctx context.Context, kind string, r wire.ForgeItemReq
 		out, err = d.jiraItem(ctx, method, key, deref(r.Cursor))
 	} else if project, id, ok := boardsOfNode(r.Node); ok && kind == lineage.KindIssue {
 		out, err = d.boardsItem(ctx, method, project, id, deref(r.Cursor))
-	} else if repo, number, ok := forgejoOfNode(r.Node); ok {
-		out, err = d.forgejoItem(ctx, method, kind, repo, number, deref(r.Cursor))
 	} else if repo, number, ok := bitbucketOfNode(r.Node); ok {
 		out, err = d.bitbucketItem(ctx, method, kind, repo, number, deref(r.Cursor))
 	} else if repo, number, ok := azureDevOpsOfNode(r.Node); ok {

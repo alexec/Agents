@@ -235,7 +235,7 @@ type forgeChild struct {
 
 // forges is the registry: every forge that has moved onto Forge, in a fixed order.
 func (d *Daemon) forges() []Forge {
-	return []Forge{githubForge{d: d}, gitlabForge{d: d}}
+	return []Forge{githubForge{d: d}, gitlabForge{d: d}, forgejoForge{d: d}}
 }
 
 // forgeOwning is the forge that owns node, and its ref there.

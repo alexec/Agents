@@ -122,12 +122,6 @@ func (d *Daemon) forgeAddChild(ctx context.Context, r wire.ForgeAddChildRequest)
 	} else if t.boards != nil {
 		// The level is the work item's type too, as its process names it.
 		_, url, err = t.boards.AddChild(ctx, t.project, t.number, title, labels, level)
-	} else if t.forgejo != nil {
-		// A Forgejo epic's children are the issues it depends on.
-		var n int
-		if n, url, err = t.forgejo.CreateIssue(ctx, t.project, title, labels); err == nil {
-			err = t.forgejo.SetBlockedBy(ctx, t.project, t.number, t.project, n, true)
-		}
 	}
 	// A new issue that did not become a child is still made: forget the kept answers either way.
 	d.forgeWrote()
@@ -150,7 +144,7 @@ func (d *Daemon) addExistingChild(ctx context.Context, method string, t forgeTar
 			return wire.ForgeDone{}, Invalid("%s: an epic is not its own child", method)
 		}
 		err = t.linear.SetParent(ctx, key, t.identifier)
-	} else if t.boards != nil {
+	} else {
 		id, ok := boardsItemID(ref)
 		if !ok {
 			return wire.ForgeDone{}, Invalid("%s: %q is not a work item: give its id, such as 12 or AB#12, or its page", method, ref)
@@ -159,15 +153,6 @@ func (d *Daemon) addExistingChild(ctx context.Context, method string, t forgeTar
 			return wire.ForgeDone{}, Invalid("%s: an epic is not its own child", method)
 		}
 		err = t.boards.SetParent(ctx, t.project, id, t.number)
-	} else {
-		repo, n, ok := d.forgejoIssueOf(ref, t.project)
-		if !ok {
-			return wire.ForgeDone{}, Invalid("%s: %q is not an issue on the connected Forgejo: give #12, owner/repo#12 or its URL", method, ref)
-		}
-		if forgejoNode(repo, n, false) == epic {
-			return wire.ForgeDone{}, Invalid("%s: an epic is not its own child", method)
-		}
-		err = t.forgejo.SetBlockedBy(ctx, t.project, t.number, repo, n, true)
 	}
 	if err != nil {
 		return wire.ForgeDone{}, err
@@ -213,7 +198,6 @@ func (d *Daemon) forgeBlockedBy(ctx context.Context, r wire.ForgeBlockedByReques
 	// Every blocker is checked before the first write, so a wrong one changes nothing.
 	type blocker struct {
 		ref     forgeRef
-		repo    string
 		number  int
 		key     string
 		blocked bool
@@ -229,7 +213,6 @@ func (d *Daemon) forgeBlockedBy(ctx context.Context, r wire.ForgeBlockedByReques
 			}
 			key, onLinear := strings.CutPrefix(b.Ref, "linear:")
 			project, id, onBoards := boardsOfNode(b)
-			fjRepo, fjNumber, onForgejo := forgejoOfNode(b)
 			switch {
 			case b.Kind != lineage.KindIssue:
 				return wire.ForgeDone{}, Invalid("%s: %s is not an issue", method, b.Ref)
@@ -244,8 +227,6 @@ func (d *Daemon) forgeBlockedBy(ctx context.Context, r wire.ForgeBlockedByReques
 			// A link is within an organization.
 			case t.boards != nil && onBoards && boardsOrg(project) == boardsOrg(t.project):
 				todo = append(todo, blocker{number: id, blocked: list.blocked})
-			case t.forgejo != nil && onForgejo:
-				todo = append(todo, blocker{repo: fjRepo, number: fjNumber, blocked: list.blocked})
 			default:
 				return wire.ForgeDone{}, Invalid("%s: %s is not on the forge %s is on", method, b.Ref, r.Node.Ref)
 			}
@@ -256,10 +237,8 @@ func (d *Daemon) forgeBlockedBy(ctx context.Context, r wire.ForgeBlockedByReques
 			err = forgeCannotErr(method, t.forge, t.forge.SetBlockedBy(ctx, t.ref, b.ref, b.blocked))
 		} else if t.linear != nil {
 			err = t.linear.SetBlockedBy(ctx, t.identifier, b.key, b.blocked)
-		} else if t.boards != nil {
-			err = t.boards.SetBlockedBy(ctx, t.project, t.number, b.number, b.blocked)
 		} else {
-			err = t.forgejo.SetBlockedBy(ctx, t.project, t.number, b.repo, b.number, b.blocked)
+			err = t.boards.SetBlockedBy(ctx, t.project, t.number, b.number, b.blocked)
 		}
 		if err != nil {
 			break

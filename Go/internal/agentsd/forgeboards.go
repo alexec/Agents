@@ -110,7 +110,7 @@ func narrowToBoard(s *forgeSources, b wire.ProjectBoard, in []string, prs bool) 
 	key := deref(b.Key)
 	azureDevOps, azureDevOpsErr := s.azureDevOps, s.azureDevOpsErr
 	s.teams, s.projects, s.workspace = nil, nil, false
-	s.forgejo, s.forgejoErr, s.bitbucket, s.bitbucketErr = nil, nil, nil, nil
+	s.bitbucket, s.bitbucketErr = nil, nil
 	s.azureDevOps, s.azureDevOpsErr = nil, nil
 	boards := s.boards
 	s.boards = nil
