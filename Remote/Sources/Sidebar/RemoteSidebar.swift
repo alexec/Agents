@@ -1163,7 +1163,7 @@ private struct RuntimesRow: View {
             }
             // An allowance nearly used up (#3956): the runtime, in grey under the title.
             if let low = tally?.lowWords {
-                Text(low).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
+                Text(low).appText(.fine).foregroundStyle(.secondary).lineLimit(1)
             }
         }
         .accessibilityElement(children: .combine)

@@ -385,7 +385,7 @@ struct RuntimesRow: View {
                 Spacer()
             }
             if let low = tally?.lowWords {
-                Text(low).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                Text(low).appText(.fine).foregroundStyle(.secondary).lineLimit(1)
             }
         }
         .help(tally.map { [$0.lowWords, "\($0.working) of \($0.total) runtimes working. Your runtimes and accounts, and where each machine has them"]
