@@ -1,5 +1,17 @@
 {
-  "pins" : [],
+  "pins" : [
+    {
+      "pinned_by" : {
+        "person" : true
+      },
+      "title" : "Mail",
+      "view" : {
+        "server" : "email",
+        "tool" : "show_mail",
+        "uri" : "ui://email/mail"
+      }
+    }
+  ],
   "sessions" : [
     {
       "pinned_by" : {
