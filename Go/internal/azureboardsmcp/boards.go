@@ -20,6 +20,8 @@ type Person struct {
 	DisplayName string
 	// Bot says it is not a person: a build service, a service or a group (#728).
 	Bot bool
+	// Avatar is the identity's picture, on the organization; "" for none (#4363).
+	Avatar string
 }
 
 // trusted says whether p is a person of the organization, never a bot.
@@ -30,6 +32,13 @@ func (p *Person) name() string {
 		return ""
 	}
 	return p.Name
+}
+
+func (p *Person) avatar() string {
+	if p == nil {
+		return ""
+	}
+	return p.Avatar
 }
 
 // WorkItem is a work item as the events and the tools name it.

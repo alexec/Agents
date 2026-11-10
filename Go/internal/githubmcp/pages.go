@@ -253,6 +253,8 @@ func ownerName(repo string) (string, string, error) {
 type gqlActor struct {
 	Login    string `json:"login"`
 	Typename string `json:"__typename"`
+	// AvatarURL is read only where a query asks for it (the forge reads, #4363).
+	AvatarURL string `json:"avatarUrl"`
 }
 
 func (a *gqlActor) login() string {
@@ -260,6 +262,13 @@ func (a *gqlActor) login() string {
 		return ""
 	}
 	return a.Login
+}
+
+func (a *gqlActor) avatar() string {
+	if a == nil {
+		return ""
+	}
+	return a.AvatarURL
 }
 
 // isBot: a GitHub App writes as a Bot; CodeRabbit (#1344) is named as itself.

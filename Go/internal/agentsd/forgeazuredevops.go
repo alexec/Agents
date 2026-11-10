@@ -130,6 +130,7 @@ func (azureDevOpsForge) Caps() forgeCaps {
 		PRs: true,
 		PR: forgeActions{Comment: true, Label: true, Close: true, Reopen: true, Merge: true, AutoMerge: true, Approve: true,
 			Rerun: true, Log: true, Diff: true},
+		Avatars: true,
 		// A pull request's comment count is on its own page only.
 		CommentCount: "detail",
 		Reasons: map[string]string{
@@ -256,7 +257,7 @@ func (a azureDevOpsForge) Item(ctx context.Context, r forgeRef, cursor string) (
 	out := wire.ForgeItemDetail{Item: azureDevOpsItemOf(p.Item, folder), Body: p.Body, Comments: []wire.ForgeComment{}, Cursor: optional(p.Before),
 		Checks: []wire.ForgeCheck{}}
 	for _, c := range p.Thread {
-		out.Comments = append(out.Comments, forgeCommentOf(c.Author, c.Body, c.At, c.URL, c.Bot))
+		out.Comments = append(out.Comments, forgeCommentOf(c.Author, c.Avatar, c.Body, c.At, c.URL, c.Bot))
 	}
 	for _, c := range p.CheckRuns {
 		out.Checks = append(out.Checks, wire.ForgeCheck{Name: c.Name, State: c.State, URL: optional(c.URL)})
@@ -444,7 +445,7 @@ func (d *Daemon) forgeAzureDevOps(root string) forgeAzureDevOps {
 // azureDevOpsItemOf is an Azure Repos pull request in the one model, from folder.
 func azureDevOpsItemOf(i azuredevopsmcp.Item, folder string) wire.ForgeItem {
 	return wire.ForgeItem{Node: azureDevOpsNode(i.Repo, i.Number), Title: i.Title, State: i.State, URL: optional(i.URL),
-		Folder: optional(folder), Labels: forgeLabelsOf(i.Labels, nil), Author: optional(i.Author), Assignees: []string{},
+		Folder: optional(folder), Labels: forgeLabelsOf(i.Labels, nil), Author: optional(i.Author), AuthorAvatar: optional(i.AuthorAvatar), Assignees: []string{},
 		UpdatedAt: forgeDate(i.UpdatedAt), Comments: int64(i.Comments), Draft: new(i.Draft), AutoMerge: new(i.AutoMerge),
 		Checks: optional(i.Checks), Review: optional(i.Review), Mergeable: optional(i.Mergeable)}
 }

@@ -101,7 +101,7 @@ func (f *forgeFake) serve(w http.ResponseWriter, r *http.Request) {
 		}, pg == "1")
 	case p == "acme/app/pullrequests/8" && r.Method == http.MethodGet:
 		f.write(w, pull(8, "hello", dev, obj{"title": "Add hello", "description": "Fixes #7", "updated_on": at(6), "comment_count": 2,
-			"source": obj{"branch": obj{"name": "hello"}, "commit": obj{"hash": "abc123def456"}, "repository": obj{"full_name": repo}},
+			"source":       obj{"branch": obj{"name": "hello"}, "commit": obj{"hash": "abc123def456"}, "repository": obj{"full_name": repo}},
 			"reviewers":    []obj{alex},
 			"participants": []obj{{"user": alex, "role": "REVIEWER", "approved": true, "state": "approved"}, {"user": dev, "role": "PARTICIPANT"}}}))
 	case p == "acme/app/pullrequests/8/comments" && r.Method == http.MethodGet:
@@ -234,7 +234,7 @@ func TestItemPageReadsAnIssue(t *testing.T) {
 	}
 	if d.Body != "As **Markdown**" || d.Before != "2" || d.Comments != 51 || d.Milestone != "v1" || d.Assignees[0] != "dev" ||
 		!slices.Equal(d.Labels, []string{"bug", "ui"}) || len(d.Thread) != 2 || d.Thread[0].Body != "older on page 1" || !d.Thread[0].Bot ||
-		d.Thread[1].Author != "dev" {
+		d.Thread[1].Author != "dev" || d.Thread[1].Avatar != "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/a-dev/48" {
 		t.Fatalf("issue: %+v", d)
 	}
 	older, err := bb.ItemPage(context.Background(), "acme/app", 7, false, d.Before)
@@ -342,7 +342,7 @@ func TestPRDiff(t *testing.T) {
 
 func TestPipelineRun(t *testing.T) {
 	for link, want := range map[string]int{
-		"https://bitbucket.org/acme/app/pipelines/results/12":          12,
+		"https://bitbucket.org/acme/app/pipelines/results/12":           12,
 		"https://bitbucket.org/acme/app/pipelines/results/12/steps/{x}": 12,
 		"https://ci.example/build/3":                                    0,
 		"":                                                              0,

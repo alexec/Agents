@@ -56,8 +56,21 @@ func (f *forgeLab) serve(w http.ResponseWriter, r *http.Request) {
 
 func forgeItemJSON(iid int, state, updated string) obj {
 	return obj{"iid": iid, "title": "Item " + strconv.Itoa(iid), "state": state, "updated_at": updated, "web_url": "w" + strconv.Itoa(iid),
-		"author": obj{"username": "kim"}, "assignees": []obj{{"username": "alex"}}, "labels": []obj{{"name": "bug", "color": "#D9534F"}},
+		"author": obj{"username": "kim", "avatar_url": "https://secure.gravatar.com/avatar/k?s=80&d=identicon"}, "assignees": []obj{{"username": "alex"}}, "labels": []obj{{"name": "bug", "color": "#D9534F"}},
 		"milestone": obj{"title": "0.16"}, "user_notes_count": 2, "detailed_merge_status": "not_approved", "draft": true}
+}
+
+func TestUserAvatarIsAWholeURL(t *testing.T) {
+	for _, c := range []struct{ avatar, page, want string }{
+		{"https://gitlab.example.com/uploads/-/system/user/avatar/1/a.png", "https://gitlab.example.com/g/p/-/issues/1", "https://gitlab.example.com/uploads/-/system/user/avatar/1/a.png"},
+		{"/uploads/-/system/user/avatar/1/a.png", "https://gitlab.example.com/g/p/-/issues/1", "https://gitlab.example.com/uploads/-/system/user/avatar/1/a.png"},
+		{"/uploads/a.png", "w4", ""},
+		{"", "https://gitlab.com/g/p/-/issues/1", ""},
+	} {
+		if got := (user{AvatarURL: c.avatar}).avatar(c.page); got != c.want {
+			t.Errorf("avatar(%q, %q) = %q, want %q", c.avatar, c.page, got, c.want)
+		}
+	}
 }
 
 func newForgeLab(t *testing.T) (*forgeLab, *RealGitLab) {
@@ -95,7 +108,7 @@ func TestSearchMergesProjectsByTime(t *testing.T) {
 		t.Fatalf("asked: %q", f.asked)
 	}
 	i := p.Items[0]
-	if i.State != "open" || i.Author != "kim" || i.Milestone != "0.16" || i.Comments != 2 || i.LabelColors["bug"] != "#d9534f" ||
+	if i.State != "open" || i.Author != "kim" || i.AuthorAvatar != "https://secure.gravatar.com/avatar/k?s=80&d=identicon" || i.Milestone != "0.16" || i.Comments != 2 || i.LabelColors["bug"] != "#d9534f" ||
 		len(i.Assignees) != 1 || i.MR || i.Review != "" {
 		t.Fatalf("item: %+v", i)
 	}
@@ -157,14 +170,14 @@ func TestItemPageReadsAMergeRequest(t *testing.T) {
 	f.one["projects/group%2Fapp/merge_requests/4"] = mr
 	notes := []any{}
 	for n := 50; n >= 1; n-- {
-		note := obj{"id": n, "body": "note " + strconv.Itoa(n), "author": obj{"username": "kim"}, "created_at": "2026-11-01T09:00:00.000Z"}
+		note := obj{"id": n, "body": "note " + strconv.Itoa(n), "author": obj{"username": "kim", "avatar_url": "https://secure.gravatar.com/avatar/k?s=80&d=identicon"}, "created_at": "2026-11-01T09:00:00.000Z"}
 		switch n {
 		case 50:
 			note["system"] = true
 		case 49:
 			note["type"] = "DiffNote"
 		case 48:
-			note["author"] = obj{"username": "project_7_bot_x", "bot": true}
+			note["author"] = obj{"username": "project_7_bot_x", "bot": true, "avatar_url": "/uploads/-/system/user/avatar/7/avatar.png"}
 		}
 		notes = append(notes, note)
 	}
@@ -196,6 +209,10 @@ func TestItemPageReadsAMergeRequest(t *testing.T) {
 	}
 	if len(d.Thread) != 48 || d.Thread[0].Body != "note 1" || d.Thread[47].Body != "note 48" || !d.Thread[47].Bot || d.Thread[0].URL != "w4#note_1" {
 		t.Fatalf("thread: %d %+v", len(d.Thread), d.Thread[len(d.Thread)-1])
+	}
+	// An older GitLab's upload path is on the GitLab of the item (w4 here has no host, so none).
+	if d.Thread[47].Avatar != "" || d.Thread[0].Avatar != "https://secure.gravatar.com/avatar/k?s=80&d=identicon" {
+		t.Fatalf("avatars: %q %q", d.Thread[0].Avatar, d.Thread[47].Avatar)
 	}
 	if len(d.CheckRuns) != 2 || d.CheckRuns[0].State != "failing" || d.CheckRuns[1].State != "skipped" || d.CheckRuns[0].Name != "check: test" {
 		t.Fatalf("checks: %+v", d.CheckRuns)

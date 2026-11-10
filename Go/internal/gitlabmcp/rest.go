@@ -368,6 +368,25 @@ type user struct {
 	Username string `json:"username"`
 	Name     string `json:"name"`
 	Bot      bool   `json:"bot"`
+	// AvatarURL is the person's picture: on the GitLab itself, or on Gravatar (#4363).
+	AvatarURL string `json:"avatar_url"`
+}
+
+// avatar is u's picture as a whole URL: an older GitLab gives an upload's path only, which is on
+// the GitLab of page, an item's web URL.
+func (u user) avatar(page string) string {
+	if u.AvatarURL == "" || !strings.HasPrefix(u.AvatarURL, "/") || strings.HasPrefix(u.AvatarURL, "//") {
+		return u.AvatarURL
+	}
+	base, err := url.Parse(page)
+	if err != nil || !base.IsAbs() {
+		return ""
+	}
+	ref, err := url.Parse(u.AvatarURL)
+	if err != nil {
+		return ""
+	}
+	return base.ResolveReference(ref).String()
 }
 
 type mergeRequest struct {

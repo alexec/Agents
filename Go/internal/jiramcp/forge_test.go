@@ -38,7 +38,7 @@ func TestSearchOnCloudGoesOnInAPagesMiddle(t *testing.T) {
 	}
 	i := page.Items[0]
 	if i.Key != "ENG-3" || i.State != "closed" || i.Status != "Shipped" || i.Milestone != "2.4" || i.Comments != 3 || i.Parent != "ENG-1" ||
-		i.SubTotal != 2 || i.SubDone != 1 || i.Author != "Alex" || len(i.Assignees) != 1 || i.UpdatedAt != "2026-11-01T10:00:00.000Z" {
+		i.SubTotal != 2 || i.SubDone != 1 || i.Author != "Alex" || i.AuthorAvatar != "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/u1/48" || len(i.Assignees) != 1 || i.UpdatedAt != "2026-11-01T10:00:00.000Z" {
 		t.Fatalf("item %+v", i)
 	}
 	page, err = j.Search(context.Background(), []string{"ENG"}, SearchFilter{}, page.Next, 2)

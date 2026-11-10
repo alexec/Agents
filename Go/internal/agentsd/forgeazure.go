@@ -150,7 +150,7 @@ func (d *Daemon) forgeAzureBoards() (forgeAzureBoards, error) {
 // boardsItemOf is a work item in the one model, from folder.
 func boardsItemOf(i azureboardsmcp.Item, folder string) wire.ForgeItem {
 	out := wire.ForgeItem{Node: boardsNode(i.Project, i.ID), Title: i.Title, State: i.State, Status: optional(i.Status),
-		URL: optional(i.URL), Folder: optional(folder), Labels: forgeLabelsOf(i.Labels, nil), Author: optional(i.Author),
+		URL: optional(i.URL), Folder: optional(folder), Labels: forgeLabelsOf(i.Labels, nil), Author: optional(i.Author), AuthorAvatar: optional(i.AuthorAvatar),
 		Assignees: i.Assignees, UpdatedAt: forgeDate(i.UpdatedAt), Comments: int64(i.Comments)}
 	if out.Assignees == nil {
 		out.Assignees = []string{}
@@ -187,6 +187,7 @@ func (azureBoardsForge) Caps() forgeCaps {
 	return forgeCaps{
 		Issues:       true,
 		Issue:        forgeActions{Comment: true, Label: true, Close: true, Reopen: true, Transition: true},
+		Avatars:      true,
 		CommentCount: "exact",
 		Plan:         true, BlockedBy: true, AddChild: true,
 		Reasons: map[string]string{
@@ -310,7 +311,7 @@ func (a azureBoardsForge) Item(ctx context.Context, r forgeRef, cursor string) (
 		Cursor: optional(p.Before), Transitions: []wire.ForgeTransition{}}
 	out.Start = boardsStart(out.Item)
 	for _, c := range p.Thread {
-		out.Comments = append(out.Comments, forgeCommentOf(c.Author, c.Body, c.At, c.URL, c.Bot))
+		out.Comments = append(out.Comments, forgeCommentOf(c.Author, c.Avatar, c.Body, c.At, c.URL, c.Bot))
 	}
 	for _, t := range p.Transitions {
 		out.Transitions = append(out.Transitions, wire.ForgeTransition{ID: t.ID, Name: t.Name, Category: optional(t.Category)})
