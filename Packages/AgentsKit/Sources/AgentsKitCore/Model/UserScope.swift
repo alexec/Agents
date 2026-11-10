@@ -105,10 +105,6 @@ public extension DaemonAPI {
         public var projects: [String]?
         /// Ask before use (#4163): an agent's read of it waits on a person. nil is on; false is off.
         public var askBeforeUse: Bool?
-        /// When it last took another's place (#4157); the control plane sets it. nil for one never changed.
-        public var edited: Date? = nil
-        /// Its newest operation, as a machine knows it (#4157); the control plane does not keep it.
-        public var lastOp: AccountLastOp? = nil
 
         public var id: String { service.lowercased() + "#" + (address ?? "").lowercased() }
 
@@ -147,17 +143,6 @@ public extension DaemonAPI {
     }
 
     /// The accounts part.
-    /// An account's newest operation (#4157): `read`, `added` or `edited`, by an agent.
-    struct AccountLastOp: Codable, Sendable, Hashable {
-        public var what: String
-        public var at: Date
-
-        public init(what: String, at: Date) {
-            self.what = what
-            self.at = at
-        }
-    }
-
     struct OutsideAccounts: Codable, Sendable, Hashable {
         public var accounts: [OutsideAccount]
 
