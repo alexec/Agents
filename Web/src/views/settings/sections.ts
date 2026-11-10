@@ -12,6 +12,7 @@ import { AgentRuntimesSection } from "./AgentRuntimes";
 import { AgentsPolicySection } from "./AgentsPolicy";
 import { BackupsSection, ServerBackupsSection } from "./Backups";
 import { BrowserSection } from "./Browser";
+import { ClientsSection } from "./Clients";
 import { ConnectAnotherSection } from "./ConnectAnother";
 import { ControlOverviewSection } from "./ControlOverview";
 import { DesktopControlSection } from "./DesktopControl";
@@ -52,6 +53,8 @@ export const settingsSections: readonly SettingsSection[] = [
   { name: "browser", scope: "machines", order: 55, Section: BrowserSection },
   // Channel identities linked to people (#1762).
   { name: "channels", scope: "controlPlane", order: 30, Section: ChannelsSection },
+  // Pair a Device…, Pair a Mac… and Add a Browser… (#4253), as the window's Clients: a code that lets one more in.
+  { name: "clients", scope: "controlPlane", order: 12, Section: ClientsSection },
   // Connect to Another… on the page this Mac serves (#4257): the window on this Mac does it.
   { name: "connectAnother", scope: "controlPlane", order: 55, Section: ConnectAnotherSection, shows: (store) => store.canConnectAnother.value },
   // Serve Agents to browsers on this Mac and Restart, on the page this Mac serves (#4252), first as in the window.

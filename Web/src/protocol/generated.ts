@@ -13030,7 +13030,10 @@ export interface Methods {
   "clientPermissions/set": { params: ClientPermissionSettings; result: ClientPermissionSettings };
   "clientPermissions/state": { params: Empty; result: ClientPermissionSettings };
   "clients/forgetSelf": { params: Empty; result: Empty };
+  "clients/list": { params: Empty; result: ClientRecord[] };
   "clients/setWebPush": { params: WebPushSubscription; result: Empty };
+  "clients/startPairing": { params: ClientPairingRequest; result: ControlCodeShown };
+  "clients/stopPairing": { params: Empty; result: Empty };
   "clients/webPushKey": { params: Empty; result: WebPushKey };
   "connections/bot": { params: Empty; result: ConnectionBot };
   "connections/bot/complete": { params: ConnectionBotCompleteRequest; result: ConnectionBot };
@@ -13443,7 +13446,10 @@ export const MethodTarget = {
   "clientPermissions/set": "host",
   "clientPermissions/state": "host",
   "clients/forgetSelf": "control",
+  "clients/list": "control",
   "clients/setWebPush": "control",
+  "clients/startPairing": "control",
+  "clients/stopPairing": "control",
   "clients/webPushKey": "control",
   "connections/bot": "host",
   "connections/bot/complete": "host",
@@ -13796,6 +13802,7 @@ export interface Notifications {
   "clone/changed": CloneNotification;
   "control/budgetRequested": BudgetRequest;
   "control/capReached": CapReached;
+  "control/clientChanged": ControlClientChanged;
   "control/connectReported": ConnectReport;
   "control/governanceRequested": CatalogRequest;
   "control/groupsChanged": GroupsChanged;
