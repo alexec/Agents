@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="640" viewBox="0 0 1000 640" font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <defs>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#20242A" flood-opacity="0.18"/>
+    </filter>
+    <symbol id="warn" viewBox="0 0 16 16">
+      <path d="M8 1.5 L15 14 H1 Z" fill="#C2620A" stroke="#C2620A" stroke-width="1" stroke-linejoin="round"/>
+      <rect x="7.3" y="5.5" width="1.4" height="4.6" rx="0.7" fill="#fff"/><circle cx="8" cy="12" r="0.85" fill="#fff"/>
+    </symbol>
+    <symbol id="key" viewBox="0 0 16 16">
+      <circle cx="5" cy="8" r="3.4" fill="none" stroke="currentColor" stroke-width="1.4"/>
+      <path d="M8.4 8 H15 M13 8 V11 M10.8 8 V10" fill="none" stroke="currentColor" stroke-width="1.4"/>
+    </symbol>
+    <symbol id="person" viewBox="0 0 16 16">
+      <circle cx="8" cy="5" r="3" fill="none" stroke="currentColor" stroke-width="1.4"/>
+      <path d="M2.5 15 C2.5 11 5 9.5 8 9.5 C11 9.5 13.5 11 13.5 15" fill="none" stroke="currentColor" stroke-width="1.4"/>
+    </symbol>
+    <symbol id="cpu" viewBox="0 0 16 16">
+      <rect x="3.5" y="3.5" width="9" height="9" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/>
+      <path d="M6 1v2.5M10 1v2.5M6 12.5V15M10 12.5V15M1 6h2.5M1 10h2.5M12.5 6H15M12.5 10H15" stroke="currentColor" stroke-width="1.2"/>
+    </symbol>
+    <symbol id="list" viewBox="0 0 16 16">
+      <rect x="1.5" y="2.5" width="13" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.3"/>
+      <path d="M4.5 6h7M4.5 8.5h7M4.5 11h4" stroke="currentColor" stroke-width="1.2"/>
+    </symbol>
+  </defs>
+  <rect width="1000" height="640" fill="#D9DDE2"/>
+
+  <g filter="url(#shadow)"><rect x="24" y="20" width="952" height="600" rx="12" fill="#F7F8F9"/></g>
+  <path d="M24 32 a12 12 0 0 1 12 -12 H284 V620 H36 a12 12 0 0 1 -12 -12 Z" fill="#F0F1F3"/>
+  <line x1="284" y1="20" x2="284" y2="620" stroke="#DDE1E6"/>
+  <circle cx="46" cy="42" r="6" fill="#FF5F57"/><circle cx="66" cy="42" r="6" fill="#FEBC2E"/><circle cx="86" cy="42" r="6" fill="#28C840"/>
+
+  <!-- The sidebar -->
+  <rect x="38" y="66" width="234" height="26" rx="7" fill="#E7EAEE"/>
+  <text x="50" y="84" font-size="13" fill="#8A8F97">Search</text>
+  <text x="44" y="122" font-size="13" fill="#1F5FC8">+ New Session</text>
+
+  <text x="44" y="158" font-size="11" font-weight="600" fill="#8A8F97">Status</text>
+  <g font-size="13" fill="#1C1D20">
+    <use href="#cpu" x="52" y="170" width="15" height="15" color="#1F5FC8"/><text x="76" y="182">Runtimes</text>
+    <use href="#list" x="52" y="196" width="15" height="15" color="#1F5FC8"/><text x="76" y="208">Events</text>
+    <rect x="38" y="218" width="234" height="26" rx="6" fill="#1F5FC8"/>
+    <use href="#key" x="52" y="223" width="15" height="15" color="#FFFFFF"/>
+    <text x="76" y="236" fill="#fff" font-weight="500">Secrets</text>
+    <text x="262" y="236" font-size="11" fill="#DCE6F7" text-anchor="end">5 min ago</text>
+    <circle cx="66" cy="225" r="4.5" fill="#C2620A" stroke="#1F5FC8" stroke-width="1.5"/>
+    <use href="#person" x="52" y="250" width="15" height="15" color="#1F5FC8"/><text x="76" y="262">Accounts</text>
+    <text x="262" y="262" font-size="11" fill="#8A8F97" text-anchor="end">5 min ago</text>
+    <circle cx="66" cy="251" r="4.5" fill="#C2620A" stroke="#F0F1F3" stroke-width="1.5"/>
+  </g>
+
+  <text x="44" y="300" font-size="11" font-weight="600" fill="#8A8F97">Machines</text>
+  <g font-size="13" fill="#1C1D20"><text x="76" y="326">This Mac</text><text x="76" y="352">devbox</text></g>
+  <text x="44" y="390" font-size="11" font-weight="600" fill="#8A8F97">Usage</text>
+  <g font-size="13" fill="#1C1D20"><text x="76" y="416">Cost</text><text x="76" y="442">Tokens</text></g>
+  <text x="44" y="480" font-size="11" font-weight="600" fill="#8A8F97">Agents</text>
+  <g font-size="13" fill="#6B7078"><text x="76" y="506">Fix the shop sign-in</text><text x="76" y="532">Make the OpenAI key</text></g>
+
+  <!-- The Status ▸ Secrets page -->
+  <text x="316" y="64" font-size="20" font-weight="700" fill="#1C1D20">Secrets</text>
+  <text x="316" y="86" font-size="12" fill="#6B7078">What happened to your secrets last, newest first. Only status here: change them in Settings ▸ You ▸ Secrets.</text>
+
+  <rect x="316" y="104" width="628" height="352" rx="10" fill="#FFFFFF" stroke="#DDE1E6"/>
+  <g font-size="11" font-weight="600" fill="#8A8F97">
+    <text x="334" y="126">Secret</text><text x="530" y="126">Last 4</text><text x="616" y="126">Last operation</text><text x="926" y="126" text-anchor="end">When</text>
+  </g>
+  <line x1="316" y1="136" x2="944" y2="136" stroke="#DDE1E6"/>
+
+  <g font-size="13" fill="#1C1D20">
+    <text x="334" y="162" font-family="'SF Mono', Menlo, monospace">OPENAI_API_KEY</text>
+    <text x="530" y="162" font-family="'SF Mono', Menlo, monospace" font-size="12" fill="#8A8F97">••••Zq9w</text>
+    <text x="616" y="162">Read by fill_secret on devbox</text>
+    <text x="926" y="162" text-anchor="end" fill="#6B7078">5 min ago</text>
+    <use href="#warn" x="334" y="170" width="12" height="12"/>
+    <text x="351" y="180" font-size="11" fill="#C2620A">Not backed up: only on devbox.</text>
+    <line x1="334" y1="194" x2="944" y2="194" stroke="#DDE1E6"/>
+
+    <text x="334" y="220" font-family="'SF Mono', Menlo, monospace">SHOP_PASSWORD</text>
+    <text x="530" y="220" font-family="'SF Mono', Menlo, monospace" font-size="12" fill="#8A8F97">••••</text>
+    <text x="616" y="220">Read by fill_secret on this Mac</text>
+    <text x="926" y="220" text-anchor="end" fill="#6B7078">20 min ago</text>
+    <use href="#warn" x="334" y="228" width="12" height="12"/>
+    <text x="351" y="238" font-size="11" fill="#C2620A">Not backed up: for one session, on this Mac.</text>
+    <line x1="334" y1="252" x2="944" y2="252" stroke="#DDE1E6"/>
+
+    <text x="334" y="278" font-family="'SF Mono', Menlo, monospace">GITHUB_TOKEN</text>
+    <text x="530" y="278" font-family="'SF Mono', Menlo, monospace" font-size="12" fill="#8A8F97">••••ab12</text>
+    <text x="616" y="278">Read by set_ci_secret on this Mac</text>
+    <text x="926" y="278" text-anchor="end" fill="#6B7078">2 h ago</text>
+    <line x1="334" y1="294" x2="944" y2="294" stroke="#DDE1E6"/>
+
+    <text x="334" y="320" font-family="'SF Mono', Menlo, monospace">SHOP_CARD</text>
+    <text x="530" y="320" font-family="'SF Mono', Menlo, monospace" font-size="12" fill="#8A8F97">••••4242</text>
+    <text x="616" y="320">Replaced on the web page</text>
+    <text x="926" y="320" text-anchor="end" fill="#6B7078">2 d ago</text>
+    <line x1="334" y1="336" x2="944" y2="336" stroke="#DDE1E6"/>
+
+    <text x="334" y="362" font-family="'SF Mono', Menlo, monospace">NPM_PIN</text>
+    <text x="530" y="362" font-family="'SF Mono', Menlo, monospace" font-size="12" fill="#8A8F97">••••</text>
+    <text x="616" y="362">Given to a session from secrets.env</text>
+    <text x="926" y="362" text-anchor="end" fill="#6B7078">12 d ago</text>
+    <line x1="334" y1="378" x2="944" y2="378" stroke="#DDE1E6"/>
+
+    <text x="334" y="404" font-family="'SF Mono', Menlo, monospace" fill="#8A8F97">OLD_SLACK_TOKEN</text>
+    <text x="530" y="404" font-family="'SF Mono', Menlo, monospace" font-size="12" fill="#B5BAC1">••••9fK2</text>
+    <text x="616" y="404" fill="#8A8F97">Removed on this Mac</text>
+    <text x="926" y="404" text-anchor="end" fill="#8A8F97">5 d ago</text>
+  </g>
+  <text x="334" y="438" font-size="13" fill="#1F5FC8">Edit in Settings ▸ You ▸ Secrets</text>
+
+  <text x="316" y="484" font-size="11" fill="#8A8F97">A press on a row opens it in Settings ▸ You ▸ Secrets. The full history of each read is in Audit.</text>
+
+  <!-- Callout -->
+  <g font-size="11" fill="#1F5FC8">
+    <path d="M272 231 C300 250 290 520 330 540" fill="none" stroke="#1F5FC8" stroke-dasharray="3 3"/>
+    <rect x="330" y="524" width="430" height="58" rx="8" fill="#EAF1FC"/>
+    <text x="344" y="545">The sidebar row's time is the newest operation on any secret.</text>
+    <text x="344" y="562">The orange dot: at least one secret is not backed up (as Runtimes</text>
+    <text x="344" y="576">is red when none can start). Accounts has the same.</text>
+  </g>
+</svg>

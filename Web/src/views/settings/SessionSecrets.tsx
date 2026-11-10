@@ -13,6 +13,8 @@ import { Capability } from "../../protocol/capabilities.generated";
 import { AskBeforeUseCheck } from "../AskBeforeUse";
 import { Modal } from "../Modal";
 import { SecretDescriptionField } from "../SecretDescription";
+import { SecretInfoLine } from "../SecretInfoLine";
+import { hint, sessionLine, sessionNotBackedUp } from "../../model/secretInfo";
 import { useSettingsMachine } from "./SettingsMachine";
 
 const lists = signal<Record<string, SessionSecrets | null>>({});
@@ -57,7 +59,12 @@ export function SessionSecretsSection({ store, down }: { store: Store; down: boo
       {!list ? <p class="hint">Loading…</p> : list.secrets.length === 0 ? <p class="hint">{sessionSecretWords.none}</p> : null}
       {list?.secrets.map((s) => (
         <div class="setting" key={`${s.agentID}/${s.name}`}>
-          <span><code>{s.name}</code> <span class="faint small">{s.title}</span><br /><span class="faint small">{about(s.description)}</span></span>
+          <span>
+            <code>{s.name}</code> <code class="faint small" aria-label={s.hint ? `Ends in ${s.hint}` : "Value hidden"}>{hint(s.hint)}</code><br />
+            <span class="faint small">{about(s.description)}</span><br />
+            <SecretInfoLine parts={sessionLine(s)} class="faint small" /><br />
+            <span class="small secret-warning"><span aria-hidden="true">⚠ </span>{sessionNotBackedUp}</span>
+          </span>
           {offersAsk && (
             <label title={askBeforeUseHint(s.needsApproval === true)}>
               <input type="checkbox" checked={s.needsApproval === true} disabled={down}

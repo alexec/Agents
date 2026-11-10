@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="460" viewBox="0 0 920 460" font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <defs>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#20242A" flood-opacity="0.18"/>
+    </filter>
+    <symbol id="more" viewBox="0 0 16 16">
+      <circle cx="8" cy="8" r="7" fill="none" stroke="#1F5FC8" stroke-width="1.2"/>
+      <circle cx="4.8" cy="8" r="1" fill="#1F5FC8"/><circle cx="8" cy="8" r="1" fill="#1F5FC8"/><circle cx="11.2" cy="8" r="1" fill="#1F5FC8"/>
+    </symbol>
+    <symbol id="warn" viewBox="0 0 16 16">
+      <path d="M8 1.5 L15 14 H1 Z" fill="#C2620A" stroke="#C2620A" stroke-width="1" stroke-linejoin="round"/>
+      <rect x="7.3" y="5.5" width="1.4" height="4.6" rx="0.7" fill="#fff"/><circle cx="8" cy="12" r="0.85" fill="#fff"/>
+    </symbol>
+  </defs>
+  <rect width="920" height="460" fill="#D9DDE2"/>
+  <g filter="url(#shadow)"><rect x="30" y="24" width="860" height="412" rx="12" fill="#F7F8F9"/></g>
+  <path d="M30 36 a12 12 0 0 1 12 -12 H254 V436 H42 a12 12 0 0 1 -12 -12 Z" fill="#F0F1F3"/>
+  <line x1="254" y1="24" x2="254" y2="436" stroke="#DDE1E6"/>
+  <circle cx="52" cy="46" r="6" fill="#FF5F57"/><circle cx="72" cy="46" r="6" fill="#FEBC2E"/><circle cx="92" cy="46" r="6" fill="#28C840"/>
+  <text x="48" y="92" font-size="11" fill="#8A8F97" font-weight="600">You</text>
+  <g font-size="13" fill="#1C1D20">
+    <text x="72" y="118">Connectors</text>
+    <text x="72" y="148">Secrets</text>
+    <rect x="40" y="160" width="202" height="26" rx="6" fill="#1F5FC8"/>
+    <text x="72" y="178" fill="#fff" font-weight="500">Accounts</text>
+  </g>
+
+  <text x="290" y="72" font-size="20" font-weight="700" fill="#1C1D20">Accounts</text>
+  <rect x="290" y="92" width="560" height="282" rx="10" fill="#FFFFFF" stroke="#DDE1E6"/>
+
+  <!-- gitlab.com -->
+  <text x="308" y="120" font-size="13" fill="#1C1D20"><tspan font-weight="500">gitlab.com</tspan><tspan fill="#6B7078" dx="8">agentstest@… · Free</tspan></text>
+  <text x="790" y="120" font-family="'SF Mono', Menlo, monospace" font-size="12" fill="#8A8F97" text-anchor="end" letter-spacing="0.5">••••ab12</text>
+  <use href="#more" x="808" y="108" width="16" height="16"/>
+  <text x="308" y="139" font-size="11" fill="#6B7078">Made 9 d ago · Used 2 h ago · Token expires in 21 d</text>
+  <line x1="308" y1="154" x2="850" y2="154" stroke="#DDE1E6"/>
+
+  <!-- aws -->
+  <rect x="291" y="155" width="558" height="78" fill="#FFF7EE"/>
+  <text x="308" y="180" font-size="13" fill="#1C1D20"><tspan font-weight="500">aws.amazon.com</tspan><tspan fill="#6B7078" dx="8">alex@… · Pay as you go · $4/mo</tspan></text>
+  <text x="790" y="180" font-family="'SF Mono', Menlo, monospace" font-size="12" fill="#8A8F97" text-anchor="end" letter-spacing="0.5">••••Zq9w</text>
+  <use href="#more" x="808" y="168" width="16" height="16"/>
+  <text x="308" y="199" font-size="11" fill="#6B7078">Made 3 d ago · Edited 1 d ago · Used 5 min ago</text>
+  <use href="#warn" x="308" y="207" width="12" height="12"/>
+  <text x="325" y="217" font-size="11" fill="#C2620A">Its key, AWS_SECRET_KEY, is only on devbox. Not backed up.</text>
+  <line x1="308" y1="233" x2="850" y2="233" stroke="#DDE1E6"/>
+
+  <!-- slack -->
+  <text x="308" y="259" font-size="13" fill="#1C1D20"><tspan font-weight="500">slack.com</tspan><tspan fill="#6B7078" dx="8">alex@… · Pro · $8/mo</tspan></text>
+  <text x="790" y="259" font-size="12" fill="#8A8F97" text-anchor="end">no secret</text>
+  <use href="#more" x="808" y="247" width="16" height="16"/>
+  <text x="308" y="278" font-size="11" fill="#6B7078">Made 30 d ago · Never used</text>
+  <line x1="308" y1="293" x2="850" y2="293" stroke="#DDE1E6"/>
+
+  <text x="308" y="318" font-size="13" fill="#1C1D20">Total</text>
+  <text x="832" y="318" font-size="13" fill="#1C1D20" text-anchor="end">$12 a month</text>
+  <line x1="308" y1="332" x2="850" y2="332" stroke="#DDE1E6"/>
+  <text x="308" y="357" font-size="13" fill="#1F5FC8">Add Account…</text>
+
+  <text x="290" y="396" font-size="11" fill="#8A8F97">••••ab12 is the last 4 of the secret the account names.</text>
+  <text x="290" y="412" font-size="11" fill="#8A8F97">"Used" is the last read of that secret, or a manage_accounts call that names the account.</text>
+</svg>

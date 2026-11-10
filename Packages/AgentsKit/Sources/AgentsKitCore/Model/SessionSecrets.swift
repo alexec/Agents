@@ -13,17 +13,30 @@ public struct SessionSecret: Codable, Sendable, Hashable, Identifiable {
     public var needsApproval: Bool?
     /// What it is for (#4167).
     public var description: String?
+    /// When the name was first set for the session (#4158); a new value keeps it.
+    public var created: Date?
+    /// The value's last 4 (#4158); nil for a short value.
+    public var hint: String?
+    /// Its newest operation (#4158).
+    public var lastOp: DaemonAPI.SecretLastOp?
+    /// Always false (#4158): it is on this machine only.
+    public var backedUp: Bool?
 
     public var id: String { "\(agentID.uuidString)/\(name)" }
     public var asksBeforeUse: Bool { needsApproval == true }
 
-    public init(agentID: UUID, title: String, name: String, setAt: Date, needsApproval: Bool? = nil, description: String? = nil) {
+    public init(agentID: UUID, title: String, name: String, setAt: Date, needsApproval: Bool? = nil, description: String? = nil,
+                created: Date? = nil, hint: String? = nil, lastOp: DaemonAPI.SecretLastOp? = nil, backedUp: Bool? = nil) {
         self.agentID = agentID
         self.title = title
         self.name = name
         self.setAt = setAt
         self.needsApproval = needsApproval
         self.description = description
+        self.created = created
+        self.hint = hint
+        self.lastOp = lastOp
+        self.backedUp = backedUp
     }
 }
 
