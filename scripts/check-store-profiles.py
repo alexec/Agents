@@ -4,16 +4,15 @@
     scripts/check-store-profiles.py SECRET=path/to/profile [SECRET=path …]
     scripts/check-store-profiles.py --selftest   the table below matches project.yml (lint)
 
-SECRET is the `release` environment's secret that holds the profile (PROFILE_UNIVERSAL_MAC,
-PROFILE_REMOTE, PROFILE_REMOTE_NOTIFY or PROFILE_REMOTE_WIDGET); the path is the profile as
+SECRET is the `release` environment's secret that holds the profile (PROFILE_REMOTE,
+PROFILE_REMOTE_NOTIFY or PROFILE_REMOTE_WIDGET); the path is the profile as
 installed (the testflight job decodes each secret to one). The target's .entitlements file is
 the one its Release configuration signs with in project.yml. A profile made before an
 entitlement was added (v0.12.1: Sign in with Apple, #2507) fails here, naming the entitlement
 and the secret, before an archive spends a tag on it. It never prints a profile's contents.
 
 The sandbox's own keys (com.apple.security.*, apart from application-groups) are not in a
-profile and are not checked. On macOS a team-prefixed app group needs no profile entry, so it
-is checked only when the profile lists app groups. Needs macOS (`security cms`).
+profile and are not checked. Needs macOS (`security cms`).
 """
 import fnmatch
 import plistlib
@@ -21,14 +20,12 @@ import subprocess
 import sys
 
 ENTITLEMENTS = {
-    "PROFILE_UNIVERSAL_MAC": "App/Agents-Store.entitlements",
     "PROFILE_REMOTE": "Remote/Remote-AppStore.entitlements",
     "PROFILE_REMOTE_NOTIFY": "RemoteNotify/RemoteNotify.entitlements",
     "PROFILE_REMOTE_WIDGET": "RemoteWidget/RemoteWidget.entitlements",
 }
 # The profile each secret holds, as scripts/release-secrets.sh --store finds it by name.
 PROFILES = {
-    "PROFILE_UNIVERSAL_MAC": "Agents Universal Mac App Store",
     "PROFILE_REMOTE": "Agents Remote App Store",
     "PROFILE_REMOTE_NOTIFY": "Agents Remote Notify App Store",
     "PROFILE_REMOTE_WIDGET": "Agents Remote Widget App Store",
@@ -63,7 +60,6 @@ def check(secret, path):
     granted = profile.get("Entitlements", {})
     team = (profile.get("TeamIdentifier") or [""])[0]
     prefix = (profile.get("ApplicationIdentifierPrefix") or [team])[0] + "."
-    mac = "OSX" in profile.get("Platform", [])
     source = ENTITLEMENTS[secret]
     with open(source, "rb") as f:
         wanted = plistlib.load(f)
@@ -71,10 +67,6 @@ def check(secret, path):
     for key, want in sorted(wanted.items()):
         if key.startswith("com.apple.security.") and key != GROUPS:
             continue
-        if key == GROUPS and mac and key not in granted:
-            want = [g for g in values(want) if not str(g).startswith(f"{team}.")]
-            if not want:
-                continue
         if key not in granted:
             problems.append(f"{secret} ({profile.get('Name', '?')}) has no {key}, which {source} asks for")
         elif not allowed(want, granted[key], prefix):

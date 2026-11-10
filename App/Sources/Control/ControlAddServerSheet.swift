@@ -377,7 +377,7 @@ struct ControlAddServerSheet: View {
         if !keyPath.isEmpty {
             let url = keyURL ?? URL(fileURLWithPath: (keyPath as NSString).expandingTildeInPath)
             let scoped = url.startAccessingSecurityScopedResource()
-            key = try? String(contentsOf: url, encoding: .utf8)  // store-ok: a file the person chose in the open panel
+            key = try? String(contentsOf: url, encoding: .utf8)
             if scoped { url.stopAccessingSecurityScopedResource() }
             guard let key, !key.isEmpty else {
                 outcome = .failed("That key could not be read. Choose it with Choose….")

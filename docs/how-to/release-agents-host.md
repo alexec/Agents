@@ -69,29 +69,23 @@ You set this up once, as the Apple Developer account's Account Holder.
    | `ASC_KEY_P8` | the App Store Connect API key's `.p8`, as text |
    | `ASC_KEY_ID`, `ASC_ISSUER_ID` | that key's ID and its issuer ID |
 
-3. **The TestFlight secrets.** Export **Apple Distribution: …** and **3rd Party Mac
-   Developer Installer: …** from Keychain Access as two `.p12` files. Install the four App
-   Store profiles: **Agents Universal Mac App Store**, **Agents Remote App Store**,
-   **Agents Remote Notify App Store** and **Agents Remote Widget App Store**. Then run
-   `scripts/release-secrets.sh --store Distribution.p12 Installer.p12` and delete both
-   `.p12` files. It sets:
+3. **The TestFlight secrets.** Only the Remote is in the App Store (#4229). Export **Apple
+   Distribution: …** from Keychain Access as a `.p12` file. Install the three App Store
+   profiles: **Agents Remote App Store**, **Agents Remote Notify App Store** and **Agents
+   Remote Widget App Store**. Then run `scripts/release-secrets.sh --store Distribution.p12`
+   and delete the `.p12` file. It sets:
 
    | Secret | Value |
    |---|---|
    | `APPLE_DISTRIBUTION_P12`, `APPLE_DISTRIBUTION_P12_PASSWORD` | the Apple Distribution identity and its password |
-   | `MAC_INSTALLER_P12`, `MAC_INSTALLER_P12_PASSWORD` | the 3rd Party Mac Developer Installer identity and its password |
-   | `PROFILE_UNIVERSAL_MAC` | `base64` of "Agents Universal Mac App Store" |
    | `PROFILE_REMOTE` | `base64` of "Agents Remote App Store" |
    | `PROFILE_REMOTE_NOTIFY` | `base64` of "Agents Remote Notify App Store" |
    | `PROFILE_REMOTE_WIDGET` | `base64` of "Agents Remote Widget App Store" |
 
-   Until #4229 lands, the job also archives the old Mac App Store window, so it still asks
-   for the installer identity and `PROFILE_UNIVERSAL_MAC`. #4229 removes them.
-
    Without these secrets the GitHub release still goes out, and the `testflight` job fails
    at its first step, naming the secrets that are missing.
 
-   Before it archives, the job runs `scripts/check-store-profiles.py` on the four decoded
+   Before it archives, the job runs `scripts/check-store-profiles.py` on the three decoded
    profiles (#2781). Each must allow every entitlement in the `.entitlements` file its target
    signs with in Release. The check names a missing entitlement and the secret, never a
    secret's value. `release-secrets.sh --store` runs the same check on the installed profiles

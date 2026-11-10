@@ -120,18 +120,18 @@ actor KokoroVoice {
         let models = try TtsCacheDirectory.ensure().appending(path: "Models")
         for folder in ["kokoro", "kokoro-82m-coreml/ANE"] {
             let source = voice.appending(path: folder)
-            guard let names = try? files.contentsOfDirectory(atPath: source.path) else { continue } // store-ok: the app's own bundle
+            guard let names = try? files.contentsOfDirectory(atPath: source.path) else { continue }
             let cache = models.appending(path: folder)
-            try files.createDirectory(at: cache, withIntermediateDirectories: true) // store-ok: the app's own container
+            try files.createDirectory(at: cache, withIntermediateDirectories: true)
             for name in names {
                 let link = cache.appending(path: name)
                 let target = source.appending(path: name)
                 if (try? files.destinationOfSymbolicLink(atPath: link.path)) == target.path { continue }
-                try? files.removeItem(at: link) // store-ok: the app's own container
+                try? files.removeItem(at: link)
                 do {
                     try files.createSymbolicLink(at: link, withDestinationURL: target)
                 } catch {
-                    try files.copyItem(at: target, to: link) // store-ok: from the app's own bundle to its container
+                    try files.copyItem(at: target, to: link)
                 }
             }
             Leftovers.removeAll(in: cache, except: Set(names))

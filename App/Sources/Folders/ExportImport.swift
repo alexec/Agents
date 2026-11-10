@@ -34,13 +34,13 @@ extension AppModel {
             do {
                 try await AgentsExportTransfer.read(made, from: client, into: target, progress: progress.report)
             } catch {
-                try? FileManager.default.removeItem(at: target) // store-ok: the save panel's own file
+                try? FileManager.default.removeItem(at: target)
                 throw error
             }
             exportImport = nil
             if say(AgentsExportTransfer.exported(made.agents), "Saved as \(target.lastPathComponent).",
                    also: "Show in Finder") {
-                NSWorkspace.shared.activateFileViewerSelecting([target]) // store-ok: the save panel's own file
+                NSWorkspace.shared.activateFileViewerSelecting([target])
             }
         } failed: { [self] error in
             say("The export did not finish", describe(error))

@@ -43,7 +43,7 @@ CACHED="$(cd "$(dirname "$0")/../../../.." && pwd)/scripts/build-cache.sh"
 [ -x "$CACHED" ] || CACHED=$MAIN/scripts/build-cache.sh
 check_minutes() {
 	case $1 in
-	build-host | build-store) echo 30 ;;
+	build-host) echo 30 ;;
 	build-remote) echo 30 ;;
 	web) echo 10 ;;
 	test-*) echo 30 ;;
@@ -55,7 +55,6 @@ check_command() { # name [filter]
 	case $1 in
 	# build/DD, as run-app's launch.sh builds, so the smoke check after them is incremental.
 	build-host) echo "xcodegen generate >/dev/null && $CACHED xcodebuild -scheme AgentsHost -configuration Debug -destination 'platform=macOS' -derivedDataPath build/DD $XFLAGS build" ;;
-	build-store) echo "xcodegen generate >/dev/null && $CACHED xcodebuild -scheme AgentsStore -configuration Debug -destination 'platform=macOS' -derivedDataPath build/DD $XFLAGS build" ;;
 	build-remote) echo "xcodegen generate >/dev/null && $CACHED xcodebuild -scheme Remote -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath build/DD-sim $XFLAGS build" ;;
 	# What CI's web job runs: a build (Web/dist is not checked in, #473), check and tests.
 	web) echo "scripts/web.sh build && cd Web && npm run check && npm test" ;;
@@ -78,7 +77,7 @@ builds_for_paths() {
 		Web/*) web=1 ;;
 		esac
 	done
-	if [ $host = 1 ]; then echo build-host; echo build-store; fi
+	if [ $host = 1 ]; then echo build-host; fi
 	if [ $remote = 1 ]; then echo build-remote; fi
 	if [ $web = 1 ]; then echo web; fi
 }

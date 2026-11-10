@@ -45,7 +45,7 @@ struct MCPSignInSheet: View {
                     Text("Finish signing in in your browser. This closes by itself when you have.")
                         .appText(.fine).fixedSize(horizontal: false, vertical: true)
                 }
-                Button("Open the page again") { NSWorkspace.shared.open(page) } // store-ok: a web page in the browser, not a path
+                Button("Open the page again") { NSWorkspace.shared.open(page) }
                     .buttonStyle(.paper).appText(.fine)
             case .failed(let why):
                 Text(why).appText(.fine).tinted(.failure).fixedSize(horizontal: false, vertical: true)
@@ -92,7 +92,7 @@ struct MCPSignInSheet: View {
             return
         }
         step = .waiting(flowID: flowID, page: page)
-        NSWorkspace.shared.open(page) // store-ok: the sign-in page in the browser, not a path
+        NSWorkspace.shared.open(page)
         while case .waiting(let waiting, _) = step, waiting == flowID {
             switch await model.mcpSignInWait(flowID) {
             case .waiting:

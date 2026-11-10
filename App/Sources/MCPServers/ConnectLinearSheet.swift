@@ -145,7 +145,7 @@ extension AppModel {
     func handOffSignIn(_ flow: DaemonAPI.ConnectionSignIn, to folder: URL, on host: MachineRef) async -> CodeFlowSignIn.Outcome {
         let note = ["flowID": flow.flowID.uuidString, "address": flow.verificationURL]
         guard let data = try? JSONSerialization.data(withJSONObject: note),
-              (try? data.write(to: folder.appendingPathComponent("sign-in.json"), options: .atomic)) != nil  // store-ok: the window's own container
+              (try? data.write(to: folder.appendingPathComponent("sign-in.json"), options: .atomic)) != nil
         else { return .failed("The walk's sign-in could not be handed on.") }
         while !Task.isCancelled {
             switch await waitForSignIn(flow.flowID, on: host) {

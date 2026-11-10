@@ -629,7 +629,7 @@ struct AddProviderSheet: View {
     private func readServiceKey(_ file: URL) {
         let opened = file.startAccessingSecurityScopedResource()
         defer { if opened { file.stopAccessingSecurityScopedResource() } }
-        guard let data = try? Data(contentsOf: file),  // store-ok: a file chosen in the open panel
+        guard let data = try? Data(contentsOf: file),
               let email = (try? JSONValue.parse(data))?.objectValue?["client_email"]?.stringValue else {
             problem = "That file isn’t a service account’s JSON key."
             return
@@ -1170,7 +1170,7 @@ struct EditProviderSheet: View {
     private func readServiceKey(_ file: URL) {
         let opened = file.startAccessingSecurityScopedResource()
         defer { if opened { file.stopAccessingSecurityScopedResource() } }
-        guard let data = try? Data(contentsOf: file),  // store-ok: a file chosen in the open panel
+        guard let data = try? Data(contentsOf: file),
               let email = (try? JSONValue.parse(data))?.objectValue?["client_email"]?.stringValue else {
             problem = "That file isn’t a service account’s JSON key."
             return

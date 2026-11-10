@@ -52,13 +52,13 @@ enum WindowDefaults {
         let preferences = library.appendingPathComponent("Preferences", isDirectory: true)
         let walks = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Agents/walks", isDirectory: true)
-        let files = (try? FileManager.default.contentsOfDirectory(atPath: preferences.path)) ?? []  // store-ok: the container's own Preferences
+        let files = (try? FileManager.default.contentsOfDirectory(atPath: preferences.path)) ?? []
         for file in files where file.hasSuffix(".plist") {
             let name = String(file.dropLast(".plist".count))
             guard name != scratchDomain else { continue }
             if name.hasPrefix(bundle + walkInfix) {
                 let walk = walks.appendingPathComponent(String(name.dropFirst((bundle + walkInfix).count)))
-                if FileManager.default.fileExists(atPath: walk.path) { continue }  // store-ok: a walk's folder in the container
+                if FileManager.default.fileExists(atPath: walk.path) { continue }
             } else if name.hasPrefix(bundle + rootInfix) {
                 let launched = UserDefaults(suiteName: name)?.object(forKey: launchedKey) as? Date ?? .distantPast
                 if now.timeIntervalSince(launched) < rootKept { continue }
@@ -67,12 +67,12 @@ enum WindowDefaults {
             }
             // Emptied by the first, and the empty file left behind goes with the second.
             UserDefaults.standard.removePersistentDomain(forName: name)
-            try? FileManager.default.removeItem(at: preferences.appendingPathComponent(file))  // store-ok: the container's own Preferences
+            try? FileManager.default.removeItem(at: preferences.appendingPathComponent(file))
         }
         // Also the keys of a walk whose domain an older copy removed.
         ControlClientKey.deleteWalkKeys { walk in
             walk != ControlConfig.walk
-                && !FileManager.default.fileExists(atPath: walks.appendingPathComponent(walk).path)  // store-ok: a walk's folder in the container
+                && !FileManager.default.fileExists(atPath: walks.appendingPathComponent(walk).path)
         }
     }
 }

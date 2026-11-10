@@ -77,9 +77,7 @@ struct MacSettingsView: View {
 
     var body: some View {
         Form {
-            #if !STORE_WINDOW
             if let host = HostScenes.model { HostMacSection(host: host) }
-            #endif
             WakeSettingsSection()
             DesktopControlSettingsSection()
             SelfUpdateSection()

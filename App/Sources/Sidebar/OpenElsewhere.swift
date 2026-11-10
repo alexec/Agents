@@ -23,7 +23,7 @@ struct OpenElsewhere: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))  // store-ok: an icon for the file's kind; nothing is read
+            Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
                 .resizable()
                 .frame(width: 64, height: 64)
             Text(url.lastPathComponent)

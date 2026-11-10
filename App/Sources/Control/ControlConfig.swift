@@ -54,9 +54,9 @@ enum ControlConfig {
     /// work again (v0.x, no migration).
     private static let retiredFileKey: Void = {
         let old = folder.appendingPathComponent("control-client-key")
-        guard FileManager.default.fileExists(atPath: old.path) else { return }  // store-ok: the window's own container
-        try? FileManager.default.removeItem(at: membershipFile)  // store-ok: the window's own container
-        try? FileManager.default.removeItem(at: old)  // store-ok: the window's own container
+        guard FileManager.default.fileExists(atPath: old.path) else { return }
+        try? FileManager.default.removeItem(at: membershipFile)
+        try? FileManager.default.removeItem(at: old)
     }()
 
     static var needsFirstRun: Bool { endpoint == nil }
@@ -139,7 +139,7 @@ enum ControlConfig {
 
     /// The pairing as it is on disk, for Connect to Another… (#4228) to put back when the
     /// switch stops part way.
-    static func keptPairing() -> Data? { try? Data(contentsOf: membershipFile) }  // store-ok: the window's own container
+    static func keptPairing() -> Data? { try? Data(contentsOf: membershipFile) }
 
     /// The pairing with this Mac's own control plane, kept while the window is paired with
     /// another (#4228), so Use This Mac Only goes back as the same client.
@@ -147,15 +147,15 @@ enum ControlConfig {
 
     static func keepHerePairing(_ pairing: Data?) {
         guard let pairing else { return }
-        try? pairing.write(to: herePairingFile, options: .atomic)  // store-ok: the window's own container
+        try? pairing.write(to: herePairingFile, options: .atomic)
     }
 
     /// The kept pairing with this Mac's own control plane, made the window's again; nil with none.
     static func takeHerePairing() -> ControlMembership? {
         guard let membership = ControlMembership.load(herePairingFile), membership.client != nil, membership.url != nil else { return nil }
-        try? FileManager.default.removeItem(at: membershipFile)  // store-ok: the window's own container
+        try? FileManager.default.removeItem(at: membershipFile)
         do {
-            try FileManager.default.moveItem(at: herePairingFile, to: membershipFile)  // store-ok: the window's own container
+            try FileManager.default.moveItem(at: herePairingFile, to: membershipFile)
         } catch {
             return nil
         }
@@ -164,16 +164,16 @@ enum ControlConfig {
 
     static func putBack(_ pairing: Data?) {
         if let pairing {
-            try? pairing.write(to: membershipFile, options: .atomic)  // store-ok: the window's own container
+            try? pairing.write(to: membershipFile, options: .atomic)
         } else {
-            try? FileManager.default.removeItem(at: membershipFile)  // store-ok: the window's own container
+            try? FileManager.default.removeItem(at: membershipFile)
         }
     }
 
     static func forget() {
         // Its machine-lock pins go with it (#3670), named by the control plane while it is known.
         LockPins(defaults: WindowDefaults.store, name: lockPinName).clearAll()
-        try? FileManager.default.removeItem(at: membershipFile)  // store-ok: the window's own container
+        try? FileManager.default.removeItem(at: membershipFile)
     }
 
     /// Connect to a control plane (frame C, and the first open, #4226): say who this window is with the code,

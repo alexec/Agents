@@ -202,9 +202,9 @@ scenario_lane() {
 	branch s7-shared sh -c 'echo "// wave self-test" >>Shared/UI/AllowanceBar.swift'
 	branch s7-docs sh -c 'echo "wave" >>docs/index.md'
 	lane() { "$MW" plan "$1" | sed -n 's/^      \(build-[a-z]*\):.*/\1/p' | tr '\n' ' '; }
-	[ "$(lane s7-app)" = "build-host build-store " ] || fail "an App/ and Host/ lane builds the Mac schemes only: $(lane s7-app)"
+	[ "$(lane s7-app)" = "build-host " ] || fail "an App/ and Host/ lane builds the Mac scheme only: $(lane s7-app)"
 	[ "$(lane s7-remote)" = "build-remote " ] || fail "a Remote/ lane builds the Remote only: $(lane s7-remote)"
-	[ "$(lane s7-shared)" = "build-host build-store build-remote " ] || fail "a Shared/ lane builds both: $(lane s7-shared)"
+	[ "$(lane s7-shared)" = "build-host build-remote " ] || fail "a Shared/ lane builds both: $(lane s7-shared)"
 	out=$("$MW" plan s7-docs)
 	echo "$out" | grep -q 'its lane builds nothing' || fail "a docs lane builds nothing"
 	ok "a lane builds only the platforms its paths need"

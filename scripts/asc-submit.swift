@@ -1,24 +1,24 @@
-// Submit a version for App Review (#3657): the iOS and the macOS version of the Universal record
-// (Loops, Apple ID 6817621595), each with the newest processed (VALID) build of that version,
-// through the App Store Connect API. app-store.yml runs it only after a person approved the
+// Submit a version for App Review (#3657): the iOS version of the App Store record (Loops, Apple
+// ID 6817621595; iPhone and iPad only since #4229), with the newest processed (VALID) build of
+// that version, through the App Store Connect API. app-store.yml runs it only after a person approved the
 // `app-store` environment's gate; it never runs on its own.
 //
-//   swift scripts/asc-submit.swift 0.3.0             submit now, when both builds are VALID
-//   swift scripts/asc-submit.swift 0.3.0 --wait 60   wait for both builds, for up to 60 minutes
+//   swift scripts/asc-submit.swift 0.3.0             submit now, when the build is VALID
+//   swift scripts/asc-submit.swift 0.3.0 --wait 60   wait for the build, for up to 60 minutes
 //
 // For each platform it finds or makes the App Store version (or renames the one still being
 // prepared), sets its build, sets "What's New" to WHATS_NEW when given and App Store Connect
 // takes it (a first version has none), adds the version to an open review submission (or a new
 // one) and submits that. The last line it prints is the build number it submitted.
 //
-// It exits 0 when both are submitted, 1 when App Store Connect refuses or the wait runs out, and
+// It exits 0 when it is submitted, 1 when App Store Connect refuses or the wait runs out, and
 // 2 on a usage or key problem. The key is ASC_KEY_ID, ASC_ISSUER_ID and ASC_KEY_PATH, as for
 // asc-builds.swift; without them, ~/.private_keys/asc.env and the AuthKey_<id>.p8 beside it.
 import CryptoKit
 import Foundation
 
 let appID = "6817621595"
-let platforms = ["IOS", "MAC_OS"]
+let platforms = ["IOS"]
 
 func fail(_ message: String, _ code: Int32 = 2) -> Never {
     FileHandle.standardError.write(Data((message + "\n").utf8))
@@ -191,5 +191,4 @@ for platform in platforms {
     let submission = try await submit(versionID, platform)
     print("\(platform) \(version) (\(build.number)): submitted for App Review, review submission \(submission)")
 }
-// Both platforms' builds of one upload share a number (release-store.sh); the iOS one names it.
 print(builds["IOS"]!.number)

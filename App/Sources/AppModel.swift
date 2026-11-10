@@ -2913,7 +2913,7 @@ final class AppModel {
             do {
                 // Off the main thread: up to 25 MB.
                 data = try await Task.detached {
-                    try Data(contentsOf: file)  // store-ok: a file the person dropped, which the drag lets this window read
+                    try Data(contentsOf: file)
                 }.value
             } catch {
                 problem = "\(name) could not be read to put in the drop box: \(error.localizedDescription)"
@@ -6743,7 +6743,7 @@ final class AppModel {
                   let url = URL(string: uri), url.isFileURL,
                   let agent = work.agent(agentID),
                   !url.path.hasPrefix(agent.cwd.path),
-                  FileManager.default.fileExists(atPath: url.path) else {  // store-ok: a file the person attached: picked or dropped, so the sandbox lets it be read
+                  FileManager.default.fileExists(atPath: url.path) else {
                 carried.append(attachment)
                 continue
             }
@@ -6757,7 +6757,7 @@ final class AppModel {
             let data: Data
             do {
                 data = try await Task.detached {
-                    try Data(contentsOf: url)  // store-ok: a file the person attached: picked or dropped
+                    try Data(contentsOf: url)
                 }.value
             } catch {
                 // Not "too big": a file this window may not read, or one gone, says so (073).

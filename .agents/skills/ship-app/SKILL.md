@@ -60,14 +60,13 @@ Since 058 the Mac runs:
   (`Agents Host --register-jobs`). Then the copy goes back, and the script checks that both jobs
   run from `~/Applications`. `ship.sh --check-host` shows the copies and where
   the jobs run from, and changes nothing.
-- **The window**: the `AgentsStore` build, a client of the control plane. It runs from
-  `~/Applications/AgentsLive/<sha>-<time>/Agents.app`, never from `build/DD-store`. Any
-  build in the main checkout writes over `build/DD-*`.
+- **The window** is the same app since #4225: there is no App Store window to install
+  (#4229). Any build in the main checkout writes over `build/DD-*`.
 
 There is no phone bridge to start. The Remote reaches the control plane itself.
 
-The script builds `AgentsHost` (Live) into `build/DD-host`, `AgentsStore` into `build/DD-store`
-and the Remote into `build/DD-ios`, one after another in the checkout it runs from, through
+The script builds `AgentsHost` (Live) into `build/DD-host` and the Remote into
+`build/DD-ios`, one after another in the checkout it runs from, through
 `scripts/build-cache.sh` (#234): the packages and compiled outputs come from the cache in
 `~/Library/Caches/Agents-build/` that every worktree and wave shares, so a ship after a
 wave recompiles little. Logs are in `/tmp/ship-app-<sha>/`. It refuses when:

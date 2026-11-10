@@ -12,9 +12,9 @@
 #
 # and the control plane's image, ghcr.io/alexec/agents-control:<version> (#2140), signed.
 #
-# Beside it, the testflight job (#914) uploads the Universal app to TestFlight: the Mac window
-# as a .pkg and the Remote as an .ipa, version <tag> and build <run number>, and waits until App
-# Store Connect has processed both. Nothing is submitted to App Review here: app-store.yml
+# Beside it, the testflight job (#914) uploads the Remote to TestFlight as an .ipa, version <tag>
+# and build <run number>, and waits until App Store Connect has processed it. The Mac is not in
+# the App Store (#4229). Nothing is submitted to App Review here: app-store.yml
 # does that, when a person approves it (#3657).
 #
 # The release notes are the tag's message when it has one (the release skill writes them,
@@ -27,8 +27,6 @@
 #                                                 and altool
 # and for the testflight job (scripts/release-secrets.sh --store sets them):
 #   APPLE_DISTRIBUTION_P12, APPLE_DISTRIBUTION_P12_PASSWORD   the Apple Distribution identity
-#   MAC_INSTALLER_P12, MAC_INSTALLER_P12_PASSWORD             3rd Party Mac Developer Installer
-#   PROFILE_UNIVERSAL_MAC   "Agents Universal Mac App Store"
 #   PROFILE_REMOTE          "Agents Remote App Store"
 #   PROFILE_REMOTE_NOTIFY   "Agents Remote Notify App Store"
 #   PROFILE_REMOTE_WIDGET   "Agents Remote Widget App Store"
@@ -249,7 +247,7 @@ jobs:
               "${notes[@]}" --verify-tag
           fi
 
-  # The Universal app on TestFlight (#914). It needs nothing from the other jobs, and a
+  # The Remote on TestFlight (#914). It needs nothing from the other jobs, and a
   # failure here leaves the GitHub release as it is.
   testflight:
     runs-on: xcode-27
@@ -263,9 +261,6 @@ jobs:
         env:
           APPLE_DISTRIBUTION_P12: ${{ secrets.APPLE_DISTRIBUTION_P12 }}
           APPLE_DISTRIBUTION_P12_PASSWORD: ${{ secrets.APPLE_DISTRIBUTION_P12_PASSWORD }}
-          MAC_INSTALLER_P12: ${{ secrets.MAC_INSTALLER_P12 }}
-          MAC_INSTALLER_P12_PASSWORD: ${{ secrets.MAC_INSTALLER_P12_PASSWORD }}
-          PROFILE_UNIVERSAL_MAC: ${{ secrets.PROFILE_UNIVERSAL_MAC }}
           PROFILE_REMOTE: ${{ secrets.PROFILE_REMOTE }}
           PROFILE_REMOTE_NOTIFY: ${{ secrets.PROFILE_REMOTE_NOTIFY }}
           PROFILE_REMOTE_WIDGET: ${{ secrets.PROFILE_REMOTE_WIDGET }}
@@ -274,9 +269,8 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: |
           missing=()
-          for name in APPLE_DISTRIBUTION_P12 APPLE_DISTRIBUTION_P12_PASSWORD MAC_INSTALLER_P12 \
-            MAC_INSTALLER_P12_PASSWORD PROFILE_UNIVERSAL_MAC PROFILE_REMOTE PROFILE_REMOTE_NOTIFY \
-            PROFILE_REMOTE_WIDGET ASC_KEY_P8 ASC_KEY_ID ASC_ISSUER_ID; do
+          for name in APPLE_DISTRIBUTION_P12 APPLE_DISTRIBUTION_P12_PASSWORD PROFILE_REMOTE \
+            PROFILE_REMOTE_NOTIFY PROFILE_REMOTE_WIDGET ASC_KEY_P8 ASC_KEY_ID ASC_ISSUER_ID; do
             [[ -n "${!name}" ]] || missing+=("$name")
           done
           if (( ${#missing[@]} )); then
@@ -305,9 +299,6 @@ jobs:
         env:
           APPLE_DISTRIBUTION_P12: ${{ secrets.APPLE_DISTRIBUTION_P12 }}
           APPLE_DISTRIBUTION_P12_PASSWORD: ${{ secrets.APPLE_DISTRIBUTION_P12_PASSWORD }}
-          MAC_INSTALLER_P12: ${{ secrets.MAC_INSTALLER_P12 }}
-          MAC_INSTALLER_P12_PASSWORD: ${{ secrets.MAC_INSTALLER_P12_PASSWORD }}
-          PROFILE_UNIVERSAL_MAC: ${{ secrets.PROFILE_UNIVERSAL_MAC }}
           PROFILE_REMOTE: ${{ secrets.PROFILE_REMOTE }}
           PROFILE_REMOTE_NOTIFY: ${{ secrets.PROFILE_REMOTE_NOTIFY }}
           PROFILE_REMOTE_WIDGET: ${{ secrets.PROFILE_REMOTE_WIDGET }}
@@ -318,26 +309,20 @@ jobs:
           security create-keychain -p "$password" "$keychain"
           security set-keychain-settings -lut 5400 "$keychain"
           security unlock-keychain -p "$password" "$keychain"
-          for identity in APPLE_DISTRIBUTION MAC_INSTALLER; do
-            p12="${identity}_P12" pass="${identity}_P12_PASSWORD"
-            echo "${!p12}" | base64 --decode > "$RUNNER_TEMP/identity.p12"
-            security import "$RUNNER_TEMP/identity.p12" -k "$keychain" -P "${!pass}" \
-              -T /usr/bin/codesign -T /usr/bin/productbuild -T /usr/bin/xcodebuild
-            rm "$RUNNER_TEMP/identity.p12"
-          done
+          echo "$APPLE_DISTRIBUTION_P12" | base64 --decode > "$RUNNER_TEMP/identity.p12"
+          security import "$RUNNER_TEMP/identity.p12" -k "$keychain" -P "$APPLE_DISTRIBUTION_P12_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/xcodebuild
+          rm "$RUNNER_TEMP/identity.p12"
           security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$keychain" >/dev/null
           security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
           profiles="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
           mkdir -p "$profiles"
-          echo "$PROFILE_UNIVERSAL_MAC" | base64 --decode > "$profiles/agents-universal-mac.provisionprofile"
           echo "$PROFILE_REMOTE" | base64 --decode > "$profiles/agents-remote.mobileprovision"
           echo "$PROFILE_REMOTE_NOTIFY" | base64 --decode > "$profiles/agents-remote-notify.mobileprovision"
           echo "$PROFILE_REMOTE_WIDGET" | base64 --decode > "$profiles/agents-remote-widget.mobileprovision"
           echo "$ASC_KEY_P8" > "$RUNNER_TEMP/asc.p8"
           security find-identity -v "$keychain" | grep -q "Apple Distribution" || {
             echo "::error::APPLE_DISTRIBUTION_P12 holds no Apple Distribution identity, or its password is wrong"; exit 1; }
-          security find-identity -v "$keychain" | grep -q "3rd Party Mac Developer Installer" || {
-            echo "::error::MAC_INSTALLER_P12 holds no 3rd Party Mac Developer Installer identity, or its password is wrong"; exit 1; }
 
       # Before the archive, so a profile made before an entitlement was added (v0.12.1, #2781)
       # names the entitlement and the secret rather than failing the archive.
@@ -345,7 +330,6 @@ jobs:
         run: |
           profiles="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
           python3 scripts/check-store-profiles.py \
-            "PROFILE_UNIVERSAL_MAC=$profiles/agents-universal-mac.provisionprofile" \
             "PROFILE_REMOTE=$profiles/agents-remote.mobileprovision" \
             "PROFILE_REMOTE_NOTIFY=$profiles/agents-remote-notify.mobileprovision" \
             "PROFILE_REMOTE_WIDGET=$profiles/agents-remote-widget.mobileprovision"
@@ -367,7 +351,7 @@ jobs:
           swift scripts/asc-builds.swift "${TAG#v}" "${{ github.run_number }}" --wait 45
 
       # What this run deployed, for Lineage (#3584): Agents reads the notice from the run, so App
-      # Store Connect's key stays here. The Universal app's Mac and iOS builds share one bundle id.
+      # Store Connect's key stays here.
       - name: Say the deploy
         run: echo "::notice title=deploy::testflight:com.alexecollins.agents.remote/${{ github.run_number }}"
 

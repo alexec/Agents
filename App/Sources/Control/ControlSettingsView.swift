@@ -122,9 +122,7 @@ struct ControlOverviewPage: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             if control.isOnThisMac { ControlBrowserCard(control: control) }
-            #if !STORE_WINDOW
             if let host = HostScenes.model { HostServeCard(host: host) }
-            #endif
             ControlCard {
                 ControlRow(dot: control.isReachable ? .online : .offline,
                            title: control.isOnThisMac ? "This Mac" : (control.status?.name ?? "Control plane"),
@@ -133,9 +131,7 @@ struct ControlOverviewPage: View {
                     if control.isOnThisMac {
                         Button("Restart") { Task { await restart() } }.buttonStyle(.paper)
                     }
-                    #if !STORE_WINDOW
                     ControlPlaneMoveButton(control: control)
-                    #endif
                 }
                 Divider()
                 ControlRow(dot: .none, title: "Reachable away from home",
@@ -162,10 +158,8 @@ struct ControlOverviewPage: View {
                     }
                 }
             }
-            #if !STORE_WINDOW
             // Agents Host's control plane controls (#4227): moving it, and its store.
             if let host = HostScenes.model { HostControlPlaneCards(host: host) }
-            #endif
             if control.isOnThisMac {
                 Text("While this Mac sleeps, no window or device can reach any of your agents. Agents on other machines keep working.")
                     .appText(.supporting).foregroundStyle(.secondary)
@@ -198,9 +192,7 @@ struct ControlOverviewPage: View {
 
     /// The control plane on this Mac is a login item of this app's host side (#4230).
     private func restart() async {
-        #if !STORE_WINDOW
         if let host = HostScenes.model { await host.restartControl(); await control.refresh(); return }
-        #endif
         await control.restart()
     }
 

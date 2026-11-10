@@ -245,6 +245,6 @@ struct ConnectJiraSheet: View {
 
     private func open(_ address: String) {
         guard let url = URL(string: address) else { return }
-        NSWorkspace.shared.open(url) // store-ok: Atlassian or Jira in the browser, not a path
+        NSWorkspace.shared.open(url)
     }
 }

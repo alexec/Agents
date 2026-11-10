@@ -68,7 +68,7 @@ worktree's own `build/` and `.build` is still the clean-up, and leaves the cache
 Verify only what you touched: the schemes and tests for the paths your branch changes, as
 `.agents/skills/merge-wave/scripts/merge-wave.sh plan <your branch>`, run in your
 worktree, lists them with their commands (#2685): an `App/` or `Host/` change needs
-`AgentsHost` and `AgentsStore`, not the Remote or the web page, so no iOS simulator
+`AgentsHost` (Agents, the one Mac app), not the Remote or the web page, so no iOS simulator
 build; a `Remote/` change needs only the Remote; a `Shared/`, `Packages/` or `project.yml`
 change needs both; a `Packages/AgentsKit` change needs its tests filtered by
 `scripts/select-test-suites.sh`. The full suite and every scheme run once, in the wave.

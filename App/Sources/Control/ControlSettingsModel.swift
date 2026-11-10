@@ -604,10 +604,10 @@ final class ControlSettingsModel {
     /// The default browser, or for a walk the file its headless browser is pointed at by.
     private static func open(_ url: URL) {
         if let file = ControlConfig.walkOpenedURL {
-            try? Data(url.absoluteString.utf8).write(to: file, options: .atomic)  // store-ok: the window's own container
+            try? Data(url.absoluteString.utf8).write(to: file, options: .atomic)
             return
         }
-        NSWorkspace.shared.open(url)  // store-ok: a web page
+        NSWorkspace.shared.open(url)
     }
 
     func stopCodes() async {

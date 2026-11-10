@@ -84,111 +84,6 @@ packages:
     url: https://github.com/FluidInference/FluidAudio.git
     exactVersion: 0.17.7
 targets:
-  # The Mac window (058, research R12): the App Store app, sandboxed, and linking
-  # AgentsKitCore only, as the Remote does. It carries no helpers, no Linux programs and
-  # no install scripts: Agents Host runs the agents, and the window reaches them through
-  # the control plane. The developer window it was built beside went in T106.
-  AgentsStore:
-    type: application
-    supportedDestinations: [macOS]
-    # The sandbox gate (T044b): linking only Core stops a Process, not a read of the disk
-    # or Finder pointed at a path. This does, before anything compiles.
-    preBuildScripts:
-      - name: Check the sandbox gate
-        script: python3 "$SRCROOT/scripts/check-store-window.py"
-        basedOnDependencyAnalysis: false
-      # Every window preference in WindowDefaults (#1029): a scratch copy shares the
-      # bundle id, so a key in the standard domain lands in the person's window.
-      - name: Check window defaults
-        script: python3 "$SRCROOT/scripts/check-window-defaults.py"
-        basedOnDependencyAnalysis: false
-    sources:
-      - path: App/Sources
-      - path: App/Resources
-        excludes:
-          - servers
-          - toolsets
-      # Compiled into the Remote as well. The two apps shared no view code before
-      # this, which is how they came to draw the same state in three colours and the
-      # same block kind at two sizes; the definitions both must agree on live here.
-      - path: Shared/UI
-      # Listed, not owned. An `entitlements:` key here would make XcodeGen the author
-      # of the file and rewrite it from this one on every generate — and with nothing
-      # under the key to write, what it writes is an empty plist. The project is not in
-      # git and `xcodegen generate` is the first thing a fresh clone runs, so the day
-      # the app needed a capability was the day that silently took it away again.
-      # `CODE_SIGN_ENTITLEMENTS` below is what actually signs it in.
-      - path: App/Agents-Store.entitlements
-        buildPhase: none
-      # The privacy manifest (#729): the required-reason APIs it uses, no data collected, no
-      # tracking.
-      - path: App/PrivacyInfo.xcprivacy
-        buildPhase: resources
-    dependencies:
-      - package: AgentsKit
-        product: AgentsKitCore
-      - package: SwiftTerm
-      - package: CodeText
-      - package: Yams
-      - package: FluidAudio
-    # The voice's models, copied into Resources/Voice (#2322).
-    postBuildScripts:
-      - name: Carry the voice
-        script: sh "$SRCROOT/scripts/voice-models.sh" --carry
-        basedOnDependencyAnalysis: false
-    info:
-      path: App/Info-Store.plist
-      properties:
-        CFBundleDisplayName: Agents
-        CFBundleName: Agents
-        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        CFBundleShortVersionString: $(MARKETING_VERSION)
-        LSApplicationCategoryType: public.app-category.developer-tools
-        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
-        NSHumanReadableCopyright: © 2026 Alex Collins
-        NSMicrophoneUsageDescription: >-
-          So you can say what you want done instead of typing it, and talk to your
-          agents in voice mode. No audio is kept.
-        NSSpeechRecognitionUsageDescription: >-
-          So what you say becomes the words in the prompt. It is recognised on this Mac
-          where this Mac can do it.
-        NSLocalNetworkUsageDescription: >-
-          To find and reach your agents' control plane on this network.
-        NSBonjourServices: [_agents-control._tcp]
-        # Exempt (#729): what is encrypted (HPKE for sealed pushes, and the P-256
-        # agreement) is CryptoKit's, and TLS is the system's. The app's own SHA-256,
-        # HMAC and HKDF hash and authenticate; its own P-256 arithmetic runs only on Linux.
-        ITSAppUsesNonExemptEncryption: false
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.store
-        CODE_SIGN_ENTITLEMENTS: App/Agents-Store.entitlements
-        # Not Agents, which the one app is (#4225): both are built into one build/DD, where
-        # the second Agents.app wrote over the first. The person still sees CFBundleName.
-        PRODUCT_NAME: Agents Store
-        # Its own @main (StoreEntry). The one app's is HostEntry (#4225), until #4224's
-        # removal child deletes this target.
-        SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) STORE_WINDOW
-        SDKROOT: macosx
-        SUPPORTED_PLATFORMS: macosx
-        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
-        ENABLE_PREVIEWS: YES
-        GENERATE_INFOPLIST_FILE: NO
-        ENABLE_HARDENED_RUNTIME: YES
-        # The gate reads the sources, which a sandboxed script phase may not.
-        ENABLE_USER_SCRIPT_SANDBOXING: NO
-      # The App Store archive (058, T089, T093): Apple Distribution and the App Store profile
-      # made for it, so the archive carries the entitlements an upload is checked against.
-      # It ships as the Remote's bundle ID: one App Store app on Mac, iPhone and iPad,
-      # bought once (Universal Purchase, T107, #659). Debug and Live keep `.store`, so
-      # the window already running keeps its container and its pairing.
-      configs:
-        Release:
-          PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.remote
-          CODE_SIGN_STYLE: Manual
-          CODE_SIGN_IDENTITY: Apple Distribution
-          PROVISIONING_PROFILE_SPECIFIER: Agents Universal Mac App Store
   # The remote: the same app, laid out for a phone and an iPad. It links
   # AgentsKitCore and nothing else, which is the rule that keeps a `Process` or a PTY
   # from ever reaching it — the compiler refuses before a reviewer has to.
@@ -201,9 +96,9 @@ targets:
       # The Live Activity's attributes (#1657): the app starts it, the widget draws it, and
       # ActivityKit matches the two by this one type.
       - path: RemoteWidget/Sources/TurnActivityAttributes.swift
-      # The same files the Mac compiles. See the note on the AgentsStore target.
+      # The same files the Mac compiles. See the note on the AgentsHost target.
       - path: Shared/UI
-      # Listed, not owned. See the note on the AgentsStore target's entitlements.
+      # Listed, not owned. See the note on the AgentsHost target's entitlements.
       - path: Remote/Remote.entitlements
         buildPhase: none
       # The privacy manifest (#729): the required-reason APIs it uses, no data collected, no
@@ -240,7 +135,7 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleShortVersionString: $(MARKETING_VERSION)
         NSHumanReadableCopyright: © 2026 Alex Collins
-        # Exempt (#729). See the note on the AgentsStore target.
+        # Exempt (#729). See the note on the AgentsHost target.
         ITSAppUsesNonExemptEncryption: false
         # The scheme the Home-screen widget links into (068). One scheme, two links: the
         # body of the widget and one of its rows.
@@ -379,7 +274,7 @@ targets:
       - path: Shared/UI/Paper.swift
       - path: Shared/UI/StateTint.swift
       - path: Shared/UI/TypeScale.swift
-      # Listed, not owned. See the note on the AgentsStore target's entitlements.
+      # Listed, not owned. See the note on the AgentsHost target's entitlements.
       - path: RemoteWidget/RemoteWidget.entitlements
         buildPhase: none
       # The privacy manifest (#729): the required-reason APIs it uses, no data collected, no
@@ -581,7 +476,16 @@ targets:
         excludes:
           - servers
           - toolsets
+      # Compiled into the Remote as well. The two apps shared no view code before
+      # this, which is how they came to draw the same state in three colours and the
+      # same block kind at two sizes; the definitions both must agree on live here.
       - path: Shared/UI
+      # Listed, not owned. An `entitlements:` key here would make XcodeGen the author
+      # of the file and rewrite it from this one on every generate — and with nothing
+      # under the key to write, what it writes is an empty plist. The project is not in
+      # git and `xcodegen generate` is the first thing a fresh clone runs, so the day
+      # the app needed a capability was the day that silently took it away again.
+      # `CODE_SIGN_ENTITLEMENTS` below is what actually signs it in.
       - path: Host/AgentsHost.entitlements
         buildPhase: none
       - path: Host/AgentsHost-Live.entitlements
@@ -656,6 +560,9 @@ targets:
         NSLocalNetworkUsageDescription: >-
           To find and reach your agents' control plane on this network.
         NSBonjourServices: [_agents-control._tcp]
+        # Exempt (#729): what is encrypted (HPKE for sealed pushes, and the P-256
+        # agreement) is CryptoKit's, and TLS is the system's. The app's own SHA-256,
+        # HMAC and HKDF hash and authenticate; its own P-256 arithmetic runs only on Linux.
         ITSAppUsesNonExemptEncryption: false
     settings:
       base:
@@ -747,7 +654,7 @@ targets:
       - path: Host/PeerCheck
         excludes:
           - "*.entitlements"
-      # Listed, not owned. See the note on the AgentsStore target's entitlements.
+      # Listed, not owned. See the note on the AgentsHost target's entitlements.
       - path: Host/PeerCheck/agents-peer.entitlements
         buildPhase: none
     settings:
@@ -774,15 +681,6 @@ schemes:
         AgentsHost: all
     run:
       config: Debug
-  AgentsStore:
-    build:
-      targets:
-        AgentsStore: all
-    run:
-      config: Debug
-    # The Mac App Store archive (058, T089), checked by scripts/check-store-archive.sh.
-    archive:
-      config: Release
   agents-peer:
     build:
       targets:

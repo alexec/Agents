@@ -73,10 +73,10 @@ enum BackgroundOutput {
         let local = FileManager.default.temporaryDirectory
             .appendingPathComponent("\(prefix)\(item.id)")
             .appendingPathExtension(ext)
-        guard (try? text.write(to: local, atomically: true, encoding: .utf8)) != nil else { return }  // store-ok: the app's own temporary folder
+        guard (try? text.write(to: local, atomically: true, encoding: .utf8)) != nil else { return }
         // Async because this function already is: the synchronous open is not the one
         // a concurrent context is offered.
-        _ = try? await NSWorkspace.shared.open([local],  // store-ok: a copy in the app's own temporary folder
+        _ = try? await NSWorkspace.shared.open([local],
                                             withApplicationAt: URL(fileURLWithPath: "/System/Applications/TextEdit.app"),
                                             configuration: NSWorkspace.OpenConfiguration())
     }
