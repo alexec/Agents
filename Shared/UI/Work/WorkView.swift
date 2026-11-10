@@ -24,21 +24,40 @@ struct WorkView: View {
                 WorkListPane(model: model, kind: place.kind, list: model.workLists[place.kind]).id(place.kind)
             }
         }
-        // The list's own title: its row in the sidebar chose it (#4004).
-        .navigationTitle(place.kind.title)
+        // The list's own title: its row in the sidebar chose it (#4004). On the Remote an item's
+        // page says its number, *#4331*, as the bar's title (#4401).
+        .navigationTitle(Self.title(place))
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .toolbar {
-            ToolbarItemGroup(placement: Self.historyPlacement) {
-                Button { model.workHistory.back() } label: { Image(systemName: "chevron.left") }
-                    .disabled(!model.workHistory.canGoBack)
-                    .help("Back")
-                Button { model.workHistory.forward() } label: { Image(systemName: "chevron.right") }
-                    .disabled(!model.workHistory.canGoForward)
-                    .help("Forward")
+            // The Remote's item page has its own bar: ‹ Issues, ↑ ↓ and Open on GitHub (#4401).
+            if Self.history(place) {
+                ToolbarItemGroup(placement: Self.historyPlacement) {
+                    Button { model.workHistory.back() } label: { Image(systemName: "chevron.left") }
+                        .disabled(!model.workHistory.canGoBack)
+                        .help("Back")
+                    Button { model.workHistory.forward() } label: { Image(systemName: "chevron.right") }
+                        .disabled(!model.workHistory.canGoForward)
+                        .help("Forward")
+                }
             }
         }
+    }
+
+    private static func title(_ place: WorkPlace) -> String {
+        #if os(iOS)
+        if let ref = place.ref { return WorkList.shortRef(ref) }
+        #endif
+        return place.kind.title
+    }
+
+    private static func history(_ place: WorkPlace) -> Bool {
+        #if os(iOS)
+        place.ref == nil
+        #else
+        true
+        #endif
     }
 
     /// Back and Forward: beside the window's title on the Mac, at the bar's end on the Remote,

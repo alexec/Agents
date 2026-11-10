@@ -98,6 +98,10 @@ struct WorkItemPage: View {
         .onGeometryChange(for: CGFloat.self, of: \.size.width) { width = $0 }
         #if os(iOS)
         .refreshable { asked += 1 }
+        .navigationSubtitle(model.workNeighbours.map { WorkList.positionWords($0, more: model.workLists[place.kind].hasMore) } ?? "")
+        // ‹ Issues takes the split view's own back: from the list, that goes on to the sidebar.
+        .navigationBarBackButtonHidden(true)
+        .toolbar { barItems }
         #else
         .toolbar { toolbar }
         // The place says Issues › #12: the window's own title, Issues, would say it twice.
@@ -140,15 +144,59 @@ struct WorkItemPage: View {
     }
     #endif
 
+    #if os(iOS)
+    /// The Remote's bar (#4401 notes 1, 2 and 7): ‹ Issues, the number with *3 of 42* under it,
+    /// then ↑ and ↓, and on the iPhone Open on GitHub, as the state line has no room for it.
+    @ToolbarContentBuilder
+    private var barItems: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            // An HStack, not a Label: the bar draws a Label's icon alone.
+            Button { back() } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "chevron.left").fontWeight(.semibold)
+                    Text(backWords)
+                }
+            }
+            .accessibilityLabel(backWords)
+        }
+        ToolbarItemGroup(placement: .topBarTrailing) {
+            if let n = model.workNeighbours {
+                let list = model.workLists[place.kind]
+                Button { Task { await model.stepWork(forward: false) } } label: { Image(systemName: "chevron.up") }
+                    .disabled(n.previous == nil)
+                    .accessibilityLabel("Previous")
+                Button { Task { await model.stepWork(forward: true) } } label: {
+                    if list.loadingMore { ProgressView() } else { Image(systemName: "chevron.down") }
+                }
+                .disabled(!model.workHasNext || list.loadingMore)
+                .accessibilityLabel("Next")
+            }
+            if compact, let url = forgeURL {
+                Button { openURL(url) } label: { Image(systemName: "arrow.up.right.square") }
+                    .accessibilityLabel(WorkList.openOnWords(node.ref))
+            }
+        }
+    }
+
+    /// Back to the place before, the list when it was one; else to the list (a page opened from a link).
+    private var backWords: String {
+        let history = model.workHistory
+        guard history.canGoBack, let ref = history.places[history.at - 1].ref else { return place.kind.title }
+        return WorkList.shortRef(ref)
+    }
+
+    private func back() {
+        if model.workHistory.canGoBack { model.workHistory.back() } else { model.showWork(WorkPlace(kind: place.kind)) }
+    }
+    #endif
+
+    private var forgeURL: URL? { item?.url.flatMap(URL.init(string:)) ?? row?.url ?? WorkList.url(node) }
+
     // MARK: Header
 
     private var header: some View {
         let title = item?.title ?? row?.title
         return VStack(alignment: .leading, spacing: 8) {
-            #if os(iOS)
-            // The Remote's navigation bar takes Previous and Next with #4401; until then they stay here.
-            if model.workNeighbours != nil { HStack { stepper } }
-            #endif
             if narrow {
                 titleLine(title)
                 stateLine
@@ -185,7 +233,8 @@ struct WorkItemPage: View {
     /// The state pill (a tracker's status menu in its place), *alexec opened this · 4 comments*,
     /// and Open on GitHub at the trailing end. The opened and closed times come with #4373.
     private var stateLine: some View {
-        let url = item?.url.flatMap(URL.init(string:)) ?? row?.url ?? WorkList.url(node)
+        // On the iPhone Open on GitHub is the bar's (#4401 note 7).
+        let url = compact ? nil : forgeURL
         return HStack(alignment: .center, spacing: 8) {
             if let item, let transitions = detail?.got.transitions, writes {
                 WorkStatusMenu(item: item, transitions: transitions) { transition in
@@ -199,11 +248,7 @@ struct WorkItemPage: View {
             Spacer(minLength: 8)
             if let url {
                 Button { openURL(url) } label: {
-                    if compact {
-                        Image(systemName: "arrow.up.right.square")
-                    } else {
-                        Label(WorkList.openOnWords(node.ref), systemImage: "arrow.up.right.square")
-                    }
+                    Label(WorkList.openOnWords(node.ref), systemImage: "arrow.up.right.square")
                 }
                 .linkStyle()
                 .help(WorkList.openOnWords(node.ref))
@@ -257,8 +302,9 @@ struct WorkItemPage: View {
         }
     }
 
+    #if os(macOS)
     /// Previous and Next through the list the page was opened from (#3257), and where it stands
-    /// in it: ↑ *3 of 42* ↓. None on a page opened from a link or an address.
+    /// in it: ↑ *3 of 42* ↓. None on a page opened from a link or an address. The Remote's are its bar's.
     @ViewBuilder
     private var stepper: some View {
         if let n = model.workNeighbours {
@@ -282,15 +328,11 @@ struct WorkItemPage: View {
         }
     }
 
-    /// An arrow with a target a finger or a pointer finds: 44 points on the Remote, 24 on the Mac.
+    /// An arrow with a target a pointer finds.
     private func stepLabel(_ symbol: String) -> some View {
-        #if os(iOS)
-        let side: CGFloat = 44
-        #else
-        let side: CGFloat = 24
-        #endif
-        return Image(systemName: symbol).frame(width: side, height: side).contentShape(Rectangle())
+        Image(systemName: symbol).frame(width: 24, height: 24).contentShape(Rectangle())
     }
+    #endif
 
     // MARK: States
 
@@ -315,7 +357,7 @@ struct WorkItemPage: View {
             Text(words).appText(.supporting).foregroundStyle(.secondary).multilineTextAlignment(.center).textSelection(.enabled)
             HStack(spacing: 12) {
                 Button(WorkLook.tryAgain) { asked += 1 }.buttonStyle(.paper)
-                if let url = item?.url.flatMap(URL.init(string:)) ?? row?.url ?? WorkList.url(node) {
+                if let url = forgeURL {
                     Button(WorkList.openOnWords(node.ref)) { openURL(url) }.linkStyle()
                 }
             }
@@ -438,7 +480,12 @@ struct WorkItemPage: View {
                 }
             }
         }
+        #if os(iOS)
+        // A sheet on the Remote, the iPad too (#4401 note 12).
+        .sheet(isPresented: $pickingLabels) { labelsPicker.paperSheet().presentationDetents([.medium, .large]) }
+        #else
         .popover(isPresented: $pickingLabels, arrowEdge: .leading) { labelsPicker }
+        #endif
         WorkSideSection(title: "Milestone") {
             if let milestone = item?.milestone ?? row?.milestone {
                 Label(milestone, systemImage: "flag")
