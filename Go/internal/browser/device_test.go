@@ -69,7 +69,7 @@ func TestADeviceOnARealChromium(t *testing.T) {
 	if exe == "" {
 		t.Skip("AGENTS_TEST_CHROMIUM names no Chromium")
 	}
-	p, err := launchChromium(exe, t.TempDir(), append(os.Environ(), "HOME="+t.TempDir()))
+	p, err := launchChromium(exe, t.TempDir(), append(os.Environ(), "HOME="+t.TempDir()), false)
 	if err != nil {
 		t.Fatal(err)
 	}

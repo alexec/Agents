@@ -278,6 +278,11 @@ func (d *Daemon) driveBrowser(ctx context.Context, agent wire.UUID, name string,
 	}
 	ctx, cancel := context.WithTimeout(ctx, browserCallLongest)
 	defer cancel()
+	if name == "browser_navigate" && browser.ChecksBots(argString(args, "url")) && d.browser.Headed() {
+		// A site whose bot check refuses headless Chrome: the browser starts again with a
+		// window off-screen (#4272), and browserDriveFor starts Playwright on it.
+		log.Printf("browser: a site that checks for bots, so the browser starts again headed")
+	}
 	drive, err := d.browserDriveFor(ctx, agent, folderPath(a))
 	if err != nil {
 		return failed("The browser did not start: " + browserWords(err))

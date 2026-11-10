@@ -33,8 +33,8 @@ func (s *fakeStore) clearAll(context.Context) error { s.jar = nil; return nil }
 func withStore(t *testing.T, f *fake, store *fakeStore) {
 	t.Helper()
 	launch := f.m.launch
-	f.m.launch = func(exe, profile string, env []string) (*process, error) {
-		p, err := launch(exe, profile, env)
+	f.m.launch = func(exe, profile string, env []string, headed bool) (*process, error) {
+		p, err := launch(exe, profile, env, headed)
 		if p != nil {
 			p.store = store
 		}
@@ -139,7 +139,7 @@ func TestARealChromiumsCookies(t *testing.T) {
 	if exe == "" {
 		t.Skip("set AGENTS_TEST_CHROMIUM to a Chromium to start a real one")
 	}
-	p, err := launchChromium(exe, t.TempDir(), os.Environ())
+	p, err := launchChromium(exe, t.TempDir(), os.Environ(), false)
 	if err != nil {
 		t.Fatal(err)
 	}
