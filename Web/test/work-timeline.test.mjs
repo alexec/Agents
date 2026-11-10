@@ -145,8 +145,21 @@ test("a label drops its title before the next thing on its lane", () => {
   const room = t.labelRoom(line, axis.x(line.start), axis, now);
   assert.equal(room, 14);
   assert.equal(t.fitLabel(line, room, measure), undefined);
-  assert.equal(t.fitLabel(line, 80, measure), "#19 · 0 of 1");
-  assert.equal(t.fitLabel(line, Infinity, measure), "Issue 19  #19 · 0 of 1");
+  assert.equal(t.labelText(t.fitLabel(line, 80, measure)), "#19 · 0 of 1");
+  assert.equal(t.labelText(t.fitLabel(line, Infinity, measure)), "Issue 19  #19 · 0 of 1");
+});
+
+test("a long title is cut with an ellipsis so the label fits its line", () => {
+  const [line] = t.timelineLines({ epics: [epic(19, [child(60, { started: -9, closed: -1 })], [[-9, -1]])], releases: [] }, now);
+  const measure = (s) => Array.from(s).length * 6;
+  // A closed line: the label stops at its end, not after it.
+  const x = axis.x(line.start);
+  assert.equal(t.labelRoom(line, x, axis, now), axis.x(line.end) - x);
+  // "Issue 19  #19 · 1 of 1" is 22 characters; 20 keep "Issue…" and the figures.
+  assert.deepEqual(t.fitLabel(line, 20 * 6, measure), { title: "Issue…", figures: "#19 · 1 of 1" });
+  // Room for one letter and "…": the name keeps one; less, and only the figures.
+  assert.equal(t.labelText(t.fitLabel(line, 16 * 6, measure)), "I…  #19 · 1 of 1");
+  assert.equal(t.labelText(t.fitLabel(line, 15 * 6, measure)), "#19 · 1 of 1");
 });
 
 test("a feature keeps its colour, the window's", () => {

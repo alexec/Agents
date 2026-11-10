@@ -287,7 +287,7 @@ public enum WorkTimeline {
 
         public var id: String { "\(epic.ref)/\(segment)" }
 
-        /// The label: the name, then `#n · 6 of 8`; the short one keeps only the figures.
+        /// The label: the name, then `#n · 6 of 8`; a short one cuts the name with "…".
         public var label: String { "\(title)  \(figures)" }
         public var figures: String { "\(number) · \(done) of \(total)" }
 
@@ -434,20 +434,43 @@ public enum WorkTimeline {
     }
 
     /// How far a line's label may run from `x` before the next thing on its lane: Now, its band or
-    /// its pill (section 12, item 6). Infinity when nothing is in the way.
+    /// its pill (section 12, item 6), and never past the line's own end.
     public static func labelRoom(_ line: Line, from x: Double, axis: Axis, now: Date) -> Double {
         var stops: [Double] = []
         let nowX = axis.x(now)
         if nowX > x, line.end > now { stops.append(nowX) }
         if let band = line.band { stops.append(axis.x(band.start)) }
         if case .waits = line.how { stops.append(axis.x(line.end)) }
-        return stops.filter { $0 > x }.min().map { $0 - x - 6 } ?? .infinity
+        let ahead = stops.filter { $0 > x }.min().map { $0 - x - 6 } ?? .infinity
+        return min(ahead, axis.x(line.end) - x)
     }
 
-    /// The label that fits `room`: the whole one, then the figures alone, then nothing.
-    public static func label(_ line: Line, room: Double, measure: (String) -> Double) -> String? {
-        if measure(line.label) <= room { return line.label }
-        if measure(line.figures) <= room { return line.figures }
+    /// What a label says: the name, whole or cut short with "…", or "" for none; then the figures.
+    public struct Words: Sendable, Hashable {
+        public var title: String
+        public var figures: String
+        public var text: String { title.isEmpty ? figures : "\(title)  \(figures)" }
+    }
+
+    /// The label that fits `room`: the whole one, then the name cut short with "…" before the
+    /// figures, then the figures alone, then nothing.
+    public static func label(_ line: Line, room: Double, measure: (String) -> Double) -> Words? {
+        if measure(line.label) <= room { return Words(title: line.title, figures: line.figures) }
+        let title = Array(line.title)
+        var best: String?
+        var low = 1, high = title.count - 1
+        while low <= high {
+            let mid = (low + high) / 2
+            let cut = String(title[..<mid]).trimmingCharacters(in: .whitespaces)
+            if !cut.isEmpty, measure("\(cut)…  \(line.figures)") <= room {
+                best = cut + "…"
+                low = mid + 1
+            } else {
+                high = mid - 1
+            }
+        }
+        if let best { return Words(title: best, figures: line.figures) }
+        if measure(line.figures) <= room { return Words(title: "", figures: line.figures) }
         return nil
     }
 
