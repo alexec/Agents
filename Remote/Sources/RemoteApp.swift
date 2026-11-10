@@ -34,7 +34,9 @@ struct RemoteApp: App {
     }
 
     static func link() -> any DaemonLink {
-        if ProcessInfo.processInfo.arguments.contains("-fake") { return FakeDaemon() }
+        // The canned daemon speaks bare JSON-RPC; the Remote wraps its lines for a control
+        // plane (#3234), so one is put in front of it (#4126).
+        if ProcessInfo.processInfo.arguments.contains("-fake") { return OneHostPlane(FakeDaemon()) }
         return RemoteControl.link() ?? NotPairedLink()
     }
 
