@@ -166,4 +166,53 @@ struct RuntimeTallyTests {
         #expect(tally.words == "0/2")
         #expect(tally.noneWorking)
     }
+
+    private func allowances(_ readings: [String: AllowanceReading]) -> RuntimeAllowances {
+        RuntimeAllowances(rows: readings.map { id, reading in
+            var state = AllowanceState(credentialKey: "\(id):sign-in", entryID: UUID(), since: now)
+            state.reading = reading
+            return RuntimeAllowances.Row(credentialKey: "\(id):sign-in", state: state)
+        }, at: now)
+    }
+
+    private var two: [RuntimeStatus] { [status("claude", available), status("codex", available)] }
+
+    @Test func lessThanATenthLeftIsLow() throws {
+        let tally = try #require(RuntimeTally(two, allowances: allowances(["claude": AllowanceReading(used: 0.92, at: now)])))
+        #expect(tally.isLow)
+        #expect(tally.lowWords == "Claude: 8% left")
+    }
+
+    @Test func eightyPercentUsedIsNotLow() throws {
+        let tally = try #require(RuntimeTally(two, allowances: allowances(["claude": AllowanceReading(used: 0.85, at: now)])))
+        #expect(!tally.isLow)
+        #expect(tally.lowWords == nil)
+    }
+
+    @Test func aWarningWithNoAmountIsNearlyUsedUp() throws {
+        let tally = try #require(RuntimeTally(two, allowances: allowances(["claude": AllowanceReading(nearlySpent: true, at: now)])))
+        #expect(tally.lowWords == "Claude: nearly used up")
+    }
+
+    @Test func twoLowAreNamedTogether() throws {
+        let tally = try #require(RuntimeTally(two + [status("grok", available)], allowances: allowances([
+            "claude": AllowanceReading(used: 0.95, at: now), "codex": AllowanceReading(spent: true, at: now)])))
+        #expect(tally.lowWords == "Claude, Codex: low allowance")
+        #expect(tally.low.count == 2)
+    }
+
+    @Test func aReadingThatHasResetIsNotLow() throws {
+        let tally = try #require(RuntimeTally(two, allowances: allowances([
+            "claude": AllowanceReading(used: 0.95, resetsAt: now.addingTimeInterval(-60), at: now)])))
+        #expect(!tally.isLow)
+    }
+
+    @Test func noneWorkingIsRedNotLow() throws {
+        var out = status("claude", available)
+        out.isOut = true
+        let tally = try #require(RuntimeTally([out], allowances: allowances(["claude": AllowanceReading(spent: true, at: now)])))
+        #expect(tally.noneWorking)
+        #expect(!tally.isLow)
+        #expect(tally.lowWords == nil)
+    }
 }

@@ -51,9 +51,10 @@ struct RemoteSidebar: View {
                 })
     }
 
-    /// No runtime can be started on: Runtimes' icon says so in red (#587).
-    private var runtimesFailing: Bool {
-        RuntimeTally(model.runtimes, allowances: model.runtimeAllowances)?.noneWorking == true
+    /// No runtime can be started on: Runtimes' icon says so in red (#587); one nearly used
+    /// up, in the warning tint (#3956).
+    private var runtimesTally: RuntimeTally? {
+        RuntimeTally(model.runtimes, allowances: model.runtimeAllowances)
     }
 
     private var servers: [MachineRef] {
@@ -176,7 +177,8 @@ struct RemoteSidebar: View {
                         .activityIcon("multiply.circle").appText(.supporting).tag(SidebarItem.multiplier)
                     EventsRow().activityIcon("list.bullet.rectangle").appText(.supporting).tag(SidebarItem.events)
                     ResourcesRow().activityIcon("square.stack.3d.up").appText(.supporting).tag(SidebarItem.resources)
-                    RuntimesRow().activityIcon("cpu", warns: runtimesFailing)
+                    RuntimesRow().activityIcon("cpu", warns: runtimesTally.map { $0.noneWorking || $0.isLow } ?? false,
+                                               tint: runtimesTally?.isLow == true ? .attention : .failure)
                         .appText(.supporting).tag(SidebarItem.runtimes)
                     // What happened last to the person's secrets and accounts (#4161), as the window's.
                     ForEach([StatusSecretsKind.secrets, .accounts], id: \.self) { kind in
@@ -302,8 +304,9 @@ struct RemoteSidebar: View {
             }
             await model.searchSessions(words)
         }
-        // Every folder's workflows and pinned pages, and the rows' lease marks (#175).
-        .shows([.workflows, .pins, .leases])
+        // Every folder's workflows and pinned pages, the rows' lease marks (#175), and what
+        // the Runtimes row's icon and line read (#3956).
+        .shows([.workflows, .pins, .leases, .runtimes, .allowances])
         .safeAreaInset(edge: .top, spacing: 0) {
             if showsBanner { StaleBanner() }
         }
@@ -1153,9 +1156,15 @@ private struct RuntimesRow: View {
 
     var body: some View {
         let tally = RuntimeTally(model.runtimes, allowances: model.runtimeAllowances)
-        HStack {
-            Text("Runtimes")
-            Spacer()
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text("Runtimes")
+                Spacer()
+            }
+            // An allowance nearly used up (#3956): the runtime, in grey under the title.
+            if let low = tally?.lowWords {
+                Text(low).appText(.fine).foregroundStyle(.secondary).lineLimit(1)
+            }
         }
         .accessibilityElement(children: .combine)
         .accessibilityValue(tally.map { $0.noneWorking ? "None of \($0.total) working"
