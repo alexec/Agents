@@ -327,3 +327,65 @@ test("a forge that could not be read keeps its last rows, dimmed; a fresh read h
   assert.equal(carryStale({ host: "mac", items: [], errors: [] }, had).items.length, 0);
   assert.equal(w.errorWords({ forge: "forgejo", message: "Forgejo: Get …: refused" }, undefined), "Forgejo: Get …: refused");
 });
+
+// The lists (#4395, specs/4328-work-look/lists.md), as WorkLookTests has them on the Mac (#4393).
+test("a draft says so after its number; a closed draft does not (#4395)", () => {
+  const now = Date.parse("2026-10-30T12:00:00Z");
+  const pr = (extra) => w.forgeRow(item(4328, { node: { kind: "pr", ref: "github:alexec/Agents#4328" }, author: "alexec", draft: true, ...extra }), "mac");
+  assert.equal(w.rowLine(pr({}), now).wide, "#4328 · Draft · updated 2 hours ago by alexec");
+  assert.equal(w.rowLine(pr({}), now).short, "#4328 · Draft · 2 h · alexec");
+  assert.equal(w.rowLine(pr({ state: "closed" }), now).short, "#4328 · 2 h · alexec");
+});
+
+test("the end of a list counts its rows, with + while more pages are there (#4395)", () => {
+  assert.equal(w.countWords("issue", 128), "128 issues");
+  assert.equal(w.countWords("issue", 50, true), "50+ issues");
+  assert.equal(w.countWords("issue", 1), "1 issue");
+  assert.equal(w.countWords("pr", 1), "1 pull request");
+  assert.equal(w.countWords("pr", 1, true), "1+ pull requests");
+  assert.equal(w.loadingMore(50), "Loading more… · 50 shown");
+  assert.equal(w.couldNotRead("pr"), "Could not read pull requests");
+});
+
+test("an empty list says the filters that are set; none says nothing (#4395)", () => {
+  assert.equal(w.setFilters(w.anyFilter), undefined);
+  assert.equal(w.setFilters({ ...w.anyFilter, label: "bug", assignee: "alexec" }), "Label: bug · Assignee: alexec");
+  assert.equal(w.setFilters({ ...w.anyFilter, text: " look ", project: "p1", repo: "github:alexec/Agents", board: "u" }, "Agents", "Roadmap"),
+    "“look” · Project: Agents · Repo: alexec/Agents · Board: Roadmap");
+});
+
+test("a credential the forge refused offers Settings ▸ Connectors (#4395)", () => {
+  assert.equal(w.credentialProblem("GitHub said 401 Bad credentials"), true);
+  assert.equal(w.credentialProblem("GitHub is not connected"), true);
+  assert.equal(w.credentialProblem("rate limit"), false);
+});
+
+test("the filters and the sort go in the address and back, only what is not the default (#4395)", () => {
+  assert.equal(w.workQuery(w.anyFilter, "updated"), "");
+  const f = { ...w.anyFilter, project: "agents", label: "bug", state: "closed", text: "a b" };
+  const q = w.workQuery(f, "newest");
+  assert.equal(q, "q=a+b&project=agents&state=closed&label=bug&sort=newest");
+  assert.deepEqual(w.parseWorkQuery(q, "issue"), { filter: f, sort: "newest" });
+  // A word the list does not know is left out: merged is a PR's state, a board is Issues' only.
+  assert.deepEqual(w.parseWorkQuery("state=merged&sort=up", "issue"), { filter: w.anyFilter, sort: "updated" });
+  assert.deepEqual(w.parseWorkQuery("state=merged&board=x", "pr"), { filter: { ...w.anyFilter, state: "merged" }, sort: "updated" });
+  assert.equal(w.parseWorkQuery("board=x", "issue").filter.board, "x");
+});
+
+test("a next page a forge could not read keeps the rows and the cursor, and says so at the end (#4395)", async () => {
+  const lists = await load("src/model/workLists.ts");
+  const l = lists.workList("pr");
+  l.lists.value = [{ host: "mac", items: [item(1)], cursor: "next", errors: [] }];
+  let answer = { items: [], errors: [{ forge: "github", message: "GitHub said 502" }] };
+  const store = { link: { call: async () => answer } };
+  await lists.loadMore(store, l);
+  assert.equal(l.moreFailed.value, "GitHub said 502");
+  assert.equal(l.lists.value[0].cursor, "next");
+  assert.equal(l.lists.value[0].items.length, 1);
+  assert.equal(l.problem.value, null, "not the strip over the rows");
+  answer = { items: [item(2)], errors: [] };
+  await lists.loadMore(store, l);
+  assert.equal(l.moreFailed.value, null);
+  assert.equal(l.lists.value[0].items.length, 2);
+  assert.equal(l.lists.value[0].cursor, undefined);
+});

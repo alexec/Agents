@@ -6,14 +6,18 @@ long title, and an issue (#12) with comments by two people and a bot. Scratch da
 run-app host at it with --env AGENTS_TEST_GITHUB_URL=http://127.0.0.1:<port>, and connect GitHub with
 rpc.py call connections/sign-in/token '{"provider":"github","token":"walk"}'.
 
-    python3 Web/test/walk/forge4391-github.py <port> [slow seconds]
+    python3 Web/test/walk/forge4391-github.py <port> [slow seconds] [page size]
 
-With slow seconds, each list read waits that long first, so a walk sees the loading state.
+With slow seconds, each list read waits that long first, so a walk sees the loading state. With a
+page size, a list comes in pages of that many, so a walk sees paging (#4395); while the file
+<port>.fail-more is in the system's temporary folder, a page after the first fails.
 """
 import datetime
 import json
+import os
 import re
 import sys
+import tempfile
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -132,7 +136,15 @@ class Handler(BaseHTTPRequestHandler):
         if "search(" in q:
             time.sleep(SLOW)
             ns = sorted((k for k in ITEMS if wanted(k, v.get("q", ""))), key=lambda k: ITEMS[k]["at"])
-            return self.answer(200, {"data": {"search": {"pageInfo": {"hasNextPage": False, "endCursor": None},
+            after = v.get("after")
+            if after and os.path.exists(FAIL_MORE):
+                return self.answer(502, {"message": "Server Error"})
+            if after:
+                ns = ns[[f"c{k}" for k in ns].index(after) + 1:]
+            size = PAGE or len(ns)
+            more = len(ns) > size
+            ns = ns[:size]
+            return self.answer(200, {"data": {"search": {"pageInfo": {"hasNextPage": more, "endCursor": f"c{ns[-1]}" if more else None},
                                                          "edges": [{"cursor": f"c{k}", "node": node(k)} for k in ns]}}})
         self.answer(200, {"data": {}})
 
@@ -146,6 +158,8 @@ class Handler(BaseHTTPRequestHandler):
 
 
 SLOW = float(sys.argv[2]) if len(sys.argv) > 2 else 0
+PAGE = int(sys.argv[3]) if len(sys.argv) > 3 else 0
+FAIL_MORE = os.path.join(tempfile.gettempdir(), f"{sys.argv[1]}.fail-more")
 
 if __name__ == "__main__":
     ThreadingHTTPServer(("127.0.0.1", int(sys.argv[1])), Handler).serve_forever()
