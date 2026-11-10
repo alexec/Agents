@@ -435,7 +435,8 @@ struct RemoteView: View {
     private func activityPage(_ item: SidebarItem) -> some View {
         switch item {
         case .events: EventsListView().paperGround()
-        case .resources: ResourcesListView().paperGround()
+        // Resources are a section of This Mac's page (#4027).
+        case .resources: RemoteMachinePage(host: .mac).paperGround()
         case .runtimes: RuntimesView().paperGround()
         case .secretsStatus: RemoteStatusSecretsPage(kind: .secrets).paperGround()
         case .accountsStatus: RemoteStatusSecretsPage(kind: .accounts).paperGround()

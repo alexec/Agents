@@ -482,10 +482,16 @@ struct RemoteChatView: View {
 
     private var actions: ChatActions {
         let agentID = agent?.id
-        // Activity ▸ Resources (#116), as the Mac opens its Resources page (#2344). Not in a
-        // scene of its own, which has no Activity: there the line is words alone (#2447).
+        // This Mac's page at its Resources (#116, #4027), as the Mac opens its machine page
+        // there (#3629). Not in a scene of its own, which has no sidebar: there the line is
+        // words alone (#2447).
         var openLease: (@MainActor (ResourceName) -> Void)?
-        if popped == nil { openLease = { [model] _ in model.sidebarItem = .resources } }
+        if popped == nil {
+            openLease = { [model] _ in
+                model.resourcesAsked = true
+                model.sidebarItem = .machine(.mac)
+            }
+        }
         return ChatActions(
             open: { [model] location in
                 guard !model.macLacksPanes, let agentID else {

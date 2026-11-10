@@ -33,8 +33,8 @@ The folders of one project are one group, in the place of the first of them. See
 
 **Status**, **Machines** and **Usage** each fold, as a folder does. All start open.
 **Status** has **Runtimes** and **Events** on the Mac and on the web page, where it is a
-section of the bar. The iPhone and the iPad have the same **Status**, with **Resources** too
-until #4027 takes it out. **Runtimes** shows its icon in red when no runtime
+section of the bar. The iPhone and the iPad have the same **Status**. On the iPhone and the iPad,
+**Resources** is on This Mac's page only, and a chat's lease line opens it there. **Runtimes** shows its icon in red when no runtime
 can start. When one of your connectors does not answer or one of your connections ended
 (for example, a GitLab token that expired), **Settings ▸ You ▸ Connectors** shows a warning
 sign in the Settings rail, and its tooltip says which. A project's **Connectors** row keeps
