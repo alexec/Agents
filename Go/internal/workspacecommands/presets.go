@@ -318,15 +318,20 @@ func codespacesAPI(o map[string]any) (Config, error) {
 		"shutdown": Stopped}, Making{
 		// From a repository (#1809): the codespace clones it itself, with its own git
 		// credentials. It has no user data, so Agents is installed over ssh afterwards.
+		// With no repository, it is made from GitHub's public blank template (#4260).
 		CreateRequest: &Request{Method: "POST", URL: base + "/repos/${repository.owner}/${repository.name}/codespaces",
 			Headers: headers, Body: map[string]any{"display_name": "${name}"}},
 		DeleteRequest: &Request{Method: "DELETE", URL: base + "/user/codespaces/${id}", Headers: headers},
-		Options: map[string]any{"type": "object", "required": []any{"repository"}, "properties": map[string]any{
-			"repository": map[string]any{"type": "string", "title": "Repository",
-				"description": "The repository to make the codespace from, as owner/name."},
+		Options: map[string]any{"type": "object", "properties": map[string]any{
+			"repository": map[string]any{"type": "string", "title": "Repository", "default": BlankCodespace,
+				"description": "The repository to make the codespace from, as owner/name. Empty: " + BlankCodespace + "."},
 		}},
 	}), nil
 }
+
+// BlankCodespace is GitHub's public blank template: a codespace with no repository is made
+// from it (#4260).
+const BlankCodespace = "github/codespaces-blank"
 
 // coderAPI is Coder workspaces through the deployment's API at url, with a session token
 // in CODER_SESSION_TOKEN: no coder for start and stop. ssh still goes through coder: the

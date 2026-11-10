@@ -72,6 +72,12 @@ export function formFields(schema: JSONValue | undefined): FormField[] {
   });
 }
 
+/** What the provider makes a machine from when no repository is given, such as Codespaces' blank template (#4260). */
+export function repositoryDefault(schema: JSONValue | undefined): string | undefined {
+  const d = (schema as { properties?: { repository?: { default?: unknown } } } | null)?.properties?.repository?.default;
+  return typeof d === "string" && d ? d : undefined;
+}
+
 /** What Start sends: providers/create with the repository, if any (#2131), and the form's values, typed. */
 export function createRequest(provider: string, name: string, repository: Repository | null, fields: readonly FormField[]): ProviderCreate {
   const options: Record<string, JSONValue> = {};
@@ -97,4 +103,5 @@ export const machineWords = {
   joining: (name: string, r: Repository) => `${name} is starting. It installs Agents, joins and clones ${r.path} on its first boot. The folder shows when it has.`,
   notJoining: (name: string, provider: string) => `${provider} made ${name}, but can't install Agents on its first boot. Add it as a machine in Settings ▸ Machine providers, with Add as Machine….`,
   privateNote: "A private repository needs git access on the new machine.",
+  blankNote: (provider: string, from: string) => `With no repository, ${provider} makes it from ${from}.`,
 };

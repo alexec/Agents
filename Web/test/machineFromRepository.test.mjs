@@ -47,6 +47,15 @@ test("the form leaves out repository, and the request types its values", () => {
   });
 });
 
+test("a provider's default repository is named, for a machine made with none (#4260)", () => {
+  assert.equal(m.repositoryDefault({ properties: { repository: { type: "string", default: "github/codespaces-blank" } } }),
+    "github/codespaces-blank");
+  assert.equal(m.repositoryDefault({ properties: { repository: { type: "string" } } }), undefined);
+  assert.equal(m.repositoryDefault(undefined), undefined);
+  assert.equal(m.machineWords.blankNote("Codespaces", "github/codespaces-blank"),
+    "With no repository, Codespaces makes it from github/codespaces-blank.");
+});
+
 test("the words say what happens next", () => {
   const r = m.repositoryOf("https://github.com/alexec/agents");
   assert.match(m.machineWords.joining("agents-1", r), /clones alexec\/agents on its first boot/);
