@@ -87,14 +87,18 @@ func (d *Daemon) startOnMachine(me *wire.Agent, args map[string]json.RawMessage,
 			ask = fmt.Sprintf("Send %s, with its uncommitted changes, to %s on %s, then start a session there to %s?",
 				sending.branch, folder, machine, quotedTitle(&title))
 		}
-		yes, err := d.personSaysYes(me.ID, d.agentWho(me.ID)+" wants to start a session on "+machine, ask, "Start it")
-		if err != nil {
-			return "", err
-		}
-		if !yes {
-			return "Nothing was started: the person said no, or didn’t answer.", nil
-		}
+		return d.personSaysYes(me.ID, d.agentWho(me.ID)+" wants to start a session on "+machine, ask, "Start it", func(yes bool) (string, error) {
+			if !yes {
+				return "Nothing was started: the person said no, or didn’t answer.", nil
+			}
+			return d.startThere(me, here, machine, folder, title, r, sending)
+		})
 	}
+	return d.startThere(me, here, machine, folder, title, r, sending)
+}
+
+// startThere is start_session on another machine once it may start (#4261: also after a late yes).
+func (d *Daemon) startThere(me *wire.Agent, here, machine, folder, title string, r wire.StartRequest, sending *sendingBranch) (string, error) {
 	sent := ""
 	if sending != nil {
 		if err := d.sendThere(me, machine, folder, *sending); err != nil {

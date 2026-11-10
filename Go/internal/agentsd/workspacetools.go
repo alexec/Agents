@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"sort"
 	"strings"
 	"time"
@@ -189,31 +190,29 @@ func (d *Daemon) makeMachine(agent wire.UUID, args map[string]json.RawMessage) (
 	if len(choices) > 0 {
 		question += " (" + strings.Join(choices, ", ") + ")"
 	}
-	yes, err := d.personSaysYes(agent, d.agentWho(agent)+" wants to make a machine", question+"?", "Make it")
-	if err != nil {
-		return "", err
-	}
-	if !yes {
-		return "Nothing was made: the person said no, or didn’t answer.", nil
-	}
-	params := map[string]any{"id": found.ID}
-	if name != "" {
-		params["name"] = name
-	}
-	if len(args["options"]) > 0 && string(args["options"]) != "null" {
-		params["options"] = args["options"]
-	}
-	out, err := d.askWorkspaces(agent, providersCreate, params)
-	if err != nil {
-		return "", err
-	}
-	var made wire.ProviderCreated
-	json.Unmarshal(out, &made)
-	if made.Joining {
-		return "Made " + made.Workspace.Name + ". It joins as the host " + made.Workspace.Name + " on its first boot: wait for server.online.", nil
-	}
-	return "Made " + made.Workspace.Name + ". It can’t install Agents on its first boot, so the person adds it from " +
-		"Settings ▸ Machine Providers with Add as Machine….", nil
+	return d.personSaysYes(agent, d.agentWho(agent)+" wants to make a machine", question+"?", "Make it", func(yes bool) (string, error) {
+		if !yes {
+			return "Nothing was made: the person said no, or didn’t answer.", nil
+		}
+		params := map[string]any{"id": found.ID}
+		if name != "" {
+			params["name"] = name
+		}
+		if len(args["options"]) > 0 && string(args["options"]) != "null" {
+			params["options"] = args["options"]
+		}
+		out, err := d.askWorkspaces(agent, providersCreate, params)
+		if err != nil {
+			return "", err
+		}
+		var made wire.ProviderCreated
+		json.Unmarshal(out, &made)
+		if made.Joining {
+			return "Made " + made.Workspace.Name + ". It joins as the host " + made.Workspace.Name + " on its first boot: wait for server.online.", nil
+		}
+		return "Made " + made.Workspace.Name + ". It can’t install Agents on its first boot, so the person adds it from " +
+			"Settings ▸ Machine Providers with Add as Machine….", nil
+	})
 }
 
 // deleteMachine is delete_machine.
@@ -242,18 +241,17 @@ func (d *Daemon) deleteMachine(agent wire.UUID, args map[string]json.RawMessage)
 	if !provider.CanDelete {
 		return "", Invalid("Nothing was deleted: %s runs on %s, which can’t delete machines.", host, provider.Name)
 	}
-	yes, err := d.personSaysYes(agent, d.agentWho(agent)+" wants to delete a machine",
-		"Delete the machine "+host+" runs on, with everything on its disk, and remove the machine "+host+" with its agents?", "Delete it")
-	if err != nil {
-		return "", err
-	}
-	if !yes {
-		return "Nothing was deleted: the person said no, or didn’t answer.", nil
-	}
-	if _, err := d.askWorkspaces(agent, hostsDeleteMachine, map[string]any{"host": host}); err != nil {
-		return "", err
-	}
-	return "Deleted the machine " + host + " ran on, and removed the machine.", nil
+	return d.personSaysYes(agent, d.agentWho(agent)+" wants to delete a machine",
+		"Delete the machine "+host+" runs on, with everything on its disk, and remove the machine "+host+" with its agents?", "Delete it",
+		func(yes bool) (string, error) {
+			if !yes {
+				return "Nothing was deleted: the person said no, or didn’t answer.", nil
+			}
+			if _, err := d.askWorkspaces(agent, hostsDeleteMachine, map[string]any{"host": host}); err != nil {
+				return "", err
+			}
+			return "Deleted the machine " + host + " ran on, and removed the machine.", nil
+		})
 }
 
 // agentWho is an agent as the control plane's log and the card name it: "Claude (fix-login)".
@@ -272,17 +270,39 @@ func (d *Daemon) agentWho(agent wire.UUID) string {
 	return who
 }
 
-// personSaysYes is one yes-or-no question on the agent's card; true only for the yes.
-func (d *Daemon) personSaysYes(agent wire.UUID, title, question, yes string) (bool, error) {
+// personSaysYes is one yes-or-no question on the agent's card: then does what the answer
+// says, with true only for the yes, and its words are the call's. A card still open after
+// formHoldLimit keeps then (#4261): the call says so, and when the person answers, then
+// runs and its words come to the agent as a prompt. A no, or no answer, never says yes.
+func (d *Daemon) personSaysYes(agent wire.UUID, title, question, yes string, then func(yes bool) (string, error)) (string, error) {
 	q, _ := json.Marshal([]map[string]any{{"id": "go", "prompt": question,
 		"options": []map[string]string{{"id": "yes", "label": yes}, {"id": "no", "label": "Don’t"}}}})
 	t, _ := json.Marshal(title)
-	note, err := d.askQuestion(agent, map[string]json.RawMessage{"title": t, "questions": q})
-	if err != nil {
-		return false, err
+	said := func(note string) bool { return strings.Contains(note, ": "+yes) }
+	late := func(note string) {
+		words, err := then(said(note))
+		if err != nil {
+			_, msg := errMessage(err)
+			words = msg
+		}
+		if err := d.promptFromApp(agent, "The person answered your card \""+title+"\". "+words); err != nil {
+			log.Printf("agent %s: card answer: %v", agent, err)
+		}
 	}
-	return strings.Contains(note, ": "+yes), nil
+	note, answered, err := d.askForm(agent, map[string]json.RawMessage{"title": t, "questions": q}, late)
+	if err != nil {
+		return "", err
+	}
+	if !answered {
+		return yesStillOpen, nil
+	}
+	return then(said(note))
 }
+
+// yesStillOpen is what a call that asks with personSaysYes says when the card is not answered
+// within formHoldLimit (#4261).
+const yesStillOpen = "The card is still open: nothing is done until the person answers it. When they say yes, it is done then, " +
+	"and you are started again with the result. End your turn (or go on with other work). Do not ask again."
 
 // workspaceProvider is the provider an agent named, by id or by name.
 func workspaceProvider(given string, listed wire.AgentMachines) *wire.AgentMachinesProvider {

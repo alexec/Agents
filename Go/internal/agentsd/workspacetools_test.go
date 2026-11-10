@@ -3,9 +3,11 @@ package agentsd
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/wire"
@@ -140,5 +142,92 @@ func TestAnAgentsWorkspaceTools(t *testing.T) {
 		if call.Method == "machines/deleteMachine" {
 			t.Fatal("deleted without a yes")
 		}
+	}
+}
+
+// A yes that comes after the card's hold (#4261): the call says the card is still open and
+// nothing is made yet; the late yes makes the machine and tells the agent, and a late no
+// deletes nothing.
+func TestAYesAfterTheHoldStillMakesTheMachine(t *testing.T) {
+	fakeRuntimes(t)
+	was := formHoldLimit
+	formHoldLimit = 300 * time.Millisecond
+	defer func() { formHoldLimit = was }()
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	title := "fix-login"
+	a := seeded(t, d, t.TempDir(), func(a *wire.Agent) {
+		a.State, a.EndedReason, a.RuntimeID, a.Title = wire.AgentStateRunning, nil, "claude", &title
+	})
+	m := appClient(t, d, a.ID)
+	m.post("initialize", map[string]any{}, 1)
+	host := "devbox"
+	listed := wire.AgentMachines{Providers: []wire.AgentMachinesProvider{{ID: "do", Name: "DigitalOcean", CanMake: true, CanDelete: true,
+		Workspaces: []wire.AgentMachinesMachine{{ID: "w1", Name: "devbox", State: "running", Host: &host, HostState: new("online")}}}}}
+	var mu sync.Mutex
+	var done []string
+	d.SetControlAsk(func(_ context.Context, method string, params any) (json.RawMessage, error) {
+		if method == wire.CallUserSetPolicy.Name {
+			return json.RawMessage(`{}`), nil
+		}
+		call := params.(wire.MachineWorkspaceCall)
+		switch call.Method {
+		case "machines/forAgent":
+			b, _ := json.Marshal(listed)
+			return b, nil
+		case "providers/create":
+			mu.Lock()
+			done = append(done, call.Method+" "+string(call.Params))
+			mu.Unlock()
+			return json.RawMessage(`{"workspace":{"id":"w2","name":"second"},"joining":true}`), nil
+		}
+		mu.Lock()
+		done = append(done, call.Method)
+		mu.Unlock()
+		return nil, &controllink.AskError{Code: -32010, Message: "Agents can’t ask that of the control plane."}
+	})
+	did := func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		return slices.Clone(done)
+	}
+	l := d.live(a.ID)
+	l.mu.Lock()
+	l.inTurn = true
+	l.mu.Unlock()
+	if text, isErr := m.tool(2, "make_machine", map[string]any{"provider": "do", "name": "second"}); isErr || text != yesStillOpen {
+		t.Fatal(text)
+	}
+	if got := did(); len(got) != 0 {
+		t.Fatalf("made before the yes: %v", got)
+	}
+	if text, isErr := m.tool(3, "delete_machine", map[string]any{"host": "devbox"}); isErr || text != yesStillOpen {
+		t.Fatal(text)
+	}
+	l.closeForms(false) // the turn stops; the cards stay
+	l.mu.Lock()
+	l.inTurn = false
+	l.mu.Unlock()
+	var pending []wire.ElicitationRequest
+	json.Unmarshal(c.call(t, 1, "elicitations/pending", nil), &pending)
+	if len(pending) != 2 {
+		t.Fatalf("%+v", pending)
+	}
+	for i, p := range pending {
+		answer := "no"
+		if *p.Message == "Claude (fix-login) wants to make a machine" {
+			answer = "yes"
+		}
+		c.call(t, 2+i, "elicitations/answer", map[string]any{"requestID": p.ID, "action": "accept", "content": map[string]any{"go": answer}})
+	}
+	waitFor(t, "both results in its chat", func() bool {
+		said := userMessages(d, a.ID)
+		return slices.Contains(said, "The person answered your card \"Claude (fix-login) wants to make a machine\". "+
+			"Made second. It joins as the host second on its first boot: wait for server.online.") &&
+			slices.Contains(said, "The person answered your card \"Claude (fix-login) wants to delete a machine\". "+
+				"Nothing was deleted: the person said no, or didn’t answer.")
+	})
+	if got := did(); len(got) != 1 || got[0] != `providers/create {"id":"do","name":"second"}` {
+		t.Fatalf("%v", got)
 	}
 }

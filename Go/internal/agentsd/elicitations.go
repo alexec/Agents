@@ -34,6 +34,9 @@ type pendingElicitation struct {
 	// left is an ask_question whose call came back before the answer (formStillOpen): the
 	// form stays open after the turn, and its answer goes to the agent as a prompt.
 	left bool
+	// late is what an answer to a form left open does instead of the prompt formAnsweredWords
+	// makes (personSaysYes, #4261): it is given askQuestionNote's words.
+	late func(note string)
 }
 
 type elicitationReply struct {
@@ -115,8 +118,8 @@ func (l *live) showForm(req wire.ElicitationRequest) *pendingElicitation {
 }
 
 // holdAskedForm is ask_question's form: held up to formHoldLimit, then left open, with false,
-// for the answer to come as a prompt (#1641).
-func (l *live) holdAskedForm(req wire.ElicitationRequest) (elicitationReply, bool) {
+// for the answer to come as a prompt (#1641), or to go to late when it is not nil (#4261).
+func (l *live) holdAskedForm(req wire.ElicitationRequest, late func(note string)) (elicitationReply, bool) {
 	pe := l.showForm(req)
 	hold := time.NewTimer(formHoldLimit)
 	defer hold.Stop()
@@ -128,6 +131,7 @@ func (l *live) holdAskedForm(req wire.ElicitationRequest) (elicitationReply, boo
 	l.mu.Lock()
 	_, open := l.elicitations[req.ID]
 	pe.left = open
+	pe.late = late
 	l.mu.Unlock()
 	if !open {
 		return <-pe.reply, true // answered in the same instant
@@ -343,6 +347,11 @@ func (d *Daemon) answerElicitation(r wire.AnswerElicitationRequest) error {
 	d.moveIf(l.id, wire.AgentStateWaitingOnUser, wire.AgentStateRunning)
 	d.formDown(l.id, r.RequestID)
 	// A form whose call came back already (#1641): the answer starts the agent again.
+	if pe.left && pe.late != nil {
+		// Off the client's call: what the answer does can take a while (providers/create).
+		go pe.late(askQuestionNote(action, said))
+		return nil
+	}
 	if pe.left {
 		if err := d.promptFromApp(l.id, d.formAnsweredWords(pe.req, action, content, said)); err != nil {
 			log.Printf("agent %s: form answer: %v", l.id, err)

@@ -74,7 +74,7 @@ func (d *Daemon) handToPerson(agent wire.UUID, args map[string]json.RawMessage) 
 		HandOff: &wire.ElicitationHandOff{Step: step, Reason: &reason},
 		Mode:    wire.ElicitationRequestMode{Form: &wire.ElicitationRequestModeForm{Value: handOffSchema(reason)}},
 		Scope:   wire.ElicitationRequestScopeSession, AskedAt: now()}
-	r, answered := l.holdAskedForm(req)
+	r, answered := l.holdAskedForm(req, nil)
 	if !answered {
 		return handOffStillOpen, false
 	}
