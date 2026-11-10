@@ -114,6 +114,7 @@ public enum Capability {
     public static let mailbox1 = "mailbox/1"
     public static let marketplaces1 = "marketplaces/1"
     public static let mcp1 = "mcp/1"
+    public static let messages1 = "messages/1"
     public static let modes1 = "modes/1"
     public static let multiplier1 = "multiplier/1"
     public static let mute1 = "mute/1"
@@ -407,6 +408,8 @@ public enum Capability {
         "mcp/sign-in/wait": "mcp/1",
         "mcp/sign-out": "mcp/1",
         "mcp/verify": "mcp/1",
+        "messages/conversations": "messages/1",
+        "messages/read": "messages/1",
         "modes/remembered": "modes/1",
         "multiplier/state": "multiplier/1",
         "options/remembered": "options/1",
