@@ -81,6 +81,8 @@ var own = methodSet(
 	"clients/webPushKey",
 	"control/connectAnother",
 	"control/connectReport",
+	"control/planeMove",
+	"control/planeMoveReport",
 	"control/restart",
 	"control/retryWeb",
 	"control/rotate",
@@ -565,6 +567,8 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return m.readAPIMethod(ctx, method, params, from)
 	case "control/connectAnother", "control/connectReport":
 		return m.connectAnotherMethod(method, params, from)
+	case "control/planeMove", "control/planeMoveReport":
+		return m.planeMoveMethod(method, params, from)
 	case "control/rotate":
 		return wire.Empty{}, m.s.rotate(ctx, from)
 	case "control/restart", "control/retryWeb", "control/setWeb":

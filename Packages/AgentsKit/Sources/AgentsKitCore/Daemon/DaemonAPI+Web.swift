@@ -518,6 +518,8 @@ public extension DaemonAPI {
                 Row(Method.controlSetWeb, params: WebServe.self, result: WebRemoteStatus.self, kind: .controlRequest),
                 // Connect to Another… on the page this Mac serves (#4257).
                 Row(Method.controlConnectAnother, params: ConnectAnother.Request.self, result: Empty.self, kind: .controlRequest),
+                // Move to Another Machine… and Run It Here Again… on the page (#4255).
+                Row(Method.controlPlaneMove, params: PlaneMove.Ask.self, result: Empty.self, kind: .controlRequest),
                 // Reports (#1811): usage, cost and time by person, folder and machine.
                 Row(Method.reportsUsage, params: ReportQuery.self, result: UsageReport.self, kind: .controlRequest),
                 Row(Method.reportsExport, params: ReportQuery.self, result: ReportExport.self, kind: .controlRequest),
@@ -766,6 +768,8 @@ public extension DaemonAPI {
                 Row(Notification.controlSealingWanted, params: Empty.self, result: Empty.self,
                     kind: .controlNotification),
                 Row(Notification.controlConnectReported, params: ConnectAnother.Report.self, result: Empty.self,
+                    kind: .controlNotification),
+                Row(Notification.controlPlaneMoveReported, params: PlaneMove.Report.self, result: Empty.self,
                     kind: .controlNotification),
                 Row(Notification.controlGovernanceRequested, params: CatalogRequest.self, result: Empty.self,
                     kind: .controlNotification),

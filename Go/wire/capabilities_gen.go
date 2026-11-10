@@ -41,6 +41,7 @@ const CapConnectorsSetup1 = "connectors.setup/1"
 const CapConsole1 = "console/1"
 const CapControlConnectAnother1 = "control.connect-another/1"
 const CapControlLocal1 = "control.local/1"
+const CapControlPlaneMove1 = "control.plane-move/1"
 const CapControlRotate1 = "control.rotate/1"
 const CapControl1 = "control/1"
 const CapCost1 = "cost/1"
@@ -728,6 +729,8 @@ var ControlCapabilities = pairs([][2]string{
 	{"control/connectAnother", "control.connect-another/1"},
 	{"control/connectReport", "control.connect-another/1"},
 	{"control/ping", "control/1"},
+	{"control/planeMove", "control.plane-move/1"},
+	{"control/planeMoveReport", "control.plane-move/1"},
 	{"control/restart", "control.local/1"},
 	{"control/retryWeb", "control.local/1"},
 	{"control/rotate", "control.rotate/1"},
@@ -941,6 +944,8 @@ var ControlCapabilities = pairs([][2]string{
 	{"control/orgRoutesChanged", "org-routes/2"},
 	{"control/orgRoutesLeft", "org-routes/2"},
 	{"control/peopleChanged", "people/1"},
+	{"control/planeMoveReported", "control.plane-move/1"},
+	{"control/planeMoveWanted", "control.plane-move/1"},
 	{"control/policyChanged", "policy/1"},
 	{"control/projectsChanged", "projects/1"},
 	{"control/providerDraft", "control/1"},
@@ -997,6 +1002,8 @@ var ControlNotifications = set([]string{
 	"control/orgRoutesChanged",
 	"control/orgRoutesLeft",
 	"control/peopleChanged",
+	"control/planeMoveReported",
+	"control/planeMoveWanted",
 	"control/policyChanged",
 	"control/projectsChanged",
 	"control/providerDraft",

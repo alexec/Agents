@@ -7955,6 +7955,130 @@ export type PlanState =
   | "current"
   | "withdrawn";
 
+/**
+ * What a client asks of a move of the control plane (#4255), as the Mac window's sheets do it:
+ * status says how it stands; move and return open Move to Another Machine… and Run It Here Again…;
+ * the rest are the sheets' buttons and the overview's.
+ */
+export type PlaneMoveAction =
+  | "status"
+  | "move"
+  | "return"
+  | "saveKey"
+  | "useKey"
+  | "continue"
+  | "back"
+  | "check"
+  | "announce"
+  | "withdraw"
+  | "moveNow"
+  | "cancel"
+  | "close"
+  | "stopForwarding"
+  | "stopReturnForwarding"
+  | "dismiss";
+
+/**
+ * control/planeMove and control/planeMoveWanted (#4255): a client asks the window on the Mac that
+ * moves the control plane to do one step. The window does it with this Mac's control key, which
+ * never leaves the Mac.
+ */
+export interface PlaneMoveAsk {
+  action: PlaneMoveAction;
+  /**
+   * With check on a move: where the other machine's control plane is, its https address; with no
+   * scheme, https.
+   */
+  address?: string;
+}
+
+/**
+ * Where a move a client asked for is, as the Mac window's sheet would draw it (#4255), in its
+ * words.
+ */
+export interface PlaneMoveFlow {
+  /** Move to Another Machine… or Run It Here Again…. */
+  kind: "move" | "return";
+  /** The sheet's frame: key and check (P, Q or V), told (R or W), moving (S or X). */
+  step: "key" | "check" | "told" | "moving";
+  title: string;
+  /** The line under the title. */
+  lead?: string;
+  /** Where the control plane goes, or comes back from. */
+  address?: string;
+  /** The checks (key, check) or the stages (moving), in order. */
+  lines?: PlaneMoveLine[];
+  /** Who has heard where it goes (told). */
+  members?: PlaneMoveMember[];
+  /** How many know, in words (told). */
+  knowing?: string;
+  /**
+   * Run It Here Again…: the other machine holds another key, so this Mac takes it first (Use Key…).
+   */
+  otherKey?: boolean;
+  /** Every check passed: Tell Everyone may be asked. */
+  checked?: boolean;
+  /** A check or a step runs on the Mac now. */
+  busy?: boolean;
+  /** The other end serves now: Cancel can't undo it. */
+  taken?: boolean;
+  /** A stage failed: Close, not Cancel. */
+  failed?: boolean;
+  problem?: string;
+}
+
+/** One check or stage of a move (#4255). */
+export interface PlaneMoveLine {
+  label: string;
+  state: "waiting" | "yes" | "no" | "todo" | "doing" | "done" | "failed" | "warning";
+  /** Why it failed, or a note under it. */
+  note?: string;
+}
+
+/**
+ * A window, phone or machine of the control plane, and whether it knows where the control plane
+ * goes (#4255).
+ */
+export interface PlaneMoveMember {
+  name: string;
+  /** What it is, and when it last connected, in words. */
+  kind: string;
+  state: "knows" | "cantFollow" | "notYet";
+  note?: string;
+}
+
+/**
+ * control/planeMoveReport and control/planeMoveReported (#4255): how a move of the control plane
+ * stands on the Mac that does it, in the Mac window's words: Settings ▸ Control plane ▸ Overview's
+ * rows, and the sheet a client opened.
+ */
+export interface PlaneMoveReport {
+  /** The Mac whose window says it. */
+  mac: string;
+  rows: PlaneMoveRow[];
+  flow?: PlaneMoveFlow;
+  /** Why an overview step (Stop Forwarding) failed. */
+  problem?: string;
+}
+
+/**
+ * A row of the control plane's move card (#4255): Move to Another Machine, This Mac moved its
+ * control plane, a forwarding row, or the way back's.
+ */
+export interface PlaneMoveRow {
+  kind: "move" | "moved" | "forwarding" | "returned";
+  title: string;
+  detail: string;
+  /** Its dot is orange. */
+  attention?: boolean;
+  /** Its button's words. */
+  button?: string;
+  action?: PlaneMoveAction;
+  disabled?: boolean;
+  /** Asked before the action, as Stop forwarding?'s message. */
+  confirm?: string;
+}
+
 export interface PluginApproveRequest {
   plugin: URLString;
   digest: string;
@@ -13132,6 +13256,7 @@ export interface Methods {
   "console/stopAgent": { params: ConsoleStopAgent; result: Empty };
   "console/teamWorkflows": { params: Empty; result: TeamWorkflows };
   "control/connectAnother": { params: ConnectAnotherRequest; result: Empty };
+  "control/planeMove": { params: PlaneMoveAsk; result: Empty };
   "control/restart": { params: Empty; result: Empty };
   "control/retryWeb": { params: Empty; result: WebRemoteStatus };
   "control/rotate": { params: Empty; result: Empty };
@@ -13549,6 +13674,7 @@ export const MethodTarget = {
   "console/stopAgent": "control",
   "console/teamWorkflows": "control",
   "control/connectAnother": "control",
+  "control/planeMove": "control",
   "control/restart": "control",
   "control/retryWeb": "control",
   "control/rotate": "control",
@@ -13898,6 +14024,7 @@ export interface Notifications {
   "control/lockJoinRequested": LockJoinRequest;
   "control/orgRoutesChanged": Empty;
   "control/peopleChanged": PeopleChanged;
+  "control/planeMoveReported": PlaneMoveReport;
   "control/policyChanged": PolicyView;
   "control/projectsChanged": ProjectsChanged;
   "control/providersChanged": ProviderList;
@@ -14600,6 +14727,12 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PinsChangedNotification: { required: ["folder", "pins"], optional: ["sessions", "workflows", "views", "reviews", "suggestions"] },
   Plan: { required: ["entries", "state", "at"], optional: ["planID"] },
   PlanEntry: { required: ["content", "priority", "status"], optional: [] },
+  PlaneMoveAsk: { required: ["action"], optional: ["address"] },
+  PlaneMoveFlow: { required: ["kind", "step", "title"], optional: ["lead", "address", "lines", "members", "knowing", "otherKey", "checked", "busy", "taken", "failed", "problem"] },
+  PlaneMoveLine: { required: ["label", "state"], optional: ["note"] },
+  PlaneMoveMember: { required: ["name", "kind", "state"], optional: ["note"] },
+  PlaneMoveReport: { required: ["mac", "rows"], optional: ["flow", "problem"] },
+  PlaneMoveRow: { required: ["kind", "title", "detail"], optional: ["attention", "button", "action", "disabled", "confirm"] },
   PluginApproveRequest: { required: ["plugin", "digest"], optional: [] },
   PluginsList: { required: ["folder", "plugins"], optional: [] },
   PluginsListRequest: { required: ["folder"], optional: [] },
