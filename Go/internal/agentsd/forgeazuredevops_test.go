@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -280,28 +279,35 @@ func TestAzureDevOpsOfNode(t *testing.T) {
 // #4055: a Pull requests list narrowed to a board lists Azure Repos pull requests only for an
 // Azure DevOps board, and then only the repositories of its project, on its Azure DevOps.
 func TestABoardNarrowsAzureReposToItsProject(t *testing.T) {
-	sources := func() forgeSources {
-		return forgeSources{azureDevOpsRoot: "https://dev.azure.com/", azureDevOps: []string{"Acme/Web/app", "acme/web/site", "acme/Ops/infra"},
-			azureDevOpsErr: errors.New("elsewhere"), boardsFolder: map[string]string{}}
+	d, _, ado, _ := azureDevOpsDaemon(t)
+	scope := azureDevOpsScope{root: azuredevopsmcp.DefaultBase, repos: []string{"Acme/Web/app", "acme/web/site", "acme/Ops/infra"},
+		folderOf: map[string]string{}}
+	list := func(b wire.ProjectBoard, prs bool) (forgePage, error) {
+		ado.searches = nil
+		s := forgeSources{boardsFolder: map[string]string{}}
+		board := narrowToBoard(&s, b, []string{"/f"}, prs)
+		return azureDevOpsForge{d: d}.List(context.Background(), scope, forgeFilter{PRs: prs, Board: board}, "", 10)
 	}
-	s := sources()
-	narrowToBoard(&s, wire.ProjectBoard{Forge: new(wire.ConnectionProviderGithub), Key: new("alexec/1")}, []string{"/f"}, true)
-	if s.azureDevOps != nil || s.azureDevOpsErr != nil {
-		t.Fatalf("a GitHub board: %+v", s)
+	if p, err := list(wire.ProjectBoard{Forge: new(wire.ConnectionProviderGithub), Key: new("alexec/1")}, true); err != nil || len(p.items) > 0 || len(ado.searches) > 0 {
+		t.Fatalf("a GitHub board: %+v, %v, searched %v", p, err, ado.searches)
 	}
-	s = sources()
-	narrowToBoard(&s, wire.ProjectBoard{Forge: new(wire.ConnectionProviderAzuredevops), Key: new("acme/web/Web Team"), Site: new("dev.azure.com")}, []string{"/f"}, true)
-	if want := []string{"Acme/Web/app", "acme/web/site"}; !slices.Equal(s.azureDevOps, want) || s.azureDevOpsErr == nil || s.boards != nil {
-		t.Fatalf("an Azure DevOps board: %+v", s)
+	azure := wire.ProjectBoard{Forge: new(wire.ConnectionProviderAzuredevops), Key: new("acme/web/Web Team"), Site: new("dev.azure.com")}
+	if p, err := list(azure, true); err != nil || len(p.items) != 2 || len(ado.searches) != 1 || !strings.HasPrefix(ado.searches[0], "[Acme/Web/app acme/web/site] ") {
+		t.Fatalf("an Azure DevOps board: %+v, %v, searched %v", p, err, ado.searches)
 	}
-	s = sources()
-	narrowToBoard(&s, wire.ProjectBoard{Forge: new(wire.ConnectionProviderAzuredevops), Key: new("acme/web/Web Team"), Site: new("ado.example.com")}, []string{"/f"}, true)
-	if s.azureDevOps != nil {
-		t.Fatalf("a board on another Azure DevOps: %+v", s)
+	elsewhere := wire.ProjectBoard{Forge: new(wire.ConnectionProviderAzuredevops), Key: new("acme/web/Web Team"), Site: new("ado.example.com")}
+	if p, err := list(elsewhere, true); err != nil || len(p.items) > 0 || len(ado.searches) > 0 {
+		t.Fatalf("a board on another Azure DevOps: %+v, %v, searched %v", p, err, ado.searches)
 	}
-	s = sources()
-	narrowToBoard(&s, wire.ProjectBoard{Forge: new(wire.ConnectionProviderAzuredevops), Key: new("acme/web/Web Team"), Site: new("dev.azure.com")}, []string{"/f"}, false)
-	if s.azureDevOps != nil || s.azureDevOpsErr != nil {
-		t.Fatalf("an Issues list: %+v", s)
+	if p, err := list(azure, false); err != nil || len(p.items) > 0 || len(ado.searches) > 0 {
+		t.Fatalf("an Issues list: %+v, %v, searched %v", p, err, ado.searches)
+	}
+	// With no token for the folders' Azure DevOps, a board's list still says so.
+	scope = azureDevOpsScope{unsigned: errors.New(azuredevopsmcp.NotConnected)}
+	if scope.Empty() {
+		t.Fatal("a scope with no token is empty, so the list says nothing")
+	}
+	if _, err := list(azure, true); err == nil || err.Error() != azuredevopsmcp.NotConnected {
+		t.Fatalf("no token: %v", err)
 	}
 }

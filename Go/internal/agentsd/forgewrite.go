@@ -118,23 +118,23 @@ func (d *Daemon) registerForgeWrites() {
 }
 
 // forgeTarget is the item a write is on, and the forge to write it with: a forge on the
-// interface (#4329), with its ref there; or, of the forges not yet on it, one of
-// azureDevOps (with its repository there, in project), linear (with its identifier), jira (with its key, in identifier) or
-// boards (with its project and its id, in number).
+// interface (#4329), with its ref there; or, of the forges not yet on it, one of linear (with
+// its identifier), jira (with its key, in identifier) or boards (with its project and its id,
+// in number).
 type forgeTarget struct {
-	number      int
-	pr          bool
-	forge       Forge
-	ref         forgeRef
-	project     string
-	linear      forgeLinear
-	jira        forgeJira
-	boards      forgeAzureBoards
-	azureDevOps forgeAzureDevOps
-	identifier  string
+	number     int
+	pr         bool
+	forge      Forge
+	ref        forgeRef
+	project    string
+	linear     forgeLinear
+	jira       forgeJira
+	boards     forgeAzureBoards
+	identifier string
 }
 
-// forgeTargetOf is node's forge, or why there is none. prOnly refuses an issue.
+// forgeTargetOf is node's forge, or why there is none. prOnly refuses an issue; every forge with
+// pull requests is on the interface (#4356), so a pull request's target has its forge.
 func (d *Daemon) forgeTargetOf(ctx context.Context, method string, node wire.LineageNode, prOnly bool) (forgeTarget, error) {
 	if prOnly && node.Kind != lineage.KindPR {
 		return forgeTarget{}, Invalid("%s: %s is not a pull request", method, node.Ref)
@@ -162,13 +162,6 @@ func (d *Daemon) forgeTargetOf(ctx context.Context, method string, node wire.Lin
 			return forgeTarget{}, err
 		}
 		return forgeTarget{boards: b, project: project, number: id}, nil
-	}
-	if repo, number, ok := azureDevOpsOfNode(node); ok {
-		ado, named, _, err := d.azureDevOpsOf(ctx, method, repo)
-		if err != nil {
-			return forgeTarget{}, err
-		}
-		return forgeTarget{azureDevOps: ado, project: named, number: number, pr: true}, nil
 	}
 	return forgeTarget{}, Invalid("%s: %s is not an issue or a pull request on GitHub, GitLab, Forgejo, Bitbucket, Azure DevOps, Linear, Jira or Azure Boards", method, node.Ref)
 }
@@ -205,8 +198,6 @@ func (d *Daemon) forgeComment(ctx context.Context, r wire.ForgeCommentRequest) (
 		url, err = t.jira.Comment(ctx, t.identifier, body)
 	case t.boards != nil:
 		url, err = t.boards.Comment(ctx, t.project, t.number, body)
-	case t.azureDevOps != nil:
-		url, err = t.azureDevOps.Comment(ctx, t.project, t.number, body)
 	}
 	if err != nil {
 		return wire.ForgeDone{}, err
@@ -255,8 +246,6 @@ func (d *Daemon) forgeLabel(ctx context.Context, r wire.ForgeLabelRequest) (wire
 		err = t.jira.SetLabels(ctx, t.identifier, add, remove)
 	case t.boards != nil:
 		err = t.boards.SetTags(ctx, t.project, t.number, add, remove)
-	case t.azureDevOps != nil:
-		err = t.azureDevOps.SetLabels(ctx, t.project, t.number, add, remove)
 	}
 	if err != nil {
 		return wire.ForgeDone{}, err
@@ -286,8 +275,6 @@ func (d *Daemon) forgeLabels(ctx context.Context, r wire.ForgeNodeRequest) (wire
 		names, colors, err = t.jira.Labels(ctx, t.identifier)
 	case t.boards != nil:
 		names, colors, err = t.boards.Labels(ctx, t.project, t.number)
-	case t.azureDevOps != nil:
-		names, err = t.azureDevOps.RepoLabels(ctx, t.project)
 	}
 	if err != nil {
 		return wire.ForgeLabels{}, err
@@ -324,8 +311,6 @@ func (d *Daemon) forgeClose(ctx context.Context, r wire.ForgeCloseRequest) (wire
 		err = t.jira.SetState(ctx, t.identifier, closed)
 	case t.linear != nil:
 		err = t.linear.SetState(ctx, t.identifier, closed)
-	case t.azureDevOps != nil:
-		err = t.azureDevOps.SetState(ctx, t.project, t.number, closed)
 	}
 	if err != nil {
 		return wire.ForgeDone{}, err
@@ -347,20 +332,12 @@ func (d *Daemon) forgeMerge(ctx context.Context, r wire.ForgeMergeRequest) (wire
 	if r.Method != nil {
 		how = string(*r.Method)
 	}
-	auto := r.Auto != nil && *r.Auto
-	if t.forge != nil {
-		done, err := t.forge.Merge(ctx, t.ref, r.Sha, how, auto)
-		if err != nil {
-			return wire.ForgeDone{}, forgeCannotErr(method, t.forge, err)
-		}
-		d.forgeWrote()
-		return done, nil
-	}
-	if err := d.azureDevOpsMerge(ctx, method, t, r.Sha, how, auto); err != nil {
-		return wire.ForgeDone{}, err
+	done, err := t.forge.Merge(ctx, t.ref, r.Sha, how, r.Auto != nil && *r.Auto)
+	if err != nil {
+		return wire.ForgeDone{}, forgeCannotErr(method, t.forge, err)
 	}
 	d.forgeWrote()
-	return wire.ForgeDone{Auto: optionalTrue(auto)}, nil
+	return done, nil
 }
 
 func (d *Daemon) forgeApprove(ctx context.Context, r wire.ForgeApproveRequest) (wire.ForgeDone, error) {
@@ -372,20 +349,12 @@ func (d *Daemon) forgeApprove(ctx context.Context, r wire.ForgeApproveRequest) (
 	if err != nil {
 		return wire.ForgeDone{}, err
 	}
-	var url string
-	switch {
-	case t.forge != nil:
-		var done wire.ForgeDone
-		done, err = t.forge.Approve(ctx, t.ref, r.Sha)
-		url, err = deref(done.URL), forgeCannotErr(method, t.forge, err)
-	case t.azureDevOps != nil:
-		url, err = t.azureDevOps.Approve(ctx, t.project, t.number, r.Sha)
-	}
+	done, err := t.forge.Approve(ctx, t.ref, r.Sha)
 	if err != nil {
-		return wire.ForgeDone{}, err
+		return wire.ForgeDone{}, forgeCannotErr(method, t.forge, err)
 	}
 	d.forgeWrote()
-	return wire.ForgeDone{URL: optional(url)}, nil
+	return wire.ForgeDone{URL: done.URL}, nil
 }
 
 // actionsRun is an Actions run's id in a check's link: …/actions/runs/123/job/456.
@@ -416,15 +385,12 @@ func (d *Daemon) forgeRerun(ctx context.Context, r wire.ForgeNodeRequest) (wire.
 	if err != nil {
 		return wire.ForgeDone{}, err
 	}
-	if t.forge != nil {
-		done, err := t.forge.Rerun(ctx, t.ref)
-		if err != nil {
-			return wire.ForgeDone{}, forgeCannotErr(method, t.forge, err)
-		}
-		d.forgeWrote()
-		return done, nil
+	done, err := t.forge.Rerun(ctx, t.ref)
+	if err != nil {
+		return wire.ForgeDone{}, forgeCannotErr(method, t.forge, err)
 	}
-	return d.azureDevOpsRerun(ctx, method, t, r.Node.Ref)
+	d.forgeWrote()
+	return done, nil
 }
 
 func (d *Daemon) forgeLog(ctx context.Context, r wire.ForgeLogRequest) (wire.ForgeLog, error) {
@@ -433,12 +399,8 @@ func (d *Daemon) forgeLog(ctx context.Context, r wire.ForgeLogRequest) (wire.For
 	if err != nil {
 		return wire.ForgeLog{}, err
 	}
-	check := strings.TrimSpace(deref(r.Check))
-	if t.forge != nil {
-		out, err := t.forge.Log(ctx, t.ref, check)
-		return out, forgeCannotErr(method, t.forge, err)
-	}
-	return azureDevOpsLog(ctx, t, check)
+	out, err := t.forge.Log(ctx, t.ref, strings.TrimSpace(deref(r.Check)))
+	return out, forgeCannotErr(method, t.forge, err)
 }
 
 func (d *Daemon) forgeDiff(ctx context.Context, r wire.ForgeNodeRequest) (wire.ForgeDiff, error) {
@@ -446,19 +408,8 @@ func (d *Daemon) forgeDiff(ctx context.Context, r wire.ForgeNodeRequest) (wire.F
 	if err != nil {
 		return wire.ForgeDiff{}, err
 	}
-	if t.forge != nil {
-		diff, err := t.forge.Diff(ctx, t.ref)
-		return diff, forgeCannotErr("forge/diff", t.forge, err)
-	}
-	var out map[string]any
-	switch {
-	case t.azureDevOps != nil:
-		out, err = t.azureDevOps.PRDiff(ctx, t.project, t.number)
-	}
-	if err != nil {
-		return wire.ForgeDiff{}, err
-	}
-	return diffOf(out)
+	diff, err := t.forge.Diff(ctx, t.ref)
+	return diff, forgeCannotErr("forge/diff", t.forge, err)
 }
 
 // diffOf is a connector's diff on the wire.
