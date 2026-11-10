@@ -1,0 +1,794 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1572" height="1558" viewBox="0 0 1572 1558" font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif">
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#20242A" flood-opacity="0.14"/>
+    </filter>
+    <symbol id="open" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="8" r="2" fill="currentColor"/></symbol>
+    <symbol id="done" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5.3 8.2l1.8 1.8 3.6-3.8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="notplanned" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M4 12L12 4" stroke="currentColor" stroke-width="1.4"/></symbol>
+    <symbol id="pr" viewBox="0 0 16 16"><circle cx="4" cy="3.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="4" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="12" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M4 5.1v5.8M12 10.9V6.5a2 2 0 0 0-2-2H7.5M9 3l-1.6 1.5L9 6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="tag" viewBox="0 0 16 16"><path d="M2.5 2.5h5.5l5.5 5.5-5.5 5.5-5.5-5.5z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="5.5" cy="5.5" r="1" fill="currentColor"/></symbol>
+    <symbol id="flag" viewBox="0 0 16 16"><path d="M3.5 14V2.5M3.5 3h8.5l-2 3 2 3H3.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="gear" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.2" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M3.6 12.4L5 11M11 5l1.4-1.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="warn" viewBox="0 0 16 16"><path d="M8 2.2L14.3 13.5H1.7z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M8 6.5v3.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="11.6" r=".8" fill="currentColor"/></symbol>
+    <symbol id="refresh" viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v2.5h-2.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="chev" viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="chevr" viewBox="0 0 10 10"><path d="M3.5 2l3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="up" viewBox="0 0 16 16"><path d="M3.5 10L8 5.5l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="down" viewBox="0 0 16 16"><path d="M3.5 6L8 10.5l4.5-4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="back" viewBox="0 0 16 16"><path d="M10 3L5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="fwd" viewBox="0 0 16 16"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="ext" viewBox="0 0 16 16"><path d="M9 3h4v4M13 3L7.5 8.5M11 9.5V13H3V5h3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="more" viewBox="0 0 16 16"><circle cx="3.5" cy="8" r="1.3" fill="currentColor"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/><circle cx="12.5" cy="8" r="1.3" fill="currentColor"/></symbol>
+    <symbol id="spark" viewBox="0 0 16 16"><path d="M8 2l1.4 4.6L14 8l-4.6 1.4L8 14l-1.4-4.6L2 8l4.6-1.4z" fill="currentColor"/></symbol>
+    <symbol id="doc" viewBox="0 0 16 16"><path d="M4 2h5.5L12.5 5v9H4z M9.5 2v3h3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
+    <symbol id="link" viewBox="0 0 16 16"><path d="M6.5 9.5l3-3M7 4.5l1-1a2.5 2.5 0 0 1 3.5 3.5l-1 1M9 11.5l-1 1A2.5 2.5 0 0 1 4.5 9l1-1" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+    <symbol id="sidebar" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M6 3v10" stroke="currentColor" stroke-width="1.3"/></symbol>
+  </defs>
+  <rect width="1572" height="1558" fill="#E7EAEE"/>
+  <text x="24" y="34" font-size="15" fill="#1C1D20" font-weight="600">Issue page (#4331): the states, on the Mac window</text>
+  <text x="24" y="54" font-size="12" fill="#5B616B">The Remote and the web page show the same states in their own layout. Scratch data.</text>
+  <text x="24.0" y="82.0" font-size="12" fill="#1C1D20" font-weight="600">Loading, opened from the list: the row's title and state show at once</text>
+  <g transform="translate(24.0,92.0) scale(0.6)" filter="url(#shadow)">
+  <rect x="0" y="0" width="820" height="740" rx="12" fill="#FFFFFF" stroke="#C7CCD3"/>
+  <clipPath id="c1"><rect x="0" y="0" width="820" height="740" rx="12"/></clipPath>
+  <g clip-path="url(#c1)">
+  <text x="24" y="40" font-size="21" fill="#1C1D20" font-weight="600">Work look: wireframe the issue page <tspan font-weight="400" fill="#5B616B">#4331</tspan></text>
+  <rect x="684" y="20" width="112" height="28" rx="6" fill="#0A6CDB"/>
+  <use href="#spark" x="695" y="27.0" width="14" height="14" color="#FFF"/>
+  <text x="713" y="38.5" font-size="12.5" fill="#FFF" font-weight="500">Start Agent</text>
+  <rect x="24" y="60" width="67.6" height="24" rx="12.0" fill="#1A7F37"/>
+  <use href="#open" x="32" y="65.0" width="14" height="14" color="#FFF"/>
+  <text x="50" y="76.5" font-size="12.5" fill="#FFF" font-weight="600">Open</text>
+  <text x="101.6" y="77" font-size="12.5" fill="#5B616B">alexec opened 2 h ago · 4 comments</text>
+  <text x="796" y="77" font-size="12.5" fill="#0A6CDB" text-anchor="end">Open on GitHub</text>
+  <use href="#ext" x="680" y="65" width="14" height="14" color="#0A6CDB"/>
+  <path d="M24 100H796" stroke="#E0E3E7" stroke-width="1"/>
+  <rect x="556" y="122" width="70" height="8" rx="4.0" fill="#E6E9ED"/>
+  <rect x="556" y="140" width="200" height="10" rx="5.0" fill="#E6E9ED"/>
+  <path d="M556 166H796" stroke="#EEF0F3" stroke-width="1"/>
+  <rect x="556" y="184" width="70" height="8" rx="4.0" fill="#E6E9ED"/>
+  <rect x="556" y="202" width="200" height="10" rx="5.0" fill="#E6E9ED"/>
+  <path d="M556 228H796" stroke="#EEF0F3" stroke-width="1"/>
+  <rect x="556" y="246" width="70" height="8" rx="4.0" fill="#E6E9ED"/>
+  <rect x="556" y="264" width="200" height="10" rx="5.0" fill="#E6E9ED"/>
+  <path d="M556 290H796" stroke="#EEF0F3" stroke-width="1"/>
+  <rect x="556" y="308" width="70" height="8" rx="4.0" fill="#E6E9ED"/>
+  <rect x="556" y="326" width="200" height="10" rx="5.0" fill="#E6E9ED"/>
+  <path d="M556 352H796" stroke="#EEF0F3" stroke-width="1"/>
+  <rect x="556" y="370" width="70" height="8" rx="4.0" fill="#E6E9ED"/>
+  <rect x="556" y="388" width="200" height="10" rx="5.0" fill="#E6E9ED"/>
+  <path d="M556 414H796" stroke="#EEF0F3" stroke-width="1"/>
+  <circle cx="38" cy="132" r="14" fill="#E6E9ED"/>
+  <text x="38" y="136.48" font-size="11.9" fill="#FFF" font-weight="600" text-anchor="middle"> </text>
+  <rect x="64" y="118" width="460" height="132" rx="6" fill="#FFFFFF" stroke="#E0E3E7"/>
+  <rect x="76" y="130" width="160" height="10" rx="5.0" fill="#E6E9ED"/>
+  <rect x="76" y="168" width="387.0" height="10" rx="5.0" fill="#E6E9ED"/>
+  <rect x="76" y="188" width="352.59999999999997" height="10" rx="5.0" fill="#E6E9ED"/>
+  <rect x="76" y="208" width="369.8" height="10" rx="5.0" fill="#E6E9ED"/>
+  <rect x="76" y="228" width="215.0" height="10" rx="5.0" fill="#E6E9ED"/>
+  </g>
+  </g>
+  <text x="540.0" y="82.0" font-size="12" fill="#1C1D20" font-weight="600">Loading, opened from a link: all placeholders</text>
+  <g transform="translate(540.0,92.0) scale(0.6)" filter="url(#shadow)">
+  <rect x="0" y="0" width="820" height="740" rx="12" fill="#FFFFFF" stroke="#C7CCD3"/>
+  <clipPath id="c2"><rect x="0" y="0" width="820" height="740" rx="12"/></clipPath>
+  <g clip-path="url(#c2)">
+  <rect x="24" y="24" width="420" height="18" rx="9.0" fill="#E6E9ED"/>
+  <rect x="24" y="62" width="64" height="22" rx="11.0" fill="#E6E9ED"/>
+  <rect x="100" y="68" width="240" height="10" rx="5.0" fill="#E6E9ED"/>
+  <path d="M24 100H796" stroke="#E0E3E7" stroke-width="1"/>
+  <rect x="556" y="122" width="70" height="8" rx="4.0" fill="#E6E9ED"/>
+  <rect x="556" y="140" width="200" height="10" rx="5.0" fill="#E6E9ED"/>
+  <path d="M556 166H796" stroke="#EEF0F3" stroke-width="1"/>
+  <rect x="556" y="184" width="70" height="8" rx="4.0" fill="#E6E9ED"/>
+  <rect x="556" y="202" width="200" height="10" rx="5.0" fill="#E6E9ED"/>
+  <path d="M556 228H796" stroke="#EEF0F3" stroke-width="1"/>
+  <rect x="556" y="246" width="70" height="8" rx="4.0" fill="#E6E9ED"/>
+  <rect x="556" y="264" width="200" height="10" rx="5.0" fill="#E6E9ED"/>
+  <path d="M556 290H796" stroke="#EEF0F3" stroke-width="1"/>
+  <rect x="556" y="308" width="70" height="8" rx="4.0" fill="#E6E9ED"/>
+  <rect x="556" y="326" width="200" height="10" rx="5.0" fill="#E6E9ED"/>
+  <path d="M556 352H796" stroke="#EEF0F3" stroke-width="1"/>
+  <rect x="556" y="370" width="70" height="8" rx="4.0" fill="#E6E9ED"/>
+  <rect x="556" y="388" width="200" height="10" rx="5.0" fill="#E6E9ED"/>
+  <path d="M556 414H796" stroke="#EEF0F3" stroke-width="1"/>
+  <circle cx="38" cy="132" r="14" fill="#E6E9ED"/>
+  <text x="38" y="136.48" font-size="11.9" fill="#FFF" font-weight="600" text-anchor="middle"> </text>
+  <rect x="64" y="118" width="460" height="132" rx="6" fill="#FFFFFF" stroke="#E0E3E7"/>
+  <rect x="76" y="130" width="160" height="10" rx="5.0" fill="#E6E9ED"/>
+  <rect x="76" y="168" width="387.0" height="10" rx="5.0" fill="#E6E9ED"/>
+  <rect x="76" y="188" width="352.59999999999997" height="10" rx="5.0" fill="#E6E9ED"/>
+  <rect x="76" y="208" width="369.8" height="10" rx="5.0" fill="#E6E9ED"/>
+  <rect x="76" y="228" width="215.0" height="10" rx="5.0" fill="#E6E9ED"/>
+  </g>
+  </g>
+  <text x="1056.0" y="82.0" font-size="12" fill="#1C1D20" font-weight="600">Error, after a read: a strip, the last read dimmed under it</text>
+  <g transform="translate(1056.0,92.0) scale(0.6)" filter="url(#shadow)">
+  <rect x="0" y="0" width="820" height="740" rx="12" fill="#FFFFFF" stroke="#C7CCD3"/>
+  <clipPath id="c3"><rect x="0" y="0" width="820" height="740" rx="12"/></clipPath>
+  <g clip-path="url(#c3)">
+  <text x="24" y="40" font-size="21" fill="#1C1D20" font-weight="600">Work look: wireframe the issue page <tspan font-weight="400" fill="#5B616B">#4331</tspan></text>
+  <rect x="684" y="20" width="112" height="28" rx="6" fill="#0A6CDB"/>
+  <use href="#spark" x="695" y="27.0" width="14" height="14" color="#FFF"/>
+  <text x="713" y="38.5" font-size="12.5" fill="#FFF" font-weight="500">Start Agent</text>
+  <rect x="24" y="60" width="67.6" height="24" rx="12.0" fill="#1A7F37"/>
+  <use href="#open" x="32" y="65.0" width="14" height="14" color="#FFF"/>
+  <text x="50" y="76.5" font-size="12.5" fill="#FFF" font-weight="600">Open</text>
+  <text x="101.6" y="77" font-size="12.5" fill="#5B616B">alexec opened 2 h ago · 4 comments</text>
+  <text x="796" y="77" font-size="12.5" fill="#0A6CDB" text-anchor="end">Open on GitHub</text>
+  <use href="#ext" x="680" y="65" width="14" height="14" color="#0A6CDB"/>
+  <path d="M24 100H796" stroke="#E0E3E7" stroke-width="1"/>
+  <rect x="24" y="118" width="772" height="40" rx="6" fill="#FFF4E5" stroke="#F0C48A"/>
+  <use href="#warn" x="36" y="130" width="16" height="16" color="#B35900"/>
+  <text x="60" y="143" font-size="12.5" fill="#1C1D20">GitHub said: API rate limit exceeded. It resets at 14:05.</text>
+  <rect x="698" y="125" width="88" height="26" rx="6" fill="#FFFFFF" stroke="#D0D5DB"/>
+  <text x="709" y="142.5" font-size="12.5" fill="#1C1D20" font-weight="500">Try again</text>
+  <text x="556" y="186" font-size="11.5" fill="#5B616B" font-weight="600">Assignees</text>
+  <use href="#gear" x="780" y="175" width="14" height="14" color="#8A9099"/>
+  <circle cx="565" cy="204" r="9" fill="#7C5CC4"/>
+  <text x="565" y="206.88" font-size="7.6499999999999995" fill="#FFF" font-weight="600" text-anchor="middle">A</text>
+  <text x="580" y="208.5" font-size="12.5" fill="#1C1D20">alexec</text>
+  <path d="M556 226H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="250" font-size="11.5" fill="#5B616B" font-weight="600">Labels</text>
+  <use href="#gear" x="780" y="239" width="14" height="14" color="#8A9099"/>
+  <rect x="556" y="260" width="79.1" height="18" rx="9" fill="#A2EEEF" stroke="#A2EEEF" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="595.55" y="273" font-size="11" fill="#1E6F70" font-weight="500" text-anchor="middle">enhancement</text>
+  <rect x="641.1" y="260" width="42.5" height="18" rx="9" fill="#FBCA04" stroke="#FBCA04" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="662.35" y="273" font-size="11" fill="#7A6000" font-weight="500" text-anchor="middle">spike</text>
+  <rect x="556" y="284" width="85.2" height="18" rx="9" fill="#1D76DB" stroke="#1D76DB" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="598.6" y="297" font-size="11" fill="#145AA8" text-anchor="middle">feature:<tspan font-weight="600">work</tspan></text>
+  <path d="M556 314H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="338" font-size="11.5" fill="#5B616B" font-weight="600">Milestone</text>
+  <use href="#gear" x="780" y="327" width="14" height="14" color="#8A9099"/>
+  <text x="556" y="360" font-size="12.5" fill="#8A9099">None</text>
+  <path d="M556 376H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="400" font-size="11.5" fill="#5B616B" font-weight="600">Repo</text>
+  <text x="556" y="422" font-size="12.5" fill="#1C1D20">alexec/Agents</text>
+  <path d="M556 438H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="462" font-size="11.5" fill="#5B616B" font-weight="600">Linked</text>
+  <text x="556" y="482" font-size="10.5" fill="#8A9099">Parent</text>
+  <use href="#open" x="556" y="488" width="14" height="14" color="#1A7F37"/>
+  <text x="576" y="500" font-size="12.5" fill="#1C1D20">#4327 Work look</text>
+  <text x="556" y="520" font-size="10.5" fill="#8A9099">Fixed by</text>
+  <use href="#pr" x="556" y="526" width="14" height="14" color="#1A7F37"/>
+  <text x="576" y="538" font-size="12.5" fill="#1C1D20">#4391 Work look: wirefr…</text>
+  <path d="M556 552H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="576" font-size="11.5" fill="#5B616B" font-weight="600">Lineage</text>
+  <use href="#spark" x="556" y="587" width="14" height="14" color="#8250DF"/>
+  <text x="576" y="598" font-size="12.5" fill="#1C1D20">Claude · $0.42 · 1 session</text>
+  <circle cx="560" cy="614" r="3.5" fill="#1A7F37"/>
+  <text x="576" y="618" font-size="12.5" fill="#0A6CDB">Work look: issue page</text>
+  <text x="556" y="638" font-size="11.5" fill="#5B616B">Estimate: about $0.60, 40 min</text>
+  <text x="556" y="654" font-size="11.5" fill="#8A9099">(from 12 closed spikes)</text>
+  <path d="M556 668H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="692" font-size="11.5" fill="#5B616B" font-weight="600">Docs</text>
+  <use href="#doc" x="556" y="702" width="14" height="14" color="#5B616B"/>
+  <text x="576" y="713" font-size="12" fill="#0A6CDB">specs/4328-work-look/parts.md</text>
+  <use href="#doc" x="556" y="722" width="14" height="14" color="#5B616B"/>
+  <text x="576" y="733" font-size="12" fill="#0A6CDB">docs/explanation/work.md</text>
+  <text x="556" y="752" font-size="11.5" fill="#8A9099">Like it: lists.md, epic.md</text>
+  <g opacity=".45">
+  <circle cx="38" cy="188" r="14" fill="#7C5CC4"/>
+  <text x="38" y="192.48" font-size="11.9" fill="#FFF" font-weight="600" text-anchor="middle">A</text>
+  <rect x="64" y="174" width="460" height="132" rx="6" fill="#FFFFFF" stroke="#E0E3E7"/>
+  <path d="M64 180a6 6 0 0 1 6-6h448a6 6 0 0 1 6 6v28H64z" fill="#F6F7F8"/>
+  <path d="M64 208H524" stroke="#E0E3E7" stroke-width="1"/>
+  <text x="76" y="195" font-size="12.5" fill="#5B616B"><tspan font-weight="600">alexec</tspan> opened 2 h ago</text>
+  <use href="#more" x="498" y="183" width="16" height="16" color="#8A9099"/>
+  <text x="76" y="232" font-size="13" fill="#1C1D20">Wireframe the issue page with the shared parts of #4328.</text>
+  <text x="76" y="252" font-size="13" fill="#1C1D20">The issue page: title, state, the side panel, the body, comments,</text>
+  <text x="76" y="272" font-size="13" fill="#1C1D20">the comment box, the actions (Start Agent, Close, Labels), Back and</text>
+  <text x="76" y="292" font-size="13" fill="#1C1D20">Forward, “1 of 2”, Open on the forge, Docs, lineage.</text>
+  <path d="M78 306V346" stroke="#E0E3E7" stroke-width="2"/>
+  <circle cx="78" cy="326" r="10" fill="#F6F7F8" stroke="#E0E3E7"/>
+  <use href="#tag" x="71" y="319" width="14" height="14" color="#5B616B"/>
+  <text x="96" y="330" font-size="12" fill="#5B616B"><tspan font-weight="600" fill="#1C1D20">alexec</tspan> added</text>
+  <rect x="182" y="317" width="42.5" height="18" rx="9" fill="#FBCA04" stroke="#FBCA04" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="203.25" y="330" font-size="11" fill="#7A6000" font-weight="500" text-anchor="middle">spike</text>
+  <rect x="230.5" y="317" width="85.2" height="18" rx="9" fill="#1D76DB" stroke="#1D76DB" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="273.1" y="330" font-size="11" fill="#145AA8" text-anchor="middle">feature:<tspan font-weight="600">work</tspan></text>
+  <text x="323.7" y="330" font-size="12" fill="#8A9099">· 2 h ago</text>
+  <path d="M78 346V360" stroke="#E0E3E7" stroke-width="2"/>
+  <circle cx="38" cy="374" r="14" fill="#8250DF"/>
+  <text x="38" y="378.48" font-size="11.9" fill="#FFF" font-weight="600" text-anchor="middle">✦</text>
+  <rect x="64" y="360" width="460" height="92" rx="6" fill="#FFFFFF" stroke="#E0E3E7"/>
+  <path d="M64 366a6 6 0 0 1 6-6h448a6 6 0 0 1 6 6v28H64z" fill="#F6F7F8"/>
+  <path d="M64 394H524" stroke="#E0E3E7" stroke-width="1"/>
+  <text x="76" y="381" font-size="12.5" fill="#1C1D20"><tspan font-weight="600">alexec-agents</tspan></text>
+  <rect x="176" y="369" width="30" height="16" rx="8" fill="#FFFFFF" stroke="#C7CCD3"/>
+  <text x="191" y="381" font-size="10.5" fill="#5B616B" font-weight="500" text-anchor="middle">bot</text>
+  <text x="214" y="381" font-size="12.5" fill="#5B616B">commented 1 h ago</text>
+  <use href="#more" x="498" y="369" width="16" height="16" color="#8A9099"/>
+  <text x="76" y="418" font-size="13" fill="#1C1D20">Draft of issue.md is up, with the Mac, the Remote and the web</text>
+  <text x="76" y="438" font-size="13" fill="#1C1D20">page. The side panel follows parts.md §5.</text>
+  <path d="M78 452V492" stroke="#E0E3E7" stroke-width="2"/>
+  <circle cx="78" cy="472" r="10" fill="#F6F7F8" stroke="#E0E3E7"/>
+  <use href="#link" x="71" y="465" width="14" height="14" color="#5B616B"/>
+  <text x="96" y="476" font-size="12" fill="#5B616B"><tspan font-weight="600" fill="#1C1D20">alexec-agents</tspan> linked</text>
+  <use href="#pr" x="228" y="464" width="14" height="14" color="#1A7F37"/>
+  <text x="246" y="476" font-size="12" fill="#5B616B">#4391 Work look: the issue page · 40 min ago</text>
+  <path d="M78 492V506" stroke="#E0E3E7" stroke-width="2"/>
+  <circle cx="38" cy="520" r="14" fill="#7C5CC4"/>
+  <text x="38" y="524.48" font-size="11.9" fill="#FFF" font-weight="600" text-anchor="middle">A</text>
+  <rect x="64" y="506" width="460" height="72" rx="6" fill="#FFFFFF" stroke="#E0E3E7"/>
+  <path d="M64 512a6 6 0 0 1 6-6h448a6 6 0 0 1 6 6v28H64z" fill="#F6F7F8"/>
+  <path d="M64 540H524" stroke="#E0E3E7" stroke-width="1"/>
+  <text x="76" y="527" font-size="12.5" fill="#5B616B"><tspan font-weight="600">alexec</tspan> commented 20 min ago</text>
+  <use href="#more" x="498" y="515" width="16" height="16" color="#8A9099"/>
+  <text x="76" y="564" font-size="13" fill="#1C1D20">Put Close beside Comment, as GitHub does.</text>
+  </g>
+  <path d="M24 596H524" stroke="#E0E3E7" stroke-width="2"/>
+  <circle cx="38" cy="628" r="14" fill="#7C5CC4"/>
+  <text x="38" y="632.48" font-size="11.9" fill="#FFF" font-weight="600" text-anchor="middle">A</text>
+  <rect x="64" y="614" width="460" height="84" rx="6" fill="#FFFFFF" stroke="#C7CCD3"/>
+  <text x="76" y="638" font-size="13" fill="#8A9099">Comment, in Markdown</text>
+  <text x="512" y="690" font-size="11" fill="#8A9099" text-anchor="end">⌘↩</text>
+  <rect x="432" y="708" width="92" height="26" rx="6" fill="#0A6CDB"/>
+  <text x="443" y="725.5" font-size="12.5" fill="#FFF" font-weight="500">Comment</text>
+  <rect x="288" y="708" width="136" height="26" rx="6" fill="#FFFFFF" stroke="#D0D5DB"/>
+  <use href="#done" x="299" y="714.0" width="14" height="14" color="#8250DF"/>
+  <text x="317" y="725.5" font-size="12.5" fill="#1C1D20" font-weight="500">Close issue</text>
+  <use href="#chev" x="406" y="716.0" width="10" height="10" color="#1C1D20"/>
+  </g>
+  </g>
+  <text x="24.0" y="578.0" font-size="12" fill="#1C1D20" font-weight="600">Error, nothing read: in the middle</text>
+  <g transform="translate(24.0,588.0) scale(0.6)" filter="url(#shadow)">
+  <rect x="0" y="0" width="820" height="740" rx="12" fill="#FFFFFF" stroke="#C7CCD3"/>
+  <clipPath id="c4"><rect x="0" y="0" width="820" height="740" rx="12"/></clipPath>
+  <g clip-path="url(#c4)">
+  <use href="#warn" x="394.0" y="150" width="32" height="32" color="#B35900"/>
+  <text x="410.0" y="214" font-size="17" fill="#1C1D20" font-weight="600" text-anchor="middle">Could not read #4331</text>
+  <text x="410.0" y="240" font-size="13" fill="#5B616B" text-anchor="middle">GitHub said: Not Found. The token may not see alexec/Agents.</text>
+  <rect x="260.0" y="266" width="110" height="30" rx="6" fill="#FFFFFF" stroke="#D0D5DB"/>
+  <text x="271.0" y="285.5" font-size="12.5" fill="#1C1D20" font-weight="500">Try again</text>
+  <rect x="380.0" y="266" width="180" height="30" rx="6" fill="#FFFFFF" stroke="#D0D5DB"/>
+  <use href="#ext" x="391.0" y="274.0" width="14" height="14" color="#0A6CDB"/>
+  <text x="409.0" y="285.5" font-size="12.5" fill="#1C1D20" font-weight="500">Open on GitHub</text>
+  </g>
+  </g>
+  <text x="540.0" y="578.0" font-size="12" fill="#1C1D20" font-weight="600">Closed as completed: purple, Reopen issue, no Start Agent</text>
+  <g transform="translate(540.0,588.0) scale(0.6)" filter="url(#shadow)">
+  <rect x="0" y="0" width="820" height="740" rx="12" fill="#FFFFFF" stroke="#C7CCD3"/>
+  <clipPath id="c5"><rect x="0" y="0" width="820" height="740" rx="12"/></clipPath>
+  <g clip-path="url(#c5)">
+  <text x="24" y="40" font-size="21" fill="#1C1D20" font-weight="600">Work look: wireframe the issue page <tspan font-weight="400" fill="#5B616B">#4331</tspan></text>
+  <rect x="24" y="60" width="82.4" height="24" rx="12.0" fill="#8250DF"/>
+  <use href="#done" x="32" y="65.0" width="14" height="14" color="#FFF"/>
+  <text x="50" y="76.5" font-size="12.5" fill="#FFF" font-weight="600">Closed</text>
+  <text x="116.4" y="77" font-size="12.5" fill="#5B616B">alexec closed this 10 min ago · 4 comments</text>
+  <text x="796" y="77" font-size="12.5" fill="#0A6CDB" text-anchor="end">Open on GitHub</text>
+  <use href="#ext" x="680" y="65" width="14" height="14" color="#0A6CDB"/>
+  <path d="M24 100H796" stroke="#E0E3E7" stroke-width="1"/>
+  <text x="556" y="130" font-size="11.5" fill="#5B616B" font-weight="600">Assignees</text>
+  <use href="#gear" x="780" y="119" width="14" height="14" color="#8A9099"/>
+  <circle cx="565" cy="148" r="9" fill="#7C5CC4"/>
+  <text x="565" y="150.88" font-size="7.6499999999999995" fill="#FFF" font-weight="600" text-anchor="middle">A</text>
+  <text x="580" y="152.5" font-size="12.5" fill="#1C1D20">alexec</text>
+  <path d="M556 170H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="194" font-size="11.5" fill="#5B616B" font-weight="600">Labels</text>
+  <use href="#gear" x="780" y="183" width="14" height="14" color="#8A9099"/>
+  <rect x="556" y="204" width="79.1" height="18" rx="9" fill="#A2EEEF" stroke="#A2EEEF" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="595.55" y="217" font-size="11" fill="#1E6F70" font-weight="500" text-anchor="middle">enhancement</text>
+  <rect x="641.1" y="204" width="42.5" height="18" rx="9" fill="#FBCA04" stroke="#FBCA04" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="662.35" y="217" font-size="11" fill="#7A6000" font-weight="500" text-anchor="middle">spike</text>
+  <rect x="556" y="228" width="85.2" height="18" rx="9" fill="#1D76DB" stroke="#1D76DB" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="598.6" y="241" font-size="11" fill="#145AA8" text-anchor="middle">feature:<tspan font-weight="600">work</tspan></text>
+  <path d="M556 258H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="282" font-size="11.5" fill="#5B616B" font-weight="600">Milestone</text>
+  <use href="#gear" x="780" y="271" width="14" height="14" color="#8A9099"/>
+  <text x="556" y="304" font-size="12.5" fill="#8A9099">None</text>
+  <path d="M556 320H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="344" font-size="11.5" fill="#5B616B" font-weight="600">Repo</text>
+  <text x="556" y="366" font-size="12.5" fill="#1C1D20">alexec/Agents</text>
+  <path d="M556 382H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="406" font-size="11.5" fill="#5B616B" font-weight="600">Linked</text>
+  <text x="556" y="426" font-size="10.5" fill="#8A9099">Parent</text>
+  <use href="#open" x="556" y="432" width="14" height="14" color="#1A7F37"/>
+  <text x="576" y="444" font-size="12.5" fill="#1C1D20">#4327 Work look</text>
+  <text x="556" y="464" font-size="10.5" fill="#8A9099">Fixed by</text>
+  <use href="#pr" x="556" y="470" width="14" height="14" color="#1A7F37"/>
+  <text x="576" y="482" font-size="12.5" fill="#1C1D20">#4391 Work look: wirefr…</text>
+  <path d="M556 496H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="520" font-size="11.5" fill="#5B616B" font-weight="600">Lineage</text>
+  <use href="#spark" x="556" y="531" width="14" height="14" color="#8250DF"/>
+  <text x="576" y="542" font-size="12.5" fill="#1C1D20">Claude · $0.42 · 1 session</text>
+  <circle cx="560" cy="558" r="3.5" fill="#1A7F37"/>
+  <text x="576" y="562" font-size="12.5" fill="#0A6CDB">Work look: issue page</text>
+  <text x="556" y="582" font-size="11.5" fill="#5B616B">Estimate: about $0.60, 40 min</text>
+  <text x="556" y="598" font-size="11.5" fill="#8A9099">(from 12 closed spikes)</text>
+  <path d="M556 612H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="636" font-size="11.5" fill="#5B616B" font-weight="600">Docs</text>
+  <use href="#doc" x="556" y="646" width="14" height="14" color="#5B616B"/>
+  <text x="576" y="657" font-size="12" fill="#0A6CDB">specs/4328-work-look/parts.md</text>
+  <use href="#doc" x="556" y="666" width="14" height="14" color="#5B616B"/>
+  <text x="576" y="677" font-size="12" fill="#0A6CDB">docs/explanation/work.md</text>
+  <text x="556" y="696" font-size="11.5" fill="#8A9099">Like it: lists.md, epic.md</text>
+  <circle cx="38" cy="132" r="14" fill="#7C5CC4"/>
+  <text x="38" y="136.48" font-size="11.9" fill="#FFF" font-weight="600" text-anchor="middle">A</text>
+  <rect x="64" y="118" width="460" height="132" rx="6" fill="#FFFFFF" stroke="#E0E3E7"/>
+  <path d="M64 124a6 6 0 0 1 6-6h448a6 6 0 0 1 6 6v28H64z" fill="#F6F7F8"/>
+  <path d="M64 152H524" stroke="#E0E3E7" stroke-width="1"/>
+  <text x="76" y="139" font-size="12.5" fill="#5B616B"><tspan font-weight="600">alexec</tspan> opened 2 h ago</text>
+  <use href="#more" x="498" y="127" width="16" height="16" color="#8A9099"/>
+  <text x="76" y="176" font-size="13" fill="#1C1D20">Wireframe the issue page with the shared parts of #4328.</text>
+  <text x="76" y="196" font-size="13" fill="#1C1D20">The issue page: title, state, the side panel, the body, comments,</text>
+  <text x="76" y="216" font-size="13" fill="#1C1D20">the comment box, the actions (Start Agent, Close, Labels), Back and</text>
+  <text x="76" y="236" font-size="13" fill="#1C1D20">Forward, “1 of 2”, Open on the forge, Docs, lineage.</text>
+  <path d="M78 250V290" stroke="#E0E3E7" stroke-width="2"/>
+  <circle cx="78" cy="270" r="10" fill="#F6F7F8" stroke="#E0E3E7"/>
+  <use href="#tag" x="71" y="263" width="14" height="14" color="#5B616B"/>
+  <text x="96" y="274" font-size="12" fill="#5B616B"><tspan font-weight="600" fill="#1C1D20">alexec</tspan> added</text>
+  <rect x="182" y="261" width="42.5" height="18" rx="9" fill="#FBCA04" stroke="#FBCA04" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="203.25" y="274" font-size="11" fill="#7A6000" font-weight="500" text-anchor="middle">spike</text>
+  <rect x="230.5" y="261" width="85.2" height="18" rx="9" fill="#1D76DB" stroke="#1D76DB" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="273.1" y="274" font-size="11" fill="#145AA8" text-anchor="middle">feature:<tspan font-weight="600">work</tspan></text>
+  <text x="323.7" y="274" font-size="12" fill="#8A9099">· 2 h ago</text>
+  <path d="M78 290V304" stroke="#E0E3E7" stroke-width="2"/>
+  <circle cx="38" cy="318" r="14" fill="#8250DF"/>
+  <text x="38" y="322.48" font-size="11.9" fill="#FFF" font-weight="600" text-anchor="middle">✦</text>
+  <rect x="64" y="304" width="460" height="92" rx="6" fill="#FFFFFF" stroke="#E0E3E7"/>
+  <path d="M64 310a6 6 0 0 1 6-6h448a6 6 0 0 1 6 6v28H64z" fill="#F6F7F8"/>
+  <path d="M64 338H524" stroke="#E0E3E7" stroke-width="1"/>
+  <text x="76" y="325" font-size="12.5" fill="#1C1D20"><tspan font-weight="600">alexec-agents</tspan></text>
+  <rect x="176" y="313" width="30" height="16" rx="8" fill="#FFFFFF" stroke="#C7CCD3"/>
+  <text x="191" y="325" font-size="10.5" fill="#5B616B" font-weight="500" text-anchor="middle">bot</text>
+  <text x="214" y="325" font-size="12.5" fill="#5B616B">commented 1 h ago</text>
+  <use href="#more" x="498" y="313" width="16" height="16" color="#8A9099"/>
+  <text x="76" y="362" font-size="13" fill="#1C1D20">Draft of issue.md is up, with the Mac, the Remote and the web</text>
+  <text x="76" y="382" font-size="13" fill="#1C1D20">page. The side panel follows parts.md §5.</text>
+  <path d="M78 396V436" stroke="#E0E3E7" stroke-width="2"/>
+  <circle cx="78" cy="416" r="10" fill="#F6F7F8" stroke="#E0E3E7"/>
+  <use href="#link" x="71" y="409" width="14" height="14" color="#5B616B"/>
+  <text x="96" y="420" font-size="12" fill="#5B616B"><tspan font-weight="600" fill="#1C1D20">alexec-agents</tspan> linked</text>
+  <use href="#pr" x="228" y="408" width="14" height="14" color="#1A7F37"/>
+  <text x="246" y="420" font-size="12" fill="#5B616B">#4391 Work look: the issue page · 40 min ago</text>
+  <path d="M78 436V476" stroke="#E0E3E7" stroke-width="2"/>
+  <circle cx="78" cy="456" r="11" fill="#8250DF"/>
+  <use href="#done" x="71" y="449" width="14" height="14" color="#FFF"/>
+  <text x="96" y="460" font-size="12" fill="#5B616B"><tspan font-weight="600" fill="#1C1D20">alexec</tspan> closed this as completed · 10 min ago</text>
+  <path d="M24 494H524" stroke="#E0E3E7" stroke-width="2"/>
+  <circle cx="38" cy="526" r="14" fill="#7C5CC4"/>
+  <text x="38" y="530.48" font-size="11.9" fill="#FFF" font-weight="600" text-anchor="middle">A</text>
+  <rect x="64" y="512" width="460" height="84" rx="6" fill="#FFFFFF" stroke="#C7CCD3"/>
+  <text x="76" y="536" font-size="13" fill="#8A9099">Comment, in Markdown</text>
+  <text x="512" y="588" font-size="11" fill="#8A9099" text-anchor="end">⌘↩</text>
+  <rect x="432" y="606" width="92" height="26" rx="6" fill="#0A6CDB"/>
+  <text x="443" y="623.5" font-size="12.5" fill="#FFF" font-weight="500">Comment</text>
+  <rect x="300" y="606" width="124" height="26" rx="6" fill="#FFFFFF" stroke="#D0D5DB"/>
+  <use href="#open" x="311" y="612.0" width="14" height="14" color="#1A7F37"/>
+  <text x="329" y="623.5" font-size="12.5" fill="#1C1D20" font-weight="500">Reopen issue</text>
+  </g>
+  </g>
+  <text x="1056.0" y="578.0" font-size="12" fill="#1C1D20" font-weight="600">Closed as not planned: grey</text>
+  <g transform="translate(1056.0,588.0) scale(0.6)" filter="url(#shadow)">
+  <rect x="0" y="0" width="820" height="740" rx="12" fill="#FFFFFF" stroke="#C7CCD3"/>
+  <clipPath id="c6"><rect x="0" y="0" width="820" height="740" rx="12"/></clipPath>
+  <g clip-path="url(#c6)">
+  <text x="24" y="40" font-size="21" fill="#1C1D20" font-weight="600">Work look: wireframe the issue page <tspan font-weight="400" fill="#5B616B">#4331</tspan></text>
+  <rect x="24" y="60" width="193.4" height="24" rx="12.0" fill="#6E7781"/>
+  <use href="#notplanned" x="32" y="65.0" width="14" height="14" color="#FFF"/>
+  <text x="50" y="76.5" font-size="12.5" fill="#FFF" font-weight="600">Closed as not planned</text>
+  <text x="227.4" y="77" font-size="12.5" fill="#5B616B">alexec closed this 10 min ago · 4 comments</text>
+  <text x="796" y="77" font-size="12.5" fill="#0A6CDB" text-anchor="end">Open on GitHub</text>
+  <use href="#ext" x="680" y="65" width="14" height="14" color="#0A6CDB"/>
+  <path d="M24 100H796" stroke="#E0E3E7" stroke-width="1"/>
+  <text x="556" y="130" font-size="11.5" fill="#5B616B" font-weight="600">Assignees</text>
+  <use href="#gear" x="780" y="119" width="14" height="14" color="#8A9099"/>
+  <circle cx="565" cy="148" r="9" fill="#7C5CC4"/>
+  <text x="565" y="150.88" font-size="7.6499999999999995" fill="#FFF" font-weight="600" text-anchor="middle">A</text>
+  <text x="580" y="152.5" font-size="12.5" fill="#1C1D20">alexec</text>
+  <path d="M556 170H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="194" font-size="11.5" fill="#5B616B" font-weight="600">Labels</text>
+  <use href="#gear" x="780" y="183" width="14" height="14" color="#8A9099"/>
+  <rect x="556" y="204" width="79.1" height="18" rx="9" fill="#A2EEEF" stroke="#A2EEEF" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="595.55" y="217" font-size="11" fill="#1E6F70" font-weight="500" text-anchor="middle">enhancement</text>
+  <rect x="641.1" y="204" width="42.5" height="18" rx="9" fill="#FBCA04" stroke="#FBCA04" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="662.35" y="217" font-size="11" fill="#7A6000" font-weight="500" text-anchor="middle">spike</text>
+  <rect x="556" y="228" width="85.2" height="18" rx="9" fill="#1D76DB" stroke="#1D76DB" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="598.6" y="241" font-size="11" fill="#145AA8" text-anchor="middle">feature:<tspan font-weight="600">work</tspan></text>
+  <path d="M556 258H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="282" font-size="11.5" fill="#5B616B" font-weight="600">Milestone</text>
+  <use href="#gear" x="780" y="271" width="14" height="14" color="#8A9099"/>
+  <text x="556" y="304" font-size="12.5" fill="#8A9099">None</text>
+  <path d="M556 320H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="344" font-size="11.5" fill="#5B616B" font-weight="600">Repo</text>
+  <text x="556" y="366" font-size="12.5" fill="#1C1D20">alexec/Agents</text>
+  <path d="M556 382H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="406" font-size="11.5" fill="#5B616B" font-weight="600">Linked</text>
+  <text x="556" y="426" font-size="10.5" fill="#8A9099">Parent</text>
+  <use href="#open" x="556" y="432" width="14" height="14" color="#1A7F37"/>
+  <text x="576" y="444" font-size="12.5" fill="#1C1D20">#4327 Work look</text>
+  <text x="556" y="464" font-size="10.5" fill="#8A9099">Fixed by</text>
+  <use href="#pr" x="556" y="470" width="14" height="14" color="#1A7F37"/>
+  <text x="576" y="482" font-size="12.5" fill="#1C1D20">#4391 Work look: wirefr…</text>
+  <path d="M556 496H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="520" font-size="11.5" fill="#5B616B" font-weight="600">Lineage</text>
+  <use href="#spark" x="556" y="531" width="14" height="14" color="#8250DF"/>
+  <text x="576" y="542" font-size="12.5" fill="#1C1D20">Claude · $0.42 · 1 session</text>
+  <circle cx="560" cy="558" r="3.5" fill="#1A7F37"/>
+  <text x="576" y="562" font-size="12.5" fill="#0A6CDB">Work look: issue page</text>
+  <text x="556" y="582" font-size="11.5" fill="#5B616B">Estimate: about $0.60, 40 min</text>
+  <text x="556" y="598" font-size="11.5" fill="#8A9099">(from 12 closed spikes)</text>
+  <path d="M556 612H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="636" font-size="11.5" fill="#5B616B" font-weight="600">Docs</text>
+  <use href="#doc" x="556" y="646" width="14" height="14" color="#5B616B"/>
+  <text x="576" y="657" font-size="12" fill="#0A6CDB">specs/4328-work-look/parts.md</text>
+  <use href="#doc" x="556" y="666" width="14" height="14" color="#5B616B"/>
+  <text x="576" y="677" font-size="12" fill="#0A6CDB">docs/explanation/work.md</text>
+  <text x="556" y="696" font-size="11.5" fill="#8A9099">Like it: lists.md, epic.md</text>
+  <circle cx="38" cy="132" r="14" fill="#7C5CC4"/>
+  <text x="38" y="136.48" font-size="11.9" fill="#FFF" font-weight="600" text-anchor="middle">A</text>
+  <rect x="64" y="118" width="460" height="132" rx="6" fill="#FFFFFF" stroke="#E0E3E7"/>
+  <path d="M64 124a6 6 0 0 1 6-6h448a6 6 0 0 1 6 6v28H64z" fill="#F6F7F8"/>
+  <path d="M64 152H524" stroke="#E0E3E7" stroke-width="1"/>
+  <text x="76" y="139" font-size="12.5" fill="#5B616B"><tspan font-weight="600">alexec</tspan> opened 2 h ago</text>
+  <use href="#more" x="498" y="127" width="16" height="16" color="#8A9099"/>
+  <text x="76" y="176" font-size="13" fill="#1C1D20">Wireframe the issue page with the shared parts of #4328.</text>
+  <text x="76" y="196" font-size="13" fill="#1C1D20">The issue page: title, state, the side panel, the body, comments,</text>
+  <text x="76" y="216" font-size="13" fill="#1C1D20">the comment box, the actions (Start Agent, Close, Labels), Back and</text>
+  <text x="76" y="236" font-size="13" fill="#1C1D20">Forward, “1 of 2”, Open on the forge, Docs, lineage.</text>
+  <path d="M78 250V290" stroke="#E0E3E7" stroke-width="2"/>
+  <circle cx="78" cy="270" r="10" fill="#F6F7F8" stroke="#E0E3E7"/>
+  <use href="#tag" x="71" y="263" width="14" height="14" color="#5B616B"/>
+  <text x="96" y="274" font-size="12" fill="#5B616B"><tspan font-weight="600" fill="#1C1D20">alexec</tspan> added</text>
+  <rect x="182" y="261" width="42.5" height="18" rx="9" fill="#FBCA04" stroke="#FBCA04" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="203.25" y="274" font-size="11" fill="#7A6000" font-weight="500" text-anchor="middle">spike</text>
+  <rect x="230.5" y="261" width="85.2" height="18" rx="9" fill="#1D76DB" stroke="#1D76DB" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="273.1" y="274" font-size="11" fill="#145AA8" text-anchor="middle">feature:<tspan font-weight="600">work</tspan></text>
+  <text x="323.7" y="274" font-size="12" fill="#8A9099">· 2 h ago</text>
+  <path d="M78 290V304" stroke="#E0E3E7" stroke-width="2"/>
+  <circle cx="38" cy="318" r="14" fill="#8250DF"/>
+  <text x="38" y="322.48" font-size="11.9" fill="#FFF" font-weight="600" text-anchor="middle">✦</text>
+  <rect x="64" y="304" width="460" height="92" rx="6" fill="#FFFFFF" stroke="#E0E3E7"/>
+  <path d="M64 310a6 6 0 0 1 6-6h448a6 6 0 0 1 6 6v28H64z" fill="#F6F7F8"/>
+  <path d="M64 338H524" stroke="#E0E3E7" stroke-width="1"/>
+  <text x="76" y="325" font-size="12.5" fill="#1C1D20"><tspan font-weight="600">alexec-agents</tspan></text>
+  <rect x="176" y="313" width="30" height="16" rx="8" fill="#FFFFFF" stroke="#C7CCD3"/>
+  <text x="191" y="325" font-size="10.5" fill="#5B616B" font-weight="500" text-anchor="middle">bot</text>
+  <text x="214" y="325" font-size="12.5" fill="#5B616B">commented 1 h ago</text>
+  <use href="#more" x="498" y="313" width="16" height="16" color="#8A9099"/>
+  <text x="76" y="362" font-size="13" fill="#1C1D20">Draft of issue.md is up, with the Mac, the Remote and the web</text>
+  <text x="76" y="382" font-size="13" fill="#1C1D20">page. The side panel follows parts.md §5.</text>
+  <path d="M78 396V436" stroke="#E0E3E7" stroke-width="2"/>
+  <circle cx="78" cy="416" r="10" fill="#F6F7F8" stroke="#E0E3E7"/>
+  <use href="#link" x="71" y="409" width="14" height="14" color="#5B616B"/>
+  <text x="96" y="420" font-size="12" fill="#5B616B"><tspan font-weight="600" fill="#1C1D20">alexec-agents</tspan> linked</text>
+  <use href="#pr" x="228" y="408" width="14" height="14" color="#1A7F37"/>
+  <text x="246" y="420" font-size="12" fill="#5B616B">#4391 Work look: the issue page · 40 min ago</text>
+  <path d="M78 436V476" stroke="#E0E3E7" stroke-width="2"/>
+  <circle cx="78" cy="456" r="11" fill="#6E7781"/>
+  <use href="#notplanned" x="71" y="449" width="14" height="14" color="#FFF"/>
+  <text x="96" y="460" font-size="12" fill="#5B616B"><tspan font-weight="600" fill="#1C1D20">alexec</tspan> closed this as not planned · 10 min ago</text>
+  <path d="M24 494H524" stroke="#E0E3E7" stroke-width="2"/>
+  <circle cx="38" cy="526" r="14" fill="#7C5CC4"/>
+  <text x="38" y="530.48" font-size="11.9" fill="#FFF" font-weight="600" text-anchor="middle">A</text>
+  <rect x="64" y="512" width="460" height="84" rx="6" fill="#FFFFFF" stroke="#C7CCD3"/>
+  <text x="76" y="536" font-size="13" fill="#8A9099">Comment, in Markdown</text>
+  <text x="512" y="588" font-size="11" fill="#8A9099" text-anchor="end">⌘↩</text>
+  <rect x="432" y="606" width="92" height="26" rx="6" fill="#0A6CDB"/>
+  <text x="443" y="623.5" font-size="12.5" fill="#FFF" font-weight="500">Comment</text>
+  <rect x="300" y="606" width="124" height="26" rx="6" fill="#FFFFFF" stroke="#D0D5DB"/>
+  <use href="#open" x="311" y="612.0" width="14" height="14" color="#1A7F37"/>
+  <text x="329" y="623.5" font-size="12.5" fill="#1C1D20" font-weight="500">Reopen issue</text>
+  </g>
+  </g>
+  <text x="24.0" y="1074.0" font-size="12" fill="#1C1D20" font-weight="600">Jira (and Azure Boards): the status menu in the pill's place, no Close</text>
+  <g transform="translate(24.0,1084.0) scale(0.6)" filter="url(#shadow)">
+  <rect x="0" y="0" width="820" height="740" rx="12" fill="#FFFFFF" stroke="#C7CCD3"/>
+  <clipPath id="c7"><rect x="0" y="0" width="820" height="740" rx="12"/></clipPath>
+  <g clip-path="url(#c7)">
+  <text x="24" y="40" font-size="21" fill="#1C1D20" font-weight="600">Work look: wireframe the issue page <tspan font-weight="400" fill="#5B616B">#4331</tspan></text>
+  <rect x="684" y="20" width="112" height="28" rx="6" fill="#0A6CDB"/>
+  <use href="#spark" x="695" y="27.0" width="14" height="14" color="#FFF"/>
+  <text x="713" y="38.5" font-size="12.5" fill="#FFF" font-weight="500">Start Agent</text>
+  <rect x="24" y="60" width="132" height="24" rx="12.0" fill="#1A7F37"/>
+  <use href="#open" x="32" y="65.0" width="14" height="14" color="#FFF"/>
+  <text x="50" y="76.5" font-size="12.5" fill="#FFF" font-weight="600">In Progress</text>
+  <use href="#chev" x="138" y="67.0" width="10" height="10" color="#FFF"/>
+  <text x="166" y="77" font-size="12.5" fill="#5B616B">alexec opened 2 h ago · 4 comments · jira:WORK-31</text>
+  <text x="796" y="77" font-size="12.5" fill="#0A6CDB" text-anchor="end">Open on Jira</text>
+  <use href="#ext" x="696" y="65" width="14" height="14" color="#0A6CDB"/>
+  <path d="M24 100H796" stroke="#E0E3E7" stroke-width="1"/>
+  <text x="556" y="130" font-size="11.5" fill="#5B616B" font-weight="600">Assignees</text>
+  <use href="#gear" x="780" y="119" width="14" height="14" color="#8A9099"/>
+  <circle cx="565" cy="148" r="9" fill="#7C5CC4"/>
+  <text x="565" y="150.88" font-size="7.6499999999999995" fill="#FFF" font-weight="600" text-anchor="middle">A</text>
+  <text x="580" y="152.5" font-size="12.5" fill="#1C1D20">alexec</text>
+  <path d="M556 170H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="194" font-size="11.5" fill="#5B616B" font-weight="600">Labels</text>
+  <use href="#gear" x="780" y="183" width="14" height="14" color="#8A9099"/>
+  <rect x="556" y="204" width="79.1" height="18" rx="9" fill="#A2EEEF" stroke="#A2EEEF" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="595.55" y="217" font-size="11" fill="#1E6F70" font-weight="500" text-anchor="middle">enhancement</text>
+  <rect x="641.1" y="204" width="42.5" height="18" rx="9" fill="#FBCA04" stroke="#FBCA04" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="662.35" y="217" font-size="11" fill="#7A6000" font-weight="500" text-anchor="middle">spike</text>
+  <rect x="556" y="228" width="85.2" height="18" rx="9" fill="#1D76DB" stroke="#1D76DB" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="598.6" y="241" font-size="11" fill="#145AA8" text-anchor="middle">feature:<tspan font-weight="600">work</tspan></text>
+  <path d="M556 258H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="282" font-size="11.5" fill="#5B616B" font-weight="600">Milestone</text>
+  <use href="#gear" x="780" y="271" width="14" height="14" color="#8A9099"/>
+  <text x="556" y="304" font-size="12.5" fill="#8A9099">None</text>
+  <path d="M556 320H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="344" font-size="11.5" fill="#5B616B" font-weight="600">Repo</text>
+  <text x="556" y="366" font-size="12.5" fill="#1C1D20">alexec/Agents</text>
+  <path d="M556 382H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="406" font-size="11.5" fill="#5B616B" font-weight="600">Linked</text>
+  <text x="556" y="426" font-size="10.5" fill="#8A9099">Parent</text>
+  <use href="#open" x="556" y="432" width="14" height="14" color="#1A7F37"/>
+  <text x="576" y="444" font-size="12.5" fill="#1C1D20">#4327 Work look</text>
+  <text x="556" y="464" font-size="10.5" fill="#8A9099">Fixed by</text>
+  <use href="#pr" x="556" y="470" width="14" height="14" color="#1A7F37"/>
+  <text x="576" y="482" font-size="12.5" fill="#1C1D20">#4391 Work look: wirefr…</text>
+  <path d="M556 496H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="520" font-size="11.5" fill="#5B616B" font-weight="600">Lineage</text>
+  <use href="#spark" x="556" y="531" width="14" height="14" color="#8250DF"/>
+  <text x="576" y="542" font-size="12.5" fill="#1C1D20">Claude · $0.42 · 1 session</text>
+  <circle cx="560" cy="558" r="3.5" fill="#1A7F37"/>
+  <text x="576" y="562" font-size="12.5" fill="#0A6CDB">Work look: issue page</text>
+  <text x="556" y="582" font-size="11.5" fill="#5B616B">Estimate: about $0.60, 40 min</text>
+  <text x="556" y="598" font-size="11.5" fill="#8A9099">(from 12 closed spikes)</text>
+  <path d="M556 612H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="636" font-size="11.5" fill="#5B616B" font-weight="600">Docs</text>
+  <use href="#doc" x="556" y="646" width="14" height="14" color="#5B616B"/>
+  <text x="576" y="657" font-size="12" fill="#0A6CDB">specs/4328-work-look/parts.md</text>
+  <use href="#doc" x="556" y="666" width="14" height="14" color="#5B616B"/>
+  <text x="576" y="677" font-size="12" fill="#0A6CDB">docs/explanation/work.md</text>
+  <text x="556" y="696" font-size="11.5" fill="#8A9099">Like it: lists.md, epic.md</text>
+  <circle cx="38" cy="132" r="14" fill="#7C5CC4"/>
+  <text x="38" y="136.48" font-size="11.9" fill="#FFF" font-weight="600" text-anchor="middle">A</text>
+  <rect x="64" y="118" width="460" height="132" rx="6" fill="#FFFFFF" stroke="#E0E3E7"/>
+  <path d="M64 124a6 6 0 0 1 6-6h448a6 6 0 0 1 6 6v28H64z" fill="#F6F7F8"/>
+  <path d="M64 152H524" stroke="#E0E3E7" stroke-width="1"/>
+  <text x="76" y="139" font-size="12.5" fill="#5B616B"><tspan font-weight="600">alexec</tspan> opened 2 h ago</text>
+  <use href="#more" x="498" y="127" width="16" height="16" color="#8A9099"/>
+  <text x="76" y="176" font-size="13" fill="#1C1D20">Wireframe the issue page with the shared parts of #4328.</text>
+  <text x="76" y="196" font-size="13" fill="#1C1D20">The issue page: title, state, the side panel, the body, comments,</text>
+  <text x="76" y="216" font-size="13" fill="#1C1D20">the comment box, the actions (Start Agent, Close, Labels), Back and</text>
+  <text x="76" y="236" font-size="13" fill="#1C1D20">Forward, “1 of 2”, Open on the forge, Docs, lineage.</text>
+  <path d="M78 250V290" stroke="#E0E3E7" stroke-width="2"/>
+  <circle cx="78" cy="270" r="10" fill="#F6F7F8" stroke="#E0E3E7"/>
+  <use href="#tag" x="71" y="263" width="14" height="14" color="#5B616B"/>
+  <text x="96" y="274" font-size="12" fill="#5B616B"><tspan font-weight="600" fill="#1C1D20">alexec</tspan> added</text>
+  <rect x="182" y="261" width="42.5" height="18" rx="9" fill="#FBCA04" stroke="#FBCA04" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="203.25" y="274" font-size="11" fill="#7A6000" font-weight="500" text-anchor="middle">spike</text>
+  <rect x="230.5" y="261" width="85.2" height="18" rx="9" fill="#1D76DB" stroke="#1D76DB" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="273.1" y="274" font-size="11" fill="#145AA8" text-anchor="middle">feature:<tspan font-weight="600">work</tspan></text>
+  <text x="323.7" y="274" font-size="12" fill="#8A9099">· 2 h ago</text>
+  <path d="M78 290V304" stroke="#E0E3E7" stroke-width="2"/>
+  <circle cx="38" cy="318" r="14" fill="#8250DF"/>
+  <text x="38" y="322.48" font-size="11.9" fill="#FFF" font-weight="600" text-anchor="middle">✦</text>
+  <rect x="64" y="304" width="460" height="92" rx="6" fill="#FFFFFF" stroke="#E0E3E7"/>
+  <path d="M64 310a6 6 0 0 1 6-6h448a6 6 0 0 1 6 6v28H64z" fill="#F6F7F8"/>
+  <path d="M64 338H524" stroke="#E0E3E7" stroke-width="1"/>
+  <text x="76" y="325" font-size="12.5" fill="#1C1D20"><tspan font-weight="600">alexec-agents</tspan></text>
+  <rect x="176" y="313" width="30" height="16" rx="8" fill="#FFFFFF" stroke="#C7CCD3"/>
+  <text x="191" y="325" font-size="10.5" fill="#5B616B" font-weight="500" text-anchor="middle">bot</text>
+  <text x="214" y="325" font-size="12.5" fill="#5B616B">commented 1 h ago</text>
+  <use href="#more" x="498" y="313" width="16" height="16" color="#8A9099"/>
+  <text x="76" y="362" font-size="13" fill="#1C1D20">Draft of issue.md is up, with the Mac, the Remote and the web</text>
+  <text x="76" y="382" font-size="13" fill="#1C1D20">page. The side panel follows parts.md §5.</text>
+  <path d="M78 396V436" stroke="#E0E3E7" stroke-width="2"/>
+  <circle cx="78" cy="416" r="10" fill="#F6F7F8" stroke="#E0E3E7"/>
+  <use href="#link" x="71" y="409" width="14" height="14" color="#5B616B"/>
+  <text x="96" y="420" font-size="12" fill="#5B616B"><tspan font-weight="600" fill="#1C1D20">alexec-agents</tspan> linked</text>
+  <use href="#pr" x="228" y="408" width="14" height="14" color="#1A7F37"/>
+  <text x="246" y="420" font-size="12" fill="#5B616B">#4391 Work look: the issue page · 40 min ago</text>
+  <path d="M78 436V450" stroke="#E0E3E7" stroke-width="2"/>
+  <circle cx="38" cy="464" r="14" fill="#7C5CC4"/>
+  <text x="38" y="468.48" font-size="11.9" fill="#FFF" font-weight="600" text-anchor="middle">A</text>
+  <rect x="64" y="450" width="460" height="72" rx="6" fill="#FFFFFF" stroke="#E0E3E7"/>
+  <path d="M64 456a6 6 0 0 1 6-6h448a6 6 0 0 1 6 6v28H64z" fill="#F6F7F8"/>
+  <path d="M64 484H524" stroke="#E0E3E7" stroke-width="1"/>
+  <text x="76" y="471" font-size="12.5" fill="#5B616B"><tspan font-weight="600">alexec</tspan> commented 20 min ago</text>
+  <use href="#more" x="498" y="459" width="16" height="16" color="#8A9099"/>
+  <text x="76" y="508" font-size="13" fill="#1C1D20">Put Close beside Comment, as GitHub does.</text>
+  <path d="M24 540H524" stroke="#E0E3E7" stroke-width="2"/>
+  <circle cx="38" cy="572" r="14" fill="#7C5CC4"/>
+  <text x="38" y="576.48" font-size="11.9" fill="#FFF" font-weight="600" text-anchor="middle">A</text>
+  <rect x="64" y="558" width="460" height="84" rx="6" fill="#FFFFFF" stroke="#C7CCD3"/>
+  <text x="76" y="582" font-size="13" fill="#8A9099">Comment, in Markdown</text>
+  <text x="512" y="634" font-size="11" fill="#8A9099" text-anchor="end">⌘↩</text>
+  <rect x="432" y="652" width="92" height="26" rx="6" fill="#0A6CDB"/>
+  <text x="443" y="669.5" font-size="12.5" fill="#FFF" font-weight="500">Comment</text>
+  <rect x="24" y="92" width="200" height="112" rx="8" fill="#FFFFFF" stroke="#E0E3E7"/>
+  <text x="56" y="114" font-size="12.5" fill="#1C1D20">To Do</text>
+  <use href="#done" x="34" y="127" width="14" height="14" color="#0A6CDB"/>
+  <text x="56" y="139" font-size="12.5" fill="#1C1D20">In Progress</text>
+  <text x="56" y="164" font-size="12.5" fill="#1C1D20">In Review</text>
+  <text x="56" y="189" font-size="12.5" fill="#1C1D20">Done</text>
+  </g>
+  </g>
+  <text x="540.0" y="1074.0" font-size="12" fill="#1C1D20" font-weight="600">No machine can write: no Start Agent, no comment box</text>
+  <g transform="translate(540.0,1084.0) scale(0.6)" filter="url(#shadow)">
+  <rect x="0" y="0" width="820" height="740" rx="12" fill="#FFFFFF" stroke="#C7CCD3"/>
+  <clipPath id="c8"><rect x="0" y="0" width="820" height="740" rx="12"/></clipPath>
+  <g clip-path="url(#c8)">
+  <text x="24" y="40" font-size="21" fill="#1C1D20" font-weight="600">Work look: wireframe the issue page <tspan font-weight="400" fill="#5B616B">#4331</tspan></text>
+  <rect x="24" y="60" width="67.6" height="24" rx="12.0" fill="#1A7F37"/>
+  <use href="#open" x="32" y="65.0" width="14" height="14" color="#FFF"/>
+  <text x="50" y="76.5" font-size="12.5" fill="#FFF" font-weight="600">Open</text>
+  <text x="101.6" y="77" font-size="12.5" fill="#5B616B">alexec opened 2 h ago · 4 comments</text>
+  <text x="796" y="77" font-size="12.5" fill="#0A6CDB" text-anchor="end">Open on GitHub</text>
+  <use href="#ext" x="680" y="65" width="14" height="14" color="#0A6CDB"/>
+  <path d="M24 100H796" stroke="#E0E3E7" stroke-width="1"/>
+  <text x="556" y="130" font-size="11.5" fill="#5B616B" font-weight="600">Assignees</text>
+  <use href="#gear" x="780" y="119" width="14" height="14" color="#8A9099"/>
+  <circle cx="565" cy="148" r="9" fill="#7C5CC4"/>
+  <text x="565" y="150.88" font-size="7.6499999999999995" fill="#FFF" font-weight="600" text-anchor="middle">A</text>
+  <text x="580" y="152.5" font-size="12.5" fill="#1C1D20">alexec</text>
+  <path d="M556 170H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="194" font-size="11.5" fill="#5B616B" font-weight="600">Labels</text>
+  <use href="#gear" x="780" y="183" width="14" height="14" color="#8A9099"/>
+  <rect x="556" y="204" width="79.1" height="18" rx="9" fill="#A2EEEF" stroke="#A2EEEF" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="595.55" y="217" font-size="11" fill="#1E6F70" font-weight="500" text-anchor="middle">enhancement</text>
+  <rect x="641.1" y="204" width="42.5" height="18" rx="9" fill="#FBCA04" stroke="#FBCA04" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="662.35" y="217" font-size="11" fill="#7A6000" font-weight="500" text-anchor="middle">spike</text>
+  <rect x="556" y="228" width="85.2" height="18" rx="9" fill="#1D76DB" stroke="#1D76DB" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="598.6" y="241" font-size="11" fill="#145AA8" text-anchor="middle">feature:<tspan font-weight="600">work</tspan></text>
+  <path d="M556 258H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="282" font-size="11.5" fill="#5B616B" font-weight="600">Milestone</text>
+  <use href="#gear" x="780" y="271" width="14" height="14" color="#8A9099"/>
+  <text x="556" y="304" font-size="12.5" fill="#8A9099">None</text>
+  <path d="M556 320H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="344" font-size="11.5" fill="#5B616B" font-weight="600">Repo</text>
+  <text x="556" y="366" font-size="12.5" fill="#1C1D20">alexec/Agents</text>
+  <path d="M556 382H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="406" font-size="11.5" fill="#5B616B" font-weight="600">Linked</text>
+  <text x="556" y="426" font-size="10.5" fill="#8A9099">Parent</text>
+  <use href="#open" x="556" y="432" width="14" height="14" color="#1A7F37"/>
+  <text x="576" y="444" font-size="12.5" fill="#1C1D20">#4327 Work look</text>
+  <text x="556" y="464" font-size="10.5" fill="#8A9099">Fixed by</text>
+  <use href="#pr" x="556" y="470" width="14" height="14" color="#1A7F37"/>
+  <text x="576" y="482" font-size="12.5" fill="#1C1D20">#4391 Work look: wirefr…</text>
+  <path d="M556 496H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="520" font-size="11.5" fill="#5B616B" font-weight="600">Lineage</text>
+  <use href="#spark" x="556" y="531" width="14" height="14" color="#8250DF"/>
+  <text x="576" y="542" font-size="12.5" fill="#1C1D20">Claude · $0.42 · 1 session</text>
+  <circle cx="560" cy="558" r="3.5" fill="#1A7F37"/>
+  <text x="576" y="562" font-size="12.5" fill="#0A6CDB">Work look: issue page</text>
+  <text x="556" y="582" font-size="11.5" fill="#5B616B">Estimate: about $0.60, 40 min</text>
+  <text x="556" y="598" font-size="11.5" fill="#8A9099">(from 12 closed spikes)</text>
+  <path d="M556 612H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="636" font-size="11.5" fill="#5B616B" font-weight="600">Docs</text>
+  <use href="#doc" x="556" y="646" width="14" height="14" color="#5B616B"/>
+  <text x="576" y="657" font-size="12" fill="#0A6CDB">specs/4328-work-look/parts.md</text>
+  <use href="#doc" x="556" y="666" width="14" height="14" color="#5B616B"/>
+  <text x="576" y="677" font-size="12" fill="#0A6CDB">docs/explanation/work.md</text>
+  <text x="556" y="696" font-size="11.5" fill="#8A9099">Like it: lists.md, epic.md</text>
+  <circle cx="38" cy="132" r="14" fill="#7C5CC4"/>
+  <text x="38" y="136.48" font-size="11.9" fill="#FFF" font-weight="600" text-anchor="middle">A</text>
+  <rect x="64" y="118" width="460" height="132" rx="6" fill="#FFFFFF" stroke="#E0E3E7"/>
+  <path d="M64 124a6 6 0 0 1 6-6h448a6 6 0 0 1 6 6v28H64z" fill="#F6F7F8"/>
+  <path d="M64 152H524" stroke="#E0E3E7" stroke-width="1"/>
+  <text x="76" y="139" font-size="12.5" fill="#5B616B"><tspan font-weight="600">alexec</tspan> opened 2 h ago</text>
+  <use href="#more" x="498" y="127" width="16" height="16" color="#8A9099"/>
+  <text x="76" y="176" font-size="13" fill="#1C1D20">Wireframe the issue page with the shared parts of #4328.</text>
+  <text x="76" y="196" font-size="13" fill="#1C1D20">The issue page: title, state, the side panel, the body, comments,</text>
+  <text x="76" y="216" font-size="13" fill="#1C1D20">the comment box, the actions (Start Agent, Close, Labels), Back and</text>
+  <text x="76" y="236" font-size="13" fill="#1C1D20">Forward, “1 of 2”, Open on the forge, Docs, lineage.</text>
+  <path d="M78 250V290" stroke="#E0E3E7" stroke-width="2"/>
+  <circle cx="78" cy="270" r="10" fill="#F6F7F8" stroke="#E0E3E7"/>
+  <use href="#tag" x="71" y="263" width="14" height="14" color="#5B616B"/>
+  <text x="96" y="274" font-size="12" fill="#5B616B"><tspan font-weight="600" fill="#1C1D20">alexec</tspan> added</text>
+  <rect x="182" y="261" width="42.5" height="18" rx="9" fill="#FBCA04" stroke="#FBCA04" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="203.25" y="274" font-size="11" fill="#7A6000" font-weight="500" text-anchor="middle">spike</text>
+  <rect x="230.5" y="261" width="85.2" height="18" rx="9" fill="#1D76DB" stroke="#1D76DB" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="273.1" y="274" font-size="11" fill="#145AA8" text-anchor="middle">feature:<tspan font-weight="600">work</tspan></text>
+  <text x="323.7" y="274" font-size="12" fill="#8A9099">· 2 h ago</text>
+  <path d="M78 290V304" stroke="#E0E3E7" stroke-width="2"/>
+  <circle cx="38" cy="318" r="14" fill="#8250DF"/>
+  <text x="38" y="322.48" font-size="11.9" fill="#FFF" font-weight="600" text-anchor="middle">✦</text>
+  <rect x="64" y="304" width="460" height="92" rx="6" fill="#FFFFFF" stroke="#E0E3E7"/>
+  <path d="M64 310a6 6 0 0 1 6-6h448a6 6 0 0 1 6 6v28H64z" fill="#F6F7F8"/>
+  <path d="M64 338H524" stroke="#E0E3E7" stroke-width="1"/>
+  <text x="76" y="325" font-size="12.5" fill="#1C1D20"><tspan font-weight="600">alexec-agents</tspan></text>
+  <rect x="176" y="313" width="30" height="16" rx="8" fill="#FFFFFF" stroke="#C7CCD3"/>
+  <text x="191" y="325" font-size="10.5" fill="#5B616B" font-weight="500" text-anchor="middle">bot</text>
+  <text x="214" y="325" font-size="12.5" fill="#5B616B">commented 1 h ago</text>
+  <use href="#more" x="498" y="313" width="16" height="16" color="#8A9099"/>
+  <text x="76" y="362" font-size="13" fill="#1C1D20">Draft of issue.md is up, with the Mac, the Remote and the web</text>
+  <text x="76" y="382" font-size="13" fill="#1C1D20">page. The side panel follows parts.md §5.</text>
+  <path d="M78 396V436" stroke="#E0E3E7" stroke-width="2"/>
+  <circle cx="78" cy="416" r="10" fill="#F6F7F8" stroke="#E0E3E7"/>
+  <use href="#link" x="71" y="409" width="14" height="14" color="#5B616B"/>
+  <text x="96" y="420" font-size="12" fill="#5B616B"><tspan font-weight="600" fill="#1C1D20">alexec-agents</tspan> linked</text>
+  <use href="#pr" x="228" y="408" width="14" height="14" color="#1A7F37"/>
+  <text x="246" y="420" font-size="12" fill="#5B616B">#4391 Work look: the issue page · 40 min ago</text>
+  <path d="M78 436V450" stroke="#E0E3E7" stroke-width="2"/>
+  <circle cx="38" cy="464" r="14" fill="#7C5CC4"/>
+  <text x="38" y="468.48" font-size="11.9" fill="#FFF" font-weight="600" text-anchor="middle">A</text>
+  <rect x="64" y="450" width="460" height="72" rx="6" fill="#FFFFFF" stroke="#E0E3E7"/>
+  <path d="M64 456a6 6 0 0 1 6-6h448a6 6 0 0 1 6 6v28H64z" fill="#F6F7F8"/>
+  <path d="M64 484H524" stroke="#E0E3E7" stroke-width="1"/>
+  <text x="76" y="471" font-size="12.5" fill="#5B616B"><tspan font-weight="600">alexec</tspan> commented 20 min ago</text>
+  <use href="#more" x="498" y="459" width="16" height="16" color="#8A9099"/>
+  <text x="76" y="508" font-size="13" fill="#1C1D20">Put Close beside Comment, as GitHub does.</text>
+  <path d="M24 540H524" stroke="#E0E3E7" stroke-width="2"/>
+  <rect x="64" y="558" width="460" height="44" rx="6" fill="#F6F7F8" stroke="#E0E3E7"/>
+  <use href="#warn" x="76" y="572" width="16" height="16" color="#5B616B"/>
+  <text x="100" y="585" font-size="12.5" fill="#5B616B">No machine of yours can write to GitHub.</text>
+  </g>
+  </g>
+  <text x="1056.0" y="1074.0" font-size="12" fill="#1C1D20" font-weight="600">No description, no comments</text>
+  <g transform="translate(1056.0,1084.0) scale(0.6)" filter="url(#shadow)">
+  <rect x="0" y="0" width="820" height="740" rx="12" fill="#FFFFFF" stroke="#C7CCD3"/>
+  <clipPath id="c9"><rect x="0" y="0" width="820" height="740" rx="12"/></clipPath>
+  <g clip-path="url(#c9)">
+  <text x="24" y="40" font-size="21" fill="#1C1D20" font-weight="600">Work look: wireframe the issue page <tspan font-weight="400" fill="#5B616B">#4331</tspan></text>
+  <rect x="684" y="20" width="112" height="28" rx="6" fill="#0A6CDB"/>
+  <use href="#spark" x="695" y="27.0" width="14" height="14" color="#FFF"/>
+  <text x="713" y="38.5" font-size="12.5" fill="#FFF" font-weight="500">Start Agent</text>
+  <rect x="24" y="60" width="67.6" height="24" rx="12.0" fill="#1A7F37"/>
+  <use href="#open" x="32" y="65.0" width="14" height="14" color="#FFF"/>
+  <text x="50" y="76.5" font-size="12.5" fill="#FFF" font-weight="600">Open</text>
+  <text x="101.6" y="77" font-size="12.5" fill="#5B616B">alexec opened 2 h ago · 4 comments</text>
+  <text x="796" y="77" font-size="12.5" fill="#0A6CDB" text-anchor="end">Open on GitHub</text>
+  <use href="#ext" x="680" y="65" width="14" height="14" color="#0A6CDB"/>
+  <path d="M24 100H796" stroke="#E0E3E7" stroke-width="1"/>
+  <text x="556" y="130" font-size="11.5" fill="#5B616B" font-weight="600">Assignees</text>
+  <use href="#gear" x="780" y="119" width="14" height="14" color="#8A9099"/>
+  <circle cx="565" cy="148" r="9" fill="#7C5CC4"/>
+  <text x="565" y="150.88" font-size="7.6499999999999995" fill="#FFF" font-weight="600" text-anchor="middle">A</text>
+  <text x="580" y="152.5" font-size="12.5" fill="#1C1D20">alexec</text>
+  <path d="M556 170H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="194" font-size="11.5" fill="#5B616B" font-weight="600">Labels</text>
+  <use href="#gear" x="780" y="183" width="14" height="14" color="#8A9099"/>
+  <rect x="556" y="204" width="79.1" height="18" rx="9" fill="#A2EEEF" stroke="#A2EEEF" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="595.55" y="217" font-size="11" fill="#1E6F70" font-weight="500" text-anchor="middle">enhancement</text>
+  <rect x="641.1" y="204" width="42.5" height="18" rx="9" fill="#FBCA04" stroke="#FBCA04" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="662.35" y="217" font-size="11" fill="#7A6000" font-weight="500" text-anchor="middle">spike</text>
+  <rect x="556" y="228" width="85.2" height="18" rx="9" fill="#1D76DB" stroke="#1D76DB" fill-opacity=".18" stroke-opacity=".6"/>
+  <text x="598.6" y="241" font-size="11" fill="#145AA8" text-anchor="middle">feature:<tspan font-weight="600">work</tspan></text>
+  <path d="M556 258H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="282" font-size="11.5" fill="#5B616B" font-weight="600">Milestone</text>
+  <use href="#gear" x="780" y="271" width="14" height="14" color="#8A9099"/>
+  <text x="556" y="304" font-size="12.5" fill="#8A9099">None</text>
+  <path d="M556 320H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="344" font-size="11.5" fill="#5B616B" font-weight="600">Repo</text>
+  <text x="556" y="366" font-size="12.5" fill="#1C1D20">alexec/Agents</text>
+  <path d="M556 382H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="406" font-size="11.5" fill="#5B616B" font-weight="600">Linked</text>
+  <text x="556" y="426" font-size="10.5" fill="#8A9099">Parent</text>
+  <use href="#open" x="556" y="432" width="14" height="14" color="#1A7F37"/>
+  <text x="576" y="444" font-size="12.5" fill="#1C1D20">#4327 Work look</text>
+  <text x="556" y="464" font-size="10.5" fill="#8A9099">Fixed by</text>
+  <use href="#pr" x="556" y="470" width="14" height="14" color="#1A7F37"/>
+  <text x="576" y="482" font-size="12.5" fill="#1C1D20">#4391 Work look: wirefr…</text>
+  <path d="M556 496H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="520" font-size="11.5" fill="#5B616B" font-weight="600">Lineage</text>
+  <use href="#spark" x="556" y="531" width="14" height="14" color="#8250DF"/>
+  <text x="576" y="542" font-size="12.5" fill="#1C1D20">Claude · $0.42 · 1 session</text>
+  <circle cx="560" cy="558" r="3.5" fill="#1A7F37"/>
+  <text x="576" y="562" font-size="12.5" fill="#0A6CDB">Work look: issue page</text>
+  <text x="556" y="582" font-size="11.5" fill="#5B616B">Estimate: about $0.60, 40 min</text>
+  <text x="556" y="598" font-size="11.5" fill="#8A9099">(from 12 closed spikes)</text>
+  <path d="M556 612H796" stroke="#EEF0F3" stroke-width="1"/>
+  <text x="556" y="636" font-size="11.5" fill="#5B616B" font-weight="600">Docs</text>
+  <use href="#doc" x="556" y="646" width="14" height="14" color="#5B616B"/>
+  <text x="576" y="657" font-size="12" fill="#0A6CDB">specs/4328-work-look/parts.md</text>
+  <use href="#doc" x="556" y="666" width="14" height="14" color="#5B616B"/>
+  <text x="576" y="677" font-size="12" fill="#0A6CDB">docs/explanation/work.md</text>
+  <text x="556" y="696" font-size="11.5" fill="#8A9099">Like it: lists.md, epic.md</text>
+  <circle cx="38" cy="132" r="14" fill="#7C5CC4"/>
+  <text x="38" y="136.48" font-size="11.9" fill="#FFF" font-weight="600" text-anchor="middle">A</text>
+  <rect x="64" y="118" width="460" height="72" rx="6" fill="#FFFFFF" stroke="#E0E3E7"/>
+  <path d="M64 124a6 6 0 0 1 6-6h448a6 6 0 0 1 6 6v28H64z" fill="#F6F7F8"/>
+  <path d="M64 152H524" stroke="#E0E3E7" stroke-width="1"/>
+  <text x="76" y="139" font-size="12.5" fill="#5B616B"><tspan font-weight="600">alexec</tspan> opened 2 h ago</text>
+  <use href="#more" x="498" y="127" width="16" height="16" color="#8A9099"/>
+  <text x="76" y="176" font-size="13" fill="#8A9099" font-style="italic">No description.</text>
+  <path d="M24 224H524" stroke="#E0E3E7" stroke-width="2"/>
+  <circle cx="38" cy="256" r="14" fill="#7C5CC4"/>
+  <text x="38" y="260.48" font-size="11.9" fill="#FFF" font-weight="600" text-anchor="middle">A</text>
+  <rect x="64" y="242" width="460" height="84" rx="6" fill="#FFFFFF" stroke="#C7CCD3"/>
+  <text x="76" y="266" font-size="13" fill="#8A9099">Comment, in Markdown</text>
+  <text x="512" y="318" font-size="11" fill="#8A9099" text-anchor="end">⌘↩</text>
+  <rect x="432" y="336" width="92" height="26" rx="6" fill="#0A6CDB"/>
+  <text x="443" y="353.5" font-size="12.5" fill="#FFF" font-weight="500">Comment</text>
+  <rect x="288" y="336" width="136" height="26" rx="6" fill="#FFFFFF" stroke="#D0D5DB"/>
+  <use href="#done" x="299" y="342.0" width="14" height="14" color="#8250DF"/>
+  <text x="317" y="353.5" font-size="12.5" fill="#1C1D20" font-weight="500">Close issue</text>
+  <use href="#chev" x="406" y="344.0" width="10" height="10" color="#1C1D20"/>
+  </g>
+  </g>
+</svg>
