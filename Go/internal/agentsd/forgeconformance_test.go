@@ -4,13 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/alexec/agents/Go/internal/connections"
 	"github.com/alexec/agents/Go/internal/githubmcp"
+	"github.com/alexec/agents/Go/internal/gitlabmcp"
 	"github.com/alexec/agents/Go/internal/lineage"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -31,6 +35,7 @@ type conformRow struct {
 
 var conformRows = []conformRow{
 	{name: "github", daemon: conformGitHubDaemon},
+	{name: "gitlab", daemon: conformGitLabDaemon},
 }
 
 // conformGitHub is GitHub with four items on alexec/agents, which pages by its cursor.
@@ -110,6 +115,82 @@ func conformGitHubDaemon(t *testing.T) (*Daemon, *conn) {
 	d, c, gh, _ := forgeDaemon(t)
 	fake := conformGitHub{gh}
 	d.newForgeGitHub = func(string) forgeGitHub { return fake }
+	return d, c
+}
+
+// conformGitLab is GitLab with four items on Group/App, which pages by its cursor.
+type conformGitLab struct {
+	*fakeForgeGitLab
+}
+
+var conformGitLabItems = []gitlabmcp.Item{
+	{Project: "Group/App", Number: 4, MR: true, State: "merged", Title: "Merged", URL: "https://gitlab.com/Group/App/-/merge_requests/4",
+		Author: "kim", Labels: []string{"enhancement"}, LabelColors: map[string]string{"enhancement": "#a2eeef"},
+		UpdatedAt: "2026-11-04T10:00:00Z", Comments: 1},
+	{Project: "Group/App", Number: 3, MR: true, State: "open", Title: "Open", URL: "https://gitlab.com/Group/App/-/merge_requests/3",
+		Author: "kim", Labels: []string{"bug"}, LabelColors: map[string]string{"bug": "#d9534f"}, Assignees: []string{"kim"},
+		UpdatedAt: "2026-11-03T10:00:00Z", Checks: "failing"},
+	{Project: "Group/App", Number: 2, State: "closed", Title: "Closed", URL: "https://gitlab.com/Group/App/-/issues/2",
+		Author: "kim", UpdatedAt: "2026-11-02T10:00:00Z"},
+	{Project: "Group/App", Number: 1, State: "open", Title: "Open issue", URL: "https://gitlab.com/Group/App/-/issues/1",
+		Author: "kim", Labels: []string{"task"}, LabelColors: map[string]string{"task": "#c5def5"},
+		UpdatedAt: "2026-11-01T10:00:00Z", Comments: 2},
+}
+
+func (g conformGitLab) Search(_ context.Context, _ []string, sf gitlabmcp.SearchFilter, after string, first int) (gitlabmcp.SearchPage, error) {
+	var kept []gitlabmcp.Item
+	for _, i := range conformGitLabItems {
+		open := i.State == "open"
+		if i.MR == sf.MRs && (sf.State == "all" || (sf.State == "closed") != open) {
+			kept = append(kept, i)
+		}
+	}
+	from, _ := strconv.Atoi(after)
+	var page gitlabmcp.SearchPage
+	for n := from; n < len(kept) && len(page.Items) < first; n++ {
+		page.Items = append(page.Items, kept[n])
+		page.Cursors = append(page.Cursors, strconv.Itoa(n+1))
+	}
+	if end := from + len(page.Items); end < len(kept) {
+		page.Next = strconv.Itoa(end)
+	}
+	return page, nil
+}
+
+func (g conformGitLab) ItemPage(_ context.Context, _ string, number int, mr bool, _ string) (gitlabmcp.ItemDetail, error) {
+	for _, i := range conformGitLabItems {
+		if i.Number == number && i.MR == mr {
+			d := gitlabmcp.ItemDetail{Item: i, Body: "The body.",
+				Thread: []gitlabmcp.Comment{{Author: "kim", Body: "A comment.", At: i.UpdatedAt}}}
+			if i.MR {
+				d.Head, d.Pipeline = "abc", 7
+				d.CheckRuns = []gitlabmcp.Check{{Name: "test: unit", State: "failing"}}
+			}
+			return d, nil
+		}
+	}
+	return gitlabmcp.ItemDetail{}, &gitlabmcp.GitLabError{Kind: gitlabmcp.NotFound, Message: "not found on GitLab"}
+}
+
+func (g conformGitLab) Plan(_ context.Context, _ string, _ int) (gitlabmcp.Plan, error) {
+	return gitlabmcp.Plan{Epic: conformGitLabItems[3]}, nil
+}
+
+// conformGitLabDaemon is a daemon with one folder on Group/App on the connected gitlab.com.
+func conformGitLabDaemon(t *testing.T) (*Daemon, *conn) {
+	t.Helper()
+	t.Setenv("AGENTS_PERSONAL_HOME", t.TempDir())
+	d, c := start(t, t.TempDir())
+	t.Cleanup(d.Shutdown)
+	file := &connections.File{Path: filepath.Join(t.TempDir(), ".agents-secrets", connections.FileName)}
+	d.connStoreFor = func() (connections.Store, error) { return file, nil }
+	fake := conformGitLab{&fakeForgeGitLab{}}
+	d.newForgeGitLab = func(string, string) forgeGitLab { return fake }
+	c.call(t, 100, "folders/add", map[string]any{"folder": "file://" + gitFolder(t, "git@gitlab.com:Group/App.git")})
+	if err := file.Put(connections.Connection{Provider: connections.GitLab, Login: "kim", Access: "gloas-secret", URL: connections.GitLabCom,
+		AccessExpiresAt: time.Now().Add(time.Hour), ConnectedAt: time.Now()}); err != nil {
+		t.Fatal(err)
+	}
 	return d, c
 }
 

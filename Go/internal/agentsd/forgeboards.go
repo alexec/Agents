@@ -87,9 +87,9 @@ type forgeBoard struct {
 	home string
 	// project is a GitHub board's <owner>/<number>.
 	project string
-	// group and id are a GitLab group board's.
-	group string
-	id    int
+	// group and id are a GitLab group board's, and site the GitLab it is on.
+	group, site string
+	id          int
 	// jira is a Jira board's id.
 	jira string
 	// azureProject and azureTeam are an Azure Boards board's: organization/project in lower
@@ -101,15 +101,15 @@ func (b *forgeBoard) key() []any {
 	if b == nil {
 		return nil
 	}
-	return []any{b.project, b.group, b.id, b.jira, b.azureProject, b.azureTeam, b.azureSite}
+	return []any{b.project, b.group, b.site, b.id, b.jira, b.azureProject, b.azureTeam, b.azureSite}
 }
 
 // narrowToBoard keeps of s only what is on the board's forge, and says what to read there.
 func narrowToBoard(s *forgeSources, b wire.ProjectBoard, in []string, prs bool) *forgeBoard {
 	board := &forgeBoard{forge: string(*b.Forge), home: in[0]}
 	key := deref(b.Key)
-	gitlab, azureDevOps, azureDevOpsErr := s.gitlab, s.azureDevOps, s.azureDevOpsErr
-	s.gitlab, s.teams, s.projects, s.workspace, s.gitlabErr = nil, nil, nil, false, nil
+	azureDevOps, azureDevOpsErr := s.azureDevOps, s.azureDevOpsErr
+	s.teams, s.projects, s.workspace = nil, nil, false
 	s.forgejo, s.forgejoErr, s.bitbucket, s.bitbucketErr = nil, nil, nil, nil
 	s.azureDevOps, s.azureDevOpsErr = nil, nil
 	boards := s.boards
@@ -120,16 +120,9 @@ func narrowToBoard(s *forgeSources, b wire.ProjectBoard, in []string, prs bool) 
 		board.project = key
 	case wire.ConnectionProviderGitlab:
 		group, number, _ := strings.Cut(key, "#")
-		board.group = group
+		// GitLab is on the forge interface: gitlabForge.List reads the board's projects.
+		board.group, board.site = group, deref(b.Site)
 		board.id, _ = strconv.Atoi(number)
-		// Only a board on the connected GitLab: its token is for nowhere else.
-		if root, err := url.Parse(s.root); err == nil && s.root != "" && strings.EqualFold(root.Host, deref(b.Site)) {
-			for _, project := range gitlab {
-				if strings.HasPrefix(strings.ToLower(project), strings.ToLower(group)+"/") {
-					s.gitlab = append(s.gitlab, project)
-				}
-			}
-		}
 	case wire.ConnectionProviderLinear:
 		if !prs {
 			s.teams = []string{key}

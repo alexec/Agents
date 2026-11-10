@@ -407,23 +407,6 @@ func (d *Daemon) standingBlockers(ctx context.Context, method string, epic wire.
 			}
 			return nil
 		}
-		repo, _, ok := nodeOfRepo(epic.Node)
-		if !ok || repo.forge != "gitlab" {
-			return nil
-		}
-		gl, project, _, err := d.gitlabOf(ctx, method, repo)
-		if err != nil {
-			return err
-		}
-		by, err := gl.Blockers(ctx, project, numbers)
-		if err != nil {
-			return err
-		}
-		for n := range children {
-			for _, b := range by[numbers[n]] {
-				set(n, forgeRepo{"gitlab", strings.ToLower(b.Project)}.issue(b.Number), b.Open)
-			}
-		}
 	}
 	return nil
 }
