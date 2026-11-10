@@ -211,7 +211,8 @@ func (d *Daemon) isSessionSecret(agent wire.UUID, name string) bool {
 }
 
 // openSecretUseRequest is the open request for this use: the one the session opened
-// before, when it is still open, so a call made again does not ask twice.
+// before, when it is still open, so a call made again does not ask twice. That one is shown
+// again (raiseAgain, #4298).
 func (d *Daemon) openSecretUseRequest(agent wire.UUID, ask wire.RequestSecretUse) (wire.UUID, bool) {
 	a := d.Store.Agent(agent)
 	if a == nil || a.State == wire.AgentStateArchived {
@@ -223,13 +224,14 @@ func (d *Daemon) openSecretUseRequest(agent wire.UUID, ask wire.RequestSecretUse
 			sessionKey(*r.AskedBy) == sessionKey(agent) && s.Name == ask.Name && s.Use == ask.Use && s.Place == ask.Place {
 			id := r.ID
 			d.requests.mu.Unlock()
+			d.raiseAgain(wire.NeedID{Request: &id}) // asked again: shown again (#4298)
 			return id, true
 		}
 	}
 	at := now()
 	asker := agent
 	title := map[wire.SecretUse]string{wire.SecretUseFill: "Fill " + ask.Name + " on " + ask.Place,
-		wire.SecretUseCi:  "Set " + ask.Name + " as a CI secret in " + ask.Place,
+		wire.SecretUseCi:      "Set " + ask.Name + " as a CI secret in " + ask.Place,
 		wire.SecretUseMCP:     "Send " + ask.Name + " to the MCP server " + ask.Place,
 		wire.SecretUseAccount: "Read the account " + ask.Name}[ask.Use]
 	r := &wire.Request{ID: store.NewUUID(), Kind: wire.RequestKindApprove, Source: wire.RequestSourceSecretUse,
