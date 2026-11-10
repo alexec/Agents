@@ -8,6 +8,9 @@ import SwiftUI
 /// window and the Remote (#3256): on a phone the filters scroll sideways and a row wraps.
 struct WorkView: View {
     let model: any WorkModel
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    #endif
 
     var body: some View {
         let place = model.workPlace
@@ -27,7 +30,8 @@ struct WorkView: View {
         // The list's own title: its row in the sidebar chose it (#4004).
         .navigationTitle(place.kind.title)
         #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
+        // A phone's list has a large title (lists.md section 3); an item's page and the iPad keep it small.
+        .navigationBarTitleDisplayMode(sizeClass == .compact && place.ref == nil && place.kind.fromForge ? .large : .inline)
         #endif
         .toolbar {
             ToolbarItemGroup(placement: Self.historyPlacement) {
@@ -87,9 +91,9 @@ private struct WorkListPane: View {
     #else
     private let compact = false
     @Environment(\.openSettings) private var openSettings
+    #endif
     /// Back from an item's page gives the list the keys, so ↑ and ↓ go on from the row left.
     @FocusState private var focused: Bool
-    #endif
 
     /// The list's state lives in the model (#3257), so an item's page can go through it and Back finds it as it was.
     @Bindable var list: WorkListState
@@ -116,13 +120,15 @@ private struct WorkListPane: View {
         #if os(iOS)
         // On a phone the search is the navigation bar's; the menus scroll under it.
         .modifier(PhoneSearch(on: compact, text: $list.filter.text, prompt: WorkLook.searchPrompt(kind)))
-        #else
+        #endif
+        // Refresh in the toolbar; a phone has pull to refresh in its place (lists.md section 3).
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                WorkRefreshButton(running: list.lists == nil || list.loadingMore) { list.asked += 1 }
+            if !compact {
+                ToolbarItem(placement: .primaryAction) {
+                    WorkRefreshButton(running: list.lists == nil || list.loadingMore) { list.asked += 1 }
+                }
             }
         }
-        #endif
         .workTask(id: list.ask) { await list.load(model: model) }
         .onChange(of: model.workProjects, initial: true) { _, projects in list.projects = projects }
     }
@@ -280,7 +286,7 @@ private struct WorkListPane: View {
                     Button { open(row.id) } label: {
                         WorkItemRow(row: row, several: several, compact: compact, pick: pick)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(WorkRowButtonStyle())
                     // A forge that failed leaves its rows, dimmed, under the strip (lists.md section 5).
                     .opacity(lines.isEmpty ? 1 : 0.6)
                     .id(row.id)
@@ -300,14 +306,13 @@ private struct WorkListPane: View {
                 guard let opened = list.opened else { return }
                 list.selected = opened
                 reader.scrollTo(opened, anchor: .center)
-                #if os(macOS)
-                focused = true
-                #endif
+                focused = !compact
             }
         }
     }
 
-    /// The Mac's list keeps a selection that ↑ and ↓ move and Return opens; on the Remote a tap opens the row.
+    /// The Mac's list keeps a selection that ↑ and ↓ move and Return opens; so does an iPad's with
+    /// a keyboard (lists.md section 3). On a phone a tap opens the row, with no selection.
     @ViewBuilder
     private func selectable(@ViewBuilder _ rows: () -> some View) -> some View {
         #if os(macOS)
@@ -317,7 +322,18 @@ private struct WorkListPane: View {
                 if let ref = refs.first { open(ref) }
             }
         #else
-        List { rows() }
+        if compact {
+            List { rows() }
+        } else {
+            // A tap goes to the row's button; Return opens the row the keys selected.
+            List(selection: $list.selected) { rows() }
+                .focused($focused)
+                .onKeyPress(.return) {
+                    guard let ref = list.selected else { return .ignored }
+                    open(ref)
+                    return .handled
+                }
+        }
         #endif
     }
 
@@ -360,6 +376,19 @@ private struct WorkListPane: View {
         { list.filter.label = $0 }
         #else
         nil
+        #endif
+    }
+}
+
+/// A row as a button: plain on the Mac, whose list draws the selection; on the Remote the row
+/// shows pressed (grey) as a tap opens it (lists.md section 3).
+private struct WorkRowButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        #if os(iOS)
+        configuration.label
+            .background(Color.secondary.opacity(configuration.isPressed ? 0.15 : 0).padding(.horizontal, -16).padding(.vertical, -4))
+        #else
+        configuration.label
         #endif
     }
 }
