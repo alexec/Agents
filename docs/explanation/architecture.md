@@ -21,8 +21,11 @@ numbers are the blue pins.
    the web page draw the same product. Windows and Android come soon. Each one asks a
    machine for everything and passes on what you type and click.
 - **2 · The control plane is the switchboard.** It pairs each screen and each machine, and
-   sends each request to the machine it is for. Its store is a folder. It holds who is
-   paired and which machines there are, but nothing about the agents.
+   sends each request to the machine it is for. It runs in the cloud: at agentloops.dev for
+   a hosted account, or on your own hosting. A Mac can run one for its one person, as an
+   option. Its store is a folder or a bucket. It holds who is paired and which machines
+   there are, but nothing about the agents. There is no relay: no Mac passes traffic for
+   other screens or machines.
 - **3 · Everything connects out.** Screens and machines all dial the control plane. A machine
    never has to be reachable, so a server behind a firewall works. The one shortcut: the
    window on a Mac goes direct to that same Mac.

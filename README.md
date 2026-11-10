@@ -18,6 +18,12 @@ by themselves on a schedule or when something happens.
 
 ## Setting it up
 
+The way in is [agentloops.dev](https://agentloops.dev): sign up in a browser with Apple,
+Google or GitHub, and get a control plane of your own, with nothing to install. A person on
+their own is an account with one person. A Mac then joins it as a machine for its local
+folders: in Agents, **Settings ▸ Control plane ▸ Connect to Another… ▸ Sign In to
+agentloops.dev**.
+
 On a Mac, Agents is one app, **Agents**: a download signed by us (Developer ID), not in
 the Mac App Store (#4224). It has the window, and it runs this Mac's agents and a control
 plane in the background, as two launch agents that macOS keeps running. The window starts
