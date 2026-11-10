@@ -83,7 +83,8 @@ final class MessagesListState {
 
 /// Messages (#4344): the conversations of every messaging connector that follows the messaging
 /// contract, on every machine, in one list, the newest first, with Source and Unread filters; a
-/// conversation opens to its messages, read only. The web page's is `Web/src/views/Messages.tsx`.
+/// conversation opens to its messages, with a reply field when its connector can send (#4345). The
+/// web page's is `Web/src/views/Messages.tsx`.
 struct MessagesView: View {
     @Bindable var list: MessagesListState
 
@@ -221,7 +222,8 @@ private struct ConversationRow: View {
 }
 
 /// A conversation's messages, the newest first, each with its sender, time, text (outside content,
-/// drawn as plain text) and a link to the original; older pages with More.
+/// drawn as plain text) and a link to the original; older pages with More. Under them, the reply
+/// field (#4345), when the connector can send: the person's own reply, which says who it goes as.
 private struct ConversationPage: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openURL) private var openURL
@@ -231,6 +233,11 @@ private struct ConversationPage: View {
     @State private var cursor: String?
     @State private var problem: String?
     @State private var loading = false
+    @State private var draft = ""
+    /// The thread the reply answers in; nil: the conversation itself.
+    @State private var thread: String?
+    @State private var sending = false
+    @State private var sendProblem: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -244,7 +251,9 @@ private struct ConversationPage: View {
                     if messages.isEmpty {
                         Text(MessagesList.noMessages).foregroundStyle(.secondary)
                     }
-                    ForEach(messages) { MessageRow(message: $0) }
+                    ForEach(messages) { m in
+                        MessageRow(message: m, replyInThread: row.item.replyAs != nil && m.thread != nil ? { thread = m.thread } : nil)
+                    }
                     if cursor != nil {
                         Button(loading ? "Loading…" : "Older") { Task { await read(more: true) } }
                             .linkStyle()
@@ -255,8 +264,57 @@ private struct ConversationPage: View {
             } else {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            if let replyAs = row.item.replyAs, problem == nil, messages != nil {
+                Divider()
+                replyField(replyAs).padding(.horizontal, 16).padding(.vertical, 8)
+            }
         }
         .task { await read(more: false) }
+    }
+
+    private func replyField(_ replyAs: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if thread != nil {
+                HStack(spacing: 8) {
+                    Label(MessagesList.inThread, systemImage: "arrowshape.turn.up.left").appText(.fine).foregroundStyle(.secondary)
+                    Button(MessagesList.leaveThread) { thread = nil }
+                        .linkStyle()
+                }
+            }
+            HStack(alignment: .bottom, spacing: 8) {
+                TextField(MessagesList.replyPlaceholder, text: $draft, axis: .vertical)
+                    .lineLimit(1...6)
+                    .textFieldStyle(.roundedBorder)
+                    .disabled(sending)
+                    .accessibilityLabel(MessagesList.reply)
+                Button(sending ? MessagesList.sending : MessagesList.send) { Task { await send() } }
+                    .keyboardShortcut(.return, modifiers: .command)
+                    .disabled(sending || MessagesList.replyText(draft) == nil)
+                    .help("Send the reply (⌘↩)")
+            }
+            Text(MessagesList.sentAs(replyAs)).appText(.fine).foregroundStyle(.secondary)
+            if let sendProblem {
+                Label(sendProblem, systemImage: "exclamationmark.triangle").appText(.fine).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func send() async {
+        guard let text = MessagesList.replyText(draft), !sending else { return }
+        sending = true
+        sendProblem = nil
+        defer { sending = false }
+        do {
+            let sent = try await model.messages(
+                DaemonAPI.Method.messagesReply,
+                DaemonAPI.MessagesReplyRequest(server: row.item.server, folder: row.item.folder, conversation: row.conversation.id,
+                                               thread: thread, text: text),
+                returning: DaemonAPI.MessagesReplied.self, on: row.host)
+            messages = [sent.message] + (messages ?? [])
+            draft = ""
+        } catch {
+            sendProblem = model.describe(error)
+        }
     }
 
     private var header: some View {
@@ -294,6 +352,8 @@ private struct ConversationPage: View {
 private struct MessageRow: View {
     @Environment(\.openURL) private var openURL
     let message: DaemonAPI.MessagingMessage
+    /// Answer in this message's thread; nil when the conversation takes no reply, or it is in none.
+    var replyInThread: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -305,6 +365,10 @@ private struct MessageRow: View {
                         .appText(.fine).monospacedDigit().foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 8)
+                if let replyInThread {
+                    Button(MessagesList.replyInThread, action: replyInThread)
+                        .linkStyle()
+                }
                 if let link = message.link, let url = URL(string: link) {
                     Button("Original") { openURL(url) }
                         .linkStyle()

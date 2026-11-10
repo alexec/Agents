@@ -401,7 +401,7 @@ final class AppModel {
         }
     }
 
-    /// Whether the window is showing Messages (#4344): the messaging connectors' conversations, read only,
+    /// Whether the window is showing Messages (#4344): the messaging connectors' conversations, with a reply (#4345),
     /// and a conversation's messages. A page like Docs, and not persisted for the same reason.
     var showsMessages = false {
         didSet {
@@ -7044,7 +7044,12 @@ struct FolderGoneAsk: Identifiable, Equatable {
 }
 
 /// Work (#3119) is drawn by `Shared/UI/Work`, for the window and the Remote (#3256).
-extension AppModel: WorkModel {}
+extension AppModel: WorkModel {
+    func askWorkConnectors() -> Bool {
+        settingsPaneAsked = .connectors
+        return true
+    }
+}
 
 /// Settings ▸ You ▸ Secrets ▸ For One Session (#3548), through this Mac's host.
 extension AppModel: SessionSecretsSource {}

@@ -18,8 +18,9 @@ import (
 // list_conversations is the people the number wrote with, and read_messages is one
 // person's messages, newest first, by cursor. Both read the Store, as the Cloud API reads no
 // history: what is older than the store's limits, or came before the server ran, is not
-// there, and the last page has no cursor. Each tool says, in its _meta, that it follows the
-// contract, so the Messages page can read WhatsApp.
+// there, and the last page has no cursor. reply (#4345) is the person's own reply from the
+// Messages page, sent as the number. Each tool says, in its _meta, that it follows the
+// contract, so the Messages page can read WhatsApp and answer in it.
 
 // ContractMeta is the key that says a tool follows the messaging contract, and its version.
 const ContractMeta = "agents/messaging"
@@ -45,6 +46,15 @@ type readArgs struct {
 	Thread       string `json:"thread,omitempty" jsonschema:"a message's id (wamid.…): only that message and the ones that quote it"`
 	Limit        int    `json:"limit,omitempty" jsonschema:"at most this many: 20 when left out, 100 at most"`
 }
+
+type replyArgs struct {
+	Conversation string `json:"conversation" jsonschema:"the person's number, as list_conversations gives it"`
+	Thread       string `json:"thread,omitempty" jsonschema:"a message's id (wamid.…): quote it; WhatsApp has no threads"`
+	Text         string `json:"text" jsonschema:"the reply, as plain text"`
+}
+
+// ReplyAs is who reply sends as, in words.
+const ReplyAs = "the WhatsApp Business number"
 
 // listCursor is a list_conversations cursor: the last conversation's newest time, in Unix
 // nanoseconds, and its number.
@@ -129,6 +139,8 @@ func addMessagingTools(server *mcp.Server, inbox *Inbox) {
 			for _, c := range page {
 				out.Conversations = append(out.Conversations, c.wire())
 			}
+			as := ReplyAs
+			out.ReplyAs = &as
 			if from+limit < len(all) {
 				last := page[len(page)-1]
 				next := strconv.FormatInt(last.newest.UnixNano(), 10) + "." + last.person
@@ -190,6 +202,40 @@ func addMessagingTools(server *mcp.Server, inbox *Inbox) {
 			}
 			summary := fmt.Sprintf("conversation: %s\nmessages: %d\ncursor: %s\n\n%s\n<untrusted-content source=\"whatsapp\">\n%s</untrusted-content>",
 				cmp.Or(person, "every person"), len(out.Messages), deref(out.Cursor), Untrusted, text.String())
+			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: summary}}, StructuredContent: out}, nil
+		})
+}
+
+// addReplyTool puts reply on server: send_message's text, with the contract's input, and the
+// sent message as read_messages gives it.
+func addReplyTool(server *mcp.Server, m *Meta, inbox *Inbox) {
+	notDestructive := false
+	openWorld := true
+	tool(server, &mcp.Tool{Name: "reply", Title: "Reply",
+		Description: "The person's reply from the Messages page: sends text as the WhatsApp number to one person, quoting a message when thread is given. " +
+			"Gives the sent message as read_messages does. WhatsApp takes it only within 24 hours of the person's last message. An agent sends with send_message.",
+		Annotations: &mcp.ToolAnnotations{DestructiveHint: &notDestructive, OpenWorldHint: &openWorld},
+		Meta:        mcp.Meta{ContractMeta: ContractVersion}},
+		func(ctx context.Context, in replyArgs) (*mcp.CallToolResult, error) {
+			to, quote, err := checkTo(in.Conversation, in.Thread)
+			if err != nil {
+				return nil, fmt.Errorf("conversation: %w", err)
+			}
+			text, err := checkText("text", in.Text, maxText)
+			if err != nil {
+				return nil, err
+			}
+			id, err := m.Send(ctx, outgoing(to, quote, "text", map[string]any{"body": text, "preview_url": false}))
+			if err != nil {
+				return nil, err
+			}
+			inbox.sent(id, to, quote, text)
+			number := ""
+			if a, err := inbox.Account(); err == nil {
+				number = a.PhoneNumberID
+			}
+			out := contractMessage(number, Stored{ID: id, Person: to, Out: true, At: time.Now().Truncate(time.Second), Text: text, ReplyTo: quote})
+			summary := fmt.Sprintf("sent: %s\nconversation: %s", id, to)
 			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: summary}}, StructuredContent: out}, nil
 		})
 }

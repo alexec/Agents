@@ -38,7 +38,7 @@ type Workspace struct {
 }
 
 // self is who the bot is, and its workspace's address (https://<team>.slack.com/).
-type self struct{ team, user, url string }
+type self struct{ team, user, name, url string }
 
 // person is a Slack user's name and email, as users.info said them, and when.
 type person struct {
@@ -86,7 +86,7 @@ func (w *Workspace) whoami(ctx context.Context) (self, error) {
 	if err != nil {
 		return self{}, said(err)
 	}
-	w.self = &self{team: r.TeamID, user: r.UserID, url: r.URL}
+	w.self = &self{team: r.TeamID, user: r.UserID, name: r.User, url: r.URL}
 	return *w.self, nil
 }
 

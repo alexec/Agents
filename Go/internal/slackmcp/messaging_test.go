@@ -61,13 +61,13 @@ func TestTheContractToolsSayTheyFollowIt(t *testing.T) {
 			if v != float64(ContractVersion) {
 				t.Fatalf("%s: %s is %v", tl.Name, ContractMeta, v)
 			}
-			if tl.Annotations == nil || !tl.Annotations.ReadOnlyHint {
-				t.Fatalf("%s is not read-only", tl.Name)
+			if tl.Annotations == nil || tl.Annotations.ReadOnlyHint != (tl.Name != "reply") {
+				t.Fatalf("%s: read-only is %v", tl.Name, tl.Annotations)
 			}
 			marked[tl.Name] = true
 		}
 	}
-	if len(marked) != 2 || !marked["list_conversations"] || !marked["read_messages"] {
+	if len(marked) != 3 || !marked["list_conversations"] || !marked["read_messages"] || !marked["reply"] {
 		t.Fatalf("the contract's tools: %v", marked)
 	}
 }
@@ -201,5 +201,38 @@ func TestReadMessagesGivesAThreadNewestFirst(t *testing.T) {
 	callContract(t, s, "read_messages", map[string]any{"conversation": "C1", "thread": "1762300001.000100"}, &got)
 	if len(got.Messages) != 4 || got.Messages[3].ID != "1762300001.000100" || got.Cursor != nil {
 		t.Fatalf("the whole thread: %+v", got)
+	}
+}
+
+// reply (#4345) posts the person's reply as the bot, in a thread when one is given, and gives
+// the sent message as read_messages does; it refuses a broadcast, and the list says who a
+// reply goes as.
+func TestReplyPostsAsTheBot(t *testing.T) {
+	f := newFakeSlack(t)
+	f.answers["auth.test"] = map[string]any{"ok": true, "team_id": fakeTeam, "user_id": fakeBot, "user": "agents", "url": "https://acme.slack.com/"}
+	f.answers["users.conversations"] = map[string]any{"ok": true, "channels": []any{}}
+	s := contractSession(t, f)
+
+	var list wire.MessagingConversations
+	callContract(t, s, "list_conversations", map[string]any{}, &list)
+	if deref(list.ReplyAs) != "the Slack bot @agents" {
+		t.Fatalf("replyAs: %+v", list)
+	}
+
+	var sent wire.MessagingMessage
+	callContract(t, s, "reply", map[string]any{"conversation": "C1", "thread": "1762300004.000100", "text": " Deployed. "}, &sent)
+	posted := f.called("chat.postMessage")
+	if len(posted) != 1 || posted[0].Get("channel") != "C1" || posted[0].Get("text") != "Deployed." || posted[0].Get("thread_ts") != "1762300004.000100" {
+		t.Fatalf("chat.postMessage: %v", posted)
+	}
+	if sent.ID != "1762300000.000100" || sent.Conversation != "C1" || sent.Text != "Deployed." || deref(sent.Thread) != "1762300004.000100" ||
+		sent.Sender.Identity != fakeTeam+"/"+fakeBot || deref(sent.Sender.Name) != "agents" || sent.Time != "2025-11-04T23:46:40Z" {
+		t.Fatalf("reply: %+v", sent)
+	}
+	if r := callContract(t, s, "reply", map[string]any{"conversation": "C1", "text": "<!here> look"}, nil); !r.IsError {
+		t.Fatalf("a broadcast: %+v", r)
+	}
+	if len(f.called("chat.postMessage")) != 1 {
+		t.Fatal("a refused reply reached Slack")
 	}
 }

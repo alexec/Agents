@@ -1,7 +1,8 @@
 // Messages (#4344), as the window's MessagesView: the conversations of every messaging connector that
 // follows the messaging contract, on every machine, from messages/conversations, in one list, the newest
-// first, with Source and Unread filters; a conversation's page from messages/read, read only. Its text is
-// outside content: drawn as plain text, never as markup.
+// first, with Source and Unread filters; a conversation's page from messages/read, with a reply field
+// (messages/reply, #4345) when its connector can send. Its text is outside content: drawn as plain text,
+// never as markup.
 import { signal, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { MessagingMessage } from "../protocol/generated";
@@ -12,8 +13,9 @@ import { hostAnswers } from "../model/capabilities";
 import { channelName } from "../model/channelLinks";
 import { ago } from "../model/connectorSetup";
 import {
-  mergeConversations, messagesProblems, messagesSources, noConnector, noConnectorIn, noConversations, noMachine, noMessages, noUnread,
-  outside, senderName, setUp, sourceGlyph, unreadWords, type HostConversations, type MessagesRow,
+  inThread, leaveThread, mergeConversations, messagesProblems, messagesSources, noConnector, noConnectorIn, noConversations, noMachine,
+  noMessages, noUnread, outside, replyInThread, replyLabel, replyPlaceholder, replyText, send, senderName, sending, sentAs, setUp,
+  sourceGlyph, unreadWords, type HostConversations, type MessagesRow,
 } from "../model/messages";
 import { go } from "../route";
 
@@ -123,15 +125,38 @@ function ConversationRow({ row }: { row: MessagesRow }) {
 }
 
 /** A conversation's page: its messages, the newest first, each with its sender, time, text and a link to the
- * original; older pages with Older. Found by its key in the list, read again when the tab was opened on it. */
+ * original; older pages with Older; under them the reply field, when the connector can send. Found by its key
+ * in the list, read again when the tab was opened on it. */
 export function ConversationPage({ store, conversationKey }: { store: Store; conversationKey: string }) {
   useLists(store);
   const messages = useSignal<MessagingMessage[] | null>(null);
   const cursor = useSignal<string | undefined>(undefined);
   const problem = useSignal<string | null>(null);
   const loading = useSignal(false);
+  const draft = useSignal("");
+  const thread = useSignal<string | undefined>(undefined);
+  const busy = useSignal(false);
+  const sendProblem = useSignal<string | null>(null);
   const l = lists.value;
   const row = l ? mergeConversations(l).find((r) => r.key === conversationKey) : undefined;
+  const replyAs = row?.item.replyAs;
+  const reply = async () => {
+    const text = replyText(draft.value);
+    if (!row || !text || busy.value) return;
+    busy.value = true;
+    sendProblem.value = null;
+    try {
+      const got = await store.link.call("messages/reply", {
+        server: row.item.server, folder: row.item.folder, conversation: row.item.conversation.id, text,
+        ...thread.value ? { thread: thread.value } : {},
+      }, row.host);
+      messages.value = [got.message, ...messages.value ?? []];
+      draft.value = "";
+    } catch (e) {
+      sendProblem.value = describe(e);
+    }
+    busy.value = false;
+  };
   const read = async (older: boolean) => {
     if (!row) return;
     loading.value = true;
@@ -177,6 +202,8 @@ export function ConversationPage({ store, conversationKey }: { store: Store; con
                 <div class="messages-head">
                   <strong title={m.sender.identity}>{senderName(m.sender)}</strong>
                   <span class="quiet small">{new Date(m.time).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
+                  {replyAs && m.thread && <button type="button" class="link small messages-thread"
+                    onClick={() => { thread.value = m.thread; }}>{replyInThread}</button>}
                   {m.link && <a class="small messages-original" href={m.link} target="_blank" rel="noopener noreferrer">Original</a>}
                 </div>
                 <p class="messages-text">{m.text}</p>
@@ -186,6 +213,19 @@ export function ConversationPage({ store, conversationKey }: { store: Store; con
         )}
       {cursor.value && !problem.value && (
         <button type="button" class="link" disabled={loading.value} onClick={() => { void read(true); }}>{loading.value ? "Loading…" : "Older"}</button>
+      )}
+      {replyAs && !problem.value && messages.value !== null && (
+        <form class="messages-reply" onSubmit={(e) => { e.preventDefault(); void reply(); }}>
+          {thread.value && <p class="quiet small">↩ {inThread} · <button type="button" class="link" onClick={() => { thread.value = undefined; }}>{leaveThread}</button></p>}
+          <div class="messages-reply-row">
+            <textarea rows={2} aria-label={replyLabel} placeholder={replyPlaceholder} value={draft.value} disabled={busy.value}
+              onInput={(e) => { draft.value = (e.target as HTMLTextAreaElement).value; }}
+              onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void reply(); } }} />
+            <button type="submit" title="Send the reply (⌘↩)" disabled={busy.value || !replyText(draft.value)}>{busy.value ? sending : send}</button>
+          </div>
+          <p class="quiet small">{sentAs(replyAs)}</p>
+          {sendProblem.value && <p class="hint">{sendProblem.value}</p>}
+        </form>
       )}
     </article>
   );

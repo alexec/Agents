@@ -179,4 +179,24 @@ func TestTheConversationsArePagedNewestFirst(t *testing.T) {
 	if _, said := call("read_messages", map[string]any{"conversation": "sam"}); !strings.Contains(said, "conversation") {
 		t.Fatalf("a conversation that is not a number: %q", said)
 	}
+
+	// reply (#4345) sends as the number, gives the sent message as read_messages does, and
+	// keeps it, so it is the conversation's newest; the list says who a reply goes as.
+	if page["replyAs"] != ReplyAs {
+		t.Fatalf("replyAs: %v", page)
+	}
+	sent, _ := call("reply", map[string]any{"conversation": "+44 7700 900114", "text": " Thanks! "})
+	if sent["id"] == nil || sent["conversation"] != "447700900114" || sent["text"] != "Thanks!" ||
+		sent["sender"].(map[string]any)["identity"] != fakePhoneNumberID {
+		t.Fatalf("reply: %v", sent)
+	}
+	if out, _ := f.snapshot(); len(out) != 1 || out[0]["to"] != "447700900114" || out[0]["text"].(map[string]any)["body"] != "Thanks!" {
+		t.Fatalf("sent: %v", out)
+	}
+	if read, _ := call("read_messages", map[string]any{"conversation": "447700900114", "limit": 1}); ids(read["messages"], "id") != sent["id"] {
+		t.Fatalf("the reply is not the newest: %v", read)
+	}
+	if _, said := call("reply", map[string]any{"conversation": "447700900114", "text": ""}); !strings.Contains(said, "empty") {
+		t.Fatalf("no text: %q", said)
+	}
 }

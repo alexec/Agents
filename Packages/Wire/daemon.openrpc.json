@@ -5815,6 +5815,31 @@
       }
     },
     {
+      "name": "messages/reply",
+      "x-capability": "messages.reply/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MessagesReplyRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/MessagesReplied"
+        }
+      }
+    },
+    {
       "name": "modes/changed",
       "x-capability": "modes/1",
       "tags": [
