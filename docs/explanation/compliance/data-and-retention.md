@@ -51,7 +51,7 @@ Mac.
 | `spend.json` | Spend for the cost limits | The last 7 days, by date | On write and hourly (#3686) |
 | `report-hours.json` | Hourly totals sent to the control plane | 8 days | On write |
 | `features-history.json` | How often each feature is used | The last 90 days, by date | On write and hourly (#3686) |
-| `lineage.jsonl` | Links between issues, PRs, sessions and deploys | Ended links 90 days, 20,000 links | When it opens, when it grows by 2,000, and hourly (#3649) |
+| `lineage.jsonl` | Links between issues, PRs, sessions and deploys, and each session's changes of state (#4274) | Ended links 90 days, 20,000 links; changes of state 90 days (each session's latest kept), 20,000 | When it opens, when it grows by 2,000, and hourly (#3649) |
 | `lineage-cost.json` | Cost of each lineage node | 90 days, 5,000 nodes | On write |
 | `lineage-comments.json` | Cost comments on PRs | 500, 30 days | On write |
 | `release-tags.json` | Release tags already linked, for each repo | The newest 50 for each repo; an older tag counts as linked (#3652) | On write |
