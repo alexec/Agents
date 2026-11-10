@@ -514,6 +514,22 @@ test("a lock with one client offers a recovery key until it is saved or skipped 
   assert.equal(again.recovery.value.kind, "none");
 });
 
+test("Settings makes a new recovery key after the card was skipped, and says the lock has one (#4299)", async () => {
+  const plane = controlPlane();
+  const mac = plane.connect("AAAA-1111", "Mac");
+  await mac.lock.run();
+  assert.equal(mac.lock.hasRecovery.value, true);
+  const first = mac.lock.recovery.value.text;
+  mac.lock.recoveryDismissed();
+  assert.equal(mac.lock.recovery.value.kind, "none");
+  await mac.lock.makeRecoveryKey();
+  assert.equal(mac.lock.recovery.value.kind, "show");
+  assert.notEqual(mac.lock.recovery.value.text, first);
+  assert.equal(mac.lock.hasRecovery.value, true);
+  const state = await m.check(plane.lock.entries);
+  assert.equal(state.count, 3);
+});
+
 test("a forget clears every lock pin and recovery mark, and nothing else (#3670)", () => {
   const items = new Map([
     ["agents-lock-pin", "{}"], ["agents-lock-pin:ana@example.com", "{}"], ["agents-lock-pin.0401020304050607", "{}"],

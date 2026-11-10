@@ -12,7 +12,7 @@ test("each group's sections are in their subject's order", () => {
   assert.deepEqual(names("thisApp"), ["sidebar", "notifications"]);
   // What agents may do (#2957): the archive switch and the notice limits are rules of the policy now.
   assert.deepEqual(names("agents"), ["agentsPolicy"]);
-  assert.deepEqual(names("machines"), ["gitAccess", "backups", "desktopControl", "sleep", "serverBackups", "processes", "agentRuntimes", "browser"]);
+  assert.deepEqual(names("machines"), ["recoveryKey", "gitAccess", "backups", "desktopControl", "sleep", "serverBackups", "processes", "agentRuntimes", "browser"]);
   assert.deepEqual(names("agentConfiguration"), ["skills", "personas", "workflows"]);
   assert.deepEqual(names("controlPlane", "admin"), ["signIns", "forgeLogins", "people", "bots", "groups", "channels", "signInProviders", "policy", "providers", "version"]);
   assert.deepEqual(names("controlPlane", "member"), ["signIns", "forgeLogins", "people", "groups", "channels", "policy", "providers", "version"]);

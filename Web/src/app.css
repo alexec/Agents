@@ -159,7 +159,8 @@ a[href] { cursor: pointer; }
 .join-request .sign-in-code input { max-width: 10em; font-family: var(--mono, ui-monospace, monospace); }
 
 /* The machine lock's recovery key (#3493): shown once, and typed on a new device. */
-.join-request .recovery-key {
+.join-request .recovery-key,
+.settings-page .recovery-key {
   font-family: var(--mono, ui-monospace, monospace);
   font-weight: 600;
   overflow-wrap: anywhere;
@@ -168,6 +169,10 @@ a[href] { cursor: pointer; }
 }
 
 .join-request .recovery-form { margin-top: 6px; }
+
+.settings-page .recovery-key { display: block; padding: 6px 8px 0; }
+
+.settings-page .recovery-actions { display: flex; gap: 6px; }
 
 .join-request .recovery-form input.recovery-key-field { max-width: none; width: 100%; }
 

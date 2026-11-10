@@ -212,6 +212,8 @@ export class MachineLock {
   /** The signer's cards: other devices of this person that ask to join. */
   readonly cards = signal<SignerCard[]>([]);
   readonly recovery = signal<RecoveryCard>({ kind: "none" });
+  /** Whether the lock, as this page last checked it, has a recovery key (#4299): Settings says so. */
+  readonly hasRecovery = signal(false);
 
   private client = "";
   private key: { pair: CryptoKeyPair; publicRaw: Uint8Array } | null = null;
@@ -325,6 +327,7 @@ export class MachineLock {
       const state = await follow(this.pins.load(), lock);
       this.pins.save(state.pin());
       this.state = state;
+      this.hasRecovery.value = state.recovery !== null;
       return { lock, state };
     } catch (error) {
       if (!(error instanceof LockCheckError)) throw error;
@@ -477,6 +480,7 @@ export class MachineLock {
         }
         await read.state.add(entry);
         this.pins.save(read.state.pin());
+        this.hasRecovery.value = true;
         this.recovery.value = { kind: "show", text: made.text };
         return;
       }
