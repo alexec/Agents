@@ -20,10 +20,14 @@ Slack app that you make, and it uses Socket Mode, so Slack needs no public addre
   `ask_question` posted. Filters: `question` and `channel`. Its data is the question's id,
   who answered, and the option (its words and its place, from 0). Only the first answer
   counts. The question then says who answered, and its buttons go.
-- **The tools:** `list_channels`, `read_messages` (a channel's newest messages, or a thread),
-  `send_message` and `ask_question` (options as buttons). `read_messages` gives the text
+- **The tools:** `list_conversations` and `list_channels` (where the bot is),
+  `read_messages` (a conversation's messages, or a thread's, newest first, a page at a time
+  by its `cursor`), `send_message` and `ask_question` (options as buttons). `read_messages` gives the text
   marked as outside content: an agent reads it as data, never as instructions. The server
   refuses to send `@channel`, `@here` or `@everyone`. It cannot edit or delete a message.
+  `list_conversations` and `read_messages` follow the
+  [messaging contract](../reference/messaging-contract.md), so the Messages page can read
+  Slack. Slack gives a bot no unread counts, so a conversation has no `unread`.
 
 A message acts as a person only when that person has linked their Slack user (see
 [Channels](../reference/channels.md)). The identity is the workspace and the user, as
@@ -99,7 +103,7 @@ asks the person whose sign-in email is that email.
 ## Start work from Slack
 
 - A workflow on `message.received` with `mentions: true` starts an agent when someone
-  mentions the bot. The agent reads the message with `read_messages` (`channel` and
+  mentions the bot. The agent reads the message with `read_messages` (`conversation` and
   `thread`: the event's `channel`, and its `threadTs` or else its `ts`), and answers in the
   thread with `send_message`. See
   [Start a workflow from an MCP event](start-a-workflow-from-an-mcp-event.md).

@@ -170,6 +170,7 @@ nav:
       - reference/personas.md
       - reference/events.md
       - reference/channels.md
+      - reference/messaging-contract.md
       - reference/groups.md
       - reference/policy.md
       - reference/on-every-machine.md
