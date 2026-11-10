@@ -65,6 +65,10 @@ test("each section is its own address, and #/ is the Overview", async () => {
     assert.equal(r.routeHash({ nav: "settings", section: "policy" }, undefined), "#/settings/policy");
     assert.equal(r.routeHash({}, undefined), "#/");
     assert.deepEqual(r.parseRoute(r.routeHash({ nav: "reports", section: "a b" }, undefined)), { nav: "reports", section: "a b" });
+    // A list's filters and sort after a "?" (#4395); an item's page has none.
+    assert.deepEqual(r.parseRoute("#/work/issue?label=bug&sort=newest"), { nav: "work", section: "issue", query: "label=bug&sort=newest" });
+    assert.equal(r.routeHash({ nav: "work", section: "issue", query: "label=bug" }, undefined), "#/work/issue?label=bug");
+    assert.equal(r.routeHash({ nav: "work", section: "issue", item: "github:a/b#1", query: "label=bug" }, undefined), "#/work/issue/github%3Aa%2Fb%231");
     // An issue's or a PR's page is its Work list's page with the ref after it (#3119).
     const pr = { nav: "work", section: "pr", item: "github:alexec/Agents#99" };
     assert.equal(r.routeHash(pr, undefined), "#/work/pr/github%3Aalexec%2FAgents%2399");

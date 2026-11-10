@@ -3,6 +3,7 @@ package agentsd
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strconv"
 	"strings"
@@ -135,7 +136,7 @@ func (g githubForge) Item(ctx context.Context, r forgeRef, cursor string) (wire.
 		out.ReviewThreads, out.FilesChanged = new(int64(p.ReviewThreads)), new(int64(p.FilesChanged))
 		out.Head, out.MergeMethods = optional(p.Head), mergeMethodsOf(p.MergeMethods)
 	} else {
-		out.Start = forgeStartOf(out.Item)
+		out.Start = githubStart(out.Item)
 	}
 	return out, nil
 }
@@ -404,4 +405,16 @@ func (g githubForge) SetBlockedBy(ctx context.Context, r, blocker forgeRef, bloc
 		return err
 	}
 	return gh.SetBlockedBy(ctx, r.Repo, r.Number, blocker.Repo, blocker.Number, blocked)
+}
+
+// githubStart is the new-agent form for a GitHub issue (Start Agent), as the GitHub issues view
+// fills it (#834): the prompt names the issue and how to read it, and the session is labelled with it.
+func githubStart(i wire.ForgeItem) *wire.ForgeStart {
+	repo, n, ok := nodeOfRepo(i.Node)
+	if !ok {
+		return nil
+	}
+	on := " --repo " + repo.path
+	return numberedStart(fmt.Sprintf("#%d: %s\n\nWork on this GitHub issue (`gh issue view %d%s`).\n\n"+
+		"First assign it to yourself: `gh issue edit %d%s --add-assignee @me`.", n, i.Title, n, on, n, on), n, i.Title)
 }

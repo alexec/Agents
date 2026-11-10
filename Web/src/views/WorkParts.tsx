@@ -78,17 +78,18 @@ export interface MenuChoice { value: string; words: string }
 
 /** A filter's menu (section 4): a borderless button with the filter's name and a chevron that opens a list, in place of
  * a `<select>`. Set, it shows its value in the accent colour ("Label: bug ▾"); `always` shows the value with no name
- * ("Open ▾"), for a filter that always has one; `named` shows the name alone ("Sort ▾"), for an order, which filters
- * nothing. `any`, when given, is the item at the top that clears it. */
-export function FilterMenu({ label, value, choices, any, always, named, onPick }: {
-  label: string; value: string; choices: readonly MenuChoice[]; any?: string | undefined; always?: boolean; named?: boolean;
+ * ("Open ▾"), for a filter that always has one; `standard` shows the name alone at that value ("Sort ▾"), for an order,
+ * which filters nothing, and "Sort: Cost ▾" in the accent at any other (lists.md section 1). `any`, when given, is the
+ * item at the top that clears it. */
+export function FilterMenu({ label, value, choices, any, always, standard, onPick }: {
+  label: string; value: string; choices: readonly MenuChoice[]; any?: string | undefined; always?: boolean; standard?: string;
   onPick: (value: string) => void;
 }) {
   const open = useSignal<{ left: number; top: number } | null>(null);
   const anchor = useRef<HTMLSpanElement>(null);
   const menu = useRef<HTMLDivElement>(null);
   const chosen = choices.find((c) => c.value === value);
-  const set = !!value && !always && !named;
+  const set = !!value && !always && value !== standard;
   const words = always ? chosen?.words ?? label : set ? `${label}: ${chosen?.words ?? value}` : label;
   useEffect(() => {
     if (!open.value) return;
@@ -176,14 +177,22 @@ export function EmptyState({ kind, title, line, action }: {
   );
 }
 
-/** A forge that could not be read (section 7): a strip with what it said and Try again. */
-export function ErrorStrip({ lines, retry, middle }: { lines: readonly string[]; retry: () => void; middle?: boolean }) {
+/** A forge that could not be read (section 7): a strip with what it said and Try again. In the middle of a list that read
+ * nothing, a heading first ("Could not read issues", lists.md section 5), and `also` beside Try again (Settings ▸
+ * Connectors, for a credential the forge refused). */
+export function ErrorStrip({ lines, retry, middle, title, also }: {
+  lines: readonly string[]; retry: () => void; middle?: boolean; title?: string | undefined;
+  also?: { words: string; run: () => void } | undefined;
+}) {
   if (lines.length === 0) return null;
   return (
     <div class={`work-error${middle ? " middle" : ""}`} role="alert">
       <span class="mark" aria-hidden="true">⚠</span>
-      <span class="words">{lines.map((l) => <span key={l}>{l}</span>)}</span>
-      <button type="button" onClick={retry}>Try again</button>
+      <span class="words">{title && <span class="strong">{title}</span>}{lines.map((l) => <span key={l}>{l}</span>)}</span>
+      <span class="buttons">
+        <button type="button" onClick={retry}>Try again</button>
+        {also && <button type="button" onClick={also.run}>{also.words}</button>}
+      </span>
     </div>
   );
 }

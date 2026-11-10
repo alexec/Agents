@@ -4,14 +4,15 @@
 // releases lineage knows. A row opens its page.
 import { effect, useSignal } from "@preact/signals";
 import { Fragment, type ComponentChildren } from "preact";
-import { useEffect, useMemo } from "preact/hooks";
+import { useEffect, useMemo, useRef } from "preact/hooks";
 import type { ForgeComment, ForgeItemDetail, ForgeLabel, LineageEstimate } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { Capability } from "../protocol/capabilities.generated";
 import { describe } from "../model/errors";
 import { hostAnswers } from "../model/capabilities";
 import {
-  boardChoices, boardName, checksGlyph, checksWords, choices, clearedFilter, connectForge, emptyWords, errorWords, filtered, fromForge,
+  boardChoices, boardName, checksGlyph, checksWords, choices, clearedFilter, connectForge, couldNotLoadMore, couldNotRead, countWords,
+  credentialProblem, emptyWords, errorWords, filtered, fromForge, loadingMore, parseWorkQuery, setFilters, workQuery,
   lineageOnlyNote, noForgeHere, notReadHere, openOnWords, positionWords, repoName, repoOf, rowLine, rowReviewWords,
   reviewWords, shortRef, titleSaysRef, workKindTitle, workSortTitle, allProjects, projectOfFolder, projectWords, workFolderKey,
   type WorkFilter, type WorkKind, type WorkProject, type WorkRow, type WorkSort, type WorkState,
@@ -33,7 +34,7 @@ import { WorkActions, WorkCommentBox } from "./WorkActions";
 import { WorkPlan } from "./WorkPlan";
 import { WorkDocs } from "./Docs";
 import { hasPlan } from "../model/epicPlan";
-import { go, replace, route } from "../route";
+import { go, replace, route, routeHash } from "../route";
 import {
   allRows, askKey, boardHosts, boards, forgeHosts, fromList, hasMore, listProjects, loadBoards, loadList, loadMore, nextAfter, pageNeighbours,
   placeKey, shownRows, workList,
@@ -57,6 +58,19 @@ export function WorkList({ store, kind }: { store: Store; kind: WorkKind }) {
   // The list's state lives for the tab (#3257), so an item's page can go through it and Back finds it as it was.
   const l = workList(kind);
   const { filter, sort, lists, problem, more } = l;
+  // The filters and the sort are in the address too (lists.md section 4), so a link or a reload keeps them. An address
+  // that says none (the section's link, All issues) keeps the tab's, and the address then says them.
+  const query = route.value.query;
+  useEffect(() => {
+    if (query === undefined) return;
+    const said = parseWorkQuery(query, kind);
+    if (workQuery(said.filter, said.sort) !== workQuery(filter.peek(), sort.peek())) { filter.value = said.filter; sort.value = said.sort; }
+  }, [kind, query]);
+  const asked = workQuery(filter.value, sort.value);
+  useEffect(() => {
+    const now = workQuery(filter.peek(), sort.peek());
+    if ((route.peek().query ?? "") !== now) replace({ nav: "work", section: kind, ...now ? { query: now } : {} });
+  }, [asked]);
   const hosts = forgeHosts(store);
   const state = filter.value.state;
   const ask = askKey(store, l);
@@ -67,12 +81,35 @@ export function WorkList({ store, kind }: { store: Store; kind: WorkKind }) {
   const projects = workProjects(store);
   useEffect(() => { l.projects.value = projects; }, [projectsKey(projects)]);
   const offeredProjects = listProjects(l).map((p) => p.project);
-  // Back from an item's page: the list at the row last opened.
+  const rowsAt = useRef<HTMLUListElement>(null);
+  const end = useRef<HTMLDivElement>(null);
+  // Back from an item's page: the list at the row last opened, selected.
   const shownOnce = lists.value !== null;
   useEffect(() => {
     const opened = l.opened.peek();
-    if (shownOnce && opened) document.querySelector(`[data-ref="${CSS.escape(opened)}"]`)?.scrollIntoView({ block: "center" });
+    const row = shownOnce && opened ? document.querySelector<HTMLElement>(`[data-ref="${CSS.escape(opened)}"] a`) : null;
+    row?.scrollIntoView({ block: "center" });
+    row?.focus({ preventScroll: true });
   }, [shownOnce]);
+  // ↑ and ↓ move the selection, which is the focus (lists.md section 4); Enter opens the row, as a link does. From the
+  // search field, ↓ goes to the first row.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || (e.key !== "ArrowDown" && e.key !== "ArrowUp")) return;
+      const target = e.target as HTMLElement | null;
+      const links = [...rowsAt.current?.querySelectorAll<HTMLAnchorElement>("a.work-row") ?? []];
+      if (links.length === 0) return;
+      const at = links.indexOf(target?.closest<HTMLAnchorElement>("a.work-row") as HTMLAnchorElement);
+      const fromSearch = target?.matches(".work-filters input[type=search]") && e.key === "ArrowDown";
+      if (at < 0 && !fromSearch && target !== document.body) return;
+      e.preventDefault();
+      const next = links[at < 0 ? 0 : Math.max(0, Math.min(links.length - 1, at + (e.key === "ArrowDown" ? 1 : -1)))];
+      next?.focus({ preventScroll: true });
+      next?.scrollIntoView({ block: "nearest" });
+    };
+    addEventListener("keydown", onKey);
+    return () => removeEventListener("keydown", onKey);
+  }, []);
 
   const all = allRows(l);
   const offered = choices(all);
@@ -90,50 +127,85 @@ export function WorkList({ store, kind }: { store: Store; kind: WorkKind }) {
   const firstRead = lists.value === null || (l.loading.value && rows.length === 0);
   const problems = [...problem.value ? [problem.value] : [], ...errors];
   const stale = new Set((lists.value ?? []).flatMap((h) => h.stale ?? []));
-  const empty = emptyWords(kind, state, filtered(filter_), offered.repos);
+  const narrowed = filtered(filter_);
+  const empty = emptyWords(kind, state, narrowed, offered.repos);
   const things = kind === "pr" ? "pull requests" : workKindTitle[kind].toLowerCase();
+  const clear = () => { filter.value = clearedFilter(filter_); };
+  const connectors = () => go({ nav: "settings", section: "mcp" });
+
+  // The next page loads when the end of the list shows (lists.md section 4), and again while it still shows; a page that
+  // failed waits for Try again.
+  const further = hasMore(l);
+  const failed = l.moreFailed.value;
+  const shown = !(fromForge(kind) && hosts.length === 0) && !firstRead && (rows.length > 0 || further);
+  useEffect(() => {
+    const at = end.current;
+    if (!at || !shown || !further || failed || more.value || typeof IntersectionObserver === "undefined") return;
+    const seen = new IntersectionObserver((e) => { if (e.some((x) => x.isIntersecting)) void loadMore(store, l); });
+    seen.observe(at);
+    return () => seen.disconnect();
+  }, [shown, further, failed, more.value, rows.length]);
 
   return (
     <div class="work-list">
       <div class="work-filters" role="group" aria-label="Filters">
         <input type="search" placeholder={`Filter ${things}`} aria-label="Filter by words" value={filter_.text}
           onInput={(e) => set({ text: (e.target as HTMLInputElement).value })} />
+        {/* The order of lists.md section 1: Project, State, Repo, Label, Assignee, Board, Clear, then Sort at the end. */}
         <div class="work-menus">
           {(offeredProjects.length > 1 || filter_.project) && (
             <Choice label="Project" any={allProjects} value={filter_.project} options={offeredProjects.map((p) => p.id)}
               words={(id) => offeredProjects.find((p) => p.id === id)?.name ?? allProjects} onChange={(project) => set({ project })} />
           )}
           {fromForge(kind) && <FilterMenu label="State" always value={state} choices={stateChoices} onPick={(v) => set({ state: v as WorkState })} />}
-          <Choice label="Repo" value={filter_.repo} options={offered.repos} words={repoName} onChange={(repo) => set({ repo })} />
+          {(offered.repos.length > 1 || filter_.repo) && (
+            <Choice label="Repo" value={filter_.repo} options={offered.repos} words={repoName} onChange={(repo) => set({ repo })} />
+          )}
           <Choice label="Label" value={filter_.label} options={offered.labels} onChange={(label) => set({ label })} />
           {fromForge(kind) && <Choice label="Assignee" value={filter_.assignee} options={offered.assignees} onChange={(assignee) => set({ assignee })} />}
-          <FilterMenu label="Sort" named value={sort.value} choices={sortChoices} onPick={(v) => { sort.value = v as WorkSort; }} />
           {kind === "issue" && (
-            <Choice label="Board" any="All" value={filter_.board} options={boardChoices(boards.value, filter_.board)}
+            <Choice label="Board" any="All boards" value={filter_.board} options={boardChoices(boards.value, filter_.board)}
               words={(url) => boardName(boards.value, url)} onChange={(board) => set({ board })} />
           )}
+          {narrowed && (
+            <button type="button" class="work-menu-button work-clear" title="Clear the filters but State" onClick={clear}>
+              <span aria-hidden="true">✕</span>Clear</button>
+          )}
+          <span class="work-sort">
+            <FilterMenu label="Sort" standard="updated" value={sort.value} choices={sortChoices} onPick={(v) => { sort.value = v as WorkSort; }} />
+          </span>
         </div>
         <RefreshButton busy={l.loading.value} onClick={refresh} />
       </div>
       {fromForge(kind) && hosts.length === 0
-        ? <EmptyState kind={kind} title={connectForge(kind)} line={noForgeHere} action={{ words: "Settings ▸ Connectors", run: () => go({ nav: "settings", section: "mcp" }) }} />
+        ? <EmptyState kind={kind} title={connectForge(kind)} line={noForgeHere} action={{ words: "Settings ▸ Connectors", run: connectors }} />
         : firstRead ? <PlaceholderRows />
-        : rows.length === 0 && problems.length > 0 ? <ErrorStrip lines={problems} retry={refresh} middle />
+        : rows.length === 0 && !further && problems.length > 0
+          ? <ErrorStrip lines={problems} retry={refresh} middle title={couldNotRead(kind)}
+              also={problems.some(credentialProblem) ? { words: "Settings ▸ Connectors", run: connectors } : undefined} />
         : (
           <>
             <ErrorStrip lines={problems} retry={refresh} />
             {rows.length === 0
-              ? <EmptyState kind={kind} title={empty.title} line={empty.line}
-                  action={filtered(filter_) ? { words: "Clear filters", run: () => { filter.value = clearedFilter(filter_); } } : undefined} />
+              ? <EmptyState kind={kind} title={empty.title}
+                  line={narrowed ? setFilters(filter_, offeredProjects.find((p) => p.id === filter_.project)?.name, filter_.board ? boardName(boards.value, filter_.board) : undefined) : empty.line}
+                  action={narrowed ? { words: "Clear filters", run: clear } : undefined} />
               : (
-                <ul class="work-rows work-item-rows">
+                <ul class="work-rows work-item-rows" ref={rowsAt}>
                   {rows.map((r) => <WorkRowView key={r.node.ref} row={r} several={offered.repos.length > 1} dim={stale.has(r.node.ref)} pick={pick}
                     open={() => { l.opened.value = r.node.ref; fromList.value = placeKey(kind, r.node.ref); go({ nav: "work", section: kind, item: r.node.ref }); }} />)}
                 </ul>
               )}
           </>
         )}
-      {hasMore(l) && <button type="button" class="link" disabled={more.value} onClick={() => void loadMore(store, l)}>{more.value ? "Loading…" : "More"}</button>}
+      {shown && (
+        <div class="work-list-end quiet small" ref={end} aria-live="polite">
+          {more.value ? <><span class="work-spinner" aria-hidden="true" />{loadingMore(rows.length)}</>
+            : failed ? <><span title={failed}>{couldNotLoadMore}</span><button type="button" onClick={() => void loadMore(store, l)}>Try again</button></>
+            : further ? <><button type="button" onClick={() => void loadMore(store, l)}>Load more</button><span>{countWords(kind, rows.length, true)}</span></>
+            : <span>{countWords(kind, rows.length)}</span>}
+        </div>
+      )}
       {!fromForge(kind) && <p class="quiet small">{lineageOnlyNote}</p>}
     </div>
   );
@@ -155,7 +227,7 @@ export function StatePill({ state, draft, status }: { state: string; draft?: boo
   return <span class={`work-state ${word}`}>{status ?? word}</span>;
 }
 
-/** A row (#4392, parts.md section 2): the state icon, the title and at most three chips, the comment count and the
+/** A row (#4392, parts.md section 2), a link to its page (#4395): the state icon, the title and at most three chips, the comment count and the
  * assignees; under it the number, the age, the author and what lineage knows. On a phone the CSS folds it: the
  * title on two lines, every chip under it, the short line and no avatars. */
 function WorkRowView({ row, several, dim, pick, open }: { row: WorkRow; several: boolean; dim: boolean; pick: (label: string) => void; open: () => void }) {
@@ -165,7 +237,9 @@ function WorkRowView({ row, several, dim, pick, open }: { row: WorkRow; several:
   const comments = row.comments ?? 0;
   return (
     <li data-ref={row.node.ref} class={dim ? "stale" : undefined}>
-      <button type="button" class="work-row work-item-row" onClick={open}>
+      {/* A link (lists.md section 4): a click opens the page here, a middle-click or ⌘-click in a new tab. */}
+      <a class="work-row work-item-row" href={routeHash({ nav: "work", section: row.node.kind, item: row.node.ref })}
+        onClick={(e) => { if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; e.preventDefault(); open(); }}>
         <span class="work-row-icon"><StateIcon kind={row.node.kind} state={row.state} draft={row.draft} /></span>
         <span class="work-row-main">
           <span class="work-row-head">
@@ -189,7 +263,7 @@ function WorkRowView({ row, several, dim, pick, open }: { row: WorkRow; several:
             <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" /></svg>{comments}</span>}
           <Avatars logins={row.assignees} />
         </span>
-      </button>
+      </a>
     </li>
   );
 }

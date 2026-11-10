@@ -3,6 +3,7 @@ package agentsd
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/url"
 	"slices"
 	"strings"
@@ -168,7 +169,7 @@ func (g gitlabForge) Item(ctx context.Context, r forgeRef, cursor string) (wire.
 			out.MergeMethods = mergeMethodsOf(methods)
 		}
 	} else {
-		out.Start = forgeStartOf(out.Item)
+		out.Start = gitlabStart(out.Item)
 	}
 	return out, nil
 }
@@ -373,4 +374,13 @@ func (g gitlabForge) Rerun(ctx context.Context, r forgeRef) (wire.ForgeDone, err
 	}
 	link, _ := out["url"].(string)
 	return wire.ForgeDone{URL: optional(link), Reran: new(int64(1))}, nil
+}
+
+// gitlabStart is the new-agent form's prompt for a GitLab issue.
+func gitlabStart(i wire.ForgeItem) *wire.ForgeStart {
+	_, n, ok := nodeOfRepo(i.Node)
+	if !ok {
+		return nil
+	}
+	return numberedStart(fmt.Sprintf("#%d: %s\n\nWork on this GitLab issue: %s", n, i.Title, deref(i.URL)), n, i.Title)
 }

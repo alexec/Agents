@@ -245,7 +245,7 @@ func (g forgejoForge) Item(ctx context.Context, r forgeRef, cursor string) (wire
 		out.Comments = append(out.Comments, forgeCommentOf(c.Author, c.Body, c.At, c.URL, c.Bot))
 	}
 	if !p.PR {
-		out.Start = forgeStartOf(out.Item)
+		out.Start = forgejoStart(out.Item, r.Number)
 		return out, nil
 	}
 	out.Checks = []wire.ForgeCheck{}
