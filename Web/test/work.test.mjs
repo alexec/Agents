@@ -156,12 +156,11 @@ test("an issue, a PR, a milestone or a release has a page; a session has none", 
   assert.equal(w.hasPage({ kind: "session", ref: "session:S1" }), false);
 });
 
-test("a PR's checks and review, and a page's people, in words", () => {
+test("a PR's checks and review in words", () => {
   const checks = [{ name: "a", state: "passing" }, { name: "b", state: "passing" }, { name: "c", state: "failing" }];
   assert.equal(w.checksWords(checks), "Checks: 2 passing, 1 failing");
   assert.equal(w.checksWords([], "none"), undefined);
   assert.equal(w.reviewWords("changes_requested"), "Review: Changes requested");
-  assert.equal(w.peopleWords({ author: "alexec", assignees: ["bob"], milestone: "0.14" }), "by alexec · assigned to bob · milestone 0.14");
 });
 
 test("a milestone's and a release's short name", () => {
@@ -262,4 +261,69 @@ test("a project has the repos its folders read on every machine, and the Project
   assert.equal(w.projectOfFolder("/home/a/Agents", "mac", [agents, www]), undefined);
   assert.equal(w.projectOfFolder(undefined, "mac", [agents]), undefined);
   assert.equal(w.projectWords("Agents"), "Project Agents");
+});
+
+// Work's look (#4392, specs/4328-work-look/parts.md): the state icon, the row's line, the chip's colours, the empty states.
+test("a row's state icon is the state's glyph, with words, and none for a milestone (#4392)", () => {
+  assert.equal(w.stateGlyph("issue", "open"), "issue-open");
+  assert.equal(w.stateGlyph("issue", "closed"), "issue-done");
+  assert.equal(w.stateGlyph("issue", "closed", false, true), "issue-dropped");
+  assert.equal(w.stateGlyph("pr", "open", true), "pr-draft");
+  assert.equal(w.stateGlyph("pr", "open"), "pr-open");
+  assert.equal(w.stateGlyph("pr", "merged"), "pr-merged");
+  assert.equal(w.stateGlyph("pr", "closed"), "pr-closed");
+  assert.equal(w.stateGlyph("milestone", "open"), undefined);
+  assert.equal(w.stateGlyphWords["pr-merged"], "Merged pull request");
+});
+
+test("a row's second line: wide with the age, the author and lineage; short on a phone (#4392)", () => {
+  const now = Date.parse("2026-10-30T12:00:00Z");
+  const row = w.forgeRow(item(4328, { author: "alexec", comments: 3, status: "In Review" }), "mac", node(4328, 0.42));
+  assert.equal(row.comments, 3);
+  const line = w.rowLine(row, now);
+  assert.equal(line.wide, "#4328 · In Review · updated 2 hours ago by alexec · 2 sessions · $0.42");
+  assert.equal(line.short, "#4328 · In Review · 2 h · alexec · $0.42");
+  const bare = w.rowLine(w.forgeRow(item(7, { author: "bob" }), "mac"), now);
+  assert.equal(bare.wide, "#7 · updated 2 hours ago by bob");
+});
+
+test("a label chip's text has 4.5:1 to its fill, in light and dark; no colour, no chip colours (#4392)", () => {
+  for (const color of ["d73a4a", "ffffff", "000000", "fbca04", "1D76DB", "0e8a16"]) {
+    for (const scheme of ["light", "dark"]) {
+      const c = w.chipColours(color, scheme);
+      const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+      assert.ok(w.contrast(rgb(c.ink), rgb(c.fill)) >= 4.5, `${color} ${scheme}: ${c.ink} on ${c.fill}`);
+    }
+  }
+  assert.equal(w.chipColours(undefined, "light"), undefined);
+  assert.deepEqual(w.labelScope("feature:work"), ["feature:", "work"]);
+  assert.equal(w.labelScope("bug"), undefined);
+});
+
+test("one login keeps one avatar colour (#4392)", () => {
+  assert.equal(w.avatarHue("alexec"), w.avatarHue("alexec"));
+  assert.notEqual(w.avatarHue("alexec"), w.avatarHue("bob"));
+});
+
+test("an empty list says no open issues, or no match with Clear filters, which keeps the state (#4392)", () => {
+  const f = { ...w.anyFilter, state: "closed", label: "bug" };
+  assert.equal(w.filtered(f), true);
+  assert.equal(w.filtered(w.anyFilter), false);
+  assert.deepEqual(w.clearedFilter(f), { ...w.anyFilter, state: "closed" });
+  assert.deepEqual(w.emptyWords("issue", "open", false, ["github:alexec/Agents"]),
+    { title: "No open issues", line: "Issues on alexec/Agents show here." });
+  assert.deepEqual(w.emptyWords("pr", "open", true, []), { title: "No pull requests match" });
+});
+
+test("a forge that could not be read keeps its last rows, dimmed; a fresh read has none to carry (#4392)", async () => {
+  const { carryStale } = await load("src/model/workLists.ts");
+  const fj = (n) => item(n, { node: { kind: "issue", ref: `forgejo:acme/app#${n}` } });
+  const had = { host: "mac", items: [item(1), fj(2)], errors: [] };
+  const failed = carryStale({ host: "mac", items: [item(1)], errors: [{ forge: "forgejo", message: "down" }] }, had);
+  assert.deepEqual(failed.items.map((i) => i.node.ref), ["github:alexec/Agents#1", "forgejo:acme/app#2"]);
+  assert.deepEqual(failed.stale, ["forgejo:acme/app#2"]);
+  const machine = carryStale({ host: "mac", items: [], errors: [{ forge: "", message: "offline" }] }, had);
+  assert.equal(machine.items.length, 2);
+  assert.equal(carryStale({ host: "mac", items: [], errors: [] }, had).items.length, 0);
+  assert.equal(w.errorWords({ forge: "forgejo", message: "Forgejo: Get …: refused" }, undefined), "Forgejo: Get …: refused");
 });
