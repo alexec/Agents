@@ -22,15 +22,20 @@ import (
 	"github.com/coder/websocket"
 )
 
-// countingStore counts the lists made of a store, and can fail every read of a code.
+// countingStore counts the lists made of a store and the reads of its records (each
+// lists the clients once), and can fail every read of a code.
 type countingStore struct {
 	store.Store
 	lists     atomic.Int64
+	reads     atomic.Int64
 	codesFail atomic.Bool
 }
 
 func (c *countingStore) List(ctx context.Context, prefix string) ([]store.Key, error) {
 	c.lists.Add(1)
+	if prefix == records.ClientsPrefix {
+		c.reads.Add(1)
+	}
 	return c.Store.List(ctx, prefix)
 }
 
@@ -47,8 +52,12 @@ func TestUnknownIDsReadTheStoreOnce(t *testing.T) {
 	t.Parallel()
 	st := &countingStore{Store: store.NewMemory()}
 	p := startPlane(t, st, controllink.NewPrivateKey())
-	// Past the window of any read Start made.
-	time.Sleep(readAgainEvery)
+	// The gate's clock stands still past the window of any read Start made, so both
+	// crowds are within one window however long they take under load (#3930).
+	still := time.Now().Add(readAgainEvery)
+	p.s.reads.mu.Lock()
+	p.s.reads.now = func() time.Time { return still }
+	p.s.reads.mu.Unlock()
 	crowd := func() {
 		var wg sync.WaitGroup
 		for i := range 200 {
@@ -66,17 +75,16 @@ func TestUnknownIDsReadTheStoreOnce(t *testing.T) {
 		}
 		wg.Wait()
 	}
-	before := st.lists.Load()
+	// Reads of the records, not all lists: the plane's other loops list the store too.
+	before := st.reads.Load()
 	crowd()
-	// One read lists the clients, the hosts, the people (#994), the groups (#1761) and the
-	// projects (#2317).
-	if got := st.lists.Load() - before; got > 5 {
-		t.Fatalf("200 made-up ids made %d lists; one read is 5", got)
+	if got := st.reads.Load() - before; got > 1 {
+		t.Fatalf("200 made-up ids made %d reads of the records; one is enough", got)
 	}
-	before = st.lists.Load()
+	before = st.reads.Load()
 	crowd()
-	if got := st.lists.Load() - before; got != 0 {
-		t.Fatalf("a crowd within %v of a read made %d lists", readAgainEvery, got)
+	if got := st.reads.Load() - before; got != 0 {
+		t.Fatalf("a crowd within %v of a read made %d reads of the records", readAgainEvery, got)
 	}
 }
 
