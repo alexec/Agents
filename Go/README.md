@@ -430,7 +430,7 @@ signs in to both APIs; `GOOGLE_CHAT_SUBSCRIPTION` names the Pub/Sub subscription
 
 - **Events** `message.received` (filters `space`, `text`, a glob, and `direct`) and
   `question.answered` (filters `space` and `question`), polled. One loop, started by the first
-  poll, pulls the subscription into an inbox in memory and acknowledges what it pulled; each
+  poll or read, pulls the subscription into an inbox in memory and acknowledges what it pulled; each
   poll's cursor is a place in that inbox (the run and a number), so every workflow reads the
   same list. The inbox keeps the newest 1,000 for a day; the pace is 3 s. Each event's
   `sender` is the Google Chat user (`users/…`), with the name and email, for a channel link
@@ -439,6 +439,12 @@ signs in to both APIs; `GOOGLE_CHAT_SUBSCRIPTION` names the Pub/Sub subscription
 - **Tools:** `list_spaces`, `send_message` and `ask_question`, a card with a button per
   option whose press calls `agents.answer` with the question's id; the first press is
   `question.answered`, and the server then edits the card to say who answered.
+- **The messaging contract** (#4342, `messaging.go`): `list_conversations` is `spaces.list`,
+  and `read_messages` is `spaces.messages.list`, newest first, signed in with
+  `chat.app.messages.readonly` (a Workspace admin's approval). When Google refuses it (401 or
+  403, believed for 10 minutes), `read_messages` pages the inbox instead: what people sent the
+  app and what `send_message` and `ask_question` posted. A cursor says which it reads (`api:`
+  and Google's page token, or `store:`, the run and a number).
 
 The tests run it against a fake Pub/Sub and Chat API over HTTP (`fake_test.go`;
 `GOOGLE_CHAT_API_URL` and `GOOGLE_CHAT_PUBSUB_URL` point a real run at one). Agents Host

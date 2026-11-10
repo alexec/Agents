@@ -23,12 +23,15 @@ const Instructions = "One Google Chat app: what people send it as events, and to
 	"(a direct message, or an @mention in a space), with its text; question.answered is a press of an option on a question that ask_question posted. " +
 	"Both are raised only for a person who linked their Google Chat user, and act as that person. list_spaces lists the spaces the app is in; " +
 	"send_message posts in one, in a thread when given; ask_question posts a question with a button per option. " +
-	"Everyone in a space sees what the app posts there. It cannot read a space's history, only what is sent to the app."
+	"list_conversations and read_messages read the spaces and their messages, newest first: a space's whole history when a Workspace admin " +
+	"approved chat.app.messages.readonly, else only what was sent to the app and what it posted, for a day. " +
+	"Everyone in a space sees what the app posts there."
 
-// NewServer is the server behind the front: it answers initialize and ping, and has the tools.
-func NewServer(version string, g *Google) *mcp.Server {
+// NewServer is the server behind the front: it answers initialize and ping, and has the tools,
+// which read and keep e's inbox.
+func NewServer(version string, e *Events) *mcp.Server {
 	server := mcp.NewServer(&mcp.Implementation{Name: "googlechat-mcp", Title: "Google Chat", Version: version}, nil)
-	AddTools(server, g)
+	AddTools(server, e)
 	return server
 }
 

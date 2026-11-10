@@ -19,15 +19,19 @@ type fakeGoogle struct {
 	t   *testing.T
 	srv *httptest.Server
 
-	mu      sync.Mutex
-	queue   []map[string]any // waiting to be pulled
-	acked   []string
-	posted  []map[string]any
-	edited  []map[string]any
-	nextID  int
-	refuse  int // the status every call gets, when set
-	pulled  chan struct{}
+	mu     sync.Mutex
+	queue  []map[string]any // waiting to be pulled
+	acked  []string
+	posted []map[string]any
+	edited []map[string]any
+	nextID int
+	refuse int // the status every call gets, when set
+	pulled chan struct{}
 	spaces []map[string]any
+	// history is each space's messages, the oldest first, for spaces.messages.list; nil: the
+	// app may not read them (no chat.app.messages.readonly), and the list is refused.
+	history map[string][]map[string]any
+	listed  []string // each spaces.messages.list's query
 }
 
 const fakeSubscription = "projects/agents-fake/subscriptions/agents-chat"
@@ -103,6 +107,38 @@ func (f *fakeGoogle) serve(w http.ResponseWriter, r *http.Request) {
 		answer(map[string]any{})
 	case r.Method == http.MethodGet && path == "/v1/spaces":
 		answer(map[string]any{"spaces": f.spaces})
+	case r.Method == http.MethodGet && strings.HasPrefix(path, "/v1/spaces/") && strings.HasSuffix(path, "/messages"):
+		space := strings.TrimSuffix(strings.TrimPrefix(path, "/v1/"), "/messages")
+		q := r.URL.Query()
+		f.mu.Lock()
+		f.listed = append(f.listed, r.URL.RawQuery)
+		history, allowed := f.history[space]
+		allowed = allowed || f.history != nil
+		f.mu.Unlock()
+		if !allowed {
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = w.Write([]byte(`{"error":{"code":403,"message":"This method requires admin approval","status":"PERMISSION_DENIED"}}`))
+			return
+		}
+		if q.Get("orderBy") != "createTime DESC" {
+			f.t.Errorf("fake Google: messages listed in order %q", q.Get("orderBy"))
+		}
+		newest := []map[string]any{}
+		thread := strings.TrimPrefix(q.Get("filter"), "thread.name = ")
+		for i := len(history) - 1; i >= 0; i-- {
+			if m := history[i]; q.Get("filter") == "" || m["thread"].(map[string]any)["name"] == thread {
+				newest = append(newest, m)
+			}
+		}
+		from := 0
+		_, _ = fmt.Sscan(q.Get("pageToken"), &from)
+		size := 25
+		_, _ = fmt.Sscan(q.Get("pageSize"), &size)
+		page := map[string]any{"messages": newest[min(from, len(newest)):min(from+size, len(newest))]}
+		if from+size < len(newest) {
+			page["nextPageToken"] = fmt.Sprint(from + size)
+		}
+		answer(page)
 	case r.Method == http.MethodPost && strings.HasPrefix(path, "/v1/spaces/") && strings.HasSuffix(path, "/messages"):
 		space := strings.TrimSuffix(strings.TrimPrefix(path, "/v1/"), "/messages")
 		f.mu.Lock()
@@ -115,7 +151,8 @@ func (f *fakeGoogle) serve(w http.ResponseWriter, r *http.Request) {
 		if th, ok := in["thread"].(map[string]any); ok {
 			thread = th["name"].(string)
 		}
-		answer(map[string]any{"name": name, "thread": map[string]any{"name": thread}})
+		answer(map[string]any{"name": name, "thread": map[string]any{"name": thread}, "createTime": time.Now().UTC().Format(time.RFC3339Nano),
+			"sender": map[string]any{"name": "users/app", "type": "BOT"}})
 	case r.Method == http.MethodPatch && strings.HasPrefix(path, "/v1/spaces/"):
 		f.mu.Lock()
 		in["_name"], in["_mask"] = strings.TrimPrefix(path, "/v1/"), r.URL.Query().Get("updateMask")
