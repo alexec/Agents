@@ -1,0 +1,55 @@
+Return-Path: <account-security-noreply@accountprotection.microsoft.com>
+Received: from compute1.internal (compute1.internal [10.0.0.1])
+	 by store.internal (Cyrus) with LMTPA;
+	 Tue, 10 Nov 2026 00:20:18 -0500
+X-Delivered-to: agents@example.com
+Received: from mx.example.net (localhost [127.0.0.1])
+	by mx.example.net (Postfix) with ESMTP id 0000000000
+	for <agents@example.com>; Tue, 10 Nov 2026 00:20:18 -0500 (EST)
+ARC-Authentication-Results: i=2; mx.example.net; dkim=pass header.d=accountprotection.microsoft.com
+X-ME-Authentication-Results: mx.example.net; x-aligned-from=pass
+Authentication-Results: mx.example.net;
+    x-csa=none;
+    x-me-sender=none;
+    x-ptr=fail smtp.helo=out.example.org
+      policy.ptr=out.example.org
+Authentication-Results: mx.example.net;
+    bimi=none (No BIMI records found)
+Authentication-Results: mx.example.net;
+    arc=pass (as.1.microsoft.com=pass, ams.1.microsoft.com=pass)
+      smtp.remote-ip=192.0.2.10
+Authentication-Results: mx.example.net;
+    dkim2=none (no signatures found);
+    dkim=pass (1024-bit rsa key sha256)
+      header.d=accountprotection.microsoft.com
+      header.i=@accountprotection.microsoft.com header.b=AAAAAAAA
+      header.a=rsa-sha256 header.s=selector1;
+    dmarc=pass policy.published-domain-policy=reject
+      policy.applied-disposition=none policy.evaluated-disposition=none
+      (p=reject,d=none,d.eval=none) policy.policy-from=p
+      header.from=accountprotection.microsoft.com;
+    iprev=pass smtp.remote-ip=192.0.2.10 (out.example.org);
+    spf=pass
+      smtp.mailfrom=account-security-noreply@accountprotection.microsoft.com
+      smtp.helo=out.example.org
+X-ME-VSScore: 0
+Received-SPF: pass
+Received: from out.example.org (out.example.org [192.0.2.10])
+	by mx.example.net (Postfix) with ESMTPS
+	for <agents@example.com>; Tue, 10 Nov 2026 00:20:18 -0500 (EST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=accountprotection.microsoft.com; s=selector1; b=AAAAAAAA
+Received: from relay.example.org by out.example.org; Tue, 10 Nov 2026 05:20:17 +0000
+From: Microsoft account team <account-security-noreply@accountprotection.microsoft.com>
+Date: Tue, 10 Nov 2026 05:20:17 +0000
+Subject: Verify your email address
+To: agents@example.com
+Message-ID: <scratch-4322@example.org>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+
+Please use the following security code for the Microsoft account ag*****@example.com.
+
+Security code: 000000
+
+Thanks,
+The Microsoft account team

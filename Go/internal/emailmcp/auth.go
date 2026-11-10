@@ -3,10 +3,10 @@ package emailmcp
 import (
 	"bufio"
 	"bytes"
-	"net/textproto"
 	"strings"
 
 	"github.com/emersion/go-imap/v2"
+	"github.com/emersion/go-message/textproto"
 )
 
 // Whether a message's sender is who its From says. The receiving mail server checks DMARC,
@@ -19,7 +19,7 @@ import (
 var authSection = &imap.FetchItemBodySection{Specifier: imap.PartSpecifierHeader,
 	HeaderFields: []string{"Authentication-Results"}, Peek: true}
 
-// authenticated is true when header (the fetched Authentication-Results lines) says the
+// authenticated is true when header (the fetched Authentication-Results and Received lines) says the
 // sender of from (the message's From, exactly one address) is who it says.
 func authenticated(header []byte, from []string) bool {
 	dmarc, dkim := authResults(header, from)
@@ -43,15 +43,7 @@ func authResults(header []byte, from []string) (dmarc bool, dkim string) {
 	if !ok || domain == "" {
 		return false, ""
 	}
-	fields, err := textproto.NewReader(bufio.NewReader(bytes.NewReader(append(header, '\r', '\n')))).ReadMIMEHeader()
-	if err != nil && len(fields) == 0 {
-		return false, ""
-	}
-	results := fields.Values("Authentication-Results")
-	if len(results) == 0 {
-		return false, ""
-	}
-	for _, result := range strings.Split(uncomment(results[0]), ";")[1:] {
+	for _, result := range receivingResults(header) {
 		words := strings.Fields(strings.ToLower(result))
 		if len(words) == 0 {
 			continue
@@ -78,6 +70,51 @@ func authResults(header []byte, from []string) (dmarc bool, dkim string) {
 		}
 	}
 	return dmarc, dkim
+}
+
+// receivingResults are the results (resinfo, between the semicolons, comments dropped) of
+// the receiving server's Authentication-Results: the topmost header, and each one straight
+// after it with the same authserv-id, up to the first Received line. The first of them that
+// names a method (dkim, dmarc…) has the say for it, so a header the sender wrote below with
+// the same authserv-id cannot turn the server's dmarc=fail into a pass.
+func receivingResults(header []byte) []string {
+	h, err := textproto.ReadHeader(bufio.NewReader(bytes.NewReader(append(header, '\r', '\n'))))
+	if err != nil && h.Len() == 0 {
+		return nil
+	}
+	var out []string
+	id, said := "", map[string]bool{}
+	for fields := h.Fields(); fields.Next(); {
+		if strings.EqualFold(fields.Key(), "Received") {
+			if id != "" {
+				break
+			}
+			continue // a Received above the results: the receiving server's own hops
+		}
+		if !strings.EqualFold(fields.Key(), "Authentication-Results") {
+			continue
+		}
+		parts := strings.Split(uncomment(fields.Value()), ";")
+		authserv := strings.ToLower(strings.TrimSpace(parts[0]))
+		if id == "" {
+			id = authserv
+		} else if authserv != id {
+			break
+		}
+		here := map[string]bool{}
+		for _, result := range parts[1:] {
+			method, _, _ := strings.Cut(strings.ToLower(strings.TrimSpace(result)), "=")
+			if method == "" || said[method] {
+				continue
+			}
+			here[method] = true
+			out = append(out, result)
+		}
+		for method := range here {
+			said[method] = true
+		}
+	}
+	return out
 }
 
 // uncomment drops the (comments) from a header value, which can hold any text.

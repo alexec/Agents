@@ -3,6 +3,7 @@ package emailmcp
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"testing"
 	"time"
 
@@ -287,6 +288,28 @@ func TestReceivedAuthenticatedOnly(t *testing.T) {
 	}
 	if _, err := poll(t, s, map[string]any{"authenticated": "maybe"}, ""); err == nil {
 		t.Fatal("authenticated takes true or false")
+	}
+}
+
+// The Microsoft sign-up mail that mail-code.py missed (#4322): its receiving server split its
+// results into four headers, and authenticated: "true" with a glob on the display-name
+// address hears it.
+func TestReceivedHearsSplitResults(t *testing.T) {
+	raw, err := os.ReadFile("testdata/split-results.eml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := newFakeMail(t, nil)
+	s := &Events{Mailbox: f.mailbox()}
+	args := map[string]any{"from": "*microsoft*", "authenticated": "true"}
+	_, cursor := mustPoll(t, s, args, "")
+	f.deliver("INBOX", string(raw))
+	events, _ := mustPoll(t, s, args, cursor)
+	if len(events) != 1 {
+		t.Fatalf("events: %v", events)
+	}
+	if data := events[0].(map[string]any)["data"].(map[string]any); data["subject"] != "Verify your email address" || data["authenticated"] != true {
+		t.Fatalf("event: %v", data)
 	}
 }
 
