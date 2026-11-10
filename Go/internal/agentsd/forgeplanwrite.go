@@ -117,8 +117,6 @@ func (d *Daemon) forgeAddChild(ctx context.Context, r wire.ForgeAddChildRequest)
 		var done wire.ForgeDone
 		done, err = t.forge.AddChild(ctx, t.ref, forgeChild{Title: title, Labels: labels, Level: level})
 		url, err = deref(done.URL), forgeCannotErr(method, t.forge, err)
-	} else if t.linear != nil {
-		_, url, err = t.linear.AddChild(ctx, t.identifier, title, labels)
 	} else if t.boards != nil {
 		// The level is the work item's type too, as its process names it.
 		_, url, err = t.boards.AddChild(ctx, t.project, t.number, title, labels, level)
@@ -131,30 +129,16 @@ func (d *Daemon) forgeAddChild(ctx context.Context, r wire.ForgeAddChildRequest)
 	return wire.ForgeDone{URL: optional(url)}, nil
 }
 
-// addExistingChild moves the issue that ref names under the epic t.
+// addExistingChild moves the work item that ref names under the Azure Boards epic t.
 func (d *Daemon) addExistingChild(ctx context.Context, method string, t forgeTarget, epic wire.LineageNode, ref string) (wire.ForgeDone, error) {
-	var err error
-	if t.linear != nil {
-		m := linearIssueRef.FindStringSubmatch(ref)
-		if m == nil {
-			return wire.ForgeDone{}, Invalid("%s: %q is not a Linear issue: give its key, such as ENG-4", method, ref)
-		}
-		key := strings.ToUpper(m[1])
-		if key == t.identifier {
-			return wire.ForgeDone{}, Invalid("%s: an epic is not its own child", method)
-		}
-		err = t.linear.SetParent(ctx, key, t.identifier)
-	} else {
-		id, ok := boardsItemID(ref)
-		if !ok {
-			return wire.ForgeDone{}, Invalid("%s: %q is not a work item: give its id, such as 12 or AB#12, or its page", method, ref)
-		}
-		if id == t.number {
-			return wire.ForgeDone{}, Invalid("%s: an epic is not its own child", method)
-		}
-		err = t.boards.SetParent(ctx, t.project, id, t.number)
+	id, ok := boardsItemID(ref)
+	if !ok {
+		return wire.ForgeDone{}, Invalid("%s: %q is not a work item: give its id, such as 12 or AB#12, or its page", method, ref)
 	}
-	if err != nil {
+	if id == t.number {
+		return wire.ForgeDone{}, Invalid("%s: an epic is not its own child", method)
+	}
+	if err := t.boards.SetParent(ctx, t.project, id, t.number); err != nil {
 		return wire.ForgeDone{}, err
 	}
 	d.forgeWrote()
@@ -199,7 +183,6 @@ func (d *Daemon) forgeBlockedBy(ctx context.Context, r wire.ForgeBlockedByReques
 	type blocker struct {
 		ref     forgeRef
 		number  int
-		key     string
 		blocked bool
 	}
 	var todo []blocker
@@ -211,7 +194,6 @@ func (d *Daemon) forgeBlockedBy(ctx context.Context, r wire.ForgeBlockedByReques
 			if b == r.Node {
 				return wire.ForgeDone{}, Invalid("%s: an issue does not block itself", method)
 			}
-			key, onLinear := strings.CutPrefix(b.Ref, "linear:")
 			project, id, onBoards := boardsOfNode(b)
 			switch {
 			case b.Kind != lineage.KindIssue:
@@ -222,8 +204,6 @@ func (d *Daemon) forgeBlockedBy(ctx context.Context, r wire.ForgeBlockedByReques
 					return wire.ForgeDone{}, Invalid("%s: %s is not on the forge %s is on", method, b.Ref, r.Node.Ref)
 				}
 				todo = append(todo, blocker{ref: ref, blocked: list.blocked})
-			case t.linear != nil && onLinear && linearLabel.MatchString(key):
-				todo = append(todo, blocker{key: key, blocked: list.blocked})
 			// A link is within an organization.
 			case t.boards != nil && onBoards && boardsOrg(project) == boardsOrg(t.project):
 				todo = append(todo, blocker{number: id, blocked: list.blocked})
@@ -235,8 +215,6 @@ func (d *Daemon) forgeBlockedBy(ctx context.Context, r wire.ForgeBlockedByReques
 	for _, b := range todo {
 		if t.forge != nil {
 			err = forgeCannotErr(method, t.forge, t.forge.SetBlockedBy(ctx, t.ref, b.ref, b.blocked))
-		} else if t.linear != nil {
-			err = t.linear.SetBlockedBy(ctx, t.identifier, b.key, b.blocked)
 		} else {
 			err = t.boards.SetBlockedBy(ctx, t.project, t.number, b.number, b.blocked)
 		}

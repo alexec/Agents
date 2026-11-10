@@ -19,6 +19,7 @@ import (
 	"github.com/alexec/agents/Go/internal/githubmcp"
 	"github.com/alexec/agents/Go/internal/gitlabmcp"
 	"github.com/alexec/agents/Go/internal/lineage"
+	"github.com/alexec/agents/Go/internal/linearmcp"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -42,6 +43,7 @@ var conformRows = []conformRow{
 	{name: "forgejo", daemon: conformForgejoDaemon},
 	{name: "bitbucket", daemon: conformBitbucketDaemon},
 	{name: "azuredevops", daemon: conformAzureDevOpsDaemon},
+	{name: "linear", daemon: conformLinearDaemon},
 }
 
 // conformGitHub is GitHub with four items on alexec/agents, which pages by its cursor.
@@ -399,6 +401,71 @@ func conformAzureDevOpsDaemon(t *testing.T) (*Daemon, *conn) {
 	d.newForgeAzureDevOps = func(string, string) forgeAzureDevOps { return fake }
 	c.call(t, 100, "folders/add", map[string]any{"folder": "file://" + gitFolder(t, "https://acme@dev.azure.com/acme/Web%20App/_git/App")})
 	if err := file.Put(connections.AzureDevOpsConnection(connections.AzureDevOpsServices, "acme", "ado-secret", "Agents Test", time.Now())); err != nil {
+		t.Fatal(err)
+	}
+	return d, c
+}
+
+// conformLinear is Linear with two issues in the workspace, which pages by its cursor. It has no
+// pull requests.
+type conformLinear struct {
+	*fakeForgeLinear
+}
+
+var conformLinearItems = []linearmcp.Item{
+	{Identifier: "ENG-2", Team: "ENG", State: "closed", Title: "Closed", URL: "https://linear.app/acme/issue/ENG-2", Author: "kim",
+		UpdatedAt: "2026-11-02T10:00:00Z"},
+	{Identifier: "ENG-1", Team: "ENG", State: "open", Title: "Open issue", URL: "https://linear.app/acme/issue/ENG-1", Author: "kim",
+		Labels: []string{"task", "feature:Export"}, LabelColors: map[string]string{"task": "#c5def5", "feature:Export": "#1d76db"},
+		Assignees: []string{"kim"}, UpdatedAt: "2026-11-01T10:00:00Z", Comments: 2},
+}
+
+func (g conformLinear) Search(_ context.Context, _ []string, sf linearmcp.SearchFilter, after string, first int) (linearmcp.SearchPage, error) {
+	var kept []linearmcp.Item
+	for _, i := range conformLinearItems {
+		if sf.State == "all" || (sf.State == "closed") != (i.State == "open") {
+			kept = append(kept, i)
+		}
+	}
+	from, _ := strconv.Atoi(after)
+	var page linearmcp.SearchPage
+	for n := from; n < len(kept) && len(page.Items) < first; n++ {
+		page.Items = append(page.Items, kept[n])
+		page.Cursors = append(page.Cursors, strconv.Itoa(n+1))
+	}
+	if end := from + len(page.Items); end < len(kept) {
+		page.Next = strconv.Itoa(end)
+	}
+	return page, nil
+}
+
+func (g conformLinear) ItemPage(_ context.Context, identifier, _ string) (linearmcp.ItemDetail, error) {
+	for _, i := range conformLinearItems {
+		if i.Identifier == identifier {
+			return linearmcp.ItemDetail{Item: i, Body: "The body.",
+				Thread: []linearmcp.Comment{{Author: "kim", Body: "A comment.", At: i.UpdatedAt}}}, nil
+		}
+	}
+	return linearmcp.ItemDetail{}, &linearmcp.LinearError{Kind: linearmcp.NotFound, Message: "Linear issue " + identifier + " was not found"}
+}
+
+func (g conformLinear) Plan(_ context.Context, identifier string) (linearmcp.Plan, error) {
+	return linearmcp.Plan{Epic: conformLinearItems[1]}, nil
+}
+
+// conformLinearDaemon is a daemon with the Linear connection and no folder that names a team, so
+// its lists are of the whole workspace (#3311).
+func conformLinearDaemon(t *testing.T) (*Daemon, *conn) {
+	t.Helper()
+	t.Setenv("AGENTS_PERSONAL_HOME", t.TempDir())
+	d, c := start(t, t.TempDir())
+	t.Cleanup(d.Shutdown)
+	file := &connections.File{Path: filepath.Join(t.TempDir(), ".agents-secrets", connections.FileName)}
+	d.connStoreFor = func() (connections.Store, error) { return file, nil }
+	fake := conformLinear{&fakeForgeLinear{}}
+	d.newForgeLinear = func(string) forgeLinear { return fake }
+	if err := file.Put(connections.Connection{Provider: connections.Linear, Login: "kim", Access: "lin_oauth",
+		AccessExpiresAt: time.Now().Add(time.Hour), ConnectedAt: time.Now()}); err != nil {
 		t.Fatal(err)
 	}
 	return d, c

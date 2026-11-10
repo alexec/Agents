@@ -118,16 +118,14 @@ func (d *Daemon) registerForgeWrites() {
 }
 
 // forgeTarget is the item a write is on, and the forge to write it with: a forge on the
-// interface (#4329), with its ref there; or, of the forges not yet on it, one of linear (with
-// its identifier), jira (with its key, in identifier) or boards (with its project and its id,
-// in number).
+// interface (#4329), with its ref there; or, of the forges not yet on it, one of jira (with its
+// key, in identifier) or boards (with its project and its id, in number).
 type forgeTarget struct {
 	number     int
 	pr         bool
 	forge      Forge
 	ref        forgeRef
 	project    string
-	linear     forgeLinear
 	jira       forgeJira
 	boards     forgeAzureBoards
 	identifier string
@@ -141,13 +139,6 @@ func (d *Daemon) forgeTargetOf(ctx context.Context, method string, node wire.Lin
 	}
 	if f, ref, ok := d.forgeOwning(node); ok {
 		return forgeTarget{forge: f, ref: ref, pr: ref.pr()}, nil
-	}
-	if identifier, ok := strings.CutPrefix(node.Ref, "linear:"); ok && node.Kind == lineage.KindIssue && linearLabel.MatchString(identifier) {
-		l, err := d.forgeLinear()
-		if err != nil {
-			return forgeTarget{}, err
-		}
-		return forgeTarget{linear: l, identifier: identifier}, nil
 	}
 	if key, ok := strings.CutPrefix(node.Ref, "jira:"); ok && node.Kind == lineage.KindIssue && linearLabel.MatchString(key) {
 		j, err := d.forgeJira()
@@ -192,8 +183,6 @@ func (d *Daemon) forgeComment(ctx context.Context, r wire.ForgeCommentRequest) (
 		var done wire.ForgeDone
 		done, err = t.forge.Comment(ctx, t.ref, body)
 		url, err = deref(done.URL), forgeCannotErr(method, t.forge, err)
-	case t.linear != nil:
-		url, err = t.linear.Comment(ctx, t.identifier, body)
 	case t.jira != nil:
 		url, err = t.jira.Comment(ctx, t.identifier, body)
 	case t.boards != nil:
@@ -240,8 +229,6 @@ func (d *Daemon) forgeLabel(ctx context.Context, r wire.ForgeLabelRequest) (wire
 	switch {
 	case t.forge != nil:
 		err = forgeCannotErr(method, t.forge, t.forge.SetLabels(ctx, t.ref, add, remove))
-	case t.linear != nil:
-		err = t.linear.SetLabels(ctx, t.identifier, add, remove)
 	case t.jira != nil:
 		err = t.jira.SetLabels(ctx, t.identifier, add, remove)
 	case t.boards != nil:
@@ -269,8 +256,6 @@ func (d *Daemon) forgeLabels(ctx context.Context, r wire.ForgeNodeRequest) (wire
 	var names []string
 	var colors map[string]string
 	switch {
-	case t.linear != nil:
-		names, colors, err = t.linear.Labels(ctx, t.identifier)
 	case t.jira != nil:
 		names, colors, err = t.jira.Labels(ctx, t.identifier)
 	case t.boards != nil:
@@ -309,8 +294,6 @@ func (d *Daemon) forgeClose(ctx context.Context, r wire.ForgeCloseRequest) (wire
 		err = t.boards.SetState(ctx, t.project, t.number, closed)
 	case t.jira != nil:
 		err = t.jira.SetState(ctx, t.identifier, closed)
-	case t.linear != nil:
-		err = t.linear.SetState(ctx, t.identifier, closed)
 	}
 	if err != nil {
 		return wire.ForgeDone{}, err

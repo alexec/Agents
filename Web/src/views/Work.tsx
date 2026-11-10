@@ -3,16 +3,16 @@
 // what lineage knows (reports/nodes: sessions, cost, lead time) under its title; the milestones and
 // releases lineage knows. A row opens its page.
 import { effect, useSignal } from "@preact/signals";
-import { Fragment } from "preact";
+import { Fragment, type ComponentChildren } from "preact";
 import { useEffect, useMemo } from "preact/hooks";
-import type { ForgeItemDetail, ForgeLabel, LineageEstimate } from "../protocol/generated";
+import type { ForgeComment, ForgeItemDetail, ForgeLabel, LineageEstimate } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { Capability } from "../protocol/capabilities.generated";
 import { describe } from "../model/errors";
 import { hostAnswers } from "../model/capabilities";
 import {
-  boardChoices, boardName, checksWords, choices, errorWords, fromForge, labelColor, labelInk, lineageOnlyNote,
-  lineageWords, noAgentYet, noForgeHere, noWork, notReadHere, openOnWords, peopleWords, positionWords, repoName,
+  boardChoices, boardName, checksGlyph, checksWords, choices, clearedFilter, connectForge, emptyWords, errorWords, filtered, fromForge,
+  lineageOnlyNote, noForgeHere, notReadHere, openOnWords, positionWords, repoName, repoOf, rowLine, rowReviewWords,
   reviewWords, shortRef, titleSaysRef, workKindTitle, workSortTitle, allProjects, projectOfFolder, projectWords, workFolderKey,
   type WorkFilter, type WorkKind, type WorkProject, type WorkRow, type WorkSort, type WorkState,
 } from "../model/work";
@@ -28,6 +28,7 @@ import { type ForgeImages, Markdown } from "../render/markdown";
 import { bytesOf } from "../model/pageImage";
 import { forgeMarkdown } from "../model/forgeMarkdown";
 import { ForgeTitle } from "../render/ForgeTitle";
+import { Avatar, Avatars, EmptyState, ErrorStrip, FilterMenu, LabelChip, PlaceholderRows, RefreshButton, StateIcon, type MenuChoice } from "./WorkParts";
 import { WorkActions, WorkCommentBox } from "./WorkActions";
 import { WorkPlan } from "./WorkPlan";
 import { WorkDocs } from "./Docs";
@@ -80,43 +81,57 @@ export function WorkList({ store, kind }: { store: Store; kind: WorkKind }) {
   const set = (patch: Partial<WorkFilter>) => { filter.value = { ...filter.value, ...patch }; };
   const states: WorkState[] = kind === "pr" ? ["open", "merged", "closed", "all"] : ["open", "closed", "all"];
 
+  const filter_ = filter.value;
+  const pick = (label: string) => set({ label });
+  const stateChoices: MenuChoice[] = states.map((s) => ({ value: s, words: s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1) }));
+  const sortChoices: MenuChoice[] = (Object.keys(workSortTitle) as WorkSort[]).filter((s) => fromForge(kind) || s !== "newest")
+    .map((s) => ({ value: s, words: workSortTitle[s] }));
+  const refresh = () => { l.asked.value++; if (kind === "issue") void loadBoards(store, true); };
+  const firstRead = lists.value === null || (l.loading.value && rows.length === 0);
+  const problems = [...problem.value ? [problem.value] : [], ...errors];
+  const stale = new Set((lists.value ?? []).flatMap((h) => h.stale ?? []));
+  const empty = emptyWords(kind, state, filtered(filter_), offered.repos);
+  const things = kind === "pr" ? "pull requests" : workKindTitle[kind].toLowerCase();
+
   return (
     <div class="work-list">
       <div class="work-filters" role="group" aria-label="Filters">
-        {fromForge(kind) && (
-          <label>State <select value={state} onChange={(e) => set({ state: (e.target as HTMLSelectElement).value as WorkState })}>
-            {states.map((s) => <option key={s} value={s}>{s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
-          </select></label>
-        )}
-        {(offeredProjects.length > 1 || filter.value.project) && (
-          <Choice label="Project" any={allProjects} value={filter.value.project} options={offeredProjects.map((p) => p.id)}
-            words={(id) => offeredProjects.find((p) => p.id === id)?.name ?? allProjects} onChange={(project) => set({ project })} />
-        )}
-        {kind === "issue" && (
-          <Choice label="Board" any="All" value={filter.value.board} options={boardChoices(boards.value, filter.value.board)}
-            words={(url) => boardName(boards.value, url)} onChange={(board) => set({ board })} />
-        )}
-        <Choice label="Repo" value={filter.value.repo} options={offered.repos} words={repoName} onChange={(repo) => set({ repo })} />
-        <Choice label="Label" value={filter.value.label} options={offered.labels} onChange={(label) => set({ label })} />
-        {fromForge(kind) && <Choice label="Assignee" value={filter.value.assignee} options={offered.assignees} onChange={(assignee) => set({ assignee })} />}
-        <label>Sort <select value={sort.value} onChange={(e) => { sort.value = (e.target as HTMLSelectElement).value as WorkSort; }}>
-          {(Object.keys(workSortTitle) as WorkSort[]).filter((s) => fromForge(kind) || s !== "newest")
-            .map((s) => <option key={s} value={s}>{workSortTitle[s]}</option>)}
-        </select></label>
-        <input type="search" placeholder="Filter" aria-label="Filter by words" value={filter.value.text}
+        <input type="search" placeholder={`Filter ${things}`} aria-label="Filter by words" value={filter_.text}
           onInput={(e) => set({ text: (e.target as HTMLInputElement).value })} />
-        <button type="button" class="link" onClick={() => { l.asked.value++; if (kind === "issue") void loadBoards(store, true); }}>Refresh</button>
+        <div class="work-menus">
+          {(offeredProjects.length > 1 || filter_.project) && (
+            <Choice label="Project" any={allProjects} value={filter_.project} options={offeredProjects.map((p) => p.id)}
+              words={(id) => offeredProjects.find((p) => p.id === id)?.name ?? allProjects} onChange={(project) => set({ project })} />
+          )}
+          {fromForge(kind) && <FilterMenu label="State" always value={state} choices={stateChoices} onPick={(v) => set({ state: v as WorkState })} />}
+          <Choice label="Repo" value={filter_.repo} options={offered.repos} words={repoName} onChange={(repo) => set({ repo })} />
+          <Choice label="Label" value={filter_.label} options={offered.labels} onChange={(label) => set({ label })} />
+          {fromForge(kind) && <Choice label="Assignee" value={filter_.assignee} options={offered.assignees} onChange={(assignee) => set({ assignee })} />}
+          <FilterMenu label="Sort" named value={sort.value} choices={sortChoices} onPick={(v) => { sort.value = v as WorkSort; }} />
+          {kind === "issue" && (
+            <Choice label="Board" any="All" value={filter_.board} options={boardChoices(boards.value, filter_.board)}
+              words={(url) => boardName(boards.value, url)} onChange={(board) => set({ board })} />
+          )}
+        </div>
+        <RefreshButton busy={l.loading.value} onClick={refresh} />
       </div>
-      {problem.value && <p class="hint">{problem.value}</p>}
-      {errors.map((e) => <p key={e} class="hint">{e}</p>)}
-      {fromForge(kind) && hosts.length === 0 ? <p class="hint">{noForgeHere}</p>
-        : lists.value === null ? <p class="hint">Loading…</p>
-        : rows.length === 0 ? <p class="hint">{noWork(kind)}</p>
+      {fromForge(kind) && hosts.length === 0
+        ? <EmptyState kind={kind} title={connectForge(kind)} line={noForgeHere} action={{ words: "Settings ▸ Connectors", run: () => go({ nav: "settings", section: "mcp" }) }} />
+        : firstRead ? <PlaceholderRows />
+        : rows.length === 0 && problems.length > 0 ? <ErrorStrip lines={problems} retry={refresh} middle />
         : (
-          <ul class="work-rows">
-            {rows.map((r) => <WorkRowView key={r.node.ref} row={r} several={offered.repos.length > 1}
-              open={() => { l.opened.value = r.node.ref; fromList.value = placeKey(kind, r.node.ref); go({ nav: "work", section: kind, item: r.node.ref }); }} />)}
-          </ul>
+          <>
+            <ErrorStrip lines={problems} retry={refresh} />
+            {rows.length === 0
+              ? <EmptyState kind={kind} title={empty.title} line={empty.line}
+                  action={filtered(filter_) ? { words: "Clear filters", run: () => { filter.value = clearedFilter(filter_); } } : undefined} />
+              : (
+                <ul class="work-rows work-item-rows">
+                  {rows.map((r) => <WorkRowView key={r.node.ref} row={r} several={offered.repos.length > 1} dim={stale.has(r.node.ref)} pick={pick}
+                    open={() => { l.opened.value = r.node.ref; fromList.value = placeKey(kind, r.node.ref); go({ nav: "work", section: kind, item: r.node.ref }); }} />)}
+                </ul>
+              )}
+          </>
         )}
       {hasMore(l) && <button type="button" class="link" disabled={more.value} onClick={() => void loadMore(store, l)}>{more.value ? "Loading…" : "More"}</button>}
       {!fromForge(kind) && <p class="quiet small">{lineageOnlyNote}</p>}
@@ -124,46 +139,56 @@ export function WorkList({ store, kind }: { store: Store; kind: WorkKind }) {
   );
 }
 
-/** A filter's menu: Any (or `any`), then the choices. */
+/** A filter's menu (#4392): Any (or `any`), then the choices, as a button that opens a list. */
 export function Choice({ label, value, options, words = (s) => s, any = label === "Repo" ? "All" : "Any", onChange }: {
   label: string; value: string; options: string[]; words?: (s: string) => string; any?: string; onChange: (v: string) => void;
 }) {
   if (options.length === 0 && !value) return null;
-  return (
-    <label>{label} <select value={value} onChange={(e) => onChange((e.target as HTMLSelectElement).value)}>
-      <option value="">{any}</option>
-      {options.map((o) => <option key={o} value={o}>{words(o)}</option>)}
-    </select></label>
-  );
+  return <FilterMenu label={label} value={value} any={any} choices={options.map((o) => ({ value: o, words: words(o) }))} onPick={onChange} />;
 }
 
-/** A label in its forge's colour (#2956). */
-export function LabelChip({ label }: { label: ForgeLabel }) {
-  const bg = labelColor(label.color);
-  return <span class="work-label" style={bg ? { background: bg, color: labelInk(label.color), borderColor: bg } : undefined}>{label.name}</span>;
-}
-
-/** The state as a word in a pill: open, closed, merged, draft; or the tracker's own status (a Jira
- * status, #3260), in the colour of the state it is in. */
+/** The state as a word in a pill on an item's page: open, closed, merged, draft; or the tracker's own status (a Jira
+ * status, #3260), in the colour of the state it is in. A row has the state icon instead (#4392). */
 export function StatePill({ state, draft, status }: { state: string; draft?: boolean | undefined; status?: string | undefined }) {
   if (!state) return null;
   const word = draft && state === "open" ? "draft" : state;
   return <span class={`work-state ${word}`}>{status ?? word}</span>;
 }
 
-function WorkRowView({ row, several, open }: { row: WorkRow; several: boolean; open: () => void }) {
-  const figures = lineageWords(row.lineage);
+/** A row (#4392, parts.md section 2): the state icon, the title and at most three chips, the comment count and the
+ * assignees; under it the number, the age, the author and what lineage knows. On a phone the CSS folds it: the
+ * title on two lines, every chip under it, the short line and no avatars. */
+function WorkRowView({ row, several, dim, pick, open }: { row: WorkRow; several: boolean; dim: boolean; pick: (label: string) => void; open: () => void }) {
+  const line = rowLine(row, Date.now());
+  const checks = row.node.kind === "pr" ? checksGlyph(row.checks) : undefined;
+  const review = row.node.kind === "pr" ? rowReviewWords(row.review) : undefined;
+  const comments = row.comments ?? 0;
   return (
-    <li data-ref={row.node.ref}>
-      <button type="button" class="work-row" onClick={open}>
-        <span class="work-row-head">
-          {!titleSaysRef(row) && <span class="work-ref">{shortRef(row.node.ref)}</span>}
-          <span class="work-title"><ForgeTitle text={row.title} /></span>
-          <StatePill state={row.state} draft={row.draft} status={row.status} />
-          {row.labels.map((l) => <LabelChip key={l.name} label={l} />)}
-          {several && <span class="quiet small">{repoName(row.repo)}</span>}
+    <li data-ref={row.node.ref} class={dim ? "stale" : undefined}>
+      <button type="button" class="work-row work-item-row" onClick={open}>
+        <span class="work-row-icon"><StateIcon kind={row.node.kind} state={row.state} draft={row.draft} /></span>
+        <span class="work-row-main">
+          <span class="work-row-head">
+            <span class="work-title"><ForgeTitle text={row.title} /></span>
+            {row.labels.length > 0 && (
+              <span class="work-chips">
+                {row.labels.map((l) => <LabelChip key={l.name} label={l} pick={pick} />)}
+                {row.labels.length > 3 && <span class="work-chips-more quiet small">+{row.labels.length - 3}</span>}
+              </span>
+            )}
+          </span>
+          <span class="work-row-line quiet small">
+            <span class="wide-line">{line.wide}</span><span class="short-line">{line.short}</span>
+            {several && <span class="work-row-repo">{repoName(row.repo)}</span>}
+          </span>
         </span>
-        <span class={`work-figures small${figures ? "" : " quiet"}`}>{figures ?? noAgentYet}</span>
+        <span class="work-row-end small">
+          {checks && <span class={`work-checks ${checks.tone}`} title={checks.words} aria-label={checks.words}>{checks.mark}</span>}
+          {review && <span class={`work-review${row.review === "changes_requested" ? " bad" : ""}`}>{review}</span>}
+          {comments > 0 && <span class="work-count" aria-label={`${comments} comment${comments === 1 ? "" : "s"}`}>
+            <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" /></svg>{comments}</span>}
+          <Avatars logins={row.assignees} />
+        </span>
       </button>
     </li>
   );
@@ -273,30 +298,57 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
   const checks = item?.node.kind === "pr" ? checksWords(detail.value?.got.checks, item.checks) : undefined;
   const review = item?.node.kind === "pr" ? reviewWords(item.review) : undefined;
 
+  const spentWords = estimate.value ? estimateSpentWords(estimate.value) : undefined;
+  const lineage = [...spentWords ? [spentWords] : [], ...actual ? [actual] : []];
+  const commentCount = item?.comments ?? detail.value?.got.comments.length ?? 0;
+  const byline = item ? [
+    ...item.author ? [item.author] : [],
+    `updated ${ago(fromWireDate(item.updatedAt))}`,
+    ...commentCount > 0 ? [`${commentCount} comment${commentCount === 1 ? "" : "s"}`] : [],
+  ].join(" · ") : "";
+
   return (
-    <article class="work-page">
+    <article class="work-page work-item-page">
+      <div class="work-item-grid">
       <div class="work-page-bar">
         <button type="button" title="Back" aria-label="Back" onClick={() => history.back()}>‹</button>
         <button type="button" title="Forward" aria-label="Forward" onClick={() => history.forward()}>›</button>
         <button type="button" class="link" onClick={() => go({ nav: "work", section: kind })}>All {workKindTitle[kind].toLowerCase()}</button>
-        <button type="button" class="link" onClick={() => { asked.value++; }}>Refresh</button>
         <Stepper store={store} kind={kind} at={ref} />
+        <RefreshButton busy={fromForge(kind) && !detail.value && !forgeProblem.value} onClick={() => { asked.value++; }} />
       </div>
       <header class="work-page-head">
         <h2><span class="work-title"><ForgeTitle text={title} /></span> {!titleSaysRef({ title, node }) && <span class="work-ref">{shortRef(ref)}</span>}</h2>
-        <div class="work-row-head">
+        <p class="work-page-byline small">
           <StatePill state={state} draft={item?.draft} status={item?.status} />
-          {labels.map((l) => <LabelChip key={l.name} label={l} />)}
-        </div>
-        <p class="quiet small">
-          {[ref, ...item ? [peopleWords(item)] : [], ...project ? [projectWords(project.name)] : []].filter(Boolean).join(" · ")}
-          {url && <> · <a href={url} target="_blank" rel="noopener noreferrer">{openOnWords(ref)}</a></>}
+          {byline && <span class="quiet">{byline}</span>}
+          {url && <a href={url} target="_blank" rel="noopener noreferrer">{openOnWords(ref)}</a>}
         </p>
+      </header>
+      {/* The side panel (#4392, parts.md section 5): a column on a wide page; under the header on a narrow one, with
+          Linked and Lineage at the end. */}
+      {item && (
+        <aside class="work-side people" aria-label="Details">
+          <SideSection title="Assignees">
+            {item.assignees.length === 0 ? <span class="quiet">No one</span>
+              : item.assignees.map((a) => <span key={a} class="work-person"><Avatar login={a} />{a}</span>)}
+          </SideSection>
+          <SideSection title="Labels">
+            {labels.length === 0 ? <span class="quiet">None</span> : <span class="work-chips">{labels.map((l) => <LabelChip key={l.name} label={l} />)}</span>}
+          </SideSection>
+          <SideSection title="Milestone">
+            {item.milestone ? <span><span aria-hidden="true">⚑ </span>{item.milestone}</span> : <span class="quiet">None</span>}
+          </SideSection>
+          <SideSection title="Repo">
+            <span>{repoName(repoOf(ref))}</span>
+            {project && <span class="quiet">{projectWords(project.name)}</span>}
+          </SideSection>
+        </aside>
+      )}
+      <div class="work-main">
         {estimate.value && isOpen && showsEstimate(estimate.value) && (
-          <p class="quiet small work-estimate" title={estimateRangeWords(estimate.value)}>
-            {[estimateLine(estimate.value), estimateSpentWords(estimate.value)].filter(Boolean).join(" · ")}</p>
+          <p class="quiet small work-estimate" title={estimateRangeWords(estimate.value)}>{estimateLine(estimate.value)}</p>
         )}
-        {actual && <p class="quiet small work-estimate">{actual}</p>}
         {pipeline.value.length > 0 && (
           <p class="small work-pipeline">{pipeline.value.map((s, i) => (
             <Fragment key={i}>{i > 0 && " · "}{s.url ? <a href={s.url} target="_blank" rel="noopener noreferrer">{s.words}</a> : <span class="quiet">{s.words}</span>}</Fragment>
@@ -304,37 +356,75 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
         )}
         {(checks || review) && <p class="small">{[checks, review].filter(Boolean).join(" · ")}</p>}
         {writes && detail.value && <WorkActions store={store} host={detail.value.host} detail={detail.value.got} wrote={() => void reread()} />}
-      </header>
-      {forgeProblem.value && <p class="hint">{forgeProblem.value}</p>}
-      {fromForge(kind) && !detail.value && !forgeProblem.value && <p class="hint">Loading…</p>}
-      {detail.value && hasPlan(detail.value.got.item) && (
-        <WorkPlan store={store} host={detail.value.host} lineageHost={lineageHost} detail={detail.value.got} asked={asked.value}
-          estimates={estimate.value?.children ?? []}
-          writes={writes} wrote={() => void reread()} />
+        {forgeProblem.value && <ErrorStrip lines={[forgeProblem.value]} retry={() => { asked.value++; }} />}
+        {fromForge(kind) && !detail.value && !forgeProblem.value && <PlaceholderRows />}
+        {detail.value && hasPlan(detail.value.got.item) && (
+          <WorkPlan store={store} host={detail.value.host} lineageHost={lineageHost} detail={detail.value.got} asked={asked.value}
+            estimates={estimate.value?.children ?? []}
+            writes={writes} wrote={() => void reread()} />
+        )}
+        {detail.value && (
+          <section class="work-body" aria-label="Description">
+            {detail.value.got.body.trim() ? <Markdown text={forgeMarkdown(detail.value.got.body)} forgeImages={forgeImages} /> : <p class="quiet">No description.</p>}
+          </section>
+        )}
+        {detail.value && (detail.value.got.comments.length > 0 || detail.value.got.cursor) && (
+          <section class="work-comments" aria-label="Comments">
+            {detail.value.got.cursor && <button type="button" class="link" disabled={older.value} onClick={() => void readOlder()}>
+              {older.value ? "Loading…" : "Older comments"}</button>}
+            {detail.value.got.comments.map((c, i) => <Comment key={`${c.at}-${i}`} comment={c} forgeImages={forgeImages} />)}
+          </section>
+        )}
+        {writes && detail.value && <WorkCommentBox store={store} host={detail.value.host} node={node} wrote={() => void reread()} />}
+        {detail.value && (kind === "issue" || kind === "pr") && (
+          <WorkDocs store={store} itemRef={ref} title={detail.value.got.item.title} body={detail.value.got.body} asked={asked.value} />
+        )}
+      </div>
+      {item && (
+        <aside class="work-side links" aria-label="Linked and lineage">
+          <SideSection title="Linked">
+            {item.parent ? (
+              <button type="button" class="work-mini-row" onClick={() => go({ nav: "work", section: "issue", item: item.parent!.ref })}>
+                <StateIcon kind="issue" state="open" size={14} /><span>{shortRef(item.parent.ref)}</span><span class="quiet">parent</span>
+              </button>
+            ) : <span class="quiet">None</span>}
+          </SideSection>
+          <SideSection title="Lineage">
+            {lineage.length === 0 ? <span class="quiet">None</span> : lineage.map((w) => <span key={w}>{w}</span>)}
+          </SideSection>
+        </aside>
       )}
-      {detail.value && (
-        <section class="work-body" aria-label="Description">
-          {detail.value.got.body.trim() ? <Markdown text={forgeMarkdown(detail.value.got.body)} forgeImages={forgeImages} /> : <p class="quiet">No description.</p>}
-        </section>
-      )}
-      {detail.value && (detail.value.got.comments.length > 0 || detail.value.got.cursor) && (
-        <section class="work-comments" aria-label="Comments">
-          <h3>Comments</h3>
-          {detail.value.got.cursor && <button type="button" class="link" disabled={older.value} onClick={() => void readOlder()}>
-            {older.value ? "Loading…" : "Older comments"}</button>}
-          {detail.value.got.comments.map((c, i) => (
-            <div key={`${c.at}-${i}`} class="work-comment">
-              <p class="quiet small"><span class="strong">{c.author}</span>{c.bot ? " (bot)" : ""} · {ago(fromWireDate(c.at))}</p>
-              <Markdown text={forgeMarkdown(c.body)} forgeImages={forgeImages} />
-            </div>
-          ))}
-        </section>
-      )}
-      {writes && detail.value && <WorkCommentBox store={store} host={detail.value.host} node={node} wrote={() => void reread()} />}
-      {detail.value && (kind === "issue" || kind === "pr") && (
-        <WorkDocs store={store} itemRef={ref} title={detail.value.got.item.title} body={detail.value.got.body} asked={asked.value} />
-      )}
+      </div>
     </article>
+  );
+}
+
+/** One section of the side panel: a small grey heading, then its value. */
+function SideSection({ title, children }: { title: string; children: ComponentChildren }) {
+  return (
+    <section class="work-side-section">
+      <h3>{title}</h3>
+      <div class="value">{children}</div>
+    </section>
+  );
+}
+
+/** A comment on the timeline (#4392, parts.md section 6): its avatar on the line, the author, when, and the body in a
+ * box; a bot's with a small "bot" capsule. */
+function Comment({ comment: c, forgeImages }: { comment: ForgeComment; forgeImages: ForgeImages | undefined }) {
+  const at = fromWireDate(c.at);
+  return (
+    <div class="work-comment">
+      <Avatar login={c.author} size={28} />
+      <div class="work-comment-main">
+        <p class="small">
+          <span class="strong">{c.author}</span>
+          {c.bot && <span class="work-bot">bot</span>}
+          <span class="quiet" title={at.toLocaleString()}> commented {ago(at)}</span>
+        </p>
+        <div class="work-comment-body"><Markdown text={forgeMarkdown(c.body)} forgeImages={forgeImages} /></div>
+      </div>
+    </div>
   );
 }
 
