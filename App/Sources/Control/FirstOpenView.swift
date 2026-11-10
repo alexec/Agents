@@ -6,8 +6,7 @@ import SwiftUI
 /// its place. A step that fails shows one line with **Try Again** and **Show Details**, and
 /// **Open Login Items** when macOS wants the person to allow the app there.
 ///
-/// With the control plane on another machine, and in the App Store window until #4229
-/// removes it, the window connects to that control plane with a code or a sign-in.
+/// With the control plane on another machine, the window connects to that control plane with a code or a sign-in.
 struct FirstOpenView: View {
     @Environment(AppModel.self) private var model
     @State private var connecting = false
@@ -17,15 +16,11 @@ struct FirstOpenView: View {
         VStack(alignment: .leading, spacing: 20) {
             // The mark of a team (#1007): no prompt here, so the Blobs only look around.
             Huddle(promptFocused: false, pointer: nil)
-            #if STORE_WINDOW
-            elsewhere
-            #else
             if let firstOpen = HostScenes.firstOpen {
                 steps(firstOpen)
             } else {
                 elsewhere
             }
-            #endif
         }
         // A floor on the width: laid out narrower, the words fixed to their height push
         // the window thousands of points tall.
@@ -38,7 +33,6 @@ struct FirstOpenView: View {
         .task { await model.pairForWalk() }
     }
 
-    #if !STORE_WINDOW
     @ViewBuilder
     private func steps(_ firstOpen: FirstOpen) -> some View {
         Group {
@@ -93,7 +87,6 @@ struct FirstOpenView: View {
         let membership = try await ControlConfig.pair(with: code)
         await model.adopt(.remote(membership))
     }
-    #endif
 
     /// The control plane is on another machine: the window connects to it.
     private var elsewhere: some View {

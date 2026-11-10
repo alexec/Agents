@@ -157,7 +157,7 @@ struct TerminalHostView: NSViewRepresentable {
             // browser. The pane's browser is for what they type into it (FR-035).
             Task { @MainActor in
                 guard let url = URL(string: link), url.scheme == "http" || url.scheme == "https" else { return }
-                NSWorkspace.shared.open(url)  // store-ok: web links only, checked above
+                NSWorkspace.shared.open(url)
             }
         }
 

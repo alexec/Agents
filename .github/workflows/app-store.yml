@@ -1,9 +1,9 @@
 # Submits a release to App Review when a person approves it (#3657). On each version tag, the
 # submit job waits at the `app-store` environment's gate for one of its required reviewers. Agents
 # shows the wait as a Deploy row in Needs You (#3587), and Approve or Reject answers GitHub. Only
-# after Approve does the job wait for release.yml's TestFlight builds of the tag to be processed,
-# then submit the iOS and the macOS version for App Review (scripts/asc-submit.swift). Reject
-# ends it, and the release stays on TestFlight.
+# after Approve does the job wait for release.yml's TestFlight build of the tag to be processed,
+# then submit the iOS version for App Review (scripts/asc-submit.swift); the Mac is not in the App
+# Store (#4229). Reject ends it, and the release stays on TestFlight.
 #
 # What it submitted is two deploy notices, for Lineage (#3584): the App Store version,
 # appstore:<bundle id>/<version>, and the TestFlight build it submitted. Agents links the release
@@ -73,8 +73,8 @@ jobs:
           fi
           echo "$ASC_KEY_P8" > "$RUNNER_TEMP/asc.p8"
 
-      # release.yml uploads the builds; its testflight job takes up to 90 minutes, and App Store
-      # Connect then processes them. "What's New" is the tag's message, the release notes.
+      # release.yml uploads the build; its testflight job takes up to 90 minutes, and App Store
+      # Connect then processes it. "What's New" is the tag's message, the release notes.
       - name: Submit for App Review
         id: submit
         env:

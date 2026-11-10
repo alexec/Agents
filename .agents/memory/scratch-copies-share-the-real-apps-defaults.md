@@ -6,11 +6,11 @@ metadata:
   modified: 2026-10-15T14:09:15.936Z
 ---
 
-Every copy of the window is `com.alexecollins.agents.store`: one container, one standard defaults
-domain. Since #1029 (PR #1039, merged 2026-10-15), every window key goes through
+Every copy of the window is one bundle ID (`com.alexecollins.agents.host` since #4225; the App Store
+window's `com.alexecollins.agents.store` went in #4229): one standard defaults domain. Since #1029 (PR #1039, merged 2026-10-15), every window key goes through
 `WindowDefaults.store` (App/Sources/WindowDefaults.swift). That is `.standard` for Alex's window,
 `<bundle>.walk.<walk>` for a run-app window (`--walk`), and `<bundle>.root.<name>` for a branch build
-on another root. `scripts/check-window-defaults.py` (an AgentsStore pre-build phase) fails on a bare
+on another root. `scripts/check-window-defaults.py` (an AgentsHost pre-build phase) fails on a bare
 `@AppStorage` or `UserDefaults.standard`. The Remote has its own `WindowDefaults` (`.standard`) for
 Shared/UI.
 

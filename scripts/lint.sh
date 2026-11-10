@@ -242,8 +242,6 @@ run_checks() {
 	python3 scripts/check-test-indexing.py --selftest || status=1
 	python3 scripts/check-test-indexing.py || status=1
 	python3 scripts/check-window-defaults.py || status=1
-	python3 scripts/check-store-window.py || status=1
-	python3 scripts/check-store-entitlements.py || status=1
 	python3 scripts/check-store-profiles.py --selftest || status=1
 	python3 scripts/check-stacked-labels.py --selftest || status=1
 	python3 scripts/check-stacked-labels.py || status=1

@@ -234,6 +234,6 @@ struct ConnectGitLabSheet: View {
 
     private func open(_ address: String) {
         guard let url = URL(string: address) else { return }
-        NSWorkspace.shared.open(url) // store-ok: gitlab.com in the browser, not a path
+        NSWorkspace.shared.open(url)
     }
 }

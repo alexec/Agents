@@ -1,18 +1,18 @@
-// Say whether a TestFlight upload has been processed (#914): the iOS and the macOS build of
-// one version and build number on the Universal record (Loops, Apple ID 6817621595), through
-// the App Store Connect API. It reads only.
+// Say whether a TestFlight upload has been processed (#914): the iOS build of one version and
+// build number on the App Store record (Loops, Apple ID 6817621595; iPhone and iPad only since
+// #4229), through the App Store Connect API. It reads only.
 //
-//   swift scripts/asc-builds.swift 0.3.0 57             each platform's state, now
-//   swift scripts/asc-builds.swift 0.3.0 57 --wait 45   until both are VALID, for up to 45 minutes
+//   swift scripts/asc-builds.swift 0.3.0 57             its state, now
+//   swift scripts/asc-builds.swift 0.3.0 57 --wait 45   until it is VALID, for up to 45 minutes
 //
-// It exits 0 when both are VALID, 1 when one is INVALID or FAILED or the wait runs out, and
+// It exits 0 when it is VALID, 1 when one is INVALID or FAILED or the wait runs out, and
 // 2 on a usage or key problem. The key is ASC_KEY_ID, ASC_ISSUER_ID and ASC_KEY_PATH, as for
 // notarytool; without them, ~/.private_keys/asc.env and the AuthKey_<id>.p8 beside it.
 import CryptoKit
 import Foundation
 
 let appID = "6817621595"
-let platforms = ["IOS", "MAC_OS"]
+let platforms = ["IOS"]
 
 func fail(_ message: String, _ code: Int32 = 2) -> Never {
     FileHandle.standardError.write(Data((message + "\n").utf8))

@@ -1,11 +1,11 @@
-# The release's two archives, on a runner with an empty build cache, before a tag is spent
+# The release's two builds, on a runner with an empty build cache, before a tag is spent
 # on them (#2780). v0.12.0's `mac` and `testflight` jobs both failed: scripts/build-cache.sh
 # resolved packages with no -scheme, which only a cold cache shows (#2773). Lanes and the
 # merge wave build on Macs with a warm cache, so nothing saw it before the tag.
 #
 # It runs release.yml's archive commands as dry runs: scripts/release-host.sh --dry-run
-# (ad hoc signed, not notarized) and scripts/release-store.sh --dry-run (archived without a
-# certificate and checked, not exported or uploaded). No secret, no `release` environment.
+# (ad hoc signed, not notarized) and scripts/release-store.sh --dry-run (the Remote, archived
+# without a certificate and checked, not exported or uploaded). No secret, no `release` environment.
 #
 # It starts only:
 #   - on a pull request that changes what the release builds with (the paths below), so CI
@@ -136,7 +136,7 @@ jobs:
           xcodebuild -downloadComponent MetalToolchain
           wait "$xcodegen_pid"
 
-      - name: Archive and check the store app and the Remote (dry run, cold cache)
+      - name: Archive and check the Remote (dry run, cold cache)
         run: |
           export AGENTS_BUILD_CACHE="$RUNNER_TEMP/build-cache"
           test ! -e "$AGENTS_BUILD_CACHE"

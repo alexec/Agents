@@ -25,7 +25,7 @@ enum WalkServer {
     }
 
     private static func serve(in folder: URL) {
-        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)  // store-ok: the walk's folder in the container
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { return log("socket: \(errno)") }
         // Bound by a name relative to the folder: the container's path is longer than the

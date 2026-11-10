@@ -146,7 +146,7 @@ jobs:
       # A graph restored from another tree can hold an AgentsKit that Xcode will not
       # rebuild: on 2026-10-11 three pull requests (#679, #681, #683) restored main's older
       # DerivedData, the Swift driver compiled none of AgentsKitCore's changed sources,
-      # AgentsStore failed against the old module, and the clean retry below cost 6–9
+      # the Mac window failed against the old module, and the clean retry below cost 6–9
       # minutes each. The save records which AgentsKit sources the graph was built from;
       # when they differ, only AgentsKit's own objects go, and the rest stays warm.
       - name: Drop a stale AgentsKit from the Xcode build cache
@@ -213,9 +213,9 @@ jobs:
         run: mkdir -p App/Resources/servers
 
       # One scheme after the other, and with plug-in validation skipped: without it
-      # SwiftTerm's plug-in fails and says nothing. No signing on a runner. Agents Host
-      # carries agentsd and agents-control (Go); the window is the App Store build.
-      - name: Build Agents Host and the window (macOS)
+      # SwiftTerm's plug-in fails and says nothing. No signing on a runner. Agents, the one
+      # Mac app (#4224), carries agentsd and agents-control (Go).
+      - name: Build Agents (macOS)
         id: build-mac
         env:
           RESTORED: ${{ steps.xcode-cache.outputs.cache-matched-key }}
@@ -223,9 +223,6 @@ jobs:
           source scripts/ci-clean-retry.sh
           build() {
             xcodebuild build -project Agents.xcodeproj -scheme AgentsHost \
-              -destination 'platform=macOS' -derivedDataPath build/DD \
-              -skipPackagePluginValidation CODE_SIGNING_ALLOWED=NO &&
-            xcodebuild build -project Agents.xcodeproj -scheme AgentsStore \
               -destination 'platform=macOS' -derivedDataPath build/DD \
               -skipPackagePluginValidation CODE_SIGNING_ALLOWED=NO
           }

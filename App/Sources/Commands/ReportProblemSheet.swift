@@ -90,7 +90,7 @@ struct ReportProblemSheet: View {
                 Button("Cancel", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
                 Button("Open on GitHub") {
-                    if let url = URL(string: report.url) { NSWorkspace.shared.open(url) }  // store-ok: a web page
+                    if let url = URL(string: report.url) { NSWorkspace.shared.open(url) }
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)

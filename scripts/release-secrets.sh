@@ -9,11 +9,11 @@
 # beside it).
 # Nothing is written to disk; delete the .p12 afterwards.
 #
-#   scripts/release-secrets.sh --store path/to/Distribution.p12 path/to/Installer.p12
+#   scripts/release-secrets.sh --store path/to/Distribution.p12
 #
 # The TestFlight upload's secrets (#914), into the same environment: the Apple Distribution
-# identity and the Mac installer identity ("3rd Party Mac Developer Installer"), each exported
-# from Keychain Access as a .p12, and the four installed App Store profiles, found by name. Run
+# identity, exported from Keychain Access as a .p12, and the Remote's three installed App Store
+# profiles, found by name. The Mac is not in the App Store (#4229). Run
 # the plain form first: it makes the environment and sets the App Store Connect key both use.
 #
 #   scripts/release-secrets.sh --app-store [reviewer]
@@ -49,12 +49,10 @@ set_identity() {
 }
 
 if [[ ${1:-} == --store ]]; then
-    distribution=${2:?usage: release-secrets.sh --store Distribution.p12 Installer.p12}
-    installer=${3:?usage: release-secrets.sh --store Distribution.p12 Installer.p12}
+    distribution=${2:?usage: release-secrets.sh --store Distribution.p12}
     gh api repos/$repo/environments/release --silent ||
         { print -u2 "No release environment: run release-secrets.sh with the Developer ID .p12 first."; exit 1 }
     typeset -A wanted=(
-        PROFILE_UNIVERSAL_MAC "Agents Universal Mac App Store"
         PROFILE_REMOTE "Agents Remote App Store"
         PROFILE_REMOTE_NOTIFY "Agents Remote Notify App Store"
         PROFILE_REMOTE_WIDGET "Agents Remote Widget App Store"
@@ -69,15 +67,14 @@ if [[ ${1:-} == --store ]]; then
     for secret file in ${(kv)found}; do checks+=("$secret=$file"); done
     python3 ${0:A:h}/check-store-profiles.py $checks ||
         { print -u2 "Make the profiles above again and install them; no secret was set."; exit 1 }
-    print "the App Store identities…"
+    print "the App Store identity…"
     set_identity APPLE_DISTRIBUTION_P12 $distribution "Apple Distribution"
-    set_identity MAC_INSTALLER_P12 $installer "3rd Party Mac Developer Installer"
     print "the App Store profiles…"
     for secret file in ${(kv)found}; do
         base64 -i "$file" | gh secret set $secret --env release -R $repo
     done
     gh secret list --env release -R $repo
-    print "Done. Delete both .p12 files. The next v* tag also uploads to TestFlight."
+    print "Done. Delete the .p12 file. The next v* tag also uploads to TestFlight."
     exit 0
 fi
 

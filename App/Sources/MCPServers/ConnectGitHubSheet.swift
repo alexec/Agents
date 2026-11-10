@@ -272,7 +272,7 @@ struct ConnectGitHubSheet: View {
 
     private func open(_ address: String) {
         guard let url = URL(string: address) else { return }
-        NSWorkspace.shared.open(url) // store-ok: github.com in the browser, not a path
+        NSWorkspace.shared.open(url)
     }
 }
 

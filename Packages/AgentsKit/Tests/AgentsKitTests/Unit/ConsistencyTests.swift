@@ -508,7 +508,6 @@ struct ConsistencyTests {
     /// each one compiles. `Shared/UI` is in both, deliberately: the phone runs the same
     /// prompt as the Mac, so it asks for the same things.
     private static let appTargets: [(name: String, plist: String, sources: [String])] = [
-        ("AgentsStore", "App/Info-Store.plist", ["App/Sources", "Shared/UI"]),
         // The one app, Agents (#4225): the window and the host.
         ("AgentsHost", "Host/Info.plist", ["App/Sources", "Shared/UI", "Host/Sources"]),
         ("Remote", "Remote/Info.plist", ["Remote/Sources", "Shared/UI"]),

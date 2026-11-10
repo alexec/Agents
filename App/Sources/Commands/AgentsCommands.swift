@@ -392,11 +392,10 @@ struct AgentsCommands: Commands {
         CommandGroup(replacing: .printItem) {}
 
         CommandGroup(replacing: .help) {
-            Button("Agents Help") { NSWorkspace.shared.open(HelpSite.url) }  // store-ok: a web page
+            Button("Agents Help") { NSWorkspace.shared.open(HelpSite.url) }
                 .keyboardShortcut("?")
             Divider()
             Button("Report a Problem…") { requests.showsReportProblem = true }
-            #if !STORE_WINDOW
             // Agents Host's diagnostics (#678, #4227), also in Settings ▸ Machines ▸ This Mac.
             if let host = HostScenes.model {
                 Menu("Diagnostics") {
@@ -405,7 +404,6 @@ struct AgentsCommands: Commands {
                     Button("Show Logs") { host.showLogs() }
                 }
             }
-            #endif
         }
     }
 

@@ -1,4 +1,3 @@
-#if !STORE_WINDOW
 import AgentsKitCore
 import AuthenticationServices
 import SwiftUI
@@ -269,4 +268,3 @@ enum ControlPlaneMove {
         }
     }
 }
-#endif

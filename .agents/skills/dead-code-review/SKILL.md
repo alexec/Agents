@@ -24,14 +24,14 @@ the keyboard, that is true only of a workflow run.
 - Periphery is pinned at 3.8.0. Download its release archive to a temporary folder and
   run that binary; do not install it. Verify its SHA-256 against the recorded value in
   `baseline.md` before use.
-  Scan `AgentsHost`, `AgentsStore` (the Mac window: `App/Sources`), `Remote` and every
+  Scan `AgentsHost` (the one Mac app: `App/Sources` and `Host/Sources`), `Remote` and every
   `Packages/*` Swift package. Run `xcodegen generate` first (`Agents.xcodeproj` is not
   checked in, and a copy older than the merge of `main` misses new files). Build the
-  three schemes one at a time with plain `xcodebuild`
+  two schemes one at a time with plain `xcodebuild`
   (`-derivedDataPath build/DD-periphery`, the build cache's package checkout through
   `-clonedSourcePackagesDirPath`, `COMPILER_INDEX_STORE_ENABLE=YES`), not through
   `scripts/build-cache.sh`: its prefix mapping writes `/^worktree` paths into the index,
-  and Periphery then finds nothing. Run one scan over all three schemes with
+  and Periphery then finds nothing. Run one scan over both schemes with
   `--skip-build --index-store-path build/DD-periphery/Index.noindex/DataStore`. For a
   package, `swift build --build-tests --build-system native -Xswiftc -index-store-path
   -Xswiftc .build/periphery-index` (Swift 6.4's default build system writes no index),

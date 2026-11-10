@@ -130,6 +130,6 @@ struct ConnectTokenSheet: View {
 
     private func open(_ address: String) {
         guard let url = URL(string: address) else { return }
-        NSWorkspace.shared.open(url) // store-ok: the provider's token page in the browser, not a path
+        NSWorkspace.shared.open(url)
     }
 }
