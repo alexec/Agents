@@ -2,7 +2,9 @@
 """A fixture GitHub for the Work look's shared parts (#4391, #4392): example/shop's issues and pull
 requests in every state (open, closed, draft, merged, closed unmerged), with label colours, scoped
 labels, more than three labels, assignees, comment counts, a pull request's checks and review, a
-long title, and an issue (#12) with comments by two people and a bot. Scratch data only. Point a
+long title, and an issue (#12) with comments by two people and a bot; for the pull request page
+(#4406), each pull request's checks one by one, a pull request with conflicts (#24) and one with
+auto-merge on (#25). Scratch data only. Point a
 run-app host at it with --env AGENTS_TEST_GITHUB_URL=http://127.0.0.1:<port>, and connect GitHub with
 rpc.py call connections/sign-in/token '{"provider":"github","token":"walk"}'.
 
@@ -55,6 +57,10 @@ ITEMS = {
          "author": "robin", "at": 75, "check": "FAILURE", "review": "CHANGES_REQUESTED", "commentCount": 5},
     23: {"title": "Search: typo tolerance", "state": "OPEN", "labels": [], "pr": True, "draft": True, "author": "kai",
          "at": 4 * 60, "check": "PENDING"},
+    24: {"title": "Cart: keep the coupon after a refresh", "state": "OPEN", "labels": ["area:cart"], "pr": True,
+         "author": "sam", "at": 40, "check": "SUCCESS", "review": "REVIEW_REQUIRED", "conflicts": True, "threads": 2},
+    25: {"title": "Search: rank exact matches first", "state": "OPEN", "labels": ["feature:search"], "pr": True,
+         "author": "kai", "at": 30, "check": "PENDING", "review": "APPROVED", "auto": True},
     19: {"title": "Gift card balances in the store's API", "state": "MERGED", "labels": ["feature:checkout"], "pr": True,
          "author": "robin", "at": 2 * 1440, "check": "SUCCESS", "review": "APPROVED"},
     18: {"title": "Try a second payment provider", "state": "CLOSED", "labels": [], "pr": True, "author": "sam",
@@ -88,9 +94,29 @@ def node(n):
     kids = [k for k, c in ITEMS.items() if c.get("parent") == n]
     got["subIssuesSummary"] = {"total": len(kids), "completed": sum(ITEMS[k]["state"] == "CLOSED" for k in kids)}
     if pr:
-        got.update({"isDraft": bool(i.get("draft")), "mergeable": "MERGEABLE", "reviewDecision": i.get("review", ""),
-                    "autoMergeRequest": None,
+        got.update({"isDraft": bool(i.get("draft")), "mergeable": "CONFLICTING" if i.get("conflicts") else "MERGEABLE",
+                    "reviewDecision": i.get("review", ""),
+                    "autoMergeRequest": {"enabledAt": ago(5)} if i.get("auto") else None,
                     "checkState": {"nodes": [{"commit": {"statusCheckRollup": {"state": i["check"]} if "check" in i else None}}]}})
+    return got
+
+
+def checks(n):
+    """A pull request's checks one by one, as its rollup word says: a failing one has a failed test
+    job, a pending one has jobs still running."""
+    state = ITEMS[n]["check"]
+    run = f"https://github.com/{REPO}/actions/runs/{900 + n}/job/1"
+    names = ["build", "lint", "unit tests", "web", "go-darwin"]
+    got = []
+    for k, name in enumerate(names):
+        conclusion, status = "SUCCESS", "COMPLETED"
+        if state == "FAILURE" and name == "unit tests":
+            conclusion = "FAILURE"
+        if state == "PENDING" and k >= 3:
+            conclusion, status = None, "IN_PROGRESS"
+        got.append({"__typename": "CheckRun", "name": name, "status": status, "conclusion": conclusion, "detailsUrl": run})
+    got.append({"__typename": "CheckRun", "name": "deploy preview", "status": "COMPLETED", "conclusion": "SKIPPED",
+                "detailsUrl": run})
     return got
 
 
@@ -101,8 +127,9 @@ def detail(n):
     got = {**node(n), "body": i.get("body", ""),
            "comments": {"pageInfo": {"hasPreviousPage": False, "startCursor": None}, "nodes": comments}}
     if i.get("pr"):
-        got.update({"reviewThreads": {"totalCount": 0}, "changedFiles": 3, "headRefOid": "abc123",
-                    "commits": {"nodes": [{"commit": {"oid": "abc123", "statusCheckRollup": None}}]}})
+        rollup = {"contexts": {"nodes": checks(n)}} if "check" in i else None
+        got.update({"reviewThreads": {"totalCount": i.get("threads", 0)}, "changedFiles": 3, "headRefOid": "abc123",
+                    "commits": {"nodes": [{"commit": {"oid": "abc123", "statusCheckRollup": rollup}}]}})
     return got
 
 
@@ -132,7 +159,9 @@ class Handler(BaseHTTPRequestHandler):
                                            for k, c in ITEMS.items() if c.get("parent") == n]}
             return self.answer(200, {"data": {"repository": {"issue": epic}}})
         if "issueOrPullRequest" in q:
-            return self.answer(200, {"data": {"repository": {"issueOrPullRequest": detail(n) if n in ITEMS else None}}})
+            return self.answer(200, {"data": {"repository": {"issueOrPullRequest": detail(n) if n in ITEMS else None,
+                                                             "viewerDefaultMergeMethod": "SQUASH", "squashMergeAllowed": True,
+                                                             "mergeCommitAllowed": True, "rebaseMergeAllowed": False}}})
         if "search(" in q:
             time.sleep(SLOW)
             ns = sorted((k for k in ITEMS if wanted(k, v.get("q", ""))), key=lambda k: ITEMS[k]["at"])

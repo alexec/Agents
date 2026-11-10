@@ -456,19 +456,6 @@ public enum WorkList {
         Kind(rawValue: node.kind).flatMap { $0 == .feature || $0 == .timeline ? nil : $0 }
     }
 
-    /// A PR's checks: "Checks: 14 passing, 1 failing"; nil with none.
-    public static func checksWords(_ checks: [DaemonAPI.ForgeCheck]?, summary: String? = nil) -> String? {
-        guard let checks, !checks.isEmpty else {
-            guard let summary, summary != "none" else { return nil }
-            return "Checks \(summary)"
-        }
-        let parts = ["passing", "failing", "running", "skipped"].compactMap { state -> String? in
-            let n = checks.filter { $0.state == state }.count
-            return n > 0 ? "\(n) \(state)" : nil
-        }
-        return "Checks: \(parts.joined(separator: ", "))"
-    }
-
     // MARK: Actions (#3130)
 
     /// A merge method's button, as GitHub says it.
@@ -511,15 +498,6 @@ public enum WorkList {
             done.reran.map { $0 == 1 ? "1 run started again." : "\($0) runs started again." } ?? "Started again."
         default: "Done."
         }
-    }
-
-    /// Close or Reopen, by the item's state.
-    public static func closeTitle(_ state: String) -> String { state == "open" ? "Close" : "Reopen" }
-
-    public static func reviewWords(_ review: String?) -> String? {
-        guard let review else { return nil }
-        let title = ["approved": "Approved", "changes_requested": "Changes requested", "review_required": "Review required"]
-        return "Review: \(title[review] ?? review.replacingOccurrences(of: "_", with: " "))"
     }
 
     /// "by alexec · assigned to bob · milestone 0.14".
