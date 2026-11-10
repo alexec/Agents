@@ -20,6 +20,7 @@ import { VersionsSection } from "./Machines";
 import { NotificationsSection } from "./Notifications";
 import { PolicySection } from "./Policy";
 import { ProcessesSection } from "./Processes";
+import { RecoveryKeySection } from "./RecoveryKey";
 import { SidebarGroupsSection } from "./SidebarGroups";
 import { SleepSection } from "./Sleep";
 import { PersonasConfigSection, SkillsConfigSection, WorkflowsConfigSection } from "../AgentConfigEditor";
@@ -69,6 +70,8 @@ export const settingsSections: readonly SettingsSection[] = [
   // What runs on each machine, with its CPU and memory (#3453).
   { name: "processes", scope: "machines", order: 45, Section: ProcessesSection },
   { name: "providers", scope: "controlPlane", order: 50, Section: ProvidersSection },
+  // The lock's recovery key (#4299): Make Recovery Key after the sidebar's card was skipped or before it shows.
+  { name: "recoveryKey", scope: "machines", order: 5, Section: RecoveryKeySection },
   { name: "serverBackups", scope: "machines", order: 40, Section: ServerBackupsSection },
   // Kept on the Mac's host, the same on every client (#1033, #2079); its subject is the app (#2157).
   { name: "sidebar", scope: "thisApp", order: 20, Section: SidebarGroupsSection },

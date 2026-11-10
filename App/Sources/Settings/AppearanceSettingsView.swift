@@ -71,7 +71,7 @@ struct AccountSettingsView: View {
 
 /// Settings ▸ Machines ▸ This Mac (#846): first, whether Agents runs here and Remove Agents
 /// from This Mac (#4227); then whether this Mac stays awake, whether Agents updates itself
-/// (#2178), how long archived agents are kept, and its backups (#1810).
+/// (#2178), its lock's recovery key (#4299), how long archived agents are kept, and its backups (#1810).
 struct MacSettingsView: View {
     @Environment(AppModel.self) private var model
 
@@ -81,6 +81,7 @@ struct MacSettingsView: View {
             WakeSettingsSection()
             DesktopControlSettingsSection()
             SelfUpdateSection()
+            RecoveryKeySettingsSection()
             ArchiveSettingsSection()
             if let backups = model.work.backupState {
                 BackupsSection(state: backups, configure: model.configureBackups, make: model.makeBackup,
