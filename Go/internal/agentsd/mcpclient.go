@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"mime"
 	"net/http"
 	"os/exec"
@@ -239,6 +240,7 @@ func startStdioMCP(s *sdk.McpServerStdio, cwd string) (*stdioMCP, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, &mcpCheckFailure{kind: "stopped", message: "It could not be started: " + strings.TrimPrefix(err.Error(), "exec: ") + "."}
 	}
+	log.Printf("mcp client: %s started (pid %d)", s.Name, cmd.Process.Pid)
 	c := &stdioMCP{cmd: cmd, in: in, lines: make(chan []byte, 16), gone: make(chan struct{})}
 	go func() {
 		r := bufio.NewReaderSize(out, 64*1024)

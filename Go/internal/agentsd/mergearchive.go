@@ -106,8 +106,8 @@ func (d *Daemon) addMergeArchives(wanted map[string]*mcpSubscription, servers fu
 					continue
 				}
 				wanted[id] = &mcpSubscription{id: id, key: key, folder: folder, server: name, event: def.Name,
-					arguments: t.arguments, archives: true, pool: f.server.pool(), filled: f.server.filled,
-					cwd: f.server.cwd, fingerprint: def.wireText() + "\n" + f.server.entry}
+					arguments: t.arguments, archives: true, pool: f.server.pool(), source: f.server,
+					fingerprint: def.wireText() + "\n" + f.server.entry}
 			}
 		}
 	}
