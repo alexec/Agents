@@ -9,9 +9,9 @@ Planning is the product theme (`feature:planning`, Alex, 2026-11-10) that answer
 
 ## The three questions
 
-1. **What do we do next?** The plan is in the forge: epics, their sub-issues and the "blocked by" links between them (`specs/3265-work-plans/spec.md`, #3265). The Product Owner ranks with RICE, the Scrum Master gives places in a fixed order, and the Work pages show the plan as steps.
-2. **What will it cost, and when does it land?** An **estimate** sizes one issue or epic from closed issues like it (#3557). A **forecast** says when an epic or a milestone lands and what the coming weeks cost, from the daily throughput and the burn rate, with no per-issue size (#4533).
-3. **What did it deliver?** Reports ▸ Value says what the work cost, the PRs merged, the waste, and the lead and cycle times (#2351). It is the record the first two questions are checked against.
+- **What do we do next?** The plan is in the forge: epics, their sub-issues and the "blocked by" links between them (`specs/3265-work-plans/spec.md`, #3265). The Product Owner ranks with RICE, the Scrum Master gives places in a fixed order, and the Work pages show the plan as steps.
+- **What will it cost, and when does it land?** An **estimate** sizes one issue or epic from closed issues like it (#3557). A **forecast** says when an epic or a milestone lands and what the coming weeks cost, from the daily throughput and the burn rate, with no per-issue size (#4533).
+- **What did it deliver?** Reports ▸ Value says what the work cost, the PRs merged, the waste, and the lead and cycle times (#2351). It is the record the first two questions are checked against.
 
 ## What the figures come from
 
