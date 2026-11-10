@@ -366,7 +366,8 @@ private struct RuntimeStatusRow<Actions: View>: View {
 
 /// The sidebar's way into Status ▸ Runtimes (065, #3631). It says how many runtimes on this
 /// Mac can start a turn, out of how many are installed (#379), and a red dot only when
-/// none can: one being out does not matter, the work goes on on the others.
+/// none can: one being out does not matter, the work goes on on the others. One nearly
+/// used up gets the warning tint and a grey line (#3956).
 struct RuntimesRow: View {
     @Environment(AppModel.self) private var model
 
@@ -375,14 +376,22 @@ struct RuntimesRow: View {
     }
 
     var body: some View {
-        // The title alone (#587): how many work is the tooltip's, and none working turns
-        // the row's icon red (`activityIcon(_:warns:)`).
-        HStack(alignment: .firstTextBaseline) {
-            Text("Runtimes").foregroundStyle(.primary)
-            Spacer()
+        // The title (#587): how many work is the tooltip's, and none working turns the
+        // row's icon red (`activityIcon(_:warns:)`). An allowance nearly used up turns it
+        // orange, with a grey line that names the runtime (#3956).
+        VStack(alignment: .leading, spacing: 1) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Runtimes").foregroundStyle(.primary)
+                Spacer()
+            }
+            if let low = tally?.lowWords {
+                Text(low).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
         }
-        .help(tally.map { "\($0.working) of \($0.total) runtimes working. Your runtimes and accounts, and where each machine has them" }
+        .help(tally.map { [$0.lowWords, "\($0.working) of \($0.total) runtimes working. Your runtimes and accounts, and where each machine has them"]
+                    .compactMap { $0 }.joined(separator: ". ") }
               ?? "Your runtimes and accounts, and where each machine has them")
-        .accessibilityValue(tally.map { $0.noneWorking ? "None of \($0.total) working" : "\($0.working) of \($0.total) working" } ?? "")
+        .accessibilityValue(tally.map { [$0.noneWorking ? "None of \($0.total) working" : "\($0.working) of \($0.total) working", $0.lowWords]
+                                .compactMap { $0 }.joined(separator: ", ") } ?? "")
     }
 }

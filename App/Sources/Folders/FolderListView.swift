@@ -68,9 +68,10 @@ struct FolderListView: View {
         (model.hasMacHost ? [.mac] : []) + model.hosts.servers
     }
 
-    /// No runtime can be started on: Runtimes' icon says so in red (#587).
-    private var runtimesFailing: Bool {
-        RuntimeTally(model.runtimes, allowances: model.runtimeAllowances)?.noneWorking == true
+    /// No runtime can be started on: Runtimes' icon says so in red (#587); one nearly used
+    /// up, in the warning tint (#3956).
+    private var runtimesTally: RuntimeTally? {
+        RuntimeTally(model.runtimes, allowances: model.runtimeAllowances)
     }
 
     /// Each project's Connectors folder (#3407), whose stored set-up says whether a slot's
@@ -222,7 +223,8 @@ struct FolderListView: View {
             // accounts and a line per machine (#3631), and the record of what happened. The
             // person's connectors, secrets and outside accounts are in Settings ▸ You.
             Section(isExpanded: $showsStatus) {
-                RuntimesRow().activityIcon("cpu", warns: runtimesFailing)
+                RuntimesRow().activityIcon("cpu", warns: runtimesTally.map { $0.noneWorking || $0.isLow } ?? false,
+                                           tint: runtimesTally?.isLow == true ? .attention : .failure)
                     .appText(.supporting).sidebarInk(.runtimes).tag(SidebarItem.runtimes)
                 EventsRow().activityIcon("list.bullet.rectangle")
                     .appText(.supporting).sidebarInk(.events).tag(SidebarItem.events)
