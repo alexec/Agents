@@ -7,8 +7,11 @@ import SwiftUI
 /// the Work look (#4400, `specs/4328-work-look/issue.md`): the header with Start Agent, one
 /// timeline (the body, then the comments), the comment box with Close or Reopen, and the side
 /// panel (Assignees, Labels with its gear, Milestone, Repo, Linked, Lineage and, on the Mac, Docs).
+/// A pull request's page (#4406, `specs/4328-work-look/pull-request.md`) has Files changed in
+/// place of Start Agent, the merge box at the end of the timeline (at the top of a narrow page),
+/// Close or Reopen pull request in the comment box, and Reviewers and Branch on the panel.
 /// On the Mac the place, Previous and Next, and Refresh are the toolbar's. Its writes (#3130) go to
-/// the machine that read it; a pull request's actions are still `WorkItemActions` (#4332).
+/// the machine that read it.
 struct WorkItemPage: View {
     let model: any WorkModel
     #if os(iOS)
@@ -68,6 +71,12 @@ struct WorkItemPage: View {
                         header
                         problemStrip
                         Group {
+                            if let detail, let box = WorkLook.mergeBox(detail.got) {
+                                mergeBox(box, detail.got, on: detail.host)
+                            }
+                            if let detail, detail.got.item.node.kind == "pr" {
+                                WorkFilesChanged(model: model, host: detail.host, detail: detail.got, compact: true)
+                            }
                             sidePanel(compact: true) { details }
                             main
                             if detail != nil {
@@ -205,15 +214,11 @@ struct WorkItemPage: View {
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
                     titleLine(title).frame(maxWidth: .infinity, alignment: .leading)
                     if let start = startOffer { startButton(start) }
+                    if let detail, detail.got.item.node.kind == "pr" {
+                        WorkFilesChanged(model: model, host: detail.host, detail: detail.got)
+                    }
                 }
                 stateLine
-            }
-            if let item, item.node.kind == "pr" {
-                let words = [WorkList.checksWords(detail?.got.checks, summary: item.checks), WorkList.reviewWords(item.review)]
-                    .compactMap { $0 }
-                if !words.isEmpty {
-                    Text(words.joined(separator: " · ")).appText(.supporting)
-                }
             }
         }
         .redacted(reason: title == nil ? .placeholder : [])
@@ -262,6 +267,10 @@ struct WorkItemPage: View {
         let author = item?.author ?? row?.author
         let updated = item?.updatedAt ?? row?.updated
         let comments = item?.comments ?? row?.comments ?? 0
+        if node.kind == "pr" {
+            return WorkLook.pullStateWords(author: author, state: item?.state ?? row?.state ?? "open", updated: updated,
+                                           comments: comments, narrow: narrow)
+        }
         let age = updated.map { WorkLook.ageWords(Date().timeIntervalSince($0)) }
         var parts: [String] = []
         if narrow {
@@ -371,9 +380,6 @@ struct WorkItemPage: View {
 
     @ViewBuilder
     private var main: some View {
-        if let detail, detail.got.item.node.kind == "pr", writes {
-            WorkItemActions(model: model, host: detail.host, detail: detail.got, wrote: { Task { await reread() } })
-        }
         #if os(macOS)
         // An epic's plan (#3268): Mac + web, so not on the Remote (#2796).
         if let detail, WorkPlan.hasPlan(detail.got.item) {
@@ -422,18 +428,57 @@ struct WorkItemPage: View {
             if got.item.node.kind == "issue", got.item.state == "closed", got.transitions == nil {
                 WorkTimelineEvent(symbol: "checkmark.circle", words: "Closed")
             }
+            if got.item.node.kind == "pr" { pullEnd(got, on: host) }
         }
         if writes {
             WorkCommentBox(model: model, host: host, node: got.item.node,
-                           closes: isIssue && got.transitions == nil && ["open", "closed"].contains(got.item.state) ? got.item.state : nil,
+                           closes: got.transitions == nil && ["open", "closed"].contains(got.item.state) ? got.item.state : nil,
+                           noun: isIssue ? "issue" : "pull request",
                            compact: narrow, said: said) { words, failed in
                 said = (words, failed)
                 if !failed { Task { await reread() } }
             }
-        } else {
+        } else if WorkLook.mergeBox(got) == nil {
             Text("No machine of yours can write to \(WorkList.forgeName(node.ref)).")
                 .appText(.supporting).foregroundStyle(.secondary)
         }
+    }
+
+    /// The end of a pull request's timeline: the merge box while it is open (on a wide page; a
+    /// narrow one has it at the top), *Merged* and the pipeline line once it merged, *Closed
+    /// with unmerged commits* once it closed.
+    @ViewBuilder
+    private func pullEnd(_ got: DaemonAPI.ForgeItemDetail, on host: MachineRef) -> some View {
+        switch got.item.state {
+        case "merged":
+            WorkTimelineEvent(symbol: "arrow.triangle.merge", words: "Merged", at: got.item.updatedAt)
+            mergedStrip
+        case "closed":
+            WorkTimelineEvent(symbol: "xmark.circle", words: "Closed with unmerged commits", at: got.item.updatedAt)
+        default:
+            if !narrow, let box = WorkLook.mergeBox(got) { mergeBox(box, got, on: host) }
+        }
+    }
+
+    private func mergeBox(_ box: WorkLook.MergeBox, _ got: DaemonAPI.ForgeItemDetail, on host: MachineRef) -> some View {
+        WorkMergeBox(model: model, host: host, detail: got, box: box, writes: writes, compact: narrow) {
+            Task { await reread() }
+        }
+    }
+
+    /// In the merge box's place once it merged: *Merged.*, then (Mac) where it went (#3588).
+    private var mergedStrip: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(WorkLook.mergedStrip).appText(.supporting).fontWeight(.semibold)
+            #if os(macOS)
+            if !pipeline.isEmpty { pipelineLine }
+            #endif
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: Paper.Radius.card).fill(Paper.well))
+        .padding(.leading, narrow ? 0 : WorkTimelineEntry<EmptyView, EmptyView>.column + 10)
+        .padding(.bottom, 14)
     }
 
     private var olderComments: some View {
@@ -468,6 +513,17 @@ struct WorkItemPage: View {
                 ForEach(assignees, id: \.self) { WorkSidePerson(login: $0) }
             }
         }
+        if node.kind == "pr" {
+            // Each reviewer and their state come with the forge's reviewers (#4406, missing fields).
+            WorkSideSection(title: "Reviewers") {
+                let review = item?.review ?? row?.review
+                if review == nil {
+                    WorkSideNone(words: WorkLook.reviewersWords(nil))
+                } else {
+                    Text(WorkLook.reviewersWords(review))
+                }
+            }
+        }
         WorkSideSection(title: "Labels", edit: labelsEdit) {
             let labels = item?.labels ?? row?.labels ?? []
             if labels.isEmpty {
@@ -491,6 +547,12 @@ struct WorkItemPage: View {
                 Label(milestone, systemImage: "flag")
             } else {
                 WorkSideNone(words: "None")
+            }
+        }
+        if node.kind == "pr", let files = WorkLook.branchWords(detail?.got.filesChanged) {
+            // The head and base branches and the size come with the forge's fields (#4406).
+            WorkSideSection(title: "Branch") {
+                Label(files, systemImage: "arrow.triangle.branch").monospacedDigit()
             }
         }
         WorkSideSection(title: "Repo") {
@@ -587,10 +649,9 @@ struct WorkItemPage: View {
         .accessibilityLabel([title ?? "A session on another machine", runs ? "running" : nil].compactMap { $0 }.joined(separator: ", "))
     }
 
-    /// The gear on an issue's Labels, when a machine of the person's writes. A pull request's
-    /// Labels is still its actions' menu (#4332).
+    /// The gear on an issue's or a pull request's Labels, when a machine of the person's writes.
     private var labelsEdit: (() -> Void)? {
-        guard isIssue, writes, let item, WorkList.takesLabels(item.node) else { return nil }
+        guard [.issue, .pr].contains(place.kind), writes, let item, WorkList.takesLabels(item.node) else { return nil }
         return { pickingLabels = true }
     }
 

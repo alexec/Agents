@@ -188,6 +188,7 @@ nav:
   - Explanation:
       - explanation/index.md
       - explanation/direction.md
+      - explanation/planning.md
       - explanation/why-agents.md
       - explanation/control-plane.md
       - explanation/org-keys-and-gateways.md

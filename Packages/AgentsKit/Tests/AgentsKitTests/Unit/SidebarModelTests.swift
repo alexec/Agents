@@ -394,6 +394,68 @@ struct SidebarModelTests {
         #expect(SidebarSmartRow.needsYou.count(in: model, folders: [key]) == 2)
     }
 
+    /// Later (#4234): a deferred request leaves Needs You's rows, its count and the badge,
+    /// and its asker is not a session row there either; it is a row of Later, which keeps
+    /// Needs You drawn on its own. Bring back now puts it back.
+    @Test func aDeferredRequestIsInLaterAndInNoCount() {
+        let model = AgentsModel()
+        let asking = started(api, .waitingOnUser, "asking", at: 1)
+        model.replaceAgents([asking])
+        var request = NeedRequest(id: UUID(), kind: .decide, source: "question", title: "Which port?", folder: api,
+                                  askedBy: asking.id, waiters: [.init(agent: asking.id, since: t0)], askedAt: t0)
+        model.replaceRequests([request])
+        #expect(SidebarSmartRow.needsYou.count(in: model, folders: [key]) == 1)
+
+        request.deferred = .init(atMac: true, at: t0)
+        model.apply(.requestChanged(request))
+        #expect(SidebarSmartRow.needsYou.requests(in: model, folders: [key]).isEmpty)
+        #expect(SidebarSmartRow.needsYou.agents(in: model, folders: [key]).isEmpty)
+        #expect(SidebarSmartRow.needsYou.count(in: model, folders: [key]) == 0)
+        #expect(model.attentionCount(in: key) + model.requestBadgeShift(in: api) == 0)
+        #expect(SidebarSmartRow.needsYou.laterRequests(in: model, folders: [key]).map(\.request.id) == [request.id])
+        #expect(SidebarSmartRow.needsYou.isShown(in: model, folders: [key]))
+        #expect(SidebarSmartRow.needsYou.isShown(in: model, folders: [key], query: "port"))
+
+        request.deferred = nil
+        model.apply(.requestChanged(request))
+        #expect(SidebarSmartRow.needsYou.laterRequests(in: model, folders: [key]).isEmpty)
+        #expect(SidebarSmartRow.needsYou.count(in: model, folders: [key]) == 1)
+    }
+
+    /// Later's choices (#4234): 1h, 4h, 8h and 1d on from now; At my Mac, no time. Its row
+    /// says when it comes back.
+    @Test func laterChoicesAndWhenItComesBack() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(identifier: "America/Los_Angeles"))
+        func at(_ day: Int, _ hour: Int) -> Date {
+            calendar.date(from: DateComponents(year: 2026, month: 11, day: day, hour: hour))!
+        }
+        let noon = at(10, 12)
+        #expect(NeedRequest.Later.timed.map(\.short) == ["1h", "4h", "8h", "1d"])
+        #expect(NeedRequest.Later.hour.until(from: noon) == at(10, 13))
+        #expect(NeedRequest.Later.fourHours.until(from: noon) == at(10, 16))
+        #expect(NeedRequest.Later.eightHours.until(from: noon) == at(10, 20))
+        #expect(NeedRequest.Later.day.until(from: noon) == at(11, 12))
+        #expect(NeedRequest.Later.atMac.until(from: noon) == nil)
+        #expect(NeedRequest.Later.atMac.params(id: UUID(), now: noon).atMac == true)
+
+        #expect(NeedRequest.Deferral(atMac: true, at: noon).back(now: noon, calendar: calendar) == "At my Mac")
+        #expect(NeedRequest.Deferral(until: at(10, 18), at: noon).back(now: noon, calendar: calendar).hasPrefix("Back at "))
+        #expect(NeedRequest.Deferral(until: at(11, 9), atMac: true, at: noon).back(now: noon, calendar: calendar)
+            .hasPrefix("Back tomorrow at "))
+        #expect(NeedRequest.Deferral(until: at(11, 9), atMac: true, at: noon).back(now: noon, calendar: calendar)
+            .hasSuffix(" or at my Mac"))
+        #expect(NeedRequest.Deferral(until: at(14, 9), at: noon).back(now: noon, calendar: calendar).hasPrefix("Back on "))
+    }
+
+    /// A request read off the wire keeps its deferral (#4233).
+    @Test func aRequestDecodesItsDeferral() throws {
+        let json = #"{"id":"6F9619FF-8B86-D011-B42D-00C04FC964FF","kind":"decide","source":"question","state":"open","title":"t","detail":{},"folder":"file:///tmp/a/","waiters":[],"askedAt":784468800,"deferred":{"atMac":true,"at":784468800,"by":{"user":"alex"}}}"#
+        let request = try JSONValue.parse(Data(json.utf8)).decode(NeedRequest.self)
+        #expect(request.deferred?.atMac == true)
+        #expect(request.deferred?.by?.user == "alex")
+    }
+
     /// A terminal's agents-secret (#4179) has no session and no folder of the sidebar: Needs
     /// You lists it and counts it anyway, and a search finds it by its title.
     @Test func needsYouListsATerminalsRequest() throws {

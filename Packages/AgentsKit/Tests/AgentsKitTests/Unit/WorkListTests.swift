@@ -235,12 +235,7 @@ struct WorkPageTests {
         #expect(WorkList.kind(of: session) == nil)
     }
 
-    @Test func checksReviewAndPeopleInWords() {
-        let checks: [DaemonAPI.ForgeCheck] = [.init(name: "a", state: "passing"), .init(name: "b", state: "passing"),
-                                              .init(name: "c", state: "failing")]
-        #expect(WorkList.checksWords(checks) == "Checks: 2 passing, 1 failing")
-        #expect(WorkList.checksWords([], summary: "none") == nil)
-        #expect(WorkList.reviewWords("changes_requested") == "Review: Changes requested")
+    @Test func peopleInWords() {
         let item = DaemonAPI.ForgeItem(node: pr, title: "T", state: "open", author: "alexec", assignees: ["bob"],
                                        milestone: "0.14", updatedAt: at)
         #expect(WorkList.peopleWords(item) == "by alexec · assigned to bob · milestone 0.14")
@@ -259,8 +254,6 @@ struct WorkPageTests {
         #expect(WorkList.doneWords(DaemonAPI.Method.forgeRerun, .init(reran: 2)) == "2 runs started again.")
         #expect(WorkList.doneWords(DaemonAPI.Method.forgeClose, .init(), reopened: true) == "Reopened.")
         #expect(WorkList.doneWords(DaemonAPI.Method.forgeClose, .init(), moved: true) == "Status changed.")
-        #expect(WorkList.closeTitle("open") == "Close")
-        #expect(WorkList.closeTitle("closed") == "Reopen")
     }
 
     /// #3130: a pull request's diff from the forge is the diff a view gives the app's diff page.

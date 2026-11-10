@@ -57,8 +57,9 @@ struct RequestRowLabel: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
+            // In Later (#4234), grey: nobody is waited on until it comes back.
             Image(systemName: request.symbol)
-                .sidebarMark(StateTint.attention.style(or: .primary))
+                .sidebarMark(request.isDeferred ? AnyShapeStyle(.secondary) : StateTint.attention.style(or: .primary))
                 .frame(width: 16)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
@@ -75,7 +76,9 @@ struct RequestRowLabel: View {
                             .layoutPriority(-1)
                     }
                 }
-                Text(request.line(asker: asker))
+                // In Later, when it comes back first (#4234).
+                Text(([request.deferred?.back()] + [request.line(asker: asker)]).compactMap { $0 }
+                    .joined(separator: " · "))
                     .appText(.fine)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -85,7 +88,7 @@ struct RequestRowLabel: View {
         }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
-        .accessibilityValue("waiting for your answer")
+        .accessibilityValue(request.isDeferred ? "in Later" : "waiting for your answer")
     }
 }
 
