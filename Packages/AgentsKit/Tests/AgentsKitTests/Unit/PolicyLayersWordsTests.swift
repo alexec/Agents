@@ -15,7 +15,7 @@ struct PolicyLayersWordsTests {
         #expect(rules == ["permissionMode", "permissionRequests", "sandbox", "budgets.perAgent", "budgets.daily",
                           "budgets.perAgentTokens", "budgets.dailyTokens", "helpers.mostRunning", "helpers.mostNotArchived",
                           "workflows.mostOn", "noticeLimits.burst", "noticeLimits.waitMinutes", "archiveMyChats", "runtimes",
-                          "marketplaces.allowed", "marketplaces.customServers", "environment"])
+                          "marketplaces.allowed", "marketplaces.customServers", "environment", "connectorTools"])
         #expect(PolicyLayersWords.Section.allCases.map(\.title) == ["Permissions", "Money", "Work at once", "Your attention", "Tools"])
     }
 

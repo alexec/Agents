@@ -44,6 +44,32 @@ public extension DaemonAPI {
         }
     }
 
+    /// What agents may do with one tool of a connector (#4099): use it without asking, ask the
+    /// person first, or never use it. A layer can only move a tool towards Off. A level this
+    /// build does not know reads as Ask.
+    enum ConnectorToolLevel: String, Codable, Sendable, Hashable, CaseIterable {
+        case allow, ask, off
+
+        public init(from decoder: Decoder) throws {
+            self = Self(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .ask
+        }
+
+        /// Tighter is later: Allow, Ask, Off.
+        public var order: Int { Self.allCases.firstIndex(of: self) ?? 1 }
+    }
+
+    /// The levels a layer sets for one connector's tools (#4099). A tool's own level comes
+    /// before the layer's switch for every tool that writes.
+    struct PolicyConnectorRule: Codable, Sendable, Hashable {
+        public var writes: ConnectorToolLevel?
+        public var tools: [String: ConnectorToolLevel]?
+
+        public init(writes: ConnectorToolLevel? = nil, tools: [String: ConnectorToolLevel]? = nil) {
+            self.writes = writes
+            self.tools = tools
+        }
+    }
+
     /// The rules a layer sets (#2957, data-model.md "PolicyRules"): the same shape on the
     /// organisation, your and a folder's layer (FR-002). Every field is optional: absent sets
     /// nothing.
@@ -59,12 +85,14 @@ public extension DaemonAPI {
         public var runtimes: [String: PolicyRuntimeRule]?
         public var marketplaces: PolicyMarketplaces?
         public var environment: PolicyEnvironment?
+        /// The level of each connector's tools, by the connector's name (#4099).
+        public var connectorTools: [String: PolicyConnectorRule]?
 
         public init(permissionMode: PermissionLevel? = nil, permissionRequests: ClientPermissionMode? = nil,
                     sandbox: SandboxChoice? = nil, budgets: PolicyRuleBudgets? = nil, helpers: PolicyHelpers? = nil,
                     workflows: PolicyWorkflows? = nil, noticeLimits: PolicyNoticeLimits? = nil, archiveMyChats: Bool? = nil,
                     runtimes: [String: PolicyRuntimeRule]? = nil, marketplaces: PolicyMarketplaces? = nil,
-                    environment: PolicyEnvironment? = nil) {
+                    environment: PolicyEnvironment? = nil, connectorTools: [String: PolicyConnectorRule]? = nil) {
             self.permissionMode = permissionMode
             self.permissionRequests = permissionRequests
             self.sandbox = sandbox
@@ -76,6 +104,7 @@ public extension DaemonAPI {
             self.runtimes = runtimes
             self.marketplaces = marketplaces
             self.environment = environment
+            self.connectorTools = connectorTools
         }
     }
 

@@ -37,13 +37,13 @@ public enum WorkFeatures {
         /// No open epic and no open issue (#3741).
         case finished
 
-        /// The group's head: "Needs you", "Finished (7)".
-        public func words(_ count: Int) -> String {
+        /// The group's head: "Needs you", "Finished"; its count follows it in the tertiary colour (#4416).
+        public var words: String {
             switch self {
             case .needsYou: return "Needs you"
             case .inFlight: return "In flight"
             case .idle: return "Idle"
-            case .finished: return WorkFeatures.finishedWords(count)
+            case .finished: return "Finished"
             }
         }
     }
@@ -81,8 +81,29 @@ public enum WorkFeatures {
     /// An In flight feature's sessions: "1 session", "3 sessions".
     public static func sessionWords(_ count: Int) -> String { "\(count) \(count == 1 ? "session" : "sessions")" }
 
-    /// The Finished group's head: "Finished (7)".
-    public static func finishedWords(_ count: Int) -> String { "Finished (\(count))" }
+    /// A feature's bar (epic.md, Features note 2): its epics closed, of all; nil with no epic.
+    public static func epicsDone(_ feature: DaemonAPI.ForgeFeature) -> Double? {
+        feature.epics > 0 ? Double(max(feature.epics - feature.open, 0)) / Double(feature.epics) : nil
+    }
+
+    /// The words at a feature's bar: "1 of 2 epics done", "0 of 1 epic done".
+    public static func epicsDoneWords(_ feature: DaemonAPI.ForgeFeature) -> String {
+        "\(max(feature.epics - feature.open, 0)) of \(feature.epics) \(feature.epics == 1 ? "epic" : "epics") done"
+    }
+
+    /// What waits for the person on a Needs you feature (Features note 2): "P#4405 waits for your
+    /// approval", "#4290 waits for you", "“Work look: epic page” needs you"; nil with nothing.
+    public static func needsWords(_ feature: DaemonAPI.ForgeFeature, sessions: [Agent], approvals: [String]) -> String? {
+        let waiting = approvals.map { "P" + WorkList.shortRef($0) }
+        if let pr = waiting.first(where: { p in sessions.contains { $0.labels.contains { $0.value == p } } }) {
+            return "\(pr) waits for your approval"
+        }
+        if let ref = feature.waiting?.first { return "\(WorkList.shortRef(ref)) waits for you" }
+        if let session = sessions.first(where: { $0.state == .waitingOnUser }) {
+            return session.title.map { "“\($0)” needs you" } ?? "A session needs you"
+        }
+        return nil
+    }
 
     /// The features of several machines as one list, by name: the counts of one feature added up.
     /// Its issues are unknown when one machine does not count them.
@@ -134,9 +155,9 @@ public enum WorkFeatures {
         item.level == "epic" || (item.progress?.total ?? 0) > 0
     }
 
-    /// An epic's progress: "1/6", its closed sub-issues of all; "0/0" with none yet.
+    /// An epic's progress: "1 of 6", its closed sub-issues of all; "0 of 0" with none yet.
     public static func progressWords(_ item: DaemonAPI.ForgeItem) -> String {
-        "\(item.progress?.done ?? 0)/\(item.progress?.total ?? 0)"
+        "\(item.progress?.done ?? 0) of \(item.progress?.total ?? 0)"
     }
 
     /// The session that leads an epic, of those this app knows: labelled lead and the epic's short
@@ -151,20 +172,22 @@ public enum WorkFeatures {
         }
     }
 
-    /// An epic's lead on its row: "● lead running", "● lead needs you", "lead stopped"; "—" with none.
+    /// An epic's lead on its row: "● lead working", "● lead needs you", "lead stopped"; "—" with none.
     public static func leadWords(_ state: AgentState?) -> String {
         switch state {
         case nil, .archived: return "—"
         case .waitingOnUser: return "● lead needs you"
-        case .starting, .running: return "● lead running"
+        case .starting, .running: return "● lead working"
         case .finished: return "lead waiting"
         case .stopped: return "lead stopped"
         case .queued: return "lead queued"
         }
     }
 
-    /// When no feature is on any epic yet.
-    public static let noFeatures = "No features yet. A feature is a feature:<name> label on an epic."
+    /// When no feature is on any epic yet (states board, 10): the title, then two lines.
+    public static let noFeaturesTitle = "No features yet"
+    public static let noFeatures = "A feature is a feature:<name> label on an epic."
+    public static let noFeaturesLabel = "Label an epic on its forge to see it here."
     /// An opened feature with no open epics or loose issues.
     public static let nothingOpen = "No open epics or issues."
 }

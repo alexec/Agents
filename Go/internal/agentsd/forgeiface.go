@@ -102,6 +102,54 @@ func (a forgeActions) on(action string) bool {
 		actionRerun: a.Rerun, actionLog: a.Log, actionDiff: a.Diff}[action]
 }
 
+// wire is the capabilities of the forge called name as ForgeList.forges says them (#4361).
+func (c forgeCaps) wire(name string) wire.ForgeCapabilities {
+	out := wire.ForgeCapabilities{Forge: name, Issues: c.Issues, Pulls: c.PRs, LabelColors: c.LabelColors,
+		Avatars: c.Avatars, StateReason: c.StateReason, CommentCount: wire.ForgeCommentCount(c.CommentCount)}
+	if c.CommentsMost > 0 {
+		out.CommentsMost = new(int64(c.CommentsMost))
+	}
+	return out
+}
+
+// itemActions are what the page of item allows now (#4361), from c and the item's state: only an
+// open item closes, merges, auto-merges, is approved or runs its checks again, and only a closed
+// one reopens (a merged pull request does not). A transition needs a move that the workflow
+// allows now; a plan's writes are an issue's.
+func (c forgeCaps) itemActions(d wire.ForgeItemDetail) []wire.ForgeAction {
+	i := d.Item
+	a := c.Issue
+	if i.Node.Kind == lineage.KindPR {
+		a = c.PR
+	}
+	open := i.State == "open"
+	issue := i.Node.Kind == lineage.KindIssue
+	out := []wire.ForgeAction{}
+	for _, on := range []struct {
+		action wire.ForgeAction
+		on     bool
+	}{
+		{wire.ForgeActionComment, a.Comment},
+		{wire.ForgeActionLabel, a.Label},
+		{wire.ForgeActionClose, a.Close && open},
+		{wire.ForgeActionReopen, a.Reopen && i.State == "closed"},
+		{wire.ForgeActionTransition, a.Transition && len(d.Transitions) > 0},
+		{wire.ForgeActionMerge, a.Merge && open},
+		{wire.ForgeActionAutoMerge, a.AutoMerge && open},
+		{wire.ForgeActionApprove, a.Approve && open},
+		{wire.ForgeActionRerun, a.Rerun && open},
+		{wire.ForgeActionLog, a.Log},
+		{wire.ForgeActionDiff, a.Diff},
+		{wire.ForgeActionAddChild, c.AddChild && issue},
+		{wire.ForgeActionBlockedBy, c.BlockedBy && issue},
+	} {
+		if on.on {
+			out = append(out, on.action)
+		}
+	}
+	return out
+}
+
 // errForgeCannot is what a forge's method gives for an action that the forge does not do;
 // errors.Is finds it in a forgeCannot.
 var errForgeCannot = errors.New("the forge cannot do this")

@@ -106,6 +106,7 @@ func (d *Daemon) register() {
 	d.registerPolicy()
 	d.registerPolicyYours()
 	d.registerPolicyFolder()
+	d.registerMCPTools()
 	// Person settings sync across machines, but local edits remain allowed (#2410).
 	d.registerUserScope()
 	On(d, wire.CallPermissionsPending, func(ctx context.Context, c *Client, _ wire.Empty) ([]wire.PermissionRequest, error) {

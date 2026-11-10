@@ -130,16 +130,48 @@ public extension DaemonAPI {
         }
     }
 
+    /// What one forge on a list's page fills (#4361), so a client hides what it does not.
+    /// `commentCount` says how to read an item's `comments`: `exact`; `capped` at `commentsMost`
+    /// (show 50+ there); or `detail`, only on the item's own page (hide it on the row). A string,
+    /// so a way a later daemon adds does not break this decoder.
+    struct ForgeCapabilities: Codable, Sendable, Hashable {
+        public var forge: String
+        public var issues: Bool
+        public var pulls: Bool
+        public var labelColors: Bool
+        public var avatars: Bool
+        public var stateReason: Bool
+        public var commentCount: String
+        public var commentsMost: Int?
+
+        public init(forge: String, issues: Bool = false, pulls: Bool = false, labelColors: Bool = false,
+                    avatars: Bool = false, stateReason: Bool = false, commentCount: String = "exact",
+                    commentsMost: Int? = nil) {
+            self.forge = forge
+            self.issues = issues
+            self.pulls = pulls
+            self.labelColors = labelColors
+            self.avatars = avatars
+            self.stateReason = stateReason
+            self.commentCount = commentCount
+            self.commentsMost = commentsMost
+        }
+    }
+
     /// A page of items, the last updated first. `cursor` is the next page; nil at the end.
+    /// `forges` is what each forge with an item on the page fills (#4361); nil from an earlier daemon.
     struct ForgeList: Codable, Sendable, Hashable {
         public var items: [ForgeItem]
         public var cursor: String?
         public var errors: [ForgeListError]?
+        public var forges: [ForgeCapabilities]?
 
-        public init(items: [ForgeItem] = [], cursor: String? = nil, errors: [ForgeListError]? = nil) {
+        public init(items: [ForgeItem] = [], cursor: String? = nil, errors: [ForgeListError]? = nil,
+                    forges: [ForgeCapabilities]? = nil) {
             self.items = items
             self.cursor = cursor
             self.errors = errors
+            self.forges = forges
         }
     }
 
@@ -221,7 +253,10 @@ public extension DaemonAPI {
     /// oldest first in the page. `cursor` is the page before it; nil at the first comment. A pull
     /// request's `head` is the commit a merge or an approval names, and `mergeMethods` its repo's,
     /// the default first (#3130); an issue's `start` is its new-agent form, and `transitions` the
-    /// moves its workflow allows (Jira, #3260), in place of Close and Reopen.
+    /// moves its workflow allows (Jira, #3260), in place of Close and Reopen. `actions` are what
+    /// the page offers now, by name (comment, label, close, reopen, transition, merge, autoMerge,
+    /// approve, rerun, log, diff, addChild, blockedBy; #4361), as strings so a later daemon's new
+    /// one does not break this decoder; nil from an earlier daemon.
     struct ForgeItemDetail: Codable, Sendable, Hashable {
         public var item: ForgeItem
         public var body: String
@@ -234,11 +269,12 @@ public extension DaemonAPI {
         public var mergeMethods: [ForgeMergeMethod]?
         public var start: ForgeStart?
         public var transitions: [ForgeTransition]?
+        public var actions: [String]?
 
         public init(item: ForgeItem, body: String = "", comments: [ForgeComment] = [], cursor: String? = nil,
                     checks: [ForgeCheck]? = nil, reviewThreads: Int? = nil, filesChanged: Int? = nil,
                     head: String? = nil, mergeMethods: [ForgeMergeMethod]? = nil, start: ForgeStart? = nil,
-                    transitions: [ForgeTransition]? = nil) {
+                    transitions: [ForgeTransition]? = nil, actions: [String]? = nil) {
             self.item = item
             self.body = body
             self.comments = comments
@@ -250,6 +286,7 @@ public extension DaemonAPI {
             self.mergeMethods = mergeMethods
             self.start = start
             self.transitions = transitions
+            self.actions = actions
         }
     }
 

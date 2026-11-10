@@ -2533,6 +2533,15 @@ export type ConnectorSlotState =
   | "noRemote"
   | "skipped";
 
+/**
+ * What agents may do with one tool of a connector (#4099): allow (use it without asking), ask (ask
+ * the person first) or off (never use it). A layer can only move a tool towards off.
+ */
+export type ConnectorToolLevel =
+  | "allow"
+  | "ask"
+  | "off";
+
 export interface ConnectorWorkflow {
   id: string;
   name: string;
@@ -4001,6 +4010,26 @@ export interface FoldersListRequest {
 }
 
 /**
+ * A write or a read that an item's page offers (#4329, #4361): forge/comment, forge/label,
+ * forge/close (a close, a reopen or a transition), forge/merge (now, or with auto), forge/approve,
+ * forge/rerun, forge/log, forge/diff, forge/add-child and forge/blocked-by.
+ */
+export type ForgeAction =
+  | "comment"
+  | "label"
+  | "close"
+  | "reopen"
+  | "transition"
+  | "merge"
+  | "autoMerge"
+  | "approve"
+  | "rerun"
+  | "log"
+  | "diff"
+  | "addChild"
+  | "blockedBy";
+
+/**
  * forge/add-child (#3271): add a child to an epic's plan: a new issue (title, with level story,
  * task, spike or bug) or one that is there (issue: #12, owner/repo#12, its URL, or a Linear key
  * such as ENG-4). A new child gets the level's label and the epic's feature: label. GitHub and
@@ -4048,6 +4077,24 @@ export interface ForgeBoardsRequest {
 }
 
 /**
+ * What one forge on a list's page fills (#4329, #4361), so a client hides what it does not: issues
+ * and pulls say it has them; labelColors that its labels have a #rrggbb colour; avatars that its
+ * items have authorAvatar; stateReason that its closed issues have stateReason. commentCount says
+ * how to read ForgeItem.comments: exact; capped at commentsMost (show 50+ there); or detail, only
+ * on an item's own page (hide it on the row).
+ */
+export interface ForgeCapabilities {
+  forge: string;
+  issues: boolean;
+  pulls: boolean;
+  labelColors: boolean;
+  avatars: boolean;
+  stateReason: boolean;
+  commentCount: ForgeCommentCount;
+  commentsMost?: number;
+}
+
+/**
  * One of a pull request's checks (#3129): a check run or a commit status. state is passing,
  * failing, running or skipped; url is its page on the forge.
  */
@@ -4078,6 +4125,16 @@ export interface ForgeComment {
   url?: string;
   bot?: boolean;
 }
+
+/**
+ * How a forge counts an item's comments (#4329): exact; capped at the forge's commentsMost
+ * (Linear's 50); or detail, only on an item's own page (Bitbucket issues, Azure Repos), so a list's
+ * count is 0.
+ */
+export type ForgeCommentCount =
+  | "exact"
+  | "capped"
+  | "detail";
 
 /**
  * forge/comment (#3130): a comment, as Markdown, on an issue or a pull request, as the person whose
@@ -4234,7 +4291,10 @@ export interface ForgeItem {
  * and files changed come with it. head is a pull request's head commit, which forge/merge and
  * forge/approve name (#3130); mergeMethods are the ways its repo allows, the repo's default first;
  * start is the new-agent form for an issue. transitions are the moves an issue's workflow allows
- * now (Jira, #3260), which forge/close takes in place of a close or a reopen.
+ * now (Jira, #3260), which forge/close takes in place of a close or a reopen. actions are what the
+ * item's page offers now, from its forge and its state (#4361): a merged pull request has no merge
+ * and no reopen, a closed item no close; absent from an earlier daemon, when the page shows what it
+ * did before.
  */
 export interface ForgeItemDetail {
   item: ForgeItem;
@@ -4248,6 +4308,7 @@ export interface ForgeItemDetail {
   mergeMethods?: ForgeMergeMethod[];
   start?: ForgeStart;
   transitions?: ForgeTransition[];
+  actions?: ForgeAction[];
 }
 
 /**
@@ -4293,12 +4354,14 @@ export interface ForgeLead {
 /**
  * forge/issues and forge/pulls (#3129): a page of items, the last updated first. cursor is the next
  * page, absent at the end. errors says a forge that could not be read (not connected, a rate
- * limit), and the items of the others still come.
+ * limit), and the items of the others still come. forges says what each forge on the page fills
+ * (#4361); absent from an earlier daemon.
  */
 export interface ForgeList {
   items: ForgeItem[];
   cursor?: string;
   errors?: ForgeListError[];
+  forges?: ForgeCapabilities[];
 }
 
 /**
@@ -5114,7 +5177,7 @@ export interface LineageFigures {
  * walk stopped at its limit on nodes, so there is more. resolved is each node's title, state and
  * labels from its connector, by ref, for the nodes a connector could resolve (#3089). resolving
  * says some nodes are still being resolved in the background, so walk again shortly for them
- * (#3102).
+ * (#3102). states is the current state of each session node in it that has one, by ref (#4274).
  */
 export interface LineageGraph {
   nodes: LineageNode[];
@@ -5122,6 +5185,7 @@ export interface LineageGraph {
   limited?: boolean;
   resolving?: boolean;
   resolved?: Record<string, LineageResolved>;
+  states?: Record<string, LineageSessionState>;
 }
 
 /**
@@ -5152,11 +5216,14 @@ export interface LineageLinkRequest {
 
 /**
  * The links of a node, newest first (#2348), or the links lineage/end ended. limited says there are
- * more than the answer holds.
+ * more than the answer holds. states is a session node's changes of state, newest first, so the
+ * first is its state now (#4274); absent for a node that is not a session, or a session with none
+ * recorded.
  */
 export interface LineageLinks {
   links: LineageLink[];
   limited?: boolean;
+  states?: LineageSessionState[];
 }
 
 /** A milestone a release finished (#4427), with its title when the host has resolved it. */
@@ -5228,6 +5295,30 @@ export interface LineageSessionMatch {
   agentID: UUID;
   on: LineageNode;
 }
+
+/**
+ * A change of a session node's state, as its machine recorded it (#4274): state is what it changed
+ * to, at is when. The machine keeps the changes of the last 90 days, and each session's latest
+ * whatever its age.
+ */
+export interface LineageSessionState {
+  state: LineageSessionStateName;
+  at: WireDate;
+}
+
+/**
+ * A session's state in lineage (#4274): working is in a turn (or starting one); waiting waits on an
+ * event, CI, a timer or a place to start; needs-you waits on a person, for a question or an
+ * approval; stopped is not running and not archived; archived is archived; deleted is deleted, and
+ * the node keeps no title. A state this build does not know reads as stopped.
+ */
+export type LineageSessionStateName =
+  | "working"
+  | "waiting"
+  | "needs-you"
+  | "stopped"
+  | "archived"
+  | "deleted";
 
 /**
  * The sessions on this machine that lineage links to the issue, to its sub-issues or to their PRs,
@@ -5802,6 +5893,20 @@ export interface MCPSetSecretRequest {
   needsApproval?: boolean;
 }
 
+/**
+ * Sets the level of one tool of a connector, or of all its tools that write, in the destination's
+ * layer: yours for personal, the folder's .agents/policy.json for a folder (#4099).
+ */
+export interface MCPSetToolLevelRequest {
+  destination: SkillDestination;
+  /** The connector's name. */
+  name: string;
+  /** The tool's name. Absent: the switch for every tool that writes. */
+  tool?: string;
+  /** Absent: the layer sets nothing for it, and the default applies. */
+  level?: ConnectorToolLevel;
+}
+
 export interface MCPSignInAnswer {
   flowID?: UUID;
   authorizationURL?: string;
@@ -5848,6 +5953,46 @@ export interface MCPSignOutAnswer {
 
 export interface MCPSignOutRequest {
   target: MCPSignInTarget;
+}
+
+/** One tool of a connector, as tools/list gave it, with its level (#4099). */
+export interface MCPToolRow {
+  name: string;
+  title?: string;
+  /**
+   * Its annotations do not say it is read only (readOnlyHint), or say it is destructive
+   * (destructiveHint).
+   */
+  writes: boolean;
+  /**
+   * The level in force: the tightest of every layer, or the default (ask for a tool that writes,
+   * allow for one that only reads).
+   */
+  level: ConnectorToolLevel;
+  /** What the destination's layer sets for this tool itself. Absent: nothing. */
+  own?: ConnectorToolLevel;
+  /** The tightest level of the layers above the destination's; a menu dims what is looser. */
+  cap?: ConnectorToolLevel;
+  /** For example "Your policy: at most Ask". */
+  capLine?: string;
+}
+
+export interface MCPToolsAnswer {
+  name: string;
+  tools: MCPToolRow[];
+  /** The destination layer's switch for every tool that writes. Absent: not set. */
+  writes?: ConnectorToolLevel;
+  writesCap?: ConnectorToolLevel;
+  writesCapLine?: string;
+  /**
+   * Why there is no list of tools: the connector has not answered a check yet, or did not answer.
+   */
+  problem?: string;
+}
+
+export interface MCPToolsRequest {
+  destination: SkillDestination;
+  name: string;
 }
 
 export type MCPTransportName =
@@ -8138,6 +8283,17 @@ export interface PolicyBudgets {
 }
 
 /**
+ * The levels a layer sets for one connector's tools (#4099). A tool's own level comes before the
+ * layer's writes switch.
+ */
+export interface PolicyConnectorRule {
+  /** The level of every tool that writes and that tools does not name. */
+  writes?: ConnectorToolLevel;
+  /** A level for each tool, by its name. */
+  tools?: Record<string, ConnectorToolLevel>;
+}
+
+/**
  * policy/effective (#2957): the rules for an agent in folder, or, with no folder, outside any
  * folder layer.
  */
@@ -8322,7 +8478,8 @@ export type PolicyRuleName =
   | "runtimes"
   | "marketplaces.allowed"
   | "marketplaces.customServers"
-  | "environment";
+  | "environment"
+  | "connectorTools";
 
 /**
  * The rules a layer sets (#2957, data-model.md "PolicyRules"): the same shape on the organisation,
@@ -8341,6 +8498,11 @@ export interface PolicyRules {
   runtimes?: Record<string, PolicyRuntimeRule>;
   marketplaces?: PolicyMarketplaces;
   environment?: PolicyEnvironment;
+  /**
+   * The level of each connector's tools, by the connector's name (#4099). A tool no layer names is
+   * ask when it writes and allow when it only reads.
+   */
+  connectorTools?: Record<string, PolicyConnectorRule>;
 }
 
 /** One allowed runtime in a policy (#998). */
@@ -13380,6 +13542,8 @@ export interface Methods {
   "mcp/health/check": { params: MCPHealthCheckRequest; result: MCPHealthSnapshot };
   "mcp/hosted": { params: Empty; result: HostedMCPSnapshot };
   "mcp/remove": { params: MCPRemoveRequest; result: MCPRemoveAnswer };
+  "mcp/setToolLevel": { params: MCPSetToolLevelRequest; result: MCPToolsAnswer };
+  "mcp/tools": { params: MCPToolsRequest; result: MCPToolsAnswer };
   "messages/conversations": { params: MessagesConversationsRequest; result: MessagesConversations };
   "messages/read": { params: MessagesReadRequest; result: MessagesRead };
   "messages/reply": { params: MessagesReplyRequest; result: MessagesReplied };
@@ -13798,6 +13962,8 @@ export const MethodTarget = {
   "mcp/health/check": "host",
   "mcp/hosted": "host",
   "mcp/remove": "host",
+  "mcp/setToolLevel": "host",
+  "mcp/tools": "host",
   "messages/conversations": "host",
   "messages/read": "host",
   "messages/reply": "host",
@@ -14394,6 +14560,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeBlockedByRequest: { required: ["node"], optional: ["add", "remove"] },
   ForgeBoards: { required: ["boards"], optional: [] },
   ForgeBoardsRequest: { required: [], optional: ["folder"] },
+  ForgeCapabilities: { required: ["forge", "issues", "pulls", "labelColors", "avatars", "stateReason", "commentCount"], optional: ["commentsMost"] },
   ForgeCheck: { required: ["name", "state"], optional: ["url"] },
   ForgeCloseRequest: { required: ["node"], optional: ["reopen", "transition"] },
   ForgeComment: { required: ["author", "body", "at"], optional: ["url", "bot"] },
@@ -14408,13 +14575,13 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeImage: { required: ["mimeType", "data"], optional: [] },
   ForgeImageRequest: { required: ["url"], optional: [] },
   ForgeItem: { required: ["node", "title", "state", "labels", "assignees", "updatedAt", "comments"], optional: ["status", "url", "folder", "author", "milestone", "draft", "checks", "review", "mergeable", "autoMerge", "parent", "level", "feature", "progress", "standing"] },
-  ForgeItemDetail: { required: ["item", "body", "comments"], optional: ["cursor", "checks", "reviewThreads", "filesChanged", "head", "mergeMethods", "start", "transitions"] },
+  ForgeItemDetail: { required: ["item", "body", "comments"], optional: ["cursor", "checks", "reviewThreads", "filesChanged", "head", "mergeMethods", "start", "transitions", "actions"] },
   ForgeItemRequest: { required: ["node"], optional: ["cursor"] },
   ForgeLabel: { required: ["name"], optional: ["color"] },
   ForgeLabelRequest: { required: ["node"], optional: ["add", "remove"] },
   ForgeLabels: { required: ["labels"], optional: [] },
   ForgeLead: { required: ["session", "state"], optional: ["title"] },
-  ForgeList: { required: ["items"], optional: ["cursor", "errors"] },
+  ForgeList: { required: ["items"], optional: ["cursor", "errors", "forges"] },
   ForgeListError: { required: ["forge", "message"], optional: [] },
   ForgeListRequest: { required: [], optional: ["folder", "state", "label", "assignee", "query", "cursor", "limit", "feature", "board"] },
   ForgeLog: { required: ["text"], optional: [] },
@@ -14484,10 +14651,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineageEstimateRange: { required: ["median", "p10", "p90"], optional: [] },
   LineageEstimateRequest: { required: ["node"], optional: ["startAt"] },
   LineageFigures: { required: ["node", "cost", "sessions", "running", "runtimes"], optional: ["releasedIn", "finishedIn", "milestonesFinished", "leadTimeSeconds", "limited"] },
-  LineageGraph: { required: ["nodes", "links"], optional: ["limited", "resolving", "resolved"] },
+  LineageGraph: { required: ["nodes", "links"], optional: ["limited", "resolving", "resolved", "states"] },
   LineageLink: { required: ["from", "to", "rel", "source", "at"], optional: ["endedAt"] },
   LineageLinkRequest: { required: ["from", "to", "rel", "source"], optional: [] },
-  LineageLinks: { required: ["links"], optional: ["limited"] },
+  LineageLinks: { required: ["links"], optional: ["limited", "states"] },
   LineageMilestoneFinished: { required: ["milestone"], optional: ["title"] },
   LineageNode: { required: ["kind", "ref"], optional: [] },
   LineageNodeRequest: { required: ["node"], optional: ["depth"] },
@@ -14496,6 +14663,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineageRuntimeCount: { required: ["runtimeID", "sessions"], optional: [] },
   LineageSessionIssue: { required: ["node"], optional: ["title"] },
   LineageSessionMatch: { required: ["agentID", "on"], optional: [] },
+  LineageSessionState: { required: ["state", "at"], optional: [] },
   LineageSessions: { required: ["matches"], optional: ["issues", "limited"] },
   LineageSessionsRequest: { required: ["number"], optional: [] },
   ListCursor: { required: ["lastActivityAt", "id"], optional: ["archivedAt"] },
@@ -14545,6 +14713,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MCPServerHealth: { required: ["name", "transport", "hosted", "check"], optional: ["live", "checkedAt", "lastError", "tools", "levels", "folder"] },
   MCPSetSecretAnswer: { required: ["set"], optional: [] },
   MCPSetSecretRequest: { required: ["name", "value"], optional: ["needsApproval"] },
+  MCPSetToolLevelRequest: { required: ["destination", "name"], optional: ["tool", "level"] },
   MCPSignInAnswer: { required: [], optional: ["flowID", "authorizationURL", "needsClient", "callback", "error"] },
   MCPSignInClient: { required: ["id"], optional: ["secret"] },
   MCPSignInFlowRequest: { required: ["flowID"], optional: [] },
@@ -14552,6 +14721,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MCPSignInWaitAnswer: { required: ["status"], optional: [] },
   MCPSignOutAnswer: { required: [], optional: ["error"] },
   MCPSignOutRequest: { required: ["target"], optional: [] },
+  MCPToolRow: { required: ["name", "writes", "level"], optional: ["title", "own", "cap", "capLine"] },
+  MCPToolsAnswer: { required: ["name", "tools"], optional: ["writes", "writesCap", "writesCapLine", "problem"] },
+  MCPToolsRequest: { required: ["destination", "name"], optional: [] },
   MCPTriggerFailure: { required: ["code", "message", "since"], optional: [] },
   MCPTriggerStatus: { required: ["name", "state"], optional: ["server", "lastPolledAt", "lastEventAt", "missedSince", "failure", "retryAt"] },
   MCPVariable: { required: ["name", "description", "kind", "required", "alreadySet"], optional: ["placeholder"] },
@@ -14741,6 +14913,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PolicyAskForMore: { required: [], optional: ["why"] },
   PolicyBehindMachine: { required: ["host", "name"], optional: [] },
   PolicyBudgets: { required: ["allowUnmetered", "raises"], optional: ["daily", "dailyTokens", "perAgent", "perAgentTokens"] },
+  PolicyConnectorRule: { required: [], optional: ["writes", "tools"] },
   PolicyEffectiveRequest: { required: [], optional: ["folder"] },
   PolicyEnvironment: { required: ["passThrough"], optional: ["runtimes"] },
   PolicyFolderRequest: { required: ["folder"], optional: [] },
@@ -14758,7 +14931,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PolicyRefuseMore: { required: ["request"], optional: [] },
   PolicyRuleBudgets: { required: [], optional: ["perAgent", "daily", "perAgentTokens", "dailyTokens"] },
   PolicyRuleLine: { required: ["rule", "title", "words"], optional: [] },
-  PolicyRules: { required: [], optional: ["permissionMode", "permissionRequests", "sandbox", "budgets", "helpers", "workflows", "noticeLimits", "archiveMyChats", "runtimes", "marketplaces", "environment"] },
+  PolicyRules: { required: [], optional: ["permissionMode", "permissionRequests", "sandbox", "budgets", "helpers", "workflows", "noticeLimits", "archiveMyChats", "runtimes", "marketplaces", "environment", "connectorTools"] },
   PolicyRuntimeRule: { required: [], optional: ["models", "reach"] },
   PolicySet: { required: ["policy"], optional: ["rev"] },
   PolicySetBy: { required: ["by", "rule", "words"], optional: ["layer"] },

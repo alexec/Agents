@@ -67,8 +67,7 @@ type mcpSubscription struct {
 	// archives is whether Archive a session when its pull request merges holds it (#2886).
 	archives bool
 	pool     string
-	filled   sdk.McpServer
-	cwd      string
+	source   eventServer
 	// fingerprint is what a stopped subscription waits to see change: the event as the
 	// server lists it, the server's entry, and the workflows' files.
 	fingerprint string
@@ -200,6 +199,7 @@ func (d *Daemon) StartMCPEvents() {
 	ctx, cancel := context.WithCancel(d.ctx)
 	d.mcpEvStarted, d.mcpEvStop = true, cancel
 	d.mcpConns = newMCPEventConns(d.mcpEventsListChanged)
+	d.mcpConns.hosted = d.hostedEventConnect
 	d.mcpSubs, d.mcpCancels, d.mcpLives = map[string]*mcpSubscription{}, map[string]context.CancelFunc{}, map[string]mcpLive{}
 	d.mcpListings, d.mcpLines = map[string]*mcpListing{}, map[string][]mcpLine{}
 	d.mcpToTell, d.mcpBadNames, d.mcpTold = map[string]bool{}, map[string]bool{}, map[string]time.Time{}
@@ -377,8 +377,8 @@ func (d *Daemon) addMCPWaits(wanted map[string]*mcpSubscription, servers func(fo
 						continue
 					}
 					wanted[id] = &mcpSubscription{id: id, key: key, folder: sw.folder, server: name, event: def.Name,
-						arguments: nt.arguments, waits: []wire.UUID{sw.agent}, pool: f.server.pool(), filled: f.server.filled,
-						cwd: f.server.cwd, fingerprint: def.wireText() + "\n" + f.server.entry}
+						arguments: nt.arguments, waits: []wire.UUID{sw.agent}, pool: f.server.pool(), source: f.server,
+						fingerprint: def.wireText() + "\n" + f.server.entry}
 				}
 			}
 		}
@@ -398,9 +398,17 @@ func containsUUID(l []wire.UUID, v wire.UUID) bool {
 type eventServer struct {
 	name, scope, cwd, entry string
 	filled                  sdk.McpServer
+	// hosted is an entry with "hosted": true: its events come through the host's one copy
+	// (#4516), as its views do.
+	hosted bool
 }
 
-func (s eventServer) pool() string { return s.scope + "|" + s.name + "|" + s.entry }
+func (s eventServer) pool() string {
+	if s.hosted {
+		return s.scope + "|" + s.name + "|" + s.entry + "|hosted"
+	}
+	return s.scope + "|" + s.name + "|" + s.entry
+}
 
 // mcpServerNames is every server name a session in folder could be given, but the app's.
 func (d *Daemon) mcpServerNames(folder string) []string {
@@ -422,8 +430,7 @@ func (d *Daemon) mcpServerNames(folder string) []string {
 
 // eventServerNamed is name as a session in folder is given it: the folder's approved
 // entry, then the person's. Problem is notSetUp, waiting, oldTransport or missingSecret. A
-// hosted server's events come from a copy of the host's own, since this host does not host
-// servers.
+// hosted server's events come through the host's one copy of it (#4516).
 func (d *Daemon) eventServerNamed(name, folder string, secrets map[string]string) (eventServer, string) {
 	if name == appServerName {
 		return eventServer{}, "notSetUp"
@@ -436,7 +443,8 @@ func (d *Daemon) eventServerNamed(name, folder string, secrets map[string]string
 		if len(gone) > 0 {
 			return eventServer{}, "missingSecret"
 		}
-		return eventServer{name: name, scope: scope, cwd: cwd, entry: serverDigest(filled), filled: filled}, ""
+		return eventServer{name: name, scope: scope, cwd: cwd, entry: serverDigest(filled), filled: filled,
+			hosted: e.hosted && filled.Stdio != nil}, ""
 	}
 	entries, _ := readMCPFile(filepath.Join(folder, ".agents", "mcp.json"))
 	for _, e := range entries {
@@ -487,7 +495,7 @@ func (d *Daemon) mcpEventListing(s eventServer) mcpListing {
 	}
 	var events []mcpEventDef
 	offers := false
-	err := conns.with(pool, s.filled, s.cwd, func(c *mcpEventConn) error {
+	err := conns.with(s, func(c *mcpEventConn) error {
 		offers = c.hasEvents
 		if !offers {
 			return nil
@@ -676,7 +684,7 @@ func (d *Daemon) reconcileMCPEvents(ctx context.Context) {
 					}
 				} else {
 					wanted[id] = &mcpSubscription{id: id, key: key, folder: w.folder, server: name, event: t.event,
-						arguments: t.arguments, workflows: []string{w.id}, pool: f.server.pool(), filled: f.server.filled, cwd: f.server.cwd}
+						arguments: t.arguments, workflows: []string{w.id}, pool: f.server.pool(), source: f.server}
 				}
 				wanted[id].fingerprint = def.wireText() + "\n" + f.server.entry
 				tl = append(tl, mcpLine{event: t.event, server: &server, subscription: id})
@@ -1021,7 +1029,7 @@ func (d *Daemon) markMCPListingStale(pool string) {
 
 func (d *Daemon) mcpPoll(s *mcpSubscription, cursor *string) (mcpPollResult, *mcpEventsError) {
 	var result mcpPollResult
-	err := d.mcpConns.with(s.pool, s.filled, s.cwd, func(c *mcpEventConn) error {
+	err := d.mcpConns.with(s.source, func(c *mcpEventConn) error {
 		var err error
 		result, err = c.poll(d.mcpConns.timeout, s.event, s.arguments, cursor)
 		return err

@@ -2821,6 +2821,13 @@ const ConnectorSlotStateRefused ConnectorSlotState = "refused"
 const ConnectorSlotStateNoRemote ConnectorSlotState = "noRemote"
 const ConnectorSlotStateSkipped ConnectorSlotState = "skipped"
 
+// What agents may do with one tool of a connector (#4099): allow (use it without asking), ask (ask the person first) or off (never use it). A layer can only move a tool towards off.
+type ConnectorToolLevel string
+
+const ConnectorToolLevelAllow ConnectorToolLevel = "allow"
+const ConnectorToolLevelAsk ConnectorToolLevel = "ask"
+const ConnectorToolLevelOff ConnectorToolLevel = "off"
+
 type ConnectorWorkflow struct {
 	ID string `json:"id"`
 
@@ -4602,6 +4609,23 @@ type FoldersListRequest struct {
 	IncludeArchived bool `json:"includeArchived"`
 }
 
+// A write or a read that an item's page offers (#4329, #4361): forge/comment, forge/label, forge/close (a close, a reopen or a transition), forge/merge (now, or with auto), forge/approve, forge/rerun, forge/log, forge/diff, forge/add-child and forge/blocked-by.
+type ForgeAction string
+
+const ForgeActionComment ForgeAction = "comment"
+const ForgeActionLabel ForgeAction = "label"
+const ForgeActionClose ForgeAction = "close"
+const ForgeActionReopen ForgeAction = "reopen"
+const ForgeActionTransition ForgeAction = "transition"
+const ForgeActionMerge ForgeAction = "merge"
+const ForgeActionAutoMerge ForgeAction = "autoMerge"
+const ForgeActionApprove ForgeAction = "approve"
+const ForgeActionRerun ForgeAction = "rerun"
+const ForgeActionLog ForgeAction = "log"
+const ForgeActionDiff ForgeAction = "diff"
+const ForgeActionAddChild ForgeAction = "addChild"
+const ForgeActionBlockedBy ForgeAction = "blockedBy"
+
 // forge/add-child (#3271): add a child to an epic's plan: a new issue (title, with level story, task, spike or bug) or one that is there (issue: #12, owner/repo#12, its URL, or a Linear key such as ENG-4). A new child gets the level's label and the epic's feature: label. GitHub and Linear.
 type ForgeAddChildRequest struct {
 	Node LineageNode `json:"node"`
@@ -4639,6 +4663,25 @@ type ForgeBoardsRequest struct {
 	Folder *string `json:"folder,omitzero"`
 }
 
+// What one forge on a list's page fills (#4329, #4361), so a client hides what it does not: issues and pulls say it has them; labelColors that its labels have a #rrggbb colour; avatars that its items have authorAvatar; stateReason that its closed issues have stateReason. commentCount says how to read ForgeItem.comments: exact; capped at commentsMost (show 50+ there); or detail, only on an item's own page (hide it on the row).
+type ForgeCapabilities struct {
+	Forge string `json:"forge"`
+
+	Issues bool `json:"issues"`
+
+	Pulls bool `json:"pulls"`
+
+	LabelColors bool `json:"labelColors"`
+
+	Avatars bool `json:"avatars"`
+
+	StateReason bool `json:"stateReason"`
+
+	CommentCount ForgeCommentCount `json:"commentCount"`
+
+	CommentsMost *int64 `json:"commentsMost,omitzero"`
+}
+
 // One of a pull request's checks (#3129): a check run or a commit status. state is passing, failing, running or skipped; url is its page on the forge.
 type ForgeCheck struct {
 	Name string `json:"name"`
@@ -4669,6 +4712,13 @@ type ForgeComment struct {
 
 	Bot *bool `json:"bot,omitzero"`
 }
+
+// How a forge counts an item's comments (#4329): exact; capped at the forge's commentsMost (Linear's 50); or detail, only on an item's own page (Bitbucket issues, Azure Repos), so a list's count is 0.
+type ForgeCommentCount string
+
+const ForgeCommentCountExact ForgeCommentCount = "exact"
+const ForgeCommentCountCapped ForgeCommentCount = "capped"
+const ForgeCommentCountDetail ForgeCommentCount = "detail"
 
 // forge/comment (#3130): a comment, as Markdown, on an issue or a pull request, as the person whose machine it is.
 type ForgeCommentRequest struct {
@@ -4816,7 +4866,7 @@ type ForgeItem struct {
 	Standing *bool `json:"standing,omitzero"`
 }
 
-// forge/issue and forge/pull (#3129): one item with its body (Markdown) and a page of its comments, the newest page first and at most 50, oldest first in the page; cursor is the page before it, absent at the first comment. A pull request's checks, review threads (line comments, in threads) and files changed come with it. head is a pull request's head commit, which forge/merge and forge/approve name (#3130); mergeMethods are the ways its repo allows, the repo's default first; start is the new-agent form for an issue. transitions are the moves an issue's workflow allows now (Jira, #3260), which forge/close takes in place of a close or a reopen.
+// forge/issue and forge/pull (#3129): one item with its body (Markdown) and a page of its comments, the newest page first and at most 50, oldest first in the page; cursor is the page before it, absent at the first comment. A pull request's checks, review threads (line comments, in threads) and files changed come with it. head is a pull request's head commit, which forge/merge and forge/approve name (#3130); mergeMethods are the ways its repo allows, the repo's default first; start is the new-agent form for an issue. transitions are the moves an issue's workflow allows now (Jira, #3260), which forge/close takes in place of a close or a reopen. actions are what the item's page offers now, from its forge and its state (#4361): a merged pull request has no merge and no reopen, a closed item no close; absent from an earlier daemon, when the page shows what it did before.
 type ForgeItemDetail struct {
 	Item ForgeItem `json:"item"`
 
@@ -4839,6 +4889,8 @@ type ForgeItemDetail struct {
 	Start *ForgeStart `json:"start,omitzero"`
 
 	Transitions []ForgeTransition `json:"transitions,omitzero"`
+
+	Actions []ForgeAction `json:"actions,omitzero"`
 }
 
 // forge/issue and forge/pull (#3129): the item's lineage node, and for an older page of its comments the cursor of the page after it.
@@ -4878,13 +4930,15 @@ type ForgeLead struct {
 	State AgentState `json:"state"`
 }
 
-// forge/issues and forge/pulls (#3129): a page of items, the last updated first. cursor is the next page, absent at the end. errors says a forge that could not be read (not connected, a rate limit), and the items of the others still come.
+// forge/issues and forge/pulls (#3129): a page of items, the last updated first. cursor is the next page, absent at the end. errors says a forge that could not be read (not connected, a rate limit), and the items of the others still come. forges says what each forge on the page fills (#4361); absent from an earlier daemon.
 type ForgeList struct {
 	Items []ForgeItem `json:"items"`
 
 	Cursor *string `json:"cursor,omitzero"`
 
 	Errors []ForgeListError `json:"errors,omitzero"`
+
+	Forges []ForgeCapabilities `json:"forges,omitzero"`
 }
 
 // A forge forge/issues or forge/pulls could not read (#3129): forge is github, gitlab or linear.
@@ -5762,7 +5816,7 @@ type LineageFigures struct {
 	Limited *bool `json:"limited,omitzero"`
 }
 
-// lineage/walk (#2348): the nodes the walk reached and the links it went along. limited says the walk stopped at its limit on nodes, so there is more. resolved is each node's title, state and labels from its connector, by ref, for the nodes a connector could resolve (#3089). resolving says some nodes are still being resolved in the background, so walk again shortly for them (#3102).
+// lineage/walk (#2348): the nodes the walk reached and the links it went along. limited says the walk stopped at its limit on nodes, so there is more. resolved is each node's title, state and labels from its connector, by ref, for the nodes a connector could resolve (#3089). resolving says some nodes are still being resolved in the background, so walk again shortly for them (#3102). states is the current state of each session node in it that has one, by ref (#4274).
 type LineageGraph struct {
 	Nodes []LineageNode `json:"nodes"`
 
@@ -5773,6 +5827,8 @@ type LineageGraph struct {
 	Resolving *bool `json:"resolving,omitzero"`
 
 	Resolved map[string]LineageResolved `json:"resolved,omitzero"`
+
+	States map[string]LineageSessionState `json:"states,omitzero"`
 }
 
 // A typed link in the lineage graph (#2348): from works-on, opens, fixes, started, reviews, closes or part-of to. source is how the host knows it: start, branch, pr-body, helper, agent, person or forge. at is when it started; endedAt is set when it stops being active (a PR merged, a session archived). Both lists are open: a host keeps a relationship or a source it does not know.
@@ -5801,11 +5857,13 @@ type LineageLinkRequest struct {
 	Source string `json:"source"`
 }
 
-// The links of a node, newest first (#2348), or the links lineage/end ended. limited says there are more than the answer holds.
+// The links of a node, newest first (#2348), or the links lineage/end ended. limited says there are more than the answer holds. states is a session node's changes of state, newest first, so the first is its state now (#4274); absent for a node that is not a session, or a session with none recorded.
 type LineageLinks struct {
 	Links []LineageLink `json:"links"`
 
 	Limited *bool `json:"limited,omitzero"`
+
+	States []LineageSessionState `json:"states,omitzero"`
 }
 
 // A milestone a release finished (#4427), with its title when the host has resolved it.
@@ -5866,6 +5924,43 @@ type LineageSessionMatch struct {
 	AgentID UUID `json:"agentID"`
 
 	On LineageNode `json:"on"`
+}
+
+// A change of a session node's state, as its machine recorded it (#4274): state is what it changed to, at is when. The machine keeps the changes of the last 90 days, and each session's latest whatever its age.
+type LineageSessionState struct {
+	State LineageSessionStateName `json:"state"`
+
+	At Date `json:"at"`
+}
+
+// A session's state in lineage (#4274): working is in a turn (or starting one); waiting waits on an event, CI, a timer or a place to start; needs-you waits on a person, for a question or an approval; stopped is not running and not archived; archived is archived; deleted is deleted, and the node keeps no title. A state this build does not know reads as stopped.
+type LineageSessionStateName string
+
+const LineageSessionStateNameWorking LineageSessionStateName = "working"
+const LineageSessionStateNameWaiting LineageSessionStateName = "waiting"
+const LineageSessionStateNameNeedsYou LineageSessionStateName = "needs-you"
+const LineageSessionStateNameStopped LineageSessionStateName = "stopped"
+const LineageSessionStateNameArchived LineageSessionStateName = "archived"
+const LineageSessionStateNameDeleted LineageSessionStateName = "deleted"
+
+// UnmarshalJSON reads a value this build does not know as "stopped".
+func (v *LineageSessionStateName) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	switch LineageSessionStateName(s) {
+	case LineageSessionStateNameWorking,
+		LineageSessionStateNameWaiting,
+		LineageSessionStateNameNeedsYou,
+		LineageSessionStateNameStopped,
+		LineageSessionStateNameArchived,
+		LineageSessionStateNameDeleted:
+		*v = LineageSessionStateName(s)
+	default:
+		*v = LineageSessionStateNameStopped
+	}
+	return nil
 }
 
 // The sessions on this machine that lineage links to the issue, to its sub-issues or to their PRs, each once, on the first issue in issues they came by. limited says there were more sub-issues or sessions than are counted.
@@ -6582,6 +6677,20 @@ type MCPSetSecretRequest struct {
 	NeedsApproval *bool `json:"needsApproval,omitzero"`
 }
 
+// Sets the level of one tool of a connector, or of all its tools that write, in the destination's layer: yours for personal, the folder's .agents/policy.json for a folder (#4099).
+type MCPSetToolLevelRequest struct {
+	Destination SkillDestination `json:"destination"`
+
+	// The connector's name.
+	Name string `json:"name"`
+
+	// The tool's name. Absent: the switch for every tool that writes.
+	Tool *string `json:"tool,omitzero"`
+
+	// Absent: the layer sets nothing for it, and the default applies.
+	Level *ConnectorToolLevel `json:"level,omitzero"`
+}
+
 type MCPSignInAnswer struct {
 	FlowID *UUID `json:"flowID,omitzero"`
 
@@ -6657,6 +6766,50 @@ type MCPSignOutAnswer struct {
 
 type MCPSignOutRequest struct {
 	Target MCPSignInTarget `json:"target"`
+}
+
+// One tool of a connector, as tools/list gave it, with its level (#4099).
+type MCPToolRow struct {
+	Name string `json:"name"`
+
+	Title *string `json:"title,omitzero"`
+
+	// Its annotations do not say it is read only (readOnlyHint), or say it is destructive (destructiveHint).
+	Writes bool `json:"writes"`
+
+	// The level in force: the tightest of every layer, or the default (ask for a tool that writes, allow for one that only reads).
+	Level ConnectorToolLevel `json:"level"`
+
+	// What the destination's layer sets for this tool itself. Absent: nothing.
+	Own *ConnectorToolLevel `json:"own,omitzero"`
+
+	// The tightest level of the layers above the destination's; a menu dims what is looser.
+	Cap *ConnectorToolLevel `json:"cap,omitzero"`
+
+	// For example "Your policy: at most Ask".
+	CapLine *string `json:"capLine,omitzero"`
+}
+
+type MCPToolsAnswer struct {
+	Name string `json:"name"`
+
+	Tools []MCPToolRow `json:"tools"`
+
+	// The destination layer's switch for every tool that writes. Absent: not set.
+	Writes *ConnectorToolLevel `json:"writes,omitzero"`
+
+	WritesCap *ConnectorToolLevel `json:"writesCap,omitzero"`
+
+	WritesCapLine *string `json:"writesCapLine,omitzero"`
+
+	// Why there is no list of tools: the connector has not answered a check yet, or did not answer.
+	Problem *string `json:"problem,omitzero"`
+}
+
+type MCPToolsRequest struct {
+	Destination SkillDestination `json:"destination"`
+
+	Name string `json:"name"`
 }
 
 type MCPTransportName string
@@ -9120,6 +9273,15 @@ type PolicyBudgets struct {
 	Raises []BudgetRaise `json:"raises"`
 }
 
+// The levels a layer sets for one connector's tools (#4099). A tool's own level comes before the layer's writes switch.
+type PolicyConnectorRule struct {
+	// The level of every tool that writes and that tools does not name.
+	Writes *ConnectorToolLevel `json:"writes,omitzero"`
+
+	// A level for each tool, by its name.
+	Tools map[string]ConnectorToolLevel `json:"tools,omitzero"`
+}
+
 // policy/effective (#2957): the rules for an agent in folder, or, with no folder, outside any folder layer.
 type PolicyEffectiveRequest struct {
 	Folder *URL `json:"folder,omitzero"`
@@ -9288,6 +9450,7 @@ const PolicyRuleNameRuntimes PolicyRuleName = "runtimes"
 const PolicyRuleNameMarketplacesAllowed PolicyRuleName = "marketplaces.allowed"
 const PolicyRuleNameMarketplacesCustomServers PolicyRuleName = "marketplaces.customServers"
 const PolicyRuleNameEnvironment PolicyRuleName = "environment"
+const PolicyRuleNameConnectorTools PolicyRuleName = "connectorTools"
 
 // The rules a layer sets (#2957, data-model.md "PolicyRules"): the same shape on the organisation, your and a folder's layer (FR-002). Every field is optional: absent sets nothing.
 type PolicyRules struct {
@@ -9313,6 +9476,9 @@ type PolicyRules struct {
 	Marketplaces *PolicyMarketplaces `json:"marketplaces,omitzero"`
 
 	Environment *PolicyEnvironment `json:"environment,omitzero"`
+
+	// The level of each connector's tools, by the connector's name (#4099). A tool no layer names is ask when it writes and allow when it only reads.
+	ConnectorTools map[string]PolicyConnectorRule `json:"connectorTools,omitzero"`
 }
 
 // One allowed runtime in a policy (#998).

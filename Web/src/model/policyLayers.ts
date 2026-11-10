@@ -109,6 +109,7 @@ export const rows: readonly Row[] = [
   { rule: "marketplaces.allowed", title: "Marketplaces", section: "tools", kind: { kind: "list" }, unset: "Every marketplace" },
   { rule: "marketplaces.customServers", title: "Connectors added by hand", section: "tools", kind: { kind: "list" }, unset: "Allowed" },
   { rule: "environment", title: "Variables agents get", section: "tools", kind: { kind: "list" }, unset: "Each runtime’s own" },
+  { rule: "connectorTools", title: "Connector tools", section: "tools", kind: { kind: "list" }, unset: "Ask before a tool that writes" },
 ];
 
 export function rowsIn(section: Section): Row[] {

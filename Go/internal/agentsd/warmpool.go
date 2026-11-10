@@ -184,6 +184,8 @@ func (d *Daemon) warmKey(a *wire.Agent) string {
 		servers = append(servers, e.name+"="+string(b))
 	}
 	k["servers"] = servers
+	// A tool turned Off is in the runtime's own deny list, which it reads as it starts (#4099).
+	k["toolsOff"] = d.offTools(a)
 	k["secrets"] = d.sessionSecretEnv(a.ID)
 	// A server a person allowed after it was refused connects at a new start (#4120).
 	k["secretProxy"] = d.secretProxyStart(a.ID)

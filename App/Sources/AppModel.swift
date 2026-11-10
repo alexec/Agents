@@ -4812,6 +4812,27 @@ final class AppModel {
         }
     }
 
+    /// A connector's tools with Allow, Ask or Off for each (#4099); nil when the host cannot say.
+    func mcpTools(_ name: String, at destination: DaemonAPI.SkillDestination) async -> DaemonAPI.MCPToolsAnswer? {
+        try? await macClient.call(DaemonAPI.Method.mcpTools,
+                                  DaemonAPI.MCPToolsRequest(destination: destination, name: name),
+                                  returning: DaemonAPI.MCPToolsAnswer.self)
+    }
+
+    /// Sets one tool's level, or with no tool the switch for every tool that writes; no level
+    /// clears it (#4099). The connector's tools again, or why it was not set.
+    func setMCPToolLevel(_ name: String, tool: String?, to level: DaemonAPI.ConnectorToolLevel?,
+                         at destination: DaemonAPI.SkillDestination) async -> Result<DaemonAPI.MCPToolsAnswer, DaemonAPI.MCPCatalogError> {
+        do {
+            return .success(try await macClient.call(DaemonAPI.Method.mcpSetToolLevel,
+                                                     DaemonAPI.MCPSetToolLevelRequest(destination: destination, name: name,
+                                                                                     tool: tool, level: level),
+                                                     returning: DaemonAPI.MCPToolsAnswer.self))
+        } catch {
+            return .failure(Self.mcpError(error))
+        }
+    }
+
     /// Approve the entry the row showed. A digest that no longer matches comes back as an error.
     func approveFolderMCP(_ name: String, digest: String, in folder: URL) async -> DaemonAPI.MCPCatalogError? {
         do {

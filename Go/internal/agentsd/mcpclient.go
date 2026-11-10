@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"mime"
 	"net/http"
 	"os/exec"
@@ -81,9 +82,46 @@ type mcpConn interface {
 	end()
 }
 
-// checkMCP connects, lists the tools and ends: how many it has and what it declares (#1428),
-// or why it did not answer.
-func checkMCP(ctx context.Context, s sdk.McpServer, cwd string, timeout time.Duration) (int, mcpcatalog.Declared, error) {
+// mcpToolInfo is one tool as tools/list gave it, for Allow, Ask or Off (#4099).
+type mcpToolInfo struct {
+	name, title string
+	// writes is MCP's annotations read safely: a tool writes unless it says it is read only,
+	// and one that says it is destructive writes whatever else it says.
+	writes bool
+}
+
+// toolInfos reads tools/list's tools, in its order, each name once.
+func toolInfos(raw []json.RawMessage) []mcpToolInfo {
+	out := make([]mcpToolInfo, 0, len(raw))
+	seen := map[string]bool{}
+	for _, r := range raw {
+		var t struct {
+			Name        string `json:"name"`
+			Title       string `json:"title"`
+			Annotations struct {
+				Title           string `json:"title"`
+				ReadOnlyHint    *bool  `json:"readOnlyHint"`
+				DestructiveHint *bool  `json:"destructiveHint"`
+			} `json:"annotations"`
+		}
+		if json.Unmarshal(r, &t) != nil || t.Name == "" || seen[t.Name] {
+			continue
+		}
+		seen[t.Name] = true
+		title := t.Title
+		if title == "" {
+			title = t.Annotations.Title
+		}
+		readOnly := t.Annotations.ReadOnlyHint != nil && *t.Annotations.ReadOnlyHint
+		destructive := t.Annotations.DestructiveHint != nil && *t.Annotations.DestructiveHint
+		out = append(out, mcpToolInfo{name: t.Name, title: title, writes: !readOnly || destructive})
+	}
+	return out
+}
+
+// checkMCP connects, lists the tools and ends: its tools and what it declares (#1428), or
+// why it did not answer.
+func checkMCP(ctx context.Context, s sdk.McpServer, cwd string, timeout time.Duration) ([]mcpToolInfo, mcpcatalog.Declared, error) {
 	none := mcpcatalog.Declared{}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -92,13 +130,13 @@ func checkMCP(ctx context.Context, s sdk.McpServer, cwd string, timeout time.Dur
 	case s.Stdio != nil:
 		sc, err := startStdioMCP(s.Stdio, cwd)
 		if err != nil {
-			return 0, none, err
+			return nil, none, err
 		}
 		c = sc
 	case s.Http != nil:
 		c = &httpMCP{url: s.Http.Url, headers: s.Http.Headers}
 	default:
-		return 0, none, &mcpCheckFailure{kind: "notMCP"}
+		return nil, none, &mcpCheckFailure{kind: "notMCP"}
 	}
 	defer c.end()
 	timedOut := func(err error) error {
@@ -110,14 +148,14 @@ func checkMCP(ctx context.Context, s sdk.McpServer, cwd string, timeout time.Dur
 	raw, err := c.call(ctx, 1, "initialize", map[string]any{"protocolVersion": "2025-06-18", "capabilities": map[string]any{},
 		"clientInfo": map[string]any{"name": "Agents", "version": "1"}})
 	if err != nil {
-		return 0, none, timedOut(err)
+		return nil, none, timedOut(err)
 	}
 	var init struct {
 		Capabilities map[string]json.RawMessage `json:"capabilities"`
 	}
 	_ = json.Unmarshal(raw, &init)
 	if err := c.notify(ctx, "notifications/initialized"); err != nil {
-		return 0, none, timedOut(err)
+		return nil, none, timedOut(err)
 	}
 	var tools []json.RawMessage
 	id := 2
@@ -128,14 +166,14 @@ func checkMCP(ctx context.Context, s sdk.McpServer, cwd string, timeout time.Dur
 		}
 		raw, err := c.call(ctx, id, "tools/list", params)
 		if err != nil {
-			return 0, none, timedOut(err)
+			return nil, none, timedOut(err)
 		}
 		var page struct {
 			Tools      []json.RawMessage `json:"tools"`
 			NextCursor string            `json:"nextCursor"`
 		}
 		if json.Unmarshal(raw, &page) != nil {
-			return 0, none, &mcpCheckFailure{kind: "notMCP"}
+			return nil, none, &mcpCheckFailure{kind: "notMCP"}
 		}
 		tools = append(tools, page.Tools...)
 		if page.NextCursor == "" || id > 50 {
@@ -173,7 +211,7 @@ func checkMCP(ctx context.Context, s sdk.McpServer, cwd string, timeout time.Dur
 			}
 		}
 	}
-	return len(tools), declared, nil
+	return toolInfos(tools), declared, nil
 }
 
 func answerOf(raw []byte, id int) (json.RawMessage, bool, error) {
@@ -239,6 +277,7 @@ func startStdioMCP(s *sdk.McpServerStdio, cwd string) (*stdioMCP, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, &mcpCheckFailure{kind: "stopped", message: "It could not be started: " + strings.TrimPrefix(err.Error(), "exec: ") + "."}
 	}
+	log.Printf("mcp client: %s started (pid %d)", s.Name, cmd.Process.Pid)
 	c := &stdioMCP{cmd: cmd, in: in, lines: make(chan []byte, 16), gone: make(chan struct{})}
 	go func() {
 		r := bufio.NewReaderSize(out, 64*1024)

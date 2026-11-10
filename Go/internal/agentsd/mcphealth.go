@@ -43,7 +43,7 @@ type mcpHealthResult struct {
 	check  wire.MCPCheckState
 	at     wire.Date
 	err    string
-	tools  int
+	tools  []mcpToolInfo
 	// declared is what the server declared when it answered, for its levels.
 	declared mcpcatalog.Declared
 	// ours is the catalogue id when Agents made the server.
@@ -282,7 +282,7 @@ func (d *Daemon) mcpHealthPass() (wire.MCPHealthSnapshot, []mcpDue) {
 					h.LastError = &kept.err
 				}
 				if kept.check == wire.MCPCheckStateAnswered {
-					n := int64(kept.tools)
+					n := int64(len(kept.tools))
 					h.Tools = &n
 				}
 				mcpLevels(&h, e, &kept)

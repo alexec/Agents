@@ -65,16 +65,38 @@ struct WorkPlanTests {
         #expect(WorkPlan.mark(child(1, step: 2), pr: pr(10, outcome: "closed"), states: [.stopped]) == .waiting)
     }
 
-    @Test func whatWorksOnAChild() {
-        #expect(WorkPlan.workWords(pr: pr(10), states: [.running]) == "● lane running · PR #10 open")
-        #expect(WorkPlan.workWords(pr: pr(10, failed: 2), states: [.waitingOnUser, .running])
-            == "● lane needs you · PR #10 open · 2 failed checks")
-        #expect(WorkPlan.workWords(pr: pr(10, outcome: "merged"), states: [.finished]) == "PR #10 merged")
-        #expect(WorkPlan.workWords(pr: nil, states: []) == nil)
+    @Test func aChildsLineSaysWhatWorksOnIt() {
+        let plan = DaemonAPI.ForgePlan(item: .init(node: issue(1), title: "Epic", state: "open", updatedAt: day), children: [
+            child(2, step: 1, state: "closed"), child(3, step: 1), child(4, step: 2, blockedBy: [2, 3]),
+        ])
+        func line(_ c: DaemonAPI.ForgePlanChild, pr: DaemonAPI.LineageCostNode? = nil, states: [AgentState] = [],
+                  lane: String? = nil) -> String? {
+            WorkPlan.lineWords(c, mark: WorkPlan.mark(c, pr: pr, states: states), pr: pr, states: states, lane: lane, in: plan,
+                               now: day.addingTimeInterval(6 * 3600))
+        }
+        #expect(line(child(3, step: 1), states: [.running], lane: "Work look: epic page") == "Working · “Work look: epic page”")
+        #expect(line(child(3, step: 1), pr: pr(11)) == "Working · P#11 open")
+        #expect(line(child(3, step: 1), pr: pr(11), states: [.waitingOnUser]) == "Needs you · its lane asks a question")
+        #expect(line(child(3, step: 1), pr: pr(11, failed: 1)) == "Needs you · 1 failed check")
+        #expect(line(child(3, step: 1), pr: pr(11, failed: 2)) == "Needs you · 2 failed checks")
+        #expect(line(child(4, step: 2, blockedBy: [2, 3])) == "Waiting for #3")
+        #expect(line(child(4, step: 2, blockedBy: [2])) == nil)
+        #expect(line(child(5, step: 1, outside: [100])) == "Blocked by #100, outside the plan")
+        #expect(line(child(2, step: 1, state: "closed"), pr: pr(10, outcome: "merged")) == "merged P#10 · 6 h ago")
+        #expect(line(child(2, step: 1, state: "closed")) == nil)
+    }
+
+    @Test func anOpenChildsEstimateIsShort() {
+        var e = DaemonAPI.LineageEstimate(node: issue(2), matchedBy: "level", matches: 3)
+        #expect(WorkPlan.estimateWords(e) == nil)
+        e.workingSeconds = .init(median: 7200, p10: 3600, p90: 9000)
+        #expect(WorkPlan.estimateWords(e)?.hasPrefix("~") == true)
+        e.cost = ["USD": .init(median: 0.6, p10: 0.2, p90: 1)]
+        #expect(WorkPlan.estimateWords(e) == "~$0.60")
     }
 
     @Test func aChildBlockedOutsideThePlanSaysByWhat() {
-        #expect(WorkPlan.blockedWords(child(1, step: 1, outside: [17])) == "blocked by #17")
+        #expect(WorkPlan.blockedWords(child(1, step: 1, outside: [17])) == "Blocked by #17, outside the plan")
         #expect(WorkPlan.blockedWords(child(1, step: 1, state: "closed", outside: [17])) == nil)
         #expect(WorkPlan.blockedWords(child(1, step: 1)) == nil)
     }
@@ -94,22 +116,47 @@ struct WorkPlanTests {
             child(2, step: 1, state: "closed"), child(3, step: 1), child(4, step: 2),
         ])
         let words = WorkPlan.progressWords(plan, running: 1, rollups: [rollup(2, usd: 4.1), rollup(3, usd: 1.2)])
-        #expect(words.hasPrefix("1/3 done · 1 running · "))
-        #expect(words.hasSuffix("5.30"))
-        #expect(WorkPlan.progressWords(plan, running: 0, rollups: []) == "1/3 done")
+        #expect(words.hasPrefix("1 of 3 done · 1 running · "))
+        #expect(words.hasSuffix("5.30 spent"))
+        #expect(WorkPlan.progressWords(plan, running: 0, rollups: []) == "1 of 3 done")
+        func estimate(_ n: Int, _ usd: Double) -> DaemonAPI.LineageEstimate {
+            var e = DaemonAPI.LineageEstimate(node: issue(n), matchedBy: "level", matches: 3)
+            e.cost = ["USD": .init(median: usd, p10: usd / 2, p90: usd * 2)]
+            return e
+        }
+        // A closed child's estimate is not to go.
+        #expect(WorkPlan.progressWords(plan, running: 0, rollups: [], estimates: [estimate(2, 9), estimate(3, 1.5), estimate(4, 3.2)])
+            == "1 of 3 done · about $4.70 to go")
+        let bar = WorkPlan.bar(plan, running: 1)
+        #expect(bar.done == 1.0 / 3 && bar.running == 1.0 / 3)
+        #expect(WorkPlan.bar(.init(item: plan.item), running: 0) == (0, 0))
+    }
+
+    @Test func aStepSaysItsCountsAndFoldsWhenDone() throws {
+        let plan = DaemonAPI.ForgePlan(item: .init(node: issue(1), title: "Epic", state: "open", updatedAt: day), children: [
+            child(2, step: 1, state: "closed"), child(3, step: 2, state: "closed"), child(4, step: 2),
+        ], steps: [.init(step: 1, nodes: [issue(2)]), .init(step: 2, nodes: [issue(3), issue(4)])])
+        let first = try #require(plan.steps.first), second = try #require(plan.steps.last)
+        #expect(WorkPlan.startsFolded(first, in: plan))
+        #expect(!WorkPlan.startsFolded(second, in: plan))
+        #expect(WorkPlan.stepWords(first, in: plan, rollups: [issue(2): rollup(2, usd: 0.9)]) == "1 of 1 done · $0.90")
+        #expect(WorkPlan.stepWords(first, in: plan, rollups: [:]) == "1 of 1 done")
+        #expect(WorkPlan.stepWords(second, in: plan, rollups: [issue(3): rollup(3, usd: 0.9)]) == "1 of 2 done")
     }
 
     @Test func aStandingEpicsHeaderHasNoEnd() {
         let plan = DaemonAPI.ForgePlan(item: .init(node: issue(1), title: "Bug lane", state: "open", updatedAt: day),
                                        children: [child(2, step: 1), child(3, step: 1)], standing: .init(labels: ["bug"]))
         let words = WorkPlan.standingWords(plan, running: 1, rollups: [rollup(2, usd: 4.1)])
-        #expect(words.hasPrefix("Standing · 1 running · 2 open · "))
-        #expect(words.hasSuffix("4.10"))
-        #expect(WorkPlan.standingWords(plan, running: 0, rollups: []) == "Standing · 2 open")
+        #expect(words.hasPrefix("2 open · 1 running · "))
+        #expect(words.hasSuffix("4.10 spent"))
+        #expect(WorkPlan.standingWords(plan, running: 0, rollups: []) == "2 open")
         let full = DaemonAPI.ForgePlan(item: plan.item, children: (2...101).map { child($0, step: 1) }, standing: plan.standing)
-        #expect(WorkPlan.standingWords(full, running: 0, rollups: []) == "Standing · 100+ open")
+        #expect(WorkPlan.standingWords(full, running: 0, rollups: []) == "100+ open")
         let bad = DaemonAPI.ForgePlan(item: plan.item, standing: .init(error: "no standing block"))
-        #expect(WorkPlan.standingWords(bad, running: 0, rollups: []) == "Standing")
+        #expect(WorkPlan.standingWords(bad, running: 0, rollups: []) == "")
+        #expect(WorkPlan.moreWords(19) == "9 more")
+        #expect(WorkPlan.moreWords(10) == nil)
     }
 
     @Test func aStandingEpicsQueryInWords() {
@@ -120,12 +167,16 @@ struct WorkPlanTests {
         #expect(WorkPlan.queryWords(.init(labels: ["ui"], any: ["bug", "polish"], milestone: "any"))
             == "Open issues labelled ui, and bug or polish · in a milestone · 1 lane at a time")
         #expect(WorkPlan.queryWords(.init()) == "Open issues · 1 lane at a time")
+        #expect(WorkPlan.queryRestWords(.init(labels: ["bug"], milestone: "none")) == "· no milestone · 1 lane at a time")
+        #expect(WorkPlan.queryRestWords(.init(any: ["polish", "competitor"], not: ["wontfix"], lanes: 2))
+            == "· polish or competitor · not wontfix · 2 lanes at a time")
     }
 
     @Test func theLeadsWords() {
-        let lead = DaemonAPI.ForgeLead(session: UUID(), title: "Work pages lead", state: .running)
-        #expect(WorkPlan.leadWords(lead, title: nil) == "Lead: “Work pages lead” (working)")
-        #expect(WorkPlan.leadWords(lead, title: "Renamed") == "Lead: “Renamed” (working)")
+        #expect(WorkPlan.leadWords(.running) == "working")
+        #expect(WorkPlan.leadWords(.waitingOnUser) == "needs you")
+        #expect(WorkPlan.leadWords(.finished) == "waiting")
+        #expect(WorkPlan.leadWords(.stopped) == "stopped")
     }
 
     @Test func startLeadFillsTheLeadSkillsForm() {
