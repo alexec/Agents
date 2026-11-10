@@ -32,10 +32,10 @@ import (
 // client (githubmcp.RealGitHub), not a copy of it: one search for every repo the folders are
 // on, so a list costs one GitHub call however many folders there are. GitLab (#3209) is read
 // with the host's GitLab connection, only on its own GitLab, through gitlabmcp.RealGitLab: a
-// call per project, as GitLab has no list across chosen projects. Linear (#3209) is read with
-// the Linear connection, issues only, of the teams the folders' .agents/folder.json name in
+// call per project, as GitLab has no list across chosen projects. Linear (#3209, #4357) is read
+// with the Linear connection, issues only, of the teams the folders' .agents/folder.json name in
 // "linearTeams": one query for every team; when no folder names one, of the whole workspace,
-// as the Linear connector's view lists it (#3311). Jira (#3260) is read with the jira connector's
+// as the Linear connector's view lists it (#3311) (linearForge). Jira (#3260) is read with the jira connector's
 // sign-in (JIRA_URL, JIRA_EMAIL and JIRA_API_TOKEN in the secrets) through jiramcp.RealJira,
 // issues only, of the projects the folders' .agents/folder.json name in "jiraProjects": one
 // search for every project. Azure Boards (#3815) is read the same way, of the projects the
@@ -302,25 +302,6 @@ func (d *Daemon) forgeList(ctx context.Context, prs bool, r wire.ForgeListReques
 		p.forge = name
 		pages = append(pages, p)
 	}
-	if (len(sources.teams) > 0 || sources.workspace) && !slices.Contains(cursor.Done, "linear") {
-		p := forgePage{forge: "linear"}
-		l, err := d.forgeLinear()
-		if err == nil {
-			var page linearmcp.SearchPage
-			page, err = l.Search(ctx, sources.teams, linearmcp.SearchFilter{State: state, Label: deref(r.Label),
-				Assignee: deref(r.Assignee), Query: deref(r.Query), Feature: deref(r.Feature)}, cursor.Linear, limit)
-			for _, i := range page.Items {
-				folder, named := sources.teamFolder[i.Team]
-				if !named {
-					folder = sources.linearHome
-				}
-				p.items = append(p.items, linearItemOf(i, folder))
-			}
-			p.cursors, p.next = page.Cursors, page.Next
-		}
-		p.err = err
-		pages = append(pages, p)
-	}
 	if (len(sources.projects) > 0 || board != nil && board.jira != "") && !slices.Contains(cursor.Done, "jira") {
 		p := forgePage{forge: "jira"}
 		j, err := d.forgeJira()
@@ -413,17 +394,11 @@ func mergeForgePages(pages []forgePage, from forgeCursor, limit int) ([]wire.For
 	return items, next, more
 }
 
-// forgeSources are what a list reads of the forges not yet on the interface: the Linear teams,
-// the Jira projects and the others' repositories, each once, with a folder on each to act from.
+// forgeSources are what a list reads of the forges not yet on the interface: the Jira projects
+// and the Azure Boards projects, each once, with a folder on each to act from.
 type forgeSources struct {
-	teams []string
-	// workspace is the whole Linear workspace, when no folder names a team (#3311); its
-	// issues act from linearHome.
-	workspace     bool
-	linearHome    string
 	projects      []string
 	folderOf      map[forgeRepo]string
-	teamFolder    map[string]string
 	projectFolder map[string]string
 	// boards is the Azure Boards projects (#3815), organization/project.
 	boards       []string
@@ -431,20 +406,14 @@ type forgeSources struct {
 }
 
 func (s forgeSources) key() []any {
-	return []any{s.teams, s.workspace, s.linearHome, s.projects, s.boards}
+	return []any{s.projects, s.boards}
 }
 
 func (d *Daemon) forgeSources(ctx context.Context, prs bool, folders []string) forgeSources {
-	s := forgeSources{folderOf: map[forgeRepo]string{}, teamFolder: map[string]string{}, projectFolder: map[string]string{}, boardsFolder: map[string]string{}}
+	s := forgeSources{folderOf: map[forgeRepo]string{}, projectFolder: map[string]string{}, boardsFolder: map[string]string{}}
 	for _, f := range folders {
 		if prs {
 			continue
-		}
-		for _, team := range d.folderLinearTeams(f) {
-			if _, seen := s.teamFolder[team]; !seen {
-				s.teamFolder[team] = f
-				s.teams = append(s.teams, team)
-			}
 		}
 		for _, project := range d.folderJiraProjects(f) {
 			if _, seen := s.projectFolder[project]; !seen {
@@ -459,10 +428,6 @@ func (d *Daemon) forgeSources(ctx context.Context, prs bool, folders []string) f
 			}
 		}
 	}
-	if !prs && len(s.teams) == 0 && d.linearConnected() && !d.anyLinearTeams() {
-		s.workspace, s.linearHome = true, d.linearHome()
-	}
-	slices.Sort(s.teams)
 	slices.Sort(s.projects)
 	slices.Sort(s.boards)
 	return s
@@ -591,8 +556,6 @@ func (d *Daemon) forgeItem(ctx context.Context, kind string, r wire.ForgeItemReq
 	if f, ref, ok := d.forgeOwning(r.Node); ok {
 		out, err = f.Item(ctx, ref, deref(r.Cursor))
 		err = forgeCannotErr(method, f, err)
-	} else if identifier, ok := strings.CutPrefix(r.Node.Ref, "linear:"); ok && kind == lineage.KindIssue && linearLabel.MatchString(identifier) {
-		out, err = d.linearItem(ctx, method, identifier, deref(r.Cursor))
 	} else if key, ok := strings.CutPrefix(r.Node.Ref, "jira:"); ok && kind == lineage.KindIssue && linearLabel.MatchString(key) {
 		out, err = d.jiraItem(ctx, method, key, deref(r.Cursor))
 	} else if project, id, ok := boardsOfNode(r.Node); ok && kind == lineage.KindIssue {
@@ -625,27 +588,6 @@ func (d *Daemon) gitlabOf(ctx context.Context, method string, repo forgeRepo) (f
 		return nil, "", "", Invalid("%s: %s is not on the connected GitLab, %s", method, repo.path, root)
 	}
 	return d.forgeGitLab(root), project, folder, nil
-}
-
-func (d *Daemon) linearItem(ctx context.Context, method, identifier, cursor string) (wire.ForgeItemDetail, error) {
-	l, err := d.forgeLinear()
-	if err != nil {
-		return wire.ForgeItemDetail{}, err
-	}
-	p, err := l.ItemPage(ctx, identifier, cursor)
-	if err != nil {
-		var le *linearmcp.LinearError
-		if errors.As(err, &le) && le.Kind == linearmcp.NotFound {
-			return wire.ForgeItemDetail{}, Invalid("%s: %v", method, err)
-		}
-		return wire.ForgeItemDetail{}, err
-	}
-	out := wire.ForgeItemDetail{Item: linearItemOf(p.Item, d.linearFolder(p.Team)), Body: p.Body, Comments: []wire.ForgeComment{}, Cursor: optional(p.Before)}
-	out.Start = forgeStartOf(out.Item)
-	for _, c := range p.Thread {
-		out.Comments = append(out.Comments, forgeCommentOf(c.Author, c.Body, c.At, c.URL, c.Bot))
-	}
-	return out, nil
 }
 
 func (d *Daemon) jiraItem(ctx context.Context, method, key, cursor string) (wire.ForgeItemDetail, error) {

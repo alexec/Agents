@@ -10,7 +10,6 @@ import (
 
 	"github.com/alexec/agents/Go/internal/jiramcp"
 	"github.com/alexec/agents/Go/internal/lineage"
-	"github.com/alexec/agents/Go/internal/linearmcp"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -99,8 +98,6 @@ func (d *Daemon) forgePlan(ctx context.Context, r wire.ForgePlanRequest) (wire.F
 			var a forgePlanAnswer
 			a, err = f.Plan(ctx, ref)
 			epic, children, err = a.epic, a.children, forgeCannotErr(method, f, err)
-		} else if identifier, ok := strings.CutPrefix(r.Node.Ref, "linear:"); ok && linearLabel.MatchString(identifier) {
-			epic, children, err = d.linearPlan(ctx, method, identifier)
 		} else if key, ok := strings.CutPrefix(r.Node.Ref, "jira:"); ok && linearLabel.MatchString(key) {
 			epic, children, err = d.jiraPlan(ctx, method, key)
 		} else if project, id, ok := boardsOfNode(r.Node); ok {
@@ -227,32 +224,6 @@ func (d *Daemon) leadOf(epic wire.LineageNode) *wire.ForgeLead {
 		return nil
 	}
 	return &wire.ForgeLead{Session: best.ID, Title: best.Title, State: best.State}
-}
-
-func (d *Daemon) linearPlan(ctx context.Context, method, identifier string) (wire.ForgeItem, []planChild, error) {
-	l, err := d.forgeLinear()
-	if err != nil {
-		return wire.ForgeItem{}, nil, err
-	}
-	p, err := l.Plan(ctx, identifier)
-	if err != nil {
-		var le *linearmcp.LinearError
-		if errors.As(err, &le) && le.Kind == linearmcp.NotFound {
-			return wire.ForgeItem{}, nil, Invalid("%s: %v", method, err)
-		}
-		return wire.ForgeItem{}, nil, err
-	}
-	folderOf := d.linearFolder
-	epic := linearItemOf(p.Epic, folderOf(p.Epic.Team))
-	var children []planChild
-	for _, c := range p.Children {
-		pc := planChild{item: linearItemOf(c.Item, folderOf(c.Team))}
-		for _, b := range c.BlockedBy {
-			pc.blockedBy = append(pc.blockedBy, planRef{node: wire.LineageNode{Kind: lineage.KindIssue, Ref: "linear:" + b.Identifier}, open: b.Open})
-		}
-		children = append(children, pc)
-	}
-	return epic, children, nil
 }
 
 // featurePages reads at most featureEpicPages pages of the issues q asks for, on r's folder and
