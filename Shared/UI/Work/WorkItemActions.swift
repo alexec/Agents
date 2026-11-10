@@ -286,9 +286,7 @@ struct WorkMergeBox: View {
         said = nil
         defer { busy = nil }
         do {
-            let got = try await model.forge(DaemonAPI.Method.forgeLog, DaemonAPI.ForgeLogRequest(node: node, check: check),
-                                            returning: DaemonAPI.ForgeLog.self, on: host)
-            log = WorkLog(title: check, text: got.text)
+            log = try await WorkLog.read(check, of: node, model: model, on: host)
         } catch {
             said = (WorkList.failureWords(error), true)
         }
@@ -641,6 +639,13 @@ struct WorkLog: Identifiable {
     let id = UUID()
     let title: String
     let text: String
+
+    /// The end of a failed check's log, from the machine that read the item (`forge/log`).
+    static func read(_ check: String, of node: DaemonAPI.LineageNode, model: any WorkModel, on host: MachineRef) async throws -> WorkLog {
+        let got = try await model.forge(DaemonAPI.Method.forgeLog, DaemonAPI.ForgeLogRequest(node: node, check: check),
+                                        returning: DaemonAPI.ForgeLog.self, on: host)
+        return WorkLog(title: check, text: got.text)
+    }
 }
 
 private struct WorkLogSheet: View {
@@ -775,9 +780,7 @@ struct WorkChecksPage: View {
         said = nil
         defer { busy = nil }
         do {
-            let got = try await model.forge(DaemonAPI.Method.forgeLog, DaemonAPI.ForgeLogRequest(node: node, check: check),
-                                            returning: DaemonAPI.ForgeLog.self, on: host)
-            log = WorkLog(title: check, text: got.text)
+            log = try await WorkLog.read(check, of: node, model: model, on: host)
         } catch {
             said = (WorkList.failureWords(error), true)
         }
