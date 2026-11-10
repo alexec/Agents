@@ -103,6 +103,8 @@ public enum WorkLook {
     public static func rowLine(_ row: WorkList.Row, compact: Bool, now: Date = Date()) -> String {
         var parts: [String] = []
         if !WorkList.titleSaysRef(row.title, row.node.ref) { parts.append(WorkList.shortRef(row.node.ref)) }
+        // A draft says so in grey after its number (lists.md section 2), as its grey glyph does.
+        if row.draft, row.state == "open" { parts.append("Draft") }
         if let status = row.status, !status.isEmpty { parts.append(status) }
         let age = ageWords(now.timeIntervalSince(row.updated))
         if compact {
@@ -252,6 +254,29 @@ public enum WorkLook {
     /// The filter with all but its state cleared.
     public static func cleared(_ f: WorkList.Filter) -> WorkList.Filter { WorkList.Filter(state: f.state) }
 
+    /// The filter bar's Clear button (lists.md section 1), after the last filter while `narrows`.
+    public static let clear = "Clear"
+
+    /// The filters that are set, as the empty list says them: "Label: bug · Assignee: alexec".
+    /// `project` and `board` are the names of the ones picked; nil when nothing narrows.
+    public static func setFilters(_ f: WorkList.Filter, project: String? = nil, board: String? = nil) -> String? {
+        let text = f.text.trimmingCharacters(in: .whitespaces)
+        let parts: [String?] = [
+            text.isEmpty ? nil : "“\(text)”",
+            f.project.isEmpty ? nil : menuTitle("Project", value: project ?? f.project),
+            f.repo.isEmpty ? nil : menuTitle("Repo", value: WorkList.repoName(f.repo)),
+            f.label.isEmpty ? nil : menuTitle("Label", value: f.label),
+            f.assignee.isEmpty ? nil : menuTitle("Assignee", value: f.assignee),
+            f.board.isEmpty ? nil : menuTitle("Board", value: board ?? f.board),
+        ]
+        let set = parts.compactMap { $0 }
+        return set.isEmpty ? nil : set.joined(separator: " · ")
+    }
+
+    /// The search field's widths on the Mac (lists.md section 2): 200 pt while the bar fits one
+    /// line, 140 pt when it does not; then the menus with no value go into More.
+    public static let filterBarSearch = (wide: 200.0, short: 140.0)
+
     // MARK: 6. A comment
 
     /// An avatar with no image: the login's first letter, upper case.
@@ -299,4 +324,35 @@ public enum WorkLook {
 
     public static let clearFilters = "Clear filters"
     public static let tryAgain = "Try again"
+
+    /// One item of a kind, or many: "1 issue", "128 issues", "2 pull requests".
+    public static func count(_ kind: WorkList.Kind, _ n: Int, more: Bool = false) -> String {
+        let noun = kind.title.lowercased()
+        let one = n == 1 && !more ? String(noun.dropLast()) : noun
+        return "\(n)\(more ? "+" : "") \(one)"
+    }
+
+    /// The footer while the next page loads (lists.md section 2): "Loading more… · 50 shown".
+    public static func loadingMore(shown: Int) -> String { "Loading more… · \(shown) shown" }
+
+    /// The end of the list, in grey: "128 issues"; "50+ issues" while more pages are there and
+    /// the forge gives no total (`ForgeList.total` comes with #4397).
+    public static func endWords(_ kind: WorkList.Kind, shown: Int, more: Bool) -> String { count(kind, shown, more: more) }
+
+    /// A page after the first that did not load: one line at the end, and Try again.
+    public static let couldNotLoadMore = "Could not load more."
+
+    /// The middle of a list that read nothing: "Could not read issues", then what the forge said.
+    public static func couldNotRead(_ kind: WorkList.Kind) -> String { "Could not read \(kind.title.lowercased())" }
+
+    /// Where a person connects a forge, or gives it a new token.
+    public static let connectors = "Settings ▸ Connectors"
+
+    /// Whether what a forge said is about its credential (a token refused, ended or missing), so
+    /// the error offers Settings ▸ Connectors as well as Try again.
+    public static func credentialProblem(_ message: String) -> Bool {
+        let m = message.lowercased()
+        return ["401", "403", "bad credentials", "unauthorized", "not connected", "token", "sign in", "signed in"]
+            .contains { m.contains($0) }
+    }
 }

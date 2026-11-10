@@ -8,11 +8,13 @@ struct WorkStateIcon: View {
     let kind: String
     let state: String
     var draft = false
+    /// White on a selected row in a key window, as the row's text.
+    @Environment(\.backgroundProminence) private var prominence
 
     var body: some View {
         if let glyph = WorkLook.glyph(kind: kind, state: state, draft: draft) {
             symbol(glyph)
-                .foregroundStyle(glyph.tone.color)
+                .foregroundStyle(prominence == .increased ? Color.white : glyph.tone.color)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(glyph.accessibilityLabel)
         } else {
@@ -97,6 +99,8 @@ struct WorkLabelChip: View {
     /// Sets the list's Label filter (Mac); nil where a chip is not a button.
     var pick: ((String) -> Void)?
     @Environment(\.colorScheme) private var scheme
+    /// On a selected row in a key window the chip goes white, as the row's text does (lists.md section 2).
+    @Environment(\.backgroundProminence) private var prominence
 
     var body: some View {
         if let pick {
@@ -109,7 +113,11 @@ struct WorkLabelChip: View {
     }
 
     private var chip: some View {
-        let colours = WorkLook.chip(label.color, dark: scheme == .dark)
+        let white = prominence == .increased
+        let colours = white ? nil : WorkLook.chip(label.color, dark: scheme == .dark)
+        let text: Color = white ? .white : colours?.text.color ?? .secondary
+        let fill: Color = white ? .white.opacity(0.2) : colours?.fill.color ?? Paper.well
+        let border: Color = white ? .white.opacity(0.6) : colours?.border.color ?? Paper.rule
         let parts = WorkLook.scoped(label.name)
         var words = Text(parts.rest).fontWeight(.medium)
         if let scope = parts.scope { words = Text("\(Text(scope).fontWeight(.regular))\(words)") }
@@ -118,9 +126,9 @@ struct WorkLabelChip: View {
             .lineLimit(1)
             .padding(.horizontal, 6)
             .frame(minHeight: 18)
-            .foregroundStyle(colours.map { $0.text.color } ?? Color.secondary)
-            .background(Capsule().fill(colours.map { $0.fill.color } ?? Paper.well))
-            .overlay(Capsule().strokeBorder(colours.map { $0.border.color } ?? Paper.rule))
+            .foregroundStyle(text)
+            .background(Capsule().fill(fill))
+            .overlay(Capsule().strokeBorder(border))
             // One element with one label: a label stacked on a Text's own crashes AppKit's accessibility.
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Label \(label.name)")

@@ -38,12 +38,14 @@ private struct WorkShimmer: ViewModifier {
 }
 
 /// An empty list in the middle: the page's glyph, the title ("No open issues"), one line under
-/// it, and a button where there is one (Clear filters, Settings ▸ Connectors).
+/// it, and the buttons where there are any (Clear filters; Try again and Settings ▸ Connectors).
 struct WorkEmptyState: View {
     let symbol: String
     let title: String
     var line: String?
     var action: (title: String, run: () -> Void)?
+    /// A second button beside it (Settings ▸ Connectors, for a credential the forge refused).
+    var also: (title: String, run: () -> Void)?
 
     var body: some View {
         VStack(spacing: 8) {
@@ -56,9 +58,11 @@ struct WorkEmptyState: View {
             if let line {
                 Text(line).appText(.supporting).foregroundStyle(.secondary).multilineTextAlignment(.center)
             }
-            if let action {
-                Button(action.title, action: action.run).buttonStyle(.paper).padding(.top, 4)
+            HStack(spacing: 8) {
+                if let action { Button(action.title, action: action.run).buttonStyle(.paper) }
+                if let also { Button(also.title, action: also.run).buttonStyle(.paper) }
             }
+            .padding(.top, 4)
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
