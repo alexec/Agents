@@ -385,7 +385,14 @@ the IMAP server, the user and an app password), or `EMAIL_IMAP_URL`, `EMAIL_USER
   most), so a quiet poll asks the server nothing and the pace is 10 s; with no IDLE, 60 s.
 - **Tools:** `list_folders`, `list_messages`, `search_messages`, `read_message` (its text
   inside `<untrusted-content source="email">`, as outside content), `mark_read` and
-  `move_message`. Reading leaves a message unread. Nothing sends, answers or deletes mail.
+  `move_message`; and the messaging contract's `list_conversations` and `read_messages`
+  (#4340, `docs/reference/messaging-contract.md`, `_meta` `"agents/messaging": 1`). A
+  conversation is a thread, made from `References`, `In-Reply-To`, and the subject of a
+  reply that has neither (`threads.go`): `list_conversations` groups a window of the folder's
+  newest mail (ten for each conversation asked for, 500 at most) and leaves out a thread that
+  an earlier page listed; `read_messages` searches the folder and the Sent folder for the
+  thread's root `Message-ID`, newest first, by cursor. Reading leaves a message unread.
+  Nothing sends, answers or deletes mail.
 
 The tests run it against go-imap's in-memory IMAP server (`fake_test.go`). Agents Host
 carries it (`scripts/go-github-mcp.sh email-mcp`) and every Linux host installs

@@ -62,6 +62,10 @@ type Summary struct {
 	// dkim is the domain of a DKIM pass aligned with From, or "" (#1762).
 	dkim string
 	uid  imap.UID
+	// messageID, inReplyTo and refs (References) are the Message-IDs, without their angle
+	// brackets, that put a message in its thread (threads.go).
+	messageID       string
+	inReplyTo, refs []string
 }
 
 // Message is a message with its text, which is outside content (body.go).
@@ -290,8 +294,12 @@ var roles = map[imap.MailboxAttr]string{
 	imap.MailboxAttrJunk: "junk", imap.MailboxAttrArchive: "archive",
 }
 
-// junkNames are the names, in lower case, that mail servers give a junk folder with no role.
-var junkNames = []string{"junk", "spam", "junk mail", "junk e-mail", "junk email", "bulk mail"}
+// junkNames are the names, in lower case, that mail servers give a junk folder with no role,
+// and sentNames a sent folder's.
+var (
+	junkNames = []string{"junk", "spam", "junk mail", "junk e-mail", "junk email", "bulk mail"}
+	sentNames = []string{"sent", "sent items", "sent mail", "sent messages"}
+)
 
 // Folders is every folder that holds messages, with its counts. It is kept for foldersFor,
 // and dropped when a message is marked or moved, so show_mail on every Back, folder change
@@ -355,6 +363,9 @@ func folders(c *imapclient.Client) ([]Folder, error) {
 		}
 		if f.Role == "" && slices.Contains(junkNames, strings.ToLower(l.Mailbox)) {
 			f.Role = "junk" // a server without SPECIAL-USE, or one that names no role
+		}
+		if f.Role == "" && slices.Contains(sentNames, strings.ToLower(l.Mailbox)) {
+			f.Role = "sent" // read_messages reads a thread's answers there (threads.go)
 		}
 		status := l.Status
 		if status == nil {
@@ -487,7 +498,7 @@ func (m *Mailbox) summaries(c *imapclient.Client, folder string, set imap.NumSet
 		return out, nil
 	}
 	msgs, err := c.Fetch(set, &imap.FetchOptions{UID: true, Envelope: true, Flags: true, InternalDate: true,
-		BodySection: []*imap.FetchItemBodySection{authSection}}).Collect()
+		BodySection: []*imap.FetchItemBodySection{authSection, refsSection}}).Collect()
 	if err != nil {
 		return nil, err
 	}
@@ -513,12 +524,14 @@ func (m *Mailbox) summary(folder string, msg *imapclient.FetchMessageBuffer) Sum
 		Unread: !slices.Contains(msg.Flags, imap.FlagSeen), Date: msg.InternalDate.UTC()}
 	if e := msg.Envelope; e != nil {
 		s.From, s.To, s.Subject = addresses(e.From), addresses(e.To), e.Subject
+		s.messageID, s.inReplyTo = strings.Trim(e.MessageID, "<> "), e.InReplyTo
 		if !e.Date.IsZero() {
 			s.Date = e.Date.UTC()
 		}
 	}
 	header := msg.FindBodySection(authSection)
 	s.Authenticated, s.dkim = authenticated(header, s.From), alignedDKIM(header, s.From)
+	s.refs = references(msg.FindBodySection(refsSection))
 	return s
 }
 

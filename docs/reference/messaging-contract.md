@@ -158,10 +158,12 @@ The epic's open questions, settled for version 1.
 ### Mail: a conversation is a thread
 
 Decided: a mail conversation is a **thread**, made from `References` and `In-Reply-To` (and
-the subject when a mail has neither), `kind: thread`, because that is what a person reads
+the subject when a reply, `Re: …`, has neither), `kind: thread`, because that is what a person reads
 as one conversation, and a folder holds thousands of unrelated mails. The folder is a
 filter: the email server's `list_conversations` takes an optional `folder` (`INBOX` when left
-out) and lists the threads whose newest mail is in it. Alex can overrule.
+out) and lists the threads that have mail in it, by its newest mail there. `read_messages`
+gives the thread's mail in that folder and in the Sent folder, so the person's own answers
+are in it (#4340). Alex can overrule.
 
 ### Unread state: the service's own
 
