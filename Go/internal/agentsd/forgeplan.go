@@ -105,8 +105,6 @@ func (d *Daemon) forgePlan(ctx context.Context, r wire.ForgePlanRequest) (wire.F
 			epic, children, err = d.jiraPlan(ctx, method, key)
 		} else if project, id, ok := boardsOfNode(r.Node); ok {
 			epic, children, err = d.boardsPlan(ctx, method, project, id)
-		} else if _, _, ok := bitbucketOfNode(r.Node); ok {
-			return wire.ForgePlan{}, Invalid("%s: %s", method, bitbucketNoPlan)
 		} else {
 			return wire.ForgePlan{}, Invalid("%s: %s is not an issue on GitHub, GitLab, Forgejo, Linear, Jira or Azure Boards", method, r.Node.Ref)
 		}

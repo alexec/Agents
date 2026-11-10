@@ -14,7 +14,6 @@ import (
 
 	"github.com/alexec/agents/Go/internal/azureboardsmcp"
 	"github.com/alexec/agents/Go/internal/azuredevopsmcp"
-	"github.com/alexec/agents/Go/internal/bitbucketmcp"
 	"github.com/alexec/agents/Go/internal/connections"
 	"github.com/alexec/agents/Go/internal/githubmcp"
 	"github.com/alexec/agents/Go/internal/gitlabmcp"
@@ -43,8 +42,8 @@ import (
 // search for every project. Azure Boards (#3815) is read the same way, of the projects the
 // folders name in "azureBoardsProjects" (forgeazure.go). Forgejo (#3753, #4354) is read with the
 // host's Forgejo connection, only on its own Forgejo, a call per repository (forgejoForge).
-// Bitbucket Cloud (#3786) is read with the host's Bitbucket connection, a call per repository
-// (forgebitbucket.go). Azure Repos (#3803) is read with the Azure DevOps token here, pull
+// Bitbucket Cloud (#3786, #4355) is read with the host's Bitbucket connection, a call per
+// repository (bitbucketForge). Azure Repos (#3803) is read with the Azure DevOps token here, pull
 // requests only, a call per repository (forgeazuredevops.go).
 //
 // A list is one page of every forge, merged by updatedAt: each forge is asked for a page, the
@@ -304,10 +303,6 @@ func (d *Daemon) forgeList(ctx context.Context, prs bool, r wire.ForgeListReques
 		p.forge = name
 		pages = append(pages, p)
 	}
-	if (len(sources.bitbucket) > 0 || sources.bitbucketErr != nil) && !slices.Contains(cursor.Done, "bitbucket") {
-		pages = append(pages, d.bitbucketPage(ctx, sources, bitbucketmcp.SearchFilter{PRs: prs, State: state, Label: deref(r.Label),
-			Assignee: deref(r.Assignee), Query: deref(r.Query), Feature: deref(r.Feature)}, cursor.Bitbucket, limit))
-	}
 	if prs && (len(sources.azureDevOps) > 0 || sources.azureDevOpsErr != nil) && !slices.Contains(cursor.Done, "azuredevops") {
 		pages = append(pages, d.azureDevOpsPage(ctx, sources, azuredevopsmcp.SearchFilter{State: state, Label: deref(r.Label),
 			Assignee: deref(r.Assignee), Query: deref(r.Query), Feature: deref(r.Feature)}, cursor.AzureDevOps, limit))
@@ -438,11 +433,6 @@ type forgeSources struct {
 	// boards is the Azure Boards projects (#3815), organization/project.
 	boards       []string
 	boardsFolder map[string]string
-	// bitbucket is the repositories on Bitbucket Cloud (#3786), workspace/repo, read at
-	// bitbucketRoot, the connection's API.
-	bitbucket     []string
-	bitbucketRoot string
-	bitbucketErr  error
 	// azureDevOps is the repositories on Azure DevOps (#3803), organization/project/name, of
 	// pull requests only, read at azureDevOpsRoot.
 	azureDevOps     []string
@@ -451,7 +441,7 @@ type forgeSources struct {
 }
 
 func (s forgeSources) key() []any {
-	return []any{s.teams, s.workspace, s.linearHome, s.projects, s.boards, s.bitbucketRoot, s.bitbucket, s.azureDevOpsRoot, s.azureDevOps}
+	return []any{s.teams, s.workspace, s.linearHome, s.projects, s.boards, s.azureDevOpsRoot, s.azureDevOps}
 }
 
 func (d *Daemon) forgeSources(ctx context.Context, prs bool, folders []string) forgeSources {
@@ -479,7 +469,6 @@ func (d *Daemon) forgeSources(ctx context.Context, prs bool, folders []string) f
 			}
 		}
 	}
-	d.bitbucketSources(ctx, &s, folders)
 	if prs {
 		d.azureDevOpsSources(ctx, &s, folders)
 	}
@@ -621,8 +610,6 @@ func (d *Daemon) forgeItem(ctx context.Context, kind string, r wire.ForgeItemReq
 		out, err = d.jiraItem(ctx, method, key, deref(r.Cursor))
 	} else if project, id, ok := boardsOfNode(r.Node); ok && kind == lineage.KindIssue {
 		out, err = d.boardsItem(ctx, method, project, id, deref(r.Cursor))
-	} else if repo, number, ok := bitbucketOfNode(r.Node); ok {
-		out, err = d.bitbucketItem(ctx, method, kind, repo, number, deref(r.Cursor))
 	} else if repo, number, ok := azureDevOpsOfNode(r.Node); ok {
 		out, err = d.azureDevOpsItem(ctx, method, repo, number, deref(r.Cursor))
 	} else {

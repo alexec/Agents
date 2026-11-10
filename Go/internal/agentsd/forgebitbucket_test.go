@@ -3,7 +3,6 @@ package agentsd
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"path/filepath"
 	"slices"
@@ -273,6 +272,12 @@ func TestForgeWritesOnABitbucketItem(t *testing.T) {
 	if !strings.Contains(log.Text, "jenkins is not a Bitbucket Pipelines run") {
 		t.Fatalf("another CI's log: %+v", log)
 	}
+	if e := c.callError(t, 16, "forge/close", wire.ForgeCloseRequest{Node: pr, Reopen: new(true)}); e == nil || !strings.Contains(e.Message, bitbucketNoReopen) {
+		t.Fatalf("reopen a pull request: %v", e)
+	}
+	if e := c.callError(t, 17, "forge/labels", wire.ForgeNodeRequest{Node: pr}); e == nil || !strings.Contains(e.Message, "no labels") {
+		t.Fatalf("a pull request's labels: %v", e)
+	}
 	var labels wire.ForgeLabels
 	json.Unmarshal(c.call(t, 14, "forge/labels", wire.ForgeNodeRequest{Node: issue}), &labels)
 	if len(labels.Labels) != 3 || labels.Labels[2].Name != "ui" {
@@ -307,10 +312,11 @@ func TestBitbucketOfNode(t *testing.T) {
 
 // #3938: a list narrowed to a board has no Bitbucket items: Bitbucket has no boards.
 func TestABoardLeavesBitbucketOut(t *testing.T) {
-	s := forgeSources{bitbucket: []string{"walkalex/app"}, bitbucketErr: errors.New("elsewhere")}
-	narrowToBoard(&s, wire.ProjectBoard{Forge: new(wire.ConnectionProviderGithub), Key: new("alexec/1")}, []string{"/f"}, false)
-	if s.bitbucket != nil || s.bitbucketErr != nil {
-		t.Fatalf("sources: %+v", s)
+	d, _, bb, _ := bitbucketDaemon(t)
+	scope := bitbucketScope{root: bitbucketmcp.DefaultBase, repos: []string{"walkalex/App"}}
+	p, err := bitbucketForge{d: d}.List(context.Background(), scope, forgeFilter{Board: &forgeBoard{forge: "github"}}, "", 10)
+	if err != nil || len(p.items) > 0 || len(bb.searches) > 0 {
+		t.Fatalf("a board's list: %+v, %v, searched %v", p, err, bb.searches)
 	}
 }
 
