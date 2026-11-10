@@ -233,14 +233,23 @@ func TestARequestDeferredToATimeComesBack(t *testing.T) {
 		t.Fatalf("a past time: %+v", e)
 	}
 	var got wire.RequestUpdate
-	json.Unmarshal(c.call(t, 3, "requests/defer", map[string]any{"id": id, "until": wire.DateOf(time.Now().Add(400 * time.Millisecond))}), &got)
+	// An hour, so a slow runner cannot see it come back before it looks (#4389).
+	json.Unmarshal(c.call(t, 3, "requests/defer", map[string]any{"id": id, "until": wire.DateOf(time.Now().Add(time.Hour))}), &got)
 	if got.Request.Deferred == nil || got.Request.Deferred.Until == nil || got.Request.State != wire.RequestStateOpen {
 		t.Fatalf("%+v", got.Request)
 	}
 	if isNeed(d, id) || !contains(names(d), "request.deferred") {
 		t.Fatalf("still a need, or no event: %v", names(d))
 	}
+	// Its time comes: the timer, aimed again, brings it back.
+	past := wire.DateOf(time.Now().Add(-time.Millisecond))
+	d.requests.mu.Lock()
+	d.requests.byID[id].Deferred.Until = &past
+	d.requests.mu.Unlock()
+	d.armRequestTimer()
 	waitFor(t, "it comes back", func() bool { r := d.request(id); return r.Deferred == nil && isNeed(d, id) })
+	// request.opened is raised after the deferral is cleared, so wait for it too.
+	waitFor(t, "request.opened again", func() bool { return countEvents(d, "request.opened") >= 2 })
 	if n := countEvents(d, "request.opened"); n != 2 {
 		t.Fatalf("request.opened %d times", n)
 	}
