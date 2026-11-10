@@ -41,6 +41,7 @@ public enum Capability {
     public static let connectorsSetup1 = "connectors.setup/1"
     public static let console1 = "console/1"
     public static let controlConnectAnother1 = "control.connect-another/1"
+    public static let controlLocal1 = "control.local/1"
     public static let controlRotate1 = "control.rotate/1"
     public static let control1 = "control/1"
     public static let cost1 = "cost/1"
@@ -659,9 +660,12 @@ public enum Capability {
         "control/connectAnother": "control.connect-another/1",
         "control/connectReport": "control.connect-another/1",
         "control/ping": "control/1",
+        "control/restart": "control.local/1",
+        "control/retryWeb": "control.local/1",
         "control/rotate": "control.rotate/1",
         "control/setAuditDays": "events.audit/1",
         "control/setFolderDetection": "control/1",
+        "control/setWeb": "control.local/1",
         "control/status": "control/1",
         "folders/detected": "folders/1",
         "git/credential": "git/1",

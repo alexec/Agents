@@ -83,6 +83,14 @@ type Config struct {
 	// Told whenever the web remote's listener starts or fails to (071 R3): serve --home
 	// writes it beside the log for Agents Host.
 	WebChanged func(web.Status)
+	// Start with the web remote's listener off (071 FR-002, #4252): the person turned it
+	// off, and serve --home keeps that in web-off. Web still says where it would be.
+	WebOff bool
+	// Told when a person turns the listener on or off (control/setWeb, #4252), to keep it.
+	WebSwitched func(on bool) error
+	// Stops this copy for whatever runs it to start it again (control/restart, #4252):
+	// Agents Host's launch agent. Nil where nothing would, and control/status says so.
+	Restart func()
 	// Hosted is a copy we run for an account on our servers (#1807): it has no ssh, so no
 	// tunnels, and it installs, finds and updates no machine over ssh. Machines join by a
 	// code, their join command, or a provider.
@@ -244,6 +252,8 @@ type Service struct {
 	accepting sync.WaitGroup
 	ready     bool
 	loopback  *web.Listener
+	// One control/setWeb at a time (#4252).
+	webSwitch sync.Mutex
 	// The page at this copy's own origin (#1459), or nil.
 	page *web.Public
 	// What an operations team scrapes (#2176): always counted, served only by ServeMetrics.
@@ -465,7 +475,11 @@ func (s *Service) Start(ctx context.Context) (int, error) {
 	}
 	s.setReady(true)
 	if s.cfg.Web != nil {
-		s.startWeb()
+		if s.cfg.WebOff {
+			s.sayWeb(web.Off(s.cfg.Web.Port))
+		} else {
+			s.startWeb()
+		}
 	}
 	go s.refreshEvery(15 * time.Second)
 	go s.sweepEveryHour()
@@ -1141,6 +1155,11 @@ func (s *Service) startWeb() {
 	s.mu.Lock()
 	s.loopback = listener
 	s.mu.Unlock()
+	s.sayWeb(status)
+}
+
+// sayWeb tells control/status, WebChanged and every client how the listener stands.
+func (s *Service) sayWeb(status web.Status) {
 	s.methods.SetWeb(&status)
 	if s.cfg.WebChanged != nil {
 		s.cfg.WebChanged(status)
@@ -1154,7 +1173,7 @@ func (s *Service) RetryWeb() {
 	s.mu.Lock()
 	serving := s.loopback != nil
 	s.mu.Unlock()
-	if s.cfg.Web == nil || serving {
+	if s.cfg.Web == nil || serving || s.webIsOff() {
 		return
 	}
 	s.startWeb()

@@ -29,6 +29,15 @@ public extension DaemonAPI.Method {
     /// `Empty` → `Empty`, an admin's only (#997): a new control key; members take it as
     /// they connect again, with no new pairing.
     static let controlRotate = "control/rotate"
+    /// `Empty` → `Empty`, an admin's only (#4252): the control plane stops, and Agents Host's
+    /// launch agent starts it again (`ControlStatus.restartable`).
+    static let controlRestart = "control/restart"
+    /// `Empty` → `WebRemoteStatus`, an admin's only (#4252): open the loopback listener
+    /// again when it isn't serving (Try Again).
+    static let controlRetryWeb = "control/retryWeb"
+    /// `WebServe` → `WebRemoteStatus`, an admin's only (#4252, 071 FR-002): serve Agents to
+    /// browsers on this Mac, or stop; the control plane keeps it.
+    static let controlSetWeb = "control/setWeb"
     /// `ConnectAnother.Request` → `Empty` (#4257): a client asks the window on the control
     /// plane's Mac to connect it to another; an admin's only.
     static let controlConnectAnother = "control/connectAnother"
@@ -159,6 +168,9 @@ public extension DaemonAPI {
         /// The web remote's loopback listener (071 R3): whether the page is served, and why
         /// not. Nil when this copy was not asked to serve it.
         public var web: WebRemoteStatus?
+        /// Whatever runs it starts it again after `control/restart` (#4252): Agents Host's
+        /// launch agent. Nil where nothing would.
+        public var restartable: Bool?
         /// Where a browser anywhere opens the page, on the control plane's own domain
         /// (#1459): its https address. Nil when it serves no page there.
         public var publicWeb: String?
@@ -202,11 +214,13 @@ public extension DaemonAPI {
         /// The port asked for: 8792 for Agents Host's copy.
         public var port: Int
         public var served: Bool
-        /// Why not, when it isn't: `portInUse`, `build` or `failed`.
+        /// Why not, when it isn't: `off`, `portInUse`, `build` or `failed`.
         public var reason: String?
         /// The error as the control plane met it.
         public var detail: String?
 
+        /// The person turned it off (071 FR-002, #4252).
+        public static let off = "off"
         public static let portInUse = "portInUse"
         public static let build = "build"
         public static let failed = "failed"
@@ -220,15 +234,25 @@ public extension DaemonAPI {
 
         public var address: String { "http://localhost:\(port)" }
 
+        /// The person turned it off.
+        public var isOff: Bool { !served && reason == Self.off }
+
         /// In plain words, for the row that would otherwise give the address.
         public var summary: String {
             if served { return "At \(address), for a browser on this Mac only." }
             switch reason {
+            case Self.off: return "Off. Turn it on to use Agents at \(address), in a browser on this Mac only."
             case Self.portInUse: return "Not serving: port \(port) is in use by another app."
             case Self.build: return "Not serving: this copy of the Agents web app is damaged or missing."
             default: return "Not serving: port \(port) couldn’t be opened\(detail.map { " (\($0))" } ?? "")."
             }
         }
+    }
+
+    /// `control/setWeb`'s params (#4252).
+    struct WebServe: Codable, Sendable, Hashable {
+        public var on: Bool
+        public init(on: Bool) { self.on = on }
     }
 
     /// What the control plane needs of a host and of a client to route for it (#1748).

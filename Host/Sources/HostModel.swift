@@ -645,15 +645,28 @@ final class HostModel {
     /// again with or without its loopback listener; with the control plane elsewhere, this
     /// Mac's host does, which serves the page then (#1952).
     func setServeWebRemote(_ on: Bool) async {
-        guard settings.servesWebRemote != on else { return }
+        guard servesWebRemote != on else { return }
         settings.serveWebRemote = on
         settings.save(paths)
+        // The page's switch keeps off in the control plane's web-off (#4252).
+        if on { try? FileManager.default.removeItem(at: webOffFile) }
         if settings.role == .joinElsewhere {
             _ = await services.restart(.daemon)
         } else {
             await restartControl()
         }
     }
+
+    /// Whether the switch is on: this Mac's setting, and with the control plane here, its
+    /// own `web-off`, which the page's switch keeps (control/setWeb, #4252).
+    var servesWebRemote: Bool {
+        guard settings.servesWebRemote else { return false }
+        guard settings.role != .joinElsewhere else { return true }
+        if controlRunning, let webRemote { return !webRemote.isOff }
+        return !FileManager.default.fileExists(atPath: webOffFile.path)
+    }
+
+    private var webOffFile: URL { paths.controlHome.appendingPathComponent("web-off") }
 
     /// Where the web remote is, while it is served.
     var webRemoteAddress: String { "http://localhost:\(paths.webPort)" }
@@ -665,7 +678,7 @@ final class HostModel {
     /// The toggle's line: what the control plane says, else the address it was asked for;
     /// and while it's off, that it's off, never an address as if the page were there (R3).
     var webRemoteLine: String {
-        guard settings.servesWebRemote else {
+        guard servesWebRemote else {
             return "Off. Turn it on to use Agents at \(webRemoteAddress), in a browser on this Mac only."
         }
         guard controlRunning, let webRemote else {
@@ -675,7 +688,7 @@ final class HostModel {
     }
 
     /// The person turned it on and the control plane couldn't serve it.
-    var webRemoteFailed: Bool { settings.servesWebRemote && controlRunning && webRemote?.served == false }
+    var webRemoteFailed: Bool { servesWebRemote && controlRunning && webRemote?.served == false }
 
     /// Asks the running control plane to bind the page's port again, keeping every
     /// connection it has: SIGUSR1 to `agents-control serve` (071 R3).
@@ -699,7 +712,7 @@ final class HostModel {
             .filter { $0.count >= 3 && $0[2] == ClientRecord.Kind.browser.rawValue }.map { $0[1] }
         let app = NSWorkspace.shared.urlForApplication(toOpen: URL(string: "http://localhost")!)
         let family = BrowserOpening.family(bundleID: app.flatMap { Bundle(url: $0)?.bundleIdentifier })
-        let web = settings.servesWebRemote && controlRunning ? webRemote : nil
+        let web = servesWebRemote && controlRunning ? webRemote : nil
         switch BrowserOpening.step(web: web, browsers: browsers, family: family) {
         case .notServed(let why):
             problem = why

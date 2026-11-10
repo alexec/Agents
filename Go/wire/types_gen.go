@@ -3140,6 +3140,9 @@ type ControlStatus struct {
 
 	Web *WebRemoteStatus `json:"web,omitzero"`
 
+	// Whatever runs this control plane starts it again after control/restart (#4252): Agents Host's launch agent on a Mac. Absent where nothing would.
+	Restartable *bool `json:"restartable,omitzero"`
+
 	// Where a browser anywhere opens the page, on the control plane's own domain (#1459): its https address, when it serves the page there.
 	PublicWeb *string `json:"publicWeb,omitzero"`
 
@@ -13862,6 +13865,11 @@ type WebRemoteStatus struct {
 	Reason *string `json:"reason,omitzero"`
 
 	Detail *string `json:"detail,omitzero"`
+}
+
+// control/setWeb (#4252, 071 FR-002): serve Agents to browsers on the control plane's Mac, or stop. Off closes the loopback listener; a page open through it stays connected.
+type WebServe struct {
+	On bool `json:"on"`
 }
 
 type Weekday string

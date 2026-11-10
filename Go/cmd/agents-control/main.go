@@ -6,6 +6,7 @@
 //	agents-control serve … [--host-root DIR]    this Mac's host's root: its join in control/status (#113)
 //	agents-control serve … [--log FILE]         stamped lines into FILE, rolled at 4 MB (#174)
 //	agents-control serve … [--web DIR] [--web-port N] [--no-web]
+//	agents-control serve … [--restartable]      launchd starts it again: control/restart (#4252)
 //	agents-control serve … [--public-web DIR]   the page at AGENTS_CONTROL_URL too (#1459)
 //	agents-control serve … [--views-url URL]    its views' sandbox proxy at URL (#1484)
 //	agents-control serve … [--store-credentials-fd N]
@@ -610,6 +611,29 @@ func serve() {
 			}
 		}
 	}
+	// Turned off from a page (control/setWeb, #4252): web-off beside web.json keeps it.
+	if home() != "" && cfg.Web != nil {
+		off := filepath.Join(home(), "web-off")
+		_, err := os.Stat(off)
+		cfg.WebOff = err == nil
+		cfg.WebSwitched = func(on bool) error {
+			if on {
+				if err := os.Remove(off); err != nil && !os.IsNotExist(err) {
+					return err
+				}
+				return nil
+			}
+			return os.WriteFile(off, nil, 0o644)
+		}
+	}
+	stop := make(chan os.Signal, 1)
+	// Agents Host's launch agent starts it again (KeepAlive): control/restart stops it.
+	if has("--restartable") {
+		cfg.Restart = func() {
+			time.Sleep(200 * time.Millisecond)
+			stop <- syscall.SIGTERM
+		}
+	}
 	cfg.Store = openStore("")
 	cfg.PrivateKey, cfg.KeyKeeper = keyAndKeeper(cfg.Store)
 	cfg.SecretKeeper = secretKeeper()
@@ -650,7 +674,6 @@ func serve() {
 			s.RetryWeb()
 		}
 	}()
-	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
 	<-stop
 	if advertiser != nil && advertiser.Process != nil {
@@ -763,7 +786,7 @@ func list(hosts bool) {
 const usage = `usage: agents-control serve [--port N] [--bind ADDR] [--self-signed DIR] [--name NAME] [--key-fd N]
        agents-control code (--client [--browser] | --host) [--minutes N]
        agents-control serve --home DIR [--no-bonjour]
-       agents-control serve … [--host-root DIR] [--log FILE] [--web DIR] [--web-port N] [--no-web]
+       agents-control serve … [--host-root DIR] [--log FILE] [--web DIR] [--web-port N] [--no-web] [--restartable]
        agents-control serve … [--public-web DIR] [--views-url URL]
        agents-control hosts | clients
        agents-control key seal (--key-fd N | AGENTS_CONTROL_KEY)

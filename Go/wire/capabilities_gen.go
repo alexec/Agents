@@ -40,6 +40,7 @@ const CapConnections1 = "connections/1"
 const CapConnectorsSetup1 = "connectors.setup/1"
 const CapConsole1 = "console/1"
 const CapControlConnectAnother1 = "control.connect-another/1"
+const CapControlLocal1 = "control.local/1"
 const CapControlRotate1 = "control.rotate/1"
 const CapControl1 = "control/1"
 const CapCost1 = "cost/1"
@@ -717,9 +718,12 @@ var ControlCapabilities = pairs([][2]string{
 	{"control/connectAnother", "control.connect-another/1"},
 	{"control/connectReport", "control.connect-another/1"},
 	{"control/ping", "control/1"},
+	{"control/restart", "control.local/1"},
+	{"control/retryWeb", "control.local/1"},
 	{"control/rotate", "control.rotate/1"},
 	{"control/setAuditDays", "events.audit/1"},
 	{"control/setFolderDetection", "control/1"},
+	{"control/setWeb", "control.local/1"},
 	{"control/status", "control/1"},
 	{"folders/detected", "folders/1"},
 	{"git/credential", "git/1"},
