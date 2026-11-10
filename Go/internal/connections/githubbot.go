@@ -33,9 +33,9 @@ import (
 // the GitHub connection, not a connection of its own.
 const GitHubBot = "github-bot"
 
-// BotPermissions is the bot's fixed permissions (spec 3856 §1). Never workflows,
-// administration, secrets, variables, environments, deployments or members: the tools that
-// need them keep the person's user token.
+// BotPermissions is the bot's fixed permissions (spec 3856 §1). Workflows, so a lane can push
+// a change to .github/workflows (#4291). Never administration, secrets, variables,
+// environments, deployments or members: the tools that need them keep the person's user token.
 var BotPermissions = map[string]string{
 	"contents":      "write",
 	"pull_requests": "write",
@@ -43,6 +43,7 @@ var BotPermissions = map[string]string{
 	"checks":        "read",
 	"statuses":      "read",
 	"actions":       "write",
+	"workflows":     "write",
 }
 
 // AppNameMost is GitHub's longest App name.

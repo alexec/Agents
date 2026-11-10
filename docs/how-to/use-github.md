@@ -93,8 +93,11 @@ To make the agents' posts show the App's badge for these too, give the `agents-l
 **Contents**, **Pull requests** and **Actions** read and write on github.com, and accept the
 new permissions on its install.
 
-The App and the bot have no Workflows permission, so GitHub refuses their push of a change to
-`.github/workflows/`. Push such a change from your own terminal.
+The `agents-loops` App has no Workflows permission, so GitHub refuses its push of a change to
+`.github/workflows/`. The agents' bot has Workflows read and write (#4291), so a push as the
+bot works. A bot made before #4291 needs it on github.com: on its App's **Permissions &
+events**, set **Workflows** to **Read and write**, then accept the new permission on its
+install. Without the bot, push such a change from your own terminal.
 
 ### Change or end the connection
 
