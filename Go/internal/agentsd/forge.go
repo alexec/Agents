@@ -261,29 +261,44 @@ func (d *Daemon) forgeList(ctx context.Context, prs bool, r wire.ForgeListReques
 	if deref(r.Board) != "" {
 		board = narrowToBoard(&sources, boardWire, folders, prs)
 	}
-	key, _ := json.Marshal([]any{method, sources.key(), board.key(), r.State, r.Label, r.Assignee, r.Query, r.Feature, cursor, limit})
+	filter := forgeFilter{PRs: prs, State: state, Label: deref(r.Label), Assignee: deref(r.Assignee), Query: deref(r.Query),
+		Feature: deref(r.Feature), Board: board}
+	// The forges on the interface (#4329): each one's scope, and why it left folders out.
+	type scoped struct {
+		forge Forge
+		scope forgeScope
+		err   error
+	}
+	var moved []scoped
+	scopeKeys := []any{}
+	for _, f := range d.forges() {
+		// A board's list is of the board's forge only.
+		if board != nil && board.forge != f.Name() {
+			continue
+		}
+		s, err := f.Sources(ctx, folders, prs)
+		if s == nil || s.Empty() && err == nil {
+			continue
+		}
+		moved = append(moved, scoped{f, s, err})
+		scopeKeys = append(scopeKeys, f.Name(), s.Key())
+	}
+	key, _ := json.Marshal([]any{method, scopeKeys, sources.key(), board.key(), r.State, r.Label, r.Assignee, r.Query, r.Feature, cursor, limit})
 	if a, ok := d.forgeCached(string(key)); ok && a.list != nil {
 		return *a.list, nil
 	}
 	out := wire.ForgeList{Items: []wire.ForgeItem{}}
 	var pages []forgePage
-	if len(sources.repos) > 0 && !slices.Contains(cursor.Done, "github") {
-		p := forgePage{forge: "github"}
-		gh, err := d.forgeGitHub()
-		if err == nil {
-			var page githubmcp.SearchPage
-			f := githubmcp.SearchFilter{PRs: prs, State: state, Label: deref(r.Label),
-				Assignee: deref(r.Assignee), Query: deref(r.Query), Feature: deref(r.Feature)}
-			if board != nil {
-				f.Project = board.project
-			}
-			page, err = gh.Search(ctx, sources.repos, f, cursor.GitHub, limit)
-			for _, i := range page.Items {
-				p.items = append(p.items, forgeItemOf(i, sources.folderOf[forgeRepo{"github", strings.ToLower(i.Repo)}]))
-			}
-			p.cursors, p.next = page.Cursors, page.Next
+	for _, m := range moved {
+		name := m.forge.Name()
+		if slices.Contains(cursor.Done, name) {
+			continue
 		}
-		p.err = err
+		p := forgePage{err: m.err}
+		if p.err == nil {
+			p, p.err = m.forge.List(ctx, m.scope, filter, *cursor.of(name), limit)
+		}
+		p.forge = name
 		pages = append(pages, p)
 	}
 	if (len(sources.gitlab) > 0 || sources.gitlabErr != nil) && !slices.Contains(cursor.Done, "gitlab") {
@@ -426,10 +441,9 @@ func mergeForgePages(pages []forgePage, from forgeCursor, limit int) ([]wire.For
 	return items, next, more
 }
 
-// forgeSources are what a list reads: the GitHub repos, the GitLab projects on the connected
+// forgeSources are what a list reads of the forges not yet on the interface: the GitLab projects on the connected
 // GitLab, the Linear teams and the Jira projects, each once, with a folder on each to act from.
 type forgeSources struct {
-	repos     []string
 	gitlab    []string
 	root      string
 	gitlabErr error
@@ -464,7 +478,7 @@ type forgeSources struct {
 }
 
 func (s forgeSources) key() []any {
-	return []any{s.repos, s.root, s.gitlab, s.teams, s.workspace, s.linearHome, s.projects, s.boards, s.forgejoRoot, s.forgejo, s.bitbucketRoot, s.bitbucket, s.azureDevOpsRoot, s.azureDevOps}
+	return []any{s.root, s.gitlab, s.teams, s.workspace, s.linearHome, s.projects, s.boards, s.forgejoRoot, s.forgejo, s.bitbucketRoot, s.bitbucket, s.azureDevOpsRoot, s.azureDevOps}
 }
 
 func (d *Daemon) forgeSources(ctx context.Context, prs bool, folders []string) forgeSources {
@@ -477,11 +491,8 @@ func (d *Daemon) forgeSources(ctx context.Context, prs bool, folders []string) f
 	for _, f := range folders {
 		repo := d.folderRepo(f)
 		if _, seen := s.folderOf[repo]; repo.path != "" && !seen {
-			switch repo.forge {
-			case "github":
-				s.folderOf[repo] = f
-				s.repos = append(s.repos, repo.path)
-			case "gitlab":
+			// GitHub is on the forge interface: githubForge.Sources reads its repos.
+			if repo.forge == "gitlab" {
 				// Only a project on the connected GitLab: its token is for nowhere else.
 				if root, project := d.gitlabProjectAt(ctx, f, gl.URL); s.root != "" && root == s.root {
 					s.folderOf[repo] = f
@@ -521,7 +532,6 @@ func (d *Daemon) forgeSources(ctx context.Context, prs bool, folders []string) f
 	if !prs && len(s.teams) == 0 && d.linearConnected() && !d.anyLinearTeams() {
 		s.workspace, s.linearHome = true, d.linearHome()
 	}
-	slices.Sort(s.repos)
 	slices.Sort(s.gitlab)
 	slices.Sort(s.teams)
 	slices.Sort(s.projects)
@@ -646,7 +656,7 @@ func (d *Daemon) jiraFolder(project string) string {
 
 // forgeItem is one issue or pull request, with its body and a page of its comments.
 func (d *Daemon) forgeItem(ctx context.Context, kind string, r wire.ForgeItemRequest) (wire.ForgeItemDetail, error) {
-	method := "forge/" + map[string]string{lineage.KindIssue: "issue", lineage.KindPR: "pull"}[kind]
+	method := itemMethod(kind)
 	if r.Node.Kind != kind {
 		return wire.ForgeItemDetail{}, Invalid("%s: the node's kind is %s, not %s", method, r.Node.Kind, kind)
 	}
@@ -656,7 +666,10 @@ func (d *Daemon) forgeItem(ctx context.Context, kind string, r wire.ForgeItemReq
 	}
 	var out wire.ForgeItemDetail
 	var err error
-	if identifier, ok := strings.CutPrefix(r.Node.Ref, "linear:"); ok && kind == lineage.KindIssue && linearLabel.MatchString(identifier) {
+	if f, ref, ok := d.forgeOwning(r.Node); ok {
+		out, err = f.Item(ctx, ref, deref(r.Cursor))
+		err = forgeCannotErr(method, f, err)
+	} else if identifier, ok := strings.CutPrefix(r.Node.Ref, "linear:"); ok && kind == lineage.KindIssue && linearLabel.MatchString(identifier) {
 		out, err = d.linearItem(ctx, method, identifier, deref(r.Cursor))
 	} else if key, ok := strings.CutPrefix(r.Node.Ref, "jira:"); ok && kind == lineage.KindIssue && linearLabel.MatchString(key) {
 		out, err = d.jiraItem(ctx, method, key, deref(r.Cursor))
@@ -670,51 +683,14 @@ func (d *Daemon) forgeItem(ctx context.Context, kind string, r wire.ForgeItemReq
 		out, err = d.azureDevOpsItem(ctx, method, repo, number, deref(r.Cursor))
 	} else if repo, number, ok := nodeOfRepo(r.Node); !ok {
 		return wire.ForgeItemDetail{}, Invalid("%s: %s is not an issue or a pull request on GitHub, GitLab, Forgejo, Bitbucket, Azure DevOps, Linear, Jira or Azure Boards", method, r.Node.Ref)
-	} else if repo.forge == "gitlab" {
-		out, err = d.gitlabItem(ctx, method, kind, repo, number, deref(r.Cursor))
 	} else {
-		out, err = d.githubItem(ctx, method, kind, repo, number, deref(r.Cursor))
+		out, err = d.gitlabItem(ctx, method, kind, repo, number, deref(r.Cursor))
 	}
 	if err != nil {
 		return wire.ForgeItemDetail{}, err
 	}
 	d.forgeRemember(string(key), forgeAnswer{item: &out})
 	d.resolvedFromForge([]wire.ForgeItem{out.Item})
-	return out, nil
-}
-
-func (d *Daemon) githubItem(ctx context.Context, method, kind string, repo forgeRepo, number int, cursor string) (wire.ForgeItemDetail, error) {
-	gh, err := d.forgeGitHub()
-	if err != nil {
-		return wire.ForgeItemDetail{}, err
-	}
-	p, err := gh.ItemPage(ctx, repo.path, number, cursor)
-	if err != nil {
-		var ge *githubmcp.GitHubError
-		if errors.As(err, &ge) && ge.Kind == githubmcp.NotFound {
-			return wire.ForgeItemDetail{}, Invalid("%s: %v", method, err)
-		}
-		return wire.ForgeItemDetail{}, err
-	}
-	if p.PR != (kind == lineage.KindPR) {
-		return wire.ForgeItemDetail{}, Invalid("%s: %s#%d is not %s", method, repo.path, number,
-			map[string]string{lineage.KindIssue: "an issue", lineage.KindPR: "a pull request"}[kind])
-	}
-	out := wire.ForgeItemDetail{Item: forgeItemOf(p.Item, d.repoFolder(repo)), Body: p.Body, Comments: []wire.ForgeComment{}}
-	for _, c := range p.Thread {
-		out.Comments = append(out.Comments, forgeCommentOf(c.Author, c.Body, c.At, c.URL, c.Bot))
-	}
-	out.Cursor = optional(p.Before)
-	if p.PR {
-		out.Checks = []wire.ForgeCheck{}
-		for _, c := range p.CheckRuns {
-			out.Checks = append(out.Checks, wire.ForgeCheck{Name: c.Name, State: c.State, URL: optional(c.URL)})
-		}
-		out.ReviewThreads, out.FilesChanged = new(int64(p.ReviewThreads)), new(int64(p.FilesChanged))
-		out.Head, out.MergeMethods = optional(p.Head), mergeMethodsOf(p.MergeMethods)
-	} else {
-		out.Start = forgeStartOf(out.Item)
-	}
 	return out, nil
 }
 
@@ -908,12 +884,9 @@ func forgeItemOf(i githubmcp.Item, folder string) wire.ForgeItem {
 	}
 	out := wire.ForgeItem{Node: node, Title: i.Title, State: i.State, URL: optional(i.URL), Folder: optional(folder),
 		Author: optional(i.Author), Assignees: i.Assignees, Milestone: optional(i.Milestone),
-		UpdatedAt: forgeDate(i.UpdatedAt), Comments: int64(i.Comments)}
+		Labels: forgeLabelsOf(i.Labels, i.LabelColors), UpdatedAt: forgeDate(i.UpdatedAt), Comments: int64(i.Comments)}
 	if out.Assignees == nil {
 		out.Assignees = []string{}
-	}
-	for _, name := range i.Labels {
-		out.Labels = append(out.Labels, wire.ForgeLabel{Name: name, Color: optional(i.LabelColors[name])})
 	}
 	if i.PR {
 		out.Draft, out.AutoMerge = new(i.Draft), new(i.AutoMerge)

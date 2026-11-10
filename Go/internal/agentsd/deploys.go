@@ -114,22 +114,18 @@ func (d *Daemon) readDeploys(ctx context.Context) {
 		d.setDeploys(map[string][]waitingDeploy{}, nil)
 		return
 	}
-	s := d.forgeSources(ctx, true, d.folderPaths())
 	read := map[string][]waitingDeploy{}
 	var kept []string
-	for repo, folder := range s.folderOf {
-		if repo.forge != "github" {
-			continue
-		}
-		waiting, err := gh.WaitingDeploys(ctx, repo.path, "", "")
+	for repo, folder := range (githubForge{d: d}).scopeOf(d.folderPaths()).folderOf {
+		waiting, err := gh.WaitingDeploys(ctx, repo, "", "")
 		if err != nil {
-			log.Printf("deploys: the waiting runs of %s: %v", repo.path, err)
+			log.Printf("deploys: the waiting runs of %s: %v", repo, err)
 			kept = append(kept, folder)
 			continue
 		}
 		for _, w := range waiting {
 			if w.CanApprove {
-				read[folder] = append(read[folder], waitingDeploy{repo: repo.path, WaitingDeploy: w})
+				read[folder] = append(read[folder], waitingDeploy{repo: repo, WaitingDeploy: w})
 			}
 		}
 	}

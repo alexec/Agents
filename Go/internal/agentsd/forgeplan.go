@@ -8,7 +8,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/alexec/agents/Go/internal/githubmcp"
 	"github.com/alexec/agents/Go/internal/gitlabmcp"
 	"github.com/alexec/agents/Go/internal/jiramcp"
 	"github.com/alexec/agents/Go/internal/lineage"
@@ -97,7 +96,11 @@ func (d *Daemon) forgePlan(ctx context.Context, r wire.ForgePlanRequest) (wire.F
 		epic, children, standing = a.plan.epic, a.plan.children, a.plan.standing
 	} else {
 		var err error
-		if identifier, ok := strings.CutPrefix(r.Node.Ref, "linear:"); ok && linearLabel.MatchString(identifier) {
+		if f, ref, ok := d.forgeOwning(r.Node); ok {
+			var a forgePlanAnswer
+			a, err = f.Plan(ctx, ref)
+			epic, children, err = a.epic, a.children, forgeCannotErr(method, f, err)
+		} else if identifier, ok := strings.CutPrefix(r.Node.Ref, "linear:"); ok && linearLabel.MatchString(identifier) {
 			epic, children, err = d.linearPlan(ctx, method, identifier)
 		} else if key, ok := strings.CutPrefix(r.Node.Ref, "jira:"); ok && linearLabel.MatchString(key) {
 			epic, children, err = d.jiraPlan(ctx, method, key)
@@ -109,10 +112,8 @@ func (d *Daemon) forgePlan(ctx context.Context, r wire.ForgePlanRequest) (wire.F
 			return wire.ForgePlan{}, Invalid("%s: %s", method, bitbucketNoPlan)
 		} else if repo, number, ok := nodeOfRepo(r.Node); !ok {
 			return wire.ForgePlan{}, Invalid("%s: %s is not an issue on GitHub, GitLab, Forgejo, Linear, Jira or Azure Boards", method, r.Node.Ref)
-		} else if repo.forge == "gitlab" {
-			epic, children, err = d.gitlabPlan(ctx, method, repo, number)
 		} else {
-			epic, children, err = d.githubPlan(ctx, method, repo, number)
+			epic, children, err = d.gitlabPlan(ctx, method, repo, number)
 		}
 		if err != nil {
 			return wire.ForgePlan{}, err
@@ -233,32 +234,6 @@ func (d *Daemon) leadOf(epic wire.LineageNode) *wire.ForgeLead {
 		return nil
 	}
 	return &wire.ForgeLead{Session: best.ID, Title: best.Title, State: best.State}
-}
-
-func (d *Daemon) githubPlan(ctx context.Context, method string, repo forgeRepo, number int) (wire.ForgeItem, []planChild, error) {
-	gh, err := d.forgeGitHub()
-	if err != nil {
-		return wire.ForgeItem{}, nil, err
-	}
-	p, err := gh.Plan(ctx, repo.path, number)
-	if err != nil {
-		var ge *githubmcp.GitHubError
-		if errors.As(err, &ge) && ge.Kind == githubmcp.NotFound {
-			return wire.ForgeItem{}, nil, Invalid("%s: %v", method, err)
-		}
-		return wire.ForgeItem{}, nil, err
-	}
-	epic := forgeItemOf(p.Epic, d.repoFolder(repo))
-	var children []planChild
-	for _, c := range p.Children {
-		child := forgeRepo{"github", strings.ToLower(c.Repo)}
-		pc := planChild{item: forgeItemOf(c.Item, d.repoFolder(child))}
-		for _, b := range c.BlockedBy {
-			pc.blockedBy = append(pc.blockedBy, planRef{node: forgeRepo{"github", strings.ToLower(b.Repo)}.issue(b.Number), open: b.Open})
-		}
-		children = append(children, pc)
-	}
-	return epic, children, nil
 }
 
 func (d *Daemon) gitlabPlan(ctx context.Context, method string, repo forgeRepo, number int) (wire.ForgeItem, []planChild, error) {

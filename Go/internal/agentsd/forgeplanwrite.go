@@ -60,6 +60,8 @@ func (d *Daemon) planTargetOf(ctx context.Context, method string, node wire.Line
 		return forgeTarget{}, err
 	}
 	switch {
+	case t.forge != nil && !t.forge.Caps().Plan:
+		return forgeTarget{}, forgeCannotErr(method, t.forge, cannot(actionPlan))
 	case t.jira != nil:
 		return forgeTarget{}, Invalid("%s: a Jira plan is changed in Jira, not yet here", method)
 	case t.gitlab != nil:
@@ -84,6 +86,14 @@ func (d *Daemon) forgeAddChild(ctx context.Context, r wire.ForgeAddChildRequest)
 	if err != nil {
 		return wire.ForgeDone{}, err
 	}
+	if issue != "" && t.forge != nil {
+		done, err := t.forge.AddChild(ctx, t.ref, forgeChild{Issue: issue})
+		if err != nil {
+			return wire.ForgeDone{}, forgeCannotErr(method, t.forge, err)
+		}
+		d.forgeWrote()
+		return done, nil
+	}
 	if issue != "" {
 		return d.addExistingChild(ctx, method, t, r.Node, issue)
 	}
@@ -101,7 +111,11 @@ func (d *Daemon) forgeAddChild(ctx context.Context, r wire.ForgeAddChildRequest)
 		labels = append(labels, featurePrefix+*f)
 	}
 	var url string
-	if t.linear != nil {
+	if t.forge != nil {
+		var done wire.ForgeDone
+		done, err = t.forge.AddChild(ctx, t.ref, forgeChild{Title: title, Labels: labels, Level: level})
+		url, err = deref(done.URL), forgeCannotErr(method, t.forge, err)
+	} else if t.linear != nil {
 		_, url, err = t.linear.AddChild(ctx, t.identifier, title, labels)
 	} else if t.boards != nil {
 		// The level is the work item's type too, as its process names it.
@@ -111,11 +125,6 @@ func (d *Daemon) forgeAddChild(ctx context.Context, r wire.ForgeAddChildRequest)
 		var n int
 		if n, url, err = t.forgejo.CreateIssue(ctx, t.project, title, labels); err == nil {
 			err = t.forgejo.SetBlockedBy(ctx, t.project, t.number, t.project, n, true)
-		}
-	} else {
-		var n int
-		if n, url, err = t.github.CreateIssue(ctx, t.repo.path, title, labels); err == nil {
-			err = t.github.AddSubIssue(ctx, t.repo.path, t.number, t.repo.path, n)
 		}
 	}
 	// A new issue that did not become a child is still made: forget the kept answers either way.
@@ -148,7 +157,7 @@ func (d *Daemon) addExistingChild(ctx context.Context, method string, t forgeTar
 			return wire.ForgeDone{}, Invalid("%s: an epic is not its own child", method)
 		}
 		err = t.boards.SetParent(ctx, t.project, id, t.number)
-	} else if t.forgejo != nil {
+	} else {
 		repo, n, ok := d.forgejoIssueOf(ref, t.project)
 		if !ok {
 			return wire.ForgeDone{}, Invalid("%s: %q is not an issue on the connected Forgejo: give #12, owner/repo#12 or its URL", method, ref)
@@ -157,20 +166,6 @@ func (d *Daemon) addExistingChild(ctx context.Context, method string, t forgeTar
 			return wire.ForgeDone{}, Invalid("%s: an epic is not its own child", method)
 		}
 		err = t.forgejo.SetBlockedBy(ctx, t.project, t.number, repo, n, true)
-	} else {
-		m := githubIssueRef.FindStringSubmatch(ref)
-		if m == nil {
-			return wire.ForgeDone{}, Invalid("%s: %q is not a GitHub issue: give #12, owner/repo#12 or its URL", method, ref)
-		}
-		repo := strings.ToLower(m[1] + m[2])
-		if repo == "" {
-			repo = t.repo.path
-		}
-		n, _ := strconv.Atoi(m[3])
-		if (forgeRepo{"github", repo}).issue(n) == epic {
-			return wire.ForgeDone{}, Invalid("%s: an epic is not its own child", method)
-		}
-		err = t.github.AddSubIssue(ctx, t.repo.path, t.number, repo, n)
 	}
 	if err != nil {
 		return wire.ForgeDone{}, err
@@ -212,6 +207,7 @@ func (d *Daemon) forgeBlockedBy(ctx context.Context, r wire.ForgeBlockedByReques
 	}
 	// Every blocker is checked before the first write, so a wrong one changes nothing.
 	type blocker struct {
+		ref     forgeRef
 		repo    string
 		number  int
 		key     string
@@ -227,12 +223,17 @@ func (d *Daemon) forgeBlockedBy(ctx context.Context, r wire.ForgeBlockedByReques
 				return wire.ForgeDone{}, Invalid("%s: an issue does not block itself", method)
 			}
 			key, onLinear := strings.CutPrefix(b.Ref, "linear:")
-			repo, n, onRepo := nodeOfRepo(b)
 			project, id, onBoards := boardsOfNode(b)
 			fjRepo, fjNumber, onForgejo := forgejoOfNode(b)
 			switch {
 			case b.Kind != lineage.KindIssue:
 				return wire.ForgeDone{}, Invalid("%s: %s is not an issue", method, b.Ref)
+			case t.forge != nil:
+				ref, ok := t.forge.Owns(b)
+				if !ok {
+					return wire.ForgeDone{}, Invalid("%s: %s is not on the forge %s is on", method, b.Ref, r.Node.Ref)
+				}
+				todo = append(todo, blocker{ref: ref, blocked: list.blocked})
 			case t.linear != nil && onLinear && linearLabel.MatchString(key):
 				todo = append(todo, blocker{key: key, blocked: list.blocked})
 			// A link is within an organization.
@@ -240,22 +241,20 @@ func (d *Daemon) forgeBlockedBy(ctx context.Context, r wire.ForgeBlockedByReques
 				todo = append(todo, blocker{number: id, blocked: list.blocked})
 			case t.forgejo != nil && onForgejo:
 				todo = append(todo, blocker{repo: fjRepo, number: fjNumber, blocked: list.blocked})
-			case t.github != nil && onRepo && repo.forge == "github":
-				todo = append(todo, blocker{repo: repo.path, number: n, blocked: list.blocked})
 			default:
 				return wire.ForgeDone{}, Invalid("%s: %s is not on the forge %s is on", method, b.Ref, r.Node.Ref)
 			}
 		}
 	}
 	for _, b := range todo {
-		if t.linear != nil {
+		if t.forge != nil {
+			err = forgeCannotErr(method, t.forge, t.forge.SetBlockedBy(ctx, t.ref, b.ref, b.blocked))
+		} else if t.linear != nil {
 			err = t.linear.SetBlockedBy(ctx, t.identifier, b.key, b.blocked)
 		} else if t.boards != nil {
 			err = t.boards.SetBlockedBy(ctx, t.project, t.number, b.number, b.blocked)
-		} else if t.forgejo != nil {
-			err = t.forgejo.SetBlockedBy(ctx, t.project, t.number, b.repo, b.number, b.blocked)
 		} else {
-			err = t.github.SetBlockedBy(ctx, t.repo.path, t.number, b.repo, b.number, b.blocked)
+			err = t.forgejo.SetBlockedBy(ctx, t.project, t.number, b.repo, b.number, b.blocked)
 		}
 		if err != nil {
 			break
