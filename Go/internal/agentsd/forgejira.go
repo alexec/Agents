@@ -3,6 +3,7 @@ package agentsd
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 
@@ -151,7 +152,7 @@ func (j jiraForge) Item(ctx context.Context, r forgeRef, cursor string) (wire.Fo
 	}
 	out := wire.ForgeItemDetail{Item: jiraItemOf(p.Item, j.d.jiraFolder(p.Project)), Body: p.Body, Comments: []wire.ForgeComment{},
 		Cursor: optional(p.Before), Transitions: []wire.ForgeTransition{}}
-	out.Start = forgeStartOf(out.Item)
+	out.Start = jiraStart(out.Item)
 	for _, c := range p.Thread {
 		out.Comments = append(out.Comments, forgeCommentOf(c.Author, c.Body, c.At, c.URL, c.Bot))
 	}
@@ -252,4 +253,11 @@ func (j jiraForge) SetState(ctx context.Context, r forgeRef, closed bool, transi
 // jiraNode is a Jira issue's node.
 func jiraNode(key string) wire.LineageNode {
 	return wire.LineageNode{Kind: lineage.KindIssue, Ref: "jira:" + key}
+}
+
+// jiraStart is the new-agent form for a Jira issue, labelled with its key (PROJ-3).
+func jiraStart(i wire.ForgeItem) *wire.ForgeStart {
+	key := strings.TrimPrefix(i.Node.Ref, "jira:")
+	return &wire.ForgeStart{Prompt: fmt.Sprintf("%s: %s\n\nWork on this Jira issue: %s", key, i.Title, deref(i.URL)),
+		Labels: []string{key}, Worktree: optional(key + " " + i.Title)}
 }

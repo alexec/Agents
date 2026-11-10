@@ -120,7 +120,6 @@ func (d *Daemon) registerForgeWrites() {
 // forgeTarget is the item a write is on, and the forge on the interface (#4329) to write it
 // with, with its ref there.
 type forgeTarget struct {
-	pr    bool
 	forge Forge
 	ref   forgeRef
 }
@@ -132,7 +131,7 @@ func (d *Daemon) forgeTargetOf(ctx context.Context, method string, node wire.Lin
 		return forgeTarget{}, Invalid("%s: %s is not a pull request", method, node.Ref)
 	}
 	if f, ref, ok := d.forgeOwning(node); ok {
-		return forgeTarget{forge: f, ref: ref, pr: ref.pr()}, nil
+		return forgeTarget{forge: f, ref: ref}, nil
 	}
 	return forgeTarget{}, Invalid("%s: %s is not an issue or a pull request on GitHub, GitLab, Forgejo, Bitbucket, Azure DevOps, Linear, Jira or Azure Boards", method, node.Ref)
 }
@@ -346,44 +345,10 @@ func mergeMethodsOf(methods []string) []wire.ForgeMergeMethod {
 	return out
 }
 
-// forgeStartOf is the new-agent form for an issue (Start Agent), as the GitHub issues view fills it
-// (#834): the prompt names the issue and how to read it, and the session is labelled with it.
-func forgeStartOf(i wire.ForgeItem) *wire.ForgeStart {
-	if i.Node.Kind != lineage.KindIssue {
-		return nil
-	}
-	url := deref(i.URL)
-	if identifier, ok := strings.CutPrefix(i.Node.Ref, "linear:"); ok {
-		return &wire.ForgeStart{Prompt: fmt.Sprintf("%s: %s\n\nWork on this Linear issue: %s", identifier, i.Title, url),
-			Labels: []string{identifier}, Worktree: optional(identifier + " " + i.Title)}
-	}
-	if key, ok := strings.CutPrefix(i.Node.Ref, "jira:"); ok {
-		return &wire.ForgeStart{Prompt: fmt.Sprintf("%s: %s\n\nWork on this Jira issue: %s", key, i.Title, url),
-			Labels: []string{key}, Worktree: optional(key + " " + i.Title)}
-	}
-	if _, id, ok := boardsOfNode(i.Node); ok {
-		key := "AB#" + strconv.Itoa(id)
-		return &wire.ForgeStart{Prompt: fmt.Sprintf("%s: %s\n\nWork on this Azure Boards work item: %s\n\n"+
-			"Name %s in the pull request's title, so Azure Boards links it.", key, i.Title, url, key),
-			Labels: []string{key}, Worktree: optional(strconv.Itoa(id) + " " + i.Title)}
-	}
-	if _, n, ok := forgejoOfNode(i.Node); ok {
-		return forgejoStart(i, n)
-	}
-	if _, n, ok := bitbucketOfNode(i.Node); ok {
-		return bitbucketStart(i, n)
-	}
-	repo, n, ok := nodeOfRepo(i.Node)
-	if !ok {
-		return nil
-	}
-	prompt := fmt.Sprintf("#%d: %s\n\nWork on this GitLab issue: %s", n, i.Title, url)
-	if repo.forge == "github" {
-		on := " --repo " + repo.path
-		prompt = fmt.Sprintf("#%d: %s\n\nWork on this GitHub issue (`gh issue view %d%s`).\n\n"+
-			"First assign it to yourself: `gh issue edit %d%s --add-assignee @me`.", n, i.Title, n, on, n, on)
-	}
-	return &wire.ForgeStart{Prompt: prompt, Labels: []string{"#" + strconv.Itoa(n)}, Worktree: optional(strconv.Itoa(n) + " " + i.Title)}
+// numberedStart is the new-agent form for an issue a forge numbers (#12), with its prompt: the
+// session is labelled with the number (#834).
+func numberedStart(prompt string, n int, title string) *wire.ForgeStart {
+	return &wire.ForgeStart{Prompt: prompt, Labels: []string{"#" + strconv.Itoa(n)}, Worktree: optional(strconv.Itoa(n) + " " + title)}
 }
 
 func optionalTrue(b bool) *bool {
