@@ -19,7 +19,7 @@ import type {
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ConnectAnotherRequest, ConnectReport, ControlPerson, DailySummarySettings, SummaryPage, SummaryPageText, DesktopControlSettings, WakeSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
   PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, BudgetRequest, RemoveRequest, ClientPermissionSettings, PRCostComment,
   Connection, LineageNode, LineageSessionIssue, MoveToMachineAnswer, ProblemReport, ProblemReportRequest, Request as PersonRequest, RequestSecretUse, LockDelivery, RequestUpdate, ProviderID, StartedMachinePreview, FoldersFindRequest, FoundFolder,
-  OutsideAccount, OutsideAccounts, UserSecretRow } from "../protocol/generated";
+  OutsideAccount, OutsideAccounts, UserSecretRow, WebRemoteStatus, WireDate } from "../protocol/generated";
 import { endedConnections, endedLine, hasEnded } from "./connectorSetup";
 import { parseQuery } from "./labels";
 import { Failure } from "../protocol/generated";
@@ -455,7 +455,8 @@ export class Work {
    * (#666), from `control/status`.
    */
   readonly plane = signal<{ machineID: string; homeHost?: string | undefined; thisMacHost?: MachineJoinStatus | undefined;
-    name?: string; version?: string; required?: RequiredCapabilities | undefined; capabilities?: string[] | undefined } | null>(null);
+    name?: string; version?: string; required?: RequiredCapabilities | undefined; capabilities?: string[] | undefined;
+    startedAt?: WireDate | undefined; web?: WebRemoteStatus | undefined; restartable?: boolean | undefined } | null>(null);
   /** Whether the control plane said `capability` (#1748), from `control/status`: false until it has said its list. */
   planeHas(capability: string): boolean {
     return this.plane.value?.capabilities?.includes(capability) ?? false;
@@ -1505,6 +1506,11 @@ export class Store extends Work {
         this.connectReport.value = (params as ConnectReport | null) ?? null;
         return;
       }
+      if (method === "control/webChanged") {
+        const plane = this.plane.value;
+        if (plane) this.plane.value = { ...plane, web: (params as WebRemoteStatus | null) ?? undefined };
+        return;
+      }
       if (method === "control/thisMacHostChanged") {
         const plane = this.plane.value;
         if (plane) this.plane.value = { ...plane, thisMacHost: (params as MachineJoinStatus | null) ?? undefined };
@@ -1613,7 +1619,8 @@ export class Store extends Work {
     const status = await this.link.call("control/status", {}).catch(() => null);
     if (!status) return;
     this.plane.value = { machineID: status.machineID, homeHost: status.homeHost, thisMacHost: status.thisMacHost,
-      name: status.name, version: status.version, required: status.required, capabilities: status.capabilities };
+      name: status.name, version: status.version, required: status.required, capabilities: status.capabilities,
+      startedAt: status.startedAt, web: status.web, restartable: status.restartable };
     this.person.value = status.person ?? null;
     this.joinCommand.value = status.joinCommand || null;
     knowPublicViews(status.publicViews);
@@ -2453,6 +2460,31 @@ export class Store extends Work {
    * this Mac (it reads the Mac host's join), it knows the method, and the person is an admin. */
   readonly canConnectAnother: ReadonlySignal<boolean> = computed(() =>
     this.planeHas(Capability.controlConnectAnother1) && !!this.plane.value?.thisMacHost && this.person.value?.role === "admin");
+
+  /** Whether this page may restart its control plane and serve it or not (#4252): Agents runs it on this Mac and
+   * starts it again, it knows the methods, and the person is an admin. */
+  readonly canControlThisMac: ReadonlySignal<boolean> = computed(() =>
+    this.planeHas(Capability.controlLocal1) && !!this.plane.value?.restartable && this.person.value?.role === "admin");
+
+  /** Restart (#4252): the control plane stops and Agents on this Mac starts it again; this page connects again. */
+  async restartControl(): Promise<void> {
+    await this.link.call("control/restart", {});
+  }
+
+  /** Serve Agents to browsers on this Mac, or stop (#4252, 071 FR-002): off keeps this page connected until it is
+   * closed or reloaded. */
+  async setServeWeb(on: boolean): Promise<void> {
+    const web = await this.link.call("control/setWeb", { on });
+    const plane = this.plane.value;
+    if (plane) this.plane.value = { ...plane, web };
+  }
+
+  /** Try Again (#4252, 071 R3): the control plane opens its listener for browsers again. */
+  async retryWeb(): Promise<void> {
+    const web = await this.link.call("control/retryWeb", {});
+    const plane = this.plane.value;
+    if (plane) this.plane.value = { ...plane, web };
+  }
 
   /** Connect to Another… (#4257): the window on this Mac does it, and says each step as control/connectReported. */
   async connectAnother(request: ConnectAnotherRequest): Promise<void> {

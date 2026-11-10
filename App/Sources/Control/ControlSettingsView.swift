@@ -259,7 +259,7 @@ struct ControlBrowserCard: View {
     private var web: DaemonAPI.WebRemoteStatus? { control.status?.web }
 
     private var detail: String {
-        guard let web else { return BrowserOpening.offWords }
+        guard let web, !web.isOff else { return BrowserOpening.offWords }
         return web.served ? "\(web.summary) The first time, it pairs that browser too." : "\(web.summary) Try Again is beside Serve Agents to browsers on this Mac."
     }
 }

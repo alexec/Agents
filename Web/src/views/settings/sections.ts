@@ -13,6 +13,7 @@ import { AgentsPolicySection } from "./AgentsPolicy";
 import { BackupsSection, ServerBackupsSection } from "./Backups";
 import { BrowserSection } from "./Browser";
 import { ConnectAnotherSection } from "./ConnectAnother";
+import { ControlOverviewSection } from "./ControlOverview";
 import { DesktopControlSection } from "./DesktopControl";
 import { ForgeLoginsSection } from "./ForgeLogins";
 import { GitAccessSection } from "./GitAccess";
@@ -52,6 +53,8 @@ export const settingsSections: readonly SettingsSection[] = [
   { name: "channels", scope: "controlPlane", order: 30, Section: ChannelsSection },
   // Connect to Another… on the page this Mac serves (#4257): the window on this Mac does it.
   { name: "connectAnother", scope: "controlPlane", order: 55, Section: ConnectAnotherSection, shows: (store) => store.canConnectAnother.value },
+  // Serve Agents to browsers on this Mac and Restart, on the page this Mac serves (#4252), first as in the window.
+  { name: "controlOverview", scope: "controlPlane", order: 1, Section: ControlOverviewSection, shows: (store) => store.canControlThisMac.value },
   // The off-by-default switch for drive_screen (#3004, US2).
   { name: "desktopControl", scope: "machines", order: 35, Section: DesktopControlSection },
   // Your GitHub, GitLab, Linear, Jira, Forgejo, Bitbucket and Azure DevOps logins, for the Team section and "An agent is on it" (#2951, #3160).

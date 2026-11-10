@@ -332,6 +332,7 @@ func TestEveryClientMethodChecksTheOwner(t *testing.T) {
 		"governance/usage": true, "governance/request": true, "governance/requests": true, "governance/decide": true,
 		"governance/approvals": true, "governance/revoke": true,
 		"readApi/list": true, "readApi/make": true, "readApi/revoke": true,
+		"control/restart": true, "control/retryWeb": true, "control/setWeb": true,
 		// It names a bot's machine, an admin's to stop, and checks that itself (#1761).
 		"bots/stopRun": true,
 	}

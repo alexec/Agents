@@ -4,7 +4,8 @@ import assert from "node:assert/strict";
 import { load } from "./load.mjs";
 
 const { settingsSections, sectionsIn } = await load("src/views/settings/sections.ts");
-const store = (role, connect = false) => ({ person: { value: role ? { role } : null }, canConnectAnother: { value: connect } });
+const store = (role, connect = false, thisMac = false) => ({ person: { value: role ? { role } : null }, canConnectAnother: { value: connect },
+  canControlThisMac: { value: thisMac } });
 
 test("each group's sections are in their subject's order", () => {
   const names = (scope, role) => sectionsIn(scope, store(role)).map((s) => s.name);
@@ -20,6 +21,10 @@ test("each group's sections are in their subject's order", () => {
 
 test("Connect to Another… is in Control plane, before Version, only where the page may ask for it (#4257)", () => {
   assert.deepEqual(sectionsIn("controlPlane", store("admin", true)).map((s) => s.name).slice(-3), ["providers", "connectAnother", "version"]);
+});
+
+test("Overview is first in Control plane, only where the page may restart it (#4252)", () => {
+  assert.equal(sectionsIn("controlPlane", store("admin", false, true))[0].name, "controlOverview");
 });
 
 test("the list is sorted by name, a line each, and no two share a place", () => {

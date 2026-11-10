@@ -11,7 +11,7 @@ import (
 // Status is DaemonAPI.WebRemoteStatus (071 R3): whether the control plane serves the web
 // remote on its loopback port. Agents Host's row and the window's Settings show it. Port
 // is the port asked for (8792 for Agents Host's copy); Reason is why not, when it is not
-// served (ReasonPortInUse, ReasonBuild or ReasonFailed); Detail is the error as the
+// served (ReasonOff, ReasonPortInUse, ReasonBuild or ReasonFailed); Detail is the error as the
 // control plane met it.
 type Status = wire.WebRemoteStatus
 
@@ -20,7 +20,12 @@ const (
 	ReasonPortInUse = "portInUse"
 	ReasonBuild     = "build"
 	ReasonFailed    = "failed"
+	// The person turned it off (071 FR-002, #4252).
+	ReasonOff = "off"
 )
+
+// Off is the status of a listener the person turned off: port is the one it would use.
+func Off(port int) Status { return Status{Port: int64(port), Reason: new(ReasonOff)} }
 
 // Address is WebRemoteStatus.address.
 func Address(s Status) string { return OriginFor(int(s.Port)) }
@@ -36,6 +41,8 @@ func Summary(s Status) string {
 		reason = *s.Reason
 	}
 	switch reason {
+	case ReasonOff:
+		return fmt.Sprintf("Off. Turn it on to use Agents at %s, in a browser on this Mac only.", Address(s))
 	case ReasonPortInUse:
 		return fmt.Sprintf("Not serving: port %d is in use by another app.", s.Port)
 	case ReasonBuild:

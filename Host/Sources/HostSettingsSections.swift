@@ -263,7 +263,7 @@ struct HostServeCard: View {
                         Button("Try Again") { Task { await host.retryWebRemote() } }.buttonStyle(.paper)
                     }
                     Toggle("Serve Agents to browsers on this Mac",
-                           isOn: Binding(get: { host.settings.servesWebRemote },
+                           isOn: Binding(get: { host.servesWebRemote },
                                          set: { on in Task { await host.setServeWebRemote(on) } }))
                         .labelsHidden()
                         .toggleStyle(.switch)

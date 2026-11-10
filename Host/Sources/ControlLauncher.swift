@@ -138,6 +138,8 @@ enum ControlLauncher {
             } else {
                 arguments.append("--no-web")
             }
+            // launchd starts it again (KeepAlive), so a page's Restart may stop it (#4252).
+            arguments.append("--restartable")
             let planned = try ControlTool.plan(arguments, paths: paths, settings: settings)
             for (target, data) in planned.secrets {
                 var ends: [Int32] = [0, 0]

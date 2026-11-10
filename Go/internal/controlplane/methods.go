@@ -81,9 +81,12 @@ var own = methodSet(
 	"clients/webPushKey",
 	"control/connectAnother",
 	"control/connectReport",
+	"control/restart",
+	"control/retryWeb",
 	"control/rotate",
 	"control/setAuditDays",
 	"control/setFolderDetection",
+	"control/setWeb",
 	"control/status",
 	"daemon/ping",
 	"devices/forget",
@@ -564,6 +567,8 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return m.connectAnotherMethod(method, params, from)
 	case "control/rotate":
 		return wire.Empty{}, m.s.rotate(ctx, from)
+	case "control/restart", "control/retryWeb", "control/setWeb":
+		return m.localMethod(ctx, method, params, from)
 	case "control/setFolderDetection":
 		request, err := require[wire.FolderDetection](params, "FolderDetection")
 		if err != nil {
@@ -687,6 +692,9 @@ func (m *Methods) status(from Caller) wire.ControlStatus {
 	m.mu.Lock()
 	status.Web = m.web
 	m.mu.Unlock()
+	if m.s.cfg.Restart != nil {
+		status.Restartable = new(true)
+	}
 	if m.s.page != nil {
 		status.PublicWeb = new(m.s.page.Address())
 		if views := m.s.page.ViewsOrigin(); views != "" {

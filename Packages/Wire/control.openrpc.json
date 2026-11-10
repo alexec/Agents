@@ -1317,6 +1317,58 @@
       ]
     },
     {
+      "name": "control/restart",
+      "description": "An admin restarts the control plane (#4252): it answers, stops, and whatever runs it starts it again (control/status says restartable). Every client and host connects again. Refused where nothing would start it.",
+      "x-capability": "control.local/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "control/retryWeb",
+      "description": "An admin asks the control plane to open its loopback listener for browsers on its Mac again, when it isn't serving (#4252, 071 R3): Try Again once whatever held the port has let it go. Answers how the listener stands.",
+      "x-capability": "control.local/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/WebRemoteStatus"
+        }
+      }
+    },
+    {
       "name": "control/rotate",
       "description": "An admin rotates the control plane's key (#997, spec 736 FR-043). Every member's connection is closed; each connects again with the previous key and is given the new one in ok. The previous key is accepted for 30 days. Refused on a control plane of several copies, or one whose key is handed in (AGENTS_CONTROL_KEY, --key-fd).",
       "x-capability": "control.rotate/1",
@@ -1425,6 +1477,32 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/FolderDetection"
+        }
+      }
+    },
+    {
+      "name": "control/setWeb",
+      "description": "An admin turns the control plane's loopback listener for browsers on its Mac on or off, and the control plane keeps that (#4252, 071 FR-002). Off is reason off in WebRemoteStatus; a page open through the listener stays connected. Answers how the listener stands.",
+      "x-capability": "control.local/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/WebServe"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/WebRemoteStatus"
         }
       }
     },

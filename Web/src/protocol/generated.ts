@@ -2805,6 +2805,11 @@ export interface ControlStatus {
   you?: UUID;
   web?: WebRemoteStatus;
   /**
+   * Whatever runs this control plane starts it again after control/restart (#4252): Agents Host's
+   * launch agent on a Mac. Absent where nothing would.
+   */
+  restartable?: boolean;
+  /**
    * Where a browser anywhere opens the page, on the control plane's own domain (#1459): its https
    * address, when it serves the page there.
    */
@@ -12337,6 +12342,14 @@ export interface WebRemoteStatus {
   detail?: string;
 }
 
+/**
+ * control/setWeb (#4252, 071 FR-002): serve Agents to browsers on the control plane's Mac, or stop.
+ * Off closes the loopback listener; a page open through it stays connected.
+ */
+export interface WebServe {
+  on: boolean;
+}
+
 export type Weekday =
   | "sun"
   | "mon"
@@ -12937,8 +12950,11 @@ export interface Methods {
   "console/stopAgent": { params: ConsoleStopAgent; result: Empty };
   "console/teamWorkflows": { params: Empty; result: TeamWorkflows };
   "control/connectAnother": { params: ConnectAnotherRequest; result: Empty };
+  "control/restart": { params: Empty; result: Empty };
+  "control/retryWeb": { params: Empty; result: WebRemoteStatus };
   "control/rotate": { params: Empty; result: Empty };
   "control/setAuditDays": { params: AuditDays; result: AuditDays };
+  "control/setWeb": { params: WebServe; result: WebRemoteStatus };
   "control/status": { params: Empty; result: ControlStatus };
   "cost/state": { params: Empty; result: CostState };
   "credentials/offer": { params: CredentialsOffer; result: Empty };
@@ -13343,8 +13359,11 @@ export const MethodTarget = {
   "console/stopAgent": "control",
   "console/teamWorkflows": "control",
   "control/connectAnother": "control",
+  "control/restart": "control",
+  "control/retryWeb": "control",
   "control/rotate": "control",
   "control/setAuditDays": "control",
+  "control/setWeb": "control",
   "control/status": "control",
   "cost/state": "host",
   "credentials/offer": "host",
@@ -13931,7 +13950,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ControlPerson: { required: ["id", "name", "role"], optional: ["localOwner"] },
   ControlPush: { required: ["sealed"], optional: [] },
   ControlPushItem: { required: ["needID", "alert"], optional: ["headline", "timely"] },
-  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "you", "web", "publicWeb", "publicViews", "thisMacHost", "folderDetection", "unjoinedTunnels", "capabilities", "required", "person", "joinCommand"] },
+  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "you", "web", "restartable", "publicWeb", "publicViews", "thisMacHost", "folderDetection", "unjoinedTunnels", "capabilities", "required", "person", "joinCommand"] },
   Cost: { required: ["amount", "currency"], optional: [] },
   CostLimits: { required: [], optional: ["perAgent", "daily", "perAgentTokens", "dailyTokens"] },
   CostState: { required: ["limits", "today", "day", "tokensToday"], optional: ["note", "organisation", "setBy"] },
@@ -14781,6 +14800,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WebPushKey: { required: [], optional: ["publicKey"] },
   WebPushSubscription: { required: [], optional: ["endpoint", "p256dh", "auth"] },
   WebRemoteStatus: { required: ["port", "served"], optional: ["reason", "detail"] },
+  WebServe: { required: ["on"], optional: [] },
   WorkReport: { required: ["outcome", "message", "at"], optional: ["block"] },
   WorkTimeline: { required: ["epics", "releases"], optional: ["timeZone", "backtest", "errors"] },
   WorkTimelineBacktest: { required: ["error", "width", "cuts", "holds", "epics", "at"], optional: [] },

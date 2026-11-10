@@ -18,6 +18,7 @@ FIRST_RUN=0
 LAN=0
 HOST_FIRST=0
 EXTRA_ENV=()
+CONTROL_ARGS=()
 CONTROL_ENV=()
 APP_ARGS=()
 
@@ -35,6 +36,7 @@ while [ $# -gt 0 ]; do
     --seeded)    SEEDED=1 ;;         # the root exists, filled beforehand (scripts/seed-archived.swift), with no control/ yet
     --env)       EXTRA_ENV+=("$2"); shift ;;   # KEY=VALUE for the host, e.g. AGENTS_TEST_…=…
     --control-env) CONTROL_ENV+=("$2"); shift ;;  # KEY=VALUE for the control plane, e.g. AGENTS_SSH=…
+    --control-arg) CONTROL_ARGS+=("$2"); shift ;;  # an argument for agents-control serve, e.g. --restartable (#4252)
     --appearance) APP_ARGS+=(--appearance "$2"); shift ;;  # light|dark|system for the window, no setting changed
     --app-arg)   APP_ARGS+=("$2"); shift ;;   # one more argument for the window, e.g. a defaults key: -key value
     --outside-checkout) OUTSIDE=1 ;;  # open a copy of the window from the root, so its title names no worktree (#1078)
@@ -42,7 +44,7 @@ while [ $# -gt 0 ]; do
     --fake-azure-devops) FAKE_AZURE_DEVOPS=1 ;;  # Azure Repos and Azure Boards for the host (scripts/fake-azure-devops.py, #4063)
     --fake-bitbucket) FAKE_BITBUCKET=1 ;;  # Bitbucket Cloud for the host (scripts/fake-bitbucket.py, #4136)
     --fake-forgejo) FAKE_FORGEJO=1 ;;      # a Forgejo for the host (scripts/fake-forgejo.py, #4136)
-    *) echo "usage: launch.sh [--slug NAME] [--config Debug|Live] [--seeded] [--no-build] [--front] [--no-window] [--first-run] [--lan] [--host-first] [--web-port N] [--env KEY=VALUE]… [--control-env KEY=VALUE]… [--appearance light|dark] [--app-arg ARG]… [--outside-checkout] [--person NAME] [--fake-azure-devops] [--fake-bitbucket] [--fake-forgejo]" >&2; exit 2 ;;
+    *) echo "usage: launch.sh [--slug NAME] [--config Debug|Live] [--seeded] [--no-build] [--front] [--no-window] [--first-run] [--lan] [--host-first] [--web-port N] [--env KEY=VALUE]… [--control-env KEY=VALUE]… [--control-arg ARG]… [--appearance light|dark] [--app-arg ARG]… [--outside-checkout] [--person NAME] [--fake-azure-devops] [--fake-bitbucket] [--fake-forgejo]" >&2; exit 2 ;;
   esac
   shift
 done
@@ -185,7 +187,7 @@ start_control() {
   "${CLEAN[@]}" ${SSH_AUTH_SOCK:+SSH_AUTH_SOCK="$SSH_AUTH_SOCK"} AGENTS_CONTROL_URL="$URL" AGENTS_CONTROL_NAME="run-$SLUG" \
     ${SERVERS[@]+"${SERVERS[@]}"} ${CONTROL_ENV[@]+"${CONTROL_ENV[@]}"} \
     nohup "$CONTROL" serve --home "$ROOT/control" --port "$PORT" --no-bonjour \
-      --web "$REPO/Web/dist" --web-port "$WEB_PORT" --host-root "$ROOT" \
+      --web "$REPO/Web/dist" --web-port "$WEB_PORT" --host-root "$ROOT" ${CONTROL_ARGS[@]+"${CONTROL_ARGS[@]}"} \
     >>"$ROOT/control/control.log" 2>&1 &
   echo $! >"$ROOT/control/control.pid"
   for _ in $(seq 1 100); do

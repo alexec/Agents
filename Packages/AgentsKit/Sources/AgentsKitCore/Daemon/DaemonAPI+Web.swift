@@ -500,6 +500,10 @@ public extension DaemonAPI {
                 Row(Method.auditSetSinks, params: AuditSinks.self, result: AuditSinksState.self, kind: .controlRequest),
                 // Rotate Control Key… in Settings ▸ People (#997).
                 Row(Method.controlRotate, params: Empty.self, result: Empty.self, kind: .controlRequest),
+                // Settings ▸ Control plane ▸ Overview on the page this Mac serves (#4252).
+                Row(Method.controlRestart, params: Empty.self, result: Empty.self, kind: .controlRequest),
+                Row(Method.controlRetryWeb, params: Empty.self, result: WebRemoteStatus.self, kind: .controlRequest),
+                Row(Method.controlSetWeb, params: WebServe.self, result: WebRemoteStatus.self, kind: .controlRequest),
                 // Connect to Another… on the page this Mac serves (#4257).
                 Row(Method.controlConnectAnother, params: ConnectAnother.Request.self, result: Empty.self, kind: .controlRequest),
                 // Reports (#1811): usage, cost and time by person, folder and machine.
