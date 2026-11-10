@@ -88,6 +88,12 @@ When the App may not do a thing that you may do, your own login does it:
   permission is not read and write), `agentsd credential` gives git no token, and git asks
   your own `gh auth git-credential` next. Git also asks it when the host does not know the
   session's grant, for example after the host restarted.
+- The host checks this before it gives a session the App's token (#4079), not at push time.
+  It reads the install's permissions once (kept 10 minutes), and when they do not include
+  Contents read and write, it reads them once more. When they still do not, you get one
+  notice for the owner, not one per session, that names the permission to give (Contents,
+  and Pull requests when that is short too). The session's brief says it too. The notice goes
+  when a new session finds the permission given.
 
 To make the agents' posts show the App's badge for these too, give the `agents-loops` App
 **Contents**, **Pull requests** and **Actions** read and write on github.com, and accept the

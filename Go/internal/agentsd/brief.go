@@ -128,6 +128,9 @@ func (d *Daemon) brief(a *wire.Agent) string {
 	if appToolServed("move_worktree") && runtimeCanMove(a.RuntimeID) {
 		parts = append(parts, worktreesBrief)
 	}
+	if p := d.pushBrief(a.ID); p != "" {
+		parts = append(parts, p)
+	}
 	if r := residueBrief[a.RuntimeID]; r != "" {
 		parts = append(parts, r)
 	}
