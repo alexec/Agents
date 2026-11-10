@@ -38,7 +38,12 @@ const leasesBrief = "Lease a shared resource with lease_resource before using it
 	"the moment you are done. Keep leases short and extend them, and take several in the " +
 	"same order every time. A simulator, a browser and the screen (mouse, keyboard, front " +
 	"window) are for one agent at a time; lease a simulator by its UDID. If told " +
-	"you are in line, end your turn: a lease.granted event starts you again when it is yours."
+	"you are in line, end your turn: a lease.granted event starts you again when it is yours. " +
+	// The person's booking (#4268).
+	"Before a step that gives me a short time to act (a code sent by text or email, a " +
+	"sign-in to approve on my phone), book me with lease_resource on person: minutes is how " +
+	"long my step takes, by is when it stops mattering. Book first, then start the clock " +
+	"(press Send code), then hand the step over, and release it the moment it is done."
 
 // endingBrief names the three ways a turn ends (#1801). Without it an agent learnt about
 // archiving only from archive_session's description, and one that had finished with

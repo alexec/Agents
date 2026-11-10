@@ -20,8 +20,9 @@ func TestDeclaringAResource(t *testing.T) {
 	defer d.Shutdown()
 	var snap wire.LeaseSnapshot
 	json.Unmarshal(c.call(t, 1, "resources/snapshot", nil), &snap)
-	if len(snap.Resources) != 2 || snap.Resources[0].Name != "screen" || snap.Resources[0].DisplayName != "Screen, mouse and keyboard" ||
-		snap.Resources[1].Name != "browser:agents" || snap.Resources[1].Kind != "browser" {
+	if len(snap.Resources) != 3 || snap.Resources[0].Name != "screen" || snap.Resources[0].DisplayName != "Screen, mouse and keyboard" ||
+		snap.Resources[1].Name != "browser:agents" || snap.Resources[1].Kind != "browser" ||
+		!strings.HasPrefix(string(snap.Resources[2].Name), "person:") {
 		t.Fatalf("%+v", snap)
 	}
 	two := int64(2)

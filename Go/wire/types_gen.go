@@ -3118,6 +3118,9 @@ type ControlPushItem struct {
 	Alert bool `json:"alert"`
 
 	Headline *Headline `json:"headline,omitzero"`
+
+	// Asked by an agent that holds the person's booking (person:<name>, #4268): notify it as timely (Time Sensitive on iOS, an alert on the Mac, an urgent Web Push).
+	Timely *bool `json:"timely,omitzero"`
 }
 
 type ControlStatus struct {
@@ -7545,6 +7548,9 @@ type Need struct {
 	RaisedAt Date `json:"raisedAt"`
 
 	Headline Headline `json:"headline"`
+
+	// Asked by an agent that holds the person's booking (person:<name>, #4268): notify it as timely (Time Sensitive on iOS, an alert on the Mac, an urgent Web Push).
+	Timely *bool `json:"timely,omitzero"`
 }
 
 // NeedID (Attention/Need.swift): what is being answered, one key per kind. A notice (#2805) is what an agent told the person with `notify`: posted, never a Needs you row. A request (#4017) is a Needs you request posted so a phone can answer it: today only a secret's use (#4015), whose banner has its four answers.
@@ -9798,6 +9804,9 @@ type RelayDelivery struct {
 	Alert bool `json:"alert"`
 
 	Waiting *int64 `json:"waiting,omitzero"`
+
+	// Asked by an agent that holds the person's booking (person:<name>, #4268): notify it as timely (Time Sensitive on iOS, an alert on the Mac, an urgent Web Push).
+	Timely *bool `json:"timely,omitzero"`
 }
 
 type RelayGrantReply struct {

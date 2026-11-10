@@ -2788,6 +2788,11 @@ export interface ControlPushItem {
   needID: NeedID;
   alert: boolean;
   headline?: Headline;
+  /**
+   * Asked by an agent that holds the person's booking (person:<name>, #4268): notify it as timely
+   * (Time Sensitive on iOS, an alert on the Mac, an urgent Web Push).
+   */
+  timely?: boolean;
 }
 
 export interface ControlStatus {
@@ -6647,6 +6652,11 @@ export interface Need {
   kind: NeedKind;
   raisedAt: WireDate;
   headline: Headline;
+  /**
+   * Asked by an agent that holds the person's booking (person:<name>, #4268): notify it as timely
+   * (Time Sensitive on iOS, an alert on the Mac, an urgent Web Push).
+   */
+  timely?: boolean;
 }
 
 /**
@@ -8777,6 +8787,11 @@ export interface RelayDelivery {
   headline?: Headline;
   alert: boolean;
   waiting?: number;
+  /**
+   * Asked by an agent that holds the person's booking (person:<name>, #4268): notify it as timely
+   * (Time Sensitive on iOS, an alert on the Mac, an urgent Web Push).
+   */
+  timely?: boolean;
 }
 
 export interface RelayGrantReply {
@@ -13811,7 +13826,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ControlOK: { required: ["mac"], optional: ["host", "endpoints", "epoch", "newKey"] },
   ControlPerson: { required: ["id", "name", "role"], optional: ["localOwner"] },
   ControlPush: { required: ["sealed"], optional: [] },
-  ControlPushItem: { required: ["needID", "alert"], optional: ["headline"] },
+  ControlPushItem: { required: ["needID", "alert"], optional: ["headline", "timely"] },
   ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "you", "web", "publicWeb", "publicViews", "thisMacHost", "folderDetection", "unjoinedTunnels", "capabilities", "required", "person", "joinCommand"] },
   Cost: { required: ["amount", "currency"], optional: [] },
   CostLimits: { required: [], optional: ["perAgent", "daily", "perAgentTokens", "dailyTokens"] },
@@ -14159,7 +14174,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MultiplierBaseline: { required: ["prsPerWeek", "hoursPerWeek", "source"], optional: ["line"] },
   MultiplierCountParams: { required: [], optional: ["timeZone", "prsPerWeek"] },
   NativeSetting: { required: [], optional: ["options", "sandbox", "clientPermission"] },
-  Need: { required: ["id", "folder", "kind", "raisedAt", "headline"], optional: ["agentID"] },
+  Need: { required: ["id", "folder", "kind", "raisedAt", "headline"], optional: ["agentID", "timely"] },
   NotCommittedResponse: { required: ["isRepository", "paths", "more"], optional: [] },
   NoticeDelivered: { required: ["need", "to"], optional: [] },
   NoticeDelivery: { required: ["notice", "to"], optional: [] },
@@ -14348,7 +14363,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ReceiveState: { required: ["folder", "exists", "repository", "ownChanges", "heads"], optional: [] },
   ReceiveStateRequest: { required: ["folder"], optional: [] },
   ReceiveUploadRequest: { required: ["upload", "offset", "data"], optional: [] },
-  RelayDelivery: { required: ["needID", "device", "alert"], optional: ["publicKey", "headline", "waiting"] },
+  RelayDelivery: { required: ["needID", "device", "alert"], optional: ["publicKey", "headline", "waiting", "timely"] },
   RelayGrantReply: { required: ["runtime", "caCertificate", "standIn"], optional: [] },
   RelayGrantRequest: { required: ["runtime"], optional: [] },
   RelayOffer: { required: ["runtime", "socketPath", "caCertificate", "standIn"], optional: [] },

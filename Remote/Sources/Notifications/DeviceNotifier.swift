@@ -84,14 +84,14 @@ final class DeviceNotifier: NSObject, UNUserNotificationCenterDelegate {
     }
 
     private func show(_ need: Need, token: String, alert: Bool) {
-        show(need.headline, needID: need.id, alert: alert, agentID: need.agentID)
+        show(need.headline, needID: need.id, alert: alert, agentID: need.agentID, timely: need.timely == true)
     }
 
     /// A headline opened from a push, or one the Mac sent in the clear over the LAN.
     /// Idempotent like `apply`: a need already shown here — or shown and swiped away —
     /// is not shown again by a later silent push for the same need, which every move
     /// of it produces. A dismissed banner is a banner gone, not a need met (spec Notes).
-    func show(_ headline: Headline, needID: NeedID, alert: Bool, agentID: UUID? = nil) {
+    func show(_ headline: Headline, needID: NeedID, alert: Bool, agentID: UUID? = nil, timely: Bool = false) {
         let token = needID.token
         guard showing[token] == nil else { return }
         let content = UNMutableNotificationContent()
@@ -100,6 +100,8 @@ final class DeviceNotifier: NSObject, UNUserNotificationCenterDelegate {
         content.subtitle = headline.h1
         content.body = headline.h3
         content.sound = alert ? .default : nil
+        // The person's booking's holder asks (#4268): it comes through Focus.
+        content.interruptionLevel = timely ? .timeSensitive : .active
         content.userInfo = ["needToken": token]
         if let agentID { content.userInfo["agentID"] = agentID.uuidString }
         content.threadIdentifier = agentID?.uuidString ?? token
@@ -121,7 +123,7 @@ final class DeviceNotifier: NSObject, UNUserNotificationCenterDelegate {
     /// button took it away, and the question is still asked.
     func showAgain(_ need: Need) {
         showing.removeValue(forKey: need.id.token)
-        show(need.headline, needID: need.id, alert: false, agentID: need.agentID)
+        show(need.headline, needID: need.id, alert: false, agentID: need.agentID, timely: need.timely == true)
     }
 
     func withdraw(_ token: String) {

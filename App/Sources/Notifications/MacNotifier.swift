@@ -97,6 +97,8 @@ final class MacNotifier: NSObject, UNUserNotificationCenterDelegate {
         content.subtitle = headline.h1
         content.body = headline.h3
         content.sound = alert ? .default : nil
+        // The person's booking's holder asks (#4268): it comes through Focus.
+        content.interruptionLevel = need.timely == true ? .timeSensitive : .active
         content.userInfo = ["needToken": token]
         if let agentID = need.agentID {
             content.userInfo["agentID"] = agentID.uuidString
