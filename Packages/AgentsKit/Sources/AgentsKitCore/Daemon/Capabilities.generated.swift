@@ -151,6 +151,7 @@ public enum Capability {
     public static let reportsValue1 = "reports.value/1"
     public static let reportsViews1 = "reports.views/1"
     public static let reports1 = "reports/1"
+    public static let requestsDefer1 = "requests.defer/1"
     public static let requests1 = "requests/1"
     public static let resourcesLeases1 = "resources.leases/1"
     public static let resources1 = "resources/1"
@@ -461,8 +462,10 @@ public enum Capability {
         "reports/features": "features/1",
         "reports/problem": "reports.problem/1",
         "requests/answer": "requests/1",
+        "requests/defer": "requests.defer/1",
         "requests/drop": "requests/1",
         "requests/list": "requests/1",
+        "requests/undefer": "requests.defer/1",
         "resources/declare": "resources/1",
         "resources/end": "resources.leases/1",
         "resources/lease": "resources.leases/1",

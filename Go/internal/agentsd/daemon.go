@@ -370,6 +370,7 @@ func (d *Daemon) Shutdown() {
 	d.allowStopped = true
 	d.allowMu.Unlock()
 	d.stopEventWaits()
+	d.stopRequestTimer()
 	d.stopShells()
 	d.stopBrowserDrives()
 	d.browser.Shutdown()

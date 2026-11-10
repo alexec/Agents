@@ -9336,6 +9336,11 @@ export interface Request {
   /** A summary for the row; never a secret's value. */
   answer?: string;
   droppedWhy?: RequestDroppedWhy;
+  /**
+   * Later (#4233): the request is still open, but out of Needs you, the counts and the notices
+   * until it comes back. Absent when it is not deferred; an answer or a drop clears it.
+   */
+  deferred?: RequestDeferral;
 }
 
 /**
@@ -9368,6 +9373,18 @@ export interface RequestChecklistAnswer {
 export interface RequestChecklistLine {
   text: string;
   done: boolean;
+}
+
+/**
+ * When a deferred request comes back (#4233): at until, or when the person is next at the Mac
+ * (atMac: the Mac's presence changes from not here to here), whichever is first.
+ */
+export interface RequestDeferral {
+  until?: WireDate;
+  atMac?: boolean;
+  /** When it was deferred. */
+  at: WireDate;
+  by?: AuditActor;
 }
 
 /** The part of a request that depends on its source. */
@@ -9495,6 +9512,13 @@ export interface RequestsAnswer {
   answer: RequestAnswer;
 }
 
+/** Later (#4233): until, atMac or both; until is after now. */
+export interface RequestsDefer {
+  id: UUID;
+  until?: WireDate;
+  atMac?: boolean;
+}
+
 export interface RequestsDrop {
   id: UUID;
   why?: RequestDroppedWhy;
@@ -9515,6 +9539,11 @@ export type RequestsListState =
   | "open"
   | "ended"
   | "all";
+
+/** Bring back now (#4233). */
+export interface RequestsUndefer {
+  id: UUID;
+}
 
 /**
  * What the control plane needs of a peer to route for it (#1748): a host without each of host is
@@ -13149,7 +13178,9 @@ export interface Methods {
   "reports/value": { params: ReportQuery; result: ReportValue };
   "reports/views": { params: Empty; result: ReportViews };
   "requests/answer": { params: RequestsAnswer; result: RequestUpdate };
+  "requests/defer": { params: RequestsDefer; result: RequestUpdate };
   "requests/list": { params: RequestsList; result: RequestsListResult };
+  "requests/undefer": { params: RequestsUndefer; result: RequestUpdate };
   "resources/snapshot": { params: Empty; result: LeaseSnapshot };
   "reviews/dismiss": { params: ReviewDismissRequest; result: Empty };
   "reviews/open": { params: ReviewOpenRequest; result: Empty };
@@ -13555,7 +13586,9 @@ export const MethodTarget = {
   "reports/value": "control",
   "reports/views": "control",
   "requests/answer": "host",
+  "requests/defer": "host",
   "requests/list": "host",
+  "requests/undefer": "host",
   "resources/snapshot": "host",
   "reviews/dismiss": "host",
   "reviews/open": "host",
@@ -14504,11 +14537,12 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ReportViewID: { required: ["id"], optional: [] },
   ReportViews: { required: ["views"], optional: [] },
   ReportedEdit: { required: ["path", "newText", "toolCallID", "index", "entryIndex", "replaceAll", "at"], optional: ["oldText"] },
-  Request: { required: ["id", "kind", "source", "state", "title", "detail", "folder", "waiters", "askedAt"], optional: ["askedBy", "forge", "answeredAt", "answeredBy", "answer", "droppedWhy"] },
+  Request: { required: ["id", "kind", "source", "state", "title", "detail", "folder", "waiters", "askedAt"], optional: ["askedBy", "forge", "answeredAt", "answeredBy", "answer", "droppedWhy", "deferred"] },
   RequestAnswer: { required: [], optional: ["form", "checklist", "approval", "secretUse"] },
   RequestApprovalAnswer: { required: ["action"], optional: ["note"] },
   RequestChecklistAnswer: { required: ["done"], optional: [] },
   RequestChecklistLine: { required: ["text", "done"], optional: [] },
+  RequestDeferral: { required: ["at"], optional: ["until", "atMac", "by"] },
   RequestDetail: { required: [], optional: ["elicitation", "secretUse"] },
   RequestForge: { required: ["provider", "repo", "item", "number", "url", "label", "checklist", "seenAt"], optional: ["screenshots", "author", "updatedAt"] },
   RequestFormAnswer: { required: ["action"], optional: ["content"] },
@@ -14517,9 +14551,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RequestUpdate: { required: ["request"], optional: [] },
   RequestWaiter: { required: ["agent", "since"], optional: [] },
   RequestsAnswer: { required: ["id", "answer"], optional: [] },
+  RequestsDefer: { required: ["id"], optional: ["until", "atMac"] },
   RequestsDrop: { required: ["id"], optional: ["why"] },
   RequestsList: { required: [], optional: ["state", "folder"] },
   RequestsListResult: { required: ["requests"], optional: [] },
+  RequestsUndefer: { required: ["id"], optional: [] },
   RequiredCapabilities: { required: ["host", "client"], optional: [] },
   ResourceState: { required: ["name", "kind", "displayName", "isGone", "line", "endingSoon"], optional: ["holds", "lease", "places", "declared"] },
   ResumingNotification: { required: ["agentID", "isResuming"], optional: [] },

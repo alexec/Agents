@@ -150,6 +150,7 @@ const CapReportsScope1 = "reports.scope/1"
 const CapReportsValue1 = "reports.value/1"
 const CapReportsViews1 = "reports.views/1"
 const CapReports1 = "reports/1"
+const CapRequestsDefer1 = "requests.defer/1"
 const CapRequests1 = "requests/1"
 const CapResourcesLeases1 = "resources.leases/1"
 const CapResources1 = "resources/1"
@@ -460,8 +461,10 @@ var HostCapabilities = pairs([][2]string{
 	{"reports/features", "features/1"},
 	{"reports/problem", "reports.problem/1"},
 	{"requests/answer", "requests/1"},
+	{"requests/defer", "requests.defer/1"},
 	{"requests/drop", "requests/1"},
 	{"requests/list", "requests/1"},
+	{"requests/undefer", "requests.defer/1"},
 	{"resources/declare", "resources/1"},
 	{"resources/end", "resources.leases/1"},
 	{"resources/lease", "resources.leases/1"},

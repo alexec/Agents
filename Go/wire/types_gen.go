@@ -10393,6 +10393,9 @@ type Request struct {
 	Answer *string `json:"answer,omitzero"`
 
 	DroppedWhy *RequestDroppedWhy `json:"droppedWhy,omitzero"`
+
+	// Later (#4233): the request is still open, but out of Needs you, the counts and the notices until it comes back. Absent when it is not deferred; an answer or a drop clears it.
+	Deferred *RequestDeferral `json:"deferred,omitzero"`
 }
 
 // One of the answers: form for a question, a secret or a step (#3863); checklist and approval for a forge item (#3865); secretUse for the use of a secret with Ask before use (#4015).
@@ -10422,6 +10425,18 @@ type RequestChecklistLine struct {
 	Text string `json:"text"`
 
 	Done bool `json:"done"`
+}
+
+// When a deferred request comes back (#4233): at until, or when the person is next at the Mac (atMac: the Mac's presence changes from not here to here), whichever is first.
+type RequestDeferral struct {
+	Until *Date `json:"until,omitzero"`
+
+	AtMac *bool `json:"atMac,omitzero"`
+
+	// When it was deferred.
+	At Date `json:"at"`
+
+	By *AuditActor `json:"by,omitzero"`
 }
 
 // The part of a request that depends on its source.
@@ -10544,6 +10559,15 @@ type RequestsAnswer struct {
 	Answer RequestAnswer `json:"answer"`
 }
 
+// Later (#4233): until, atMac or both; until is after now.
+type RequestsDefer struct {
+	ID UUID `json:"id"`
+
+	Until *Date `json:"until,omitzero"`
+
+	AtMac *bool `json:"atMac,omitzero"`
+}
+
 type RequestsDrop struct {
 	ID UUID `json:"id"`
 
@@ -10567,6 +10591,11 @@ type RequestsListState string
 const RequestsListStateOpen RequestsListState = "open"
 const RequestsListStateEnded RequestsListState = "ended"
 const RequestsListStateAll RequestsListState = "all"
+
+// Bring back now (#4233).
+type RequestsUndefer struct {
+	ID UUID `json:"id"`
+}
 
 // What the control plane needs of a peer to route for it (#1748): a host without each of host is needsUpdate, and a client without each of client is answered -32008.
 type RequiredCapabilities struct {

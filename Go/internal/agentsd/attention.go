@@ -75,10 +75,13 @@ type attentionRecords struct {
 type attentionState struct {
 	attentionMu sync.Mutex
 	presences   map[int64]presence
-	raisedAt    map[string]wire.Date
-	raisedNeed  map[string]wire.NeedID
-	deliveries  map[string]delivery
-	settling    map[string]*time.Timer
+	// macHereAt is when a report last found the person at the Mac, so a window that
+	// reconnects is not the person coming back (#4233).
+	macHereAt  time.Time
+	raisedAt   map[string]wire.Date
+	raisedNeed map[string]wire.NeedID
+	deliveries map[string]delivery
+	settling   map[string]*time.Timer
 	// announced is every need the clients were told of with no surface to show it on, by
 	// token, so each is told when it ends too (#1367): a phone's model, and the widget it
 	// writes from it, holds what attention/pending holds and nothing it has dropped.
@@ -386,6 +389,9 @@ func (d *Daemon) needs() []wire.Need {
 		}
 	}
 	for _, e := range d.pendingElicitations() {
+		if d.requestDeferred(e.ID) {
+			continue // in Later until it comes back (#4233)
+		}
 		if a := d.Store.Agent(e.AgentID); a != nil && !archived[folderPath(a)] {
 			id := e.ID
 			need(wire.NeedID{Elicitation: &id}, a, wire.NeedKindElicitation, "Asks: "+elicitationTitle(e), formAnswers(e))
@@ -431,6 +437,9 @@ func (d *Daemon) needs() []wire.Need {
 	// banner. Its Needs you row is the request's own.
 	for _, r := range d.listRequests(wire.RequestsListStateOpen, "") {
 		u := r.Detail.SecretUse
+		if r.Deferred != nil {
+			continue // in Later until it comes back (#4233)
+		}
 		if u != nil && u.Use == wire.SecretUseTerminal && r.AskedBy == nil {
 			// A terminal's (#4179): no session, so the banner names the terminal.
 			id := wire.NeedID{Request: &r.ID}
@@ -516,6 +525,13 @@ func (d *Daemon) macPresence() (presence, bool) {
 	return best, found
 }
 
+// macHereLocked is whether the person is at the Mac: its window reported activity within
+// macIdle (Routing's rung 2). Called with attentionMu held.
+func (d *Daemon) macHereLocked(at time.Time) bool {
+	mac, ok := d.macPresence()
+	return ok && mac.active && at.Sub(mac.heardAt) < macIdle
+}
+
 // reconsider is DaemonCore.reconsider on a server: for every outstanding need, the
 // ladder's first, second and last rungs, and attention/changed for what moved.
 func (d *Daemon) reconsider() {
@@ -570,8 +586,7 @@ func (d *Daemon) reconsider() {
 			delete(d.settling, t)
 		}
 	}
-	mac, here := d.macPresence()
-	here = here && mac.active && at.Sub(mac.heardAt) < macIdle
+	here := d.macHereLocked(at)
 	for _, n := range outstanding {
 		t := token(n.ID)
 		var to *wire.Surface
@@ -767,6 +782,8 @@ func (d *Daemon) reportPresence(c *Client, r wire.PresenceReport) {
 		return
 	}
 	before, had := d.presences[c.ID]
+	heard := time.Now()
+	wasHere := d.macHereLocked(heard) || heard.Sub(d.macHereAt) < macIdle
 	shown := map[wire.UUID]bool{}
 	if r.Showing != nil {
 		shown[*r.Showing] = true
@@ -776,8 +793,16 @@ func (d *Daemon) reportPresence(c *Client, r wire.PresenceReport) {
 	for _, id := range r.AlsoShowing {
 		shown[id] = true
 	}
-	d.presences[c.ID] = presence{watching: r.Watching, active: r.Active, heardAt: time.Now(), shown: shown, device: device}
+	d.presences[c.ID] = presence{watching: r.Watching, active: r.Active, heardAt: heard, shown: shown, device: device}
+	here := d.macHereLocked(heard)
+	if here {
+		d.macHereAt = heard
+	}
+	cameBack := !wasHere && here
 	d.attentionMu.Unlock()
+	if cameBack {
+		d.macCameBack() // what was deferred until the person is at the Mac (#4233)
+	}
 	var was *wire.UUID
 	if had && before.active {
 		was = before.watching
