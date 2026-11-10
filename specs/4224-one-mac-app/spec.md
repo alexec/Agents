@@ -193,10 +193,9 @@ How (#4228):
   entitlement, which a Developer ID app gets only with a provisioning profile. The window
   did show the native Apple sheet (`SignInWithAppleButton` in `Shared/UI/SignIn`, when a
   control plane turns Apple on), and it failed there with AuthorizationError 1000 (#4279).
-  Now the Mac shows a line in place of the button when the app has no entitlement, and
-  sends the person to **Sign in to agentloops.dev** (#4228), which signs in on the web.
-  An entitlement and a Developer ID profile for `com.alexecollins.agents.host` bring the
-  sheet back.
+  Now the Mac shows a line in place of the button when the app has no entitlement. Apple
+  gives the entitlement to no Developer ID profile, so only the `Live` build has it, with
+  the development profile `Agents Development` (#4283); a release's app shows the line.
 - **Remove:**
   - the `AgentsStore` target;
   - `App/Agents-Store.entitlements` and `App/Info-Store.plist`;

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Agents in the Live build (#4283), which ship-app installs: Host/AgentsHost.entitlements
+     and Sign in with Apple. Keep the other keys the same as that file. -->
+<plist version="1.0">
+<dict>
+	<!-- This Mac's host, directly (#1118): agentsd's socket in the app group, which
+	     agents-peer makes. Team-prefixed, so no provisioning profile names it. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>6T4RVD5724.com.alexecollins.agents</string>
+	</array>
+	<!-- Dictation and voice mode: the hardened runtime asks for the microphone. -->
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+	<!-- Sign in with Apple (#4283): Apple gives this entitlement to a development profile
+	     ("Agents Development", which names Alex's Mac), never to a Developer ID one, so
+	     Release does not have it. -->
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
+</dict>
+</plist>
