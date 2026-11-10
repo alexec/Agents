@@ -52,6 +52,7 @@ func (d *Daemon) multiplierState(ctx context.Context) wire.Multiplier {
 		merges := d.multiplierMergesLocked()
 		m = lineage.MultiplierOf(merges, now, b)
 		m.BestWeek = lineage.BestWeekOf(merges, now, time.Local, b)
+		m.FirstMergeAt = lineage.FirstMergeOf(merges)
 		d.workMu.Unlock()
 	}
 	m.AgentsWorking = d.agentsWorking()

@@ -9,7 +9,8 @@ struct MultiplierTests {
     static let changed = Data("""
     {"prsMerged":7,"reverts":1,"multiplier":5,"engineerHours":200,"agentsWorking":2,
      "since":815000000,"baseline":{"prsPerWeek":1.4,"hoursPerWeek":40,"source":"DX 2025"},
-     "changedBy":{"kind":"pr","ref":"github:alexec/agents#1234"},"bestWeek":6.4,"mostAtOnce":9}
+     "changedBy":{"kind":"pr","ref":"github:alexec/agents#1234"},"bestWeek":6.4,"mostAtOnce":9,
+     "firstMergeAt":814000000}
     """.utf8)
 
     @Test func readsWhatTheHostSends() throws {
@@ -21,6 +22,7 @@ struct MultiplierTests {
         #expect(m.changedBy?.shortName == "#1234")
         #expect(m.bestWeek == 6.4)
         #expect(m.mostAtOnce == 9)
+        #expect(m.firstMergeAt == Date(timeIntervalSinceReferenceDate: 814_000_000))
     }
 
     @Test func nothingCountedHasNoFigure() throws {
@@ -48,6 +50,23 @@ struct MultiplierTests {
         #expect(own.shownLine == "My team: 2 a week")
         let none = DaemonAPI.MultiplierBaseline(prsPerWeek: 2, hoursPerWeek: 40, source: "DX 2025")
         #expect(none.shownLine == "An average engineer merged 2 PRs a week (DX 2025)")
+    }
+
+    /// The empty page's words (#4250): a start for a person whose agents never merged, else
+    /// the last 7 days had none; the person's own figure, and no second copy of their own line.
+    @Test func theEmptyPageTellsNeverFromNotThisWeek() {
+        let dx = DaemonAPI.MultiplierBaseline(prsPerWeek: 1.4, hoursPerWeek: 40, source: "DX 2025")
+        let never = DaemonAPI.Multiplier(since: .now, baseline: dx)
+        #expect(never.emptyWords.big == "Your first merged PR starts the count.")
+        #expect(never.emptyWords.small == "Each PR your agents merge counts against an engineer’s 1.4 PRs a week.")
+        let before = DaemonAPI.Multiplier(since: .now, baseline: dx, firstMergeAt: .now.addingTimeInterval(-30 * 86400))
+        #expect(before.emptyWords.big == "No merged work in the last 7 days.")
+        #expect(before.emptyWords.small == nil)
+        let three = DaemonAPI.Multiplier(since: .now, baseline: .init(prsPerWeek: 3, hoursPerWeek: 40, source: "DX 2025"))
+        #expect(three.emptyWords.small == "Each PR your agents merge counts against an engineer’s 3.0 PRs a week.")
+        let own = DaemonAPI.Multiplier(since: .now, baseline: .init(prsPerWeek: 2, hoursPerWeek: 40, source: "DX 2025",
+                                                                     line: "My team: 2 a week"))
+        #expect(own.emptyWords.small == nil)
     }
 
     @Test func aRefWithNoNumberIsItself() {

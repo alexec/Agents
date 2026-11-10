@@ -160,3 +160,19 @@ func TestBestWeekOf(t *testing.T) {
 		t.Fatalf("a best week of reverts: %v", *got)
 	}
 }
+
+// The first merge (#4250): none with no merges; the earliest, a revert too, else.
+func TestFirstMergeOf(t *testing.T) {
+	if got := FirstMergeOf(nil); got != nil {
+		t.Fatalf("a first merge of none: %v", *got)
+	}
+	now := time.Date(2026, 11, 7, 12, 0, 0, 0, time.UTC)
+	old := wire.DateOf(now.Add(-30 * 24 * time.Hour))
+	merges := map[wire.LineageNode]Merge{
+		{Kind: KindPR, Ref: "a"}: {At: wire.DateOf(now.Add(-time.Hour))},
+		{Kind: KindPR, Ref: "b"}: {At: old, Reverted: true},
+	}
+	if got := FirstMergeOf(merges); got == nil || *got != old {
+		t.Fatalf("first merge %v, want %v", got, old)
+	}
+}

@@ -65,10 +65,11 @@ func (s *Service) multiplierCount(ctx context.Context, host string, loc *time.Lo
 	return multiplierOf(held.merges, loc, b, now), nil
 }
 
-// multiplierOf is the figure and the best week of merges, against b.
+// multiplierOf is the figure, the best week and the first merge of merges, against b.
 func multiplierOf(merges map[wire.LineageNode]lineage.Merge, loc *time.Location, b wire.MultiplierBaseline, now time.Time) wire.Multiplier {
 	m := lineage.MultiplierOf(merges, now, b)
 	m.BestWeek = lineage.BestWeekOf(merges, now, loc, b)
+	m.FirstMergeAt = lineage.FirstMergeOf(merges)
 	return m
 }
 

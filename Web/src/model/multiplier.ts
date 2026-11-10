@@ -108,6 +108,16 @@ export function baselineLine(m: Multiplier): string {
   return m.baseline.line ?? `An average engineer merged ${m.baseline.prsPerWeek.toLocaleString()} PRs a week (${m.baseline.source})`;
 }
 
+/** The words under `— ×` when nothing is counted (#4250), as the window's `emptyWords`: for a person whose
+ * agents have not merged a PR yet, a start, not a failure; else, that the last 7 days had none. `small` is
+ * absent when it would say the person's own line, which the page shows anyway. */
+export function emptyWords(m: Multiplier): { big: string; small?: string } {
+  if (m.firstMergeAt !== undefined) return { big: "No merged work in the last 7 days." };
+  const big = "Your first merged PR starts the count.";
+  if (m.baseline.line !== undefined) return { big };
+  return { big, small: `Each PR your agents merge counts against an engineer’s ${oneDecimal(m.baseline.prsPerWeek)} PRs a week.` };
+}
+
 /** The rising line for the PR that changed the figure: `+0.3×  #1234 merged`, or `New best week: 4.3×`;
  * none when nothing merged (a baseline change). */
 export function newsOf(old: Multiplier | undefined, now: Multiplier): { words: string; up: boolean } | undefined {
