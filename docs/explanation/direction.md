@@ -100,12 +100,18 @@ organisations it serves, changes.
 
 | Shape | Who runs the control plane | Organisations on it | For |
 |---|---|---|---|
-| **Hosted** (the default in a browser) | Us, at agentloops.dev | Many, one per account | Anyone who wants to start in a browser, alone or as a team |
+| **Hosted** (the default way in) | Us, at agentloops.dev | Many, one per account | Anyone who starts in a browser, alone or as a team |
+| **Single user** | Us, at agentloops.dev: a hosted account with one person. Or, as an option, Agents on your Mac (the Mac download's default, #4224) | One, with one person | One developer on their own |
 | **Self-hosted** (on-premises, or in your own cloud account) | You, as a container on your own hosting | One | A team or a company that keeps everything in its own account |
-| **Single user on a Mac** (the Mac download's default, #4224) | Agents on your Mac | One, with one person | One developer who wants the control plane at home |
 
 - In every shape, the agents run on the customer's own machines. "Hosted" means that we run
   the control plane, not the agents.
+- A person on their own is the single-user case. In a browser, they sign up at
+  agentloops.dev, and their account has one person. Their Mac joins that account as a
+  machine for its local folders.
+- Agents on a Mac can run a control plane for its one person. This is an option, and the
+  default only for the Mac download (see "What the Mac download leaves out", above). Other
+  people and other clients do not need it.
 - The control plane is free in every shape. Its source is visible like the rest, all rights reserved.
 - Hosted gives **one control plane per account**, each with its own store and key, on one
   service (`agents-hosted`, #1003).

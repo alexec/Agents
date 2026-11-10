@@ -11,6 +11,11 @@ you own (see [The control plane](../explanation/control-plane.md)). On a Mac, on
 **Agents**, has all three: the window, this Mac's host (`agentsd`) and a control plane.
 The first time you open it, it sets them up with no question.
 
+The way in is [agentloops.dev](https://agentloops.dev), in a browser: sign up there first,
+and your account's control plane is in the cloud. This Mac then joins it as a machine for
+its local folders (see [Join a hosted account](#join-a-hosted-account), below). The control
+plane on this Mac is an option for a person who wants nothing remote.
+
 ## Before you start
 
 - A Mac on which you can install apps in your home folder.
@@ -59,6 +64,15 @@ come back. Agents sees the change and continues by itself.
 If a step fails, the window shows one line that says what went wrong, with **Try Again**
 and **Show Details**. See
 [Fix Agents when it won't start](fix-agents-host-not-starting.md).
+
+### Join a hosted account
+
+If you signed up at agentloops.dev, open **Settings ▸ Control plane** and click
+**Connect to Another…**. Choose **Sign In to agentloops.dev**, and sign in with the same
+Apple, Google or GitHub account. This Mac
+then joins your account as a machine for its local folders, and the window shows the
+folders of all your machines. See
+[Connect a window or phone](connect-a-window-or-phone.md#connect-this-mac-to-another-control-plane).
 
 ### The menu bar item
 

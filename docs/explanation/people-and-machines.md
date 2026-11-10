@@ -10,11 +10,19 @@ has their own clients, and each machine (a machine or a workspace) belongs to on
 
 ## The local owner
 
-The first person on a control plane is the **local owner**. They sign in with the control
-plane's own key: the codes Agents and `agents-control` make are theirs. They are an
-**admin**, and they own everything that was there before people came. A control plane
-with one person works as it did. Nothing asks them to sign in anywhere, and no account
-outside is needed.
+The first person on a control plane is the **local owner**. They are an **admin**, and they
+own everything that was there before people came. How they are made depends on the shape
+([Direction](direction.md#three-ways-to-run-it)):
+
+- **Hosted, at agentloops.dev:** the person who signs up with Apple, Google or GitHub is
+  their account's first person and admin. The browser that signed up pairs itself. From
+  the Mac app and the phone, they sign in with the same provider, with no code (#3386). A
+  person on their own is a hosted account with this one person. See
+  [Run the hosted service](../how-to/run-the-hosted-service.md).
+- **A control plane on a Mac or on your own hosting:** the local owner signs in with the
+  control plane's own key: the codes Agents and `agents-control` make are theirs. A control
+  plane with one person works as it did. Nothing asks them to sign in anywhere, and no
+  account outside is needed.
 
 ## One user per machine
 
@@ -77,6 +85,7 @@ join this team" (`docs/explanation/versions.md`).
 
 ## What comes later
 
-Sign-in with Google, Apple or GitHub (#995). Settings that follow a person to each of their
-machines, and their secrets. Groups, bots that run team workflows, and links from chat
+Sign-in with Google, Apple or GitHub is here (#995); see
+[Sign in with Google, Apple or GitHub](../how-to/sign-in-with-google-apple-or-github.md).
+Still to come: settings that follow a person to each of their machines, and their secrets. Groups, bots that run team workflows, and links from chat
 identities to people. See spec 736.
