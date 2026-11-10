@@ -7248,6 +7248,27 @@
       ]
     },
     {
+      "name": "requests/defer",
+      "x-capability": "requests.defer/1",
+      "tags": [{ "name": "web" }],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/RequestsDefer"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/RequestUpdate"
+        }
+      }
+    },
+    {
       "name": "requests/drop",
       "x-capability": "requests/1",
       "paramStructure": "by-name",
@@ -7285,6 +7306,27 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/RequestsListResult"
+        }
+      }
+    },
+    {
+      "name": "requests/undefer",
+      "x-capability": "requests.defer/1",
+      "tags": [{ "name": "web" }],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/RequestsUndefer"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/RequestUpdate"
         }
       }
     },

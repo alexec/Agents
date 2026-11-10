@@ -232,6 +232,9 @@ public extension DaemonAPI {
                     kind: .hostRequest),
                 // A secret's use answered from its Needs you row (#4017).
                 Row(Method.requestsAnswer, params: RequestsAnswer.self, result: RequestUpdate.self, kind: .hostRequest),
+                // Later and Bring back now on a Needs you row (#4233).
+                Row(Method.requestsDefer, params: RequestsDefer.self, result: RequestUpdate.self, kind: .hostRequest),
+                Row(Method.requestsUndefer, params: RequestsUndefer.self, result: RequestUpdate.self, kind: .hostRequest),
                 Row(Method.pinsRead, params: PinReadRequest.self, result: FileReading.self, kind: .hostRequest),
                 // A view drawn in the chat (#187): its resource, and what it asks of its server.
                 Row(Method.viewsRead, params: ViewReadRequest.self, result: ViewResource.self, kind: .hostRequest),

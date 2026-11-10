@@ -195,3 +195,118 @@ func TestRequestsAreBounded(t *testing.T) {
 		t.Fatalf("not pruned to the limit: %+v", d.listRequests(wire.RequestsListStateAll, ""))
 	}
 }
+
+// #4233: Later. A deferred request stays open but is no need until it comes back, at its
+// time or when the person is next at the Mac.
+
+func formRequest(t *testing.T, d *Daemon, c *conn, root string) wire.UUID {
+	t.Helper()
+	var id wire.UUID
+	json.Unmarshal(c.call(t, 100, "agents/start", map[string]any{"runtimeID": "claude", "cwd": "file://" + root,
+		"prompt": "a form please"}), &id)
+	var form wire.ElicitationRequest
+	c.until(t, "a form", asked(&form))
+	return form.ID
+}
+
+func isNeed(d *Daemon, id wire.UUID) bool {
+	for _, n := range d.attentionPending().Needs {
+		if n.ID.Elicitation != nil && *n.ID.Elicitation == id {
+			return true
+		}
+	}
+	return false
+}
+
+func TestARequestDeferredToATimeComesBack(t *testing.T) {
+	fakeRuntimes(t)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	id := formRequest(t, d, c, t.TempDir())
+	if !isNeed(d, id) {
+		t.Fatal("not a need")
+	}
+	if e := c.callError(t, 1, "requests/defer", map[string]any{"id": id}); e.Code != CodeInvalidParams {
+		t.Fatalf("no when: %+v", e)
+	}
+	if e := c.callError(t, 2, "requests/defer", map[string]any{"id": id, "until": wire.DateOf(time.Now().Add(-time.Minute))}); e.Code != CodeInvalidParams {
+		t.Fatalf("a past time: %+v", e)
+	}
+	var got wire.RequestUpdate
+	json.Unmarshal(c.call(t, 3, "requests/defer", map[string]any{"id": id, "until": wire.DateOf(time.Now().Add(400 * time.Millisecond))}), &got)
+	if got.Request.Deferred == nil || got.Request.Deferred.Until == nil || got.Request.State != wire.RequestStateOpen {
+		t.Fatalf("%+v", got.Request)
+	}
+	if isNeed(d, id) || !contains(names(d), "request.deferred") {
+		t.Fatalf("still a need, or no event: %v", names(d))
+	}
+	waitFor(t, "it comes back", func() bool { r := d.request(id); return r.Deferred == nil && isNeed(d, id) })
+	if n := countEvents(d, "request.opened"); n != 2 {
+		t.Fatalf("request.opened %d times", n)
+	}
+	// Bring back now.
+	c.call(t, 4, "requests/defer", map[string]any{"id": id, "until": wire.DateOf(time.Now().Add(time.Hour))})
+	c.call(t, 5, "requests/undefer", map[string]any{"id": id})
+	if r := d.request(id); r.Deferred != nil || !isNeed(d, id) {
+		t.Fatalf("%+v", r)
+	}
+}
+
+func TestARequestDeferredAtTheMacComesBackWhenThePersonDoes(t *testing.T) {
+	fakeRuntimes(t)
+	was := macIdle
+	macIdle = 300 * time.Millisecond
+	defer func() { macIdle = was }()
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	id := formRequest(t, d, c, t.TempDir())
+	c.call(t, 1, "presence/report", map[string]any{"active": true})
+	c.call(t, 2, "requests/defer", map[string]any{"id": id, "atMac": true})
+	// Here at the time it was deferred: another report while here does not bring it back.
+	c.call(t, 3, "presence/report", map[string]any{"active": true})
+	if r := d.request(id); r.Deferred == nil || isNeed(d, id) {
+		t.Fatalf("back while the person never left: %+v", r)
+	}
+	// Away, then here again.
+	time.Sleep(2 * macIdle)
+	c.call(t, 4, "presence/report", map[string]any{"active": true})
+	waitFor(t, "it comes back", func() bool { return d.request(id).Deferred == nil })
+	if !isNeed(d, id) {
+		t.Fatal("not a need again")
+	}
+}
+
+func TestADeferralSurvivesARestart(t *testing.T) {
+	root := t.TempDir()
+	d, c := start(t, root)
+	asker := seeded(t, d, t.TempDir(), nil)
+	msg := "Which port?"
+	req := wire.ElicitationRequest{ID: store.NewUUID(), AgentID: asker.ID, Message: &msg, AskedAt: now()}
+	d.openFormRequest(req)
+	c.call(t, 1, "requests/defer", map[string]any{"id": req.ID, "until": wire.DateOf(time.Now().Add(time.Second)), "atMac": true})
+	d.Shutdown()
+	d2, _ := start(t, root)
+	defer d2.Shutdown()
+	r := d2.request(req.ID)
+	if r == nil || r.State != wire.RequestStateOpen || r.Deferred == nil || r.Deferred.AtMac == nil || !*r.Deferred.AtMac {
+		t.Fatalf("%+v", r)
+	}
+	waitFor(t, "it comes back at its time", func() bool { return d2.request(req.ID).Deferred == nil })
+}
+
+func TestAnAnswerWhileDeferredClearsIt(t *testing.T) {
+	fakeRuntimes(t)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	id := formRequest(t, d, c, t.TempDir())
+	c.call(t, 1, "requests/defer", map[string]any{"id": id, "until": wire.DateOf(time.Now().Add(time.Hour))})
+	c.call(t, 2, "requests/answer", map[string]any{"id": id, "answer": map[string]any{"form": map[string]any{
+		"action": "accept", "content": map[string]any{"colour": "blue"}}}})
+	r := d.request(id)
+	if r.State != wire.RequestStateAnswered || r.Deferred != nil {
+		t.Fatalf("%+v", r)
+	}
+	if e := c.callError(t, 3, "requests/defer", map[string]any{"id": id, "atMac": true}); e.Code != wire.FailureNoSuchAgent {
+		t.Fatalf("deferred once ended: %+v", e)
+	}
+}

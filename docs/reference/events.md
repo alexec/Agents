@@ -37,8 +37,8 @@ give them as two columns:
     raised only for a branch an agent works on, never the default branch (#702), and a wait
     on the default branch is refused: wait for the `github` server's `pr.merged` instead;
   - `why` on `person.away` and `person.back`: `locked` or `idle`;
-  - `request` and `kind` on `request.opened`, `request.answered` and `request.dropped`: a
-    request's id, or `decide`, `secret` or `step` (#3863);
+  - `request` and `kind` on `request.opened`, `request.deferred`, `request.answered` and
+    `request.dropped`: a request's id, or `decide`, `secret` or `step` (#3863);
   - an MCP server's event's own, which the server checks (see
     [Events from MCP servers](#events-from-mcp-servers)).
 
@@ -214,9 +214,20 @@ let them review, it is a comment.
 A label changed on GitHub opens or ends the request at the next sweep. A lane waits on its
 approval with `where: {pr: <n>}`; the answer is `approve: <note>` or `changes: <note>`.
 
+A person can put an open request off to **Later** (#4233): `requests/defer` with `until` (a
+time after now), `atMac` (when the person is next at the Mac) or both, whichever comes first;
+`requests/undefer` brings it back now. A deferred request stays open, and its waiters keep
+waiting and are not woken; but it is no need, so it sends no banner and no push, and is in no
+count, until it comes back. `atMac` is the Mac's presence changing from not here to here
+(a report of activity within 120 s): one deferred while the person is at the Mac comes back
+the next time they return to it. When it comes back, `request.opened` is raised again and it
+alerts once, as a new request does. The deferral is kept in the record, so a restart keeps it;
+an answer or a drop clears it.
+
 | Event | Filter by | Details | Meaning |
 |---|---|---|---|
 | `request.opened` | request, kind, pr, issue | request, kind, source, title, agent, pr or issue, url | An agent in this folder asked a person for something. |
+| `request.deferred` | request, kind, pr, issue | request, kind, source, title, agent, pr or issue, url, until, atMac | A person put a request off to Later. `until` is RFC 3339; `atMac` is `true`. |
 | `request.answered` | request, kind, pr, issue | request, kind, source, title, agent, pr or issue, url, answer, answered_by | A request was answered. `answer` is a summary, never a secret's value. |
 | `request.dropped` | request, kind, pr, issue | request, kind, source, title, agent, pr or issue, url, why | A request ended with no answer. `why` is `askerEnded`, `folderArchived`, `forgeClosed`, `restarted` or `byPerson`. |
 
