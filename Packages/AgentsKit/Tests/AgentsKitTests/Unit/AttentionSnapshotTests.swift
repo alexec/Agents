@@ -71,6 +71,27 @@ struct AttentionSnapshotTests {
         #expect(snapshot.sessions.map(\.id) == [asked.id])
     }
 
+    /// #4235: a session that waits only on a deferred request is in Later, so it is no row
+    /// on the widget and no count; brought back, it is both again.
+    @Test func aDeferredRequestIsNotOnTheWidget() {
+        let asking = agent()
+        let model = model([asking])
+        var request = NeedRequest(id: UUID(), kind: .decide, source: "question", title: "Which port?",
+                                  folder: folder, askedBy: asking.id,
+                                  waiters: [.init(agent: asking.id, since: Date())], askedAt: Date())
+        request.deferred = .init(atMac: true, at: Date())
+        model.replaceRequests([request])
+        let later = AttentionSnapshot.make(model: model)
+        #expect(later.total == 0)
+        #expect(later.sessions.isEmpty)
+
+        request.deferred = nil
+        model.apply(.requestChanged(request))
+        let back = AttentionSnapshot.make(model: model)
+        #expect(back.total == 1)
+        #expect(back.sessions.map(\.id) == [asking.id])
+    }
+
     @Test func anArchivedFolderIsNotCounted() {
         let model = AgentsModel()
         model.replaceFolders([
