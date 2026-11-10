@@ -166,44 +166,146 @@ func boardsItemOf(i azureboardsmcp.Item, folder string) wire.ForgeItem {
 	return out
 }
 
-// boardsPage is a page of the work items of projects for a list; with an Azure Boards board,
-// of the team's area paths (#3816), on the Azure DevOps the board is on.
-func (d *Daemon) boardsPage(ctx context.Context, sources forgeSources, board *forgeBoard, f azureboardsmcp.SearchFilter, after string, limit int) forgePage {
-	p := forgePage{forge: "azureboards"}
-	b, err := d.forgeAzureBoards()
-	if err == nil && board != nil && board.azureTeam != "" {
-		if site := d.azureBoardsSite(); !strings.EqualFold(site, board.azureSite) {
-			err = errors.New("Azure DevOps is connected at " + site + ", and the board is on " + board.azureSite)
-		} else {
-			f.Areas, err = b.TeamAreas(ctx, board.azureProject, board.azureTeam)
-		}
-	}
-	if err == nil {
-		var page azureboardsmcp.SearchPage
-		page, err = b.Search(ctx, sources.boards, f, after, limit)
-		for _, i := range page.Items {
-			p.items = append(p.items, boardsItemOf(i, sources.boardsFolder[i.Project]))
-		}
-		p.cursors, p.next = page.Cursors, page.Next
-	}
-	p.err = err
-	return p
+// boardsNoPRs is why a work item has no merge, approval, run or diff: Azure Boards has no pull
+// requests.
+const boardsNoPRs = "Azure Boards has work items only: a pull request is on Azure Repos"
+
+// azureBoardsForge is Azure Boards on the forge interface (#4329, #4359): the work items of the
+// projects the folders' .agents/folder.json name in "azureBoardsProjects", through
+// forgeAzureBoards. A work item closes, reopens or moves to another state of its type, as a Jira
+// issue moves by a transition. Its plan is its parent and predecessor links. Its Caps say it has
+// no pull requests. A node is azureboards:organization/project#12.
+type azureBoardsForge struct {
+	forgeNone
+	d *Daemon
 }
 
-func (d *Daemon) boardsItem(ctx context.Context, method, project string, id int, cursor string) (wire.ForgeItemDetail, error) {
-	b, err := d.forgeAzureBoards()
-	if err != nil {
-		return wire.ForgeItemDetail{}, err
+func (azureBoardsForge) Name() string { return "azureboards" }
+
+func (azureBoardsForge) Caps() forgeCaps {
+	return forgeCaps{
+		Issues:       true,
+		Issue:        forgeActions{Comment: true, Label: true, Close: true, Reopen: true, Transition: true},
+		CommentCount: "exact",
+		Plan:         true, BlockedBy: true, AddChild: true,
+		Reasons: map[string]string{
+			actionMerge:     boardsNoPRs,
+			actionAutoMerge: boardsNoPRs,
+			actionApprove:   boardsNoPRs,
+			actionRerun:     boardsNoPRs,
+			actionLog:       boardsNoPRs,
+			actionDiff:      boardsNoPRs,
+		},
 	}
-	p, err := b.ItemPage(ctx, project, id, cursor)
-	if err != nil {
-		var be *azureboardsmcp.BoardsError
-		if errors.As(err, &be) && be.Kind == azureboardsmcp.NotFound {
-			return wire.ForgeItemDetail{}, Invalid("%s: %v", method, err)
+}
+
+// Owns is azureboards:organization/project#12, a work item.
+func (azureBoardsForge) Owns(node wire.LineageNode) (forgeRef, bool) {
+	project, id, ok := boardsOfNode(node)
+	if !ok {
+		return forgeRef{}, false
+	}
+	return forgeRef{Node: node, Repo: project, Number: id}, true
+}
+
+// boardsScope is what an issues list reads of Azure Boards: the projects the folders name,
+// organization/project in lower case, each with the first folder that names it.
+type boardsScope struct {
+	issues        bool
+	projects      []string
+	projectFolder map[string]string
+}
+
+func (s boardsScope) Key() []any { return []any{s.projects} }
+
+// Empty is true for a pull requests list only: a board's list is of a project that no folder
+// may name, so an issues list always asks List, which reads Azure Boards only when there is a
+// project.
+func (s boardsScope) Empty() bool { return !s.issues }
+
+// Sources is the Azure Boards projects of the folders, each once.
+func (a azureBoardsForge) Sources(_ context.Context, folders []string, prs bool) (forgeScope, error) {
+	s := boardsScope{issues: !prs, projectFolder: map[string]string{}}
+	if prs {
+		return s, nil
+	}
+	for _, f := range folders {
+		for _, project := range a.d.folderBoardsProjects(f) {
+			if _, seen := s.projectFolder[project]; !seen {
+				s.projectFolder[project] = f
+				s.projects = append(s.projects, project)
+			}
 		}
+	}
+	slices.Sort(s.projects)
+	return s, nil
+}
+
+// List is one query for every project. A board's list is of the work items under its team's area
+// paths (#3816), in its project, on the Azure DevOps the board is on: a work item of a project
+// that no folder names acts from the board's first folder.
+func (a azureBoardsForge) List(ctx context.Context, scope forgeScope, f forgeFilter, cursor string, limit int) (forgePage, error) {
+	s, _ := scope.(boardsScope)
+	if f.PRs {
+		return forgePage{}, nil
+	}
+	projects, home := s.projects, ""
+	if b := f.Board; b != nil {
+		if b.azureProject == "" {
+			return forgePage{}, nil
+		}
+		projects, home = []string{b.azureProject}, b.home
+	}
+	if len(projects) == 0 {
+		return forgePage{}, nil
+	}
+	ab, err := a.d.forgeAzureBoards()
+	if err != nil {
+		return forgePage{}, err
+	}
+	sf := azureboardsmcp.SearchFilter{State: f.State, Label: f.Label, Assignee: f.Assignee, Query: f.Query, Feature: f.Feature}
+	if b := f.Board; b != nil && b.azureTeam != "" {
+		if site := a.d.azureBoardsSite(); !strings.EqualFold(site, b.azureSite) {
+			return forgePage{}, errors.New("Azure DevOps is connected at " + site + ", and the board is on " + b.azureSite)
+		}
+		if sf.Areas, err = ab.TeamAreas(ctx, b.azureProject, b.azureTeam); err != nil {
+			return forgePage{}, err
+		}
+	}
+	page, err := ab.Search(ctx, projects, sf, cursor, limit)
+	var p forgePage
+	for _, i := range page.Items {
+		folder, named := s.projectFolder[i.Project]
+		if !named {
+			folder = home
+		}
+		p.items = append(p.items, boardsItemOf(i, folder))
+	}
+	p.cursors, p.next = page.Cursors, page.Next
+	return p, err
+}
+
+// boardsNotFound is err as a method's answer: a work item Azure Boards does not have is Invalid.
+func boardsNotFound(method string, err error) error {
+	var be *azureboardsmcp.BoardsError
+	if errors.As(err, &be) && be.Kind == azureboardsmcp.NotFound {
+		return Invalid("%s: %v", method, err)
+	}
+	return err
+}
+
+// Item is the work item with its description, a page of its comments and the other states of
+// its type, as transitions.
+func (a azureBoardsForge) Item(ctx context.Context, r forgeRef, cursor string) (wire.ForgeItemDetail, error) {
+	ab, err := a.d.forgeAzureBoards()
+	if err != nil {
 		return wire.ForgeItemDetail{}, err
 	}
-	out := wire.ForgeItemDetail{Item: boardsItemOf(p.Item, d.boardsFolder(p.Project)), Body: p.Body, Comments: []wire.ForgeComment{},
+	p, err := ab.ItemPage(ctx, r.Repo, r.Number, cursor)
+	if err != nil {
+		return wire.ForgeItemDetail{}, boardsNotFound(itemMethod(r.Node.Kind), err)
+	}
+	out := wire.ForgeItemDetail{Item: boardsItemOf(p.Item, a.d.boardsFolder(p.Project)), Body: p.Body, Comments: []wire.ForgeComment{},
 		Cursor: optional(p.Before), Transitions: []wire.ForgeTransition{}}
 	out.Start = forgeStartOf(out.Item)
 	for _, c := range p.Thread {
@@ -215,30 +317,137 @@ func (d *Daemon) boardsItem(ctx context.Context, method, project string, id int,
 	return out, nil
 }
 
-// boardsPlan is a work item and its children, each blocked by its predecessors.
-func (d *Daemon) boardsPlan(ctx context.Context, method, project string, id int) (wire.ForgeItem, []planChild, error) {
-	b, err := d.forgeAzureBoards()
+// Labels are the tags in use in the work item's project.
+func (a azureBoardsForge) Labels(ctx context.Context, r forgeRef) ([]wire.ForgeLabel, error) {
+	ab, err := a.d.forgeAzureBoards()
 	if err != nil {
-		return wire.ForgeItem{}, nil, err
+		return nil, err
 	}
-	p, err := b.Plan(ctx, project, id)
+	names, colors, err := ab.Labels(ctx, r.Repo, r.Number)
 	if err != nil {
-		var be *azureboardsmcp.BoardsError
-		if errors.As(err, &be) && be.Kind == azureboardsmcp.NotFound {
-			return wire.ForgeItem{}, nil, Invalid("%s: %v", method, err)
-		}
-		return wire.ForgeItem{}, nil, err
+		return nil, err
 	}
-	epic := boardsItemOf(p.Epic, d.boardsFolder(p.Epic.Project))
-	var children []planChild
+	return forgeLabelsOf(names, colors), nil
+}
+
+// Plan is a work item and its children, each blocked by its predecessors.
+func (a azureBoardsForge) Plan(ctx context.Context, r forgeRef) (forgePlanAnswer, error) {
+	ab, err := a.d.forgeAzureBoards()
+	if err != nil {
+		return forgePlanAnswer{}, err
+	}
+	p, err := ab.Plan(ctx, r.Repo, r.Number)
+	if err != nil {
+		return forgePlanAnswer{}, boardsNotFound("forge/plan", err)
+	}
+	out := forgePlanAnswer{epic: boardsItemOf(p.Epic, a.d.boardsFolder(p.Epic.Project))}
 	for _, c := range p.Children {
-		pc := planChild{item: boardsItemOf(c.Item, d.boardsFolder(c.Project))}
-		for _, r := range c.BlockedBy {
-			pc.blockedBy = append(pc.blockedBy, planRef{node: boardsNode(r.Project, r.ID), open: r.Open})
+		pc := planChild{item: boardsItemOf(c.Item, a.d.boardsFolder(c.Project))}
+		for _, b := range c.BlockedBy {
+			pc.blockedBy = append(pc.blockedBy, planRef{node: boardsNode(b.Project, b.ID), open: b.Open})
 		}
-		children = append(children, pc)
+		out.children = append(out.children, pc)
 	}
-	return epic, children, nil
+	return out, nil
+}
+
+// Blockers are the predecessors of a standing epic's children (#4242): one read for each project
+// they are in, which is the epic's.
+func (a azureBoardsForge) Blockers(ctx context.Context, children []forgeRef) (map[forgeRef][]planRef, error) {
+	ab, err := a.d.forgeAzureBoards()
+	if err != nil {
+		return nil, err
+	}
+	var projects []string
+	ids := map[string][]int{}
+	for _, c := range children {
+		if _, seen := ids[c.Repo]; !seen {
+			projects = append(projects, c.Repo)
+		}
+		ids[c.Repo] = append(ids[c.Repo], c.Number)
+	}
+	out := map[forgeRef][]planRef{}
+	for _, project := range projects {
+		by, err := ab.Blockers(ctx, project, ids[project])
+		if err != nil {
+			return nil, err
+		}
+		for _, c := range children {
+			if c.Repo != project {
+				continue
+			}
+			for _, b := range by[c.Number] {
+				out[c] = append(out[c], planRef{node: boardsNode(b.Project, b.ID), open: b.Open})
+			}
+		}
+	}
+	return out, nil
+}
+
+func (a azureBoardsForge) Comment(ctx context.Context, r forgeRef, body string) (wire.ForgeDone, error) {
+	ab, err := a.d.forgeAzureBoards()
+	if err != nil {
+		return wire.ForgeDone{}, err
+	}
+	link, err := ab.Comment(ctx, r.Repo, r.Number, body)
+	return wire.ForgeDone{URL: optional(link)}, err
+}
+
+// SetLabels adds and takes off the work item's tags.
+func (a azureBoardsForge) SetLabels(ctx context.Context, r forgeRef, add, remove []string) error {
+	ab, err := a.d.forgeAzureBoards()
+	if err != nil {
+		return err
+	}
+	return ab.SetTags(ctx, r.Repo, r.Number, add, remove)
+}
+
+// SetState moves the work item to the state the page chose, or closes or reopens it by its
+// type's own states.
+func (a azureBoardsForge) SetState(ctx context.Context, r forgeRef, closed bool, transition string) error {
+	ab, err := a.d.forgeAzureBoards()
+	if err != nil {
+		return err
+	}
+	if transition != "" {
+		return ab.Transition(ctx, r.Repo, r.Number, transition)
+	}
+	return ab.SetState(ctx, r.Repo, r.Number, closed)
+}
+
+// AddChild makes a new work item under the epic, whose type is its level as the project's process
+// names it; or moves the work item that child.Issue names (12, AB#12 or its page) under it.
+func (a azureBoardsForge) AddChild(ctx context.Context, epic forgeRef, child forgeChild) (wire.ForgeDone, error) {
+	const method = "forge/add-child"
+	ab, err := a.d.forgeAzureBoards()
+	if err != nil {
+		return wire.ForgeDone{}, err
+	}
+	if child.Issue == "" {
+		_, link, err := ab.AddChild(ctx, epic.Repo, epic.Number, child.Title, child.Labels, child.Level)
+		return wire.ForgeDone{URL: optional(link)}, err
+	}
+	id, ok := boardsItemID(child.Issue)
+	if !ok {
+		return wire.ForgeDone{}, Invalid("%s: %q is not a work item: give its id, such as 12 or AB#12, or its page", method, child.Issue)
+	}
+	if id == epic.Number {
+		return wire.ForgeDone{}, Invalid("%s: an epic is not its own child", method)
+	}
+	return wire.ForgeDone{}, ab.SetParent(ctx, epic.Repo, id, epic.Number)
+}
+
+// Links says a predecessor link is within an organization.
+func (azureBoardsForge) Links(r, blocker forgeRef) bool {
+	return boardsOrg(r.Repo) == boardsOrg(blocker.Repo)
+}
+
+func (a azureBoardsForge) SetBlockedBy(ctx context.Context, r, blocker forgeRef, blocked bool) error {
+	ab, err := a.d.forgeAzureBoards()
+	if err != nil {
+		return err
+	}
+	return ab.SetBlockedBy(ctx, r.Repo, r.Number, blocker.Number, blocked)
 }
 
 // boardsLabelNode is the work item a session's label AB#12 names: in the folder's first project.

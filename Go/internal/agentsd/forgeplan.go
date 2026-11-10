@@ -96,8 +96,6 @@ func (d *Daemon) forgePlan(ctx context.Context, r wire.ForgePlanRequest) (wire.F
 			var a forgePlanAnswer
 			a, err = f.Plan(ctx, ref)
 			epic, children, err = a.epic, a.children, forgeCannotErr(method, f, err)
-		} else if project, id, ok := boardsOfNode(r.Node); ok {
-			epic, children, err = d.boardsPlan(ctx, method, project, id)
 		} else {
 			return wire.ForgePlan{}, Invalid("%s: %s is not an issue on GitHub, GitLab, Forgejo, Linear, Jira or Azure Boards", method, r.Node.Ref)
 		}
