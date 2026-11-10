@@ -3,6 +3,15 @@
     "github": {
       "command": "github-mcp",
       "hosted": true
+    },
+    "email": {
+      "command": "email-mcp",
+      "hosted": true,
+      "env": {
+        "EMAIL_IMAP_URL": "imaps://imap.fastmail.com",
+        "EMAIL_USER": "agentloops@fastmail.com",
+        "EMAIL_PASSWORD": "${EMAIL_PASSWORD}"
+      }
     }
   }
 }
