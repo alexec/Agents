@@ -407,6 +407,7 @@ func join(ctx context.Context, cl commandLine, d *agentsd.Daemon) {
 	}
 	d.SetControl(up.Tell)
 	d.SetControlAsk(up.Ask)
+	d.SetControlCapabilities(up.ControlCapabilities)
 	safe.Go("uplink", func() {
 		// A panic in the uplink would leave the host up but offline: dial again.
 		for ctx.Err() == nil && safe.Catch("uplink", func() { up.Run(ctx) }) != nil {

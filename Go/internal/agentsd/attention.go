@@ -98,6 +98,9 @@ type attentionState struct {
 	tellControl atomic.Pointer[func(method string, params any)]
 	// askControl asks the control plane on channel 0 and waits (workspacetools.go).
 	askControl atomic.Pointer[askControl]
+	// controlCapabilities is what the control plane said it can do (#4100), the uplink's
+	// ControlCapabilities; nil off a control plane.
+	controlCapabilities atomic.Pointer[func() []string]
 	// notices are what agents told the person and are still posted, and noticeBucket the
 	// person's attention they share when this host has no control plane (#2805, notify.go).
 	notices      []postedNotice

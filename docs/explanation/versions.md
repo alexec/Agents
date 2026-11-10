@@ -110,6 +110,9 @@ The schema owns the names. Each method and notification in `Packages/Wire/*.open
 - The control plane gives its own list and its required sets in `control/status`, and each
   host's list, with what it is missing, in `machines/list`. When a host's list changes,
   `control/hostChanged` tells the clients.
+- The control plane answers a host's `machine/hello` with its own list (#4100), so the host
+  asks it only what it answers: `machine/accounts` only of one that says `machine.accounts/1`.
+  An older control plane answers `{}`, and the host asks it nothing new.
 
 The required sets start as `host.wire/1` for hosts and `client.wire/1` for clients. A client
 without its set gets `-32008` on every call except `control/status`, with the missing names

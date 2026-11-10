@@ -46,3 +46,10 @@ test("accounts: Ask before use is on at first, and the sheet keeps it off (#4163
   assert.deepEqual(a.accountOf(a.accountFields(off)), off);
   assert.deepEqual(a.accountOf({ service: "x", askBeforeUse: "" }), { service: "x" });
 });
+
+test("accounts: an older control plane gets no accounts part (#4100)", () => {
+  assert.equal(a.accountsRefusal(null), null);
+  assert.equal(a.accountsRefusal({ capabilities: ["user/1", "user/2", "user/3"] }), null);
+  assert.equal(a.accountsRefusal({ capabilities: ["user/1", "user/2"] }), "The control plane needs an update to do this.");
+  assert.equal(a.accountsRefusal({}), "The control plane needs an update to do this.");
+});

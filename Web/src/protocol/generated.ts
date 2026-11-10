@@ -5975,6 +5975,16 @@ export interface MachineHello {
 }
 
 /**
+ * The control plane's answer to machine/hello (#4100): what it can do, so the host asks only what
+ * it answers, such as machine/accounts with machine.accounts/1. An older control plane answers {}:
+ * no list, so the host asks it nothing new.
+ */
+export interface MachineHelloAnswer {
+  /** The control plane's capabilities (#1748), as control/status says them to a client. */
+  capabilities?: string[];
+}
+
+/**
  * One workspace, as its provider last listed it. `state` is running, starting, stopping, stopped or
  * unknown; or failed, for a make that failed, with the provider's `reason` (#3972).
  */
@@ -14061,6 +14071,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineFolderSend: { required: ["host"], optional: ["state", "upload", "receive", "facts", "pack", "read", "moveIn"] },
   MachineFolderSent: { required: [], optional: ["state", "folder", "facts", "pack", "read"] },
   MachineHello: { required: ["version", "platform", "machineID"], optional: ["host", "name", "implementation", "capabilities"] },
+  MachineHelloAnswer: { required: [], optional: ["capabilities"] },
   MachineInfo: { required: ["id", "name", "state"], optional: ["ssh", "tunnel", "hostKeyRenews", "cost", "host", "reason"] },
   MachineInstall: { required: ["destination"], optional: ["name", "key", "trust", "tunnel", "provider", "workspace"] },
   MachineJoinAsk: { required: ["name", "platform", "publicKey"], optional: ["version", "machineID", "person"] },

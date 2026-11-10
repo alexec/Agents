@@ -43,6 +43,19 @@ func (d *Daemon) SetControlAsk(ask askControl) {
 	safe.Go("ask how sessions elsewhere stand", d.askThereWaits)
 }
 
+// SetControlCapabilities is how this host reads what its control plane said it can do
+// (#4100): the uplink's ControlCapabilities.
+func (d *Daemon) SetControlCapabilities(list func() []string) {
+	d.controlCapabilities.Store(&list)
+}
+
+// controlHas says whether the control plane said capability when this link came up, so a
+// host asks an older one nothing it would refuse (#4100).
+func (d *Daemon) controlHas(capability string) bool {
+	list := d.controlCapabilities.Load()
+	return list != nil && wire.Has((*list)(), capability)
+}
+
 // askWorkspaces is one machine/machines call for an agent, named for the control plane's log.
 func (d *Daemon) askWorkspaces(agent wire.UUID, method string, params any) (json.RawMessage, error) {
 	return d.askWorkspacesCtx(d.ctx, agent, method, params)
