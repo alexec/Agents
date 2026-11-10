@@ -80,6 +80,8 @@ jobs:
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        # `shell: bash` adds `-o pipefail`: without it a failed submit was `tee`'s success (#4385).
+        shell: bash
         run: |
           export ASC_KEY_PATH="$RUNNER_TEMP/asc.p8"
           git fetch --quiet --force origin "refs/tags/$TAG:refs/tags/$TAG"
