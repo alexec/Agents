@@ -2488,17 +2488,20 @@ public enum DaemonAPI {
         /// nothing and answers as it did (037, FR-020). Nil from the phone and from any
         /// older window, which is today's behaviour.
         public var sendID: UUID?
+        /// Why the person declined, in their words (#4039); nil for a one-tap No thanks.
+        public var reason: String?
 
         public enum Action: String, Codable, Sendable {
             case accept, decline, cancel
         }
 
         public init(requestID: UUID, action: Action, content: [String: JSONValue] = [:],
-                    sendID: UUID? = nil) {
+                    sendID: UUID? = nil, reason: String? = nil) {
             self.requestID = requestID
             self.action = action
             self.content = content
             self.sendID = sendID
+            self.reason = reason
         }
 
         public init(from decoder: any Decoder) throws {
@@ -2507,6 +2510,7 @@ public enum DaemonAPI {
             action = try c.decodeIfPresent(Action.self, forKey: .action) ?? .cancel
             content = try c.decodeIfPresent([String: JSONValue].self, forKey: .content) ?? [:]
             sendID = try c.decodeIfPresent(UUID.self, forKey: .sendID)
+            reason = try c.decodeIfPresent(String.self, forKey: .reason)
         }
     }
 

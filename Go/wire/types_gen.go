@@ -651,6 +651,9 @@ type AnswerElicitationRequest struct {
 
 	Content map[string]JSONValue `json:"content"`
 
+	// Why the person declined, in their words (#4039): only with decline or cancel. The agent reads it.
+	Reason *string `json:"reason,omitzero"`
+
 	SendID *UUID `json:"sendID,omitzero"`
 }
 
@@ -7402,13 +7405,15 @@ type MessageSender struct {
 	Title string `json:"title"`
 }
 
-// One conversation in messages/conversations (#4343): the connector it is on (server, its name in mcp.json, and a folder that reaches it, which messages/read takes) and the conversation as the connector's list_conversations gave it.
+// One conversation in messages/conversations (#4343): the connector it is on (server, its name in mcp.json, and a folder that reaches it, which messages/read takes) and the conversation as the connector's list_conversations gave it. replyAs (#4345) is who a reply from the page goes as, in words (the Slack bot, the WhatsApp number): present only when the connector has the contract's reply tool, so a client shows a reply field only then.
 type MessagesConversation struct {
 	Server string `json:"server"`
 
 	Folder string `json:"folder"`
 
 	Conversation MessagingConversation `json:"conversation"`
+
+	ReplyAs *string `json:"replyAs,omitzero"`
 }
 
 // messages/conversations (#4343): a page of the conversations of every connector in the Messaging slot that follows the messaging contract, merged by lastActivity, the newest first. cursor is the next page, absent at the end. errors says a connector that failed or did not answer in time, and the conversations of the others still come.
@@ -7470,6 +7475,30 @@ type MessagesReadRequest struct {
 	Limit *int64 `json:"limit,omitzero"`
 }
 
+// messages/reply (#4345): the message that the connector's reply tool sent.
+type MessagesReplied struct {
+	Server string `json:"server"`
+
+	Folder string `json:"folder"`
+
+	Conversation string `json:"conversation"`
+
+	Message MessagingMessage `json:"message"`
+}
+
+// messages/reply (#4345): the person's own reply, from the Messages page, to a conversation from messages/conversations, by its server, folder and id; thread: the thread to answer in (absent: the conversation itself). The connector's reply tool sends it, as the connector's replyAs says.
+type MessagesReplyRequest struct {
+	Server string `json:"server"`
+
+	Folder string `json:"folder"`
+
+	Conversation string `json:"conversation"`
+
+	Thread *string `json:"thread,omitzero"`
+
+	Text string `json:"text"`
+}
+
 // One conversation in a messaging contract server's list_conversations (#4338, docs/reference/messaging-contract.md): a channel, a space, a direct chat or a mail thread. source is the service (slack, email, googlechat, whatsapp, or the server's own word), the same word as ChannelSender.channel. unread is the service's own count of unread messages; absent when the service does not say. lastActivity is the newest message's time.
 type MessagingConversation struct {
 	Source string `json:"source"`
@@ -7496,11 +7525,13 @@ const MessagingConversationKindChannel MessagingConversationKind = "channel"
 const MessagingConversationKindDirect MessagingConversationKind = "direct"
 const MessagingConversationKindThread MessagingConversationKind = "thread"
 
-// list_conversations' structuredContent (#4338): the conversations, newest lastActivity first. cursor is absent on the last page.
+// list_conversations' structuredContent (#4338): the conversations, newest lastActivity first. cursor is absent on the last page. replyAs (#4345): who the server's reply tool sends as, in words (the Slack bot @agents, the WhatsApp number); absent when the server has no reply tool.
 type MessagingConversations struct {
 	Conversations []MessagingConversation `json:"conversations"`
 
 	Cursor *string `json:"cursor,omitzero"`
+
+	ReplyAs *string `json:"replyAs,omitzero"`
 }
 
 // list_conversations' input (#4338). cursor is a page's cursor from the last answer; limit is at most 100, 20 when left out. unread: only the conversations with unread messages. A server may take more inputs of its own, each optional (the email server's folder).
@@ -7551,7 +7582,7 @@ type MessagingReadRequest struct {
 	Limit *int64 `json:"limit,omitzero"`
 }
 
-// reply's input (#4338, a later story): the conversation, the thread to answer in (absent: the conversation itself), and the text.
+// reply's input (#4338, #4345): the conversation, the thread to answer in (a message's thread, or the id of the message that starts one; absent: the conversation itself), and the text. Its structuredContent is the sent message, a MessagingMessage.
 type MessagingReplyRequest struct {
 	Conversation string `json:"conversation"`
 

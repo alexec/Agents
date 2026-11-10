@@ -413,8 +413,8 @@ pace is 3 s and a poll costs Slack nothing. A cursor from an earlier run starts 
   `question.answered` (`question`, `channel`). Neither has a message's text. Each has a
   `sender` (`slack`, `team/user`, and the name and email from `users.info`) for a channel
   link (#1762). Edits, deletions, joins and bots' messages are left out.
-- **Tools:** `list_channels`; the messaging contract's `list_conversations` and
-  `read_messages` (#4339, `docs/reference/messaging-contract.md`, `_meta`
+- **Tools:** `list_channels`; the messaging contract's `list_conversations`,
+  `read_messages` and `reply` (#4339, #4345: `reply` posts the person's reply as the bot; `docs/reference/messaging-contract.md`, `_meta`
   `"agents/messaging": 1`: newest first, by cursor, the text inside
   `<untrusted-content source="slack">`; `read_messages` still takes `channel` for
   `conversation`); `send_message` and `ask_question` (the options as
@@ -446,7 +446,8 @@ signs in to both APIs; `GOOGLE_CHAT_SUBSCRIPTION` names the Pub/Sub subscription
 - **Tools:** `list_spaces`, `send_message` and `ask_question`, a card with a button per
   option whose press calls `agents.answer` with the question's id; the first press is
   `question.answered`, and the server then edits the card to say who answered.
-- **The messaging contract** (#4342, `messaging.go`): `list_conversations` is `spaces.list`,
+- **The messaging contract** (#4342, `messaging.go`): `reply` (#4345) posts the person's
+  reply as the Chat app; `list_conversations` is `spaces.list`,
   and `read_messages` is `spaces.messages.list`, newest first, signed in with
   `chat.app.messages.readonly` (a Workspace admin's approval). When Google refuses it (401 or
   403, believed for 10 minutes), `read_messages` pages the inbox instead: what people sent the
@@ -483,7 +484,8 @@ signed webhook. `WHATSAPP_TOKEN` (a system user's token), `WHATSAPP_PHONE_NUMBER
   for up to ten; each option's id is `agents|<question>|<option>`, and the first press is
   `question.answered`), `send_template` (an approved template: the only message Meta takes
   more than 24 hours after the person last wrote), and the messaging contract's
-  `list_conversations` and `read_messages` (#4341, `docs/reference/messaging-contract.md`,
+  `list_conversations`, `read_messages` and `reply` (#4341, #4345: `reply` sends the person's
+  reply as the number; `docs/reference/messaging-contract.md`,
   `_meta` `"agents/messaging": 1`: a conversation is a person's number, newest first, by
   cursor, marked as outside content; `read_messages` still takes `from` for
   `conversation`). A refusal for the 24-hour window says to use `send_template`.

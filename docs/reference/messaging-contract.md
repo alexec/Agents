@@ -18,7 +18,8 @@ Why messaging is a contract over MCP, and the forges are not, is in
 The shapes are in `Packages/Wire/daemon.schema.json` (#1135), so the Go servers, the daemon
 and the clients use one type: `MessagingListRequest`, `MessagingConversations`,
 `MessagingConversation`, `MessagingConversationKind`, `MessagingReadRequest`,
-`MessagingMessages`, `MessagingMessage` and `MessagingReplyRequest`.
+`MessagingMessages`, `MessagingMessage` and `MessagingReplyRequest`; the daemon's are
+`MessagesConversations`, `MessagesRead`, `MessagesReplyRequest` and `MessagesReplied`.
 
 ## How a server says that it follows the contract
 
@@ -42,7 +43,7 @@ compatible takes the next number, and the daemon reads each version that it know
 |---|---|---|---|
 | `list_conversations` | `MessagingListRequest` | `MessagingConversations` | `readOnlyHint` |
 | `read_messages` | `MessagingReadRequest` | `MessagingMessages` | `readOnlyHint` |
-| `reply` (later, #4337) | `MessagingReplyRequest` | the sent message, a `MessagingMessage` | none: it sends |
+| `reply` (#4345) | `MessagingReplyRequest` | the sent message, a `MessagingMessage` | none: it sends |
 
 Each tool also gives a `content` text block, for an agent that calls it. The page reads only
 `structuredContent`. A server can have other tools of its own (`send_message`,
@@ -63,8 +64,10 @@ Input, every field optional:
 | `limit` | At most this many; 20 when left out, at most 100 |
 | `unread` | `true`: only the conversations with unread messages |
 
-`structuredContent` is `{ "conversations": [...], "cursor": "..." }`, the newest
-`lastActivity` first. Each conversation:
+`structuredContent` is `{ "conversations": [...], "cursor": "...", "replyAs": "..." }`, the
+newest `lastActivity` first. `replyAs` is optional: who `reply` sends as, in words that fit
+"Sent as …" (`the Slack bot @agents`, `the WhatsApp Business number`). A server with no
+`reply` leaves it out. Each conversation:
 
 | Field | Required | What |
 |---|---|---|
@@ -104,12 +107,20 @@ newest message first. Each message:
 `read_messages` reads only. It never marks a message as read (see
 [Unread state](#unread-state-the-services-own)).
 
-### reply (a later story)
+### reply
 
-Input: `conversation` (required), `thread` (the thread to answer in; absent: the conversation
-itself) and `text` (required). Its `structuredContent` is the sent message, a
-`MessagingMessage`. The page's Reply control is a later story of #4337, and waits for Alex's
-approval (#3474).
+Input: `conversation` (required), `thread` (the thread to answer in, a message's `thread`;
+absent: the conversation itself) and `text` (required, plain text). Its `structuredContent` is
+the sent message, a `MessagingMessage`. It is the person's own reply from the Messages page
+(#4345), not an agent's: an agent posts with the server's own `send_message`. The server
+sends it as what it signs in as (the bot, the number), and says so in `replyAs`.
+
+| Server | Sends as | `thread` |
+|---|---|---|
+| Slack | the bot | a message's `thread_ts` |
+| Google Chat | the Chat app | `spaces/…/threads/…` |
+| WhatsApp | the business number, within 24 hours of the person's last message | a message to quote (WhatsApp has no threads) |
+| Email | no `reply`: the server cannot send yet (#1780) | |
 
 ## Paging
 
@@ -132,6 +143,10 @@ Each machine's daemon has two methods for the Messages page (#4343,
   connectors' conversations still come.
 - **`messages/read`** calls `read_messages` on the connector that lists the conversation,
   named by its `server` and `folder`.
+- **`messages/reply`** (#4345, capability `messages.reply/1`) calls `reply` on that
+  connector, and gives the sent message. `messages/conversations` gives each conversation a
+  `replyAs` only when its connector's `reply` has the contract's `_meta` (the server's own
+  words, else the connector's name), so a client shows a reply field only then.
 
 The clients merge the machines' answers, one copy per conversation. The control plane only
 relays them and never stores message text (`docs/explanation/direction.md`).

@@ -16,8 +16,9 @@ import (
 
 // The messaging contract (#4337, #4339, docs/reference/messaging-contract.md):
 // list_conversations is the channels and direct chats the bot is in, and read_messages is a
-// conversation's or a thread's messages, newest first, by cursor. Each tool says, in its
-// _meta, that it follows the contract, so the Messages page can read Slack.
+// conversation's or a thread's messages, newest first, by cursor; reply (#4345) is the
+// person's own reply from the Messages page, posted as the bot. Each tool says, in its _meta,
+// that it follows the contract, so the Messages page can read Slack and answer in it.
 
 // ContractMeta is the key that says a tool follows the messaging contract, and its version.
 const ContractMeta = "agents/messaging"
@@ -47,6 +48,12 @@ type readArgs struct {
 	Limit        int    `json:"limit,omitempty" jsonschema:"at most this many: 20 when left out, 100 at most"`
 }
 
+type replyArgs struct {
+	Conversation string `json:"conversation" jsonschema:"the conversation's id (C…, G… or D…), as list_conversations gives it"`
+	Thread       string `json:"thread,omitempty" jsonschema:"a message's ts: answer in its thread; the conversation itself when left out"`
+	Text         string `json:"text" jsonschema:"the reply, as plain text"`
+}
+
 // tsCursor is a read_messages cursor: the ts of the oldest message of the last page.
 var tsCursor = regexp.MustCompile(`^\d+\.\d+$`)
 
@@ -57,7 +64,7 @@ func pageLimit(n int) int {
 	return min(maxLimit, n)
 }
 
-// addMessagingTools puts list_conversations and read_messages on server.
+// addMessagingTools puts list_conversations, read_messages and reply on server.
 func addMessagingTools(server *mcp.Server, w *Workspace) {
 	readOnly := &mcp.ToolAnnotations{ReadOnlyHint: true}
 	contract := mcp.Meta{ContractMeta: ContractVersion}
@@ -85,6 +92,9 @@ func addMessagingTools(server *mcp.Server, w *Workspace) {
 			me, _ := w.whoami(ctx)
 			for _, c := range channels {
 				out.Conversations = append(out.Conversations, w.conversation(ctx, api, me, c))
+			}
+			if as := replyAs(me); as != "" {
+				out.ReplyAs = &as
 			}
 			slices.SortStableFunc(out.Conversations, func(a, b wire.MessagingConversation) int {
 				return cmp.Compare(deref(b.LastActivity), deref(a.LastActivity))
@@ -151,6 +161,51 @@ func addMessagingTools(server *mcp.Server, w *Workspace) {
 				conversation, len(msgs), deref(out.Cursor), Untrusted, conversation, text.String())
 			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: summary}}, StructuredContent: out}, nil
 		})
+}
+
+// reply is a tool of its own, not send_message, so that it takes the contract's input and gives
+// the sent message as the contract says it.
+func addReplyTool(server *mcp.Server, w *Workspace) {
+	notDestructive := false
+	open := true
+	tool(server, &mcp.Tool{Name: "reply", Title: "Reply",
+		Description: "The person's reply from the Messages page: posts text as the bot in a conversation it is in, in a thread when one is given. " +
+			"Gives the sent message as read_messages does. It refuses @channel, @here and @everyone. An agent posts with send_message.",
+		Annotations: &mcp.ToolAnnotations{DestructiveHint: &notDestructive, OpenWorldHint: &open},
+		Meta:        mcp.Meta{ContractMeta: ContractVersion}},
+		func(ctx context.Context, in replyArgs) (*mcp.CallToolResult, error) {
+			conversation := strings.TrimSpace(in.Conversation)
+			text, err := checkText(conversation, in.Text)
+			if err != nil {
+				return nil, err
+			}
+			api, err := w.client()
+			if err != nil {
+				return nil, err
+			}
+			thread := strings.TrimSpace(in.Thread)
+			options := []slack.MsgOption{slack.MsgOptionText(text, false)}
+			if thread != "" {
+				options = append(options, slack.MsgOptionTS(thread))
+			}
+			channel, ts, err := api.PostMessageContext(ctx, conversation, options...)
+			if err != nil {
+				return nil, said(err)
+			}
+			me, _ := w.whoami(ctx)
+			out := w.message(ctx, me, cmp.Or(channel, conversation), slack.Message{Msg: slack.Msg{
+				Timestamp: ts, Text: text, BotID: me.user, Username: me.name, ThreadTimestamp: thread}})
+			summary := fmt.Sprintf("sent: %s\nconversation: %s\nthread: %s", ts, out.Conversation, thread)
+			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: summary}}, StructuredContent: out}, nil
+		})
+}
+
+// replyAs is who reply posts as, in words: the bot, by its name when Slack said it.
+func replyAs(me self) string {
+	if me.name == "" {
+		return "the Slack bot"
+	}
+	return "the Slack bot @" + me.name
 }
 
 // threadPage is the newest limit messages of a thread, older than cursor when it is given,

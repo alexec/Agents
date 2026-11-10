@@ -110,6 +110,7 @@ func AddTools(server *mcp.Server, w *Workspace) {
 		})
 
 	addMessagingTools(server, w)
+	addReplyTool(server, w)
 
 	tool(server, &mcp.Tool{Name: "send_message", Title: "Send a message",
 		Description: "Posts a message as the bot in a channel it is in, in a thread, or to a user directly. Gives the message's ts, " +

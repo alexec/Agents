@@ -31,6 +31,12 @@ import (
 // connector whose page was kept only in part is asked for the same page again, and the part
 // already given is skipped. A connector that fails or does not answer in time is left out,
 // with its error; the others still come.
+//
+// messages/reply (#4345) is the person's own reply from the page: the connector's reply tool
+// sends it, as the bot or the number the connector signs in as. A connector has a reply field
+// on the page only when its reply tool has the contract's _meta too, so the list says, per
+// conversation, who a reply goes as (replyAs), and the email server, which cannot send, has
+// none.
 const (
 	// messagesMost bounds a page; messagesDefault is a page when not said (the contract's).
 	messagesMost    = 100
@@ -52,6 +58,9 @@ func (d *Daemon) registerMessages() {
 	})
 	On(d, wire.CallMessagesRead, func(ctx context.Context, _ *Client, r wire.MessagesReadRequest) (wire.MessagesRead, error) {
 		return d.messagesRead(ctx, r)
+	})
+	On(d, wire.CallMessagesReply, func(ctx context.Context, _ *Client, r wire.MessagesReplyRequest) (wire.MessagesReplied, error) {
+		return d.messagesReply(ctx, r)
 	})
 }
 
@@ -173,12 +182,14 @@ func (d *Daemon) messagesConversations(ctx context.Context, r wire.MessagesConve
 }
 
 // messagesPage is one connector's page of a list, past the part of it already given; next is
-// its own cursor after the page ("" at its end); or why the connector could not be read.
+// its own cursor after the page ("" at its end); who a reply goes as ("" when it has no reply
+// tool); or why the connector could not be read.
 type messagesPage struct {
 	connector     messagesConnector
 	from          messagesConnectorCursor
 	conversations []wire.MessagingConversation
 	next          string
+	replyAs       string
 	err           error
 }
 
@@ -193,9 +204,12 @@ func (d *Daemon) messagesPageOf(ctx context.Context, c messagesConnector, from m
 		args["unread"] = true
 	}
 	var page wire.MessagingConversations
-	p.err = d.callMessaging(ctx, c, "list_conversations", args, secrets, &page)
-	if p.err != nil {
+	tools, err := d.callMessaging(ctx, c, "list_conversations", args, secrets, &page)
+	if p.err = err; err != nil {
 		return p
+	}
+	if tools["reply"] {
+		p.replyAs = replyAsOf(c, page.ReplyAs)
 	}
 	got := slices.DeleteFunc(page.Conversations, func(m wire.MessagingConversation) bool { return m.ID == "" })
 	p.conversations = got[min(from.Skip, len(got)):]
@@ -223,8 +237,11 @@ func mergeMessagesPages(pages []messagesPage, from messagesCursor, limit int) (w
 			break
 		}
 		p := pages[best]
-		out.Conversations = append(out.Conversations, wire.MessagesConversation{
-			Server: p.connector.name, Folder: p.connector.folder, Conversation: p.conversations[taken[best]]})
+		m := wire.MessagesConversation{Server: p.connector.name, Folder: p.connector.folder, Conversation: p.conversations[taken[best]]}
+		if p.replyAs != "" {
+			m.ReplyAs = &p.replyAs
+		}
+		out.Conversations = append(out.Conversations, m)
 		taken[best]++
 	}
 	next := messagesCursor{}
@@ -291,7 +308,7 @@ func (d *Daemon) messagesRead(ctx context.Context, r wire.MessagesReadRequest) (
 	}
 	var page wire.MessagingMessages
 	c := messagesConnector{name: r.Server, folder: r.Folder}
-	if err := d.callMessaging(ctx, c, "read_messages", args, d.secrets(), &page); err != nil {
+	if _, err := d.callMessaging(ctx, c, "read_messages", args, d.secrets(), &page); err != nil {
 		return wire.MessagesRead{}, &Error{Code: CodeServer, Message: r.Server + ": " + err.Error()}
 	}
 	out := wire.MessagesRead{Server: r.Server, Folder: r.Folder, Conversation: r.Conversation,
@@ -302,24 +319,69 @@ func (d *Daemon) messagesRead(ctx context.Context, r wire.MessagesReadRequest) (
 	return out, nil
 }
 
+// messagesReplyMost is the most text a reply takes, in bytes: more than any service's own
+// limit (Slack's 40,000 characters), so the service says no first.
+const messagesReplyMost = 64 << 10
+
+// messagesReply sends the person's reply to one conversation, by the connector that lists it.
+func (d *Daemon) messagesReply(ctx context.Context, r wire.MessagesReplyRequest) (wire.MessagesReplied, error) {
+	const method = "messages/reply"
+	if r.Server == "" || r.Conversation == "" {
+		return wire.MessagesReplied{}, Invalid("%s: server and conversation are needed", method)
+	}
+	if strings.TrimSpace(r.Text) == "" {
+		return wire.MessagesReplied{}, Invalid("%s: the reply has no text", method)
+	}
+	if len(r.Text) > messagesReplyMost {
+		return wire.MessagesReplied{}, Invalid("%s: the reply is longer than %d KB", method, messagesReplyMost>>10)
+	}
+	if !slices.Contains(d.folderPaths(), r.Folder) {
+		return wire.MessagesReplied{}, Invalid("%s: %s is not a folder on this machine", method, r.Folder)
+	}
+	if !slices.ContainsFunc(d.messagingServers(r.Folder), func(e docsServerEntry) bool { return e.name == r.Server }) {
+		return wire.MessagesReplied{}, Invalid("%s: %s is not a messaging connector of %s", method, r.Server, r.Folder)
+	}
+	args := map[string]any{"conversation": r.Conversation, "text": r.Text}
+	if t := deref(r.Thread); t != "" {
+		args["thread"] = t
+	}
+	var sent wire.MessagingMessage
+	c := messagesConnector{name: r.Server, folder: r.Folder}
+	if _, err := d.callMessaging(ctx, c, "reply", args, d.secrets(), &sent); err != nil {
+		if errors.Is(err, errNotContract) {
+			err = docsSearchError("It can't send a reply.")
+		}
+		return wire.MessagesReplied{}, &Error{Code: CodeServer, Message: r.Server + ": " + err.Error()}
+	}
+	return wire.MessagesReplied{Server: r.Server, Folder: r.Folder, Conversation: r.Conversation, Message: sent}, nil
+}
+
+// replyAsOf is who a connector's reply goes as: the server's own words, or its name in mcp.json.
+func replyAsOf(c messagesConnector, said *string) string {
+	if s := strings.TrimSpace(deref(said)); s != "" {
+		return s
+	}
+	return c.name
+}
+
 // callMessaging calls one contract tool of the connector, signed in, and reads its
-// structuredContent into into: errNotContract when the connector does not follow the
-// contract, or why the call failed, in a sentence.
-func (d *Daemon) callMessaging(ctx context.Context, c messagesConnector, tool string, args map[string]any, secrets map[string]string, into any) error {
+// structuredContent into into: the connector's contract tools, errNotContract when the
+// connector does not follow the contract, or why the call failed, in a sentence.
+func (d *Daemon) callMessaging(ctx context.Context, c messagesConnector, tool string, args map[string]any, secrets map[string]string, into any) (map[string]bool, error) {
 	s, cwd, err := d.docsServerFor(c.name, c.folder, secrets)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	raw, err := callMessagingTool(ctx, s, cwd, tool, args, messagesTimeout)
+	raw, tools, err := callMessagingTool(ctx, s, cwd, tool, args, messagesTimeout)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return messagingResult(raw, into)
+	return tools, messagingResult(raw, into)
 }
 
 // callMessagingTool connects, checks that the server follows the messaging contract, calls
-// tool once with args, and ends: what the call answered.
-func callMessagingTool(ctx context.Context, s sdk.McpServer, cwd, tool string, args map[string]any, timeout time.Duration) (json.RawMessage, error) {
+// tool once with args, and ends: what the call answered, and the server's contract tools.
+func callMessagingTool(ctx context.Context, s sdk.McpServer, cwd, tool string, args map[string]any, timeout time.Duration) (json.RawMessage, map[string]bool, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	var c mcpConn
@@ -327,13 +389,13 @@ func callMessagingTool(ctx context.Context, s sdk.McpServer, cwd, tool string, a
 	case s.Stdio != nil:
 		sc, err := startStdioMCP(s.Stdio, cwd)
 		if err != nil {
-			return nil, docsSearchError(mcpFailureOf(err).sentence(timeout))
+			return nil, nil, docsSearchError(mcpFailureOf(err).sentence(timeout))
 		}
 		c = sc
 	case s.Http != nil:
 		c = &httpMCP{url: s.Http.Url, headers: s.Http.Headers}
 	default:
-		return nil, docsSearchError("What came back was not MCP.")
+		return nil, nil, docsSearchError("What came back was not MCP.")
 	}
 	defer c.end()
 	failed := func(err error) error {
@@ -344,10 +406,10 @@ func callMessagingTool(ctx context.Context, s sdk.McpServer, cwd, tool string, a
 	}
 	if _, err := c.call(ctx, 1, "initialize", map[string]any{"protocolVersion": "2025-06-18", "capabilities": map[string]any{},
 		"clientInfo": map[string]any{"name": "Agents", "version": "1"}}); err != nil {
-		return nil, failed(err)
+		return nil, nil, failed(err)
 	}
 	if err := c.notify(ctx, "notifications/initialized"); err != nil {
-		return nil, failed(err)
+		return nil, nil, failed(err)
 	}
 	contract := map[string]bool{}
 	id := 2
@@ -358,7 +420,7 @@ func callMessagingTool(ctx context.Context, s sdk.McpServer, cwd, tool string, a
 		}
 		raw, err := c.call(ctx, id, "tools/list", params)
 		if err != nil {
-			return nil, failed(err)
+			return nil, nil, failed(err)
 		}
 		var page struct {
 			Tools []struct {
@@ -370,7 +432,7 @@ func callMessagingTool(ctx context.Context, s sdk.McpServer, cwd, tool string, a
 			NextCursor string `json:"nextCursor"`
 		}
 		if json.Unmarshal(raw, &page) != nil {
-			return nil, docsSearchError("What came back was not MCP.")
+			return nil, nil, docsSearchError("What came back was not MCP.")
 		}
 		for _, t := range page.Tools {
 			if t.Meta.Messaging == messagingContractVersion {
@@ -383,13 +445,13 @@ func callMessagingTool(ctx context.Context, s sdk.McpServer, cwd, tool string, a
 		cursor = page.NextCursor
 	}
 	if !contract["list_conversations"] || !contract["read_messages"] || !contract[tool] {
-		return nil, errNotContract
+		return nil, nil, errNotContract
 	}
 	raw, err := c.call(ctx, id+1, "tools/call", map[string]any{"name": tool, "arguments": args})
 	if err != nil {
-		return nil, failed(err)
+		return nil, nil, failed(err)
 	}
-	return raw, nil
+	return raw, contract, nil
 }
 
 // messagingResult reads a contract tool's structuredContent into into, or says why it could

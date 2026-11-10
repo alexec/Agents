@@ -32,9 +32,10 @@ struct WorkItemRow: View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 6) {
                 title.lineLimit(1).truncationMode(.tail).layoutPriority(1)
-                let chips = WorkLook.shownLabels(row.labels, limit: WorkLook.rowChips)
-                ForEach(chips.shown, id: \.name) { WorkLabelChip(label: $0, pick: pick) }
-                WorkMoreChips(count: chips.more)
+                // As many chips as fit whole, the rest as "+2", so a narrow window never squeezes one.
+                ViewThatFits(in: .horizontal) {
+                    ForEach((0 ... WorkLook.rowChips).reversed(), id: \.self) { chips($0) }
+                }
                 Spacer(minLength: 8)
                 trailing
                 WorkAvatarStack(logins: row.assignees)
@@ -46,6 +47,14 @@ struct WorkItemRow: View {
                     Text(WorkList.repoName(row.repo)).appText(.fine).foregroundStyle(.secondary).lineLimit(1)
                 }
             }
+        }
+    }
+
+    private func chips(_ limit: Int) -> some View {
+        let chips = WorkLook.shownLabels(row.labels, limit: limit)
+        return HStack(spacing: 6) {
+            ForEach(chips.shown, id: \.name) { WorkLabelChip(label: $0, pick: pick).fixedSize() }
+            WorkMoreChips(count: chips.more).fixedSize()
         }
     }
 

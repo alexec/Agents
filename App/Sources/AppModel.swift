@@ -401,7 +401,7 @@ final class AppModel {
         }
     }
 
-    /// Whether the window is showing Messages (#4344): the messaging connectors' conversations, read only,
+    /// Whether the window is showing Messages (#4344): the messaging connectors' conversations, with a reply (#4345),
     /// and a conversation's messages. A page like Docs, and not persisted for the same reason.
     var showsMessages = false {
         didSet {
@@ -6827,14 +6827,17 @@ final class AppModel {
     @discardableResult
     func answerElicitation(_ request: ElicitationRequest,
                            action: DaemonAPI.AnswerElicitationRequest.Action,
-                           content: [String: JSONValue] = [:]) async -> Bool {
+                           content: [String: JSONValue] = [:], reason: String? = nil) async -> Bool {
         let sendID = UUID()
+        // An empty reason is No thanks (#4039).
+        let reason = reason?.trimmingCharacters(in: .whitespacesAndNewlines)
         let sent = await attempt {
             try await self.client(forAgent: request.agentID).call(DaemonAPI.Method.elicitationsAnswer,
                                        DaemonAPI.AnswerElicitationRequest(requestID: request.id,
                                                                           action: action,
                                                                           content: content,
-                                                                          sendID: sendID))
+                                                                          sendID: sendID,
+                                                                          reason: reason?.isEmpty == false ? reason : nil))
         }
         await refreshElicitations()
         return sent
@@ -7044,7 +7047,12 @@ struct FolderGoneAsk: Identifiable, Equatable {
 }
 
 /// Work (#3119) is drawn by `Shared/UI/Work`, for the window and the Remote (#3256).
-extension AppModel: WorkModel {}
+extension AppModel: WorkModel {
+    func askWorkConnectors() -> Bool {
+        settingsPaneAsked = .connectors
+        return true
+    }
+}
 
 /// Settings ▸ You ▸ Secrets ▸ For One Session (#3548), through this Mac's host.
 extension AppModel: SessionSecretsSource {}

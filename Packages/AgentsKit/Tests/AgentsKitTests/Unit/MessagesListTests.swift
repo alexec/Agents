@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import AgentsKitCore
 
-/// The Messages page's list (#4344): the machines' conversations in one list, and its types on the wire.
+/// The Messages page's list (#4344): the machines' conversations in one list, its reply (#4345), and its types on the wire.
 @Suite("Messages list")
 struct MessagesListTests {
     typealias Conversation = DaemonAPI.MessagingConversation
@@ -57,7 +57,8 @@ struct MessagesListTests {
         let list = DaemonAPI.MessagesConversations(
             conversations: [.init(server: "slack", folder: "/p",
                                   conversation: .init(source: "slack", id: "C1", title: "#general", kind: .channel, unread: 2,
-                                                      lastActivity: "2026-11-10T08:00:00Z", link: "https://x.slack.com/archives/C1"))],
+                                                      lastActivity: "2026-11-10T08:00:00Z", link: "https://x.slack.com/archives/C1"),
+                                  replyAs: "the Slack bot @agents")],
             cursor: "abc", errors: [.init(server: "mail", folder: "/p", message: "No answer.")])
         let read = DaemonAPI.MessagesRead(
             server: "slack", folder: "/p", conversation: "C1",
@@ -75,5 +76,17 @@ struct MessagesListTests {
         #expect(schema.errors(try JSONValue.encoding(DaemonAPI.MessagesReadRequest(server: "slack", folder: "/p", conversation: "C1",
                                                                                    cursor: "c", limit: 50)),
                               against: "MessagesReadRequest") == [])
+        #expect(schema.errors(try JSONValue.encoding(DaemonAPI.MessagesReplyRequest(server: "slack", folder: "/p", conversation: "C1",
+                                                                                    thread: "1.0", text: "On it.")),
+                              against: "MessagesReplyRequest") == [])
+        let replied = DaemonAPI.MessagesReplied(server: "slack", folder: "/p", conversation: "C1", message: try #require(read.messages.first))
+        #expect(schema.errors(try JSONValue.encoding(replied), against: "MessagesReplied") == [])
+    }
+
+    /// The reply field (#4345): what it sends, and who it says the reply goes as.
+    @Test func theWordsOfAReply() {
+        #expect(MessagesList.replyText("  On it.\n") == "On it.")
+        #expect(MessagesList.replyText(" \n ") == nil)
+        #expect(MessagesList.sentAs("the Slack bot @agents") == "Sent as the Slack bot @agents, not as an agent.")
     }
 }

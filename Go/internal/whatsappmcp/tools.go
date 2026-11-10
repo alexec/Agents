@@ -256,6 +256,7 @@ func AddTools(server *mcp.Server, m *Meta, inbox *Inbox) {
 		})
 
 	addMessagingTools(server, inbox)
+	addReplyTool(server, m, inbox)
 }
 
 func newID() string {

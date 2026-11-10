@@ -428,7 +428,7 @@ func TestForgeIssuesMergesEveryForgeByTime(t *testing.T) {
 		t.Fatalf("Linear item: %+v", l)
 	}
 	cursor, _ := cursorOf(list.Cursor)
-	if cursor.GitHub != "Y3Vyc29y" || cursor.GitLab != "gl-1" || cursor.Linear != "" || !slices.Equal(cursor.Done, []string{"linear"}) {
+	if cursor.GitHub != "Y3Vyc29y" || cursor.GitLab != "gl-1" || cursor.Linear != "" || !slices.Equal(cursor.Done, []string{"linear", "jira"}) {
 		t.Fatalf("cursor: %+v", cursor)
 	}
 

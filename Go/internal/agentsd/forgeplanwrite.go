@@ -59,11 +59,8 @@ func (d *Daemon) planTargetOf(ctx context.Context, method string, node wire.Line
 	if err != nil {
 		return forgeTarget{}, err
 	}
-	switch {
-	case t.forge != nil && !t.forge.Caps().Plan:
+	if t.forge != nil && !t.forge.Caps().Plan {
 		return forgeTarget{}, forgeCannotErr(method, t.forge, cannot(actionPlan))
-	case t.jira != nil:
-		return forgeTarget{}, Invalid("%s: a Jira plan is changed in Jira, not yet here", method)
 	}
 	return t, nil
 }

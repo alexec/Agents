@@ -40,10 +40,10 @@ struct WorkLookTests {
     }
 
     func row(state: String = "open", author: String? = "alexec", lineage: DaemonAPI.ReportNode? = nil,
-             title: String = "Work look", status: String? = nil) -> WorkList.Row {
+             title: String = "Work look", status: String? = nil, draft: Bool = false) -> WorkList.Row {
         WorkList.Row(node: Node(kind: "issue", ref: "github:alexec/Agents#4328"), title: title, state: state,
                      repo: "github:alexec/Agents", author: author, updated: now.addingTimeInterval(-2 * 3600),
-                     lineage: lineage, status: status)
+                     draft: draft, lineage: lineage, status: status)
     }
 
     func lineage(sessions: Int, usd: Decimal) -> DaemonAPI.ReportNode {
@@ -160,5 +160,34 @@ struct WorkLookTests {
         #expect(WorkLook.emptyTitle(.milestone, state: .open, filtered: false) == "No milestones")
         #expect(WorkLook.emptyLine(.issue, repos: ["github:alexec/Agents"]) == "Issues on alexec/Agents show here.")
         #expect(WorkLook.emptyLine(.pr, repos: []) == "Pull requests from your folders’ repos show here.")
+    }
+
+    @Test func aDraftSaysSoAfterItsNumber() {
+        #expect(WorkLook.rowLine(row(draft: true), compact: false, now: now) == "#4328 · Draft · updated 2 h ago by alexec")
+        #expect(WorkLook.rowLine(row(draft: true), compact: true, now: now) == "#4328 · Draft · 2 h · alexec")
+        #expect(WorkLook.rowLine(row(state: "closed", draft: true), compact: true, now: now) == "#4328 · 2 h · alexec")
+    }
+
+    @Test func theFiltersThatAreSet() {
+        #expect(WorkLook.setFilters(WorkList.Filter(state: .closed)) == nil)
+        #expect(WorkLook.setFilters(WorkList.Filter(label: "bug", assignee: "alexec")) == "Label: bug · Assignee: alexec")
+        #expect(WorkLook.setFilters(WorkList.Filter(project: "p1", text: " ui "), project: "Agents") == "“ui” · Project: Agents")
+        #expect(WorkLook.setFilters(WorkList.Filter(repo: "github:alexec/Agents")) == "Repo: alexec/Agents")
+    }
+
+    @Test func pagingAndTheEndOfTheList() {
+        #expect(WorkLook.loadingMore(shown: 50) == "Loading more… · 50 shown")
+        #expect(WorkLook.endWords(.issue, shown: 128, more: false) == "128 issues")
+        #expect(WorkLook.endWords(.issue, shown: 50, more: true) == "50+ issues")
+        #expect(WorkLook.endWords(.issue, shown: 1, more: false) == "1 issue")
+        #expect(WorkLook.endWords(.pr, shown: 1, more: false) == "1 pull request")
+        #expect(WorkLook.endWords(.pr, shown: 1, more: true) == "1+ pull requests")
+        #expect(WorkLook.couldNotRead(.pr) == "Could not read pull requests")
+    }
+
+    @Test func aCredentialErrorOffersConnectors() {
+        #expect(WorkLook.credentialProblem("GitHub said 401 Bad credentials"))
+        #expect(WorkLook.credentialProblem("Linear is not connected, or its token ended: connect Linear in Connectors"))
+        #expect(!WorkLook.credentialProblem("GitHub said 502 Bad Gateway"))
     }
 }

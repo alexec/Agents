@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -18,6 +19,7 @@ import (
 	"github.com/alexec/agents/Go/internal/forgejomcp"
 	"github.com/alexec/agents/Go/internal/githubmcp"
 	"github.com/alexec/agents/Go/internal/gitlabmcp"
+	"github.com/alexec/agents/Go/internal/jiramcp"
 	"github.com/alexec/agents/Go/internal/lineage"
 	"github.com/alexec/agents/Go/internal/linearmcp"
 	"github.com/alexec/agents/Go/wire"
@@ -44,6 +46,7 @@ var conformRows = []conformRow{
 	{name: "bitbucket", daemon: conformBitbucketDaemon},
 	{name: "azuredevops", daemon: conformAzureDevOpsDaemon},
 	{name: "linear", daemon: conformLinearDaemon},
+	{name: "jira", daemon: conformJiraDaemon},
 }
 
 // conformGitHub is GitHub with four items on alexec/agents, which pages by its cursor.
@@ -468,6 +471,73 @@ func conformLinearDaemon(t *testing.T) (*Daemon, *conn) {
 		AccessExpiresAt: time.Now().Add(time.Hour), ConnectedAt: time.Now()}); err != nil {
 		t.Fatal(err)
 	}
+	return d, c
+}
+
+// conformJira is Jira with two issues in the project PROJ, which pages by its cursor. It has no
+// pull requests.
+type conformJira struct {
+	*fakeForgeJira
+}
+
+var conformJiraItems = []jiramcp.Item{
+	{Key: "PROJ-2", Project: "PROJ", State: "closed", Status: "Done", Title: "Closed", URL: "https://acme.atlassian.net/browse/PROJ-2",
+		Author: "Kim", UpdatedAt: "2026-11-02T10:00:00.000Z"},
+	{Key: "PROJ-1", Project: "PROJ", State: "open", Status: "To Do", Title: "Open issue", URL: "https://acme.atlassian.net/browse/PROJ-1",
+		Author: "Kim", Labels: []string{"billing"}, Assignees: []string{"Kim"}, UpdatedAt: "2026-11-01T10:00:00.000Z", Comments: 2},
+}
+
+func (g conformJira) Search(_ context.Context, _ []string, sf jiramcp.SearchFilter, after string, first int) (jiramcp.SearchPage, error) {
+	var kept []jiramcp.Item
+	for _, i := range conformJiraItems {
+		if sf.State == "all" || (sf.State == "closed") != (i.State == "open") {
+			kept = append(kept, i)
+		}
+	}
+	from, _ := strconv.Atoi(after)
+	var page jiramcp.SearchPage
+	for n := from; n < len(kept) && len(page.Items) < first; n++ {
+		page.Items = append(page.Items, kept[n])
+		page.Cursors = append(page.Cursors, strconv.Itoa(n+1))
+	}
+	if end := from + len(page.Items); end < len(kept) {
+		page.Next = strconv.Itoa(end)
+	}
+	return page, nil
+}
+
+func (g conformJira) ItemPage(_ context.Context, key, _ string) (jiramcp.ItemDetail, error) {
+	for _, i := range conformJiraItems {
+		if i.Key == key {
+			return jiramcp.ItemDetail{Item: i, Body: "The body.",
+				Thread:      []jiramcp.Comment{{Author: "Kim", Body: "A comment.", At: i.UpdatedAt}},
+				Transitions: []jiramcp.Transition{{ID: "31", Name: "Done", Category: "done"}}}, nil
+		}
+	}
+	return jiramcp.ItemDetail{}, &jiramcp.JiraError{Kind: jiramcp.NotFound, Message: "Jira: Issue does not exist"}
+}
+
+func (g conformJira) Plan(_ context.Context, key string) (jiramcp.Plan, error) {
+	return jiramcp.Plan{Epic: conformJiraItems[1]}, nil
+}
+
+// conformJiraDaemon is a daemon with the jira connector's sign-in and one folder, on no forge,
+// whose .agents/folder.json names the project PROJ.
+func conformJiraDaemon(t *testing.T) (*Daemon, *conn) {
+	t.Helper()
+	home := t.TempDir()
+	t.Setenv("AGENTS_PERSONAL_HOME", home)
+	d, c := start(t, t.TempDir())
+	t.Cleanup(d.Shutdown)
+	fake := conformJira{&fakeForgeJira{}}
+	d.newForgeJira = func(jiramcp.Auth) forgeJira { return fake }
+	folder := gitFolder(t, "")
+	os.MkdirAll(filepath.Join(folder, ".agents"), 0o755)
+	os.WriteFile(filepath.Join(folder, ".agents", "folder.json"), []byte(`{"jiraProjects": ["PROJ"]}`), 0o644)
+	c.call(t, 100, "folders/add", map[string]any{"folder": "file://" + folder})
+	os.MkdirAll(filepath.Join(home, ".agents-secrets"), 0o700)
+	os.WriteFile(filepath.Join(home, ".agents-secrets", "secrets.env"),
+		[]byte("JIRA_URL=https://acme.atlassian.net/\nJIRA_EMAIL=kim@acme.com\nJIRA_API_TOKEN=tok\n"), 0o600)
 	return d, c
 }
 

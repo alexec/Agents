@@ -383,7 +383,7 @@ func (d *Daemon) answerLostForm(req wire.ElicitationRequest, action wire.AnswerE
 	d.takeAnsweredBy(req.ID)
 	d.record(req.AgentID, wire.TranscriptEntryKind{ElicitationAnswered: &wire.TranscriptEntryKindElicitationAnswered{ID: req.ID,
 		Summary: outcomeSummary(action), Answers: said}})
-	if err := d.promptFromApp(req.AgentID, d.formAnsweredWords(req, action, content, said)); err != nil {
+	if err := d.promptFromApp(req.AgentID, d.formAnsweredWords(req, action, content, said, "")); err != nil {
 		log.Printf("agent %s: request answer: %v", req.AgentID, err)
 	}
 	return nil

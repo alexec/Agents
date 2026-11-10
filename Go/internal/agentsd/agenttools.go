@@ -237,5 +237,5 @@ func (d *Daemon) askForm(id wire.UUID, args map[string]json.RawMessage, late fun
 	if r.action == wire.AnswerElicitationRequestActionAccept {
 		said = answers(schema, r.content, message)
 	}
-	return askQuestionNote(r.action, said), true, nil
+	return askQuestionNote(r.action, said, r.reason), true, nil
 }

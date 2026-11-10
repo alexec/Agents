@@ -2,6 +2,7 @@ package agentsd
 
 import (
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -139,6 +140,24 @@ func TestAFormIsHeldAndAnswered(t *testing.T) {
 	}
 }
 
+// A runtime's own form declined with a reason (#4039): the runtime hears a bare decline,
+// as its protocol has no words for one, and the reason comes to the agent as its next prompt.
+func TestADeclinedRuntimeFormBringsItsReasonAsAPrompt(t *testing.T) {
+	fakeRuntimes(t)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	var id wire.UUID
+	json.Unmarshal(c.call(t, 1, "agents/start", map[string]any{"runtimeID": "claude", "cwd": "file://" + t.TempDir(),
+		"prompt": "a form please"}), &id)
+	var form wire.ElicitationRequest
+	c.until(t, "a form", asked(&form))
+	c.call(t, 2, "elicitations/answer", map[string]any{"requestID": form.ID, "action": "decline",
+		"content": map[string]any{}, "reason": "Use the brand colour"})
+	waitFor(t, "the reason in its chat", func() bool {
+		return slices.Contains(userMessages(d, id), "They declined your form \"Which colour?\" and said: Use the brand colour")
+	})
+}
+
 func TestStoppingAnAgentTakesItsFormDownWithIt(t *testing.T) {
 	fakeRuntimes(t)
 	d, c := start(t, t.TempDir())
@@ -261,8 +280,8 @@ func TestAFormIsReadAsSwiftReadsIt(t *testing.T) {
 		`{"question":"tags","answer":"Ex"}]` {
 		t.Fatal(string(b))
 	}
-	if askQuestionNote(wire.AnswerElicitationRequestActionAccept, said[:1]) != "They answered:\n- Which?: Banana, ripe" {
-		t.Fatal(askQuestionNote(wire.AnswerElicitationRequestActionAccept, said[:1]))
+	if askQuestionNote(wire.AnswerElicitationRequestActionAccept, said[:1], "") != "They answered:\n- Which?: Banana, ripe" {
+		t.Fatal(askQuestionNote(wire.AnswerElicitationRequestActionAccept, said[:1], ""))
 	}
 	// A lone untitled question takes the message as its question; with no order, by name.
 	one, _ := parseElicitation(json.RawMessage(`{"message":"Go ahead?","requestedSchema":{"properties":{"b":{"type":"boolean"},"a":{"type":"number","maximum":2}}}}`), "A")

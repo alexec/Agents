@@ -2,7 +2,8 @@ import Foundation
 
 /// `messages/conversations` and `messages/read` (#4343): the conversations of a machine's messaging
 /// connectors, the ones that follow the messaging contract (docs/reference/messaging-contract.md),
-/// and one conversation's messages. The data behind the Messages page (#4344).
+/// and one conversation's messages. The data behind the Messages page (#4344); `messages/reply`
+/// is the person's own reply from it (#4345).
 public extension DaemonAPI {
     /// Who sent a channel message (#1762): the channel's kind (slack, email) and the sender on it.
     struct ChannelSender: Codable, Sendable, Hashable {
@@ -102,16 +103,19 @@ public extension DaemonAPI {
     }
 
     /// One conversation of the list: the connector it is on (its name in mcp.json, and a folder that
-    /// reaches it), and the conversation.
+    /// reaches it), and the conversation. `replyAs` is who a reply goes as (the Slack bot, the
+    /// WhatsApp number); nil when the connector cannot send, so the page has no reply field (#4345).
     struct MessagesConversation: Codable, Sendable, Hashable {
         public var server: String
         public var folder: String
         public var conversation: MessagingConversation
+        public var replyAs: String?
 
-        public init(server: String, folder: String, conversation: MessagingConversation) {
+        public init(server: String, folder: String, conversation: MessagingConversation, replyAs: String? = nil) {
             self.server = server
             self.folder = folder
             self.conversation = conversation
+            self.replyAs = replyAs
         }
     }
 
@@ -181,10 +185,46 @@ public extension DaemonAPI {
     }
 }
 
+public extension DaemonAPI {
+    /// The person's reply to a conversation (#4345); `thread`: the thread to answer in.
+    struct MessagesReplyRequest: Codable, Sendable, Hashable {
+        public var server: String
+        public var folder: String
+        public var conversation: String
+        public var thread: String?
+        public var text: String
+
+        public init(server: String, folder: String, conversation: String, thread: String? = nil, text: String) {
+            self.server = server
+            self.folder = folder
+            self.conversation = conversation
+            self.thread = thread
+            self.text = text
+        }
+    }
+
+    /// The message the connector sent.
+    struct MessagesReplied: Codable, Sendable, Hashable {
+        public var server: String
+        public var folder: String
+        public var conversation: String
+        public var message: MessagingMessage
+
+        public init(server: String, folder: String, conversation: String, message: MessagingMessage) {
+            self.server = server
+            self.folder = folder
+            self.conversation = conversation
+            self.message = message
+        }
+    }
+}
+
 public extension DaemonAPI.Method {
-    /// `MessagesConversationsRequest` → `MessagesConversations`, `MessagesReadRequest` → `MessagesRead` (#4343).
+    /// `MessagesConversationsRequest` → `MessagesConversations`, `MessagesReadRequest` → `MessagesRead` (#4343),
+    /// `MessagesReplyRequest` → `MessagesReplied` (#4345).
     static let messagesConversations = "messages/conversations"
     static let messagesRead = "messages/read"
+    static let messagesReply = "messages/reply"
 }
 
 /// The Messages page (#4344): every machine's conversations in one list, the newest first, and its
@@ -276,7 +316,7 @@ public enum MessagesList {
     }
 
     public static let title = "Messages"
-    public static let sidebarHelp = "Your messaging connectors' conversations, read only"
+    public static let sidebarHelp = "Your messaging connectors' conversations"
     public static let noMachine = "No machine reads messages yet. Update Agents on a machine to read its messaging connectors."
     public static let noConnector = "No messaging connector yet. Add Slack, Email, Google Chat or WhatsApp in a folder's Connectors ▸ Messaging."
     public static let setUp = "Open Connectors"
@@ -284,6 +324,23 @@ public enum MessagesList {
     public static let noUnread = "No unread conversations."
     public static let noMessages = "No messages."
     public static let outside = "Outside content: these messages come from other people, through the connector."
+
+    public static let reply = "Reply"
+    public static let send = "Send"
+    public static let sending = "Sending…"
+    public static let replyPlaceholder = "Write a reply"
+    public static let replyInThread = "Reply in thread"
+    public static let inThread = "In a thread"
+    public static let leaveThread = "Not in the thread"
+
+    /// Who the reply goes as, under the field: "Sent as the Slack bot @agents, not as an agent."
+    public static func sentAs(_ replyAs: String) -> String { "Sent as \(replyAs), not as an agent." }
+
+    /// The text of a reply to send: trimmed, or nil when there is none.
+    public static func replyText(_ draft: String) -> String? {
+        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? nil : text
+    }
 
     /// "3 unread", or nil.
     public static func unread(_ c: DaemonAPI.MessagingConversation) -> String? {

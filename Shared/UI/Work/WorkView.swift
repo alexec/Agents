@@ -77,7 +77,7 @@ extension WorkList.Kind {
     }
 }
 
-/// One Work list: its filters, and a row per item.
+/// One Work list: its filters, and a row per item (lists.md, #4393).
 private struct WorkListPane: View {
     let model: any WorkModel
     let kind: WorkList.Kind
@@ -86,6 +86,9 @@ private struct WorkListPane: View {
     private var compact: Bool { sizeClass == .compact }
     #else
     private let compact = false
+    @Environment(\.openSettings) private var openSettings
+    /// Back from an item's page gives the list the keys, so ↑ and ↓ go on from the row left.
+    @FocusState private var focused: Bool
     #endif
 
     /// The list's state lives in the model (#3257), so an item's page can go through it and Back finds it as it was.
@@ -124,32 +127,54 @@ private struct WorkListPane: View {
         .onChange(of: model.workProjects, initial: true) { _, projects in list.projects = projects }
     }
 
-    /// The filter bar (#4391): the search field, then a compact menu per filter. Project and
-    /// Board come first and last, where they show.
+    /// The filter bar (lists.md section 1): the search field, Project, State, Repo, Label,
+    /// Assignee, Board, Clear, and Sort at the trailing edge.
     private var filters: some View {
-        WorkFilterBar(kind: kind, text: $list.filter.text, compact: compact) { choices }
+        WorkFilterBar(kind: kind, text: $list.filter.text, compact: compact) { folded in
+            choices(.bar(folded: folded))
+        } more: {
+            choices(.more)
+        } trailing: {
+            WorkFilterMenu(name: "Sort", selection: $list.sort, options: kind.sorts, words: \.title, compact: compact, named: true)
+        }
+    }
+
+    /// Where a filter menu is drawn: in the bar (with `folded`, only the ones set), or in More.
+    private enum Place: Equatable {
+        case bar(folded: Bool)
+        case more
+
+        func shows(set: Bool) -> Bool {
+            switch self {
+            case let .bar(folded): set || !folded
+            case .more: !set
+            }
+        }
     }
 
     @ViewBuilder
-    private var choices: some View {
+    private func choices(_ place: Place) -> some View {
         let offered = WorkList.choices(list.all)
-        project
-        if kind.fromForge {
+        project(place)
+        if kind.fromForge, place != .more {
             WorkFilterMenu(name: "State", selection: $list.filter.state, options: kind.states, words: \.title, compact: compact)
         }
-        choice("Repo", any: "All", selection: $list.filter.repo, options: offered.repos, words: WorkList.repoName)
-        choice("Label", any: "Any", selection: $list.filter.label, options: offered.labels)
+        choice("Repo", any: "All", selection: $list.filter.repo, options: offered.repos, words: WorkList.repoName, place: place)
+        choice("Label", any: "Any", selection: $list.filter.label, options: offered.labels, place: place)
         if kind.fromForge {
-            choice("Assignee", any: "Any", selection: $list.filter.assignee, options: offered.assignees)
+            choice("Assignee", any: "Any", selection: $list.filter.assignee, options: offered.assignees, place: place)
         }
-        WorkFilterMenu(name: "Sort", selection: $list.sort, options: kind.sorts, words: \.title, compact: compact, named: true)
         #if os(macOS)
         // Boards are the Mac's and the web page's (#3282, tier Mac + web): the machines narrow to one as they read.
-        if kind == .issue, !list.boards.isEmpty || !list.filter.board.isEmpty {
+        if kind == .issue, !list.boards.isEmpty || !list.filter.board.isEmpty, place.shows(set: !list.filter.board.isEmpty) {
             WorkFilterMenu(name: "Board", selection: $list.filter.board, options: boardOptions, words: { WorkList.boardName($0, in: list.boards) },
-                           any: "", anyWords: "All")
+                           any: "", anyWords: "All boards", inMore: place == .more)
         }
         #endif
+        // On a phone the empty list's Clear filters does it (lists.md section 3).
+        if !compact, place != .more, WorkLook.narrows(list.filter) {
+            WorkClearButton { list.filter = WorkLook.cleared(list.filter) }
+        }
     }
 
     #if os(macOS)
@@ -164,20 +189,21 @@ private struct WorkListPane: View {
     /// The Project filter (#3283): All projects, then each project whose folders read something.
     /// With one project it is not there, so a person with one sees Work as before.
     @ViewBuilder
-    private var project: some View {
+    private func project(_ place: Place) -> some View {
         let projects = list.projectRepos.map(\.project)
-        if projects.count > 1 || !list.filter.project.isEmpty {
+        if projects.count > 1 || !list.filter.project.isEmpty, place.shows(set: !list.filter.project.isEmpty) {
             WorkFilterMenu(name: "Project", selection: $list.filter.project, options: projects.map(\.id),
                            words: { id in projects.first { $0.id == id }?.name ?? WorkList.allProjects },
-                           any: "", anyWords: WorkList.allProjects, compact: compact)
+                           any: "", anyWords: WorkList.allProjects, compact: compact, inMore: place == .more)
         }
     }
 
     @ViewBuilder
     private func choice(_ label: String, any: String, selection: Binding<String>, options: [String],
-                        words: @escaping (String) -> String = { $0 }) -> some View {
-        if !options.isEmpty || !selection.wrappedValue.isEmpty {
-            WorkFilterMenu(name: label, selection: selection, options: options, words: words, any: "", anyWords: any, compact: compact)
+                        words: @escaping (String) -> String = { $0 }, place: Place) -> some View {
+        if !options.isEmpty || !selection.wrappedValue.isEmpty, place.shows(set: !selection.wrappedValue.isEmpty) {
+            WorkFilterMenu(name: label, selection: selection, options: options, words: words, any: "", anyWords: any,
+                           compact: compact, inMore: place == .more)
         }
     }
 
@@ -193,16 +219,17 @@ private struct WorkListPane: View {
         } else {
             let shown = list.rows
             if shown.isEmpty {
-                VStack(spacing: 0) {
+                Group {
                     if list.all.isEmpty, !lines.isEmpty {
-                        // Nothing read: the strip in the middle, in place of the list.
-                        WorkErrorStrip(lines: lines) { list.asked += 1 }
-                            .frame(maxWidth: 640)
-                            .padding(24)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        // Nothing read: what the forge said in the middle, in place of the list.
+                        WorkEmptyState(symbol: "exclamationmark.triangle", title: WorkLook.couldNotRead(kind),
+                                       line: lines.joined(separator: "\n"), action: (WorkLook.tryAgain, { list.asked += 1 }),
+                                       also: connectors(lines))
                     } else {
-                        WorkErrorStrip(lines: lines) { list.asked += 1 }.padding(.horizontal, 16).padding(.top, 8)
-                        empty
+                        VStack(spacing: 0) {
+                            WorkErrorStrip(lines: lines) { list.asked += 1 }.padding(.horizontal, 16).padding(.top, 8)
+                            empty
+                        }
                     }
                 }
                 #if os(iOS)
@@ -214,47 +241,116 @@ private struct WorkListPane: View {
         }
     }
 
-    /// The empty list: "No open issues" with a line under it, or "No issues match" with Clear filters.
+    /// Settings ▸ Connectors, beside Try again, when what a forge said is about its credential.
+    private func connectors(_ lines: [String]) -> (title: String, run: () -> Void)? {
+        #if os(macOS)
+        guard lines.contains(where: WorkLook.credentialProblem) else { return nil }
+        return (WorkLook.connectors, { if model.askWorkConnectors() { openSettings() } })
+        #else
+        nil
+        #endif
+    }
+
+    /// The empty list: "No open issues" with a line under it, or "No issues match", the filters
+    /// that are set, and Clear filters.
     private var empty: some View {
         let filtered = WorkLook.narrows(list.filter)
+        let set = WorkLook.setFilters(list.filter, project: list.projectRepos.first { $0.project.id == list.filter.project }?.project.name,
+                                      board: list.filter.board.isEmpty ? nil : WorkList.boardName(list.filter.board, in: list.boards))
         return WorkEmptyState(symbol: kind.sidebarIcon, title: WorkLook.emptyTitle(kind, state: list.filter.state, filtered: filtered),
-                              line: filtered ? nil : kind.fromForge ? WorkLook.emptyLine(kind, repos: Array(Set(list.all.map(\.repo))))
+                              line: filtered ? set : kind.fromForge ? WorkLook.emptyLine(kind, repos: Array(Set(list.all.map(\.repo))))
                                   : WorkList.lineageOnlyNote,
                               action: filtered ? (WorkLook.clearFilters, { list.filter = WorkLook.cleared(list.filter) }) : nil)
+    }
+
+    private func open(_ ref: String) {
+        list.opened = ref
+        list.selected = ref
+        model.showWork(WorkPlace(kind: kind, ref: ref, fromList: true))
     }
 
     private func rowsList(_ shown: [WorkList.Row], lines: [String]) -> some View {
         let several = Set(list.all.map(\.repo)).count > 1
         return ScrollViewReader { reader in
-            List {
+            selectable {
                 if !lines.isEmpty {
-                    WorkErrorStrip(lines: lines) { list.asked += 1 }.listRowSeparator(.hidden)
+                    WorkErrorStrip(lines: lines) { list.asked += 1 }.listRowSeparator(.hidden).selectionDisabled()
                 }
                 ForEach(shown) { row in
-                    Button {
-                        list.opened = row.id
-                        model.showWork(WorkPlace(kind: kind, ref: row.id, fromList: true))
-                    } label: {
+                    Button { open(row.id) } label: {
                         WorkItemRow(row: row, several: several, compact: compact, pick: pick)
                     }
                     .buttonStyle(.plain)
+                    // A forge that failed leaves its rows, dimmed, under the strip (lists.md section 5).
+                    .opacity(lines.isEmpty ? 1 : 0.6)
                     .id(row.id)
+                    .tag(row.id)
                 }
-                if list.hasMore {
-                    Button(list.loadingMore ? "Loading…" : "More") { Task { await list.loadMore(model: model) } }
-                        .linkStyle()
-                        .disabled(list.loadingMore)
-                }
+                footer(shown: shown.count)
                 if !kind.fromForge {
-                    Text(WorkList.lineageOnlyNote).appText(.fine).foregroundStyle(.tertiary)
+                    Text(WorkList.lineageOnlyNote).appText(.fine).foregroundStyle(.tertiary).selectionDisabled()
                 }
             }
             .listStyle(.inset)
             #if os(iOS)
             .refreshable { list.asked += 1 }
             #endif
-            // Back from an item's page: the list where it was left, at the row last opened.
-            .onAppear { if let opened = list.opened { reader.scrollTo(opened, anchor: .center) } }
+            // Back from an item's page: the list where it was left, at the row last opened, selected.
+            .onAppear {
+                guard let opened = list.opened else { return }
+                list.selected = opened
+                reader.scrollTo(opened, anchor: .center)
+                #if os(macOS)
+                focused = true
+                #endif
+            }
+        }
+    }
+
+    /// The Mac's list keeps a selection that ↑ and ↓ move and Return opens; on the Remote a tap opens the row.
+    @ViewBuilder
+    private func selectable(@ViewBuilder _ rows: () -> some View) -> some View {
+        #if os(macOS)
+        List(selection: $list.selected) { rows() }
+            .focused($focused)
+            .contextMenu(forSelectionType: String.self) { _ in } primaryAction: { refs in
+                if let ref = refs.first { open(ref) }
+            }
+        #else
+        List { rows() }
+        #endif
+    }
+
+    /// The end of the list (lists.md sections 2 and 5): the next page loads when this row shows,
+    /// with "Loading more…"; a page that failed says so with Try again; at the end, the count.
+    @ViewBuilder
+    private func footer(shown: Int) -> some View {
+        Group {
+            if list.loadingMore {
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small)
+                    Text(WorkLook.loadingMore(shown: shown))
+                }
+            } else if let failed = list.pageProblem {
+                HStack(spacing: 8) {
+                    Text(WorkLook.couldNotLoadMore).help(failed)
+                    Button(WorkLook.tryAgain) { Task { await list.loadMore(model: model) } }.buttonStyle(.paper)
+                }
+            } else {
+                Text(WorkLook.endWords(kind, shown: shown, more: list.hasMore))
+            }
+        }
+        .appText(.fine)
+        .foregroundStyle(.secondary)
+        .monospacedDigit()
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 6)
+        .listRowSeparator(.hidden)
+        .selectionDisabled()
+        // Shown, and again each time a page adds rows while it still shows: read the next page.
+        .workTask(id: list.all.count) {
+            guard list.hasMore, !list.loadingMore, list.pageProblem == nil else { return }
+            await list.loadMore(model: model)
         }
     }
 

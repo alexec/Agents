@@ -518,7 +518,10 @@ func (l *live) run() {
 	for {
 		l.mu.Lock()
 		a := l.d.Store.Agent(l.id)
-		if a == nil || !l.d.hasTurn(a) {
+		// A queued record's words wait for its place: only startQueued takes it out of the
+		// queue, on the runtime Auto picks then (#4380). A day rolling over or a message
+		// kicks it too.
+		if a == nil || a.State == wire.AgentStateQueued || !l.d.hasTurn(a) {
 			l.running = false
 			l.mu.Unlock()
 			return
@@ -1725,7 +1728,11 @@ func (l *live) open(ctx context.Context, a *wire.Agent, quiet bool) bool {
 	rt := runtimeByID(a.RuntimeID)
 	if rt == nil {
 		log.Printf("agent %s: no runtime %s", l.id, a.RuntimeID)
-		return stopped(wire.EndedReasonRuntimeError, nil)
+		why := "This version has no runtime called " + a.RuntimeID + "."
+		if a.RuntimeID == autoRuntimeID {
+			why = "It is on Auto, and Auto had not picked a runtime for it."
+		}
+		return stopped(wire.EndedReasonRuntimeError, func() { d.record(l.id, notice("error", "It did not start", why)) })
 	}
 	dir := store.FolderPath(a.Cwd)
 	// What the runtime starts with, read before anything is made for it (warmKey).

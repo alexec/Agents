@@ -320,13 +320,13 @@ func TestTheFrontOffersTheEventsAndTools(t *testing.T) {
 	for _, tl := range tools {
 		names = append(names, tl.(map[string]any)["name"].(string))
 	}
-	if want := []string{"ask_question", "list_conversations", "read_messages", "send_message", "send_template"}; !reflect.DeepEqual(names, want) {
+	if want := []string{"ask_question", "list_conversations", "read_messages", "reply", "send_message", "send_template"}; !reflect.DeepEqual(names, want) {
 		t.Fatalf("tools: %v", names)
 	}
 	for _, tl := range tools {
 		tl := tl.(map[string]any)
 		meta, _ := tl["_meta"].(map[string]any)
-		if follows := meta[ContractMeta] == float64(ContractVersion); follows != (tl["name"] == "list_conversations" || tl["name"] == "read_messages") {
+		if follows := meta[ContractMeta] == float64(ContractVersion); follows != (tl["name"] == "list_conversations" || tl["name"] == "read_messages" || tl["name"] == "reply") {
 			t.Fatalf("%s's _meta: %v", tl["name"], meta)
 		}
 	}

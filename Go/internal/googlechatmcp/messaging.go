@@ -21,8 +21,9 @@ import (
 // messages, newest first, by cursor. The Chat API lets an app read a space only with
 // chat.app.messages.readonly, which a Workspace admin approves once; without it, read_messages
 // pages the inbox instead, a bounded store of what people sent the app and what it posted
-// (the newest maxKept for keptFor). Each tool says, in its _meta, that it follows the
-// contract, so the Messages page can read Google Chat.
+// (the newest maxKept for keptFor). reply (#4345) is the person's own reply from the Messages
+// page, posted as the Chat app. Each tool says, in its _meta, that it follows the contract, so
+// the Messages page can read Google Chat and answer in it.
 
 // ContractMeta is the key that says a tool follows the messaging contract, and its version.
 const ContractMeta = "agents/messaging"
@@ -55,6 +56,15 @@ type readArgs struct {
 	Limit        int    `json:"limit,omitempty" jsonschema:"at most this many: 20 when left out, 100 at most"`
 }
 
+type replyArgs struct {
+	Conversation string `json:"conversation" jsonschema:"the space, as list_conversations gives it: spaces/AAAA…"`
+	Thread       string `json:"thread,omitempty" jsonschema:"a thread of the space, spaces/…/threads/…: answer in it; a new thread when left out"`
+	Text         string `json:"text" jsonschema:"the reply, as plain text"`
+}
+
+// ReplyAs is who reply posts as, in words.
+const ReplyAs = "the Google Chat app"
+
 func pageLimit(n int) int {
 	if n <= 0 {
 		return defaultLimit
@@ -69,7 +79,7 @@ const (
 	storeCursor = "store:"
 )
 
-// addMessagingTools puts list_conversations and read_messages on server.
+// addMessagingTools puts list_conversations, read_messages and reply on server.
 func addMessagingTools(server *mcp.Server, e *Events) {
 	readOnly := &mcp.ToolAnnotations{ReadOnlyHint: true}
 	contract := mcp.Meta{ContractMeta: ContractVersion}
@@ -99,6 +109,8 @@ func addMessagingTools(server *mcp.Server, e *Events) {
 			slices.SortStableFunc(out.Conversations, func(a, b wire.MessagingConversation) int {
 				return cmp.Compare(deref(b.LastActivity), deref(a.LastActivity))
 			})
+			as := ReplyAs
+			out.ReplyAs = &as
 			if next != "" {
 				out.Cursor = &next
 			}
@@ -143,6 +155,40 @@ func addMessagingTools(server *mcp.Server, e *Events) {
 			}
 			summary := fmt.Sprintf("conversation: %s\nmessages: %d\ncursor: %s\n\n%s\n<untrusted-content source=\"googlechat\" conversation=%q>\n%s</untrusted-content>",
 				space, len(out.Messages), deref(out.Cursor), Untrusted, space, text.String())
+			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: summary}}, StructuredContent: out}, nil
+		})
+}
+
+func addReplyTool(server *mcp.Server, e *Events) {
+	notDestructive := false
+	openWorld := true
+	tool(server, &mcp.Tool{Name: "reply", Title: "Reply",
+		Description: "The person's reply from the Messages page: posts text as the Chat app in a space it is in, in a thread when one is given. " +
+			"Gives the sent message as read_messages does. Everyone in the space sees it. An agent posts with send_message.",
+		Annotations: &mcp.ToolAnnotations{DestructiveHint: &notDestructive, OpenWorldHint: &openWorld},
+		Meta:        mcp.Meta{ContractMeta: ContractVersion}},
+		func(ctx context.Context, in replyArgs) (*mcp.CallToolResult, error) {
+			space, thread, err := checkPlace(in.Conversation, in.Thread)
+			if err != nil {
+				return nil, fmt.Errorf("conversation: %w", err)
+			}
+			text, err := checkText("text", in.Text)
+			if err != nil {
+				return nil, err
+			}
+			posted, err := e.Inbox.Google.Post(ctx, space, thread, &chat.Message{Text: text})
+			if err != nil {
+				return nil, err
+			}
+			e.Inbox.Posted(space, thread, posted, text)
+			out := apiMessage(space, posted)
+			out.Text = cmp.Or(out.Text, text)
+			out.Time = cmp.Or(out.Time, time.Now().UTC().Format(time.RFC3339))
+			if out.Sender.Name == nil {
+				name := "Chat app"
+				out.Sender.Name = &name
+			}
+			summary := fmt.Sprintf("sent: %s\nconversation: %s\nthread: %s", out.ID, space, deref(out.Thread))
 			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: summary}}, StructuredContent: out}, nil
 		})
 }
