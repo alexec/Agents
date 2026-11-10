@@ -1,0 +1,216 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif">
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#20242A" flood-opacity="0.14"/>
+    </filter>
+    <symbol id="open" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="8" r="2" fill="currentColor"/></symbol>
+    <symbol id="done" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5.3 8.2l1.8 1.8 3.6-3.8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="notplanned" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M4 12L12 4" stroke="currentColor" stroke-width="1.4"/></symbol>
+    <symbol id="pr" viewBox="0 0 16 16"><circle cx="4" cy="3.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="4" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="12" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M4 5.1v5.8M12 10.9V6.5a2 2 0 0 0-2-2H7.5M9 3l-1.6 1.5L9 6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="merged" viewBox="0 0 16 16"><circle cx="4" cy="3.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="4" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="12" cy="8" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M4 5.1v5.8M4.8 5a5 5 0 0 0 5.6 3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="prclosed" viewBox="0 0 16 16"><circle cx="4" cy="3.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="4" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M4 5.1v5.8M10 3l4 4M14 3l-4 4M12 9.5v1.4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+    <symbol id="bubble" viewBox="0 0 16 16"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></symbol>
+    <symbol id="search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+    <symbol id="refresh" viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v2.5h-2.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="chev" viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="tick" viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="spark" viewBox="0 0 16 16"><path d="M8 2l1.4 4.6L14 8l-4.6 1.4L8 14l-1.4-4.6L2 8l4.6-1.4z" fill="currentColor"/></symbol>
+  </defs>
+
+  <rect width="1200" height="900" fill="#E7EAEE"/>
+  <text x="24" y="34" font-size="15" font-weight="600" fill="#1C1D20">Work list parts (#4328): state icon, row, label chip, filter bar</text>
+  <text x="24" y="54" font-size="12" fill="#5B616B">Paper palette, light mode. Mac on the left, iPhone and web at 390 px on the right. The row is one Shared/UI view on the Mac and the Remote.</text>
+
+  <!-- ===== Mac window ===== -->
+  <g transform="translate(24,76)" filter="url(#shadow)">
+    <rect width="760" height="520" rx="12" fill="#FFFFFF"/>
+    <path d="M12 0h736a12 12 0 0 1 12 12v40H0V12A12 12 0 0 1 12 0z" fill="#F6F7F8"/>
+    <path d="M0 52h760" stroke="#E0E3E7"/>
+    <circle cx="20" cy="20" r="6" fill="#FF5F57"/><circle cx="40" cy="20" r="6" fill="#FEBC2E"/><circle cx="60" cy="20" r="6" fill="#28C840"/>
+    <text x="90" y="32" font-size="14" font-weight="600" fill="#1C1D20">Issues</text>
+    <!-- toolbar refresh icon -->
+    <rect x="716" y="14" width="28" height="24" rx="6" fill="#EDEFF2"/>
+    <use href="#refresh" x="722" y="18" width="16" height="16" color="#4A5059"/>
+    <text x="640" y="31" font-size="10" fill="#8A9099">⌘R</text>
+
+    <!-- filter bar -->
+    <rect x="16" y="66" width="300" height="26" rx="7" fill="#F0F1F3" stroke="#D6DAE0"/>
+    <use href="#search" x="24" y="71" width="16" height="16" color="#8A9099"/>
+    <text x="46" y="84" font-size="12.5" fill="#8A9099">Filter issues</text>
+    <g font-size="12.5" fill="#1C1D20">
+      <text x="334" y="84">Open</text><use href="#chev" x="368" y="75" width="10" height="10" color="#5B616B"/>
+      <text x="394" y="84">Repo</text><use href="#chev" x="428" y="75" width="10" height="10" color="#5B616B"/>
+      <text x="454" y="84" fill="#0A6CDB" font-weight="500">Label: spike</text><use href="#chev" x="531" y="75" width="10" height="10" color="#0A6CDB"/>
+      <text x="557" y="84">Assignee</text><use href="#chev" x="613" y="75" width="10" height="10" color="#5B616B"/>
+      <text x="639" y="84">Sort</text><use href="#chev" x="667" y="75" width="10" height="10" color="#5B616B"/>
+    </g>
+    <path d="M0 104h760" stroke="#E0E3E7"/>
+
+    <!-- rows -->
+    <!-- row 1: hover -->
+    <rect x="8" y="110" width="744" height="52" rx="6" fill="#F2F4F7"/>
+    <use href="#open" x="20" y="118" width="16" height="16" color="#1A7F37"/>
+    <text x="46" y="131" font-size="13" font-weight="600" fill="#1C1D20">Work look: wireframe the shared parts</text>
+    <rect x="292" y="119" width="42" height="18" rx="9" fill="#FBCA04" fill-opacity=".18" stroke="#FBCA04" stroke-opacity=".6"/>
+    <text x="313" y="132" font-size="11" font-weight="500" fill="#7A6200" text-anchor="middle">spike</text>
+    <rect x="340" y="119" width="88" height="18" rx="9" fill="#1D76DB" fill-opacity=".18" stroke="#1D76DB" stroke-opacity=".6"/>
+    <text x="384" y="132" font-size="11" fill="#145AA8" text-anchor="middle">feature:<tspan font-weight="600">work</tspan></text>
+    <use href="#bubble" x="666" y="119" width="16" height="16" color="#5B616B"/>
+    <text x="686" y="132" font-size="12" fill="#5B616B">3</text>
+    <circle cx="726" cy="127" r="10" fill="#7C5CC4"/><text x="726" y="131" font-size="11" font-weight="600" fill="#FFF" text-anchor="middle">A</text>
+    <text x="560" y="152" font-size="10" fill="#8A9099" text-anchor="end">hover ·</text>
+    <text x="46" y="152" font-size="11.5" fill="#5B616B">#4328 · opened 2 h ago by alexec · <tspan fill="#8250DF">✦</tspan> Claude · $0.42</text>
+    <text x="740" y="152" font-size="11.5" fill="#8A9099" text-anchor="end">alexec/Agents</text>
+
+    <!-- row 2: PR -->
+    <path d="M46 166h698" stroke="#EEF0F3"/>
+    <use href="#pr" x="20" y="174" width="16" height="16" color="#1A7F37"/>
+    <text x="46" y="187" font-size="13" font-weight="600" fill="#1C1D20">Forge: one interface for every forge</text>
+    <rect x="290" y="175" width="62" height="18" rx="9" fill="#A2EEEF" fill-opacity=".35" stroke="#3FB6B8" stroke-opacity=".6"/>
+    <text x="321" y="188" font-size="11" font-weight="500" fill="#0E6466" text-anchor="middle">enhanc…</text>
+    <use href="#tick" x="584" y="175" width="16" height="16" color="#1A7F37"/>
+    <text x="602" y="188" font-size="11.5" fill="#1A7F37">Approved</text>
+    <use href="#bubble" x="666" y="175" width="16" height="16" color="#5B616B"/>
+    <text x="686" y="188" font-size="12" fill="#5B616B">1</text>
+    <circle cx="722" cy="183" r="10" fill="#2E8B57"/><text x="722" y="187" font-size="11" font-weight="600" fill="#FFF" text-anchor="middle">B</text>
+    <circle cx="732" cy="183" r="10" fill="#C2543A" stroke="#FFF" stroke-width="1.5"/><text x="732" y="187" font-size="11" font-weight="600" fill="#FFF" text-anchor="middle">C</text>
+    <text x="46" y="208" font-size="11.5" fill="#5B616B">#4331 · opened 1 d ago by agents-bot · <tspan fill="#8250DF">✦</tspan> Codex · $1.10</text>
+    <text x="740" y="208" font-size="11.5" fill="#8A9099" text-anchor="end">alexec/Agents</text>
+
+    <!-- row 3: selected -->
+    <rect x="8" y="222" width="744" height="52" rx="6" fill="#0A6CDB"/>
+    <use href="#done" x="20" y="230" width="16" height="16" color="#FFFFFF"/>
+    <text x="46" y="243" font-size="13" font-weight="600" fill="#FFFFFF">Sidebar: Work as a folding group</text>
+    <rect x="262" y="231" width="34" height="18" rx="9" fill="#FFFFFF" fill-opacity=".22"/>
+    <text x="279" y="244" font-size="11" font-weight="500" fill="#FFFFFF" text-anchor="middle">bug</text>
+    <use href="#bubble" x="666" y="231" width="16" height="16" color="#FFFFFF"/>
+    <text x="686" y="244" font-size="12" fill="#FFFFFF">7</text>
+    <text x="46" y="264" font-size="11.5" fill="#DCE9FB">#4004 · closed 3 d ago by alexec · ✦ Claude · $2.80</text>
+
+    <!-- row 4: no lineage, not planned -->
+    <use href="#notplanned" x="20" y="286" width="16" height="16" color="#6E7781"/>
+    <text x="46" y="299" font-size="13" font-weight="600" fill="#1C1D20">Mac Table for Work lists</text>
+    <rect x="216" y="287" width="64" height="18" rx="9" fill="#EDEFF2" stroke="#D6DAE0"/>
+    <text x="248" y="300" font-size="11" font-weight="500" fill="#4A5059" text-anchor="middle">wontfix</text>
+    <text x="46" y="320" font-size="11.5" fill="#5B616B">#4290 · closed 5 d ago by alexec</text>
+    <text x="236" y="320" font-size="10.5" fill="#8A9099">← no lineage: the line ends; "No agent yet" goes</text>
+
+    <!-- row 5: merged + 3 chips + more -->
+    <path d="M46 330h698" stroke="#EEF0F3"/>
+    <use href="#merged" x="20" y="338" width="16" height="16" color="#8250DF"/>
+    <text x="46" y="351" font-size="13" font-weight="600" fill="#1C1D20">Wire: label colours (#2956)</text>
+    <rect x="226" y="339" width="66" height="18" rx="9" fill="#0E8A16" fill-opacity=".18" stroke="#0E8A16" stroke-opacity=".6"/>
+    <text x="259" y="352" font-size="11" font-weight="500" fill="#0B6B12" text-anchor="middle">polish</text>
+    <rect x="298" y="339" width="88" height="18" rx="9" fill="#D93F0B" fill-opacity=".18" stroke="#D93F0B" stroke-opacity=".6"/>
+    <text x="342" y="352" font-size="11" fill="#9E2E08" text-anchor="middle">priority:<tspan font-weight="600">high</tspan></text>
+    <rect x="392" y="339" width="74" height="18" rx="9" fill="#5319E7" fill-opacity=".18" stroke="#5319E7" stroke-opacity=".6"/>
+    <text x="429" y="352" font-size="11" fill="#3E12AD" text-anchor="middle">area:<tspan font-weight="600">wire</tspan></text>
+    <text x="474" y="352" font-size="11" fill="#5B616B">+2</text>
+    <text x="46" y="372" font-size="11.5" fill="#5B616B">#2960 · merged 2 w ago by agents-bot · <tspan fill="#8250DF">✦</tspan> Claude · $0.95</text>
+
+    <!-- legend: state icons -->
+    <path d="M0 392h760" stroke="#E0E3E7"/>
+    <text x="16" y="414" font-size="11" font-weight="600" fill="#8A9099">STATE ICONS</text>
+    <g font-size="11.5" fill="#1C1D20">
+      <use href="#open" x="16" y="426" width="16" height="16" color="#1A7F37"/><text x="38" y="438">Issue open</text>
+      <use href="#done" x="130" y="426" width="16" height="16" color="#8250DF"/><text x="152" y="438">Closed, done</text>
+      <use href="#notplanned" x="258" y="426" width="16" height="16" color="#6E7781"/><text x="280" y="438">Not planned</text>
+      <use href="#pr" x="376" y="426" width="16" height="16" color="#1A7F37"/><text x="398" y="438">PR open</text>
+      <use href="#pr" x="468" y="426" width="16" height="16" color="#6E7781"/><text x="490" y="438">Draft</text>
+      <use href="#merged" x="544" y="426" width="16" height="16" color="#8250DF"/><text x="566" y="438">Merged</text>
+      <use href="#prclosed" x="634" y="426" width="16" height="16" color="#CF222E"/><text x="656" y="438">PR closed</text>
+    </g>
+    <text x="16" y="470" font-size="11" font-weight="600" fill="#8A9099">LABEL CHIP</text>
+    <rect x="16" y="480" width="88" height="18" rx="9" fill="#1D76DB" fill-opacity=".18" stroke="#1D76DB" stroke-opacity=".6"/>
+    <text x="60" y="493" font-size="11" fill="#145AA8" text-anchor="middle">feature:<tspan font-weight="600">work</tspan></text>
+    <text x="114" y="493" font-size="11" fill="#5B616B">fill 18 % · border 60 % · text darkened to 4.5:1 · scope in regular weight · no colour → grey · ≤ 3, then "+n"</text>
+  </g>
+
+  <!-- ===== iPhone ===== -->
+  <g transform="translate(812,76)" filter="url(#shadow)">
+    <rect width="364" height="790" rx="44" fill="#1C1D20"/>
+    <rect x="10" y="10" width="344" height="770" rx="36" fill="#FFFFFF"/>
+    <rect x="132" y="22" width="100" height="28" rx="14" fill="#1C1D20"/>
+    <text x="24" y="104" font-size="28" font-weight="700" fill="#1C1D20">Issues</text>
+    <!-- searchable -->
+    <rect x="24" y="118" width="316" height="34" rx="10" fill="#EFF0F2"/>
+    <use href="#search" x="34" y="127" width="16" height="16" color="#8A9099"/>
+    <text x="58" y="140" font-size="14" fill="#8A9099">Filter issues</text>
+    <!-- chips row -->
+    <g font-size="12.5">
+      <rect x="24" y="164" width="70" height="28" rx="14" fill="#EFF0F2"/><text x="40" y="182" fill="#1C1D20">Open</text><use href="#chev" x="74" y="173" width="10" height="10" color="#5B616B"/>
+      <rect x="100" y="164" width="104" height="28" rx="14" fill="#DCE9FB"/><text x="114" y="182" fill="#0A6CDB" font-weight="500">Label: spike</text><use href="#chev" x="186" y="173" width="10" height="10" color="#0A6CDB"/>
+      <rect x="210" y="164" width="96" height="28" rx="14" fill="#EFF0F2"/><text x="224" y="182" fill="#1C1D20">Assignee</text><use href="#chev" x="284" y="173" width="10" height="10" color="#5B616B"/>
+      <rect x="312" y="164" width="40" height="28" rx="14" fill="#EFF0F2"/><text x="324" y="182" fill="#1C1D20">Re…</text>
+    </g>
+    <text x="24" y="210" font-size="10" fill="#8A9099">menus scroll in one row · pull to refresh</text>
+    <path d="M10 218h344" stroke="#E0E3E7"/>
+
+    <!-- phone row 1 -->
+    <use href="#open" x="24" y="232" width="18" height="18" color="#1A7F37"/>
+    <text x="52" y="246" font-size="15" font-weight="600" fill="#1C1D20">Work look: wireframe the</text>
+    <text x="52" y="266" font-size="15" font-weight="600" fill="#1C1D20">shared parts</text>
+    <rect x="52" y="276" width="42" height="18" rx="9" fill="#FBCA04" fill-opacity=".18" stroke="#FBCA04" stroke-opacity=".6"/>
+    <text x="73" y="289" font-size="11" font-weight="500" fill="#7A6200" text-anchor="middle">spike</text>
+    <rect x="100" y="276" width="88" height="18" rx="9" fill="#1D76DB" fill-opacity=".18" stroke="#1D76DB" stroke-opacity=".6"/>
+    <text x="144" y="289" font-size="11" fill="#145AA8" text-anchor="middle">feature:<tspan font-weight="600">work</tspan></text>
+    <text x="52" y="314" font-size="12.5" fill="#5B616B">#4328 · 2 h · alexec · $0.42</text>
+    <use href="#bubble" x="306" y="302" width="16" height="16" color="#5B616B"/>
+    <text x="326" y="314" font-size="12.5" fill="#5B616B">3</text>
+    <path d="M52 328h302" stroke="#EEF0F3"/>
+
+    <!-- phone row 2 -->
+    <use href="#pr" x="24" y="342" width="18" height="18" color="#1A7F37"/>
+    <text x="52" y="356" font-size="15" font-weight="600" fill="#1C1D20">Forge: one interface for every</text>
+    <text x="52" y="376" font-size="15" font-weight="600" fill="#1C1D20">forge</text>
+    <rect x="52" y="386" width="80" height="18" rx="9" fill="#A2EEEF" fill-opacity=".35" stroke="#3FB6B8" stroke-opacity=".6"/>
+    <text x="92" y="399" font-size="11" font-weight="500" fill="#0E6466" text-anchor="middle">enhancement</text>
+    <text x="52" y="424" font-size="12.5" fill="#5B616B">#4331 · 1 d · agents-bot · $1.10 · <tspan fill="#1A7F37">✓</tspan></text>
+    <use href="#bubble" x="306" y="412" width="16" height="16" color="#5B616B"/>
+    <text x="326" y="424" font-size="12.5" fill="#5B616B">1</text>
+    <path d="M52 438h302" stroke="#EEF0F3"/>
+
+    <!-- phone row 3 -->
+    <use href="#merged" x="24" y="452" width="18" height="18" color="#8250DF"/>
+    <text x="52" y="466" font-size="15" font-weight="600" fill="#1C1D20">Wire: label colours (#2956)</text>
+    <rect x="52" y="476" width="54" height="18" rx="9" fill="#0E8A16" fill-opacity=".18" stroke="#0E8A16" stroke-opacity=".6"/>
+    <text x="79" y="489" font-size="11" font-weight="500" fill="#0B6B12" text-anchor="middle">polish</text>
+    <rect x="112" y="476" width="88" height="18" rx="9" fill="#D93F0B" fill-opacity=".18" stroke="#D93F0B" stroke-opacity=".6"/>
+    <text x="156" y="489" font-size="11" fill="#9E2E08" text-anchor="middle">priority:<tspan font-weight="600">high</tspan></text>
+    <rect x="206" y="476" width="74" height="18" rx="9" fill="#5319E7" fill-opacity=".18" stroke="#5319E7" stroke-opacity=".6"/>
+    <text x="243" y="489" font-size="11" fill="#3E12AD" text-anchor="middle">area:<tspan font-weight="600">wire</tspan></text>
+    <rect x="52" y="500" width="64" height="18" rx="9" fill="#EDEFF2" stroke="#D6DAE0"/>
+    <text x="84" y="513" font-size="11" font-weight="500" fill="#4A5059" text-anchor="middle">task</text>
+    <text x="52" y="538" font-size="12.5" fill="#5B616B">#2960 · 2 w · agents-bot · $0.95</text>
+    <text x="24" y="580" font-size="10.5" fill="#8A9099">Phone: title on two lines · all chips, wrapped ·</text>
+    <text x="24" y="596" font-size="10.5" fill="#8A9099">short second line · no avatars. Web at 390 px: the same.</text>
+    <text x="24" y="612" font-size="10.5" fill="#8A9099">iPad and web over 700 px: the Mac's wide row.</text>
+    <rect x="132" y="758" width="100" height="5" rx="2.5" fill="#1C1D20"/>
+  </g>
+
+  <!-- now vs after strip -->
+  <g transform="translate(24,620)">
+    <rect width="760" height="246" rx="12" fill="#FFFFFF" filter="url(#shadow)"/>
+    <text x="16" y="28" font-size="11" font-weight="600" fill="#8A9099">NOW (Mac and web)</text>
+    <g font-size="12.5" fill="#1C1D20">
+      <text x="16" y="56">State</text><rect x="54" y="42" width="66" height="22" rx="5" fill="#FFF" stroke="#C7CCD3"/><text x="62" y="57">Open ⌃</text>
+      <text x="132" y="56">Repo</text><rect x="168" y="42" width="56" height="22" rx="5" fill="#FFF" stroke="#C7CCD3"/><text x="176" y="57">All ⌃</text>
+      <text x="236" y="56">Label</text><rect x="274" y="42" width="60" height="22" rx="5" fill="#FFF" stroke="#C7CCD3"/><text x="282" y="57">Any ⌃</text>
+      <text x="346" y="56">Sort</text><rect x="378" y="42" width="80" height="22" rx="5" fill="#FFF" stroke="#C7CCD3"/><text x="386" y="57">Updated ⌃</text>
+      <rect x="470" y="42" width="160" height="22" rx="5" fill="#FFF" stroke="#C7CCD3"/><text x="478" y="57" fill="#8A9099">Filter</text>
+      <text x="642" y="57" fill="#0A6CDB">Refresh</text>
+    </g>
+    <text x="16" y="94" font-size="13" fill="#0A6CDB">#4328</text>
+    <text x="64" y="94" font-size="13" font-weight="600" fill="#1C1D20">Work look: wireframe the shared parts</text>
+    <rect x="320" y="81" width="42" height="18" rx="9" fill="#DDF4E4"/><text x="341" y="94" font-size="11" fill="#1A7F37" text-anchor="middle">Open</text>
+    <rect x="368" y="81" width="42" height="18" rx="9" fill="#EDEFF2"/><text x="389" y="94" font-size="11" fill="#4A5059" text-anchor="middle">spike</text>
+    <text x="16" y="114" font-size="11.5" fill="#8A9099">No agent yet</text>
+    <text x="16" y="150" font-size="11" font-weight="600" fill="#8A9099">WHAT CHANGES</text>
+    <g font-size="12" fill="#1C1D20">
+      <text x="16" y="174">• Text label beside each pop-up → a search field, then compact menus ("Label ▾"); a set filter shows its value in the accent.</text>
+      <text x="16" y="194">• Refresh link → a toolbar icon (⌘R on the Mac, pull to refresh on the phone).</text>
+      <text x="16" y="214">• State pill → a state icon at the start. Grey chips → chips in the label's colour.</text>
+      <text x="16" y="234">• "No agent yet" → author, age, comments, avatars; lineage only when there is some.</text>
+    </g>
+  </g>
+</svg>
