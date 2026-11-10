@@ -346,20 +346,6 @@ func (d *Daemon) standingBlockers(ctx context.Context, method string, epic wire.
 		_, keys[n], _ = strings.Cut(c.item.Node.Ref, ":")
 	}
 	switch {
-	case strings.HasPrefix(epic.Node.Ref, "jira:"):
-		j, err := d.forgeJira()
-		if err != nil {
-			return err
-		}
-		by, err := j.Blockers(ctx, keys)
-		if err != nil {
-			return err
-		}
-		for n := range children {
-			for _, b := range by[strings.ToUpper(keys[n])] {
-				set(n, wire.LineageNode{Kind: lineage.KindIssue, Ref: "jira:" + b.Key}, b.Open)
-			}
-		}
 	default:
 		if project, _, ok := boardsOfNode(epic.Node); ok {
 			b, err := d.forgeAzureBoards()

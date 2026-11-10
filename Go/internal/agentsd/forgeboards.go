@@ -109,7 +109,6 @@ func (b *forgeBoard) key() []any {
 func narrowToBoard(s *forgeSources, b wire.ProjectBoard, in []string, prs bool) *forgeBoard {
 	board := &forgeBoard{forge: string(*b.Forge), home: in[0]}
 	key := deref(b.Key)
-	s.projects = nil
 	boards := s.boards
 	s.boards = nil
 	switch *b.Forge {
@@ -125,9 +124,8 @@ func narrowToBoard(s *forgeSources, b wire.ProjectBoard, in []string, prs bool) 
 		// Linear is on the forge interface: linearForge.List reads the board's team.
 		board.linear = key
 	case wire.ConnectionProviderAtlassian:
-		if !prs {
-			board.jira = key
-		}
+		// Jira is on the forge interface, by the name jira: jiraForge.List reads the board's filter.
+		board.forge, board.jira = "jira", key
 	case wire.ConnectionProviderAzuredevops:
 		at := strings.LastIndex(key, "/")
 		if at < 0 {
