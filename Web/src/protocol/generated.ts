@@ -6463,6 +6463,107 @@ export interface MessageSender {
 }
 
 /**
+ * One conversation in a messaging contract server's list_conversations (#4338,
+ * docs/reference/messaging-contract.md): a channel, a space, a direct chat or a mail thread. source
+ * is the service (slack, email, googlechat, whatsapp, or the server's own word), the same word as
+ * ChannelSender.channel. unread is the service's own count of unread messages; absent when the
+ * service does not say. lastActivity is the newest message's time.
+ */
+export interface MessagingConversation {
+  source: string;
+  /**
+   * The server's id for the conversation, which read_messages and reply take. Opaque to the daemon
+   * and the clients.
+   */
+  id: string;
+  title: string;
+  kind: MessagingConversationKind;
+  unread?: number;
+  lastActivity?: string;
+  /** The conversation on the service's own site or app. Absent when it has none. */
+  link?: URLString;
+}
+
+/**
+ * channel: a channel or space that many people read. direct: a chat with one person or a small
+ * group. thread: a mail thread (References and In-Reply-To).
+ */
+export type MessagingConversationKind =
+  | "channel"
+  | "direct"
+  | "thread";
+
+/**
+ * list_conversations' structuredContent (#4338): the conversations, newest lastActivity first.
+ * cursor is absent on the last page.
+ */
+export interface MessagingConversations {
+  conversations: MessagingConversation[];
+  cursor?: string;
+}
+
+/**
+ * list_conversations' input (#4338). cursor is a page's cursor from the last answer; limit is at
+ * most 100, 20 when left out. unread: only the conversations with unread messages. A server may
+ * take more inputs of its own, each optional (the email server's folder).
+ */
+export interface MessagingListRequest {
+  cursor?: string;
+  limit?: number;
+  unread?: boolean;
+}
+
+/**
+ * One message in read_messages' structuredContent (#4338). text is outside content: the result says
+ * so (untrusted), and a client draws it as plain text, never as markup. thread is the id of the
+ * message that starts its thread; absent when it is in no thread. link is the message on the
+ * service's own site or app.
+ */
+export interface MessagingMessage {
+  id: string;
+  conversation: string;
+  sender: ChannelSender;
+  time: string;
+  text: string;
+  thread?: string;
+  link?: URLString;
+}
+
+/**
+ * read_messages' structuredContent (#4338): one page of a conversation's messages, newest first.
+ * cursor gives the older page; absent on the last. untrusted is always true: every text is outside
+ * content.
+ */
+export interface MessagingMessages {
+  conversation: string;
+  messages: MessagingMessage[];
+  cursor?: string;
+  untrusted: boolean;
+}
+
+/**
+ * read_messages' input (#4338): a conversation's id from list_conversations, and a page's cursor
+ * from the last answer. thread: only that thread's messages. limit is at most 100, 20 when left
+ * out. A server may take more inputs of its own, each optional.
+ */
+export interface MessagingReadRequest {
+  conversation: string;
+  cursor?: string;
+  thread?: string;
+  limit?: number;
+}
+
+/**
+ * reply's input (#4338, a later story): the conversation, the thread to answer in (absent: the
+ * conversation itself), and the text.
+ */
+export interface MessagingReplyRequest {
+  conversation: string;
+  thread?: string;
+  text: string;
+}
+
+/**
  * One messaging connector in the Messaging slot (#1787): its name in mcp.json, what it is in words
  * (Slack, Email, Google Chat, or its name), its one real read (a list of its channels, folders or
  * spaces) and the events it declares.
@@ -14167,6 +14268,13 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MarketplacesListAnswer: { required: ["marketplaces"], optional: ["problem"] },
   MarketplacesListRequest: { required: [], optional: ["kind", "destination"] },
   MessageSender: { required: ["agentID", "title"], optional: [] },
+  MessagingConversation: { required: ["source", "id", "title", "kind"], optional: ["unread", "lastActivity", "link"] },
+  MessagingConversations: { required: ["conversations"], optional: ["cursor"] },
+  MessagingListRequest: { required: [], optional: ["cursor", "limit", "unread"] },
+  MessagingMessage: { required: ["id", "conversation", "sender", "time", "text"], optional: ["thread", "link"] },
+  MessagingMessages: { required: ["conversation", "messages", "untrusted"], optional: ["cursor"] },
+  MessagingReadRequest: { required: ["conversation"], optional: ["cursor", "thread", "limit"] },
+  MessagingReplyRequest: { required: ["conversation", "text"], optional: ["thread"] },
   MessagingServer: { required: ["name", "word", "state"], optional: ["proof", "message", "events"] },
   MissingFolder: { required: ["branchKept"], optional: [] },
   MoveAnswer: { required: ["when", "message"], optional: ["agent"] },
