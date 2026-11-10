@@ -217,6 +217,8 @@ final class LockState {
 
     /// The control plane answered. One with no lock does not know the methods: nothing shows.
     func connected(_ control: DaemonClient, client: UUID) async {
+        // A new sign-in is a new client id (#4292): its key may be another than the last one's.
+        if self.client != client.uuidString { key = nil }
         self.client = client.uuidString
         ownHostID = ownHost?.id()
         pins.pruneOthers()
@@ -401,6 +403,20 @@ final class LockState {
             return
         }
         took(state, lock)
+        // The key is in the lock for this device's id before a new sign-in (#4292): machines
+        // refuse its channels, and a key is in the lock only once. The old key, still a signer,
+        // signs the new id's own key in, so no other device approves it; when that fails, the
+        // new key asks to join as a new device does.
+        if let client, state.namesAnotherClient(key.publicKey, client: client),
+           let own = try? LockSigningKey.load(account: Self.account(account, client: client)), own.publicKey != key.publicKey {
+            if state.members[own.publicKey] == nil {
+                let body = DaemonAPI.LockBody(kind: .addClient, person: "", key: own.publicKey, id: client, name: name,
+                                              clientKind: MachineLock.clientKind(kind))
+                _ = try? await Self.put(body, on: control, pins: pins, key: key)
+            }
+            self.key = own
+            return await refresh(control)
+        }
         if state.members[key.publicKey]?.isClient == true {
             place = .member
             return
@@ -479,11 +495,20 @@ final class LockState {
         throw LockTrouble.changed
     }
 
+    /// The key this device signs with: the one made for its client id after a new sign-in
+    /// (#4292) when there is one, else the one it made first.
     private func signingKey() -> LockSigningKey? {
         if let key { return key }
-        key = try? LockSigningKey.load(account: account)
+        if let client, let own = try? LockSigningKey.existing(account: Self.account(account, client: client)) {
+            key = own
+        } else {
+            key = try? LockSigningKey.load(account: account)
+        }
         return key
     }
+
+    /// Where the key for one client id is kept.
+    static func account(_ account: String, client: String) -> String { "\(account).\(client)" }
 
     enum LockTrouble: Error { case noKey, changed }
 }

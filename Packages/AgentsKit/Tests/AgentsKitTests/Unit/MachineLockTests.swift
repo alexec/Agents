@@ -98,6 +98,30 @@ struct MachineLockTests {
         #expect(throws: MachineLock.Failure.self) { try MachineLock.check([root, forged]) }
     }
 
+    /// #4292: after a new sign-in the device's key names its old client id. The old key, still a
+    /// signer, signs in a new key for the new id, which then names it, as the window does.
+    @Test func aNewSignInSignsInANewKeyForItsNewID() throws {
+        let old = LockSigningKey.ephemeral(), new = LockSigningKey.ephemeral()
+        let first = "902FC81A-0000-0000-0000-000000000001", second = "C1216E28-0000-0000-0000-000000000002"
+        let root = try MachineLock.sign(DaemonAPI.LockBody(kind: .root, person: "alex", key: old.publicKey, id: first,
+                                                           clientKind: "mac"), after: nil, with: old)
+        var state = try MachineLock.check([root])
+        #expect(!state.namesAnotherClient(old.publicKey, client: first))
+        #expect(!state.namesAnotherClient(old.publicKey, client: first.lowercased()))
+        #expect(!state.namesAnotherClient(old.publicKey, client: nil))
+        #expect(state.namesAnotherClient(old.publicKey, client: second))
+        // A key the lock does not name is not "another client's": it asks to join.
+        #expect(!state.namesAnotherClient(new.publicKey, client: second))
+        try state.add(MachineLock.sign(DaemonAPI.LockBody(kind: .addClient, person: "", key: new.publicKey, id: second,
+                                                          clientKind: "mac"), after: state, with: old))
+        #expect(state.members[new.publicKey]?.id == second && state.isSigner(new.publicKey))
+        #expect(!state.namesAnotherClient(new.publicKey, client: second))
+        // A root with no id (an older lock) names nobody else.
+        let bare = try MachineLock.check([MachineLock.sign(DaemonAPI.LockBody(kind: .root, person: "alex", key: old.publicKey),
+                                                           after: nil, with: old)])
+        #expect(!bare.namesAnotherClient(old.publicKey, client: second))
+    }
+
     /// #3491 (D3): a host code with an invite is the version 4 code Go's `controllink.ParseCode`
     /// reads; the web page's `inviteCode` makes the same text (machineLock.test.mjs).
     @Test func anInviteGoesInAHostCode() {

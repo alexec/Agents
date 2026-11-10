@@ -164,7 +164,7 @@ func (d *Daemon) readChecked(c *Client, line string) (message, bool) {
 	if controlAsks[m.Method] || d.draftWriterStop(m) {
 		return m, true
 	}
-	return m, d.refuse(c, m, "the request is not signed by one of them")
+	return m, d.refuse(c, m, "the request is not signed by one of them. Open Agents on this device again; if it asks to join, approve it on another of your devices")
 }
 
 // draftWriterStop says m stops a provider draft's writer (#3542): the control plane ends
@@ -235,7 +235,7 @@ func (d *Daemon) answerHello(c *Client, m message) {
 	if !sameClient(channel.Member.ID, c.said) {
 		// The control plane opened the channel for one client, and the lock's key is another's.
 		log.Printf("lock: refused a channel: the control plane names client %s, the lock %s", *c.said.Client, channel.Member.ID)
-		answer(nil, notInLock("the control plane opened this channel for another of your devices"))
+		answer(nil, notInLock("the control plane opened this channel for another of your devices. Open Agents on this device again, so that it adds its key for this sign-in"))
 		return
 	}
 	// The answer goes before the channel is set, and nothing goes between them: it is not
