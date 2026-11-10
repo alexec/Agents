@@ -27,7 +27,7 @@ export function StatusListMark({ store, list }: { store: Store; list: List }) {
   const at = newestAt(lines);
   return (
     <>
-      {warns(lines) && <span class="small attention" title={w.notBackedUp} aria-label={w.notBackedUp}>●</span>}
+      {warns(lines) && <span class="small status-mark" title={w.notBackedUp} aria-label={w.notBackedUp}>●</span>}
       {at !== null && <span class="quiet small" title={new Date(at).toLocaleString()}>{shortAgo(at)}</span>}
     </>
   );

@@ -75,9 +75,10 @@ struct StatusSecretsPage: View {
                 if lines.isEmpty {
                     Text(kind == .secrets ? StatusSecretsWords.noSecrets : StatusSecretsWords.noAccounts)
                         .appText(.supporting).foregroundStyle(.secondary)
-                }
-                TimelineView(.periodic(from: .now, by: 60)) { context in
-                    ForEach(lines) { line in row(line, now: context.date) }
+                } else {
+                    TimelineView(.periodic(from: .now, by: 60)) { context in
+                        ForEach(lines) { line in row(line, now: context.date) }
+                    }
                 }
             } header: {
                 Text(kind == .secrets ? StatusSecretsWords.secretsLead : StatusSecretsWords.accountsLead)
@@ -109,6 +110,7 @@ struct StatusSecretsPage: View {
                     Text(StatusSecretsWords.notBackedUp).appText(.supporting).tinted(.attention)
                 }
             }
+            .padding(.vertical, 4)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
