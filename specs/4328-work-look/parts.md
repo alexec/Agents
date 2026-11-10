@@ -14,7 +14,7 @@ In the app's Paper palette, light mode. Where they differ from the ASCII sketche
 
 ## Decision: Mac `Table` or a two-line `List`
 
-Pending Alex's answer (asked 2026-11-09). Recommended: **a two-line `List`**, the same `Shared/UI` row on the Mac and the Remote.
+**Decided with Alex (2026-11-09): a two-line `List`**, the same `Shared/UI` row on the Mac and the Remote. No `Table`.
 
 - A label chip, a second line of author, age, agent and cost, and a long title do not fit a column grid: a `Table` cuts them or makes each row tall.
 - The Remote and the 390 px web page cannot draw a `Table`. With a `List`, all three clients draw one row, and the parity table has one row to keep.
@@ -198,7 +198,7 @@ Missing, for #4329 to add to the one interface (each forge fills what it has, an
 
 ## Clients
 
-- **Mac:** `Shared/UI/Work` (`WorkView`, `WorkItemPage`, `WorkTimelineView`). A `List` with the two-line row (the decision above).
+- **Mac:** `Shared/UI/Work` (`WorkView`, `WorkItemPage`, `WorkTimelineView`). A `List` with the two-line row (Alex's decision above).
 - **Remote:** the same `Shared/UI` views; the phone layout is the `compact` branch the row has now.
 - **Web:** `Web/src/views/Work.tsx`, `WorkTimeline.tsx`; the same parts in CSS, with the 390 px layout at the same break points.
 - The per-page spikes (step 2) use these parts and say only what a page adds.
