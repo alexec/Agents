@@ -15,6 +15,7 @@ public enum Capability {
     public static let approvals1 = "approvals/1"
     public static let artifact1 = "artifact/1"
     public static let attention1 = "attention/1"
+    public static let attention2 = "attention/2"
     public static let auditSinks1 = "audit.sinks/1"
     public static let auto1 = "auto/1"
     public static let backupsStore1 = "backups.store/1"
@@ -141,6 +142,7 @@ public enum Capability {
     public static let projects1 = "projects/1"
     public static let providersCarry1 = "providers.carry/1"
     public static let providers1 = "providers/1"
+    public static let providers2 = "providers/2"
     public static let readapi1 = "readapi/1"
     public static let relay1 = "relay/1"
     public static let reportsNodes1 = "reports.nodes/1"
@@ -625,7 +627,7 @@ public enum Capability {
 
     /// The capability of each method and notification in control.openrpc.json.
     public static let control: [String: String] = [
-        "attention/need": "attention/1",
+        "attention/need": "attention/2",
         "attention/turn": "liveactivity/1",
         "audit/export": "events.audit/1",
         "audit/list": "events.audit/1",
@@ -775,7 +777,7 @@ public enum Capability {
         "projects/setBoards": "projects.boards/1",
         "projects/setSlot": "projects/1",
         "providers/add": "providers/1",
-        "providers/create": "providers/1",
+        "providers/create": "providers/2",
         "providers/draftAnswer": "providers/1",
         "providers/draftCancel": "providers/1",
         "providers/draftSigned": "providers/1",
@@ -901,6 +903,9 @@ public enum Capability {
         "client": [
             "client.wire/1",
             "client.team/1",
+        ],
+        "control": [
+            "attention/1",
         ],
         "host": [
             "host.wire/1",

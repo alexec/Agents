@@ -790,6 +790,15 @@ jobs:
           # A pull request is checked out as its merge into the base: the first parent is the base.
           LINT_BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}
         run: scripts/lint.sh
+      # What a caller sends changed since the last release tag with the same capability
+      # number (#4095): an older server refuses it, and the caller cannot know.
+      - name: Wire compat
+        run: |
+          if git diff --quiet HEAD^1 HEAD -- Packages/Wire; then
+            echo "Packages/Wire did not change."
+          else
+            scripts/wire.sh compat
+          fi
       - if: ${{ github.event_name == 'push' && steps.golangci-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v5
         with:

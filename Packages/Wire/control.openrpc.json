@@ -15,12 +15,17 @@
       "name": "client.team/1",
       "by": "client",
       "description": "A client knows it belongs to one person of a team (#994, #1763). On a control plane with more than one person, the control plane answers a client without it -32074 updateToJoinTeam (R14)."
+    },
+    {
+      "name": "attention/1",
+      "by": "control",
+      "description": "The control plane still reads attention/need as 0.18.0 sent it. attention/2 (#4095): a host may send the NeedKind `request`, which an older control plane does not know."
     }
   ],
   "methods": [
     {
       "name": "attention/need",
-      "x-capability": "attention/1",
+      "x-capability": "attention/2",
       "description": "A host, on its channel 0 (R6).",
       "paramStructure": "by-name",
       "params": [
@@ -4528,7 +4533,7 @@
     },
     {
       "name": "providers/create",
-      "x-capability": "providers/1",
+      "x-capability": "providers/2",
       "tags": [
         {
           "name": "web"

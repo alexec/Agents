@@ -127,10 +127,23 @@ gets `-32074`. When only one person is left, they work again.
 
 ## Changing a capability
 
-- **A compatible change keeps the number:** a new optional field, or a new enum value with
-  `x-fallback`.
+- **A compatible change to what a server sends keeps the number:** a new optional field in a
+  result or a notification, or a new enum value with `x-fallback`.
+- **A change to what a caller sends makes a new number** (#4095). An older server refuses
+  params that it does not know, and the caller cannot tell why. So a method's params make a new
+  number when a field leaves `required`, an enum gets a new value, a required field or param is
+  added, or a field's type changes. `providers/create` is `providers/2` because 0.18.0 made
+  `id` and `name` optional, and `attention/need` is `attention/2` because a host can send the
+  `NeedKind` `request`. A new optional field in params keeps the number: an older server
+  ignores it.
 - **A breaking change makes a new number.** A part sends each number that it still supports
-  (`files/1` and `files/2`) until the old one is removed.
+  (`files/1` and `files/2`) until the old one is removed. When no other method names the old
+  number, the document declares it in `x-declared-capabilities`, as `attention/1` is.
+
+CI's `lint` job runs `scripts/wire.sh compat` when `Packages/Wire` changes. It compares each
+method's params with the last release tag, and fails when they changed in one of these ways
+with the same `x-capability`. The failure names the method, the change and the number to raise
+to (`providers/1` → `providers/2`).
 - **Deprecation is per capability.** A release marks `files/1` deprecated, in the schema (a
   document's `x-deprecated-capabilities`) and in the release notes, which list the
   capabilities each release adds, deprecates and removes. A later release takes it out of the required set, and then removes it.

@@ -14,6 +14,7 @@ const CapAgents1 = "agents/1"
 const CapApprovals1 = "approvals/1"
 const CapArtifact1 = "artifact/1"
 const CapAttention1 = "attention/1"
+const CapAttention2 = "attention/2"
 const CapAuditSinks1 = "audit.sinks/1"
 const CapAuto1 = "auto/1"
 const CapBackupsStore1 = "backups.store/1"
@@ -140,6 +141,7 @@ const CapProjectsSessions1 = "projects.sessions/1"
 const CapProjects1 = "projects/1"
 const CapProvidersCarry1 = "providers.carry/1"
 const CapProviders1 = "providers/1"
+const CapProviders2 = "providers/2"
 const CapReadapi1 = "readapi/1"
 const CapRelay1 = "relay/1"
 const CapReportsNodes1 = "reports.nodes/1"
@@ -683,7 +685,7 @@ var HostNotifications = set([]string{
 
 // ControlCapabilities is the capability of each method and notification in control.openrpc.json.
 var ControlCapabilities = pairs([][2]string{
-	{"attention/need", "attention/1"},
+	{"attention/need", "attention/2"},
 	{"attention/turn", "liveactivity/1"},
 	{"audit/export", "events.audit/1"},
 	{"audit/list", "events.audit/1"},
@@ -833,7 +835,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"projects/setBoards", "projects.boards/1"},
 	{"projects/setSlot", "projects/1"},
 	{"providers/add", "providers/1"},
-	{"providers/create", "providers/1"},
+	{"providers/create", "providers/2"},
 	{"providers/draftAnswer", "providers/1"},
 	{"providers/draftCancel", "providers/1"},
 	{"providers/draftSigned", "providers/1"},
@@ -1016,6 +1018,9 @@ var DeclaredCapabilities = map[string][]string{
 	"client": {
 		"client.wire/1",
 		"client.team/1",
+	},
+	"control": {
+		"attention/1",
 	},
 	"host": {
 		"host.wire/1",
