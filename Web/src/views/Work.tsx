@@ -5,7 +5,9 @@
 import { effect, useSignal } from "@preact/signals";
 import { Fragment, type ComponentChildren } from "preact";
 import { useEffect, useMemo, useRef } from "preact/hooks";
-import type { ForgeComment, ForgeItemDetail, ForgeLabel, LineageEstimate } from "../protocol/generated";
+import type {
+  ForgeCloseRequest, ForgeComment, ForgeDone, ForgeItemDetail, ForgeLabel, ForgeLabelRequest, LineageCostRollup, LineageEstimate,
+} from "../protocol/generated";
 import type { Store } from "../model/store";
 import { Capability } from "../protocol/capabilities.generated";
 import { describe } from "../model/errors";
@@ -14,15 +16,17 @@ import {
   boardChoices, boardName, checksGlyph, checksWords, choices, clearedFilter, connectForge, couldNotLoadMore, couldNotRead, countWords,
   credentialProblem, emptyWords, errorWords, filtered, fromForge, loadingMore, parseWorkQuery, setFilters, workQuery,
   lineageOnlyNote, noForgeHere, notReadHere, openOnWords, positionWords, repoName, repoOf, rowLine, rowReviewWords,
-  reviewWords, shortRef, titleSaysRef, workKindTitle, workSortTitle, allProjects, projectOfFolder, projectWords, workFolderKey,
+  reviewWords, shortRef, titleSaysRef, workKindTitle, workSortTitle, allProjects, projectOfFolder, workFolderKey,
+  doneWords, forgeName, lineageCountWords, pageStateWords, shortPositionWords, stateGlyph, takesLabels,
   type WorkFilter, type WorkKind, type WorkProject, type WorkRow, type WorkSort, type WorkState,
 } from "../model/work";
 import { newSessionProjects } from "../model/projects";
 import { orderedFolders } from "./Sidebar";
-import { lineageUrl } from "../model/lineage";
+import { lineageUrl, sessionHost } from "../model/lineage";
 import { type PipelineStep, pipelineDepth, pipelineSteps } from "../model/pipeline";
-import { nodeName } from "../model/value";
+import { costWords, nodeName, spent } from "../model/value";
 import { actualWords, estimateLine, estimateRangeWords, estimateSpentWords, showsEstimate } from "../model/estimate";
+import { offerStart } from "./NewAgent";
 import { ago } from "../model/connectorSetup";
 import { fromWireDate } from "../protocol/dates";
 import { type ForgeImages, Markdown } from "../render/markdown";
@@ -30,10 +34,10 @@ import { bytesOf } from "../model/pageImage";
 import { forgeMarkdown } from "../model/forgeMarkdown";
 import { ForgeTitle } from "../render/ForgeTitle";
 import { Avatar, Avatars, EmptyState, ErrorStrip, FilterMenu, LabelChip, PlaceholderRows, RefreshButton, StateIcon, type MenuChoice } from "./WorkParts";
-import { WorkActions, WorkCommentBox } from "./WorkActions";
+import { WorkActions, WorkCommentBox, WorkLabelsPicker, WorkStatusMenu } from "./WorkActions";
 import { WorkPlan } from "./WorkPlan";
 import { WorkDocs } from "./Docs";
-import { hasPlan } from "../model/epicPlan";
+import { hasPlan, planSessions } from "../model/epicPlan";
 import { go, replace, route, routeHash } from "../route";
 import {
   allRows, askKey, boardHosts, boards, forgeHosts, fromList, hasMore, listProjects, loadBoards, loadList, loadMore, nextAfter, pageNeighbours,
@@ -269,16 +273,24 @@ function WorkRowView({ row, several, dim, pick, open }: { row: WorkRow; several:
 }
 
 /** The page of one issue, PR, milestone or release (#3119): the item from its forge (forge/issue,
- * forge/pull) on the first machine that reads it. An issue's and a pull request's actions (#3130,
- * WorkActions) go to the machine that read it. */
+ * forge/pull) on the first machine that reads it. An issue's page is in the Work look (#4402,
+ * specs/4328-work-look/issue.md), as the window's WorkItemPage (#4400): the page's bar (the place, ↑ 3 of 42 ↓,
+ * Refresh), the header with Start Agent, one timeline (the body, then the comments), the comment box with Close or
+ * Reopen, and the side panel (Assignees, Labels with its gear, Milestone, Repo, Linked, Lineage, Docs). A pull
+ * request keeps its actions row (#4408 redoes it). Its writes (#3130) go to the machine that read it. */
 export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; ref: string }) {
   const node = useMemo(() => ({ kind, ref }), [kind, ref]);
   const asked = useSignal(0);
   const detail = useSignal<{ host: string; got: ForgeItemDetail } | null>(null);
   const forgeProblem = useSignal<string | null>(null);
+  const reading = useSignal(false);
   const older = useSignal(false);
   const estimate = useSignal<LineageEstimate | null>(null);
   const pipeline = useSignal<PipelineStep[]>([]);
+  const lineageGot = useSignal<{ cost?: LineageCostRollup | undefined; sessions: string[] } | null>(null);
+  const said = useSignal<{ words: string; failed: boolean } | null>(null);
+  const writing = useSignal(false);
+  const pickingLabels = useSignal(false);
   const forgeHosts = store.hosts.value.filter((h) => hostAnswers(h.state) && store.has(h.id, Capability.forge1));
   const lineageHosts = store.hosts.value.filter((h) => hostAnswers(h.state) && store.has(h.id, Capability.lineage1));
   // The page's images, read by the machine that read the page (#4011); without forge/image there, their words.
@@ -289,24 +301,31 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
   // Lineage from the machine that read the forge, else this Mac, else the first that keeps links.
   const lineageHost = lineageHosts.find((h) => h.id === detail.value?.host)?.id
     ?? lineageHosts.find((h) => h.id === store.macHostID.value)?.id ?? lineageHosts[0]?.id;
+  // A new item starts empty; a refresh keeps the page, and Refresh spins, until the new read comes.
+  useEffect(() => { detail.value = null; forgeProblem.value = null; said.value = null; pickingLabels.value = false; }, [kind, ref]);
   useEffect(() => {
     let current = true;
-    detail.value = null;
-    forgeProblem.value = null;
     if (!fromForge(kind)) return;
+    reading.value = true;
+    // A page opened from an address reads before the machines have said what they do: placeholders until one that
+    // reads the forge comes, and "no machine" only once none came.
+    if (forgeHosts.length === 0) {
+      const none = setTimeout(() => { if (current) { forgeProblem.value = noForgeHere; reading.value = false; } }, 4000);
+      return () => { current = false; clearTimeout(none); };
+    }
     void (async () => {
       let last: string | null = null;
       for (const h of forgeHosts) {
         try {
           const got = await store.link.call(kind === "pr" ? "forge/pull" : "forge/issue", { node }, h.id);
-          if (current) detail.value = { host: h.id, got };
+          if (current) { detail.value = { host: h.id, got }; forgeProblem.value = null; }
           return;
         } catch (e) {
           last = describe(e);
         }
       }
-      if (current) forgeProblem.value = forgeHosts.length === 0 ? noForgeHere : last ?? notReadHere;
-    })();
+      if (current) forgeProblem.value = last ?? notReadHere;
+    })().finally(() => { if (current) reading.value = false; });
     return () => { current = false; };
   }, [kind, ref, forgeHosts.map((h) => h.id).join(","), asked.value]);
   // An issue's estimate (#3560), from the machine that keeps its links: an open one's, and a closed one's as it
@@ -330,6 +349,18 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
       .then((g) => { if (current) pipeline.value = pipelineSteps(node, g); }, () => {});
     return () => { current = false; };
   }, [kind, ref, lineageHost, asked.value]);
+  // The cost and the sessions of an issue or a pull request (#4402 note 14), from the machine that keeps its links.
+  const hasDetail = detail.value !== null;
+  useEffect(() => {
+    let current = true;
+    lineageGot.value = null;
+    if (!lineageHost || !hasDetail || !fromForge(kind)) return;
+    void Promise.all([
+      store.link.call("lineage/cost", { node }, lineageHost).catch(() => undefined),
+      store.link.call("lineage/walk", { node }, lineageHost).catch(() => undefined),
+    ]).then(([cost, walk]) => { if (current) lineageGot.value = { cost, sessions: planSessions(node, walk?.links ?? [], cost) }; });
+    return () => { current = false; };
+  }, [kind, ref, lineageHost, hasDetail, asked.value]);
 
   // The item again after a write (#3130), from the machine that read it, keeping the page until it comes.
   const reread = async () => {
@@ -343,6 +374,22 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
     }
   };
   const writes = detail.value !== null && store.has(detail.value.host, Capability.forgeWrite1);
+  // A write from the header or the side panel (the status menu, a label); what it did is the line under the comment box.
+  const act = async (method: "forge/close" | "forge/label", params: ForgeCloseRequest | ForgeLabelRequest) => {
+    const host = detail.value?.host;
+    if (!host || writing.value) return;
+    writing.value = true;
+    try {
+      const done = await store.link.call(method, params as never, host) as ForgeDone;
+      const close = method === "forge/close" ? params as ForgeCloseRequest : undefined;
+      said.value = { words: doneWords(method, done, close?.reopen === true, close?.transition !== undefined), failed: false };
+      await reread();
+    } catch (e) {
+      said.value = { words: describe(e), failed: true };
+    } finally {
+      writing.value = false;
+    }
+  };
 
   const readOlder = async () => {
     const had = detail.value;
@@ -361,149 +408,280 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
     }
   };
 
-  const item = detail.value?.got.item;
-  const title = item?.title ?? nodeName(node);
-  const state = item?.state ?? "";
-  const labels: ForgeLabel[] = item?.labels ?? [];
-  const url = item?.url ?? lineageUrl(node);
+  const got = detail.value?.got;
+  const item = got?.item;
+  // The row the page was opened from, while the read runs: its title, number and state show at once.
+  const row = !item && fromForge(kind) ? allRows(workList(kind)).find((r) => r.node.ref === ref) : undefined;
+  const title = item?.title ?? row?.title ?? (fromForge(kind) ? undefined : nodeName(node));
+  const state = item?.state ?? row?.state ?? "";
+  const draft = item?.draft ?? row?.draft;
+  const status = item?.status ?? row?.status;
+  const labels: ForgeLabel[] = item?.labels ?? row?.labels ?? [];
+  const assignees = item?.assignees ?? row?.assignees ?? [];
+  const url = item?.url ?? row?.url ?? lineageUrl(node);
+  const openOn = openOnWords(ref);
   // The project the item was read for (#3283), when the person has more than one: with one, the page says nothing new.
   const projects = workProjects(store);
   const project = projects.length > 1 && detail.value ? projectOfFolder(item?.folder, detail.value.host, projects) : undefined;
-  const checks = item?.node.kind === "pr" ? checksWords(detail.value?.got.checks, item.checks) : undefined;
+  const checks = item?.node.kind === "pr" ? checksWords(got?.checks, item.checks) : undefined;
   const review = item?.node.kind === "pr" ? reviewWords(item.review) : undefined;
+  const updated = item ? fromWireDate(item.updatedAt) : row && row.updated > 0 ? new Date(row.updated * 1000) : undefined;
+  const words = pageStateWords({ author: item?.author ?? row?.author, updated, comments: item?.comments ?? row?.comments ?? got?.comments.length ?? 0 });
+  // Start Agent: on an open issue whose read gives a start (one in a folder), when a machine of the person's writes.
+  const start = kind === "issue" && writes && item?.state === "open" ? got?.start : undefined;
+  const startAgent = () => {
+    if (!detail.value || !start) return;
+    if (!item?.folder) { said.value = { words: "No folder on this machine is on this issue's repo.", failed: true }; return; }
+    const why = offerStart(store, detail.value.host, item.folder, { prompt: start.prompt, labels: start.labels, worktree: start.worktree });
+    if (why) said.value = { words: why, failed: true };
+  };
+  const labelsEdit = kind === "issue" && writes && item && takesLabels(item.node);
+  const pickLabel = (name: string) => { workList(kind).filter.value = { ...workList(kind).filter.value, label: name }; go({ nav: "work", section: kind }); };
 
+  // Lineage (#4402 note 14): the cost and the sessions, then the estimate of an open issue, or what a closed one spent;
+  // then the pipeline line.
+  const cost = lineageGot.value?.cost && spent(lineageGot.value.cost.total) ? costWords(lineageGot.value.cost.total) : undefined;
+  const sessions = lineageGot.value?.sessions ?? [];
+  const counts = lineageCountWords(cost, sessions.length);
+  const showsEst = estimate.value && isOpen && showsEstimate(estimate.value);
   const spentWords = estimate.value ? estimateSpentWords(estimate.value) : undefined;
-  const lineage = [...spentWords ? [spentWords] : [], ...actual ? [actual] : []];
-  const commentCount = item?.comments ?? detail.value?.got.comments.length ?? 0;
-  const byline = item ? [
-    ...item.author ? [item.author] : [],
-    `updated ${ago(fromWireDate(item.updatedAt))}`,
-    ...commentCount > 0 ? [`${commentCount} comment${commentCount === 1 ? "" : "s"}`] : [],
-  ].join(" · ") : "";
+  const hasLineage = counts !== "" || showsEst || actual !== undefined || pipeline.value.length > 0;
+  const session = (id: string) => {
+    const h = sessionHost(store.agents.value, id);
+    const chat = h ? store.agent(h, id) : undefined;
+    const runs = chat ? ["starting", "running", "waitingOnUser"].includes(chat.state) : false;
+    return (
+      <button key={id} type="button" class="work-session" disabled={!chat} aria-label={[chat?.title ?? "A session on another machine", ...runs ? ["running"] : []].join(", ")}
+        onClick={() => { if (h && chat) go({ host: h, folder: chat.worktree?.folder || chat.cwd, session: chat.id }); }}>
+        <span class={`dot${runs ? " runs" : ""}`} aria-hidden="true" /><span class="name">{chat?.title || "A session on another machine"}</span>
+      </button>
+    );
+  };
+
+  const nothingRead = !detail.value && forgeProblem.value !== null;
+  const loading = fromForge(kind) && !detail.value && !forgeProblem.value;
+  const narrowStart = start && (
+    <button type="button" class="prominent work-start" disabled={writing.value} onClick={startAgent}
+      title="The new-agent form in this issue's folder, filled in for it"><span aria-hidden="true">✦</span>Start Agent</button>
+  );
 
   return (
-    <article class="work-page work-item-page">
+    <article class={`work-page work-item-page${loading ? " loading" : ""}`} aria-busy={loading}>
       <div class="work-item-grid">
       <div class="work-page-bar">
-        <button type="button" title="Back" aria-label="Back" onClick={() => history.back()}>‹</button>
-        <button type="button" title="Forward" aria-label="Forward" onClick={() => history.forward()}>›</button>
-        <button type="button" class="link" onClick={() => go({ nav: "work", section: kind })}>All {workKindTitle[kind].toLowerCase()}</button>
+        {/* The place (note 1): Issues / #4331, Issues a link to the list as it was; the browser's Back and Forward are
+            the page's. On a 390 px page: ‹ Issues. */}
+        <nav class="work-place" aria-label="Place">
+          <a href={routeHash({ nav: "work", section: kind })} title={`All ${workKindTitle[kind].toLowerCase()}`}
+            onClick={(e) => { if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; e.preventDefault(); go({ nav: "work", section: kind }); }}>
+            <span class="back" aria-hidden="true">‹ </span>{workKindTitle[kind]}</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span class="here">{shortRef(ref)}</span>
+        </nav>
         <Stepper store={store} kind={kind} at={ref} />
-        <RefreshButton busy={fromForge(kind) && !detail.value && !forgeProblem.value} onClick={() => { asked.value++; }} />
+        {url && <a class="work-open-icon" href={url} target="_blank" rel="noopener noreferrer" title={openOn} aria-label={openOn}><OpenGlyph /></a>}
+        <RefreshButton busy={reading.value} onClick={() => { asked.value++; }} />
       </div>
-      <header class="work-page-head">
-        <h2><span class="work-title"><ForgeTitle text={title} /></span> {!titleSaysRef({ title, node }) && <span class="work-ref">{shortRef(ref)}</span>}</h2>
+      {nothingRead ? (
+        <div class="work-could-not" role="alert">
+          <span class="mark" aria-hidden="true">⚠</span>
+          <p class="strong">Could not read {shortRef(ref)}</p>
+          <p class="quiet">{forgeProblem.value}</p>
+          <p class="buttons">
+            <button type="button" onClick={() => { asked.value++; }}>Try again</button>
+            {url && <a href={url} target="_blank" rel="noopener noreferrer">{openOn}</a>}
+          </p>
+        </div>
+      ) : (
+      <>
+      <header class={`work-page-head${title === undefined ? " placeholder" : ""}`}>
+        <div class="work-title-line">
+          <h2>
+            {title === undefined ? <span class="bar" aria-label="Loading" />
+              : <><span class="work-title"><ForgeTitle text={title} /></span> {!titleSaysRef({ title, node }) && <span class="work-ref">{shortRef(ref)}</span>}</>}
+          </h2>
+          {narrowStart && <span class="wide-only">{narrowStart}</span>}
+        </div>
         <p class="work-page-byline small">
-          <StatePill state={state} draft={item?.draft} status={item?.status} />
-          {byline && <span class="quiet">{byline}</span>}
-          {url && <a href={url} target="_blank" rel="noopener noreferrer">{openOnWords(ref)}</a>}
+          {got?.transitions && writes && item
+            ? <WorkStatusMenu state={item.state} status={item.status} transitions={got.transitions} busy={writing.value}
+                move={(id) => void act("forge/close", { node: item.node, transition: id })} />
+            : <PagePill kind={kind} state={state} draft={draft} status={status} />}
+          {words.wide && <span class="quiet"><span class="wide-line">{words.wide}</span><span class="short-line">{words.short}</span></span>}
+          {url && <a class="work-open-on" href={url} target="_blank" rel="noopener noreferrer"><OpenGlyph />{openOn}</a>}
         </p>
+        {narrowStart && <div class="narrow-only">{narrowStart}</div>}
       </header>
-      {/* The side panel (#4392, parts.md section 5): a column on a wide page; under the header on a narrow one, with
-          Linked and Lineage at the end. */}
-      {item && (
+      {detail.value && forgeProblem.value && (
+        <div class="work-problem"><ErrorStrip lines={[forgeProblem.value]} retry={() => { asked.value++; }} /></div>
+      )}
+      {/* The side panel (parts.md section 5): a column on a page over 900 px; rows under the header on a narrower one,
+          with Linked, Lineage and Docs at the end. */}
+      {(item || loading) && (
         <aside class="work-side people" aria-label="Details">
           <SideSection title="Assignees">
-            {item.assignees.length === 0 ? <span class="quiet">No one</span>
-              : item.assignees.map((a) => <span key={a} class="work-person"><Avatar login={a} />{a}</span>)}
+            {loading && !row ? <span class="bar" /> : assignees.length === 0 ? <span class="quiet">No one</span>
+              : assignees.map((a) => <span key={a} class="work-person"><Avatar login={a} />{a}</span>)}
           </SideSection>
-          <SideSection title="Labels">
-            {labels.length === 0 ? <span class="quiet">None</span> : <span class="work-chips">{labels.map((l) => <LabelChip key={l.name} label={l} />)}</span>}
+          <SideSection title="Labels" edit={labelsEdit ? () => { pickingLabels.value = !pickingLabels.value; } : undefined}
+            editing={pickingLabels.value}>
+            {loading && !row ? <span class="bar" /> : labels.length === 0 ? <span class="quiet">None</span>
+              : <span class="work-chips">{labels.map((l) => <LabelChip key={l.name} label={l} pick={pickLabel} />)}</span>}
+            {pickingLabels.value && detail.value && item && (
+              <WorkLabelsPicker store={store} host={detail.value.host} node={item.node} has={item.labels} close={() => { pickingLabels.value = false; }}
+                pick={(name, add) => void act("forge/label", { node: item.node, ...add ? { add: [name] } : { remove: [name] } })} />
+            )}
           </SideSection>
           <SideSection title="Milestone">
-            {item.milestone ? <span><span aria-hidden="true">⚑ </span>{item.milestone}</span> : <span class="quiet">None</span>}
+            {loading && !row ? <span class="bar" /> : (item?.milestone ?? row?.milestone)
+              ? <span><span aria-hidden="true">⚑ </span>{item?.milestone ?? row?.milestone}</span> : <span class="quiet">None</span>}
           </SideSection>
-          <SideSection title="Repo">
-            <span>{repoName(repoOf(ref))}</span>
-            {project && <span class="quiet">{projectWords(project.name)}</span>}
-          </SideSection>
+          <SideSection title="Repo"><span>{repoName(repoOf(ref))}</span></SideSection>
+          {project && <SideSection title="Project"><span>{project.name}</span></SideSection>}
         </aside>
       )}
       <div class="work-main">
-        {estimate.value && isOpen && showsEstimate(estimate.value) && (
-          <p class="quiet small work-estimate" title={estimateRangeWords(estimate.value)}>{estimateLine(estimate.value)}</p>
-        )}
-        {pipeline.value.length > 0 && (
-          <p class="small work-pipeline">{pipeline.value.map((s, i) => (
-            <Fragment key={i}>{i > 0 && " · "}{s.url ? <a href={s.url} target="_blank" rel="noopener noreferrer">{s.words}</a> : <span class="quiet">{s.words}</span>}</Fragment>
-          ))}</p>
-        )}
         {(checks || review) && <p class="small">{[checks, review].filter(Boolean).join(" · ")}</p>}
-        {writes && detail.value && <WorkActions store={store} host={detail.value.host} detail={detail.value.got} wrote={() => void reread()} />}
-        {forgeProblem.value && <ErrorStrip lines={[forgeProblem.value]} retry={() => { asked.value++; }} />}
-        {fromForge(kind) && !detail.value && !forgeProblem.value && <PlaceholderRows />}
+        {writes && detail.value && kind === "pr" && <WorkActions store={store} host={detail.value.host} detail={detail.value.got} wrote={() => void reread()} />}
         {detail.value && hasPlan(detail.value.got.item) && (
           <WorkPlan store={store} host={detail.value.host} lineageHost={lineageHost} detail={detail.value.got} asked={asked.value}
             estimates={estimate.value?.children ?? []}
             writes={writes} wrote={() => void reread()} />
         )}
-        {detail.value && (
-          <section class="work-body" aria-label="Description">
-            {detail.value.got.body.trim() ? <Markdown text={forgeMarkdown(detail.value.got.body)} forgeImages={forgeImages} /> : <p class="quiet">No description.</p>}
+        {loading && (
+          <div class="work-timeline" aria-hidden="true">
+            <div class="work-comment placeholder"><span class="work-avatar" /><div class="work-comment-main">
+              <p class="small"><span class="bar short" /></p><div class="work-comment-body"><span class="bar" /><span class="bar" /><span class="bar short" /></div>
+            </div></div>
+          </div>
+        )}
+        {got && (
+          // One timeline (notes 8 to 10): the body is its first box, Older comments under it, then the comments; a
+          // closed issue's close. Events come with #4373.
+          <section class="work-timeline" aria-label="Timeline">
+            <Comment comment={{ author: got.item.author ?? forgeName(ref), body: got.body, at: got.item.updatedAt }} words="opened this" forgeImages={forgeImages}
+              empty="No description." />
+            {got.cursor && (
+              <div class="work-event">
+                <span class="mark" aria-hidden="true">…</span>
+                <button type="button" class="link" disabled={older.value} onClick={() => void readOlder()}>{older.value ? "Loading…" : "Older comments"}</button>
+              </div>
+            )}
+            {got.comments.map((c, i) => <Comment key={`${c.at}-${i}`} comment={c} forgeImages={forgeImages} />)}
+            {kind === "issue" && got.item.state === "closed" && !got.transitions && (
+              <div class="work-event"><span class="mark closed" aria-hidden="true">✓</span><span class="quiet small">Closed</span></div>
+            )}
           </section>
         )}
-        {detail.value && (detail.value.got.comments.length > 0 || detail.value.got.cursor) && (
-          <section class="work-comments" aria-label="Comments">
-            {detail.value.got.cursor && <button type="button" class="link" disabled={older.value} onClick={() => void readOlder()}>
-              {older.value ? "Loading…" : "Older comments"}</button>}
-            {detail.value.got.comments.map((c, i) => <Comment key={`${c.at}-${i}`} comment={c} forgeImages={forgeImages} />)}
-          </section>
-        )}
-        {writes && detail.value && <WorkCommentBox store={store} host={detail.value.host} node={node} wrote={() => void reread()} />}
-        {detail.value && (kind === "issue" || kind === "pr") && (
-          <WorkDocs store={store} itemRef={ref} title={detail.value.got.item.title} body={detail.value.got.body} asked={asked.value} />
-        )}
+        {got && detail.value && (writes
+          ? <WorkCommentBox store={store} host={detail.value.host} node={node} noun={kind === "pr" ? "pull request" : "issue"}
+              closes={kind === "issue" && !got.transitions ? got.item.state : undefined} said={kind === "issue" ? said.value : undefined}
+              wrote={(w, failed) => { said.value = { words: w, failed }; if (!failed) void reread(); }} />
+          : <p class="quiet small work-no-writes">No machine of yours can write to {forgeName(ref)}.</p>)}
       </div>
       {item && (
-        <aside class="work-side links" aria-label="Linked and lineage">
-          <SideSection title="Linked">
-            {item.parent ? (
-              <button type="button" class="work-mini-row" onClick={() => go({ nav: "work", section: "issue", item: item.parent!.ref })}>
-                <StateIcon kind="issue" state="open" size={14} /><span>{shortRef(item.parent.ref)}</span><span class="quiet">parent</span>
-              </button>
-            ) : <span class="quiet">None</span>}
-          </SideSection>
-          <SideSection title="Lineage">
-            {lineage.length === 0 ? <span class="quiet">None</span> : lineage.map((w) => <span key={w}>{w}</span>)}
-          </SideSection>
+        <aside class="work-side links" aria-label="Linked, lineage and docs">
+          {(item.parent || item.progress) && (
+            <SideSection title="Linked">
+              {item.parent && (
+                <button type="button" class="work-mini-row" onClick={() => go({ nav: "work", section: "issue", item: item.parent!.ref })}>
+                  <StateIcon kind="issue" state="open" size={14} /><span>{shortRef(item.parent.ref)}</span><span class="quiet">parent</span>
+                </button>
+              )}
+              {item.progress && (
+                <span class="work-progress">
+                  <progress max={Math.max(item.progress.total, 1)} value={item.progress.done} />
+                  <span class="quiet small">{item.progress.done} of {item.progress.total} closed</span>
+                </span>
+              )}
+            </SideSection>
+          )}
+          {hasLineage && (
+            <SideSection title="Lineage">
+              {counts && <span>{counts}</span>}
+              {sessions.map(session)}
+              {showsEst && estimate.value && (
+                <span class="quiet small work-estimate" title={estimateRangeWords(estimate.value)}>
+                  {[estimateLine(estimate.value), ...spentWords ? [spentWords] : []].join(" · ")}</span>
+              )}
+              {!isOpen && actual && <span class="quiet small">{actual}</span>}
+              {pipeline.value.length > 0 && (
+                <span class="small work-pipeline">{pipeline.value.map((s, i) => (
+                  <Fragment key={i}>{i > 0 && " · "}{s.url ? <a href={s.url} target="_blank" rel="noopener noreferrer">{s.words}</a> : <span class="quiet">{s.words}</span>}</Fragment>
+                ))}</span>
+              )}
+            </SideSection>
+          )}
+          {(kind === "issue" || kind === "pr") && (
+            <WorkDocs store={store} itemRef={ref} title={item.title} body={got?.body ?? ""} asked={asked.value} />
+          )}
         </aside>
+      )}
+      </>
       )}
       </div>
     </article>
   );
 }
 
-/** One section of the side panel: a small grey heading, then its value. */
-function SideSection({ title, children }: { title: string; children: ComponentChildren }) {
+/** The page header's state pill (note 6, parts.md section 1): the state's glyph and word, Open, Closed, Merged, Draft,
+ * on the state's colour. A tracker's status (a Jira status, #3260) with no write is its word in the pill. */
+function PagePill({ kind, state, draft, status }: { kind: string; state: string; draft?: boolean | undefined; status?: string | undefined }) {
+  if (!state) return <span class="work-state placeholder" aria-hidden="true">Open</span>;
+  if (status || !stateGlyph(kind, state, draft)) return <StatePill state={state} draft={draft} status={status} />;
+  const word = draft && state === "open" ? "Draft" : state.charAt(0).toUpperCase() + state.slice(1);
+  return <span class={`work-state with-glyph ${draft && state === "open" ? "draft" : state}`}><StateIcon kind={kind} state={state} draft={draft} size={14} />{word}</span>;
+}
+
+/** Open on GitHub's glyph: a square with an arrow out of it. */
+function OpenGlyph() {
+  return <svg class="work-open-glyph" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.5h4v4M13.5 2.5 7.5 8.5M12 9.5v3.25a.75.75 0 0 1-.75.75h-8a.75.75 0 0 1-.75-.75v-8A.75.75 0 0 1 3.25 4H6.5" /></svg>;
+}
+
+/** One section of the side panel: a small grey heading, then its value. `edit`, where the person can change it, is the
+ * gear on the heading (note 12); it is faint until the pointer is on the section, as on the Mac. */
+function SideSection({ title, edit, editing, children }: { title: string; edit?: (() => void) | undefined; editing?: boolean; children: ComponentChildren }) {
   return (
     <section class="work-side-section">
-      <h3>{title}</h3>
+      <h3>{title}{edit && (
+        <button type="button" class="work-gear" aria-label={`Edit ${title.toLowerCase()}`} title={`Edit ${title.toLowerCase()}`} aria-expanded={editing === true}
+          onClick={edit}>
+          {/* A cog: its teeth are a dashed ring round a ring. */}
+          <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.7" stroke-width="2.4" stroke-dasharray="2.24 2.24" />
+            <circle cx="8" cy="8" r="4.3" stroke-width="1.6" /><circle cx="8" cy="8" r="1.4" stroke-width="1.3" /></svg>
+        </button>
+      )}</h3>
       <div class="value">{children}</div>
     </section>
   );
 }
 
-/** A comment on the timeline (#4392, parts.md section 6): its avatar on the line, the author, when, and the body in a
- * box; a bot's with a small "bot" capsule. */
-function Comment({ comment: c, forgeImages }: { comment: ForgeComment; forgeImages: ForgeImages | undefined }) {
+/** A box on the timeline (parts.md section 6): its avatar on the line, the author, when, and the body in a box; a bot's
+ * with a small "bot" capsule. `words` says what in place of "commented 20 min ago" (the body's "opened this"); `empty`
+ * what an empty body says. On a page under 700 px the CSS puts the avatar in the box's header, 20 px. */
+function Comment({ comment: c, words, empty, forgeImages }: { comment: ForgeComment; words?: string; empty?: string; forgeImages: ForgeImages | undefined }) {
   const at = fromWireDate(c.at);
   return (
     <div class="work-comment">
       <Avatar login={c.author} size={28} />
       <div class="work-comment-main">
         <p class="small">
+          <span class="work-comment-small-avatar"><Avatar login={c.author} size={20} /></span>
           <span class="strong">{c.author}</span>
           {c.bot && <span class="work-bot">bot</span>}
-          <span class="quiet" title={at.toLocaleString()}> commented {ago(at)}</span>
+          <span class="quiet" title={words ? undefined : at.toLocaleString()}> {words ?? `commented ${ago(at)}`}</span>
         </p>
-        <div class="work-comment-body"><Markdown text={forgeMarkdown(c.body)} forgeImages={forgeImages} /></div>
+        <div class="work-comment-body">
+          {c.body.trim() || !empty ? <Markdown text={forgeMarkdown(c.body)} forgeImages={forgeImages} /> : <p class="quiet">{empty}</p>}
+        </div>
       </div>
     </div>
   );
 }
 
 /** Previous and Next through the list the page was opened from (#3257), j and k, and where the page
- * stands in it. Each replaces the place, so Back goes to the list. None on a page opened from a link or an address. */
+ * stands in it: ↑ 3 of 42 ↓, and 3/42 on a 390 px page. Each replaces the place, so Back goes to the list. None on a
+ * page opened from a link or an address. */
 function Stepper({ store, kind, at }: { store: Store; kind: WorkKind; at: string }) {
   const n = pageNeighbours(kind, at);
   const l = workList(kind);
@@ -530,7 +708,7 @@ function Stepper({ store, kind, at }: { store: Store; kind: WorkKind; at: string
   return (
     <span class="work-stepper">
       <button type="button" title="Previous (k)" aria-label="Previous" disabled={!n.previous} onClick={() => to(n.previous)}>↑</button>
-      <span class="quiet small">{positionWords(n, more)}</span>
+      <span class="quiet small"><span class="wide-line">{positionWords(n, more)}</span><span class="short-line">{shortPositionWords(n, more)}</span></span>
       <button type="button" title="Next (j)" aria-label="Next" disabled={(!n.next && !more) || l.more.value} onClick={() => void next()}>
         {l.more.value ? "…" : "↓"}</button>
     </span>

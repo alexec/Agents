@@ -599,3 +599,27 @@ export function parseWorkQuery(query: string, kind: WorkKind): { filter: WorkFil
 }
 
 export const connectForge = (kind: WorkKind) => `Connect a forge to see ${kind === "pr" ? "pull requests" : "issues"}`;
+
+// The issue page in the Work look (#4402, specs/4328-work-look/issue.md), as the window's WorkItemPage (#4400).
+
+/** The state line's words, wide and narrow: "alexec opened this · updated 2 hours ago · 4 comments" and "alexec · 2 h ·
+ * 4 comments". The opened and closed times come with #4373, so the age is the last update's. */
+export function pageStateWords(p: { author?: string | undefined; updated?: Date | undefined; comments: number }, now: Date = new Date()):
+  { wide: string; short: string } {
+  const comments = p.comments > 0 ? [p.comments === 1 ? "1 comment" : `${p.comments} comments`] : [];
+  const age = p.updated ? ago(p.updated, now) : undefined;
+  return {
+    wide: [...p.author ? [`${p.author} opened this`] : [], ...age ? [age === "just now" ? "updated just now" : `updated ${age}`] : [], ...comments].join(" · "),
+    short: [...p.author ? [p.author] : [], ...p.updated ? [shortAge(Math.max(0, (now.getTime() - p.updated.getTime()) / 1000))] : [], ...comments].join(" · "),
+  };
+}
+
+/** "3/42" (and "3/42+" while more can load): where the page stands, on a 390 px page's bar. */
+export function shortPositionWords(n: Neighbours, more: boolean): string {
+  return `${n.position}/${n.count}${more ? "+" : ""}`;
+}
+
+/** The Lineage section's first line: "$0.42 · 1 session"; empty when it knows neither. */
+export function lineageCountWords(cost: string | undefined, sessions: number): string {
+  return [...cost ? [cost] : [], ...sessions === 0 ? [] : [sessions === 1 ? "1 session" : `${sessions} sessions`]].join(" · ");
+}
