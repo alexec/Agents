@@ -118,6 +118,24 @@ daemon and the clients never look into it. An answer with no `cursor` is the las
 cursor that the server cannot read any more (too old, its store moved on) is a tool error
 that says so, and the caller starts again with no cursor.
 
+## How the daemon reads it
+
+Each machine's daemon has two methods for the Messages page (#4343,
+`Go/internal/agentsd/messages.go`):
+
+- **`messages/conversations`** calls `list_conversations` on every connector in the Messaging
+  slot that follows the contract, in the folders' and the person's `mcp.json`. It merges the
+  answers by `lastActivity`, newest first, one page at a time, with a cursor for each
+  connector, as the forge lists merge forges. The daemon leaves out a connector that does
+  not follow the contract and says nothing. It also leaves out a connector that fails or does
+  not answer in 15 seconds, and gives that connector's error in `errors`. The other
+  connectors' conversations still come.
+- **`messages/read`** calls `read_messages` on the connector that lists the conversation,
+  named by its `server` and `folder`.
+
+The clients merge the machines' answers, one copy per conversation. The control plane only
+relays them and never stores message text (`docs/explanation/direction.md`).
+
 ## Who sent it: the sender
 
 `sender` is the same `ChannelSender` that a message event carries for a channel link (#1762,

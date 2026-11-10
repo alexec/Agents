@@ -7355,6 +7355,74 @@ type MessageSender struct {
 	Title string `json:"title"`
 }
 
+// One conversation in messages/conversations (#4343): the connector it is on (server, its name in mcp.json, and a folder that reaches it, which messages/read takes) and the conversation as the connector's list_conversations gave it.
+type MessagesConversation struct {
+	Server string `json:"server"`
+
+	Folder string `json:"folder"`
+
+	Conversation MessagingConversation `json:"conversation"`
+}
+
+// messages/conversations (#4343): a page of the conversations of every connector in the Messaging slot that follows the messaging contract, merged by lastActivity, the newest first. cursor is the next page, absent at the end. errors says a connector that failed or did not answer in time, and the conversations of the others still come.
+type MessagesConversations struct {
+	Conversations []MessagesConversation `json:"conversations"`
+
+	Cursor *string `json:"cursor,omitzero"`
+
+	Errors []MessagesError `json:"errors,omitzero"`
+}
+
+// messages/conversations (#4343): the conversations of every folder's messaging connectors on this machine, or of one folder's. limit is 1 to 100, 20 when not said; cursor is the last page's. unread: only the conversations with unread messages.
+type MessagesConversationsRequest struct {
+	Folder *string `json:"folder,omitzero"`
+
+	Cursor *string `json:"cursor,omitzero"`
+
+	Limit *int64 `json:"limit,omitzero"`
+
+	Unread *bool `json:"unread,omitzero"`
+}
+
+// A connector messages/conversations could not read (#4343): its name in mcp.json, a folder that reaches it, and why, in a sentence.
+type MessagesError struct {
+	Server string `json:"server"`
+
+	Folder string `json:"folder"`
+
+	Message string `json:"message"`
+}
+
+// messages/read (#4343): one page of a conversation's messages, newest first, as the connector's read_messages gave it. cursor gives the older page; absent on the last. untrusted is always true: every text is outside content.
+type MessagesRead struct {
+	Server string `json:"server"`
+
+	Folder string `json:"folder"`
+
+	Conversation string `json:"conversation"`
+
+	Messages []MessagingMessage `json:"messages"`
+
+	Cursor *string `json:"cursor,omitzero"`
+
+	Untrusted bool `json:"untrusted"`
+}
+
+// messages/read (#4343): a conversation from messages/conversations, by its server, folder and id. cursor is the last page's; thread: only that thread's messages; limit is 1 to 100, 20 when not said.
+type MessagesReadRequest struct {
+	Server string `json:"server"`
+
+	Folder string `json:"folder"`
+
+	Conversation string `json:"conversation"`
+
+	Cursor *string `json:"cursor,omitzero"`
+
+	Thread *string `json:"thread,omitzero"`
+
+	Limit *int64 `json:"limit,omitzero"`
+}
+
 // One conversation in a messaging contract server's list_conversations (#4338, docs/reference/messaging-contract.md): a channel, a space, a direct chat or a mail thread. source is the service (slack, email, googlechat, whatsapp, or the server's own word), the same word as ChannelSender.channel. unread is the service's own count of unread messages; absent when the service does not say. lastActivity is the newest message's time.
 type MessagingConversation struct {
 	Source string `json:"source"`

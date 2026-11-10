@@ -5745,6 +5745,56 @@
       }
     },
     {
+      "name": "messages/conversations",
+      "x-capability": "messages/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MessagesConversationsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/MessagesConversations"
+        }
+      }
+    },
+    {
+      "name": "messages/read",
+      "x-capability": "messages/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MessagesReadRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/MessagesRead"
+        }
+      }
+    },
+    {
       "name": "modes/changed",
       "x-capability": "modes/1",
       "tags": [

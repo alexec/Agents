@@ -6468,6 +6468,79 @@ export interface MessageSender {
 }
 
 /**
+ * One conversation in messages/conversations (#4343): the connector it is on (server, its name in
+ * mcp.json, and a folder that reaches it, which messages/read takes) and the conversation as the
+ * connector's list_conversations gave it.
+ */
+export interface MessagesConversation {
+  server: string;
+  folder: string;
+  conversation: MessagingConversation;
+}
+
+/**
+ * messages/conversations (#4343): a page of the conversations of every connector in the Messaging
+ * slot that follows the messaging contract, merged by lastActivity, the newest first. cursor is the
+ * next page, absent at the end. errors says a connector that failed or did not answer in time, and
+ * the conversations of the others still come.
+ */
+export interface MessagesConversations {
+  conversations: MessagesConversation[];
+  cursor?: string;
+  errors?: MessagesError[];
+}
+
+/**
+ * messages/conversations (#4343): the conversations of every folder's messaging connectors on this
+ * machine, or of one folder's. limit is 1 to 100, 20 when not said; cursor is the last page's.
+ * unread: only the conversations with unread messages.
+ */
+export interface MessagesConversationsRequest {
+  folder?: string;
+  cursor?: string;
+  limit?: number;
+  unread?: boolean;
+}
+
+/**
+ * A connector messages/conversations could not read (#4343): its name in mcp.json, a folder that
+ * reaches it, and why, in a sentence.
+ */
+export interface MessagesError {
+  server: string;
+  folder: string;
+  message: string;
+}
+
+/**
+ * messages/read (#4343): one page of a conversation's messages, newest first, as the connector's
+ * read_messages gave it. cursor gives the older page; absent on the last. untrusted is always true:
+ * every text is outside content.
+ */
+export interface MessagesRead {
+  server: string;
+  folder: string;
+  conversation: string;
+  messages: MessagingMessage[];
+  cursor?: string;
+  untrusted: boolean;
+}
+
+/**
+ * messages/read (#4343): a conversation from messages/conversations, by its server, folder and id.
+ * cursor is the last page's; thread: only that thread's messages; limit is 1 to 100, 20 when not
+ * said.
+ */
+export interface MessagesReadRequest {
+  server: string;
+  folder: string;
+  conversation: string;
+  cursor?: string;
+  thread?: string;
+  limit?: number;
+}
+
+/**
  * One conversation in a messaging contract server's list_conversations (#4338,
  * docs/reference/messaging-contract.md): a channel, a space, a direct chat or a mail thread. source
  * is the service (slack, email, googlechat, whatsapp, or the server's own word), the same word as
@@ -13102,6 +13175,8 @@ export interface Methods {
   "mcp/health/check": { params: MCPHealthCheckRequest; result: MCPHealthSnapshot };
   "mcp/hosted": { params: Empty; result: HostedMCPSnapshot };
   "mcp/remove": { params: MCPRemoveRequest; result: MCPRemoveAnswer };
+  "messages/conversations": { params: MessagesConversationsRequest; result: MessagesConversations };
+  "messages/read": { params: MessagesReadRequest; result: MessagesRead };
   "modes/remembered": { params: Empty; result: Record<string, JSONValue> };
   "multiplier/state": { params: Empty; result: Multiplier };
   "options/remembered": { params: RememberedOptionsRequest; result: ConfigOption[] };
@@ -13513,6 +13588,8 @@ export const MethodTarget = {
   "mcp/health/check": "host",
   "mcp/hosted": "host",
   "mcp/remove": "host",
+  "messages/conversations": "host",
+  "messages/read": "host",
   "modes/remembered": "host",
   "multiplier/state": "host",
   "options/remembered": "host",
@@ -14320,6 +14397,12 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MarketplacesListAnswer: { required: ["marketplaces"], optional: ["problem"] },
   MarketplacesListRequest: { required: [], optional: ["kind", "destination"] },
   MessageSender: { required: ["agentID", "title"], optional: [] },
+  MessagesConversation: { required: ["server", "folder", "conversation"], optional: [] },
+  MessagesConversations: { required: ["conversations"], optional: ["cursor", "errors"] },
+  MessagesConversationsRequest: { required: [], optional: ["folder", "cursor", "limit", "unread"] },
+  MessagesError: { required: ["server", "folder", "message"], optional: [] },
+  MessagesRead: { required: ["server", "folder", "conversation", "messages", "untrusted"], optional: ["cursor"] },
+  MessagesReadRequest: { required: ["server", "folder", "conversation"], optional: ["cursor", "thread", "limit"] },
   MessagingConversation: { required: ["source", "id", "title", "kind"], optional: ["unread", "lastActivity", "link"] },
   MessagingConversations: { required: ["conversations"], optional: ["cursor"] },
   MessagingListRequest: { required: [], optional: ["cursor", "limit", "unread"] },
