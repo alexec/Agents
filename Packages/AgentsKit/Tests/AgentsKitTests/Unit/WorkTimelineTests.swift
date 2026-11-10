@@ -186,8 +186,27 @@ struct WorkTimelineTests {
         let room = WorkTimeline.labelRoom(line, from: x, axis: Self.axis, now: Self.now)
         #expect(room == 14)
         #expect(WorkTimeline.label(line, room: room, measure: measure) == nil)
-        #expect(WorkTimeline.label(line, room: 80, measure: measure) == "#19 · 0 of 1")
-        #expect(WorkTimeline.label(line, room: .infinity, measure: measure) == "Issue 19  #19 · 0 of 1")
+        #expect(WorkTimeline.label(line, room: 80, measure: measure)?.text == "#19 · 0 of 1")
+        #expect(WorkTimeline.label(line, room: .infinity, measure: measure)?.text == "Issue 19  #19 · 0 of 1")
+    }
+
+    @Test func aLongTitleIsCutWithAnEllipsisSoTheLabelFitsItsLine() {
+        let timeline = DaemonAPI.WorkTimeline(epics: [
+            Self.epic(19, [Self.child(60, started: -9, closed: -1)], segments: [(-9, -1)]),
+        ])
+        let line = WorkTimeline.lines(timeline, now: Self.now)[0]
+        let measure: (String) -> Double = { Double($0.count) * 6 }
+        let x = Self.axis.x(line.start)
+        // A closed line: the label stops at its end, not after it.
+        let room = WorkTimeline.labelRoom(line, from: x, axis: Self.axis, now: Self.now)
+        #expect(room == Self.axis.x(line.end) - x)
+        // "Issue 19  #19 · 1 of 1" is 22 characters; 20 keep "Issue…" and the figures.
+        let words = WorkTimeline.label(line, room: 20 * 6, measure: measure)
+        #expect(words?.title == "Issue…")
+        #expect(words?.text == "Issue…  #19 · 1 of 1")
+        // Room for one letter and "…": the name keeps one; less, and only the figures.
+        #expect(WorkTimeline.label(line, room: 16 * 6, measure: measure)?.text == "I…  #19 · 1 of 1")
+        #expect(WorkTimeline.label(line, room: 15 * 6, measure: measure)?.text == "#19 · 1 of 1")
     }
 
     @Test func aFeatureKeepsItsColour() {

@@ -581,9 +581,9 @@ private struct Drawing {
             let room = WorkTimeline.labelRoom(line, from: x, axis: axis, now: now) - (cutLeft ? 14 : 0)
             if let words = WorkTimeline.label(line, room: room, measure: WorkTimelinePane.measure) {
                 let arrow = cutLeft ? "← " : ""
-                let text: Text = words == line.label
-                    ? Text("\(Text(arrow).foregroundStyle(faint))\(Text(line.title).foregroundStyle(c))\(Text("  " + line.figures).foregroundStyle(faint))")
-                    : Text(arrow + words).foregroundStyle(faint)
+                let text: Text = words.title.isEmpty
+                    ? Text(arrow + words.figures).foregroundStyle(faint)
+                    : Text("\(Text(arrow).foregroundStyle(faint))\(Text(words.title).foregroundStyle(c))\(Text("  " + words.figures).foregroundStyle(faint))")
                 let resolved = gc.resolve(text.stepped(.fine))
                 let size = resolved.measure(in: CGSize(width: room.isFinite ? room + 20 : 2000, height: 20))
                 let halo = CGRect(x: x - 3, y: yl - 9 - size.height / 2 - 2, width: size.width + 6, height: size.height + 2)
