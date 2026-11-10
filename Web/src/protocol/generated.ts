@@ -4990,8 +4990,6 @@ export interface LineageCostNode {
   level?: string;
   /** An issue's feature: the name of its feature:<name> label (#3562). */
   feature?: string;
-  /** An issue's area: the name of its area:<name> label (#3562). */
-  area?: string;
   /** An issue's epic, by ref, as the forge's plan says it (#3562). */
   parent?: string;
   /** When a PR ended (#2351): merged, closed or reverted. Absent while open. */
@@ -9508,7 +9506,6 @@ export interface ReportNode {
   /** An issue's level, as LineageCostNode's (#3562). */
   level?: string;
   feature?: string;
-  area?: string;
   /** A PR's end, as LineageCostNode's; absent while open. */
   outcome?: string;
   /** The last change to it or any of its parts. */
@@ -14660,7 +14657,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Levels: { required: [], optional: ["model", "permission", "permissionRequests"] },
   LineMember: { required: ["agentID", "askedAt", "isCallOpen"], optional: [] },
   LineageCost: { required: ["cost", "inputTokens", "outputTokens", "turns", "workingSeconds", "waitingSeconds"], optional: ["limitTokens"] },
-  LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["repo", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "startedAt", "level", "feature", "area", "parent", "endedAt", "resolved", "sessions", "estimate"] },
+  LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["repo", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "startedAt", "level", "feature", "parent", "endedAt", "resolved", "sessions", "estimate"] },
   LineageCostRollup: { required: ["node", "own", "total", "waste", "unlinked", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "parts"], optional: ["limited"] },
   LineageEndRequest: { required: ["from", "to", "rel"], optional: [] },
   LineageEstimate: { required: ["node", "closedIssues", "matches"], optional: ["type", "level", "step", "matchedBy", "cost", "inputTokens", "outputTokens", "workingSeconds", "leadTimeSeconds", "cycleTimeSeconds", "landsAt", "openChildren", "closedChildren", "spent", "children", "kept", "actual"] },
@@ -15040,7 +15037,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ReportCounts: { required: ["sessions", "failedSessions", "prsOpened", "prsMerged", "prsReverted", "mergeSeconds", "waits", "waitBuckets", "workflowRuns", "workflowFailures"], optional: [] },
   ReportEstimateError: { required: ["issues"], optional: ["cost", "workingSeconds"] },
   ReportExport: { required: ["text", "count", "format"], optional: [] },
-  ReportNode: { required: ["node", "cost", "sessions", "lastAt"], optional: ["repo", "resolved", "leadTimeSeconds", "cycleTimeSeconds", "startedAt", "level", "feature", "area", "outcome"] },
+  ReportNode: { required: ["node", "cost", "sessions", "lastAt"], optional: ["repo", "resolved", "leadTimeSeconds", "cycleTimeSeconds", "startedAt", "level", "feature", "outcome"] },
   ReportNodeCost: { required: ["own", "total", "waste"], optional: [] },
   ReportNodes: { required: ["nodes", "limited", "unresolved"], optional: ["cursor"] },
   ReportNodesQuery: { required: ["kind"], optional: ["state", "repo", "label", "since", "sort", "cursor", "limit", "scope"] },

@@ -133,8 +133,8 @@ In the review worktree:
   --search "<ghsa_id> in:body"`): title `Dependency (<severity>): <package> <advisory
   title>`, a body with the alert's number and link, the advisory, the manifest, the
   patched version, Dependabot's pull request if any, and the finding's id; the labels
-  `priority:high` (critical and high) or `priority:medium`, `bug`, `dependencies`, and its
-  `area:<name>` from `.agents/areas` when the manifest has one. The release (its step 3)
+  `priority:high` (critical and high) or `priority:medium`, `bug` and `dependencies`. The
+  release (its step 3)
   collects these issues with its other high and medium ones, so a high alert blocks the
   release as any high finding does, and the Scrum Master's lanes fix it: they bump the
   dependency, or land Dependabot's own pull request when it is green. A low alert is only

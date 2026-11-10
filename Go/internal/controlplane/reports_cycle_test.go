@@ -22,7 +22,7 @@ func TestCycleTimeFromStartToMerge(t *testing.T) {
 	epic.Level, epic.Feature = str("epic"), str("estimates")
 	epic.StartedAt = at(1 * time.Hour)
 	story := node("issue", "github:o/r#2")
-	story.Level, story.Area, story.Parent = str("story"), str("lineage"), str(epic.Node.Ref)
+	story.Level, story.Parent = str("story"), str(epic.Node.Ref)
 	story.FirstAt, story.StartedAt = at(20*time.Hour), at(10*time.Hour)
 	pr := node("pr", "github:o/r#3")
 	pr.Fixes, pr.Outcome, pr.EndedAt, pr.StartedAt = []string{story.Node.Ref}, str("merged"), at(2*time.Hour), at(9*time.Hour)
@@ -76,7 +76,7 @@ func TestCycleTimeFromStartToMerge(t *testing.T) {
 	}
 	s, e := rows[story.Node.Ref], rows[epic.Node.Ref]
 	if s.CycleTimeSeconds == nil || *s.CycleTimeSeconds != hours(8) || s.StartedAt == nil || *s.StartedAt != *story.StartedAt ||
-		s.Level == nil || *s.Level != "story" || s.Area == nil || *s.Area != "lineage" {
+		s.Level == nil || *s.Level != "story" {
 		t.Fatalf("story row %+v", s)
 	}
 	if e.CycleTimeSeconds == nil || *e.CycleTimeSeconds != hours(8) || e.StartedAt == nil || *e.StartedAt != *story.StartedAt ||

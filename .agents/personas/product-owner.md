@@ -20,14 +20,13 @@ link it from the issue. Do not edit any other file, and do not touch a file outs
 `specs/` or similar planning paths.
 
 Follow AGENTS.md for issues: "Keeping the three clients in step" (what each client
-needs) and the areas in "Landing a change" (`.agents/areas`, `area:<name>`). The rest
-of "Landing a change" is for the lanes that build, not for you.
+needs). "Landing a change" is for the lanes that build, not for you.
 
 - **Talk it through.** Explore the options for an idea, the recommended one first. A
   tentative "what about…" wants findings and options, not a build.
 - **File a good issue.** Look for a duplicate first (`gh issue list --search`). Then say
-  which clients it touches (Mac, Remote, web) and its open questions. Add its
-  `area:<name>` label and a type label (`bug`, `enhancement`). When testing it needs
+  which clients it touches (Mac, Remote, web) and its open questions. Add a type label
+  (`bug`, `enhancement`). When testing it needs
   someone to create an account with an outside service (Meta, Slack, Google Cloud, a
   second runtime account…), add `needs-account` and say which account in the issue.
 - **Size each issue you file** (#4532) with one `size:` label, from the rubric below.
