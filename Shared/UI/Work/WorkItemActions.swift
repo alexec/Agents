@@ -1,12 +1,12 @@
 import AgentsKitCore
 import SwiftUI
 
-/// The actions on an issue's or a pull request's Work page (#3130), as the GitHub, GitLab and
-/// Linear views have them: Start Agent, labels and Close or Reopen on an issue (a Jira issue's
-/// status menu in their place, #3260); Merge, Approve, Rerun, the failed checks' logs and Show
-/// Diff on a pull request; a comment on either. Each goes to the machine that read the item
-/// (`forge/*`), as the person: their own click, so no approval card. `wrote` reads the page again
-/// after a write.
+/// The actions on a pull request's Work page (#3130), as the GitHub, GitLab and Linear views have
+/// them: Merge, Approve, Rerun, the failed checks' logs, Show Diff, Close or Reopen and Labels. Each
+/// goes to the machine that read the item (`forge/*`), as the person: their own click, so no
+/// approval card. `wrote` reads the page again after a write. An issue's actions are in its page's
+/// parts (#4400): Start Agent in the header, the status menu in the state pill's place, Labels on
+/// the side panel's gear, and Close or Reopen in the comment box.
 struct WorkItemActions: View {
     let model: any WorkModel
     @Environment(\.openURL) private var openURL
@@ -22,15 +22,16 @@ struct WorkItemActions: View {
 
     private var item: DaemonAPI.ForgeItem { detail.item }
     private var node: DaemonAPI.LineageNode { item.node }
-    private var isPR: Bool { node.kind == "pr" }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             // Wraps, so a phone's narrow page keeps every action.
             WrappingHStack(spacing: 8) {
-                if isPR { pullActions } else { issueActions }
+                pullActions
                 if let transitions = detail.transitions {
-                    statusMenu(transitions)
+                    WorkStatusMenu(item: item, transitions: transitions) { transition in
+                        act(DaemonAPI.Method.forgeClose, DaemonAPI.ForgeCloseRequest(node: node, transition: transition))
+                    }
                 } else if item.state == "open" || item.state == "closed" {
                     Button(WorkList.closeTitle(item.state)) {
                         act(DaemonAPI.Method.forgeClose,
@@ -44,7 +45,7 @@ struct WorkItemActions: View {
             #if os(iOS)
             .buttonStyle(.bordered)
             #endif
-            if isPR, !WorkList.failedChecks(detail).isEmpty { failedChecks }
+            if !WorkList.failedChecks(detail).isEmpty { failedChecks }
             if let said {
                 Text(said.words).appText(.supporting).foregroundStyle((said.failed ? StateTint.failure : .none).style(or: .secondary))
                     .textSelection(.enabled)
@@ -53,28 +54,6 @@ struct WorkItemActions: View {
         .sheet(item: $log) { log in WorkLogSheet(log: log) }
         .sheet(item: $diff) { diff in
             AppViewDiffPage(diff: diff, openLink: { openURL($0) })
-        }
-    }
-
-    // MARK: An issue's
-
-    @ViewBuilder
-    private var issueActions: some View {
-        if let start = detail.start {
-            Button("Start Agent") { startAgent(start) }
-                .buttonStyle(.borderedProminent)
-                .help("The new-agent form in this issue's folder, filled in for it")
-        }
-    }
-
-    private func startAgent(_ start: DaemonAPI.ForgeStart) {
-        guard let folder = item.folder else {
-            said = ("No folder on this machine is on this issue's repo.", true)
-            return
-        }
-        let offer = AppViewStart(prompt: start.prompt, labels: start.labels, worktree: start.worktree)
-        if let why = model.offerStart(offer, in: FolderKey(host: host, folder: URL(fileURLWithPath: folder))) {
-            said = (why, true)
         }
     }
 
@@ -146,23 +125,6 @@ struct WorkItemActions: View {
         }
     }
 
-    // MARK: A Jira issue's status
-
-    /// The moves its workflow allows now, as Jira shows them (#3260): a status is a step of a
-    /// workflow, not open or closed.
-    private func statusMenu(_ transitions: [DaemonAPI.ForgeTransition]) -> some View {
-        Menu(item.status ?? "Status") {
-            if transitions.isEmpty { Text("No moves") }
-            ForEach(transitions, id: \.id) { transition in
-                Button(transition.name) {
-                    act(DaemonAPI.Method.forgeClose, DaemonAPI.ForgeCloseRequest(node: node, transition: transition.id))
-                }
-            }
-        }
-        .fixedSize()
-        .help("Move it by its workflow")
-    }
-
     // MARK: Labels
 
     private var labelsMenu: some View {
@@ -211,45 +173,214 @@ struct WorkItemActions: View {
     }
 }
 
-/// A comment box under an item's comments (#3130): Markdown, sent as the person.
+/// A Jira issue's status menu (#3260), in the state pill's place: the moves its workflow allows
+/// now, as Jira shows them, since a status is a step of a workflow, not open or closed. `move`
+/// gets the transition's id.
+struct WorkStatusMenu: View {
+    let item: DaemonAPI.ForgeItem
+    let transitions: [DaemonAPI.ForgeTransition]
+    let move: (String) -> Void
+
+    var body: some View {
+        Menu(item.status ?? "Status") {
+            if transitions.isEmpty { Text("No moves") }
+            ForEach(transitions, id: \.id) { transition in
+                Button(transition.name) { move(transition.id) }
+            }
+        }
+        .fixedSize()
+        .help("Move it by its workflow")
+    }
+}
+
+/// The labels picker (#4400, issue.md note 12): a filter field and every label the repo has, a
+/// tick on each the item has; a click adds or takes off that one (`forge/label`). A popover on
+/// the Mac, a sheet on the Remote.
+struct WorkLabelsPicker: View {
+    let model: any WorkModel
+    let host: MachineRef
+    let item: DaemonAPI.ForgeItem
+    /// Adds (true) or takes off (false) a label.
+    let set: (String, Bool) -> Void
+
+    @State private var choices: [DaemonAPI.ForgeLabel]?
+    @State private var filter = ""
+    @Environment(\.dismiss) private var dismiss
+
+    private var shown: [DaemonAPI.ForgeLabel] {
+        let words = filter.trimmingCharacters(in: .whitespaces)
+        return (choices ?? []).filter { words.isEmpty || $0.name.localizedCaseInsensitiveContains(words) }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Apply labels").appText(.supporting).fontWeight(.semibold)
+                Spacer()
+                #if os(iOS)
+                Button("Done") { dismiss() }
+                #endif
+            }
+            .padding(.horizontal, 12).padding(.top, 10).padding(.bottom, 6)
+            TextField("Filter labels", text: $filter)
+                .textFieldStyle(.roundedBorder)
+                .padding(.horizontal, 12).padding(.bottom, 8)
+            Divider()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    if choices == nil {
+                        Text("Loading…").foregroundStyle(.secondary).padding(12)
+                    } else if shown.isEmpty {
+                        Text(filter.isEmpty ? "No labels" : "No labels match").foregroundStyle(.secondary).padding(12)
+                    }
+                    ForEach(shown, id: \.name) { label in
+                        let on = item.labels.contains { $0.name == label.name }
+                        Button { set(label.name, !on) } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "checkmark").opacity(on ? 1 : 0).accessibilityHidden(true)
+                                WorkLabelChip(label: label)
+                                Spacer(minLength: 0)
+                            }
+                            .padding(.horizontal, 12).padding(.vertical, 5)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(on ? .isSelected : [])
+                    }
+                }
+            }
+            #if os(macOS)
+            .frame(height: 260)
+            #endif
+        }
+        .appText(.supporting)
+        #if os(macOS)
+        .frame(width: 280)
+        #endif
+        .workTask(id: item.node) { await load() }
+    }
+
+    private func load() async {
+        do {
+            choices = try await model.forge(DaemonAPI.Method.forgeLabels, DaemonAPI.ForgeNodeRequest(node: item.node),
+                                            returning: DaemonAPI.ForgeLabels.self, on: host).labels
+        } catch {
+            choices = []
+        }
+    }
+}
+
+/// The comment box at the end of an item's timeline (#3130, #4400 note 11): the person's glyph
+/// and a Markdown field, then Close issue (Close with comment, with text in the field) or Reopen
+/// issue, and Comment (⌘↩). A pull request's close, and a tracker with a status menu, have Comment
+/// only. What a write did, or why not, is the line under the buttons.
 struct WorkCommentBox: View {
     let model: any WorkModel
     let host: MachineRef
     let node: DaemonAPI.LineageNode
-    let wrote: () -> Void
+    /// open or closed: the issue's close is here; nil when it is not (a pull request, a tracker's status).
+    var closes: String?
+    /// A narrow page: no avatar column, so the box takes the width.
+    var compact = false
+    /// What the page's last write did, under the buttons.
+    var said: (words: String, failed: Bool)?
+    /// After a write: what it did, and whether it failed.
+    let wrote: (String, Bool) -> Void
 
     @State private var text = ""
     @State private var sending = false
-    @State private var failure: String?
+
+    private var empty: Bool { text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            TextEditor(text: $text)
-                .appText(.reading)
-                .frame(minHeight: 70, maxHeight: 160)
-                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.separator))
-                .accessibilityLabel("New comment")
-            HStack {
-                if let failure { Text(failure).appText(.supporting).tinted(.failure) }
-                Spacer()
-                Button(sending ? "Sending…" : "Comment") { Task { await send() } }
-                    .disabled(sending || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    .keyboardShortcut(.return, modifiers: .command)
+        HStack(alignment: .top, spacing: 10) {
+            if !compact {
+                // The person's avatar comes with the forge's login for them (#4363); a person's glyph till then.
+                Image(systemName: "person.crop.circle.fill")
+                    // Sized to the timeline's avatar column, not to a text step: a marked decorative glyph.
+                    .font(.system(size: WorkTimelineEntry<EmptyView, EmptyView>.column))
+                    .foregroundStyle(.tertiary)
+                    .frame(width: WorkTimelineEntry<EmptyView, EmptyView>.column)
+                    .accessibilityHidden(true)
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                TextEditor(text: $text)
+                    .appText(.reading)
+                    .scrollContentBackground(.hidden)
+                    .padding(6)
+                    .frame(height: 96)
+                    .background(RoundedRectangle(cornerRadius: Paper.Radius.card).fill(Paper.raised))
+                    .overlay(RoundedRectangle(cornerRadius: Paper.Radius.card).strokeBorder(Paper.rule))
+                    .overlay(alignment: .topLeading) {
+                        if text.isEmpty {
+                            Text("Comment, in Markdown").appText(.reading).foregroundStyle(.tertiary)
+                                .padding(.horizontal, 11).padding(.vertical, 6)
+                                .allowsHitTesting(false)
+                        }
+                    }
+                    .accessibilityLabel("New comment")
+                HStack(spacing: 8) {
+                    if sending { ProgressView().controlSize(.small) }
+                    Spacer()
+                    if let closes { closeButton(closes) }
+                    Button("Comment") { Task { await comment() } }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(sending || empty)
+                        .keyboardShortcut(.return, modifiers: .command)
+                }
+                .disabled(sending)
+                if let said {
+                    Text(said.words).appText(.supporting)
+                        .foregroundStyle((said.failed ? StateTint.failure : .none).style(or: .secondary))
+                        .textSelection(.enabled)
+                }
             }
         }
     }
 
-    private func send() async {
+    /// Close issue, or Close with comment when the field has text: as on GitHub, so a close can
+    /// say why. Close as not planned comes with `forge/close`'s reason (#4400, task 5).
+    @ViewBuilder
+    private func closeButton(_ state: String) -> some View {
+        if state == "open" {
+            Button(empty ? "Close issue" : "Close with comment", systemImage: "checkmark.circle") { Task { await close(reopen: false) } }
+                .help("Close it as completed")
+        } else {
+            Button(empty ? "Reopen issue" : "Reopen with comment", systemImage: "arrow.uturn.backward.circle") {
+                Task { await close(reopen: true) }
+            }
+        }
+    }
+
+    private func comment() async -> Bool {
         sending = true
-        failure = nil
         defer { sending = false }
         do {
-            _ = try await model.forge(DaemonAPI.Method.forgeComment, DaemonAPI.ForgeCommentRequest(node: node, body: text),
-                                      returning: DaemonAPI.ForgeDone.self, on: host)
+            let done = try await model.forge(DaemonAPI.Method.forgeComment, DaemonAPI.ForgeCommentRequest(node: node, body: text),
+                                             returning: DaemonAPI.ForgeDone.self, on: host)
             text = ""
-            wrote()
+            wrote(WorkList.doneWords(DaemonAPI.Method.forgeComment, done), false)
+            return true
         } catch {
-            failure = error.localizedDescription
+            wrote(WorkList.failureWords(error), true)
+            return false
+        }
+    }
+
+    /// The comment first, when there is one, then the close or the reopen.
+    private func close(reopen: Bool) async {
+        if !empty {
+            guard await comment() else { return }
+        }
+        sending = true
+        defer { sending = false }
+        do {
+            let done = try await model.forge(DaemonAPI.Method.forgeClose,
+                                             DaemonAPI.ForgeCloseRequest(node: node, reopen: reopen ? true : nil),
+                                             returning: DaemonAPI.ForgeDone.self, on: host)
+            wrote(WorkList.doneWords(DaemonAPI.Method.forgeClose, done, reopened: reopen), false)
+        } catch {
+            wrote(WorkList.failureWords(error), true)
         }
     }
 }
