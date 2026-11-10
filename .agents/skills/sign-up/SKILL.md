@@ -21,7 +21,8 @@ against. It is never Alex's personal account.
   sign-ins.
 - **Never sign in to Alex's existing accounts** (DigitalOcean, AWS root, Microsoft, or any
   other). The new account uses the agents' own mailbox, **agentloops@fastmail.com** (#1780,
-  #3912), not Alex's address. Accounts made before 2026-11-09 use agentstest@alexecollins.com.
+  #3912), not Alex's address. Accounts made before 2026-11-09 use agentstest@alexecollins.com
+  ("Email codes").
 - **Accept terms and conditions for Alex** without asking (Alex authorised it, 2026-10-16).
 - **Decline cookie banners**: turn off every optional group, then confirm. **Untick every
   marketing box** on the form; some are ticked by default.
@@ -103,9 +104,10 @@ need not run. `scripts/mail-code.py` runs the server (`email-mcp`, in Agents.app
 
 A session that has the `email` connector (Connectors ▸ Email) can do the same with
 `wait_for_event` on `email.received` (`from`, `subject`, `authenticated: "true"`), then
-`read_message` with the event's id. An account made with agentstest@alexecollins.com still
-gets its mail by the Mail rule in `~/.agents/mail` (new mail in Inbox only, while Mail runs),
-until Alex moves it to the agents' mailbox.
+`read_message` with the event's id. An account made with agentstest@alexecollins.com gets its
+mail only in Alex's own mailbox: the Mail rule that saved it to `~/.agents/mail` is gone
+(Alex, 2026-11-09). When such an account needs a code, change its address (#4303) to
+agentloops@fastmail.com where the site lets you, or ask Alex with `ask_question`.
 
 ## Where things live
 
