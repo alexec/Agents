@@ -157,7 +157,29 @@ func (s *starter) starts() []string {
 // started, nothing is.
 func TestABotsMachineIsStartedOnceForItsTriggers(t *testing.T) {
 	t.Parallel()
-	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), nil)
+	// The plane's log says what it did with each trigger, so a check that nothing was started
+	// waits for that, not for a time (#4125).
+	var logMu sync.Mutex
+	var logged []string
+	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(cfg *Config) {
+		log := cfg.Log
+		cfg.Log = func(l string) {
+			logMu.Lock()
+			logged = append(logged, l)
+			logMu.Unlock()
+			log(l)
+		}
+	})
+	said := func(trigger, what string) bool {
+		logMu.Lock()
+		defer logMu.Unlock()
+		for _, l := range logged {
+			if strings.Contains(l, trigger+", and "+what) {
+				return true
+			}
+		}
+		return false
+	}
 	f := &fires{asked: map[string]int{}, ran: map[string]int{}, takes: func(string) bool { return true }}
 	p.asked = f.answer
 	clock := time.Now()
@@ -182,23 +204,30 @@ func TestABotsMachineIsStartedOnceForItsTriggers(t *testing.T) {
 	}
 	first := min(b1.member.Host, b2.member.Host)
 	samsMac := p.machine(sam, "MACHINE-S")
-	send := func(i int) {
+	// Each trigger is due a minute before the last, from one minute: a due time read from the
+	// clock at each send gave two sends either side of a minute the same trigger, and the
+	// second was refused as claimed already (#4125).
+	base := time.Now().Truncate(time.Minute)
+	send := func(i int) string {
 		t.Helper()
-		due := wire.DateOf(time.Now().Truncate(time.Minute).Add(-time.Duration(i) * time.Minute))
-		trigger, _ := json.Marshal(wire.TeamTrigger{Workflow: "app/nightly", Trigger: wire.ScheduleTriggerID(due.Time()), RunsOn: []string{"review-bot"}, DueAt: &due})
+		due := wire.DateOf(base.Add(-time.Duration(i) * time.Minute))
+		id := wire.ScheduleTriggerID(due.Time())
+		trigger, _ := json.Marshal(wire.TeamTrigger{Workflow: "app/nightly", Trigger: id, RunsOn: []string{"review-bot"}, DueAt: &due})
 		out, err := p.s.methods.HostSaid(samsMac.member.Host, "workflows/trigger", trigger)
 		if err != nil || !out.(wire.TeamTriggerSent).Taken {
 			t.Fatalf("%v %v", out, err)
 		}
+		return id
 	}
-	waitStarts := func(n int) {
+	// waitStarts waits until the last trigger sent was dealt with (done), then wants n starts.
+	waitStarts := func(n int, done func() bool) {
 		t.Helper()
-		p.waitFor(func() bool { return len(fake.starts()) >= n }, "a start")
-		time.Sleep(100 * time.Millisecond)
+		p.waitFor(func() bool { return len(fake.starts()) >= n && done() }, "a start")
 		if got := fake.starts(); len(got) != n {
 			t.Fatalf("started %v, want %d starts", got, n)
 		}
 	}
+	started := func() bool { return true }
 	waiting := func() int {
 		p.s.starts.mu.Lock()
 		defer p.s.starts.mu.Unlock()
@@ -213,7 +242,7 @@ func TestABotsMachineIsStartedOnceForItsTriggers(t *testing.T) {
 		send(i)
 	}
 	p.waitFor(func() bool { return waiting() == waitingMost }, "20 waiting")
-	waitStarts(1)
+	waitStarts(1, started)
 	if fake.starts()[0] != first {
 		t.Fatalf("started %v", fake.starts())
 	}
@@ -228,32 +257,35 @@ func TestABotsMachineIsStartedOnceForItsTriggers(t *testing.T) {
 	// Online and taking: no start.
 	send(100)
 	p.waitFor(func() bool { _, ran := f.total(); return ran == waitingMost+1 }, "run on the machine online")
-	waitStarts(1)
+	waitStarts(1, started)
 
 	// Gone again, and within 15 minutes of the start: no second start, nothing kept.
 	joined.stop()
 	p.waitFor(func() bool { s, _ := p.s.Router().State(joined.member.Host); return !s.online() }, "offline")
-	send(101)
-	waitStarts(1)
+	id := send(101)
+	waitStarts(1, func() bool { return said(id, "none was started again so soon") })
+	if waiting() != 0 {
+		t.Fatalf("%d waiting", waiting())
+	}
 
 	// Past it: one start again; a start that never joins is not tried again within 15 minutes.
 	later(startPatience + time.Minute)
 	send(102)
-	waitStarts(2)
+	waitStarts(2, started)
 	later(5 * time.Minute)
 	send(103)
-	waitStarts(2)
+	waitStarts(2, func() bool { return waiting() == 2 })
 	later(startPatience)
 	send(104)
-	waitStarts(3)
+	waitStarts(3, started)
 
 	// No machine that may be started: nothing is.
 	fake.mu.Lock()
 	fake.may = map[string]bool{}
 	fake.mu.Unlock()
 	later(startPatience + time.Minute)
-	send(105)
-	waitStarts(3)
+	id = send(105)
+	waitStarts(3, func() bool { return said(id, "none can be started") })
 	if _, ran := f.total(); ran != waitingMost+1 {
 		t.Fatalf("ran %d", ran)
 	}
