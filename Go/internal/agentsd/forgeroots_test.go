@@ -113,3 +113,35 @@ func TestBitbucketConnectedAfterTheFolderListsItsPullRequests(t *testing.T) {
 		t.Fatalf("Bitbucket was asked %v", bb.searches)
 	}
 }
+
+// #4118: a folder on a self-hosted GitLab whose host does not say "gitlab" is GitLab's in
+// lineage while that GitLab is connected, as a Forgejo or an Azure DevOps Server of any name is.
+func TestLineageOnASelfHostedGitLabOfAnyName(t *testing.T) {
+	d, c, _, file := forgeDaemon(t)
+	folder := gitFolder(t, "git@git.corp.example:Platform/API.git")
+	c.call(t, 100, "folders/add", map[string]any{"folder": "file://" + folder})
+	if r := d.folderRepo(folder); r.forge != "" {
+		t.Fatalf("with no GitLab connection: %+v", r)
+	}
+	gitlab := connections.Connection{Provider: connections.GitLab, Login: "kim", Access: "gloas-secret", URL: "https://git.corp.example/",
+		AccessExpiresAt: time.Now().Add(time.Hour), ConnectedAt: time.Now()}
+	file.Put(gitlab)
+	if r := d.folderRepo(folder); r != (forgeRepo{"gitlab", "platform/api"}) {
+		t.Fatalf("on the connected GitLab: %+v", r)
+	}
+	if n, ok := d.labelNode(folder, "P#4"); !ok || n != (wire.LineageNode{Kind: "pr", Ref: "gitlab:platform/api!4"}) {
+		t.Fatalf("its P#4: %+v", n)
+	}
+
+	// Another GitLab connected, or none: the folder is on no forge lineage knows.
+	other := gitlab
+	other.URL = connections.GitLabCom
+	file.Put(other)
+	if r := d.folderRepo(folder); r.forge != "" {
+		t.Fatalf("with gitlab.com connected: %+v", r)
+	}
+	file.Delete(connections.GitLab)
+	if r := d.folderRepo(folder); r.forge != "" {
+		t.Fatalf("with no GitLab connection: %+v", r)
+	}
+}

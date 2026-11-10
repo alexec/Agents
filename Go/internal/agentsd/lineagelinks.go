@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/bitbucketmcp"
+	"github.com/alexec/agents/Go/internal/gitlabmcp"
 	"github.com/alexec/agents/Go/internal/lineage"
 	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
@@ -171,8 +172,8 @@ func (r forgeRepo) pr(n int) wire.LineageNode {
 
 // forgeOf is the forge a remote is on: github.com, a host whose name says GitLab, codeberg.org
 // or a host whose name says Forgejo or Gitea (as forgejomcp.RepoAt finds one), bitbucket.org,
-// or Azure DevOps Services (dev.azure.com, <org>.visualstudio.com). A Forgejo or an Azure
-// DevOps Server of another name is the connected one's, which folderRepo asks for.
+// or Azure DevOps Services (dev.azure.com, <org>.visualstudio.com). A Forgejo, a GitLab or an
+// Azure DevOps Server of another name is the connected one's, which folderRepo asks for.
 func forgeOf(host, path string) forgeRepo {
 	path = repoPath(path)
 	switch host = strings.ToLower(host); {
@@ -326,7 +327,7 @@ func jiraKeys(text string, jira []string) []string {
 }
 
 // folderRepo is the forge repo a folder pushes to, from its origin remote: on a host whose name
-// says its forge, or on the connected Forgejo or Azure DevOps Server.
+// says its forge, or on the connected Forgejo, GitLab or Azure DevOps Server.
 func (d *Daemon) folderRepo(folder string) forgeRepo {
 	d.repoMu.Lock()
 	r, ok := d.repos[folder]
@@ -365,10 +366,14 @@ func (d *Daemon) folderRepo(folder string) forgeRepo {
 	return r
 }
 
-// connectedRepo is folder's repo on the connected Forgejo, else on the connected Azure DevOps
-// Server, as the Work pages find each (azureDevOpsRepoAt), or none.
+// connectedRepo is folder's repo on the connected Forgejo, else on the connected GitLab (#4118),
+// else on the connected Azure DevOps Server, as the Work pages find each (azureDevOpsRepoAt), or
+// none.
 func (d *Daemon) connectedRepo(folder string) forgeRepo {
 	if r := d.connectedForgejoRepo(folder); r.forge != "" {
+		return r
+	}
+	if r := d.connectedGitLabRepo(folder); r.forge != "" {
 		return r
 	}
 	if _, repo := d.azureDevOpsRepoAt(context.Background(), folder); repo != "" {
@@ -386,6 +391,19 @@ func (d *Daemon) connectedForgejoRepo(folder string) forgeRepo {
 	}
 	if at, repo := d.forgejoRepoAt(context.Background(), folder, c.URL); at == root && repo != "" {
 		return forgeRepo{"forgejo", repoPath(repo)}
+	}
+	return forgeRepo{}
+}
+
+// connectedGitLabRepo is folder's project on the connected GitLab, as the Work pages find it
+// (gitlabProjectAt), or none: a self-hosted GitLab's host need not say "gitlab".
+func (d *Daemon) connectedGitLabRepo(folder string) forgeRepo {
+	gl, connected := d.gitlabConnection()
+	if !connected || !gl.Usable(nowFunc()) {
+		return forgeRepo{}
+	}
+	if at, project := d.gitlabProjectAt(context.Background(), folder, gl.URL); at == gitlabmcp.BaseURL(gl.URL) && project != "" {
+		return forgeRepo{"gitlab", repoPath(project)}
 	}
 	return forgeRepo{}
 }
