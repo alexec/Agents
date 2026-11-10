@@ -15,8 +15,7 @@ import (
 // errForgeCannot from the method, for an earlier client. The conformance test
 // (forgeconformance_test.go) proves that the two agree on every forge.
 //
-// The forges move onto it one at a time (#4352–#4359). Until a forge moves, the old cases in
-// forge.go, forgewrite.go and forgeplan.go still read and write it, after the registry.
+// The forges moved onto it one at a time (#4352–#4359); Azure Boards was the last.
 
 // Forge is one forge or tracker behind the forge/* methods (#4329). It speaks the wire's types. A
 // method that the forge cannot do returns errForgeCannot with the reason, and Caps says so first,
@@ -236,7 +235,7 @@ type forgeChild struct {
 // forges is the registry: every forge that has moved onto Forge, in a fixed order.
 func (d *Daemon) forges() []Forge {
 	return []Forge{githubForge{d: d}, gitlabForge{d: d}, forgejoForge{d: d}, bitbucketForge{d: d}, azureDevOpsForge{d: d},
-		linearForge{d: d}, jiraForge{d: d}}
+		linearForge{d: d}, jiraForge{d: d}, azureBoardsForge{d: d}}
 }
 
 // forgeOwning is the forge that owns node, and its ref there.

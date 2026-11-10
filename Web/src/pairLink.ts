@@ -4,6 +4,7 @@
 // sees it, and replaced at once, so the tab's address and Back hold no code. The code is the
 // same one-use, five-minute browser code that is pasted, good only through this listener (R2).
 import { type OIDCReturn, oidcReturn } from "./model/signIn";
+import { parseCode } from "./wire/code";
 
 export const linkedCode: string | null = take();
 
@@ -23,9 +24,13 @@ function take(): string | null {
   const match = /^#code=([^&#]+)$/.exec(location.hash);
   if (!match) return null;
   history.replaceState(null, "", location.pathname + location.search);
+  const raw = match[1]!;
+  let decoded: string | null = null;
   try {
-    return decodeURIComponent(match[1]!);
-  } catch {
-    return null;
-  }
+    decoded = decodeURIComponent(raw);
+  } catch {}
+  // A code put in the address as `code` prints it, not escaped (#4129): its address and name keep
+  // their own escapes, so decoding it once more breaks it into too many fields. Take it as it is.
+  if (decoded !== null && !parseCode(decoded) && parseCode(raw)) return raw;
+  return decoded;
 }
