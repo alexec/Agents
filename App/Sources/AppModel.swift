@@ -401,7 +401,7 @@ final class AppModel {
         }
     }
 
-    /// Whether the window is showing Messages (#4344): the messaging connectors' conversations, read only,
+    /// Whether the window is showing Messages (#4344): the messaging connectors' conversations, with a reply (#4345),
     /// and a conversation's messages. A page like Docs, and not persisted for the same reason.
     var showsMessages = false {
         didSet {

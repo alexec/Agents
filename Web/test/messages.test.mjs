@@ -46,3 +46,9 @@ test("Messages is in the bar after Docs, and #/messages/<key> is a conversation'
   assert.deepEqual(route.parseRoute(hash), { nav: "messages", section: "messages", item: "slack:C1" });
   assert.deepEqual(route.parseRoute("#/messages"), { nav: "messages" });
 });
+
+test("the reply field (#4345) sends trimmed text and says who it goes as", () => {
+  assert.equal(m.replyText("  On it.\n"), "On it.");
+  assert.equal(m.replyText(" \n "), undefined);
+  assert.equal(m.sentAs("the Slack bot @agents"), "Sent as the Slack bot @agents, not as an agent.");
+});

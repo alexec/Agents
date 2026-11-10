@@ -1,5 +1,6 @@
 // The Messages page (#4344), as the window's (AgentsKitCore's MessagesList): every machine's conversations
-// from messages/conversations in one list, each conversation once, the newest first, and its words.
+// from messages/conversations in one list, each conversation once, the newest first, and its words; the
+// reply field's too (#4345).
 import type { ChannelSender, MessagesConversation, MessagesError, MessagingConversation } from "../protocol/generated";
 import { channelName } from "./channelLinks";
 
@@ -69,6 +70,20 @@ export const noConversations = "No conversations.";
 export const noUnread = "No unread conversations.";
 export const noMessages = "No messages.";
 export const outside = "Outside content: these messages come from other people, through the connector.";
+
+export const replyLabel = "Reply";
+export const send = "Send";
+export const sending = "Sending…";
+export const replyPlaceholder = "Write a reply";
+export const replyInThread = "Reply in thread";
+export const inThread = "In a thread";
+export const leaveThread = "Not in the thread";
+
+/** Who the reply goes as, under the field (#4345). */
+export const sentAs = (replyAs: string): string => `Sent as ${replyAs}, not as an agent.`;
+
+/** The text of a reply to send: trimmed, or undefined when there is none. */
+export const replyText = (draft: string): string | undefined => draft.trim() || undefined;
 
 /** "3 unread", or undefined. */
 export const unreadWords = (c: MessagingConversation): string | undefined => (c.unread ?? 0) > 0 ? `${c.unread} unread` : undefined;

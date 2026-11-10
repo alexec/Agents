@@ -6515,12 +6515,15 @@ export interface MessageSender {
 /**
  * One conversation in messages/conversations (#4343): the connector it is on (server, its name in
  * mcp.json, and a folder that reaches it, which messages/read takes) and the conversation as the
- * connector's list_conversations gave it.
+ * connector's list_conversations gave it. replyAs (#4345) is who a reply from the page goes as, in
+ * words (the Slack bot, the WhatsApp number): present only when the connector has the contract's
+ * reply tool, so a client shows a reply field only then.
  */
 export interface MessagesConversation {
   server: string;
   folder: string;
   conversation: MessagingConversation;
+  replyAs?: string;
 }
 
 /**
@@ -6585,6 +6588,27 @@ export interface MessagesReadRequest {
   limit?: number;
 }
 
+/** messages/reply (#4345): the message that the connector's reply tool sent. */
+export interface MessagesReplied {
+  server: string;
+  folder: string;
+  conversation: string;
+  message: MessagingMessage;
+}
+
+/**
+ * messages/reply (#4345): the person's own reply, from the Messages page, to a conversation from
+ * messages/conversations, by its server, folder and id; thread: the thread to answer in (absent:
+ * the conversation itself). The connector's reply tool sends it, as the connector's replyAs says.
+ */
+export interface MessagesReplyRequest {
+  server: string;
+  folder: string;
+  conversation: string;
+  thread?: string;
+  text: string;
+}
+
 /**
  * One conversation in a messaging contract server's list_conversations (#4338,
  * docs/reference/messaging-contract.md): a channel, a space, a direct chat or a mail thread. source
@@ -6618,11 +6642,13 @@ export type MessagingConversationKind =
 
 /**
  * list_conversations' structuredContent (#4338): the conversations, newest lastActivity first.
- * cursor is absent on the last page.
+ * cursor is absent on the last page. replyAs (#4345): who the server's reply tool sends as, in
+ * words (the Slack bot @agents, the WhatsApp number); absent when the server has no reply tool.
  */
 export interface MessagingConversations {
   conversations: MessagingConversation[];
   cursor?: string;
+  replyAs?: string;
 }
 
 /**
@@ -6677,8 +6703,9 @@ export interface MessagingReadRequest {
 }
 
 /**
- * reply's input (#4338, a later story): the conversation, the thread to answer in (absent: the
- * conversation itself), and the text.
+ * reply's input (#4338, #4345): the conversation, the thread to answer in (a message's thread, or
+ * the id of the message that starts one; absent: the conversation itself), and the text. Its
+ * structuredContent is the sent message, a MessagingMessage.
  */
 export interface MessagingReplyRequest {
   conversation: string;
@@ -13222,6 +13249,7 @@ export interface Methods {
   "mcp/remove": { params: MCPRemoveRequest; result: MCPRemoveAnswer };
   "messages/conversations": { params: MessagesConversationsRequest; result: MessagesConversations };
   "messages/read": { params: MessagesReadRequest; result: MessagesRead };
+  "messages/reply": { params: MessagesReplyRequest; result: MessagesReplied };
   "modes/remembered": { params: Empty; result: Record<string, JSONValue> };
   "multiplier/state": { params: Empty; result: Multiplier };
   "options/remembered": { params: RememberedOptionsRequest; result: ConfigOption[] };
@@ -13635,6 +13663,7 @@ export const MethodTarget = {
   "mcp/remove": "host",
   "messages/conversations": "host",
   "messages/read": "host",
+  "messages/reply": "host",
   "modes/remembered": "host",
   "multiplier/state": "host",
   "options/remembered": "host",
@@ -14446,14 +14475,16 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MarketplacesListAnswer: { required: ["marketplaces"], optional: ["problem"] },
   MarketplacesListRequest: { required: [], optional: ["kind", "destination"] },
   MessageSender: { required: ["agentID", "title"], optional: [] },
-  MessagesConversation: { required: ["server", "folder", "conversation"], optional: [] },
+  MessagesConversation: { required: ["server", "folder", "conversation"], optional: ["replyAs"] },
   MessagesConversations: { required: ["conversations"], optional: ["cursor", "errors"] },
   MessagesConversationsRequest: { required: [], optional: ["folder", "cursor", "limit", "unread"] },
   MessagesError: { required: ["server", "folder", "message"], optional: [] },
   MessagesRead: { required: ["server", "folder", "conversation", "messages", "untrusted"], optional: ["cursor"] },
   MessagesReadRequest: { required: ["server", "folder", "conversation"], optional: ["cursor", "thread", "limit"] },
+  MessagesReplied: { required: ["server", "folder", "conversation", "message"], optional: [] },
+  MessagesReplyRequest: { required: ["server", "folder", "conversation", "text"], optional: ["thread"] },
   MessagingConversation: { required: ["source", "id", "title", "kind"], optional: ["unread", "lastActivity", "link"] },
-  MessagingConversations: { required: ["conversations"], optional: ["cursor"] },
+  MessagingConversations: { required: ["conversations"], optional: ["cursor", "replyAs"] },
   MessagingListRequest: { required: [], optional: ["cursor", "limit", "unread"] },
   MessagingMessage: { required: ["id", "conversation", "sender", "time", "text"], optional: ["thread", "link"] },
   MessagingMessages: { required: ["conversation", "messages", "untrusted"], optional: ["cursor"] },

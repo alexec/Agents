@@ -219,6 +219,7 @@ var CallMCPSignOut = Method[MCPSignOutRequest, MCPSignOutAnswer]{"mcp/sign-out"}
 var CallMCPVerify = Method[MCPVerifyRequest, MCPVerifyAnswer]{"mcp/verify"}
 var CallMessagesConversations = Method[MessagesConversationsRequest, MessagesConversations]{"messages/conversations"}
 var CallMessagesRead = Method[MessagesReadRequest, MessagesRead]{"messages/read"}
+var CallMessagesReply = Method[MessagesReplyRequest, MessagesReplied]{"messages/reply"}
 var CallModesRemembered = Method[Empty, map[string]JSONValue]{"modes/remembered"}
 var CallMultiplierState = Method[Empty, Multiplier]{"multiplier/state"}
 var CallOptionsRemembered = Method[RememberedOptionsRequest, []ConfigOption]{"options/remembered"}

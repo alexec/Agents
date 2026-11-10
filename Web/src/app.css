@@ -2053,6 +2053,12 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .messages-message { padding: 8px 0; border-bottom: 1px solid var(--paper-rule); }
 .messages-head { display: flex; gap: 8px; align-items: baseline; }
 .messages-original { margin-left: auto; }
+.messages-thread { margin-left: auto; }
+.messages-thread + .messages-original { margin-left: 0; }
+.messages-reply { position: sticky; bottom: 0; background: var(--paper-ground); border-top: 1px solid var(--paper-rule); padding: 8px 0; margin-top: 8px; }
+.messages-reply p { margin: 4px 0 0; }
+.messages-reply-row { display: flex; gap: 8px; align-items: flex-end; }
+.messages-reply-row textarea { flex: 1; min-width: 0; resize: vertical; font: inherit; }
 .messages-text { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .work-label { display: inline-block; padding: 0 7px; border: 1px solid var(--paper-rule); border-radius: 99px; font-size: 0.8em; line-height: 1.6; }
 .work-state { display: inline-block; padding: 0 7px; border-radius: 99px; font-size: 0.8em; line-height: 1.6; color: #fff; background: #59636e; }
