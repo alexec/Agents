@@ -123,10 +123,17 @@ final class WorkFeaturesState {
 /// with its epic counts; opened, its open epics, each with its progress and lead, and its issues
 /// with no epic. A row opens the issue's page. The features are in groups (#4115): Needs you, In
 /// flight (with its sessions) and Idle, and those with no open work in Finished at the bottom,
-/// closed (#3741).
+/// closed (#3741). The Remote draws it too: on a phone an epic's progress and lead go under its title.
 struct WorkFeaturesPane: View {
     let model: any WorkModel
     @Bindable var state: WorkFeaturesState
+
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    private var compact: Bool { sizeClass == .compact }
+    #else
+    private let compact = false
+    #endif
 
     var body: some View {
         VStack(spacing: 0) {
@@ -174,6 +181,9 @@ struct WorkFeaturesPane: View {
                 }
             }
             .listStyle(.inset)
+            #if os(iOS)
+            .refreshable { state.asked += 1 }
+            #endif
         } else {
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -222,12 +232,18 @@ struct WorkFeaturesPane: View {
                 if let rgb = WorkList.rgb(feature.color) {
                     Circle().fill(Color(red: rgb.r, green: rgb.g, blue: rgb.b)).frame(width: 8, height: 8)
                 }
-                Text(WorkFeatures.title(feature.name)).fontWeight(.semibold)
-                Spacer(minLength: 8)
-                if let sessions {
-                    Text(WorkFeatures.sessionWords(sessions)).monospacedDigit().foregroundStyle(.secondary)
+                if compact {
+                    // A phone: the counts under the name, as an epic's progress is.
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(WorkFeatures.title(feature.name)).fontWeight(.semibold)
+                        featureCounts(feature, sessions: sessions).appText(.supporting)
+                    }
+                    Spacer(minLength: 0)
+                } else {
+                    Text(WorkFeatures.title(feature.name)).fontWeight(.semibold)
+                    Spacer(minLength: 8)
+                    featureCounts(feature, sessions: sessions)
                 }
-                Text(WorkFeatures.countWords(feature)).monospacedDigit().foregroundStyle(.secondary)
             }
             .padding(.vertical, 3)
             .contentShape(Rectangle())
@@ -237,6 +253,15 @@ struct WorkFeaturesPane: View {
             .compactMap(\.self).joined(separator: ", "))
         .accessibilityValue(isOpen ? "open" : "closed")
         .help(isOpen ? "Fold \(feature.name)" : "Show \(feature.name)'s open epics and issues")
+    }
+
+    private func featureCounts(_ feature: DaemonAPI.ForgeFeature, sessions: Int?) -> some View {
+        HStack(spacing: 8) {
+            if let sessions {
+                Text(WorkFeatures.sessionWords(sessions)).monospacedDigit().foregroundStyle(.secondary)
+            }
+            Text(WorkFeatures.countWords(feature)).monospacedDigit().foregroundStyle(.secondary)
+        }
     }
 
     @ViewBuilder
@@ -264,24 +289,46 @@ struct WorkFeaturesPane: View {
     private func epicRow(_ epic: DaemonAPI.ForgeItem) -> some View {
         let lead = model.workLead(of: epic.node)
         return open(epic) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text(WorkList.shortRef(epic.node.ref)).foregroundStyle(.tint).monospacedDigit()
-                Text.forgeTitle(epic.title).lineLimit(1).truncationMode(.tail)
-                Spacer(minLength: 8)
-                Text(WorkFeatures.progressWords(epic)).monospacedDigit().foregroundStyle(.secondary)
-                    .help("Sub-issues closed, of all")
-                Text(WorkFeatures.leadWords(lead?.state))
-                    .foregroundStyle((lead?.state == .waitingOnUser ? StateTint.attention : .none).style(or: .secondary))
-                    .frame(minWidth: 130, alignment: .leading)
+            if compact {
+                // A phone: the title wraps, its progress and lead under it.
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        Text(WorkList.shortRef(epic.node.ref)).foregroundStyle(.tint).monospacedDigit()
+                        Text.forgeTitle(epic.title).lineLimit(2)
+                    }
+                    HStack(spacing: 10) {
+                        epicProgress(epic)
+                        epicLead(lead)
+                    }
+                    .appText(.supporting)
+                }
+            } else {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text(WorkList.shortRef(epic.node.ref)).foregroundStyle(.tint).monospacedDigit()
+                    Text.forgeTitle(epic.title).lineLimit(1).truncationMode(.tail)
+                    Spacer(minLength: 8)
+                    epicProgress(epic)
+                    epicLead(lead).frame(minWidth: 130, alignment: .leading)
+                }
             }
         }
+    }
+
+    private func epicProgress(_ epic: DaemonAPI.ForgeItem) -> some View {
+        Text(WorkFeatures.progressWords(epic)).monospacedDigit().foregroundStyle(.secondary)
+            .help("Sub-issues closed, of all")
+    }
+
+    private func epicLead(_ lead: Agent?) -> some View {
+        Text(WorkFeatures.leadWords(lead?.state))
+            .foregroundStyle((lead?.state == .waitingOnUser ? StateTint.attention : .none).style(or: .secondary))
     }
 
     private func issueRow(_ issue: DaemonAPI.ForgeItem) -> some View {
         open(issue) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(WorkList.shortRef(issue.node.ref)).foregroundStyle(.tint).monospacedDigit()
-                Text.forgeTitle(issue.title).lineLimit(1).truncationMode(.tail)
+                Text.forgeTitle(issue.title).lineLimit(compact ? 2 : 1).truncationMode(.tail)
                 if let level = issue.level { Text(level).foregroundStyle(.secondary) }
                 Spacer(minLength: 0)
             }
