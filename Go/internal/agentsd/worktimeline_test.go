@@ -66,6 +66,7 @@ func TestWorkTimelineForecastsTheOpenEpics(t *testing.T) {
 		epics = append(epics, epic(10+i, base+9, child(base, base+2), child(base, base+4), child(base, base+6), child(base, base+8)))
 	}
 	open := epic(20, 0, child(-10, -6), child(-10, -3), child(-10, 0), child(-10, 0), child(-10, 0, "alex-todo"))
+	open.Children[1].Labels, open.Children[1].LabelColors = []string{"bug", "ui"}, map[string]string{"bug": "#d73a4a"}
 	epics = append(epics, open,
 		epic(21, 0),                                 // no children: not drawn
 		epic(22, -24*60, child(-24*62, -24*61)),     // ended before the window
@@ -106,6 +107,10 @@ func TestWorkTimelineForecastsTheOpenEpics(t *testing.T) {
 	}
 	if kids[2].ForecastAt == nil || kids[3].ForecastAt == nil || kids[4].ForecastAt != nil || kids[4].WaitsForPerson == nil || kids[0].ForecastAt != nil {
 		t.Fatalf("children: %+v", kids)
+	}
+	// The children's labels, with their colours, for the hover card's chips (#4428).
+	if l := kids[1].Item.Labels; len(l) != 2 || l[0].Name != "bug" || l[0].Color == nil || *l[0].Color != "#d73a4a" || l[1].Name != "ui" || l[1].Color != nil {
+		t.Fatalf("labels %+v", l)
 	}
 	if s := got[23].Segments; len(s) != 2 || s[0].ClosedAt == nil || s[1].ClosedAt != nil || got[23].Forecast == nil {
 		t.Fatalf("a child filed after the line ended starts a second: %+v", got[23])
