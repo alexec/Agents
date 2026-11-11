@@ -7,7 +7,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/wire"

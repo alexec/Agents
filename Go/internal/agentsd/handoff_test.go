@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/alexec/agents/Go/wire"
 )
