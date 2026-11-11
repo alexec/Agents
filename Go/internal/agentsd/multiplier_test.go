@@ -104,12 +104,21 @@ func TestMultiplierFollowsTheMerges(t *testing.T) {
 		t.Fatalf("offline: %+v", m)
 	}
 
-	// The person's own baseline (#3991): a change is told at once, and counted with.
+	// The person's own baseline (#3991): a change is told at once, and counted with. The
+	// notice goes out away from preferences/set, so it can come before the answer, which
+	// c.call skips past (#4622): another client, which asks nothing, hears it.
+	listener := newConn()
+	go d.Accept(listener)
+	t.Cleanup(func() { close(listener.in) })
+	listener.call(t, 1, "daemon/ping", nil)
 	c.call(t, 6, "preferences/set", map[string]any{"multiplierPRsPerWeek": 2.04, "multiplierLine": "My team: 2 a week"})
-	c.until(t, "the baseline told", func(m string, p json.RawMessage) bool {
+	listener.until(t, "the baseline told", func(m string, p json.RawMessage) bool {
 		return m == "multiplier/changed" && strings.Contains(string(p), `"prsPerWeek":2,`) &&
 			strings.Contains(string(p), `"line":"My team: 2 a week"`)
 	})
+	if m := state(9); m.Baseline.PrsPerWeek != 2 || m.Baseline.Line == nil || *m.Baseline.Line != "My team: 2 a week" {
+		t.Fatalf("own baseline: %+v", m.Baseline)
+	}
 	// Reset: the default figure and line.
 	c.call(t, 7, "preferences/set", map[string]any{"multiplierPRsPerWeek": nil, "multiplierLine": nil})
 	if m := state(8); m.Baseline.PrsPerWeek != 1.4 || m.Baseline.Line != nil {
