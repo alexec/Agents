@@ -363,24 +363,20 @@ func (d *Daemon) setFolderHelperRules(folder string, running, notArchived *int64
 	return err
 }
 
+// diskSpaceProblem is DiskThresholds.problem: why the lines cannot be kept, or "".
 func diskSpaceProblem(t wire.DiskThresholds) string {
-	low, lowPercent, critical := int64(20), int64(5), int64(2)
-	if t.LowGB != nil {
-		low = *t.LowGB
-	}
+	low, critical := int64(defaultDiskThresholds.lowPercent), int64(defaultDiskThresholds.criticalPercent)
 	if t.LowPercent != nil {
-		lowPercent = *t.LowPercent
+		low = *t.LowPercent
 	}
-	if t.CriticalGB != nil {
-		critical = *t.CriticalGB
+	if t.CriticalPercent != nil {
+		critical = *t.CriticalPercent
 	}
 	switch {
-	case t.LowGB != nil && (low < 1 || low > 10000):
-		return "Low disk space must be between 1 and 10000 GB."
-	case t.LowPercent != nil && (lowPercent < 0 || lowPercent > 90):
-		return "Low disk space must be between 0 and 90 percent."
-	case t.CriticalGB != nil && (critical < 0 || critical > 10000):
-		return "Critical disk space must be between 0 and 10000 GB."
+	case t.LowPercent != nil && (low < 1 || low > 90):
+		return "Low disk space must be between 1 and 90 percent."
+	case t.CriticalPercent != nil && (critical < 0 || critical > 90):
+		return "Critical disk space must be between 0 and 90 percent."
 	case critical > low:
 		return "Critical disk space can't be more than low disk space."
 	}
@@ -401,17 +397,14 @@ func (d *Daemon) setDiskSpace(r wire.SetDiskSpaceRequest) (wire.FolderSummary, e
 	defer d.approveWrite(folder, ".agents/folder.json")
 	// DiskThresholds.orNilIfDefault: a file says only what was chosen.
 	t := r.DiskSpace
-	if t.LowGB != nil && *t.LowGB == 20 {
-		t.LowGB = nil
-	}
-	if t.LowPercent != nil && *t.LowPercent == 5 {
+	if t.LowPercent != nil && *t.LowPercent == int64(defaultDiskThresholds.lowPercent) {
 		t.LowPercent = nil
 	}
-	if t.CriticalGB != nil && *t.CriticalGB == 2 {
-		t.CriticalGB = nil
+	if t.CriticalPercent != nil && *t.CriticalPercent == int64(defaultDiskThresholds.criticalPercent) {
+		t.CriticalPercent = nil
 	}
 	var v any
-	if t.LowGB != nil || t.LowPercent != nil || t.CriticalGB != nil {
+	if t.LowPercent != nil || t.CriticalPercent != nil {
 		v = t
 	}
 	if err := setFolderConfig(folder, "diskSpace", v); err != nil {

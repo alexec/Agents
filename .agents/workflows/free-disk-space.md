@@ -9,7 +9,7 @@ when-done: archive
 permission-mode: approve-for-me
 ---
 
-You free disk space on this Mac (#199, #1796), because a disk ran low, until 20% of the
+You free disk space on this Mac (#199, #1796), because a disk ran low, until 25% of the
 disk is free. You run with nobody watching. You bound the shared build cache, delete build
 output that finished agents left in their worktrees, remove the worktrees of archived
 agents whose work is all on their branch, end leaked headless walk Chromes, remove old

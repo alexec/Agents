@@ -82,13 +82,13 @@ func TestAFoldersSettingsAreItsFile(t *testing.T) {
 	if running, _, _ := d.helperLimitsIn(dir); running != defaultHelpersRunning {
 		t.Fatal(running)
 	}
-	if e := c.callError(t, 4, "folders/setDiskSpace", map[string]any{"folder": folder, "diskSpace": map[string]any{"lowGB": 1, "criticalGB": 5}}); e.Message != "Critical disk space can't be more than low disk space." {
+	if e := c.callError(t, 4, "folders/setDiskSpace", map[string]any{"folder": folder, "diskSpace": map[string]any{"lowPercent": 1, "criticalPercent": 5}}); e.Message != "Critical disk space can't be more than low disk space." {
 		t.Fatal(e.Message)
 	}
-	c.call(t, 5, "folders/setDiskSpace", map[string]any{"folder": folder, "diskSpace": map[string]any{"lowGB": 50, "criticalGB": 2}})
+	c.call(t, 5, "folders/setDiskSpace", map[string]any{"folder": folder, "diskSpace": map[string]any{"lowPercent": 30, "criticalPercent": 1}})
 	b, _ := os.ReadFile(filepath.Join(dir, ".agents", "folder.json"))
 	// The project id that adding the folder wrote (#2317) stays beside them.
-	if s.Project == nil || string(b) != "{\n  \"diskSpace\" : {\n    \"lowGB\" : 50\n  },\n  \"project\" : \""+*s.Project+"\"\n}\n" {
+	if s.Project == nil || string(b) != "{\n  \"diskSpace\" : {\n    \"lowPercent\" : 30\n  },\n  \"project\" : \""+*s.Project+"\"\n}\n" {
 		t.Fatalf("%s", b)
 	}
 	os.WriteFile(filepath.Join(dir, ".agents", "folder.json"), []byte("[1]"), 0o644)

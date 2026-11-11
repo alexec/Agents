@@ -61,8 +61,8 @@ func TestDiskLevelsTakeAMarginToGetBetter(t *testing.T) {
 			t.Fatalf("%d: %s at %d GB, want %s", i, level, s.free/g, s.want)
 		}
 	}
-	if (diskThresholds{20, 5, 2}).lowLine(1000*g) != 50*g {
-		t.Fatal("five percent of a big disk is the line")
+	if defaultDiskThresholds.lowLine(1000*g) != 200*g || defaultDiskThresholds.criticalLine(1000*g) != 10*g {
+		t.Fatal("the lines are a percent of the disk: 20% low, 1% critical")
 	}
 }
 

@@ -3136,9 +3136,8 @@ export interface DiskState {
 }
 
 export interface DiskThresholds {
-  lowGB?: number;
   lowPercent?: number;
-  criticalGB?: number;
+  criticalPercent?: number;
 }
 
 export interface DiskWorktree {
@@ -14513,7 +14512,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   DiskAlarm: { required: ["reading", "level", "threshold", "worktrees"], optional: [] },
   DiskReading: { required: ["volume", "mount", "freeBytes", "totalBytes"], optional: [] },
   DiskState: { required: ["alarms"], optional: [] },
-  DiskThresholds: { required: [], optional: ["lowGB", "lowPercent", "criticalGB"] },
+  DiskThresholds: { required: [], optional: ["lowPercent", "criticalPercent"] },
   DiskWorktree: { required: ["name", "bytes", "partial"], optional: [] },
   Doc: { required: ["ref", "title", "source"], optional: ["folder", "path", "url", "updated"] },
   DocsList: { required: ["docs", "sources"], optional: ["cursor"] },
