@@ -865,12 +865,18 @@ struct RemoteFolderFold: View {
                     // match is one tap away.
                     searchMatches(fold)
                 } else if isOpen {
-                    // The archive, one row opening a page (#495): never a fold inside
-                    // the group.
-                    let archived = fold.archivedCount(summary) + fold.archivedWorkflows.count
-                    if archived > 0 {
-                        FolderPageRow(title: "Archived", systemImage: "archivebox",
-                                       count: archived, item: .archivedSessions(key))
+                    // The archive, a row each for its sessions and its workflows opening a
+                    // page (#495, #4448): never a fold inside the group. Each only with
+                    // something in it; the count is VoiceOver's (#587).
+                    let sessions = fold.archivedCount(summary)
+                    if sessions > 0 {
+                        FolderPageRow(title: ArchivedPage.Sessions.title, systemImage: ArchivedPage.Sessions.systemImage,
+                                       count: sessions, item: .archivedSessions(key))
+                    }
+                    let flows = fold.archivedWorkflows.count
+                    if flows > 0 {
+                        FolderPageRow(title: ArchivedPage.Workflows.title, systemImage: ArchivedPage.Workflows.systemImage,
+                                       count: flows, item: .archivedWorkflows(key))
                     }
                 }
             } header: {
@@ -984,8 +990,8 @@ struct RemoteFolderFold: View {
     }
 }
 
-/// A row under a folder that opens a page about it (#495, #498): its archive. One row
-/// where there used to be folds inside the folder's fold.
+/// A row under a folder that opens a page about it (#495, #498, #4448): its archived sessions
+/// or its archived workflows. One row each where there used to be folds inside the folder's fold.
 private struct FolderPageRow: View {
     let title: String
     let systemImage: String

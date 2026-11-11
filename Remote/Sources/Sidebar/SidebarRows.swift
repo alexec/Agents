@@ -17,12 +17,15 @@ struct SidebarSessionRow: View {
     private let folds: SidebarFolds?
     /// In its folder's Sessions fold: one level in, under the word Sessions (#2312).
     private let isNested: Bool
+    /// On the Archived Sessions page (#4448): the time is when it was archived.
+    private let showsArchivedTime: Bool
     /// The mark's well and the gap after it, as the Workflows fold's rows have them (#750).
     @ScaledMetric private var scale: CGFloat = 1
 
     init(agent: Agent, place: String? = nil, tree: SidebarTree.Row? = nil, folds: SidebarFolds? = nil,
-         isNested: Bool = false) {
+         isNested: Bool = false, showsArchivedTime: Bool = false) {
         given = agent
+        self.showsArchivedTime = showsArchivedTime
         self.place = place
         self.tree = tree
         self.folds = folds
@@ -173,8 +176,12 @@ struct SidebarSessionRow: View {
                 // Only the count folds; the rest of the row opens the chat.
                 .buttonStyle(.borderless)
             }
-            // When it last did anything, as the page's row has it (#341).
-            ActivityTime(date: agent.lastActivityAt)
+            if showsArchivedTime {
+                ArchivedTime(date: agent.archivedOrder)
+            } else {
+                // When it last did anything, as the page's row has it (#341).
+                ActivityTime(date: agent.lastActivityAt)
+            }
         }
         // A child one indent a level in, under its parent's mark (#835, #3553); in a
         // Sessions fold, one more (#2312).
@@ -188,17 +195,22 @@ struct SidebarSessionRow: View {
         .contextMenu { AgentMenuItems(agent: agent) }
         // Out of the sidebar into a scene of its own, on an iPad (#888).
         .draggableToNewWindow(agent)
-        // Pin or Unpin (#180), from the leading edge, as on the Mac.
-        .swipeActions(edge: .leading) {
-            if agent.state != .archived {
+        // Pin or Unpin (#180), from the leading edge, as on the Mac; an archived one's
+        // Unarchive (#4448).
+        .swipeActions(edge: .leading, allowsFullSwipe: agent.state != .archived) {
+            if agent.state == .archived {
+                UnarchiveAgentButton(agent: agent).tint(Paper.accent)
+            } else {
                 PinAgentButton(agent: agent).tint(Paper.accent)
             }
         }
-        // Archive or Unarchive, and Mark as Read or Unread, from the trailing edge. A long
-        // swipe archives, as in Mail.
+        // Archive, and Mark as Read or Unread, from the trailing edge. A long swipe
+        // archives, as in Mail. An archived one's Delete, which asks first (#4448).
         .swipeActions(edge: .trailing, allowsFullSwipe: agent.state != .archived) {
             if agent.state == .archived {
-                UnarchiveAgentButton(agent: agent)
+                Button("Delete", systemImage: "trash") { model.askingToDelete = agent }
+                    .tint(StateTint.failure.color)
+                    .disabled(model.isStale(agent))
             } else {
                 ArchiveAgentButton(agent: agent).tint(.gray)
                 if agent.state == .finished {
