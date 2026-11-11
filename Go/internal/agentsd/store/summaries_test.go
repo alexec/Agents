@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
 	"github.com/alexec/agents/Go/wire"
@@ -216,3 +217,42 @@ func TestArchivedSummariesRebuilt(t *testing.T) {
 	}
 }
 
+
+// A write the timer began is done when FlushSummaries returns, and nothing writes after it
+// (#4666): BenchmarkChangeAgent's TempDir cleanup found the root not empty when the host's
+// stop came while the timer's write of 2,700 summaries went on.
+func TestFlushSummariesWaitsForTheTimersWrite(t *testing.T) {
+	_, s, ids := summariesRoot(t)
+	was := summaryDelay
+	summaryDelay = time.Millisecond
+	t.Cleanup(func() { summaryDelay = was })
+
+	// The write in hand: the timer fires, takes the timer and stops at summaryWrite.
+	s.summaryWrite.Lock()
+	a := s.Agent(ids[1])
+	title := "Archived again"
+	a.Title = &title
+	if err := s.Save(*a); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(50 * time.Millisecond)
+
+	flushed := make(chan struct{})
+	go func() { s.FlushSummaries(); close(flushed) }()
+	select {
+	case <-flushed:
+		t.Fatal("FlushSummaries returned while the timer's write was still to come")
+	case <-time.After(50 * time.Millisecond):
+	}
+	s.summaryWrite.Unlock()
+	<-flushed
+
+	// Nothing writes the file again once the stop has flushed it.
+	if err := os.Remove(s.Loc.Summaries()); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(50 * time.Millisecond)
+	if _, err := os.Stat(s.Loc.Summaries()); err == nil {
+		t.Fatal("the summaries were written after FlushSummaries returned")
+	}
+}
