@@ -56,17 +56,17 @@ struct HelperLimitTests {
         #expect(HelperLimit.isRunning(later))
     }
 
-    /// Blocked on agents or a time, or waiting on events: the app carries it on by
-    /// itself, so it holds a running place.
-    @Test func aHelperTheAppWillResumeIsRunning() {
+    /// Blocked on agents or a time, or waiting on events, it uses no runtime, so it holds
+    /// no running place (#4377); it runs again when it wakes, over the limit if need be.
+    @Test func aHelperThatWaitsIsNotRunning() {
         var blocked = helper(.finished)
         blocked.report = WorkReport(outcome: .waiting, message: "Waiting on the build", at: Date(),
                                     block: Block(checkAgainAt: Date().addingTimeInterval(600)))
-        #expect(HelperLimit.isRunning(blocked))
+        #expect(!HelperLimit.isRunning(blocked))
 
         var onEvents = helper(.finished)
         onEvents.eventWait = EventWait(patterns: [EventPattern("folder.idle")], from: 0, since: Date())
-        #expect(HelperLimit.isRunning(onEvents))
+        #expect(!HelperLimit.isRunning(onEvents))
 
         let restarting = helper(.stopped)
         #expect(HelperLimit.isRunning(restarting, comingBack: [restarting.id]))

@@ -8946,6 +8946,7 @@ export interface PolicyFolderWithRules {
 export interface PolicyHelpers {
   mostRunning?: number;
   mostNotArchived?: number;
+  mostQueued?: number;
 }
 
 /**
@@ -9073,6 +9074,7 @@ export type PolicyRuleName =
   | "budgets.dailyTokens"
   | "helpers.mostRunning"
   | "helpers.mostNotArchived"
+  | "helpers.mostQueued"
   | "workflows.mostOn"
   | "noticeLimits.burst"
   | "noticeLimits.waitMinutes"
@@ -15719,7 +15721,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PolicyFolderRequest: { required: ["folder"], optional: [] },
   PolicyFolderState: { required: ["rules"], optional: ["pending", "invalid"] },
   PolicyFolderWithRules: { required: ["folder", "name", "count"], optional: [] },
-  PolicyHelpers: { required: [], optional: ["mostRunning", "mostNotArchived"] },
+  PolicyHelpers: { required: [], optional: ["mostRunning", "mostNotArchived", "mostQueued"] },
   PolicyKeeper: { required: ["host", "name"], optional: [] },
   PolicyKept: { required: [], optional: ["policy", "rev", "machines"] },
   PolicyLayerRef: { required: ["kind", "name"], optional: ["folder"] },

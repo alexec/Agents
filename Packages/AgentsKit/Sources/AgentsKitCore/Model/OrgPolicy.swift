@@ -76,10 +76,12 @@ public extension DaemonAPI {
     struct PolicyHelpers: Codable, Sendable, Hashable {
         public var mostRunning: Int?
         public var mostNotArchived: Int?
+        public var mostQueued: Int?
 
-        public init(mostRunning: Int? = nil, mostNotArchived: Int? = nil) {
+        public init(mostRunning: Int? = nil, mostNotArchived: Int? = nil, mostQueued: Int? = nil) {
             self.mostRunning = mostRunning
             self.mostNotArchived = mostNotArchived
+            self.mostQueued = mostQueued
         }
     }
 
@@ -637,11 +639,12 @@ public enum OrgPolicyWords {
         return parts.isEmpty ? nil : parts.joined(separator: ", ")
     }
 
-    /// "At most 3 running and 10 not archived in a folder"; nil when neither is set.
+    /// "At most 3 running and 10 in total in a folder"; nil when none is set.
     public static func helperWords(_ h: DaemonAPI.PolicyHelpers) -> String? {
         var parts: [String] = []
         if let n = h.mostRunning { parts.append("\(n) running") }
-        if let n = h.mostNotArchived { parts.append("\(n) not archived") }
+        if let n = h.mostQueued { parts.append("\(n) queued") }
+        if let n = h.mostNotArchived { parts.append("\(n) in total") }
         return parts.isEmpty ? nil : "At most \(parts.joined(separator: " and ")) in a folder"
     }
 

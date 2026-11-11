@@ -36,6 +36,7 @@ func TestValidateRejectsANumberOutOfRange(t *testing.T) {
 		`{"helpers":{"mostRunning":0}}`,
 		`{"helpers":{"mostRunning":11}}`,
 		`{"helpers":{"mostNotArchived":21}}`,
+		`{"helpers":{"mostQueued":21}}`,
 		`{"workflows":{"mostOn":0}}`,
 		`{"workflows":{"mostOn":101}}`,
 		`{"noticeLimits":{"burst":0}}`,
@@ -49,7 +50,7 @@ func TestValidateRejectsANumberOutOfRange(t *testing.T) {
 		}
 	}
 	valid := []string{
-		`{"helpers":{"mostRunning":1,"mostNotArchived":20}}`,
+		`{"helpers":{"mostRunning":1,"mostNotArchived":20,"mostQueued":20}}`,
 		`{"workflows":{"mostOn":100}}`,
 		`{"noticeLimits":{"burst":20,"waitMinutes":1440}}`,
 		`{"budgets":{"perAgentTokens":1,"dailyTokens":1}}`,

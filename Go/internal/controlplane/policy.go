@@ -352,7 +352,7 @@ func checkPolicy(p wire.OrgPolicy) error {
 		}
 	}
 	if h := p.Helpers; h != nil {
-		for _, n := range []*int64{h.MostRunning, h.MostNotArchived} {
+		for _, n := range []*int64{h.MostRunning, h.MostNotArchived, h.MostQueued} {
 			if n != nil && (*n < 0 || *n > mostPolicyHelpers) {
 				return fail(invalidParams, "A helper limit is from 0 to %d.", mostPolicyHelpers)
 			}

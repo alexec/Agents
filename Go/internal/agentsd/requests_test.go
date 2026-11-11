@@ -139,7 +139,7 @@ func TestTwoSessionsThatWaitOnOneRequestBothWake(t *testing.T) {
 	})
 }
 
-func TestAWaitOnlyOnAPersonHoldsNoPlace(t *testing.T) {
+func TestAWaitHoldsNoRunningPlace(t *testing.T) {
 	yes := true
 	cases := []struct {
 		state   wire.AgentState
@@ -148,13 +148,19 @@ func TestAWaitOnlyOnAPersonHoldsNoPlace(t *testing.T) {
 	}{
 		{wire.AgentStateFinished, &wire.EventWait{Patterns: []wire.EventPattern{{Name: "request.answered"}, {Name: "request.dropped"}}}, false},
 		{wire.AgentStateFinished, &wire.EventWait{Patterns: []wire.EventPattern{{Name: "review.requested"}}, ForPerson: &yes}, false},
-		{wire.AgentStateFinished, &wire.EventWait{Patterns: []wire.EventPattern{{Name: "request.answered"}, {Name: "branch.moved"}}}, true},
+		// A wait on CI or a merge holds none either (#4377).
+		{wire.AgentStateFinished, &wire.EventWait{Patterns: []wire.EventPattern{{Name: "request.answered"}, {Name: "branch.moved"}}}, false},
+		{wire.AgentStateFinished, &wire.EventWait{ServerEvents: []wire.WaitServerEvent{{Servers: []string{"github"}}}}, false},
 		{wire.AgentStateRunning, &wire.EventWait{Patterns: []wire.EventPattern{{Name: "request.answered"}}}, true},
+		{wire.AgentStateRunning, nil, true},
 	}
 	for i, tc := range cases {
 		a := wire.Agent{State: tc.state, EventWait: tc.wait}
-		if got := helperRunning(&a) && !waitsOnlyOnPeople(&a); got != tc.holding {
+		if got := helperRunning(&a); got != tc.holding {
 			t.Errorf("case %d: holds a place = %v, want %v", i, got, tc.holding)
+		}
+		if tc.wait != nil && !helperBusy(&a) {
+			t.Errorf("case %d: a waiting helper is not archived at once", i)
 		}
 	}
 }

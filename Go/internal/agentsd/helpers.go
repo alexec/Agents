@@ -20,30 +20,24 @@ const (
 	defaultHelpersQueued      = 5
 )
 
-// helperLimitsIn is the folder's limits as enforced: queued stays a folder setting
-// (.agents/folder.json); running and notArchived are rules now (#2957, FR-015), read from
-// the effective policy (the organisation's, the person's and the folder's own layer,
-// tightest wins), not from .agents/folder.json's own helperLimits.running/notArchived,
-// which are no longer read.
+// helperLimitsIn is the folder's limits as enforced: running, notArchived (total) and
+// queued are rules (#2957, FR-015, #4377), read from the effective policy (the
+// organisation's, the person's and the folder's own layer, tightest wins), not from
+// .agents/folder.json's old helperLimits, which is no longer read for them.
 func (d *Daemon) helperLimitsIn(folder string) (running, notArchived, queued int64) {
-	running, notArchived, queued = defaultHelpersRunning, defaultHelpersNotArchived, defaultHelpersQueued
-	if s, ok := d.summaryFor(folder); ok && s.Folder.HelperLimits != nil && s.Folder.HelperLimits.Queued != nil {
-		queued = *s.Folder.HelperLimits.Queued
-	}
 	eff := d.effective(folder)
-	if r := effectiveRule(eff, wire.PolicyRuleNameHelpersMostRunning); r != nil && r.Decides != nil {
-		var v int64
-		if json.Unmarshal(r.Value, &v) == nil {
-			running = v
+	limit := func(rule wire.PolicyRuleName, def int64) int64 {
+		if r := effectiveRule(eff, rule); r != nil && r.Decides != nil {
+			var v int64
+			if json.Unmarshal(r.Value, &v) == nil {
+				return v
+			}
 		}
+		return def
 	}
-	if r := effectiveRule(eff, wire.PolicyRuleNameHelpersMostNotArchived); r != nil && r.Decides != nil {
-		var v int64
-		if json.Unmarshal(r.Value, &v) == nil {
-			notArchived = v
-		}
-	}
-	return
+	return limit(wire.PolicyRuleNameHelpersMostRunning, defaultHelpersRunning),
+		limit(wire.PolicyRuleNameHelpersMostNotArchived, defaultHelpersNotArchived),
+		limit(wire.PolicyRuleNameHelpersMostQueued, defaultHelpersQueued)
 }
 
 // helpersIn is HelperLimit.helpers: started by an agent, not archived, not queued, oldest first.
@@ -110,22 +104,28 @@ func (d *Daemon) queuedCount(folder string) int {
 	return n
 }
 
-// helperRunning is HelperLimit.isRunning: holding a running place.
+// helperRunning is HelperLimit.isRunning: holding a running place, which only a turn does.
+// A session in wait_for_event holds none (#4377): it uses no compute and no allowance.
 func helperRunning(a *wire.Agent) bool {
 	if a.State == wire.AgentStateArchived || a.ArchiveRequest != nil && a.ArchiveRequest.Requested != nil {
 		return false
 	}
-	if inFlight(a.State) {
-		return true
+	return inFlight(a.State)
+}
+
+// helperBusy is a helper in a turn or in wait_for_event: one that archive_session does not
+// archive at once, as its wait would end unseen.
+func helperBusy(a *wire.Agent) bool {
+	if a.State == wire.AgentStateArchived || a.ArchiveRequest != nil && a.ArchiveRequest.Requested != nil {
+		return false
 	}
-	return a.EventWait != nil && a.EventWait.Ending == nil
+	return inFlight(a.State) || a.EventWait != nil && a.EventWait.Ending == nil
 }
 
 func (d *Daemon) runningHelpers(folder string) []wire.Agent {
 	var out []wire.Agent
 	for _, a := range d.helpersIn(folder) {
-		// One that waits only on a person holds no place (#3863).
-		if helperRunning(&a) && !waitsOnlyOnPeople(&a) {
+		if helperRunning(&a) {
 			out = append(out, a)
 		}
 	}
@@ -133,7 +133,8 @@ func (d *Daemon) runningHelpers(folder string) []wire.Agent {
 }
 
 // helperPlaces is "1 of 3 running, 2 of 5 not archived", and the queue once there is one;
-// for a project, and what its count could not reach.
+// for a project, and what its count could not reach. Running can read over its limit: a
+// session that wakes from a wait always runs (#4377).
 func (d *Daemon) helperPlaces(folder string) string {
 	running, notArchived, queued := d.helperLimitsIn(folder)
 	s := fmt.Sprintf("%d of %d running, %d of %d not archived", len(d.runningHelpers(folder)), running, len(d.helpersIn(folder)), notArchived)
@@ -272,7 +273,7 @@ func (d *Daemon) requestArchiveHelper(caller, target wire.UUID) (string, error) 
 	}
 	name, folder := quotedTitle(t.Title), folderPath(t)
 	may := d.agentsMayArchive(folder)
-	if may && !helperRunning(t) {
+	if may && !helperBusy(t) {
 		d.archiveBy(t.ID, wire.AgentArchivedReasonByAgent)
 		return "Archived " + name + ", freeing its place; the person can unarchive it. " + scopeTitle(folder) + " now has " + d.helperPlaces(folder) + ".", nil
 	}

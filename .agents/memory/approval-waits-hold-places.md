@@ -1,13 +1,15 @@
 ---
 name: approval-waits-hold-places
-description: "the app counts a lane waiting on wait_for_event (e.g. Alex's approval) as running; stop+archive it and restart in its worktree on pr.commented"
+description: "since #4377 a lane in wait_for_event holds no running place; a woken one always runs, over the limit if need be; total (helpers.mostNotArchived) now bounds open work"
 metadata:
   type: project
-  modified: 2026-11-03T03:23:38.095Z
+  modified: 2026-11-11T00:00:00.000Z
 ---
 
-2026-11-02: the folder limit for sessions started by sessions was 3 running / 5 not archived. A lane waiting for Alex's approval (`needs-approval`, wait_for_event on pr.commented) still counts as running in the app, though AGENTS.md says it holds no place, so the queue jammed.
+Until #4377 (2026-11-11) the app counted a lane waiting on `wait_for_event` (CI, `pr.merged`, Alex's approval) as running, so the queue jammed and the Scrum Master stopped and archived such lanes to free places.
 
-**Why:** with the lead plus two approval waits, nothing else could run.
+Since #4377: running (`helpers.mostRunning`) counts only sessions in a turn. A session that wakes from a wait always runs, also over the limit; the running limit gates only new starts, and the queue starts the next one only when running is below it again. Queued (`helpers.mostQueued`) and total (`helpers.mostNotArchived`) are policy rules too; `.agents/folder.json`'s `helperLimits.running/notArchived/queued` are not read.
 
-**How to apply:** the Scrum Master stops and archives such a lane once its branch is pushed and its PR is open (archiving keeps the worktree), comments on the PR, watches `pr.commented`, and on Alex's comment starts a new lane in the same worktree (worktree: `work-github-issue-<n>`) that carries on from step 4 of "A UI enhancement waits for Alex". Alex chose to raise the limit to 6 (2026-11-02); it was 5 for a while, then back to 3. The same goes for an epic lead whose only open child waits for approval: park it and close the epic yourself after the merge. Related: [[lanes-follow-ci-time]].
+**Why:** a waiting lane uses no compute and no allowance.
+
+**How to apply:** do not stop and archive waiting lanes to free places any more. When many lanes wait on PRs, total is the limit that bites: raise `helpers.mostNotArchived` in `.agents/policy.json` (Alex's choice) rather than parking lanes. Related: [[lanes-follow-ci-time]].

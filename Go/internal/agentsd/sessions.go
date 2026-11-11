@@ -707,24 +707,9 @@ func (d *Daemon) messageSession(caller wire.UUID, args map[string]json.RawMessag
 	// turns pass the message over (nextTurn), until the person speaks to it; unless it set
 	// this session going (reportsTo).
 	looser := d.holdsMessageFrom(target, me)
+	// A session that wakes always runs, also over the running limit, which gates only new
+	// starts (#4377).
 	wakes := !busy && !stopped && !waitsOnPerson && looser == ""
-	if wakes && target.StartedByAgent != nil {
-		// The limit in force (#3149): the effective policy's helpers.mostRunning.
-		// Across the project (#3281).
-		folder := folderPath(target)
-		d.countProject(folder)
-		limit, _, _ := d.helperLimitsIn(folder)
-		running := 0
-		for _, a := range d.helpersIn(folder) {
-			if inFlight(a.State) {
-				running++
-			}
-		}
-		if int64(running) >= limit {
-			return "", refusedMessage(fmt.Sprintf("waking %s would take a running place, and %s already has %d of %d sessions "+
-				"started by sessions running. Send it once one finishes; wait with wait_for_event on agent.ended, naming them in agent.", name, scopeWords(folder), running, limit))
-		}
-	}
 	d.messageMu.Lock()
 	if d.messagesSent == nil {
 		d.messagesSent = map[wire.UUID][]time.Time{}

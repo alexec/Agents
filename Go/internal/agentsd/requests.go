@@ -410,28 +410,6 @@ func (d *Daemon) dropRequest(r wire.RequestsDrop, by *wire.AuditActor) (wire.Req
 	return wire.RequestUpdate{Request: *after}, nil
 }
 
-// waitsOnlyOnPeople is a session whose turn has ended and whose wait only a person can
-// settle: every pattern a request.* event, or a wait for the person (#3051). It holds no
-// running place (#3863).
-func waitsOnlyOnPeople(a *wire.Agent) bool {
-	w := a.EventWait
-	if w == nil || w.Ending != nil || inFlight(a.State) {
-		return false
-	}
-	if w.ForPerson != nil && *w.ForPerson {
-		return true
-	}
-	if len(w.Patterns) == 0 || len(w.ServerEvents) > 0 {
-		return false
-	}
-	for _, p := range w.Patterns {
-		if !strings.HasPrefix(p.Name, "request.") {
-			return false
-		}
-	}
-	return true
-}
-
 func (d *Daemon) registerRequests() {
 	On(d, wire.CallRequestsList, func(ctx context.Context, c *Client, r wire.RequestsList) (wire.RequestsListResult, error) {
 		state := wire.RequestsListStateOpen

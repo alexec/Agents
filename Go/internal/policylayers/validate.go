@@ -103,6 +103,9 @@ func validateRules(r wire.PolicyRules) error {
 		if err := inRange("helpers.mostNotArchived", r.Helpers.MostNotArchived, 1, 20); err != nil {
 			return err
 		}
+		if err := inRange("helpers.mostQueued", r.Helpers.MostQueued, 1, 20); err != nil {
+			return err
+		}
 	}
 	if r.Workflows != nil {
 		if err := inRange("workflows.mostOn", r.Workflows.MostOn, 1, 100); err != nil {
