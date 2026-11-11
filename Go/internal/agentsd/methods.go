@@ -56,6 +56,7 @@ func (d *Daemon) register() {
 	d.registerForge()
 	d.registerMessages()
 	d.registerWorkTimeline()
+	d.registerWorkFeatures()
 	d.registerDocs()
 	d.registerDevices()
 	d.registerAllowances()

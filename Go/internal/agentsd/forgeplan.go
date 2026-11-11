@@ -253,7 +253,19 @@ func (d *Daemon) featurePages(ctx context.Context, r wire.ForgeFeaturesRequest, 
 // and updatedAt are its open issues and epics, and approvals the pull requests that wait for Alex
 // (#4115), so a client matches them with its sessions' labels.
 func (d *Daemon) forgeFeatures(ctx context.Context, r wire.ForgeFeaturesRequest) (wire.ForgeFeatures, error) {
+	out, _, err := d.forgeFeaturesRead(ctx, r)
+	return out, err
+}
+
+// featureItems are the open epics and the loose open issues (not epics, with no parent) that
+// forge/features read, by the feature's name in lower case, for work/features (#4586).
+type featureItems struct {
+	epics, loose map[string][]wire.ForgeItem
+}
+
+func (d *Daemon) forgeFeaturesRead(ctx context.Context, r wire.ForgeFeaturesRequest) (wire.ForgeFeatures, featureItems, error) {
 	out := wire.ForgeFeatures{Features: []wire.ForgeFeature{}}
+	items := featureItems{epics: map[string][]wire.ForgeItem{}, loose: map[string][]wire.ForgeItem{}}
 	by := map[string]*wire.ForgeFeature{}
 	loose := map[string]int64{}
 	open := map[string]*featureWork{}
@@ -268,13 +280,16 @@ func (d *Daemon) forgeFeatures(ctx context.Context, r wire.ForgeFeaturesRequest)
 		openWork(open, key).add(i)
 		if deref(i.Level) != "epic" {
 			loose[key]++
+			if i.Parent == nil {
+				items.loose[key] = append(items.loose[key], i)
+			}
 			if _, _, ok := bitbucketOfNode(i.Node); ok && bitbucket[key] == "" {
 				bitbucket[key] = *i.Feature
 			}
 		}
 	})
 	if err != nil {
-		return wire.ForgeFeatures{}, err
+		return wire.ForgeFeatures{}, featureItems{}, err
 	}
 	err = d.featurePages(ctx, r, &out, wire.ForgeListRequest{State: new("all"), Label: new("epic")}, func(i wire.ForgeItem) {
 		if i.Feature == nil {
@@ -296,10 +311,11 @@ func (d *Daemon) forgeFeatures(ctx context.Context, r wire.ForgeFeaturesRequest)
 		if i.State == "open" {
 			f.Open++
 			openWork(open, strings.ToLower(*i.Feature)).add(i)
+			items.epics[strings.ToLower(*i.Feature)] = append(items.epics[strings.ToLower(*i.Feature)], i)
 		}
 	})
 	if err != nil {
-		return wire.ForgeFeatures{}, err
+		return wire.ForgeFeatures{}, featureItems{}, err
 	}
 	for key, name := range bitbucket {
 		if by[key] == nil {
@@ -323,7 +339,7 @@ func (d *Daemon) forgeFeatures(ctx context.Context, r wire.ForgeFeaturesRequest)
 			out.Approvals = append(out.Approvals, p.Node.Ref)
 		}
 	}
-	return out, nil
+	return out, items, nil
 }
 
 // featureWork is a feature's open issues and epics (#4115): each ref once, those labelled

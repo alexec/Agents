@@ -372,6 +372,7 @@ var CallViewsToolCall = Method[ViewToolCallRequest, JSONValue]{"views/toolCall"}
 var CallWakeSet = Method[WakeSettings, WakeSettings]{"wake/set"}
 var CallWakeSettings = Method[Empty, WakeSettings]{"wake/settings"}
 var CallWakeState = Method[Empty, WakeState]{"wake/state"}
+var CallWorkFeatures = Method[WorkFeaturesRequest, WorkFeatures]{"work/features"}
 var CallWorkTimeline = Method[WorkTimelineRequest, WorkTimeline]{"work/timeline"}
 var CallWorkflowsApprove = Method[WorkflowApproveRequest, WorkflowSummary]{"workflows/approve"}
 var CallWorkflowsArchive = Method[WorkflowArchiveRequest, WorkflowSummary]{"workflows/archive"}

@@ -13491,6 +13491,58 @@ export type Weekday =
   | "sat";
 
 /**
+ * A feature in work/features (#4586): feature is it as forge/features says it. epics are its open
+ * epics, the newest first, each with where it is in its plan and its children. loose are its open
+ * issues that are not epics and have no parent (of the newest 500 open issues), the newest update
+ * first, as children are: when each started, and whether it waits for a person.
+ */
+export interface WorkFeature {
+  feature: ForgeFeature;
+  epics: WorkFeatureEpic[];
+  loose: WorkTimelineChild[];
+}
+
+/**
+ * An open epic in work/features (#4586), from forge/plan and work/timeline. steps is the number of
+ * steps in its plan (ForgePlan.steps), and step the first of them with an open child, absent when
+ * none is open. blockedOutside are the open blockers outside the plan of that step's open children
+ * (an issue of another epic), each once. forecast is its open line's close as work/timeline
+ * forecasts it, on GitHub only; absent when there is too little history or nothing to forecast.
+ * children are its sub-issues in the plan's order (at most 100), each with its start, close and
+ * wait as in work/timeline; absent when its plan could not be read (errors says why).
+ */
+export interface WorkFeatureEpic {
+  item: ForgeItem;
+  step?: number;
+  steps: number;
+  blockedOutside?: LineageNode[];
+  forecast?: WorkTimelineForecast;
+  children?: WorkTimelineChild[];
+}
+
+/**
+ * work/features (#4586, specs/4328-work-look/features-delivery.md): the Features page's one read.
+ * features are forge/features' features, by name, each with its open epics and its loose open
+ * issues, so an open feature's epics and children draw with no second read. approvals are as in
+ * forge/features. errors say a forge, a plan or a timeline that could not be read.
+ */
+export interface WorkFeatures {
+  features: WorkFeature[];
+  approvals?: string[];
+  errors?: ForgeListError[];
+}
+
+/**
+ * work/features (#4586): the features of every folder on this machine, or of one folder's repo, as
+ * forge/features.
+ */
+export interface WorkFeaturesRequest {
+  folder?: string;
+  /** A board's url, from forge/boards (#3282): only the epics on that board. */
+  board?: string;
+}
+
+/**
  * How a turn ended (#1916): only a question needs the person. A value this build does not know,
  * such as an old record's `blocked`, `stuck` or `partly_done`, reads as `done`.
  */
@@ -14388,6 +14440,7 @@ export interface Methods {
   "views/show": { params: ViewShowRequest; result: Empty };
   "wake/set": { params: WakeSettings; result: WakeSettings };
   "wake/settings": { params: Empty; result: WakeSettings };
+  "work/features": { params: WorkFeaturesRequest; result: WorkFeatures };
   "work/timeline": { params: WorkTimelineRequest; result: WorkTimeline };
   "workflows/approve": { params: WorkflowApproveRequest; result: WorkflowSummary };
   "workflows/archive": { params: WorkflowArchiveRequest; result: WorkflowSummary };
@@ -14818,6 +14871,7 @@ export const MethodTarget = {
   "views/show": "host",
   "wake/set": "host",
   "wake/settings": "host",
+  "work/features": "host",
   "work/timeline": "host",
   "workflows/approve": "host",
   "workflows/archive": "host",
@@ -16039,6 +16093,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WebPushSubscription: { required: [], optional: ["endpoint", "p256dh", "auth"] },
   WebRemoteStatus: { required: ["port", "served"], optional: ["reason", "detail"] },
   WebServe: { required: ["on"], optional: [] },
+  WorkFeature: { required: ["feature", "epics", "loose"], optional: [] },
+  WorkFeatureEpic: { required: ["item", "steps"], optional: ["step", "blockedOutside", "forecast", "children"] },
+  WorkFeatures: { required: ["features"], optional: ["approvals", "errors"] },
+  WorkFeaturesRequest: { required: [], optional: ["folder", "board"] },
   WorkReport: { required: ["outcome", "message", "at"], optional: ["block"] },
   WorkTimeline: { required: ["epics", "releases"], optional: ["timeZone", "backtest", "errors"] },
   WorkTimelineBacktest: { required: ["error", "width", "cuts", "holds", "epics", "at"], optional: [] },
