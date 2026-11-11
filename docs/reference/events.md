@@ -168,7 +168,7 @@ These belong to the machine the host runs on, not to a folder. Any agent can wai
 `mac.sleep`, `mac.wake`, `person.away` and `person.back` are raised only on a Mac: a Linux
 server has nothing that hears them. On a server, a `wait_for_event` naming only these is
 refused, one naming them with others says so in its answer, and `manage_workflows` says so
-when it writes or lists a workflow that triggers on them. The disk events fire on both, so
+when it writes or lists a workflow that triggers on them. The disk and capacity events fire on both, so
 they are `machine.`.
 
 | Event | Filter by | Details | What it means |
@@ -179,6 +179,8 @@ they are `machine.`.
 | `mac.wake` | — | | The Mac woke up. Mac only. |
 | `machine.disk_low` | — | volume, free_bytes, free_percent, level, threshold, worktrees | Free space on a volume holding the Agents root, a folder or a worktree fell below its threshold. `level` is `low` (below 20% of the disk) or `critical` (below 1%, where commands start failing); Folder Settings ▸ Disk Space moves both. `threshold` is the line it fell below, in bytes. `worktrees` names the largest worktrees on the volume and their sizes, measured within a budget, so `over` means at least. Raised once per crossing; falling further from low to critical is a second crossing. The window shows a strip across the top while it lasts. On a Linux server the volume is called "This server’s disk". |
 | `machine.disk_ok` | — | volume, free_bytes, free_percent, threshold | Free space on a volume that was low climbed back above its threshold, by a margin of a tenth of it (at least 1 GB) so it does not flap. |
+| `machine.busy` | — | level, signal, load_per_core, memory_pressure, swap_used_percent | The machine is near or at capacity (#4578). `level` is `near` (load per core above 1.5, or memory pressure `warn`) or `full` (load per core above 2.5, memory pressure `critical`, or swap more than half used); `signal` is what put it there: `load`, `memory_pressure` or `swap`. Load per core is the 1-minute load average over the cores; memory pressure is the kernel's (macOS `kern.memorystatus_vm_pressure_level`, Linux PSI). Looked at every 15 s. Raised as the level leaves `ok`, not when it goes from near to full. `machine/usage` carries the same signals and the level as `capacity`. |
+| `machine.ok` | — | was, load_per_core, memory_pressure, swap_used_percent | The machine that was near or at capacity is `ok` again: every signal was under its line for two looks in a row, so it does not flap. `was` is `near` or `full`. |
 | `person.away` | why | why | You locked the screen or stepped away for 5 minutes. `why` is `locked` or `idle`. Mac only. |
 | `person.back` | why | why | You unlocked the screen or came back. `why` is `locked` or `idle`. Mac only. |
 | `cost.limit_reached` | — | limit, agent | A spending limit was reached. When it is an agent's, it also carries `labels`, `runtime` and `started_by`. See [Settings and the Resources page](settings.md). |

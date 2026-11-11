@@ -1487,6 +1487,16 @@ export interface CapReached {
   until: WireDate;
 }
 
+/**
+ * A machine's capacity (#4578): ok; near (load per core above 1.5, or memory pressure warn); or
+ * full (load per core above 2.5, memory pressure critical, or swap more than half used). It rises
+ * at once, and falls only after two looks under its line.
+ */
+export type CapacityLevel =
+  | "ok"
+  | "near"
+  | "full";
+
 /** An approval of an MCP server or skill (#2019, M5): for a group, or for one person. */
 export interface CatalogApproval {
   kind: CatalogKind;
@@ -7022,7 +7032,10 @@ export interface MachineUpdate {
   trust?: string;
 }
 
-/** processes/list (#3453): the whole machine's CPU and memory now. */
+/**
+ * processes/list (#3453): the whole machine's CPU and memory now; and its capacity (#4578), as the
+ * last capacity look (every 15 s) found it. The capacity fields are absent until the first look.
+ */
 export interface MachineUsage {
   /**
    * Every core together, 0 to 100, since the last ask, or over half a second when there was none in
@@ -7034,6 +7047,14 @@ export interface MachineUsage {
   memoryUsed: number;
   /** Bytes the machine has. */
   memoryTotal: number;
+  /** The 1-minute load average divided by the cores: the run queue per core (#4578). */
+  loadPerCore?: number;
+  /** The 5-minute load average divided by the cores. */
+  loadPerCore5?: number;
+  memoryPressure?: MemoryPressure;
+  /** Swap in use, 0 to 100; 0 when the machine has none. */
+  swapUsedPercent?: number;
+  capacity?: CapacityLevel;
 }
 
 /**
@@ -7217,6 +7238,15 @@ export interface MarketplacesListRequest {
   kind?: CatalogKind;
   destination?: SkillDestination;
 }
+
+/**
+ * The kernel's memory pressure (#4578): macOS kern.memorystatus_vm_pressure_level, or Linux PSI
+ * memory (warn when some avg10 is 10% or more, critical when full avg10 is 10% or more).
+ */
+export type MemoryPressure =
+  | "normal"
+  | "warn"
+  | "critical";
 
 export interface MessageSender {
   agentID: UUID;
@@ -15538,7 +15568,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineTunnel: { required: ["up"], optional: ["problem"] },
   MachineTunnelChanged: { required: ["name", "tunnel"], optional: ["host"] },
   MachineUpdate: { required: ["host", "destination"], optional: ["key", "trust"] },
-  MachineUsage: { required: ["cpuPercent", "cpuCount", "memoryUsed", "memoryTotal"], optional: [] },
+  MachineUsage: { required: ["cpuPercent", "cpuCount", "memoryUsed", "memoryTotal"], optional: ["loadPerCore", "loadPerCore5", "memoryPressure", "swapUsedPercent", "capacity"] },
   MachineUsageState: { required: ["machine", "disks"], optional: [] },
   MachineUser: { required: ["user", "kind", "name", "labels"], optional: ["capReachedUntil", "bots"] },
   MachineUserSettings: { required: ["user", "settings", "secrets"], optional: ["waiting"] },
