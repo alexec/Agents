@@ -347,7 +347,10 @@ func (d *Daemon) installRuntime(c *Client, id string) (wire.RuntimeStatus, error
 	}
 	path, _, _ := locateFor(r)
 	installed := installedAt(r, path)
-	if installed && !d.outdated(id, path) {
+	// The person's own copy of a runtime that prefers the app's is no reason not to install
+	// the app's (#4512).
+	has := installed && !(r.prefersAppCopy && macToolsHome != "" && path != appToolset(r))
+	if has && !d.outdated(id, path) {
 		delete(d.states, id)
 		d.instMu.Unlock()
 		return d.statusOf(r), nil
@@ -389,6 +392,31 @@ func (d *Daemon) installRuntime(c *Client, id string) (wire.RuntimeStatus, error
 		}
 	})
 	return d.statusOf(r), nil
+}
+
+// installOnFirstUse is a runtime that prefers the app's copy (#4512) used on a Mac that has
+// none, or an older one than this app carries: runtimes/install starts on it, and
+// runtimes/list says installing. It reports whether an install is under way. One that
+// failed is not tried again by itself: the person presses Install.
+func (d *Daemon) installOnFirstUse(r *runtimeDef) bool {
+	if !r.prefersAppCopy || macToolsHome == "" || d.recipe(r.ID) == nil {
+		return false
+	}
+	d.instMu.Lock()
+	going, failed := d.installs[r.ID], d.states[r.ID].InstallFailed != nil
+	d.instMu.Unlock()
+	if going {
+		return true
+	}
+	if path := appToolset(r); failed || path != "" && !d.outdated(r.ID, path) {
+		return false
+	}
+	log.Printf("%s has no copy of the app's own here yet: installing it", r.Name)
+	if _, err := d.installRuntime(nil, r.ID); err != nil {
+		log.Printf("installing %s: %v", r.ID, err)
+		return false
+	}
+	return true
 }
 
 func (d *Daemon) setInstallState(r *runtimeDef, s wire.RuntimeAvailability) {
