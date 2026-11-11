@@ -101,6 +101,49 @@ type ItemDetail struct {
 	ReviewThreads int
 	FilesChanged  int
 	Head          string
+	// Events are an issue's changes (#4626), oldest first, from its first page of them.
+	Events []Event
+}
+
+// Event is one change to an issue: Kind is labeled, unlabeled, assigned, unassigned, closed or
+// reopened. Label is a kind or a component, as an issue's labels are.
+type Event struct {
+	Kind, Actor, At, Label, Assignee string
+}
+
+// events are the events of one change: a kind and a component are labels, as labels() says.
+func (c changeJSON) events() []Event {
+	var out []Event
+	add := func(kind, label, assignee string) {
+		out = append(out, Event{Kind: kind, Actor: c.User.name(), At: c.CreatedOn, Label: label, Assignee: assignee})
+	}
+	for _, field := range []string{"kind", "component"} {
+		if ch, ok := c.Changes[field]; ok && ch.Old != ch.New {
+			if ch.Old != "" {
+				add("unlabeled", ch.Old, "")
+			}
+			if ch.New != "" {
+				add("labeled", ch.New, "")
+			}
+		}
+	}
+	if ch, ok := c.Changes["assignee"]; ok && ch.Old != ch.New {
+		if ch.Old != "" {
+			add("unassigned", "", ch.Old)
+		}
+		if ch.New != "" {
+			add("assigned", "", ch.New)
+		}
+	}
+	if ch, ok := c.Changes["state"]; ok {
+		switch {
+		case closedStates[ch.New] && !closedStates[ch.Old]:
+			add("closed", "", "")
+		case closedStates[ch.Old] && !closedStates[ch.New]:
+			add("reopened", "", "")
+		}
+	}
+	return out
 }
 
 // participant is a pull request's reviewer or other participant, and what they said.
@@ -451,6 +494,15 @@ func (b *RealBitbucket) ItemPage(ctx context.Context, repo string, number int, p
 		d.Thread = append(d.Thread, Comment{Author: by.name(), Avatar: by.avatar(), Body: c.Content.Raw, At: c.CreatedOn, URL: c.Links.HTML.Href, Bot: isBot(by.name(), by.Type)})
 	}
 	if !pr {
+		// The changes are the one read more of an issue's page, and a nicety (#4626).
+		d.Events = []Event{}
+		var changes paged[changeJSON]
+		if err := b.get(ctx, fmt.Sprintf("%s/issues/%d/changes?pagelen=100", repoPath(repo), number), false, &changes); err == nil {
+			for _, c := range changes.Values {
+				d.Events = append(d.Events, c.events()...)
+			}
+			slices.SortStableFunc(d.Events, func(a, b Event) int { return strings.Compare(a.At, b.At) })
+		}
 		return d, nil
 	}
 	d.Head = p.Source.hash()

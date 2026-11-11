@@ -41,6 +41,7 @@ type forgeGitHubWrites interface {
 	CommentOnPR(ctx context.Context, repo string, number int, words string) (map[string]any, error)
 	SetLabels(ctx context.Context, repo string, number int, add, remove []string) error
 	SetState(ctx context.Context, repo string, number int, closed bool) error
+	CloseAs(ctx context.Context, repo string, number int, reason string) error
 	MergeBy(ctx context.Context, repo string, number int, sha, method string, auto bool) (map[string]any, error)
 	// The pull request page's Auto-merge row and Draft state (#4410).
 	DisableAutoMerge(ctx context.Context, repo string, number int) error
@@ -281,7 +282,24 @@ func (d *Daemon) forgeClose(ctx context.Context, r wire.ForgeCloseRequest) (wire
 	}
 	transition := strings.TrimSpace(deref(r.Transition))
 	closed := r.Reopen == nil || !*r.Reopen
-	if err := t.forge.SetState(ctx, t.ref, closed, transition); err != nil {
+	// A reason is a close's (#4404): completed is the close every forge does; not_planned only
+	// where the issue's actions have closeNotPlanned.
+	reason := wire.ForgeCloseReasonCompleted
+	if r.Reason != nil {
+		reason = *r.Reason
+		switch {
+		case reason != wire.ForgeCloseReasonCompleted && reason != wire.ForgeCloseReasonNotPlanned:
+			return wire.ForgeDone{}, Invalid("%s: reason is completed or not_planned, not %q", method, reason)
+		case !closed || transition != "":
+			return wire.ForgeDone{}, Invalid("%s: a reason is a close's, with no reopen and no transition", method)
+		}
+	}
+	if reason == wire.ForgeCloseReasonNotPlanned {
+		err = t.forge.CloseNotPlanned(ctx, t.ref)
+	} else {
+		err = t.forge.SetState(ctx, t.ref, closed, transition)
+	}
+	if err != nil {
 		return wire.ForgeDone{}, forgeCannotErr(method, t.forge, err)
 	}
 	d.forgeWrote()

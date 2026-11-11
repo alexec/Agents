@@ -90,6 +90,22 @@ type ItemDetail struct {
 	Thread      []Comment
 	Before      string
 	Transitions []Transition
+	// Children are its sub-tasks and the issues whose parent it is, each once, the oldest first;
+	// Events are its changelog's label, assignee and resolution changes, oldest first (#4626).
+	Children []Child
+	Events   []Event
+}
+
+// Child is an issue's child on its read (#4626): State is open, or closed in the Done category.
+type Child struct {
+	Key, Title, URL, State string
+}
+
+// Event is a change in an issue's changelog (#4626): Kind is labeled, unlabeled, assigned,
+// unassigned, closed (a resolution set) or reopened (a resolution cleared). Label is a labeled
+// or unlabeled one's label; Assignee an assigned or unassigned one's person, by display name.
+type Event struct {
+	Kind, Actor, At, Label, Assignee string
 }
 
 // forgeComments is a page of an issue's comments.
@@ -102,7 +118,8 @@ var forgeFields = []string{"summary", "status", "labels", "assignee", "creator",
 type restIssueRef struct {
 	Key    string `json:"key"`
 	Fields struct {
-		Status *struct {
+		Summary string `json:"summary"`
+		Status  *struct {
 			Category *struct {
 				Key string `json:"key"`
 			} `json:"statusCategory"`
@@ -340,8 +357,14 @@ func markdown(rendered, text string) string {
 }
 
 // ItemPage is the issue key names, with its description, the page of its comments before the
-// cursor before (the newest page for ""), and its transitions.
+// cursor before (the newest page for ""), its transitions, and its children and events (#4626).
 func (j *RealJira) ItemPage(ctx context.Context, key, before string) (ItemDetail, error) {
+	return j.itemPage(ctx, key, before, true)
+}
+
+// itemPage is ItemPage; children reads the issues whose parent it is, the one read more. Plan
+// reads its children itself.
+func (j *RealJira) itemPage(ctx context.Context, key, before string, children bool) (ItemDetail, error) {
 	var out struct {
 		restIssue
 		Rendered struct {
@@ -355,7 +378,7 @@ func (j *RealJira) ItemPage(ctx context.Context, key, before string) (ItemDetail
 		} `json:"renderedFields"`
 	}
 	read := append(slices.Clone(forgeFields), "description")
-	path := "/issue/" + url.PathEscape(key) + "?fields=" + url.QueryEscape(strings.Join(read, ",")) + "&expand=renderedFields"
+	path := "/issue/" + url.PathEscape(key) + "?fields=" + url.QueryEscape(strings.Join(read, ",")) + "&expand=renderedFields,changelog"
 	var raw json.RawMessage
 	if err := j.call(ctx, http.MethodGet, path, nil, &raw); err != nil {
 		return ItemDetail{}, err
@@ -403,7 +426,74 @@ func (j *RealJira) ItemPage(ctx context.Context, key, before string) (ItemDetail
 		return ItemDetail{}, err
 	}
 	d.Transitions = transitions
+	d.Events = out.events()
+	d.Children = []Child{}
+	seen := map[string]bool{}
+	add := func(key, title string, done bool) {
+		if key == "" || seen[key] {
+			return
+		}
+		seen[key] = true
+		d.Children = append(d.Children, Child{Key: key, Title: title, URL: site + "/browse/" + key, State: map[bool]string{false: "open", true: "closed"}[done]})
+	}
+	for _, s := range out.Fields.Subtasks {
+		add(s.Key, s.Fields.Summary, s.done())
+	}
+	if children {
+		// The children are a nicety, as the plan reads them: a page still reads without them.
+		if list, _, err := j.search(ctx, "parent = "+quoted(key)+" ORDER BY created ASC", []string{"summary", "status"}, "", perPage); err == nil {
+			for _, r := range list {
+				add(r.Key, r.Fields.Summary, r.issue(site).StatusCategory == "done")
+			}
+		}
+	}
 	return d, nil
+}
+
+// events are the label, assignee and resolution changes of the issue's changelog, oldest first
+// (#4626). A label change gives the labels before and after; a resolution set closes the issue,
+// and one cleared reopens it.
+func (r restIssue) events() []Event {
+	out := []Event{}
+	if r.Changelog == nil {
+		return out
+	}
+	histories := slices.Clone(r.Changelog.Histories)
+	slices.SortStableFunc(histories, func(a, b restHistory) int {
+		return strings.Compare(normalized(a.Created), normalized(b.Created))
+	})
+	for _, h := range histories {
+		at := normalized(h.Created)
+		if at == "" {
+			continue
+		}
+		actor := h.Author.person().name()
+		for _, it := range h.Items {
+			switch strings.ToLower(it.Field) {
+			case "labels":
+				for _, l := range added(it.FromString, it.ToString) {
+					out = append(out, Event{Kind: "labeled", Actor: actor, At: at, Label: l})
+				}
+				for _, l := range added(it.ToString, it.FromString) {
+					out = append(out, Event{Kind: "unlabeled", Actor: actor, At: at, Label: l})
+				}
+			case "assignee":
+				if it.FromString != "" {
+					out = append(out, Event{Kind: "unassigned", Actor: actor, At: at, Assignee: it.FromString})
+				}
+				if it.ToString != "" {
+					out = append(out, Event{Kind: "assigned", Actor: actor, At: at, Assignee: it.ToString})
+				}
+			case "resolution":
+				if it.To != "" || it.ToString != "" {
+					out = append(out, Event{Kind: "closed", Actor: actor, At: at})
+				} else {
+					out = append(out, Event{Kind: "reopened", Actor: actor, At: at})
+				}
+			}
+		}
+	}
+	return out
 }
 
 // Transitions are the moves the issue's workflow allows now, in the workflow's order.
@@ -596,7 +686,7 @@ type restLinks struct {
 
 // Plan reads key and its children (at most perPage), with each child's blockers.
 func (j *RealJira) Plan(ctx context.Context, key string) (Plan, error) {
-	epic, err := j.ItemPage(ctx, key, "")
+	epic, err := j.itemPage(ctx, key, "", false)
 	if err != nil {
 		return Plan{}, err
 	}

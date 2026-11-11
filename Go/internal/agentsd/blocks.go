@@ -667,15 +667,24 @@ func (d *Daemon) dropBlock(id wire.UUID) {
 	})
 }
 
-// armBlockTimer aims one timer at the earliest time a block checks again.
+// armBlockTimer aims one timer at the earliest time a block checks again. A block that is
+// due but cannot resume yet (its agent in a turn, not finished, or with prompts queued) is
+// passed over (#4687): aimed at its time, which has passed, the timer fired every 20 ms for
+// as long as the turn went on. The run resumes it as the turn ends (run's resumeIfCleared).
+// Only live records: an archived one has no open block.
 func (d *Daemon) armBlockTimer() {
 	var next *time.Time
-	for _, a := range d.Store.Agents() {
-		if isOpenBlock(a.Report) && a.Report.Block != nil && a.Report.Block.CheckAgainAt != nil {
-			t := a.Report.Block.CheckAgainAt.Time()
-			if next == nil || t.Before(*next) {
-				next = &t
-			}
+	at := nowFunc()
+	for _, a := range d.Store.LiveAgents() {
+		if !isOpenBlock(a.Report) || a.Report.Block == nil || a.Report.Block.CheckAgainAt == nil {
+			continue
+		}
+		t := a.Report.Block.CheckAgainAt.Time()
+		if !t.After(at) && !d.mayResume(&a) {
+			continue
+		}
+		if next == nil || t.Before(*next) {
+			next = &t
 		}
 	}
 	d.waitMu.Lock()
@@ -688,13 +697,29 @@ func (d *Daemon) armBlockTimer() {
 		return
 	}
 	d.blockTimer = time.AfterFunc(max(0, time.Until(*next))+20*time.Millisecond, func() {
-		for _, a := range d.Store.Agents() {
+		d.blockFires.Add(1)
+		for _, a := range d.Store.LiveAgents() {
 			if isOpenBlock(a.Report) {
 				d.resumeIfCleared(a.ID)
 			}
 		}
 		d.armBlockTimer()
 	})
+}
+
+// mayResume is whether resumeIfCleared could resume a's block now: finished, nothing
+// queued, and not in a turn.
+func (d *Daemon) mayResume(a *wire.Agent) bool {
+	if a.State != wire.AgentStateFinished || len(a.QueuedPrompts) > 0 {
+		return false
+	}
+	l := d.liveIfAny(a.ID)
+	if l == nil {
+		return true
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return !l.running && !l.inTurn
 }
 
 // resumeBlocks is resumeBlocksAfterRestart: waits closed on what ended while the host was

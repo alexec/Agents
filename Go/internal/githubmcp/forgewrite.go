@@ -142,6 +142,16 @@ func (g *RealGitHub) SetState(ctx context.Context, repo string, number int, clos
 	return err
 }
 
+// CloseAs closes an issue with GitHub's state_reason: completed or not_planned (#4404).
+func (g *RealGitHub) CloseAs(ctx context.Context, repo string, number int, reason string) error {
+	if _, _, err := ownerName(repo); err != nil {
+		return err
+	}
+	body, _ := json.Marshal(map[string]string{"state": "closed", "state_reason": reason})
+	_, err := g.do(ctx, http.MethodPatch, fmt.Sprintf("repos/%s/issues/%d", repo, number), body, false)
+	return err
+}
+
 // SetBody writes an issue's or a pull request's body: a forge request's ticked line (#3865).
 func (g *RealGitHub) SetBody(ctx context.Context, repo string, number int, text string) error {
 	if _, _, err := ownerName(repo); err != nil {

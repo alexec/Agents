@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/wire"
@@ -99,5 +100,24 @@ func BenchmarkFolders(b *testing.B) {
 		if len(d.folders(true)) == 0 {
 			b.Fatal("no folders")
 		}
+	}
+}
+
+// BenchmarkArmBlockTimer is one aim of the block timer with a due block on an agent in a
+// turn (#4687). Before the fix the timer fired every 20 ms for as long as that turn went
+// on, and each pass read every record twice.
+func BenchmarkArmBlockTimer(b *testing.B) {
+	d, id := hotPathStore(b)
+	d.change(id, func(a *wire.Agent) {
+		a.Report = &wire.WorkReport{Outcome: wire.WorkOutcomeWaiting, Message: "Waiting for CI.", At: now(),
+			Block: &wire.Block{Waits: []wire.Wait{}, CheckAgainAt: new(wire.DateOf(time.Now().Add(-time.Minute)))}}
+	})
+	l := d.live(id)
+	l.mu.Lock()
+	l.inTurn = true
+	l.mu.Unlock()
+	b.ReportAllocs()
+	for b.Loop() {
+		d.armBlockTimer()
 	}
 }

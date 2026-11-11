@@ -133,6 +133,17 @@ Decided: no forecast is kept for a milestone, because the store has no node for 
 
 Decided: a workflow run started by `pr.merged` or `pr.closed` is not linked to the PR, because the PR is done and what follows (a ship, a clean-up) is other work. Alex can overrule.
 
+## The what-if (#4531)
+
+Reports ▸ Planning has two levers: the lane limit and the runtime mix. `lineage/forecast` takes them as `whatIf` and answers what the window assumed (`assumes`) and what the levers moved (`whatIf`).
+
+- **How the lane limit enters.** Method H uses no lane count: it resamples the hours of the last 14 days. So the limit enters through those hours. For each hour, the daemon counts the issues in flight: each landing from its first work (its lead time, else its cycle time) to its landing, and each open issue from its start to its last work. An epic's lead is not an issue in flight, as it is not a lane. With a limit of L, an hour that had a issues in flight keeps min(a, L) / a of its landings. The dates' draws keep each landing with the chance share × that part, and the spend counts each landing's cost times it. `pace` is the landings kept over all of them; each allowance burns at that pace.
+- **More lanes than ran.** A limit at or above the most issues in flight in any hour (`peakLanes`) moves nothing. No hour of the window shows what more lanes would do, and the page says so. It does not extrapolate.
+- **The runtime mix.** Each runtime's working hours (the agent, its tools and others) come from `time-history.json`, and its cost from `usage-history.json`, over the window's days. A mix is each runtime's share of the hours. Its cost per hour over the window's cost per hour scales the spend and the estimate to complete. Each allowance's pace scales by its runtime's new share over the old one. A landing does not say its runtime, so a mix does not move the dates.
+- **Never kept.** A what-if forecast is not kept on the epic's node and is not scored.
+
+Decided: the lane limit clips each hour's issues in flight, and no extrapolation above the window's peak, because the window's hours are the only data the method has, and a straight line above the peak would claim more than they show. Alex can overrule.
+
 ## Not in this spike
 
 - Cost forecasts, the burn against the allowance, and the estimate to complete. #4526 has them; this backtest is about dates only.

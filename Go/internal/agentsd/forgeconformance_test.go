@@ -207,6 +207,9 @@ func (g conformGitLab) ItemPage(_ context.Context, _ string, number int, mr bool
 			if i.MR {
 				d.Head, d.Pipeline = "abc", 7
 				d.CheckRuns = []gitlabmcp.Check{{Name: "test: unit", State: "failing"}}
+			} else if i.State == "open" {
+				d.Children = []gitlabmcp.Linked{{Project: "Group/App", Number: 2, State: "closed", Title: "Closed", URL: "https://gitlab.com/Group/App/-/issues/2"}}
+				d.ClosedBy = []gitlabmcp.Linked{{Project: "Group/App", Number: 4, MR: true, State: "merged", Title: "Merged", URL: "https://gitlab.com/Group/App/-/merge_requests/4"}}
 			}
 			return d, nil
 		}
@@ -283,6 +286,13 @@ func (g conformForgejo) ItemPage(_ context.Context, _ string, number int, pr boo
 			if i.PR {
 				d.Head = "abc"
 				d.CheckRuns = []forgejomcp.CheckRun{{Name: "ci / test", State: "failing"}}
+			} else if i.State == "open" {
+				d.LinkedPulls = []forgejomcp.Linked{{Repo: "walkalex/App", Number: 4, Title: "Merged", State: "merged", URL: "http://localhost:3753/walkalex/App/pulls/4"}}
+				d.Events = []forgejomcp.Event{
+					{Kind: "labeled", Actor: "kim", At: "2026-10-01T11:00:00Z", Label: "task", LabelColor: "#c5def5"},
+					{Kind: "assigned", Actor: "kim", At: "2026-10-01T12:00:00Z", Assignee: "kim"},
+					{Kind: "referenced", Actor: "kim", At: "2026-10-02T10:00:00Z", SourceRepo: "walkalex/App", SourceNumber: 4, SourcePR: true},
+				}
 			}
 			return d, nil
 		}
@@ -359,6 +369,11 @@ func (g conformBitbucket) ItemPage(_ context.Context, _ string, number int, pr b
 			} else {
 				// An issue's count is only on its page (commentCount detail).
 				d.Comments = len(d.Thread)
+				if i.State == "open" {
+					d.Events = []bitbucketmcp.Event{{Kind: "labeled", Actor: "kim", At: "2026-10-01T11:00:00Z", Label: "task"},
+						{Kind: "assigned", Actor: "kim", At: "2026-10-01T12:00:00Z", Assignee: "kim"}, {Kind: "closed", Actor: "kim", At: "2026-10-02T10:00:00Z"},
+						{Kind: "reopened", Actor: "kim", At: "2026-10-03T10:00:00Z"}}
+				}
 			}
 			return d, nil
 		}
@@ -482,8 +497,14 @@ func (g conformLinear) ItemPage(_ context.Context, identifier, _ string) (linear
 	for _, i := range conformLinearItems {
 		if i.Identifier == identifier {
 			return linearmcp.ItemDetail{Item: i, Body: "The body.",
-				Thread:   []linearmcp.Comment{{Author: "kim", Avatar: "https://public.linear.app/k/avatar", Body: "A comment.", At: i.UpdatedAt}},
-				Children: []linearmcp.Child{{Identifier: "ENG-2", Title: "Closed", State: "closed", URL: "https://linear.app/acme/issue/ENG-2"}}}, nil
+				Thread:      []linearmcp.Comment{{Author: "kim", Avatar: "https://public.linear.app/k/avatar", Body: "A comment.", At: i.UpdatedAt}},
+				Children:    []linearmcp.Child{{Identifier: "ENG-2", Title: "Closed", State: "closed", URL: "https://linear.app/acme/issue/ENG-2"}},
+				LinkedPulls: []linearmcp.LinkedPull{{Forge: "github", Repo: "alexec/agents", Number: 4, Title: "Merged", State: "merged", URL: "https://github.com/alexec/agents/pull/4"}},
+				Events: []linearmcp.Event{
+					{Kind: "labeled", Actor: "kim", At: "2026-10-01T11:00:00.000Z", Label: "billing", LabelColor: "#eb5757"},
+					{Kind: "assigned", Actor: "kim", At: "2026-10-01T12:00:00.000Z", Assignee: "kim"},
+					{Kind: "closed", Actor: "kim", At: "2026-10-02T10:00:00.000Z"},
+				}}, nil
 		}
 	}
 	return linearmcp.ItemDetail{}, &linearmcp.LinearError{Kind: linearmcp.NotFound, Message: "Linear issue " + identifier + " was not found"}
@@ -552,7 +573,13 @@ func (g conformJira) ItemPage(_ context.Context, key, _ string) (jiramcp.ItemDet
 		if i.Key == key {
 			return jiramcp.ItemDetail{Item: i, Body: "The body.",
 				Thread:      []jiramcp.Comment{{Author: "Kim", Avatar: "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/k/48", Body: "A comment.", At: i.UpdatedAt}},
-				Transitions: []jiramcp.Transition{{ID: "31", Name: "Done", Category: "done"}}}, nil
+				Transitions: []jiramcp.Transition{{ID: "31", Name: "Done", Category: "done"}},
+				Children:    []jiramcp.Child{{Key: "PROJ-2", Title: "Closed", State: "closed", URL: "https://acme.atlassian.net/browse/PROJ-2"}},
+				Events: []jiramcp.Event{
+					{Kind: "labeled", Actor: "Kim", At: "2026-10-01T11:00:00.000Z", Label: "billing"},
+					{Kind: "assigned", Actor: "Kim", At: "2026-10-01T12:00:00.000Z", Assignee: "Kim"},
+					{Kind: "closed", Actor: "Kim", At: "2026-10-02T10:00:00.000Z"},
+				}}, nil
 		}
 	}
 	return jiramcp.ItemDetail{}, &jiramcp.JiraError{Kind: jiramcp.NotFound, Message: "Jira: Issue does not exist"}
@@ -620,7 +647,8 @@ func (g conformBoards) ItemPage(_ context.Context, project string, id int, _ str
 		if i.ID == id && i.Project == project {
 			return azureboardsmcp.ItemDetail{Item: i, Body: "The description.",
 				Thread:      []azureboardsmcp.ForgeComment{{Author: "Kim", Avatar: "https://dev.azure.com/acme/_apis/GraphProfile/MemberAvatars/aad.aw0", Body: "A comment.", At: i.UpdatedAt}},
-				Transitions: []azureboardsmcp.Transition{{ID: "Done", Name: "Done", Category: "done"}}}, nil
+				Transitions: []azureboardsmcp.Transition{{ID: "Done", Name: "Done", Category: "done"}},
+				Children:    []azureboardsmcp.Item{{ID: 2, Project: "acme/web", Title: "Closed", State: "closed", URL: "https://dev.azure.com/acme/web/_workitems/edit/2"}}}, nil
 		}
 	}
 	return azureboardsmcp.ItemDetail{}, &azureboardsmcp.BoardsError{Kind: azureboardsmcp.NotFound, Message: "Azure Boards: no work item"}
@@ -847,17 +875,20 @@ func conformActions(f Forge, r forgeRef) map[string]func(context.Context) error 
 		actionAssign:  func(ctx context.Context) error { return f.SetAssignees(ctx, r, []string{"kim"}, nil) },
 		actionClose:   func(ctx context.Context) error { return f.SetState(ctx, r, true, "") },
 		actionReopen:  func(ctx context.Context) error { return f.SetState(ctx, r, false, "") },
+		actionCloseNotPlanned: func(ctx context.Context) error {
+			return f.CloseNotPlanned(ctx, r)
+		},
 		actionTransition: func(ctx context.Context) error {
 			return f.SetState(ctx, r, true, "31")
 		},
-		actionMerge:     func(ctx context.Context) error { _, err := f.Merge(ctx, r, "abc", "", false); return err },
-		actionAutoMerge: func(ctx context.Context) error { _, err := f.Merge(ctx, r, "abc", "", true); return err },
-		actionApprove:   func(ctx context.Context) error { _, err := f.Approve(ctx, r, "abc"); return err },
+		actionMerge:      func(ctx context.Context) error { _, err := f.Merge(ctx, r, "abc", "", false); return err },
+		actionAutoMerge:  func(ctx context.Context) error { _, err := f.Merge(ctx, r, "abc", "", true); return err },
+		actionApprove:    func(ctx context.Context) error { _, err := f.Approve(ctx, r, "abc"); return err },
 		actionCancelAuto: func(ctx context.Context) error { return f.CancelAutoMerge(ctx, r) },
 		actionReady:      func(ctx context.Context) error { return f.Ready(ctx, r) },
-		actionRerun:     func(ctx context.Context) error { _, err := f.Rerun(ctx, r); return err },
-		actionLog:       func(ctx context.Context) error { _, err := f.Log(ctx, r, ""); return err },
-		actionDiff:      func(ctx context.Context) error { _, err := f.Diff(ctx, r); return err },
+		actionRerun:      func(ctx context.Context) error { _, err := f.Rerun(ctx, r); return err },
+		actionLog:        func(ctx context.Context) error { _, err := f.Log(ctx, r, ""); return err },
+		actionDiff:       func(ctx context.Context) error { _, err := f.Diff(ctx, r); return err },
 	}
 }
 
@@ -953,7 +984,8 @@ func conformComments(t *testing.T, caps forgeCaps, listed wire.ForgeItem, page w
 
 // conformLinks checks an item's children, linkedPulls and events (#4373): on an issue's page
 // where the forge says it has them, absent elsewhere; each child is an issue and each linked pull
-// request a pull request of this forge, and each event of a kind the wire has.
+// request a pull request of this forge (of any forge for a tracker with none, as Linear's
+// attachments name GitHub's, #4626), and each event of a kind the wire has.
 func conformLinks(t *testing.T, d *Daemon, f Forge, caps forgeCaps, page wire.ForgeItemDetail) {
 	t.Helper()
 	issue := page.Item.Node.Kind == lineage.KindIssue
@@ -967,7 +999,7 @@ func conformLinks(t *testing.T, d *Daemon, f Forge, caps forgeCaps, page wire.Fo
 			t.Errorf("%v: %s %v, caps say %v", page.Item.Node, l.name, l.items, l.on)
 		}
 		for _, i := range l.items {
-			if g, _, ok := d.forgeOwning(i.Node); !ok || g.Name() != f.Name() || i.Node.Kind != l.kind {
+			if g, _, ok := d.forgeOwning(i.Node); !ok || g.Name() != f.Name() && (l.kind == lineage.KindIssue || caps.PRs) || i.Node.Kind != l.kind {
 				t.Errorf("%v: %s %v is not a %s of %s", page.Item.Node, l.name, i.Node, l.kind, f.Name())
 			}
 			if i.Title == "" || !slices.Contains([]string{"open", "closed", "merged"}, i.State) {
@@ -1112,15 +1144,17 @@ func conformItemActions(t *testing.T, caps forgeCaps, i wire.ForgeItem, actions 
 	has := func(n wire.ForgeAction) bool { return slices.Contains(actions, n) }
 	switch i.State {
 	case "merged":
-		if has(wire.ForgeActionMerge) || has(wire.ForgeActionReopen) || has(wire.ForgeActionClose) {
+		if has(wire.ForgeActionMerge) || has(wire.ForgeActionReopen) || has(wire.ForgeActionClose) || has(wire.ForgeActionCloseNotPlanned) {
 			t.Errorf("%v (merged): actions %v", i.Node, actions)
 		}
 	case "closed":
-		if has(wire.ForgeActionClose) || has(wire.ForgeActionMerge) || has(wire.ForgeActionReopen) != a.Reopen {
+		if has(wire.ForgeActionClose) || has(wire.ForgeActionCloseNotPlanned) || has(wire.ForgeActionMerge) ||
+			has(wire.ForgeActionReopen) != a.Reopen {
 			t.Errorf("%v (closed): actions %v", i.Node, actions)
 		}
 	case "open":
-		if has(wire.ForgeActionReopen) || has(wire.ForgeActionClose) != a.Close || has(wire.ForgeActionMerge) != a.Merge {
+		if has(wire.ForgeActionReopen) || has(wire.ForgeActionClose) != a.Close || has(wire.ForgeActionMerge) != a.Merge ||
+			has(wire.ForgeActionCloseNotPlanned) != a.CloseNotPlanned {
 			t.Errorf("%v (open): actions %v", i.Node, actions)
 		}
 	}

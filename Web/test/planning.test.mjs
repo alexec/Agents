@@ -55,3 +55,38 @@ test("the cost all in, with the overhead ratio", () => {
   assert.equal(p.loadedLine(v), "$16.20 all in, with the turns on no issue or pull request (the overhead was ×1.30 over the last 14 days)");
   assert.equal(p.loadedLine({}), undefined);
 });
+
+// #4531: the what-if's picks, what the window ran with, and what the picks moved.
+const assumes = { lanes: 3.24, peakLanes: 7, runtimes: [
+  { runtime: "claude", share: 0.75, hours: 30, rate: { USD: 10 } }, { runtime: "codex", share: 0.25, hours: 10, rate: { USD: 2 } }] };
+
+test("the lane limits and the shares to pick", () => {
+  const lanes = p.laneOptions(assumes);
+  assert.deepEqual(lanes[0], ["", "As they ran (up to 7)"]);
+  assert.deepEqual(lanes.slice(1, 3), [["1", "1 lane"], ["2", "2 lanes"]]);
+  assert.equal(lanes.length, 11);
+  assert.deepEqual(p.mixOptions(0.75)[0], ["", "As it ran (75%)"]);
+  assert.deepEqual(p.mixOptions(0.75).at(-1), ["100", "100%"]);
+  assert.deepEqual(p.mixOptions(0.25, 0.5)[0], ["", "The rest (50%)"]);
+});
+
+test("the request's what-if: none as it ran, and the runtimes not picked share the rest", () => {
+  assert.equal(p.whatIfOf("", {}, assumes), undefined);
+  assert.equal(p.whatIfOf("", { claude: "" }, assumes), undefined);
+  assert.deepEqual(p.whatIfOf("2", {}, assumes), { lanes: 2 });
+  assert.deepEqual(p.whatIfOf("", { claude: "50" }, assumes), { mix: { claude: 0.5, codex: 0.5 } });
+  assert.deepEqual(p.whatIfOf("3", { claude: "100", codex: "100" }, assumes), { lanes: 3, mix: { claude: 1, codex: 1 } });
+});
+
+test("what the window ran with, and what a what-if moved", () => {
+  const name = (r) => ({ claude: "Claude", codex: "Codex" })[r] ?? r;
+  assert.equal(p.assumesLine(assumes, 14, name),
+    "The last 14 days had 3.2 issues in flight in an average hour, 7 at most; the mix was Claude 75% at $10 an hour, Codex 25% at $2 an hour.");
+  assert.equal(p.assumesLine({ lanes: 0, peakLanes: 0, runtimes: [] }, 14, name), "The last 14 days had no issue in flight; no runtime’s hours are on this machine.");
+  const [lanes] = p.whatIfLines({ lanes: 2, pace: 0.64, cost: 1 }, assumes);
+  assert.match(lanes, /^At 2 lanes: 64% of the window’s landings, so the dates move out/);
+  assert.match(p.whatIfLines({ lanes: 9, pace: 1, cost: 1 }, assumes)[0], /no hour of the window had more than 7 issues in flight, so this limit moves nothing/);
+  const mixed = p.whatIfLines({ mix: { claude: 0.5, codex: 0.5 }, pace: 1, cost: 0.75 }, assumes);
+  assert.equal(mixed.length, 1);
+  assert.match(mixed[0], /^With this mix, the dollars are ×0\.75.+A mix does not move the dates/);
+});

@@ -205,7 +205,7 @@ func TestPersonas(t *testing.T) {
 	dir := t.TempDir()
 	folder := filepath.Join(dir, ".agents", "personas")
 	os.MkdirAll(folder, 0o755)
-	os.WriteFile(filepath.Join(folder, "reviewer.md"), []byte("---\nname: Reviewer\ndescription: Reads code\nmodel: opus # the big one\noptions:\n  fast: true\nlabels: [review, Review]\n---\n\nYou review.\n"), 0o644)
+	os.WriteFile(filepath.Join(folder, "reviewer.md"), []byte("---\nname: Reviewer\ndescription: Reads code\nmodel: opus # the big one\noptions:\n  fast: true\nlabels: [review, Review]\nkeywords: [\"review\", \"#<n>\", Review, \" \"]\n---\n\nYou review.\n"), 0o644)
 	os.WriteFile(filepath.Join(folder, "plain.md"), []byte("Just a prompt"), 0o644)
 	os.WriteFile(filepath.Join(folder, "broken.md"), []byte("---\nname: x\n"), 0o644)
 	os.WriteFile(filepath.Join(folder, ".hidden.md"), nil, 0o644)
@@ -223,7 +223,8 @@ func TestPersonas(t *testing.T) {
 	}
 	r := byID["reviewer"]
 	if *r.Description != "Reads code" || *r.Settings.Model != "opus" || r.Settings.Options["fast"] != "true" ||
-		strings.Join(r.Settings.Labels, ",") != "review" || r.Origin != "folder" {
+		strings.Join(r.Settings.Labels, ",") != "review" || r.Origin != "folder" ||
+		strings.Join(r.Keywords, ",") != "review,#<n>" || byID["plain"].Keywords != nil {
 		t.Fatalf("%+v", r)
 	}
 	if *byID["broken"].Problem != "The metadata block is never closed" || *byID["linked"].Problem != "This file could not be read" {

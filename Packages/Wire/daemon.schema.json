@@ -9974,6 +9974,7 @@
         "comment",
         "label",
         "close",
+        "closeNotPlanned",
         "reopen",
         "transition",
         "merge",
@@ -9988,7 +9989,7 @@
         "cancelAutoMerge",
         "ready"
       ],
-      "description": "A write or a read that an item's page offers (#4329, #4361): forge/comment, forge/label, forge/close (a close, a reopen or a transition), forge/merge (now, or with auto), forge/approve, forge/rerun, forge/log, forge/diff, forge/add-child, forge/blocked-by, forge/assign (#4403), forge/cancel-auto-merge and forge/ready (#4410)."
+      "description": "A write or a read that an item's page offers (#4329, #4361): forge/comment, forge/label, forge/close (a close, a reopen or a transition; closeNotPlanned is a close with reason not_planned, where the forge has it, #4404), forge/merge (now, or with auto), forge/approve, forge/rerun, forge/log, forge/diff, forge/add-child, forge/blocked-by, forge/assign (#4403), forge/cancel-auto-merge and forge/ready (#4410)."
     },
     "ForgeAddChildRequest": {
       "type": "object",
@@ -10213,9 +10214,17 @@
       ],
       "additionalProperties": false
     },
+    "ForgeCloseReason": {
+      "type": "string",
+      "enum": [
+        "completed",
+        "not_planned"
+      ],
+      "description": "Why forge/close closes an issue (#4404): completed, or not_planned where the forge has it (the action closeNotPlanned)."
+    },
     "ForgeCloseRequest": {
       "type": "object",
-      "description": "forge/close (#3130): close an issue or a pull request, or with reopen open it again; with transition, move a Jira issue by that transition of its workflow, by its id from the page's transitions (#3260).",
+      "description": "forge/close (#3130): close an issue or a pull request, or with reopen open it again; with transition, move a Jira issue by that transition of its workflow, by its id from the page's transitions (#3260). reason is why an issue closes (#4404): completed (the default) or not_planned, which only an issue whose actions have closeNotPlanned takes; refused with reopen or a transition, and on a pull request.",
       "properties": {
         "node": {
           "$ref": "#/definitions/LineageNode"
@@ -10225,6 +10234,9 @@
         },
         "transition": {
           "type": "string"
+        },
+        "reason": {
+          "$ref": "#/definitions/ForgeCloseReason"
         }
       },
       "required": [
@@ -13179,6 +13191,14 @@
         "overhead": {
           "$ref": "#/definitions/LineageOverhead",
           "description": "The overhead that toComplete.loaded and spend's loaded figures are made with (#4524)."
+        },
+        "assumes": {
+          "$ref": "#/definitions/LineageForecastAssumes",
+          "description": "The lanes and the runtime mix the window ran with (#4531)."
+        },
+        "whatIf": {
+          "$ref": "#/definitions/LineageForecastWhatIfEffect",
+          "description": "What the request's what-if moved (#4531); every figure is then the what-if's."
         }
       },
       "required": [
@@ -13188,6 +13208,17 @@
         "burn",
         "serviceLevels"
       ],
+      "additionalProperties": false
+    },
+    "LineageForecastAssumes": {
+      "type": "object",
+      "description": "What a forecast assumes (#4531): the lanes and the runtime mix of its window. lanes is the issues in flight (from their first work to their landing, or to now when open) in an average hour that had one; peakLanes is the most in any hour. runtimes is the mix, the most hours first.",
+      "properties": {
+        "lanes": { "type": "number" },
+        "peakLanes": { "type": "integer" },
+        "runtimes": { "type": "array", "items": { "$ref": "#/definitions/LineageForecastRuntime" } }
+      },
+      "required": ["lanes", "peakLanes", "runtimes"],
       "additionalProperties": false
     },
     "LineageForecastBurn": {
@@ -13301,7 +13332,7 @@
     },
     "LineageForecastRequest": {
       "type": "object",
-      "description": "lineage/forecast (#4526): an epic, for when it lands and its estimate to complete; or a milestone (#4620), by name, for when it lands, in folder's repo (any repo without one); without either, only the spend, the burn and the service levels, over every repo.",
+      "description": "lineage/forecast (#4526): an epic, for when it lands and its estimate to complete; or a milestone (#4620), by name, for when it lands, in folder's repo (any repo without one); without either, only the spend, the burn and the service levels, over every repo. whatIf (#4531) asks for the same figures with another lane limit or runtime mix; a what-if forecast is never kept.",
       "properties": {
         "node": {
           "$ref": "#/definitions/LineageNode"
@@ -13313,8 +13344,23 @@
         "folder": {
           "type": "string",
           "description": "The folder whose repo the milestone is in."
+        },
+        "whatIf": {
+          "$ref": "#/definitions/LineageForecastWhatIf"
         }
       },
+      "additionalProperties": false
+    },
+    "LineageForecastRuntime": {
+      "type": "object",
+      "description": "A runtime's part of a forecast's window (#4531), from this machine's usage and time histories: share is its part of the agents' working hours (the agent, its tools and others), hours is those hours, and rate is its cost per working hour.",
+      "properties": {
+        "runtime": { "type": "string" },
+        "share": { "type": "number" },
+        "hours": { "type": "number" },
+        "rate": { "type": "object", "additionalProperties": { "type": "number" }, "description": "By currency." }
+      },
+      "required": ["runtime", "share", "hours", "rate"],
       "additionalProperties": false
     },
     "LineageForecastServiceLevel": {
@@ -13412,6 +13458,27 @@
         "closed",
         "leadRatio"
       ],
+      "additionalProperties": false
+    },
+    "LineageForecastWhatIf": {
+      "type": "object",
+      "description": "A what-if for lineage/forecast (#4531): lanes is a lane limit (below 1 is as the window ran), and mix is a runtime mix, each runtime's share of the working hours, scaled to add up to 1. Absent, each is as the window ran.",
+      "properties": {
+        "lanes": { "type": "integer" },
+        "mix": { "type": "object", "additionalProperties": { "type": "number" }, "description": "By runtime id." }
+      },
+      "additionalProperties": false
+    },
+    "LineageForecastWhatIfEffect": {
+      "type": "object",
+      "description": "What a what-if moved (#4531). A lane limit keeps, in each hour of the window, min(in flight, lanes) / in flight of its landings, so the dates move out and a week's spend falls; a limit at or above peakLanes moves nothing, as no hour ran more. pace is the landings it keeps over the window's. A mix moves the dollars only: cost is the mix's cost per working hour over the window's, and each allowance's pace moves by its runtime's share over the window's. Landings do not say their runtime, so a mix does not move the dates.",
+      "properties": {
+        "lanes": { "type": "integer" },
+        "mix": { "type": "object", "additionalProperties": { "type": "number" }, "description": "By runtime id, scaled to add up to 1." },
+        "pace": { "type": "number" },
+        "cost": { "type": "number" }
+      },
+      "required": ["pace", "cost"],
       "additionalProperties": false
     },
     "LineageGraph": {
@@ -20308,6 +20375,13 @@
         },
         "settings": {
           "$ref": "#/definitions/WorkflowSettings"
+        },
+        "keywords": {
+          "description": "The front matter's `keywords:` (#4559): the words in a first prompt that make Auto pick this persona. Left out when the file names none; then its name and description are the words.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         },
         "problem": {
           "type": "string"
@@ -33187,6 +33261,110 @@
       "x-swift-type": "Date",
       "x-go-type": "Date",
       "x-ts-type": "number & { readonly __brand: \"WireDate\" }"
+    },
+    "WorkFeature": {
+      "type": "object",
+      "description": "A feature in work/features (#4586): feature is it as forge/features says it. epics are its open epics, the newest first, each with where it is in its plan and its children. loose are its open issues that are not epics and have no parent (of the newest 500 open issues), the newest update first, as children are: when each started, and whether it waits for a person.",
+      "properties": {
+        "feature": {
+          "$ref": "#/definitions/ForgeFeature"
+        },
+        "epics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WorkFeatureEpic"
+          }
+        },
+        "loose": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WorkTimelineChild"
+          }
+        }
+      },
+      "required": [
+        "feature",
+        "epics",
+        "loose"
+      ],
+      "additionalProperties": false
+    },
+    "WorkFeatureEpic": {
+      "type": "object",
+      "description": "An open epic in work/features (#4586), from forge/plan and work/timeline. steps is the number of steps in its plan (ForgePlan.steps), and step the first of them with an open child, absent when none is open. blockedOutside are the open blockers outside the plan of that step's open children (an issue of another epic), each once. forecast is its open line's close as work/timeline forecasts it, on GitHub only; absent when there is too little history or nothing to forecast. children are its sub-issues in the plan's order (at most 100), each with its start, close and wait as in work/timeline; absent when its plan could not be read (errors says why).",
+      "properties": {
+        "item": {
+          "$ref": "#/definitions/ForgeItem"
+        },
+        "step": {
+          "type": "integer"
+        },
+        "steps": {
+          "type": "integer"
+        },
+        "blockedOutside": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LineageNode"
+          }
+        },
+        "forecast": {
+          "$ref": "#/definitions/WorkTimelineForecast"
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WorkTimelineChild"
+          }
+        }
+      },
+      "required": [
+        "item",
+        "steps"
+      ],
+      "additionalProperties": false
+    },
+    "WorkFeatures": {
+      "type": "object",
+      "description": "work/features (#4586, specs/4328-work-look/features-delivery.md): the Features page's one read. features are forge/features' features, by name, each with its open epics and its loose open issues, so an open feature's epics and children draw with no second read. approvals are as in forge/features. errors say a forge, a plan or a timeline that could not be read.",
+      "properties": {
+        "features": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WorkFeature"
+          }
+        },
+        "approvals": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ForgeListError"
+          }
+        }
+      },
+      "required": [
+        "features"
+      ],
+      "additionalProperties": false
+    },
+    "WorkFeaturesRequest": {
+      "type": "object",
+      "description": "work/features (#4586): the features of every folder on this machine, or of one folder's repo, as forge/features.",
+      "properties": {
+        "folder": {
+          "type": "string"
+        },
+        "board": {
+          "type": "string",
+          "description": "A board's url, from forge/boards (#3282): only the epics on that board."
+        }
+      },
+      "additionalProperties": false
     },
     "WorkOutcome": {
       "type": "string",

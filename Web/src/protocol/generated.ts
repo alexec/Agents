@@ -4010,7 +4010,8 @@ export interface FoldersListRequest {
 
 /**
  * A write or a read that an item's page offers (#4329, #4361): forge/comment, forge/label,
- * forge/close (a close, a reopen or a transition), forge/merge (now, or with auto), forge/approve,
+ * forge/close (a close, a reopen or a transition; closeNotPlanned is a close with reason
+ * not_planned, where the forge has it, #4404), forge/merge (now, or with auto), forge/approve,
  * forge/rerun, forge/log, forge/diff, forge/add-child, forge/blocked-by, forge/assign (#4403),
  * forge/cancel-auto-merge and forge/ready (#4410).
  */
@@ -4018,6 +4019,7 @@ export type ForgeAction =
   | "comment"
   | "label"
   | "close"
+  | "closeNotPlanned"
   | "reopen"
   | "transition"
   | "merge"
@@ -4143,14 +4145,25 @@ export interface ForgeCheck {
 }
 
 /**
+ * Why forge/close closes an issue (#4404): completed, or not_planned where the forge has it (the
+ * action closeNotPlanned).
+ */
+export type ForgeCloseReason =
+  | "completed"
+  | "not_planned";
+
+/**
  * forge/close (#3130): close an issue or a pull request, or with reopen open it again; with
  * transition, move a Jira issue by that transition of its workflow, by its id from the page's
- * transitions (#3260).
+ * transitions (#3260). reason is why an issue closes (#4404): completed (the default) or
+ * not_planned, which only an issue whose actions have closeNotPlanned takes; refused with reopen or
+ * a transition, and on a pull request.
  */
 export interface ForgeCloseRequest {
   node: LineageNode;
   reopen?: boolean;
   transition?: string;
+  reason?: ForgeCloseReason;
 }
 
 /**
@@ -5451,6 +5464,21 @@ export interface LineageForecast {
   serviceLevels: LineageForecastServiceLevel[];
   /** The overhead that toComplete.loaded and spend's loaded figures are made with (#4524). */
   overhead?: LineageOverhead;
+  /** The lanes and the runtime mix the window ran with (#4531). */
+  assumes?: LineageForecastAssumes;
+  /** What the request's what-if moved (#4531); every figure is then the what-if's. */
+  whatIf?: LineageForecastWhatIfEffect;
+}
+
+/**
+ * What a forecast assumes (#4531): the lanes and the runtime mix of its window. lanes is the issues
+ * in flight (from their first work to their landing, or to now when open) in an average hour that
+ * had one; peakLanes is the most in any hour. runtimes is the mix, the most hours first.
+ */
+export interface LineageForecastAssumes {
+  lanes: number;
+  peakLanes: number;
+  runtimes: LineageForecastRuntime[];
 }
 
 /**
@@ -5507,7 +5535,8 @@ export interface LineageForecastLands {
 /**
  * lineage/forecast (#4526): an epic, for when it lands and its estimate to complete; or a milestone
  * (#4620), by name, for when it lands, in folder's repo (any repo without one); without either,
- * only the spend, the burn and the service levels, over every repo.
+ * only the spend, the burn and the service levels, over every repo. whatIf (#4531) asks for the
+ * same figures with another lane limit or runtime mix; a what-if forecast is never kept.
  */
 export interface LineageForecastRequest {
   node?: LineageNode;
@@ -5515,6 +5544,20 @@ export interface LineageForecastRequest {
   milestone?: string;
   /** The folder whose repo the milestone is in. */
   folder?: string;
+  whatIf?: LineageForecastWhatIf;
+}
+
+/**
+ * A runtime's part of a forecast's window (#4531), from this machine's usage and time histories:
+ * share is its part of the agents' working hours (the agent, its tools and others), hours is those
+ * hours, and rate is its cost per working hour.
+ */
+export interface LineageForecastRuntime {
+  runtime: string;
+  share: number;
+  hours: number;
+  /** By currency. */
+  rate: Record<string, number>;
 }
 
 /**
@@ -5563,6 +5606,33 @@ export interface LineageForecastToComplete {
    * cost already, so not the epic ratio. Absent with no ratio.
    */
   loaded?: Record<string, LineageEstimateRange>;
+}
+
+/**
+ * A what-if for lineage/forecast (#4531): lanes is a lane limit (below 1 is as the window ran), and
+ * mix is a runtime mix, each runtime's share of the working hours, scaled to add up to 1. Absent,
+ * each is as the window ran.
+ */
+export interface LineageForecastWhatIf {
+  lanes?: number;
+  /** By runtime id. */
+  mix?: Record<string, number>;
+}
+
+/**
+ * What a what-if moved (#4531). A lane limit keeps, in each hour of the window, min(in flight,
+ * lanes) / in flight of its landings, so the dates move out and a week's spend falls; a limit at or
+ * above peakLanes moves nothing, as no hour ran more. pace is the landings it keeps over the
+ * window's. A mix moves the dollars only: cost is the mix's cost per working hour over the
+ * window's, and each allowance's pace moves by its runtime's share over the window's. Landings do
+ * not say their runtime, so a mix does not move the dates.
+ */
+export interface LineageForecastWhatIfEffect {
+  lanes?: number;
+  /** By runtime id, scaled to add up to 1. */
+  mix?: Record<string, number>;
+  pace: number;
+  cost: number;
 }
 
 /**
@@ -8380,6 +8450,11 @@ export interface Persona {
   description?: string;
   origin: PersonaOrigin;
   settings: WorkflowSettings;
+  /**
+   * The front matter's `keywords:` (#4559): the words in a first prompt that make Auto pick this
+   * persona. Left out when the file names none; then its name and description are the words.
+   */
+  keywords?: string[];
   problem?: string;
 }
 
@@ -13416,6 +13491,58 @@ export type Weekday =
   | "sat";
 
 /**
+ * A feature in work/features (#4586): feature is it as forge/features says it. epics are its open
+ * epics, the newest first, each with where it is in its plan and its children. loose are its open
+ * issues that are not epics and have no parent (of the newest 500 open issues), the newest update
+ * first, as children are: when each started, and whether it waits for a person.
+ */
+export interface WorkFeature {
+  feature: ForgeFeature;
+  epics: WorkFeatureEpic[];
+  loose: WorkTimelineChild[];
+}
+
+/**
+ * An open epic in work/features (#4586), from forge/plan and work/timeline. steps is the number of
+ * steps in its plan (ForgePlan.steps), and step the first of them with an open child, absent when
+ * none is open. blockedOutside are the open blockers outside the plan of that step's open children
+ * (an issue of another epic), each once. forecast is its open line's close as work/timeline
+ * forecasts it, on GitHub only; absent when there is too little history or nothing to forecast.
+ * children are its sub-issues in the plan's order (at most 100), each with its start, close and
+ * wait as in work/timeline; absent when its plan could not be read (errors says why).
+ */
+export interface WorkFeatureEpic {
+  item: ForgeItem;
+  step?: number;
+  steps: number;
+  blockedOutside?: LineageNode[];
+  forecast?: WorkTimelineForecast;
+  children?: WorkTimelineChild[];
+}
+
+/**
+ * work/features (#4586, specs/4328-work-look/features-delivery.md): the Features page's one read.
+ * features are forge/features' features, by name, each with its open epics and its loose open
+ * issues, so an open feature's epics and children draw with no second read. approvals are as in
+ * forge/features. errors say a forge, a plan or a timeline that could not be read.
+ */
+export interface WorkFeatures {
+  features: WorkFeature[];
+  approvals?: string[];
+  errors?: ForgeListError[];
+}
+
+/**
+ * work/features (#4586): the features of every folder on this machine, or of one folder's repo, as
+ * forge/features.
+ */
+export interface WorkFeaturesRequest {
+  folder?: string;
+  /** A board's url, from forge/boards (#3282): only the epics on that board. */
+  board?: string;
+}
+
+/**
  * How a turn ended (#1916): only a question needs the person. A value this build does not know,
  * such as an old record's `blocked`, `stuck` or `partly_done`, reads as `done`.
  */
@@ -14313,6 +14440,7 @@ export interface Methods {
   "views/show": { params: ViewShowRequest; result: Empty };
   "wake/set": { params: WakeSettings; result: WakeSettings };
   "wake/settings": { params: Empty; result: WakeSettings };
+  "work/features": { params: WorkFeaturesRequest; result: WorkFeatures };
   "work/timeline": { params: WorkTimelineRequest; result: WorkTimeline };
   "workflows/approve": { params: WorkflowApproveRequest; result: WorkflowSummary };
   "workflows/archive": { params: WorkflowArchiveRequest; result: WorkflowSummary };
@@ -14743,6 +14871,7 @@ export const MethodTarget = {
   "views/show": "host",
   "wake/set": "host",
   "wake/settings": "host",
+  "work/features": "host",
   "work/timeline": "host",
   "workflows/approve": "host",
   "workflows/archive": "host",
@@ -15175,7 +15304,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeBoardsRequest: { required: [], optional: ["folder"] },
   ForgeCapabilities: { required: ["forge", "issues", "pulls", "labelColors", "avatars", "stateReason", "commentCount"], optional: ["createdAt", "closedAt", "children", "linkedPulls", "events", "total", "releases", "branches", "mergedBy", "mergeCommit", "size", "reviewers", "closes", "checkTimes", "commentsMost"] },
   ForgeCheck: { required: ["name", "state"], optional: ["url", "startedAt", "finishedAt"] },
-  ForgeCloseRequest: { required: ["node"], optional: ["reopen", "transition"] },
+  ForgeCloseRequest: { required: ["node"], optional: ["reopen", "transition", "reason"] },
   ForgeComment: { required: ["author", "body", "at"], optional: ["avatar", "url", "bot"] },
   ForgeCommentRequest: { required: ["node", "body"], optional: [] },
   ForgeDiff: { required: ["files", "cut"], optional: ["url"] },
@@ -15274,14 +15403,18 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineageEstimateRange: { required: ["median", "p10", "p90"], optional: [] },
   LineageEstimateRequest: { required: ["node"], optional: ["startAt"] },
   LineageFigures: { required: ["node", "cost", "sessions", "running", "runtimes"], optional: ["leadTimeSeconds", "limited"] },
-  LineageForecast: { required: ["at", "windowDays", "landings", "burn", "serviceLevels"], optional: ["node", "milestone", "lands", "noForecast", "toComplete", "kept", "spend", "overhead"] },
+  LineageForecast: { required: ["at", "windowDays", "landings", "burn", "serviceLevels"], optional: ["node", "milestone", "lands", "noForecast", "toComplete", "kept", "spend", "overhead", "assumes", "whatIf"] },
+  LineageForecastAssumes: { required: ["lanes", "peakLanes", "runtimes"], optional: [] },
   LineageForecastBurn: { required: ["credentialKey", "window", "used", "at", "resetsAt", "lasts"], optional: ["runsOutAt"] },
   LineageForecastKept: { required: ["at", "p50", "p85", "windowDays", "share", "open"], optional: [] },
   LineageForecastLands: { required: ["p50", "p85", "open", "closed", "stepsLeft", "share", "groups"], optional: ["growing"] },
-  LineageForecastRequest: { required: [], optional: ["node", "milestone", "folder"] },
+  LineageForecastRequest: { required: [], optional: ["node", "milestone", "folder", "whatIf"] },
+  LineageForecastRuntime: { required: ["runtime", "share", "hours", "rate"], optional: [] },
   LineageForecastServiceLevel: { required: ["level", "closed", "p50Seconds", "p85Seconds"], optional: [] },
   LineageForecastSpend: { required: ["week", "month"], optional: ["loadedWeek", "loadedMonth"] },
   LineageForecastToComplete: { required: ["cost", "ratio", "closed", "leadRatio"], optional: ["loaded"] },
+  LineageForecastWhatIf: { required: [], optional: ["lanes", "mix"] },
+  LineageForecastWhatIfEffect: { required: ["pace", "cost"], optional: ["lanes", "mix"] },
   LineageGraph: { required: ["nodes", "links"], optional: ["limited", "resolving", "resolved", "states"] },
   LineageLink: { required: ["from", "to", "rel", "source", "at"], optional: ["endedAt"] },
   LineageLinkRequest: { required: ["from", "to", "rel", "source"], optional: [] },
@@ -15509,7 +15642,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PersonSCIM: { required: ["provider", "userName", "active"], optional: ["externalId", "name", "displayName", "emails"] },
   PersonSettings: { required: [], optional: ["name", "pronouns"] },
   PersonSuspended: { required: ["by", "provider", "at"], optional: ["why"] },
-  Persona: { required: ["id", "name", "origin", "settings"], optional: ["description", "problem"] },
+  Persona: { required: ["id", "name", "origin", "settings"], optional: ["description", "keywords", "problem"] },
   PersonaAddAnswer: { required: ["persona"], optional: [] },
   PersonaFile: { required: ["id", "origin", "content"], optional: [] },
   PersonaFileSaveRequest: { required: ["origin", "id", "content"], optional: ["folder", "delete"] },
@@ -15960,6 +16093,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WebPushSubscription: { required: [], optional: ["endpoint", "p256dh", "auth"] },
   WebRemoteStatus: { required: ["port", "served"], optional: ["reason", "detail"] },
   WebServe: { required: ["on"], optional: [] },
+  WorkFeature: { required: ["feature", "epics", "loose"], optional: [] },
+  WorkFeatureEpic: { required: ["item", "steps"], optional: ["step", "blockedOutside", "forecast", "children"] },
+  WorkFeatures: { required: ["features"], optional: ["approvals", "errors"] },
+  WorkFeaturesRequest: { required: [], optional: ["folder", "board"] },
   WorkReport: { required: ["outcome", "message", "at"], optional: ["block"] },
   WorkTimeline: { required: ["epics", "releases"], optional: ["timeZone", "backtest", "errors"] },
   WorkTimelineBacktest: { required: ["error", "width", "cuts", "holds", "epics", "at"], optional: [] },

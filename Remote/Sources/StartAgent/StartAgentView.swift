@@ -27,6 +27,9 @@ struct StartAgentView: View {
     /// Said instead of typed, as in the chat's bar (#2300).
     @State private var dictation = Dictation()
     @State private var draftLabels: [String] = []
+    /// Auto (#4559): on until a segment is picked by hand, and the pick it made from the prompt.
+    @State private var personaAuto = true
+    @State private var autoPick: Persona.AutoPick?
     /// More is open (#4556); `moreAtLabels` opens it at Labels, from a label's tag.
     @State private var showingMore = false
     @State private var moreAtLabels = false
@@ -82,7 +85,10 @@ struct StartAgentView: View {
             keep()
             // Typed while dictating: theirs, and never written over (#427).
             dictation.edited(text)
+            pickAuto()
         }
+        // A folder's personas come after its page: Auto reads what the field already holds.
+        .onChange(of: model.startPersonas) { pickAuto() }
         .onChange(of: selection) {
             if let range = DictationCursor.range(of: selection, in: text) { dictation.selected(range) }
         }
@@ -166,6 +172,12 @@ struct StartAgentView: View {
                             personaPicker(usable, picked: picked, menu: true)
                         }
                     }
+                    // What Auto picked and the word, so the person sees what to change (#4559).
+                    if !usable.isEmpty, personaAuto {
+                        Text(Persona.autoLine(autoPick))
+                            .appText(.supporting)
+                            .foregroundStyle(.secondary)
+                    }
                     if let description = picked?.description {
                         Text(description)
                             .appText(.supporting)
@@ -186,40 +198,63 @@ struct StartAgentView: View {
     }
 
     static let noPersona = "No persona"
+    static let auto = "Auto"
 
     /// Segments, or a menu: the picked one's name and a chevron, where they do not fit (#2795).
+    /// Auto first (#4559): it picks from the prompt's words until a segment is picked by hand.
     @ViewBuilder
     private func personaPicker(_ usable: [Persona], picked: Persona?, menu: Bool = false) -> some View {
-        let picker = Picker("Persona", selection: Binding<String?>(
-            get: { model.startPersona },
-            set: { id in pickPersona(usable.first { $0.id == id }) }
+        let picker = Picker("Persona", selection: Binding<Persona.Segment>(
+            get: { Persona.Segment(auto: personaAuto, picked: model.startPersona) },
+            set: { segment in
+                switch segment {
+                case .auto:
+                    personaAuto = true
+                    pickAuto()
+                case .none: pickPersona(nil)
+                case .persona(let id): pickPersona(usable.first { $0.id == id })
+                }
+            }
         )) {
-            Text(Self.noPersona).tag(String?.none)
+            Text(Self.auto).tag(Persona.Segment.auto)
+            Text(Self.noPersona).tag(Persona.Segment.none)
             ForEach(usable) { persona in
-                Text(persona.name).tag(Optional(persona.id))
+                Text(persona.name).tag(Persona.Segment.persona(persona.id))
             }
         }
+        let shown = personaAuto ? Self.auto + (picked.map { ": \($0.name)" } ?? "")
+            : picked?.name ?? Self.noPersona
         if menu {
             picker
                 .pickerStyle(.menu)
                 .labelsHidden()
                 .fixedSize()
-                .accessibilityLabel("Persona: \(picked?.name ?? Self.noPersona)")
+                .accessibilityLabel("Persona: \(shown)")
         } else {
             picker
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .fixedSize(horizontal: true, vertical: false)
-                .accessibilityLabel("Persona: \(picked?.name ?? Self.noPersona)")
+                .accessibilityLabel("Persona: \(shown)")
         }
     }
 
     /// Every setting the persona names, and its labels beside any already there, in place
     /// of the last one's (#2649).
-    private func pickPersona(_ persona: Persona?) {
+    /// A pick by hand sticks for this page (#4559): typing no longer moves it.
+    private func pickPersona(_ persona: Persona?, auto: Bool = false) {
+        if !auto { personaAuto = false }
         let last = model.startPersonas.first { $0.id == model.startPersona }
         draftLabels = Persona.labels(draftLabels, switchingFrom: last, to: persona)
         Task { await model.choosePersona(persona) }
+    }
+
+    /// While Auto is on, the persona the prompt's words name, picked as a hand pick is (#4559).
+    private func pickAuto() {
+        guard personaAuto else { return }
+        let pick = Persona.autoPick(text, among: model.startPersonas)
+        autoPick = pick
+        if pick?.persona.id != model.startPersona { pickPersona(pick?.persona, auto: true) }
     }
 
     /// What a view filled the page with (#834): its prompt in the field, unsent, and its

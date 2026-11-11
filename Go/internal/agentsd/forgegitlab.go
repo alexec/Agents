@@ -39,6 +39,9 @@ func (gitlabForge) Caps() forgeCaps {
 		LabelColors: true,
 		Avatars:     true,
 		CreatedAt:   true, ClosedAt: true,
+		// An issue's child work items and the merge requests that close it (#4626). Its events
+		// are three reads more (label events, state events, system notes): not on the page.
+		Children: true, LinkedPulls: true,
 		// A pull request's branches and merge (#4409); its size, reviewers, closing issues and check times are #4682.
 		Branches: true, MergedBy: true, MergeCommit: true,
 		CommentCount: "exact",
@@ -179,8 +182,23 @@ func (g gitlabForge) Item(ctx context.Context, r forgeRef, cursor string) (wire.
 		}
 	} else {
 		out.Start = gitlabStart(out.Item)
+		out.Children, out.LinkedPulls = gitlabLinkedOf(p.Children), gitlabLinkedOf(p.ClosedBy)
 	}
 	return out, nil
+}
+
+// gitlabLinkedOf are an issue's child work items or closing merge requests in the one model (#4626).
+func gitlabLinkedOf(ls []gitlabmcp.Linked) []wire.ForgeLinked {
+	out := []wire.ForgeLinked{}
+	for _, l := range ls {
+		repo := forgeRepo{"gitlab", strings.ToLower(l.Project)}
+		node := repo.issue(l.Number)
+		if l.MR {
+			node = repo.pr(l.Number)
+		}
+		out = append(out, wire.ForgeLinked{Node: node, Title: l.Title, State: l.State, URL: optional(l.URL)})
+	}
+	return out
 }
 
 // Labels are the project's labels, with their colours.

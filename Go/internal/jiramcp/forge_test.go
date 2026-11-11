@@ -3,6 +3,7 @@ package jiramcp
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -271,5 +272,71 @@ func TestItemDates(t *testing.T) {
 			(i.ClosedAt == normalized("2026-10-02T10:00:00.000+0000")) != closed || closed && i.ClosedAt == "" {
 			t.Errorf("%s: %q %q", category, i.CreatedAt, i.ClosedAt)
 		}
+	}
+}
+
+// #4626: an issue's read has its sub-tasks and the issues whose parent it is, each once, from
+// one search more, and its changelog's label, assignee and resolution changes, oldest first.
+func TestItemPageHasChildrenAndEvents(t *testing.T) {
+	change := func(created string, items ...map[string]any) map[string]any {
+		return map[string]any{"id": created, "created": created, "author": alexUser, "items": items}
+	}
+	f, j := newSite(t, true, func(path string, body map[string]any) any {
+		switch {
+		case strings.HasSuffix(path, "/transitions"):
+			return map[string]any{"transitions": []any{}}
+		case path == "/search/jql":
+			return map[string]any{"issues": []any{
+				restIssueJSON("ENG-5", "2026-11-01T10:00:00.000+0000", map[string]any{"summary": "Sub-task"}),
+				restIssueJSON("ENG-6", "2026-11-01T10:00:00.000+0000", map[string]any{"summary": "Story",
+					"status": map[string]any{"name": "Done", "statusCategory": map[string]any{"key": "done"}}}),
+			}, "isLast": true}
+		}
+		i := restIssueJSON("ENG-3", "2026-11-01T10:00:00.000+0000", map[string]any{"subtasks": []any{
+			map[string]any{"key": "ENG-5", "fields": map[string]any{"summary": "Sub-task", "status": map[string]any{"statusCategory": map[string]any{"key": "new"}}}}}})
+		i["changelog"] = map[string]any{"histories": []any{
+			change("2026-11-03T10:00:00.000+0000", map[string]any{"field": "resolution", "to": "10000", "toString": "Done"}),
+			change("2026-11-02T10:00:00.000+0000",
+				map[string]any{"field": "labels", "fromString": "bug ui", "toString": "bug api"},
+				map[string]any{"field": "assignee", "fromString": "Kim", "toString": "Alex"},
+				map[string]any{"field": "summary", "fromString": "a", "toString": "b"}),
+			change("2026-11-04T10:00:00.000+0000", map[string]any{"field": "resolution", "fromString": "Done"},
+				map[string]any{"field": "assignee", "fromString": "Alex"}),
+		}}
+		return i
+	})
+	d, err := j.ItemPage(context.Background(), "ENG-3", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(f.asked[0], "expand=renderedFields%2Cchangelog") && !strings.Contains(f.asked[0], "expand=renderedFields,changelog") {
+		t.Fatalf("asked %q", f.asked[0])
+	}
+	if len(f.asked) != 3 || f.bodies[2]["jql"] != `parent = "ENG-3" ORDER BY created ASC` {
+		t.Fatalf("reads %q %v", f.asked, f.bodies)
+	}
+	site := j.Auth().Site
+	want := []Child{{Key: "ENG-5", Title: "Sub-task", URL: site + "/browse/ENG-5", State: "open"},
+		{Key: "ENG-6", Title: "Story", URL: site + "/browse/ENG-6", State: "closed"}}
+	if !slices.Equal(d.Children, want) {
+		t.Fatalf("children %+v", d.Children)
+	}
+	at := func(day string) string { return normalized("2026-11-0" + day + "T10:00:00.000+0000") }
+	events := []Event{
+		{Kind: "labeled", Actor: "Alex", At: at("2"), Label: "api"}, {Kind: "unlabeled", Actor: "Alex", At: at("2"), Label: "ui"},
+		{Kind: "unassigned", Actor: "Alex", At: at("2"), Assignee: "Kim"}, {Kind: "assigned", Actor: "Alex", At: at("2"), Assignee: "Alex"},
+		{Kind: "closed", Actor: "Alex", At: at("3")},
+		{Kind: "reopened", Actor: "Alex", At: at("4")}, {Kind: "unassigned", Actor: "Alex", At: at("4"), Assignee: "Alex"},
+	}
+	if !slices.Equal(d.Events, events) {
+		t.Fatalf("events %+v", d.Events)
+	}
+	// A plan reads its children itself: its epic's read makes no search for them.
+	f.asked = nil
+	if _, err := j.Plan(context.Background(), "ENG-3"); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(f.asked); n != 3 {
+		t.Fatalf("plan reads %q", f.asked)
 	}
 }

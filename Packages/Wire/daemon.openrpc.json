@@ -9873,6 +9873,31 @@
       }
     },
     {
+      "name": "work/features",
+      "x-capability": "work.features/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/WorkFeaturesRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/WorkFeatures"
+        }
+      }
+    },
+    {
       "name": "work/timeline",
       "x-capability": "work.timeline/1",
       "tags": [

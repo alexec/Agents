@@ -191,7 +191,7 @@ func (azureBoardsForge) Caps() forgeCaps {
 		Issue:       forgeActions{Comment: true, Label: true, Close: true, Reopen: true, Transition: true},
 		Avatars:     true,
 		StateReason: true,
-		CreatedAt:   true, ClosedAt: true,
+		CreatedAt:   true, ClosedAt: true, Children: true,
 		CommentCount: "exact",
 		Plan:         true, BlockedBy: true, AddChild: true,
 		Reasons: map[string]string{
@@ -316,8 +316,11 @@ func (a azureBoardsForge) Item(ctx context.Context, r forgeRef, cursor string) (
 		return wire.ForgeItemDetail{}, boardsNotFound(itemMethod(r.Node.Kind), err)
 	}
 	out := wire.ForgeItemDetail{Item: boardsItemOf(p.Item, a.d.boardsFolder(p.Project)), Body: p.Body, Comments: []wire.ForgeComment{},
-		Cursor: optional(p.Before), Transitions: []wire.ForgeTransition{}}
+		Cursor: optional(p.Before), Transitions: []wire.ForgeTransition{}, Children: []wire.ForgeLinked{}}
 	out.Start = boardsStart(out.Item)
+	for _, c := range p.Children {
+		out.Children = append(out.Children, wire.ForgeLinked{Node: boardsNode(c.Project, c.ID), Title: c.Title, State: c.State, URL: optional(c.URL)})
+	}
 	for _, c := range p.Thread {
 		out.Comments = append(out.Comments, forgeCommentOf(c.Author, c.Avatar, c.Body, c.At, c.URL, c.Bot))
 	}

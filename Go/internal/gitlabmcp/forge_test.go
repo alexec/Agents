@@ -263,3 +263,45 @@ func TestItemDates(t *testing.T) {
 		}
 	}
 }
+
+// #4626: an issue's page has its child work items, with their titles, and the merge requests that
+// close it; a GitLab that says neither still gives the page, with none of them.
+func TestItemPageReadsAnIssuesLinks(t *testing.T) {
+	f, g := newForgeLab(t)
+	f.one["projects/group%2Fapp/issues/3"] = forgeItemJSON(3, "opened", "2026-11-01T10:00:00.000Z")
+	links := true
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch path := strings.TrimPrefix(r.URL.EscapedPath(), "/api/v4/"); {
+		case !links && (path == "/api/graphql" || strings.HasSuffix(path, "/closed_by")):
+			http.Error(w, "no", http.StatusNotFound)
+		case path == "/api/graphql":
+			json.NewEncoder(w).Encode(obj{"data": obj{"project": obj{"workItems": obj{"nodes": []any{obj{"widgets": []any{obj{
+				"__typename": "WorkItemWidgetHierarchy", "children": obj{"nodes": []any{
+					obj{"iid": "5", "state": "CLOSED", "title": "A child", "webUrl": "https://gitlab.com/group/app/-/issues/5", "namespace": obj{"fullPath": "group/app"}}}}}}}}}}}})
+		case path == "projects/group%2Fapp/issues/3/closed_by":
+			json.NewEncoder(w).Encode([]any{obj{"iid": 4, "title": "The fix", "state": "merged", "web_url": "https://gitlab.com/group/web/-/merge_requests/4",
+				"references": obj{"full": "group/web!4"}}, obj{"iid": 6, "title": "Another", "state": "opened"}})
+		case path == "projects/group%2Fapp/issues/3/notes":
+			json.NewEncoder(w).Encode([]any{})
+		default:
+			f.serve(w, r)
+		}
+	}))
+	t.Cleanup(s.Close)
+	g.Base = s.URL + "/"
+	d, err := g.ItemPage(context.Background(), "group/app", 3, false, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(d.Children, []Linked{{Project: "group/app", Number: 5, State: "closed", Title: "A child", URL: "https://gitlab.com/group/app/-/issues/5"}}) {
+		t.Fatalf("children: %+v", d.Children)
+	}
+	if !slices.Equal(d.ClosedBy, []Linked{{Project: "group/web", Number: 4, MR: true, State: "merged", Title: "The fix", URL: "https://gitlab.com/group/web/-/merge_requests/4"},
+		{Project: "group/app", Number: 6, MR: true, State: "open", Title: "Another"}}) {
+		t.Fatalf("closed by: %+v", d.ClosedBy)
+	}
+	links = false
+	if d, err = g.ItemPage(context.Background(), "group/app", 3, false, ""); err != nil || d.Children == nil || len(d.Children) != 0 || d.ClosedBy == nil || len(d.ClosedBy) != 0 {
+		t.Fatalf("without links: %v %+v %+v", err, d.Children, d.ClosedBy)
+	}
+}

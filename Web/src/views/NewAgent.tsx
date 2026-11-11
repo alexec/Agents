@@ -22,7 +22,7 @@ import { folderKey } from "../model/groups";
 import { fromWireDate } from "../protocol/dates";
 import { accountChoices, accountRows, choiceNote, defaultAccountName, formRuntime, newSessionRuntime, ownRow, ownSignInID, runtimeRuns, unavailableReason } from "../model/runtimes";
 import { formFor, keepForm, keepLevels, keptForm, keptLevels } from "../model/startForm";
-import { personaChoices, withPersonaLabels } from "../model/personas";
+import { type AutoPick, autoLine, autoPersona, personaChoices, withPersonaLabels } from "../model/personas";
 import { sandboxCardTitle, sandboxChoiceWords, sandboxChoices, sandboxExplanation, sandboxOverrideWords, sandboxState,
   sandboxStateWords, sandboxWhy, startWithout, fixedSandbox, sandboxRefusedBy } from "../model/sandbox";
 import { autoID, autoWords, cellOf, fieldWords, followsSettings, levelMeaning, levelWords, matchLevel, noneIncluded, picksWords, sandboxValues } from "../model/levels";
@@ -121,6 +121,10 @@ export function NewAgent({ store, host, folder, folderName, down }: {
   const personas = useSignal<Persona[]>([]);
   const persona = useSignal<string | undefined>(undefined);
   const pendingPersona = useRef<Persona | undefined>(undefined);
+  /** Auto (#4559): on until a segment is picked by hand, the pick it made, and the prompt it read. */
+  const personaAuto = useSignal(true);
+  const autoPick = useSignal<AutoPick | undefined>(undefined);
+  const promptText = useRef("");
   /** The folder the personas came for, when they came: asked again once the host answers if not (#1096). */
   const personasFor = useRef("");
   /** A new worktree a view named (#834), or a branch it named (#837), made the place once the folder is
@@ -150,6 +154,8 @@ export function NewAgent({ store, host, folder, folderName, down }: {
     refusal.value = null;
     persona.value = undefined;
     pendingPersona.current = undefined;
+    personaAuto.value = true;
+    autoPick.value = undefined;
     personas.value = [];
     personasFor.current = "";
     askPersonas();
@@ -279,7 +285,9 @@ export function NewAgent({ store, host, folder, folderName, down }: {
   }, [correction]);
 
   // Pick a kind of session (#760): what it names is set, what it leaves out stays as the form has it.
-  const choosePersona = (id: string) => {
+  // A pick by hand sticks for the draft (#4559): typing no longer moves it.
+  const choosePersona = (id: string, auto = false) => {
+    if (!auto) personaAuto.value = false;
     const picked = personas.value.find((p) => p.id === id && p.problem === undefined);
     const last = personas.value.find((p) => p.id === persona.value);
     labels.value = withPersonaLabels(labels.value, last, picked);
@@ -296,6 +304,18 @@ export function NewAgent({ store, host, folder, folderName, down }: {
     }
     if (form.value.state !== "ready") pendingPersona.current = picked;
     else form.value = { ...form.value, chosen: { ...form.value.chosen, ...personaChoices(picked, form.value.options) } };
+  };
+  // Auto (#4559): the persona the prompt's words name, picked as a hand pick is, as it is typed.
+  const pickAuto = (text: string) => {
+    promptText.current = text;
+    if (!personaAuto.peek()) return;
+    const pick = autoPersona(text, personas.peek());
+    autoPick.value = pick;
+    if (pick?.persona.id !== persona.peek()) choosePersona(pick?.persona.id ?? "", true);
+  };
+  const chooseAuto = () => {
+    personaAuto.value = true;
+    pickAuto(promptText.current);
   };
   const usablePersonas = personas.value.filter((p) => p.problem === undefined);
   const brokenPersonas = personas.value.filter((p) => p.problem !== undefined);
@@ -496,8 +516,10 @@ export function NewAgent({ store, host, folder, folderName, down }: {
         {personas.value.length > 0 && (
           <div class="persona-choice">
             {usablePersonas.length > 0 && (
-              <PersonaSwitch personas={usablePersonas} picked={persona.value} down={down} choose={choosePersona} />
+              <PersonaSwitch personas={usablePersonas} picked={persona.value} auto={personaAuto.value} down={down}
+                choose={(id) => choosePersona(id)} chooseAuto={chooseAuto} />
             )}
+            {usablePersonas.length > 0 && personaAuto.value && <p class="quiet small">{autoLine(autoPick.value)}</p>}
             {description && <p class="quiet small">{description}</p>}
             {brokenPersonas.map((p) => <p key={p.id} class="quiet small">{p.id}.md: {p.problem}</p>)}
           </div>
@@ -508,7 +530,7 @@ export function NewAgent({ store, host, folder, folderName, down }: {
       <footer class="foot"
         onFocusIn={(e) => { if (isPrompt(e.target)) { promptFocused.value = true; typed.value = e.target.value.length; } }}
         onFocusOut={(e) => { if (isPrompt(e.target)) promptFocused.value = false; }}
-        onInput={(e) => { if (isPrompt(e.target)) typed.value = e.target.value.length; }}>
+        onInput={(e) => { if (isPrompt(e.target)) { typed.value = e.target.value.length; pickAuto(e.target.value); } }}>
         {/* A change to the folder's own files that no session can be asked about (#531). */}
         <GuardedChangeCards store={store} host={host} where={{ folder }} down={down || !store.hostIsOnline(host)} />
         <Prompt key={filled.value} store={store} draftKey={draftKey} placeholder={refusedHere ?? "What should it do?"}
@@ -779,10 +801,15 @@ export function offerStart(store: Store, host: string, folder: string, start: St
  */
 /** The kind of session to start (#760), the same control as the folder's name, a size smaller,
     on its own line under it (#913). */
-function PersonaSwitch({ personas, picked, down, choose }: {
-  personas: Persona[]; picked: string | undefined; down: boolean; choose: (id: string) => void;
+/** The menu's value for Auto: no file's id, which is a file name. */
+const autoValue = "\0auto";
+
+function PersonaSwitch({ personas, picked, auto, down, choose, chooseAuto }: {
+  personas: Persona[]; picked: string | undefined; auto: boolean; down: boolean;
+  choose: (id: string) => void; chooseAuto: () => void;
 }) {
   const name = personas.find((p) => p.id === picked)?.name;
+  const shown = auto ? `Auto${name ? `: ${name}` : ""}` : name ?? "No persona";
   // The segments when they fit; where they do not, a menu drawn as the folder's (#2795). The
   // segments stay, hidden, so a wider page can bring them back.
   const box = useRef<HTMLDivElement>(null);
@@ -799,13 +826,15 @@ function PersonaSwitch({ personas, picked, down, choose }: {
     return () => resized.disconnect();
   }, [personas]);
   return (
-    <div ref={box} class={`persona-switch${name ? "" : " none"}${fits.value ? "" : " menu"}`} title="Start a kind of session: a persona sets what it names">
+    <div ref={box} class={`persona-switch${name || auto ? "" : " none"}${fits.value ? "" : " menu"}`} title="Start a kind of session: a persona sets what it names">
       <div ref={segments} class="button-group persona-segments" role="group" aria-label="Persona" aria-hidden={!fits.value}>
-        <button type="button" aria-pressed={picked === undefined} class={picked === undefined ? "on" : ""}
+        <button type="button" aria-pressed={auto} class={auto ? "on" : ""}
+          disabled={down} tabIndex={fits.value ? undefined : -1} onClick={chooseAuto}>Auto</button>
+        <button type="button" aria-pressed={!auto && picked === undefined} class={!auto && picked === undefined ? "on" : ""}
           disabled={down} tabIndex={fits.value ? undefined : -1} onClick={() => choose("")}>No persona</button>
         {personas.map((persona) => (
-          <button key={persona.id} type="button" aria-pressed={picked === persona.id}
-            class={picked === persona.id ? "on" : ""} disabled={down} tabIndex={fits.value ? undefined : -1}
+          <button key={persona.id} type="button" aria-pressed={!auto && picked === persona.id}
+            class={!auto && picked === persona.id ? "on" : ""} disabled={down} tabIndex={fits.value ? undefined : -1}
             onClick={() => choose(persona.id)}>
             {persona.name}
           </button>
@@ -813,9 +842,14 @@ function PersonaSwitch({ personas, picked, down, choose }: {
       </div>
       {!fits.value && (
         <label class="persona-menu">
-          <span aria-hidden="true">{name ?? "No persona"} <span class="caret">▾</span></span>
-          <select aria-label="Persona" disabled={down} value={picked ?? ""}
-            onChange={(e) => choose((e.currentTarget as HTMLSelectElement).value)}>
+          <span aria-hidden="true">{shown} <span class="caret">▾</span></span>
+          <select aria-label="Persona" disabled={down} value={auto ? autoValue : picked ?? ""}
+            onChange={(e) => {
+              const value = (e.currentTarget as HTMLSelectElement).value;
+              if (value === autoValue) chooseAuto();
+              else choose(value);
+            }}>
+            <option value={autoValue}>Auto</option>
             <option value="">No persona</option>
             {personas.map((persona) => <option key={persona.id} value={persona.id}>{persona.name}</option>)}
           </select>

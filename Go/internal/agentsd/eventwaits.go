@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
@@ -763,6 +764,8 @@ type eventWaitState struct {
 	openWaits  map[wire.UUID]*openEventCall // by agent
 	waitTimer  *time.Timer
 	blockTimer *time.Timer
+	// blockFires is how many times blockTimer fired: a test's count (#4687).
+	blockFires atomic.Int64
 }
 
 func (d *Daemon) inScope(e wire.Event, a *wire.Agent) bool {
@@ -1092,7 +1095,7 @@ func (d *Daemon) endWait(agent wire.UUID, by wire.EventWaitEndingCanceller, quie
 // matchWaits is every wait this event satisfies: the call answered when it is still open,
 // else the wait ended and the wake queued in one write.
 func (d *Daemon) matchWaits(e wire.Event) {
-	for _, a := range d.Store.Agents() {
+	for _, a := range d.Store.LiveAgents() {
 		w := a.EventWait
 		// An agent's own events do not wake it, but for its own grant, which is the one
 		// thing its place in a line waits for (#2361).
@@ -1228,7 +1231,7 @@ func (d *Daemon) armWaitTimer() {
 	// A wait that ended may have held a server's subscription (#577).
 	d.kickMCPEvents()
 	var next *time.Time
-	for _, a := range d.Store.Agents() {
+	for _, a := range d.Store.LiveAgents() {
 		if w := a.EventWait; w != nil && w.Ending == nil && w.Deadline != nil {
 			t := w.Deadline.Time()
 			if next == nil || t.Before(*next) {
@@ -1252,7 +1255,7 @@ func (d *Daemon) armWaitTimer() {
 // hears it, and an agent whose turn has ended is started again to be told.
 func (d *Daemon) waitDeadlinesPassed() {
 	at := now()
-	for _, a := range d.Store.Agents() {
+	for _, a := range d.Store.LiveAgents() {
 		w := a.EventWait
 		if w == nil || w.Ending != nil || w.Deadline == nil || w.Deadline.Time().After(at.Time()) {
 			continue

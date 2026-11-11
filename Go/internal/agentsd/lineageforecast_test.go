@@ -17,11 +17,11 @@ func TestBurnOfAWeeklyAllowance(t *testing.T) {
 		return wire.AllowanceReading{Window: &window, Used: &used, At: wire.DateOf(at), ResetsAt: new(wire.DateOf(resets))}
 	}
 	resets := now.Add(5 * 24 * time.Hour)
-	b, ok := burnOf("claude:sign-in", wire.AllowanceState{Reading: new(reading("seven_day", 0.5, now, resets))}, now)
+	b, ok := burnOf("claude:sign-in", wire.AllowanceState{Reading: new(reading("seven_day", 0.5, now, resets))}, now, 1)
 	if !ok || b.Lasts || b.RunsOutAt == nil || b.RunsOutAt.Time().Sub(now).Round(time.Minute) != 48*time.Hour || b.Used != 0.5 {
 		t.Fatalf("%+v %v", b, ok)
 	}
-	b, ok = burnOf("k", wire.AllowanceState{Weeks: []wire.AllowanceReading{reading("weekly", 0.1, now, resets)}}, now)
+	b, ok = burnOf("k", wire.AllowanceState{Weeks: []wire.AllowanceReading{reading("weekly", 0.1, now, resets)}}, now, 1)
 	if !ok || !b.Lasts || b.RunsOutAt != nil {
 		t.Fatalf("%+v %v", b, ok)
 	}
@@ -29,7 +29,7 @@ func TestBurnOfAWeeklyAllowance(t *testing.T) {
 		{Reading: new(reading("five_hour", 0.5, now, now.Add(time.Hour)))},
 		{Weeks: []wire.AllowanceReading{reading("seven_day", 0.9, now.Add(-8*24*time.Hour), now.Add(-time.Hour))}},
 	} {
-		if b, ok := burnOf("k", s, now); ok {
+		if b, ok := burnOf("k", s, now, 1); ok {
 			t.Fatalf("%+v", b)
 		}
 	}

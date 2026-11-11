@@ -280,6 +280,26 @@ func TestForgeItemPage(t *testing.T) {
 	}
 }
 
+// #4626: a work item's page has its children, by id, with their titles and states, from one
+// batch read; a work item with no child has an empty list and no read more.
+func TestForgeItemPageChildren(t *testing.T) {
+	f, b := forgeFake(t)
+	f.link(1, relChild, 3)
+	f.link(1, relChild, 2)
+	d, err := b.ItemPage(context.Background(), "acme/Web App", 1, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(d.Children) != 2 || d.Children[0].ID != 2 || d.Children[0].Title != "A crash" || d.Children[0].State != "closed" ||
+		d.Children[1].ID != 3 || d.Children[1].State != "open" || d.Children[1].URL != f.server.URL+"/acme/web%20app/_workitems/edit/3" {
+		t.Fatalf("children: %+v", d.Children)
+	}
+	d, err = b.ItemPage(context.Background(), "acme/Web App", 3, "")
+	if err != nil || d.Children == nil || len(d.Children) != 0 {
+		t.Fatalf("no children: %v %+v", err, d.Children)
+	}
+}
+
 // #3815: tags are added and taken off in one change, a state is one of its type's, and close
 // and reopen are its type's first Completed and Proposed states; a comment is Markdown.
 func TestForgeWrites(t *testing.T) {
