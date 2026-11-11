@@ -29,9 +29,14 @@ type Store struct {
 	// it, and one stamped with another root's is never run.
 	RootID string
 
-	mu      sync.Mutex
-	agents  map[wire.UUID]*wire.Agent
-	folders []wire.Folder
+	mu     sync.Mutex
+	agents map[wire.UUID]*wire.Agent
+	// inFolder is each folder's agents (AgentFolder → ids), and indexed the folder each
+	// agent is filed under there, so a summary reads its own few records, not every one
+	// (#4507). Kept true with agents, under mu.
+	inFolder map[string]map[wire.UUID]struct{}
+	indexed  map[wire.UUID]string
+	folders  []wire.Folder
 	// lines is each transcript's count of lines, once counted, for an entry's index.
 	lines map[wire.UUID]int
 	// ib is where the lines of the transcripts read most recently end (lineindex.go).
@@ -51,7 +56,7 @@ func Open(root string) (*Store, error) {
 			return nil, err
 		}
 	}
-	s := &Store{Loc: loc, agents: map[wire.UUID]*wire.Agent{}, lines: map[wire.UUID]int{}, held: map[wire.UUID]*heldLines{}}
+	s := &Store{Loc: loc, agents: map[wire.UUID]*wire.Agent{}, inFolder: map[string]map[wire.UUID]struct{}{}, indexed: map[wire.UUID]string{}, lines: map[wire.UUID]int{}, held: map[wire.UUID]*heldLines{}}
 	id, adopts := loadOrMakeRootID(loc.RootIdentity(), loc.Root)
 	s.RootID = id
 	s.folders = s.loadFolders()
@@ -73,7 +78,7 @@ func Open(root string) (*Store, error) {
 			a.MadeInRoot = &id
 			changed = true
 		}
-		s.agents[a.ID] = a
+		s.put(a)
 		if changed {
 			if err := s.write(a); err != nil {
 				log.Printf("could not save agent %s: %v", a.ID, err)
@@ -205,7 +210,7 @@ const setAsidePrefix = ".deleting-"
 func (s *Store) Delete(id wire.UUID) error {
 	id = wire.UUID(strings.ToUpper(string(id)))
 	s.mu.Lock()
-	delete(s.agents, id)
+	s.drop(id)
 	delete(s.lines, id)
 	delete(s.held, id)
 	s.mu.Unlock()
@@ -251,9 +256,47 @@ func (s *Store) Save(a wire.Agent) error {
 		return err
 	}
 	s.mu.Lock()
-	s.agents[a.ID] = &a
+	s.put(&a)
 	s.mu.Unlock()
 	return nil
+}
+
+// put keeps a record and files it under its folder, out of the one it was in. With mu held.
+func (s *Store) put(a *wire.Agent) {
+	s.drop(a.ID)
+	s.agents[a.ID] = a
+	f := AgentFolder(a)
+	ids := s.inFolder[f]
+	if ids == nil {
+		ids = map[wire.UUID]struct{}{}
+		s.inFolder[f] = ids
+	}
+	ids[a.ID] = struct{}{}
+	s.indexed[a.ID] = f
+}
+
+// drop forgets a record and its place in the folder index. With mu held.
+func (s *Store) drop(id wire.UUID) {
+	delete(s.agents, id)
+	f, ok := s.indexed[id]
+	if !ok {
+		return
+	}
+	delete(s.indexed, id)
+	if ids := s.inFolder[f]; ids != nil {
+		delete(ids, id)
+		if len(ids) == 0 {
+			delete(s.inFolder, f)
+		}
+	}
+}
+
+// AgentFolder is the folder an agent is in: its worktree's folder, else its cwd.
+func AgentFolder(a *wire.Agent) string {
+	if a.Worktree != nil && a.Worktree.Folder != "" {
+		return FolderPath(a.Worktree.Folder)
+	}
+	return FolderPath(a.Cwd)
 }
 
 func (s *Store) write(a *wire.Agent) error {
@@ -277,6 +320,22 @@ func (s *Store) Agent(id wire.UUID) *wire.Agent {
 	}
 	c := *a
 	return &c
+}
+
+// AgentsIn is the records in one folder (AgentFolder), copies in no order: O(the
+// folder's agents), not the whole store's (#4507).
+func (s *Store) AgentsIn(folder string) []wire.Agent {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ids := s.inFolder[folder]
+	if len(ids) == 0 {
+		return nil
+	}
+	out := make([]wire.Agent, 0, len(ids))
+	for id := range ids {
+		out = append(out, *s.agents[id])
+	}
+	return out
 }
 
 // Agents is every record, newest activity first.

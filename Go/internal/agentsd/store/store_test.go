@@ -310,3 +310,61 @@ func TestAWorktreeWithNoFolderIsFilled(t *testing.T) {
 		}
 	}
 }
+
+// AgentsIn agrees with the records after a save, a worktree's folder change, a delete and
+// a reopen: the folder index is kept true with them (#4507).
+func TestAgentsInAgreesWithTheRecords(t *testing.T) {
+	root := t.TempDir()
+	s, _ := Open(root)
+	agrees := func(s *Store, folders ...string) {
+		t.Helper()
+		for _, f := range folders {
+			want := map[wire.UUID]bool{}
+			for _, a := range s.Agents() {
+				if AgentFolder(&a) == f {
+					want[a.ID] = true
+				}
+			}
+			got := map[wire.UUID]bool{}
+			for _, a := range s.AgentsIn(f) {
+				got[a.ID] = true
+			}
+			if len(got) != len(want) {
+				t.Fatalf("%s: AgentsIn %v, records %v", f, got, want)
+			}
+			for id := range want {
+				if !got[id] {
+					t.Fatalf("%s: AgentsIn %v, records %v", f, got, want)
+				}
+			}
+		}
+	}
+	a, b, w := NewUUID(), NewUUID(), NewUUID()
+	s.Save(wire.Agent{ID: a, Cwd: "file:///src/one/"})
+	s.Save(wire.Agent{ID: b, Cwd: "file:///src/two"})
+	tree := wire.Agent{ID: w, Cwd: "file:///src/one/.agents/worktrees/x",
+		Worktree: &wire.AgentWorktree{Name: "x", Root: "file:///src/one/.agents/worktrees/x", Folder: "file:///src/one"}}
+	s.Save(tree)
+	agrees(s, "/src/one", "/src/two", "/src/one/.agents/worktrees/x")
+	if n := len(s.AgentsIn("/src/one")); n != 2 {
+		t.Fatalf("/src/one has %d agents, want 2", n)
+	}
+	// The worktree moves to the other folder: it leaves the first.
+	tree.Worktree.Folder = "file:///src/two"
+	s.Save(tree)
+	agrees(s, "/src/one", "/src/two")
+	if n := len(s.AgentsIn("/src/two")); n != 2 {
+		t.Fatalf("/src/two has %d agents, want 2", n)
+	}
+	s.Delete(b)
+	s.Delete(a)
+	agrees(s, "/src/one", "/src/two")
+	if got := s.AgentsIn("/src/one"); got != nil {
+		t.Fatalf("/src/one after its delete: %v", got)
+	}
+	reopened, _ := Open(root)
+	agrees(reopened, "/src/one", "/src/two")
+	if got := reopened.AgentsIn("/src/two"); len(got) != 1 || got[0].ID != w {
+		t.Fatalf("/src/two reopened: %v", got)
+	}
+}
