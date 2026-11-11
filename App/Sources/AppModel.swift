@@ -1022,6 +1022,8 @@ final class AppModel {
             // A persona is a file in one folder, or the home's (#760).
             draftPersona = nil
             draftPersonas = []
+            draftPersonaAuto = true
+            draftAutoPick = nil
             Task { await loadDraftPersonas() }
         }
     }
@@ -1048,6 +1050,12 @@ final class AppModel {
     /// A persona picked while its runtime's options were still to come: laid over them
     /// when they arrive.
     private var pendingPersona: Persona?
+    /// Auto (#4559): on until a segment is picked by hand, and the pick it made from the
+    /// prompt as it is typed.
+    private(set) var draftPersonaAuto = true
+    private(set) var draftAutoPick: Persona.AutoPick?
+    /// The draft's prompt, as Auto last read it, so Auto picked again reads it at once.
+    private var draftPromptWords = ""
     /// Where in the folder the next agent works, when not the folder (030).
     /// Deliberately not kept with the rest of the form: a worktree is decided per
     /// agent, so it goes back to the folder after every start (FR-004).
@@ -5508,6 +5516,23 @@ final class AppModel {
         if let draftPersona, !listed.contains(where: { $0.id == draftPersona && $0.problem == nil }) {
             self.draftPersona = nil
         }
+        draftPromptChanged(draftPromptWords)
+    }
+
+    /// The draft's prompt as it is typed (#4559): while Auto is on, the persona its words
+    /// name is picked as a hand pick is, and none when no word matches.
+    func draftPromptChanged(_ text: String) {
+        draftPromptWords = text
+        guard draftPersonaAuto else { return }
+        let pick = Persona.autoPick(text, among: draftPersonas)
+        draftAutoPick = pick
+        if pick?.persona.id != draftPersona { choosePersona(pick?.persona, auto: true) }
+    }
+
+    /// Auto picked again: the live pick is back on, and reads the prompt at once.
+    func chooseAutoPersona() {
+        draftPersonaAuto = true
+        draftPromptChanged(draftPromptWords)
     }
 
     func agentConfigEditorFiles(on host: MachineRef, folder: URL?, kind: DaemonAPI.AgentConfigEditorKind)
@@ -5529,8 +5554,10 @@ final class AppModel {
     }
 
     /// Pick a kind of session (#760): every setting it names is set, and every one it
-    /// leaves out stays as the form has it. Nil picks none, and changes nothing else.
-    func choosePersona(_ persona: Persona?) {
+    /// leaves out stays as the form has it. Nil picks none, and changes nothing else. A
+    /// pick by hand sticks for the draft (#4559): typing no longer moves it.
+    func choosePersona(_ persona: Persona?, auto: Bool = false) {
+        if !auto { draftPersonaAuto = false }
         draftPersona = persona?.id
         pendingPersona = nil
         guard let persona else { return }
@@ -5730,6 +5757,9 @@ final class AppModel {
             let id = try await draftHostClient.call(DaemonAPI.Method.agentsStart, request, returning: UUID.self)
             started(id)
             draftID = nil
+            // The next draft starts on Auto again (#4559).
+            draftPersonaAuto = true
+            draftPromptChanged("")
             // The last folder used is the one a session was started in, from any window (#2160).
             rememberNewSessionFolder(FolderKey(host: draftHost, folder: cwd))
             // Back to the folder, and the list fetched again: the start may

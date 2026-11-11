@@ -22,17 +22,21 @@ public struct Persona: Codable, Hashable, Sendable, Identifiable {
     public var description: String?
     public var origin: Origin
     public var settings: WorkflowSettings
+    /// The front matter's `keywords:` (#4559): the words in a first prompt that make Auto
+    /// pick this persona. Nil when the file names none (`autoWords`).
+    public var keywords: [String]?
     /// Why the file cannot be used, when it cannot. Listed so the person sees it, never
     /// picked.
     public var problem: String?
 
     public init(id: String, name: String? = nil, description: String? = nil, origin: Origin,
-                settings: WorkflowSettings = WorkflowSettings(), problem: String? = nil) {
+                settings: WorkflowSettings = WorkflowSettings(), keywords: [String]? = nil, problem: String? = nil) {
         self.id = id
         self.name = name ?? id
         self.description = description
         self.origin = origin
         self.settings = settings
+        self.keywords = keywords
         self.problem = problem
     }
 

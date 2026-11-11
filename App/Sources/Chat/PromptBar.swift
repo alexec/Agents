@@ -594,6 +594,8 @@ struct PromptBar: View {
                         presence?(focused, text.count)
                         // Typed while dictating: theirs, and never written over (#427).
                         dictation.edited(text)
+                        // Auto picks the persona the words name (#4559).
+                        if isNew { model.draftPromptChanged(text) }
                         // Typing is a prompt coming (#183).
                         if !text.isEmpty, let id = agent?.id { Task { await model.prewarm(id, .typing) } }
                     }
