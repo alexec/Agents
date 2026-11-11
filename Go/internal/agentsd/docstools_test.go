@@ -31,7 +31,7 @@ func TestDocsSearchAndReadTools(t *testing.T) {
 	a := seeded(t, d, folder, nil)
 	// The folder's docs servers come after the app's own, so not appClient, which wants it alone.
 	h := d.mcpServersFor(a.ID)[0].Http
-	m := &mcpClient{t: t, url: h.Url, token: strings.TrimPrefix(h.Headers[0].Value, "Bearer ")}
+	m := newMCPClient(t, h.Url, strings.TrimPrefix(h.Headers[0].Value, "Bearer "))
 	m.post("initialize", map[string]any{}, 1)
 
 	text, isErr := m.tool(2, "docs_search", map[string]any{"query": "checkout"})
