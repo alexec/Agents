@@ -53,23 +53,19 @@ public enum HelperLimit {
 
     /// Whether a helper holds a running place.
     ///
-    /// Running is anything that is using a runtime now or will start using one again
-    /// without the person doing anything:
+    /// Running is a turn, as agentsd's `helperRunning` counts it (#4377):
     /// - `starting`, `running` and `waitingOnUser` — working, or mid-turn on a
     ///   permission question or a form;
-    /// - a finished or stopped agent the app will carry on by itself: an open wait on
-    ///   events, or a block that names agents or a time (039);
     /// - one the daemon is bringing back after a restart (`comingBack`).
     ///
-    /// Not running: finished, stopped, asking to be archived (#584), a block only the
-    /// person can clear, and archived. One that asks once its turn ends is still in
-    /// that turn, so it counts until the turn ends.
+    /// Not running: finished, stopped, waiting on events or a block (it uses no runtime,
+    /// and runs again when it wakes, over the limit if need be), asking to be archived
+    /// (#584), and archived. One that asks once its turn ends is still in that turn, so
+    /// it counts until the turn ends.
     public static func isRunning(_ agent: Agent, comingBack: Set<UUID> = []) -> Bool {
         if agent.state == .archived { return false }
         if agent.archiveRequest?.isRequested == true { return false }
-        if agent.state.hasTurnInFlight { return true }
-        if comingBack.contains(agent.id) { return true }
-        return agent.isWaiting
+        return agent.state.hasTurnInFlight || comingBack.contains(agent.id)
     }
 
     /// The agents holding a folder's not-archived places, oldest first — what a

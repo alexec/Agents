@@ -223,7 +223,9 @@ public enum PolicyLayersWords {
         Row(rule: "budgets.dailyTokens", title: "Tokens per day", section: .money, kind: .tokens, unset: "No limit"),
         Row(rule: "helpers.mostRunning", title: "Helpers running in each project", section: .workAtOnce,
             kind: .count(Array(1...10), higherIsTighter: false), unset: "3"),
-        Row(rule: "helpers.mostNotArchived", title: "Helpers not archived in each project", section: .workAtOnce,
+        Row(rule: "helpers.mostQueued", title: "Helpers queued in each project", section: .workAtOnce,
+            kind: .count(Array(1...20), higherIsTighter: false), unset: "5"),
+        Row(rule: "helpers.mostNotArchived", title: "Helpers in total in each project", section: .workAtOnce,
             kind: .count(Array(1...20), higherIsTighter: false), unset: "5"),
         Row(rule: "workflows.mostOn", title: "Workflows turned on in each folder", section: .workAtOnce,
             kind: .count(Array(1...100), higherIsTighter: false), unset: "20"),
@@ -350,6 +352,7 @@ public enum PolicyLayersWords {
         case "budgets.dailyTokens": rules.budgets?.dailyTokens.map { .int($0) }
         case "helpers.mostRunning": rules.helpers?.mostRunning.map { .int($0) }
         case "helpers.mostNotArchived": rules.helpers?.mostNotArchived.map { .int($0) }
+        case "helpers.mostQueued": rules.helpers?.mostQueued.map { .int($0) }
         case "workflows.mostOn": rules.workflows?.mostOn.map { .int($0) }
         case "noticeLimits.burst": rules.noticeLimits?.burst.map { .int($0) }
         case "noticeLimits.waitMinutes": rules.noticeLimits?.waitMinutes.map { .int($0) }
@@ -379,6 +382,7 @@ public enum PolicyLayersWords {
         case "budgets.dailyTokens": budgets.dailyTokens = value?.intValue
         case "helpers.mostRunning": helpers.mostRunning = value?.intValue
         case "helpers.mostNotArchived": helpers.mostNotArchived = value?.intValue
+        case "helpers.mostQueued": helpers.mostQueued = value?.intValue
         case "workflows.mostOn": r.workflows = value?.intValue.map { DaemonAPI.PolicyWorkflows(mostOn: $0) }
         case "noticeLimits.burst": notices.burst = value?.intValue
         case "noticeLimits.waitMinutes": notices.waitMinutes = value?.intValue
@@ -387,7 +391,7 @@ public enum PolicyLayersWords {
         default: return rules
         }
         if rule.hasPrefix("budgets.") { r.budgets = budgets == DaemonAPI.PolicyRuleBudgets() ? nil : budgets }
-        if rule.hasPrefix("helpers.") { r.helpers = helpers.mostRunning == nil && helpers.mostNotArchived == nil ? nil : helpers }
+        if rule.hasPrefix("helpers.") { r.helpers = helpers == DaemonAPI.PolicyHelpers() ? nil : helpers }
         if rule.hasPrefix("noticeLimits.") { r.noticeLimits = notices == DaemonAPI.PolicyNoticeLimits() ? nil : notices }
         return r
     }

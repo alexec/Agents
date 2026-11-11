@@ -58,14 +58,21 @@ export function writtenIn(path: string, machine: string): string {
   return `Written in ${path} on ${machine}. Commit .agents so that the project's other folders get it.`;
 }
 
-export const helperDefaults = { queued: 5, maximumQueued: 20, agentsMayArchive: true, archiveWhenMerged: true } as const;
+export const helperDefaults = { running: 3, notArchived: 5, queued: 5, agentsMayArchive: true, archiveWhenMerged: true } as const;
 /** DiskThresholds' defaults: each line a percent of the disk, so one setting fits a laptop and a server. */
 export const diskDefaults = { lowPercent: 20, criticalPercent: 1, lowChoices: [5, 10, 20, 30, 50], criticalChoices: [1, 2, 5, 10] } as const;
 
-/** The numbers Helpers queued may be: 1 to the most, and a number set by hand too. */
-export function queuedChoices(current: number): number[] {
-  const top = Math.max(helperDefaults.maximumQueued, current);
-  return Array.from({ length: top - Math.min(1, current) + 1 }, (_, i) => Math.min(1, current) + i);
+/** Under the Helpers line: HelperLimitWords.helpersNote, the window's words. */
+export const helpersNote = "Set in Agents ▸ Policy, or for this project in Policy. Running counts sessions in a turn: "
+  + "one that waits for an event holds no place, and runs again when it wakes. A start past running waits in the queue; "
+  + "a start past queued or total is refused. They count across all the project's folders, on every machine. "
+  + "A lead doesn't count; the sessions it starts do.";
+
+/** Project Settings ▸ Work at once's Helpers line (#4377): the project's own policy layer, or the defaults, as
+ * HelperLimitWords.helpersNow says it in the window. */
+export function helpersNow(limits: HelperLimits | undefined): string {
+  return `${limits?.running ?? helperDefaults.running} running, ${limits?.queued ?? helperDefaults.queued} queued, `
+    + `${limits?.notArchived ?? helperDefaults.notArchived} in total`;
 }
 
 /** A disk line's percents, with one set by hand. */
