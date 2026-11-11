@@ -28,6 +28,8 @@ const gitlabNoPlanWrite = "a GitLab plan is changed on GitLab, not yet here"
 
 func (gitlabForge) Name() string { return "gitlab" }
 
+func (gitlabForge) Images() forgeImageHost { return gitlabImages{} }
+
 func (gitlabForge) Caps() forgeCaps {
 	return forgeCaps{
 		Issues: true, PRs: true,

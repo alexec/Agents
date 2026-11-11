@@ -26,6 +26,9 @@ type Forge interface {
 	// cursor and in ForgeListError.forge.
 	Name() string
 	Caps() forgeCaps
+	// Images are the forge's image hosts and its token for them (#4544), which forge/image reads:
+	// the URLs of its attachments and avatars. nil when it has none of its own.
+	Images() forgeImageHost
 	// Owns parses a node of an issue or a pull request that is this forge's.
 	Owns(node wire.LineageNode) (forgeRef, bool)
 	// Sources is what a list of these folders reads, with a folder for each repo, team or
@@ -202,6 +205,8 @@ func forgeCannotErr(method string, f Forge, err error) error {
 // forgeNone is every operation that a forge does not override: each says it cannot. A forge
 // embeds it, so a new operation on Forge is "cannot" on every forge until it is written.
 type forgeNone struct{}
+
+func (forgeNone) Images() forgeImageHost { return nil }
 
 func (forgeNone) List(context.Context, forgeScope, forgeFilter, string, int) (forgePage, error) {
 	return forgePage{}, nil

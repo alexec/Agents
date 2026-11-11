@@ -24,6 +24,8 @@ type githubForge struct {
 
 func (githubForge) Name() string { return "github" }
 
+func (githubForge) Images() forgeImageHost { return githubImages{} }
+
 func (githubForge) Caps() forgeCaps {
 	return forgeCaps{
 		Issues: true, PRs: true,

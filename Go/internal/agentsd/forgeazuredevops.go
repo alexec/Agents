@@ -125,6 +125,8 @@ type azureDevOpsForge struct {
 
 func (azureDevOpsForge) Name() string { return "azuredevops" }
 
+func (azureDevOpsForge) Images() forgeImageHost { return azureImages{} }
+
 func (azureDevOpsForge) Caps() forgeCaps {
 	return forgeCaps{
 		PRs: true,
