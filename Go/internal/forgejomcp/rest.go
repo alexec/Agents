@@ -459,6 +459,7 @@ type reviewJSON struct {
 	Body          string `json:"body"`
 	CommitID      string `json:"commit_id"`
 	CommentsCount int    `json:"comments_count"`
+	Dismissed     bool   `json:"dismissed"`
 	SubmittedAt   string `json:"submitted_at"`
 	UpdatedAt     string `json:"updated_at"`
 	HTMLURL       string `json:"html_url"`

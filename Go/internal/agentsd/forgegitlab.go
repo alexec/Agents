@@ -42,8 +42,9 @@ func (gitlabForge) Caps() forgeCaps {
 		// An issue's child work items and the merge requests that close it (#4626). Its events
 		// are three reads more (label events, state events, system notes): not on the page.
 		Children: true, LinkedPulls: true,
-		// A pull request's branches and merge (#4409); its size, reviewers, closing issues and check times are #4682.
-		Branches: true, MergedBy: true, MergeCommit: true,
+		// A merge request's branches and merge (#4409); its size, reviewers, the issues of its
+		// project its description closes, and its jobs' times (#4682).
+		Branches: true, MergedBy: true, MergeCommit: true, Size: true, Reviewers: true, Closes: true, CheckTimes: true,
 		CommentCount: "exact",
 		Releases:     true,
 		// X-Total, which GitLab leaves out of a list of over 10,000.
@@ -172,10 +173,22 @@ func (g gitlabForge) Item(ctx context.Context, r forgeRef, cursor string) (wire.
 	if p.MR {
 		out.Checks = []wire.ForgeCheck{}
 		for _, c := range p.CheckRuns {
-			out.Checks = append(out.Checks, wire.ForgeCheck{Name: c.Name, State: c.State, URL: optional(c.URL)})
+			out.Checks = append(out.Checks, forgeCheckOf(c.Name, c.State, c.URL, c.StartedAt, c.FinishedAt))
 		}
 		out.ReviewThreads, out.FilesChanged = new(int64(p.ReviewThreads)), new(int64(p.FilesChanged))
 		out.Head = optional(p.Head)
+		if p.Size != nil {
+			withPullSize(&out, p.Size.Additions, p.Size.Deletions, p.Size.Commits)
+		}
+		if p.Reviewers != nil {
+			out.Reviewers = []wire.ForgeReviewer{}
+			for _, r := range p.Reviewers {
+				out.Reviewers = append(out.Reviewers, forgeReviewerOf(r.Login, r.Avatar, r.State))
+			}
+		}
+		if p.Closes != nil {
+			out.Closes = gitlabLinkedOf(p.Closes)
+		}
 		// The merge menu is a nicety: a page still reads when GitLab does not say the project's.
 		if methods, err := gl.MergeMethods(ctx, project); err == nil {
 			out.MergeMethods = mergeMethodsOf(methods)

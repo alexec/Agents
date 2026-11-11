@@ -72,7 +72,8 @@ func TestSearchListsPullRequestsByState(t *testing.T) {
 // comment), its builds' and statuses' checks, the line threads not resolved, and its files.
 func TestItemPageReadsAPullRequest(t *testing.T) {
 	f := newFake(t)
-	f.pulls = []obj{pull(3, "three", alex, obj{"description": "Fixes #12", "autoCompleteSetBy": alex})}
+	f.pulls = []obj{pull(3, "three", alex, obj{"description": "Fixes #12", "autoCompleteSetBy": alex, "reviewers": []obj{
+		withVote(dev, 10), withVote(alex, -5), withVote(obj{"id": "g", "displayName": "[Web App]\\Web App Team", "uniqueName": `vstfs:///Classification/TeamProject/g\Web App Team`, "isContainer": true}, 0), withVote(dev, 5)}})}
 	f.threads[3] = []obj{
 		{"id": 1, "comments": []any{obj{"id": 1, "author": dev, "content": "Looks good", "publishedDate": at(2), "commentType": "text"}}},
 		{"id": 2, "comments": []any{obj{"id": 1, "author": builder, "content": "Policy set", "publishedDate": at(1), "commentType": "system"}}},
@@ -83,6 +84,7 @@ func TestItemPageReadsAPullRequest(t *testing.T) {
 		{"id": 5, "comments": []any{obj{"id": 1, "author": renovate, "content": "Bump", "publishedDate": at(1), "commentType": "text"}}},
 	}
 	f.builds = []obj{build(70, 3, "sha3", "ci", "failed", 4)}
+	f.builds[0]["startTime"] = at(2)
 	f.statuses[3] = []obj{prStatus(1, "scan", "secrets", "succeeded", 2, 0), prStatus(2, "scan", "na", "notApplicable", 2, 0)}
 	f.iterations[3] = []obj{{"id": 1}, {"id": 2, "sourceRefCommit": obj{"commitId": "sha3"}}}
 	f.changes[3] = []obj{{"changeType": "edit", "item": obj{"path": "/a.go"}}, {"changeType": "add", "item": obj{"path": "/dir", "isFolder": true}}}
@@ -97,8 +99,12 @@ func TestItemPageReadsAPullRequest(t *testing.T) {
 		t.Fatalf("thread %+v", d.Thread)
 	}
 	same(t, []any{d.ReviewThreads, d.FilesChanged, d.Head, d.Checks, d.AutoMerge, d.Comments, d.Before}, []any{1, 1, "sha3", "failing", true, 2, ""})
-	same(t, d.CheckRuns, []CheckRun{{Name: "ci", State: "failing", URL: "https://ado.test/acme/Web%20App/_build/results?buildId=70", Build: 70},
+	same(t, d.CheckRuns, []CheckRun{{Name: "ci", State: "failing", URL: "https://ado.test/acme/Web%20App/_build/results?buildId=70", Build: 70, StartedAt: at(2), FinishedAt: at(4)},
 		{Name: "scan/secrets", State: "passing", URL: "https://scan.test/1"}})
+
+	// #4682: each reviewer once, by their vote; a group that has not voted is pending.
+	same(t, d.Reviewers, []Reviewer{{Login: "dev@acme.test", Avatar: "https://dev.azure.com/acme/_apis/GraphProfile/MemberAvatars/aad.ZGV2", State: "approved"},
+		{Login: "alex@acme.test", State: "changes_requested"}, {Login: "[Web App]\\Web App Team", State: "pending"}})
 
 	if _, err := f.azureDevOps().ItemPage(context.Background(), repo, 404, ""); !IsNotFound(err) {
 		t.Fatalf("a pull request not there: %v", err)
@@ -231,4 +237,13 @@ func TestPRDiffMakesHunksOfRanges(t *testing.T) {
 	added, removed := files[1].(map[string]any), files[2].(map[string]any)
 	same(t, []any{added["change"], added["additions"], added["hunks"]}, []any{"added", 1, []Hunk{{OldStart: 1, NewStart: 1, Lines: []DiffLine{{"added", "hello"}}}}})
 	same(t, []any{removed["change"], removed["deletions"], removed["hunks"]}, []any{"removed", 1, []Hunk{{OldStart: 1, NewStart: 1, Lines: []DiffLine{{"removed", "bye"}}}}})
+}
+
+// withVote is a reviewer of a pull request: person, with their vote.
+func withVote(person obj, vote int) obj {
+	r := obj{"vote": vote}
+	for k, v := range person {
+		r[k] = v
+	}
+	return r
 }

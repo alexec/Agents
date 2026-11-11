@@ -3,6 +3,7 @@ package gitlabmcp
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -183,7 +184,7 @@ func TestSearchClosedMergeRequests(t *testing.T) {
 func TestItemPageReadsAMergeRequest(t *testing.T) {
 	f, g := newForgeLab(t)
 	mr := forgeItemJSON(4, "opened", "2026-11-01T10:00:00.000Z")
-	mr["labels"], mr["description"], mr["changes_count"] = []string{"bug"}, "The body.", "12"
+	mr["labels"], mr["description"], mr["changes_count"] = []string{"bug"}, "The body. Closes #3, fixes #9 and other/app#5.", "12"
 	mr["head_pipeline"] = obj{"id": 77, "status": "failed"}
 	f.one["projects/group%2Fapp/merge_requests/4"] = mr
 	notes := []any{}
@@ -199,6 +200,7 @@ func TestItemPageReadsAMergeRequest(t *testing.T) {
 		}
 		notes = append(notes, note)
 	}
+	var asked map[string]any
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch path := strings.TrimPrefix(r.URL.EscapedPath(), "/api/v4/"); path {
 		case "projects/group%2Fapp/merge_requests/4/notes":
@@ -210,8 +212,21 @@ func TestItemPageReadsAMergeRequest(t *testing.T) {
 		case "projects/group%2Fapp/merge_requests/4/discussions":
 			json.NewEncoder(w).Encode([]any{obj{"id": "a", "notes": []any{obj{"type": "DiffNote"}}}, obj{"id": "b", "notes": []any{obj{"type": nil}}}})
 		case "projects/group%2Fapp/pipelines/77/jobs":
-			json.NewEncoder(w).Encode([]any{obj{"name": "test", "stage": "check", "status": "failed", "web_url": "j"},
+			json.NewEncoder(w).Encode([]any{obj{"name": "test", "stage": "check", "status": "failed", "web_url": "j", "started_at": "2026-11-01T09:00:00.000Z", "finished_at": "2026-11-01T09:02:00.000Z"},
 				obj{"name": "lint", "stage": "check", "status": "failed", "allow_failure": true}})
+		case "/api/graphql":
+			var q struct {
+				Variables map[string]any `json:"variables"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&q)
+			asked = q.Variables
+			json.NewEncoder(w).Encode(obj{"data": obj{"project": obj{
+				"mergeRequest": obj{"diffStatsSummary": obj{"additions": 40, "deletions": 2}, "commitCount": 3,
+					"reviewers": obj{"nodes": []any{
+						obj{"username": "kim", "avatarUrl": "/uploads/-/system/user/avatar/7/avatar.png", "webUrl": "https://gitlab.com/kim", "mergeRequestInteraction": obj{"reviewState": "REQUESTED_CHANGES"}},
+						obj{"username": "lee", "avatarUrl": "https://secure.gravatar.com/avatar/l", "mergeRequestInteraction": obj{"reviewState": "UNREVIEWED"}}}},
+					"approvedBy": obj{"nodes": []any{obj{"username": "lee"}, obj{"username": "ann"}}}},
+				"issues": obj{"nodes": []any{obj{"iid": "9", "title": "Nine", "state": "closed", "webUrl": "w9"}, obj{"iid": "3", "title": "Three", "state": "opened", "webUrl": "w3"}}}}}})
 		default:
 			f.serve(w, r)
 		}
@@ -222,7 +237,7 @@ func TestItemPageReadsAMergeRequest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.Body != "The body." || d.Before != "2" || d.Labels[0] != "bug" || d.FilesChanged != 12 || d.ReviewThreads != 1 || d.Checks != "failing" {
+	if d.Body != "The body. Closes #3, fixes #9 and other/app#5." || d.Before != "2" || d.Labels[0] != "bug" || d.FilesChanged != 12 || d.ReviewThreads != 1 || d.Checks != "failing" {
 		t.Fatalf("detail: %+v", d)
 	}
 	if len(d.Thread) != 48 || d.Thread[0].Body != "note 1" || d.Thread[47].Body != "note 48" || !d.Thread[47].Bot || d.Thread[0].URL != "w4#note_1" {
@@ -234,6 +249,24 @@ func TestItemPageReadsAMergeRequest(t *testing.T) {
 	}
 	if len(d.CheckRuns) != 2 || d.CheckRuns[0].State != "failing" || d.CheckRuns[1].State != "skipped" || d.CheckRuns[0].Name != "check: test" {
 		t.Fatalf("checks: %+v", d.CheckRuns)
+	}
+	// #4682: a job's times, its size, each reviewer once by their review, and the issues of its
+	// project the description closes, in its order (another project's are left out).
+	if c := d.CheckRuns[0]; c.StartedAt != "2026-11-01T09:00:00.000Z" || c.FinishedAt != "2026-11-01T09:02:00.000Z" || d.CheckRuns[1].StartedAt != "" {
+		t.Fatalf("times: %+v", d.CheckRuns)
+	}
+	if d.Size == nil || *d.Size != (Size{Additions: 40, Deletions: 2, Commits: 3}) {
+		t.Fatalf("size: %+v", d.Size)
+	}
+	if !slices.Equal(d.Reviewers, []Reviewer{{Login: "kim", Avatar: "https://gitlab.com/uploads/-/system/user/avatar/7/avatar.png", State: "changes_requested"},
+		{Login: "lee", Avatar: "https://secure.gravatar.com/avatar/l", State: "approved"}, {Login: "ann", State: "approved"}}) {
+		t.Fatalf("reviewers: %+v", d.Reviewers)
+	}
+	if fmt.Sprint(asked["closes"]) != "[3 9]" || asked["hasCloses"] != true || asked["iid"] != "4" {
+		t.Fatalf("asked: %v", asked)
+	}
+	if !slices.Equal(d.Closes, []Linked{{Project: "group/app", Number: 3, State: "open", Title: "Three", URL: "w3"}, {Project: "group/app", Number: 9, State: "closed", Title: "Nine", URL: "w9"}}) {
+		t.Fatalf("closes: %+v", d.Closes)
 	}
 	older, err := g.ItemPage(context.Background(), "group/app", 4, true, "2")
 	if err != nil || len(older.Thread) != 0 || older.Before != "" {

@@ -95,7 +95,18 @@ type ItemDetail struct {
 	// cannot be read.
 	LinkedPulls []Linked
 	Events      []Event
+	// A pull request's (#4682): its Size (nil when its commits cannot be read, the one read more
+	// of its page) and its Reviewers.
+	Size      *Size
+	Reviewers []Reviewer
 }
+
+// Size is a pull request's lines added and deleted, and its commits (#4682).
+type Size struct{ Additions, Deletions, Commits int }
+
+// Reviewer is a person or team asked to review a pull request or who reviewed it (#4682): State
+// is approved, changes_requested, commented, or pending while asked and not answered.
+type Reviewer struct{ Login, Avatar, State string }
 
 // Linked is a pull request that names an issue: State is open, closed or merged.
 type Linked struct {
@@ -384,7 +395,12 @@ func (f *RealForgejo) ItemPage(ctx context.Context, repo string, number int, pr 
 	}
 	var p struct {
 		pullJSON
-		ChangedFiles int `json:"changed_files"`
+		ChangedFiles   int `json:"changed_files"`
+		Additions      int `json:"additions"`
+		Deletions      int `json:"deletions"`
+		RequestedTeams []struct {
+			Name string `json:"name"`
+		} `json:"requested_reviewers_teams"`
 	}
 	if err := f.get(ctx, fmt.Sprintf("%s/pulls/%d", repoPath(repo), number), false, &p); err != nil {
 		return ItemDetail{}, err
@@ -420,8 +436,61 @@ func (f *RealForgejo) ItemPage(ctx context.Context, repo string, number int, pr 
 		return ItemDetail{}, err
 	}
 	d.Review, d.ReviewThreads = reviewOf(reviews, len(p.RequestedReviewers) > 0)
+	teams := make([]string, 0, len(p.RequestedTeams))
+	for _, t := range p.RequestedTeams {
+		teams = append(teams, t.Name)
+	}
+	d.Reviewers = reviewersOf(p.RequestedReviewers, teams, reviews)
+	// The commits are the one read more of a pull request's page, and a nicety: without them it
+	// has no size.
+	if commits, _, err := all[struct {
+		SHA string `json:"sha"`
+	}](ctx, f, fmt.Sprintf("%s/pulls/%d/commits?verification=false&files=false", repoPath(repo), number)); err == nil {
+		d.Size = &Size{Additions: p.Additions, Deletions: p.Deletions, Commits: len(commits)}
+	}
 	return d, nil
 }
+
+// reviewersOf is each reviewer of a pull request once: the people and teams asked and not
+// answered since are pending, as Forgejo shows them; the others by their newest review that
+// approves or asks for changes, else a comment. A dismissed review, and one not sent yet, say
+// nothing.
+func reviewersOf(requested []user, teams []string, reviews []reviewJSON) []Reviewer {
+	out := []Reviewer{}
+	seen := map[string]bool{}
+	for _, u := range requested {
+		if u.Login != "" && !seen[u.Login] {
+			seen[u.Login] = true
+			out = append(out, Reviewer{Login: u.Login, Avatar: u.AvatarURL, State: "pending"})
+		}
+	}
+	for _, t := range teams {
+		if t != "" && !seen[t] {
+			seen[t] = true
+			out = append(out, Reviewer{Login: t, State: "pending"})
+		}
+	}
+	newest := map[string]int{}
+	for _, r := range reviews {
+		state := reviewStates[r.State]
+		if r.User == nil || r.User.Login == "" || seen[r.User.Login] || state == "" || r.Dismissed {
+			continue
+		}
+		if i, ok := newest[r.User.Login]; ok {
+			// A comment after an approval or a request for changes does not take its place.
+			if state != "commented" || out[i].State == "commented" {
+				out[i].State = state
+			}
+			continue
+		}
+		newest[r.User.Login] = len(out)
+		out = append(out, Reviewer{Login: r.User.Login, Avatar: r.User.AvatarURL, State: state})
+	}
+	return out
+}
+
+// reviewStates are Forgejo's review states in the one model's words.
+var reviewStates = map[string]string{"APPROVED": "approved", "REQUEST_CHANGES": "changes_requested", "COMMENT": "commented"}
 
 // forgeTimelineJSON is one entry of an issue's timeline. A label entry's body is "1" when the label
 // was added and "" when it was taken off; ref_issue is the issue or pull request that named it.

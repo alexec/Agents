@@ -78,7 +78,13 @@ type Comment struct {
 type CheckRun struct {
 	Name, State, URL string
 	Build            int
+	// StartedAt and FinishedAt are a build's times (#4682); a status has none.
+	StartedAt, FinishedAt string
 }
+
+// Reviewer is a person or group asked to review a pull request (#4682): State is approved,
+// changes_requested, or pending while they have not voted.
+type Reviewer struct{ Login, Avatar, State string }
 
 // ItemDetail is a pull request with its description and a page of its comments (Thread),
 // oldest first in the page. Before is the cursor of the page before it, "" at the first
@@ -92,6 +98,8 @@ type ItemDetail struct {
 	ReviewThreads int
 	FilesChanged  int
 	Head          string
+	// Reviewers are its reviewers by their votes (#4682).
+	Reviewers []Reviewer
 }
 
 // forgePullJSON is a pull request with what the forge reads ask for beyond the events'.
@@ -407,7 +415,11 @@ func (f *RealAzureDevOps) checkRuns(ctx context.Context, repo string, number int
 	}
 	runs := []CheckRun{}
 	for _, b := range builds {
-		runs = append(runs, CheckRun{Name: b.Definition.Name, State: buildState(b), URL: b.Links.Web.Href, Build: b.ID})
+		run := CheckRun{Name: b.Definition.Name, State: buildState(b), URL: b.Links.Web.Href, Build: b.ID, StartedAt: b.StartTime}
+		if run.State != "running" && b.StartTime != "" {
+			run.FinishedAt = b.FinishTime
+		}
+		runs = append(runs, run)
 	}
 	statuses, err := f.statuses(ctx, repo, number, false)
 	if err != nil {
@@ -498,7 +510,7 @@ func (f *RealAzureDevOps) ItemPage(ctx context.Context, repo string, number int,
 	if err := f.get(ctx, api(fmt.Sprintf("%s/pullrequests/%d", repoPath(repo), number), nil), false, &p); err != nil {
 		return ItemDetail{}, err
 	}
-	d := ItemDetail{Item: f.item(repo, p), Body: p.Description, Thread: []Comment{}, Head: p.head()}
+	d := ItemDetail{Item: f.item(repo, p), Body: p.Description, Thread: []Comment{}, Head: p.head(), Reviewers: reviewersOf(p.Reviewers)}
 	threads, err := f.threads(ctx, repo, number, false)
 	if err != nil {
 		return ItemDetail{}, err
@@ -558,4 +570,28 @@ func (f *RealAzureDevOps) ItemPage(ctx context.Context, repo string, number int,
 		d.FilesChanged = len(files)
 	}
 	return d, nil
+}
+
+// reviewersOf is a pull request's reviewers, each once, by their votes: 10 approves and 5
+// approves with suggestions; -5 waits for the author and -10 rejects, which both ask for
+// changes; 0 has not voted yet.
+func reviewersOf(rs []reviewerJSON) []Reviewer {
+	out := []Reviewer{}
+	seen := map[string]bool{}
+	for _, r := range rs {
+		login := r.name()
+		if login == "" || seen[login] {
+			continue
+		}
+		seen[login] = true
+		state := "pending"
+		switch {
+		case r.Vote > 0:
+			state = "approved"
+		case r.Vote < 0:
+			state = "changes_requested"
+		}
+		out = append(out, Reviewer{Login: login, Avatar: r.ImageURL, State: state})
+	}
+	return out
 }

@@ -905,6 +905,22 @@ func withPullRefs(i *wire.ForgeItem, head, base, mergedBy, mergeCommit string) {
 	}
 }
 
+// withPullSize puts a pull request's lines added and deleted and its commits on its page (#4682).
+func withPullSize(d *wire.ForgeItemDetail, additions, deletions, commits int) {
+	d.Additions, d.Deletions, d.Commits = new(int64(additions)), new(int64(deletions)), new(int64(commits))
+}
+
+// forgeReviewerOf is a reviewer in the one model: state is approved, changes_requested,
+// commented or pending (#4682).
+func forgeReviewerOf(login, avatar, state string) wire.ForgeReviewer {
+	return wire.ForgeReviewer{Login: login, Avatar: optional(avatar), State: wire.ForgeReviewerState(state)}
+}
+
+// forgeCheckOf is a check with its times, when the forge gives them (#4682).
+func forgeCheckOf(name, state, url, startedAt, finishedAt string) wire.ForgeCheck {
+	return wire.ForgeCheck{Name: name, State: state, URL: optional(url), StartedAt: forgeDateOptional(startedAt), FinishedAt: forgeDateOptional(finishedAt)}
+}
+
 func optional(s string) *string {
 	if s == "" {
 		return nil
