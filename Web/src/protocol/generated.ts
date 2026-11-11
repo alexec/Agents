@@ -5064,6 +5064,11 @@ export interface LineageCostNode {
    * actual when it closes.
    */
   estimate?: LineageEstimateKept;
+  /**
+   * An epic's first landing forecast (#4526), kept once made, for the forecast against when it
+   * lands.
+   */
+  forecast?: LineageForecastKept;
 }
 
 /**
@@ -5242,6 +5247,123 @@ export interface LineageFigures {
   runtimes: LineageRuntimeCount[];
   leadTimeSeconds?: number;
   limited?: boolean;
+}
+
+/**
+ * lineage/forecast (#4526; the method is specs/4533-forecasting/spec.md): what comes next, from
+ * this machine's totals. landings is the issues (not epics) that landed with a merged PR in the
+ * window of windowDays (14) before at, in the epic's repo when a node is asked for, else in every
+ * repo. lands is when the epic lands; noForecast says why there is none (too little history, too
+ * few closed epics, nothing open). toComplete is the epic's estimate to complete, once three of its
+ * children closed with an estimate kept at their start. kept is the forecast kept on the epic's
+ * node, the first one made, so it can be scored when the epic lands. spend is what a week and a
+ * month cost at the window's pace, burn is each weekly allowance's pace, and serviceLevels is how
+ * long each level's issues took. Every figure says its window; a range is a probability, not a
+ * promise.
+ */
+export interface LineageForecast {
+  node?: LineageNode;
+  at: WireDate;
+  windowDays: number;
+  landings: number;
+  lands?: LineageForecastLands;
+  noForecast?: string;
+  toComplete?: LineageForecastToComplete;
+  kept?: LineageForecastKept;
+  spend?: LineageForecastSpend;
+  burn: LineageForecastBurn[];
+  serviceLevels: LineageForecastServiceLevel[];
+}
+
+/**
+ * A weekly allowance's pace (#4526): used (0 to 1) at its last reading at, of the week that resets
+ * at resetsAt. runsOutAt is when it runs out at that pace, absent when it lasts to the reset
+ * (lasts).
+ */
+export interface LineageForecastBurn {
+  credentialKey: string;
+  window: string;
+  used: number;
+  at: WireDate;
+  resetsAt: WireDate;
+  runsOutAt?: WireDate;
+  lasts: boolean;
+}
+
+/**
+ * An epic's landing forecast as it was made (#4526), kept once on its node, so it can be scored
+ * when the epic lands: the P50 and P85 dates, the window, the share and the open children then.
+ */
+export interface LineageForecastKept {
+  at: WireDate;
+  p50: WireDate;
+  p85: WireDate;
+  windowDays: number;
+  share: number;
+  open: number;
+}
+
+/**
+ * When an epic lands (#4526, method H of specs/4533-forecasting/spec.md): a Monte Carlo of 1,000
+ * draws with a fixed seed, each resampling hours of the window and keeping each landing in an hour
+ * with the chance share, until the open children are done. p50 and p85 are dates. share is the
+ * median share of the folder's landings that the closed epics had over their lives, from groups of
+ * them. open and closed are the children as the plan says now, with no growth for children not
+ * filed yet; stepsLeft is the blocked-by steps of the open ones, as context only: they do not enter
+ * the dates.
+ */
+export interface LineageForecastLands {
+  p50: WireDate;
+  p85: WireDate;
+  open: number;
+  closed: number;
+  stepsLeft: number;
+  share: number;
+  groups: number;
+}
+
+/**
+ * lineage/forecast (#4526): an epic, for when it lands and its estimate to complete; without one,
+ * only the spend, the burn and the service levels, over every repo.
+ */
+export interface LineageForecastRequest {
+  node?: LineageNode;
+}
+
+/**
+ * How long a level's issues took (#4526): of the closed issues of the level that landed in the
+ * window, half took up to p50Seconds and 85% up to p85Seconds, from the start of work to the last
+ * PR merged. Only a level with five or more.
+ */
+export interface LineageForecastServiceLevel {
+  level: string;
+  closed: number;
+  p50Seconds: number;
+  p85Seconds: number;
+}
+
+/**
+ * What a week and a month cost at the window's pace (#4526): dollars by currency, P10 to P90, from
+ * 1,000 draws of 7 and 30 of the window's days. A day's cost is what the issues that landed on it
+ * took, all of their work, so it follows the landings, not the hour the money went.
+ */
+export interface LineageForecastSpend {
+  week: Record<string, LineageEstimateRange>;
+  month: Record<string, LineageEstimateRange>;
+}
+
+/**
+ * An epic's estimate to complete (#4526): dollars by currency, P10 to P90, for its open children
+ * and the lead. Each child's estimate is drawn from its matches and scaled by one factor per draw,
+ * shared by every child, lognormal from the closed children's actual over their kept estimate
+ * (ratio is its median, from closed of them). The lead's term is the epic's own cost over its
+ * closed children's, leadRatio, times the children's.
+ */
+export interface LineageForecastToComplete {
+  cost: Record<string, LineageEstimateRange>;
+  ratio: number;
+  closed: number;
+  leadRatio: number;
 }
 
 /**
@@ -13616,6 +13738,7 @@ export interface Methods {
   "groups/setRole": { params: GroupRoleSet; result: Group };
   "lineage/cost": { params: LineageNodeRequest; result: LineageCostRollup };
   "lineage/estimate": { params: LineageEstimateRequest; result: LineageEstimate };
+  "lineage/forecast": { params: LineageForecastRequest; result: LineageForecast };
   "lineage/sessions": { params: LineageSessionsRequest; result: LineageSessions };
   "lineage/walk": { params: LineageNodeRequest; result: LineageGraph };
   "links/approve": { params: ChannelLinkDecide; result: Empty };
@@ -14037,6 +14160,7 @@ export const MethodTarget = {
   "groups/setRole": "control",
   "lineage/cost": "host",
   "lineage/estimate": "host",
+  "lineage/forecast": "host",
   "lineage/sessions": "host",
   "lineage/walk": "host",
   "links/approve": "control",
@@ -14763,7 +14887,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Levels: { required: [], optional: ["model", "permission", "permissionRequests"] },
   LineMember: { required: ["agentID", "askedAt", "isCallOpen"], optional: [] },
   LineageCost: { required: ["cost", "inputTokens", "outputTokens", "turns", "workingSeconds", "waitingSeconds"], optional: ["limitTokens"] },
-  LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["repo", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "startedAt", "level", "feature", "parent", "endedAt", "resolved", "sessions", "estimate"] },
+  LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["repo", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "startedAt", "level", "feature", "parent", "endedAt", "resolved", "sessions", "estimate", "forecast"] },
   LineageCostRollup: { required: ["node", "own", "total", "waste", "unlinked", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "parts"], optional: ["limited"] },
   LineageEndRequest: { required: ["from", "to", "rel"], optional: [] },
   LineageEstimate: { required: ["node", "closedIssues", "matches"], optional: ["type", "level", "step", "matchedBy", "cost", "inputTokens", "outputTokens", "workingSeconds", "leadTimeSeconds", "cycleTimeSeconds", "landsAt", "openChildren", "closedChildren", "spent", "children", "kept", "actual"] },
@@ -14772,6 +14896,14 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineageEstimateRange: { required: ["median", "p10", "p90"], optional: [] },
   LineageEstimateRequest: { required: ["node"], optional: ["startAt"] },
   LineageFigures: { required: ["node", "cost", "sessions", "running", "runtimes"], optional: ["leadTimeSeconds", "limited"] },
+  LineageForecast: { required: ["at", "windowDays", "landings", "burn", "serviceLevels"], optional: ["node", "lands", "noForecast", "toComplete", "kept", "spend"] },
+  LineageForecastBurn: { required: ["credentialKey", "window", "used", "at", "resetsAt", "lasts"], optional: ["runsOutAt"] },
+  LineageForecastKept: { required: ["at", "p50", "p85", "windowDays", "share", "open"], optional: [] },
+  LineageForecastLands: { required: ["p50", "p85", "open", "closed", "stepsLeft", "share", "groups"], optional: [] },
+  LineageForecastRequest: { required: [], optional: ["node"] },
+  LineageForecastServiceLevel: { required: ["level", "closed", "p50Seconds", "p85Seconds"], optional: [] },
+  LineageForecastSpend: { required: ["week", "month"], optional: [] },
+  LineageForecastToComplete: { required: ["cost", "ratio", "closed", "leadRatio"], optional: [] },
   LineageGraph: { required: ["nodes", "links"], optional: ["limited", "resolving", "resolved", "states"] },
   LineageLink: { required: ["from", "to", "rel", "source", "at"], optional: ["endedAt"] },
   LineageLinkRequest: { required: ["from", "to", "rel", "source"], optional: [] },

@@ -5711,6 +5711,9 @@ type LineageCostNode struct {
 
 	// An issue's estimate when its work started (#3561), kept once made, for the estimate against the actual when it closes.
 	Estimate *LineageEstimateKept `json:"estimate,omitzero"`
+
+	// An epic's first landing forecast (#4526), kept once made, for the forecast against when it lands.
+	Forecast *LineageForecastKept `json:"forecast,omitzero"`
 }
 
 // lineage/cost (#2350): a node's cost rolled up. own is what was banked on the node itself. total adds its parts: an issue's PRs (the PRs that fix it); a release's PRs and the issues they fix; a repo's every node (kind repo, ref github:alexec/agents). waste is the parts' PRs closed without a merge or reverted. unlinked is the parts' sessions: turns with no active link. parts is the nodes added up, newest first, at most 500; limited says there are more.
@@ -5891,6 +5894,114 @@ type LineageFigures struct {
 	LeadTimeSeconds *float64 `json:"leadTimeSeconds,omitzero"`
 
 	Limited *bool `json:"limited,omitzero"`
+}
+
+// lineage/forecast (#4526; the method is specs/4533-forecasting/spec.md): what comes next, from this machine's totals. landings is the issues (not epics) that landed with a merged PR in the window of windowDays (14) before at, in the epic's repo when a node is asked for, else in every repo. lands is when the epic lands; noForecast says why there is none (too little history, too few closed epics, nothing open). toComplete is the epic's estimate to complete, once three of its children closed with an estimate kept at their start. kept is the forecast kept on the epic's node, the first one made, so it can be scored when the epic lands. spend is what a week and a month cost at the window's pace, burn is each weekly allowance's pace, and serviceLevels is how long each level's issues took. Every figure says its window; a range is a probability, not a promise.
+type LineageForecast struct {
+	Node *LineageNode `json:"node,omitzero"`
+
+	At Date `json:"at"`
+
+	WindowDays int64 `json:"windowDays"`
+
+	Landings int64 `json:"landings"`
+
+	Lands *LineageForecastLands `json:"lands,omitzero"`
+
+	NoForecast *string `json:"noForecast,omitzero"`
+
+	ToComplete *LineageForecastToComplete `json:"toComplete,omitzero"`
+
+	Kept *LineageForecastKept `json:"kept,omitzero"`
+
+	Spend *LineageForecastSpend `json:"spend,omitzero"`
+
+	Burn []LineageForecastBurn `json:"burn"`
+
+	ServiceLevels []LineageForecastServiceLevel `json:"serviceLevels"`
+}
+
+// A weekly allowance's pace (#4526): used (0 to 1) at its last reading at, of the week that resets at resetsAt. runsOutAt is when it runs out at that pace, absent when it lasts to the reset (lasts).
+type LineageForecastBurn struct {
+	CredentialKey string `json:"credentialKey"`
+
+	Window string `json:"window"`
+
+	Used float64 `json:"used"`
+
+	At Date `json:"at"`
+
+	ResetsAt Date `json:"resetsAt"`
+
+	RunsOutAt *Date `json:"runsOutAt,omitzero"`
+
+	Lasts bool `json:"lasts"`
+}
+
+// An epic's landing forecast as it was made (#4526), kept once on its node, so it can be scored when the epic lands: the P50 and P85 dates, the window, the share and the open children then.
+type LineageForecastKept struct {
+	At Date `json:"at"`
+
+	P50 Date `json:"p50"`
+
+	P85 Date `json:"p85"`
+
+	WindowDays int64 `json:"windowDays"`
+
+	Share float64 `json:"share"`
+
+	Open int64 `json:"open"`
+}
+
+// When an epic lands (#4526, method H of specs/4533-forecasting/spec.md): a Monte Carlo of 1,000 draws with a fixed seed, each resampling hours of the window and keeping each landing in an hour with the chance share, until the open children are done. p50 and p85 are dates. share is the median share of the folder's landings that the closed epics had over their lives, from groups of them. open and closed are the children as the plan says now, with no growth for children not filed yet; stepsLeft is the blocked-by steps of the open ones, as context only: they do not enter the dates.
+type LineageForecastLands struct {
+	P50 Date `json:"p50"`
+
+	P85 Date `json:"p85"`
+
+	Open int64 `json:"open"`
+
+	Closed int64 `json:"closed"`
+
+	StepsLeft int64 `json:"stepsLeft"`
+
+	Share float64 `json:"share"`
+
+	Groups int64 `json:"groups"`
+}
+
+// lineage/forecast (#4526): an epic, for when it lands and its estimate to complete; without one, only the spend, the burn and the service levels, over every repo.
+type LineageForecastRequest struct {
+	Node *LineageNode `json:"node,omitzero"`
+}
+
+// How long a level's issues took (#4526): of the closed issues of the level that landed in the window, half took up to p50Seconds and 85% up to p85Seconds, from the start of work to the last PR merged. Only a level with five or more.
+type LineageForecastServiceLevel struct {
+	Level string `json:"level"`
+
+	Closed int64 `json:"closed"`
+
+	P50Seconds float64 `json:"p50Seconds"`
+
+	P85Seconds float64 `json:"p85Seconds"`
+}
+
+// What a week and a month cost at the window's pace (#4526): dollars by currency, P10 to P90, from 1,000 draws of 7 and 30 of the window's days. A day's cost is what the issues that landed on it took, all of their work, so it follows the landings, not the hour the money went.
+type LineageForecastSpend struct {
+	Week map[string]LineageEstimateRange `json:"week"`
+
+	Month map[string]LineageEstimateRange `json:"month"`
+}
+
+// An epic's estimate to complete (#4526): dollars by currency, P10 to P90, for its open children and the lead. Each child's estimate is drawn from its matches and scaled by one factor per draw, shared by every child, lognormal from the closed children's actual over their kept estimate (ratio is its median, from closed of them). The lead's term is the epic's own cost over its closed children's, leadRatio, times the children's.
+type LineageForecastToComplete struct {
+	Cost map[string]LineageEstimateRange `json:"cost"`
+
+	Ratio float64 `json:"ratio"`
+
+	Closed int64 `json:"closed"`
+
+	LeadRatio float64 `json:"leadRatio"`
 }
 
 // lineage/walk (#2348): the nodes the walk reached and the links it went along. limited says the walk stopped at its limit on nodes, so there is more. resolved is each node's title, state and labels from its connector, by ref, for the nodes a connector could resolve (#3089). resolving says some nodes are still being resolved in the background, so walk again shortly for them (#3102). states is the current state of each session node in it that has one, by ref (#4274).

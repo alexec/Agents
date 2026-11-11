@@ -100,6 +100,7 @@ const CapHostsJoin1 = "hosts.join/1"
 const CapLineageComment1 = "lineage.comment/1"
 const CapLineageEstimate1 = "lineage.estimate/1"
 const CapLineageFigures1 = "lineage.figures/1"
+const CapLineageForecast1 = "lineage.forecast/1"
 const CapLineageGraph1 = "lineage.graph/1"
 const CapLineageSessions1 = "lineage.sessions/1"
 const CapLineage1 = "lineage/1"
@@ -385,6 +386,7 @@ var HostCapabilities = pairs([][2]string{
 	{"lineage/end", "lineage/1"},
 	{"lineage/estimate", "lineage.estimate/1"},
 	{"lineage/figures", "lineage.figures/1"},
+	{"lineage/forecast", "lineage.forecast/1"},
 	{"lineage/link", "lineage/1"},
 	{"lineage/links", "lineage/1"},
 	{"lineage/sessions", "lineage.sessions/1"},

@@ -311,6 +311,8 @@ public extension DaemonAPI {
                     kind: .hostRequest),
                 Row(Method.lineageEstimate, params: LineageEstimateRequest.self, result: LineageEstimate.self,
                     kind: .hostRequest),
+                Row(Method.lineageForecast, params: LineageForecastRequest.self, result: LineageForecast.self,
+                    kind: .hostRequest),
                 Row(Method.simulatorsList, params: Empty.self, result: SimulatorList.self, kind: .hostRequest),
                 Row(Method.simulatorsBoot, params: SimulatorRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.simulatorsShutdown, params: SimulatorRequest.self, result: Empty.self, kind: .hostRequest),
