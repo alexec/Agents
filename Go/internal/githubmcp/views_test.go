@@ -332,7 +332,7 @@ func TestEachViewHasAToolThatFeedsItAndAPage(t *testing.T) {
 			t.Errorf("%s has no pull request page in it", uri)
 		}
 		if uri == issuesURI {
-			for _, want := range []string{"show_issue_details", "closed_by_pull_requests", "milestone", "aria-expanded", "issue-row",
+			for _, want := range []string{"show_issue_details", "closed_by_pull_requests", "aria-expanded", "issue-row",
 				"Add a label filter", "label-tags", "removeLabel", "Search issues", "labelColors", "query", "No open issues match"} {
 				if !strings.Contains(html, want) {
 					t.Errorf("issues page is missing %q", want)

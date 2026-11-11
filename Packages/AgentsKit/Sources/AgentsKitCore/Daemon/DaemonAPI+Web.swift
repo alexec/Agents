@@ -528,7 +528,7 @@ public extension DaemonAPI {
                 Row(Method.reportsExport, params: ReportQuery.self, result: ReportExport.self, kind: .controlRequest),
                 // Reports ▸ Value (#2351).
                 Row(Method.reportsValue, params: ReportQuery.self, result: ReportValue.self, kind: .controlRequest),
-                // Work ▸ Issues, Pull requests, Milestones and Releases (#3118).
+                // Work ▸ Issues, Pull requests and Releases (#3118).
                 Row(Method.reportsNodes, params: ReportNodesQuery.self, result: ReportNodes.self, kind: .controlRequest),
                 Row(Method.reportsScopes, params: Empty.self, result: ReportScopes.self, kind: .controlRequest),
                 Row(Method.reportsPolicy, params: Empty.self, result: ReportPolicy.self, kind: .controlRequest),

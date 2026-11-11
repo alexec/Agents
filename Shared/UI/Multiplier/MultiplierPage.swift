@@ -166,11 +166,18 @@ struct MultiplierPage: View {
             Text("— ×")
                 .appFigure(.hero)
                 .foregroundStyle(.secondary)
-            Text("No merged work in the last 7 days.")
-                .appText(.reading)
-            Text("Your number starts when an agent’s first PR merges.")
-                .appText(.supporting)
-                .foregroundStyle(.secondary)
+            // Never merged (#4250): a start, not a failure; else none in the last 7 days.
+            if let words = multiplier?.emptyWords {
+                Text(words.big)
+                    .appText(.reading)
+                if let small = words.small {
+                    Text(small)
+                        .appText(.supporting)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                }
+            }
             bests
                 .padding(.top, 16)
             EarnedBadges(achievements: achievements)

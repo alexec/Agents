@@ -836,6 +836,7 @@ func (d *Daemon) restoreAgent(id wire.UUID, raw []byte, files map[string]string,
 		return false, err
 	}
 	d.tellChanged(a, nil)
+	d.noteSessionState(nil, a)
 	return true, nil
 }
 

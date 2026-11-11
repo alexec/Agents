@@ -30,7 +30,7 @@ extension EnvironmentValues {
     @Entry var workSideCompact = false
 }
 
-/// One section of the side panel: Assignees, Labels, Milestone, Repo, Linked or Lineage. `edit`
+/// One section of the side panel: Assignees, Labels, Repo, Linked or Lineage. `edit`
 /// puts a gear by its heading (the pages say which forges can edit what).
 struct WorkSideSection<Content: View>: View {
     let title: String

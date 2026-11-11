@@ -55,6 +55,18 @@ test("the line under the figures is the person's own, else the baseline's", () =
   assert.equal(m.baselineLine(at(1, 0.7, { baseline: { ...baseline, line: "Me in 2024" } })), "Me in 2024");
 });
 
+test("the empty page tells a person who never merged from one with none this week (#4250)", () => {
+  assert.deepEqual(m.emptyWords(at(0, undefined)), {
+    big: "Your first merged PR starts the count.",
+    small: "Each PR your agents merge counts against an engineer’s 1.4 PRs a week.",
+  });
+  assert.deepEqual(m.emptyWords(at(0, undefined, { firstMergeAt: 815000000 })), { big: "No merged work in the last 7 days." });
+  assert.equal(m.emptyWords(at(0, undefined, { baseline: { ...baseline, prsPerWeek: 3 } })).small,
+    "Each PR your agents merge counts against an engineer’s 3.0 PRs a week.");
+  assert.deepEqual(m.emptyWords(at(0, undefined, { baseline: { ...baseline, line: "Me in 2024" } })),
+    { big: "Your first merged PR starts the count." }, "the person's own line is in the footer already");
+});
+
 test("the earned badges come earliest first, with the first still to earn next", () => {
   const { badges, next } = m.earnedBadges({ earned: [{ id: "firstWorkflow", at: 10 }, { id: "firstAgent", at: 20 }] });
   assert.deepEqual(badges.map((b) => b.id), ["firstWorkflow", "firstAgent"]);

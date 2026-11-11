@@ -86,7 +86,7 @@ func (f *fakeForgejo) set(change func()) {
 }
 
 var (
-	alex     = obj{"id": 1, "login": "alex"}
+	alex     = obj{"id": 1, "login": "alex", "avatar_url": "https://fj.test/avatars/a1"}
 	dev      = obj{"id": 2, "login": "dev"}
 	stranger = obj{"id": 3, "login": "stranger"}
 	renovate = obj{"id": 4, "login": "renovate-bot"}

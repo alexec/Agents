@@ -1,12 +1,12 @@
 import AgentsKitCore
 import SwiftUI
 
-/// The page of one issue, pull request, milestone or release (#3119), as the web page's
+/// The page of one issue, pull request or release (#3119), as the web page's
 /// `#/work/<kind>/<ref>`: the item from its forge (`forge/issue`, `forge/pull`) on the first
 /// machine that reads it. It opens for any item, also one no agent touched. An issue's page is in
 /// the Work look (#4400, `specs/4328-work-look/issue.md`): the header with Start Agent, one
 /// timeline (the body, then the comments), the comment box with Close or Reopen, and the side
-/// panel (Assignees, Labels with its gear, Milestone, Repo, Linked, Lineage and, on the Mac, Docs).
+/// panel (Assignees, Labels with its gear, Repo, Linked, Lineage and, on the Mac, Docs).
 /// A pull request's page (#4406, `specs/4328-work-look/pull-request.md`) has Files changed in
 /// place of Start Agent, the merge box at the end of the timeline (at the top of a narrow page),
 /// Close or Reopen pull request in the comment box, and Reviewers and Branch on the panel.
@@ -563,7 +563,7 @@ struct WorkItemPage: View {
             .redacted(reason: detail == nil ? .placeholder : [])
     }
 
-    /// Assignees, Labels (its gear opens the labels picker), Milestone, Repo and Project, as the
+    /// Assignees, Labels (its gear opens the labels picker), Repo and Project, as the
     /// wire has them now: avatars come with #4363 (parts.md section 5).
     @ViewBuilder
     private var details: some View {
@@ -605,13 +605,6 @@ struct WorkItemPage: View {
         #else
         .popover(isPresented: $pickingLabels, arrowEdge: .leading) { labelsPicker }
         #endif
-        WorkSideSection(title: "Milestone") {
-            if let milestone = item?.milestone ?? row?.milestone {
-                Label(milestone, systemImage: "flag")
-            } else {
-                WorkSideNone(words: "None")
-            }
-        }
         if node.kind == "pr", let files = WorkLook.branchWords(detail?.got.filesChanged) {
             // The head and base branches and the size come with the forge's fields (#4406).
             WorkSideSection(title: "Branch") {

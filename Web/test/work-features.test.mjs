@@ -114,6 +114,8 @@ test("the lead says its state", () => {
 });
 
 test("Work lists Features after Pull requests", () => {
-  assert.deepEqual(nav.navPages.work.map((p) => p.title), ["Issues", "Pull requests", "Features", "Milestones", "Releases", "Timeline"]);
+  assert.deepEqual(nav.navPages.work.map((p) => p.title), ["Issues", "Pull requests", "Features", "Releases", "Timeline"]);
   assert.deepEqual(nav.navPages.work[2].draw, { kind: "features" });
+  // Work has no Milestones list now (#3878): an old #/work/milestone opens the Work default.
+  assert.equal(nav.openPage("work", "milestone", true).id, "issue");
 });

@@ -209,6 +209,8 @@ type restUser struct {
 	DisplayName string `json:"displayName"`
 	Email       string `json:"emailAddress"`
 	AccountType string `json:"accountType"`
+	// AvatarURLs are the person's picture by size; the forge reads take 48x48 (#4363).
+	AvatarURLs map[string]string `json:"avatarUrls"`
 }
 
 // person is the user, or nobody. An account id is Jira Cloud's; a name, Data Center's.
@@ -220,7 +222,8 @@ func (u *restUser) person() *Person {
 	if id == "" {
 		id = u.Name
 	}
-	return &Person{ID: id, Name: u.DisplayName, Email: u.Email, App: u.AccountType == "app", Customer: u.AccountType == "customer"}
+	return &Person{ID: id, Name: u.DisplayName, Email: u.Email, App: u.AccountType == "app", Customer: u.AccountType == "customer",
+		Avatar: u.AvatarURLs["48x48"]}
 }
 
 type restComment struct {

@@ -16,8 +16,10 @@ starts lanes.
    `move_worktree`. Never run `git worktree add` (#615).
 4. Fix that issue. Follow AGENTS.md. Verify only what you touch. Use
    `scripts/build-cache.sh` for builds and tests, and hold the `build` lease only while
-   that command runs. A commit that changes one client's UI says what each of the other
-   two clients does.
+   that command runs. Run every build, test and lint in the foreground, with a timeout
+   sized to the job, never in the background: nothing wakes you when a background
+   command ends, so a turn that ends on one stalls the lane (#4557). A commit that
+   changes one client's UI says what each of the other two clients does.
 5. Run the unit tests for what you touched. For a change that needs to be seen working,
    use the run-app skill on a scratch root for `App/`, `Host/`, `Go/`, `Remote/`, or
    `Packages/AgentsKit`. Close the scratch app before you commit.

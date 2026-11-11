@@ -37,7 +37,7 @@ func TestMultiplierFollowsTheMerges(t *testing.T) {
 		}
 		return m
 	}
-	if m := state(1); m.PrsMerged != 0 || m.Multiplier != nil || m.Baseline.Source != "DX 2025" {
+	if m := state(1); m.PrsMerged != 0 || m.Multiplier != nil || m.Baseline.Source != "DX 2025" || m.FirstMergeAt != nil {
 		t.Fatalf("nothing merged: %+v", m)
 	}
 
@@ -50,7 +50,8 @@ func TestMultiplierFollowsTheMerges(t *testing.T) {
 		return m == "multiplier/changed" && strings.Contains(string(p), `"github:alexec/agents#9"`) &&
 			strings.Contains(string(p), `"prsMerged":1`)
 	})
-	if m := state(2); m.PrsMerged != 1 || m.Multiplier == nil || *m.Multiplier != 0.7 || *m.EngineerHours != 29 {
+	if m := state(2); m.PrsMerged != 1 || m.Multiplier == nil || *m.Multiplier != 0.7 || *m.EngineerHours != 29 ||
+		m.FirstMergeAt == nil {
 		t.Fatalf("one merged: %+v", m)
 	}
 
@@ -66,7 +67,8 @@ func TestMultiplierFollowsTheMerges(t *testing.T) {
 		return m == "multiplier/changed" && strings.Contains(string(p), `"github:alexec/agents#10"`) &&
 			strings.Contains(string(p), `"reverts":1`)
 	})
-	if m := state(3); m.PrsMerged != 0 || m.Reverts != 1 || m.Multiplier != nil {
+	// The page still knows they merged before (#4250).
+	if m := state(3); m.PrsMerged != 0 || m.Reverts != 1 || m.Multiplier != nil || m.FirstMergeAt == nil {
 		t.Fatalf("one revert: %+v", m)
 	}
 

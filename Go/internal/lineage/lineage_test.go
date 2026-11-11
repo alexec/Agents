@@ -172,6 +172,29 @@ func TestEndedLinksGoAfterKeepEnded(t *testing.T) {
 	}
 }
 
+// A milestone's links, from a build before #3878, go when the store opens: a link to one,
+// and its shipped-in link to a release.
+func TestOpenDropsMilestoneLinks(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "lineage.jsonl")
+	f := openAt(t, path, t0)
+	m := wire.LineageNode{Kind: removedKindMilestone, Ref: "github:alexec/Agents/milestone/15"}
+	release := wire.LineageNode{Kind: KindRelease, Ref: "github:alexec/Agents/release/v0.14.0"}
+	link(t, f, session("a"), issue("1"), RelWorksOn, t0)
+	link(t, f, issue("1"), m, RelPartOf, t0)
+	link(t, f, m, release, "shipped-in", t0)
+	f.Close()
+	again := openAt(t, path, t0)
+	if got := again.Links(issue("1")).Links; len(got) != 1 || got[0].From != session("a") {
+		t.Fatalf("%+v", got)
+	}
+	if got := again.Links(release).Links; len(got) != 0 {
+		t.Fatalf("%+v", got)
+	}
+	if data, _ := os.ReadFile(path); strings.Contains(string(data), "milestone") {
+		t.Fatalf("the file still holds a milestone: %s", data)
+	}
+}
+
 // A store left open drops an ended link on Prune once it is KeepEnded old, file and all
 // (#3649): an idle machine does not wait for its next start.
 func TestPruneDropsEndedLinksWhileOpen(t *testing.T) {
@@ -242,5 +265,102 @@ func TestRefusesWhatIsNotANodeOrALink(t *testing.T) {
 	// A kind, relationship or source this build does not name is kept.
 	if _, err := f.Link(wire.LineageLinkRequest{From: wire.LineageNode{Kind: "deploy", Ref: "argo:prod/42"}, To: pr("1"), Rel: "ships", Source: "webhook"}, t0); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func setState(t *testing.T, s Store, n wire.LineageNode, state wire.LineageSessionStateName, at time.Time) bool {
+	t.Helper()
+	did, err := s.SetState(n, state, at)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return did
+}
+
+// A session's changes of state (#4274): the same state again is not a change; Links says
+// them newest first, Walk the state now of each session it reaches, and both survive a
+// reopen and a rewrite.
+func TestSessionStates(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "lineage.jsonl")
+	f := openAt(t, path, t0)
+	link(t, f, session("a"), issue("1"), RelWorksOn, t0)
+	link(t, f, session("b"), issue("1"), RelWorksOn, t0)
+	if !setState(t, f, session("a"), wire.LineageSessionStateNameWorking, t0) {
+		t.Fatal("the first state was not recorded")
+	}
+	if setState(t, f, session("a"), wire.LineageSessionStateNameWorking, t0.Add(time.Minute)) {
+		t.Fatal("the same state again was recorded as a change")
+	}
+	setState(t, f, session("a"), wire.LineageSessionStateNameNeedsYou, t0.Add(2*time.Minute))
+	setState(t, f, session("b"), wire.LineageSessionStateNameWaiting, t0.Add(3*time.Minute))
+
+	check := func(f *Files) {
+		t.Helper()
+		got := f.Links(session("a")).States
+		if len(got) != 2 || got[0].State != wire.LineageSessionStateNameNeedsYou || got[1].State != wire.LineageSessionStateNameWorking ||
+			got[1].At != wire.DateOf(t0) {
+			t.Fatalf("a's states, newest first: %+v", got)
+		}
+		if s := f.Links(issue("1")).States; s != nil {
+			t.Fatalf("an issue has no states: %+v", s)
+		}
+		g := f.Walk(issue("1"), 1)
+		if len(g.States) != 2 || g.States[session("a").Ref].State != wire.LineageSessionStateNameNeedsYou ||
+			g.States[session("b").Ref].State != wire.LineageSessionStateNameWaiting {
+			t.Fatalf("the walk's states: %+v", g.States)
+		}
+	}
+	check(f)
+	f.Close()
+	again := openAt(t, path, t0.Add(time.Hour))
+	check(again)
+	again.mu.Lock()
+	again.rewrite()
+	again.mu.Unlock()
+	again.Close()
+	check(openAt(t, path, t0.Add(time.Hour)))
+}
+
+// A change of state goes after KeepEnded, except a node's latest, and at most MostStates
+// are kept.
+func TestSessionStatesBounded(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "lineage.jsonl")
+	f := openAt(t, path, t0)
+	setState(t, f, session("old"), wire.LineageSessionStateNameWorking, t0)
+	setState(t, f, session("old"), wire.LineageSessionStateNameArchived, t0.Add(time.Hour))
+	f.Close()
+
+	later := openAt(t, path, t0.Add(KeepEnded+2*time.Hour))
+	if got := later.Links(session("old")).States; len(got) != 1 || got[0].State != wire.LineageSessionStateNameArchived {
+		t.Fatalf("past KeepEnded, only the latest is kept: %+v", got)
+	}
+
+	later.mu.Lock()
+	for i := range MostStates + 10 {
+		at := wire.DateOf(t0.Add(KeepEnded + time.Duration(i)*time.Second))
+		later.states = append(later.states, change{session("busy"), wire.LineageSessionState{State: wire.LineageSessionStateNameWorking, At: at}})
+	}
+	later.pruneStates()
+	later.index()
+	n := len(later.states)
+	later.mu.Unlock()
+	if n != MostStates {
+		t.Fatalf("%d states kept, want %d", n, MostStates)
+	}
+	if got := later.Links(session("old")).States; len(got) != 1 {
+		t.Fatal("a node's latest state went before older changes of another node")
+	}
+}
+
+// A line from a newer build with a state this build does not know reads as stopped.
+func TestUnknownStateReadsAsStopped(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "lineage.jsonl")
+	line := `{"state":{"node":{"kind":"session","ref":"session:a"},"state":"dreaming"},"at":815054400}` + "\n"
+	if err := os.WriteFile(path, []byte(line), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f := openAt(t, path, t0)
+	if got := f.Links(session("a")).States; len(got) != 1 || got[0].State != wire.LineageSessionStateNameStopped {
+		t.Fatalf("states: %+v", got)
 	}
 }

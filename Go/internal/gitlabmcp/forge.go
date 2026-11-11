@@ -49,10 +49,12 @@ type Item struct {
 	MR      bool
 	// State is open, closed or merged.
 	State, Title, URL, Author, Milestone, UpdatedAt string
-	Labels                                          []string
-	LabelColors                                     map[string]string
-	Assignees                                       []string
-	Comments                                        int
+	// AuthorAvatar is the author's picture, on the GitLab or on Gravatar; "" for none (#4363).
+	AuthorAvatar string
+	Labels       []string
+	LabelColors  map[string]string
+	Assignees    []string
+	Comments     int
 	// A merge request's: Checks is passing, failing, running, skipped or none (only on one
 	// read on its own: a list does not say its pipeline); Review is changes_requested,
 	// review_required or ""; Mergeable is mergeable, conflicting or unknown.
@@ -77,8 +79,8 @@ type SearchPage struct {
 
 // Comment is a comment on an item, as Markdown.
 type Comment struct {
-	Author, Body, At, URL string
-	Bot                   bool
+	Author, Avatar, Body, At, URL string
+	Bot                           bool
 }
 
 // Check is one of a merge request's pipeline jobs: State is passing, failing, running or skipped.
@@ -150,7 +152,8 @@ type forgeJSON struct {
 
 func (j forgeJSON) item(project string, mr bool) Item {
 	i := Item{Project: project, Number: j.IID, MR: mr, Title: j.Title, URL: j.WebURL, Author: j.Author.Username,
-		UpdatedAt: j.UpdatedAt, Comments: j.UserNotesCount, Assignees: []string{}, Labels: []string{}, LabelColors: map[string]string{}}
+		AuthorAvatar: j.Author.avatar(j.WebURL),
+		UpdatedAt:    j.UpdatedAt, Comments: j.UserNotesCount, Assignees: []string{}, Labels: []string{}, LabelColors: map[string]string{}}
 	switch j.State {
 	case "merged", "closed":
 		i.State = j.State
@@ -370,7 +373,7 @@ func (g *RealGitLab) ItemPage(ctx context.Context, project string, number int, m
 		if n.System || n.Type == "DiffNote" {
 			continue
 		}
-		d.Thread = append(d.Thread, Comment{Author: n.Author.Username, Body: n.Body, At: n.CreatedAt,
+		d.Thread = append(d.Thread, Comment{Author: n.Author.Username, Avatar: n.Author.avatar(j.WebURL), Body: n.Body, At: n.CreatedAt,
 			URL: fmt.Sprintf("%s#note_%d", j.WebURL, n.ID), Bot: isBot(n.Author.Username, n.Author.Bot)})
 	}
 	if !mr {

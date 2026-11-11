@@ -51,9 +51,9 @@ Mac.
 | `spend.json` | Spend for the cost limits | The last 7 days, by date | On write and hourly (#3686) |
 | `report-hours.json` | Hourly totals sent to the control plane | 8 days | On write |
 | `features-history.json` | How often each feature is used | The last 90 days, by date | On write and hourly (#3686) |
-| `lineage.jsonl` | Links between issues, PRs, sessions and deploys | Ended links 90 days, 20,000 links | When it opens, when it grows by 2,000, and hourly (#3649) |
+| `lineage.jsonl` | Links between issues, PRs, sessions and deploys, and each session's changes of state (#4274) | Ended links 90 days, 20,000 links; changes of state 90 days (each session's latest kept), 20,000 | When it opens, when it grows by 2,000, and hourly (#3649) |
 | `lineage-cost.json` | Cost of each lineage node | 90 days, 5,000 nodes | On write |
-| `lineage-sync.json` | Lineage links and session states not yet sent to the control plane (#4275) | 5,000 state changes (the oldest go first) and 2,000 links (past that, every link is sent again) | On write |
+| `lineage-sync.json` | Lineage links and session states not yet sent to the control plane (#4275) | 2,000 links and 5,000 state changes; past that, it keeps only a note to send everything again from `lineage.jsonl` | On write |
 | `lineage-comments.json` | Cost comments on PRs | 500, 30 days | On write |
 | `release-tags.json` | Release tags already linked, for each repo | The newest 50 for each repo; an older tag counts as linked (#3652) | On write |
 | `achievements.json` | Milestones | A fixed set | — |
@@ -199,7 +199,7 @@ the other copies of the control plane learn that it went.
 | Host copies | Each machine's last folders and agents, up to 500, **with titles** | One a machine | When the machine is forgotten |
 | Usage reports | Usage, cost and time by person, project, folder, machine and runtime | 7 days by the hour, 90 days by the day | Hourly |
 | Lineage | Cost of each issue, PR and session node | 5,000 nodes, 90 days | On write |
-| Lineage graph | Each machine's links and its sessions' changes of state (working, waiting, needs-you, stopped, archived, deleted), as refs, states and times, in `v1/lineage-graph/<machine>/` (#4275) | Links as on the machine: an ended link 90 days after its end, 20,000 a machine. States 90 days, 20,000 a machine, and each session's last state while it is not archived or deleted. A removed machine's a day after its last send | On write, hourly |
+| Lineage graph | Each machine's links and its sessions' changes of state (working, waiting, needs-you, stopped, archived, deleted), as refs, states and times, in `v1/lineage-graph/<machine>/` (#4275) | Links as on the machine: an ended link 90 days after its end, 20,000 a machine. States as on the machine: 90 days, and each session's last state whatever its age, 20,000 a machine. A removed machine's a day after its last send | On write, hourly |
 | Workflow runs | Which machine took each workflow trigger | 7 days | Hourly |
 | Report views | Saved report views | 50 a person | When the person is removed |
 | Machine providers | Each provider | No count limit. A removed one's tombstone for 7 days (#3748) | Hourly |

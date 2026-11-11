@@ -19,8 +19,8 @@ import { useEffect } from "preact/hooks";
 import { nonePage } from "./SummaryPage";
 import { FolderSettingsModal, ProjectSettingsModal } from "./ProjectSettings";
 import { projectSettingsWords } from "../model/projectSettings";
-import { actDoing, recentArchivedShown, type Store } from "../model/store";
-import { byStart, folderKey, recentlyArchived, folderPath as agentFolderPath, showsUnread } from "../model/groups";
+import { actDoing, type Store } from "../model/store";
+import { byStart, folderKey, folderPath as agentFolderPath, showsUnread } from "../model/groups";
 import { folds } from "../model/folds";
 import { smartGroupsOn } from "../model/smartGroups";
 import { macHostNoticeDetail, macHostNoticeTitle } from "../model/macHostNotice";
@@ -34,7 +34,7 @@ import { folderLine, groupLabel, keeper, keepsInUnread, machineMark, machineStat
 import { endedLine } from "../model/connectorSetup";
 import { updatedLine } from "../model/updated";
 import { namedRelative, workflowSummary } from "../model/workflows";
-import { fromWireDate, toWireDate } from "../protocol/dates";
+import { fromWireDate } from "../protocol/dates";
 import type { Agent, AgentsExportRequest, ControlMachine, FolderSummary, Request as PersonRequest, WorkflowSummary } from "../protocol/generated";
 import { alone, aloneURL, go, route, showAll } from "../route";
 import { onThisMac } from "../place";
@@ -691,14 +691,6 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
     store.holdWorkflows(host.id, folder);
     return () => store.releaseWorkflows(host.id, folder);
   }, [unfolded, online, host.id, folder]);
-  // Its Recently archived sessions, the few it shows, while it is open by hand (#2731): not because
-  // a search unfolded it, since the search brings its own matches.
-  const opened = isAlone || folds.isOpen(host.id, folder);
-  useEffect(() => {
-    if (!opened || !online) return;
-    void store.loadArchived(host.id, folder, recentArchivedShown);
-    return () => store.unloadArchived(host.id, folder, recentArchivedShown);
-  }, [opened, online, host.id, folder]);
 
   const view = store.folderView(host.id, folder);
   // The matcher is made once per fold, not per row.
@@ -720,7 +712,6 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
     return listed;
   });
   const found = !unfolded ? [] : [...folderSessions(live, pins, parsed, kept, on), ...theirs].sort(byStart);
-  const recentArchived = !parsed ? recentlyArchived(view.archived, recentArchivedShown, toWireDate(new Date())) : [];
   const archivedFound = !unfolded || !parsed ? [] : view.archived.filter((a) => queryMatches(parsed, a));
   // A search for an epic (#3900): what it found here, live and archived, under a heading for each of its issues.
   const byIssue = parsed && groupsByIssue(parsed) ? issueGroups([...found, ...archivedFound], parsed) : [];
@@ -740,7 +731,6 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
   // tab of the folder alone, whose group is headed Sessions already. A search holds it open.
   const groupsSessions = !isAlone && sessions.length > 0;
   const sessionsOpen = searching || folds.isSessionsOpen(host.id, folder);
-  const recentArchivedOpen = searching || folds.isRecentArchivedSessionsOpen(host.id, folder);
   const nameMatches = label.toLowerCase().includes(query.toLowerCase());
   if (searching && sessions.length === 0 && archived.length === 0 && byIssue.length === 0 && workflows.length === 0
     && archivedWorkflows.length === 0 && !nameMatches) return null;
@@ -887,18 +877,6 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
                 (id) => folds.isSessionOpen(id)).map((tree) => row(tree.agent, tree))}
             </div>
           ))}
-          {recentArchived.length > 0 && (
-            <details class="recent-archived-sessions" open={recentArchivedOpen}
-              onToggle={(e) => {
-                const now = (e.currentTarget as HTMLDetailsElement).open;
-                if (!searching && now !== recentArchivedOpen) folds.setRecentArchivedSessions(host.id, folder, now);
-              }}>
-              <summary data-fold="recent-archived-sessions" aria-label={`Recently archived sessions, ${recentArchived.length}`}>
-                Recently archived sessions<span class="count">{recentArchived.length}</span>
-              </summary>
-              {recentArchivedOpen && recentArchived.map((agent) => row(agent))}
-            </details>
-          )}
           {/* Its workflows after the sessions (#495), in a Workflows fold of their own, one level in,
               as a mailbox's sub-mailboxes in Mail (#885): folded until opened, kept per folder, its
               grey count on the right. A search holds it open. */}

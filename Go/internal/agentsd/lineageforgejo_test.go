@@ -18,17 +18,7 @@ func (f *fakeForgeForgejo) Node(_ context.Context, repo string, number int) (for
 	if number == 8 {
 		return forgejomcp.Node{Title: "Add a", State: "merged"}, nil
 	}
-	return forgejomcp.Node{Title: "Lineage asks Forgejo", State: "open", Labels: []string{"bug"}, Milestone: 3}, nil
-}
-
-func (f *fakeForgeForgejo) MilestoneNode(_ context.Context, repo string, id int) (forgejomcp.Node, error) {
-	f.note(&f.asked, fmt.Sprintf("milestone %s/%d", repo, id))
-	return forgejomcp.Node{Title: "0.2 Lineage", State: "open"}, nil
-}
-
-func (f *fakeForgeForgejo) Milestones(_ context.Context, repo string) ([]forgejomcp.Milestone, error) {
-	f.note(&f.asked, "milestones "+repo)
-	return []forgejomcp.Milestone{{ID: 3, Title: "0.2 Lineage"}, {ID: 4, Title: "0.3 Later"}}, nil
+	return forgejomcp.Node{Title: "Lineage asks Forgejo", State: "open", Labels: []string{"bug"}}, nil
 }
 
 func (f *fakeForgeForgejo) CommitTime(_ context.Context, repo, ref string) (time.Time, error) {
@@ -52,7 +42,7 @@ func (f *fakeForgeForgejo) CostComment(_ context.Context, repo string, number in
 }
 
 // #3844: lineage asks the connected Forgejo, by its connection, for a node's title and state,
-// an issue's milestone, a release's pull requests and milestones, and the cost comment; and
+// a release's pull requests, and the cost comment; and
 // reads an issue address on its own host, whose name does not say Forgejo.
 func TestLineageAsksForgejo(t *testing.T) {
 	d, _, fj, _ := forgejoDaemon(t)
@@ -67,35 +57,29 @@ func TestLineageAsksForgejo(t *testing.T) {
 	pr, issue := repo.pr(8), repo.issue(7)
 	d.resolveNode(ctx, pr)
 	d.resolveNode(ctx, issue)
-	d.resolveNode(ctx, repo.milestone(3))
-	for n, want := range map[wire.LineageNode]string{pr: "Add a merged []", issue: "Lineage asks Forgejo open [bug]", repo.milestone(3): "0.2 Lineage open []"} {
+	for n, want := range map[wire.LineageNode]string{pr: "Add a merged []", issue: "Lineage asks Forgejo open [bug]"} {
 		e := d.resolveCache[n]
 		if got := fmt.Sprintf("%s %s %v", e.resolved.Title, deref(e.resolved.State), e.resolved.Labels); !e.ok || got != want {
 			t.Errorf("%s resolved %q (ok %v), want %q", n.Ref, got, e.ok, want)
 		}
 	}
 
-	// An issue's milestone.
-	d.askIssueMilestone(milestoneJob{folder, repo, 7})
-	wantLinks(t, active(d, issue), issue.Ref+" part-of forgejo:walkalex/app/milestone/3 (forge)")
-
-	// A release: the squash title's (#8), a merge commit's pull request asked, the milestone by its version.
+	// A release: the squash title's (#8), a merge commit's pull request asked.
 	if !d.linkRelease(ctx, folder, repo, "v0.2.0", "v0.1.0") {
 		t.Fatal("the release is not done")
 	}
 	release := repo.release("v0.2.0")
 	wantLinks(t, active(d, release),
 		pr.Ref+" part-of "+release.Ref+" (forge)",
-		"forgejo:walkalex/app#9 part-of "+release.Ref+" (forge)",
-		"forgejo:walkalex/app/milestone/3 shipped-in "+release.Ref+" (forge)")
+		"forgejo:walkalex/app#9 part-of "+release.Ref+" (forge)")
 
 	// The cost comment, by the connection.
 	if id, err := d.forgejoCostComment(ctx, prCommentRecord{Folder: folder, Forge: "forgejo", Path: "walkalex/app", Number: 8}, "body"); err != nil || id != "41" {
 		t.Fatalf("the cost comment: %q %v", id, err)
 	}
 
-	want := []string{"node walkalex/App#8", "node walkalex/App#7", "milestone walkalex/App/3", "node walkalex/App#7",
-		"time walkalex/App v0.2.0", "compare walkalex/App v0.1.0...v0.2.0", "pull of walkalex/App bbb", "milestones walkalex/App",
+	want := []string{"node walkalex/App#8", "node walkalex/App#7",
+		"time walkalex/App v0.2.0", "compare walkalex/App v0.1.0...v0.2.0", "pull of walkalex/App bbb",
 		"cost walkalex/App#8 id= true"}
 	if fmt.Sprint(fj.asked) != fmt.Sprint(want) {
 		t.Errorf("Forgejo was asked\n%v\nwant\n%v", fj.asked, want)
@@ -228,7 +212,7 @@ func TestLineageSessionOpensTheIssuesTeaAndFjFile(t *testing.T) {
 	// Not a filing: fj viewing an issue says no "created".
 	call("f3", "fj issue view 9", "#9: created issue #9 by walkalex\n")
 
-	settleMilestones(t, d)
+	settleParents(t, d)
 	s := sessionNode(a.ID)
 	wantLinks(t, active(d, s),
 		s.Ref+" opens "+repo.issue(1).Ref+" (agent)",

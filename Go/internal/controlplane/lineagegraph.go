@@ -22,8 +22,9 @@ import (
 //
 //   - Links are bounded as the machine bounds its own file (lineage.Bound): an ended link
 //     90 days after its end, at most lineage.MostLinks a machine.
-//   - States are each change with its time: the last 90 days, at most lineageStatesKept a
-//     machine, and each session's latest while it is neither archived nor deleted.
+//   - States are each change with its time, bounded as the machine bounds its own (#4274):
+//     the last 90 days and each session's latest whatever its age, at most
+//     lineage.MostStates a machine, those that are not a session's latest going first.
 //   - The hourly sweep applies both bounds to a machine that stopped sending, and deletes
 //     a removed machine's objects.
 
@@ -32,9 +33,6 @@ const (
 	// mostSyncLinks and mostSyncStates bound one send.
 	mostSyncLinks  = 2_000
 	mostSyncStates = 1_000
-	// lineageStatesKept bounds a machine's state changes.
-	lineageStatesKept = 20_000
-	lineageStateKept  = lineage.KeepEnded
 )
 
 // storedLinks is one machine's links as the store keeps them, oldest start first.
@@ -57,9 +55,9 @@ func lineageStatesKey(host string) string {
 	return lineageGraphPrefix + strings.ToLower(host) + "/states.json"
 }
 
-var sessionStates = map[wire.LineageSessionState]bool{
-	wire.LineageSessionStateWorking: true, wire.LineageSessionStateWaiting: true, wire.LineageSessionStateNeedsYou: true,
-	wire.LineageSessionStateStopped: true, wire.LineageSessionStateArchived: true, wire.LineageSessionStateDeleted: true,
+var sessionStates = map[wire.LineageSessionStateName]bool{
+	wire.LineageSessionStateNameWorking: true, wire.LineageSessionStateNameWaiting: true, wire.LineageSessionStateNameNeedsYou: true,
+	wire.LineageSessionStateNameStopped: true, wire.LineageSessionStateNameArchived: true, wire.LineageSessionStateNameDeleted: true,
 }
 
 // keepLineageSync is lineage/sync: the links over this machine's copies of them, and the
@@ -189,35 +187,49 @@ func (s *Service) keepSyncStates(ctx context.Context, host string, changes []wir
 	return err
 }
 
-// boundStates is the changes oldest first, each once, within the bounds at now: the last
-// lineageStateKept, and each session's latest while it is neither archived nor deleted,
-// at most lineageStatesKept, the oldest going first.
+// boundStates is the changes oldest first, each once, within the bounds at now, as the
+// machine bounds its own (lineage.Files.pruneStates): the last lineage.KeepEnded, and each
+// session's latest whatever its age; past lineage.MostStates, the oldest that are not a
+// session's latest go first, then the oldest.
 func boundStates(changes []wire.LineageStateChange, now time.Time) []wire.LineageStateChange {
 	sort.SliceStable(changes, func(i, j int) bool { return changes[i].At < changes[j].At })
-	latest := map[wire.LineageNode]int{}
 	seen := map[wire.LineageStateChange]bool{}
 	once := changes[:0:0]
 	for _, c := range changes {
-		if seen[c] {
-			continue
+		if !seen[c] {
+			seen[c] = true
+			once = append(once, c)
 		}
-		seen[c] = true
-		latest[c.Node] = len(once)
-		once = append(once, c)
 	}
-	oldest := wire.DateOf(now.Add(-lineageStateKept))
-	kept := once[:0:0]
+	latest := map[wire.LineageNode]int{}
 	for i, c := range once {
-		live := latest[c.Node] == i && c.State != wire.LineageSessionStateArchived && c.State != wire.LineageSessionStateDeleted
-		if c.At >= oldest || live {
+		latest[c.Node] = i
+	}
+	oldest := wire.DateOf(now.Add(-lineage.KeepEnded))
+	gone := map[int]bool{}
+	for i, c := range once {
+		if c.At < oldest && latest[c.Node] != i {
+			gone[i] = true
+		}
+	}
+	over := len(once) - len(gone) - lineage.MostStates
+	for i := 0; i < len(once) && over > 0; i++ {
+		if !gone[i] && latest[once[i].Node] != i {
+			gone[i] = true
+			over--
+		}
+	}
+	for i := 0; i < len(once) && over > 0; i++ {
+		if !gone[i] {
+			gone[i] = true
+			over--
+		}
+	}
+	kept := make([]wire.LineageStateChange, 0, len(once)-len(gone))
+	for i, c := range once {
+		if !gone[i] {
 			kept = append(kept, c)
 		}
-	}
-	if over := len(kept) - lineageStatesKept; over > 0 {
-		kept = kept[over:]
-	}
-	if kept == nil {
-		kept = []wire.LineageStateChange{}
 	}
 	return kept
 }

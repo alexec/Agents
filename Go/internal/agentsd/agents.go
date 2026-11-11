@@ -551,7 +551,9 @@ func (d *Daemon) deleteArchivedThen(a *wire.Agent, because string, erase func(*w
 		copyOf = "queued"
 	}
 	Broadcast(d, wire.NotifyAgentRemoved, wire.AgentRemovedNotification{AgentID: a.ID})
-	d.noteSessionDeleted(a)
+	if a.Purpose == nil {
+		d.recordSessionState(a.ID, wire.LineageSessionStateNameDeleted)
+	}
 	d.raiseAbout(a, "agent.deleted", "was deleted with its conversation.", map[string]string{"because": because, "runtimeCopy": copyOf})
 	d.takeActor(a.ID) // a helper's deletion raises nothing to take it
 	d.folderChanged(folderPath(a))

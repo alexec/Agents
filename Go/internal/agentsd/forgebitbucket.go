@@ -45,8 +45,6 @@ type forgeBitbucket interface {
 	FailedLog(ctx context.Context, repo string, run int, step string) (string, error)
 	// What lineage asks (lineagebitbucket.go).
 	Node(ctx context.Context, repo string, number int, pr bool) (bitbucketmcp.Node, error)
-	MilestoneNode(ctx context.Context, repo string, id int) (bitbucketmcp.Node, error)
-	Milestones(ctx context.Context, repo string) ([]bitbucketmcp.Milestone, error)
 	CommitTime(ctx context.Context, repo, ref string) (time.Time, error)
 	Compare(ctx context.Context, repo, base, head string) ([]bitbucketmcp.Commit, error)
 	CommitPR(ctx context.Context, repo, sha string) (int, error)
@@ -130,8 +128,9 @@ func (bitbucketForge) Name() string { return "bitbucket" }
 func (bitbucketForge) Caps() forgeCaps {
 	return forgeCaps{
 		Issues: true, PRs: true,
-		Issue: forgeActions{Comment: true, Label: true, Close: true, Reopen: true},
-		PR:    forgeActions{Comment: true, Close: true, Merge: true, Approve: true, Rerun: true, Log: true, Diff: true},
+		Issue:   forgeActions{Comment: true, Label: true, Close: true, Reopen: true},
+		PR:      forgeActions{Comment: true, Close: true, Merge: true, Approve: true, Rerun: true, Log: true, Diff: true},
+		Avatars: true,
 		// An issue's comment count is on its own page only.
 		CommentCount: "detail",
 		Reasons: map[string]string{
@@ -231,7 +230,7 @@ func (b bitbucketForge) Item(ctx context.Context, r forgeRef, cursor string) (wi
 	}
 	out := wire.ForgeItemDetail{Item: bitbucketItemOf(p.Item, folder), Body: p.Body, Comments: []wire.ForgeComment{}, Cursor: optional(p.Before)}
 	for _, c := range p.Thread {
-		out.Comments = append(out.Comments, forgeCommentOf(c.Author, c.Body, c.At, c.URL, c.Bot))
+		out.Comments = append(out.Comments, forgeCommentOf(c.Author, c.Avatar, c.Body, c.At, c.URL, c.Bot))
 	}
 	if !p.PR {
 		out.Start = bitbucketStart(out.Item, r.Number)
@@ -451,7 +450,7 @@ func (d *Daemon) forgeBitbucket(root string) forgeBitbucket {
 // bitbucketItemOf is a Bitbucket item in the one model, from folder.
 func bitbucketItemOf(i bitbucketmcp.Item, folder string) wire.ForgeItem {
 	out := wire.ForgeItem{Node: bitbucketNode(i.Repo, i.Number, i.PR), Title: i.Title, State: i.State, URL: optional(i.URL),
-		Folder: optional(folder), Labels: forgeLabelsOf(i.Labels, nil), Author: optional(i.Author), Assignees: i.Assignees,
+		Folder: optional(folder), Labels: forgeLabelsOf(i.Labels, nil), Author: optional(i.Author), AuthorAvatar: optional(i.AuthorAvatar), Assignees: i.Assignees,
 		Milestone: optional(i.Milestone), UpdatedAt: forgeDate(i.UpdatedAt), Comments: int64(i.Comments)}
 	if out.Assignees == nil {
 		out.Assignees = []string{}

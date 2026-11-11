@@ -413,10 +413,8 @@ func (d *Daemon) folderPins(folder string) wire.FolderPins {
 // knownPinFolder is a folder this host has as a folder.
 func (d *Daemon) knownPinFolder(folder wire.URL) (string, error) {
 	path := store.FolderPath(folder)
-	for _, s := range d.folders(true) {
-		if store.FolderPath(s.Folder.Folder) == path {
-			return path, nil
-		}
+	if _, ok := d.folderSummary(path); ok {
+		return path, nil
 	}
 	return "", pinRefused("This machine has no folder at " + path + ".")
 }

@@ -21,7 +21,7 @@ type lineageBook struct {
 	lineageLinker
 	costLedgerBook
 	prCommentBook
-	issueMilestoneBook
+	issueParentBook
 	releaseTagsBook
 	lineageResolveBook
 	lineageSyncBook
@@ -33,7 +33,7 @@ func (d *Daemon) lineagePath() string { return filepath.Join(d.Store.Loc.Root, "
 func (d *Daemon) lineage() lineage.Store {
 	d.lineageOnce.Do(func() {
 		// Each change is noted for the control plane's copy (#4275).
-		d.lineageStore = notingStore{Store: lineage.Open(d.lineagePath(), nowFunc), note: d.noteLinkChanged}
+		d.lineageStore = notingStore{Store: lineage.Open(d.lineagePath(), nowFunc), link: d.noteLinkChanged, state: d.noteStateChanged}
 	})
 	return d.lineageStore
 }

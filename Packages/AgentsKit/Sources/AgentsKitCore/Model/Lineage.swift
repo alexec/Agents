@@ -102,7 +102,7 @@ public extension DaemonAPI {
     /// daemon: `github:alexec/Agents#12` becomes its real title, not a guess from the ref.
     /// `state` is open, closed or merged (a pull request's; an issue's is open or closed); nil
     /// when the connector did not say. `labels` is empty when it has none. Resolved for a GitHub
-    /// or GitLab issue or pull request only; Linear, milestones and releases are not resolved yet.
+    /// or GitLab issue or pull request only; Linear and releases are not resolved yet.
     struct LineageResolved: Codable, Sendable, Hashable {
         public var title: String
         public var state: String?

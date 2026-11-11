@@ -42,8 +42,8 @@ func TestMain(m *testing.M) {
 	releaseLayerHere = false
 	// No test asks the person's gh about merged pull requests unless it says so.
 	findGH = func() string { return "" }
-	// Nor asks the forge for an issue's milestone (#2935): a test sets issueLookup.
-	milestoneLookup = func(context.Context, string, forgeRepo, int) (issueOnForge, error) {
+	// Nor asks the forge for an issue's parent (#3582): a test sets issueLookup.
+	parentLookup = func(context.Context, string, forgeRepo, int) (issueOnForge, error) {
 		return issueOnForge{}, errNoForgeInTests
 	}
 	// Nor erases a deleted agent's runtime copy (#1001): that starts the runtime.
@@ -296,6 +296,34 @@ func (f *fakeRuntime) Prompt(ctx context.Context, p sdk.PromptRequest) (sdk.Prom
 			sdk.WithStartKind(sdk.ToolKindExecute), sdk.WithStartStatus(sdk.ToolCallStatusCompleted),
 			sdk.WithStartContent([]sdk.ToolCallContent{sdk.ToolContent(sdk.TextBlock("sandbox_apply: Operation not permitted"))}))})
 		say("The command could not run.")
+		return sdk.PromptResponse{StopReason: sdk.StopReasonEndTurn}, nil
+	}
+	// Claude with a background command (#4323): the prompt is answered when the model stops,
+	// and the command's end starts a cycle of the runtime's own, with no prompt in flight.
+	// The cycle says what it found, waits until the file the words name is there, then
+	// ends; "quietly" leaves out the result's usage_update, as a runtime that names no
+	// cycle's origin does.
+	if _, path, ok := strings.Cut(text, "build in the background, then wait for "); ok {
+		path = strings.Fields(path)[0]
+		quietly := strings.Contains(text, "quietly")
+		say("Started the build in the background.")
+		go func() {
+			bg := context.Background()
+			time.Sleep(200 * time.Millisecond)
+			f.conn.SessionUpdate(bg, sdk.SessionNotification{SessionId: p.SessionId, Update: sdk.UpdateAgentMessageText("The build finished. ")})
+			for {
+				if _, err := os.Stat(path); err == nil {
+					break
+				}
+				time.Sleep(20 * time.Millisecond)
+			}
+			f.conn.SessionUpdate(bg, sdk.SessionNotification{SessionId: p.SessionId, Update: sdk.UpdateAgentMessageText("All done.")})
+			if !quietly {
+				var u sdk.SessionUpdate
+				json.Unmarshal([]byte(`{"sessionUpdate":"usage_update","used":10,"size":100,"_meta":{"_claude/origin":{"kind":"task-notification"}}}`), &u)
+				f.conn.SessionUpdate(bg, sdk.SessionNotification{SessionId: p.SessionId, Update: u})
+			}
+		}()
 		return sdk.PromptResponse{StopReason: sdk.StopReasonEndTurn}, nil
 	}
 	if strings.Contains(text, "a form") {

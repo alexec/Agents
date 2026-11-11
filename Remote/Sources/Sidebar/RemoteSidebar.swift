@@ -403,6 +403,10 @@ struct RemoteSmartFold: View {
                         RemoteCheckSuggestionRow(suggestion: item.suggestion, folder: item.folder,
                                                  place: place(of: item.folder))
                     }
+                    // Needs You's folded Later group (#4235), at its end, as the window has it.
+                    RemoteLaterRows(requests: row.laterRequests(in: model.work, folders: keys, query: query)) {
+                        place(of: $0)
+                    }
                 }
             }
         } header: {
@@ -606,10 +610,14 @@ private struct RemoteCheckSuggestionRow: View {
 /// has no card: Allow Once is a leading swipe, Deny a trailing one, and the long press has
 /// all its answers, as an approval's row has. A terminal's agents-secret (#4179) has no session
 /// to open: its long press has Allow Once, Allow for 1 Hour and Deny.
+///
+/// Later (#4235) is a trailing swipe, after Deny, that asks when, and a menu in the long press,
+/// with the window's choices. In Later, Bring Back Now is a leading swipe and in the long press.
 private struct RemoteRequestRow: View {
     @Environment(RemoteModel.self) private var model
     let request: NeedRequest
     let place: String?
+    @State private var asksWhen = false
 
     var body: some View {
         if let id = request.askedBy {
@@ -627,24 +635,91 @@ private struct RemoteRequestRow: View {
                     Button(NeedRequest.Action.once.word, systemImage: "checkmark") { answerNow(.once) }
                         .tint(Paper.accent)
                 }
+                if request.isDeferred {
+                    Button("Bring Back", systemImage: "arrow.uturn.up") { bringBack() }
+                        .tint(Paper.accent)
+                }
             }
             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                 if request.secretUse != nil {
                     Button(NeedRequest.Action.deny.word, systemImage: "xmark") { answerNow(.deny) }
                         .tint(StateTint.failure.color)
                 }
+                Button("Later", systemImage: "clock") { asksWhen = true }
+                    .tint(.indigo)
             }
             .contextMenu {
                 if let use = request.secretUse {
                     ForEach(use.actions, id: \.self) { action in
                         Button(action.word, role: action == .deny ? .destructive : nil) { answerNow(action) }
                     }
+                    Divider()
                 }
+                if request.isDeferred {
+                    Button("Bring Back Now", systemImage: "arrow.uturn.up") { bringBack() }
+                }
+                Menu("Later", systemImage: "clock") { laterButtons }
             }
+            .confirmationDialog("Later", isPresented: $asksWhen, titleVisibility: .visible) {
+                laterButtons
+            } message: {
+                Text(request.deferred?.back() ?? "Out of Needs you until then. It still waits for your answer.")
+            }
+    }
+
+    /// The window's choices (#4234): In 1 Hour, 4 Hours, 8 Hours, 1 Day, then At My Mac.
+    @ViewBuilder private var laterButtons: some View {
+        ForEach(NeedRequest.Later.allCases, id: \.self) { later in
+            Button(later.word) { Task { await model.deferRequest(request, later) } }
+        }
+    }
+
+    private func bringBack() {
+        Task { await model.undeferRequest(request) }
     }
 
     private func answerNow(_ action: NeedRequest.Action) {
         Task { await model.answerSecretUse(request, action) }
+    }
+}
+
+/// Needs You's folded Later group (#4235), the window's `LaterRows`: at its end, a row that
+/// folds it and says how many, then the deferred requests, each saying when it comes back.
+/// In no count. Folded at first, and kept as it was left on this device.
+private struct RemoteLaterRows: View {
+    let requests: [(folder: FolderKey, request: NeedRequest)]
+    let place: (FolderKey) -> String?
+    @AppStorage("sidebar.needsYou.laterOpen") private var open = false
+
+    var body: some View {
+        if !requests.isEmpty {
+            Button { withAnimation(.snappy) { open.toggle() } } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "chevron.right")
+                        .imageScale(.small)
+                        .rotationEffect(.degrees(open ? 90 : 0))
+                        .frame(width: 16)
+                    Text("Later")
+                    Text("\(requests.count)")
+                        .monospacedDigit()
+                        .appText(.fine)
+                    Spacer(minLength: 4)
+                }
+                .foregroundStyle(.secondary)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Later, \(requests.count)")
+            .accessibilityValue(open ? "unfolded" : "folded")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { open.toggle() }
+            if open {
+                ForEach(requests, id: \.request.id) { item in
+                    RemoteRequestRow(request: item.request, place: place(item.folder))
+                }
+            }
+        }
     }
 }
 
@@ -808,13 +883,6 @@ struct RemoteFolderFold: View {
                     heading(isOpen)
                 }
             }
-            // The few Recently archived sessions it shows, while it is open by hand (#2731):
-            // not because a search unfolded it, since the search brings its own matches.
-            .task(id: folds.isOpen(key)) {
-                if folds.isOpen(key) {
-                    _ = await model.loadArchived(in: key, limit: SidebarFolderFold.recentArchivedShown)
-                } else { model.letGoOfArchived(in: key.folder) }
-            }
         }
     }
 
@@ -858,15 +926,6 @@ struct RemoteFolderFold: View {
             ForEach(SidebarTree.rows(issue.sessions, in: model.work, folds: folds)) { row in
                 SidebarSessionRow(agent: row.agent, place: SidebarProjects.machineMark(of: row.agent, in: group) { model.hostLabel($0) },
                                   tree: row, folds: folds, isNested: true)
-            }
-        }
-        if !fold.recentArchived.isEmpty {
-            let recentOpen = folds.isOpen(key, .recentArchivedSessions)
-            SidebarFoldRow(title: "Recently archived sessions", count: fold.recentArchived.count, isOpen: recentOpen) {
-                folds.set(key, .recentArchivedSessions, open: !recentOpen)
-            }
-            ForEach(FoldedRow.rows(recentOpen ? fold.recentArchived : [], in: .recentArchivedSessions)) { row in
-                SidebarSessionRow(agent: row.item, isNested: true)
             }
         }
     }

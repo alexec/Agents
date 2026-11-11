@@ -99,6 +99,20 @@ func MultiplierOf(merges map[wire.LineageNode]Merge, now time.Time, b wire.Multi
 // most a few a day, so a person's every merge is a few thousand.
 var AllMerges = wire.Date(math.Inf(-1))
 
+// FirstMergeOf is when the first of merges happened (#4250): a merge or a merged revert, so
+// the page can tell a person whose agents never merged a PR from one with none this week.
+// Nil when there is none. merges is all of them (AllMerges), as for the best week.
+func FirstMergeOf(merges map[wire.LineageNode]Merge) *wire.Date {
+	var first *wire.Date
+	for _, m := range merges {
+		if first == nil || m.At < *first {
+			at := m.At
+			first = &at
+		}
+	}
+	return first
+}
+
 // BestWeekOf is the highest Multiplier of a calendar week (#3988), Monday to Sunday in loc,
 // this week too, counted as MultiplierOf counts: the week's merges less its reverts. It is
 // nil until the first merge is 7 days old (before that "best week" means nothing), and

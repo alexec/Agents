@@ -5167,7 +5167,7 @@
     {
       "name": "reports/nodes",
       "x-capability": "reports.nodes/1",
-      "description": "The lineage nodes of one kind in a scope (#3118): issues, PRs, milestones or releases, with their cost, sessions and lead time, filtered, sorted and in pages of at most 100, from the machines' lineage nodes as reports/value reads them.",
+      "description": "The lineage nodes of one kind in a scope (#3118): issues, PRs or releases, with their cost, sessions and lead time, filtered, sorted and in pages of at most 100, from the machines' lineage nodes as reports/value reads them.",
       "tags": [
         {
           "name": "web"
@@ -5322,7 +5322,7 @@
     {
       "name": "reports/value",
       "x-capability": "reports.value/1",
-      "description": "What the work in a scope cost and delivered (#2351): cost per merged PR, per issue and per milestone, waste and lead time, from the machines' lineage nodes.",
+      "description": "What the work in a scope cost and delivered (#2351): cost per merged PR, per issue and per release, waste and lead time, from the machines' lineage nodes.",
       "tags": [
         {
           "name": "web"

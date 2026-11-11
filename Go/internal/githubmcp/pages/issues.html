@@ -103,7 +103,6 @@ button.pill.colored:hover { filter: brightness(0.9); }
         ...assignees,
         ...ui.who(issue.author, issue.authorBot, issue.authorName),
         el("span", { textContent: [comments, issue.updatedAt ? ui.ago(issue.updatedAt) : ""].filter(Boolean).join(" · ") }),
-        issue.milestone ? el("span", { className: "pill", textContent: issue.milestone, title: "Milestone" }) : null,
         ...issueLabels,
       ]),
       details,

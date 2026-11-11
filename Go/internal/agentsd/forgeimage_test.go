@@ -2,13 +2,18 @@ package agentsd
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/alexec/agents/Go/internal/connections"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -175,8 +180,8 @@ func TestForgeImageRefusesSVGAndBigImages(t *testing.T) {
 	svg := []byte(`<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>`)
 	big := append(append([]byte(nil), pngBytes...), make([]byte, forgeImageMost)...)
 	c, _ := imageDaemon(t, map[string]func() *http.Response{
-		"https://raw.githubusercontent.com/a/b/main/x.svg": imageAnswer("image/svg+xml", svg),
-		"https://raw.githubusercontent.com/a/b/main/y.png": imageAnswer("image/png", svg),
+		"https://raw.githubusercontent.com/a/b/main/x.svg":   imageAnswer("image/svg+xml", svg),
+		"https://raw.githubusercontent.com/a/b/main/y.png":   imageAnswer("image/png", svg),
 		"https://raw.githubusercontent.com/a/b/main/big.png": imageAnswer("image/png", big),
 		"https://raw.githubusercontent.com/a/b/main/unsaid.png": func() *http.Response {
 			r := imageAnswer("image/png", big)()
@@ -238,5 +243,79 @@ func TestForgeImageCacheIsBounded(t *testing.T) {
 	c.put("huge", wire.ForgeImage{Data: make([]byte, forgeImageBytesKept)})
 	if c.bytes > forgeImageBytesKept {
 		t.Fatalf("%d bytes", c.bytes)
+	}
+}
+
+// #4363: each forge's avatar hosts are read: GitHub's, Gravatar, Atlassian's (Bitbucket, Jira
+// Cloud), Linear's, gitlab.com's and the connected GitLab's, Codeberg's and the connected
+// Forgejo's (on http too, its own root), Azure DevOps' and a Jira Data Center's. Only Azure
+// DevOps and Jira get a token, each its own; a host or path off the lists asks nothing.
+func TestForgeImageReadsEachForgesAvatars(t *testing.T) {
+	d, c, _, file := forgeDaemon(t)
+	web := &fakeImageWeb{answers: map[string]func() *http.Response{}}
+	d.forgeImageTransport = web
+	for _, conn := range []connections.Connection{
+		{Provider: connections.GitLab, Login: "kim", Access: "gloas-secret", URL: "https://gitlab.acme.test/",
+			AccessExpiresAt: time.Now().Add(time.Hour), ConnectedAt: time.Now()},
+		{Provider: connections.Forgejo, Login: "kim", Access: "forgejo-secret", URL: "http://localhost:3753/", ConnectedAt: time.Now()},
+	} {
+		if err := file.Put(conn); err != nil {
+			t.Fatal(err)
+		}
+	}
+	secrets := filepath.Join(os.Getenv("AGENTS_PERSONAL_HOME"), ".agents-secrets")
+	os.MkdirAll(secrets, 0o700)
+	os.WriteFile(filepath.Join(secrets, "secrets.env"), []byte("AZURE_DEVOPS_URL=https://dev.azure.com/\nAZURE_DEVOPS_TOKEN=ado\n"+
+		"JIRA_URL=https://jira.acme.test/jira\nJIRA_API_TOKEN=pat\n"), 0o600)
+	ado := "Basic " + base64.StdEncoding.EncodeToString([]byte(":ado"))
+	read := map[string]string{
+		"https://avatars.githubusercontent.com/u/1?v=4":                                           "",
+		"https://secure.gravatar.com/avatar/abc?s=80&d=identicon":                                 "",
+		"https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/u1/48":             "",
+		"https://public.linear.app/k/avatar":                                                      "",
+		"https://gitlab.com/uploads/-/system/user/avatar/7/avatar.png":                            "",
+		"https://gitlab.acme.test/uploads/-/system/user/avatar/7/avatar.png":                      "",
+		"https://codeberg.org/avatars/abc":                                                        "",
+		"http://localhost:3753/avatar/abc":                                                        "",
+		"https://dev.azure.com/acme/_apis/GraphProfile/MemberAvatars/aad.ZGV2":                    ado,
+		"https://acme.visualstudio.com/_api/_common/identityImage?id=1":                           ado,
+		"https://jira.acme.test/jira/secure/useravatar?ownerId=kim&avatarId=1":                    "Bearer pat",
+		"https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/redirected/48.png": "",
+	}
+	for u := range read {
+		web.answers[u] = imageAnswer("image/png", pngBytes)
+	}
+	// Atlassian's Gravatar URL falls back to its own host.
+	gravatar := "https://secure.gravatar.com/avatar/def?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Fredirected%2F48.png"
+	web.answers[gravatar] = redirectTo("https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/redirected/48.png")
+	n := 0
+	for u, auth := range read {
+		n++
+		c.call(t, n, "forge/image", wire.ForgeImageRequest{URL: u})
+		asked := web.requests()
+		want := u
+		if auth != "" {
+			want += " auth=" + auth
+		}
+		if asked[len(asked)-1] != want {
+			t.Fatalf("%s: asked %q", u, asked[len(asked)-1])
+		}
+	}
+	c.call(t, 50, "forge/image", wire.ForgeImageRequest{URL: gravatar})
+	before := len(web.requests())
+	for i, u := range []string{
+		"https://gitlab.acme.test/uploads/-/system/project/avatar/1/a.png", "https://gitlab.other.test/uploads/-/system/user/avatar/7/a.png",
+		"http://gitlab.acme.test/uploads/-/system/user/avatar/7/a.png", "https://secure.gravatar.com/other", "https://localhost:3753/avatars/abc",
+		"http://localhost:3753/user/abc", "https://codeberg.org/kim", "https://avatar-management--avatars.evil.example/u1/48",
+		"https://evil.example/_apis/GraphProfile/MemberAvatars/aad.x", "https://dev.azure.com/acme/_apis/git/repositories",
+		"https://jira.other.test/jira/secure/useravatar?ownerId=kim", "https://jira.acme.test/secure/useravatar?ownerId=kim",
+		"https://gitlab.com/uploads/-/system/user/avatar/../../x.png",
+	} {
+		if msg := c.callErr(t, 60+i, "forge/image", wire.ForgeImageRequest{URL: u}); msg == "" {
+			t.Errorf("%s: no error", u)
+		}
+	}
+	if asked := web.requests(); len(asked) != before {
+		t.Fatalf("asked %q", asked[before:])
 	}
 }

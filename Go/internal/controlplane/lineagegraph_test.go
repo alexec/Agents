@@ -9,6 +9,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/internal/lineage"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -62,7 +63,7 @@ func TestLineageSyncKeepsAMergedCopy(t *testing.T) {
 	}
 	at := wire.DateOf(now.Add(-time.Hour))
 	works := wire.LineageLink{From: session, To: issue, Rel: "works-on", Source: "start", At: at}
-	working := wire.LineageStateChange{Node: session, State: wire.LineageSessionStateWorking, At: wire.DateOf(now)}
+	working := wire.LineageStateChange{Node: session, State: wire.LineageSessionStateNameWorking, At: wire.DateOf(now)}
 
 	// No copy yet: the states are kept, and the machine is asked for every link.
 	answer, err := send(wire.LineageSync{Links: []wire.LineageLink{works}, States: []wire.LineageStateChange{working}})
@@ -85,7 +86,7 @@ func TestLineageSyncKeepsAMergedCopy(t *testing.T) {
 	endedAt := wire.DateOf(now)
 	ended.EndedAt = &endedAt
 	opens := wire.LineageLink{From: session, To: pr, Rel: "opens", Source: "agent", At: wire.DateOf(now)}
-	stopped := wire.LineageStateChange{Node: session, State: wire.LineageSessionStateStopped, At: wire.DateOf(now.Add(time.Second))}
+	stopped := wire.LineageStateChange{Node: session, State: wire.LineageSessionStateNameStopped, At: wire.DateOf(now.Add(time.Second))}
 	if answer, err := send(wire.LineageSync{Links: []wire.LineageLink{ended, opens}, States: []wire.LineageStateChange{stopped, working}}); err != nil || answer.Full != nil {
 		t.Fatalf("%+v %v", answer, err)
 	}
@@ -106,10 +107,10 @@ func TestLineageSyncKeepsAMergedCopy(t *testing.T) {
 		t.Fatalf("after reset %+v", got)
 	}
 
-	// Refused: a state that is not a session's, a state not in the list, and a send too big.
+	// Refused: a state that is not a session's, and a send too big. (A state this build does
+	// not know reads as stopped.)
 	bad := []wire.LineageSync{
-		{States: []wire.LineageStateChange{{Node: issue, State: wire.LineageSessionStateWorking, At: working.At}}},
-		{States: []wire.LineageStateChange{{Node: session, State: "napping", At: working.At}}},
+		{States: []wire.LineageStateChange{{Node: issue, State: wire.LineageSessionStateNameWorking, At: working.At}}},
 		{Links: make([]wire.LineageLink, mostSyncLinks+1)},
 	}
 	for _, b := range bad {
@@ -118,15 +119,15 @@ func TestLineageSyncKeepsAMergedCopy(t *testing.T) {
 		}
 	}
 
-	// The sweep, 91 days on: the ended link and the old changes go, but a session's last
-	// state while it is not archived. A removed machine's objects go once a day old.
+	// The sweep, 91 days on: the ended link and the old changes go, but each session's last
+	// state. A removed machine's objects go once a day old.
 	later := now.Add(91 * 24 * time.Hour)
 	old := wire.LineageLink{From: session, To: issue, Rel: "reviews", Source: "agent", At: at, EndedAt: &endedAt}
 	if _, err := send(wire.LineageSync{Links: []wire.LineageLink{old}}); err != nil {
 		t.Fatal(err)
 	}
 	other := wire.LineageNode{Kind: "session", Ref: "session:b2"}
-	archived := wire.LineageStateChange{Node: other, State: wire.LineageSessionStateArchived, At: wire.DateOf(now)}
+	archived := wire.LineageStateChange{Node: other, State: wire.LineageSessionStateNameArchived, At: wire.DateOf(now)}
 	if _, err := send(wire.LineageSync{States: []wire.LineageStateChange{archived}}); err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +142,7 @@ func TestLineageSyncKeepsAMergedCopy(t *testing.T) {
 	if got := links(); len(got) != 1 || got[0] != opens {
 		t.Fatalf("links after the sweep %+v", got)
 	}
-	if s := states(); len(s) != 1 || s[0] != stopped {
+	if s := states(); len(s) != 2 || s[0] != archived || s[1] != stopped {
 		t.Fatalf("states after the sweep %+v", s)
 	}
 	if object, _ := mem.Get(ctx, gone); object != nil {
@@ -152,17 +153,17 @@ func TestLineageSyncKeepsAMergedCopy(t *testing.T) {
 	}
 }
 
-// #4275: the states are bounded by count, the oldest going first.
+// #4275: the states are bounded by count, the oldest that are not a session's latest first.
 func TestLineageStatesAreBounded(t *testing.T) {
 	t.Parallel()
 	now := time.Now()
 	var changes []wire.LineageStateChange
-	for i := range lineageStatesKept + 10 {
+	for i := range lineage.MostStates + 10 {
 		changes = append(changes, wire.LineageStateChange{Node: wire.LineageNode{Kind: "session", Ref: "session:x"},
-			State: wire.LineageSessionStateWorking, At: wire.DateOf(now.Add(time.Duration(i) * time.Second))})
+			State: wire.LineageSessionStateNameWorking, At: wire.DateOf(now.Add(time.Duration(i) * time.Second))})
 	}
 	kept := boundStates(changes, now)
-	if len(kept) != lineageStatesKept || kept[0].At != changes[10].At {
+	if len(kept) != lineage.MostStates || kept[0].At != changes[10].At {
 		t.Fatalf("%d, first %v", len(kept), kept[0].At)
 	}
 }

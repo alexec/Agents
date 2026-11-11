@@ -236,11 +236,10 @@ never a bot. A pull request from a fork never counts.
   is on Forgejo when its `origin` is on the connected Forgejo, or on a host whose name says
   Codeberg, Forgejo or Gitea.
 - **Lineage asks the connected Forgejo (#3844),** with the Forgejo connection, about the
-  repositories of the folders on it: an issue's, a pull request's and a milestone's title
-  and state, an issue's milestone, a version tag's pull requests (from `(#12)` at the end of
-  a squash commit's title, or else the commit's pull request) and the milestone whose title
-  starts with its version, and the cost comment on a merged pull request (when the folder's
-  `prCostComment` says so). Forgejo has no parent issues, so an issue has none. An issue's
+  repositories of the folders on it: an issue's and a pull request's title and state, a
+  version tag's pull requests (from `(#12)` at the end of a squash commit's title, or else
+  the commit's pull request), and the cost comment on a merged pull request (when the
+  folder's `prCostComment` says so). Forgejo has no parent issues, so an issue has none. An issue's
   address on the connected Forgejo is read in a filed issue's output. A doc's address is
   `/src/HEAD/<path>`, which Forgejo sends on to the default branch.
 - **The forgejo server's pages have a Lineage section (#3850).** An issue's row and a pull

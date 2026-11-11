@@ -29,7 +29,7 @@ public enum SidebarItem: Hashable, Sendable {
     /// Where the time of running chats went (#852): the agent, its tools, and waiting.
     case time
     /// One of Work's lists (#3119), a row each under the Work group (#4004): the issues and pull
-    /// requests from the forges, with lineage on top, the features, and the milestones and releases
+    /// requests from the forges, with lineage on top, the features, and the releases
     /// lineage knows. An item's page keeps its list's row. The Remote has no Features row (#3269).
     case work(WorkList.Kind)
     /// The folders' docs and the docs connectors', each doc a page (#3321, spec 3319). Mac + web:

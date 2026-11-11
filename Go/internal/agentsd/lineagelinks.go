@@ -29,8 +29,7 @@ import (
 //   - pr.opened links the PR to every session that worked on its branch (opens), and the
 //     PR to the issues its body closes (fixes). pr.merged and pr.closed link what its body
 //     closes too, so a closed PR's cost stays against its issues (#2350).
-//   - Each forge issue named here is part of its milestone (lineagemilestone.go, #2935),
-//     and of its parent issue (#3582).
+//   - Each GitHub issue named here is part of its parent issue (lineageparent.go, #3582).
 //   - A session opens each forge issue it files (lineagefiled.go, #3582).
 //   - checks.passed and checks.failed link the CI run builds its PR; run.completed on a
 //     version tag links the run builds its release (lineageci.go, #3581).
@@ -65,7 +64,7 @@ type forgeRepo struct{ forge, path string }
 
 // forgeKind is what lineage does on one forge. A forge that is not in forgeKinds has no
 // lineage; a new one is a row here, and each lookup's switch
-// (lineageresolve.go, lineagemilestone.go, lineagerelease.go, lineagecomment.go, the doc and
+// (lineageresolve.go, lineageparent.go, lineagerelease.go, lineagecomment.go, the doc and
 // ref addresses) says what it asks there, or nothing.
 type forgeKind struct {
 	// prMark is between a pull request node's path and its number: GitLab numbers its merge
@@ -76,9 +75,8 @@ type forgeKind struct {
 	prPath, issuePath string
 	// anyHost: the pull request's address says the forge on a host of any name.
 	anyHost bool
-	// cli is the person's CLI that lineage asks the forge with: a node's title, an issue's
-	// milestone and parent, a release's commits and milestones, a merged pull request's cost
-	// comment.
+	// cli is the person's CLI that lineage asks the forge with: a node's title, a GitHub
+	// issue's parent, a release's commits, a merged pull request's cost comment.
 	cli string
 	// connection: lineage asks the forge the same by the person's connection to it
 	// (connectionAsks: lineageforgejo.go, lineagebitbucket.go, lineageazuredevops.go), not a CLI. With neither, the
@@ -122,17 +120,14 @@ func (r forgeRepo) asks() bool {
 
 // forgeAsks is what lineage asks a forge by the person's connection to it (forgeKind.connection),
 // each in the shape of the gh and glab default it takes the place of: a node's title and state
-// (lineageresolve.go), an issue's milestone (lineagemilestone.go), a release's commit time,
-// commits, pull requests and milestones (lineagerelease.go), and the cost comment on a merged
+// (lineageresolve.go), a release's commit time, commits and pull requests (lineagerelease.go), and the cost comment on a merged
 // pull request (lineagecomment.go). The folder each is given is not used: the connection is
 // the person's in every folder.
 type forgeAsks struct {
 	resolve     resolveLookup
-	issue       issueLookup
 	commitTime  func(ctx context.Context, folder string, repo forgeRepo, ref string) (time.Time, error)
 	compare     func(ctx context.Context, folder string, repo forgeRepo, base, head string) ([]compareCommit, error)
 	commitPR    func(ctx context.Context, folder string, repo forgeRepo, sha string) (int, error)
-	milestones  func(ctx context.Context, folder string, repo forgeRepo) ([]forgeMilestone, error)
 	costComment func(ctx context.Context, r prCommentRecord, body string) (string, error)
 }
 
@@ -141,14 +136,14 @@ type forgeAsks struct {
 func (d *Daemon) connectionAsks(forge string) (forgeAsks, bool) {
 	switch forge {
 	case "forgejo":
-		return forgeAsks{d.forgejoResolveNode, d.forgejoIssue, d.forgejoCommitTime, d.forgejoCompareCommits, d.forgejoCommitPR,
-			d.forgejoMilestones, d.forgejoCostComment}, true
+		return forgeAsks{d.forgejoResolveNode, d.forgejoCommitTime, d.forgejoCompareCommits, d.forgejoCommitPR,
+			d.forgejoCostComment}, true
 	case "bitbucket":
-		return forgeAsks{d.bitbucketResolveNode, d.bitbucketIssue, d.bitbucketCommitTime, d.bitbucketCompareCommits, d.bitbucketCommitPR,
-			d.bitbucketMilestones, d.bitbucketCostComment}, true
+		return forgeAsks{d.bitbucketResolveNode, d.bitbucketCommitTime, d.bitbucketCompareCommits, d.bitbucketCommitPR,
+			d.bitbucketCostComment}, true
 	case "azuredevops":
-		return forgeAsks{d.azureDevOpsResolveNode, d.azureDevOpsIssue, d.azureDevOpsCommitTime, d.azureDevOpsCompareCommits,
-			d.azureDevOpsCommitPR, d.azureDevOpsMilestones, d.azureDevOpsCostComment}, true
+		return forgeAsks{d.azureDevOpsResolveNode, d.azureDevOpsCommitTime, d.azureDevOpsCompareCommits,
+			d.azureDevOpsCommitPR, d.azureDevOpsCostComment}, true
 	}
 	return forgeAsks{}, false
 }
@@ -488,8 +483,7 @@ func (d *Daemon) noteLineage(before *wire.Agent, a wire.Agent) {
 	if a.Purpose != nil {
 		return
 	}
-	// Its state, for the control plane's copy (#4275).
-	d.noteSessionState(&a)
+	d.noteSessionState(before, a)
 	var was wire.Agent
 	if before != nil {
 		was = *before
@@ -564,7 +558,7 @@ func (d *Daemon) noteLineage(before *wire.Agent, a wire.Agent) {
 			d.link(s, to, lineage.RelWorksOn, source)
 			d.lineageReportsHealth(s, to)
 			if repo, n, ok := issueOfNode(to); ok {
-				d.noteIssueMilestone(folder, repo, n)
+				d.noteIssueParent(folder, repo, n)
 			}
 		}
 		for _, v := range removed {
@@ -645,7 +639,7 @@ func (d *Daemon) lineageEvent(e wire.Event) {
 			if issue, ok := fixedIssue(repo, f); ok {
 				d.link(pr, issue, lineage.RelFixes, lineage.SourcePRBody)
 				if r, n, ok := issueOfNode(issue); ok {
-					d.noteIssueMilestone(folder, r, n)
+					d.noteIssueParent(folder, r, n)
 				}
 			}
 		}

@@ -59,7 +59,7 @@ public enum WorkLook {
         }
     }
 
-    /// The glyph of an issue or a pull request; nil for a milestone, a release, or a state no one
+    /// The glyph of an issue or a pull request; nil for a release, or a state no one
     /// said. `stateReason` is the forge's `not_planned` where it gives one (#4365); until then a
     /// closed issue is done.
     public static func glyph(kind: String, state: String, draft: Bool = false, stateReason: String? = nil) -> Glyph? {

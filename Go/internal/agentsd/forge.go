@@ -558,8 +558,8 @@ func (d *Daemon) gitlabOf(ctx context.Context, method string, repo forgeRepo) (f
 	return d.forgeGitLab(root), project, folder, nil
 }
 
-func forgeCommentOf(author, body, at, url string, bot bool) wire.ForgeComment {
-	c := wire.ForgeComment{Author: author, Body: body, At: forgeDate(at), URL: optional(url)}
+func forgeCommentOf(author, avatar, body, at, url string, bot bool) wire.ForgeComment {
+	c := wire.ForgeComment{Author: author, Avatar: optional(avatar), Body: body, At: forgeDate(at), URL: optional(url)}
 	if bot {
 		c.Bot = new(true)
 	}
@@ -647,7 +647,7 @@ func forgeItemOf(i githubmcp.Item, folder string) wire.ForgeItem {
 		node = repo.pr(i.Number)
 	}
 	out := wire.ForgeItem{Node: node, Title: i.Title, State: i.State, URL: optional(i.URL), Folder: optional(folder),
-		Author: optional(i.Author), Assignees: i.Assignees, Milestone: optional(i.Milestone),
+		Author: optional(i.Author), AuthorAvatar: optional(i.AuthorAvatar), Assignees: i.Assignees, Milestone: optional(i.Milestone),
 		Labels: forgeLabelsOf(i.Labels, i.LabelColors), UpdatedAt: forgeDate(i.UpdatedAt), Comments: int64(i.Comments)}
 	if out.Assignees == nil {
 		out.Assignees = []string{}
@@ -673,7 +673,7 @@ func gitlabItemOf(i gitlabmcp.Item, folder string) wire.ForgeItem {
 		node = repo.pr(i.Number)
 	}
 	out := wire.ForgeItem{Node: node, Title: i.Title, State: i.State, URL: optional(i.URL), Folder: optional(folder),
-		Labels: forgeLabelsOf(i.Labels, i.LabelColors), Author: optional(i.Author), Assignees: i.Assignees,
+		Labels: forgeLabelsOf(i.Labels, i.LabelColors), Author: optional(i.Author), AuthorAvatar: optional(i.AuthorAvatar), Assignees: i.Assignees,
 		Milestone: optional(i.Milestone), UpdatedAt: forgeDate(i.UpdatedAt), Comments: int64(i.Comments)}
 	if out.Assignees == nil {
 		out.Assignees = []string{}
@@ -694,7 +694,7 @@ func gitlabItemOf(i gitlabmcp.Item, folder string) wire.ForgeItem {
 // linearItemOf is a Linear issue in the one model, from folder.
 func linearItemOf(i linearmcp.Item, folder string) wire.ForgeItem {
 	out := wire.ForgeItem{Node: wire.LineageNode{Kind: lineage.KindIssue, Ref: "linear:" + i.Identifier}, Title: i.Title, State: i.State,
-		URL: optional(i.URL), Folder: optional(folder), Labels: forgeLabelsOf(i.Labels, i.LabelColors), Author: optional(i.Author),
+		URL: optional(i.URL), Folder: optional(folder), Labels: forgeLabelsOf(i.Labels, i.LabelColors), Author: optional(i.Author), AuthorAvatar: optional(i.AuthorAvatar),
 		Assignees: i.Assignees, Milestone: optional(i.Milestone), UpdatedAt: forgeDate(i.UpdatedAt), Comments: int64(i.Comments)}
 	if out.Assignees == nil {
 		out.Assignees = []string{}
@@ -711,7 +711,7 @@ func linearItemOf(i linearmcp.Item, folder string) wire.ForgeItem {
 func jiraItemOf(i jiramcp.Item, folder string) wire.ForgeItem {
 	out := wire.ForgeItem{Node: wire.LineageNode{Kind: lineage.KindIssue, Ref: "jira:" + i.Key}, Title: i.Title, State: i.State,
 		Status: optional(i.Status), URL: optional(i.URL), Folder: optional(folder), Labels: forgeLabelsOf(i.Labels, nil),
-		Author: optional(i.Author), Assignees: i.Assignees, Milestone: optional(i.Milestone), UpdatedAt: forgeDate(i.UpdatedAt),
+		Author: optional(i.Author), AuthorAvatar: optional(i.AuthorAvatar), Assignees: i.Assignees, Milestone: optional(i.Milestone), UpdatedAt: forgeDate(i.UpdatedAt),
 		Comments: int64(i.Comments)}
 	if out.Assignees == nil {
 		out.Assignees = []string{}

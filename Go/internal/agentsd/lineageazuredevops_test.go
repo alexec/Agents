@@ -92,7 +92,7 @@ func TestLineageOnAnAzureReposFolder(t *testing.T) {
 	// An Azure Pipelines build builds the pull request; its node says builds, not GitHub's actions.
 	d.lineageCIEvent(wire.Event{Name: "checks.failed", Details: map[string]string{"payload": `{"pr":{"number":8,` +
 		`"url":"https://dev.azure.com/acme/Web%20App/_git/App/pullrequest/8"},"run":{"id":12}}`}})
-	settleMilestones(t, d)
+	settleParents(t, d)
 	if !active(d, pr)["azuredevops:acme/web app/app/builds/12 builds "+pr.Ref+" (forge)"] {
 		t.Errorf("the build: %v", active(d, pr))
 	}
@@ -105,7 +105,7 @@ func TestLineageOnAnAzureReposFolder(t *testing.T) {
 }
 
 // #3952: lineage asks Azure DevOps, by its connection, for a pull request's title and state, a
-// release's pull requests, and the cost comment. It asks no milestone: Azure Repos has none.
+// release's pull requests, and the cost comment.
 func TestLineageAsksAzureDevOps(t *testing.T) {
 	d, _, ado, _ := azureDevOpsDaemon(t)
 	repo := azureDevOpsRepo

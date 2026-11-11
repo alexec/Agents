@@ -51,7 +51,7 @@ const allowedURLs = new Set([
   // Connect GitHub's personal access token (#3945): Make a Token on GitHub's page, the same for
   // every person, as the window's; a link opened in a new tab, never fetched.
   "https://github.com/settings/tokens/new?description=Agents&scopes=repo,codespace",
-  // Reports ▸ Value and Work (#2998): an issue's, a PR's or a milestone's page on GitHub,
+  // Reports ▸ Value and Work (#2998): an issue's, a PR's or a release's page on GitHub,
   // as the window's, a link the person opens in a new tab, never fetched.
   "https://github.com/",
   // Connect GitLab (#1630): the address field's example, and Make a Token's page with no address,

@@ -15,40 +15,40 @@ import (
 )
 
 // The merged copy of lineage (#4273, #4275): this machine stays the system of record for its
-// links, and sends the control plane what changed (lineage/sync) a short time after each
-// change, so lineage is there while it sleeps: the links started or ended, and its sessions'
-// changes of state. Only refs, states and times (principle 7).
+// links and its sessions' states (#4274), and sends the control plane what changed
+// (lineage/sync) a short time after each change, so lineage is there while it sleeps: the
+// links started or ended, and the changes of state the store recorded. Only refs, states and
+// times (principle 7).
 //
 // A send of its own, not with usage/rollup: the rollup goes hourly and is a costly call,
 // and "working" must reach the control plane within seconds (#4265 pulses on it). Changes
 // within lineageSyncAfter of each other go as one send.
 //
 // What is unsent is in <root>/lineage-sync.json. The first send, and the one after a control
-// plane says it has no copy (a new or moved one), is every link, the first with reset.
+// plane says it has no copy (a new or moved one), is every link and every change of state
+// the store keeps, the first with reset.
 
 const (
 	lineageSyncAfter = 2 * time.Second
 	// lineageSyncLinks and lineageSyncStates bound one send, as the control plane does.
 	lineageSyncLinks  = 2_000
 	lineageSyncStates = 1_000
-	// lineageStatesHeld bounds the changes held while the control plane cannot be reached:
-	// the oldest go first.
+	// lineageStatesHeld and lineageLinksSaved bound what is held unsent: past them, a whole
+	// send is to make instead, from what the store keeps.
 	lineageStatesHeld = 5_000
-	// lineageLinksSaved bounds the links saved unsent: past it, the file says to send them
-	// all again, which All has.
 	lineageLinksSaved = 2_000
 )
 
 type lineageSyncFile struct {
-	// Full is a whole send to make: every link, the first send with reset.
+	// Kept is true in every file written; a file without it is a whole send to make.
+	Kept bool `json:"kept"`
+	// Full is a whole send to make: every link and state, the first send with reset.
 	Full bool `json:"full,omitempty"`
 	// Reset is that the next send starts the control plane's copy again.
 	Reset bool `json:"reset,omitempty"`
 	// Links is each link to send, by lineageSyncKey, as it is now.
 	Links map[string]wire.LineageLink `json:"links,omitempty"`
-	// Told is each session's state as last noted; a file without it is a whole send to make.
-	Told map[wire.UUID]wire.LineageSessionState `json:"told"`
-	// States is the changes to send, oldest first.
+	// States is the changes of state to send, oldest first.
 	States []wire.LineageStateChange `json:"states,omitempty"`
 }
 
@@ -56,25 +56,26 @@ type lineageSyncBook struct {
 	syncMu    sync.Mutex
 	syncFile  *lineageSyncFile
 	syncTimer *time.Timer
-	syncOnce  sync.Once
-	// syncDropped counts the changes dropped past lineageStatesHeld, so a send's own are
-	// taken off States after it.
-	syncDropped int
+	// syncStatesGen moves each time States is made again, so a send's own are taken off
+	// it only when it is the same list.
+	syncStatesGen int
 	// syncSending keeps one send at a time.
 	syncSending sync.Mutex
 }
 
-// notingStore is the lineage store, noting each link it starts or ends for the next send.
+// notingStore is the lineage store, noting each link it starts or ends, and each change of
+// state it records, for the next send.
 type notingStore struct {
 	lineage.Store
-	note func(wire.LineageLink)
+	link  func(wire.LineageLink)
+	state func(wire.LineageStateChange)
 }
 
 func (s notingStore) Link(r wire.LineageLinkRequest, at time.Time) (wire.LineageLink, error) {
 	l, err := s.Store.Link(r, at)
 	// An active link is the answer unchanged, and was noted when it started.
 	if err == nil && l.At == wire.DateOf(at) {
-		s.note(l)
+		s.link(l)
 	}
 	return l, err
 }
@@ -82,9 +83,17 @@ func (s notingStore) Link(r wire.LineageLinkRequest, at time.Time) (wire.Lineage
 func (s notingStore) End(r wire.LineageEndRequest, at time.Time) ([]wire.LineageLink, error) {
 	ended, err := s.Store.End(r, at)
 	for _, l := range ended {
-		s.note(l)
+		s.link(l)
 	}
 	return ended, err
+}
+
+func (s notingStore) SetState(n wire.LineageNode, state wire.LineageSessionStateName, at time.Time) (bool, error) {
+	moved, err := s.Store.SetState(n, state, at)
+	if err == nil && moved {
+		s.state(wire.LineageStateChange{Node: n, State: state, At: wire.DateOf(at)})
+	}
+	return moved, err
 }
 
 func lineageSyncKey(l wire.LineageLink) string {
@@ -99,10 +108,9 @@ func (d *Daemon) lineageSyncPath() string { return filepath.Join(d.Store.Loc.Roo
 func (d *Daemon) syncLocked() *lineageSyncFile {
 	if d.syncFile == nil {
 		f := &lineageSyncFile{}
-		readStore(d.lineageSyncPath(), f, "every link goes to the control plane again")
-		if f.Told == nil {
-			f.Full = true
-			f.Told = map[wire.UUID]wire.LineageSessionState{}
+		readStore(d.lineageSyncPath(), f, "all of lineage goes to the control plane again")
+		if !f.Kept {
+			*f = lineageSyncFile{Kept: true, Full: true}
 		}
 		if f.Links == nil {
 			f.Links = map[string]wire.LineageLink{}
@@ -115,88 +123,27 @@ func (d *Daemon) syncLocked() *lineageSyncFile {
 // noteLinkChanged keeps l for the next send.
 func (d *Daemon) noteLinkChanged(l wire.LineageLink) {
 	d.syncMu.Lock()
-	f := d.syncLocked()
-	if !f.Full {
+	if f := d.syncLocked(); !f.Full {
 		f.Links[lineageSyncKey(l)] = l
 	}
 	d.syncMu.Unlock()
 	d.lineageSyncSoon()
 }
 
-// sessionStateOf is a session's state in the graph (#4273), from the group the sidebars put
-// it in.
-func sessionStateOf(a *wire.Agent) wire.LineageSessionState {
-	switch Group(a) {
-	case "running":
-		return wire.LineageSessionStateWorking
-	case "waiting":
-		return wire.LineageSessionStateWaiting
-	case "needsAttention", "blocked":
-		return wire.LineageSessionStateNeedsYou
-	case "archived":
-		return wire.LineageSessionStateArchived
-	}
-	return wire.LineageSessionStateStopped
-}
-
-// noteSessionState keeps a's state for the next send when it moved. A writer agent is in
-// no graph.
-func (d *Daemon) noteSessionState(a *wire.Agent) {
-	if a.Purpose != nil {
-		return
-	}
-	state := sessionStateOf(a)
+// noteStateChanged keeps c for the next send; past lineageStatesHeld, a whole send is to
+// make instead.
+func (d *Daemon) noteStateChanged(c wire.LineageStateChange) {
 	d.syncMu.Lock()
-	moved := d.noteStateLocked(a.ID, state, nowFunc())
-	d.syncMu.Unlock()
-	if moved {
-		d.lineageSyncSoon()
-	}
-}
-
-// noteSessionDeleted keeps a deleted session's last change; it is told no more.
-func (d *Daemon) noteSessionDeleted(a *wire.Agent) {
-	if a.Purpose != nil {
-		return
-	}
-	d.syncMu.Lock()
-	d.noteStateLocked(a.ID, wire.LineageSessionStateDeleted, nowFunc())
-	delete(d.syncLocked().Told, a.ID)
-	d.syncMu.Unlock()
-	d.lineageSyncSoon()
-}
-
-func (d *Daemon) noteStateLocked(id wire.UUID, state wire.LineageSessionState, at time.Time) bool {
-	f := d.syncLocked()
-	if told, ok := f.Told[id]; ok && told == state {
-		return false
-	}
-	f.Told[id] = state
-	f.States = append(f.States, wire.LineageStateChange{Node: sessionNode(id), State: state, At: wire.DateOf(at)})
-	if over := len(f.States) - lineageStatesHeld; over > 0 {
-		f.States = append([]wire.LineageStateChange(nil), f.States[over:]...)
-		d.syncDropped += over
-	}
-	return true
-}
-
-// noteSessionsNow notes each session's state as it is now, once a run, for what changed
-// while this host was not running, and forgets the sessions that are no longer here.
-func (d *Daemon) noteSessionsNow() {
-	agents := d.Store.Agents()
-	here := map[wire.UUID]bool{}
-	for i := range agents {
-		here[agents[i].ID] = true
-		d.noteSessionState(&agents[i])
-	}
-	d.syncMu.Lock()
-	f := d.syncLocked()
-	for id := range f.Told {
-		if !here[id] {
-			delete(f.Told, id)
+	if f := d.syncLocked(); !f.Full {
+		f.States = append(f.States, c)
+		// A whole send holds every state the store keeps, so the bound is past that.
+		if len(f.States) > lineage.MostStates+lineageStatesHeld {
+			f.Full, f.Reset, f.States, f.Links = true, false, nil, map[string]wire.LineageLink{}
+			d.syncStatesGen++
 		}
 	}
 	d.syncMu.Unlock()
+	d.lineageSyncSoon()
 }
 
 // lineageSyncSoon sends within lineageSyncAfter, with what else changes by then.
@@ -226,10 +173,9 @@ func (d *Daemon) sendLineage() {
 	}
 	d.syncSending.Lock()
 	defer d.syncSending.Unlock()
-	d.syncOnce.Do(d.noteSessionsNow)
 	defer d.saveLineageSync()
 	for d.ctx.Err() == nil {
-		send, dropped, ok := d.unsentLineage()
+		send, gen, ok := d.unsentLineage()
 		if !ok {
 			return
 		}
@@ -244,28 +190,31 @@ func (d *Daemon) sendLineage() {
 			log.Printf("lineage/sync: not sent, tried again later: %v", err)
 			return
 		}
-		d.lineageSent(send, dropped, answer.Full != nil && *answer.Full)
+		d.lineageSent(send, gen, answer.Full != nil && *answer.Full)
 	}
 }
 
 // unsentLineage is the next send: the oldest links and states first, at most a send's
-// bound. A whole send to make takes every link first.
+// bound, and the generation of States it took from. A whole send to make takes every link
+// and every change of state the store keeps first.
 func (d *Daemon) unsentLineage() (wire.LineageSync, int, bool) {
 	d.syncMu.Lock()
 	f := d.syncLocked()
 	if f.Full {
-		// A link noted from now is kept as it is then; All, read outside syncMu (the store
-		// notes under it), fills in the rest.
-		f.Full, f.Reset = false, true
+		// What is noted from now is kept as it is then; All, read outside syncMu (the store
+		// notes under it), fills in what came before.
+		f.Full, f.Reset, f.States = false, true, nil
 		f.Links = map[string]wire.LineageLink{}
+		d.syncStatesGen++
 		d.syncMu.Unlock()
-		all := d.lineage().All()
+		links, states := d.lineage().All()
 		d.syncMu.Lock()
-		for _, l := range all {
+		for _, l := range links {
 			if k := lineageSyncKey(l); !hasLink(f.Links, k) {
 				f.Links[k] = l
 			}
 		}
+		f.States = append(states, f.States...)
 	}
 	defer d.syncMu.Unlock()
 	if !f.Reset && len(f.Links) == 0 && len(f.States) == 0 {
@@ -288,21 +237,23 @@ func (d *Daemon) unsentLineage() (wire.LineageSync, int, bool) {
 	})
 	send.Links = links[:min(len(links), lineageSyncLinks)]
 	send.States = append([]wire.LineageStateChange(nil), f.States[:min(len(f.States), lineageSyncStates)]...)
-	return send, d.syncDropped, true
+	return send, d.syncStatesGen, true
 }
 
 // lineageSent drops what went, but a link that changed on its way. When the control plane
 // had no copy of the links, the next send is every link again.
-func (d *Daemon) lineageSent(send wire.LineageSync, dropped int, full bool) {
+func (d *Daemon) lineageSent(send wire.LineageSync, gen int, full bool) {
 	d.syncMu.Lock()
 	defer d.syncMu.Unlock()
 	f := d.syncLocked()
-	// The ones dropped while it was on its way were the oldest: the send's own.
-	sent := max(0, len(send.States)-(d.syncDropped-dropped))
-	f.States = f.States[min(sent, len(f.States)):]
+	if gen == d.syncStatesGen {
+		f.States = f.States[min(len(send.States), len(f.States)):]
+	}
 	if full {
-		f.Full, f.Reset = true, false
+		// The states were kept; the links come again with every state, as a whole send is.
+		f.Full, f.Reset, f.States = true, false, nil
 		f.Links = map[string]wire.LineageLink{}
+		d.syncStatesGen++
 		return
 	}
 	if send.Reset != nil {
@@ -328,8 +279,8 @@ func sameLink(a, b wire.LineageLink) bool {
 	return a.From == b.From && a.To == b.To && a.Rel == b.Rel && a.Source == b.Source && a.At == b.At
 }
 
-// saveLineageSync writes the file. Past lineageLinksSaved links it says to send them all
-// again instead, so it stays small.
+// saveLineageSync writes the file. Past its bounds it says to make a whole send instead,
+// so it stays small.
 func (d *Daemon) saveLineageSync() {
 	d.syncMu.Lock()
 	defer d.syncMu.Unlock()
@@ -337,8 +288,8 @@ func (d *Daemon) saveLineageSync() {
 		return
 	}
 	saved := *d.syncFile
-	if len(saved.Links) > lineageLinksSaved {
-		saved.Full, saved.Reset, saved.Links = true, false, nil
+	if len(saved.Links) > lineageLinksSaved || len(saved.States) > lineageStatesHeld {
+		saved.Full, saved.Reset, saved.Links, saved.States = true, false, nil, nil
 	}
 	if err := writeStore(d.lineageSyncPath(), saved); err != nil {
 		log.Printf("lineage-sync.json: could not save: %v", err)

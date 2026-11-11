@@ -56,7 +56,7 @@ editor or `ShellClient` again.
 
 ## `Work/` (#3119, #3256)
 
-Work: the issue, pull request, milestone and release lists, an item's page and its
+Work: the issue, pull request and release lists, an item's page and its
 actions (#3130), for the window and the Remote. What each app
 does differently comes in through `WorkModel`, which `AppModel` and `RemoteModel` adopt:
 which machines read their forges and keep links, the client a call goes to, a session's

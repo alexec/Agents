@@ -3,6 +3,9 @@
 // them (works-on, opens, fixes, ...). The store holds only links, so many-to-many needs
 // nothing more: a node is in the graph while a link names it.
 //
+// A session node also has a state (#4274): working, waiting, needs-you, stopped, archived or
+// deleted, each change with its time, so the graph says what each session is doing now.
+//
 // Store is the one way in, for reads and writes, so a graph database can replace the files
 // later (Alex, 2026-10-22). Files is today's store: an append-only <root>/lineage.jsonl.
 package lineage
@@ -34,7 +37,6 @@ const (
 	KindCommit      = "commit"
 	KindFile        = "file"
 	KindBranch      = "branch"
-	KindMilestone   = "milestone"
 	KindWorkflow    = "workflow"
 	KindRelease     = "release"
 	// KindDoc is a doc behind the work (#3308): a file under specs/ or docs/, or a docs page.
@@ -57,8 +59,6 @@ const (
 	RelReviews = "reviews"
 	RelCloses  = "closes"
 	RelPartOf  = "part-of"
-	// RelShippedIn is a milestone shipped in a release (#3023).
-	RelShippedIn = "shipped-in"
 	// RelReads and RelLinksTo are a session that read a doc, or named it in what it said (#3308).
 	RelReads   = "reads"
 	RelLinksTo = "links-to"
@@ -78,7 +78,7 @@ const (
 	SourceHelper = "helper"
 	SourceAgent  = "agent"
 	SourcePerson = "person"
-	// SourceForge is a link the forge says, such as an issue part-of its milestone (#2935).
+	// SourceForge is a link the forge says, such as an issue part-of its parent epic (#3582).
 	SourceForge = "forge"
 	// SourceHealth is a link a health source says, such as Sentry's release of an issue (#3585).
 	SourceHealth = "health"
@@ -86,11 +86,14 @@ const (
 
 // The bounds (#2348; "Bound data, not concurrency"). An ended link is kept KeepEnded after
 // its end; at most MostLinks are kept, the oldest ended ones going first, then the oldest
-// active ones. An answer holds at most MostAnswer links, and a walk reaches at most
-// MostNodes nodes, at most MostDepth links away.
+// active ones. A change of state is kept KeepEnded too, except each node's latest; at most
+// MostStates are kept, the oldest that are not a node's latest going first (#4274). An
+// answer holds at most MostAnswer links or states, and a walk reaches at most MostNodes
+// nodes, at most MostDepth links away.
 const (
 	KeepEnded    = 90 * 24 * time.Hour
 	MostLinks    = 20_000
+	MostStates   = 20_000
 	MostAnswer   = 500
 	MostNodes    = 500
 	MostDepth    = 4
@@ -109,11 +112,15 @@ type Store interface {
 	End(r wire.LineageEndRequest, at time.Time) ([]wire.LineageLink, error)
 	// Links is a node's links, either way, newest first, at most MostAnswer.
 	Links(n wire.LineageNode) wire.LineageLinks
-	// Walk is the graph within depth links of a node, either way.
+	// Walk is the graph within depth links of a node, either way, with the state now of
+	// each node in it that has one.
 	Walk(n wire.LineageNode, depth int) wire.LineageGraph
-	// All is every link kept, oldest start first: a machine's whole send to its control
-	// plane (#4275).
-	All() []wire.LineageLink
+	// SetState records that a node's state changed to state at at (#4274), unless it is in
+	// that state already, and says whether it recorded it. Links says a node's changes.
+	SetState(n wire.LineageNode, state wire.LineageSessionStateName, at time.Time) (bool, error)
+	// All is every link and every change of state kept, each oldest first: a machine's
+	// whole send to its control plane (#4275).
+	All() ([]wire.LineageLink, []wire.LineageStateChange)
 	// Prune drops what is past the bounds now, not only at open or on a long append
 	// (#3649), and says how many links it dropped.
 	Prune() int
@@ -152,11 +159,24 @@ func checkWord(what, w string) error {
 	return nil
 }
 
-// line is one line of lineage.jsonl: a link started, or a link ended.
+// line is one line of lineage.jsonl: a link started, a link ended, or a node's change of
+// state (with At).
 type line struct {
-	Link *wire.LineageLink       `json:"link,omitempty"`
-	End  *wire.LineageEndRequest `json:"end,omitempty"`
-	At   *wire.Date              `json:"at,omitempty"`
+	Link  *wire.LineageLink       `json:"link,omitempty"`
+	End   *wire.LineageEndRequest `json:"end,omitempty"`
+	State *stateLine              `json:"state,omitempty"`
+	At    *wire.Date              `json:"at,omitempty"`
+}
+
+type stateLine struct {
+	Node  wire.LineageNode             `json:"node"`
+	State wire.LineageSessionStateName `json:"state"`
+}
+
+// change is a node's change of state, as Files keeps it.
+type change struct {
+	node wire.LineageNode
+	wire.LineageSessionState
 }
 
 type key struct {
@@ -177,7 +197,11 @@ type Files struct {
 	// active is the index in links of each active link.
 	active map[key]int
 	// byNode is the indexes in links of each node's links.
-	byNode   map[wire.LineageNode][]int
+	byNode map[wire.LineageNode][]int
+	// states is every change of state kept, oldest first; stateOf is the indexes in states
+	// of each node's changes.
+	states   []change
+	stateOf  map[wire.LineageNode][]int
 	appended int
 	file     *os.File
 	now      func() time.Time
@@ -192,6 +216,7 @@ func Open(path string, now func() time.Time) *Files {
 		log.Printf("%s: %v; starting with no links", filepath.Base(path), err)
 	}
 	var links []wire.LineageLink
+	var states []change
 	active := map[key]int{}
 	raws := bytes.Split(data, []byte("\n"))
 	for len(raws) > 0 && len(raws[len(raws)-1]) == 0 {
@@ -222,6 +247,8 @@ func Open(path string, now func() time.Time) *Files {
 				links[i].EndedAt = &at
 				delete(active, k)
 			}
+		case !bad && l.State != nil && l.At != nil && checkNode(l.State.Node) == nil:
+			states = append(states, change{l.State.Node, wire.LineageSessionState{State: l.State.State, At: *l.At}})
 		default:
 			if i < len(raws)-1 {
 				unreadable++
@@ -234,7 +261,7 @@ func Open(path string, now func() time.Time) *Files {
 		store.TrimSetAsides(path)
 		log.Printf("%s: %d lines could not be read; the file is kept as %s", filepath.Base(path), unreadable, filepath.Base(aside))
 	}
-	f.links = links
+	f.links, f.states = links, states
 	f.appended = len(raws)
 	if f.prune() || unreadable > 0 {
 		f.rewrite()
@@ -244,10 +271,14 @@ func Open(path string, now func() time.Time) *Files {
 	return f
 }
 
-// index makes active and byNode again from links.
+// index makes active, byNode and stateOf again from links and states.
 func (f *Files) index() {
 	f.active = map[key]int{}
 	f.byNode = map[wire.LineageNode][]int{}
+	f.stateOf = map[wire.LineageNode][]int{}
+	for i, c := range f.states {
+		f.stateOf[c.node] = append(f.stateOf[c.node], i)
+	}
 	for i, l := range f.links {
 		if l.EndedAt == nil {
 			f.active[keyOf(l)] = i
@@ -259,21 +290,30 @@ func (f *Files) index() {
 	}
 }
 
-// prune drops what Bound drops. It says whether it dropped any.
+// removedKindMilestone is the kind of a forge milestone's node, which #3878 removed: prune
+// drops each link from or to one, and a milestone's shipped-in link to its release.
+const removedKindMilestone = "milestone"
+
+// prune drops what Bound drops, and the states past their bounds. It says whether it
+// dropped any.
 func (f *Files) prune() bool {
 	kept := Bound(f.links, f.now())
 	dropped := len(kept) != len(f.links)
 	f.links = kept
-	return dropped
+	return f.pruneStates() || dropped
 }
 
-// Bound is links, oldest start first, within the bounds at now: the ended links past
-// KeepEnded go, then the oldest past MostLinks, ended ones first. The control plane's copy
-// of a machine's links (#4275) is bounded by it too. links is not changed.
+// Bound is links, oldest start first, within the bounds at now: the links of a removed
+// kind go, the ended links past KeepEnded, then the oldest past MostLinks, ended ones
+// first. The control plane's copy of a machine's links (#4275) is bounded by it too. links
+// is not changed.
 func Bound(links []wire.LineageLink, now time.Time) []wire.LineageLink {
 	oldest := wire.DateOf(now.Add(-KeepEnded))
 	kept := links[:0:0]
 	for _, l := range links {
+		if l.From.Kind == removedKindMilestone || l.To.Kind == removedKindMilestone {
+			continue
+		}
 		if l.EndedAt == nil || *l.EndedAt >= oldest {
 			kept = append(kept, l)
 		}
@@ -299,6 +339,47 @@ func Bound(links []wire.LineageLink, now time.Time) []wire.LineageLink {
 	return kept
 }
 
+// pruneStates drops the changes of state past KeepEnded that are not their node's latest,
+// then the oldest past MostStates, those that are not a node's latest first. It says
+// whether it dropped any.
+func (f *Files) pruneStates() bool {
+	oldest := wire.DateOf(f.now().Add(-KeepEnded))
+	latest := map[wire.LineageNode]int{}
+	for i, c := range f.states {
+		latest[c.node] = i
+	}
+	gone := map[int]bool{}
+	for i, c := range f.states {
+		if c.At < oldest && latest[c.node] != i {
+			gone[i] = true
+		}
+	}
+	over := len(f.states) - len(gone) - MostStates
+	for i := 0; i < len(f.states) && over > 0; i++ {
+		if !gone[i] && latest[f.states[i].node] != i {
+			gone[i] = true
+			over--
+		}
+	}
+	for i := 0; i < len(f.states) && over > 0; i++ {
+		if !gone[i] {
+			gone[i] = true
+			over--
+		}
+	}
+	if len(gone) == 0 {
+		return false
+	}
+	kept := make([]change, 0, len(f.states)-len(gone))
+	for i, c := range f.states {
+		if !gone[i] {
+			kept = append(kept, c)
+		}
+	}
+	f.states = kept
+	return true
+}
+
 func encode(l line) []byte {
 	b, err := diskjson.Marshal(l)
 	if err != nil {
@@ -308,11 +389,16 @@ func encode(l line) []byte {
 	return append(b, '\n')
 }
 
-// rewrite writes every link kept, ended ones whole, and indexes them again.
+// rewrite writes every link kept, ended ones whole, then every change of state kept, and
+// indexes them again.
 func (f *Files) rewrite() {
 	var buf bytes.Buffer
 	for _, l := range f.links {
 		buf.Write(encode(line{Link: &l}))
+	}
+	for _, c := range f.states {
+		at := c.At
+		buf.Write(encode(line{State: &stateLine{c.node, c.State}, At: &at}))
 	}
 	if f.file != nil {
 		f.file.Close()
@@ -321,7 +407,7 @@ func (f *Files) rewrite() {
 	if err := store.WriteAtomically(f.path, buf.Bytes(), 0o644); err != nil {
 		log.Printf("%s: could not rewrite: %v", filepath.Base(f.path), err)
 	}
-	f.appended = len(f.links)
+	f.appended = len(f.links) + len(f.states)
 	f.index()
 }
 
@@ -350,13 +436,15 @@ func (f *Files) append(l line) error {
 		return err
 	}
 	f.appended++
-	if f.appended > len(f.links)+rewriteMargin || len(f.links) > MostLinks+rewriteMargin/2 {
+	if f.appended > len(f.links)+len(f.states)+rewriteMargin || len(f.links) > MostLinks+rewriteMargin/2 ||
+		len(f.states) > MostStates+rewriteMargin/2 {
 		f.prune()
 		f.rewrite()
 	}
 	return nil
 }
 
+// Prune says how many links it dropped; changes of state it drops are not counted.
 func (f *Files) Prune() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -439,6 +527,36 @@ func (f *Files) End(r wire.LineageEndRequest, at time.Time) ([]wire.LineageLink,
 	return []wire.LineageLink{ended}, nil
 }
 
+func (f *Files) SetState(n wire.LineageNode, state wire.LineageSessionStateName, at time.Time) (bool, error) {
+	if err := checkNode(n); err != nil {
+		return false, err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if s, ok := f.stateNow(n); ok && s.State == state {
+		return false, nil
+	}
+	c := change{n, wire.LineageSessionState{State: state, At: wire.DateOf(at)}}
+	i := len(f.states)
+	f.states = append(f.states, c)
+	f.stateOf[n] = append(f.stateOf[n], i)
+	if err := f.append(line{State: &stateLine{n, state}, At: &c.At}); err != nil {
+		f.states = f.states[:i]
+		f.index()
+		return false, err
+	}
+	return true, nil
+}
+
+// stateNow is a node's latest change of state. Under mu.
+func (f *Files) stateNow(n wire.LineageNode) (wire.LineageSessionState, bool) {
+	idx := f.stateOf[n]
+	if len(idx) == 0 {
+		return wire.LineageSessionState{}, false
+	}
+	return f.states[idx[len(idx)-1]].LineageSessionState, true
+}
+
 // linksOf is the indexes in links of a node's links, newest start first. Under mu.
 func (f *Files) linksOf(n wire.LineageNode) []int {
 	idx := f.byNode[n]
@@ -461,13 +579,21 @@ func (f *Files) Links(n wire.LineageNode) wire.LineageLinks {
 		t := true
 		out.Limited = &t
 	}
+	states := f.stateOf[n]
+	for i := len(states) - 1; i >= 0 && len(out.States) < MostAnswer; i-- {
+		out.States = append(out.States, f.states[states[i]].LineageSessionState)
+	}
 	return out
 }
 
-func (f *Files) All() []wire.LineageLink {
+func (f *Files) All() ([]wire.LineageLink, []wire.LineageStateChange) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return append([]wire.LineageLink(nil), f.links...)
+	states := make([]wire.LineageStateChange, 0, len(f.states))
+	for _, c := range f.states {
+		states = append(states, wire.LineageStateChange{Node: c.node, State: c.State, At: c.At})
+	}
+	return append([]wire.LineageLink(nil), f.links...), states
 }
 
 func (f *Files) Walk(n wire.LineageNode, depth int) wire.LineageGraph {
@@ -514,6 +640,14 @@ func (f *Files) Walk(n wire.LineageNode, depth int) wire.LineageGraph {
 		edge = next
 	}
 	sort.SliceStable(g.Links, func(i, j int) bool { return g.Links[i].At > g.Links[j].At })
+	for _, n := range g.Nodes {
+		if s, ok := f.stateNow(n); ok {
+			if g.States == nil {
+				g.States = map[string]wire.LineageSessionState{}
+			}
+			g.States[n.Ref] = s
+		}
+	}
 	if limited {
 		g.Limited = &limited
 	}

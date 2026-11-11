@@ -5,8 +5,9 @@ import SwiftUI
 /// timeline (at the top of a narrow page) with a row for the review, the checks and conflicts,
 /// each with a glyph in its state's colour, then Merge ▾, Approve and Rerun failed. The checks
 /// list opens with Show all, and is open from the start when a check failed; a failed check has
-/// Log (`forge/log`). Each write goes to the machine that read the item, as the person: their own
-/// click, so no approval card. `wrote` reads the page again after a write.
+/// Log (`forge/log`). On the iPhone (#4407) the checks row pushes the Checks page in place of
+/// the list, and Merge ▾ takes the width. Each write goes to the machine that read the item, as
+/// the person: their own click, so no approval card. `wrote` reads the page again after a write.
 struct WorkMergeBox: View {
     let model: any WorkModel
     let host: MachineRef
@@ -22,6 +23,14 @@ struct WorkMergeBox: View {
     @State private var said: (words: String, failed: Bool)?
     @State private var log: WorkLog?
     @State private var showsChecks: Bool?
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @State private var checksPage = false
+    /// The iPhone: the Checks page, and full-width buttons (#4407, pull-request.md note 17).
+    private var phone: Bool { compact && sizeClass == .compact }
+    #else
+    private let phone = false
+    #endif
 
     private var item: DaemonAPI.ForgeItem { detail.item }
     private var node: DaemonAPI.LineageNode { item.node }
@@ -44,13 +53,28 @@ struct WorkMergeBox: View {
             }
         }
         .sheet(item: $log) { log in WorkLogSheet(log: log) }
+        #if os(iOS)
+        .navigationDestination(isPresented: $checksPage) {
+            WorkChecksPage(model: model, host: host, detail: detail, writes: writes, wrote: wrote).paperGround()
+        }
+        #endif
     }
 
     private var content: some View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(box.rows, id: \.kind) { row in
+                #if os(iOS)
+                if phone, row.kind == .checks, !checks.isEmpty {
+                    Button { checksPage = true } label: { rowView(row) }
+                        .buttonStyle(.plain)
+                        .accessibilityHint("Opens the checks")
+                } else {
+                    rowView(row)
+                }
+                #else
                 rowView(row)
-                if row.kind == .checks, checksOpen, !checks.isEmpty { checksList }
+                #endif
+                if row.kind == .checks, checksOpen, !phone, !checks.isEmpty { checksList }
                 Divider()
             }
             buttons.padding(12)
@@ -74,12 +98,22 @@ struct WorkMergeBox: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if row.kind == .checks, !checks.isEmpty {
-                Button(checksOpen ? "Hide" : "Show all") { showsChecks = !checksOpen }
-                    .linkStyle()
-                    .appText(.supporting)
+                if phone {
+                    // *15 ›*: the row is the button that pushes the Checks page.
+                    HStack(spacing: 4) {
+                        Text("\(checks.count)").monospacedDigit()
+                        Image(systemName: "chevron.right").foregroundStyle(.tertiary)
+                    }
+                    .appText(.supporting).foregroundStyle(.secondary)
+                } else {
+                    Button(checksOpen ? "Hide" : "Show all") { showsChecks = !checksOpen }
+                        .linkStyle()
+                        .appText(.supporting)
+                }
             }
         }
         .padding(12)
+        .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
     }
 
@@ -116,6 +150,8 @@ struct WorkMergeBox: View {
                 Text(WorkLook.noWriter(node.ref)).appText(.supporting).foregroundStyle(.secondary)
             } else if item.draft == true {
                 Text(WorkLook.readyOnForge(node.ref)).appText(.supporting).foregroundStyle(.secondary)
+            } else if phone {
+                phoneButtons
             } else {
                 WrappingHStack(spacing: 8) {
                     if box.merges, let head = detail.head { mergeButton(head) }
@@ -146,15 +182,80 @@ struct WorkMergeBox: View {
         }
     }
 
+    /// The iPhone's buttons (pull-request.md, Narrow): Merge ▾ the full width, or with Approve
+    /// beside it (Approve its own width, never wrapped; Merge the rest); Approve and Rerun failed
+    /// side by side when both show.
+    @ViewBuilder
+    private var phoneButtons: some View {
+        let merges = box.merges && detail.head != nil
+        let resolve = box.resolve ? item.url.flatMap(URL.init(string:)) : nil
+        let approves = box.approves && detail.head != nil
+        // Approve goes beside Merge only when Rerun failed does not need the row under it.
+        let approveBeside = approves && !box.reruns && (merges || resolve != nil)
+        let gap: CGFloat = 8
+        VStack(spacing: gap) {
+            if merges || resolve != nil {
+                HStack(spacing: gap) {
+                    Group {
+                        if merges, let head = detail.head {
+                            mergeButton(head, full: true)
+                        } else if let resolve {
+                            Button { openURL(resolve.appendingPathComponent("conflicts")) } label: {
+                                Text(WorkLook.resolveOnForge(node.ref)).frame(maxWidth: .infinity)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    if approveBeside { approveButton(glyph: false).fixedSize() }
+                }
+            }
+            if (approves && !approveBeside) || box.reruns {
+                HStack(spacing: gap) {
+                    if approves && !approveBeside { approveButton(glyph: true) }
+                    if box.reruns { rerunButton }
+                }
+            }
+            if busy != nil { ProgressView().controlSize(.small) }
+        }
+        .disabled(busy != nil)
+        .buttonStyle(.bordered)
+        .controlSize(.large)
+    }
+
+    /// Approve; beside Merge it is its word alone, so Merge keeps its words.
+    private func approveButton(glyph: Bool) -> some View {
+        Button {
+            if let head = detail.head {
+                act(DaemonAPI.Method.forgeApprove, DaemonAPI.ForgeApproveRequest(node: node, sha: head))
+            }
+        } label: {
+            Group {
+                if glyph { Label("Approve", systemImage: "checkmark") } else { Text("Approve") }
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    private var rerunButton: some View {
+        Button { act(DaemonAPI.Method.forgeRerun, DaemonAPI.ForgeNodeRequest(node: node)) } label: {
+            Label("Rerun failed", systemImage: "arrow.clockwise").frame(maxWidth: .infinity)
+        }
+    }
+
     /// Merge ▾: the repo's first method (Merge when checks pass while they run), the menu the
     /// others, then Merge when checks pass. Green when it merges now, the accent while it waits.
-    private func mergeButton(_ head: String) -> some View {
+    /// `full`: the main button takes the width (the iPhone).
+    private func mergeButton(_ head: String, full: Bool = false) -> some View {
         let methods = detail.mergeMethods ?? []
         let waits = box.waits
         // A Menu with a primary action draws grey on the Mac whatever its tint: a prominent
         // button and a menu beside it, as one split button.
         return HStack(spacing: 1) {
-            Button(WorkLook.mergeMain(methods, waits: waits)) { merge(head, methods.first, auto: waits) }
+            Button { merge(head, methods.first, auto: waits) } label: {
+                // Beside Approve on a phone, *Squash and merge* shrinks a little before it cuts.
+                Text(WorkLook.mergeMain(methods, waits: waits)).lineLimit(1).minimumScaleFactor(full ? 0.8 : 1)
+                    .frame(maxWidth: full ? .infinity : nil, maxHeight: full ? .infinity : nil)
+            }
             Menu {
                 ForEach(methods.dropFirst(), id: \.self) { method in
                     Button(WorkList.mergeButton(method, waits: waits)) { merge(head, method, auto: waits) }
@@ -164,7 +265,8 @@ struct WorkMergeBox: View {
                     Button("Merge when checks pass") { merge(head, methods.first, auto: true) }
                 }
             } label: {
-                Image(systemName: "chevron.down").imageScale(.small)
+                // The full-width pair is one height: a Menu's label is shorter than a button's.
+                Image(systemName: "chevron.down").imageScale(.small).frame(maxHeight: full ? .infinity : nil)
             }
             .menuIndicator(.hidden)
             .accessibilityLabel("More ways to merge")
@@ -172,7 +274,7 @@ struct WorkMergeBox: View {
         }
         .buttonStyle(.borderedProminent)
         .tint(waits ? Paper.accent : WorkLook.Glyph.prOpen.tone.color)
-        .fixedSize()
+        .fixedSize(horizontal: !full, vertical: true)
     }
 
     private func merge(_ head: String, _ method: DaemonAPI.ForgeMergeMethod?, auto: Bool) {
@@ -181,11 +283,10 @@ struct WorkMergeBox: View {
 
     private func readLog(_ check: String) async {
         busy = DaemonAPI.Method.forgeLog
+        said = nil
         defer { busy = nil }
         do {
-            let got = try await model.forge(DaemonAPI.Method.forgeLog, DaemonAPI.ForgeLogRequest(node: node, check: check),
-                                            returning: DaemonAPI.ForgeLog.self, on: host)
-            log = WorkLog(title: check, text: got.text)
+            log = try await WorkLog.read(check, of: node, model: model, on: host)
         } catch {
             said = (WorkList.failureWords(error), true)
         }
@@ -538,6 +639,13 @@ struct WorkLog: Identifiable {
     let id = UUID()
     let title: String
     let text: String
+
+    /// The end of a failed check's log, from the machine that read the item (`forge/log`).
+    static func read(_ check: String, of node: DaemonAPI.LineageNode, model: any WorkModel, on host: MachineRef) async throws -> WorkLog {
+        let got = try await model.forge(DaemonAPI.Method.forgeLog, DaemonAPI.ForgeLogRequest(node: node, check: check),
+                                        returning: DaemonAPI.ForgeLog.self, on: host)
+        return WorkLog(title: check, text: got.text)
+    }
 }
 
 private struct WorkLogSheet: View {
@@ -557,10 +665,140 @@ private struct WorkLogSheet: View {
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
+            // `forge/log` gives the end of the log, where a failure says why: open there.
+            .defaultScrollAnchor(.bottom, for: .initialOffset)
         }
         .padding(20)
         #if os(macOS)
         .frame(minWidth: 640, minHeight: 420)
+        #else
+        .paperSheet()
+        .presentationDetents([.medium, .large])
         #endif
     }
 }
+
+#if os(iOS)
+/// The Checks page on the iPhone (#4407, pull-request.md note 17), pushed by the merge box's
+/// checks row: *1 failed, 12 passed, 1 running*, Rerun failed the full width, then a row per check,
+/// the failed first. A tap on a failed check opens the end of its log in a sheet (`forge/log`
+/// reads only a failed one's); on another, its page on the forge. A check's time comes with the
+/// forge's check times (#4406, missing fields).
+struct WorkChecksPage: View {
+    let model: any WorkModel
+    let host: MachineRef
+    let detail: DaemonAPI.ForgeItemDetail
+    let writes: Bool
+    let wrote: () -> Void
+
+    @Environment(\.openURL) private var openURL
+    @State private var busy: String?
+    @State private var said: (words: String, failed: Bool)?
+    @State private var log: WorkLog?
+
+    private var node: DaemonAPI.LineageNode { detail.item.node }
+    private var checks: [DaemonAPI.ForgeCheck] { WorkLook.checksInOrder(detail.checks ?? []) }
+
+    var body: some View {
+        List {
+            Section {
+                if let line = WorkLook.checksRow(detail.checks, summary: detail.item.checks)?.line {
+                    Text(line).appText(.supporting).foregroundStyle(.secondary).monospacedDigit()
+                }
+                if writes, !WorkList.failedChecks(detail).isEmpty {
+                    Button { rerun() } label: {
+                        HStack {
+                            Label("Rerun failed", systemImage: "arrow.clockwise")
+                            if busy == DaemonAPI.Method.forgeRerun { ProgressView() }
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    .disabled(busy != nil)
+                }
+                if let said {
+                    Text(said.words).appText(.supporting)
+                        .foregroundStyle((said.failed ? StateTint.failure : .none).style(or: .secondary))
+                }
+            }
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+            Section {
+                ForEach(Array(checks.enumerated()), id: \.offset) { _, check in
+                    row(check)
+                }
+            }
+            .listRowBackground(Paper.raised)
+        }
+        .scrollContentBackground(.hidden)
+        .navigationTitle("Checks")
+        .navigationSubtitle("\(WorkList.shortRef(node.ref)) · \(checks.count)")
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $log) { log in WorkLogSheet(log: log) }
+    }
+
+    /// The glyph, the name, *running* or *skipped* (a time comes with the forge's), and a chevron
+    /// on one that opens something.
+    @ViewBuilder
+    private func row(_ check: DaemonAPI.ForgeCheck) -> some View {
+        let logs = check.state == "failing" && writes
+        let url = check.url.flatMap(URL.init(string:))
+        let line = HStack(spacing: 10) {
+            Image(systemName: WorkMergeBox.checkSymbol(check.state))
+                .foregroundStyle(WorkMergeBox.tint(WorkMergeBox.checkSign(check.state)).map(AnyShapeStyle.init) ?? AnyShapeStyle(.secondary))
+                .frame(width: 18)
+                .accessibilityLabel(check.state)
+            Text(check.name).lineLimit(1).truncationMode(.middle)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if ["running", "skipped"].contains(check.state) {
+                Text(check.state).foregroundStyle(.secondary)
+            }
+            if busy == check.name { ProgressView() }
+            if logs || url != nil {
+                Image(systemName: "chevron.right").foregroundStyle(.tertiary).accessibilityHidden(true)
+            }
+        }
+        .appText(.reading)
+        .contentShape(Rectangle())
+        if logs {
+            Button { Task { await readLog(check.name) } } label: { line }
+                .buttonStyle(.plain)
+                .disabled(busy != nil)
+                .accessibilityHint("Opens the end of its log")
+        } else if let url {
+            Button { openURL(url) } label: { line }
+                .buttonStyle(.plain)
+                .accessibilityHint(WorkList.openOnWords(node.ref))
+        } else {
+            line
+        }
+    }
+
+    private func readLog(_ check: String) async {
+        busy = check
+        said = nil
+        defer { busy = nil }
+        do {
+            log = try await WorkLog.read(check, of: node, model: model, on: host)
+        } catch {
+            said = (WorkList.failureWords(error), true)
+        }
+    }
+
+    private func rerun() {
+        Task {
+            busy = DaemonAPI.Method.forgeRerun
+            defer { busy = nil }
+            do {
+                let done = try await model.forge(DaemonAPI.Method.forgeRerun, DaemonAPI.ForgeNodeRequest(node: node),
+                                                 returning: DaemonAPI.ForgeDone.self, on: host)
+                said = (WorkList.doneWords(DaemonAPI.Method.forgeRerun, done), false)
+                wrote()
+            } catch {
+                said = (WorkList.failureWords(error), true)
+            }
+        }
+    }
+}
+#endif

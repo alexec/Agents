@@ -41,10 +41,12 @@ type Item struct {
 	PR     bool
 	// State is open, closed or merged.
 	State, Title, URL, Author, Milestone, UpdatedAt string
-	Labels                                          []string
-	LabelColors                                     map[string]string
-	Assignees                                       []string
-	Comments                                        int
+	// AuthorAvatar is the author's picture, on the Forgejo or on Gravatar; "" for none (#4363).
+	AuthorAvatar string
+	Labels       []string
+	LabelColors  map[string]string
+	Assignees    []string
+	Comments     int
 	// A pull request's: Checks is passing, failing, running or none, Review is approved,
 	// changes_requested, review_required or "", Mergeable is mergeable, conflicting or unknown.
 	// A list says only Draft; one read on its own says the rest.
@@ -63,8 +65,8 @@ type SearchPage struct {
 
 // Comment is a comment on an item, as Markdown.
 type Comment struct {
-	Author, Body, At, URL string
-	Bot                   bool
+	Author, Avatar, Body, At, URL string
+	Bot                           bool
 }
 
 // CheckRun is one commit status of a pull request's head: State is passing, failing or running.
@@ -116,7 +118,8 @@ type forgeJSON struct {
 
 func (j forgeJSON) item(repo string) Item {
 	i := Item{Repo: repo, Number: j.Number, PR: j.PullRequest != nil, Title: j.Title, URL: j.HTMLURL, Author: j.User.Login,
-		UpdatedAt: j.UpdatedAt, Comments: j.Comments, Assignees: []string{}, Labels: []string{}, LabelColors: map[string]string{}}
+		AuthorAvatar: j.User.AvatarURL,
+		UpdatedAt:    j.UpdatedAt, Comments: j.Comments, Assignees: []string{}, Labels: []string{}, LabelColors: map[string]string{}}
 	i.State = "open"
 	switch {
 	case j.PullRequest != nil && j.PullRequest.Merged:
@@ -335,7 +338,7 @@ func (f *RealForgejo) ItemPage(ctx context.Context, repo string, number int, pr 
 		d.Before = strconv.Itoa(page - 1)
 	}
 	for _, c := range comments {
-		d.Thread = append(d.Thread, Comment{Author: c.User.Login, Body: c.Body, At: c.CreatedAt, URL: c.HTMLURL, Bot: isBot(c.User.Login, c.User.ID)})
+		d.Thread = append(d.Thread, Comment{Author: c.User.Login, Avatar: c.User.AvatarURL, Body: c.Body, At: c.CreatedAt, URL: c.HTMLURL, Bot: isBot(c.User.Login, c.User.ID)})
 	}
 	if !pr {
 		return d, nil

@@ -357,7 +357,7 @@ final class AppModel {
     }
 
     /// Whether the window is showing Work (#3119): every issue and pull request from the forges,
-    /// with lineage on top, and the milestones and releases lineage knows. A page like Cost, and
+    /// with lineage on top, and the releases lineage knows. A page like Cost, and
     /// not persisted for the same reason.
     var showsWork = false {
         didSet {
@@ -1528,8 +1528,8 @@ final class AppModel {
     static let archivedShown = SidebarFolderFold.archivedShown
 
     /// A folder's newest `limit` archived sessions, for its Archived page when it opens
-    /// (#164), or the few its Recently archived sessions show (#2731): the window holds the
-    /// live agents, and a page of archived ones per open folder. Answers whether the host
+    /// (#164): the window holds the live agents, and a page of archived ones per open
+    /// Archived page. Answers whether the host
     /// did, so the page can tell an empty archive from a silent host (#664).
     @discardableResult
     func loadArchived(in key: FolderKey, limit: Int = archivedShown) async -> Bool {

@@ -10,13 +10,12 @@ const cost = (usd, tokens = 0) => ({ cost: usd ? { USD: usd } : {}, inputTokens:
 test("a node is named without its tracker, as the window names it", () => {
   assert.equal(v.nodeName({ kind: "issue", ref: "github:alexec/agents#12" }), "alexec/agents#12");
   assert.equal(v.nodeName({ kind: "issue", ref: "linear:ENG-4" }), "ENG-4");
-  assert.equal(v.nodeName({ kind: "milestone", ref: "github:alexec/agents/milestone/15" }), "alexec/agents milestone 15");
   assert.equal(v.nodeName({ kind: "release", ref: "github:alexec/agents/release/v0.14.0" }), "alexec/agents release v0.14.0");
 });
 
 test("the headline, the waste and the lead time", () => {
   const value = { range: "month", scope: { kind: "me" }, total: cost(10), waste: cost(3), unlinked: cost(0), perMergedPR: { USD: 5 },
-    prsMerged: 2, prsClosed: 1, prsReverted: 0, failedChecks: 2, leadTimeSeconds: 19 * 3600, issues: [], milestones: [] };
+    prsMerged: 2, prsClosed: 1, prsReverted: 0, failedChecks: 2, leadTimeSeconds: 19 * 3600, issues: [], releases: [] };
   assert.match(v.valueHeadline(value), /^\$10\.00 on issues and pull requests · 2 merged · \$5\.00 a merged pull request$/);
   assert.equal(v.wasteLine(value), "$3.00 wasted: 1 closed without a merge · 2 failed CI rounds");
   assert.equal(v.wasteLine({ ...value, prsClosed: 0, failedChecks: 0 }), "Nothing wasted");
@@ -33,9 +32,8 @@ test("an issue's line", () => {
   assert.equal(v.rowLine({ ...row, prsMerged: 0, prsClosed: 0, waste: cost(0), failedChecks: 0, leadTimeSeconds: undefined }), "$10.00 · Not merged yet");
 });
 
-test("a GitHub issue's, milestone's or release's address, as ReportValueWords.url has it; none for another tracker", () => {
+test("a GitHub issue's or release's address, as ReportValueWords.url has it; none for another tracker", () => {
   assert.equal(v.nodeUrl({ kind: "issue", ref: "github:alexec/agents#12" }), "https://github.com/alexec/agents/issues/12");
-  assert.equal(v.nodeUrl({ kind: "milestone", ref: "github:alexec/agents/milestone/15" }), "https://github.com/alexec/agents/milestone/15");
   assert.equal(v.nodeUrl({ kind: "release", ref: "github:alexec/agents/release/v0.14.0" }), "https://github.com/alexec/agents/releases/tag/v0.14.0");
   assert.equal(v.nodeUrl({ kind: "issue", ref: "linear:ENG-4" }), undefined);
   assert.equal(v.nodeUrl({ kind: "issue", ref: "github:alexec/agents#x" }), undefined);

@@ -179,6 +179,8 @@ type gqlPerson struct {
 
 type gqlBot struct {
 	Name string `json:"name"`
+	// AvatarURL is read only where a query asks for it (the forge reads, #4363).
+	AvatarURL string `json:"avatarUrl"`
 }
 
 // person is who did something: the user, else the app (bot) that did it, else nobody.

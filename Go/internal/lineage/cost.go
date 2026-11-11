@@ -11,7 +11,7 @@ import (
 // Cost on the link (#2350): each turn's cost, tokens and time are banked under the links
 // that are active when it is banked, split evenly, so the totals add up to the real spend.
 // What is banked stays where it went: a label changed later moves nothing. A node's banked
-// cost is a wire.LineageCostNode; Rollup adds them up to a PR, an issue, a milestone or a
+// cost is a wire.LineageCostNode; Rollup adds them up to a PR, an issue, a release or a
 // repo. The host and the control plane add up the same way.
 
 // The outcomes of a PR. The list is open.
@@ -96,21 +96,14 @@ func RepoOf(n wire.LineageNode) string {
 
 func blankCost() wire.LineageCost { return wire.LineageCost{Cost: map[string]float64{}} }
 
-// PartOfKind is the kind of a ref in a node's PartOf: milestone or release (#3023), by the
-// path segment a forge link gives it (.../milestone/<n> or .../release/<tag>). These are
-// the only two kinds a PartOf ref names.
-func PartOfKind(ref string) string {
-	if strings.Contains(ref, "/release/") {
-		return KindRelease
-	}
-	return KindMilestone
-}
+// IsReleaseRef says a ref in a node's PartOf is a release's (#3023): .../release/<tag>. A host
+// from before #3878 sends its milestones there too, which nothing adds up now.
+func IsReleaseRef(ref string) bool { return strings.Contains(ref, "/release/") }
 
 // Rollup adds up of's cost from nodes, which hold each node once:
 //
 //   - a PR, or any other node: itself;
 //   - an issue: itself and the PRs that fix it;
-//   - a milestone: the issues and PRs part of it, and the PRs that fix those issues;
 //   - a release (#3023): the PRs part of it, and the issues those PRs fix;
 //   - a repo (kind repo, ref as LineageCostNode.repo): every node in it.
 //
@@ -134,26 +127,6 @@ func Rollup(nodes []wire.LineageCostNode, of wire.LineageNode) wire.LineageCostR
 		for _, n := range nodes {
 			if n.Node.Kind == KindPR && has(n.Fixes, of.Ref) {
 				in[n.Node] = true
-			}
-		}
-	case KindMilestone:
-		issues := map[string]bool{}
-		for _, n := range nodes {
-			if has(n.PartOf, of.Ref) {
-				in[n.Node] = true
-				if n.Node.Kind == KindIssue {
-					issues[n.Node.Ref] = true
-				}
-			}
-		}
-		for _, n := range nodes {
-			if n.Node.Kind != KindPR {
-				continue
-			}
-			for _, f := range n.Fixes {
-				if issues[f] {
-					in[n.Node] = true
-				}
 			}
 		}
 	case KindRelease:

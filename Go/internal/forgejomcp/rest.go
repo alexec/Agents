@@ -336,6 +336,8 @@ func newest[T any](ctx context.Context, f *RealForgejo, path, since string, at f
 type user struct {
 	ID    int    `json:"id"`
 	Login string `json:"login"`
+	// AvatarURL is the person's picture: on the Forgejo itself (/avatars/…), or on Gravatar (#4363).
+	AvatarURL string `json:"avatar_url"`
 }
 
 type label struct {

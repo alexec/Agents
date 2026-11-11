@@ -4,9 +4,10 @@ requests in every state (open, closed, draft, merged, closed unmerged), with lab
 labels, more than three labels, assignees, comment counts, a pull request's checks and review, a
 long title, and an issue (#12) with comments by two people and a bot; for the pull request page
 (#4406), each pull request's checks one by one, a pull request with conflicts (#24) and one with
-auto-merge on (#25); for the epic page (#4416), the epic #10 with sub-issues in three steps: #12
-waits for #11 (closed, so step 1 starts folded), #13 and #17 wait for #12, and #17 is also blocked by
-#16, outside the plan. Scratch data only. Point a
+auto-merge on (#25), and the failed check's job and the end of its log (`forge/log`, #4407); for the
+epic page (#4416), the epic #10 with sub-issues in three steps: #12 waits for #11 (closed, so step 1
+starts folded), #13 and #17 wait for #12, and #17 is also blocked by #16, outside the plan. Scratch
+data only. Point a
 run-app host at it with --env AGENTS_TEST_GITHUB_URL=http://127.0.0.1:<port>, and connect GitHub with
 rpc.py call connections/sign-in/token '{"provider":"github","token":"walk"}'.
 
@@ -190,9 +191,26 @@ class Handler(BaseHTTPRequestHandler):
             return self.answer(200, {"login": "sam"})
         if self.path.split("?")[0] == f"/api/repos/{REPO}/labels":
             return self.answer(200, [{"name": k, "color": c} for k, c in LABELS.items()])
+        # A failed check's run: its jobs, then the failed one's log (#4407).
+        m = re.fullmatch(rf"/api/repos/{REPO}/actions/runs/(\d+)/jobs", self.path.split("?")[0])
+        if m:
+            run = int(m.group(1))
+            return self.answer(200, {"jobs": [{"id": run, "name": "unit tests", "conclusion": "failure",
+                                               "html_url": f"https://github.com/{REPO}/actions/runs/{run}/job/1"}]})
+        if re.fullmatch(rf"/api/repos/{REPO}/actions/jobs/\d+/logs", self.path.split("?")[0]):
+            b = LOG.encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Content-Length", str(len(b)))
+            self.end_headers()
+            return self.wfile.write(b)
         self.answer(404, {"message": "Not Found"})
 
 
+LOG = "\n".join([f"ok   shop/cart/{p}  0.{k}s" for k, p in enumerate(["coupon", "totals", "tax", "gift"])] + [
+    "--- FAIL: TestFilterByPrice (0.02s)",
+    "    filter_test.go:41: price 12.50 in range 10..12: expected it out, got it in",
+    "FAIL shop/search 0.31s", "FAIL", "Process completed with exit code 1."]) + "\n"
 SLOW = float(sys.argv[2]) if len(sys.argv) > 2 else 0
 PAGE = int(sys.argv[3]) if len(sys.argv) > 3 else 0
 FAIL_MORE = os.path.join(tempfile.gettempdir(), f"{sys.argv[1]}.fail-more")

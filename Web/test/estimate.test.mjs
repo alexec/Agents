@@ -14,13 +14,27 @@ const story = {
 };
 
 test("an issue's estimate says its figures, what it was made from and the range", () => {
-  assert.equal(e.estimateLine(story), "Estimate: about $3.20, 45K output tokens, 2h 10m of work (from 31 closed stories)");
+  assert.equal(e.estimateLine(story), "Estimate: $1 to $10, typically $3; 30 min to 6 hours of agents' compute time (from 31 closed stories)");
   assert.equal(e.estimateRangeWords(story),
     "8 in 10 like it: $1.10 to $9.80, 12K to 140K output tokens, 30m to 6h of work. Lead time 3h to 40h: it varies with the queue.");
   assert.equal(e.estimateSpentWords(story), undefined);
   assert.equal(e.showsEstimate(story), true);
   assert.equal(e.estimateSource({ ...story, matchedBy: "type", type: "bug" }), "31 closed bugs");
   assert.equal(e.estimateSource({ ...story, matchedBy: "all" }), "31 closed issues");
+});
+
+test("the line is a range rounded to one significant figure (#4530)", () => {
+  assert.equal(e.roughly(5.87), 6);
+  assert.equal(e.roughly(14.6), 10);
+  assert.equal(e.roughly(0.42), 0.4);
+  assert.equal(e.rough(0.42, "USD"), "$0.4");
+  assert.equal(e.roughTime(1200, 5400), "20 to 90 min");
+  assert.equal(e.roughTime(1800, 21600), "30 min to 6 hours");
+  assert.equal(e.roughTime(7200, 7200), "2 hours");
+  assert.equal(e.roughTime(172800, 432000), "2 to 5 days");
+  const narrow = { ...story, cost: { USD: range(5.87, 5.6, 6.1) }, workingSeconds: undefined };
+  assert.equal(e.estimateLine(narrow), "Estimate: about $6 (from 31 closed stories)");
+  assert.equal(e.estimateLine({ ...narrow, cost: undefined }), "Estimate: 12K to 140K output tokens (from 31 closed stories)");
 });
 
 test("too little history says so and nothing else", () => {
@@ -37,9 +51,9 @@ test("an epic adds up its open children and says what its closed ones spent", ()
     spent: { cost: { USD: 4.1 }, inputTokens: 0, outputTokens: 0, turns: 2, workingSeconds: 0, waitingSeconds: 0 },
     children: [story],
   };
-  assert.equal(e.estimateLine(epic), "Estimate for 3 open children: about $12.00, 10h of work (from 60 closed issues)");
+  assert.equal(e.estimateLine(epic), "Estimate for 3 open children: $6 to $30, typically $10; 5 to 20 hours of agents' compute time (from 60 closed issues)");
   assert.equal(e.estimateSpentWords(epic), "Spent $4.10 on 2 closed children");
-  assert.equal(e.childEstimateWords(story), "est. $3.20 · 2h 10m");
+  assert.equal(e.childEstimateWords(story), "est. $3 · 2 hours");
   assert.equal(e.showsEstimate({ ...epic, openChildren: 0 }), false);
 });
 

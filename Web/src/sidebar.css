@@ -60,12 +60,12 @@
    and a grey count, and its workflows one level in. Measured from a session's row (#1079): its 8px
    edge, then the chevron in the 18px mark column, the word at the title (8px on), and each
    workflow's mark under the word. */
-.with-sidebar details:is(.workflows, .sessions, .recent-archived-sessions) > summary { display: flex; align-items: baseline; list-style: none; cursor: pointer;
+.with-sidebar details:is(.workflows, .sessions) > summary { display: flex; align-items: baseline; list-style: none; cursor: pointer;
   padding: 5px 8px; font-size: 0.75rem; color: color-mix(in srgb, currentColor 60%, transparent); }
-.with-sidebar details:is(.workflows, .sessions, .recent-archived-sessions) > summary::-webkit-details-marker { display: none; }
-.with-sidebar details:is(.workflows, .sessions, .recent-archived-sessions) > summary::before { content: "›"; display: inline-block; width: 18px; margin-right: 8px; text-align: center; opacity: 0.7; }
-.with-sidebar details:is(.workflows, .sessions, .recent-archived-sessions)[open] > summary::before { content: "⌄"; }
-.with-sidebar details:is(.workflows, .sessions, .recent-archived-sessions) > summary .count { margin-left: auto; font-variant-numeric: tabular-nums; }
+.with-sidebar details:is(.workflows, .sessions) > summary::-webkit-details-marker { display: none; }
+.with-sidebar details:is(.workflows, .sessions) > summary::before { content: "›"; display: inline-block; width: 18px; margin-right: 8px; text-align: center; opacity: 0.7; }
+.with-sidebar details:is(.workflows, .sessions)[open] > summary::before { content: "⌄"; }
+.with-sidebar details:is(.workflows, .sessions) > summary .count { margin-left: auto; font-variant-numeric: tabular-nums; }
 .with-sidebar details.workflows .row.workflow .pick { padding-left: calc(8px + 26px); }
 .with-sidebar details.workflows .workflow-group-heading { display: flex; padding: 5px 8px 3px 34px;
   font-size: 0.6875rem; color: color-mix(in srgb, currentColor 60%, transparent); }
@@ -73,7 +73,6 @@
 /* A folder's sessions under its Sessions row (#2312): one level in, as the workflows; a child one more a level. */
 .with-sidebar details.sessions .nav-item > .row.session { padding-left: calc(8px + 26px); }
 .with-sidebar details.sessions .nav-item.child > .row.session { padding-left: calc(8px + 26px + 26px * var(--indent, 1)); }
-.with-sidebar details.recent-archived-sessions .row.session { padding-left: calc(8px + 26px); }
 /* A search for an epic (#3900): a heading for each issue, one level in as the Sessions row's title, its rows one more. */
 .with-sidebar .issue-group-heading { display: flex; gap: 6px; padding: 5px 8px 3px 34px;
   font-size: 0.6875rem; color: color-mix(in srgb, currentColor 60%, transparent); }

@@ -4700,9 +4700,11 @@ type ForgeCloseRequest struct {
 	Transition *string `json:"transition,omitzero"`
 }
 
-// A comment on an issue or a pull request (#3129), as Markdown. bot says a bot or an app wrote it.
+// A comment on an issue or a pull request (#3129), as Markdown. bot says a bot or an app wrote it. avatar is the author's picture, a URL that only forge/image reads (#4363); none when the forge gives none.
 type ForgeComment struct {
 	Author string `json:"author"`
+
+	Avatar *string `json:"avatar,omitzero"`
 
 	Body string `json:"body"`
 
@@ -4819,7 +4821,7 @@ type ForgeImageRequest struct {
 	URL string `json:"url"`
 }
 
-// An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for GitHub, GitLab, Linear and Jira (#3260), so one page draws each. node is its lineage node (kind issue or pr, ref github:alexec/Agents#12). state is open, closed or merged; status is the tracker's own name for its step, where its workflow has steps (a Jira status, as In Progress; one in Jira's Done category is closed). folder is a folder on this machine on its repo, to act from. labels have their #rrggbb colour where the forge gives one (#2956). The pull request's own fields: draft; checks is passing, failing, running or none; review is approved, changes_requested or review_required; mergeable is mergeable, conflicting or unknown; autoMerge says auto-merge is on. The hierarchy (#3267): parent is the issue it is a sub-issue (a Linear or GitLab child) of; level is epic, story, task or spike, from its labels; feature is the name of its feature:<name> label; progress is a parent's closed children of all of them, where the forge says it: in a GitHub list, and on an issue's own read. standing says it has the label standing: a standing epic, whose plan is a query (#3659).
+// An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for GitHub, GitLab, Linear and Jira (#3260), so one page draws each. node is its lineage node (kind issue or pr, ref github:alexec/Agents#12). state is open, closed or merged; status is the tracker's own name for its step, where its workflow has steps (a Jira status, as In Progress; one in Jira's Done category is closed). folder is a folder on this machine on its repo, to act from. labels have their #rrggbb colour where the forge gives one (#2956). The pull request's own fields: draft; checks is passing, failing, running or none; review is approved, changes_requested or review_required; mergeable is mergeable, conflicting or unknown; autoMerge says auto-merge is on. The hierarchy (#3267): parent is the issue it is a sub-issue (a Linear or GitLab child) of; level is epic, story, task or spike, from its labels; feature is the name of its feature:<name> label; progress is a parent's closed children of all of them, where the forge says it: in a GitHub list, and on an issue's own read. standing says it has the label standing: a standing epic, whose plan is a query (#3659). authorAvatar is the author's picture, a URL that only forge/image reads (#4363), where the forge gives one (ForgeCapabilities.avatars).
 type ForgeItem struct {
 	Node LineageNode `json:"node"`
 
@@ -4836,6 +4838,8 @@ type ForgeItem struct {
 	Labels []ForgeLabel `json:"labels"`
 
 	Author *string `json:"author,omitzero"`
+
+	AuthorAvatar *string `json:"authorAvatar,omitzero"`
 
 	Assignees []string `json:"assignees"`
 
@@ -5599,7 +5603,7 @@ type LineageCost struct {
 	WaitingSeconds float64 `json:"waitingSeconds"`
 }
 
-// One node's banked cost on a machine (#2350), whole, with what its rollups need: the repo or tracker its ref is in, the issues a PR fixes (ended links too: a PR closed without a merge still counts against its issue, as waste), the milestones it is part of, and how a PR ended. A session's own cost is its turns that had no active link.
+// One node's banked cost on a machine (#2350), whole, with what its rollups need: the repo or tracker its ref is in, the issues a PR fixes (ended links too: a PR closed without a merge still counts against its issue, as waste), the releases it is part of, and how a PR ended. A session's own cost is its turns that had no active link.
 type LineageCostNode struct {
 	Node LineageNode `json:"node"`
 
@@ -5611,7 +5615,7 @@ type LineageCostNode struct {
 	// A PR's issues, by ref.
 	Fixes []string `json:"fixes,omitzero"`
 
-	// The milestones it is part of, by ref.
+	// The releases it is part of, by ref.
 	PartOf []string `json:"partOf,omitzero"`
 
 	// A PR's end: merged, closed (without a merge: waste) or reverted (a merged revert: waste). Absent while open. The list is open.
@@ -5653,7 +5657,7 @@ type LineageCostNode struct {
 	Estimate *LineageEstimateKept `json:"estimate,omitzero"`
 }
 
-// lineage/cost (#2350): a node's cost rolled up. own is what was banked on the node itself. total adds its parts: an issue's PRs (the PRs that fix it); a milestone's issues, their PRs and the PRs part of it; a repo's every node (kind repo, ref github:alexec/agents). waste is the parts' PRs closed without a merge or reverted. unlinked is the parts' sessions: turns with no active link. parts is the nodes added up, newest first, at most 500; limited says there are more.
+// lineage/cost (#2350): a node's cost rolled up. own is what was banked on the node itself. total adds its parts: an issue's PRs (the PRs that fix it); a release's PRs and the issues they fix; a repo's every node (kind repo, ref github:alexec/agents). waste is the parts' PRs closed without a merge or reverted. unlinked is the parts' sessions: turns with no active link. parts is the nodes added up, newest first, at most 500; limited says there are more.
 type LineageCostRollup struct {
 	Node LineageNode `json:"node"`
 
@@ -5792,7 +5796,7 @@ type LineageEstimateRequest struct {
 	StartAt *Date `json:"startAt,omitzero"`
 }
 
-// lineage/figures (#4427): a milestone's or a release's Lineage panel on its Work page, from this machine's totals. cost is its rollup's total, as lineage/cost's. sessions is how many sessions worked on it and its parts, each once; running is how many of them run now (starting, running or waiting on the person). runtimes is the runtimes of the sessions this machine has, the most sessions first. A milestone has releasedIn: the releases that took its issues (and its PRs that fix none of them), each item in the first release that took it, the oldest release first; and finishedIn, the newest of them, once the milestone is closed. A release has milestonesFinished: the milestones shipped in it (by title) and the closed milestones whose last release is this one; and leadTimeSeconds, from the first work on its parts to its tag. limited says the rollup had more parts than it counts. Another kind of node is refused.
+// lineage/figures (#4427): a release's Lineage panel on its Work page, from this machine's totals. cost is its rollup's total, as lineage/cost's. sessions is how many sessions worked on it and its parts, each once; running is how many of them run now (starting, running or waiting on the person). runtimes is the runtimes of the sessions this machine has, the most sessions first. leadTimeSeconds is from the first work on its parts to its tag (#3878 removed the milestone figures). limited says the rollup had more parts than it counts. Another kind of node is refused.
 type LineageFigures struct {
 	Node LineageNode `json:"node"`
 
@@ -5804,19 +5808,12 @@ type LineageFigures struct {
 
 	Runtimes []LineageRuntimeCount `json:"runtimes"`
 
-	ReleasedIn []LineageReleaseTook `json:"releasedIn,omitzero"`
-
-	// A closed milestone's last release.
-	FinishedIn *LineageNode `json:"finishedIn,omitzero"`
-
-	MilestonesFinished []LineageMilestoneFinished `json:"milestonesFinished,omitzero"`
-
 	LeadTimeSeconds *float64 `json:"leadTimeSeconds,omitzero"`
 
 	Limited *bool `json:"limited,omitzero"`
 }
 
-// lineage/walk (#2348): the nodes the walk reached and the links it went along. limited says the walk stopped at its limit on nodes, so there is more. resolved is each node's title, state and labels from its connector, by ref, for the nodes a connector could resolve (#3089). resolving says some nodes are still being resolved in the background, so walk again shortly for them (#3102).
+// lineage/walk (#2348): the nodes the walk reached and the links it went along. limited says the walk stopped at its limit on nodes, so there is more. resolved is each node's title, state and labels from its connector, by ref, for the nodes a connector could resolve (#3089). resolving says some nodes are still being resolved in the background, so walk again shortly for them (#3102). states is the current state of each session node in it that has one, by ref (#4274).
 type LineageGraph struct {
 	Nodes []LineageNode `json:"nodes"`
 
@@ -5827,6 +5824,8 @@ type LineageGraph struct {
 	Resolving *bool `json:"resolving,omitzero"`
 
 	Resolved map[string]LineageResolved `json:"resolved,omitzero"`
+
+	States map[string]LineageSessionState `json:"states,omitzero"`
 }
 
 // A typed link in the lineage graph (#2348): from works-on, opens, fixes, started, reviews, closes or part-of to. source is how the host knows it: start, branch, pr-body, helper, agent, person or forge. at is when it started; endedAt is set when it stops being active (a PR merged, a session archived). Both lists are open: a host keeps a relationship or a source it does not know.
@@ -5855,21 +5854,16 @@ type LineageLinkRequest struct {
 	Source string `json:"source"`
 }
 
-// The links of a node, newest first (#2348), or the links lineage/end ended. limited says there are more than the answer holds.
+// The links of a node, newest first (#2348), or the links lineage/end ended. limited says there are more than the answer holds. states is a session node's changes of state, newest first, so the first is its state now (#4274); absent for a node that is not a session, or a session with none recorded.
 type LineageLinks struct {
 	Links []LineageLink `json:"links"`
 
 	Limited *bool `json:"limited,omitzero"`
+
+	States []LineageSessionState `json:"states,omitzero"`
 }
 
-// A milestone a release finished (#4427), with its title when the host has resolved it.
-type LineageMilestoneFinished struct {
-	Milestone LineageNode `json:"milestone"`
-
-	Title *string `json:"title,omitzero"`
-}
-
-// A node in the lineage graph (#2348). kind is what it is: issue, pr, session, workflow-run, commit, file, branch or milestone, and the list is open. ref names it apart from any tracker, as <scheme>:<id>: github:alexec/Agents#123, gitlab:group/repo!45, linear:ENG-4, jira:ABC-9, session:<agent id>.
+// A node in the lineage graph (#2348). kind is what it is: issue, pr, session, workflow-run, commit, file, branch or release, and the list is open. ref names it apart from any tracker, as <scheme>:<id>: github:alexec/Agents#123, gitlab:group/repo!45, linear:ENG-4, jira:ABC-9, session:<agent id>.
 type LineageNode struct {
 	Kind string `json:"kind"`
 
@@ -5883,16 +5877,7 @@ type LineageNodeRequest struct {
 	Depth *int64 `json:"depth,omitzero"`
 }
 
-// A release that took a milestone's items, its tag, and how many items it took (#4427).
-type LineageReleaseTook struct {
-	Release LineageNode `json:"release"`
-
-	Tag string `json:"tag"`
-
-	Items int64 `json:"items"`
-}
-
-// A node's title, state and labels from its connector (#3089), resolved and cached on the daemon so a lineage renderer shows "Fix flaky test" rather than its ref. state is open, closed or merged (a pull request's; an issue's is open or closed); absent when the connector does not say. labels is empty when it has none. Resolved for a GitHub or GitLab issue or pull request only; Linear, milestones and releases are not resolved yet.
+// A node's title, state and labels from its connector (#3089), resolved and cached on the daemon so a lineage renderer shows "Fix flaky test" rather than its ref. state is open, closed or merged (a pull request's; an issue's is open or closed); absent when the connector does not say. labels is empty when it has none. Resolved for a GitHub or GitLab issue or pull request only; Linear and releases are not resolved yet.
 type LineageResolved struct {
 	Title string `json:"title"`
 
@@ -5922,15 +5907,42 @@ type LineageSessionMatch struct {
 	On LineageNode `json:"on"`
 }
 
-// A session's state in the lineage graph (#4273): working, in a turn; waiting, on an event, CI or a timer; needs-you, on a person (a question or an approval); stopped, not running and not archived; archived; deleted, when the node keeps no title.
-type LineageSessionState string
+// A change of a session node's state, as its machine recorded it (#4274): state is what it changed to, at is when. The machine keeps the changes of the last 90 days, and each session's latest whatever its age.
+type LineageSessionState struct {
+	State LineageSessionStateName `json:"state"`
 
-const LineageSessionStateWorking LineageSessionState = "working"
-const LineageSessionStateWaiting LineageSessionState = "waiting"
-const LineageSessionStateNeedsYou LineageSessionState = "needs-you"
-const LineageSessionStateStopped LineageSessionState = "stopped"
-const LineageSessionStateArchived LineageSessionState = "archived"
-const LineageSessionStateDeleted LineageSessionState = "deleted"
+	At Date `json:"at"`
+}
+
+// A session's state in lineage (#4274): working is in a turn (or starting one); waiting waits on an event, CI, a timer or a place to start; needs-you waits on a person, for a question or an approval; stopped is not running and not archived; archived is archived; deleted is deleted, and the node keeps no title. A state this build does not know reads as stopped.
+type LineageSessionStateName string
+
+const LineageSessionStateNameWorking LineageSessionStateName = "working"
+const LineageSessionStateNameWaiting LineageSessionStateName = "waiting"
+const LineageSessionStateNameNeedsYou LineageSessionStateName = "needs-you"
+const LineageSessionStateNameStopped LineageSessionStateName = "stopped"
+const LineageSessionStateNameArchived LineageSessionStateName = "archived"
+const LineageSessionStateNameDeleted LineageSessionStateName = "deleted"
+
+// UnmarshalJSON reads a value this build does not know as "stopped".
+func (v *LineageSessionStateName) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	switch LineageSessionStateName(s) {
+	case LineageSessionStateNameWorking,
+		LineageSessionStateNameWaiting,
+		LineageSessionStateNameNeedsYou,
+		LineageSessionStateNameStopped,
+		LineageSessionStateNameArchived,
+		LineageSessionStateNameDeleted:
+		*v = LineageSessionStateName(s)
+	default:
+		*v = LineageSessionStateNameStopped
+	}
+	return nil
+}
 
 // The sessions on this machine that lineage links to the issue, to its sub-issues or to their PRs, each once, on the first issue in issues they came by. limited says there were more sub-issues or sessions than are counted.
 type LineageSessions struct {
@@ -5947,16 +5959,16 @@ type LineageSessionsRequest struct {
 	Number int64 `json:"number"`
 }
 
-// A session node's change of state, and when (#4275). Only the ref, the state and the time: no title or text (principle 7).
+// A session node's change of state, and when (#4275), as lineage/sync sends it. Only the ref, the state and the time: no title or text (principle 7).
 type LineageStateChange struct {
 	Node LineageNode `json:"node"`
 
-	State LineageSessionState `json:"state"`
+	State LineageSessionStateName `json:"state"`
 
 	At Date `json:"at"`
 }
 
-// lineage/sync (#4275): what changed in a machine's lineage since its last send: links started or ended (each whole, as the machine has it now), and its sessions' changes of state. reset starts the control plane's copy of the links again from this send, the first of a whole send; the states are kept.
+// lineage/sync (#4275): what changed in a machine's lineage since its last send: links started or ended (each whole, as the machine has it now), and its sessions' changes of state (#4274). reset starts the control plane's copy of the links again from this send, the first of a whole send; the states are kept.
 type LineageSync struct {
 	Links []LineageLink `json:"links,omitzero"`
 
@@ -7885,6 +7897,9 @@ type Multiplier struct {
 
 	// The most of this machine's agents in a turn at the same time, ever (#3988): the time history's record. Absent when none has run.
 	MostAtOnce *int64 `json:"mostAtOnce,omitzero"`
+
+	// When the person's first counted merge or merged revert happened (#4250), in the record the host keeps (90 days of ended work) or the control plane's. Absent: their agents have not merged a PR yet, and the page says their first one starts the count.
+	FirstMergeAt *Date `json:"firstMergeAt,omitzero"`
 }
 
 // What the Multiplier compares with (#3902), so that no client keeps its own copy: an engineer with no AI in 2025.
@@ -10466,7 +10481,7 @@ type ReportFormat string
 const ReportFormatCsv ReportFormat = "csv"
 const ReportFormatJsonl ReportFormat = "jsonl"
 
-// One row of reports/nodes (#3118): an issue, PR, milestone or release, its cost rolled up from every machine in the scope as reports/value adds it up. own is what was banked on the node itself; total adds its parts (an issue's PRs; a milestone's or release's issues and PRs); waste is the parts' PRs closed without a merge or reverted. sessions is how many sessions worked on it and its parts, each once. leadTimeSeconds is from the first work on it to its last PR merged, absent before a merge. resolved is the newest title, state and labels any machine sent; absent when none had them.
+// One row of reports/nodes (#3118): an issue, PR or release, its cost rolled up from every machine in the scope as reports/value adds it up. own is what was banked on the node itself; total adds its parts (an issue's PRs; a release's issues and PRs); waste is the parts' PRs closed without a merge or reverted. sessions is how many sessions worked on it and its parts, each once. leadTimeSeconds is from the first work on it to its last PR merged, absent before a merge. resolved is the newest title, state and labels any machine sent; absent when none had them.
 type ReportNode struct {
 	Node LineageNode `json:"node"`
 
@@ -10521,9 +10536,9 @@ type ReportNodes struct {
 	Unresolved int64 `json:"unresolved"`
 }
 
-// reports/nodes (#3118): the lineage nodes of one kind in a scope, with filters and pages. The scope is as reports/value's. state is open, closed or merged, from the node's resolved state (a PR with none falls back to its outcome); milestones and releases have no state in v1. repo is a ref prefix (github:alexec/Agents). since is on the node's last change. limit is 1 to 100, 50 when absent. cursor is the last page's, opaque.
+// reports/nodes (#3118): the lineage nodes of one kind in a scope, with filters and pages. The scope is as reports/value's. state is open, closed or merged, from the node's resolved state (a PR with none falls back to its outcome); releases have no state in v1. repo is a ref prefix (github:alexec/Agents). since is on the node's last change. limit is 1 to 100, 50 when absent. cursor is the last page's, opaque.
 type ReportNodesQuery struct {
-	// issue, pr, milestone or release.
+	// issue, pr or release.
 	Kind string `json:"kind"`
 
 	State *string `json:"state,omitzero"`
@@ -10679,7 +10694,7 @@ type ReportScopes struct {
 	Admin bool `json:"admin"`
 }
 
-// reports/value (#2351): what the work in a scope cost and what it delivered, from the lineage nodes that the scope's machines send (#2350). A node is in the range when it last changed in it, with its whole cost. total is the work on issues and PRs; waste is the PRs closed without a merge and merged reverts; unlinked is the turns with no issue or PR. perMergedPR is total by the PRs merged, by currency. leadTimeSeconds is the median of the issues' lead times. issues, milestones and releases (#3023) are the most costly first, at most 100 each; limited says there are more.
+// reports/value (#2351): what the work in a scope cost and what it delivered, from the lineage nodes that the scope's machines send (#2350). A node is in the range when it last changed in it, with its whole cost. total is the work on issues and PRs; waste is the PRs closed without a merge and merged reverts; unlinked is the turns with no issue or PR. perMergedPR is total by the PRs merged, by currency. leadTimeSeconds is the median of the issues' lead times. issues and releases (#3023) are the most costly first, at most 100 each; limited says there are more.
 type ReportValue struct {
 	Range ReportRange `json:"range"`
 
@@ -10711,15 +10726,13 @@ type ReportValue struct {
 
 	Issues []ReportValueRow `json:"issues"`
 
-	Milestones []ReportValueRow `json:"milestones"`
-
-	// One row per release (#3023): the PRs part-of it and the issues those PRs fix, the same way as a milestone.
+	// One row per release (#3023): the PRs part-of it and the issues those PRs fix.
 	Releases []ReportValueRow `json:"releases"`
 
 	Limited *bool `json:"limited,omitzero"`
 }
 
-// One issue or milestone on Reports ▸ Value (#2351): its cost rolled up from every machine in the scope, as lineage/cost adds it up, and how its PRs ended.
+// One issue or release on Reports ▸ Value (#2351): its cost rolled up from every machine in the scope, as lineage/cost adds it up, and how its PRs ended.
 type ReportValueRow struct {
 	Node LineageNode `json:"node"`
 

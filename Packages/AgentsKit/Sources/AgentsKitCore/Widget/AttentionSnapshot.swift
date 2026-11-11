@@ -191,13 +191,16 @@ public struct AttentionSnapshot: Codable, Hashable, Sendable {
                   newestNeed[agentID].map({ $0.raisedAt < need.raisedAt }) ?? true else { continue }
             newestNeed[agentID] = need
         }
+        // A session that waits only on deferred requests is in Later, not on the widget (#4235).
+        let open = Set(model.requests.filter { !$0.isDeferred }.compactMap(\.askedBy))
+        let later = Set(model.requests.filter(\.isDeferred).compactMap(\.askedBy)).subtracting(open)
         // A terminal's agents-secret (#4179) is in no folder.
         total += model.terminalRequests.count
         for summary in model.liveFolders {
             // Requests, not sessions (#3864): one for each open request, less its asker.
             total += model.attentionCount(in: summary.folder.folder) + model.requestBadgeShift(in: summary.folder.folder)
             waiting += AgentGroup.allCases.flatMap { model.agents(in: summary.folder.folder, group: $0) }
-                .filter(model.wantsALook)
+                .filter { model.wantsALook($0) && !later.contains($0.id) }
         }
         // One row per session. An agent that asked twice is one session waiting on you and
         // must not take two rows (FR-005).

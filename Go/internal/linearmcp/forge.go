@@ -25,9 +25,11 @@ type Item struct {
 	Identifier, Team string
 	// State is open or closed.
 	State, Title, URL, Author, Milestone, UpdatedAt string
-	Labels                                          []string
-	LabelColors                                     map[string]string
-	Assignees                                       []string
+	// AuthorAvatar is the author's picture, on Linear's public upload host; "" for none (#4363).
+	AuthorAvatar string
+	Labels       []string
+	LabelColors  map[string]string
+	Assignees    []string
 	// Comments is how many, at most 50: Linear does not count them.
 	Comments int
 	// Parent is the issue it is a child of, by identifier (#3267). SubTotal and SubDone are its
@@ -48,8 +50,8 @@ type SearchPage struct {
 
 // Comment is a comment on an issue, as Markdown.
 type Comment struct {
-	Author, Body, At, URL string
-	Bot                   bool
+	Author, Avatar, Body, At, URL string
+	Bot                           bool
 }
 
 // ItemDetail is an issue with its description and a page of its comments (Thread), oldest
@@ -65,7 +67,7 @@ type ItemDetail struct {
 const forgeComments = 50
 
 const forgeFields = `identifier title url updatedAt team { key } state { type } projectMilestone { name }
-  labels { nodes { name color } } assignee { displayName } creator { displayName } botActor { name }
+  labels { nodes { name color } } assignee { displayName } creator { displayName avatarUrl } botActor { name avatarUrl }
   commentCount: comments(first: 50) { nodes { id } } parent { identifier }`
 
 // forgeChildren are an issue's children's states, to count them (#3267).
@@ -78,7 +80,13 @@ const forgeSearch = `query ForgeIssues($filter: IssueFilter, $first: Int, $after
 // Linear's pages go newest first, so the page before a comment is the one after it.
 const forgeItem = `query ForgeIssue($id: String!, $comments: Int, $before: String) { issue(id: $id) { ` + forgeFields + ` ` + forgeChildren + ` description
   comments(first: $comments, after: $before) { pageInfo { hasNextPage endCursor }
-    nodes { body createdAt url user { displayName } botActor { name } } } } }`
+    nodes { body createdAt url user { displayName avatarUrl } botActor { name avatarUrl } } } } }`
+
+// forgePerson is an issue's creator or a comment's writer.
+type forgePerson struct {
+	DisplayName string `json:"displayName"`
+	AvatarURL   string `json:"avatarUrl"`
+}
 
 type forgeNode struct {
 	Identifier string `json:"identifier"`
@@ -103,10 +111,8 @@ type forgeNode struct {
 	Assignee *struct {
 		DisplayName string `json:"displayName"`
 	} `json:"assignee"`
-	Creator *struct {
-		DisplayName string `json:"displayName"`
-	} `json:"creator"`
-	BotActor     *gqlBot `json:"botActor"`
+	Creator      *forgePerson `json:"creator"`
+	BotActor     *gqlBot      `json:"botActor"`
 	CommentCount struct {
 		Nodes []struct{} `json:"nodes"`
 	} `json:"commentCount"`
@@ -145,9 +151,9 @@ func (n forgeNode) item() Item {
 	}
 	switch {
 	case n.Creator != nil:
-		i.Author = n.Creator.DisplayName
+		i.Author, i.AuthorAvatar = n.Creator.DisplayName, n.Creator.AvatarURL
 	case n.BotActor != nil:
-		i.Author = n.BotActor.Name
+		i.Author, i.AuthorAvatar = n.BotActor.Name, n.BotActor.AvatarURL
 	}
 	if n.Parent != nil {
 		i.Parent = n.Parent.Identifier
@@ -251,13 +257,11 @@ func (l *RealLinear) ItemPage(ctx context.Context, identifier, before string) (I
 					EndCursor   string `json:"endCursor"`
 				} `json:"pageInfo"`
 				Nodes []struct {
-					Body      string `json:"body"`
-					CreatedAt string `json:"createdAt"`
-					URL       string `json:"url"`
-					User      *struct {
-						DisplayName string `json:"displayName"`
-					} `json:"user"`
-					BotActor *gqlBot `json:"botActor"`
+					Body      string       `json:"body"`
+					CreatedAt string       `json:"createdAt"`
+					URL       string       `json:"url"`
+					User      *forgePerson `json:"user"`
+					BotActor  *gqlBot      `json:"botActor"`
 				} `json:"nodes"`
 			} `json:"comments"`
 		} `json:"issue"`
@@ -273,9 +277,9 @@ func (l *RealLinear) ItemPage(ctx context.Context, identifier, before string) (I
 		comment := Comment{Body: c.Body, At: c.CreatedAt, URL: c.URL}
 		switch {
 		case c.User != nil:
-			comment.Author = c.User.DisplayName
+			comment.Author, comment.Avatar = c.User.DisplayName, c.User.AvatarURL
 		case c.BotActor != nil:
-			comment.Author, comment.Bot = c.BotActor.Name, true
+			comment.Author, comment.Avatar, comment.Bot = c.BotActor.Name, c.BotActor.AvatarURL, true
 		}
 		d.Thread = append(d.Thread, comment)
 	}

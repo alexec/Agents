@@ -123,13 +123,6 @@ func TestAnIssueAddsUpItsPRsAndTheirWaste(t *testing.T) {
 		t.Fatalf("%+v", issue)
 	}
 
-	// A milestone holds the issue, so its PRs too.
-	m := wire.LineageNode{Kind: "milestone", Ref: "github:alexec/agents/milestone/15"}
-	d.link(wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#7"}, m, lineage.RelPartOf, lineage.SourcePerson)
-	if got := d.lineageCost(m); usd(got.Total) != 7 || usd(got.Waste) != 1 {
-		t.Fatalf("milestone %+v", got)
-	}
-
 	var sent []wire.UsageRollup
 	d.SetControlAsk(askControl(func(_ context.Context, _ string, params any) (json.RawMessage, error) {
 		sent = append(sent, params.(wire.UsageRollup))
@@ -144,7 +137,7 @@ func TestAnIssueAddsUpItsPRsAndTheirWaste(t *testing.T) {
 	}
 	closed := work["github:alexec/agents#9"]
 	if len(work) != 3 || closed.Outcome == nil || *closed.Outcome != "closed" || len(closed.Fixes) != 1 ||
-		len(work["github:alexec/agents#7"].PartOf) != 1 {
+		len(work["github:alexec/agents#7"].PartOf) != 0 {
 		t.Fatalf("%+v", work)
 	}
 	// Reports ▸ Value's lead time (#2351): when the work started, and when a PR ended.

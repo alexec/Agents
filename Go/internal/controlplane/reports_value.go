@@ -190,15 +190,15 @@ func mergeNode(have *wire.LineageCostNode, n wire.LineageCostNode) {
 }
 
 // valueOf adds up the nodes that changed since: the totals over each node once, and a row
-// for each issue, milestone and release with a part that changed since.
+// for each issue and release with a part that changed since.
 func valueOf(nodes []wire.LineageCostNode, since wire.Date) wire.ReportValue {
 	blank := func() wire.LineageCost { return wire.LineageCost{Cost: map[string]float64{}} }
 	out := wire.ReportValue{Total: blank(), Waste: blank(), Unlinked: blank(), PerMergedPR: map[string]float64{},
-		Issues: []wire.ReportValueRow{}, Milestones: []wire.ReportValueRow{}, Releases: []wire.ReportValueRow{}}
+		Issues: []wire.ReportValueRow{}, Releases: []wire.ReportValueRow{}}
 	byRef := map[string]wire.LineageCostNode{}
 	fixers := map[string][]wire.LineageCostNode{}
 	members := map[string][]wire.LineageCostNode{}
-	var issues, milestones, releases []string
+	var issues, releases []string
 	seen := map[string]bool{}
 	addIssue := func(ref string) {
 		if !seen[ref] {
@@ -218,12 +218,11 @@ func valueOf(nodes []wire.LineageCostNode, since wire.Date) wire.ReportValue {
 			}
 		}
 		for _, m := range n.PartOf {
+			if !lineage.IsReleaseRef(m) {
+				continue
+			}
 			if _, ok := members[m]; !ok {
-				if lineage.PartOfKind(m) == lineage.KindRelease {
-					releases = append(releases, m)
-				} else {
-					milestones = append(milestones, m)
-				}
+				releases = append(releases, m)
 			}
 			members[m] = append(members[m], n)
 		}
@@ -274,18 +273,6 @@ func valueOf(nodes []wire.LineageCostNode, since wire.Date) wire.ReportValue {
 		}
 		out.Issues = append(out.Issues, row)
 	}
-	for _, ref := range milestones {
-		// Its issues and PRs, and the PRs that fix those issues, each once.
-		parts := dedupParts(members[ref], func(n wire.LineageCostNode) []wire.LineageCostNode {
-			if n.Node.Kind != lineage.KindIssue {
-				return nil
-			}
-			return fixers[n.Node.Ref]
-		})
-		if row, ok := valueRow(wire.LineageNode{Kind: lineage.KindMilestone, Ref: ref}, parts, since); ok {
-			out.Milestones = append(out.Milestones, row)
-		}
-	}
 	for _, ref := range releases {
 		// Its PRs, and the issues those PRs fix, each once (#3023; the same shape as
 		// lineage.Rollup's KindRelease case): only PRs are ever part-of a release.
@@ -307,8 +294,6 @@ func valueOf(nodes []wire.LineageCostNode, since wire.Date) wire.ReportValue {
 	limited := false
 	out.Issues, limited = mostCostly(out.Issues)
 	var more bool
-	out.Milestones, more = mostCostly(out.Milestones)
-	limited = limited || more
 	out.Releases, more = mostCostly(out.Releases)
 	if limited || more {
 		t := true

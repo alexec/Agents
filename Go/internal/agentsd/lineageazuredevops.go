@@ -17,7 +17,7 @@ import (
 //
 // A pull request is azuredevops:organization/project/repo#12. Azure Repos has no issues: "#12"
 // in its repository is the work item 12 of its project on Azure Boards (forgeRepo.issue), which
-// lineage does not ask here. It has no milestones either.
+// lineage does not ask here.
 
 // azureDevOpsResolveNode is a pull request's title, state and tags.
 func (d *Daemon) azureDevOpsResolveNode(ctx context.Context, _ string, repo forgeRepo, _ string, n int) (wire.LineageResolved, error) {
@@ -30,11 +30,6 @@ func (d *Daemon) azureDevOpsResolveNode(ctx context.Context, _ string, repo forg
 		return wire.LineageResolved{}, err
 	}
 	return wire.LineageResolved{Title: got.Title, State: &got.State, Labels: got.Labels}, nil
-}
-
-// azureDevOpsIssue is no milestone: Azure Repos has no issues.
-func (d *Daemon) azureDevOpsIssue(context.Context, string, forgeRepo, int) (issueOnForge, error) {
-	return issueOnForge{}, nil
 }
 
 // azureDevOpsCommitTime is the commit time of a tag or sha.
@@ -70,11 +65,6 @@ func (d *Daemon) azureDevOpsCommitPR(ctx context.Context, _ string, repo forgeRe
 		return 0, err
 	}
 	return ado.CommitPR(ctx, named, sha)
-}
-
-// azureDevOpsMilestones is none: Azure Repos has no milestones.
-func (d *Daemon) azureDevOpsMilestones(context.Context, string, forgeRepo) ([]forgeMilestone, error) {
-	return nil, nil
 }
 
 // azureDevOpsCostComment posts the cost comment, or edits the one r.ID names or the one the

@@ -31,6 +31,7 @@ func (githubForge) Caps() forgeCaps {
 		PR: forgeActions{Comment: true, Label: true, Close: true, Reopen: true, Merge: true, AutoMerge: true, Approve: true,
 			Rerun: true, Log: true, Diff: true},
 		LabelColors:  true,
+		Avatars:      true,
 		CommentCount: "exact",
 		Plan:         true, BlockedBy: true, AddChild: true,
 		Reasons: map[string]string{
@@ -125,7 +126,7 @@ func (g githubForge) Item(ctx context.Context, r forgeRef, cursor string) (wire.
 	}
 	out := wire.ForgeItemDetail{Item: forgeItemOf(p.Item, g.d.repoFolder(forgeRepo{"github", r.Repo})), Body: p.Body, Comments: []wire.ForgeComment{}}
 	for _, c := range p.Thread {
-		out.Comments = append(out.Comments, forgeCommentOf(c.Author, c.Body, c.At, c.URL, c.Bot))
+		out.Comments = append(out.Comments, forgeCommentOf(c.Author, c.Avatar, c.Body, c.At, c.URL, c.Bot))
 	}
 	out.Cursor = optional(p.Before)
 	if p.PR {
