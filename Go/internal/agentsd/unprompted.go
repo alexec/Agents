@@ -2,6 +2,7 @@ package agentsd
 
 import (
 	"strings"
+	"sync/atomic"
 	"time"
 
 	sdk "github.com/coder/acp-go-sdk"
@@ -22,6 +23,10 @@ import (
 // may go without an update before it is taken as ended.
 var unpromptedQuiet = 2 * time.Minute
 
+// promptAnswered runs as a prompt's answer comes back, before its turn ends: a test holds
+// the turn there.
+var promptAnswered atomic.Pointer[func(*live)]
+
 // beginsWork is whether an update between turns is the runtime working: words, a thought or
 // a new tool call. A late tool_call_update or a usage count is not.
 func beginsWork(u sdk.SessionUpdate) bool {
@@ -38,6 +43,12 @@ func endsCycle(meta map[string]any) bool {
 // beginUnprompted begins an unprompted turn when no turn is in flight and the runtime is
 // there; it is false when one was not begun.
 func (l *live) beginUnprompted() bool {
+	return l.beginUnpromptedSaying(false)
+}
+
+// beginUnpromptedSaying is beginUnprompted; with late, the turn keeps the words the
+// runtime said after its prompt's answer (noteLate), for its report.
+func (l *live) beginUnpromptedSaying(late bool) bool {
 	l.mu.Lock()
 	if l.inTurn || l.running || l.session == nil {
 		l.mu.Unlock()
@@ -48,7 +59,14 @@ func (l *live) beginUnprompted() bool {
 	// prompting, so a stop sends session/cancel: the runtime has the turn.
 	l.inTurn, l.prompting, l.unprompted = true, true, true
 	l.stopped, l.reported, l.showedFile, l.heldBlock = false, false, false, nil
-	l.lastMessageID, l.lastMessage = "", strings.Builder{}
+	said, prefix := l.lastMessage.String(), l.latePrefix
+	l.lastMessage = strings.Builder{}
+	if late {
+		// What came after the prompt's own words; all of it when the message changed since.
+		l.lastMessage.WriteString(strings.TrimPrefix(said, prefix))
+	} else {
+		l.lastMessageID = ""
+	}
 	l.failure = nil
 	l.armQuiet(seq)
 	l.mu.Unlock()
@@ -59,6 +77,39 @@ func (l *live) beginUnprompted() bool {
 	}
 	l.d.setState(l.id, wire.AgentStateRunning)
 	return true
+}
+
+// noteLate marks work the runtime began after its prompt's answer while that turn still
+// ends (#4568): words, a thought or a tool call there are a cycle of its own, as they are
+// once the turn is over, and beginLate begins it then. Without this the prompt's end left
+// the agent finished while the runtime worked on, when the cycle came that soon.
+func (l *live) noteLate() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.inTurn && l.answered && !l.unprompted && !l.late {
+		l.late, l.latePrefix = true, l.lastMessage.String()
+	}
+}
+
+// beginLate begins the unprompted turn of work noted late, once the turn it came in has
+// ended and the run loop has let the runtime go.
+func (l *live) beginLate() {
+	l.mu.Lock()
+	late := l.late
+	l.late = false
+	l.mu.Unlock()
+	if late {
+		l.beginUnpromptedSaying(true)
+	}
+}
+
+// cycleEnded is a cycle's result: it ends the runtime's own turn, and a cycle that came
+// and went as the prompt's turn ended leaves none to begin.
+func (l *live) cycleEnded() {
+	l.mu.Lock()
+	l.late = false
+	l.mu.Unlock()
+	l.endUnprompted(wire.AgentStateFinished, wire.EndedReasonEndTurn)
 }
 
 // armQuiet starts or restarts the quiet timer of unprompted turn seq. Called with l.mu held.
