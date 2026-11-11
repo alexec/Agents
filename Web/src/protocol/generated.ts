@@ -5281,6 +5281,8 @@ export interface LineageForecast {
   spend?: LineageForecastSpend;
   burn: LineageForecastBurn[];
   serviceLevels: LineageForecastServiceLevel[];
+  /** The overhead that toComplete.loaded and spend's loaded figures are made with (#4524). */
+  overhead?: LineageOverhead;
 }
 
 /**
@@ -5358,6 +5360,13 @@ export interface LineageForecastServiceLevel {
 export interface LineageForecastSpend {
   week: Record<string, LineageEstimateRange>;
   month: Record<string, LineageEstimateRange>;
+  /**
+   * week with the overhead loaded in (#4524): times (1 + overhead.unlinkedRatio). Absent with no
+   * ratio.
+   */
+  loadedWeek?: Record<string, LineageEstimateRange>;
+  /** month, loaded as loadedWeek is. */
+  loadedMonth?: Record<string, LineageEstimateRange>;
 }
 
 /**
@@ -5372,6 +5381,11 @@ export interface LineageForecastToComplete {
   ratio: number;
   closed: number;
   leadRatio: number;
+  /**
+   * cost with the overhead loaded in (#4524): times (1 + overhead.unlinkedRatio). The lead is in
+   * cost already, so not the epic ratio. Absent with no ratio.
+   */
+  loaded?: Record<string, LineageEstimateRange>;
 }
 
 /**
@@ -14934,14 +14948,14 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineageEstimateRange: { required: ["median", "p10", "p90"], optional: [] },
   LineageEstimateRequest: { required: ["node"], optional: ["startAt"] },
   LineageFigures: { required: ["node", "cost", "sessions", "running", "runtimes"], optional: ["leadTimeSeconds", "limited"] },
-  LineageForecast: { required: ["at", "windowDays", "landings", "burn", "serviceLevels"], optional: ["node", "lands", "noForecast", "toComplete", "kept", "spend"] },
+  LineageForecast: { required: ["at", "windowDays", "landings", "burn", "serviceLevels"], optional: ["node", "lands", "noForecast", "toComplete", "kept", "spend", "overhead"] },
   LineageForecastBurn: { required: ["credentialKey", "window", "used", "at", "resetsAt", "lasts"], optional: ["runsOutAt"] },
   LineageForecastKept: { required: ["at", "p50", "p85", "windowDays", "share", "open"], optional: [] },
   LineageForecastLands: { required: ["p50", "p85", "open", "closed", "stepsLeft", "share", "groups"], optional: [] },
   LineageForecastRequest: { required: [], optional: ["node"] },
   LineageForecastServiceLevel: { required: ["level", "closed", "p50Seconds", "p85Seconds"], optional: [] },
-  LineageForecastSpend: { required: ["week", "month"], optional: [] },
-  LineageForecastToComplete: { required: ["cost", "ratio", "closed", "leadRatio"], optional: [] },
+  LineageForecastSpend: { required: ["week", "month"], optional: ["loadedWeek", "loadedMonth"] },
+  LineageForecastToComplete: { required: ["cost", "ratio", "closed", "leadRatio"], optional: ["loaded"] },
   LineageGraph: { required: ["nodes", "links"], optional: ["limited", "resolving", "resolved", "states"] },
   LineageLink: { required: ["from", "to", "rel", "source", "at"], optional: ["endedAt"] },
   LineageLinkRequest: { required: ["from", "to", "rel", "source"], optional: [] },

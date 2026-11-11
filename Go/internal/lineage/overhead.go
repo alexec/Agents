@@ -131,8 +131,33 @@ func Load(e *wire.LineageEstimate, o wire.LineageOverhead, epic bool) {
 	if !ok || len(e.Cost) == 0 {
 		return
 	}
-	e.Loaded = map[string]wire.LineageEstimateRange{}
-	for k, r := range e.Cost {
-		e.Loaded[k] = wire.LineageEstimateRange{Median: r.Median * f, P10: r.P10 * f, P90: r.P90 * f}
+	e.Loaded = LoadRanges(e.Cost, f)
+}
+
+// LoadRanges is each range in m times f; nil when m is empty.
+func LoadRanges(m map[string]wire.LineageEstimateRange, f float64) map[string]wire.LineageEstimateRange {
+	if len(m) == 0 {
+		return nil
+	}
+	out := make(map[string]wire.LineageEstimateRange, len(m))
+	for k, r := range m {
+		out[k] = wire.LineageEstimateRange{Median: r.Median * f, P10: r.P10 * f, P90: r.P90 * f}
+	}
+	return out
+}
+
+// LoadForecast puts on f its loaded figures and o (#4524): the estimate to complete and the
+// spend, times 1 + the unlinked ratio. The estimate to complete has the lead's term already.
+func LoadForecast(f *wire.LineageForecast, o wire.LineageOverhead) {
+	f.Overhead = &o
+	factor, ok := LoadFactor(o, false)
+	if !ok {
+		return
+	}
+	if f.ToComplete != nil {
+		f.ToComplete.Loaded = LoadRanges(f.ToComplete.Cost, factor)
+	}
+	if f.Spend != nil {
+		f.Spend.LoadedWeek, f.Spend.LoadedMonth = LoadRanges(f.Spend.Week, factor), LoadRanges(f.Spend.Month, factor)
 	}
 }

@@ -65,3 +65,16 @@ func TestRollupOfAReleaseCountsItself(t *testing.T) {
 		t.Fatalf("%q", got)
 	}
 }
+
+// #4524: a forecast's estimate to complete and spend are loaded with the unlinked ratio only.
+func TestLoadForecast(t *testing.T) {
+	r, e := 0.5, 1.0
+	o := wire.LineageOverhead{UnlinkedRatio: &r, EpicRatio: &e}
+	one := map[string]wire.LineageEstimateRange{"USD": {Median: 10, P10: 2, P90: 20}}
+	f := wire.LineageForecast{ToComplete: &wire.LineageForecastToComplete{Cost: one}, Spend: &wire.LineageForecastSpend{Week: one, Month: one}}
+	LoadForecast(&f, o)
+	if f.Overhead == nil || f.ToComplete.Loaded["USD"].Median != 15 || f.Spend.LoadedWeek["USD"].P90 != 30 ||
+		f.Spend.LoadedMonth["USD"].P10 != 3 {
+		t.Fatalf("%+v %+v", f.ToComplete, f.Spend)
+	}
+}

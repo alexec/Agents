@@ -40,6 +40,8 @@ func (d *Daemon) lineageForecast(ctx context.Context, r wire.LineageForecastRequ
 	nodes := ledgerNodes(d.costLedgerLocked())
 	d.workMu.Unlock()
 	f := lineage.ForecastOf(nodes, r.Node, isEpic, children, now)
+	// The overhead, loaded into the cost as "about $165 all in" (#4524).
+	lineage.LoadForecast(&f, lineage.Overhead(nodes, now))
 	if r.Node != nil {
 		f.Kept = d.keepForecast(costKey(*r.Node), lineage.KeepForecast(f))
 	}

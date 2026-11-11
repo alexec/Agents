@@ -5925,6 +5925,9 @@ type LineageForecast struct {
 	Burn []LineageForecastBurn `json:"burn"`
 
 	ServiceLevels []LineageForecastServiceLevel `json:"serviceLevels"`
+
+	// The overhead that toComplete.loaded and spend's loaded figures are made with (#4524).
+	Overhead *LineageOverhead `json:"overhead,omitzero"`
 }
 
 // A weekly allowance's pace (#4526): used (0 to 1) at its last reading at, of the week that resets at resetsAt. runsOutAt is when it runs out at that pace, absent when it lasts to the reset (lasts).
@@ -5997,6 +6000,12 @@ type LineageForecastSpend struct {
 	Week map[string]LineageEstimateRange `json:"week"`
 
 	Month map[string]LineageEstimateRange `json:"month"`
+
+	// week with the overhead loaded in (#4524): times (1 + overhead.unlinkedRatio). Absent with no ratio.
+	LoadedWeek map[string]LineageEstimateRange `json:"loadedWeek,omitzero"`
+
+	// month, loaded as loadedWeek is.
+	LoadedMonth map[string]LineageEstimateRange `json:"loadedMonth,omitzero"`
 }
 
 // An epic's estimate to complete (#4526): dollars by currency, P10 to P90, for its open children and the lead. Each child's estimate is drawn from its matches and scaled by one factor per draw, shared by every child, lognormal from the closed children's actual over their kept estimate (ratio is its median, from closed of them). The lead's term is the epic's own cost over its closed children's, leadRatio, times the children's.
@@ -6008,6 +6017,9 @@ type LineageForecastToComplete struct {
 	Closed int64 `json:"closed"`
 
 	LeadRatio float64 `json:"leadRatio"`
+
+	// cost with the overhead loaded in (#4524): times (1 + overhead.unlinkedRatio). The lead is in cost already, so not the epic ratio. Absent with no ratio.
+	Loaded map[string]LineageEstimateRange `json:"loaded,omitzero"`
 }
 
 // lineage/walk (#2348): the nodes the walk reached and the links it went along. limited says the walk stopped at its limit on nodes, so there is more. resolved is each node's title, state and labels from its connector, by ref, for the nodes a connector could resolve (#3089). resolving says some nodes are still being resolved in the background, so walk again shortly for them (#3102). states is the current state of each session node in it that has one, by ref (#4274).

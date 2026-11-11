@@ -113,6 +113,15 @@ Decided: method H (hourly throughput, 14-day window, past groups' median share, 
 
 Decided: milestones go in #4620, not in #4526, because their membership must first be kept in the store, which is a change of its own. Alex can overrule.
 
+## The overhead, loaded in (#4524)
+
+- **Linked where it can be:** a turn with no work that started sessions goes on their work, so a Scrum Master's turn that starts a lead or a lane goes on that epic or issue. A workflow run started by a PR's `checks.*` or `pr.*` event (fix-failed-checks) works on that PR until it merges. A session labelled with a version tag (`v1.2.0`) works on that release, and the release's rollup counts it. The merge wave labels itself `P#<n>` for each PR it lands; the release labels itself `v<next>`.
+- **Measured where it cannot be:** `lineage.Overhead` takes the nodes that changed in the last 14 days. `unlinkedRatio` is the sessions' cost over the issues', PRs' and releases'. `epicRatio` is the epics' own cost over their children's and those children's PRs'.
+- **Shown as a loaded figure:** `lineage/estimate` has `loaded` beside `cost`: times (1 + `unlinkedRatio`), and for an epic times (1 + `epicRatio`) too, as its cost leaves its lead out. `lineage/forecast`'s `toComplete.loaded` and `spend.loadedWeek`/`loadedMonth` are times (1 + `unlinkedRatio`) only: the lead is in `toComplete` already. `reports/value` has `loaded` (total and unlinked) and the scope's `overhead`.
+- **Uncounted:** people's time and CI minutes are in no store; `overhead.uncounted` names them.
+
+Decided: a workflow run started by `pr.merged` or `pr.closed` is not linked to the PR, because the PR is done and what follows (a ship, a clean-up) is other work. Alex can overrule.
+
 ## Not in this spike
 
 - Cost forecasts, the burn against the allowance, and the estimate to complete. #4526 has them; this backtest is about dates only.

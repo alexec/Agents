@@ -12843,6 +12843,10 @@
           "items": {
             "$ref": "#/definitions/LineageForecastServiceLevel"
           }
+        },
+        "overhead": {
+          "$ref": "#/definitions/LineageOverhead",
+          "description": "The overhead that toComplete.loaded and spend's loaded figures are made with (#4524)."
         }
       },
       "required": [
@@ -13010,6 +13014,20 @@
           "additionalProperties": {
             "$ref": "#/definitions/LineageEstimateRange"
           }
+        },
+        "loadedWeek": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/LineageEstimateRange"
+          },
+          "description": "week with the overhead loaded in (#4524): times (1 + overhead.unlinkedRatio). Absent with no ratio."
+        },
+        "loadedMonth": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/LineageEstimateRange"
+          },
+          "description": "month, loaded as loadedWeek is."
         }
       },
       "required": [
@@ -13036,6 +13054,13 @@
         },
         "leadRatio": {
           "type": "number"
+        },
+        "loaded": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/LineageEstimateRange"
+          },
+          "description": "cost with the overhead loaded in (#4524): times (1 + overhead.unlinkedRatio). The lead is in cost already, so not the epic ratio. Absent with no ratio."
         }
       },
       "required": [
