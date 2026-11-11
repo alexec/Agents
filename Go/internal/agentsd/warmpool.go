@@ -41,7 +41,8 @@ import (
 //     WakeSettings.backgroundHours after its last turn ended, its processes with it and a
 //     note in the chat that names them. Once its last process ends, warmIdle starts then;
 //   - a warm runtime takes the next turn only when its start is what that turn's would be
-//     (warmKey).
+//     (warmKey);
+//   - under memory pressure the cap is 0 (memorypressure.go, #4514).
 //
 // Archive, delete and move release at once, as before. Each decision is logged as
 // "warm pool: <pooled|released|prewarmed> <id> (<why>)".
@@ -95,6 +96,9 @@ type warmBook struct {
 	// wakeSettings reads the Mac's settings (wake_darwin.go); unset off a Mac, where the
 	// defaults hold.
 	wakeSettings atomic.Pointer[func() wire.WakeSettings]
+	// pressure is the memory pressure at the last look (warmCap), "" with none.
+	pressureMu sync.Mutex
+	pressure   string
 }
 
 func (d *Daemon) warmSettings() wire.WakeSettings {
@@ -379,7 +383,8 @@ func (d *Daemon) warmPass() {
 		return
 	}
 	s := d.warmSettings()
-	capacity, hours, idle := int(s.WarmRuntimes), backgroundHoursOf(s), releaseAfterOf(s)
+	capacity, pressure := d.warmCap(s)
+	hours, idle := backgroundHoursOf(s), releaseAfterOf(s)
 	now := warmNow()
 	type look struct {
 		l       *live
@@ -445,6 +450,9 @@ func (d *Daemon) warmPass() {
 		if l == nil {
 			continue
 		}
+		if pressure != "" && !r.background {
+			r.why += "; " + pressure
+		}
 		if w := waitOf(d.Store.Agent(r.id)); w != nil {
 			r.why += "; it waits for " + waitLabel(w) + ", and its next turn continues the conversation"
 		}
@@ -493,8 +501,8 @@ func (d *Daemon) warmSoon(l *live) {
 	if !warm {
 		return
 	}
-	s := d.warmSettings()
-	log.Printf("warm pool: pooled %s (turn ended; cap %d)", l.id, s.WarmRuntimes)
+	capacity, _ := d.warmCap(d.warmSettings())
+	log.Printf("warm pool: pooled %s (turn ended; cap %d)", l.id, capacity)
 	d.goAfterTurn("warm pool", d.warmPass)
 }
 
@@ -576,7 +584,7 @@ func (d *Daemon) prewarm(r wire.PrewarmRequest) {
 	if runtimeByID(a.RuntimeID) == nil || !isDir(store.FolderPath(a.Cwd)) {
 		return
 	}
-	capacity := int(d.warmSettings().WarmRuntimes)
+	capacity, _ := d.warmCap(d.warmSettings())
 	if capacity == 0 {
 		return
 	}
