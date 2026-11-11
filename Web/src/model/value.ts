@@ -73,6 +73,21 @@ export function estimateErrorLine(v: ReportValue): string | undefined {
     : `Estimates were off by ${off.join(" and ")} (the median of ${issues})`;
 }
 
+/** How often the kept estimate's P10–P90 dollar range held the actual (#4525), which should be about 80%:
+ * "The dollar range held the actual 71% of the time". */
+export function estimateCoverageLine(v: ReportValue): string | undefined {
+  const coverage = v.estimateError?.coverage;
+  if (coverage === undefined) return undefined;
+  return `The dollar range held the actual ${Math.round(coverage * 100)}% of the time (it should hold it about 80%)`;
+}
+
+/** The landing date's median error in days (#4525): "The landing date was off by a median of 3 days". */
+export function estimateLandsAtLine(v: ReportValue): string | undefined {
+  const days = v.estimateError?.landsAtErrorDays;
+  if (days === undefined) return undefined;
+  return `The landing date was off by a median of ${plural(Math.round(days), "day", "days")}`;
+}
+
 /** The turns that had no issue or pull request, or nothing when there were none. */
 export function unlinkedLine(v: ReportValue): string | undefined {
   return spent(v.unlinked) ? `${costWords(v.unlinked)} on turns with no issue or pull request` : undefined;

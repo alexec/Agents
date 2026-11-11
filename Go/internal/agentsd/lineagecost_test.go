@@ -404,3 +404,41 @@ func TestLineageEstimateKeepsTheStartAndSaysTheActual(t *testing.T) {
 		t.Fatalf("%+v", kept)
 	}
 }
+
+// #4525: an estimate kept before the cycle time and landsAt were added gets them the next time
+// the backfill runs, from the same history, so its median dollars does not change.
+func TestKeepEstimatesBackfillsCycleTimeAndLandsAt(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	issue := func(n int) wire.LineageNode {
+		return wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#" + strconv.Itoa(n)}
+	}
+	str := func(s string) *string { return &s }
+	now := time.Now()
+	state, merged, level := "closed", lineage.OutcomeMerged, "task"
+	labels := []string{"enhancement", "task"}
+	d.workMu.Lock()
+	f := d.costLedgerLocked()
+	for n := 1; n <= 5; n++ {
+		started, ended := wire.DateOf(now.Add(-10*time.Hour)), wire.DateOf(now.Add(-9*time.Hour))
+		c := wire.LineageCostNode{Node: issue(n), Banked: wire.LineageCost{Cost: map[string]float64{"USD": float64(n)}}, Level: &level,
+			StartedAt: &started, Resolved: &wire.LineageResolved{Title: "Done", State: &state, Labels: labels}}
+		pr := wire.LineageCostNode{Node: wire.LineageNode{Kind: "pr", Ref: "github:alexec/agents#" + strconv.Itoa(100+n)},
+			Banked: wire.LineageCost{Cost: map[string]float64{}}, Fixes: []string{c.Node.Ref}, Outcome: &merged, EndedAt: &ended}
+		f.Nodes[costKey(c.Node)], f.Nodes[costKey(pr.Node)] = c, pr
+	}
+	// The target: an old-shape kept estimate, made before #4525, with no cycle time.
+	began := wire.DateOf(now.Add(-time.Hour))
+	target := issue(20)
+	f.Nodes[costKey(target)] = wire.LineageCostNode{Node: target, StartedAt: &began,
+		Resolved: &wire.LineageResolved{Title: "Open", State: str("open"), Labels: labels},
+		Estimate: &wire.LineageEstimateKept{At: began, Matches: 5, MatchedBy: str(lineage.MatchedByLevel), Cost: map[string]float64{"USD": 3}}}
+	d.keepEstimatesLocked()
+	got := d.costLedgerLocked().Nodes[costKey(target)].Estimate
+	d.workMu.Unlock()
+	// The same median as before: the history it was made from has not changed.
+	if got == nil || got.Cost["USD"] != 3 || got.CycleTimeSeconds == nil || got.CycleTimeSeconds.Median != 3600 ||
+		got.LandsAt == nil || got.LandsAt.Median != began+3600 {
+		t.Fatalf("%+v", got)
+	}
+}

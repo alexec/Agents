@@ -326,14 +326,19 @@ func (d *Daemon) refreshCostResolvedLocked() {
 // unsent. It is made once, so an issue that closes is set against what was said at its start.
 // An epic (labelled epic, or another issue's parent) has none here: lineage/estimate makes an
 // epic's from its plan.
+//
+// An estimate kept before #4525 has no cycleTimeSeconds: it is made again here, so it gets the
+// P10 to P90 of each figure, the cycle time and landsAt too (the backfill). When the issue
+// still has too little cycle history to say, the figures do not change, and nothing is marked
+// unsent again.
 func (d *Daemon) keepEstimatesLocked() {
 	f := d.costLedgerLocked()
 	var history []lineage.Past
 	var parents map[string]bool
 	for k, c := range f.Nodes {
 		start := lineage.StartOf(c)
-		if c.Node.Kind != lineage.KindIssue || c.Estimate != nil || start == nil || c.Resolved == nil ||
-			(c.Level != nil && *c.Level == "epic") {
+		if c.Node.Kind != lineage.KindIssue || start == nil || c.Resolved == nil ||
+			(c.Level != nil && *c.Level == "epic") || (c.Estimate != nil && c.Estimate.CycleTimeSeconds != nil) {
 			continue
 		}
 		if parents == nil {
@@ -350,6 +355,9 @@ func (d *Daemon) keepEstimatesLocked() {
 			continue
 		}
 		kept := lineage.KeepIssue(history, c.Node, c.Resolved.Labels, *start)
+		if c.Estimate != nil && reflect.DeepEqual(kept, *c.Estimate) {
+			continue
+		}
 		d.keepEstimateLocked(k, kept)
 	}
 }
@@ -552,10 +560,11 @@ func (d *Daemon) lineageEstimate(ctx context.Context, r wire.LineageEstimateRequ
 // keptEpic is the estimate an epic had when its work started (#3561): the one kept on its
 // node, else one made now from its plan, every child open, and the issues merged before the
 // first start on it or any child; kept on its node when the store has one. None before work
-// starts. An estimate kept as an issue's (it had no children yet) is made again.
+// starts. An estimate kept as an issue's (it had no children yet) is made again. One kept
+// before #4525, with no cycleTimeSeconds, is made again too (the backfill).
 func (d *Daemon) keptEpic(history []lineage.Past, nodes []wire.LineageCostNode, own wire.LineageCostNode, haveOwn bool,
 	of wire.LineageNode, labels []string, children []lineage.EpicChild) *wire.LineageEstimateKept {
-	if haveOwn && own.Estimate != nil && own.Estimate.MatchedBy == nil {
+	if haveOwn && own.Estimate != nil && own.Estimate.MatchedBy == nil && own.Estimate.CycleTimeSeconds != nil {
 		return own.Estimate
 	}
 	in := map[wire.LineageNode]bool{of: true}
@@ -572,7 +581,7 @@ func (d *Daemon) keptEpic(history []lineage.Past, nodes []wire.LineageCostNode, 
 		return nil
 	}
 	kept := lineage.KeepEpic(history, of, labels, children, *start)
-	if haveOwn {
+	if haveOwn && (own.Estimate == nil || !reflect.DeepEqual(kept, *own.Estimate)) {
 		d.workMu.Lock()
 		d.keepEstimateLocked(costKey(of), kept)
 		d.costChangedLocked()

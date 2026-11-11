@@ -143,7 +143,8 @@ func TestEstimateEpic(t *testing.T) {
 }
 
 // #3561: an estimate kept for a start knows only the issues merged before it, and keeps its
-// medians; an epic's counts every child as open.
+// medians; an epic's counts every child as open. #4525: it keeps the P10 to P90 of each figure,
+// the cycle time and landsAt too.
 func TestKeepAtTheStart(t *testing.T) {
 	var h []Past
 	for i := range 6 {
@@ -157,6 +158,12 @@ func TestKeepAtTheStart(t *testing.T) {
 	k := KeepIssue(h, wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#9"}, []string{"enhancement", "task"}, 200)
 	if k.At != 200 || k.Matches != 6 || k.Cost["USD"] != 3.5 || *k.MatchedBy != MatchedByLevel || *k.WorkingSeconds != 210 {
 		t.Fatalf("%+v", k)
+	}
+	if k.CostP10["USD"] != 1.5 || k.CostP90["USD"] != 5.5 || *k.WorkingSecondsP10 != 90 || *k.WorkingSecondsP90 != 330 {
+		t.Fatalf("range %+v", k)
+	}
+	if k.CycleTimeSeconds == nil || k.CycleTimeSeconds.Median != 1 || k.LandsAt == nil || k.LandsAt.Median != 201 {
+		t.Fatalf("cycle %+v", k)
 	}
 	if k := KeepIssue(h, wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#9"}, nil, 50); k.Matches != 0 || k.Cost != nil {
 		t.Fatalf("%+v", k)

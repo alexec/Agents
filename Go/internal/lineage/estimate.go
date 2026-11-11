@@ -356,20 +356,30 @@ func StartOf(n wire.LineageCostNode) *wire.Date {
 	return n.FirstAt
 }
 
-// Keep is e's medians, as an estimate kept for the start at (#3561).
+// Keep is e's figures, as an estimate kept for the start at (#3561): the median of each, and
+// (#4525) its P10 to P90, the cycle time and landsAt, so a closed issue can check how well the
+// range held and how far off its landing date was.
 func Keep(e wire.LineageEstimate, at wire.Date) wire.LineageEstimateKept {
 	k := wire.LineageEstimateKept{At: at, MatchedBy: e.MatchedBy, Matches: e.Matches}
 	for currency, r := range e.Cost {
 		if k.Cost == nil {
-			k.Cost = map[string]float64{}
+			k.Cost, k.CostP10, k.CostP90 = map[string]float64{}, map[string]float64{}, map[string]float64{}
 		}
-		k.Cost[currency] = r.Median
+		k.Cost[currency], k.CostP10[currency], k.CostP90[currency] = r.Median, r.P10, r.P90
 	}
 	if e.OutputTokens != nil {
-		k.OutputTokens = &e.OutputTokens.Median
+		k.OutputTokens, k.OutputTokensP10, k.OutputTokensP90 = &e.OutputTokens.Median, &e.OutputTokens.P10, &e.OutputTokens.P90
 	}
 	if e.WorkingSeconds != nil {
-		k.WorkingSeconds = &e.WorkingSeconds.Median
+		k.WorkingSeconds, k.WorkingSecondsP10, k.WorkingSecondsP90 = &e.WorkingSeconds.Median, &e.WorkingSeconds.P10, &e.WorkingSeconds.P90
+	}
+	if e.CycleTimeSeconds != nil {
+		r := *e.CycleTimeSeconds
+		k.CycleTimeSeconds = &r
+	}
+	if e.LandsAt != nil {
+		d := *e.LandsAt
+		k.LandsAt = &d
 	}
 	return k
 }

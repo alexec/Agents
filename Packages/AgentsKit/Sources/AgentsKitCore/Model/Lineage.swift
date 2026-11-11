@@ -216,24 +216,43 @@ public extension DaemonAPI {
     }
 
     /// An estimate as it was when work started (#3561): the medians, from the issues merged
-    /// before then.
+    /// before then, and (#4525) the P10 to P90 beside each, the cycle time and landsAt.
     struct LineageEstimateKept: Codable, Sendable, Hashable {
         public var at: Date
         public var matchedBy: String?
         public var matches: Int
         /// Dollars, by currency.
         public var cost: [String: Double]?
+        public var costP10: [String: Double]?
+        public var costP90: [String: Double]?
         public var outputTokens: Double?
+        public var outputTokensP10: Double?
+        public var outputTokensP90: Double?
         public var workingSeconds: Double?
+        public var workingSecondsP10: Double?
+        public var workingSecondsP90: Double?
+        public var cycleTimeSeconds: LineageEstimateRange?
+        public var landsAt: LineageEstimateDates?
 
         public init(at: Date, matchedBy: String? = nil, matches: Int = 0, cost: [String: Double]? = nil,
-                    outputTokens: Double? = nil, workingSeconds: Double? = nil) {
+                    costP10: [String: Double]? = nil, costP90: [String: Double]? = nil,
+                    outputTokens: Double? = nil, outputTokensP10: Double? = nil, outputTokensP90: Double? = nil,
+                    workingSeconds: Double? = nil, workingSecondsP10: Double? = nil, workingSecondsP90: Double? = nil,
+                    cycleTimeSeconds: LineageEstimateRange? = nil, landsAt: LineageEstimateDates? = nil) {
             self.at = at
             self.matchedBy = matchedBy
             self.matches = matches
             self.cost = cost
+            self.costP10 = costP10
+            self.costP90 = costP90
             self.outputTokens = outputTokens
+            self.outputTokensP10 = outputTokensP10
+            self.outputTokensP90 = outputTokensP90
             self.workingSeconds = workingSeconds
+            self.workingSecondsP10 = workingSecondsP10
+            self.workingSecondsP90 = workingSecondsP90
+            self.cycleTimeSeconds = cycleTimeSeconds
+            self.landsAt = landsAt
         }
     }
 

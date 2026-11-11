@@ -45,3 +45,12 @@ test("how far the estimates were from the actual figures (#3561)", () => {
     "Estimates were off by ×1.5 in dollars and ×1.4 in hours of work (the median of 12 closed issues)");
   assert.equal(v.estimateErrorLine({ estimateError: { issues: 1 } }), "No estimate had a figure to set against the actual (1 closed issue)");
 });
+
+test("how often the kept range held the actual, and the landing date's error in days (#4525)", () => {
+  assert.equal(v.estimateCoverageLine({}), undefined);
+  assert.equal(v.estimateCoverageLine({ estimateError: { issues: 3, coverage: 0.71 } }),
+    "The dollar range held the actual 71% of the time (it should hold it about 80%)");
+  assert.equal(v.estimateLandsAtLine({}), undefined);
+  assert.equal(v.estimateLandsAtLine({ estimateError: { issues: 3, landsAtErrorDays: 1 } }), "The landing date was off by a median of 1 day");
+  assert.equal(v.estimateLandsAtLine({ estimateError: { issues: 3, landsAtErrorDays: 3.4 } }), "The landing date was off by a median of 3 days");
+});
