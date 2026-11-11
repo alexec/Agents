@@ -24,6 +24,8 @@ type githubForge struct {
 
 func (githubForge) Name() string { return "github" }
 
+func (githubForge) Images() forgeImageHost { return githubImages{} }
+
 func (githubForge) Caps() forgeCaps {
 	return forgeCaps{
 		Issues: true, PRs: true,
@@ -35,6 +37,7 @@ func (githubForge) Caps() forgeCaps {
 		StateReason: true,
 		CreatedAt:   true, ClosedAt: true, Children: true, LinkedPulls: true, Events: true,
 		CommentCount: "exact",
+		Total:        true,
 		Plan:         true, BlockedBy: true, AddChild: true,
 		Reasons: map[string]string{
 			actionTransition: "only a Jira issue or an Azure Boards work item moves by a transition",
@@ -99,7 +102,7 @@ func (g githubForge) List(ctx context.Context, scope forgeScope, f forgeFilter, 
 	for _, i := range page.Items {
 		p.items = append(p.items, forgeItemOf(i, s.folderOf[strings.ToLower(i.Repo)]))
 	}
-	p.cursors, p.next = page.Cursors, page.Next
+	p.cursors, p.next, p.total = page.Cursors, page.Next, page.Total
 	return p, err
 }
 

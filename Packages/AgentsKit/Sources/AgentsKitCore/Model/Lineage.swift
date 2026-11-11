@@ -388,6 +388,8 @@ public extension DaemonAPI {
         public var ratio: Double
         public var closed: Int
         public var leadRatio: Double
+        /// `cost` with the overhead loaded in (#4524): the cost no issue links to; nil with no ratio.
+        public var loaded: [String: LineageEstimateRange]?
     }
 
     /// What a week and a month cost at the window's pace (#4526): dollars by currency.

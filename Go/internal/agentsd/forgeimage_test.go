@@ -319,3 +319,97 @@ func TestForgeImageReadsEachForgesAvatars(t *testing.T) {
 		t.Fatalf("asked %q", asked[before:])
 	}
 }
+
+// #4544: each forge's attachment links are read, with each forge's own token only on the hosts
+// that need it, never on the signed URL a redirect goes to: GitLab's uploads (the connected
+// GitLab's from its API), Forgejo's and Codeberg's attachments, Bitbucket's images and issue
+// attachments, Azure DevOps' work item and pull request attachments, Linear's uploads, and Jira's
+// attachments. Every forge in the registry gives its image hosts.
+func TestForgeImageReadsEachForgesAttachments(t *testing.T) {
+	d, c, _, file := forgeDaemon(t)
+	for _, f := range d.forges() {
+		if f.Images() == nil {
+			t.Errorf("%s gives no image hosts", f.Name())
+		}
+	}
+	web := &fakeImageWeb{answers: map[string]func() *http.Response{}}
+	d.forgeImageTransport = web
+	for _, conn := range []connections.Connection{
+		{Provider: connections.GitLab, Login: "kim", Access: "gloas-secret", URL: "https://gitlab.acme.test/",
+			AccessExpiresAt: time.Now().Add(time.Hour), ConnectedAt: time.Now()},
+		{Provider: connections.Forgejo, Login: "kim", Access: "forgejo-secret", URL: "http://localhost:3753/", ConnectedAt: time.Now()},
+		{Provider: connections.Bitbucket, Login: "kim", User: "kim@example.com", Access: "bb-secret", ConnectedAt: time.Now()},
+		{Provider: connections.Linear, Login: "kim", Access: "lin-secret", ConnectedAt: time.Now()},
+	} {
+		if err := file.Put(conn); err != nil {
+			t.Fatal(err)
+		}
+	}
+	secrets := filepath.Join(os.Getenv("AGENTS_PERSONAL_HOME"), ".agents-secrets")
+	os.MkdirAll(secrets, 0o700)
+	os.WriteFile(filepath.Join(secrets, "secrets.env"), []byte("AZURE_DEVOPS_URL=https://dev.azure.com/\nAZURE_DEVOPS_TOKEN=ado\n"+
+		"JIRA_URL=https://jira.acme.test/jira\nJIRA_API_TOKEN=pat\n"), 0o600)
+	ado := " auth=Basic " + base64.StdEncoding.EncodeToString([]byte(":ado"))
+	bb := " auth=Basic " + base64.StdEncoding.EncodeToString([]byte("kim@example.com:bb-secret"))
+	secret := "0123456789abcdef0123456789abcdef"
+	uuid := "0f8fad5b-d9cb-469f-a165-70867728950e"
+	bucket := "https://bbuseruploads.s3.amazonaws.com/abc/shot.png?Signature=signed"
+	media := "https://api.media.atlassian.com/file/abc/binary?token=signed"
+	// Each link, and what it asks: the URL, then the token it sends.
+	read := map[string][]string{
+		"https://gitlab.acme.test/-/project/7/uploads/" + secret + "/shot.png": {"https://gitlab.acme.test/api/v4/projects/7/uploads/" + secret + "/shot.png auth=Bearer gloas-secret"},
+		"https://gitlab.acme.test/acme/tools/app/uploads/" + secret + "/shot.png": {
+			"https://gitlab.acme.test/api/v4/projects/acme%2Ftools%2Fapp/uploads/" + secret + "/shot.png auth=Bearer gloas-secret"},
+		"https://gitlab.com/kim/app/uploads/" + secret + "/shot.png":                                  {"https://gitlab.com/kim/app/uploads/" + secret + "/shot.png"},
+		"http://localhost:3753/attachments/" + uuid:                                                   {"http://localhost:3753/attachments/" + uuid + " auth=token forgejo-secret"},
+		"http://localhost:3753/kim/app/attachments/" + uuid:                                           {"http://localhost:3753/kim/app/attachments/" + uuid + " auth=token forgejo-secret"},
+		"https://codeberg.org/attachments/" + uuid:                                                    {"https://codeberg.org/attachments/" + uuid},
+		"https://bitbucket.org/repo/aKq8Ep/images/123-shot.png":                                       {"https://bitbucket.org/repo/aKq8Ep/images/123-shot.png" + bb, bucket},
+		"https://api.bitbucket.org/2.0/repositories/kim/app/issues/3/attachments/shot.png":            {"https://api.bitbucket.org/2.0/repositories/kim/app/issues/3/attachments/shot.png" + bb},
+		"https://dev.azure.com/acme/proj/_apis/wit/attachments/" + uuid + "?fileName=shot.png":        {"https://dev.azure.com/acme/proj/_apis/wit/attachments/" + uuid + "?fileName=shot.png" + ado},
+		"https://dev.azure.com/acme/proj/_apis/git/repositories/app/pullRequests/4/attachments/x.png": {"https://dev.azure.com/acme/proj/_apis/git/repositories/app/pullRequests/4/attachments/x.png" + ado},
+		"https://uploads.linear.app/org/" + uuid + "/" + uuid:                                         {"https://uploads.linear.app/org/" + uuid + "/" + uuid + " auth=Bearer lin-secret"},
+		"https://jira.acme.test/jira/secure/attachment/10001/shot.png":                                {"https://jira.acme.test/jira/secure/attachment/10001/shot.png auth=Bearer pat"},
+		"https://jira.acme.test/jira/rest/api/3/attachment/content/10001":                             {"https://jira.acme.test/jira/rest/api/3/attachment/content/10001 auth=Bearer pat", media},
+	}
+	for _, asks := range read {
+		u, _, _ := strings.Cut(asks[len(asks)-1], " auth=")
+		web.answers[u] = imageAnswer("image/png", pngBytes)
+	}
+	web.answers["https://bitbucket.org/repo/aKq8Ep/images/123-shot.png"] = redirectTo(bucket)
+	web.answers["https://jira.acme.test/jira/rest/api/3/attachment/content/10001"] = redirectTo(media)
+	n := 0
+	for u, want := range read {
+		n++
+		before := len(web.requests())
+		var image wire.ForgeImage
+		json.Unmarshal(c.call(t, n, "forge/image", wire.ForgeImageRequest{URL: u}), &image)
+		if image.MimeType != "image/png" {
+			t.Errorf("%s: %s", u, image.MimeType)
+		}
+		if asked := web.requests()[before:]; strings.Join(asked, "\n") != strings.Join(want, "\n") {
+			t.Errorf("%s: asked %q, want %q", u, asked, want)
+		}
+	}
+	before := len(web.requests())
+	for i, u := range []string{
+		"https://gitlab.acme.test/-/project/x/uploads/" + secret + "/a.png", "https://gitlab.acme.test/acme/app/uploads/0123/a.png",
+		"https://gitlab.acme.test/acme/app/-/uploads/" + secret + "/a.png", "https://gitlab.acme.test/acme/../uploads/" + secret + "/a.png",
+		"https://gitlab.acme.test/acme/app/uploads/" + secret + "/%2e%2e", "https://gitlab.other.test/acme/app/uploads/" + secret + "/a.png",
+		"https://gitlab.com/api/v4/projects/7/uploads/" + secret + "/a.png", "http://gitlab.com/kim/app/uploads/" + secret + "/a.png",
+		"http://localhost:3753/attachments/not-a-uuid", "https://codeberg.org/kim/app/attachments/" + uuid + "/x",
+		"http://localhost:3753/kim/app/raw/branch/main/x.png", "https://bitbucket.org/kim/app/issues/1",
+		"https://bbuseruploads.s3.amazonaws.com.evil.example/x", "https://api.bitbucket.org/2.0/repositories/kim/app/issues/x/attachments/a.png",
+		"https://dev.azure.com/acme/proj/_apis/wit/workitems/1", "https://dev.azure.com/acme/proj/_apis/wit/attachments/..",
+		"https://evil.example/acme/proj/_apis/wit/attachments/" + uuid, "https://linear.app/acme/issue/ENG-1", "http://uploads.linear.app/a",
+		"https://jira.acme.test/jira/secure/attachment/abc/x.png", "https://jira.acme.test/jira/rest/api/2/attachment/10001",
+		"https://jira.other.test/jira/secure/attachment/10001/x.png", "https://api.media.atlassian.com/other",
+	} {
+		if msg := c.callErr(t, 100+i, "forge/image", wire.ForgeImageRequest{URL: u}); msg == "" {
+			t.Errorf("%s: no error", u)
+		}
+	}
+	if asked := web.requests(); len(asked) != before {
+		t.Fatalf("asked %q", asked[before:])
+	}
+}

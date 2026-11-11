@@ -4081,9 +4081,10 @@ export interface ForgeBoardsRequest {
  * and pulls say it has them; labelColors that its labels have a #rrggbb colour; avatars that its
  * items have authorAvatar; stateReason that its closed issues have stateReason. createdAt that its
  * items have createdAt, and closedAt that its closed and merged items have closedAt; children,
- * linkedPulls and events that an item's read has them (#4373); each is absent from an earlier
- * daemon, which has none. commentCount says how to read ForgeItem.comments: exact; capped at
- * commentsMost (show 50+ there); or detail, only on an item's own page (hide it on the row).
+ * linkedPulls and events that an item's read has them (#4373); total that it counts a list's items,
+ * for ForgeList.total (#4396); each is absent from an earlier daemon, which has none. commentCount
+ * says how to read ForgeItem.comments: exact; capped at commentsMost (show 50+ there); or detail,
+ * only on an item's own page (hide it on the row).
  */
 export interface ForgeCapabilities {
   forge: string;
@@ -4097,6 +4098,7 @@ export interface ForgeCapabilities {
   children?: boolean;
   linkedPulls?: boolean;
   events?: boolean;
+  total?: boolean;
   commentCount: ForgeCommentCount;
   commentsMost?: number;
 }
@@ -4419,11 +4421,14 @@ export interface ForgeLinked {
  * forge/issues and forge/pulls (#3129): a page of items, the last updated first. cursor is the next
  * page, absent at the end. errors says a forge that could not be read (not connected, a rate
  * limit), and the items of the others still come. forges says what each forge on the page fills
- * (#4361); absent from an earlier daemon.
+ * (#4361); absent from an earlier daemon. total is how many items the whole list has, the sum of
+ * each forge's count, kept from each forge's first page (#4396); absent when a forge on the list
+ * gives no count (ForgeCapabilities.total) or could not be read, and from an earlier daemon.
  */
 export interface ForgeList {
   items: ForgeItem[];
   cursor?: string;
+  total?: number;
   errors?: ForgeListError[];
   forges?: ForgeCapabilities[];
 }
@@ -11118,6 +11123,21 @@ export interface SendFile {
 }
 
 /**
+ * send/changed (#4613): how a send that folders/send started goes. `sent` of `total` bytes are on
+ * the other machine (0 of 0 while the bundle is made); `finished` once it ended, whichever way:
+ * `received` is the folder it became there, or `problem` says why it stopped, in the person's
+ * words.
+ */
+export interface SendNotification {
+  send: SendSummary;
+  sent: number;
+  total: number;
+  finished: boolean;
+  problem?: string;
+  received?: FolderSummary;
+}
+
+/**
  * What folders/sendPack made (#1123): each branch at its commit, the bundle (none when the
  * receiving host has every commit) and the patch (none when nothing is uncommitted).
  */
@@ -11151,6 +11171,36 @@ export interface SendRead {
 export interface SendReadRequest {
   id: UUID;
   offset: number;
+}
+
+/**
+ * folders/send (#4613): Send to ‹machine›… from a client. This host sends `branches` of the
+ * repository at `folder`, less the commits the folder there has, and with `includeChanges` its
+ * uncommitted changes, to `destination` on `machine` (the control plane's id or name for it;
+ * `machineName` is the name the person knows it by, for the words), through the control plane, as
+ * start_session with send does (#2929). There `checkout` is checked out and `origin` set.
+ */
+export interface SendRequest {
+  folder: URLString;
+  machine: string;
+  machineName?: string;
+  destination: string;
+  branches: string[];
+  checkout: string;
+  includeChanges: boolean;
+  origin?: string;
+}
+
+/**
+ * One send folders/send started (#4613): the folder here, and the folder on the machine it goes to.
+ */
+export interface SendSummary {
+  id: UUID;
+  folder: URLString;
+  machine: string;
+  machineName: string;
+  destination: string;
+  startedAt: WireDate;
 }
 
 /** A branch the Mac sends, at the commit it has (#1123). */
@@ -14918,7 +14968,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeBlockedByRequest: { required: ["node"], optional: ["add", "remove"] },
   ForgeBoards: { required: ["boards"], optional: [] },
   ForgeBoardsRequest: { required: [], optional: ["folder"] },
-  ForgeCapabilities: { required: ["forge", "issues", "pulls", "labelColors", "avatars", "stateReason", "commentCount"], optional: ["createdAt", "closedAt", "children", "linkedPulls", "events", "commentsMost"] },
+  ForgeCapabilities: { required: ["forge", "issues", "pulls", "labelColors", "avatars", "stateReason", "commentCount"], optional: ["createdAt", "closedAt", "children", "linkedPulls", "events", "total", "commentsMost"] },
   ForgeCheck: { required: ["name", "state"], optional: ["url"] },
   ForgeCloseRequest: { required: ["node"], optional: ["reopen", "transition"] },
   ForgeComment: { required: ["author", "body", "at"], optional: ["avatar", "url", "bot"] },
@@ -14941,7 +14991,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeLabels: { required: ["labels"], optional: [] },
   ForgeLead: { required: ["session", "state"], optional: ["title"] },
   ForgeLinked: { required: ["node", "title", "state"], optional: ["url"] },
-  ForgeList: { required: ["items"], optional: ["cursor", "errors", "forges"] },
+  ForgeList: { required: ["items"], optional: ["cursor", "total", "errors", "forges"] },
   ForgeListError: { required: ["forge", "message"], optional: [] },
   ForgeListRequest: { required: [], optional: ["folder", "state", "label", "assignee", "query", "cursor", "limit", "feature", "board"] },
   ForgeLog: { required: ["text"], optional: [] },
@@ -15499,10 +15549,13 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SendFacts: { required: ["branches", "hasChanges"], optional: ["current", "origin"] },
   SendFactsRequest: { required: ["folder"], optional: [] },
   SendFile: { required: ["id", "size"], optional: [] },
+  SendNotification: { required: ["send", "sent", "total", "finished"], optional: ["problem", "received"] },
   SendPack: { required: ["commits"], optional: ["bundle", "patch"] },
   SendPackRequest: { required: ["folder", "branches", "leavingOut", "includeChanges"], optional: [] },
   SendRead: { required: ["data", "end"], optional: [] },
   SendReadRequest: { required: ["id", "offset"], optional: [] },
+  SendRequest: { required: ["folder", "machine", "destination", "branches", "checkout", "includeChanges"], optional: ["machineName", "origin"] },
+  SendSummary: { required: ["id", "folder", "machine", "machineName", "destination", "startedAt"], optional: [] },
   SentBranch: { required: ["name", "commit"], optional: [] },
   SentNotice: { required: ["title", "outcome"], optional: ["body", "nextAt", "to"] },
   ServedRequest: { required: ["kind", "outcome"], optional: [] },

@@ -183,6 +183,8 @@ type azureBoardsForge struct {
 
 func (azureBoardsForge) Name() string { return "azureboards" }
 
+func (azureBoardsForge) Images() forgeImageHost { return azureImages{} }
+
 func (azureBoardsForge) Caps() forgeCaps {
 	return forgeCaps{
 		Issues:      true,

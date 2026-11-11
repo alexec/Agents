@@ -383,15 +383,18 @@ test("New Session starts in the folder last started in, while it is live (#495)"
   assert.equal(rememberedFolder(storage), undefined, "stored badly, none");
 });
 
-test("a folder's archive is in the address (#499)", async () => {
+test("a folder's Archived Sessions and Archived Workflows are in the address (#499, #4451)", async () => {
   globalThis.location = { hash: "" };
   globalThis.addEventListener = () => {};
   try {
     const { parseRoute, routeHash } = await load("src/route.ts");
-    const hash = routeHash({ host: "mac", folder: "file:///w/a", archive: true });
-    assert.equal(hash, "#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/ar/1");
-    assert.deepEqual(parseRoute(hash), { host: "mac", folder: "file:///w/a", archive: true });
-    assert.equal(routeHash({ host: "mac", folder: "file:///w/a", session: "s", archive: true }),
+    const hash = routeHash({ host: "mac", folder: "file:///w/a", archive: "sessions" });
+    assert.equal(hash, "#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/ar/sessions");
+    assert.deepEqual(parseRoute(hash), { host: "mac", folder: "file:///w/a", archive: "sessions" });
+    assert.equal(routeHash({ host: "mac", folder: "file:///w/a", archive: "workflows" }), "#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/ar/workflows");
+    assert.equal(parseRoute("#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/ar/workflows").archive, "workflows");
+    assert.equal(parseRoute("#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/ar/1").archive, "sessions", "an old link opens sessions");
+    assert.equal(routeHash({ host: "mac", folder: "file:///w/a", session: "s", archive: "sessions" }),
       "#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/s/s", "a session opened from it is a page of its own");
   } finally {
     delete globalThis.location;

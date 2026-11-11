@@ -31,6 +31,9 @@ export function foldName(host: string, folder: string): string {
   return `${host}|${folderKey(folder)}`;
 }
 
+/** Needs You's Later group (#4236), as the window's sidebar.needsYou.laterOpen. */
+const laterName = "smart:needsYou:later";
+
 function smartName(row: SmartRow): string {
   return `smart:${row}`;
 }
@@ -117,6 +120,15 @@ export class Folds {
   setSmart(row: SmartRow, isOpen: boolean): void {
     if (smartStartsOpen(row)) this.change(this.closed, closedKey, smartName(row), !isOpen);
     else this.change(this.open, storageKey, smartName(row), isOpen);
+  }
+
+  /** Whether Needs You's Later group is open (#4236): folded until opened. */
+  isLaterOpen(): boolean {
+    return this.open.value.has(laterName);
+  }
+
+  setLaterOpen(isOpen: boolean): void {
+    this.change(this.open, storageKey, laterName, isOpen);
   }
 
   /**

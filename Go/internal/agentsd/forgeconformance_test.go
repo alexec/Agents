@@ -35,8 +35,8 @@ import (
 // passes it before it gets its own tests.
 //
 // ForgeList.forges and ForgeItemDetail.actions are checked here since #4361, authorAvatar since
-// #4363, stateReason since #4365, and createdAt, closedAt and an issue's children, linkedPulls and
-// events since #4373.
+// #4363, stateReason since #4365, createdAt, closedAt and an issue's children, linkedPulls and
+// events since #4373, and ForgeList.total since #4396.
 
 type conformRow struct {
 	name string
@@ -90,6 +90,10 @@ func (g conformGitHub) Search(_ context.Context, _ []string, sf githubmcp.Search
 	}
 	if end := from + len(page.Items); end < len(kept) {
 		page.Next = strconv.Itoa(end)
+	}
+	// The first page counts the list (#4396).
+	if after == "" {
+		page.Total = new(len(kept))
 	}
 	return page, nil
 }
@@ -178,6 +182,10 @@ func (g conformGitLab) Search(_ context.Context, _ []string, sf gitlabmcp.Search
 	}
 	if end := from + len(page.Items); end < len(kept) {
 		page.Next = strconv.Itoa(end)
+	}
+	// The first page counts the list (#4396).
+	if after == "" {
+		page.Total = new(len(kept))
 	}
 	return page, nil
 }
@@ -518,6 +526,10 @@ func (g conformJira) Search(_ context.Context, _ []string, sf jiramcp.SearchFilt
 	if end := from + len(page.Items); end < len(kept) {
 		page.Next = strconv.Itoa(end)
 	}
+	// The first page counts the list (#4396).
+	if after == "" {
+		page.Total = new(len(kept))
+	}
 	return page, nil
 }
 
@@ -623,7 +635,15 @@ func conformBoardsDaemon(t *testing.T) (*Daemon, *conn) {
 // conformList is every item of a forge/issues or forge/pulls list, a page of limit at a time.
 func conformList(t *testing.T, c *conn, method string, limit int64) []wire.ForgeItem {
 	t.Helper()
+	items, _ := conformPages(t, c, method, limit)
+	return items
+}
+
+// conformPages is conformList, and each page's total.
+func conformPages(t *testing.T, c *conn, method string, limit int64) ([]wire.ForgeItem, []*int64) {
+	t.Helper()
 	var items []wire.ForgeItem
+	var totals []*int64
 	var cursor *string
 	for n := 0; ; n++ {
 		if n > 20 {
@@ -637,8 +657,9 @@ func conformList(t *testing.T, c *conn, method string, limit int64) []wire.Forge
 			t.Fatalf("%s: %+v", method, page.Errors)
 		}
 		items = append(items, page.Items...)
+		totals = append(totals, page.Total)
 		if page.Cursor == nil {
-			return items
+			return items, totals
 		}
 		cursor = page.Cursor
 	}
@@ -668,9 +689,21 @@ func TestForgeConformance(t *testing.T) {
 				all[prs] = conformList(t, c, method, forgeListMost)
 				// 4. The list pages: a limit of 1 gives every item once, by the cursors.
 				d.forgeWrote()
-				one := conformList(t, c, method, 1)
+				one, totals := conformPages(t, c, method, 1)
 				if !slices.EqualFunc(one, all[prs], func(a, b wire.ForgeItem) bool { return a.Node == b.Node }) {
 					t.Errorf("%s by ones: %v, want %v", method, conformNodes(one), conformNodes(all[prs]))
+				}
+				// 5. The total (#4396): a forge that counts says the whole list's on every page; one
+				// that does not says none, unless its list ends on its first page.
+				for n, total := range totals {
+					counts := caps.Total || len(all[prs]) <= 1
+					if counts != (total != nil) || total != nil && *total != int64(len(all[prs])) {
+						got := "none"
+						if total != nil {
+							got = strconv.FormatInt(*total, 10)
+						}
+						t.Errorf("%s page %d: total %s, want %d (caps say total=%v)", method, n, got, len(all[prs]), caps.Total)
+					}
 				}
 			}
 			// The list says the forge's capabilities (#4361).

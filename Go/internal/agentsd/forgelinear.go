@@ -27,6 +27,8 @@ type linearForge struct {
 
 func (linearForge) Name() string { return "linear" }
 
+func (linearForge) Images() forgeImageHost { return linearImages{} }
+
 func (linearForge) Caps() forgeCaps {
 	return forgeCaps{
 		Issues:      true,

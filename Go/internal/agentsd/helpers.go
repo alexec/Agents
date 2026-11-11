@@ -54,7 +54,7 @@ func (d *Daemon) helpersIn(folder string) []wire.Agent {
 	out := d.thereAgents(folder)
 	project := projectOfFolder(folder)
 	projects := projectsOfFolders{folder: project}
-	for _, a := range d.Store.Agents() {
+	for _, a := range d.Store.LiveAgents() {
 		if a.StartedByAgent != nil && a.State != wire.AgentStateArchived && a.State != wire.AgentStateQueued && !isLead(&a) &&
 			inLimitScope(folder, project, projects, &a) {
 			out = append(out, a)
@@ -86,7 +86,7 @@ func (d *Daemon) helperQueue(folder string) []wire.Agent {
 	var out []wire.Agent
 	project := projectOfFolder(folder)
 	projects := projectsOfFolders{folder: project}
-	for _, a := range d.Store.Agents() {
+	for _, a := range d.Store.LiveAgents() {
 		if a.State == wire.AgentStateQueued && inLimitScope(folder, project, projects, &a) {
 			out = append(out, a)
 		}

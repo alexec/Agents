@@ -317,7 +317,11 @@ struct FolderListView: View {
                 ForEach(model.clones) { clone in
                     CloningRow(clone: clone).appText(.supporting)
                 }
-                if model.folders.isEmpty, model.clones.isEmpty, model.hasLoadedFolders, model.isConnected {
+                // A folder on its way to another machine, until it is a folder there (#4613).
+                ForEach(model.sends) { send in
+                    SendingRow(send: send).appText(.supporting)
+                }
+                if model.folders.isEmpty, model.clones.isEmpty, model.sends.isEmpty, model.hasLoadedFolders, model.isConnected {
                     EmptyFolderList(isChoosingFolder: $isChoosingFolder, isCloning: $isCloning)
                         .appText(.supporting)
                 }

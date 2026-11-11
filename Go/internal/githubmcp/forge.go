@@ -53,11 +53,13 @@ type Item struct {
 
 // SearchPage is a page of a search, the last updated first. Cursors[i] goes on after Items[i],
 // so a caller that keeps only some of the page (the daemon, merging forges by time, #3209) goes
-// on from the last it kept; Next is the cursor of the page after it, "" at the end.
+// on from the last it kept; Next is the cursor of the page after it, "" at the end. Total is how
+// many items the whole search finds (#4396).
 type SearchPage struct {
 	Items   []Item
 	Cursors []string
 	Next    string
+	Total   *int
 }
 
 // Comment is a comment on an item, as Markdown.
@@ -153,7 +155,7 @@ const pullFields = `isDraft mergeable reviewDecision autoMergeRequest { enabledA
   checkState: commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }`
 
 const searchQuery = `query($q: String!, $first: Int!, $after: String) {
-  search(query: $q, type: ISSUE, first: $first, after: $after) { pageInfo { hasNextPage endCursor } edges { cursor node {
+  search(query: $q, type: ISSUE, first: $first, after: $after) { issueCount pageInfo { hasNextPage endCursor } edges { cursor node {
     __typename ... on Issue { issueState: state ` + itemFields + ` ` + issueFields + ` }
     ... on PullRequest { pullState: state ` + itemFields + ` ` + pullFields + ` } } } } }`
 
@@ -321,7 +323,8 @@ func (g *RealGitHub) Search(ctx context.Context, repos []string, f SearchFilter,
 	}
 	var data struct {
 		Search struct {
-			PageInfo struct {
+			IssueCount int `json:"issueCount"`
+			PageInfo   struct {
 				HasNextPage bool   `json:"hasNextPage"`
 				EndCursor   string `json:"endCursor"`
 			} `json:"pageInfo"`
@@ -334,7 +337,7 @@ func (g *RealGitHub) Search(ctx context.Context, repos []string, f SearchFilter,
 	if err := g.graphql(ctx, searchQuery, vars, &data); err != nil {
 		return SearchPage{}, err
 	}
-	p := SearchPage{Items: []Item{}, Cursors: []string{}}
+	p := SearchPage{Items: []Item{}, Cursors: []string{}, Total: &data.Search.IssueCount}
 	for _, e := range data.Search.Edges {
 		// A search for issues can find nothing else, but a node it cannot read is empty.
 		if n := e.Node; n.Number > 0 && n.Repository.NameWithOwner != "" {

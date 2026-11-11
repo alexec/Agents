@@ -323,7 +323,7 @@ func (d *Daemon) checkBranches(folder string) {
 	d.branchCheckMu.Lock()
 	defer d.branchCheckMu.Unlock()
 	watched := map[string]bool{}
-	for _, a := range d.agentsOf(folder) {
+	for _, a := range d.liveAgentsOf(folder) {
 		if a.State != wire.AgentStateArchived && a.Worktree != nil && a.Worktree.Branch != nil {
 			watched[*a.Worktree.Branch] = true
 		}

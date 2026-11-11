@@ -194,20 +194,16 @@ func (d *Daemon) change(id wire.UUID, edit func(a *wire.Agent)) *wire.Agent {
 // changeAgent is change; with moveOn false, the record keeps its last activity, so a mark
 // such as Mute (#2003) does not move the session up its list.
 func (d *Daemon) changeAgent(id wire.UUID, moveOn bool, edit func(a *wire.Agent)) *wire.Agent {
-	d.agentMu.Lock()
-	defer d.agentMu.Unlock()
-	a := d.Store.Agent(id)
+	// agentMu covers only the read, the edit and the save; the tell lock keeps this
+	// agent's tells in the order of its saves (agenttell.go, #4509).
+	unlockTell := d.lockAgentTell(id)
+	defer unlockTell()
+	a, before := d.saveChange(id, moveOn, edit)
 	if a == nil {
 		return nil
 	}
-	before := *a
-	edit(a)
-	if moveOn {
-		a.LastActivityAt = now()
-	}
-	if err := d.Store.Save(*a); err != nil {
-		log.Printf("agent %s: %v", id, err)
-		return nil
+	if told := d.changeTold; told != nil {
+		told(*a)
 	}
 	d.tellChanged(*a, &before)
 	d.noteLineage(&before, *a)
@@ -220,6 +216,27 @@ func (d *Daemon) changeAgent(id wire.UUID, moveOn bool, edit func(a *wire.Agent)
 	// Every place a need begins or ends moves the record (DaemonCore.move's reconsider).
 	safe.Go("reconsider", d.reconsider)
 	return a
+}
+
+// saveChange is changeAgent's part under agentMu: the record after the edit, saved, and
+// the record before it; nil when there is no such agent or the save failed.
+func (d *Daemon) saveChange(id wire.UUID, moveOn bool, edit func(a *wire.Agent)) (*wire.Agent, wire.Agent) {
+	d.agentMu.Lock()
+	defer d.agentMu.Unlock()
+	a := d.Store.Agent(id)
+	if a == nil {
+		return nil, wire.Agent{}
+	}
+	before := *a
+	edit(a)
+	if moveOn {
+		a.LastActivityAt = now()
+	}
+	if err := d.Store.Save(*a); err != nil {
+		log.Printf("agent %s: %v", id, err)
+		return nil, wire.Agent{}
+	}
+	return a, before
 }
 
 func reason(r wire.EndedReason) *wire.EndedReason { return &r }

@@ -10,6 +10,7 @@ import type { Store } from "./model/store";
 import { alone } from "./route";
 import { faviconFor, iconMood, type MoodCounts } from "./model/iconMood";
 import { hostAnswers } from "./model/capabilities";
+import { groupOf } from "./model/groups";
 
 const settle = 500;
 
@@ -22,8 +23,17 @@ export function needsPersonCount(store: Store): number {
   for (const [host, folders] of Object.entries(store.folders.value)) {
     for (const folder of folders) {
       if (folder.folder.archivedAt !== undefined) continue;
-      // Needs you and Blocked, as the Dock badge counts (#1565).
-      total += store.folderView(host, folder.folder.folder).attention;
+      // Needs you and Blocked, as the Dock badge counts (#1565), shifted by its requests (#3864):
+      // one for each not in Later, less each asker counted already. One in Later counts nothing,
+      // and its asker neither (#4236), as requestBadgeShift.
+      const path = folder.folder.folder;
+      const askers = new Set(store.openPersonRequestsIn(host, path).map((r) => r.askedBy as string));
+      const looked = [...askers].filter((id) => {
+        const agent = store.agent(host, id);
+        const group = agent ? groupOf(agent) : undefined;
+        return group === "needsAttention" || group === "blocked";
+      }).length;
+      total += store.folderView(host, path).attention + store.personRequestsIn(host, path).length - looked;
     }
   }
   return total;

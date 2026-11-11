@@ -9,6 +9,10 @@ export interface MenuItem {
   label: string;
   help?: string;
   disabled?: boolean;
+  /** A section's heading (#4418): grey words, not a button; `run` is not called. */
+  heading?: boolean;
+  /** A tick before the label, for a choice that is on now. */
+  checked?: boolean;
   run: () => void;
 }
 
@@ -142,10 +146,13 @@ export function ContextMenu() {
   };
   return (
     <div class="popover context-menu" role="menu" ref={menu} style={{ left: `${left}px`, top: `${top}px` }} onKeyDown={keys}>
-      {shown.items.map((item) => (
-        <button key={item.label} role="menuitem" title={item.help} disabled={item.disabled}
-          onClick={() => { close(); item.run(); }}>{item.label}</button>
-      ))}
+      {shown.items.map((item) => item.heading
+        ? <p key={item.label} class="context-menu-heading small" role="presentation">{item.label}</p>
+        : (
+          <button key={item.label} role={item.checked === undefined ? "menuitem" : "menuitemcheckbox"} aria-checked={item.checked}
+            title={item.help} disabled={item.disabled} onClick={() => { close(); item.run(); }}>
+            {item.checked !== undefined && <span class="tick" aria-hidden="true">{item.checked ? "✓" : ""}</span>}{item.label}</button>
+        ))}
     </div>
   );
 }

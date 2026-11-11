@@ -36,6 +36,7 @@ func (d *Daemon) register() {
 	d.registerLockReset()
 	d.registerReceive()
 	d.registerSend()
+	d.registerFolderSend()
 	d.registerExports()
 	d.registerBringBack()
 	d.registerLeases()
@@ -248,8 +249,8 @@ func (d *Daemon) folderPaths() []string {
 		}
 		add(f)
 	}
-	for _, a := range d.Store.Agents() {
-		if f := folderPath(&a); !archived[f] && !seen[f] {
+	for _, f := range d.Store.AgentFolders() {
+		if !archived[f] && !seen[f] {
 			// As summary names a folder with no record: its links resolved.
 			add(store.FolderPath(store.FolderURL(f)))
 		}
@@ -262,25 +263,23 @@ func (d *Daemon) folders(includeArchived bool) []wire.FolderSummary {
 	for _, p := range d.Store.Folders() {
 		records[store.FolderPath(p.Folder)] = p
 	}
-	agents := map[string][]wire.Agent{}
-	for _, a := range d.Store.Agents() {
-		f := folderPath(&a)
-		agents[f] = append(agents[f], a)
-	}
 	folders := map[string]bool{}
 	for f := range records {
 		folders[f] = true
 	}
-	for f := range agents {
+	for _, f := range d.Store.AgentFolders() {
 		folders[f] = true
 	}
 	var out []wire.FolderSummary
 	for f := range folders {
-		s := summary(f, records, agents[f])
+		// Each folder's live records, and its archived ones as the store keeps them summed
+		// (#4510), not every record copied.
+		agents := d.Store.LiveAgentsIn(f)
+		s := summary(f, records, agents, d.Store.ArchivedIn(f))
 		if !includeArchived && s.Folder.ArchivedAt != nil {
 			continue
 		}
-		d.dress(&s, agents[f])
+		d.dress(&s, agents)
 		d.markHelperLimits(&s)
 		out = append(out, s)
 	}
@@ -310,15 +309,16 @@ func (d *Daemon) folderSummary(folder string) (wire.FolderSummary, bool) {
 			break
 		}
 	}
-	agents := d.Store.AgentsIn(folder)
-	if !found && len(agents) == 0 {
+	agents := d.Store.LiveAgentsIn(folder)
+	archived := d.Store.ArchivedIn(folder)
+	if !found && len(agents) == 0 && archived.Count == 0 {
 		return wire.FolderSummary{}, false
 	}
 	records := map[string]wire.Folder{}
 	if found {
 		records[folder] = record
 	}
-	s := summary(folder, records, agents)
+	s := summary(folder, records, agents, archived)
 	d.dress(&s, agents)
 	d.markHelperLimits(&s)
 	return s, true
@@ -326,19 +326,33 @@ func (d *Daemon) folderSummary(folder string) (wire.FolderSummary, bool) {
 
 func folderPath(a *wire.Agent) string { return store.AgentFolder(a) }
 
-func summary(folder string, records map[string]wire.Folder, agents []wire.Agent) wire.FolderSummary {
+// summary is a folder's summary from its record, its live agents and its archived ones
+// summed (store.ArchivedIn, #4510).
+func summary(folder string, records map[string]wire.Folder, agents []wire.Agent, archived store.ArchivedTally) wire.FolderSummary {
 	p, ok := records[folder]
 	if !ok {
 		p = wire.Folder{Folder: store.FolderURL(folder)}
+		if archived.Count > 0 {
+			p.AddedAt = archived.FirstCreatedAt
+		}
 		for i, a := range agents {
-			if i == 0 || a.CreatedAt < p.AddedAt {
+			if i == 0 && archived.Count == 0 || a.CreatedAt < p.AddedAt {
 				p.AddedAt = a.CreatedAt
 			}
 		}
 	}
 	newest := p.AddedAt
+	if archived.LastActivityAt > newest {
+		newest = archived.LastActivityAt
+	}
 	counts := map[string]int64{}
+	if archived.Count > 0 {
+		counts["archived"] = archived.Count
+	}
 	cost := map[string]float64{}
+	for cur, v := range archived.CostToDate {
+		cost[cur] += v
+	}
 	for _, a := range agents {
 		if a.LastActivityAt > newest {
 			newest = a.LastActivityAt
@@ -516,7 +530,11 @@ func (d *Daemon) listAgents(r wire.ListRequest) []wire.Agent {
 	read := 0
 	issue := d.issueSearchOf(query)
 	projects := projectsOfFolders{}
-	agents := d.Store.Agents()
+	// A list with no archived agent in it reads only the live records (#4510).
+	agents := d.Store.LiveAgents()
+	if r.IncludeArchived || r.ArchivedOnly {
+		agents = d.Store.Agents()
+	}
 	if r.ArchivedOnly {
 		sort.SliceStable(agents, func(i, j int) bool {
 			if a, b := archivedOrder(&agents[i]), archivedOrder(&agents[j]); a != b {

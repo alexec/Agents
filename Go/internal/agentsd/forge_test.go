@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -571,5 +572,43 @@ func TestForgeCursorReadsAnEarlierDaemons(t *testing.T) {
 	b, _ := json.Marshal(c)
 	if string(b) != `{"azureboards":"b2","done":["jira"]}` {
 		t.Fatalf("%s", b)
+	}
+}
+
+// A list's total (#4396): each forge's count from its first page, kept in the cursor, so a page
+// after a forge is done still counts it; a forge with no count counts its items when its first
+// page is its last, and the list has no total while a forge has none.
+func TestListTotalsKeepEachForgesFirstCount(t *testing.T) {
+	item := wire.ForgeItem{UpdatedAt: forgeDate("2026-11-01T10:00:00Z")}
+	pages := []forgePage{
+		{forge: "github", items: []wire.ForgeItem{item}, next: "g1", total: new(57)},
+		{forge: "linear", items: []wire.ForgeItem{item, item}},
+		{forge: "forgejo", items: []wire.ForgeItem{item}, next: "f1"},
+		{forge: "jira", err: errors.New("Jira: HTTP 500")},
+	}
+	totals := listTotals(forgeCursor{}, pages)
+	if !maps.Equal(totals, map[string]int{"github": 57, "linear": 2}) {
+		t.Fatalf("first page: %v", totals)
+	}
+	if n, ok := listTotal([]string{"github", "linear"}, totals); !ok || n != 59 {
+		t.Fatalf("total %d %v", n, ok)
+	}
+	if _, ok := listTotal([]string{"github", "linear", "forgejo"}, totals); ok {
+		t.Fatal("a forge with no count gave a total")
+	}
+	// A later page keeps the first page's count, and counts a forge that failed then.
+	from := forgeCursor{At: map[string]string{"github": "g1"}, Done: []string{"linear"}, Totals: totals}
+	later := listTotals(from, []forgePage{
+		{forge: "github", items: []wire.ForgeItem{item}, total: new(58)},
+		{forge: "jira", items: []wire.ForgeItem{item}, total: new(3)},
+	})
+	if !maps.Equal(later, map[string]int{"github": 57, "linear": 2, "jira": 3}) || len(from.Totals) != 2 {
+		t.Fatalf("later page: %v, from %v", later, from.Totals)
+	}
+	// The cursor carries them.
+	c := forgeCursor{At: map[string]string{"github": "g2"}, Totals: later}
+	back, err := cursorOf(c.text())
+	if err != nil || !maps.Equal(back.Totals, later) || back.At["github"] != "g2" {
+		t.Fatalf("%+v %v", back, err)
 	}
 }

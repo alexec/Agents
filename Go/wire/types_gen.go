@@ -4663,7 +4663,7 @@ type ForgeBoardsRequest struct {
 	Folder *string `json:"folder,omitzero"`
 }
 
-// What one forge on a list's page fills (#4329, #4361), so a client hides what it does not: issues and pulls say it has them; labelColors that its labels have a #rrggbb colour; avatars that its items have authorAvatar; stateReason that its closed issues have stateReason. createdAt that its items have createdAt, and closedAt that its closed and merged items have closedAt; children, linkedPulls and events that an item's read has them (#4373); each is absent from an earlier daemon, which has none. commentCount says how to read ForgeItem.comments: exact; capped at commentsMost (show 50+ there); or detail, only on an item's own page (hide it on the row).
+// What one forge on a list's page fills (#4329, #4361), so a client hides what it does not: issues and pulls say it has them; labelColors that its labels have a #rrggbb colour; avatars that its items have authorAvatar; stateReason that its closed issues have stateReason. createdAt that its items have createdAt, and closedAt that its closed and merged items have closedAt; children, linkedPulls and events that an item's read has them (#4373); total that it counts a list's items, for ForgeList.total (#4396); each is absent from an earlier daemon, which has none. commentCount says how to read ForgeItem.comments: exact; capped at commentsMost (show 50+ there); or detail, only on an item's own page (hide it on the row).
 type ForgeCapabilities struct {
 	Forge string `json:"forge"`
 
@@ -4686,6 +4686,8 @@ type ForgeCapabilities struct {
 	LinkedPulls *bool `json:"linkedPulls,omitzero"`
 
 	Events *bool `json:"events,omitzero"`
+
+	Total *bool `json:"total,omitzero"`
 
 	CommentCount ForgeCommentCount `json:"commentCount"`
 
@@ -4993,11 +4995,13 @@ type ForgeLinked struct {
 	URL *string `json:"url,omitzero"`
 }
 
-// forge/issues and forge/pulls (#3129): a page of items, the last updated first. cursor is the next page, absent at the end. errors says a forge that could not be read (not connected, a rate limit), and the items of the others still come. forges says what each forge on the page fills (#4361); absent from an earlier daemon.
+// forge/issues and forge/pulls (#3129): a page of items, the last updated first. cursor is the next page, absent at the end. errors says a forge that could not be read (not connected, a rate limit), and the items of the others still come. forges says what each forge on the page fills (#4361); absent from an earlier daemon. total is how many items the whole list has, the sum of each forge's count, kept from each forge's first page (#4396); absent when a forge on the list gives no count (ForgeCapabilities.total) or could not be read, and from an earlier daemon.
 type ForgeList struct {
 	Items []ForgeItem `json:"items"`
 
 	Cursor *string `json:"cursor,omitzero"`
+
+	Total *int64 `json:"total,omitzero"`
 
 	Errors []ForgeListError `json:"errors,omitzero"`
 
@@ -12219,6 +12223,21 @@ type SendFile struct {
 	Size int64 `json:"size"`
 }
 
+// send/changed (#4613): how a send that folders/send started goes. `sent` of `total` bytes are on the other machine (0 of 0 while the bundle is made); `finished` once it ended, whichever way: `received` is the folder it became there, or `problem` says why it stopped, in the person's words.
+type SendNotification struct {
+	Send SendSummary `json:"send"`
+
+	Sent int64 `json:"sent"`
+
+	Total int64 `json:"total"`
+
+	Finished bool `json:"finished"`
+
+	Problem *string `json:"problem,omitzero"`
+
+	Received *FolderSummary `json:"received,omitzero"`
+}
+
 // What folders/sendPack made (#1123): each branch at its commit, the bundle (none when the receiving host has every commit) and the patch (none when nothing is uncommitted).
 type SendPack struct {
 	Commits []SentBranch `json:"commits"`
@@ -12251,6 +12270,40 @@ type SendReadRequest struct {
 	ID UUID `json:"id"`
 
 	Offset int64 `json:"offset"`
+}
+
+// folders/send (#4613): Send to ‹machine›… from a client. This host sends `branches` of the repository at `folder`, less the commits the folder there has, and with `includeChanges` its uncommitted changes, to `destination` on `machine` (the control plane's id or name for it; `machineName` is the name the person knows it by, for the words), through the control plane, as start_session with send does (#2929). There `checkout` is checked out and `origin` set.
+type SendRequest struct {
+	Folder URL `json:"folder"`
+
+	Machine string `json:"machine"`
+
+	MachineName *string `json:"machineName,omitzero"`
+
+	Destination string `json:"destination"`
+
+	Branches []string `json:"branches"`
+
+	Checkout string `json:"checkout"`
+
+	IncludeChanges bool `json:"includeChanges"`
+
+	Origin *string `json:"origin,omitzero"`
+}
+
+// One send folders/send started (#4613): the folder here, and the folder on the machine it goes to.
+type SendSummary struct {
+	ID UUID `json:"id"`
+
+	Folder URL `json:"folder"`
+
+	Machine string `json:"machine"`
+
+	MachineName string `json:"machineName"`
+
+	Destination string `json:"destination"`
+
+	StartedAt Date `json:"startedAt"`
 }
 
 // A branch the Mac sends, at the commit it has (#1123).

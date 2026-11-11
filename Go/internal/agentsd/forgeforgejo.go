@@ -128,6 +128,8 @@ type forgejoForge struct {
 
 func (forgejoForge) Name() string { return "forgejo" }
 
+func (forgejoForge) Images() forgeImageHost { return forgejoImages{} }
+
 func (forgejoForge) Caps() forgeCaps {
 	return forgeCaps{
 		Issues: true, PRs: true,

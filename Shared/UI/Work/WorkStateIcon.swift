@@ -8,7 +8,7 @@ struct WorkStateIcon: View {
     let kind: String
     let state: String
     var draft = false
-    /// The forge's `not_planned`, where it gives one: a ring with a slash.
+    /// The forge's `not_planned`, where it gives one (#4365): a ring with a slash.
     var stateReason: String?
     /// White, on a fill of the state's colour (the item page's pill, #4400).
     var onFill = false
@@ -53,37 +53,106 @@ extension WorkLook.Tone {
     var color: Color { Color(light: light, dark: dark) }
 }
 
-/// A person's avatar (#4391, parts.md section 6). With no image (the wire has none yet, #4363): a
-/// circle with the login's first letter on a colour picked from the login, so one person keeps
-/// one colour.
+/// A person's avatar (#4391, parts.md section 6): the forge's picture (#4363), read through the
+/// machine that read the forge (`workPictures`). With no picture (a forge that gives none, or
+/// one that did not load): a circle with the login's first letter on a colour picked from the
+/// login, so one person keeps one colour.
 struct WorkAvatar: View {
     let login: String
+    var url: String?
     var side: CGFloat = 20
+    @Environment(\.workPictures) private var pictures
+    @State private var picture: PlatformImage?
 
     var body: some View {
-        Circle()
-            .fill(Color(hue: WorkLook.avatarHue(login), saturation: 0.45, brightness: 0.78))
-            .frame(width: side, height: side)
-            .overlay {
-                Text(WorkLook.initial(login))
-                    // Sized to the circle, not to the text style: a marked decorative glyph.
-                    .font(.system(size: side * 0.48, weight: .semibold))
-                    .foregroundStyle(.white)
+        Group {
+            if let picture {
+                Image(platformImage: picture).resizable().scaledToFill()
+            } else {
+                Circle()
+                    .fill(Color(hue: WorkLook.avatarHue(login), saturation: 0.45, brightness: 0.78))
+                    .overlay {
+                        Text(WorkLook.initial(login))
+                            // Sized to the circle, not to the text style: a marked decorative glyph.
+                            .font(.system(size: side * 0.48, weight: .semibold))
+                            .foregroundStyle(.white)
+                    }
             }
-            .accessibilityHidden(true)
+        }
+        .frame(width: side, height: side)
+        .clipShape(Circle())
+        .accessibilityHidden(true)
+        .task(id: WorkPictureAsk(url: url, pictures: pictures)) {
+            guard let url, let pictures else { picture = nil; return }
+            picture = await WorkPictureCache.shared.picture(url, pictures)
+        }
+    }
+}
+
+/// Who reads a forge's pictures for the views under it (`forge/image` on the machine that read
+/// the item, #4363): the list sets it per row, an item's page for the page.
+struct WorkPictures: Equatable {
+    let model: any WorkModel
+    let host: MachineRef
+
+    static func == (a: Self, b: Self) -> Bool { a.model === b.model && a.host == b.host }
+
+    func read(_ url: String) async -> PlatformImage? {
+        guard let got = try? await model.forge(DaemonAPI.Method.forgeImage, DaemonAPI.ForgeImageRequest(url: url),
+                                               returning: DaemonAPI.ForgeImage.self, on: host) else { return nil }
+        return PlatformImage(data: got.data)
+    }
+}
+
+extension EnvironmentValues {
+    @Entry var workPictures: WorkPictures?
+}
+
+private struct WorkPictureAsk: Equatable {
+    var url: String?
+    var pictures: WorkPictures?
+}
+
+/// The pictures read so far, by URL, so a person's avatar is read once for every row and page,
+/// and a picture that did not load is not asked for again. At most `most` are kept.
+@MainActor
+final class WorkPictureCache {
+    static let shared = WorkPictureCache()
+    static let most = 500
+
+    private var got: [String: PlatformImage] = [:]
+    private var failed: Set<String> = []
+    private var reading: [String: Task<PlatformImage?, Never>] = [:]
+
+    func picture(_ url: String, _ pictures: WorkPictures) async -> PlatformImage? {
+        if let image = got[url] { return image }
+        if failed.contains(url) { return nil }
+        if let task = reading[url] { return await task.value }
+        let task = Task { await pictures.read(url) }
+        reading[url] = task
+        let image = await task.value
+        reading[url] = nil
+        if got.count + failed.count >= Self.most {
+            got.removeAll()
+            failed.removeAll()
+        }
+        if let image { got[url] = image } else { failed.insert(url) }
+        return image
     }
 }
 
 /// Up to three avatars, overlapped, then "+2" (the row's trailing edge).
 struct WorkAvatarStack: View {
     let logins: [String]
+    /// The pictures the forge gives, by login (the author's, #4363): the rest are initials.
+    var avatars: [String: String] = [:]
     var limit = 3
 
     var body: some View {
         if !logins.isEmpty {
             HStack(spacing: -6) {
                 ForEach(logins.prefix(limit), id: \.self) { login in
-                    WorkAvatar(login: login).overlay(Circle().strokeBorder(Paper.raised, lineWidth: 1.5))
+                    WorkAvatar(login: login, url: avatars[login]).overlay(Circle().strokeBorder(Paper.raised, lineWidth: 1.5))
                 }
                 if logins.count > limit {
                     Text("+\(logins.count - limit)").appText(.fine).foregroundStyle(.secondary).padding(.leading, 8)

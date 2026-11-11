@@ -60,12 +60,12 @@
    and a grey count, and its workflows one level in. Measured from a session's row (#1079): its 8px
    edge, then the chevron in the 18px mark column, the word at the title (8px on), and each
    workflow's mark under the word. */
-.with-sidebar details:is(.workflows, .sessions) > summary { display: flex; align-items: baseline; list-style: none; cursor: pointer;
+.with-sidebar details:is(.workflows, .sessions, .later) > summary { display: flex; align-items: baseline; list-style: none; cursor: pointer;
   padding: 5px 8px; font-size: 0.75rem; color: color-mix(in srgb, currentColor 60%, transparent); }
-.with-sidebar details:is(.workflows, .sessions) > summary::-webkit-details-marker { display: none; }
-.with-sidebar details:is(.workflows, .sessions) > summary::before { content: "›"; display: inline-block; width: 18px; margin-right: 8px; text-align: center; opacity: 0.7; }
-.with-sidebar details:is(.workflows, .sessions)[open] > summary::before { content: "⌄"; }
-.with-sidebar details:is(.workflows, .sessions) > summary .count { margin-left: auto; font-variant-numeric: tabular-nums; }
+.with-sidebar details:is(.workflows, .sessions, .later) > summary::-webkit-details-marker { display: none; }
+.with-sidebar details:is(.workflows, .sessions, .later) > summary::before { content: "›"; display: inline-block; width: 18px; margin-right: 8px; text-align: center; opacity: 0.7; }
+.with-sidebar details:is(.workflows, .sessions, .later)[open] > summary::before { content: "⌄"; }
+.with-sidebar details:is(.workflows, .sessions, .later) > summary .count { margin-left: auto; font-variant-numeric: tabular-nums; }
 .with-sidebar details.workflows .row.workflow .pick { padding-left: calc(8px + 26px); }
 .with-sidebar details.workflows .workflow-group-heading { display: flex; padding: 5px 8px 3px 34px;
   font-size: 0.6875rem; color: color-mix(in srgb, currentColor 60%, transparent); }
@@ -87,6 +87,8 @@
   color: color-mix(in srgb, currentColor 50%, transparent); }
 .with-sidebar details.smart > summary .count { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 500; }
 .with-sidebar details.smart > summary .count.needs { color: var(--tint-attention); }
+/* Needs You's folded Later group (#4236), at its end, folding as Workflows does; its rows grey. */
+.with-sidebar details.smart details.later .row.session .name { opacity: 0.7; }
 .with-sidebar details.smart > summary .updated { margin-left: 0.5em; font-weight: 400; opacity: 0.6; white-space: nowrap; }
 
 /* Which folder a row is in, after its title, under a group at the top (#495). */
@@ -113,6 +115,7 @@
 .sidebar-mark.asksToArchive { color: var(--tint-attention); font-size: 0.75rem; }
 /* Waiting for an OK (#773): a shield, in the attention tint as the hand is, whatever its kind. */
 .sidebar-mark.approval { color: var(--tint-attention); }
+.sidebar-mark.later { color: color-mix(in srgb, var(--paper-ink) 55%, transparent); }
 /* For Review's pull requests (#3330): the accent, as a page's row; Dismiss over the time on hover. */
 .sidebar-mark.pull { color: var(--accent); }
 .nav-item.review-pull { position: relative; }
@@ -147,10 +150,26 @@
 /* The Connectors row's count, small and grey just after the title (#1569). */
 .row.page-row .title .count { margin-left: 6px; font-size: 0.6875rem; font-variant-numeric: tabular-nums; }
 
-/* A folder's archive, in the chat's place (#499). */
-.with-sidebar .archive-page .column-head .quiet { font-size: 0.75rem; }
-.with-sidebar .archive-body { max-width: 760px; padding: 8px 12px; }
-.with-sidebar .archive-body .hint { padding: 8px; font-size: 0.75rem; opacity: 0.6; }
+/* A folder's Archived Sessions and Archived Workflows, in the chat's place (#499, #4451): a filter under the
+   head, the sidebar's rows under a heading per day, the footer with Load more, and the states. */
+.with-sidebar .archived-page .column-head .quiet { font-size: 0.75rem; }
+.with-sidebar .archived-body { max-width: 760px; padding: 8px 12px; display: flex; flex-direction: column; min-height: 100%; box-sizing: border-box; }
+.with-sidebar .archived-filter { width: 260px; max-width: 100%; margin: 4px 8px 6px; box-sizing: border-box; padding: 5px 8px;
+  border: 1px solid var(--paper-rule); border-radius: var(--radius-control); background: var(--paper-raised); color: inherit; font: inherit; }
+.with-sidebar .archived-day .subhead { margin-top: 14px; }
+.with-sidebar .archived-rows.stale { opacity: 0.55; }
+.with-sidebar .archived-stale { margin: 6px 8px; border: none; border-radius: 8px; }
+.with-sidebar .archived-middle { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+.with-sidebar .archived-glyph { font-size: 2rem; opacity: 0.45; }
+.with-sidebar .archived-footer { display: flex; align-items: center; gap: 12px; padding: 14px 8px 8px; font-size: 0.75rem; }
+.with-sidebar .archived-footer > span:first-child { opacity: 0.6; }
+.with-sidebar .archived-footer .spinner { width: 10px; height: 10px; }
+/* At a phone's width: the filter the full width, the title cut at one line, the footer centred. */
+@media (max-width: 759px) {
+  .with-sidebar .archived-filter { width: auto; }
+  .with-sidebar .archived-footer { justify-content: center; }
+  .with-sidebar .archived-rows .row.session .title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
 /* Show all N under a fold's first archived matches, and More matches… after the folders (#193):
    fine and secondary, as the window's. */
 .sidebar button.link.show-all, .sidebar button.link.more-matches {
@@ -254,6 +273,10 @@
 .context-menu { position: fixed; top: 0; left: 0; display: flex; flex-direction: column; }
 .context-menu button { text-align: left; border: none; background: none; padding: 5px 10px; border-radius: var(--radius-control); }
 .context-menu button:hover:not(:disabled), .context-menu button:focus-visible { background: var(--paper-selection); outline: none; }
+.context-menu-heading { margin: 0; padding: 5px 10px 2px; font-weight: 600; opacity: 0.6; }
+.context-menu button[role=menuitemcheckbox] { display: flex; max-width: 300px; }
+.context-menu button .tick { flex: none; display: inline-block; width: 1.2em; }
+.context-menu [role=menuitemcheckbox] + [role=menuitem] { margin-top: 4px; border-top: 1px solid var(--paper-rule); border-radius: 0; }
 
 /* A folder's pinned pages (#159), and New Session at the sidebar's top (#495): a mark in the
    accent and a title, as a session's row is tall. */

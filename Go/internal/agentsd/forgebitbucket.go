@@ -125,6 +125,8 @@ type bitbucketForge struct {
 
 func (bitbucketForge) Name() string { return "bitbucket" }
 
+func (bitbucketForge) Images() forgeImageHost { return bitbucketImages{} }
+
 func (bitbucketForge) Caps() forgeCaps {
 	return forgeCaps{
 		Issues: true, PRs: true,

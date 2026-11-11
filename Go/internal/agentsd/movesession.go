@@ -243,7 +243,7 @@ func (d *Daemon) exportForMove(asker *wire.Agent, machine string, a wire.Agent) 
 	if err := d.writeBackupArchive(path, &m, []wire.Agent{a}, false); err != nil {
 		return "", err
 	}
-	return d.uploadThere(asker, machine, file)
+	return d.uploadThere(asker, machine, file, nil)
 }
 
 // letGo forgets a session that another machine now has: as a delete does, with nothing
