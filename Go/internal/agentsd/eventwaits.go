@@ -28,6 +28,12 @@ import (
 // eventHoldLimit is how long a wait_for_event call is held open (LeaseLimits.waitLimit).
 var eventHoldLimit = 45 * time.Second
 
+// waitLooksBack is how far back a new wait looks for a server's event it missed (#4716):
+// a forge reports an event about 25 s after it happens, so a pull request that merged a
+// few seconds before the wait was made comes in after the wait's `from`, or was raised
+// while no wait held its subscription.
+const waitLooksBack = 15 * time.Minute
+
 const (
 	waitMinutesLow  = 1
 	waitMinutesHigh = 1440
@@ -760,8 +766,11 @@ type openEventCall struct {
 }
 
 type eventWaitState struct {
-	waitMu     sync.Mutex
-	openWaits  map[wire.UUID]*openEventCall // by agent
+	waitMu    sync.Mutex
+	openWaits map[wire.UUID]*openEventCall // by agent
+	// wokeAt is the position of the last event that woke each agent, so a wait's look back
+	// (#4716) never wakes it again on what it was told. Not kept across a restart.
+	wokeAt     map[wire.UUID]int64
 	waitTimer  *time.Timer
 	blockTimer *time.Timer
 	// blockFires is how many times blockTimer fired: a test's count (#4687).
@@ -770,6 +779,47 @@ type eventWaitState struct {
 
 func (d *Daemon) inScope(e wire.Event, a *wire.Agent) bool {
 	return e.Scope.Mac != nil || e.Scope.Folder != nil && store.FolderPath(e.Scope.Folder.Value) == folderPath(a)
+}
+
+// woke records that an event woke the agent: a later wait looks back only after it.
+func (d *Daemon) woke(agent wire.UUID, position int64) {
+	d.waitMu.Lock()
+	defer d.waitMu.Unlock()
+	if d.wokeAt == nil {
+		d.wokeAt = map[wire.UUID]int64{}
+	}
+	if position > d.wokeAt[agent] {
+		d.wokeAt[agent] = position
+	}
+}
+
+// missedServerEvent is a server's event that a wait made now would have matched and that
+// came in a short time before it (#4716): after the last event that woke the agent, raised
+// at most waitLooksBack ago. Only a server's events are looked back on: the daemon raises
+// its own events at once, and an old one (a lease.granted the agent was given by its
+// call) is not news. floor is wokeAt's; the caller holds eventMu.
+func (d *Daemon) missedServerEvent(w *wire.EventWait, a *wire.Agent, floor int64, at time.Time) *wire.Event {
+	if len(w.ServerEvents) == 0 {
+		return nil
+	}
+	back := *w
+	back.From = floor
+	since := at.Add(-waitLooksBack)
+	start := len(d.eventList)
+	for start > 0 {
+		e := d.eventList[start-1]
+		if e.Position <= floor || e.At.Time().Before(since) {
+			break
+		}
+		start--
+	}
+	for _, e := range d.eventList[start:] {
+		if e.Details["server"] != "" && d.inScope(e, a) && waitMatches(&back, e) {
+			c := copyEvent(e)
+			return &c
+		}
+	}
+	return nil
 }
 
 func (d *Daemon) takeOpenWait(agent wire.UUID) *openEventCall {
@@ -906,8 +956,12 @@ func (d *Daemon) waitForEvent(agent wire.UUID, args map[string]json.RawMessage) 
 		}
 	}
 
-	// Something already after from: answered now, and nothing is left waiting.
+	// Something already after from, or a server's event that came in a short time before
+	// (#4716): answered now, and nothing is left waiting.
 	var hit *wire.Event
+	d.waitMu.Lock()
+	floor := d.wokeAt[agent]
+	d.waitMu.Unlock()
 	d.eventMu.Lock()
 	for _, e := range d.eventList {
 		if d.inScope(e, a) && waitMatches(&wait, e) {
@@ -916,8 +970,12 @@ func (d *Daemon) waitForEvent(agent wire.UUID, args map[string]json.RawMessage) 
 			break
 		}
 	}
+	if hit == nil {
+		hit = d.missedServerEvent(&wait, a, floor, at.Time())
+	}
 	d.eventMu.Unlock()
 	if hit != nil {
+		d.woke(agent, hit.Position)
 		prev := d.endWait(agent, "agent", true)
 		replaced := ""
 		if prev != nil {
@@ -1107,6 +1165,7 @@ func (d *Daemon) matchWaits(e wire.Event) {
 			title = *a.Title
 		}
 		if w.Ending == nil {
+			d.woke(a.ID, e.Position)
 			if c := d.takeOpenWait(a.ID); c != nil {
 				waited := int(time.Since(c.started).Round(time.Second).Seconds())
 				d.change(a.ID, func(a *wire.Agent) { a.EventWait = nil })
@@ -1135,6 +1194,7 @@ func (d *Daemon) matchWaits(e wire.Event) {
 			}
 			promptID := *w.ResumePromptID
 			notice := d.restartNotice(w)
+			d.woke(a.ID, e.Position)
 			d.change(a.ID, func(a *wire.Agent) {
 				if a.EventWait == nil || a.EventWait.Ending == nil || a.EventWait.Ending.Matched == nil {
 					return
