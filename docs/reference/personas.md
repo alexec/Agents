@@ -34,6 +34,7 @@ model: gpt-5.5
 effort: high
 permission-mode: read-only
 labels: [review]
+keywords: ["review", "check this"]
 ---
 
 You review changes. Use the code-review skill, and say what you would change before
@@ -44,6 +45,7 @@ changing anything.
 |---|---|
 | `name` | The name on the choice. The id when left out. |
 | `description` | The line shown under the choice once it is picked. |
+| `keywords` | The words in a first prompt that make **Auto** pick this persona (#4559). `"#<n>"` stands for any issue number, such as `#123`. When left out, the words of five letters or more in `name` and `description` are used. |
 | `runtime`, `model`, `effort`, `permission-mode`, `options`, `labels` | The same settings, with the same values, as in a [workflow](workflows.md). |
 
 Every key is optional, and so is the front matter: a file with none is all prompt.
@@ -60,8 +62,8 @@ does not know, so a saved persona is available to future session starts in that 
 ## Picking one
 
 The choice is a menu under the folder's name at the top of the new-session form, on the
-Mac, the Remote and the web page (#918). It shows the persona picked, or **No persona**, and
-**No persona** is first in the menu. It is not shown when the folder has no personas. A file that cannot be read is listed under it with what is wrong.
+Mac, the Remote and the web page (#918). It shows **Auto**, the persona picked, or **No persona**, and
+**Auto** is first, then **No persona**. It is not shown when the folder has no personas. A file that cannot be read is listed under it with what is wrong.
 
 Picking a persona:
 
@@ -71,6 +73,22 @@ Picking a persona:
 - adds its labels beside any already there.
 
 You can still change anything before you start.
+
+### Auto
+
+When the folder has personas, the first segment is **Auto**, and a new draft starts on it
+(#4559). As you type the first prompt, Auto picks the persona whose `keywords` the prompt
+names, as if you picked it:
+
+- a keyword counts when it is a whole word, followed by a space or punctuation, so a
+  half-typed word does not match; case does not matter;
+- the persona with the most matches wins, and the earliest match breaks a tie;
+- when no keyword matches, the session has no persona;
+- a grey line under the control names the pick and the word, for example
+  `Auto picked Product Owner: "what about"`.
+
+When you pick a segment yourself, the pick stays for that draft and typing does not move it.
+Pick **Auto** again to turn the live pick back on.
 
 When a runtime advertises ACP's session system-prompt capability, the persona prompt is appended after the app's briefing on session creation and when the app loads, resumes or forks the session. Otherwise the app uses a runtime compatibility adapter where available, or sends the persona prompt before your words in the first user prompt. It is read from the file each time, and is not shown in the transcript.
 

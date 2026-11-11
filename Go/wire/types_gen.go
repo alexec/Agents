@@ -9105,6 +9105,9 @@ type Persona struct {
 
 	Settings WorkflowSettings `json:"settings"`
 
+	// The front matter's `keywords:` (#4559): the words in a first prompt that make Auto pick this persona. Left out when the file names none; then its name and description are the words.
+	Keywords []string `json:"keywords,omitzero"`
+
 	Problem *string `json:"problem,omitzero"`
 }
 

@@ -8216,6 +8216,11 @@ export interface Persona {
   description?: string;
   origin: PersonaOrigin;
   settings: WorkflowSettings;
+  /**
+   * The front matter's `keywords:` (#4559): the words in a first prompt that make Auto pick this
+   * persona. Left out when the file names none; then its name and description are the words.
+   */
+  keywords?: string[];
   problem?: string;
 }
 
@@ -15247,7 +15252,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PersonSCIM: { required: ["provider", "userName", "active"], optional: ["externalId", "name", "displayName", "emails"] },
   PersonSettings: { required: [], optional: ["name", "pronouns"] },
   PersonSuspended: { required: ["by", "provider", "at"], optional: ["why"] },
-  Persona: { required: ["id", "name", "origin", "settings"], optional: ["description", "problem"] },
+  Persona: { required: ["id", "name", "origin", "settings"], optional: ["description", "keywords", "problem"] },
   PersonaAddAnswer: { required: ["persona"], optional: [] },
   PersonaFile: { required: ["id", "origin", "content"], optional: [] },
   PersonaFileSaveRequest: { required: ["origin", "id", "content"], optional: ["folder", "delete"] },

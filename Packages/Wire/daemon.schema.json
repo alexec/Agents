@@ -19991,6 +19991,13 @@
         "settings": {
           "$ref": "#/definitions/WorkflowSettings"
         },
+        "keywords": {
+          "description": "The front matter's `keywords:` (#4559): the words in a first prompt that make Auto pick this persona. Left out when the file names none; then its name and description are the words.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "problem": {
           "type": "string"
         }
