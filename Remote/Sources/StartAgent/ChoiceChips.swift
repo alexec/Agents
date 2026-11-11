@@ -1,69 +1,79 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Which runtime, and what it offers: the Mac's start controls, as rows (029).
+/// Which runtime, and what it offers: the Mac's start controls, as chips in the prompt
+/// card (029, #4556).
 ///
-/// Only what the runtime advertises is drawn, in the order the Mac draws it
-/// (`PromptControlsState.drawable`), and each row names what it chooses. A runtime that
-/// cannot start is still listed, with why, because one that silently is not there reads
-/// as one the phone forgot.
-struct ChoiceRows: View {
+/// In the Mac's order: where, runtime, account, model, permission mode, sandbox, and ⋯
+/// for the rest. They wrap into rows rather than scroll sideways, so none is past the
+/// edge, and they sit above the words, so with the keyboard up they are in view. Each
+/// chip reads its value and opens the menu its row opened. A runtime that cannot start is
+/// still listed, with why, because one that silently is not there reads as one the phone
+/// forgot.
+struct ChoiceChips: View {
     @Environment(RemoteModel.self) private var model
-    @State private var confirmingAlwaysApprove = false
+    /// The session's labels, after ⋯ as tags (#2649).
+    let labels: [String]
+    /// Opens More; true to open it at Labels.
+    let more: (_ atLabels: Bool) -> Void
     @State private var confirmingBypass = false
 
     var body: some View {
-        Section {
-            runtimeRow
-            // The values in the shared words (#2658, Story 6).
-            modelRow
-            permissionModeRow
-            permissionRow
+        WrappingHStack(spacing: 6) {
+            if model.startWorktrees.isRepository {
+                worktreeChip
+            }
+            runtimeChip
             // Which of the runtime's accounts (#840): only when it has more than one.
             if !model.startAccounts.isEmpty {
-                accountRow
+                accountChip
             }
-            if model.startWorktrees.isRepository {
-                worktreeRow
-            }
-            sandboxRow
-        }
-        .paperListRow()
-        // The runtime's own choices, behind the shared ones; none on Auto, which has no
-        // runtime yet (#2658).
-        if !model.isAutoStart {
-        Section {
-            switch model.startChoicesState {
-            case .loading:
-                Label("Asking \(runtimeName) what it offers…", systemImage: "hourglass")
-                    .appText(.supporting)
-                    .foregroundStyle(.secondary)
-            case .failed(let reason):
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(reason).appText(.supporting).tinted(.failure)
-                    Button("Try again") { Task { await model.retryStartChoices() } }
-                        .appText(.supporting)
-                        .accessibilityHint("Asks \(runtimeName) again what it offers")
+            // The values in the shared words (#2658, Story 6).
+            modelChip
+            permissionModeChip
+            sandboxChip
+            moreChip
+            ForEach(labels, id: \.self) { label in
+                Button { more(true) } label: {
+                    StartChip(title: label, chevron: false, plain: true)
                 }
-            case .ready:
-                if model.startOptions.isEmpty {
-                    Text("\(runtimeName) has nothing to adjust.")
-                        .appText(.supporting)
-                        .foregroundStyle(.secondary)
-                }
-                ForEach(model.startOptions, id: \.id) { option in
-                    row(for: option)
-                }
-            }
-        } header: {
-            Text(LevelWords.own(runtimeName))
-        } footer: {
-            if case .failed = model.startChoicesState, model.startRuntimeID != nil {
-                Text("You can still start it with what \(runtimeName) chooses by itself.")
+                .accessibilityLabel("Label, \(label)")
+                .accessibilityHint("Opens More at Labels")
             }
         }
-        .paperListRow()
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        // Bypass Permissions: one more tap, as the pill asks (#2892).
+        .confirmationDialog(LevelWords.bypassConfirmTitle, isPresented: $confirmingBypass, titleVisibility: .visible) {
+            Button(LevelWords.bypassConfirmButton, role: .destructive) {
+                model.chooseStartLevel(.permission, PermissionLevel.bypassPermissions.rawValue)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(LevelWords.bypassConfirmMessage)
         }
+    }
+
+    /// How many of More's choices are set (#4556): the runtime's own options away from
+    /// their default, the Reach folders, the labels, and Permission requests set for this
+    /// session.
+    static func moreCount(_ model: RemoteModel, labels: [String]) -> Int {
+        let own = model.isAutoStart ? 0 : model.startOptions.filter { option in
+            guard let chosen = model.startChosen[option.id] else { return false }
+            return chosen != option.currentValue
+        }.count
+        return own + model.startFolders.count + labels.count + (model.startClientPermission == nil ? 0 : 1)
+    }
+
+    private var moreChip: some View {
+        let count = Self.moreCount(model, labels: labels)
+        return Button { more(false) } label: {
+            StartChip(title: nil, systemImage: "ellipsis", chevron: false, badge: count)
+        }
+        // Not "More": the page's own ⋯ in the navigation bar is called that.
+        .accessibilityLabel("More choices")
+        .accessibilityValue(count == 0 ? "" : "\(count) set")
+        .accessibilityHint("The runtime's own options, Permission requests, Reach and Labels")
     }
 
     /// The runtime Auto picks now, by name.
@@ -76,29 +86,33 @@ struct ChoiceRows: View {
         model.isAutoStart ? model.startAutoPreview?.runtimeID : model.startRuntimeID
     }
 
-    /// Model: Fast, Balanced, Smart as a segmented control (Story 6); the runtime's own
-    /// setting that matches none says Custom under it.
-    private var modelRow: some View {
+    /// Model: Fast, Balanced, Smart, each with what it is on the runtime (Story 6); the
+    /// runtime's own setting that matches none reads Custom.
+    private var modelChip: some View {
         let chosen = model.startLevel(.model)
-        return VStack(alignment: .leading, spacing: 6) {
-            Picker(LevelWords.modelField, selection: Binding(
-                get: { chosen ?? "" },
-                set: { model.chooseStartLevel(.model, $0) })) {
-                ForEach(LevelWords.levels(.model), id: \.self) { level in
-                    Text(LevelWords.level(.model, level)).tag(level)
+        // Custom says which field it is: two chips reading Custom are two chips alike.
+        let title = chosen.map { LevelWords.level(.model, $0) } ?? "\(LevelWords.modelField) · \(LevelWords.custom)"
+        return Menu {
+            ForEach(LevelWords.levels(.model), id: \.self) { level in
+                Button {
+                    model.chooseStartLevel(.model, level)
+                } label: {
+                    choiceLabel(LevelWords.level(.model, level), chosen: level == chosen)
+                    Text(levelLine(.model, level))
                 }
             }
-            .pickerStyle(.segmented)
-            Text(levelLine(.model, chosen))
-                .appText(.supporting)
-                .foregroundStyle(.secondary)
+            if chosen == nil {
+                Section { Text(levelLine(.model, nil)) }
+            }
+        } label: {
+            StartChip(title: title)
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(LevelWords.modelField)
+        .accessibilityLabel("\(LevelWords.modelField), \(chosen.map { LevelWords.level(.model, $0) } ?? LevelWords.custom)")
     }
 
-    private var permissionModeRow: some View {
+    private var permissionModeChip: some View {
         let chosen = model.startLevel(.permission)
+        let title = chosen.map { LevelWords.level(.permission, $0) } ?? "\(LevelWords.permissionField) · \(LevelWords.custom)"
         return Menu {
             ForEach(LevelWords.levels(.permission), id: \.self) { level in
                 let cell = mappedRuntime.flatMap { model.autoMappings.cell($0, .permission, level) }
@@ -109,32 +123,16 @@ struct ChoiceRows: View {
                         model.chooseStartLevel(.permission, level)
                     }
                 } label: {
-                    if level == chosen {
-                        Label(LevelWords.level(.permission, level), systemImage: "checkmark")
-                    } else {
-                        Text(LevelWords.level(.permission, level))
-                    }
+                    choiceLabel(LevelWords.level(.permission, level), chosen: level == chosen)
                     Text(cell.map { "\($0.words) on \(PromptWords.runtimeName($0.runtimeID))" }
                          ?? LevelWords.meaning(permission: PermissionLevel(rawValue: level) ?? .ask))
                 }
                 .disabled(cell.map { $0.mark == .notPossible || $0.mark == .dropped } ?? false)
             }
         } label: {
-            LabeledContent(LevelWords.permissionField) {
-                Text(chosen.map { LevelWords.level(.permission, $0) } ?? LevelWords.custom).foregroundStyle(.secondary)
-            }
-            .appText(.reading)
+            StartChip(title: title)
         }
         .accessibilityLabel("\(LevelWords.permissionField), \(chosen.map { LevelWords.level(.permission, $0) } ?? LevelWords.custom)")
-        // Bypass Permissions: one more tap, as the pill asks (#2892).
-        .confirmationDialog(LevelWords.bypassConfirmTitle, isPresented: $confirmingBypass, titleVisibility: .visible) {
-            Button(LevelWords.bypassConfirmButton, role: .destructive) {
-                model.chooseStartLevel(.permission, PermissionLevel.bypassPermissions.rawValue)
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text(LevelWords.bypassConfirmMessage)
-        }
     }
 
     /// "Sonnet on Claude" under the value, or Custom's meaning.
@@ -150,19 +148,30 @@ struct ChoiceRows: View {
         model.startRuntime?.runtime.name ?? PromptControlsState.unnamedRuntime
     }
 
-    /// "Auto (Claude)" on Auto (Story 6), else the runtime's name.
+    /// "Auto · Claude" on Auto, as the chat's header says it (#4556), else the runtime's name.
     private var runtimeTitle: String {
-        if model.isAutoStart { return LevelWords.autoRow(autoPicked) }
+        if model.isAutoStart {
+            if model.startAutoPicksNothing { return "\(LevelWords.auto) · no runtime" }
+            return autoPicked.map(LevelWords.header) ?? LevelWords.auto
+        }
         return model.startRuntime?.runtime.name ?? "None set up on \(model.startHost == .mac ? "the Mac" : model.hostName(model.startHost))"
     }
 
-    private var runtimeRow: some View {
+    /// The mark on the Runtime chip: red when Auto picks nothing (#2658), orange when the
+    /// runtime chosen is out (052, 065).
+    private var runtimeDot: StateTint {
+        if model.startAutoPicksNothing { return .failure }
+        if model.startRuntimeOut != nil { return .attention }
+        return .none
+    }
+
+    private var runtimeChip: some View {
         Menu {
             // Auto first (#2658): the Mac picks the runtime when the session starts.
             Button {
                 Task { await model.chooseRuntime(LevelWords.autoID) }
             } label: {
-                Text(LevelWords.auto)
+                choiceLabel(LevelWords.auto, chosen: model.isAutoStart)
                 Text(LevelWords.picks(autoPicked))
             }
             if !outRuntimes.isEmpty {
@@ -176,62 +185,10 @@ struct ChoiceRows: View {
                 runtimeButtons(in: model.startRuntimes)
             }
         } label: {
-            LabeledContent(LevelWords.runtimeField) {
-                Text(runtimeTitle)
-                    .foregroundStyle(.secondary)
-            }
-            .appText(.reading)
+            StartChip(title: runtimeTitle, dot: runtimeDot)
         }
         .disabled(model.startRuntimes.isEmpty)
         .accessibilityLabel("Runtime, \(runtimeTitle)")
-    }
-
-    /// The new agent's answer to permission requests (#2658, FR-019): its own, or the value
-    /// Settings gives, marked; only for Cursor, Grok and OpenCode, and not on Auto, where it
-    /// follows the permission mode.
-    @ViewBuilder
-    private var permissionRow: some View {
-        if let runtimeID = model.startRuntimeID, ClientPermissionSettings.supports(runtimeID) {
-            let name = model.startRuntime?.runtime.name ?? runtimeID
-            let settings = model.clientPermissions.mode(for: runtimeID)
-            let mode = model.startClientPermission ?? settings
-            Menu {
-                ForEach([ClientPermissionMode.default, .alwaysApprove], id: \.self) { choice in
-                    Button {
-                        if choice == .alwaysApprove, mode != .alwaysApprove {
-                            confirmingAlwaysApprove = true
-                        } else {
-                            model.startClientPermission = model.startClientPermission == nil && choice == settings ? nil : choice
-                        }
-                    } label: {
-                        VStack(alignment: .leading, spacing: 2) {
-                            choiceLabel(ClientPermissionWords.title(choice), chosen: choice == mode)
-                            Text(model.startClientPermission == nil && choice == settings
-                                 ? "\(LevelWords.followsSettings). \(ClientPermissionWords.description(choice, runtimeName: name))"
-                                 : ClientPermissionWords.description(choice, runtimeName: name))
-                                .appText(.supporting)
-                        }
-                    }
-                }
-            } label: {
-                LabeledContent(LevelWords.requestsField) {
-                    Text(ClientPermissionWords.title(mode)).foregroundStyle(.secondary)
-                }
-                .appText(.reading)
-            }
-            .accessibilityLabel("\(ClientPermissionWords.name(runtimeName: name)), \(ClientPermissionWords.title(mode))")
-            .accessibilityHint(ClientPermissionWords.scope(runtimeName: name))
-            // Yes to all answers every request: one more tap, as the capsule asks (#2746).
-            .confirmationDialog(ClientPermissionWords.confirmTitle(runtimeName: name),
-                                isPresented: $confirmingAlwaysApprove, titleVisibility: .visible) {
-                Button(ClientPermissionWords.confirmButton, role: .destructive) {
-                    model.startClientPermission = settings == .alwaysApprove ? nil : .alwaysApprove
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text(ClientPermissionWords.confirmMessage(runtimeName: name))
-            }
-        }
     }
 
     /// Under an account's name: why it cannot be used, or that its allowance is out, as the
@@ -244,7 +201,7 @@ struct ChoiceRows: View {
 
     /// Which of the runtime's accounts the session uses (#840), the organisation's included
     /// (#999). One the organisation's policy refuses is shown, not chosen.
-    private var accountRow: some View {
+    private var accountChip: some View {
         let choices = model.startAccountChoices
         let chosen = choices?.account(for: model.startAccountID)
         let name = choices?.name(model.startAccountID) ?? AccountProfile.defaultName
@@ -272,10 +229,7 @@ struct ChoiceRows: View {
                 }
             }
         } label: {
-            LabeledContent("Account") {
-                Text(name).foregroundStyle(.secondary)
-            }
-            .appText(.reading)
+            StartChip(title: name, locked: choices?.ownSetBy != nil)
         }
         .accessibilityLabel("Account, \(name)")
     }
@@ -286,7 +240,7 @@ struct ChoiceRows: View {
             Button {
                 Task { await model.chooseRuntime(status.runtime.id) }
             } label: {
-                Text(status.runtime.name)
+                choiceLabel(status.runtime.name, chosen: status.runtime.id == model.startRuntimeID)
                 if let detail = detail(for: status, out: out) { Text(detail) }
             }
             .disabled(!status.canStart)
@@ -301,7 +255,7 @@ struct ChoiceRows: View {
         if let reason = status.unavailableReason { return reason }
         // The allowances and accounts are the Mac's, and say nothing of a server's
         // runtime (#240).
-        guard splitsByAllowance else { return nil }
+        guard model.startSplitsByAllowance else { return nil }
         if out { return outNote(status.runtime.id) }
         return availableNote(status.runtime.id) ?? model.signInNote(for: status.runtime.id)
     }
@@ -309,22 +263,14 @@ struct ChoiceRows: View {
     /// The runtimes in two runs, as the Mac's chooser draws them (065): those that can
     /// take a turn now, and those whose plan is spent. An out runtime stays listed and
     /// stays pickable, because a chat on it takes the message and the runtime says no
-    /// until its plan is back, and hiding it would hide the only way back to it. Naming
-    /// it as out is the whole of the change: a list of runtimes by name says nothing
-    /// about which ones will turn a message down.
-    ///
-    /// A server folder's runtimes are left in one run, as the window leaves them (#240):
-    /// the allowances are the Mac's own, and would label a server's runtime with the
-    /// Mac's state.
-    private var splitsByAllowance: Bool { model.startHost == .mac }
-
+    /// until its plan is back, and hiding it would hide the only way back to it.
     private var availableRuntimes: [RuntimeStatus] {
-        guard splitsByAllowance else { return model.startRuntimes }
+        guard model.startSplitsByAllowance else { return model.startRuntimes }
         return model.startRuntimes.filter { !isOut($0.id) }
     }
 
     private var outRuntimes: [RuntimeStatus] {
-        guard splitsByAllowance else { return [] }
+        guard model.startSplitsByAllowance else { return [] }
         return model.startRuntimes.filter { isOut($0.id) }
     }
 
@@ -346,7 +292,7 @@ struct ChoiceRows: View {
 
     /// Folder, a new worktree, or one already there (030), as the Mac's start
     /// bar offers them. Only on a repository.
-    private var worktreeRow: some View {
+    private var worktreeChip: some View {
         let listed = model.startWorktrees
         let others = listed.worktrees.filter { !$0.isFolderPath }
         return Menu {
@@ -397,10 +343,8 @@ struct ChoiceRows: View {
                 }
             }
         } label: {
-            LabeledContent("Worktree") {
-                Text(worktreeTitle).foregroundStyle(.secondary)
-            }
-            .appText(.reading)
+            // A worktree's name is cut at the end; the menu shows the whole of it (#2659).
+            StartChip(title: worktreeTitle, systemImage: "arrow.triangle.branch", maxTitleWidth: 140)
         }
         .accessibilityLabel("Worktree, \(worktreeTitle)")
     }
@@ -408,7 +352,7 @@ struct ChoiceRows: View {
     /// The new agent's command sandbox (064): its own choice, or its runtime's default.
     /// A runtime with no choice says its state, with why.
     @ViewBuilder
-    private var sandboxRow: some View {
+    private var sandboxChip: some View {
         if model.isAutoStart {
             // On Auto, the three values, each said as it is on the runtime Auto picks now.
             let chosen = model.startSandbox ?? .runtime
@@ -429,10 +373,7 @@ struct ChoiceRows: View {
                     }
                 }
             } label: {
-                LabeledContent(LevelWords.sandboxField) {
-                    Text(LevelWords.sandbox(chosen)).foregroundStyle(.secondary)
-                }
-                .appText(.reading)
+                StartChip(title: LevelWords.sandbox(chosen), locked: setBy != nil)
             }
             .accessibilityLabel("\(LevelWords.sandboxField), \(LevelWords.sandbox(chosen))")
         } else if let runtimeID = model.startRuntimeID {
@@ -440,16 +381,15 @@ struct ChoiceRows: View {
             let runtimeDefault = model.sandboxSettings.choice(for: runtimeID)
             let title = SandboxWords.override(model.startSandbox, runtimeDefault: runtimeDefault, runtimeID: runtimeID)
             if choices.isEmpty {
-                LabeledContent(LevelWords.sandboxField) {
-                    // Its fixed value, in the shared words (#2658).
-                    let none = SandboxCatalog.state(runtimeID: runtimeID, choice: .runtime) == SandboxState.none
-                    Text(LevelWords.sandbox(none ? .off : .runtime))
-                        .foregroundStyle(.secondary)
-                }
-                .appText(.reading)
-                .accessibilityHint(SandboxCatalog.entry(for: runtimeID)?.why ?? "")
-                // No sandbox the app can vouch for, so the organisation's rule refuses it (#998).
-                if let mark = model.sandboxSettings.setBy { OrgPolicyLine(mark: mark) }
+                // Its fixed value, in the shared words (#2658): said, not offered. With no
+                // sandbox the app can vouch for, the organisation's rule refuses it (#998),
+                // which the line over the card says.
+                let none = SandboxCatalog.state(runtimeID: runtimeID, choice: .runtime) == SandboxState.none
+                let fixed = LevelWords.sandbox(none ? .off : .runtime)
+                StartChip(title: fixed, chevron: false, locked: model.sandboxSettings.setBy != nil)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(LevelWords.sandboxField), \(fixed)")
+                    .accessibilityHint(SandboxCatalog.entry(for: runtimeID)?.why ?? "")
             } else {
                 // While the organisation requires the sandbox, only On is in force (#998).
                 let setBy = model.sandboxSettings.setBy
@@ -478,10 +418,7 @@ struct ChoiceRows: View {
                         }
                     }
                 } label: {
-                    LabeledContent(LevelWords.sandboxField) {
-                        Text(title).foregroundStyle(.secondary)
-                    }
-                    .appText(.reading)
+                    StartChip(title: title, locked: setBy != nil)
                 }
                 .accessibilityLabel("Sandbox, \(title)")
             }
@@ -503,7 +440,6 @@ struct ChoiceRows: View {
         if chosen { Label(title, systemImage: "checkmark") } else { Text(title) }
     }
 
-    /// Its branch, its git status and who is in it, as the Mac says it.
     /// Its branch, git status, who is in it, and with `size` how much it holds (#790).
     static func worktreeDetail(_ worktree: DaemonAPI.WorktreeSummary, size: DaemonAPI.WorktreeSize? = nil) -> String {
         guard worktree.exists else { return "Missing" }
@@ -517,41 +453,82 @@ struct ChoiceRows: View {
         if let size { parts.append(size.words) }
         return parts.joined(separator: " · ")
     }
+}
 
-    @ViewBuilder
-    private func row(for option: ConfigOption) -> some View {
-        if option.isBoolean {
-            Toggle(option.name, isOn: Binding(
-                get: { model.startChosen[option.id]?.boolValue ?? option.currentValue?.boolValue ?? false },
-                set: { model.choose(.bool($0), for: option.id) }))
-                .appText(.reading)
-        } else {
-            let chosen = model.startChosen[option.id]
-            Menu {
-                ForEach(option.options ?? [], id: \.id) { choice in
-                    if let mark = choice.setBy {
-                        // A mode or model the organisation refuses: shown, not chosen (#998).
-                        OrgPolicyMenuItem(name: choice.name, mark: mark)
-                    } else {
-                        Button {
-                            model.choose(choice.value, for: option.id)
-                        } label: {
-                            if choice.value == chosen {
-                                Label(choice.name, systemImage: "checkmark")
-                            } else {
-                                Text(choice.name)
-                            }
-                            if let description = choice.description { Text(description) }
-                        }
-                    }
-                }
-            } label: {
-                LabeledContent(option.name) {
-                    Text(option.closedTitle(for: chosen)).foregroundStyle(.secondary)
-                }
-                .appText(.reading)
+/// One chip in the prompt card (#4556): a raised paper capsule, 32 pt tall, that reads
+/// its value, with a chevron when it opens a menu (`SelectCapsule`'s look).
+struct StartChip: View {
+    let title: String?
+    var systemImage: String?
+    var chevron = true
+    /// A mark at its corner: red when it cannot start, orange when it needs a look.
+    var dot: StateTint = .none
+    /// Set by the organisation (#998): the menu still opens, with the refused values dimmed.
+    var locked = false
+    /// A count in the accent colour, for ⋯ (#4556).
+    var badge = 0
+    /// Cut at the end past this width, as a worktree's name is.
+    var maxTitleWidth: CGFloat?
+    /// A label's tag: grey, with no raised paper.
+    var plain = false
+
+    var body: some View {
+        HStack(spacing: 4) {
+            if let systemImage {
+                Image(systemName: systemImage)
+                    // Decorative: the chip's words say what it is (FR-015).
+                    .glyph(size: 11, weight: .semibold)
+                    .foregroundStyle(.secondary)
             }
-            .accessibilityLabel("\(option.name), \(option.closedTitle(for: chosen))")
+            if let title {
+                Text(title)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: maxTitleWidth, alignment: .leading)
+            }
+            if locked {
+                Image(systemName: "lock.fill")
+                    .glyph(size: 8, weight: .semibold)
+                    .foregroundStyle(.secondary)
+            }
+            if badge > 0 {
+                Text("\(badge)")
+                    .appText(.fine).fontWeight(.semibold)
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 5)
+                    .frame(minWidth: 18, minHeight: 18)
+                    .background(Color.accentColor, in: Capsule())
+            }
+            if chevron {
+                Image(systemName: "chevron.down")
+                    .glyph(size: 8, weight: .semibold)
+                    .foregroundStyle(.secondary)
+            }
         }
+        .appText(.fine)
+        .foregroundStyle(plain ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
+        .padding(.horizontal, 10)
+        .frame(minHeight: 32)
+        .contentShape(Capsule())
+        .background { if plain { Capsule().fill(Paper.wash) } }
+        .modifier(RaisedUnlessPlain(plain: plain))
+        .overlay(alignment: .topTrailing) {
+            if let color = dot.color {
+                Circle().fill(color)
+                    .frame(width: 8, height: 8)
+                    .offset(x: -2, y: 2)
+                    .accessibilityHidden(true)
+            }
+        }
+        .fixedSize(horizontal: maxTitleWidth == nil, vertical: true)
+    }
+}
+
+private struct RaisedUnlessPlain: ViewModifier {
+    let plain: Bool
+
+    func body(content: Content) -> some View {
+        if plain { content } else { content.paperRaised(in: .capsule) }
     }
 }

@@ -3,9 +3,10 @@ import SwiftUI
 
 /// New session, on a phone: a runtime, what it offers, and what to ask it (029).
 ///
-/// The choices sit above and the prompt sits at the bottom, over the keyboard, so that
-/// with the keyboard up the words and Send are what is in view, and the choices are a
-/// scroll away rather than behind it.
+/// A composer (#4556): the chat's prompt card at the bottom, over the keyboard, with the
+/// choices as chips in it above the words, so that with the keyboard up the choices are in
+/// view whenever the words are. The rarer ones are behind ⋯, in More. Above the card is
+/// only what is not a choice: the project, the persona, kept starts and the Blobs.
 ///
 /// The folder's own page (#366): what its row opens, in the detail rather than a sheet
 /// over it, as the Mac's folder row opens its new-session chat. Leaving keeps what was
@@ -26,7 +27,9 @@ struct StartAgentView: View {
     /// Said instead of typed, as in the chat's bar (#2300).
     @State private var dictation = Dictation()
     @State private var draftLabels: [String] = []
-    @State private var folderPath = ""
+    /// More is open (#4556); `moreAtLabels` opens it at Labels, from a label's tag.
+    @State private var showingMore = false
+    @State private var moreAtLabels = false
     /// Why something picked could not be attached, or that a kept picture was too big
     /// to keep and needs picking again.
     @State private var attachNote: String?
@@ -95,12 +98,6 @@ struct StartAgentView: View {
 
     private var form: some View {
         Form {
-            // The Blobs (#987): at the pointer on an iPad with one, else down at the prompt.
-            Section {
-                Huddle(promptFocused: focused, pointer: pointer, typed: text.count)
-                    .frame(maxWidth: .infinity)
-                    .listRowBackground(Color.clear)
-            }
             // Project, then On (#3279): not in a folder's own scene, which is the folder.
             if sceneFolder == nil { ProjectRows(folder: key) }
             personaHeading
@@ -126,34 +123,12 @@ struct StartAgentView: View {
                     }
                 }
             }
-            ChoiceRows()
-            Section("Reach") {
-                ForEach(model.startFolders, id: \.self) { folder in
-                    HStack {
-                        Text(folder.path).lineLimit(1)
-                        Spacer()
-                        Button("Remove") { model.startFolders.removeAll { $0 == folder } }
-                    }
-                }
-                HStack {
-                    TextField("Folder path", text: $folderPath)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                    Button("Add") {
-                        let folder = URL(fileURLWithPath: (folderPath as NSString).expandingTildeInPath)
-                        if !model.startFolders.contains(folder) { model.startFolders.append(folder) }
-                        folderPath = ""
-                    }
-                    .disabled(folderPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-            }
-            Section("Labels") {
-                LabelTagField(labels: draftLabels.map { SessionLabel(value: $0, owner: .person) },
-                              suggestions: model.labelSuggestions(in: folder),
-                              add: { draftLabels += $0 },
-                              remove: { value in
-                                  draftLabels.removeAll { SessionLabelPolicy.key($0) == SessionLabelPolicy.key(value) }
-                              })
+            // The Blobs (#987) in the space left, last, so with the keyboard up on an iPhone
+            // they are what gives way: at the pointer on an iPad with one, else down at the prompt.
+            Section {
+                Huddle(promptFocused: focused, pointer: pointer, typed: text.count)
+                    .frame(maxWidth: .infinity)
+                    .listRowBackground(Color.clear)
             }
         }
         .paperForm()
@@ -168,6 +143,10 @@ struct StartAgentView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { promptBar }
+        .sheet(isPresented: $showingMore) {
+            MoreSheet(folder: folder, labels: $draftLabels, atLabels: moreAtLabels)
+                .environment(model)
+        }
     }
 
     /// The kind of session to start (#760), at the top of the page as a heading-style menu
@@ -270,10 +249,35 @@ struct StartAgentView: View {
             if model.isStarting {
                 Telling(host: model.recipient(on: model.startHost), doing: AgentState.startingLabel)
             }
+            // What the chips' marks are about, in words, as the Mac's bar says them: the
+            // runtime chosen is out (052, 065), Auto picks nothing (#2658), or the
+            // organisation sets the sandbox (#998).
+            if let out = model.startRuntimeOut {
+                Text(out)
+                    .appText(.supporting)
+                    .foregroundStyle(StateTint.attention.style(or: .primary))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if model.startAutoPicksNothing {
+                Text(LevelWords.noRuntime(model.startAutoPreview?.skipped ?? [], name: PromptWords.runtimeName))
+                    .appText(.supporting)
+                    .tinted(.failure)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let mark = model.sandboxSettings.setBy {
+                OrgPolicyLine(mark: mark)
+            }
             // The chat's prompt bar (#2621, #2752): one raised card holding the attachments and
             // the words, with attach on the left and dictate and send on the right under them,
             // so starting an agent and talking to one look like the same act.
             VStack(alignment: .leading, spacing: 8) {
+                // The choices, above the words (#4556). Off while it starts (#87), and while
+                // the host is not answering (#239), when choosing would go nowhere.
+                ChoiceChips(labels: draftLabels) { atLabels in
+                    moreAtLabels = atLabels
+                    showingMore = true
+                }
+                .disabled(model.isStarting || hostOff)
                 if !attachments.isEmpty {
                     AttachmentStrip(attachments: $attachments,
                                     capabilities: model.promptCapabilities(for: model.startRuntimeID),
@@ -353,8 +357,15 @@ struct StartAgentView: View {
         model.startHost == .mac ? model.policyState?.composerReason : nil
     }
 
+    /// The folder's host is not answering, and does not start when used (#239, #691 US3).
+    private var hostOff: Bool {
+        model.isStale(on: model.startHost) && !model.startsWhenUsed(model.startHost)
+    }
+
     private var canSend: Bool {
         guard policyRefusal == nil else { return false }
+        // Auto found no runtime that can take it (#2658): the line over the card says why.
+        guard !model.startAutoPicksNothing else { return false }
         // Off while the folder's host is not answering, the Mac or its server (#239).
         // A stopped workspace that starts when used keeps the start until it is up (#691 US3).
         return !model.isStarting && (!model.isStale(on: model.startHost) || model.startsWhenUsed(model.startHost))
