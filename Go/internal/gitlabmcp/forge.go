@@ -108,6 +108,17 @@ type ItemDetail struct {
 	// a retry and a log name (#3130).
 	Head     string
 	Pipeline int
+	// An issue's (#4626): Children are its child work items, in GitLab's order (empty on a GitLab
+	// without work items), and ClosedBy the merge requests that close it.
+	Children, ClosedBy []Linked
+}
+
+// Linked is an item that another names, with its title: State is open, closed or merged.
+type Linked struct {
+	Project           string
+	Number            int
+	MR                bool
+	State, Title, URL string
 }
 
 // forgeComments is a page of an item's comments.
@@ -400,8 +411,16 @@ func (g *RealGitLab) ItemPage(ctx context.Context, project string, number int, m
 	d := ItemDetail{Item: j.item(project, mr), Body: j.Description, Thread: []Comment{}}
 	if !mr {
 		// The hierarchy is a nicety: a page still reads on a GitLab without work items.
+		d.Children, d.ClosedBy = []Linked{}, []Linked{}
 		if h, err := g.hierarchy(ctx, project, number); err == nil {
 			h.into(&d.Item)
+			for _, c := range h.children {
+				d.Children = append(d.Children, Linked{Project: c.Project, Number: c.Number, State: c.State, Title: c.Title, URL: c.URL})
+			}
+		}
+		// The merge requests that close it (#4626): the one read more of an issue's page, a nicety too.
+		if closedBy, err := g.closedBy(ctx, project, number); err == nil {
+			d.ClosedBy = closedBy
 		}
 	}
 	var notes []noteJSON
@@ -483,7 +502,7 @@ type Plan struct {
 const hierarchyQuery = `query($path: ID!, $iid: String!) { project(fullPath: $path) { workItems(iids: [$iid], first: 1) { nodes {
   widgets { __typename ... on WorkItemWidgetHierarchy {
     parent { iid state namespace { fullPath } }
-    children(first: 100) { nodes { iid state namespace { fullPath }
+    children(first: 100) { nodes { iid state title webUrl namespace { fullPath }
       widgets { __typename ... on WorkItemWidgetLinkedItems { linkedItems(first: 50) { nodes { linkType
         workItem { iid state namespace { fullPath } } } } } } } } } } } } } }`
 
@@ -557,6 +576,8 @@ func (g *RealGitLab) hierarchy(ctx context.Context, project string, number int) 
 						Children struct {
 							Nodes []struct {
 								workItemRef
+								Title   string `json:"title"`
+								WebURL  string `json:"webUrl"`
 								Widgets []struct {
 									LinkedItems struct {
 										Nodes []struct {
@@ -593,7 +614,8 @@ func (g *RealGitLab) hierarchy(ctx context.Context, project string, number int) 
 			if !ok {
 				continue
 			}
-			child := PlanChild{Item: Item{Project: r.Project, Number: r.Number, State: map[bool]string{true: "open", false: "closed"}[r.Open]}, BlockedBy: []Ref{}}
+			child := PlanChild{Item: Item{Project: r.Project, Number: r.Number, State: map[bool]string{true: "open", false: "closed"}[r.Open],
+				Title: c.Title, URL: c.WebURL}, BlockedBy: []Ref{}}
 			for _, cw := range c.Widgets {
 				for _, l := range cw.LinkedItems.Nodes {
 					if b, ok := l.WorkItem.ref(); ok && strings.EqualFold(l.LinkType, "is_blocked_by") {
@@ -605,6 +627,36 @@ func (g *RealGitLab) hierarchy(ctx context.Context, project string, number int) 
 		}
 	}
 	return h, nil
+}
+
+// closedBy are the merge requests that close issue number of project when they merge (#4626).
+func (g *RealGitLab) closedBy(ctx context.Context, project string, number int) ([]Linked, error) {
+	var mrs []struct {
+		IID        int    `json:"iid"`
+		Title      string `json:"title"`
+		State      string `json:"state"`
+		WebURL     string `json:"web_url"`
+		References struct {
+			Full string `json:"full"`
+		} `json:"references"`
+	}
+	if err := g.get(ctx, fmt.Sprintf("projects/%s/issues/%d/closed_by?per_page=100", pid(project), number), false, &mrs); err != nil {
+		return nil, err
+	}
+	out := []Linked{}
+	for _, m := range mrs {
+		// references.full is group/project!4; a merge request of this project says only !4.
+		path, _, ok := strings.Cut(m.References.Full, "!")
+		if !ok || path == "" {
+			path = project
+		}
+		state := map[string]string{"opened": "open", "merged": "merged"}[m.State]
+		if state == "" {
+			state = "closed"
+		}
+		out = append(out, Linked{Project: path, Number: m.IID, MR: true, State: state, Title: m.Title, URL: m.WebURL})
+	}
+	return out, nil
 }
 
 // Plan is the issue number of project, its child issues and each one's blockers: one GraphQL

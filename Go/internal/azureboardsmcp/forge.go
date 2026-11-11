@@ -90,6 +90,8 @@ type ItemDetail struct {
 	Thread      []ForgeComment
 	Before      string
 	Transitions []Transition
+	// Children are its child work items, at most 200, by id, read with one batch (#4626).
+	Children []Item
 }
 
 const (
@@ -489,12 +491,17 @@ func (f *RealBoards) ItemPage(ctx context.Context, project string, id int, befor
 	}
 	states, _ := f.categories(ctx, project)
 	d := ItemDetail{Item: f.forgeItem(orgOf(project), w.workItemJSON, states), Body: markdown(w.text(fieldDesc)), Thread: []ForgeComment{},
-		Transitions: []Transition{}}
+		Transitions: []Transition{}, Children: []Item{}}
+	var ids []int
 	for _, r := range w.Relations {
 		if r.Rel == relChild {
 			d.SubTotal++
+			if n := r.linked(); n > 0 {
+				ids = append(ids, n)
+			}
 		}
 	}
+	d.Children = f.children(ctx, project, ids, states)
 	for _, s := range types[d.Type] {
 		if s.Name != d.Status {
 			d.Transitions = append(d.Transitions, Transition{ID: s.Name, Name: s.Name, Category: category(s.Category)})
@@ -529,6 +536,30 @@ func (f *RealBoards) ItemPage(ctx context.Context, project string, id int, befor
 	}
 	d.Before = list.Next
 	return d, nil
+}
+
+// children are the work items of ids, with one batch read (#4626). A child in another project
+// takes that project's states, which are kept. The children are a nicety: when the read fails,
+// the page has none.
+func (f *RealBoards) children(ctx context.Context, project string, ids []int, states map[string]map[string]string) []Item {
+	out := []Item{}
+	if len(ids) == 0 {
+		return out
+	}
+	org := orgOf(project)
+	slices.Sort(ids)
+	items, err := f.orgItems(ctx, org, ids[:min(len(ids), 200)], forgeFields, false)
+	if err != nil {
+		return out
+	}
+	for _, c := range items {
+		s := states
+		if p := c.project(org); p != project {
+			s, _ = f.categories(ctx, p)
+		}
+		out = append(out, f.forgeItem(org, c.workItemJSON, s))
+	}
+	return out
 }
 
 // MARK: Writes

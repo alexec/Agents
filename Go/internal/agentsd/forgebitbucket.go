@@ -136,8 +136,11 @@ func (bitbucketForge) Caps() forgeCaps {
 		PR:          forgeActions{Comment: true, Close: true, Merge: true, Approve: true, Rerun: true, Log: true, Diff: true, Ready: true},
 		Avatars:     true,
 		StateReason: true,
-		// Bitbucket says when an item opened, but no time that it closed or merged.
+		// Bitbucket says when an item opened, but no time that it closed or merged: a pull
+		// request's activity has it, a read more for each item of a list (#4626).
 		CreatedAt: true,
+		// An issue's changes: its kind and component (its labels), assignee and state (#4626).
+		Events: true,
 		// A pull request's branches and merge (#4409); its size, reviewers, closing issues and check times are #4682.
 		Branches: true, MergeCommit: true,
 		// An issue's comment count is on its own page only.
@@ -246,6 +249,14 @@ func (b bitbucketForge) Item(ctx context.Context, r forgeRef, cursor string) (wi
 	}
 	if !p.PR {
 		out.Start = bitbucketStart(out.Item, r.Number)
+		out.Events = []wire.ForgeEvent{}
+		for _, e := range p.Events {
+			ev := wire.ForgeEvent{Kind: wire.ForgeEventKind(e.Kind), Actor: optional(e.Actor), At: forgeDate(e.At), Assignee: optional(e.Assignee)}
+			if e.Label != "" {
+				ev.Label = &wire.ForgeLabel{Name: e.Label}
+			}
+			out.Events = append(out.Events, ev)
+		}
 		return out, nil
 	}
 	out.Checks = []wire.ForgeCheck{}
