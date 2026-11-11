@@ -227,11 +227,42 @@ test("the words say about", () => {
   assert.match(words[0], /^Closes about /);
   assert.match(words[1], /^8 times in 10 between /);
   assert.equal(words[2], "Past forecasts were off by ×2.2");
-  assert.match(t.spoken([line], now)[0].words, /^Issue 22, 1 of 2 done, closes about /);
   assert.equal(t.waitWords(3), "3 wait for you");
   assert.equal(t.waitWords(1), "1 waits for you");
   assert.deepEqual(t.lineWords(line, undefined, now).slice(0, 2), ["#22 Issue 22", "1 of 2 done"]);
   assert.equal(t.dotWords(line.dots[0], now)[0], "#90 Issue 90");
+});
+
+test("under 700 px the epics are a list, in the order they close", () => {
+  const timeline = { epics: [
+    epic(30, [child(1, { started: -5, closed: -2 })], [[-5, -2]]),
+    epic(31, [child(2, { started: -3, closed: -1 }), child(3, { forecast: 3 })], [[-3, null]], { forecast: fc(2, 3, 5) }),
+    epic(32, [child(4, { started: -2, waits: true }), child(5, { started: -2, waits: true })], [[-2, null]]),
+    epic(33, [child(6, { started: -4, closed: -3 })], [[-4, -3]]),
+    epic(34, [child(7, { started: -1, closed: -0.5 }), child(8, { forecast: 1 })], [[-1, null]], { forecast: fc(0.5, 1, 2) }),
+  ], releases: [] };
+  const rows = t.epicRows(t.timelineLines(timeline, now), t.rangeWindow("twoDays", now), now);
+  assert.deepEqual(rows.map((r) => r.line.number), ["#34", "#31", "#32", "#30", "#33"]);
+  assert.match(rows[0].line2, /^closes about .+ · .+–.+$/);
+  assert.equal(rows[2].line2, "2 wait for you");
+  assert.match(rows[3].line2, /^joined /);
+  assert.equal(rows[1].line.done, 1);
+  assert.equal(rows[1].line.total, 2);
+});
+
+test("an empty window says when the last epic joined, and the week is a click away", () => {
+  const timeline = { epics: [
+    epic(40, [child(1, { started: -100, closed: -96 })], [[-100, -96]]),
+    epic(41, [child(2, { started: -80, closed: -50 })], [[-80, -50]]),
+  ], releases: [] };
+  assert.equal(t.epicRows(t.timelineLines(timeline, now), t.rangeWindow("twoDays", now), now).length, 0);
+  assert.equal(t.lastJoined(timeline, h(-24)), h(-50));
+  assert.equal(t.lastJoined(timeline, h(-200)), undefined);
+  assert.equal(t.noEpicsWords("twoDays"), "No epic in these 2 days");
+  assert.equal(t.noEpicsWords("day"), "No epic in these 24 hours");
+  assert.match(t.lastJoinedWords(h(-96), now), /^The last one joined 4 ?d ago\.$/);
+  assert.equal(t.showTheWeek, "Show the week");
+  assert.equal(t.noProjectTitle, "No project to draw");
 });
 
 test("machines merge each epic and release once", () => {
