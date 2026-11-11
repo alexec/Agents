@@ -77,6 +77,8 @@ type forgeGitHub interface {
 	Releases(ctx context.Context, repo string, limit int) ([]githubmcp.RepoRelease, error)
 	// Timeline is the epics and releases work/timeline reads (#4172).
 	Timeline(ctx context.Context, repo, since string) (githubmcp.Timeline, error)
+	// Milestones are the open milestones with their due dates (#4654).
+	Milestones(ctx context.Context, repo string) ([]githubmcp.Milestone, error)
 	forgeGitHubWrites
 }
 

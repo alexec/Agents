@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/lineage"
+	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -14,7 +15,8 @@ import (
 // service levels from this machine's totals (lineage.ForecastOf), and each weekly allowance's
 // burn from allowances.json. An epic's first landing forecast is kept on its node, so a report
 // can score it when the epic lands. A milestone (#4620) is forecast from the store's issues
-// in it, in its folder's repo; nothing is kept for it, since a milestone has no node.
+// in it, in its folder's repo; nothing is kept for it, since a milestone has no node, but
+// a P85 date past its due date is told once (milestonenotice.go, #4654).
 
 // allowanceWeek is how long a weekly allowance's window is.
 const allowanceWeek = 7 * 24 * time.Hour
@@ -51,7 +53,8 @@ func (d *Daemon) lineageForecast(ctx context.Context, r wire.LineageForecastRequ
 	return f, nil
 }
 
-// milestoneForecast is when the milestone named lands, in folder's repo (any for none).
+// milestoneForecast is when the milestone named lands, in folder's repo (any for none). With a
+// repo, a P85 date past its due date tells the person (#4654).
 func (d *Daemon) milestoneForecast(milestone, folder string) wire.LineageForecast {
 	repo := ""
 	if folder != "" {
@@ -59,6 +62,15 @@ func (d *Daemon) milestoneForecast(milestone, folder string) wire.LineageForecas
 			repo = r.forge + ":" + r.path
 		}
 	}
+	f := d.milestoneForecastIn(milestone, repo)
+	if repo != "" {
+		safe.Go("milestone due date", func() { d.tellMilestoneLate(milestoneOf{repo, milestone}, f) })
+	}
+	return f
+}
+
+// milestoneForecastIn is when the milestone named lands, in repo (any for "").
+func (d *Daemon) milestoneForecastIn(milestone, repo string) wire.LineageForecast {
 	now := nowFunc()
 	nodes := d.forecastNodes()
 	f := lineage.MilestoneForecastOf(nodes, milestone, repo, now)
