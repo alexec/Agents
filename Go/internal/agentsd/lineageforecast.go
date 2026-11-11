@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/alexec/agents/Go/internal/lineage"
@@ -14,7 +15,9 @@ import (
 // service levels from this machine's totals (lineage.ForecastOf), and each weekly allowance's
 // burn from allowances.json. An epic's first landing forecast is kept on its node, so a report
 // can score it when the epic lands. A milestone (#4620) is forecast from the store's issues
-// in it, in its folder's repo; nothing is kept for it, since a milestone has no node.
+// in it, in its folder's repo; nothing is kept for it, since a milestone has no node. A
+// what-if (#4531) takes the window's runtime mix from the usage and time histories, and is
+// never kept.
 
 // allowanceWeek is how long a weekly allowance's window is.
 const allowanceWeek = 7 * 24 * time.Hour
@@ -24,7 +27,7 @@ func (d *Daemon) lineageForecast(ctx context.Context, r wire.LineageForecastRequ
 		if r.Node != nil {
 			return wire.LineageForecast{}, errors.New("lineage/forecast: a node or a milestone, not both")
 		}
-		return d.milestoneForecast(milestone, deref(r.Folder)), nil
+		return d.milestoneForecast(milestone, deref(r.Folder), d.whatIfOf(r.WhatIf)), nil
 	}
 	var children []lineage.EpicChild
 	isEpic := false
@@ -41,18 +44,76 @@ func (d *Daemon) lineageForecast(ctx context.Context, r wire.LineageForecastRequ
 	}
 	now := nowFunc()
 	nodes := d.forecastNodes()
-	f := lineage.ForecastOf(nodes, r.Node, isEpic, children, now)
+	f := lineage.ForecastOf(nodes, r.Node, isEpic, children, now, d.whatIfOf(r.WhatIf))
 	// The overhead, loaded into the cost as "about $165 all in" (#4524).
 	lineage.LoadForecast(&f, lineage.Overhead(nodes, now))
-	if r.Node != nil {
+	if r.Node != nil && f.WhatIf == nil {
 		f.Kept = d.keepForecast(costKey(*r.Node), lineage.KeepForecast(f))
 	}
-	f.Burn = d.allowanceBurn(now)
+	f.Burn = d.forecastBurn(f, now)
 	return f, nil
 }
 
+// whatIfOf is the request's what-if, with the window's runtime mix (#4531).
+func (d *Daemon) whatIfOf(r *wire.LineageForecastWhatIf) lineage.WhatIf {
+	w := lineage.WhatIf{Runtimes: d.runtimeMix(nowFunc())}
+	if r != nil {
+		if r.Lanes != nil {
+			w.Lanes = int(*r.Lanes)
+		}
+		w.Mix = r.Mix
+	}
+	return w
+}
+
+// forecastBurn is each allowance's burn at f's what-if's pace for its runtime.
+func (d *Daemon) forecastBurn(f wire.LineageForecast, now time.Time) []wire.LineageForecastBurn {
+	return d.allowanceBurn(now, func(key string) float64 { return lineage.BurnPace(f, burnRuntime(key)) })
+}
+
+// burnRuntime is the runtime of an allowance's credential key: the part before the colon.
+func burnRuntime(key string) string {
+	runtime, _, _ := strings.Cut(key, ":")
+	return runtime
+}
+
+// runtimeMix is the window's runtime mix (#4531): each runtime's working hours (the agent, its
+// tools and others) from time-history.json and its cost from usage-history.json, over the days
+// of the last lineage.ThroughputWindow.
+func (d *Daemon) runtimeMix(now time.Time) []wire.LineageForecastRuntime {
+	first := dayStamp(now.Add(-lineage.ThroughputWindow + 24*time.Hour))
+	hours := map[string]float64{}
+	d.timeMu.Lock()
+	for day, by := range d.timeLocked().Days {
+		if day < first {
+			continue
+		}
+		for runtime, b := range by {
+			hours[runtime] += (b.Agent + b.Tools + b.Others) / 3600
+		}
+	}
+	d.timeMu.Unlock()
+	cost := map[string]map[string]float64{}
+	d.costMu.Lock()
+	for day, by := range d.usageLocked().Days {
+		if day < first {
+			continue
+		}
+		for runtime, b := range by {
+			for currency, v := range b.Cost {
+				if cost[runtime] == nil {
+					cost[runtime] = map[string]float64{}
+				}
+				cost[runtime][currency] += v
+			}
+		}
+	}
+	d.costMu.Unlock()
+	return lineage.RuntimesOf(hours, cost)
+}
+
 // milestoneForecast is when the milestone named lands, in folder's repo (any for none).
-func (d *Daemon) milestoneForecast(milestone, folder string) wire.LineageForecast {
+func (d *Daemon) milestoneForecast(milestone, folder string, w lineage.WhatIf) wire.LineageForecast {
 	repo := ""
 	if folder != "" {
 		if r := d.folderRepo(folder); r.forge != "" {
@@ -61,9 +122,9 @@ func (d *Daemon) milestoneForecast(milestone, folder string) wire.LineageForecas
 	}
 	now := nowFunc()
 	nodes := d.forecastNodes()
-	f := lineage.MilestoneForecastOf(nodes, milestone, repo, now)
+	f := lineage.MilestoneForecastOf(nodes, milestone, repo, now, w)
 	lineage.LoadForecast(&f, lineage.Overhead(nodes, now))
-	f.Burn = d.allowanceBurn(now)
+	f.Burn = d.forecastBurn(f, now)
 	return f
 }
 
@@ -100,13 +161,14 @@ func (d *Daemon) keepForecast(k string, kept *wire.LineageForecastKept) *wire.Li
 }
 
 // allowanceBurn is each credential's weekly allowance at the pace of its last reading of the
-// week now running: when it runs out, or that it lasts to the reset.
-func (d *Daemon) allowanceBurn(now time.Time) []wire.LineageForecastBurn {
+// week now running, times pace's for its key (a what-if's, #4531): when it runs out, or that
+// it lasts to the reset.
+func (d *Daemon) allowanceBurn(now time.Time, pace func(key string) float64) []wire.LineageForecastBurn {
 	d.allowMu.Lock()
 	defer d.allowMu.Unlock()
 	out := []wire.LineageForecastBurn{}
 	for key, s := range d.allowancesLocked() {
-		if b, ok := burnOf(key, s, now); ok {
+		if b, ok := burnOf(key, s, now, pace(key)); ok {
 			out = append(out, b)
 		}
 	}
@@ -114,8 +176,9 @@ func (d *Daemon) allowanceBurn(now time.Time) []wire.LineageForecastBurn {
 	return out
 }
 
-// burnOf is a credential's burn from its latest weekly reading whose week has not reset.
-func burnOf(key string, s wire.AllowanceState, now time.Time) (wire.LineageForecastBurn, bool) {
+// burnOf is a credential's burn from its latest weekly reading whose week has not reset, at
+// pace times the pace of the week so far (1 as it ran; 0 never runs out).
+func burnOf(key string, s wire.AllowanceState, now time.Time, pace float64) (wire.LineageForecastBurn, bool) {
 	var latest *wire.AllowanceReading
 	readings := append([]wire.AllowanceReading{}, s.Weeks...)
 	if s.Reading != nil {
@@ -137,8 +200,8 @@ func burnOf(key string, s wire.AllowanceState, now time.Time) (wire.LineageForec
 	elapsed := at.Sub(resets.Add(-allowanceWeek))
 	if used >= 1 {
 		b.RunsOutAt, b.Lasts = &b.At, false
-	} else if used > 0 && elapsed > 0 {
-		out := at.Add(time.Duration(float64(elapsed) * (1 - used) / used))
+	} else if used > 0 && elapsed > 0 && pace > 0 {
+		out := at.Add(time.Duration(float64(elapsed) * (1 - used) / used / pace))
 		if out.Before(resets) {
 			when := wire.DateOf(out)
 			b.RunsOutAt, b.Lasts = &when, false

@@ -215,15 +215,18 @@ func HourBins(landings []Landing, now time.Time) ([]int, bool) {
 }
 
 // LandsIn is how many hours from now open items take, P50 and P85, by method H: each draw
-// resamples hours of bins and keeps each landing in one with the chance share. ok is false
-// when P85 is past throughputMaxHours.
-func LandsIn(bins []int, share float64, open int, rng *rand.Rand) (p50, p85 float64, ok bool) {
+// resamples hours of bins and keeps each landing in one with the chance share, times keep's
+// for the hour (a what-if's lanes, #4531; nil keeps them all). ok is false when P85 is past
+// throughputMaxHours.
+func LandsIn(bins []int, keep []float64, share float64, open int, rng *rand.Rand) (p50, p85 float64, ok bool) {
 	hours := make([]float64, ThroughputDraws)
 	for i := range hours {
 		done, h := 0, 0
 		for done < open && h < throughputMaxHours {
-			for range bins[rng.IntN(len(bins))] {
-				if rng.Float64() < share {
+			b := rng.IntN(len(bins))
+			chance := share * keepAt(keep, b)
+			for range bins[b] {
+				if rng.Float64() < chance {
 					done++
 				}
 			}
@@ -237,15 +240,16 @@ func LandsIn(bins []int, share float64, open int, rng *rand.Rand) (p50, p85 floa
 }
 
 // ForecastOf is lineage/forecast from nodes at now: for an epic (with its plan's children), when
-// it lands and its estimate to complete; always the spend and the service levels. The burn is
-// the allowances', not the store's: the daemon adds it.
-func ForecastOf(nodes []wire.LineageCostNode, epic *wire.LineageNode, isEpic bool, children []EpicChild, now time.Time) wire.LineageForecast {
+// it lands and its estimate to complete; always the spend, the service levels and what the
+// window assumes. With a what-if (#4531), its lanes move the dates and the spend, and its mix
+// the dollars. The burn is the allowances', not the store's: the daemon adds it.
+func ForecastOf(nodes []wire.LineageCostNode, epic *wire.LineageNode, isEpic bool, children []EpicChild, now time.Time, w WhatIf) wire.LineageForecast {
 	all := Landings(nodes)
 	repo := ""
 	if epic != nil {
 		repo = repoOf(nodes, *epic, children)
 	}
-	f, bins, enough := forecastIn(inRepo(all, repo), now)
+	f, bins, enough, wi := forecastIn(nodes, inRepo(all, repo), repo, now, w)
 	f.Node = epic
 	if epic == nil {
 		return f
@@ -258,6 +262,9 @@ func ForecastOf(nodes []wire.LineageCostNode, epic *wire.LineageNode, isEpic boo
 		return no(NoForecastNotEpic)
 	}
 	f.ToComplete = ToComplete(History(nodes), nodes, *epic, children)
+	if f.ToComplete != nil && wi.cost != nil {
+		f.ToComplete.Cost = scaleRanges(f.ToComplete.Cost, wi.cost)
+	}
 	var open, closed int64
 	steps := map[int64]bool{}
 	for _, c := range children {
@@ -280,7 +287,7 @@ func ForecastOf(nodes []wire.LineageCostNode, epic *wire.LineageNode, isEpic boo
 		return no(NoForecastNoLanding)
 	}
 	share := median(shares)
-	p50, p85, ok := LandsIn(bins, share, int(open), Rng("lands:"+epic.Ref))
+	p50, p85, ok := LandsIn(bins, wi.keep, share, int(open), Rng("lands:"+epic.Ref))
 	if !ok {
 		return no(NoForecastTooSlow)
 	}
@@ -290,19 +297,48 @@ func ForecastOf(nodes []wire.LineageCostNode, epic *wire.LineageNode, isEpic boo
 	return f
 }
 
-// forecastIn is what every forecast says from landings at now: the window's landings, the
-// service levels and, with enough history, the spend; and the window's hours.
-func forecastIn(landings []Landing, now time.Time) (wire.LineageForecast, []int, bool) {
-	f := wire.LineageForecast{At: wire.DateOf(now), WindowDays: int64(ThroughputWindow / (24 * time.Hour)),
+// forecastIn is what every forecast says from landings (of nodes, in repo) at now: the
+// window's landings, the service levels, what the window assumes (#4531) and, with enough
+// history, the spend; and the window's hours. With a what-if, the spend is the what-if's, and
+// wi is what the dates and the estimate to complete take from it.
+func forecastIn(nodes []wire.LineageCostNode, landings []Landing, repo string, now time.Time, w WhatIf) (f wire.LineageForecast, bins []int, enough bool, wi whatIfIn) {
+	f = wire.LineageForecast{At: wire.DateOf(now), WindowDays: int64(ThroughputWindow / (24 * time.Hour)),
 		Burn: []wire.LineageForecastBurn{}, ServiceLevels: ServiceLevels(landings, now)}
-	bins, enough := HourBins(landings, now)
+	bins, enough = HourBins(landings, now)
 	for _, n := range bins {
 		f.Landings += int64(n)
 	}
-	if enough {
-		f.Spend = Spend(landings, now)
+	inFlight := InFlight(nodes, landings, repo, now)
+	lanes, peak := LanesOf(inFlight)
+	f.Assumes = &wire.LineageForecastAssumes{Lanes: lanes, PeakLanes: int64(peak), Runtimes: w.Runtimes}
+	if f.Assumes.Runtimes == nil {
+		f.Assumes.Runtimes = []wire.LineageForecastRuntime{}
 	}
-	return f, bins, enough
+	if w.Asked() {
+		wi.keep = LaneKeep(inFlight, w.Lanes)
+		f.WhatIf = &wire.LineageForecastWhatIfEffect{Pace: Pace(bins, wi.keep), Cost: 1}
+		if wi.keep != nil {
+			lanes := int64(w.Lanes)
+			f.WhatIf.Lanes = &lanes
+		}
+		if mix, c, ok := Mix(w.Runtimes, w.Mix); ok {
+			f.WhatIf.Mix, wi.cost, f.WhatIf.Cost = mix, c, costFactor(c)
+		}
+	}
+	if enough {
+		f.Spend = Spend(landings, now, wi.keep)
+		if f.Spend != nil && wi.cost != nil {
+			f.Spend.Week, f.Spend.Month = scaleRanges(f.Spend.Week, wi.cost), scaleRanges(f.Spend.Month, wi.cost)
+		}
+	}
+	return f, bins, enough, wi
+}
+
+// whatIfIn is what a what-if gives the dates and the dollars: each hour's landings kept, and
+// the cost by currency; nil for as the window ran.
+type whatIfIn struct {
+	keep []float64
+	cost map[string]float64
 }
 
 // repoOf is the repo of an epic: its node's, else a child's; "" when the store has neither.
@@ -438,8 +474,9 @@ func meanSD(v []float64) (float64, float64) {
 }
 
 // Spend is what 7 and 30 of the window's days cost, drawn ThroughputDraws times: a day's cost is
-// what the issues that landed on it took. Nil when no landing in the window had a cost.
-func Spend(landings []Landing, now time.Time) *wire.LineageForecastSpend {
+// what the issues that landed on it took, each times keep's for its hour (a what-if's lanes,
+// #4531; nil keeps them all). Nil when no landing in the window had a cost.
+func Spend(landings []Landing, now time.Time, keep []float64) *wire.LineageForecastSpend {
 	since := now.Add(-ThroughputWindow)
 	days := int(ThroughputWindow / (24 * time.Hour))
 	byDay := map[string][]float64{}
@@ -451,7 +488,7 @@ func Spend(landings []Landing, now time.Time) *wire.LineageForecastSpend {
 			if byDay[currency] == nil {
 				byDay[currency] = make([]float64, days)
 			}
-			byDay[currency][int(l.At.Sub(since)/(24*time.Hour))] += v
+			byDay[currency][int(l.At.Sub(since)/(24*time.Hour))] += v * keepAt(keep, int(l.At.Sub(since)/time.Hour))
 		}
 	}
 	if len(byDay) == 0 {

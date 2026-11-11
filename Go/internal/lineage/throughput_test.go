@@ -46,16 +46,16 @@ func TestLandsInCountsHours(t *testing.T) {
 	for i := range bins {
 		bins[i] = 1
 	}
-	p50, p85, ok := LandsIn(bins, 1, 6, Rng("x"))
+	p50, p85, ok := LandsIn(bins, nil, 1, 6, Rng("x"))
 	if !ok || p50 != 6 || p85 != 6 {
 		t.Fatalf("%v %v %v", p50, p85, ok)
 	}
 	// Half of them: about twelve hours, later at P85.
-	p50, p85, ok = LandsIn(bins, 0.5, 6, Rng("x"))
+	p50, p85, ok = LandsIn(bins, nil, 0.5, 6, Rng("x"))
 	if !ok || p50 < 9 || p50 > 15 || p85 < p50 {
 		t.Fatalf("%v %v %v", p50, p85, ok)
 	}
-	if _, _, ok = LandsIn(make([]int, 24), 1, 1, Rng("x")); ok {
+	if _, _, ok = LandsIn(make([]int, 24), nil, 1, 1, Rng("x")); ok {
 		t.Fatal("no landings should never finish")
 	}
 }
@@ -93,7 +93,7 @@ func TestForecastOfAnEpic(t *testing.T) {
 		{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#9991"}, Step: 2, Open: true},
 		{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#9992"}, Step: 2, Open: true},
 	}
-	f := ForecastOf(nodes, &asked, true, children, now)
+	f := ForecastOf(nodes, &asked, true, children, now, WhatIf{})
 	if f.NoForecast != nil || f.Lands == nil {
 		t.Fatalf("%+v", f)
 	}
@@ -107,7 +107,7 @@ func TestForecastOfAnEpic(t *testing.T) {
 		t.Fatalf("%+v", k)
 	}
 	// The same history gives the same dates.
-	if g := ForecastOf(nodes, &asked, true, children, now); *g.Lands != *l {
+	if g := ForecastOf(nodes, &asked, true, children, now, WhatIf{}); *g.Lands != *l {
 		t.Fatalf("%+v, then %+v", l, g.Lands)
 	}
 	// The service levels: tasks took an hour, stories two.
@@ -121,11 +121,11 @@ func TestForecastOfAnEpic(t *testing.T) {
 	last := reopened[len(reopened)-1]
 	last.Resolved = &wire.LineageResolved{Title: "epic", State: &open}
 	reopened[len(reopened)-1] = last
-	if g := ForecastOf(reopened, &asked, true, children, now); g.Lands != nil || *g.NoForecast != NoForecastGroups {
+	if g := ForecastOf(reopened, &asked, true, children, now, WhatIf{}); g.Lands != nil || *g.NoForecast != NoForecastGroups {
 		t.Fatalf("%+v", g)
 	}
 	// Six days of history are too little.
-	if g := ForecastOf(nodes, &asked, true, children, now.Add(-15*24*time.Hour)); g.Lands != nil || *g.NoForecast != NoForecastHistory {
+	if g := ForecastOf(nodes, &asked, true, children, now.Add(-15*24*time.Hour), WhatIf{}); g.Lands != nil || *g.NoForecast != NoForecastHistory {
 		t.Fatalf("%+v", g)
 	}
 	for _, c := range []struct {
@@ -133,12 +133,12 @@ func TestForecastOfAnEpic(t *testing.T) {
 		children []EpicChild
 		why      string
 	}{{false, nil, NoForecastNotEpic}, {true, []EpicChild{{Node: children[0].Node}}, NoForecastNothing}} {
-		if g := ForecastOf(nodes, &asked, c.isEpic, c.children, now); g.Lands != nil || *g.NoForecast != c.why {
+		if g := ForecastOf(nodes, &asked, c.isEpic, c.children, now, WhatIf{}); g.Lands != nil || *g.NoForecast != c.why {
 			t.Fatalf("%+v", g)
 		}
 	}
 	// No node: the spend and the service levels only.
-	if g := ForecastOf(nodes, nil, false, nil, now); g.Lands != nil || g.NoForecast != nil || g.Spend == nil || len(g.ServiceLevels) != 2 {
+	if g := ForecastOf(nodes, nil, false, nil, now, WhatIf{}); g.Lands != nil || g.NoForecast != nil || g.Spend == nil || len(g.ServiceLevels) != 2 {
 		t.Fatalf("%+v", g)
 	}
 }
@@ -150,7 +150,7 @@ func TestSpendDrawsDays(t *testing.T) {
 	for d := range 20 {
 		ls = append(ls, landed{n: d + 1, level: "task", at: now.Add(-time.Duration(d)*24*time.Hour - time.Hour), usd: 1})
 	}
-	s := Spend(Landings(landedNodes(ls...)), now)
+	s := Spend(Landings(landedNodes(ls...)), now, nil)
 	if s == nil || s.Week["USD"].Median != 7 || s.Week["USD"].P90 != 7 || s.Month["USD"].Median != 30 {
 		t.Fatalf("%+v", s)
 	}

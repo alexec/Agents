@@ -103,8 +103,9 @@ func MilestoneShares(nodes []wire.LineageCostNode, landings []Landing, not miles
 }
 
 // MilestoneForecastOf is lineage/forecast for the milestone name in repo ("" for the repo its
-// items are in, or every repo when they are in more than one) from nodes at now.
-func MilestoneForecastOf(nodes []wire.LineageCostNode, name, repo string, now time.Time) wire.LineageForecast {
+// items are in, or every repo when they are in more than one) from nodes at now, with w's
+// what-if (#4531).
+func MilestoneForecastOf(nodes []wire.LineageCostNode, name, repo string, now time.Time, w WhatIf) wire.LineageForecast {
 	all := Landings(nodes)
 	landed := map[string]bool{}
 	for _, l := range all {
@@ -130,7 +131,7 @@ func MilestoneForecastOf(nodes []wire.LineageCostNode, name, repo string, now ti
 			items = append(items, g...)
 		}
 	}
-	f, bins, enough := forecastIn(inRepo(all, repo), now)
+	f, bins, enough, wi := forecastIn(nodes, inRepo(all, repo), repo, now, w)
 	f.Milestone = &name
 	no := func(why string) wire.LineageForecast {
 		f.NoForecast = &why
@@ -158,7 +159,7 @@ func MilestoneForecastOf(nodes []wire.LineageCostNode, name, repo string, now ti
 		return no(NoForecastNoLanding)
 	}
 	share := median(shares)
-	p50, p85, ok := LandsIn(bins, share, int(open), Rng("lands:milestone:"+strings.ToLower(repo)+":"+strings.ToLower(name)))
+	p50, p85, ok := LandsIn(bins, wi.keep, share, int(open), Rng("lands:milestone:"+strings.ToLower(repo)+":"+strings.ToLower(name)))
 	if !ok {
 		return no(NoForecastTooSlow)
 	}

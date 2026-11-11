@@ -108,6 +108,13 @@ machines' copies of one node add up, as each banked its own turns.
   cycle time), and when each open epic of the scope lands (P50 and P85, with its estimate to
   complete, direct and all in). The spend, service levels and epics are from this Mac when it
   has landings, else the machine with the most. `specs/4533-forecasting/spec.md` has the method.
+- **What if** (#4531): a lane limit (1 to 10) and each runtime's share of the working hours
+  (0% to 100%, the others share the rest), sent as `whatIf` to every machine's
+  `lineage/forecast`, so every date, spend, burn and estimate to complete above is the
+  what-if's. Under them, what the window ran with (`assumes`: the issues in flight in an
+  average hour and at most, and each runtime's share and cost an hour) and what the picks moved
+  (`whatIf`). A lane limit moves the dates and the dollars; a mix moves the dollars only. A
+  what-if is never kept or scored.
 - **How the estimates and forecasts scored** (#3561, #4525, #4528): the estimates' error, how
   often their P10–P90 range held, the landing date's error, and how often the epics' kept
   landing forecasts held their P50 and P85 dates (`forecastScore`, over the epics whose last PR

@@ -51,7 +51,7 @@ func TestMilestoneForecastOf(t *testing.T) {
 	}
 	nodes = append(nodes, item(90001, "task"), item(90002, "task"), item(90003, "story"), item(90004, "epic"))
 
-	f := MilestoneForecastOf(nodes, "Next", "github:o/r", now)
+	f := MilestoneForecastOf(nodes, "Next", "github:o/r", now, WhatIf{})
 	if f.NoForecast != nil || f.Lands == nil || f.Milestone == nil || *f.Milestone != "Next" || f.Node != nil {
 		t.Fatalf("%+v", f)
 	}
@@ -61,7 +61,7 @@ func TestMilestoneForecastOf(t *testing.T) {
 		t.Fatalf("%+v %+v", f, l)
 	}
 	// Without a repo it is the repo its items are in: the same dates.
-	if g := MilestoneForecastOf(nodes, "next", "", now); g.Lands == nil || !reflect.DeepEqual(*g.Lands, *l) {
+	if g := MilestoneForecastOf(nodes, "next", "", now, WhatIf{}); g.Lands == nil || !reflect.DeepEqual(*g.Lands, *l) {
 		t.Fatalf("%+v, then %+v", l, g.Lands)
 	}
 	// Two of the open items closed: half are done, so the scope is no longer growing.
@@ -72,7 +72,7 @@ func TestMilestoneForecastOf(t *testing.T) {
 		r.State = &closed
 		done[i].Resolved = &r
 	}
-	if g := MilestoneForecastOf(done, "Next", "github:o/r", now); g.Lands == nil || g.Lands.Open != 1 || g.Lands.Closed != 3 || *g.Lands.Growing {
+	if g := MilestoneForecastOf(done, "Next", "github:o/r", now, WhatIf{}); g.Lands == nil || g.Lands.Open != 1 || g.Lands.Closed != 3 || *g.Lands.Growing {
 		t.Fatalf("%+v", g)
 	}
 
@@ -90,7 +90,7 @@ func TestMilestoneForecastOf(t *testing.T) {
 			return c
 		}())},
 	} {
-		if g := MilestoneForecastOf(c.nodes, c.name, c.repo, now); g.NoForecast == nil || *g.NoForecast != c.why || g.Lands != nil {
+		if g := MilestoneForecastOf(c.nodes, c.name, c.repo, now, WhatIf{}); g.NoForecast == nil || *g.NoForecast != c.why || g.Lands != nil {
 			t.Fatalf("%s in %s: %+v", c.name, c.repo, g)
 		}
 	}
