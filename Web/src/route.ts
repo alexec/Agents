@@ -1,5 +1,6 @@
 // Where the page is, in the URL's fragment (071 research R2): #/h/<host>/p/<folder>/s/<session>, or
-// /w/<workflow> for a workflow's page in the chat's place (#98), /ar/1 for the folder's archive (#499),
+// /w/<workflow> for a workflow's page in the chat's place (#98), /ar/sessions and /ar/workflows for the folder's
+// Archived Sessions and Archived Workflows pages (#499, #4451; an old /ar/1 opens sessions),
 // /rv/<kind:key> for a change waiting for an OK, on its Review page (#1472),
 // /s/<session>/t/<browser|simulator> for a tab that takes over the agent browser or a simulator (#4141),
 // The page is by section (#2141): #/ is the Overview, #/agents the sidebar with nothing chosen, and
@@ -40,8 +41,8 @@ export interface Route {
   artifactFile?: string | undefined;
   /** A new session's form, which is the folder's empty pane: shown on a narrow window too. */
   compose?: boolean | undefined;
-  /** The folder's archived sessions and workflows (#495, #499), a page opened from one row of the sidebar. */
-  archive?: boolean | undefined;
+  /** The folder's Archived Sessions or Archived Workflows page (#495, #499, #4451), each opened from its row of the sidebar. */
+  archive?: ArchiveRoute | undefined;
   /** The folder's MCP servers and how each is doing (#753), a page opened from its row in the sidebar. */
   mcp?: boolean | undefined;
   /** A change waiting for an OK, on its Review page in the chat's place (#1472), by its approval's id. */
@@ -54,6 +55,8 @@ export interface Route {
 
 /** What a take-over tab shows (#4141). */
 export type TakeOver = "browser" | "simulator";
+/** Which of a folder's two Archived pages (#4451). */
+export type ArchiveRoute = "sessions" | "workflows";
 
 /** The folder this tab holds alone (#1089), from the address it was opened at; undefined for every folder. */
 export interface AloneFolder { host: string; folder: string }
@@ -110,7 +113,8 @@ export function parseRoute(hash: string): Route {
       case "pg": route.page = value; break;
       case "f": route.files = value === "1"; break;
       case "n": route.compose = value === "1"; break;
-      case "ar": route.archive = value === "1"; break;
+      // An old link's /ar/1 opens sessions.
+      case "ar": route.archive = value === "workflows" ? "workflows" : value === "sessions" || value === "1" ? "sessions" : undefined; break;
       case "m": route.mcp = value === "1"; break;
       case "rv": route.review = value; break;
       case "o": route.alone = value === "1"; break;
@@ -142,7 +146,7 @@ export function routeHash(route: Route, aloneIn: AloneFolder | undefined = alone
   if (route.session && route.files) parts.push("f", "1");
   if (route.session && route.files && route.artifactFile) parts.push("af", route.artifactFile);
   if (route.host && route.folder && !route.session && !route.workflow && !route.page && route.compose) parts.push("n", "1");
-  else if (route.host && route.folder && !route.session && !route.workflow && !route.page && route.archive) parts.push("ar", "1");
+  else if (route.host && route.folder && !route.session && !route.workflow && !route.page && route.archive) parts.push("ar", route.archive);
   else if (route.host && route.folder && !route.session && !route.workflow && !route.page && route.mcp) parts.push("m", "1");
   return "#/" + parts.map(encodeURIComponent).join("/");
 }

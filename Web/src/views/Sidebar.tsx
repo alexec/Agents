@@ -36,7 +36,8 @@ import { updatedLine } from "../model/updated";
 import { namedRelative, workflowSummary } from "../model/workflows";
 import { fromWireDate } from "../protocol/dates";
 import type { Agent, AgentsExportRequest, ControlMachine, FolderSummary, Request as PersonRequest, WorkflowSummary } from "../protocol/generated";
-import { alone, aloneURL, go, route, showAll } from "../route";
+import { alone, aloneURL, go, route, showAll, type ArchiveRoute } from "../route";
+import { sessionCount, sessionsWords, workflowCount, workflowsWords } from "../model/archivedPage";
 import { onThisMac } from "../place";
 import { browserName, type Session } from "../session";
 import { keptByState, machineFilter, setMachineFilter, setStateFilter, stateFilter, stateFilterTitle, stateFilters,
@@ -424,7 +425,7 @@ function inOpenSmartRow(store: Store, host: string, agent: Agent): boolean {
 }
 
 /** A search narrows workflows by name and what they are; one asking for a label or an issue leaves them out. */
-function workflowMatches(store: Store, host: string, query: LabelQuery | undefined): (w: WorkflowSummary) => boolean {
+export function workflowMatches(store: Store, host: string, query: LabelQuery | undefined): (w: WorkflowSummary) => boolean {
   if (!query) return () => true;
   const runtimeName = (id: string) => (store.runtimes.value[host] ?? []).find((s) => s.runtime.id === id)?.runtime.name;
   const text = query.text.toLowerCase();
@@ -736,7 +737,18 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
     && archivedWorkflows.length === 0 && !nameMatches) return null;
 
   const here = r.host === host.id && r.folder !== undefined && folderKey(r.folder) === folderKey(folder);
-  const archiveCount = (summary.counts.archived ?? 0) + archivedWorkflows.length;
+  const archivedSessionCount = summary.counts.archived ?? 0;
+  const pageRow = (page: ArchiveRoute, mark: string, title: string, count: string) => (
+    <div class="nav-item">
+      <div class={`row page-row${here && r.archive === page ? " chosen" : ""}`}>
+        <button class="pick" aria-current={here && r.archive === page} aria-label={`${title}, ${count}`}
+          title={count} onClick={() => go({ host: host.id, folder: folder, archive: page })}>
+          <span class="pin-mark" aria-hidden="true">{mark}</span>
+          <span class="title">{title}</span>
+        </button>
+      </div>
+    </div>
+  );
   // The project's connectors, one row for all its folders (#3407): this machine's folder, else the first online one.
   const connectors = connectorsPlace(group, store.macHostID.value, (h) => store.hostIsOnline(h));
   const connectorsHost = connectors.host.id;
@@ -920,19 +932,11 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
               </button>
             </div>
           </div>
-          {archiveCount > 0 && (
-            // The archive, one row opening a page (#495): never a fold inside the group.
-            <div class="nav-item">
-              <div class={`row page-row${here && r.archive ? " chosen" : ""}`}>
-                {/* Nothing at its end, which is only a session's (#587): the count is its tooltip's. */}
-                <button class="pick" aria-current={here && !!r.archive} aria-label={`Archived, ${archiveCount}`}
-                  title={`${archiveCount} archived`} onClick={() => go({ host: host.id, folder: folder, archive: true })}>
-                  <span class="pin-mark" aria-hidden="true">▣</span>
-                  <span class="title">Archived</span>
-                </button>
-              </div>
-            </div>
-          )}
+          {/* Archived Sessions and Archived Workflows (#495, #4451): a row each opening its page, never a fold inside
+              the group, each only with something archived. Nothing at its end, which is only a session's (#587): the
+              count is its tooltip's. */}
+          {archivedSessionCount > 0 && pageRow("sessions", "▣", sessionsWords.title, sessionCount(archivedSessionCount))}
+          {archivedWorkflows.length > 0 && pageRow("workflows", "◷", workflowsWords.title, workflowCount(archivedWorkflows.length))}
           </>}
         </div>
       )}
@@ -994,8 +998,10 @@ export const deleteFolderMessage = "Every session in it is deleted, with its con
  * One session's row in the sidebar, drawn again only when the agent, whether it is chosen, or its
  * host's state changes, or something is on its way to it: not when its neighbours change.
  */
-export const SidebarSession = memo(function SidebarSession({ store, host, folder, agent, chosen, down, pinnedAt, place, tree }: {
+export const SidebarSession = memo(function SidebarSession({ store, host, folder, agent, chosen, down, pinnedAt, place, tree, archivedTime }: {
   store: Store; host: string; folder: string; agent: Agent; chosen: boolean; down: boolean;
+  /** On the Archived Sessions page (#4451): the time is when it was archived, not its last activity. */
+  archivedTime?: boolean | undefined;
   /** Where it sits in its list's tree (#835): a parent with its count and fold, or a child one indent in. */
   tree?: TreeRow | undefined;
   /** Under Pinned: the whole pinned order, for its Move Up and Move Down (#180). */
@@ -1052,7 +1058,7 @@ export const SidebarSession = memo(function SidebarSession({ store, host, folder
         ? <div class="row session renaming"><RenameInput store={store} host={host} agent={agent} /></div>
         : <SessionRow agent={agent} chosen={chosen} onPick={() => { if (chosen) store.toEndAsks.value++; go({ host, folder: folder, session: agent.id }); }} going={going}
         extras={rowExtras(store, host, agent)}
-        inSidebar place={place} markAgent={markAgent} />}
+        inSidebar place={place} markAgent={markAgent} archivedTime={archivedTime} />}
       {parent && (
         <button class="fold-count" aria-expanded={tree.isUnfolded}
           aria-label={tree.isUnfolded ? `Hide ${tree.children} started sessions` : `Show ${tree.children} started sessions`}

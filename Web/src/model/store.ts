@@ -1,6 +1,7 @@
 // What the page holds and what each notification means: AgentsModel (Client/AgentsModel.swift),
 // ported by hand for the notifications the web remote hears and held to Fixtures/web/reducer
 // (research R7). Nothing here decides anything; the hosts do.
+import { pageSize } from "./archivedPage";
 import { answerElsewhere, approveSecretUse, isTerminalRequest, type SecretUseAction, secretUseApprovalParams, secretUseSigns } from "./secretUse";
 import { preferencesSaid, sendPreferencesWith } from "./preferences";
 import { folderPath as hostedFolderPath, healthTally, personalServers } from "./hostedMCP";
@@ -144,8 +145,8 @@ const filesNamedAtMost = 64;
 export const quietSettle = 250;
 const filesSettle = quietSettle;
 
-/** How many archived sessions the Archived page lists: as many as it shows (#170). */
-export const archivedPage = 50;
+/** How many archived sessions the Archived Sessions page lists at first: as many as it shows (#170). */
+export const archivedPage = pageSize;
 
 /** The most a search brings back from each host, a page at a time (#165, #193). */
 export const searchShown = 200;
@@ -2073,27 +2074,39 @@ export class Store extends Work {
   }
 
   /** One folder's newest `limit` archived sessions, asked for when a view of them opens (#170), such
-   *  as the Archive page. Only more than is held is asked again. Each
-   *  call is matched by one `unloadArchived` with the same limit. */
-  async loadArchived(host: string, folder: string, limit = archivedPage): Promise<void> {
+   *  as the Archived Sessions page. Only more than is held is asked again. Each
+   *  call is matched by one `unloadArchived` with the same limit. Whether the host answered (#664). */
+  async loadArchived(host: string, folder: string, limit = archivedPage): Promise<boolean> {
     const key = `${host}|${folderKey(folder)}`;
     const hold = this.archivedHolds.get(key) ?? { limits: [], listed: 0 };
     this.archivedHolds.set(key, hold);
     hold.limits.push(limit);
-    if (limit <= hold.listed) return;
-    await this.listArchived(host, folder, key, limit);
+    if (limit <= hold.listed) return true;
+    return this.listArchived(host, folder, key, limit);
   }
 
-  private async listArchived(host: string, folder: string, key: string, limit: number): Promise<void> {
+  private async listArchived(host: string, folder: string, key: string, limit: number, query?: string): Promise<boolean> {
     const hold = this.archivedHolds.get(key);
-    if (hold) hold.listed = Math.max(hold.listed, limit);
+    if (hold && query === undefined) hold.listed = Math.max(hold.listed, limit);
     const listed = await this.link.call("agents/list", {
       includeArchived: true, archivedCommands: false, archivedOnly: true, folder: folder as never, lean: true, limit,
+      ...(query === undefined ? {} : { query }),
     }, host).catch(() => null);
-    if (!listed || this.archivedHolds.get(key) !== hold) return;
+    if (!listed) return false;
+    if (this.archivedHolds.get(key) !== hold) return true;
     // On show in the fold now: no longer the search's to let go.
     for (const agent of listed) this.searched.get(host)?.delete(agent.id);
     this.addAgents(listed, host);
+    return true;
+  }
+
+  /** The folder's archived sessions that match the words, from its host (#4451), as the Mac's
+   *  searchArchived: an Archived Sessions page's filter finds one older than the page it holds. Held,
+   *  and let go, with the page's own (`loadArchived`). Whether the host answered. */
+  async searchArchived(host: string, folder: string, words: string): Promise<boolean> {
+    const key = `${host}|${folderKey(folder)}`;
+    if (!this.archivedHolds.has(key)) return false;
+    return this.listArchived(host, folder, key, searchShown, words);
   }
 
   /** The search's words, trimmed; empty when there is none. */
