@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/alexec/agents/Go/wire"
 )
@@ -17,9 +18,18 @@ import (
 
 type mcpClient struct {
 	t       *testing.T
+	client  *http.Client
 	url     string
 	token   string
 	session string
+}
+
+// newMCPClient has a connection pool of its own, closed when the test ends, and a time
+// limit: on http.DefaultClient a call hung for 9 minutes under -race (#4593).
+func newMCPClient(t *testing.T, url, token string) *mcpClient {
+	c := &http.Client{Transport: http.DefaultTransport.(*http.Transport).Clone(), Timeout: 2 * time.Minute}
+	t.Cleanup(c.CloseIdleConnections)
+	return &mcpClient{t: t, client: c, url: url, token: token}
 }
 
 func (m *mcpClient) post(method string, params any, id int) (int, map[string]json.RawMessage) {
@@ -31,7 +41,7 @@ func (m *mcpClient) post(method string, params any, id int) (int, map[string]jso
 	if m.session != "" {
 		req.Header.Set("Mcp-Session-Id", m.session)
 	}
-	res, err := http.DefaultClient.Do(req)
+	res, err := m.client.Do(req)
 	if err != nil {
 		m.t.Fatal(err)
 	}
@@ -55,7 +65,7 @@ func appClient(t *testing.T, d *Daemon, id wire.UUID) *mcpClient {
 	if !strings.HasPrefix(h.Url, "http://127.0.0.1:") || !strings.HasSuffix(h.Url, "/mcp/agents") || len(h.Headers) != 1 {
 		t.Fatalf("%+v", h)
 	}
-	return &mcpClient{t: t, url: h.Url, token: strings.TrimPrefix(h.Headers[0].Value, "Bearer ")}
+	return newMCPClient(t, h.Url, strings.TrimPrefix(h.Headers[0].Value, "Bearer "))
 }
 
 func TestTheAppsToolsAreServedToEachRuntime(t *testing.T) {
@@ -66,7 +76,7 @@ func TestTheAppsToolsAreServedToEachRuntime(t *testing.T) {
 	})
 	m := appClient(t, d, a.ID)
 
-	stranger := &mcpClient{t: t, url: m.url, token: "nobody"}
+	stranger := newMCPClient(t, m.url, "nobody")
 	if code, _ := stranger.post("initialize", map[string]any{}, 1); code != 404 {
 		t.Fatalf("a stranger's token: %d", code)
 	}
@@ -135,7 +145,7 @@ func TestTheAppsToolsAreServedToEachRuntime(t *testing.T) {
 	// A browser page is not for this.
 	req, _ := http.NewRequest("POST", m.url, strings.NewReader("{}"))
 	req.Header.Set("Origin", "https://example.com")
-	if res, _ := http.DefaultClient.Do(req); res.StatusCode != 403 {
+	if res, _ := m.client.Do(req); res.StatusCode != 403 {
 		t.Fatal(res.StatusCode)
 	}
 }
