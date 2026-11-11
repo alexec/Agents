@@ -1,6 +1,6 @@
 // The Blob's mood on the tab's favicon (#1317), as the window draws it on its Dock tile
 // (IconMood.swift): quizzical while a question waits, happy while an agent works, asleep with
-// neither. The images are design/logo/blob/final/make.sh's. Always on: no switch (#2156).
+// neither. The images are scripts/design.sh marks's. Always on: no switch (#2156).
 
 export type IconMood = "asleep" | "happy" | "quizzical";
 

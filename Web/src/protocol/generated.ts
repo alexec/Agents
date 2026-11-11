@@ -7375,9 +7375,9 @@ export interface MessagingListRequest {
 
 /**
  * One message in read_messages' structuredContent (#4338). text is outside content: the result says
- * so (untrusted), and a client draws it as plain text, never as markup. thread is the id of the
- * message that starts its thread; absent when it is in no thread. link is the message on the
- * service's own site or app.
+ * so (untrusted), and a client draws it as Markdown that loads nothing: no HTML, no image from the
+ * network, and only http, https and mailto links. thread is the id of the message that starts its
+ * thread; absent when it is in no thread. link is the message on the service's own site or app.
  */
 export interface MessagingMessage {
   id: string;

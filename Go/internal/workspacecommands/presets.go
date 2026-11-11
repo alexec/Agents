@@ -319,15 +319,25 @@ func codespacesAPI(o map[string]any) (Config, error) {
 		// From a repository (#1809): the codespace clones it itself, with its own git
 		// credentials. It has no user data, so Agents is installed over ssh afterwards.
 		// With no repository, it is made from GitHub's public blank template (#4260).
+		// GitHub stops a codespace that nobody uses after its idle timeout, set only at
+		// creation, and counts no background process as use (#4636): its maximum keeps a
+		// turn from being stopped half-way. An organisation's policy can cap it lower.
 		CreateRequest: &Request{Method: "POST", URL: base + "/repos/${repository.owner}/${repository.name}/codespaces",
-			Headers: headers, Body: map[string]any{"display_name": "${name}"}},
+			Headers: headers, Body: map[string]any{"display_name": "${name}", "idle_timeout_minutes": "${idleTimeout}"}},
 		DeleteRequest: &Request{Method: "DELETE", URL: base + "/user/codespaces/${id}", Headers: headers},
 		Options: map[string]any{"type": "object", "properties": map[string]any{
 			"repository": map[string]any{"type": "string", "title": "Repository", "default": BlankCodespace,
 				"description": "The repository to make the codespace from, as owner/name. Empty: " + BlankCodespace + "."},
+			// The first choice is the default: the Mac's picker takes the first one.
+			"idleTimeout": map[string]any{"type": "integer", "title": "Stops after idle (minutes)",
+				"enum": []any{CodespaceIdleTimeout, 120, 60, 30}, "default": CodespaceIdleTimeout,
+				"description": "GitHub stops the codespace when nobody has used it for this long. It can't be changed later."},
 		}},
 	}), nil
 }
+
+// CodespaceIdleTimeout is a new codespace's idle timeout in minutes: GitHub's maximum (#4636).
+const CodespaceIdleTimeout = 240
 
 // BlankCodespace is GitHub's public blank template: a codespace with no repository is made
 // from it (#4260).

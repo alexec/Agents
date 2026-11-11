@@ -96,9 +96,8 @@ func TestAskingForASecret(t *testing.T) {
 // answer as a prompt with only the name in it.
 func TestASecretLeftOpenBringsOnlyItsName(t *testing.T) {
 	fakeRuntimes(t)
-	was := formHoldLimit
-	formHoldLimit = 300 * time.Millisecond
-	defer func() { formHoldLimit = was }()
+	_, left := formHolds(t)
+	left() // the call must outlast its hold
 	home := t.TempDir()
 	t.Setenv("AGENTS_PERSONAL_HOME", home)
 	path := skillcatalog.SecretsPath(home)

@@ -1,8 +1,8 @@
 // Messages (#4344), as the window's MessagesView: the conversations of every messaging connector that
 // follows the messaging contract, on every machine, from messages/conversations, in one list, the newest
 // first, with Source and Unread filters; a conversation's page from messages/read, with a reply field
-// (messages/reply, #4345) when its connector can send. Its text is outside content: drawn as plain text,
-// never as markup.
+// (messages/reply, #4345) when its connector can send. Its text is outside content: drawn as Markdown
+// by renderMarkdown, which draws no HTML, fetches no image and follows only http, https and mailto links.
 import { signal, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { MessagingMessage } from "../protocol/generated";
@@ -18,6 +18,7 @@ import {
   sourceGlyph, unreadWords, type HostConversations, type MessagesRow,
 } from "../model/messages";
 import { go } from "../route";
+import { renderMarkdown } from "../render/markdown";
 
 /** The list's state, for the tab: a conversation's page goes back to it as it was left. */
 const lists = signal<HostConversations[] | null>(null);
@@ -206,7 +207,7 @@ export function ConversationPage({ store, conversationKey }: { store: Store; con
                     onClick={() => { thread.value = m.thread; }}>{replyInThread}</button>}
                   {m.link && <a class="small messages-original" href={m.link} target="_blank" rel="noopener noreferrer">Original</a>}
                 </div>
-                <p class="messages-text">{m.text}</p>
+                <div class="messages-text markdown">{renderMarkdown(m.text)}</div>
               </li>
             ))}
           </ul>

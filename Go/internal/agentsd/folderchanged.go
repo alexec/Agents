@@ -4,7 +4,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -39,7 +38,9 @@ func (d *Daemon) folderChanged(folder string) {
 	d.folderDirty[folder] = true
 	after := d.folderAfter
 	d.folderChangedMu.Unlock()
-	send := func() { safe.Go("folder changed", func() { d.sendFolderChanged(folder) }) }
+	// Work Shutdown waits for, and none once the host is going (#4666): the summary reads
+	// your policy, whose first read makes the first-start move into the root.
+	send := func() { d.goAfterTurn("folder changed", func() { d.sendFolderChanged(folder) }) }
 	if after != nil {
 		after(folderChangedWindow, send)
 		return

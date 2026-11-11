@@ -23,8 +23,8 @@ import (
 const summariesVersion = 1
 
 // summaryDelay is how long after an archived record changes the file is written, so a
-// burst of archives writes it once.
-const summaryDelay = 2 * time.Second
+// burst of archives writes it once. A test shortens it.
+var summaryDelay = 2 * time.Second
 
 type summaryFile struct {
 	Version int                         `json:"version"`
@@ -105,31 +105,52 @@ func (s *Store) summariesSoon() {
 		s.summaryTimer.Reset(summaryDelay)
 		return
 	}
-	s.summaryTimer = time.AfterFunc(summaryDelay, func() {
+	var t *time.Timer
+	t = time.AfterFunc(summaryDelay, func() {
+		// Under summaryWrite from the check to the end of the write, so FlushSummaries
+		// waits for a write that has begun, and a timer it took writes nothing after it
+		// (#4666): the host's stop then leaves no writer in the root.
+		s.summaryWrite.Lock()
+		defer s.summaryWrite.Unlock()
 		s.mu.Lock()
-		s.summaryTimer = nil
+		mine := s.summaryTimer == t
+		if mine {
+			s.summaryTimer = nil
+		}
 		s.mu.Unlock()
+		// Not this timer's write any more: FlushSummaries wrote it, or this is a second
+		// firing after a Reset of a timer that had already fired.
+		if !mine {
+			return
+		}
 		// A root gone (a test's, removed) gets no cache made again.
 		if _, err := os.Stat(s.Loc.Root); err != nil {
 			return
 		}
-		if err := s.WriteSummaries(); err != nil {
+		if err := s.writeSummaries(); err != nil {
 			log.Printf("could not write the archived agents' summaries: %v", err)
 		}
 	})
+	s.summaryTimer = t
 }
 
 // FlushSummaries writes the summaries' file now when a write is due, and leaves none due:
-// for the host's stop, so the next start trusts every summary.
+// for the host's stop, so the next start trusts every summary. A write the timer began is
+// done when it returns, and the timer writes nothing after it (#4666).
 func (s *Store) FlushSummaries() {
+	s.summaryWrite.Lock()
+	defer s.summaryWrite.Unlock()
 	s.mu.Lock()
-	due := s.summaryTimer != nil && s.summaryTimer.Stop()
-	s.summaryTimer = nil
+	due := s.summaryTimer != nil
+	if due {
+		s.summaryTimer.Stop()
+		s.summaryTimer = nil
+	}
 	s.mu.Unlock()
 	if !due {
 		return
 	}
-	if err := s.WriteSummaries(); err != nil {
+	if err := s.writeSummaries(); err != nil {
 		log.Printf("could not write the archived agents' summaries: %v", err)
 	}
 }
@@ -138,6 +159,11 @@ func (s *Store) FlushSummaries() {
 func (s *Store) WriteSummaries() error {
 	s.summaryWrite.Lock()
 	defer s.summaryWrite.Unlock()
+	return s.writeSummaries()
+}
+
+// writeSummaries is WriteSummaries with summaryWrite held.
+func (s *Store) writeSummaries() error {
 	s.mu.Lock()
 	f := summaryFile{Version: summariesVersion, Records: make(map[wire.UUID]summaryRecord, len(s.stamps))}
 	for id, st := range s.stamps {
@@ -176,4 +202,3 @@ func (s *Store) commandsOnDisk(id wire.UUID) []wire.SlashCommand {
 	}
 	return r.AvailableCommands
 }
-

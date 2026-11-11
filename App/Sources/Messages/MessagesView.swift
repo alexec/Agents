@@ -222,7 +222,7 @@ private struct ConversationRow: View {
 }
 
 /// A conversation's messages, the newest first, each with its sender, time, text (outside content,
-/// drawn as plain text) and a link to the original; older pages with More. Under them, the reply
+/// drawn as Markdown that loads nothing) and a link to the original; older pages with More. Under them, the reply
 /// field (#4345), when the connector can send: the person's own reply, which says who it goes as.
 private struct ConversationPage: View {
     @Environment(AppModel.self) private var model
@@ -375,8 +375,9 @@ private struct MessageRow: View {
                         .help(link)
                 }
             }
-            // Outside content: plain text, never Markdown.
-            Text(verbatim: message.text).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+            // Outside content: Markdown with no base and no remote-image loader, so an image
+            // stays its alternative text and nothing is fetched (FR-013).
+            MarkdownText(markdown: message.text).textSelection(.enabled)
         }
         .padding(.vertical, 4)
     }
