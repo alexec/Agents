@@ -66,6 +66,10 @@ test("the state line, Files changed, Branch, Reviewers and the Checks page's wor
   assert.deepEqual(p.pullStateWords({ author: "sam", state: "open", updated, comments: 4 }, now),
     { wide: "sam opened this pull request · updated 2 h ago · 4 comments", short: "sam · 2 h · 4 comments" });
   assert.equal(p.pullStateWords({ author: "sam", state: "merged", comments: 0 }, now).wide, "sam’s pull request was merged");
+  assert.deepEqual(p.pullStateWords({ author: "sam", state: "merged", updated, closed: new Date("2026-11-10T11:50:00Z"), comments: 0 }, now),
+    { wide: "sam’s pull request was merged 10 min ago", short: "sam · 10 min" });
+  assert.equal(p.pullStateWords({ author: "sam", state: "open", updated, created: new Date("2026-11-07T12:00:00Z"), comments: 0 }, now).wide,
+    "sam opened this pull request 3 days ago");
   assert.equal(p.filesChangedWords(6), "Files changed 6");
   assert.equal(p.filesChangedWords(undefined), "Files changed");
   assert.equal(p.branchWords(1), "1 file");

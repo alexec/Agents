@@ -2176,6 +2176,7 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .work-avatars .more { margin-left: 3px; font-size: 0.85em; opacity: 0.7; }
 .work-avatar { flex: none; display: inline-grid; place-items: center; border-radius: 50%; box-shadow: 0 0 0 1.5px var(--paper-raised);
   background: hsl(var(--hue) 55% 45%); color: #fff; font-weight: 600; line-height: 1; }
+img.work-avatar { object-fit: cover; background: var(--paper-wash); }
 .work-item-rows li.stale { opacity: 0.5; }
 /* The lists (#4395, lists.md): a row is a link; the selected row (the focus) has a 2 px accent ring on the light accent fill. */
 a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
@@ -2275,6 +2276,7 @@ a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
 .work-state.with-glyph.open { background: #1a7f37; }
 .work-state.with-glyph.closed.pr-closed { background: #cf222e; }
 .work-state.with-glyph.closed, .work-state.with-glyph.merged { background: #8250df; }
+.work-state.with-glyph.closed.not-planned { background: #59636e; }
 .work-status-menu { border: none; cursor: pointer; font: inherit; font-size: 0.9em; padding: 2px 10px; }
 .work-status-menu:disabled { cursor: default; opacity: 0.7; }
 /* Placeholders while the page reads (section 7): grey bars with a slow shimmer, no spinner. */
@@ -2319,6 +2321,7 @@ a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
 .work-mini-row { display: inline-flex; gap: 6px; align-items: center; padding: 2px 0; background: none; border: none; color: inherit; font: inherit;
   cursor: pointer; text-align: left; }
 .work-mini-row:hover { text-decoration: underline; }
+.work-mini-row .work-mini-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.7; }
 .work-progress { display: flex; flex-direction: column; gap: 2px; width: 100%; }
 .work-progress progress { width: 100%; height: 6px; }
 .work-session { display: inline-flex; gap: 6px; align-items: center; max-width: 100%; padding: 1px 0; border: none; background: none; color: var(--accent);
@@ -2365,6 +2368,8 @@ a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
 .work-event .mark { flex: none; display: inline-grid; place-items: center; width: 22px; height: 22px; margin: 0 3px; border-radius: 50%; background: var(--paper-well);
   font-size: 12px; box-shadow: 0 0 0 3px var(--paper-ground); }
 .work-event .mark.closed { background: #8250df; color: #fff; }
+.work-event .mark.not-planned { background: #59636e; color: #fff; }
+.work-event .mark .work-state-icon { --state: currentColor; }
 /* The comment box (note 11): the person's glyph on the timeline's column, the field, then Close issue and Comment. */
 .work-comment-box { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; margin-top: 16px; }
 .work-comment-me svg { display: block; fill: var(--paper-wash); }
@@ -2400,6 +2405,7 @@ a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
   .work-state.with-glyph.open { background: #238636; }
   .work-state.with-glyph.closed, .work-state.with-glyph.merged { background: #8957e5; }
   .work-state.with-glyph.closed.pr-closed { background: #da3633; }
+  .work-state.with-glyph.closed.not-planned { background: #6e7681; }
   .work-session .dot.runs { background: #3fb950; }
   .work-close-mark.open { color: #a371f7; }
   .work-close-mark.open.pull { color: #f85149; }
@@ -2740,8 +2746,43 @@ dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
 .timeline-tick line { stroke: var(--timeline-faint); }
 .timeline-tick text { fill: var(--timeline-faint); }
 .timeline-tick.midnight text { font-weight: 600; }
+/* S11: a card in the middle of the plot, with Show the week. */
 .timeline-empty { position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%); width: max-content; max-width: 80%; margin: 0;
-  padding: 6px 10px; border-radius: 6px; background: var(--paper-raised); box-shadow: 0 1px 4px var(--paper-shadow); pointer-events: none; }
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 14px; border: 1px solid var(--paper-rule);
+  border-radius: 6px; background: var(--paper-raised); box-shadow: 0 1px 4px var(--paper-shadow); text-align: center; }
+.timeline-empty button { margin-top: 4px; }
+/* The bar (notes 30 to 32): the range and a bordered Now at the trailing edge, then Refresh. */
+.timeline-bar .work-menus { gap: 8px; }
+.timeline-trailing { display: inline-flex; gap: 8px; align-items: center; margin-left: auto; }
+.timeline-now-button { padding: 2px 10px; font-size: 0.75rem; border: 1px solid var(--paper-rule); border-radius: 999px; background: none; }
+/* S12: the last plot under the error strip, dimmed. */
+.timeline.dim .timeline-scroll { opacity: 0.45; }
+/* S10: grey bars where the lanes go, shimmering; still with Reduce Motion. */
+.timeline-placeholder rect { fill: var(--timeline-faint); opacity: 0.25; }
+@media (prefers-reduced-motion: no-preference) {
+  .timeline-placeholder rect { animation: timeline-shimmer 1.4s ease-in-out infinite; }
+}
+@keyframes timeline-shimmer { 0%, 100% { opacity: 0.15; } 50% { opacity: 0.35; } }
+/* The list of epics (note 36): what a screen reader reads over the plot; the Timeline itself under 700 px. Now on a
+   line above it, then a row per epic: its colour at the leading edge, the title and line 2, the progress at the end. */
+.timeline-list { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.timeline-list-now { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; color: var(--timeline-now); }
+.timeline-list-now::after { content: ""; flex: 1; height: 1.5px; background: var(--timeline-now); }
+.timeline-list-row { display: flex; flex-direction: row; justify-content: flex-start; align-items: center; gap: 10px; width: 100%;
+  text-align: left; background: none; border: none; border-radius: 0; padding: 8px 4px 8px 0; font: inherit; color: inherit; cursor: pointer; }
+.timeline-list-row .edge { flex: none; align-self: stretch; width: 4px; border-radius: 2px; background: var(--c-shown, var(--c)); }
+.timeline-list-row .work-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.timeline-list-row .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timeline-list-row .waits { color: var(--tint-attention); }
+.timeline-list-progress { flex: none; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.timeline-list-progress .track { width: 56px; height: 4px; border-radius: 2px; background: var(--paper-rule); overflow: hidden; }
+.timeline-list-progress .fill { display: block; height: 100%; background: var(--c-shown, var(--c)); }
+@media (max-width: 699px) {
+  .timeline-scroll { display: none; }
+  .timeline-list { position: static; width: auto; height: auto; overflow: visible; clip-path: none; white-space: normal; }
+  .timeline-empty { position: static; transform: none; width: auto; max-width: none; margin: 8px 0; }
+  .timeline-trailing { margin-left: 0; }
+}
 .timeline-card { position: absolute; z-index: 2; max-width: 360px; padding: 8px; border: 1px solid var(--paper-rule); border-radius: 6px;
   background: var(--paper-raised); box-shadow: 0 2px 8px var(--paper-shadow); pointer-events: none; line-height: 1.35; }
 .timeline-card .strong { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -2763,7 +2804,10 @@ dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
 .timeline-breathing path { stroke: var(--c-shown, var(--c)); }
 @media (prefers-reduced-motion: no-preference) {
   .timeline-breathing { display: inline; animation: timeline-breathe 1.6s ease-in-out infinite; }
+  /* The ◐ turns once a breath, on the same clock (#4265); with Reduce Motion it is still. */
+  .timeline-working path { animation: timeline-turn 1.6s linear infinite; }
 }
+@keyframes timeline-turn { to { transform: rotate(360deg); } }
 @keyframes timeline-breathe {
   0%, 100% { stroke-width: 4px; stroke-opacity: 0.1; }
   50% { stroke-width: 12px; stroke-opacity: 0.4; }

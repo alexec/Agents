@@ -185,6 +185,10 @@ func TestWithoutIDLEEveryPollAsks(t *testing.T) {
 	if err != nil || r["nextPollMs"] != plainPollMs {
 		t.Fatalf("first poll: %v %v", r, err)
 	}
+	time.Sleep(200 * time.Millisecond) // time for a watcher to reach IDLE, were there one
+	if _, live := s.Watchers.Folder("INBOX").State(); live {
+		t.Fatal("IDLE on a server without it")
+	}
 	f.deliver("INBOX", plain("a@example.com", fakeUser, "New", "new"))
 	if events, _ := mustPoll(t, s, nil, r["cursor"].(string)); len(events) != 1 {
 		t.Fatalf("after new mail: %v", events)

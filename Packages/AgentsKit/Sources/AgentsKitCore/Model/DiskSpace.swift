@@ -3,70 +3,65 @@ import Foundation
 /// How full a volume is allowed to get before the app says so (#195): `machine.disk_low` and
 /// `machine.disk_ok`, and the machine's row and page (#3628).
 ///
-/// Set in a folder's `.agents/folder.json` beside `helperLimits`, or in Folder
-/// Settings. A nil field is its default. A volume holding several folders goes by the
-/// most careful of the settings those that set one chose: the highest line of each.
-/// When none sets one, the defaults.
+/// Each line is a percent of the volume, not a size, so one setting fits a 256 GB laptop
+/// and a 4 TB server alike (Alex, 2026-11-11). Set in a folder's `.agents/folder.json`
+/// beside `helperLimits`, or in Folder Settings. A nil field is its default. A volume
+/// holding several folders goes by the most careful of the settings those that set one
+/// chose: the highest line of each. When none sets one, the defaults.
 ///
-///     "diskSpace" : { "lowGB" : 20, "lowPercent" : 5, "criticalGB" : 2 }
+///     "diskSpace" : { "lowPercent" : 20, "criticalPercent" : 1 }
 public struct DiskThresholds: Codable, Hashable, Sendable {
-    /// Below this many GB free is `low`, or below `lowPercent`, whichever is more.
-    public var lowGB: Int?
+    /// Below this percent of the volume free is `low`: where the Free disk space workflow starts.
     public var lowPercent: Int?
-    /// Below this many GB free is `critical`: where writes start failing.
-    public var criticalGB: Int?
+    /// Below this percent free is `critical`: where writes start failing.
+    public var criticalPercent: Int?
 
-    public static let defaultLowGB = 20
-    public static let defaultLowPercent = 5
-    public static let defaultCriticalGB = 2
+    public static let defaultLowPercent = 20
+    public static let defaultCriticalPercent = 1
     /// The choices Folder Settings offers.
-    public static let lowChoices = [5, 10, 20, 50, 100]
+    public static let lowChoices = [5, 10, 20, 30, 50]
     public static let criticalChoices = [1, 2, 5, 10]
 
-    public init(lowGB: Int? = nil, lowPercent: Int? = nil, criticalGB: Int? = nil) {
-        self.lowGB = lowGB
+    public init(lowPercent: Int? = nil, criticalPercent: Int? = nil) {
         self.lowPercent = lowPercent
-        self.criticalGB = criticalGB
+        self.criticalPercent = criticalPercent
     }
 
-    public var effectiveLowGB: Int { lowGB ?? Self.defaultLowGB }
     public var effectiveLowPercent: Int { lowPercent ?? Self.defaultLowPercent }
-    public var effectiveCriticalGB: Int { criticalGB ?? Self.defaultCriticalGB }
+    public var effectiveCriticalPercent: Int { criticalPercent ?? Self.defaultCriticalPercent }
 
     /// Nil when nothing differs from the defaults, so a file says only what was chosen.
     public var orNilIfDefault: DiskThresholds? {
         var kept = self
-        if kept.lowGB == Self.defaultLowGB { kept.lowGB = nil }
         if kept.lowPercent == Self.defaultLowPercent { kept.lowPercent = nil }
-        if kept.criticalGB == Self.defaultCriticalGB { kept.criticalGB = nil }
+        if kept.criticalPercent == Self.defaultCriticalPercent { kept.criticalPercent = nil }
         return kept == DiskThresholds() ? nil : kept
     }
 
     /// Why a setting cannot be kept, in the person's words; nil when it can.
     public var problem: String? {
-        if let lowGB, !(1...10_000).contains(lowGB) { return "Low disk space must be between 1 and 10000 GB." }
-        if let lowPercent, !(0...90).contains(lowPercent) { return "Low disk space must be between 0 and 90 percent." }
-        if let criticalGB, !(0...10_000).contains(criticalGB) {
-            return "Critical disk space must be between 0 and 10000 GB."
+        if let lowPercent, !(1...90).contains(lowPercent) { return "Low disk space must be between 1 and 90 percent." }
+        if let criticalPercent, !(0...90).contains(criticalPercent) {
+            return "Critical disk space must be between 0 and 90 percent."
         }
-        if effectiveCriticalGB > effectiveLowGB { return "Critical disk space can't be more than low disk space." }
+        if effectiveCriticalPercent > effectiveLowPercent {
+            return "Critical disk space can't be more than low disk space."
+        }
         return nil
     }
 
     /// The most careful of several settings: each line at its highest.
     public static func strictest(_ all: [DiskThresholds]) -> DiskThresholds {
         guard !all.isEmpty else { return DiskThresholds() }
-        return DiskThresholds(lowGB: all.map(\.effectiveLowGB).max(),
-                              lowPercent: all.map(\.effectiveLowPercent).max(),
-                              criticalGB: all.map(\.effectiveCriticalGB).max())
+        return DiskThresholds(lowPercent: all.map(\.effectiveLowPercent).max(),
+                              criticalPercent: all.map(\.effectiveCriticalPercent).max())
     }
 
     /// Bytes free below which a volume of `total` bytes is low.
-    public func lowLine(total: Int64) -> Int64 {
-        max(Int64(effectiveLowGB) * DiskSpace.gigabyte, total / 100 * Int64(effectiveLowPercent))
-    }
+    public func lowLine(total: Int64) -> Int64 { total / 100 * Int64(effectiveLowPercent) }
 
-    public var criticalLine: Int64 { Int64(effectiveCriticalGB) * DiskSpace.gigabyte }
+    /// Bytes free below which a volume of `total` bytes is critical.
+    public func criticalLine(total: Int64) -> Int64 { total / 100 * Int64(effectiveCriticalPercent) }
 }
 
 /// How a volume stands. Worse is greater.
@@ -179,7 +174,7 @@ public enum DiskSpace {
                             _ thresholds: DiskThresholds) -> (level: DiskLevel, crossing: DiskCrossing?) {
         let free = reading.freeBytes
         let low = thresholds.lowLine(total: reading.totalBytes)
-        let critical = thresholds.criticalLine
+        let critical = thresholds.criticalLine(total: reading.totalBytes)
         let raw: DiskLevel = free < critical ? .critical : free < low ? .low : .ok
         let was = before ?? .ok
         if raw > was {

@@ -350,13 +350,18 @@ public extension DaemonAPI {
         }
     }
 
-    /// `lineage/forecast` (#4526): an epic, for when it lands and its estimate to complete; nil
-    /// for only the spend, the burn and the service levels.
+    /// `lineage/forecast` (#4526): an epic, for when it lands and its estimate to complete; or a
+    /// milestone by name, in folder's repo (#4620); neither for only the spend, the burn and the
+    /// service levels.
     struct LineageForecastRequest: Codable, Sendable, Hashable {
         public var node: LineageNode?
+        public var milestone: String?
+        public var folder: String?
 
-        public init(node: LineageNode? = nil) {
+        public init(node: LineageNode? = nil, milestone: String? = nil, folder: String? = nil) {
             self.node = node
+            self.milestone = milestone
+            self.folder = folder
         }
     }
 
@@ -370,6 +375,8 @@ public extension DaemonAPI {
         public var stepsLeft: Int
         public var share: Double
         public var groups: Int
+        /// A milestone with less than half of its items landed (#4620): its scope is still growing.
+        public var growing: Bool?
     }
 
     /// An epic's first landing forecast, kept on its node to score when it lands (#4526).
@@ -420,6 +427,7 @@ public extension DaemonAPI {
     /// `lineage/forecast`'s answer (#4526): what comes next, from this machine's totals.
     struct LineageForecast: Codable, Sendable, Hashable {
         public var node: LineageNode?
+        public var milestone: String?
         public var at: Date
         public var windowDays: Int
         public var landings: Int

@@ -3524,11 +3524,9 @@ type DiskState struct {
 }
 
 type DiskThresholds struct {
-	LowGB *int64 `json:"lowGB,omitzero"`
-
 	LowPercent *int64 `json:"lowPercent,omitzero"`
 
-	CriticalGB *int64 `json:"criticalGB,omitzero"`
+	CriticalPercent *int64 `json:"criticalPercent,omitzero"`
 }
 
 type DiskWorktree struct {
@@ -4663,7 +4661,7 @@ type ForgeBoardsRequest struct {
 	Folder *string `json:"folder,omitzero"`
 }
 
-// What one forge on a list's page fills (#4329, #4361), so a client hides what it does not: issues and pulls say it has them; labelColors that its labels have a #rrggbb colour; avatars that its items have authorAvatar; stateReason that its closed issues have stateReason. createdAt that its items have createdAt, and closedAt that its closed and merged items have closedAt; children, linkedPulls and events that an item's read has them (#4373); total that it counts a list's items, for ForgeList.total (#4396); each is absent from an earlier daemon, which has none. commentCount says how to read ForgeItem.comments: exact; capped at commentsMost (show 50+ there); or detail, only on an item's own page (hide it on the row).
+// What one forge on a list's page fills (#4329, #4361), so a client hides what it does not: issues and pulls say it has them; labelColors that its labels have a #rrggbb colour; avatars that its items have authorAvatar; stateReason that its closed issues have stateReason. createdAt that its items have createdAt, and closedAt that its closed and merged items have closedAt; children, linkedPulls and events that an item's read has them (#4373); total that it counts a list's items, for ForgeList.total (#4396); releases that it has releases, for forge/releases and forge/release (#4426); each is absent from an earlier daemon, which has none. commentCount says how to read ForgeItem.comments: exact; capped at commentsMost (show 50+ there); or detail, only on an item's own page (hide it on the row).
 type ForgeCapabilities struct {
 	Forge string `json:"forge"`
 
@@ -4688,6 +4686,8 @@ type ForgeCapabilities struct {
 	Events *bool `json:"events,omitzero"`
 
 	Total *bool `json:"total,omitzero"`
+
+	Releases *bool `json:"releases,omitzero"`
 
 	CommentCount ForgeCommentCount `json:"commentCount"`
 
@@ -5129,6 +5129,86 @@ type ForgeProgress struct {
 	Done int64 `json:"done"`
 
 	Total int64 `json:"total"`
+}
+
+// A release on a forge (#4426). node is its lineage node (kind release, ref <forge>:<repo>/release/<tag>), which forge/release reads and lineage keys its cost by. repo is the repo as the forge names it, and folder a folder on it. latest is the repo's newest published release that is neither a draft nor a pre-release. publishedAt is absent on a draft; author and authorAvatar when the forge says them; assets is how many files it has.
+type ForgeRelease struct {
+	Node LineageNode `json:"node"`
+
+	Forge string `json:"forge"`
+
+	Repo string `json:"repo"`
+
+	Folder *string `json:"folder,omitzero"`
+
+	Tag string `json:"tag"`
+
+	Name string `json:"name"`
+
+	Body *string `json:"body,omitzero"`
+
+	Draft bool `json:"draft"`
+
+	Prerelease bool `json:"prerelease"`
+
+	Latest bool `json:"latest"`
+
+	CreatedAt *string `json:"createdAt,omitzero"`
+
+	PublishedAt *string `json:"publishedAt,omitzero"`
+
+	Author *string `json:"author,omitzero"`
+
+	AuthorAvatar *string `json:"authorAvatar,omitzero"`
+
+	Assets int64 `json:"assets"`
+
+	URL string `json:"url"`
+}
+
+// forge/release (#4426): a release, the release before it (previous, its tag; absent for the first), how many commits are between the two (commits, at most what the forge's compare gives) and the pull requests they merged, from each squash commit's (#n) or (!n), oldest first. compareUrl is the forge's page of the range.
+type ForgeReleaseDetail struct {
+	Release ForgeRelease `json:"release"`
+
+	Previous *string `json:"previous,omitzero"`
+
+	CompareUrl *string `json:"compareUrl,omitzero"`
+
+	Commits int64 `json:"commits"`
+
+	Pulls []ForgeReleasePull `json:"pulls"`
+}
+
+// A pull request in a release (#4426): its node, its number, and its title as its squash commit says it, with the (#n) taken off; sha is the commit.
+type ForgeReleasePull struct {
+	Node LineageNode `json:"node"`
+
+	Number int64 `json:"number"`
+
+	Title string `json:"title"`
+
+	Sha string `json:"sha"`
+}
+
+// forge/release (#4426): a release's lineage node, as ForgeRelease.node says it.
+type ForgeReleaseRequest struct {
+	Node LineageNode `json:"node"`
+}
+
+// forge/releases (#4426): the releases of the folders' repos, newest first (a draft, which has no publishedAt, by createdAt). none are the forges in reach that have no releases, and why, so a client says so (Linear and Jira have no releases); errors are the forges that could not be read.
+type ForgeReleases struct {
+	Releases []ForgeRelease `json:"releases"`
+
+	None []ForgeListError `json:"none,omitzero"`
+
+	Errors []ForgeListError `json:"errors,omitzero"`
+}
+
+// forge/releases (#4426): the releases of every folder's repo on this machine, or of one folder's, at most limit (1 to 100, 30 when absent) of each repo.
+type ForgeReleasesRequest struct {
+	Folder *string `json:"folder,omitzero"`
+
+	Limit *int64 `json:"limit,omitzero"`
 }
 
 // A standing epic's query (#3659, #3661), as the daemon read it from the standing block in the epic's body. labels: the issue has all of them; any: at least one of them; not: none of them; milestone: none, any or a milestone's name. lanes is how many lanes its lead runs at once, 1 when the block does not say. error says why there is no query: no block, a second block, or an unknown or bad field; with an error, the plan has no children.
@@ -5713,6 +5793,9 @@ type LineageCostNode struct {
 	// An issue's epic, by ref, as the forge's plan says it (#3562).
 	Parent *string `json:"parent,omitzero"`
 
+	// An issue's milestone, by name, as the forge's lists last said it (#4620). Kept once known, so a closed issue keeps it.
+	Milestone *string `json:"milestone,omitzero"`
+
 	// When a PR ended (#2351): merged, closed or reverted. Absent while open.
 	EndedAt *Date `json:"endedAt,omitzero"`
 
@@ -5917,9 +6000,11 @@ type LineageFigures struct {
 	Limited *bool `json:"limited,omitzero"`
 }
 
-// lineage/forecast (#4526; the method is specs/4533-forecasting/spec.md): what comes next, from this machine's totals. landings is the issues (not epics) that landed with a merged PR in the window of windowDays (14) before at, in the epic's repo when a node is asked for, else in every repo. lands is when the epic lands; noForecast says why there is none (too little history, too few closed epics, nothing open). toComplete is the epic's estimate to complete, once three of its children closed with an estimate kept at their start. kept is the forecast kept on the epic's node, the first one made, so it can be scored when the epic lands. spend is what a week and a month cost at the window's pace, burn is each weekly allowance's pace, and serviceLevels is how long each level's issues took. Every figure says its window; a range is a probability, not a promise.
+// lineage/forecast (#4526; the method is specs/4533-forecasting/spec.md): what comes next, from this machine's totals. landings is the issues (not epics) that landed with a merged PR in the window of windowDays (14) before at, in the epic's repo when a node is asked for, else in every repo. milestone is the milestone asked for (#4620), whose landings are its repo's. lands is when the epic or the milestone lands; noForecast says why there is none (too little history, too few closed epics, nothing open). toComplete is the epic's estimate to complete, once three of its children closed with an estimate kept at their start. kept is the forecast kept on the epic's node, the first one made, so it can be scored when the epic lands. spend is what a week and a month cost at the window's pace, burn is each weekly allowance's pace, and serviceLevels is how long each level's issues took. Every figure says its window; a range is a probability, not a promise.
 type LineageForecast struct {
 	Node *LineageNode `json:"node,omitzero"`
+
+	Milestone *string `json:"milestone,omitzero"`
 
 	At Date `json:"at"`
 
@@ -5977,8 +6062,10 @@ type LineageForecastKept struct {
 	Open int64 `json:"open"`
 }
 
-// When an epic lands (#4526, method H of specs/4533-forecasting/spec.md): a Monte Carlo of 1,000 draws with a fixed seed, each resampling hours of the window and keeping each landing in an hour with the chance share, until the open children are done. p50 and p85 are dates. share is the median share of the folder's landings that the closed epics had over their lives, from groups of them. open and closed are the children as the plan says now, with no growth for children not filed yet; stepsLeft is the blocked-by steps of the open ones, as context only: they do not enter the dates.
+// When an epic lands (#4526, method H of specs/4533-forecasting/spec.md): a Monte Carlo of 1,000 draws with a fixed seed, each resampling hours of the window and keeping each landing in an hour with the chance share, until the open children are done. p50 and p85 are dates. share is the median share of the folder's landings that the closed epics had over their lives, from groups of them. open and closed are the children as the plan says now, with no growth for children not filed yet; stepsLeft is the blocked-by steps of the open ones, as context only: they do not enter the dates. For a milestone (#4620), open and closed are its items in the store, the share is the closed milestones', stepsLeft is 0, and growing says that less than half of its items have landed, so its scope is still growing (a milestone grows about 5× after its first issue): the dates are a floor.
 type LineageForecastLands struct {
+	Growing *bool `json:"growing,omitzero"`
+
 	P50 Date `json:"p50"`
 
 	P85 Date `json:"p85"`
@@ -5994,9 +6081,15 @@ type LineageForecastLands struct {
 	Groups int64 `json:"groups"`
 }
 
-// lineage/forecast (#4526): an epic, for when it lands and its estimate to complete; without one, only the spend, the burn and the service levels, over every repo.
+// lineage/forecast (#4526): an epic, for when it lands and its estimate to complete; or a milestone (#4620), by name, for when it lands, in folder's repo (any repo without one); without either, only the spend, the burn and the service levels, over every repo.
 type LineageForecastRequest struct {
 	Node *LineageNode `json:"node,omitzero"`
+
+	// A milestone's name (#4620): its items are the store's issues in it. Not with node.
+	Milestone *string `json:"milestone,omitzero"`
+
+	// The folder whose repo the milestone is in.
+	Folder *string `json:"folder,omitzero"`
 }
 
 // How long a level's issues took (#4526): of the closed issues of the level that landed in the window, half took up to p50Seconds and 85% up to p85Seconds, from the start of work to the last PR merged. Only a level with five or more.
@@ -10775,6 +10868,17 @@ type ReportExport struct {
 	Format ReportFormat `json:"format"`
 }
 
+// How the kept landing forecasts scored (#4528): of the epics that landed in the range with a forecast kept on their node (lineage/forecast's first one, #4526), how many landed by its P50 date and by its P85 date. A good P85 holds about 85% of the time, and a P50 about half. errorDays is the median of how many days the P50 date was off by. An epic lands when the last PR of it or its children merges.
+type ReportForecastScore struct {
+	Epics int64 `json:"epics"`
+
+	P50Held int64 `json:"p50Held"`
+
+	P85Held int64 `json:"p85Held"`
+
+	ErrorDays *float64 `json:"errorDays,omitzero"`
+}
+
 type ReportFormat string
 
 const ReportFormatCsv ReportFormat = "csv"
@@ -11026,6 +11130,12 @@ type ReportValue struct {
 	CycleTimeSeconds *float64 `json:"cycleTimeSeconds,omitzero"`
 
 	EstimateError *ReportEstimateError `json:"estimateError,omitzero"`
+
+	// How the kept landing forecasts of the epics that landed in the range scored (#4528); absent when none had one.
+	ForecastScore *ReportForecastScore `json:"forecastScore,omitzero"`
+
+	// The open epics in the scope (#4528), the most recently changed first, at most 20, so Reports ▸ Planning can ask lineage/forecast when each lands.
+	OpenEpics []LineageNode `json:"openEpics,omitzero"`
 
 	Issues []ReportValueRow `json:"issues"`
 
@@ -14645,6 +14755,9 @@ type WakeSettings struct {
 
 	// How long a finished runtime whose background processes (a dev server, a build, a watcher) still run is kept, counted from its last turn's end (#4044): 1 to 24 hours, default 4. Its processes are then ended with it. 0, or missing, from a client that does not know it, keeps the value the host has.
 	BackgroundHours *int64 `json:"backgroundHours,omitzero"`
+
+	// How long a finished runtime with no background processes is kept, counted from its last turn's end, before the host ends it (#4044, #4513): 0 to 1440 minutes, default 10. An agent that waits for an event (wait_for_event, check_again, a lease) is then continued with session/load when the event comes. 0 releases none for being idle; warmRuntimes still holds. Missing, from a client that does not know it, keeps the value the host has. A runtime that can neither load nor resume a conversation is kept while its agent waits.
+	ReleaseAfterMinutes *int64 `json:"releaseAfterMinutes,omitzero"`
 }
 
 // Why the Mac is, or is not, being kept awake (024).
@@ -14772,7 +14885,7 @@ type WorkTimelineBacktest struct {
 	At Date `json:"at"`
 }
 
-// A child of an epic in work/timeline (#4172). stateReason is completed or not_planned, where the forge says it. startedAt is the earliest of the first session linked to it in lineage, the opening of the first pull request that closes it, and its close; absent while nothing has started it. waitsForPerson: it is open and labelled alex-todo or needs-account, so it is not forecast. forecastAt is an open child's forecast close: its epic's P50 shared out along the line, in the order of the children.
+// A child of an epic in work/timeline (#4172). item has its labels with their colours, for the hover card's chips (#4428). stateReason is completed or not_planned, where the forge says it. startedAt is the earliest of the first session linked to it in lineage, the opening of the first pull request that closes it, and its close; absent while nothing has started it. waitsForPerson: it is open and labelled alex-todo or needs-account, so it is not forecast. forecastAt is an open child's forecast close: its epic's P50 shared out along the line, in the order of the children.
 type WorkTimelineChild struct {
 	Item ForgeItem `json:"item"`
 

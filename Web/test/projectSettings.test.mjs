@@ -15,7 +15,8 @@ test("project settings: the queued and disk menus offer a number set by hand", (
   assert.deepEqual(p.queuedChoices(5).slice(0, 3), [1, 2, 3]);
   assert.equal(p.queuedChoices(30).at(-1), 30);
   assert.deepEqual(p.diskChoices([5, 10, 20], 15), [5, 10, 15, 20]);
-  assert.deepEqual(p.withDiskLine({ lowGB: 50 }, "lowGB", 20, 20), {});
+  assert.deepEqual(p.withDiskLine({ lowPercent: 50 }, "lowPercent", 20, 20), {});
+  assert.deepEqual(p.withDiskLine(undefined, "criticalPercent", 5, 1), { criticalPercent: 5 });
 });
 
 test("project settings: the folder that keeps them is named", () => {

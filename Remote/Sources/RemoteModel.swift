@@ -60,7 +60,7 @@ final class RemoteModel {
             selection = nil
             openWorkflow = nil
             openPin = nil
-            openArchive = false
+            openArchive = nil
             if selectedKey != nil { openActivity = nil }
             letGoOfFolders(keeping: selectedFolder)
         }
@@ -559,9 +559,9 @@ final class RemoteModel {
     var openWorkflow: Workflow.ID?
     /// The folder's pinned page (#159) pushed over the folder page, by its path in it.
     var openPin: String?
-    /// The folder's archive (#495, #498): its archived sessions and workflows, a page
-    /// opened from one row in the sidebar rather than folds inside the folder's.
-    var openArchive = false
+    /// Which of the folder's archive pages is open (#495, #4448), Archived Sessions or
+    /// Archived Workflows, each from its own row in the sidebar; nil when neither is.
+    var openArchive: ArchiveKind?
     /// A change waiting for an OK, on its Review page (#1472), by its `Approval.id`: from
     /// Needs You, the detail's own page; from Review… on a chat's card, pushed over the chat.
     var openReview: String?
@@ -598,7 +598,11 @@ final class RemoteModel {
             if case .work = openActivity { return .work(workPlace.kind) }
             if let openActivity { return openActivity }
             guard let key = selectedKey else { return nil }
-            if openArchive { return .archivedSessions(key) }
+            switch openArchive {
+            case .sessions: return .archivedSessions(key)
+            case .workflows: return .archivedWorkflows(key)
+            case nil: break
+            }
             if let openPin { return .pin(openPin, in: key) }
             if let openWorkflow { return .workflow(openWorkflow, in: key) }
             if let selection { return .session(selection) }
@@ -616,14 +620,14 @@ final class RemoteModel {
                 selection = nil
                 openWorkflow = nil
                 openPin = nil
-                openArchive = false
+                openArchive = nil
                 openReview = nil
             case .folder(let key):
                 selectedKey = key
                 selection = nil
                 openPin = nil
                 openWorkflow = nil
-                openArchive = false
+                openArchive = nil
                 openReview = nil
                 // The next New Session at the sidebar's top starts here too (#495).
                 rememberNewSessionFolder(key)
@@ -631,21 +635,21 @@ final class RemoteModel {
                 if let agent = work.agent(id) { selectedKey = FolderKey(host: agent.host, folder: agent.folderPath) }
                 openPin = nil
                 openWorkflow = nil
-                openArchive = false
+                openArchive = nil
                 openReview = nil
                 selection = id
             case .workflow(let id, let key):
                 selectedKey = key
                 openPin = nil
                 selection = nil
-                openArchive = false
+                openArchive = nil
                 openReview = nil
                 openWorkflow = id
             case .pin(let path, let key):
                 selectedKey = key
                 openWorkflow = nil
                 selection = nil
-                openArchive = false
+                openArchive = nil
                 openReview = nil
                 openPin = path
             case .review(let id, let key):
@@ -654,7 +658,7 @@ final class RemoteModel {
                 selection = nil
                 openPin = nil
                 openWorkflow = nil
-                openArchive = false
+                openArchive = nil
                 openReview = id
             case .resources, .events, .runtimes, .summary, .secretsStatus, .accountsStatus:
                 openActivity = newValue
@@ -663,14 +667,14 @@ final class RemoteModel {
                 if workPlace.kind != kind { workHistory.go(WorkPlace(kind: kind)) }
                 openActivity = newValue
             case .archivedSessions(let key), .archivedWorkflows(let key):
-                // The folder's archive page (#495, #498), with what is opened from it
-                // pushed over it. One page for both until the Remote has the two (#4452).
+                // One of the folder's archive pages (#495, #4448), with what is opened from
+                // it pushed over it.
                 selectedKey = key
                 selection = nil
                 openPin = nil
                 openWorkflow = nil
                 openReview = nil
-                openArchive = true
+                if case .archivedSessions = newValue { openArchive = .sessions } else { openArchive = .workflows }
             case .machine:
                 // A machine's page (#4034), as the window's Machines group opens it.
                 openActivity = newValue
@@ -3894,6 +3898,20 @@ final class RemoteModel {
         return await loadArchivedAgents(in: key, limit: limit)
     }
 
+    /// The archived sessions of a folder that hold `words`, for the Archived Sessions page's
+    /// filter (#4448), as the window asks, so one older than the page held is found too.
+    /// Let go with the rest when the page closes. Answers whether the host did.
+    @discardableResult
+    func searchArchived(in key: FolderKey, words: String) async -> Bool {
+        let request = DaemonAPI.ListRequest(archivedCommands: false, archivedOnly: true, folder: key.folder,
+                                            limit: Self.searchShown, lean: true, query: words)
+        guard let target = hostClient(key.host),
+              let listed = try? await target.call(DaemonAPI.Method.agentsList, request,
+                                                  returning: [Agent].self) else { return false }
+        work.takeListed(listed.map { var agent = $0; agent.host = key.host; return agent })
+        return true
+    }
+
     /// A folder's Archived fold has closed: what it held is let go, but for the chat open
     /// and whatever the open folder's pages still show.
     func letGoOfArchived(in folder: URL) {
@@ -5799,3 +5817,9 @@ extension RemoteModel: WorkModel {}
 
 /// Settings ▸ You ▸ Secrets ▸ For One Session (#4032), through the Mac's host.
 extension RemoteModel: SessionSecretsSource {}
+
+/// Which of a folder's two archive pages (#4448): its archived sessions or its archived workflows.
+enum ArchiveKind: Hashable {
+    case sessions
+    case workflows
+}

@@ -107,8 +107,11 @@ heading to open it. In order, an open folder holds:
   several machines has one row, for the folder on this machine, else the first one that is
   online. It is red when a connector does not answer, or when the connection that its
   slots use ended.
-- **Archived,** a row that opens a page of the folder's archived sessions and
-  workflows. It shows only when there is something archived.
+- **Archived Sessions,** a row that opens a page of the folder's archived sessions, the
+  newest archived first, under a heading for each day. It shows only when the folder has an
+  archived session.
+- **Archived Workflows,** a row that opens a page of the folder's archived workflows, by
+  name. It shows only when the folder has an archived workflow.
 
 While you search, the archived sessions and workflows that match show in the folder's
 group instead, the first 10 with **Show all** for the rest.

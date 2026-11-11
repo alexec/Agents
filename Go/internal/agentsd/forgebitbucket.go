@@ -139,6 +139,7 @@ func (bitbucketForge) Caps() forgeCaps {
 		// An issue's comment count is on its own page only.
 		CommentCount: "detail",
 		Reasons: map[string]string{
+			actionReleases: "Bitbucket Cloud has no releases, only tags",
 			actionTransition: "only a Jira issue or an Azure Boards work item moves by a transition",
 			actionAutoMerge:  bitbucketNoAutoMerge,
 			actionLabel:      bitbucketmcp.NoPRLabels,

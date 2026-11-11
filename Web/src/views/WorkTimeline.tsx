@@ -13,14 +13,14 @@ import { describe } from "../model/errors";
 import { boardChoices, boardName, withBoard, type WorkProject } from "../model/work";
 import { boards, forgeHosts, loadBoards } from "../model/workLists";
 import {
-  Axis, cardRows, colourIndex, dotX, epicCount, epicOf, errorWords, fitLabel, hit, isOpen, joins, label, labelText, landed as landedRefs,
-  lanes, layout, labelRoom, mergeTimelines, noEpics, noMachine, noProject, overlapping, rangeSpan, rangeTitle, rangeWindow, riser, sessionNodes, spoken,
-  startedBySessions,
-  timelineLines, timelineRanges, titleWords, waitWords, zoomed, type Interval, type TimelineHit, type TimelineLine, type TimelineRange,
+  Axis, cardRows, colourIndex, dotX, epicCount, epicOf, epicRows, errorWords, fitLabel, hit, isOpen, joins, label, labelText, lastJoined,
+  lastJoinedWords, landed as landedRefs, lanes, layout, labelRoom, mergeTimelines, noEpicsWords, noMachine, noProject, noProjectTitle,
+  overlapping, rangeSpan, rangeTitle, rangeWindow, riser, sessionNodes, showTheWeek, startedBySessions, timelineLines, workingNow, timelineRanges,
+  titleWords, waitWords, zoomed, type Interval, type TimelineHit, type TimelineLine, type TimelineRange,
 } from "../model/workTimeline";
 import { go } from "../route";
 import { Choice, workProjects } from "./Work";
-import { LabelChip, StateIcon } from "./WorkParts";
+import { EmptyState, ErrorStrip, FilterMenu, LabelChip, PlaceholderRows, RefreshButton, StateIcon } from "./WorkParts";
 
 const range = signal<TimelineRange>("twoDays");
 /** The project, by id; "" until one is picked, then the first one. */
@@ -36,6 +36,10 @@ const asked = signal(0);
 const nowAsked = signal(0);
 /** Children that closed since the last read: their dots pulse once. */
 const landed = signal<ReadonlySet<string>>(new Set());
+/** A read of `work/timeline` runs: Refresh spins (note 30). */
+const reading = signal(false);
+/** Every machine failed the last read: the plot is the one before it, dimmed under the strip (S12). */
+const stale = signal(false);
 let read: string | undefined;
 /**
  * Every machine's sessions on the epics and their children, from the control plane's merged copy
@@ -73,11 +77,12 @@ async function loadTimeline(store: Store) {
   const key = `${asked.value} ${chosen?.id} ${board.value} ${range.value} ${span.start} ${timelineHosts(store).map((h) => h.id).join(",")}`;
   if (read === key && timeline.value !== null) return;
   read = key;
-  if (!chosen) { timeline.value = { epics: [], releases: [] }; return; }
+  if (!chosen) { timeline.value = { epics: [], releases: [] }; stale.value = false; return; }
   if (project.value !== chosen.id) project.value = chosen.id;
   const on = new Set<string>([...chosen.folders].map((f) => f.slice(0, f.indexOf("|"))));
   const hosts = timelineHosts(store).filter((h) => on.has(h.id));
   const chosenBoard = board.value;
+  reading.value = true;
   const got = await Promise.all(hosts.map(async (h) => {
     try {
       const t = await store.link.call("work/timeline", { project: chosen.id, from: toWireDate(new Date(span.start)), to: toWireDate(new Date(span.end)) }, h.id);
@@ -95,6 +100,12 @@ async function loadTimeline(store: Store) {
     }
   }));
   if (read !== key) return;
+  reading.value = false;
+  const failed = got.flatMap((g) => g.problem ? [g.problem] : []);
+  problem.value = failed.length === 0 ? null : failed.join("\n");
+  // With every machine failing, the last plot stays, dimmed.
+  stale.value = hosts.length > 0 && failed.length === hosts.length && timeline.value !== null;
+  if (stale.value) return;
   const merged = mergeTimelines(got.flatMap((g) => g.t ? [g.t] : []));
   const epics = chosenBoard ? new Set(got.flatMap((g) => g.refs ?? [])) : undefined;
   if (epics) merged.epics = merged.epics.filter((e) => epics.has(e.item.node.ref));
@@ -102,8 +113,6 @@ async function loadTimeline(store: Store) {
     const fresh = landedRefs(timeline.value, merged);
     if (fresh.length > 0) landed.value = new Set(fresh);
   }
-  const failed = got.flatMap((g) => g.problem ? [g.problem] : []);
-  problem.value = failed.length === 0 ? null : failed.join("\n");
   fromMachines = merged;
   sessions.value = await readSessions(store, merged);
   if (read !== key || fromMachines !== merged) return;
@@ -166,39 +175,45 @@ export function WorkTimeline({ store }: { store: Store }) {
   }, [project.value]);
   const t = timeline.value;
   const problems = [...problem.value ? problem.value.split("\n") : [], ...t?.errors ?? []];
+  const refresh = () => { asked.value++; void loadBoards(store, true); };
   return (
     <div class="work-list timeline-page">
-      <div class="work-filters">
-        <div class="diff-choice" role="group" aria-label="Range">
-          {timelineRanges.map((r) => (
-            <button key={r} type="button" aria-pressed={range.value === r} onClick={() => { range.value = r; goToNow(); }}>{rangeTitle[r]}</button>
-          ))}
+      {/* The filter bar of parts.md section 4 (note 31 and 32): Project and Board at the leading edge, the title line, then
+          the range and Now at the trailing edge, where Sort is on a list, and Refresh (note 30). */}
+      <div class="work-filters timeline-bar" role="group" aria-label="Timeline">
+        <div class="work-menus">
+          {projects.length > 1 && (
+            <FilterMenu label="Project" value={project.value} choices={projects.map((p) => ({ value: p.id, words: p.name }))}
+              onPick={(id) => { project.value = id; }} />
+          )}
+          <Choice label="Board" any="All boards" value={board.value} options={boardChoices(boards.value, board.value)}
+            words={(url) => boardName(boards.value, url)} onChange={(url) => { board.value = url; }} />
+          {/* The forecast is always drawn (Alex, 2026-11-10): how past forecasts did is the title line's help. */}
+          {t && projects.length > 0 && (
+            <span class="quiet timeline-title" title={t.backtest ? `The forecast after now. ${errorWords(t.backtest)}.` : "The forecast after now"}>
+              {titleWords(projects.length > 1 ? "" : projects[0]!.name,
+                epicCount(timelineLines(t, Date.now()), rangeWindow(range.value, anchor.value)), range.value)}
+            </span>
+          )}
         </div>
-        <button type="button" onClick={goToNow} title="Back to now">Now</button>
-        {projects.length > 1 && (
-          <label>Project <select value={project.value} onChange={(e) => { project.value = (e.target as HTMLSelectElement).value; }}>
-            {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select></label>
-        )}
-        <Choice label="Board" any="All" value={board.value} options={boardChoices(boards.value, board.value)}
-          words={(url) => boardName(boards.value, url)} onChange={(url) => { board.value = url; }} />
-        {/* The forecast is always drawn (Alex, 2026-11-10): how past forecasts did is the title line's help. */}
-        {t && projects.length > 0 && (
-          <span class="quiet timeline-title" title={t.backtest ? `The forecast after now. ${errorWords(t.backtest)}.` : "The forecast after now"}>
-            {titleWords(projects.length > 1 ? "" : projects[0]!.name,
-              epicCount(timelineLines(t, Date.now()), rangeWindow(range.value, anchor.value)), range.value)}
-          </span>
-        )}
-        <span class="spacer" />
-        <button type="button" class="link" onClick={() => { asked.value++; void loadBoards(store, true); }}>Refresh</button>
+        <span class="timeline-trailing">
+          <div class="diff-choice" role="group" aria-label="Range">
+            {timelineRanges.map((r) => (
+              <button key={r} type="button" aria-pressed={range.value === r} onClick={() => { range.value = r; goToNow(); }}>{rangeTitle[r]}</button>
+            ))}
+          </div>
+          <button type="button" class="timeline-now-button" onClick={goToNow} title="Back to now">Now</button>
+        </span>
+        <RefreshButton busy={reading.value} onClick={refresh} />
       </div>
-      {hosts.length === 0 ? <p class="hint">{noMachine}</p>
-        : t === null ? <p class="hint">Loading…</p>
-        : projects.length === 0 ? <p class="hint">{noProject}</p>
+      {hosts.length === 0 ? <EmptyState kind="timeline" title={noMachine} />
+        : projects.length === 0 ? <EmptyState kind="timeline" title={noProjectTitle} line={noProject} />
         : (
           <>
-            {problems.map((p) => <p key={p} class="hint">⚠ {p}</p>)}
-            <Plot timeline={t} projectName={projects.find((p) => p.id === project.value)?.name ?? ""} />
+            <ErrorStrip lines={problems} retry={refresh} />
+            <Plot timeline={t ?? { epics: [], releases: [] }} loading={t === null} dim={stale.value}
+              projectName={projects.find((p) => p.id === project.value)?.name ?? ""}
+              working={t ? workingNow(t, sessions.value, Object.values(store.agents.value).flat()) : new Set()} />
           </>
         )}
     </div>
@@ -217,7 +232,12 @@ function useMinute(): number {
 
 interface Hover { hit: TimelineHit; x: number; y: number }
 
-function Plot({ timeline: t, projectName }: { timeline: Timeline; projectName: string }) {
+/** The plot; under 700 px the list of epics in its place (note 36). `loading`: the first read, the releases line and
+ * Now with grey lanes that shimmer (S10). `dim`: the last plot under the error strip (S12). `working`: the epics and
+ * children a session is in a turn on now (#4265); their open lines pulse. */
+function Plot({ timeline: t, projectName, loading, dim, working }: {
+  timeline: Timeline; projectName: string; loading: boolean; dim: boolean; working: ReadonlySet<string>;
+}) {
   const now = useMinute();
   const scroller = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -241,7 +261,7 @@ function Plot({ timeline: t, projectName }: { timeline: Timeline; projectName: s
   const visible = Math.max(size.width, 1);
   const span = content();
   const axis = new Axis(span, visible * (span.end - span.start) / rangeSpan[range.value]);
-  const lines = layout(overlapping(timelineLines(t, now), span), axis, (l) => measure(label(l)));
+  const lines = layout(overlapping(timelineLines(t, now, true, working), span), axis, (l) => measure(label(l)));
   const { above, below } = lanes(lines);
   const sides = Math.max(above, below, 2);
   const height = Math.max((2 * sides + 2) * laneHeight, size.height - axisHeight);
@@ -311,8 +331,11 @@ function Plot({ timeline: t, projectName }: { timeline: Timeline; projectName: s
   };
 
   const d = new Drawing(lines, t, axis, now, trunk, height, offset, visible, projectName);
+  const win = rangeWindow(range.value, anchor.value);
+  const rows = epicRows(timelineLines(t, now), win, now);
+  const last = rows.length === 0 && !loading ? lastJoined(t, win.start) : undefined;
   return (
-    <div class="timeline">
+    <div class={`timeline${dim ? " dim" : ""}`}>
       <div class="timeline-scroll" ref={scroller} onScroll={onScroll}>
         <div class="timeline-content" style={{ width: `${axis.width}px` }}>
           <svg class={`timeline-plot${hover ? " pointing" : ""}`} width={axis.width} height={height} aria-hidden="true"
@@ -320,18 +343,46 @@ function Plot({ timeline: t, projectName }: { timeline: Timeline; projectName: s
             onMouseLeave={() => setHover(null)}
             onClick={(e) => { const h = hitAt(point(e)); if (h) open(h); }}>
             {d.plot()}
+            {loading && d.placeholders()}
           </svg>
           {hover && <Card hover={hover} lines={lines} timeline={t} now={now} right={offset + visible} />}
           <svg class="timeline-axis" width={axis.width} height={axisHeight} aria-hidden="true">{d.axisMarks()}</svg>
         </div>
       </div>
-      {lines.length === 0 && <p class="timeline-empty">{noEpics}</p>}
-      {/* A list in time order (section 5), each opening its epic's Plan. */}
-      <ul class="visually-hidden" aria-label="Timeline">
-        {spoken(lines, now).map(({ line, words }) => (
-          <li key={line.id}><button type="button" onClick={() => go({ nav: "work", section: "issue", item: line.epic })}>{words}</button></li>
-        ))}
-      </ul>
+      {/* S11: no epic in the window, and the way to a wider one. */}
+      {rows.length === 0 && !loading && (
+        <div class="timeline-empty" role="status">
+          <span class="strong">{noEpicsWords(range.value)}</span>
+          {last !== undefined && <span class="quiet">{lastJoinedWords(last, now)}</span>}
+          {range.value !== "week" && <button type="button" onClick={() => { range.value = "week"; goToNow(); }}>{showTheWeek}</button>}
+        </div>
+      )}
+      {/* The list of epics (note 36): what a screen reader reads over the plot, and the Timeline itself under 700 px, where
+          a plot of 24 h is not readable. In the order they close; a tap opens the epic's page. */}
+      <div class="timeline-list">
+        <p class="timeline-list-now small"><span class="strong">Now</span> · {new Date(now).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}</p>
+        {loading ? <PlaceholderRows /> : rows.length > 0 && (
+          <ul class="work-rows" aria-label="Epics">
+            {rows.map(({ line, line2 }) => (
+              <li key={line.id}>
+                <button type="button" class="timeline-list-row" style={{ "--c": d.colour(line) }}
+                  aria-label={`${line.title}, ${line.done} of ${line.total} done, ${line2}`}
+                  onClick={() => go({ nav: "work", section: "issue", item: line.epic })}>
+                  <span class="edge" aria-hidden="true" />
+                  <span class="work-row-main">
+                    <span class="title strong">{line.title}</span>
+                    <span class={`quiet small${line.how.how === "waits" ? " waits" : ""}`}>{line2}</span>
+                  </span>
+                  <span class="timeline-list-progress small quiet" aria-hidden="true">
+                    <span class="track"><span class="fill" style={{ width: `${line.total ? Math.round(100 * line.done / line.total) : 0}%` }} /></span>
+                    {line.done} of {line.total}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
@@ -414,7 +465,7 @@ class Drawing {
     const left = this.offset, right = this.offset + this.visible;
     const out = [
       <defs key="defs">
-        <clipPath id="timeline-past"><rect x={-100} y={0} width={nowX + 100} height={height} /></clipPath>
+        <clipPath id="timeline-past"><rect x={-100} y={0} width={Math.max(nowX + 100, 0)} height={height} /></clipPath>
         <clipPath id="timeline-ahead"><rect x={nowX} y={0} width={Math.max(axis.width - nowX + 100, 0)} height={height} /></clipPath>
       </defs>,
       <rect key="plot" class="timeline-ground" x={0} y={0} width={axis.width} height={height} />,
@@ -427,8 +478,9 @@ class Drawing {
     }
     // The releases line: solid to Now, dashed after, the brightest at night.
     out.push(<g key="trunk" class="timeline-trunk">{this.stroke("trunk", `M0,${trunk} L${axis.width},${trunk}`, "var(--timeline-trunk)", 2.5)}</g>);
-    // An epic worked on now: under its line, a glow that breathes, one clock for every working line; with Reduce
-    // Motion, none (the CSS's). The line itself is twice as thick.
+    // An epic a session is in a turn on now (#4265): under its line, a glow that breathes, and its ◐ turns, one
+    // clock for every working line and ring (spinnerClock.ts); with Reduce Motion, neither (the CSS's). The line
+    // itself is twice as thick.
     const working = shown.filter((l) => this.isWorking(l));
     if (working.length > 0) {
       out.push(<g key="breathing" class="timeline-breathing">
@@ -469,11 +521,11 @@ class Drawing {
         }
       }
       if (this.isWorking(l)) {
-        // ◐: a ring at Now, its left half filled.
+        // ◐: a ring at Now, its left half filled; the half turns about the ring's centre.
         out.push(
           <g key={`working ${l.id}`} class="timeline-working" style={{ "--c": c }}>
             <circle cx={nowX} cy={yl} r={5} />
-            <path d={`M${nowX},${yl - 5} A5,5 0 0 0 ${nowX},${yl + 5} Z`} />
+            <path style={{ transformOrigin: `${nowX}px ${yl}px` }} d={`M${nowX},${yl - 5} A5,5 0 0 0 ${nowX},${yl + 5} Z`} />
           </g>,
         );
       }
@@ -540,6 +592,18 @@ class Drawing {
       out.push(this.pill(`tag ${rel.repo}@${rel.tag}`, rel.tag, x, trunk + (free(trunk + 17) ? 17 : -17), "timeline-pill tag"));
     }
     return out;
+  }
+
+  /** S10: grey bars that shimmer where the lanes go, on the window, over the releases line and Now. */
+  placeholders() {
+    const x = this.offset + this.visible * 0.08;
+    return (
+      <g key="placeholders" class="timeline-placeholder">
+        {[[1, 0.55], [-1, 0.4], [2, 0.3], [-2, 0.5]].map(([lane, w], i) => (
+          <rect key={i} x={x + i * this.visible * 0.06} y={this.y(lane!) - 4} width={this.visible * w!} height={8} rx={4} />
+        ))}
+      </g>
+    );
   }
 
   pill(key: string, words: string, x: number, y: number, cls: string) {

@@ -42,6 +42,8 @@ type forgeForgejo interface {
 	CommitTime(ctx context.Context, repo, ref string) (time.Time, error)
 	Compare(ctx context.Context, repo, base, head string) ([]forgejomcp.Commit, error)
 	CommitPR(ctx context.Context, repo, sha string) (int, error)
+	// Releases are a repository's newest releases (#4426).
+	Releases(ctx context.Context, repo string, limit int) ([]forgejomcp.RepoRelease, error)
 	CostComment(ctx context.Context, repo string, number int, id, mark, body string) (string, error)
 	Plan(ctx context.Context, repo string, number int) (forgejomcp.Plan, error)
 	// Blockers are the blockers of a standing epic's children (#4242).
@@ -140,6 +142,7 @@ func (forgejoForge) Caps() forgeCaps {
 		Avatars:     true,
 		CreatedAt:   true, ClosedAt: true,
 		CommentCount: "exact",
+		Releases:     true,
 		Plan:         true, BlockedBy: true, AddChild: true,
 		Reasons: map[string]string{
 			actionTransition: "only a Jira issue or an Azure Boards work item moves by a transition",

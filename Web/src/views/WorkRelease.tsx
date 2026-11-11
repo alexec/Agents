@@ -22,7 +22,7 @@ import { planSessions } from "../model/epicPlan";
 import { allRows, askKey, loadList, workList } from "../model/workLists";
 import { go, routeHash } from "../route";
 import { ErrorStrip, PlaceholderRows, RefreshButton, StateIcon } from "./WorkParts";
-import { Choice, OpenGlyph, ReleaseChip, ReleaseGlyph, SideSection, Stepper, WorkRowView, WorkSession } from "./Work";
+import { Choice, OpenGlyph, ReleaseChip, ReleaseGlyph, SideSection, Stepper, WorkRowView, WorkSession, pictureReader } from "./Work";
 
 const allPulls: WorkFilter = { ...anyFilter, state: "all" };
 
@@ -111,7 +111,7 @@ export function WorkReleasePage({ store, ref }: { store: Store; ref: string }) {
         <button type="button" class="link" onClick={() => { filter.value = allPulls; }}>Clear filters</button></p>
     ) : (
       <ul class="work-rows work-item-rows work-release-pulls">
-        {shown.map((r) => <WorkRowView key={r.node.ref} row={r} several={false} dim={false} pick={(label) => set({ label })} open={() => openPull(r.node.ref)} />)}
+        {shown.map((r) => <WorkRowView key={r.node.ref} row={r} several={false} dim={false} pick={(label) => set({ label })} read={pictureReader(store, r.host)} open={() => openPull(r.node.ref)} />)}
       </ul>
     );
   const pullsFilters = pulls !== undefined && pulls.length > 0 && (

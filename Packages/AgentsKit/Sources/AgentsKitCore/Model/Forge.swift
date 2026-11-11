@@ -151,7 +151,8 @@ public extension DaemonAPI {
     /// (show 50+ there); or `detail`, only on the item's own page (hide it on the row). A string,
     /// so a way a later daemon adds does not break this decoder. `createdAt` and `closedAt` say
     /// its items have those dates; `children`, `linkedPulls` and `events` that an issue's read has
-    /// them (#4373); `total` that it counts a list's items (#4396); each is nil (none) from an
+    /// them (#4373); `total` that it counts a list's items (#4396); `releases` that it has releases
+    /// (#4426); each is nil (none) from an
     /// earlier daemon.
     struct ForgeCapabilities: Codable, Sendable, Hashable {
         public var forge: String
@@ -166,13 +167,14 @@ public extension DaemonAPI {
         public var linkedPulls: Bool?
         public var events: Bool?
         public var total: Bool?
+        public var releases: Bool?
         public var commentCount: String
         public var commentsMost: Int?
 
         public init(forge: String, issues: Bool = false, pulls: Bool = false, labelColors: Bool = false,
                     avatars: Bool = false, stateReason: Bool = false, commentCount: String = "exact",
                     commentsMost: Int? = nil, createdAt: Bool? = nil, closedAt: Bool? = nil, children: Bool? = nil,
-                    linkedPulls: Bool? = nil, events: Bool? = nil, total: Bool? = nil) {
+                    linkedPulls: Bool? = nil, events: Bool? = nil, total: Bool? = nil, releases: Bool? = nil) {
             self.forge = forge
             self.issues = issues
             self.pulls = pulls
@@ -185,6 +187,7 @@ public extension DaemonAPI {
             self.linkedPulls = linkedPulls
             self.events = events
             self.total = total
+            self.releases = releases
             self.commentCount = commentCount
             self.commentsMost = commentsMost
         }
@@ -788,6 +791,9 @@ public extension DaemonAPI.Method {
     static let forgeBoards = "forge/boards"
     /// `ForgeImageRequest` → `ForgeImage` (#4009).
     static let forgeImage = "forge/image"
+    /// `ForgeReleasesRequest` → `ForgeReleases`, `ForgeReleaseRequest` → `ForgeReleaseDetail` (#4426).
+    static let forgeReleases = "forge/releases"
+    static let forgeRelease = "forge/release"
     /// The plan's writes (#3271): `ForgeAddChildRequest` and `ForgeBlockedByRequest` → `ForgeDone`.
     static let forgeAddChild = "forge/add-child"
     static let forgeBlockedBy = "forge/blocked-by"

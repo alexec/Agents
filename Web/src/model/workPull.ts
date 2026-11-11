@@ -3,6 +3,7 @@
 // and Rerun failed), Files changed in the header, the state line, and the Checks page of a 390 px page.
 import type { ForgeAction, ForgeCheck, ForgeItemDetail, ForgeMergeMethod } from "../protocol/generated";
 import { failedChecks, forgeName, mergeTitle, mergeWaits, shortAge } from "./work";
+import { ago } from "./connectorSetup";
 
 /** How a merge box row stands: its glyph's colour. pass is green, fail red, wait amber, info grey. */
 export type MergeSign = "pass" | "fail" | "wait" | "info";
@@ -128,19 +129,24 @@ export const filesChangedWords = (n: number | undefined) => n === undefined ? "F
 /** The side panel's Branch, until the wire has the branches (#4406, missing fields): 6 files. */
 export const branchWords = (n: number | undefined) => n === undefined ? undefined : n === 1 ? "1 file" : `${n} files`;
 
-/** A pull request's state line after its pill, wide and narrow: "sam opened this pull request · updated 2 h ago · 4
- * comments"; merged: "sam's pull request was merged · …"; on a phone: "sam · 2 h · 4 comments". The opened and merged
- * times and the branches come with #4373 and the forge fields. */
-export function pullStateWords(p: { author?: string | undefined; state: string; updated?: Date | undefined; comments: number }, now: Date = new Date()):
-  { wide: string; short: string } {
+/** A pull request's state line after its pill, wide and narrow: "sam opened this pull request 2 hours ago · 4 comments";
+ * merged: "sam's pull request was merged 10 min ago"; on a phone: "sam · 2 h · 4 comments". With no opened or merged time
+ * from the forge (#4373), the last update's: "sam opened this pull request · updated 2 h ago". */
+export function pullStateWords(p: {
+  author?: string | undefined; state: string; updated?: Date | undefined; created?: Date | undefined; closed?: Date | undefined; comments: number;
+}, now: Date = new Date()): { wide: string; short: string } {
   const comments = p.comments > 0 ? [p.comments === 1 ? "1 comment" : `${p.comments} comments`] : [];
-  const age = p.updated ? shortAge(Math.max(0, (now.getTime() - p.updated.getTime()) / 1000)) : undefined;
-  const lead = p.state === "merged" ? (p.author ? `${p.author}’s pull request was merged` : "Merged")
-    : p.state === "closed" ? (p.author ? `${p.author}’s pull request was closed with unmerged commits` : "Closed with unmerged commits")
-    : p.author ? `${p.author} opened this pull request` : undefined;
+  const at = p.state === "open" ? p.created : p.closed;
+  const shortOf = (d: Date) => shortAge(Math.max(0, (now.getTime() - d.getTime()) / 1000));
+  const age = !at && p.updated ? shortOf(p.updated) : undefined;
+  const when = at ? ` ${ago(at, now)}` : "";
+  const lead = p.state === "merged" ? (p.author ? `${p.author}’s pull request was merged${when}` : `Merged${when}`)
+    : p.state === "closed" ? (p.author ? `${p.author}’s pull request was closed with unmerged commits${when}` : `Closed with unmerged commits${when}`)
+    : p.author ? `${p.author} opened this pull request${when}` : undefined;
+  const short = at ?? p.updated;
   return {
     wide: [...lead ? [lead] : [], ...age ? [age === "now" ? "updated now" : `updated ${age} ago`] : [], ...comments].join(" · "),
-    short: [...p.author ? [p.author] : [], ...age ? [age] : [], ...comments].join(" · "),
+    short: [...p.author ? [p.author] : [], ...short ? [shortOf(short)] : [], ...comments].join(" · "),
   };
 }
 

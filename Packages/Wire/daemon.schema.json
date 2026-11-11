@@ -7436,13 +7436,10 @@
     "DiskThresholds": {
       "type": "object",
       "properties": {
-        "lowGB": {
-          "type": "integer"
-        },
         "lowPercent": {
           "type": "integer"
         },
-        "criticalGB": {
+        "criticalPercent": {
           "type": "integer"
         }
       },
@@ -10082,7 +10079,7 @@
     },
     "ForgeCapabilities": {
       "type": "object",
-      "description": "What one forge on a list's page fills (#4329, #4361), so a client hides what it does not: issues and pulls say it has them; labelColors that its labels have a #rrggbb colour; avatars that its items have authorAvatar; stateReason that its closed issues have stateReason. createdAt that its items have createdAt, and closedAt that its closed and merged items have closedAt; children, linkedPulls and events that an item's read has them (#4373); total that it counts a list's items, for ForgeList.total (#4396); each is absent from an earlier daemon, which has none. commentCount says how to read ForgeItem.comments: exact; capped at commentsMost (show 50+ there); or detail, only on an item's own page (hide it on the row).",
+      "description": "What one forge on a list's page fills (#4329, #4361), so a client hides what it does not: issues and pulls say it has them; labelColors that its labels have a #rrggbb colour; avatars that its items have authorAvatar; stateReason that its closed issues have stateReason. createdAt that its items have createdAt, and closedAt that its closed and merged items have closedAt; children, linkedPulls and events that an item's read has them (#4373); total that it counts a list's items, for ForgeList.total (#4396); releases that it has releases, for forge/releases and forge/release (#4426); each is absent from an earlier daemon, which has none. commentCount says how to read ForgeItem.comments: exact; capped at commentsMost (show 50+ there); or detail, only on an item's own page (hide it on the row).",
       "properties": {
         "forge": {
           "type": "string"
@@ -10118,6 +10115,9 @@
           "type": "boolean"
         },
         "total": {
+          "type": "boolean"
+        },
+        "releases": {
           "type": "boolean"
         },
         "commentCount": {
@@ -11087,6 +11087,182 @@
         "done",
         "total"
       ],
+      "additionalProperties": false
+    },
+    "ForgeRelease": {
+      "type": "object",
+      "description": "A release on a forge (#4426). node is its lineage node (kind release, ref <forge>:<repo>/release/<tag>), which forge/release reads and lineage keys its cost by. repo is the repo as the forge names it, and folder a folder on it. latest is the repo's newest published release that is neither a draft nor a pre-release. publishedAt is absent on a draft; author and authorAvatar when the forge says them; assets is how many files it has.",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "forge": {
+          "type": "string"
+        },
+        "repo": {
+          "type": "string"
+        },
+        "folder": {
+          "type": "string"
+        },
+        "tag": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "draft": {
+          "type": "boolean"
+        },
+        "prerelease": {
+          "type": "boolean"
+        },
+        "latest": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "publishedAt": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "authorAvatar": {
+          "type": "string"
+        },
+        "assets": {
+          "type": "integer"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "node",
+        "forge",
+        "repo",
+        "tag",
+        "name",
+        "draft",
+        "prerelease",
+        "latest",
+        "assets",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeReleaseDetail": {
+      "type": "object",
+      "description": "forge/release (#4426): a release, the release before it (previous, its tag; absent for the first), how many commits are between the two (commits, at most what the forge's compare gives) and the pull requests they merged, from each squash commit's (#n) or (!n), oldest first. compareUrl is the forge's page of the range.",
+      "properties": {
+        "release": {
+          "$ref": "#/definitions/ForgeRelease"
+        },
+        "previous": {
+          "type": "string"
+        },
+        "compareUrl": {
+          "type": "string"
+        },
+        "commits": {
+          "type": "integer"
+        },
+        "pulls": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ForgeReleasePull"
+          }
+        }
+      },
+      "required": [
+        "release",
+        "commits",
+        "pulls"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeReleasePull": {
+      "type": "object",
+      "description": "A pull request in a release (#4426): its node, its number, and its title as its squash commit says it, with the (#n) taken off; sha is the commit.",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "number": {
+          "type": "integer"
+        },
+        "title": {
+          "type": "string"
+        },
+        "sha": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "node",
+        "number",
+        "title",
+        "sha"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeReleaseRequest": {
+      "type": "object",
+      "description": "forge/release (#4426): a release's lineage node, as ForgeRelease.node says it.",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/LineageNode"
+        }
+      },
+      "required": [
+        "node"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeReleases": {
+      "type": "object",
+      "description": "forge/releases (#4426): the releases of the folders' repos, newest first (a draft, which has no publishedAt, by createdAt). none are the forges in reach that have no releases, and why, so a client says so (Linear and Jira have no releases); errors are the forges that could not be read.",
+      "properties": {
+        "releases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ForgeRelease"
+          }
+        },
+        "none": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ForgeListError"
+          }
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ForgeListError"
+          }
+        }
+      },
+      "required": [
+        "releases"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeReleasesRequest": {
+      "type": "object",
+      "description": "forge/releases (#4426): the releases of every folder's repo on this machine, or of one folder's, at most limit (1 to 100, 30 when absent) of each repo.",
+      "properties": {
+        "folder": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer"
+        }
+      },
       "additionalProperties": false
     },
     "ForgeStanding": {
@@ -12445,6 +12621,10 @@
           "type": "string",
           "description": "An issue's epic, by ref, as the forge's plan says it (#3562)."
         },
+        "milestone": {
+          "type": "string",
+          "description": "An issue's milestone, by name, as the forge's lists last said it (#4620). Kept once known, so a closed issue keeps it."
+        },
         "endedAt": {
           "$ref": "#/definitions/WireDate",
           "description": "When a PR ended (#2351): merged, closed or reverted. Absent while open."
@@ -12834,10 +13014,13 @@
     },
     "LineageForecast": {
       "type": "object",
-      "description": "lineage/forecast (#4526; the method is specs/4533-forecasting/spec.md): what comes next, from this machine's totals. landings is the issues (not epics) that landed with a merged PR in the window of windowDays (14) before at, in the epic's repo when a node is asked for, else in every repo. lands is when the epic lands; noForecast says why there is none (too little history, too few closed epics, nothing open). toComplete is the epic's estimate to complete, once three of its children closed with an estimate kept at their start. kept is the forecast kept on the epic's node, the first one made, so it can be scored when the epic lands. spend is what a week and a month cost at the window's pace, burn is each weekly allowance's pace, and serviceLevels is how long each level's issues took. Every figure says its window; a range is a probability, not a promise.",
+      "description": "lineage/forecast (#4526; the method is specs/4533-forecasting/spec.md): what comes next, from this machine's totals. landings is the issues (not epics) that landed with a merged PR in the window of windowDays (14) before at, in the epic's repo when a node is asked for, else in every repo. milestone is the milestone asked for (#4620), whose landings are its repo's. lands is when the epic or the milestone lands; noForecast says why there is none (too little history, too few closed epics, nothing open). toComplete is the epic's estimate to complete, once three of its children closed with an estimate kept at their start. kept is the forecast kept on the epic's node, the first one made, so it can be scored when the epic lands. spend is what a week and a month cost at the window's pace, burn is each weekly allowance's pace, and serviceLevels is how long each level's issues took. Every figure says its window; a range is a probability, not a promise.",
       "properties": {
         "node": {
           "$ref": "#/definitions/LineageNode"
+        },
+        "milestone": {
+          "type": "string"
         },
         "at": {
           "$ref": "#/definitions/WireDate"
@@ -12960,8 +13143,11 @@
     },
     "LineageForecastLands": {
       "type": "object",
-      "description": "When an epic lands (#4526, method H of specs/4533-forecasting/spec.md): a Monte Carlo of 1,000 draws with a fixed seed, each resampling hours of the window and keeping each landing in an hour with the chance share, until the open children are done. p50 and p85 are dates. share is the median share of the folder's landings that the closed epics had over their lives, from groups of them. open and closed are the children as the plan says now, with no growth for children not filed yet; stepsLeft is the blocked-by steps of the open ones, as context only: they do not enter the dates.",
+      "description": "When an epic lands (#4526, method H of specs/4533-forecasting/spec.md): a Monte Carlo of 1,000 draws with a fixed seed, each resampling hours of the window and keeping each landing in an hour with the chance share, until the open children are done. p50 and p85 are dates. share is the median share of the folder's landings that the closed epics had over their lives, from groups of them. open and closed are the children as the plan says now, with no growth for children not filed yet; stepsLeft is the blocked-by steps of the open ones, as context only: they do not enter the dates. For a milestone (#4620), open and closed are its items in the store, the share is the closed milestones', stepsLeft is 0, and growing says that less than half of its items have landed, so its scope is still growing (a milestone grows about 5× after its first issue): the dates are a floor.",
       "properties": {
+        "growing": {
+          "type": "boolean"
+        },
         "p50": {
           "$ref": "#/definitions/WireDate"
         },
@@ -12997,10 +13183,18 @@
     },
     "LineageForecastRequest": {
       "type": "object",
-      "description": "lineage/forecast (#4526): an epic, for when it lands and its estimate to complete; without one, only the spend, the burn and the service levels, over every repo.",
+      "description": "lineage/forecast (#4526): an epic, for when it lands and its estimate to complete; or a milestone (#4620), by name, for when it lands, in folder's repo (any repo without one); without either, only the spend, the burn and the service levels, over every repo.",
       "properties": {
         "node": {
           "$ref": "#/definitions/LineageNode"
+        },
+        "milestone": {
+          "type": "string",
+          "description": "A milestone's name (#4620): its items are the store's issues in it. Not with node."
+        },
+        "folder": {
+          "type": "string",
+          "description": "The folder whose repo the milestone is in."
         }
       },
       "additionalProperties": false
@@ -23727,6 +23921,30 @@
       ],
       "additionalProperties": false
     },
+    "ReportForecastScore": {
+      "type": "object",
+      "description": "How the kept landing forecasts scored (#4528): of the epics that landed in the range with a forecast kept on their node (lineage/forecast's first one, #4526), how many landed by its P50 date and by its P85 date. A good P85 holds about 85% of the time, and a P50 about half. errorDays is the median of how many days the P50 date was off by. An epic lands when the last PR of it or its children merges.",
+      "properties": {
+        "epics": {
+          "type": "integer"
+        },
+        "p50Held": {
+          "type": "integer"
+        },
+        "p85Held": {
+          "type": "integer"
+        },
+        "errorDays": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "epics",
+        "p50Held",
+        "p85Held"
+      ],
+      "additionalProperties": false
+    },
     "ReportFormat": {
       "type": "string",
       "enum": [
@@ -24188,6 +24406,17 @@
         },
         "estimateError": {
           "$ref": "#/definitions/ReportEstimateError"
+        },
+        "forecastScore": {
+          "$ref": "#/definitions/ReportForecastScore",
+          "description": "How the kept landing forecasts of the epics that landed in the range scored (#4528); absent when none had one."
+        },
+        "openEpics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LineageNode"
+          },
+          "description": "The open epics in the scope (#4528), the most recently changed first, at most 20, so Reports ▸ Planning can ask lineage/forecast when each lands."
         },
         "issues": {
           "type": "array",
@@ -32700,6 +32929,10 @@
         "backgroundHours": {
           "type": "integer",
           "description": "How long a finished runtime whose background processes (a dev server, a build, a watcher) still run is kept, counted from its last turn's end (#4044): 1 to 24 hours, default 4. Its processes are then ended with it. 0, or missing, from a client that does not know it, keeps the value the host has."
+        },
+        "releaseAfterMinutes": {
+          "type": "integer",
+          "description": "How long a finished runtime with no background processes is kept, counted from its last turn's end, before the host ends it (#4044, #4513): 0 to 1440 minutes, default 10. An agent that waits for an event (wait_for_event, check_again, a lease) is then continued with session/load when the event comes. 0 releases none for being idle; warmRuntimes still holds. Missing, from a client that does not know it, keeps the value the host has. A runtime that can neither load nor resume a conversation is kept while its agent waits."
         }
       },
       "required": [
@@ -32941,7 +33174,7 @@
     },
     "WorkTimelineChild": {
       "type": "object",
-      "description": "A child of an epic in work/timeline (#4172). stateReason is completed or not_planned, where the forge says it. startedAt is the earliest of the first session linked to it in lineage, the opening of the first pull request that closes it, and its close; absent while nothing has started it. waitsForPerson: it is open and labelled alex-todo or needs-account, so it is not forecast. forecastAt is an open child's forecast close: its epic's P50 shared out along the line, in the order of the children.",
+      "description": "A child of an epic in work/timeline (#4172). item has its labels with their colours, for the hover card's chips (#4428). stateReason is completed or not_planned, where the forge says it. startedAt is the earliest of the first session linked to it in lineage, the opening of the first pull request that closes it, and its close; absent while nothing has started it. waitsForPerson: it is open and labelled alex-todo or needs-account, so it is not forecast. forecastAt is an open child's forecast close: its epic's P50 shared out along the line, in the order of the children.",
       "properties": {
         "item": {
           "$ref": "#/definitions/ForgeItem"

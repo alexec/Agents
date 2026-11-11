@@ -2,6 +2,7 @@ package agentsd
 
 import (
 	"context"
+	"errors"
 	"sort"
 	"time"
 
@@ -12,12 +13,19 @@ import (
 // lineage/forecast (#4526): when an epic lands, its estimate to complete, the spend and the
 // service levels from this machine's totals (lineage.ForecastOf), and each weekly allowance's
 // burn from allowances.json. An epic's first landing forecast is kept on its node, so a report
-// can score it when the epic lands.
+// can score it when the epic lands. A milestone (#4620) is forecast from the store's issues
+// in it, in its folder's repo; nothing is kept for it, since a milestone has no node.
 
 // allowanceWeek is how long a weekly allowance's window is.
 const allowanceWeek = 7 * 24 * time.Hour
 
 func (d *Daemon) lineageForecast(ctx context.Context, r wire.LineageForecastRequest) (wire.LineageForecast, error) {
+	if milestone := deref(r.Milestone); milestone != "" {
+		if r.Node != nil {
+			return wire.LineageForecast{}, errors.New("lineage/forecast: a node or a milestone, not both")
+		}
+		return d.milestoneForecast(milestone, deref(r.Folder)), nil
+	}
 	var children []lineage.EpicChild
 	isEpic := false
 	if r.Node != nil {
@@ -32,13 +40,7 @@ func (d *Daemon) lineageForecast(ctx context.Context, r wire.LineageForecastRequ
 		}
 	}
 	now := nowFunc()
-	d.lineageSettle(2 * time.Second)
-	d.workMu.Lock()
-	d.refreshCostLinksLocked()
-	d.refreshCostResolvedLocked()
-	d.keepEstimatesLocked()
-	nodes := ledgerNodes(d.costLedgerLocked())
-	d.workMu.Unlock()
+	nodes := d.forecastNodes()
 	f := lineage.ForecastOf(nodes, r.Node, isEpic, children, now)
 	// The overhead, loaded into the cost as "about $165 all in" (#4524).
 	lineage.LoadForecast(&f, lineage.Overhead(nodes, now))
@@ -47,6 +49,34 @@ func (d *Daemon) lineageForecast(ctx context.Context, r wire.LineageForecastRequ
 	}
 	f.Burn = d.allowanceBurn(now)
 	return f, nil
+}
+
+// milestoneForecast is when the milestone named lands, in folder's repo (any for none).
+func (d *Daemon) milestoneForecast(milestone, folder string) wire.LineageForecast {
+	repo := ""
+	if folder != "" {
+		if r := d.folderRepo(folder); r.forge != "" {
+			repo = r.forge + ":" + r.path
+		}
+	}
+	now := nowFunc()
+	nodes := d.forecastNodes()
+	f := lineage.MilestoneForecastOf(nodes, milestone, repo, now)
+	lineage.LoadForecast(&f, lineage.Overhead(nodes, now))
+	f.Burn = d.allowanceBurn(now)
+	return f
+}
+
+// forecastNodes is the store's nodes, with the links, the resolved labels and the estimates
+// brought up to date first.
+func (d *Daemon) forecastNodes() []wire.LineageCostNode {
+	d.lineageSettle(2 * time.Second)
+	d.workMu.Lock()
+	defer d.workMu.Unlock()
+	d.refreshCostLinksLocked()
+	d.refreshCostResolvedLocked()
+	d.keepEstimatesLocked()
+	return ledgerNodes(d.costLedgerLocked())
 }
 
 // keepForecast keeps kept on the node at k when it has none yet, marking it unsent, and is

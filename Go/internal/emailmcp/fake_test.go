@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -117,6 +118,8 @@ func (f *fakeMail) asked() (searched, fetched int) {
 }
 
 // newFakeMail is a mailbox with INBOX and Archive. caps nil is IMAP4rev2 (IDLE and MOVE).
+// Caps without IDLE give a server with no IDLE, though go-imap's server says IDLE to every
+// IMAP4rev1 client once it is signed in (#4661).
 func newFakeMail(t *testing.T, caps imap.CapSet) *fakeMail {
 	t.Helper()
 	user := imapmemserver.NewUser(fakeUser, fakePassword)
@@ -141,10 +144,38 @@ func newFakeMail(t *testing.T, caps imap.CapSet) *fakeMail {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if !caps.Has(imap.CapIdle) {
+		ln = noIdleListener{ln}
+	}
 	go func() { _ = server.Serve(ln) }()
 	t.Cleanup(func() { _ = server.Close() })
 	f.address = ln.Addr().String()
 	return f
+}
+
+// noIdleListener takes IDLE out of what its server says it can do.
+type noIdleListener struct{ net.Listener }
+
+func (l noIdleListener) Accept() (net.Conn, error) {
+	c, err := l.Listener.Accept()
+	if err != nil {
+		return nil, err
+	}
+	return noIdleConn{c}, nil
+}
+
+type noIdleConn struct{ net.Conn }
+
+var idleCap = regexp.MustCompile(`(CAPABILITY[^\r\n]*?) IDLE\b`)
+
+func (c noIdleConn) Write(b []byte) (int, error) {
+	if !idleCap.Match(b) {
+		return c.Conn.Write(b)
+	}
+	if _, err := c.Conn.Write(idleCap.ReplaceAll(b, []byte("$1"))); err != nil {
+		return 0, err
+	}
+	return len(b), nil
 }
 
 func (f *fakeMail) account() (Account, error) {

@@ -63,7 +63,7 @@ func TestALinkedAgentsFolderIsRefused(t *testing.T) {
 		t.Fatal(err)
 	}
 	folder := store.FolderURL(dir)
-	if e := c.callError(t, 2, "folders/setDiskSpace", map[string]any{"folder": folder, "diskSpace": map[string]any{"lowGB": 50, "criticalGB": 2}}); !strings.Contains(e.Message, "is a link or a file") {
+	if e := c.callError(t, 2, "folders/setDiskSpace", map[string]any{"folder": folder, "diskSpace": map[string]any{"lowPercent": 30, "criticalPercent": 1}}); !strings.Contains(e.Message, "is a link or a file") {
 		t.Fatal(e.Message)
 	}
 	if err := d.writePins(pinsFile{pins: []pinEntry{{path: "x.md"}}}, dir); err == nil || !strings.Contains(err.Error(), "is a link or a file") {

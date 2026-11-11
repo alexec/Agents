@@ -113,6 +113,17 @@ Decided: method H (hourly throughput, 14-day window, past groups' median share, 
 
 Decided: milestones go in #4620, not in #4526, because their membership must first be kept in the store, which is a change of its own. Alex can overrule.
 
+## Milestones (#4620)
+
+- **Kept:** an issue's milestone is kept on its cost node (`LineageCostNode.milestone`), from the forge lists that fill the resolve cache, once known. A list without a milestone does not clear it. The control plane keeps the newest copy's, as for the epic.
+- **Asked for:** `lineage/forecast` with `milestone` (a name) and `folder` (its repo; without one, the repo the milestone's items are in). Not with `node`.
+- **Items:** the store's issues in the milestone, in that repo, not epics. An item is done when it landed or closed.
+- **Share:** the median share of the closed milestones (all their items in the store done), as an epic's, from 5 or more. Nothing is kept for scoring: a milestone has no node.
+- **Growing:** with less than half of its items done, `lands.growing` says the scope is still growing, so the dates are a floor.
+- **Only issues the forge lists showed:** a milestone's item that no list has shown since #4620 is not in it. The share gets better as the lists show more closed issues.
+
+Decided: no forecast is kept for a milestone, because the store has no node for one and #4529 reads the P85 live. Alex can overrule.
+
 ## The overhead, loaded in (#4524)
 
 - **Linked where it can be:** a turn with no work that started sessions goes on their work, so a Scrum Master's turn that starts a lead or a lane goes on that epic or issue. A workflow run started by a PR's `checks.*` or `pr.*` event (fix-failed-checks) works on that PR until it merges. A session labelled with a version tag (`v1.2.0`) works on that release, and the release's rollup counts it. The merge wave labels itself `P#<n>` for each PR it lands; the release labels itself `v<next>`.

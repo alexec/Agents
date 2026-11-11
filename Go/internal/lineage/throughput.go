@@ -51,11 +51,11 @@ const (
 	NoForecastTooSlow   = "more than a year at this pace"
 )
 
-// Landing is an issue that landed: History's, with its repo, epic and level.
+// Landing is an issue that landed: History's, with its repo, epic, milestone and level.
 type Landing struct {
 	Past
-	Repo, Parent string
-	At           time.Time
+	Repo, Parent, Milestone string
+	At                      time.Time
 }
 
 // Landings is the issues in nodes that landed with a merged PR, no epic (labelled one, or
@@ -79,6 +79,7 @@ func Landings(nodes []wire.LineageCostNode) []Landing {
 		if n.Parent != nil {
 			l.Parent = *n.Parent
 		}
+		l.Milestone = deref(n.Milestone)
 		out = append(out, l)
 	}
 	slices.SortStableFunc(out, func(a, b Landing) int { return a.At.Compare(b.At) })
@@ -138,31 +139,40 @@ func EpicShares(nodes []wire.LineageCostNode, landings []Landing, not string) []
 		if !have && slices.ContainsFunc(kids[ref], func(n wire.LineageCostNode) bool { return !closed(n) }) {
 			continue
 		}
-		start, end := mine[0].At, mine[0].At
-		for _, l := range mine {
-			start, end = minTime(start, l.At), laterOf(end, l.At)
-		}
 		starts := kids[ref]
 		if have {
 			starts = append(slices.Clone(starts), epic)
 		}
-		for _, n := range starts {
-			if s := StartOf(n); s != nil {
-				start = minTime(start, s.Time())
-			}
-		}
-		start, end = start.Truncate(time.Hour), end.Truncate(time.Hour).Add(time.Hour)
-		all := 0
-		for _, l := range inRepo(landings, mine[0].Repo) {
-			if !l.At.Before(start) && l.At.Before(end) {
-				all++
-			}
-		}
-		if all > 0 {
-			shares = append(shares, float64(len(mine))/float64(all))
+		if share, ok := groupShare(mine, starts, landings); ok {
+			shares = append(shares, share)
 		}
 	}
 	return shares
+}
+
+// groupShare is a group's landings, mine, over all of its repo's landings from its start (the
+// first work on one of starts, else its first landing) to its last landing, by the hour.
+func groupShare(mine []Landing, starts []wire.LineageCostNode, landings []Landing) (float64, bool) {
+	start, end := mine[0].At, mine[0].At
+	for _, l := range mine {
+		start, end = minTime(start, l.At), laterOf(end, l.At)
+	}
+	for _, n := range starts {
+		if s := StartOf(n); s != nil {
+			start = minTime(start, s.Time())
+		}
+	}
+	start, end = start.Truncate(time.Hour), end.Truncate(time.Hour).Add(time.Hour)
+	all := 0
+	for _, l := range inRepo(landings, mine[0].Repo) {
+		if !l.At.Before(start) && l.At.Before(end) {
+			all++
+		}
+	}
+	if all == 0 {
+		return 0, false
+	}
+	return float64(len(mine)) / float64(all), true
 }
 
 func minTime(a, b time.Time) time.Time {
@@ -235,16 +245,8 @@ func ForecastOf(nodes []wire.LineageCostNode, epic *wire.LineageNode, isEpic boo
 	if epic != nil {
 		repo = repoOf(nodes, *epic, children)
 	}
-	landings := inRepo(all, repo)
-	f := wire.LineageForecast{Node: epic, At: wire.DateOf(now), WindowDays: int64(ThroughputWindow / (24 * time.Hour)),
-		Burn: []wire.LineageForecastBurn{}, ServiceLevels: ServiceLevels(landings, now)}
-	bins, enough := HourBins(landings, now)
-	for _, n := range bins {
-		f.Landings += int64(n)
-	}
-	if enough {
-		f.Spend = Spend(landings, now)
-	}
+	f, bins, enough := forecastIn(inRepo(all, repo), now)
+	f.Node = epic
 	if epic == nil {
 		return f
 	}
@@ -286,6 +288,21 @@ func ForecastOf(nodes []wire.LineageCostNode, epic *wire.LineageNode, isEpic boo
 	f.Lands = &wire.LineageForecastLands{P50: at(p50), P85: at(p85), Open: open, Closed: closed,
 		StepsLeft: int64(len(steps)), Share: share, Groups: int64(len(shares))}
 	return f
+}
+
+// forecastIn is what every forecast says from landings at now: the window's landings, the
+// service levels and, with enough history, the spend; and the window's hours.
+func forecastIn(landings []Landing, now time.Time) (wire.LineageForecast, []int, bool) {
+	f := wire.LineageForecast{At: wire.DateOf(now), WindowDays: int64(ThroughputWindow / (24 * time.Hour)),
+		Burn: []wire.LineageForecastBurn{}, ServiceLevels: ServiceLevels(landings, now)}
+	bins, enough := HourBins(landings, now)
+	for _, n := range bins {
+		f.Landings += int64(n)
+	}
+	if enough {
+		f.Spend = Spend(landings, now)
+	}
+	return f, bins, enough
 }
 
 // repoOf is the repo of an epic: its node's, else a child's; "" when the store has neither.

@@ -33,10 +33,10 @@ func idleFor(id string, ago time.Duration) warmEntry {
 // At the cap, the least recently used goes first.
 func TestWarmPoolReleasesTheLeastRecentlyUsedAtTheCap(t *testing.T) {
 	es := []warmEntry{idleFor("a", 4*time.Minute), idleFor("b", 1*time.Minute), idleFor("c", 3*time.Minute), idleFor("d", 2*time.Minute)}
-	if got := released(warmDecide(es, warmT0, 3, 4)); !slices.Equal(got, []string{"a"}) {
+	if got := released(warmDecide(es, warmT0, 3, 4, warmIdle)); !slices.Equal(got, []string{"a"}) {
 		t.Fatalf("released %v, want a", got)
 	}
-	if got := released(warmDecide(es, warmT0, 2, 4)); !slices.Equal(got, []string{"a", "c"}) {
+	if got := released(warmDecide(es, warmT0, 2, 4, warmIdle)); !slices.Equal(got, []string{"a", "c"}) {
 		t.Fatalf("released %v, want a and c", got)
 	}
 }
@@ -44,7 +44,7 @@ func TestWarmPoolReleasesTheLeastRecentlyUsedAtTheCap(t *testing.T) {
 // A finished runtime goes after 10 minutes idle, under the cap too.
 func TestWarmPoolReleasesAfterTenMinutesIdle(t *testing.T) {
 	es := []warmEntry{idleFor("old", warmIdle), idleFor("new", warmIdle-time.Second)}
-	got := warmDecide(es, warmT0, 3, 4)
+	got := warmDecide(es, warmT0, 3, 4, warmIdle)
 	if len(got) != 1 || got[0].id != "old" || got[0].background || got[0].why != "10 min idle" {
 		t.Fatalf("released %+v", got)
 	}
@@ -53,10 +53,10 @@ func TestWarmPoolReleasesAfterTenMinutesIdle(t *testing.T) {
 // Prewarms under way count against the cap, and are never released for it.
 func TestWarmPoolCapHoldsWithPrewarmsUnderWay(t *testing.T) {
 	es := []warmEntry{{id: "p1", prewarming: true}, {id: "p2", prewarming: true}, idleFor("idle", time.Minute)}
-	if got := released(warmDecide(es, warmT0, 2, 4)); !slices.Equal(got, []string{"idle"}) {
+	if got := released(warmDecide(es, warmT0, 2, 4, warmIdle)); !slices.Equal(got, []string{"idle"}) {
 		t.Fatalf("released %v, want idle", got)
 	}
-	if got := released(warmDecide(es, warmT0, 3, 4)); len(got) != 0 {
+	if got := released(warmDecide(es, warmT0, 3, 4, warmIdle)); len(got) != 0 {
 		t.Fatalf("released %v under the cap", got)
 	}
 }
@@ -66,10 +66,10 @@ func TestWarmPoolCapHoldsWithPrewarmsUnderWay(t *testing.T) {
 func TestWarmPoolKeepsABackgroundRuntimeUntilItsHours(t *testing.T) {
 	bg := warmEntry{id: "bg", lastUsed: warmT0.Add(-3 * time.Hour), background: true}
 	es := []warmEntry{bg, idleFor("a", time.Minute)}
-	if got := warmDecide(es, warmT0, 1, 4); len(got) != 0 {
+	if got := warmDecide(es, warmT0, 1, 4, warmIdle); len(got) != 0 {
 		t.Fatalf("released %+v at 3 h with a cap of 1", got)
 	}
-	got := warmDecide(es, warmT0.Add(time.Hour), 1, 4)
+	got := warmDecide(es, warmT0.Add(time.Hour), 1, 4, warmIdle)
 	if len(got) != 2 || got[0].id != "bg" || !got[0].background || got[0].why != "4 h idle" {
 		t.Fatalf("released %+v at 4 h", got)
 	}
@@ -78,10 +78,10 @@ func TestWarmPoolKeepsABackgroundRuntimeUntilItsHours(t *testing.T) {
 // Once its last process ends, the 10 minutes start then.
 func TestWarmPoolReleasesTenMinutesAfterTheLastProcessEnds(t *testing.T) {
 	e := warmEntry{id: "bg", lastUsed: warmT0.Add(-2 * time.Hour), quietSince: warmT0}
-	if got := warmDecide([]warmEntry{e}, warmT0.Add(warmIdle-time.Second), 3, 4); len(got) != 0 {
+	if got := warmDecide([]warmEntry{e}, warmT0.Add(warmIdle-time.Second), 3, 4, warmIdle); len(got) != 0 {
 		t.Fatalf("released %+v before 10 minutes", got)
 	}
-	if got := warmDecide([]warmEntry{e}, warmT0.Add(warmIdle), 3, 4); len(got) != 1 || got[0].background {
+	if got := warmDecide([]warmEntry{e}, warmT0.Add(warmIdle), 3, 4, warmIdle); len(got) != 1 || got[0].background {
 		t.Fatalf("released %+v at 10 minutes", got)
 	}
 }
@@ -89,7 +89,7 @@ func TestWarmPoolReleasesTenMinutesAfterTheLastProcessEnds(t *testing.T) {
 // A cap of 0 turns the pool off: every idle runtime goes, one with background processes stays.
 func TestWarmPoolCapOfZero(t *testing.T) {
 	es := []warmEntry{idleFor("a", 0), idleFor("b", time.Second), {id: "bg", lastUsed: warmT0, background: true}}
-	if got := released(warmDecide(es, warmT0, 0, 4)); !slices.Equal(got, []string{"a", "b"}) {
+	if got := released(warmDecide(es, warmT0, 0, 4, warmIdle)); !slices.Equal(got, []string{"a", "b"}) {
 		t.Fatalf("released %v", got)
 	}
 }
@@ -301,5 +301,149 @@ func TestPrewarmStartsTheRuntimeQuietly(t *testing.T) {
 	time.Sleep(300 * time.Millisecond)
 	if n := startsIn(starts); n != 2 {
 		t.Fatalf("%d starts with the pool off", n)
+	}
+}
+
+// releaseAfterMinutes is how long an idle runtime stays (#4513): 0 releases none for being
+// idle, and the cap still holds; a kept runtime neither counts against the cap nor goes.
+func TestWarmPoolReleaseAfterMinutes(t *testing.T) {
+	es := []warmEntry{idleFor("a", 30*time.Minute), idleFor("b", 5*time.Minute), idleFor("c", time.Minute)}
+	if got := released(warmDecide(es, warmT0, 3, 4, 20*time.Minute)); !slices.Equal(got, []string{"a"}) {
+		t.Fatalf("released %v at 20 minutes", got)
+	}
+	if got := released(warmDecide(es, warmT0, 3, 4, 0)); len(got) != 0 {
+		t.Fatalf("released %v with the release off", got)
+	}
+	if got := released(warmDecide(es, warmT0, 2, 4, 0)); !slices.Equal(got, []string{"a"}) {
+		t.Fatalf("released %v over the cap with the release off", got)
+	}
+	kept := warmEntry{id: "kept", lastUsed: warmT0.Add(-2 * time.Hour), kept: true}
+	if got := released(warmDecide(append(es, kept), warmT0, 1, 4, warmIdle)); !slices.Equal(got, []string{"a", "b"}) {
+		t.Fatalf("released %v with a kept runtime", got)
+	}
+}
+
+// The minutes are 0 to 1440, 10 when missing, and a client that does not send them (no
+// client shows them) keeps them; 0 is kept as 0.
+func TestReleaseAfterMinutesClamped(t *testing.T) {
+	for _, c := range []struct {
+		in   *int64
+		want int64
+	}{{nil, 10}, {new(int64(0)), 0}, {new(int64(-5)), 0}, {new(int64(30)), 30}, {new(int64(9999)), 1440}} {
+		got := clampWake(wire.WakeSettings{ReleaseAfterMinutes: c.in})
+		if *got.ReleaseAfterMinutes != c.want {
+			t.Fatalf("%v: %d, want %d", c.in, *got.ReleaseAfterMinutes, c.want)
+		}
+	}
+	w := &waker{file: filepath.Join(t.TempDir(), "wake.json"), hold: func() (func(), error) { return func() {}, nil }, tell: func(wire.WakeState) {}}
+	w.settings = new(defaultWake())
+	if got := w.Set(wire.WakeSettings{KeepsAwake: true, WarmRuntimes: 3, ReleaseAfterMinutes: new(int64(0))}); *got.ReleaseAfterMinutes != 0 {
+		t.Fatalf("set %d", *got.ReleaseAfterMinutes)
+	}
+	if got := w.Set(wire.WakeSettings{KeepsAwake: true, WarmRuntimes: 2}); *got.ReleaseAfterMinutes != 0 {
+		t.Fatalf("a client without the minutes set them to %d", *got.ReleaseAfterMinutes)
+	}
+	if s := readWakeSettings(w.file); *s.ReleaseAfterMinutes != 0 {
+		t.Fatalf("read back %d", *s.ReleaseAfterMinutes)
+	}
+	if got := releaseAfterOf(wire.WakeSettings{}); got != warmIdle {
+		t.Fatalf("missing is %s", got)
+	}
+}
+
+// waitIdle has a warm agent wait on branch.moved, its wait_for_event call over, and the pool's
+// clock moved past the release.
+func waitIdle(t *testing.T, d *Daemon, id wire.UUID) {
+	t.Helper()
+	was := eventHoldLimit
+	eventHoldLimit = 200 * time.Millisecond
+	t.Cleanup(func() { eventHoldLimit = was })
+	m := appClient(t, d, id)
+	m.post("initialize", map[string]any{}, 1)
+	if text, _ := m.tool(2, "wait_for_event", map[string]any{"events": "branch.moved", "where": map[string]any{"branch": []string{"cd"}}, "until_minutes": 60}); !strings.HasPrefix(text, "Still waiting for ") {
+		t.Fatal(text)
+	}
+	later := time.Now().Add(warmIdle + time.Minute)
+	warmNow = func() time.Time { return later }
+	t.Cleanup(func() { warmNow = time.Now })
+}
+
+// An agent that waits past releaseAfterMinutes has no runtime; its ACP session id is kept,
+// and the event's turn starts one that continues the same conversation with session/load
+// (#4513).
+func TestAWaitingAgentsRuntimeIsReleasedAndTheEventContinuesIt(t *testing.T) {
+	fakeRuntimes(t)
+	t.Setenv("AGENTS_FAKE_CONTINUE", "load")
+	starts := filepath.Join(t.TempDir(), "starts")
+	t.Setenv("AGENTS_FAKE_STARTS", starts)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := t.TempDir()
+	id := warmAgent(t, d, c, dir)
+	l := d.live(id)
+	l.mu.Lock()
+	pid := l.session.Pid()
+	l.mu.Unlock()
+	waitIdle(t, d, id)
+
+	d.warmPass()
+	l.mu.Lock()
+	gone := l.session == nil
+	l.mu.Unlock()
+	if !gone {
+		t.Fatal("the waiting agent's runtime was kept")
+	}
+	waitFor(t, "the runtime's process to end", func() bool { return syscall.Kill(pid, 0) != nil })
+	a := d.Store.Agent(id)
+	if a.RuntimeSessionID == nil || *a.RuntimeSessionID != "fake-session" || waitOf(a) == nil {
+		t.Fatalf("session %v, wait %+v", a.RuntimeSessionID, a.EventWait)
+	}
+
+	d.raise(wire.EventDraft{Name: "branch.moved", At: now(), Scope: folderScope(dir), Sentence: "cd moved.", Details: map[string]string{"branch": "cd"}})
+	waitFor(t, "the wake's turn", func() bool {
+		a := d.Store.Agent(id)
+		woke := false
+		for _, u := range userMessages(d, id) {
+			woke = woke || strings.HasPrefix(u, "The event you were waiting for happened.")
+		}
+		return woke && a.State == wire.AgentStateFinished && len(a.QueuedPrompts) == 0
+	})
+	if n := startsIn(starts); n != 2 {
+		t.Fatalf("%d starts, want 2", n)
+	}
+	notes := strings.Join(runtimeNotes(d, id), " | ")
+	if !strings.HasSuffix(notes, "Picked the conversation back up.") || strings.Contains(notes, "no longer has this conversation") {
+		t.Fatal(notes)
+	}
+	if a := d.Store.Agent(id); *a.RuntimeSessionID != "fake-session" {
+		t.Fatalf("a new session %s", *a.RuntimeSessionID)
+	}
+}
+
+// A waiting agent whose runtime can neither load nor resume keeps it: a release would lose
+// the conversation. Without the wait it goes as before.
+func TestAWaitingAgentWhoseRuntimeCannotContinueIsKept(t *testing.T) {
+	fakeRuntimes(t)
+	t.Setenv("AGENTS_FAKE_CONTINUE", "none")
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := t.TempDir()
+	id := warmAgent(t, d, c, dir)
+	waitIdle(t, d, id)
+	d.warmPass()
+	l := d.live(id)
+	l.mu.Lock()
+	kept, logged := l.session != nil, l.pool.keptWaiting
+	l.mu.Unlock()
+	if !kept || !logged {
+		t.Fatalf("kept %v, logged %v", kept, logged)
+	}
+	d.endWait(id, "agent", true)
+	d.warmPass()
+	l.mu.Lock()
+	gone := l.session == nil
+	l.mu.Unlock()
+	if !gone {
+		t.Fatal("kept once it no longer waits")
 	}
 }

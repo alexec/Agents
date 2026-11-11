@@ -59,7 +59,8 @@ export function writtenIn(path: string, machine: string): string {
 }
 
 export const helperDefaults = { queued: 5, maximumQueued: 20, agentsMayArchive: true, archiveWhenMerged: true } as const;
-export const diskDefaults = { lowGB: 20, lowPercent: 5, criticalGB: 2, lowChoices: [5, 10, 20, 50, 100], criticalChoices: [1, 2, 5, 10] } as const;
+/** DiskThresholds' defaults: each line a percent of the disk, so one setting fits a laptop and a server. */
+export const diskDefaults = { lowPercent: 20, criticalPercent: 1, lowChoices: [5, 10, 20, 30, 50], criticalChoices: [1, 2, 5, 10] } as const;
 
 /** The numbers Helpers queued may be: 1 to the most, and a number set by hand too. */
 export function queuedChoices(current: number): number[] {
@@ -67,7 +68,7 @@ export function queuedChoices(current: number): number[] {
   return Array.from({ length: top - Math.min(1, current) + 1 }, (_, i) => Math.min(1, current) + i);
 }
 
-/** A disk line's sizes, with one set by hand. */
+/** A disk line's percents, with one set by hand. */
 export function diskChoices(choices: readonly number[], current: number): number[] {
   return [...new Set([...choices, current])].sort((a, b) => a - b);
 }
@@ -82,7 +83,7 @@ export function withLimit<K extends keyof HelperLimits>(kept: HelperLimits | und
 }
 
 /** The disk lines with one changed, the default kept as no value. */
-export function withDiskLine(kept: DiskThresholds | undefined, key: "lowGB" | "criticalGB", value: number,
+export function withDiskLine(kept: DiskThresholds | undefined, key: "lowPercent" | "criticalPercent", value: number,
   standard: number): DiskThresholds {
   const next: DiskThresholds = { ...(kept ?? {}) };
   if (value === standard) delete next[key];

@@ -418,3 +418,86 @@ func TestAServerTakesNPXAsNoClaude(t *testing.T) {
 		t.Fatal("a Mac's npx is Claude, as before")
 	}
 }
+
+// Claude prefers the app's own copy on a Mac (#4512): the first use of the person's npx
+// installs the pinned toolset, runtimes/list says installing, and from then on the shim
+// runs the adapter with node, with no `npm exec` under it.
+func TestClaudesFirstUseInstallsTheAppsCopy(t *testing.T) {
+	_, bundle := fakeVendors(t)
+	own := t.TempDir()
+	os.WriteFile(filepath.Join(own, "npx"), []byte("#!/bin/sh\n"), 0o755)
+	oldShell := loginShellPath
+	loginShellPath = func(string) []string { return []string{own} }
+	resetShellPath := func() { shellPath.Lock(); shellPath.key = ""; shellPath.Unlock() }
+	resetShellPath()
+	t.Cleanup(func() { loginShellPath = oldShell; resetShellPath() })
+	claude := filepath.Join(bundle, "claude")
+	os.MkdirAll(claude, 0o755)
+	for name, text := range map[string]string{"package.json": `{}`, "package-lock.json": `{}`,
+		"manifest.json": `{"runtimeID":"claude","package":"@x/adapter","entry":"dist/index.js"}`} {
+		os.WriteFile(filepath.Join(claude, name), []byte(text), 0o644)
+	}
+	pin, _ := os.ReadFile(filepath.Join(bundle, "codex", "mac-node.json"))
+	os.WriteFile(filepath.Join(claude, "mac-node.json"), pin, 0o644)
+	d, c := start(t, t.TempDir())
+	d.serveInstall(filepath.Join(t.TempDir(), "tools"), bundle)
+	r := runtimeByID("claude")
+
+	launch, err := d.launchFor(r, t.TempDir())
+	if err != nil || launch.Command != filepath.Join(own, "npx") {
+		t.Fatalf("the first use ran %q, %v: want the person's npx while the app's copy installs", launch.Command, err)
+	}
+	if s := d.statusOf(r); s.Availability.Installing == nil {
+		t.Fatalf("runtimes/list says %+v while the app's copy installs", s.Availability)
+	}
+	end := waitInstalled(t, c, "claude")
+	if end.Availability.Available == nil || end.Availability.Available.Path != appToolset(r) {
+		t.Fatalf("installed as %+v", end.Availability)
+	}
+	if launch, err = d.launchFor(r, t.TempDir()); err != nil || launch.Command != appToolset(r) {
+		t.Fatalf("the next use ran %q, %v: want the app's copy", launch.Command, err)
+	}
+	shim, _ := os.ReadFile(launch.Command)
+	if !strings.Contains(string(shim), `exec "$d/node/bin/node" "$d/lib/node_modules/@x/adapter/dist/index.js"`) || strings.Contains(string(shim), "npx") {
+		t.Fatalf("the shim: %s", shim)
+	}
+	if d.installOnFirstUse(r) {
+		t.Fatal("a whole copy installed again")
+	}
+	// Codex, which uses the app's copy only, is installed by the person, not by a use.
+	if d.installOnFirstUse(runtimeByID("codex")) {
+		t.Fatal("codex installed on use")
+	}
+	// One that failed waits for the person's Install.
+	os.RemoveAll(filepath.Join(macToolsHome, "claude"))
+	d.instMu.Lock()
+	d.states["claude"] = installFailed("no room")
+	d.instMu.Unlock()
+	if d.installOnFirstUse(r) {
+		t.Fatal("a failed install was tried again by itself")
+	}
+}
+
+// Dependabot bumps the adapter in package.json and its lock (#4512), and nothing else: the
+// manifest's packageVersion, which runtimes/list and the runtime check read, must say the same.
+func TestTheBundlesNodeToolsetsPinOneVersion(t *testing.T) {
+	for _, id := range []string{"claude", "codex"} {
+		dir := filepath.Join("../../../App/Resources/toolsets", id)
+		var manifest struct{ Package, PackageVersion string }
+		var pkg struct{ Dependencies map[string]string }
+		var lock struct {
+			Packages map[string]struct{ Version string } `json:"packages"`
+		}
+		for name, v := range map[string]any{"manifest.json": &manifest, "package.json": &pkg, "package-lock.json": &lock} {
+			b, err := os.ReadFile(filepath.Join(dir, name))
+			if err != nil || json.Unmarshal(b, v) != nil {
+				t.Fatalf("%s/%s: %v", id, name, err)
+			}
+		}
+		pinned, locked := pkg.Dependencies[manifest.Package], lock.Packages["node_modules/"+manifest.Package].Version
+		if pinned != manifest.PackageVersion || locked != manifest.PackageVersion {
+			t.Fatalf("%s pins %s %s in package.json and %s in its lock, and its manifest says %s: run scripts/update-toolset.sh for %s with %s",
+				id, manifest.Package, pinned, locked, manifest.PackageVersion, id, pinned)
+		}
+	}
+}

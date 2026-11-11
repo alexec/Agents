@@ -294,7 +294,7 @@ deletes build output (the folders `.gitignore` ignores and git tracks nothing in
 Done or Archived and hold no lease. It also removes archived agents' worktrees that have
 nothing uncommitted, keeping the branch, bounds the shared build cache (Swift and Go), ends
 headless walk Chromes left running over 6 hours, and removes older Xcode device support
-(`scripts/free-disk.sh`, #1796). It goes on until 20% of the disk is free or the steps run
+(`scripts/free-disk.sh`, #1796). It goes on until 25% of the disk is free or the steps run
 out. It never touches the folder, a worktree no session names, or a busy agent's.
 It too arrives turned off.
 
