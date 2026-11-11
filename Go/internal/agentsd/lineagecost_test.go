@@ -442,3 +442,111 @@ func TestKeepEstimatesBackfillsCycleTimeAndLandsAt(t *testing.T) {
 		t.Fatalf("%+v", got)
 	}
 }
+
+// #4524: a turn with no work that started sessions goes on their work, a Scrum Master's turn
+// on the lane it started; a later turn that started nothing stays on the session.
+func TestATurnThatStartsALaneGoesOnItsWork(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	folder := t.TempDir()
+	d.repos = map[string]forgeRepo{folder: {"github", "alexec/agents"}}
+	sm := seeded(t, d, folder, nil)
+	now := nowFunc()
+	if _, err := d.lineage().SetState(sessionNode(sm.ID), wire.LineageSessionStateNameWorking, now.Add(-time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	lane := seeded(t, d, folder, func(a *wire.Agent) {
+		a.StartedByAgent = &sm.ID
+		a.Labels = []wire.SessionLabel{{Value: "#8", Owner: wire.SessionLabelOwnerAgent}}
+	})
+	d.noteLineage(nil, lane)
+	d.bankSessionCost(sm.ID, wire.Cost{Amount: 1, Currency: "USD"})
+	issue := wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#8"}
+	if got := d.lineageCost(issue); usd(got.Own) != 1 {
+		t.Fatalf("#8 %+v", got.Own)
+	}
+
+	// The next turn starts nothing: on the session.
+	for i, s := range []wire.LineageSessionStateName{wire.LineageSessionStateNameWaiting, wire.LineageSessionStateNameWorking} {
+		if _, err := d.lineage().SetState(sessionNode(sm.ID), s, now.Add(time.Duration(i+1)*time.Minute)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	d.bankSessionCost(sm.ID, wire.Cost{Amount: 3, Currency: "USD"})
+	if got := d.lineageCost(issue); usd(got.Own) != 1 {
+		t.Fatalf("#8 %+v", got.Own)
+	}
+	if got := d.lineageCost(sessionNode(sm.ID)); usd(got.Own) != 2 {
+		t.Fatalf("session %+v", got.Own)
+	}
+}
+
+// #4524: a turn begins at the oldest of its newest run of working and needs-you.
+func TestTurnStart(t *testing.T) {
+	st := func(s wire.LineageSessionStateName, at wire.Date) wire.LineageSessionState {
+		return wire.LineageSessionState{State: s, At: at}
+	}
+	w, n, wait := wire.LineageSessionStateNameWorking, wire.LineageSessionStateNameNeedsYou, wire.LineageSessionStateNameWaiting
+	for _, c := range []struct {
+		states []wire.LineageSessionState
+		want   wire.Date
+		ok     bool
+	}{
+		{nil, 0, false},
+		{[]wire.LineageSessionState{st(wait, 9)}, 0, false},
+		{[]wire.LineageSessionState{st(w, 9), st(wait, 8)}, 9, true},
+		{[]wire.LineageSessionState{st(wire.LineageSessionStateNameStopped, 10), st(w, 9), st(n, 8), st(w, 7), st(wait, 6), st(w, 5)}, 7, true},
+	} {
+		if got, ok := turnStart(c.states); got != c.want || ok != c.ok {
+			t.Errorf("%v: %v %v, want %v %v", c.states, got, ok, c.want, c.ok)
+		}
+	}
+}
+
+// #4524: a run started by a PR's checks.failed works on that PR until it merges; one started
+// by pr.merged does not.
+func TestARunStartedByChecksFailedWorksOnItsPR(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	folder := t.TempDir()
+	d.repos = map[string]forgeRepo{folder: {"github", "alexec/agents"}}
+	event := func(name string) wire.Event {
+		return wire.Event{Name: name, Details: map[string]string{"payload": `{"pr":{"number":9,"title":"Fix it",` +
+			`"url":"https://github.com/alexec/Agents/pull/9"},"run":{"id":5}}`}}
+	}
+	fix := seeded(t, d, folder, nil)
+	d.lineagePRStarted(event("checks.failed"), fix.ID)
+	ship := seeded(t, d, folder, nil)
+	d.lineagePRStarted(event("pr.merged"), ship.ID)
+	d.bankSessionCost(fix.ID, wire.Cost{Amount: 2, Currency: "USD"})
+	d.bankSessionCost(ship.ID, wire.Cost{Amount: 5, Currency: "USD"})
+	pr := wire.LineageNode{Kind: "pr", Ref: "github:alexec/agents#9"}
+	if got := d.lineageCost(pr); usd(got.Own) != 2 {
+		t.Fatalf("pr %+v", got.Own)
+	}
+	if got := d.lineageCost(sessionNode(ship.ID)); usd(got.Own) != 5 {
+		t.Fatalf("ship %+v", got.Own)
+	}
+}
+
+// #4524: a release session's version label puts its cost on the release, and the release's
+// rollup counts it.
+func TestAReleaseSessionsCostGoesOnItsRelease(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	folder := t.TempDir()
+	d.repos = map[string]forgeRepo{folder: {"github", "alexec/agents"}}
+	a := seeded(t, d, folder, func(a *wire.Agent) {
+		a.Labels = []wire.SessionLabel{{Value: "v1.2.0", Owner: wire.SessionLabelOwnerAgent}}
+	})
+	d.noteLineage(nil, a)
+	d.bankSessionCost(a.ID, wire.Cost{Amount: 4, Currency: "USD"})
+	release := wire.LineageNode{Kind: lineage.KindRelease, Ref: "github:alexec/agents/release/v1.2.0"}
+	if got := d.lineageCost(release); usd(got.Own) != 4 || usd(got.Total) != 4 {
+		t.Fatalf("release %+v", got)
+	}
+	repo := d.lineageCost(wire.LineageNode{Kind: lineage.KindRepo, Ref: "github:alexec/agents"})
+	if usd(repo.Total) != 4 || usd(repo.Unlinked) != 0 {
+		t.Fatalf("repo %+v", repo)
+	}
+}

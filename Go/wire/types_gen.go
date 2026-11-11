@@ -5818,6 +5818,12 @@ type LineageEstimate struct {
 
 	// What a closed issue or epic took (#3561): an issue's own cost and its PRs'; an epic's, its own and every child's. Absent while open.
 	Actual *LineageCost `json:"actual,omitzero"`
+
+	// cost with the overhead loaded in (#4524), by currency: each figure times (1 + overhead.unlinkedRatio), and an epic's times (1 + overhead.epicRatio) too, as "direct $100, about $165 all in". Absent when cost is, or the overhead has no ratio.
+	Loaded map[string]LineageEstimateRange `json:"loaded,omitzero"`
+
+	// The overhead that loaded is made with (#4524), on this machine.
+	Overhead *LineageOverhead `json:"overhead,omitzero"`
 }
 
 // When work lands (#3559): the median and the P10 to P90 range.
@@ -5930,6 +5936,9 @@ type LineageForecast struct {
 	Burn []LineageForecastBurn `json:"burn"`
 
 	ServiceLevels []LineageForecastServiceLevel `json:"serviceLevels"`
+
+	// The overhead that toComplete.loaded and spend's loaded figures are made with (#4524).
+	Overhead *LineageOverhead `json:"overhead,omitzero"`
 }
 
 // A weekly allowance's pace (#4526): used (0 to 1) at its last reading at, of the week that resets at resetsAt. runsOutAt is when it runs out at that pace, absent when it lasts to the reset (lasts).
@@ -6002,6 +6011,12 @@ type LineageForecastSpend struct {
 	Week map[string]LineageEstimateRange `json:"week"`
 
 	Month map[string]LineageEstimateRange `json:"month"`
+
+	// week with the overhead loaded in (#4524): times (1 + overhead.unlinkedRatio). Absent with no ratio.
+	LoadedWeek map[string]LineageEstimateRange `json:"loadedWeek,omitzero"`
+
+	// month, loaded as loadedWeek is.
+	LoadedMonth map[string]LineageEstimateRange `json:"loadedMonth,omitzero"`
 }
 
 // An epic's estimate to complete (#4526): dollars by currency, P10 to P90, for its open children and the lead. Each child's estimate is drawn from its matches and scaled by one factor per draw, shared by every child, lognormal from the closed children's actual over their kept estimate (ratio is its median, from closed of them). The lead's term is the epic's own cost over its closed children's, leadRatio, times the children's.
@@ -6013,6 +6028,9 @@ type LineageForecastToComplete struct {
 	Closed int64 `json:"closed"`
 
 	LeadRatio float64 `json:"leadRatio"`
+
+	// cost with the overhead loaded in (#4524): times (1 + overhead.unlinkedRatio). The lead is in cost already, so not the epic ratio. Absent with no ratio.
+	Loaded map[string]LineageEstimateRange `json:"loaded,omitzero"`
 }
 
 // lineage/walk (#2348): the nodes the walk reached and the links it went along. limited says the walk stopped at its limit on nodes, so there is more. resolved is each node's title, state and labels from its connector, by ref, for the nodes a connector could resolve (#3089). resolving says some nodes are still being resolved in the background, so walk again shortly for them (#3102). states is the current state of each session node in it that has one, by ref (#4274).
@@ -6077,6 +6095,25 @@ type LineageNodeRequest struct {
 	Node LineageNode `json:"node"`
 
 	Depth *int64 `json:"depth,omitzero"`
+}
+
+// The overhead (#4524): the cost no issue, PR or release carries, over the nodes that last changed in the last windowDays days (a rolling 14). unlinked is the sessions' cost that went on no work (a Scrum Master's turn that started nothing, a review, a check); linked is the cost on issues, PRs and releases. unlinkedRatio is unlinked over linked, and epicRatio is the epics' own cost (their leads') over their children's and their PRs', each in currency, the currency with the most linked cost; absent when there is nothing to divide by. A loaded figure is a direct one times (1 + unlinkedRatio), and an epic's plan times (1 + epicRatio) too. uncounted names what no figure has.
+type LineageOverhead struct {
+	WindowDays int64 `json:"windowDays"`
+
+	// The currency of the ratios; absent with no linked cost.
+	Currency *string `json:"currency,omitzero"`
+
+	Linked LineageCost `json:"linked"`
+
+	Unlinked LineageCost `json:"unlinked"`
+
+	UnlinkedRatio *float64 `json:"unlinkedRatio,omitzero"`
+
+	EpicRatio *float64 `json:"epicRatio,omitzero"`
+
+	// What no figure here counts: people-time (a person's reviews and answers) and ci-minutes (the forge's runners).
+	Uncounted []string `json:"uncounted"`
 }
 
 // A node's title, state and labels from its connector (#3089), resolved and cached on the daemon so a lineage renderer shows "Fix flaky test" rather than its ref. state is open, closed or merged (a pull request's; an issue's is open or closed); absent when the connector does not say. labels is empty when it has none. Resolved for a GitHub or GitLab issue or pull request only; Linear and releases are not resolved yet.
@@ -10950,7 +10987,7 @@ type ReportScopes struct {
 	Admin bool `json:"admin"`
 }
 
-// reports/value (#2351): what the work in a scope cost and what it delivered, from the lineage nodes that the scope's machines send (#2350). A node is in the range when it last changed in it, with its whole cost. total is the work on issues and PRs; waste is the PRs closed without a merge and merged reverts; unlinked is the turns with no issue or PR. perMergedPR is total by the PRs merged, by currency. leadTimeSeconds is the median of the issues' lead times. issues and releases (#3023) are the most costly first, at most 100 each; limited says there are more.
+// reports/value (#2351): what the work in a scope cost and what it delivered, from the lineage nodes that the scope's machines send (#2350). A node is in the range when it last changed in it, with its whole cost. total is the work on issues, PRs and releases (a release session's own, #4524); waste is the PRs closed without a merge and merged reverts; unlinked is the turns with no issue or PR. perMergedPR is total by the PRs merged, by currency. leadTimeSeconds is the median of the issues' lead times. issues and releases (#3023) are the most costly first, at most 100 each; limited says there are more.
 type ReportValue struct {
 	Range ReportRange `json:"range"`
 
@@ -10961,6 +10998,12 @@ type ReportValue struct {
 	Waste LineageCost `json:"waste"`
 
 	Unlinked LineageCost `json:"unlinked"`
+
+	// total and unlinked together (#4524): what the work cost all in, as the agents spent it.
+	Loaded *LineageCost `json:"loaded,omitzero"`
+
+	// The scope's overhead over the 14 days to now (#4524), whatever the range.
+	Overhead *LineageOverhead `json:"overhead,omitzero"`
 
 	// By currency.
 	PerMergedPR map[string]float64 `json:"perMergedPR"`
