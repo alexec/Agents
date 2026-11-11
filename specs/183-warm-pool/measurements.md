@@ -57,3 +57,17 @@ default of 3 holds 0.9–1.5 GB at most, for no more than 30 minutes, and never 
 person is away. A budget would come to three to five runtimes either way, and a count is
 what the person can predict from Settings. Revisit it if a runtime arrives that is several
 times heavier.
+
+## A waiting agent (#4513)
+
+An agent that waits for an event (`wait_for_event`, `check_again`, a place in a lease's
+line) ends its turn, so its runtime is an idle one: the pool releases it after
+`releaseAfterMinutes` (wake.json, default 10, 0 turning that off), and the event's turn
+continues the conversation with `session/resume` or `session/load`. A waiting agent whose
+runtime can do neither keeps its runtime, as a release would lose the conversation.
+
+**Is the cold start acceptable when an event wakes an agent?** Yes. A wake after a release
+costs one cold start: about 32 s for Claude (against 1.6 s warm) and 4 s for Codex
+(against 2 s). It is paid once per wake, after a wait of more than 10 minutes, so it adds
+less than 5% to it, and nobody waits on a waking agent's first token as they do on a
+reply. Keeping the runtime costs 387–491 MB for Claude for the whole wait.

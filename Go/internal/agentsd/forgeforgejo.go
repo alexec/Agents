@@ -31,10 +31,14 @@ type forgeForgejo interface {
 	ItemPage(ctx context.Context, repo string, number int, pr bool, before string) (forgejomcp.ItemDetail, error)
 	Comment(ctx context.Context, repo string, number int, body string) (string, error)
 	SetLabels(ctx context.Context, repo string, number int, add, remove []string) error
+	SetAssignees(ctx context.Context, repo string, number int, add, remove []string) error
 	SetState(ctx context.Context, repo string, number int, closed bool) error
 	RepoLabels(ctx context.Context, repo string) ([]string, map[string]string, error)
 	MergeMethods(ctx context.Context, repo string) ([]string, error)
 	Merge(ctx context.Context, repo string, number int, sha, method string, auto bool) error
+	// The pull request page's Auto-merge row and Draft state (#4410).
+	CancelAutoMerge(ctx context.Context, repo string, number int) error
+	MarkReady(ctx context.Context, repo string, number int) error
 	Approve(ctx context.Context, repo string, number int, sha string) (string, error)
 	PRDiff(ctx context.Context, repo string, number int) (map[string]any, error)
 	// What lineage asks (lineageforgejo.go).
@@ -42,6 +46,8 @@ type forgeForgejo interface {
 	CommitTime(ctx context.Context, repo, ref string) (time.Time, error)
 	Compare(ctx context.Context, repo, base, head string) ([]forgejomcp.Commit, error)
 	CommitPR(ctx context.Context, repo, sha string) (int, error)
+	// Releases are a repository's newest releases (#4426).
+	Releases(ctx context.Context, repo string, limit int) ([]forgejomcp.RepoRelease, error)
 	CostComment(ctx context.Context, repo string, number int, id, mark, body string) (string, error)
 	Plan(ctx context.Context, repo string, number int) (forgejomcp.Plan, error)
 	// Blockers are the blockers of a standing epic's children (#4242).
@@ -133,13 +139,16 @@ func (forgejoForge) Images() forgeImageHost { return forgejoImages{} }
 func (forgejoForge) Caps() forgeCaps {
 	return forgeCaps{
 		Issues: true, PRs: true,
-		Issue: forgeActions{Comment: true, Label: true, Close: true, Reopen: true},
-		PR: forgeActions{Comment: true, Label: true, Close: true, Reopen: true, Merge: true, AutoMerge: true, Approve: true,
-			Diff: true},
+		Issue: forgeActions{Comment: true, Label: true, Assign: true, Close: true, Reopen: true},
+		PR: forgeActions{Comment: true, Label: true, Assign: true, Close: true, Reopen: true, Merge: true, AutoMerge: true, Approve: true,
+			Diff: true, CancelAutoMerge: true, Ready: true},
 		LabelColors: true,
 		Avatars:     true,
 		CreatedAt:   true, ClosedAt: true,
+		// A pull request's branches and merge (#4409); its size, reviewers, closing issues and check times are #4682.
+		Branches: true, MergedBy: true, MergeCommit: true,
 		CommentCount: "exact",
+		Releases:     true,
 		Plan:         true, BlockedBy: true, AddChild: true,
 		Reasons: map[string]string{
 			actionTransition: "only a Jira issue or an Azure Boards work item moves by a transition",
@@ -376,6 +385,14 @@ func (g forgejoForge) SetLabels(ctx context.Context, r forgeRef, add, remove []s
 	return fj.SetLabels(ctx, named, r.Number, add, remove)
 }
 
+func (g forgejoForge) SetAssignees(ctx context.Context, r forgeRef, add, remove []string) error {
+	fj, named, _, err := g.of(ctx, "forge/assign", r)
+	if err != nil {
+		return err
+	}
+	return fj.SetAssignees(ctx, named, r.Number, add, remove)
+}
+
 func (g forgejoForge) SetState(ctx context.Context, r forgeRef, closed bool, transition string) error {
 	if transition != "" {
 		return cannot(actionTransition)
@@ -414,6 +431,28 @@ func (g forgejoForge) Merge(ctx context.Context, r forgeRef, sha, how string, au
 		return wire.ForgeDone{}, err
 	}
 	return wire.ForgeDone{Auto: optionalTrue(auto)}, nil
+}
+
+func (g forgejoForge) CancelAutoMerge(ctx context.Context, r forgeRef) error {
+	if !r.pr() {
+		return cannot(actionCancelAuto)
+	}
+	fj, named, _, err := g.of(ctx, "forge/cancel-auto-merge", r)
+	if err != nil {
+		return err
+	}
+	return fj.CancelAutoMerge(ctx, named, r.Number)
+}
+
+func (g forgejoForge) Ready(ctx context.Context, r forgeRef) error {
+	if !r.pr() {
+		return cannot(actionReady)
+	}
+	fj, named, _, err := g.of(ctx, "forge/ready", r)
+	if err != nil {
+		return err
+	}
+	return fj.MarkReady(ctx, named, r.Number)
 }
 
 func (g forgejoForge) Approve(ctx context.Context, r forgeRef, sha string) (wire.ForgeDone, error) {
@@ -501,6 +540,7 @@ func forgejoItemOf(i forgejomcp.Item, folder string) wire.ForgeItem {
 	if i.PR {
 		out.Draft, out.AutoMerge = new(i.Draft), new(i.AutoMerge)
 		out.Checks, out.Review, out.Mergeable = optional(i.Checks), optional(i.Review), optional(i.Mergeable)
+		withPullRefs(&out, i.HeadRef, i.BaseRef, i.MergedBy, i.MergeCommit)
 		return out
 	}
 	// An issue's level and feature are its labels'; Forgejo has no parent, and a list does not

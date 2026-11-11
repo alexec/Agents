@@ -195,8 +195,12 @@ func (azureBoardsForge) Caps() forgeCaps {
 		CommentCount: "exact",
 		Plan:         true, BlockedBy: true, AddChild: true,
 		Reasons: map[string]string{
+			actionAssign:   "the app does not set an Azure Boards work item's assignee yet",
+			actionReleases: "Azure Boards has no releases: it is a tracker, with no repositories",
 			actionMerge:     boardsNoPRs,
 			actionAutoMerge: boardsNoPRs,
+			actionCancelAuto: boardsNoPRs,
+			actionReady: boardsNoPRs,
 			actionApprove:   boardsNoPRs,
 			actionRerun:     boardsNoPRs,
 			actionLog:       boardsNoPRs,

@@ -16,8 +16,9 @@ import (
 
 // The forge writes (#3130): the actions of the GitHub, GitLab, Forgejo (#3753), Bitbucket (#3786), Azure DevOps (#3803), Linear, Jira (#3260) and Azure
 // Boards (#3815) views, on the Work pages' issue and pull request pages: comment, labels (a work
-// item's tags), close and reopen (a Jira issue's move by a transition of its workflow, a work
-// item's to another state of its type), and a pull request's merge, approve, rerun of its failed
+// item's tags), assignees (#4403), close and reopen (a Jira issue's move by a transition of its workflow, a work
+// item's to another state of its type), and a pull request's merge, auto-merge turned off and ready
+// for review (#4410), approve, rerun of its failed
 // checks, their logs and its diff. Next to the reads (forge.go), with the same tokens and the
 // connectors' own write code.
 //
@@ -31,6 +32,8 @@ const (
 	forgeCommentMost = 65536
 	// forgeLabelsMost bounds the labels one call adds or takes off.
 	forgeLabelsMost = 20
+	// forgeAssigneesMost bounds the people one call assigns or takes off, as GitHub does (#4403).
+	forgeAssigneesMost = 10
 )
 
 // forgeGitHubWrites is what the writes ask of GitHub; a test gives a fake.
@@ -39,6 +42,9 @@ type forgeGitHubWrites interface {
 	SetLabels(ctx context.Context, repo string, number int, add, remove []string) error
 	SetState(ctx context.Context, repo string, number int, closed bool) error
 	MergeBy(ctx context.Context, repo string, number int, sha, method string, auto bool) (map[string]any, error)
+	// The pull request page's Auto-merge row and Draft state (#4410).
+	DisableAutoMerge(ctx context.Context, repo string, number int) error
+	MarkReady(ctx context.Context, repo string, number int) error
 	ReviewPR(ctx context.Context, repo string, number int, sha string, approve bool, words string) (map[string]any, error)
 	RerunFailed(ctx context.Context, repo string, runID int) (map[string]any, error)
 	FailedLog(ctx context.Context, repo string, runID int, job string) (string, error)
@@ -59,15 +65,21 @@ type forgeGitHubWrites interface {
 	// A forge request's answer (#3865).
 	SetBody(ctx context.Context, repo string, number int, body string) error
 	Unassign(ctx context.Context, repo string, number int, logins []string) error
+	// The issue page's Assignees (#4403).
+	Assign(ctx context.Context, repo string, number int, logins []string) error
 }
 
 // forgeGitLabWrites is what the writes ask of GitLab; a test gives a fake.
 type forgeGitLabWrites interface {
 	Comment(ctx context.Context, project string, number int, mr bool, body string) error
 	SetLabels(ctx context.Context, project string, number int, mr bool, add, remove []string) error
+	SetAssignees(ctx context.Context, project string, number int, mr bool, add, remove []string) error
 	SetState(ctx context.Context, project string, number int, mr, closed bool) error
 	MergeMethods(ctx context.Context, project string) ([]string, error)
 	Merge(ctx context.Context, project string, number int, sha string, squash, auto bool) error
+	// The merge request page's Auto-merge row and Draft state (#4410).
+	CancelAutoMerge(ctx context.Context, project string, number int) error
+	MarkReady(ctx context.Context, project string, number int) error
 	Approve(ctx context.Context, project string, number int, sha string) (map[string]any, error)
 	RetryPipeline(ctx context.Context, project string, pipelineID int) (map[string]any, error)
 	FailedLog(ctx context.Context, project string, pipelineID int, job string) (string, error)
@@ -94,6 +106,9 @@ func (d *Daemon) registerForgeWrites() {
 	On(d, wire.CallForgeLabel, func(ctx context.Context, _ *Client, r wire.ForgeLabelRequest) (wire.ForgeDone, error) {
 		return d.forgeLabel(ctx, r)
 	})
+	On(d, wire.CallForgeAssign, func(ctx context.Context, _ *Client, r wire.ForgeAssignRequest) (wire.ForgeDone, error) {
+		return d.forgeAssign(ctx, r)
+	})
 	On(d, wire.CallForgeLabels, func(ctx context.Context, _ *Client, r wire.ForgeNodeRequest) (wire.ForgeLabels, error) {
 		return d.forgeLabels(ctx, r)
 	})
@@ -102,6 +117,12 @@ func (d *Daemon) registerForgeWrites() {
 	})
 	On(d, wire.CallForgeMerge, func(ctx context.Context, _ *Client, r wire.ForgeMergeRequest) (wire.ForgeDone, error) {
 		return d.forgeMerge(ctx, r)
+	})
+	On(d, wire.CallForgeCancelAutoMerge, func(ctx context.Context, _ *Client, r wire.ForgeNodeRequest) (wire.ForgeDone, error) {
+		return d.forgePullWrite(ctx, "forge/cancel-auto-merge", r.Node, Forge.CancelAutoMerge)
+	})
+	On(d, wire.CallForgeReady, func(ctx context.Context, _ *Client, r wire.ForgeNodeRequest) (wire.ForgeDone, error) {
+		return d.forgePullWrite(ctx, "forge/ready", r.Node, Forge.Ready)
 	})
 	On(d, wire.CallForgeApprove, func(ctx context.Context, _ *Client, r wire.ForgeApproveRequest) (wire.ForgeDone, error) {
 		return d.forgeApprove(ctx, r)
@@ -202,6 +223,44 @@ func (d *Daemon) forgeLabel(ctx context.Context, r wire.ForgeLabelRequest) (wire
 	return wire.ForgeDone{}, nil
 }
 
+// assigneeLogins are the logins given, trimmed, without a leading @, each once, or why not.
+func assigneeLogins(method, what string, logins []string) ([]string, error) {
+	out := []string{}
+	for _, l := range logins {
+		if l = strings.TrimPrefix(strings.TrimSpace(l), "@"); l != "" && !slices.ContainsFunc(out, func(o string) bool { return strings.EqualFold(o, l) }) {
+			out = append(out, l)
+		}
+	}
+	if len(out) > forgeAssigneesMost {
+		return nil, Invalid("%s: at most %d people to %s at once", method, forgeAssigneesMost, what)
+	}
+	return out, nil
+}
+
+func (d *Daemon) forgeAssign(ctx context.Context, r wire.ForgeAssignRequest) (wire.ForgeDone, error) {
+	const method = "forge/assign"
+	add, err := assigneeLogins(method, "assign", r.Add)
+	if err != nil {
+		return wire.ForgeDone{}, err
+	}
+	remove, err := assigneeLogins(method, "take off", r.Remove)
+	if err != nil {
+		return wire.ForgeDone{}, err
+	}
+	if len(add)+len(remove) == 0 {
+		return wire.ForgeDone{}, Invalid("%s: name a person to assign or take off", method)
+	}
+	t, err := d.forgeTargetOf(ctx, method, r.Node, false)
+	if err != nil {
+		return wire.ForgeDone{}, err
+	}
+	if err := t.forge.SetAssignees(ctx, t.ref, add, remove); err != nil {
+		return wire.ForgeDone{}, forgeCannotErr(method, t.forge, err)
+	}
+	d.forgeWrote()
+	return wire.ForgeDone{}, nil
+}
+
 func (d *Daemon) forgeLabels(ctx context.Context, r wire.ForgeNodeRequest) (wire.ForgeLabels, error) {
 	t, err := d.forgeTargetOf(ctx, "forge/labels", r.Node, false)
 	if err != nil {
@@ -248,6 +307,20 @@ func (d *Daemon) forgeMerge(ctx context.Context, r wire.ForgeMergeRequest) (wire
 	}
 	d.forgeWrote()
 	return done, nil
+}
+
+// forgePullWrite is a write on a pull request with nothing but its node: forge/cancel-auto-merge
+// and forge/ready (#4410).
+func (d *Daemon) forgePullWrite(ctx context.Context, method string, node wire.LineageNode, write func(Forge, context.Context, forgeRef) error) (wire.ForgeDone, error) {
+	t, err := d.forgeTargetOf(ctx, method, node, true)
+	if err != nil {
+		return wire.ForgeDone{}, err
+	}
+	if err := write(t.forge, ctx, t.ref); err != nil {
+		return wire.ForgeDone{}, forgeCannotErr(method, t.forge, err)
+	}
+	d.forgeWrote()
+	return wire.ForgeDone{}, nil
 }
 
 func (d *Daemon) forgeApprove(ctx context.Context, r wire.ForgeApproveRequest) (wire.ForgeDone, error) {

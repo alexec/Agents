@@ -54,6 +54,10 @@ type Item struct {
 	// A list says only Draft; one read on its own says the rest.
 	Draft, AutoMerge          bool
 	Checks, Review, Mergeable string
+	// Only one read on its own says these.
+	// HeadRef is the branch it merges from and BaseRef the one it merges into; a merged one's
+	// MergedBy is who merged it and MergeCommit the commit it made (#4409).
+	HeadRef, BaseRef, MergedBy, MergeCommit string
 }
 
 // SearchPage is a page of a list, the last updated first. Cursors[i] goes on after Items[i],
@@ -357,6 +361,13 @@ func (f *RealForgejo) ItemPage(ctx context.Context, repo string, number int, pr 
 	}
 	d.Draft = p.draft()
 	d.Head, d.FilesChanged = p.Head.SHA, p.ChangedFiles
+	d.HeadRef, d.BaseRef = p.Head.Ref, p.Base.Ref
+	if d.State == "merged" {
+		d.MergeCommit = p.MergeCommitSHA
+		if p.MergedBy != nil {
+			d.MergedBy = p.MergedBy.Login
+		}
+	}
 	if d.State == "open" {
 		d.Mergeable = map[bool]string{true: "mergeable", false: "conflicting"}[p.Mergeable]
 	}

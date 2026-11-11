@@ -8,6 +8,7 @@ import (
 	"maps"
 	"net/http"
 	"os"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -72,8 +73,12 @@ type forgeGitHub interface {
 	// Tags and Compare say what a waiting deploy of a tag ships (#3587).
 	Tags(ctx context.Context, repo string) ([]string, error)
 	Compare(ctx context.Context, repo, base, head string) ([]githubmcp.Commit, error)
+	// Releases are a repo's newest releases (#4426).
+	Releases(ctx context.Context, repo string, limit int) ([]githubmcp.RepoRelease, error)
 	// Timeline is the epics and releases work/timeline reads (#4172).
 	Timeline(ctx context.Context, repo, since string) (githubmcp.Timeline, error)
+	// Milestones are the open milestones with their due dates (#4654).
+	Milestones(ctx context.Context, repo string) ([]githubmcp.Milestone, error)
 	forgeGitHubWrites
 }
 
@@ -87,6 +92,9 @@ type forgeGitLab interface {
 	// Parents are the parents of a standing epic's issues, for parent: none (#4335).
 	Parents(ctx context.Context, project string, numbers []int) (map[int]gitlabmcp.Ref, error)
 	GroupBoard(ctx context.Context, group string, id int) (gitlabmcp.BoardScope, error)
+	// Releases and Compare are a project's newest releases and a release's commits (#4426).
+	Releases(ctx context.Context, project string, limit int) ([]gitlabmcp.RepoRelease, error)
+	Compare(ctx context.Context, project, from, to string) ([]gitlabmcp.Commit, error)
 	forgeGitLabWrites
 }
 
@@ -122,6 +130,8 @@ type forgeAnswer struct {
 	plan *forgePlanAnswer
 	// timeline is a repo's read for work/timeline (#4172).
 	timeline *githubmcp.Timeline
+	// releases is a forge/releases answer (#4426).
+	releases *wire.ForgeReleases
 }
 
 // forgePlanAnswer is an epic and its children as the forge said them (#3267).
@@ -180,6 +190,7 @@ func (d *Daemon) registerForge() {
 	d.registerForgeWrites()
 	d.registerForgeBoards()
 	d.registerForgeImage()
+	d.registerForgeReleases()
 }
 
 // forgeCursor is a list's cursor, one per forge by its name, so a page goes on where each forge
@@ -715,6 +726,7 @@ func forgeItemOf(i githubmcp.Item, folder string) wire.ForgeItem {
 	if i.PR {
 		out.Draft, out.AutoMerge = new(i.Draft), new(i.AutoMerge)
 		out.Checks, out.Review, out.Mergeable = optional(i.Checks), optional(i.Review), optional(i.Mergeable)
+		withPullRefs(&out, i.HeadRef, i.BaseRef, i.MergedBy, i.MergeCommit)
 		return out
 	}
 	var parent *wire.LineageNode
@@ -741,6 +753,7 @@ func gitlabItemOf(i gitlabmcp.Item, folder string) wire.ForgeItem {
 	if i.MR {
 		out.Draft, out.AutoMerge = new(i.Draft), new(i.AutoMerge)
 		out.Checks, out.Review, out.Mergeable = optional(i.Checks), optional(i.Review), optional(i.Mergeable)
+		withPullRefs(&out, i.HeadRef, i.BaseRef, i.MergedBy, i.MergeCommit)
 		return out
 	}
 	var parent *wire.LineageNode
@@ -784,12 +797,26 @@ func jiraItemOf(i jiramcp.Item, folder string) wire.ForgeItem {
 	return out
 }
 
+// forgeLabelsOf gives each label its colour as #rrggbb (#4362). A forge that gives rrggbb with no
+// #, or in capitals, is put right here; a colour that is not six hex digits (a name) is left out,
+// and the client draws a neutral chip.
 func forgeLabelsOf(names []string, colors map[string]string) []wire.ForgeLabel {
 	out := []wire.ForgeLabel{}
 	for _, name := range names {
-		out = append(out, wire.ForgeLabel{Name: name, Color: optional(colors[name])})
+		out = append(out, wire.ForgeLabel{Name: name, Color: optional(forgeLabelColor(colors[name]))})
 	}
 	return out
+}
+
+var forgeHexColor = regexp.MustCompile(`^#?[0-9a-fA-F]{6}$`)
+
+// forgeLabelColor is c as #rrggbb, or "" when c is not six hex digits.
+func forgeLabelColor(c string) string {
+	c = strings.TrimSpace(c)
+	if !forgeHexColor.MatchString(c) {
+		return ""
+	}
+	return "#" + strings.ToLower(strings.TrimPrefix(c, "#"))
 }
 
 // resolvedFromForge keeps what the lists read in the lineage cache (#3089), so a walk to an
@@ -838,7 +865,7 @@ func (d *Daemon) forgeCached(key string) (forgeAnswer, bool) {
 // forgeRemember keeps an answer for forgeCacheFor; an answer with an error is not kept, so
 // the next ask tries again.
 func (d *Daemon) forgeRemember(key string, a forgeAnswer) {
-	if a.list != nil && len(a.list.Errors) > 0 {
+	if a.list != nil && len(a.list.Errors) > 0 || a.releases != nil && len(a.releases.Errors) > 0 {
 		return
 	}
 	a.at = nowFunc()
@@ -867,6 +894,15 @@ func forgeDate(s string) wire.Date {
 		return 0
 	}
 	return wire.DateOf(t)
+}
+
+// withPullRefs puts a pull request's branches on i, and who merged it and its merge commit when
+// it merged (#4409); a forge's "" is none.
+func withPullRefs(i *wire.ForgeItem, head, base, mergedBy, mergeCommit string) {
+	i.HeadRef, i.BaseRef = optional(head), optional(base)
+	if i.State == "merged" {
+		i.MergedBy, i.MergeCommit = optional(mergedBy), optional(mergeCommit)
+	}
 }
 
 func optional(s string) *string {

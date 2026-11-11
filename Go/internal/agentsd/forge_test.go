@@ -59,6 +59,16 @@ type fakeForgeGitHub struct {
 	authors map[int]string
 	// labeled are what a list of a label gives, when set for that label (#3661).
 	labeled map[string][]githubmcp.Item
+	// milestones are what Milestones gives, and milestoneReads how often it was asked (#4654).
+	milestones     []githubmcp.Milestone
+	milestoneReads int
+}
+
+func (f *fakeForgeGitHub) Milestones(context.Context, string) ([]githubmcp.Milestone, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.milestoneReads++
+	return f.milestones, nil
 }
 
 func (f *fakeForgeGitHub) Search(_ context.Context, repos []string, sf githubmcp.SearchFilter, after string, first int) (githubmcp.SearchPage, error) {
@@ -610,5 +620,20 @@ func TestListTotalsKeepEachForgesFirstCount(t *testing.T) {
 	back, err := cursorOf(c.text())
 	if err != nil || !maps.Equal(back.Totals, later) || back.At["github"] != "g2" {
 		t.Fatalf("%+v %v", back, err)
+	}
+}
+
+// A label's colour reaches the wire as #rrggbb whatever form the forge gives it in (#4362).
+func TestForgeLabelColor(t *testing.T) {
+	for in, want := range map[string]string{
+		"#d73a4a": "#d73a4a", "D73A4A": "#d73a4a", "#A2EEEF": "#a2eeef", " a2eeef ": "#a2eeef",
+		"": "", "red": "", "#fff": "", "#d73a4a00": "", "zzzzzz": "",
+	} {
+		if got := forgeLabelColor(in); got != want {
+			t.Errorf("forgeLabelColor(%q) = %q, want %q", in, got, want)
+		}
+	}
+	if l := forgeLabelsOf([]string{"bug", "odd"}, map[string]string{"bug": "D73A4A", "odd": "red"}); deref(l[0].Color) != "#d73a4a" || l[1].Color != nil {
+		t.Errorf("forgeLabelsOf: %+v", l)
 	}
 }

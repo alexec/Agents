@@ -4011,7 +4011,8 @@ export interface FoldersListRequest {
 /**
  * A write or a read that an item's page offers (#4329, #4361): forge/comment, forge/label,
  * forge/close (a close, a reopen or a transition), forge/merge (now, or with auto), forge/approve,
- * forge/rerun, forge/log, forge/diff, forge/add-child and forge/blocked-by.
+ * forge/rerun, forge/log, forge/diff, forge/add-child, forge/blocked-by, forge/assign (#4403),
+ * forge/cancel-auto-merge and forge/ready (#4410).
  */
 export type ForgeAction =
   | "comment"
@@ -4026,7 +4027,10 @@ export type ForgeAction =
   | "log"
   | "diff"
   | "addChild"
-  | "blockedBy";
+  | "blockedBy"
+  | "assign"
+  | "cancelAutoMerge"
+  | "ready";
 
 /**
  * forge/add-child (#3271): add a child to an epic's plan: a new issue (title, with level story,
@@ -4048,6 +4052,16 @@ export interface ForgeAddChildRequest {
 export interface ForgeApproveRequest {
   node: LineageNode;
   sha: string;
+}
+
+/**
+ * forge/assign (#4403): people to assign to an issue or a pull request, and people to take off it,
+ * by their login on the forge. At most 10 of each at once.
+ */
+export interface ForgeAssignRequest {
+  node: LineageNode;
+  add?: string[];
+  remove?: string[];
 }
 
 /**
@@ -4081,9 +4095,13 @@ export interface ForgeBoardsRequest {
  * items have authorAvatar; stateReason that its closed issues have stateReason. createdAt that its
  * items have createdAt, and closedAt that its closed and merged items have closedAt; children,
  * linkedPulls and events that an item's read has them (#4373); total that it counts a list's items,
- * for ForgeList.total (#4396); each is absent from an earlier daemon, which has none. commentCount
- * says how to read ForgeItem.comments: exact; capped at commentsMost (show 50+ there); or detail,
- * only on an item's own page (hide it on the row).
+ * for ForgeList.total (#4396); releases that it has releases, for forge/releases and forge/release
+ * (#4426); a pull request's fields (#4409): branches that it has headRef and baseRef, mergedBy and
+ * mergeCommit that a merged one says them, size that its read has additions, deletions and commits,
+ * reviewers and closes that its read has them, and checkTimes that its checks have startedAt and
+ * finishedAt; each is absent from an earlier daemon, which has none. commentCount says how to read
+ * ForgeItem.comments: exact; capped at commentsMost (show 50+ there); or detail, only on an item's
+ * own page (hide it on the row).
  */
 export interface ForgeCapabilities {
   forge: string;
@@ -4098,18 +4116,30 @@ export interface ForgeCapabilities {
   linkedPulls?: boolean;
   events?: boolean;
   total?: boolean;
+  releases?: boolean;
+  branches?: boolean;
+  mergedBy?: boolean;
+  mergeCommit?: boolean;
+  size?: boolean;
+  reviewers?: boolean;
+  closes?: boolean;
+  checkTimes?: boolean;
   commentCount: ForgeCommentCount;
   commentsMost?: number;
 }
 
 /**
  * One of a pull request's checks (#3129): a check run or a commit status. state is passing,
- * failing, running or skipped; url is its page on the forge.
+ * failing, running or skipped; url is its page on the forge. startedAt and finishedAt are when it
+ * started and ended (#4409), where the forge says them (ForgeCapabilities.checkTimes): absent on a
+ * check that has not started, and finishedAt on one still running; a commit status has neither.
  */
 export interface ForgeCheck {
   name: string;
   state: string;
   url?: string;
+  startedAt?: WireDate;
+  finishedAt?: WireDate;
 }
 
 /**
@@ -4301,7 +4331,12 @@ export interface ForgeImageRequest {
  * why a closed issue closed (#4365): completed, not_planned or duplicate, where the forge says it
  * (ForgeCapabilities.stateReason); absent on an open issue and on a pull request. createdAt is when
  * it opened and closedAt when it closed or merged (#4373), where the forge says them
- * (ForgeCapabilities.createdAt and closedAt); closedAt is absent while it is open.
+ * (ForgeCapabilities.createdAt and closedAt); closedAt is absent while it is open. A pull request's
+ * branches (#4409): headRef is the branch it merges from and baseRef the one it merges into, where
+ * the forge says them (ForgeCapabilities.branches); on its own read at least, and on a list's row
+ * where the list says them. A merged pull request's mergedBy is who merged it and mergeCommit the
+ * commit it made on baseRef (ForgeCapabilities.mergedBy and mergeCommit); each is absent while it
+ * is open or closed unmerged.
  */
 export interface ForgeItem {
   node: LineageNode;
@@ -4325,6 +4360,10 @@ export interface ForgeItem {
   review?: string;
   mergeable?: string;
   autoMerge?: boolean;
+  headRef?: string;
+  baseRef?: string;
+  mergedBy?: string;
+  mergeCommit?: string;
   parent?: LineageNode;
   level?: string;
   feature?: string;
@@ -4345,7 +4384,10 @@ export interface ForgeItem {
  * did before. On an issue's read (#4373), where the forge says them (ForgeCapabilities): children
  * are its sub-issues, linkedPulls the pull requests that close it, and events its timeline, oldest
  * first (labelled, assigned, closed, referenced and the like); each is absent where the forge gives
- * none.
+ * none. On a pull request's read (#4409), where the forge says them (ForgeCapabilities): additions,
+ * deletions and commits are its size; reviewers are the people asked to review it and the people
+ * who reviewed it, each once with their newest state; closes are the issues it closes when it
+ * merges.
  */
 export interface ForgeItemDetail {
   item: ForgeItem;
@@ -4355,6 +4397,11 @@ export interface ForgeItemDetail {
   checks?: ForgeCheck[];
   reviewThreads?: number;
   filesChanged?: number;
+  additions?: number;
+  deletions?: number;
+  commits?: number;
+  reviewers?: ForgeReviewer[];
+  closes?: ForgeLinked[];
   head?: string;
   mergeMethods?: ForgeMergeMethod[];
   start?: ForgeStart;
@@ -4406,8 +4453,8 @@ export interface ForgeLead {
 }
 
 /**
- * An item that an issue's read names (#4373): a sub-issue, or a pull request that closes it. state
- * is open, closed or merged, as ForgeItem.state.
+ * An item that an issue's read names (#4373): a sub-issue, or a pull request that closes it; or an
+ * issue that a pull request closes (#4409). state is open, closed or merged, as ForgeItem.state.
  */
 export interface ForgeLinked {
   node: LineageNode;
@@ -4559,6 +4606,103 @@ export interface ForgeProgress {
   done: number;
   total: number;
 }
+
+/**
+ * A release on a forge (#4426). node is its lineage node (kind release, ref
+ * <forge>:<repo>/release/<tag>), which forge/release reads and lineage keys its cost by. repo is
+ * the repo as the forge names it, and folder a folder on it. latest is the repo's newest published
+ * release that is neither a draft nor a pre-release. publishedAt is absent on a draft; author and
+ * authorAvatar when the forge says them; assets is how many files it has.
+ */
+export interface ForgeRelease {
+  node: LineageNode;
+  forge: string;
+  repo: string;
+  folder?: string;
+  tag: string;
+  name: string;
+  body?: string;
+  draft: boolean;
+  prerelease: boolean;
+  latest: boolean;
+  createdAt?: string;
+  publishedAt?: string;
+  author?: string;
+  authorAvatar?: string;
+  assets: number;
+  url: string;
+}
+
+/**
+ * forge/release (#4426): a release, the release before it (previous, its tag; absent for the
+ * first), how many commits are between the two (commits, at most what the forge's compare gives)
+ * and the pull requests they merged, from each squash commit's (#n) or (!n), oldest first.
+ * compareUrl is the forge's page of the range.
+ */
+export interface ForgeReleaseDetail {
+  release: ForgeRelease;
+  previous?: string;
+  compareUrl?: string;
+  commits: number;
+  pulls: ForgeReleasePull[];
+}
+
+/**
+ * A pull request in a release (#4426): its node, its number, and its title as its squash commit
+ * says it, with the (#n) taken off; sha is the commit.
+ */
+export interface ForgeReleasePull {
+  node: LineageNode;
+  number: number;
+  title: string;
+  sha: string;
+}
+
+/** forge/release (#4426): a release's lineage node, as ForgeRelease.node says it. */
+export interface ForgeReleaseRequest {
+  node: LineageNode;
+}
+
+/**
+ * forge/releases (#4426): the releases of the folders' repos, newest first (a draft, which has no
+ * publishedAt, by createdAt). none are the forges in reach that have no releases, and why, so a
+ * client says so (Linear and Jira have no releases); errors are the forges that could not be read.
+ */
+export interface ForgeReleases {
+  releases: ForgeRelease[];
+  none?: ForgeListError[];
+  errors?: ForgeListError[];
+}
+
+/**
+ * forge/releases (#4426): the releases of every folder's repo on this machine, or of one folder's,
+ * at most limit (1 to 100, 30 when absent) of each repo.
+ */
+export interface ForgeReleasesRequest {
+  folder?: string;
+  limit?: number;
+}
+
+/**
+ * A reviewer of a pull request (#4409): login is who; avatar their picture, a URL that only
+ * forge/image reads, where the forge gives one; state is their newest review, or pending while they
+ * are asked and have not answered, or were asked again since.
+ */
+export interface ForgeReviewer {
+  login: string;
+  avatar?: string;
+  state: ForgeReviewerState;
+}
+
+/**
+ * A reviewer's state (#4409): approved, changes_requested, commented (reviewed with no verdict) or
+ * pending (asked, not answered).
+ */
+export type ForgeReviewerState =
+  | "approved"
+  | "changes_requested"
+  | "commented"
+  | "pending";
 
 /**
  * A standing epic's query (#3659, #3661), as the daemon read it from the standing block in the
@@ -13256,6 +13400,15 @@ export interface WakeSettings {
    * host has.
    */
   backgroundHours?: number;
+  /**
+   * How long a finished runtime with no background processes is kept, counted from its last turn's
+   * end, before the host ends it (#4044, #4513): 0 to 1440 minutes, default 10. An agent that waits
+   * for an event (wait_for_event, check_again, a lease) is then continued with session/load when
+   * the event comes. 0 releases none for being idle; warmRuntimes still holds. Missing, from a
+   * client that does not know it, keeps the value the host has. A runtime that can neither load nor
+   * resume a conversation is kept while its agent waits.
+   */
+  releaseAfterMinutes?: number;
 }
 
 /** Why the Mac is, or is not, being kept awake (024). */
@@ -13371,12 +13524,12 @@ export interface WorkTimelineBacktest {
 }
 
 /**
- * A child of an epic in work/timeline (#4172). stateReason is completed or not_planned, where the
- * forge says it. startedAt is the earliest of the first session linked to it in lineage, the
- * opening of the first pull request that closes it, and its close; absent while nothing has started
- * it. waitsForPerson: it is open and labelled alex-todo or needs-account, so it is not forecast.
- * forecastAt is an open child's forecast close: its epic's P50 shared out along the line, in the
- * order of the children.
+ * A child of an epic in work/timeline (#4172). item has its labels with their colours, for the
+ * hover card's chips (#4428). stateReason is completed or not_planned, where the forge says it.
+ * startedAt is the earliest of the first session linked to it in lineage, the opening of the first
+ * pull request that closes it, and its close; absent while nothing has started it. waitsForPerson:
+ * it is open and labelled alex-todo or needs-account, so it is not forecast. forecastAt is an open
+ * child's forecast close: its epic's P50 shared out along the line, in the order of the children.
  */
 export interface WorkTimelineChild {
   item: ForgeItem;
@@ -13965,8 +14118,10 @@ export interface Methods {
   "folders/undoGuardedChange": { params: GuardedChangeRequest; result: FolderSummary };
   "forge/add-child": { params: ForgeAddChildRequest; result: ForgeDone };
   "forge/approve": { params: ForgeApproveRequest; result: ForgeDone };
+  "forge/assign": { params: ForgeAssignRequest; result: ForgeDone };
   "forge/blocked-by": { params: ForgeBlockedByRequest; result: ForgeDone };
   "forge/boards": { params: ForgeBoardsRequest; result: ForgeBoards };
+  "forge/cancel-auto-merge": { params: ForgeNodeRequest; result: ForgeDone };
   "forge/close": { params: ForgeCloseRequest; result: ForgeDone };
   "forge/comment": { params: ForgeCommentRequest; result: ForgeDone };
   "forge/diff": { params: ForgeNodeRequest; result: ForgeDiff };
@@ -13981,6 +14136,9 @@ export interface Methods {
   "forge/plan": { params: ForgePlanRequest; result: ForgePlan };
   "forge/pull": { params: ForgeItemRequest; result: ForgeItemDetail };
   "forge/pulls": { params: ForgeListRequest; result: ForgeList };
+  "forge/ready": { params: ForgeNodeRequest; result: ForgeDone };
+  "forge/release": { params: ForgeReleaseRequest; result: ForgeReleaseDetail };
+  "forge/releases": { params: ForgeReleasesRequest; result: ForgeReleases };
   "forge/rerun": { params: ForgeNodeRequest; result: ForgeDone };
   "governance/approvals": { params: Empty; result: CatalogApprovalList };
   "governance/decide": { params: CatalogDecide; result: CatalogRequest };
@@ -13994,6 +14152,7 @@ export interface Methods {
   "groups/setRole": { params: GroupRoleSet; result: Group };
   "lineage/cost": { params: LineageNodeRequest; result: LineageCostRollup };
   "lineage/estimate": { params: LineageEstimateRequest; result: LineageEstimate };
+  "lineage/figures": { params: LineageNodeRequest; result: LineageFigures };
   "lineage/forecast": { params: LineageForecastRequest; result: LineageForecast };
   "lineage/sessions": { params: LineageSessionsRequest; result: LineageSessions };
   "lineage/sessionsOn": { params: LineageSessionsOnRequest; result: LineageSessionsOn };
@@ -14389,8 +14548,10 @@ export const MethodTarget = {
   "folders/undoGuardedChange": "host",
   "forge/add-child": "host",
   "forge/approve": "host",
+  "forge/assign": "host",
   "forge/blocked-by": "host",
   "forge/boards": "host",
+  "forge/cancel-auto-merge": "host",
   "forge/close": "host",
   "forge/comment": "host",
   "forge/diff": "host",
@@ -14405,6 +14566,9 @@ export const MethodTarget = {
   "forge/plan": "host",
   "forge/pull": "host",
   "forge/pulls": "host",
+  "forge/ready": "host",
+  "forge/release": "host",
+  "forge/releases": "host",
   "forge/rerun": "host",
   "governance/approvals": "control",
   "governance/decide": "control",
@@ -14418,6 +14582,7 @@ export const MethodTarget = {
   "groups/setRole": "control",
   "lineage/cost": "host",
   "lineage/estimate": "host",
+  "lineage/figures": "host",
   "lineage/forecast": "host",
   "lineage/sessions": "host",
   "lineage/sessionsOn": "control",
@@ -15061,11 +15226,12 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FoldersListRequest: { required: ["includeArchived"], optional: [] },
   ForgeAddChildRequest: { required: ["node"], optional: ["title", "level", "issue"] },
   ForgeApproveRequest: { required: ["node", "sha"], optional: [] },
+  ForgeAssignRequest: { required: ["node"], optional: ["add", "remove"] },
   ForgeBlockedByRequest: { required: ["node"], optional: ["add", "remove"] },
   ForgeBoards: { required: ["boards"], optional: [] },
   ForgeBoardsRequest: { required: [], optional: ["folder"] },
-  ForgeCapabilities: { required: ["forge", "issues", "pulls", "labelColors", "avatars", "stateReason", "commentCount"], optional: ["createdAt", "closedAt", "children", "linkedPulls", "events", "total", "commentsMost"] },
-  ForgeCheck: { required: ["name", "state"], optional: ["url"] },
+  ForgeCapabilities: { required: ["forge", "issues", "pulls", "labelColors", "avatars", "stateReason", "commentCount"], optional: ["createdAt", "closedAt", "children", "linkedPulls", "events", "total", "releases", "branches", "mergedBy", "mergeCommit", "size", "reviewers", "closes", "checkTimes", "commentsMost"] },
+  ForgeCheck: { required: ["name", "state"], optional: ["url", "startedAt", "finishedAt"] },
   ForgeCloseRequest: { required: ["node"], optional: ["reopen", "transition"] },
   ForgeComment: { required: ["author", "body", "at"], optional: ["avatar", "url", "bot"] },
   ForgeCommentRequest: { required: ["node", "body"], optional: [] },
@@ -15079,8 +15245,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeFeaturesRequest: { required: [], optional: ["folder", "board"] },
   ForgeImage: { required: ["mimeType", "data"], optional: [] },
   ForgeImageRequest: { required: ["url"], optional: [] },
-  ForgeItem: { required: ["node", "title", "state", "labels", "assignees", "updatedAt", "comments"], optional: ["stateReason", "status", "url", "folder", "author", "authorAvatar", "milestone", "createdAt", "closedAt", "draft", "checks", "review", "mergeable", "autoMerge", "parent", "level", "feature", "progress", "standing"] },
-  ForgeItemDetail: { required: ["item", "body", "comments"], optional: ["cursor", "checks", "reviewThreads", "filesChanged", "head", "mergeMethods", "start", "transitions", "actions", "children", "linkedPulls", "events"] },
+  ForgeItem: { required: ["node", "title", "state", "labels", "assignees", "updatedAt", "comments"], optional: ["stateReason", "status", "url", "folder", "author", "authorAvatar", "milestone", "createdAt", "closedAt", "draft", "checks", "review", "mergeable", "autoMerge", "headRef", "baseRef", "mergedBy", "mergeCommit", "parent", "level", "feature", "progress", "standing"] },
+  ForgeItemDetail: { required: ["item", "body", "comments"], optional: ["cursor", "checks", "reviewThreads", "filesChanged", "additions", "deletions", "commits", "reviewers", "closes", "head", "mergeMethods", "start", "transitions", "actions", "children", "linkedPulls", "events"] },
   ForgeItemRequest: { required: ["node"], optional: ["cursor"] },
   ForgeLabel: { required: ["name"], optional: ["color"] },
   ForgeLabelRequest: { required: ["node"], optional: ["add", "remove"] },
@@ -15100,6 +15266,13 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgePlanRequest: { required: ["node"], optional: [] },
   ForgePlanStep: { required: ["step", "nodes"], optional: [] },
   ForgeProgress: { required: ["done", "total"], optional: [] },
+  ForgeRelease: { required: ["node", "forge", "repo", "tag", "name", "draft", "prerelease", "latest", "assets", "url"], optional: ["folder", "body", "createdAt", "publishedAt", "author", "authorAvatar"] },
+  ForgeReleaseDetail: { required: ["release", "commits", "pulls"], optional: ["previous", "compareUrl"] },
+  ForgeReleasePull: { required: ["node", "number", "title", "sha"], optional: [] },
+  ForgeReleaseRequest: { required: ["node"], optional: [] },
+  ForgeReleases: { required: ["releases"], optional: ["none", "errors"] },
+  ForgeReleasesRequest: { required: [], optional: ["folder", "limit"] },
+  ForgeReviewer: { required: ["login", "state"], optional: ["avatar"] },
   ForgeStanding: { required: ["labels", "any", "not", "lanes"], optional: ["milestone", "error"] },
   ForgeStart: { required: ["prompt", "labels"], optional: ["worktree"] },
   ForgeTransition: { required: ["id", "name"], optional: ["category"] },
@@ -15841,7 +16014,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WaitServerEvent: { required: ["trigger", "servers"], optional: [] },
   WaitStatus: { required: ["line", "mark", "cancellable"], optional: [] },
   WaitingAgent: { required: ["agentID", "title", "folder", "status"], optional: [] },
-  WakeSettings: { required: ["keepsAwake", "graceHours", "warmRuntimes", "awakeOnPower"], optional: ["backgroundHours"] },
+  WakeSettings: { required: ["keepsAwake", "graceHours", "warmRuntimes", "awakeOnPower"], optional: ["backgroundHours", "releaseAfterMinutes"] },
   WakeState: { required: ["isHolding", "agentsInFlight", "heldBackByBattery", "onPower"], optional: ["batteryPercent", "since", "graceUntil"] },
   WebPagePairing: { required: ["url"], optional: [] },
   WebPushKey: { required: [], optional: ["publicKey"] },

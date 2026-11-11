@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/lineage"
+	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -15,9 +16,10 @@ import (
 // service levels from this machine's totals (lineage.ForecastOf), and each weekly allowance's
 // burn from allowances.json. An epic's first landing forecast is kept on its node, so a report
 // can score it when the epic lands. A milestone (#4620) is forecast from the store's issues
-// in it, in its folder's repo; nothing is kept for it, since a milestone has no node. A
-// what-if (#4531) takes the window's runtime mix from the usage and time histories, and is
-// never kept.
+// in it, in its folder's repo; nothing is kept for it, since a milestone has no node, but
+// a P85 date past its due date is told once (milestonenotice.go, #4654). A what-if (#4531)
+// takes the window's runtime mix from the usage and time histories, and is never kept or
+// told.
 
 // allowanceWeek is how long a weekly allowance's window is.
 const allowanceWeek = 7 * 24 * time.Hour
@@ -112,7 +114,8 @@ func (d *Daemon) runtimeMix(now time.Time) []wire.LineageForecastRuntime {
 	return lineage.RuntimesOf(hours, cost)
 }
 
-// milestoneForecast is when the milestone named lands, in folder's repo (any for none).
+// milestoneForecast is when the milestone named lands, in folder's repo (any for none), with
+// w's what-if. With a repo and no what-if, a P85 date past its due date tells the person (#4654).
 func (d *Daemon) milestoneForecast(milestone, folder string, w lineage.WhatIf) wire.LineageForecast {
 	repo := ""
 	if folder != "" {
@@ -120,6 +123,15 @@ func (d *Daemon) milestoneForecast(milestone, folder string, w lineage.WhatIf) w
 			repo = r.forge + ":" + r.path
 		}
 	}
+	f := d.milestoneForecastIn(milestone, repo, w)
+	if repo != "" && f.WhatIf == nil {
+		safe.Go("milestone due date", func() { d.tellMilestoneLate(milestoneOf{repo, milestone}, f) })
+	}
+	return f
+}
+
+// milestoneForecastIn is when the milestone named lands, in repo (any for ""), with w's what-if.
+func (d *Daemon) milestoneForecastIn(milestone, repo string, w lineage.WhatIf) wire.LineageForecast {
 	now := nowFunc()
 	nodes := d.forecastNodes()
 	f := lineage.MilestoneForecastOf(nodes, milestone, repo, now, w)
