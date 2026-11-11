@@ -60,11 +60,13 @@ type Item struct {
 
 // SearchPage is a page of a list, the last updated first. Cursors[i] goes on after Items[i],
 // so a caller that keeps only some of the page goes on from the last it kept; Next is the
-// cursor after the page, "" at the end.
+// cursor after the page, "" at the end. Total is how many issues the whole list has, on its
+// first page only (#4396); nil where Jira did not say.
 type SearchPage struct {
 	Items   []Item
 	Cursors []string
 	Next    string
+	Total   *int
 }
 
 // Comment is a comment on an issue, as Markdown.
@@ -227,6 +229,13 @@ func cursorParts(cursor string) (string, int, error) {
 // searchPage is one page of what jql finds, at most max, from page (Jira Cloud's page token,
 // or Data Center's start), and the page after it ("" at the end).
 func (j *RealJira) searchPage(ctx context.Context, jql string, read []string, max int, page string) ([]restIssue, string, error) {
+	list, next, _, err := j.searchCounted(ctx, jql, read, max, page)
+	return list, next, err
+}
+
+// searchCounted is searchPage and how many issues jql finds in all: Data Center says it with
+// the page; Jira Cloud's /search/jql does not, so it is -1 there.
+func (j *RealJira) searchCounted(ctx context.Context, jql string, read []string, max int, page string) ([]restIssue, string, int, error) {
 	var out struct {
 		Issues        []restIssue `json:"issues"`
 		StartAt       int         `json:"startAt"`
@@ -240,29 +249,41 @@ func (j *RealJira) searchPage(ctx context.Context, jql string, read []string, ma
 			body["nextPageToken"] = page
 		}
 		if err := j.call(ctx, http.MethodPost, "/search/jql", body, &out); err != nil {
-			return nil, "", err
+			return nil, "", 0, err
 		}
 		if out.NextPageToken == "" || out.IsLast != nil && *out.IsLast {
-			return out.Issues, "", nil
+			return out.Issues, "", -1, nil
 		}
-		return out.Issues, out.NextPageToken, nil
+		return out.Issues, out.NextPageToken, -1, nil
 	}
 	start := 0
 	if page != "" {
 		n, err := strconv.Atoi(page)
 		if err != nil || n < 0 {
-			return nil, "", &JiraError{Kind: Failed, Message: "Jira: the cursor is not one a list gave"}
+			return nil, "", 0, &JiraError{Kind: Failed, Message: "Jira: the cursor is not one a list gave"}
 		}
 		start = n
 	}
 	body["startAt"] = start
 	if err := j.call(ctx, http.MethodPost, "/search", body, &out); err != nil {
-		return nil, "", err
+		return nil, "", 0, err
 	}
 	if next := start + len(out.Issues); len(out.Issues) > 0 && next < out.Total {
-		return out.Issues, strconv.Itoa(next), nil
+		return out.Issues, strconv.Itoa(next), out.Total, nil
 	}
-	return out.Issues, "", nil
+	return out.Issues, "", out.Total, nil
+}
+
+// approximateCount is how many issues jql finds on Jira Cloud, which Jira says is approximate
+// (#4396); -1 where it does not say.
+func (j *RealJira) approximateCount(ctx context.Context, jql string) int {
+	var out struct {
+		Count *int `json:"count"`
+	}
+	if err := j.call(ctx, http.MethodPost, "/search/approximate-count", map[string]any{"jql": jql}, &out); err != nil || out.Count == nil {
+		return -1
+	}
+	return *out.Count
 }
 
 // Search is one page of the issues of projects, at most first (1 to 100), after the cursor
@@ -278,9 +299,19 @@ func (j *RealJira) Search(ctx context.Context, projects []string, f SearchFilter
 	}
 	first = max(1, min(first, perPage))
 	// The issues skipped are read again, as Jira Cloud cannot start in a page's middle.
-	list, next, err := j.searchPage(ctx, SearchJQL(projects, f), forgeFields, min(perPage, first+skip), from)
+	jql := SearchJQL(projects, f)
+	list, next, total, err := j.searchCounted(ctx, jql, forgeFields, min(perPage, first+skip), from)
 	if err != nil {
 		return SearchPage{}, err
+	}
+	// Only the first page counts; a count that fails leaves the list without one.
+	if after == "" {
+		if total < 0 {
+			total = j.approximateCount(ctx, jql)
+		}
+		if total >= 0 {
+			page.Total = &total
+		}
 	}
 	site := j.Auth().Site
 	for n := skip; n < len(list) && len(page.Items) < first; n++ {

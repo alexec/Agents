@@ -183,11 +183,13 @@ func (d *Daemon) registerForge() {
 }
 
 // forgeCursor is a list's cursor, one per forge by its name, so a page goes on where each forge
-// stopped. Done are the forges whose list has ended. Its JSON is flat, {"github": "…", "done":
-// […]}, so a cursor from a daemon before the map (#4360) still reads.
+// stopped. Done are the forges whose list has ended. Totals are each forge's count from its
+// first page, so every page says the list's total (#4396). Its JSON is flat, {"github": "…",
+// "done": […], "totals": {…}}, so a cursor from a daemon before the map (#4360) still reads.
 type forgeCursor struct {
-	At   map[string]string
-	Done []string
+	At     map[string]string
+	Done   []string
+	Totals map[string]int
 }
 
 // set is where forge goes on from; "" is from its start.
@@ -212,6 +214,9 @@ func (c forgeCursor) MarshalJSON() ([]byte, error) {
 	if len(c.Done) > 0 {
 		m["done"] = c.Done
 	}
+	if len(c.Totals) > 0 {
+		m["totals"] = c.Totals
+	}
 	return json.Marshal(m)
 }
 
@@ -224,6 +229,12 @@ func (c *forgeCursor) UnmarshalJSON(b []byte) error {
 	for k, v := range m {
 		if k == "done" {
 			if err := json.Unmarshal(v, &c.Done); err != nil {
+				return err
+			}
+			continue
+		}
+		if k == "totals" {
+			if err := json.Unmarshal(v, &c.Totals); err != nil {
 				return err
 			}
 			continue
@@ -338,7 +349,16 @@ func (d *Daemon) forgeList(ctx context.Context, prs bool, r wire.ForgeListReques
 		pages = append(pages, p)
 	}
 	var more bool
+	totals := listTotals(cursor, pages)
 	out.Items, cursor, more = mergeForgePages(pages, cursor, limit)
+	cursor.Totals = totals
+	names := make([]string, len(moved))
+	for n, m := range moved {
+		names[n] = m.forge.Name()
+	}
+	if total, ok := listTotal(names, totals); ok {
+		out.Total = new(int64(total))
+	}
 	// What each forge with an item on the page fills, so a client draws its rows (#4361).
 	for _, m := range moved {
 		if slices.ContainsFunc(out.Items, func(i wire.ForgeItem) bool { _, ok := m.forge.Owns(i.Node); return ok }) {
@@ -359,13 +379,52 @@ func (d *Daemon) forgeList(ctx context.Context, prs bool, r wire.ForgeListReques
 }
 
 // forgePage is one forge's page of a list: cursors[i] goes on after items[i], next after the
-// page ("" at its end); or why the forge could not be read.
+// page ("" at its end); or why the forge could not be read. total is how many items the forge's
+// whole list has, given on its first page where Caps().Total says so (#4396).
 type forgePage struct {
 	forge   string
 	items   []wire.ForgeItem
 	cursors []string
 	next    string
+	total   *int
 	err     error
+}
+
+// listTotals are each forge's count of a list (#4396): from's, and the count on each page that
+// is its forge's first. A forge whose first page is its last counts its items, so a forge that
+// gives no count has one then; one that could not be read has none yet.
+func listTotals(from forgeCursor, pages []forgePage) map[string]int {
+	totals := maps.Clone(from.Totals)
+	for _, p := range pages {
+		if p.err != nil || from.At[p.forge] != "" {
+			continue
+		}
+		n := len(p.items)
+		switch {
+		case p.total != nil:
+			n = *p.total
+		case p.next != "":
+			continue
+		}
+		if totals == nil {
+			totals = map[string]int{}
+		}
+		totals[p.forge] = n
+	}
+	return totals
+}
+
+// listTotal is the sum of the forges' totals, and false while one of them has none.
+func listTotal(forges []string, totals map[string]int) (int, bool) {
+	sum := 0
+	for _, f := range forges {
+		n, ok := totals[f]
+		if !ok {
+			return 0, false
+		}
+		sum += n
+	}
+	return sum, true
 }
 
 // mergeForgePages keeps the newest limit items of the forges' pages, each forge's in its own

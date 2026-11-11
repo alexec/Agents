@@ -72,11 +72,13 @@ type Item struct {
 
 // SearchPage is a page of a list, the last updated first. Cursors[i] goes on after Items[i],
 // so a caller that keeps only some of the page goes on from the last it kept; Next is the
-// cursor after the page, "" at the end.
+// cursor after the page, "" at the end. Total is how many items the whole list has, on its
+// first page only (#4396); nil where GitLab does not say.
 type SearchPage struct {
 	Items   []Item
 	Cursors []string
 	Next    string
+	Total   *int
 }
 
 // Comment is a comment on an item, as Markdown.
@@ -311,10 +313,26 @@ func (g *RealGitLab) Search(ctx context.Context, projects []string, f SearchFilt
 	ask := min(perPage, first+len(c.Seen))
 	var all []Item
 	more := false
+	// The first page counts each project's list in each state; later pages leave the count out.
+	total := 0
+	if after != "" {
+		total = -1
+	}
 	for _, project := range projects {
 		for _, state := range listStates(f) {
 			var list []forgeJSON
-			if err := g.get(ctx, listPath(project, f, state, c.Before, ask), false, &list); err != nil {
+			path := listPath(project, f, state, c.Before, ask)
+			if total < 0 {
+				err = g.get(ctx, path, false, &list)
+			} else {
+				var n int
+				if n, err = g.getCounted(ctx, path, &list); n < 0 {
+					total = -1
+				} else {
+					total += n
+				}
+			}
+			if err != nil {
 				return SearchPage{}, err
 			}
 			more = more || len(list) >= ask
@@ -339,6 +357,9 @@ func (g *RealGitLab) Search(ctx context.Context, projects []string, f SearchFilt
 	}
 	if more && len(page.Items) > 0 {
 		page.Next = page.Cursors[len(page.Cursors)-1]
+	}
+	if total >= 0 {
+		page.Total = &total
 	}
 	return page, nil
 }

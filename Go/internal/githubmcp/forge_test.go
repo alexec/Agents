@@ -13,7 +13,7 @@ import (
 	"testing"
 )
 
-const searchAnswer = `{"data":{"search":{"pageInfo":{"hasNextPage":true,"endCursor":"Y3Vyc29y"},"edges":[
+const searchAnswer = `{"data":{"search":{"issueCount":57,"pageInfo":{"hasNextPage":true,"endCursor":"Y3Vyc29y"},"edges":[
  {"cursor":"YzE=","node":{"__typename":"PullRequest","number":12,"title":"Forge reads","url":"https://github.com/o/r/pull/12","pullState":"MERGED",
   "updatedAt":"2026-11-01T10:00:00Z","author":{"login":"alexec","__typename":"User","avatarUrl":"https://avatars.githubusercontent.com/u/1142830?v=4"},"repository":{"nameWithOwner":"o/r"},
   "labels":{"nodes":[{"name":"enhancement","color":"A2EEEF"},{"name":"odd","color":"red"}]},
@@ -104,7 +104,8 @@ func TestSearchListsManyReposInOneCall(t *testing.T) {
 	if vars := a.all(); len(vars) != 1 || vars[0]["q"] != `is:pr is:open repo:o/r repo:o/s label:"enhancement" sort:updated-desc` || vars[0]["first"] != float64(100) {
 		t.Fatalf("asked: %v", vars)
 	}
-	if p.Next != "Y3Vyc29y" || len(p.Items) != 2 || !slices.Equal(p.Cursors, []string{"YzE=", "YzI="}) {
+	// The count is the whole search's (#4396), not the page's.
+	if p.Next != "Y3Vyc29y" || len(p.Items) != 2 || !slices.Equal(p.Cursors, []string{"YzE=", "YzI="}) || p.Total == nil || *p.Total != 57 {
 		t.Fatalf("page: %+v", p)
 	}
 	first, b := p.Items[0], p.Items[1]
