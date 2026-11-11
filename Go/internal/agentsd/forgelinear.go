@@ -36,18 +36,18 @@ func (linearForge) Caps() forgeCaps {
 		LabelColors: true,
 		Avatars:     true,
 		StateReason: true,
-		CreatedAt:   true, ClosedAt: true, Children: true,
+		CreatedAt:   true, ClosedAt: true, Children: true, LinkedPulls: true, Events: true,
 		// Linear does not count an issue's comments: a list reads at most 50.
 		CommentCount: "capped", CommentsMost: 50,
 		Plan: true, BlockedBy: true, AddChild: true,
 		Reasons: map[string]string{
-			actionAssign:   "the app does not set a Linear issue's assignee yet",
-			actionReleases: "Linear has no releases: it is a tracker, with no repositories",
+			actionAssign:     "the app does not set a Linear issue's assignee yet",
+			actionReleases:   "Linear has no releases: it is a tracker, with no repositories",
 			actionTransition: "only a Jira issue or an Azure Boards work item moves by a transition",
 			actionMerge:      linearNoPRs,
 			actionAutoMerge:  linearNoPRs,
 			actionCancelAuto: linearNoPRs,
-			actionReady: linearNoPRs,
+			actionReady:      linearNoPRs,
 			actionApprove:    linearNoPRs,
 			actionRerun:      linearNoPRs,
 			actionLog:        linearNoPRs,
@@ -165,6 +165,20 @@ func (l linearForge) Item(ctx context.Context, r forgeRef, cursor string) (wire.
 	for _, c := range p.Children {
 		out.Children = append(out.Children, wire.ForgeLinked{Node: wire.LineageNode{Kind: lineage.KindIssue, Ref: "linear:" + c.Identifier},
 			Title: c.Title, State: c.State, URL: optional(c.URL)})
+	}
+	// Linear has no pull requests: a linked one is GitHub's or GitLab's, from an attachment (#4626).
+	out.LinkedPulls = []wire.ForgeLinked{}
+	for _, l := range p.LinkedPulls {
+		repo := forgeRepo{l.Forge, strings.ToLower(l.Repo)}
+		out.LinkedPulls = append(out.LinkedPulls, wire.ForgeLinked{Node: repo.pr(l.Number), Title: l.Title, State: l.State, URL: optional(l.URL)})
+	}
+	out.Events = []wire.ForgeEvent{}
+	for _, e := range p.Events {
+		ev := wire.ForgeEvent{Kind: wire.ForgeEventKind(e.Kind), Actor: optional(e.Actor), At: forgeDate(e.At), Assignee: optional(e.Assignee)}
+		if e.Label != "" {
+			ev.Label = &wire.ForgeLabel{Name: e.Label, Color: optional(forgeLabelColor(e.LabelColor))}
+		}
+		out.Events = append(out.Events, ev)
 	}
 	for _, c := range p.Thread {
 		out.Comments = append(out.Comments, forgeCommentOf(c.Author, c.Avatar, c.Body, c.At, c.URL, c.Bot))

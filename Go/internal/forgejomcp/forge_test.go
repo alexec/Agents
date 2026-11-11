@@ -73,6 +73,20 @@ func (f *forgeFake) serve(w http.ResponseWriter, r *http.Request) {
 	case p == "repos/acme/app/issues/7/comments" && r.Method == http.MethodGet:
 		page := r.URL.Query().Get("page")
 		f.write(w, []obj{{"id": 100, "user": renovate, "body": "page " + page, "created_at": at(1), "html_url": "https://fj.test/c/100"}})
+	case p == "repos/acme/app/issues/7/timeline":
+		pull := obj{"number": 8, "title": "WIP: Add hello", "state": "closed", "html_url": "https://fj.test/acme/app/pulls/8",
+			"pull_request": obj{"merged": true}, "repository": obj{"full_name": "acme/app"}}
+		f.write(w, []obj{
+			{"type": "label", "body": "1", "user": alex, "created_at": at(1), "label": obj{"name": "bug", "color": "EE0701"}},
+			{"type": "label", "body": "", "user": alex, "created_at": at(2), "label": obj{"name": "docs", "color": "0075ca"}},
+			{"type": "assignees", "user": alex, "created_at": at(2), "assignee": dev},
+			{"type": "assignees", "user": alex, "created_at": at(2), "assignee": dev, "removed_assignee": true},
+			{"type": "comment", "user": dev, "created_at": at(3), "body": "a comment is not an event"},
+			{"type": "pull_ref", "user": dev, "created_at": at(3), "ref_issue": pull},
+			{"type": "comment_ref", "user": dev, "created_at": at(3), "ref_issue": pull},
+			{"type": "issue_ref", "user": dev, "created_at": at(4), "ref_issue": obj{"number": 3, "title": "Other", "state": "open", "repository": obj{"full_name": "acme/lib"}}},
+			{"type": "close", "user": alex, "created_at": at(4)},
+			{"type": "reopen", "user": alex, "created_at": at(5)}})
 	case p == "repos/acme/app/issues/8":
 		f.write(w, obj{"number": 8, "title": "WIP: Add hello", "body": "Fixes #7", "state": "open", "html_url": "https://fj.test/acme/app/pulls/8",
 			"user": dev, "updated_at": at(6), "comments": 0, "pull_request": obj{"merged": false, "draft": false}})
@@ -213,6 +227,42 @@ func TestTheForgeItemPageReadsAnIssueAndAPullRequest(t *testing.T) {
 	if !p.PR || !p.Draft || p.Head != "abc123" || p.FilesChanged != 2 || p.Mergeable != "conflicting" || p.Checks != "failing" ||
 		p.Review != "changes_requested" || p.ReviewThreads != 3 || len(p.CheckRuns) != 2 || p.CheckRuns[0].State != "failing" || p.CheckRuns[1].State != "passing" {
 		t.Fatalf("a pull request's page: %+v", p)
+	}
+}
+
+// #4626: an issue's timeline gives its events, oldest first, and the pull requests that name
+// it, each once; an entry the wire has no word for is left out.
+func TestTheForgeItemPageReadsAnIssuesTimeline(t *testing.T) {
+	_, fj := newForgeFake(t)
+	d, err := fj.ItemPage(context.Background(), "acme/app", 7, false, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(d.LinkedPulls) != 1 || d.LinkedPulls[0] != (Linked{Repo: "acme/app", Number: 8, Title: "WIP: Add hello", State: "merged", URL: "https://fj.test/acme/app/pulls/8"}) {
+		t.Fatalf("linked pulls: %+v", d.LinkedPulls)
+	}
+	var kinds []string
+	for _, e := range d.Events {
+		kinds = append(kinds, e.Kind)
+	}
+	if !slices.Equal(kinds, []string{"labeled", "unlabeled", "assigned", "unassigned", "referenced", "referenced", "referenced", "closed", "reopened"}) {
+		t.Fatalf("kinds: %v", kinds)
+	}
+	if e := d.Events[0]; e.Label != "bug" || e.LabelColor != "#ee0701" || e.Actor != "alex" {
+		t.Errorf("labeled: %+v", e)
+	}
+	if e := d.Events[2]; e.Assignee != "dev" {
+		t.Errorf("assigned: %+v", e)
+	}
+	if e := d.Events[6]; e.SourceRepo != "acme/lib" || e.SourceNumber != 3 || e.SourcePR {
+		t.Errorf("an issue that named it: %+v", e)
+	}
+	if e := d.Events[4]; e.SourceRepo != "acme/app" || e.SourceNumber != 8 || !e.SourcePR {
+		t.Errorf("a pull request that named it: %+v", e)
+	}
+	// A pull request's read has no timeline.
+	if p, err := fj.ItemPage(context.Background(), "acme/app", 8, true, ""); err != nil || p.LinkedPulls != nil || p.Events != nil {
+		t.Fatalf("a pull request's page: %+v %v", p, err)
 	}
 }
 

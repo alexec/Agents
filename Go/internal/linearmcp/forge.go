@@ -4,7 +4,9 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -70,6 +72,23 @@ type ItemDetail struct {
 	Before string
 	// Children are its sub-issues, at most 50, in Linear's order (#4373).
 	Children []Child
+	// LinkedPulls are the GitHub pull requests and GitLab merge requests attached to it, and
+	// Events what its latest 50 changes did, oldest first (#4626).
+	LinkedPulls []LinkedPull
+	Events      []Event
+}
+
+// LinkedPull is a pull request (Forge github) or a merge request (Forge gitlab) that an
+// attachment names: Repo is owner/repo or group/project, State open, closed or merged.
+type LinkedPull struct {
+	Forge, Repo, Title, URL, State string
+	Number                         int
+}
+
+// Event is one thing a change did (#4626): Kind is labeled, unlabeled, assigned, unassigned,
+// closed or reopened. Label and LabelColor name a label; Assignee a person.
+type Event struct {
+	Kind, Actor, At, Label, LabelColor, Assignee string
 }
 
 // Child is a sub-issue on an issue's read: State is open or closed.
@@ -94,6 +113,9 @@ const forgeSearch = `query ForgeIssues($filter: IssueFilter, $first: Int, $after
 // Linear's pages go newest first, so the page before a comment is the one after it.
 const forgeItem = `query ForgeIssue($id: String!, $comments: Int, $before: String) { issue(id: $id) { ` + forgeFields + ` ` + forgeChildren + ` description
   subIssues: children(first: 50) { nodes { identifier title url state { type } } }
+  attachments(first: 50) { nodes { url title sourceType metadata } }
+  history(first: 50) { nodes { createdAt actor { displayName } botActor { name } addedLabels { name color } removedLabels { name color }
+    fromAssignee { displayName } toAssignee { displayName } fromState { type } toState { type } } }
   comments(first: $comments, after: $before) { pageInfo { hasNextPage endCursor }
     nodes { body createdAt url user { displayName avatarUrl } botActor { name avatarUrl } } } } }`
 
@@ -309,6 +331,12 @@ func (l *RealLinear) ItemPage(ctx context.Context, identifier, before string) (I
 					} `json:"state"`
 				} `json:"nodes"`
 			} `json:"subIssues"`
+			Attachments struct {
+				Nodes []forgeAttachment `json:"nodes"`
+			} `json:"attachments"`
+			History struct {
+				Nodes []forgeHistory `json:"nodes"`
+			} `json:"history"`
 		} `json:"issue"`
 	}
 	if err := l.query(ctx, forgeItem, vars, &out); err != nil {
@@ -325,6 +353,13 @@ func (l *RealLinear) ItemPage(ctx context.Context, identifier, before string) (I
 		}
 		d.Children = append(d.Children, Child{Identifier: c.Identifier, Title: c.Title, URL: c.URL, State: state})
 	}
+	d.LinkedPulls = []LinkedPull{}
+	for _, a := range out.Issue.Attachments.Nodes {
+		if p, ok := a.pull(); ok {
+			d.LinkedPulls = append(d.LinkedPulls, p)
+		}
+	}
+	d.Events = eventsOf(out.Issue.History.Nodes)
 	for _, c := range slices.Backward(out.Issue.Comments.Nodes) {
 		comment := Comment{Body: c.Body, At: c.CreatedAt, URL: c.URL}
 		switch {
@@ -465,4 +500,115 @@ func (l *RealLinear) Blockers(ctx context.Context, identifiers []string) (map[st
 		}
 	}
 	return out, nil
+}
+
+// forgeAttachment is a link on an issue: an integration's (sourceType github, gitlab) has the
+// pull request's status in its metadata.
+type forgeAttachment struct {
+	URL        string `json:"url"`
+	Title      string `json:"title"`
+	SourceType string `json:"sourceType"`
+	Metadata   struct {
+		Status string `json:"status"`
+		State  string `json:"state"`
+	} `json:"metadata"`
+}
+
+var (
+	githubPull  = regexp.MustCompile(`^https://github\.com/([^/]+/[^/]+)/pull/(\d+)(?:[/?#].*)?$`)
+	gitlabMerge = regexp.MustCompile(`^https://[^/]+/(.+?)/-/merge_requests/(\d+)(?:[/?#].*)?$`)
+)
+
+// pull is the pull request or merge request the attachment links to, if it is one.
+func (a forgeAttachment) pull() (LinkedPull, bool) {
+	forge, m := "", []string(nil)
+	switch strings.ToLower(a.SourceType) {
+	case "github":
+		forge, m = "github", githubPull.FindStringSubmatch(a.URL)
+	case "gitlab":
+		forge, m = "gitlab", gitlabMerge.FindStringSubmatch(a.URL)
+	}
+	if m == nil {
+		return LinkedPull{}, false
+	}
+	n, err := strconv.Atoi(m[2])
+	if err != nil || n < 1 {
+		return LinkedPull{}, false
+	}
+	state := "open"
+	switch s := strings.ToLower(cmp.Or(a.Metadata.Status, a.Metadata.State)); s {
+	case "merged", "closed":
+		state = s
+	}
+	return LinkedPull{Forge: forge, Repo: m[1], Number: n, Title: cmp.Or(a.Title, a.URL), URL: a.URL, State: state}, true
+}
+
+// forgeHistory is one change to an issue, as an issue's read asks for it.
+type forgeHistory struct {
+	CreatedAt string       `json:"createdAt"`
+	Actor     *forgePerson `json:"actor"`
+	BotActor  *gqlBot      `json:"botActor"`
+	Added     []struct {
+		Name  string `json:"name"`
+		Color string `json:"color"`
+	} `json:"addedLabels"`
+	Removed []struct {
+		Name  string `json:"name"`
+		Color string `json:"color"`
+	} `json:"removedLabels"`
+	FromAssignee *forgePerson `json:"fromAssignee"`
+	ToAssignee   *forgePerson `json:"toAssignee"`
+	FromState    *struct {
+		Type string `json:"type"`
+	} `json:"fromState"`
+	ToState *struct {
+		Type string `json:"type"`
+	} `json:"toState"`
+}
+
+// eventsOf are what the changes did, oldest first: one change can add and remove labels,
+// change the assignee and move the state at once.
+func eventsOf(history []forgeHistory) []Event {
+	out := []Event{}
+	for _, h := range history {
+		actor := ""
+		switch {
+		case h.Actor != nil:
+			actor = h.Actor.DisplayName
+		case h.BotActor != nil:
+			actor = h.BotActor.Name
+		}
+		at := func(kind string) Event { return Event{Kind: kind, Actor: actor, At: h.CreatedAt} }
+		for _, l := range h.Added {
+			e := at("labeled")
+			e.Label, e.LabelColor = l.Name, l.Color
+			out = append(out, e)
+		}
+		for _, l := range h.Removed {
+			e := at("unlabeled")
+			e.Label, e.LabelColor = l.Name, l.Color
+			out = append(out, e)
+		}
+		if h.FromAssignee != nil && (h.ToAssignee == nil || h.ToAssignee.DisplayName != h.FromAssignee.DisplayName) {
+			e := at("unassigned")
+			e.Assignee = h.FromAssignee.DisplayName
+			out = append(out, e)
+		}
+		if h.ToAssignee != nil && (h.FromAssignee == nil || h.ToAssignee.DisplayName != h.FromAssignee.DisplayName) {
+			e := at("assigned")
+			e.Assignee = h.ToAssignee.DisplayName
+			out = append(out, e)
+		}
+		if h.FromState != nil && h.ToState != nil {
+			switch from, to := isClosed(h.FromState.Type), isClosed(h.ToState.Type); {
+			case !from && to:
+				out = append(out, at("closed"))
+			case from && !to:
+				out = append(out, at("reopened"))
+			}
+		}
+	}
+	// history(first:) is the newest first; a stable sort keeps one change's events in order.
+	slices.SortStableFunc(out, func(a, b Event) int { return cmp.Compare(a.At, b.At) })
+	return out
 }

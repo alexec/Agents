@@ -145,6 +145,9 @@ func (forgejoForge) Caps() forgeCaps {
 		LabelColors: true,
 		Avatars:     true,
 		CreatedAt:   true, ClosedAt: true,
+		// An issue's read has the pull requests that name it and its timeline (#4626); Forgejo
+		// has no sub-issues.
+		LinkedPulls: true, Events: true,
 		// A pull request's branches and merge (#4409); its size, reviewers, closing issues and check times are #4682.
 		Branches: true, MergedBy: true, MergeCommit: true,
 		CommentCount: "exact",
@@ -257,6 +260,20 @@ func (g forgejoForge) Item(ctx context.Context, r forgeRef, cursor string) (wire
 	}
 	if !p.PR {
 		out.Start = forgejoStart(out.Item, r.Number)
+		out.LinkedPulls, out.Events = []wire.ForgeLinked{}, []wire.ForgeEvent{}
+		for _, l := range p.LinkedPulls {
+			out.LinkedPulls = append(out.LinkedPulls, wire.ForgeLinked{Node: forgejoNode(l.Repo, l.Number, true), Title: l.Title, State: l.State, URL: optional(l.URL)})
+		}
+		for _, e := range p.Events {
+			ev := wire.ForgeEvent{Kind: wire.ForgeEventKind(e.Kind), Actor: optional(e.Actor), At: forgeDate(e.At), Assignee: optional(e.Assignee)}
+			if e.Label != "" {
+				ev.Label = &wire.ForgeLabel{Name: e.Label, Color: optional(e.LabelColor)}
+			}
+			if e.SourceNumber > 0 {
+				ev.Source = new(forgejoNode(e.SourceRepo, e.SourceNumber, e.SourcePR))
+			}
+			out.Events = append(out.Events, ev)
+		}
 		return out, nil
 	}
 	out.Checks = []wire.ForgeCheck{}

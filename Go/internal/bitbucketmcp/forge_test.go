@@ -99,6 +99,12 @@ func (f *forgeFake) serve(w http.ResponseWriter, r *http.Request) {
 			comment(100, alex, "", at(2), nil),
 			comment(99, renovate, "older on page "+pg, at(1), nil),
 		}, pg == "1")
+	case p == "acme/app/issues/7/changes" && r.Method == http.MethodGet:
+		page([]obj{
+			{"created_on": at(3), "user": dev, "changes": obj{"state": obj{"old": "open", "new": "resolved"}}},
+			{"created_on": at(1), "user": alex, "changes": obj{"kind": obj{"old": "task", "new": "bug"}, "assignee": obj{"old": "", "new": "dev"}, "title": obj{"old": "a", "new": "b"}}},
+			{"created_on": at(4), "user": alex, "changes": obj{"state": obj{"old": "resolved", "new": "open"}, "component": obj{"old": "", "new": "ui"}}},
+		}, false)
 	case p == "acme/app/pullrequests/8" && r.Method == http.MethodGet:
 		f.write(w, pull(8, "hello", dev, obj{"title": "Add hello", "description": "Fixes #7", "updated_on": at(6), "comment_count": 2,
 			"source":       obj{"branch": obj{"name": "hello"}, "commit": obj{"hash": "abc123def456"}, "repository": obj{"full_name": repo}},
@@ -236,6 +242,12 @@ func TestItemPageReadsAnIssue(t *testing.T) {
 		!slices.Equal(d.Labels, []string{"bug", "ui"}) || len(d.Thread) != 2 || d.Thread[0].Body != "older on page 1" || !d.Thread[0].Bot ||
 		d.Thread[1].Author != "dev" || d.Thread[1].Avatar != "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/a-dev/48" {
 		t.Fatalf("issue: %+v", d)
+	}
+	// Its changes are its events, oldest first; a title's change is none (#4626).
+	if !slices.Equal(d.Events, []Event{{Kind: "unlabeled", Actor: "alex", At: at(1), Label: "task"}, {Kind: "labeled", Actor: "alex", At: at(1), Label: "bug"},
+		{Kind: "assigned", Actor: "alex", At: at(1), Assignee: "dev"}, {Kind: "closed", Actor: "dev", At: at(3)},
+		{Kind: "labeled", Actor: "alex", At: at(4), Label: "ui"}, {Kind: "reopened", Actor: "alex", At: at(4)}}) {
+		t.Fatalf("events: %+v", d.Events)
 	}
 	older, err := bb.ItemPage(context.Background(), "acme/app", 7, false, d.Before)
 	if err != nil || older.Before != "" || older.Thread[0].Body != "older on page 2" {
