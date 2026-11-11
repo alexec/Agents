@@ -2073,7 +2073,7 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .docs-match { display: flex; gap: 8px; text-align: left; }
 .docs-line { min-width: 3em; text-align: right; opacity: 0.6; font-variant-numeric: tabular-nums; }
 .docs-text { margin-top: 12px; }
-/* Messages (#4344): a conversation's row, and its messages as plain text. */
+/* Messages (#4344): a conversation's row, and its messages as Markdown. */
 .messages-source { width: 1.2em; text-align: center; opacity: 0.7; }
 .messages-row .work-row-head { flex-wrap: nowrap; }
 .messages-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; font-weight: normal; }
@@ -2090,7 +2090,7 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .messages-reply p { margin: 4px 0 0; }
 .messages-reply-row { display: flex; gap: 8px; align-items: flex-end; }
 .messages-reply-row textarea { flex: 1; min-width: 0; resize: vertical; font: inherit; }
-.messages-text { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.messages-text { margin: 4px 0 0; overflow-wrap: anywhere; }
 /* The label chip (#4392, parts.md section 3): a capsule in the label's colour at 18 %, its border at 60 %, the text at
    4.5:1 (model/work chipColours); grey with no colour. A scoped label's scope in the regular weight. */
 .work-label { display: inline-flex; align-items: center; box-sizing: border-box; height: 18px; padding: 0 6px; border: 1px solid var(--paper-rule);
