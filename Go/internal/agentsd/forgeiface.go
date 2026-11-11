@@ -55,6 +55,8 @@ type Forge interface {
 	// The writes: a person's own clicks (forgewrite.go's rules do not change).
 	Comment(ctx context.Context, r forgeRef, body string) (wire.ForgeDone, error)
 	SetLabels(ctx context.Context, r forgeRef, add, remove []string) error
+	// SetAssignees assigns people to an item and takes others off it, by their logins (#4403).
+	SetAssignees(ctx context.Context, r forgeRef, add, remove []string) error
 	SetState(ctx context.Context, r forgeRef, closed bool, transition string) error
 	Merge(ctx context.Context, r forgeRef, sha, method string, auto bool) (wire.ForgeDone, error)
 	Approve(ctx context.Context, r forgeRef, sha string) (wire.ForgeDone, error)
@@ -92,13 +94,14 @@ type forgeCaps struct {
 
 // forgeActions are the writes a forge allows on one kind of item.
 type forgeActions struct {
-	Comment, Label, Close, Reopen, Transition, Merge, AutoMerge, Approve, Rerun, Log, Diff bool
+	Comment, Label, Assign, Close, Reopen, Transition, Merge, AutoMerge, Approve, Rerun, Log, Diff bool
 }
 
 // The actions' names, as forgeCaps.Reasons and errForgeCannot name them.
 const (
 	actionComment    = "comment"
 	actionLabel      = "label"
+	actionAssign     = "assign"
 	actionClose      = "close"
 	actionReopen     = "reopen"
 	actionTransition = "transition"
@@ -116,7 +119,7 @@ const (
 
 // on says whether the actions allow the action of that name.
 func (a forgeActions) on(action string) bool {
-	return map[string]bool{actionComment: a.Comment, actionLabel: a.Label, actionClose: a.Close, actionReopen: a.Reopen,
+	return map[string]bool{actionComment: a.Comment, actionLabel: a.Label, actionAssign: a.Assign, actionClose: a.Close, actionReopen: a.Reopen,
 		actionTransition: a.Transition, actionMerge: a.Merge, actionAutoMerge: a.AutoMerge, actionApprove: a.Approve,
 		actionRerun: a.Rerun, actionLog: a.Log, actionDiff: a.Diff}[action]
 }
@@ -159,6 +162,7 @@ func (c forgeCaps) itemActions(d wire.ForgeItemDetail) []wire.ForgeAction {
 	}{
 		{wire.ForgeActionComment, a.Comment},
 		{wire.ForgeActionLabel, a.Label},
+		{wire.ForgeActionAssign, a.Assign},
 		{wire.ForgeActionClose, a.Close && open},
 		{wire.ForgeActionReopen, a.Reopen && i.State == "closed"},
 		{wire.ForgeActionTransition, a.Transition && len(d.Transitions) > 0},
@@ -252,6 +256,9 @@ func (forgeNone) Comment(context.Context, forgeRef, string) (wire.ForgeDone, err
 }
 func (forgeNone) SetLabels(context.Context, forgeRef, []string, []string) error {
 	return cannot(actionLabel)
+}
+func (forgeNone) SetAssignees(context.Context, forgeRef, []string, []string) error {
+	return cannot(actionAssign)
 }
 func (forgeNone) SetState(_ context.Context, _ forgeRef, closed bool, transition string) error {
 	switch {

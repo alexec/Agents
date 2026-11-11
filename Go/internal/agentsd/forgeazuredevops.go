@@ -137,6 +137,7 @@ func (azureDevOpsForge) Caps() forgeCaps {
 		// A pull request's comment count is on its own page only.
 		CommentCount: "detail",
 		Reasons: map[string]string{
+			actionAssign:   "an Azure Repos pull request has reviewers, not assignees",
 			actionReleases: "Azure Repos has no releases, only tags",
 			actionTransition: "only a Jira issue or an Azure Boards work item moves by a transition",
 			actionPlan:       azureDevOpsNoIssues,

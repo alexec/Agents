@@ -88,6 +88,11 @@ func (f *fakeForgeGitLab) SetLabels(_ context.Context, project string, number in
 	return nil
 }
 
+func (f *fakeForgeGitLab) SetAssignees(_ context.Context, project string, number int, mr bool, add, remove []string) error {
+	f.note("assignees %s %d mr=%v +%s -%s", project, number, mr, strings.Join(add, ","), strings.Join(remove, ","))
+	return nil
+}
+
 func (f *fakeForgeGitLab) SetState(_ context.Context, project string, number int, mr, closed bool) error {
 	f.note("state %s %d mr=%v closed=%v", project, number, mr, closed)
 	return nil
@@ -170,8 +175,11 @@ func TestForgeIssueWritesGoToGitHub(t *testing.T) {
 	c.call(t, 3, "forge/label", wire.ForgeLabelRequest{Node: ghIssue, Add: []string{"bug", " bug "}, Remove: []string{"odd"}})
 	c.call(t, 4, "forge/close", wire.ForgeCloseRequest{Node: ghIssue})
 	c.call(t, 5, "forge/close", wire.ForgeCloseRequest{Node: ghIssue, Reopen: new(true)})
+	c.call(t, 8, "forge/assign", wire.ForgeAssignRequest{Node: ghIssue, Add: []string{" @kim ", "Kim", "lee"}, Remove: []string{"odd"}})
+	c.call(t, 9, "forge/assign", wire.ForgeAssignRequest{Node: ghIssue, Remove: []string{"lee"}})
 	want := []string{"comment alexec/agents#7 Looks good.", "labels alexec/agents#7 +bug -odd",
-		"state alexec/agents#7 closed=true", "state alexec/agents#7 closed=false"}
+		"state alexec/agents#7 closed=true", "state alexec/agents#7 closed=false",
+		"assign alexec/agents#7 [kim lee]", "unassign alexec/agents#7 [odd]", "unassign alexec/agents#7 [lee]"}
 	if got := gh.writes(); !slices.Equal(got, want) {
 		t.Fatalf("writes:\n%q\nwant\n%q", got, want)
 	}
@@ -250,6 +258,9 @@ func TestForgeWritesRefuseWhatIsWrong(t *testing.T) {
 	}{
 		{"forge/comment", wire.ForgeCommentRequest{Node: ghIssue, Body: "  "}},
 		{"forge/label", wire.ForgeLabelRequest{Node: ghIssue, Add: []string{" "}}},
+		{"forge/assign", wire.ForgeAssignRequest{Node: ghIssue, Add: []string{" @ "}}},
+		{"forge/assign", wire.ForgeAssignRequest{Node: ghIssue, Add: []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k"}}},
+		{"forge/assign", wire.ForgeAssignRequest{Node: wire.LineageNode{Kind: "issue", Ref: "linear:ENG-4"}, Add: []string{"kim"}}},
 		{"forge/merge", wire.ForgeMergeRequest{Node: ghPull}},
 		{"forge/approve", wire.ForgeApproveRequest{Node: ghIssue, Sha: "abc"}},
 		{"forge/rerun", wire.ForgeNodeRequest{Node: ghIssue}},
@@ -266,7 +277,7 @@ func TestForgeWritesRefuseWhatIsWrong(t *testing.T) {
 
 // #3130: an agent's connection may call none of the writes: a person writes, from their own page.
 func TestForgeWritesAreNotAnAgents(t *testing.T) {
-	for _, m := range []string{"forge/comment", "forge/label", "forge/close", "forge/merge", "forge/approve", "forge/rerun"} {
+	for _, m := range []string{"forge/comment", "forge/label", "forge/assign", "forge/close", "forge/merge", "forge/approve", "forge/rerun"} {
 		if RoleAgent.Allows(m) {
 			t.Fatalf("an agent may call %s", m)
 		}
@@ -289,11 +300,13 @@ func TestForgeWritesGoToGitLabAndLinear(t *testing.T) {
 	c.call(t, 5, "forge/approve", wire.ForgeApproveRequest{Node: mr, Sha: "head4"})
 	c.call(t, 6, "forge/rerun", wire.ForgeNodeRequest{Node: mr})
 	c.call(t, 7, "forge/log", wire.ForgeLogRequest{Node: mr, Check: new("check: test")})
+	c.call(t, 8, "forge/assign", wire.ForgeAssignRequest{Node: mr, Add: []string{"kim"}, Remove: []string{"lee"}})
 	gl.mu.Lock()
 	got := slices.Clone(gl.wrote)
 	gl.mu.Unlock()
 	want := []string{"comment Group/App 4 mr=true Fine.", "merge Group/App 4 head4 squash=false auto=false",
-		"merge Group/App 4 head4 squash=true auto=true", "approve Group/App 4 head4", "retry Group/App 99", "log Group/App 99 test"}
+		"merge Group/App 4 head4 squash=true auto=true", "approve Group/App 4 head4", "retry Group/App 99", "log Group/App 99 test",
+		"assignees Group/App 4 mr=true +kim -lee"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("GitLab writes:\n%q\nwant\n%q", got, want)
 	}

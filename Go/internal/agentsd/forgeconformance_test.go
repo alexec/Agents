@@ -835,6 +835,7 @@ func conformActions(f Forge, r forgeRef) map[string]func(context.Context) error 
 	return map[string]func(context.Context) error{
 		actionComment: func(ctx context.Context) error { _, err := f.Comment(ctx, r, "A comment."); return err },
 		actionLabel:   func(ctx context.Context) error { return f.SetLabels(ctx, r, []string{"bug"}, nil) },
+		actionAssign:  func(ctx context.Context) error { return f.SetAssignees(ctx, r, []string{"kim"}, nil) },
 		actionClose:   func(ctx context.Context) error { return f.SetState(ctx, r, true, "") },
 		actionReopen:  func(ctx context.Context) error { return f.SetState(ctx, r, false, "") },
 		actionTransition: func(ctx context.Context) error {

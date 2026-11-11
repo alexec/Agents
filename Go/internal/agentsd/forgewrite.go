@@ -16,7 +16,7 @@ import (
 
 // The forge writes (#3130): the actions of the GitHub, GitLab, Forgejo (#3753), Bitbucket (#3786), Azure DevOps (#3803), Linear, Jira (#3260) and Azure
 // Boards (#3815) views, on the Work pages' issue and pull request pages: comment, labels (a work
-// item's tags), close and reopen (a Jira issue's move by a transition of its workflow, a work
+// item's tags), assignees (#4403), close and reopen (a Jira issue's move by a transition of its workflow, a work
 // item's to another state of its type), and a pull request's merge, approve, rerun of its failed
 // checks, their logs and its diff. Next to the reads (forge.go), with the same tokens and the
 // connectors' own write code.
@@ -31,6 +31,8 @@ const (
 	forgeCommentMost = 65536
 	// forgeLabelsMost bounds the labels one call adds or takes off.
 	forgeLabelsMost = 20
+	// forgeAssigneesMost bounds the people one call assigns or takes off, as GitHub does (#4403).
+	forgeAssigneesMost = 10
 )
 
 // forgeGitHubWrites is what the writes ask of GitHub; a test gives a fake.
@@ -59,12 +61,15 @@ type forgeGitHubWrites interface {
 	// A forge request's answer (#3865).
 	SetBody(ctx context.Context, repo string, number int, body string) error
 	Unassign(ctx context.Context, repo string, number int, logins []string) error
+	// The issue page's Assignees (#4403).
+	Assign(ctx context.Context, repo string, number int, logins []string) error
 }
 
 // forgeGitLabWrites is what the writes ask of GitLab; a test gives a fake.
 type forgeGitLabWrites interface {
 	Comment(ctx context.Context, project string, number int, mr bool, body string) error
 	SetLabels(ctx context.Context, project string, number int, mr bool, add, remove []string) error
+	SetAssignees(ctx context.Context, project string, number int, mr bool, add, remove []string) error
 	SetState(ctx context.Context, project string, number int, mr, closed bool) error
 	MergeMethods(ctx context.Context, project string) ([]string, error)
 	Merge(ctx context.Context, project string, number int, sha string, squash, auto bool) error
@@ -93,6 +98,9 @@ func (d *Daemon) registerForgeWrites() {
 	})
 	On(d, wire.CallForgeLabel, func(ctx context.Context, _ *Client, r wire.ForgeLabelRequest) (wire.ForgeDone, error) {
 		return d.forgeLabel(ctx, r)
+	})
+	On(d, wire.CallForgeAssign, func(ctx context.Context, _ *Client, r wire.ForgeAssignRequest) (wire.ForgeDone, error) {
+		return d.forgeAssign(ctx, r)
 	})
 	On(d, wire.CallForgeLabels, func(ctx context.Context, _ *Client, r wire.ForgeNodeRequest) (wire.ForgeLabels, error) {
 		return d.forgeLabels(ctx, r)
@@ -196,6 +204,44 @@ func (d *Daemon) forgeLabel(ctx context.Context, r wire.ForgeLabelRequest) (wire
 		return wire.ForgeDone{}, err
 	}
 	if err := t.forge.SetLabels(ctx, t.ref, add, remove); err != nil {
+		return wire.ForgeDone{}, forgeCannotErr(method, t.forge, err)
+	}
+	d.forgeWrote()
+	return wire.ForgeDone{}, nil
+}
+
+// assigneeLogins are the logins given, trimmed, without a leading @, each once, or why not.
+func assigneeLogins(method, what string, logins []string) ([]string, error) {
+	out := []string{}
+	for _, l := range logins {
+		if l = strings.TrimPrefix(strings.TrimSpace(l), "@"); l != "" && !slices.ContainsFunc(out, func(o string) bool { return strings.EqualFold(o, l) }) {
+			out = append(out, l)
+		}
+	}
+	if len(out) > forgeAssigneesMost {
+		return nil, Invalid("%s: at most %d people to %s at once", method, forgeAssigneesMost, what)
+	}
+	return out, nil
+}
+
+func (d *Daemon) forgeAssign(ctx context.Context, r wire.ForgeAssignRequest) (wire.ForgeDone, error) {
+	const method = "forge/assign"
+	add, err := assigneeLogins(method, "assign", r.Add)
+	if err != nil {
+		return wire.ForgeDone{}, err
+	}
+	remove, err := assigneeLogins(method, "take off", r.Remove)
+	if err != nil {
+		return wire.ForgeDone{}, err
+	}
+	if len(add)+len(remove) == 0 {
+		return wire.ForgeDone{}, Invalid("%s: name a person to assign or take off", method)
+	}
+	t, err := d.forgeTargetOf(ctx, method, r.Node, false)
+	if err != nil {
+		return wire.ForgeDone{}, err
+	}
+	if err := t.forge.SetAssignees(ctx, t.ref, add, remove); err != nil {
 		return wire.ForgeDone{}, forgeCannotErr(method, t.forge, err)
 	}
 	d.forgeWrote()

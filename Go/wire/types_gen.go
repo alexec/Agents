@@ -4607,7 +4607,7 @@ type FoldersListRequest struct {
 	IncludeArchived bool `json:"includeArchived"`
 }
 
-// A write or a read that an item's page offers (#4329, #4361): forge/comment, forge/label, forge/close (a close, a reopen or a transition), forge/merge (now, or with auto), forge/approve, forge/rerun, forge/log, forge/diff, forge/add-child and forge/blocked-by.
+// A write or a read that an item's page offers (#4329, #4361): forge/comment, forge/label, forge/close (a close, a reopen or a transition), forge/merge (now, or with auto), forge/approve, forge/rerun, forge/log, forge/diff, forge/add-child, forge/blocked-by and forge/assign (#4403).
 type ForgeAction string
 
 const ForgeActionComment ForgeAction = "comment"
@@ -4623,6 +4623,7 @@ const ForgeActionLog ForgeAction = "log"
 const ForgeActionDiff ForgeAction = "diff"
 const ForgeActionAddChild ForgeAction = "addChild"
 const ForgeActionBlockedBy ForgeAction = "blockedBy"
+const ForgeActionAssign ForgeAction = "assign"
 
 // forge/add-child (#3271): add a child to an epic's plan: a new issue (title, with level story, task, spike or bug) or one that is there (issue: #12, owner/repo#12, its URL, or a Linear key such as ENG-4). A new child gets the level's label and the epic's feature: label. GitHub and Linear.
 type ForgeAddChildRequest struct {
@@ -4640,6 +4641,15 @@ type ForgeApproveRequest struct {
 	Node LineageNode `json:"node"`
 
 	Sha string `json:"sha"`
+}
+
+// forge/assign (#4403): people to assign to an issue or a pull request, and people to take off it, by their login on the forge. At most 10 of each at once.
+type ForgeAssignRequest struct {
+	Node LineageNode `json:"node"`
+
+	Add []string `json:"add,omitzero"`
+
+	Remove []string `json:"remove,omitzero"`
 }
 
 // forge/blocked-by (#3271): the issues that block a child of a plan, to add and to take off, by node. GitHub and Linear.

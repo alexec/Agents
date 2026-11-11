@@ -66,6 +66,7 @@ const CapFoldersNotCommitted1 = "folders.not-committed/1"
 const CapFoldersToMachine1 = "folders.to-machine/1"
 const CapFolders1 = "folders/1"
 const CapForgeWrite1 = "forge-write/1"
+const CapForgeAssign1 = "forge.assign/1"
 const CapForgeBoards1 = "forge.boards/1"
 const CapForgeImage1 = "forge.image/1"
 const CapForgeReleases1 = "forge.releases/1"
@@ -369,6 +370,7 @@ var HostCapabilities = pairs([][2]string{
 	{"folders/undoGuardedChange", "folders/1"},
 	{"forge/add-child", "forge-write/1"},
 	{"forge/approve", "forge-write/1"},
+	{"forge/assign", "forge.assign/1"},
 	{"forge/blocked-by", "forge-write/1"},
 	{"forge/boards", "forge.boards/1"},
 	{"forge/close", "forge-write/1"},

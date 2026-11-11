@@ -280,6 +280,7 @@ public extension DaemonAPI {
                 Row(Method.forgeComment, params: ForgeCommentRequest.self, result: ForgeDone.self, kind: .hostRequest),
                 Row(Method.forgeLabel, params: ForgeLabelRequest.self, result: ForgeDone.self, kind: .hostRequest),
                 Row(Method.forgeLabels, params: ForgeNodeRequest.self, result: ForgeLabels.self, kind: .hostRequest),
+                Row(Method.forgeAssign, params: ForgeAssignRequest.self, result: ForgeDone.self, kind: .hostRequest),
                 Row(Method.forgeClose, params: ForgeCloseRequest.self, result: ForgeDone.self, kind: .hostRequest),
                 Row(Method.forgeMerge, params: ForgeMergeRequest.self, result: ForgeDone.self, kind: .hostRequest),
                 Row(Method.forgeApprove, params: ForgeApproveRequest.self, result: ForgeDone.self, kind: .hostRequest),

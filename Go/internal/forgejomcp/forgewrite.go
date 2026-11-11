@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -50,6 +51,30 @@ func (f *RealForgejo) SetLabels(ctx context.Context, repo string, number int, ad
 		}
 	}
 	return nil
+}
+
+// SetAssignees assigns people to an issue or a pull request and takes others off it, by login
+// (#4403). Forgejo sets the whole list, so it reads the list there is first.
+func (f *RealForgejo) SetAssignees(ctx context.Context, repo string, number int, add, remove []string) error {
+	path := fmt.Sprintf("%s/issues/%d", repoPath(repo), number)
+	var item struct {
+		Assignees []user `json:"assignees"`
+	}
+	if err := f.get(ctx, path, false, &item); err != nil {
+		return err
+	}
+	logins := []string{}
+	for _, u := range item.Assignees {
+		if !slices.ContainsFunc(remove, func(l string) bool { return strings.EqualFold(u.Login, l) }) {
+			logins = append(logins, u.Login)
+		}
+	}
+	for _, l := range add {
+		if !slices.ContainsFunc(logins, func(o string) bool { return strings.EqualFold(o, l) }) {
+			logins = append(logins, l)
+		}
+	}
+	return f.send(ctx, http.MethodPatch, path, map[string]any{"assignees": logins}, nil)
 }
 
 // SetState closes an issue or a pull request, or opens it again.
