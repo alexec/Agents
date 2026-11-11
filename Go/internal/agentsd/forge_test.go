@@ -612,3 +612,18 @@ func TestListTotalsKeepEachForgesFirstCount(t *testing.T) {
 		t.Fatalf("%+v %v", back, err)
 	}
 }
+
+// A label's colour reaches the wire as #rrggbb whatever form the forge gives it in (#4362).
+func TestForgeLabelColor(t *testing.T) {
+	for in, want := range map[string]string{
+		"#d73a4a": "#d73a4a", "D73A4A": "#d73a4a", "#A2EEEF": "#a2eeef", " a2eeef ": "#a2eeef",
+		"": "", "red": "", "#fff": "", "#d73a4a00": "", "zzzzzz": "",
+	} {
+		if got := forgeLabelColor(in); got != want {
+			t.Errorf("forgeLabelColor(%q) = %q, want %q", in, got, want)
+		}
+	}
+	if l := forgeLabelsOf([]string{"bug", "odd"}, map[string]string{"bug": "D73A4A", "odd": "red"}); deref(l[0].Color) != "#d73a4a" || l[1].Color != nil {
+		t.Errorf("forgeLabelsOf: %+v", l)
+	}
+}

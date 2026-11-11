@@ -69,7 +69,7 @@ func (f *fakeForgeGitHub) PRDiff(_ context.Context, repo string, number int, _ s
 }
 
 func (f *fakeForgeGitHub) RepoLabels(context.Context, string) ([]string, map[string]string, error) {
-	return []string{"bug", "enhancement"}, map[string]string{"bug": "#d73a4a"}, nil
+	return []string{"bug", "enhancement"}, map[string]string{"bug": "#d73a4a", "enhancement": "A2EEEF"}, nil
 }
 
 func (f *fakeForgeGitLab) note(format string, args ...any) {
@@ -122,7 +122,7 @@ func (f *fakeForgeGitLab) MRDiff(context.Context, string, int) (map[string]any, 
 }
 
 func (f *fakeForgeGitLab) ProjectLabels(context.Context, string) ([]string, map[string]string, error) {
-	return []string{"bug"}, nil, nil
+	return []string{"bug"}, map[string]string{"bug": "#D9534F"}, nil
 }
 
 func (f *fakeForgeLinear) note(format string, args ...any) {
@@ -147,7 +147,7 @@ func (f *fakeForgeLinear) SetState(_ context.Context, identifier string, closed 
 }
 
 func (f *fakeForgeLinear) Labels(context.Context, string) ([]string, map[string]string, error) {
-	return []string{"Bug"}, nil, nil
+	return []string{"Bug"}, map[string]string{"Bug": "#eb5757"}, nil
 }
 
 var (
