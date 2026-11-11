@@ -38,7 +38,8 @@ import { WorkChecksPage, WorkCommentBox, WorkFilesChanged, WorkLabelsPicker, Wor
 import { branchWords, mergeBox, mergedStrip, offers, pullStateWords, reviewersWords } from "../model/workPull";
 import { WorkPlan } from "./WorkPlan";
 import { WorkDocs } from "./Docs";
-import { hasPlan, planSessions } from "../model/epicPlan";
+import { hasPlan, leadStart, leadWords, planSessions } from "../model/epicPlan";
+import { epicLead } from "../model/workFeatures";
 import { go, replace, route, routeHash } from "../route";
 import {
   allRows, askKey, boardHosts, boards, forgeHosts, fromList, hasMore, listProjects, loadBoards, loadList, loadMore, nextAfter, pageNeighbours,
@@ -438,11 +439,23 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
       checksPage={top ? () => { checksPage.value = true; } : undefined} wrote={() => void reread()} />
   );
   // The comment box's Close or Reopen: an issue with no tracker's status; a pull request's as its forge offers them.
-  const closes = !got || got.transitions ? undefined : kind === "issue" ? got.item.state
+  // A standing epic never closes (epic.md note 16).
+  const closes = !got || got.transitions || got.item.standing ? undefined : kind === "issue" ? got.item.state
     : kind === "pr" && got.item.state === "open" && offers(got, "close") ? "open"
     : kind === "pr" && got.item.state === "closed" && offers(got, "reopen") ? "closed" : undefined;
-  // Start Agent: on an open issue whose read gives a start (one in a folder), when a machine of the person's writes.
-  const start = kind === "issue" && writes && item?.state === "open" ? got?.start : undefined;
+  // Start Agent: on an open issue whose read gives a start (one in a folder), when a machine of the person's writes. An
+  // epic has Start lead or Open lead in its place (#4418, epic.md note 1).
+  const isEpic = item !== undefined && hasPlan(item);
+  const start = kind === "issue" && writes && item?.state === "open" && !isEpic ? got?.start : undefined;
+  const lead = isEpic ? epicLead(node, Object.values(store.agents.value).flat()) : undefined;
+  const leadAt = lead ? sessionHost(store.agents.value, lead.id) : undefined;
+  const startsLead = isEpic && !lead && writes && item?.state === "open" ? got?.start : undefined;
+  const startLead = () => {
+    if (!detail.value || !startsLead) return;
+    if (!item?.folder) { said.value = { words: "No folder on this machine is on this issue's repo.", failed: true }; return; }
+    const why = offerStart(store, detail.value.host, item.folder, leadStart(startsLead, item.url));
+    if (why) said.value = { words: why, failed: true };
+  };
   const startAgent = () => {
     if (!detail.value || !start) return;
     if (!item?.folder) { said.value = { words: "No folder on this machine is on this issue's repo.", failed: true }; return; }
@@ -474,9 +487,18 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
 
   const nothingRead = !detail.value && forgeProblem.value !== null;
   const loading = fromForge(kind) && !detail.value && !forgeProblem.value;
-  const narrowStart = start && (
+  const narrowStart = start ? (
     <button type="button" class="prominent work-start" disabled={writing.value} onClick={startAgent}
       title="The new-agent form in this issue's folder, filled in for it"><span aria-hidden="true">✦</span>Start Agent</button>
+  ) : lead ? (
+    // Open lead (bordered), with a dot for the lead's state: green while it works, the attention colour when it needs you.
+    <button type="button" class="work-start work-open-lead" title="The lead's chat" aria-label={`Open lead, ${leadWords(lead.state)}`}
+      onClick={() => { if (leadAt) go({ host: leadAt, folder: lead.worktree?.folder || lead.cwd, session: lead.id }); }}>
+      <PersonGlyph />Open lead<span class={`dot ${lead.state === "waitingOnUser" ? "attention" : ["starting", "running"].includes(lead.state) ? "working" : "quiet"}`} aria-hidden="true" />
+    </button>
+  ) : startsLead && (
+    <button type="button" class="prominent work-start" onClick={startLead}
+      title="The new-session form in this epic's folder, filled in for a lead with the lead skill"><span aria-hidden="true">✦</span>Start lead</button>
   );
 
   // The Checks page (note 17), pushed from the checks row of a page under 700 px.
@@ -532,6 +554,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
             ? <WorkStatusMenu state={item.state} status={item.status} transitions={got.transitions} busy={writing.value}
                 move={(id) => void act("forge/close", { node: item.node, transition: id })} />
             : <PagePill kind={kind} state={state} draft={draft} status={status} />}
+          {item?.standing && <span class="work-standing">Standing</span>}
           {words.wide && <span class="quiet"><span class="wide-line">{words.wide}</span><span class="short-line">{words.short}</span></span>}
           {url && <a class="work-open-on" href={url} target="_blank" rel="noopener noreferrer"><OpenGlyph />{openOn}</a>}
         </p>
@@ -686,6 +709,11 @@ function PipelineLine({ steps }: { steps: readonly PipelineStep[] }) {
       <Fragment key={i}>{i > 0 && " · "}{s.url ? <a href={s.url} target="_blank" rel="noopener noreferrer">{s.words}</a> : <span class="quiet">{s.words}</span>}</Fragment>
     ))}</span>
   );
+}
+
+/** Open lead's glyph: a person. */
+function PersonGlyph() {
+  return <svg class="work-open-glyph" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="5.5" r="2.75" /><path d="M2.75 14a5.25 5.25 0 0 1 10.5 0" /></svg>;
 }
 
 /** Branch's glyph: a branch off a line. */
