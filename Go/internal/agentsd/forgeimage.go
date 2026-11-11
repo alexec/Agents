@@ -9,11 +9,14 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/alexec/agents/Go/internal/azuredevopsmcp"
+	"github.com/alexec/agents/Go/internal/bitbucketmcp"
+	"github.com/alexec/agents/Go/internal/connections"
 	"github.com/alexec/agents/Go/internal/forgejomcp"
 	"github.com/alexec/agents/Go/internal/gitlabmcp"
 	"github.com/alexec/agents/Go/internal/jiramcp"
@@ -45,7 +48,7 @@ const (
 var forgeImageTypes = map[string]bool{"image/png": true, "image/jpeg": true, "image/gif": true, "image/webp": true}
 
 // forgeImageHost is one forge's seam: the URLs of its images, and its token for the hosts that need it.
-// Each later forge adds one, with its hosts and its auth.
+// Each forge gives its own as Forge.Images (#4544).
 type forgeImageHost interface {
 	// allows says that u is one of this forge's image URLs, for the first read and each redirect.
 	// d says which GitLab, Forgejo, Azure DevOps or Jira is connected: a self-hosted one's own root.
@@ -177,48 +180,277 @@ func (publicAvatars) allows(_ *Daemon, u *url.URL) bool {
 
 func (publicAvatars) authorize(*Daemon, *http.Request) {}
 
-// gitlabImages are a GitLab's user avatars (#4363): gitlab.com's, and the connected GitLab's on
-// its own root. An avatar is public, so no token goes.
+// gitlabImages are a GitLab's images: its user avatars (#4363), and the uploads that an issue, a
+// merge request or a comment links (#4544), as /-/project/<id>/uploads/<secret>/<file> or
+// /<namespace>/<project>/uploads/<secret>/<file>, on gitlab.com or the connected GitLab's root.
+// An avatar is public, so no token goes. GitLab's web route reads an upload only with a session,
+// so the connected GitLab's upload is read from its API instead (GitLab 17.4 and later, a Guest
+// can), with the token; gitlab.com's, when another GitLab is connected, is read with none, as a
+// public project's is.
 type gitlabImages struct{}
 
-func (gitlabImages) allows(d *Daemon, u *url.URL) bool {
-	if !pathUnder(u, "/uploads/-/system/user/avatar/") {
-		return false
+// gitlabRoot is the connected GitLab's root, or "".
+func (d *Daemon) gitlabImageRoot() string {
+	if c, ok := d.gitlabConnection(); ok {
+		return gitlabmcp.BaseURL(c.URL)
 	}
-	if publicHost(u) == "gitlab.com" {
-		return true
-	}
-	c, ok := d.gitlabConnection()
-	return ok && c.URL != "" && onRoot(u, gitlabmcp.BaseURL(c.URL))
+	return ""
 }
 
-func (gitlabImages) authorize(*Daemon, *http.Request) {}
+// rootSegments are u's path segments below root's path, or nil when u is not under it.
+func rootSegments(u *url.URL, root string) []string {
+	rest, ok := strings.CutPrefix(u.EscapedPath(), strings.TrimSuffix(siteURLPath(root), "/")+"/")
+	if !ok {
+		return nil
+	}
+	return strings.Split(rest, "/")
+}
 
-// forgejoImages are a Forgejo's avatars (#4363): Codeberg's, and the connected Forgejo's on its
-// own root; /avatars/ are uploaded, /avatar/ made from the e-mail. They are public: no token goes.
+// plainSegments says that every segment is set, and none is a dot segment, also when escaped.
+func plainSegments(parts []string) bool {
+	for _, p := range parts {
+		plain, err := url.PathUnescape(p)
+		if p == "" || err != nil || plain == "" || plain == "." || plain == ".." || strings.Contains(plain, "/") {
+			return false
+		}
+	}
+	return len(parts) > 0
+}
+
+// gitlabSecret says that s is an upload's secret: 32 hex digits.
+func gitlabSecret(s string) bool {
+	if len(s) != 32 {
+		return false
+	}
+	for _, r := range s {
+		if !strings.ContainsRune("0123456789abcdef", r) {
+			return false
+		}
+	}
+	return true
+}
+
+// gitlabUpload is the project of an upload's web link, its id or its escaped path, and the
+// upload's secret and file; ok is false when parts are not one.
+func gitlabUpload(parts []string) (project, secret, file string, ok bool) {
+	n := len(parts)
+	if n < 5 || parts[n-3] != "uploads" || !gitlabSecret(parts[n-2]) || !plainSegments(parts[n-1:]) {
+		return "", "", "", false
+	}
+	secret, file = parts[n-2], parts[n-1]
+	// /-/project/<id>/uploads/<secret>/<file>
+	if parts[0] == "-" {
+		if n != 6 || parts[1] != "project" || strings.Trim(parts[2], "0123456789") != "" || parts[2] == "" {
+			return "", "", "", false
+		}
+		return parts[2], secret, file, true
+	}
+	// /<namespace>/<project>/uploads/<secret>/<file>: no "-", which starts GitLab's own routes,
+	// and not under /api/, a name GitLab keeps for itself.
+	space := parts[:n-3]
+	if !plainSegments(space) || slices.Contains(space, "-") || space[0] == "api" {
+		return "", "", "", false
+	}
+	plain := make([]string, len(space))
+	for i, p := range space {
+		plain[i], _ = url.PathUnescape(p)
+	}
+	return url.PathEscape(strings.Join(plain, "/")), secret, file, true
+}
+
+// gitlabAPIUpload says that parts are /api/v4/projects/<project>/uploads/<secret>/<file>.
+func gitlabAPIUpload(parts []string) bool {
+	return len(parts) == 7 && parts[0] == "api" && parts[1] == "v4" && parts[2] == "projects" && gitlabProject(parts[3]) &&
+		parts[4] == "uploads" && gitlabSecret(parts[5]) && plainSegments(parts[6:])
+}
+
+// gitlabProject says that p is a project's id, or its path with each "/" escaped.
+func gitlabProject(p string) bool {
+	plain, err := url.PathUnescape(p)
+	return err == nil && !strings.Contains(p, "/") && plainSegments(strings.Split(plain, "/"))
+}
+
+func (gitlabImages) allows(d *Daemon, u *url.URL) bool {
+	if publicHost(u) == "gitlab.com" {
+		if pathUnder(u, "/uploads/-/system/user/avatar/") {
+			return true
+		}
+		if _, _, _, ok := gitlabUpload(rootSegments(u, gitlabmcp.DefaultBase)); ok {
+			return true
+		}
+	}
+	root := d.gitlabImageRoot()
+	if root == "" || !onRoot(u, root) {
+		return false
+	}
+	if pathUnder(u, strings.TrimSuffix(siteURLPath(root), "/")+"/uploads/-/system/user/avatar/") {
+		return true
+	}
+	parts := rootSegments(u, root)
+	_, _, _, upload := gitlabUpload(parts)
+	return upload || gitlabAPIUpload(parts)
+}
+
+// source is the connected GitLab's API URL of an upload on its root; any other URL as it is.
+func (gitlabImages) source(d *Daemon, u *url.URL) *url.URL {
+	root := d.gitlabImageRoot()
+	if root == "" || !onRoot(u, root) {
+		return u
+	}
+	project, secret, file, ok := gitlabUpload(rootSegments(u, root))
+	if !ok {
+		return u
+	}
+	api := *u
+	prefix := strings.TrimSuffix(siteURLPath(root), "/") + "/api/v4/projects/"
+	api.RawPath = prefix + project + "/uploads/" + secret + "/" + file
+	api.Path, _ = url.PathUnescape(api.RawPath)
+	api.RawQuery, api.Fragment = "", ""
+	return &api
+}
+
+// authorize sends the connected GitLab's token to its API's uploads, and nowhere else.
+func (gitlabImages) authorize(d *Daemon, req *http.Request) {
+	root := d.gitlabImageRoot()
+	if root == "" || !onRoot(req.URL, root) || !gitlabAPIUpload(rootSegments(req.URL, root)) {
+		return
+	}
+	if c, ok := d.gitlabConnection(); ok && c.Usable(nowFunc()) && c.Access != "" {
+		req.Header.Set("Authorization", "Bearer "+c.Access)
+	}
+}
+
+// forgejoImages are a Forgejo's images on Codeberg or the connected Forgejo's own root: its
+// avatars (#4363; /avatars/ are uploaded, /avatar/ made from the e-mail), which are public, and
+// the attachments an issue, a pull request or a comment links (#4544), /attachments/<uuid> or
+// /<owner>/<repo>/attachments/<uuid>. Forgejo takes a token on an attachment's web route, so the
+// connected Forgejo's token goes to its attachments, and nowhere else.
 type forgejoImages struct{}
 
-func (forgejoImages) allows(d *Daemon, u *url.URL) bool {
-	if !pathUnder(u, "/avatars/") && !pathUnder(u, "/avatar/") {
-		return false
+// forgejoImageRoot is the connected Forgejo's root, or "".
+func (d *Daemon) forgejoImageRoot() string {
+	if c, ok := d.forgejoConnection(); ok {
+		return forgejomcp.BaseURL(c.URL)
 	}
-	if publicHost(u) == "codeberg.org" {
-		return true
-	}
-	c, ok := d.forgejoConnection()
-	return ok && c.URL != "" && onRoot(u, forgejomcp.BaseURL(c.URL))
+	return ""
 }
 
-func (forgejoImages) authorize(*Daemon, *http.Request) {}
+// forgejoAttachment says that parts are attachments/<uuid> or <owner>/<repo>/attachments/<uuid>.
+func forgejoAttachment(parts []string) bool {
+	if !plainSegments(parts) {
+		return false
+	}
+	switch {
+	case len(parts) == 2 && parts[0] == "attachments":
+	case len(parts) == 4 && parts[2] == "attachments":
+	default:
+		return false
+	}
+	id := parts[len(parts)-1]
+	return len(id) == 36 && strings.Trim(id, "0123456789abcdef-") == ""
+}
 
-// azureImages are an Azure DevOps identity's picture (#4363), for Azure Repos and Azure Boards:
-// /<organization>/_apis/GraphProfile/MemberAvatars/<descriptor> or _api/_common/identityImage, on
-// dev.azure.com, an organization's visualstudio.com, or the connected Azure DevOps Server. It
+// forgejoAvatar says that parts are avatars/<…> or avatar/<…>.
+func forgejoAvatar(parts []string) bool {
+	return len(parts) >= 2 && (parts[0] == "avatars" || parts[0] == "avatar") && plainSegments(parts[1:])
+}
+
+func (forgejoImages) allows(d *Daemon, u *url.URL) bool {
+	if publicHost(u) == "codeberg.org" {
+		parts := rootSegments(u, forgejomcp.DefaultBase)
+		return forgejoAvatar(parts) || forgejoAttachment(parts)
+	}
+	root := d.forgejoImageRoot()
+	if root == "" || !onRoot(u, root) {
+		return false
+	}
+	parts := rootSegments(u, root)
+	return forgejoAvatar(parts) || forgejoAttachment(parts)
+}
+
+func (forgejoImages) authorize(d *Daemon, req *http.Request) {
+	root := d.forgejoImageRoot()
+	if root == "" || !onRoot(req.URL, root) || !forgejoAttachment(rootSegments(req.URL, root)) {
+		return
+	}
+	if c, ok := d.forgejoConnection(); ok && c.Usable(nowFunc()) && c.Access != "" {
+		req.Header.Set("Authorization", "token "+c.Access)
+	}
+}
+
+// bitbucketImages are Bitbucket Cloud's attachments (#4544): an image in an issue's, a pull
+// request's or a comment's words, bitbucket.org/repo/<id>/images/<file>, and an issue's
+// attachment from the API, /2.0/repositories/<workspace>/<repo>/issues/<n>/attachments/<file>.
+// Both redirect to a signed URL on Bitbucket's upload bucket, which takes no token. Bitbucket's
+// avatars are on publicAvatars' hosts.
+type bitbucketImages struct{}
+
+// bitbucketUploads is the bucket Bitbucket Cloud's attachments redirect to.
+const bitbucketUploads = "bbuseruploads.s3.amazonaws.com"
+
+// bitbucketNeedsToken says that u is a Bitbucket Cloud attachment that is read with the token.
+func bitbucketNeedsToken(u *url.URL) bool {
+	switch publicHost(u) {
+	case "bitbucket.org":
+		parts := rootSegments(u, "https://bitbucket.org/")
+		return len(parts) == 4 && parts[0] == "repo" && parts[2] == "images" && plainSegments(parts)
+	case "api.bitbucket.org":
+		parts := rootSegments(u, bitbucketmcp.DefaultBase)
+		return len(parts) == 7 && parts[0] == "repositories" && parts[3] == "issues" && strings.Trim(parts[4], "0123456789") == "" &&
+			parts[5] == "attachments" && plainSegments(parts)
+	}
+	return false
+}
+
+func (bitbucketImages) allows(_ *Daemon, u *url.URL) bool {
+	if publicHost(u) == bitbucketUploads {
+		return pathUnder(u, "/")
+	}
+	return bitbucketNeedsToken(u)
+}
+
+// authorize sends the Bitbucket connection's token as its API takes it: with its e-mail, an API
+// token; without, an OAuth token.
+func (bitbucketImages) authorize(d *Daemon, req *http.Request) {
+	if !bitbucketNeedsToken(req.URL) {
+		return
+	}
+	c, ok := d.bitbucketConnection()
+	if !ok || !c.Usable(nowFunc()) || c.Access == "" {
+		return
+	}
+	if email := strings.TrimSpace(c.User); email != "" {
+		req.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(email+":"+c.Access)))
+	} else {
+		req.Header.Set("Authorization", "Bearer "+c.Access)
+	}
+}
+
+// azureImages are Azure DevOps' images, for Azure Repos and Azure Boards, on dev.azure.com, an
+// organization's visualstudio.com, or the connected Azure DevOps Server: an identity's picture
+// (#4363), /<organization>/_apis/GraphProfile/MemberAvatars/<descriptor> or
+// _api/_common/identityImage; a work item's attachment (#4544), …/_apis/wit/attachments/<id>; and
+// a pull request's, …/_apis/git/repositories/<repo>/pullRequests/<n>/attachments/<file>. Each
 // needs the token, as the API does.
 type azureImages struct{}
 
 func azureImagePath(u *url.URL) bool {
-	return strings.Contains(u.Path, "/_apis/GraphProfile/MemberAvatars/") || strings.HasSuffix(u.Path, "/_api/_common/identityImage")
+	if strings.Contains(u.Path, "/_apis/GraphProfile/MemberAvatars/") || strings.HasSuffix(u.Path, "/_api/_common/identityImage") {
+		return true
+	}
+	parts := strings.Split(strings.TrimPrefix(u.EscapedPath(), "/"), "/")
+	at := slices.Index(parts, "_apis")
+	if at < 0 || !plainSegments(parts) {
+		return false
+	}
+	rest := parts[at+1:]
+	switch {
+	case len(rest) == 3 && rest[0] == "wit" && rest[1] == "attachments":
+		return true
+	case len(rest) == 7 && rest[0] == "git" && rest[1] == "repositories" && rest[3] == "pullRequests" && rest[5] == "attachments":
+		return strings.Trim(rest[4], "0123456789") == ""
+	}
+	return false
 }
 
 // azureImageRoot is the root of the Azure DevOps that u is on, or "".
@@ -257,14 +489,57 @@ func (azureImages) authorize(d *Daemon, req *http.Request) {
 	}
 }
 
-// jiraImages are Jira Data Center's avatars, on the signed-in site's /secure/useravatar (#4363),
-// with its sign-in; Jira Cloud's are on Atlassian's avatar host (publicAvatars).
+// linearImages are Linear's uploads (#4544): an image in an issue's or a comment's words, on
+// uploads.linear.app, which takes the connection's token. Linear's avatars are on publicAvatars'
+// hosts.
+type linearImages struct{}
+
+func (linearImages) allows(_ *Daemon, u *url.URL) bool {
+	return publicHost(u) == "uploads.linear.app" && pathUnder(u, "/")
+}
+
+func (linearImages) authorize(d *Daemon, req *http.Request) {
+	if publicHost(req.URL) != "uploads.linear.app" {
+		return
+	}
+	s, err := d.connectionStore()
+	if err != nil {
+		return
+	}
+	// The connection's token is OAuth's, which says Bearer.
+	if c, ok, err := s.Get(connections.Linear); err == nil && ok && c.Usable(nowFunc()) && c.Access != "" {
+		req.Header.Set("Authorization", "Bearer "+c.Access)
+	}
+}
+
+// jiraImages are Jira's images on the signed-in site, with its sign-in: Jira Data Center's
+// avatars, /secure/useravatar (#4363; Jira Cloud's are on Atlassian's avatar host, publicAvatars),
+// and an issue's attachments (#4544): /secure/attachment/<id>/<file> and /secure/thumbnail/<id>/<file>,
+// as Jira renders them, and /rest/api/<2|3>/attachment/<content|thumbnail>/<id>. Jira Cloud
+// redirects an attachment to a signed URL on Atlassian's media host, which takes no token.
 type jiraImages struct{}
+
+// jiraMedia is the host Jira Cloud's attachments redirect to.
+const jiraMedia = "api.media.atlassian.com"
+
+// jiraImagePath says that parts, below the site's root, are one of Jira's image paths.
+func jiraImagePath(parts []string) bool {
+	switch {
+	case len(parts) == 2 && parts[0] == "secure" && parts[1] == "useravatar":
+		return true
+	case len(parts) == 4 && parts[0] == "secure" && (parts[1] == "attachment" || parts[1] == "thumbnail"):
+		return strings.Trim(parts[2], "0123456789") == "" && plainSegments(parts)
+	case len(parts) == 6 && parts[0] == "rest" && parts[1] == "api" && (parts[2] == "2" || parts[2] == "3") && parts[3] == "attachment" &&
+		(parts[4] == "content" || parts[4] == "thumbnail"):
+		return parts[5] != "" && strings.Trim(parts[5], "0123456789") == ""
+	}
+	return false
+}
 
 func (d *Daemon) jiraImageAuth(u *url.URL) (jiramcp.Auth, bool) {
 	secrets := d.secrets()
 	auth := jiramcp.TokenAuth(secrets["JIRA_URL"], secrets["JIRA_EMAIL"], secrets["JIRA_API_TOKEN"])
-	ok := auth.Site != "" && auth.Header != "" && onRoot(u, auth.Site) && u.Path == strings.TrimSuffix(siteURLPath(auth.Site), "/")+"/secure/useravatar"
+	ok := auth.Site != "" && auth.Header != "" && onRoot(u, auth.Site) && jiraImagePath(rootSegments(u, auth.Site))
 	return auth, ok
 }
 
@@ -277,6 +552,9 @@ func siteURLPath(site string) string {
 }
 
 func (jiraImages) allows(d *Daemon, u *url.URL) bool {
+	if publicHost(u) == jiraMedia {
+		return pathUnder(u, "/file/")
+	}
 	_, ok := d.jiraImageAuth(u)
 	return ok
 }
@@ -287,9 +565,23 @@ func (jiraImages) authorize(d *Daemon, req *http.Request) {
 	}
 }
 
-// forgeImageHosts are the forges whose images are read, GitHub first. Bitbucket's and Linear's
-// avatars are on publicAvatars' hosts.
-var forgeImageHosts = []forgeImageHost{githubImages{}, publicAvatars{}, gitlabImages{}, forgejoImages{}, azureImages{}, jiraImages{}}
+// forgeImageSource is a forge whose image is read from another URL than the one a page links:
+// GitLab's upload, from its API. The URL it gives is checked as a redirect is.
+type forgeImageSource interface {
+	source(d *Daemon, u *url.URL) *url.URL
+}
+
+// forgeImageHosts are the hosts whose images are read: the shared avatar hosts, then each
+// forge's own (Forge.Images), in the registry's order, GitHub first.
+func (d *Daemon) forgeImageHosts() []forgeImageHost {
+	hosts := []forgeImageHost{publicAvatars{}}
+	for _, f := range d.forges() {
+		if h := f.Images(); h != nil {
+			hosts = append(hosts, h)
+		}
+	}
+	return hosts
+}
 
 type forgeImageCache struct {
 	mu    sync.Mutex
@@ -344,7 +636,7 @@ func (d *Daemon) registerForgeImage() {
 
 // forgeImageOf is the forge whose image u is, or nil.
 func (d *Daemon) forgeImageOf(u *url.URL) forgeImageHost {
-	for _, h := range forgeImageHosts {
+	for _, h := range d.forgeImageHosts() {
 		if h.allows(d, u) {
 			return h
 		}
@@ -365,9 +657,15 @@ func (d *Daemon) forgeImage(ctx context.Context, raw string) (wire.ForgeImage, e
 	if image, ok := d.forgeImages.get(key); ok {
 		return image, nil
 	}
+	read := u
+	if s, ok := forge.(forgeImageSource); ok {
+		if read = s.source(d, u); !forge.allows(d, read) {
+			return wire.ForgeImage{}, fmt.Errorf("forge/image: %s is not a forge's image host", read.Hostname())
+		}
+	}
 	ctx, cancel := context.WithTimeout(ctx, forgeImageWait)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, key, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, read.String(), nil)
 	if err != nil {
 		return wire.ForgeImage{}, fmt.Errorf("forge/image: %w", err)
 	}

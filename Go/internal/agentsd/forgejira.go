@@ -29,6 +29,8 @@ type jiraForge struct {
 
 func (jiraForge) Name() string { return "jira" }
 
+func (jiraForge) Images() forgeImageHost { return jiraImages{} }
+
 func (jiraForge) Caps() forgeCaps {
 	return forgeCaps{
 		Issues:      true,
