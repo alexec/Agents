@@ -178,9 +178,8 @@ func TestAddingAnAccountAsksBeforeReplacing(t *testing.T) {
 // card is still open, not that the person said no, and the result comes to the agent as a prompt.
 func TestALateReplaceStillReplacesTheAccount(t *testing.T) {
 	fakeRuntimes(t)
-	was := formHoldLimit
-	formHoldLimit = 300 * time.Millisecond
-	defer func() { formHoldLimit = was }()
+	_, left := formHolds(t)
+	left() // the call must outlast its hold
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
 	title := "sign-up"

@@ -109,9 +109,7 @@ func signedAnswer(t *testing.T, key *ecdsa.PrivateKey, r wire.Request, action st
 // value is sealed to the release key too, and opens only for an approval the person's
 // device signed, which the control plane takes once. After a restart, a grant asks again.
 func TestOnLinuxAFlaggedValueOpensOnlyForASignedApproval(t *testing.T) {
-	was := formHoldLimit
-	formHoldLimit = 300 * time.Millisecond
-	defer func() { formHoldLimit = was }()
+	_, left := formHolds(t)
 	m, page, d, phone, state := linuxMachine(t)
 
 	// No control plane: no flagged value, and nothing in the plain file either.
@@ -194,6 +192,7 @@ func TestOnLinuxAFlaggedValueOpensOnlyForASignedApproval(t *testing.T) {
 	d.secretReleased = nil
 	d.secretReleaseMu.Unlock()
 	page.value = ""
+	left() // this call must outlast its hold
 	if got := replyOf(t, fillAsync(m, 4)); !strings.Contains(replyText(got), "wait_for_event") || page.value != "" {
 		t.Fatalf("after a restart: %+v %q", got, page.value)
 	}

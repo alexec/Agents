@@ -123,9 +123,8 @@ func TestAskingThePersonAForm(t *testing.T) {
 // answer starts it again.
 func TestAFormLeftOpenBringsItsAnswerLater(t *testing.T) {
 	fakeRuntimes(t)
-	was := formHoldLimit
-	formHoldLimit = 300 * time.Millisecond
-	defer func() { formHoldLimit = was }()
+	_, left := formHolds(t)
+	left() // the call must outlast its hold
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
 	a := seeded(t, d, t.TempDir(), func(a *wire.Agent) { a.State, a.EndedReason = wire.AgentStateRunning, nil })
@@ -185,9 +184,8 @@ func TestAFormLeftOpenBringsItsAnswerLater(t *testing.T) {
 // says so, and a form left open is named ahead of the message.
 func TestAMessageDismissesTheQuestions(t *testing.T) {
 	fakeRuntimes(t)
-	was := formHoldLimit
-	formHoldLimit = 300 * time.Millisecond
-	defer func() { formHoldLimit = was }()
+	answered, left := formHolds(t)
+	left() // the first call must outlast its hold
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
 	a := seeded(t, d, t.TempDir(), func(a *wire.Agent) { a.State, a.EndedReason = wire.AgentStateRunning, nil })
@@ -202,7 +200,7 @@ func TestAMessageDismissesTheQuestions(t *testing.T) {
 	if text, _ := m.tool(2, "ask_question", question); text != formStillOpen {
 		t.Fatal(text)
 	}
-	formHoldLimit = time.Minute
+	answered() // the second is answered while it is held
 	answered := make(chan string, 1)
 	go func() { text, _ := m.tool(3, "ask_question", question); answered <- text }()
 	var pending []wire.ElicitationRequest

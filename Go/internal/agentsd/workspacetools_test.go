@@ -150,9 +150,8 @@ func TestAnAgentsWorkspaceTools(t *testing.T) {
 // deletes nothing.
 func TestAYesAfterTheHoldStillMakesTheMachine(t *testing.T) {
 	fakeRuntimes(t)
-	was := formHoldLimit
-	formHoldLimit = 300 * time.Millisecond
-	defer func() { formHoldLimit = was }()
+	_, left := formHolds(t)
+	left() // the call must outlast its hold
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
 	title := "fix-login"
