@@ -1,8 +1,9 @@
 // Work ▸ Features (#3269, spec 3265), as the window's WorkFeatures: each feature:<name> label
 // (forge/features) with its epic counts, in the groups of FeatureGroup (#4115); opened, its open epics, each with its progress and its
 // lead, and its loose issues (the open issues with the label and no parent epic).
-import type { Agent, AgentState, ForgeFeature, ForgeItem, LineageNode } from "../protocol/generated";
-import { shortRef } from "./work";
+import type { Agent, AgentState, ForgeFeature, ForgeItem, ForgePlan, LineageNode } from "../protocol/generated";
+import { fromWireDate } from "../protocol/dates";
+import { shortAge, shortRef } from "./work";
 
 /** A feature's name as a title: work is Work. */
 export const featureTitle = (name: string) => name.charAt(0).toUpperCase() + name.slice(1);
@@ -151,3 +152,135 @@ export const noFeaturesTitle = "No features yet";
 export const noFeatures = "A feature is a feature:<name> label on an epic.";
 export const noFeaturesLabel = "Label an epic on its forge to see it here.";
 export const nothingOpen = "No open epics or issues.";
+
+// Features as a delivery view (#4589, specs/4328-work-look/features-delivery.md): each open epic is a line with where it
+// is in its plan, and its children in flight under it. Until work/features (#4586), the epics come from forge/issues,
+// their children and steps from forge/plan, and what works on a child from the sessions labelled with it (note 16).
+
+/** A feature in Needs you or In flight starts open; Idle and Finished start folded, except that Idle starts open when no
+ * feature is in Needs you or In flight (state 14). */
+export const startsOpen = (group: FeatureGroup, groups: readonly FeatureGroup[]) =>
+  group === "needsYou" || group === "inFlight" || (group === "idle" && !groups.includes("needsYou") && !groups.includes("inFlight"));
+
+/** The lanes on an issue, of the sessions this page knows: not archived, labelled with its short ref, and not a lead
+ * (a lead labels its epic). The newest first. */
+export function issueLanes(ref: string, agents: readonly Agent[]): Agent[] {
+  const short = shortRef(ref);
+  return agents.filter((a) => a.state !== "archived" && (a.labels ?? []).some((l) => l.value === short)
+    && !(a.labels ?? []).some((l) => l.value === "lead")).sort((a, b) => b.createdAt - a.createdAt);
+}
+
+/** A lane's pull request, from its labels (P#45), as a lane labels its own; undefined with none. */
+export const lanePR = (a: Agent) => (a.labels ?? []).find((l) => /^P[#!]\d+$/.test(l.value))?.value;
+
+/** A child in flight (note 8): Needs you (the warn glyph, in the attention colour) or Working (a green dot). */
+export type FlightMark = "attention" | "working";
+export interface InFlight { item: ForgeItem; mark: FlightMark; words: string; pr: string | undefined }
+
+/** Whether an issue waits for the person by its labels: alex-todo or needs-account. */
+const waitsForPerson = (item: ForgeItem) => item.labels.some((l) => ["alex-todo", "needs-account"].includes(l.name.toLowerCase()));
+
+/** An open child in flight (note 8), and what works on it: "P#45 waits for your approval", "Needs you · the lane asks a
+ * question", "waits for you (alex-todo)", "Working · “Gift card errors”"; undefined for a closed child, or an open one
+ * with no lane and nothing for the person. `approvals` are the pull requests that wait for approval, as P#45. */
+export function inFlight(item: ForgeItem, agents: readonly Agent[], approvals: ReadonlySet<string>): InFlight | undefined {
+  if (item.state === "closed") return undefined;
+  const lanes = issueLanes(item.node.ref, agents);
+  const prs = lanes.flatMap((a) => { const p = lanePR(a); return p ? [p] : []; });
+  const pr = prs.find((p) => approvals.has(p)) ?? prs[0];
+  if (pr && approvals.has(pr)) return { item, mark: "attention", words: `${pr} waits for your approval`, pr };
+  if (lanes.some((a) => a.state === "waitingOnUser")) return { item, mark: "attention", words: "Needs you · the lane asks a question", pr };
+  if (waitsForPerson(item)) {
+    const label = item.labels.find((l) => ["alex-todo", "needs-account"].includes(l.name.toLowerCase()))!.name;
+    return { item, mark: "attention", words: `waits for you (${label})`, pr };
+  }
+  const lane = lanes[0];
+  if (!lane) return undefined;
+  return { item, mark: "working", words: lane.title ? `Working · “${lane.title}”` : "Working", pr };
+}
+
+/** The children in flight, in note 8's order: Needs you first, then Working, each the most recently updated first. */
+export function flightOrder(list: readonly InFlight[]): InFlight[] {
+  return [...list].sort((a, b) => a.mark !== b.mark ? (a.mark === "attention" ? -1 : 1) : b.item.updatedAt - a.item.updatedAt);
+}
+
+/** The lines in flight a wide page shows under an epic, and a phone's (notes 8 and 14). */
+export const flightShown = 5;
+export const flightShownPhone = 2;
+
+/** A bar's counts (notes 4 and 6): done (closed), in flight, of all. */
+export interface Delivery { done: number; flight: number; total: number }
+
+/** An epic's counts from its plan: its children closed, in flight, of all. */
+export function planDelivery(plan: ForgePlan, flight: number): Delivery {
+  return { done: plan.children.filter((c) => c.item.state === "closed").length, flight, total: plan.children.length };
+}
+
+/** An epic's counts before its plan is read: its sub-issues closed of all, none in flight (state 13). */
+export const progressDelivery = (item: ForgeItem): Delivery => ({ done: item.progress?.done ?? 0, flight: 0, total: item.progress?.total ?? 0 });
+
+/** Counts added up: a feature's, over its open epics and its loose issues (note 4). */
+export const addDelivery = (list: readonly Delivery[]): Delivery =>
+  list.reduce((a, b) => ({ done: a.done + b.done, flight: a.flight + b.flight, total: a.total + b.total }), { done: 0, flight: 0, total: 0 });
+
+/** A bar's shares (note 4): done (purple), in flight (green); the rest is grey. */
+export const deliveryShares = (d: Delivery) => d.total === 0 ? { done: 0, flight: 0 }
+  : { done: d.done / d.total, flight: Math.min(d.flight, d.total - d.done) / d.total };
+
+/** The words after a feature's bar: "9 of 21 done". */
+export const deliveryWords = (d: Delivery) => `${d.done} of ${d.total} done`;
+
+/** Where an epic is in its plan (note 5): "step 2 of 3", "step 1 of 2 · waits for #10" when its first open step waits
+ * on an open issue outside the plan; undefined with no open child. */
+export function whereWords(plan: ForgePlan): string | undefined {
+  const open = plan.children.filter((c) => c.item.state !== "closed");
+  if (open.length === 0 || plan.steps.length === 0) return undefined;
+  const step = Math.min(...open.map((c) => c.step));
+  const index = plan.steps.findIndex((s) => s.step === step);
+  const words = `step ${index < 0 ? step : index + 1} of ${plan.steps.length}`;
+  const outside: string[] = [];
+  for (const c of open) {
+    if (c.step !== step) continue;
+    for (const b of c.blockedOutside ?? []) { const r = shortRef(b.ref); if (!outside.includes(r)) outside.push(r); }
+  }
+  return outside.length === 0 ? words : `${words} · waits for ${outside.join(", ")}`;
+}
+
+/** A feature's line 2 (note 3): "2 epics · 4 in flight", the open epics and the children in flight. */
+export function featureFlightWords(f: ForgeFeature, flight: number): string {
+  const epics = isFinished(f) ? f.epics : f.open;
+  return `${epics} ${epics === 1 ? "epic" : "epics"} · ${flight === 0 ? "nothing in flight" : `${flight} in flight`}`;
+}
+
+/** The issues of a feature in flight, before its plans are read (note 3): its open issues and epics with a lane, or
+ * that wait for the person; the epics' leads do not count. */
+export function featureFlight(f: ForgeFeature, agents: readonly Agent[]): number {
+  const waiting = new Set(f.waiting ?? []);
+  return (f.refs ?? []).filter((r) => waiting.has(r) || issueLanes(r, agents).length > 0).length;
+}
+
+/** An Idle feature's age (note 3): "updated 3 d ago"; undefined with no date. */
+export function updatedWords(f: ForgeFeature, now: number = Date.now()): string | undefined {
+  if (f.updatedAt === undefined) return undefined;
+  const age = shortAge(Math.max(0, (now - fromWireDate(f.updatedAt).getTime()) / 1000));
+  return age === "now" ? "updated now" : `updated ${age} ago`;
+}
+
+/** The rest under an epic, in words (notes 9 and 15): "2 more in flight · 2 more not started · 4 done"; undefined with
+ * none. `shown` are the lines in flight drawn above it, so the counts say "more". */
+export function restWords(d: Delivery, shown: number): string | undefined {
+  const notStarted = Math.max(d.total - d.done - d.flight, 0);
+  const more = Math.max(d.flight - shown, 0);
+  const parts: string[] = [];
+  if (more > 0) parts.push(`${more} more in flight`);
+  if (notStarted > 0) parts.push(`${notStarted}${shown > 0 || more > 0 ? " more" : ""} not started`);
+  if (d.done > 0) parts.push(`${d.done} done`);
+  return parts.length === 0 ? undefined : parts.join(" · ");
+}
+
+/** An epic with no child in flight (note 10). */
+export const nothingInFlight = "Nothing in flight";
+/** The link at the end of the rest's words (note 9). */
+export const openEpicWords = "open the epic for the plan";
+/** While an epic's plan is read (state 13). */
+export const readingWords = "reading…";
