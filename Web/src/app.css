@@ -2690,15 +2690,53 @@ dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
   .work-features .work-plan-bar .done { background: #8957e5; }
   .work-feature-epic-end .lead.working { color: #3fb950; }
 }
+/* Features as a delivery view (#4589, features-delivery.md): an epic's line with where it is, its children in flight under
+   it (a green dot for Working, the warn glyph and the attention colour for Needs you), and the rest in words. */
+.work-features .work-plan-bar .running { background: #1a7f37; }
+.work-epic-glyph { flex: none; color: #1a7f37; }
+.work-epic-glyph.closed { color: #8250df; }
+.work-delivery-epic { margin-top: 4px; }
+.work-delivery-epic-row .work-title { font-weight: 600; }
+.work-delivery-epic-row .where { white-space: nowrap; }
+.work-delivery-phone { display: none; }
+.work-flight-lines { padding-left: 22px; }
+.work-flight-row .mark { flex: none; width: 14px; text-align: center; color: #1a7f37; font-size: 0.8em; }
+.work-flight-row.is-attention .mark { color: var(--tint-attention); font-size: 1em; }
+.work-flight-row .name { flex: 0 1 auto; }
+.work-flight-row .ref { font-variant-numeric: tabular-nums; }
+.work-flight-row .words { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.75; }
+.work-flight-row.is-attention .words { color: var(--tint-attention); font-weight: 600; opacity: 1; }
+.work-flight-row .pr { flex: none; display: inline-flex; gap: 4px; align-items: center; margin-left: auto; white-space: nowrap; }
+.work-delivery-rest { margin: 2px 0 4px; padding-left: 26px; }
+.work-delivery-rest .short-line { display: none; }
+.work-delivery-rest a { color: inherit; }
+@media (prefers-color-scheme: dark) {
+  .work-features .work-plan-bar .running, .work-epic-glyph, .work-flight-row .mark { color: #3fb950; }
+  .work-features .work-plan-bar .running { background: #3fb950; }
+  .work-epic-glyph.closed { color: #8957e5; }
+}
+@container (max-width: 899px) {
+  .work-flight-row .pr { display: none; }
+  .work-feature-epic-end .lead { min-width: 0; }
+}
 @container (max-width: 699px) {
   .work-feature-chip, .work-feature-done .words { display: none; }
   .work-feature-done .work-plan-bar { width: 60px; }
-  .work-feature-open { padding-left: 24px; }
+  .work-feature-open { padding-left: 20px; }
   .work-feature-row { flex-wrap: wrap; align-items: baseline; }
-  .work-feature-row .name { flex-basis: calc(100% - 22px); white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-  .work-feature-epic-end { margin-left: 22px; }
-  .work-feature-epic-end .work-plan-bar { display: none; }
-  .work-feature-epic-end .figures, .work-feature-epic-end .lead { min-width: 0; }
+  .work-feature-row .name { flex: 1 1 0; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .work-delivery-epic-row .where, .work-feature-epic-end .figures, .work-feature-epic-end .lead { display: none; }
+  .work-feature-epic-end .work-plan-bar { width: 60px; }
+  .work-delivery-phone { display: block; flex-basis: 100%; padding-left: 22px; opacity: 0.75; }
+  .work-delivery-phone.working { color: #1a7f37; opacity: 1; }
+  .work-delivery-phone.attention { color: var(--tint-attention); opacity: 1; }
+  .work-flight-lines { padding-left: 14px; }
+  .work-flight-lines .wide-only { display: none; }
+  .work-flight-row .words { flex-basis: 100%; padding-left: 22px; white-space: normal; }
+  .work-flight-row .words .sep { display: none; }
+  .work-delivery-rest { padding-left: 36px; }
+  .work-delivery-rest .wide-line { display: none; }
+  .work-delivery-rest .short-line { display: inline; }
 }
 /* Work ▸ Timeline (#4206), as the window's (#4173): white by day, navy at night, where the lines glow and the
    features' colours are mixed 25% with white to keep 3:1 on the navy (wireframe section 11). */

@@ -136,3 +136,70 @@ test("Work lists Features after Pull requests", () => {
   // Work has no Milestones list now (#3878): an old #/work/milestone opens the Work default.
   assert.equal(nav.openPage("work", "milestone", true).id, "issue");
 });
+
+// #4589: Features as a delivery view (features-delivery.md).
+const plan = (children, steps) => ({ item: issue(10, { level: "epic" }), children, steps: steps.map((s) => ({ step: s, nodes: [] })) });
+const child = (n, step, { state = "open", outside = [] } = {}) => ({
+  item: issue(n, { state }), blockedBy: [], step, ...outside.length ? { blockedOutside: outside.map(node) } : {},
+});
+
+test("features in Needs you and In flight start open; Idle only when nothing is in flight", () => {
+  assert.equal(f.startsOpen("needsYou", ["needsYou", "idle"]), true);
+  assert.equal(f.startsOpen("inFlight", ["inFlight"]), true);
+  assert.equal(f.startsOpen("idle", ["inFlight", "idle"]), false);
+  assert.equal(f.startsOpen("idle", ["idle", "finished"]), true);
+  assert.equal(f.startsOpen("finished", ["finished"]), false);
+});
+
+test("a child in flight says what works on it", () => {
+  const approvals = new Set(["P#45"]);
+  const withLabel = (n, name) => ({ ...issue(n), labels: [{ name }] });
+  assert.deepEqual(f.inFlight(issue(13), [agent("a", ["#13", "P#45"], "finished")], approvals),
+    { item: issue(13), mark: "attention", words: "P#45 waits for your approval", pr: "P#45" });
+  assert.equal(f.inFlight(issue(33), [agent("a", ["#33"], "waitingOnUser")], approvals)?.words, "Needs you · the lane asks a question");
+  assert.equal(f.inFlight(withLabel(7, "alex-todo"), [], approvals)?.words, "waits for you (alex-todo)");
+  const lane = { ...agent("b", ["#12", "P#44"], "running"), title: "Gift card part-payment" };
+  assert.deepEqual(f.inFlight(issue(12), [lane], approvals), { item: issue(12), mark: "working", words: "Working · “Gift card part-payment”", pr: "P#44" });
+  // A lead labels its epic; an archived lane and a closed child are not in flight.
+  assert.equal(f.inFlight(issue(10), [agent("l", ["#10", "lead"], "running")], approvals), undefined);
+  assert.equal(f.inFlight(issue(12), [agent("x", ["#12"], "archived")], approvals), undefined);
+  assert.equal(f.inFlight(issue(12, { state: "closed" }), [lane], approvals), undefined);
+});
+
+test("the children in flight: Needs you first, then the most recently updated", () => {
+  const line = (n, mark, at) => ({ item: issue(n, { at }), mark, words: "", pr: undefined });
+  assert.deepEqual(f.flightOrder([line(1, "working", 5), line(2, "attention", 1), line(3, "working", 9)]).map((l) => l.item.node.ref),
+    [node(2).ref, node(3).ref, node(1).ref]);
+});
+
+test("an epic says where it is in its plan", () => {
+  assert.equal(f.whereWords(plan([child(1, 1, { state: "closed" }), child(2, 2), child(3, 3)], [1, 2, 3])), "step 2 of 3");
+  assert.equal(f.whereWords(plan([child(4, 1, { outside: [10] }), child(5, 2)], [1, 2])), "step 1 of 2 · waits for #10");
+  assert.equal(f.whereWords(plan([child(1, 1, { state: "closed" })], [1])), undefined);
+});
+
+test("the bars count children: done, in flight and not started", () => {
+  const p = plan([child(1, 1, { state: "closed" }), child(2, 1), child(3, 2), child(4, 2)], [1, 2]);
+  const d = f.planDelivery(p, 1);
+  assert.deepEqual(d, { done: 1, flight: 1, total: 4 });
+  assert.deepEqual(f.deliveryShares(d), { done: 0.25, flight: 0.25 });
+  assert.deepEqual(f.progressDelivery(issue(9, { progress: [4, 9] })), { done: 4, flight: 0, total: 9 });
+  const all = f.addDelivery([d, { done: 0, flight: 1, total: 2 }]);
+  assert.equal(f.deliveryWords(all), "1 of 6 done");
+  assert.deepEqual(f.deliveryShares({ done: 0, flight: 0, total: 0 }), { done: 0, flight: 0 });
+});
+
+test("the rest under an epic, in words, wide and on a phone", () => {
+  const d = { done: 4, flight: 3, total: 9 };
+  assert.equal(f.restWords(d, 3), "2 more not started · 4 done");
+  assert.equal(f.restWords(d, 2), "1 more in flight · 2 more not started · 4 done");
+  assert.equal(f.restWords({ done: 0, flight: 0, total: 3 }, 0), "3 not started");
+  assert.equal(f.restWords({ done: 0, flight: 1, total: 1 }, 1), undefined);
+});
+
+test("a feature's line 2 says its epics and what is in flight", () => {
+  assert.equal(f.featureFlightWords({ name: "checkout", epics: 3, open: 2 }, 4), "2 epics · 4 in flight");
+  assert.equal(f.featureFlightWords({ name: "accounts", epics: 1, open: 1 }, 0), "1 epic · nothing in flight");
+  const feature = { name: "checkout", epics: 1, open: 1, refs: [node(10).ref, node(12).ref, node(13).ref], waiting: [node(13).ref] };
+  assert.equal(f.featureFlight(feature, [agent("a", ["#12"], "running"), agent("l", ["#10", "lead"], "running")]), 2);
+});
