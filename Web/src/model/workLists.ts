@@ -19,6 +19,8 @@ const lineagePages = 5;
 /** A machine's page of a forge list, and the cursor to its next. */
 export interface HostList {
   host: string; items: ForgeItem[]; cursor?: string | undefined; errors: ForgeListError[];
+  /** How many items the whole list has, from the machine's first page (#4396); none when a forge on it gives no count. */
+  total?: number | undefined;
   /** The refs of the items carried from the last read for a forge this read could not reach, shown dimmed (#4392). */
   stale?: string[] | undefined;
 }
@@ -167,7 +169,7 @@ export async function loadList(store: Store, l: WorkListState): Promise<void> {
       const had = before.find((b) => b.host === h.id);
       try {
         const got = await store.link.call(method, forgeListRequest(forgeState(state), board), h.id);
-        return carryStale({ host: h.id, items: got.items, cursor: got.cursor, errors: got.errors ?? [] }, had);
+        return carryStale({ host: h.id, items: got.items, cursor: got.cursor, errors: got.errors ?? [], total: got.total }, had);
       } catch (e) {
         return carryStale({ host: h.id, items: [], errors: [{ forge: "", message: describe(e) }] }, had);
       }

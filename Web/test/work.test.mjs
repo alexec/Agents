@@ -407,3 +407,57 @@ test("the 390 px bar says 3/42, and Lineage says the cost and the sessions", () 
   assert.equal(w.lineageCountWords(undefined, 2), "2 sessions");
   assert.equal(w.lineageCountWords(undefined, 0), "");
 });
+
+// The forge's own fields (#4398), as WorkLookTests has them on the Mac (#4397).
+test("a row says when it opened, closed or merged, and not planned; with no times, the last update (#4398)", () => {
+  const now = Date.parse("2026-10-30T12:00:00Z");
+  const open = w.forgeRow(item(12, { author: "sam", createdAt: at("2026-10-27T12:00:00Z") }), "mac");
+  assert.deepEqual(w.rowLine(open, now), { wide: "#12 · opened 3 days ago by sam", short: "#12 · 3 d · sam" });
+  const closed = w.forgeRow(item(20, { author: "sam", state: "closed", stateReason: "not_planned", closedAt: at("2026-10-25T12:00:00Z") }), "mac");
+  assert.equal(w.rowLine(closed, now).wide, "#20 · closed 5 days ago · not planned");
+  assert.equal(w.rowLine(closed, now).short, "#20 · 5 d · sam · not planned");
+  assert.equal(w.stateGlyph("issue", closed.state, false, closed.stateReason === "not_planned"), "issue-dropped");
+  const merged = w.forgeRow(item(21, { node: { kind: "pr", ref: "github:alexec/Agents#21" }, state: "merged", closedAt: at("2026-10-30T10:00:00Z") }), "mac");
+  assert.equal(w.rowLine(merged, now).wide, "#21 · merged 2 hours ago");
+  assert.equal(w.rowLine(w.forgeRow(item(7, { author: "bob" }), "mac"), now).wide, "#7 · updated 2 hours ago by bob");
+  assert.equal(w.forgeRow(item(7, { authorAvatar: "https://avatars.githubusercontent.com/u/1" }), "mac").avatar, "https://avatars.githubusercontent.com/u/1");
+});
+
+test("an issue's state line says when it opened and closed; with no opened time, the last update (#4398)", () => {
+  const now = new Date("2026-10-30T12:00:00Z");
+  assert.deepEqual(w.pageStateWords({ author: "sam", state: "closed", created: new Date("2026-10-27T12:00:00Z"),
+    closed: new Date("2026-10-29T12:00:00Z"), updated: new Date("2026-10-29T12:00:00Z"), comments: 4 }, now),
+    { wide: "sam opened this 3 days ago · closed yesterday · 4 comments", short: "sam · 3 d · 4 comments" });
+  assert.equal(w.pageStateWords({ author: "sam", updated: new Date("2026-10-30T10:00:00Z"), comments: 0 }, now).wide,
+    "sam opened this · updated 2 hours ago");
+});
+
+test("the end of a list says the forge's total, only for one machine's list with no filter here (#4398)", () => {
+  assert.equal(w.endWords("issue", 50, true, 128), "128 issues");
+  assert.equal(w.endWords("issue", 50, true), "50+ issues");
+  assert.equal(w.loadingMore(50, 128), "Loading more… · 50 of 128 shown");
+  assert.equal(w.listTotal([128], w.anyFilter), 128);
+  assert.equal(w.listTotal([128], { ...w.anyFilter, board: "b1" }), 128);
+  assert.equal(w.listTotal([128], { ...w.anyFilter, label: "bug" }), undefined);
+  assert.equal(w.listTotal([128, 40], w.anyFilter), undefined);
+  assert.equal(w.listTotal([undefined], w.anyFilter), undefined);
+});
+
+test("an issue's events go between its comments in time order; one this client does not know draws nothing (#4398)", () => {
+  const c = (iso, body) => ({ author: "sam", body, at: at(iso) });
+  const e = (iso, kind, extra = {}) => ({ kind, actor: "alexec", at: at(iso), ...extra });
+  assert.equal(w.eventWords(e("2026-10-01T00:00:00Z", "labeled", { label: { name: "bug" } })), "alexec added the label bug");
+  assert.equal(w.eventWords(e("2026-10-01T00:00:00Z", "assigned", { assignee: "alexec" })), "alexec self-assigned this");
+  assert.equal(w.eventWords(e("2026-10-01T00:00:00Z", "unassigned", { assignee: "sam" })), "alexec unassigned sam");
+  assert.equal(w.eventWords(e("2026-10-01T00:00:00Z", "closed", { source: { kind: "pr", ref: "github:alexec/Agents#21" } })), "alexec closed this in #21");
+  assert.equal(w.eventWords(e("2026-10-01T00:00:00Z", "referenced", { source: { kind: "pr", ref: "github:alexec/Agents#21" } })), "alexec mentioned this in #21");
+  assert.equal(w.eventWords(e("2026-10-01T00:00:00Z", "renamed")), undefined);
+  const comments = [c("2026-10-02T00:00:00Z", "a"), c("2026-10-04T00:00:00Z", "b")];
+  const events = [e("2026-10-01T00:00:00Z", "reopened"), e("2026-10-03T00:00:00Z", "closed"), e("2026-10-03T00:00:00Z", "renamed")];
+  const shape = (xs) => xs.map((x) => "comment" in x ? x.comment.body : x.words);
+  assert.deepEqual(shape(w.timelineEntries(comments, events, false)), ["alexec reopened this", "a", "alexec closed this", "b"]);
+  // With older comments to read, an event before the first comment shown waits with them.
+  assert.deepEqual(shape(w.timelineEntries(comments, events, true)), ["a", "alexec closed this", "b"]);
+  assert.equal(w.eventsSayClose(events), true);
+  assert.equal(w.eventsSayClose(undefined), false);
+});
