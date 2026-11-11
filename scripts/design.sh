@@ -3,7 +3,8 @@
 #
 #   scripts/design.sh gen             write the CSS token files from design/tokens.json (#4602):
 #                                     Web/src/theme/tokens.css, www/tokens.css,
-#                                     docs/stylesheets/tokens.css, Go/internal/forgepages/tokens.css;
+#                                     docs/stylesheets/tokens.css, Go/internal/forgepages/tokens.css,
+#                                     and the token tables in docs/reference/design-system.md (#4604);
 #                                     DesignTokensTests checks Paper.swift, StateTint.swift,
 #                                     TypeScale.swift and the AccentColor assets against the JSON
 #   scripts/design.sh check           write nothing; fail when a token file is not what the JSON
