@@ -16,6 +16,8 @@ import { undoLabel, undoMillis } from "../model/archiveWords";
 import { healthTally, folderServers } from "../model/hostedMCP";
 import { signal, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
+import type { ComponentChildren } from "preact";
+import { byBack } from "../model/later";
 import { nonePage } from "./SummaryPage";
 import { FolderSettingsModal, ProjectSettingsModal } from "./ProjectSettings";
 import { projectSettingsWords } from "../model/projectSettings";
@@ -531,10 +533,10 @@ function SmartFold({ row, store, folders, places, query, linkDown, downSince }: 
       // The pinned are in Pinned alone: each session is listed once (#587).
       const pins = store.sessionPinsIn(placed.host.id, placed.folder.folder.folder);
       // A failed workflow run's agent is its workflow's row under Needs You, not a session too (#989);
-      // an asker, its requests' rows (#3864).
+      // an asker, its requests' rows (#3864), in Needs You or in Later (#4236).
       const failed = row === "needsYou" ? failedRuns(placed.folder.approvals) : new Set<string>();
       if (row === "needsYou") {
-        for (const request of store.personRequestsIn(placed.host.id, placed.folder.folder.folder)) failed.add(request.askedBy as string);
+        for (const request of store.openPersonRequestsIn(placed.host.id, placed.folder.folder.folder)) failed.add(request.askedBy as string);
       }
       const gathered = (query?: typeof parsed) => smartAgents(row, live, query, pins, on).filter((a) => !failed.has(a.id));
       count += gathered().length;
@@ -560,6 +562,13 @@ function SmartFold({ row, store, folders, places, query, linkDown, downSince }: 
   ].sort((a, b) => a.request.askedAt - b.request.askedAt);
   const asked = parsed ? requests.filter(({ request }) => request.title.toLowerCase().includes(query.toLowerCase())) : requests;
   count += requests.length;
+  // The deferred ones (#4236), in the folded Later group at the end, the soonest back first, in no count.
+  const deferred: typeof requests = row !== "needsYou" ? [] : [
+    ...hostsHere.flatMap((host) => store.laterTerminalRequests(host.id).map((request) => ({ host, request }))),
+    ...folders.flatMap((placed) => store.laterRequestsIn(placed.host.id, placed.folder.folder.folder)
+      .map((request) => ({ host: placed.host, folder: placed, request }))),
+  ].sort((a, b) => byBack(a.request, b.request));
+  const later = parsed ? deferred.filter(({ request }) => request.title.toLowerCase().includes(query.toLowerCase())) : deferred;
   // What waits for an OK, each folder's, after the sessions (#773).
   const waiting = row !== "needsYou" ? [] : folders.map((placed) => ({ folder: placed, approvals: placed.folder.approvals }));
   const approvals = smartApprovals(waiting, query);
@@ -574,8 +583,9 @@ function SmartFold({ row, store, folders, places, query, linkDown, downSince }: 
     suggestions: store.checkSuggestionsIn(placed.host.id, placed.folder.folder.folder) }));
   const suggestions = smartSuggestions(checked, query);
   if (row === "forReview") count += query ? smartSuggestions(checked).length : suggestions.length;
-  if (parsed ? lines.length === 0 && asked.length === 0 && approvals.length === 0 && pulls.length === 0 && suggestions.length === 0
-    : count === 0 && !keptPlace) return null;
+  // Later alone keeps Needs You drawn (#4236).
+  if (parsed ? lines.length === 0 && asked.length === 0 && later.length === 0 && approvals.length === 0 && pulls.length === 0 && suggestions.length === 0
+    : count === 0 && !keptPlace && deferred.length === 0) return null;
   const title = smartTitles[row];
   const updated = row === "needsYou" && downSince !== undefined ? updatedLine(downSince) : null;
   return (
@@ -639,6 +649,34 @@ function SmartFold({ row, store, folders, places, query, linkDown, downSince }: 
           suggestion={suggestion} place={placeOf(places, placed.host, placed.folder, store.macHostID.value)}
           down={linkDown || !store.hostIsOnline(host)} />;
       })}
+      {open && later.length > 0 && <LaterGroup open={parsed !== undefined || folds.isLaterOpen()} count={later.length}>
+        {later.map(({ host: on, folder: placed, request }) => {
+          const host = on.id;
+          return <RequestRow key={`${host}|${request.id}`} store={store} host={host} folder={placed?.folder.folder.folder ?? ""} request={request}
+            place={placed ? placeOf(places, placed.host, placed.folder, store.macHostID.value) : ""}
+            chosen={!!request.askedBy && r.host === host && r.session === request.askedBy} />;
+        })}
+      </LaterGroup>}
+    </details>
+  );
+}
+
+/**
+ * Needs You's folded Later group (#4236), at its end, as the window's LaterRows: its heading folds it
+ * and says how many, kept in localStorage as the other folds; its rows are the deferred requests,
+ * each saying when it comes back. A search unfolds it.
+ */
+function LaterGroup({ open, count, children }: { open: boolean; count: number; children: ComponentChildren }) {
+  return (
+    <details class="later" role="group" aria-label="Later" open={open}
+      onToggle={(e) => {
+        const now = (e.currentTarget as HTMLDetailsElement).open;
+        if (now !== open) folds.setLaterOpen(now);
+      }}>
+      <summary aria-label={`Later, ${count}`}>
+        Later<span class="count">{count}</span>
+      </summary>
+      {open && children}
     </details>
   );
 }
