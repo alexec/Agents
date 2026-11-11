@@ -50,6 +50,9 @@ type costLedgerFile struct {
 	// the change it was last at.
 	Unsent map[string]int64 `json:"unsent,omitempty"`
 	Seq    int64            `json:"seq,omitempty"`
+	// Overruns is each epic's highest overrun threshold the person was told (#4529), by
+	// costKey: kept here, not on its node, as it is this machine's notice, not a figure.
+	Overruns map[string]int64 `json:"overruns,omitempty"`
 }
 
 type costLedgerBook struct {
@@ -93,8 +96,11 @@ func (d *Daemon) bankWork(a *wire.Agent, add wire.LineageCost) {
 			repo = d.sessionRepo(folder)
 		}
 		shares := lineage.Split(add, len(work))
-		// After the unlock: a merged PR's comment says the new total (#2352).
+		// After the unlock: a merged PR's comment says the new total (#2352), and an epic past
+		// a multiple of its estimate gets its notice (#4529).
 		defer d.prCostChanged(work)
+		var told []overrunNotice
+		defer func() { d.postOverrunNotices(told) }()
 		d.workMu.Lock()
 		defer d.workMu.Unlock()
 		for i, n := range work {
@@ -106,6 +112,7 @@ func (d *Daemon) bankWork(a *wire.Agent, add wire.LineageCost) {
 			})
 		}
 		d.costChangedLocked()
+		told = d.overrunsLocked(work)
 	})
 }
 
