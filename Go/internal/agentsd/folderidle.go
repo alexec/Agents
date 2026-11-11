@@ -75,7 +75,7 @@ func (d *Daemon) watchForIdle(folder string) {
 // workingIn is the agents starting or running in a folder, less the clean-up's own.
 func (d *Daemon) workingIn(folder string) []wire.UUID {
 	var out []wire.UUID
-	for _, a := range d.agentsOf(folder) {
+	for _, a := range d.liveAgentsOf(folder) {
 		if (a.State == wire.AgentStateStarting || a.State == wire.AgentStateRunning) && !d.isIdleJob(&a) {
 			out = append(out, a.ID)
 		}

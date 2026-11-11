@@ -734,7 +734,7 @@ func (d *Daemon) resumeBlocks() {
 			}
 		}
 	}
-	for _, a := range d.Store.Agents() {
+	for _, a := range d.Store.LiveAgents() {
 		if a.State == wire.AgentStateFinished && a.Report != nil && a.Report.Outcome == wire.WorkOutcomeWaiting &&
 			a.Report.Block != nil && a.Report.Block.ClearedAt != nil &&
 			(a.Report.Block.ClearedBy == nil || *a.Report.Block.ClearedBy != wire.BlockClearingDropped) &&

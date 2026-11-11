@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -68,7 +69,7 @@ func (d *Daemon) waitingWorkflowChanges(folder string) []wire.GuardedChange {
 		out = append(out, wire.GuardedChange{Path: workflowChangePath(id), Digest: &digest,
 			ChangedBy: []string{}, ChangedByIDs: []wire.UUID{}, Since: since})
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Path < out[j].Path })
+	slices.SortFunc(out, byPath)
 	return out
 }
 
