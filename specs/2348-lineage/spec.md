@@ -441,3 +441,29 @@ remote: tier mac+web for all three.
 All three: the docs in the Lineage section (#3308), drawn by the servers' own `ui://` pages.
 web: Reports ▸ Value (#2351), its release rows and the Lineage pane's release node
 (#3023); Cost on Pull Requests… in the folder's menu (#2352).
+
+## Reads across machines (#4276)
+
+The control plane answers lineage reads from its merged copy (#4275), so a machine that
+sleeps is still in the answer. Forge data (titles, states, children) still comes from the
+machines (principle 6); the copy has only refs, states and times (principle 7).
+
+- **`lineage/walkAll`** (`LineageWalkAllRequest {node, depth?, scope?}` → `LineageGraph`):
+  `lineage/walk` over every machine's links in the scope, each link once, with each
+  session's state now. It has no `resolved`: the control plane keeps no titles. The walk
+  is `lineage.WalkOver`, the same code as a machine's own walk.
+- **`lineage/sessionsOn`** (`LineageSessionsOnRequest {nodes, scope?}` →
+  `LineageSessionsOn`): the sessions linked straight to the nodes asked for (at most 500),
+  each once, with its machine, the nodes it is on, its first link's start and its state now.
+- **The scope** is as `reports/value`'s: `me` when absent for a member, the organisation
+  for an admin; a group for its lead or an admin.
+- **`control/lineageChanged`** (`LineageChanged {host, states, links?}`): after each
+  `lineage/sync` that brought something, to the machine's person and to the admins, at this
+  copy and (over the peer links only) at the others. A client that shows working reads
+  again on it, so it does not poll.
+- **Work ▸ Timeline** (Mac and web): after the machines' `work/timeline`, the client asks
+  `lineage/sessionsOn` for the epics and their children, and a child starts at the earliest
+  of its own start, its close and its first session's link, on any machine; its line starts
+  no later (`WorkTimeline.started`, `startedBySessions`). It asks again on each
+  `control/lineageChanged`. A control plane from before it answers nothing, and the
+  Timeline is as the machines say.

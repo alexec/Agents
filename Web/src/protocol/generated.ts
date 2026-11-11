@@ -4985,6 +4985,19 @@ export interface LineMember {
 }
 
 /**
+ * control/lineageChanged (#4276): a machine sent lineage the control plane's copy did not have, to
+ * the machine's person and to the admins: the changes of state it sent, so a client that shows
+ * working does not poll, and links when links changed too. Only refs, states and times.
+ */
+export interface LineageChanged {
+  /** The machine's id. */
+  host: string;
+  states: LineageStateChange[];
+  /** Links started or ended too: a read of them is out of date. */
+  links?: boolean;
+}
+
+/**
  * What was banked under lineage nodes (#2350): a turn's cost, tokens and time, split evenly among
  * the links active when it was banked. turns is a share of turns, so a turn on two nodes is half a
  * turn on each.
@@ -5478,6 +5491,20 @@ export interface LineageSessionMatch {
 }
 
 /**
+ * A session that lineage links to one or more of the nodes asked for (#4276), on any machine in the
+ * scope: the session's node, its machine, the nodes asked for it is linked to, when its first link
+ * to them started, and its state now when its machine sent one.
+ */
+export interface LineageSessionOn {
+  node: LineageNode;
+  /** The id of the machine that sent the link. */
+  host: string;
+  on: LineageNode[];
+  at: WireDate;
+  state?: LineageSessionState;
+}
+
+/**
  * A change of a session node's state, as its machine recorded it (#4274): state is what it changed
  * to, at is when. The machine keeps the changes of the last 90 days, and each session's latest
  * whatever its age.
@@ -5518,6 +5545,25 @@ export interface LineageSessions {
 }
 
 /**
+ * lineage/sessionsOn (#4276): the sessions linked to the nodes asked for, each once, the earliest
+ * link first. limited says there were more than lineage's answer bound (500).
+ */
+export interface LineageSessionsOn {
+  sessions: LineageSessionOn[];
+  limited?: boolean;
+}
+
+/**
+ * lineage/sessionsOn (#4276): the nodes (at most 500, such as an epic and its children) whose
+ * sessions to say, over every machine's copy that the scope takes. The scope is as reports/value's:
+ * me when absent for a member, the organisation for an admin.
+ */
+export interface LineageSessionsOnRequest {
+  nodes: LineageNode[];
+  scope?: ReportScope;
+}
+
+/**
  * lineage/sessions (#3899): a session search for #<number> asks for the sessions on that issue, on
  * the issues part-of it (its sub-issues, at most 100) and on the PRs that fix them. The issue is
  * #<number> in the forge repo of each of this machine's folders.
@@ -5554,6 +5600,18 @@ export interface LineageSync {
  */
 export interface LineageSyncAnswer {
   full?: boolean;
+}
+
+/**
+ * lineage/walkAll (#4276): lineage/walk over the control plane's merged copy, every machine's links
+ * that the scope takes, so a machine that sleeps is still in it. depth is as lineage/walk's; the
+ * scope is as reports/value's. The answer has no resolved: the control plane keeps no titles
+ * (principle 7).
+ */
+export interface LineageWalkAllRequest {
+  node: LineageNode;
+  depth?: number;
+  scope?: ReportScope;
 }
 
 export interface ListCursor {
@@ -13740,7 +13798,9 @@ export interface Methods {
   "lineage/estimate": { params: LineageEstimateRequest; result: LineageEstimate };
   "lineage/forecast": { params: LineageForecastRequest; result: LineageForecast };
   "lineage/sessions": { params: LineageSessionsRequest; result: LineageSessions };
+  "lineage/sessionsOn": { params: LineageSessionsOnRequest; result: LineageSessionsOn };
   "lineage/walk": { params: LineageNodeRequest; result: LineageGraph };
+  "lineage/walkAll": { params: LineageWalkAllRequest; result: LineageGraph };
   "links/approve": { params: ChannelLinkDecide; result: Empty };
   "links/deny": { params: ChannelLinkDecide; result: Empty };
   "links/list": { params: Empty; result: ChannelLink[] };
@@ -14162,7 +14222,9 @@ export const MethodTarget = {
   "lineage/estimate": "host",
   "lineage/forecast": "host",
   "lineage/sessions": "host",
+  "lineage/sessionsOn": "control",
   "lineage/walk": "host",
+  "lineage/walkAll": "control",
   "links/approve": "control",
   "links/deny": "control",
   "links/list": "control",
@@ -14425,6 +14487,7 @@ export interface Notifications {
   "control/joinRequested": JoinRequest;
   "control/keptChanged": KeptList;
   "control/keptDelivered": KeptDelivered;
+  "control/lineageChanged": LineageChanged;
   "control/linkDecided": ChannelLinkDecided;
   "control/linkRequested": ChannelLinkRequest;
   "control/linksChanged": Empty;
@@ -14886,6 +14949,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LendSignIn: { required: ["host", "from", "runtime", "allowed"], optional: [] },
   Levels: { required: [], optional: ["model", "permission", "permissionRequests"] },
   LineMember: { required: ["agentID", "askedAt", "isCallOpen"], optional: [] },
+  LineageChanged: { required: ["host", "states"], optional: ["links"] },
   LineageCost: { required: ["cost", "inputTokens", "outputTokens", "turns", "workingSeconds", "waitingSeconds"], optional: ["limitTokens"] },
   LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["repo", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "startedAt", "level", "feature", "parent", "endedAt", "resolved", "sessions", "estimate", "forecast"] },
   LineageCostRollup: { required: ["node", "own", "total", "waste", "unlinked", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "parts"], optional: ["limited"] },
@@ -14914,12 +14978,16 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineageRuntimeCount: { required: ["runtimeID", "sessions"], optional: [] },
   LineageSessionIssue: { required: ["node"], optional: ["title"] },
   LineageSessionMatch: { required: ["agentID", "on"], optional: [] },
+  LineageSessionOn: { required: ["node", "host", "on", "at"], optional: ["state"] },
   LineageSessionState: { required: ["state", "at"], optional: [] },
   LineageSessions: { required: ["matches"], optional: ["issues", "limited"] },
+  LineageSessionsOn: { required: ["sessions"], optional: ["limited"] },
+  LineageSessionsOnRequest: { required: ["nodes"], optional: ["scope"] },
   LineageSessionsRequest: { required: ["number"], optional: [] },
   LineageStateChange: { required: ["node", "state", "at"], optional: [] },
   LineageSync: { required: [], optional: ["links", "states", "reset"] },
   LineageSyncAnswer: { required: [], optional: ["full"] },
+  LineageWalkAllRequest: { required: ["node"], optional: ["depth", "scope"] },
   ListCursor: { required: ["lastActivityAt", "id"], optional: ["archivedAt"] },
   ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID", "after", "query", "project"] },
   ListedSkill: { required: ["name", "folder"], optional: ["description", "managed"] },

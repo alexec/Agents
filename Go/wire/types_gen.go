@@ -5641,6 +5641,17 @@ type LineMember struct {
 	IsCallOpen bool `json:"isCallOpen"`
 }
 
+// control/lineageChanged (#4276): a machine sent lineage the control plane's copy did not have, to the machine's person and to the admins: the changes of state it sent, so a client that shows working does not poll, and links when links changed too. Only refs, states and times.
+type LineageChanged struct {
+	// The machine's id.
+	Host string `json:"host"`
+
+	States []LineageStateChange `json:"states"`
+
+	// Links started or ended too: a read of them is out of date.
+	Links *bool `json:"links,omitzero"`
+}
+
 // What was banked under lineage nodes (#2350): a turn's cost, tokens and time, split evenly among the links active when it was banked. turns is a share of turns, so a turn on two nodes is half a turn on each.
 type LineageCost struct {
 	// By currency.
@@ -6098,6 +6109,20 @@ type LineageSessionMatch struct {
 	On LineageNode `json:"on"`
 }
 
+// A session that lineage links to one or more of the nodes asked for (#4276), on any machine in the scope: the session's node, its machine, the nodes asked for it is linked to, when its first link to them started, and its state now when its machine sent one.
+type LineageSessionOn struct {
+	Node LineageNode `json:"node"`
+
+	// The id of the machine that sent the link.
+	Host string `json:"host"`
+
+	On []LineageNode `json:"on"`
+
+	At Date `json:"at"`
+
+	State *LineageSessionState `json:"state,omitzero"`
+}
+
 // A change of a session node's state, as its machine recorded it (#4274): state is what it changed to, at is when. The machine keeps the changes of the last 90 days, and each session's latest whatever its age.
 type LineageSessionState struct {
 	State LineageSessionStateName `json:"state"`
@@ -6145,6 +6170,20 @@ type LineageSessions struct {
 	Limited *bool `json:"limited,omitzero"`
 }
 
+// lineage/sessionsOn (#4276): the sessions linked to the nodes asked for, each once, the earliest link first. limited says there were more than lineage's answer bound (500).
+type LineageSessionsOn struct {
+	Sessions []LineageSessionOn `json:"sessions"`
+
+	Limited *bool `json:"limited,omitzero"`
+}
+
+// lineage/sessionsOn (#4276): the nodes (at most 500, such as an epic and its children) whose sessions to say, over every machine's copy that the scope takes. The scope is as reports/value's: me when absent for a member, the organisation for an admin.
+type LineageSessionsOnRequest struct {
+	Nodes []LineageNode `json:"nodes"`
+
+	Scope *ReportScope `json:"scope,omitzero"`
+}
+
 // lineage/sessions (#3899): a session search for #<number> asks for the sessions on that issue, on the issues part-of it (its sub-issues, at most 100) and on the PRs that fix them. The issue is #<number> in the forge repo of each of this machine's folders.
 type LineageSessionsRequest struct {
 	Number int64 `json:"number"`
@@ -6171,6 +6210,15 @@ type LineageSync struct {
 // lineage/sync's answer (#4275). full: the control plane has no copy of this machine's links (a new or moved control plane), so the machine sends them all again, the first with reset.
 type LineageSyncAnswer struct {
 	Full *bool `json:"full,omitzero"`
+}
+
+// lineage/walkAll (#4276): lineage/walk over the control plane's merged copy, every machine's links that the scope takes, so a machine that sleeps is still in it. depth is as lineage/walk's; the scope is as reports/value's. The answer has no resolved: the control plane keeps no titles (principle 7).
+type LineageWalkAllRequest struct {
+	Node LineageNode `json:"node"`
+
+	Depth *int64 `json:"depth,omitzero"`
+
+	Scope *ReportScope `json:"scope,omitzero"`
 }
 
 type ListCursor struct {
