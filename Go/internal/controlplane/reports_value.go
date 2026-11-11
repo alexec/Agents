@@ -188,6 +188,10 @@ func mergeNode(have *wire.LineageCostNode, n wire.LineageCostNode) {
 	if n.Estimate != nil && (have.Estimate == nil || n.Estimate.At < have.Estimate.At) {
 		have.Estimate = n.Estimate
 	}
+	// The first landing forecast any machine kept (#4528), as each keeps its first.
+	if n.Forecast != nil && (have.Forecast == nil || n.Forecast.At < have.Forecast.At) {
+		have.Forecast = n.Forecast
+	}
 	if n.LastAt > have.LastAt {
 		have.LastAt = n.LastAt
 	}
@@ -312,6 +316,8 @@ func valueOf(nodes []wire.LineageCostNode, since wire.Date) wire.ReportValue {
 	}
 	out.LeadTimeSeconds, out.CycleTimeSeconds = median(leads), median(cycles)
 	out.EstimateError = estimateError(issues, byRef, issueParts, children, since)
+	out.ForecastScore = forecastScore(byRef, issueParts, children, since)
+	out.OpenEpics = openEpics(nodes, children)
 	limited := false
 	out.Issues, limited = mostCostly(out.Issues)
 	var more bool
@@ -384,6 +390,82 @@ func estimateError(issues []string, byRef map[string]wire.LineageCostNode, issue
 	if checked > 0 {
 		c := float64(covered) / float64(checked)
 		out.Coverage = &c
+	}
+	return out
+}
+
+// mostOpenEpics bounds reports/value's openEpics.
+const mostOpenEpics = 20
+
+// isEpic says an issue is an epic: its level says so, or it has children.
+func isEpic(n wire.LineageCostNode, children map[string][]string) bool {
+	return len(children[n.Node.Ref]) > 0 || (n.Level != nil && *n.Level == "epic")
+}
+
+// isOpen says a node's connector last said it is open.
+func isOpen(n wire.LineageCostNode) bool {
+	return n.Resolved != nil && n.Resolved.State != nil && *n.Resolved.State == "open"
+}
+
+// forecastScore is how the kept landing forecasts of the epics that landed since scored
+// (#4528): an epic lands when the last PR of it or its children merges. None when no epic
+// that landed since had a forecast kept.
+func forecastScore(byRef map[string]wire.LineageCostNode, issueParts func(string) []wire.LineageCostNode,
+	children map[string][]string, since wire.Date) *wire.ReportForecastScore {
+	refs := make([]string, 0, len(byRef))
+	for ref := range byRef {
+		refs = append(refs, ref)
+	}
+	sort.Strings(refs)
+	out := wire.ReportForecastScore{}
+	var off []float64
+	for _, ref := range refs {
+		n := byRef[ref]
+		if n.Forecast == nil || !isEpic(n, children) || isOpen(n) {
+			continue
+		}
+		var landed *wire.Date
+		for _, p := range epicParts(ref, children[ref], issueParts) {
+			if p.Node.Kind == lineage.KindPR && p.Outcome != nil && *p.Outcome == lineage.OutcomeMerged && p.EndedAt != nil &&
+				(landed == nil || *p.EndedAt > *landed) {
+				landed = p.EndedAt
+			}
+		}
+		if landed == nil || *landed < since {
+			continue
+		}
+		out.Epics++
+		if *landed <= n.Forecast.P50 {
+			out.P50Held++
+		}
+		if *landed <= n.Forecast.P85 {
+			out.P85Held++
+		}
+		off = append(off, math.Abs(float64(*landed-n.Forecast.P50))/secondsPerDay)
+	}
+	if out.Epics == 0 {
+		return nil
+	}
+	out.ErrorDays = median(off)
+	return &out
+}
+
+// openEpics is the epics whose connector says they are open, the most recently changed
+// first, at most mostOpenEpics (#4528).
+func openEpics(nodes []wire.LineageCostNode, children map[string][]string) []wire.LineageNode {
+	var open []wire.LineageCostNode
+	for _, n := range nodes {
+		if n.Node.Kind == lineage.KindIssue && isEpic(n, children) && isOpen(n) {
+			open = append(open, n)
+		}
+	}
+	sort.SliceStable(open, func(i, j int) bool { return open[i].LastAt > open[j].LastAt })
+	out := []wire.LineageNode{}
+	for i, n := range open {
+		if i == mostOpenEpics {
+			break
+		}
+		out = append(out, n.Node)
 	}
 	return out
 }

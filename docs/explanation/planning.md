@@ -11,7 +11,7 @@ Planning is the product theme (`feature:planning`, Alex, 2026-11-10) that answer
 
 - **What do we do next?** The plan is in the forge: epics, their sub-issues and the "blocked by" links between them (`specs/3265-work-plans/spec.md`, #3265). The Product Owner ranks with RICE, the Scrum Master gives places in a fixed order, and the Work pages show the plan as steps.
 - **What will it cost, and when does it land?** An **estimate** sizes one issue or epic from closed issues like it (#3557). A **forecast** says when an epic lands and what the coming weeks cost, from the daily throughput and the burn rate, with no per-issue size (#4533).
-- **What did it deliver?** Reports ▸ Value says what the work cost, the PRs merged, the waste, and the lead and cycle times (#2351). It is the record the first two questions are checked against.
+- **What did it deliver?** Reports ▸ Planning (Value before #4528) says what the work cost, the PRs merged, the waste, and the lead and cycle times (#2351). It is the record the first two questions are checked against.
 
 ## What the figures come from
 
@@ -20,7 +20,7 @@ Every figure comes from the cost on the links (#2350): each turn's dollars, toke
 ## How the figures earn trust
 
 - **A range with a probability, never a point.** An estimate is "$2 to $15, typically $6"; a forecast is "lands 18 to 24 Nov, 85% by 27 Nov". A point hides an error that is ×1.7 half the time.
-- **Kept and scored.** Each estimate and forecast is kept when it is made, and scored against the actual figure when the work lands. Reports ▸ Value says how often the range held and by how much the dates missed. A model nobody can check does not improve, and the review of 2026-11-10 found exactly that: seven times more history left the per-issue estimate where it was.
+- **Kept and scored.** Each estimate and forecast is kept when it is made, and scored against the actual figure when the work lands. Reports ▸ Planning says how often the range held, by how much the dates missed, and how often the epics' P85 landing dates held (#4528). A model nobody can check does not improve, and the review of 2026-11-10 found exactly that: seven times more history left the per-issue estimate where it was.
 - **The overhead is loaded in.** The Scrum Master, the leads, the merge waves and the releases cost money that no issue carries: 39% of the total on 2026-11-10. A loaded figure stands beside the direct one, so a budget means what it says.
 - **The assumptions are stated.** A forecast names its window, the lanes and the runtime mix it assumes, because each one moves the dates and the dollars.
 
