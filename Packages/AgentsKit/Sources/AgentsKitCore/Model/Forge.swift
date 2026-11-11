@@ -24,6 +24,9 @@ public extension DaemonAPI {
         public var node: LineageNode
         public var title: String
         public var state: String
+        /// Why a closed issue closed: completed, not_planned or duplicate, where the forge says
+        /// it (`ForgeCapabilities.stateReason`); nil while it is open and on a pull request (#4365).
+        public var stateReason: String?
         public var status: String?
         public var url: String?
         public var folder: String?
@@ -56,10 +59,11 @@ public extension DaemonAPI {
                     updatedAt: Date, comments: Int = 0, draft: Bool? = nil, checks: String? = nil, review: String? = nil,
                     mergeable: String? = nil, autoMerge: Bool? = nil, parent: LineageNode? = nil, level: String? = nil,
                     feature: String? = nil, progress: ForgeProgress? = nil, status: String? = nil, standing: Bool? = nil,
-                    authorAvatar: String? = nil) {
+                    authorAvatar: String? = nil, stateReason: String? = nil) {
             self.node = node
             self.title = title
             self.state = state
+            self.stateReason = stateReason
             self.status = status
             self.url = url
             self.folder = folder

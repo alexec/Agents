@@ -4261,12 +4261,15 @@ export interface ForgeImageRequest {
  * label; progress is a parent's closed children of all of them, where the forge says it: in a
  * GitHub list, and on an issue's own read. standing says it has the label standing: a standing
  * epic, whose plan is a query (#3659). authorAvatar is the author's picture, a URL that only
- * forge/image reads (#4363), where the forge gives one (ForgeCapabilities.avatars).
+ * forge/image reads (#4363), where the forge gives one (ForgeCapabilities.avatars). stateReason is
+ * why a closed issue closed (#4365): completed, not_planned or duplicate, where the forge says it
+ * (ForgeCapabilities.stateReason); absent on an open issue and on a pull request.
  */
 export interface ForgeItem {
   node: LineageNode;
   title: string;
   state: string;
+  stateReason?: string;
   status?: string;
   url?: string;
   folder?: string;
@@ -14559,7 +14562,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeFeaturesRequest: { required: [], optional: ["folder", "board"] },
   ForgeImage: { required: ["mimeType", "data"], optional: [] },
   ForgeImageRequest: { required: ["url"], optional: [] },
-  ForgeItem: { required: ["node", "title", "state", "labels", "assignees", "updatedAt", "comments"], optional: ["status", "url", "folder", "author", "authorAvatar", "milestone", "draft", "checks", "review", "mergeable", "autoMerge", "parent", "level", "feature", "progress", "standing"] },
+  ForgeItem: { required: ["node", "title", "state", "labels", "assignees", "updatedAt", "comments"], optional: ["stateReason", "status", "url", "folder", "author", "authorAvatar", "milestone", "draft", "checks", "review", "mergeable", "autoMerge", "parent", "level", "feature", "progress", "standing"] },
   ForgeItemDetail: { required: ["item", "body", "comments"], optional: ["cursor", "checks", "reviewThreads", "filesChanged", "head", "mergeMethods", "start", "transitions", "actions"] },
   ForgeItemRequest: { required: ["node"], optional: ["cursor"] },
   ForgeLabel: { required: ["name"], optional: ["color"] },

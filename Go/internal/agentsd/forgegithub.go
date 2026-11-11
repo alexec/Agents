@@ -32,6 +32,7 @@ func (githubForge) Caps() forgeCaps {
 			Rerun: true, Log: true, Diff: true},
 		LabelColors:  true,
 		Avatars:      true,
+		StateReason:  true,
 		CommentCount: "exact",
 		Plan:         true, BlockedBy: true, AddChild: true,
 		Reasons: map[string]string{

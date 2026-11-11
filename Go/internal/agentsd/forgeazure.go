@@ -150,7 +150,7 @@ func (d *Daemon) forgeAzureBoards() (forgeAzureBoards, error) {
 // boardsItemOf is a work item in the one model, from folder.
 func boardsItemOf(i azureboardsmcp.Item, folder string) wire.ForgeItem {
 	out := wire.ForgeItem{Node: boardsNode(i.Project, i.ID), Title: i.Title, State: i.State, Status: optional(i.Status),
-		URL: optional(i.URL), Folder: optional(folder), Labels: forgeLabelsOf(i.Labels, nil), Author: optional(i.Author), AuthorAvatar: optional(i.AuthorAvatar),
+		URL: optional(i.URL), Folder: optional(folder), Labels: forgeLabelsOf(i.Labels, nil), Author: optional(i.Author), AuthorAvatar: optional(i.AuthorAvatar), StateReason: optional(i.StateReason),
 		Assignees: i.Assignees, UpdatedAt: forgeDate(i.UpdatedAt), Comments: int64(i.Comments)}
 	if out.Assignees == nil {
 		out.Assignees = []string{}
@@ -188,6 +188,7 @@ func (azureBoardsForge) Caps() forgeCaps {
 		Issues:       true,
 		Issue:        forgeActions{Comment: true, Label: true, Close: true, Reopen: true, Transition: true},
 		Avatars:      true,
+		StateReason:  true,
 		CommentCount: "exact",
 		Plan:         true, BlockedBy: true, AddChild: true,
 		Reasons: map[string]string{

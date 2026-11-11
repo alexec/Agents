@@ -27,9 +27,12 @@ type Item struct {
 	State, Title, URL, Author, Milestone, UpdatedAt string
 	// AuthorAvatar is the author's picture, on Linear's public upload host; "" for none (#4363).
 	AuthorAvatar string
-	Labels       []string
-	LabelColors  map[string]string
-	Assignees    []string
+	// StateReason is why a closed issue closed: completed, not_planned or duplicate; "" while
+	// it is open (#4365).
+	StateReason string
+	Labels      []string
+	LabelColors map[string]string
+	Assignees   []string
 	// Comments is how many, at most 50: Linear does not count them.
 	Comments int
 	// Parent is the issue it is a child of, by identifier (#3267). SubTotal and SubDone are its
@@ -66,7 +69,7 @@ type ItemDetail struct {
 // forgeComments is a page of an issue's comments.
 const forgeComments = 50
 
-const forgeFields = `identifier title url updatedAt team { key } state { type } projectMilestone { name }
+const forgeFields = `identifier title url updatedAt team { key } state { type name } projectMilestone { name }
   labels { nodes { name color } } assignee { displayName } creator { displayName avatarUrl } botActor { name avatarUrl }
   commentCount: comments(first: 50) { nodes { id } } parent { identifier }`
 
@@ -98,6 +101,7 @@ type forgeNode struct {
 	} `json:"team"`
 	State *struct {
 		Type string `json:"type"`
+		Name string `json:"name"`
 	} `json:"state"`
 	ProjectMilestone *struct {
 		Name string `json:"name"`
@@ -135,7 +139,7 @@ func (n forgeNode) item() Item {
 		i.Team = n.Team.Key
 	}
 	if n.State != nil && isClosed(n.State.Type) {
-		i.State = "closed"
+		i.State, i.StateReason = "closed", stateReasonOf(n.State.Type, n.State.Name)
 	}
 	if n.ProjectMilestone != nil {
 		i.Milestone = n.ProjectMilestone.Name
@@ -167,6 +171,20 @@ func (n forgeNode) item() Item {
 		}
 	}
 	return i
+}
+
+// stateReasonOf is why an issue in a closed state of stateType and name closed (#4365): a
+// completed state is completed; a canceled one is not_planned, or duplicate when it is the
+// team's Duplicate state, where Linear's "Mark as duplicate" moves an issue (Linear's Issue has
+// no field that says it is a duplicate, only a relation).
+func stateReasonOf(stateType, name string) string {
+	switch {
+	case stateType == "completed":
+		return "completed"
+	case strings.EqualFold(strings.TrimSpace(name), "duplicate"):
+		return "duplicate"
+	}
+	return "not_planned"
 }
 
 // SearchFilterOf is Linear's IssueFilter for teams (by key) and f; no teams is the whole

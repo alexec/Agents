@@ -233,3 +233,15 @@ func TestABoardIsItsFilter(t *testing.T) {
 		t.Fatalf("asked %q", f.asked)
 	}
 }
+
+// A done issue's resolution says why it closed (#4365).
+func TestStateReasonOf(t *testing.T) {
+	for _, c := range []struct{ resolution, want string }{
+		{"Done", "completed"}, {"Fixed", "completed"}, {"", "completed"},
+		{"Duplicate", "duplicate"}, {"Won't Do", "not_planned"}, {"Cannot Reproduce", "not_planned"},
+	} {
+		if got := stateReasonOf(c.resolution); got != c.want {
+			t.Errorf("%q: %q, want %q", c.resolution, got, c.want)
+		}
+	}
+}

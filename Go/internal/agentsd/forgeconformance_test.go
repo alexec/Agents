@@ -34,9 +34,8 @@ import (
 // where the forge has them), and the same checks on every row. A new forge gets its row and
 // passes it before it gets its own tests.
 //
-// ForgeList.forges and ForgeItemDetail.actions are checked here since #4361; the checks of
-// authorAvatar and stateReason come with the tasks that put them on the wire (#4327's tasks 12
-// and 14).
+// ForgeList.forges and ForgeItemDetail.actions are checked here since #4361, authorAvatar since
+// #4363 and stateReason since #4365.
 
 type conformRow struct {
 	name string
@@ -67,7 +66,7 @@ var conformGitHubItems = []githubmcp.Item{
 	{Repo: "alexec/agents", Number: 3, PR: true, State: "open", Title: "Open", URL: "https://github.com/alexec/agents/pull/3",
 		Author: "alexec", AuthorAvatar: "https://avatars.githubusercontent.com/u/1?v=4", Labels: []string{"bug"}, LabelColors: map[string]string{"bug": "#d73a4a"}, Assignees: []string{"alexec"},
 		UpdatedAt: "2026-11-03T10:00:00Z", Checks: "failing"},
-	{Repo: "alexec/agents", Number: 2, State: "closed", Title: "Closed", URL: "https://github.com/alexec/agents/issues/2",
+	{Repo: "alexec/agents", Number: 2, State: "closed", StateReason: "not_planned", Title: "Closed", URL: "https://github.com/alexec/agents/issues/2",
 		Author: "alexec", AuthorAvatar: "https://avatars.githubusercontent.com/u/1?v=4", UpdatedAt: "2026-11-02T10:00:00Z"},
 	{Repo: "alexec/agents", Number: 1, State: "open", Title: "Open issue", URL: "https://github.com/alexec/agents/issues/1",
 		Author: "alexec", AuthorAvatar: "https://avatars.githubusercontent.com/u/1?v=4", Labels: []string{"task", "feature:work"}, LabelColors: map[string]string{"task": "#c5def5", "feature:work": "#1d76db"},
@@ -297,7 +296,7 @@ var conformBitbucketItems = []bitbucketmcp.Item{
 		Author: "kim", AuthorAvatar: "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/k/48", UpdatedAt: "2026-11-04T10:00:00Z", Comments: 1},
 	{Repo: "walkalex/App", Number: 3, PR: true, State: "open", Title: "Open", URL: "https://bitbucket.org/walkalex/App/pull-requests/3",
 		Author: "kim", AuthorAvatar: "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/k/48", Assignees: []string{"kim"}, UpdatedAt: "2026-11-03T10:00:00Z", Checks: "failing"},
-	{Repo: "walkalex/App", Number: 2, State: "closed", Title: "Closed", URL: "https://bitbucket.org/walkalex/App/issues/2",
+	{Repo: "walkalex/App", Number: 2, State: "closed", StateReason: "duplicate", Title: "Closed", URL: "https://bitbucket.org/walkalex/App/issues/2",
 		Author: "kim", AuthorAvatar: "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/k/48", Labels: []string{"bug"}, UpdatedAt: "2026-11-02T10:00:00Z"},
 	{Repo: "walkalex/App", Number: 1, State: "open", Title: "Open issue", URL: "https://bitbucket.org/walkalex/App/issues/1",
 		Author: "kim", AuthorAvatar: "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/k/48", Labels: []string{"task", "feature:Export"}, UpdatedAt: "2026-11-01T10:00:00Z"},
@@ -422,7 +421,7 @@ type conformLinear struct {
 }
 
 var conformLinearItems = []linearmcp.Item{
-	{Identifier: "ENG-2", Team: "ENG", State: "closed", Title: "Closed", URL: "https://linear.app/acme/issue/ENG-2", Author: "kim", AuthorAvatar: "https://public.linear.app/k/avatar",
+	{Identifier: "ENG-2", Team: "ENG", State: "closed", StateReason: "completed", Title: "Closed", URL: "https://linear.app/acme/issue/ENG-2", Author: "kim", AuthorAvatar: "https://public.linear.app/k/avatar",
 		UpdatedAt: "2026-11-02T10:00:00Z"},
 	{Identifier: "ENG-1", Team: "ENG", State: "open", Title: "Open issue", URL: "https://linear.app/acme/issue/ENG-1", Author: "kim", AuthorAvatar: "https://public.linear.app/k/avatar",
 		Labels: []string{"task", "feature:Export"}, LabelColors: map[string]string{"task": "#c5def5", "feature:Export": "#1d76db"},
@@ -487,7 +486,7 @@ type conformJira struct {
 }
 
 var conformJiraItems = []jiramcp.Item{
-	{Key: "PROJ-2", Project: "PROJ", State: "closed", Status: "Done", Title: "Closed", URL: "https://acme.atlassian.net/browse/PROJ-2",
+	{Key: "PROJ-2", Project: "PROJ", State: "closed", StateReason: "completed", Status: "Done", Title: "Closed", URL: "https://acme.atlassian.net/browse/PROJ-2",
 		Author: "Kim", AuthorAvatar: "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/k/48", UpdatedAt: "2026-11-02T10:00:00.000Z"},
 	{Key: "PROJ-1", Project: "PROJ", State: "open", Status: "To Do", Title: "Open issue", URL: "https://acme.atlassian.net/browse/PROJ-1",
 		Author: "Kim", AuthorAvatar: "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/k/48", Labels: []string{"billing"}, Assignees: []string{"Kim"}, UpdatedAt: "2026-11-01T10:00:00.000Z", Comments: 2},
@@ -554,7 +553,7 @@ type conformBoards struct {
 }
 
 var conformBoardsItems = []azureboardsmcp.Item{
-	{ID: 2, Project: "acme/web", Type: "Task", State: "closed", Status: "Done", Title: "Closed",
+	{ID: 2, Project: "acme/web", Type: "Task", State: "closed", StateReason: "not_planned", Status: "Done", Title: "Closed",
 		URL: "https://dev.azure.com/acme/web/_workitems/edit/2", Author: "Kim", AuthorAvatar: "https://dev.azure.com/acme/_apis/GraphProfile/MemberAvatars/aad.aw0", UpdatedAt: "2026-11-02T10:00:00.000Z"},
 	{ID: 1, Project: "acme/web", Type: "Task", State: "open", Status: "To Do", Title: "Open work item",
 		URL: "https://dev.azure.com/acme/web/_workitems/edit/1", Author: "Kim", AuthorAvatar: "https://dev.azure.com/acme/_apis/GraphProfile/MemberAvatars/aad.aw0", Labels: []string{"billing"},
@@ -791,6 +790,17 @@ func conformModel(t *testing.T, d *Daemon, caps forgeCaps, i wire.ForgeItem) {
 	}
 	if caps.Avatars {
 		conformAvatar(t, d, fmt.Sprint(i.Node), i.AuthorAvatar)
+	}
+	// stateReason is one of the three on a closed issue when the forge gives it, and missing on
+	// every other item (#4365).
+	closedIssue := i.Node.Kind == lineage.KindIssue && i.State == "closed"
+	switch r := deref(i.StateReason); {
+	case caps.StateReason && closedIssue:
+		if r != "completed" && r != "not_planned" && r != "duplicate" {
+			t.Errorf("%v: stateReason %q, not completed, not_planned or duplicate", i.Node, r)
+		}
+	case i.StateReason != nil:
+		t.Errorf("%v: stateReason %q on an item that has none", i.Node, r)
 	}
 }
 

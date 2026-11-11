@@ -31,10 +31,13 @@ type Item struct {
 	State, Title, URL, Author, Milestone, UpdatedAt string
 	// AuthorAvatar is the author's picture (avatars.githubusercontent.com), "" for none (#4363).
 	AuthorAvatar string
-	Labels       []string
-	LabelColors  map[string]string
-	Assignees    []string
-	Comments     int
+	// StateReason is why a closed issue closed: completed, not_planned or duplicate; "" for an
+	// open issue, a pull request, or none (#4365).
+	StateReason string
+	Labels      []string
+	LabelColors map[string]string
+	Assignees   []string
+	Comments    int
 	// A pull request's: Checks is passing, failing, running or none; Review is approved,
 	// changes_requested, review_required or ""; Mergeable is mergeable, conflicting or unknown.
 	Draft, AutoMerge          bool
@@ -85,8 +88,9 @@ type ItemDetail struct {
 const itemFields = `number title url updatedAt author { login __typename avatarUrl } repository { nameWithOwner }
   ` + labelFields + ` assignees(first: 20) { nodes { login } } milestone { title } commentCount: comments { totalCount }`
 
-// issueFields are an issue's own: its parent and how many of its sub-issues are closed (#3267).
-const issueFields = `parent { number repository { nameWithOwner } } subIssuesSummary { total completed }`
+// issueFields are an issue's own: its parent and how many of its sub-issues are closed (#3267),
+// and why it closed (#4365).
+const issueFields = `parent { number repository { nameWithOwner } } subIssuesSummary { total completed } stateReason`
 
 // pullFields are a pull request's own, for a list: its checks in one word, not each of them.
 const pullFields = `isDraft mergeable reviewDecision autoMergeRequest { enabledAt }
@@ -109,15 +113,17 @@ const itemQuery = `query($owner: String!, $name: String!, $number: Int!, $before
     viewerDefaultMergeMethod squashMergeAllowed mergeCommitAllowed rebaseMergeAllowed } }`
 
 type gqlItem struct {
-	Typename   string    `json:"__typename"`
-	Number     int       `json:"number"`
-	Title      string    `json:"title"`
-	URL        string    `json:"url"`
-	IssueState string    `json:"issueState"`
-	PullState  string    `json:"pullState"`
-	UpdatedAt  string    `json:"updatedAt"`
-	Author     *gqlActor `json:"author"`
-	Repository struct {
+	Typename   string `json:"__typename"`
+	Number     int    `json:"number"`
+	Title      string `json:"title"`
+	URL        string `json:"url"`
+	IssueState string `json:"issueState"`
+	// StateReason is an issue's COMPLETED, NOT_PLANNED, DUPLICATE or REOPENED.
+	StateReason string    `json:"stateReason"`
+	PullState   string    `json:"pullState"`
+	UpdatedAt   string    `json:"updatedAt"`
+	Author      *gqlActor `json:"author"`
+	Repository  struct {
 		NameWithOwner string `json:"nameWithOwner"`
 	} `json:"repository"`
 	Labels    gqlLabels `json:"labels"`
@@ -176,6 +182,9 @@ func (n gqlItem) item() Item {
 		i.SubTotal, i.SubDone = n.SubIssues.Total, n.SubIssues.Completed
 	}
 	if !i.PR {
+		if i.State == "closed" {
+			i.StateReason = stateReasonOf(n.StateReason)
+		}
 		return i
 	}
 	i.Draft, i.AutoMerge, i.Review = n.IsDraft, n.AutoMerge != nil, strings.ToLower(n.Review)
@@ -195,6 +204,16 @@ func (n gqlItem) item() Item {
 		}
 	}
 	return i
+}
+
+// stateReasonOf is GitHub's reason for a closed issue in the one model's words (#4365):
+// completed, not_planned or duplicate, "" for another (REOPENED) or none.
+func stateReasonOf(reason string) string {
+	switch reason {
+	case "COMPLETED", "NOT_PLANNED", "DUPLICATE":
+		return strings.ToLower(reason)
+	}
+	return ""
 }
 
 // SearchQuery is GitHub search's words for repos and f, the last updated first.

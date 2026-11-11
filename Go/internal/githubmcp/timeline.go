@@ -44,8 +44,9 @@ const (
 	timelineReleases = 50
 )
 
-// timelineFields are an issue's dates, as both an epic and a child say them.
-const timelineFields = `createdAt closedAt stateReason`
+// timelineFields are an issue's dates, as both an epic and a child say them; its stateReason is
+// in issueFields.
+const timelineFields = `createdAt closedAt`
 
 const timelineQuery = `query($owner: String!, $name: String!, $states: [IssueState!], $since: DateTime, $first: Int!, $after: String, $releases: Int!) {
   repository(owner: $owner, name: $name) {
@@ -58,9 +59,8 @@ const timelineQuery = `query($owner: String!, $name: String!, $states: [IssueSta
 
 type gqlTimelineIssue struct {
 	gqlItem
-	CreatedAt   string `json:"createdAt"`
-	ClosedAt    string `json:"closedAt"`
-	StateReason string `json:"stateReason"`
+	CreatedAt string `json:"createdAt"`
+	ClosedAt  string `json:"closedAt"`
 }
 
 // Timeline is repo's open epics, and those closed since since (RFC 3339), with their

@@ -260,10 +260,13 @@ type restIssue struct {
 			Comments []restComment `json:"comments"`
 			Total    int           `json:"total"`
 		} `json:"comment"`
-		// The forge reads' (forge.go): the milestone, the parent and the sub-tasks.
+		// The forge reads' (forge.go): the milestone, the parent, the sub-tasks and the resolution.
 		FixVersions []struct {
 			Name string `json:"name"`
 		} `json:"fixVersions"`
+		Resolution *struct {
+			Name string `json:"name"`
+		} `json:"resolution"`
 		Parent   *restIssueRef  `json:"parent"`
 		Subtasks []restIssueRef `json:"subtasks"`
 	} `json:"fields"`

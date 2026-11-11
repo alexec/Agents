@@ -507,6 +507,10 @@ func (i issueJSON) issue() Issue {
 // closedStates are an issue's states that are closed; new, open and on hold are open.
 var closedStates = map[string]bool{"resolved": true, "invalid": true, "duplicate": true, "wontfix": true, "closed": true}
 
+// stateReasons are why an issue in each closed state closed, in the one model's words (#4365).
+var stateReasons = map[string]string{"resolved": "completed", "closed": "completed", "invalid": "not_planned",
+	"wontfix": "not_planned", "duplicate": "duplicate"}
+
 // openIssues is BBQL for an open issue.
 const openIssues = `(state="new" OR state="open" OR state="on hold")`
 
