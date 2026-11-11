@@ -27,6 +27,12 @@ export type WorkState = "open" | "closed" | "merged" | "all";
 export type WorkSort = "updated" | "newest" | "cost";
 export const workSortTitle: Record<WorkSort, string> = { updated: "Last updated", newest: "Newest", cost: "Cost" };
 
+/** The sorts a list offers: a release's Newest is its version, the highest first (#4421), and it has no Last updated. */
+export const workSorts = (kind: WorkKind): WorkSort[] => fromForge(kind) ? ["updated", "newest", "cost"] : ["newest", "cost"];
+
+/** The sort a list opens with: a release's is Newest. */
+export const defaultSort = (kind: WorkKind): WorkSort => kind === "release" ? "newest" : "updated";
+
 /** One row of a list: the item as its forge says it, or as lineage resolved it, and its lineage. */
 export interface WorkRow {
   node: LineageNode;
@@ -87,6 +93,25 @@ export function shortRef(ref: string): string {
   return m ? m[1]! : nodeName({ kind: "", ref });
 }
 
+/** A version tag's numbers: [0, 42, 0] of "v0.42.0"; undefined for a tag that is not a version. */
+export function version(tag: string): number[] | undefined {
+  const parts = (tag.startsWith("v") ? tag.slice(1) : tag).split(".");
+  return parts.every((p) => /^\d+$/.test(p)) ? parts.map(Number) : undefined;
+}
+
+/** Whether tag a is a later version than b; a tag that is not a version is older than one that is. */
+export function newer(a: string, b: string): boolean {
+  const x = version(a);
+  const y = version(b);
+  if (!x) return false;
+  if (!y) return true;
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    const d = (x[i] ?? -1) - (y[i] ?? -1);
+    if (d !== 0) return d > 0;
+  }
+  return false;
+}
+
 /** Whether a row's title says its short name already, as a release lineage could not resolve does. */
 export const titleSaysRef = (row: Pick<WorkRow, "title" | "node">) => row.title.endsWith(shortRef(row.node.ref));
 
@@ -104,10 +129,10 @@ export function forgeRow(item: ForgeItem, host: string, lineage?: ReportNode): W
 /** A lineage node's repo: lineage says "linear" for every Linear issue, Work its team (#3311). */
 const repoOfNode = (n: ReportNode) => n.repo && n.repo !== "linear" ? n.repo : repoOf(n.node.ref);
 
-/** A row lineage alone knows: a release, or an item no forge listed. */
+/** A row lineage alone knows: a release, named by its tag until the forge names it (#4426), or an item no forge listed. */
 export function lineageRow(n: ReportNode): WorkRow {
   return {
-    node: n.node, title: n.resolved?.title ?? nodeName(n.node), state: n.resolved?.state ?? (n.outcome === "merged" ? "merged" : ""),
+    node: n.node, title: n.resolved?.title ?? (n.node.kind === "release" ? shortRef(n.node.ref) : nodeName(n.node)), state: n.resolved?.state ?? (n.outcome === "merged" ? "merged" : ""),
     labels: (n.resolved?.labels ?? []).map((name) => ({ name })), repo: repoOfNode(n), assignees: [],
     updated: unix(n.lastAt), url: lineageUrl(n.node), lineage: n,
   };
@@ -249,8 +274,14 @@ export function sortRows(rows: readonly WorkRow[], sort: WorkSort): WorkRow[] {
   const tie = (a: WorkRow, b: WorkRow) => b.updated - a.updated || a.node.ref.localeCompare(b.node.ref);
   switch (sort) {
     case "updated": return out.sort(tie);
-    // A forge numbers its items as they are made, so the highest number is the newest.
-    case "newest": return out.sort((a, b) => refNumber(b.node.ref) - refNumber(a.node.ref) || tie(a, b));
+    // A forge numbers its items as they are made, so the highest number is the newest; a release's version says it (#4421).
+    case "newest": return out.sort((a, b) => {
+      if (a.node.kind === "release" && b.node.kind === "release") {
+        const [x, y] = [shortRef(a.node.ref), shortRef(b.node.ref)];
+        return newer(x, y) ? -1 : newer(y, x) ? 1 : tie(a, b);
+      }
+      return refNumber(b.node.ref) - refNumber(a.node.ref) || tie(a, b);
+    });
     // With no lineage last; among those, the last updated first.
     case "cost": return out.sort((a, b) => costOf(b) - costOf(a) || Number(!!b.lineage) - Number(!!a.lineage) || tie(a, b));
   }
@@ -346,8 +377,6 @@ export function labelInk(color: string | undefined): string | undefined {
 /** A label's colour as CSS: "#d73a4a" of "d73a4a"; undefined when the forge gave none. */
 export const labelColor = (color: string | undefined) => labelInk(color) ? `#${color!.replace(/^#/, "")}` : undefined;
 
-export const noWork = (kind: WorkKind) => kind === "release" ? "No releases that an agent worked on yet."
-  : `No ${workKindTitle[kind].toLowerCase()} match.`;
 export const lineageOnlyNote = "Lineage lists a release once an agent works on one of its issues or pull requests.";
 export const noForgeHere = "No machine reads issues and pull requests yet. Update Agents on a machine to see them.";
 
@@ -445,7 +474,9 @@ export function rowLine(row: WorkRow, now: number): { wide: string; short: strin
   const status = [...row.draft && row.state === "open" ? ["Draft"] : [], ...row.status ? [row.status] : []];
   const age = row.updated > 0 ? Math.max(0, now / 1000 - row.updated) : undefined;
   const by = row.author ? ` by ${row.author}` : "";
-  const when = age === undefined ? row.author ? [`by ${row.author}`] : [] : [`updated ${ago(new Date(row.updated * 1000), new Date(now))}${by}`];
+  // Lineage's links to a release are at its tag's commit time (#4421).
+  const verb = row.node.kind === "release" ? "released" : "updated";
+  const when = age === undefined ? row.author ? [`by ${row.author}`] : [] : [`${verb} ${ago(new Date(row.updated * 1000), new Date(now))}${by}`];
   const figures = lineageWords(row.lineage);
   const cost = row.lineage && spent(row.lineage.cost.total) ? [costWords(row.lineage.cost.total)] : [];
   return {
@@ -520,7 +551,7 @@ export const clearedFilter = (f: WorkFilter): WorkFilter => ({ ...anyFilter, sta
 /** An empty list's words (parts.md section 7): with a filter, "No issues match"; with none, "No open issues" and
  * where they come from. */
 export function emptyWords(kind: WorkKind, state: WorkState, filter: boolean, repos: readonly string[]): { title: string; line?: string } {
-  if (!fromForge(kind)) return { title: noWork(kind) };
+  if (kind === "release") return { title: filter ? "No releases match" : "No releases yet" };
   const things = workKindTitle[kind].toLowerCase();
   if (filter) return { title: `No ${things} match` };
   const word = state === "all" ? "" : `${state} `;
@@ -567,7 +598,7 @@ export function credentialProblem(message: string): boolean {
 
 /** The filters and the sort in the address (lists.md section 4), "project=agents&label=bug&sort=newest", so a link or a
  * reload keeps them: only what is not the default. */
-export function workQuery(f: WorkFilter, sort: WorkSort): string {
+export function workQuery(f: WorkFilter, sort: WorkSort, kind: WorkKind = "issue"): string {
   const q = new URLSearchParams();
   if (f.text.trim()) q.set("q", f.text);
   if (f.project) q.set("project", f.project);
@@ -576,7 +607,7 @@ export function workQuery(f: WorkFilter, sort: WorkSort): string {
   if (f.label) q.set("label", f.label);
   if (f.assignee) q.set("assignee", f.assignee);
   if (f.board) q.set("board", f.board);
-  if (sort !== "updated") q.set("sort", sort);
+  if (sort !== defaultSort(kind)) q.set("sort", sort);
   return q.toString();
 }
 
@@ -592,7 +623,7 @@ export function parseWorkQuery(query: string, kind: WorkKind): { filter: WorkFil
       project: q.get("project") ?? "", repo: q.get("repo") ?? "", label: q.get("label") ?? "", assignee: q.get("assignee") ?? "",
       text: q.get("q") ?? "", board: kind === "issue" ? q.get("board") ?? "" : "",
     },
-    sort: sort && sort in workSortTitle ? sort as WorkSort : "updated",
+    sort: sort && workSorts(kind).includes(sort as WorkSort) ? sort as WorkSort : defaultSort(kind),
   };
 }
 

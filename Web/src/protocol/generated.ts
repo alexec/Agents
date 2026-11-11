@@ -13898,6 +13898,7 @@ export interface Methods {
   "groups/setRole": { params: GroupRoleSet; result: Group };
   "lineage/cost": { params: LineageNodeRequest; result: LineageCostRollup };
   "lineage/estimate": { params: LineageEstimateRequest; result: LineageEstimate };
+  "lineage/figures": { params: LineageNodeRequest; result: LineageFigures };
   "lineage/forecast": { params: LineageForecastRequest; result: LineageForecast };
   "lineage/sessions": { params: LineageSessionsRequest; result: LineageSessions };
   "lineage/sessionsOn": { params: LineageSessionsOnRequest; result: LineageSessionsOn };
@@ -14322,6 +14323,7 @@ export const MethodTarget = {
   "groups/setRole": "control",
   "lineage/cost": "host",
   "lineage/estimate": "host",
+  "lineage/figures": "host",
   "lineage/forecast": "host",
   "lineage/sessions": "host",
   "lineage/sessionsOn": "control",

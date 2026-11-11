@@ -17,9 +17,10 @@ import {
   credentialProblem, emptyWords, errorWords, filtered, fromForge, loadingMore, parseWorkQuery, setFilters, workQuery,
   lineageOnlyNote, noForgeHere, notReadHere, openOnWords, positionWords, repoName, repoOf, rowLine, rowReviewWords,
   shortRef, titleSaysRef, workKindTitle, workSortTitle, allProjects, projectOfFolder, workFolderKey,
-  doneWords, forgeName, lineageCountWords, pageStateWords, shortPositionWords, stateGlyph, takesLabels,
-  type WorkFilter, type WorkKind, type WorkProject, type WorkRow, type WorkSort, type WorkState,
+  defaultSort, doneWords, forgeName, lineageCountWords, pageStateWords, shortPositionWords, stateGlyph, takesLabels,
+  workSorts, type WorkFilter, type WorkKind, type WorkProject, type WorkRow, type WorkSort, type WorkState,
 } from "../model/work";
+import { latest, latestWords } from "../model/workRelease";
 import { newSessionProjects } from "../model/projects";
 import { orderedFolders } from "./Sidebar";
 import { lineageUrl, sessionHost } from "../model/lineage";
@@ -71,11 +72,11 @@ export function WorkList({ store, kind }: { store: Store; kind: WorkKind }) {
   useEffect(() => {
     if (query === undefined) return;
     const said = parseWorkQuery(query, kind);
-    if (workQuery(said.filter, said.sort) !== workQuery(filter.peek(), sort.peek())) { filter.value = said.filter; sort.value = said.sort; }
+    if (workQuery(said.filter, said.sort, kind) !== workQuery(filter.peek(), sort.peek(), kind)) { filter.value = said.filter; sort.value = said.sort; }
   }, [kind, query]);
-  const asked = workQuery(filter.value, sort.value);
+  const asked = workQuery(filter.value, sort.value, kind);
   useEffect(() => {
-    const now = workQuery(filter.peek(), sort.peek());
+    const now = workQuery(filter.peek(), sort.peek(), kind);
     if ((route.peek().query ?? "") !== now) replace({ nav: "work", section: kind, ...now ? { query: now } : {} });
   }, [asked]);
   const hosts = forgeHosts(store);
@@ -121,6 +122,8 @@ export function WorkList({ store, kind }: { store: Store; kind: WorkKind }) {
   const all = allRows(l);
   const offered = choices(all);
   const rows = shownRows(l);
+  // The latest release of each repo has a green Latest chip (milestones.md note 19).
+  const newest = kind === "release" ? latest(all) : undefined;
   const errors = (lists.value ?? []).flatMap((h) => h.errors.map((e) => errorWords(e, hosts.length > 1 ? store.hosts.value.find((x) => x.id === h.host)?.name : undefined)));
   const set = (patch: Partial<WorkFilter>) => { filter.value = { ...filter.value, ...patch }; };
   const states: WorkState[] = kind === "pr" ? ["open", "merged", "closed", "all"] : ["open", "closed", "all"];
@@ -128,8 +131,7 @@ export function WorkList({ store, kind }: { store: Store; kind: WorkKind }) {
   const filter_ = filter.value;
   const pick = (label: string) => set({ label });
   const stateChoices: MenuChoice[] = states.map((s) => ({ value: s, words: s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1) }));
-  const sortChoices: MenuChoice[] = (Object.keys(workSortTitle) as WorkSort[]).filter((s) => fromForge(kind) || s !== "newest")
-    .map((s) => ({ value: s, words: workSortTitle[s] }));
+  const sortChoices: MenuChoice[] = workSorts(kind).map((s) => ({ value: s, words: workSortTitle[s] }));
   const refresh = () => { l.asked.value++; if (kind === "issue") void loadBoards(store, true); };
   const firstRead = lists.value === null || (l.loading.value && rows.length === 0);
   const problems = [...problem.value ? [problem.value] : [], ...errors];
@@ -179,7 +181,7 @@ export function WorkList({ store, kind }: { store: Store; kind: WorkKind }) {
               <span aria-hidden="true">✕</span>Clear</button>
           )}
           <span class="work-sort">
-            <FilterMenu label="Sort" standard="updated" value={sort.value} choices={sortChoices} onPick={(v) => { sort.value = v as WorkSort; }} />
+            <FilterMenu label="Sort" standard={defaultSort(kind)} value={sort.value} choices={sortChoices} onPick={(v) => { sort.value = v as WorkSort; }} />
           </span>
         </div>
         <RefreshButton busy={l.loading.value} onClick={refresh} />
@@ -200,6 +202,7 @@ export function WorkList({ store, kind }: { store: Store; kind: WorkKind }) {
               : (
                 <ul class="work-rows work-item-rows" ref={rowsAt}>
                   {rows.map((r) => <WorkRowView key={r.node.ref} row={r} several={offered.repos.length > 1} dim={stale.has(r.node.ref)} pick={pick}
+                    latest={newest?.has(r.node.ref) === true}
                     open={() => { l.opened.value = r.node.ref; fromList.value = placeKey(kind, r.node.ref); go({ nav: "work", section: kind, item: r.node.ref }); }} />)}
                 </ul>
               )}
@@ -237,7 +240,9 @@ export function StatePill({ state, draft, status }: { state: string; draft?: boo
 /** A row (#4392, parts.md section 2), a link to its page (#4395): the state icon, the title and at most three chips, the comment count and the
  * assignees; under it the number, the age, the author and what lineage knows. On a phone the CSS folds it: the
  * title on two lines, every chip under it, the short line and no avatars. */
-function WorkRowView({ row, several, dim, pick, open }: { row: WorkRow; several: boolean; dim: boolean; pick: (label: string) => void; open: () => void }) {
+export function WorkRowView({ row, several, dim, pick, open, latest: isLatest = false }: {
+  row: WorkRow; several: boolean; dim: boolean; pick: (label: string) => void; open: () => void; latest?: boolean;
+}) {
   const line = rowLine(row, Date.now());
   const checks = row.node.kind === "pr" ? checksGlyph(row.checks) : undefined;
   const review = row.node.kind === "pr" ? rowReviewWords(row.review) : undefined;
@@ -247,10 +252,11 @@ function WorkRowView({ row, several, dim, pick, open }: { row: WorkRow; several:
       {/* A link (lists.md section 4): a click opens the page here, a middle-click or ⌘-click in a new tab. */}
       <a class="work-row work-item-row" href={routeHash({ nav: "work", section: row.node.kind, item: row.node.ref })}
         onClick={(e) => { if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; e.preventDefault(); open(); }}>
-        <span class="work-row-icon"><StateIcon kind={row.node.kind} state={row.state} draft={row.draft} /></span>
+        <span class="work-row-icon">{row.node.kind === "release" ? <ReleaseGlyph /> : <StateIcon kind={row.node.kind} state={row.state} draft={row.draft} />}</span>
         <span class="work-row-main">
           <span class="work-row-head">
             <span class="work-title"><ForgeTitle text={row.title} /></span>
+            {isLatest && <ReleaseChip />}
             {row.labels.length > 0 && (
               <span class="work-chips">
                 {row.labels.map((l) => <LabelChip key={l.name} label={l} pick={pick} />)}
@@ -489,17 +495,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
   const showsEst = estimate.value && isOpen && showsEstimate(estimate.value);
   const spentWords = estimate.value ? estimateSpentWords(estimate.value) : undefined;
   const hasLineage = counts !== "" || showsEst || actual !== undefined || forecastLines.length > 0 || pipeline.value.length > 0;
-  const session = (id: string) => {
-    const h = sessionHost(store.agents.value, id);
-    const chat = h ? store.agent(h, id) : undefined;
-    const runs = chat ? ["starting", "running", "waitingOnUser"].includes(chat.state) : false;
-    return (
-      <button key={id} type="button" class="work-session" disabled={!chat} aria-label={[chat?.title ?? "A session on another machine", ...runs ? ["running"] : []].join(", ")}
-        onClick={() => { if (h && chat) go({ host: h, folder: chat.worktree?.folder || chat.cwd, session: chat.id }); }}>
-        <span class={`dot${runs ? " runs" : ""}`} aria-hidden="true" /><span class="name">{chat?.title || "A session on another machine"}</span>
-      </button>
-    );
-  };
+  const session = (id: string) => <WorkSession key={id} store={store} id={id} />;
 
   const nothingRead = !detail.value && forgeProblem.value !== null;
   const loading = fromForge(kind) && !detail.value && !forgeProblem.value;
@@ -710,6 +706,31 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
   );
 }
 
+/** A session on the Lineage section: its title, a green dot while it runs; a click opens its chat. */
+export function WorkSession({ store, id }: { store: Store; id: string }) {
+  const h = sessionHost(store.agents.value, id);
+  const chat = h ? store.agent(h, id) : undefined;
+  const runs = chat ? ["starting", "running", "waitingOnUser"].includes(chat.state) : false;
+  return (
+    <button type="button" class="work-session" disabled={!chat} aria-label={[chat?.title ?? "A session on another machine", ...runs ? ["running"] : []].join(", ")}
+      onClick={() => { if (h && chat) go({ host: h, folder: chat.worktree?.folder || chat.cwd, session: chat.id }); }}>
+      <span class={`dot${runs ? " runs" : ""}`} aria-hidden="true" /><span class="name">{chat?.title || "A session on another machine"}</span>
+    </button>
+  );
+}
+
+/** A release's chip after its name (milestones.md note 19): Latest in green; Pre-release and Draft come with the forge's
+ * releases (#4426). */
+export function ReleaseChip() {
+  return <span class="work-release-chip latest">{latestWords}</span>;
+}
+
+/** A release's glyph (note 19): a box. */
+export function ReleaseGlyph({ size = 16 }: { size?: number }) {
+  return <svg class="work-release-glyph" width={size} height={size} viewBox="0 0 16 16" aria-hidden="true">
+    <path d="M2.5 5 8 2.5 13.5 5v6L8 13.5 2.5 11z" /><path d="M2.5 5 8 7.5 13.5 5M8 7.5v6" /></svg>;
+}
+
 /** The page header's state pill (note 6, parts.md section 1): the state's glyph and word, Open, Closed, Merged, Draft,
  * on the state's colour. A tracker's status (a Jira status, #3260) with no write is its word in the pill. */
 function PagePill({ kind, state, draft, status }: { kind: string; state: string; draft?: boolean | undefined; status?: string | undefined }) {
@@ -720,7 +741,7 @@ function PagePill({ kind, state, draft, status }: { kind: string; state: string;
 }
 
 /** The pipeline line (#3588): its releases, CI runs, deploys and health, each a link where it has one. */
-function PipelineLine({ steps }: { steps: readonly PipelineStep[] }) {
+export function PipelineLine({ steps }: { steps: readonly PipelineStep[] }) {
   return (
     <span class="small work-pipeline">{steps.map((s, i) => (
       <Fragment key={i}>{i > 0 && " · "}{s.url ? <a href={s.url} target="_blank" rel="noopener noreferrer">{s.words}</a> : <span class="quiet">{s.words}</span>}</Fragment>
@@ -740,13 +761,13 @@ function BranchGlyph() {
 }
 
 /** Open on GitHub's glyph: a square with an arrow out of it. */
-function OpenGlyph() {
+export function OpenGlyph() {
   return <svg class="work-open-glyph" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.5h4v4M13.5 2.5 7.5 8.5M12 9.5v3.25a.75.75 0 0 1-.75.75h-8a.75.75 0 0 1-.75-.75v-8A.75.75 0 0 1 3.25 4H6.5" /></svg>;
 }
 
 /** One section of the side panel: a small grey heading, then its value. `edit`, where the person can change it, is the
  * gear on the heading (note 12); it is faint until the pointer is on the section, as on the Mac. */
-function SideSection({ title, edit, editing, children }: { title: string; edit?: (() => void) | undefined; editing?: boolean; children: ComponentChildren }) {
+export function SideSection({ title, edit, editing, children }: { title: string; edit?: (() => void) | undefined; editing?: boolean; children: ComponentChildren }) {
   return (
     <section class="work-side-section">
       <h3>{title}{edit && (
@@ -788,7 +809,7 @@ function Comment({ comment: c, words, empty, forgeImages }: { comment: ForgeComm
 /** Previous and Next through the list the page was opened from (#3257), j and k, and where the page
  * stands in it: ↑ 3 of 42 ↓, and 3/42 on a 390 px page. Each replaces the place, so Back goes to the list. None on a
  * page opened from a link or an address. */
-function Stepper({ store, kind, at }: { store: Store; kind: WorkKind; at: string }) {
+export function Stepper({ store, kind, at }: { store: Store; kind: WorkKind; at: string }) {
   const n = pageNeighbours(kind, at);
   const l = workList(kind);
   const more = hasMore(l);

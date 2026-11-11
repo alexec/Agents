@@ -9,7 +9,7 @@ import { CallFailed } from "../wire/link";
 import { describe } from "./errors";
 import { hostAnswers } from "./capabilities";
 import {
-  anyFilter, filterRows, forgeListRequest, fromForge, lineageRow, mergeBoards, mergeForge, neighbours, projectRepos, sortRows,
+  anyFilter, defaultSort, filterRows, forgeListRequest, fromForge, lineageRow, mergeBoards, mergeForge, neighbours, projectRepos, sortRows,
   type Neighbours, type WorkFilter, type WorkKind, type WorkProject, type WorkProjectRepos, type WorkRow, type WorkSort, type WorkState,
 } from "./work";
 
@@ -55,7 +55,7 @@ export function workList(kind: WorkKind): WorkListState {
   let l = lists.get(kind);
   if (!l) {
     l = {
-      kind, filter: signal(anyFilter), projects: signal([]), sort: signal<WorkSort>("updated"), lists: signal(null), loading: signal(false), lineage: signal([]),
+      kind, filter: signal(anyFilter), projects: signal([]), sort: signal<WorkSort>(defaultSort(kind)), lists: signal(null), loading: signal(false), lineage: signal([]),
       lineageCursor: signal(undefined), problem: signal(null), more: signal(false), moreFailed: signal(null), asked: signal(0), opened: signal(undefined),
       read: undefined,
     };

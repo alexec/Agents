@@ -19,6 +19,7 @@ import { policyNotSaved } from "./ConsolePolicy";
 import { orgPolicyNotSaved } from "./ConsoleOrgPolicy";
 import { ReportsPage } from "./Reports";
 import { WorkList, WorkPage } from "./Work";
+import { WorkReleasePage } from "./WorkRelease";
 import { WorkFeatures } from "./WorkFeatures";
 import { WorkTimeline } from "./WorkTimeline";
 import { DocPage, DocsList } from "./Docs";
@@ -248,7 +249,9 @@ export function PageView({ store, page, down }: { store: Store; page: NavPage; d
         : page.draw.kind === "usage" ? <Usage store={store} />
         // An item of a list Work no longer has (#/work/milestone/<ref>, #3878) opens the Work default's list.
         : page.draw.kind === "work" ? (route.value.item && route.value.section === page.id
-          ? <WorkPage key={route.value.item} store={store} kind={page.draw.work} ref={route.value.item} />
+          ? page.draw.work === "release"
+            ? <WorkReleasePage key={route.value.item} store={store} ref={route.value.item} />
+            : <WorkPage key={route.value.item} store={store} kind={page.draw.work} ref={route.value.item} />
           : <WorkList key={page.draw.work} store={store} kind={page.draw.work} />)
         : page.draw.kind === "machine" ? <MachinePage key={page.draw.host} store={store} host={page.draw.host} />
         : page.draw.kind === "features" ? <WorkFeatures store={store} />
