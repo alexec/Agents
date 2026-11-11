@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -90,7 +91,7 @@ func TestAHelpersCostGoesToItsParentsWork(t *testing.T) {
 // #2350: an issue adds up its PRs; a PR closed without a merge stays against it, as
 // waste; failed CI rounds are counted; the nodes go to the control plane with the hours.
 func TestAnIssueAddsUpItsPRsAndTheirWaste(t *testing.T) {
-	d, _ := start(t, t.TempDir())
+	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
 	d.SettingsDir = t.TempDir()
 	folder := t.TempDir()
@@ -116,6 +117,11 @@ func TestAnIssueAddsUpItsPRsAndTheirWaste(t *testing.T) {
 	// Up 4, split between the issue and the next PR.
 	d.bankSessionCost(a.ID, wire.Cost{Amount: 7, Currency: "USD"})
 	d.lineageEvent(event("pr.merged", 10))
+	// The merge's multiplierChanged runs away from the caller and reports when it finds a
+	// control plane: wait for it before one is set, so it does not report alongside (#4624).
+	c.until(t, "the merge told", func(m string, p json.RawMessage) bool {
+		return m == "multiplier/changed" && strings.Contains(string(p), `"github:alexec/agents#10"`)
+	})
 
 	issue := d.lineageCost(wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#7"})
 	if usd(issue.Own) != 1+1+2 || usd(issue.Total) != 7 || usd(issue.Waste) != 1 ||
@@ -155,7 +161,9 @@ func TestAnIssueAddsUpItsPRsAndTheirWaste(t *testing.T) {
 
 	// The totals outlive the host.
 	d.closeCost()
+	d.workMu.Lock()
 	d.workLedger = nil
+	d.workMu.Unlock()
 	if got := d.lineageCost(wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#7"}); usd(got.Total) != 7 {
 		t.Fatalf("read again: %+v", got)
 	}
