@@ -9709,6 +9709,8 @@ type PolicyHelpers struct {
 	MostRunning *int64 `json:"mostRunning,omitzero"`
 
 	MostNotArchived *int64 `json:"mostNotArchived,omitzero"`
+
+	MostQueued *int64 `json:"mostQueued,omitzero"`
 }
 
 // Which machine signs your layer (#2957, research R4): the Mac's host, or the first machine of yours that saved one, when you have no Mac.
@@ -9828,6 +9830,7 @@ const PolicyRuleNameBudgetsPerAgentTokens PolicyRuleName = "budgets.perAgentToke
 const PolicyRuleNameBudgetsDailyTokens PolicyRuleName = "budgets.dailyTokens"
 const PolicyRuleNameHelpersMostRunning PolicyRuleName = "helpers.mostRunning"
 const PolicyRuleNameHelpersMostNotArchived PolicyRuleName = "helpers.mostNotArchived"
+const PolicyRuleNameHelpersMostQueued PolicyRuleName = "helpers.mostQueued"
 const PolicyRuleNameWorkflowsMostOn PolicyRuleName = "workflows.mostOn"
 const PolicyRuleNameNoticeLimitsBurst PolicyRuleName = "noticeLimits.burst"
 const PolicyRuleNameNoticeLimitsWaitMinutes PolicyRuleName = "noticeLimits.waitMinutes"

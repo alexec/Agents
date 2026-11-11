@@ -92,6 +92,14 @@ func Resolve(layers []Layer) wire.EffectivePolicy {
 					return float64(*r.Helpers.MostNotArchived), true
 				},
 				NumberTighterIsLess, countWords("not archived")),
+			scalar(wire.PolicyRuleNameHelpersMostQueued, layers,
+				func(r wire.PolicyRules) (float64, bool) {
+					if r.Helpers == nil || r.Helpers.MostQueued == nil {
+						return 0, false
+					}
+					return float64(*r.Helpers.MostQueued), true
+				},
+				NumberTighterIsLess, countWords("queued")),
 			scalar(wire.PolicyRuleNameWorkflowsMostOn, layers,
 				func(r wire.PolicyRules) (float64, bool) {
 					if r.Workflows == nil || r.Workflows.MostOn == nil {

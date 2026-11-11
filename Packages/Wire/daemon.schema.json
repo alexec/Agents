@@ -21343,6 +21343,9 @@
         },
         "mostNotArchived": {
           "type": "integer"
+        },
+        "mostQueued": {
+          "type": "integer"
         }
       },
       "additionalProperties": false
@@ -21592,6 +21595,7 @@
         "budgets.dailyTokens",
         "helpers.mostRunning",
         "helpers.mostNotArchived",
+        "helpers.mostQueued",
         "workflows.mostOn",
         "noticeLimits.burst",
         "noticeLimits.waitMinutes",
