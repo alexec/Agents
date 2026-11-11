@@ -86,6 +86,15 @@ struct WorkPlanTests {
         #expect(line(child(2, step: 1, state: "closed")) == nil)
     }
 
+    @Test func aChildsLineIsShortOnAPhone() {
+        #expect(WorkPlan.phoneWords("Working · “Work look: epic page”") == "Working")
+        #expect(WorkPlan.phoneWords("Needs you · 1 failed check") == "Needs you")
+        #expect(WorkPlan.phoneWords("merged P#10 · 6 h ago") == "merged P#10")
+        #expect(WorkPlan.phoneWords("Waiting for #3") == "Waiting for #3")
+        #expect(WorkPlan.phoneWords("Blocked by #100, outside the plan") == "Blocked by #100")
+        #expect(WorkPlan.phoneWords(nil) == nil)
+    }
+
     @Test func anOpenChildsEstimateIsShort() {
         var e = DaemonAPI.LineageEstimate(node: issue(2), matchedBy: "level", matches: 3)
         #expect(WorkPlan.estimateWords(e) == nil)
