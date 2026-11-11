@@ -11123,6 +11123,21 @@ export interface SendFile {
 }
 
 /**
+ * send/changed (#4613): how a send that folders/send started goes. `sent` of `total` bytes are on
+ * the other machine (0 of 0 while the bundle is made); `finished` once it ended, whichever way:
+ * `received` is the folder it became there, or `problem` says why it stopped, in the person's
+ * words.
+ */
+export interface SendNotification {
+  send: SendSummary;
+  sent: number;
+  total: number;
+  finished: boolean;
+  problem?: string;
+  received?: FolderSummary;
+}
+
+/**
  * What folders/sendPack made (#1123): each branch at its commit, the bundle (none when the
  * receiving host has every commit) and the patch (none when nothing is uncommitted).
  */
@@ -11156,6 +11171,36 @@ export interface SendRead {
 export interface SendReadRequest {
   id: UUID;
   offset: number;
+}
+
+/**
+ * folders/send (#4613): Send to ‹machine›… from a client. This host sends `branches` of the
+ * repository at `folder`, less the commits the folder there has, and with `includeChanges` its
+ * uncommitted changes, to `destination` on `machine` (the control plane's id or name for it;
+ * `machineName` is the name the person knows it by, for the words), through the control plane, as
+ * start_session with send does (#2929). There `checkout` is checked out and `origin` set.
+ */
+export interface SendRequest {
+  folder: URLString;
+  machine: string;
+  machineName?: string;
+  destination: string;
+  branches: string[];
+  checkout: string;
+  includeChanges: boolean;
+  origin?: string;
+}
+
+/**
+ * One send folders/send started (#4613): the folder here, and the folder on the machine it goes to.
+ */
+export interface SendSummary {
+  id: UUID;
+  folder: URLString;
+  machine: string;
+  machineName: string;
+  destination: string;
+  startedAt: WireDate;
 }
 
 /** A branch the Mac sends, at the commit it has (#1123). */
@@ -15504,10 +15549,13 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SendFacts: { required: ["branches", "hasChanges"], optional: ["current", "origin"] },
   SendFactsRequest: { required: ["folder"], optional: [] },
   SendFile: { required: ["id", "size"], optional: [] },
+  SendNotification: { required: ["send", "sent", "total", "finished"], optional: ["problem", "received"] },
   SendPack: { required: ["commits"], optional: ["bundle", "patch"] },
   SendPackRequest: { required: ["folder", "branches", "leavingOut", "includeChanges"], optional: [] },
   SendRead: { required: ["data", "end"], optional: [] },
   SendReadRequest: { required: ["id", "offset"], optional: [] },
+  SendRequest: { required: ["folder", "machine", "destination", "branches", "checkout", "includeChanges"], optional: ["machineName", "origin"] },
+  SendSummary: { required: ["id", "folder", "machine", "machineName", "destination", "startedAt"], optional: [] },
   SentBranch: { required: ["name", "commit"], optional: [] },
   SentNotice: { required: ["title", "outcome"], optional: ["body", "nextAt", "to"] },
   ServedRequest: { required: ["kind", "outcome"], optional: [] },

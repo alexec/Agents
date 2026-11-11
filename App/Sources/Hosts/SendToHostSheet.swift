@@ -2,9 +2,9 @@ import AgentsKitCore
 import SwiftUI
 
 /// Send to ‹host›… (#1123): a folder's or a worktree's folder on this Mac, sent to a host
-/// over the link the window already has to it, and added there as a folder. `from` is the
-/// host the folder is on: this Mac's, whose agentsd makes the bundle and the patch, since
-/// the window is sandboxed and reads no repository itself.
+/// and added there as a folder. `from` is the host the folder is on: this Mac's, whose
+/// agentsd sends it itself, through the control plane (#4613), since the window is
+/// sandboxed and reads no repository itself. The window only starts it and shows its row.
 struct SendToHostRequest: Identifiable, Hashable {
     let folder: URL
     let from: MachineRef
@@ -34,37 +34,69 @@ extension AppModel {
                                          returning: DaemonAPI.SendFacts.self)
     }
 
-    /// Sends `branches` of the repository at `folder` on this Mac's host `from`, less what
-    /// `host` already has, and the uncommitted changes when `includeChanges`, then has
-    /// `host` make or bring up to date its copy at `destination`. Each part goes through
-    /// the window, from one host's link to the other's. The folder it becomes is listed
-    /// and returned.
-    func sendRepository(_ folder: URL, from: MachineRef, to host: MachineRef, at destination: String, branches: [String],
-                        checkout: String, includeChanges: Bool, origin: String?,
-                        progress: @escaping @MainActor (String) -> Void) async throws -> DaemonAPI.FolderSummary {
-        let label = hosts.label(host)
-        let state = try await receiveState(at: destination, on: host)
-        if state.ownChanges {
-            throw SendFailure(message: "\(destination) has changes of its own on \(label). Commit or remove them there, then send again.")
+    /// Starts sending what `request` names from the host `from` (this Mac's), which sends it
+    /// itself, through the control plane (#4613): it answers once it has checked the folder
+    /// there, and `send/changed` says how it goes. The window is free the whole time, and
+    /// closing it stops nothing.
+    func startSend(_ request: DaemonAPI.SendRequest, from: MachineRef) async throws {
+        let summary = try await client(for: from).call(DaemonAPI.Method.foldersSend, request,
+                                                        returning: DaemonAPI.SendSummary.self)
+        // A small send can end before its answer comes.
+        guard !sendsEnded.contains(summary.id) else { return }
+        if let i = sends.firstIndex(where: { $0.id == summary.id }) {
+            sends[i].request = request
+            sends[i].from = from
+        } else {
+            sends.append(FolderSend(state: DaemonAPI.SendNotification(send: summary), request: request, from: from))
         }
-        progress("Making the bundle…")
-        let mac = client(for: from), there = client(for: host)
-        let pack = try await mac.callWhileAnswering(
-            DaemonAPI.Method.foldersSendPack,
-            DaemonAPI.SendPackRequest(folder: folder, branches: branches, leavingOut: state.repository ? state.heads : [],
-                                      includeChanges: includeChanges),
-            checkingEvery: .seconds(10)).decode(DaemonAPI.SendPack.self)
-        let (bundle, patch) = try await relay(pack, from: mac, to: there, verb: "Sending", progress: progress)
-        progress("Adding it on \(label)…")
-        let answer = try await there.callWhileAnswering(
-            DaemonAPI.Method.foldersReceive,
-            DaemonAPI.ReceiveRequest(folder: destination, bundle: bundle, patch: patch, branches: pack.commits,
-                                     checkout: checkout, origin: origin),
-            checkingEvery: .seconds(10))
-        var summary = try answer.decode(DaemonAPI.FolderSummary.self)
-        summary.host = host
-        upsert(summary)
-        return summary
+    }
+
+    /// Sends again what a send that stopped sent: the host checks the folder there again.
+    func retrySend(_ send: FolderSend) async {
+        guard let request = send.request else { return }
+        sends.removeAll { $0.id == send.id }
+        do {
+            try await startSend(request, from: send.from)
+        } catch {
+            var stopped = send
+            stopped.state.problem = describe(error)
+            sends.append(stopped)
+        }
+    }
+
+    /// Takes a send that stopped out of the Folders column.
+    func putAwaySend(_ send: FolderSend) {
+        sends.removeAll { $0.id == send.id }
+    }
+
+    /// A `send/changed`: the row goes a part further, shows why it stopped, or, once the
+    /// folder is there, gives way to that folder.
+    func sendChanged(_ change: DaemonAPI.SendNotification) {
+        let i = sends.firstIndex { $0.id == change.send.id }
+        if change.finished { sendsEnded.insert(change.send.id) }
+        if change.finished, change.problem == nil {
+            if let i { sends.remove(at: i) }
+            if var summary = change.received {
+                summary.host = MachineRef(rawValue: change.send.machine)
+                upsert(summary)
+            }
+            return
+        }
+        if let i {
+            sends[i].state = change
+        } else {
+            sends.append(FolderSend(state: change, request: nil, from: .mac))
+        }
+    }
+
+    /// The sends this Mac's host is making, for a window that connects mid-send. Those
+    /// that stopped stay, until they are sent again or put away.
+    func refreshSends() async {
+        guard let running = try? await client(for: .mac).call(DaemonAPI.Method.foldersSends,
+                                                   returning: [DaemonAPI.SendNotification].self) else { return }
+        let known = Dictionary(sends.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        sends = sends.filter { $0.state.problem != nil }
+            + running.map { FolderSend(state: $0, request: known[$0.send.id]?.request, from: known[$0.send.id]?.from ?? .mac) }
     }
 
     /// Carries the bundle and the patch a pack made from one host's link to the other's, in
@@ -103,6 +135,15 @@ extension AppModel {
     }
 }
 
+/// A send in the Folders column (#4613): how it goes, and, when this window started it,
+/// what Retry sends again and from which host.
+struct FolderSend: Identifiable, Hashable {
+    var state: DaemonAPI.SendNotification
+    var request: DaemonAPI.SendRequest?
+    var from: MachineRef
+    var id: UUID { state.send.id }
+}
+
 /// One part of a send as `folders/sendRead` answered it: its data still the base64 text.
 struct RelayPart: Sendable {
     let data: JSONValue
@@ -123,6 +164,65 @@ struct RelayPart: Sendable {
         let utf8 = text.utf8
         let padding = utf8.reversed().prefix(2).prefix(while: { $0 == UInt8(ascii: "=") }).count
         return utf8.count / 4 * 3 - padding
+    }
+}
+
+/// A send under way (#4613), as a clone's row is (027): the folder, and how far it is on its
+/// way to the machine. A send that stopped says why, with Retry, and × to put it away.
+struct SendingRow: View {
+    @Environment(AppModel.self) private var model
+    let send: FolderSend
+
+    private var name: String { send.state.send.folder.lastPathComponent }
+    private var machine: String { send.state.send.machineName }
+
+    private var line: String {
+        let s = send.state
+        guard s.total >= 1_000_000 else { return "Sending to \(machine)…" }
+        return "Sending to \(machine): \(s.sent.formatted(.byteCount(style: .file))) of \(s.total.formatted(.byteCount(style: .file)))…"
+    }
+
+    var body: some View {
+        if let problem = send.state.problem {
+            HStack(alignment: .top, spacing: 8) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(name)
+                        .lineLimit(1)
+                        .foregroundStyle(.secondary)
+                    Text(problem)
+                        .appText(.fine).tinted(.failure)
+                        .lineLimit(3)
+                        .help(problem)
+                }
+                Spacer(minLength: 4)
+                if send.request != nil {
+                    Button("Retry") { Task { await model.retrySend(send) } }
+                        .buttonStyle(.link)
+                        .appText(.fine)
+                }
+                Button { model.putAwaySend(send) } label: { Image(systemName: "xmark") }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .help("Put away")
+                    .accessibilityLabel("Put away")
+            }
+        } else {
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(name)
+                        .lineLimit(1)
+                        .foregroundStyle(.secondary)
+                    Text(line)
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 4)
+                ProgressView().controlSize(.small)
+            }
+            .help("\(send.state.send.destination) on \(machine)")
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Sending \(name) to \(send.state.send.destination) on \(machine)")
+        }
     }
 }
 
@@ -295,12 +395,12 @@ struct SendToHostSheet: View {
         problem = nil
         progress = "Checking \(label)…"
         do {
-            let summary = try await model.sendRepository(
-                request.folder, from: request.from, to: request.host, at: destination,
-                branches: facts.branches.filter(chosen.contains), checkout: checkout,
-                includeChanges: includeChanges && changesCanGo, origin: facts.origin) { progress = $0 }
+            try await model.startSend(
+                DaemonAPI.SendRequest(folder: request.folder, machine: request.host.rawValue, machineName: label,
+                                      destination: destination, branches: facts.branches.filter(chosen.contains),
+                                      checkout: checkout, includeChanges: includeChanges && changesCanGo, origin: facts.origin),
+                from: request.from)
             dismiss()
-            model.select(summary.key)
         } catch {
             progress = nil
             problem = model.describe(error)

@@ -172,6 +172,7 @@ const CapRuntimesSignIn1 = "runtimes.sign-in/1"
 const CapRuntimes1 = "runtimes/1"
 const CapSandbox1 = "sandbox/1"
 const CapSealing1 = "sealing/1"
+const CapSend1 = "send/1"
 const CapSessionsElsewhere1 = "sessions.elsewhere/1"
 const CapSessionsMove1 = "sessions.move/1"
 const CapSessionsOnMachine1 = "sessions.on-machine/1"
@@ -353,9 +354,11 @@ var HostCapabilities = pairs([][2]string{
 	{"folders/receive", "folders/1"},
 	{"folders/receiveState", "folders/1"},
 	{"folders/receiveUpload", "folders/1"},
+	{"folders/send", "send/1"},
 	{"folders/sendFacts", "folders/1"},
 	{"folders/sendPack", "folders/1"},
 	{"folders/sendRead", "folders/1"},
+	{"folders/sends", "send/1"},
 	{"folders/setDiskSpace", "folders/1"},
 	{"folders/setHelperLimits", "folders/1"},
 	{"folders/setPRCostComment", "lineage.comment/1"},
@@ -632,6 +635,7 @@ var HostCapabilities = pairs([][2]string{
 	{"runtimes/allowancesChanged", "runtimes/1"},
 	{"sandbox/changed", "sandbox/1"},
 	{"selfUpdate/changed", "host.update/1"},
+	{"send/changed", "send/1"},
 	{"shell/output", "shell/1"},
 	{"shell/stateChanged", "shell/1"},
 	{"storage/writeFailed", "storage/1"},
@@ -691,6 +695,7 @@ var HostNotifications = set([]string{
 	"runtimes/allowancesChanged",
 	"sandbox/changed",
 	"selfUpdate/changed",
+	"send/changed",
 	"shell/output",
 	"shell/stateChanged",
 	"storage/writeFailed",

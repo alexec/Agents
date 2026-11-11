@@ -100,6 +100,12 @@ final class AppModel {
     /// Clones under way on this Mac, from whichever window started them (027). Each is
     /// a row in the Folders column until it becomes a folder or fails.
     private(set) var clones: [DaemonAPI.CloneSummary] = []
+    /// Sends under way from this Mac's host, and those that stopped with a problem (#4613).
+    /// Each is a row in the Folders column until it is a folder there, or is put away.
+    var sends: [FolderSend] = []
+    /// The sends that ended, so an answer to `folders/send` that comes after the end adds
+    /// no row.
+    @ObservationIgnored var sendsEnded: Set<UUID> = []
 
     // What the window reads, which is the shared model under another name. Forwarded
     // rather than mirrored: a copy is a thing that can fall behind.
@@ -3620,6 +3626,10 @@ final class AppModel {
             clones.removeAll { $0.id == change.clone.id }
             if !change.finished { clones.append(change.clone) }
 
+        case DaemonAPI.Notification.sendChanged:
+            guard let change = try? params?.decode(DaemonAPI.SendNotification.self) else { return }
+            sendChanged(change)
+
         case DaemonAPI.Notification.clientPermissionsChanged:
             guard let settings = try? params?.decode(ClientPermissionSettings.self) else { return }
             let changed = clientPermissions != settings
@@ -4499,6 +4509,7 @@ final class AppModel {
         async let person: Void = refreshPerson()
         async let runtimeStates: Void = refreshRuntimeAllowances()
         async let cloning: Void = refreshClones()
+        async let sending: Void = refreshSends()
         async let wake: Void = refreshWakeState()
         async let storeNotes: Void = refreshStoreNotes()
         async let achievements: Void = refreshAchievements()
@@ -4517,7 +4528,7 @@ final class AppModel {
         async let dailySummary: Void = refreshDailySummarySettings()
         async let summaries: Void = refreshSummaryPages()
         _ = await (popped, runtimes, accounts, workflows, pinned, requests, permissions,
-                   elicitations, attention, resuming, cost, retention, clientPermissions, cloning, wake, leases, events, modes,
+                   elicitations, attention, resuming, cost, retention, clientPermissions, cloning, sending, wake, leases, events, modes,
                    transcript, runtimeStates, sandbox, person, disk, storeNotes, hostedMCP, mcpHealth, achievements, multiplier,
                    display, auto, dailySummary, summaries)
     }
