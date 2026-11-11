@@ -131,7 +131,7 @@ struct WorkFeaturesTests {
     }
 
     @Test func theLeadSaysItsState() {
-        #expect(WorkFeatures.leadWords(nil) == "—")
+        #expect(WorkFeatures.leadWords(nil) == "No lead")
         #expect(WorkFeatures.leadWords(.running) == "● lead working")
         #expect(WorkFeatures.leadWords(.waitingOnUser) == "● lead needs you")
         #expect(WorkFeatures.leadWords(.stopped) == "lead stopped")
@@ -161,5 +161,106 @@ struct WorkFeaturesTests {
         #expect(WorkList.Kind.allCases.map(\.title) == ["Issues", "Pull requests", "Features", "Releases", "Timeline"])
         #expect(!WorkList.Kind.feature.fromForge)
         #expect(WorkList.kind(of: Node(kind: "feature", ref: "work")) == nil)
+    }
+
+    // MARK: The delivery view (#4587)
+
+    func pull(_ n: Int, checks: String? = nil, review: String? = nil) -> DaemonAPI.ForgeItem {
+        DaemonAPI.ForgeItem(node: Node(kind: "pr", ref: "github:alexec/Agents#\(n)"), title: "PR \(n)", state: "open",
+                            updatedAt: day, checks: checks, review: review)
+    }
+
+    @Test func featuresInNeedsYouAndInFlightStartOpen() {
+        let all: [WorkFeatures.Group] = [.needsYou, .inFlight, .idle, .finished]
+        #expect(WorkFeatures.startsOpen(.needsYou, in: all))
+        #expect(WorkFeatures.startsOpen(.inFlight, in: all))
+        #expect(!WorkFeatures.startsOpen(.idle, in: all))
+        #expect(!WorkFeatures.startsOpen(.finished, in: all))
+        // Everything idle (state 14): Idle starts open.
+        #expect(WorkFeatures.startsOpen(.idle, in: [.idle, .finished]))
+        #expect(!WorkFeatures.startsOpen(.finished, in: [.finished]))
+    }
+
+    @Test func aChildIsInFlightWithALaneOrAPullRequest() throws {
+        let pulls = WorkFeatures.pullsByLabel([pull(44, checks: "running"), pull(45), pull(46, checks: "passing", review: "approved")])
+        let lane = { (labels: [String], state: AgentState) -> Agent in
+            var a = self.agent(labels, state: state)
+            a.title = "Gift card part-payment"
+            return a
+        }
+        let agents = [lane(["#12", "P#44"], .running), lane(["#13", "P#45"], .finished), agent(["#33"], state: .waitingOnUser),
+                      agent(["#40"], state: .archived), lane(["#14", "P#46"], .stopped)]
+        let approvals: Set<String> = ["P#45"]
+        func line(_ item: DaemonAPI.ForgeItem) -> WorkFeatures.Line? {
+            WorkFeatures.line(item, work: WorkFeatures.work(of: item, agents: agents, pulls: pulls), approvals: approvals)
+        }
+        let working = try #require(line(issue(12)))
+        #expect(working.flight == .working)
+        #expect(working.words == "Working · “Gift card part-payment” · checks running")
+        #expect(working.pr.map { WorkList.shortRef($0.node.ref) } == "#44")
+        #expect(line(issue(13))?.words == "P#45 waits for your approval")
+        #expect(line(issue(13))?.flight == .needsYou)
+        #expect(line(issue(33))?.words == "Needs you · the lane asks a question")
+        #expect(line(issue(14))?.words == "Working · “Gift card part-payment” · approved")
+        var todo = issue(50)
+        todo.labels = [.init(name: "alex-todo")]
+        #expect(line(todo)?.words == "waits for you (alex-todo)")
+        // An archived lane, nothing on it, or closed: not in flight.
+        #expect(line(issue(40)) == nil)
+        #expect(line(issue(41)) == nil)
+        #expect(line(issue(12, state: "closed")) == nil)
+        // A pull request with no lane this app knows says itself.
+        #expect(WorkFeatures.line(issue(60), work: .init(pr: pull(47, checks: "failing")), approvals: [])?.words
+            == "P#47 open · checks failed")
+
+        let items = [issue(12, at: 10), issue(13, at: 1), issue(33, at: 5), issue(41), issue(42, state: "closed")]
+        let lines = WorkFeatures.inFlight(items, work: { WorkFeatures.work(of: $0, agents: agents, pulls: pulls) }, approvals: approvals)
+        #expect(lines.map { WorkList.shortRef($0.item.node.ref) } == ["#33", "#13", "#12"])
+        let tally = WorkFeatures.tally(items, work: { WorkFeatures.work(of: $0, agents: agents, pulls: pulls) }, approvals: approvals)
+        #expect(tally == .init(done: 1, inFlight: 3, notStarted: 1))
+        #expect(tally.words == "1 of 5 done")
+        #expect(tally.epicWords == "1 of 5")
+        #expect(tally.shares.done == 0.2)
+        #expect(WorkFeatures.restWords(tally) == "1 more not started · 1 done")
+        #expect(WorkFeatures.restWords(tally, afterLines: false) == "1 not started · 1 done")
+        #expect(WorkFeatures.restWords(.init()) == nil)
+        #expect(WorkFeatures.phoneRestWords(tally, moreInFlight: 1) == "1 more in flight · 1 not started · 1 done")
+        #expect(WorkFeatures.moreInFlightWords(2) == "2 more in flight")
+        #expect(WorkFeatures.tally(progress: issue(1, progress: (4, 9))) == .init(done: 4, notStarted: 5))
+    }
+
+    @Test func anEpicSaysWhereItIsInItsPlan() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(identifier: "UTC"))
+        func child(_ n: Int, step: Int, state: String = "open", outside: [Int] = []) -> DaemonAPI.ForgePlanChild {
+            .init(item: issue(n, state: state), blockedOutside: outside.map { Node(kind: "issue", ref: "github:alexec/Agents#\($0)") },
+                  step: step)
+        }
+        let steps = (1 ... 3).map { DaemonAPI.ForgePlanStep(step: $0, nodes: []) }
+        let plan = DaemonAPI.ForgePlan(item: issue(10, level: "epic"),
+                                       children: [child(1, step: 1, state: "closed"), child(2, step: 2, outside: [99]),
+                                                  child(3, step: 3)], steps: steps)
+        #expect(WorkFeatures.whereWords(plan, closes: nil) == "step 2 of 3 · waits for #99")
+        let thursday = day.addingTimeInterval(3 * 86400)
+        let words = try #require(WorkFeatures.whereWords(plan, closes: thursday, now: day, calendar: calendar))
+        #expect(words.hasPrefix("step 2 of 3 · waits for #99 · closes about "))
+        #expect(!words.hasSuffix("today") && !words.hasSuffix("tomorrow"))
+        #expect(WorkFeatures.dayWords(day, now: day, calendar: calendar) == "today")
+        #expect(WorkFeatures.dayWords(day.addingTimeInterval(86400), now: day, calendar: calendar) == "tomorrow")
+        let done = DaemonAPI.ForgePlan(item: issue(10), children: [child(1, step: 1, state: "closed")], steps: [.init(step: 1, nodes: [])])
+        #expect(WorkFeatures.whereWords(done, closes: nil) == nil)
+    }
+
+    @Test func aFeatureSaysWhatIsInFlight() {
+        let feature = DaemonAPI.ForgeFeature(name: "checkout", epics: 3, open: 2, issues: 1, updatedAt: day)
+        #expect(WorkFeatures.deliveryWords(feature, inFlight: 4, sessions: nil, now: day) == "2 epics · 4 in flight")
+        #expect(WorkFeatures.deliveryWords(feature, inFlight: 2, sessions: 2, now: day) == "2 epics · 2 in flight · 2 sessions")
+        #expect(WorkFeatures.deliveryWords(feature, inFlight: nil, sessions: nil, now: day) == "2 epics")
+        #expect(WorkFeatures.deliveryWords(.init(name: "accounts", epics: 1, open: 1, updatedAt: day), inFlight: 0, sessions: nil,
+                                           now: day.addingTimeInterval(3 * 86400)).hasPrefix("1 epic · nothing in flight · updated 3"))
+        #expect(WorkFeatures.deliveryWords(.init(name: "done", epics: 2, open: 0, issues: 0), inFlight: 0, sessions: nil)
+            == "2 epics · nothing in flight")
+        #expect(WorkFeatures.deliveryWords(.init(name: "loose", epics: 0, open: 0, issues: 3), inFlight: 1, sessions: nil)
+            == "3 open issues · 1 in flight")
     }
 }
