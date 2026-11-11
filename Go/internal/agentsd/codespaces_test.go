@@ -54,8 +54,9 @@ func TestCodespacesCreateUsesTheRepositoryDefaultBranch(t *testing.T) {
 		if r.Method != http.MethodPost || r.URL.Path != "/repos/alexec/agents/codespaces" {
 			t.Errorf("create request %s %s", r.Method, r.URL.Path)
 		}
-		var body map[string]string
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body["display_name"] != "Alex's Codespace" || body["ref"] != "main" {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body["display_name"] != "Alex's Codespace" || body["ref"] != "main" ||
+			body["idle_timeout_minutes"] != float64(240) {
 			t.Errorf("create body %v, %v", body, err)
 		}
 		w.WriteHeader(http.StatusCreated)

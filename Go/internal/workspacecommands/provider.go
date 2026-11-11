@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -422,6 +423,8 @@ func (p *Provider) Create(name string, options map[string]any, firstBoot string)
 			values[key] = v.String()
 		case float64:
 			values[key] = fmt.Sprint(v)
+		case int:
+			values[key] = strconv.Itoa(v)
 		case bool:
 			values[key] = fmt.Sprint(v)
 		}
@@ -433,8 +436,12 @@ func (p *Provider) Create(name string, options map[string]any, firstBoot string)
 	} else if making.CreateRequest != nil && strings.Contains(making.CreateRequest.URL, "${repository.") {
 		return Workspace{}, Failure{Reason: "Give the repository as owner/name."}
 	}
+	request, err := withIntegers(making.CreateRequest, properties, values)
+	if err != nil {
+		return Workspace{}, err
+	}
 	// The first-boot command carries a host code: logged as the template, never filled in.
-	if err := p.do(making.Create, making.CreateRequest, values, "create "+name, "making "+name); err != nil {
+	if err := p.do(making.Create, request, values, "create "+name, "making "+name); err != nil {
 		return Workspace{}, err
 	}
 	all, err = p.List()
@@ -447,6 +454,61 @@ func (p *Provider) Create(name string, options map[string]any, firstBoot string)
 		}
 	}
 	return Workspace{}, Failure{Reason: name + " was made, but the list doesn't show it yet."}
+}
+
+// withIntegers is the request with each body value that is only ${key}, for an option of
+// type integer, as a JSON number (#4636): an API such as GitHub's refuses "240" for 240. A
+// form can give the number as a string, as the Mac's picker gives an enum's choice.
+func withIntegers(request *Request, properties map[string]any, values map[string]string) (*Request, error) {
+	if request == nil {
+		return nil, nil
+	}
+	numbers := map[string]json.Number{}
+	for key, property := range properties {
+		if kind, _ := property.(map[string]any)["type"].(string); kind != "integer" {
+			continue
+		}
+		value, ok := values[key]
+		if !ok {
+			continue
+		}
+		if _, err := strconv.Atoi(value); err != nil {
+			title, _ := property.(map[string]any)["title"].(string)
+			if title == "" {
+				title = key
+			}
+			return nil, Failure{Reason: title + " must be a whole number."}
+		}
+		numbers["${"+key+"}"] = json.Number(value)
+	}
+	if len(numbers) == 0 {
+		return request, nil
+	}
+	var typed func(any) any
+	typed = func(v any) any {
+		switch t := v.(type) {
+		case string:
+			if n, ok := numbers[t]; ok {
+				return n
+			}
+		case []any:
+			out := make([]any, len(t))
+			for i, e := range t {
+				out[i] = typed(e)
+			}
+			return out
+		case map[string]any:
+			out := make(map[string]any, len(t))
+			for k, e := range t {
+				out[k] = typed(e)
+			}
+			return out
+		}
+		return v
+	}
+	copied := *request
+	copied.Body = typed(request.Body)
+	return &copied, nil
 }
 
 // Delete deletes the workspace and everything on it.

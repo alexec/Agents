@@ -612,6 +612,34 @@ func TestRetryAfterInSecondsOrADate(t *testing.T) {
 	}
 }
 
+// GitHub's idle timeout is set at creation, as a number (#4636): the Mac's picker gives the
+// choice as a string, the web page as a number.
+func TestACodespaceIsMadeWithItsIdleTimeout(t *testing.T) {
+	f, text := fakeCodespaces(t, "")
+	p, _ := apiProvider(t, text, GitHubSecret, token)
+	property, _ := p.Config.Making.Options["properties"].(map[string]any)["idleTimeout"].(map[string]any)
+	if choices, _ := property["enum"].([]any); len(choices) != 4 || choices[0] != CodespaceIdleTimeout || property["default"] != CodespaceIdleTimeout {
+		t.Errorf("%+v", property)
+	}
+	for name, given := range map[string]any{"mac-1": "60", "web-1": json.Number("30")} {
+		if _, err := p.Create(name, map[string]any{"idleTimeout": given}, "curl … | sh"); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+	}
+	for _, want := range []string{
+		`POST /repos/github/codespaces-blank/codespaces {"display_name":"mac-1","idle_timeout_minutes":60}`,
+		`POST /repos/github/codespaces-blank/codespaces {"display_name":"web-1","idle_timeout_minutes":30}`,
+	} {
+		if !contains(f.requests(), want) {
+			t.Errorf("no %s in %q", want, f.requests())
+		}
+	}
+	if _, err := p.Create("odd-1", map[string]any{"idleTimeout": "soon"}, "curl … | sh"); err == nil ||
+		err.Error() != "Stops after idle (minutes) must be a whole number." {
+		t.Errorf("%v", err)
+	}
+}
+
 func TestACodespaceIsMadeFromItsRepository(t *testing.T) {
 	f, text := fakeCodespaces(t, "")
 	p, _ := apiProvider(t, text, GitHubSecret, token)
@@ -625,14 +653,14 @@ func TestACodespaceIsMadeFromItsRepository(t *testing.T) {
 	if made, err := p.Create("blank-1", map[string]any{}, "curl … | sh"); err != nil || made.Name != "blank-1" {
 		t.Fatalf("%v %+v", err, made)
 	}
-	if !contains(f.requests(), `POST /repos/github/codespaces-blank/codespaces {"display_name":"blank-1"}`) {
+	if !contains(f.requests(), `POST /repos/github/codespaces-blank/codespaces {"display_name":"blank-1","idle_timeout_minutes":240}`) {
 		t.Errorf("%q", f.requests())
 	}
 	made, err := p.Create("agents-1", map[string]any{"repository": "alexec/agents"}, "curl … | sh")
 	if err != nil || made.ID != "fluffy-octo-1" || made.Name != "agents-1" || made.State != Starting {
 		t.Fatalf("%v %+v", err, made)
 	}
-	if !contains(f.requests(), `POST /repos/alexec/agents/codespaces {"display_name":"agents-1"}`) {
+	if !contains(f.requests(), `POST /repos/alexec/agents/codespaces {"display_name":"agents-1","idle_timeout_minutes":240}`) {
 		t.Errorf("%q", f.requests())
 	}
 	if err := p.Delete("fluffy-octo-1"); err != nil || !contains(f.requests(), "DELETE /user/codespaces/fluffy-octo-1") {
