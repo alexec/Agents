@@ -285,6 +285,8 @@ public extension DaemonAPI {
                 Row(Method.forgeMerge, params: ForgeMergeRequest.self, result: ForgeDone.self, kind: .hostRequest),
                 Row(Method.forgeApprove, params: ForgeApproveRequest.self, result: ForgeDone.self, kind: .hostRequest),
                 Row(Method.forgeRerun, params: ForgeNodeRequest.self, result: ForgeDone.self, kind: .hostRequest),
+                Row(Method.forgeCancelAutoMerge, params: ForgeNodeRequest.self, result: ForgeDone.self, kind: .hostRequest),
+                Row(Method.forgeReady, params: ForgeNodeRequest.self, result: ForgeDone.self, kind: .hostRequest),
                 Row(Method.forgeLog, params: ForgeLogRequest.self, result: ForgeLog.self, kind: .hostRequest),
                 Row(Method.forgeDiff, params: ForgeNodeRequest.self, result: ForgeDiff.self, kind: .hostRequest),
                 Row(Method.forgePlan, params: ForgePlanRequest.self, result: ForgePlan.self, kind: .hostRequest),

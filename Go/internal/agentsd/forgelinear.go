@@ -46,6 +46,8 @@ func (linearForge) Caps() forgeCaps {
 			actionTransition: "only a Jira issue or an Azure Boards work item moves by a transition",
 			actionMerge:      linearNoPRs,
 			actionAutoMerge:  linearNoPRs,
+			actionCancelAuto: linearNoPRs,
+			actionReady: linearNoPRs,
 			actionApprove:    linearNoPRs,
 			actionRerun:      linearNoPRs,
 			actionLog:        linearNoPRs,

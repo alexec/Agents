@@ -82,6 +82,34 @@ func (g *RealGitHub) MergeBy(ctx context.Context, repo string, number int, sha, 
 	return map[string]any{"merged": true, "auto": false, "url": prURL(repo, number)}, nil
 }
 
+// DisableAutoMerge turns off a pull request's auto-merge (#4410): it merges only when a person
+// merges it.
+func (g *RealGitHub) DisableAutoMerge(ctx context.Context, repo string, number int) error {
+	const disable = `mutation($id: ID!) { disablePullRequestAutoMerge(input: {pullRequestId: $id}) { pullRequest { number } } }`
+	return g.pullMutation(ctx, repo, number, disable)
+}
+
+// MarkReady marks a draft pull request ready for review (#4410).
+func (g *RealGitHub) MarkReady(ctx context.Context, repo string, number int) error {
+	const ready = `mutation($id: ID!) { markPullRequestReadyForReview(input: {pullRequestId: $id}) { pullRequest { number } } }`
+	return g.pullMutation(ctx, repo, number, ready)
+}
+
+// pullMutation runs a GraphQL mutation whose one variable is the pull request's node id.
+func (g *RealGitHub) pullMutation(ctx context.Context, repo string, number int, mutation string) error {
+	if _, _, err := ownerName(repo); err != nil {
+		return err
+	}
+	var p struct {
+		NodeID string `json:"node_id"`
+	}
+	if err := g.get(ctx, fmt.Sprintf("repos/%s/pulls/%d", repo, number), false, &p); err != nil {
+		return err
+	}
+	var out struct{}
+	return g.graphql(ctx, mutation, map[string]any{"id": p.NodeID}, &out)
+}
+
 // SetLabels adds labels to an issue or a pull request and takes others off it, by name. A label
 // to take off that it does not have is not an error.
 func (g *RealGitHub) SetLabels(ctx context.Context, repo string, number int, add, remove []string) error {

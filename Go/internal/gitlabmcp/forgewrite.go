@@ -1,6 +1,7 @@
 package gitlabmcp
 
 import (
+	"regexp"
 	"context"
 	"fmt"
 	"net/http"
@@ -113,6 +114,34 @@ func (g *RealGitLab) Merge(ctx context.Context, project string, number int, sha 
 	}
 	var out map[string]any
 	return g.send(ctx, http.MethodPut, fmt.Sprintf("projects/%s/merge_requests/%d/merge", pid(project), number), body, &out)
+}
+
+// CancelAutoMerge turns off a merge request's merge when its pipeline passes (#4410).
+func (g *RealGitLab) CancelAutoMerge(ctx context.Context, project string, number int) error {
+	var out map[string]any
+	return g.send(ctx, http.MethodPost, fmt.Sprintf("projects/%s/merge_requests/%d/cancel_merge_when_pipeline_succeeds", pid(project), number), nil, &out)
+}
+
+// draftMark is GitLab's mark of a draft at the start of a title: Draft:, [Draft] or (Draft), as
+// GitLab's own DRAFT_REGEX finds it, one or more times.
+var draftMark = regexp.MustCompile(`(?i)^\s*((\[draft\]|\(draft\)|draft:)\s*)+`)
+
+// MarkReady marks a draft merge request ready (#4410): GitLab's API has no draft field to set,
+// so its title loses the draft mark, as GitLab's own Mark as ready does.
+func (g *RealGitLab) MarkReady(ctx context.Context, project string, number int) error {
+	path := fmt.Sprintf("projects/%s/merge_requests/%d", pid(project), number)
+	var m struct {
+		Title string `json:"title"`
+	}
+	if err := g.get(ctx, path, false, &m); err != nil {
+		return err
+	}
+	title := draftMark.ReplaceAllString(m.Title, "")
+	if title == m.Title {
+		return nil
+	}
+	var out map[string]any
+	return g.send(ctx, http.MethodPut, path, map[string]any{"title": title}, &out)
 }
 
 // ProjectLabels are a project's labels, at most 100, with their colours.

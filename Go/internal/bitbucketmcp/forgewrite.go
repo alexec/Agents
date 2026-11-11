@@ -159,6 +159,19 @@ func (b *RealBitbucket) atHead(ctx context.Context, repo string, number int, sha
 }
 
 // Merge merges a pull request at sha by method (merge, squash or rebase) and deletes its
+// MarkReady marks a draft pull request ready for review (#4410). Bitbucket asks for the title
+// with each change, so it is read first.
+func (b *RealBitbucket) MarkReady(ctx context.Context, repo string, number int) error {
+	path := fmt.Sprintf("%s/pullrequests/%d", repoPath(repo), number)
+	var p struct {
+		Title string `json:"title"`
+	}
+	if err := b.get(ctx, path, false, &p); err != nil {
+		return err
+	}
+	return b.send(ctx, http.MethodPut, path, map[string]any{"title": p.Title, "draft": false}, nil)
+}
+
 // branch. Bitbucket's merge takes no commit, so the head is read first.
 func (b *RealBitbucket) Merge(ctx context.Context, repo string, number int, sha, method string) error {
 	strategy := strategyOf(method)

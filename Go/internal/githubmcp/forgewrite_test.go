@@ -31,6 +31,10 @@ func restAPI(t *testing.T) (*RealGitHub, func() []string) {
 		case r.Method == http.MethodDelete && strings.HasSuffix(r.URL.Path, "/800"):
 			w.WriteHeader(http.StatusNotFound)
 			io.WriteString(w, `{"message":"Not Found"}`)
+		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/pulls/7"):
+			io.WriteString(w, `{"node_id":"PR_7","number":7}`)
+		case r.URL.Path == "/graphql":
+			io.WriteString(w, `{"data":{}}`)
 		case r.Method == http.MethodGet:
 			w.WriteHeader(http.StatusNotFound)
 			io.WriteString(w, `{"message":"Not Found"}`)
@@ -115,5 +119,22 @@ func TestAssignAndUnassign(t *testing.T) {
 	want := []string{`POST /repos/o/r/issues/7/assignees {"assignees":["kim","lee"]}`, `DELETE /repos/o/r/issues/7/assignees {"assignees":["lee"]}`}
 	if g := got(); !slices.Equal(g, want) {
 		t.Fatalf("requests:\n%q\nwant\n%q", g, want)
+	}
+}
+
+// #4410: auto-merge turns off and a draft is marked ready by the pull request's node id.
+func TestDisableAutoMergeAndMarkReady(t *testing.T) {
+	g, got := restAPI(t)
+	ctx := context.Background()
+	if err := g.DisableAutoMerge(ctx, "o/r", 7); err != nil {
+		t.Fatal(err)
+	}
+	if err := g.MarkReady(ctx, "o/r", 7); err != nil {
+		t.Fatal(err)
+	}
+	reqs := got()
+	if len(reqs) != 4 || reqs[0] != "GET /repos/o/r/pulls/7" || !strings.Contains(reqs[1], "disablePullRequestAutoMerge") ||
+		!strings.Contains(reqs[1], `"id":"PR_7"`) || !strings.Contains(reqs[3], "markPullRequestReadyForReview") {
+		t.Fatalf("requests:\n%q", reqs)
 	}
 }

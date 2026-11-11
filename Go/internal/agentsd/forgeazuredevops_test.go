@@ -90,6 +90,16 @@ func (f *fakeForgeAzureDevOps) Merge(_ context.Context, repo string, number int,
 	return nil
 }
 
+func (f *fakeForgeAzureDevOps) CancelAutoMerge(_ context.Context, repo string, number int) error {
+	f.note(&f.wrote, fmt.Sprintf("auto-merge off %s#%d", repo, number))
+	return nil
+}
+
+func (f *fakeForgeAzureDevOps) MarkReady(_ context.Context, repo string, number int) error {
+	f.note(&f.wrote, fmt.Sprintf("ready %s#%d", repo, number))
+	return nil
+}
+
 func (f *fakeForgeAzureDevOps) Approve(_ context.Context, repo string, number int, sha string) (string, error) {
 	f.note(&f.wrote, fmt.Sprintf("approve %s#%d %s", repo, number, sha))
 	return "https://dev.azure.com/acme/Web%20App/_git/App/pullrequest/3", nil

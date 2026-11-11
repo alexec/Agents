@@ -17,7 +17,8 @@ import (
 // The forge writes (#3130): the actions of the GitHub, GitLab, Forgejo (#3753), Bitbucket (#3786), Azure DevOps (#3803), Linear, Jira (#3260) and Azure
 // Boards (#3815) views, on the Work pages' issue and pull request pages: comment, labels (a work
 // item's tags), assignees (#4403), close and reopen (a Jira issue's move by a transition of its workflow, a work
-// item's to another state of its type), and a pull request's merge, approve, rerun of its failed
+// item's to another state of its type), and a pull request's merge, auto-merge turned off and ready
+// for review (#4410), approve, rerun of its failed
 // checks, their logs and its diff. Next to the reads (forge.go), with the same tokens and the
 // connectors' own write code.
 //
@@ -41,6 +42,9 @@ type forgeGitHubWrites interface {
 	SetLabels(ctx context.Context, repo string, number int, add, remove []string) error
 	SetState(ctx context.Context, repo string, number int, closed bool) error
 	MergeBy(ctx context.Context, repo string, number int, sha, method string, auto bool) (map[string]any, error)
+	// The pull request page's Auto-merge row and Draft state (#4410).
+	DisableAutoMerge(ctx context.Context, repo string, number int) error
+	MarkReady(ctx context.Context, repo string, number int) error
 	ReviewPR(ctx context.Context, repo string, number int, sha string, approve bool, words string) (map[string]any, error)
 	RerunFailed(ctx context.Context, repo string, runID int) (map[string]any, error)
 	FailedLog(ctx context.Context, repo string, runID int, job string) (string, error)
@@ -73,6 +77,9 @@ type forgeGitLabWrites interface {
 	SetState(ctx context.Context, project string, number int, mr, closed bool) error
 	MergeMethods(ctx context.Context, project string) ([]string, error)
 	Merge(ctx context.Context, project string, number int, sha string, squash, auto bool) error
+	// The merge request page's Auto-merge row and Draft state (#4410).
+	CancelAutoMerge(ctx context.Context, project string, number int) error
+	MarkReady(ctx context.Context, project string, number int) error
 	Approve(ctx context.Context, project string, number int, sha string) (map[string]any, error)
 	RetryPipeline(ctx context.Context, project string, pipelineID int) (map[string]any, error)
 	FailedLog(ctx context.Context, project string, pipelineID int, job string) (string, error)
@@ -110,6 +117,12 @@ func (d *Daemon) registerForgeWrites() {
 	})
 	On(d, wire.CallForgeMerge, func(ctx context.Context, _ *Client, r wire.ForgeMergeRequest) (wire.ForgeDone, error) {
 		return d.forgeMerge(ctx, r)
+	})
+	On(d, wire.CallForgeCancelAutoMerge, func(ctx context.Context, _ *Client, r wire.ForgeNodeRequest) (wire.ForgeDone, error) {
+		return d.forgePullWrite(ctx, "forge/cancel-auto-merge", r.Node, Forge.CancelAutoMerge)
+	})
+	On(d, wire.CallForgeReady, func(ctx context.Context, _ *Client, r wire.ForgeNodeRequest) (wire.ForgeDone, error) {
+		return d.forgePullWrite(ctx, "forge/ready", r.Node, Forge.Ready)
 	})
 	On(d, wire.CallForgeApprove, func(ctx context.Context, _ *Client, r wire.ForgeApproveRequest) (wire.ForgeDone, error) {
 		return d.forgeApprove(ctx, r)
@@ -294,6 +307,20 @@ func (d *Daemon) forgeMerge(ctx context.Context, r wire.ForgeMergeRequest) (wire
 	}
 	d.forgeWrote()
 	return done, nil
+}
+
+// forgePullWrite is a write on a pull request with nothing but its node: forge/cancel-auto-merge
+// and forge/ready (#4410).
+func (d *Daemon) forgePullWrite(ctx context.Context, method string, node wire.LineageNode, write func(Forge, context.Context, forgeRef) error) (wire.ForgeDone, error) {
+	t, err := d.forgeTargetOf(ctx, method, node, true)
+	if err != nil {
+		return wire.ForgeDone{}, err
+	}
+	if err := write(t.forge, ctx, t.ref); err != nil {
+		return wire.ForgeDone{}, forgeCannotErr(method, t.forge, err)
+	}
+	d.forgeWrote()
+	return wire.ForgeDone{}, nil
 }
 
 func (d *Daemon) forgeApprove(ctx context.Context, r wire.ForgeApproveRequest) (wire.ForgeDone, error) {

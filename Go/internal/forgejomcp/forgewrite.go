@@ -147,6 +147,43 @@ func (f *RealForgejo) Merge(ctx context.Context, repo string, number int, sha, m
 	return nil
 }
 
+// CancelAutoMerge turns off a pull request's merge when its checks succeed (#4410).
+func (f *RealForgejo) CancelAutoMerge(ctx context.Context, repo string, number int) error {
+	return f.send(ctx, http.MethodDelete, fmt.Sprintf("%s/pulls/%d/merge", repoPath(repo), number), nil, nil)
+}
+
+// MarkReady marks a draft pull request ready for review (#4410): a draft is a title that starts
+// with one of wipPrefixes, so the title loses them, as Forgejo's own button does.
+func (f *RealForgejo) MarkReady(ctx context.Context, repo string, number int) error {
+	path := fmt.Sprintf("%s/pulls/%d", repoPath(repo), number)
+	var p pullJSON
+	if err := f.get(ctx, path, false, &p); err != nil {
+		return err
+	}
+	title := readyTitle(p.Title)
+	if title == p.Title {
+		return nil
+	}
+	return f.send(ctx, http.MethodPatch, path, map[string]any{"title": title}, nil)
+}
+
+// readyTitle is title without its draft marks at the start.
+func readyTitle(title string) string {
+	out := strings.TrimSpace(title)
+	for cut := true; cut; {
+		cut = false
+		for _, prefix := range wipPrefixes {
+			if strings.HasPrefix(strings.ToLower(out), prefix) {
+				out, cut = strings.TrimSpace(out[len(prefix):]), true
+			}
+		}
+	}
+	if out == strings.TrimSpace(title) {
+		return title
+	}
+	return out
+}
+
 // Approve approves a pull request at the head commit sha, and says the review's link.
 func (f *RealForgejo) Approve(ctx context.Context, repo string, number int, sha string) (string, error) {
 	sha, err := headSha(sha)

@@ -47,6 +47,8 @@ func (jiraForge) Caps() forgeCaps {
 			actionReleases: "Jira has no releases here: its fix versions are not read yet",
 			actionMerge:     jiraNoPRs,
 			actionAutoMerge: jiraNoPRs,
+			actionCancelAuto: jiraNoPRs,
+			actionReady: jiraNoPRs,
 			actionApprove:   jiraNoPRs,
 			actionRerun:     jiraNoPRs,
 			actionLog:       jiraNoPRs,

@@ -4011,7 +4011,8 @@ export interface FoldersListRequest {
 /**
  * A write or a read that an item's page offers (#4329, #4361): forge/comment, forge/label,
  * forge/close (a close, a reopen or a transition), forge/merge (now, or with auto), forge/approve,
- * forge/rerun, forge/log, forge/diff, forge/add-child, forge/blocked-by and forge/assign (#4403).
+ * forge/rerun, forge/log, forge/diff, forge/add-child, forge/blocked-by, forge/assign (#4403),
+ * forge/cancel-auto-merge and forge/ready (#4410).
  */
 export type ForgeAction =
   | "comment"
@@ -4027,7 +4028,9 @@ export type ForgeAction =
   | "diff"
   | "addChild"
   | "blockedBy"
-  | "assign";
+  | "assign"
+  | "cancelAutoMerge"
+  | "ready";
 
 /**
  * forge/add-child (#3271): add a child to an epic's plan: a new issue (title, with level story,
@@ -14061,6 +14064,7 @@ export interface Methods {
   "forge/assign": { params: ForgeAssignRequest; result: ForgeDone };
   "forge/blocked-by": { params: ForgeBlockedByRequest; result: ForgeDone };
   "forge/boards": { params: ForgeBoardsRequest; result: ForgeBoards };
+  "forge/cancel-auto-merge": { params: ForgeNodeRequest; result: ForgeDone };
   "forge/close": { params: ForgeCloseRequest; result: ForgeDone };
   "forge/comment": { params: ForgeCommentRequest; result: ForgeDone };
   "forge/diff": { params: ForgeNodeRequest; result: ForgeDiff };
@@ -14075,6 +14079,7 @@ export interface Methods {
   "forge/plan": { params: ForgePlanRequest; result: ForgePlan };
   "forge/pull": { params: ForgeItemRequest; result: ForgeItemDetail };
   "forge/pulls": { params: ForgeListRequest; result: ForgeList };
+  "forge/ready": { params: ForgeNodeRequest; result: ForgeDone };
   "forge/release": { params: ForgeReleaseRequest; result: ForgeReleaseDetail };
   "forge/releases": { params: ForgeReleasesRequest; result: ForgeReleases };
   "forge/rerun": { params: ForgeNodeRequest; result: ForgeDone };
@@ -14489,6 +14494,7 @@ export const MethodTarget = {
   "forge/assign": "host",
   "forge/blocked-by": "host",
   "forge/boards": "host",
+  "forge/cancel-auto-merge": "host",
   "forge/close": "host",
   "forge/comment": "host",
   "forge/diff": "host",
@@ -14503,6 +14509,7 @@ export const MethodTarget = {
   "forge/plan": "host",
   "forge/pull": "host",
   "forge/pulls": "host",
+  "forge/ready": "host",
   "forge/release": "host",
   "forge/releases": "host",
   "forge/rerun": "host",
