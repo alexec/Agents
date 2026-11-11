@@ -52,6 +52,9 @@ type Item struct {
 	// Checks; one read on its own does.
 	Draft, AutoMerge          bool
 	Checks, Review, Mergeable string
+	// HeadRef is the branch it merges from and BaseRef the one it merges into; a completed one's
+	// MergedBy is who completed it and MergeCommit the commit it made (#4409).
+	HeadRef, BaseRef, MergedBy, MergeCommit string
 }
 
 // SearchPage is a page of a list, the last updated first. Cursors[i] goes on after Items[i],
@@ -100,7 +103,8 @@ type forgePullJSON struct {
 func (f *RealAzureDevOps) item(repo string, p forgePullJSON) Item {
 	i := Item{Repo: repo, Number: p.ID, Title: p.Title, URL: f.prURL(repo, p.ID), Author: p.CreatedBy.name(), AuthorAvatar: p.CreatedBy.ImageURL, UpdatedAt: p.updated(),
 		CreatedAt: p.CreationDate,
-		Labels:    p.labels(), Draft: p.IsDraft, AutoMerge: p.AutoCompleteSetBy != nil, Review: p.review(), Mergeable: "unknown"}
+		Labels:    p.labels(), Draft: p.IsDraft, AutoMerge: p.AutoCompleteSetBy != nil, Review: p.review(), Mergeable: "unknown",
+		HeadRef: branch(p.SourceRefName), BaseRef: branch(p.TargetRefName)}
 	if p.Status != "active" {
 		i.ClosedAt = p.ClosedDate
 	}
@@ -115,6 +119,13 @@ func (f *RealAzureDevOps) item(repo string, p forgePullJSON) Item {
 		}
 	case "completed":
 		i.State = "merged"
+		// An active pull request's lastMergeCommit is a trial merge; a completed one's is on the target.
+		if p.LastMergeCommit != nil {
+			i.MergeCommit = p.LastMergeCommit.CommitID
+		}
+		if p.ClosedBy != nil {
+			i.MergedBy = p.ClosedBy.name()
+		}
 	default:
 		i.State = "closed"
 	}

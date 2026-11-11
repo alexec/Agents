@@ -726,6 +726,7 @@ func forgeItemOf(i githubmcp.Item, folder string) wire.ForgeItem {
 	if i.PR {
 		out.Draft, out.AutoMerge = new(i.Draft), new(i.AutoMerge)
 		out.Checks, out.Review, out.Mergeable = optional(i.Checks), optional(i.Review), optional(i.Mergeable)
+		withPullRefs(&out, i.HeadRef, i.BaseRef, i.MergedBy, i.MergeCommit)
 		return out
 	}
 	var parent *wire.LineageNode
@@ -752,6 +753,7 @@ func gitlabItemOf(i gitlabmcp.Item, folder string) wire.ForgeItem {
 	if i.MR {
 		out.Draft, out.AutoMerge = new(i.Draft), new(i.AutoMerge)
 		out.Checks, out.Review, out.Mergeable = optional(i.Checks), optional(i.Review), optional(i.Mergeable)
+		withPullRefs(&out, i.HeadRef, i.BaseRef, i.MergedBy, i.MergeCommit)
 		return out
 	}
 	var parent *wire.LineageNode
@@ -892,6 +894,15 @@ func forgeDate(s string) wire.Date {
 		return 0
 	}
 	return wire.DateOf(t)
+}
+
+// withPullRefs puts a pull request's branches on i, and who merged it and its merge commit when
+// it merged (#4409); a forge's "" is none.
+func withPullRefs(i *wire.ForgeItem, head, base, mergedBy, mergeCommit string) {
+	i.HeadRef, i.BaseRef = optional(head), optional(base)
+	if i.State == "merged" {
+		i.MergedBy, i.MergeCommit = optional(mergedBy), optional(mergeCommit)
+	}
 }
 
 func optional(s string) *string {

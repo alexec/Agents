@@ -371,6 +371,7 @@ type pullJSON struct {
 	Merged             bool       `json:"merged"`
 	MergedAt           *string    `json:"merged_at"`
 	MergeCommitSHA     string     `json:"merge_commit_sha"`
+	MergedBy           *user      `json:"merged_by"`
 	ClosedAt           *string    `json:"closed_at"`
 	CreatedAt          string     `json:"created_at"`
 	UpdatedAt          string     `json:"updated_at"`

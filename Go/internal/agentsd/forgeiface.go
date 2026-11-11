@@ -76,6 +76,9 @@ type forgeCaps struct {
 	// closed. Children, LinkedPulls and Events: an issue's read has its sub-issues, the pull
 	// requests that close it, and its timeline (#4373).
 	CreatedAt, ClosedAt, Children, LinkedPulls, Events bool
+	// A pull request's (#4409): Branches, its head and base branches; MergedBy and MergeCommit, a
+	// merged one's; Size, Reviewers and Closes, on its read; CheckTimes, its checks' times.
+	Branches, MergedBy, MergeCommit, Size, Reviewers, Closes, CheckTimes bool
 	// CommentCount is "exact", "capped" (at CommentsMost, Linear's 50) or "detail" (only on an
 	// item's own page: Bitbucket issues, Azure Repos).
 	CommentCount string
@@ -135,7 +138,9 @@ func (c forgeCaps) wire(name string) wire.ForgeCapabilities {
 	for _, f := range []struct {
 		on  bool
 		out **bool
-	}{{c.CreatedAt, &out.CreatedAt}, {c.ClosedAt, &out.ClosedAt}, {c.Children, &out.Children}, {c.LinkedPulls, &out.LinkedPulls}, {c.Events, &out.Events}, {c.Total, &out.Total}, {c.Releases, &out.Releases}} {
+	}{{c.CreatedAt, &out.CreatedAt}, {c.ClosedAt, &out.ClosedAt}, {c.Children, &out.Children}, {c.LinkedPulls, &out.LinkedPulls}, {c.Events, &out.Events}, {c.Total, &out.Total}, {c.Releases, &out.Releases},
+		{c.Branches, &out.Branches}, {c.MergedBy, &out.MergedBy}, {c.MergeCommit, &out.MergeCommit}, {c.Size, &out.Size},
+		{c.Reviewers, &out.Reviewers}, {c.Closes, &out.Closes}, {c.CheckTimes, &out.CheckTimes}} {
 		if f.on {
 			*f.out = new(true)
 		}

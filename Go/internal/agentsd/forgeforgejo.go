@@ -142,6 +142,8 @@ func (forgejoForge) Caps() forgeCaps {
 		LabelColors: true,
 		Avatars:     true,
 		CreatedAt:   true, ClosedAt: true,
+		// A pull request's branches and merge (#4409); its size, reviewers, closing issues and check times are #4682.
+		Branches: true, MergedBy: true, MergeCommit: true,
 		CommentCount: "exact",
 		Releases:     true,
 		Plan:         true, BlockedBy: true, AddChild: true,
@@ -513,6 +515,7 @@ func forgejoItemOf(i forgejomcp.Item, folder string) wire.ForgeItem {
 	if i.PR {
 		out.Draft, out.AutoMerge = new(i.Draft), new(i.AutoMerge)
 		out.Checks, out.Review, out.Mergeable = optional(i.Checks), optional(i.Review), optional(i.Mergeable)
+		withPullRefs(&out, i.HeadRef, i.BaseRef, i.MergedBy, i.MergeCommit)
 		return out
 	}
 	// An issue's level and feature are its labels'; Forgejo has no parent, and a list does not

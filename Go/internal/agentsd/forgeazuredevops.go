@@ -134,11 +134,13 @@ func (azureDevOpsForge) Caps() forgeCaps {
 			Rerun: true, Log: true, Diff: true},
 		Avatars:   true,
 		CreatedAt: true, ClosedAt: true,
+		// A pull request's branches and merge (#4409); its size, reviewers, closing issues and check times are #4682.
+		Branches: true, MergedBy: true, MergeCommit: true,
 		// A pull request's comment count is on its own page only.
 		CommentCount: "detail",
 		Reasons: map[string]string{
-			actionAssign:   "an Azure Repos pull request has reviewers, not assignees",
-			actionReleases: "Azure Repos has no releases, only tags",
+			actionAssign:     "an Azure Repos pull request has reviewers, not assignees",
+			actionReleases:   "Azure Repos has no releases, only tags",
 			actionTransition: "only a Jira issue or an Azure Boards work item moves by a transition",
 			actionPlan:       azureDevOpsNoIssues,
 			actionAddChild:   azureDevOpsNoIssues,
@@ -449,10 +451,12 @@ func (d *Daemon) forgeAzureDevOps(root string) forgeAzureDevOps {
 
 // azureDevOpsItemOf is an Azure Repos pull request in the one model, from folder.
 func azureDevOpsItemOf(i azuredevopsmcp.Item, folder string) wire.ForgeItem {
-	return wire.ForgeItem{Node: azureDevOpsNode(i.Repo, i.Number), Title: i.Title, State: i.State, URL: optional(i.URL),
+	out := wire.ForgeItem{Node: azureDevOpsNode(i.Repo, i.Number), Title: i.Title, State: i.State, URL: optional(i.URL),
 		Folder: optional(folder), Labels: forgeLabelsOf(i.Labels, nil), Author: optional(i.Author), AuthorAvatar: optional(i.AuthorAvatar), Assignees: []string{},
 		UpdatedAt: forgeDate(i.UpdatedAt), CreatedAt: forgeDateOptional(i.CreatedAt), ClosedAt: forgeDateOptional(i.ClosedAt), Comments: int64(i.Comments), Draft: new(i.Draft), AutoMerge: new(i.AutoMerge),
 		Checks: optional(i.Checks), Review: optional(i.Review), Mergeable: optional(i.Mergeable)}
+	withPullRefs(&out, i.HeadRef, i.BaseRef, i.MergedBy, i.MergeCommit)
+	return out
 }
 
 // azureDevOpsFailedBuilds are the Azure Pipelines builds of a pull request's failed checks, or

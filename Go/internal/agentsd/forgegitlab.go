@@ -39,6 +39,8 @@ func (gitlabForge) Caps() forgeCaps {
 		LabelColors: true,
 		Avatars:     true,
 		CreatedAt:   true, ClosedAt: true,
+		// A pull request's branches and merge (#4409); its size, reviewers, closing issues and check times are #4682.
+		Branches: true, MergedBy: true, MergeCommit: true,
 		CommentCount: "exact",
 		Releases:     true,
 		// X-Total, which GitLab leaves out of a list of over 10,000.

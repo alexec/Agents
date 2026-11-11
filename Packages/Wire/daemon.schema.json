@@ -10105,7 +10105,7 @@
     },
     "ForgeCapabilities": {
       "type": "object",
-      "description": "What one forge on a list's page fills (#4329, #4361), so a client hides what it does not: issues and pulls say it has them; labelColors that its labels have a #rrggbb colour; avatars that its items have authorAvatar; stateReason that its closed issues have stateReason. createdAt that its items have createdAt, and closedAt that its closed and merged items have closedAt; children, linkedPulls and events that an item's read has them (#4373); total that it counts a list's items, for ForgeList.total (#4396); releases that it has releases, for forge/releases and forge/release (#4426); each is absent from an earlier daemon, which has none. commentCount says how to read ForgeItem.comments: exact; capped at commentsMost (show 50+ there); or detail, only on an item's own page (hide it on the row).",
+      "description": "What one forge on a list's page fills (#4329, #4361), so a client hides what it does not: issues and pulls say it has them; labelColors that its labels have a #rrggbb colour; avatars that its items have authorAvatar; stateReason that its closed issues have stateReason. createdAt that its items have createdAt, and closedAt that its closed and merged items have closedAt; children, linkedPulls and events that an item's read has them (#4373); total that it counts a list's items, for ForgeList.total (#4396); releases that it has releases, for forge/releases and forge/release (#4426); a pull request's fields (#4409): branches that it has headRef and baseRef, mergedBy and mergeCommit that a merged one says them, size that its read has additions, deletions and commits, reviewers and closes that its read has them, and checkTimes that its checks have startedAt and finishedAt; each is absent from an earlier daemon, which has none. commentCount says how to read ForgeItem.comments: exact; capped at commentsMost (show 50+ there); or detail, only on an item's own page (hide it on the row).",
       "properties": {
         "forge": {
           "type": "string"
@@ -10146,6 +10146,27 @@
         "releases": {
           "type": "boolean"
         },
+        "branches": {
+          "type": "boolean"
+        },
+        "mergedBy": {
+          "type": "boolean"
+        },
+        "mergeCommit": {
+          "type": "boolean"
+        },
+        "size": {
+          "type": "boolean"
+        },
+        "reviewers": {
+          "type": "boolean"
+        },
+        "closes": {
+          "type": "boolean"
+        },
+        "checkTimes": {
+          "type": "boolean"
+        },
         "commentCount": {
           "$ref": "#/definitions/ForgeCommentCount"
         },
@@ -10166,7 +10187,7 @@
     },
     "ForgeCheck": {
       "type": "object",
-      "description": "One of a pull request's checks (#3129): a check run or a commit status. state is passing, failing, running or skipped; url is its page on the forge.",
+      "description": "One of a pull request's checks (#3129): a check run or a commit status. state is passing, failing, running or skipped; url is its page on the forge. startedAt and finishedAt are when it started and ended (#4409), where the forge says them (ForgeCapabilities.checkTimes): absent on a check that has not started, and finishedAt on one still running; a commit status has neither.",
       "properties": {
         "name": {
           "type": "string"
@@ -10176,6 +10197,12 @@
         },
         "url": {
           "type": "string"
+        },
+        "startedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "finishedAt": {
+          "$ref": "#/definitions/WireDate"
         }
       },
       "required": [
@@ -10519,7 +10546,7 @@
     },
     "ForgeItem": {
       "type": "object",
-      "description": "An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for GitHub, GitLab, Linear and Jira (#3260), so one page draws each. node is its lineage node (kind issue or pr, ref github:alexec/Agents#12). state is open, closed or merged; status is the tracker's own name for its step, where its workflow has steps (a Jira status, as In Progress; one in Jira's Done category is closed). folder is a folder on this machine on its repo, to act from. labels have their #rrggbb colour where the forge gives one (#2956). The pull request's own fields: draft; checks is passing, failing, running or none; review is approved, changes_requested or review_required; mergeable is mergeable, conflicting or unknown; autoMerge says auto-merge is on. The hierarchy (#3267): parent is the issue it is a sub-issue (a Linear or GitLab child) of; level is epic, story, task or spike, from its labels; feature is the name of its feature:<name> label; progress is a parent's closed children of all of them, where the forge says it: in a GitHub list, and on an issue's own read. standing says it has the label standing: a standing epic, whose plan is a query (#3659). authorAvatar is the author's picture, a URL that only forge/image reads (#4363), where the forge gives one (ForgeCapabilities.avatars). stateReason is why a closed issue closed (#4365): completed, not_planned or duplicate, where the forge says it (ForgeCapabilities.stateReason); absent on an open issue and on a pull request. createdAt is when it opened and closedAt when it closed or merged (#4373), where the forge says them (ForgeCapabilities.createdAt and closedAt); closedAt is absent while it is open.",
+      "description": "An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for GitHub, GitLab, Linear and Jira (#3260), so one page draws each. node is its lineage node (kind issue or pr, ref github:alexec/Agents#12). state is open, closed or merged; status is the tracker's own name for its step, where its workflow has steps (a Jira status, as In Progress; one in Jira's Done category is closed). folder is a folder on this machine on its repo, to act from. labels have their #rrggbb colour where the forge gives one (#2956). The pull request's own fields: draft; checks is passing, failing, running or none; review is approved, changes_requested or review_required; mergeable is mergeable, conflicting or unknown; autoMerge says auto-merge is on. The hierarchy (#3267): parent is the issue it is a sub-issue (a Linear or GitLab child) of; level is epic, story, task or spike, from its labels; feature is the name of its feature:<name> label; progress is a parent's closed children of all of them, where the forge says it: in a GitHub list, and on an issue's own read. standing says it has the label standing: a standing epic, whose plan is a query (#3659). authorAvatar is the author's picture, a URL that only forge/image reads (#4363), where the forge gives one (ForgeCapabilities.avatars). stateReason is why a closed issue closed (#4365): completed, not_planned or duplicate, where the forge says it (ForgeCapabilities.stateReason); absent on an open issue and on a pull request. createdAt is when it opened and closedAt when it closed or merged (#4373), where the forge says them (ForgeCapabilities.createdAt and closedAt); closedAt is absent while it is open. A pull request's branches (#4409): headRef is the branch it merges from and baseRef the one it merges into, where the forge says them (ForgeCapabilities.branches); on its own read at least, and on a list's row where the list says them. A merged pull request's mergedBy is who merged it and mergeCommit the commit it made on baseRef (ForgeCapabilities.mergedBy and mergeCommit); each is absent while it is open or closed unmerged.",
       "properties": {
         "node": {
           "$ref": "#/definitions/LineageNode"
@@ -10590,6 +10617,18 @@
         "autoMerge": {
           "type": "boolean"
         },
+        "headRef": {
+          "type": "string"
+        },
+        "baseRef": {
+          "type": "string"
+        },
+        "mergedBy": {
+          "type": "string"
+        },
+        "mergeCommit": {
+          "type": "string"
+        },
         "parent": {
           "$ref": "#/definitions/LineageNode"
         },
@@ -10619,7 +10658,7 @@
     },
     "ForgeItemDetail": {
       "type": "object",
-      "description": "forge/issue and forge/pull (#3129): one item with its body (Markdown) and a page of its comments, the newest page first and at most 50, oldest first in the page; cursor is the page before it, absent at the first comment. A pull request's checks, review threads (line comments, in threads) and files changed come with it. head is a pull request's head commit, which forge/merge and forge/approve name (#3130); mergeMethods are the ways its repo allows, the repo's default first; start is the new-agent form for an issue. transitions are the moves an issue's workflow allows now (Jira, #3260), which forge/close takes in place of a close or a reopen. actions are what the item's page offers now, from its forge and its state (#4361): a merged pull request has no merge and no reopen, a closed item no close; absent from an earlier daemon, when the page shows what it did before. On an issue's read (#4373), where the forge says them (ForgeCapabilities): children are its sub-issues, linkedPulls the pull requests that close it, and events its timeline, oldest first (labelled, assigned, closed, referenced and the like); each is absent where the forge gives none.",
+      "description": "forge/issue and forge/pull (#3129): one item with its body (Markdown) and a page of its comments, the newest page first and at most 50, oldest first in the page; cursor is the page before it, absent at the first comment. A pull request's checks, review threads (line comments, in threads) and files changed come with it. head is a pull request's head commit, which forge/merge and forge/approve name (#3130); mergeMethods are the ways its repo allows, the repo's default first; start is the new-agent form for an issue. transitions are the moves an issue's workflow allows now (Jira, #3260), which forge/close takes in place of a close or a reopen. actions are what the item's page offers now, from its forge and its state (#4361): a merged pull request has no merge and no reopen, a closed item no close; absent from an earlier daemon, when the page shows what it did before. On an issue's read (#4373), where the forge says them (ForgeCapabilities): children are its sub-issues, linkedPulls the pull requests that close it, and events its timeline, oldest first (labelled, assigned, closed, referenced and the like); each is absent where the forge gives none. On a pull request's read (#4409), where the forge says them (ForgeCapabilities): additions, deletions and commits are its size; reviewers are the people asked to review it and the people who reviewed it, each once with their newest state; closes are the issues it closes when it merges.",
       "properties": {
         "item": {
           "$ref": "#/definitions/ForgeItem"
@@ -10647,6 +10686,27 @@
         },
         "filesChanged": {
           "type": "integer"
+        },
+        "additions": {
+          "type": "integer"
+        },
+        "deletions": {
+          "type": "integer"
+        },
+        "commits": {
+          "type": "integer"
+        },
+        "reviewers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ForgeReviewer"
+          }
+        },
+        "closes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ForgeLinked"
+          }
         },
         "head": {
           "type": "string"
@@ -10793,7 +10853,7 @@
     },
     "ForgeLinked": {
       "type": "object",
-      "description": "An item that an issue's read names (#4373): a sub-issue, or a pull request that closes it. state is open, closed or merged, as ForgeItem.state.",
+      "description": "An item that an issue's read names (#4373): a sub-issue, or a pull request that closes it; or an issue that a pull request closes (#4409). state is open, closed or merged, as ForgeItem.state.",
       "properties": {
         "node": {
           "$ref": "#/definitions/LineageNode"
@@ -11290,6 +11350,36 @@
         }
       },
       "additionalProperties": false
+    },
+    "ForgeReviewer": {
+      "type": "object",
+      "description": "A reviewer of a pull request (#4409): login is who; avatar their picture, a URL that only forge/image reads, where the forge gives one; state is their newest review, or pending while they are asked and have not answered, or were asked again since.",
+      "properties": {
+        "login": {
+          "type": "string"
+        },
+        "avatar": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/definitions/ForgeReviewerState"
+        }
+      },
+      "required": [
+        "login",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeReviewerState": {
+      "type": "string",
+      "description": "A reviewer's state (#4409): approved, changes_requested, commented (reviewed with no verdict) or pending (asked, not answered).",
+      "enum": [
+        "approved",
+        "changes_requested",
+        "commented",
+        "pending"
+      ]
     },
     "ForgeStanding": {
       "type": "object",

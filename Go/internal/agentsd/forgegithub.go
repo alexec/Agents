@@ -36,6 +36,7 @@ func (githubForge) Caps() forgeCaps {
 		Avatars:     true,
 		StateReason: true,
 		CreatedAt:   true, ClosedAt: true, Children: true, LinkedPulls: true, Events: true,
+		Branches: true, MergedBy: true, MergeCommit: true, Size: true, Reviewers: true, Closes: true, CheckTimes: true,
 		CommentCount: "exact",
 		Releases:     true,
 		Total:        true,
@@ -138,9 +139,16 @@ func (g githubForge) Item(ctx context.Context, r forgeRef, cursor string) (wire.
 	if p.PR {
 		out.Checks = []wire.ForgeCheck{}
 		for _, c := range p.CheckRuns {
-			out.Checks = append(out.Checks, wire.ForgeCheck{Name: c.Name, State: c.State, URL: optional(c.URL)})
+			out.Checks = append(out.Checks, wire.ForgeCheck{Name: c.Name, State: c.State, URL: optional(c.URL),
+				StartedAt: forgeDateOptional(c.StartedAt), FinishedAt: forgeDateOptional(c.FinishedAt)})
 		}
 		out.ReviewThreads, out.FilesChanged = new(int64(p.ReviewThreads)), new(int64(p.FilesChanged))
+		out.Additions, out.Deletions, out.Commits = new(int64(p.Additions)), new(int64(p.Deletions)), new(int64(p.Commits))
+		out.Closes = githubLinkedOf(p.Closes)
+		out.Reviewers = []wire.ForgeReviewer{}
+		for _, r := range p.Reviewers {
+			out.Reviewers = append(out.Reviewers, wire.ForgeReviewer{Login: r.Login, Avatar: optional(r.Avatar), State: wire.ForgeReviewerState(r.State)})
+		}
 		out.Head, out.MergeMethods = optional(p.Head), mergeMethodsOf(p.MergeMethods)
 	} else {
 		out.Start = githubStart(out.Item)

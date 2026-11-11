@@ -60,6 +60,10 @@ type Item struct {
 	// A list says only Draft and Review; one read on its own says the rest.
 	Draft                     bool
 	Checks, Review, Mergeable string
+	// HeadRef is the branch it merges from and BaseRef the one it merges into; a merged one's
+	// MergeCommit is the commit it made (#4409), as Bitbucket gives it (12 hex digits). Bitbucket
+	// says nobody that merged it.
+	HeadRef, BaseRef, MergeCommit string
 }
 
 // SearchPage is a page of a list, the last updated first. Cursors[i] goes on after Items[i],
@@ -128,6 +132,10 @@ func (p forgePullJSON) item(repo string) Item {
 		i.State = "closed"
 	}
 	i.Review = p.review()
+	i.HeadRef, i.BaseRef = p.Source.Branch.Name, p.Destination.Branch.Name
+	if i.State == "merged" && p.MergeCommit != nil {
+		i.MergeCommit = p.MergeCommit.Hash
+	}
 	return i
 }
 
