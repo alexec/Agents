@@ -43,6 +43,7 @@ func (jiraForge) Caps() forgeCaps {
 		Total: true,
 		Plan:  true,
 		Reasons: map[string]string{
+			actionReleases: "Jira has no releases here: its fix versions are not read yet",
 			actionMerge:     jiraNoPRs,
 			actionAutoMerge: jiraNoPRs,
 			actionApprove:   jiraNoPRs,

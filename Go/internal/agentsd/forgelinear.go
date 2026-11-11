@@ -41,6 +41,7 @@ func (linearForge) Caps() forgeCaps {
 		CommentCount: "capped", CommentsMost: 50,
 		Plan: true, BlockedBy: true, AddChild: true,
 		Reasons: map[string]string{
+			actionReleases: "Linear has no releases: it is a tracker, with no repositories",
 			actionTransition: "only a Jira issue or an Azure Boards work item moves by a transition",
 			actionMerge:      linearNoPRs,
 			actionAutoMerge:  linearNoPRs,

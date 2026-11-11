@@ -40,6 +40,7 @@ func (gitlabForge) Caps() forgeCaps {
 		Avatars:     true,
 		CreatedAt:   true, ClosedAt: true,
 		CommentCount: "exact",
+		Releases:     true,
 		// X-Total, which GitLab leaves out of a list of over 10,000.
 		Total: true,
 		Plan:  true,

@@ -4081,9 +4081,10 @@ export interface ForgeBoardsRequest {
  * items have authorAvatar; stateReason that its closed issues have stateReason. createdAt that its
  * items have createdAt, and closedAt that its closed and merged items have closedAt; children,
  * linkedPulls and events that an item's read has them (#4373); total that it counts a list's items,
- * for ForgeList.total (#4396); each is absent from an earlier daemon, which has none. commentCount
- * says how to read ForgeItem.comments: exact; capped at commentsMost (show 50+ there); or detail,
- * only on an item's own page (hide it on the row).
+ * for ForgeList.total (#4396); releases that it has releases, for forge/releases and forge/release
+ * (#4426); each is absent from an earlier daemon, which has none. commentCount says how to read
+ * ForgeItem.comments: exact; capped at commentsMost (show 50+ there); or detail, only on an item's
+ * own page (hide it on the row).
  */
 export interface ForgeCapabilities {
   forge: string;
@@ -4098,6 +4099,7 @@ export interface ForgeCapabilities {
   linkedPulls?: boolean;
   events?: boolean;
   total?: boolean;
+  releases?: boolean;
   commentCount: ForgeCommentCount;
   commentsMost?: number;
 }
@@ -4558,6 +4560,82 @@ export interface ForgePlanStep {
 export interface ForgeProgress {
   done: number;
   total: number;
+}
+
+/**
+ * A release on a forge (#4426). node is its lineage node (kind release, ref
+ * <forge>:<repo>/release/<tag>), which forge/release reads and lineage keys its cost by. repo is
+ * the repo as the forge names it, and folder a folder on it. latest is the repo's newest published
+ * release that is neither a draft nor a pre-release. publishedAt is absent on a draft; author and
+ * authorAvatar when the forge says them; assets is how many files it has.
+ */
+export interface ForgeRelease {
+  node: LineageNode;
+  forge: string;
+  repo: string;
+  folder?: string;
+  tag: string;
+  name: string;
+  body?: string;
+  draft: boolean;
+  prerelease: boolean;
+  latest: boolean;
+  createdAt?: string;
+  publishedAt?: string;
+  author?: string;
+  authorAvatar?: string;
+  assets: number;
+  url: string;
+}
+
+/**
+ * forge/release (#4426): a release, the release before it (previous, its tag; absent for the
+ * first), how many commits are between the two (commits, at most what the forge's compare gives)
+ * and the pull requests they merged, from each squash commit's (#n) or (!n), oldest first.
+ * compareUrl is the forge's page of the range.
+ */
+export interface ForgeReleaseDetail {
+  release: ForgeRelease;
+  previous?: string;
+  compareUrl?: string;
+  commits: number;
+  pulls: ForgeReleasePull[];
+}
+
+/**
+ * A pull request in a release (#4426): its node, its number, and its title as its squash commit
+ * says it, with the (#n) taken off; sha is the commit.
+ */
+export interface ForgeReleasePull {
+  node: LineageNode;
+  number: number;
+  title: string;
+  sha: string;
+}
+
+/** forge/release (#4426): a release's lineage node, as ForgeRelease.node says it. */
+export interface ForgeReleaseRequest {
+  node: LineageNode;
+}
+
+/**
+ * forge/releases (#4426): the releases of the folders' repos, newest first (a draft, which has no
+ * publishedAt, by createdAt). none are the forges in reach that have no releases, and why, so a
+ * client says so (Linear and Jira have no releases); errors are the forges that could not be read.
+ */
+export interface ForgeReleases {
+  releases: ForgeRelease[];
+  none?: ForgeListError[];
+  errors?: ForgeListError[];
+}
+
+/**
+ * forge/releases (#4426): the releases of every folder's repo on this machine, or of one folder's,
+ * at most limit (1 to 100, 30 when absent) of each repo.
+ */
+export interface ForgeReleasesRequest {
+  folder?: string;
+  limit?: number;
 }
 
 /**
@@ -13924,6 +14002,8 @@ export interface Methods {
   "forge/plan": { params: ForgePlanRequest; result: ForgePlan };
   "forge/pull": { params: ForgeItemRequest; result: ForgeItemDetail };
   "forge/pulls": { params: ForgeListRequest; result: ForgeList };
+  "forge/release": { params: ForgeReleaseRequest; result: ForgeReleaseDetail };
+  "forge/releases": { params: ForgeReleasesRequest; result: ForgeReleases };
   "forge/rerun": { params: ForgeNodeRequest; result: ForgeDone };
   "governance/approvals": { params: Empty; result: CatalogApprovalList };
   "governance/decide": { params: CatalogDecide; result: CatalogRequest };
@@ -14348,6 +14428,8 @@ export const MethodTarget = {
   "forge/plan": "host",
   "forge/pull": "host",
   "forge/pulls": "host",
+  "forge/release": "host",
+  "forge/releases": "host",
   "forge/rerun": "host",
   "governance/approvals": "control",
   "governance/decide": "control",
@@ -15007,7 +15089,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeBlockedByRequest: { required: ["node"], optional: ["add", "remove"] },
   ForgeBoards: { required: ["boards"], optional: [] },
   ForgeBoardsRequest: { required: [], optional: ["folder"] },
-  ForgeCapabilities: { required: ["forge", "issues", "pulls", "labelColors", "avatars", "stateReason", "commentCount"], optional: ["createdAt", "closedAt", "children", "linkedPulls", "events", "total", "commentsMost"] },
+  ForgeCapabilities: { required: ["forge", "issues", "pulls", "labelColors", "avatars", "stateReason", "commentCount"], optional: ["createdAt", "closedAt", "children", "linkedPulls", "events", "total", "releases", "commentsMost"] },
   ForgeCheck: { required: ["name", "state"], optional: ["url"] },
   ForgeCloseRequest: { required: ["node"], optional: ["reopen", "transition"] },
   ForgeComment: { required: ["author", "body", "at"], optional: ["avatar", "url", "bot"] },
@@ -15043,6 +15125,12 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgePlanRequest: { required: ["node"], optional: [] },
   ForgePlanStep: { required: ["step", "nodes"], optional: [] },
   ForgeProgress: { required: ["done", "total"], optional: [] },
+  ForgeRelease: { required: ["node", "forge", "repo", "tag", "name", "draft", "prerelease", "latest", "assets", "url"], optional: ["folder", "body", "createdAt", "publishedAt", "author", "authorAvatar"] },
+  ForgeReleaseDetail: { required: ["release", "commits", "pulls"], optional: ["previous", "compareUrl"] },
+  ForgeReleasePull: { required: ["node", "number", "title", "sha"], optional: [] },
+  ForgeReleaseRequest: { required: ["node"], optional: [] },
+  ForgeReleases: { required: ["releases"], optional: ["none", "errors"] },
+  ForgeReleasesRequest: { required: [], optional: ["folder", "limit"] },
   ForgeStanding: { required: ["labels", "any", "not", "lanes"], optional: ["milestone", "error"] },
   ForgeStart: { required: ["prompt", "labels"], optional: ["worktree"] },
   ForgeTransition: { required: ["id", "name"], optional: ["category"] },
