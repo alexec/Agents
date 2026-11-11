@@ -313,6 +313,87 @@ public extension DaemonAPI {
             self.actual = actual
         }
     }
+
+    /// `lineage/forecast` (#4526): an epic, for when it lands and its estimate to complete; nil
+    /// for only the spend, the burn and the service levels.
+    struct LineageForecastRequest: Codable, Sendable, Hashable {
+        public var node: LineageNode?
+
+        public init(node: LineageNode? = nil) {
+            self.node = node
+        }
+    }
+
+    /// When an epic lands (#4526): P50 and P85, from the hourly throughput of the last 14 days and
+    /// the closed epics' median share, with the children as the plan says them now.
+    struct LineageForecastLands: Codable, Sendable, Hashable {
+        public var p50: Date
+        public var p85: Date
+        public var open: Int
+        public var closed: Int
+        public var stepsLeft: Int
+        public var share: Double
+        public var groups: Int
+    }
+
+    /// An epic's first landing forecast, kept on its node to score when it lands (#4526).
+    struct LineageForecastKept: Codable, Sendable, Hashable {
+        public var at: Date
+        public var p50: Date
+        public var p85: Date
+        public var windowDays: Int
+        public var share: Double
+        public var open: Int
+    }
+
+    /// An epic's estimate to complete (#4526): dollars by currency, P10 to P90.
+    struct LineageForecastToComplete: Codable, Sendable, Hashable {
+        public var cost: [String: LineageEstimateRange]
+        public var ratio: Double
+        public var closed: Int
+        public var leadRatio: Double
+    }
+
+    /// What a week and a month cost at the window's pace (#4526): dollars by currency.
+    struct LineageForecastSpend: Codable, Sendable, Hashable {
+        public var week: [String: LineageEstimateRange]
+        public var month: [String: LineageEstimateRange]
+    }
+
+    /// A weekly allowance's pace (#4526): when it runs out, or that it lasts to the reset.
+    struct LineageForecastBurn: Codable, Sendable, Hashable {
+        public var credentialKey: String
+        public var window: String
+        public var used: Double
+        public var at: Date
+        public var resetsAt: Date
+        public var runsOutAt: Date?
+        public var lasts: Bool
+    }
+
+    /// How long a level's issues took in the window (#4526): half by p50Seconds, 85% by p85Seconds.
+    struct LineageForecastServiceLevel: Codable, Sendable, Hashable {
+        public var level: String
+        public var closed: Int
+        public var p50Seconds: Double
+        public var p85Seconds: Double
+    }
+
+    /// `lineage/forecast`'s answer (#4526): what comes next, from this machine's totals.
+    struct LineageForecast: Codable, Sendable, Hashable {
+        public var node: LineageNode?
+        public var at: Date
+        public var windowDays: Int
+        public var landings: Int
+        public var lands: LineageForecastLands?
+        /// Why there is no landing date.
+        public var noForecast: String?
+        public var toComplete: LineageForecastToComplete?
+        public var kept: LineageForecastKept?
+        public var spend: LineageForecastSpend?
+        public var burn: [LineageForecastBurn]
+        public var serviceLevels: [LineageForecastServiceLevel]
+    }
 }
 
 /// The lineage nodes and walks the clients ask for: a lead's epic, an epic's plan, Work's links.

@@ -141,6 +141,8 @@ public enum DaemonAPI {
         public static let lineageCost = "lineage/cost"
         /// What an issue or an epic will probably cost and take, from past work (#3559, #3560).
         public static let lineageEstimate = "lineage/estimate"
+        /// When an epic lands, its estimate to complete, the spend, the burn and service levels (#4526).
+        public static let lineageForecast = "lineage/forecast"
         public static let simulatorsList = "simulators/list"
         public static let simulatorsBoot = "simulators/boot"
         public static let simulatorsShutdown = "simulators/shutdown"
