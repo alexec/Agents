@@ -56,6 +56,7 @@ func (d *Daemon) register() {
 	d.registerForge()
 	d.registerMessages()
 	d.registerWorkTimeline()
+	d.registerWorkFeatures()
 	d.registerDocs()
 	d.registerDevices()
 	d.registerAllowances()
@@ -489,12 +490,16 @@ func (d *Daemon) archiveSweeping(id wire.UUID, by wire.AgentArchivedReason, swee
 
 // listed is one agent as agents/list gives it: lean when asked, and an archived agent's
 // commands left out unless asked for.
-func listed(a wire.Agent, r wire.ListRequest) wire.Agent {
+func (d *Daemon) listed(a wire.Agent, r wire.ListRequest) wire.Agent {
 	if r.Lean {
 		return leaned(a)
 	}
-	if a.State == wire.AgentStateArchived && !r.ArchivedCommands {
+	// The store holds an archived agent without its commands (#4653): read when asked for.
+	if a.State == wire.AgentStateArchived {
 		a.AvailableCommands = []wire.SlashCommand{}
+		if r.ArchivedCommands {
+			a.AvailableCommands = d.Store.Commands(a.ID)
+		}
 	}
 	return a
 }
@@ -514,7 +519,7 @@ func archivedOrder(a *wire.Agent) wire.Date {
 func (d *Daemon) listAgents(r wire.ListRequest) []wire.Agent {
 	if r.AgentID != nil {
 		if a := d.Store.Agent(*r.AgentID); a != nil {
-			return []wire.Agent{withProject(listed(*a, r), projectOfFolder(folderPath(a)))}
+			return []wire.Agent{withProject(d.listed(*a, r), projectOfFolder(folderPath(a)))}
 		}
 		return []wire.Agent{}
 	}
@@ -581,7 +586,7 @@ func (d *Daemon) listAgents(r wire.ListRequest) []wire.Agent {
 				continue
 			}
 		}
-		out = append(out, withProject(listed(a, r), projects.of(&a)))
+		out = append(out, withProject(d.listed(a, r), projects.of(&a)))
 		if int64(len(out)) == limit {
 			break
 		}
@@ -593,7 +598,7 @@ func (d *Daemon) listAgents(r wire.ListRequest) []wire.Agent {
 const maxPage = 500
 
 func (d *Daemon) transcript(r wire.TranscriptRequest) (wire.TranscriptPage, error) {
-	if d.Store.Agent(r.AgentID) == nil {
+	if !d.Store.Has(r.AgentID) {
 		return wire.TranscriptPage{}, &Error{Code: CodeNoSuchAgent, Message: "no agent " + string(r.AgentID)}
 	}
 	if r.Limit < 0 || r.Before != nil && *r.Before < 0 || r.From != nil && *r.From < 0 {

@@ -60,6 +60,10 @@ type Item struct {
 	// A list says only Draft and Review; one read on its own says the rest.
 	Draft                     bool
 	Checks, Review, Mergeable string
+	// HeadRef is the branch it merges from and BaseRef the one it merges into; a merged one's
+	// MergeCommit is the commit it made (#4409), as Bitbucket gives it (12 hex digits). Bitbucket
+	// says nobody that merged it.
+	HeadRef, BaseRef, MergeCommit string
 }
 
 // SearchPage is a page of a list, the last updated first. Cursors[i] goes on after Items[i],
@@ -82,7 +86,17 @@ type Comment struct {
 type CheckRun struct {
 	Name, State, URL string
 	Run              int
+	// StartedAt is when the status was first sent and FinishedAt when it last changed, once it
+	// is not running (#4682).
+	StartedAt, FinishedAt string
 }
+
+// Size is a pull request's lines added and deleted, and its commits (#4682).
+type Size struct{ Additions, Deletions, Commits int }
+
+// Reviewer is a person asked to review a pull request or who reviewed it (#4682): State is
+// approved, changes_requested, or pending while asked and not answered.
+type Reviewer struct{ Login, Avatar, State string }
 
 // ItemDetail is an item with its body and a page of its comments (Thread), oldest first in the
 // page. Before is the cursor of the page before it, "" at the first comment. CheckRuns are a
@@ -97,6 +111,53 @@ type ItemDetail struct {
 	ReviewThreads int
 	FilesChanged  int
 	Head          string
+	// Events are an issue's changes (#4626), oldest first, from its first page of them.
+	Events []Event
+	// A pull request's (#4682): its Size (nil when its commits cannot be read, the one read more
+	// of its page) and its Reviewers.
+	Size      *Size
+	Reviewers []Reviewer
+}
+
+// Event is one change to an issue: Kind is labeled, unlabeled, assigned, unassigned, closed or
+// reopened. Label is a kind or a component, as an issue's labels are.
+type Event struct {
+	Kind, Actor, At, Label, Assignee string
+}
+
+// events are the events of one change: a kind and a component are labels, as labels() says.
+func (c changeJSON) events() []Event {
+	var out []Event
+	add := func(kind, label, assignee string) {
+		out = append(out, Event{Kind: kind, Actor: c.User.name(), At: c.CreatedOn, Label: label, Assignee: assignee})
+	}
+	for _, field := range []string{"kind", "component"} {
+		if ch, ok := c.Changes[field]; ok && ch.Old != ch.New {
+			if ch.Old != "" {
+				add("unlabeled", ch.Old, "")
+			}
+			if ch.New != "" {
+				add("labeled", ch.New, "")
+			}
+		}
+	}
+	if ch, ok := c.Changes["assignee"]; ok && ch.Old != ch.New {
+		if ch.Old != "" {
+			add("unassigned", "", ch.Old)
+		}
+		if ch.New != "" {
+			add("assigned", "", ch.New)
+		}
+	}
+	if ch, ok := c.Changes["state"]; ok {
+		switch {
+		case closedStates[ch.New] && !closedStates[ch.Old]:
+			add("closed", "", "")
+		case closedStates[ch.Old] && !closedStates[ch.New]:
+			add("reopened", "", "")
+		}
+	}
+	return out
 }
 
 // participant is a pull request's reviewer or other participant, and what they said.
@@ -128,6 +189,10 @@ func (p forgePullJSON) item(repo string) Item {
 		i.State = "closed"
 	}
 	i.Review = p.review()
+	i.HeadRef, i.BaseRef = p.Source.Branch.Name, p.Destination.Branch.Name
+	if i.State == "merged" && p.MergeCommit != nil {
+		i.MergeCommit = p.MergeCommit.Hash
+	}
 	return i
 }
 
@@ -151,6 +216,37 @@ func (p forgePullJSON) review() string {
 		return "review_required"
 	}
 	return ""
+}
+
+// reviewers are a pull request's reviewers, each once: a participant who approved or asked for
+// changes by that, and a reviewer who has not yet pending. Bitbucket has no review that only
+// comments: a participant who commented and is no reviewer is not one.
+func (p forgePullJSON) reviewers() []Reviewer {
+	out := []Reviewer{}
+	seen := map[string]bool{}
+	add := func(u *user, state string) {
+		if login := u.name(); login != "" && !seen[login] {
+			seen[login] = true
+			out = append(out, Reviewer{Login: login, Avatar: u.avatar(), State: state})
+		}
+	}
+	for _, r := range p.Participants {
+		switch {
+		case r.State == "changes_requested":
+			add(&r.User, "changes_requested")
+		case r.Approved || r.State == "approved":
+			add(&r.User, "approved")
+		}
+	}
+	for _, r := range p.Participants {
+		if r.Role == "REVIEWER" {
+			add(&r.User, "pending")
+		}
+	}
+	for _, r := range p.Reviewers {
+		add(&r, "pending")
+	}
+	return out
 }
 
 // forgeItem is an issue as a list says it.
@@ -443,16 +539,35 @@ func (b *RealBitbucket) ItemPage(ctx context.Context, repo string, number int, p
 		d.Thread = append(d.Thread, Comment{Author: by.name(), Avatar: by.avatar(), Body: c.Content.Raw, At: c.CreatedOn, URL: c.Links.HTML.Href, Bot: isBot(by.name(), by.Type)})
 	}
 	if !pr {
+		// The changes are the one read more of an issue's page, and a nicety (#4626).
+		d.Events = []Event{}
+		var changes paged[changeJSON]
+		if err := b.get(ctx, fmt.Sprintf("%s/issues/%d/changes?pagelen=100", repoPath(repo), number), false, &changes); err == nil {
+			for _, c := range changes.Values {
+				d.Events = append(d.Events, c.events()...)
+			}
+			slices.SortStableFunc(d.Events, func(a, b Event) int { return strings.Compare(a.At, b.At) })
+		}
 		return d, nil
 	}
 	d.Head = p.Source.hash()
-	files, _, err := all[struct {
-		Status string `json:"status"`
-	}](ctx, b, fmt.Sprintf("%s/pullrequests/%d/diffstat", repoPath(repo), number), false)
+	files, _, err := all[fileJSON](ctx, b, fmt.Sprintf("%s/pullrequests/%d/diffstat", repoPath(repo), number), false)
 	if err != nil {
 		return ItemDetail{}, err
 	}
 	d.FilesChanged = len(files)
+	additions, deletions := 0, 0
+	for _, f := range files {
+		additions, deletions = additions+f.Added, deletions+f.Removed
+	}
+	// The commits are the one read more of a pull request's page, and a nicety: without them it
+	// has no size.
+	if commits, _, err := all[struct {
+		Hash string `json:"hash"`
+	}](ctx, b, fmt.Sprintf("%s/pullrequests/%d/commits", repoPath(repo), number), false); err == nil {
+		d.Size = &Size{Additions: additions, Deletions: deletions, Commits: len(commits)}
+	}
+	d.Reviewers = p.reviewers()
 	if d.State == "open" {
 		d.Mergeable = "mergeable"
 		for _, f := range files {
@@ -469,7 +584,11 @@ func (b *RealBitbucket) ItemPage(ctx context.Context, repo string, number int, p
 			return ItemDetail{}, err
 		}
 		for _, s := range statuses {
-			d.CheckRuns = append(d.CheckRuns, CheckRun{Name: s.title(), State: checkState(s.State), URL: s.URL, Run: PipelineRun(s.URL)})
+			run := CheckRun{Name: s.title(), State: checkState(s.State), URL: s.URL, Run: PipelineRun(s.URL), StartedAt: s.CreatedOn}
+			if run.State != "running" && s.CreatedOn != "" {
+				run.FinishedAt = s.UpdatedOn
+			}
+			d.CheckRuns = append(d.CheckRuns, run)
 		}
 		if state := combined(statuses); state != "" {
 			d.Checks = checkState(state)

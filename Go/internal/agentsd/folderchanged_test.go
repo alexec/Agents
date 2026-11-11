@@ -131,3 +131,27 @@ func TestFolderChangedOneChangeAtWindowEnd(t *testing.T) {
 		return seen[one] && seen[two]
 	})
 }
+
+// #4666: a window that ends after Shutdown reads no summary. Reading one reads your
+// policy, whose first read makes the first-start move into the root, which a test's
+// TempDir cleanup was removing (BenchmarkChangeAgent).
+func TestFolderChangedNotAfterShutdown(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	clock := &windowClock{}
+	d.folderAfter = clock.after
+	folder := t.TempDir()
+	a := seeded(t, d, folder, nil)
+	d.change(a.ID, func(a *wire.Agent) { a.Title = nil })
+	d.Shutdown()
+	if n := clock.advance(folderChangedWindow); n != 1 {
+		t.Fatalf("%d windows ended, want 1", n)
+	}
+	// A send that ran would have closed the folder's window.
+	time.Sleep(100 * time.Millisecond)
+	d.folderChangedMu.Lock()
+	open := d.folderDirty[folder]
+	d.folderChangedMu.Unlock()
+	if !open {
+		t.Fatal("the folder's summary was read after Shutdown")
+	}
+}

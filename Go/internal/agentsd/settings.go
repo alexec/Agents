@@ -267,7 +267,17 @@ func parsePersona(text, id, origin string) wire.Persona {
 			if d, ok := mapping["description"].Text(); ok && d != "" {
 				p.Description = &d
 			}
-			return p
+			if n, ok := mapping["keywords"]; ok {
+				words, ok := n.Values()
+				if !ok {
+					err = &yamlnode.Failure{Message: "`keywords:` must be a list of words"}
+				} else {
+					p.Keywords = keywords(words)
+				}
+			}
+			if err == nil {
+				return p
+			}
 		}
 	}
 	problem := "The metadata could not be read"
@@ -276,6 +286,22 @@ func parsePersona(text, id, origin string) wire.Persona {
 	}
 	p.Problem = &problem
 	return p
+}
+
+// keywords is a persona's `keywords:` (#4559), each once, blanks left out. None at all
+// is nil, so its name and description are the words.
+func keywords(words []string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, w := range words {
+		w = strings.TrimSpace(w)
+		if w == "" || seen[strings.ToLower(w)] {
+			continue
+		}
+		seen[strings.ToLower(w)] = true
+		out = append(out, w)
+	}
+	return out
 }
 
 // workflowSettings is WorkflowFile.settings(from:).

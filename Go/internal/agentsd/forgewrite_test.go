@@ -41,9 +41,24 @@ func (f *fakeForgeGitHub) SetState(_ context.Context, repo string, number int, c
 	return nil
 }
 
+func (f *fakeForgeGitHub) CloseAs(_ context.Context, repo string, number int, reason string) error {
+	f.note("close %s#%d %s", repo, number, reason)
+	return nil
+}
+
 func (f *fakeForgeGitHub) MergeBy(_ context.Context, repo string, number int, sha, method string, auto bool) (map[string]any, error) {
 	f.note("merge %s#%d %s %s auto=%v", repo, number, sha, method, auto)
 	return map[string]any{"url": "https://github.com/" + repo + "/pull/12"}, nil
+}
+
+func (f *fakeForgeGitHub) DisableAutoMerge(_ context.Context, repo string, number int) error {
+	f.note("auto-merge off %s#%d", repo, number)
+	return nil
+}
+
+func (f *fakeForgeGitHub) MarkReady(_ context.Context, repo string, number int) error {
+	f.note("ready %s#%d", repo, number)
+	return nil
 }
 
 func (f *fakeForgeGitHub) ReviewPR(_ context.Context, repo string, number int, sha string, approve bool, _ string) (map[string]any, error) {
@@ -88,6 +103,11 @@ func (f *fakeForgeGitLab) SetLabels(_ context.Context, project string, number in
 	return nil
 }
 
+func (f *fakeForgeGitLab) SetAssignees(_ context.Context, project string, number int, mr bool, add, remove []string) error {
+	f.note("assignees %s %d mr=%v +%s -%s", project, number, mr, strings.Join(add, ","), strings.Join(remove, ","))
+	return nil
+}
+
 func (f *fakeForgeGitLab) SetState(_ context.Context, project string, number int, mr, closed bool) error {
 	f.note("state %s %d mr=%v closed=%v", project, number, mr, closed)
 	return nil
@@ -99,6 +119,16 @@ func (f *fakeForgeGitLab) MergeMethods(context.Context, string) ([]string, error
 
 func (f *fakeForgeGitLab) Merge(_ context.Context, project string, number int, sha string, squash, auto bool) error {
 	f.note("merge %s %d %s squash=%v auto=%v", project, number, sha, squash, auto)
+	return nil
+}
+
+func (f *fakeForgeGitLab) CancelAutoMerge(_ context.Context, project string, number int) error {
+	f.note("auto-merge off %s %d", project, number)
+	return nil
+}
+
+func (f *fakeForgeGitLab) MarkReady(_ context.Context, project string, number int) error {
+	f.note("ready %s %d", project, number)
 	return nil
 }
 
@@ -170,8 +200,11 @@ func TestForgeIssueWritesGoToGitHub(t *testing.T) {
 	c.call(t, 3, "forge/label", wire.ForgeLabelRequest{Node: ghIssue, Add: []string{"bug", " bug "}, Remove: []string{"odd"}})
 	c.call(t, 4, "forge/close", wire.ForgeCloseRequest{Node: ghIssue})
 	c.call(t, 5, "forge/close", wire.ForgeCloseRequest{Node: ghIssue, Reopen: new(true)})
+	c.call(t, 8, "forge/assign", wire.ForgeAssignRequest{Node: ghIssue, Add: []string{" @kim ", "Kim", "lee"}, Remove: []string{"odd"}})
+	c.call(t, 9, "forge/assign", wire.ForgeAssignRequest{Node: ghIssue, Remove: []string{"lee"}})
 	want := []string{"comment alexec/agents#7 Looks good.", "labels alexec/agents#7 +bug -odd",
-		"state alexec/agents#7 closed=true", "state alexec/agents#7 closed=false"}
+		"state alexec/agents#7 closed=true", "state alexec/agents#7 closed=false",
+		"assign alexec/agents#7 [kim lee]", "unassign alexec/agents#7 [odd]", "unassign alexec/agents#7 [lee]"}
 	if got := gh.writes(); !slices.Equal(got, want) {
 		t.Fatalf("writes:\n%q\nwant\n%q", got, want)
 	}
@@ -185,6 +218,44 @@ func TestForgeIssueWritesGoToGitHub(t *testing.T) {
 	json.Unmarshal(c.call(t, 7, "forge/labels", wire.ForgeNodeRequest{Node: ghIssue}), &labels)
 	if len(labels.Labels) != 2 || deref(labels.Labels[0].Color) != "#d73a4a" {
 		t.Fatalf("labels: %+v", labels)
+	}
+}
+
+// #4404: a GitHub issue closes as not planned, and its open page offers it; a pull request, a
+// reason with a reopen, and a forge that keeps no reason (GitLab) are refused, each saying why.
+func TestForgeCloseAsNotPlanned(t *testing.T) {
+	_, c, gh, gl, _, _ := allForgesDaemon(t)
+	var page wire.ForgeItemDetail
+	json.Unmarshal(c.call(t, 1, "forge/issue", wire.ForgeItemRequest{Node: ghIssue}), &page)
+	if !slices.Contains(page.Actions, wire.ForgeActionCloseNotPlanned) {
+		t.Fatalf("an open GitHub issue's actions: %v", page.Actions)
+	}
+	notPlanned, completed := wire.ForgeCloseReasonNotPlanned, wire.ForgeCloseReasonCompleted
+	c.call(t, 2, "forge/close", wire.ForgeCloseRequest{Node: ghIssue, Reason: &notPlanned})
+	c.call(t, 3, "forge/close", wire.ForgeCloseRequest{Node: ghIssue, Reason: &completed})
+	if got, want := gh.writes(), []string{"close alexec/agents#7 not_planned", "state alexec/agents#7 closed=true"}; !slices.Equal(got, want) {
+		t.Fatalf("writes:\n%q\nwant\n%q", got, want)
+	}
+	for i, ask := range []struct {
+		r    wire.ForgeCloseRequest
+		says string
+	}{
+		{wire.ForgeCloseRequest{Node: ghPull, Reason: &notPlanned}, githubPRNoReason},
+		{wire.ForgeCloseRequest{Node: ghIssue, Reopen: new(true), Reason: &notPlanned}, "no reopen"},
+		{wire.ForgeCloseRequest{Node: ghIssue, Reason: new(wire.ForgeCloseReason("wontfix"))}, "completed or not_planned"},
+		{wire.ForgeCloseRequest{Node: wire.LineageNode{Kind: "issue", Ref: "gitlab:group/app#3"}, Reason: &notPlanned}, forgeNoNotPlanned},
+	} {
+		if e := c.callError(t, 10+i, "forge/close", ask.r); e == nil || !strings.Contains(e.Message, ask.says) {
+			t.Errorf("%+v: %v, want %q", ask.r, e, ask.says)
+		}
+	}
+	if len(gh.writes()) != 2 {
+		t.Fatalf("a refused close wrote: %q", gh.writes())
+	}
+	gl.mu.Lock()
+	defer gl.mu.Unlock()
+	if len(gl.wrote) > 0 {
+		t.Fatalf("GitLab wrote: %q", gl.wrote)
 	}
 }
 
@@ -240,6 +311,54 @@ func TestForgePullWritesGoToGitHub(t *testing.T) {
 	}
 }
 
+// #4410: a pull request's auto-merge turns off and a draft is marked ready, on GitHub; an issue
+// is refused before GitHub is asked, and Bitbucket, which has no auto-merge, says why.
+func TestForgeCancelAutoMergeAndReady(t *testing.T) {
+	_, c, gh, _ := forgeDaemon(t)
+	c.call(t, 1, "forge/cancel-auto-merge", wire.ForgeNodeRequest{Node: ghPull})
+	c.call(t, 2, "forge/ready", wire.ForgeNodeRequest{Node: ghPull})
+	for i, m := range []string{"forge/cancel-auto-merge", "forge/ready"} {
+		if e := c.callError(t, 3+i, m, wire.ForgeNodeRequest{Node: ghIssue}); e == nil || !strings.Contains(e.Message, "not a pull request") {
+			t.Fatalf("%s on an issue: %v", m, e)
+		}
+	}
+	want := []string{"auto-merge off alexec/agents#12", "ready alexec/agents#12"}
+	if got := gh.writes(); !slices.Equal(got, want) {
+		t.Fatalf("writes:\n%q\nwant\n%q", got, want)
+	}
+	var b Forge = bitbucketForge{}
+	if err := b.CancelAutoMerge(context.Background(), forgeRef{}); cannotReason(b, err) != bitbucketNoAutoMerge {
+		t.Fatalf("Bitbucket: %v", err)
+	}
+}
+
+// #4410: the page offers Turn off auto-merge only while it is on, and Ready for review only on a
+// draft, and neither once the pull request is closed.
+func TestForgeItemActionsFollowAutoMergeAndDraft(t *testing.T) {
+	caps := githubForge{}.Caps()
+	for _, tc := range []struct {
+		state       string
+		auto, draft bool
+		want        []wire.ForgeAction
+	}{
+		{"open", true, false, []wire.ForgeAction{wire.ForgeActionCancelAutoMerge}},
+		{"open", false, true, []wire.ForgeAction{wire.ForgeActionReady}},
+		{"open", false, false, nil},
+		{"closed", true, true, nil},
+	} {
+		d := wire.ForgeItemDetail{Item: wire.ForgeItem{Node: ghPull, State: tc.state, AutoMerge: new(tc.auto), Draft: new(tc.draft)}}
+		var got []wire.ForgeAction
+		for _, a := range caps.itemActions(d) {
+			if a == wire.ForgeActionCancelAutoMerge || a == wire.ForgeActionReady {
+				got = append(got, a)
+			}
+		}
+		if !slices.Equal(got, tc.want) {
+			t.Errorf("%s auto=%v draft=%v: %v, want %v", tc.state, tc.auto, tc.draft, got, tc.want)
+		}
+	}
+}
+
 // #3130: a write says what is wrong with it, and asks the forge nothing: an empty comment, no
 // label, a merge with no head, a pull request's action on an issue, a forge it does not know.
 func TestForgeWritesRefuseWhatIsWrong(t *testing.T) {
@@ -250,6 +369,9 @@ func TestForgeWritesRefuseWhatIsWrong(t *testing.T) {
 	}{
 		{"forge/comment", wire.ForgeCommentRequest{Node: ghIssue, Body: "  "}},
 		{"forge/label", wire.ForgeLabelRequest{Node: ghIssue, Add: []string{" "}}},
+		{"forge/assign", wire.ForgeAssignRequest{Node: ghIssue, Add: []string{" @ "}}},
+		{"forge/assign", wire.ForgeAssignRequest{Node: ghIssue, Add: []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k"}}},
+		{"forge/assign", wire.ForgeAssignRequest{Node: wire.LineageNode{Kind: "issue", Ref: "linear:ENG-4"}, Add: []string{"kim"}}},
 		{"forge/merge", wire.ForgeMergeRequest{Node: ghPull}},
 		{"forge/approve", wire.ForgeApproveRequest{Node: ghIssue, Sha: "abc"}},
 		{"forge/rerun", wire.ForgeNodeRequest{Node: ghIssue}},
@@ -266,7 +388,7 @@ func TestForgeWritesRefuseWhatIsWrong(t *testing.T) {
 
 // #3130: an agent's connection may call none of the writes: a person writes, from their own page.
 func TestForgeWritesAreNotAnAgents(t *testing.T) {
-	for _, m := range []string{"forge/comment", "forge/label", "forge/close", "forge/merge", "forge/approve", "forge/rerun"} {
+	for _, m := range []string{"forge/comment", "forge/label", "forge/assign", "forge/close", "forge/merge", "forge/cancel-auto-merge", "forge/ready", "forge/approve", "forge/rerun"} {
 		if RoleAgent.Allows(m) {
 			t.Fatalf("an agent may call %s", m)
 		}
@@ -289,11 +411,13 @@ func TestForgeWritesGoToGitLabAndLinear(t *testing.T) {
 	c.call(t, 5, "forge/approve", wire.ForgeApproveRequest{Node: mr, Sha: "head4"})
 	c.call(t, 6, "forge/rerun", wire.ForgeNodeRequest{Node: mr})
 	c.call(t, 7, "forge/log", wire.ForgeLogRequest{Node: mr, Check: new("check: test")})
+	c.call(t, 8, "forge/assign", wire.ForgeAssignRequest{Node: mr, Add: []string{"kim"}, Remove: []string{"lee"}})
 	gl.mu.Lock()
 	got := slices.Clone(gl.wrote)
 	gl.mu.Unlock()
 	want := []string{"comment Group/App 4 mr=true Fine.", "merge Group/App 4 head4 squash=false auto=false",
-		"merge Group/App 4 head4 squash=true auto=true", "approve Group/App 4 head4", "retry Group/App 99", "log Group/App 99 test"}
+		"merge Group/App 4 head4 squash=true auto=true", "approve Group/App 4 head4", "retry Group/App 99", "log Group/App 99 test",
+		"assignees Group/App 4 mr=true +kim -lee"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("GitLab writes:\n%q\nwant\n%q", got, want)
 	}

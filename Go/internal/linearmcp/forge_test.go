@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -23,6 +24,16 @@ const forgeSearchAnswer = `{"data":{"issues":{"pageInfo":{"hasNextPage":true,"en
 
 const forgeItemAnswer = `{"data":{"issue":{"identifier":"ENG-4","title":"Sync the billing export","url":"u","updatedAt":"2026-11-01T10:00:00.000Z",
  "team":{"key":"ENG"},"state":{"type":"completed"},"labels":{"nodes":[]},"commentCount":{"nodes":[{}]},"description":"The body.",
+ "attachments":{"nodes":[
+  {"url":"https://github.com/Alexec/Agents/pull/12","title":"Export billing","sourceType":"github","metadata":{"status":"merged"}},
+  {"url":"https://gitlab.com/acme/web/app/-/merge_requests/3","title":"Fix","sourceType":"gitlab","metadata":{"state":"opened"}},
+  {"url":"https://github.com/alexec/agents/issues/9","title":"An issue","sourceType":"github","metadata":{}},
+  {"url":"https://figma.com/f","title":"A design","sourceType":"figma","metadata":{}}]},
+ "history":{"nodes":[
+  {"createdAt":"2026-11-01T10:03:00.000Z","actor":{"displayName":"kim"},"fromState":{"type":"started"},"toState":{"type":"completed"}},
+  {"createdAt":"2026-11-01T10:02:00.000Z","actor":{"displayName":"kim"},"fromAssignee":{"displayName":"alex"},"toAssignee":{"displayName":"kim"}},
+  {"createdAt":"2026-11-01T10:01:00.000Z","botActor":{"name":"GitHub"},"addedLabels":[{"name":"Bug","color":"#EB5757"}],"removedLabels":[{"name":"Idea","color":"#000000"}]},
+  {"createdAt":"2026-11-01T10:00:30.000Z","actor":{"displayName":"kim"},"fromState":{"type":"completed"},"toState":{"type":"started"}}]},
  "comments":{"pageInfo":{"hasNextPage":true,"endCursor":"older"},"nodes":[
   {"body":"Newest.","createdAt":"2026-11-01T10:02:00.000Z","url":"c2","user":null,"botActor":{"name":"GitHub"}},
   {"body":"Oldest.","createdAt":"2026-11-01T10:01:00.000Z","url":"c1","user":{"displayName":"kim","avatarUrl":"https://public.linear.app/k/avatar"}}]}}}}`
@@ -155,5 +166,33 @@ func TestItemDates(t *testing.T) {
 		if i := n.item(); i.CreatedAt != "2026-10-01T10:00:00.000Z" || i.ClosedAt != c.closed {
 			t.Errorf("%s: %q %q", c.json, i.CreatedAt, i.ClosedAt)
 		}
+	}
+}
+
+// #4626: an issue's read has the pull requests and merge requests its attachments link to,
+// and what its changes did, oldest first; other attachments are left out.
+func TestForgeItemPageLinksAndEvents(t *testing.T) {
+	l, _ := forgeLinear(t)
+	d, err := l.ItemPage(context.Background(), "ENG-4", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pulls := []LinkedPull{
+		{Forge: "github", Repo: "Alexec/Agents", Number: 12, Title: "Export billing", URL: "https://github.com/Alexec/Agents/pull/12", State: "merged"},
+		{Forge: "gitlab", Repo: "acme/web/app", Number: 3, Title: "Fix", URL: "https://gitlab.com/acme/web/app/-/merge_requests/3", State: "open"},
+	}
+	if !reflect.DeepEqual(d.LinkedPulls, pulls) {
+		t.Errorf("pulls: %+v", d.LinkedPulls)
+	}
+	events := []Event{
+		{Kind: "reopened", Actor: "kim", At: "2026-11-01T10:00:30.000Z"},
+		{Kind: "labeled", Actor: "GitHub", At: "2026-11-01T10:01:00.000Z", Label: "Bug", LabelColor: "#EB5757"},
+		{Kind: "unlabeled", Actor: "GitHub", At: "2026-11-01T10:01:00.000Z", Label: "Idea", LabelColor: "#000000"},
+		{Kind: "unassigned", Actor: "kim", At: "2026-11-01T10:02:00.000Z", Assignee: "alex"},
+		{Kind: "assigned", Actor: "kim", At: "2026-11-01T10:02:00.000Z", Assignee: "kim"},
+		{Kind: "closed", Actor: "kim", At: "2026-11-01T10:03:00.000Z"},
+	}
+	if !reflect.DeepEqual(d.Events, events) {
+		t.Errorf("events: %+v", d.Events)
 	}
 }

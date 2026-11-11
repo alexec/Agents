@@ -739,6 +739,8 @@ type jobJSON struct {
 	Status       string `json:"status"`
 	WebURL       string `json:"web_url"`
 	AllowFailure bool   `json:"allow_failure"`
+	StartedAt    string `json:"started_at"`
+	FinishedAt   string `json:"finished_at"`
 }
 
 func (g *RealGitLab) PipelineDetails(ctx context.Context, project string, p Pipeline) (*FailedPipelineData, error) {

@@ -66,8 +66,11 @@ const CapFoldersNotCommitted1 = "folders.not-committed/1"
 const CapFoldersToMachine1 = "folders.to-machine/1"
 const CapFolders1 = "folders/1"
 const CapForgeWrite1 = "forge-write/1"
+const CapForgeAssign1 = "forge.assign/1"
 const CapForgeBoards1 = "forge.boards/1"
+const CapForgeCancelAutoMerge1 = "forge.cancel-auto-merge/1"
 const CapForgeImage1 = "forge.image/1"
+const CapForgeReady1 = "forge.ready/1"
 const CapForgeReleases1 = "forge.releases/1"
 const CapForge1 = "forge/1"
 const CapGit1 = "git/1"
@@ -198,6 +201,7 @@ const CapUser2 = "user/2"
 const CapUser3 = "user/3"
 const CapViews1 = "views/1"
 const CapWake1 = "wake/1"
+const CapWorkFeatures1 = "work.features/1"
 const CapWorkTimeline1 = "work.timeline/1"
 const CapWorkflow1 = "workflow/1"
 const CapWorkflows1 = "workflows/1"
@@ -369,8 +373,10 @@ var HostCapabilities = pairs([][2]string{
 	{"folders/undoGuardedChange", "folders/1"},
 	{"forge/add-child", "forge-write/1"},
 	{"forge/approve", "forge-write/1"},
+	{"forge/assign", "forge.assign/1"},
 	{"forge/blocked-by", "forge-write/1"},
 	{"forge/boards", "forge.boards/1"},
+	{"forge/cancel-auto-merge", "forge.cancel-auto-merge/1"},
 	{"forge/close", "forge-write/1"},
 	{"forge/comment", "forge-write/1"},
 	{"forge/diff", "forge-write/1"},
@@ -385,6 +391,7 @@ var HostCapabilities = pairs([][2]string{
 	{"forge/plan", "forge/1"},
 	{"forge/pull", "forge/1"},
 	{"forge/pulls", "forge/1"},
+	{"forge/ready", "forge.ready/1"},
 	{"forge/release", "forge.releases/1"},
 	{"forge/releases", "forge.releases/1"},
 	{"forge/rerun", "forge-write/1"},
@@ -571,6 +578,7 @@ var HostCapabilities = pairs([][2]string{
 	{"wake/set", "wake/1"},
 	{"wake/settings", "wake/1"},
 	{"wake/state", "wake/1"},
+	{"work/features", "work.features/1"},
 	{"work/timeline", "work.timeline/1"},
 	{"workflows/approve", "workflows/1"},
 	{"workflows/archive", "workflows/1"},

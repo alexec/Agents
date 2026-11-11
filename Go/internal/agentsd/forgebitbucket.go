@@ -39,6 +39,8 @@ type forgeBitbucket interface {
 	RepoLabels(ctx context.Context, repo string) ([]string, error)
 	MergeMethods(ctx context.Context, repo string, number int) ([]string, error)
 	Merge(ctx context.Context, repo string, number int, sha, method string) error
+	// MarkReady marks a draft pull request ready for review (#4410).
+	MarkReady(ctx context.Context, repo string, number int) error
 	Approve(ctx context.Context, repo string, number int, sha string) (string, error)
 	PRDiff(ctx context.Context, repo string, number int) (map[string]any, error)
 	RetryPipeline(ctx context.Context, repo string, run int) (map[string]any, error)
@@ -131,17 +133,25 @@ func (bitbucketForge) Caps() forgeCaps {
 	return forgeCaps{
 		Issues: true, PRs: true,
 		Issue:       forgeActions{Comment: true, Label: true, Close: true, Reopen: true},
-		PR:          forgeActions{Comment: true, Close: true, Merge: true, Approve: true, Rerun: true, Log: true, Diff: true},
+		PR:          forgeActions{Comment: true, Close: true, Merge: true, Approve: true, Rerun: true, Log: true, Diff: true, Ready: true},
 		Avatars:     true,
 		StateReason: true,
-		// Bitbucket says when an item opened, but no time that it closed or merged.
+		// Bitbucket says when an item opened, but no time that it closed or merged: a pull
+		// request's activity has it, a read more for each item of a list (#4626).
 		CreatedAt: true,
+		// An issue's changes: its kind and component (its labels), assignee and state (#4626).
+		Events: true,
+		// A pull request's branches and merge (#4409), its size, reviewers and its statuses' times
+		// (#4682). Bitbucket says no issue that a pull request closes.
+		Branches: true, MergeCommit: true, Size: true, Reviewers: true, CheckTimes: true,
 		// An issue's comment count is on its own page only.
 		CommentCount: "detail",
 		Reasons: map[string]string{
-			actionReleases: "Bitbucket Cloud has no releases, only tags",
+			actionAssign:     "the app does not set a Bitbucket issue's assignee yet, and a pull request has reviewers, not assignees",
+			actionReleases:   "Bitbucket Cloud has no releases, only tags",
 			actionTransition: "only a Jira issue or an Azure Boards work item moves by a transition",
 			actionAutoMerge:  bitbucketNoAutoMerge,
+			actionCancelAuto: bitbucketNoAutoMerge,
 			actionLabel:      bitbucketmcp.NoPRLabels,
 			actionReopen:     bitbucketNoReopen,
 			actionPlan:       bitbucketNoPlan,
@@ -240,14 +250,29 @@ func (b bitbucketForge) Item(ctx context.Context, r forgeRef, cursor string) (wi
 	}
 	if !p.PR {
 		out.Start = bitbucketStart(out.Item, r.Number)
+		out.Events = []wire.ForgeEvent{}
+		for _, e := range p.Events {
+			ev := wire.ForgeEvent{Kind: wire.ForgeEventKind(e.Kind), Actor: optional(e.Actor), At: forgeDate(e.At), Assignee: optional(e.Assignee)}
+			if e.Label != "" {
+				ev.Label = &wire.ForgeLabel{Name: e.Label}
+			}
+			out.Events = append(out.Events, ev)
+		}
 		return out, nil
 	}
 	out.Checks = []wire.ForgeCheck{}
 	for _, c := range p.CheckRuns {
-		out.Checks = append(out.Checks, wire.ForgeCheck{Name: c.Name, State: c.State, URL: optional(c.URL)})
+		out.Checks = append(out.Checks, forgeCheckOf(c.Name, c.State, c.URL, c.StartedAt, c.FinishedAt))
 	}
 	out.ReviewThreads, out.FilesChanged = new(int64(p.ReviewThreads)), new(int64(p.FilesChanged))
 	out.Head = optional(p.Head)
+	if p.Size != nil {
+		withPullSize(&out, p.Size.Additions, p.Size.Deletions, p.Size.Commits)
+	}
+	out.Reviewers = []wire.ForgeReviewer{}
+	for _, r := range p.Reviewers {
+		out.Reviewers = append(out.Reviewers, forgeReviewerOf(r.Login, r.Avatar, r.State))
+	}
 	// The merge menu is a nicety: a page still reads when Bitbucket does not say the branch's.
 	if p.State == "open" {
 		if methods, err := bb.MergeMethods(ctx, named, r.Number); err == nil {
@@ -383,6 +408,17 @@ func (b bitbucketForge) Merge(ctx context.Context, r forgeRef, sha, how string, 
 	return wire.ForgeDone{}, bb.Merge(ctx, named, r.Number, sha, how)
 }
 
+func (b bitbucketForge) Ready(ctx context.Context, r forgeRef) error {
+	if !r.pr() {
+		return cannot(actionReady)
+	}
+	bb, named, _, err := b.of(ctx, "forge/ready", r)
+	if err != nil {
+		return err
+	}
+	return bb.MarkReady(ctx, named, r.Number)
+}
+
 func (b bitbucketForge) Approve(ctx context.Context, r forgeRef, sha string) (wire.ForgeDone, error) {
 	if !r.pr() {
 		return wire.ForgeDone{}, cannot(actionApprove)
@@ -465,6 +501,7 @@ func bitbucketItemOf(i bitbucketmcp.Item, folder string) wire.ForgeItem {
 		// Bitbucket has no merge when checks pass.
 		out.Draft, out.AutoMerge = new(i.Draft), new(false)
 		out.Checks, out.Review, out.Mergeable = optional(i.Checks), optional(i.Review), optional(i.Mergeable)
+		withPullRefs(&out, i.HeadRef, i.BaseRef, "", i.MergeCommit)
 		return out
 	}
 	// An issue's level and feature are its labels' (its component); Bitbucket has no parent.

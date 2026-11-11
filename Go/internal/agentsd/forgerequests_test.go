@@ -26,6 +26,11 @@ func (f *fakeForgeGitHub) Unassign(_ context.Context, repo string, number int, l
 	return nil
 }
 
+func (f *fakeForgeGitHub) Assign(_ context.Context, repo string, number int, logins []string) error {
+	f.note("assign %s#%d %v", repo, number, logins)
+	return nil
+}
+
 const todoBody = "Why.\n\n## What Alex does\n\n- [ ] Sign in to gitlab.com\n- [x] Make a token\n- [ ] Paste it\n\n## Notes\n\n- [ ] not a step\n"
 
 func TestChecklistIsReadAndTicked(t *testing.T) {

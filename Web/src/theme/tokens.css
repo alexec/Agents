@@ -1,0 +1,67 @@
+/* Made by scripts/design.sh gen from design/tokens.json (#4602). Do not edit: change the
+   JSON and run gen again. */
+
+:root {
+  color-scheme: light dark;
+  /* The page every column sits on. */
+  --paper-ground: #f7f8f9;
+  /* The folders column, one shade deeper. */
+  --paper-sidebar: #f0f1f3;
+  /* What floats: the prompt bar, cards, menus. */
+  --paper-raised: #ffffff;
+  /* What is set into the page: code, your own message. */
+  --paper-well: #f0f2f4;
+  /* A row under the pointer, a picked item. */
+  --paper-wash: #e7eaee;
+  /* Hairlines between rows, and round raised things. */
+  --paper-rule: #dde1e6;
+  /* Text, and the prominent button's fill. */
+  --paper-ink: #1c1d20;
+  /* A selection. Nothing is drawn in the accent on it. */
+  --paper-selection: #d8dee6;
+  /* Under a raised thing: short and neutral, paper lifted a little off the desk. */
+  --paper-shadow: rgb(32 36 42 / 10%);
+  /* The app icon's cobalt: links, focus, controls and the prominent button's fill. */
+  --accent: #1f5fc8;
+  accent-color: var(--accent);
+  /* Needs you; the only tint drawn in a list. */
+  --tint-attention: #ba4a13;
+  /* Failed. */
+  --tint-failure: #b4232b;
+  /* Approved, done: an ending the app can vouch for. */
+  --tint-vouched: #2d765c;
+  /* A label naming an issue, #12. */
+  --label-issue: #0e6b82;
+  /* A label naming a pull request, P#12. */
+  --label-pull: #7442b8;
+  /* Chips, the rail, inputs. */
+  --radius-control: 7px;
+  /* Rows, wells, cards. */
+  --radius-card: 10px;
+  /* Sheets, menus, the prompt bar (web). */
+  --radius-floating: 16px;
+  /* The system's sans-serif, for everything a person reads. Nothing is loaded from the network. */
+  --font-text: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  /* The system's monospace, for code. */
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper-ground: #1c1d20;
+    --paper-sidebar: #161719;
+    --paper-raised: #26282c;
+    --paper-well: #2a2d31;
+    --paper-wash: #33363b;
+    --paper-rule: #3a3e44;
+    --paper-ink: #e8eaed;
+    --paper-selection: #3a3e44;
+    --paper-shadow: rgb(0 0 0 / 10%);
+    --accent: #7fb0ff;
+    --tint-attention: #f0a06b;
+    --tint-failure: #f08086;
+    --tint-vouched: #8bc6a7;
+    --label-issue: #6cc6db;
+    --label-pull: #b79af0;
+  }
+}

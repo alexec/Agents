@@ -77,6 +77,8 @@ type forgeGitHub interface {
 	Releases(ctx context.Context, repo string, limit int) ([]githubmcp.RepoRelease, error)
 	// Timeline is the epics and releases work/timeline reads (#4172).
 	Timeline(ctx context.Context, repo, since string) (githubmcp.Timeline, error)
+	// Milestones are the open milestones with their due dates (#4654).
+	Milestones(ctx context.Context, repo string) ([]githubmcp.Milestone, error)
 	forgeGitHubWrites
 }
 
@@ -724,6 +726,7 @@ func forgeItemOf(i githubmcp.Item, folder string) wire.ForgeItem {
 	if i.PR {
 		out.Draft, out.AutoMerge = new(i.Draft), new(i.AutoMerge)
 		out.Checks, out.Review, out.Mergeable = optional(i.Checks), optional(i.Review), optional(i.Mergeable)
+		withPullRefs(&out, i.HeadRef, i.BaseRef, i.MergedBy, i.MergeCommit)
 		return out
 	}
 	var parent *wire.LineageNode
@@ -750,6 +753,7 @@ func gitlabItemOf(i gitlabmcp.Item, folder string) wire.ForgeItem {
 	if i.MR {
 		out.Draft, out.AutoMerge = new(i.Draft), new(i.AutoMerge)
 		out.Checks, out.Review, out.Mergeable = optional(i.Checks), optional(i.Review), optional(i.Mergeable)
+		withPullRefs(&out, i.HeadRef, i.BaseRef, i.MergedBy, i.MergeCommit)
 		return out
 	}
 	var parent *wire.LineageNode
@@ -890,6 +894,31 @@ func forgeDate(s string) wire.Date {
 		return 0
 	}
 	return wire.DateOf(t)
+}
+
+// withPullRefs puts a pull request's branches on i, and who merged it and its merge commit when
+// it merged (#4409); a forge's "" is none.
+func withPullRefs(i *wire.ForgeItem, head, base, mergedBy, mergeCommit string) {
+	i.HeadRef, i.BaseRef = optional(head), optional(base)
+	if i.State == "merged" {
+		i.MergedBy, i.MergeCommit = optional(mergedBy), optional(mergeCommit)
+	}
+}
+
+// withPullSize puts a pull request's lines added and deleted and its commits on its page (#4682).
+func withPullSize(d *wire.ForgeItemDetail, additions, deletions, commits int) {
+	d.Additions, d.Deletions, d.Commits = new(int64(additions)), new(int64(deletions)), new(int64(commits))
+}
+
+// forgeReviewerOf is a reviewer in the one model: state is approved, changes_requested,
+// commented or pending (#4682).
+func forgeReviewerOf(login, avatar, state string) wire.ForgeReviewer {
+	return wire.ForgeReviewer{Login: login, Avatar: optional(avatar), State: wire.ForgeReviewerState(state)}
+}
+
+// forgeCheckOf is a check with its times, when the forge gives them (#4682).
+func forgeCheckOf(name, state, url, startedAt, finishedAt string) wire.ForgeCheck {
+	return wire.ForgeCheck{Name: name, State: state, URL: optional(url), StartedAt: forgeDateOptional(startedAt), FinishedAt: forgeDateOptional(finishedAt)}
 }
 
 func optional(s string) *string {

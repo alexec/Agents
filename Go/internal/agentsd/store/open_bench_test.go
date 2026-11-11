@@ -55,6 +55,8 @@ func BenchmarkOpen(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
+	// The archived records' summaries are written, as the host's stop writes them (#4653).
+	s.FlushSummaries()
 	b.ReportAllocs()
 	for b.Loop() {
 		o, err := Open(root)

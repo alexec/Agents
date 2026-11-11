@@ -78,6 +78,11 @@ func (f *fakeForgeForgejo) SetLabels(_ context.Context, repo string, number int,
 	return nil
 }
 
+func (f *fakeForgeForgejo) SetAssignees(_ context.Context, repo string, number int, add, remove []string) error {
+	f.note(&f.wrote, fmt.Sprintf("assignees %s#%d +%v -%v", repo, number, add, remove))
+	return nil
+}
+
 func (f *fakeForgeForgejo) SetState(_ context.Context, repo string, number int, closed bool) error {
 	f.note(&f.wrote, fmt.Sprintf("state %s#%d closed=%v", repo, number, closed))
 	return nil
@@ -93,6 +98,16 @@ func (f *fakeForgeForgejo) MergeMethods(context.Context, string) ([]string, erro
 
 func (f *fakeForgeForgejo) Merge(_ context.Context, repo string, number int, sha, method string, auto bool) error {
 	f.note(&f.wrote, fmt.Sprintf("merge %s#%d %s %s auto=%v", repo, number, sha, method, auto))
+	return nil
+}
+
+func (f *fakeForgeForgejo) CancelAutoMerge(_ context.Context, repo string, number int) error {
+	f.note(&f.wrote, fmt.Sprintf("auto-merge off %s#%d", repo, number))
+	return nil
+}
+
+func (f *fakeForgeForgejo) MarkReady(_ context.Context, repo string, number int) error {
+	f.note(&f.wrote, fmt.Sprintf("ready %s#%d", repo, number))
 	return nil
 }
 

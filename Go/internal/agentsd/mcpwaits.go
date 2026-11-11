@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/alexec/agents/Go/wire"
 )
@@ -420,7 +421,10 @@ func (d *Daemon) checkMCPWait(names []string, filters map[string][]string, folde
 }
 
 // startMCPWait starts a new wait's subscriptions from now: an old wait's record, kept a
-// day, is not where this one starts. Then the next look subscribes.
+// day, is not where this one starts. A record polled less than waitLooksBack ago is kept
+// (#4716): its cursor brings what happened since the last wait stopped, such as a pull
+// request that merged in the seconds between two waits, which a first poll never raises.
+// Then the next look subscribes.
 func (d *Daemon) startMCPWait(check mcpWaitCheck) {
 	if len(check.events) == 0 {
 		return
@@ -428,8 +432,13 @@ func (d *Daemon) startMCPWait(check mcpWaitCheck) {
 	d.mcpEvMu.Lock()
 	cleared := false
 	recs := d.mcpRecordsLocked()
+	recent := time.Now().Add(-waitLooksBack)
 	for _, id := range check.fresh {
-		if d.mcpSubs[id] == nil && recs.Subscriptions[id] != nil {
+		r := recs.Subscriptions[id]
+		if r != nil && r.Cursor != nil && r.LastPolledAt != nil && !r.LastPolledAt.Time().Before(recent) {
+			continue
+		}
+		if d.mcpSubs[id] == nil && r != nil {
 			delete(recs.Subscriptions, id)
 			cleared = true
 		}
@@ -450,7 +459,7 @@ type serverWait struct {
 
 func (d *Daemon) serverWaits() []serverWait {
 	var out []serverWait
-	for _, a := range d.Store.Agents() {
+	for _, a := range d.Store.LiveAgents() {
 		w := a.EventWait
 		if w == nil || w.Ending != nil || len(w.ServerEvents) == 0 {
 			continue

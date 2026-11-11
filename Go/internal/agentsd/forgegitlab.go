@@ -33,12 +33,18 @@ func (gitlabForge) Images() forgeImageHost { return gitlabImages{} }
 func (gitlabForge) Caps() forgeCaps {
 	return forgeCaps{
 		Issues: true, PRs: true,
-		Issue: forgeActions{Comment: true, Label: true, Close: true, Reopen: true},
-		PR: forgeActions{Comment: true, Label: true, Close: true, Reopen: true, Merge: true, AutoMerge: true, Approve: true,
-			Rerun: true, Log: true, Diff: true},
+		Issue: forgeActions{Comment: true, Label: true, Assign: true, Close: true, Reopen: true},
+		PR: forgeActions{Comment: true, Label: true, Assign: true, Close: true, Reopen: true, Merge: true, AutoMerge: true, Approve: true,
+			Rerun: true, Log: true, Diff: true, CancelAutoMerge: true, Ready: true},
 		LabelColors: true,
 		Avatars:     true,
 		CreatedAt:   true, ClosedAt: true,
+		// An issue's child work items and the merge requests that close it (#4626). Its events
+		// are three reads more (label events, state events, system notes): not on the page.
+		Children: true, LinkedPulls: true,
+		// A merge request's branches and merge (#4409); its size, reviewers, the issues of its
+		// project its description closes, and its jobs' times (#4682).
+		Branches: true, MergedBy: true, MergeCommit: true, Size: true, Reviewers: true, Closes: true, CheckTimes: true,
 		CommentCount: "exact",
 		Releases:     true,
 		// X-Total, which GitLab leaves out of a list of over 10,000.
@@ -167,18 +173,45 @@ func (g gitlabForge) Item(ctx context.Context, r forgeRef, cursor string) (wire.
 	if p.MR {
 		out.Checks = []wire.ForgeCheck{}
 		for _, c := range p.CheckRuns {
-			out.Checks = append(out.Checks, wire.ForgeCheck{Name: c.Name, State: c.State, URL: optional(c.URL)})
+			out.Checks = append(out.Checks, forgeCheckOf(c.Name, c.State, c.URL, c.StartedAt, c.FinishedAt))
 		}
 		out.ReviewThreads, out.FilesChanged = new(int64(p.ReviewThreads)), new(int64(p.FilesChanged))
 		out.Head = optional(p.Head)
+		if p.Size != nil {
+			withPullSize(&out, p.Size.Additions, p.Size.Deletions, p.Size.Commits)
+		}
+		if p.Reviewers != nil {
+			out.Reviewers = []wire.ForgeReviewer{}
+			for _, r := range p.Reviewers {
+				out.Reviewers = append(out.Reviewers, forgeReviewerOf(r.Login, r.Avatar, r.State))
+			}
+		}
+		if p.Closes != nil {
+			out.Closes = gitlabLinkedOf(p.Closes)
+		}
 		// The merge menu is a nicety: a page still reads when GitLab does not say the project's.
 		if methods, err := gl.MergeMethods(ctx, project); err == nil {
 			out.MergeMethods = mergeMethodsOf(methods)
 		}
 	} else {
 		out.Start = gitlabStart(out.Item)
+		out.Children, out.LinkedPulls = gitlabLinkedOf(p.Children), gitlabLinkedOf(p.ClosedBy)
 	}
 	return out, nil
+}
+
+// gitlabLinkedOf are an issue's child work items or closing merge requests in the one model (#4626).
+func gitlabLinkedOf(ls []gitlabmcp.Linked) []wire.ForgeLinked {
+	out := []wire.ForgeLinked{}
+	for _, l := range ls {
+		repo := forgeRepo{"gitlab", strings.ToLower(l.Project)}
+		node := repo.issue(l.Number)
+		if l.MR {
+			node = repo.pr(l.Number)
+		}
+		out = append(out, wire.ForgeLinked{Node: node, Title: l.Title, State: l.State, URL: optional(l.URL)})
+	}
+	return out
 }
 
 // Labels are the project's labels, with their colours.
@@ -309,6 +342,14 @@ func (g gitlabForge) SetLabels(ctx context.Context, r forgeRef, add, remove []st
 	return gl.SetLabels(ctx, project, r.Number, r.pr(), add, remove)
 }
 
+func (g gitlabForge) SetAssignees(ctx context.Context, r forgeRef, add, remove []string) error {
+	gl, project, _, err := g.of(ctx, "forge/assign", r)
+	if err != nil {
+		return err
+	}
+	return gl.SetAssignees(ctx, project, r.Number, r.pr(), add, remove)
+}
+
 func (g gitlabForge) SetState(ctx context.Context, r forgeRef, closed bool, transition string) error {
 	if transition != "" {
 		return cannot(actionTransition)
@@ -344,6 +385,28 @@ func (g gitlabForge) Merge(ctx context.Context, r forgeRef, sha, how string, aut
 		return wire.ForgeDone{}, err
 	}
 	return wire.ForgeDone{Auto: optionalTrue(auto)}, nil
+}
+
+func (g gitlabForge) CancelAutoMerge(ctx context.Context, r forgeRef) error {
+	if !r.pr() {
+		return cannot(actionCancelAuto)
+	}
+	gl, project, _, err := g.of(ctx, "forge/cancel-auto-merge", r)
+	if err != nil {
+		return err
+	}
+	return gl.CancelAutoMerge(ctx, project, r.Number)
+}
+
+func (g gitlabForge) Ready(ctx context.Context, r forgeRef) error {
+	if !r.pr() {
+		return cannot(actionReady)
+	}
+	gl, project, _, err := g.of(ctx, "forge/ready", r)
+	if err != nil {
+		return err
+	}
+	return gl.MarkReady(ctx, project, r.Number)
 }
 
 func (g gitlabForge) Approve(ctx context.Context, r forgeRef, sha string) (wire.ForgeDone, error) {

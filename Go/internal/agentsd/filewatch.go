@@ -130,7 +130,7 @@ func (d *Daemon) fileGlobs(folder string) []string {
 			}
 		}
 	}
-	for _, a := range d.Store.Agents() {
+	for _, a := range d.Store.LiveAgents() {
 		if w := a.EventWait; w != nil && w.Ending == nil && folderPath(&a) == folder {
 			for _, p := range waitPatterns(w) {
 				add(p)

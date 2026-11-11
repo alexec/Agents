@@ -37,15 +37,18 @@ func (jiraForge) Caps() forgeCaps {
 		Issue:       forgeActions{Comment: true, Label: true, Close: true, Reopen: true, Transition: true},
 		Avatars:     true,
 		StateReason: true,
-		CreatedAt:   true, ClosedAt: true,
+		CreatedAt:   true, ClosedAt: true, Children: true, Events: true,
 		CommentCount: "exact",
 		// Data Center's search total; Jira Cloud's approximate count.
 		Total: true,
 		Plan:  true,
 		Reasons: map[string]string{
+			actionAssign:   "the app does not set a Jira issue's assignee yet",
 			actionReleases: "Jira has no releases here: its fix versions are not read yet",
 			actionMerge:     jiraNoPRs,
 			actionAutoMerge: jiraNoPRs,
+			actionCancelAuto: jiraNoPRs,
+			actionReady: jiraNoPRs,
 			actionApprove:   jiraNoPRs,
 			actionRerun:     jiraNoPRs,
 			actionLog:       jiraNoPRs,
@@ -166,6 +169,18 @@ func (j jiraForge) Item(ctx context.Context, r forgeRef, cursor string) (wire.Fo
 	}
 	for _, t := range p.Transitions {
 		out.Transitions = append(out.Transitions, wire.ForgeTransition{ID: t.ID, Name: t.Name, Category: optional(t.Category)})
+	}
+	// Its sub-tasks and children, and its changelog (#4626).
+	out.Children, out.Events = []wire.ForgeLinked{}, []wire.ForgeEvent{}
+	for _, c := range p.Children {
+		out.Children = append(out.Children, wire.ForgeLinked{Node: jiraNode(c.Key), Title: c.Title, State: c.State, URL: optional(c.URL)})
+	}
+	for _, e := range p.Events {
+		ev := wire.ForgeEvent{Kind: wire.ForgeEventKind(e.Kind), Actor: optional(e.Actor), At: forgeDate(e.At), Assignee: optional(e.Assignee)}
+		if e.Label != "" {
+			ev.Label = &wire.ForgeLabel{Name: e.Label}
+		}
+		out.Events = append(out.Events, ev)
 	}
 	return out, nil
 }

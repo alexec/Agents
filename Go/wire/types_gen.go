@@ -4607,12 +4607,13 @@ type FoldersListRequest struct {
 	IncludeArchived bool `json:"includeArchived"`
 }
 
-// A write or a read that an item's page offers (#4329, #4361): forge/comment, forge/label, forge/close (a close, a reopen or a transition), forge/merge (now, or with auto), forge/approve, forge/rerun, forge/log, forge/diff, forge/add-child and forge/blocked-by.
+// A write or a read that an item's page offers (#4329, #4361): forge/comment, forge/label, forge/close (a close, a reopen or a transition; closeNotPlanned is a close with reason not_planned, where the forge has it, #4404), forge/merge (now, or with auto), forge/approve, forge/rerun, forge/log, forge/diff, forge/add-child, forge/blocked-by, forge/assign (#4403), forge/cancel-auto-merge and forge/ready (#4410).
 type ForgeAction string
 
 const ForgeActionComment ForgeAction = "comment"
 const ForgeActionLabel ForgeAction = "label"
 const ForgeActionClose ForgeAction = "close"
+const ForgeActionCloseNotPlanned ForgeAction = "closeNotPlanned"
 const ForgeActionReopen ForgeAction = "reopen"
 const ForgeActionTransition ForgeAction = "transition"
 const ForgeActionMerge ForgeAction = "merge"
@@ -4623,6 +4624,9 @@ const ForgeActionLog ForgeAction = "log"
 const ForgeActionDiff ForgeAction = "diff"
 const ForgeActionAddChild ForgeAction = "addChild"
 const ForgeActionBlockedBy ForgeAction = "blockedBy"
+const ForgeActionAssign ForgeAction = "assign"
+const ForgeActionCancelAutoMerge ForgeAction = "cancelAutoMerge"
+const ForgeActionReady ForgeAction = "ready"
 
 // forge/add-child (#3271): add a child to an epic's plan: a new issue (title, with level story, task, spike or bug) or one that is there (issue: #12, owner/repo#12, its URL, or a Linear key such as ENG-4). A new child gets the level's label and the epic's feature: label. GitHub and Linear.
 type ForgeAddChildRequest struct {
@@ -4640,6 +4644,15 @@ type ForgeApproveRequest struct {
 	Node LineageNode `json:"node"`
 
 	Sha string `json:"sha"`
+}
+
+// forge/assign (#4403): people to assign to an issue or a pull request, and people to take off it, by their login on the forge. At most 10 of each at once.
+type ForgeAssignRequest struct {
+	Node LineageNode `json:"node"`
+
+	Add []string `json:"add,omitzero"`
+
+	Remove []string `json:"remove,omitzero"`
 }
 
 // forge/blocked-by (#3271): the issues that block a child of a plan, to add and to take off, by node. GitHub and Linear.
@@ -4661,7 +4674,7 @@ type ForgeBoardsRequest struct {
 	Folder *string `json:"folder,omitzero"`
 }
 
-// What one forge on a list's page fills (#4329, #4361), so a client hides what it does not: issues and pulls say it has them; labelColors that its labels have a #rrggbb colour; avatars that its items have authorAvatar; stateReason that its closed issues have stateReason. createdAt that its items have createdAt, and closedAt that its closed and merged items have closedAt; children, linkedPulls and events that an item's read has them (#4373); total that it counts a list's items, for ForgeList.total (#4396); releases that it has releases, for forge/releases and forge/release (#4426); each is absent from an earlier daemon, which has none. commentCount says how to read ForgeItem.comments: exact; capped at commentsMost (show 50+ there); or detail, only on an item's own page (hide it on the row).
+// What one forge on a list's page fills (#4329, #4361), so a client hides what it does not: issues and pulls say it has them; labelColors that its labels have a #rrggbb colour; avatars that its items have authorAvatar; stateReason that its closed issues have stateReason. createdAt that its items have createdAt, and closedAt that its closed and merged items have closedAt; children, linkedPulls and events that an item's read has them (#4373); total that it counts a list's items, for ForgeList.total (#4396); releases that it has releases, for forge/releases and forge/release (#4426); a pull request's fields (#4409): branches that it has headRef and baseRef, mergedBy and mergeCommit that a merged one says them, size that its read has additions, deletions and commits, reviewers and closes that its read has them, and checkTimes that its checks have startedAt and finishedAt; each is absent from an earlier daemon, which has none. commentCount says how to read ForgeItem.comments: exact; capped at commentsMost (show 50+ there); or detail, only on an item's own page (hide it on the row).
 type ForgeCapabilities struct {
 	Forge string `json:"forge"`
 
@@ -4689,27 +4702,53 @@ type ForgeCapabilities struct {
 
 	Releases *bool `json:"releases,omitzero"`
 
+	Branches *bool `json:"branches,omitzero"`
+
+	MergedBy *bool `json:"mergedBy,omitzero"`
+
+	MergeCommit *bool `json:"mergeCommit,omitzero"`
+
+	Size *bool `json:"size,omitzero"`
+
+	Reviewers *bool `json:"reviewers,omitzero"`
+
+	Closes *bool `json:"closes,omitzero"`
+
+	CheckTimes *bool `json:"checkTimes,omitzero"`
+
 	CommentCount ForgeCommentCount `json:"commentCount"`
 
 	CommentsMost *int64 `json:"commentsMost,omitzero"`
 }
 
-// One of a pull request's checks (#3129): a check run or a commit status. state is passing, failing, running or skipped; url is its page on the forge.
+// One of a pull request's checks (#3129): a check run or a commit status. state is passing, failing, running or skipped; url is its page on the forge. startedAt and finishedAt are when it started and ended (#4409), where the forge says them (ForgeCapabilities.checkTimes): absent on a check that has not started, and finishedAt on one still running; a commit status has neither.
 type ForgeCheck struct {
 	Name string `json:"name"`
 
 	State string `json:"state"`
 
 	URL *string `json:"url,omitzero"`
+
+	StartedAt *Date `json:"startedAt,omitzero"`
+
+	FinishedAt *Date `json:"finishedAt,omitzero"`
 }
 
-// forge/close (#3130): close an issue or a pull request, or with reopen open it again; with transition, move a Jira issue by that transition of its workflow, by its id from the page's transitions (#3260).
+// Why forge/close closes an issue (#4404): completed, or not_planned where the forge has it (the action closeNotPlanned).
+type ForgeCloseReason string
+
+const ForgeCloseReasonCompleted ForgeCloseReason = "completed"
+const ForgeCloseReasonNotPlanned ForgeCloseReason = "not_planned"
+
+// forge/close (#3130): close an issue or a pull request, or with reopen open it again; with transition, move a Jira issue by that transition of its workflow, by its id from the page's transitions (#3260). reason is why an issue closes (#4404): completed (the default) or not_planned, which only an issue whose actions have closeNotPlanned takes; refused with reopen or a transition, and on a pull request.
 type ForgeCloseRequest struct {
 	Node LineageNode `json:"node"`
 
 	Reopen *bool `json:"reopen,omitzero"`
 
 	Transition *string `json:"transition,omitzero"`
+
+	Reason *ForgeCloseReason `json:"reason,omitzero"`
 }
 
 // A comment on an issue or a pull request (#3129), as Markdown. bot says a bot or an app wrote it. avatar is the author's picture, a URL that only forge/image reads (#4363); none when the forge gives none.
@@ -4859,7 +4898,7 @@ type ForgeImageRequest struct {
 	URL string `json:"url"`
 }
 
-// An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for GitHub, GitLab, Linear and Jira (#3260), so one page draws each. node is its lineage node (kind issue or pr, ref github:alexec/Agents#12). state is open, closed or merged; status is the tracker's own name for its step, where its workflow has steps (a Jira status, as In Progress; one in Jira's Done category is closed). folder is a folder on this machine on its repo, to act from. labels have their #rrggbb colour where the forge gives one (#2956). The pull request's own fields: draft; checks is passing, failing, running or none; review is approved, changes_requested or review_required; mergeable is mergeable, conflicting or unknown; autoMerge says auto-merge is on. The hierarchy (#3267): parent is the issue it is a sub-issue (a Linear or GitLab child) of; level is epic, story, task or spike, from its labels; feature is the name of its feature:<name> label; progress is a parent's closed children of all of them, where the forge says it: in a GitHub list, and on an issue's own read. standing says it has the label standing: a standing epic, whose plan is a query (#3659). authorAvatar is the author's picture, a URL that only forge/image reads (#4363), where the forge gives one (ForgeCapabilities.avatars). stateReason is why a closed issue closed (#4365): completed, not_planned or duplicate, where the forge says it (ForgeCapabilities.stateReason); absent on an open issue and on a pull request. createdAt is when it opened and closedAt when it closed or merged (#4373), where the forge says them (ForgeCapabilities.createdAt and closedAt); closedAt is absent while it is open.
+// An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for GitHub, GitLab, Linear and Jira (#3260), so one page draws each. node is its lineage node (kind issue or pr, ref github:alexec/Agents#12). state is open, closed or merged; status is the tracker's own name for its step, where its workflow has steps (a Jira status, as In Progress; one in Jira's Done category is closed). folder is a folder on this machine on its repo, to act from. labels have their #rrggbb colour where the forge gives one (#2956). The pull request's own fields: draft; checks is passing, failing, running or none; review is approved, changes_requested or review_required; mergeable is mergeable, conflicting or unknown; autoMerge says auto-merge is on. The hierarchy (#3267): parent is the issue it is a sub-issue (a Linear or GitLab child) of; level is epic, story, task or spike, from its labels; feature is the name of its feature:<name> label; progress is a parent's closed children of all of them, where the forge says it: in a GitHub list, and on an issue's own read. standing says it has the label standing: a standing epic, whose plan is a query (#3659). authorAvatar is the author's picture, a URL that only forge/image reads (#4363), where the forge gives one (ForgeCapabilities.avatars). stateReason is why a closed issue closed (#4365): completed, not_planned or duplicate, where the forge says it (ForgeCapabilities.stateReason); absent on an open issue and on a pull request. createdAt is when it opened and closedAt when it closed or merged (#4373), where the forge says them (ForgeCapabilities.createdAt and closedAt); closedAt is absent while it is open. A pull request's branches (#4409): headRef is the branch it merges from and baseRef the one it merges into, where the forge says them (ForgeCapabilities.branches); on its own read at least, and on a list's row where the list says them. A merged pull request's mergedBy is who merged it and mergeCommit the commit it made on baseRef (ForgeCapabilities.mergedBy and mergeCommit); each is absent while it is open or closed unmerged.
 type ForgeItem struct {
 	Node LineageNode `json:"node"`
 
@@ -4903,6 +4942,14 @@ type ForgeItem struct {
 
 	AutoMerge *bool `json:"autoMerge,omitzero"`
 
+	HeadRef *string `json:"headRef,omitzero"`
+
+	BaseRef *string `json:"baseRef,omitzero"`
+
+	MergedBy *string `json:"mergedBy,omitzero"`
+
+	MergeCommit *string `json:"mergeCommit,omitzero"`
+
 	Parent *LineageNode `json:"parent,omitzero"`
 
 	Level *string `json:"level,omitzero"`
@@ -4914,7 +4961,7 @@ type ForgeItem struct {
 	Standing *bool `json:"standing,omitzero"`
 }
 
-// forge/issue and forge/pull (#3129): one item with its body (Markdown) and a page of its comments, the newest page first and at most 50, oldest first in the page; cursor is the page before it, absent at the first comment. A pull request's checks, review threads (line comments, in threads) and files changed come with it. head is a pull request's head commit, which forge/merge and forge/approve name (#3130); mergeMethods are the ways its repo allows, the repo's default first; start is the new-agent form for an issue. transitions are the moves an issue's workflow allows now (Jira, #3260), which forge/close takes in place of a close or a reopen. actions are what the item's page offers now, from its forge and its state (#4361): a merged pull request has no merge and no reopen, a closed item no close; absent from an earlier daemon, when the page shows what it did before. On an issue's read (#4373), where the forge says them (ForgeCapabilities): children are its sub-issues, linkedPulls the pull requests that close it, and events its timeline, oldest first (labelled, assigned, closed, referenced and the like); each is absent where the forge gives none.
+// forge/issue and forge/pull (#3129): one item with its body (Markdown) and a page of its comments, the newest page first and at most 50, oldest first in the page; cursor is the page before it, absent at the first comment. A pull request's checks, review threads (line comments, in threads) and files changed come with it. head is a pull request's head commit, which forge/merge and forge/approve name (#3130); mergeMethods are the ways its repo allows, the repo's default first; start is the new-agent form for an issue. transitions are the moves an issue's workflow allows now (Jira, #3260), which forge/close takes in place of a close or a reopen. actions are what the item's page offers now, from its forge and its state (#4361): a merged pull request has no merge and no reopen, a closed item no close; absent from an earlier daemon, when the page shows what it did before. On an issue's read (#4373), where the forge says them (ForgeCapabilities): children are its sub-issues, linkedPulls the pull requests that close it, and events its timeline, oldest first (labelled, assigned, closed, referenced and the like); each is absent where the forge gives none. On a pull request's read (#4409), where the forge says them (ForgeCapabilities): additions, deletions and commits are its size; reviewers are the people asked to review it and the people who reviewed it, each once with their newest state; closes are the issues it closes when it merges.
 type ForgeItemDetail struct {
 	Item ForgeItem `json:"item"`
 
@@ -4929,6 +4976,16 @@ type ForgeItemDetail struct {
 	ReviewThreads *int64 `json:"reviewThreads,omitzero"`
 
 	FilesChanged *int64 `json:"filesChanged,omitzero"`
+
+	Additions *int64 `json:"additions,omitzero"`
+
+	Deletions *int64 `json:"deletions,omitzero"`
+
+	Commits *int64 `json:"commits,omitzero"`
+
+	Reviewers []ForgeReviewer `json:"reviewers,omitzero"`
+
+	Closes []ForgeLinked `json:"closes,omitzero"`
 
 	Head *string `json:"head,omitzero"`
 
@@ -4984,7 +5041,7 @@ type ForgeLead struct {
 	State AgentState `json:"state"`
 }
 
-// An item that an issue's read names (#4373): a sub-issue, or a pull request that closes it. state is open, closed or merged, as ForgeItem.state.
+// An item that an issue's read names (#4373): a sub-issue, or a pull request that closes it; or an issue that a pull request closes (#4409). state is open, closed or merged, as ForgeItem.state.
 type ForgeLinked struct {
 	Node LineageNode `json:"node"`
 
@@ -5210,6 +5267,23 @@ type ForgeReleasesRequest struct {
 
 	Limit *int64 `json:"limit,omitzero"`
 }
+
+// A reviewer of a pull request (#4409): login is who; avatar their picture, a URL that only forge/image reads, where the forge gives one; state is their newest review, or pending while they are asked and have not answered, or were asked again since.
+type ForgeReviewer struct {
+	Login string `json:"login"`
+
+	Avatar *string `json:"avatar,omitzero"`
+
+	State ForgeReviewerState `json:"state"`
+}
+
+// A reviewer's state (#4409): approved, changes_requested, commented (reviewed with no verdict) or pending (asked, not answered).
+type ForgeReviewerState string
+
+const ForgeReviewerStateApproved ForgeReviewerState = "approved"
+const ForgeReviewerStateChangesRequested ForgeReviewerState = "changes_requested"
+const ForgeReviewerStateCommented ForgeReviewerState = "commented"
+const ForgeReviewerStatePending ForgeReviewerState = "pending"
 
 // A standing epic's query (#3659, #3661), as the daemon read it from the standing block in the epic's body. labels: the issue has all of them; any: at least one of them; not: none of them; milestone: none, any or a milestone's name. lanes is how many lanes its lead runs at once, 1 when the block does not say. error says why there is no query: no block, a second block, or an unknown or bad field; with an error, the plan has no children.
 type ForgeStanding struct {
@@ -6028,6 +6102,21 @@ type LineageForecast struct {
 
 	// The overhead that toComplete.loaded and spend's loaded figures are made with (#4524).
 	Overhead *LineageOverhead `json:"overhead,omitzero"`
+
+	// The lanes and the runtime mix the window ran with (#4531).
+	Assumes *LineageForecastAssumes `json:"assumes,omitzero"`
+
+	// What the request's what-if moved (#4531); every figure is then the what-if's.
+	WhatIf *LineageForecastWhatIfEffect `json:"whatIf,omitzero"`
+}
+
+// What a forecast assumes (#4531): the lanes and the runtime mix of its window. lanes is the issues in flight (from their first work to their landing, or to now when open) in an average hour that had one; peakLanes is the most in any hour. runtimes is the mix, the most hours first.
+type LineageForecastAssumes struct {
+	Lanes float64 `json:"lanes"`
+
+	PeakLanes int64 `json:"peakLanes"`
+
+	Runtimes []LineageForecastRuntime `json:"runtimes"`
 }
 
 // A weekly allowance's pace (#4526): used (0 to 1) at its last reading at, of the week that resets at resetsAt. runsOutAt is when it runs out at that pace, absent when it lasts to the reset (lasts).
@@ -6081,7 +6170,7 @@ type LineageForecastLands struct {
 	Groups int64 `json:"groups"`
 }
 
-// lineage/forecast (#4526): an epic, for when it lands and its estimate to complete; or a milestone (#4620), by name, for when it lands, in folder's repo (any repo without one); without either, only the spend, the burn and the service levels, over every repo.
+// lineage/forecast (#4526): an epic, for when it lands and its estimate to complete; or a milestone (#4620), by name, for when it lands, in folder's repo (any repo without one); without either, only the spend, the burn and the service levels, over every repo. whatIf (#4531) asks for the same figures with another lane limit or runtime mix; a what-if forecast is never kept.
 type LineageForecastRequest struct {
 	Node *LineageNode `json:"node,omitzero"`
 
@@ -6090,6 +6179,20 @@ type LineageForecastRequest struct {
 
 	// The folder whose repo the milestone is in.
 	Folder *string `json:"folder,omitzero"`
+
+	WhatIf *LineageForecastWhatIf `json:"whatIf,omitzero"`
+}
+
+// A runtime's part of a forecast's window (#4531), from this machine's usage and time histories: share is its part of the agents' working hours (the agent, its tools and others), hours is those hours, and rate is its cost per working hour.
+type LineageForecastRuntime struct {
+	Runtime string `json:"runtime"`
+
+	Share float64 `json:"share"`
+
+	Hours float64 `json:"hours"`
+
+	// By currency.
+	Rate map[string]float64 `json:"rate"`
 }
 
 // How long a level's issues took (#4526): of the closed issues of the level that landed in the window, half took up to p50Seconds and 85% up to p85Seconds, from the start of work to the last PR merged. Only a level with five or more.
@@ -6128,6 +6231,26 @@ type LineageForecastToComplete struct {
 
 	// cost with the overhead loaded in (#4524): times (1 + overhead.unlinkedRatio). The lead is in cost already, so not the epic ratio. Absent with no ratio.
 	Loaded map[string]LineageEstimateRange `json:"loaded,omitzero"`
+}
+
+// A what-if for lineage/forecast (#4531): lanes is a lane limit (below 1 is as the window ran), and mix is a runtime mix, each runtime's share of the working hours, scaled to add up to 1. Absent, each is as the window ran.
+type LineageForecastWhatIf struct {
+	Lanes *int64 `json:"lanes,omitzero"`
+
+	// By runtime id.
+	Mix map[string]float64 `json:"mix,omitzero"`
+}
+
+// What a what-if moved (#4531). A lane limit keeps, in each hour of the window, min(in flight, lanes) / in flight of its landings, so the dates move out and a week's spend falls; a limit at or above peakLanes moves nothing, as no hour ran more. pace is the landings it keeps over the window's. A mix moves the dollars only: cost is the mix's cost per working hour over the window's, and each allowance's pace moves by its runtime's share over the window's. Landings do not say their runtime, so a mix does not move the dates.
+type LineageForecastWhatIfEffect struct {
+	Lanes *int64 `json:"lanes,omitzero"`
+
+	// By runtime id, scaled to add up to 1.
+	Mix map[string]float64 `json:"mix,omitzero"`
+
+	Pace float64 `json:"pace"`
+
+	Cost float64 `json:"cost"`
 }
 
 // lineage/walk (#2348): the nodes the walk reached and the links it went along. limited says the walk stopped at its limit on nodes, so there is more. resolved is each node's title, state and labels from its connector, by ref, for the nodes a connector could resolve (#3089). resolving says some nodes are still being resolved in the background, so walk again shortly for them (#3102). states is the current state of each session node in it that has one, by ref (#4274).
@@ -8079,7 +8202,7 @@ type MessagingListRequest struct {
 	Unread *bool `json:"unread,omitzero"`
 }
 
-// One message in read_messages' structuredContent (#4338). text is outside content: the result says so (untrusted), and a client draws it as plain text, never as markup. thread is the id of the message that starts its thread; absent when it is in no thread. link is the message on the service's own site or app.
+// One message in read_messages' structuredContent (#4338). text is outside content: the result says so (untrusted), and a client draws it as Markdown that loads nothing: no HTML, no image from the network, and only http, https and mailto links. thread is the id of the message that starts its thread; absent when it is in no thread. link is the message on the service's own site or app.
 type MessagingMessage struct {
 	ID string `json:"id"`
 
@@ -9201,6 +9324,9 @@ type Persona struct {
 	Origin PersonaOrigin `json:"origin"`
 
 	Settings WorkflowSettings `json:"settings"`
+
+	// The front matter's `keywords:` (#4559): the words in a first prompt that make Auto pick this persona. Left out when the file names none; then its name and description are the words.
+	Keywords []string `json:"keywords,omitzero"`
 
 	Problem *string `json:"problem,omitzero"`
 }
@@ -14823,6 +14949,47 @@ const WeekdayWed Weekday = "wed"
 const WeekdayThu Weekday = "thu"
 const WeekdayFri Weekday = "fri"
 const WeekdaySat Weekday = "sat"
+
+// A feature in work/features (#4586): feature is it as forge/features says it. epics are its open epics, the newest first, each with where it is in its plan and its children. loose are its open issues that are not epics and have no parent (of the newest 500 open issues), the newest update first, as children are: when each started, and whether it waits for a person.
+type WorkFeature struct {
+	Feature ForgeFeature `json:"feature"`
+
+	Epics []WorkFeatureEpic `json:"epics"`
+
+	Loose []WorkTimelineChild `json:"loose"`
+}
+
+// An open epic in work/features (#4586), from forge/plan and work/timeline. steps is the number of steps in its plan (ForgePlan.steps), and step the first of them with an open child, absent when none is open. blockedOutside are the open blockers outside the plan of that step's open children (an issue of another epic), each once. forecast is its open line's close as work/timeline forecasts it, on GitHub only; absent when there is too little history or nothing to forecast. children are its sub-issues in the plan's order (at most 100), each with its start, close and wait as in work/timeline; absent when its plan could not be read (errors says why).
+type WorkFeatureEpic struct {
+	Item ForgeItem `json:"item"`
+
+	Step *int64 `json:"step,omitzero"`
+
+	Steps int64 `json:"steps"`
+
+	BlockedOutside []LineageNode `json:"blockedOutside,omitzero"`
+
+	Forecast *WorkTimelineForecast `json:"forecast,omitzero"`
+
+	Children []WorkTimelineChild `json:"children,omitzero"`
+}
+
+// work/features (#4586, specs/4328-work-look/features-delivery.md): the Features page's one read. features are forge/features' features, by name, each with its open epics and its loose open issues, so an open feature's epics and children draw with no second read. approvals are as in forge/features. errors say a forge, a plan or a timeline that could not be read.
+type WorkFeatures struct {
+	Features []WorkFeature `json:"features"`
+
+	Approvals []string `json:"approvals,omitzero"`
+
+	Errors []ForgeListError `json:"errors,omitzero"`
+}
+
+// work/features (#4586): the features of every folder on this machine, or of one folder's repo, as forge/features.
+type WorkFeaturesRequest struct {
+	Folder *string `json:"folder,omitzero"`
+
+	// A board's url, from forge/boards (#3282): only the epics on that board.
+	Board *string `json:"board,omitzero"`
+}
 
 // How a turn ended (#1916): only a question needs the person. A value this build does not know, such as an old record's `blocked`, `stuck` or `partly_done`, reads as `done`.
 type WorkOutcome string

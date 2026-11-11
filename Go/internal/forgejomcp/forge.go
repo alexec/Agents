@@ -54,6 +54,10 @@ type Item struct {
 	// A list says only Draft; one read on its own says the rest.
 	Draft, AutoMerge          bool
 	Checks, Review, Mergeable string
+	// Only one read on its own says these.
+	// HeadRef is the branch it merges from and BaseRef the one it merges into; a merged one's
+	// MergedBy is who merged it and MergeCommit the commit it made (#4409).
+	HeadRef, BaseRef, MergedBy, MergeCommit string
 }
 
 // SearchPage is a page of a list, the last updated first. Cursors[i] goes on after Items[i],
@@ -86,6 +90,41 @@ type ItemDetail struct {
 	ReviewThreads int
 	FilesChanged  int
 	Head          string
+	// On an issue's read (#4626), from its timeline: LinkedPulls are the pull requests that
+	// name it, each once, and Events what happened on it, oldest first. Empty when the timeline
+	// cannot be read.
+	LinkedPulls []Linked
+	Events      []Event
+	// A pull request's (#4682): its Size (nil when its commits cannot be read, the one read more
+	// of its page) and its Reviewers.
+	Size      *Size
+	Reviewers []Reviewer
+}
+
+// Size is a pull request's lines added and deleted, and its commits (#4682).
+type Size struct{ Additions, Deletions, Commits int }
+
+// Reviewer is a person or team asked to review a pull request or who reviewed it (#4682): State
+// is approved, changes_requested, commented, or pending while asked and not answered.
+type Reviewer struct{ Login, Avatar, State string }
+
+// Linked is a pull request that names an issue: State is open, closed or merged.
+type Linked struct {
+	Repo              string
+	Number            int
+	Title, State, URL string
+}
+
+// Event is one event on an issue's timeline (#4626). Kind is labeled, unlabeled, assigned,
+// unassigned, closed, reopened or referenced; Label (with its #rrggbb LabelColor) or Assignee is
+// whom it names; Source is the issue or pull request that named it.
+type Event struct {
+	Kind, Actor, At   string
+	Label, LabelColor string
+	Assignee          string
+	SourceRepo        string
+	SourceNumber      int
+	SourcePR          bool
 }
 
 // forgeComments is a page of an item's comments: Forgejo's own most.
@@ -346,17 +385,35 @@ func (f *RealForgejo) ItemPage(ctx context.Context, repo string, number int, pr 
 		d.Thread = append(d.Thread, Comment{Author: c.User.Login, Avatar: c.User.AvatarURL, Body: c.Body, At: c.CreatedAt, URL: c.HTMLURL, Bot: isBot(c.User.Login, c.User.ID)})
 	}
 	if !pr {
+		// The timeline is a nicety: a page still reads when Forgejo does not give it.
+		d.LinkedPulls, d.Events = []Linked{}, []Event{}
+		var timeline []forgeTimelineJSON
+		if err := f.get(ctx, fmt.Sprintf("%s/issues/%d/timeline?limit=%d", repoPath(repo), number, perPage), false, &timeline); err == nil {
+			d.LinkedPulls, d.Events = timelineOf(repo, timeline)
+		}
 		return d, nil
 	}
 	var p struct {
 		pullJSON
-		ChangedFiles int `json:"changed_files"`
+		ChangedFiles   int `json:"changed_files"`
+		Additions      int `json:"additions"`
+		Deletions      int `json:"deletions"`
+		RequestedTeams []struct {
+			Name string `json:"name"`
+		} `json:"requested_reviewers_teams"`
 	}
 	if err := f.get(ctx, fmt.Sprintf("%s/pulls/%d", repoPath(repo), number), false, &p); err != nil {
 		return ItemDetail{}, err
 	}
 	d.Draft = p.draft()
 	d.Head, d.FilesChanged = p.Head.SHA, p.ChangedFiles
+	d.HeadRef, d.BaseRef = p.Head.Ref, p.Base.Ref
+	if d.State == "merged" {
+		d.MergeCommit = p.MergeCommitSHA
+		if p.MergedBy != nil {
+			d.MergedBy = p.MergedBy.Login
+		}
+	}
 	if d.State == "open" {
 		d.Mergeable = map[bool]string{true: "mergeable", false: "conflicting"}[p.Mergeable]
 	}
@@ -379,7 +436,130 @@ func (f *RealForgejo) ItemPage(ctx context.Context, repo string, number int, pr 
 		return ItemDetail{}, err
 	}
 	d.Review, d.ReviewThreads = reviewOf(reviews, len(p.RequestedReviewers) > 0)
+	teams := make([]string, 0, len(p.RequestedTeams))
+	for _, t := range p.RequestedTeams {
+		teams = append(teams, t.Name)
+	}
+	d.Reviewers = reviewersOf(p.RequestedReviewers, teams, reviews)
+	// The commits are the one read more of a pull request's page, and a nicety: without them it
+	// has no size.
+	if commits, _, err := all[struct {
+		SHA string `json:"sha"`
+	}](ctx, f, fmt.Sprintf("%s/pulls/%d/commits?verification=false&files=false", repoPath(repo), number)); err == nil {
+		d.Size = &Size{Additions: p.Additions, Deletions: p.Deletions, Commits: len(commits)}
+	}
 	return d, nil
+}
+
+// reviewersOf is each reviewer of a pull request once: the people and teams asked and not
+// answered since are pending, as Forgejo shows them; the others by their newest review that
+// approves or asks for changes, else a comment. A dismissed review, and one not sent yet, say
+// nothing.
+func reviewersOf(requested []user, teams []string, reviews []reviewJSON) []Reviewer {
+	out := []Reviewer{}
+	seen := map[string]bool{}
+	for _, u := range requested {
+		if u.Login != "" && !seen[u.Login] {
+			seen[u.Login] = true
+			out = append(out, Reviewer{Login: u.Login, Avatar: u.AvatarURL, State: "pending"})
+		}
+	}
+	for _, t := range teams {
+		if t != "" && !seen[t] {
+			seen[t] = true
+			out = append(out, Reviewer{Login: t, State: "pending"})
+		}
+	}
+	newest := map[string]int{}
+	for _, r := range reviews {
+		state := reviewStates[r.State]
+		if r.User == nil || r.User.Login == "" || seen[r.User.Login] || state == "" || r.Dismissed {
+			continue
+		}
+		if i, ok := newest[r.User.Login]; ok {
+			// A comment after an approval or a request for changes does not take its place.
+			if state != "commented" || out[i].State == "commented" {
+				out[i].State = state
+			}
+			continue
+		}
+		newest[r.User.Login] = len(out)
+		out = append(out, Reviewer{Login: r.User.Login, Avatar: r.User.AvatarURL, State: state})
+	}
+	return out
+}
+
+// reviewStates are Forgejo's review states in the one model's words.
+var reviewStates = map[string]string{"APPROVED": "approved", "REQUEST_CHANGES": "changes_requested", "COMMENT": "commented"}
+
+// forgeTimelineJSON is one entry of an issue's timeline. A label entry's body is "1" when the label
+// was added and "" when it was taken off; ref_issue is the issue or pull request that named it.
+type forgeTimelineJSON struct {
+	Type            string     `json:"type"`
+	Body            string     `json:"body"`
+	User            *user      `json:"user"`
+	CreatedAt       string     `json:"created_at"`
+	Label           *labelJSON `json:"label"`
+	Assignee        *user      `json:"assignee"`
+	RemovedAssignee bool       `json:"removed_assignee"`
+	RefIssue        *struct {
+		forgeJSON
+		Repository *struct {
+			FullName string `json:"full_name"`
+		} `json:"repository"`
+	} `json:"ref_issue"`
+}
+
+// timelineOf is an issue's linked pull requests and events from its timeline, oldest first. An
+// entry of a kind the wire has no word for is left out.
+func timelineOf(repo string, timeline []forgeTimelineJSON) ([]Linked, []Event) {
+	pulls, events := []Linked{}, []Event{}
+	seen := map[string]bool{}
+	for _, t := range timeline {
+		e := Event{At: t.CreatedAt}
+		if t.User != nil {
+			e.Actor = t.User.Login
+		}
+		switch t.Type {
+		case "label":
+			if t.Label == nil {
+				continue
+			}
+			e.Kind = map[bool]string{true: "labeled", false: "unlabeled"}[t.Body == "1"]
+			e.Label = t.Label.Name
+			if t.Label.Color != "" {
+				e.LabelColor = "#" + strings.ToLower(strings.TrimPrefix(t.Label.Color, "#"))
+			}
+		case "assignees":
+			if t.Assignee == nil {
+				continue
+			}
+			e.Kind = map[bool]string{false: "assigned", true: "unassigned"}[t.RemovedAssignee]
+			e.Assignee = t.Assignee.Login
+		case "close":
+			e.Kind = "closed"
+		case "reopen":
+			e.Kind = "reopened"
+		case "pull_ref", "issue_ref", "comment_ref":
+			if t.RefIssue == nil || t.RefIssue.Number < 1 {
+				continue
+			}
+			from := repo
+			if t.RefIssue.Repository != nil && t.RefIssue.Repository.FullName != "" {
+				from = t.RefIssue.Repository.FullName
+			}
+			ref := t.RefIssue.item(from)
+			e.Kind, e.SourceRepo, e.SourceNumber, e.SourcePR = "referenced", from, ref.Number, ref.PR
+			if key := ref.key(); ref.PR && !seen[key] {
+				seen[key] = true
+				pulls = append(pulls, Linked{Repo: from, Number: ref.Number, Title: ref.Title, State: ref.State, URL: ref.URL})
+			}
+		default:
+			continue
+		}
+		events = append(events, e)
+	}
+	return pulls, events
 }
 
 // reviewOf is a pull request's review in a list's words, from each reviewer's last review, and

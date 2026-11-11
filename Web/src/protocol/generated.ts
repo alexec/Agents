@@ -4010,13 +4010,16 @@ export interface FoldersListRequest {
 
 /**
  * A write or a read that an item's page offers (#4329, #4361): forge/comment, forge/label,
- * forge/close (a close, a reopen or a transition), forge/merge (now, or with auto), forge/approve,
- * forge/rerun, forge/log, forge/diff, forge/add-child and forge/blocked-by.
+ * forge/close (a close, a reopen or a transition; closeNotPlanned is a close with reason
+ * not_planned, where the forge has it, #4404), forge/merge (now, or with auto), forge/approve,
+ * forge/rerun, forge/log, forge/diff, forge/add-child, forge/blocked-by, forge/assign (#4403),
+ * forge/cancel-auto-merge and forge/ready (#4410).
  */
 export type ForgeAction =
   | "comment"
   | "label"
   | "close"
+  | "closeNotPlanned"
   | "reopen"
   | "transition"
   | "merge"
@@ -4026,7 +4029,10 @@ export type ForgeAction =
   | "log"
   | "diff"
   | "addChild"
-  | "blockedBy";
+  | "blockedBy"
+  | "assign"
+  | "cancelAutoMerge"
+  | "ready";
 
 /**
  * forge/add-child (#3271): add a child to an epic's plan: a new issue (title, with level story,
@@ -4048,6 +4054,16 @@ export interface ForgeAddChildRequest {
 export interface ForgeApproveRequest {
   node: LineageNode;
   sha: string;
+}
+
+/**
+ * forge/assign (#4403): people to assign to an issue or a pull request, and people to take off it,
+ * by their login on the forge. At most 10 of each at once.
+ */
+export interface ForgeAssignRequest {
+  node: LineageNode;
+  add?: string[];
+  remove?: string[];
 }
 
 /**
@@ -4082,7 +4098,10 @@ export interface ForgeBoardsRequest {
  * items have createdAt, and closedAt that its closed and merged items have closedAt; children,
  * linkedPulls and events that an item's read has them (#4373); total that it counts a list's items,
  * for ForgeList.total (#4396); releases that it has releases, for forge/releases and forge/release
- * (#4426); each is absent from an earlier daemon, which has none. commentCount says how to read
+ * (#4426); a pull request's fields (#4409): branches that it has headRef and baseRef, mergedBy and
+ * mergeCommit that a merged one says them, size that its read has additions, deletions and commits,
+ * reviewers and closes that its read has them, and checkTimes that its checks have startedAt and
+ * finishedAt; each is absent from an earlier daemon, which has none. commentCount says how to read
  * ForgeItem.comments: exact; capped at commentsMost (show 50+ there); or detail, only on an item's
  * own page (hide it on the row).
  */
@@ -4100,29 +4119,51 @@ export interface ForgeCapabilities {
   events?: boolean;
   total?: boolean;
   releases?: boolean;
+  branches?: boolean;
+  mergedBy?: boolean;
+  mergeCommit?: boolean;
+  size?: boolean;
+  reviewers?: boolean;
+  closes?: boolean;
+  checkTimes?: boolean;
   commentCount: ForgeCommentCount;
   commentsMost?: number;
 }
 
 /**
  * One of a pull request's checks (#3129): a check run or a commit status. state is passing,
- * failing, running or skipped; url is its page on the forge.
+ * failing, running or skipped; url is its page on the forge. startedAt and finishedAt are when it
+ * started and ended (#4409), where the forge says them (ForgeCapabilities.checkTimes): absent on a
+ * check that has not started, and finishedAt on one still running; a commit status has neither.
  */
 export interface ForgeCheck {
   name: string;
   state: string;
   url?: string;
+  startedAt?: WireDate;
+  finishedAt?: WireDate;
 }
+
+/**
+ * Why forge/close closes an issue (#4404): completed, or not_planned where the forge has it (the
+ * action closeNotPlanned).
+ */
+export type ForgeCloseReason =
+  | "completed"
+  | "not_planned";
 
 /**
  * forge/close (#3130): close an issue or a pull request, or with reopen open it again; with
  * transition, move a Jira issue by that transition of its workflow, by its id from the page's
- * transitions (#3260).
+ * transitions (#3260). reason is why an issue closes (#4404): completed (the default) or
+ * not_planned, which only an issue whose actions have closeNotPlanned takes; refused with reopen or
+ * a transition, and on a pull request.
  */
 export interface ForgeCloseRequest {
   node: LineageNode;
   reopen?: boolean;
   transition?: string;
+  reason?: ForgeCloseReason;
 }
 
 /**
@@ -4303,7 +4344,12 @@ export interface ForgeImageRequest {
  * why a closed issue closed (#4365): completed, not_planned or duplicate, where the forge says it
  * (ForgeCapabilities.stateReason); absent on an open issue and on a pull request. createdAt is when
  * it opened and closedAt when it closed or merged (#4373), where the forge says them
- * (ForgeCapabilities.createdAt and closedAt); closedAt is absent while it is open.
+ * (ForgeCapabilities.createdAt and closedAt); closedAt is absent while it is open. A pull request's
+ * branches (#4409): headRef is the branch it merges from and baseRef the one it merges into, where
+ * the forge says them (ForgeCapabilities.branches); on its own read at least, and on a list's row
+ * where the list says them. A merged pull request's mergedBy is who merged it and mergeCommit the
+ * commit it made on baseRef (ForgeCapabilities.mergedBy and mergeCommit); each is absent while it
+ * is open or closed unmerged.
  */
 export interface ForgeItem {
   node: LineageNode;
@@ -4327,6 +4373,10 @@ export interface ForgeItem {
   review?: string;
   mergeable?: string;
   autoMerge?: boolean;
+  headRef?: string;
+  baseRef?: string;
+  mergedBy?: string;
+  mergeCommit?: string;
   parent?: LineageNode;
   level?: string;
   feature?: string;
@@ -4347,7 +4397,10 @@ export interface ForgeItem {
  * did before. On an issue's read (#4373), where the forge says them (ForgeCapabilities): children
  * are its sub-issues, linkedPulls the pull requests that close it, and events its timeline, oldest
  * first (labelled, assigned, closed, referenced and the like); each is absent where the forge gives
- * none.
+ * none. On a pull request's read (#4409), where the forge says them (ForgeCapabilities): additions,
+ * deletions and commits are its size; reviewers are the people asked to review it and the people
+ * who reviewed it, each once with their newest state; closes are the issues it closes when it
+ * merges.
  */
 export interface ForgeItemDetail {
   item: ForgeItem;
@@ -4357,6 +4410,11 @@ export interface ForgeItemDetail {
   checks?: ForgeCheck[];
   reviewThreads?: number;
   filesChanged?: number;
+  additions?: number;
+  deletions?: number;
+  commits?: number;
+  reviewers?: ForgeReviewer[];
+  closes?: ForgeLinked[];
   head?: string;
   mergeMethods?: ForgeMergeMethod[];
   start?: ForgeStart;
@@ -4408,8 +4466,8 @@ export interface ForgeLead {
 }
 
 /**
- * An item that an issue's read names (#4373): a sub-issue, or a pull request that closes it. state
- * is open, closed or merged, as ForgeItem.state.
+ * An item that an issue's read names (#4373): a sub-issue, or a pull request that closes it; or an
+ * issue that a pull request closes (#4409). state is open, closed or merged, as ForgeItem.state.
  */
 export interface ForgeLinked {
   node: LineageNode;
@@ -4637,6 +4695,27 @@ export interface ForgeReleasesRequest {
   folder?: string;
   limit?: number;
 }
+
+/**
+ * A reviewer of a pull request (#4409): login is who; avatar their picture, a URL that only
+ * forge/image reads, where the forge gives one; state is their newest review, or pending while they
+ * are asked and have not answered, or were asked again since.
+ */
+export interface ForgeReviewer {
+  login: string;
+  avatar?: string;
+  state: ForgeReviewerState;
+}
+
+/**
+ * A reviewer's state (#4409): approved, changes_requested, commented (reviewed with no verdict) or
+ * pending (asked, not answered).
+ */
+export type ForgeReviewerState =
+  | "approved"
+  | "changes_requested"
+  | "commented"
+  | "pending";
 
 /**
  * A standing epic's query (#3659, #3661), as the daemon read it from the standing block in the
@@ -5385,6 +5464,21 @@ export interface LineageForecast {
   serviceLevels: LineageForecastServiceLevel[];
   /** The overhead that toComplete.loaded and spend's loaded figures are made with (#4524). */
   overhead?: LineageOverhead;
+  /** The lanes and the runtime mix the window ran with (#4531). */
+  assumes?: LineageForecastAssumes;
+  /** What the request's what-if moved (#4531); every figure is then the what-if's. */
+  whatIf?: LineageForecastWhatIfEffect;
+}
+
+/**
+ * What a forecast assumes (#4531): the lanes and the runtime mix of its window. lanes is the issues
+ * in flight (from their first work to their landing, or to now when open) in an average hour that
+ * had one; peakLanes is the most in any hour. runtimes is the mix, the most hours first.
+ */
+export interface LineageForecastAssumes {
+  lanes: number;
+  peakLanes: number;
+  runtimes: LineageForecastRuntime[];
 }
 
 /**
@@ -5441,7 +5535,8 @@ export interface LineageForecastLands {
 /**
  * lineage/forecast (#4526): an epic, for when it lands and its estimate to complete; or a milestone
  * (#4620), by name, for when it lands, in folder's repo (any repo without one); without either,
- * only the spend, the burn and the service levels, over every repo.
+ * only the spend, the burn and the service levels, over every repo. whatIf (#4531) asks for the
+ * same figures with another lane limit or runtime mix; a what-if forecast is never kept.
  */
 export interface LineageForecastRequest {
   node?: LineageNode;
@@ -5449,6 +5544,20 @@ export interface LineageForecastRequest {
   milestone?: string;
   /** The folder whose repo the milestone is in. */
   folder?: string;
+  whatIf?: LineageForecastWhatIf;
+}
+
+/**
+ * A runtime's part of a forecast's window (#4531), from this machine's usage and time histories:
+ * share is its part of the agents' working hours (the agent, its tools and others), hours is those
+ * hours, and rate is its cost per working hour.
+ */
+export interface LineageForecastRuntime {
+  runtime: string;
+  share: number;
+  hours: number;
+  /** By currency. */
+  rate: Record<string, number>;
 }
 
 /**
@@ -5497,6 +5606,33 @@ export interface LineageForecastToComplete {
    * cost already, so not the epic ratio. Absent with no ratio.
    */
   loaded?: Record<string, LineageEstimateRange>;
+}
+
+/**
+ * A what-if for lineage/forecast (#4531): lanes is a lane limit (below 1 is as the window ran), and
+ * mix is a runtime mix, each runtime's share of the working hours, scaled to add up to 1. Absent,
+ * each is as the window ran.
+ */
+export interface LineageForecastWhatIf {
+  lanes?: number;
+  /** By runtime id. */
+  mix?: Record<string, number>;
+}
+
+/**
+ * What a what-if moved (#4531). A lane limit keeps, in each hour of the window, min(in flight,
+ * lanes) / in flight of its landings, so the dates move out and a week's spend falls; a limit at or
+ * above peakLanes moves nothing, as no hour ran more. pace is the landings it keeps over the
+ * window's. A mix moves the dollars only: cost is the mix's cost per working hour over the
+ * window's, and each allowance's pace moves by its runtime's share over the window's. Landings do
+ * not say their runtime, so a mix does not move the dates.
+ */
+export interface LineageForecastWhatIfEffect {
+  lanes?: number;
+  /** By runtime id, scaled to add up to 1. */
+  mix?: Record<string, number>;
+  pace: number;
+  cost: number;
 }
 
 /**
@@ -7239,9 +7375,9 @@ export interface MessagingListRequest {
 
 /**
  * One message in read_messages' structuredContent (#4338). text is outside content: the result says
- * so (untrusted), and a client draws it as plain text, never as markup. thread is the id of the
- * message that starts its thread; absent when it is in no thread. link is the message on the
- * service's own site or app.
+ * so (untrusted), and a client draws it as Markdown that loads nothing: no HTML, no image from the
+ * network, and only http, https and mailto links. thread is the id of the message that starts its
+ * thread; absent when it is in no thread. link is the message on the service's own site or app.
  */
 export interface MessagingMessage {
   id: string;
@@ -8314,6 +8450,11 @@ export interface Persona {
   description?: string;
   origin: PersonaOrigin;
   settings: WorkflowSettings;
+  /**
+   * The front matter's `keywords:` (#4559): the words in a first prompt that make Auto pick this
+   * persona. Left out when the file names none; then its name and description are the words.
+   */
+  keywords?: string[];
   problem?: string;
 }
 
@@ -13352,6 +13493,58 @@ export type Weekday =
   | "sat";
 
 /**
+ * A feature in work/features (#4586): feature is it as forge/features says it. epics are its open
+ * epics, the newest first, each with where it is in its plan and its children. loose are its open
+ * issues that are not epics and have no parent (of the newest 500 open issues), the newest update
+ * first, as children are: when each started, and whether it waits for a person.
+ */
+export interface WorkFeature {
+  feature: ForgeFeature;
+  epics: WorkFeatureEpic[];
+  loose: WorkTimelineChild[];
+}
+
+/**
+ * An open epic in work/features (#4586), from forge/plan and work/timeline. steps is the number of
+ * steps in its plan (ForgePlan.steps), and step the first of them with an open child, absent when
+ * none is open. blockedOutside are the open blockers outside the plan of that step's open children
+ * (an issue of another epic), each once. forecast is its open line's close as work/timeline
+ * forecasts it, on GitHub only; absent when there is too little history or nothing to forecast.
+ * children are its sub-issues in the plan's order (at most 100), each with its start, close and
+ * wait as in work/timeline; absent when its plan could not be read (errors says why).
+ */
+export interface WorkFeatureEpic {
+  item: ForgeItem;
+  step?: number;
+  steps: number;
+  blockedOutside?: LineageNode[];
+  forecast?: WorkTimelineForecast;
+  children?: WorkTimelineChild[];
+}
+
+/**
+ * work/features (#4586, specs/4328-work-look/features-delivery.md): the Features page's one read.
+ * features are forge/features' features, by name, each with its open epics and its loose open
+ * issues, so an open feature's epics and children draw with no second read. approvals are as in
+ * forge/features. errors say a forge, a plan or a timeline that could not be read.
+ */
+export interface WorkFeatures {
+  features: WorkFeature[];
+  approvals?: string[];
+  errors?: ForgeListError[];
+}
+
+/**
+ * work/features (#4586): the features of every folder on this machine, or of one folder's repo, as
+ * forge/features.
+ */
+export interface WorkFeaturesRequest {
+  folder?: string;
+  /** A board's url, from forge/boards (#3282): only the epics on that board. */
+  board?: string;
+}
+
+/**
  * How a turn ended (#1916): only a question needs the person. A value this build does not know,
  * such as an old record's `blocked`, `stuck` or `partly_done`, reads as `done`.
  */
@@ -13997,8 +14190,10 @@ export interface Methods {
   "folders/undoGuardedChange": { params: GuardedChangeRequest; result: FolderSummary };
   "forge/add-child": { params: ForgeAddChildRequest; result: ForgeDone };
   "forge/approve": { params: ForgeApproveRequest; result: ForgeDone };
+  "forge/assign": { params: ForgeAssignRequest; result: ForgeDone };
   "forge/blocked-by": { params: ForgeBlockedByRequest; result: ForgeDone };
   "forge/boards": { params: ForgeBoardsRequest; result: ForgeBoards };
+  "forge/cancel-auto-merge": { params: ForgeNodeRequest; result: ForgeDone };
   "forge/close": { params: ForgeCloseRequest; result: ForgeDone };
   "forge/comment": { params: ForgeCommentRequest; result: ForgeDone };
   "forge/diff": { params: ForgeNodeRequest; result: ForgeDiff };
@@ -14013,6 +14208,7 @@ export interface Methods {
   "forge/plan": { params: ForgePlanRequest; result: ForgePlan };
   "forge/pull": { params: ForgeItemRequest; result: ForgeItemDetail };
   "forge/pulls": { params: ForgeListRequest; result: ForgeList };
+  "forge/ready": { params: ForgeNodeRequest; result: ForgeDone };
   "forge/release": { params: ForgeReleaseRequest; result: ForgeReleaseDetail };
   "forge/releases": { params: ForgeReleasesRequest; result: ForgeReleases };
   "forge/rerun": { params: ForgeNodeRequest; result: ForgeDone };
@@ -14028,6 +14224,7 @@ export interface Methods {
   "groups/setRole": { params: GroupRoleSet; result: Group };
   "lineage/cost": { params: LineageNodeRequest; result: LineageCostRollup };
   "lineage/estimate": { params: LineageEstimateRequest; result: LineageEstimate };
+  "lineage/figures": { params: LineageNodeRequest; result: LineageFigures };
   "lineage/forecast": { params: LineageForecastRequest; result: LineageForecast };
   "lineage/sessions": { params: LineageSessionsRequest; result: LineageSessions };
   "lineage/sessionsOn": { params: LineageSessionsOnRequest; result: LineageSessionsOn };
@@ -14245,6 +14442,7 @@ export interface Methods {
   "views/show": { params: ViewShowRequest; result: Empty };
   "wake/set": { params: WakeSettings; result: WakeSettings };
   "wake/settings": { params: Empty; result: WakeSettings };
+  "work/features": { params: WorkFeaturesRequest; result: WorkFeatures };
   "work/timeline": { params: WorkTimelineRequest; result: WorkTimeline };
   "workflows/approve": { params: WorkflowApproveRequest; result: WorkflowSummary };
   "workflows/archive": { params: WorkflowArchiveRequest; result: WorkflowSummary };
@@ -14423,8 +14621,10 @@ export const MethodTarget = {
   "folders/undoGuardedChange": "host",
   "forge/add-child": "host",
   "forge/approve": "host",
+  "forge/assign": "host",
   "forge/blocked-by": "host",
   "forge/boards": "host",
+  "forge/cancel-auto-merge": "host",
   "forge/close": "host",
   "forge/comment": "host",
   "forge/diff": "host",
@@ -14439,6 +14639,7 @@ export const MethodTarget = {
   "forge/plan": "host",
   "forge/pull": "host",
   "forge/pulls": "host",
+  "forge/ready": "host",
   "forge/release": "host",
   "forge/releases": "host",
   "forge/rerun": "host",
@@ -14454,6 +14655,7 @@ export const MethodTarget = {
   "groups/setRole": "control",
   "lineage/cost": "host",
   "lineage/estimate": "host",
+  "lineage/figures": "host",
   "lineage/forecast": "host",
   "lineage/sessions": "host",
   "lineage/sessionsOn": "control",
@@ -14671,6 +14873,7 @@ export const MethodTarget = {
   "views/show": "host",
   "wake/set": "host",
   "wake/settings": "host",
+  "work/features": "host",
   "work/timeline": "host",
   "workflows/approve": "host",
   "workflows/archive": "host",
@@ -15097,12 +15300,13 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FoldersListRequest: { required: ["includeArchived"], optional: [] },
   ForgeAddChildRequest: { required: ["node"], optional: ["title", "level", "issue"] },
   ForgeApproveRequest: { required: ["node", "sha"], optional: [] },
+  ForgeAssignRequest: { required: ["node"], optional: ["add", "remove"] },
   ForgeBlockedByRequest: { required: ["node"], optional: ["add", "remove"] },
   ForgeBoards: { required: ["boards"], optional: [] },
   ForgeBoardsRequest: { required: [], optional: ["folder"] },
-  ForgeCapabilities: { required: ["forge", "issues", "pulls", "labelColors", "avatars", "stateReason", "commentCount"], optional: ["createdAt", "closedAt", "children", "linkedPulls", "events", "total", "releases", "commentsMost"] },
-  ForgeCheck: { required: ["name", "state"], optional: ["url"] },
-  ForgeCloseRequest: { required: ["node"], optional: ["reopen", "transition"] },
+  ForgeCapabilities: { required: ["forge", "issues", "pulls", "labelColors", "avatars", "stateReason", "commentCount"], optional: ["createdAt", "closedAt", "children", "linkedPulls", "events", "total", "releases", "branches", "mergedBy", "mergeCommit", "size", "reviewers", "closes", "checkTimes", "commentsMost"] },
+  ForgeCheck: { required: ["name", "state"], optional: ["url", "startedAt", "finishedAt"] },
+  ForgeCloseRequest: { required: ["node"], optional: ["reopen", "transition", "reason"] },
   ForgeComment: { required: ["author", "body", "at"], optional: ["avatar", "url", "bot"] },
   ForgeCommentRequest: { required: ["node", "body"], optional: [] },
   ForgeDiff: { required: ["files", "cut"], optional: ["url"] },
@@ -15115,8 +15319,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeFeaturesRequest: { required: [], optional: ["folder", "board"] },
   ForgeImage: { required: ["mimeType", "data"], optional: [] },
   ForgeImageRequest: { required: ["url"], optional: [] },
-  ForgeItem: { required: ["node", "title", "state", "labels", "assignees", "updatedAt", "comments"], optional: ["stateReason", "status", "url", "folder", "author", "authorAvatar", "milestone", "createdAt", "closedAt", "draft", "checks", "review", "mergeable", "autoMerge", "parent", "level", "feature", "progress", "standing"] },
-  ForgeItemDetail: { required: ["item", "body", "comments"], optional: ["cursor", "checks", "reviewThreads", "filesChanged", "head", "mergeMethods", "start", "transitions", "actions", "children", "linkedPulls", "events"] },
+  ForgeItem: { required: ["node", "title", "state", "labels", "assignees", "updatedAt", "comments"], optional: ["stateReason", "status", "url", "folder", "author", "authorAvatar", "milestone", "createdAt", "closedAt", "draft", "checks", "review", "mergeable", "autoMerge", "headRef", "baseRef", "mergedBy", "mergeCommit", "parent", "level", "feature", "progress", "standing"] },
+  ForgeItemDetail: { required: ["item", "body", "comments"], optional: ["cursor", "checks", "reviewThreads", "filesChanged", "additions", "deletions", "commits", "reviewers", "closes", "head", "mergeMethods", "start", "transitions", "actions", "children", "linkedPulls", "events"] },
   ForgeItemRequest: { required: ["node"], optional: ["cursor"] },
   ForgeLabel: { required: ["name"], optional: ["color"] },
   ForgeLabelRequest: { required: ["node"], optional: ["add", "remove"] },
@@ -15142,6 +15346,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeReleaseRequest: { required: ["node"], optional: [] },
   ForgeReleases: { required: ["releases"], optional: ["none", "errors"] },
   ForgeReleasesRequest: { required: [], optional: ["folder", "limit"] },
+  ForgeReviewer: { required: ["login", "state"], optional: ["avatar"] },
   ForgeStanding: { required: ["labels", "any", "not", "lanes"], optional: ["milestone", "error"] },
   ForgeStart: { required: ["prompt", "labels"], optional: ["worktree"] },
   ForgeTransition: { required: ["id", "name"], optional: ["category"] },
@@ -15200,14 +15405,18 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineageEstimateRange: { required: ["median", "p10", "p90"], optional: [] },
   LineageEstimateRequest: { required: ["node"], optional: ["startAt"] },
   LineageFigures: { required: ["node", "cost", "sessions", "running", "runtimes"], optional: ["leadTimeSeconds", "limited"] },
-  LineageForecast: { required: ["at", "windowDays", "landings", "burn", "serviceLevels"], optional: ["node", "milestone", "lands", "noForecast", "toComplete", "kept", "spend", "overhead"] },
+  LineageForecast: { required: ["at", "windowDays", "landings", "burn", "serviceLevels"], optional: ["node", "milestone", "lands", "noForecast", "toComplete", "kept", "spend", "overhead", "assumes", "whatIf"] },
+  LineageForecastAssumes: { required: ["lanes", "peakLanes", "runtimes"], optional: [] },
   LineageForecastBurn: { required: ["credentialKey", "window", "used", "at", "resetsAt", "lasts"], optional: ["runsOutAt"] },
   LineageForecastKept: { required: ["at", "p50", "p85", "windowDays", "share", "open"], optional: [] },
   LineageForecastLands: { required: ["p50", "p85", "open", "closed", "stepsLeft", "share", "groups"], optional: ["growing"] },
-  LineageForecastRequest: { required: [], optional: ["node", "milestone", "folder"] },
+  LineageForecastRequest: { required: [], optional: ["node", "milestone", "folder", "whatIf"] },
+  LineageForecastRuntime: { required: ["runtime", "share", "hours", "rate"], optional: [] },
   LineageForecastServiceLevel: { required: ["level", "closed", "p50Seconds", "p85Seconds"], optional: [] },
   LineageForecastSpend: { required: ["week", "month"], optional: ["loadedWeek", "loadedMonth"] },
   LineageForecastToComplete: { required: ["cost", "ratio", "closed", "leadRatio"], optional: ["loaded"] },
+  LineageForecastWhatIf: { required: [], optional: ["lanes", "mix"] },
+  LineageForecastWhatIfEffect: { required: ["pace", "cost"], optional: ["lanes", "mix"] },
   LineageGraph: { required: ["nodes", "links"], optional: ["limited", "resolving", "resolved", "states"] },
   LineageLink: { required: ["from", "to", "rel", "source", "at"], optional: ["endedAt"] },
   LineageLinkRequest: { required: ["from", "to", "rel", "source"], optional: [] },
@@ -15435,7 +15644,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PersonSCIM: { required: ["provider", "userName", "active"], optional: ["externalId", "name", "displayName", "emails"] },
   PersonSettings: { required: [], optional: ["name", "pronouns"] },
   PersonSuspended: { required: ["by", "provider", "at"], optional: ["why"] },
-  Persona: { required: ["id", "name", "origin", "settings"], optional: ["description", "problem"] },
+  Persona: { required: ["id", "name", "origin", "settings"], optional: ["description", "keywords", "problem"] },
   PersonaAddAnswer: { required: ["persona"], optional: [] },
   PersonaFile: { required: ["id", "origin", "content"], optional: [] },
   PersonaFileSaveRequest: { required: ["origin", "id", "content"], optional: ["folder", "delete"] },
@@ -15886,6 +16095,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WebPushSubscription: { required: [], optional: ["endpoint", "p256dh", "auth"] },
   WebRemoteStatus: { required: ["port", "served"], optional: ["reason", "detail"] },
   WebServe: { required: ["on"], optional: [] },
+  WorkFeature: { required: ["feature", "epics", "loose"], optional: [] },
+  WorkFeatureEpic: { required: ["item", "steps"], optional: ["step", "blockedOutside", "forecast", "children"] },
+  WorkFeatures: { required: ["features"], optional: ["approvals", "errors"] },
+  WorkFeaturesRequest: { required: [], optional: ["folder", "board"] },
   WorkReport: { required: ["outcome", "message", "at"], optional: ["block"] },
   WorkTimeline: { required: ["epics", "releases"], optional: ["timeZone", "backtest", "errors"] },
   WorkTimelineBacktest: { required: ["error", "width", "cuts", "holds", "epics", "at"], optional: [] },

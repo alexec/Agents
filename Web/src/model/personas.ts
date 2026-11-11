@@ -44,3 +44,72 @@ export function withPersonaLabels(labels: readonly string[], last: Persona | und
   const have = new Set(left.map((l) => l.toLowerCase()));
   return [...left, ...(persona?.settings.labels ?? []).filter((l) => !have.has(l.toLowerCase()) && have.add(l.toLowerCase()))];
 }
+
+/** Auto on the New Agent page (#4559): the persona the first prompt's words name, and the word.
+ *  Persona.autoPick (Model/PersonaAutoPick.swift) ported by hand: a keyword counts once it is a
+ *  whole word, followed by a space or punctuation; most matches wins, the earliest breaks a tie. */
+export interface AutoPick { persona: Persona; word: string }
+
+/** The keyword that stands for any issue number, such as `#123`. */
+export const issueNumberKeyword = "#<n>";
+
+const commonWords = new Set(["about", "after", "before", "every", "other", "their", "there",
+  "these", "those", "until", "where", "which", "while", "would"]);
+const isWord = (c: string | undefined) => c !== undefined && /[\p{L}\p{N}]/u.test(c);
+
+/** Its `keywords:`, else the longer words of its name and description. */
+export function autoWords(persona: Persona): string[] {
+  if (persona.keywords && persona.keywords.length > 0) return persona.keywords;
+  const seen = new Set<string>();
+  return [persona.name, persona.description ?? ""].flatMap((s) => s.split(/[^\p{L}\p{N}]+/u))
+    .filter((w) => [...w].length >= 5 && !commonWords.has(w.toLowerCase()))
+    .filter((w) => !seen.has(w.toLowerCase()) && seen.add(w.toLowerCase()));
+}
+
+function matches(keyword: string, text: string[]): { at: number; word: string }[] {
+  const wanted = keyword.trim();
+  const found: { at: number; word: string }[] = [];
+  if (wanted === issueNumberKeyword) {
+    text.forEach((c, i) => {
+      if (c !== "#" || isWord(text[i - 1])) return;
+      let end = i + 1;
+      while (end < text.length && /[0-9]/.test(text[end]!)) end++;
+      if (end > i + 1 && end < text.length && !isWord(text[end])) found.push({ at: i, word: text.slice(i, end).join("") });
+    });
+    return found;
+  }
+  const word = [...wanted.toLowerCase()];
+  if (word.length === 0 || word.length >= text.length) return found;
+  for (let i = 0; i + word.length < text.length; i++) {
+    if (word.every((c, j) => text[i + j] === c) && !isWord(text[i - 1]) && !isWord(text[i + word.length])) {
+      found.push({ at: i, word: wanted });
+    }
+  }
+  return found;
+}
+
+/** The persona `prompt` names, or undefined when none matches. */
+export function autoPersona(prompt: string, personas: readonly Persona[]): AutoPick | undefined {
+  const text = [...prompt.toLowerCase()];
+  let best: { pick: AutoPick; count: number; first: number } | undefined;
+  for (const persona of personas) {
+    if (persona.problem !== undefined) continue;
+    let count = 0;
+    let first: { at: number; word: string } | undefined;
+    for (const keyword of autoWords(persona)) {
+      for (const match of matches(keyword, text)) {
+        count++;
+        if (!first || match.at < first.at) first = match;
+      }
+    }
+    if (!first) continue;
+    if (!best || count > best.count || (count === best.count && first.at < best.first)) {
+      best = { pick: { persona, word: first.word }, count, first: first.at };
+    }
+  }
+  return best?.pick;
+}
+
+/** The grey line under the control: what Auto picked, and the word. */
+export const autoLine = (pick: AutoPick | undefined) =>
+  pick ? `Auto picked ${pick.persona.name}: "${pick.word}"` : "Auto picks a persona from the words you type";

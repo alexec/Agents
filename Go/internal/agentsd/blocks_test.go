@@ -346,3 +346,42 @@ func TestAWaitOutlivesAnotherAgentsMessage(t *testing.T) {
 	})
 	waitFor(t, "its turn over", turnOver(3))
 }
+
+// A due block on an agent in a turn does not keep the block timer firing (#4687): aimed
+// at its time, which had passed, the timer fired every 20 ms until the turn ended, and
+// each pass copied and sorted every record. The block resumes as the turn ends.
+func TestADueBlockInATurnFiresTheTimerOnce(t *testing.T) {
+	fakeRuntimes(t)
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	lead := seeded(t, d, t.TempDir(), func(a *wire.Agent) {
+		a.State, a.EndedReason = wire.AgentStateFinished, reason(wire.EndedReasonEndTurn)
+		a.Report = &wire.WorkReport{Outcome: wire.WorkOutcomeWaiting, Message: "Waiting for CI.", At: now(),
+			Block: &wire.Block{Waits: []wire.Wait{}, CheckAgainAt: new(wire.DateOf(time.Now().Add(-time.Minute)))}}
+	})
+	l := d.live(lead.ID)
+	l.mu.Lock()
+	l.inTurn = true
+	l.mu.Unlock()
+	fires := d.blockFires.Load()
+	d.armBlockTimer()
+	time.Sleep(300 * time.Millisecond)
+	if n := d.blockFires.Load() - fires; n > 1 {
+		t.Fatalf("the block timer fired %d times in 300 ms", n)
+	}
+	if r := d.Store.Agent(lead.ID).Report; !isOpenBlock(r) {
+		t.Fatalf("resumed in its turn: %+v", r)
+	}
+	l.mu.Lock()
+	l.inTurn = false
+	l.mu.Unlock()
+	l.kick()
+	waitFor(t, "the block resumed", func() bool {
+		for _, u := range userMessages(d, lead.ID) {
+			if strings.HasPrefix(u, "The time you asked to check again has come.") {
+				return true
+			}
+		}
+		return false
+	})
+}

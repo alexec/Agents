@@ -20,6 +20,9 @@ protocol WorkModel: AnyObject, Sendable {
     /// The machines that draw Work ▸ Timeline (`work/timeline`, #4173), the home one first. None on
     /// the Remote: the Timeline is the Mac's (remote: by design).
     var timelineMachines: [(id: MachineRef, name: String)] { get }
+    /// The machines that give Work ▸ Features in one read (`work/features`, #4586), the home one
+    /// first; the others are read with `forge/features`, `forge/issues` and `forge/plan`.
+    var featuresMachines: [(id: MachineRef, name: String)] { get }
     /// The person's projects (#3283), for Work's Project filter: Mac + web, so the Remote has none.
     var workProjects: [WorkList.Project] { get }
     /// The machines that keep links, the home one first.
@@ -67,6 +70,7 @@ extension WorkModel {
     var workProjects: [WorkList.Project] { [] }
     func askWorkConnectors() -> Bool { false }
     var timelineMachines: [(id: MachineRef, name: String)] { [] }
+    var featuresMachines: [(id: MachineRef, name: String)] { [] }
     func lineageSessionsOn(_ nodes: [DaemonAPI.LineageNode]) async -> DaemonAPI.LineageSessionsOn? { nil }
     var lineageChanges: Int { 0 }
 

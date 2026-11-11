@@ -31,10 +31,14 @@ type forgeForgejo interface {
 	ItemPage(ctx context.Context, repo string, number int, pr bool, before string) (forgejomcp.ItemDetail, error)
 	Comment(ctx context.Context, repo string, number int, body string) (string, error)
 	SetLabels(ctx context.Context, repo string, number int, add, remove []string) error
+	SetAssignees(ctx context.Context, repo string, number int, add, remove []string) error
 	SetState(ctx context.Context, repo string, number int, closed bool) error
 	RepoLabels(ctx context.Context, repo string) ([]string, map[string]string, error)
 	MergeMethods(ctx context.Context, repo string) ([]string, error)
 	Merge(ctx context.Context, repo string, number int, sha, method string, auto bool) error
+	// The pull request page's Auto-merge row and Draft state (#4410).
+	CancelAutoMerge(ctx context.Context, repo string, number int) error
+	MarkReady(ctx context.Context, repo string, number int) error
 	Approve(ctx context.Context, repo string, number int, sha string) (string, error)
 	PRDiff(ctx context.Context, repo string, number int) (map[string]any, error)
 	// What lineage asks (lineageforgejo.go).
@@ -135,12 +139,18 @@ func (forgejoForge) Images() forgeImageHost { return forgejoImages{} }
 func (forgejoForge) Caps() forgeCaps {
 	return forgeCaps{
 		Issues: true, PRs: true,
-		Issue: forgeActions{Comment: true, Label: true, Close: true, Reopen: true},
-		PR: forgeActions{Comment: true, Label: true, Close: true, Reopen: true, Merge: true, AutoMerge: true, Approve: true,
-			Diff: true},
+		Issue: forgeActions{Comment: true, Label: true, Assign: true, Close: true, Reopen: true},
+		PR: forgeActions{Comment: true, Label: true, Assign: true, Close: true, Reopen: true, Merge: true, AutoMerge: true, Approve: true,
+			Diff: true, CancelAutoMerge: true, Ready: true},
 		LabelColors: true,
 		Avatars:     true,
 		CreatedAt:   true, ClosedAt: true,
+		// An issue's read has the pull requests that name it and its timeline (#4626); Forgejo
+		// has no sub-issues.
+		LinkedPulls: true, Events: true,
+		// A pull request's branches and merge (#4409), its size and reviewers (#4682). The issues it
+		// closes would need a read each for their titles, and a commit status has no times.
+		Branches: true, MergedBy: true, MergeCommit: true, Size: true, Reviewers: true,
 		CommentCount: "exact",
 		Releases:     true,
 		Plan:         true, BlockedBy: true, AddChild: true,
@@ -251,6 +261,20 @@ func (g forgejoForge) Item(ctx context.Context, r forgeRef, cursor string) (wire
 	}
 	if !p.PR {
 		out.Start = forgejoStart(out.Item, r.Number)
+		out.LinkedPulls, out.Events = []wire.ForgeLinked{}, []wire.ForgeEvent{}
+		for _, l := range p.LinkedPulls {
+			out.LinkedPulls = append(out.LinkedPulls, wire.ForgeLinked{Node: forgejoNode(l.Repo, l.Number, true), Title: l.Title, State: l.State, URL: optional(l.URL)})
+		}
+		for _, e := range p.Events {
+			ev := wire.ForgeEvent{Kind: wire.ForgeEventKind(e.Kind), Actor: optional(e.Actor), At: forgeDate(e.At), Assignee: optional(e.Assignee)}
+			if e.Label != "" {
+				ev.Label = &wire.ForgeLabel{Name: e.Label, Color: optional(e.LabelColor)}
+			}
+			if e.SourceNumber > 0 {
+				ev.Source = new(forgejoNode(e.SourceRepo, e.SourceNumber, e.SourcePR))
+			}
+			out.Events = append(out.Events, ev)
+		}
 		return out, nil
 	}
 	out.Checks = []wire.ForgeCheck{}
@@ -259,6 +283,13 @@ func (g forgejoForge) Item(ctx context.Context, r forgeRef, cursor string) (wire
 	}
 	out.ReviewThreads, out.FilesChanged = new(int64(p.ReviewThreads)), new(int64(p.FilesChanged))
 	out.Head = optional(p.Head)
+	if p.Size != nil {
+		withPullSize(&out, p.Size.Additions, p.Size.Deletions, p.Size.Commits)
+	}
+	out.Reviewers = []wire.ForgeReviewer{}
+	for _, r := range p.Reviewers {
+		out.Reviewers = append(out.Reviewers, forgeReviewerOf(r.Login, r.Avatar, r.State))
+	}
 	// The merge menu is a nicety: a page still reads when Forgejo does not say the repository's.
 	if methods, err := fj.MergeMethods(ctx, named); err == nil {
 		out.MergeMethods = mergeMethodsOf(methods)
@@ -379,6 +410,14 @@ func (g forgejoForge) SetLabels(ctx context.Context, r forgeRef, add, remove []s
 	return fj.SetLabels(ctx, named, r.Number, add, remove)
 }
 
+func (g forgejoForge) SetAssignees(ctx context.Context, r forgeRef, add, remove []string) error {
+	fj, named, _, err := g.of(ctx, "forge/assign", r)
+	if err != nil {
+		return err
+	}
+	return fj.SetAssignees(ctx, named, r.Number, add, remove)
+}
+
 func (g forgejoForge) SetState(ctx context.Context, r forgeRef, closed bool, transition string) error {
 	if transition != "" {
 		return cannot(actionTransition)
@@ -417,6 +456,28 @@ func (g forgejoForge) Merge(ctx context.Context, r forgeRef, sha, how string, au
 		return wire.ForgeDone{}, err
 	}
 	return wire.ForgeDone{Auto: optionalTrue(auto)}, nil
+}
+
+func (g forgejoForge) CancelAutoMerge(ctx context.Context, r forgeRef) error {
+	if !r.pr() {
+		return cannot(actionCancelAuto)
+	}
+	fj, named, _, err := g.of(ctx, "forge/cancel-auto-merge", r)
+	if err != nil {
+		return err
+	}
+	return fj.CancelAutoMerge(ctx, named, r.Number)
+}
+
+func (g forgejoForge) Ready(ctx context.Context, r forgeRef) error {
+	if !r.pr() {
+		return cannot(actionReady)
+	}
+	fj, named, _, err := g.of(ctx, "forge/ready", r)
+	if err != nil {
+		return err
+	}
+	return fj.MarkReady(ctx, named, r.Number)
 }
 
 func (g forgejoForge) Approve(ctx context.Context, r forgeRef, sha string) (wire.ForgeDone, error) {
@@ -504,6 +565,7 @@ func forgejoItemOf(i forgejomcp.Item, folder string) wire.ForgeItem {
 	if i.PR {
 		out.Draft, out.AutoMerge = new(i.Draft), new(i.AutoMerge)
 		out.Checks, out.Review, out.Mergeable = optional(i.Checks), optional(i.Review), optional(i.Mergeable)
+		withPullRefs(&out, i.HeadRef, i.BaseRef, i.MergedBy, i.MergeCommit)
 		return out
 	}
 	// An issue's level and feature are its labels'; Forgejo has no parent, and a list does not

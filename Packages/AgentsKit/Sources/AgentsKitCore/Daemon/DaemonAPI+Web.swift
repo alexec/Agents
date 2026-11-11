@@ -280,10 +280,13 @@ public extension DaemonAPI {
                 Row(Method.forgeComment, params: ForgeCommentRequest.self, result: ForgeDone.self, kind: .hostRequest),
                 Row(Method.forgeLabel, params: ForgeLabelRequest.self, result: ForgeDone.self, kind: .hostRequest),
                 Row(Method.forgeLabels, params: ForgeNodeRequest.self, result: ForgeLabels.self, kind: .hostRequest),
+                Row(Method.forgeAssign, params: ForgeAssignRequest.self, result: ForgeDone.self, kind: .hostRequest),
                 Row(Method.forgeClose, params: ForgeCloseRequest.self, result: ForgeDone.self, kind: .hostRequest),
                 Row(Method.forgeMerge, params: ForgeMergeRequest.self, result: ForgeDone.self, kind: .hostRequest),
                 Row(Method.forgeApprove, params: ForgeApproveRequest.self, result: ForgeDone.self, kind: .hostRequest),
                 Row(Method.forgeRerun, params: ForgeNodeRequest.self, result: ForgeDone.self, kind: .hostRequest),
+                Row(Method.forgeCancelAutoMerge, params: ForgeNodeRequest.self, result: ForgeDone.self, kind: .hostRequest),
+                Row(Method.forgeReady, params: ForgeNodeRequest.self, result: ForgeDone.self, kind: .hostRequest),
                 Row(Method.forgeLog, params: ForgeLogRequest.self, result: ForgeLog.self, kind: .hostRequest),
                 Row(Method.forgeDiff, params: ForgeNodeRequest.self, result: ForgeDiff.self, kind: .hostRequest),
                 Row(Method.forgePlan, params: ForgePlanRequest.self, result: ForgePlan.self, kind: .hostRequest),
@@ -301,6 +304,8 @@ public extension DaemonAPI {
                 Row(Method.messagesReply, params: MessagesReplyRequest.self, result: MessagesReplied.self, kind: .hostRequest),
                 // Work ▸ Timeline on the web page (#4206).
                 Row(Method.workTimeline, params: WorkTimelineRequest.self, result: WorkTimeline.self, kind: .hostRequest),
+                // Work ▸ Features as a delivery view (#4586).
+                Row(Method.workFeatures, params: WorkFeaturesRequest.self, result: WorkFeatures.self, kind: .hostRequest),
                 Row(Method.docsList, params: DocsListRequest.self, result: DocsList.self, kind: .hostRequest),
                 Row(Method.docsSearch, params: DocsSearchRequest.self, result: DocsSearch.self, kind: .hostRequest),
                 Row(Method.docsRead, params: DocsReadRequest.self, result: DocsReading.self, kind: .hostRequest),
@@ -314,6 +319,9 @@ public extension DaemonAPI {
                 Row(Method.lineageEstimate, params: LineageEstimateRequest.self, result: LineageEstimate.self,
                     kind: .hostRequest),
                 Row(Method.lineageForecast, params: LineageForecastRequest.self, result: LineageForecast.self,
+                    kind: .hostRequest),
+                // A release's Lineage panel on the web page (#4423).
+                Row(Method.lineageFigures, params: LineageNodeRequest.self, result: LineageFigures.self,
                     kind: .hostRequest),
                 Row(Method.simulatorsList, params: Empty.self, result: SimulatorList.self, kind: .hostRequest),
                 Row(Method.simulatorsBoot, params: SimulatorRequest.self, result: Empty.self, kind: .hostRequest),

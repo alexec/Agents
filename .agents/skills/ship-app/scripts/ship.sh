@@ -37,6 +37,9 @@
 #                           check the products are optimised, and stop: nothing is installed
 #   ship.sh --check-host    say which copies of Agents macOS knows and whether the jobs
 #                           run from the installed one; nothing is changed (#3451)
+#   ship.sh --control-plane also deploy this checkout to the live control plane,
+#                           control.agentloops.dev, with deploy/gcp/up.sh (#4712): the
+#                           release's image on a release tag, else built here (--build)
 #
 # The jobs name their app by bundle id only, so launchd can start them from any copy that
 # LaunchServices knows, such as an old Debug build in some checkout (#3451). launchd keeps
@@ -280,7 +283,7 @@ if [[ ${1:-} == --install-device ]]; then
   exit
 fi
 
-BUILD=1 DEVICES=1 MAC=1 DELAY=20 LINUX=1 BUILD_ONLY=0 LIST_DEVICES=0
+BUILD=1 DEVICES=1 MAC=1 DELAY=20 LINUX=1 BUILD_ONLY=0 LIST_DEVICES=0 CONTROL_PLANE=0
 typeset -a ONLY
 while (( $# )); do
   case $1 in
@@ -293,6 +296,7 @@ while (( $# )); do
     --now) DELAY=3 ;;
     --build-only) BUILD_ONLY=1 ;;
     --list-devices) LIST_DEVICES=1 ;;
+    --control-plane) CONTROL_PLANE=1 ;;
     *) echo "unknown option $1" >&2; exit 2 ;;
   esac
   shift
@@ -353,6 +357,8 @@ HOSTAPP=$REPO/build/DD-host/Build/Products/$CONFIG/Agents.app
 IOSAPP=$REPO/build/DD-ios/Build/Products/$CONFIG-iphoneos/Agents.app
 echo "$( (( BUILD_ONLY )) && echo "build only, $REPO" || echo "main, $REPO") $SHA  logs $LOGS"
 if [[ -n $(git -C "$REPO" --no-optional-locks status --porcelain --untracked-files=no) ]]; then
+  # The live control plane serves other people: only a commit, never edits on top of one.
+  (( CONTROL_PLANE && ! BUILD_ONLY )) && { echo "$REPO has uncommitted changes; not deploying them to the control plane; stop" >&2; exit 1; }
   echo "note: $REPO has uncommitted changes; the build includes them"
 fi
 
@@ -430,6 +436,24 @@ if (( BUILD_ONLY )); then
   exit 0
 fi
 
+# The live control plane (#4712), before the Mac restart, which can end this session's turn.
+# A failed deploy does not stop the Mac and the devices; the script exits 1 at the end.
+CP_FAILED=0
+if (( CONTROL_PLANE )); then
+  CP_VERSION=$("$REPO/scripts/version.sh")
+  typeset -a UP_FLAGS
+  # Only a release's X.Y.Z has an image to pull; any other commit is built here.
+  [[ $CP_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || UP_FLAGS=(--build)
+  echo "$(date +%T) control-plane $CP_VERSION${UP_FLAGS:+ (image built here)}; log $LOGS/control-plane.log"
+  if ( cd "$REPO" && deploy/gcp/up.sh $UP_FLAGS ) > $LOGS/control-plane.log 2>&1; then
+    echo "$(date +%T) control plane serves: $(grep -E '^agents-control ' $LOGS/control-plane.log | tail -1)"
+  else
+    CP_FAILED=1
+    echo "FAILED: control-plane (log $LOGS/control-plane.log)" >&2
+    tail -5 $LOGS/control-plane.log >&2
+  fi
+fi
+
 if (( DEVICES )); then
   [[ -d $IOSAPP ]] || { echo "no device build at $IOSAPP" >&2; exit 1; }
   BID=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' $IOSAPP/Info.plist)
@@ -461,3 +485,4 @@ if (( MAC )); then
 else
   echo "leaving the Mac app where it is: no copy into Applications, no login-item restart"
 fi
+(( ! CP_FAILED ))

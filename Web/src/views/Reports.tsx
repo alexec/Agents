@@ -7,7 +7,7 @@ import { signal, useSignal } from "@preact/signals";
 import { go, routeHash } from "../route";
 import { hasPage } from "../model/work";
 import type { Store } from "../model/store";
-import type { FeatureUsage, LineageForecast, LineageNode, MachineRef, ReportFormat, ReportPage, ReportRange, ReportRow, ReportScope, ReportScopeOption, ReportValue, ReportValueRow, ReportView,
+import type { FeatureUsage, LineageForecast, LineageForecastAssumes, LineageForecastWhatIfEffect, LineageNode, MachineRef, ReportFormat, ReportPage, ReportRange, ReportRow, ReportScope, ReportScopeOption, ReportValue, ReportValueRow, ReportView,
   UsageReport } from "../protocol/generated";
 import { CallFailed } from "../wire/link";
 import { adoption, adoptionLine, barCaption, adoptionNote, budgetWords, dimensionTitle, empty, exportName, groupNote, hiddenNote, line, meNote,
@@ -21,8 +21,8 @@ import {
   estimateCoverageLine, estimateErrorLine, estimateLandsAtLine, leadLine, noValue, noValueHere, nodeName, rowLine,
   unlinkedLine, valueHeadline, valueNote, wasteLine,
 } from "../model/value";
-import { burnLine, burnRuntime, forecastScoreLine, landsLine, loadedLine, mergeBurns, nextNote, noNext, noNextHere, noNextOffline, serviceLevelLine,
-  spendLines } from "../model/planning";
+import { assumesLine, burnLine, burnRuntime, forecastScoreLine, landsLine, laneOptions, loadedLine, mergeBurns, mixOptions, nextNote, noNext,
+  noNextHere, noNextOffline, serviceLevelLine, spendLines, whatIfLines, whatIfNote, whatIfOf } from "../model/planning";
 import { Capability } from "../protocol/capabilities.generated";
 import type { Section } from "../model/console";
 import { Choice } from "./Choice";
@@ -445,7 +445,8 @@ function PlanningPane({ store, scope, initial }: { store: Store; scope: ReportSc
 
 /** What comes next on Reports ▸ Planning (#4528), from lineage/forecast on the person's own machines: each
  * allowance's burn, the newest reading of it from any machine; the spend and the service levels of the machine with
- * the most landings (this Mac first); and when each open epic lands, from that machine. */
+ * the most landings (this Mac first); and when each open epic lands, from that machine. What if (#4531): a lane limit
+ * and a runtime mix, asked of every machine, move the figures; the mix to pick from is the main machine's. */
 function NextPart({ store, epics }: { store: Store; epics: readonly LineageNode[] }) {
   const answering = store.hosts.value.filter((h) => hostAnswers(h.state));
   const hosts = answering.filter((h) => store.has(h.id, Capability.lineageForecast1)).map((h) => h.id);
@@ -454,19 +455,27 @@ function NextPart({ store, epics }: { store: Store; epics: readonly LineageNode[
   const lands = useSignal<Record<string, LineageForecast | string>>({});
   const names = runtimeNameIn(store);
   const epicKey = epics.map((e) => e.ref).join(" ");
+  // The what-if's picks: "" is as the window ran. assumes is what the window ran with, from the first answer.
+  const lanes = useSignal("");
+  const mix = useSignal<Record<string, string>>({});
+  const assumes = useSignal<LineageForecastAssumes | undefined>(undefined);
+  const whatIf = whatIfOf(lanes.value, mix.value, assumes.value);
+  const whatIfKey = JSON.stringify(whatIf ?? null);
   useEffect(() => {
     let live = true;
-    all.value = null;
+    // A new what-if keeps the figures on screen until its answer comes; the epics say they are forecasting.
     lands.value = {};
-    void Promise.all(hosts.map((host) => store.link.call("lineage/forecast", {}, host).then((forecast) => ({ host, forecast }), () => null)))
+    const ask = whatIf ? { whatIf } : {};
+    void Promise.all(hosts.map((host) => store.link.call("lineage/forecast", ask, host).then((forecast) => ({ host, forecast }), () => null)))
       .then((got) => {
         if (!live) return;
         const answers = got.filter((g): g is { host: MachineRef; forecast: LineageForecast } => g !== null);
         all.value = answers;
         const main = mainForecast(answers, store.macHostID.value);
         if (!main) return;
+        if (!assumes.value) assumes.value = main.forecast.assumes;
         for (const node of epics) {
-          void store.link.call("lineage/forecast", { node }, main.host).then((f) => {
+          void store.link.call("lineage/forecast", { node, ...ask }, main.host).then((f) => {
             if (live) lands.value = { ...lands.value, [node.ref]: f };
           }, (error: unknown) => {
             if (live) lands.value = { ...lands.value, [node.ref]: sentence(error) };
@@ -474,7 +483,7 @@ function NextPart({ store, epics }: { store: Store; epics: readonly LineageNode[
         }
       });
     return () => { live = false; };
-  }, [hosts.join(" "), epicKey]);
+  }, [hosts.join(" "), epicKey, whatIfKey]);
   if (hosts.length === 0) return <><h3>What comes next</h3><p class="hint">{answering.length === 0 ? noNextOffline : noNextHere}</p></>;
   if (all.value === null) return <><h3>What comes next</h3><p class="hint">Loading…</p></>;
   const main = mainForecast(all.value, store.macHostID.value);
@@ -504,7 +513,35 @@ function NextPart({ store, epics }: { store: Store; epics: readonly LineageNode[
           ))}
         </ul>
       )}
+      {assumes.value && main && (
+        <WhatIfPart assumes={assumes.value} windowDays={main.forecast.windowDays} effect={main.forecast.whatIf} names={names}
+          lanes={lanes.value} mix={mix.value} onLanes={(v) => { lanes.value = v; }} onMix={(runtime, v) => { mix.value = { ...mix.value, [runtime]: v }; }} />
+      )}
       <p class="quiet small">{nextNote}</p>
+    </>
+  );
+}
+
+/** What if (#4531): the lane limit and each runtime's share, what the window ran with, and what the picks moved. */
+function WhatIfPart({ assumes, windowDays, effect, names, lanes, mix, onLanes, onMix }: {
+  assumes: LineageForecastAssumes; windowDays: number; effect: LineageForecastWhatIfEffect | undefined; names: (runtime: string) => string;
+  lanes: string; mix: Record<string, string>; onLanes: (v: string) => void; onMix: (runtime: string, v: string) => void;
+}) {
+  return (
+    <>
+      <h4>What if</h4>
+      <div class="report-whatif">
+        <Choice label="Lanes" value={lanes} options={laneOptions(assumes)} onPick={onLanes} />
+        {assumes.runtimes.length > 1 && assumes.runtimes.map((r) => (
+          <Choice key={r.runtime} label={names(r.runtime)} value={mix[r.runtime] ?? ""} onPick={(v) => onMix(r.runtime, v)}
+            options={mixOptions(r.share, effect?.mix && !mix[r.runtime] ? effect.mix[r.runtime] ?? 0 : undefined)} />
+        ))}
+      </div>
+      <ul class="report-list">
+        <li><span class="quiet small">{assumesLine(assumes, windowDays, names)}</span></li>
+        {effect && whatIfLines(effect, assumes).map((line) => <li key={line}><span>{line}</span></li>)}
+      </ul>
+      {effect && <p class="quiet small">{whatIfNote}</p>}
     </>
   );
 }

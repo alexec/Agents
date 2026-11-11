@@ -1273,6 +1273,7 @@ dialog.image-viewer::backdrop { background: rgb(0 0 0 / 0.45); }
 .report-budget { display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card);
   padding: 10px 12px; background: var(--paper-raised); }
 .report-scopes { margin-bottom: 8px; }
+.report-whatif { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 /* A feature with no use in 90 days (#2165), as the window's orange mark. */
 .report-unused { color: var(--tint-attention); }
 /* The Console's pages draw Settings' sections (People, Groups): Settings' rows, as sidebar.css has them under .with-sidebar. */
@@ -2072,7 +2073,7 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .docs-match { display: flex; gap: 8px; text-align: left; }
 .docs-line { min-width: 3em; text-align: right; opacity: 0.6; font-variant-numeric: tabular-nums; }
 .docs-text { margin-top: 12px; }
-/* Messages (#4344): a conversation's row, and its messages as plain text. */
+/* Messages (#4344): a conversation's row, and its messages as Markdown. */
 .messages-source { width: 1.2em; text-align: center; opacity: 0.7; }
 .messages-row .work-row-head { flex-wrap: nowrap; }
 .messages-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; font-weight: normal; }
@@ -2089,7 +2090,7 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .messages-reply p { margin: 4px 0 0; }
 .messages-reply-row { display: flex; gap: 8px; align-items: flex-end; }
 .messages-reply-row textarea { flex: 1; min-width: 0; resize: vertical; font: inherit; }
-.messages-text { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.messages-text { margin: 4px 0 0; overflow-wrap: anywhere; }
 /* The label chip (#4392, parts.md section 3): a capsule in the label's colour at 18 %, its border at 60 %, the text at
    4.5:1 (model/work chipColours); grey with no colour. A scoped label's scope in the regular weight. */
 .work-label { display: inline-flex; align-items: center; box-sizing: border-box; height: 18px; padding: 0 6px; border: 1px solid var(--paper-rule);
@@ -2450,6 +2451,54 @@ button.work-merge-row:hover { background: var(--paper-wash); }
 .work-event .mark.merged { background: #8250df; }
 .work-event .mark.merged .work-state-icon { --state: #fff; }
 .work-event .mark.pr-closed { background: #cf222e; color: #fff; }
+/* A release (#4423, specs/4328-work-look/milestones.md notes 19 and 22 to 29), as the window's WorkReleasePage (#4421):
+   the box glyph and the green Latest chip on its row and its header; its page the notes, then the pull requests, and the
+   side panel a 240 px column over 900 px, rows under the notes under it; under 700 px the pull requests a row that
+   opens their list. */
+.work-release-glyph { flex: none; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; opacity: 0.7; }
+.work-release-chip { flex: none; display: inline-block; padding: 0 7px; border: 1px solid; border-radius: 99px; font-size: 0.75rem; font-weight: 500;
+  line-height: 1.5; vertical-align: middle; white-space: nowrap; }
+.work-release-chip.latest { color: #1a7f37; border-color: color-mix(in srgb, #1a7f37 60%, transparent); }
+.work-release-grid { display: grid; grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "bar" "head" "problem" "notes" "people" "main"; column-gap: 24px; }
+.work-release-grid > .work-page-bar { grid-area: bar; }
+.work-release-grid > .work-page-head { grid-area: head; }
+.work-release-grid > .work-problem { grid-area: problem; }
+.work-release-grid > .work-release-notes { grid-area: notes; }
+.work-release-grid > .work-side.people { grid-area: people; margin: 12px 0; border-bottom: 1px solid var(--paper-rule); }
+.work-release-grid > .work-main { grid-area: main; min-width: 0; }
+.work-release-grid:has(> .work-problem) > :is(.work-side, .work-main, .work-release-notes) { opacity: 0.5; }
+.work-release-page .work-page-byline .quiet { font-variant-numeric: tabular-nums; }
+.work-release-range, .work-release-tag { font-family: var(--mono, ui-monospace, monospace); font-size: 0.95em; }
+.work-release-tag { display: inline-flex; gap: 6px; align-items: center; }
+.work-page section.work-release-notes { margin-top: 0; padding: 12px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-well); }
+.work-release-notes h3, .work-release-pulls-head h3 { margin: 0 0 6px; font-size: 0.875rem; font-weight: 600; }
+.work-release-notes p { margin: 0; }
+.work-release-pulls-head { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin-bottom: 8px; }
+.work-release-pulls-head h3 { margin: 0; margin-right: auto; font-variant-numeric: tabular-nums; }
+.work-release-filters { display: inline-flex; gap: 8px; align-items: center; }
+.work-release-filters input[type="search"] { width: 200px; padding: 5px 8px; border: 1px solid var(--paper-rule); border-radius: var(--radius-control);
+  background: var(--paper-raised); color: inherit; font: inherit; }
+.work-release-pulls { border: 1px solid var(--paper-rule); border-radius: var(--radius-card); overflow: hidden; }
+.work-release-none { display: flex; gap: 8px; align-items: baseline; }
+.work-release-stage { display: inline-flex; gap: 6px; align-items: baseline; }
+.work-release-stage .tick { color: #1a7f37; font-weight: 600; }
+.work-release-figures { font-variant-numeric: tabular-nums; }
+.work-release-pulls-title { margin: 4px 0 8px; }
+.work-release-pulls-bar { margin-bottom: 8px; }
+.work-release-pulls-bar .work-release-filters { display: flex; }
+.work-release-pulls-bar input[type="search"] { flex: 1; width: auto; min-width: 0; }
+.work-release-back { padding: 0; }
+@container (min-width: 900px) {
+  .work-release-grid { grid-template-columns: minmax(0, 1fr) 240px; grid-template-rows: auto auto auto auto 1fr;
+    grid-template-areas: "bar bar" "head head" "problem problem" "notes people" "main people"; }
+  .work-release-grid > .work-side.people { margin: 0; border-bottom: none; }
+  .work-release-grid > .work-side.people > .work-side-section:first-child { border-top: none; padding-top: 0; }
+}
+@media (prefers-color-scheme: dark) {
+  .work-release-chip.latest { color: #3fb950; border-color: color-mix(in srgb, #3fb950 60%, transparent); }
+  .work-release-stage .tick { color: #3fb950; }
+}
 /* The Checks page (note 17): ‹ #4402, the counts, Rerun failed full width, a row per check with a chevron. */
 .work-checks-page h2 { margin: 4px 0 2px; }
 .work-checks-page > p { margin: 0 0 12px; }
@@ -2641,15 +2690,53 @@ dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
   .work-features .work-plan-bar .done { background: #8957e5; }
   .work-feature-epic-end .lead.working { color: #3fb950; }
 }
+/* Features as a delivery view (#4589, features-delivery.md): an epic's line with where it is, its children in flight under
+   it (a green dot for Working, the warn glyph and the attention colour for Needs you), and the rest in words. */
+.work-features .work-plan-bar .running { background: #1a7f37; }
+.work-epic-glyph { flex: none; color: #1a7f37; }
+.work-epic-glyph.closed { color: #8250df; }
+.work-delivery-epic { margin-top: 4px; }
+.work-delivery-epic-row .work-title { font-weight: 600; }
+.work-delivery-epic-row .where { white-space: nowrap; }
+.work-delivery-phone { display: none; }
+.work-flight-lines { padding-left: 22px; }
+.work-flight-row .mark { flex: none; width: 14px; text-align: center; color: #1a7f37; font-size: 0.8em; }
+.work-flight-row.is-attention .mark { color: var(--tint-attention); font-size: 1em; }
+.work-flight-row .name { flex: 0 1 auto; }
+.work-flight-row .ref { font-variant-numeric: tabular-nums; }
+.work-flight-row .words { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.75; }
+.work-flight-row.is-attention .words { color: var(--tint-attention); font-weight: 600; opacity: 1; }
+.work-flight-row .pr { flex: none; display: inline-flex; gap: 4px; align-items: center; margin-left: auto; white-space: nowrap; }
+.work-delivery-rest { margin: 2px 0 4px; padding-left: 26px; }
+.work-delivery-rest .short-line { display: none; }
+.work-delivery-rest a { color: inherit; }
+@media (prefers-color-scheme: dark) {
+  .work-features .work-plan-bar .running, .work-epic-glyph, .work-flight-row .mark { color: #3fb950; }
+  .work-features .work-plan-bar .running { background: #3fb950; }
+  .work-epic-glyph.closed { color: #8957e5; }
+}
+@container (max-width: 899px) {
+  .work-flight-row .pr { display: none; }
+  .work-feature-epic-end .lead { min-width: 0; }
+}
 @container (max-width: 699px) {
   .work-feature-chip, .work-feature-done .words { display: none; }
   .work-feature-done .work-plan-bar { width: 60px; }
-  .work-feature-open { padding-left: 24px; }
+  .work-feature-open { padding-left: 20px; }
   .work-feature-row { flex-wrap: wrap; align-items: baseline; }
-  .work-feature-row .name { flex-basis: calc(100% - 22px); white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-  .work-feature-epic-end { margin-left: 22px; }
-  .work-feature-epic-end .work-plan-bar { display: none; }
-  .work-feature-epic-end .figures, .work-feature-epic-end .lead { min-width: 0; }
+  .work-feature-row .name { flex: 1 1 0; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .work-delivery-epic-row .where, .work-feature-epic-end .figures, .work-feature-epic-end .lead { display: none; }
+  .work-feature-epic-end .work-plan-bar { width: 60px; }
+  .work-delivery-phone { display: block; flex-basis: 100%; padding-left: 22px; opacity: 0.75; }
+  .work-delivery-phone.working { color: #1a7f37; opacity: 1; }
+  .work-delivery-phone.attention { color: var(--tint-attention); opacity: 1; }
+  .work-flight-lines { padding-left: 14px; }
+  .work-flight-lines .wide-only { display: none; }
+  .work-flight-row .words { flex-basis: 100%; padding-left: 22px; white-space: normal; }
+  .work-flight-row .words .sep { display: none; }
+  .work-delivery-rest { padding-left: 36px; }
+  .work-delivery-rest .wide-line { display: none; }
+  .work-delivery-rest .short-line { display: inline; }
 }
 /* Work ▸ Timeline (#4206), as the window's (#4173): white by day, navy at night, where the lines glow and the
    features' colours are mixed 25% with white to keep 3:1 on the navy (wireframe section 11). */

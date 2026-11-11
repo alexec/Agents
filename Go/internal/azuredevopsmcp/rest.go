@@ -364,6 +364,7 @@ type pullJSON struct {
 	IsDraft               bool           `json:"isDraft"`
 	LastMergeSourceCommit *commitRef     `json:"lastMergeSourceCommit"`
 	LastMergeCommit       *commitRef     `json:"lastMergeCommit"`
+	ClosedBy              *identity      `json:"closedBy"`
 	Reviewers             []reviewerJSON `json:"reviewers"`
 	Labels                []labelJSON    `json:"labels"`
 	ForkSource            *struct {
@@ -471,6 +472,7 @@ type buildJSON struct {
 	Status       string            `json:"status"`
 	Result       string            `json:"result"`
 	QueueTime    string            `json:"queueTime"`
+	StartTime    string            `json:"startTime"`
 	FinishTime   string            `json:"finishTime"`
 	SourceBranch string            `json:"sourceBranch"`
 	SourceVer    string            `json:"sourceVersion"`

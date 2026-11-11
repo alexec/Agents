@@ -20,6 +20,11 @@ extension RemoteModel {
         workMachines { $0.has(Capability.lineage1) }
     }
 
+    /// The machines that give Work ▸ Features in one read (#4586).
+    var featuresMachines: [(id: MachineRef, name: String)] {
+        workMachines { $0.has(Capability.forge1) && $0.has(Capability.workFeatures1) && $0.state != "offline" }
+    }
+
     /// None: boards are the Mac's and the web page's (#3282, tier Mac + web).
     var boardMachines: [(id: MachineRef, name: String)] { [] }
 

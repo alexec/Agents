@@ -110,7 +110,7 @@ func (d *Daemon) registerHost() {
 // holdingRuntimes is DaemonStatus's count: agents starting, running or waiting on the person.
 func (d *Daemon) holdingRuntimes() int {
 	n := 0
-	for _, a := range d.Store.Agents() {
+	for _, a := range d.Store.LiveAgents() {
 		switch a.State {
 		case wire.AgentStateStarting, wire.AgentStateRunning, wire.AgentStateWaitingOnUser:
 			n++

@@ -115,6 +115,9 @@ func (l Locations) ProjectTools() string { return filepath.Join(l.Root, "project
 // ArchiveIndex is the Swift daemon's index of archived agents (051), a cache.
 func (l Locations) ArchiveIndex() string { return filepath.Join(l.Cache, "archive.json") }
 
+// Summaries is this host's index of the archived agents' records (#4653), a cache.
+func (l Locations) Summaries() string { return filepath.Join(l.Cache, "archived-summaries.json") }
+
 // Turns is the Swift daemon's cache of an agent's turn summaries (StoreLocations.turns).
 func (l Locations) Turns(id string) string {
 	return filepath.Join(l.Cache, "turns", strings.ToUpper(id)+".jsonl")
