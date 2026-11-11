@@ -36,7 +36,8 @@ import (
 //
 // ForgeList.forges and ForgeItemDetail.actions are checked here since #4361, authorAvatar since
 // #4363, stateReason since #4365, createdAt, closedAt and an issue's children, linkedPulls and
-// events since #4373, and ForgeList.total since #4396.
+// events since #4373, ForgeList.total since #4396, and the comment count by commentCount since
+// #4364.
 
 type conformRow struct {
 	name string
@@ -66,9 +67,9 @@ var conformGitHubItems = []githubmcp.Item{
 		CreatedAt: "2026-10-01T10:00:00Z", ClosedAt: "2026-11-04T10:00:00Z", UpdatedAt: "2026-11-04T10:00:00Z", Comments: 1},
 	{Repo: "alexec/agents", Number: 3, PR: true, State: "open", Title: "Open", URL: "https://github.com/alexec/agents/pull/3",
 		Author: "alexec", AuthorAvatar: "https://avatars.githubusercontent.com/u/1?v=4", Labels: []string{"bug"}, LabelColors: map[string]string{"bug": "#d73a4a"}, Assignees: []string{"alexec"},
-		CreatedAt: "2026-10-01T10:00:00Z", UpdatedAt: "2026-11-03T10:00:00Z", Checks: "failing"},
+		CreatedAt: "2026-10-01T10:00:00Z", UpdatedAt: "2026-11-03T10:00:00Z", Checks: "failing", Comments: 1},
 	{Repo: "alexec/agents", Number: 2, State: "closed", StateReason: "not_planned", Title: "Closed", URL: "https://github.com/alexec/agents/issues/2",
-		Author: "alexec", AuthorAvatar: "https://avatars.githubusercontent.com/u/1?v=4", CreatedAt: "2026-10-01T10:00:00Z", ClosedAt: "2026-11-02T10:00:00Z", UpdatedAt: "2026-11-02T10:00:00Z"},
+		Author: "alexec", AuthorAvatar: "https://avatars.githubusercontent.com/u/1?v=4", CreatedAt: "2026-10-01T10:00:00Z", ClosedAt: "2026-11-02T10:00:00Z", UpdatedAt: "2026-11-02T10:00:00Z", Comments: 1},
 	{Repo: "alexec/agents", Number: 1, State: "open", Title: "Open issue", URL: "https://github.com/alexec/agents/issues/1",
 		Author: "alexec", AuthorAvatar: "https://avatars.githubusercontent.com/u/1?v=4", Labels: []string{"task", "feature:work"}, LabelColors: map[string]string{"task": "#c5def5", "feature:work": "#1d76db"},
 		CreatedAt: "2026-10-01T10:00:00Z", UpdatedAt: "2026-11-01T10:00:00Z", Comments: 2},
@@ -158,9 +159,9 @@ var conformGitLabItems = []gitlabmcp.Item{
 		CreatedAt: "2026-10-01T10:00:00Z", ClosedAt: "2026-11-04T10:00:00Z", UpdatedAt: "2026-11-04T10:00:00Z", Comments: 1},
 	{Project: "Group/App", Number: 3, MR: true, State: "open", Title: "Open", URL: "https://gitlab.com/Group/App/-/merge_requests/3",
 		Author: "kim", AuthorAvatar: "https://gitlab.com/uploads/-/system/user/avatar/7/avatar.png", Labels: []string{"bug"}, LabelColors: map[string]string{"bug": "#d9534f"}, Assignees: []string{"kim"},
-		CreatedAt: "2026-10-01T10:00:00Z", UpdatedAt: "2026-11-03T10:00:00Z", Checks: "failing"},
+		CreatedAt: "2026-10-01T10:00:00Z", UpdatedAt: "2026-11-03T10:00:00Z", Checks: "failing", Comments: 1},
 	{Project: "Group/App", Number: 2, State: "closed", Title: "Closed", URL: "https://gitlab.com/Group/App/-/issues/2",
-		Author: "kim", AuthorAvatar: "https://gitlab.com/uploads/-/system/user/avatar/7/avatar.png", CreatedAt: "2026-10-01T10:00:00Z", ClosedAt: "2026-11-02T10:00:00Z", UpdatedAt: "2026-11-02T10:00:00Z"},
+		Author: "kim", AuthorAvatar: "https://gitlab.com/uploads/-/system/user/avatar/7/avatar.png", CreatedAt: "2026-10-01T10:00:00Z", ClosedAt: "2026-11-02T10:00:00Z", UpdatedAt: "2026-11-02T10:00:00Z", Comments: 1},
 	{Project: "Group/App", Number: 1, State: "open", Title: "Open issue", URL: "https://gitlab.com/Group/App/-/issues/1",
 		Author: "kim", AuthorAvatar: "https://gitlab.com/uploads/-/system/user/avatar/7/avatar.png", Labels: []string{"task"}, LabelColors: map[string]string{"task": "#c5def5"},
 		CreatedAt: "2026-10-01T10:00:00Z", UpdatedAt: "2026-11-01T10:00:00Z", Comments: 2},
@@ -238,9 +239,9 @@ var conformForgejoItems = []forgejomcp.Item{
 		CreatedAt: "2026-10-01T10:00:00Z", ClosedAt: "2026-11-04T10:00:00Z", UpdatedAt: "2026-11-04T10:00:00Z", Comments: 1},
 	{Repo: "walkalex/App", Number: 3, PR: true, State: "open", Title: "Open", URL: "http://localhost:3753/walkalex/App/pulls/3",
 		Author: "kim", AuthorAvatar: "http://localhost:3753/avatars/k", Labels: []string{"bug"}, LabelColors: map[string]string{"bug": "#ee0701"}, Assignees: []string{"kim"},
-		CreatedAt: "2026-10-01T10:00:00Z", UpdatedAt: "2026-11-03T10:00:00Z", Checks: "failing"},
+		CreatedAt: "2026-10-01T10:00:00Z", UpdatedAt: "2026-11-03T10:00:00Z", Checks: "failing", Comments: 1},
 	{Repo: "walkalex/App", Number: 2, State: "closed", Title: "Closed", URL: "http://localhost:3753/walkalex/App/issues/2",
-		Author: "kim", AuthorAvatar: "http://localhost:3753/avatars/k", CreatedAt: "2026-10-01T10:00:00Z", ClosedAt: "2026-11-02T10:00:00Z", UpdatedAt: "2026-11-02T10:00:00Z"},
+		Author: "kim", AuthorAvatar: "http://localhost:3753/avatars/k", CreatedAt: "2026-10-01T10:00:00Z", ClosedAt: "2026-11-02T10:00:00Z", UpdatedAt: "2026-11-02T10:00:00Z", Comments: 1},
 	{Repo: "walkalex/App", Number: 1, State: "open", Title: "Open issue", URL: "http://localhost:3753/walkalex/App/issues/1",
 		Author: "kim", AuthorAvatar: "http://localhost:3753/avatars/k", Labels: []string{"task"}, LabelColors: map[string]string{"task": "#c5def5"},
 		CreatedAt: "2026-10-01T10:00:00Z", UpdatedAt: "2026-11-01T10:00:00Z", Comments: 2},
@@ -312,7 +313,7 @@ var conformBitbucketItems = []bitbucketmcp.Item{
 	{Repo: "walkalex/App", Number: 4, PR: true, State: "merged", Title: "Merged", URL: "https://bitbucket.org/walkalex/App/pull-requests/4",
 		Author: "kim", AuthorAvatar: "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/k/48", CreatedAt: "2026-10-01T10:00:00Z", UpdatedAt: "2026-11-04T10:00:00Z", Comments: 1},
 	{Repo: "walkalex/App", Number: 3, PR: true, State: "open", Title: "Open", URL: "https://bitbucket.org/walkalex/App/pull-requests/3",
-		Author: "kim", AuthorAvatar: "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/k/48", Assignees: []string{"kim"}, CreatedAt: "2026-10-01T10:00:00Z", UpdatedAt: "2026-11-03T10:00:00Z", Checks: "failing"},
+		Author: "kim", AuthorAvatar: "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/k/48", Assignees: []string{"kim"}, CreatedAt: "2026-10-01T10:00:00Z", UpdatedAt: "2026-11-03T10:00:00Z", Checks: "failing", Comments: 1},
 	{Repo: "walkalex/App", Number: 2, State: "closed", StateReason: "duplicate", Title: "Closed", URL: "https://bitbucket.org/walkalex/App/issues/2",
 		Author: "kim", AuthorAvatar: "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/k/48", Labels: []string{"bug"}, CreatedAt: "2026-10-01T10:00:00Z", UpdatedAt: "2026-11-02T10:00:00Z"},
 	{Repo: "walkalex/App", Number: 1, State: "open", Title: "Open issue", URL: "https://bitbucket.org/walkalex/App/issues/1",
@@ -347,6 +348,9 @@ func (g conformBitbucket) ItemPage(_ context.Context, _ string, number int, pr b
 			if i.PR {
 				d.Head = "abc"
 				d.CheckRuns = []bitbucketmcp.CheckRun{{Name: "Pipeline #12", State: "failing", Run: 12}}
+			} else {
+				// An issue's count is only on its page (commentCount detail).
+				d.Comments = len(d.Thread)
 			}
 			return d, nil
 		}
@@ -406,6 +410,8 @@ func (g conformAzureDevOps) Search(_ context.Context, _ []string, sf azuredevops
 func (g conformAzureDevOps) ItemPage(_ context.Context, _ string, number int, _ string) (azuredevopsmcp.ItemDetail, error) {
 	for _, i := range conformAzureDevOpsItems {
 		if i.Number == number {
+			// The count is only on the page (commentCount detail).
+			i.Comments = 1
 			return azuredevopsmcp.ItemDetail{Item: i, Body: "The body.", Head: "abc",
 				Thread:    []azuredevopsmcp.Comment{{Author: "kim@example.com", Avatar: "https://dev.azure.com/acme/_apis/GraphProfile/MemberAvatars/aad.aw0", Body: "A comment.", At: i.UpdatedAt}},
 				CheckRuns: []azuredevopsmcp.CheckRun{{Name: "ci", State: "failing", Build: 70}}}, nil
@@ -439,7 +445,7 @@ type conformLinear struct {
 
 var conformLinearItems = []linearmcp.Item{
 	{Identifier: "ENG-2", Team: "ENG", State: "closed", StateReason: "completed", Title: "Closed", URL: "https://linear.app/acme/issue/ENG-2", Author: "kim", AuthorAvatar: "https://public.linear.app/k/avatar",
-		CreatedAt: "2026-10-01T10:00:00Z", ClosedAt: "2026-11-02T10:00:00Z", UpdatedAt: "2026-11-02T10:00:00Z"},
+		CreatedAt: "2026-10-01T10:00:00Z", ClosedAt: "2026-11-02T10:00:00Z", UpdatedAt: "2026-11-02T10:00:00Z", Comments: 1},
 	{Identifier: "ENG-1", Team: "ENG", State: "open", Title: "Open issue", URL: "https://linear.app/acme/issue/ENG-1", Author: "kim", AuthorAvatar: "https://public.linear.app/k/avatar",
 		Labels: []string{"task", "feature:Export"}, LabelColors: map[string]string{"task": "#c5def5", "feature:Export": "#1d76db"},
 		Assignees: []string{"kim"}, CreatedAt: "2026-10-01T10:00:00Z", UpdatedAt: "2026-11-01T10:00:00Z", Comments: 2},
@@ -505,7 +511,7 @@ type conformJira struct {
 
 var conformJiraItems = []jiramcp.Item{
 	{Key: "PROJ-2", Project: "PROJ", State: "closed", StateReason: "completed", Status: "Done", Title: "Closed", URL: "https://acme.atlassian.net/browse/PROJ-2",
-		Author: "Kim", AuthorAvatar: "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/k/48", CreatedAt: "2026-10-01T10:00:00.000Z", ClosedAt: "2026-11-02T10:00:00.000Z", UpdatedAt: "2026-11-02T10:00:00.000Z"},
+		Author: "Kim", AuthorAvatar: "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/k/48", CreatedAt: "2026-10-01T10:00:00.000Z", ClosedAt: "2026-11-02T10:00:00.000Z", UpdatedAt: "2026-11-02T10:00:00.000Z", Comments: 1},
 	{Key: "PROJ-1", Project: "PROJ", State: "open", Status: "To Do", Title: "Open issue", URL: "https://acme.atlassian.net/browse/PROJ-1",
 		Author: "Kim", AuthorAvatar: "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/k/48", Labels: []string{"billing"}, Assignees: []string{"Kim"}, CreatedAt: "2026-10-01T10:00:00.000Z", UpdatedAt: "2026-11-01T10:00:00.000Z", Comments: 2},
 }
@@ -576,7 +582,7 @@ type conformBoards struct {
 
 var conformBoardsItems = []azureboardsmcp.Item{
 	{ID: 2, Project: "acme/web", Type: "Task", State: "closed", StateReason: "not_planned", Status: "Done", Title: "Closed",
-		URL: "https://dev.azure.com/acme/web/_workitems/edit/2", Author: "Kim", AuthorAvatar: "https://dev.azure.com/acme/_apis/GraphProfile/MemberAvatars/aad.aw0", CreatedAt: "2026-10-01T10:00:00.000Z", ClosedAt: "2026-11-02T10:00:00.000Z", UpdatedAt: "2026-11-02T10:00:00.000Z"},
+		URL: "https://dev.azure.com/acme/web/_workitems/edit/2", Author: "Kim", AuthorAvatar: "https://dev.azure.com/acme/_apis/GraphProfile/MemberAvatars/aad.aw0", CreatedAt: "2026-10-01T10:00:00.000Z", ClosedAt: "2026-11-02T10:00:00.000Z", UpdatedAt: "2026-11-02T10:00:00.000Z", Comments: 1},
 	{ID: 1, Project: "acme/web", Type: "Task", State: "open", Status: "To Do", Title: "Open work item",
 		URL: "https://dev.azure.com/acme/web/_workitems/edit/1", Author: "Kim", AuthorAvatar: "https://dev.azure.com/acme/_apis/GraphProfile/MemberAvatars/aad.aw0", Labels: []string{"billing"},
 		Assignees: []string{"Kim"}, CreatedAt: "2026-10-01T10:00:00.000Z", UpdatedAt: "2026-11-01T10:00:00.000Z", Comments: 2},
@@ -751,6 +757,7 @@ func TestForgeConformance(t *testing.T) {
 						t.Fatal(err)
 					}
 					conformItemActions(t, caps, i, page.Actions)
+					conformComments(t, caps, i, page)
 					conformAvatars(t, d, caps, page)
 					conformLinks(t, d, f, caps, page)
 				}
@@ -869,6 +876,37 @@ func conformModel(t *testing.T, d *Daemon, caps forgeCaps, i wire.ForgeItem) {
 		}
 	case i.ClosedAt == nil || *i.ClosedAt == 0 || i.CreatedAt != nil && *i.ClosedAt < *i.CreatedAt:
 		t.Errorf("%v: closedAt %v, createdAt %v", i.Node, i.ClosedAt, i.CreatedAt)
+	}
+}
+
+// conformComments checks that an item's comment count follows commentCount (#4364): exact, the
+// list's count is the page's; capped, it is the page's up to commentsMost; detail, the list has
+// none, or the page's, as Bitbucket's pull requests have. The page's count is never less than the
+// comments it holds.
+func conformComments(t *testing.T, caps forgeCaps, listed wire.ForgeItem, page wire.ForgeItemDetail) {
+	t.Helper()
+	counted, held := page.Item.Comments, int64(len(page.Comments))
+	switch {
+	case counted < held:
+		t.Errorf("%v: the page counts %d comments and holds %d", listed.Node, counted, held)
+	case caps.CommentCount == "capped" && counted > int64(caps.CommentsMost):
+		t.Errorf("%v: the page counts %d comments, over the cap of %d", listed.Node, counted, caps.CommentsMost)
+	}
+	switch caps.CommentCount {
+	case "exact":
+		if listed.Comments != counted || caps.CommentsMost != 0 {
+			t.Errorf("%v: exact, the list counts %d and the page %d (commentsMost %d)", listed.Node, listed.Comments, counted, caps.CommentsMost)
+		}
+	case "capped":
+		if caps.CommentsMost <= 0 || listed.Comments != min(counted, int64(caps.CommentsMost)) {
+			t.Errorf("%v: capped at %d, the list counts %d and the page %d", listed.Node, caps.CommentsMost, listed.Comments, counted)
+		}
+	case "detail":
+		if listed.Comments != 0 && listed.Comments != counted || caps.CommentsMost != 0 {
+			t.Errorf("%v: detail, the list counts %d and the page %d (commentsMost %d)", listed.Node, listed.Comments, counted, caps.CommentsMost)
+		}
+	default:
+		t.Errorf("commentCount %q, not exact, capped or detail", caps.CommentCount)
 	}
 }
 
