@@ -10,7 +10,7 @@ Two ways to put an agent down, each keeping its whole conversation:
 
 - **Stop** ends what it is doing now. The chat stays where it is, and you can tell it what
   to do next.
-- **Archive** puts away a chat you are done with. It folds out of sight under **Archived sessions**.
+- **Archive** puts away a chat you are done with. It goes to the folder's **Archived Sessions** page.
   It can be unarchived.
 
 An agent that has finished can also archive itself. A chat you started does so without asking, unless you turn that off; where it needs your approval, you approve it with one click.
@@ -39,15 +39,19 @@ An agent that has finished can also archive itself. A chat you started does so w
    on the trackpad and click the **Archive** button it uncovers; or right-click the card
    and choose **Archive**.
 
-   An agent still working is stopped first. The chat moves under **Archived** at the
-   bottom of the folder's page, folded away.
+   An agent still working is stopped first. The chat moves to **Archived Sessions**, a
+   row at the bottom of the folder in the sidebar that opens a page of them.
 2. If the agent worked in a worktree the app made, archiving also removes the
    worktree, with any changes there that are not committed. Its branch, with its
    commits, stays unless it is merged. See
    [Start an agent in its own worktree](start-in-a-worktree.md).
-3. To unarchive it, open **Archived**, then right-click the card and choose **Unarchive**.
-   On iPhone and iPad, open **Archived**, open the chat, and choose **Unarchive** from
-   the **Actions** menu.
+3. To unarchive it, open **Archived Sessions**, then right-click the card and choose
+   **Unarchive**. On iPhone and iPad, open **Archived Sessions**, open the chat, and choose
+   **Unarchive** from the **Actions** menu.
+
+   The page shows the 50 newest first. To see older ones, click **Load more** at the
+   bottom. To find one, type in the **Filter** field: it also asks the folder's machine,
+   so it finds chats that the page has not loaded yet.
 
 **Approve archiving a chat**
 
@@ -88,7 +92,7 @@ approval. Bring back an archived chat with **Unarchive**. See
 **Undo Archive**
 
 Each time you archive, the app gives you five seconds to take it back. This lets you
-undo an archive by mistake without a search under **Archived**.
+undo an archive by mistake without a search on the **Archived Sessions** page.
 
 1. Archive a chat. A strip shows **Archived** and the chat's title, for example
    **Archived “Fix the parser”**, with **Undo**. On the Mac and the web page it is at the
@@ -135,7 +139,7 @@ An archived chat, including its labels and their owners, is kept whole and can b
 After that it is **deleted**: its conversation and record are removed, and nothing is left of
 it. An event or a chat that named it just says "another agent".
 
-- To delete one now, right-click its card under **Archived** and choose **Delete…**. On iPhone
+- To delete one now, right-click its card on the **Archived Sessions** page and choose **Delete…**. On iPhone
   and iPad, touch and hold its card; on the web page, use its **···** menu. You are asked
   first, and it cannot be undone.
 - Only archived chats can be deleted. Archive a chat first to delete it.
