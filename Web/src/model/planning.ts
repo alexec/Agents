@@ -2,8 +2,8 @@
 // burn against each weekly allowance, what a week and a month cost at the window's pace, each level's service level,
 // each open epic's landing range, and how the kept forecasts scored. The loaded figures (#4524) sit beside the direct
 // ones. The method is specs/4533-forecasting/spec.md.
-import type { LineageEstimateRange, LineageForecast, LineageForecastBurn, LineageForecastServiceLevel, ReportForecastScore,
-  ReportValue } from "../protocol/generated";
+import type { LineageEstimateRange, LineageForecast, LineageForecastAssumes, LineageForecastBurn, LineageForecastServiceLevel,
+  LineageForecastWhatIf, LineageForecastWhatIfEffect, ReportForecastScore, ReportValue } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import { roughTime } from "./estimate";
 import { money as moneyWords } from "./limits";
@@ -120,6 +120,68 @@ export function mergeBurns(all: readonly LineageForecast[]): LineageForecastBurn
 
 /** The name of the allowance's runtime: the part of its key before the colon. */
 export const burnRuntime = (b: LineageForecastBurn) => b.credentialKey.split(":", 1)[0] ?? b.credentialKey;
+
+// What-if (#4531): a lane limit and a runtime mix, each "" as the window ran.
+
+/** The lane limits to pick: as they ran, then 1 to 10. */
+export function laneOptions(a: LineageForecastAssumes | undefined): [string, string][] {
+  const ran = a && a.peakLanes > 0 ? `As they ran (up to ${a.peakLanes})` : "As they ran";
+  return [["", ran], ...Array.from({ length: 10 }, (_, i): [string, string] => [String(i + 1), plural(i + 1, "lane", "lanes")])];
+}
+
+/** A runtime's shares to pick: as it ran (or, when another runtime is picked, the rest it takes now), then 0% to 100%
+ * by tens. */
+export function mixOptions(share: number, rest?: number): [string, string][] {
+  return [["", rest === undefined ? `As it ran (${Math.round(share * 100)}%)` : `The rest (${Math.round(rest * 100)}%)`],
+    ...Array.from({ length: 11 }, (_, i): [string, string] => [String(i * 10), `${i * 10}%`])];
+}
+
+/** The request's what-if from the picks: undefined when every pick is as it ran. The runtimes not picked share what the
+ * picked ones leave, in the parts they ran with; the daemon scales the mix to add up to 1. */
+export function whatIfOf(lanes: string, mix: Record<string, string>, a: LineageForecastAssumes | undefined): LineageForecastWhatIf | undefined {
+  const w: LineageForecastWhatIf = {};
+  if (lanes) w.lanes = Number(lanes);
+  const picked = a ? a.runtimes.filter((r) => (mix[r.runtime] ?? "") !== "") : [];
+  if (a && picked.length > 0) {
+    const taken = picked.reduce((sum, r) => sum + Number(mix[r.runtime]) / 100, 0);
+    const rest = a.runtimes.filter((r) => !picked.includes(r));
+    const restRan = rest.reduce((sum, r) => sum + r.share, 0);
+    w.mix = Object.fromEntries(a.runtimes.map((r) => [r.runtime, picked.includes(r) ? Number(mix[r.runtime]) / 100
+      : restRan > 0 ? Math.max(0, 1 - taken) * r.share / restRan : 0]));
+  }
+  return w.lanes === undefined && w.mix === undefined ? undefined : w;
+}
+
+const perHour = (rate: Record<string, number>) => {
+  const priced = Object.entries(rate).sort(([a], [b]) => a.localeCompare(b));
+  return priced.length === 0 ? "" : ` at ${priced.map(([currency, v]) => money2(v, currency)).join(" + ")} an hour`;
+};
+
+/** What the window ran with: "The last 14 days had 3.2 issues in flight in an average hour, 7 at most; the mix was
+ * Claude 75% at $10 an hour, Codex 25% at $2 an hour." */
+export function assumesLine(a: LineageForecastAssumes, windowDays: number, name: (runtime: string) => string): string {
+  const lanes = a.peakLanes === 0 ? `The last ${windowDays} days had no issue in flight`
+    : `The last ${windowDays} days had ${(Math.round(a.lanes * 10) / 10).toLocaleString()} issues in flight in an average hour, ${a.peakLanes} at most`;
+  if (a.runtimes.length === 0) return `${lanes}; no runtime’s hours are on this machine.`;
+  return `${lanes}; the mix was ${a.runtimes.map((r) => `${name(r.runtime)} ${Math.round(r.share * 100)}%${perHour(r.rate)}`).join(", ")}.`;
+}
+
+/** What a what-if moved: "At 2 lanes: 64% of the landings, so the dates move out and a week costs less. With this mix,
+ * the dollars are ×0.75; a mix does not move the dates, as a landing does not say its runtime." */
+export function whatIfLines(e: LineageForecastWhatIfEffect, a: LineageForecastAssumes | undefined): string[] {
+  const out: string[] = [];
+  if (e.lanes !== undefined) {
+    out.push(e.pace >= 0.995
+      ? `At ${plural(e.lanes, "lane", "lanes")}: no hour of the window had more than ${a?.peakLanes ?? e.lanes} issues in flight, so this limit moves nothing. Nothing here says what more lanes than that would do.`
+      : `At ${plural(e.lanes, "lane", "lanes")}: ${Math.round(e.pace * 100)}% of the window’s landings, so the dates move out and a week costs less. Each allowance burns slower by as much.`);
+  }
+  if (e.mix) {
+    out.push(`With this mix, the dollars are ×${e.cost.toFixed(2)}, and each allowance burns at its runtime’s new share. A mix does not move the dates: a landing does not say its runtime.`);
+  }
+  return out;
+}
+
+export const whatIfNote = "A what-if is not kept and not scored: only the forecast as the window ran is.";
 
 export const noNext = "Not enough history on this machine to say what comes next: it needs 7 days of issues landed with a merged pull request.";
 export const nextNote = "What comes next is this machine’s: its last 14 days of landings, drawn 1,000 times. A range is P10 to P90; P50 is as likely early as late, and P85 holds about 85% of the time. An epic’s date counts the children filed now, so it moves when more are filed. “All in” adds the turns that went on no issue or pull request (a Scrum Master’s, a review’s); people’s time and CI minutes are in no figure.";

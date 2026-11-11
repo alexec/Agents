@@ -6093,6 +6093,21 @@ type LineageForecast struct {
 
 	// The overhead that toComplete.loaded and spend's loaded figures are made with (#4524).
 	Overhead *LineageOverhead `json:"overhead,omitzero"`
+
+	// The lanes and the runtime mix the window ran with (#4531).
+	Assumes *LineageForecastAssumes `json:"assumes,omitzero"`
+
+	// What the request's what-if moved (#4531); every figure is then the what-if's.
+	WhatIf *LineageForecastWhatIfEffect `json:"whatIf,omitzero"`
+}
+
+// What a forecast assumes (#4531): the lanes and the runtime mix of its window. lanes is the issues in flight (from their first work to their landing, or to now when open) in an average hour that had one; peakLanes is the most in any hour. runtimes is the mix, the most hours first.
+type LineageForecastAssumes struct {
+	Lanes float64 `json:"lanes"`
+
+	PeakLanes int64 `json:"peakLanes"`
+
+	Runtimes []LineageForecastRuntime `json:"runtimes"`
 }
 
 // A weekly allowance's pace (#4526): used (0 to 1) at its last reading at, of the week that resets at resetsAt. runsOutAt is when it runs out at that pace, absent when it lasts to the reset (lasts).
@@ -6146,7 +6161,7 @@ type LineageForecastLands struct {
 	Groups int64 `json:"groups"`
 }
 
-// lineage/forecast (#4526): an epic, for when it lands and its estimate to complete; or a milestone (#4620), by name, for when it lands, in folder's repo (any repo without one); without either, only the spend, the burn and the service levels, over every repo.
+// lineage/forecast (#4526): an epic, for when it lands and its estimate to complete; or a milestone (#4620), by name, for when it lands, in folder's repo (any repo without one); without either, only the spend, the burn and the service levels, over every repo. whatIf (#4531) asks for the same figures with another lane limit or runtime mix; a what-if forecast is never kept.
 type LineageForecastRequest struct {
 	Node *LineageNode `json:"node,omitzero"`
 
@@ -6155,6 +6170,20 @@ type LineageForecastRequest struct {
 
 	// The folder whose repo the milestone is in.
 	Folder *string `json:"folder,omitzero"`
+
+	WhatIf *LineageForecastWhatIf `json:"whatIf,omitzero"`
+}
+
+// A runtime's part of a forecast's window (#4531), from this machine's usage and time histories: share is its part of the agents' working hours (the agent, its tools and others), hours is those hours, and rate is its cost per working hour.
+type LineageForecastRuntime struct {
+	Runtime string `json:"runtime"`
+
+	Share float64 `json:"share"`
+
+	Hours float64 `json:"hours"`
+
+	// By currency.
+	Rate map[string]float64 `json:"rate"`
 }
 
 // How long a level's issues took (#4526): of the closed issues of the level that landed in the window, half took up to p50Seconds and 85% up to p85Seconds, from the start of work to the last PR merged. Only a level with five or more.
@@ -6193,6 +6222,26 @@ type LineageForecastToComplete struct {
 
 	// cost with the overhead loaded in (#4524): times (1 + overhead.unlinkedRatio). The lead is in cost already, so not the epic ratio. Absent with no ratio.
 	Loaded map[string]LineageEstimateRange `json:"loaded,omitzero"`
+}
+
+// A what-if for lineage/forecast (#4531): lanes is a lane limit (below 1 is as the window ran), and mix is a runtime mix, each runtime's share of the working hours, scaled to add up to 1. Absent, each is as the window ran.
+type LineageForecastWhatIf struct {
+	Lanes *int64 `json:"lanes,omitzero"`
+
+	// By runtime id.
+	Mix map[string]float64 `json:"mix,omitzero"`
+}
+
+// What a what-if moved (#4531). A lane limit keeps, in each hour of the window, min(in flight, lanes) / in flight of its landings, so the dates move out and a week's spend falls; a limit at or above peakLanes moves nothing, as no hour ran more. pace is the landings it keeps over the window's. A mix moves the dollars only: cost is the mix's cost per working hour over the window's, and each allowance's pace moves by its runtime's share over the window's. Landings do not say their runtime, so a mix does not move the dates.
+type LineageForecastWhatIfEffect struct {
+	Lanes *int64 `json:"lanes,omitzero"`
+
+	// By runtime id, scaled to add up to 1.
+	Mix map[string]float64 `json:"mix,omitzero"`
+
+	Pace float64 `json:"pace"`
+
+	Cost float64 `json:"cost"`
 }
 
 // lineage/walk (#2348): the nodes the walk reached and the links it went along. limited says the walk stopped at its limit on nodes, so there is more. resolved is each node's title, state and labels from its connector, by ref, for the nodes a connector could resolve (#3089). resolving says some nodes are still being resolved in the background, so walk again shortly for them (#3102). states is the current state of each session node in it that has one, by ref (#4274).

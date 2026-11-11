@@ -76,7 +76,7 @@ func (d *Daemon) checkMilestones(due []milestoneOf) {
 	}
 	safe.Go("milestone due dates", func() {
 		for _, m := range due {
-			d.tellMilestoneLate(m, d.milestoneForecastIn(m.name, m.repo))
+			d.tellMilestoneLate(m, d.milestoneForecastIn(m.name, m.repo, lineage.WhatIf{}))
 		}
 	})
 }

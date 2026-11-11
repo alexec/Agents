@@ -5451,6 +5451,21 @@ export interface LineageForecast {
   serviceLevels: LineageForecastServiceLevel[];
   /** The overhead that toComplete.loaded and spend's loaded figures are made with (#4524). */
   overhead?: LineageOverhead;
+  /** The lanes and the runtime mix the window ran with (#4531). */
+  assumes?: LineageForecastAssumes;
+  /** What the request's what-if moved (#4531); every figure is then the what-if's. */
+  whatIf?: LineageForecastWhatIfEffect;
+}
+
+/**
+ * What a forecast assumes (#4531): the lanes and the runtime mix of its window. lanes is the issues
+ * in flight (from their first work to their landing, or to now when open) in an average hour that
+ * had one; peakLanes is the most in any hour. runtimes is the mix, the most hours first.
+ */
+export interface LineageForecastAssumes {
+  lanes: number;
+  peakLanes: number;
+  runtimes: LineageForecastRuntime[];
 }
 
 /**
@@ -5507,7 +5522,8 @@ export interface LineageForecastLands {
 /**
  * lineage/forecast (#4526): an epic, for when it lands and its estimate to complete; or a milestone
  * (#4620), by name, for when it lands, in folder's repo (any repo without one); without either,
- * only the spend, the burn and the service levels, over every repo.
+ * only the spend, the burn and the service levels, over every repo. whatIf (#4531) asks for the
+ * same figures with another lane limit or runtime mix; a what-if forecast is never kept.
  */
 export interface LineageForecastRequest {
   node?: LineageNode;
@@ -5515,6 +5531,20 @@ export interface LineageForecastRequest {
   milestone?: string;
   /** The folder whose repo the milestone is in. */
   folder?: string;
+  whatIf?: LineageForecastWhatIf;
+}
+
+/**
+ * A runtime's part of a forecast's window (#4531), from this machine's usage and time histories:
+ * share is its part of the agents' working hours (the agent, its tools and others), hours is those
+ * hours, and rate is its cost per working hour.
+ */
+export interface LineageForecastRuntime {
+  runtime: string;
+  share: number;
+  hours: number;
+  /** By currency. */
+  rate: Record<string, number>;
 }
 
 /**
@@ -5563,6 +5593,33 @@ export interface LineageForecastToComplete {
    * cost already, so not the epic ratio. Absent with no ratio.
    */
   loaded?: Record<string, LineageEstimateRange>;
+}
+
+/**
+ * A what-if for lineage/forecast (#4531): lanes is a lane limit (below 1 is as the window ran), and
+ * mix is a runtime mix, each runtime's share of the working hours, scaled to add up to 1. Absent,
+ * each is as the window ran.
+ */
+export interface LineageForecastWhatIf {
+  lanes?: number;
+  /** By runtime id. */
+  mix?: Record<string, number>;
+}
+
+/**
+ * What a what-if moved (#4531). A lane limit keeps, in each hour of the window, min(in flight,
+ * lanes) / in flight of its landings, so the dates move out and a week's spend falls; a limit at or
+ * above peakLanes moves nothing, as no hour ran more. pace is the landings it keeps over the
+ * window's. A mix moves the dollars only: cost is the mix's cost per working hour over the
+ * window's, and each allowance's pace moves by its runtime's share over the window's. Landings do
+ * not say their runtime, so a mix does not move the dates.
+ */
+export interface LineageForecastWhatIfEffect {
+  lanes?: number;
+  /** By runtime id, scaled to add up to 1. */
+  mix?: Record<string, number>;
+  pace: number;
+  cost: number;
 }
 
 /**
@@ -15279,14 +15336,18 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineageEstimateRange: { required: ["median", "p10", "p90"], optional: [] },
   LineageEstimateRequest: { required: ["node"], optional: ["startAt"] },
   LineageFigures: { required: ["node", "cost", "sessions", "running", "runtimes"], optional: ["leadTimeSeconds", "limited"] },
-  LineageForecast: { required: ["at", "windowDays", "landings", "burn", "serviceLevels"], optional: ["node", "milestone", "lands", "noForecast", "toComplete", "kept", "spend", "overhead"] },
+  LineageForecast: { required: ["at", "windowDays", "landings", "burn", "serviceLevels"], optional: ["node", "milestone", "lands", "noForecast", "toComplete", "kept", "spend", "overhead", "assumes", "whatIf"] },
+  LineageForecastAssumes: { required: ["lanes", "peakLanes", "runtimes"], optional: [] },
   LineageForecastBurn: { required: ["credentialKey", "window", "used", "at", "resetsAt", "lasts"], optional: ["runsOutAt"] },
   LineageForecastKept: { required: ["at", "p50", "p85", "windowDays", "share", "open"], optional: [] },
   LineageForecastLands: { required: ["p50", "p85", "open", "closed", "stepsLeft", "share", "groups"], optional: ["growing"] },
-  LineageForecastRequest: { required: [], optional: ["node", "milestone", "folder"] },
+  LineageForecastRequest: { required: [], optional: ["node", "milestone", "folder", "whatIf"] },
+  LineageForecastRuntime: { required: ["runtime", "share", "hours", "rate"], optional: [] },
   LineageForecastServiceLevel: { required: ["level", "closed", "p50Seconds", "p85Seconds"], optional: [] },
   LineageForecastSpend: { required: ["week", "month"], optional: ["loadedWeek", "loadedMonth"] },
   LineageForecastToComplete: { required: ["cost", "ratio", "closed", "leadRatio"], optional: ["loaded"] },
+  LineageForecastWhatIf: { required: [], optional: ["lanes", "mix"] },
+  LineageForecastWhatIfEffect: { required: ["pace", "cost"], optional: ["lanes", "mix"] },
   LineageGraph: { required: ["nodes", "links"], optional: ["limited", "resolving", "resolved", "states"] },
   LineageLink: { required: ["from", "to", "rel", "source", "at"], optional: ["endedAt"] },
   LineageLinkRequest: { required: ["from", "to", "rel", "source"], optional: [] },
