@@ -6,14 +6,20 @@ Reads the app's own session records (agent.json and transcript.jsonl under
 that were active in the last N days, and prints:
 
 - the totals: running time, split into tool time and model time (thinking and
-  writing), and the time between turns, split by what woke the session;
+  writing), and the time between turns, split by what woke the session. A wait
+  is not running: the in-call part of a wait (the daemon holds a wait_for_event
+  call for up to 45 s before the turn can end) is left out of the running and
+  tool totals and shown on a line of its own;
+- the waits, from the wait call to the wake, by what ended them, with the share
+  answered inside the call; with --forge, the lost waits (a wait on pr.merged or
+  pr.closed that timed out though the pull request had merged or closed);
 - tool time by category (xcodebuild, swift test, go-changed, lint, gh, git,
   run-app, lease_resource, ...), with count, median, p90 and failures;
 - the slowest single calls, the commands run again and again in one session,
   and the sessions that ran longest.
 
 Read only. Standard library only, so it runs with `python3 -I`.
-Usage: time-spent.py [--days 7] [--folder PATH] [--store PATH] [--json] [--top 15]
+Usage: time-spent.py [--days 7] [--folder PATH] [--store PATH] [--json] [--top 15] [--forge]
 """
 
 from __future__ import annotations
@@ -94,8 +100,41 @@ RULES: list[tuple[str, str]] = [
 ]
 
 
-# Tools whose time is a wait, not work: they hold the turn open.
+# Tools that start a wait. A wait is not running time: the call holds the turn
+# for a short time (the daemon's hold, up to 45 s), and then the wait goes on
+# with the turn ended, until its event, its answer or its time-out.
 WAITS = {"wait_for_event", "ask_question", "hand_to_person", "check_again"}
+
+# What a wait call's result says.
+HAPPENED = re.compile(r"(\S+) happened at \d")
+RESOURCE = re.compile(r"\bresource=([^,.\s]+)")
+ANSWERED = ("They answered", "The person did", "The person could not")
+PENDING = ("Still waiting", "Recorded.", "Your place is kept", "has not finished yet",
+           "You will be resumed")
+
+
+def wait_name(title: str) -> str | None:
+    if title.startswith("mcp__"):
+        name = title.split("__", 2)[-1]
+        return name if name in WAITS else None
+    if title == "Asking for your input":
+        return "ask_question"
+    return None
+
+
+def wait_outcome(tool: str, text: str) -> tuple[str, str | None]:
+    """('answered', what) when the call itself got the event or the answer,
+    ('pending', None) when the wait goes on after the call, ('none', None) when
+    the call started no wait (an error, or 'Not waiting')."""
+    m = HAPPENED.search(text)
+    if m:
+        r = RESOURCE.search(text)
+        return "answered", f"event: {m.group(1)}" + (f" ({r.group(1)})" if r else "")
+    if text.lstrip().startswith(ANSWERED):
+        return "answered", "person or agent message"
+    if any(p in text for p in PENDING):
+        return "pending", None
+    return "none", None
 
 
 SETUP = re.compile(
@@ -112,10 +151,7 @@ def repeat_key(title: str) -> str:
 
 def category(title: str, kind: str | None) -> str:
     if title.startswith("mcp__"):
-        name = title.split("__", 2)[-1]
-        return ("wait: " if name in WAITS else "tool: ") + name
-    if title == "Asking for your input":
-        return "wait: question to the person"
+        return "tool: " + title.split("__", 2)[-1]
     if kind in ("read", "edit", "fetch", "think") or title in ("Read File", "Edit", "Write"):
         return f"file: {kind or title.lower()}"
     if title in ("ToolSearch", "Load skill", "Fetch"):
@@ -184,6 +220,7 @@ def read_session(d: str, since: datetime) -> dict | None:
     run_start: datetime | None = None
     stopped_at: datetime | None = None
     tokens = 0
+    messages: list[tuple[datetime, str]] = []
     for at, k, v in events:
         if k == "stateChanged":
             state = v.get("_0")
@@ -193,7 +230,9 @@ def read_session(d: str, since: datetime) -> dict | None:
             elif run_start is not None:
                 running.append((run_start, at))
                 run_start, stopped_at = None, at
-        elif k == "userMessage" and stopped_at is not None:
+        if k == "userMessage":
+            messages.append((at, v.get("_0", "")))
+        if k == "userMessage" and stopped_at is not None:
             gaps.append((wake_reason(v.get("_0", "")), (at - stopped_at).total_seconds()))
             stopped_at = None
         elif k == "usageRecorded":
@@ -203,7 +242,11 @@ def read_session(d: str, since: datetime) -> dict | None:
             cid = u.get("toolCallID") or u.get("raw", {}).get("toolCallId")
             if not cid:
                 continue
-            c = calls.setdefault(cid, {"start": at, "end": None, "title": "", "kind": None, "status": None})
+            c = calls.setdefault(cid, {"start": at, "end": None, "title": "", "kind": None, "status": None,
+                                       "input": {}, "text": ""})
+            raw_input = u.get("rawInput")
+            if isinstance(raw_input, dict) and len(raw_input) >= len(c["input"]):
+                c["input"] = raw_input
             if k == "toolCall":
                 c["start"] = min(c["start"], at)
                 c["kind"] = u.get("kind")
@@ -216,8 +259,11 @@ def read_session(d: str, since: datetime) -> dict | None:
             if u.get("status") in ("completed", "failed"):
                 c["end"] = at
                 c["status"] = u["status"]
+                c["text"] = "".join((x.get("content") or {}).get("text", "")
+                                    for x in u.get("content") or [] if isinstance(x, dict))
     if run_start is not None:
         running.append((run_start, events[-1][0]))
+    done = sorted((c for c in calls.values() if c["end"] is not None), key=lambda c: c["start"])
 
     return {
         "id": agent.get("id"),
@@ -228,10 +274,38 @@ def read_session(d: str, since: datetime) -> dict | None:
         "folder": path_of((agent.get("worktree") or {}).get("folder")),
         "running": running,
         "gaps": gaps,
-        "calls": [c for c in calls.values() if c["end"] is not None],
+        "calls": done,
+        "waits": whole_waits(done, messages),
         "tokens": tokens,
         "cost": (agent.get("costToDate") or {}).get("USD", 0.0),
     }
+
+
+def whole_waits(calls: list[dict], messages: list[tuple[datetime, str]]) -> list[dict]:
+    """Each wait from its call to its wake. A wait answered in the call ends
+    with the call; one that goes on ends at the next message that starts the
+    session again (its event, its time-out, an answer, or a person); one that a
+    later wait call replaces before that is left out."""
+    started = [(c, wait_name(c["title"])) for c in calls]
+    started = [(c, n) for c, n in started if n]
+    out = []
+    for i, (c, tool) in enumerate(started):
+        state, ended_by = wait_outcome(tool, c["text"])
+        if state == "none":
+            continue
+        w = {"tool": tool, "start": c["start"], "in_call": state == "answered", "input": c["input"]}
+        if state == "answered":
+            w["end"], w["ended_by"] = c["end"], ended_by
+        else:
+            wake = next(((at, t) for at, t in messages if at >= c["end"]), None)
+            if wake is None:
+                continue  # still waiting at the end of the window
+            later = started[i + 1][0]["start"] if i + 1 < len(started) else None
+            if later is not None and later < wake[0]:
+                continue  # replaced by the next wait call
+            w["end"], w["ended_by"] = wake[0], wake_reason(wake[1])
+        out.append(w)
+    return out
 
 
 def union_seconds(spans: list[tuple[datetime, datetime]]) -> float:
@@ -275,6 +349,37 @@ def pct(values: list[float], p: float) -> float:
     return values[min(len(values) - 1, int(p * len(values)))]
 
 
+def lost_waits(waits: list[dict], folder: str) -> dict:
+    """Waits on pr.merged or pr.closed that timed out though the pull request
+    had merged or closed before the time-out (asks `gh pr view`, once per PR)."""
+    seen: dict[int, datetime | None] = {}
+    checked, examples = 0, []
+    for w in waits:
+        if w["tool"] != "wait_for_event" or w["ended_by"] != "wait timed out":
+            continue
+        events = w["input"].get("events") or [w["input"].get("event")]
+        pr = (w["input"].get("where") or {}).get("pr")
+        if not {"pr.merged", "pr.closed"} & set(events) or not isinstance(pr, int):
+            continue
+        checked += 1
+        if pr not in seen:
+            try:
+                out = subprocess.run(["gh", "pr", "view", str(pr), "--json", "mergedAt,closedAt"],
+                                     cwd=folder, capture_output=True, text=True, check=True, timeout=30).stdout
+                o = json.loads(out)
+                at = o.get("mergedAt") or o.get("closedAt")
+                seen[pr] = parse_at(at) if at else None
+            except (OSError, subprocess.SubprocessError, ValueError):
+                seen[pr] = None
+        done = seen[pr]
+        if done is not None and done < w["end"]:
+            examples.append({"pr": pr, "late_s": (w["end"] - max(done, w["start"])).total_seconds(),
+                             "session": w.get("session", "")})
+    examples.sort(key=lambda x: -x["late_s"])
+    return {"count": len(examples), "checked": checked,
+            "total_s": sum(x["late_s"] for x in examples), "examples": examples}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--days", type=float, default=7)
@@ -282,6 +387,8 @@ def main() -> int:
     ap.add_argument("--store", default=STORE)
     ap.add_argument("--top", type=int, default=15)
     ap.add_argument("--json", action="store_true", help="print the numbers as JSON")
+    ap.add_argument("--forge", action="store_true",
+                    help="count lost waits with `gh pr view` (needs the network; slower)")
     args = ap.parse_args()
 
     folder = os.path.abspath(args.folder or default_folder())
@@ -302,7 +409,10 @@ def main() -> int:
             continue
         sessions.append(s)
 
-    run_total = tool_total = 0.0
+    run_total = tool_total = in_call_total = 0.0
+    in_call_by_tool: dict[str, list[float]] = defaultdict(list)
+    by_end: dict[str, list[tuple[float, bool]]] = defaultdict(list)
+    all_waits = []
     by_cat: dict[str, list[float]] = defaultdict(list)
     failed: dict[str, int] = defaultdict(int)
     by_wake: dict[str, list[float]] = defaultdict(list)
@@ -310,14 +420,25 @@ def main() -> int:
     repeats = []
     per_session = []
     for s in sessions:
-        run = sum((e - b).total_seconds() for b, e in s["running"])
+        # A wait is not running: its in-call part comes off the running time.
+        wait_spans = [(c["start"], c["end"]) for c in s["calls"] if wait_name(c["title"])]
         spans = [(c["start"], c["end"]) for c in s["calls"]]
-        tools = union_seconds(clip(spans, s["running"]))
+        in_call = union_seconds(clip(wait_spans, s["running"]))
+        run = sum((e - b).total_seconds() for b, e in s["running"]) - in_call
+        tools = union_seconds(clip(spans, s["running"])) - in_call
         run_total += run
         tool_total += tools
+        in_call_total += in_call
+        for w in s["waits"]:
+            by_end[w["ended_by"]].append(((w["end"] - w["start"]).total_seconds(), w["in_call"]))
+            all_waits.append({**w, "session": s["title"][:50]})
         seen: dict[str, list[float]] = defaultdict(list)
         for c in s["calls"]:
             dur = (c["end"] - c["start"]).total_seconds()
+            tool = wait_name(c["title"])
+            if tool:
+                in_call_by_tool[tool].append(dur)
+                continue
             cat = category(c["title"], c["kind"])
             by_cat[cat].append(dur)
             if c["status"] == "failed":
@@ -333,7 +454,8 @@ def main() -> int:
         per_session.append((run, tools, s["title"][:60], s["id"], s["tokens"], s["cost"]))
 
     model_total = max(0.0, run_total - tool_total)
-    wait_in_turn = sum(sum(v) for k, v in by_cat.items() if k.startswith("wait: "))
+    lost = lost_waits(all_waits, folder) if args.forge else None
+    ends = sorted(by_end.items(), key=lambda kv: -sum(d for d, _ in kv[1]))
     cats = sorted(by_cat.items(), key=lambda kv: -sum(kv[1]))
     wakes = sorted(by_wake.items(), key=lambda kv: -sum(kv[1]))
     slowest.sort(reverse=True)
@@ -344,7 +466,13 @@ def main() -> int:
         json.dump({
             "folder": folder, "days": args.days, "sessions": len(sessions),
             "running_s": run_total, "tool_s": tool_total, "model_s": model_total,
-            "waits_in_turn_s": wait_in_turn,
+            "in_call_waits_s": in_call_total,
+            "in_call_waits": [{"tool": k, "count": len(v), "total_s": sum(v), "median_s": statistics.median(v)}
+                              for k, v in sorted(in_call_by_tool.items(), key=lambda kv: -sum(kv[1]))],
+            "waits": [{"ended_by": k, "count": len(v), "median_s": statistics.median([d for d, _ in v]),
+                       "p90_s": pct([d for d, _ in v], 0.9), "total_s": sum(d for d, _ in v),
+                       "answered_in_call": sum(1 for _, a in v if a) / len(v)} for k, v in ends],
+            "lost_waits": lost,
             "categories": [{"category": k, "count": len(v), "total_s": sum(v),
                             "median_s": statistics.median(v), "p90_s": pct(v, 0.9),
                             "failed": failed.get(k, 0)} for k, v in cats],
@@ -364,7 +492,9 @@ def main() -> int:
         return 0
     print(f"Running {fmt(run_total)}: tools {fmt(tool_total)} ({tool_total / max(run_total, 1):.0%}), "
           f"model {fmt(model_total)} ({model_total / max(run_total, 1):.0%}).")
-    print(f"Of the tool time, {fmt(wait_in_turn)} is waits that hold a turn open (the `wait:` rows).")
+    n_waits = sum(len(v) for v in in_call_by_tool.values())
+    print(f"Not in those: the in-call part of waits, {fmt(in_call_total)} in {n_waits} calls "
+          f"(a wait call holds the turn for up to 45 s, then the wait goes on with the turn ended).")
     print(f"Between turns {fmt(sum(sum(v) for v in by_wake.values()))} (wall time a session sat waiting).\n")
 
     print("## Tool time by category\n")
@@ -373,6 +503,28 @@ def main() -> int:
     for k, v in cats[: args.top * 2]:
         print(f"| {k} | {len(v)} | {fmt(sum(v))} | {sum(v) / max(run_total, 1):.1%} | "
               f"{fmt(statistics.median(v))} | {fmt(pct(v, 0.9))} | {failed.get(k, 0)} |")
+
+    print("\n## Waits, call to wake\n")
+    print("From the wait call (wait_for_event, check_again, ask_question, hand_to_person) to the event,")
+    print("answer or time-out that ended it. A wait is not running time.\n")
+    print("| Ended by | Waits | Median | p90 | Total | Answered in the call |")
+    print("|---|---:|---:|---:|---:|---:|")
+    for k, v in ends:
+        d = [x for x, _ in v]
+        print(f"| {k} | {len(v)} | {fmt(statistics.median(d))} | {fmt(pct(d, 0.9))} | {fmt(sum(d))} | "
+              f"{sum(1 for _, a in v if a) / len(v):.0%} |")
+    every = [x for v in by_end.values() for x in v]
+    if every:
+        d = [x for x, _ in every]
+        print(f"| **All waits** | {len(every)} | {fmt(statistics.median(d))} | {fmt(pct(d, 0.9))} | "
+              f"{fmt(sum(d))} | {sum(1 for _, a in every if a) / len(every):.0%} |")
+    if lost is None:
+        print("\nLost waits: not counted (run with --forge).")
+    else:
+        print(f"\nLost waits: {lost['count']} of {lost['checked']} timed-out waits on pr.merged or pr.closed "
+              f"timed out though the pull request had merged or closed, {fmt(lost['total_s'])} in all.")
+        for x in lost["examples"][: args.top]:
+            print(f"- PR #{x['pr']}: done {fmt(x['late_s'])} before the time-out ({x['session']})")
 
     print("\n## Between turns, by what woke the session\n")
     print("| Woken by | Times | Total | Median |")

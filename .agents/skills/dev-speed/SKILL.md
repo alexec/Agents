@@ -53,15 +53,24 @@ to `ci-speed`; do not change `ci.yml` here.
    D=~/.agents/reviews/dev-speed; mkdir -p "$D"; T=$(date +%F)
    S=.agents/skills/dev-speed/time-spent.py
    python3 -I "$S" --days 7 --top 20 > "$D/$T.md"
-   python3 -I "$S" --days 7 --top 50 --json > "$D/$T.json"
+   python3 -I "$S" --days 7 --top 50 --json --forge > "$D/$T.json"
    ```
 
    It reads every session of this folder (and its worktrees) active in the window, in
    about 5 seconds, and writes:
-   - **the totals:** running time, split into tool time and model time; how much of the
-     tool time is waits that hold a turn open (the `wait:` rows); the time between turns;
+   - **the totals:** running time, split into tool time and model time; the time
+     between turns. A wait is not running time (Alex, 2026-11-11): the in-call part of
+     a wait (the daemon holds a `wait_for_event` call for up to 45 s, then the wait goes
+     on with the turn ended) is left out of both and shown on a line of its own;
    - **tool time by category,** with calls, total, share of running time, median, p90
      and failures;
+   - **waits, call to wake:** each wait (`wait_for_event`, `check_again`,
+     `ask_question`, `hand_to_person`) from its call to the event, answer or time-out
+     that ended it, by what ended it, with the count, median, p90, total and the share
+     answered inside the call;
+   - **lost waits** (with `--forge` only, as it asks `gh pr view` once per pull
+     request): waits on `pr.merged` or `pr.closed` that timed out though the pull
+     request had merged or closed before the time-out;
    - **between turns, by what woke the session:** `event: checks.passed`,
      `event: lease.granted (build)` (the line for the lease), `wait timed out`,
      `check_again timer`, `person or agent message`, and the rest;
@@ -69,7 +78,7 @@ to `ci-speed`; do not change `ci.yml` here.
      longest-running sessions, with tokens and cost.
 
    `--days`, `--folder` and `--store` change the window, the folder and the records
-   it reads.
+   it reads. Without `--forge` it needs no network.
 
 2. If there is an earlier report in `~/.agents/reviews/dev-speed/`, compare: for each
    of the top 10 categories, the total per session then and now. A category that grew
@@ -110,10 +119,15 @@ Look first for these causes, in this order. Each names the place a fix goes.
    error each time (a wrong argument in a skill's example, a missing label). The fix is
    the cause, or the skill's text that leads lanes into the error. A flaky test goes by
    `AGENTS.md` (`.flakyUnderLoad` and an issue).
-6. **Waits inside a turn.** `wait: wait_for_event` calls × their median is time a turn
-   is held open for nothing; many calls in one session mean a lane that waits on one
-   event at a time where one call on several would do. `wait: question to the person`
-   is Alex's time: a question that "Questions that already have an answer" in
+6. **Waits.** A wait costs no running time: its in-call part is the daemon's short
+   hold, which gets an event that comes at once without a new turn, so it is not a
+   cause. Look at the waits table instead. A long median for one event is the time
+   that event takes to come (CI, a review, a lane). Lost waits are waits that missed
+   their event: a subscription that started after the event, or a filter that never
+   matched; each one cost its whole time-out. Many waits in one session that each
+   end on a different event of one pull request mean a lane that waits on one event
+   at a time where one call on several would do. A wait ended by `ask_question`'s
+   answer is Alex's time: a question that "Questions that already have an answer" in
    `AGENTS.md` answers is a cause; propose a line there for one that comes back.
 7. **Model time.** A session whose model time is far above its tool time, or whose
    tokens are high, usually read too much: whole files where `grep` or a range would
