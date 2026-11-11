@@ -8,6 +8,7 @@ import (
 	"maps"
 	"net/http"
 	"os"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -792,12 +793,26 @@ func jiraItemOf(i jiramcp.Item, folder string) wire.ForgeItem {
 	return out
 }
 
+// forgeLabelsOf gives each label its colour as #rrggbb (#4362). A forge that gives rrggbb with no
+// #, or in capitals, is put right here; a colour that is not six hex digits (a name) is left out,
+// and the client draws a neutral chip.
 func forgeLabelsOf(names []string, colors map[string]string) []wire.ForgeLabel {
 	out := []wire.ForgeLabel{}
 	for _, name := range names {
-		out = append(out, wire.ForgeLabel{Name: name, Color: optional(colors[name])})
+		out = append(out, wire.ForgeLabel{Name: name, Color: optional(forgeLabelColor(colors[name]))})
 	}
 	return out
+}
+
+var forgeHexColor = regexp.MustCompile(`^#?[0-9a-fA-F]{6}$`)
+
+// forgeLabelColor is c as #rrggbb, or "" when c is not six hex digits.
+func forgeLabelColor(c string) string {
+	c = strings.TrimSpace(c)
+	if !forgeHexColor.MatchString(c) {
+		return ""
+	}
+	return "#" + strings.ToLower(strings.TrimPrefix(c, "#"))
 }
 
 // resolvedFromForge keeps what the lists read in the lineage cache (#3089), so a walk to an

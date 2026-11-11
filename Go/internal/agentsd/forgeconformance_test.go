@@ -756,6 +756,25 @@ func TestForgeConformance(t *testing.T) {
 				}
 			}
 
+			// forge/labels gives the colours as the lists do (#4362).
+			for _, kind := range []string{lineage.KindIssue, lineage.KindPR} {
+				r, ok := refs[kind+" open"]
+				if !ok {
+					continue
+				}
+				labels, err := f.Labels(ctx, r)
+				if errors.Is(err, errForgeCannot) && !caps.PR.Label && kind == lineage.KindPR {
+					continue
+				}
+				if err != nil {
+					t.Fatalf("Labels(%v): %v", r.Node, err)
+				}
+				if len(labels) == 0 {
+					t.Errorf("Labels(%v): none", r.Node)
+				}
+				conformLabelColors(t, "labels of "+fmt.Sprint(r.Node), caps, labels)
+			}
+
 			// 2. Caps agrees with the methods.
 			for kind, actions := range map[string]forgeActions{lineage.KindIssue: caps.Issue, lineage.KindPR: caps.PR} {
 				r, ok := refs[kind+" open"]
@@ -823,6 +842,20 @@ func conformActions(f Forge, r forgeRef) map[string]func(context.Context) error 
 	}
 }
 
+// conformLabelColors: each label has a #rrggbb colour when the forge says LabelColors, and none when
+// it does not (#4362).
+func conformLabelColors(t *testing.T, where string, caps forgeCaps, labels []wire.ForgeLabel) {
+	t.Helper()
+	for _, l := range labels {
+		switch {
+		case caps.LabelColors && !labelColor.MatchString(deref(l.Color)):
+			t.Errorf("%s: label %s's colour is %q, not #rrggbb", where, l.Name, deref(l.Color))
+		case !caps.LabelColors && l.Color != nil:
+			t.Errorf("%s: label %s has colour %q; caps say labelColors=false", where, l.Name, *l.Color)
+		}
+	}
+}
+
 func conformModel(t *testing.T, d *Daemon, caps forgeCaps, i wire.ForgeItem) {
 	t.Helper()
 	if i.Labels == nil || i.Assignees == nil {
@@ -834,11 +867,7 @@ func conformModel(t *testing.T, d *Daemon, caps forgeCaps, i wire.ForgeItem) {
 	if !slices.Contains([]string{"open", "closed", "merged"}, i.State) {
 		t.Errorf("%v: state %q", i.Node, i.State)
 	}
-	for _, l := range i.Labels {
-		if caps.LabelColors && !labelColor.MatchString(deref(l.Color)) {
-			t.Errorf("%v: label %s's colour is %q, not #rrggbb", i.Node, l.Name, deref(l.Color))
-		}
-	}
+	conformLabelColors(t, fmt.Sprint(i.Node), caps, i.Labels)
 	if caps.Avatars {
 		conformAvatar(t, d, fmt.Sprint(i.Node), i.AuthorAvatar)
 	}

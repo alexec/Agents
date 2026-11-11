@@ -84,7 +84,7 @@ func (f *fakeForgeForgejo) SetState(_ context.Context, repo string, number int, 
 }
 
 func (f *fakeForgeForgejo) RepoLabels(context.Context, string) ([]string, map[string]string, error) {
-	return []string{"bug", "docs"}, map[string]string{"bug": "#ee0701"}, nil
+	return []string{"bug", "docs"}, map[string]string{"bug": "#ee0701", "docs": "0075ca"}, nil
 }
 
 func (f *fakeForgeForgejo) MergeMethods(context.Context, string) ([]string, error) {
