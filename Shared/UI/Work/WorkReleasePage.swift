@@ -381,17 +381,17 @@ struct WorkReleasePage: View {
 /// with the forge's releases (#4426).
 struct WorkReleaseChip: View {
     let words: String
-    let tone: WorkLook.Tone
+    let color: Color
 
-    static let latest = WorkReleaseChip(words: "Latest", tone: .green)
+    static let latest = WorkReleaseChip(words: "Latest", color: WorkLook.Tone.green.color)
 
     var body: some View {
         Text(words)
             .appText(.fine)
             .fontWeight(.medium)
-            .foregroundStyle(tone.color)
+            .foregroundStyle(color)
             .padding(.horizontal, 7)
             .padding(.vertical, 1)
-            .overlay(Capsule().strokeBorder(tone.color.opacity(0.6)))
+            .overlay(Capsule().strokeBorder(color.opacity(0.6)))
     }
 }
