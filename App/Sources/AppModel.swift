@@ -6589,6 +6589,11 @@ final class AppModel {
                                           returning: DaemonAPI.LineageEstimate.self)
     }
 
+    func lineageForecast(_ node: DaemonAPI.LineageNode, on host: MachineRef) async -> DaemonAPI.LineageForecast? {
+        try? await client(for: host).call(DaemonAPI.Method.lineageForecast, DaemonAPI.LineageForecastRequest(node: node),
+                                          returning: DaemonAPI.LineageForecast.self)
+    }
+
     /// The machines that keep links (#3157), for an Issue page's estimate and an epic's plan: This
     /// Mac first, then the rest by name. Empty without a control plane, where there is only one.
     var lineageMachines: [(id: MachineRef, name: String)] {
