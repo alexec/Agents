@@ -240,15 +240,21 @@ struct WorkFeaturesTests {
         let plan = DaemonAPI.ForgePlan(item: issue(10, level: "epic"),
                                        children: [child(1, step: 1, state: "closed"), child(2, step: 2, outside: [99]),
                                                   child(3, step: 3)], steps: steps)
-        #expect(WorkFeatures.whereWords(plan, closes: nil) == "step 2 of 3 · waits for #99")
+        #expect(WorkFeatures.whereWords(WorkFeatures.place(plan, closes: nil)) == "step 2 of 3 · waits for #99")
         let thursday = day.addingTimeInterval(3 * 86400)
-        let words = try #require(WorkFeatures.whereWords(plan, closes: thursday, now: day, calendar: calendar))
+        let words = try #require(WorkFeatures.whereWords(WorkFeatures.place(plan, closes: thursday), now: day, calendar: calendar))
         #expect(words.hasPrefix("step 2 of 3 · waits for #99 · closes about "))
         #expect(!words.hasSuffix("today") && !words.hasSuffix("tomorrow"))
         #expect(WorkFeatures.dayWords(day, now: day, calendar: calendar) == "today")
         #expect(WorkFeatures.dayWords(day.addingTimeInterval(86400), now: day, calendar: calendar) == "tomorrow")
         let done = DaemonAPI.ForgePlan(item: issue(10), children: [child(1, step: 1, state: "closed")], steps: [.init(step: 1, nodes: [])])
-        #expect(WorkFeatures.whereWords(done, closes: nil) == nil)
+        #expect(WorkFeatures.whereWords(WorkFeatures.place(done, closes: nil)) == nil)
+        // From work/features (#4586): the forecast that waits says so in place of a day.
+        let epic = DaemonAPI.WorkFeatureEpic(item: issue(10, level: "epic"), step: 3, steps: 3,
+                                             forecast: .init(low: day, mid: thursday, high: thursday, waits: true),
+                                             children: [.init(item: issue(3), createdAt: day)])
+        #expect(WorkFeatures.place(epic).flatMap { WorkFeatures.whereWords($0) } == "step 3 of 3 · waits for you")
+        #expect(WorkFeatures.place(DaemonAPI.WorkFeatureEpic(item: issue(10), steps: 1)) == nil)
     }
 
     @Test func aFeatureSaysWhatIsInFlight() {
@@ -262,5 +268,26 @@ struct WorkFeaturesTests {
             == "2 epics · nothing in flight")
         #expect(WorkFeatures.deliveryWords(.init(name: "loose", epics: 0, open: 0, issues: 3), inFlight: 1, sessions: nil)
             == "3 open issues · 1 in flight")
+    }
+
+    /// #4586: one read gives the features, their epics' places, and what waits for the person.
+    @Test func workFeaturesGivesEpicsAndChildrenInOneRead() throws {
+        let child = DaemonAPI.WorkTimelineChild(item: issue(12, parent: 10), createdAt: day, waitsForPerson: true)
+        let one = DaemonAPI.WorkFeatures(features: [
+            .init(feature: .init(name: "Checkout", epics: 2, open: 2, issues: 1),
+                  epics: [.init(item: issue(10, level: "epic"), step: 1, steps: 2, children: [child]),
+                          .init(item: issue(20, level: "epic"), steps: 0)],
+                  loose: [.init(item: issue(31), createdAt: day)]),
+        ])
+        let two = DaemonAPI.WorkFeatures(features: [.init(feature: .init(name: "checkout", epics: 1, open: 1, issues: 0))])
+        let read = WorkFeatures.read([one, two])
+        try #require(read.features.count == 1)
+        #expect(read.features[0].epics == 3)
+        #expect(read.items["checkout"]?.map { WorkList.shortRef($0.node.ref) } == ["#10", "#20", "#31"])
+        #expect(read.places["github:alexec/Agents#10"]?.children.count == 1)
+        #expect(read.unread == ["github:alexec/Agents#20"])
+        #expect(read.waiting == ["github:alexec/Agents#12"])
+        let work = WorkFeatures.work(of: child.item, agents: [], pulls: [:], waiting: read.waiting)
+        #expect(WorkFeatures.line(child.item, work: work, approvals: [])?.words == "waits for you (alex-todo)")
     }
 }

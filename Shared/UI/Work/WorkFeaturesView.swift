@@ -2,12 +2,13 @@ import AgentsKitCore
 import Observation
 import SwiftUI
 
-/// Work ▸ Features's state (#3269, #4587): the features of every machine's forges
-/// (`forge/features`) and the open pull requests; for each feature open, its open issues
-/// (`forge/issues` with the feature), each open epic's plan (`forge/plan`) and forecast
-/// (`lineage/forecast`). Until `work/features` (#4586) gives them in one read, these are the
-/// reads (features-delivery.md note 16). The model keeps it, so Back from an epic's page finds
-/// the list as it was left.
+/// Work ▸ Features's state (#3269, #4587): the features of every machine's forges and the open
+/// pull requests. A machine with `work.features/1` (#4586) gives each feature with its open epics,
+/// their places and their children, and its loose issues, in one read (`work/features`). An older
+/// one gives the features (`forge/features`); then, for each feature open, its open issues
+/// (`forge/issues` with the feature), and each open epic's plan (`forge/plan`) and forecast
+/// (`lineage/forecast`) (features-delivery.md note 16). The model keeps it, so Back from an
+/// epic's page finds the list as it was left.
 @MainActor
 @Observable
 final class WorkFeaturesState {
@@ -21,15 +22,15 @@ final class WorkFeaturesState {
     /// The groups a person opened or closed (#3741, #4115). Each is open until closed, except
     /// Finished, which is closed until opened, unless every feature is in it.
     var groupOpen: [WorkFeatures.Group: Bool] = [:]
-    /// An open feature's open issues, by name in lower case; absent while they are read.
+    /// A feature's open epics and issues, by name in lower case; absent while they are read.
     var items: [String: [DaemonAPI.ForgeItem]] = [:]
     var itemErrors: [String: [String]] = [:]
-    /// An open epic's plan, by its ref; absent while it is read (state 13).
-    var plans: [String: DaemonAPI.ForgePlan] = [:]
+    /// An open epic's children and where it is, by its ref; absent while it is read (state 13).
+    var places: [String: WorkFeatures.Place] = [:]
     /// The epics whose plan could not be read.
     var unread: Set<String> = []
-    /// An open epic's forecast close (the P50), by its ref.
-    var closes: [String: Date] = [:]
+    /// The children `work/features` says wait for the person, by ref.
+    var waiting: Set<String> = []
     /// The open pull requests of every machine, by the label a lane gives each (*P#45*).
     var pulls: [String: DaemonAPI.ForgeItem] = [:]
     var asked = 0
@@ -38,6 +39,10 @@ final class WorkFeaturesState {
     /// The boards the Board menu offers, read with the features.
     var boards: [DaemonAPI.ProjectBoard] = []
     private var read: Ask?
+    /// What the machines with `work/features` gave each feature, by name in lower case.
+    private var oneRead: [String: [DaemonAPI.ForgeItem]] = [:]
+    /// The machines with no `work/features`, whose features are read issue by issue.
+    private var older: [(id: MachineRef, name: String)] = []
 
     private struct Ask: Equatable {
         var asked: Int
@@ -51,8 +56,13 @@ final class WorkFeaturesState {
         picked[name.lowercased()] ?? WorkFeatures.startsOpen(group, in: groups)
     }
 
-    /// Read the features, unless they were read for this Refresh and board already; then the
-    /// issues and plans of the features that are open.
+    private enum Answer: Sendable {
+        case one(DaemonAPI.WorkFeatures)
+        case features(DaemonAPI.ForgeFeatures)
+    }
+
+    /// Read the features, unless they were read for this Refresh and board already; then, from an
+    /// older machine, the issues and plans of the features that are open.
     func load(model: any WorkModel) async {
         let mine = ask
         guard read != mine || features == nil else { return }
@@ -62,48 +72,76 @@ final class WorkFeaturesState {
         errors = []
         items = [:]
         itemErrors = [:]
-        plans = [:]
+        places = [:]
         unread = []
-        closes = [:]
+        waiting = []
         pulls = [:]
+        oneRead = [:]
         let board = board
         let found = await model.workBoards()
         guard ask == mine else { return }
         boards = found
         let machines = model.workMachines(board: board)
-        var got: [(host: MachineRef, list: DaemonAPI.ForgeFeatures)] = []
+        let reads = Set(model.featuresMachines.map(\.id))
+        older = machines.filter { !reads.contains($0.id) }
+        var got: [(host: MachineRef, answer: Answer)] = []
         var prs: [DaemonAPI.ForgeItem] = []
-        await withTaskGroup(of: (MachineRef, DaemonAPI.ForgeFeatures, [DaemonAPI.ForgeItem]).self) { group in
+        let narrow = board.isEmpty ? nil : board
+        await withTaskGroup(of: (MachineRef, Answer, [DaemonAPI.ForgeItem]).self) { group in
             for machine in machines {
+                let one = reads.contains(machine.id)
                 group.addTask {
                     // The open pull requests say what works on a child and its checks (note 8).
                     async let open = try? model.forgeList(.pr, .init(state: "open", limit: 100), on: machine.id)
+                    let answer: Answer
                     do {
-                        let list = try await model.forge(DaemonAPI.Method.forgeFeatures,
-                                                         DaemonAPI.ForgeFeaturesRequest(board: board.isEmpty ? nil : board),
-                                                         returning: DaemonAPI.ForgeFeatures.self, on: machine.id)
-                        return (machine.id, list, await open?.items ?? [])
+                        answer = one
+                            ? .one(try await model.forge(DaemonAPI.Method.workFeatures, DaemonAPI.WorkFeaturesRequest(board: narrow),
+                                                         returning: DaemonAPI.WorkFeatures.self, on: machine.id))
+                            : .features(try await model.forge(DaemonAPI.Method.forgeFeatures,
+                                                              DaemonAPI.ForgeFeaturesRequest(board: narrow),
+                                                              returning: DaemonAPI.ForgeFeatures.self, on: machine.id))
                     } catch {
-                        return (machine.id, .init(errors: [.init(forge: "", message: error.localizedDescription)]),
-                                await open?.items ?? [])
+                        answer = .features(.init(errors: [.init(forge: "", message: error.localizedDescription)]))
                     }
+                    return (machine.id, answer, await open?.items ?? [])
                 }
             }
-            for await (host, list, open) in group {
-                got.append((host, list))
+            for await (host, answer, open) in group {
+                got.append((host, answer))
                 prs += open
             }
         }
         guard ask == mine else { return }
-        errors = got.flatMap { entry in
-            (entry.list.errors ?? []).map { e in
-                WorkList.errorWords(e, machine: machines.count > 1 ? machines.first { $0.id == entry.host }?.name : nil)
+        var lists: [[DaemonAPI.ForgeFeature]] = []
+        var ones: [DaemonAPI.WorkFeatures] = []
+        for entry in got {
+            let machine = machines.count > 1 ? machines.first { $0.id == entry.host }?.name : nil
+            let (found, approved, problems): ([DaemonAPI.ForgeFeature], [String]?, [DaemonAPI.ForgeListError]?)
+            switch entry.answer {
+            case let .one(one):
+                ones.append(one)
+                (found, approved, problems) = (one.features.map(\.feature), one.approvals, one.errors)
+            case let .features(list):
+                (found, approved, problems) = (list.features, list.approvals, list.errors)
             }
+            lists.append(found)
+            approvals += approved ?? []
+            errors += (problems ?? []).map { WorkList.errorWords($0, machine: machine) }
         }
-        let merged = WorkFeatures.merge(got.map(\.list.features))
-        approvals = got.flatMap { $0.list.approvals ?? [] }
+        let one = WorkFeatures.read(ones)
+        oneRead = one.items
+        places = one.places
+        unread = one.unread
+        waiting = one.waiting
+        let merged = WorkFeatures.merge(lists)
+        // With every machine on `work/features`, every feature is read: an open one draws at once.
+        if older.isEmpty {
+            items = Dictionary(merged.map { ($0.name.lowercased(), one.items[$0.name.lowercased()] ?? []) }, uniquingKeysWith: { a, _ in a })
+        }
         pulls = WorkFeatures.pullsByLabel(prs)
         features = merged
+        guard !older.isEmpty else { return }
         let groups = WorkFeatures.groups(merged, agents: model.workAgents, approvals: approvals)
         let open = groups.flatMap { entry in
             entry.features.filter { isOpen($0.name, in: entry.group, of: groups.map(\.group)) }.map(\.name)
@@ -120,12 +158,13 @@ final class WorkFeaturesState {
         if open, items[key] == nil { await readItems(name, model: model) }
     }
 
-    /// An open feature's open issues from every machine, each ref once; then its epics' plans.
+    /// An open feature's open issues from the older machines, each ref once, with what the others
+    /// gave it; then its epics' plans.
     private func readItems(_ name: String, model: any WorkModel) async {
         let key = name.lowercased()
         let mine = ask
         let board = board
-        let machines = model.workMachines(board: board)
+        let machines = older
         var got: [(host: MachineRef, item: DaemonAPI.ForgeItem)] = []
         var problems: [String] = []
         await withTaskGroup(of: (MachineRef, Result<DaemonAPI.ForgeList, Error>).self) { group in
@@ -152,12 +191,12 @@ final class WorkFeaturesState {
             }
         }
         guard ask == mine else { return }
-        items[key] = got.map(\.item)
+        items[key] = (oneRead[key] ?? []) + got.map(\.item)
         itemErrors[key] = problems
         let epics = WorkFeatures.opened(got.map(\.item)).epics
         let hosts = Dictionary(got.map { ($0.item.node.ref, $0.host) }, uniquingKeysWith: { a, _ in a })
         await withTaskGroup(of: Void.self) { group in
-            for epic in epics where plans[epic.node.ref] == nil {
+            for epic in epics where places[epic.node.ref] == nil {
                 guard let host = hosts[epic.node.ref] else { continue }
                 group.addTask { await self.readPlan(epic, on: host, model: model) }
             }
@@ -174,8 +213,7 @@ final class WorkFeaturesState {
                                           returning: DaemonAPI.ForgePlan.self, on: host)
         let closes = await forecast?.lands?.p50
         guard ask == mine else { return }
-        if let plan { plans[epic.node.ref] = plan } else { unread.insert(epic.node.ref) }
-        if let closes { self.closes[epic.node.ref] = closes }
+        if let plan { places[epic.node.ref] = WorkFeatures.place(plan, closes: closes) } else { unread.insert(epic.node.ref) }
     }
 
     private static func forecast(_ node: DaemonAPI.LineageNode, on host: MachineRef?,
@@ -311,7 +349,7 @@ struct WorkFeaturesPane: View {
     private var approvals: Set<String> { Set(state.approvals.map { "P" + WorkList.shortRef($0) }) }
 
     private func work(_ item: DaemonAPI.ForgeItem) -> WorkFeatures.Work {
-        WorkFeatures.work(of: item, agents: model.workAgents, pulls: state.pulls)
+        WorkFeatures.work(of: item, agents: model.workAgents, pulls: state.pulls, waiting: state.waiting)
     }
 
     private func list(_ features: [DaemonAPI.ForgeFeature]) -> some View {
@@ -385,7 +423,7 @@ struct WorkFeaturesPane: View {
 
     /// A read epic's children; nil while its plan is read.
     private func children(_ epic: DaemonAPI.ForgeItem) -> [DaemonAPI.ForgeItem]? {
-        state.plans[epic.node.ref]?.children.map(\.item)
+        state.places[epic.node.ref]?.children
     }
 
     /// An epic's bar: over its children once its plan is read, else its closed sub-issues of all.
@@ -533,7 +571,7 @@ struct WorkFeaturesPane: View {
     private func epicRow(_ epic: DaemonAPI.ForgeItem) -> some View {
         let lead = model.workLead(of: epic.node)
         let tally = tally(epic)
-        let place = state.plans[epic.node.ref].flatMap { WorkFeatures.whereWords($0, closes: state.closes[epic.node.ref]) }
+        let place = state.places[epic.node.ref].flatMap { WorkFeatures.whereWords($0) }
         return open(epic, indent: Self.epicIndent) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: "chart.pie")

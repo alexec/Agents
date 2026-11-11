@@ -211,21 +211,25 @@ public enum WorkFeatures {
     public struct Work: Sendable, Equatable {
         public var sessions: [Agent]
         public var pr: DaemonAPI.ForgeItem?
+        /// `work/features` says it waits for the person (`WorkTimelineChild.waitsForPerson`).
+        public var waitsForPerson: Bool
 
-        public init(sessions: [Agent] = [], pr: DaemonAPI.ForgeItem? = nil) {
+        public init(sessions: [Agent] = [], pr: DaemonAPI.ForgeItem? = nil, waitsForPerson: Bool = false) {
             self.sessions = sessions
             self.pr = pr
+            self.waitsForPerson = waitsForPerson
         }
     }
 
     /// A child's work: the sessions this app knows that are labelled with it and not archived,
     /// a live one first; and the open pull request one of them is labelled with, by `P#<n>`.
-    public static func work(of item: DaemonAPI.ForgeItem, agents: [Agent], pulls: [String: DaemonAPI.ForgeItem]) -> Work {
+    public static func work(of item: DaemonAPI.ForgeItem, agents: [Agent], pulls: [String: DaemonAPI.ForgeItem],
+                            waiting: Set<String> = []) -> Work {
         let ref = WorkList.shortRef(item.node.ref)
         let mine = agents.filter { a in a.state != .archived && a.labels.contains { $0.value == ref } }
             .sorted { a, b in a.state.holdsRuntime != b.state.holdsRuntime ? a.state.holdsRuntime : a.createdAt > b.createdAt }
         let pr = mine.lazy.flatMap(\.labels).first { $0.value.hasPrefix("P#") && pulls[$0.value] != nil }.flatMap { pulls[$0.value] }
-        return Work(sessions: mine, pr: pr)
+        return Work(sessions: mine, pr: pr, waitsForPerson: waiting.contains(item.node.ref))
     }
 
     /// The open pull requests read, by the label a lane gives each: *P#45*.
@@ -240,7 +244,7 @@ public enum WorkFeatures {
     /// with a lane or an open pull request.
     public static func flight(_ item: DaemonAPI.ForgeItem, work: Work, approvals: Set<String>) -> Flight {
         if item.state != "open" { return .done }
-        if waitsForPerson(item) || work.sessions.contains(where: { $0.state == .waitingOnUser }) { return .needsYou }
+        if waitsForPerson(item) || work.waitsForPerson || work.sessions.contains(where: { $0.state == .waitingOnUser }) { return .needsYou }
         if let pr = work.pr, approvals.contains("P" + WorkList.shortRef(pr.node.ref)) { return .needsYou }
         return work.sessions.isEmpty && work.pr == nil ? .notStarted : .working
     }
@@ -354,23 +358,92 @@ public enum WorkFeatures {
         return Tally(done: done, notStarted: max((epic.progress?.total ?? 0) - done, 0))
     }
 
+    /// An open epic as its line needs it, from `work/features` or, from an older daemon, from
+    /// `forge/plan` and `lineage/forecast` (note 16): its children, the first step with an open
+    /// child of all its steps, that step's open blockers outside the plan, and its forecast.
+    public struct Place: Sendable, Equatable {
+        public var children: [DaemonAPI.ForgeItem]
+        public var step: Int?
+        public var steps: Int
+        public var blockedOutside: [DaemonAPI.LineageNode]
+        public var closes: Date?
+        /// The forecast waits for the person (the Timeline's `forecast.waits`, note 12).
+        public var waits: Bool
+
+        public init(children: [DaemonAPI.ForgeItem], step: Int? = nil, steps: Int = 0,
+                    blockedOutside: [DaemonAPI.LineageNode] = [], closes: Date? = nil, waits: Bool = false) {
+            self.children = children
+            self.step = step
+            self.steps = steps
+            self.blockedOutside = blockedOutside
+            self.closes = closes
+            self.waits = waits
+        }
+    }
+
+    /// An epic's place from `work/features`; nil when its plan could not be read.
+    public static func place(_ epic: DaemonAPI.WorkFeatureEpic) -> Place? {
+        guard let children = epic.children else { return nil }
+        return Place(children: children.map(\.item), step: epic.step, steps: epic.steps,
+                     blockedOutside: epic.blockedOutside ?? [], closes: epic.forecast?.mid, waits: epic.forecast?.waits == true)
+    }
+
+    /// An epic's place from `forge/plan` and its forecast's P50, for an older daemon (note 16).
+    public static func place(_ plan: DaemonAPI.ForgePlan, closes: Date?) -> Place {
+        let open = plan.children.filter { $0.item.state == "open" }
+        let step = open.map(\.step).min()
+        var outside: [DaemonAPI.LineageNode] = []
+        for child in open where child.step == step {
+            for b in child.blockedOutside ?? [] where !outside.contains(b) { outside.append(b) }
+        }
+        return Place(children: plan.children.map(\.item), step: step, steps: plan.steps.count, blockedOutside: outside,
+                     closes: closes)
+    }
+
     /// Where an epic is in its plan (note 5, note 12): *step 2 of 3*, *· waits for #10* when its
     /// first open step waits on an open issue outside the plan, *· closes about Thu* from its
-    /// forecast. Nil for a plan with no open child.
-    public static func whereWords(_ plan: DaemonAPI.ForgePlan, closes: Date?, now: Date = Date(),
-                                  calendar: Calendar = .current) -> String? {
-        let open = plan.children.filter { $0.item.state == "open" }
-        guard let step = open.map(\.step).min(), !plan.steps.isEmpty else { return nil }
-        var parts = ["step \(step) of \(plan.steps.count)"]
+    /// forecast, or *· waits for you* when the forecast waits. Nil for a plan with no open child.
+    public static func whereWords(_ place: Place, now: Date = Date(), calendar: Calendar = .current) -> String? {
+        guard let step = place.step, place.steps > 0 else { return nil }
+        var parts = ["step \(step) of \(place.steps)"]
         var outside: [String] = []
-        for child in open where child.step == step {
-            for b in child.blockedOutside ?? [] where !outside.contains(WorkList.shortRef(b.ref)) {
-                outside.append(WorkList.shortRef(b.ref))
-            }
-        }
+        for b in place.blockedOutside where !outside.contains(WorkList.shortRef(b.ref)) { outside.append(WorkList.shortRef(b.ref)) }
         if !outside.isEmpty { parts.append("waits for \(outside.joined(separator: ", "))") }
-        if let closes { parts.append("closes about \(dayWords(closes, now: now, calendar: calendar))") }
+        if place.waits {
+            parts.append("waits for you")
+        } else if let closes = place.closes {
+            parts.append("closes about \(dayWords(closes, now: now, calendar: calendar))")
+        }
         return parts.joined(separator: " · ")
+    }
+
+    /// `work/features`' features as one list, as `merge` does `forge/features`'; with each
+    /// feature's open epics and loose issues as items, by name in lower case; each epic's place by
+    /// ref; the refs `work/features` says wait for the person.
+    public struct Read: Sendable, Equatable {
+        public var features: [DaemonAPI.ForgeFeature] = []
+        public var items: [String: [DaemonAPI.ForgeItem]] = [:]
+        public var places: [String: Place] = [:]
+        /// The epics whose plan could not be read.
+        public var unread: Set<String> = []
+        public var waiting: Set<String> = []
+
+        public init() {}
+    }
+
+    public static func read(_ lists: [DaemonAPI.WorkFeatures]) -> Read {
+        var out = Read()
+        out.features = merge(lists.map { $0.features.map(\.feature) })
+        for f in lists.flatMap(\.features) {
+            let key = f.feature.name.lowercased()
+            out.items[key, default: []] += f.epics.map(\.item) + f.loose.map(\.item)
+            for epic in f.epics {
+                if let place = place(epic) { out.places[epic.item.node.ref] = place } else { out.unread.insert(epic.item.node.ref) }
+                for child in epic.children ?? [] where child.waitsForPerson == true { out.waiting.insert(child.item.node.ref) }
+            }
+            for child in f.loose where child.waitsForPerson == true { out.waiting.insert(child.item.node.ref) }
+        }
+        return out
     }
 
     /// A forecast's day: *today*, *tomorrow*, *Thu* within a week, else *Nov 20*.
