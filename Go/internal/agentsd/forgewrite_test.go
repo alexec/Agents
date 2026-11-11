@@ -41,6 +41,11 @@ func (f *fakeForgeGitHub) SetState(_ context.Context, repo string, number int, c
 	return nil
 }
 
+func (f *fakeForgeGitHub) CloseAs(_ context.Context, repo string, number int, reason string) error {
+	f.note("close %s#%d %s", repo, number, reason)
+	return nil
+}
+
 func (f *fakeForgeGitHub) MergeBy(_ context.Context, repo string, number int, sha, method string, auto bool) (map[string]any, error) {
 	f.note("merge %s#%d %s %s auto=%v", repo, number, sha, method, auto)
 	return map[string]any{"url": "https://github.com/" + repo + "/pull/12"}, nil
@@ -213,6 +218,44 @@ func TestForgeIssueWritesGoToGitHub(t *testing.T) {
 	json.Unmarshal(c.call(t, 7, "forge/labels", wire.ForgeNodeRequest{Node: ghIssue}), &labels)
 	if len(labels.Labels) != 2 || deref(labels.Labels[0].Color) != "#d73a4a" {
 		t.Fatalf("labels: %+v", labels)
+	}
+}
+
+// #4404: a GitHub issue closes as not planned, and its open page offers it; a pull request, a
+// reason with a reopen, and a forge that keeps no reason (GitLab) are refused, each saying why.
+func TestForgeCloseAsNotPlanned(t *testing.T) {
+	_, c, gh, gl, _, _ := allForgesDaemon(t)
+	var page wire.ForgeItemDetail
+	json.Unmarshal(c.call(t, 1, "forge/issue", wire.ForgeItemRequest{Node: ghIssue}), &page)
+	if !slices.Contains(page.Actions, wire.ForgeActionCloseNotPlanned) {
+		t.Fatalf("an open GitHub issue's actions: %v", page.Actions)
+	}
+	notPlanned, completed := wire.ForgeCloseReasonNotPlanned, wire.ForgeCloseReasonCompleted
+	c.call(t, 2, "forge/close", wire.ForgeCloseRequest{Node: ghIssue, Reason: &notPlanned})
+	c.call(t, 3, "forge/close", wire.ForgeCloseRequest{Node: ghIssue, Reason: &completed})
+	if got, want := gh.writes(), []string{"close alexec/agents#7 not_planned", "state alexec/agents#7 closed=true"}; !slices.Equal(got, want) {
+		t.Fatalf("writes:\n%q\nwant\n%q", got, want)
+	}
+	for i, ask := range []struct {
+		r    wire.ForgeCloseRequest
+		says string
+	}{
+		{wire.ForgeCloseRequest{Node: ghPull, Reason: &notPlanned}, githubPRNoReason},
+		{wire.ForgeCloseRequest{Node: ghIssue, Reopen: new(true), Reason: &notPlanned}, "no reopen"},
+		{wire.ForgeCloseRequest{Node: ghIssue, Reason: new(wire.ForgeCloseReason("wontfix"))}, "completed or not_planned"},
+		{wire.ForgeCloseRequest{Node: wire.LineageNode{Kind: "issue", Ref: "gitlab:group/app#3"}, Reason: &notPlanned}, forgeNoNotPlanned},
+	} {
+		if e := c.callError(t, 10+i, "forge/close", ask.r); e == nil || !strings.Contains(e.Message, ask.says) {
+			t.Errorf("%+v: %v, want %q", ask.r, e, ask.says)
+		}
+	}
+	if len(gh.writes()) != 2 {
+		t.Fatalf("a refused close wrote: %q", gh.writes())
+	}
+	gl.mu.Lock()
+	defer gl.mu.Unlock()
+	if len(gl.wrote) > 0 {
+		t.Fatalf("GitLab wrote: %q", gl.wrote)
 	}
 }
 

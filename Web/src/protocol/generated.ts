@@ -4010,7 +4010,8 @@ export interface FoldersListRequest {
 
 /**
  * A write or a read that an item's page offers (#4329, #4361): forge/comment, forge/label,
- * forge/close (a close, a reopen or a transition), forge/merge (now, or with auto), forge/approve,
+ * forge/close (a close, a reopen or a transition; closeNotPlanned is a close with reason
+ * not_planned, where the forge has it, #4404), forge/merge (now, or with auto), forge/approve,
  * forge/rerun, forge/log, forge/diff, forge/add-child, forge/blocked-by, forge/assign (#4403),
  * forge/cancel-auto-merge and forge/ready (#4410).
  */
@@ -4018,6 +4019,7 @@ export type ForgeAction =
   | "comment"
   | "label"
   | "close"
+  | "closeNotPlanned"
   | "reopen"
   | "transition"
   | "merge"
@@ -4143,14 +4145,25 @@ export interface ForgeCheck {
 }
 
 /**
+ * Why forge/close closes an issue (#4404): completed, or not_planned where the forge has it (the
+ * action closeNotPlanned).
+ */
+export type ForgeCloseReason =
+  | "completed"
+  | "not_planned";
+
+/**
  * forge/close (#3130): close an issue or a pull request, or with reopen open it again; with
  * transition, move a Jira issue by that transition of its workflow, by its id from the page's
- * transitions (#3260).
+ * transitions (#3260). reason is why an issue closes (#4404): completed (the default) or
+ * not_planned, which only an issue whose actions have closeNotPlanned takes; refused with reopen or
+ * a transition, and on a pull request.
  */
 export interface ForgeCloseRequest {
   node: LineageNode;
   reopen?: boolean;
   transition?: string;
+  reason?: ForgeCloseReason;
 }
 
 /**
@@ -15175,7 +15188,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeBoardsRequest: { required: [], optional: ["folder"] },
   ForgeCapabilities: { required: ["forge", "issues", "pulls", "labelColors", "avatars", "stateReason", "commentCount"], optional: ["createdAt", "closedAt", "children", "linkedPulls", "events", "total", "releases", "branches", "mergedBy", "mergeCommit", "size", "reviewers", "closes", "checkTimes", "commentsMost"] },
   ForgeCheck: { required: ["name", "state"], optional: ["url", "startedAt", "finishedAt"] },
-  ForgeCloseRequest: { required: ["node"], optional: ["reopen", "transition"] },
+  ForgeCloseRequest: { required: ["node"], optional: ["reopen", "transition", "reason"] },
   ForgeComment: { required: ["author", "body", "at"], optional: ["avatar", "url", "bot"] },
   ForgeCommentRequest: { required: ["node", "body"], optional: [] },
   ForgeDiff: { required: ["files", "cut"], optional: ["url"] },

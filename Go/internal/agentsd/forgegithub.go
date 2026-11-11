@@ -29,7 +29,7 @@ func (githubForge) Images() forgeImageHost { return githubImages{} }
 func (githubForge) Caps() forgeCaps {
 	return forgeCaps{
 		Issues: true, PRs: true,
-		Issue: forgeActions{Comment: true, Label: true, Assign: true, Close: true, Reopen: true},
+		Issue: forgeActions{Comment: true, Label: true, Assign: true, Close: true, Reopen: true, CloseNotPlanned: true},
 		PR: forgeActions{Comment: true, Label: true, Assign: true, Close: true, Reopen: true, Merge: true, AutoMerge: true, Approve: true,
 			Rerun: true, Log: true, Diff: true, CancelAutoMerge: true, Ready: true},
 		LabelColors: true,
@@ -42,10 +42,15 @@ func (githubForge) Caps() forgeCaps {
 		Total:        true,
 		Plan:         true, BlockedBy: true, AddChild: true,
 		Reasons: map[string]string{
-			actionTransition: "only a Jira issue or an Azure Boards work item moves by a transition",
+			actionTransition:      "only a Jira issue or an Azure Boards work item moves by a transition",
+			actionCloseNotPlanned: githubPRNoReason,
 		},
 	}
 }
+
+// githubPRNoReason is why a pull request does not close as not planned: GitHub keeps a reason
+// only for an issue.
+const githubPRNoReason = "a pull request closes with no reason; only an issue closes as not planned"
 
 // Owns is github:owner/repo#12, an issue or a pull request.
 func (githubForge) Owns(node wire.LineageNode) (forgeRef, bool) {
@@ -355,6 +360,17 @@ func (g githubForge) SetState(ctx context.Context, r forgeRef, closed bool, tran
 		return err
 	}
 	return gh.SetState(ctx, r.Repo, r.Number, closed)
+}
+
+func (g githubForge) CloseNotPlanned(ctx context.Context, r forgeRef) error {
+	if r.pr() {
+		return cannot(actionCloseNotPlanned)
+	}
+	gh, err := g.d.forgeGitHub()
+	if err != nil {
+		return err
+	}
+	return gh.CloseAs(ctx, r.Repo, r.Number, string(wire.ForgeCloseReasonNotPlanned))
 }
 
 // Merge merges at sha by method, or by the repo's default when none is said.

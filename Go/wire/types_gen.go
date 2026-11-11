@@ -4607,12 +4607,13 @@ type FoldersListRequest struct {
 	IncludeArchived bool `json:"includeArchived"`
 }
 
-// A write or a read that an item's page offers (#4329, #4361): forge/comment, forge/label, forge/close (a close, a reopen or a transition), forge/merge (now, or with auto), forge/approve, forge/rerun, forge/log, forge/diff, forge/add-child, forge/blocked-by, forge/assign (#4403), forge/cancel-auto-merge and forge/ready (#4410).
+// A write or a read that an item's page offers (#4329, #4361): forge/comment, forge/label, forge/close (a close, a reopen or a transition; closeNotPlanned is a close with reason not_planned, where the forge has it, #4404), forge/merge (now, or with auto), forge/approve, forge/rerun, forge/log, forge/diff, forge/add-child, forge/blocked-by, forge/assign (#4403), forge/cancel-auto-merge and forge/ready (#4410).
 type ForgeAction string
 
 const ForgeActionComment ForgeAction = "comment"
 const ForgeActionLabel ForgeAction = "label"
 const ForgeActionClose ForgeAction = "close"
+const ForgeActionCloseNotPlanned ForgeAction = "closeNotPlanned"
 const ForgeActionReopen ForgeAction = "reopen"
 const ForgeActionTransition ForgeAction = "transition"
 const ForgeActionMerge ForgeAction = "merge"
@@ -4733,13 +4734,21 @@ type ForgeCheck struct {
 	FinishedAt *Date `json:"finishedAt,omitzero"`
 }
 
-// forge/close (#3130): close an issue or a pull request, or with reopen open it again; with transition, move a Jira issue by that transition of its workflow, by its id from the page's transitions (#3260).
+// Why forge/close closes an issue (#4404): completed, or not_planned where the forge has it (the action closeNotPlanned).
+type ForgeCloseReason string
+
+const ForgeCloseReasonCompleted ForgeCloseReason = "completed"
+const ForgeCloseReasonNotPlanned ForgeCloseReason = "not_planned"
+
+// forge/close (#3130): close an issue or a pull request, or with reopen open it again; with transition, move a Jira issue by that transition of its workflow, by its id from the page's transitions (#3260). reason is why an issue closes (#4404): completed (the default) or not_planned, which only an issue whose actions have closeNotPlanned takes; refused with reopen or a transition, and on a pull request.
 type ForgeCloseRequest struct {
 	Node LineageNode `json:"node"`
 
 	Reopen *bool `json:"reopen,omitzero"`
 
 	Transition *string `json:"transition,omitzero"`
+
+	Reason *ForgeCloseReason `json:"reason,omitzero"`
 }
 
 // A comment on an issue or a pull request (#3129), as Markdown. bot says a bot or an app wrote it. avatar is the author's picture, a URL that only forge/image reads (#4363); none when the forge gives none.
