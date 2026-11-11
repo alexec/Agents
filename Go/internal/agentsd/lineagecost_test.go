@@ -288,9 +288,14 @@ func TestCostNodeKeepsStartAndLevel(t *testing.T) {
 	e.parent = &epic
 	d.resolveCache[issue] = e
 	d.resolveMu.Unlock()
+	// A forge list says its milestone (#4620); a list without one leaves it.
+	d.resolvedFromForge([]wire.ForgeItem{{Node: issue, Title: "Fix it", State: "open", Milestone: new("Planning"),
+		Labels: []wire.ForgeLabel{{Name: "Story"}, {Name: "feature:estimates"}}}})
+	d.resolvedFromForge([]wire.ForgeItem{{Node: issue, Title: "Fix it", State: "open",
+		Labels: []wire.ForgeLabel{{Name: "Story"}, {Name: "feature:estimates"}}}})
 	n = node()
 	if n.Level == nil || *n.Level != "story" || n.Feature == nil || *n.Feature != "estimates" ||
-		n.Parent == nil || *n.Parent != epic.Ref {
+		n.Parent == nil || *n.Parent != epic.Ref || n.Milestone == nil || *n.Milestone != "Planning" {
 		t.Fatalf("%+v", n)
 	}
 
@@ -300,7 +305,8 @@ func TestCostNodeKeepsStartAndLevel(t *testing.T) {
 	d.resolveMu.Unlock()
 	d.unlink(s, issue, lineage.RelOpens)
 	n = node()
-	if n.StartedAt == nil || *n.StartedAt != wire.DateOf(began) || n.Level == nil || *n.Level != "story" || n.Parent == nil {
+	if n.StartedAt == nil || *n.StartedAt != wire.DateOf(began) || n.Level == nil || *n.Level != "story" || n.Parent == nil ||
+		n.Milestone == nil {
 		t.Fatalf("%+v", n)
 	}
 }
