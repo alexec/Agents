@@ -2176,6 +2176,7 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .work-avatars .more { margin-left: 3px; font-size: 0.85em; opacity: 0.7; }
 .work-avatar { flex: none; display: inline-grid; place-items: center; border-radius: 50%; box-shadow: 0 0 0 1.5px var(--paper-raised);
   background: hsl(var(--hue) 55% 45%); color: #fff; font-weight: 600; line-height: 1; }
+img.work-avatar { object-fit: cover; background: var(--paper-wash); }
 .work-item-rows li.stale { opacity: 0.5; }
 /* The lists (#4395, lists.md): a row is a link; the selected row (the focus) has a 2 px accent ring on the light accent fill. */
 a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
@@ -2275,6 +2276,7 @@ a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
 .work-state.with-glyph.open { background: #1a7f37; }
 .work-state.with-glyph.closed.pr-closed { background: #cf222e; }
 .work-state.with-glyph.closed, .work-state.with-glyph.merged { background: #8250df; }
+.work-state.with-glyph.closed.not-planned { background: #59636e; }
 .work-status-menu { border: none; cursor: pointer; font: inherit; font-size: 0.9em; padding: 2px 10px; }
 .work-status-menu:disabled { cursor: default; opacity: 0.7; }
 /* Placeholders while the page reads (section 7): grey bars with a slow shimmer, no spinner. */
@@ -2319,6 +2321,7 @@ a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
 .work-mini-row { display: inline-flex; gap: 6px; align-items: center; padding: 2px 0; background: none; border: none; color: inherit; font: inherit;
   cursor: pointer; text-align: left; }
 .work-mini-row:hover { text-decoration: underline; }
+.work-mini-row .work-mini-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.7; }
 .work-progress { display: flex; flex-direction: column; gap: 2px; width: 100%; }
 .work-progress progress { width: 100%; height: 6px; }
 .work-session { display: inline-flex; gap: 6px; align-items: center; max-width: 100%; padding: 1px 0; border: none; background: none; color: var(--accent);
@@ -2365,6 +2368,8 @@ a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
 .work-event .mark { flex: none; display: inline-grid; place-items: center; width: 22px; height: 22px; margin: 0 3px; border-radius: 50%; background: var(--paper-well);
   font-size: 12px; box-shadow: 0 0 0 3px var(--paper-ground); }
 .work-event .mark.closed { background: #8250df; color: #fff; }
+.work-event .mark.not-planned { background: #59636e; color: #fff; }
+.work-event .mark .work-state-icon { --state: currentColor; }
 /* The comment box (note 11): the person's glyph on the timeline's column, the field, then Close issue and Comment. */
 .work-comment-box { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; margin-top: 16px; }
 .work-comment-me svg { display: block; fill: var(--paper-wash); }
@@ -2400,6 +2405,7 @@ a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
   .work-state.with-glyph.open { background: #238636; }
   .work-state.with-glyph.closed, .work-state.with-glyph.merged { background: #8957e5; }
   .work-state.with-glyph.closed.pr-closed { background: #da3633; }
+  .work-state.with-glyph.closed.not-planned { background: #6e7681; }
   .work-session .dot.runs { background: #3fb950; }
   .work-close-mark.open { color: #a371f7; }
   .work-close-mark.open.pull { color: #f85149; }
