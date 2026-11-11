@@ -1,7 +1,9 @@
 #!/bin/bash
 # The linters (#1224): each one fast, with a fix mode, and only its bug and security rules on.
 #
-#   scripts/lint.sh [linter…]         lint the whole tree; every linter when none is named
+#   scripts/lint.sh [linter…]         lint the whole tree; with none named, every linter (on a
+#                                     Mac, those for the branch's files: below)
+#   scripts/lint.sh --all             every linter, on a Mac too
 #   scripts/lint.sh --fix [linter…]   run each linter's fix mode first, then lint
 #   scripts/lint.sh --tools DIR TOOL…  put the pinned binaries in DIR (CI): shellcheck, ruff,
 #                                     golangci-lint, govulncheck (needs Go), biome, swiftlint, jscpd;
@@ -10,6 +12,12 @@
 # Linters: shell (shellcheck), zsh (zsh -n), python (ruff), go (golangci-lint), govulncheck,
 # web (biome lint), swift (SwiftLint), dupes (jscpd), checks (our own text checks). Their rules are in
 # .shellcheckrc, ruff.toml, Go/.golangci.yml, Web/biome.json and .swiftlint.yml.
+#
+# On a Mac (not CI) with no linter named, only the linters for the files the branch changes
+# since its merge base with origin/main, committed or not, run (#4710): go and govulncheck for
+# Go/ or Packages/Wire/, swift for *.swift or .swiftlint.yml, web for Web/, python for *.py or
+# ruff.toml, shell and zsh for a shell file or .shellcheckrc; checks and dupes always. A change
+# to this script runs every one. It says which it skipped. CI runs every linter.
 #
 # A linter is "required" or "report". A required one is clean on main, and a finding fails
 # this script. A report one prints its findings and exits 0: its old findings are listed in
@@ -93,8 +101,58 @@ if [ "${1:-}" = --tools ]; then
 fi
 
 fix=0
-[ "${1:-}" = --fix ] && { fix=1; shift; }
-linters=${*:-$ALL}
+all=0
+while [ $# -gt 0 ]; do
+	case $1 in
+	--fix) fix=1 ;;
+	--all) all=1 ;;
+	*) break ;;
+	esac
+	shift
+done
+
+# changed_linters: the linters for the files this branch changes since its merge base with
+# origin/main, committed or not; every one when that cannot be told or this script changed.
+changed_linters() {
+	local base f line want=" checks dupes " l out=
+	base=$(git merge-base origin/main HEAD 2>/dev/null) || { echo "$ALL"; return; }
+	while IFS= read -r f; do
+		[ -n "$f" ] || continue
+		case $f in
+		scripts/lint.sh) echo "$ALL"; return ;;
+		Go/* | Packages/Wire/*) want="$want go govulncheck " ;;
+		esac
+		case $f in
+		*.swift | .swiftlint.yml) want="$want swift " ;;
+		Web/*) want="$want web " ;;
+		*.py | ruff.toml) want="$want python " ;;
+		*.sh | *.bash | *.zsh | .shellcheckrc) want="$want shell zsh " ;;
+		*)
+			# An executable script with no extension: its first line says sh or zsh.
+			if [ -f "$f" ] && [ -x "$f" ]; then
+				IFS= read -r line <"$f" || line=
+				case $line in '#!'*sh*) want="$want shell zsh " ;; esac
+			fi ;;
+		esac
+	done < <({ git diff --name-only "$base"; git ls-files --others --exclude-standard; } | sort -u)
+	for l in $ALL; do
+		case "$want" in *" $l "*) out="$out $l" ;; esac
+	done
+	echo "${out# }"
+}
+
+if [ $# -gt 0 ]; then
+	linters=$*
+elif [ "$all" = 0 ] && [ "$(uname -s)" = Darwin ] && [ -z "${CI:-}" ]; then
+	linters=$(changed_linters)
+	skipped=
+	for l in $ALL; do
+		case " $linters " in *" $l "*) ;; *) skipped="$skipped $l" ;; esac
+	done
+	[ -n "$skipped" ] && echo "lint.sh: only the linters for this branch's files ($linters); skipped:$skipped. --all runs every one."
+else
+	linters=$ALL
+fi
 
 # tool LINTER: the program it runs; zsh and checks need none of ours.
 tool() {
