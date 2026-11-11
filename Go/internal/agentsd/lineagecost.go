@@ -599,4 +599,7 @@ func (d *Daemon) registerLineageCost() {
 	On(d, wire.CallLineageEstimate, func(ctx context.Context, _ *Client, r wire.LineageEstimateRequest) (wire.LineageEstimate, error) {
 		return d.lineageEstimate(ctx, r)
 	})
+	On(d, wire.CallLineageForecast, func(ctx context.Context, _ *Client, r wire.LineageForecastRequest) (wire.LineageForecast, error) {
+		return d.lineageForecast(ctx, r)
+	})
 }
