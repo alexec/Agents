@@ -139,9 +139,11 @@ struct ContentView: View {
         } else if model.folderPage == .mcpServers, let key = model.selectedFolderKey {
             // A folder's MCP servers, from its row in the sidebar (#753).
             MCPServersView(folder: key).paperGround()
-        } else if let page = model.folderPage, let key = model.selectedFolderKey {
-            // A folder's workflows or its archive, from its row in the sidebar (#495).
-            FolderWorkPage(page: page, folder: key).paperGround()
+        } else if model.folderPage == .archivedSessions, let key = model.selectedFolderKey {
+            // A folder's archived sessions, from its row in the sidebar (#495, #4448).
+            ArchivedSessionsPage(folder: key).paperGround()
+        } else if model.folderPage == .archivedWorkflows, let key = model.selectedFolderKey {
+            ArchivedWorkflowsPage(folder: key).paperGround()
         } else if let path = model.openPin, let key = model.selectedFolderKey, let summary = model.selectedFolderSummary {
             // One of the folder's pinned pages (#159), live, where the chat would be; or a
             // pinned view (#189), fed afresh.

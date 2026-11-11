@@ -18,8 +18,10 @@ public enum SidebarItem: Hashable, Sendable {
     /// One of the folder's pinned pages (#159), by its path in the folder, under the
     /// folder's row and above its sessions.
     case pin(String, in: FolderKey)
-    /// A folder's archived sessions and workflows, as a page (#495), with Unarchive.
-    case archive(FolderKey)
+    /// A folder's archived sessions, as a page (#495, #4448), by the day each was archived.
+    case archivedSessions(FolderKey)
+    /// A folder's archived workflows, as a page (#4448), by name.
+    case archivedWorkflows(FolderKey)
     /// The Multiplier page (#3986): what the window shows with nothing else open, first under
     /// Usage so there is a way back to it. The Mac window's only: the Remote never has it.
     case multiplier

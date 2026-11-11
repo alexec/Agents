@@ -1,7 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// What one folder has archived (#498), the window's `FolderWorkPage`: sessions and
+/// What one folder has archived (#498), the window's `ArchivedSessionsPage`: sessions and
 /// workflows. They used to be folds inside the folder's fold in the sidebar; one row
 /// there now opens this, so the sidebar is never more than two levels deep (#495).
 ///
@@ -26,9 +26,8 @@ struct ArchivePage: View {
                         SidebarSessionRow(agent: agent)
                     }
                 }
-                if let note = ArchivedSessionsNote.note(shown: sessions.count, total: total, answered: answered,
-                                                        hostOffline: model.isStale(on: folder.host)) {
-                    Text(note.text).foregroundStyle(.secondary)
+                if let note = note(shown: sessions.count, total: total) {
+                    Text(note).foregroundStyle(.secondary)
                 }
             }
             if !flows.isEmpty {
@@ -54,6 +53,18 @@ struct ArchivePage: View {
             if !model.openArchive || model.selectedKey != folder {
                 model.letGoOfArchived(in: folder.folder)
             }
+        }
+    }
+
+    /// The line under the sessions, in the words the Mac's Archived Sessions page uses (#4448),
+    /// until the Remote has the two pages (#4452).
+    private func note(shown: Int, total: Int) -> String? {
+        switch ArchivedPage.state(held: shown, filtering: false, answered: answered,
+                                  hostOffline: model.isStale(on: folder.host)) {
+        case .loading: ArchivedPage.loading
+        case .hostSilent: ArchivedPage.staleStrip
+        case .empty, .noMatch: ArchivedPage.Sessions.emptyTitle
+        case .rows: ArchivedPage.hasMore(shown: shown, total: total) ? ArchivedPage.footer(shown: shown, total: total) : nil
         }
     }
 }

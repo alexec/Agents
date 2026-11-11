@@ -604,7 +604,8 @@ final class AppModel {
             guard let key = selectedFolderKey else { return selection == nil && !composing ? .multiplier : nil }
             if let id = openWorkflow { return .workflow(id, in: key) }
             if case .review(let id)? = folderPage { return .review(id, in: key) }
-            if folderPage == .archive { return .archive(key) }
+            if folderPage == .archivedSessions { return .archivedSessions(key) }
+            if folderPage == .archivedWorkflows { return .archivedWorkflows(key) }
             if folderPage == .mcpServers { return .folderMCPServers(key) }
             if let openPin { return .pin(openPin, in: key) }
             if let selection { return .session(selection) }
@@ -632,8 +633,10 @@ final class AppModel {
                 openWorkflow = id
             case .pin(let path, let key):
                 showPin(path, in: key)
-            case .archive(let key):
-                showFolderPage(.archive, of: key)
+            case .archivedSessions(let key):
+                showFolderPage(.archivedSessions, of: key)
+            case .archivedWorkflows(let key):
+                showFolderPage(.archivedWorkflows, of: key)
             case .folderMCPServers(let key):
                 showFolderPage(.mcpServers, of: key)
             case .review(let id, let key):
@@ -957,7 +960,9 @@ final class AppModel {
     }
 
     enum FolderPage: Equatable {
-        case archive
+        /// Archived Sessions and Archived Workflows (#4448).
+        case archivedSessions
+        case archivedWorkflows
         /// Its MCP servers and how each is doing (#753).
         case mcpServers
         /// A change waiting for an OK, by its `Approval.id` (#1472).
@@ -1535,6 +1540,19 @@ final class AppModel {
     func loadArchived(in key: FolderKey, limit: Int = archivedShown) async -> Bool {
         let request = DaemonAPI.ListRequest(archivedOnly: true, folder: key.folder,
                                             limit: limit, lean: true)
+        guard let listed = try? await client(for: key.host).call(DaemonAPI.Method.agentsList, request,
+                                                                  returning: [Agent].self) else { return false }
+        work.takeListed(listed.map { var agent = $0; agent.host = key.host; return agent })
+        return true
+    }
+
+    /// The archived sessions of a folder that hold `words`, for the Archived Sessions page's
+    /// filter (#4448), so one older than the page held is found too. Let go with the rest
+    /// when the page closes.
+    @discardableResult
+    func searchArchived(in key: FolderKey, words: String) async -> Bool {
+        let request = DaemonAPI.ListRequest(archivedOnly: true, folder: key.folder, limit: Self.searchShown,
+                                            lean: true, query: words)
         guard let listed = try? await client(for: key.host).call(DaemonAPI.Method.agentsList, request,
                                                                   returning: [Agent].self) else { return false }
         work.takeListed(listed.map { var agent = $0; agent.host = key.host; return agent })
