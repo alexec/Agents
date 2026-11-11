@@ -311,6 +311,23 @@ export function NewAgent({ store, host, folder, folderName, down }: {
       .then((p) => { if (current) autoPreview.value = p; });
     return () => { current = false; };
   }, [host, cwd, isAuto, levels.value, sandbox.value, needs.value, store.autoSettings.value]);
+
+  // Auto has no commands of its own: the "/" picker borrows the skills of the runtime it
+  // would use right now, once picked, so it offers what a named runtime always does (#2658).
+  useEffect(() => {
+    if (!isAuto) return;
+    const picked = autoPreview.value?.runtimeID;
+    if (!picked) return;
+    let current = true;
+    void store.draft(host, picked, cwd).then((answer) => {
+      if ("draftID" in answer) store.discardDraft(host, answer.draftID);
+      if (!current || "failure" in answer) return;
+      if (chosenRuntime === autoID && autoPreview.value?.runtimeID === picked) {
+        form.value = { ...form.value, commands: answer.commands };
+      }
+    });
+    return () => { current = false; };
+  }, [host, cwd, isAuto, autoPreview.value?.runtimeID]);
   const mappings = store.autoMappings.value[store.macHostID.value];
   /** The options a value sets on the chosen runtime, where it offers them. */
   function levelOptions(options: ConfigOption[], only?: "model" | "permission"): Record<string, JSONValue> {
