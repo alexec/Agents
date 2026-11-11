@@ -1,6 +1,6 @@
 ---
 name: free-disk-space
-description: Free disk space on this Mac (#199, #1796) until 20% of the disk is free. Bound the shared build cache (Swift and Go), delete the build output that finished agents left in their worktrees, remove the worktrees of archived agents whose work is all on their branch, end leaked headless Chromes and their clones, remove old Xcode device support and unavailable simulators, and remove the Xcode DerivedData of removed worktrees. Nothing else. Use when the Free disk space workflow runs on machine.disk_low, or when Alex asks to free disk space.
+description: Free disk space on this Mac (#199, #1796) until 25% of the disk is free. Bound the shared build cache (Swift and Go), delete the build output that finished agents left in their worktrees, remove the worktrees of archived agents whose work is all on their branch, end leaked headless Chromes and their clones, remove old Xcode device support and unavailable simulators, and remove the Xcode DerivedData of removed worktrees. Nothing else. Use when the Free disk space workflow runs on machine.disk_low, or when Alex asks to free disk space.
 ---
 
 # Free disk space
@@ -10,8 +10,9 @@ This is the method of the Free disk space workflow
 starts it. A person or an agent can also follow it by hand. Where it says that nobody is
 at the keyboard, that is true only of a run of the workflow.
 
-**Work to the target, not to the threshold (#1796).** The target is 20% of the disk free
-(about 92 GB on a 494 GB disk). After each of steps 3 to 6, run:
+**Work to the target, not to the threshold (#1796).** The target is 25% of the disk free
+(about 123 GB on a 494 GB disk), above the 20% line `machine.disk_low` fires at, so a run
+ends past the line and not on it. After each of steps 3 to 6, run:
 
 ```sh
 scripts/free-disk.sh status   # exits 0 at the target, 1 under it

@@ -201,16 +201,15 @@ private struct FolderDiskSpacePane: View {
             SettingsPaneTitle(title: FolderSettingsPane.diskSpace.title)
             Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 14, verticalSpacing: 12) {
                 settingsRow("Low disk space") {
-                    diskLine(\.lowGB, default: DiskThresholds.defaultLowGB, choices: DiskThresholds.lowChoices)
+                    diskLine(\.lowPercent, default: DiskThresholds.defaultLowPercent, choices: DiskThresholds.lowChoices)
                 }
                 settingsRow("Critical disk space") {
                     VStack(alignment: .leading, spacing: 6) {
-                        diskLine(\.criticalGB, default: DiskThresholds.defaultCriticalGB,
+                        diskLine(\.criticalPercent, default: DiskThresholds.defaultCriticalPercent,
                                  choices: DiskThresholds.criticalChoices)
                         settingsNote("When free space on the disk holding this folder or its worktrees falls below "
-                                     + "these, the machine's row and page say so and machine.disk_low is raised for agents and workflows. "
-                                     + "Low is also below \((summary.folder.diskSpace ?? DiskThresholds()).effectiveLowPercent)% "
-                                     + "of the disk. Saved in .agents/folder.json.")
+                                     + "these, as a percent of the disk, the machine's row and page say so and "
+                                     + "machine.disk_low is raised for agents and workflows. Saved in .agents/folder.json.")
                     }
                 }
             }
@@ -218,8 +217,8 @@ private struct FolderDiskSpacePane: View {
         }
     }
 
-    /// One disk space line (#195) as a menu of sizes, its default marked and choosing it
-    /// putting the folder back to the default. A size set by hand is offered too.
+    /// One disk space line (#195) as a menu of percents, its default marked and choosing it
+    /// putting the folder back to the default. A percent set by hand is offered too.
     private func diskLine(_ key: WritableKeyPath<DiskThresholds, Int?>, default standard: Int,
                           choices: [Int]) -> some View {
         let kept = summary.folder.diskSpace ?? DiskThresholds()
@@ -230,8 +229,8 @@ private struct FolderDiskSpacePane: View {
             lines[keyPath: key] = chosen == standard ? nil : chosen
             Task { await model.setDiskSpace(lines, for: summary.key) }
         })) {
-            ForEach(offered, id: \.self) { size in
-                Text(size == standard ? "\(size) GB (default)" : "\(size) GB").tag(size)
+            ForEach(offered, id: \.self) { percent in
+                Text(percent == standard ? "\(percent)% (default)" : "\(percent)%").tag(percent)
             }
         }
         .labelsHidden()

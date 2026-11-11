@@ -86,19 +86,19 @@ func TestAPullsChangeWaits(t *testing.T) {
 	dir := repo(t)
 	c.call(t, 1, "folders/add", map[string]any{"folder": store.FolderURL(dir)})
 	os.MkdirAll(filepath.Join(dir, ".agents"), 0o755)
-	os.WriteFile(filepath.Join(dir, ".agents", "folder.json"), []byte(`{"diskSpace":{"lowGB":30}}`), 0o644)
+	os.WriteFile(filepath.Join(dir, ".agents", "folder.json"), []byte(`{"diskSpace":{"lowPercent":30}}`), 0o644)
 	d.checkGuarded(dir, ".agents/folder.json", nil) // first seen: approved
-	pulled := []byte(`{"diskSpace":{"lowGB":90}}`)
+	pulled := []byte(`{"diskSpace":{"lowPercent":50}}`)
 	os.WriteFile(filepath.Join(dir, ".agents", "folder.json"), pulled, 0o644)
 	git(dir, "add", ".agents/folder.json")
 	git(dir, "commit", "-q", "-m", "pulled")
 	d.checkGuarded(dir, ".agents/folder.json", nil)
 	s, _ := d.summaryFor(dir)
 	if len(s.GuardedChanges) != 1 || !s.GuardedChanges[0].ByGit || s.Approvals[0].Line != "Changed with the last pull" ||
-		s.Folder.DiskSpace == nil || *s.Folder.DiskSpace.LowGB != 30 {
+		s.Folder.DiskSpace == nil || *s.Folder.DiskSpace.LowPercent != 30 {
 		t.Fatalf("%+v %+v %+v", s.GuardedChanges, s.Approvals, s.Folder.DiskSpace)
 	}
-	if e := c.callError(t, 2, "folders/setDiskSpace", map[string]any{"folder": store.FolderURL(dir), "diskSpace": map[string]any{"lowGB": 40}}); !strings.HasPrefix(e.Message, "The disk space lines were not changed: ") {
+	if e := c.callError(t, 2, "folders/setDiskSpace", map[string]any{"folder": store.FolderURL(dir), "diskSpace": map[string]any{"lowPercent": 40}}); !strings.HasPrefix(e.Message, "The disk space lines were not changed: ") {
 		t.Fatal(e.Message)
 	}
 }

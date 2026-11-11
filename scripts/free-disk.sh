@@ -8,7 +8,8 @@
 #   free-disk.sh xcode                 older iOS DeviceSupport builds, unavailable simulators
 #   free-disk.sh deriveddata [--dry-run]  Xcode DerivedData of worktrees that are gone
 #
-# status: the target is 20% of the disk (AGENTS_FREE_TARGET_PCT moves it). It exits 0 when
+# status: the target is 25% of the disk (AGENTS_FREE_TARGET_PCT moves it), above the 20% line
+# machine.disk_low fires at, so a run ends past the line and not on it. It exits 0 when
 # free space is at the target or over it, and 1 when it is under.
 #
 # chromes: a walk's Chrome (Web/test/walk/cdp.mjs) is headless, with a throwaway profile
@@ -42,7 +43,7 @@ die() { echo "free-disk.sh: $*" >&2; exit 1; }
 gb() { awk -v k="$1" 'BEGIN { printf "%.1f", k / 1048576 }'; }
 
 status() {
-	local pct=${AGENTS_FREE_TARGET_PCT:-20} line size avail target
+	local pct=${AGENTS_FREE_TARGET_PCT:-25} line size avail target
 	line=$(df -k "$HOME" | tail -1)
 	size=$(echo "$line" | awk '{print $2}')
 	avail=$(echo "$line" | awk '{print $4}')

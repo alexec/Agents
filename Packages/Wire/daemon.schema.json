@@ -7436,13 +7436,10 @@
     "DiskThresholds": {
       "type": "object",
       "properties": {
-        "lowGB": {
-          "type": "integer"
-        },
         "lowPercent": {
           "type": "integer"
         },
-        "criticalGB": {
+        "criticalPercent": {
           "type": "integer"
         }
       },

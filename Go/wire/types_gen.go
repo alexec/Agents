@@ -3524,11 +3524,9 @@ type DiskState struct {
 }
 
 type DiskThresholds struct {
-	LowGB *int64 `json:"lowGB,omitzero"`
-
 	LowPercent *int64 `json:"lowPercent,omitzero"`
 
-	CriticalGB *int64 `json:"criticalGB,omitzero"`
+	CriticalPercent *int64 `json:"criticalPercent,omitzero"`
 }
 
 type DiskWorktree struct {
