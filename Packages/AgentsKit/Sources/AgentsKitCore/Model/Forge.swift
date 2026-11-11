@@ -48,6 +48,13 @@ public extension DaemonAPI {
         public var review: String?
         public var mergeable: String?
         public var autoMerge: Bool?
+        /// A pull request's branches: the one it merges from and the one it merges into, where the
+        /// forge says them (`ForgeCapabilities.branches`); a merged one's `mergedBy` and
+        /// `mergeCommit` (#4409).
+        public var headRef: String?
+        public var baseRef: String?
+        public var mergedBy: String?
+        public var mergeCommit: String?
         /// The hierarchy (#3267): the issue it is a sub-issue of; its level (epic, story, task or
         /// spike, from its labels); its feature (the name of its `feature:` label); and a
         /// parent's closed children of all of them, where the forge says it.
@@ -64,7 +71,8 @@ public extension DaemonAPI {
                     mergeable: String? = nil, autoMerge: Bool? = nil, parent: LineageNode? = nil, level: String? = nil,
                     feature: String? = nil, progress: ForgeProgress? = nil, status: String? = nil, standing: Bool? = nil,
                     authorAvatar: String? = nil, stateReason: String? = nil, createdAt: Date? = nil,
-                    closedAt: Date? = nil) {
+                    closedAt: Date? = nil, headRef: String? = nil, baseRef: String? = nil, mergedBy: String? = nil,
+                    mergeCommit: String? = nil) {
             self.node = node
             self.title = title
             self.state = state
@@ -86,6 +94,10 @@ public extension DaemonAPI {
             self.review = review
             self.mergeable = mergeable
             self.autoMerge = autoMerge
+            self.headRef = headRef
+            self.baseRef = baseRef
+            self.mergedBy = mergedBy
+            self.mergeCommit = mergeCommit
             self.parent = parent
             self.level = level
             self.feature = feature
@@ -151,7 +163,10 @@ public extension DaemonAPI {
     /// (show 50+ there); or `detail`, only on the item's own page (hide it on the row). A string,
     /// so a way a later daemon adds does not break this decoder. `createdAt` and `closedAt` say
     /// its items have those dates; `children`, `linkedPulls` and `events` that an issue's read has
-    /// them (#4373); each is nil (none) from an earlier daemon.
+    /// them (#4373); `total` that it counts a list's items (#4396); `releases` that it has releases
+    /// (#4426); a pull request's `branches`, `mergedBy`, `mergeCommit`, `size`, `reviewers`,
+    /// `closes` and `checkTimes` that it fills those (#4409); each is nil (none) from an earlier
+    /// daemon.
     struct ForgeCapabilities: Codable, Sendable, Hashable {
         public var forge: String
         public var issues: Bool
@@ -164,13 +179,24 @@ public extension DaemonAPI {
         public var children: Bool?
         public var linkedPulls: Bool?
         public var events: Bool?
+        public var total: Bool?
+        public var releases: Bool?
+        public var branches: Bool?
+        public var mergedBy: Bool?
+        public var mergeCommit: Bool?
+        public var size: Bool?
+        public var reviewers: Bool?
+        public var closes: Bool?
+        public var checkTimes: Bool?
         public var commentCount: String
         public var commentsMost: Int?
 
         public init(forge: String, issues: Bool = false, pulls: Bool = false, labelColors: Bool = false,
                     avatars: Bool = false, stateReason: Bool = false, commentCount: String = "exact",
                     commentsMost: Int? = nil, createdAt: Bool? = nil, closedAt: Bool? = nil, children: Bool? = nil,
-                    linkedPulls: Bool? = nil, events: Bool? = nil) {
+                    linkedPulls: Bool? = nil, events: Bool? = nil, total: Bool? = nil, releases: Bool? = nil,
+                    branches: Bool? = nil, mergedBy: Bool? = nil, mergeCommit: Bool? = nil, size: Bool? = nil,
+                    reviewers: Bool? = nil, closes: Bool? = nil, checkTimes: Bool? = nil) {
             self.forge = forge
             self.issues = issues
             self.pulls = pulls
@@ -182,6 +208,15 @@ public extension DaemonAPI {
             self.children = children
             self.linkedPulls = linkedPulls
             self.events = events
+            self.total = total
+            self.releases = releases
+            self.branches = branches
+            self.mergedBy = mergedBy
+            self.mergeCommit = mergeCommit
+            self.size = size
+            self.reviewers = reviewers
+            self.closes = closes
+            self.checkTimes = checkTimes
             self.commentCount = commentCount
             self.commentsMost = commentsMost
         }
@@ -189,16 +224,20 @@ public extension DaemonAPI {
 
     /// A page of items, the last updated first. `cursor` is the next page; nil at the end.
     /// `forges` is what each forge with an item on the page fills (#4361); nil from an earlier daemon.
+    /// `total` is how many items the whole list has, on every page (#4396); nil when a forge on the
+    /// list gives no count or could not be read, and from an earlier daemon.
     struct ForgeList: Codable, Sendable, Hashable {
         public var items: [ForgeItem]
         public var cursor: String?
+        public var total: Int?
         public var errors: [ForgeListError]?
         public var forges: [ForgeCapabilities]?
 
         public init(items: [ForgeItem] = [], cursor: String? = nil, errors: [ForgeListError]? = nil,
-                    forges: [ForgeCapabilities]? = nil) {
+                    forges: [ForgeCapabilities]? = nil, total: Int? = nil) {
             self.items = items
             self.cursor = cursor
+            self.total = total
             self.errors = errors
             self.forges = forges
         }
@@ -236,16 +275,37 @@ public extension DaemonAPI {
         }
     }
 
-    /// One of a pull request's checks: passing, failing, running or skipped.
+    /// One of a pull request's checks: passing, failing, running or skipped. `startedAt` and
+    /// `finishedAt` are when it started and ended, where the forge says them
+    /// (`ForgeCapabilities.checkTimes`, #4409); nil before it starts or ends, and on a commit status.
     struct ForgeCheck: Codable, Sendable, Hashable {
         public var name: String
         public var state: String
         public var url: String?
+        public var startedAt: Date?
+        public var finishedAt: Date?
 
-        public init(name: String, state: String, url: String? = nil) {
+        public init(name: String, state: String, url: String? = nil, startedAt: Date? = nil, finishedAt: Date? = nil) {
             self.name = name
             self.state = state
             self.url = url
+            self.startedAt = startedAt
+            self.finishedAt = finishedAt
+        }
+    }
+
+    /// A reviewer of a pull request (#4409): `state` is approved, changes_requested, commented or
+    /// pending (asked, not answered), a string so a later daemon's new state does not break this
+    /// decoder; `avatar` is their picture, a URL that only `forge/image` reads.
+    struct ForgeReviewer: Codable, Sendable, Hashable {
+        public var login: String
+        public var avatar: String?
+        public var state: String
+
+        public init(login: String, state: String, avatar: String? = nil) {
+            self.login = login
+            self.avatar = avatar
+            self.state = state
         }
     }
 
@@ -287,10 +347,12 @@ public extension DaemonAPI {
     /// the default first (#3130); an issue's `start` is its new-agent form, and `transitions` the
     /// moves its workflow allows (Jira, #3260), in place of Close and Reopen. `actions` are what
     /// the page offers now, by name (comment, label, close, reopen, transition, merge, autoMerge,
-    /// approve, rerun, log, diff, addChild, blockedBy; #4361), as strings so a later daemon's new
-    /// one does not break this decoder; nil from an earlier daemon. On an issue's read, where the
+    /// approve, rerun, log, diff, addChild, blockedBy, assign, cancelAutoMerge, ready; #4361), as
+    /// strings so a later daemon's new one does not break this decoder; nil from an earlier daemon. On an issue's read, where the
     /// forge says them (#4373): `children` are its sub-issues, `linkedPulls` the pull requests that
-    /// close it, and `events` its timeline, oldest first; nil where the forge gives none.
+    /// close it, and `events` its timeline, oldest first; nil where the forge gives none. On a pull
+    /// request's read (#4409): `additions`, `deletions` and `commits` are its size, `reviewers`
+    /// each person asked or who reviewed, once, and `closes` the issues it closes when it merges.
     struct ForgeItemDetail: Codable, Sendable, Hashable {
         public var item: ForgeItem
         public var body: String
@@ -299,6 +361,11 @@ public extension DaemonAPI {
         public var checks: [ForgeCheck]?
         public var reviewThreads: Int?
         public var filesChanged: Int?
+        public var additions: Int?
+        public var deletions: Int?
+        public var commits: Int?
+        public var reviewers: [ForgeReviewer]?
+        public var closes: [ForgeLinked]?
         public var head: String?
         public var mergeMethods: [ForgeMergeMethod]?
         public var start: ForgeStart?
@@ -312,7 +379,9 @@ public extension DaemonAPI {
                     checks: [ForgeCheck]? = nil, reviewThreads: Int? = nil, filesChanged: Int? = nil,
                     head: String? = nil, mergeMethods: [ForgeMergeMethod]? = nil, start: ForgeStart? = nil,
                     transitions: [ForgeTransition]? = nil, actions: [String]? = nil, children: [ForgeLinked]? = nil,
-                    linkedPulls: [ForgeLinked]? = nil, events: [ForgeEvent]? = nil) {
+                    linkedPulls: [ForgeLinked]? = nil, events: [ForgeEvent]? = nil, additions: Int? = nil,
+                    deletions: Int? = nil, commits: Int? = nil, reviewers: [ForgeReviewer]? = nil,
+                    closes: [ForgeLinked]? = nil) {
             self.item = item
             self.body = body
             self.comments = comments
@@ -320,6 +389,11 @@ public extension DaemonAPI {
             self.checks = checks
             self.reviewThreads = reviewThreads
             self.filesChanged = filesChanged
+            self.additions = additions
+            self.deletions = deletions
+            self.commits = commits
+            self.reviewers = reviewers
+            self.closes = closes
             self.head = head
             self.mergeMethods = mergeMethods
             self.start = start
@@ -331,7 +405,8 @@ public extension DaemonAPI {
         }
     }
 
-    /// An item an issue's read names (#4373): a sub-issue, or a pull request that closes it.
+    /// An item an issue's read names (#4373): a sub-issue, or a pull request that closes it; or an
+    /// issue that a pull request closes (#4409).
     /// `state` is open, closed or merged.
     struct ForgeLinked: Codable, Sendable, Hashable {
         public var node: LineageNode
@@ -392,6 +467,20 @@ public extension DaemonAPI {
 
     /// `forge/label`: labels to add, and labels to take off, by name.
     struct ForgeLabelRequest: Codable, Sendable, Hashable {
+        public var node: LineageNode
+        public var add: [String]?
+        public var remove: [String]?
+
+        public init(node: LineageNode, add: [String]? = nil, remove: [String]? = nil) {
+            self.node = node
+            self.add = add
+            self.remove = remove
+        }
+    }
+
+    /// `forge/assign` (#4403): people to assign, and people to take off, by their login on the
+    /// forge; at most 10 of each. Offered where the item's `actions` has `assign`.
+    struct ForgeAssignRequest: Codable, Sendable, Hashable {
         public var node: LineageNode
         public var add: [String]?
         public var remove: [String]?
@@ -770,8 +859,14 @@ public extension DaemonAPI.Method {
     static let forgeMerge = "forge/merge"
     static let forgeApprove = "forge/approve"
     static let forgeRerun = "forge/rerun"
+    /// `ForgeNodeRequest` → `ForgeDone` (#4410): turn off a pull request's auto-merge, and mark
+    /// a draft ready for review. Offered where the page's `actions` has `cancelAutoMerge`, `ready`.
+    static let forgeCancelAutoMerge = "forge/cancel-auto-merge"
+    static let forgeReady = "forge/ready"
     /// `ForgeNodeRequest` → `ForgeLabels`, `ForgeLogRequest` → `ForgeLog`, `ForgeNodeRequest` → `ForgeDiff` (#3130).
     static let forgeLabels = "forge/labels"
+    /// `ForgeAssignRequest` → `ForgeDone` (#4403).
+    static let forgeAssign = "forge/assign"
     static let forgeLog = "forge/log"
     static let forgeDiff = "forge/diff"
     /// `ForgePlanRequest` → `ForgePlan`, `ForgeFeaturesRequest` → `ForgeFeatures` (#3267).
@@ -781,6 +876,9 @@ public extension DaemonAPI.Method {
     static let forgeBoards = "forge/boards"
     /// `ForgeImageRequest` → `ForgeImage` (#4009).
     static let forgeImage = "forge/image"
+    /// `ForgeReleasesRequest` → `ForgeReleases`, `ForgeReleaseRequest` → `ForgeReleaseDetail` (#4426).
+    static let forgeReleases = "forge/releases"
+    static let forgeRelease = "forge/release"
     /// The plan's writes (#3271): `ForgeAddChildRequest` and `ForgeBlockedByRequest` → `ForgeDone`.
     static let forgeAddChild = "forge/add-child"
     static let forgeBlockedBy = "forge/blocked-by"

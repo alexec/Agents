@@ -1,0 +1,19 @@
+# Version updates for the runtimes' adapters the app installs (#4512). Each toolset pins its
+# adapter exactly in package.json, with npm's lock beside it; Dependabot bumps both. The
+# manifest's packageVersion and the Node pin are not npm's, so a bump's PR fails
+# TestTheBundlesNodeToolsetsPinOneVersion until scripts/update-toolset.sh is run on it.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directories:
+      - /App/Resources/toolsets/claude
+      - /App/Resources/toolsets/codex
+    schedule:
+      interval: weekly
+    versioning-strategy: increase
+    open-pull-requests-limit: 2
+    labels:
+      - dependencies
+      - integration
+    commit-message:
+      prefix: "toolsets:"

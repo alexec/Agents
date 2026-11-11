@@ -13,7 +13,7 @@ import (
 	"testing"
 )
 
-const searchAnswer = `{"data":{"search":{"pageInfo":{"hasNextPage":true,"endCursor":"Y3Vyc29y"},"edges":[
+const searchAnswer = `{"data":{"search":{"issueCount":57,"pageInfo":{"hasNextPage":true,"endCursor":"Y3Vyc29y"},"edges":[
  {"cursor":"YzE=","node":{"__typename":"PullRequest","number":12,"title":"Forge reads","url":"https://github.com/o/r/pull/12","pullState":"MERGED",
   "updatedAt":"2026-11-01T10:00:00Z","author":{"login":"alexec","__typename":"User","avatarUrl":"https://avatars.githubusercontent.com/u/1142830?v=4"},"repository":{"nameWithOwner":"o/r"},
   "labels":{"nodes":[{"name":"enhancement","color":"A2EEEF"},{"name":"odd","color":"red"}]},
@@ -48,10 +48,17 @@ const pullAnswer = `{"data":{"repository":{"issueOrPullRequest":{"__typename":"P
  "url":"u","pullState":"OPEN","updatedAt":"2026-11-01T10:00:00Z","author":{"login":"alexec","__typename":"User"},
  "repository":{"nameWithOwner":"o/r"},"labels":{"nodes":[]},"assignees":{"nodes":[]},"milestone":null,"commentCount":{"totalCount":0},
  "isDraft":false,"mergeable":"MERGEABLE","reviewDecision":"REVIEW_REQUIRED","autoMergeRequest":null,
+ "headRefName":"agents/12-forge-reads","baseRefName":"main","mergedBy":null,"mergeCommit":null,
+ "additions":412,"deletions":18,"commitCount":{"totalCount":3},
+ "closes":{"nodes":[{"issueState":"OPEN","number":3,"title":"Mean is off by one","url":"https://github.com/o/r/issues/3","repository":{"nameWithOwner":"o/r"}},{"number":0}]},
+ "latestReviews":{"nodes":[{"author":{"login":"kim","__typename":"User","avatarUrl":"https://avatars.githubusercontent.com/u/2?v=4"},"state":"APPROVED"},
+  {"author":{"login":"lee","__typename":"User"},"state":"CHANGES_REQUESTED"},{"author":{"login":"sam","__typename":"User"},"state":"DISMISSED"},
+  {"author":null,"state":"COMMENTED"}]},
+ "reviewRequests":{"nodes":[{"requestedReviewer":{"__typename":"User","login":"lee"}},{"requestedReviewer":{"__typename":"Team","combinedSlug":"o/reviewers"}},{"requestedReviewer":null}]},
  "checkState":{"nodes":[{"commit":{"statusCheckRollup":{"state":"PENDING"}}}]},"body":"","comments":{"pageInfo":{"hasPreviousPage":false},"nodes":[]},
  "reviewThreads":{"totalCount":2},"changedFiles":5,"commits":{"nodes":[{"commit":{"statusCheckRollup":{"contexts":{"nodes":[
-  {"__typename":"CheckRun","name":"test","status":"COMPLETED","conclusion":"FAILURE","detailsUrl":"https://github.com/o/r/actions/runs/9/job/1"},
-  {"__typename":"StatusContext","context":"CodeRabbit","state":"PENDING","targetUrl":"t"}]}}}}]}}}}}`
+  {"__typename":"CheckRun","name":"test","status":"COMPLETED","conclusion":"FAILURE","detailsUrl":"https://github.com/o/r/actions/runs/9/job/1","startedAt":"2026-11-01T10:00:00Z","completedAt":"2026-11-01T10:02:10Z"},
+  {"__typename":"StatusContext","context":"CodeRabbit","state":"PENDING","targetUrl":"t","createdAt":"2026-11-01T10:00:00Z"}]}}}}]}}}}}`
 
 // asked is each GraphQL request's variables.
 type asked struct {
@@ -104,7 +111,8 @@ func TestSearchListsManyReposInOneCall(t *testing.T) {
 	if vars := a.all(); len(vars) != 1 || vars[0]["q"] != `is:pr is:open repo:o/r repo:o/s label:"enhancement" sort:updated-desc` || vars[0]["first"] != float64(100) {
 		t.Fatalf("asked: %v", vars)
 	}
-	if p.Next != "Y3Vyc29y" || len(p.Items) != 2 || !slices.Equal(p.Cursors, []string{"YzE=", "YzI="}) {
+	// The count is the whole search's (#4396), not the page's.
+	if p.Next != "Y3Vyc29y" || len(p.Items) != 2 || !slices.Equal(p.Cursors, []string{"YzE=", "YzI="}) || p.Total == nil || *p.Total != 57 {
 		t.Fatalf("page: %+v", p)
 	}
 	first, b := p.Items[0], p.Items[1]
@@ -183,9 +191,25 @@ func TestItemPage(t *testing.T) {
 	if !p.PR || p.Checks != "running" || p.Before != "" || p.Children != nil || p.Events != nil || p.ReviewThreads != 2 || p.FilesChanged != 5 || len(p.Thread) != 0 {
 		t.Fatalf("pull: %+v", p)
 	}
-	if len(p.CheckRuns) != 2 || p.CheckRuns[0] != (Check{"test", "failing", "https://github.com/o/r/actions/runs/9/job/1"}) ||
-		p.CheckRuns[1] != (Check{"CodeRabbit", "running", "t"}) {
+	// #4409: a check run's times; a commit status has none.
+	if len(p.CheckRuns) != 2 || p.CheckRuns[0] != (Check{Name: "test", State: "failing", URL: "https://github.com/o/r/actions/runs/9/job/1",
+		StartedAt: "2026-11-01T10:00:00Z", FinishedAt: "2026-11-01T10:02:10Z"}) ||
+		p.CheckRuns[1] != (Check{Name: "CodeRabbit", State: "running", URL: "t"}) {
 		t.Fatalf("checks: %+v", p.CheckRuns)
+	}
+	// #4409: its branches, its size, the issues it closes (an unreadable one left out), and each
+	// reviewer once: asked again (lee) is pending, a team by its slug, a dismissed review and a
+	// deleted account left out. An open pull request has no merge.
+	if p.HeadRef != "agents/12-forge-reads" || p.BaseRef != "main" || p.MergedBy != "" || p.MergeCommit != "" ||
+		p.Additions != 412 || p.Deletions != 18 || p.Commits != 3 {
+		t.Fatalf("pull fields: %+v", p.Item)
+	}
+	if !slices.Equal(p.Closes, []Linked{{Repo: "o/r", Number: 3, Title: "Mean is off by one", State: "open", URL: "https://github.com/o/r/issues/3"}}) {
+		t.Fatalf("closes: %+v", p.Closes)
+	}
+	if want := []Reviewer{{Login: "lee", State: "pending"}, {Login: "o/reviewers", State: "pending"},
+		{Login: "kim", Avatar: "https://avatars.githubusercontent.com/u/2?v=4", State: "approved"}}; !slices.Equal(p.Reviewers, want) {
+		t.Fatalf("reviewers: %+v", p.Reviewers)
 	}
 
 	var ge *GitHubError
@@ -210,5 +234,21 @@ func TestItemStateReason(t *testing.T) {
 		if got := n.item().StateReason; got != c.want {
 			t.Errorf("%+v: StateReason %q, want %q", c, got, c.want)
 		}
+	}
+}
+
+// A merged pull request says who merged it and its merge commit; an open one says neither, even
+// where GitHub fills them (#4409).
+func TestItemMerge(t *testing.T) {
+	n := gqlItem{Typename: "PullRequest", Number: 12, PullState: "MERGED", HeadRef: "agents/12", BaseRef: "main", MergedBy: &gqlActor{Login: "alexec"}}
+	n.MergeOID = &struct {
+		OID string `json:"oid"`
+	}{"9f1c2b3"}
+	if i := n.item(); i.MergedBy != "alexec" || i.MergeCommit != "9f1c2b3" || i.HeadRef != "agents/12" || i.BaseRef != "main" {
+		t.Fatalf("merged: %+v", i)
+	}
+	n.PullState = "OPEN"
+	if i := n.item(); i.MergedBy != "" || i.MergeCommit != "" || i.HeadRef != "agents/12" {
+		t.Fatalf("open: %+v", i)
 	}
 }

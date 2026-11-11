@@ -39,7 +39,7 @@ func (d *Daemon) muteWorkflow(r wire.WorkflowMuteRequest, byPerson bool) (wire.W
 	if err != nil {
 		return wire.WorkflowSummary{}, err
 	}
-	for _, a := range d.Store.Agents() {
+	for _, a := range d.Store.LiveAgents() {
 		if a.State == wire.AgentStateArchived || a.StartedByWorkflow == nil || *a.StartedByWorkflow != r.WorkflowID || folderPath(&a) != folder {
 			continue
 		}

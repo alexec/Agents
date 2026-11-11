@@ -13,7 +13,8 @@ import (
 
 // #4172: Timeline reads the open epics, then those closed since a time, a page at a time, each
 // with its sub-issues' dates and the PRs that close them; the releases come with the first page,
-// drafts left out; an epic in both lists is said once.
+// drafts left out; an epic in both lists is said once. Each child has its labels with their
+// colours, for the hover card's chips (#4428).
 func TestTimelineReadsEpicsChildrenAndReleases(t *testing.T) {
 	issue := func(n int, state, extra string) string {
 		return `{"number":` + strconv.Itoa(n) + `,"title":"t","url":"u","issueState":"` + state + `","updatedAt":"2026-11-08T10:00:00Z","author":null,
@@ -24,6 +25,7 @@ func TestTimelineReadsEpicsChildrenAndReleases(t *testing.T) {
 	child := `"subIssues":{"nodes":[` + strings.TrimSuffix(issue(11, "CLOSED", `,"closedByPullRequestsReferences":{"nodes":[{"createdAt":"2026-11-02T00:00:00Z"}]}`), "}") +
 		`}]}`
 	child = strings.Replace(child, `"closedAt":null,"stateReason":null`, `"closedAt":"2026-11-03T00:00:00Z","stateReason":"COMPLETED"`, 1)
+	child = strings.Replace(child, `{"name":"epic"}`, `{"name":"bug","color":"D73A4A"}`, 1)
 	var asked []map[string]any
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
@@ -63,7 +65,8 @@ func TestTimelineReadsEpicsChildrenAndReleases(t *testing.T) {
 	}
 	c := tl.Epics[0].Children
 	if len(c) != 1 || c[0].State != "closed" || c[0].StateReason != "completed" || c[0].ClosedAt != "2026-11-03T00:00:00Z" ||
-		len(c[0].PROpenedAt) != 1 || c[0].CreatedAt != "2026-11-01T00:00:00Z" {
+		len(c[0].PROpenedAt) != 1 || c[0].CreatedAt != "2026-11-01T00:00:00Z" ||
+		len(c[0].Labels) != 1 || c[0].Labels[0] != "bug" || c[0].LabelColors["bug"] != "#d73a4a" {
 		t.Fatalf("children %+v", c)
 	}
 }

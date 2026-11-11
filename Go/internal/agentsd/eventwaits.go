@@ -724,7 +724,7 @@ func (d *Daemon) waitingAgents() []wire.WaitingAgent {
 		since wire.Date
 	}
 	var rows []row
-	for _, a := range d.Store.Agents() {
+	for _, a := range d.Store.LiveAgents() {
 		if a.State == wire.AgentStateArchived {
 			continue
 		}

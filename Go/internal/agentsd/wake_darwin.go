@@ -69,7 +69,7 @@ func holdTheMac() (func(), error) {
 // It lives here because only a Mac calls it; a Linux build would call it unused.
 func (d *Daemon) agentsInFlight() int {
 	n := 0
-	for _, a := range d.Store.Agents() {
+	for _, a := range d.Store.LiveAgents() {
 		if a.State == wire.AgentStateStarting || a.State == wire.AgentStateRunning {
 			n++
 		}

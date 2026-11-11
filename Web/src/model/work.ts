@@ -3,7 +3,7 @@
 // (reports/nodes: cost, sessions, lead time) on top. Releases come from reports/nodes alone in v1. As
 // WorkList has it on the window.
 import type {
-  ForgeCheck, ForgeDone, ForgeItem, ForgeItemDetail, ForgeLabel, ForgeListError, ForgeListRequest, ForgeMergeMethod,
+  ForgeCheck, ForgeComment, ForgeDone, ForgeEvent, ForgeItem, ForgeItemDetail, ForgeLabel, ForgeListError, ForgeListRequest, ForgeMergeMethod,
   LineageNode, ProjectBoard, ReportNode,
 } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
@@ -27,21 +27,34 @@ export type WorkState = "open" | "closed" | "merged" | "all";
 export type WorkSort = "updated" | "newest" | "cost";
 export const workSortTitle: Record<WorkSort, string> = { updated: "Last updated", newest: "Newest", cost: "Cost" };
 
+/** The sorts a list offers: a release's Newest is its version, the highest first (#4421), and it has no Last updated. */
+export const workSorts = (kind: WorkKind): WorkSort[] => fromForge(kind) ? ["updated", "newest", "cost"] : ["newest", "cost"];
+
+/** The sort a list opens with: a release's is Newest. */
+export const defaultSort = (kind: WorkKind): WorkSort => kind === "release" ? "newest" : "updated";
+
 /** One row of a list: the item as its forge says it, or as lineage resolved it, and its lineage. */
 export interface WorkRow {
   node: LineageNode;
   title: string;
   /** open, closed or merged; empty when nothing says. */
   state: string;
+  /** Why a closed issue closed (completed, not_planned or duplicate), where the forge says it (#4365). */
+  stateReason?: string | undefined;
   /** The tracker's own name for its step (a Jira status, #3260), shown in place of state. */
   status?: string | undefined;
   labels: ForgeLabel[];
   /** The ref's repo or tracker: github:alexec/Agents, linear:ENG (a Linear team, #3311), jira. */
   repo: string;
   author?: string | undefined;
+  /** The author's picture, a URL that only forge/image reads (#4363). */
+  avatar?: string | undefined;
   assignees: string[];
   /** Seconds since 1970, for sorting; 0 when not known. */
   updated: number;
+  /** When it opened, and when it closed or merged, in seconds since 1970, where the forge says them (#4373). */
+  created?: number | undefined;
+  closed?: number | undefined;
   url?: string | undefined;
   /** The machine the forge read came from, to read the item again on. */
   host?: string | undefined;
@@ -87,6 +100,25 @@ export function shortRef(ref: string): string {
   return m ? m[1]! : nodeName({ kind: "", ref });
 }
 
+/** A version tag's numbers: [0, 42, 0] of "v0.42.0"; undefined for a tag that is not a version. */
+export function version(tag: string): number[] | undefined {
+  const parts = (tag.startsWith("v") ? tag.slice(1) : tag).split(".");
+  return parts.every((p) => /^\d+$/.test(p)) ? parts.map(Number) : undefined;
+}
+
+/** Whether tag a is a later version than b; a tag that is not a version is older than one that is. */
+export function newer(a: string, b: string): boolean {
+  const x = version(a);
+  const y = version(b);
+  if (!x) return false;
+  if (!y) return true;
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    const d = (x[i] ?? -1) - (y[i] ?? -1);
+    if (d !== 0) return d > 0;
+  }
+  return false;
+}
+
 /** Whether a row's title says its short name already, as a release lineage could not resolve does. */
 export const titleSaysRef = (row: Pick<WorkRow, "title" | "node">) => row.title.endsWith(shortRef(row.node.ref));
 
@@ -95,8 +127,9 @@ const unix = (at: number) => fromWireDate(at as never).getTime() / 1000;
 /** A row from the forge's item, with its lineage when there is any. */
 export function forgeRow(item: ForgeItem, host: string, lineage?: ReportNode): WorkRow {
   return {
-    node: item.node, title: item.title, state: item.state, status: item.status, labels: item.labels, repo: repoOf(item.node.ref),
-    author: item.author, assignees: item.assignees, updated: unix(item.updatedAt),
+    node: item.node, title: item.title, state: item.state, stateReason: item.stateReason, status: item.status, labels: item.labels,
+    repo: repoOf(item.node.ref), author: item.author, avatar: item.authorAvatar, assignees: item.assignees, updated: unix(item.updatedAt),
+    created: item.createdAt === undefined ? undefined : unix(item.createdAt), closed: item.closedAt === undefined ? undefined : unix(item.closedAt),
     url: item.url, host, folder: item.folder, draft: item.draft, comments: item.comments, checks: item.checks, review: item.review, lineage,
   };
 }
@@ -104,10 +137,10 @@ export function forgeRow(item: ForgeItem, host: string, lineage?: ReportNode): W
 /** A lineage node's repo: lineage says "linear" for every Linear issue, Work its team (#3311). */
 const repoOfNode = (n: ReportNode) => n.repo && n.repo !== "linear" ? n.repo : repoOf(n.node.ref);
 
-/** A row lineage alone knows: a release, or an item no forge listed. */
+/** A row lineage alone knows: a release, named by its tag until the forge names it (#4426), or an item no forge listed. */
 export function lineageRow(n: ReportNode): WorkRow {
   return {
-    node: n.node, title: n.resolved?.title ?? nodeName(n.node), state: n.resolved?.state ?? (n.outcome === "merged" ? "merged" : ""),
+    node: n.node, title: n.resolved?.title ?? (n.node.kind === "release" ? shortRef(n.node.ref) : nodeName(n.node)), state: n.resolved?.state ?? (n.outcome === "merged" ? "merged" : ""),
     labels: (n.resolved?.labels ?? []).map((name) => ({ name })), repo: repoOfNode(n), assignees: [],
     updated: unix(n.lastAt), url: lineageUrl(n.node), lineage: n,
   };
@@ -249,8 +282,14 @@ export function sortRows(rows: readonly WorkRow[], sort: WorkSort): WorkRow[] {
   const tie = (a: WorkRow, b: WorkRow) => b.updated - a.updated || a.node.ref.localeCompare(b.node.ref);
   switch (sort) {
     case "updated": return out.sort(tie);
-    // A forge numbers its items as they are made, so the highest number is the newest.
-    case "newest": return out.sort((a, b) => refNumber(b.node.ref) - refNumber(a.node.ref) || tie(a, b));
+    // A forge numbers its items as they are made, so the highest number is the newest; a release's version says it (#4421).
+    case "newest": return out.sort((a, b) => {
+      if (a.node.kind === "release" && b.node.kind === "release") {
+        const [x, y] = [shortRef(a.node.ref), shortRef(b.node.ref)];
+        return newer(x, y) ? -1 : newer(y, x) ? 1 : tie(a, b);
+      }
+      return refNumber(b.node.ref) - refNumber(a.node.ref) || tie(a, b);
+    });
     // With no lineage last; among those, the last updated first.
     case "cost": return out.sort((a, b) => costOf(b) - costOf(a) || Number(!!b.lineage) - Number(!!a.lineage) || tie(a, b));
   }
@@ -346,8 +385,6 @@ export function labelInk(color: string | undefined): string | undefined {
 /** A label's colour as CSS: "#d73a4a" of "d73a4a"; undefined when the forge gave none. */
 export const labelColor = (color: string | undefined) => labelInk(color) ? `#${color!.replace(/^#/, "")}` : undefined;
 
-export const noWork = (kind: WorkKind) => kind === "release" ? "No releases that an agent worked on yet."
-  : `No ${workKindTitle[kind].toLowerCase()} match.`;
 export const lineageOnlyNote = "Lineage lists a release once an agent works on one of its issues or pull requests.";
 export const noForgeHere = "No machine reads issues and pull requests yet. Update Agents on a machine to see them.";
 
@@ -408,7 +445,7 @@ export const closeTitle = (state: string) => state === "open" ? "Close" : "Reope
 // The shared parts of Work's look (#4392, specs/4328-work-look/parts.md): the state icon, the row's second
 // line, the label chip's colours, the avatar's colour and the empty states, as Shared/UI's (#4391).
 
-/** A row's state glyph (parts.md section 1). A closed issue is done until the wire says not planned (#4398). */
+/** A row's state glyph (parts.md section 1). A closed issue is done, unless the forge says not planned (#4365). */
 export type StateGlyph = "issue-open" | "issue-done" | "issue-dropped" | "pr-open" | "pr-draft" | "pr-merged" | "pr-closed";
 
 export function stateGlyph(kind: string, state: string, draft?: boolean, notPlanned?: boolean): StateGlyph | undefined {
@@ -436,21 +473,35 @@ export function shortAge(seconds: number): string {
   return `${Math.floor(seconds / 86_400)} d`;
 }
 
-/** A row's second line (parts.md section 2), wide and on a phone: "#12 · In Review · updated 2 hours ago by alexec ·
- * 2 sessions · $0.42" and "#12 · 2 h · alexec · $0.42". The wire has no created or closed time yet (#4398), so the age
- * is the last update's. With no lineage the line ends after the author. */
+/** The time a row's second line says, and its verb: an open item's opening, a closed or merged one's close, where the forge
+ * says them (#4373); else the last update. Undefined when nothing says a time. */
+function rowTime(row: WorkRow): { verb: string; at: number } | undefined {
+  // Lineage's links to a release are at its tag's commit time (#4421).
+  if (row.node.kind === "release") return row.updated > 0 ? { verb: "released", at: row.updated } : undefined;
+  if (row.state === "open" && row.created !== undefined) return { verb: "opened", at: row.created };
+  if ((row.state === "closed" || row.state === "merged") && row.closed !== undefined) return { verb: row.state, at: row.closed };
+  return row.updated > 0 ? { verb: "updated", at: row.updated } : undefined;
+}
+
+/** A row's second line (parts.md section 2), wide and on a phone: "#12 · In Review · opened 2 hours ago by alexec ·
+ * 2 sessions · $0.42" and "#12 · 2 h · alexec · $0.42"; closed, "#12 · closed 5 days ago", and "not planned" at the end
+ * for one closed so (lists.md section 2, note 13). A forge that gives no opened or closed time says the last update's.
+ * With no lineage the line ends after the author. */
 export function rowLine(row: WorkRow, now: number): { wide: string; short: string } {
   const ref = titleSaysRef(row) ? [] : [shortRef(row.node.ref)];
   // A draft says so in grey after its number (lists.md section 2), as its grey glyph does.
   const status = [...row.draft && row.state === "open" ? ["Draft"] : [], ...row.status ? [row.status] : []];
-  const age = row.updated > 0 ? Math.max(0, now / 1000 - row.updated) : undefined;
-  const by = row.author ? ` by ${row.author}` : "";
-  const when = age === undefined ? row.author ? [`by ${row.author}`] : [] : [`updated ${ago(new Date(row.updated * 1000), new Date(now))}${by}`];
+  const time = rowTime(row);
+  const age = time ? Math.max(0, now / 1000 - time.at) : undefined;
+  // "closed 5 days ago by alexec" would name the closer: the author goes with the opening.
+  const by = row.author && (!time || time.verb === "opened" || time.verb === "updated" || time.verb === "released") ? ` by ${row.author}` : "";
+  const when = time ? [`${time.verb} ${ago(new Date(time.at * 1000), new Date(now))}${by}`] : row.author ? [`by ${row.author}`] : [];
   const figures = lineageWords(row.lineage);
   const cost = row.lineage && spent(row.lineage.cost.total) ? [costWords(row.lineage.cost.total)] : [];
+  const reason = row.node.kind === "issue" && row.state === "closed" && row.stateReason === "not_planned" ? ["not planned"] : [];
   return {
-    wide: [...ref, ...status, ...when, ...figures ? [figures] : []].join(" · "),
-    short: [...ref, ...status, ...age === undefined ? [] : [shortAge(age)], ...row.author ? [row.author] : [], ...cost].join(" · "),
+    wide: [...ref, ...status, ...when, ...figures ? [figures] : [], ...reason].join(" · "),
+    short: [...ref, ...status, ...age === undefined ? [] : [shortAge(age)], ...row.author ? [row.author] : [], ...cost, ...reason].join(" · "),
   };
 }
 
@@ -520,7 +571,7 @@ export const clearedFilter = (f: WorkFilter): WorkFilter => ({ ...anyFilter, sta
 /** An empty list's words (parts.md section 7): with a filter, "No issues match"; with none, "No open issues" and
  * where they come from. */
 export function emptyWords(kind: WorkKind, state: WorkState, filter: boolean, repos: readonly string[]): { title: string; line?: string } {
-  if (!fromForge(kind)) return { title: noWork(kind) };
+  if (kind === "release") return { title: filter ? "No releases match" : "No releases yet" };
   const things = workKindTitle[kind].toLowerCase();
   if (filter) return { title: `No ${things} match` };
   const word = state === "all" ? "" : `${state} `;
@@ -543,15 +594,28 @@ export function setFilters(f: WorkFilter, project?: string, board?: string): str
   return parts.length === 0 ? undefined : parts.join(" · ");
 }
 
-/** One item of a kind, or many: "1 issue", "128 issues", "50+ issues" while more pages are there (lists.md section 5;
- * the forges give no total yet, #4397). */
+/** One item of a kind, or many: "1 issue", "128 issues", "50+ issues" while more pages are there (lists.md section 5). */
 export function countWords(kind: WorkKind, n: number, more = false): string {
   const noun = workKindTitle[kind].toLowerCase();
   return `${n}${more ? "+" : ""} ${n === 1 && !more ? noun.slice(0, -1) : noun}`;
 }
 
-/** The footer while the next page loads: "Loading more… · 50 shown". */
-export const loadingMore = (shown: number) => `Loading more… · ${shown} shown`;
+/** The footer while the next page loads: "Loading more… · 50 shown"; "Loading more… · 50 of 128 shown" with the forge's
+ * total (#4396). */
+export const loadingMore = (shown: number, total?: number) => `Loading more… · ${shown}${total === undefined ? "" : ` of ${total}`} shown`;
+
+/** The end of the list: "128 issues", the forge's total where it gives one (#4396); with none, "50+ issues" while more
+ * pages are there, else the rows read. */
+export const endWords = (kind: WorkKind, shown: number, more: boolean, total?: number) =>
+  total === undefined ? countWords(kind, shown, more) : countWords(kind, total);
+
+/** The forge's total for a list as the person sees it, or undefined: only from one machine's read (two machines read the
+ * same repos, so their counts overlap), and only while no filter narrows it here (the forge counts what it was asked: the
+ * state and the board). */
+export function listTotal(totals: readonly (number | undefined)[], f: WorkFilter): number | undefined {
+  if (totals.length !== 1) return undefined;
+  return filtered({ ...f, board: "" }) ? undefined : totals[0];
+}
 
 /** A page after the first that did not load: one line at the end, and Try again. */
 export const couldNotLoadMore = "Could not load more.";
@@ -567,7 +631,7 @@ export function credentialProblem(message: string): boolean {
 
 /** The filters and the sort in the address (lists.md section 4), "project=agents&label=bug&sort=newest", so a link or a
  * reload keeps them: only what is not the default. */
-export function workQuery(f: WorkFilter, sort: WorkSort): string {
+export function workQuery(f: WorkFilter, sort: WorkSort, kind: WorkKind = "issue"): string {
   const q = new URLSearchParams();
   if (f.text.trim()) q.set("q", f.text);
   if (f.project) q.set("project", f.project);
@@ -576,7 +640,7 @@ export function workQuery(f: WorkFilter, sort: WorkSort): string {
   if (f.label) q.set("label", f.label);
   if (f.assignee) q.set("assignee", f.assignee);
   if (f.board) q.set("board", f.board);
-  if (sort !== "updated") q.set("sort", sort);
+  if (sort !== defaultSort(kind)) q.set("sort", sort);
   return q.toString();
 }
 
@@ -592,7 +656,7 @@ export function parseWorkQuery(query: string, kind: WorkKind): { filter: WorkFil
       project: q.get("project") ?? "", repo: q.get("repo") ?? "", label: q.get("label") ?? "", assignee: q.get("assignee") ?? "",
       text: q.get("q") ?? "", board: kind === "issue" ? q.get("board") ?? "" : "",
     },
-    sort: sort && sort in workSortTitle ? sort as WorkSort : "updated",
+    sort: sort && workSorts(kind).includes(sort as WorkSort) ? sort as WorkSort : defaultSort(kind),
   };
 }
 
@@ -600,17 +664,63 @@ export const connectForge = (kind: WorkKind) => `Connect a forge to see ${kind =
 
 // The issue page in the Work look (#4402, specs/4328-work-look/issue.md), as the window's WorkItemPage (#4400).
 
-/** The state line's words, wide and narrow: "alexec opened this · updated 2 hours ago · 4 comments" and "alexec · 2 h ·
- * 4 comments". The opened and closed times come with #4373, so the age is the last update's. */
-export function pageStateWords(p: { author?: string | undefined; updated?: Date | undefined; comments: number }, now: Date = new Date()):
-  { wide: string; short: string } {
+/** The state line's words, wide and narrow: "alexec opened this 3 days ago · closed yesterday · 4 comments" and "alexec ·
+ * 3 d · 4 comments". With no opened time from the forge (#4373), the last update's: "alexec opened this · updated 2 hours
+ * ago". */
+export function pageStateWords(p: {
+  author?: string | undefined; state?: string | undefined; updated?: Date | undefined; created?: Date | undefined; closed?: Date | undefined;
+  comments: number;
+}, now: Date = new Date()): { wide: string; short: string } {
   const comments = p.comments > 0 ? [p.comments === 1 ? "1 comment" : `${p.comments} comments`] : [];
-  const age = p.updated ? ago(p.updated, now) : undefined;
+  const opened = p.created ? ` ${ago(p.created, now)}` : "";
+  const closed = p.state === "closed" && p.closed ? [`closed ${ago(p.closed, now)}`] : [];
+  const age = !p.created && p.updated ? ago(p.updated, now) : undefined;
+  const short = p.created ?? p.updated;
   return {
-    wide: [...p.author ? [`${p.author} opened this`] : [], ...age ? [age === "just now" ? "updated just now" : `updated ${age}`] : [], ...comments].join(" · "),
-    short: [...p.author ? [p.author] : [], ...p.updated ? [shortAge(Math.max(0, (now.getTime() - p.updated.getTime()) / 1000))] : [], ...comments].join(" · "),
+    wide: [...p.author ? [`${p.author} opened this${opened}`] : [], ...closed,
+      ...age ? [age === "just now" ? "updated just now" : `updated ${age}`] : [], ...comments].join(" · "),
+    short: [...p.author ? [p.author] : [], ...short ? [shortAge(Math.max(0, (now.getTime() - short.getTime()) / 1000))] : [], ...comments].join(" · "),
   };
 }
+
+// An issue's timeline events (#4373), as WorkLook's on the window (#4397).
+
+/** An event as one grey line: "alexec added the label bug", "alexec closed this in #4331". Undefined for a kind this
+ * client does not know: it draws nothing. */
+export function eventWords(e: ForgeEvent): string | undefined {
+  const who = e.actor ?? "Someone";
+  const source = e.source ? ` in ${shortRef(e.source.ref)}` : "";
+  switch (e.kind) {
+    case "labeled": return e.label ? `${who} added the label ${e.label.name}` : undefined;
+    case "unlabeled": return e.label ? `${who} removed the label ${e.label.name}` : undefined;
+    case "assigned": return !e.assignee ? undefined : e.assignee === e.actor ? `${who} self-assigned this` : `${who} assigned ${e.assignee}`;
+    case "unassigned": return !e.assignee ? undefined : e.assignee === e.actor ? `${who} removed their assignment` : `${who} unassigned ${e.assignee}`;
+    case "closed": return `${who} closed this${source}`;
+    case "reopened": return `${who} reopened this`;
+    case "referenced": return e.source ? `${who} mentioned this in ${shortRef(e.source.ref)}` : undefined;
+    default: return undefined;
+  }
+}
+
+export type TimelineEntry = { comment: ForgeComment; at: number } | { event: ForgeEvent; words: string; at: number };
+
+/** The comments and the events in time order (#4373). While older comments are still to read (`older`), the events before
+ * the first comment read wait with them, so the timeline never shows an event out of its place. An event no words say is
+ * left out. */
+export function timelineEntries(comments: readonly ForgeComment[], events: readonly ForgeEvent[] | undefined, older: boolean): TimelineEntry[] {
+  const from = older && comments.length > 0 ? Math.min(...comments.map((c) => unix(c.at))) : undefined;
+  const all: TimelineEntry[] = comments.map((c) => ({ comment: c, at: unix(c.at) }));
+  for (const e of events ?? []) {
+    const words = eventWords(e);
+    const at = unix(e.at);
+    if (words !== undefined && (from === undefined || at >= from)) all.push({ event: e, words, at });
+  }
+  // A stable sort: a comment and an event at one time keep the comment first.
+  return all.map((x, i) => [x, i] as const).sort((a, b) => a[0].at - b[0].at || a[1] - b[1]).map(([x]) => x);
+}
+
+/** Whether the forge gave the item's own events with its close: the page then draws its close from them. */
+export const eventsSayClose = (events: readonly ForgeEvent[] | undefined) => events?.some((e) => e.kind === "closed") ?? false;
 
 /** "3/42" (and "3/42+" while more can load): where the page stands, on a 390 px page's bar. */
 export function shortPositionWords(n: Neighbours, more: boolean): string {

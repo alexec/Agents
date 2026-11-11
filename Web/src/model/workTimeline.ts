@@ -3,7 +3,7 @@
 // releases line when their first child starts and join it when their last child closes, on a
 // linear time axis. The range, the lines, their lanes, the marks and the words; the view draws them
 // in SVG. Times are milliseconds since 1970.
-import type { ForgeLabel, LineageNode, LineageSessionOn, WireDate, WorkTimeline, WorkTimelineBacktest, WorkTimelineRelease } from "../protocol/generated";
+import type { Agent, ForgeLabel, LineageNode, LineageSessionOn, WireDate, WorkTimeline, WorkTimelineBacktest, WorkTimelineRelease } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import { shortAge, shortRef } from "./work";
 
@@ -88,7 +88,8 @@ export interface TimelineLine {
   how: TimelineEnd;
   band: Interval | undefined;
   dots: TimelineDot[];
-  /** Children working now: a ring at Now on the line. */
+  /** The epic and its open children that a session is in a turn on now (#4265): the line pulses and a
+   * ring turns at Now while it is above 0. */
   working: number;
   /** 1, 2, … above the releases line, −1, −2, … below. */
   lane: number;
@@ -103,8 +104,10 @@ export const isOpen = (l: TimelineLine) => l.how.how === "forecast" || l.how.how
 
 /** The lines of a timeline, past and forecast, as section 7 says: one per segment, an epic with no
  * children not drawn, a line that has not started not drawn unless it is forecast. `forecast` off
- * draws the past only: an open line stops at Now. */
-export function timelineLines(timeline: WorkTimeline, now: number, forecast = true): TimelineLine[] {
+ * draws the past only: an open line stops at Now. `working` is the refs a session is in a turn on now
+ * (`workingNow`): only the open line of their epic works. */
+export function timelineLines(timeline: WorkTimeline, now: number, forecast = true,
+  working: ReadonlySet<string> = new Set()): TimelineLine[] {
   return timeline.epics.flatMap((epic) => {
     if (epic.children.length === 0) return [];
     const total = epic.children.length;
@@ -159,11 +162,13 @@ export function timelineLines(timeline: WorkTimeline, now: number, forecast = tr
         if (!forecast || child.waitsForPerson === true || at === undefined) return [];
         return [{ ...base, at: Math.min(Math.max(at, Math.max(start, now)), end), closed: false, notPlanned: false }];
       });
-      const working = open ? mine.filter((c) => c.closedAt === undefined && c.startedAt !== undefined && c.waitsForPerson !== true).length : 0;
+      const worked = open
+        ? mine.filter((c) => c.closedAt === undefined && working.has(c.item.node.ref)).length + (working.has(epic.item.node.ref) ? 1 : 0)
+        : 0;
       return [{
         id: `${epic.item.node.ref}/${i}`, epic: epic.item.node.ref, segment: i, title: epic.item.title,
         number: shortRef(epic.item.node.ref), feature: epic.item.feature, done, total, start, end, how, band,
-        dots: dots.sort((a, b) => a.at - b.at), working, lane: 0,
+        dots: dots.sort((a, b) => a.at - b.at), working: worked, lane: 0,
       }];
     });
   });
@@ -434,24 +439,14 @@ export function cardRows(h: TimelineHit, lines: readonly TimelineLine[], timelin
 /** The epics with a line in `window`. */
 export const epicCount = (lines: readonly TimelineLine[], window: Interval) => new Set(overlapping(lines, window).map((l) => l.epic)).size;
 
+/** The window in words: "these 2 days". */
+const these: Record<TimelineRange, string> = { day: "these 24 hours", twoDays: "these 2 days", week: "these 7 days" };
+
 /** The title line above the plot (note 32): "Agents · 6 epics in these 2 days"; no project when a
  * menu names it. Its help is the forecast's backtest (Alex, 2026-11-10). */
 export function titleWords(project: string, epics: number, r: TimelineRange): string {
-  const these: Record<TimelineRange, string> = { day: "these 24 hours", twoDays: "these 2 days", week: "these 7 days" };
   const count = `${epics} epic${epics === 1 ? "" : "s"} in ${these[r]}`;
   return project ? `${project} · ${count}` : count;
-}
-
-/** What a screen reader reads, a row per line in time order (section 5): "Azure DevOps, 3 of 7
- * done, closes about 6:00 PM". */
-export function spoken(lines: readonly TimelineLine[], now: number): { line: TimelineLine; words: string }[] {
-  return [...lines].sort(byStart).map((line) => {
-    const end = line.how.how === "joined" ? `closed ${timeWords(line.end, now)}`
-      : line.how.how === "dropped" ? "closed as not planned"
-      : line.how.how === "forecast" ? `closes about ${timeWords(line.end, now)}`
-      : line.how.how === "waits" ? waitWords(line.how.count) : "open";
-    return { line, words: `${line.title}, ${line.done} of ${line.total} done, ${end}` };
-  });
 }
 
 /** Several machines' timelines of one project as one: each epic and release once. */
@@ -504,6 +499,26 @@ export function startedBySessions(timeline: WorkTimeline, sessions: readonly Lin
   };
 }
 
+/**
+ * The epics and children a session is in a turn on now (#4265), by ref: every machine's sessions from
+ * the control plane's copy whose state is working, and the page's own sessions that are running with a
+ * `#<n>` label of one. A session that waits (on an event, on CI, on the person) is not in a turn, so it
+ * does not count. A session the page knows goes by its own state, which is newer than the copy's. As
+ * the window's `WorkTimeline.workingNow`.
+ */
+export function workingNow(timeline: WorkTimeline, sessions: readonly LineageSessionOn[], agents: readonly Agent[]): Set<string> {
+  const known = new Set(agents.map((a) => `session:${a.id}`.toUpperCase()));
+  const out = new Set(sessions.filter((s) => s.state?.state === "working" && !known.has(s.node.ref.toUpperCase()))
+    .flatMap((s) => s.on.map((n) => n.ref)));
+  const labels = new Set(agents.filter((a) => a.state === "running" || a.state === "starting")
+    .flatMap((a) => (a.labels ?? []).map((l) => l.value)));
+  if (labels.size === 0) return out;
+  for (const epic of timeline.epics) {
+    for (const node of [epic.item.node, ...epic.children.map((c) => c.item.node)]) if (labels.has(shortRef(node.ref))) out.add(node.ref);
+  }
+  return out;
+}
+
 /** The nodes a timeline asks `lineage/sessionsOn` for: its epics and their children, each once, at most 500. */
 export function sessionNodes(timeline: WorkTimeline): LineageNode[] {
   const seen = new Set<string>();
@@ -522,6 +537,40 @@ export function landed(before: WorkTimeline, after: WorkTimeline): string[] {
     .filter((c) => c.closedAt !== undefined && !was.has(c.item.node.ref) && known.has(c.item.node.ref)).map((c) => c.item.node.ref);
 }
 
-export const noEpics = "No epic has work in this time. An epic is drawn once one of its children starts.";
+/** A row of the list of epics (note 36): the Timeline under 700 px, and what a screen reader reads over it. */
+export interface EpicRow { line: TimelineLine; line2: string }
+
+/** The list of epics in the window (note 36), in the order they close: the forecast first (the soonest first), then
+ * those that wait for the person, then those still open, then those that joined (the latest first). Line 2: "closes
+ * about 5:00 PM · 3:00 PM–9:00 PM", "3 wait for you", "joined 9:40 AM". */
+export function epicRows(lines: readonly TimelineLine[], window: Interval, now: number): EpicRow[] {
+  const rank = (l: TimelineLine) => ({ forecast: 0, waits: 1, open: 2, joined: 3, dropped: 3 })[l.how.how];
+  const line2 = (l: TimelineLine): string => {
+    switch (l.how.how) {
+      case "forecast": return [`closes about ${timeWords(l.end, now)}`,
+        ...l.band ? [`${timeWords(l.band.start, now)}–${timeWords(l.band.end, now)}`] : []].join(" · ");
+      case "waits": return waitWords(l.how.count);
+      case "open": return "open";
+      case "joined": return `joined ${timeWords(l.end, now)}`;
+      case "dropped": return "closed as not planned";
+    }
+  };
+  return overlapping(lines, window)
+    .sort((a, b) => rank(a) - rank(b) || (rank(a) === 3 ? b.end - a.end : a.end - b.end) || a.title.localeCompare(b.title))
+    .map((line) => ({ line, line2: line2(line) }));
+}
+
+/** When the last line before `at` joined, for the empty card (S11); undefined when the read has none. */
+export function lastJoined(timeline: WorkTimeline, at: number): number | undefined {
+  const joined = timeline.epics.flatMap((e) => e.segments).flatMap((s) => { const c = ms(s.closedAt); return c !== undefined && c < at ? [c] : []; });
+  return joined.length > 0 ? Math.max(...joined) : undefined;
+}
+
+/** The empty card (S11): "No epic in these 2 days", and "The last one joined 4 d ago." when known. */
+export const noEpicsWords = (r: TimelineRange) => `No epic in ${these[r]}`;
+export const lastJoinedWords = (t: number, now: number) => `The last one joined ${agoWords(t, now)}.`;
+export const showTheWeek = "Show the week";
+/** S12: no project to draw. */
+export const noProjectTitle = "No project to draw";
 export const noProject = "Timeline shows a project’s epics. Add a folder to a project to see them.";
 export const noMachine = "No machine draws the timeline yet. Update Agents on a machine to see it.";

@@ -62,6 +62,9 @@ type Item struct {
 	// review_required or ""; Mergeable is mergeable, conflicting or unknown.
 	Draft, AutoMerge          bool
 	Checks, Review, Mergeable string
+	// HeadRef is the branch it merges from and BaseRef the one it merges into; a merged one's
+	// MergedBy is who merged it and MergeCommit the commit it made (#4409).
+	HeadRef, BaseRef, MergedBy, MergeCommit string
 	// An issue's place in the hierarchy of work items (#3267): the issue it is a child of
 	// (ParentProject "" for none), and its children, SubDone of them closed. Only an issue's own
 	// read and a plan say them: GitLab's REST lists do not.
@@ -72,11 +75,13 @@ type Item struct {
 
 // SearchPage is a page of a list, the last updated first. Cursors[i] goes on after Items[i],
 // so a caller that keeps only some of the page goes on from the last it kept; Next is the
-// cursor after the page, "" at the end.
+// cursor after the page, "" at the end. Total is how many items the whole list has, on its
+// first page only (#4396); nil where GitLab does not say.
 type SearchPage struct {
 	Items   []Item
 	Cursors []string
 	Next    string
+	Total   *int
 }
 
 // Comment is a comment on an item, as Markdown.
@@ -148,6 +153,11 @@ type forgeJSON struct {
 	MergeStatus               string `json:"merge_status"`
 	MergeWhenPipelineSucceeds bool   `json:"merge_when_pipeline_succeeds"`
 	ChangesCount              string `json:"changes_count"`
+	SourceBranch              string `json:"source_branch"`
+	TargetBranch              string `json:"target_branch"`
+	MergeUser                 *user  `json:"merge_user"`
+	MergeCommitSHA            string `json:"merge_commit_sha"`
+	SquashCommitSHA           string `json:"squash_commit_sha"`
 	SHA                       string `json:"sha"`
 	HeadPipeline              *struct {
 		ID     int    `json:"id"`
@@ -187,6 +197,14 @@ func (j forgeJSON) item(project string, mr bool) Item {
 	m := mergeRequest{Draft: j.Draft, WorkInProgress: j.WorkInProgress, HasConflicts: j.HasConflicts,
 		DetailedMergeStatus: j.DetailedMergeStatus, MergeStatus: j.MergeStatus, MergeWhenPipelineSucceeds: j.MergeWhenPipelineSucceeds}
 	i.Draft, i.AutoMerge, i.Review = m.draft(), m.autoMerge(), m.review()
+	i.HeadRef, i.BaseRef = j.SourceBranch, j.TargetBranch
+	if i.State == "merged" {
+		// A squashed merge request's commit on the target is its squash commit.
+		i.MergeCommit = cmp.Or(j.MergeCommitSHA, j.SquashCommitSHA)
+		if j.MergeUser != nil {
+			i.MergedBy = j.MergeUser.Username
+		}
+	}
 	i.Mergeable = "unknown"
 	if c := m.conflicts(); c != nil {
 		i.Mergeable = map[bool]string{true: "conflicting", false: "mergeable"}[*c]
@@ -311,10 +329,26 @@ func (g *RealGitLab) Search(ctx context.Context, projects []string, f SearchFilt
 	ask := min(perPage, first+len(c.Seen))
 	var all []Item
 	more := false
+	// The first page counts each project's list in each state; later pages leave the count out.
+	total := 0
+	if after != "" {
+		total = -1
+	}
 	for _, project := range projects {
 		for _, state := range listStates(f) {
 			var list []forgeJSON
-			if err := g.get(ctx, listPath(project, f, state, c.Before, ask), false, &list); err != nil {
+			path := listPath(project, f, state, c.Before, ask)
+			if total < 0 {
+				err = g.get(ctx, path, false, &list)
+			} else {
+				var n int
+				if n, err = g.getCounted(ctx, path, &list); n < 0 {
+					total = -1
+				} else {
+					total += n
+				}
+			}
+			if err != nil {
 				return SearchPage{}, err
 			}
 			more = more || len(list) >= ask
@@ -339,6 +373,9 @@ func (g *RealGitLab) Search(ctx context.Context, projects []string, f SearchFilt
 	}
 	if more && len(page.Items) > 0 {
 		page.Next = page.Cursors[len(page.Cursors)-1]
+	}
+	if total >= 0 {
+		page.Total = &total
 	}
 	return page, nil
 }

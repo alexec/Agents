@@ -40,6 +40,8 @@ func TestMain(m *testing.M) {
 	// The sealed-secret tests are the Mac's path on every system; a test of the Linux release
 	// layer turns it on for its daemon (releaseOn).
 	releaseLayerHere = false
+	// The machine's memory pressure does not move a test's warm pool (#4514).
+	pressureNow = func() string { return "" }
 	// No test asks the person's gh about merged pull requests unless it says so.
 	findGH = func() string { return "" }
 	// Nor asks the forge for an issue's parent (#3582): a test sets issueLookup.
@@ -111,9 +113,18 @@ func (f *fakeRuntime) Initialize(context.Context, sdk.InitializeRequest) (sdk.In
 	if os.Getenv("AGENTS_FAKE_NO_DELETE") == "" {
 		del = &sdk.SessionDeleteCapabilities{}
 	}
+	// AGENTS_FAKE_CONTINUE: "load", an adapter that continues a conversation only with
+	// session/load; "none", one that can neither load nor resume (#4513).
+	load, resume := true, &sdk.SessionResumeCapabilities{}
+	switch os.Getenv("AGENTS_FAKE_CONTINUE") {
+	case "load":
+		resume = nil
+	case "none":
+		load, resume = false, nil
+	}
 	return sdk.InitializeResponse{ProtocolVersion: sdk.ProtocolVersionNumber, AuthMethods: fakeAuthMethods(),
 		AgentCapabilities: sdk.AgentCapabilities{Auth: sdk.AgentAuthCapabilities{Logout: &sdk.LogoutCapabilities{}},
-			Providers: &sdk.ProvidersCapabilities{}, LoadSession: true, SessionCapabilities: sdk.SessionCapabilities{Resume: &sdk.SessionResumeCapabilities{},
+			Providers: &sdk.ProvidersCapabilities{}, LoadSession: load, SessionCapabilities: sdk.SessionCapabilities{Resume: resume,
 				Fork: &sdk.SessionForkCapabilities{}, List: &sdk.SessionListCapabilities{}, Delete: del}}}, nil
 }
 
@@ -123,8 +134,12 @@ func (f *fakeRuntime) ListSessions(_ context.Context, r sdk.ListSessionsRequest)
 	return sdk.ListSessionsResponse{Sessions: []sdk.SessionInfo{{SessionId: "theirs", Cwd: *r.Cwd, Title: &title, UpdatedAt: &at}}}, nil
 }
 
-// LoadSession replays "theirs": the person's words in two chunks, then the reply.
+// LoadSession replays "theirs": the person's words in two chunks, then the reply. Its own,
+// "fake-session", it loads with no replay.
 func (f *fakeRuntime) LoadSession(ctx context.Context, r sdk.LoadSessionRequest) (sdk.LoadSessionResponse, error) {
+	if r.SessionId == "fake-session" {
+		return sdk.LoadSessionResponse{}, nil
+	}
 	if r.SessionId != "theirs" {
 		return sdk.LoadSessionResponse{}, fmt.Errorf("no session %s", r.SessionId)
 	}

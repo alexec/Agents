@@ -151,22 +151,26 @@ public extension WorkLook {
         filesChanged.map { $0 == 1 ? "1 file" : "\($0) files" }
     }
 
-    /// A pull request's state line after its pill. Wide: *sam opened this pull request · updated
-    /// 2 h ago · 4 comments*; merged: *merged · updated 10 min ago*; on a phone: *sam · 2 h · 4
-    /// comments*. The opened and merged times and the branches come with #4373 and the forge fields.
+    /// A pull request's state line after its pill. Wide: *sam opened this pull request 2 h ago ·
+    /// 4 comments*; merged: *sam’s pull request was merged 10 min ago*; on a phone: *sam · 2 h · 4
+    /// comments*. With no opened or merged time from the forge (#4373), the last update's:
+    /// *sam opened this pull request · updated 2 h ago*.
     static func pullStateWords(author: String?, state: String, updated: Date?, comments: Int, narrow: Bool,
-                               now: Date = Date()) -> String {
-        let age = updated.map { ageWords(now.timeIntervalSince($0)) }
+                               created: Date? = nil, closed: Date? = nil, now: Date = Date()) -> String {
+        let at = state == "open" ? created : closed
         var parts: [String] = []
         if narrow {
-            parts += [author, age].compactMap { $0 }
+            parts += [author, (at ?? updated).map { ageWords(now.timeIntervalSince($0)) }].compactMap { $0 }
         } else {
+            let when = at.map { " " + ago($0, now: now) } ?? ""
             switch state {
-            case "merged": parts.append(author.map { "\($0)’s pull request was merged" } ?? "Merged")
-            case "closed": parts.append(author.map { "\($0)’s pull request was closed with unmerged commits" } ?? "Closed with unmerged commits")
-            default: if let author { parts.append("\(author) opened this pull request") }
+            case "merged": parts.append(author.map { "\($0)’s pull request was merged\(when)" } ?? "Merged\(when)")
+            case "closed":
+                parts.append(author.map { "\($0)’s pull request was closed with unmerged commits\(when)" }
+                    ?? "Closed with unmerged commits\(when)")
+            default: if let author { parts.append("\(author) opened this pull request\(when)") }
             }
-            if let age { parts.append(age == "now" ? "updated now" : "updated \(age) ago") }
+            if at == nil, let updated { parts.append("updated " + ago(updated, now: now)) }
         }
         if comments > 0 { parts.append(comments == 1 ? "1 comment" : "\(comments) comments") }
         return parts.joined(separator: " · ")

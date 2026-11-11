@@ -19,6 +19,7 @@ import { policyNotSaved } from "./ConsolePolicy";
 import { orgPolicyNotSaved } from "./ConsoleOrgPolicy";
 import { ReportsPage } from "./Reports";
 import { WorkList, WorkPage } from "./Work";
+import { WorkReleasePage } from "./WorkRelease";
 import { WorkFeatures } from "./WorkFeatures";
 import { WorkTimeline } from "./WorkTimeline";
 import { DocPage, DocsList } from "./Docs";
@@ -47,13 +48,14 @@ import type { Session } from "../session";
 /**
  * How many requests and sessions need the person, across every folder: Agents' count in the bar.
  * Requests, not sessions (#3864): each open request, and each session needing the person that asked none;
- * a terminal's agents-secret too (#4179).
+ * a terminal's agents-secret too (#4179). A request in Later counts nothing, and its asker neither (#4236).
  */
 export function needsYouCount(store: Store): number {
-  const requests = store.hosts.value.flatMap((h) => (store.folders.value[h.id] ?? [])
-    .filter((f) => f.folder.archivedAt === undefined)
-    .flatMap((f) => store.personRequestsIn(h.id, f.folder.folder).map((r) => `${h.id}|${r.askedBy}`)));
-  const askers = new Set(requests);
+  const folders = store.hosts.value.flatMap((h) => (store.folders.value[h.id] ?? [])
+    .filter((f) => f.folder.archivedAt === undefined).map((f) => ({ host: h.id, folder: f.folder.folder })));
+  const requests = folders.flatMap(({ host, folder }) => store.personRequestsIn(host, folder));
+  const askers = new Set(folders.flatMap(({ host, folder }) => store.openPersonRequestsIn(host, folder)
+    .map((r) => `${host}|${r.askedBy}`)));
   const sessions = needingYou(placedSessions(store.hosts.value, store.folders.value,
     (h, f) => store.folderView(h, f).headings.flatMap((x) => x.agents)))
     .filter((p) => !askers.has(`${p.host.id}|${p.agent.id}`));
@@ -247,7 +249,9 @@ export function PageView({ store, page, down }: { store: Store; page: NavPage; d
         : page.draw.kind === "usage" ? <Usage store={store} />
         // An item of a list Work no longer has (#/work/milestone/<ref>, #3878) opens the Work default's list.
         : page.draw.kind === "work" ? (route.value.item && route.value.section === page.id
-          ? <WorkPage key={route.value.item} store={store} kind={page.draw.work} ref={route.value.item} />
+          ? page.draw.work === "release"
+            ? <WorkReleasePage key={route.value.item} store={store} ref={route.value.item} />
+            : <WorkPage key={route.value.item} store={store} kind={page.draw.work} ref={route.value.item} />
           : <WorkList key={page.draw.work} store={store} kind={page.draw.work} />)
         : page.draw.kind === "machine" ? <MachinePage key={page.draw.host} store={store} host={page.draw.host} />
         : page.draw.kind === "features" ? <WorkFeatures store={store} />

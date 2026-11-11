@@ -1,6 +1,7 @@
 package githubmcp
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"strings"
@@ -44,6 +45,9 @@ type Item struct {
 	// changes_requested, review_required or ""; Mergeable is mergeable, conflicting or unknown.
 	Draft, AutoMerge          bool
 	Checks, Review, Mergeable string
+	// HeadRef is the branch it merges from and BaseRef the one it merges into; a merged one's
+	// MergedBy is who merged it and MergeCommit the commit it made (#4409).
+	HeadRef, BaseRef, MergedBy, MergeCommit string
 	// An issue's place in the hierarchy (#3267): the issue it is a sub-issue of (ParentRepo ""
 	// for none), and its sub-issues, SubDone of them closed.
 	ParentRepo        string
@@ -53,11 +57,13 @@ type Item struct {
 
 // SearchPage is a page of a search, the last updated first. Cursors[i] goes on after Items[i],
 // so a caller that keeps only some of the page (the daemon, merging forges by time, #3209) goes
-// on from the last it kept; Next is the cursor of the page after it, "" at the end.
+// on from the last it kept; Next is the cursor of the page after it, "" at the end. Total is how
+// many items the whole search finds (#4396).
 type SearchPage struct {
 	Items   []Item
 	Cursors []string
 	Next    string
+	Total   *int
 }
 
 // Comment is a comment on an item, as Markdown.
@@ -67,7 +73,13 @@ type Comment struct {
 }
 
 // Check is one of a pull request's checks: State is passing, failing, running or skipped.
-type Check struct{ Name, State, URL string }
+// StartedAt and FinishedAt are a check run's times, "" for a commit status, which says none, and
+// for a check that has not started or ended (#4409).
+type Check struct{ Name, State, URL, StartedAt, FinishedAt string }
+
+// Reviewer is a person asked to review a pull request or who reviewed it (#4409): State is
+// approved, changes_requested, commented, or pending while asked and not answered.
+type Reviewer struct{ Login, Avatar, State string }
 
 // ItemDetail is an item with its body and a page of its comments (Thread), oldest first in the
 // page. Before is the cursor of the page before it, "" at the first comment. CheckRuns are a pull
@@ -85,8 +97,12 @@ type ItemDetail struct {
 	CheckRuns             []Check
 	ReviewThreads         int
 	FilesChanged          int
-	Head                  string
-	MergeMethods          []string
+	// A pull request's size, its reviewers, and the issues it closes when it merges (#4409).
+	Additions, Deletions, Commits int
+	Reviewers                     []Reviewer
+	Closes                        []Linked
+	Head                          string
+	MergeMethods                  []string
 }
 
 // Linked is an item an issue names: a sub-issue, or a pull request that closes it (#4373). State
@@ -149,11 +165,12 @@ const itemFields = `number title url createdAt closedAt updatedAt author { login
 const issueFields = `parent { number repository { nameWithOwner } } subIssuesSummary { total completed } stateReason`
 
 // pullFields are a pull request's own, for a list: its checks in one word, not each of them.
-const pullFields = `isDraft mergeable reviewDecision autoMergeRequest { enabledAt }
+const pullFields = `isDraft mergeable reviewDecision autoMergeRequest { enabledAt } headRefName baseRefName
+  mergedBy { login } mergeCommit { oid }
   checkState: commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }`
 
 const searchQuery = `query($q: String!, $first: Int!, $after: String) {
-  search(query: $q, type: ISSUE, first: $first, after: $after) { pageInfo { hasNextPage endCursor } edges { cursor node {
+  search(query: $q, type: ISSUE, first: $first, after: $after) { issueCount pageInfo { hasNextPage endCursor } edges { cursor node {
     __typename ... on Issue { issueState: state ` + itemFields + ` ` + issueFields + ` }
     ... on PullRequest { pullState: state ` + itemFields + ` ` + pullFields + ` } } } } }`
 
@@ -161,12 +178,22 @@ const searchQuery = `query($q: String!, $first: Int!, $after: String) {
 const commentFields = `comments(last: 50, before: $before) { pageInfo { hasPreviousPage startCursor }
   nodes { author { login __typename avatarUrl } body createdAt url } }`
 
+// pullReadFields are a pull request's own read (#4409): its size, the issues it closes, and its
+// reviewers: each one's newest review, and the people and teams asked and not answered since.
+var pullReadFields = fmt.Sprintf(`additions deletions commitCount: commits { totalCount }
+  closes: closingIssuesReferences(first: %[1]d) { nodes { issueState: state `+linkedFields+` } }
+  latestReviews(first: %[1]d) { nodes { author { login __typename avatarUrl } state } }
+  reviewRequests(first: %[1]d) { nodes { requestedReviewer { __typename
+    ... on User { login avatarUrl } ... on Bot { login avatarUrl } ... on Mannequin { login avatarUrl } ... on Team { combinedSlug } } } }`,
+	issueLinked)
+
 var itemQuery = `query($owner: String!, $name: String!, $number: Int!, $before: String) {
   repository(owner: $owner, name: $name) { issueOrPullRequest(number: $number) {
     __typename ... on Issue { issueState: state ` + itemFields + ` ` + issueFields + ` body ` + commentFields + `
       ` + issueReadFields + ` }
     ... on PullRequest { pullState: state ` + itemFields + ` ` + pullFields + ` body ` + commentFields + `
-      reviewThreads { totalCount } changedFiles headRefOid ` + rollupFields + ` } }
+      reviewThreads { totalCount } changedFiles headRefOid ` + rollupFields + `
+      ` + pullReadFields + ` } }
     viewerDefaultMergeMethod squashMergeAllowed mergeCommitAllowed rebaseMergeAllowed } }`
 
 type gqlItem struct {
@@ -195,10 +222,16 @@ type gqlItem struct {
 	CommentCount struct {
 		TotalCount int `json:"totalCount"`
 	} `json:"commentCount"`
-	IsDraft    bool      `json:"isDraft"`
-	Mergeable  string    `json:"mergeable"`
-	Review     string    `json:"reviewDecision"`
-	AutoMerge  *struct{} `json:"autoMergeRequest"`
+	IsDraft   bool      `json:"isDraft"`
+	Mergeable string    `json:"mergeable"`
+	Review    string    `json:"reviewDecision"`
+	AutoMerge *struct{} `json:"autoMergeRequest"`
+	HeadRef   string    `json:"headRefName"`
+	BaseRef   string    `json:"baseRefName"`
+	MergedBy  *gqlActor `json:"mergedBy"`
+	MergeOID  *struct {
+		OID string `json:"oid"`
+	} `json:"mergeCommit"`
 	CheckState struct {
 		Nodes []struct {
 			Commit struct {
@@ -248,6 +281,13 @@ func (n gqlItem) item() Item {
 		return i
 	}
 	i.Draft, i.AutoMerge, i.Review = n.IsDraft, n.AutoMerge != nil, strings.ToLower(n.Review)
+	i.HeadRef, i.BaseRef = n.HeadRef, n.BaseRef
+	if i.State == "merged" {
+		i.MergedBy = n.MergedBy.login()
+		if n.MergeOID != nil {
+			i.MergeCommit = n.MergeOID.OID
+		}
+	}
 	i.Mergeable = "unknown"
 	if c := conflictsOf(n.Mergeable); c != nil {
 		i.Mergeable = map[bool]string{true: "conflicting", false: "mergeable"}[*c]
@@ -321,7 +361,8 @@ func (g *RealGitHub) Search(ctx context.Context, repos []string, f SearchFilter,
 	}
 	var data struct {
 		Search struct {
-			PageInfo struct {
+			IssueCount int `json:"issueCount"`
+			PageInfo   struct {
 				HasNextPage bool   `json:"hasNextPage"`
 				EndCursor   string `json:"endCursor"`
 			} `json:"pageInfo"`
@@ -334,7 +375,7 @@ func (g *RealGitHub) Search(ctx context.Context, repos []string, f SearchFilter,
 	if err := g.graphql(ctx, searchQuery, vars, &data); err != nil {
 		return SearchPage{}, err
 	}
-	p := SearchPage{Items: []Item{}, Cursors: []string{}}
+	p := SearchPage{Items: []Item{}, Cursors: []string{}, Total: &data.Search.IssueCount}
 	for _, e := range data.Search.Edges {
 		// A search for issues can find nothing else, but a node it cannot read is empty.
 		if n := e.Node; n.Number > 0 && n.Repository.NameWithOwner != "" {
@@ -386,6 +427,28 @@ func (g *RealGitHub) ItemPage(ctx context.Context, repo string, number int, befo
 				Events struct {
 					Nodes []gqlEvent `json:"nodes"`
 				} `json:"events"`
+				Additions   int `json:"additions"`
+				Deletions   int `json:"deletions"`
+				CommitCount struct {
+					TotalCount int `json:"totalCount"`
+				} `json:"commitCount"`
+				Closes struct {
+					Nodes []gqlLinked `json:"nodes"`
+				} `json:"closes"`
+				LatestReviews struct {
+					Nodes []struct {
+						Author *gqlActor `json:"author"`
+						State  string    `json:"state"`
+					} `json:"nodes"`
+				} `json:"latestReviews"`
+				ReviewRequests struct {
+					Nodes []struct {
+						Reviewer *struct {
+							gqlActor
+							CombinedSlug string `json:"combinedSlug"`
+						} `json:"requestedReviewer"`
+					} `json:"nodes"`
+				} `json:"reviewRequests"`
 			} `json:"issueOrPullRequest"`
 			mergeSettings
 		} `json:"repository"`
@@ -434,11 +497,47 @@ func (g *RealGitHub) ItemPage(ctx context.Context, repo string, number int, befo
 			if c.Typename == "StatusContext" {
 				name, link = c.Context, c.TargetURL
 			}
-			d.CheckRuns = append(d.CheckRuns, Check{Name: name, State: c.state(), URL: link})
+			check := Check{Name: name, State: c.state(), URL: link}
+			if c.Typename != "StatusContext" {
+				check.StartedAt, check.FinishedAt = c.StartedAt, c.CompletedAt
+			}
+			d.CheckRuns = append(d.CheckRuns, check)
 		}
+		d.Additions, d.Deletions, d.Commits = n.Additions, n.Deletions, n.CommitCount.TotalCount
+		d.Closes = []Linked{}
+		for _, c := range n.Closes.Nodes {
+			if l, ok := c.linked(false); ok {
+				d.Closes = append(d.Closes, l)
+			}
+		}
+		// Each reviewer once: asked again since their review, they are pending, as GitHub shows it.
+		var reviewers []Reviewer
+		asked := map[string]bool{}
+		for _, q := range n.ReviewRequests.Nodes {
+			if q.Reviewer == nil {
+				continue
+			}
+			login := cmp.Or(q.Reviewer.Login, q.Reviewer.CombinedSlug)
+			if login != "" && !asked[login] {
+				asked[login] = true
+				reviewers = append(reviewers, Reviewer{Login: login, Avatar: q.Reviewer.AvatarURL, State: "pending"})
+			}
+		}
+		for _, v := range n.LatestReviews.Nodes {
+			state := reviewStates[v.State]
+			if login := v.Author.login(); login != "" && state != "" && !asked[login] {
+				asked[login] = true
+				reviewers = append(reviewers, Reviewer{Login: login, Avatar: v.Author.avatar(), State: state})
+			}
+		}
+		d.Reviewers = append([]Reviewer{}, reviewers...)
 	}
 	return d, nil
 }
+
+// reviewStates are GitHub's review states in the one model's words; a dismissed review, and the
+// viewer's own pending one, say nothing.
+var reviewStates = map[string]string{"APPROVED": "approved", "CHANGES_REQUESTED": "changes_requested", "COMMENTED": "commented"}
 
 // Ref is an issue another names, as a blocker: open says it is not closed.
 type Ref struct {

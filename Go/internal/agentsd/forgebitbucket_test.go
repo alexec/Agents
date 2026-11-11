@@ -101,6 +101,11 @@ func (f *fakeForgeBitbucket) Merge(_ context.Context, repo string, number int, s
 	return nil
 }
 
+func (f *fakeForgeBitbucket) MarkReady(_ context.Context, repo string, number int) error {
+	f.note(&f.wrote, fmt.Sprintf("ready %s#%d", repo, number))
+	return nil
+}
+
 func (f *fakeForgeBitbucket) Approve(_ context.Context, repo string, number int, sha string) (string, error) {
 	f.note(&f.wrote, fmt.Sprintf("approve %s#%d %s", repo, number, sha))
 	return "https://bitbucket.org/" + repo + "/pull-requests/8", nil

@@ -35,8 +35,10 @@ import (
 // passes it before it gets its own tests.
 //
 // ForgeList.forges and ForgeItemDetail.actions are checked here since #4361, authorAvatar since
-// #4363, stateReason since #4365, and createdAt, closedAt and an issue's children, linkedPulls and
-// events since #4373.
+// #4363, stateReason since #4365, createdAt, closedAt and an issue's children, linkedPulls and
+// events since #4373, ForgeList.total since #4396, the comment count by commentCount since
+// #4364, and a pull request's branches, merge, size, reviewers, closing issues and check times
+// since #4409.
 
 type conformRow struct {
 	name string
@@ -61,14 +63,14 @@ type conformGitHub struct {
 }
 
 var conformGitHubItems = []githubmcp.Item{
-	{Repo: "alexec/agents", Number: 4, PR: true, State: "merged", Title: "Merged", URL: "https://github.com/alexec/agents/pull/4",
+	{Repo: "alexec/agents", Number: 4, PR: true, State: "merged", HeadRef: "agents/4-merged", BaseRef: "main", MergeCommit: "9f1c2b3a4d5e6f708192a3b4c5d6e7f809a1b2c3", MergedBy: "alexec", Title: "Merged", URL: "https://github.com/alexec/agents/pull/4",
 		Author: "alexec", AuthorAvatar: "https://avatars.githubusercontent.com/u/1?v=4", Labels: []string{"enhancement"}, LabelColors: map[string]string{"enhancement": "#a2eeef"},
 		CreatedAt: "2026-10-01T10:00:00Z", ClosedAt: "2026-11-04T10:00:00Z", UpdatedAt: "2026-11-04T10:00:00Z", Comments: 1},
-	{Repo: "alexec/agents", Number: 3, PR: true, State: "open", Title: "Open", URL: "https://github.com/alexec/agents/pull/3",
+	{Repo: "alexec/agents", Number: 3, PR: true, State: "open", HeadRef: "agents/3-open", BaseRef: "main", Title: "Open", URL: "https://github.com/alexec/agents/pull/3",
 		Author: "alexec", AuthorAvatar: "https://avatars.githubusercontent.com/u/1?v=4", Labels: []string{"bug"}, LabelColors: map[string]string{"bug": "#d73a4a"}, Assignees: []string{"alexec"},
-		CreatedAt: "2026-10-01T10:00:00Z", UpdatedAt: "2026-11-03T10:00:00Z", Checks: "failing"},
+		CreatedAt: "2026-10-01T10:00:00Z", UpdatedAt: "2026-11-03T10:00:00Z", Checks: "failing", Comments: 1},
 	{Repo: "alexec/agents", Number: 2, State: "closed", StateReason: "not_planned", Title: "Closed", URL: "https://github.com/alexec/agents/issues/2",
-		Author: "alexec", AuthorAvatar: "https://avatars.githubusercontent.com/u/1?v=4", CreatedAt: "2026-10-01T10:00:00Z", ClosedAt: "2026-11-02T10:00:00Z", UpdatedAt: "2026-11-02T10:00:00Z"},
+		Author: "alexec", AuthorAvatar: "https://avatars.githubusercontent.com/u/1?v=4", CreatedAt: "2026-10-01T10:00:00Z", ClosedAt: "2026-11-02T10:00:00Z", UpdatedAt: "2026-11-02T10:00:00Z", Comments: 1},
 	{Repo: "alexec/agents", Number: 1, State: "open", Title: "Open issue", URL: "https://github.com/alexec/agents/issues/1",
 		Author: "alexec", AuthorAvatar: "https://avatars.githubusercontent.com/u/1?v=4", Labels: []string{"task", "feature:work"}, LabelColors: map[string]string{"task": "#c5def5", "feature:work": "#1d76db"},
 		CreatedAt: "2026-10-01T10:00:00Z", UpdatedAt: "2026-11-01T10:00:00Z", Comments: 2},
@@ -91,6 +93,10 @@ func (g conformGitHub) Search(_ context.Context, _ []string, sf githubmcp.Search
 	if end := from + len(page.Items); end < len(kept) {
 		page.Next = strconv.Itoa(end)
 	}
+	// The first page counts the list (#4396).
+	if after == "" {
+		page.Total = new(len(kept))
+	}
 	return page, nil
 }
 
@@ -101,7 +107,14 @@ func (g conformGitHub) ItemPage(_ context.Context, _ string, number int, _ strin
 				Thread: []githubmcp.Comment{{Author: "alexec", Avatar: "https://avatars.githubusercontent.com/u/1?v=4", Body: "A comment.", At: i.UpdatedAt}}}
 			if i.PR {
 				d.Head, d.MergeMethods = "abc", []string{"squash"}
-				d.CheckRuns = []githubmcp.Check{{Name: "test", State: "failing", URL: "https://github.com/alexec/agents/actions/runs/7"}}
+				d.CheckRuns = []githubmcp.Check{
+					{Name: "test", State: "failing", URL: "https://github.com/alexec/agents/actions/runs/7", StartedAt: "2026-11-03T10:00:00Z", FinishedAt: "2026-11-03T10:02:10Z"},
+					{Name: "lint", State: "running", URL: "https://github.com/alexec/agents/actions/runs/8", StartedAt: "2026-11-03T10:00:05Z"},
+					{Name: "ci/status", State: "passing", URL: "https://ci.example.com/1"},
+				}
+				d.Additions, d.Deletions, d.Commits = 412, 18, 3
+				d.Reviewers = []githubmcp.Reviewer{{Login: "kim", Avatar: "https://avatars.githubusercontent.com/u/2?v=4", State: "approved"}, {Login: "alexec/reviewers", State: "pending"}}
+				d.Closes = []githubmcp.Linked{{Repo: "alexec/agents", Number: 1, Title: "Open issue", State: "open", URL: "https://github.com/alexec/agents/issues/1"}}
 			} else {
 				d.Children = []githubmcp.Linked{{Repo: "alexec/agents", Number: 2, Title: "Closed", State: "closed", URL: "https://github.com/alexec/agents/issues/2"}}
 				d.LinkedPulls = []githubmcp.Linked{{Repo: "alexec/agents", Number: 4, PR: true, Title: "Merged", State: "merged", URL: "https://github.com/alexec/agents/pull/4"}}
@@ -149,14 +162,14 @@ type conformGitLab struct {
 }
 
 var conformGitLabItems = []gitlabmcp.Item{
-	{Project: "Group/App", Number: 4, MR: true, State: "merged", Title: "Merged", URL: "https://gitlab.com/Group/App/-/merge_requests/4",
+	{Project: "Group/App", Number: 4, MR: true, State: "merged", HeadRef: "agents/4-merged", BaseRef: "main", MergeCommit: "9f1c2b3a4d5e6f708192a3b4c5d6e7f809a1b2c3", MergedBy: "kim", Title: "Merged", URL: "https://gitlab.com/Group/App/-/merge_requests/4",
 		Author: "kim", AuthorAvatar: "https://gitlab.com/uploads/-/system/user/avatar/7/avatar.png", Labels: []string{"enhancement"}, LabelColors: map[string]string{"enhancement": "#a2eeef"},
 		CreatedAt: "2026-10-01T10:00:00Z", ClosedAt: "2026-11-04T10:00:00Z", UpdatedAt: "2026-11-04T10:00:00Z", Comments: 1},
-	{Project: "Group/App", Number: 3, MR: true, State: "open", Title: "Open", URL: "https://gitlab.com/Group/App/-/merge_requests/3",
+	{Project: "Group/App", Number: 3, MR: true, State: "open", HeadRef: "agents/3-open", BaseRef: "main", Title: "Open", URL: "https://gitlab.com/Group/App/-/merge_requests/3",
 		Author: "kim", AuthorAvatar: "https://gitlab.com/uploads/-/system/user/avatar/7/avatar.png", Labels: []string{"bug"}, LabelColors: map[string]string{"bug": "#d9534f"}, Assignees: []string{"kim"},
-		CreatedAt: "2026-10-01T10:00:00Z", UpdatedAt: "2026-11-03T10:00:00Z", Checks: "failing"},
+		CreatedAt: "2026-10-01T10:00:00Z", UpdatedAt: "2026-11-03T10:00:00Z", Checks: "failing", Comments: 1},
 	{Project: "Group/App", Number: 2, State: "closed", Title: "Closed", URL: "https://gitlab.com/Group/App/-/issues/2",
-		Author: "kim", AuthorAvatar: "https://gitlab.com/uploads/-/system/user/avatar/7/avatar.png", CreatedAt: "2026-10-01T10:00:00Z", ClosedAt: "2026-11-02T10:00:00Z", UpdatedAt: "2026-11-02T10:00:00Z"},
+		Author: "kim", AuthorAvatar: "https://gitlab.com/uploads/-/system/user/avatar/7/avatar.png", CreatedAt: "2026-10-01T10:00:00Z", ClosedAt: "2026-11-02T10:00:00Z", UpdatedAt: "2026-11-02T10:00:00Z", Comments: 1},
 	{Project: "Group/App", Number: 1, State: "open", Title: "Open issue", URL: "https://gitlab.com/Group/App/-/issues/1",
 		Author: "kim", AuthorAvatar: "https://gitlab.com/uploads/-/system/user/avatar/7/avatar.png", Labels: []string{"task"}, LabelColors: map[string]string{"task": "#c5def5"},
 		CreatedAt: "2026-10-01T10:00:00Z", UpdatedAt: "2026-11-01T10:00:00Z", Comments: 2},
@@ -178,6 +191,10 @@ func (g conformGitLab) Search(_ context.Context, _ []string, sf gitlabmcp.Search
 	}
 	if end := from + len(page.Items); end < len(kept) {
 		page.Next = strconv.Itoa(end)
+	}
+	// The first page counts the list (#4396).
+	if after == "" {
+		page.Total = new(len(kept))
 	}
 	return page, nil
 }
@@ -225,14 +242,14 @@ type conformForgejo struct {
 }
 
 var conformForgejoItems = []forgejomcp.Item{
-	{Repo: "walkalex/App", Number: 4, PR: true, State: "merged", Title: "Merged", URL: "http://localhost:3753/walkalex/App/pulls/4",
+	{Repo: "walkalex/App", Number: 4, PR: true, State: "merged", Title: "Merged", URL: "http://localhost:3753/walkalex/App/pulls/4", HeadRef: "agents/4-merged", BaseRef: "main", MergeCommit: "9f1c2b3a4d5e6f708192a3b4c5d6e7f809a1b2c3", MergedBy: "walkalex",
 		Author: "kim", AuthorAvatar: "http://localhost:3753/avatars/k", Labels: []string{"enhancement"}, LabelColors: map[string]string{"enhancement": "#a2eeef"},
 		CreatedAt: "2026-10-01T10:00:00Z", ClosedAt: "2026-11-04T10:00:00Z", UpdatedAt: "2026-11-04T10:00:00Z", Comments: 1},
-	{Repo: "walkalex/App", Number: 3, PR: true, State: "open", Title: "Open", URL: "http://localhost:3753/walkalex/App/pulls/3",
+	{Repo: "walkalex/App", Number: 3, PR: true, State: "open", Title: "Open", URL: "http://localhost:3753/walkalex/App/pulls/3", HeadRef: "agents/3-open", BaseRef: "main",
 		Author: "kim", AuthorAvatar: "http://localhost:3753/avatars/k", Labels: []string{"bug"}, LabelColors: map[string]string{"bug": "#ee0701"}, Assignees: []string{"kim"},
-		CreatedAt: "2026-10-01T10:00:00Z", UpdatedAt: "2026-11-03T10:00:00Z", Checks: "failing"},
+		CreatedAt: "2026-10-01T10:00:00Z", UpdatedAt: "2026-11-03T10:00:00Z", Checks: "failing", Comments: 1},
 	{Repo: "walkalex/App", Number: 2, State: "closed", Title: "Closed", URL: "http://localhost:3753/walkalex/App/issues/2",
-		Author: "kim", AuthorAvatar: "http://localhost:3753/avatars/k", CreatedAt: "2026-10-01T10:00:00Z", ClosedAt: "2026-11-02T10:00:00Z", UpdatedAt: "2026-11-02T10:00:00Z"},
+		Author: "kim", AuthorAvatar: "http://localhost:3753/avatars/k", CreatedAt: "2026-10-01T10:00:00Z", ClosedAt: "2026-11-02T10:00:00Z", UpdatedAt: "2026-11-02T10:00:00Z", Comments: 1},
 	{Repo: "walkalex/App", Number: 1, State: "open", Title: "Open issue", URL: "http://localhost:3753/walkalex/App/issues/1",
 		Author: "kim", AuthorAvatar: "http://localhost:3753/avatars/k", Labels: []string{"task"}, LabelColors: map[string]string{"task": "#c5def5"},
 		CreatedAt: "2026-10-01T10:00:00Z", UpdatedAt: "2026-11-01T10:00:00Z", Comments: 2},
@@ -301,10 +318,10 @@ type conformBitbucket struct {
 }
 
 var conformBitbucketItems = []bitbucketmcp.Item{
-	{Repo: "walkalex/App", Number: 4, PR: true, State: "merged", Title: "Merged", URL: "https://bitbucket.org/walkalex/App/pull-requests/4",
+	{Repo: "walkalex/App", Number: 4, PR: true, State: "merged", Title: "Merged", URL: "https://bitbucket.org/walkalex/App/pull-requests/4", HeadRef: "agents/4-merged", BaseRef: "main", MergeCommit: "9f1c2b3a4d5e",
 		Author: "kim", AuthorAvatar: "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/k/48", CreatedAt: "2026-10-01T10:00:00Z", UpdatedAt: "2026-11-04T10:00:00Z", Comments: 1},
-	{Repo: "walkalex/App", Number: 3, PR: true, State: "open", Title: "Open", URL: "https://bitbucket.org/walkalex/App/pull-requests/3",
-		Author: "kim", AuthorAvatar: "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/k/48", Assignees: []string{"kim"}, CreatedAt: "2026-10-01T10:00:00Z", UpdatedAt: "2026-11-03T10:00:00Z", Checks: "failing"},
+	{Repo: "walkalex/App", Number: 3, PR: true, State: "open", Title: "Open", URL: "https://bitbucket.org/walkalex/App/pull-requests/3", HeadRef: "agents/3-open", BaseRef: "main",
+		Author: "kim", AuthorAvatar: "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/k/48", Assignees: []string{"kim"}, CreatedAt: "2026-10-01T10:00:00Z", UpdatedAt: "2026-11-03T10:00:00Z", Checks: "failing", Comments: 1},
 	{Repo: "walkalex/App", Number: 2, State: "closed", StateReason: "duplicate", Title: "Closed", URL: "https://bitbucket.org/walkalex/App/issues/2",
 		Author: "kim", AuthorAvatar: "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/k/48", Labels: []string{"bug"}, CreatedAt: "2026-10-01T10:00:00Z", UpdatedAt: "2026-11-02T10:00:00Z"},
 	{Repo: "walkalex/App", Number: 1, State: "open", Title: "Open issue", URL: "https://bitbucket.org/walkalex/App/issues/1",
@@ -339,6 +356,9 @@ func (g conformBitbucket) ItemPage(_ context.Context, _ string, number int, pr b
 			if i.PR {
 				d.Head = "abc"
 				d.CheckRuns = []bitbucketmcp.CheckRun{{Name: "Pipeline #12", State: "failing", Run: 12}}
+			} else {
+				// An issue's count is only on its page (commentCount detail).
+				d.Comments = len(d.Thread)
 			}
 			return d, nil
 		}
@@ -370,9 +390,9 @@ type conformAzureDevOps struct {
 }
 
 var conformAzureDevOpsItems = []azuredevopsmcp.Item{
-	{Repo: "acme/Web App/App", Number: 4, State: "merged", Title: "Merged", URL: "https://dev.azure.com/acme/Web%20App/_git/App/pullrequest/4",
+	{Repo: "acme/Web App/App", Number: 4, State: "merged", HeadRef: "agents/4-merged", BaseRef: "main", MergeCommit: "9f1c2b3a4d5e6f708192a3b4c5d6e7f809a1b2c3", MergedBy: "Kim", Title: "Merged", URL: "https://dev.azure.com/acme/Web%20App/_git/App/pullrequest/4",
 		Author: "kim@example.com", AuthorAvatar: "https://dev.azure.com/acme/_apis/GraphProfile/MemberAvatars/aad.aw0", CreatedAt: "2026-10-01T10:00:00Z", ClosedAt: "2026-11-04T10:00:00Z", UpdatedAt: "2026-11-04T10:00:00Z"},
-	{Repo: "acme/Web App/App", Number: 3, State: "open", Title: "Open", URL: "https://dev.azure.com/acme/Web%20App/_git/App/pullrequest/3",
+	{Repo: "acme/Web App/App", Number: 3, State: "open", HeadRef: "agents/3-open", BaseRef: "main", Title: "Open", URL: "https://dev.azure.com/acme/Web%20App/_git/App/pullrequest/3",
 		Author: "kim@example.com", AuthorAvatar: "https://dev.azure.com/acme/_apis/GraphProfile/MemberAvatars/aad.aw0", Labels: []string{"ui"}, CreatedAt: "2026-10-01T10:00:00Z", UpdatedAt: "2026-11-03T10:00:00Z", Checks: "failing"},
 }
 
@@ -398,6 +418,8 @@ func (g conformAzureDevOps) Search(_ context.Context, _ []string, sf azuredevops
 func (g conformAzureDevOps) ItemPage(_ context.Context, _ string, number int, _ string) (azuredevopsmcp.ItemDetail, error) {
 	for _, i := range conformAzureDevOpsItems {
 		if i.Number == number {
+			// The count is only on the page (commentCount detail).
+			i.Comments = 1
 			return azuredevopsmcp.ItemDetail{Item: i, Body: "The body.", Head: "abc",
 				Thread:    []azuredevopsmcp.Comment{{Author: "kim@example.com", Avatar: "https://dev.azure.com/acme/_apis/GraphProfile/MemberAvatars/aad.aw0", Body: "A comment.", At: i.UpdatedAt}},
 				CheckRuns: []azuredevopsmcp.CheckRun{{Name: "ci", State: "failing", Build: 70}}}, nil
@@ -431,7 +453,7 @@ type conformLinear struct {
 
 var conformLinearItems = []linearmcp.Item{
 	{Identifier: "ENG-2", Team: "ENG", State: "closed", StateReason: "completed", Title: "Closed", URL: "https://linear.app/acme/issue/ENG-2", Author: "kim", AuthorAvatar: "https://public.linear.app/k/avatar",
-		CreatedAt: "2026-10-01T10:00:00Z", ClosedAt: "2026-11-02T10:00:00Z", UpdatedAt: "2026-11-02T10:00:00Z"},
+		CreatedAt: "2026-10-01T10:00:00Z", ClosedAt: "2026-11-02T10:00:00Z", UpdatedAt: "2026-11-02T10:00:00Z", Comments: 1},
 	{Identifier: "ENG-1", Team: "ENG", State: "open", Title: "Open issue", URL: "https://linear.app/acme/issue/ENG-1", Author: "kim", AuthorAvatar: "https://public.linear.app/k/avatar",
 		Labels: []string{"task", "feature:Export"}, LabelColors: map[string]string{"task": "#c5def5", "feature:Export": "#1d76db"},
 		Assignees: []string{"kim"}, CreatedAt: "2026-10-01T10:00:00Z", UpdatedAt: "2026-11-01T10:00:00Z", Comments: 2},
@@ -497,7 +519,7 @@ type conformJira struct {
 
 var conformJiraItems = []jiramcp.Item{
 	{Key: "PROJ-2", Project: "PROJ", State: "closed", StateReason: "completed", Status: "Done", Title: "Closed", URL: "https://acme.atlassian.net/browse/PROJ-2",
-		Author: "Kim", AuthorAvatar: "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/k/48", CreatedAt: "2026-10-01T10:00:00.000Z", ClosedAt: "2026-11-02T10:00:00.000Z", UpdatedAt: "2026-11-02T10:00:00.000Z"},
+		Author: "Kim", AuthorAvatar: "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/k/48", CreatedAt: "2026-10-01T10:00:00.000Z", ClosedAt: "2026-11-02T10:00:00.000Z", UpdatedAt: "2026-11-02T10:00:00.000Z", Comments: 1},
 	{Key: "PROJ-1", Project: "PROJ", State: "open", Status: "To Do", Title: "Open issue", URL: "https://acme.atlassian.net/browse/PROJ-1",
 		Author: "Kim", AuthorAvatar: "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/k/48", Labels: []string{"billing"}, Assignees: []string{"Kim"}, CreatedAt: "2026-10-01T10:00:00.000Z", UpdatedAt: "2026-11-01T10:00:00.000Z", Comments: 2},
 }
@@ -517,6 +539,10 @@ func (g conformJira) Search(_ context.Context, _ []string, sf jiramcp.SearchFilt
 	}
 	if end := from + len(page.Items); end < len(kept) {
 		page.Next = strconv.Itoa(end)
+	}
+	// The first page counts the list (#4396).
+	if after == "" {
+		page.Total = new(len(kept))
 	}
 	return page, nil
 }
@@ -564,7 +590,7 @@ type conformBoards struct {
 
 var conformBoardsItems = []azureboardsmcp.Item{
 	{ID: 2, Project: "acme/web", Type: "Task", State: "closed", StateReason: "not_planned", Status: "Done", Title: "Closed",
-		URL: "https://dev.azure.com/acme/web/_workitems/edit/2", Author: "Kim", AuthorAvatar: "https://dev.azure.com/acme/_apis/GraphProfile/MemberAvatars/aad.aw0", CreatedAt: "2026-10-01T10:00:00.000Z", ClosedAt: "2026-11-02T10:00:00.000Z", UpdatedAt: "2026-11-02T10:00:00.000Z"},
+		URL: "https://dev.azure.com/acme/web/_workitems/edit/2", Author: "Kim", AuthorAvatar: "https://dev.azure.com/acme/_apis/GraphProfile/MemberAvatars/aad.aw0", CreatedAt: "2026-10-01T10:00:00.000Z", ClosedAt: "2026-11-02T10:00:00.000Z", UpdatedAt: "2026-11-02T10:00:00.000Z", Comments: 1},
 	{ID: 1, Project: "acme/web", Type: "Task", State: "open", Status: "To Do", Title: "Open work item",
 		URL: "https://dev.azure.com/acme/web/_workitems/edit/1", Author: "Kim", AuthorAvatar: "https://dev.azure.com/acme/_apis/GraphProfile/MemberAvatars/aad.aw0", Labels: []string{"billing"},
 		Assignees: []string{"Kim"}, CreatedAt: "2026-10-01T10:00:00.000Z", UpdatedAt: "2026-11-01T10:00:00.000Z", Comments: 2},
@@ -623,7 +649,15 @@ func conformBoardsDaemon(t *testing.T) (*Daemon, *conn) {
 // conformList is every item of a forge/issues or forge/pulls list, a page of limit at a time.
 func conformList(t *testing.T, c *conn, method string, limit int64) []wire.ForgeItem {
 	t.Helper()
+	items, _ := conformPages(t, c, method, limit)
+	return items
+}
+
+// conformPages is conformList, and each page's total.
+func conformPages(t *testing.T, c *conn, method string, limit int64) ([]wire.ForgeItem, []*int64) {
+	t.Helper()
 	var items []wire.ForgeItem
+	var totals []*int64
 	var cursor *string
 	for n := 0; ; n++ {
 		if n > 20 {
@@ -637,8 +671,9 @@ func conformList(t *testing.T, c *conn, method string, limit int64) []wire.Forge
 			t.Fatalf("%s: %+v", method, page.Errors)
 		}
 		items = append(items, page.Items...)
+		totals = append(totals, page.Total)
 		if page.Cursor == nil {
-			return items
+			return items, totals
 		}
 		cursor = page.Cursor
 	}
@@ -668,9 +703,21 @@ func TestForgeConformance(t *testing.T) {
 				all[prs] = conformList(t, c, method, forgeListMost)
 				// 4. The list pages: a limit of 1 gives every item once, by the cursors.
 				d.forgeWrote()
-				one := conformList(t, c, method, 1)
+				one, totals := conformPages(t, c, method, 1)
 				if !slices.EqualFunc(one, all[prs], func(a, b wire.ForgeItem) bool { return a.Node == b.Node }) {
 					t.Errorf("%s by ones: %v, want %v", method, conformNodes(one), conformNodes(all[prs]))
+				}
+				// 5. The total (#4396): a forge that counts says the whole list's on every page; one
+				// that does not says none, unless its list ends on its first page.
+				for n, total := range totals {
+					counts := caps.Total || len(all[prs]) <= 1
+					if counts != (total != nil) || total != nil && *total != int64(len(all[prs])) {
+						got := "none"
+						if total != nil {
+							got = strconv.FormatInt(*total, 10)
+						}
+						t.Errorf("%s page %d: total %s, want %d (caps say total=%v)", method, n, got, len(all[prs]), caps.Total)
+					}
 				}
 			}
 			// The list says the forge's capabilities (#4361).
@@ -718,9 +765,30 @@ func TestForgeConformance(t *testing.T) {
 						t.Fatal(err)
 					}
 					conformItemActions(t, caps, i, page.Actions)
+					conformComments(t, caps, i, page)
 					conformAvatars(t, d, caps, page)
 					conformLinks(t, d, f, caps, page)
+					conformPull(t, d, f, caps, i, page)
 				}
+			}
+
+			// forge/labels gives the colours as the lists do (#4362).
+			for _, kind := range []string{lineage.KindIssue, lineage.KindPR} {
+				r, ok := refs[kind+" open"]
+				if !ok {
+					continue
+				}
+				labels, err := f.Labels(ctx, r)
+				if errors.Is(err, errForgeCannot) && !caps.PR.Label && kind == lineage.KindPR {
+					continue
+				}
+				if err != nil {
+					t.Fatalf("Labels(%v): %v", r.Node, err)
+				}
+				if len(labels) == 0 {
+					t.Errorf("Labels(%v): none", r.Node)
+				}
+				conformLabelColors(t, "labels of "+fmt.Sprint(r.Node), caps, labels)
 			}
 
 			// 2. Caps agrees with the methods.
@@ -760,6 +828,13 @@ func TestForgeConformance(t *testing.T) {
 					}
 				}
 			}
+			// 6. Releases agrees with Caps (#4426): a forge with none says why.
+			s, _ := f.Sources(ctx, d.folderPaths(), caps.PRs && !caps.Issues)
+			if _, err := f.Releases(ctx, s, 1); errors.Is(err, errForgeCannot) == caps.Releases {
+				t.Errorf("releases: caps say %v, the method says %v", caps.Releases, err)
+			} else if !caps.Releases && cannotReason(f, err) == "the forge cannot releases" {
+				t.Errorf("releases: no reason of its own")
+			}
 		})
 	}
 }
@@ -769,6 +844,7 @@ func conformActions(f Forge, r forgeRef) map[string]func(context.Context) error 
 	return map[string]func(context.Context) error{
 		actionComment: func(ctx context.Context) error { _, err := f.Comment(ctx, r, "A comment."); return err },
 		actionLabel:   func(ctx context.Context) error { return f.SetLabels(ctx, r, []string{"bug"}, nil) },
+		actionAssign:  func(ctx context.Context) error { return f.SetAssignees(ctx, r, []string{"kim"}, nil) },
 		actionClose:   func(ctx context.Context) error { return f.SetState(ctx, r, true, "") },
 		actionReopen:  func(ctx context.Context) error { return f.SetState(ctx, r, false, "") },
 		actionTransition: func(ctx context.Context) error {
@@ -777,9 +853,25 @@ func conformActions(f Forge, r forgeRef) map[string]func(context.Context) error 
 		actionMerge:     func(ctx context.Context) error { _, err := f.Merge(ctx, r, "abc", "", false); return err },
 		actionAutoMerge: func(ctx context.Context) error { _, err := f.Merge(ctx, r, "abc", "", true); return err },
 		actionApprove:   func(ctx context.Context) error { _, err := f.Approve(ctx, r, "abc"); return err },
+		actionCancelAuto: func(ctx context.Context) error { return f.CancelAutoMerge(ctx, r) },
+		actionReady:      func(ctx context.Context) error { return f.Ready(ctx, r) },
 		actionRerun:     func(ctx context.Context) error { _, err := f.Rerun(ctx, r); return err },
 		actionLog:       func(ctx context.Context) error { _, err := f.Log(ctx, r, ""); return err },
 		actionDiff:      func(ctx context.Context) error { _, err := f.Diff(ctx, r); return err },
+	}
+}
+
+// conformLabelColors: each label has a #rrggbb colour when the forge says LabelColors, and none when
+// it does not (#4362).
+func conformLabelColors(t *testing.T, where string, caps forgeCaps, labels []wire.ForgeLabel) {
+	t.Helper()
+	for _, l := range labels {
+		switch {
+		case caps.LabelColors && !labelColor.MatchString(deref(l.Color)):
+			t.Errorf("%s: label %s's colour is %q, not #rrggbb", where, l.Name, deref(l.Color))
+		case !caps.LabelColors && l.Color != nil:
+			t.Errorf("%s: label %s has colour %q; caps say labelColors=false", where, l.Name, *l.Color)
+		}
 	}
 }
 
@@ -794,11 +886,7 @@ func conformModel(t *testing.T, d *Daemon, caps forgeCaps, i wire.ForgeItem) {
 	if !slices.Contains([]string{"open", "closed", "merged"}, i.State) {
 		t.Errorf("%v: state %q", i.Node, i.State)
 	}
-	for _, l := range i.Labels {
-		if caps.LabelColors && !labelColor.MatchString(deref(l.Color)) {
-			t.Errorf("%v: label %s's colour is %q, not #rrggbb", i.Node, l.Name, deref(l.Color))
-		}
-	}
+	conformLabelColors(t, fmt.Sprint(i.Node), caps, i.Labels)
 	if caps.Avatars {
 		conformAvatar(t, d, fmt.Sprint(i.Node), i.AuthorAvatar)
 	}
@@ -829,6 +917,37 @@ func conformModel(t *testing.T, d *Daemon, caps forgeCaps, i wire.ForgeItem) {
 		}
 	case i.ClosedAt == nil || *i.ClosedAt == 0 || i.CreatedAt != nil && *i.ClosedAt < *i.CreatedAt:
 		t.Errorf("%v: closedAt %v, createdAt %v", i.Node, i.ClosedAt, i.CreatedAt)
+	}
+}
+
+// conformComments checks that an item's comment count follows commentCount (#4364): exact, the
+// list's count is the page's; capped, it is the page's up to commentsMost; detail, the list has
+// none, or the page's, as Bitbucket's pull requests have. The page's count is never less than the
+// comments it holds.
+func conformComments(t *testing.T, caps forgeCaps, listed wire.ForgeItem, page wire.ForgeItemDetail) {
+	t.Helper()
+	counted, held := page.Item.Comments, int64(len(page.Comments))
+	switch {
+	case counted < held:
+		t.Errorf("%v: the page counts %d comments and holds %d", listed.Node, counted, held)
+	case caps.CommentCount == "capped" && counted > int64(caps.CommentsMost):
+		t.Errorf("%v: the page counts %d comments, over the cap of %d", listed.Node, counted, caps.CommentsMost)
+	}
+	switch caps.CommentCount {
+	case "exact":
+		if listed.Comments != counted || caps.CommentsMost != 0 {
+			t.Errorf("%v: exact, the list counts %d and the page %d (commentsMost %d)", listed.Node, listed.Comments, counted, caps.CommentsMost)
+		}
+	case "capped":
+		if caps.CommentsMost <= 0 || listed.Comments != min(counted, int64(caps.CommentsMost)) {
+			t.Errorf("%v: capped at %d, the list counts %d and the page %d", listed.Node, caps.CommentsMost, listed.Comments, counted)
+		}
+	case "detail":
+		if listed.Comments != 0 && listed.Comments != counted || caps.CommentsMost != 0 {
+			t.Errorf("%v: detail, the list counts %d and the page %d (commentsMost %d)", listed.Node, listed.Comments, counted, caps.CommentsMost)
+		}
+	default:
+		t.Errorf("commentCount %q, not exact, capped or detail", caps.CommentCount)
 	}
 }
 
@@ -878,6 +997,72 @@ func conformLinks(t *testing.T, d *Daemon, f Forge, caps forgeCaps, page wire.Fo
 			if e.Source == nil {
 				t.Errorf("%v: event %d referenced names no source", page.Item.Node, n)
 			}
+		}
+	}
+}
+
+// conformPull checks a pull request's fields (#4409) against the capabilities: the branches on
+// its page (and the same on its row, where the list says them), who merged it and its merge commit
+// on a merged one only, its size, reviewers and the issues it closes on its page, and its checks'
+// times; an issue has none of them.
+func conformPull(t *testing.T, d *Daemon, f Forge, caps forgeCaps, listed wire.ForgeItem, page wire.ForgeItemDetail) {
+	t.Helper()
+	i, node := page.Item, page.Item.Node
+	pr, merged := node.Kind == lineage.KindPR, i.State == "merged"
+	for _, b := range []struct {
+		name         string
+		row, onPage  *string
+		on, expected bool
+	}{
+		{"headRef", listed.HeadRef, i.HeadRef, caps.Branches, pr},
+		{"baseRef", listed.BaseRef, i.BaseRef, caps.Branches, pr},
+		{"mergedBy", listed.MergedBy, i.MergedBy, caps.MergedBy, pr && merged},
+		{"mergeCommit", listed.MergeCommit, i.MergeCommit, caps.MergeCommit, pr && merged},
+	} {
+		switch {
+		case (b.onPage != nil && *b.onPage != "") != (b.on && b.expected):
+			t.Errorf("%v: %s %q, caps say %v", node, b.name, deref(b.onPage), b.on)
+		case b.row != nil && deref(b.row) != deref(b.onPage):
+			t.Errorf("%v: %s %q on the row, %q on the page", node, b.name, *b.row, deref(b.onPage))
+		}
+	}
+	if c := deref(i.MergeCommit); c != "" && !regexp.MustCompile(`^[0-9a-f]{7,40}$`).MatchString(c) {
+		t.Errorf("%v: mergeCommit %q is not a commit", node, c)
+	}
+	size := page.Additions != nil && page.Deletions != nil && page.Commits != nil
+	if none := page.Additions == nil && page.Deletions == nil && page.Commits == nil; !size && !none || size != (caps.Size && pr) {
+		t.Errorf("%v: additions %v, deletions %v, commits %v; caps say size=%v", node, page.Additions, page.Deletions, page.Commits, caps.Size)
+	} else if size && (*page.Additions < 0 || *page.Deletions < 0 || *page.Commits < 1) {
+		t.Errorf("%v: +%d −%d in %d commits", node, *page.Additions, *page.Deletions, *page.Commits)
+	}
+	if (page.Reviewers != nil) != (caps.Reviewers && pr) {
+		t.Errorf("%v: reviewers %v, caps say %v", node, page.Reviewers, caps.Reviewers)
+	}
+	states := []wire.ForgeReviewerState{wire.ForgeReviewerStateApproved, wire.ForgeReviewerStateChangesRequested, wire.ForgeReviewerStateCommented, wire.ForgeReviewerStatePending}
+	seen := map[string]bool{}
+	for _, r := range page.Reviewers {
+		if r.Login == "" || seen[r.Login] || !slices.Contains(states, r.State) {
+			t.Errorf("%v: reviewer %+v: no login, twice, or an unknown state", node, r)
+		}
+		seen[r.Login] = true
+		if caps.Avatars && r.Avatar != nil {
+			conformAvatar(t, d, fmt.Sprint(node), r.Avatar)
+		}
+	}
+	if (page.Closes != nil) != (caps.Closes && pr) {
+		t.Errorf("%v: closes %v, caps say %v", node, page.Closes, caps.Closes)
+	}
+	for _, c := range page.Closes {
+		if g, _, ok := d.forgeOwning(c.Node); !ok || g.Name() != f.Name() || c.Node.Kind != lineage.KindIssue || c.Title == "" {
+			t.Errorf("%v: closes %+v, not an issue of %s", node, c, f.Name())
+		}
+	}
+	for _, c := range page.Checks {
+		switch {
+		case !caps.CheckTimes && (c.StartedAt != nil || c.FinishedAt != nil):
+			t.Errorf("%v: check %s has times; caps say checkTimes=false", node, c.Name)
+		case c.FinishedAt != nil && (c.StartedAt == nil || *c.FinishedAt < *c.StartedAt || c.State == "running"):
+			t.Errorf("%v: check %s (%s) started %v, finished %v", node, c.Name, c.State, c.StartedAt, *c.FinishedAt)
 		}
 	}
 }

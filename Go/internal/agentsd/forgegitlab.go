@@ -28,17 +28,24 @@ const gitlabNoPlanWrite = "a GitLab plan is changed on GitLab, not yet here"
 
 func (gitlabForge) Name() string { return "gitlab" }
 
+func (gitlabForge) Images() forgeImageHost { return gitlabImages{} }
+
 func (gitlabForge) Caps() forgeCaps {
 	return forgeCaps{
 		Issues: true, PRs: true,
-		Issue: forgeActions{Comment: true, Label: true, Close: true, Reopen: true},
-		PR: forgeActions{Comment: true, Label: true, Close: true, Reopen: true, Merge: true, AutoMerge: true, Approve: true,
-			Rerun: true, Log: true, Diff: true},
+		Issue: forgeActions{Comment: true, Label: true, Assign: true, Close: true, Reopen: true},
+		PR: forgeActions{Comment: true, Label: true, Assign: true, Close: true, Reopen: true, Merge: true, AutoMerge: true, Approve: true,
+			Rerun: true, Log: true, Diff: true, CancelAutoMerge: true, Ready: true},
 		LabelColors: true,
 		Avatars:     true,
 		CreatedAt:   true, ClosedAt: true,
+		// A pull request's branches and merge (#4409); its size, reviewers, closing issues and check times are #4682.
+		Branches: true, MergedBy: true, MergeCommit: true,
 		CommentCount: "exact",
-		Plan:         true,
+		Releases:     true,
+		// X-Total, which GitLab leaves out of a list of over 10,000.
+		Total: true,
+		Plan:  true,
 		Reasons: map[string]string{
 			actionTransition: "only a Jira issue or an Azure Boards work item moves by a transition",
 			actionAddChild:   gitlabNoPlanWrite,
@@ -132,7 +139,7 @@ func (g gitlabForge) List(ctx context.Context, scope forgeScope, f forgeFilter, 
 	for _, i := range page.Items {
 		p.items = append(p.items, gitlabItemOf(i, s.folderOf[strings.ToLower(i.Project)]))
 	}
-	p.cursors, p.next = page.Cursors, page.Next
+	p.cursors, p.next, p.total = page.Cursors, page.Next, page.Total
 	return p, err
 }
 
@@ -304,6 +311,14 @@ func (g gitlabForge) SetLabels(ctx context.Context, r forgeRef, add, remove []st
 	return gl.SetLabels(ctx, project, r.Number, r.pr(), add, remove)
 }
 
+func (g gitlabForge) SetAssignees(ctx context.Context, r forgeRef, add, remove []string) error {
+	gl, project, _, err := g.of(ctx, "forge/assign", r)
+	if err != nil {
+		return err
+	}
+	return gl.SetAssignees(ctx, project, r.Number, r.pr(), add, remove)
+}
+
 func (g gitlabForge) SetState(ctx context.Context, r forgeRef, closed bool, transition string) error {
 	if transition != "" {
 		return cannot(actionTransition)
@@ -339,6 +354,28 @@ func (g gitlabForge) Merge(ctx context.Context, r forgeRef, sha, how string, aut
 		return wire.ForgeDone{}, err
 	}
 	return wire.ForgeDone{Auto: optionalTrue(auto)}, nil
+}
+
+func (g gitlabForge) CancelAutoMerge(ctx context.Context, r forgeRef) error {
+	if !r.pr() {
+		return cannot(actionCancelAuto)
+	}
+	gl, project, _, err := g.of(ctx, "forge/cancel-auto-merge", r)
+	if err != nil {
+		return err
+	}
+	return gl.CancelAutoMerge(ctx, project, r.Number)
+}
+
+func (g gitlabForge) Ready(ctx context.Context, r forgeRef) error {
+	if !r.pr() {
+		return cannot(actionReady)
+	}
+	gl, project, _, err := g.of(ctx, "forge/ready", r)
+	if err != nil {
+		return err
+	}
+	return gl.MarkReady(ctx, project, r.Number)
 }
 
 func (g gitlabForge) Approve(ctx context.Context, r forgeRef, sha string) (wire.ForgeDone, error) {

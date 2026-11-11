@@ -36,6 +36,9 @@ type forgeAzureDevOps interface {
 	RepoLabels(ctx context.Context, repo string) ([]string, error)
 	MergeMethods(ctx context.Context, repo string, number int) ([]string, error)
 	Merge(ctx context.Context, repo string, number int, sha, method string, auto bool) error
+	// The pull request page's Auto-complete row and Draft state (#4410).
+	CancelAutoMerge(ctx context.Context, repo string, number int) error
+	MarkReady(ctx context.Context, repo string, number int) error
 	Approve(ctx context.Context, repo string, number int, sha string) (string, error)
 	PRDiff(ctx context.Context, repo string, number int) (map[string]any, error)
 	RetryBuild(ctx context.Context, repo string, build int) (string, error)
@@ -125,16 +128,22 @@ type azureDevOpsForge struct {
 
 func (azureDevOpsForge) Name() string { return "azuredevops" }
 
+func (azureDevOpsForge) Images() forgeImageHost { return azureImages{} }
+
 func (azureDevOpsForge) Caps() forgeCaps {
 	return forgeCaps{
 		PRs: true,
 		PR: forgeActions{Comment: true, Label: true, Close: true, Reopen: true, Merge: true, AutoMerge: true, Approve: true,
-			Rerun: true, Log: true, Diff: true},
+			Rerun: true, Log: true, Diff: true, CancelAutoMerge: true, Ready: true},
 		Avatars:   true,
 		CreatedAt: true, ClosedAt: true,
+		// A pull request's branches and merge (#4409); its size, reviewers, closing issues and check times are #4682.
+		Branches: true, MergedBy: true, MergeCommit: true,
 		// A pull request's comment count is on its own page only.
 		CommentCount: "detail",
 		Reasons: map[string]string{
+			actionAssign:     "an Azure Repos pull request has reviewers, not assignees",
+			actionReleases:   "Azure Repos has no releases, only tags",
 			actionTransition: "only a Jira issue or an Azure Boards work item moves by a transition",
 			actionPlan:       azureDevOpsNoIssues,
 			actionAddChild:   azureDevOpsNoIssues,
@@ -382,6 +391,23 @@ func (a azureDevOpsForge) Merge(ctx context.Context, r forgeRef, sha, how string
 	return wire.ForgeDone{Auto: optionalTrue(auto)}, nil
 }
 
+// CancelAutoMerge turns off a pull request's auto-complete.
+func (a azureDevOpsForge) CancelAutoMerge(ctx context.Context, r forgeRef) error {
+	ado, named, _, err := a.of(ctx, "forge/cancel-auto-merge", r)
+	if err != nil {
+		return err
+	}
+	return ado.CancelAutoMerge(ctx, named, r.Number)
+}
+
+func (a azureDevOpsForge) Ready(ctx context.Context, r forgeRef) error {
+	ado, named, _, err := a.of(ctx, "forge/ready", r)
+	if err != nil {
+		return err
+	}
+	return ado.MarkReady(ctx, named, r.Number)
+}
+
 func (a azureDevOpsForge) Approve(ctx context.Context, r forgeRef, sha string) (wire.ForgeDone, error) {
 	ado, named, _, err := a.of(ctx, "forge/approve", r)
 	if err != nil {
@@ -445,10 +471,12 @@ func (d *Daemon) forgeAzureDevOps(root string) forgeAzureDevOps {
 
 // azureDevOpsItemOf is an Azure Repos pull request in the one model, from folder.
 func azureDevOpsItemOf(i azuredevopsmcp.Item, folder string) wire.ForgeItem {
-	return wire.ForgeItem{Node: azureDevOpsNode(i.Repo, i.Number), Title: i.Title, State: i.State, URL: optional(i.URL),
+	out := wire.ForgeItem{Node: azureDevOpsNode(i.Repo, i.Number), Title: i.Title, State: i.State, URL: optional(i.URL),
 		Folder: optional(folder), Labels: forgeLabelsOf(i.Labels, nil), Author: optional(i.Author), AuthorAvatar: optional(i.AuthorAvatar), Assignees: []string{},
 		UpdatedAt: forgeDate(i.UpdatedAt), CreatedAt: forgeDateOptional(i.CreatedAt), ClosedAt: forgeDateOptional(i.ClosedAt), Comments: int64(i.Comments), Draft: new(i.Draft), AutoMerge: new(i.AutoMerge),
 		Checks: optional(i.Checks), Review: optional(i.Review), Mergeable: optional(i.Mergeable)}
+	withPullRefs(&out, i.HeadRef, i.BaseRef, i.MergedBy, i.MergeCommit)
+	return out
 }
 
 // azureDevOpsFailedBuilds are the Azure Pipelines builds of a pull request's failed checks, or

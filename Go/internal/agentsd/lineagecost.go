@@ -50,6 +50,12 @@ type costLedgerFile struct {
 	// the change it was last at.
 	Unsent map[string]int64 `json:"unsent,omitempty"`
 	Seq    int64            `json:"seq,omitempty"`
+	// Overruns is each epic's highest overrun threshold the person was told (#4529), by
+	// costKey: kept here, not on its node, as it is this machine's notice, not a figure.
+	Overruns map[string]int64 `json:"overruns,omitempty"`
+	// MilestonesLate is the due date each milestone's late notice told (#4654), by its repo and
+	// name in lower case.
+	MilestonesLate map[string]string `json:"milestonesLate,omitempty"`
 }
 
 type costLedgerBook struct {
@@ -59,6 +65,8 @@ type costLedgerBook struct {
 	workClosed bool
 	// multiplierMerges is the merges the Multiplier counts (#3903), nil until first asked.
 	multiplierMerges map[wire.LineageNode]lineage.Merge
+	// milestoneChecked is when spend last made each milestone's forecast (#4654), by its key.
+	milestoneChecked map[string]time.Time
 }
 
 func costKey(n wire.LineageNode) string { return n.Kind + "\t" + n.Ref }
@@ -93,8 +101,13 @@ func (d *Daemon) bankWork(a *wire.Agent, add wire.LineageCost) {
 			repo = d.sessionRepo(folder)
 		}
 		shares := lineage.Split(add, len(work))
-		// After the unlock: a merged PR's comment says the new total (#2352).
+		// After the unlock: a merged PR's comment says the new total (#2352), an epic past a
+		// multiple of its estimate gets its notice (#4529), and a milestone past its due date
+		// gets its own (#4654).
 		defer d.prCostChanged(work)
+		var told []overrunNotice
+		var milestones []milestoneOf
+		defer func() { d.postOverrunNotices(told); d.checkMilestones(milestones) }()
 		d.workMu.Lock()
 		defer d.workMu.Unlock()
 		for i, n := range work {
@@ -106,6 +119,8 @@ func (d *Daemon) bankWork(a *wire.Agent, add wire.LineageCost) {
 			})
 		}
 		d.costChangedLocked()
+		told = d.overrunsLocked(work)
+		milestones = d.milestonesDueLocked(work, at)
 	})
 }
 
@@ -368,6 +383,7 @@ func (d *Daemon) refreshCostResolvedLocked() {
 			if e.parent != nil {
 				keep(&c.Parent, e.parent.Ref)
 			}
+			keep(&c.Milestone, e.milestone)
 		}
 		if reflect.DeepEqual(before, c) {
 			continue

@@ -29,6 +29,8 @@ type jiraForge struct {
 
 func (jiraForge) Name() string { return "jira" }
 
+func (jiraForge) Images() forgeImageHost { return jiraImages{} }
+
 func (jiraForge) Caps() forgeCaps {
 	return forgeCaps{
 		Issues:      true,
@@ -37,10 +39,16 @@ func (jiraForge) Caps() forgeCaps {
 		StateReason: true,
 		CreatedAt:   true, ClosedAt: true,
 		CommentCount: "exact",
-		Plan:         true,
+		// Data Center's search total; Jira Cloud's approximate count.
+		Total: true,
+		Plan:  true,
 		Reasons: map[string]string{
+			actionAssign:   "the app does not set a Jira issue's assignee yet",
+			actionReleases: "Jira has no releases here: its fix versions are not read yet",
 			actionMerge:     jiraNoPRs,
 			actionAutoMerge: jiraNoPRs,
+			actionCancelAuto: jiraNoPRs,
+			actionReady: jiraNoPRs,
 			actionApprove:   jiraNoPRs,
 			actionRerun:     jiraNoPRs,
 			actionLog:       jiraNoPRs,
@@ -129,7 +137,7 @@ func (j jiraForge) List(ctx context.Context, scope forgeScope, f forgeFilter, cu
 		}
 		p.items = append(p.items, jiraItemOf(i, folder))
 	}
-	p.cursors, p.next = page.Cursors, page.Next
+	p.cursors, p.next, p.total = page.Cursors, page.Next, page.Total
 	return p, err
 }
 

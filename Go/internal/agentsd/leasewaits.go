@@ -111,7 +111,7 @@ func (d *Daemon) reconcileLineWaits() {
 		held  bool
 	}
 	var orphans []orphan
-	for _, a := range d.Store.Agents() {
+	for _, a := range d.Store.LiveAgents() {
 		name, ok := lineWaitResource(a.EventWait, a.ID)
 		if !ok || a.EventWait.Ending != nil || a.State == wire.AgentStateArchived {
 			continue

@@ -171,6 +171,28 @@ enum Canned {
                   title: "The folder lead that came back out", state: .archived,
                   createdAt: ago(2_200), lastActivityAt: ago(2_000),
                   archivedReason: .byUser),
+            // More of the archive, on other days, for the Archived Sessions page (#4448).
+            {
+                var agent = Agent(id: UUID(), runtimeID: "claude", cwd: agentsFolder,
+                                  title: "Messages page, read only", state: .archived,
+                                  createdAt: ago(1_900), lastActivityAt: ago(1_600), archivedReason: .byUser)
+                agent.archivedAt = ago(1_500)
+                return agent
+            }(),
+            {
+                var agent = Agent(id: UUID(), runtimeID: "codex", cwd: agentsFolder,
+                                  title: "Forge interface: move Azure Repos over", state: .archived,
+                                  createdAt: ago(3_400), lastActivityAt: ago(3_000), archivedReason: .byUser)
+                agent.archivedAt = ago(2_900)
+                return agent
+            }(),
+            {
+                var agent = Agent(id: UUID(), runtimeID: "claude", cwd: agentsFolder,
+                                  title: "Why does the walk hang on the lock?", state: .archived,
+                                  createdAt: ago(5_000), lastActivityAt: ago(4_700), archivedReason: .byUser)
+                agent.archivedAt = ago(4_600)
+                return agent
+            }(),
             // Waiting on an event (042): the wait card at the end of its chat, with Show in
             // Events (#2083).
             Agent(id: UUID(), runtimeID: "claude", cwd: agentsFolder,
@@ -188,6 +210,16 @@ enum Canned {
                 return agent
             }(),
         ]
+    }
+
+    /// The folder's archived workflows, for the Archived Workflows page (#4448).
+    static func workflows(in folder: URL?) -> [WorkflowSummary] {
+        guard folder.map(Folder.standardize) ?? Folder.standardize(agentsFolder) == Folder.standardize(agentsFolder) else { return [] }
+        return [("nightly-dead-code", "Nightly dead-code review"), ("release-notes", "Release notes draft"),
+                ("weekly-competitors", "Weekly competitor check")].map { id, name in
+            WorkflowSummary(workflow: Workflow(workflowID: id, folder: agentsFolder, name: name, archived: true),
+                            isArchived: true)
+        }
     }
 
     /// The daemon works these out from the agents, so the fake does too rather than

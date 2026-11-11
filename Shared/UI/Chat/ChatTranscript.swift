@@ -481,7 +481,7 @@ struct ChatTranscript: View {
             }
             VStack(alignment: .leading, spacing: 0) {
                 if let quietSince {
-                    QuietLine(since: quietSince)
+                    QuietLine(since: quietSince, startedAt: agent.createdAt)
                         .inColumn(column)
                 }
                 Color.clear.frame(height: 1).id(bottom)

@@ -52,6 +52,8 @@ type resolvedEntry struct {
 	at       time.Time
 	// parent is an issue's epic, as the forge's plan last said it (#3562); a lookup keeps it.
 	parent *wire.LineageNode
+	// milestone is an issue's milestone, as a forge list last said it (#4620); a lookup keeps it.
+	milestone string
 }
 
 type lineageResolveBook struct {
@@ -208,7 +210,7 @@ func (d *Daemon) resolveNode(ctx context.Context, n wire.LineageNode) {
 	if !cached && len(d.resolveCache) >= resolvedCached {
 		d.dropOldestResolvedLocked()
 	}
-	d.resolveCache[n] = resolvedEntry{resolved: r, ok: err == nil, at: nowFunc(), parent: had.parent}
+	d.resolveCache[n] = resolvedEntry{resolved: r, ok: err == nil, at: nowFunc(), parent: had.parent, milestone: had.milestone}
 }
 
 // dropOldestResolvedLocked makes room for one more cached node.

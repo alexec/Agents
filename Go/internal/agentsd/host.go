@@ -324,12 +324,17 @@ func folderBytes(folder string) int64 {
 
 const gigabyte = 1_000_000_000
 
-type diskThresholds struct{ lowGB, lowPercent, criticalGB float64 }
+// diskThresholds are DiskThresholds: each line a percent of the volume, so one setting
+// fits a 256 GB laptop and a 4 TB server alike.
+type diskThresholds struct{ lowPercent, criticalPercent float64 }
 
-func (t diskThresholds) lowLine(total int64) int64 {
-	return max(int64(t.lowGB*gigabyte), int64(float64(total)/100*t.lowPercent))
+// defaultDiskThresholds is DiskThresholds' defaults: low below 20%, critical below 1%.
+var defaultDiskThresholds = diskThresholds{20, 1}
+
+func (t diskThresholds) lowLine(total int64) int64 { return int64(float64(total) / 100 * t.lowPercent) }
+func (t diskThresholds) criticalLine(total int64) int64 {
+	return int64(float64(total) / 100 * t.criticalPercent)
 }
-func (t diskThresholds) criticalLine() int64 { return int64(t.criticalGB * gigabyte) }
 
 // folderThresholds is a folder's .agents/folder.json "diskSpace", where it says one.
 func folderThresholds(folder string) (diskThresholds, bool) {
@@ -342,23 +347,19 @@ func folderThresholds(folder string) (diskThresholds, bool) {
 	}
 	var p struct {
 		DiskSpace *struct {
-			LowGB      *float64 `json:"lowGB"`
-			LowPercent *float64 `json:"lowPercent"`
-			CriticalGB *float64 `json:"criticalGB"`
+			LowPercent      *float64 `json:"lowPercent"`
+			CriticalPercent *float64 `json:"criticalPercent"`
 		} `json:"diskSpace"`
 	}
 	if json.Unmarshal(b, &p) != nil || p.DiskSpace == nil {
 		return diskThresholds{}, false
 	}
-	t := diskThresholds{20, 5, 2}
-	if p.DiskSpace.LowGB != nil {
-		t.lowGB = *p.DiskSpace.LowGB
-	}
+	t := defaultDiskThresholds
 	if p.DiskSpace.LowPercent != nil {
 		t.lowPercent = *p.DiskSpace.LowPercent
 	}
-	if p.DiskSpace.CriticalGB != nil {
-		t.criticalGB = *p.DiskSpace.CriticalGB
+	if p.DiskSpace.CriticalPercent != nil {
+		t.criticalPercent = *p.DiskSpace.CriticalPercent
 	}
 	return t, true
 }
@@ -416,7 +417,7 @@ func (d *Daemon) checkDisk() {
 		m := mounts[key]
 		if m == nil {
 			m = &mount{reading: wire.DiskReading{Volume: volume, Mount: key,
-				FreeBytes: int64(st.Bavail) * int64(st.Bsize), TotalBytes: int64(st.Blocks) * int64(st.Bsize)}, t: diskThresholds{20, 5, 2}}
+				FreeBytes: int64(st.Bavail) * int64(st.Bsize), TotalBytes: int64(st.Blocks) * int64(st.Bsize)}, t: defaultDiskThresholds}
 			mounts[key] = m
 		}
 		if has {
@@ -424,7 +425,7 @@ func (d *Daemon) checkDisk() {
 			if !m.set {
 				m.t, m.set = t, true
 			} else {
-				m.t = diskThresholds{max(m.t.lowGB, t.lowGB), max(m.t.lowPercent, t.lowPercent), max(m.t.criticalGB, t.criticalGB)}
+				m.t = diskThresholds{max(m.t.lowPercent, t.lowPercent), max(m.t.criticalPercent, t.criticalPercent)}
 			}
 		}
 	}
@@ -460,7 +461,7 @@ func (d *Daemon) checkDisk() {
 	sort.Strings(keys)
 	for _, key := range keys {
 		m := mounts[key]
-		low, critical := m.t.lowLine(m.reading.TotalBytes), m.t.criticalLine()
+		low, critical := m.t.lowLine(m.reading.TotalBytes), m.t.criticalLine(m.reading.TotalBytes)
 		was := d.diskLevels[key]
 		level := nextDiskLevel(was, m.reading.FreeBytes, low, critical)
 		d.diskLevels[key] = level

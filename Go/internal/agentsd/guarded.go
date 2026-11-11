@@ -8,7 +8,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 
@@ -268,6 +268,10 @@ func (d *Daemon) guardedChanges(folder string) []wire.GuardedChange {
 	return append(d.guardedFileChanges(folder), d.waitingWorkflowChanges(folder)...)
 }
 
+// byPath orders guarded changes by path. slices.SortFunc, not sort.Slice: needs sorts each
+// folder's on every change, and sort.Slice allocates even for none (#4510).
+func byPath(a, b wire.GuardedChange) int { return strings.Compare(a.Path, b.Path) }
+
 // guardedFileChanges is the guarded files' changes waiting in a folder, by path.
 func (d *Daemon) guardedFileChanges(folder string) []wire.GuardedChange {
 	d.guardedMu.Lock()
@@ -291,7 +295,7 @@ func (d *Daemon) guardedFileChanges(folder string) []wire.GuardedChange {
 		}
 		out = append(out, c)
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Path < out[j].Path })
+	slices.SortFunc(out, byPath)
 	return out
 }
 

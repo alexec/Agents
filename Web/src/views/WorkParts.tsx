@@ -22,8 +22,10 @@ const glyphPaths: Record<StateGlyph, ComponentChildren> = {
 };
 
 /** One glyph in the state's colour (section 1), with its words for a screen reader; nothing for a release. */
-export function StateIcon({ kind, state, draft, size = 16 }: { kind: string; state: string; draft?: boolean | undefined; size?: number }) {
-  const glyph = stateGlyph(kind, state, draft);
+export function StateIcon({ kind, state, draft, stateReason, size = 16 }: {
+  kind: string; state: string; draft?: boolean | undefined; stateReason?: string | undefined; size?: number;
+}) {
+  const glyph = stateGlyph(kind, state, draft, stateReason === "not_planned");
   if (!glyph) return null;
   return (
     <svg class={`work-state-icon ${glyph}`} width={size} height={size} viewBox="0 0 16 16" role="img" aria-label={stateGlyphWords[glyph]}>
@@ -53,22 +55,55 @@ export function LabelChip({ label, pick }: { label: ForgeLabel; pick?: ((name: s
   );
 }
 
-/** A person with no image yet (section 6): the login's first letter on a colour picked from the login. */
-export function Avatar({ login, size = 20 }: { login: string; size?: number }) {
+/** Reads a forge's picture by its URL (forge/image on the machine that read the item, #4363), as a URL the page can draw. */
+export type ReadPicture = (url: string) => Promise<string | null>;
+
+/** The pictures read so far, by URL, so a person's avatar is read once for every row and page, and a picture that did
+ * not load is not asked for again. At most `mostPictures` are kept. */
+const pictures = new Map<string, Promise<string | null>>();
+const mostPictures = 500;
+
+/** `url`'s picture as an object URL, read with `read` the first time; null when it did not load. */
+export function picture(url: string, read: (url: string) => Promise<{ bytes: Uint8Array; type: string }>): Promise<string | null> {
+  const had = pictures.get(url);
+  if (had) return had;
+  if (pictures.size >= mostPictures) {
+    for (const p of pictures.values()) void p.then((u) => { if (u) URL.revokeObjectURL(u); });
+    pictures.clear();
+  }
+  const got = read(url).then((p) => URL.createObjectURL(new Blob([p.bytes as BlobPart], { type: p.type })), () => null);
+  pictures.set(url, got);
+  return got;
+}
+
+/** A person (section 6): the forge's picture where it gives one and `read` can read it (#4363); else, or until it loads,
+ * the login's first letter on a colour picked from the login. */
+export function Avatar({ login, size = 20, url, read }: { login: string; size?: number; url?: string | undefined; read?: ReadPicture | undefined }) {
+  const src = useSignal<string | null>(null);
+  useEffect(() => {
+    src.value = null;
+    if (!url || !read) return;
+    let live = true;
+    void read(url).then((u) => { if (live) src.value = u; });
+    return () => { live = false; };
+  }, [url, read]);
+  const box = { width: `${size}px`, height: `${size}px` };
+  if (src.value) return <img class="work-avatar" src={src.value} alt="" title={login} aria-hidden="true" style={box} />;
   return (
     <span class="work-avatar" title={login} aria-hidden="true"
-      style={{ "--hue": avatarHue(login), width: `${size}px`, height: `${size}px`, fontSize: `${Math.round(size * 0.5)}px` }}>
+      style={{ "--hue": avatarHue(login), ...box, fontSize: `${Math.round(size * 0.5)}px` }}>
       {login.replace(/^@/, "").charAt(0).toUpperCase()}
     </span>
   );
 }
 
-/** Up to three assignees, overlapped, then "+2" (section 2). */
-export function Avatars({ logins }: { logins: readonly string[] }) {
+/** Up to three assignees, overlapped, then "+2" (section 2). `avatars` are the pictures the forge gives, by login (the
+ * author's, #4363): the rest are initials. */
+export function Avatars({ logins, avatars = {}, read }: { logins: readonly string[]; avatars?: Record<string, string>; read?: ReadPicture | undefined }) {
   if (logins.length === 0) return null;
   return (
     <span class="work-avatars" aria-label={`Assigned to ${logins.join(", ")}`}>
-      {logins.slice(0, 3).map((l) => <Avatar key={l} login={l} />)}
+      {logins.slice(0, 3).map((l) => <Avatar key={l} login={l} url={avatars[l]} read={read} />)}
       {logins.length > 3 && <span class="more">+{logins.length - 3}</span>}
     </span>
   );
@@ -150,11 +185,11 @@ export function RefreshButton({ busy, onClick }: { busy: boolean; onClick: () =>
   );
 }
 
-/** A first read (section 7): six placeholder rows, a circle and two bars each, with a slow shimmer. */
-export function PlaceholderRows() {
+/** A first read (section 7): six placeholder rows (or `count`), a circle and two bars each, with a slow shimmer. */
+export function PlaceholderRows({ count = 6 }: { count?: number }) {
   return (
     <ul class="work-rows work-item-rows work-placeholder" aria-busy="true" aria-label="Loading">
-      {[62, 48, 70, 40, 56, 66].map((w, i) => (
+      {[62, 48, 70, 40, 56, 66].slice(0, count).map((w, i) => (
         <li key={i} aria-hidden="true"><span class="work-row work-item-row">
           <span class="dot" /><span class="work-row-main"><span class="bar" style={{ width: `${w}%` }} /><span class="bar short" style={{ width: `${w / 2}%` }} /></span>
         </span></li>

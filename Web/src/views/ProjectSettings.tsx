@@ -249,13 +249,13 @@ export function FolderSettingsModal({ store, host, folder, summary, down, close,
   const { problem, busy, save } = useSaving();
   const off = down || busy.value;
   const disk = summary.folder.diskSpace;
-  const low = disk?.lowGB ?? diskDefaults.lowGB;
-  const critical = disk?.criticalGB ?? diskDefaults.criticalGB;
-  const line = (key: "lowGB" | "criticalGB", current: number, standard: number, choices: readonly number[], label: string) => (
+  const low = disk?.lowPercent ?? diskDefaults.lowPercent;
+  const critical = disk?.criticalPercent ?? diskDefaults.criticalPercent;
+  const line = (key: "lowPercent" | "criticalPercent", current: number, standard: number, choices: readonly number[], label: string) => (
     <select aria-label={label} disabled={off} value={String(current)}
       onChange={(e) => void save(() => store.setFolderDiskSpace(host, folder,
         withDiskLine(disk, key, Number((e.currentTarget as HTMLSelectElement).value), standard)))}>
-      {diskChoices(choices, current).map((n) => <option key={n} value={String(n)}>{n === standard ? `${n} GB (default)` : `${n} GB`}</option>)}
+      {diskChoices(choices, current).map((n) => <option key={n} value={String(n)}>{n === standard ? `${n}% (default)` : `${n}%`}</option>)}
     </select>
   );
   const general = <dl class="settings-grid">
@@ -270,13 +270,13 @@ export function FolderSettingsModal({ store, host, folder, summary, down, close,
     </dd>
   </dl>;
   const diskSpace = <dl class="settings-grid">
-    <dt>Low disk space</dt><dd>{line("lowGB", low, diskDefaults.lowGB, diskDefaults.lowChoices, "Low disk space")}</dd>
+    <dt>Low disk space</dt><dd>{line("lowPercent", low, diskDefaults.lowPercent, diskDefaults.lowChoices, "Low disk space")}</dd>
     <dt>Critical disk space</dt>
     <dd>
-      {line("criticalGB", critical, diskDefaults.criticalGB, diskDefaults.criticalChoices, "Critical disk space")}
-      <p class="sheet-note">When free space on the disk holding this folder or its worktrees falls below these, the machine's
-        row and page say so and machine.disk_low is raised for agents and workflows. Low is also below {disk?.lowPercent ?? diskDefaults.lowPercent}%
-        of the disk. Saved in .agents/folder.json.</p>
+      {line("criticalPercent", critical, diskDefaults.criticalPercent, diskDefaults.criticalChoices, "Critical disk space")}
+      <p class="sheet-note">When free space on the disk holding this folder or its worktrees falls below these, as a percent
+        of the disk, the machine's row and page say so and machine.disk_low is raised for agents and workflows. Saved in
+        .agents/folder.json.</p>
     </dd>
   </dl>;
   return (

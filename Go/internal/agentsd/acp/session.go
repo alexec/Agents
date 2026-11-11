@@ -1088,6 +1088,12 @@ func (s *Session) CanList() bool   { return s.Init.AgentCapabilities.SessionCapa
 func (s *Session) CanDelete() bool { return s.Init.AgentCapabilities.SessionCapabilities.Delete != nil }
 func (s *Session) CanLoad() bool   { return s.Init.AgentCapabilities.LoadSession }
 
+// CanContinue is whether a new process of this runtime can continue one of its
+// conversations: with session/resume or session/load (continueSession).
+func (s *Session) CanContinue() bool {
+	return s.Init.AgentCapabilities.SessionCapabilities.Resume != nil || s.CanLoad()
+}
+
 // ListSessions is session/list for a folder, every page of it (ACPSession.listSessions).
 func (s *Session) ListSessions(ctx context.Context, cwd string) ([]sdk.SessionInfo, error) {
 	var out []sdk.SessionInfo

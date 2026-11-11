@@ -24,17 +24,22 @@ type githubForge struct {
 
 func (githubForge) Name() string { return "github" }
 
+func (githubForge) Images() forgeImageHost { return githubImages{} }
+
 func (githubForge) Caps() forgeCaps {
 	return forgeCaps{
 		Issues: true, PRs: true,
-		Issue: forgeActions{Comment: true, Label: true, Close: true, Reopen: true},
-		PR: forgeActions{Comment: true, Label: true, Close: true, Reopen: true, Merge: true, AutoMerge: true, Approve: true,
-			Rerun: true, Log: true, Diff: true},
+		Issue: forgeActions{Comment: true, Label: true, Assign: true, Close: true, Reopen: true},
+		PR: forgeActions{Comment: true, Label: true, Assign: true, Close: true, Reopen: true, Merge: true, AutoMerge: true, Approve: true,
+			Rerun: true, Log: true, Diff: true, CancelAutoMerge: true, Ready: true},
 		LabelColors: true,
 		Avatars:     true,
 		StateReason: true,
 		CreatedAt:   true, ClosedAt: true, Children: true, LinkedPulls: true, Events: true,
+		Branches: true, MergedBy: true, MergeCommit: true, Size: true, Reviewers: true, Closes: true, CheckTimes: true,
 		CommentCount: "exact",
+		Releases:     true,
+		Total:        true,
 		Plan:         true, BlockedBy: true, AddChild: true,
 		Reasons: map[string]string{
 			actionTransition: "only a Jira issue or an Azure Boards work item moves by a transition",
@@ -99,7 +104,7 @@ func (g githubForge) List(ctx context.Context, scope forgeScope, f forgeFilter, 
 	for _, i := range page.Items {
 		p.items = append(p.items, forgeItemOf(i, s.folderOf[strings.ToLower(i.Repo)]))
 	}
-	p.cursors, p.next = page.Cursors, page.Next
+	p.cursors, p.next, p.total = page.Cursors, page.Next, page.Total
 	return p, err
 }
 
@@ -134,9 +139,16 @@ func (g githubForge) Item(ctx context.Context, r forgeRef, cursor string) (wire.
 	if p.PR {
 		out.Checks = []wire.ForgeCheck{}
 		for _, c := range p.CheckRuns {
-			out.Checks = append(out.Checks, wire.ForgeCheck{Name: c.Name, State: c.State, URL: optional(c.URL)})
+			out.Checks = append(out.Checks, wire.ForgeCheck{Name: c.Name, State: c.State, URL: optional(c.URL),
+				StartedAt: forgeDateOptional(c.StartedAt), FinishedAt: forgeDateOptional(c.FinishedAt)})
 		}
 		out.ReviewThreads, out.FilesChanged = new(int64(p.ReviewThreads)), new(int64(p.FilesChanged))
+		out.Additions, out.Deletions, out.Commits = new(int64(p.Additions)), new(int64(p.Deletions)), new(int64(p.Commits))
+		out.Closes = githubLinkedOf(p.Closes)
+		out.Reviewers = []wire.ForgeReviewer{}
+		for _, r := range p.Reviewers {
+			out.Reviewers = append(out.Reviewers, wire.ForgeReviewer{Login: r.Login, Avatar: optional(r.Avatar), State: wire.ForgeReviewerState(r.State)})
+		}
 		out.Head, out.MergeMethods = optional(p.Head), mergeMethodsOf(p.MergeMethods)
 	} else {
 		out.Start = githubStart(out.Item)
@@ -318,6 +330,22 @@ func (g githubForge) SetLabels(ctx context.Context, r forgeRef, add, remove []st
 	return gh.SetLabels(ctx, r.Repo, r.Number, add, remove)
 }
 
+func (g githubForge) SetAssignees(ctx context.Context, r forgeRef, add, remove []string) error {
+	gh, err := g.d.forgeGitHub()
+	if err != nil {
+		return err
+	}
+	if len(add) > 0 {
+		if err := gh.Assign(ctx, r.Repo, r.Number, add); err != nil {
+			return err
+		}
+	}
+	if len(remove) > 0 {
+		return gh.Unassign(ctx, r.Repo, r.Number, remove)
+	}
+	return nil
+}
+
 func (g githubForge) SetState(ctx context.Context, r forgeRef, closed bool, transition string) error {
 	if transition != "" {
 		return cannot(actionTransition)
@@ -354,6 +382,28 @@ func (g githubForge) Merge(ctx context.Context, r forgeRef, sha, method string, 
 	}
 	url, _ := out["url"].(string)
 	return wire.ForgeDone{URL: optional(url), Auto: optionalTrue(auto)}, nil
+}
+
+func (g githubForge) CancelAutoMerge(ctx context.Context, r forgeRef) error {
+	if !r.pr() {
+		return cannot(actionCancelAuto)
+	}
+	gh, err := g.d.forgeGitHub()
+	if err != nil {
+		return err
+	}
+	return gh.DisableAutoMerge(ctx, r.Repo, r.Number)
+}
+
+func (g githubForge) Ready(ctx context.Context, r forgeRef) error {
+	if !r.pr() {
+		return cannot(actionReady)
+	}
+	gh, err := g.d.forgeGitHub()
+	if err != nil {
+		return err
+	}
+	return gh.MarkReady(ctx, r.Repo, r.Number)
 }
 
 func (g githubForge) Approve(ctx context.Context, r forgeRef, sha string) (wire.ForgeDone, error) {

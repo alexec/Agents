@@ -62,6 +62,100 @@ struct WorkLookTests {
         #expect(!WorkLook.rowLine(row(), compact: false, now: now).contains(WorkList.noAgentYet))
     }
 
+    @Test func rowLineSaysTheOpenedAndClosedAges() {
+        var open = row()
+        open.created = now.addingTimeInterval(-3 * 86_400)
+        #expect(WorkLook.rowLine(open, compact: false, now: now) == "#4328 · opened 3 d ago by alexec")
+        #expect(WorkLook.rowLine(open, compact: true, now: now) == "#4328 · 3 d · alexec")
+        var closed = row(state: "closed")
+        closed.closed = now.addingTimeInterval(-5 * 86_400)
+        #expect(WorkLook.rowLine(closed, compact: false, now: now) == "#4328 · closed 5 d ago")
+        closed.stateReason = "not_planned"
+        #expect(WorkLook.rowLine(closed, compact: false, now: now) == "#4328 · closed 5 d ago · not planned")
+        #expect(WorkLook.rowLine(closed, compact: true, now: now) == "#4328 · 5 d · alexec · not planned")
+        // A forge that gives no close time says the last update's, with its author.
+        #expect(WorkLook.rowLine(row(state: "closed"), compact: false, now: now) == "#4328 · updated 2 h ago by alexec")
+    }
+
+    @Test func rowTakesTheNewFieldsFromItsItem() {
+        let item = DaemonAPI.ForgeItem(node: Node(kind: "issue", ref: "github:alexec/Agents#7"), title: "Fix", state: "closed",
+                                       author: "sam", updatedAt: now, authorAvatar: "https://avatars/sam",
+                                       stateReason: "not_planned", createdAt: now.addingTimeInterval(-60), closedAt: now)
+        let r = WorkList.Row(item, on: .mac)
+        #expect(r.stateReason == "not_planned")
+        #expect(r.avatar == "https://avatars/sam")
+        #expect(r.created == now.addingTimeInterval(-60))
+        #expect(r.closed == now)
+    }
+
+    @Test func issueStateLine() {
+        let created = now.addingTimeInterval(-3 * 86_400)
+        let closed = now.addingTimeInterval(-86_400)
+        #expect(WorkLook.issueStateWords(author: "sam", state: "closed", updated: now, comments: 4, narrow: false,
+                                         created: created, closed: closed, now: now)
+            == "sam opened this 3 d ago · closed 1 d ago · 4 comments")
+        #expect(WorkLook.issueStateWords(author: "sam", state: "open", updated: now, comments: 1, narrow: true,
+                                         created: created, now: now) == "sam · 3 d · 1 comment")
+        #expect(WorkLook.issueStateWords(author: "sam", state: "open", updated: now.addingTimeInterval(-7200), comments: 0,
+                                         narrow: false, now: now) == "sam opened this · updated 2 h ago")
+    }
+
+    @Test func pullStateLineWithItsTimes() {
+        let at = now.addingTimeInterval(-7200)
+        #expect(WorkLook.pullStateWords(author: "sam", state: "open", updated: now, comments: 0, narrow: false, created: at, now: now)
+            == "sam opened this pull request 2 h ago")
+        #expect(WorkLook.pullStateWords(author: "sam", state: "merged", updated: now, comments: 2, narrow: false, closed: at, now: now)
+            == "sam’s pull request was merged 2 h ago · 2 comments")
+        #expect(WorkLook.pullStateWords(author: "sam", state: "merged", updated: now, comments: 0, narrow: true, closed: at, now: now)
+            == "sam · 2 h")
+    }
+
+    @Test func eventWords() {
+        typealias Event = DaemonAPI.ForgeEvent
+        #expect(WorkLook.eventWords(Event(kind: "labeled", actor: "sam", at: now, label: .init(name: "bug"))) == "sam added the label bug")
+        #expect(WorkLook.eventWords(Event(kind: "unlabeled", actor: "sam", at: now, label: .init(name: "bug"))) == "sam removed the label bug")
+        #expect(WorkLook.eventWords(Event(kind: "assigned", actor: "sam", at: now, assignee: "sam")) == "sam self-assigned this")
+        #expect(WorkLook.eventWords(Event(kind: "assigned", actor: "sam", at: now, assignee: "kim")) == "sam assigned kim")
+        #expect(WorkLook.eventWords(Event(kind: "closed", actor: "sam", at: now,
+                                          source: Node(kind: "pr", ref: "github:alexec/Agents#9"))) == "sam closed this in #9")
+        #expect(WorkLook.eventWords(Event(kind: "reopened", at: now)) == "Someone reopened this")
+        #expect(WorkLook.eventWords(Event(kind: "referenced", actor: "sam", at: now,
+                                          source: Node(kind: "issue", ref: "github:alexec/Agents#3"))) == "sam mentioned this in #3")
+        // A kind this client does not know, or one with nothing to say, draws nothing.
+        #expect(WorkLook.eventWords(Event(kind: "milestoned", actor: "sam", at: now)) == nil)
+        #expect(WorkLook.eventWords(Event(kind: "labeled", actor: "sam", at: now)) == nil)
+    }
+
+    @Test func timelineInterleavesCommentsAndEvents() {
+        let c1 = DaemonAPI.ForgeComment(author: "a", body: "one", at: now.addingTimeInterval(-300))
+        let c2 = DaemonAPI.ForgeComment(author: "b", body: "two", at: now.addingTimeInterval(-100))
+        let early = DaemonAPI.ForgeEvent(kind: "labeled", actor: "a", at: now.addingTimeInterval(-400), label: .init(name: "bug"))
+        let mid = DaemonAPI.ForgeEvent(kind: "assigned", actor: "a", at: now.addingTimeInterval(-200), assignee: "b")
+        let odd = DaemonAPI.ForgeEvent(kind: "pinned", actor: "a", at: now.addingTimeInterval(-150))
+        #expect(WorkLook.timeline(comments: [c1, c2], events: [early, mid, odd], older: false)
+            == [.event(early), .comment(c1), .event(mid), .comment(c2)])
+        // While older comments are to read, an event before the first comment read waits with them.
+        #expect(WorkLook.timeline(comments: [c1, c2], events: [early, mid], older: true) == [.comment(c1), .event(mid), .comment(c2)])
+        #expect(WorkLook.timeline(comments: [c1], events: nil, older: false) == [.comment(c1)])
+        #expect(WorkLook.eventsSayClose([DaemonAPI.ForgeEvent(kind: "closed", at: now)]))
+        #expect(!WorkLook.eventsSayClose(nil))
+    }
+
+    @Test func listTotal() {
+        #expect(WorkLook.listTotal([128], filter: .init()) == 128)
+        // Two machines read the same repos: their counts overlap.
+        #expect(WorkLook.listTotal([128, 128], filter: .init()) == nil)
+        #expect(WorkLook.listTotal([nil], filter: .init()) == nil)
+        var f = WorkList.Filter()
+        f.board = "https://github.com/orgs/acme/projects/1"
+        #expect(WorkLook.listTotal([12], filter: f) == 12)
+        f.label = "bug"
+        #expect(WorkLook.listTotal([12], filter: f) == nil)
+        #expect(WorkLook.endWords(.issue, shown: 50, more: true, total: 128) == "128 issues")
+        #expect(WorkLook.endWords(.issue, shown: 50, more: true) == "50+ issues")
+        #expect(WorkLook.loadingMore(shown: 50, total: 128) == "Loading more… · 50 of 128 shown")
+    }
+
     @Test func rowLineSaysTheTrackersStatus() {
         #expect(WorkLook.rowLine(row(status: "In Progress"), compact: true, now: now) == "#4328 · In Progress · 2 h · alexec")
     }

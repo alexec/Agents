@@ -69,8 +69,19 @@ func (d *Daemon) readyThere(me *wire.Agent, machine, folder string) ([]string, e
 
 // sendThere sends b to folder on machine, leaving out the commits it has; me asks.
 func (d *Daemon) sendThere(me *wire.Agent, machine, folder string, b sendingBranch) error {
-	pack, err := d.sendPack(wire.SendPackRequest{Folder: store.PathURL(b.path), Branches: []string{b.branch}, LeavingOut: b.heads, IncludeChanges: true})
-	for _, f := range []*wire.SendFile{pack.Bundle, pack.Patch} {
+	_, err := d.packThere(me, machine,
+		wire.SendPackRequest{Folder: store.PathURL(b.path), Branches: []string{b.branch}, LeavingOut: b.heads, IncludeChanges: true},
+		wire.ReceiveRequest{Folder: folder, Checkout: b.branch, Origin: b.origin}, nil)
+	return err
+}
+
+// packThere makes what pack asks for, sends it to machine, and has receive make or bring up
+// to date the folder there with it, which it answers with; me asks. sent, when not nil,
+// hears the bytes sent and the total after each part (#4613).
+func (d *Daemon) packThere(me *wire.Agent, machine string, pack wire.SendPackRequest, receive wire.ReceiveRequest,
+	sent func(done, total int64)) (wire.FolderSummary, error) {
+	packed, err := d.sendPack(pack)
+	for _, f := range []*wire.SendFile{packed.Bundle, packed.Patch} {
 		if f != nil {
 			defer func(id wire.UUID) {
 				if file, err := d.outgoingFile(id); err == nil {
@@ -80,28 +91,49 @@ func (d *Daemon) sendThere(me *wire.Agent, machine, folder string, b sendingBran
 		}
 	}
 	if err != nil {
-		return err
+		return wire.FolderSummary{}, err
 	}
-	receive := wire.ReceiveRequest{Folder: folder, Branches: pack.Commits, Checkout: b.branch, Origin: b.origin}
-	if pack.Bundle != nil {
-		id, err := d.uploadThere(me, machine, pack.Bundle.ID)
+	var total, done int64
+	for _, f := range []*wire.SendFile{packed.Bundle, packed.Patch} {
+		if f != nil {
+			total += f.Size
+		}
+	}
+	part := func(n int64) {
+		done += n
+		if sent != nil {
+			sent(done, total)
+		}
+	}
+	part(0)
+	receive.Branches = packed.Commits
+	if packed.Bundle != nil {
+		id, err := d.uploadThere(me, machine, packed.Bundle.ID, part)
 		if err != nil {
-			return err
+			return wire.FolderSummary{}, err
 		}
 		receive.Bundle = &id
 	}
-	if pack.Patch != nil {
-		id, err := d.uploadThere(me, machine, pack.Patch.ID)
+	if packed.Patch != nil {
+		id, err := d.uploadThere(me, machine, packed.Patch.ID, part)
 		if err != nil {
-			return err
+			return wire.FolderSummary{}, err
 		}
 		receive.Patch = &id
 	}
-	return d.askSend(me, wire.MachineFolderSend{Host: machine, Receive: &receive}, nil)
+	var made wire.MachineFolderSent
+	if err := d.askSend(me, wire.MachineFolderSend{Host: machine, Receive: &receive}, &made); err != nil {
+		return wire.FolderSummary{}, err
+	}
+	if made.Folder == nil {
+		return wire.FolderSummary{}, nil
+	}
+	return *made.Folder, nil
 }
 
 // uploadThere sends the outgoing file id to machine in parts, and is the upload's id there.
-func (d *Daemon) uploadThere(me *wire.Agent, machine string, id wire.UUID) (wire.UUID, error) {
+// sent, when not nil, hears the size of each part once it is there.
+func (d *Daemon) uploadThere(me *wire.Agent, machine string, id wire.UUID, sent func(int64)) (wire.UUID, error) {
 	file, err := d.outgoingFile(id)
 	if err != nil {
 		return "", err
@@ -121,6 +153,9 @@ func (d *Daemon) uploadThere(me *wire.Agent, machine string, id wire.UUID) (wire
 				return "", err
 			}
 			offset += int64(n)
+			if sent != nil {
+				sent(int64(n))
+			}
 		}
 		if err == io.EOF || err == io.ErrUnexpectedEOF {
 			return upload, nil

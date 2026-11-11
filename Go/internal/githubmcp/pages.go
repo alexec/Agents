@@ -146,6 +146,9 @@ type checkItem struct {
 	Context    string `json:"context"`
 	State      string `json:"state"`
 	TargetURL  string `json:"targetUrl"`
+	// A check run's times (#4409), "" before it starts or ends.
+	StartedAt   string `json:"startedAt"`
+	CompletedAt string `json:"completedAt"`
 }
 
 var runInURL = regexp.MustCompile(`/actions/runs/([0-9]+)`)
@@ -276,7 +279,7 @@ func (a *gqlActor) isBot() bool { return a != nil && a.Typename == "Bot" }
 
 // rollupFields are a PR's last commit's checks.
 const rollupFields = `commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes {
-  __typename ... on CheckRun { name status conclusion detailsUrl } ... on StatusContext { context state targetUrl } } } } } } }`
+  __typename ... on CheckRun { name status conclusion detailsUrl startedAt completedAt } ... on StatusContext { context state targetUrl } } } } } } }`
 
 // labelFields are a PR's labels, with their colours (#2956).
 const labelFields = `labels(first: 50) { nodes { name color } }`

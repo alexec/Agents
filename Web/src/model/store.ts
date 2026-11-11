@@ -1,6 +1,8 @@
 // What the page holds and what each notification means: AgentsModel (Client/AgentsModel.swift),
 // ported by hand for the notifications the web remote hears and held to Fixtures/web/reducer
 // (research R7). Nothing here decides anything; the hosts do.
+import { pageSize } from "./archivedPage";
+import { deferParams, isDeferred, type Later } from "./later";
 import { answerElsewhere, approveSecretUse, isTerminalRequest, type SecretUseAction, secretUseApprovalParams, secretUseSigns } from "./secretUse";
 import { preferencesSaid, sendPreferencesWith } from "./preferences";
 import { folderPath as hostedFolderPath, healthTally, personalServers } from "./hostedMCP";
@@ -144,8 +146,8 @@ const filesNamedAtMost = 64;
 export const quietSettle = 250;
 const filesSettle = quietSettle;
 
-/** How many archived sessions the Archived page lists: as many as it shows (#170). */
-export const archivedPage = 50;
+/** How many archived sessions the Archived Sessions page lists at first: as many as it shows (#170). */
+export const archivedPage = pageSize;
 
 /** The most a search brings back from each host, a page at a time (#165, #193). */
 export const searchShown = 200;
@@ -668,13 +670,9 @@ export class Work {
       case "workflow/changed":
         this.placeWorkflow(params as WorkflowSummary, host);
         return true;
-      case "requests/changed": {
-        const { request } = params as RequestUpdate;
-        const list = (this.personRequests.value[host] ?? []).filter((r) => r.id !== request.id);
-        if (request.state === "open") list.push(request);
-        this.personRequests.value = { ...this.personRequests.value, [host]: list.sort(byAsked) };
+      case "requests/changed":
+        this.placeRequest(host, (params as RequestUpdate).request);
         return true;
-      }
       case "pins/changed": {
         const note = params as PinsChangedNotification;
         this.pins.value = { ...this.pins.value, [`${host}|${folderKey(note.folder)}`]: note.pins };
@@ -1214,6 +1212,13 @@ export class Work {
   }
 
   /** The prompts kept for one agent, oldest first. */
+  /** One request changed (#3864): an open one is kept, oldest first, an answered or dropped one goes. */
+  protected placeRequest(host: string, request: PersonRequest): void {
+    const list = (this.personRequests.peek()[host] ?? []).filter((r) => r.id !== request.id);
+    if (request.state === "open") list.push(request);
+    this.personRequests.value = { ...this.personRequests.peek(), [host]: list.sort(byAsked) };
+  }
+
   keptFor(host: string, agentID: string): KeptRequest[] {
     return this.kept.value.filter((k) => k.host === host && k.kind === "prompt" && k.agentID === agentID);
   }
@@ -2073,27 +2078,39 @@ export class Store extends Work {
   }
 
   /** One folder's newest `limit` archived sessions, asked for when a view of them opens (#170), such
-   *  as the Archive page. Only more than is held is asked again. Each
-   *  call is matched by one `unloadArchived` with the same limit. */
-  async loadArchived(host: string, folder: string, limit = archivedPage): Promise<void> {
+   *  as the Archived Sessions page. Only more than is held is asked again. Each
+   *  call is matched by one `unloadArchived` with the same limit. Whether the host answered (#664). */
+  async loadArchived(host: string, folder: string, limit = archivedPage): Promise<boolean> {
     const key = `${host}|${folderKey(folder)}`;
     const hold = this.archivedHolds.get(key) ?? { limits: [], listed: 0 };
     this.archivedHolds.set(key, hold);
     hold.limits.push(limit);
-    if (limit <= hold.listed) return;
-    await this.listArchived(host, folder, key, limit);
+    if (limit <= hold.listed) return true;
+    return this.listArchived(host, folder, key, limit);
   }
 
-  private async listArchived(host: string, folder: string, key: string, limit: number): Promise<void> {
+  private async listArchived(host: string, folder: string, key: string, limit: number, query?: string): Promise<boolean> {
     const hold = this.archivedHolds.get(key);
-    if (hold) hold.listed = Math.max(hold.listed, limit);
+    if (hold && query === undefined) hold.listed = Math.max(hold.listed, limit);
     const listed = await this.link.call("agents/list", {
       includeArchived: true, archivedCommands: false, archivedOnly: true, folder: folder as never, lean: true, limit,
+      ...(query === undefined ? {} : { query }),
     }, host).catch(() => null);
-    if (!listed || this.archivedHolds.get(key) !== hold) return;
+    if (!listed) return false;
+    if (this.archivedHolds.get(key) !== hold) return true;
     // On show in the fold now: no longer the search's to let go.
     for (const agent of listed) this.searched.get(host)?.delete(agent.id);
     this.addAgents(listed, host);
+    return true;
+  }
+
+  /** The folder's archived sessions that match the words, from its host (#4451), as the Mac's
+   *  searchArchived: an Archived Sessions page's filter finds one older than the page it holds. Held,
+   *  and let go, with the page's own (`loadArchived`). Whether the host answered. */
+  async searchArchived(host: string, folder: string, words: string): Promise<boolean> {
+    const key = `${host}|${folderKey(folder)}`;
+    if (!this.archivedHolds.has(key)) return false;
+    return this.listArchived(host, folder, key, searchShown, words);
   }
 
   /** The search's words, trimmed; empty when there is none. */
@@ -3542,16 +3559,46 @@ export class Store extends Work {
     await this.act("pins/hideView", { folder: folder as never, uri, hidden }, host);
   }
 
-  /** A folder's open requests to the person whose asker is held and not archived (#3864), oldest first. */
-  personRequestsIn(host: string, folder: string): PersonRequest[] {
+  /**
+   * A folder's open requests to the person, deferred or not, whose asker is held and not archived
+   * (#3864), oldest first: each stands for its asker, in Needs You or in Later (#4236).
+   */
+  openPersonRequestsIn(host: string, folder: string): PersonRequest[] {
     const key = folderKey(folder);
     return (this.personRequests.value[host] ?? []).filter((r) => folderKey(r.folder) === key
       && r.askedBy !== undefined && (this.agent(host, r.askedBy)?.state ?? "archived") !== "archived");
   }
 
-  /** A machine's open requests from a terminal's agents-secret (#4179): no session asked them, so no folder lists them. */
+  /** A folder's requests in Needs You's rows and count: the open ones not in Later (#4236). */
+  personRequestsIn(host: string, folder: string): PersonRequest[] {
+    return this.openPersonRequestsIn(host, folder).filter((r) => !isDeferred(r));
+  }
+
+  /** A folder's deferred requests (#4236): the Later group's rows, in no count. */
+  laterRequestsIn(host: string, folder: string): PersonRequest[] {
+    return this.openPersonRequestsIn(host, folder).filter(isDeferred);
+  }
+
+  /** A machine's open requests from a terminal's agents-secret (#4179): no session asked them, so no folder lists them. Not the deferred ones. */
   terminalRequests(host: string): PersonRequest[] {
-    return (this.personRequests.value[host] ?? []).filter(isTerminalRequest);
+    return (this.personRequests.value[host] ?? []).filter((r) => isTerminalRequest(r) && !isDeferred(r));
+  }
+
+  /** A terminal's deferred requests (#4236), in Later with the rest. */
+  laterTerminalRequests(host: string): PersonRequest[] {
+    return (this.personRequests.value[host] ?? []).filter((r) => isTerminalRequest(r) && isDeferred(r));
+  }
+
+  /** Later on a request (#4236): out of Needs You until its time, or until the person is next at the Mac. */
+  async deferRequest(host: string, request: string, later: Later): Promise<void> {
+    const changed = await this.act("requests/defer", deferParams(request, later), host);
+    if (changed) this.placeRequest(host, changed.request);
+  }
+
+  /** Bring Back Now (#4236): a deferred request back into Needs You at once. */
+  async undeferRequest(host: string, request: string): Promise<void> {
+    const changed = await this.act("requests/undefer", { id: request as never }, host);
+    if (changed) this.placeRequest(host, changed.request);
   }
 
   /** A folder's pull requests waiting for the person's approval (#3330), newest first. */

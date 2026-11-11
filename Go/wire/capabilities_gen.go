@@ -66,8 +66,12 @@ const CapFoldersNotCommitted1 = "folders.not-committed/1"
 const CapFoldersToMachine1 = "folders.to-machine/1"
 const CapFolders1 = "folders/1"
 const CapForgeWrite1 = "forge-write/1"
+const CapForgeAssign1 = "forge.assign/1"
 const CapForgeBoards1 = "forge.boards/1"
+const CapForgeCancelAutoMerge1 = "forge.cancel-auto-merge/1"
 const CapForgeImage1 = "forge.image/1"
+const CapForgeReady1 = "forge.ready/1"
+const CapForgeReleases1 = "forge.releases/1"
 const CapForge1 = "forge/1"
 const CapGit1 = "git/1"
 const CapGovernance1 = "governance/1"
@@ -172,6 +176,7 @@ const CapRuntimesSignIn1 = "runtimes.sign-in/1"
 const CapRuntimes1 = "runtimes/1"
 const CapSandbox1 = "sandbox/1"
 const CapSealing1 = "sealing/1"
+const CapSend1 = "send/1"
 const CapSessionsElsewhere1 = "sessions.elsewhere/1"
 const CapSessionsMove1 = "sessions.move/1"
 const CapSessionsOnMachine1 = "sessions.on-machine/1"
@@ -353,9 +358,11 @@ var HostCapabilities = pairs([][2]string{
 	{"folders/receive", "folders/1"},
 	{"folders/receiveState", "folders/1"},
 	{"folders/receiveUpload", "folders/1"},
+	{"folders/send", "send/1"},
 	{"folders/sendFacts", "folders/1"},
 	{"folders/sendPack", "folders/1"},
 	{"folders/sendRead", "folders/1"},
+	{"folders/sends", "send/1"},
 	{"folders/setDiskSpace", "folders/1"},
 	{"folders/setHelperLimits", "folders/1"},
 	{"folders/setPRCostComment", "lineage.comment/1"},
@@ -365,8 +372,10 @@ var HostCapabilities = pairs([][2]string{
 	{"folders/undoGuardedChange", "folders/1"},
 	{"forge/add-child", "forge-write/1"},
 	{"forge/approve", "forge-write/1"},
+	{"forge/assign", "forge.assign/1"},
 	{"forge/blocked-by", "forge-write/1"},
 	{"forge/boards", "forge.boards/1"},
+	{"forge/cancel-auto-merge", "forge.cancel-auto-merge/1"},
 	{"forge/close", "forge-write/1"},
 	{"forge/comment", "forge-write/1"},
 	{"forge/diff", "forge-write/1"},
@@ -381,6 +390,9 @@ var HostCapabilities = pairs([][2]string{
 	{"forge/plan", "forge/1"},
 	{"forge/pull", "forge/1"},
 	{"forge/pulls", "forge/1"},
+	{"forge/ready", "forge.ready/1"},
+	{"forge/release", "forge.releases/1"},
+	{"forge/releases", "forge.releases/1"},
 	{"forge/rerun", "forge-write/1"},
 	{"git/fill", "git/1"},
 	{"lineage/cost", "lineage/1"},
@@ -632,6 +644,7 @@ var HostCapabilities = pairs([][2]string{
 	{"runtimes/allowancesChanged", "runtimes/1"},
 	{"sandbox/changed", "sandbox/1"},
 	{"selfUpdate/changed", "host.update/1"},
+	{"send/changed", "send/1"},
 	{"shell/output", "shell/1"},
 	{"shell/stateChanged", "shell/1"},
 	{"storage/writeFailed", "storage/1"},
@@ -691,6 +704,7 @@ var HostNotifications = set([]string{
 	"runtimes/allowancesChanged",
 	"sandbox/changed",
 	"selfUpdate/changed",
+	"send/changed",
 	"shell/output",
 	"shell/stateChanged",
 	"storage/writeFailed",

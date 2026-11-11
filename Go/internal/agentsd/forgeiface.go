@@ -26,6 +26,9 @@ type Forge interface {
 	// cursor and in ForgeListError.forge.
 	Name() string
 	Caps() forgeCaps
+	// Images are the forge's image hosts and its token for them (#4544), which forge/image reads:
+	// the URLs of its attachments and avatars. nil when it has none of its own.
+	Images() forgeImageHost
 	// Owns parses a node of an issue or a pull request that is this forge's.
 	Owns(node wire.LineageNode) (forgeRef, bool)
 	// Sources is what a list of these folders reads, with a folder for each repo, team or
@@ -42,12 +45,24 @@ type Forge interface {
 	Blockers(ctx context.Context, children []forgeRef) (map[forgeRef][]planRef, error)
 	Diff(ctx context.Context, r forgeRef) (wire.ForgeDiff, error)
 	Log(ctx context.Context, r forgeRef, check string) (wire.ForgeLog, error)
+	// Releases are the releases of the scope's repos (#4426), at most limit of each, with their
+	// nodes; Latest is left to forge/releases. ReleaseCommits are the commits of repo (as a node
+	// names it) in head and not in base, oldest first, and the forge's page of the range. A forge
+	// with no releases says so in Caps: Releases false, and why in Reasons.
+	Releases(ctx context.Context, s forgeScope, limit int) ([]wire.ForgeRelease, error)
+	ReleaseCommits(ctx context.Context, repo, base, head string) ([]compareCommit, string, error)
 
 	// The writes: a person's own clicks (forgewrite.go's rules do not change).
 	Comment(ctx context.Context, r forgeRef, body string) (wire.ForgeDone, error)
 	SetLabels(ctx context.Context, r forgeRef, add, remove []string) error
+	// SetAssignees assigns people to an item and takes others off it, by their logins (#4403).
+	SetAssignees(ctx context.Context, r forgeRef, add, remove []string) error
 	SetState(ctx context.Context, r forgeRef, closed bool, transition string) error
 	Merge(ctx context.Context, r forgeRef, sha, method string, auto bool) (wire.ForgeDone, error)
+	// CancelAutoMerge turns off a pull request's auto-merge, and Ready marks a draft ready for
+	// review (#4410).
+	CancelAutoMerge(ctx context.Context, r forgeRef) error
+	Ready(ctx context.Context, r forgeRef) error
 	Approve(ctx context.Context, r forgeRef, sha string) (wire.ForgeDone, error)
 	Rerun(ctx context.Context, r forgeRef) (wire.ForgeDone, error)
 	AddChild(ctx context.Context, epic forgeRef, child forgeChild) (wire.ForgeDone, error)
@@ -65,12 +80,20 @@ type forgeCaps struct {
 	// closed. Children, LinkedPulls and Events: an issue's read has its sub-issues, the pull
 	// requests that close it, and its timeline (#4373).
 	CreatedAt, ClosedAt, Children, LinkedPulls, Events bool
+	// A pull request's (#4409): Branches, its head and base branches; MergedBy and MergeCommit, a
+	// merged one's; Size, Reviewers and Closes, on its read; CheckTimes, its checks' times.
+	Branches, MergedBy, MergeCommit, Size, Reviewers, Closes, CheckTimes bool
 	// CommentCount is "exact", "capped" (at CommentsMost, Linear's 50) or "detail" (only on an
 	// item's own page: Bitbucket issues, Azure Repos).
 	CommentCount string
 	CommentsMost int
+	// Total: a list's first page says how many items the whole list has (forgePage.total, #4396).
+	// A forge without it has a total only when its list ends on its first page.
+	Total bool
 	// Plans: sub-issues, blocked-by, a new child.
 	Plan, BlockedBy, AddChild bool
+	// Releases: forge/releases and forge/release read its releases (#4426).
+	Releases bool
 	// Reasons say why an action is missing, by the action's name, in the words a person reads,
 	// as bitbucketNoAutoMerge says it now.
 	Reasons map[string]string
@@ -78,18 +101,23 @@ type forgeCaps struct {
 
 // forgeActions are the writes a forge allows on one kind of item.
 type forgeActions struct {
-	Comment, Label, Close, Reopen, Transition, Merge, AutoMerge, Approve, Rerun, Log, Diff bool
+	Comment, Label, Assign, Close, Reopen, Transition, Merge, AutoMerge, Approve, Rerun, Log, Diff bool
+	// CancelAutoMerge turns auto-merge off; Ready marks a draft ready for review (#4410).
+	CancelAutoMerge, Ready bool
 }
 
 // The actions' names, as forgeCaps.Reasons and errForgeCannot name them.
 const (
 	actionComment    = "comment"
 	actionLabel      = "label"
+	actionAssign     = "assign"
 	actionClose      = "close"
 	actionReopen     = "reopen"
 	actionTransition = "transition"
 	actionMerge      = "merge"
 	actionAutoMerge  = "autoMerge"
+	actionCancelAuto = "cancelAutoMerge"
+	actionReady      = "ready"
 	actionApprove    = "approve"
 	actionRerun      = "rerun"
 	actionLog        = "log"
@@ -97,13 +125,14 @@ const (
 	actionPlan       = "plan"
 	actionAddChild   = "addChild"
 	actionBlockedBy  = "blockedBy"
+	actionReleases   = "releases"
 )
 
 // on says whether the actions allow the action of that name.
 func (a forgeActions) on(action string) bool {
-	return map[string]bool{actionComment: a.Comment, actionLabel: a.Label, actionClose: a.Close, actionReopen: a.Reopen,
+	return map[string]bool{actionComment: a.Comment, actionLabel: a.Label, actionAssign: a.Assign, actionClose: a.Close, actionReopen: a.Reopen,
 		actionTransition: a.Transition, actionMerge: a.Merge, actionAutoMerge: a.AutoMerge, actionApprove: a.Approve,
-		actionRerun: a.Rerun, actionLog: a.Log, actionDiff: a.Diff}[action]
+		actionRerun: a.Rerun, actionLog: a.Log, actionDiff: a.Diff, actionCancelAuto: a.CancelAutoMerge, actionReady: a.Ready}[action]
 }
 
 // wire is the capabilities of the forge called name as ForgeList.forges says them (#4361).
@@ -117,7 +146,9 @@ func (c forgeCaps) wire(name string) wire.ForgeCapabilities {
 	for _, f := range []struct {
 		on  bool
 		out **bool
-	}{{c.CreatedAt, &out.CreatedAt}, {c.ClosedAt, &out.ClosedAt}, {c.Children, &out.Children}, {c.LinkedPulls, &out.LinkedPulls}, {c.Events, &out.Events}} {
+	}{{c.CreatedAt, &out.CreatedAt}, {c.ClosedAt, &out.ClosedAt}, {c.Children, &out.Children}, {c.LinkedPulls, &out.LinkedPulls}, {c.Events, &out.Events}, {c.Total, &out.Total}, {c.Releases, &out.Releases},
+		{c.Branches, &out.Branches}, {c.MergedBy, &out.MergedBy}, {c.MergeCommit, &out.MergeCommit}, {c.Size, &out.Size},
+		{c.Reviewers, &out.Reviewers}, {c.Closes, &out.Closes}, {c.CheckTimes, &out.CheckTimes}} {
 		if f.on {
 			*f.out = new(true)
 		}
@@ -128,7 +159,8 @@ func (c forgeCaps) wire(name string) wire.ForgeCapabilities {
 // itemActions are what the page of item allows now (#4361), from c and the item's state: only an
 // open item closes, merges, auto-merges, is approved or runs its checks again, and only a closed
 // one reopens (a merged pull request does not). A transition needs a move that the workflow
-// allows now; a plan's writes are an issue's.
+// allows now; a plan's writes are an issue's. Auto-merge turns off only while it is on, and only a
+// draft is marked ready (#4410).
 func (c forgeCaps) itemActions(d wire.ForgeItemDetail) []wire.ForgeAction {
 	i := d.Item
 	a := c.Issue
@@ -144,6 +176,7 @@ func (c forgeCaps) itemActions(d wire.ForgeItemDetail) []wire.ForgeAction {
 	}{
 		{wire.ForgeActionComment, a.Comment},
 		{wire.ForgeActionLabel, a.Label},
+		{wire.ForgeActionAssign, a.Assign},
 		{wire.ForgeActionClose, a.Close && open},
 		{wire.ForgeActionReopen, a.Reopen && i.State == "closed"},
 		{wire.ForgeActionTransition, a.Transition && len(d.Transitions) > 0},
@@ -153,6 +186,8 @@ func (c forgeCaps) itemActions(d wire.ForgeItemDetail) []wire.ForgeAction {
 		{wire.ForgeActionRerun, a.Rerun && open},
 		{wire.ForgeActionLog, a.Log},
 		{wire.ForgeActionDiff, a.Diff},
+		{wire.ForgeActionCancelAutoMerge, a.CancelAutoMerge && open && i.AutoMerge != nil && *i.AutoMerge},
+		{wire.ForgeActionReady, a.Ready && open && i.Draft != nil && *i.Draft},
 		{wire.ForgeActionAddChild, c.AddChild && issue},
 		{wire.ForgeActionBlockedBy, c.BlockedBy && issue},
 	} {
@@ -203,6 +238,8 @@ func forgeCannotErr(method string, f Forge, err error) error {
 // embeds it, so a new operation on Forge is "cannot" on every forge until it is written.
 type forgeNone struct{}
 
+func (forgeNone) Images() forgeImageHost { return nil }
+
 func (forgeNone) List(context.Context, forgeScope, forgeFilter, string, int) (forgePage, error) {
 	return forgePage{}, nil
 }
@@ -224,11 +261,20 @@ func (forgeNone) Diff(context.Context, forgeRef) (wire.ForgeDiff, error) {
 func (forgeNone) Log(context.Context, forgeRef, string) (wire.ForgeLog, error) {
 	return wire.ForgeLog{}, cannot(actionLog)
 }
+func (forgeNone) Releases(context.Context, forgeScope, int) ([]wire.ForgeRelease, error) {
+	return nil, cannot(actionReleases)
+}
+func (forgeNone) ReleaseCommits(context.Context, string, string, string) ([]compareCommit, string, error) {
+	return nil, "", cannot(actionReleases)
+}
 func (forgeNone) Comment(context.Context, forgeRef, string) (wire.ForgeDone, error) {
 	return wire.ForgeDone{}, cannot(actionComment)
 }
 func (forgeNone) SetLabels(context.Context, forgeRef, []string, []string) error {
 	return cannot(actionLabel)
+}
+func (forgeNone) SetAssignees(context.Context, forgeRef, []string, []string) error {
+	return cannot(actionAssign)
 }
 func (forgeNone) SetState(_ context.Context, _ forgeRef, closed bool, transition string) error {
 	switch {
@@ -241,6 +287,12 @@ func (forgeNone) SetState(_ context.Context, _ forgeRef, closed bool, transition
 }
 func (forgeNone) Merge(context.Context, forgeRef, string, string, bool) (wire.ForgeDone, error) {
 	return wire.ForgeDone{}, cannot(actionMerge)
+}
+func (forgeNone) CancelAutoMerge(context.Context, forgeRef) error {
+	return cannot(actionCancelAuto)
+}
+func (forgeNone) Ready(context.Context, forgeRef) error {
+	return cannot(actionReady)
 }
 func (forgeNone) Approve(context.Context, forgeRef, string) (wire.ForgeDone, error) {
 	return wire.ForgeDone{}, cannot(actionApprove)

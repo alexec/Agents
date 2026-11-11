@@ -18,7 +18,7 @@ struct WorkItemRow: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            WorkStateIcon(kind: row.node.kind, state: row.state, draft: row.draft)
+            WorkStateIcon(kind: row.node.kind, state: row.state, draft: row.draft, stateReason: row.stateReason)
                 .frame(width: 16)
             if compact { stacked } else { wide }
         }
@@ -26,6 +26,12 @@ struct WorkItemRow: View {
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityWords)
+    }
+
+    /// The pictures the forge gives on a row: the author's, for an assignee who wrote it (#4363).
+    private var avatars: [String: String] {
+        guard let author = row.author, let avatar = row.avatar else { return [:] }
+        return [author: avatar]
     }
 
     private var title: Text { Text.forgeTitle(row.title).fontWeight(.semibold) }
@@ -41,7 +47,7 @@ struct WorkItemRow: View {
                 }
                 Spacer(minLength: 8)
                 trailing
-                WorkAvatarStack(logins: row.assignees)
+                WorkAvatarStack(logins: row.assignees, avatars: avatars)
             }
             HStack(spacing: 6) {
                 secondLine
@@ -115,7 +121,8 @@ struct WorkItemRow: View {
     }
 
     private var accessibilityWords: String {
-        var parts = [WorkLook.glyph(kind: row.node.kind, state: row.state, draft: row.draft)?.accessibilityLabel, row.title,
+        var parts = [WorkLook.glyph(kind: row.node.kind, state: row.state, draft: row.draft, stateReason: row.stateReason)?
+            .accessibilityLabel, row.title,
                      latest ? WorkReleaseChip.latest.words : nil]
         parts.append(row.labels.isEmpty ? nil : "labels " + row.labels.map(\.name).joined(separator: ", "))
         parts.append(WorkLook.rowLine(row, compact: false))

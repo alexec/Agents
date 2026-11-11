@@ -280,7 +280,8 @@ public enum WorkTimeline {
         public var how: End
         public var band: DateInterval?
         public var dots: [Dot]
-        /// Children working now: a ring at Now on the line.
+        /// The epic and its open children that a session is in a turn on now (#4265): the line
+        /// pulses and a ring turns at Now while it is above 0.
         public var working: Int
         /// The lane: 1, 2, … above the releases line, −1, −2, … below.
         public var lane: Int = 0
@@ -302,8 +303,10 @@ public enum WorkTimeline {
 
     /// The lines of a timeline, past and forecast, as section 7 says: one per segment, an epic with
     /// no children not drawn, a line that has not started not drawn unless it is forecast.
-    /// `forecast` off draws the past only: an open line stops at Now.
-    public static func lines(_ timeline: DaemonAPI.WorkTimeline, now: Date, forecast: Bool = true) -> [Line] {
+    /// `forecast` off draws the past only: an open line stops at Now. `working` is the refs a session
+    /// is in a turn on now (`workingNow`): only the open line of their epic works.
+    public static func lines(_ timeline: DaemonAPI.WorkTimeline, now: Date, forecast: Bool = true,
+                             working: Set<String> = []) -> [Line] {
         timeline.epics.flatMap { epic -> [Line] in
             guard !epic.children.isEmpty else { return [] }
             let total = epic.children.count
@@ -355,7 +358,10 @@ public enum WorkTimeline {
                     return Dot(ref: child.item.node.ref, number: number, title: child.item.title,
                                at: min(max(at, max(start, now)), end), closed: false, notPlanned: false)
                 }
-                let working = isOpen ? mine.filter { $0.closedAt == nil && $0.startedAt != nil && $0.waitsForPerson != true }.count : 0
+                let working = isOpen
+                    ? mine.filter { $0.closedAt == nil && working.contains($0.item.node.ref) }.count
+                        + (working.contains(epic.item.node.ref) ? 1 : 0)
+                    : 0
                 return Line(epic: epic.item.node, segment: i, title: epic.item.title,
                             number: WorkList.shortRef(epic.item.node.ref), feature: epic.item.feature,
                             done: done, total: total, start: start, end: end, how: how, band: band,
@@ -666,6 +672,27 @@ public enum WorkTimeline {
                 if epic.segments[i].startedAt.map({ start < $0 }) ?? true { epic.segments[i].startedAt = start }
             }
             out.epics[e] = epic
+        }
+        return out
+    }
+
+    /// The epics and children a session is in a turn on now (#4265), by ref: every machine's
+    /// sessions from the control plane's copy whose state is working, and this app's own sessions
+    /// that are running with a `#<n>` label of one. A session that waits (on an event, on CI, on
+    /// the person) is not in a turn, so it does not count. A session this app knows goes by its own
+    /// state, which is newer than the control plane's copy.
+    public static func workingNow(_ timeline: DaemonAPI.WorkTimeline, sessions: [DaemonAPI.LineageSessionOn],
+                                  agents: [Agent]) -> Set<String> {
+        let known = Set(agents.map { LineageList.node(ofSession: $0.id).ref.uppercased() })
+        var out = Set(sessions.filter { $0.state?.working == true && !known.contains($0.node.ref.uppercased()) }
+            .flatMap { $0.on.map(\.ref) })
+        let turning = agents.filter { $0.state == .running || $0.state == .starting }
+        guard !turning.isEmpty else { return out }
+        let labels = Set(turning.flatMap { $0.labels.map(\.value) })
+        for epic in timeline.epics {
+            for node in [epic.item.node] + epic.children.map(\.item.node) where labels.contains(WorkList.shortRef(node.ref)) {
+                out.insert(node.ref)
+            }
         }
         return out
     }

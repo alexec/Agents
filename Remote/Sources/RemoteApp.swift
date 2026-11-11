@@ -184,7 +184,7 @@ struct RemoteView: View {
     /// one the sidebar lights; the rest are pushed over it. With none, a new session in the
     /// folder when one was asked for (#366), else nothing (#2090).
     private var routes: [RemoteRoute] {
-        let open = [model.openArchive ? RemoteRoute.archive : nil,
+        let open = [model.openArchive.map(RemoteRoute.archive),
                     model.openPin.map(RemoteRoute.page),
                     model.openWorkflow.map(RemoteRoute.workflow), model.selection.map(RemoteRoute.agent),
                     model.openReview.map(RemoteRoute.review)]
@@ -200,7 +200,7 @@ struct RemoteView: View {
                 set: { more in
                     guard let root = routes.first else { return }
                     let all = [root] + more
-                    model.openArchive = all.contains(.archive)
+                    model.openArchive = all.lazy.compactMap(\.archiveKind).first
                     model.openPin = all.lazy.compactMap(\.pinPath).first
                     model.openWorkflow = all.lazy.compactMap(\.workflowID).first
                     model.selection = all.compactMap(\.agentID).last
@@ -385,9 +385,13 @@ struct RemoteView: View {
             if let summary = model.selectedSummary {
                 RemoteReviewDestination(id: id, folder: summary.key).paperGround()
             }
-        case .archive:
+        case .archive(.sessions):
             if let summary = model.selectedSummary {
-                ArchivePage(folder: summary.key).paperGround()
+                ArchivedSessionsPage(folder: summary.key).paperGround()
+            }
+        case .archive(.workflows):
+            if let summary = model.selectedSummary {
+                ArchivedWorkflowsPage(folder: summary.key).paperGround()
             }
         case .start:
             if let key = model.selectedKey {
@@ -463,13 +467,19 @@ enum RemoteRoute: Hashable {
     case start
     /// One of the folder's pinned pages (#159), by its path in the folder.
     case page(String)
-    /// What the folder has archived (#495, #498), from its Archived row in the sidebar.
-    case archive
+    /// One of the folder's archive pages (#495, #4448), from its Archived Sessions or
+    /// Archived Workflows row in the sidebar.
+    case archive(ArchiveKind)
     /// A change waiting for an OK, on its Review page (#1472), by its `Approval.id`.
     case review(String)
 
     var reviewID: String? {
         if case .review(let id) = self { return id }
+        return nil
+    }
+
+    var archiveKind: ArchiveKind? {
+        if case .archive(let kind) = self { return kind }
         return nil
     }
 

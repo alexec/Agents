@@ -15,33 +15,25 @@ public enum ActivityWords {
         return "\(hours / 24)d"
     }
 
-    /// How long a chat has been quiet, at the foot of its transcript (#1564): "Last
-    /// activity 12 minutes ago · 14:32". Nil under five minutes, and for a date ahead of
-    /// `now`. Past a day it gives the day instead: "yesterday · 14:32", "3 Oct · 09:10",
-    /// and the year when it is not this one. The page has its own copy (`quietLine` in
+    /// How long a chat has been quiet, and how old the session is, at the foot of its
+    /// transcript (#1564): "Last activity 12 minutes ago · started 3 hours ago". Nil under
+    /// five minutes of quiet, and for a date ahead of `now`. Both are a time ago, never a
+    /// clock time or a day (`ago`). The page has its own copy (`quietLine` in
     /// `Web/src/model/activity.ts`), held to `Fixtures/web/activity/quiet.json`.
-    public static func quiet(since date: Date, now: Date = Date(), timeZone: TimeZone = .current) -> String? {
+    public static func quiet(since date: Date, startedAt: Date, now: Date = Date()) -> String? {
         let minutes = Int((now.timeIntervalSince(date) / 60).rounded(.down))
         guard minutes >= quietMinutes else { return nil }
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = timeZone
-        let at = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: date)
-        let time = String(format: "%02d:%02d", at.hour ?? 0, at.minute ?? 0)
+        // Never younger than its quiet: a host's clock can put the start a little late.
+        let age = max(minutes, Int((now.timeIntervalSince(startedAt) / 60).rounded(.down)))
+        return "Last activity \(ago(minutes)) · started \(ago(age))"
+    }
+
+    /// Whole minutes as a time ago, rounded down to the largest unit: "5 minutes ago",
+    /// "1 hour ago", "3 days ago".
+    static func ago(_ minutes: Int) -> String {
         let hours = minutes / 60
-        let when: String
-        if hours < 1 {
-            when = "\(minutes) minutes ago"
-        } else if hours < 24 {
-            when = hours == 1 ? "1 hour ago" : "\(hours) hours ago"
-        } else {
-            let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: date),
-                                               to: calendar.startOfDay(for: now)).day ?? 0
-            let today = calendar.dateComponents([.year], from: now)
-            let day = "\(at.day ?? 1) \(months[((at.month ?? 1) - 1) % 12])"
-            when = days == 1 ? "yesterday"
-                : at.year == today.year ? day : "\(day) \(at.year ?? 0)"
-        }
-        return "Last activity \(when) · \(time)"
+        let (count, unit) = hours < 1 ? (minutes, "minute") : hours < 24 ? (hours, "hour") : (hours / 24, "day")
+        return count == 1 ? "1 \(unit) ago" : "\(count) \(unit)s ago"
     }
 
     /// When a prompt was sent, on its row of the Prompts list (#1658): "14:05" today,

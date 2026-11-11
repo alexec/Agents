@@ -7,7 +7,7 @@ import { signal, useSignal } from "@preact/signals";
 import { go, routeHash } from "../route";
 import { hasPage } from "../model/work";
 import type { Store } from "../model/store";
-import type { FeatureUsage, ReportFormat, ReportPage, ReportRange, ReportRow, ReportScope, ReportScopeOption, ReportValue, ReportValueRow, ReportView,
+import type { FeatureUsage, LineageForecast, LineageNode, MachineRef, ReportFormat, ReportPage, ReportRange, ReportRow, ReportScope, ReportScopeOption, ReportValue, ReportValueRow, ReportView,
   UsageReport } from "../protocol/generated";
 import { CallFailed } from "../wire/link";
 import { adoption, adoptionLine, barCaption, adoptionNote, budgetWords, dimensionTitle, empty, exportName, groupNote, hiddenNote, line, meNote,
@@ -21,6 +21,9 @@ import {
   estimateCoverageLine, estimateErrorLine, estimateLandsAtLine, leadLine, noValue, noValueHere, nodeName, rowLine,
   unlinkedLine, valueHeadline, valueNote, wasteLine,
 } from "../model/value";
+import { burnLine, burnRuntime, forecastScoreLine, landsLine, loadedLine, mergeBurns, nextNote, noNext, noNextHere, noNextOffline, serviceLevelLine,
+  spendLines } from "../model/planning";
+import { Capability } from "../protocol/capabilities.generated";
 import type { Section } from "../model/console";
 import { Choice } from "./Choice";
 
@@ -359,10 +362,12 @@ function AdoptionPane({ store, scope, initial }: { store: Store; scope: ReportSc
   );
 }
 
-/** Reports ▸ Value (#2351): what the work cost and delivered, from the machines' lineage nodes:
- * cost per merged pull request, waste and lead time, then each issue and release (#3023), the
- * most costly first. */
-function ValuePane({ store, scope, initial }: { store: Store; scope: ReportScope | undefined; initial?: Initial | undefined }) {
+/** Reports ▸ Planning (#4528; Value before, #2351): what the work cost and delivered, from the machines' lineage
+ * nodes: cost per merged pull request, all in beside it, waste and lead time; then what comes next, from
+ * lineage/forecast (#4526): the burn against each allowance, the spend at this pace, the service levels and when each
+ * open epic lands; then how the estimates and the forecasts scored; then each issue and release (#3023), the most
+ * costly first. */
+function PlanningPane({ store, scope, initial }: { store: Store; scope: ReportScope | undefined; initial?: Initial | undefined }) {
   const range = useSignal<ReportRange>(initial?.range ?? "month");
   const value = useSignal<ReportValue | null>(null);
   const problem = useSignal<string | null>(null);
@@ -392,10 +397,13 @@ function ValuePane({ store, scope, initial }: { store: Store; scope: ReportScope
     );
   };
   const lead = shown && leadLine(shown);
+  const loaded = shown && loadedLine(shown);
   const unlinked = shown && unlinkedLine(shown);
   const estimates = shown && estimateErrorLine(shown);
   const coverage = shown && estimateCoverageLine(shown);
   const landsAt = shown && estimateLandsAtLine(shown);
+  const forecasts = shown && forecastScoreLine(shown.forecastScore);
+  const empty = shown && shown.issues.length === 0 && shown.prsMerged + shown.prsClosed === 0;
   return (
     <div class="reports-pane">
       <div class="reports-head">
@@ -405,27 +413,108 @@ function ValuePane({ store, scope, initial }: { store: Store; scope: ReportScope
       <p class="quiet small">{rangeSpan[range.value]}</p>
       {problem.value && <p class="hint">{problem.value}</p>}
       {!shown && !problem.value && <p class="hint">Loading…</p>}
-      {shown && (shown.issues.length === 0 && shown.prsMerged + shown.prsClosed === 0 ? <p class="hint">{noValue}</p> : (
-        <>
-          <ul class="report-list">
-            <li class="report-total"><span class="strong">{valueHeadline(shown)}</span><span class="quiet small">{wasteLine(shown)}</span></li>
-            {lead && <li><span>{lead}</span></li>}
-            {estimates && <li><span>{estimates}</span></li>}
-            {coverage && <li><span class="quiet small">{coverage}</span></li>}
-            {landsAt && <li><span class="quiet small">{landsAt}</span></li>}
-            {unlinked && <li><span class="quiet">{unlinked}</span></li>}
-          </ul>
-          {shown.issues.length > 0 && <h3>Issues</h3>}
-          {shown.issues.length > 0 && <ul class="report-list">{shown.issues.map(row)}</ul>}
-          {shown.releases.length > 0 && <h3>Releases</h3>}
-          {shown.releases.length > 0 && <ul class="report-list">{shown.releases.map(row)}</ul>}
-          {shown.limited && <p class="quiet small">The 100 most costly of each.</p>}
-        </>
-      ))}
+      {empty && <p class="hint">{noValue}</p>}
+      {shown && !empty && (
+        <ul class="report-list">
+          <li class="report-total"><span class="strong">{valueHeadline(shown)}</span><span class="quiet small">{wasteLine(shown)}</span></li>
+          {loaded && <li><span>{loaded}</span></li>}
+          {lead && <li><span>{lead}</span></li>}
+          {unlinked && <li><span class="quiet">{unlinked}</span></li>}
+        </ul>
+      )}
+      <NextPart store={store} epics={shown?.openEpics ?? []} />
+      {(estimates || forecasts) && <h3>How the estimates and forecasts scored</h3>}
+      {(estimates || forecasts) && (
+        <ul class="report-list">
+          {forecasts && <li><span>{forecasts}</span></li>}
+          {estimates && <li><span>{estimates}</span></li>}
+          {coverage && <li><span class="quiet small">{coverage}</span></li>}
+          {landsAt && <li><span class="quiet small">{landsAt}</span></li>}
+        </ul>
+      )}
+      {shown && !empty && shown.issues.length > 0 && <h3>Issues</h3>}
+      {shown && !empty && shown.issues.length > 0 && <ul class="report-list">{shown.issues.map(row)}</ul>}
+      {shown && !empty && shown.releases.length > 0 && <h3>Releases</h3>}
+      {shown && !empty && shown.releases.length > 0 && <ul class="report-list">{shown.releases.map(row)}</ul>}
+      {shown?.limited && <p class="quiet small">The 100 most costly of each.</p>}
       <p class="quiet small">{valueNote}</p>
       {scope && <p class="quiet small">{scopeNote(scope, undefined)}</p>}
     </div>
   );
+}
+
+/** What comes next on Reports ▸ Planning (#4528), from lineage/forecast on the person's own machines: each
+ * allowance's burn, the newest reading of it from any machine; the spend and the service levels of the machine with
+ * the most landings (this Mac first); and when each open epic lands, from that machine. */
+function NextPart({ store, epics }: { store: Store; epics: readonly LineageNode[] }) {
+  const answering = store.hosts.value.filter((h) => hostAnswers(h.state));
+  const hosts = answering.filter((h) => store.has(h.id, Capability.lineageForecast1)).map((h) => h.id);
+  const all = useSignal<{ host: MachineRef; forecast: LineageForecast }[] | null>(null);
+  // Each open epic's forecast, or why it could not be made.
+  const lands = useSignal<Record<string, LineageForecast | string>>({});
+  const names = runtimeNameIn(store);
+  const epicKey = epics.map((e) => e.ref).join(" ");
+  useEffect(() => {
+    let live = true;
+    all.value = null;
+    lands.value = {};
+    void Promise.all(hosts.map((host) => store.link.call("lineage/forecast", {}, host).then((forecast) => ({ host, forecast }), () => null)))
+      .then((got) => {
+        if (!live) return;
+        const answers = got.filter((g): g is { host: MachineRef; forecast: LineageForecast } => g !== null);
+        all.value = answers;
+        const main = mainForecast(answers, store.macHostID.value);
+        if (!main) return;
+        for (const node of epics) {
+          void store.link.call("lineage/forecast", { node }, main.host).then((f) => {
+            if (live) lands.value = { ...lands.value, [node.ref]: f };
+          }, (error: unknown) => {
+            if (live) lands.value = { ...lands.value, [node.ref]: sentence(error) };
+          });
+        }
+      });
+    return () => { live = false; };
+  }, [hosts.join(" "), epicKey]);
+  if (hosts.length === 0) return <><h3>What comes next</h3><p class="hint">{answering.length === 0 ? noNextOffline : noNextHere}</p></>;
+  if (all.value === null) return <><h3>What comes next</h3><p class="hint">Loading…</p></>;
+  const main = mainForecast(all.value, store.macHostID.value);
+  const burns = mergeBurns(all.value.map((a) => a.forecast));
+  const spend = main ? spendLines(main.forecast) : [];
+  const levels = main?.forecast.serviceLevels ?? [];
+  return (
+    <>
+      <h3>What comes next</h3>
+      {burns.length === 0 && spend.length === 0 && levels.length === 0 && <p class="hint">{noNext}</p>}
+      {(burns.length > 0 || spend.length > 0) && (
+        <ul class="report-list">
+          {burns.map((b) => <li key={b.credentialKey}><span>{burnLine(b, names(burnRuntime(b)))}</span></li>)}
+          {spend.map((line) => <li key={line}><span class="quiet">{line}</span></li>)}
+        </ul>
+      )}
+      {levels.length > 0 && <h4>Service levels</h4>}
+      {levels.length > 0 && <ul class="report-list">{levels.map((l) => <li key={l.level}><span>{serviceLevelLine(l)}</span></li>)}</ul>}
+      {epics.length > 0 && <h4>Open epics</h4>}
+      {epics.length > 0 && (
+        <ul class="report-list">
+          {epics.map((n) => (
+            <li key={n.ref}>
+              <a href={routeHash({ nav: "work", section: n.kind, item: n.ref })}>{nodeName(n)}</a>
+              <span class="quiet small">{landsWords(lands.value[n.ref])}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p class="quiet small">{nextNote}</p>
+    </>
+  );
+}
+
+const landsWords = (f: LineageForecast | string | undefined) => f === undefined ? "Forecasting…" : typeof f === "string" ? f : landsLine(f);
+
+/** The machine whose forecast the page shows: this Mac when it has landings, else the one with the most. */
+function mainForecast<T extends { host: MachineRef; forecast: LineageForecast }>(answers: readonly T[], mac: string | null | undefined): T | undefined {
+  const here = answers.find((a) => a.host === mac && a.forecast.landings > 0);
+  return here ?? [...answers].sort((a, b) => b.forecast.landings - a.forecast.landings)[0];
 }
 
 /** Reports ▸ Features (#2165), as the window's: which methods the clients and agents called on the
@@ -510,7 +599,7 @@ export function ReportsPage({ store, section, down }: { store: Store; section: S
         : section.id in countsPages
         ? <CountsPane key={`${section.id}:${view?.id ?? ""}`} store={store} runtimeName={runtimeNameIn(store)} scope={option?.scope}
           kind={section.id as CountsKind} initial={initial} />
-        : section.id === "value" ? <ValuePane key={view?.id ?? ""} store={store} scope={option?.scope} initial={initial} />
+        : section.id === "value" ? <PlanningPane key={view?.id ?? ""} store={store} scope={option?.scope} initial={initial} />
         : section.id === "adoption" ? <AdoptionPane key={view?.id ?? ""} store={store} scope={option?.scope} initial={initial} />
         : <ReportsPane key={view?.id ?? ""} store={store} runtimeName={runtimeNameIn(store)} scope={option?.scope} seesMore={list.length > 1} initial={initial} />)}
     </>

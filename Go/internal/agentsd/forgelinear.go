@@ -27,6 +27,8 @@ type linearForge struct {
 
 func (linearForge) Name() string { return "linear" }
 
+func (linearForge) Images() forgeImageHost { return linearImages{} }
+
 func (linearForge) Caps() forgeCaps {
 	return forgeCaps{
 		Issues:      true,
@@ -39,9 +41,13 @@ func (linearForge) Caps() forgeCaps {
 		CommentCount: "capped", CommentsMost: 50,
 		Plan: true, BlockedBy: true, AddChild: true,
 		Reasons: map[string]string{
+			actionAssign:   "the app does not set a Linear issue's assignee yet",
+			actionReleases: "Linear has no releases: it is a tracker, with no repositories",
 			actionTransition: "only a Jira issue or an Azure Boards work item moves by a transition",
 			actionMerge:      linearNoPRs,
 			actionAutoMerge:  linearNoPRs,
+			actionCancelAuto: linearNoPRs,
+			actionReady: linearNoPRs,
 			actionApprove:    linearNoPRs,
 			actionRerun:      linearNoPRs,
 			actionLog:        linearNoPRs,
