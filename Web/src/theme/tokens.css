@@ -34,6 +34,54 @@
   --label-issue: #0e6b82;
   /* A label naming a pull request, P#12. */
   --label-pull: #7442b8;
+  /* What is drawn on a filled mark: a state's badge, a swipe's action. */
+  --paper-on-fill: #ffffff;
+  /* Behind a sheet or a viewer, mixed with transparent to the strength it needs. */
+  --paper-scrim: #000000;
+  /* Open; a check that passed; running. */
+  --forge-open: #1a7f37;
+  /* A closed issue, a merged pull request. */
+  --forge-done: #8250df;
+  /* A pull request closed unmerged; a check that failed; changes asked for. */
+  --forge-closed: #cf222e;
+  /* A draft, an issue not planned. */
+  --forge-draft: #6e7781;
+  /* A check still running; an agent that waits on the person. */
+  --forge-waiting: #9a6700;
+  /* An open badge; the merge button. */
+  --forge-fill-open: #1f883d;
+  /* A merged or closed badge. */
+  --forge-fill-done: #8250df;
+  /* A closed pull request's badge. */
+  --forge-fill-closed: #cf222e;
+  /* A draft's or a not planned issue's badge. */
+  --forge-fill-draft: #59636e;
+  /* A comment, in italic. */
+  --code-comment: #64707a;
+  /* A keyword, true, false, null. */
+  --code-keyword: #2b4c8c;
+  /* A string. */
+  --code-string: #4e6420;
+  /* A number. */
+  --code-number: #7a3e7a;
+  /* A type. */
+  --code-type: #1f6a6a;
+  /* A function. */
+  --code-function: #5b4bb5;
+  /* A property. */
+  --code-property: #52627a;
+  /* Punctuation and operators. */
+  --code-punctuation: #5e6470;
+  /* The plot behind the lines. */
+  --timeline-plot: #ffffff;
+  /* The axis's marks. */
+  --timeline-faint: #8c8c8c;
+  /* The trunk every feature leaves from. */
+  --timeline-trunk: #999999;
+  /* A release's ring on the trunk. */
+  --timeline-release: #000000;
+  /* The Now line. */
+  --timeline-now: #8c8c8c;
   /* Chips, the rail, inputs. */
   --radius-control: 7px;
   /* Rows, wells, cards. */
@@ -63,5 +111,29 @@
     --tint-vouched: #8bc6a7;
     --label-issue: #6cc6db;
     --label-pull: #b79af0;
+    --paper-on-fill: #ffffff;
+    --paper-scrim: #000000;
+    --forge-open: #3fb950;
+    --forge-done: #a371f7;
+    --forge-closed: #f85149;
+    --forge-draft: #8b949e;
+    --forge-waiting: #d29922;
+    --forge-fill-open: #238636;
+    --forge-fill-done: #8957e5;
+    --forge-fill-closed: #da3633;
+    --forge-fill-draft: #6e7681;
+    --code-comment: #a3adb8;
+    --code-keyword: #8fb0e8;
+    --code-string: #a9c27a;
+    --code-number: #d5a3d5;
+    --code-type: #7cc4c0;
+    --code-function: #b3a6f0;
+    --code-property: #bac5d7;
+    --code-punctuation: #a9b2bd;
+    --timeline-plot: #0d1429;
+    --timeline-faint: #999999;
+    --timeline-trunk: #e7e8ea;
+    --timeline-release: #ffffff;
+    --timeline-now: #8c8c8c;
   }
 }
