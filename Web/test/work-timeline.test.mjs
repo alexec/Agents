@@ -138,13 +138,13 @@ test("joins within six pixels are one ring with a count", () => {
   assert.equal(joins[1].forecast, true);
 });
 
-test("a label drops its title before the next thing on its lane", () => {
+test("a label runs the whole line, past Now and over its band", () => {
   const [line] = t.timelineLines({ epics: [epic(19, [child(60, { started: -1, forecast: 5 })], [[-1, null]], { forecast: fc(3, 5, 8) })], releases: [] }, now);
   const measure = (s) => s.length * 6;
-  // Now is 20 px on: room for nothing.
-  const room = t.labelRoom(line, axis.x(line.start), axis, now);
-  assert.equal(room, 14);
-  assert.equal(t.fitLabel(line, room, measure), undefined);
+  // Now is 20 px on, and the band 80: the label runs on to the line's end (Alex, 2026-11-10).
+  const x = axis.x(line.start);
+  assert.equal(t.labelRoom(line, x, axis), axis.x(line.end) - x);
+  assert.equal(t.fitLabel(line, 10, measure), undefined);
   assert.equal(t.labelText(t.fitLabel(line, 80, measure)), "#19 · 0 of 1");
   assert.equal(t.labelText(t.fitLabel(line, Infinity, measure)), "Issue 19  #19 · 0 of 1");
 });
@@ -154,7 +154,7 @@ test("a long title is cut with an ellipsis so the label fits its line", () => {
   const measure = (s) => Array.from(s).length * 6;
   // A closed line: the label stops at its end, not after it.
   const x = axis.x(line.start);
-  assert.equal(t.labelRoom(line, x, axis, now), axis.x(line.end) - x);
+  assert.equal(t.labelRoom(line, x, axis), axis.x(line.end) - x);
   // "Issue 19  #19 · 1 of 1" is 22 characters; 20 keep "Issue…" and the figures.
   assert.deepEqual(t.fitLabel(line, 20 * 6, measure), { title: "Issue…", figures: "#19 · 1 of 1" });
   // Room for one letter and "…": the name keeps one; less, and only the figures.
@@ -181,6 +181,39 @@ test("the hit is the nearest dot, then the line", () => {
   assert.equal(at(axis.x(h(-4)), y + 5)?.kind, "line");
   assert.equal(at(axis.x(h(-12)), trunk)?.release?.tag, "v1.2.0");
   assert.equal(at(axis.x(h(-4)), y - 20), undefined);
+});
+
+test("a dot is on the stretch of its line that is on its lane", () => {
+  // Children that closed as the line forked and as it joined: their dots are held off the curves.
+  const timeline = { epics: [epic(23, [child(92, { started: -10, closed: -10 }), child(93, { started: -9, closed: -2 })], [[-10, -2]])], releases: [] };
+  const [line] = t.layout(t.timelineLines(timeline, now), axis, () => 10);
+  const r = t.riser(line.lane);
+  const [first, last] = line.dots;
+  assert.equal(t.dotX(first, line, axis), axis.x(line.start) + r);
+  assert.equal(t.dotX(last, line, axis), axis.x(line.end) - r);
+  // The hit test finds a dot where it is drawn.
+  const trunk = 200, lane = 60;
+  assert.equal(t.hit({ x: axis.x(line.start) + r, y: trunk - line.lane * lane }, [line], [], axis, trunk, lane)?.dot?.number, "#92");
+});
+
+test("the hover card is a row of three lines: the title, the labels, the prediction", () => {
+  const labelled = epic(24, [child(94, { started: -3, closed: -1 }), child(95, { forecast: 2 })], [[-3, null]], { forecast: fc(1, 2, 4) });
+  labelled.item.labels = [{ name: "enhancement", color: "a2eeef" }];
+  labelled.children[0].item.labels = [{ name: "bug" }];
+  const timeline = { epics: [labelled], releases: [], backtest: { error: 2.16, width: 1.3, cuts: 69, holds: 55, epics: 21, at: wire(0) } };
+  const lines = t.timelineLines(timeline, now);
+  const [row] = t.cardRows({ kind: "line", line: lines[0] }, lines, timeline, now);
+  assert.deepEqual([row.state, row.title], ["open", "Issue 24"]);
+  assert.deepEqual(row.labels.map((l) => l.name), ["enhancement"]);
+  assert.match(row.line, /^#24 · 1 of 2 · closes about .*–.*, 8 in 10$/);
+  // How past forecasts did is the title line's help, not the card's.
+  assert.doesNotMatch(row.line, /Past forecasts/);
+  const [dot] = t.cardRows({ kind: "dot", line: lines[0], dot: lines[0].dots[0] }, lines, timeline, now);
+  assert.deepEqual([dot.state, dot.title, dot.labels.map((l) => l.name), dot.line], ["closed", "Issue 94", ["bug"], "#94 · closed 1 h ago"]);
+  const [release] = t.cardRows({ kind: "release", release: { tag: "v1.2.0", at: wire(-2), repo: "alexec/Agents" } }, lines, timeline, now);
+  assert.deepEqual([release.state, release.line], [undefined, "alexec/Agents · released 2 h ago"]);
+  assert.equal(t.titleWords("Agents", t.epicCount(lines, t.rangeWindow("twoDays", now)), "twoDays"), "Agents · 1 epic in these 2 days");
+  assert.equal(t.titleWords("", 6, "week"), "6 epics in these 7 days");
 });
 
 test("the words say about", () => {

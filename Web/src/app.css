@@ -2448,10 +2448,11 @@ dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
 .work-feature-row .lead.attention { color: var(--tint-attention); opacity: 1; }
 /* Work ▸ Timeline (#4206), as the window's (#4173): white by day, navy at night, where the lines glow and the
    features' colours are mixed 25% with white to keep 3:1 on the navy (wireframe section 11). */
-.timeline-page { --timeline-plot: #ffffff; --timeline-ahead: #f6f6f6; --timeline-faint: #8c8c8c; --timeline-trunk: #999999;
-  --timeline-release: #000000; --timeline-now: #ff3b30; --timeline-glow: 0; }
+/* One background before and after Now, and Now grey (Alex, 2026-11-10). */
+.timeline-page { --timeline-plot: #ffffff; --timeline-faint: #8c8c8c; --timeline-trunk: #999999;
+  --timeline-release: #000000; --timeline-now: #8c8c8c; --timeline-glow: 0; }
 @media (prefers-color-scheme: dark) {
-  .timeline-page { --timeline-plot: #0d1429; --timeline-ahead: #141f38; --timeline-faint: #999999; --timeline-trunk: rgb(255 255 255 / 90%);
+  .timeline-page { --timeline-plot: #0d1429; --timeline-faint: #999999; --timeline-trunk: rgb(255 255 255 / 90%);
     --timeline-release: #ffffff; --timeline-glow: 1; }
   .timeline-page [style*="--c"] { --c-shown: color-mix(in srgb, var(--c) 75%, white); }
 }
@@ -2464,18 +2465,17 @@ dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
 .timeline-plot.pointing { cursor: pointer; }
 .timeline-axis { position: sticky; bottom: 0; }
 .timeline-ground { fill: var(--timeline-plot); }
-.timeline-ahead { fill: var(--timeline-ahead); }
 .timeline-stroke path { fill: none; stroke: var(--c-shown, var(--c)); stroke-linecap: round; }
 .timeline-stroke .glow { opacity: calc(0.7 * var(--timeline-glow)); filter: blur(3px); }
 .timeline-band { fill: var(--c-shown, var(--c)); opacity: 0.13; }
 .timeline-join circle { fill: var(--c-shown, var(--c)); }
-.timeline-join.forecast circle { fill: var(--timeline-ahead); stroke: var(--c-shown, var(--c)); stroke-width: 2; }
+.timeline-join.forecast circle { fill: var(--timeline-plot); stroke: var(--c-shown, var(--c)); stroke-width: 2; }
 .timeline-join text { fill: white; font-weight: 700; }
 .timeline-join.forecast text { fill: var(--c-shown, var(--c)); }
 .timeline-release { fill: var(--timeline-plot); stroke: var(--timeline-release); stroke-width: 2; }
 .timeline-dot { fill: var(--c-shown, var(--c)); }
 .timeline-dot.dropped { fill: var(--timeline-faint); }
-.timeline-dot.ahead { fill: var(--timeline-ahead); stroke: var(--c-shown, var(--c)); stroke-width: 1.5; }
+.timeline-dot.ahead { fill: var(--timeline-plot); stroke: var(--c-shown, var(--c)); stroke-width: 1.5; }
 .timeline-working circle { fill: var(--timeline-plot); stroke: var(--c-shown, var(--c)); stroke-width: 1.5; }
 .timeline-working path { fill: var(--c-shown, var(--c)); }
 .timeline-cross { fill: none; stroke: var(--c-shown, var(--c)); stroke-width: 2; }
@@ -2495,13 +2495,31 @@ dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
 .timeline-tick.midnight text { font-weight: 600; }
 .timeline-empty { position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%); width: max-content; max-width: 80%; margin: 0;
   padding: 6px 10px; border-radius: 6px; background: var(--paper-raised); box-shadow: 0 1px 4px var(--paper-shadow); pointer-events: none; }
-.timeline-card { position: absolute; z-index: 2; max-width: 320px; padding: 8px; border: 1px solid var(--paper-rule); border-radius: 6px;
+.timeline-card { position: absolute; z-index: 2; max-width: 360px; padding: 8px; border: 1px solid var(--paper-rule); border-radius: 6px;
   background: var(--paper-raised); box-shadow: 0 2px 8px var(--paper-shadow); pointer-events: none; line-height: 1.35; }
-.timeline-card .strong { font-weight: 600; }
+.timeline-card .strong { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timeline-card-title { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.timeline-card-title svg { flex: none; }
+.timeline-card .work-chips, .timeline-card-line { margin-left: 20px; }
+.timeline-card-line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timeline-card-row { display: flex; flex-direction: column; gap: 4px; }
+.timeline-card-row + .timeline-card-row { margin-top: 8px; }
+.timeline-card .work-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.timeline-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* A dot that landed while the page is open pulses once; not with Reduce Motion. */
 .timeline-pulse { fill: none; stroke: var(--c-shown, var(--c)); stroke-width: 2; opacity: 0; }
 @media (prefers-reduced-motion: no-preference) {
   .timeline-pulse { animation: timeline-pulse 1s ease-out 1; }
+}
+/* An epic worked on now: a glow under its line breathes every 1.6 s, one clock for every line; not with Reduce Motion. */
+.timeline-breathing { display: none; fill: none; stroke-linecap: round; }
+.timeline-breathing path { stroke: var(--c-shown, var(--c)); }
+@media (prefers-reduced-motion: no-preference) {
+  .timeline-breathing { display: inline; animation: timeline-breathe 1.6s ease-in-out infinite; }
+}
+@keyframes timeline-breathe {
+  0%, 100% { stroke-width: 4px; stroke-opacity: 0.1; }
+  50% { stroke-width: 12px; stroke-opacity: 0.4; }
 }
 @keyframes timeline-pulse { from { r: 4px; opacity: 1; } to { r: 14px; opacity: 0; } }
 .work-plan-item { display: flex; align-items: baseline; }
