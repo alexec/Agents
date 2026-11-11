@@ -450,7 +450,7 @@ type serverWait struct {
 
 func (d *Daemon) serverWaits() []serverWait {
 	var out []serverWait
-	for _, a := range d.Store.Agents() {
+	for _, a := range d.Store.LiveAgents() {
 		w := a.EventWait
 		if w == nil || w.Ending != nil || len(w.ServerEvents) == 0 {
 			continue
