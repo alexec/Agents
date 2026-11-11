@@ -20,6 +20,10 @@ import (
 // runtimeDef is a RuntimeCatalog entry, and what RuntimeLaunch passes it.
 type runtimeDef struct {
 	wire.Runtime
+	// prefersAppCopy: on a Mac, the app's own pinned toolset goes before the person's PATH,
+	// and the first use installs it (#4512). Claude's PATH copy is `npx`, which starts an
+	// `npm exec` for each session and runs whatever adapter npm finds, not the pin.
+	prefersAppCopy bool
 }
 
 func runtime(id, name, exe string, args []string, page string, appCopyOnly bool) runtimeDef {
@@ -46,6 +50,9 @@ var catalog = func() []runtimeDef {
 		runtime("codex", "Codex", "codex-acp", nil, "https://github.com/agentclientprotocol/codex-acp", true),
 		runtime("antigravity", "Antigravity", "agy_acp_server", nil, "https://antigravity.google/docs/ide/extensions", true),
 		runtime("opencode", "OpenCode", "opencode", []string{"acp"}, "https://opencode.ai/docs/", true),
+	}
+	for i := range c {
+		c[i].prefersAppCopy = c[i].ID == "claude"
 	}
 	sort.Slice(c, func(i, j int) bool { return c[i].Name < c[j].Name })
 	return c
@@ -88,7 +95,8 @@ func toolsetShim(folder, executable string) string {
 // locate is RuntimeDiscovery.locate. On a server: the installed toolset's shim, then (for
 // a runtime that may be the person's own copy) the login shell's PATH. On a Mac (#1138):
 // the app's own toolset in the root's cache (macToolsHome) is the only copy of a runtime
-// that uses the app's copy, and is looked for after the person's PATH for the others.
+// that uses the app's copy, is looked for first for one that prefers it (#4512), and after
+// the person's PATH for the others.
 func (r *runtimeDef) locate() (path string, args []string, lookedIn []string) {
 	mac := macToolsHome != ""
 	if !mac {
@@ -102,10 +110,12 @@ func (r *runtimeDef) locate() (path string, args []string, lookedIn []string) {
 		}
 		return toolsetShim(filepath.Join(macToolsHome, r.ID), r.Executable)
 	}
-	if r.UsesAppCopyOnly {
+	if r.UsesAppCopyOnly || r.prefersAppCopy {
 		if shim := appCopy(); shim != "" {
 			return shim, r.Arguments, nil
 		}
+	}
+	if r.UsesAppCopyOnly {
 		if mac {
 			return "", nil, []string{filepath.Join(macToolsHome, r.ID, "current", "bin")}
 		}
@@ -303,7 +313,12 @@ func (d *Daemon) launchAs(r *runtimeDef, dir string, account *wire.AccountProfil
 // (#999). An org account is reached through the model relay, never the 056 relay (D8).
 func (d *Daemon) launchOn(r *runtimeDef, dir string, account *wire.AccountProfile, agent wire.UUID) (acp.Launch, error) {
 	path, args, looked := locateFor(r)
+	// Until the app's copy is whole, the person's own (npx) still runs this session.
+	installing := d.installOnFirstUse(r)
 	if path == "" {
+		if installing {
+			return acp.Launch{}, &Error{Code: CodeRuntimeNotFound, Message: r.Name + " is being installed on " + thisMachine() + ". Start again when it is ready."}
+		}
 		return acp.Launch{}, &Error{Code: CodeRuntimeNotFound, Message: r.Name + " is not installed on this machine (looked in " + strings.Join(looked, ", ") + ")"}
 	}
 	env := loginEnvironment()
