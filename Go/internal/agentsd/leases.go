@@ -64,12 +64,12 @@ func (r leaseRules) length(minutes *int64) (time.Duration, bool) {
 // waiter is a place in line. Its wait is the agent's event wait (#2361); a book from
 // before that has a waitID, which is read and dropped.
 type waiter struct {
-	AgentID wire.UUID  `json:"agentID"`
-	AskedAt wire.Date  `json:"askedAt"`
-	Minutes *int64     `json:"minutes,omitempty"`
+	AgentID wire.UUID `json:"agentID"`
+	AskedAt wire.Date `json:"askedAt"`
+	Minutes *int64    `json:"minutes,omitempty"`
 	// By is when its step stops mattering (#4268): the line is in this order, none last.
 	By     *wire.Date `json:"by,omitempty"`
-	WaitID  *wire.UUID `json:"waitID,omitempty"`
+	WaitID *wire.UUID `json:"waitID,omitempty"`
 }
 
 type leaseEntry struct {
@@ -197,6 +197,14 @@ func (d *Daemon) store(name wire.ResourceName, e *leaseEntry) {
 	} else {
 		d.book.Entries[name] = e
 	}
+}
+
+// toldWhenItEnds is a lease's Warned as lease_resource grants or extends it: one that ends
+// within leaseWarning is warned by the reply that says when it ends, so no notice says it
+// again in the agent's next reply (#4569). A grant from the line says no time, so it keeps
+// its notice.
+func toldWhenItEnds(l wire.Lease, at wire.Date) bool {
+	return l.ExpiresAt.Time().Sub(at.Time()) <= leaseWarning
 }
 
 func (d *Daemon) leaveNotice(n leaseNotice, agent wire.UUID) {

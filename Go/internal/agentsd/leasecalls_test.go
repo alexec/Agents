@@ -231,3 +231,43 @@ func TestOrdinals(t *testing.T) {
 		}
 	}
 }
+
+// #4569: a lease that lease_resource grants or extends inside the warning window was told
+// when it ends in that reply, so no ending-soon notice heads the next one; a longer lease
+// is warned once its window comes. The clock is the test's, and lapse runs when it says.
+func TestAShortLeaseIsNotWarnedAgain(t *testing.T) {
+	fakeRuntimes(t)
+	at := time.Now()
+	setClock := func(m int) { setNowFunc(func() time.Time { return at.Add(time.Duration(m) * time.Minute) }) }
+	t.Cleanup(func() { setNowFunc(time.Now) })
+	setClock(0)
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	m := appClient(t, d, seeded(t, d, t.TempDir(), nil).ID)
+	m.post("initialize", map[string]any{}, 1)
+	lapse := func() {
+		d.leaseMu.Lock()
+		events := d.lapse(now().Time())
+		d.leasesChanged()
+		d.leaseMu.Unlock()
+		d.settle(events)
+	}
+
+	m.tool(2, "lease_resource", map[string]any{"name": "short", "minutes": 3})
+	m.tool(3, "lease_resource", map[string]any{"name": "long", "minutes": 10})
+	lapse()
+	if text, _ := m.tool(4, "release_resource", map[string]any{"name": "short"}); text != "Released short." {
+		t.Fatal(text)
+	}
+	setClock(6)
+	lapse()
+	if text, _ := m.tool(5, "lease_resource", map[string]any{"name": "long", "minutes": 3}); !strings.HasPrefix(text,
+		"Your lease on long ends at "+clock(wire.DateOf(at.Add(10*time.Minute)))+". Extend it with lease_resource if you still need it.\n\nYou still hold long, now until ") {
+		t.Fatal(text)
+	}
+	// The extension leaves four minutes, said in its reply: no second notice.
+	lapse()
+	if text, _ := m.tool(6, "release_resource", map[string]any{"name": "long"}); text != "Released long." {
+		t.Fatal(text)
+	}
+}
