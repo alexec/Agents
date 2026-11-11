@@ -6,7 +6,8 @@ import UIKit
 /// What the Remote's walk socket does (#1182), on the main thread, in this process: the
 /// window draws itself into a PNG, reads its own accessibility tree, and presses and types
 /// into its own elements. The same verbs and replies as the Mac's (#1172), less the ones a
-/// phone has no use for (menus, window sizes, folding).
+/// phone has no use for (the menu bar, window sizes, folding). A `Menu`'s menu opens and
+/// runs its items through `press` (#4381).
 @MainActor
 enum WalkCommands {
     static func run(_ line: Data) -> Data {
