@@ -36,27 +36,10 @@ public enum WorkLook {
         }
     }
 
-    /// The four state colours, light and dark (GitHub's own, as parts.md section 1 sets them).
+    /// The four state colours (GitHub's own, as parts.md section 1 sets them). Their values are
+    /// `design/tokens.json`'s `color.forge` and `Shared/UI/Paper.swift`'s `forge…` (#4618).
     public enum Tone: String, Sendable, CaseIterable {
         case green, purple, grey, red
-
-        public var light: UInt32 {
-            switch self {
-            case .green: 0x1A7F37
-            case .purple: 0x8250DF
-            case .grey: 0x6E7781
-            case .red: 0xCF222E
-            }
-        }
-
-        public var dark: UInt32 {
-            switch self {
-            case .green: 0x3FB950
-            case .purple: 0xA371F7
-            case .grey: 0x8B949E
-            case .red: 0xF85149
-            }
-        }
     }
 
     /// The glyph of an issue or a pull request; nil for a release, or a state no one

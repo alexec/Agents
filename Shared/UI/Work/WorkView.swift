@@ -453,10 +453,10 @@ struct WorkStatePill: View {
     /// its forge, not the app's (`StateTint`).
     private func color(_ word: String) -> Color {
         switch word {
-        case "open": Color(red: 0x1f / 255, green: 0x88 / 255, blue: 0x3d / 255)
-        case "merged": Color(red: 0x82 / 255, green: 0x50 / 255, blue: 0xdf / 255)
-        case "closed": Color(red: 0xcf / 255, green: 0x22 / 255, blue: 0x2e / 255)
-        default: Color(red: 0x59 / 255, green: 0x63 / 255, blue: 0x6e / 255)
+        case "open": Paper.forgeFillOpen
+        case "merged": Paper.forgeFillDone
+        case "closed": Paper.forgeFillClosed
+        default: Paper.forgeFillDraft
         }
     }
 }

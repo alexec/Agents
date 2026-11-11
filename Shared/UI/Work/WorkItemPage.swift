@@ -337,7 +337,7 @@ struct WorkItemPage: View {
 
     private func leadDot(_ state: AgentState) -> Color {
         switch state {
-        case .waitingOnUser: Color(light: 0x9A6700, dark: 0xD29922)
+        case .waitingOnUser: Paper.forgeWaiting
         case .starting, .running: WorkLook.Tone.green.color
         default: Color.secondary.opacity(0.5)
         }

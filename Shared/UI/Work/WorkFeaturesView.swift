@@ -432,7 +432,7 @@ struct WorkFeaturesPane: View {
         .help(isOpen ? "Fold \(group.words)" : "Show \(group.words)")
     }
 
-    private static let attention = Color(light: 0x9A6700, dark: 0xD29922)
+    private static let attention = Paper.forgeWaiting
 
     // MARK: Counting
 

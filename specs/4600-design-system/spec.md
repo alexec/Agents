@@ -109,8 +109,17 @@ The values the app has today. `design/tokens.json` holds them (#4602; the repo's
 | tint.vouched | `#2D765C` | `#8BC6A7` | approved, done |
 | label.issue | `#0E6B82` | `#6CC6DB` | a label naming an issue, `#12` |
 | label.pull | `#7442B8` | `#B79AF0` | a label naming a pull request, `P#12` |
+| forge.open | `#1A7F37` | `#3FB950` | an item's state on its forge (GitHub's colours, #4618): open, a check passed |
+| forge.done | `#8250DF` | `#A371F7` | a closed issue that is done, a merged pull request |
+| forge.draft | `#6E7781` | `#8B949E` | not planned, a draft |
+| forge.closed | `#CF222E` | `#F85149` | closed without a merge, a check failed, changes requested |
+| forge.waiting | `#9A6700` | `#D29922` | the forge's amber: waits on someone, still runs |
+| forge.waiting-wash, waiting-rule | `#FFF8C5`, `#D4A72C` | `#2F2A1A`, `#6B5A1E` | a notice in the amber: fill, edge |
+| forge.mark | `#212121` | `#212121` | the disc under a connector's letters |
+| forge.fill.open, done, closed, draft | `#1F883D`, `#8250DF`, `#CF222E`, `#59636E` | `#238636`, `#8957E5`, `#DA3633`, `#6E7681` | a state chip's fill under white words |
+| code.comment … code.punctuation | `InkValues.swift` | | code's ink, 8 roles (041); `DesignTokensTests` checks `InkValues.swift` |
 
-Every text colour clears 4.5:1 on the ground and the well; the accent is never drawn on a selection.
+Every text colour clears 4.5:1 on the ground and the well; the accent is never drawn on a selection. In Swift a colour's value is written only in `Paper.swift`, `StateTint.swift` and `InkValues.swift`; `ConsistencyTests.noCallSiteWritesAColourValue` fails on one anywhere else in `App/Sources`, `Remote/Sources` and `Shared/UI` that is not on its allow-list (#4618).
 
 ### Shape
 

@@ -18,7 +18,7 @@ thing only, which is something going wrong, and an icon that shouts undoes that.
 
 ## Now: Blob
 
-Since 2026-10-03 the icon is **Blob** from `colour/` (violet, oval eyes, the soft outline),
+Since 2026-10-03 the icon is **Blob** from `colour/` (oval eyes, the soft outline; cobalt since #695, violet before),
 chosen from the variations in `blob/`. `scripts/design.sh marks` (#4615) draws it from the parts in `blob/final/` and writes every mark:
 the Mac and iPhone icons, the Dock moods, the menu bar template, the docs logo and favicons, and
 the icons, favicons and touch icons of the web page and www. CI's `marks` job runs
