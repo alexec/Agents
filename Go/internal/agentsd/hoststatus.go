@@ -28,7 +28,7 @@ type hostStatusBook struct {
 // waiting on a person, no permission asked and no terminal or folder shell open.
 func (d *Daemon) hostStatus() wire.MachineStatus {
 	running := []string{}
-	for _, a := range d.Store.Agents() {
+	for _, a := range d.Store.LiveAgents() {
 		if a.State != wire.AgentStateStarting && a.State != wire.AgentStateRunning && a.State != wire.AgentStateWaitingOnUser {
 			continue
 		}

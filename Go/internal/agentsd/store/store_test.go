@@ -368,3 +368,56 @@ func TestAgentsInAgreesWithTheRecords(t *testing.T) {
 		t.Fatalf("/src/two reopened: %v", got)
 	}
 }
+
+// The live index and the archived tallies agree with the records after an archive, an
+// unarchive, a cost added to an archived record and a delete; a tally is summed once,
+// then read without visiting its records again (#4510).
+func TestLiveIndexAndArchivedTally(t *testing.T) {
+	s, _ := Open(t.TempDir())
+	byUser, endTurn := wire.AgentArchivedReasonByUser, wire.EndedReasonEndTurn
+	archived := func(id wire.UUID, made wire.Date, cost float64) wire.Agent {
+		return wire.Agent{ID: id, Cwd: "file:///src/one", State: wire.AgentStateArchived, ArchivedReason: &byUser,
+			CreatedAt: made, LastActivityAt: made + 10, CostToDate: map[string]float64{"USD": cost}}
+	}
+	live, old, older := NewUUID(), NewUUID(), NewUUID()
+	s.Save(wire.Agent{ID: live, Cwd: "file:///src/one", State: wire.AgentStateFinished, EndedReason: &endTurn, CreatedAt: 50, LastActivityAt: 60})
+	s.Save(archived(old, 20, 1))
+	s.Save(archived(older, 10, 2))
+	if got := s.LiveAgents(); len(got) != 1 || got[0].ID != live {
+		t.Fatalf("live %v", got)
+	}
+	if got := s.LiveAgentsIn("/src/one"); len(got) != 1 || got[0].ID != live {
+		t.Fatalf("live in /src/one %v", got)
+	}
+	if n := len(s.Agents()); n != 3 {
+		t.Fatalf("Agents has %d, want every record", n)
+	}
+	tally := s.ArchivedIn("/src/one")
+	if tally.Count != 2 || tally.CostToDate["USD"] != 3 || tally.FirstCreatedAt != 10 || tally.LastActivityAt != 30 {
+		t.Fatalf("tally %+v", tally)
+	}
+	// Read again, it visits nothing; the copy it gives is the caller's own.
+	tally.CostToDate["USD"] = 99
+	before := s.Visited()
+	if again := s.ArchivedIn("/src/one"); again.CostToDate["USD"] != 3 || s.Visited() != before {
+		t.Fatalf("again %+v, visited %d more", again, s.Visited()-before)
+	}
+	// An archived record changes: its tally is summed again.
+	s.Save(archived(old, 20, 5))
+	if got := s.ArchivedIn("/src/one"); got.CostToDate["USD"] != 7 {
+		t.Fatalf("after a cost %+v", got)
+	}
+	// The live one is archived, an archived one comes back, one is deleted.
+	s.Save(archived(live, 50, 1))
+	s.Save(wire.Agent{ID: old, Cwd: "file:///src/one", State: wire.AgentStateFinished, EndedReason: &endTurn, CreatedAt: 20, LastActivityAt: 70})
+	s.Delete(older)
+	if got := s.LiveAgentsIn("/src/one"); len(got) != 1 || got[0].ID != old {
+		t.Fatalf("live after the moves %v", got)
+	}
+	if got := s.ArchivedIn("/src/one"); got.Count != 1 || got.CostToDate["USD"] != 1 || got.FirstCreatedAt != 50 {
+		t.Fatalf("tally after the moves %+v", got)
+	}
+	if got := s.ArchivedIn("/src/none"); got.Count != 0 || len(got.CostToDate) != 0 {
+		t.Fatalf("an empty folder's tally %+v", got)
+	}
+}

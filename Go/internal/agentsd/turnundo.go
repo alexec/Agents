@@ -62,7 +62,7 @@ func (d *Daemon) snapshotTurn(id, turn wire.UUID) *turnSnapshot {
 
 // othersInTurn is whether another agent working in root is in a turn now.
 func (d *Daemon) othersInTurn(id wire.UUID, root string) bool {
-	for _, o := range d.Store.Agents() {
+	for _, o := range d.Store.LiveAgents() {
 		if o.ID == id || o.State == wire.AgentStateArchived {
 			continue
 		}

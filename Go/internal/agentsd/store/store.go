@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
@@ -36,6 +37,15 @@ type Store struct {
 	// (#4507). Kept true with agents, under mu.
 	inFolder map[string]map[wire.UUID]struct{}
 	indexed  map[wire.UUID]string
+	// live is the agents not archived, and liveIn each folder's, so the paths that need
+	// only those (the summary, approvals, idle, helper limits) skip the 99% that are
+	// archived (#4510). tallies is each folder's archived agents summed (ArchivedIn), made
+	// when first asked for and dropped when one of them changes. Kept true with agents.
+	live    map[wire.UUID]struct{}
+	liveIn  map[string]map[wire.UUID]struct{}
+	tallies map[string]ArchivedTally
+	// visited is how many records were copied out of the store: a test's count (#4510).
+	visited atomic.Int64
 	folders  []wire.Folder
 	// lines is each transcript's count of lines, once counted, for an entry's index.
 	lines map[wire.UUID]int
@@ -56,7 +66,8 @@ func Open(root string) (*Store, error) {
 			return nil, err
 		}
 	}
-	s := &Store{Loc: loc, agents: map[wire.UUID]*wire.Agent{}, inFolder: map[string]map[wire.UUID]struct{}{}, indexed: map[wire.UUID]string{}, lines: map[wire.UUID]int{}, held: map[wire.UUID]*heldLines{}}
+	s := &Store{Loc: loc, agents: map[wire.UUID]*wire.Agent{}, inFolder: map[string]map[wire.UUID]struct{}{}, indexed: map[wire.UUID]string{},
+		live: map[wire.UUID]struct{}{}, liveIn: map[string]map[wire.UUID]struct{}{}, tallies: map[string]ArchivedTally{}, lines: map[wire.UUID]int{}, held: map[wire.UUID]*heldLines{}}
 	id, adopts := loadOrMakeRootID(loc.RootIdentity(), loc.Root)
 	s.RootID = id
 	s.folders = s.loadFolders()
@@ -266,27 +277,46 @@ func (s *Store) put(a *wire.Agent) {
 	s.drop(a.ID)
 	s.agents[a.ID] = a
 	f := AgentFolder(a)
-	ids := s.inFolder[f]
-	if ids == nil {
-		ids = map[wire.UUID]struct{}{}
-		s.inFolder[f] = ids
-	}
-	ids[a.ID] = struct{}{}
+	file(s.inFolder, f, a.ID)
 	s.indexed[a.ID] = f
+	if a.State == wire.AgentStateArchived {
+		delete(s.tallies, f)
+	} else {
+		s.live[a.ID] = struct{}{}
+		file(s.liveIn, f, a.ID)
+	}
 }
 
 // drop forgets a record and its place in the folder index. With mu held.
 func (s *Store) drop(id wire.UUID) {
+	if a := s.agents[id]; a != nil && a.State == wire.AgentStateArchived {
+		delete(s.tallies, s.indexed[id])
+	}
 	delete(s.agents, id)
+	delete(s.live, id)
 	f, ok := s.indexed[id]
 	if !ok {
 		return
 	}
 	delete(s.indexed, id)
-	if ids := s.inFolder[f]; ids != nil {
+	unfile(s.inFolder, f, id)
+	unfile(s.liveIn, f, id)
+}
+
+func file(index map[string]map[wire.UUID]struct{}, f string, id wire.UUID) {
+	ids := index[f]
+	if ids == nil {
+		ids = map[wire.UUID]struct{}{}
+		index[f] = ids
+	}
+	ids[id] = struct{}{}
+}
+
+func unfile(index map[string]map[wire.UUID]struct{}, f string, id wire.UUID) {
+	if ids := index[f]; ids != nil {
 		delete(ids, id)
 		if len(ids) == 0 {
-			delete(s.inFolder, f)
+			delete(index, f)
 		}
 	}
 }
@@ -327,7 +357,18 @@ func (s *Store) Agent(id wire.UUID) *wire.Agent {
 func (s *Store) AgentsIn(folder string) []wire.Agent {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	ids := s.inFolder[folder]
+	return s.copies(s.inFolder[folder])
+}
+
+// LiveAgentsIn is AgentsIn without the archived records (#4510).
+func (s *Store) LiveAgentsIn(folder string) []wire.Agent {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.copies(s.liveIn[folder])
+}
+
+// copies is the records of ids, in no order. With mu held.
+func (s *Store) copies(ids map[wire.UUID]struct{}) []wire.Agent {
 	if len(ids) == 0 {
 		return nil
 	}
@@ -335,10 +376,11 @@ func (s *Store) AgentsIn(folder string) []wire.Agent {
 	for id := range ids {
 		out = append(out, *s.agents[id])
 	}
+	s.visited.Add(int64(len(out)))
 	return out
 }
 
-// Agents is every record, newest activity first.
+// Agents is every record, archived ones too, newest activity first.
 func (s *Store) Agents() []wire.Agent {
 	s.mu.Lock()
 	out := make([]wire.Agent, 0, len(s.agents))
@@ -346,6 +388,20 @@ func (s *Store) Agents() []wire.Agent {
 		out = append(out, *a)
 	}
 	s.mu.Unlock()
+	s.visited.Add(int64(len(out)))
+	return newestFirst(out)
+}
+
+// LiveAgents is every record that is not archived, newest activity first (#4510): what
+// a path that skips the archived reads, so it does not copy them only to throw them away.
+func (s *Store) LiveAgents() []wire.Agent {
+	s.mu.Lock()
+	out := s.copies(s.live)
+	s.mu.Unlock()
+	return newestFirst(out)
+}
+
+func newestFirst(out []wire.Agent) []wire.Agent {
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].LastActivityAt != out[j].LastActivityAt {
 			return out[i].LastActivityAt > out[j].LastActivityAt
@@ -354,6 +410,65 @@ func (s *Store) Agents() []wire.Agent {
 	})
 	return out
 }
+
+// AgentFolders is every folder some agent is in, in no order.
+func (s *Store) AgentFolders() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]string, 0, len(s.inFolder))
+	for f := range s.inFolder {
+		out = append(out, f)
+	}
+	return out
+}
+
+// ArchivedTally is what a folder's summary needs of its archived agents (#4510): their
+// count, their cost summed, the earliest made and the latest activity.
+type ArchivedTally struct {
+	Count          int64
+	CostToDate     map[string]float64
+	FirstCreatedAt wire.Date
+	LastActivityAt wire.Date
+}
+
+// ArchivedIn is the folder's archived agents summed: read once, then kept until one of
+// them changes, so a summary reads only its live records (#4510). The cost is a copy.
+func (s *Store) ArchivedIn(folder string) ArchivedTally {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	t, ok := s.tallies[folder]
+	if !ok {
+		t = ArchivedTally{CostToDate: map[string]float64{}}
+		for id := range s.inFolder[folder] {
+			a := s.agents[id]
+			if a.State != wire.AgentStateArchived {
+				continue
+			}
+			if t.Count == 0 || a.CreatedAt < t.FirstCreatedAt {
+				t.FirstCreatedAt = a.CreatedAt
+			}
+			if a.LastActivityAt > t.LastActivityAt {
+				t.LastActivityAt = a.LastActivityAt
+			}
+			for cur, v := range a.CostToDate {
+				t.CostToDate[cur] += v
+			}
+			t.Count++
+		}
+		s.visited.Add(t.Count)
+		s.tallies[folder] = t
+	}
+	cost := make(map[string]float64, len(t.CostToDate))
+	for cur, v := range t.CostToDate {
+		cost[cur] = v
+	}
+	t.CostToDate = cost
+	return t
+}
+
+// Visited is how many records the store has copied out or summed since it opened: a
+// test's count of the work a path does (#4510).
+func (s *Store) Visited() int64 { return s.visited.Load() }
 
 // Append adds an entry to an agent's transcript and says its index: the line it is.
 // The entry is redacted as AppendMany does it; AppendOne also gives it back.

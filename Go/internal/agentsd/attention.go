@@ -397,7 +397,7 @@ func (d *Daemon) needs() []wire.Need {
 			need(wire.NeedID{Elicitation: &id}, a, wire.NeedKindElicitation, "Asks: "+elicitationTitle(e), formAnswers(e))
 		}
 	}
-	for _, a := range d.Store.Agents() {
+	for _, a := range d.Store.LiveAgents() {
 		if a.State != wire.AgentStateFinished || a.Report == nil || !needsAPerson(a.Report.Outcome) || archived[folderPath(&a)] {
 			continue
 		}
@@ -741,7 +741,7 @@ func (d *Daemon) waitingCount() int64 {
 		}
 	}
 	var n int64
-	for _, a := range d.Store.Agents() {
+	for _, a := range d.Store.LiveAgents() {
 		if a.State == wire.AgentStateArchived || archived[folderPath(&a)] {
 			continue
 		}
