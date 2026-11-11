@@ -93,14 +93,9 @@ func titles(agents []wire.Agent) string {
 	return strings.Join(names, ", ")
 }
 
+// agentsOf is a folder's agents, in no order, from the store's folder index (#4507).
 func (d *Daemon) agentsOf(folder string) []wire.Agent {
-	var out []wire.Agent
-	for _, a := range d.Store.Agents() {
-		if folderPath(&a) == folder {
-			out = append(out, a)
-		}
-	}
-	return out
+	return d.Store.AgentsIn(folder)
 }
 
 func holdsRuntime(s wire.AgentState) bool {
@@ -662,10 +657,10 @@ func (d *Daemon) approvedConfig(folder string) (map[string]any, error) {
 	return m, nil
 }
 
-// archiveApprovals is the sessions asking to be archived, oldest first.
-func (d *Daemon) archiveApprovals(folder string) []wire.Approval {
+// archiveApprovals is the sessions of a folder's agents asking to be archived, oldest first.
+func archiveApprovals(agents []wire.Agent) []wire.Approval {
 	var asking []wire.Agent
-	for _, a := range d.agentsOf(folder) {
+	for _, a := range agents {
 		if a.ArchiveRequest != nil && a.ArchiveRequest.Requested != nil && a.State != wire.AgentStateArchived {
 			asking = append(asking, a)
 		}
@@ -686,8 +681,9 @@ func (d *Daemon) archiveApprovals(folder string) []wire.Approval {
 }
 
 // dress is what a summary says beyond the record: the settings in .agents/folder.json
-// (#126), the record's own older ones where the file has none.
-func (d *Daemon) dress(s *wire.FolderSummary) {
+// (#126), the record's own older ones where the file has none. agents is the folder's
+// agents, read once by the caller (#4507).
+func (d *Daemon) dress(s *wire.FolderSummary, agents []wire.Agent) {
 	folder := store.FolderPath(s.Folder.Folder)
 	if s.Folder.Pinned != nil && !*s.Folder.Pinned {
 		s.Folder.Pinned = nil
@@ -700,7 +696,7 @@ func (d *Daemon) dress(s *wire.FolderSummary) {
 			s.Approvals = append(s.Approvals, fileApproval(c))
 		}
 	}
-	s.Approvals = append(s.Approvals, d.archiveApprovals(folder)...)
+	s.Approvals = append(s.Approvals, archiveApprovals(agents)...)
 	s.Approvals = append(s.Approvals, d.workflowFailures(folder)...)
 	s.Approvals = append(s.Approvals, d.deployApprovals(folder)...)
 	m, err := d.approvedConfig(folder)
