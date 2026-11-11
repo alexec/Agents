@@ -375,6 +375,7 @@ func (d *Daemon) refreshCostResolvedLocked() {
 			if e.parent != nil {
 				keep(&c.Parent, e.parent.Ref)
 			}
+			keep(&c.Milestone, e.milestone)
 		}
 		if reflect.DeepEqual(before, c) {
 			continue

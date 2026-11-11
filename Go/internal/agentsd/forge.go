@@ -816,7 +816,12 @@ func (d *Daemon) resolvedFromForge(items []wire.ForgeItem) {
 			p := *i.Parent
 			parent = &p
 		}
-		d.resolveCache[i.Node] = resolvedEntry{resolved: wire.LineageResolved{Title: i.Title, State: &state, Labels: labels}, ok: true, at: now, parent: parent}
+		milestone := had.milestone
+		if i.Milestone != nil {
+			milestone = *i.Milestone
+		}
+		d.resolveCache[i.Node] = resolvedEntry{resolved: wire.LineageResolved{Title: i.Title, State: &state, Labels: labels}, ok: true, at: now,
+			parent: parent, milestone: milestone}
 	}
 }
 

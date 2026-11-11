@@ -67,3 +67,34 @@ func TestLineageForecastOfAnEpic(t *testing.T) {
 		t.Fatalf("%+v", got)
 	}
 }
+
+// #4620: lineage/forecast for a milestone reads the store's issues in it, in the folder's repo;
+// a node and a milestone together are refused.
+func TestLineageForecastOfAMilestone(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	folder := t.TempDir()
+	d.repos = map[string]forgeRepo{folder: {"github", "alexec/agents"}}
+	issue := wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#11"}
+	open := "open"
+	d.workMu.Lock()
+	d.costLedgerLocked().Nodes[costKey(issue)] = wire.LineageCostNode{Node: issue, Repo: new("github:alexec/agents"), Milestone: new("Planning"),
+		Level: new("task"), Banked: wire.LineageCost{Cost: map[string]float64{}}, Resolved: &wire.LineageResolved{State: &open}}
+	d.workMu.Unlock()
+	var f wire.LineageForecast
+	if err := json.Unmarshal(c.call(t, 1, "lineage/forecast", wire.LineageForecastRequest{Milestone: new("Planning"), Folder: &folder}), &f); err != nil {
+		t.Fatal(err)
+	}
+	if f.Lands != nil || f.NoForecast == nil || *f.NoForecast != lineage.NoForecastHistory || f.Milestone == nil || f.Burn == nil {
+		t.Fatalf("%+v", f)
+	}
+	if err := json.Unmarshal(c.call(t, 2, "lineage/forecast", wire.LineageForecastRequest{Milestone: new("Later"), Folder: &folder}), &f); err != nil {
+		t.Fatal(err)
+	}
+	if f.NoForecast == nil || *f.NoForecast != lineage.NoForecastNoItems {
+		t.Fatalf("%+v", f)
+	}
+	if _, err := d.lineageForecast(t.Context(), wire.LineageForecastRequest{Node: &issue, Milestone: new("Planning")}); err == nil {
+		t.Fatal("a node and a milestone together")
+	}
+}
