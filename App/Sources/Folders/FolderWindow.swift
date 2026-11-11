@@ -227,8 +227,10 @@ private struct FolderWindowColumns: View {
             }
         case .workflow(let id, _):
             WorkflowPage(workflowID: id).paperGround()
-        case .archive(let key):
-            FolderWorkPage(page: .archive, folder: key).paperGround()
+        case .archivedSessions(let key):
+            ArchivedSessionsPage(folder: key).paperGround()
+        case .archivedWorkflows(let key):
+            ArchivedWorkflowsPage(folder: key).paperGround()
         case .folderMCPServers(let key):
             MCPServersView(folder: key).paperGround()
         case .review(let id, let key):

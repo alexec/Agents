@@ -503,7 +503,9 @@ struct FolderListView: View {
             folds.set(key, open: true)
         } else if case .pin(_, let key) = item {
             folds.set(key, open: true)
-        } else if case .archive(let key) = item {
+        } else if case .archivedSessions(let key) = item {
+            folds.set(key, open: true)
+        } else if case .archivedWorkflows(let key) = item {
             folds.set(key, open: true)
         } else if case .folderMCPServers(let key) = item {
             // The project's Connectors row may be another folder's of the group (#3407).
@@ -669,12 +671,20 @@ struct FolderFold: View {
                                    item: .folderMCPServers(place), warns: tally?.failing == true || ended != nil,
                                    count: servers.count)
                         .help([tally?.words ?? "No connectors yet", ended].compactMap { $0 }.joined(separator: ". "))
-                    // The archive, one row opening a page (#495): never a fold inside
-                    // the group.
-                    let archived = fold.archivedCount(summary) + fold.archivedWorkflows.count
-                    if archived > 0 {
-                        FolderPageRow(title: "Archived", systemImage: "archivebox", item: .archive(key))
-                            .help("\(archived) archived")
+                    // The archive, a row each for its sessions and its workflows opening a page
+                    // (#495, #4448): never a fold inside the group. Each only with something in it,
+                    // its count in the help, nothing at the row's end (#587).
+                    let sessions = fold.archivedCount(summary)
+                    if sessions > 0 {
+                        FolderPageRow(title: ArchivedPage.Sessions.title, systemImage: ArchivedPage.Sessions.systemImage,
+                                      item: .archivedSessions(key))
+                            .help(ArchivedPage.sessionCount(sessions))
+                    }
+                    let flows = fold.archivedWorkflows.count
+                    if flows > 0 {
+                        FolderPageRow(title: ArchivedPage.Workflows.title, systemImage: ArchivedPage.Workflows.systemImage,
+                                      item: .archivedWorkflows(key))
+                            .help(ArchivedPage.workflowCount(flows))
                     }
                 }
             } header: {
@@ -827,9 +837,11 @@ struct SessionSidebarRow: View {
     var folds: SidebarFolds? = nil
     /// In its folder's Sessions fold: one level in, under the word Sessions (#2312).
     var isNested = false
+    /// On the Archived Sessions page (#4448): its time is when it was archived.
+    var showsArchivedTime = false
 
     var body: some View {
-        AgentRow(agent: agent, isCompact: true, place: place, tree: tree) {
+        AgentRow(agent: agent, isCompact: true, place: place, tree: tree, showsArchivedTime: showsArchivedTime) {
             guard let tree else { return }
             folds?.set(session: agent.id, open: !tree.isUnfolded)
         }

@@ -20,3 +20,20 @@ struct ActivityTime: View {
         .help(date.formatted(date: .abbreviated, time: .shortened))
     }
 }
+
+/// When a session was archived, on its row of an Archived Sessions page (#4448): "2 h ago"
+/// under Today, the clock time under any other day, the full date and time in the tooltip.
+struct ArchivedTime: View {
+    let date: Date
+
+    var body: some View {
+        TimelineView(.everyMinute) { context in
+            Text(ArchivedPage.time(date, now: context.date))
+                .appText(.fine)
+                .foregroundStyle(.tertiary)
+                .lineLimit(1)
+        }
+        .fixedSize()
+        .help(date.formatted(date: .complete, time: .shortened))
+    }
+}

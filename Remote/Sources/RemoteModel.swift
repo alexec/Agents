@@ -598,7 +598,7 @@ final class RemoteModel {
             if case .work = openActivity { return .work(workPlace.kind) }
             if let openActivity { return openActivity }
             guard let key = selectedKey else { return nil }
-            if openArchive { return .archive(key) }
+            if openArchive { return .archivedSessions(key) }
             if let openPin { return .pin(openPin, in: key) }
             if let openWorkflow { return .workflow(openWorkflow, in: key) }
             if let selection { return .session(selection) }
@@ -662,9 +662,9 @@ final class RemoteModel {
                 // The list's row: its list, or the place in it still open (#4004).
                 if workPlace.kind != kind { workHistory.go(WorkPlace(kind: kind)) }
                 openActivity = newValue
-            case .archive(let key):
+            case .archivedSessions(let key), .archivedWorkflows(let key):
                 // The folder's archive page (#495, #498), with what is opened from it
-                // pushed over it.
+                // pushed over it. One page for both until the Remote has the two (#4452).
                 selectedKey = key
                 selection = nil
                 openPin = nil
