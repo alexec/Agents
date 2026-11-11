@@ -12223,6 +12223,21 @@ type SendFile struct {
 	Size int64 `json:"size"`
 }
 
+// send/changed (#4613): how a send that folders/send started goes. `sent` of `total` bytes are on the other machine (0 of 0 while the bundle is made); `finished` once it ended, whichever way: `received` is the folder it became there, or `problem` says why it stopped, in the person's words.
+type SendNotification struct {
+	Send SendSummary `json:"send"`
+
+	Sent int64 `json:"sent"`
+
+	Total int64 `json:"total"`
+
+	Finished bool `json:"finished"`
+
+	Problem *string `json:"problem,omitzero"`
+
+	Received *FolderSummary `json:"received,omitzero"`
+}
+
 // What folders/sendPack made (#1123): each branch at its commit, the bundle (none when the receiving host has every commit) and the patch (none when nothing is uncommitted).
 type SendPack struct {
 	Commits []SentBranch `json:"commits"`
@@ -12255,6 +12270,40 @@ type SendReadRequest struct {
 	ID UUID `json:"id"`
 
 	Offset int64 `json:"offset"`
+}
+
+// folders/send (#4613): Send to ‹machine›… from a client. This host sends `branches` of the repository at `folder`, less the commits the folder there has, and with `includeChanges` its uncommitted changes, to `destination` on `machine` (the control plane's id or name for it; `machineName` is the name the person knows it by, for the words), through the control plane, as start_session with send does (#2929). There `checkout` is checked out and `origin` set.
+type SendRequest struct {
+	Folder URL `json:"folder"`
+
+	Machine string `json:"machine"`
+
+	MachineName *string `json:"machineName,omitzero"`
+
+	Destination string `json:"destination"`
+
+	Branches []string `json:"branches"`
+
+	Checkout string `json:"checkout"`
+
+	IncludeChanges bool `json:"includeChanges"`
+
+	Origin *string `json:"origin,omitzero"`
+}
+
+// One send folders/send started (#4613): the folder here, and the folder on the machine it goes to.
+type SendSummary struct {
+	ID UUID `json:"id"`
+
+	Folder URL `json:"folder"`
+
+	Machine string `json:"machine"`
+
+	MachineName string `json:"machineName"`
+
+	Destination string `json:"destination"`
+
+	StartedAt Date `json:"startedAt"`
 }
 
 // A branch the Mac sends, at the commit it has (#1123).

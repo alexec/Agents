@@ -31,6 +31,7 @@ type folderState struct {
 	PersonalHome string
 	cloneMu      sync.Mutex
 	clones       map[string]wire.CloneSummary
+	sendState
 }
 
 // summaryFor is the summary of one folder, or false.

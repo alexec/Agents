@@ -622,6 +622,38 @@
     "data": "aGVsbG8=",
     "end": true
   },
+  "SendRequest": {
+    "folder": "file:///Users/p/app/",
+    "machine": "pc-id",
+    "machineName": "pc",
+    "destination": "~/app",
+    "branches": ["main", "fix-login"],
+    "checkout": "fix-login",
+    "includeChanges": true,
+    "origin": "git@github.com:o/app.git"
+  },
+  "SendSummary": {
+    "id": "A0000000-0000-4000-8000-000000000002",
+    "folder": "file:///Users/p/app/",
+    "machine": "pc-id",
+    "machineName": "pc",
+    "destination": "~/app",
+    "startedAt": 800000000
+  },
+  "SendNotification": {
+    "send": {
+      "id": "A0000000-0000-4000-8000-000000000002",
+      "folder": "file:///Users/p/app/",
+      "machine": "pc-id",
+      "machineName": "pc",
+      "destination": "~/app",
+      "startedAt": 800000000
+    },
+    "sent": 4194304,
+    "total": 6291456,
+    "finished": true,
+    "problem": "app did not reach pc: pc is offline."
+  },
   "ActivityToken": {
     "agentID": "A0000000-0000-4000-8000-000000000001",
     "token": "b1b2c3d4",
