@@ -2,7 +2,7 @@ import AgentsKitCore
 import SwiftUI
 
 /// One machine's page in the main window (#3626): the place to go for its status. A summary
-/// first (#3743): its CPU, memory and worst disk on one line. Then the detail, most of it
+/// first (#3743): its CPU, load and capacity (#4582), memory and worst disk on one line. Then the detail, most of it
 /// closed until the person opens it: the disk that matters with the others folded, a row
 /// per folder's worktrees (#3627), the runtimes installed there (#3629), resources only
 /// when one is declared or held, and its processes (#3453). Read with
@@ -100,13 +100,34 @@ struct MachinePage: View {
         return DiskSpace.headline(usage.disks, folders: folders)
     }
 
-    /// "Is this machine OK?" in one line (#3743): CPU, memory and the worst disk, in its tint.
+    /// The sessions here that wait for a place to start (#4377), for the summary's second line (#4582).
+    private var queuedStarts: Int {
+        model.work.agents.filter { $0.host == host && $0.state == .queued }.count
+    }
+
+    /// "Is this machine OK?" in one line (#3743): CPU, the load and the level (#4582), memory and
+    /// the worst disk, each in its tint. Above it at near and full, why, in the level's tint; under
+    /// it, the starts that wait.
     @ViewBuilder
     private var summarySection: some View {
         Section {
             if let usage {
+                if let warning = CapacityWords.warning(usage.machine, name: name) {
+                    Text(warning)
+                        .foregroundStyle(Self.tint(usage.machine.capacity).style(or: .primary))
+                        .monospacedDigit()
+                }
                 HStack(spacing: 0) {
-                    Text("CPU \(ProcessWords.cpu(usage.machine.cpuPercent)) · Memory \(ProcessWords.machineMemory(usage.machine))")
+                    Text("CPU \(ProcessWords.cpu(usage.machine.cpuPercent))")
+                    if let load = usage.machine.loadPerCore {
+                        Text(" · \(CapacityWords.load(load))")
+                            .help(CapacityWords.detail(usage.machine) ?? "")
+                    }
+                    if let level = CapacityWords.level(usage.machine.capacity) {
+                        Text(" · ")
+                        Text(level).foregroundStyle(Self.tint(usage.machine.capacity).style(or: .primary))
+                    }
+                    Text(" · Memory \(ProcessWords.machineMemory(usage.machine))")
                     if let disk = headline {
                         Text(" · ")
                         Text(DiskSpace.summaryWords(disk))
@@ -116,6 +137,9 @@ struct MachinePage: View {
                 }
                 .monospacedDigit()
                 .help(ProcessWords.machineCPU(usage.machine))
+                if let queued = CapacityWords.queued(queuedStarts) {
+                    Text(queued).foregroundStyle(.secondary)
+                }
             } else if let failure {
                 Text(failure).foregroundStyle(.secondary)
             } else {
@@ -159,6 +183,14 @@ struct MachinePage: View {
             Text(disk.reading.volume)
         }
         .help(disk.level == .ok ? disk.reading.mount : "\(disk.reading.mount): \(disk.line)")
+    }
+
+    static func tint(_ level: DaemonAPI.CapacityLevel?) -> StateTint {
+        switch level {
+        case .ok, nil: .none
+        case .near: .attention
+        case .full: .failure
+        }
     }
 
     static func tint(_ level: DiskLevel) -> StateTint {
