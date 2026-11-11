@@ -118,6 +118,9 @@ type Store interface {
 	// SetState records that a node's state changed to state at at (#4274), unless it is in
 	// that state already, and says whether it recorded it. Links says a node's changes.
 	SetState(n wire.LineageNode, state wire.LineageSessionStateName, at time.Time) (bool, error)
+	// All is every link and every change of state kept, each oldest first: a machine's
+	// whole send to its control plane (#4275).
+	All() ([]wire.LineageLink, []wire.LineageStateChange)
 	// Prune drops what is past the bounds now, not only at open or on a long append
 	// (#3649), and says how many links it dropped.
 	Prune() int
@@ -132,6 +135,12 @@ var (
 
 // maxRef bounds a ref, so one line stays small.
 const maxRef = 512
+
+// CheckNode says what is wrong with a node's kind or ref, or nil.
+func CheckNode(n wire.LineageNode) error { return checkNode(n) }
+
+// CheckWord says what is wrong with a relationship or a source, or nil.
+func CheckWord(what, w string) error { return checkWord(what, w) }
 
 func checkNode(n wire.LineageNode) error {
 	if !kindPattern.MatchString(n.Kind) {
@@ -285,12 +294,23 @@ func (f *Files) index() {
 // drops each link from or to one, and a milestone's shipped-in link to its release.
 const removedKindMilestone = "milestone"
 
-// prune drops the links of a removed kind, the ended links past KeepEnded, then the oldest
-// past MostLinks, ended ones first. It says whether it dropped any.
+// prune drops what Bound drops, and the states past their bounds. It says whether it
+// dropped any.
 func (f *Files) prune() bool {
-	oldest := wire.DateOf(f.now().Add(-KeepEnded))
-	kept := f.links[:0:0]
-	for _, l := range f.links {
+	kept := Bound(f.links, f.now())
+	dropped := len(kept) != len(f.links)
+	f.links = kept
+	return f.pruneStates() || dropped
+}
+
+// Bound is links, oldest start first, within the bounds at now: the links of a removed
+// kind go, the ended links past KeepEnded, then the oldest past MostLinks, ended ones
+// first. The control plane's copy of a machine's links (#4275) is bounded by it too. links
+// is not changed.
+func Bound(links []wire.LineageLink, now time.Time) []wire.LineageLink {
+	oldest := wire.DateOf(now.Add(-KeepEnded))
+	kept := links[:0:0]
+	for _, l := range links {
 		if l.From.Kind == removedKindMilestone || l.To.Kind == removedKindMilestone {
 			continue
 		}
@@ -316,9 +336,7 @@ func (f *Files) prune() bool {
 		}
 		kept = left
 	}
-	dropped := len(kept) != len(f.links)
-	f.links = kept
-	return f.pruneStates() || dropped
+	return kept
 }
 
 // pruneStates drops the changes of state past KeepEnded that are not their node's latest,
@@ -566,6 +584,16 @@ func (f *Files) Links(n wire.LineageNode) wire.LineageLinks {
 		out.States = append(out.States, f.states[states[i]].LineageSessionState)
 	}
 	return out
+}
+
+func (f *Files) All() ([]wire.LineageLink, []wire.LineageStateChange) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	states := make([]wire.LineageStateChange, 0, len(f.states))
+	for _, c := range f.states {
+		states = append(states, wire.LineageStateChange{Node: c.node, State: c.State, At: c.At})
+	}
+	return append([]wire.LineageLink(nil), f.links...), states
 }
 
 func (f *Files) Walk(n wire.LineageNode, depth int) wire.LineageGraph {

@@ -53,6 +53,7 @@ Mac.
 | `features-history.json` | How often each feature is used | The last 90 days, by date | On write and hourly (#3686) |
 | `lineage.jsonl` | Links between issues, PRs, sessions and deploys, and each session's changes of state (#4274) | Ended links 90 days, 20,000 links; changes of state 90 days (each session's latest kept), 20,000 | When it opens, when it grows by 2,000, and hourly (#3649) |
 | `lineage-cost.json` | Cost of each lineage node | 90 days, 5,000 nodes | On write |
+| `lineage-sync.json` | Lineage links and session states not yet sent to the control plane (#4275) | 2,000 links and 5,000 state changes; past that, it keeps only a note to send everything again from `lineage.jsonl` | On write |
 | `lineage-comments.json` | Cost comments on PRs | 500, 30 days | On write |
 | `release-tags.json` | Release tags already linked, for each repo | The newest 50 for each repo; an older tag counts as linked (#3652) | On write |
 | `achievements.json` | Milestones | A fixed set | — |
@@ -151,7 +152,9 @@ Agents starts these tools. It does not own what they keep.
 The control plane's store is a folder or an S3-compatible bucket. **It holds conversation
 data:** servers' backups (their transcripts, sealed), each machine's last list of folders
 and agents (with agent titles), prompts waiting for a stopped workspace (with their
-attachments), and lineage nodes (each issue, PR and session it links, with its cost).
+attachments), lineage nodes (each issue, PR and session it links, with its cost), and a
+copy of each machine's lineage links and its sessions' changes of state (refs, states and
+times only: no titles or text; #4275).
 
 One sweep runs every hour. It removes old audit days, codes, tombstones, records with no
 owner, usage, workflow runs and lineage, join, lock-join, sign-in and link requests, and
@@ -196,6 +199,7 @@ the other copies of the control plane learn that it went.
 | Host copies | Each machine's last folders and agents, up to 500, **with titles** | One a machine | When the machine is forgotten |
 | Usage reports | Usage, cost and time by person, project, folder, machine and runtime | 7 days by the hour, 90 days by the day | Hourly |
 | Lineage | Cost of each issue, PR and session node | 5,000 nodes, 90 days | On write |
+| Lineage graph | Each machine's links and its sessions' changes of state (working, waiting, needs-you, stopped, archived, deleted), as refs, states and times, in `v1/lineage-graph/<machine>/` (#4275) | Links as on the machine: an ended link 90 days after its end, 20,000 a machine. States as on the machine: 90 days, and each session's last state whatever its age, 20,000 a machine. A removed machine's a day after its last send | On write, hourly |
 | Workflow runs | Which machine took each workflow trigger | 7 days | Hourly |
 | Report views | Saved report views | 50 a person | When the person is removed |
 | Machine providers | Each provider | No count limit. A removed one's tombstone for 7 days (#3748) | Hourly |
@@ -305,7 +309,8 @@ These stay behind:
 - the agent's events, until they are 7 days old;
 - the agent's title in its machine's host copy on the control plane, until a window next
   lists that machine's agents;
-- its lineage nodes and cost, until they age out (90 days);
+- its lineage nodes and cost, until they age out (90 days), and its links and states in the
+  control plane's lineage copy (its last state says `deleted`), until they age out (90 days);
 - the backups that hold it, on the machine and on the control plane, until they age out (a
   restore skips it).
 

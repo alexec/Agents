@@ -12944,6 +12944,59 @@
       ],
       "additionalProperties": false
     },
+    "LineageStateChange": {
+      "type": "object",
+      "description": "A session node's change of state, and when (#4275), as lineage/sync sends it. Only the ref, the state and the time: no title or text (principle 7).",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "state": {
+          "$ref": "#/definitions/LineageSessionStateName"
+        },
+        "at": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "node",
+        "state",
+        "at"
+      ],
+      "additionalProperties": false
+    },
+    "LineageSync": {
+      "type": "object",
+      "description": "lineage/sync (#4275): what changed in a machine's lineage since its last send: links started or ended (each whole, as the machine has it now), and its sessions' changes of state (#4274). reset starts the control plane's copy of the links again from this send, the first of a whole send; the states are kept.",
+      "properties": {
+        "links": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LineageLink"
+          }
+        },
+        "states": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LineageStateChange"
+          }
+        },
+        "reset": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "LineageSyncAnswer": {
+      "type": "object",
+      "description": "lineage/sync's answer (#4275). full: the control plane has no copy of this machine's links (a new or moved control plane), so the machine sends them all again, the first with reset.",
+      "properties": {
+        "full": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
     "ListCursor": {
       "type": "object",
       "properties": {

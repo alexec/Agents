@@ -414,6 +414,8 @@ func (d *Daemon) sendReport() {
 // startReports sends what is unsent now, and starts the hourly send once.
 func (d *Daemon) startReports() {
 	safe.Go("usage rollup", d.sendReport)
+	// And the lineage changed since (#4275), on the same clock in case a send failed.
+	safe.Go("lineage sync", d.sendLineage)
 	// What it has from a catalogue (#2019, M5), on the same clock.
 	safe.Go("governance report", d.sendGovernanceReport)
 	d.reportTick.Do(func() {
@@ -427,6 +429,7 @@ func (d *Daemon) startReports() {
 				case <-tick.C:
 					d.sendReport()
 					d.sendGovernanceReport()
+					d.sendLineage()
 				}
 			}
 		})

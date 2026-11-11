@@ -1229,6 +1229,12 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 			prs = *count.PrsPerWeek
 		}
 		return m.s.multiplierCount(ctx, host, zoneOf(count.TimeZone), lineage.BaselineOf(prs, ""), time.Now())
+	case "lineage/sync":
+		sync, err := require[wire.LineageSync](params, "LineageSync")
+		if err != nil {
+			return nil, err
+		}
+		return m.s.keepLineageSync(ctx, host, sync, time.Now())
 	case "usage/rollup":
 		rollup, err := require[wire.UsageRollup](params, "UsageRollup")
 		if err != nil {

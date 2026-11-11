@@ -5961,6 +5961,29 @@ type LineageSessionsRequest struct {
 	Number int64 `json:"number"`
 }
 
+// A session node's change of state, and when (#4275), as lineage/sync sends it. Only the ref, the state and the time: no title or text (principle 7).
+type LineageStateChange struct {
+	Node LineageNode `json:"node"`
+
+	State LineageSessionStateName `json:"state"`
+
+	At Date `json:"at"`
+}
+
+// lineage/sync (#4275): what changed in a machine's lineage since its last send: links started or ended (each whole, as the machine has it now), and its sessions' changes of state (#4274). reset starts the control plane's copy of the links again from this send, the first of a whole send; the states are kept.
+type LineageSync struct {
+	Links []LineageLink `json:"links,omitzero"`
+
+	States []LineageStateChange `json:"states,omitzero"`
+
+	Reset *bool `json:"reset,omitzero"`
+}
+
+// lineage/sync's answer (#4275). full: the control plane has no copy of this machine's links (a new or moved control plane), so the machine sends them all again, the first with reset.
+type LineageSyncAnswer struct {
+	Full *bool `json:"full,omitzero"`
+}
+
 type ListCursor struct {
 	LastActivityAt Date `json:"lastActivityAt"`
 
