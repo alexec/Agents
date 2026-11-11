@@ -37,6 +37,7 @@ func (githubForge) Caps() forgeCaps {
 		StateReason: true,
 		CreatedAt:   true, ClosedAt: true, Children: true, LinkedPulls: true, Events: true,
 		CommentCount: "exact",
+		Releases:     true,
 		Total:        true,
 		Plan:         true, BlockedBy: true, AddChild: true,
 		Reasons: map[string]string{

@@ -68,6 +68,7 @@ const CapFolders1 = "folders/1"
 const CapForgeWrite1 = "forge-write/1"
 const CapForgeBoards1 = "forge.boards/1"
 const CapForgeImage1 = "forge.image/1"
+const CapForgeReleases1 = "forge.releases/1"
 const CapForge1 = "forge/1"
 const CapGit1 = "git/1"
 const CapGovernance1 = "governance/1"
@@ -384,6 +385,8 @@ var HostCapabilities = pairs([][2]string{
 	{"forge/plan", "forge/1"},
 	{"forge/pull", "forge/1"},
 	{"forge/pulls", "forge/1"},
+	{"forge/release", "forge.releases/1"},
+	{"forge/releases", "forge.releases/1"},
 	{"forge/rerun", "forge-write/1"},
 	{"git/fill", "git/1"},
 	{"lineage/cost", "lineage/1"},

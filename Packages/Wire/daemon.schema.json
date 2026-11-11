@@ -10079,7 +10079,7 @@
     },
     "ForgeCapabilities": {
       "type": "object",
-      "description": "What one forge on a list's page fills (#4329, #4361), so a client hides what it does not: issues and pulls say it has them; labelColors that its labels have a #rrggbb colour; avatars that its items have authorAvatar; stateReason that its closed issues have stateReason. createdAt that its items have createdAt, and closedAt that its closed and merged items have closedAt; children, linkedPulls and events that an item's read has them (#4373); total that it counts a list's items, for ForgeList.total (#4396); each is absent from an earlier daemon, which has none. commentCount says how to read ForgeItem.comments: exact; capped at commentsMost (show 50+ there); or detail, only on an item's own page (hide it on the row).",
+      "description": "What one forge on a list's page fills (#4329, #4361), so a client hides what it does not: issues and pulls say it has them; labelColors that its labels have a #rrggbb colour; avatars that its items have authorAvatar; stateReason that its closed issues have stateReason. createdAt that its items have createdAt, and closedAt that its closed and merged items have closedAt; children, linkedPulls and events that an item's read has them (#4373); total that it counts a list's items, for ForgeList.total (#4396); releases that it has releases, for forge/releases and forge/release (#4426); each is absent from an earlier daemon, which has none. commentCount says how to read ForgeItem.comments: exact; capped at commentsMost (show 50+ there); or detail, only on an item's own page (hide it on the row).",
       "properties": {
         "forge": {
           "type": "string"
@@ -10115,6 +10115,9 @@
           "type": "boolean"
         },
         "total": {
+          "type": "boolean"
+        },
+        "releases": {
           "type": "boolean"
         },
         "commentCount": {
@@ -11084,6 +11087,182 @@
         "done",
         "total"
       ],
+      "additionalProperties": false
+    },
+    "ForgeRelease": {
+      "type": "object",
+      "description": "A release on a forge (#4426). node is its lineage node (kind release, ref <forge>:<repo>/release/<tag>), which forge/release reads and lineage keys its cost by. repo is the repo as the forge names it, and folder a folder on it. latest is the repo's newest published release that is neither a draft nor a pre-release. publishedAt is absent on a draft; author and authorAvatar when the forge says them; assets is how many files it has.",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "forge": {
+          "type": "string"
+        },
+        "repo": {
+          "type": "string"
+        },
+        "folder": {
+          "type": "string"
+        },
+        "tag": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "draft": {
+          "type": "boolean"
+        },
+        "prerelease": {
+          "type": "boolean"
+        },
+        "latest": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "publishedAt": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "authorAvatar": {
+          "type": "string"
+        },
+        "assets": {
+          "type": "integer"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "node",
+        "forge",
+        "repo",
+        "tag",
+        "name",
+        "draft",
+        "prerelease",
+        "latest",
+        "assets",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeReleaseDetail": {
+      "type": "object",
+      "description": "forge/release (#4426): a release, the release before it (previous, its tag; absent for the first), how many commits are between the two (commits, at most what the forge's compare gives) and the pull requests they merged, from each squash commit's (#n) or (!n), oldest first. compareUrl is the forge's page of the range.",
+      "properties": {
+        "release": {
+          "$ref": "#/definitions/ForgeRelease"
+        },
+        "previous": {
+          "type": "string"
+        },
+        "compareUrl": {
+          "type": "string"
+        },
+        "commits": {
+          "type": "integer"
+        },
+        "pulls": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ForgeReleasePull"
+          }
+        }
+      },
+      "required": [
+        "release",
+        "commits",
+        "pulls"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeReleasePull": {
+      "type": "object",
+      "description": "A pull request in a release (#4426): its node, its number, and its title as its squash commit says it, with the (#n) taken off; sha is the commit.",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "number": {
+          "type": "integer"
+        },
+        "title": {
+          "type": "string"
+        },
+        "sha": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "node",
+        "number",
+        "title",
+        "sha"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeReleaseRequest": {
+      "type": "object",
+      "description": "forge/release (#4426): a release's lineage node, as ForgeRelease.node says it.",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/LineageNode"
+        }
+      },
+      "required": [
+        "node"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeReleases": {
+      "type": "object",
+      "description": "forge/releases (#4426): the releases of the folders' repos, newest first (a draft, which has no publishedAt, by createdAt). none are the forges in reach that have no releases, and why, so a client says so (Linear and Jira have no releases); errors are the forges that could not be read.",
+      "properties": {
+        "releases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ForgeRelease"
+          }
+        },
+        "none": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ForgeListError"
+          }
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ForgeListError"
+          }
+        }
+      },
+      "required": [
+        "releases"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeReleasesRequest": {
+      "type": "object",
+      "description": "forge/releases (#4426): the releases of every folder's repo on this machine, or of one folder's, at most limit (1 to 100, 30 when absent) of each repo.",
+      "properties": {
+        "folder": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer"
+        }
+      },
       "additionalProperties": false
     },
     "ForgeStanding": {

@@ -195,6 +195,7 @@ func (azureBoardsForge) Caps() forgeCaps {
 		CommentCount: "exact",
 		Plan:         true, BlockedBy: true, AddChild: true,
 		Reasons: map[string]string{
+			actionReleases: "Azure Boards has no releases: it is a tracker, with no repositories",
 			actionMerge:     boardsNoPRs,
 			actionAutoMerge: boardsNoPRs,
 			actionApprove:   boardsNoPRs,

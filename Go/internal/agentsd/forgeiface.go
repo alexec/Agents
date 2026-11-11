@@ -45,6 +45,12 @@ type Forge interface {
 	Blockers(ctx context.Context, children []forgeRef) (map[forgeRef][]planRef, error)
 	Diff(ctx context.Context, r forgeRef) (wire.ForgeDiff, error)
 	Log(ctx context.Context, r forgeRef, check string) (wire.ForgeLog, error)
+	// Releases are the releases of the scope's repos (#4426), at most limit of each, with their
+	// nodes; Latest is left to forge/releases. ReleaseCommits are the commits of repo (as a node
+	// names it) in head and not in base, oldest first, and the forge's page of the range. A forge
+	// with no releases says so in Caps: Releases false, and why in Reasons.
+	Releases(ctx context.Context, s forgeScope, limit int) ([]wire.ForgeRelease, error)
+	ReleaseCommits(ctx context.Context, repo, base, head string) ([]compareCommit, string, error)
 
 	// The writes: a person's own clicks (forgewrite.go's rules do not change).
 	Comment(ctx context.Context, r forgeRef, body string) (wire.ForgeDone, error)
@@ -77,6 +83,8 @@ type forgeCaps struct {
 	Total bool
 	// Plans: sub-issues, blocked-by, a new child.
 	Plan, BlockedBy, AddChild bool
+	// Releases: forge/releases and forge/release read its releases (#4426).
+	Releases bool
 	// Reasons say why an action is missing, by the action's name, in the words a person reads,
 	// as bitbucketNoAutoMerge says it now.
 	Reasons map[string]string
@@ -103,6 +111,7 @@ const (
 	actionPlan       = "plan"
 	actionAddChild   = "addChild"
 	actionBlockedBy  = "blockedBy"
+	actionReleases   = "releases"
 )
 
 // on says whether the actions allow the action of that name.
@@ -123,7 +132,7 @@ func (c forgeCaps) wire(name string) wire.ForgeCapabilities {
 	for _, f := range []struct {
 		on  bool
 		out **bool
-	}{{c.CreatedAt, &out.CreatedAt}, {c.ClosedAt, &out.ClosedAt}, {c.Children, &out.Children}, {c.LinkedPulls, &out.LinkedPulls}, {c.Events, &out.Events}, {c.Total, &out.Total}} {
+	}{{c.CreatedAt, &out.CreatedAt}, {c.ClosedAt, &out.ClosedAt}, {c.Children, &out.Children}, {c.LinkedPulls, &out.LinkedPulls}, {c.Events, &out.Events}, {c.Total, &out.Total}, {c.Releases, &out.Releases}} {
 		if f.on {
 			*f.out = new(true)
 		}
@@ -231,6 +240,12 @@ func (forgeNone) Diff(context.Context, forgeRef) (wire.ForgeDiff, error) {
 }
 func (forgeNone) Log(context.Context, forgeRef, string) (wire.ForgeLog, error) {
 	return wire.ForgeLog{}, cannot(actionLog)
+}
+func (forgeNone) Releases(context.Context, forgeScope, int) ([]wire.ForgeRelease, error) {
+	return nil, cannot(actionReleases)
+}
+func (forgeNone) ReleaseCommits(context.Context, string, string, string) ([]compareCommit, string, error) {
+	return nil, "", cannot(actionReleases)
 }
 func (forgeNone) Comment(context.Context, forgeRef, string) (wire.ForgeDone, error) {
 	return wire.ForgeDone{}, cannot(actionComment)

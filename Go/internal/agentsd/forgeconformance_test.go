@@ -793,6 +793,13 @@ func TestForgeConformance(t *testing.T) {
 					}
 				}
 			}
+			// 6. Releases agrees with Caps (#4426): a forge with none says why.
+			s, _ := f.Sources(ctx, d.folderPaths(), caps.PRs && !caps.Issues)
+			if _, err := f.Releases(ctx, s, 1); errors.Is(err, errForgeCannot) == caps.Releases {
+				t.Errorf("releases: caps say %v, the method says %v", caps.Releases, err)
+			} else if !caps.Releases && cannotReason(f, err) == "the forge cannot releases" {
+				t.Errorf("releases: no reason of its own")
+			}
 		})
 	}
 }

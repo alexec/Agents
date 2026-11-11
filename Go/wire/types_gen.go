@@ -4661,7 +4661,7 @@ type ForgeBoardsRequest struct {
 	Folder *string `json:"folder,omitzero"`
 }
 
-// What one forge on a list's page fills (#4329, #4361), so a client hides what it does not: issues and pulls say it has them; labelColors that its labels have a #rrggbb colour; avatars that its items have authorAvatar; stateReason that its closed issues have stateReason. createdAt that its items have createdAt, and closedAt that its closed and merged items have closedAt; children, linkedPulls and events that an item's read has them (#4373); total that it counts a list's items, for ForgeList.total (#4396); each is absent from an earlier daemon, which has none. commentCount says how to read ForgeItem.comments: exact; capped at commentsMost (show 50+ there); or detail, only on an item's own page (hide it on the row).
+// What one forge on a list's page fills (#4329, #4361), so a client hides what it does not: issues and pulls say it has them; labelColors that its labels have a #rrggbb colour; avatars that its items have authorAvatar; stateReason that its closed issues have stateReason. createdAt that its items have createdAt, and closedAt that its closed and merged items have closedAt; children, linkedPulls and events that an item's read has them (#4373); total that it counts a list's items, for ForgeList.total (#4396); releases that it has releases, for forge/releases and forge/release (#4426); each is absent from an earlier daemon, which has none. commentCount says how to read ForgeItem.comments: exact; capped at commentsMost (show 50+ there); or detail, only on an item's own page (hide it on the row).
 type ForgeCapabilities struct {
 	Forge string `json:"forge"`
 
@@ -4686,6 +4686,8 @@ type ForgeCapabilities struct {
 	Events *bool `json:"events,omitzero"`
 
 	Total *bool `json:"total,omitzero"`
+
+	Releases *bool `json:"releases,omitzero"`
 
 	CommentCount ForgeCommentCount `json:"commentCount"`
 
@@ -5127,6 +5129,86 @@ type ForgeProgress struct {
 	Done int64 `json:"done"`
 
 	Total int64 `json:"total"`
+}
+
+// A release on a forge (#4426). node is its lineage node (kind release, ref <forge>:<repo>/release/<tag>), which forge/release reads and lineage keys its cost by. repo is the repo as the forge names it, and folder a folder on it. latest is the repo's newest published release that is neither a draft nor a pre-release. publishedAt is absent on a draft; author and authorAvatar when the forge says them; assets is how many files it has.
+type ForgeRelease struct {
+	Node LineageNode `json:"node"`
+
+	Forge string `json:"forge"`
+
+	Repo string `json:"repo"`
+
+	Folder *string `json:"folder,omitzero"`
+
+	Tag string `json:"tag"`
+
+	Name string `json:"name"`
+
+	Body *string `json:"body,omitzero"`
+
+	Draft bool `json:"draft"`
+
+	Prerelease bool `json:"prerelease"`
+
+	Latest bool `json:"latest"`
+
+	CreatedAt *string `json:"createdAt,omitzero"`
+
+	PublishedAt *string `json:"publishedAt,omitzero"`
+
+	Author *string `json:"author,omitzero"`
+
+	AuthorAvatar *string `json:"authorAvatar,omitzero"`
+
+	Assets int64 `json:"assets"`
+
+	URL string `json:"url"`
+}
+
+// forge/release (#4426): a release, the release before it (previous, its tag; absent for the first), how many commits are between the two (commits, at most what the forge's compare gives) and the pull requests they merged, from each squash commit's (#n) or (!n), oldest first. compareUrl is the forge's page of the range.
+type ForgeReleaseDetail struct {
+	Release ForgeRelease `json:"release"`
+
+	Previous *string `json:"previous,omitzero"`
+
+	CompareUrl *string `json:"compareUrl,omitzero"`
+
+	Commits int64 `json:"commits"`
+
+	Pulls []ForgeReleasePull `json:"pulls"`
+}
+
+// A pull request in a release (#4426): its node, its number, and its title as its squash commit says it, with the (#n) taken off; sha is the commit.
+type ForgeReleasePull struct {
+	Node LineageNode `json:"node"`
+
+	Number int64 `json:"number"`
+
+	Title string `json:"title"`
+
+	Sha string `json:"sha"`
+}
+
+// forge/release (#4426): a release's lineage node, as ForgeRelease.node says it.
+type ForgeReleaseRequest struct {
+	Node LineageNode `json:"node"`
+}
+
+// forge/releases (#4426): the releases of the folders' repos, newest first (a draft, which has no publishedAt, by createdAt). none are the forges in reach that have no releases, and why, so a client says so (Linear and Jira have no releases); errors are the forges that could not be read.
+type ForgeReleases struct {
+	Releases []ForgeRelease `json:"releases"`
+
+	None []ForgeListError `json:"none,omitzero"`
+
+	Errors []ForgeListError `json:"errors,omitzero"`
+}
+
+// forge/releases (#4426): the releases of every folder's repo on this machine, or of one folder's, at most limit (1 to 100, 30 when absent) of each repo.
+type ForgeReleasesRequest struct {
+	Folder *string `json:"folder,omitzero"`
+
+	Limit *int64 `json:"limit,omitzero"`
 }
 
 // A standing epic's query (#3659, #3661), as the daemon read it from the standing block in the epic's body. labels: the issue has all of them; any: at least one of them; not: none of them; milestone: none, any or a milestone's name. lanes is how many lanes its lead runs at once, 1 when the block does not say. error says why there is no query: no block, a second block, or an unknown or bad field; with an error, the plan has no children.
