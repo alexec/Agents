@@ -142,7 +142,7 @@ the **release** workflow by hand and give it the tag. It replaces the release's 
 `scripts/release-host.sh 0.2.0` does what the workflow's Mac job does. It needs the
 Developer ID identity in your keychain, and `ASC_KEY_ID`,
 `ASC_ISSUER_ID` and `ASC_KEY_PATH` set. It needs the Linux agentsd in `App/Resources/servers`,
-from `scripts/build-linux-agentsd.sh`, and Docker running (or Go installed) for the Go
+from `scripts/build-linux-agentsd.sh`, and Go installed (`brew install go`) for the Go
 programs Agents carries. It writes `Agents-0.2.0.dmg`, `Agents-0.2.0.zip`,
 `Agents-Host-0.2.0.zip`, the Linux tarballs and `SHA256SUMS` into `build/release/`.
 

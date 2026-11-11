@@ -37,6 +37,8 @@ func TestMain(m *testing.M) {
 		<-f.conn.Done()
 		return
 	}
+	// A test's writes are not synced to the disk: on a Mac each sync costs about 4 ms (#4709).
+	store.SyncWrites = false
 	// The sealed-secret tests are the Mac's path on every system; a test of the Linux release
 	// layer turns it on for its daemon (releaseOn).
 	releaseLayerHere = false

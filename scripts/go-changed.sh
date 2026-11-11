@@ -5,8 +5,8 @@
 # A package is changed when a file in its folder under Go/ changed since the merge base
 # with origin/main, committed or not (a testdata file counts for the package above it).
 # A change to Go/go.mod, Go/go.sum or Packages/Wire (wiregen's source) runs ./... . No Go
-# change: nothing runs. The container is Linux, so a failure only macOS has (CI's
-# `go-darwin`) still shows only in CI.
+# change: nothing runs. On a Mac it is the Mac's own Go (#4709), so a failure only Linux
+# has (CI's `go` job) still shows only in CI.
 #
 # When Go/internal/agentsd changes, its hot-path benchmarks (#4505) then run once each,
 # without -race, so a change to that path shows its cost before a push; compare it with

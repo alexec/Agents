@@ -1,8 +1,7 @@
 #!/bin/sh
 # The Go the control plane (#1137), which Agents Host carries as Contents/Helpers/agents-control: what
 # Agents Host's build runs first. Builds Go/out/helpers/agents-control, for both Mac architectures,
-# when a Go source is newer than it. With no way to run Go here (no Docker and no Go) the
-# build fails: since #1314 there is no Swift one to fall back on.
+# when a Go source is newer than it. With no Go here the build fails: since #1314 there is no Swift one to fall back on.
 #
 #   scripts/go-control.sh            build it if stale
 #   scripts/go-control.sh --force    build it whatever
@@ -12,7 +11,7 @@ set -eu
 
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 out="$root/Go/out/helpers/agents-control"
-# An Xcode script phase has a bare PATH: look where Docker and Go are usually installed too.
+# An Xcode script phase has a bare PATH: look where Go is usually installed too.
 PATH="$PATH:/opt/homebrew/bin:/usr/local/bin:/usr/local/go/bin"
 
 if [ "${1:-}" = --carry ]; then
@@ -36,8 +35,8 @@ if [ "${1:-}" != --force ] && [ -x "$out" ] &&
 	exit 0
 fi
 
-if ! { command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; } && ! command -v go >/dev/null 2>&1; then
-	echo "error: go-control.sh: no Docker running and no Go here, so Agents Host would carry no agents-control. Start Docker (colima start) or install Go." >&2
+if ! command -v go >/dev/null 2>&1; then
+	echo "error: go-control.sh: no Go here, so Agents Host would carry no agents-control: brew install go." >&2
 	exit 1
 fi
 

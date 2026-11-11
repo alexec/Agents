@@ -39,17 +39,13 @@ the keyboard, that is true only of a workflow run.
   --retain-public`. The Xcode index can still be partial: a Swift finding counts only
   when its name appears nowhere else in tracked Swift files. Record the exact command
   and any target the scan could not index.
-- Run `deadcode` from `golang.org/x/tools/cmd/deadcode@v0.49.0` inside the same pinned Go
-  container used by `scripts/lint.sh`; scan `./...` from `Go/`. Scan again with
-  `GOOS=darwin GOARCH=arm64` (install `deadcode` for linux first, then run it with those
-  set), or every function with only `_darwin.go` callers reads as dead.
-  If the container is killed for memory (exit 137; the VM has about 4 GB), run the same
-  `deadcode` on the Mac with the Go of `go.mod` downloaded from go.dev to a temporary
-  folder (verify its SHA-256 against go.dev's list; do not install it), with `GOOS=linux`
-  and then `GOOS=darwin` set, and record that in the report.
-- Run Knip 6.42.1 from the pinned `node:$NODE` container used by `scripts/lint.sh`, with
-  `KNIP_DISABLE_RAW_TRANSFER=1` (needed for container memory limits) and the npm cache
-  under `~/Library/Caches/Agents-build/npm`; run it from `Web/`. Keep the
+- Run `deadcode` from `golang.org/x/tools/cmd/deadcode@v0.49.0` with the Mac's own Go,
+  as `scripts/lint.sh` and `Go/scripts/go.sh` do (#4709; no container); scan `./...` from
+  `Go/`. Scan with `GOOS=linux` and again with `GOOS=darwin GOARCH=arm64`, or every function
+  with only `_darwin.go` (or only `_linux.go`) callers reads as dead.
+- Run Knip 6.42.1 with `npx` and the Node of `Web/.node-version` on the Mac (no container,
+  #4709), with `KNIP_DISABLE_RAW_TRANSFER=1` and the npm cache under
+  `~/Library/Caches/Agents-build/npm`; run it from `Web/`. Keep the
   explicit build entry points in `Web/knip.json`. Use `--include files,exports
   --include-entry-exports`; dependencies are outside this review's scope.
 - Nobody is at the keyboard during a workflow run. Do not ask questions. Record any

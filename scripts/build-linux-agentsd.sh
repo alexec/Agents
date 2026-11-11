@@ -27,17 +27,11 @@
 #   VERSION                          the version, SemVer: scripts/version.sh, or on a release
 #                                    AGENTS_MARKETING_VERSION, the tag's (#1748)
 #
-# Go runs through Go/scripts/go.sh (a container on this Mac): lease "build, test or scratch app" first. It takes
-# seconds and needs no swift.org toolchain. The container mounts the repository, and Colima
-# shares only your home folder: a checkout under /tmp fails with "go.mod file not found".
+# Go runs through Go/scripts/go.sh, the Mac's own Go cross-compiling with cgo off (#4709):
+# lease "build" first. It takes seconds and needs no swift.org toolchain.
 set -euo pipefail
 
 root=${0:A:h:h}
-# Stop at once, not with Go's "go.mod file not found" after the steps before it (#2221).
-if [[ $(uname -s) == Darwin && $root/ != $HOME/* ]]; then
-    print -u2 "build-linux-agentsd: $root is not under $HOME, and Go's container sees only the home folder: make the checkout under it (e.g. git worktree add --detach ~/.agents/scratch/<name> <ref>)"
-    exit 1
-fi
 check=0
 [[ ${1:-} == --check ]] && { check=1; shift }
 
