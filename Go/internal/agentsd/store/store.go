@@ -131,7 +131,7 @@ func Open(root string) (*Store, error) {
 	}
 	if read > 0 || gone > 0 {
 		if why == "" {
-			why = fmt.Sprintf("%d stale, %d gone", read, gone)
+			why = fmt.Sprintf("%d new or changed, %d gone", read, gone)
 		}
 		log.Printf("the archived agents' summaries were %s: read %d of %d archived records in full, and wrote them again", why, read, archived)
 		if err := s.WriteSummaries(); err != nil {

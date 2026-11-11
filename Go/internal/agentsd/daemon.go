@@ -382,6 +382,8 @@ func (d *Daemon) Shutdown() {
 	d.stopModelRelay()
 	// The last chance for chat lines the disk refused: they live only in memory (#3245).
 	d.writeHeld()
+	// The archived agents' summaries, so the next start trusts them all (#4653).
+	d.Store.FlushSummaries()
 }
 
 // once is true the first time a sendID is seen: a window sends a prompt again for 30 s

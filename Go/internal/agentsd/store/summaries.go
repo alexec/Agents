@@ -98,10 +98,11 @@ func (s *Store) stampSummary(a *wire.Agent, st stamp) {
 	s.summariesSoon()
 }
 
-// summariesSoon writes the file summaryDelay from now, unless a write is already due.
-// With mu held.
+// summariesSoon writes the file summaryDelay after the last change that calls it. With mu
+// held.
 func (s *Store) summariesSoon() {
 	if s.summaryTimer != nil {
+		s.summaryTimer.Reset(summaryDelay)
 		return
 	}
 	s.summaryTimer = time.AfterFunc(summaryDelay, func() {
@@ -116,6 +117,21 @@ func (s *Store) summariesSoon() {
 			log.Printf("could not write the archived agents' summaries: %v", err)
 		}
 	})
+}
+
+// FlushSummaries writes the summaries' file now when a write is due, and leaves none due:
+// for the host's stop, so the next start trusts every summary.
+func (s *Store) FlushSummaries() {
+	s.mu.Lock()
+	due := s.summaryTimer != nil && s.summaryTimer.Stop()
+	s.summaryTimer = nil
+	s.mu.Unlock()
+	if !due {
+		return
+	}
+	if err := s.WriteSummaries(); err != nil {
+		log.Printf("could not write the archived agents' summaries: %v", err)
+	}
 }
 
 // WriteSummaries writes the archived records' summaries now: what the next start reads.

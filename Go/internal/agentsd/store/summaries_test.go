@@ -53,6 +53,8 @@ func summariesRoot(t *testing.T) (string, *Store, []wire.UUID) {
 	if err := s.WriteSummaries(); err != nil {
 		t.Fatal(err)
 	}
+	// No write is left due when the test's root goes.
+	t.Cleanup(s.FlushSummaries)
 	return root, s, ids
 }
 
@@ -75,6 +77,7 @@ func reopen(t *testing.T, root string) (*Store, string) {
 			t.Fatal(err)
 		}
 	})
+	t.Cleanup(s.FlushSummaries)
 	return s, out
 }
 
@@ -192,7 +195,7 @@ func TestArchivedSummariesRebuilt(t *testing.T) {
 	}
 	os.RemoveAll(o.Loc.Agent(string(ids[3])))
 	o, out = reopen(t, root)
-	if !strings.Contains(out, "summaries were 1 stale, 1 gone: read 1 of 2 archived records in full") {
+	if !strings.Contains(out, "summaries were 1 new or changed, 1 gone: read 1 of 2 archived records in full") {
 		t.Fatalf("no line for stale summaries: %q", out)
 	}
 	if a := o.Agent(ids[1]); *a.Title != title || len(a.AvailableCommands) != 1 {
