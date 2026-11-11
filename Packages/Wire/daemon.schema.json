@@ -12532,7 +12532,7 @@
     },
     "LineageEstimateKept": {
       "type": "object",
-      "description": "An estimate as it was when work started (#3561): the medians of lineage/estimate's figures, made from the closed issues that had merged before the start, so it can be set against what the work took when it closes.",
+      "description": "An estimate as it was when work started (#3561): lineage/estimate's figures, made from the closed issues that had merged before the start, so it can be set against what the work took when it closes. Dollars, output tokens and working seconds keep the median, and (#4525) the P10 and P90 beside it; the cycle time and the landing date keep the median and the P10 to P90 range, so Reports ▸ Value can say how often the range held the actual.",
       "properties": {
         "at": {
           "$ref": "#/definitions/WireDate",
@@ -12553,13 +12553,51 @@
           },
           "description": "Dollars, by currency: the median."
         },
+        "costP10": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "Dollars, by currency: P10 (#4525)."
+        },
+        "costP90": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "Dollars, by currency: P90 (#4525)."
+        },
         "outputTokens": {
           "type": "number",
           "description": "The median."
         },
+        "outputTokensP10": {
+          "type": "number",
+          "description": "P10 (#4525)."
+        },
+        "outputTokensP90": {
+          "type": "number",
+          "description": "P90 (#4525)."
+        },
         "workingSeconds": {
           "type": "number",
           "description": "The agents' time at work: the median."
+        },
+        "workingSecondsP10": {
+          "type": "number",
+          "description": "The agents' time at work: P10 (#4525)."
+        },
+        "workingSecondsP90": {
+          "type": "number",
+          "description": "The agents' time at work: P90 (#4525)."
+        },
+        "cycleTimeSeconds": {
+          "$ref": "#/definitions/LineageEstimateRange",
+          "description": "From the start of work to the last PR merged (#4525)."
+        },
+        "landsAt": {
+          "$ref": "#/definitions/LineageEstimateDates",
+          "description": "When it was expected to land (#4525)."
         }
       },
       "required": [
@@ -23066,7 +23104,7 @@
     },
     "ReportEstimateError": {
       "type": "object",
-      "description": "How far the estimates were from the actual figures (#3561), over the issues closed in the range that had an estimate when their work started: the median of max(estimate/actual, actual/estimate), so 1.5 means 1.5 times too high or too low. A figure is absent when no issue had it.",
+      "description": "How far the estimates were from the actual figures (#3561), over the issues closed in the range that had an estimate when their work started: the median of max(estimate/actual, actual/estimate), so 1.5 means 1.5 times too high or too low. A figure is absent when no issue had it. coverage and landsAtErrorDays (#4525) check the claims the kept estimate made: how often its P10-P90 dollar range held the actual, and how many days its landing date was off by, the median over the same issues.",
       "properties": {
         "issues": {
           "type": "integer",
@@ -23079,6 +23117,14 @@
         "workingSeconds": {
           "type": "number",
           "description": "In the agents' time at work."
+        },
+        "coverage": {
+          "type": "number",
+          "description": "How often the kept estimate's P10 to P90 dollar range held the actual, 0 to 1; it should be about 0.8 (#4525)."
+        },
+        "landsAtErrorDays": {
+          "type": "number",
+          "description": "The median of how many days the kept landing date was off by (#4525)."
         }
       },
       "required": [
