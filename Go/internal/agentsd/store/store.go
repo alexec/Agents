@@ -46,6 +46,12 @@ type Store struct {
 	tallies map[string]ArchivedTally
 	// visited is how many records were copied out of the store: a test's count (#4510).
 	visited atomic.Int64
+	// stamps is each archived record's file as its summary was made of it, the archived
+	// records being held as summaries (summaries.go, #4653); summaryTimer is the write of
+	// the summaries' file that is due, and summaryWrite lets one write at a time.
+	stamps       map[wire.UUID]stamp
+	summaryTimer *time.Timer
+	summaryWrite sync.Mutex
 	folders  []wire.Folder
 	// lines is each transcript's count of lines, once counted, for an entry's index.
 	lines map[wire.UUID]int
@@ -67,15 +73,28 @@ func Open(root string) (*Store, error) {
 		}
 	}
 	s := &Store{Loc: loc, agents: map[wire.UUID]*wire.Agent{}, inFolder: map[string]map[wire.UUID]struct{}{}, indexed: map[wire.UUID]string{},
-		live: map[wire.UUID]struct{}{}, liveIn: map[string]map[wire.UUID]struct{}{}, tallies: map[string]ArchivedTally{}, lines: map[wire.UUID]int{}, held: map[wire.UUID]*heldLines{}}
+		live: map[wire.UUID]struct{}{}, liveIn: map[string]map[wire.UUID]struct{}{}, tallies: map[string]ArchivedTally{}, stamps: map[wire.UUID]stamp{}, lines: map[wire.UUID]int{}, held: map[wire.UUID]*heldLines{}}
 	id, adopts := loadOrMakeRootID(loc.RootIdentity(), loc.Root)
 	s.RootID = id
 	s.folders = s.loadFolders()
 	finishDeleting(loc)
+	// The archived records come from their summaries, each read in full only when its
+	// record changed since its summary was made (#4653).
+	summaries, why := s.readSummaries()
+	if adopts {
+		summaries, why = nil, "made before this root had an id"
+	}
+	read, archived := 0, 0
 	entries, _ := os.ReadDir(loc.Agents())
 	for _, e := range entries {
 		name := e.Name()
 		if !wireUUID(name) {
+			continue
+		}
+		if a, st, ok := s.trusted(summaries, name); ok {
+			s.put(a)
+			s.stamps[a.ID] = st
+			archived++
 			continue
 		}
 		a, filled, err := s.load(name)
@@ -89,11 +108,34 @@ func Open(root string) (*Store, error) {
 			a.MadeInRoot = &id
 			changed = true
 		}
-		s.put(a)
 		if changed {
 			if err := s.write(a); err != nil {
 				log.Printf("could not save agent %s: %v", a.ID, err)
 			}
+		}
+		s.put(a)
+		if a.State == wire.AgentStateArchived {
+			if fi, err := os.Stat(s.Loc.Record(string(a.ID))); err == nil {
+				s.stamps[a.ID] = stampOf(fi)
+			}
+			read++
+			archived++
+		}
+	}
+	// A summary of no record there now (deleted by another build) is gone too.
+	gone := 0
+	for id := range summaries {
+		if _, ok := s.stamps[id]; !ok {
+			gone++
+		}
+	}
+	if read > 0 || gone > 0 {
+		if why == "" {
+			why = fmt.Sprintf("%d stale, %d gone", read, gone)
+		}
+		log.Printf("the archived agents' summaries were %s: read %d of %d archived records in full, and wrote them again", why, read, archived)
+		if err := s.WriteSummaries(); err != nil {
+			log.Printf("could not write the archived agents' summaries: %v", err)
 		}
 	}
 	// The Swift daemon's index of archived agents is a cache this host does not keep. It
@@ -263,18 +305,36 @@ func (s *Store) Save(a wire.Agent) error {
 	if a.State != wire.AgentStateArchived {
 		a.ArchivedAt = nil
 	}
+	// A summary copied out of the store (Agents) has no commands: they stay those on disk.
+	s.mu.Lock()
+	held := s.agents[a.ID]
+	s.mu.Unlock()
+	if held != nil && held.State == wire.AgentStateArchived && len(a.AvailableCommands) == 0 {
+		a.AvailableCommands = s.commandsOnDisk(a.ID)
+	}
 	if err := s.write(&a); err != nil {
 		return err
 	}
+	var st stamp
+	if a.State == wire.AgentStateArchived {
+		if fi, err := os.Stat(s.Loc.Record(string(a.ID))); err == nil {
+			st = stampOf(fi)
+		}
+	}
 	s.mu.Lock()
 	s.put(&a)
+	s.stampSummary(&a, st)
 	s.mu.Unlock()
 	return nil
 }
 
-// put keeps a record and files it under its folder, out of the one it was in. With mu held.
+// put keeps a record, an archived one as its summary, and files it under its folder, out
+// of the one it was in. With mu held.
 func (s *Store) put(a *wire.Agent) {
 	s.drop(a.ID)
+	if a.State == wire.AgentStateArchived {
+		a = summary(a)
+	}
 	s.agents[a.ID] = a
 	f := AgentFolder(a)
 	file(s.inFolder, f, a.ID)
@@ -294,6 +354,10 @@ func (s *Store) drop(id wire.UUID) {
 	}
 	delete(s.agents, id)
 	delete(s.live, id)
+	if _, ok := s.stamps[id]; ok {
+		delete(s.stamps, id)
+		s.summariesSoon()
+	}
 	f, ok := s.indexed[id]
 	if !ok {
 		return
@@ -340,16 +404,27 @@ func (s *Store) write(a *wire.Agent) error {
 	return WriteAtomically(s.Loc.Record(string(a.ID)), b, 0o644)
 }
 
-// Agent is one record, a copy, or nil.
+// Agent is one record, a copy, or nil. An archived one is whole: its commands are read
+// from its file (#4653).
 func (s *Store) Agent(id wire.UUID) *wire.Agent {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	a := s.agents[wire.UUID(strings.ToUpper(string(id)))]
+	s.mu.Unlock()
 	if a == nil {
 		return nil
 	}
 	c := *a
+	if c.State == wire.AgentStateArchived {
+		c.AvailableCommands = s.commandsOnDisk(c.ID)
+	}
 	return &c
+}
+
+// Has says whether the store has the agent, reading no file.
+func (s *Store) Has(id wire.UUID) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.agents[wire.UUID(strings.ToUpper(string(id)))] != nil
 }
 
 // AgentsIn is the records in one folder (AgentFolder), copies in no order: O(the
@@ -380,7 +455,8 @@ func (s *Store) copies(ids map[wire.UUID]struct{}) []wire.Agent {
 	return out
 }
 
-// Agents is every record, archived ones too, newest activity first.
+// Agents is every record, archived ones too as summaries (no commands), newest activity
+// first.
 func (s *Store) Agents() []wire.Agent {
 	s.mu.Lock()
 	out := make([]wire.Agent, 0, len(s.agents))
