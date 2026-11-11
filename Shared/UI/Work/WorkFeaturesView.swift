@@ -649,7 +649,7 @@ struct WorkFeaturesPane: View {
     /// *2 more not started · 4 done · open the epic for the plan*, the last words in the link colour.
     private func linkText(words: String?, link: String?) -> Text {
         guard let link else { return Text(words ?? "") }
-        let linked = Text(link).foregroundStyle(Color.accentColor)
+        let linked = Text(link).foregroundStyle(.tint)
         guard let words else { return linked }
         return Text("\(words) · \(linked)")
     }
