@@ -648,7 +648,8 @@ func forgeItemOf(i githubmcp.Item, folder string) wire.ForgeItem {
 	}
 	out := wire.ForgeItem{Node: node, Title: i.Title, State: i.State, URL: optional(i.URL), Folder: optional(folder),
 		Author: optional(i.Author), AuthorAvatar: optional(i.AuthorAvatar), StateReason: optional(i.StateReason), Assignees: i.Assignees, Milestone: optional(i.Milestone),
-		Labels: forgeLabelsOf(i.Labels, i.LabelColors), UpdatedAt: forgeDate(i.UpdatedAt), Comments: int64(i.Comments)}
+		Labels: forgeLabelsOf(i.Labels, i.LabelColors), UpdatedAt: forgeDate(i.UpdatedAt), Comments: int64(i.Comments),
+		CreatedAt: forgeDateOptional(i.CreatedAt), ClosedAt: forgeDateOptional(i.ClosedAt)}
 	if out.Assignees == nil {
 		out.Assignees = []string{}
 	}
@@ -674,7 +675,7 @@ func gitlabItemOf(i gitlabmcp.Item, folder string) wire.ForgeItem {
 	}
 	out := wire.ForgeItem{Node: node, Title: i.Title, State: i.State, URL: optional(i.URL), Folder: optional(folder),
 		Labels: forgeLabelsOf(i.Labels, i.LabelColors), Author: optional(i.Author), AuthorAvatar: optional(i.AuthorAvatar), Assignees: i.Assignees,
-		Milestone: optional(i.Milestone), UpdatedAt: forgeDate(i.UpdatedAt), Comments: int64(i.Comments)}
+		Milestone: optional(i.Milestone), UpdatedAt: forgeDate(i.UpdatedAt), CreatedAt: forgeDateOptional(i.CreatedAt), ClosedAt: forgeDateOptional(i.ClosedAt), Comments: int64(i.Comments)}
 	if out.Assignees == nil {
 		out.Assignees = []string{}
 	}
@@ -695,7 +696,7 @@ func gitlabItemOf(i gitlabmcp.Item, folder string) wire.ForgeItem {
 func linearItemOf(i linearmcp.Item, folder string) wire.ForgeItem {
 	out := wire.ForgeItem{Node: wire.LineageNode{Kind: lineage.KindIssue, Ref: "linear:" + i.Identifier}, Title: i.Title, State: i.State,
 		URL: optional(i.URL), Folder: optional(folder), Labels: forgeLabelsOf(i.Labels, i.LabelColors), Author: optional(i.Author), AuthorAvatar: optional(i.AuthorAvatar), StateReason: optional(i.StateReason),
-		Assignees: i.Assignees, Milestone: optional(i.Milestone), UpdatedAt: forgeDate(i.UpdatedAt), Comments: int64(i.Comments)}
+		Assignees: i.Assignees, Milestone: optional(i.Milestone), UpdatedAt: forgeDate(i.UpdatedAt), CreatedAt: forgeDateOptional(i.CreatedAt), ClosedAt: forgeDateOptional(i.ClosedAt), Comments: int64(i.Comments)}
 	if out.Assignees == nil {
 		out.Assignees = []string{}
 	}
@@ -711,7 +712,7 @@ func linearItemOf(i linearmcp.Item, folder string) wire.ForgeItem {
 func jiraItemOf(i jiramcp.Item, folder string) wire.ForgeItem {
 	out := wire.ForgeItem{Node: wire.LineageNode{Kind: lineage.KindIssue, Ref: "jira:" + i.Key}, Title: i.Title, State: i.State,
 		Status: optional(i.Status), URL: optional(i.URL), Folder: optional(folder), Labels: forgeLabelsOf(i.Labels, nil),
-		Author: optional(i.Author), AuthorAvatar: optional(i.AuthorAvatar), StateReason: optional(i.StateReason), Assignees: i.Assignees, Milestone: optional(i.Milestone), UpdatedAt: forgeDate(i.UpdatedAt),
+		Author: optional(i.Author), AuthorAvatar: optional(i.AuthorAvatar), StateReason: optional(i.StateReason), Assignees: i.Assignees, Milestone: optional(i.Milestone), UpdatedAt: forgeDate(i.UpdatedAt), CreatedAt: forgeDateOptional(i.CreatedAt), ClosedAt: forgeDateOptional(i.ClosedAt),
 		Comments: int64(i.Comments)}
 	if out.Assignees == nil {
 		out.Assignees = []string{}

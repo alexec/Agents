@@ -43,6 +43,9 @@ type Item struct {
 	// State is open, or closed for a state of the Completed or Removed category; Status is
 	// the state's own name, as Active; Type is its type, as User Story.
 	State, Status, Type, Title, URL, Author, UpdatedAt string
+	// CreatedAt is when it was made; ClosedAt is when a closed work item last changed state,
+	// into its closed state; "" while it is open (#4373).
+	CreatedAt, ClosedAt string
 	// AuthorAvatar is the author's picture, on the organization; "" for none (#4363).
 	AuthorAvatar string
 	// StateReason is why a closed work item closed: completed, not_planned or duplicate; ""
@@ -105,6 +108,8 @@ const (
 	fieldComments = "System.CommentCount"
 	fieldParent   = "System.Parent"
 	fieldReason   = "System.Reason"
+	// fieldStateChanged is when its state last changed: on a closed work item, when it closed.
+	fieldStateChanged = "Microsoft.VSTS.Common.StateChangeDate"
 	// The links a plan reads and writes: a child's parent, and a work item's predecessor
 	// (the one it waits for, as Jira's "is blocked by").
 	relParent      = "System.LinkTypes.Hierarchy-Reverse"
@@ -113,7 +118,7 @@ const (
 )
 
 // forgeFields are what a forge read asks for.
-var forgeFields = append(slices.Clone(itemFields), fieldProject, fieldComments, fieldParent, fieldReason)
+var forgeFields = append(slices.Clone(itemFields), fieldProject, fieldComments, fieldParent, fieldReason, fieldStateChanged)
 
 // patch is a JSON Patch, which Azure DevOps changes a work item by.
 type patch []map[string]any
@@ -180,9 +185,11 @@ func (f *RealBoards) forgeItem(org string, w workItemJSON, states map[string]map
 	author := w.who(fieldCreatedBy).person()
 	i := Item{ID: w.ID, Project: project, State: "open", Status: state, Type: kind, Title: w.text(fieldTitle),
 		URL: f.webURL(project, w.ID), Author: author.name(), AuthorAvatar: author.avatar(), UpdatedAt: normalized(w.text(fieldChanged)),
-		Labels: tags(w.text(fieldTags)), Assignees: []string{}, Comments: w.number(fieldComments), Parent: w.number(fieldParent)}
+		CreatedAt: normalized(w.text(fieldCreated)),
+		Labels:    tags(w.text(fieldTags)), Assignees: []string{}, Comments: w.number(fieldComments), Parent: w.number(fieldParent)}
 	if closedIn(states, kind, state) {
 		i.State, i.StateReason = "closed", stateReasonOf(states[kind][state], w.text(fieldReason))
+		i.ClosedAt = normalized(w.text(fieldStateChanged))
 	}
 	if a := w.who(fieldAssigned).person(); a != nil {
 		i.Assignees = append(i.Assignees, a.name())

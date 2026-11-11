@@ -428,3 +428,15 @@ func TestStateReasonOf(t *testing.T) {
 		}
 	}
 }
+
+// #4373: a work item says when it was made, and a closed one when its state last changed.
+func TestForgeItemDates(t *testing.T) {
+	states := map[string]map[string]string{"Task": {"Active": "InProgress", "Closed": "Completed"}}
+	for state, closed := range map[string]string{"Active": "", "Closed": "2026-10-02T10:00:00.000Z"} {
+		w := workItemJSON{ID: 1, Fields: map[string]json.RawMessage{fieldType: json.RawMessage(`"Task"`), fieldState: json.RawMessage(`"` + state + `"`),
+			fieldCreated: json.RawMessage(`"2026-10-01T10:00:00Z"`), fieldStateChanged: json.RawMessage(`"2026-10-02T10:00:00Z"`)}}
+		if i := (&RealBoards{}).forgeItem("acme", w, states); i.CreatedAt != "2026-10-01T10:00:00.000Z" || i.ClosedAt != closed {
+			t.Errorf("%s: %q %q", state, i.CreatedAt, i.ClosedAt)
+		}
+	}
+}

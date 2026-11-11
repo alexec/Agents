@@ -10082,7 +10082,7 @@
     },
     "ForgeCapabilities": {
       "type": "object",
-      "description": "What one forge on a list's page fills (#4329, #4361), so a client hides what it does not: issues and pulls say it has them; labelColors that its labels have a #rrggbb colour; avatars that its items have authorAvatar; stateReason that its closed issues have stateReason. commentCount says how to read ForgeItem.comments: exact; capped at commentsMost (show 50+ there); or detail, only on an item's own page (hide it on the row).",
+      "description": "What one forge on a list's page fills (#4329, #4361), so a client hides what it does not: issues and pulls say it has them; labelColors that its labels have a #rrggbb colour; avatars that its items have authorAvatar; stateReason that its closed issues have stateReason. createdAt that its items have createdAt, and closedAt that its closed and merged items have closedAt; children, linkedPulls and events that an item's read has them (#4373); each is absent from an earlier daemon, which has none. commentCount says how to read ForgeItem.comments: exact; capped at commentsMost (show 50+ there); or detail, only on an item's own page (hide it on the row).",
       "properties": {
         "forge": {
           "type": "string"
@@ -10100,6 +10100,21 @@
           "type": "boolean"
         },
         "stateReason": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "boolean"
+        },
+        "closedAt": {
+          "type": "boolean"
+        },
+        "children": {
+          "type": "boolean"
+        },
+        "linkedPulls": {
+          "type": "boolean"
+        },
+        "events": {
           "type": "boolean"
         },
         "commentCount": {
@@ -10317,6 +10332,48 @@
       "required": [],
       "additionalProperties": false
     },
+    "ForgeEvent": {
+      "type": "object",
+      "description": "One event on an issue's timeline (#4373), as its forge says it: kind is what happened; actor is who did it, absent when the forge says nobody (a deleted account); label is the label that labelled and unlabelled name; assignee is the person that assigned and unassigned name; source is the issue or pull request that referenced names, or the pull request that closed closed it with.",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/ForgeEventKind"
+        },
+        "actor": {
+          "type": "string"
+        },
+        "at": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "label": {
+          "$ref": "#/definitions/ForgeLabel"
+        },
+        "assignee": {
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/definitions/LineageNode"
+        }
+      },
+      "required": [
+        "kind",
+        "at"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeEventKind": {
+      "type": "string",
+      "enum": [
+        "labeled",
+        "unlabeled",
+        "assigned",
+        "unassigned",
+        "closed",
+        "reopened",
+        "referenced"
+      ],
+      "description": "What happened on an issue (#4373): a label was added or removed, a person assigned or unassigned, it closed or reopened, or another issue or pull request named it."
+    },
     "ForgeFeature": {
       "type": "object",
       "description": "A feature (#3267): name is its label's after feature:, with the label's colour where the forge gives one; epics counts its epics, open the open ones. issues counts its open issues that are not epics, of the newest 500 open issues (#3741); a feature with no open epic and no such issue is finished. refs are the lineage refs of its open issues and open epics, waiting the ones labelled alex-todo, and updatedAt the newest update of any of them (#4115), so a client finds the sessions labelled #<n> for them and which wait for Alex.",
@@ -10433,7 +10490,7 @@
     },
     "ForgeItem": {
       "type": "object",
-      "description": "An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for GitHub, GitLab, Linear and Jira (#3260), so one page draws each. node is its lineage node (kind issue or pr, ref github:alexec/Agents#12). state is open, closed or merged; status is the tracker's own name for its step, where its workflow has steps (a Jira status, as In Progress; one in Jira's Done category is closed). folder is a folder on this machine on its repo, to act from. labels have their #rrggbb colour where the forge gives one (#2956). The pull request's own fields: draft; checks is passing, failing, running or none; review is approved, changes_requested or review_required; mergeable is mergeable, conflicting or unknown; autoMerge says auto-merge is on. The hierarchy (#3267): parent is the issue it is a sub-issue (a Linear or GitLab child) of; level is epic, story, task or spike, from its labels; feature is the name of its feature:<name> label; progress is a parent's closed children of all of them, where the forge says it: in a GitHub list, and on an issue's own read. standing says it has the label standing: a standing epic, whose plan is a query (#3659). authorAvatar is the author's picture, a URL that only forge/image reads (#4363), where the forge gives one (ForgeCapabilities.avatars). stateReason is why a closed issue closed (#4365): completed, not_planned or duplicate, where the forge says it (ForgeCapabilities.stateReason); absent on an open issue and on a pull request.",
+      "description": "An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for GitHub, GitLab, Linear and Jira (#3260), so one page draws each. node is its lineage node (kind issue or pr, ref github:alexec/Agents#12). state is open, closed or merged; status is the tracker's own name for its step, where its workflow has steps (a Jira status, as In Progress; one in Jira's Done category is closed). folder is a folder on this machine on its repo, to act from. labels have their #rrggbb colour where the forge gives one (#2956). The pull request's own fields: draft; checks is passing, failing, running or none; review is approved, changes_requested or review_required; mergeable is mergeable, conflicting or unknown; autoMerge says auto-merge is on. The hierarchy (#3267): parent is the issue it is a sub-issue (a Linear or GitLab child) of; level is epic, story, task or spike, from its labels; feature is the name of its feature:<name> label; progress is a parent's closed children of all of them, where the forge says it: in a GitHub list, and on an issue's own read. standing says it has the label standing: a standing epic, whose plan is a query (#3659). authorAvatar is the author's picture, a URL that only forge/image reads (#4363), where the forge gives one (ForgeCapabilities.avatars). stateReason is why a closed issue closed (#4365): completed, not_planned or duplicate, where the forge says it (ForgeCapabilities.stateReason); absent on an open issue and on a pull request. createdAt is when it opened and closedAt when it closed or merged (#4373), where the forge says them (ForgeCapabilities.createdAt and closedAt); closedAt is absent while it is open.",
       "properties": {
         "node": {
           "$ref": "#/definitions/LineageNode"
@@ -10476,6 +10533,12 @@
         },
         "milestone": {
           "type": "string"
+        },
+        "createdAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "closedAt": {
+          "$ref": "#/definitions/WireDate"
         },
         "updatedAt": {
           "$ref": "#/definitions/WireDate"
@@ -10527,7 +10590,7 @@
     },
     "ForgeItemDetail": {
       "type": "object",
-      "description": "forge/issue and forge/pull (#3129): one item with its body (Markdown) and a page of its comments, the newest page first and at most 50, oldest first in the page; cursor is the page before it, absent at the first comment. A pull request's checks, review threads (line comments, in threads) and files changed come with it. head is a pull request's head commit, which forge/merge and forge/approve name (#3130); mergeMethods are the ways its repo allows, the repo's default first; start is the new-agent form for an issue. transitions are the moves an issue's workflow allows now (Jira, #3260), which forge/close takes in place of a close or a reopen. actions are what the item's page offers now, from its forge and its state (#4361): a merged pull request has no merge and no reopen, a closed item no close; absent from an earlier daemon, when the page shows what it did before.",
+      "description": "forge/issue and forge/pull (#3129): one item with its body (Markdown) and a page of its comments, the newest page first and at most 50, oldest first in the page; cursor is the page before it, absent at the first comment. A pull request's checks, review threads (line comments, in threads) and files changed come with it. head is a pull request's head commit, which forge/merge and forge/approve name (#3130); mergeMethods are the ways its repo allows, the repo's default first; start is the new-agent form for an issue. transitions are the moves an issue's workflow allows now (Jira, #3260), which forge/close takes in place of a close or a reopen. actions are what the item's page offers now, from its forge and its state (#4361): a merged pull request has no merge and no reopen, a closed item no close; absent from an earlier daemon, when the page shows what it did before. On an issue's read (#4373), where the forge says them (ForgeCapabilities): children are its sub-issues, linkedPulls the pull requests that close it, and events its timeline, oldest first (labelled, assigned, closed, referenced and the like); each is absent where the forge gives none.",
       "properties": {
         "item": {
           "$ref": "#/definitions/ForgeItem"
@@ -10578,6 +10641,24 @@
           "type": "array",
           "items": {
             "$ref": "#/definitions/ForgeAction"
+          }
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ForgeLinked"
+          }
+        },
+        "linkedPulls": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ForgeLinked"
+          }
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ForgeEvent"
           }
         }
       },
@@ -10677,6 +10758,30 @@
       },
       "required": [
         "session",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeLinked": {
+      "type": "object",
+      "description": "An item that an issue's read names (#4373): a sub-issue, or a pull request that closes it. state is open, closed or merged, as ForgeItem.state.",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "title": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "node",
+        "title",
         "state"
       ],
       "additionalProperties": false

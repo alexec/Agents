@@ -4079,9 +4079,11 @@ export interface ForgeBoardsRequest {
 /**
  * What one forge on a list's page fills (#4329, #4361), so a client hides what it does not: issues
  * and pulls say it has them; labelColors that its labels have a #rrggbb colour; avatars that its
- * items have authorAvatar; stateReason that its closed issues have stateReason. commentCount says
- * how to read ForgeItem.comments: exact; capped at commentsMost (show 50+ there); or detail, only
- * on an item's own page (hide it on the row).
+ * items have authorAvatar; stateReason that its closed issues have stateReason. createdAt that its
+ * items have createdAt, and closedAt that its closed and merged items have closedAt; children,
+ * linkedPulls and events that an item's read has them (#4373); each is absent from an earlier
+ * daemon, which has none. commentCount says how to read ForgeItem.comments: exact; capped at
+ * commentsMost (show 50+ there); or detail, only on an item's own page (hide it on the row).
  */
 export interface ForgeCapabilities {
   forge: string;
@@ -4090,6 +4092,11 @@ export interface ForgeCapabilities {
   labelColors: boolean;
   avatars: boolean;
   stateReason: boolean;
+  createdAt?: boolean;
+  closedAt?: boolean;
+  children?: boolean;
+  linkedPulls?: boolean;
+  events?: boolean;
   commentCount: ForgeCommentCount;
   commentsMost?: number;
 }
@@ -4190,6 +4197,34 @@ export interface ForgeDone {
 }
 
 /**
+ * One event on an issue's timeline (#4373), as its forge says it: kind is what happened; actor is
+ * who did it, absent when the forge says nobody (a deleted account); label is the label that
+ * labelled and unlabelled name; assignee is the person that assigned and unassigned name; source is
+ * the issue or pull request that referenced names, or the pull request that closed closed it with.
+ */
+export interface ForgeEvent {
+  kind: ForgeEventKind;
+  actor?: string;
+  at: WireDate;
+  label?: ForgeLabel;
+  assignee?: string;
+  source?: LineageNode;
+}
+
+/**
+ * What happened on an issue (#4373): a label was added or removed, a person assigned or unassigned,
+ * it closed or reopened, or another issue or pull request named it.
+ */
+export type ForgeEventKind =
+  | "labeled"
+  | "unlabeled"
+  | "assigned"
+  | "unassigned"
+  | "closed"
+  | "reopened"
+  | "referenced";
+
+/**
  * A feature (#3267): name is its label's after feature:, with the label's colour where the forge
  * gives one; epics counts its epics, open the open ones. issues counts its open issues that are not
  * epics, of the newest 500 open issues (#3741); a feature with no open epic and no such issue is
@@ -4263,7 +4298,9 @@ export interface ForgeImageRequest {
  * epic, whose plan is a query (#3659). authorAvatar is the author's picture, a URL that only
  * forge/image reads (#4363), where the forge gives one (ForgeCapabilities.avatars). stateReason is
  * why a closed issue closed (#4365): completed, not_planned or duplicate, where the forge says it
- * (ForgeCapabilities.stateReason); absent on an open issue and on a pull request.
+ * (ForgeCapabilities.stateReason); absent on an open issue and on a pull request. createdAt is when
+ * it opened and closedAt when it closed or merged (#4373), where the forge says them
+ * (ForgeCapabilities.createdAt and closedAt); closedAt is absent while it is open.
  */
 export interface ForgeItem {
   node: LineageNode;
@@ -4278,6 +4315,8 @@ export interface ForgeItem {
   authorAvatar?: string;
   assignees: string[];
   milestone?: string;
+  createdAt?: WireDate;
+  closedAt?: WireDate;
   updatedAt: WireDate;
   comments: number;
   draft?: boolean;
@@ -4302,7 +4341,10 @@ export interface ForgeItem {
  * now (Jira, #3260), which forge/close takes in place of a close or a reopen. actions are what the
  * item's page offers now, from its forge and its state (#4361): a merged pull request has no merge
  * and no reopen, a closed item no close; absent from an earlier daemon, when the page shows what it
- * did before.
+ * did before. On an issue's read (#4373), where the forge says them (ForgeCapabilities): children
+ * are its sub-issues, linkedPulls the pull requests that close it, and events its timeline, oldest
+ * first (labelled, assigned, closed, referenced and the like); each is absent where the forge gives
+ * none.
  */
 export interface ForgeItemDetail {
   item: ForgeItem;
@@ -4317,6 +4359,9 @@ export interface ForgeItemDetail {
   start?: ForgeStart;
   transitions?: ForgeTransition[];
   actions?: ForgeAction[];
+  children?: ForgeLinked[];
+  linkedPulls?: ForgeLinked[];
+  events?: ForgeEvent[];
 }
 
 /**
@@ -4357,6 +4402,17 @@ export interface ForgeLead {
   session: UUID;
   title?: string;
   state: AgentState;
+}
+
+/**
+ * An item that an issue's read names (#4373): a sub-issue, or a pull request that closes it. state
+ * is open, closed or merged, as ForgeItem.state.
+ */
+export interface ForgeLinked {
+  node: LineageNode;
+  title: string;
+  state: string;
+  url?: string;
 }
 
 /**
@@ -14623,7 +14679,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeBlockedByRequest: { required: ["node"], optional: ["add", "remove"] },
   ForgeBoards: { required: ["boards"], optional: [] },
   ForgeBoardsRequest: { required: [], optional: ["folder"] },
-  ForgeCapabilities: { required: ["forge", "issues", "pulls", "labelColors", "avatars", "stateReason", "commentCount"], optional: ["commentsMost"] },
+  ForgeCapabilities: { required: ["forge", "issues", "pulls", "labelColors", "avatars", "stateReason", "commentCount"], optional: ["createdAt", "closedAt", "children", "linkedPulls", "events", "commentsMost"] },
   ForgeCheck: { required: ["name", "state"], optional: ["url"] },
   ForgeCloseRequest: { required: ["node"], optional: ["reopen", "transition"] },
   ForgeComment: { required: ["author", "body", "at"], optional: ["avatar", "url", "bot"] },
@@ -14632,18 +14688,20 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeDiffFile: { required: ["path", "change", "additions", "deletions", "hunks"], optional: ["previousPath", "note"] },
   ForgeDiffHunk: { required: ["oldStart", "newStart", "lines"], optional: [] },
   ForgeDone: { required: [], optional: ["url", "auto", "reran"] },
+  ForgeEvent: { required: ["kind", "at"], optional: ["actor", "label", "assignee", "source"] },
   ForgeFeature: { required: ["name", "epics", "open"], optional: ["color", "issues", "refs", "waiting", "updatedAt"] },
   ForgeFeatures: { required: ["features"], optional: ["approvals", "errors"] },
   ForgeFeaturesRequest: { required: [], optional: ["folder", "board"] },
   ForgeImage: { required: ["mimeType", "data"], optional: [] },
   ForgeImageRequest: { required: ["url"], optional: [] },
-  ForgeItem: { required: ["node", "title", "state", "labels", "assignees", "updatedAt", "comments"], optional: ["stateReason", "status", "url", "folder", "author", "authorAvatar", "milestone", "draft", "checks", "review", "mergeable", "autoMerge", "parent", "level", "feature", "progress", "standing"] },
-  ForgeItemDetail: { required: ["item", "body", "comments"], optional: ["cursor", "checks", "reviewThreads", "filesChanged", "head", "mergeMethods", "start", "transitions", "actions"] },
+  ForgeItem: { required: ["node", "title", "state", "labels", "assignees", "updatedAt", "comments"], optional: ["stateReason", "status", "url", "folder", "author", "authorAvatar", "milestone", "createdAt", "closedAt", "draft", "checks", "review", "mergeable", "autoMerge", "parent", "level", "feature", "progress", "standing"] },
+  ForgeItemDetail: { required: ["item", "body", "comments"], optional: ["cursor", "checks", "reviewThreads", "filesChanged", "head", "mergeMethods", "start", "transitions", "actions", "children", "linkedPulls", "events"] },
   ForgeItemRequest: { required: ["node"], optional: ["cursor"] },
   ForgeLabel: { required: ["name"], optional: ["color"] },
   ForgeLabelRequest: { required: ["node"], optional: ["add", "remove"] },
   ForgeLabels: { required: ["labels"], optional: [] },
   ForgeLead: { required: ["session", "state"], optional: ["title"] },
+  ForgeLinked: { required: ["node", "title", "state"], optional: ["url"] },
   ForgeList: { required: ["items"], optional: ["cursor", "errors", "forges"] },
   ForgeListError: { required: ["forge", "message"], optional: [] },
   ForgeListRequest: { required: [], optional: ["folder", "state", "label", "assignee", "query", "cursor", "limit", "feature", "board"] },

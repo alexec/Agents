@@ -151,7 +151,7 @@ func (d *Daemon) forgeAzureBoards() (forgeAzureBoards, error) {
 func boardsItemOf(i azureboardsmcp.Item, folder string) wire.ForgeItem {
 	out := wire.ForgeItem{Node: boardsNode(i.Project, i.ID), Title: i.Title, State: i.State, Status: optional(i.Status),
 		URL: optional(i.URL), Folder: optional(folder), Labels: forgeLabelsOf(i.Labels, nil), Author: optional(i.Author), AuthorAvatar: optional(i.AuthorAvatar), StateReason: optional(i.StateReason),
-		Assignees: i.Assignees, UpdatedAt: forgeDate(i.UpdatedAt), Comments: int64(i.Comments)}
+		Assignees: i.Assignees, UpdatedAt: forgeDate(i.UpdatedAt), CreatedAt: forgeDateOptional(i.CreatedAt), ClosedAt: forgeDateOptional(i.ClosedAt), Comments: int64(i.Comments)}
 	if out.Assignees == nil {
 		out.Assignees = []string{}
 	}
@@ -185,10 +185,11 @@ func (azureBoardsForge) Name() string { return "azureboards" }
 
 func (azureBoardsForge) Caps() forgeCaps {
 	return forgeCaps{
-		Issues:       true,
-		Issue:        forgeActions{Comment: true, Label: true, Close: true, Reopen: true, Transition: true},
-		Avatars:      true,
-		StateReason:  true,
+		Issues:      true,
+		Issue:       forgeActions{Comment: true, Label: true, Close: true, Reopen: true, Transition: true},
+		Avatars:     true,
+		StateReason: true,
+		CreatedAt:   true, ClosedAt: true,
 		CommentCount: "exact",
 		Plan:         true, BlockedBy: true, AddChild: true,
 		Reasons: map[string]string{

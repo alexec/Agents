@@ -30,9 +30,10 @@ func (githubForge) Caps() forgeCaps {
 		Issue: forgeActions{Comment: true, Label: true, Close: true, Reopen: true},
 		PR: forgeActions{Comment: true, Label: true, Close: true, Reopen: true, Merge: true, AutoMerge: true, Approve: true,
 			Rerun: true, Log: true, Diff: true},
-		LabelColors:  true,
-		Avatars:      true,
-		StateReason:  true,
+		LabelColors: true,
+		Avatars:     true,
+		StateReason: true,
+		CreatedAt:   true, ClosedAt: true, Children: true, LinkedPulls: true, Events: true,
 		CommentCount: "exact",
 		Plan:         true, BlockedBy: true, AddChild: true,
 		Reasons: map[string]string{
@@ -139,8 +140,35 @@ func (g githubForge) Item(ctx context.Context, r forgeRef, cursor string) (wire.
 		out.Head, out.MergeMethods = optional(p.Head), mergeMethodsOf(p.MergeMethods)
 	} else {
 		out.Start = githubStart(out.Item)
+		out.Children, out.LinkedPulls = githubLinkedOf(p.Children), githubLinkedOf(p.LinkedPulls)
+		out.Events = []wire.ForgeEvent{}
+		for _, e := range p.Events {
+			ev := wire.ForgeEvent{Kind: wire.ForgeEventKind(e.Kind), Actor: optional(e.Actor), At: forgeDate(e.At), Assignee: optional(e.Assignee)}
+			if e.Label != "" {
+				ev.Label = &wire.ForgeLabel{Name: e.Label, Color: optional(e.LabelColor)}
+			}
+			if e.SourceRepo != "" {
+				repo := forgeRepo{"github", strings.ToLower(e.SourceRepo)}
+				ev.Source = new(map[bool]wire.LineageNode{false: repo.issue(e.SourceNumber), true: repo.pr(e.SourceNumber)}[e.SourcePR])
+			}
+			out.Events = append(out.Events, ev)
+		}
 	}
 	return out, nil
+}
+
+// githubLinkedOf are an issue's sub-issues or closing pull requests in the one model (#4373).
+func githubLinkedOf(ls []githubmcp.Linked) []wire.ForgeLinked {
+	out := []wire.ForgeLinked{}
+	for _, l := range ls {
+		repo := forgeRepo{"github", strings.ToLower(l.Repo)}
+		node := repo.issue(l.Number)
+		if l.PR {
+			node = repo.pr(l.Number)
+		}
+		out = append(out, wire.ForgeLinked{Node: node, Title: l.Title, State: l.State, URL: optional(l.URL)})
+	}
+	return out
 }
 
 // Labels are the repo's labels, with their colours.

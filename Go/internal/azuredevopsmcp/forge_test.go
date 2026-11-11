@@ -43,6 +43,9 @@ func TestSearchListsPullRequestsByState(t *testing.T) {
 	if len(closed.Items) != 2 || closed.Items[0].Number != 1 || closed.Items[0].State != "merged" || closed.Items[1].State != "closed" {
 		t.Fatalf("closed: %+v", closed.Items)
 	}
+	// #4373: when each opened, and when a completed or abandoned one closed.
+	same(t, []any{three.CreatedAt, three.ClosedAt, closed.Items[0].CreatedAt, closed.Items[0].ClosedAt, closed.Items[1].ClosedAt},
+		[]any{at(30), "", at(5), at(40), at(10)})
 
 	byTag, _ := ado.Search(ctx, []string{repo}, SearchFilter{Label: "UI"}, "", 50)
 	byWords, _ := ado.Search(ctx, []string{repo}, SearchFilter{Query: "sheet"}, "", 50)

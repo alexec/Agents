@@ -362,3 +362,19 @@ func TestIssueStateReason(t *testing.T) {
 		}
 	}
 }
+
+// #4373: an issue and a pull request say when they opened; Bitbucket says no time that one closed.
+func TestItemDates(t *testing.T) {
+	var p forgePullJSON
+	var i issueJSON
+	if err := json.Unmarshal([]byte(`{"state":"MERGED","created_on":"2026-10-01T10:00:00Z","updated_on":"2026-10-02T10:00:00Z"}`), &p); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal([]byte(`{"state":"resolved","created_on":"2026-10-01T11:00:00Z","updated_on":"2026-10-02T10:00:00Z"}`), &i); err != nil {
+		t.Fatal(err)
+	}
+	if pr, issue := p.item("o/r"), i.forgeItem("o/r"); pr.CreatedAt != "2026-10-01T10:00:00Z" || issue.CreatedAt != "2026-10-01T11:00:00Z" ||
+		pr.ClosedAt != "" || issue.ClosedAt != "" {
+		t.Fatalf("pull %+v, issue %+v", pr, issue)
+	}
+}

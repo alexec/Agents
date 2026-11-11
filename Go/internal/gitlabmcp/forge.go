@@ -49,6 +49,8 @@ type Item struct {
 	MR      bool
 	// State is open, closed or merged.
 	State, Title, URL, Author, Milestone, UpdatedAt string
+	// CreatedAt is when it opened; ClosedAt when it closed or merged, "" while open (#4373).
+	CreatedAt, ClosedAt string
 	// AuthorAvatar is the author's picture, on the GitLab or on Gravatar; "" for none (#4363).
 	AuthorAvatar string
 	Labels       []string
@@ -134,6 +136,9 @@ type forgeJSON struct {
 		Title string `json:"title"`
 	} `json:"milestone"`
 	UpdatedAt      string `json:"updated_at"`
+	CreatedAt      string `json:"created_at"`
+	ClosedAt       string `json:"closed_at"`
+	MergedAt       string `json:"merged_at"`
 	UserNotesCount int    `json:"user_notes_count"`
 	// A merge request's.
 	Draft                     bool   `json:"draft"`
@@ -153,10 +158,12 @@ type forgeJSON struct {
 func (j forgeJSON) item(project string, mr bool) Item {
 	i := Item{Project: project, Number: j.IID, MR: mr, Title: j.Title, URL: j.WebURL, Author: j.Author.Username,
 		AuthorAvatar: j.Author.avatar(j.WebURL),
-		UpdatedAt:    j.UpdatedAt, Comments: j.UserNotesCount, Assignees: []string{}, Labels: []string{}, LabelColors: map[string]string{}}
+		UpdatedAt:    j.UpdatedAt, CreatedAt: j.CreatedAt, Comments: j.UserNotesCount, Assignees: []string{}, Labels: []string{}, LabelColors: map[string]string{}}
 	switch j.State {
 	case "merged", "closed":
 		i.State = j.State
+		// A merged merge request has merged_at, and closed_at only when it was closed first.
+		i.ClosedAt = cmp.Or(j.MergedAt, j.ClosedAt)
 	default:
 		i.State = "open"
 	}

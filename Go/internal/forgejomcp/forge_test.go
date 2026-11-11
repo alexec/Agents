@@ -278,3 +278,23 @@ func TestThePullRequestsDiff(t *testing.T) {
 		t.Fatalf("a changed file: %+v", changed)
 	}
 }
+
+// #4373: an item says when it opened, and a closed or merged one when it closed.
+func TestItemDates(t *testing.T) {
+	for _, c := range []struct {
+		json, created, closed string
+	}{
+		{`{"state":"open","created_at":"2026-10-01T10:00:00Z","closed_at":null}`, "2026-10-01T10:00:00Z", ""},
+		{`{"state":"closed","created_at":"2026-10-01T10:00:00Z","closed_at":"2026-10-02T10:00:00Z"}`, "2026-10-01T10:00:00Z", "2026-10-02T10:00:00Z"},
+		{`{"state":"closed","created_at":"2026-10-01T10:00:00Z","closed_at":"2026-10-02T10:00:00Z",
+		  "pull_request":{"merged":true,"merged_at":"2026-10-03T10:00:00Z"}}`, "2026-10-01T10:00:00Z", "2026-10-03T10:00:00Z"},
+	} {
+		var j forgeJSON
+		if err := json.Unmarshal([]byte(c.json), &j); err != nil {
+			t.Fatal(err)
+		}
+		if i := j.item("o/r"); i.CreatedAt != c.created || i.ClosedAt != c.closed {
+			t.Errorf("%s: %q %q", c.json, i.CreatedAt, i.ClosedAt)
+		}
+	}
+}

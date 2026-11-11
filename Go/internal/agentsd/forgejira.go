@@ -31,10 +31,11 @@ func (jiraForge) Name() string { return "jira" }
 
 func (jiraForge) Caps() forgeCaps {
 	return forgeCaps{
-		Issues:       true,
-		Issue:        forgeActions{Comment: true, Label: true, Close: true, Reopen: true, Transition: true},
-		Avatars:      true,
-		StateReason:  true,
+		Issues:      true,
+		Issue:       forgeActions{Comment: true, Label: true, Close: true, Reopen: true, Transition: true},
+		Avatars:     true,
+		StateReason: true,
+		CreatedAt:   true, ClosedAt: true,
 		CommentCount: "exact",
 		Plan:         true,
 		Reasons: map[string]string{

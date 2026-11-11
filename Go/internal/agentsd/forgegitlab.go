@@ -34,8 +34,9 @@ func (gitlabForge) Caps() forgeCaps {
 		Issue: forgeActions{Comment: true, Label: true, Close: true, Reopen: true},
 		PR: forgeActions{Comment: true, Label: true, Close: true, Reopen: true, Merge: true, AutoMerge: true, Approve: true,
 			Rerun: true, Log: true, Diff: true},
-		LabelColors:  true,
-		Avatars:      true,
+		LabelColors: true,
+		Avatars:     true,
+		CreatedAt:   true, ClosedAt: true,
 		CommentCount: "exact",
 		Plan:         true,
 		Reasons: map[string]string{
