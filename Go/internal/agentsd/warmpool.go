@@ -28,7 +28,12 @@ import (
 // a chat the person opens or types in. Every runtime costs about 0.3 to 0.5 GB
 // (specs/183-warm-pool/measurements.md), so the pool is bounded:
 //
-//   - a finished runtime is released after warmIdle with no turn;
+//   - a finished runtime is released after WakeSettings.releaseAfterMinutes with no turn
+//     (warmIdle by default, 0 turning that off). An agent waiting for an event (#4513)
+//     is one: its runtime is ended and the ACP session id kept, and the event's turn
+//     continues the conversation with session/load or session/resume. A waiting agent
+//     whose runtime can do neither is kept, as a release would lose the conversation;
+//     it does not count against the cap;
 //   - at most WakeSettings.warmRuntimes stay warm (0 turns the pool off), the least
 //     recently used going first, and a prewarm counts against that before it launches;
 //   - a runtime whose background processes still run (a dev server, a build, a watcher)
@@ -41,8 +46,9 @@ import (
 // Archive, delete and move release at once, as before. Each decision is logged as
 // "warm pool: <pooled|released|prewarmed> <id> (<why>)".
 
-// warmIdle is how long a finished runtime with no background processes is kept.
-const warmIdle = 10 * time.Minute
+// warmIdle is how long a finished runtime with no background processes is kept by default
+// (WakeSettings.releaseAfterMinutes).
+const warmIdle = defaultReleaseAfterMinutes * time.Minute
 
 var (
 	// warmEvery is how often the pool looks at its runtimes.
@@ -79,6 +85,8 @@ type warmLive struct {
 	// failedAt is its last prewarm's failure; asked is each reason's last prewarm.
 	failedAt time.Time
 	asked    map[wire.PrewarmRequestWhy]time.Time
+	// keptWaiting is whether the log has said it is kept for its wait (#4513).
+	keptWaiting bool
 }
 
 type warmBook struct {
@@ -103,6 +111,14 @@ func backgroundHoursOf(s wire.WakeSettings) int {
 	return int(min(max(*s.BackgroundHours, 1), 24))
 }
 
+// releaseAfterOf is how long an idle runtime is kept; 0 is none released for being idle.
+func releaseAfterOf(s wire.WakeSettings) time.Duration {
+	if s.ReleaseAfterMinutes == nil {
+		return warmIdle
+	}
+	return time.Duration(min(max(*s.ReleaseAfterMinutes, 0), maxReleaseAfterMinutes)) * time.Minute
+}
+
 // MARK: the rules
 
 // warmEntry is a runtime the pool may release: idle, or a prewarm under way.
@@ -112,6 +128,8 @@ type warmEntry struct {
 	quietSince time.Time
 	background bool
 	prewarming bool
+	// kept is an agent that waits, on a runtime that cannot continue its conversation.
+	kept bool
 }
 
 type warmRelease struct {
@@ -121,10 +139,11 @@ type warmRelease struct {
 	background bool
 }
 
-// warmDecide is which runtimes go now: those idle past their time, then the least recently
-// used beyond the cap. A prewarm under way counts against the cap but is never released;
-// a runtime with background processes does not count and goes only at backgroundHours.
-func warmDecide(es []warmEntry, now time.Time, capacity, backgroundHours int) []warmRelease {
+// warmDecide is which runtimes go now: those idle past idle (none when it is 0), then the
+// least recently used beyond the cap. A prewarm under way counts against the cap but is
+// never released; a runtime with background processes does not count and goes only at
+// backgroundHours; a kept one neither counts nor goes.
+func warmDecide(es []warmEntry, now time.Time, capacity, backgroundHours int, idle time.Duration) []warmRelease {
 	var out []warmRelease
 	var counted []warmEntry
 	prewarms := 0
@@ -132,6 +151,7 @@ func warmDecide(es []warmEntry, now time.Time, capacity, backgroundHours int) []
 		switch {
 		case e.prewarming:
 			prewarms++
+		case e.kept:
 		case e.background:
 			if now.Sub(e.lastUsed) >= time.Duration(backgroundHours)*time.Hour {
 				out = append(out, warmRelease{id: e.id, why: fmt.Sprintf("%d h idle", backgroundHours), background: true})
@@ -141,8 +161,8 @@ func warmDecide(es []warmEntry, now time.Time, capacity, backgroundHours int) []
 			if e.quietSince.After(from) {
 				from = e.quietSince
 			}
-			if now.Sub(from) >= warmIdle {
-				out = append(out, warmRelease{id: e.id, why: fmt.Sprintf("%d min idle", int(warmIdle.Minutes()))})
+			if idle > 0 && now.Sub(from) >= idle {
+				out = append(out, warmRelease{id: e.id, why: fmt.Sprintf("%d min idle", int(idle.Minutes()))})
 			} else {
 				counted = append(counted, e)
 			}
@@ -359,7 +379,7 @@ func (d *Daemon) warmPass() {
 		return
 	}
 	s := d.warmSettings()
-	capacity, hours := int(s.WarmRuntimes), backgroundHoursOf(s)
+	capacity, hours, idle := int(s.WarmRuntimes), backgroundHoursOf(s), releaseAfterOf(s)
 	now := warmNow()
 	type look struct {
 		l       *live
@@ -398,6 +418,7 @@ func (d *Daemon) warmPass() {
 	background := map[wire.UUID][]acp.Command{}
 	for _, i := range looks {
 		l := i.l
+		w := waitOf(d.Store.Agent(l.id))
 		// A turn's look only gathers the groups its commands run in.
 		l.mu.Lock()
 		bg := backgroundOf(i.session, i.own, i.groups, table)
@@ -412,16 +433,20 @@ func (d *Daemon) warmPass() {
 			l.pool.quietSince = now
 		}
 		l.pool.background = len(bg) > 0
-		es = append(es, warmEntry{id: l.id, lastUsed: l.pool.lastUsed, quietSince: l.pool.quietSince, background: l.pool.background})
+		kept := keptForWait(l, i.session, w)
+		es = append(es, warmEntry{id: l.id, lastUsed: l.pool.lastUsed, quietSince: l.pool.quietSince, background: l.pool.background, kept: kept})
 		l.mu.Unlock()
 	}
 	if idles == 0 {
 		return
 	}
-	for _, r := range warmDecide(es, now, capacity, hours) {
+	for _, r := range warmDecide(es, now, capacity, hours, idle) {
 		l := d.liveIfAny(r.id)
 		if l == nil {
 			continue
+		}
+		if w := waitOf(d.Store.Agent(r.id)); w != nil {
+			r.why += "; it waits for " + waitLabel(w) + ", and its next turn continues the conversation"
 		}
 		var bg []acp.Command
 		if r.background {
@@ -431,6 +456,30 @@ func (d *Daemon) warmPass() {
 			d.record(r.id, runtimeNote(backgroundNote(hours, bg)))
 		}
 	}
+}
+
+// waitOf is the agent's open wait (wait_for_event, check_again, a place in a lease's line),
+// or nil.
+func waitOf(a *wire.Agent) *wire.EventWait {
+	if a == nil || a.EventWait == nil || a.EventWait.Ending != nil {
+		return nil
+	}
+	return a.EventWait
+}
+
+// keptForWait is whether an idle agent's runtime is kept for its wait (#4513): it waits,
+// and its runtime can neither load nor resume a conversation, so a release would lose it.
+// The log says so once for each runtime. Under l.mu.
+func keptForWait(l *live, s *acp.Session, w *wire.EventWait) bool {
+	if w == nil || s.CanContinue() {
+		l.pool.keptWaiting = false
+		return false
+	}
+	if !l.pool.keptWaiting {
+		l.pool.keptWaiting = true
+		log.Printf("warm pool: kept %s (it waits for %s, and its runtime has no session/load or session/resume, so a release would lose the conversation)", l.id, waitLabel(w))
+	}
+	return true
 }
 
 // warmSoon is a pass after a turn ends, on a goroutine of its own.
