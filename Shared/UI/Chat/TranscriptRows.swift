@@ -1054,14 +1054,16 @@ struct WorkingLine: View {
     }
 }
 
-/// How long the chat has been quiet, at its foot: "Last activity 12 minutes ago · 14:32"
-/// (#1564). Nothing under five minutes. Read again on the minute, as `ActivityTime` is.
+/// How long the chat has been quiet and how old it is, at its foot: "Last activity 12
+/// minutes ago · started 3 hours ago" (#1564). Nothing under five minutes. Read again on
+/// the minute, as `ActivityTime` is.
 struct QuietLine: View {
     let since: Date
+    let startedAt: Date
 
     var body: some View {
         TimelineView(.everyMinute) { context in
-            if let line = ActivityWords.quiet(since: since, now: context.date) {
+            if let line = ActivityWords.quiet(since: since, startedAt: startedAt, now: context.date) {
                 Text(line)
                     .appText(.fine)
                     .foregroundStyle(.tertiary)

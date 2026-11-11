@@ -679,7 +679,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           }}
           stop={() => store.cancelWait(host, agent.id)} />}
         {agent && !store.isComingBack(host, agent.id) && agent.state !== "running" && agent.state !== "starting" && (
-          <QuietLine since={lastEntryAt(store.entries.value, store.turns.value) ?? fromWireDate(agent.lastActivityAt)} />
+          <QuietLine since={lastEntryAt(store.entries.value, store.turns.value) ?? fromWireDate(agent.lastActivityAt)}
+            startedAt={fromWireDate(agent.createdAt)} />
         )}
       </div>
       {subagent.value && (
@@ -1074,14 +1075,14 @@ function lastEntryAt(entries: readonly TranscriptEntry[], turns: readonly TurnSu
   return at === undefined ? null : fromWireDate(at);
 }
 
-/** How long the chat has been quiet, at its foot (QuietLine, #1564). Nothing under five minutes; read again on the minute. */
-function QuietLine({ since }: { since: Date }) {
+/** How long the chat has been quiet and how old it is, at its foot (QuietLine, #1564). Nothing under five minutes; read again on the minute. */
+function QuietLine({ since, startedAt }: { since: Date; startedAt: Date }) {
   const now = useSignal(new Date());
   useEffect(() => {
     const timer = setInterval(() => (now.value = new Date()), 60_000);
     return () => clearInterval(timer);
   }, []);
-  const line = quietLine(since, now.value);
+  const line = quietLine(since, startedAt, now.value);
   return line ? <p class="quiet-line" title={since.toLocaleString()}>{line}</p> : null;
 }
 

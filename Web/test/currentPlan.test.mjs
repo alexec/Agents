@@ -26,6 +26,6 @@ for (const { name, input, expected } of cases("activity/short.json")) {
 
 for (const { name, input, expected } of cases("activity/quiet.json")) {
   test(`quiet: ${name}`, () => {
-    assert.equal(a.quietLine(fromWireDate(input.at), fromWireDate(input.now), input.timeZone), expected);
+    assert.equal(a.quietLine(fromWireDate(input.at), fromWireDate(input.startedAt), fromWireDate(input.now)), expected);
   });
 }
