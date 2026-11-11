@@ -16,7 +16,7 @@ import {
   Axis, cardRows, colourIndex, dotX, epicCount, epicOf, errorWords, fitLabel, hit, isOpen, joins, label, labelText, landed as landedRefs,
   lanes, layout, labelRoom, mergeTimelines, noEpics, noMachine, noProject, overlapping, rangeSpan, rangeTitle, rangeWindow, riser, sessionNodes, spoken,
   startedBySessions,
-  timelineLines, timelineRanges, titleWords, waitWords, zoomed, type Interval, type TimelineHit, type TimelineLine, type TimelineRange,
+  timelineLines, workingNow, timelineRanges, titleWords, waitWords, zoomed, type Interval, type TimelineHit, type TimelineLine, type TimelineRange,
 } from "../model/workTimeline";
 import { go } from "../route";
 import { Choice, workProjects } from "./Work";
@@ -198,7 +198,8 @@ export function WorkTimeline({ store }: { store: Store }) {
         : (
           <>
             {problems.map((p) => <p key={p} class="hint">⚠ {p}</p>)}
-            <Plot timeline={t} projectName={projects.find((p) => p.id === project.value)?.name ?? ""} />
+            <Plot timeline={t} projectName={projects.find((p) => p.id === project.value)?.name ?? ""}
+              working={workingNow(t, sessions.value, Object.values(store.agents.value).flat())} />
           </>
         )}
     </div>
@@ -217,7 +218,8 @@ function useMinute(): number {
 
 interface Hover { hit: TimelineHit; x: number; y: number }
 
-function Plot({ timeline: t, projectName }: { timeline: Timeline; projectName: string }) {
+/** `working`: the epics and children a session is in a turn on now (#4265); their open lines pulse. */
+function Plot({ timeline: t, projectName, working }: { timeline: Timeline; projectName: string; working: ReadonlySet<string> }) {
   const now = useMinute();
   const scroller = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -241,7 +243,7 @@ function Plot({ timeline: t, projectName }: { timeline: Timeline; projectName: s
   const visible = Math.max(size.width, 1);
   const span = content();
   const axis = new Axis(span, visible * (span.end - span.start) / rangeSpan[range.value]);
-  const lines = layout(overlapping(timelineLines(t, now), span), axis, (l) => measure(label(l)));
+  const lines = layout(overlapping(timelineLines(t, now, true, working), span), axis, (l) => measure(label(l)));
   const { above, below } = lanes(lines);
   const sides = Math.max(above, below, 2);
   const height = Math.max((2 * sides + 2) * laneHeight, size.height - axisHeight);
@@ -427,8 +429,9 @@ class Drawing {
     }
     // The releases line: solid to Now, dashed after, the brightest at night.
     out.push(<g key="trunk" class="timeline-trunk">{this.stroke("trunk", `M0,${trunk} L${axis.width},${trunk}`, "var(--timeline-trunk)", 2.5)}</g>);
-    // An epic worked on now: under its line, a glow that breathes, one clock for every working line; with Reduce
-    // Motion, none (the CSS's). The line itself is twice as thick.
+    // An epic a session is in a turn on now (#4265): under its line, a glow that breathes, and its ◐ turns, one
+    // clock for every working line and ring (spinnerClock.ts); with Reduce Motion, neither (the CSS's). The line
+    // itself is twice as thick.
     const working = shown.filter((l) => this.isWorking(l));
     if (working.length > 0) {
       out.push(<g key="breathing" class="timeline-breathing">
@@ -469,11 +472,11 @@ class Drawing {
         }
       }
       if (this.isWorking(l)) {
-        // ◐: a ring at Now, its left half filled.
+        // ◐: a ring at Now, its left half filled; the half turns about the ring's centre.
         out.push(
           <g key={`working ${l.id}`} class="timeline-working" style={{ "--c": c }}>
             <circle cx={nowX} cy={yl} r={5} />
-            <path d={`M${nowX},${yl - 5} A5,5 0 0 0 ${nowX},${yl + 5} Z`} />
+            <path style={{ transformOrigin: `${nowX}px ${yl}px` }} d={`M${nowX},${yl - 5} A5,5 0 0 0 ${nowX},${yl + 5} Z`} />
           </g>,
         );
       }

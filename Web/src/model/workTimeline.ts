@@ -3,7 +3,7 @@
 // releases line when their first child starts and join it when their last child closes, on a
 // linear time axis. The range, the lines, their lanes, the marks and the words; the view draws them
 // in SVG. Times are milliseconds since 1970.
-import type { ForgeLabel, LineageNode, LineageSessionOn, WireDate, WorkTimeline, WorkTimelineBacktest, WorkTimelineRelease } from "../protocol/generated";
+import type { Agent, ForgeLabel, LineageNode, LineageSessionOn, WireDate, WorkTimeline, WorkTimelineBacktest, WorkTimelineRelease } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import { shortAge, shortRef } from "./work";
 
@@ -88,7 +88,8 @@ export interface TimelineLine {
   how: TimelineEnd;
   band: Interval | undefined;
   dots: TimelineDot[];
-  /** Children working now: a ring at Now on the line. */
+  /** The epic and its open children that a session is in a turn on now (#4265): the line pulses and a
+   * ring turns at Now while it is above 0. */
   working: number;
   /** 1, 2, … above the releases line, −1, −2, … below. */
   lane: number;
@@ -103,8 +104,10 @@ export const isOpen = (l: TimelineLine) => l.how.how === "forecast" || l.how.how
 
 /** The lines of a timeline, past and forecast, as section 7 says: one per segment, an epic with no
  * children not drawn, a line that has not started not drawn unless it is forecast. `forecast` off
- * draws the past only: an open line stops at Now. */
-export function timelineLines(timeline: WorkTimeline, now: number, forecast = true): TimelineLine[] {
+ * draws the past only: an open line stops at Now. `working` is the refs a session is in a turn on now
+ * (`workingNow`): only the open line of their epic works. */
+export function timelineLines(timeline: WorkTimeline, now: number, forecast = true,
+  working: ReadonlySet<string> = new Set()): TimelineLine[] {
   return timeline.epics.flatMap((epic) => {
     if (epic.children.length === 0) return [];
     const total = epic.children.length;
@@ -159,11 +162,13 @@ export function timelineLines(timeline: WorkTimeline, now: number, forecast = tr
         if (!forecast || child.waitsForPerson === true || at === undefined) return [];
         return [{ ...base, at: Math.min(Math.max(at, Math.max(start, now)), end), closed: false, notPlanned: false }];
       });
-      const working = open ? mine.filter((c) => c.closedAt === undefined && c.startedAt !== undefined && c.waitsForPerson !== true).length : 0;
+      const worked = open
+        ? mine.filter((c) => c.closedAt === undefined && working.has(c.item.node.ref)).length + (working.has(epic.item.node.ref) ? 1 : 0)
+        : 0;
       return [{
         id: `${epic.item.node.ref}/${i}`, epic: epic.item.node.ref, segment: i, title: epic.item.title,
         number: shortRef(epic.item.node.ref), feature: epic.item.feature, done, total, start, end, how, band,
-        dots: dots.sort((a, b) => a.at - b.at), working, lane: 0,
+        dots: dots.sort((a, b) => a.at - b.at), working: worked, lane: 0,
       }];
     });
   });
@@ -502,6 +507,26 @@ export function startedBySessions(timeline: WorkTimeline, sessions: readonly Lin
       return { ...epic, children, segments };
     }),
   };
+}
+
+/**
+ * The epics and children a session is in a turn on now (#4265), by ref: every machine's sessions from
+ * the control plane's copy whose state is working, and the page's own sessions that are running with a
+ * `#<n>` label of one. A session that waits (on an event, on CI, on the person) is not in a turn, so it
+ * does not count. A session the page knows goes by its own state, which is newer than the copy's. As
+ * the window's `WorkTimeline.workingNow`.
+ */
+export function workingNow(timeline: WorkTimeline, sessions: readonly LineageSessionOn[], agents: readonly Agent[]): Set<string> {
+  const known = new Set(agents.map((a) => `session:${a.id}`.toUpperCase()));
+  const out = new Set(sessions.filter((s) => s.state?.state === "working" && !known.has(s.node.ref.toUpperCase()))
+    .flatMap((s) => s.on.map((n) => n.ref)));
+  const labels = new Set(agents.filter((a) => a.state === "running" || a.state === "starting")
+    .flatMap((a) => (a.labels ?? []).map((l) => l.value)));
+  if (labels.size === 0) return out;
+  for (const epic of timeline.epics) {
+    for (const node of [epic.item.node, ...epic.children.map((c) => c.item.node)]) if (labels.has(shortRef(node.ref))) out.add(node.ref);
+  }
+  return out;
 }
 
 /** The nodes a timeline asks `lineage/sessionsOn` for: its epics and their children, each once, at most 500. */

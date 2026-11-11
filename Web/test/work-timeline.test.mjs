@@ -80,7 +80,8 @@ test("an open line is forecast, waits or stops at Now", () => {
   assert.equal(lines[0].end, h(5));
   assert.deepEqual(lines[0].band, { start: h(2), end: h(11) });
   assert.deepEqual(lines[0].dots.map((d) => d.closed), [true, false, false]);
-  assert.equal(lines[0].working, 1);
+  // A start is history: no session in a turn, no line works (#4265).
+  assert.ok(lines.every((l) => l.working === 0));
   assert.equal(lines[2].end, now);
   assert.equal(lines[3].start, h(6));
   // Forecast off: the past only.
@@ -245,6 +246,30 @@ test("machines merge each epic and release once", () => {
 
 // #4276: a session on another machine, from the control plane's copy, starts a child this machine
 // had no start for, and an earlier one moves a start and its line back; as the window's test.
+test("a line works only while a session is in a turn on it", () => {
+  const timeline = { epics: [
+    epic(1, [child(2, { started: -10, closed: -6 }), child(3, { started: -2 })], [[-10, -6], [-3, null]]),
+    epic(4, [child(5, { started: -2 })], [[-2, null]]),
+    epic(6, [child(7, { started: -2 })], [[-2, null]]),
+  ], releases: [] };
+  const ref = (n) => `github:alexec/Agents#${n}`;
+  const on = (n, state, id = crypto.randomUUID()) => ({ node: { kind: "session", ref: `session:${id}` }, host: "BEAS-MAC",
+    on: [{ kind: "issue", ref: ref(n) }], at: wire(-1), state: { state, at: wire(-1) } });
+  const agent = (label, state) => ({ id: crypto.randomUUID().toUpperCase(), runtimeID: "claude", cwd: "file:///tmp/work", state,
+    labels: [{ value: label, owner: "agent", addedAt: 0 }] });
+  // Here: a lead on #4 between turns, and a lane on #7 in one. There: a lane on #3 in a turn, one on #5
+  // waiting, and one that is #4's lead, whose old copy still says working.
+  const lead = agent("#4", "finished");
+  const working = t.workingNow(timeline, [on(3, "working"), on(5, "waiting"), on(4, "working", lead.id.toLowerCase())],
+    [lead, agent("#7", "running"), agent("#9", "running")]);
+  assert.deepEqual([...working].sort(), [ref(3), ref(7)]);
+  // #1's closed segment does not work; its open one does.
+  assert.deepEqual(t.timelineLines(timeline, now, true, working).map((l) => l.working), [0, 1, 0, 1]);
+  // The epic's own session counts too: a lead in a turn.
+  assert.deepEqual(t.timelineLines(timeline, now, true, new Set([ref(4)])).map((l) => l.working), [0, 0, 1, 0]);
+  assert.equal(t.workingNow(timeline, [], []).size, 0);
+});
+
 test("sessions on every machine start the children", () => {
   const timeline = { epics: [epic(1, [child(3, { started: -10, closed: -5 }), child(2), child(4, { started: -3 })], [[-10, -5], [-3, null]])], releases: [] };
   const on = (n, hours) => ({ node: { kind: "session", ref: `session:${n}-${hours}` }, host: "BEAS-MAC",

@@ -2715,7 +2715,10 @@ dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
 .timeline-breathing path { stroke: var(--c-shown, var(--c)); }
 @media (prefers-reduced-motion: no-preference) {
   .timeline-breathing { display: inline; animation: timeline-breathe 1.6s ease-in-out infinite; }
+  /* The ◐ turns once a breath, on the same clock (#4265); with Reduce Motion it is still. */
+  .timeline-working path { animation: timeline-turn 1.6s linear infinite; }
 }
+@keyframes timeline-turn { to { transform: rotate(360deg); } }
 @keyframes timeline-breathe {
   0%, 100% { stroke-width: 4px; stroke-opacity: 0.1; }
   50% { stroke-width: 12px; stroke-opacity: 0.4; }
