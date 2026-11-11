@@ -10,6 +10,12 @@ import (
 	"strings"
 )
 
+// SyncWrites is whether WriteAtomically syncs the file before it renames it. Only tests
+// turn it off: on a Mac, Go's Sync is F_FULLFSYNC, which flushes the disk's own cache and
+// costs about 4 ms a write, so agentsd's tests took twice as long on a Mac as on Linux
+// (#4709). A test proves nothing about a crash, so it gives up nothing.
+var SyncWrites = true
+
 // WriteAtomically writes data whole, as StoreCoding.writeAtomically does: to a temporary
 // file beside it, synced, then renamed into place, so a crash leaves the old file or the
 // new one and never a torn one.
@@ -26,7 +32,7 @@ func WriteAtomically(file string, data []byte, mode os.FileMode) error {
 		return err
 	}
 	_, err = f.Write(data)
-	if err == nil {
+	if err == nil && SyncWrites {
 		err = f.Sync()
 	}
 	if cerr := f.Close(); err == nil {

@@ -4,7 +4,7 @@
 # workspace-commands, #1364, the command machine provider agents-control looks for beside
 # itself), for Agents Host to carry beside agentsd (#700): what Agents Host's build runs first. Builds
 # Go/out/helpers/<name>, for both Mac architectures, when a Go source is newer than it. With no
-# way to run Go here (no Docker and no Go), it leaves none and warns: the app still builds,
+# Go here, it leaves none and warns: the app still builds,
 # without it.
 #
 #   scripts/go-github-mcp.sh                       build github-mcp if stale
@@ -38,7 +38,7 @@ case "$name" in github-mcp | linear-mcp | gitlab-mcp | email-mcp | jira-mcp | sl
 
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 out="$root/Go/out/helpers/$name"
-# An Xcode script phase has a bare PATH: look where Docker and Go are usually installed too.
+# An Xcode script phase has a bare PATH: look where Go is usually installed too.
 PATH="$PATH:/opt/homebrew/bin:/usr/local/bin:/usr/local/go/bin"
 
 if [ "$mode" = --carry ]; then
@@ -62,8 +62,8 @@ if [ "$mode" != --force ] && [ -x "$out" ] &&
 	exit 0
 fi
 
-if ! { command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; } && ! command -v go >/dev/null 2>&1; then
-	echo "warning: go-github-mcp.sh: no Docker running and no Go here, so Agents Host carries no $name." >&2
+if ! command -v go >/dev/null 2>&1; then
+	echo "warning: go-github-mcp.sh: no Go here, so Agents Host carries no $name." >&2
 	rm -f "$out"
 	exit 0
 fi

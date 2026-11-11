@@ -88,8 +88,8 @@ Go/scripts/go.sh test ./...
 ```
 
 Build the schemes one after another, not at once. `agentsd` and `agents-control` are Go
-(`Go/`, see `Go/README.md`): the `AgentsHost` build makes them with Go in a container, so it
-needs Docker running (or Go installed). The Linux programs are built the same way:
+(`Go/`, see `Go/README.md`): the `AgentsHost` build makes them with the Mac's Go, so it
+needs Go installed (`brew install go`). The Linux programs are built the same way:
 `scripts/build-linux-agentsd.sh` for a server's host; the control plane's container builds
 its own (`deploy/Containerfile`). `deploy/` runs three copies of the control plane over
 MinIO behind Caddy, for trying it out; see `deploy/README.md`.

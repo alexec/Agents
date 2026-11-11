@@ -16,8 +16,8 @@ is no published image yet: you build it from the source.
 
 ## Before you start
 
-- A clone of the Agents repository on a Mac with Docker running, to build the Linux
-  programs: they are Go, built in a container.
+- A clone of the Agents repository on a Mac with Go installed (`brew install go`), to build
+  the Linux programs: they are Go, cross-compiled on the Mac.
 - Docker, or anywhere else that runs containers.
 - An S3-compatible bucket (Amazon S3, Cloudflare R2 or MinIO, for example) and an access
   key for it. It must support conditional writes, which the copies rely on so that two of

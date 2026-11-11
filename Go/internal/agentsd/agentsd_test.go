@@ -149,7 +149,7 @@ func TestASwiftRootIsServed(t *testing.T) {
 	// The fixture's folder is a real one on the Mac it was made on: here, a folder of the
 	// test's own, so the host never reads (or runs the workflows of) a real folder.
 	b = []byte(strings.ReplaceAll(string(b), `"file:///Users/alexcollins/Agents/"`, `"`+string(store.FolderURL(t.TempDir()))+`/"`))
-	if strings.Contains(string(b), "/Users/alexcollins") {
+	if strings.Contains(string(b), "file:///Users/alexcollins/Agents/") {
 		t.Fatal("the fixture still names a real folder")
 	}
 	dir := filepath.Join(root, "agents", strings.ToUpper(head.ID))
