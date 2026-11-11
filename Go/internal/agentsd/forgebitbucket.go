@@ -136,11 +136,13 @@ func (bitbucketForge) Caps() forgeCaps {
 		StateReason: true,
 		// Bitbucket says when an item opened, but no time that it closed or merged.
 		CreatedAt: true,
+		// A pull request's branches and merge (#4409); its size, reviewers, closing issues and check times are #4682.
+		Branches: true, MergeCommit: true,
 		// An issue's comment count is on its own page only.
 		CommentCount: "detail",
 		Reasons: map[string]string{
-			actionAssign:   "the app does not set a Bitbucket issue's assignee yet, and a pull request has reviewers, not assignees",
-			actionReleases: "Bitbucket Cloud has no releases, only tags",
+			actionAssign:     "the app does not set a Bitbucket issue's assignee yet, and a pull request has reviewers, not assignees",
+			actionReleases:   "Bitbucket Cloud has no releases, only tags",
 			actionTransition: "only a Jira issue or an Azure Boards work item moves by a transition",
 			actionAutoMerge:  bitbucketNoAutoMerge,
 			actionLabel:      bitbucketmcp.NoPRLabels,
@@ -466,6 +468,7 @@ func bitbucketItemOf(i bitbucketmcp.Item, folder string) wire.ForgeItem {
 		// Bitbucket has no merge when checks pass.
 		out.Draft, out.AutoMerge = new(i.Draft), new(false)
 		out.Checks, out.Review, out.Mergeable = optional(i.Checks), optional(i.Review), optional(i.Mergeable)
+		withPullRefs(&out, i.HeadRef, i.BaseRef, "", i.MergeCommit)
 		return out
 	}
 	// An issue's level and feature are its labels' (its component); Bitbucket has no parent.
