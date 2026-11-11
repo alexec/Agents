@@ -365,7 +365,7 @@ function Plot({ timeline: t, projectName, loading, dim, working }: {
           <ul class="work-rows" aria-label="Epics">
             {rows.map(({ line, line2 }) => (
               <li key={line.id}>
-                <button type="button" class="work-row timeline-list-row" style={{ "--c": d.colour(line) }}
+                <button type="button" class="timeline-list-row" style={{ "--c": d.colour(line) }}
                   aria-label={`${line.title}, ${line.done} of ${line.total} done, ${line2}`}
                   onClick={() => go({ nav: "work", section: "issue", item: line.epic })}>
                   <span class="edge" aria-hidden="true" />
@@ -465,7 +465,7 @@ class Drawing {
     const left = this.offset, right = this.offset + this.visible;
     const out = [
       <defs key="defs">
-        <clipPath id="timeline-past"><rect x={-100} y={0} width={nowX + 100} height={height} /></clipPath>
+        <clipPath id="timeline-past"><rect x={-100} y={0} width={Math.max(nowX + 100, 0)} height={height} /></clipPath>
         <clipPath id="timeline-ahead"><rect x={nowX} y={0} width={Math.max(axis.width - nowX + 100, 0)} height={height} /></clipPath>
       </defs>,
       <rect key="plot" class="timeline-ground" x={0} y={0} width={axis.width} height={height} />,
