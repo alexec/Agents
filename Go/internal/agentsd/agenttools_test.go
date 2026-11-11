@@ -183,7 +183,7 @@ func TestAFormLeftOpenBringsItsAnswerLater(t *testing.T) {
 // says so, and a form left open is named ahead of the message.
 func TestAMessageDismissesTheQuestions(t *testing.T) {
 	fakeRuntimes(t)
-	answered, left := formHolds(t)
+	held, left := formHolds(t)
 	left() // the first call must outlast its hold
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
@@ -199,7 +199,7 @@ func TestAMessageDismissesTheQuestions(t *testing.T) {
 	if text, _ := m.tool(2, "ask_question", question); text != formStillOpen {
 		t.Fatal(text)
 	}
-	answered() // the second is answered while it is held
+	held() // the second is answered while it is held
 	answered := make(chan string, 1)
 	go func() { text, _ := m.tool(3, "ask_question", question); answered <- text }()
 	var pending []wire.ElicitationRequest
