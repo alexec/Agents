@@ -413,3 +413,18 @@ func TestBlockersAreThePredecessors(t *testing.T) {
 		t.Fatalf("none asked: %v %v", by, err)
 	}
 }
+
+// A closed work item's state category and System.Reason say why it closed (#4365).
+func TestStateReasonOf(t *testing.T) {
+	for _, c := range []struct{ category, reason, want string }{
+		{"Completed", "Work finished", "completed"},
+		{"Completed", "Duplicate", "duplicate"},
+		{"Completed", "Cut", "not_planned"},
+		{"Completed", "Removed from the backlog", "not_planned"},
+		{"Removed", "Moved to state Removed", "not_planned"},
+	} {
+		if got := stateReasonOf(c.category, c.reason); got != c.want {
+			t.Errorf("%s %q: %q, want %q", c.category, c.reason, got, c.want)
+		}
+	}
+}

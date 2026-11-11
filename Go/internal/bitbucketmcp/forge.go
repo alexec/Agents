@@ -46,9 +46,12 @@ type Item struct {
 	State, Title, URL, Author, Milestone, UpdatedAt string
 	// AuthorAvatar is the author's picture, on Atlassian's avatar host or Gravatar; "" for none (#4363).
 	AuthorAvatar string
-	Labels       []string
-	Assignees    []string
-	Comments     int
+	// StateReason is why a closed issue closed, from its state: completed, not_planned or
+	// duplicate; "" for an open issue or a pull request (#4365).
+	StateReason string
+	Labels      []string
+	Assignees   []string
+	Comments    int
 	// A pull request's: Checks is passing, failing, running or none, Review is approved,
 	// changes_requested, review_required or "", Mergeable is mergeable, conflicting or unknown.
 	// A list says only Draft and Review; one read on its own says the rest.
@@ -152,7 +155,7 @@ func (i issueJSON) forgeItem(repo string) Item {
 	it := Item{Repo: repo, Number: i.ID, Title: i.Title, URL: i.Links.HTML.Href, Author: i.Reporter.name(), AuthorAvatar: i.Reporter.avatar(), UpdatedAt: i.UpdatedOn,
 		Labels: i.labels(), Assignees: i.issue().Assignees, State: "open"}
 	if closedStates[i.State] {
-		it.State = "closed"
+		it.State, it.StateReason = "closed", stateReasons[i.State]
 	}
 	if i.Milestone != nil {
 		it.Milestone = i.Milestone.Name

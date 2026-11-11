@@ -128,9 +128,10 @@ func (bitbucketForge) Name() string { return "bitbucket" }
 func (bitbucketForge) Caps() forgeCaps {
 	return forgeCaps{
 		Issues: true, PRs: true,
-		Issue:   forgeActions{Comment: true, Label: true, Close: true, Reopen: true},
-		PR:      forgeActions{Comment: true, Close: true, Merge: true, Approve: true, Rerun: true, Log: true, Diff: true},
-		Avatars: true,
+		Issue:       forgeActions{Comment: true, Label: true, Close: true, Reopen: true},
+		PR:          forgeActions{Comment: true, Close: true, Merge: true, Approve: true, Rerun: true, Log: true, Diff: true},
+		Avatars:     true,
+		StateReason: true,
 		// An issue's comment count is on its own page only.
 		CommentCount: "detail",
 		Reasons: map[string]string{
@@ -450,7 +451,7 @@ func (d *Daemon) forgeBitbucket(root string) forgeBitbucket {
 // bitbucketItemOf is a Bitbucket item in the one model, from folder.
 func bitbucketItemOf(i bitbucketmcp.Item, folder string) wire.ForgeItem {
 	out := wire.ForgeItem{Node: bitbucketNode(i.Repo, i.Number, i.PR), Title: i.Title, State: i.State, URL: optional(i.URL),
-		Folder: optional(folder), Labels: forgeLabelsOf(i.Labels, nil), Author: optional(i.Author), AuthorAvatar: optional(i.AuthorAvatar), Assignees: i.Assignees,
+		Folder: optional(folder), Labels: forgeLabelsOf(i.Labels, nil), Author: optional(i.Author), AuthorAvatar: optional(i.AuthorAvatar), StateReason: optional(i.StateReason), Assignees: i.Assignees,
 		Milestone: optional(i.Milestone), UpdatedAt: forgeDate(i.UpdatedAt), Comments: int64(i.Comments)}
 	if out.Assignees == nil {
 		out.Assignees = []string{}

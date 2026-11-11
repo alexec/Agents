@@ -33,6 +33,7 @@ func (linearForge) Caps() forgeCaps {
 		Issue:       forgeActions{Comment: true, Label: true, Close: true, Reopen: true},
 		LabelColors: true,
 		Avatars:     true,
+		StateReason: true,
 		// Linear does not count an issue's comments: a list reads at most 50.
 		CommentCount: "capped", CommentsMost: 50,
 		Plan: true, BlockedBy: true, AddChild: true,

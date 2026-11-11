@@ -352,3 +352,13 @@ func TestPipelineRun(t *testing.T) {
 		}
 	}
 }
+
+// A closed issue's state says why it closed; an open one says none (#4365).
+func TestIssueStateReason(t *testing.T) {
+	for state, want := range map[string]string{"resolved": "completed", "closed": "completed", "wontfix": "not_planned",
+		"invalid": "not_planned", "duplicate": "duplicate", "open": "", "on hold": ""} {
+		if got := (issueJSON{State: state}).forgeItem("w/r").StateReason; got != want {
+			t.Errorf("%s: %q, want %q", state, got, want)
+		}
+	}
+}

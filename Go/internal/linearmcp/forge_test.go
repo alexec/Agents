@@ -125,3 +125,16 @@ func TestForgeItemPage(t *testing.T) {
 		t.Fatalf("not found: %v", err)
 	}
 }
+
+// A closed issue's state says why it closed (#4365).
+func TestStateReasonOf(t *testing.T) {
+	for _, c := range []struct{ stateType, name, want string }{
+		{"completed", "Done", "completed"},
+		{"canceled", "Canceled", "not_planned"},
+		{"canceled", "Duplicate", "duplicate"},
+	} {
+		if got := stateReasonOf(c.stateType, c.name); got != c.want {
+			t.Errorf("%s %s: %q, want %q", c.stateType, c.name, got, c.want)
+		}
+	}
+}

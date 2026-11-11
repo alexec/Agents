@@ -166,3 +166,22 @@ func TestItemPage(t *testing.T) {
 		t.Fatalf("missing: %v", err)
 	}
 }
+
+// A closed issue says why it closed in the one model's words; an open one and a PR say none (#4365).
+func TestItemStateReason(t *testing.T) {
+	for _, c := range []struct {
+		typename, issueState, pullState, reason, want string
+	}{
+		{"Issue", "CLOSED", "", "COMPLETED", "completed"},
+		{"Issue", "CLOSED", "", "NOT_PLANNED", "not_planned"},
+		{"Issue", "CLOSED", "", "DUPLICATE", "duplicate"},
+		{"Issue", "CLOSED", "", "", ""},
+		{"Issue", "OPEN", "", "REOPENED", ""},
+		{"PullRequest", "", "CLOSED", "", ""},
+	} {
+		n := gqlItem{Typename: c.typename, IssueState: c.issueState, PullState: c.pullState, StateReason: c.reason}
+		if got := n.item().StateReason; got != c.want {
+			t.Errorf("%+v: StateReason %q, want %q", c, got, c.want)
+		}
+	}
+}

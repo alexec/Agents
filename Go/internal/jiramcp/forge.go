@@ -40,6 +40,9 @@ type Item struct {
 	State, Status, Title, URL, Author, UpdatedAt string
 	// AuthorAvatar is the author's picture, its 48x48; "" for none (#4363).
 	AuthorAvatar string
+	// StateReason is why a closed issue closed, from its resolution: completed, not_planned or
+	// duplicate; "" while it is open (#4365).
+	StateReason string
 	// Milestone is the first fix version: the closest Jira has to a release (#3260).
 	Milestone string
 	Labels    []string
@@ -88,7 +91,7 @@ const forgeComments = 50
 
 // forgeFields are what a forge read asks for.
 var forgeFields = []string{"summary", "status", "labels", "assignee", "creator", "reporter", "updated", "project",
-	"fixVersions", "comment", "parent", "subtasks"}
+	"fixVersions", "comment", "parent", "subtasks", "resolution"}
 
 type restIssueRef struct {
 	Key    string `json:"key"`
@@ -106,6 +109,20 @@ func (r restIssueRef) done() bool {
 	return s != nil && s.Category != nil && s.Category.Key == "done"
 }
 
+// stateReasonOf is a resolution's reason (#4365). Jira's resolutions are names a site can add
+// to, with no category: Duplicate is duplicate; Done, Fixed and the like are completed; any
+// other (Won't Do, Won't Fix, Cannot Reproduce, Incomplete, Declined) is not_planned. A done
+// issue with no resolution, as a team-managed project leaves it, is completed.
+func stateReasonOf(resolution string) string {
+	switch strings.ToLower(strings.TrimSpace(resolution)) {
+	case "duplicate":
+		return "duplicate"
+	case "", "done", "fixed", "resolved", "complete", "completed":
+		return "completed"
+	}
+	return "not_planned"
+}
+
 func (r restIssue) item(site string) Item {
 	f := r.Fields
 	base := r.issue(site)
@@ -113,6 +130,11 @@ func (r restIssue) item(site string) Item {
 		UpdatedAt: normalized(f.Updated), Labels: base.Labels, Assignees: []string{}}
 	if base.StatusCategory == "done" {
 		i.State = "closed"
+		if f.Resolution != nil {
+			i.StateReason = stateReasonOf(f.Resolution.Name)
+		} else {
+			i.StateReason = "completed"
+		}
 	}
 	if base.Creator != nil {
 		i.Author, i.AuthorAvatar = base.Creator.Name, base.Creator.Avatar

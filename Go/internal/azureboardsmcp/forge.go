@@ -45,9 +45,12 @@ type Item struct {
 	State, Status, Type, Title, URL, Author, UpdatedAt string
 	// AuthorAvatar is the author's picture, on the organization; "" for none (#4363).
 	AuthorAvatar string
-	Labels       []string
-	Assignees    []string
-	Comments     int
+	// StateReason is why a closed work item closed: completed, not_planned or duplicate; ""
+	// while it is open (#4365).
+	StateReason string
+	Labels      []string
+	Assignees   []string
+	Comments    int
 	// Parent is the work item it is a child of, 0 for none; SubTotal and SubDone are its
 	// children and the closed ones, where the read says them (a plan's).
 	Parent            int
@@ -101,6 +104,7 @@ const (
 	fieldProject  = "System.TeamProject"
 	fieldComments = "System.CommentCount"
 	fieldParent   = "System.Parent"
+	fieldReason   = "System.Reason"
 	// The links a plan reads and writes: a child's parent, and a work item's predecessor
 	// (the one it waits for, as Jira's "is blocked by").
 	relParent      = "System.LinkTypes.Hierarchy-Reverse"
@@ -109,7 +113,7 @@ const (
 )
 
 // forgeFields are what a forge read asks for.
-var forgeFields = append(slices.Clone(itemFields), fieldProject, fieldComments, fieldParent)
+var forgeFields = append(slices.Clone(itemFields), fieldProject, fieldComments, fieldParent, fieldReason)
 
 // patch is a JSON Patch, which Azure DevOps changes a work item by.
 type patch []map[string]any
@@ -150,6 +154,26 @@ func category(c string) string {
 	return "indeterminate"
 }
 
+// stateReasonOf is why a work item in a closed state of category closed, for reason (its
+// System.Reason), in the one model's words (#4365). A state of the Removed category is
+// not_planned. Otherwise the reason says it: Duplicate is duplicate; Cut, Won't Fix, Obsolete,
+// Abandoned, Deferred, Rejected, Out of scope and Removed from the backlog are not_planned;
+// any other, as Completed, Fixed or Accepted, is completed.
+func stateReasonOf(category, reason string) string {
+	if category == "Removed" {
+		return "not_planned"
+	}
+	r := strings.ToLower(strings.TrimSpace(reason))
+	switch {
+	case r == "duplicate":
+		return "duplicate"
+	case r == "cut", r == "won't fix", r == "wont fix", r == "obsolete", r == "abandoned", r == "deferred",
+		r == "rejected", r == "out of scope", strings.HasPrefix(r, "removed"):
+		return "not_planned"
+	}
+	return "completed"
+}
+
 func (f *RealBoards) forgeItem(org string, w workItemJSON, states map[string]map[string]string) Item {
 	project := w.project(org)
 	kind, state := w.text(fieldType), w.text(fieldState)
@@ -158,7 +182,7 @@ func (f *RealBoards) forgeItem(org string, w workItemJSON, states map[string]map
 		URL: f.webURL(project, w.ID), Author: author.name(), AuthorAvatar: author.avatar(), UpdatedAt: normalized(w.text(fieldChanged)),
 		Labels: tags(w.text(fieldTags)), Assignees: []string{}, Comments: w.number(fieldComments), Parent: w.number(fieldParent)}
 	if closedIn(states, kind, state) {
-		i.State = "closed"
+		i.State, i.StateReason = "closed", stateReasonOf(states[kind][state], w.text(fieldReason))
 	}
 	if a := w.who(fieldAssigned).person(); a != nil {
 		i.Assignees = append(i.Assignees, a.name())
