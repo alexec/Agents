@@ -217,12 +217,6 @@ func (d *Daemon) changeAgent(id wire.UUID, moveOn bool, edit func(a *wire.Agent)
 	return a
 }
 
-func (d *Daemon) folderChanged(folder string) {
-	if s, ok := d.folderSummary(folder); ok {
-		Broadcast(d, wire.NotifyFolderChanged, s)
-	}
-}
-
 func reason(r wire.EndedReason) *wire.EndedReason { return &r }
 
 // start makes an agent and queues its first turn.

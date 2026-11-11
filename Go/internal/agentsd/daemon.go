@@ -97,6 +97,7 @@ type Daemon struct {
 	headlessSignInState
 	costBook
 	featureBook
+	folderChangedState
 	workflowBook
 	allowanceBook
 	accountBook
