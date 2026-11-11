@@ -15,7 +15,9 @@ struct WorkView: View {
     var body: some View {
         let place = model.workPlace
         Group {
-            if place.ref != nil {
+            if place.ref != nil, place.kind == .release {
+                WorkReleasePage(model: model, place: place).id(place)
+            } else if place.ref != nil {
                 WorkItemPage(model: model, place: place).id(place)
             } else if place.kind == .feature {
                 WorkFeaturesPane(model: model, state: model.workLists.features)
@@ -294,6 +296,7 @@ private struct WorkListPane: View {
 
     private func rowsList(_ shown: [WorkList.Row], lines: [String]) -> some View {
         let several = Set(list.all.map(\.repo)).count > 1
+        let latest = kind == .release ? WorkReleaseLook.latest(list.all) : []
         return ScrollViewReader { reader in
             selectable {
                 if !lines.isEmpty {
@@ -301,7 +304,7 @@ private struct WorkListPane: View {
                 }
                 ForEach(shown) { row in
                     Button { open(row.id) } label: {
-                        WorkItemRow(row: row, several: several, compact: compact, pick: pick)
+                        WorkItemRow(row: row, several: several, compact: compact, latest: latest.contains(row.id), pick: pick)
                     }
                     .buttonStyle(WorkRowButtonStyle())
                     // A forge that failed leaves its rows, dimmed, under the strip (lists.md section 5).

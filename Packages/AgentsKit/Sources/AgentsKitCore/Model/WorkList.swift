@@ -30,7 +30,11 @@ public enum WorkList {
         /// The states a list can be narrowed to: a PR's merged is its own.
         public var states: [State] { self == .pr ? [.open, .merged, .closed, .all] : [.open, .closed, .all] }
 
-        public var sorts: [Sort] { fromForge ? Sort.allCases : [.updated, .cost] }
+        /// A release's Newest is its version, the highest first (#4421).
+        public var sorts: [Sort] { fromForge ? Sort.allCases : self == .release ? [.newest, .cost] : [.updated, .cost] }
+
+        /// The sort a list opens with: a release's is Newest.
+        public var defaultSort: Sort { self == .release ? .newest : .updated }
     }
 
     public enum State: String, CaseIterable, Sendable, Hashable {
@@ -116,9 +120,10 @@ public enum WorkList {
                       status: item.status, comments: item.comments, checks: item.checks, review: item.review)
         }
 
-        /// A row lineage alone knows: a release.
+        /// A row lineage alone knows: a release, named by its tag until the forge names it (#4426).
         public init(_ n: DaemonAPI.ReportNode) {
-            self.init(node: n.node, title: n.resolved?.title ?? ReportValueWords.name(n.node),
+            self.init(node: n.node,
+                      title: n.resolved?.title ?? (n.node.kind == "release" ? WorkList.shortRef(n.node.ref) : ReportValueWords.name(n.node)),
                       state: n.resolved?.state ?? (n.outcome == "merged" ? "merged" : ""),
                       labels: (n.resolved?.labels ?? []).map { DaemonAPI.ForgeLabel(name: $0) },
                       repo: WorkList.repo(of: n), updated: n.lastAt,
@@ -317,8 +322,15 @@ public enum WorkList {
         case .updated:
             return rows.sorted(by: tie)
         case .newest:
-            // A forge numbers its items as they are made, so the highest number is the newest.
+            // A forge numbers its items as they are made, so the highest number is the newest; a
+            // release's version says it (#4421).
             return rows.sorted { a, b in
+                if a.node.kind == "release", b.node.kind == "release" {
+                    let (x, y) = (shortRef(a.node.ref), shortRef(b.node.ref))
+                    if WorkReleaseLook.newer(x, than: y) { return true }
+                    if WorkReleaseLook.newer(y, than: x) { return false }
+                    return tie(a, b)
+                }
                 let (x, y) = (number(a.node.ref), number(b.node.ref))
                 return x != y ? x > y : tie(a, b)
             }

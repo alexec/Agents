@@ -157,7 +157,7 @@ struct WorkLookTests {
         #expect(WorkLook.emptyTitle(.pr, state: .merged, filtered: false) == "No merged pull requests")
         #expect(WorkLook.emptyTitle(.issue, state: .all, filtered: false) == "No issues")
         #expect(WorkLook.emptyTitle(.issue, state: .open, filtered: true) == "No issues match")
-        #expect(WorkLook.emptyTitle(.release, state: .open, filtered: false) == "No releases")
+        #expect(WorkLook.emptyTitle(.release, state: .open, filtered: false) == "No releases yet")
         #expect(WorkLook.emptyLine(.issue, repos: ["github:alexec/Agents"]) == "Issues on alexec/Agents show here.")
         #expect(WorkLook.emptyLine(.pr, repos: []) == "Pull requests from your folders’ repos show here.")
     }
