@@ -225,3 +225,23 @@ func TestItemPageReadsAMergeRequest(t *testing.T) {
 		t.Fatalf("no such issue: %v", err)
 	}
 }
+
+// #4373: an item says when it opened, and a closed or merged one when it closed; a merged merge
+// request has merged_at, and closed_at only when it was closed before.
+func TestItemDates(t *testing.T) {
+	for _, c := range []struct {
+		json, created, closed string
+	}{
+		{`{"state":"opened","created_at":"2026-10-01T10:00:00Z","closed_at":null}`, "2026-10-01T10:00:00Z", ""},
+		{`{"state":"closed","created_at":"2026-10-01T10:00:00Z","closed_at":"2026-10-02T10:00:00Z"}`, "2026-10-01T10:00:00Z", "2026-10-02T10:00:00Z"},
+		{`{"state":"merged","created_at":"2026-10-01T10:00:00Z","merged_at":"2026-10-03T10:00:00Z"}`, "2026-10-01T10:00:00Z", "2026-10-03T10:00:00Z"},
+	} {
+		var j forgeJSON
+		if err := json.Unmarshal([]byte(c.json), &j); err != nil {
+			t.Fatal(err)
+		}
+		if i := j.item("g/a", strings.Contains(c.json, "merged")); i.CreatedAt != c.created || i.ClosedAt != c.closed {
+			t.Errorf("%s: %q %q", c.json, i.CreatedAt, i.ClosedAt)
+		}
+	}
+}

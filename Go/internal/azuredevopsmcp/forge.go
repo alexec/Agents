@@ -40,6 +40,9 @@ type Item struct {
 	Number int
 	// State is open, closed or merged.
 	State, Title, URL, Author, UpdatedAt string
+	// CreatedAt is when it opened; ClosedAt when it was completed or abandoned, "" while active
+	// (#4373).
+	CreatedAt, ClosedAt string
 	// AuthorAvatar is the author's picture, on the organization; "" for none (#4363).
 	AuthorAvatar string
 	Labels       []string
@@ -96,7 +99,11 @@ type forgePullJSON struct {
 
 func (f *RealAzureDevOps) item(repo string, p forgePullJSON) Item {
 	i := Item{Repo: repo, Number: p.ID, Title: p.Title, URL: f.prURL(repo, p.ID), Author: p.CreatedBy.name(), AuthorAvatar: p.CreatedBy.ImageURL, UpdatedAt: p.updated(),
-		Labels: p.labels(), Draft: p.IsDraft, AutoMerge: p.AutoCompleteSetBy != nil, Review: p.review(), Mergeable: "unknown"}
+		CreatedAt: p.CreationDate,
+		Labels:    p.labels(), Draft: p.IsDraft, AutoMerge: p.AutoCompleteSetBy != nil, Review: p.review(), Mergeable: "unknown"}
+	if p.Status != "active" {
+		i.ClosedAt = p.ClosedDate
+	}
 	switch p.Status {
 	case "active":
 		i.State = "open"

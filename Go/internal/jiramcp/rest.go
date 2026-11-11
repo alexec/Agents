@@ -267,8 +267,9 @@ type restIssue struct {
 		Resolution *struct {
 			Name string `json:"name"`
 		} `json:"resolution"`
-		Parent   *restIssueRef  `json:"parent"`
-		Subtasks []restIssueRef `json:"subtasks"`
+		ResolutionDate string         `json:"resolutiondate"`
+		Parent         *restIssueRef  `json:"parent"`
+		Subtasks       []restIssueRef `json:"subtasks"`
 	} `json:"fields"`
 	Changelog *struct {
 		Histories []restHistory `json:"histories"`

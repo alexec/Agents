@@ -38,6 +38,10 @@ type Item struct {
 	// State is open, or closed for a status in the Done category; Status is the status's own
 	// name, as In Progress.
 	State, Status, Title, URL, Author, UpdatedAt string
+	// CreatedAt is when it was made; ClosedAt is its resolution date on a done issue, "" while
+	// it is open or when a done issue has no resolution, as a team-managed project can leave it
+	// (#4373).
+	CreatedAt, ClosedAt string
 	// AuthorAvatar is the author's picture, its 48x48; "" for none (#4363).
 	AuthorAvatar string
 	// StateReason is why a closed issue closed, from its resolution: completed, not_planned or
@@ -91,7 +95,7 @@ const forgeComments = 50
 
 // forgeFields are what a forge read asks for.
 var forgeFields = []string{"summary", "status", "labels", "assignee", "creator", "reporter", "updated", "project",
-	"fixVersions", "comment", "parent", "subtasks", "resolution"}
+	"fixVersions", "comment", "parent", "subtasks", "resolution", "created", "resolutiondate"}
 
 type restIssueRef struct {
 	Key    string `json:"key"`
@@ -127,9 +131,9 @@ func (r restIssue) item(site string) Item {
 	f := r.Fields
 	base := r.issue(site)
 	i := Item{Key: r.Key, Project: base.Project, State: "open", Status: base.Status, Title: f.Summary, URL: base.URL,
-		UpdatedAt: normalized(f.Updated), Labels: base.Labels, Assignees: []string{}}
+		UpdatedAt: normalized(f.Updated), CreatedAt: normalized(f.Created), Labels: base.Labels, Assignees: []string{}}
 	if base.StatusCategory == "done" {
-		i.State = "closed"
+		i.State, i.ClosedAt = "closed", normalized(f.ResolutionDate)
 		if f.Resolution != nil {
 			i.StateReason = stateReasonOf(f.Resolution.Name)
 		} else {

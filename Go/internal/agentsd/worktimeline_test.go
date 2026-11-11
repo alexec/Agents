@@ -43,8 +43,8 @@ func TestWorkTimelineForecastsTheOpenEpics(t *testing.T) {
 	number := 100
 	child := func(filed, closed float64, labels ...string) githubmcp.TimelineChild {
 		number++
-		c := githubmcp.TimelineChild{Item: githubmcp.Item{Repo: "alexec/Agents", Number: number, State: "open", Title: "child " + strconv.Itoa(number), Labels: labels},
-			CreatedAt: stamp(filed)}
+		c := githubmcp.TimelineChild{Item: githubmcp.Item{Repo: "alexec/Agents", Number: number, State: "open", Title: "child " + strconv.Itoa(number), Labels: labels,
+			CreatedAt: stamp(filed)}}
 		if closed != 0 {
 			c.State, c.ClosedAt, c.StateReason = "closed", stamp(closed), "completed"
 			c.PROpenedAt = []string{stamp(closed - 1)}
@@ -52,8 +52,8 @@ func TestWorkTimelineForecastsTheOpenEpics(t *testing.T) {
 		return c
 	}
 	epic := func(n int, closed float64, kids ...githubmcp.TimelineChild) githubmcp.TimelineEpic {
-		e := githubmcp.TimelineEpic{Item: githubmcp.Item{Repo: "alexec/Agents", Number: n, State: "open", Title: "epic " + strconv.Itoa(n), Labels: []string{"epic"}},
-			CreatedAt: stamp(-24 * 40), Children: kids}
+		e := githubmcp.TimelineEpic{Item: githubmcp.Item{Repo: "alexec/Agents", Number: n, State: "open", Title: "epic " + strconv.Itoa(n), Labels: []string{"epic"},
+			CreatedAt: stamp(-24 * 40)}, Children: kids}
 		if closed != 0 {
 			e.State, e.ClosedAt, e.StateReason = "closed", stamp(closed), "completed"
 		}

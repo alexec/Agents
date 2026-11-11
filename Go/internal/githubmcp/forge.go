@@ -29,6 +29,8 @@ type Item struct {
 	PR     bool
 	// State is open, closed or merged.
 	State, Title, URL, Author, Milestone, UpdatedAt string
+	// CreatedAt is when it opened; ClosedAt when it closed or merged, "" while open (#4373).
+	CreatedAt, ClosedAt string
 	// AuthorAvatar is the author's picture (avatars.githubusercontent.com), "" for none (#4363).
 	AuthorAvatar string
 	// StateReason is why a closed issue closed: completed, not_planned or duplicate; "" for an
@@ -73,19 +75,73 @@ type Check struct{ Name, State, URL string }
 // MergeMethods are merge, squash or rebase, as the repo allows them, the default first.
 type ItemDetail struct {
 	Item
-	Body          string
-	Thread        []Comment
-	Before        string
-	CheckRuns     []Check
-	ReviewThreads int
-	FilesChanged  int
-	Head          string
-	MergeMethods  []string
+	// An issue's own (#4373): its sub-issues, the pull requests that close it, and its newest
+	// timeline events, oldest first.
+	Children, LinkedPulls []Linked
+	Events                []Event
+	Body                  string
+	Thread                []Comment
+	Before                string
+	CheckRuns             []Check
+	ReviewThreads         int
+	FilesChanged          int
+	Head                  string
+	MergeMethods          []string
 }
+
+// Linked is an item an issue names: a sub-issue, or a pull request that closes it (#4373). State
+// is open, closed or merged.
+type Linked struct {
+	Repo              string
+	Number            int
+	PR                bool
+	Title, State, URL string
+}
+
+// Event is one event on an issue's timeline (#4373). Kind is labeled, unlabeled, assigned,
+// unassigned, closed, reopened or referenced; Label (with its #rrggbb LabelColor) or Assignee is
+// whom it names; Source is the issue or pull request that referenced it, or that closed it.
+type Event struct {
+	Kind, Actor, At   string
+	Label, LabelColor string
+	Assignee          string
+	SourceRepo        string
+	SourceNumber      int
+	SourcePR          bool
+}
+
+// Events are at most issueTimeline of an issue's newest, and at most issueLinked of its sub-issues
+// and of the pull requests that close it.
+const (
+	issueTimeline = 100
+	issueLinked   = 50
+)
+
+// linkedFields are what a sub-issue and a closing pull request say on an issue's read.
+const linkedFields = `number title url repository { nameWithOwner }`
+
+// issueReadFields are an issue's own read (#4373): its sub-issues, the pull requests that close
+// it, and its timeline's events of the kinds the one model has.
+var issueReadFields = fmt.Sprintf(`children: subIssues(first: %[1]d) { nodes { issueState: state `+linkedFields+` } }
+  linkedPulls: closedByPullRequestsReferences(first: %[1]d, includeClosedPrs: true) { nodes { pullState: state `+linkedFields+` } }
+  events: timelineItems(last: %[2]d, itemTypes: [LABELED_EVENT, UNLABELED_EVENT, ASSIGNED_EVENT, UNASSIGNED_EVENT, CLOSED_EVENT, REOPENED_EVENT, CROSS_REFERENCED_EVENT]) {
+    nodes { __typename
+      ... on LabeledEvent { actor { login } createdAt label { name color } }
+      ... on UnlabeledEvent { actor { login } createdAt label { name color } }
+      ... on AssignedEvent { actor { login } createdAt assignee { `+assigneeFields+` } }
+      ... on UnassignedEvent { actor { login } createdAt assignee { `+assigneeFields+` } }
+      ... on ClosedEvent { actor { login } createdAt closer { __typename ... on PullRequest { number repository { nameWithOwner } } } }
+      ... on ReopenedEvent { actor { login } createdAt }
+      ... on CrossReferencedEvent { actor { login } createdAt source { __typename
+        ... on Issue { number repository { nameWithOwner } } ... on PullRequest { number repository { nameWithOwner } } } } } }`,
+	issueLinked, issueTimeline)
+
+// assigneeFields are an Assignee's login, which each of its types has.
+const assigneeFields = `... on User { login } ... on Bot { login } ... on Mannequin { login } ... on Organization { login }`
 
 // itemFields are what an issue and a pull request both say, in a search and on their own. Their
 // states are of two types, so each has its own name: issueState and pullState.
-const itemFields = `number title url updatedAt author { login __typename avatarUrl } repository { nameWithOwner }
+const itemFields = `number title url createdAt closedAt updatedAt author { login __typename avatarUrl } repository { nameWithOwner }
   ` + labelFields + ` assignees(first: 20) { nodes { login } } milestone { title } commentCount: comments { totalCount }`
 
 // issueFields are an issue's own: its parent and how many of its sub-issues are closed (#3267),
@@ -105,9 +161,10 @@ const searchQuery = `query($q: String!, $first: Int!, $after: String) {
 const commentFields = `comments(last: 50, before: $before) { pageInfo { hasPreviousPage startCursor }
   nodes { author { login __typename avatarUrl } body createdAt url } }`
 
-const itemQuery = `query($owner: String!, $name: String!, $number: Int!, $before: String) {
+var itemQuery = `query($owner: String!, $name: String!, $number: Int!, $before: String) {
   repository(owner: $owner, name: $name) { issueOrPullRequest(number: $number) {
-    __typename ... on Issue { issueState: state ` + itemFields + ` ` + issueFields + ` body ` + commentFields + ` }
+    __typename ... on Issue { issueState: state ` + itemFields + ` ` + issueFields + ` body ` + commentFields + `
+      ` + issueReadFields + ` }
     ... on PullRequest { pullState: state ` + itemFields + ` ` + pullFields + ` body ` + commentFields + `
       reviewThreads { totalCount } changedFiles headRefOid ` + rollupFields + ` } }
     viewerDefaultMergeMethod squashMergeAllowed mergeCommitAllowed rebaseMergeAllowed } }`
@@ -122,6 +179,8 @@ type gqlItem struct {
 	StateReason string    `json:"stateReason"`
 	PullState   string    `json:"pullState"`
 	UpdatedAt   string    `json:"updatedAt"`
+	CreatedAt   string    `json:"createdAt"`
+	ClosedAt    string    `json:"closedAt"`
 	Author      *gqlActor `json:"author"`
 	Repository  struct {
 		NameWithOwner string `json:"nameWithOwner"`
@@ -164,6 +223,7 @@ type gqlItem struct {
 func (n gqlItem) item() Item {
 	i := Item{Repo: n.Repository.NameWithOwner, Number: n.Number, PR: n.Typename == "PullRequest",
 		State: strings.ToLower(n.IssueState + n.PullState), Title: n.Title, URL: n.URL, Author: n.Author.login(), AuthorAvatar: n.Author.avatar(), UpdatedAt: n.UpdatedAt,
+		CreatedAt: n.CreatedAt, ClosedAt: n.ClosedAt,
 		Comments: n.CommentCount.TotalCount, Assignees: []string{}}
 	if i.State != "merged" && i.State != "closed" {
 		i.State = "open"
@@ -317,6 +377,15 @@ func (g *RealGitHub) ItemPage(ctx context.Context, repo string, number int, befo
 				ChangedFiles int       `json:"changedFiles"`
 				HeadRefOid   string    `json:"headRefOid"`
 				Commits      gqlRollup `json:"commits"`
+				Children     struct {
+					Nodes []gqlLinked `json:"nodes"`
+				} `json:"children"`
+				LinkedPulls struct {
+					Nodes []gqlLinked `json:"nodes"`
+				} `json:"linkedPulls"`
+				Events struct {
+					Nodes []gqlEvent `json:"nodes"`
+				} `json:"events"`
 			} `json:"issueOrPullRequest"`
 			mergeSettings
 		} `json:"repository"`
@@ -337,6 +406,24 @@ func (g *RealGitHub) ItemPage(ctx context.Context, repo string, number int, befo
 	}
 	if n.Comments.PageInfo.HasPreviousPage {
 		d.Before = n.Comments.PageInfo.StartCursor
+	}
+	if !d.PR {
+		d.Children, d.LinkedPulls, d.Events = []Linked{}, []Linked{}, []Event{}
+		for _, c := range n.Children.Nodes {
+			if l, ok := c.linked(false); ok {
+				d.Children = append(d.Children, l)
+			}
+		}
+		for _, c := range n.LinkedPulls.Nodes {
+			if l, ok := c.linked(true); ok {
+				d.LinkedPulls = append(d.LinkedPulls, l)
+			}
+		}
+		for _, e := range n.Events.Nodes {
+			if ev, ok := e.event(); ok {
+				d.Events = append(d.Events, ev)
+			}
+		}
 	}
 	if d.PR {
 		d.ReviewThreads, d.FilesChanged, d.Head = n.ReviewThreads.TotalCount, n.ChangedFiles, n.HeadRefOid
@@ -475,4 +562,75 @@ func (g *RealGitHub) Blockers(ctx context.Context, repo string, numbers []int) (
 		}
 	}
 	return out, nil
+}
+
+type gqlLinked struct {
+	Number     int    `json:"number"`
+	Title      string `json:"title"`
+	URL        string `json:"url"`
+	IssueState string `json:"issueState"`
+	PullState  string `json:"pullState"`
+	Repository struct {
+		NameWithOwner string `json:"nameWithOwner"`
+	} `json:"repository"`
+}
+
+// linked is n as a sub-issue or a closing pull request; a node the token cannot read is empty.
+func (n gqlLinked) linked(pr bool) (Linked, bool) {
+	if n.Number < 1 || n.Repository.NameWithOwner == "" {
+		return Linked{}, false
+	}
+	state := strings.ToLower(n.IssueState + n.PullState)
+	if state != "closed" && state != "merged" {
+		state = "open"
+	}
+	return Linked{Repo: n.Repository.NameWithOwner, Number: n.Number, PR: pr, Title: n.Title, State: state, URL: n.URL}, true
+}
+
+// gqlRefTo is an issue or a pull request that an event names.
+type gqlRefTo struct {
+	Typename   string `json:"__typename"`
+	Number     int    `json:"number"`
+	Repository struct {
+		NameWithOwner string `json:"nameWithOwner"`
+	} `json:"repository"`
+}
+
+type gqlEvent struct {
+	Typename  string    `json:"__typename"`
+	Actor     *gqlActor `json:"actor"`
+	CreatedAt string    `json:"createdAt"`
+	Label     *label    `json:"label"`
+	Assignee  *gqlActor `json:"assignee"`
+	Closer    *gqlRefTo `json:"closer"`
+	Source    *gqlRefTo `json:"source"`
+}
+
+// eventKinds are GitHub's timeline items in the one model's words.
+var eventKinds = map[string]string{"LabeledEvent": "labeled", "UnlabeledEvent": "unlabeled", "AssignedEvent": "assigned",
+	"UnassignedEvent": "unassigned", "ClosedEvent": "closed", "ReopenedEvent": "reopened", "CrossReferencedEvent": "referenced"}
+
+// event is e in the one model; one of another kind, or a reference from what the token cannot
+// read, is left out.
+func (e gqlEvent) event() (Event, bool) {
+	kind, ok := eventKinds[e.Typename]
+	if !ok || e.CreatedAt == "" {
+		return Event{}, false
+	}
+	out := Event{Kind: kind, Actor: e.Actor.login(), At: e.CreatedAt, Assignee: e.Assignee.login()}
+	if e.Label != nil {
+		names, colors := labelsOf([]label{*e.Label})
+		out.Label, out.LabelColor = names[0], colors[names[0]]
+	}
+	ref := e.Source
+	if kind == "closed" {
+		ref = e.Closer
+	}
+	if ref != nil && ref.Number > 0 && ref.Repository.NameWithOwner != "" {
+		out.SourceRepo, out.SourceNumber, out.SourcePR = ref.Repository.NameWithOwner, ref.Number, ref.Typename == "PullRequest"
+	}
+	if kind == "referenced" && out.SourceRepo == "" {
+		return Event{}, false
+	}
+	return out, true
 }

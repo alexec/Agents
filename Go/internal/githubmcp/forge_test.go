@@ -28,6 +28,16 @@ const searchAnswer = `{"data":{"search":{"pageInfo":{"hasNextPage":true,"endCurs
 
 const itemAnswer = `{"data":{"repository":{"issueOrPullRequest":{"__typename":"Issue","number":3,"title":"Mean is off by one",
  "url":"https://github.com/o/r/issues/3","issueState":"CLOSED","updatedAt":"2026-11-01T08:00:00Z",
+ "createdAt":"2026-10-30T08:00:00Z","closedAt":"2026-11-01T07:00:00Z",
+ "children":{"nodes":[{"issueState":"OPEN","number":4,"title":"A child","url":"https://github.com/o/r/issues/4","repository":{"nameWithOwner":"o/r"}},{}]},
+ "linkedPulls":{"nodes":[{"pullState":"MERGED","number":12,"title":"Forge reads","url":"u","repository":{"nameWithOwner":"o/r"}}]},
+ "events":{"nodes":[
+  {"__typename":"LabeledEvent","actor":{"login":"kim"},"createdAt":"2026-10-30T09:00:00Z","label":{"name":"bug","color":"d73a4a"}},
+  {"__typename":"AssignedEvent","actor":{"login":"kim"},"createdAt":"2026-10-30T10:00:00Z","assignee":{"login":"alexec"}},
+  {"__typename":"CrossReferencedEvent","actor":null,"createdAt":"2026-10-31T10:00:00Z","source":{"__typename":"PullRequest","number":12,"repository":{"nameWithOwner":"o/r"}}},
+  {"__typename":"CrossReferencedEvent","actor":{"login":"kim"},"createdAt":"2026-10-31T11:00:00Z","source":{}},
+  {"__typename":"ClosedEvent","actor":{"login":"alexec"},"createdAt":"2026-11-01T07:00:00Z","closer":{"__typename":"PullRequest","number":12,"repository":{"nameWithOwner":"o/r"}}},
+  {}]},
  "author":{"login":"kim","__typename":"User"},"repository":{"nameWithOwner":"o/r"},"labels":{"nodes":[{"name":"bug","color":"d73a4a"}]},
  "assignees":{"nodes":[]},"milestone":null,"commentCount":{"totalCount":51},"body":"It is off by one.",
  "comments":{"pageInfo":{"hasPreviousPage":true,"startCursor":"b2xkZXI="},"nodes":[
@@ -142,6 +152,23 @@ func TestItemPage(t *testing.T) {
 	if got := i.Thread; len(got) != 2 || !got[0].Bot || got[0].Author != "dependabot" || got[0].Avatar != "https://avatars.githubusercontent.com/in/29110?v=4" || got[1].Author != "" || got[1].Avatar != "" || got[1].Body != "Ghost." {
 		t.Fatalf("comments: %+v", got)
 	}
+	// #4373: its dates, its sub-issues and closing pull requests (an unreadable node left out),
+	// and its events in the one model (a reference from what the token cannot read left out).
+	if i.CreatedAt != "2026-10-30T08:00:00Z" || i.ClosedAt != "2026-11-01T07:00:00Z" {
+		t.Fatalf("dates: %q %q", i.CreatedAt, i.ClosedAt)
+	}
+	if !slices.Equal(i.Children, []Linked{{Repo: "o/r", Number: 4, Title: "A child", State: "open", URL: "https://github.com/o/r/issues/4"}}) ||
+		!slices.Equal(i.LinkedPulls, []Linked{{Repo: "o/r", Number: 12, PR: true, Title: "Forge reads", State: "merged", URL: "u"}}) {
+		t.Fatalf("linked: %+v %+v", i.Children, i.LinkedPulls)
+	}
+	if want := []Event{
+		{Kind: "labeled", Actor: "kim", At: "2026-10-30T09:00:00Z", Label: "bug", LabelColor: "#d73a4a"},
+		{Kind: "assigned", Actor: "kim", At: "2026-10-30T10:00:00Z", Assignee: "alexec"},
+		{Kind: "referenced", At: "2026-10-31T10:00:00Z", SourceRepo: "o/r", SourceNumber: 12, SourcePR: true},
+		{Kind: "closed", Actor: "alexec", At: "2026-11-01T07:00:00Z", SourceRepo: "o/r", SourceNumber: 12, SourcePR: true},
+	}; !slices.Equal(i.Events, want) {
+		t.Fatalf("events: %+v", i.Events)
+	}
 	if _, ok := a.all()[0]["before"]; ok {
 		t.Fatalf("first page sent a cursor: %v", a.all())
 	}
@@ -153,7 +180,7 @@ func TestItemPage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !p.PR || p.Checks != "running" || p.Before != "" || p.ReviewThreads != 2 || p.FilesChanged != 5 || len(p.Thread) != 0 {
+	if !p.PR || p.Checks != "running" || p.Before != "" || p.Children != nil || p.Events != nil || p.ReviewThreads != 2 || p.FilesChanged != 5 || len(p.Thread) != 0 {
 		t.Fatalf("pull: %+v", p)
 	}
 	if len(p.CheckRuns) != 2 || p.CheckRuns[0] != (Check{"test", "failing", "https://github.com/o/r/actions/runs/9/job/1"}) ||

@@ -38,6 +38,10 @@ public extension DaemonAPI {
         /// The wire's, for the standing epics' queries; the app does not show it (#3878).
         public var milestone: String?
         public var updatedAt: Date
+        /// When it opened, and when it closed or merged (nil while open), where the forge says
+        /// them (`ForgeCapabilities.createdAt` and `closedAt`; #4373).
+        public var createdAt: Date?
+        public var closedAt: Date?
         public var comments: Int
         public var draft: Bool?
         public var checks: String?
@@ -59,7 +63,8 @@ public extension DaemonAPI {
                     updatedAt: Date, comments: Int = 0, draft: Bool? = nil, checks: String? = nil, review: String? = nil,
                     mergeable: String? = nil, autoMerge: Bool? = nil, parent: LineageNode? = nil, level: String? = nil,
                     feature: String? = nil, progress: ForgeProgress? = nil, status: String? = nil, standing: Bool? = nil,
-                    authorAvatar: String? = nil, stateReason: String? = nil) {
+                    authorAvatar: String? = nil, stateReason: String? = nil, createdAt: Date? = nil,
+                    closedAt: Date? = nil) {
             self.node = node
             self.title = title
             self.state = state
@@ -73,6 +78,8 @@ public extension DaemonAPI {
             self.assignees = assignees
             self.milestone = milestone
             self.updatedAt = updatedAt
+            self.createdAt = createdAt
+            self.closedAt = closedAt
             self.comments = comments
             self.draft = draft
             self.checks = checks
@@ -142,7 +149,9 @@ public extension DaemonAPI {
     /// What one forge on a list's page fills (#4361), so a client hides what it does not.
     /// `commentCount` says how to read an item's `comments`: `exact`; `capped` at `commentsMost`
     /// (show 50+ there); or `detail`, only on the item's own page (hide it on the row). A string,
-    /// so a way a later daemon adds does not break this decoder.
+    /// so a way a later daemon adds does not break this decoder. `createdAt` and `closedAt` say
+    /// its items have those dates; `children`, `linkedPulls` and `events` that an issue's read has
+    /// them (#4373); each is nil (none) from an earlier daemon.
     struct ForgeCapabilities: Codable, Sendable, Hashable {
         public var forge: String
         public var issues: Bool
@@ -150,18 +159,29 @@ public extension DaemonAPI {
         public var labelColors: Bool
         public var avatars: Bool
         public var stateReason: Bool
+        public var createdAt: Bool?
+        public var closedAt: Bool?
+        public var children: Bool?
+        public var linkedPulls: Bool?
+        public var events: Bool?
         public var commentCount: String
         public var commentsMost: Int?
 
         public init(forge: String, issues: Bool = false, pulls: Bool = false, labelColors: Bool = false,
                     avatars: Bool = false, stateReason: Bool = false, commentCount: String = "exact",
-                    commentsMost: Int? = nil) {
+                    commentsMost: Int? = nil, createdAt: Bool? = nil, closedAt: Bool? = nil, children: Bool? = nil,
+                    linkedPulls: Bool? = nil, events: Bool? = nil) {
             self.forge = forge
             self.issues = issues
             self.pulls = pulls
             self.labelColors = labelColors
             self.avatars = avatars
             self.stateReason = stateReason
+            self.createdAt = createdAt
+            self.closedAt = closedAt
+            self.children = children
+            self.linkedPulls = linkedPulls
+            self.events = events
             self.commentCount = commentCount
             self.commentsMost = commentsMost
         }
@@ -268,7 +288,9 @@ public extension DaemonAPI {
     /// moves its workflow allows (Jira, #3260), in place of Close and Reopen. `actions` are what
     /// the page offers now, by name (comment, label, close, reopen, transition, merge, autoMerge,
     /// approve, rerun, log, diff, addChild, blockedBy; #4361), as strings so a later daemon's new
-    /// one does not break this decoder; nil from an earlier daemon.
+    /// one does not break this decoder; nil from an earlier daemon. On an issue's read, where the
+    /// forge says them (#4373): `children` are its sub-issues, `linkedPulls` the pull requests that
+    /// close it, and `events` its timeline, oldest first; nil where the forge gives none.
     struct ForgeItemDetail: Codable, Sendable, Hashable {
         public var item: ForgeItem
         public var body: String
@@ -282,11 +304,15 @@ public extension DaemonAPI {
         public var start: ForgeStart?
         public var transitions: [ForgeTransition]?
         public var actions: [String]?
+        public var children: [ForgeLinked]?
+        public var linkedPulls: [ForgeLinked]?
+        public var events: [ForgeEvent]?
 
         public init(item: ForgeItem, body: String = "", comments: [ForgeComment] = [], cursor: String? = nil,
                     checks: [ForgeCheck]? = nil, reviewThreads: Int? = nil, filesChanged: Int? = nil,
                     head: String? = nil, mergeMethods: [ForgeMergeMethod]? = nil, start: ForgeStart? = nil,
-                    transitions: [ForgeTransition]? = nil, actions: [String]? = nil) {
+                    transitions: [ForgeTransition]? = nil, actions: [String]? = nil, children: [ForgeLinked]? = nil,
+                    linkedPulls: [ForgeLinked]? = nil, events: [ForgeEvent]? = nil) {
             self.item = item
             self.body = body
             self.comments = comments
@@ -299,6 +325,48 @@ public extension DaemonAPI {
             self.start = start
             self.transitions = transitions
             self.actions = actions
+            self.children = children
+            self.linkedPulls = linkedPulls
+            self.events = events
+        }
+    }
+
+    /// An item an issue's read names (#4373): a sub-issue, or a pull request that closes it.
+    /// `state` is open, closed or merged.
+    struct ForgeLinked: Codable, Sendable, Hashable {
+        public var node: LineageNode
+        public var title: String
+        public var state: String
+        public var url: String?
+
+        public init(node: LineageNode, title: String, state: String, url: String? = nil) {
+            self.node = node
+            self.title = title
+            self.state = state
+            self.url = url
+        }
+    }
+
+    /// One event on an issue's timeline (#4373). `kind` is labeled, unlabeled, assigned,
+    /// unassigned, closed, reopened or referenced, a string so a later daemon's new kind does not
+    /// break this decoder; `label` or `assignee` is whom it names; `source` is the item that
+    /// referenced it, or the pull request that closed it.
+    struct ForgeEvent: Codable, Sendable, Hashable {
+        public var kind: String
+        public var actor: String?
+        public var at: Date
+        public var label: ForgeLabel?
+        public var assignee: String?
+        public var source: LineageNode?
+
+        public init(kind: String, actor: String? = nil, at: Date, label: ForgeLabel? = nil, assignee: String? = nil,
+                    source: LineageNode? = nil) {
+            self.kind = kind
+            self.actor = actor
+            self.at = at
+            self.label = label
+            self.assignee = assignee
+            self.source = source
         }
     }
 

@@ -2,6 +2,7 @@ package jiramcp
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -242,6 +243,22 @@ func TestStateReasonOf(t *testing.T) {
 	} {
 		if got := stateReasonOf(c.resolution); got != c.want {
 			t.Errorf("%q: %q, want %q", c.resolution, got, c.want)
+		}
+	}
+}
+
+// #4373: an issue says when it was made, and a done one its resolution date.
+func TestItemDates(t *testing.T) {
+	for category, closed := range map[string]bool{"indeterminate": false, "done": true} {
+		var r restIssue
+		if err := json.Unmarshal([]byte(`{"key":"ENG-1","fields":{"status":{"name":"S","statusCategory":{"key":"`+category+`"}},
+			"created":"2026-10-01T10:00:00.000+0000","resolutiondate":"2026-10-02T10:00:00.000+0000"}}`), &r); err != nil {
+			t.Fatal(err)
+		}
+		i := r.item("https://acme.atlassian.net")
+		if i.CreatedAt != normalized("2026-10-01T10:00:00.000+0000") || i.CreatedAt == "" ||
+			(i.ClosedAt == normalized("2026-10-02T10:00:00.000+0000")) != closed || closed && i.ClosedAt == "" {
+			t.Errorf("%s: %q %q", category, i.CreatedAt, i.ClosedAt)
 		}
 	}
 }

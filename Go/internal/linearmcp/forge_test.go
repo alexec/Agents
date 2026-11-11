@@ -138,3 +138,22 @@ func TestStateReasonOf(t *testing.T) {
 		}
 	}
 }
+
+// #4373: an issue says when it was made, and a completed or canceled one when it closed.
+func TestItemDates(t *testing.T) {
+	for _, c := range []struct {
+		json, closed string
+	}{
+		{`{"state":{"type":"started"},"createdAt":"2026-10-01T10:00:00.000Z"}`, ""},
+		{`{"state":{"type":"completed"},"createdAt":"2026-10-01T10:00:00.000Z","completedAt":"2026-10-02T10:00:00.000Z"}`, "2026-10-02T10:00:00.000Z"},
+		{`{"state":{"type":"canceled"},"createdAt":"2026-10-01T10:00:00.000Z","canceledAt":"2026-10-03T10:00:00.000Z"}`, "2026-10-03T10:00:00.000Z"},
+	} {
+		var n forgeNode
+		if err := json.Unmarshal([]byte(c.json), &n); err != nil {
+			t.Fatal(err)
+		}
+		if i := n.item(); i.CreatedAt != "2026-10-01T10:00:00.000Z" || i.ClosedAt != c.closed {
+			t.Errorf("%s: %q %q", c.json, i.CreatedAt, i.ClosedAt)
+		}
+	}
+}
