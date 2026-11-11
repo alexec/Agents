@@ -146,8 +146,6 @@ const filesSettle = quietSettle;
 
 /** How many archived sessions the Archived page lists: as many as it shows (#170). */
 export const archivedPage = 50;
-/** How many an open folder's Recently archived sessions lists (#2587): no more is asked (#2731). */
-export const recentArchivedShown = 3;
 
 /** The most a search brings back from each host, a page at a time (#165, #193). */
 export const searchShown = 200;
@@ -2068,8 +2066,8 @@ export class Store extends Work {
     if (listed) this.writeWorkflows(key, listed);
   }
 
-  /** One folder's newest `limit` archived sessions, asked for when a view of them opens (#170): the
-   *  sidebar's few (#2731) or the Archive page's page. Only more than is held is asked again. Each
+  /** One folder's newest `limit` archived sessions, asked for when a view of them opens (#170), such
+   *  as the Archive page. Only more than is held is asked again. Each
    *  call is matched by one `unloadArchived` with the same limit. */
   async loadArchived(host: string, folder: string, limit = archivedPage): Promise<void> {
     const key = `${host}|${folderKey(folder)}`;

@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { load } from "./load.mjs";
 
 const {
-  Work, Store, archivedPage, recentArchivedShown, searchShown, keepingTurns, effect,
+  Work, Store, archivedPage, searchShown, keepingTurns, effect,
   turnPage, openTurnsHeld, historyEntriesCap, historyTurnsCap, eventsKept, eventsPagedMost, rememberOpen, quietSettle,
   CallFailed, Failure,
 } = await load("test/bounded.ts");
@@ -254,7 +254,8 @@ test("an Archived fold asks for a page, and a reconnect lists it again rather th
   assert.deepEqual(store.agents.value.mac.map((a) => a.id), ["live", "old"]);
 });
 
-test("the sidebar asks for its few archived, the Archive page for more, and each keeps its own (#2731)", async () => {
+test("a view asks for a few archived, the Archive page for more, and each keeps its own (#2731)", async () => {
+  const few = 3;
   const params = [];
   const link = fakeLink((method, p) => {
     if (method === "agents/list") {
@@ -264,18 +265,18 @@ test("the sidebar asks for its few archived, the Archive page for more, and each
     return undefined;
   });
   const store = new Store(link);
-  await store.loadArchived("mac", "file:///w/p", recentArchivedShown);
-  assert.deepEqual(params.map((p) => p.limit), [recentArchivedShown]);
+  await store.loadArchived("mac", "file:///w/p", few);
+  assert.deepEqual(params.map((p) => p.limit), [few]);
   await store.loadArchived("mac", "file:///w/p", archivedPage);
-  assert.deepEqual(params.map((p) => p.limit), [recentArchivedShown, archivedPage]);
-  // A second sidebar fold over what is held asks for nothing.
-  await store.loadArchived("mac", "file:///w/p", recentArchivedShown);
+  assert.deepEqual(params.map((p) => p.limit), [few, archivedPage]);
+  // A second view of the few over what is held asks for nothing.
+  await store.loadArchived("mac", "file:///w/p", few);
   assert.equal(params.length, 2);
-  // The Archive page closing leaves the sidebar's rows.
+  // The Archive page closing leaves the few.
   store.unloadArchived("mac", "file:///w/p", archivedPage);
-  store.unloadArchived("mac", "file:///w/p", recentArchivedShown);
+  store.unloadArchived("mac", "file:///w/p", few);
   assert.equal(store.agents.value.mac.length, archivedPage);
-  store.unloadArchived("mac", "file:///w/p", recentArchivedShown);
+  store.unloadArchived("mac", "file:///w/p", few);
   assert.equal(store.agents.value.mac.length, 0);
 });
 

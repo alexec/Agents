@@ -3887,8 +3887,7 @@ final class RemoteModel {
     }
 
     /// A folder's Archived page has opened: a page of its newest archived sessions, from
-    /// the folder's own host (#533), or the few its Recently archived sessions show (#2731).
-    /// Answers whether the host did (#664).
+    /// the folder's own host (#533). Answers whether the host did (#664).
     @discardableResult
     func loadArchived(in key: FolderKey, limit: Int = SidebarFolderFold.archivedShown) async -> Bool {
         openArchivedFolds.insert(Folder.standardize(key.folder))

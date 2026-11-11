@@ -650,15 +650,6 @@ struct FolderFold: View {
                                           tree: row.item, folds: folds, isNested: true)
                     }
                 }
-                if !fold.recentArchived.isEmpty {
-                    let recentOpen = folds.isOpen(key, .recentArchivedSessions)
-                    SidebarFoldRow(title: "Recently archived sessions", count: fold.recentArchived.count, isOpen: Binding(
-                        get: { recentOpen },
-                        set: { folds.set(key, .recentArchivedSessions, open: $0) }))
-                    ForEach(FoldedRow.rows(recentOpen ? fold.recentArchived : [], in: .recentArchivedSessions)) { row in
-                        SessionSidebarRow(agent: row.item, isNested: true)
-                    }
-                }
                 // Then its workflows, after the sessions (Alex, #495), in a Workflows fold
                 // of their own, one level in, as a mailbox's sub-mailboxes in Mail (#885).
                 FolderWorkflowRows(fold: fold, folds: folds)
@@ -692,13 +683,6 @@ struct FolderFold: View {
                 } else {
                     heading(fold, isOpen: isOpen)
                 }
-            }
-            // The few Recently archived sessions it shows, while it is open by hand (#2731):
-            // not because a search unfolded it, since the search brings its own matches.
-            .task(id: folds.isOpen(key)) {
-                if folds.isOpen(key) {
-                    _ = await model.loadArchived(in: key, limit: SidebarFolderFold.recentArchivedShown)
-                } else { model.letGoOfArchived(in: key) }
             }
         }
     }
