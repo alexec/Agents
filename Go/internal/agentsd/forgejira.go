@@ -37,7 +37,9 @@ func (jiraForge) Caps() forgeCaps {
 		StateReason: true,
 		CreatedAt:   true, ClosedAt: true,
 		CommentCount: "exact",
-		Plan:         true,
+		// Data Center's search total; Jira Cloud's approximate count.
+		Total: true,
+		Plan:  true,
 		Reasons: map[string]string{
 			actionMerge:     jiraNoPRs,
 			actionAutoMerge: jiraNoPRs,
@@ -129,7 +131,7 @@ func (j jiraForge) List(ctx context.Context, scope forgeScope, f forgeFilter, cu
 		}
 		p.items = append(p.items, jiraItemOf(i, folder))
 	}
-	p.cursors, p.next = page.Cursors, page.Next
+	p.cursors, p.next, p.total = page.Cursors, page.Next, page.Total
 	return p, err
 }
 

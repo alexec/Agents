@@ -69,6 +69,9 @@ type forgeCaps struct {
 	// item's own page: Bitbucket issues, Azure Repos).
 	CommentCount string
 	CommentsMost int
+	// Total: a list's first page says how many items the whole list has (forgePage.total, #4396).
+	// A forge without it has a total only when its list ends on its first page.
+	Total bool
 	// Plans: sub-issues, blocked-by, a new child.
 	Plan, BlockedBy, AddChild bool
 	// Reasons say why an action is missing, by the action's name, in the words a person reads,
@@ -117,7 +120,7 @@ func (c forgeCaps) wire(name string) wire.ForgeCapabilities {
 	for _, f := range []struct {
 		on  bool
 		out **bool
-	}{{c.CreatedAt, &out.CreatedAt}, {c.ClosedAt, &out.ClosedAt}, {c.Children, &out.Children}, {c.LinkedPulls, &out.LinkedPulls}, {c.Events, &out.Events}} {
+	}{{c.CreatedAt, &out.CreatedAt}, {c.ClosedAt, &out.ClosedAt}, {c.Children, &out.Children}, {c.LinkedPulls, &out.LinkedPulls}, {c.Events, &out.Events}, {c.Total, &out.Total}} {
 		if f.on {
 			*f.out = new(true)
 		}

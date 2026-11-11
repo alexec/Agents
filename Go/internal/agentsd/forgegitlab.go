@@ -38,7 +38,9 @@ func (gitlabForge) Caps() forgeCaps {
 		Avatars:     true,
 		CreatedAt:   true, ClosedAt: true,
 		CommentCount: "exact",
-		Plan:         true,
+		// X-Total, which GitLab leaves out of a list of over 10,000.
+		Total: true,
+		Plan:  true,
 		Reasons: map[string]string{
 			actionTransition: "only a Jira issue or an Azure Boards work item moves by a transition",
 			actionAddChild:   gitlabNoPlanWrite,
@@ -132,7 +134,7 @@ func (g gitlabForge) List(ctx context.Context, scope forgeScope, f forgeFilter, 
 	for _, i := range page.Items {
 		p.items = append(p.items, gitlabItemOf(i, s.folderOf[strings.ToLower(i.Project)]))
 	}
-	p.cursors, p.next = page.Cursors, page.Next
+	p.cursors, p.next, p.total = page.Cursors, page.Next, page.Total
 	return p, err
 }
 

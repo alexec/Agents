@@ -4081,9 +4081,10 @@ export interface ForgeBoardsRequest {
  * and pulls say it has them; labelColors that its labels have a #rrggbb colour; avatars that its
  * items have authorAvatar; stateReason that its closed issues have stateReason. createdAt that its
  * items have createdAt, and closedAt that its closed and merged items have closedAt; children,
- * linkedPulls and events that an item's read has them (#4373); each is absent from an earlier
- * daemon, which has none. commentCount says how to read ForgeItem.comments: exact; capped at
- * commentsMost (show 50+ there); or detail, only on an item's own page (hide it on the row).
+ * linkedPulls and events that an item's read has them (#4373); total that it counts a list's items,
+ * for ForgeList.total (#4396); each is absent from an earlier daemon, which has none. commentCount
+ * says how to read ForgeItem.comments: exact; capped at commentsMost (show 50+ there); or detail,
+ * only on an item's own page (hide it on the row).
  */
 export interface ForgeCapabilities {
   forge: string;
@@ -4097,6 +4098,7 @@ export interface ForgeCapabilities {
   children?: boolean;
   linkedPulls?: boolean;
   events?: boolean;
+  total?: boolean;
   commentCount: ForgeCommentCount;
   commentsMost?: number;
 }
@@ -4419,11 +4421,14 @@ export interface ForgeLinked {
  * forge/issues and forge/pulls (#3129): a page of items, the last updated first. cursor is the next
  * page, absent at the end. errors says a forge that could not be read (not connected, a rate
  * limit), and the items of the others still come. forges says what each forge on the page fills
- * (#4361); absent from an earlier daemon.
+ * (#4361); absent from an earlier daemon. total is how many items the whole list has, the sum of
+ * each forge's count, kept from each forge's first page (#4396); absent when a forge on the list
+ * gives no count (ForgeCapabilities.total) or could not be read, and from an earlier daemon.
  */
 export interface ForgeList {
   items: ForgeItem[];
   cursor?: string;
+  total?: number;
   errors?: ForgeListError[];
   forges?: ForgeCapabilities[];
 }
@@ -14918,7 +14923,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeBlockedByRequest: { required: ["node"], optional: ["add", "remove"] },
   ForgeBoards: { required: ["boards"], optional: [] },
   ForgeBoardsRequest: { required: [], optional: ["folder"] },
-  ForgeCapabilities: { required: ["forge", "issues", "pulls", "labelColors", "avatars", "stateReason", "commentCount"], optional: ["createdAt", "closedAt", "children", "linkedPulls", "events", "commentsMost"] },
+  ForgeCapabilities: { required: ["forge", "issues", "pulls", "labelColors", "avatars", "stateReason", "commentCount"], optional: ["createdAt", "closedAt", "children", "linkedPulls", "events", "total", "commentsMost"] },
   ForgeCheck: { required: ["name", "state"], optional: ["url"] },
   ForgeCloseRequest: { required: ["node"], optional: ["reopen", "transition"] },
   ForgeComment: { required: ["author", "body", "at"], optional: ["avatar", "url", "bot"] },
@@ -14941,7 +14946,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeLabels: { required: ["labels"], optional: [] },
   ForgeLead: { required: ["session", "state"], optional: ["title"] },
   ForgeLinked: { required: ["node", "title", "state"], optional: ["url"] },
-  ForgeList: { required: ["items"], optional: ["cursor", "errors", "forges"] },
+  ForgeList: { required: ["items"], optional: ["cursor", "total", "errors", "forges"] },
   ForgeListError: { required: ["forge", "message"], optional: [] },
   ForgeListRequest: { required: [], optional: ["folder", "state", "label", "assignee", "query", "cursor", "limit", "feature", "board"] },
   ForgeLog: { required: ["text"], optional: [] },
