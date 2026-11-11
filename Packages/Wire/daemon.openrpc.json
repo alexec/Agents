@@ -5157,6 +5157,11 @@
     {
       "name": "lineage/figures",
       "x-capability": "lineage.figures/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
