@@ -97,7 +97,7 @@ func (d *Daemon) multiplierOfControl(ctx context.Context, b wire.MultiplierBasel
 // agentsWorking is this machine's agents with a turn starting or running.
 func (d *Daemon) agentsWorking() int64 {
 	var n int64
-	for _, a := range d.Store.Agents() {
+	for _, a := range d.Store.LiveAgents() {
 		if a.State == wire.AgentStateStarting || a.State == wire.AgentStateRunning {
 			n++
 		}
