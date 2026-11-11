@@ -29,8 +29,8 @@ page.
   project's id and name.
 - **Page** (the Mac and the Remote, #2183): Spend, or Outcomes, Time, Runtimes, Adoption or
   Workflows, which are the web page's Reports pages below at the Me scope. A segmented control
-  on the Mac, and a menu on the Remote. On the web page these pages are in Reports. Value
-  (#2351) is on the Mac only, not on the Remote (tier Mac + web, #2796).
+  on the Mac, and a menu on the Remote. On the web page these pages are in Reports. Planning
+  (#2351, #4528) is on the web page only (#3224), not on the Remote (tier Mac + web, #2796).
 - **A control plane that keeps no reports** (one from before #1811) says so, and says to
   update it.
 
@@ -86,9 +86,10 @@ Three more pages of Reports (#2019), with the same scopes:
   ended in an error), the cost of a run and the time working a run. By Workflow first. The
   most failed runs come first. By Person shows each bot's runs under its name.
 
-## Reports ▸ Value, on the web page and the Mac (#2351)
+## Reports ▸ Planning, on the web page (#2351, #4528)
 
-What the work cost and what it delivered, from the cost on the links (#2350). The control
+Value before #4528. What the work cost and what it delivered, then what comes next. Its page id is still
+`value`, so saved views and links keep working. The cost part: from the cost on the links (#2350). The control
 plane adds up the nodes that the scope's machines send (`v1/lineage/<host>.json`); the
 machines' copies of one node add up, as each banked its own turns.
 
@@ -97,7 +98,20 @@ machines' copies of one node add up, as each banked its own turns.
 - **Waste:** the PRs closed without a merge and the merged reverts, and the failed CI rounds.
 - **Lead time:** the median of the issues' lead times, each from the first work on the issue
   or its PRs (`firstAt`) to its last PR merged (`endedAt`).
+- **All in** (#4524): the work and the turns with no issue or PR together, with the overhead
+  ratio of the last 14 days.
 - **Unlinked:** the turns with no issue or PR.
+- **What comes next** (#4528), from `lineage/forecast` (#4526) on the person's own machines,
+  whatever the scope: each weekly allowance's burn (when it runs out at this pace, or that it
+  lasts to the reset; the newest reading from any machine), what a week and a month cost at the
+  window's pace with the loaded figure beside it, each level's service level (P50 and P85
+  cycle time), and when each open epic of the scope lands (P50 and P85, with its estimate to
+  complete, direct and all in). The spend, service levels and epics are from this Mac when it
+  has landings, else the machine with the most. `specs/4533-forecasting/spec.md` has the method.
+- **How the estimates and forecasts scored** (#3561, #4525, #4528): the estimates' error, how
+  often their P10–P90 range held, the landing date's error, and how often the epics' kept
+  landing forecasts held their P50 and P85 dates (`forecastScore`, over the epics whose last PR
+  merged in the range).
 - **Issues and Releases:** each one's cost (its own and its PRs'), how its PRs ended, its
   waste and lead time, the most costly first, at most 100 each. Milestones went with #3878. On the Mac a GitHub one is a
   link.
@@ -196,7 +210,8 @@ machines' copies of one node add up, as each banked its own turns.
   `waits`, `workflowRuns`, `workflowFailures`; blank from a machine before #2019), then
   `groups`.
 
-- `reports/value` (#2351) with a range and a scope: Reports ▸ Value (`ReportValue`).
+- `reports/value` (#2351) with a range and a scope: Reports ▸ Planning (`ReportValue`), with
+  `forecastScore` and `openEpics` (#4528).
 - `reports/views`, `reports/saveView` (a view with no `id` is new) and `reports/deleteView`
   (#2019): the caller's saved views.
 
