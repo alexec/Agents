@@ -14947,6 +14947,47 @@ const WeekdayThu Weekday = "thu"
 const WeekdayFri Weekday = "fri"
 const WeekdaySat Weekday = "sat"
 
+// A feature in work/features (#4586): feature is it as forge/features says it. epics are its open epics, the newest first, each with where it is in its plan and its children. loose are its open issues that are not epics and have no parent (of the newest 500 open issues), the newest update first, as children are: when each started, and whether it waits for a person.
+type WorkFeature struct {
+	Feature ForgeFeature `json:"feature"`
+
+	Epics []WorkFeatureEpic `json:"epics"`
+
+	Loose []WorkTimelineChild `json:"loose"`
+}
+
+// An open epic in work/features (#4586), from forge/plan and work/timeline. steps is the number of steps in its plan (ForgePlan.steps), and step the first of them with an open child, absent when none is open. blockedOutside are the open blockers outside the plan of that step's open children (an issue of another epic), each once. forecast is its open line's close as work/timeline forecasts it, on GitHub only; absent when there is too little history or nothing to forecast. children are its sub-issues in the plan's order (at most 100), each with its start, close and wait as in work/timeline; absent when its plan could not be read (errors says why).
+type WorkFeatureEpic struct {
+	Item ForgeItem `json:"item"`
+
+	Step *int64 `json:"step,omitzero"`
+
+	Steps int64 `json:"steps"`
+
+	BlockedOutside []LineageNode `json:"blockedOutside,omitzero"`
+
+	Forecast *WorkTimelineForecast `json:"forecast,omitzero"`
+
+	Children []WorkTimelineChild `json:"children,omitzero"`
+}
+
+// work/features (#4586, specs/4328-work-look/features-delivery.md): the Features page's one read. features are forge/features' features, by name, each with its open epics and its loose open issues, so an open feature's epics and children draw with no second read. approvals are as in forge/features. errors say a forge, a plan or a timeline that could not be read.
+type WorkFeatures struct {
+	Features []WorkFeature `json:"features"`
+
+	Approvals []string `json:"approvals,omitzero"`
+
+	Errors []ForgeListError `json:"errors,omitzero"`
+}
+
+// work/features (#4586): the features of every folder on this machine, or of one folder's repo, as forge/features.
+type WorkFeaturesRequest struct {
+	Folder *string `json:"folder,omitzero"`
+
+	// A board's url, from forge/boards (#3282): only the epics on that board.
+	Board *string `json:"board,omitzero"`
+}
+
 // How a turn ended (#1916): only a question needs the person. A value this build does not know, such as an old record's `blocked`, `stuck` or `partly_done`, reads as `done`.
 type WorkOutcome string
 

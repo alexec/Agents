@@ -24,6 +24,19 @@ import (
 // timelineWaitLabels mark a child that waits for a person: it is not forecast.
 var timelineWaitLabels = []string{"alex-todo", "needs-account"}
 
+// timelineGitHubOnly ends the error that says a project has folders on other forges.
+const timelineGitHubOnly = " reads only GitHub's epics for now"
+
+// waitsForPerson is true for an open issue with one of timelineWaitLabels, else nil.
+func waitsForPerson(i wire.ForgeItem) *bool {
+	if i.State == "open" && slices.ContainsFunc(i.Labels, func(l wire.ForgeLabel) bool {
+		return slices.Contains(timelineWaitLabels, strings.ToLower(l.Name))
+	}) {
+		return new(true)
+	}
+	return nil
+}
+
 // timelineBacktestEvery is how often a project's backtest runs again: at the first read after it.
 const timelineBacktestEvery = 24 * time.Hour
 
@@ -73,7 +86,7 @@ func (d *Daemon) workTimeline(ctx context.Context, r wire.WorkTimelineRequest) (
 		repos = append(repos, repo)
 	}
 	if other {
-		out.Errors = append(out.Errors, method+" reads only GitHub's epics for now")
+		out.Errors = append(out.Errors, method+timelineGitHubOnly)
 	}
 	if len(repos) == 0 {
 		return out, nil
@@ -163,11 +176,7 @@ func (d *Daemon) timelineEpicOf(e githubmcp.TimelineEpic, folder string) timelin
 		child := wire.WorkTimelineChild{Item: forgeItemOf(c.Item, d.repoFolder(forgeRepo{"github", strings.ToLower(c.Repo)})),
 			StateReason: optional(c.StateReason), CreatedAt: forgeDate(c.CreatedAt), ClosedAt: forgeDateOptional(c.ClosedAt)}
 		child.StartedAt = d.childStarted(child.Item.Node, child.ClosedAt, c.PROpenedAt)
-		if child.Item.State == "open" && slices.ContainsFunc(child.Item.Labels, func(l wire.ForgeLabel) bool {
-			return slices.Contains(timelineWaitLabels, strings.ToLower(l.Name))
-		}) {
-			child.WaitsForPerson = new(true)
-		}
+		child.WaitsForPerson = waitsForPerson(child.Item)
 		out.wire.Children = append(out.wire.Children, child)
 	}
 	out.segment()
