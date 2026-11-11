@@ -46,6 +46,7 @@ test("the estimate to complete is a rounded range", () => {
     "To complete: the open children's estimates × 1.31, as the 4 closed children cost against theirs. All in adds the cost no issue links to.");
   const same = { ...t, loaded: { USD: range(96, 62, 144) } };
   assert.equal(f.toCompleteLine(forecast({ toComplete: same })), "To complete: about $60 to $100");
+  assert.ok(!f.forecastHelp(forecast({ toComplete: same })).includes("All in"));
 });
 
 test("a closed epic says its first forecast against when it landed", () => {

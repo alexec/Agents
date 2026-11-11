@@ -50,7 +50,7 @@ public enum ForecastWords {
                 + "\(plural(t.closed, "closed child", "closed children")) cost against theirs"
             if t.leadRatio > 0 { w += ", plus \(percent(t.leadRatio)) for the lead" }
             w += "."
-            if t.loaded != nil { w += " All in adds the cost no issue links to." }
+            if toCompleteLine(f)?.contains("all in") == true { w += " All in adds the cost no issue links to." }
             words.append(w)
         }
         return words.isEmpty ? nil : words.joined(separator: " ")

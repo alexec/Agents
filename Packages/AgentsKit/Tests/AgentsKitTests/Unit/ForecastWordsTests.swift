@@ -59,6 +59,7 @@ struct ForecastWordsTests {
             == "To complete: the open children's estimates × 1.31, as the 4 closed children cost against theirs. All in adds the cost no issue links to.")
         t.loaded = ["USD": Range(median: 96, p10: 62, p90: 144)]
         #expect(ForecastWords.toCompleteLine(forecast(toComplete: t)) == "To complete: about $60 to $100")
+        #expect(ForecastWords.help(forecast(toComplete: t))?.contains("All in") == false)
     }
 
     @Test func aClosedEpicSaysItsFirstForecastAgainstWhenItLanded() {

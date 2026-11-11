@@ -69,7 +69,7 @@ export function forecastHelp(f: LineageForecast): string | undefined {
       + `${plural(t.closed, "closed child", "closed children")} cost against theirs`;
     if (t.leadRatio > 0) w += `, plus ${percent(t.leadRatio)} for the lead`;
     w += ".";
-    if (t.loaded) w += " All in adds the cost no issue links to.";
+    if (toCompleteLine(f)?.includes("all in")) w += " All in adds the cost no issue links to.";
     words.push(w);
   }
   return words.length > 0 ? words.join(" ") : undefined;
