@@ -1,7 +1,7 @@
 // The Mac window's layout in a tab (071 US2, US6; #151, #235). As the window since #145: one
 // sidebar (New Session, Activity, the smart groups, a group per folder, the hosts' state at its
-// foot; #499), then the chat, a folder's new-session form, a workflow, its archive, an Activity
-// page, a change's Review page (#1472), this browser's Settings (#846), or the Multiplier page with nothing chosen (#3990); the files pane a third column from 1440, over the chat below that. Below 760 the same
+// foot; #499), then the chat, a folder's new-session form, a workflow, its Archived Sessions or
+// Archived Workflows, an Activity page, a change's Review page (#1472), this browser's Settings (#846), or the Multiplier page with nothing chosen (#3990); the files pane a third column from 1440, over the chat below that. Below 760 the same
 // sidebar is the root list, as the iPhone Remote's is (#226), and what it picks takes its place,
 // with ‹ Agents back to it. Above it all, the bar of sections (#2141): this is Agents; the Overview
 // and every other section take the place of the sidebar and the chat.
@@ -25,7 +25,8 @@ import { FilesPane } from "./FilesPane";
 import { WorkflowPage } from "./WorkflowPage";
 import { PinnedPage } from "./Pins";
 import { SummaryPage } from "./SummaryPage";
-import { ArchivePage } from "./ArchivePage";
+import { ArchivedSessionsPage } from "./ArchivedSessionsPage";
+import { ArchivedWorkflowsPage } from "./ArchivedWorkflowsPage";
 import { MCPServersPage } from "./MCPServers";
 import { ReviewPage } from "./Review";
 import { projectNameOf, Sidebar } from "./Sidebar";
@@ -101,8 +102,13 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
               workflowID={r.workflow} down={down || !store.hostIsOnline(r.host)} />
           ) : r.host && r.folder && folder && r.page ? (
             <PinnedPage store={store} host={r.host} folder={folder.folder.folder} path={r.page} down={down || !store.hostIsOnline(r.host)} />
+          ) : r.host && r.folder && folder && r.archive === "workflows" ? (
+            <ArchivedWorkflowsPage key={`${r.host}|${folder.folder.folder}`} store={store} host={r.host} folder={folder.folder.folder}
+              folderName={folder.name} down={down} />
           ) : r.host && r.folder && folder && r.archive ? (
-            <ArchivePage store={store} host={r.host} folder={folder.folder.folder} folderName={folder.name} down={down} />
+            // Keyed by folder: another folder's page starts with its own page held, filter and state.
+            <ArchivedSessionsPage key={`${r.host}|${folder.folder.folder}`} store={store} host={r.host} folder={folder.folder.folder}
+              folderName={folder.name} down={down} />
           ) : r.host && r.folder && folder && r.mcp ? (
             <MCPServersPage store={store} host={r.host} folder={folder.folder.folder}
               folderName={projectNameOf(folder.project) ?? folder.name} />

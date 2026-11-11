@@ -4,6 +4,7 @@
 // what it waits on, and whether an agent asks for it to be archived. Only Needs you is ever in
 // colour. In the sidebar it is the mark, the title, the time and one grey line (#587): the rest is
 // the folder page's and the chat's.
+import { archivedOrder, archivedTime as archivedWhen } from "../model/archivedPage";
 import type { Agent } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { leaseMark, lineResource, startedByAgentLabel, waitMark, worktreeHelp, type LeaseMark, type WaitMark } from "../model/rowLines";
@@ -165,8 +166,11 @@ export function rowExtras(store: Store, host: string, agent: Agent): RowExtras {
   };
 }
 
-export function SessionRow({ agent, chosen, onPick, going, extras, inSidebar = false, place, markAgent }: {
+export function SessionRow({ agent, chosen, onPick, going, extras, inSidebar = false, place, markAgent, archivedTime = false }: {
   agent: Agent; chosen: boolean; onPick: () => void;
+  /** On the Archived Sessions page (#4451): when it was archived, "2 h ago" today and the clock time
+   *  before, with the full date and time in its tooltip, in place of its last activity. */
+  archivedTime?: boolean | undefined;
   /** A folded parent's: the most urgent of it and the sessions it started, whose mark it shows (#835). */
   markAgent?: Agent | undefined;
   /**
@@ -248,7 +252,10 @@ export function SessionRow({ agent, chosen, onPick, going, extras, inSidebar = f
           {asks && <span class="subtitle quiet archive-mark">{asks}</span>}
         </>}
       </span>
-      <time class="when" dateTime={activity.toISOString()} title={activity.toLocaleString()}>{shortAgo(activity)}</time>
+      {archivedTime ? (() => {
+        const archived = archivedOrder(agent);
+        return <time class="when" dateTime={archived.toISOString()} title={archived.toLocaleString(undefined, { dateStyle: "full", timeStyle: "short" })}>{archivedWhen(archived)}</time>;
+      })() : <time class="when" dateTime={activity.toISOString()} title={activity.toLocaleString()}>{shortAgo(activity)}</time>}
     </button>
   );
 }
