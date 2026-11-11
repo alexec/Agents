@@ -57,12 +57,7 @@ func replyOf(t *testing.T, done chan browserReply) browserReply {
 // Once fills once; a hold that ends names the request to wait on; deny is an error; always
 // is a grant for the domain that a person can take away.
 func TestAFlaggedFillWaitsOnAPerson(t *testing.T) {
-	// A call the test answers while it is held is held for a minute, so a slow runner does
-	// not end its hold first (#4569); a call that is left to end its hold is held 300 ms.
-	was := formHoldLimit
-	defer func() { formHoldLimit = was }()
-	answered, left := func() { formHoldLimit = time.Minute }, func() { formHoldLimit = 300 * time.Millisecond }
-	answered()
+	answered, left := formHolds(t)
 	m, page, d := fillSetUp(t, nil)
 	if err := d.saveSecret("GITLAB_PASSWORD", filledValue, true); err != nil {
 		t.Fatal(err)
@@ -175,9 +170,8 @@ func grantAs(d *Daemon, method, name, use, place string) {
 
 // #4015: set_ci_secret of a flagged secret waits on a person, for the repository.
 func TestAFlaggedCISecretWaitsOnAPerson(t *testing.T) {
-	was := formHoldLimit
-	formHoldLimit = 300 * time.Millisecond
-	defer func() { formHoldLimit = was }()
+	answered, left := formHolds(t)
+	left() // the first call must outlast its hold
 	d, _, gh, _ := forgeDaemon(t)
 	a := seeded(t, d, gitFolder(t, "git@github.com:alexec/newapp.git"), func(a *wire.Agent) { a.State, a.EndedReason = wire.AgentStateRunning, nil })
 	const value = "sntrys_4015-not-real"
@@ -201,6 +195,7 @@ func TestAFlaggedCISecretWaitsOnAPerson(t *testing.T) {
 		t.Fatalf("%q %v", got, err)
 	}
 	// Held, and denied.
+	answered()
 	done := make(chan error, 1)
 	go func() { _, err := d.setCISecret(a.ID, args); done <- err }()
 	answerUse(t, d, openSecretUse(t, d), secretUseDeny)
@@ -265,9 +260,7 @@ func requestNeeds(d *Daemon) []wire.Need {
 // banner: the secret's name and the place, never the value, and the row's four answers.
 // Answered, it goes.
 func TestASecretUseIsPostedWithItsAnswers(t *testing.T) {
-	was := formHoldLimit
-	formHoldLimit = 300 * time.Millisecond
-	defer func() { formHoldLimit = was }()
+	formHolds(t) // the call is answered while it is held
 	m, _, d := fillSetUp(t, nil)
 	if err := d.saveSecret("GITLAB_PASSWORD", filledValue, true); err != nil {
 		t.Fatal(err)

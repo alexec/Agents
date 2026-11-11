@@ -14,9 +14,10 @@ import (
 // ran it, and takes once, hour or deny; hour is kept in memory, so a call in the hour does not
 // ask. A flagged secret and a name that is not set get words and no request.
 func TestATerminalsAgentsSecretAsksAPerson(t *testing.T) {
-	was, wasHour, wasParent := formHoldLimit, terminalHour, parentCommand
-	formHoldLimit, parentCommand = 300*time.Millisecond, func() string { return "/bin/zsh" }
-	defer func() { formHoldLimit, terminalHour, parentCommand = was, wasHour, wasParent }()
+	answered, left := formHolds(t)
+	wasHour, wasParent := terminalHour, parentCommand
+	parentCommand = func() string { return "/bin/zsh" }
+	defer func() { terminalHour, parentCommand = wasHour, wasParent }()
 	home := t.TempDir()
 	t.Setenv("AGENTS_PERSONAL_HOME", home)
 	d, sock := serveWith(t, fixedPolicy{role: RoleStranger, ok: true})
@@ -53,6 +54,7 @@ func TestATerminalsAgentsSecretAsksAPerson(t *testing.T) {
 	}
 
 	// No allow yet: a request with no session, held past the hold, then answered once.
+	left()
 	done := run("PLAIN_KEY")
 	r := openSecretUse(t, d)
 	if u := r.Detail.SecretUse; r.AskedBy != nil || u.Use != wire.SecretUseTerminal || u.Name != "PLAIN_KEY" || u.Place != "zsh" {
@@ -67,7 +69,9 @@ func TestATerminalsAgentsSecretAsksAPerson(t *testing.T) {
 		t.Fatalf("allowed once: %+v", res)
 	}
 
-	// Once was one call: the next asks again, and Allow for 1 Hour lets the rest through.
+	// Once was one call: the next asks again, and Allow for 1 Hour lets the rest through. The
+	// calls from here on are answered while they are held.
+	answered()
 	done = run("PLAIN_KEY")
 	answerUse(t, d, openSecretUse(t, d), secretUseHour)
 	if res := got(done); res.code != 0 || res.out != plain {
