@@ -44,12 +44,13 @@ struct ArchivedPageTests {
         #expect(ArchivedPage.nextLimit(held: 50) == 100)
     }
 
-    @Test func rowsGoByTheDayTheyWereArchivedInTheHostsOrder() {
+    @Test func rowsGoByTheDayTheyWereArchivedInTheHostsOrder() throws {
         let agents = [archived(2), archived(5), archived(20), archived(24 * 3 + 2)]
         let days = ArchivedPage.days(agents, now: now, calendar: calendar)
         #expect(days.map(\.title) == ["Today", "Yesterday", "Friday 7 November"])
         #expect(days.map(\.agents.count) == [2, 1, 1])
-        #expect(days[0].agents.map(\.id) == [agents[0].id, agents[1].id])
+        let today = try #require(days.first)
+        #expect(today.agents.map(\.id) == agents.prefix(2).map(\.id))
         #expect(days.map(\.isToday) == [true, false, false])
     }
 

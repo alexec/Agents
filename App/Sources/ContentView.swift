@@ -272,6 +272,12 @@ struct ContentView: View {
         AppCheckout.windowTitle(model.selectedAgent?.title ?? (model.composing ? model.selectedFolderSummary?.name : nil))
     }
 
+    /// The folder's name under a chat's title, and under an Archived page's (#4448).
+    private var subtitle: String {
+        let archived = model.folderPage == .archivedSessions || model.folderPage == .archivedWorkflows
+        return model.selectedAgent == nil && !archived ? "" : (model.selectedFolderSummary?.name ?? "")
+    }
+
     var body: some View {
         @Bindable var model = model
         // A sidebar and what is being read (#145). Picking a session shows its chat
@@ -313,7 +319,7 @@ struct ContentView: View {
                     .overlay { fileSearch }
                     .toolbar { detailToolbar }
                     .navigationTitle(title)
-                    .navigationSubtitle(model.selectedAgent == nil ? "" : (model.selectedFolderSummary?.name ?? ""))
+                    .navigationSubtitle(subtitle)
                 }
             }
         }

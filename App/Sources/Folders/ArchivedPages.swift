@@ -45,6 +45,7 @@ struct ArchivedSessionsPage: View {
                 list(shown, held: held.count).opacity(stale ? 0.55 : 1)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle(ArchivedPage.Sessions.title)
         .navigationSubtitle(model.work.folder(folder)?.name ?? "")
         .searchable(text: $filter, prompt: ArchivedPage.filterPrompt)
@@ -145,6 +146,7 @@ struct ArchivedWorkflowsPage: View {
                 .opacity(stale ? 0.55 : 1)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle(ArchivedPage.Workflows.title)
         .navigationSubtitle(model.work.folder(folder)?.name ?? "")
         .searchable(text: $filter, prompt: ArchivedPage.filterPrompt)
