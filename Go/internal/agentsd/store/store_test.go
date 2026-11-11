@@ -421,3 +421,36 @@ func TestLiveIndexAndArchivedTally(t *testing.T) {
 		t.Fatalf("an empty folder's tally %+v", got)
 	}
 }
+
+// A record's folder path is kept as it loads or saves, so reading it again does not
+// unescape the URL (#4511), and a Save that moves the agent's folder gives the new path.
+func TestTheFolderPathIsKeptAndFollowsAMove(t *testing.T) {
+	endTurn := wire.EndedReasonEndTurn
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := wire.Agent{ID: NewUUID(), RuntimeID: "claude", Cwd: "file:///Users/a/My%20Projects/one/", State: wire.AgentStateFinished, EndedReason: &endTurn,
+		AdvertisedOptions: []wire.ConfigOption{}, AvailableCommands: []wire.SlashCommand{}}
+	if err := s.Save(a); err != nil {
+		t.Fatal(err)
+	}
+	kept := s.Agent(a.ID)
+	if got := AgentFolder(kept); got != "/Users/a/My Projects/one" {
+		t.Fatalf("folder %q", got)
+	}
+	if n := testing.AllocsPerRun(100, func() { AgentFolder(kept) }); n != 0 {
+		t.Fatalf("a kept folder path allocates %v times", n)
+	}
+	a.Cwd = "file:///Users/a/My%20Projects/two"
+	a.Worktree = &wire.AgentWorktree{Name: "lane", Root: "file:///Users/a/My%20Projects/two/.agents/worktrees/lane", Folder: "file:///Users/a/My%20Projects/two"}
+	if err := s.Save(a); err != nil {
+		t.Fatal(err)
+	}
+	if got := AgentFolder(s.Agent(a.ID)); got != "/Users/a/My Projects/two" {
+		t.Fatalf("after the move, folder %q", got)
+	}
+	if len(s.AgentsIn("/Users/a/My Projects/one")) != 0 || len(s.AgentsIn("/Users/a/My Projects/two")) != 1 {
+		t.Fatal("the folder index did not follow the move")
+	}
+}
