@@ -26,7 +26,7 @@ struct WorkPlaceholderRows: View {
 }
 
 /// A slow shimmer over the placeholders.
-private struct WorkShimmer: ViewModifier {
+struct WorkShimmer: ViewModifier {
     @State private var dim = false
 
     func body(content: Content) -> some View {

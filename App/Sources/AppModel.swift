@@ -6666,6 +6666,12 @@ final class AppModel {
         return forgeMachines.filter { draws.contains($0.id) }
     }
 
+    /// The machines that give Work ▸ Features in one read (#4586), This Mac first.
+    var featuresMachines: [(id: MachineRef, name: String)] {
+        let reads = Set((controlPlaneHosts ?? []).filter { $0.has(Capability.workFeatures1) }.map(\.id))
+        return forgeMachines.filter { reads.contains($0.id) }
+    }
+
     /// The machines that read docs (#3321), this Mac first.
     var docsMachines: [(id: MachineRef, name: String)] {
         let mine = thisMacHostID
