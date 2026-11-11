@@ -313,6 +313,27 @@ struct WorkTimelineTests {
         #expect(merged.errors == ["x", "y"])
     }
 
+    /// #4276: a session on another machine, from the control plane's copy, starts a child that
+    /// this machine had no start for, and an earlier one moves a start and its line back.
+    @Test func sessionsOnEveryMachineStartTheChildren() throws {
+        let open = Self.child(2)
+        let closed = Self.child(3, started: -10, closed: -5)
+        let later = Self.child(4, started: -3)
+        let timeline = DaemonAPI.WorkTimeline(epics: [Self.epic(1, [closed, open, later], segments: [(-10, -5), (-3, nil)])])
+        func on(_ n: Int, _ hours: Double) -> DaemonAPI.LineageSessionOn {
+            .init(node: Node(kind: "session", ref: "session:\(n)-\(hours)"), host: "BEAS-MAC",
+                  on: [Node(kind: "issue", ref: "github:alexec/Agents#\(n)")], at: Self.h(hours))
+        }
+        let got = WorkTimeline.started(timeline, by: [on(2, -4), on(3, -12), on(4, -1), on(9, -50)])
+        let epic = try #require(got.epics.first)
+        let kids = epic.children
+        // #3 started earlier on Bea's machine; #2 started there; #4 started here first.
+        #expect(kids.map(\.startedAt) == [Self.h(-12), Self.h(-4), Self.h(-3)])
+        #expect(epic.segments.map(\.startedAt) == [Self.h(-12), Self.h(-4)])
+        #expect(WorkTimeline.started(timeline, by: []) == timeline)
+        #expect(WorkTimeline.sessionNodes(got).map(\.ref) == [1, 3, 2, 4].map { "github:alexec/Agents#\($0)" })
+    }
+
     @Test func timelineIsAWorkListWithNoLineagePage() {
         #expect(WorkList.Kind.allCases.last == .timeline)
         #expect(WorkList.kind(of: Node(kind: "timeline", ref: "x")) == nil)

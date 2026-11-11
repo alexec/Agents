@@ -426,6 +426,12 @@ func (m *mesh) received(line string, link *peerLink) {
 		if json.Unmarshal(o["event"], &e) == nil {
 			m.s.apply(e)
 		}
+	case o["lineage"] != nil:
+		// A machine's lineage/sync at another copy (#4276): its person and the admins here.
+		var c wire.LineageChanged
+		if json.Unmarshal(o["lineage"], &c) == nil && c.Host != "" {
+			m.s.tellLineageChanged(c)
+		}
 	case o["presence"] != nil:
 		var p struct {
 			Client string          `json:"client"`

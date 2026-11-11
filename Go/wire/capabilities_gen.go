@@ -102,6 +102,7 @@ const CapLineageEstimate1 = "lineage.estimate/1"
 const CapLineageFigures1 = "lineage.figures/1"
 const CapLineageForecast1 = "lineage.forecast/1"
 const CapLineageGraph1 = "lineage.graph/1"
+const CapLineageRead1 = "lineage.read/1"
 const CapLineageSessions1 = "lineage.sessions/1"
 const CapLineage1 = "lineage/1"
 const CapLinks1 = "links/1"
@@ -758,7 +759,9 @@ var ControlCapabilities = pairs([][2]string{
 	{"groups/set", "groups/1"},
 	{"groups/setRole", "org-identity/1"},
 	{"handover/status", "handover/1"},
+	{"lineage/sessionsOn", "lineage.read/1"},
 	{"lineage/sync", "lineage.graph/1"},
+	{"lineage/walkAll", "lineage.read/1"},
 	{"links/approve", "links/1"},
 	{"links/check", "links/1"},
 	{"links/deny", "links/1"},
@@ -941,6 +944,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"control/joinRequested", "hosts.join/1"},
 	{"control/keptChanged", "control/1"},
 	{"control/keptDelivered", "control/1"},
+	{"control/lineageChanged", "lineage.read/1"},
 	{"control/linkDecided", "links/1"},
 	{"control/linkRequested", "links/1"},
 	{"control/linksChanged", "links/1"},
@@ -999,6 +1003,7 @@ var ControlNotifications = set([]string{
 	"control/joinRequested",
 	"control/keptChanged",
 	"control/keptDelivered",
+	"control/lineageChanged",
 	"control/linkDecided",
 	"control/linkRequested",
 	"control/linksChanged",

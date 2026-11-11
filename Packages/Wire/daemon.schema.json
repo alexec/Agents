@@ -12315,6 +12315,31 @@
       ],
       "additionalProperties": false
     },
+    "LineageChanged": {
+      "type": "object",
+      "description": "control/lineageChanged (#4276): a machine sent lineage the control plane's copy did not have, to the machine's person and to the admins: the changes of state it sent, so a client that shows working does not poll, and links when links changed too. Only refs, states and times.",
+      "properties": {
+        "host": {
+          "type": "string",
+          "description": "The machine's id."
+        },
+        "states": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LineageStateChange"
+          }
+        },
+        "links": {
+          "type": "boolean",
+          "description": "Links started or ended too: a read of them is out of date."
+        }
+      },
+      "required": [
+        "host",
+        "states"
+      ],
+      "additionalProperties": false
+    },
     "LineageCost": {
       "type": "object",
       "description": "What was banked under lineage nodes (#2350): a turn's cost, tokens and time, split evenly among the links active when it was banked. turns is a share of turns, so a turn on two nodes is half a turn on each.",
@@ -13263,6 +13288,38 @@
       ],
       "additionalProperties": false
     },
+    "LineageSessionOn": {
+      "type": "object",
+      "description": "A session that lineage links to one or more of the nodes asked for (#4276), on any machine in the scope: the session's node, its machine, the nodes asked for it is linked to, when its first link to them started, and its state now when its machine sent one.",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "host": {
+          "type": "string",
+          "description": "The id of the machine that sent the link."
+        },
+        "on": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LineageNode"
+          }
+        },
+        "at": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "state": {
+          "$ref": "#/definitions/LineageSessionState"
+        }
+      },
+      "required": [
+        "node",
+        "host",
+        "on",
+        "at"
+      ],
+      "additionalProperties": false
+    },
     "LineageSessionState": {
       "type": "object",
       "description": "A change of a session node's state, as its machine recorded it (#4274): state is what it changed to, at is when. The machine keeps the changes of the last 90 days, and each session's latest whatever its age.",
@@ -13316,6 +13373,44 @@
       },
       "required": [
         "matches"
+      ],
+      "additionalProperties": false
+    },
+    "LineageSessionsOn": {
+      "type": "object",
+      "description": "lineage/sessionsOn (#4276): the sessions linked to the nodes asked for, each once, the earliest link first. limited says there were more than lineage's answer bound (500).",
+      "properties": {
+        "sessions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LineageSessionOn"
+          }
+        },
+        "limited": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "sessions"
+      ],
+      "additionalProperties": false
+    },
+    "LineageSessionsOnRequest": {
+      "type": "object",
+      "description": "lineage/sessionsOn (#4276): the nodes (at most 500, such as an epic and its children) whose sessions to say, over every machine's copy that the scope takes. The scope is as reports/value's: me when absent for a member, the organisation for an admin.",
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LineageNode"
+          }
+        },
+        "scope": {
+          "$ref": "#/definitions/ReportScope"
+        }
+      },
+      "required": [
+        "nodes"
       ],
       "additionalProperties": false
     },
@@ -13383,6 +13478,25 @@
           "type": "boolean"
         }
       },
+      "additionalProperties": false
+    },
+    "LineageWalkAllRequest": {
+      "type": "object",
+      "description": "lineage/walkAll (#4276): lineage/walk over the control plane's merged copy, every machine's links that the scope takes, so a machine that sleeps is still in it. depth is as lineage/walk's; the scope is as reports/value's. The answer has no resolved: the control plane keeps no titles (principle 7).",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "depth": {
+          "type": "integer"
+        },
+        "scope": {
+          "$ref": "#/definitions/ReportScope"
+        }
+      },
+      "required": [
+        "node"
+      ],
       "additionalProperties": false
     },
     "ListCursor": {

@@ -5,7 +5,7 @@
 // issue's page finds the Timeline as it was left.
 import { signal } from "@preact/signals";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
-import type { ForgeItem, WorkTimeline as Timeline } from "../protocol/generated";
+import type { ForgeItem, LineageSessionOn, WorkTimeline as Timeline } from "../protocol/generated";
 import { Capability } from "../protocol/capabilities.generated";
 import { fromWireDate, toWireDate } from "../protocol/dates";
 import type { Store } from "../model/store";
@@ -14,7 +14,8 @@ import { boardChoices, boardName, withBoard, type WorkProject } from "../model/w
 import { boards, forgeHosts, loadBoards } from "../model/workLists";
 import {
   Axis, cardRows, colourIndex, dotX, epicCount, epicOf, errorWords, fitLabel, hit, isOpen, joins, label, labelText, landed as landedRefs,
-  lanes, layout, labelRoom, mergeTimelines, noEpics, noMachine, noProject, overlapping, rangeSpan, rangeTitle, rangeWindow, riser, spoken,
+  lanes, layout, labelRoom, mergeTimelines, noEpics, noMachine, noProject, overlapping, rangeSpan, rangeTitle, rangeWindow, riser, sessionNodes, spoken,
+  startedBySessions,
   timelineLines, timelineRanges, titleWords, waitWords, zoomed, type Interval, type TimelineHit, type TimelineLine, type TimelineRange,
 } from "../model/workTimeline";
 import { go } from "../route";
@@ -36,6 +37,13 @@ const nowAsked = signal(0);
 /** Children that closed since the last read: their dots pulse once. */
 const landed = signal<ReadonlySet<string>>(new Set());
 let read: string | undefined;
+/**
+ * Every machine's sessions on the epics and their children, from the control plane's merged copy
+ * (#4276): a sleeping machine's sessions still start their children.
+ */
+const sessions = signal<LineageSessionOn[]>([]);
+/** The machines' timelines as one, before the sessions start their children. */
+let fromMachines: Timeline | undefined;
 
 const laneHeight = 60;
 const axisHeight = 26;
@@ -96,7 +104,31 @@ async function loadTimeline(store: Store) {
   }
   const failed = got.flatMap((g) => g.problem ? [g.problem] : []);
   problem.value = failed.length === 0 ? null : failed.join("\n");
-  timeline.value = merged;
+  fromMachines = merged;
+  sessions.value = await readSessions(store, merged);
+  if (read !== key || fromMachines !== merged) return;
+  timeline.value = startedBySessions(merged, sessions.value);
+}
+
+/** Every machine's sessions on the timeline's epics and children, from the control plane's merged copy (#4276); none from one before it. */
+async function readSessions(store: Store, t: Timeline): Promise<LineageSessionOn[]> {
+  const nodes = sessionNodes(t);
+  if (nodes.length === 0) return [];
+  try {
+    return (await store.link.call("lineage/sessionsOn", { nodes })).sessions;
+  } catch {
+    return [];
+  }
+}
+
+/** The sessions again, on control/lineageChanged (#4276): a session that starts on a child on any machine starts it, with no read of the forges. */
+async function readSessionsAgain(store: Store) {
+  const machines = fromMachines;
+  if (!machines) return;
+  const got = await readSessions(store, machines);
+  if (fromMachines !== machines) return;
+  sessions.value = got;
+  timeline.value = startedBySessions(machines, got);
 }
 
 function goToNow() {
@@ -120,6 +152,13 @@ export function WorkTimeline({ store }: { store: Store }) {
   const projectKey = projects.map((p) => p.id).join(",");
   useEffect(() => { void loadTimeline(store); }, [asked.value, project.value, board.value, range.value, anchor.value, hostKey, projectKey]);
   useEffect(() => { void loadBoards(store); }, [hostKey]);
+  // A machine sent new lineage to the control plane (#4276): the sessions again, no polling.
+  const lineageChanges = store.lineageChanges.value;
+  useEffect(() => {
+    if (lineageChanges === 0) return;
+    const t = setTimeout(() => { void readSessionsAgain(store); }, 500);
+    return () => clearTimeout(t);
+  }, [lineageChanges]);
   // Read again every five minutes, so closes land while the page is open.
   useEffect(() => {
     const t = setInterval(() => { asked.value++; }, 300_000);

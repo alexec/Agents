@@ -430,6 +430,103 @@ public extension DaemonAPI {
         public var burn: [LineageForecastBurn]
         public var serviceLevels: [LineageForecastServiceLevel]
     }
+
+    /// A session node's state now (#4274): working, waiting, needs-you, stopped, archived or
+    /// deleted, and when it changed to it. A state this build does not know is kept as it is.
+    struct LineageSessionState: Codable, Sendable, Hashable {
+        public var state: String
+        public var at: Date
+
+        public init(state: String, at: Date) {
+            self.state = state
+            self.at = at
+        }
+
+        /// In a turn now.
+        public var working: Bool { state == "working" }
+    }
+
+    /// A session node's change of state, and when (#4275).
+    struct LineageStateChange: Codable, Sendable, Hashable {
+        public var node: LineageNode
+        public var state: String
+        public var at: Date
+
+        public init(node: LineageNode, state: String, at: Date) {
+            self.node = node
+            self.state = state
+            self.at = at
+        }
+    }
+
+    /// `lineage/walkAll` (#4276): `lineage/walk` over the control plane's merged copy of every
+    /// machine's lineage in the scope (`me` when nil for a member, the organisation for an admin).
+    struct LineageWalkAllRequest: Codable, Sendable, Hashable {
+        public var node: LineageNode
+        public var depth: Int?
+        public var scope: ReportScope?
+
+        public init(node: LineageNode, depth: Int? = nil, scope: ReportScope? = nil) {
+            self.node = node
+            self.depth = depth
+            self.scope = scope
+        }
+    }
+
+    /// `lineage/sessionsOn` (#4276): the nodes (at most 500) whose sessions to say, over every
+    /// machine's copy in the scope.
+    struct LineageSessionsOnRequest: Codable, Sendable, Hashable {
+        public var nodes: [LineageNode]
+        public var scope: ReportScope?
+
+        public init(nodes: [LineageNode], scope: ReportScope? = nil) {
+            self.nodes = nodes
+            self.scope = scope
+        }
+    }
+
+    /// A session lineage links to nodes asked for, on any machine: its machine, the nodes it is
+    /// on, when its first link to them started, and its state now when its machine sent one.
+    struct LineageSessionOn: Codable, Sendable, Hashable {
+        public var node: LineageNode
+        public var host: String
+        public var on: [LineageNode]
+        public var at: Date
+        public var state: LineageSessionState?
+
+        public init(node: LineageNode, host: String, on: [LineageNode], at: Date, state: LineageSessionState? = nil) {
+            self.node = node
+            self.host = host
+            self.on = on
+            self.at = at
+            self.state = state
+        }
+    }
+
+    /// `lineage/sessionsOn`'s answer: each session once, the earliest link first.
+    struct LineageSessionsOn: Codable, Sendable, Hashable {
+        public var sessions: [LineageSessionOn]
+        public var limited: Bool?
+
+        public init(sessions: [LineageSessionOn] = [], limited: Bool? = nil) {
+            self.sessions = sessions
+            self.limited = limited
+        }
+    }
+
+    /// `control/lineageChanged` (#4276): a machine sent lineage the merged copy did not have:
+    /// its sessions' changes of state, and `links` when links changed too.
+    struct LineageChanged: Codable, Sendable, Hashable {
+        public var host: String
+        public var states: [LineageStateChange]
+        public var links: Bool?
+
+        public init(host: String, states: [LineageStateChange] = [], links: Bool? = nil) {
+            self.host = host
+            self.states = states
+            self.links = links
+        }
+    }
 }
 
 /// The lineage nodes and walks the clients ask for: a lead's epic, an epic's plan, Work's links.
@@ -482,4 +579,16 @@ public struct LineageHistory<Place: Hashable & Sendable>: Hashable, Sendable {
 
     public mutating func back() { if canGoBack { at -= 1 } }
     public mutating func forward() { if canGoForward { at += 1 } }
+}
+
+public extension DaemonAPI.Method {
+    /// `LineageWalkAllRequest` → `LineageGraph`, from the control plane's merged copy (#4276).
+    static let lineageWalkAll = "lineage/walkAll"
+    /// `LineageSessionsOnRequest` → `LineageSessionsOn`, from the control plane's merged copy (#4276).
+    static let lineageSessionsOn = "lineage/sessionsOn"
+}
+
+public extension DaemonAPI.Notification {
+    /// `LineageChanged`: a machine sent new lineage to the control plane (#4276).
+    static let controlLineageChanged = "control/lineageChanged"
 }
