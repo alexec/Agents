@@ -6,7 +6,7 @@ import { useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import type { Store } from "../model/store";
 import { deleteQuestion, machineActions, machineDot, machineIcon, machineKind, machineSwipes, removeQuestion, swipeDistance,
-  type MachineIconTone, type MachineKind } from "../model/machineRow";
+  type MachineIconTone, type MachineKind, type MachineMaking } from "../model/machineRow";
 import { machineSheets } from "../model/machineSheets";
 import { placedSessions } from "../model/overview";
 import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
@@ -151,12 +151,19 @@ export function MachineRow({ store, host, on, open, children }: {
   );
 }
 
-/** A machine New Machine is making (#3974): an amber, pulsing cloud and `Making…` until it joins. */
-export function MakingRow({ name }: { name: string }) {
+/** A machine New Machine is making (#3974): an amber, pulsing cloud and `Making…` until it joins; red with the reason,
+ * and Delete in its menu, once the control plane gave up waiting for it (#4610). */
+export function MakingRow({ row, onDelete }: { row: MachineMaking; onDelete: () => void }) {
+  const name = row.name || "New machine";
+  const gaveUp = row.notJoined !== null;
+  const items = (): MenuItem[] => [{ label: `Delete ${name}…`, run: onDelete }];
   return (
-    <div class="machine-row making" role="status">
-      <span class="sub-app-row"><span class="machine-name"><MachineIcon kind="cloud" tone="busy" />{name || "New machine"}</span></span>
-      <p class="machine-need quiet small">Making…</p>
+    <div class={`machine-row making${gaveUp ? " not-joined" : ""}`} role={gaveUp ? undefined : "status"}
+      onContextMenu={gaveUp ? (e) => openContextMenu(e, items()) : undefined}>
+      <span class="sub-app-row"><span class="machine-name"><MachineIcon kind="cloud" tone={gaveUp ? "failure" : "busy"} />{name}</span></span>
+      {gaveUp && <button type="button" class="machine-more" aria-label={`More for ${name}`}
+        onClick={(e) => openContextMenu(e, items())}>···</button>}
+      <p class={`machine-need small ${gaveUp ? "failure" : "quiet"}`}>{row.notJoined ?? "Making…"}</p>
     </div>
   );
 }

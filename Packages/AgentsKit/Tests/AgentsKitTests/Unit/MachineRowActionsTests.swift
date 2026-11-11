@@ -35,6 +35,32 @@ struct MachineRowActionsTests {
         #expect(MachineRowActions.of(row("online", canStop: false), isThisMac: false) == MachineRowActions(delete: true))
     }
 
+    private func provider(_ id: String, _ workspaces: [DaemonAPI.MachineInfo]) -> DaemonAPI.ProviderSummary {
+        DaemonAPI.ProviderSummary(id: ProviderID(rawValue: id), name: id.capitalized, kind: "command",
+                                  capabilities: ["create"], workspaces: workspaces)
+    }
+
+    /// A machine New Machine made has a row until it joins (#4610): Making… while the control
+    /// plane waits, the reason once it gave up; none once linked, or once a machine of its name is here.
+    @Test func aMadeMachineHasARowUntilItJoins() throws {
+        let making = DaemonAPI.MachineInfo(id: "ws-1", name: "machine-1", state: "starting", joining: true)
+        let gaveUp = DaemonAPI.MachineInfo(id: "ws-2", name: "machine-2", state: "running",
+                                           notJoined: "Made at Do, but it didn’t join in 10 minutes.")
+        let linked = DaemonAPI.MachineInfo(id: "ws-3", name: "machine-3", state: "running",
+                                           host: MachineRef(rawValue: "h3"), joining: true)
+        let joinedByName = DaemonAPI.MachineInfo(id: "ws-4", name: "machine-4", state: "running", joining: true)
+        let plain = DaemonAPI.MachineInfo(id: "ws-5", name: "old", state: "running")
+        let rows = MachineMaking.rows([provider("do", [gaveUp, plain, making, linked, joinedByName])], hostNames: ["machine-4"])
+        #expect(rows.map(\.name) == ["machine-1", "machine-2"])
+        let still = try #require(rows.first)
+        let gone = try #require(rows.last)
+        #expect(still.line == "Making…")
+        #expect(still.notJoined == nil)
+        #expect(gone.line == "Made at Do, but it didn’t join in 10 minutes.")
+        #expect(gone.id == "do/ws-2")
+        #expect(gone.deleteMessage == "Do deletes machine-2. Nothing was installed on it, so there is nothing to back up.")
+    }
+
     @Test func aRegisteredMachineIsOnlyRemoved() {
         #expect(MachineRowActions.of(row("online", workspace: false), isThisMac: false) == MachineRowActions(remove: true))
     }

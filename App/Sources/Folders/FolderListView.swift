@@ -253,6 +253,14 @@ struct FolderListView: View {
                         MachineRow(host: host) { picked = [.machine(host)] }
                             .appText(.supporting).sidebarInk(.machine(host)).tag(SidebarItem.machine(host))
                     }
+                    // The machines New Machine is making, and the ones the control plane gave up
+                    // waiting for (#4610): a row each until a machine of the name joins.
+                    ForEach(0..<model.machinesBeingMade, id: \.self) { _ in
+                        MakingMachineRow(making: nil).appText(.supporting)
+                    }
+                    ForEach(model.machinesMaking) { making in
+                        MakingMachineRow(making: making).appText(.supporting)
+                    }
                 } header: {
                     MachinesHeader()
                 }

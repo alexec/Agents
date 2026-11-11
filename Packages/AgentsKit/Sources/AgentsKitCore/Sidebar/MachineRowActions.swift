@@ -95,3 +95,50 @@ public enum MachineIcon: Equatable, Sendable {
         isThisMac ? "laptopcomputer" : row?.workspace != nil ? "cloud" : "server.rack"
     }
 }
+
+/// A machine New Machine made that has not joined yet (#4610): a row under Machines, as the
+/// web page's. Amber and *Making…* while the control plane waits for it; red with the reason
+/// and Delete once the control plane gave up. The web page's machineRow has the same rows.
+public struct MachineMaking: Equatable, Sendable, Identifiable {
+    public var provider: ProviderID
+    public var providerName: String
+    public var workspace: String
+    public var name: String
+    /// Why the control plane gave up waiting; nil while it still waits.
+    public var notJoined: String?
+
+    public var id: String { "\(provider.rawValue)/\(workspace)" }
+
+    public init(provider: ProviderID, providerName: String, workspace: String, name: String, notJoined: String? = nil) {
+        self.provider = provider
+        self.providerName = providerName
+        self.workspace = workspace
+        self.name = name
+        self.notJoined = notJoined
+    }
+
+    /// The rows: each provider's workspaces New Machine made that no machine is linked to and
+    /// no machine of the same name has joined, the ones still making first, then by name.
+    public static func rows(_ providers: [DaemonAPI.ProviderSummary], hostNames: Set<String>) -> [MachineMaking] {
+        var rows: [MachineMaking] = []
+        for provider in providers {
+            for workspace in provider.workspaces where workspace.host == nil && !hostNames.contains(workspace.name) {
+                guard workspace.joining == true || workspace.notJoined != nil else { continue }
+                rows.append(MachineMaking(provider: provider.id, providerName: provider.name, workspace: workspace.id,
+                                          name: workspace.name, notJoined: workspace.notJoined))
+            }
+        }
+        return rows.sorted { a, b in
+            if (a.notJoined == nil) != (b.notJoined == nil) { return a.notJoined == nil }
+            return a.name.localizedStandardCompare(b.name) == .orderedAscending
+        }
+    }
+
+    /// The grey line under the row: *Making…*, or why it did not join.
+    public var line: String { notJoined ?? "Making…" }
+
+    /// Delete's question on a row the control plane gave up on.
+    public var deleteMessage: String {
+        "\(providerName) deletes \(name). Nothing was installed on it, so there is nothing to back up."
+    }
+}

@@ -680,6 +680,7 @@ var CallProjectsSetBoards = Method[ProjectBoardsSet, Project]{"projects/setBoard
 var CallProjectsSetSlot = Method[ProjectSlotSet, Project]{"projects/setSlot"}
 var CallProvidersAdd = Method[ProviderAdd, ProviderSummary]{"providers/add"}
 var CallProvidersCreate = Method[ProviderCreate, ProviderCreated]{"providers/create"}
+var CallProvidersDeleteWorkspace = Method[ProviderWorkspaceRequest, Empty]{"providers/deleteWorkspace"}
 var CallProvidersDraftAnswer = Method[ProviderDraftAnswer, Empty]{"providers/draftAnswer"}
 var CallProvidersDraftCancel = Method[ProviderDraftRequest, Empty]{"providers/draftCancel"}
 var CallProvidersDraftSigned = Method[ProviderDraftSigned, Empty]{"providers/draftSigned"}

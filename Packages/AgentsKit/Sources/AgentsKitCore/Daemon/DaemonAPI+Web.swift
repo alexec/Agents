@@ -491,6 +491,9 @@ public extension DaemonAPI {
                 Row(Method.hostsDeletePreview, params: MachineRequest.self, result: StartedMachinePreview.self,
                     kind: .controlRequest),
                 Row(Method.providersMakeDefault, params: ProviderRequest.self, result: Empty.self, kind: .controlRequest),
+                // Delete on a machine New Machine made that never joined (#4610).
+                Row(Method.providersDeleteWorkspace, params: ProviderWorkspaceRequest.self, result: Empty.self,
+                    kind: .controlRequest),
                 // Add as Machine… on a workspace (#3365): installed over the control plane's ssh.
                 Row(Method.hostsInstall, params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
                 // Update… on a machine's row (#4122): updated over the control plane's ssh, as installed.

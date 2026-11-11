@@ -104,7 +104,7 @@ func (p *Providers) refuse(method string, params []byte, caller Caller) error {
 	decodeJSON(params, &named)
 	provider := ""
 	switch method {
-	case MethodProvidersOptions, MethodProvidersCreate:
+	case MethodProvidersOptions, MethodProvidersCreate, MethodProvidersDeleteWorkspace:
 		provider = named.ID
 	case MethodHostsLink:
 		provider = named.Provider

@@ -203,6 +203,7 @@ struct WireSchemaTests {
             "ProviderSummary": Self.through(DaemonAPI.ProviderSummary.self),
             "ProviderAdd": Self.through(DaemonAPI.ProviderAdd.self),
             "ProviderRequest": Self.through(DaemonAPI.ProviderRequest.self),
+            "ProviderWorkspaceRequest": Self.through(DaemonAPI.ProviderWorkspaceRequest.self),
             "MachineLink": Self.through(DaemonAPI.MachineLink.self),
             "MachineOptions": Self.through(DaemonAPI.MachineOptions.self),
             "ProviderOptions": Self.through(DaemonAPI.ProviderOptions.self),
