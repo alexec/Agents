@@ -6,7 +6,8 @@
 #                                     icons, the Dock moods, the menu bar template, and the icons,
 #                                     favicons and touch icons of the web page, the docs site and www
 #   scripts/design.sh marks --check   write nothing; fail when a mark is not what `marks` makes
-#                                     (CI's `marks` job, #4615)
+#                                     (CI's `marks` job, #4615): the same bytes, or for a PNG the
+#                                     same size and every channel within 8/255
 #
 # `marks` runs on the Mac only: AppKit (design/logo/blob/final/render.swift) renders every PNG, so
 # no two targets drift by a renderer. It needs no build lease: it compiles one file.
@@ -153,15 +154,22 @@ case "${1:-} ${2:-}" in
 	rm "$root/.marks"
 	;;
 "marks --check")
+	MOST=8
 	out=$(mktemp -d)
 	trap 'rm -rf "$out"' EXIT
 	marks "$out" >/dev/null
+	swiftc -O -o "$out/.render" "$root/design/logo/blob/final/render.swift"
 	stale=0
 	while read -r f; do
-		if ! cmp -s "$out/$f" "$root/$f"; then
-			echo "design.sh: $f is not what \`scripts/design.sh marks\` makes" >&2
-			stale=1
-		fi
+		cmp -s "$out/$f" "$root/$f" && continue
+		# A PNG may differ by a few levels from the Mac that made it (CI's GPU is a virtual one):
+		# the same size and at most $MOST/255 on every channel is the same mark
+		case "$f" in
+		*.png) [ -f "$root/$f" ] && why=$("$out/.render" same "$out/$f" "$root/$f" "$MOST") && continue ;;
+		*) why= ;;
+		esac
+		echo "design.sh: $f is not what \`scripts/design.sh marks\` makes${why:+ ($why)}" >&2
+		stale=1
 	done <"$out/.marks"
 	if [ "$stale" = 1 ]; then
 		echo "design.sh: run scripts/design.sh marks and commit what it writes" >&2
