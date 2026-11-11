@@ -29,8 +29,8 @@ func (githubForge) Images() forgeImageHost { return githubImages{} }
 func (githubForge) Caps() forgeCaps {
 	return forgeCaps{
 		Issues: true, PRs: true,
-		Issue: forgeActions{Comment: true, Label: true, Close: true, Reopen: true},
-		PR: forgeActions{Comment: true, Label: true, Close: true, Reopen: true, Merge: true, AutoMerge: true, Approve: true,
+		Issue: forgeActions{Comment: true, Label: true, Assign: true, Close: true, Reopen: true},
+		PR: forgeActions{Comment: true, Label: true, Assign: true, Close: true, Reopen: true, Merge: true, AutoMerge: true, Approve: true,
 			Rerun: true, Log: true, Diff: true},
 		LabelColors: true,
 		Avatars:     true,
@@ -320,6 +320,22 @@ func (g githubForge) SetLabels(ctx context.Context, r forgeRef, add, remove []st
 		return err
 	}
 	return gh.SetLabels(ctx, r.Repo, r.Number, add, remove)
+}
+
+func (g githubForge) SetAssignees(ctx context.Context, r forgeRef, add, remove []string) error {
+	gh, err := g.d.forgeGitHub()
+	if err != nil {
+		return err
+	}
+	if len(add) > 0 {
+		if err := gh.Assign(ctx, r.Repo, r.Number, add); err != nil {
+			return err
+		}
+	}
+	if len(remove) > 0 {
+		return gh.Unassign(ctx, r.Repo, r.Number, remove)
+	}
+	return nil
 }
 
 func (g githubForge) SetState(ctx context.Context, r forgeRef, closed bool, transition string) error {

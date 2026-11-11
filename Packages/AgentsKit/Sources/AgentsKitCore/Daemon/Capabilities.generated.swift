@@ -67,6 +67,7 @@ public enum Capability {
     public static let foldersToMachine1 = "folders.to-machine/1"
     public static let folders1 = "folders/1"
     public static let forgeWrite1 = "forge-write/1"
+    public static let forgeAssign1 = "forge.assign/1"
     public static let forgeBoards1 = "forge.boards/1"
     public static let forgeImage1 = "forge.image/1"
     public static let forgeReleases1 = "forge.releases/1"
@@ -370,6 +371,7 @@ public enum Capability {
         "folders/undoGuardedChange": "folders/1",
         "forge/add-child": "forge-write/1",
         "forge/approve": "forge-write/1",
+        "forge/assign": "forge.assign/1",
         "forge/blocked-by": "forge-write/1",
         "forge/boards": "forge.boards/1",
         "forge/close": "forge-write/1",

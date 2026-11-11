@@ -4564,6 +4564,31 @@
       }
     },
     {
+      "name": "forge/assign",
+      "x-capability": "forge.assign/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ForgeAssignRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ForgeDone"
+        }
+      }
+    },
+    {
       "name": "forge/blocked-by",
       "x-capability": "forge-write/1",
       "tags": [

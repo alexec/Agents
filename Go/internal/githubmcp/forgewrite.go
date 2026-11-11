@@ -134,6 +134,17 @@ func (g *RealGitHub) Unassign(ctx context.Context, repo string, number int, logi
 	return err
 }
 
+// Assign adds people to an issue or a pull request, by login (#4403). GitHub leaves out, with no
+// error, a login that cannot be assigned.
+func (g *RealGitHub) Assign(ctx context.Context, repo string, number int, logins []string) error {
+	if _, _, err := ownerName(repo); err != nil {
+		return err
+	}
+	body, _ := json.Marshal(map[string][]string{"assignees": logins})
+	_, err := g.do(ctx, http.MethodPost, fmt.Sprintf("repos/%s/issues/%d/assignees", repo, number), body, false)
+	return err
+}
+
 // RepoLabels are a repo's labels, at most 100, with their colours.
 func (g *RealGitHub) RepoLabels(ctx context.Context, repo string) ([]string, map[string]string, error) {
 	if _, _, err := ownerName(repo); err != nil {

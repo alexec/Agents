@@ -33,8 +33,8 @@ func (gitlabForge) Images() forgeImageHost { return gitlabImages{} }
 func (gitlabForge) Caps() forgeCaps {
 	return forgeCaps{
 		Issues: true, PRs: true,
-		Issue: forgeActions{Comment: true, Label: true, Close: true, Reopen: true},
-		PR: forgeActions{Comment: true, Label: true, Close: true, Reopen: true, Merge: true, AutoMerge: true, Approve: true,
+		Issue: forgeActions{Comment: true, Label: true, Assign: true, Close: true, Reopen: true},
+		PR: forgeActions{Comment: true, Label: true, Assign: true, Close: true, Reopen: true, Merge: true, AutoMerge: true, Approve: true,
 			Rerun: true, Log: true, Diff: true},
 		LabelColors: true,
 		Avatars:     true,
@@ -307,6 +307,14 @@ func (g gitlabForge) SetLabels(ctx context.Context, r forgeRef, add, remove []st
 		return err
 	}
 	return gl.SetLabels(ctx, project, r.Number, r.pr(), add, remove)
+}
+
+func (g gitlabForge) SetAssignees(ctx context.Context, r forgeRef, add, remove []string) error {
+	gl, project, _, err := g.of(ctx, "forge/assign", r)
+	if err != nil {
+		return err
+	}
+	return gl.SetAssignees(ctx, project, r.Number, r.pr(), add, remove)
 }
 
 func (g gitlabForge) SetState(ctx context.Context, r forgeRef, closed bool, transition string) error {

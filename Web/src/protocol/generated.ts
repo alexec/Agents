@@ -4011,7 +4011,7 @@ export interface FoldersListRequest {
 /**
  * A write or a read that an item's page offers (#4329, #4361): forge/comment, forge/label,
  * forge/close (a close, a reopen or a transition), forge/merge (now, or with auto), forge/approve,
- * forge/rerun, forge/log, forge/diff, forge/add-child and forge/blocked-by.
+ * forge/rerun, forge/log, forge/diff, forge/add-child, forge/blocked-by and forge/assign (#4403).
  */
 export type ForgeAction =
   | "comment"
@@ -4026,7 +4026,8 @@ export type ForgeAction =
   | "log"
   | "diff"
   | "addChild"
-  | "blockedBy";
+  | "blockedBy"
+  | "assign";
 
 /**
  * forge/add-child (#3271): add a child to an epic's plan: a new issue (title, with level story,
@@ -4048,6 +4049,16 @@ export interface ForgeAddChildRequest {
 export interface ForgeApproveRequest {
   node: LineageNode;
   sha: string;
+}
+
+/**
+ * forge/assign (#4403): people to assign to an issue or a pull request, and people to take off it,
+ * by their login on the forge. At most 10 of each at once.
+ */
+export interface ForgeAssignRequest {
+  node: LineageNode;
+  add?: string[];
+  remove?: string[];
 }
 
 /**
@@ -13995,6 +14006,7 @@ export interface Methods {
   "folders/undoGuardedChange": { params: GuardedChangeRequest; result: FolderSummary };
   "forge/add-child": { params: ForgeAddChildRequest; result: ForgeDone };
   "forge/approve": { params: ForgeApproveRequest; result: ForgeDone };
+  "forge/assign": { params: ForgeAssignRequest; result: ForgeDone };
   "forge/blocked-by": { params: ForgeBlockedByRequest; result: ForgeDone };
   "forge/boards": { params: ForgeBoardsRequest; result: ForgeBoards };
   "forge/close": { params: ForgeCloseRequest; result: ForgeDone };
@@ -14421,6 +14433,7 @@ export const MethodTarget = {
   "folders/undoGuardedChange": "host",
   "forge/add-child": "host",
   "forge/approve": "host",
+  "forge/assign": "host",
   "forge/blocked-by": "host",
   "forge/boards": "host",
   "forge/close": "host",
@@ -15095,6 +15108,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FoldersListRequest: { required: ["includeArchived"], optional: [] },
   ForgeAddChildRequest: { required: ["node"], optional: ["title", "level", "issue"] },
   ForgeApproveRequest: { required: ["node", "sha"], optional: [] },
+  ForgeAssignRequest: { required: ["node"], optional: ["add", "remove"] },
   ForgeBlockedByRequest: { required: ["node"], optional: ["add", "remove"] },
   ForgeBoards: { required: ["boards"], optional: [] },
   ForgeBoardsRequest: { required: [], optional: ["folder"] },

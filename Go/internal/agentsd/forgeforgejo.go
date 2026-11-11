@@ -31,6 +31,7 @@ type forgeForgejo interface {
 	ItemPage(ctx context.Context, repo string, number int, pr bool, before string) (forgejomcp.ItemDetail, error)
 	Comment(ctx context.Context, repo string, number int, body string) (string, error)
 	SetLabels(ctx context.Context, repo string, number int, add, remove []string) error
+	SetAssignees(ctx context.Context, repo string, number int, add, remove []string) error
 	SetState(ctx context.Context, repo string, number int, closed bool) error
 	RepoLabels(ctx context.Context, repo string) ([]string, map[string]string, error)
 	MergeMethods(ctx context.Context, repo string) ([]string, error)
@@ -135,8 +136,8 @@ func (forgejoForge) Images() forgeImageHost { return forgejoImages{} }
 func (forgejoForge) Caps() forgeCaps {
 	return forgeCaps{
 		Issues: true, PRs: true,
-		Issue: forgeActions{Comment: true, Label: true, Close: true, Reopen: true},
-		PR: forgeActions{Comment: true, Label: true, Close: true, Reopen: true, Merge: true, AutoMerge: true, Approve: true,
+		Issue: forgeActions{Comment: true, Label: true, Assign: true, Close: true, Reopen: true},
+		PR: forgeActions{Comment: true, Label: true, Assign: true, Close: true, Reopen: true, Merge: true, AutoMerge: true, Approve: true,
 			Diff: true},
 		LabelColors: true,
 		Avatars:     true,
@@ -377,6 +378,14 @@ func (g forgejoForge) SetLabels(ctx context.Context, r forgeRef, add, remove []s
 		return err
 	}
 	return fj.SetLabels(ctx, named, r.Number, add, remove)
+}
+
+func (g forgejoForge) SetAssignees(ctx context.Context, r forgeRef, add, remove []string) error {
+	fj, named, _, err := g.of(ctx, "forge/assign", r)
+	if err != nil {
+		return err
+	}
+	return fj.SetAssignees(ctx, named, r.Number, add, remove)
 }
 
 func (g forgejoForge) SetState(ctx context.Context, r forgeRef, closed bool, transition string) error {

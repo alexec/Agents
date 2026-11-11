@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
+	"slices"
 	"strings"
 )
 
@@ -33,6 +35,43 @@ func (g *RealGitLab) SetLabels(ctx context.Context, project string, number int, 
 	}
 	var out map[string]any
 	return g.send(ctx, http.MethodPut, fmt.Sprintf("projects/%s/%s/%d", pid(project), kindPath(mr), number), change, &out)
+}
+
+// SetAssignees assigns people to an issue or a merge request and takes others off it, by
+// username (#4403). GitLab sets the whole list by user id, so it reads the list there is and each
+// new person's id first. A username that GitLab does not know is an error.
+func (g *RealGitLab) SetAssignees(ctx context.Context, project string, number int, mr bool, add, remove []string) error {
+	path := fmt.Sprintf("projects/%s/%s/%d", pid(project), kindPath(mr), number)
+	var item struct {
+		Assignees []user `json:"assignees"`
+	}
+	if err := g.get(ctx, path, false, &item); err != nil {
+		return err
+	}
+	ids := []int{}
+	has := func(name string) bool {
+		return slices.ContainsFunc(item.Assignees, func(u user) bool { return strings.EqualFold(u.Username, name) })
+	}
+	for _, u := range item.Assignees {
+		if !slices.ContainsFunc(remove, func(name string) bool { return strings.EqualFold(u.Username, name) }) {
+			ids = append(ids, u.ID)
+		}
+	}
+	for _, name := range add {
+		if has(name) {
+			continue
+		}
+		var found []user
+		if err := g.get(ctx, "users?username="+url.QueryEscape(name), false, &found); err != nil {
+			return err
+		}
+		if len(found) == 0 {
+			return &GitLabError{Kind: NotFound, Message: "no GitLab user is called " + name}
+		}
+		ids = append(ids, found[0].ID)
+	}
+	var out map[string]any
+	return g.send(ctx, http.MethodPut, path, map[string]any{"assignee_ids": ids}, &out)
 }
 
 // SetState closes an issue or a merge request, or opens it again.

@@ -78,6 +78,11 @@ func (f *fakeForgeForgejo) SetLabels(_ context.Context, repo string, number int,
 	return nil
 }
 
+func (f *fakeForgeForgejo) SetAssignees(_ context.Context, repo string, number int, add, remove []string) error {
+	f.note(&f.wrote, fmt.Sprintf("assignees %s#%d +%v -%v", repo, number, add, remove))
+	return nil
+}
+
 func (f *fakeForgeForgejo) SetState(_ context.Context, repo string, number int, closed bool) error {
 	f.note(&f.wrote, fmt.Sprintf("state %s#%d closed=%v", repo, number, closed))
 	return nil

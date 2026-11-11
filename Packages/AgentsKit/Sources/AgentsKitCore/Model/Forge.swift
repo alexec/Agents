@@ -413,6 +413,20 @@ public extension DaemonAPI {
         }
     }
 
+    /// `forge/assign` (#4403): people to assign, and people to take off, by their login on the
+    /// forge; at most 10 of each. Offered where the item's `actions` has `assign`.
+    struct ForgeAssignRequest: Codable, Sendable, Hashable {
+        public var node: LineageNode
+        public var add: [String]?
+        public var remove: [String]?
+
+        public init(node: LineageNode, add: [String]? = nil, remove: [String]? = nil) {
+            self.node = node
+            self.add = add
+            self.remove = remove
+        }
+    }
+
     /// `forge/add-child` (#3271): a new child (`title`, with its `level`) or one that is there
     /// (`issue`: #12, owner/repo#12, its URL, or a key such as ENG-4), added to the epic `node`.
     struct ForgeAddChildRequest: Codable, Sendable, Hashable {
@@ -782,6 +796,8 @@ public extension DaemonAPI.Method {
     static let forgeRerun = "forge/rerun"
     /// `ForgeNodeRequest` → `ForgeLabels`, `ForgeLogRequest` → `ForgeLog`, `ForgeNodeRequest` → `ForgeDiff` (#3130).
     static let forgeLabels = "forge/labels"
+    /// `ForgeAssignRequest` → `ForgeDone` (#4403).
+    static let forgeAssign = "forge/assign"
     static let forgeLog = "forge/log"
     static let forgeDiff = "forge/diff"
     /// `ForgePlanRequest` → `ForgePlan`, `ForgeFeaturesRequest` → `ForgeFeatures` (#3267).

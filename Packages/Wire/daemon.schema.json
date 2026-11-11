@@ -9983,9 +9983,10 @@
         "log",
         "diff",
         "addChild",
-        "blockedBy"
+        "blockedBy",
+        "assign"
       ],
-      "description": "A write or a read that an item's page offers (#4329, #4361): forge/comment, forge/label, forge/close (a close, a reopen or a transition), forge/merge (now, or with auto), forge/approve, forge/rerun, forge/log, forge/diff, forge/add-child and forge/blocked-by."
+      "description": "A write or a read that an item's page offers (#4329, #4361): forge/comment, forge/label, forge/close (a close, a reopen or a transition), forge/merge (now, or with auto), forge/approve, forge/rerun, forge/log, forge/diff, forge/add-child, forge/blocked-by and forge/assign (#4403)."
     },
     "ForgeAddChildRequest": {
       "type": "object",
@@ -10023,6 +10024,31 @@
       "required": [
         "node",
         "sha"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeAssignRequest": {
+      "type": "object",
+      "description": "forge/assign (#4403): people to assign to an issue or a pull request, and people to take off it, by their login on the forge. At most 10 of each at once.",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "add": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "remove": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "node"
       ],
       "additionalProperties": false
     },

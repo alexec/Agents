@@ -101,3 +101,19 @@ func TestRequestWritesSetBodyAndUnassign(t *testing.T) {
 		t.Fatalf("asked:\n%q\nwant\n%q", g, want)
 	}
 }
+
+// #4403: Assign adds the logins on the issue's assignees; Unassign takes them off.
+func TestAssignAndUnassign(t *testing.T) {
+	g, got := restAPI(t)
+	ctx := context.Background()
+	if err := g.Assign(ctx, "o/r", 7, []string{"kim", "lee"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := g.Unassign(ctx, "o/r", 7, []string{"lee"}); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{`POST /repos/o/r/issues/7/assignees {"assignees":["kim","lee"]}`, `DELETE /repos/o/r/issues/7/assignees {"assignees":["lee"]}`}
+	if g := got(); !slices.Equal(g, want) {
+		t.Fatalf("requests:\n%q\nwant\n%q", g, want)
+	}
+}

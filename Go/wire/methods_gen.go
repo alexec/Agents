@@ -167,6 +167,7 @@ var CallFoldersUnarchive = Method[FolderRequest, FolderSummary]{"folders/unarchi
 var CallFoldersUndoGuardedChange = Method[GuardedChangeRequest, FolderSummary]{"folders/undoGuardedChange"}
 var CallForgeAddChild = Method[ForgeAddChildRequest, ForgeDone]{"forge/add-child"}
 var CallForgeApprove = Method[ForgeApproveRequest, ForgeDone]{"forge/approve"}
+var CallForgeAssign = Method[ForgeAssignRequest, ForgeDone]{"forge/assign"}
 var CallForgeBlockedBy = Method[ForgeBlockedByRequest, ForgeDone]{"forge/blocked-by"}
 var CallForgeBoards = Method[ForgeBoardsRequest, ForgeBoards]{"forge/boards"}
 var CallForgeClose = Method[ForgeCloseRequest, ForgeDone]{"forge/close"}
