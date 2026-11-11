@@ -439,24 +439,14 @@ export function cardRows(h: TimelineHit, lines: readonly TimelineLine[], timelin
 /** The epics with a line in `window`. */
 export const epicCount = (lines: readonly TimelineLine[], window: Interval) => new Set(overlapping(lines, window).map((l) => l.epic)).size;
 
+/** The window in words: "these 2 days". */
+const these: Record<TimelineRange, string> = { day: "these 24 hours", twoDays: "these 2 days", week: "these 7 days" };
+
 /** The title line above the plot (note 32): "Agents · 6 epics in these 2 days"; no project when a
  * menu names it. Its help is the forecast's backtest (Alex, 2026-11-10). */
 export function titleWords(project: string, epics: number, r: TimelineRange): string {
-  const these: Record<TimelineRange, string> = { day: "these 24 hours", twoDays: "these 2 days", week: "these 7 days" };
   const count = `${epics} epic${epics === 1 ? "" : "s"} in ${these[r]}`;
   return project ? `${project} · ${count}` : count;
-}
-
-/** What a screen reader reads, a row per line in time order (section 5): "Azure DevOps, 3 of 7
- * done, closes about 6:00 PM". */
-export function spoken(lines: readonly TimelineLine[], now: number): { line: TimelineLine; words: string }[] {
-  return [...lines].sort(byStart).map((line) => {
-    const end = line.how.how === "joined" ? `closed ${timeWords(line.end, now)}`
-      : line.how.how === "dropped" ? "closed as not planned"
-      : line.how.how === "forecast" ? `closes about ${timeWords(line.end, now)}`
-      : line.how.how === "waits" ? waitWords(line.how.count) : "open";
-    return { line, words: `${line.title}, ${line.done} of ${line.total} done, ${end}` };
-  });
 }
 
 /** Several machines' timelines of one project as one: each epic and release once. */
@@ -547,6 +537,40 @@ export function landed(before: WorkTimeline, after: WorkTimeline): string[] {
     .filter((c) => c.closedAt !== undefined && !was.has(c.item.node.ref) && known.has(c.item.node.ref)).map((c) => c.item.node.ref);
 }
 
-export const noEpics = "No epic has work in this time. An epic is drawn once one of its children starts.";
+/** A row of the list of epics (note 36): the Timeline under 700 px, and what a screen reader reads over it. */
+export interface EpicRow { line: TimelineLine; line2: string }
+
+/** The list of epics in the window (note 36), in the order they close: the forecast first (the soonest first), then
+ * those that wait for the person, then those still open, then those that joined (the latest first). Line 2: "closes
+ * about 5:00 PM · 3:00 PM–9:00 PM", "3 wait for you", "joined 9:40 AM". */
+export function epicRows(lines: readonly TimelineLine[], window: Interval, now: number): EpicRow[] {
+  const rank = (l: TimelineLine) => ({ forecast: 0, waits: 1, open: 2, joined: 3, dropped: 3 })[l.how.how];
+  const line2 = (l: TimelineLine): string => {
+    switch (l.how.how) {
+      case "forecast": return [`closes about ${timeWords(l.end, now)}`,
+        ...l.band ? [`${timeWords(l.band.start, now)}–${timeWords(l.band.end, now)}`] : []].join(" · ");
+      case "waits": return waitWords(l.how.count);
+      case "open": return "open";
+      case "joined": return `joined ${timeWords(l.end, now)}`;
+      case "dropped": return "closed as not planned";
+    }
+  };
+  return overlapping(lines, window)
+    .sort((a, b) => rank(a) - rank(b) || (rank(a) === 3 ? b.end - a.end : a.end - b.end) || a.title.localeCompare(b.title))
+    .map((line) => ({ line, line2: line2(line) }));
+}
+
+/** When the last line before `at` joined, for the empty card (S11); undefined when the read has none. */
+export function lastJoined(timeline: WorkTimeline, at: number): number | undefined {
+  const joined = timeline.epics.flatMap((e) => e.segments).flatMap((s) => { const c = ms(s.closedAt); return c !== undefined && c < at ? [c] : []; });
+  return joined.length > 0 ? Math.max(...joined) : undefined;
+}
+
+/** The empty card (S11): "No epic in these 2 days", and "The last one joined 4 d ago." when known. */
+export const noEpicsWords = (r: TimelineRange) => `No epic in ${these[r]}`;
+export const lastJoinedWords = (t: number, now: number) => `The last one joined ${agoWords(t, now)}.`;
+export const showTheWeek = "Show the week";
+/** S12: no project to draw. */
+export const noProjectTitle = "No project to draw";
 export const noProject = "Timeline shows a project’s epics. Add a folder to a project to see them.";
 export const noMachine = "No machine draws the timeline yet. Update Agents on a machine to see it.";
