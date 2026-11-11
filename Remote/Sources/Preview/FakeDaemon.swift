@@ -63,6 +63,10 @@ private actor FakeState {
             case DaemonAPI.Method.agentsList:
                 return .success(try JSONValue.encoding(agents))
 
+            case DaemonAPI.Method.workflowsList:
+                let request = try? params?.decode(DaemonAPI.WorkflowsListRequest.self)
+                return .success(try JSONValue.encoding(Canned.workflows(in: request?.folder)))
+
             case DaemonAPI.Method.foldersList:
                 return .success(try JSONValue.encoding(Canned.folders(for: agents)))
 
