@@ -180,7 +180,7 @@ func (d *Daemon) processesState(ctx context.Context) wire.ProcessesState {
 		out.Processes = append(out.Processes, u)
 	}
 
-	out.Machine = machineUsage(ctx, beforeBusy, beforeAll, busy, all)
+	out.Machine = d.withCapacity(machineUsage(ctx, beforeBusy, beforeAll, busy, all))
 	return out
 }
 
@@ -224,7 +224,7 @@ func (d *Daemon) machineUsageState(ctx context.Context) wire.MachineUsageState {
 	d.machineBusy, d.machineAll, d.machineAt = busy, all, time.Now()
 	d.procMu.Unlock()
 
-	out := wire.MachineUsageState{Machine: machineUsage(ctx, beforeBusy, beforeAll, busy, all)}
+	out := wire.MachineUsageState{Machine: d.withCapacity(machineUsage(ctx, beforeBusy, beforeAll, busy, all))}
 	d.diskMu.Lock()
 	out.Disks = append([]wire.DiskAlarm{}, d.diskVolumes...)
 	d.diskMu.Unlock()

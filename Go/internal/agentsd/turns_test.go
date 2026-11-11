@@ -44,6 +44,8 @@ func TestMain(m *testing.M) {
 	releaseLayerHere = false
 	// The machine's memory pressure does not move a test's warm pool (#4514).
 	pressureNow = func() string { return "" }
+	// Nor does the load of the machine a test runs on raise machine.busy (#4578).
+	capacitySampler = func(context.Context) capacitySample { return capacitySample{} }
 	// No test asks the person's gh about merged pull requests unless it says so.
 	findGH = func() string { return "" }
 	// Nor asks the forge for an issue's parent (#3582): a test sets issueLookup.
