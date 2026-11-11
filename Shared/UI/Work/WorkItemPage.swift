@@ -29,6 +29,8 @@ struct WorkItemPage: View {
     @State private var olderLoading = false
     @State private var estimate: DaemonAPI.LineageEstimate?
     @State private var estimateRange = false
+    @State private var forecast: DaemonAPI.LineageForecast?
+    @State private var forecastHelp = false
     @State private var pipeline: [Pipeline.Step] = []
     @State private var lineage: (cost: DaemonAPI.LineageCostRollup?, sessions: [UUID])?
     @State private var said: (words: String, failed: Bool)?
@@ -123,6 +125,7 @@ struct WorkItemPage: View {
         #endif
         .workTask(id: asked) { await loadForge() }
         .workTask(id: estimateAsk) { await loadEstimate() }
+        .workTask(id: forecastAsk) { await loadForecast() }
         .workTask(id: lineageAsk) { await loadLineage() }
         #if os(macOS)
         .workTask(id: pipelineAsk) { await loadPipeline() }
@@ -666,7 +669,9 @@ struct WorkItemPage: View {
     private func lineageSection(_ item: DaemonAPI.ForgeItem) -> some View {
         let sessions = lineage?.sessions ?? []
         let cost = lineage?.cost.flatMap { $0.total.cost.values.contains { $0 > 0 } ? ReportValueWords.cost($0.total) : nil }
-        let shows = !sessions.isEmpty || cost != nil || estimate.map { item.state == "open" ? EstimateWords.shows($0) : EstimateWords.actualWords($0) != nil } == true
+        let forecastLines = forecastLines(item)
+        let shows = !sessions.isEmpty || cost != nil || !forecastLines.isEmpty
+            || estimate.map { item.state == "open" ? EstimateWords.shows($0) : EstimateWords.actualWords($0) != nil } == true
         #if os(macOS)
         let any = shows || !pipeline.isEmpty
         #else
@@ -687,6 +692,7 @@ struct WorkItemPage: View {
                         .textSelection(.enabled)
                     #endif
                 }
+                if !forecastLines.isEmpty { forecastLine(forecastLines, item: item) }
                 #if os(macOS)
                 if !pipeline.isEmpty { pipelineLine }
                 #endif
@@ -759,6 +765,14 @@ struct WorkItemPage: View {
         return LineageAsk(host: lineageHost, asked: asked)
     }
 
+    /// An epic's forecast (#4527), from the machine that keeps its links: when an open one lands and
+    /// what it costs to complete, and a closed one's first forecast against when it landed. A
+    /// standing epic never lands (#3662).
+    private var forecastAsk: LineageAsk? {
+        guard let item, item.node.kind == "issue", isEpic, item.standing != true else { return nil }
+        return LineageAsk(host: lineageHost, asked: asked)
+    }
+
     /// The cost and the sessions of an issue or a pull request, from the machine that keeps its links.
     private var lineageAsk: LineageAsk? {
         guard detail != nil, [.issue, .pr].contains(place.kind), !node.ref.isEmpty else { return nil }
@@ -788,6 +802,34 @@ struct WorkItemPage: View {
         }
         #else
         line.textSelection(.enabled).help(range ?? "")
+        #endif
+    }
+
+    /// An open epic's "Likely lands by …" and "To complete: …", or a closed one's first forecast
+    /// against when it landed (#4527).
+    private func forecastLines(_ item: DaemonAPI.ForgeItem) -> [String] {
+        guard let forecast, forecastAsk != nil else { return [] }
+        if item.state == "open" {
+            return [ForecastWords.landsLine(forecast), ForecastWords.toCompleteLine(forecast)].compactMap { $0 }
+        }
+        return [ForecastWords.keptLine(forecast, landed: item.closedAt)].compactMap { $0 }
+    }
+
+    /// The forecast's lines under the estimate. The assumptions are their help on the Mac; on the
+    /// Remote a tap shows them under the lines, as the estimate's range does.
+    @ViewBuilder
+    private func forecastLine(_ lines: [String], item: DaemonAPI.ForgeItem) -> some View {
+        let help = forecast.flatMap { item.state == "open" ? ForecastWords.help($0) : ForecastWords.keptHelp($0) }
+        let text = Text(lines.joined(separator: "\n"))
+            .appText(.fine).foregroundStyle(.secondary).monospacedDigit()
+            .accessibilityHint(help ?? "")
+        #if os(iOS)
+        text.onTapGesture { if help != nil { forecastHelp.toggle() } }
+        if forecastHelp, let help {
+            Text(help).appText(.fine).foregroundStyle(.secondary).monospacedDigit()
+        }
+        #else
+        text.textSelection(.enabled).help(help ?? "")
         #endif
     }
 
@@ -913,6 +955,15 @@ struct WorkItemPage: View {
         let got = await model.lineageEstimate(node, on: host)
         guard estimateAsk == mine else { return }
         estimate = got
+    }
+
+    private func loadForecast() async {
+        let mine = forecastAsk
+        forecast = nil
+        guard let mine, let host = mine.host else { return }
+        let got = await model.lineageForecast(node, on: host)
+        guard forecastAsk == mine else { return }
+        forecast = got
     }
 }
 

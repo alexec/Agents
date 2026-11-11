@@ -6,7 +6,7 @@ import { effect, useSignal } from "@preact/signals";
 import { Fragment, type ComponentChildren } from "preact";
 import { useEffect, useMemo, useRef } from "preact/hooks";
 import type {
-  ForgeCloseRequest, ForgeComment, ForgeDone, ForgeItemDetail, ForgeLabel, ForgeLabelRequest, LineageCostRollup, LineageEstimate,
+  ForgeCloseRequest, ForgeComment, ForgeDone, ForgeItemDetail, ForgeLabel, ForgeLabelRequest, LineageCostRollup, LineageEstimate, LineageForecast,
 } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { Capability } from "../protocol/capabilities.generated";
@@ -26,6 +26,7 @@ import { lineageUrl, sessionHost } from "../model/lineage";
 import { type PipelineStep, pipelineDepth, pipelineSteps } from "../model/pipeline";
 import { costWords, nodeName, spent } from "../model/value";
 import { actualWords, estimateLine, estimateRangeWords, estimateSpentWords, showsEstimate } from "../model/estimate";
+import { forecastHelp, keptHelp, keptLine, landsLine, toCompleteLine } from "../model/forecast";
 import { offerStart } from "./NewAgent";
 import { ago } from "../model/connectorSetup";
 import { fromWireDate } from "../protocol/dates";
@@ -290,6 +291,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
   const reading = useSignal(false);
   const older = useSignal(false);
   const estimate = useSignal<LineageEstimate | null>(null);
+  const forecast = useSignal<LineageForecast | null>(null);
   const pipeline = useSignal<PipelineStep[]>([]);
   const lineageGot = useSignal<{ cost?: LineageCostRollup | undefined; sessions: string[] } | null>(null);
   const said = useSignal<{ words: string; failed: boolean } | null>(null);
@@ -345,6 +347,20 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
     return () => { current = false; };
   }, [kind, ref, lineageHost, isIssue, isOpen, asked.value]);
   const actual = estimate.value && !isOpen ? actualWords(estimate.value) : undefined;
+  // An epic's forecast (#4527): when an open one lands and what it costs to complete, and a closed one's first
+  // forecast against when it landed. A standing epic never lands (#3662).
+  const forecasts = isIssue && !!detail.value && hasPlan(detail.value.got.item) && detail.value.got.item.standing !== true;
+  useEffect(() => {
+    let current = true;
+    forecast.value = null;
+    if (!lineageHost || !forecasts) return;
+    void store.link.call("lineage/forecast", { node }, lineageHost).then((r) => { if (current) forecast.value = r; }, () => {});
+    return () => { current = false; };
+  }, [kind, ref, lineageHost, forecasts, isOpen, asked.value]);
+  const f = forecasts ? forecast.value : null;
+  const forecastLines = !f ? [] : isOpen ? [landsLine(f), toCompleteLine(f)].filter((l) => l !== undefined)
+    : [keptLine(f, detail.value?.got.item.closedAt)].filter((l) => l !== undefined);
+  const forecastTitle = f ? isOpen ? forecastHelp(f) : keptHelp(f) : undefined;
   // The outer loop in reach (#3588): its releases, CI runs, deploys and health, and what it came from.
   useEffect(() => {
     let current = true;
@@ -472,7 +488,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
   const counts = lineageCountWords(cost, sessions.length);
   const showsEst = estimate.value && isOpen && showsEstimate(estimate.value);
   const spentWords = estimate.value ? estimateSpentWords(estimate.value) : undefined;
-  const hasLineage = counts !== "" || showsEst || actual !== undefined || pipeline.value.length > 0;
+  const hasLineage = counts !== "" || showsEst || actual !== undefined || forecastLines.length > 0 || pipeline.value.length > 0;
   const session = (id: string) => {
     const h = sessionHost(store.agents.value, id);
     const chat = h ? store.agent(h, id) : undefined;
@@ -678,6 +694,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
                   {[estimateLine(estimate.value), ...spentWords ? [spentWords] : []].join(" · ")}</span>
               )}
               {!isOpen && actual && <span class="quiet small">{actual}</span>}
+              {forecastLines.map((line) => <span key={line} class="quiet small work-forecast" title={forecastTitle}>{line}</span>)}
               {pipeline.value.length > 0 && <PipelineLine steps={pipeline.value} />}
             </SideSection>
           )}
