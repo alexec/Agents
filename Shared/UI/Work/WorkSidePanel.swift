@@ -88,13 +88,14 @@ struct WorkSideNone: View {
     var body: some View { Text(words).foregroundStyle(.secondary) }
 }
 
-/// A person on the side panel: the avatar and the login.
+/// A person on the side panel: the avatar (the forge's picture where it gives one) and the login.
 struct WorkSidePerson: View {
     let login: String
+    var avatar: String?
 
     var body: some View {
         HStack(spacing: 6) {
-            WorkAvatar(login: login)
+            WorkAvatar(login: login, url: avatar)
             Text(login).lineLimit(1)
         }
     }

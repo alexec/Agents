@@ -43,7 +43,7 @@ struct WorkCommentView<Body: View>: View {
             .padding(.bottom, 14)
         } else {
             WorkTimelineEntry {
-                WorkAvatar(login: comment.author, side: WorkTimelineEntry<EmptyView, EmptyView>.column)
+                WorkAvatar(login: comment.author, url: comment.avatar, side: WorkTimelineEntry<EmptyView, EmptyView>.column)
             } content: {
                 VStack(alignment: .leading, spacing: 6) {
                     header.padding(.top, 5)
@@ -55,7 +55,7 @@ struct WorkCommentView<Body: View>: View {
 
     private var header: some View {
         HStack(spacing: 6) {
-            if compact { WorkAvatar(login: comment.author, side: 20) }
+            if compact { WorkAvatar(login: comment.author, url: comment.avatar, side: 20) }
             Text(comment.author).appText(.fine).fontWeight(.semibold)
             if comment.bot == true { WorkBotCapsule() }
             Text(words ?? WorkLook.commentedWords(comment.at))
@@ -85,11 +85,23 @@ struct WorkBotCapsule: View {
 }
 
 /// An event on the timeline (a label, a state change, a linked pull request): an icon on the line
-/// in place of the avatar, a small grey line, no box. The wire gives the events with #4373.
+/// in place of the avatar, a small grey line, no box. The forge's own events come with #4373.
 struct WorkTimelineEvent: View {
     let symbol: String
     let words: String
     var at: Date?
+
+    /// The icon of a forge's event; a close takes the issue's reason (#4365).
+    static func symbol(_ e: DaemonAPI.ForgeEvent, stateReason: String?) -> String {
+        switch e.kind {
+        case "labeled", "unlabeled": "tag"
+        case "assigned", "unassigned": "person"
+        case "closed": stateReason == "not_planned" ? "slash.circle" : "checkmark.circle"
+        case "reopened": "arrow.uturn.backward.circle"
+        case "referenced": "arrow.turn.down.right"
+        default: "circle"
+        }
+    }
 
     var body: some View {
         WorkTimelineEntry {
