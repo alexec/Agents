@@ -6,10 +6,9 @@ description: Find out where this folder's recent agent sessions spent their time
 # Dev speed check
 
 Lanes spend their time in five places: the model's own work (reading, thinking,
-writing), tools (builds, tests, lint, walks, `gh`, `git`), waits inside a turn
-(`wait_for_event` holds a turn for up to 45 s, a question card holds it until the person
-answers), the line for the `build` lease, and the time between turns (CI, merges,
-reviews, timers). This skill measures each from the app's own records and removes the
+writing), tools (builds, tests, lint, walks, `gh`, `git`), waits (from the
+`wait_for_event`, `check_again` or question call to the wake; not running time), the
+line for the `build` lease, and the time between turns (CI, merges, reviews, timers). This skill measures each from the app's own records and removes the
 largest cost that a change in this repo can remove.
 
 The `ci-speed` skill owns CI itself (`.github/workflows/ci.yml`). This skill owns what
@@ -53,13 +52,21 @@ to `ci-speed`; do not change `ci.yml` here.
    D=~/.agents/reviews/dev-speed; mkdir -p "$D"; T=$(date +%F)
    S=.agents/skills/dev-speed/time-spent.py
    python3 -I "$S" --days 7 --top 20 > "$D/$T.md"
-   python3 -I "$S" --days 7 --top 50 --json > "$D/$T.json"
+   python3 -I "$S" --days 7 --top 50 --json --forge > "$D/$T.json"
    ```
 
    It reads every session of this folder (and its worktrees) active in the window, in
-   about 5 seconds, and writes:
-   - **the totals:** running time, split into tool time and model time; how much of the
-     tool time is waits that hold a turn open (the `wait:` rows); the time between turns;
+   about 10 seconds (with `--forge`, about a minute: it asks `gh` about each PR a lost
+   wait could name), and writes:
+   - **the totals:** running time, split into tool time and model time; the in-call
+     part of waits; the waits, call to wake; the time between turns. Waits are not
+     running time: the daemon holds a `wait_for_event` call for up to 45 s, and then the
+     wait goes on with the turn ended. So the in-call part of a wait is a line of its
+     own, not in the running or tool totals;
+   - **waits, call to wake,** by what woke the session: the count, median, p90 and
+     total from the wait call to the wake, and the share answered inside the call.
+     With `--forge`, the **lost waits:** waits on `pr.merged` or `pr.closed` that timed
+     out though their PR merged or closed before the time-out (#4716);
    - **tool time by category,** with calls, total, share of running time, median, p90
      and failures;
    - **between turns, by what woke the session:** `event: checks.passed`,
@@ -110,10 +117,13 @@ Look first for these causes, in this order. Each names the place a fix goes.
    error each time (a wrong argument in a skill's example, a missing label). The fix is
    the cause, or the skill's text that leads lanes into the error. A flaky test goes by
    `AGENTS.md` (`.flakyUnderLoad` and an issue).
-6. **Waits inside a turn.** `wait: wait_for_event` calls × their median is time a turn
-   is held open for nothing; many calls in one session mean a lane that waits on one
-   event at a time where one call on several would do. `wait: question to the person`
-   is Alex's time: a question that "Questions that already have an answer" in
+6. **Waits.** A wait costs no running time, and its in-call part (up to 45 s) is not a
+   turn held open for nothing: do not chase it (#4711). Look at the whole waits
+   instead. Lost waits are a cause: the PR merged or closed, and the lane slept until
+   its time-out; the fix is the event the wait missed, in the server or the skill
+   (#4716). Many waits in one session on one event at a time, where one call on
+   several would do, are a cause. `question answered` and `person or agent message`
+   are Alex's time: a question that "Questions that already have an answer" in
    `AGENTS.md` answers is a cause; propose a line there for one that comes back.
 7. **Model time.** A session whose model time is far above its tool time, or whose
    tokens are high, usually read too much: whole files where `grep` or a range would
