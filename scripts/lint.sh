@@ -49,6 +49,7 @@ GOVULNCHECK=1.9.0
 BIOME=2.5.15
 SWIFTLINT=0.65.1
 JSCPD=5.4.2
+ZSH=5.9
 CACHE=${AGENTS_BUILD_CACHE:-$HOME/Library/Caches/Agents-build}
 
 REQUIRED=" shell zsh checks "
@@ -238,9 +239,16 @@ run_shell() {
 
 run_zsh() {
 	local f status=0
-	command -v zsh >/dev/null 2>&1 || { echo "lint.sh: no zsh on the PATH" >&2; return 1; }
-	for f in $(tracked zsh); do zsh -n "$f" 2>&1 || status=1; done
-	return $status
+	if command -v zsh >/dev/null 2>&1; then
+		for f in $(tracked zsh); do zsh -n "$f" 2>&1 || status=1; done
+		return $status
+	fi
+	# CI's Linux runner has no zsh: the pinned zsh container there. A Mac has zsh.
+	[ "$(uname -s)" = Linux ] && command -v docker >/dev/null 2>&1 ||
+		{ echo "lint.sh: no zsh on the PATH" >&2; return 1; }
+	# shellcheck disable=SC2016,SC2046 # $f is the container's; one path per line, none with spaces
+	docker run --rm -v "$root":/repo -w /repo "zshusers/zsh:$ZSH" \
+		zsh -c 'rc=0; for f in "$@"; do zsh -n "$f" || rc=1; done; exit $rc' zsh $(tracked zsh)
 }
 
 run_python() {
