@@ -139,6 +139,8 @@ public enum DaemonAPI {
         /// The sessions on an issue, its sub-issues and their PRs, for a `#<n>` search (#3899).
         public static let lineageSessions = "lineage/sessions"
         public static let lineageCost = "lineage/cost"
+        /// A release's Lineage panel on its Work page (#4427): `LineageNodeRequest` → `LineageFigures`.
+        public static let lineageFigures = "lineage/figures"
         /// What an issue or an epic will probably cost and take, from past work (#3559, #3560).
         public static let lineageEstimate = "lineage/estimate"
         public static let simulatorsList = "simulators/list"

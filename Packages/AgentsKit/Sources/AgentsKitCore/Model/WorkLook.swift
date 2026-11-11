@@ -107,7 +107,10 @@ public enum WorkLook {
         if row.draft, row.state == "open" { parts.append("Draft") }
         if let status = row.status, !status.isEmpty { parts.append(status) }
         let age = ageWords(now.timeIntervalSince(row.updated))
-        if compact {
+        if row.node.kind == "release" {
+            // Lineage's links to a release are at its tag's commit time (#4421).
+            parts.append(WorkReleaseLook.releasedWords(row.updated, compact: compact, now: now))
+        } else if compact {
             parts.append(age)
             if let author = row.author { parts.append(author) }
         } else {
@@ -311,6 +314,7 @@ public enum WorkLook {
     public static func emptyTitle(_ kind: WorkList.Kind, state: WorkList.State, filtered: Bool) -> String {
         let noun = kind.title.lowercased()
         if filtered { return "No \(noun) match" }
+        if kind == .release { return "No releases yet" }
         guard kind.fromForge, state != .all else { return "No \(noun)" }
         return "No \(state.rawValue) \(noun)"
     }

@@ -98,6 +98,42 @@ public extension DaemonAPI {
         }
     }
 
+    /// `lineage/figures` (#4427): a release's Lineage panel, from this machine's totals. `cost` is
+    /// its rollup's total; `sessions` the sessions on it and its parts, each once, of which
+    /// `running` run now; `runtimes` those this machine has, the most sessions first;
+    /// `leadTimeSeconds` from the first work on its parts to its tag.
+    struct LineageFigures: Codable, Sendable, Hashable {
+        public var node: LineageNode
+        public var cost: LineageCost
+        public var sessions: Int
+        public var running: Int
+        public var runtimes: [LineageRuntimeCount]
+        public var leadTimeSeconds: Double?
+        public var limited: Bool?
+
+        public init(node: LineageNode, cost: LineageCost = .init(), sessions: Int = 0, running: Int = 0,
+                    runtimes: [LineageRuntimeCount] = [], leadTimeSeconds: Double? = nil, limited: Bool? = nil) {
+            self.node = node
+            self.cost = cost
+            self.sessions = sessions
+            self.running = running
+            self.runtimes = runtimes
+            self.leadTimeSeconds = leadTimeSeconds
+            self.limited = limited
+        }
+    }
+
+    /// A runtime of `lineage/figures`' sessions, and how many of them it ran (#4427).
+    struct LineageRuntimeCount: Codable, Sendable, Hashable {
+        public var runtimeID: String
+        public var sessions: Int
+
+        public init(runtimeID: String, sessions: Int) {
+            self.runtimeID = runtimeID
+            self.sessions = sessions
+        }
+    }
+
     /// A node's title, state and labels from its connector (#3089), resolved and cached on the
     /// daemon: `github:alexec/Agents#12` becomes its real title, not a guess from the ref.
     /// `state` is open, closed or merged (a pull request's; an issue's is open or closed); nil
