@@ -474,6 +474,119 @@ func TestAWaitOnAServersEvent(t *testing.T) {
 	})
 }
 
+// #4716: a pull request that merged in the seconds between two waits is not lost. The next
+// wait's subscription goes on from the last one's cursor, so its first poll raises what
+// came since; and a server's event raised while no wait was open answers the next wait at
+// once. What woke the agent never wakes it again.
+func TestAWaitLooksBackForAServersEventItMissed(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	ci := newEventsServer(t)
+	a := seeded(t, d, t.TempDir(), nil)
+	m := appClient(t, d, a.ID)
+	m.post("initialize", map[string]any{}, 1)
+	serverHome(t, d, ci.URL)
+	quickPolls(d)
+	d.StartMCPEvents()
+	args := map[string]any{"events": "pr.merged", "where": map[string]any{"repo": "alexec/Agents", "pr": 5}, "until_minutes": 10}
+	wait := func(id int) chan string {
+		answered := make(chan string, 1)
+		go func() {
+			text, _ := m.tool(id, "wait_for_event", args)
+			answered <- text
+		}()
+		return answered
+	}
+	heard := func(answered chan string, position int64) {
+		t.Helper()
+		select {
+		case text := <-answered:
+			if !strings.Contains(text, "pr.merged happened at ") || position > 0 && !strings.Contains(text, fmt.Sprintf("(position %d)", position)) {
+				t.Fatal(text)
+			}
+		case <-time.After(10 * time.Second):
+			t.Fatal("the wait was never answered")
+		}
+	}
+	gone := func() {
+		t.Helper()
+		waitFor(t, "the subscription gone", func() bool {
+			d.mcpEvMu.Lock()
+			defer d.mcpEvMu.Unlock()
+			return len(d.mcpSubs) == 0
+		})
+	}
+	raised := func(id string) *wire.Event {
+		d.eventMu.Lock()
+		defer d.eventMu.Unlock()
+		for _, e := range d.eventList {
+			if e.Details["mcp_event_id"] == id {
+				c := copyEvent(e)
+				return &c
+			}
+		}
+		return nil
+	}
+
+	first := wait(1)
+	waitFor(t, "the first poll", func() bool { return ci.polled("c1") })
+	ci.mu.Lock()
+	ci.queued = []map[string]any{{"eventId": "w1", "name": "pr.merged", "data": map[string]any{}}}
+	ci.mu.Unlock()
+	heard(first, 0)
+	gone()
+
+	// It merged while nothing was subscribed: the next wait's first poll is from cursor c2.
+	ci.mu.Lock()
+	ci.byCursor["c2"] = []map[string]any{{"eventId": "w2", "name": "pr.merged", "data": map[string]any{}}}
+	ci.mu.Unlock()
+	heard(wait(2), 0)
+	ci.mu.Lock()
+	fromNow := 0
+	for _, c := range ci.polls {
+		if c == "" {
+			fromNow++
+		}
+	}
+	ci.mu.Unlock()
+	if fromNow != 1 {
+		t.Fatalf("polls %v: the second wait started from now, not from the cursor", ci.polls)
+	}
+	gone()
+
+	// Raised while no wait was open, as the last poll of the wait before can: the next wait
+	// is answered by it at once.
+	w2 := raised("w2")
+	if w2 == nil {
+		t.Fatal("w2 was not raised")
+	}
+	details := map[string]string{}
+	for k, v := range w2.Details {
+		details[k] = v
+	}
+	details["mcp_event_id"] = "w3"
+	w3 := d.raise(wire.EventDraft{Name: "pr.merged", At: now(), Scope: w2.Scope, Sentence: w2.Sentence, Details: details})
+	heard(wait(3), w3.Position)
+
+	// Nothing new since: the next wait waits.
+	fourth := wait(4)
+	waitFor(t, "the fourth wait on the record", func() bool {
+		w := d.Store.Agent(a.ID).EventWait
+		return w != nil && w.Ending == nil
+	})
+	time.Sleep(200 * time.Millisecond)
+	select {
+	case text := <-fourth:
+		t.Fatalf("answered by what it was told: %s", text)
+	default:
+	}
+	if text, _ := m.tool(5, "cancel_wait", nil); !strings.HasPrefix(text, "Stopped waiting for pr.merged") {
+		t.Fatal(text)
+	}
+	<-fourth
+	gone()
+}
+
 // #3797: a wait on a server's event about one PR names it, or sets any: true, when the
 // server offers any; one that names nothing is refused with the keys that would.
 func TestAWaitOnAServersEventNamesWhatItWaitsFor(t *testing.T) {
