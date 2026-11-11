@@ -462,6 +462,8 @@ export interface AgentMachinesMachine {
   host?: string;
   hostState?: string;
   cost?: string;
+  /** Why it failed, on a make that failed (#4706). */
+  reason?: string;
 }
 
 export interface AgentMachinesProvider {
@@ -15024,7 +15026,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AgentConfigFiles: { required: ["files"], optional: ["updated"] },
   AgentMachines: { required: ["providers"], optional: ["hosts"] },
   AgentMachinesHost: { required: ["name", "state"], optional: [] },
-  AgentMachinesMachine: { required: ["id", "name", "state"], optional: ["host", "hostState", "cost"] },
+  AgentMachinesMachine: { required: ["id", "name", "state"], optional: ["host", "hostState", "cost", "reason"] },
   AgentMachinesProvider: { required: ["id", "name", "canMake", "canDelete", "workspaces"], optional: ["options"] },
   AgentRemovedNotification: { required: ["agentID"], optional: [] },
   AgentRequest: { required: ["agentID"], optional: [] },

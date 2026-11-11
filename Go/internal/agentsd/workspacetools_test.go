@@ -229,3 +229,18 @@ func TestAYesAfterTheHoldStillMakesTheMachine(t *testing.T) {
 		t.Fatalf("%v", got)
 	}
 }
+
+// A make that failed says why in list_machines (#4706), not that it is no host.
+func TestAFailedMakeSaysWhyInListMachines(t *testing.T) {
+	listed := wire.AgentMachines{Providers: []wire.AgentMachinesProvider{{ID: "cs", Name: "GitHub Codespaces", CanMake: true,
+		Workspaces: []wire.AgentMachinesMachine{
+			{ID: "failed-machine-21", Name: "machine-21", State: "failed", Reason: new("GitHub said 403: Resource not accessible by integration.")},
+			{ID: "c1", Name: "machine-12", State: "stopped"}}}}}
+	note := workspacesNote(listed)
+	if !strings.Contains(note, "  - machine-21: failed — GitHub said 403: Resource not accessible by integration.\n") {
+		t.Errorf("%s", note)
+	}
+	if !strings.Contains(note, "  - machine-12: stopped — not a host") {
+		t.Errorf("%s", note)
+	}
+}

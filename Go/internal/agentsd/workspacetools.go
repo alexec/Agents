@@ -372,6 +372,10 @@ func workspacesNote(listed wire.AgentMachines) string {
 		}
 		for _, w := range p.Workspaces {
 			host := " — not a host"
+			// A make that failed says why (#4706), not that it is no host.
+			if w.Reason != nil && *w.Reason != "" {
+				host = " — " + *w.Reason
+			}
 			if w.Host != nil {
 				state := "unknown"
 				if w.HostState != nil {

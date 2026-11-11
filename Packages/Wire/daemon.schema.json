@@ -837,6 +837,10 @@
         },
         "cost": {
           "type": "string"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Why it failed, on a make that failed (#4706)."
         }
       },
       "required": [

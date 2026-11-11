@@ -64,14 +64,17 @@ public extension DaemonAPI {
             public var host: String?
             public var hostState: String?
             public var cost: String?
+            /// Why it failed, on a make that failed (#4706).
+            public var reason: String?
             public init(id: String, name: String, state: String, host: String? = nil, hostState: String? = nil,
-                        cost: String? = nil) {
+                        cost: String? = nil, reason: String? = nil) {
                 self.id = id
                 self.name = name
                 self.state = state
                 self.host = host
                 self.hostState = hostState
                 self.cost = cost
+                self.reason = reason
             }
         }
 

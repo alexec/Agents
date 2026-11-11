@@ -431,6 +431,9 @@ type AgentMachinesMachine struct {
 	HostState *string `json:"hostState,omitzero"`
 
 	Cost *string `json:"cost,omitzero"`
+
+	// Why it failed, on a make that failed (#4706).
+	Reason *string `json:"reason,omitzero"`
 }
 
 type AgentMachinesProvider struct {
