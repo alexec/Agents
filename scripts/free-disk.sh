@@ -7,10 +7,29 @@
 #   free-disk.sh chromes [--hours N]   end leaked headless Chromes, then their clones
 #   free-disk.sh xcode                 older iOS DeviceSupport builds, unavailable simulators
 #   free-disk.sh deriveddata [--dry-run]  Xcode DerivedData of worktrees that are gone
+#   free-disk.sh worktrees [--dry-run] [--committed-hours N] [--uncommitted-hours N]
+#                                      worktrees nobody has changed for a while
+#   free-disk.sh coredevice [--dry-run]   the app install deltas CoreDevice keeps
 #
-# status: the target is 25% of the disk (AGENTS_FREE_TARGET_PCT moves it), above the 20% line
-# machine.disk_low fires at, so a run ends past the line and not on it. It exits 0 when
-# free space is at the target or over it, and 1 when it is under.
+# status: the target is 20% of the disk (AGENTS_FREE_TARGET_PCT moves it; #4699), twice
+# the 10% line machine.disk_low fires at, so a run ends well past the line and not on it.
+# It exits 0 when free space is at the target or over it, and 1 when it is under.
+#
+# worktrees: the worktrees under <main checkout>/.agents/worktrees that nobody has changed
+# for a while (Alex, 2026-11-11, #4699). It needs no session list, so a person can run it.
+# The last change is the newest file's mtime, leaving out .git and build output (build,
+# .build, DerivedData, node_modules). A worktree goes, with `git worktree remove --force`,
+# when one of these is true:
+#   - all its work is committed, and nothing changed for N hours (--committed-hours, 4);
+#   - it has uncommitted work, and nothing changed for N hours (--uncommitted-hours, 8).
+#     That work is lost: --force removes it.
+# It keeps a worktree any process has as its working folder, a detached HEAD with commits
+# that are on no branch, a locked one, and anything that is not a linked worktree of the
+# main checkout. The branch stays, with every commit. --dry-run says what it would remove.
+#
+# coredevice: CoreDevice keeps a delta of each app it installs on a device
+# (AppInstallationBinaryDeltas, 15 GB here on 2026-11-11), so the next install sends only
+# what changed. It removes them when no devicectl runs; the next install sends the whole app.
 #
 # chromes: a walk's Chrome (Web/test/walk/cdp.mjs) is headless, with a throwaway profile
 # under /tmp. One that a walk left keeps running, and a running Chrome keeps the APFS
@@ -43,7 +62,7 @@ die() { echo "free-disk.sh: $*" >&2; exit 1; }
 gb() { awk -v k="$1" 'BEGIN { printf "%.1f", k / 1048576 }'; }
 
 status() {
-	local pct=${AGENTS_FREE_TARGET_PCT:-25} line size avail target
+	local pct=${AGENTS_FREE_TARGET_PCT:-20} line size avail target
 	line=$(df -k "$HOME" | tail -1)
 	size=$(echo "$line" | awk '{print $2}')
 	avail=$(echo "$line" | awk '{print $4}')
@@ -96,7 +115,7 @@ chromes() {
 	# Every clone any process has a file open in: a running Chrome runs from its own.
 	open=$(lsof -nP -Fn 2>/dev/null | sed -n 's#^n.*/com\.google\.Chrome\.code_sign_clone/\(code_sign_clone\.[^/]*\).*#\1#p' | sort -u || true)
 	while IFS= read -r d; do
-		if printf '%s\n' "$open" | grep -qxF "$(basename "$d")"; then
+		if grep -qxF "$(basename "$d")" <<<"$open"; then
 			echo "kept $(basename "$d"): in use"
 			continue
 		fi
@@ -155,7 +174,7 @@ deriveddata() {
 			echo "kept $name: $ws is there"
 			continue
 		fi
-		if [ -n "$builds" ] && printf '%s\n' "$builds" | grep -qF -e "$name" -e "$(dirname "$ws")"; then
+		if [ -n "$builds" ] && grep -qF -e "$name" -e "$(dirname "$ws")" <<<"$builds"; then
 			echo "kept $name: an xcodebuild uses it"
 			continue
 		fi
@@ -172,10 +191,113 @@ deriveddata() {
 	fi
 }
 
+# The newest mtime, in seconds, of a file in $1, leaving out .git and build output.
+last_change() {
+	find "$1" \( -name .git -o -name build -o -name .build -o -name DerivedData -o -name node_modules \) -prune \
+		-o -type f -exec stat -f '%m' {} + 2>/dev/null | awk '$1 > m { m = $1 } END { if (m) print m }'
+}
+
+worktrees() {
+	local dry=0 committed=4 uncommitted=8
+	while [ $# -gt 0 ]; do
+		case $1 in
+		--dry-run) dry=1 ;;
+		--committed-hours) committed=$2; shift ;;
+		--uncommitted-hours) uncommitted=$2; shift ;;
+		*) die "worktrees [--dry-run] [--committed-hours N] [--uncommitted-hours N]" ;;
+		esac
+		shift
+	done
+	local main
+	main=$(dirname "$(git -C "$(dirname "$0")" rev-parse --path-format=absolute --git-common-dir)")
+	main=$(cd "$main" && pwd -P)
+	[ -d "$main/.agents/worktrees" ] || { echo "no worktrees"; return 0; }
+	local listed cwds now w name last hours dirty limit k freed=0 removed=0 verb=removing
+	[ "$dry" = 0 ] || verb="would remove"
+	listed=$(git -C "$main" worktree list --porcelain)
+	# Every process's working folder: a session or a build in a worktree keeps it.
+	cwds=$(lsof -a -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' || true)
+	now=$(date +%s)
+	for w in "$main"/.agents/worktrees/*/; do
+		w=$(cd "$w" && pwd -P) || continue
+		name=$(basename "$w")
+		if [ "$w" = "$main" ] || ! grep -qxF "worktree $w" <<<"$listed"; then
+			echo "kept $name: not a linked worktree of $main"
+			continue
+		fi
+		if [ "$(git -C "$w" rev-parse --path-format=absolute --git-dir)" = \
+			"$(git -C "$w" rev-parse --path-format=absolute --git-common-dir)" ]; then
+			echo "kept $name: a main checkout"
+			continue
+		fi
+		if awk -v w="worktree $w" '$0 == w { f = 1; next } /^worktree / { f = 0 } f && /^locked/ { found = 1 } END { exit !found }' <<<"$listed"; then
+			echo "kept $name: locked"
+			continue
+		fi
+		if awk -v w="$w" '$0 == w || index($0, w "/") == 1 { found = 1 } END { exit !found }' <<<"$cwds"; then
+			echo "kept $name: a process works in it"
+			continue
+		fi
+		if ! git -C "$w" symbolic-ref -q HEAD >/dev/null &&
+			[ -n "$(git -C "$w" rev-list -n 1 HEAD --not --branches --remotes)" ]; then
+			echo "kept $name: detached, with commits on no branch"
+			continue
+		fi
+		last=$(last_change "$w")
+		hours=$(((now - ${last:-$now}) / 3600))
+		dirty=$(git -C "$w" status --porcelain --untracked-files=all | wc -l | tr -d ' ')
+		if [ "$dirty" -gt 0 ]; then limit=$uncommitted; else limit=$committed; fi
+		if [ "$hours" -lt "$limit" ]; then
+			echo "kept $name: changed ${hours}h ago, under ${limit}h ($dirty uncommitted)"
+			continue
+		fi
+		k=$(du -sk "$w" | cut -f1)
+		echo "$verb $name ($(gb "$k") GB): unchanged for ${hours}h, $dirty uncommitted, branch $(git -C "$w" symbolic-ref -q --short HEAD || echo detached) kept"
+		if [ "$dry" = 0 ] && ! git -C "$main" worktree remove --force "$w"; then
+			echo "kept $name: git worktree remove failed"
+			continue
+		fi
+		freed=$((freed + k))
+		removed=$((removed + 1))
+	done
+	[ "$dry" = 1 ] || git -C "$main" worktree prune
+	if [ "$dry" = 1 ]; then
+		echo "would remove $removed worktree(s), $(gb "$freed") GB"
+	else
+		echo "removed $removed worktree(s), $(gb "$freed") GB"
+	fi
+}
+
+coredevice() {
+	local dry=0
+	while [ $# -gt 0 ]; do
+		case $1 in
+		--dry-run) dry=1 ;;
+		*) die "coredevice [--dry-run]" ;;
+		esac
+		shift
+	done
+	local d="$HOME/Library/Containers/com.apple.CoreDevice.CoreDeviceService/Data/Library/Caches/AppInstallationBinaryDeltas" k
+	[ -d "$d" ] || { echo "no CoreDevice install deltas"; return 0; }
+	if pgrep -q devicectl; then
+		echo "kept CoreDevice install deltas: a devicectl runs"
+		return 0
+	fi
+	k=$(du -sk "$d" | cut -f1)
+	if [ "$dry" = 1 ]; then
+		echo "would remove CoreDevice install deltas ($(gb "$k") GB)"
+	else
+		find "$d" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+		echo "removed CoreDevice install deltas ($(gb "$k") GB)"
+	fi
+}
+
 case ${1:-} in
 status) status ;;
 chromes) shift; chromes "$@" ;;
 xcode) xcode ;;
 deriveddata) shift; deriveddata "$@" ;;
-*) sed -n '2,37p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+worktrees) shift; worktrees "$@" ;;
+coredevice) shift; coredevice "$@" ;;
+*) sed -n '2,57p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac
