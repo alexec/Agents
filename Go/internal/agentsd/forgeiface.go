@@ -58,6 +58,9 @@ type Forge interface {
 	// SetAssignees assigns people to an item and takes others off it, by their logins (#4403).
 	SetAssignees(ctx context.Context, r forgeRef, add, remove []string) error
 	SetState(ctx context.Context, r forgeRef, closed bool, transition string) error
+	// CloseNotPlanned closes an issue as not planned (#4404), where the forge keeps why an
+	// issue closed.
+	CloseNotPlanned(ctx context.Context, r forgeRef) error
 	Merge(ctx context.Context, r forgeRef, sha, method string, auto bool) (wire.ForgeDone, error)
 	// CancelAutoMerge turns off a pull request's auto-merge, and Ready marks a draft ready for
 	// review (#4410).
@@ -104,35 +107,40 @@ type forgeActions struct {
 	Comment, Label, Assign, Close, Reopen, Transition, Merge, AutoMerge, Approve, Rerun, Log, Diff bool
 	// CancelAutoMerge turns auto-merge off; Ready marks a draft ready for review (#4410).
 	CancelAutoMerge, Ready bool
+	// CloseNotPlanned: a close with reason not_planned (#4404).
+	CloseNotPlanned bool
 }
 
 // The actions' names, as forgeCaps.Reasons and errForgeCannot name them.
 const (
-	actionComment    = "comment"
-	actionLabel      = "label"
-	actionAssign     = "assign"
-	actionClose      = "close"
-	actionReopen     = "reopen"
-	actionTransition = "transition"
-	actionMerge      = "merge"
-	actionAutoMerge  = "autoMerge"
-	actionCancelAuto = "cancelAutoMerge"
-	actionReady      = "ready"
-	actionApprove    = "approve"
-	actionRerun      = "rerun"
-	actionLog        = "log"
-	actionDiff       = "diff"
-	actionPlan       = "plan"
-	actionAddChild   = "addChild"
-	actionBlockedBy  = "blockedBy"
-	actionReleases   = "releases"
+	actionComment = "comment"
+	actionLabel   = "label"
+	actionAssign  = "assign"
+	actionClose   = "close"
+	// actionCloseNotPlanned is the wire's ForgeActionCloseNotPlanned.
+	actionCloseNotPlanned = "closeNotPlanned"
+	actionReopen          = "reopen"
+	actionTransition      = "transition"
+	actionMerge           = "merge"
+	actionAutoMerge       = "autoMerge"
+	actionCancelAuto      = "cancelAutoMerge"
+	actionReady           = "ready"
+	actionApprove         = "approve"
+	actionRerun           = "rerun"
+	actionLog             = "log"
+	actionDiff            = "diff"
+	actionPlan            = "plan"
+	actionAddChild        = "addChild"
+	actionBlockedBy       = "blockedBy"
+	actionReleases        = "releases"
 )
 
 // on says whether the actions allow the action of that name.
 func (a forgeActions) on(action string) bool {
 	return map[string]bool{actionComment: a.Comment, actionLabel: a.Label, actionAssign: a.Assign, actionClose: a.Close, actionReopen: a.Reopen,
 		actionTransition: a.Transition, actionMerge: a.Merge, actionAutoMerge: a.AutoMerge, actionApprove: a.Approve,
-		actionRerun: a.Rerun, actionLog: a.Log, actionDiff: a.Diff, actionCancelAuto: a.CancelAutoMerge, actionReady: a.Ready}[action]
+		actionRerun: a.Rerun, actionLog: a.Log, actionDiff: a.Diff, actionCancelAuto: a.CancelAutoMerge, actionReady: a.Ready,
+		actionCloseNotPlanned: a.CloseNotPlanned}[action]
 }
 
 // wire is the capabilities of the forge called name as ForgeList.forges says them (#4361).
@@ -178,6 +186,7 @@ func (c forgeCaps) itemActions(d wire.ForgeItemDetail) []wire.ForgeAction {
 		{wire.ForgeActionLabel, a.Label},
 		{wire.ForgeActionAssign, a.Assign},
 		{wire.ForgeActionClose, a.Close && open},
+		{wire.ForgeActionCloseNotPlanned, a.CloseNotPlanned && open},
 		{wire.ForgeActionReopen, a.Reopen && i.State == "closed"},
 		{wire.ForgeActionTransition, a.Transition && len(d.Transitions) > 0},
 		{wire.ForgeActionMerge, a.Merge && open},
@@ -197,6 +206,9 @@ func (c forgeCaps) itemActions(d wire.ForgeItemDetail) []wire.ForgeAction {
 	}
 	return out
 }
+
+// forgeNoNotPlanned is why a forge with no close reason does not close as not planned (#4404).
+const forgeNoNotPlanned = "this forge does not keep why an issue closed, so it cannot close one as not planned"
 
 // errForgeCannot is what a forge's method gives for an action that the forge does not do;
 // errors.Is finds it in a forgeCannot.
@@ -284,6 +296,9 @@ func (forgeNone) SetState(_ context.Context, _ forgeRef, closed bool, transition
 		return cannot(actionClose)
 	}
 	return cannot(actionReopen)
+}
+func (forgeNone) CloseNotPlanned(context.Context, forgeRef) error {
+	return &forgeCannot{action: actionCloseNotPlanned, reason: forgeNoNotPlanned}
 }
 func (forgeNone) Merge(context.Context, forgeRef, string, string, bool) (wire.ForgeDone, error) {
 	return wire.ForgeDone{}, cannot(actionMerge)

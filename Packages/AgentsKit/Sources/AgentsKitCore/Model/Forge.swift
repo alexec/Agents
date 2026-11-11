@@ -521,17 +521,27 @@ public extension DaemonAPI {
         }
     }
 
+    /// Why `forge/close` closes an issue (#4404): `notPlanned` only where the item's `actions`
+    /// have `closeNotPlanned`.
+    enum ForgeCloseReason: String, Codable, Sendable, Hashable, CaseIterable {
+        case completed
+        case notPlanned = "not_planned"
+    }
+
     /// `forge/close`: close it, or with `reopen` open it again; with `transition`, move a Jira
-    /// issue by that transition of its workflow, by its id (#3260).
+    /// issue by that transition of its workflow, by its id (#3260). `reason` is why an issue
+    /// closes (#4404).
     struct ForgeCloseRequest: Codable, Sendable, Hashable {
         public var node: LineageNode
         public var reopen: Bool?
         public var transition: String?
+        public var reason: ForgeCloseReason?
 
-        public init(node: LineageNode, reopen: Bool? = nil, transition: String? = nil) {
+        public init(node: LineageNode, reopen: Bool? = nil, transition: String? = nil, reason: ForgeCloseReason? = nil) {
             self.node = node
             self.reopen = reopen
             self.transition = transition
+            self.reason = reason
         }
     }
 

@@ -847,17 +847,20 @@ func conformActions(f Forge, r forgeRef) map[string]func(context.Context) error 
 		actionAssign:  func(ctx context.Context) error { return f.SetAssignees(ctx, r, []string{"kim"}, nil) },
 		actionClose:   func(ctx context.Context) error { return f.SetState(ctx, r, true, "") },
 		actionReopen:  func(ctx context.Context) error { return f.SetState(ctx, r, false, "") },
+		actionCloseNotPlanned: func(ctx context.Context) error {
+			return f.CloseNotPlanned(ctx, r)
+		},
 		actionTransition: func(ctx context.Context) error {
 			return f.SetState(ctx, r, true, "31")
 		},
-		actionMerge:     func(ctx context.Context) error { _, err := f.Merge(ctx, r, "abc", "", false); return err },
-		actionAutoMerge: func(ctx context.Context) error { _, err := f.Merge(ctx, r, "abc", "", true); return err },
-		actionApprove:   func(ctx context.Context) error { _, err := f.Approve(ctx, r, "abc"); return err },
+		actionMerge:      func(ctx context.Context) error { _, err := f.Merge(ctx, r, "abc", "", false); return err },
+		actionAutoMerge:  func(ctx context.Context) error { _, err := f.Merge(ctx, r, "abc", "", true); return err },
+		actionApprove:    func(ctx context.Context) error { _, err := f.Approve(ctx, r, "abc"); return err },
 		actionCancelAuto: func(ctx context.Context) error { return f.CancelAutoMerge(ctx, r) },
 		actionReady:      func(ctx context.Context) error { return f.Ready(ctx, r) },
-		actionRerun:     func(ctx context.Context) error { _, err := f.Rerun(ctx, r); return err },
-		actionLog:       func(ctx context.Context) error { _, err := f.Log(ctx, r, ""); return err },
-		actionDiff:      func(ctx context.Context) error { _, err := f.Diff(ctx, r); return err },
+		actionRerun:      func(ctx context.Context) error { _, err := f.Rerun(ctx, r); return err },
+		actionLog:        func(ctx context.Context) error { _, err := f.Log(ctx, r, ""); return err },
+		actionDiff:       func(ctx context.Context) error { _, err := f.Diff(ctx, r); return err },
 	}
 }
 
@@ -1112,15 +1115,17 @@ func conformItemActions(t *testing.T, caps forgeCaps, i wire.ForgeItem, actions 
 	has := func(n wire.ForgeAction) bool { return slices.Contains(actions, n) }
 	switch i.State {
 	case "merged":
-		if has(wire.ForgeActionMerge) || has(wire.ForgeActionReopen) || has(wire.ForgeActionClose) {
+		if has(wire.ForgeActionMerge) || has(wire.ForgeActionReopen) || has(wire.ForgeActionClose) || has(wire.ForgeActionCloseNotPlanned) {
 			t.Errorf("%v (merged): actions %v", i.Node, actions)
 		}
 	case "closed":
-		if has(wire.ForgeActionClose) || has(wire.ForgeActionMerge) || has(wire.ForgeActionReopen) != a.Reopen {
+		if has(wire.ForgeActionClose) || has(wire.ForgeActionCloseNotPlanned) || has(wire.ForgeActionMerge) ||
+			has(wire.ForgeActionReopen) != a.Reopen {
 			t.Errorf("%v (closed): actions %v", i.Node, actions)
 		}
 	case "open":
-		if has(wire.ForgeActionReopen) || has(wire.ForgeActionClose) != a.Close || has(wire.ForgeActionMerge) != a.Merge {
+		if has(wire.ForgeActionReopen) || has(wire.ForgeActionClose) != a.Close || has(wire.ForgeActionMerge) != a.Merge ||
+			has(wire.ForgeActionCloseNotPlanned) != a.CloseNotPlanned {
 			t.Errorf("%v (open): actions %v", i.Node, actions)
 		}
 	}

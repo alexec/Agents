@@ -9974,6 +9974,7 @@
         "comment",
         "label",
         "close",
+        "closeNotPlanned",
         "reopen",
         "transition",
         "merge",
@@ -9988,7 +9989,7 @@
         "cancelAutoMerge",
         "ready"
       ],
-      "description": "A write or a read that an item's page offers (#4329, #4361): forge/comment, forge/label, forge/close (a close, a reopen or a transition), forge/merge (now, or with auto), forge/approve, forge/rerun, forge/log, forge/diff, forge/add-child, forge/blocked-by, forge/assign (#4403), forge/cancel-auto-merge and forge/ready (#4410)."
+      "description": "A write or a read that an item's page offers (#4329, #4361): forge/comment, forge/label, forge/close (a close, a reopen or a transition; closeNotPlanned is a close with reason not_planned, where the forge has it, #4404), forge/merge (now, or with auto), forge/approve, forge/rerun, forge/log, forge/diff, forge/add-child, forge/blocked-by, forge/assign (#4403), forge/cancel-auto-merge and forge/ready (#4410)."
     },
     "ForgeAddChildRequest": {
       "type": "object",
@@ -10213,9 +10214,17 @@
       ],
       "additionalProperties": false
     },
+    "ForgeCloseReason": {
+      "type": "string",
+      "enum": [
+        "completed",
+        "not_planned"
+      ],
+      "description": "Why forge/close closes an issue (#4404): completed, or not_planned where the forge has it (the action closeNotPlanned)."
+    },
     "ForgeCloseRequest": {
       "type": "object",
-      "description": "forge/close (#3130): close an issue or a pull request, or with reopen open it again; with transition, move a Jira issue by that transition of its workflow, by its id from the page's transitions (#3260).",
+      "description": "forge/close (#3130): close an issue or a pull request, or with reopen open it again; with transition, move a Jira issue by that transition of its workflow, by its id from the page's transitions (#3260). reason is why an issue closes (#4404): completed (the default) or not_planned, which only an issue whose actions have closeNotPlanned takes; refused with reopen or a transition, and on a pull request.",
       "properties": {
         "node": {
           "$ref": "#/definitions/LineageNode"
@@ -10225,6 +10234,9 @@
         },
         "transition": {
           "type": "string"
+        },
+        "reason": {
+          "$ref": "#/definitions/ForgeCloseReason"
         }
       },
       "required": [
