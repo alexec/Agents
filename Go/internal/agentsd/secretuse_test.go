@@ -57,9 +57,12 @@ func replyOf(t *testing.T, done chan browserReply) browserReply {
 // Once fills once; a hold that ends names the request to wait on; deny is an error; always
 // is a grant for the domain that a person can take away.
 func TestAFlaggedFillWaitsOnAPerson(t *testing.T) {
+	// A call the test answers while it is held is held for a minute, so a slow runner does
+	// not end its hold first (#4569); a call that is left to end its hold is held 300 ms.
 	was := formHoldLimit
-	formHoldLimit = 300 * time.Millisecond
 	defer func() { formHoldLimit = was }()
+	answered, left := func() { formHoldLimit = time.Minute }, func() { formHoldLimit = 300 * time.Millisecond }
+	answered()
 	m, page, d := fillSetUp(t, nil)
 	if err := d.saveSecret("GITLAB_PASSWORD", filledValue, true); err != nil {
 		t.Fatal(err)
@@ -82,12 +85,14 @@ func TestAFlaggedFillWaitsOnAPerson(t *testing.T) {
 
 	// Once was one use: the next waits, and after the hold names its request.
 	page.value = ""
+	left()
 	got := replyOf(t, fillAsync(m, 3))
 	r = openSecretUse(t, d)
 	if got.IsError || !strings.Contains(replyText(got), `wait_for_event, where: {"request": "`+string(r.ID)+`"}`) || page.value != "" {
 		t.Fatalf("%+v %q", got, page.value)
 	}
 	// A call made again joins the same request; deny fails it.
+	answered()
 	done = fillAsync(m, 4)
 	time.Sleep(50 * time.Millisecond)
 	if again := openSecretUse(t, d); again.ID != r.ID {
@@ -120,6 +125,7 @@ func TestAFlaggedFillWaitsOnAPerson(t *testing.T) {
 	}
 	// Another domain still asks.
 	page.site, page.value = "evil.example.net", ""
+	left()
 	if got := replyOf(t, fillAsync(m, 7)); !strings.Contains(replyText(got), "wait_for_event") || page.value != "" {
 		t.Fatalf("%+v", got)
 	}
