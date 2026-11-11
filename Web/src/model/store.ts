@@ -2,6 +2,7 @@
 // ported by hand for the notifications the web remote hears and held to Fixtures/web/reducer
 // (research R7). Nothing here decides anything; the hosts do.
 import { pageSize } from "./archivedPage";
+import { deferParams, isDeferred, type Later } from "./later";
 import { answerElsewhere, approveSecretUse, isTerminalRequest, type SecretUseAction, secretUseApprovalParams, secretUseSigns } from "./secretUse";
 import { preferencesSaid, sendPreferencesWith } from "./preferences";
 import { folderPath as hostedFolderPath, healthTally, personalServers } from "./hostedMCP";
@@ -669,13 +670,9 @@ export class Work {
       case "workflow/changed":
         this.placeWorkflow(params as WorkflowSummary, host);
         return true;
-      case "requests/changed": {
-        const { request } = params as RequestUpdate;
-        const list = (this.personRequests.value[host] ?? []).filter((r) => r.id !== request.id);
-        if (request.state === "open") list.push(request);
-        this.personRequests.value = { ...this.personRequests.value, [host]: list.sort(byAsked) };
+      case "requests/changed":
+        this.placeRequest(host, (params as RequestUpdate).request);
         return true;
-      }
       case "pins/changed": {
         const note = params as PinsChangedNotification;
         this.pins.value = { ...this.pins.value, [`${host}|${folderKey(note.folder)}`]: note.pins };
@@ -1215,6 +1212,13 @@ export class Work {
   }
 
   /** The prompts kept for one agent, oldest first. */
+  /** One request changed (#3864): an open one is kept, oldest first, an answered or dropped one goes. */
+  protected placeRequest(host: string, request: PersonRequest): void {
+    const list = (this.personRequests.peek()[host] ?? []).filter((r) => r.id !== request.id);
+    if (request.state === "open") list.push(request);
+    this.personRequests.value = { ...this.personRequests.peek(), [host]: list.sort(byAsked) };
+  }
+
   keptFor(host: string, agentID: string): KeptRequest[] {
     return this.kept.value.filter((k) => k.host === host && k.kind === "prompt" && k.agentID === agentID);
   }
@@ -3555,16 +3559,46 @@ export class Store extends Work {
     await this.act("pins/hideView", { folder: folder as never, uri, hidden }, host);
   }
 
-  /** A folder's open requests to the person whose asker is held and not archived (#3864), oldest first. */
-  personRequestsIn(host: string, folder: string): PersonRequest[] {
+  /**
+   * A folder's open requests to the person, deferred or not, whose asker is held and not archived
+   * (#3864), oldest first: each stands for its asker, in Needs You or in Later (#4236).
+   */
+  openPersonRequestsIn(host: string, folder: string): PersonRequest[] {
     const key = folderKey(folder);
     return (this.personRequests.value[host] ?? []).filter((r) => folderKey(r.folder) === key
       && r.askedBy !== undefined && (this.agent(host, r.askedBy)?.state ?? "archived") !== "archived");
   }
 
-  /** A machine's open requests from a terminal's agents-secret (#4179): no session asked them, so no folder lists them. */
+  /** A folder's requests in Needs You's rows and count: the open ones not in Later (#4236). */
+  personRequestsIn(host: string, folder: string): PersonRequest[] {
+    return this.openPersonRequestsIn(host, folder).filter((r) => !isDeferred(r));
+  }
+
+  /** A folder's deferred requests (#4236): the Later group's rows, in no count. */
+  laterRequestsIn(host: string, folder: string): PersonRequest[] {
+    return this.openPersonRequestsIn(host, folder).filter(isDeferred);
+  }
+
+  /** A machine's open requests from a terminal's agents-secret (#4179): no session asked them, so no folder lists them. Not the deferred ones. */
   terminalRequests(host: string): PersonRequest[] {
-    return (this.personRequests.value[host] ?? []).filter(isTerminalRequest);
+    return (this.personRequests.value[host] ?? []).filter((r) => isTerminalRequest(r) && !isDeferred(r));
+  }
+
+  /** A terminal's deferred requests (#4236), in Later with the rest. */
+  laterTerminalRequests(host: string): PersonRequest[] {
+    return (this.personRequests.value[host] ?? []).filter((r) => isTerminalRequest(r) && isDeferred(r));
+  }
+
+  /** Later on a request (#4236): out of Needs You until its time, or until the person is next at the Mac. */
+  async deferRequest(host: string, request: string, later: Later): Promise<void> {
+    const changed = await this.act("requests/defer", deferParams(request, later), host);
+    if (changed) this.placeRequest(host, changed.request);
+  }
+
+  /** Bring Back Now (#4236): a deferred request back into Needs You at once. */
+  async undeferRequest(host: string, request: string): Promise<void> {
+    const changed = await this.act("requests/undefer", { id: request as never }, host);
+    if (changed) this.placeRequest(host, changed.request);
   }
 
   /** A folder's pull requests waiting for the person's approval (#3330), newest first. */
