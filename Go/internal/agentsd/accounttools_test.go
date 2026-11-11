@@ -422,9 +422,7 @@ func TestTrimOldest(t *testing.T) {
 // waits on a person, with a secret's answers. Deny is an error; once reads once; always turns
 // the account's Ask before use off, so the next get does not wait.
 func TestAGetOfAnAccountThatAsksWaitsOnAPerson(t *testing.T) {
-	was := formHoldLimit
-	formHoldLimit = 2 * time.Second
-	defer func() { formHoldLimit = was }()
+	answered, left := formHolds(t)
 	d, _ := start(t, t.TempDir())
 	defer d.Shutdown()
 	a := seeded(t, d, t.TempDir(), func(a *wire.Agent) { a.State, a.EndedReason, a.RuntimeID = wire.AgentStateRunning, nil, "claude" })
@@ -471,6 +469,7 @@ func TestAGetOfAnAccountThatAsksWaitsOnAPerson(t *testing.T) {
 	}
 
 	// The hold ends: the answer names the request, and says nothing of the account but its name.
+	left()
 	if text := get(4); !strings.Contains(text, "Wait with wait_for_event") || strings.Contains(text, "Agents CI") {
 		t.Fatal(text)
 	}
@@ -485,6 +484,7 @@ func TestAGetOfAnAccountThatAsksWaitsOnAPerson(t *testing.T) {
 	}
 
 	// Deny: the held call fails with words that say so.
+	answered()
 	denied := make(chan string, 1)
 	go func() {
 		text, failed := m.tool(5, "manage_accounts", map[string]any{"action": "get", "id": id})
@@ -510,6 +510,7 @@ func TestAGetOfAnAccountThatAsksWaitsOnAPerson(t *testing.T) {
 	if text := <-done; !strings.Contains(text, "Agents CI") {
 		t.Fatal(text)
 	}
+	left()
 	if text := get(7); !strings.Contains(text, "Wait with wait_for_event") {
 		t.Fatal("once allowed a second get:", text)
 	}
