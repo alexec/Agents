@@ -660,8 +660,36 @@ func (s *Store) SaveFolders(ps []wire.Folder) error {
 	return nil
 }
 
+// folderPaths is each URL's path as FolderPath made it, so a read of a record's folder
+// does not unescape it again (#4511): put fills it as a record loads or saves. A URL's
+// path never changes, so no entry goes stale; a record that moves has a new URL, and
+// that is a new key. At most maxFolderPaths are kept: when full, it starts again.
+var folderPaths = struct {
+	sync.RWMutex
+	m map[wire.URL]string
+}{m: map[wire.URL]string{}}
+
+const maxFolderPaths = 8192
+
 // FolderPath is a file URL's path, without the trailing slash; a plain path as it is.
 func FolderPath(u wire.URL) string {
+	folderPaths.RLock()
+	p, ok := folderPaths.m[u]
+	folderPaths.RUnlock()
+	if ok {
+		return p
+	}
+	p = folderPath(u)
+	folderPaths.Lock()
+	if len(folderPaths.m) >= maxFolderPaths {
+		clear(folderPaths.m)
+	}
+	folderPaths.m[u] = p
+	folderPaths.Unlock()
+	return p
+}
+
+func folderPath(u wire.URL) string {
 	p := strings.TrimPrefix(string(u), "file://")
 	if q, err := unescape(p); err == nil {
 		p = q
