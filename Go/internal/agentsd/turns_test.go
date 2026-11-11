@@ -40,6 +40,8 @@ func TestMain(m *testing.M) {
 	// The sealed-secret tests are the Mac's path on every system; a test of the Linux release
 	// layer turns it on for its daemon (releaseOn).
 	releaseLayerHere = false
+	// The machine's memory pressure does not move a test's warm pool (#4514).
+	pressureNow = func() string { return "" }
 	// No test asks the person's gh about merged pull requests unless it says so.
 	findGH = func() string { return "" }
 	// Nor asks the forge for an issue's parent (#3582): a test sets issueLookup.
