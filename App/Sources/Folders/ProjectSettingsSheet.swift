@@ -560,8 +560,8 @@ private struct ProjectToolsPane: View {
     }
 }
 
-/// How many helpers the project's sessions may have at once (#64): running and not archived
-/// from the policy, queued, and what they may do by themselves. The Remote's Project Settings
+/// How many helpers the project's sessions may have at once (#64): running, queued and total
+/// from the policy (#4377), and what they may do by themselves. The Remote's Project Settings
 /// page has the same rows (`RemoteProjectSettings`).
 private struct ProjectWorkAtOncePane: View {
     @Environment(AppModel.self) private var model
@@ -579,18 +579,10 @@ private struct ProjectWorkAtOncePane: View {
                 // to change it. Project Settings ▸ Policy sets this project's own.
                 settingsRow(HelperLimitWords.helpers) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text(HelperLimitWords.helpersNow(running: summary.helperLimits.running,
-                                                         notArchived: summary.helperLimits.notArchived))
+                        Text(HelperLimitWords.helpersNow(summary.helperLimits))
                             .monospacedDigit()
                         if let mark = summary.helperLimitsSetBy { OrgPolicyLine(mark: mark) }
                         settingsNote(HelperLimitWords.helpersNote)
-                    }
-                }
-                settingsRow(HelperLimitWords.queued) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        HelperLimitPicker(limits: limits, key: \.queued, standard: HelperLimit.defaultQueued,
-                                          maximum: HelperLimit.maximumQueued, disabled: offline, save: save)
-                        settingsNote(HelperLimitWords.queuedNote)
                     }
                 }
                 settingsRow(HelperLimitWords.allowance) {

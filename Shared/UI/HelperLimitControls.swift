@@ -9,16 +9,16 @@ enum HelperLimitWords {
     static let sessions = "Sessions"
 
     static let helpers = "Helpers"
-    static func helpersNow(running: Int, notArchived: Int) -> String {
-        "\(running) running, \(notArchived) not archived"
+    /// Running, queued and total, from the policy (#4377). The web page's is `helpersNow` in
+    /// `Web/src/model/projectSettings.ts`.
+    static func helpersNow(_ limits: (running: Int, notArchived: Int, queued: Int)) -> String {
+        "\(limits.running) running, \(limits.queued) queued, \(limits.notArchived) in total"
     }
     static let helpersNote = "Set in Settings ▸ Agents ▸ Policy, or for this project in Policy. "
+        + "Running counts sessions in a turn: one that waits for an event holds no place, and runs again "
+        + "when it wakes. A start past running waits in the queue; a start past queued or total is refused. "
         + "They count across all the project's folders, on every machine. A lead doesn't count; "
         + "the sessions it starts do."
-
-    static let queued = "Helpers queued"
-    static let queuedNote = "How many more sessions that other sessions started may wait to start, "
-        + "oldest first, when a place frees. Agents can't change this. Saved in .agents/folder.json."
 
     static let allowance = "Allowance spent"
     static let allowanceSwitch = "Helpers continue when the allowance is back"
@@ -63,38 +63,6 @@ struct HelperLimitSwitch: View {
         .toggleStyle(.switch)
         #if os(macOS)
         .controlSize(.small)
-        #endif
-        .disabled(disabled)
-    }
-}
-
-/// One helper limit (#64) as a menu of the numbers it may be, its default marked and
-/// choosing it putting the folder back to the default.
-struct HelperLimitPicker: View {
-    let limits: HelperLimits
-    let key: WritableKeyPath<HelperLimits, Int?>
-    let standard: Int
-    let maximum: Int
-    var minimum = 1
-    /// The menu's own label; hidden on the Mac, whose grid names the row.
-    var title = ""
-    let disabled: Bool
-    let save: (HelperLimits) async -> Void
-
-    var body: some View {
-        let current = limits[keyPath: key] ?? standard
-        Picker(title, selection: Binding(get: { current }, set: { chosen in
-            var changed = limits
-            changed[keyPath: key] = chosen == standard ? nil : chosen
-            Task { await save(changed) }
-        })) {
-            ForEach(Array(Swift.min(minimum, current)...Swift.max(maximum, current)), id: \.self) { number in
-                Text(number == standard ? "\(number) (default)" : "\(number)").tag(number)
-            }
-        }
-        #if os(macOS)
-        .labelsHidden()
-        .fixedSize()
         #endif
         .disabled(disabled)
     }

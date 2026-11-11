@@ -33,6 +33,54 @@
   --label-issue: light-dark(#0e6b82, #6cc6db);
   /* A label naming a pull request, P#12. */
   --label-pull: light-dark(#7442b8, #b79af0);
+  /* What is drawn on a filled mark: a state's badge, a swipe's action. */
+  --paper-on-fill: light-dark(#ffffff, #ffffff);
+  /* Behind a sheet or a viewer, mixed with transparent to the strength it needs. */
+  --paper-scrim: light-dark(#000000, #000000);
+  /* Open; a check that passed; running. */
+  --forge-open: light-dark(#1a7f37, #3fb950);
+  /* A closed issue, a merged pull request. */
+  --forge-done: light-dark(#8250df, #a371f7);
+  /* A pull request closed unmerged; a check that failed; changes asked for. */
+  --forge-closed: light-dark(#cf222e, #f85149);
+  /* A draft, an issue not planned. */
+  --forge-draft: light-dark(#6e7781, #8b949e);
+  /* A check still running; an agent that waits on the person. */
+  --forge-waiting: light-dark(#9a6700, #d29922);
+  /* An open badge; the merge button. */
+  --forge-fill-open: light-dark(#1f883d, #238636);
+  /* A merged or closed badge. */
+  --forge-fill-done: light-dark(#8250df, #8957e5);
+  /* A closed pull request's badge. */
+  --forge-fill-closed: light-dark(#cf222e, #da3633);
+  /* A draft's or a not planned issue's badge. */
+  --forge-fill-draft: light-dark(#59636e, #6e7681);
+  /* A comment, in italic. */
+  --code-comment: light-dark(#64707a, #a3adb8);
+  /* A keyword, true, false, null. */
+  --code-keyword: light-dark(#2b4c8c, #8fb0e8);
+  /* A string. */
+  --code-string: light-dark(#4e6420, #a9c27a);
+  /* A number. */
+  --code-number: light-dark(#7a3e7a, #d5a3d5);
+  /* A type. */
+  --code-type: light-dark(#1f6a6a, #7cc4c0);
+  /* A function. */
+  --code-function: light-dark(#5b4bb5, #b3a6f0);
+  /* A property. */
+  --code-property: light-dark(#52627a, #bac5d7);
+  /* Punctuation and operators. */
+  --code-punctuation: light-dark(#5e6470, #a9b2bd);
+  /* The plot behind the lines. */
+  --timeline-plot: light-dark(#ffffff, #0d1429);
+  /* The axis's marks. */
+  --timeline-faint: light-dark(#8c8c8c, #999999);
+  /* The trunk every feature leaves from. */
+  --timeline-trunk: light-dark(#999999, #e7e8ea);
+  /* A release's ring on the trunk. */
+  --timeline-release: light-dark(#000000, #ffffff);
+  /* The Now line. */
+  --timeline-now: light-dark(#8c8c8c, #8c8c8c);
   /* Chips, the rail, inputs. */
   --radius-control: 7px;
   /* Rows, wells, cards. */

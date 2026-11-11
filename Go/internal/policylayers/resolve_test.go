@@ -84,6 +84,9 @@ func TestResolveNeverLooserThanTheTightestLayer(t *testing.T) {
 		{"helpers.mostNotArchived", wire.PolicyRuleNameHelpersMostNotArchived,
 			wire.PolicyRules{Helpers: &wire.PolicyHelpers{MostNotArchived: i64(1)}},
 			wire.PolicyRules{Helpers: &wire.PolicyHelpers{MostNotArchived: i64(20)}}},
+		{"helpers.mostQueued", wire.PolicyRuleNameHelpersMostQueued,
+			wire.PolicyRules{Helpers: &wire.PolicyHelpers{MostQueued: i64(1)}},
+			wire.PolicyRules{Helpers: &wire.PolicyHelpers{MostQueued: i64(20)}}},
 		{"workflows.mostOn", wire.PolicyRuleNameWorkflowsMostOn,
 			wire.PolicyRules{Workflows: &wire.PolicyWorkflows{MostOn: i64(1)}},
 			wire.PolicyRules{Workflows: &wire.PolicyWorkflows{MostOn: i64(100)}}},
@@ -142,8 +145,8 @@ func TestResolveRuleNoLayerSetsHasNoDecides(t *testing.T) {
 			}
 		}
 	}
-	if len(ep.Rules) != 18 {
-		t.Fatalf("got %d rules, want 18 (FR-002, #4099)", len(ep.Rules))
+	if len(ep.Rules) != 19 {
+		t.Fatalf("got %d rules, want 19 (FR-002, #4099, #4377)", len(ep.Rules))
 	}
 }
 

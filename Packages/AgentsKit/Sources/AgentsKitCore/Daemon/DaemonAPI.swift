@@ -900,8 +900,9 @@ public enum DaemonAPI {
         public var id: URL { folder.folder }
         public var key: FolderKey { FolderKey(host: host, folder: folder.folder) }
         /// The helper limits enforced here (#64): the person's, or the defaults.
-        public var helperLimits: (running: Int, notArchived: Int) {
-            (folder.helperLimits ?? HelperLimits()).effective
+        public var helperLimits: (running: Int, notArchived: Int, queued: Int) {
+            let limits = folder.helperLimits ?? HelperLimits()
+            return (limits.effective.running, limits.effective.notArchived, limits.effectiveQueued)
         }
 
         enum CodingKeys: String, CodingKey {

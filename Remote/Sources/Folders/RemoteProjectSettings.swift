@@ -90,8 +90,7 @@ struct RemoteProjectSettings: View {
             // A section per control, its note under it, as iOS Settings has them.
             Section {
                 LabeledContent(HelperLimitWords.helpers) {
-                    Text(HelperLimitWords.helpersNow(running: summary.helperLimits.running,
-                                                     notArchived: summary.helperLimits.notArchived))
+                    Text(HelperLimitWords.helpersNow(summary.helperLimits))
                         .monospacedDigit()
                 }
                 if let mark = summary.helperLimitsSetBy { OrgPolicyLine(mark: mark) }
@@ -99,13 +98,6 @@ struct RemoteProjectSettings: View {
                 Text(HelperLimitWords.workAtOnce)
             } footer: {
                 Text(HelperLimitWords.helpersNote)
-            }
-            Section {
-                HelperLimitPicker(limits: limits, key: \.queued, standard: HelperLimit.defaultQueued,
-                                  maximum: HelperLimit.maximumQueued, title: HelperLimitWords.queued,
-                                  disabled: offline, save: save)
-            } footer: {
-                Text(HelperLimitWords.queuedNote)
             }
             Section {
                 HelperLimitSwitch(limits: limits, title: HelperLimitWords.allowanceSwitch, disabled: offline,

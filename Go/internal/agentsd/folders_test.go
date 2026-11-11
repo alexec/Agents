@@ -57,18 +57,23 @@ func TestAFoldersSettingsAreItsFile(t *testing.T) {
 	defer d.Shutdown()
 	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
-	// running and notArchived are rules now (#2957, FR-015): this method keeps them in the
-	// folder's own policy layer, reads them back from it, and enforces them (#3149).
+	// running, notArchived and queued are rules now (#2957, FR-015, #4377): this method
+	// keeps them in the folder's own policy layer, reads them back from it, and enforces
+	// them (#3149).
 	var s wire.FolderSummary
-	json.Unmarshal(c.call(t, 3, "folders/setHelperLimits", map[string]any{"folder": folder, "limits": map[string]any{"running": 4, "notArchived": 6, "agentsMayArchive": true}}), &s)
-	if l := s.Folder.HelperLimits; l == nil || l.Running == nil || *l.Running != 4 || l.NotArchived == nil || *l.NotArchived != 6 || l.AgentsMayArchive != nil {
+	json.Unmarshal(c.call(t, 3, "folders/setHelperLimits", map[string]any{"folder": folder, "limits": map[string]any{"running": 4, "notArchived": 6, "queued": 2, "agentsMayArchive": true}}), &s)
+	if l := s.Folder.HelperLimits; l == nil || l.Running == nil || *l.Running != 4 || l.NotArchived == nil || *l.NotArchived != 6 ||
+		l.Queued == nil || *l.Queued != 2 || l.AgentsMayArchive != nil {
 		t.Fatalf("%+v", s.Folder.HelperLimits)
 	}
-	if b, _ := os.ReadFile(filepath.Join(dir, ".agents", "policy.json")); string(b) != "{\n  \"helpers\": {\n    \"mostNotArchived\": 6,\n    \"mostRunning\": 4\n  }\n}\n" {
+	if b, _ := os.ReadFile(filepath.Join(dir, ".agents", "policy.json")); string(b) != "{\n  \"helpers\": {\n    \"mostNotArchived\": 6,\n    \"mostQueued\": 2,\n    \"mostRunning\": 4\n  }\n}\n" {
 		t.Fatalf("%s", b)
 	}
-	if running, notArchived, _ := d.helperLimitsIn(dir); running != 4 || notArchived != 6 {
-		t.Fatal(running, notArchived)
+	if b, _ := os.ReadFile(filepath.Join(dir, ".agents", "folder.json")); strings.Contains(string(b), "helperLimits") {
+		t.Fatalf("the limits are not written to folder.json any more: %s", b)
+	}
+	if running, notArchived, queued := d.helperLimitsIn(dir); running != 4 || notArchived != 6 || queued != 2 {
+		t.Fatal(running, notArchived, queued)
 	}
 	if e := c.callError(t, 30, "folders/setHelperLimits", map[string]any{"folder": folder, "limits": map[string]any{"running": 7, "notArchived": 6}}); e.Message != "Running helpers (7) cannot be more than helpers not yet archived (6)." {
 		t.Fatal(e.Message)
@@ -79,8 +84,8 @@ func TestAFoldersSettingsAreItsFile(t *testing.T) {
 	if l := s.Folder.HelperLimits; l == nil || l.Running != nil || l.NotArchived == nil || *l.NotArchived != 6 {
 		t.Fatalf("%+v", s.Folder.HelperLimits)
 	}
-	if running, _, _ := d.helperLimitsIn(dir); running != defaultHelpersRunning {
-		t.Fatal(running)
+	if running, _, queued := d.helperLimitsIn(dir); running != defaultHelpersRunning || queued != defaultHelpersQueued {
+		t.Fatal(running, queued)
 	}
 	if e := c.callError(t, 4, "folders/setDiskSpace", map[string]any{"folder": folder, "diskSpace": map[string]any{"lowPercent": 1, "criticalPercent": 5}}); e.Message != "Critical disk space can't be more than low disk space." {
 		t.Fatal(e.Message)

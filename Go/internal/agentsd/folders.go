@@ -309,15 +309,16 @@ func (d *Daemon) setHelperLimits(r wire.SetHelperLimitsRequest) (wire.FolderSumm
 	if !d.settled(folder, ".agents/folder.json") {
 		return wire.FolderSummary{}, guardedRefusal(".agents/folder.json", "The helper limits were not changed: ")
 	}
-	// running and notArchived are rules now (#2957, FR-015): they go to the folder's own
-	// policy layer (.agents/policy.json), and .agents/folder.json keeps the rest (#3149).
-	if err := d.setFolderHelperRules(folder, r.Limits.Running, r.Limits.NotArchived); err != nil {
+	// running, notArchived and queued are rules now (#2957, FR-015, #4377): they go to the
+	// folder's own policy layer (.agents/policy.json), and .agents/folder.json keeps the rest
+	// (#3149).
+	if err := d.setFolderHelperRules(folder, r.Limits.Running, r.Limits.NotArchived, r.Limits.Queued); err != nil {
 		return wire.FolderSummary{}, err
 	}
 	defer d.approveWrite(folder, ".agents/folder.json")
 	// HelperLimits.orNilIfDefault: the switch at its default is no choice at all.
 	l := r.Limits
-	l.Running, l.NotArchived = nil, nil
+	l.Running, l.NotArchived, l.Queued = nil, nil, nil
 	if l.AgentsMayArchive != nil && *l.AgentsMayArchive {
 		l.AgentsMayArchive = nil
 	}
@@ -331,7 +332,7 @@ func (d *Daemon) setHelperLimits(r wire.SetHelperLimitsRequest) (wire.FolderSumm
 		l.AgentsMayStartOnMachines = nil
 	}
 	var v any
-	if l.Running != nil || l.NotArchived != nil || l.Queued != nil || l.AgentsMayArchive != nil || l.ContinueWhenBack != nil ||
+	if l.AgentsMayArchive != nil || l.ContinueWhenBack != nil ||
 		l.ArchiveWhenMerged != nil || l.AgentsMayStartOnMachines != nil {
 		v = l
 	}
@@ -344,21 +345,21 @@ func (d *Daemon) setHelperLimits(r wire.SetHelperLimitsRequest) (wire.FolderSumm
 	return d.sendFolder(folder)
 }
 
-// setFolderHelperRules writes helpers.mostRunning and helpers.mostNotArchived into the
-// folder's own policy layer, leaving its other rules as they are; nil is no choice (the
-// default). Nothing is written when they are already so.
-func (d *Daemon) setFolderHelperRules(folder string, running, notArchived *int64) error {
+// setFolderHelperRules writes helpers.mostRunning, helpers.mostNotArchived and
+// helpers.mostQueued into the folder's own policy layer, leaving its other rules as they
+// are; nil is no choice (the default). Nothing is written when they are already so.
+func (d *Daemon) setFolderHelperRules(folder string, running, notArchived, queued *int64) error {
 	rules := d.folderApprovedRules(folder)
 	var was wire.PolicyHelpers
 	if rules.Helpers != nil {
 		was = *rules.Helpers
 	}
-	if sameInt(was.MostRunning, running) && sameInt(was.MostNotArchived, notArchived) {
+	if sameInt(was.MostRunning, running) && sameInt(was.MostNotArchived, notArchived) && sameInt(was.MostQueued, queued) {
 		return nil
 	}
 	rules.Helpers = nil
-	if running != nil || notArchived != nil {
-		rules.Helpers = &wire.PolicyHelpers{MostRunning: running, MostNotArchived: notArchived}
+	if running != nil || notArchived != nil || queued != nil {
+		rules.Helpers = &wire.PolicyHelpers{MostRunning: running, MostNotArchived: notArchived, MostQueued: queued}
 	}
 	_, err := d.setFolderPolicy(wire.SetFolderPolicyRequest{Folder: store.FolderURL(folder), Rules: rules})
 	return err

@@ -1015,31 +1015,31 @@ func (d *Daemon) customServerRefusal() error {
 // MARK: helpers
 
 // helperCaps caps a folder's helper limits by the organisation's and your layer's (#2957,
-// FR-002: helpers.mostRunning/mostNotArchived are a new rule of your layer too), tightest
-// wins, and marks them with whichever layer decided.
-func (d *Daemon) helperCaps(running, notArchived int64) (int64, int64, *wire.PolicySetBy) {
+// FR-002: helpers.mostRunning/mostNotArchived/mostQueued are a new rule of your layer too),
+// tightest wins, and marks them with whichever layer decided.
+func (d *Daemon) helperCaps(running, notArchived, queued int64) (int64, int64, int64, *wire.PolicySetBy) {
 	var mark *wire.PolicySetBy
+	tighten := func(who string, ref wire.PolicyLayerRef, h *wire.PolicyHelpers) {
+		if v := h.MostRunning; v != nil && *v < running {
+			running = *v
+			mark = setBy(ref, "helpers.mostRunning", helperWords(who, h))
+		}
+		if v := h.MostNotArchived; v != nil && *v < notArchived {
+			notArchived = *v
+			mark = setBy(ref, "helpers.mostNotArchived", helperWords(who, h))
+		}
+		if v := h.MostQueued; v != nil && *v < queued {
+			queued = *v
+			mark = setBy(ref, "helpers.mostQueued", helperWords(who, h))
+		}
+	}
 	if p := d.orgPolicy(); p != nil && p.Helpers != nil {
-		if h := p.Helpers.MostRunning; h != nil && *h < running {
-			running = *h
-			mark = setBy(orgLayerRef(p), "helpers.mostRunning", helperWords("Your organisation", p.Helpers))
-		}
-		if h := p.Helpers.MostNotArchived; h != nil && *h < notArchived {
-			notArchived = *h
-			mark = setBy(orgLayerRef(p), "helpers.mostNotArchived", helperWords("Your organisation", p.Helpers))
-		}
+		tighten("Your organisation", orgLayerRef(p), p.Helpers)
 	}
 	if yh := d.yourPolicyRules().Helpers; yh != nil {
-		if h := yh.MostRunning; h != nil && *h < running {
-			running = *h
-			mark = setBy(youLayerRef(), "helpers.mostRunning", helperWords("Your policy", yh))
-		}
-		if h := yh.MostNotArchived; h != nil && *h < notArchived {
-			notArchived = *h
-			mark = setBy(youLayerRef(), "helpers.mostNotArchived", helperWords("Your policy", yh))
-		}
+		tighten("Your policy", youLayerRef(), yh)
 	}
-	return running, notArchived, mark
+	return running, notArchived, queued, mark
 }
 
 func helperWords(who string, h *wire.PolicyHelpers) string {
@@ -1047,15 +1047,18 @@ func helperWords(who string, h *wire.PolicyHelpers) string {
 	if h.MostRunning != nil {
 		parts = append(parts, fmt.Sprintf("%d running", *h.MostRunning))
 	}
+	if h.MostQueued != nil {
+		parts = append(parts, fmt.Sprintf("%d queued", *h.MostQueued))
+	}
 	if h.MostNotArchived != nil {
-		parts = append(parts, fmt.Sprintf("%d not archived", *h.MostNotArchived))
+		parts = append(parts, fmt.Sprintf("%d in total", *h.MostNotArchived))
 	}
 	return who + " allows at most " + strings.Join(parts, " and ") + " helper sessions in a folder."
 }
 
 // markHelperLimits shows the folder's helper limits as its own policy layer keeps them
-// (#2957, FR-015, #3149), not .agents/folder.json's old running/notArchived, and marks a
-// folder whose limits the organisation's or your layer caps.
+// (#2957, FR-015, #3149, #4377), not .agents/folder.json's old running/notArchived/queued,
+// and marks a folder whose limits the organisation's or your layer caps.
 func (d *Daemon) markHelperLimits(s *wire.FolderSummary) {
 	s.HelperLimitsSetBy = nil
 	var own wire.PolicyHelpers
@@ -1067,37 +1070,44 @@ func (d *Daemon) markHelperLimits(s *wire.FolderSummary) {
 		if l != nil {
 			limits = *l
 		}
-		limits.Running, limits.NotArchived = own.MostRunning, own.MostNotArchived
+		limits.Running, limits.NotArchived, limits.Queued = own.MostRunning, own.MostNotArchived, own.MostQueued
 		s.Folder.HelperLimits = &limits
 	}
-	running, notArchived := int64(defaultHelpersRunning), int64(defaultHelpersNotArchived)
-	if own.MostRunning != nil {
-		running = *own.MostRunning
+	or := func(v *int64, def int64) int64 {
+		if v != nil {
+			return *v
+		}
+		return def
 	}
-	if own.MostNotArchived != nil {
-		notArchived = *own.MostNotArchived
-	}
-	_, _, s.HelperLimitsSetBy = d.helperCaps(running, notArchived)
+	_, _, _, s.HelperLimitsSetBy = d.helperCaps(or(own.MostRunning, defaultHelpersRunning),
+		or(own.MostNotArchived, defaultHelpersNotArchived), or(own.MostQueued, defaultHelpersQueued))
 }
 
 // helperLimitsRefusal is why the folder's own helper limits may not be set this high, by
 // the organisation's or your own layer, whichever is tighter.
 func (d *Daemon) helperLimitsRefusal(l wire.HelperLimits) error {
-	if p := d.orgPolicy(); p != nil && p.Helpers != nil {
-		if h := p.Helpers.MostRunning; h != nil && l.Running != nil && *l.Running > *h {
-			return policyRefusal("policy", "helpers.mostRunning", helperWords("Your organisation", p.Helpers), nil, orgLayerRef(p))
+	over := func(who string, ref wire.PolicyLayerRef, h *wire.PolicyHelpers) error {
+		for _, c := range []struct {
+			rule      string
+			cap, want *int64
+		}{
+			{"helpers.mostRunning", h.MostRunning, l.Running},
+			{"helpers.mostNotArchived", h.MostNotArchived, l.NotArchived},
+			{"helpers.mostQueued", h.MostQueued, l.Queued},
+		} {
+			if c.cap != nil && c.want != nil && *c.want > *c.cap {
+				return policyRefusal("policy", c.rule, helperWords(who, h), nil, ref)
+			}
 		}
-		if h := p.Helpers.MostNotArchived; h != nil && l.NotArchived != nil && *l.NotArchived > *h {
-			return policyRefusal("policy", "helpers.mostNotArchived", helperWords("Your organisation", p.Helpers), nil, orgLayerRef(p))
+		return nil
+	}
+	if p := d.orgPolicy(); p != nil && p.Helpers != nil {
+		if err := over("Your organisation", orgLayerRef(p), p.Helpers); err != nil {
+			return err
 		}
 	}
 	if yh := d.yourPolicyRules().Helpers; yh != nil {
-		if h := yh.MostRunning; h != nil && l.Running != nil && *l.Running > *h {
-			return policyRefusal("policy", "helpers.mostRunning", helperWords("Your policy", yh), nil, youLayerRef())
-		}
-		if h := yh.MostNotArchived; h != nil && l.NotArchived != nil && *l.NotArchived > *h {
-			return policyRefusal("policy", "helpers.mostNotArchived", helperWords("Your policy", yh), nil, youLayerRef())
-		}
+		return over("Your policy", youLayerRef(), yh)
 	}
 	return nil
 }

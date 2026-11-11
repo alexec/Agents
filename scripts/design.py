@@ -50,11 +50,12 @@ def tokens(tree, path=()):
 
 
 def name(path):
-    """A token's custom property: colours are --paper-*, but for the accent, the tints and
-    the labels, which keep the names the web page has always used."""
+    """A token's custom property: colours are --paper-*, but for the accent and the groups
+    named for what they draw (the tints, the labels, the forge's states, code's inks, the
+    timeline), which keep the names the web page has always used."""
     head, rest = path[0], path[1:]
     if head == "color":
-        if rest[0] in ("tint", "label"):
+        if rest[0] in ("tint", "label", "forge", "code", "timeline"):
             return "--" + "-".join(rest)
         if rest == ("accent",):
             return "--accent"
@@ -96,8 +97,8 @@ def comment(token, indent):
 
 # What each output holds: the groups, and how the dark is written.
 OUTPUTS = {
-    # Byte-equal to the :root blocks paper.css held before #4602 once esbuild minifies it, so
-    # the web page does not change: its groups, and the two lines it always had.
+    # The :root blocks paper.css held before #4602, and the two lines it always had; since #4608
+    # also the colours app.css named itself.
     "Web/src/theme/tokens.css": {"groups": ("color", "radius", "font"), "dark": "media", "web": True},
     "www/tokens.css": {"groups": ("color", "radius", "font", "type"), "dark": "media"},
     "docs/stylesheets/tokens.css": {"groups": ("color", "radius", "font", "type"), "dark": "material"},
@@ -237,13 +238,14 @@ def selftest():
         "color": {"$type": "color",
                   "ground": {"$value": "#ffffff", "$extensions": {DARK: "#000000"}},
                   "shadow": {"$value": "#20242a", "$extensions": {DARK: "#000000", ALPHA: 0.1}},
-                  "tint": {"failure": {"$value": "#b4232b", "$extensions": {DARK: "#f08086"}}}},
+                  "tint": {"failure": {"$value": "#b4232b", "$extensions": {DARK: "#f08086"}}},
+                  "forge": {"fill": {"open": {"$value": "#1f883d", "$extensions": {DARK: "#238636"}}}}},
         "radius": {"$type": "dimension", "card": {"$value": {"value": 10, "unit": "px"}}},
         "font": {"$type": "fontFamily", "mono": {"$value": ["ui-monospace", "SF Mono"]}},
     }
     web = render(source, OUTPUTS["Web/src/theme/tokens.css"])
     for want in ("--paper-ground: #ffffff;", "--paper-shadow: rgb(32 36 42 / 10%);",
-                 "--tint-failure: #f08086;", "--radius-card: 10px;", '--font-mono: ui-monospace, "SF Mono";',
+                 "--tint-failure: #f08086;", "--forge-fill-open: #238636;", "--radius-card: 10px;", '--font-mono: ui-monospace, "SF Mono";',
                  "@media (prefers-color-scheme: dark)"):
         assert want in web, (want, web)
     assert "--radius-card" not in web.split("@media")[1], web

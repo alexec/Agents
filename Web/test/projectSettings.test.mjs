@@ -11,9 +11,12 @@ test("project settings: a limit at its default leaves .agents/folder.json", () =
   assert.deepEqual(p.withLimit({ continueWhenBack: true }, "continueWhenBack", undefined, undefined), {});
 });
 
-test("project settings: the queued and disk menus offer a number set by hand", () => {
-  assert.deepEqual(p.queuedChoices(5).slice(0, 3), [1, 2, 3]);
-  assert.equal(p.queuedChoices(30).at(-1), 30);
+test("project settings: the Helpers line says running, queued and total from policy (#4377)", () => {
+  assert.equal(p.helpersNow(undefined), "3 running, 5 queued, 5 in total");
+  assert.equal(p.helpersNow({ running: 4, queued: 2, notArchived: 9 }), "4 running, 2 queued, 9 in total");
+});
+
+test("project settings: the disk menus offer a number set by hand", () => {
   assert.deepEqual(p.diskChoices([5, 10, 20], 15), [5, 10, 15, 20]);
   assert.deepEqual(p.withDiskLine({ lowPercent: 50 }, "lowPercent", 20, 20), {});
   assert.deepEqual(p.withDiskLine(undefined, "criticalPercent", 5, 1), { criticalPercent: 5 });

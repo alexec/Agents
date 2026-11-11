@@ -78,6 +78,7 @@ type Daemon struct {
 	selfUpdateState
 	quitState
 	processBook
+	capacityBook
 	warmBook
 	leaseState
 	eventBook
@@ -214,6 +215,8 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 	d.checkReleaseTagsEveryHour()
 	d.saveFeaturesEveryMinute()
 	d.watchDisk()
+	// The machine's capacity, ok, near or full (#4578).
+	d.watchCapacity()
 	// The counts on the servers' list view rows (#2033).
 	d.startViewCounts()
 	// The pull requests waiting for the person, in For Review (#3330).
