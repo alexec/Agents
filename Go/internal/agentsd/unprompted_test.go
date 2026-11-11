@@ -81,7 +81,7 @@ func TestAStopEndsATurnTheRuntimeBegan(t *testing.T) {
 
 // A call from the runtime before any word of its own cycle begins the turn too.
 func TestAnAskerBeginsATurnForALiveRuntime(t *testing.T) {
-	d, _, id, release := backgroundBuild(t, "Run the build in the background, then wait for ")
+	d, c, id, release := backgroundBuild(t, "Run the build in the background, then wait for ")
 	l := d.live(id)
 	if !l.leaveUnprompted() {
 		t.Fatal("no turn of its own")
@@ -93,4 +93,7 @@ func TestAnAskerBeginsATurnForALiveRuntime(t *testing.T) {
 		t.Fatal("the call began no turn")
 	}
 	os.WriteFile(release, nil, 0o600)
+	// The cycle's last words and result end a turn of their own: wait for it, so the
+	// daemon writes nothing in its root as the test's folders go (#4568).
+	c.until(t, "the runtime's own turn's end", ended(id, wire.AgentStateFinished))
 }
