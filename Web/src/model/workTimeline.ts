@@ -3,9 +3,9 @@
 // releases line when their first child starts and join it when their last child closes, on a
 // linear time axis. The range, the lines, their lanes, the marks and the words; the view draws them
 // in SVG. Times are milliseconds since 1970.
-import type { WorkTimeline, WorkTimelineBacktest, WorkTimelineRelease } from "../protocol/generated";
+import type { ForgeLabel, WorkTimeline, WorkTimelineBacktest, WorkTimelineRelease } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
-import { shortRef } from "./work";
+import { shortAge, shortRef } from "./work";
 
 const ms = (d: number | undefined) => d === undefined ? undefined : fromWireDate(d as never).getTime();
 const day = 86_400_000;
@@ -224,16 +224,20 @@ export function joins(lines: readonly TimelineLine[], axis: Axis, within = 6): T
   return out;
 }
 
-/** How far a line's label may run from `x` before the next thing on its lane: Now, its band or its
- * pill (section 12, item 6), and never past the line's own end. */
-export function labelRoom(line: TimelineLine, x: number, axis: Axis, now: number): number {
-  const stops: number[] = [];
-  const nowX = axis.x(now);
-  if (nowX > x && line.end > now) stops.push(nowX);
-  if (line.band) stops.push(axis.x(line.band.start));
-  if (line.how.how === "waits") stops.push(axis.x(line.end));
-  const ahead = stops.filter((s) => s > x);
-  return Math.min(ahead.length === 0 ? Infinity : Math.min(...ahead) - x - 6, axis.x(line.end) - x);
+/** How far a line's label may run from `x`: the whole line, to its end (Alex, 2026-11-10). It runs
+ * past Now and over its band, on its halo; a pill where the line waits is after its end. */
+export function labelRoom(line: TimelineLine, x: number, axis: Axis): number {
+  return axis.x(line.end) - x;
+}
+
+/** Where a dot is drawn: at its time, held to the stretch of the line that is on its lane, so no dot
+ * is on the fork's or the join's curve, off the line (Alex, 2026-11-10). */
+export function dotX(dot: TimelineDot, line: TimelineLine, axis: Axis): number {
+  const r = riser(line.lane);
+  const sx = axis.x(line.start), ex = Math.max(axis.x(line.end), sx);
+  const from = sx + r;
+  const to = line.how.how === "joined" || line.how.how === "forecast" ? Math.max(ex - r, from) : Math.max(ex, from);
+  return Math.min(Math.max(axis.x(dot.at), from), to);
 }
 
 /** What a label says: the name, whole or cut short with "…", or "" for none; then the figures. */
@@ -296,7 +300,7 @@ export function hit(p: { x: number; y: number }, lines: readonly TimelineLine[],
   let best: [number, TimelineHit] | undefined;
   for (const line of lines) {
     for (const dot of line.dots) {
-      const d = Math.hypot(axis.x(dot.at) - p.x, y(line.lane) - p.y);
+      const d = Math.hypot(dotX(dot, line, axis) - p.x, y(line.lane) - p.y);
       if (d <= 10 && d < (best?.[0] ?? Infinity)) best = [d, { kind: "dot", line, dot }];
     }
   }
@@ -375,6 +379,68 @@ export function joinCardWords(join: TimelineJoin, lines: readonly TimelineLine[]
 /** The hover card on a release. */
 export const releaseWords = (r: WorkTimelineRelease) =>
   [r.tag, `Released ${fromWireDate(r.at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}`];
+
+/** A row of the hover card, on three lines (Alex, 2026-11-10): the state glyph and the title; the label
+ * chips, where the wire has them; then the prediction, in the window's words. A release has no glyph. */
+export interface CardRow { state?: "open" | "closed"; title: string; labels: ForgeLabel[]; line: string }
+
+/** "2 h ago", or "just now". */
+function agoWords(t: number, now: number): string {
+  const age = shortAge((now - t) / 1000);
+  return age === "now" ? "just now" : `${age} ago`;
+}
+
+/** On a dot: "#4250 · closed 2 h ago" or "#4250 · closes about 5:00 PM". */
+export function dotLine(dot: TimelineDot, now: number): string {
+  const state = dot.closed ? `${dot.notPlanned ? "closed as not planned" : "closed"} ${agoWords(dot.at, now)}` : `closes about ${timeWords(dot.at, now)}`;
+  return `${dot.number} · ${state}`;
+}
+
+/** On an epic's line or its join: "#4250 · 11 of 16 · closes about 5:00 PM · 3:00 PM–9:00 PM, 8 in 10". */
+export function lineLine(line: TimelineLine, now: number): string {
+  const out = [figures(line)];
+  switch (line.how.how) {
+    case "joined": out.push(`closed ${agoWords(line.end, now)}`); break;
+    case "dropped": out.push("closed as not planned"); break;
+    case "forecast":
+      out.push(`closes about ${timeWords(line.end, now)}`);
+      if (line.band) out.push(`${timeWords(line.band.start, now)}–${timeWords(line.band.end, now)}, 8 in 10`);
+      break;
+    case "waits": out.push(waitWords(line.how.count)); break;
+    case "open": out.push("open"); break;
+  }
+  return out.join(" · ");
+}
+
+/** The hover card's rows: one for a dot, a line or a release, one for each line of a join. The
+ * backtest is not in it: it is the title line's help. */
+export function cardRows(h: TimelineHit, lines: readonly TimelineLine[], timeline: WorkTimeline, now: number): CardRow[] {
+  const lineRow = (l: TimelineLine): CardRow => {
+    const epic = timeline.epics.find((e) => e.item.node.ref === l.epic);
+    return { state: (epic?.item.state ?? (isOpen(l) ? "open" : "closed")) === "open" ? "open" : "closed", title: l.title,
+      labels: epic?.item.labels ?? [], line: lineLine(l, now) };
+  };
+  switch (h.kind) {
+    case "dot": {
+      const child = timeline.epics.flatMap((e) => e.children).find((c) => c.item.node.ref === h.dot.ref);
+      return [{ state: h.dot.closed ? "closed" : "open", title: h.dot.title, labels: child?.item.labels ?? [], line: dotLine(h.dot, now) }];
+    }
+    case "line": return [lineRow(h.line)];
+    case "join": return h.join.lines.flatMap((id) => { const l = lines.find((x) => x.id === id); return l ? [lineRow(l)] : []; });
+    case "release": return [{ title: h.release.tag, labels: [], line: `${h.release.repo} · released ${agoWords(ms(h.release.at)!, now)}` }];
+  }
+}
+
+/** The epics with a line in `window`. */
+export const epicCount = (lines: readonly TimelineLine[], window: Interval) => new Set(overlapping(lines, window).map((l) => l.epic)).size;
+
+/** The title line above the plot (note 32): "Agents · 6 epics in these 2 days"; no project when a
+ * menu names it. Its help is the forecast's backtest (Alex, 2026-11-10). */
+export function titleWords(project: string, epics: number, r: TimelineRange): string {
+  const these: Record<TimelineRange, string> = { day: "these 24 hours", twoDays: "these 2 days", week: "these 7 days" };
+  const count = `${epics} epic${epics === 1 ? "" : "s"} in ${these[r]}`;
+  return project ? `${project} · ${count}` : count;
+}
 
 /** What a screen reader reads, a row per line in time order (section 5): "Azure DevOps, 3 of 7
  * done, closes about 6:00 PM". */

@@ -13,15 +13,15 @@ import { describe } from "../model/errors";
 import { boardChoices, boardName, withBoard, type WorkProject } from "../model/work";
 import { boards, forgeHosts, loadBoards } from "../model/workLists";
 import {
-  Axis, colourIndex, dotWords, epicOf, errorWords, fitLabel, hit, isOpen, joinCardWords, joins, label, labelText, landed as landedRefs, lanes,
-  layout, labelRoom, lineWords, mergeTimelines, noEpics, noMachine, noProject, overlapping, rangeSpan, rangeTitle, rangeWindow, releaseWords,
-  riser, spoken, timelineLines, timelineRanges, waitWords, zoomed, type Interval, type TimelineHit, type TimelineLine, type TimelineRange,
+  Axis, cardRows, colourIndex, dotX, epicCount, epicOf, errorWords, fitLabel, hit, isOpen, joins, label, labelText, landed as landedRefs,
+  lanes, layout, labelRoom, mergeTimelines, noEpics, noMachine, noProject, overlapping, rangeSpan, rangeTitle, rangeWindow, riser, spoken,
+  timelineLines, timelineRanges, titleWords, waitWords, zoomed, type Interval, type TimelineHit, type TimelineLine, type TimelineRange,
 } from "../model/workTimeline";
 import { go } from "../route";
 import { Choice, workProjects } from "./Work";
+import { LabelChip, StateIcon } from "./WorkParts";
 
 const range = signal<TimelineRange>("twoDays");
-const forecast = signal(true);
 /** The project, by id; "" until one is picked, then the first one. */
 const project = signal("");
 /** The board the epics are narrowed to (#3282), by its url; "" for every board. */
@@ -37,7 +37,7 @@ const nowAsked = signal(0);
 const landed = signal<ReadonlySet<string>>(new Set());
 let read: string | undefined;
 
-const laneHeight = 30;
+const laneHeight = 60;
 const axisHeight = 26;
 
 /** The system colours for the features, as the window's palette; the last, grey, for an epic with none. */
@@ -136,9 +136,6 @@ export function WorkTimeline({ store }: { store: Store }) {
           ))}
         </div>
         <button type="button" onClick={goToNow} title="Back to now">Now</button>
-        <label title={t?.backtest ? `The forecast after now. ${errorWords(t.backtest)}.` : "The forecast after now"}>
-          <input type="checkbox" checked={forecast.value} onChange={(e) => { forecast.value = (e.target as HTMLInputElement).checked; }} /> Forecast
-        </label>
         {projects.length > 1 && (
           <label>Project <select value={project.value} onChange={(e) => { project.value = (e.target as HTMLSelectElement).value; }}>
             {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -146,6 +143,13 @@ export function WorkTimeline({ store }: { store: Store }) {
         )}
         <Choice label="Board" any="All" value={board.value} options={boardChoices(boards.value, board.value)}
           words={(url) => boardName(boards.value, url)} onChange={(url) => { board.value = url; }} />
+        {/* The forecast is always drawn (Alex, 2026-11-10): how past forecasts did is the title line's help. */}
+        {t && projects.length > 0 && (
+          <span class="quiet timeline-title" title={t.backtest ? `The forecast after now. ${errorWords(t.backtest)}.` : "The forecast after now"}>
+            {titleWords(projects.length > 1 ? "" : projects[0]!.name,
+              epicCount(timelineLines(t, Date.now()), rangeWindow(range.value, anchor.value)), range.value)}
+          </span>
+        )}
         <span class="spacer" />
         <button type="button" class="link" onClick={() => { asked.value++; void loadBoards(store, true); }}>Refresh</button>
       </div>
@@ -192,13 +196,13 @@ function Plot({ timeline: t, projectName }: { timeline: Timeline; projectName: s
     return () => ro.disconnect();
   }, []);
 
-  // A card is for what was under the pointer: a new range, forecast or window draws other things.
-  useEffect(() => setHover(null), [range.value, forecast.value, anchor.value, nowAsked.value]);
+  // A card is for what was under the pointer: a new range or window draws other things.
+  useEffect(() => setHover(null), [range.value, anchor.value, nowAsked.value]);
 
   const visible = Math.max(size.width, 1);
   const span = content();
   const axis = new Axis(span, visible * (span.end - span.start) / rangeSpan[range.value]);
-  const lines = layout(overlapping(timelineLines(t, now, forecast.value), span), axis, (l) => measure(label(l)));
+  const lines = layout(overlapping(timelineLines(t, now), span), axis, (l) => measure(label(l)));
   const { above, below } = lanes(lines);
   const sides = Math.max(above, below, 2);
   const height = Math.max((2 * sides + 2) * laneHeight, size.height - axisHeight);
@@ -293,18 +297,28 @@ function Plot({ timeline: t, projectName }: { timeline: Timeline; projectName: s
   );
 }
 
-/** The card beside the pointer, on the left of it near the plot's right edge, so it stays in sight. */
+/** The card beside the pointer, on the left of it near the plot's right edge, so it stays in sight. A row on three
+ * lines (Alex, 2026-11-10): the title; the label chips, where the wire has them; the prediction. A join has a row
+ * for each of its lines. */
 function Card({ hover, lines, timeline: t, now, right }: { hover: Hover; lines: TimelineLine[]; timeline: Timeline; now: number; right: number }) {
-  const h = hover.hit;
-  const words = h.kind === "dot" ? dotWords(h.dot, now)
-    : h.kind === "line" ? lineWords(h.line, t.backtest, now)
-    : h.kind === "join" ? joinCardWords(h.join, lines, t.backtest, now)
-    : releaseWords(h.release);
   return (
-    <div class="timeline-card" style={hover.x + 14 + 330 > right
+    <div class="timeline-card" style={hover.x + 14 + 370 > right
       ? { left: `${hover.x - 14}px`, transform: "translateX(-100%)", top: `${hover.y + 14}px` }
       : { left: `${hover.x + 14}px`, top: `${hover.y + 14}px` }}>
-      {words.map((w, i) => <div key={i} class={i === 0 ? "strong" : "quiet small"}>{w}</div>)}
+      {cardRows(hover.hit, lines, t, now).map((row, i) => (
+        <div key={i} class="timeline-card-row">
+          <div class="timeline-card-title">
+            {row.state && <StateIcon kind="issue" state={row.state} size={14} />}<span class="strong">{row.title}</span>
+          </div>
+          {row.labels.length > 0 && (
+            <div class="work-chips">
+              {row.labels.slice(0, 3).map((l) => <LabelChip key={l.name} label={l} />)}
+              {row.labels.length > 3 && <span class="work-chips-more quiet small">+{row.labels.length - 3}</span>}
+            </div>
+          )}
+          <div class="quiet small timeline-card-line">{row.line}</div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -326,6 +340,9 @@ class Drawing {
   y(lane: number) { return this.trunk - lane * laneHeight; }
 
   colour(l: TimelineLine) { return palette[colourIndex(l.feature, palette.length)]!; }
+
+  /** A child of the line is worked on now, and the line is open at Now. */
+  isWorking(l: TimelineLine) { return l.working > 0 && l.start <= this.now && l.end >= this.now; }
 
   /** A line's path: a cubic curve up from the releases line, along its lane, and a curve back down
    * when it joins (section 10). The rise is in pixels, not minutes (section 12, item 2). */
@@ -362,7 +379,6 @@ class Drawing {
         <clipPath id="timeline-ahead"><rect x={nowX} y={0} width={Math.max(axis.width - nowX + 100, 0)} height={height} /></clipPath>
       </defs>,
       <rect key="plot" class="timeline-ground" x={0} y={0} width={axis.width} height={height} />,
-      <rect key="ahead" class="timeline-ahead" x={nowX} y={0} width={Math.max(axis.width - nowX, 0)} height={height} />,
     ];
     // The bands under everything (8 times in 10).
     for (const l of shown) {
@@ -372,8 +388,16 @@ class Drawing {
     }
     // The releases line: solid to Now, dashed after, the brightest at night.
     out.push(<g key="trunk" class="timeline-trunk">{this.stroke("trunk", `M0,${trunk} L${axis.width},${trunk}`, "var(--timeline-trunk)", 2.5)}</g>);
+    // An epic worked on now: under its line, a glow that breathes, one clock for every working line; with Reduce
+    // Motion, none (the CSS's). The line itself is twice as thick.
+    const working = shown.filter((l) => this.isWorking(l));
+    if (working.length > 0) {
+      out.push(<g key="breathing" class="timeline-breathing">
+        {working.map((l) => <path key={l.id} d={this.path(l)} style={{ "--c": this.colour(l) }} />)}
+      </g>);
+    }
     // The lines.
-    for (const l of shown) out.push(this.stroke(`line ${l.id}`, this.path(l), this.colour(l), 2));
+    for (const l of shown) out.push(this.stroke(`line ${l.id}`, this.path(l), this.colour(l), this.isWorking(l) ? 4 : 2));
     // The joins on the releases line.
     for (const j of joins(shown, axis)) {
       const x = axis.x(j.at);
@@ -397,7 +421,7 @@ class Drawing {
     for (const l of shown) {
       const c = this.colour(l), yl = this.y(l.lane);
       for (const dot of l.dots) {
-        const x = axis.x(dot.at);
+        const x = dotX(dot, l, axis);
         out.push(<circle key={`dot ${l.id} ${dot.ref}`} class={`timeline-dot${dot.closed ? "" : " ahead"}${dot.notPlanned ? " dropped" : ""}`}
           style={{ "--c": c }} cx={x} cy={yl} r={dot.closed ? 4 : 3.5} />);
         if (landed.value.has(dot.ref)) {
@@ -405,7 +429,7 @@ class Drawing {
             onAnimationEnd={() => { const next = new Set(landed.value); next.delete(dot.ref); landed.value = next; }} />);
         }
       }
-      if (l.working > 0 && l.start <= this.now && l.end >= this.now) {
+      if (this.isWorking(l)) {
         // ◐: a ring at Now, its left half filled.
         out.push(
           <g key={`working ${l.id}`} class="timeline-working" style={{ "--c": c }}>
@@ -420,7 +444,7 @@ class Drawing {
           d={`M${x - 4},${yl - 4} L${x + 4},${yl + 4} M${x - 4},${yl + 4} L${x + 4},${yl - 4}`} />);
       }
     }
-    // Now: a red line.
+    // Now: a grey line.
     out.push(<line key="now" class="timeline-now" x1={nowX} y1={0} x2={nowX} y2={height} />);
 
     // Last, on a halo: the labels, the pills that wait for the person, the arrows at the edges.
@@ -438,7 +462,7 @@ class Drawing {
       if (!(endX >= left || isOpen(l)) || startX > right) continue;
       const cutLeft = startX < left + 8;
       const x = cutLeft ? left + 8 : startX;
-      const room = labelRoom(l, x, axis, this.now) - (cutLeft ? 14 : 0);
+      const room = labelRoom(l, x, axis) - (cutLeft ? 14 : 0);
       const words = fitLabel(l, room, measure);
       if (words) {
         const arrow = cutLeft ? "← " : "";
@@ -489,7 +513,7 @@ class Drawing {
     );
   }
 
-  /** The hour axis at the foot, and Now's time in a red pill, as in Calendar. */
+  /** The hour axis at the foot, and Now's time in a grey pill. */
   axisMarks() {
     const { axis, nowX } = this;
     const out = [<rect key="ground" class="timeline-ground" x={0} y={0} width={axis.width} height={axisHeight} />];
