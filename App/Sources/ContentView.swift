@@ -139,9 +139,11 @@ struct ContentView: View {
         } else if model.folderPage == .mcpServers, let key = model.selectedFolderKey {
             // A folder's MCP servers, from its row in the sidebar (#753).
             MCPServersView(folder: key).paperGround()
-        } else if let page = model.folderPage, let key = model.selectedFolderKey {
-            // A folder's workflows or its archive, from its row in the sidebar (#495).
-            FolderWorkPage(page: page, folder: key).paperGround()
+        } else if model.folderPage == .archivedSessions, let key = model.selectedFolderKey {
+            // A folder's archived sessions, from its row in the sidebar (#495, #4448).
+            ArchivedSessionsPage(folder: key).paperGround()
+        } else if model.folderPage == .archivedWorkflows, let key = model.selectedFolderKey {
+            ArchivedWorkflowsPage(folder: key).paperGround()
         } else if let path = model.openPin, let key = model.selectedFolderKey, let summary = model.selectedFolderSummary {
             // One of the folder's pinned pages (#159), live, where the chat would be; or a
             // pinned view (#189), fed afresh.
@@ -270,6 +272,12 @@ struct ContentView: View {
         AppCheckout.windowTitle(model.selectedAgent?.title ?? (model.composing ? model.selectedFolderSummary?.name : nil))
     }
 
+    /// The folder's name under a chat's title, and under an Archived page's (#4448).
+    private var subtitle: String {
+        let archived = model.folderPage == .archivedSessions || model.folderPage == .archivedWorkflows
+        return model.selectedAgent == nil && !archived ? "" : (model.selectedFolderSummary?.name ?? "")
+    }
+
     var body: some View {
         @Bindable var model = model
         // A sidebar and what is being read (#145). Picking a session shows its chat
@@ -311,7 +319,7 @@ struct ContentView: View {
                     .overlay { fileSearch }
                     .toolbar { detailToolbar }
                     .navigationTitle(title)
-                    .navigationSubtitle(model.selectedAgent == nil ? "" : (model.selectedFolderSummary?.name ?? ""))
+                    .navigationSubtitle(subtitle)
                 }
             }
         }

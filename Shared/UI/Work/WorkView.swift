@@ -15,7 +15,9 @@ struct WorkView: View {
     var body: some View {
         let place = model.workPlace
         Group {
-            if place.ref != nil {
+            if place.ref != nil, place.kind == .release {
+                WorkReleasePage(model: model, place: place).id(place)
+            } else if place.ref != nil {
                 WorkItemPage(model: model, place: place).id(place)
             } else if place.kind == .feature {
                 WorkFeaturesPane(model: model, state: model.workLists.features)
@@ -294,6 +296,7 @@ private struct WorkListPane: View {
 
     private func rowsList(_ shown: [WorkList.Row], lines: [String]) -> some View {
         let several = Set(list.all.map(\.repo)).count > 1
+        let latest = kind == .release ? WorkReleaseLook.latest(list.all) : []
         return ScrollViewReader { reader in
             selectable {
                 if !lines.isEmpty {
@@ -301,9 +304,10 @@ private struct WorkListPane: View {
                 }
                 ForEach(shown) { row in
                     Button { open(row.id) } label: {
-                        WorkItemRow(row: row, several: several, compact: compact, pick: pick)
+                        WorkItemRow(row: row, several: several, compact: compact, latest: latest.contains(row.id), pick: pick)
                     }
                     .buttonStyle(WorkRowButtonStyle())
+                    .environment(\.workPictures, row.host.map { WorkPictures(model: model, host: $0) })
                     // A forge that failed leaves its rows, dimmed, under the strip (lists.md section 5).
                     .opacity(lines.isEmpty ? 1 : 0.6)
                     .id(row.id)
@@ -362,7 +366,7 @@ private struct WorkListPane: View {
             if list.loadingMore {
                 HStack(spacing: 6) {
                     ProgressView().controlSize(.small)
-                    Text(WorkLook.loadingMore(shown: shown))
+                    Text(WorkLook.loadingMore(shown: shown, total: total))
                 }
             } else if let failed = list.pageProblem {
                 HStack(spacing: 8) {
@@ -370,7 +374,7 @@ private struct WorkListPane: View {
                     Button(WorkLook.tryAgain) { Task { await list.loadMore(model: model) } }.buttonStyle(.paper)
                 }
             } else {
-                Text(WorkLook.endWords(kind, shown: shown, more: list.hasMore))
+                Text(WorkLook.endWords(kind, shown: shown, more: list.hasMore, total: total))
             }
         }
         .appText(.fine)
@@ -386,6 +390,9 @@ private struct WorkListPane: View {
             await list.loadMore(model: model)
         }
     }
+
+    /// The forge's count of the list (#4396), where it gives one and the list shows all it counts.
+    private var total: Int? { WorkLook.listTotal(list.lists?.map(\.list.total) ?? [], filter: list.filter) }
 
     /// A click on a chip sets the Label filter to it (Mac); on a phone a tap opens the row.
     private var pick: ((String) -> Void)? {

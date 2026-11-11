@@ -30,7 +30,11 @@ public enum WorkList {
         /// The states a list can be narrowed to: a PR's merged is its own.
         public var states: [State] { self == .pr ? [.open, .merged, .closed, .all] : [.open, .closed, .all] }
 
-        public var sorts: [Sort] { fromForge ? Sort.allCases : [.updated, .cost] }
+        /// A release's Newest is its version, the highest first (#4421).
+        public var sorts: [Sort] { fromForge ? Sort.allCases : self == .release ? [.newest, .cost] : [.updated, .cost] }
+
+        /// The sort a list opens with: a release's is Newest.
+        public var defaultSort: Sort { self == .release ? .newest : .updated }
     }
 
     public enum State: String, CaseIterable, Sendable, Hashable {
@@ -60,14 +64,21 @@ public enum WorkList {
         public var title: String
         /// open, closed or merged; empty when nothing says.
         public var state: String
+        /// Why a closed issue closed (completed, not_planned or duplicate), where the forge says it (#4365).
+        public var stateReason: String?
         /// The tracker's own name for its step (a Jira status, #3260), shown in place of `state`.
         public var status: String?
         public var labels: [DaemonAPI.ForgeLabel]
         /// The ref's repo or tracker: github:alexec/Agents, linear:ENG (a Linear team, #3311), jira.
         public var repo: String
         public var author: String?
+        /// The author's picture, a URL that only `forge/image` reads (#4363).
+        public var avatar: String?
         public var assignees: [String]
         public var updated: Date
+        /// When it opened, and when it closed or merged, where the forge says them (#4373).
+        public var created: Date?
+        public var closed: Date?
         public var url: URL?
         /// The machine the forge read came from, to read the item again on.
         public var host: MachineRef?
@@ -87,16 +98,21 @@ public enum WorkList {
                     repo: String, author: String? = nil, assignees: [String] = [],
                     updated: Date, url: URL? = nil, host: MachineRef? = nil, folder: String? = nil, draft: Bool = false,
                     lineage: DaemonAPI.ReportNode? = nil, status: String? = nil, comments: Int = 0, checks: String? = nil,
-                    review: String? = nil) {
+                    review: String? = nil, stateReason: String? = nil, avatar: String? = nil, created: Date? = nil,
+                    closed: Date? = nil) {
             self.node = node
             self.title = title
             self.state = state
+            self.stateReason = stateReason
             self.status = status
             self.labels = labels
             self.repo = repo
             self.author = author
+            self.avatar = avatar
             self.assignees = assignees
             self.updated = updated
+            self.created = created
+            self.closed = closed
             self.url = url
             self.host = host
             self.folder = folder
@@ -113,12 +129,14 @@ public enum WorkList {
                       author: item.author, assignees: item.assignees, updated: item.updatedAt,
                       url: item.url.flatMap(URL.init(string:)), host: host, folder: item.folder, draft: item.draft ?? false,
                       lineage: lineage,
-                      status: item.status, comments: item.comments, checks: item.checks, review: item.review)
+                      status: item.status, comments: item.comments, checks: item.checks, review: item.review,
+                      stateReason: item.stateReason, avatar: item.authorAvatar, created: item.createdAt, closed: item.closedAt)
         }
 
-        /// A row lineage alone knows: a release.
+        /// A row lineage alone knows: a release, named by its tag until the forge names it (#4426).
         public init(_ n: DaemonAPI.ReportNode) {
-            self.init(node: n.node, title: n.resolved?.title ?? ReportValueWords.name(n.node),
+            self.init(node: n.node,
+                      title: n.resolved?.title ?? (n.node.kind == "release" ? WorkList.shortRef(n.node.ref) : ReportValueWords.name(n.node)),
                       state: n.resolved?.state ?? (n.outcome == "merged" ? "merged" : ""),
                       labels: (n.resolved?.labels ?? []).map { DaemonAPI.ForgeLabel(name: $0) },
                       repo: WorkList.repo(of: n), updated: n.lastAt,
@@ -317,8 +335,15 @@ public enum WorkList {
         case .updated:
             return rows.sorted(by: tie)
         case .newest:
-            // A forge numbers its items as they are made, so the highest number is the newest.
+            // A forge numbers its items as they are made, so the highest number is the newest; a
+            // release's version says it (#4421).
             return rows.sorted { a, b in
+                if a.node.kind == "release", b.node.kind == "release" {
+                    let (x, y) = (shortRef(a.node.ref), shortRef(b.node.ref))
+                    if WorkReleaseLook.newer(x, than: y) { return true }
+                    if WorkReleaseLook.newer(y, than: x) { return false }
+                    return tie(a, b)
+                }
                 let (x, y) = (number(a.node.ref), number(b.node.ref))
                 return x != y ? x > y : tie(a, b)
             }

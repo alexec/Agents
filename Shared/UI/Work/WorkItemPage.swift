@@ -29,6 +29,8 @@ struct WorkItemPage: View {
     @State private var olderLoading = false
     @State private var estimate: DaemonAPI.LineageEstimate?
     @State private var estimateRange = false
+    @State private var forecast: DaemonAPI.LineageForecast?
+    @State private var forecastHelp = false
     @State private var pipeline: [Pipeline.Step] = []
     @State private var lineage: (cost: DaemonAPI.LineageCostRollup?, sessions: [UUID])?
     @State private var said: (words: String, failed: Bool)?
@@ -110,6 +112,7 @@ struct WorkItemPage: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .onGeometryChange(for: CGFloat.self, of: \.size.width) { width = $0 }
+        .environment(\.workPictures, detail.map { WorkPictures(model: model, host: $0.host) })
         #if os(iOS)
         .refreshable { asked += 1 }
         .navigationSubtitle(model.workNeighbours.map { WorkList.positionWords($0, more: model.workLists[place.kind].hasMore) } ?? "")
@@ -123,6 +126,7 @@ struct WorkItemPage: View {
         #endif
         .workTask(id: asked) { await loadForge() }
         .workTask(id: estimateAsk) { await loadEstimate() }
+        .workTask(id: forecastAsk) { await loadForecast() }
         .workTask(id: lineageAsk) { await loadLineage() }
         #if os(macOS)
         .workTask(id: pipelineAsk) { await loadPipeline() }
@@ -242,8 +246,8 @@ struct WorkItemPage: View {
         return line.appText(.title).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
     }
 
-    /// The state pill (a tracker's status menu in its place), *alexec opened this · 4 comments*,
-    /// and Open on GitHub at the trailing end. The opened and closed times come with #4373.
+    /// The state pill (a tracker's status menu in its place), *alexec opened this 3 d ago · 4
+    /// comments*, and Open on GitHub at the trailing end.
     private var stateLine: some View {
         // On the iPhone Open on GitHub is the bar's (#4401 note 7).
         let url = compact ? nil : forgeURL
@@ -254,7 +258,7 @@ struct WorkItemPage: View {
                 }
             } else {
                 WorkPagePill(kind: node.kind, state: item?.state ?? row?.state ?? "", draft: item?.draft ?? row?.draft ?? false,
-                             status: item?.status ?? row?.status)
+                             status: item?.status ?? row?.status, stateReason: item?.stateReason ?? row?.stateReason)
             }
             if item?.standing == true {
                 // A standing epic never closes (#3662, epic.md note 16).
@@ -276,25 +280,21 @@ struct WorkItemPage: View {
         }
     }
 
-    /// "alexec opened this · updated 2 h ago · 4 comments"; narrow: "alexec · 2 h · 4 comments".
+    /// "alexec opened this 3 d ago · closed 1 d ago · 4 comments"; narrow: "alexec · 3 d · 4
+    /// comments". With no opened time from the forge, the last update's (#4373).
     private var stateWords: String {
         let author = item?.author ?? row?.author
         let updated = item?.updatedAt ?? row?.updated
         let comments = item?.comments ?? row?.comments ?? 0
+        let state = item?.state ?? row?.state ?? "open"
+        let created = item?.createdAt ?? row?.created
+        let closed = item?.closedAt ?? row?.closed
         if node.kind == "pr" {
-            return WorkLook.pullStateWords(author: author, state: item?.state ?? row?.state ?? "open", updated: updated,
-                                           comments: comments, narrow: narrow)
+            return WorkLook.pullStateWords(author: author, state: state, updated: updated, comments: comments, narrow: narrow,
+                                           created: created, closed: closed)
         }
-        let age = updated.map { WorkLook.ageWords(Date().timeIntervalSince($0)) }
-        var parts: [String] = []
-        if narrow {
-            parts += [author, age].compactMap { $0 }
-        } else {
-            if let author { parts.append(node.kind == "pr" ? "\(author) opened this pull request" : "\(author) opened this") }
-            if let age { parts.append(age == "now" ? "updated now" : "updated \(age) ago") }
-        }
-        if comments > 0 { parts.append(comments == 1 ? "1 comment" : "\(comments) comments") }
-        return parts.joined(separator: " · ")
+        return WorkLook.issueStateWords(author: author, state: state, updated: updated, comments: comments, narrow: narrow,
+                                        created: created, closed: closed)
     }
 
     /// Start Agent: on an open issue whose read gives a `start` (one in a folder), when a machine
@@ -473,11 +473,13 @@ struct WorkItemPage: View {
     }
 
     /// One timeline (#4400 notes 8 to 11): the body is its first box, Older comments under it,
-    /// then the comments; a closed item's close; then the comment box. Events come with #4373.
+    /// then the comments and the forge's events in time order (#4373); a closed item's close,
+    /// from its state where the forge gives no events; then the comment box.
     @ViewBuilder
     private func timeline(_ got: DaemonAPI.ForgeItemDetail, on host: MachineRef) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            WorkCommentView(comment: .init(author: got.item.author ?? WorkList.forgeName(node.ref), body: got.body, at: got.item.updatedAt),
+            WorkCommentView(comment: .init(author: got.item.author ?? WorkList.forgeName(node.ref), body: got.body,
+                                           at: got.item.createdAt ?? got.item.updatedAt, avatar: got.item.authorAvatar),
                             words: "opened this", compact: narrow) {
                 if got.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Text("No description.").foregroundStyle(.secondary)
@@ -488,13 +490,23 @@ struct WorkItemPage: View {
             if got.cursor != nil {
                 olderComments
             }
-            ForEach(Array(got.comments.enumerated()), id: \.offset) { _, c in
-                WorkCommentView(comment: c, compact: narrow) {
-                    MarkdownText(markdown: ForgeMarkdown.markdown(c.body), remoteImage: image(on: host))
+            ForEach(Array(WorkLook.timeline(comments: got.comments, events: got.events, older: got.cursor != nil).enumerated()),
+                    id: \.offset) { _, entry in
+                switch entry {
+                case let .comment(c):
+                    WorkCommentView(comment: c, compact: narrow) {
+                        MarkdownText(markdown: ForgeMarkdown.markdown(c.body), remoteImage: image(on: host))
+                    }
+                case let .event(e):
+                    if let words = WorkLook.eventWords(e) {
+                        WorkTimelineEvent(symbol: WorkTimelineEvent.symbol(e, stateReason: got.item.stateReason), words: words, at: e.at)
+                    }
                 }
             }
-            if got.item.node.kind == "issue", got.item.state == "closed", got.transitions == nil {
-                WorkTimelineEvent(symbol: "checkmark.circle", words: "Closed")
+            if got.item.node.kind == "issue", got.item.state == "closed", got.transitions == nil, !WorkLook.eventsSayClose(got.events) {
+                WorkTimelineEvent(symbol: got.item.stateReason == "not_planned" ? "slash.circle" : "checkmark.circle",
+                                  words: got.item.stateReason == "not_planned" ? "Closed as not planned" : "Closed",
+                                  at: got.item.closedAt)
             }
             if got.item.node.kind == "pr" { pullEnd(got, on: host) }
         }
@@ -521,10 +533,10 @@ struct WorkItemPage: View {
     private func pullEnd(_ got: DaemonAPI.ForgeItemDetail, on host: MachineRef) -> some View {
         switch got.item.state {
         case "merged":
-            WorkTimelineEvent(symbol: "arrow.triangle.merge", words: "Merged", at: got.item.updatedAt)
+            WorkTimelineEvent(symbol: "arrow.triangle.merge", words: "Merged", at: got.item.closedAt ?? got.item.updatedAt)
             mergedStrip
         case "closed":
-            WorkTimelineEvent(symbol: "xmark.circle", words: "Closed with unmerged commits", at: got.item.updatedAt)
+            WorkTimelineEvent(symbol: "xmark.circle", words: "Closed with unmerged commits", at: got.item.closedAt ?? got.item.updatedAt)
         default:
             if !narrow, let box = WorkLook.mergeBox(got) { mergeBox(box, got, on: host) }
         }
@@ -570,8 +582,8 @@ struct WorkItemPage: View {
             .redacted(reason: detail == nil ? .placeholder : [])
     }
 
-    /// Assignees, Labels (its gear opens the labels picker), Repo and Project, as the
-    /// wire has them now: avatars come with #4363 (parts.md section 5).
+    /// Assignees, Labels (its gear opens the labels picker), Repo and Project (parts.md section
+    /// 5). The forge gives the author's picture (#4363): an assignee who wrote it has it.
     @ViewBuilder
     private var details: some View {
         let item = item
@@ -580,7 +592,9 @@ struct WorkItemPage: View {
             if assignees.isEmpty {
                 WorkSideNone(words: "No one")
             } else {
-                ForEach(assignees, id: \.self) { WorkSidePerson(login: $0) }
+                let author = item?.author ?? row?.author
+                let avatar = item?.authorAvatar ?? row?.avatar
+                ForEach(assignees, id: \.self) { WorkSidePerson(login: $0, avatar: $0 == author ? avatar : nil) }
             }
         }
         if node.kind == "pr" {
@@ -641,22 +655,30 @@ struct WorkItemPage: View {
         }
     }
 
-    /// The parent, and an epic's progress. The children and the pull requests that close it come with #4373.
+    /// The parent, an epic's progress, then its children and the pull requests that close it,
+    /// where the forge gives them (#4373); each opens its page.
     @ViewBuilder
     private func linked(_ item: DaemonAPI.ForgeItem) -> some View {
-        if item.parent != nil || item.progress != nil {
+        let children = detail?.got.children ?? []
+        let pulls = detail?.got.linkedPulls ?? []
+        if item.parent != nil || item.progress != nil || !children.isEmpty || !pulls.isEmpty {
             WorkSideSection(title: "Linked") {
                 if let parent = item.parent {
-                    WorkSideLinked(node: parent) {
-                        if let kind = WorkList.kind(of: parent) { model.showWork(WorkPlace(kind: kind, ref: parent.ref)) }
-                    }
+                    WorkSideLinked(node: parent) { show(parent) }
                 }
                 if let progress = item.progress {
                     ProgressView(value: Double(progress.done), total: Double(max(progress.total, 1)))
                     Text("\(progress.done) of \(progress.total) closed").appText(.fine).foregroundStyle(.secondary).monospacedDigit()
                 }
+                ForEach(children + pulls, id: \.node.ref) { linked in
+                    WorkSideLinked(node: linked.node, title: linked.title, state: linked.state) { show(linked.node) }
+                }
             }
         }
+    }
+
+    private func show(_ node: DaemonAPI.LineageNode) {
+        if let kind = WorkList.kind(of: node) { model.showWork(WorkPlace(kind: kind, ref: node.ref)) }
     }
 
     /// What lineage knows (#4400 note 14): the cost and the sessions, each a link with a green dot
@@ -666,7 +688,9 @@ struct WorkItemPage: View {
     private func lineageSection(_ item: DaemonAPI.ForgeItem) -> some View {
         let sessions = lineage?.sessions ?? []
         let cost = lineage?.cost.flatMap { $0.total.cost.values.contains { $0 > 0 } ? ReportValueWords.cost($0.total) : nil }
-        let shows = !sessions.isEmpty || cost != nil || estimate.map { item.state == "open" ? EstimateWords.shows($0) : EstimateWords.actualWords($0) != nil } == true
+        let forecastLines = forecastLines(item)
+        let shows = !sessions.isEmpty || cost != nil || !forecastLines.isEmpty
+            || estimate.map { item.state == "open" ? EstimateWords.shows($0) : EstimateWords.actualWords($0) != nil } == true
         #if os(macOS)
         let any = shows || !pipeline.isEmpty
         #else
@@ -687,6 +711,7 @@ struct WorkItemPage: View {
                         .textSelection(.enabled)
                     #endif
                 }
+                if !forecastLines.isEmpty { forecastLine(forecastLines, item: item) }
                 #if os(macOS)
                 if !pipeline.isEmpty { pipelineLine }
                 #endif
@@ -759,6 +784,14 @@ struct WorkItemPage: View {
         return LineageAsk(host: lineageHost, asked: asked)
     }
 
+    /// An epic's forecast (#4527), from the machine that keeps its links: when an open one lands and
+    /// what it costs to complete, and a closed one's first forecast against when it landed. A
+    /// standing epic never lands (#3662).
+    private var forecastAsk: LineageAsk? {
+        guard let item, item.node.kind == "issue", isEpic, item.standing != true else { return nil }
+        return LineageAsk(host: lineageHost, asked: asked)
+    }
+
     /// The cost and the sessions of an issue or a pull request, from the machine that keeps its links.
     private var lineageAsk: LineageAsk? {
         guard detail != nil, [.issue, .pr].contains(place.kind), !node.ref.isEmpty else { return nil }
@@ -788,6 +821,34 @@ struct WorkItemPage: View {
         }
         #else
         line.textSelection(.enabled).help(range ?? "")
+        #endif
+    }
+
+    /// An open epic's "Likely lands by …" and "To complete: …", or a closed one's first forecast
+    /// against when it landed (#4527).
+    private func forecastLines(_ item: DaemonAPI.ForgeItem) -> [String] {
+        guard let forecast, forecastAsk != nil else { return [] }
+        if item.state == "open" {
+            return [ForecastWords.landsLine(forecast), ForecastWords.toCompleteLine(forecast)].compactMap { $0 }
+        }
+        return [ForecastWords.keptLine(forecast, landed: item.closedAt)].compactMap { $0 }
+    }
+
+    /// The forecast's lines under the estimate. The assumptions are their help on the Mac; on the
+    /// Remote a tap shows them under the lines, as the estimate's range does.
+    @ViewBuilder
+    private func forecastLine(_ lines: [String], item: DaemonAPI.ForgeItem) -> some View {
+        let help = forecast.flatMap { item.state == "open" ? ForecastWords.help($0) : ForecastWords.keptHelp($0) }
+        let text = Text(lines.joined(separator: "\n"))
+            .appText(.fine).foregroundStyle(.secondary).monospacedDigit()
+            .accessibilityHint(help ?? "")
+        #if os(iOS)
+        text.onTapGesture { if help != nil { forecastHelp.toggle() } }
+        if forecastHelp, let help {
+            Text(help).appText(.fine).foregroundStyle(.secondary).monospacedDigit()
+        }
+        #else
+        text.textSelection(.enabled).help(help ?? "")
         #endif
     }
 
@@ -914,6 +975,15 @@ struct WorkItemPage: View {
         guard estimateAsk == mine else { return }
         estimate = got
     }
+
+    private func loadForecast() async {
+        let mine = forecastAsk
+        forecast = nil
+        guard let mine, let host = mine.host else { return }
+        let got = await model.lineageForecast(node, on: host)
+        guard forecastAsk == mine else { return }
+        forecast = got
+    }
 }
 
 /// The page header's state pill (#4400 note 6, parts.md section 1): the state's glyph and word,
@@ -924,11 +994,13 @@ struct WorkPagePill: View {
     let state: String
     var draft = false
     var status: String?
+    /// The forge's `not_planned` (#4365): the grey pill with a slash.
+    var stateReason: String?
 
     var body: some View {
-        if let glyph = WorkLook.glyph(kind: kind, state: state, draft: draft), status == nil {
+        if let glyph = WorkLook.glyph(kind: kind, state: state, draft: draft, stateReason: stateReason), status == nil {
             HStack(spacing: 4) {
-                WorkStateIcon(kind: kind, state: state, draft: draft, onFill: true)
+                WorkStateIcon(kind: kind, state: state, draft: draft, stateReason: stateReason, onFill: true)
                 Text(words)
             }
             .appText(.supporting)

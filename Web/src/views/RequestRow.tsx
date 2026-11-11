@@ -11,12 +11,16 @@
 // Allow for 1 Hour and Deny, and its grey line says that Agents cannot tell a terminal from an agent.
 // Its mark is one for each kind (#4026), as NeedRequest.symbol is: unlike an approval's one shield,
 // it says what is asked. The step's hand taps: the raised hand is a session that needs the person.
+// Its menu also has Later (#4236): In 1 Hour, 4 Hours, 8 Hours, 1 Day and At My Mac, as the window's
+// RequestLaterMenu. In Needs You's Later group the row is grey, its grey line starts with when it
+// comes back, and its menu has Bring Back Now before Later again.
 import type { Request as PersonRequest, RequestKind } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { shortAgo } from "../model/activity";
 import { fromWireDate } from "../protocol/dates";
 import { go } from "../route";
 import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
+import { backWords, isDeferred, laters, laterWords } from "../model/later";
 import { answerElsewhere, isTerminalRequest, secretUseActions, secretUseOf, secretUseSigns, secretUseTitle, secretUseWhere, secretUseWords } from "../model/secretUse";
 
 const kindWords: Record<RequestKind, string> = {
@@ -45,9 +49,9 @@ const kindMarks: Record<RequestKind, string[]> = {
 };
 
 /** A request's mark, its kind's, in the attention tint. */
-function RequestMark({ kind }: { kind: RequestKind }) {
+function RequestMark({ kind, later }: { kind: RequestKind; later: boolean }) {
   return (
-    <span class="sidebar-mark approval" aria-hidden="true">
+    <span class={`sidebar-mark ${later ? "later" : "approval"}`} aria-hidden="true">
       <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"
         stroke-linejoin="round" stroke-linecap="round">
         {(kindMarks[kind] ?? kindMarks.decide).map((d) => <path key={d} d={d} />)}
@@ -64,7 +68,9 @@ export function RequestRow({ store, host, folder, request, place, chosen }: {
   const askerTitle = store.agent(host, asker)?.title;
   const use = secretUseOf(request);
   const unsigned = !!use && secretUseSigns(use, "once") && !store.machineLock.canSign();
-  const line = unsigned ? `${requestLine(request, askerTitle)} · ${answerElsewhere}` : requestLine(request, askerTitle);
+  const later = isDeferred(request);
+  const asked = unsigned ? `${requestLine(request, askerTitle)} · ${answerElsewhere}` : requestLine(request, askerTitle);
+  const line = later ? `${backWords(request.deferred!)} · ${asked}` : asked;
   const terminal = isTerminalRequest(request);
   const open = () => go({ host, folder, session: asker });
   const menu = (): MenuItem[] => [
@@ -72,14 +78,18 @@ export function RequestRow({ store, host, folder, request, place, chosen }: {
       label: secretUseWords[action], run: () => void store.answerSecretUse(host, request.id, action, use),
     })) : []),
     ...(terminal ? [] : [{ label: "Open Session", run: open }]),
+    ...(later ? [{ label: "Bring Back Now", run: () => void store.undeferRequest(host, request.id) }] : []),
+    ...laters.map((choice) => ({ label: laterWords[choice],
+      help: choice === "atMac" ? "Out of Needs You until you are next at the Mac" : "Out of Needs You until then",
+      run: () => void store.deferRequest(host, request.id, choice) })),
   ];
   return (
     <div class="nav-item">
       <button class={`row session approval${chosen ? " chosen" : ""}`} aria-current={chosen}
-        aria-description="waiting for your answer" title={line} onClick={terminal ? (e) => openContextMenu(e, menu()) : open}
+        aria-description={later ? "in Later" : "waiting for your answer"} title={line} onClick={terminal ? (e) => openContextMenu(e, menu()) : open}
         onContextMenu={(e) => openContextMenu(e, menu())}
         onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu()); }} {...holdForMenu(menu)}>
-        <RequestMark kind={request.kind} />
+        <RequestMark kind={request.kind} later={later} />
         <span class="body">
           <span class="title placed">
             <span class="name">{use ? secretUseTitle(use) : request.title}</span>

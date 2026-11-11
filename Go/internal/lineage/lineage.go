@@ -597,12 +597,20 @@ func (f *Files) All() ([]wire.LineageLink, []wire.LineageStateChange) {
 }
 
 func (f *Files) Walk(n wire.LineageNode, depth int) wire.LineageGraph {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return WalkOver(f.links, f.linksOf, f.stateNow, n, depth)
+}
+
+// WalkOver is the graph within depth links of n, either way, over links: linksOf is the
+// indexes in links of a node's links, newest start first, and stateNow a node's latest state.
+// A machine's own walk and the control plane's walk of its merged copy (#4276) are both this.
+func WalkOver(links []wire.LineageLink, linksOf func(wire.LineageNode) []int,
+	stateNow func(wire.LineageNode) (wire.LineageSessionState, bool), n wire.LineageNode, depth int) wire.LineageGraph {
 	if depth <= 0 {
 		depth = DefaultDepth
 	}
 	depth = min(depth, MostDepth)
-	f.mu.Lock()
-	defer f.mu.Unlock()
 	seen := map[wire.LineageNode]bool{n: true}
 	g := wire.LineageGraph{Nodes: []wire.LineageNode{n}, Links: []wire.LineageLink{}}
 	went := map[int]bool{}
@@ -611,11 +619,11 @@ func (f *Files) Walk(n wire.LineageNode, depth int) wire.LineageGraph {
 	for range depth {
 		var next []wire.LineageNode
 		for _, at := range edge {
-			for _, i := range f.linksOf(at) {
+			for _, i := range linksOf(at) {
 				if went[i] {
 					continue
 				}
-				l := f.links[i]
+				l := links[i]
 				other := l.To
 				if other == at {
 					other = l.From
@@ -641,7 +649,7 @@ func (f *Files) Walk(n wire.LineageNode, depth int) wire.LineageGraph {
 	}
 	sort.SliceStable(g.Links, func(i, j int) bool { return g.Links[i].At > g.Links[j].At })
 	for _, n := range g.Nodes {
-		if s, ok := f.stateNow(n); ok {
+		if s, ok := stateNow(n); ok {
 			if g.States == nil {
 				g.States = map[string]wire.LineageSessionState{}
 			}

@@ -208,7 +208,7 @@ struct WorkListTests {
         var n = node(0, 2)
         n.node = Node(kind: "release", ref: "github:alexec/Agents/release/v0.14.0")
         let row = WorkList.Row(n)
-        #expect(row.title == "alexec/Agents release v0.14.0")
+        #expect(row.title == "v0.14.0")
         #expect(WorkList.titleSaysRef(row.title, row.node.ref))
         #expect(row.url?.absoluteString == "https://github.com/alexec/Agents/releases/tag/v0.14.0")
     }

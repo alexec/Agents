@@ -6,8 +6,10 @@ long title, and an issue (#12) with comments by two people and a bot; for the pu
 (#4406), each pull request's checks one by one, a pull request with conflicts (#24) and one with
 auto-merge on (#25), and the failed check's job and the end of its log (`forge/log`, #4407); for the
 epic page (#4416), the epic #10 with sub-issues in three steps: #12 waits for #11 (closed, so step 1
-starts folded), #13 and #17 wait for #12, and #17 is also blocked by #16, outside the plan. Scratch
-data only. Point a
+starts folded), #13 and #17 wait for #12, and #17 is also blocked by #16, outside the plan; for the
+forge's own fields (#4397), opened and closed times, a closed issue not planned (#20), avatars (public
+GitHub avatars, which `forge/image` reads), the list's total, #12's timeline events and the pull
+request that closes it (#21), and #10's children. Scratch data only. Point a
 run-app host at it with --env AGENTS_TEST_GITHUB_URL=http://127.0.0.1:<port>, and connect GitHub with
 rpc.py call connections/sign-in/token '{"provider":"github","token":"walk"}'.
 
@@ -72,7 +74,22 @@ ITEMS = {
          "author": "robin", "at": 2 * 1440, "check": "SUCCESS", "review": "APPROVED"},
     18: {"title": "Try a second payment provider", "state": "CLOSED", "labels": [], "pr": True, "author": "sam",
          "at": 5 * 1440},
+    20: {"title": "Pay with a store voucher", "state": "CLOSED", "reason": "NOT_PLANNED", "labels": ["feature:checkout"], "parent": 10,
+         "author": "kai", "at": 4 * 1440},
 }
+
+# Public avatars (GitHub's own organisations), so `forge/image` reads a real picture: robin has none.
+AVATARS = {"sam": "https://avatars.githubusercontent.com/u/9919?v=4", "kai": "https://avatars.githubusercontent.com/u/44036562?v=4"}
+
+# #12's timeline: the events of the one model's kinds, oldest first, with the minutes ago of each.
+EVENTS = {12: [("LabeledEvent", "sam", 1400, {"label": {"name": "story", "color": LABELS["story"]}}),
+               ("AssignedEvent", "sam", 1395, {"assignee": {"login": "robin"}}),
+               ("CrossReferencedEvent", "robin", 175, {"source": {"__typename": "PullRequest", "number": 21,
+                                                                  "repository": {"nameWithOwner": REPO}}}),
+               ("LabeledEvent", "robin", 60, {"label": {"name": "feature:checkout", "color": LABELS["feature:checkout"]}})]}
+
+# The pull requests that close an issue.
+CLOSES = {12: [21]}
 
 
 def wanted(n, q):
@@ -92,12 +109,18 @@ def node(n):
     got = {"__typename": "PullRequest" if pr else "Issue", "number": n, "title": i["title"],
            ("pullState" if pr else "issueState"): i["state"],
            "url": f"https://github.com/{REPO}/{'pull' if pr else 'issues'}/{n}", "updatedAt": ago(i["at"]),
-           "author": {"login": i["author"], "__typename": "User"}, "repository": {"nameWithOwner": REPO},
+           "author": {"login": i["author"], "__typename": "User", "avatarUrl": AVATARS.get(i["author"])},
+           "repository": {"nameWithOwner": REPO},
+           # Opened a day before its last update; closed at it.
+           "createdAt": ago(i["at"] + 1440),
+           "closedAt": ago(i["at"]) if i["state"] in ("CLOSED", "MERGED") else None,
            "labels": {"nodes": [{"name": l, "color": LABELS[l]} for l in i["labels"]]},
            "assignees": {"nodes": [{"login": a, "__typename": "User"} for a in i.get("assignees", [])]},
            "milestone": {"title": "1.3"} if not pr else None,
            "commentCount": {"totalCount": i.get("commentCount", len(i.get("comments", [])))},
            "parent": {"number": i["parent"], "repository": {"nameWithOwner": REPO}} if "parent" in i else None}
+    if not pr and i["state"] == "CLOSED":
+        got["stateReason"] = i.get("reason", "COMPLETED")
     kids = [k for k, c in ITEMS.items() if c.get("parent") == n]
     got["subIssuesSummary"] = {"total": len(kids), "completed": sum(ITEMS[k]["state"] == "CLOSED" for k in kids)}
     if pr:
@@ -129,10 +152,20 @@ def checks(n):
 
 def detail(n):
     i = ITEMS[n]
-    comments = [{"author": {"login": who, "__typename": kind}, "body": body, "createdAt": ago(m),
+    comments = [{"author": {"login": who, "__typename": kind, "avatarUrl": AVATARS.get(who)}, "body": body, "createdAt": ago(m),
                  "url": f"https://github.com/{REPO}/issues/{n}#c{k}"} for k, (who, kind, body, m) in enumerate(i.get("comments", []))]
     got = {**node(n), "body": i.get("body", ""),
            "comments": {"pageInfo": {"hasPreviousPage": False, "startCursor": None}, "nodes": comments}}
+    if not i.get("pr"):
+        def linked(k):
+            c = ITEMS[k]
+            return {("pullState" if c.get("pr") else "issueState"): c["state"], "number": k, "title": c["title"],
+                    "url": f"https://github.com/{REPO}/{'pull' if c.get('pr') else 'issues'}/{k}",
+                    "repository": {"nameWithOwner": REPO}}
+        got["children"] = {"nodes": [linked(k) for k, c in ITEMS.items() if c.get("parent") == n]}
+        got["linkedPulls"] = {"nodes": [linked(k) for k in CLOSES.get(n, [])]}
+        got["events"] = {"nodes": [{"__typename": t, "actor": {"login": who}, "createdAt": ago(m), **more}
+                                   for t, who, m, more in EVENTS.get(n, [])]}
     if i.get("pr"):
         rollup = {"contexts": {"nodes": checks(n)}} if "check" in i else None
         got.update({"reviewThreads": {"totalCount": i.get("threads", 0)}, "changedFiles": 3, "headRefOid": "abc123",
@@ -158,6 +191,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.answer(404, {"message": "Not Found"})
         q, v = b.get("query", ""), b.get("variables", {})
         n = v.get("number")
+        if "issueOrPullRequest" in q:
+            return self.answer(200, {"data": {"repository": {"issueOrPullRequest": detail(n) if n in ITEMS else None,
+                                                             "viewerDefaultMergeMethod": "SQUASH", "squashMergeAllowed": True,
+                                                             "mergeCommitAllowed": True, "rebaseMergeAllowed": False}}})
         if "subIssues(" in q:
             if n not in ITEMS:
                 return self.answer(200, {"data": {"repository": {"issue": None}}})
@@ -166,13 +203,10 @@ class Handler(BaseHTTPRequestHandler):
                 {"number": b, "state": ITEMS[b]["state"], "repository": {"nameWithOwner": REPO}} for b in c.get("blockedBy", [])]}}
                                            for k, c in ITEMS.items() if c.get("parent") == n]}
             return self.answer(200, {"data": {"repository": {"issue": epic}}})
-        if "issueOrPullRequest" in q:
-            return self.answer(200, {"data": {"repository": {"issueOrPullRequest": detail(n) if n in ITEMS else None,
-                                                             "viewerDefaultMergeMethod": "SQUASH", "squashMergeAllowed": True,
-                                                             "mergeCommitAllowed": True, "rebaseMergeAllowed": False}}})
         if "search(" in q:
             time.sleep(SLOW)
             ns = sorted((k for k in ITEMS if wanted(k, v.get("q", ""))), key=lambda k: ITEMS[k]["at"])
+            total = len(ns)
             after = v.get("after")
             if after and os.path.exists(FAIL_MORE):
                 return self.answer(502, {"message": "Server Error"})
@@ -181,7 +215,7 @@ class Handler(BaseHTTPRequestHandler):
             size = PAGE or len(ns)
             more = len(ns) > size
             ns = ns[:size]
-            return self.answer(200, {"data": {"search": {"pageInfo": {"hasNextPage": more, "endCursor": f"c{ns[-1]}" if more else None},
+            return self.answer(200, {"data": {"search": {"issueCount": total, "pageInfo": {"hasNextPage": more, "endCursor": f"c{ns[-1]}" if more else None},
                                                          "edges": [{"cursor": f"c{k}", "node": node(k)} for k in ns]}}})
         self.answer(200, {"data": {}})
 

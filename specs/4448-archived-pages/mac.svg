@@ -1,0 +1,323 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1340" height="1220" viewBox="0 0 1340 1220" font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif">
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#20242A" flood-opacity="0.14"/>
+    </filter>
+    <symbol id="box" viewBox="0 0 16 16"><path d="M2.5 3.5h11v3h-11zM3.5 6.5v6h9v-6M6.5 9h3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+    <symbol id="search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+    <symbol id="chev" viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="chevr" viewBox="0 0 10 10"><path d="M3.5 2l3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="back" viewBox="0 0 16 16"><path d="M10 3L5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="fwd" viewBox="0 0 16 16"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="tick" viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="pause" viewBox="0 0 16 16"><path d="M5.5 4v8M10.5 4v8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="ring" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+    <symbol id="rack" viewBox="0 0 16 16"><rect x="2.5" y="3" width="11" height="4" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="2.5" y="9" width="11" height="4" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/></symbol>
+    <symbol id="flow" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 4.5V8l2.5 1.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+    <symbol id="warn" viewBox="0 0 16 16"><path d="M8 2.2L14.3 13.5H1.7z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M8 6.5v3.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="11.6" r=".8" fill="currentColor"/></symbol>
+    <symbol id="spin" viewBox="0 0 16 16"><path d="M8 2a6 6 0 1 1-6 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="cross" viewBox="0 0 16 16"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="hand" viewBox="0 0 16 16"><path d="M5 8V3.5a1 1 0 0 1 2 0V7M7 7V2.5a1 1 0 0 1 2 0V7M9 7V3.5a1 1 0 0 1 2 0V8.5M11 8.5V5a1 1 0 0 1 2 0v4.5c0 3-2 4.5-4.5 4.5S4.5 12.5 4 10L3 7.5a1 1 0 0 1 1.9-.6L5 8" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></symbol>
+    <symbol id="sparkles" viewBox="0 0 16 16"><path d="M6.5 2.5l1.2 3.3 3.3 1.2-3.3 1.2-1.2 3.3-1.2-3.3L2 7l3.3-1.2zM12 9.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></symbol>
+    <symbol id="doc" viewBox="0 0 16 16"><path d="M4 1.8h5.2L12.5 5v9.2H4zM9 1.8V5.2h3.5M6 8h4.5M6 10.5h4.5" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></symbol>
+  </defs>
+  <rect x="0" y="0" width="1340" height="1220" rx="0" fill="#E7EAEE"/>
+  <text x="24" y="34" font-size="15" fill="#1C1D20" font-weight="600">Archived Sessions and Archived Workflows (#4448): the Mac window</text>
+  <text x="24" y="54" font-size="12" fill="#5B616B">Two rows of the folder's fold, two pages. Title and filter in the title bar, rows by day, Load more. Orange numbers are the notes in wireframe.md. Scratch data.</text>
+  <g transform="translate(24,76)" filter="url(#shadow)">
+  <rect x="0" y="0" width="900" height="560" rx="12" fill="#FFFFFF"/>
+  <path d="M12 0h876a12 12 0 0 1 12 12v52H0V12A12 12 0 0 1 12 0z" fill="#F6F7F8"/>
+  <rect x="0" y="0" width="240" height="560" rx="12" fill="#F0F1F3"/>
+  <rect x="228" y="0" width="12" height="560" rx="0" fill="#F0F1F3"/>
+  <path d="M0 52L900 52" stroke="#E0E3E7" stroke-width="1" fill="none"/>
+  <path d="M240 0L240 560" stroke="#E0E3E7" stroke-width="1" fill="none"/>
+  <circle cx="20" cy="20" r="6" fill="#FF5F57"/>
+  <circle cx="40" cy="20" r="6" fill="#FEBC2E"/>
+  <circle cx="60" cy="20" r="6" fill="#28C840"/>
+  <use href="#back" x="256" y="18" width="16" height="16" color="#8A9099"/>
+  <use href="#fwd" x="276" y="18" width="16" height="16" color="#C7CCD3"/>
+  <text x="308" y="26" font-size="14" fill="#1C1D20" font-weight="600">Archived Sessions</text>
+  <text x="308" y="42" font-size="11.5" fill="#5B616B">Agents</text>
+  <rect x="664" y="13" width="220" height="26" rx="7" fill="#FFFFFF" stroke="#C7CCD3" stroke-width="1"/>
+  <use href="#search" x="672" y="19.0" width="14" height="14" color="#8A9099"/>
+  <text x="692" y="30.5" font-size="12.5" fill="#8A9099">Filter</text>
+  <use href="#plus" x="21" y="71" width="14" height="14" color="#0A6CDB"/>
+  <text x="38" y="82" font-size="12.5" fill="#1C1D20" font-weight="500">New Session</text>
+  <use href="#doc" x="21" y="95" width="14" height="14" color="#0A6CDB"/>
+  <text x="38" y="106" font-size="12.5" fill="#1C1D20">Docs</text>
+  <use href="#chevr" x="20" y="129" width="10" height="10" color="#8A9099"/>
+  <text x="38" y="138" font-size="12.5" fill="#1C1D20" font-weight="500">Work</text>
+  <use href="#chevr" x="20" y="153" width="10" height="10" color="#8A9099"/>
+  <text x="38" y="162" font-size="12.5" fill="#1C1D20" font-weight="500">Your setup</text>
+  <use href="#chevr" x="20" y="177" width="10" height="10" color="#8A9099"/>
+  <text x="38" y="186" font-size="12.5" fill="#1C1D20" font-weight="500">Machines</text>
+  <use href="#chev" x="20" y="209" width="10" height="10" color="#8A9099"/>
+  <text x="38" y="218" font-size="12.5" fill="#1C1D20" font-weight="500">Agents</text>
+  <use href="#chev" x="42" y="233" width="10" height="10" color="#8A9099"/>
+  <text x="60" y="242" font-size="12.5" fill="#1C1D20" font-weight="500">Sessions</text>
+  <text x="234" y="242" font-size="11.5" fill="#8A9099" text-anchor="end">3</text>
+  <use href="#hand" x="61" y="253" width="14" height="14" color="#B35900"/>
+  <text x="82" y="264" font-size="12.5" fill="#1C1D20" font-weight="600">Archived pages: hi-fi mocks</text>
+  <use href="#ring" x="61" y="275" width="14" height="14" color="#0A6CDB"/>
+  <text x="82" y="286" font-size="12.5" fill="#1C1D20">Bug lane: #4440 sidebar count</text>
+  <use href="#tick" x="61" y="297" width="14" height="14" color="#5B616B"/>
+  <text x="82" y="308" font-size="12.5" fill="#1C1D20">Daily summary</text>
+  <use href="#chevr" x="42" y="321" width="10" height="10" color="#8A9099"/>
+  <text x="60" y="330" font-size="12.5" fill="#1C1D20" font-weight="500">Workflows</text>
+  <text x="234" y="330" font-size="11.5" fill="#8A9099" text-anchor="end">5</text>
+  <use href="#rack" x="39" y="343" width="14" height="14" color="#0A6CDB"/>
+  <text x="60" y="354" font-size="12.5" fill="#1C1D20">Connectors</text>
+  <rect x="8" y="361" width="224" height="24" rx="6" fill="#DCEBFC"/>
+  <use href="#box" x="39" y="367" width="14" height="14" color="#0A6CDB"/>
+  <text x="60" y="378" font-size="12.5" fill="#1C1D20">Archived Sessions</text>
+  <use href="#flow" x="39" y="391" width="14" height="14" color="#0A6CDB"/>
+  <text x="60" y="402" font-size="12.5" fill="#1C1D20">Archived Workflows</text>
+  <text x="272" y="88" font-size="11.5" fill="#5B616B" font-weight="600">Today</text>
+  <use href="#box" x="272" y="102" width="14" height="14" color="#8A9099"/>
+  <text x="294" y="113" font-size="13" fill="#1C1D20">Sidebar: a folding Work group</text>
+  <rect x="498.04" y="101" width="37.3" height="16" rx="8" fill="#0E6B82" fill-opacity="0.14"/>
+  <rect x="498.04" y="101" width="37.3" height="16" rx="8" fill="none" stroke="#0E6B82" stroke-width="0.8"/>
+  <text x="503.04" y="112.5" font-size="10.5" fill="#0E6B82" font-weight="500">#4004</text>
+  <rect x="540.34" y="101" width="42.76" height="16" rx="8" fill="#6E7781" fill-opacity="0.14"/>
+  <rect x="540.34" y="101" width="42.76" height="16" rx="8" fill="none" stroke="#6E7781" stroke-width="0.8"/>
+  <text x="545.34" y="112.5" font-size="10.5" fill="#6E7781" font-weight="500">merged</text>
+  <text x="868" y="113" font-size="11.5" fill="#8A9099" text-anchor="end">2 h ago</text>
+  <text x="294" y="129" font-size="11.5" fill="#5B616B">Merged P#4021 · the segmented picker is gone</text>
+  <path d="M294 138L868 138" stroke="#E0E3E7" stroke-width="1" fill="none"/>
+  <rect x="264" y="140" width="612" height="44" rx="6" fill="#E7EAEE"/>
+  <use href="#box" x="272" y="148" width="14" height="14" color="#8A9099"/>
+  <text x="294" y="159" font-size="13" fill="#1C1D20">Fix the web test job</text>
+  <rect x="437.20000000000005" y="147" width="37.3" height="16" rx="8" fill="#0E6B82" fill-opacity="0.14"/>
+  <rect x="437.20000000000005" y="147" width="37.3" height="16" rx="8" fill="none" stroke="#0E6B82" stroke-width="0.8"/>
+  <text x="442.20000000000005" y="158.5" font-size="10.5" fill="#0E6B82" font-weight="500">#4385</text>
+  <text x="868" y="159" font-size="11.5" fill="#8A9099" text-anchor="end">5 h ago</text>
+  <text x="294" y="175" font-size="11.5" fill="#5B616B">A failing web test fails the web job now</text>
+  <path d="M294 184L868 184" stroke="#E0E3E7" stroke-width="1" fill="none"/>
+  <use href="#box" x="272" y="194" width="14" height="14" color="#8A9099"/>
+  <text x="294" y="205" font-size="13" fill="#1C1D20">Messages page, read only</text>
+  <rect x="464.24" y="193" width="37.3" height="16" rx="8" fill="#0E6B82" fill-opacity="0.14"/>
+  <rect x="464.24" y="193" width="37.3" height="16" rx="8" fill="none" stroke="#0E6B82" stroke-width="0.8"/>
+  <text x="469.24" y="204.5" font-size="10.5" fill="#0E6B82" font-weight="500">#4344</text>
+  <rect x="506.54" y="193" width="42.76" height="16" rx="8" fill="#7442B8" fill-opacity="0.14"/>
+  <rect x="506.54" y="193" width="42.76" height="16" rx="8" fill="none" stroke="#7442B8" stroke-width="0.8"/>
+  <text x="511.54" y="204.5" font-size="10.5" fill="#7442B8" font-weight="500">P#4387</text>
+  <text x="868" y="205" font-size="11.5" fill="#8A9099" text-anchor="end">9 h ago</text>
+  <text x="294" y="221" font-size="11.5" fill="#5B616B">Shipped on the Mac and the web; the Remote is tier mac+web</text>
+  <path d="M294 230L868 230" stroke="#E0E3E7" stroke-width="1" fill="none"/>
+  <text x="272" y="258" font-size="11.5" fill="#5B616B" font-weight="600">Yesterday</text>
+  <use href="#box" x="272" y="272" width="14" height="14" color="#8A9099"/>
+  <text x="294" y="283" font-size="13" fill="#1C1D20">Forge interface: move Azure Repos</text>
+  <rect x="525.08" y="271" width="37.3" height="16" rx="8" fill="#0E6B82" fill-opacity="0.14"/>
+  <rect x="525.08" y="271" width="37.3" height="16" rx="8" fill="none" stroke="#0E6B82" stroke-width="0.8"/>
+  <text x="530.08" y="282.5" font-size="10.5" fill="#0E6B82" font-weight="500">#4356</text>
+  <text x="868" y="283" font-size="11.5" fill="#8A9099" text-anchor="end">18:40</text>
+  <text x="294" y="299" font-size="11.5" fill="#5B616B">Azure Repos is on the one interface</text>
+  <path d="M294 308L868 308" stroke="#E0E3E7" stroke-width="1" fill="none"/>
+  <use href="#box" x="272" y="318" width="14" height="14" color="#8A9099"/>
+  <text x="294" y="329" font-size="13" fill="#1C1D20">Pair a Device… in Settings</text>
+  <rect x="477.76" y="317" width="37.3" height="16" rx="8" fill="#0E6B82" fill-opacity="0.14"/>
+  <rect x="477.76" y="317" width="37.3" height="16" rx="8" fill="none" stroke="#0E6B82" stroke-width="0.8"/>
+  <text x="482.76" y="328.5" font-size="10.5" fill="#0E6B82" font-weight="500">#4253</text>
+  <text x="868" y="329" font-size="11.5" fill="#8A9099" text-anchor="end">11:05</text>
+  <text x="294" y="345" font-size="11.5" fill="#5B616B">Three buttons under Clients; walked on a scratch app</text>
+  <path d="M294 354L868 354" stroke="#E0E3E7" stroke-width="1" fill="none"/>
+  <text x="272" y="382" font-size="11.5" fill="#5B616B" font-weight="600">Friday 7 November</text>
+  <use href="#box" x="272" y="396" width="14" height="14" color="#8A9099"/>
+  <text x="294" y="407" font-size="13" fill="#1C1D20">Why does the walk hang on the simulator?</text>
+  <text x="868" y="407" font-size="11.5" fill="#8A9099" text-anchor="end">16:12</text>
+  <text x="294" y="423" font-size="11.5" fill="#5B616B">The sim had a stale lock; filed #4402</text>
+  <path d="M294 432L868 432" stroke="#E0E3E7" stroke-width="1" fill="none"/>
+  <use href="#box" x="272" y="442" width="14" height="14" color="#8A9099"/>
+  <text x="294" y="453" font-size="13" fill="#1C1D20">Lint: shellcheck on scripts/web.sh</text>
+  <rect x="531.84" y="441" width="37.3" height="16" rx="8" fill="#0E6B82" fill-opacity="0.14"/>
+  <rect x="531.84" y="441" width="37.3" height="16" rx="8" fill="none" stroke="#0E6B82" stroke-width="0.8"/>
+  <text x="536.84" y="452.5" font-size="10.5" fill="#0E6B82" font-weight="500">#4390</text>
+  <text x="868" y="453" font-size="11.5" fill="#8A9099" text-anchor="end">09:48</text>
+  <text x="294" y="469" font-size="11.5" fill="#5B616B">Two warnings fixed</text>
+  <path d="M294 478L868 478" stroke="#E0E3E7" stroke-width="1" fill="none"/>
+  <text x="272" y="508" font-size="11.5" fill="#5B616B">50 of 128 archived sessions ·</text>
+  <text x="455.42" y="508" font-size="11.5" fill="#0A6CDB" font-weight="500">Load more</text>
+  </g>
+  <circle cx="514" cy="102" r="9" fill="#B35900"/>
+  <text x="514" y="106" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">1</text>
+  <circle cx="674" cy="102" r="9" fill="#B35900"/>
+  <text x="674" y="106" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">2</text>
+  <circle cx="270" cy="450" r="9" fill="#B35900"/>
+  <text x="270" y="454" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">3</text>
+  <circle cx="266" cy="164" r="9" fill="#B35900"/>
+  <text x="266" y="168" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">4</text>
+  <circle cx="782" cy="235" r="9" fill="#B35900"/>
+  <text x="782" y="239" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">5</text>
+  <circle cx="904" cy="578" r="9" fill="#B35900"/>
+  <text x="904" y="582" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">6</text>
+  <circle cx="904" cy="235" r="9" fill="#B35900"/>
+  <text x="904" y="239" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">7</text>
+  <g transform="translate(24,670)" filter="url(#shadow)">
+  <rect x="0" y="0" width="900" height="430" rx="12" fill="#FFFFFF"/>
+  <path d="M12 0h876a12 12 0 0 1 12 12v52H0V12A12 12 0 0 1 12 0z" fill="#F6F7F8"/>
+  <rect x="0" y="0" width="240" height="430" rx="12" fill="#F0F1F3"/>
+  <rect x="228" y="0" width="12" height="430" rx="0" fill="#F0F1F3"/>
+  <path d="M0 52L900 52" stroke="#E0E3E7" stroke-width="1" fill="none"/>
+  <path d="M240 0L240 430" stroke="#E0E3E7" stroke-width="1" fill="none"/>
+  <circle cx="20" cy="20" r="6" fill="#FF5F57"/>
+  <circle cx="40" cy="20" r="6" fill="#FEBC2E"/>
+  <circle cx="60" cy="20" r="6" fill="#28C840"/>
+  <use href="#back" x="256" y="18" width="16" height="16" color="#8A9099"/>
+  <use href="#fwd" x="276" y="18" width="16" height="16" color="#C7CCD3"/>
+  <text x="308" y="26" font-size="14" fill="#1C1D20" font-weight="600">Archived Workflows</text>
+  <text x="308" y="42" font-size="11.5" fill="#5B616B">Agents</text>
+  <rect x="664" y="13" width="220" height="26" rx="7" fill="#FFFFFF" stroke="#C7CCD3" stroke-width="1"/>
+  <use href="#search" x="672" y="19.0" width="14" height="14" color="#8A9099"/>
+  <text x="692" y="30.5" font-size="12.5" fill="#8A9099">Filter</text>
+  <use href="#plus" x="21" y="71" width="14" height="14" color="#0A6CDB"/>
+  <text x="38" y="82" font-size="12.5" fill="#1C1D20" font-weight="500">New Session</text>
+  <use href="#doc" x="21" y="95" width="14" height="14" color="#0A6CDB"/>
+  <text x="38" y="106" font-size="12.5" fill="#1C1D20">Docs</text>
+  <use href="#chevr" x="20" y="129" width="10" height="10" color="#8A9099"/>
+  <text x="38" y="138" font-size="12.5" fill="#1C1D20" font-weight="500">Work</text>
+  <use href="#chevr" x="20" y="153" width="10" height="10" color="#8A9099"/>
+  <text x="38" y="162" font-size="12.5" fill="#1C1D20" font-weight="500">Your setup</text>
+  <use href="#chevr" x="20" y="177" width="10" height="10" color="#8A9099"/>
+  <text x="38" y="186" font-size="12.5" fill="#1C1D20" font-weight="500">Machines</text>
+  <use href="#chev" x="20" y="209" width="10" height="10" color="#8A9099"/>
+  <text x="38" y="218" font-size="12.5" fill="#1C1D20" font-weight="500">Agents</text>
+  <use href="#chev" x="42" y="233" width="10" height="10" color="#8A9099"/>
+  <text x="60" y="242" font-size="12.5" fill="#1C1D20" font-weight="500">Sessions</text>
+  <text x="234" y="242" font-size="11.5" fill="#8A9099" text-anchor="end">3</text>
+  <use href="#hand" x="61" y="253" width="14" height="14" color="#B35900"/>
+  <text x="82" y="264" font-size="12.5" fill="#1C1D20" font-weight="600">Archived pages: hi-fi mocks</text>
+  <use href="#ring" x="61" y="275" width="14" height="14" color="#0A6CDB"/>
+  <text x="82" y="286" font-size="12.5" fill="#1C1D20">Bug lane: #4440 sidebar count</text>
+  <use href="#tick" x="61" y="297" width="14" height="14" color="#5B616B"/>
+  <text x="82" y="308" font-size="12.5" fill="#1C1D20">Daily summary</text>
+  <use href="#chevr" x="42" y="321" width="10" height="10" color="#8A9099"/>
+  <text x="60" y="330" font-size="12.5" fill="#1C1D20" font-weight="500">Workflows</text>
+  <text x="234" y="330" font-size="11.5" fill="#8A9099" text-anchor="end">5</text>
+  <use href="#rack" x="39" y="343" width="14" height="14" color="#0A6CDB"/>
+  <text x="60" y="354" font-size="12.5" fill="#1C1D20">Connectors</text>
+  <use href="#box" x="39" y="367" width="14" height="14" color="#0A6CDB"/>
+  <text x="60" y="378" font-size="12.5" fill="#1C1D20">Archived Sessions</text>
+  <rect x="8" y="385" width="224" height="24" rx="6" fill="#DCEBFC"/>
+  <use href="#flow" x="39" y="391" width="14" height="14" color="#0A6CDB"/>
+  <text x="60" y="402" font-size="12.5" fill="#1C1D20">Archived Workflows</text>
+  <use href="#pause" x="272" y="78" width="14" height="14" color="#8A9099"/>
+  <text x="294" y="89" font-size="13" fill="#1C1D20">Nightly dead-code review</text>
+  <text x="868" y="89" font-size="11.5" fill="#8A9099" text-anchor="end">Last ran 3 d ago</text>
+  <text x="294" y="105" font-size="11.5" fill="#5B616B">Tuesday, Thursday and Saturday · folder workflow</text>
+  <path d="M294 114L868 114" stroke="#E0E3E7" stroke-width="1" fill="none"/>
+  <use href="#pause" x="272" y="124" width="14" height="14" color="#8A9099"/>
+  <text x="294" y="135" font-size="13" fill="#1C1D20">Release notes draft</text>
+  <text x="868" y="135" font-size="11.5" fill="#8A9099" text-anchor="end">Last ran 2 w ago</text>
+  <text x="294" y="151" font-size="11.5" fill="#5B616B">On release.tagged · folder workflow</text>
+  <path d="M294 160L868 160" stroke="#E0E3E7" stroke-width="1" fill="none"/>
+  <use href="#pause" x="272" y="170" width="14" height="14" color="#8A9099"/>
+  <text x="294" y="181" font-size="13" fill="#1C1D20">Weekly competitor check</text>
+  <text x="868" y="181" font-size="11.5" fill="#8A9099" text-anchor="end">Last ran 1 mo ago</text>
+  <text x="294" y="197" font-size="11.5" fill="#5B616B">Mondays 06:00 · user workflow</text>
+  <path d="M294 206L868 206" stroke="#E0E3E7" stroke-width="1" fill="none"/>
+  <use href="#pause" x="272" y="216" width="14" height="14" color="#8A9099"/>
+  <text x="294" y="227" font-size="13" fill="#1C1D20">Crash reports (old)</text>
+  <text x="868" y="227" font-size="11.5" fill="#8A9099" text-anchor="end">Never ran</text>
+  <text x="294" y="243" font-size="11.5" fill="#5B616B">Replaced by the crash-reports skill · folder workflow</text>
+  <path d="M294 252L868 252" stroke="#E0E3E7" stroke-width="1" fill="none"/>
+  <text x="272" y="282" font-size="11.5" fill="#5B616B">4 archived workflows</text>
+  </g>
+  <circle cx="266" cy="758" r="9" fill="#B35900"/>
+  <text x="266" y="762" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">8</text>
+  <circle cx="904" cy="946" r="9" fill="#B35900"/>
+  <text x="904" y="950" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">9</text>
+  <text x="960" y="92" font-size="13" fill="#1C1D20" font-weight="600">The folder's fold, before</text>
+  <g transform="translate(960,104)" filter="url(#shadow)">
+  <rect x="0" y="0" width="350" height="420" rx="10" fill="#F0F1F3"/>
+  <use href="#plus" x="21" y="19" width="14" height="14" color="#0A6CDB"/>
+  <text x="38" y="30" font-size="12.5" fill="#1C1D20" font-weight="500">New Session</text>
+  <use href="#doc" x="21" y="43" width="14" height="14" color="#0A6CDB"/>
+  <text x="38" y="54" font-size="12.5" fill="#1C1D20">Docs</text>
+  <use href="#chevr" x="20" y="77" width="10" height="10" color="#8A9099"/>
+  <text x="38" y="86" font-size="12.5" fill="#1C1D20" font-weight="500">Work</text>
+  <use href="#chevr" x="20" y="101" width="10" height="10" color="#8A9099"/>
+  <text x="38" y="110" font-size="12.5" fill="#1C1D20" font-weight="500">Your setup</text>
+  <use href="#chevr" x="20" y="125" width="10" height="10" color="#8A9099"/>
+  <text x="38" y="134" font-size="12.5" fill="#1C1D20" font-weight="500">Machines</text>
+  <use href="#chev" x="20" y="157" width="10" height="10" color="#8A9099"/>
+  <text x="38" y="166" font-size="12.5" fill="#1C1D20" font-weight="500">Agents</text>
+  <use href="#chev" x="42" y="181" width="10" height="10" color="#8A9099"/>
+  <text x="60" y="190" font-size="12.5" fill="#1C1D20" font-weight="500">Sessions</text>
+  <text x="234" y="190" font-size="11.5" fill="#8A9099" text-anchor="end">3</text>
+  <use href="#hand" x="61" y="201" width="14" height="14" color="#B35900"/>
+  <text x="82" y="212" font-size="12.5" fill="#1C1D20" font-weight="600">Archived pages: hi-fi mocks</text>
+  <use href="#ring" x="61" y="223" width="14" height="14" color="#0A6CDB"/>
+  <text x="82" y="234" font-size="12.5" fill="#1C1D20">Bug lane: #4440 sidebar count</text>
+  <use href="#tick" x="61" y="245" width="14" height="14" color="#5B616B"/>
+  <text x="82" y="256" font-size="12.5" fill="#1C1D20">Daily summary</text>
+  <use href="#chev" x="42" y="269" width="10" height="10" color="#8A9099"/>
+  <text x="60" y="278" font-size="12.5" fill="#1C1D20" font-weight="500">Recently archived sessions</text>
+  <text x="234" y="278" font-size="11.5" fill="#8A9099" text-anchor="end">3</text>
+  <use href="#box" x="61" y="289" width="14" height="14" color="#8A9099"/>
+  <text x="82" y="300" font-size="12.5" fill="#1C1D20">Sidebar: a folding Work group</text>
+  <use href="#box" x="61" y="311" width="14" height="14" color="#8A9099"/>
+  <text x="82" y="322" font-size="12.5" fill="#1C1D20">Fix the web test job</text>
+  <use href="#box" x="61" y="333" width="14" height="14" color="#8A9099"/>
+  <text x="82" y="344" font-size="12.5" fill="#1C1D20">Messages page, read only</text>
+  <use href="#chevr" x="42" y="357" width="10" height="10" color="#8A9099"/>
+  <text x="60" y="366" font-size="12.5" fill="#1C1D20" font-weight="500">Workflows</text>
+  <text x="234" y="366" font-size="11.5" fill="#8A9099" text-anchor="end">5</text>
+  <use href="#rack" x="39" y="379" width="14" height="14" color="#0A6CDB"/>
+  <text x="60" y="390" font-size="12.5" fill="#1C1D20">Connectors</text>
+  <rect x="8" y="397" width="224" height="24" rx="6" fill="#DCEBFC"/>
+  <use href="#box" x="39" y="403" width="14" height="14" color="#0A6CDB"/>
+  <text x="60" y="414" font-size="12.5" fill="#1C1D20">Archived</text>
+  </g>
+  <rect x="992" y="364" width="300" height="92" rx="6" fill="none" stroke="#CF222E" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <rect x="992" y="500" width="300" height="26" rx="6" fill="none" stroke="#B35900" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <text x="960" y="542" font-size="11.5" fill="#CF222E">Red: the Recently archived sessions group goes.</text>
+  <text x="960" y="558" font-size="11.5" fill="#B35900">Orange: one Archived row and page, split in two.</text>
+  <text x="960" y="580" font-size="13" fill="#1C1D20" font-weight="600">The folder's fold, after</text>
+  <g transform="translate(960,592)" filter="url(#shadow)">
+  <rect x="0" y="0" width="350" height="380" rx="10" fill="#F0F1F3"/>
+  <use href="#plus" x="21" y="19" width="14" height="14" color="#0A6CDB"/>
+  <text x="38" y="30" font-size="12.5" fill="#1C1D20" font-weight="500">New Session</text>
+  <use href="#doc" x="21" y="43" width="14" height="14" color="#0A6CDB"/>
+  <text x="38" y="54" font-size="12.5" fill="#1C1D20">Docs</text>
+  <use href="#chevr" x="20" y="77" width="10" height="10" color="#8A9099"/>
+  <text x="38" y="86" font-size="12.5" fill="#1C1D20" font-weight="500">Work</text>
+  <use href="#chevr" x="20" y="101" width="10" height="10" color="#8A9099"/>
+  <text x="38" y="110" font-size="12.5" fill="#1C1D20" font-weight="500">Your setup</text>
+  <use href="#chevr" x="20" y="125" width="10" height="10" color="#8A9099"/>
+  <text x="38" y="134" font-size="12.5" fill="#1C1D20" font-weight="500">Machines</text>
+  <use href="#chev" x="20" y="157" width="10" height="10" color="#8A9099"/>
+  <text x="38" y="166" font-size="12.5" fill="#1C1D20" font-weight="500">Agents</text>
+  <use href="#chev" x="42" y="181" width="10" height="10" color="#8A9099"/>
+  <text x="60" y="190" font-size="12.5" fill="#1C1D20" font-weight="500">Sessions</text>
+  <text x="234" y="190" font-size="11.5" fill="#8A9099" text-anchor="end">3</text>
+  <use href="#hand" x="61" y="201" width="14" height="14" color="#B35900"/>
+  <text x="82" y="212" font-size="12.5" fill="#1C1D20" font-weight="600">Archived pages: hi-fi mocks</text>
+  <use href="#ring" x="61" y="223" width="14" height="14" color="#0A6CDB"/>
+  <text x="82" y="234" font-size="12.5" fill="#1C1D20">Bug lane: #4440 sidebar count</text>
+  <use href="#tick" x="61" y="245" width="14" height="14" color="#5B616B"/>
+  <text x="82" y="256" font-size="12.5" fill="#1C1D20">Daily summary</text>
+  <use href="#chevr" x="42" y="269" width="10" height="10" color="#8A9099"/>
+  <text x="60" y="278" font-size="12.5" fill="#1C1D20" font-weight="500">Workflows</text>
+  <text x="234" y="278" font-size="11.5" fill="#8A9099" text-anchor="end">5</text>
+  <use href="#rack" x="39" y="291" width="14" height="14" color="#0A6CDB"/>
+  <text x="60" y="302" font-size="12.5" fill="#1C1D20">Connectors</text>
+  <use href="#box" x="39" y="315" width="14" height="14" color="#0A6CDB"/>
+  <text x="60" y="326" font-size="12.5" fill="#1C1D20">Archived Sessions</text>
+  <use href="#flow" x="39" y="339" width="14" height="14" color="#0A6CDB"/>
+  <text x="60" y="350" font-size="12.5" fill="#1C1D20">Archived Workflows</text>
+  </g>
+  <rect x="992" y="900" width="300" height="50" rx="6" fill="none" stroke="#1A7F37" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <text x="960" y="990" font-size="11.5" fill="#1A7F37">Green: two rows, each shown only with something archived.</text>
+  <text x="960" y="1006" font-size="11.5" fill="#5B616B">Help on each: “128 archived sessions”, “4 archived workflows”.</text>
+  <text x="960" y="1040" font-size="13" fill="#1C1D20" font-weight="600">Notes</text>
+  <text x="960" y="1060" font-size="11.5" fill="#5B616B">1  The title bar holds the page's title and the folder's name.</text>
+  <text x="960" y="1076" font-size="11.5" fill="#5B616B">2  Filter: the toolbar's search field (.searchable).</text>
+  <text x="960" y="1092" font-size="11.5" fill="#5B616B">3  Two sidebar rows; the open page's row is selected.</text>
+  <text x="960" y="1108" font-size="11.5" fill="#5B616B">4  Rows under day headings: Today, Yesterday, then the date.</text>
+  <text x="960" y="1124" font-size="11.5" fill="#5B616B">5  Time: when it was archived (ago today, the clock time before).</text>
+  <text x="960" y="1140" font-size="11.5" fill="#5B616B">6  Footer: the count, and Load more for the next 50.</text>
+  <text x="960" y="1156" font-size="11.5" fill="#5B616B">7  A row under the pointer: the list's hover wash.</text>
+  <text x="960" y="1172" font-size="11.5" fill="#5B616B">8  Workflows: the sidebar's row, by name, no day headings.</text>
+  <text x="960" y="1188" font-size="11.5" fill="#5B616B">9  No Load more: a folder's workflows are all held.</text>
+</svg>

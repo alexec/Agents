@@ -139,8 +139,12 @@ public enum DaemonAPI {
         /// The sessions on an issue, its sub-issues and their PRs, for a `#<n>` search (#3899).
         public static let lineageSessions = "lineage/sessions"
         public static let lineageCost = "lineage/cost"
+        /// A release's Lineage panel on its Work page (#4427): `LineageNodeRequest` → `LineageFigures`.
+        public static let lineageFigures = "lineage/figures"
         /// What an issue or an epic will probably cost and take, from past work (#3559, #3560).
         public static let lineageEstimate = "lineage/estimate"
+        /// When an epic lands, its estimate to complete, the spend, the burn and service levels (#4526).
+        public static let lineageForecast = "lineage/forecast"
         public static let simulatorsList = "simulators/list"
         public static let simulatorsBoot = "simulators/boot"
         public static let simulatorsShutdown = "simulators/shutdown"
@@ -302,6 +306,11 @@ public enum DaemonAPI {
         public static let foldersSendFacts = "folders/sendFacts"
         public static let foldersSendPack = "folders/sendPack"
         public static let foldersSendRead = "folders/sendRead"
+        /// Send to ‹machine›… (#4613): this Mac's host sends the folder itself, through the
+        /// control plane, and answers at once; `send/changed` says how it goes, and
+        /// `folders/sends` lists the sends under way for a window that connects mid-send.
+        public static let foldersSend = "folders/send"
+        public static let foldersSends = "folders/sends"
         /// The folders a person may add as folders on this host (#656): the git
         /// repositories directly inside each of `paths`, and each of `folders` as typed.
         /// Adds nothing; the window adds the ones the person ticks with `folders/add`.
@@ -597,6 +606,9 @@ public enum DaemonAPI {
         /// A clone began, or ended either way (027). Every window hears it, because a
         /// clone belongs to the Mac and not to the window that asked for it.
         public static let cloneChanged = "clone/changed"
+        /// A send went a part further, or ended either way (#4613). Carries
+        /// `SendNotification`.
+        public static let sendChanged = "send/changed"
         /// A write nobody was waiting on was refused: a line of a chat, an agent's record,
         /// the day's spend (#88). Carries `WriteFailure`; a window shows its message.
         /// Sent once in a while per cause, not once per write.
@@ -4329,6 +4341,69 @@ public extension DaemonAPI {
         public init(data: Data, end: Bool) {
             self.data = data
             self.end = end
+        }
+    }
+
+    /// `folders/send` (#4613): `branches` of the repository at `folder` on this Mac's host, less
+    /// what the folder there has, and with `includeChanges` what is uncommitted, to
+    /// `destination` on `machine` (the control plane's id; `machineName` is for the words).
+    struct SendRequest: Codable, Hashable, Sendable {
+        public var folder: URL
+        public var machine: String
+        public var machineName: String?
+        public var destination: String
+        public var branches: [String]
+        public var checkout: String
+        public var includeChanges: Bool
+        public var origin: String?
+        public init(folder: URL, machine: String, machineName: String? = nil, destination: String, branches: [String],
+                    checkout: String, includeChanges: Bool, origin: String? = nil) {
+            self.folder = folder
+            self.machine = machine
+            self.machineName = machineName
+            self.destination = destination
+            self.branches = branches
+            self.checkout = checkout
+            self.includeChanges = includeChanges
+            self.origin = origin
+        }
+    }
+
+    /// One send under way: the folder here, and the folder on the machine it goes to.
+    struct SendSummary: Codable, Hashable, Sendable, Identifiable {
+        public var id: UUID
+        public var folder: URL
+        public var machine: String
+        public var machineName: String
+        public var destination: String
+        public var startedAt: Date
+        public init(id: UUID, folder: URL, machine: String, machineName: String, destination: String, startedAt: Date) {
+            self.id = id
+            self.folder = folder
+            self.machine = machine
+            self.machineName = machineName
+            self.destination = destination
+            self.startedAt = startedAt
+        }
+    }
+
+    /// `send/changed`: `sent` of `total` bytes are there (0 of 0 while the bundle is made).
+    /// Once `finished`, `received` is the folder it became there, or `problem` says why not.
+    struct SendNotification: Codable, Hashable, Sendable {
+        public var send: SendSummary
+        public var sent: Int
+        public var total: Int
+        public var finished: Bool
+        public var problem: String?
+        public var received: FolderSummary?
+        public init(send: SendSummary, sent: Int = 0, total: Int = 0, finished: Bool = false, problem: String? = nil,
+                    received: FolderSummary? = nil) {
+            self.send = send
+            self.sent = sent
+            self.total = total
+            self.finished = finished
+            self.problem = problem
+            self.received = received
         }
     }
 

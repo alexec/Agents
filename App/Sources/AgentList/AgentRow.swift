@@ -22,13 +22,16 @@ struct AgentRow: View {
     private let tree: SidebarTree.Row?
     /// Folds or unfolds a parent's children.
     private let toggleFold: () -> Void
+    /// On the Archived Sessions page (#4448): the time is when it was archived, not its last activity.
+    private let showsArchivedTime: Bool
 
     init(agent: Agent, isCompact: Bool = false, place: String? = nil,
-         tree: SidebarTree.Row? = nil, toggleFold: @escaping () -> Void = {}) {
+         tree: SidebarTree.Row? = nil, showsArchivedTime: Bool = false, toggleFold: @escaping () -> Void = {}) {
         given = agent
         self.isCompact = isCompact
         self.place = place
         self.tree = tree
+        self.showsArchivedTime = showsArchivedTime
         self.toggleFold = toggleFold
     }
 
@@ -317,9 +320,14 @@ struct AgentRow: View {
                 FoldCount(count: tree.children, isUnfolded: tree.isUnfolded, toggle: toggleFold)
                     .padding(.top, 1)
             }
-            // When it last did anything, as the page's row has it (#341).
-            ActivityTime(date: agent.lastActivityAt)
-                .padding(.top, 1)
+            if showsArchivedTime {
+                ArchivedTime(date: agent.archivedOrder)
+                    .padding(.top, 1)
+            } else {
+                // When it last did anything, as the page's row has it (#341).
+                ActivityTime(date: agent.lastActivityAt)
+                    .padding(.top, 1)
+            }
         }
         // A child one indent a level in, under its parent's mark (#835, #3553).
         .padding(.leading, CGFloat(tree?.indent ?? 0) * 22)

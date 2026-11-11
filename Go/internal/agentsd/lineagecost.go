@@ -18,10 +18,13 @@ import (
 // Cost on the link (#2350): each turn's cost, tokens and time go under the session's links
 // that are active then, split evenly, in <root>/lineage-cost.json, one total per node.
 //
-//   - A session's work is its active works-on, opens and reviews links to an issue or a PR
-//     (a review session's P#n label is a works-on link, so a review counts on its PR).
+//   - A session's work is its active works-on, opens and reviews links to an issue, a PR or
+//     a release (a review session's P#n label is a works-on link, so a review counts on its
+//     PR; a release session's v1.2.0, on its release, #4524).
 //   - A helper with no work of its own works for its parent: the session that started it,
 //     and so on up, at most lineage.MostDepth sessions.
+//   - A turn with no work, that started sessions, goes on their work (#4524): a Scrum
+//     Master's turn that starts a lead or a lane goes on that epic or issue.
 //   - A turn with no work at all goes under the session itself, so every turn is
 //     somewhere; a repo's rollup says those as unlinked.
 //   - What is banked stays: a label changed later moves nothing (#829).
@@ -117,29 +120,15 @@ func (d *Daemon) sessionRepo(folder string) string {
 	return "folder:" + filepath.Base(folder)
 }
 
-// workOf is what a session works on now: its own work, else its parent's, else itself.
+// workOf is what a session works on now: its own work, else its parent's, else the work of
+// the sessions it started in this turn (#4524), else itself.
 func (d *Daemon) workOf(id wire.UUID) []wire.LineageNode {
 	s := sessionNode(id)
 	seen := map[wire.LineageNode]bool{}
 	for range lineage.MostDepth {
 		seen[s] = true
-		var work []wire.LineageNode
-		var parent *wire.LineageNode
-		for _, l := range d.lineage().Links(s).Links {
-			switch {
-			case l.From == s && l.EndedAt == nil && (l.To.Kind == lineage.KindIssue || l.To.Kind == lineage.KindPR) &&
-				(l.Rel == lineage.RelWorksOn || l.Rel == lineage.RelOpens || l.Rel == lineage.RelReviews):
-				if !seen[l.To] {
-					seen[l.To] = true
-					work = append(work, l.To)
-				}
-			case l.To == s && l.Rel == lineage.RelStarted && l.From.Kind == lineage.KindSession && parent == nil && !seen[l.From]:
-				p := l.From
-				parent = &p
-			}
-		}
+		work, parent := d.ownWork(s, seen)
 		if len(work) > 0 {
-			sort.Slice(work, func(i, j int) bool { return costKey(work[i]) < costKey(work[j]) })
 			return work
 		}
 		if parent == nil {
@@ -147,7 +136,79 @@ func (d *Daemon) workOf(id wire.UUID) []wire.LineageNode {
 		}
 		s = *parent
 	}
+	if work := d.startedWork(sessionNode(id)); len(work) > 0 {
+		return work
+	}
 	return []wire.LineageNode{sessionNode(id)}
+}
+
+// isWork says n is work a turn's cost can go on: an issue, a PR, or a release (#4524).
+func isWork(n wire.LineageNode) bool {
+	return n.Kind == lineage.KindIssue || n.Kind == lineage.KindPR || n.Kind == lineage.KindRelease
+}
+
+// ownWork is what s works on itself, by its active works-on, opens and reviews links, each not
+// seen yet, in order; and the session that started it, when one did and is not seen.
+func (d *Daemon) ownWork(s wire.LineageNode, seen map[wire.LineageNode]bool) ([]wire.LineageNode, *wire.LineageNode) {
+	var work []wire.LineageNode
+	var parent *wire.LineageNode
+	for _, l := range d.lineage().Links(s).Links {
+		switch {
+		case l.From == s && l.EndedAt == nil && isWork(l.To) &&
+			(l.Rel == lineage.RelWorksOn || l.Rel == lineage.RelOpens || l.Rel == lineage.RelReviews):
+			if !seen[l.To] {
+				seen[l.To] = true
+				work = append(work, l.To)
+			}
+		case l.To == s && l.Rel == lineage.RelStarted && l.From.Kind == lineage.KindSession && parent == nil && !seen[l.From]:
+			p := l.From
+			parent = &p
+		}
+	}
+	sort.Slice(work, func(i, j int) bool { return costKey(work[i]) < costKey(work[j]) })
+	return work, parent
+}
+
+// startedWork is the work of the sessions s started in its turn now (#4524): a Scrum Master's
+// turn that starts a lead or a lane goes on that epic or issue. Each started session counts by
+// its own work only. None when s has no turn on record.
+func (d *Daemon) startedWork(s wire.LineageNode) []wire.LineageNode {
+	links := d.lineage().Links(s)
+	start, ok := turnStart(links.States)
+	if !ok {
+		return nil
+	}
+	seen := map[wire.LineageNode]bool{s: true}
+	var work []wire.LineageNode
+	for _, l := range links.Links {
+		if l.From != s || l.Rel != lineage.RelStarted || l.To.Kind != lineage.KindSession || l.At < start || seen[l.To] {
+			continue
+		}
+		seen[l.To] = true
+		w, _ := d.ownWork(l.To, seen)
+		work = append(work, w...)
+	}
+	sort.Slice(work, func(i, j int) bool { return costKey(work[i]) < costKey(work[j]) })
+	return work
+}
+
+// turnStart is when the newest turn in states began, newest first: the oldest of the newest
+// run of working and needs-you, as a question in a turn is still the turn. Not ok with no
+// working state.
+func turnStart(states []wire.LineageSessionState) (wire.Date, bool) {
+	var start wire.Date
+	found := false
+	for _, st := range states {
+		switch {
+		case st.State == wire.LineageSessionStateNameWorking:
+			start, found = st.At, true
+		case st.State == wire.LineageSessionStateNameNeedsYou && found:
+			start = st.At
+		case found:
+			return start, true
+		}
+	}
+	return start, found
 }
 
 // noteCostLocked changes a node's total, made when it is new, and marks it unsent.
@@ -526,10 +587,13 @@ func (d *Daemon) lineageEstimate(ctx context.Context, r wire.LineageEstimateRequ
 	own, haveOwn := f.Nodes[costKey(r.Node)]
 	d.workMu.Unlock()
 	history := lineage.History(nodes)
+	// The overhead, loaded into the cost as "about $165 all in" (#4524).
+	overhead := lineage.Overhead(nodes, nowFunc())
 	labels := forgeLabelNames(plan.Item.Labels)
 	closed := plan.Item.State == "closed" || plan.Item.State == "merged"
 	if len(plan.Children) == 0 && lineage.LevelOf(labels) != "epic" {
 		e := lineage.EstimateIssue(history, r.Node, labels, start)
+		lineage.Load(&e, overhead, false)
 		if haveOwn {
 			e.Kept = own.Estimate
 		}
@@ -545,6 +609,7 @@ func (d *Daemon) lineageEstimate(ctx context.Context, r wire.LineageEstimateRequ
 			Open: c.Item.State != "closed" && c.Item.State != "merged"})
 	}
 	e := lineage.EstimateEpic(history, nodes, r.Node, labels, children, start)
+	lineage.Load(&e, overhead, true)
 	e.Kept = d.keptEpic(history, nodes, own, haveOwn, r.Node, labels, children)
 	if closed {
 		actual := lineage.Rollup(nodes, r.Node).Total
@@ -606,5 +671,8 @@ func (d *Daemon) registerLineageCost() {
 	})
 	On(d, wire.CallLineageEstimate, func(ctx context.Context, _ *Client, r wire.LineageEstimateRequest) (wire.LineageEstimate, error) {
 		return d.lineageEstimate(ctx, r)
+	})
+	On(d, wire.CallLineageForecast, func(ctx context.Context, _ *Client, r wire.LineageForecastRequest) (wire.LineageForecast, error) {
+		return d.lineageForecast(ctx, r)
 	})
 }

@@ -29,14 +29,19 @@ type jiraForge struct {
 
 func (jiraForge) Name() string { return "jira" }
 
+func (jiraForge) Images() forgeImageHost { return jiraImages{} }
+
 func (jiraForge) Caps() forgeCaps {
 	return forgeCaps{
-		Issues:       true,
-		Issue:        forgeActions{Comment: true, Label: true, Close: true, Reopen: true, Transition: true},
-		Avatars:      true,
-		StateReason:  true,
+		Issues:      true,
+		Issue:       forgeActions{Comment: true, Label: true, Close: true, Reopen: true, Transition: true},
+		Avatars:     true,
+		StateReason: true,
+		CreatedAt:   true, ClosedAt: true,
 		CommentCount: "exact",
-		Plan:         true,
+		// Data Center's search total; Jira Cloud's approximate count.
+		Total: true,
+		Plan:  true,
 		Reasons: map[string]string{
 			actionMerge:     jiraNoPRs,
 			actionAutoMerge: jiraNoPRs,
@@ -128,7 +133,7 @@ func (j jiraForge) List(ctx context.Context, scope forgeScope, f forgeFilter, cu
 		}
 		p.items = append(p.items, jiraItemOf(i, folder))
 	}
-	p.cursors, p.next = page.Cursors, page.Next
+	p.cursors, p.next, p.total = page.Cursors, page.Next, page.Total
 	return p, err
 }
 

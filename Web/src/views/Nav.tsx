@@ -26,7 +26,7 @@ import { ConversationPage, MessagesList } from "./Messages";
 import { MachinePage } from "./MachinePage";
 import { machineNeed, machineNeedLine } from "./OfflineStrip";
 import { MachineRow, MakingRow } from "./MachineRow";
-import { makingRows, newMachineItems } from "../model/machineRow";
+import { deleteMakingQuestion, makingRows, newMachineItems } from "../model/machineRow";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { AddMachineDialog } from "./AddMachineDialog";
 import { addMachineWords } from "../model/addMachine";
@@ -47,13 +47,14 @@ import type { Session } from "../session";
 /**
  * How many requests and sessions need the person, across every folder: Agents' count in the bar.
  * Requests, not sessions (#3864): each open request, and each session needing the person that asked none;
- * a terminal's agents-secret too (#4179).
+ * a terminal's agents-secret too (#4179). A request in Later counts nothing, and its asker neither (#4236).
  */
 export function needsYouCount(store: Store): number {
-  const requests = store.hosts.value.flatMap((h) => (store.folders.value[h.id] ?? [])
-    .filter((f) => f.folder.archivedAt === undefined)
-    .flatMap((f) => store.personRequestsIn(h.id, f.folder.folder).map((r) => `${h.id}|${r.askedBy}`)));
-  const askers = new Set(requests);
+  const folders = store.hosts.value.flatMap((h) => (store.folders.value[h.id] ?? [])
+    .filter((f) => f.folder.archivedAt === undefined).map((f) => ({ host: h.id, folder: f.folder.folder })));
+  const requests = folders.flatMap(({ host, folder }) => store.personRequestsIn(host, folder));
+  const askers = new Set(folders.flatMap(({ host, folder }) => store.openPersonRequestsIn(host, folder)
+    .map((r) => `${host}|${r.askedBy}`)));
   const sessions = needingYou(placedSessions(store.hosts.value, store.folders.value,
     (h, f) => store.folderView(h, f).headings.flatMap((x) => x.agents)))
     .filter((p) => !askers.has(`${p.host.id}|${p.agent.id}`));
@@ -217,8 +218,9 @@ export function SectionPage({ store, section, down }: { store: Store; section: E
                   {isRuntimesPage(p) && <RuntimesLowLine store={store} />}
                 </Fragment>
               ))}
-              {machinesHead(group) && makingRows(store.machinesMaking.value, store.hosts.value)
-                .map((name, i) => <MakingRow key={`making-${i}`} name={name} />)}
+              {machinesHead(group) && makingRows(store.machinesMaking.value, store.providers.list.value, store.hosts.value)
+                .map((row) => <MakingRow key={`making-${row.provider}/${row.workspace}/${row.name}`} row={row}
+                  onDelete={() => { if (window.confirm(deleteMakingQuestion(row))) void store.deleteWorkspace(row.provider, row.workspace); }} />)}
             </div>
           ))}
         </nav>

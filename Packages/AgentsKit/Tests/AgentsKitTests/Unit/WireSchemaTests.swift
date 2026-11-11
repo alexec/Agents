@@ -203,6 +203,7 @@ struct WireSchemaTests {
             "ProviderSummary": Self.through(DaemonAPI.ProviderSummary.self),
             "ProviderAdd": Self.through(DaemonAPI.ProviderAdd.self),
             "ProviderRequest": Self.through(DaemonAPI.ProviderRequest.self),
+            "ProviderWorkspaceRequest": Self.through(DaemonAPI.ProviderWorkspaceRequest.self),
             "MachineLink": Self.through(DaemonAPI.MachineLink.self),
             "MachineOptions": Self.through(DaemonAPI.MachineOptions.self),
             "ProviderOptions": Self.through(DaemonAPI.ProviderOptions.self),
@@ -241,6 +242,9 @@ struct WireSchemaTests {
             "SendPack": Self.through(DaemonAPI.SendPack.self),
             "SendReadRequest": Self.through(DaemonAPI.SendReadRequest.self),
             "SendRead": Self.through(DaemonAPI.SendRead.self),
+            "SendRequest": Self.through(DaemonAPI.SendRequest.self),
+            "SendSummary": Self.through(DaemonAPI.SendSummary.self),
+            "SendNotification": Self.through(DaemonAPI.SendNotification.self),
             "ActivityToken": Self.through(DaemonAPI.ActivityToken.self),
             // People and approve-to-join (#994).
             "ControlPerson": Self.through(DaemonAPI.ControlPerson.self),

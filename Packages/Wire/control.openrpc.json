@@ -1029,6 +1029,27 @@
       ]
     },
     {
+      "name": "control/lineageChanged",
+      "x-capability": "lineage.read/1",
+      "description": "To a machine's person and to the admins (#4276): the machine sent lineage the merged copy did not have, with its sessions' changes of state, so a client that shows working does not poll.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LineageChanged"
+          }
+        }
+      ]
+    },
+    {
       "name": "control/linkDecided",
       "x-capability": "links/1",
       "tags": [
@@ -2137,6 +2158,32 @@
       }
     },
     {
+      "name": "lineage/sessionsOn",
+      "x-capability": "lineage.read/1",
+      "description": "The sessions on every machine in a scope that lineage links to these nodes (#4276), with when each started on them and its state now, from the merged copy: a machine that sleeps is still in it.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LineageSessionsOnRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LineageSessionsOn"
+        }
+      }
+    },
+    {
       "name": "lineage/sync",
       "x-capability": "lineage.graph/1",
       "description": "A host, on its channel 0 (#4275): its lineage links and its sessions' changes of state since its last send, a few seconds after each, for the control plane's merged copy. Only refs, states and times.",
@@ -2154,6 +2201,32 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/LineageSyncAnswer"
+        }
+      }
+    },
+    {
+      "name": "lineage/walkAll",
+      "x-capability": "lineage.read/1",
+      "description": "lineage/walk over the merged copy of every machine's lineage in a scope (#4276), with each session's state now.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LineageWalkAllRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LineageGraph"
         }
       }
     },
@@ -4756,6 +4829,32 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/ProviderCreated"
+        }
+      }
+    },
+    {
+      "name": "providers/deleteWorkspace",
+      "x-capability": "providers/2",
+      "description": "Delete on a machine New Machine made that never joined (#4610): the provider deletes the workspace. Refused when a machine is linked to it (Delete that machine instead), or when the caller may not use the provider.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ProviderWorkspaceRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
         }
       }
     },

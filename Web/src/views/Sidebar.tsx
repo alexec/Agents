@@ -16,6 +16,8 @@ import { undoLabel, undoMillis } from "../model/archiveWords";
 import { healthTally, folderServers } from "../model/hostedMCP";
 import { signal, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
+import type { ComponentChildren } from "preact";
+import { byBack } from "../model/later";
 import { nonePage } from "./SummaryPage";
 import { FolderSettingsModal, ProjectSettingsModal } from "./ProjectSettings";
 import { projectSettingsWords } from "../model/projectSettings";
@@ -36,7 +38,8 @@ import { updatedLine } from "../model/updated";
 import { namedRelative, workflowSummary } from "../model/workflows";
 import { fromWireDate } from "../protocol/dates";
 import type { Agent, AgentsExportRequest, ControlMachine, FolderSummary, Request as PersonRequest, WorkflowSummary } from "../protocol/generated";
-import { alone, aloneURL, go, route, showAll } from "../route";
+import { alone, aloneURL, go, route, showAll, type ArchiveRoute } from "../route";
+import { sessionCount, sessionsWords, workflowCount, workflowsWords } from "../model/archivedPage";
 import { onThisMac } from "../place";
 import { browserName, type Session } from "../session";
 import { keptByState, machineFilter, setMachineFilter, setStateFilter, stateFilter, stateFilterTitle, stateFilters,
@@ -424,7 +427,7 @@ function inOpenSmartRow(store: Store, host: string, agent: Agent): boolean {
 }
 
 /** A search narrows workflows by name and what they are; one asking for a label or an issue leaves them out. */
-function workflowMatches(store: Store, host: string, query: LabelQuery | undefined): (w: WorkflowSummary) => boolean {
+export function workflowMatches(store: Store, host: string, query: LabelQuery | undefined): (w: WorkflowSummary) => boolean {
   if (!query) return () => true;
   const runtimeName = (id: string) => (store.runtimes.value[host] ?? []).find((s) => s.runtime.id === id)?.runtime.name;
   const text = query.text.toLowerCase();
@@ -530,10 +533,10 @@ function SmartFold({ row, store, folders, places, query, linkDown, downSince }: 
       // The pinned are in Pinned alone: each session is listed once (#587).
       const pins = store.sessionPinsIn(placed.host.id, placed.folder.folder.folder);
       // A failed workflow run's agent is its workflow's row under Needs You, not a session too (#989);
-      // an asker, its requests' rows (#3864).
+      // an asker, its requests' rows (#3864), in Needs You or in Later (#4236).
       const failed = row === "needsYou" ? failedRuns(placed.folder.approvals) : new Set<string>();
       if (row === "needsYou") {
-        for (const request of store.personRequestsIn(placed.host.id, placed.folder.folder.folder)) failed.add(request.askedBy as string);
+        for (const request of store.openPersonRequestsIn(placed.host.id, placed.folder.folder.folder)) failed.add(request.askedBy as string);
       }
       const gathered = (query?: typeof parsed) => smartAgents(row, live, query, pins, on).filter((a) => !failed.has(a.id));
       count += gathered().length;
@@ -559,6 +562,13 @@ function SmartFold({ row, store, folders, places, query, linkDown, downSince }: 
   ].sort((a, b) => a.request.askedAt - b.request.askedAt);
   const asked = parsed ? requests.filter(({ request }) => request.title.toLowerCase().includes(query.toLowerCase())) : requests;
   count += requests.length;
+  // The deferred ones (#4236), in the folded Later group at the end, the soonest back first, in no count.
+  const deferred: typeof requests = row !== "needsYou" ? [] : [
+    ...hostsHere.flatMap((host) => store.laterTerminalRequests(host.id).map((request) => ({ host, request }))),
+    ...folders.flatMap((placed) => store.laterRequestsIn(placed.host.id, placed.folder.folder.folder)
+      .map((request) => ({ host: placed.host, folder: placed, request }))),
+  ].sort((a, b) => byBack(a.request, b.request));
+  const later = parsed ? deferred.filter(({ request }) => request.title.toLowerCase().includes(query.toLowerCase())) : deferred;
   // What waits for an OK, each folder's, after the sessions (#773).
   const waiting = row !== "needsYou" ? [] : folders.map((placed) => ({ folder: placed, approvals: placed.folder.approvals }));
   const approvals = smartApprovals(waiting, query);
@@ -573,8 +583,9 @@ function SmartFold({ row, store, folders, places, query, linkDown, downSince }: 
     suggestions: store.checkSuggestionsIn(placed.host.id, placed.folder.folder.folder) }));
   const suggestions = smartSuggestions(checked, query);
   if (row === "forReview") count += query ? smartSuggestions(checked).length : suggestions.length;
-  if (parsed ? lines.length === 0 && asked.length === 0 && approvals.length === 0 && pulls.length === 0 && suggestions.length === 0
-    : count === 0 && !keptPlace) return null;
+  // Later alone keeps Needs You drawn (#4236).
+  if (parsed ? lines.length === 0 && asked.length === 0 && later.length === 0 && approvals.length === 0 && pulls.length === 0 && suggestions.length === 0
+    : count === 0 && !keptPlace && deferred.length === 0) return null;
   const title = smartTitles[row];
   const updated = row === "needsYou" && downSince !== undefined ? updatedLine(downSince) : null;
   return (
@@ -638,6 +649,34 @@ function SmartFold({ row, store, folders, places, query, linkDown, downSince }: 
           suggestion={suggestion} place={placeOf(places, placed.host, placed.folder, store.macHostID.value)}
           down={linkDown || !store.hostIsOnline(host)} />;
       })}
+      {open && later.length > 0 && <LaterGroup open={parsed !== undefined || folds.isLaterOpen()} count={later.length}>
+        {later.map(({ host: on, folder: placed, request }) => {
+          const host = on.id;
+          return <RequestRow key={`${host}|${request.id}`} store={store} host={host} folder={placed?.folder.folder.folder ?? ""} request={request}
+            place={placed ? placeOf(places, placed.host, placed.folder, store.macHostID.value) : ""}
+            chosen={!!request.askedBy && r.host === host && r.session === request.askedBy} />;
+        })}
+      </LaterGroup>}
+    </details>
+  );
+}
+
+/**
+ * Needs You's folded Later group (#4236), at its end, as the window's LaterRows: its heading folds it
+ * and says how many, kept in localStorage as the other folds; its rows are the deferred requests,
+ * each saying when it comes back. A search unfolds it.
+ */
+function LaterGroup({ open, count, children }: { open: boolean; count: number; children: ComponentChildren }) {
+  return (
+    <details class="later" role="group" aria-label="Later" open={open}
+      onToggle={(e) => {
+        const now = (e.currentTarget as HTMLDetailsElement).open;
+        if (now !== open) folds.setLaterOpen(now);
+      }}>
+      <summary aria-label={`Later, ${count}`}>
+        Later<span class="count">{count}</span>
+      </summary>
+      {open && children}
     </details>
   );
 }
@@ -736,7 +775,18 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
     && archivedWorkflows.length === 0 && !nameMatches) return null;
 
   const here = r.host === host.id && r.folder !== undefined && folderKey(r.folder) === folderKey(folder);
-  const archiveCount = (summary.counts.archived ?? 0) + archivedWorkflows.length;
+  const archivedSessionCount = summary.counts.archived ?? 0;
+  const pageRow = (page: ArchiveRoute, mark: string, title: string, count: string) => (
+    <div class="nav-item">
+      <div class={`row page-row${here && r.archive === page ? " chosen" : ""}`}>
+        <button class="pick" aria-current={here && r.archive === page} aria-label={`${title}, ${count}`}
+          title={count} onClick={() => go({ host: host.id, folder: folder, archive: page })}>
+          <span class="pin-mark" aria-hidden="true">{mark}</span>
+          <span class="title">{title}</span>
+        </button>
+      </div>
+    </div>
+  );
   // The project's connectors, one row for all its folders (#3407): this machine's folder, else the first online one.
   const connectors = connectorsPlace(group, store.macHostID.value, (h) => store.hostIsOnline(h));
   const connectorsHost = connectors.host.id;
@@ -920,19 +970,11 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
               </button>
             </div>
           </div>
-          {archiveCount > 0 && (
-            // The archive, one row opening a page (#495): never a fold inside the group.
-            <div class="nav-item">
-              <div class={`row page-row${here && r.archive ? " chosen" : ""}`}>
-                {/* Nothing at its end, which is only a session's (#587): the count is its tooltip's. */}
-                <button class="pick" aria-current={here && !!r.archive} aria-label={`Archived, ${archiveCount}`}
-                  title={`${archiveCount} archived`} onClick={() => go({ host: host.id, folder: folder, archive: true })}>
-                  <span class="pin-mark" aria-hidden="true">▣</span>
-                  <span class="title">Archived</span>
-                </button>
-              </div>
-            </div>
-          )}
+          {/* Archived Sessions and Archived Workflows (#495, #4451): a row each opening its page, never a fold inside
+              the group, each only with something archived. Nothing at its end, which is only a session's (#587): the
+              count is its tooltip's. */}
+          {archivedSessionCount > 0 && pageRow("sessions", "▣", sessionsWords.title, sessionCount(archivedSessionCount))}
+          {archivedWorkflows.length > 0 && pageRow("workflows", "◷", workflowsWords.title, workflowCount(archivedWorkflows.length))}
           </>}
         </div>
       )}
@@ -994,8 +1036,10 @@ export const deleteFolderMessage = "Every session in it is deleted, with its con
  * One session's row in the sidebar, drawn again only when the agent, whether it is chosen, or its
  * host's state changes, or something is on its way to it: not when its neighbours change.
  */
-export const SidebarSession = memo(function SidebarSession({ store, host, folder, agent, chosen, down, pinnedAt, place, tree }: {
+export const SidebarSession = memo(function SidebarSession({ store, host, folder, agent, chosen, down, pinnedAt, place, tree, archivedTime }: {
   store: Store; host: string; folder: string; agent: Agent; chosen: boolean; down: boolean;
+  /** On the Archived Sessions page (#4451): the time is when it was archived, not its last activity. */
+  archivedTime?: boolean | undefined;
   /** Where it sits in its list's tree (#835): a parent with its count and fold, or a child one indent in. */
   tree?: TreeRow | undefined;
   /** Under Pinned: the whole pinned order, for its Move Up and Move Down (#180). */
@@ -1052,7 +1096,7 @@ export const SidebarSession = memo(function SidebarSession({ store, host, folder
         ? <div class="row session renaming"><RenameInput store={store} host={host} agent={agent} /></div>
         : <SessionRow agent={agent} chosen={chosen} onPick={() => { if (chosen) store.toEndAsks.value++; go({ host, folder: folder, session: agent.id }); }} going={going}
         extras={rowExtras(store, host, agent)}
-        inSidebar place={place} markAgent={markAgent} />}
+        inSidebar place={place} markAgent={markAgent} archivedTime={archivedTime} />}
       {parent && (
         <button class="fold-count" aria-expanded={tree.isUnfolded}
           aria-label={tree.isUnfolded ? `Hide ${tree.children} started sessions` : `Show ${tree.children} started sessions`}

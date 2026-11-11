@@ -269,6 +269,10 @@ func (d *Daemon) deleteMachine(agent wire.UUID, args map[string]json.RawMessage)
 
 // agentWho is an agent as the control plane's log and the card name it: "Claude (fix-login)".
 func (d *Daemon) agentWho(agent wire.UUID) string {
+	if agent == "" {
+		// The person, in a client: Send to ‹machine›… (#4613).
+		return "You"
+	}
 	a := d.Store.Agent(agent)
 	if a == nil {
 		return "An agent"

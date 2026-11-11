@@ -128,14 +128,17 @@ type forgejoForge struct {
 
 func (forgejoForge) Name() string { return "forgejo" }
 
+func (forgejoForge) Images() forgeImageHost { return forgejoImages{} }
+
 func (forgejoForge) Caps() forgeCaps {
 	return forgeCaps{
 		Issues: true, PRs: true,
 		Issue: forgeActions{Comment: true, Label: true, Close: true, Reopen: true},
 		PR: forgeActions{Comment: true, Label: true, Close: true, Reopen: true, Merge: true, AutoMerge: true, Approve: true,
 			Diff: true},
-		LabelColors:  true,
-		Avatars:      true,
+		LabelColors: true,
+		Avatars:     true,
+		CreatedAt:   true, ClosedAt: true,
 		CommentCount: "exact",
 		Plan:         true, BlockedBy: true, AddChild: true,
 		Reasons: map[string]string{
@@ -491,7 +494,7 @@ func (d *Daemon) forgeForgejo(c connections.Connection, root string) forgeForgej
 func forgejoItemOf(i forgejomcp.Item, folder string) wire.ForgeItem {
 	out := wire.ForgeItem{Node: forgejoNode(i.Repo, i.Number, i.PR), Title: i.Title, State: i.State, URL: optional(i.URL),
 		Folder: optional(folder), Labels: forgeLabelsOf(i.Labels, i.LabelColors), Author: optional(i.Author), AuthorAvatar: optional(i.AuthorAvatar), Assignees: i.Assignees,
-		Milestone: optional(i.Milestone), UpdatedAt: forgeDate(i.UpdatedAt), Comments: int64(i.Comments)}
+		Milestone: optional(i.Milestone), UpdatedAt: forgeDate(i.UpdatedAt), CreatedAt: forgeDateOptional(i.CreatedAt), ClosedAt: forgeDateOptional(i.ClosedAt), Comments: int64(i.Comments)}
 	if out.Assignees == nil {
 		out.Assignees = []string{}
 	}

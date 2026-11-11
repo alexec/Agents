@@ -553,6 +553,58 @@ func TestAWorkspaceThatInstallsOnFirstBootJoinsAndIsLinked(t *testing.T) {
 	}
 }
 
+// A make the control plane waits for says so to every client, and one it gave up on says
+// so with a reason, until Delete deletes the workspace at the provider (#4610).
+func TestAMadeMachineThatNeverJoinsIsSaidAndCanBeDeleted(t *testing.T) {
+	h := newHarness(t, func(o *harnessOptions) { o.timing.GiveUp = 300 * time.Millisecond })
+	id := h.add()
+	made, err := h.create("build-3", nil)
+	if err != nil || !made.Joining {
+		t.Fatalf("%v %+v", err, made)
+	}
+	listed := func() *MachineInfo {
+		for _, s := range h.must(MethodProvidersList, nil).(map[string]any)["providers"].([]ProviderSummary) {
+			for _, w := range s.Workspaces {
+				if w.ID == "ws-build-3" {
+					return &w
+				}
+			}
+		}
+		return nil
+	}
+	// While the control plane waits, the row says Making….
+	if w := listed(); w == nil || !deref(w.Joining) || w.NotJoined != nil {
+		t.Fatalf("%+v", w)
+	}
+	if !eventually(t, func() bool { w := listed(); return w != nil && w.NotJoined != nil }) {
+		t.Fatal("never given up")
+	}
+	w := listed()
+	if deref(w.Joining) || !strings.Contains(*w.NotJoined, "didn’t join in") {
+		t.Errorf("%+v", w)
+	}
+	// Delete on its row: the provider deletes it, and it is gone from the list.
+	h.must(MethodProvidersDeleteWorkspace, map[string]string{"id": id, "workspace": "ws-build-3"})
+	h.provider.mu.Lock()
+	deleted := append([]string{}, h.provider.deleted...)
+	h.provider.mu.Unlock()
+	if !reflect.DeepEqual(deleted, []string{"ws-build-3"}) || listed() != nil {
+		t.Errorf("deleted %v, listed %+v", deleted, listed())
+	}
+}
+
+// A workspace a machine is linked to is not deleted by its row: Delete on the machine
+// does that, with the machine's backup first (#4610).
+func TestDeleteWorkspaceRefusesOneAMachineIsLinkedTo(t *testing.T) {
+	h := newHarness(t)
+	id := h.add()
+	h.link(id, devbox, "agents-devbox")
+	_, err := h.call(MethodProvidersDeleteWorkspace, map[string]string{"id": id, "workspace": "agents-devbox"})
+	if err == nil || !strings.Contains(err.Error(), "Delete the machine instead") {
+		t.Fatalf("%v", err)
+	}
+}
+
 // A host that joined with a code made for a workspace is linked to it, whatever name it
 // joined with (#3871): a codespace's host joins with its own hostname.
 func TestAHostThatJoinedForAWorkspaceIsLinkedToItWhateverItsName(t *testing.T) {

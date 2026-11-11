@@ -27,6 +27,8 @@ type linearForge struct {
 
 func (linearForge) Name() string { return "linear" }
 
+func (linearForge) Images() forgeImageHost { return linearImages{} }
+
 func (linearForge) Caps() forgeCaps {
 	return forgeCaps{
 		Issues:      true,
@@ -34,6 +36,7 @@ func (linearForge) Caps() forgeCaps {
 		LabelColors: true,
 		Avatars:     true,
 		StateReason: true,
+		CreatedAt:   true, ClosedAt: true, Children: true,
 		// Linear does not count an issue's comments: a list reads at most 50.
 		CommentCount: "capped", CommentsMost: 50,
 		Plan: true, BlockedBy: true, AddChild: true,
@@ -154,6 +157,11 @@ func (l linearForge) Item(ctx context.Context, r forgeRef, cursor string) (wire.
 	}
 	out := wire.ForgeItemDetail{Item: linearItemOf(p.Item, l.d.linearFolder(p.Team)), Body: p.Body, Comments: []wire.ForgeComment{}, Cursor: optional(p.Before)}
 	out.Start = linearStart(out.Item)
+	out.Children = []wire.ForgeLinked{}
+	for _, c := range p.Children {
+		out.Children = append(out.Children, wire.ForgeLinked{Node: wire.LineageNode{Kind: lineage.KindIssue, Ref: "linear:" + c.Identifier},
+			Title: c.Title, State: c.State, URL: optional(c.URL)})
+	}
 	for _, c := range p.Thread {
 		out.Comments = append(out.Comments, forgeCommentOf(c.Author, c.Avatar, c.Body, c.At, c.URL, c.Bot))
 	}

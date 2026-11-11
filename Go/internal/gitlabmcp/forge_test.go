@@ -20,6 +20,8 @@ type forgeLab struct {
 	asked []string
 	lists map[string][]obj // "group/app issues" → items, newest first
 	one   map[string]obj   // a path → its answer
+	// uncounted leaves X-Total out, as GitLab does over 10,000.
+	uncounted bool
 }
 
 func (f *forgeLab) serve(w http.ResponseWriter, r *http.Request) {
@@ -40,6 +42,7 @@ func (f *forgeLab) serve(w http.ResponseWriter, r *http.Request) {
 	list := []obj{}
 	q := r.URL.Query()
 	n, _ := strconv.Atoi(q.Get("per_page"))
+	total := 0
 	for _, i := range f.lists[project+" "+parts[2]] {
 		if s := q.Get("state"); s != "all" && i["state"] != s {
 			continue
@@ -47,9 +50,14 @@ func (f *forgeLab) serve(w http.ResponseWriter, r *http.Request) {
 		if b := q.Get("updated_before"); b != "" && i["updated_at"].(string) > b {
 			continue
 		}
+		total++
 		if len(list) < n {
 			list = append(list, i)
 		}
+	}
+	// GitLab leaves the count out of a list of over 10,000 (#4396).
+	if !f.uncounted {
+		w.Header().Set("X-Total", strconv.Itoa(total))
 	}
 	json.NewEncoder(w).Encode(list)
 }
@@ -102,6 +110,10 @@ func TestSearchMergesProjectsByTime(t *testing.T) {
 	if !slices.Equal(got, []string{"group/app#3", "group/app#2"}) || len(p.Cursors) != 2 || p.Next != p.Cursors[1] {
 		t.Fatalf("page: %v %+v", got, p)
 	}
+	// The first page counts both projects' lists (#4396).
+	if p.Total == nil || *p.Total != 5 {
+		t.Fatalf("total: %v", p.Total)
+	}
 	if !strings.Contains(f.asked[0], "/projects/group%2Fapp/issues?") || !strings.Contains(f.asked[0], "labels=bug") ||
 		!strings.Contains(f.asked[0], "search=flaky") || !strings.Contains(f.asked[0], "state=opened") ||
 		!strings.Contains(f.asked[0], "with_labels_details=true") || strings.Contains(f.asked[0], "updated_before") {
@@ -122,8 +134,9 @@ func TestSearchMergesProjectsByTime(t *testing.T) {
 	for _, i := range p.Items {
 		got = append(got, i.key())
 	}
-	// group/web#9 was updated in the same millisecond as group/app#2, which was given.
-	if !slices.Equal(got, []string{"group/web#9", "group/web#8"}) || p.Next == "" {
+	// group/web#9 was updated in the same millisecond as group/app#2, which was given. A later page
+	// does not count.
+	if !slices.Equal(got, []string{"group/web#9", "group/web#8"}) || p.Next == "" || p.Total != nil {
 		t.Fatalf("second page: %v", got)
 	}
 	if !strings.Contains(f.asked[0], "updated_before=2026-11-01T08%3A00%3A00.001Z") || !strings.Contains(f.asked[0], "per_page=3") {
@@ -152,8 +165,13 @@ func TestSearchClosedMergeRequests(t *testing.T) {
 	if len(f.asked) != 2 || !strings.Contains(f.asked[0], "state=closed") || !strings.Contains(f.asked[1], "state=merged") {
 		t.Fatalf("asked: %q", f.asked)
 	}
-	if len(p.Items) != 2 || p.Items[0].State != "merged" || p.Items[1].State != "closed" || p.Next != "" {
+	if len(p.Items) != 2 || p.Items[0].State != "merged" || p.Items[1].State != "closed" || p.Next != "" || p.Total == nil || *p.Total != 2 {
 		t.Fatalf("page: %+v", p)
+	}
+	// Where GitLab does not count one of the lists, the page has no total.
+	f.uncounted = true
+	if p, _ = g.Search(context.Background(), []string{"group/app"}, SearchFilter{MRs: true, State: "closed"}, "", 10); p.Total != nil {
+		t.Fatalf("uncounted total: %v", *p.Total)
 	}
 	if i := p.Items[0]; !i.MR || i.key() != "group/app!5" || !i.Draft || i.Review != "review_required" || i.Mergeable != "mergeable" || i.Checks != "" {
 		t.Fatalf("merge request: %+v", i)
@@ -223,5 +241,25 @@ func TestItemPageReadsAMergeRequest(t *testing.T) {
 	}
 	if _, err := g.ItemPage(context.Background(), "group/app", 5, false, ""); !IsNotFound(err) {
 		t.Fatalf("no such issue: %v", err)
+	}
+}
+
+// #4373: an item says when it opened, and a closed or merged one when it closed; a merged merge
+// request has merged_at, and closed_at only when it was closed before.
+func TestItemDates(t *testing.T) {
+	for _, c := range []struct {
+		json, created, closed string
+	}{
+		{`{"state":"opened","created_at":"2026-10-01T10:00:00Z","closed_at":null}`, "2026-10-01T10:00:00Z", ""},
+		{`{"state":"closed","created_at":"2026-10-01T10:00:00Z","closed_at":"2026-10-02T10:00:00Z"}`, "2026-10-01T10:00:00Z", "2026-10-02T10:00:00Z"},
+		{`{"state":"merged","created_at":"2026-10-01T10:00:00Z","merged_at":"2026-10-03T10:00:00Z"}`, "2026-10-01T10:00:00Z", "2026-10-03T10:00:00Z"},
+	} {
+		var j forgeJSON
+		if err := json.Unmarshal([]byte(c.json), &j); err != nil {
+			t.Fatal(err)
+		}
+		if i := j.item("g/a", strings.Contains(c.json, "merged")); i.CreatedAt != c.created || i.ClosedAt != c.closed {
+			t.Errorf("%s: %q %q", c.json, i.CreatedAt, i.ClosedAt)
+		}
 	}
 }

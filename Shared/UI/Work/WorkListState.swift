@@ -32,7 +32,10 @@ final class WorkListState {
     /// How many pages of `reports/nodes` a list reads for its lineage: at most 500 nodes.
     private static let lineagePages = 5
 
-    init(kind: WorkList.Kind) { self.kind = kind }
+    init(kind: WorkList.Kind) {
+        self.kind = kind
+        sort = kind.defaultSort
+    }
 
     struct Ask: Equatable {
         var state: String

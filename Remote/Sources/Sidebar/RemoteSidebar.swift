@@ -870,7 +870,7 @@ struct RemoteFolderFold: View {
                     let archived = fold.archivedCount(summary) + fold.archivedWorkflows.count
                     if archived > 0 {
                         FolderPageRow(title: "Archived", systemImage: "archivebox",
-                                       count: archived, item: .archive(key))
+                                       count: archived, item: .archivedSessions(key))
                     }
                 }
             } header: {

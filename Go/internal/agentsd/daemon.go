@@ -98,6 +98,7 @@ type Daemon struct {
 	costBook
 	featureBook
 	folderChangedState
+	agentTellState
 	workflowBook
 	allowanceBook
 	accountBook

@@ -3,7 +3,7 @@
 // releases line when their first child starts and join it when their last child closes, on a
 // linear time axis. The range, the lines, their lanes, the marks and the words; the view draws them
 // in SVG. Times are milliseconds since 1970.
-import type { ForgeLabel, WorkTimeline, WorkTimelineBacktest, WorkTimelineRelease } from "../protocol/generated";
+import type { ForgeLabel, LineageNode, LineageSessionOn, WireDate, WorkTimeline, WorkTimelineBacktest, WorkTimelineRelease } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import { shortAge, shortRef } from "./work";
 
@@ -467,6 +467,48 @@ export function mergeTimelines(timelines: readonly WorkTimeline[]): WorkTimeline
   }
   out.releases.sort((a, b) => a.at - b.at);
   return out;
+}
+
+/**
+ * The children's starts with every machine's sessions on them (#4276, `lineage/sessionsOn`), so a
+ * child a sleeping machine's session started still starts then: a child starts at the earliest of
+ * its own start, its close and its first session's link, and its line no later. As the window's
+ * `WorkTimeline.started`.
+ */
+export function startedBySessions(timeline: WorkTimeline, sessions: readonly LineageSessionOn[]): WorkTimeline {
+  const first = new Map<string, WireDate>();
+  for (const s of sessions) for (const n of s.on) first.set(n.ref, Math.min(first.get(n.ref) ?? s.at, s.at) as WireDate);
+  if (first.size === 0) return timeline;
+  return {
+    ...timeline,
+    epics: timeline.epics.map((epic) => {
+      const children = epic.children.map((c) => ({ ...c }));
+      const segments = epic.segments.map((s) => ({ ...s }));
+      const last = segments.length - 1;
+      for (const child of children) {
+        const at = first.get(child.item.node.ref);
+        if (at === undefined) continue;
+        const start = Math.min(child.startedAt ?? at, child.closedAt ?? at, at) as WireDate;
+        if (start === child.startedAt) continue;
+        child.startedAt = start;
+        if (last < 0) continue;
+        // Its line, as timelineLines finds it: an open child is on the last; a closed one on the line it closed in.
+        let i = last;
+        const closed = child.closedAt;
+        if (closed !== undefined) i = segments.findIndex((_, k) => k === last || closed < (segments[k + 1]!.startedAt ?? Infinity));
+        const segment = segments[i]!;
+        if (segment.startedAt === undefined || start < segment.startedAt) segment.startedAt = start;
+      }
+      return { ...epic, children, segments };
+    }),
+  };
+}
+
+/** The nodes a timeline asks `lineage/sessionsOn` for: its epics and their children, each once, at most 500. */
+export function sessionNodes(timeline: WorkTimeline): LineageNode[] {
+  const seen = new Set<string>();
+  return timeline.epics.flatMap((e) => [e.item.node, ...e.children.map((c) => c.item.node)])
+    .filter((n) => !seen.has(n.ref) && seen.add(n.ref)).slice(0, 500);
 }
 
 /** The epic a line's id (`<ref>/<segment>`) is of. */

@@ -53,6 +53,9 @@ func (s *Service) valueReport(ctx context.Context, r wire.ReportRange, scope *wi
 	}
 	out := valueOf(nodes, wire.DateOf(since))
 	out.Range, out.Scope = r, *scope
+	// The overhead over the 14 days to now, whatever the range (#4524).
+	overhead := lineage.Overhead(nodes, now)
+	out.Overhead = &overhead
 	return out, nil
 }
 
@@ -197,6 +200,8 @@ func valueOf(nodes []wire.LineageCostNode, since wire.Date) wire.ReportValue {
 	out := wire.ReportValue{Total: blank(), Waste: blank(), Unlinked: blank(), PerMergedPR: map[string]float64{},
 		Issues: []wire.ReportValueRow{}, Releases: []wire.ReportValueRow{}}
 	byRef := map[string]wire.LineageCostNode{}
+	// A release's own node (#4524): what a release session banked on it.
+	ownRelease := map[string]wire.LineageCostNode{}
 	fixers := map[string][]wire.LineageCostNode{}
 	members := map[string][]wire.LineageCostNode{}
 	var issues, releases []string
@@ -217,6 +222,12 @@ func valueOf(nodes []wire.LineageCostNode, since wire.Date) wire.ReportValue {
 				fixers[f] = append(fixers[f], n)
 				addIssue(f)
 			}
+		case lineage.KindRelease:
+			if _, ok := members[n.Node.Ref]; !ok {
+				releases = append(releases, n.Node.Ref)
+				members[n.Node.Ref] = nil
+			}
+			ownRelease[n.Node.Ref] = n
 		}
 		for _, m := range n.PartOf {
 			if !lineage.IsReleaseRef(m) {
@@ -231,7 +242,7 @@ func valueOf(nodes []wire.LineageCostNode, since wire.Date) wire.ReportValue {
 			continue
 		}
 		switch n.Node.Kind {
-		case lineage.KindIssue, lineage.KindPR:
+		case lineage.KindIssue, lineage.KindPR, lineage.KindRelease:
 			lineage.AddCost(&out.Total, n.Banked)
 		case lineage.KindSession:
 			lineage.AddCost(&out.Unlinked, n.Banked)
@@ -241,6 +252,11 @@ func valueOf(nodes []wire.LineageCostNode, since wire.Date) wire.ReportValue {
 		}
 		countPR(n, &out.PrsMerged, &out.PrsClosed, &out.PrsReverted, &out.FailedChecks)
 	}
+	// All in (#4524): the work, and the turns that went on no work.
+	loaded := wire.LineageCost{Cost: map[string]float64{}}
+	lineage.AddCost(&loaded, out.Total)
+	lineage.AddCost(&loaded, out.Unlinked)
+	out.Loaded = &loaded
 	if out.PrsMerged > 0 {
 		for currency, v := range out.Total.Cost {
 			out.PerMergedPR[currency] = v / float64(out.PrsMerged)
@@ -277,7 +293,11 @@ func valueOf(nodes []wire.LineageCostNode, since wire.Date) wire.ReportValue {
 	for _, ref := range releases {
 		// Its PRs, and the issues those PRs fix, each once (#3023; the same shape as
 		// lineage.Rollup's KindRelease case): only PRs are ever part-of a release.
-		parts := dedupParts(members[ref], func(n wire.LineageCostNode) []wire.LineageCostNode {
+		var own []wire.LineageCostNode
+		if n, ok := ownRelease[ref]; ok {
+			own = append(own, n)
+		}
+		parts := dedupParts(append(own, members[ref]...), func(n wire.LineageCostNode) []wire.LineageCostNode {
 			var fixed []wire.LineageCostNode
 			for _, f := range n.Fixes {
 				if issue, ok := byRef[f]; ok {

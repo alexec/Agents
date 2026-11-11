@@ -98,7 +98,41 @@ export function removeQuestion(host: ControlMachine): string {
   return `${addMachineWords.removeTitle(host.name)} ${addMachineWords.removeNote}`;
 }
 
-/** The rows New Machine is making: the names that have not joined as a machine yet. */
-export function makingRows(making: readonly string[], hosts: readonly { name: string }[]): string[] {
-  return making.filter((name) => !hosts.some((h) => h.name === name));
+/** A machine New Machine made that has not joined yet (#4610), as the window's MachineMaking: Making… while the control
+ * plane waits for it, the reason and Delete once it gave up. An empty provider is the page's own row, before the
+ * control plane lists the machine. */
+export interface MachineMaking {
+  provider: string;
+  providerName: string;
+  workspace: string;
+  name: string;
+  notJoined: string | null;
+}
+
+/** The rows New Machine is making: each provider's workspaces the control plane waits for or gave up on, that no machine is
+ * linked to and no machine of the name has joined; then the page's own names the list does not have yet. Making… first,
+ * then by name. */
+export function makingRows(making: readonly string[], providers: readonly ProviderSummary[] | null,
+  hosts: readonly { name: string }[]): MachineMaking[] {
+  const joined = (name: string) => hosts.some((h) => h.name === name);
+  const rows: MachineMaking[] = [];
+  for (const p of providers ?? []) {
+    for (const w of p.workspaces) {
+      if (w.host || !(w.joining || w.notJoined) || joined(w.name)) continue;
+      rows.push({ provider: p.id, providerName: p.name, workspace: w.id, name: w.name, notJoined: w.notJoined ?? null });
+    }
+  }
+  for (const name of making) {
+    if (joined(name) || rows.some((r) => r.name === name)) continue;
+    rows.push({ provider: "", providerName: "", workspace: "", name, notJoined: null });
+  }
+  return rows.sort((a, b) => {
+    if ((a.notJoined === null) !== (b.notJoined === null)) return a.notJoined === null ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+/** Delete's question on a row the control plane gave up on (#4610). */
+export function deleteMakingQuestion(row: MachineMaking): string {
+  return `Delete ${row.name}? ${row.providerName} deletes it. Nothing was installed on it, so there is nothing to back up.`;
 }

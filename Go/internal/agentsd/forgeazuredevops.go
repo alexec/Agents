@@ -125,12 +125,15 @@ type azureDevOpsForge struct {
 
 func (azureDevOpsForge) Name() string { return "azuredevops" }
 
+func (azureDevOpsForge) Images() forgeImageHost { return azureImages{} }
+
 func (azureDevOpsForge) Caps() forgeCaps {
 	return forgeCaps{
 		PRs: true,
 		PR: forgeActions{Comment: true, Label: true, Close: true, Reopen: true, Merge: true, AutoMerge: true, Approve: true,
 			Rerun: true, Log: true, Diff: true},
-		Avatars: true,
+		Avatars:   true,
+		CreatedAt: true, ClosedAt: true,
 		// A pull request's comment count is on its own page only.
 		CommentCount: "detail",
 		Reasons: map[string]string{
@@ -446,7 +449,7 @@ func (d *Daemon) forgeAzureDevOps(root string) forgeAzureDevOps {
 func azureDevOpsItemOf(i azuredevopsmcp.Item, folder string) wire.ForgeItem {
 	return wire.ForgeItem{Node: azureDevOpsNode(i.Repo, i.Number), Title: i.Title, State: i.State, URL: optional(i.URL),
 		Folder: optional(folder), Labels: forgeLabelsOf(i.Labels, nil), Author: optional(i.Author), AuthorAvatar: optional(i.AuthorAvatar), Assignees: []string{},
-		UpdatedAt: forgeDate(i.UpdatedAt), Comments: int64(i.Comments), Draft: new(i.Draft), AutoMerge: new(i.AutoMerge),
+		UpdatedAt: forgeDate(i.UpdatedAt), CreatedAt: forgeDateOptional(i.CreatedAt), ClosedAt: forgeDateOptional(i.ClosedAt), Comments: int64(i.Comments), Draft: new(i.Draft), AutoMerge: new(i.AutoMerge),
 		Checks: optional(i.Checks), Review: optional(i.Review), Mergeable: optional(i.Mergeable)}
 }
 

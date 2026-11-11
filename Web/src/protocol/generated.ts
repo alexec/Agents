@@ -4078,9 +4078,12 @@ export interface ForgeBoardsRequest {
 /**
  * What one forge on a list's page fills (#4329, #4361), so a client hides what it does not: issues
  * and pulls say it has them; labelColors that its labels have a #rrggbb colour; avatars that its
- * items have authorAvatar; stateReason that its closed issues have stateReason. commentCount says
- * how to read ForgeItem.comments: exact; capped at commentsMost (show 50+ there); or detail, only
- * on an item's own page (hide it on the row).
+ * items have authorAvatar; stateReason that its closed issues have stateReason. createdAt that its
+ * items have createdAt, and closedAt that its closed and merged items have closedAt; children,
+ * linkedPulls and events that an item's read has them (#4373); total that it counts a list's items,
+ * for ForgeList.total (#4396); each is absent from an earlier daemon, which has none. commentCount
+ * says how to read ForgeItem.comments: exact; capped at commentsMost (show 50+ there); or detail,
+ * only on an item's own page (hide it on the row).
  */
 export interface ForgeCapabilities {
   forge: string;
@@ -4089,6 +4092,12 @@ export interface ForgeCapabilities {
   labelColors: boolean;
   avatars: boolean;
   stateReason: boolean;
+  createdAt?: boolean;
+  closedAt?: boolean;
+  children?: boolean;
+  linkedPulls?: boolean;
+  events?: boolean;
+  total?: boolean;
   commentCount: ForgeCommentCount;
   commentsMost?: number;
 }
@@ -4189,6 +4198,34 @@ export interface ForgeDone {
 }
 
 /**
+ * One event on an issue's timeline (#4373), as its forge says it: kind is what happened; actor is
+ * who did it, absent when the forge says nobody (a deleted account); label is the label that
+ * labelled and unlabelled name; assignee is the person that assigned and unassigned name; source is
+ * the issue or pull request that referenced names, or the pull request that closed closed it with.
+ */
+export interface ForgeEvent {
+  kind: ForgeEventKind;
+  actor?: string;
+  at: WireDate;
+  label?: ForgeLabel;
+  assignee?: string;
+  source?: LineageNode;
+}
+
+/**
+ * What happened on an issue (#4373): a label was added or removed, a person assigned or unassigned,
+ * it closed or reopened, or another issue or pull request named it.
+ */
+export type ForgeEventKind =
+  | "labeled"
+  | "unlabeled"
+  | "assigned"
+  | "unassigned"
+  | "closed"
+  | "reopened"
+  | "referenced";
+
+/**
  * A feature (#3267): name is its label's after feature:, with the label's colour where the forge
  * gives one; epics counts its epics, open the open ones. issues counts its open issues that are not
  * epics, of the newest 500 open issues (#3741); a feature with no open epic and no such issue is
@@ -4262,7 +4299,9 @@ export interface ForgeImageRequest {
  * epic, whose plan is a query (#3659). authorAvatar is the author's picture, a URL that only
  * forge/image reads (#4363), where the forge gives one (ForgeCapabilities.avatars). stateReason is
  * why a closed issue closed (#4365): completed, not_planned or duplicate, where the forge says it
- * (ForgeCapabilities.stateReason); absent on an open issue and on a pull request.
+ * (ForgeCapabilities.stateReason); absent on an open issue and on a pull request. createdAt is when
+ * it opened and closedAt when it closed or merged (#4373), where the forge says them
+ * (ForgeCapabilities.createdAt and closedAt); closedAt is absent while it is open.
  */
 export interface ForgeItem {
   node: LineageNode;
@@ -4277,6 +4316,8 @@ export interface ForgeItem {
   authorAvatar?: string;
   assignees: string[];
   milestone?: string;
+  createdAt?: WireDate;
+  closedAt?: WireDate;
   updatedAt: WireDate;
   comments: number;
   draft?: boolean;
@@ -4301,7 +4342,10 @@ export interface ForgeItem {
  * now (Jira, #3260), which forge/close takes in place of a close or a reopen. actions are what the
  * item's page offers now, from its forge and its state (#4361): a merged pull request has no merge
  * and no reopen, a closed item no close; absent from an earlier daemon, when the page shows what it
- * did before.
+ * did before. On an issue's read (#4373), where the forge says them (ForgeCapabilities): children
+ * are its sub-issues, linkedPulls the pull requests that close it, and events its timeline, oldest
+ * first (labelled, assigned, closed, referenced and the like); each is absent where the forge gives
+ * none.
  */
 export interface ForgeItemDetail {
   item: ForgeItem;
@@ -4316,6 +4360,9 @@ export interface ForgeItemDetail {
   start?: ForgeStart;
   transitions?: ForgeTransition[];
   actions?: ForgeAction[];
+  children?: ForgeLinked[];
+  linkedPulls?: ForgeLinked[];
+  events?: ForgeEvent[];
 }
 
 /**
@@ -4359,14 +4406,28 @@ export interface ForgeLead {
 }
 
 /**
+ * An item that an issue's read names (#4373): a sub-issue, or a pull request that closes it. state
+ * is open, closed or merged, as ForgeItem.state.
+ */
+export interface ForgeLinked {
+  node: LineageNode;
+  title: string;
+  state: string;
+  url?: string;
+}
+
+/**
  * forge/issues and forge/pulls (#3129): a page of items, the last updated first. cursor is the next
  * page, absent at the end. errors says a forge that could not be read (not connected, a rate
  * limit), and the items of the others still come. forges says what each forge on the page fills
- * (#4361); absent from an earlier daemon.
+ * (#4361); absent from an earlier daemon. total is how many items the whole list has, the sum of
+ * each forge's count, kept from each forge's first page (#4396); absent when a forge on the list
+ * gives no count (ForgeCapabilities.total) or could not be read, and from an earlier daemon.
  */
 export interface ForgeList {
   items: ForgeItem[];
   cursor?: string;
+  total?: number;
   errors?: ForgeListError[];
   forges?: ForgeCapabilities[];
 }
@@ -4928,6 +4989,19 @@ export interface LineMember {
 }
 
 /**
+ * control/lineageChanged (#4276): a machine sent lineage the control plane's copy did not have, to
+ * the machine's person and to the admins: the changes of state it sent, so a client that shows
+ * working does not poll, and links when links changed too. Only refs, states and times.
+ */
+export interface LineageChanged {
+  /** The machine's id. */
+  host: string;
+  states: LineageStateChange[];
+  /** Links started or ended too: a read of them is out of date. */
+  links?: boolean;
+}
+
+/**
  * What was banked under lineage nodes (#2350): a turn's cost, tokens and time, split evenly among
  * the links active when it was banked. turns is a share of turns, so a turn on two nodes is half a
  * turn on each.
@@ -5007,6 +5081,11 @@ export interface LineageCostNode {
    * actual when it closes.
    */
   estimate?: LineageEstimateKept;
+  /**
+   * An epic's first landing forecast (#4526), kept once made, for the forecast against when it
+   * lands.
+   */
+  forecast?: LineageForecastKept;
 }
 
 /**
@@ -5103,6 +5182,14 @@ export interface LineageEstimate {
    * and every child's. Absent while open.
    */
   actual?: LineageCost;
+  /**
+   * cost with the overhead loaded in (#4524), by currency: each figure times (1 +
+   * overhead.unlinkedRatio), and an epic's times (1 + overhead.epicRatio) too, as "direct $100,
+   * about $165 all in". Absent when cost is, or the overhead has no ratio.
+   */
+  loaded?: Record<string, LineageEstimateRange>;
+  /** The overhead that loaded is made with (#4524), on this machine. */
+  overhead?: LineageOverhead;
 }
 
 /** When work lands (#3559): the median and the P10 to P90 range. */
@@ -5188,6 +5275,137 @@ export interface LineageFigures {
 }
 
 /**
+ * lineage/forecast (#4526; the method is specs/4533-forecasting/spec.md): what comes next, from
+ * this machine's totals. landings is the issues (not epics) that landed with a merged PR in the
+ * window of windowDays (14) before at, in the epic's repo when a node is asked for, else in every
+ * repo. lands is when the epic lands; noForecast says why there is none (too little history, too
+ * few closed epics, nothing open). toComplete is the epic's estimate to complete, once three of its
+ * children closed with an estimate kept at their start. kept is the forecast kept on the epic's
+ * node, the first one made, so it can be scored when the epic lands. spend is what a week and a
+ * month cost at the window's pace, burn is each weekly allowance's pace, and serviceLevels is how
+ * long each level's issues took. Every figure says its window; a range is a probability, not a
+ * promise.
+ */
+export interface LineageForecast {
+  node?: LineageNode;
+  at: WireDate;
+  windowDays: number;
+  landings: number;
+  lands?: LineageForecastLands;
+  noForecast?: string;
+  toComplete?: LineageForecastToComplete;
+  kept?: LineageForecastKept;
+  spend?: LineageForecastSpend;
+  burn: LineageForecastBurn[];
+  serviceLevels: LineageForecastServiceLevel[];
+  /** The overhead that toComplete.loaded and spend's loaded figures are made with (#4524). */
+  overhead?: LineageOverhead;
+}
+
+/**
+ * A weekly allowance's pace (#4526): used (0 to 1) at its last reading at, of the week that resets
+ * at resetsAt. runsOutAt is when it runs out at that pace, absent when it lasts to the reset
+ * (lasts).
+ */
+export interface LineageForecastBurn {
+  credentialKey: string;
+  window: string;
+  used: number;
+  at: WireDate;
+  resetsAt: WireDate;
+  runsOutAt?: WireDate;
+  lasts: boolean;
+}
+
+/**
+ * An epic's landing forecast as it was made (#4526), kept once on its node, so it can be scored
+ * when the epic lands: the P50 and P85 dates, the window, the share and the open children then.
+ */
+export interface LineageForecastKept {
+  at: WireDate;
+  p50: WireDate;
+  p85: WireDate;
+  windowDays: number;
+  share: number;
+  open: number;
+}
+
+/**
+ * When an epic lands (#4526, method H of specs/4533-forecasting/spec.md): a Monte Carlo of 1,000
+ * draws with a fixed seed, each resampling hours of the window and keeping each landing in an hour
+ * with the chance share, until the open children are done. p50 and p85 are dates. share is the
+ * median share of the folder's landings that the closed epics had over their lives, from groups of
+ * them. open and closed are the children as the plan says now, with no growth for children not
+ * filed yet; stepsLeft is the blocked-by steps of the open ones, as context only: they do not enter
+ * the dates.
+ */
+export interface LineageForecastLands {
+  p50: WireDate;
+  p85: WireDate;
+  open: number;
+  closed: number;
+  stepsLeft: number;
+  share: number;
+  groups: number;
+}
+
+/**
+ * lineage/forecast (#4526): an epic, for when it lands and its estimate to complete; without one,
+ * only the spend, the burn and the service levels, over every repo.
+ */
+export interface LineageForecastRequest {
+  node?: LineageNode;
+}
+
+/**
+ * How long a level's issues took (#4526): of the closed issues of the level that landed in the
+ * window, half took up to p50Seconds and 85% up to p85Seconds, from the start of work to the last
+ * PR merged. Only a level with five or more.
+ */
+export interface LineageForecastServiceLevel {
+  level: string;
+  closed: number;
+  p50Seconds: number;
+  p85Seconds: number;
+}
+
+/**
+ * What a week and a month cost at the window's pace (#4526): dollars by currency, P10 to P90, from
+ * 1,000 draws of 7 and 30 of the window's days. A day's cost is what the issues that landed on it
+ * took, all of their work, so it follows the landings, not the hour the money went.
+ */
+export interface LineageForecastSpend {
+  week: Record<string, LineageEstimateRange>;
+  month: Record<string, LineageEstimateRange>;
+  /**
+   * week with the overhead loaded in (#4524): times (1 + overhead.unlinkedRatio). Absent with no
+   * ratio.
+   */
+  loadedWeek?: Record<string, LineageEstimateRange>;
+  /** month, loaded as loadedWeek is. */
+  loadedMonth?: Record<string, LineageEstimateRange>;
+}
+
+/**
+ * An epic's estimate to complete (#4526): dollars by currency, P10 to P90, for its open children
+ * and the lead. Each child's estimate is drawn from its matches and scaled by one factor per draw,
+ * shared by every child, lognormal from the closed children's actual over their kept estimate
+ * (ratio is its median, from closed of them). The lead's term is the epic's own cost over its
+ * closed children's, leadRatio, times the children's.
+ */
+export interface LineageForecastToComplete {
+  cost: Record<string, LineageEstimateRange>;
+  ratio: number;
+  closed: number;
+  leadRatio: number;
+  /**
+   * cost with the overhead loaded in (#4524): times (1 + overhead.unlinkedRatio). The lead is in
+   * cost already, so not the epic ratio. Absent with no ratio.
+   */
+  loaded?: Record<string, LineageEstimateRange>;
+}
+
+/**
  * lineage/walk (#2348): the nodes the walk reached and the links it went along. limited says the
  * walk stopped at its limit on nodes, so there is more. resolved is each node's title, state and
  * labels from its connector, by ref, for the nodes a connector could resolve (#3089). resolving
@@ -5262,6 +5480,31 @@ export interface LineageNodeRequest {
 }
 
 /**
+ * The overhead (#4524): the cost no issue, PR or release carries, over the nodes that last changed
+ * in the last windowDays days (a rolling 14). unlinked is the sessions' cost that went on no work
+ * (a Scrum Master's turn that started nothing, a review, a check); linked is the cost on issues,
+ * PRs and releases. unlinkedRatio is unlinked over linked, and epicRatio is the epics' own cost
+ * (their leads') over their children's and their PRs', each in currency, the currency with the most
+ * linked cost; absent when there is nothing to divide by. A loaded figure is a direct one times (1
+ * + unlinkedRatio), and an epic's plan times (1 + epicRatio) too. uncounted names what no figure
+ * has.
+ */
+export interface LineageOverhead {
+  windowDays: number;
+  /** The currency of the ratios; absent with no linked cost. */
+  currency?: string;
+  linked: LineageCost;
+  unlinked: LineageCost;
+  unlinkedRatio?: number;
+  epicRatio?: number;
+  /**
+   * What no figure here counts: people-time (a person's reviews and answers) and ci-minutes (the
+   * forge's runners).
+   */
+  uncounted: string[];
+}
+
+/**
  * A node's title, state and labels from its connector (#3089), resolved and cached on the daemon so
  * a lineage renderer shows "Fix flaky test" rather than its ref. state is open, closed or merged (a
  * pull request's; an issue's is open or closed); absent when the connector does not say. labels is
@@ -5296,6 +5539,20 @@ export interface LineageSessionIssue {
 export interface LineageSessionMatch {
   agentID: UUID;
   on: LineageNode;
+}
+
+/**
+ * A session that lineage links to one or more of the nodes asked for (#4276), on any machine in the
+ * scope: the session's node, its machine, the nodes asked for it is linked to, when its first link
+ * to them started, and its state now when its machine sent one.
+ */
+export interface LineageSessionOn {
+  node: LineageNode;
+  /** The id of the machine that sent the link. */
+  host: string;
+  on: LineageNode[];
+  at: WireDate;
+  state?: LineageSessionState;
 }
 
 /**
@@ -5339,6 +5596,25 @@ export interface LineageSessions {
 }
 
 /**
+ * lineage/sessionsOn (#4276): the sessions linked to the nodes asked for, each once, the earliest
+ * link first. limited says there were more than lineage's answer bound (500).
+ */
+export interface LineageSessionsOn {
+  sessions: LineageSessionOn[];
+  limited?: boolean;
+}
+
+/**
+ * lineage/sessionsOn (#4276): the nodes (at most 500, such as an epic and its children) whose
+ * sessions to say, over every machine's copy that the scope takes. The scope is as reports/value's:
+ * me when absent for a member, the organisation for an admin.
+ */
+export interface LineageSessionsOnRequest {
+  nodes: LineageNode[];
+  scope?: ReportScope;
+}
+
+/**
  * lineage/sessions (#3899): a session search for #<number> asks for the sessions on that issue, on
  * the issues part-of it (its sub-issues, at most 100) and on the PRs that fix them. The issue is
  * #<number> in the forge repo of each of this machine's folders.
@@ -5375,6 +5651,18 @@ export interface LineageSync {
  */
 export interface LineageSyncAnswer {
   full?: boolean;
+}
+
+/**
+ * lineage/walkAll (#4276): lineage/walk over the control plane's merged copy, every machine's links
+ * that the scope takes, so a machine that sleeps is still in it. depth is as lineage/walk's; the
+ * scope is as reports/value's. The answer has no resolved: the control plane keeps no titles
+ * (principle 7).
+ */
+export interface LineageWalkAllRequest {
+  node: LineageNode;
+  depth?: number;
+  scope?: ReportScope;
 }
 
 export interface ListCursor {
@@ -6252,7 +6540,9 @@ export interface MachineHelloAnswer {
 
 /**
  * One workspace, as its provider last listed it. `state` is running, starting, stopping, stopped or
- * unknown; or failed, for a make that failed, with the provider's `reason` (#3972).
+ * unknown; or failed, for a make that failed, with the provider's `reason` (#3972). `joining` while
+ * New Machine waits for it to join the control plane, and `notJoined` once the control plane gave
+ * up waiting (#4610).
  */
 export interface MachineInfo {
   id: string;
@@ -6269,6 +6559,15 @@ export interface MachineInfo {
   host?: MachineRef;
   /** Why the make failed, in the provider's words, when `state` is failed. */
   reason?: string;
+  /**
+   * New Machine made it and the control plane waits for it to join: the row says Making… (#4610).
+   */
+  joining?: boolean;
+  /**
+   * Why the control plane gave up waiting for it to join, once it did (#4610): the row says so,
+   * with Delete.
+   */
+  notJoined?: string;
 }
 
 /**
@@ -9212,6 +9511,14 @@ export interface ProviderSummary {
 }
 
 /**
+ * providers/deleteWorkspace (#4610): one of a provider's workspaces that no machine is linked to.
+ */
+export interface ProviderWorkspaceRequest {
+  id: ProviderID;
+  workspace: string;
+}
+
+/**
  * Which APNs a device token belongs to (#1460): a Debug build's (sandbox) or a TestFlight and App
  * Store build's.
  */
@@ -9705,10 +10012,11 @@ export interface ReportScopes {
 /**
  * reports/value (#2351): what the work in a scope cost and what it delivered, from the lineage
  * nodes that the scope's machines send (#2350). A node is in the range when it last changed in it,
- * with its whole cost. total is the work on issues and PRs; waste is the PRs closed without a merge
- * and merged reverts; unlinked is the turns with no issue or PR. perMergedPR is total by the PRs
- * merged, by currency. leadTimeSeconds is the median of the issues' lead times. issues and releases
- * (#3023) are the most costly first, at most 100 each; limited says there are more.
+ * with its whole cost. total is the work on issues, PRs and releases (a release session's own,
+ * #4524); waste is the PRs closed without a merge and merged reverts; unlinked is the turns with no
+ * issue or PR. perMergedPR is total by the PRs merged, by currency. leadTimeSeconds is the median
+ * of the issues' lead times. issues and releases (#3023) are the most costly first, at most 100
+ * each; limited says there are more.
  */
 export interface ReportValue {
   range: ReportRange;
@@ -9716,6 +10024,10 @@ export interface ReportValue {
   total: LineageCost;
   waste: LineageCost;
   unlinked: LineageCost;
+  /** total and unlinked together (#4524): what the work cost all in, as the agents spent it. */
+  loaded?: LineageCost;
+  /** The scope's overhead over the 14 days to now (#4524), whatever the range. */
+  overhead?: LineageOverhead;
   /** By currency. */
   perMergedPR: Record<string, number>;
   prsMerged: number;
@@ -10810,6 +11122,21 @@ export interface SendFile {
 }
 
 /**
+ * send/changed (#4613): how a send that folders/send started goes. `sent` of `total` bytes are on
+ * the other machine (0 of 0 while the bundle is made); `finished` once it ended, whichever way:
+ * `received` is the folder it became there, or `problem` says why it stopped, in the person's
+ * words.
+ */
+export interface SendNotification {
+  send: SendSummary;
+  sent: number;
+  total: number;
+  finished: boolean;
+  problem?: string;
+  received?: FolderSummary;
+}
+
+/**
  * What folders/sendPack made (#1123): each branch at its commit, the bundle (none when the
  * receiving host has every commit) and the patch (none when nothing is uncommitted).
  */
@@ -10843,6 +11170,36 @@ export interface SendRead {
 export interface SendReadRequest {
   id: UUID;
   offset: number;
+}
+
+/**
+ * folders/send (#4613): Send to ‹machine›… from a client. This host sends `branches` of the
+ * repository at `folder`, less the commits the folder there has, and with `includeChanges` its
+ * uncommitted changes, to `destination` on `machine` (the control plane's id or name for it;
+ * `machineName` is the name the person knows it by, for the words), through the control plane, as
+ * start_session with send does (#2929). There `checkout` is checked out and `origin` set.
+ */
+export interface SendRequest {
+  folder: URLString;
+  machine: string;
+  machineName?: string;
+  destination: string;
+  branches: string[];
+  checkout: string;
+  includeChanges: boolean;
+  origin?: string;
+}
+
+/**
+ * One send folders/send started (#4613): the folder here, and the folder on the machine it goes to.
+ */
+export interface SendSummary {
+  id: UUID;
+  folder: URLString;
+  machine: string;
+  machineName: string;
+  destination: string;
+  startedAt: WireDate;
 }
 
 /** A branch the Mac sends, at the commit it has (#1123). */
@@ -13540,8 +13897,11 @@ export interface Methods {
   "groups/setRole": { params: GroupRoleSet; result: Group };
   "lineage/cost": { params: LineageNodeRequest; result: LineageCostRollup };
   "lineage/estimate": { params: LineageEstimateRequest; result: LineageEstimate };
+  "lineage/forecast": { params: LineageForecastRequest; result: LineageForecast };
   "lineage/sessions": { params: LineageSessionsRequest; result: LineageSessions };
+  "lineage/sessionsOn": { params: LineageSessionsOnRequest; result: LineageSessionsOn };
   "lineage/walk": { params: LineageNodeRequest; result: LineageGraph };
+  "lineage/walkAll": { params: LineageWalkAllRequest; result: LineageGraph };
   "links/approve": { params: ChannelLinkDecide; result: Empty };
   "links/deny": { params: ChannelLinkDecide; result: Empty };
   "links/list": { params: Empty; result: ChannelLink[] };
@@ -13657,6 +14017,7 @@ export interface Methods {
   "projects/setSlot": { params: ProjectSlotSet; result: Project };
   "providers/add": { params: ProviderAdd; result: ProviderSummary };
   "providers/create": { params: ProviderCreate; result: ProviderCreated };
+  "providers/deleteWorkspace": { params: ProviderWorkspaceRequest; result: Empty };
   "providers/list": { params: Empty; result: ProviderList };
   "providers/makeDefault": { params: ProviderRequest; result: Empty };
   "providers/options": { params: ProviderRequest; result: ProviderOptions };
@@ -13960,8 +14321,11 @@ export const MethodTarget = {
   "groups/setRole": "control",
   "lineage/cost": "host",
   "lineage/estimate": "host",
+  "lineage/forecast": "host",
   "lineage/sessions": "host",
+  "lineage/sessionsOn": "control",
   "lineage/walk": "host",
+  "lineage/walkAll": "control",
   "links/approve": "control",
   "links/deny": "control",
   "links/list": "control",
@@ -14077,6 +14441,7 @@ export const MethodTarget = {
   "projects/setSlot": "control",
   "providers/add": "control",
   "providers/create": "control",
+  "providers/deleteWorkspace": "control",
   "providers/list": "control",
   "providers/makeDefault": "control",
   "providers/options": "control",
@@ -14223,6 +14588,7 @@ export interface Notifications {
   "control/joinRequested": JoinRequest;
   "control/keptChanged": KeptList;
   "control/keptDelivered": KeptDelivered;
+  "control/lineageChanged": LineageChanged;
   "control/linkDecided": ChannelLinkDecided;
   "control/linkRequested": ChannelLinkRequest;
   "control/linksChanged": Empty;
@@ -14601,7 +14967,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeBlockedByRequest: { required: ["node"], optional: ["add", "remove"] },
   ForgeBoards: { required: ["boards"], optional: [] },
   ForgeBoardsRequest: { required: [], optional: ["folder"] },
-  ForgeCapabilities: { required: ["forge", "issues", "pulls", "labelColors", "avatars", "stateReason", "commentCount"], optional: ["commentsMost"] },
+  ForgeCapabilities: { required: ["forge", "issues", "pulls", "labelColors", "avatars", "stateReason", "commentCount"], optional: ["createdAt", "closedAt", "children", "linkedPulls", "events", "total", "commentsMost"] },
   ForgeCheck: { required: ["name", "state"], optional: ["url"] },
   ForgeCloseRequest: { required: ["node"], optional: ["reopen", "transition"] },
   ForgeComment: { required: ["author", "body", "at"], optional: ["avatar", "url", "bot"] },
@@ -14610,19 +14976,21 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeDiffFile: { required: ["path", "change", "additions", "deletions", "hunks"], optional: ["previousPath", "note"] },
   ForgeDiffHunk: { required: ["oldStart", "newStart", "lines"], optional: [] },
   ForgeDone: { required: [], optional: ["url", "auto", "reran"] },
+  ForgeEvent: { required: ["kind", "at"], optional: ["actor", "label", "assignee", "source"] },
   ForgeFeature: { required: ["name", "epics", "open"], optional: ["color", "issues", "refs", "waiting", "updatedAt"] },
   ForgeFeatures: { required: ["features"], optional: ["approvals", "errors"] },
   ForgeFeaturesRequest: { required: [], optional: ["folder", "board"] },
   ForgeImage: { required: ["mimeType", "data"], optional: [] },
   ForgeImageRequest: { required: ["url"], optional: [] },
-  ForgeItem: { required: ["node", "title", "state", "labels", "assignees", "updatedAt", "comments"], optional: ["stateReason", "status", "url", "folder", "author", "authorAvatar", "milestone", "draft", "checks", "review", "mergeable", "autoMerge", "parent", "level", "feature", "progress", "standing"] },
-  ForgeItemDetail: { required: ["item", "body", "comments"], optional: ["cursor", "checks", "reviewThreads", "filesChanged", "head", "mergeMethods", "start", "transitions", "actions"] },
+  ForgeItem: { required: ["node", "title", "state", "labels", "assignees", "updatedAt", "comments"], optional: ["stateReason", "status", "url", "folder", "author", "authorAvatar", "milestone", "createdAt", "closedAt", "draft", "checks", "review", "mergeable", "autoMerge", "parent", "level", "feature", "progress", "standing"] },
+  ForgeItemDetail: { required: ["item", "body", "comments"], optional: ["cursor", "checks", "reviewThreads", "filesChanged", "head", "mergeMethods", "start", "transitions", "actions", "children", "linkedPulls", "events"] },
   ForgeItemRequest: { required: ["node"], optional: ["cursor"] },
   ForgeLabel: { required: ["name"], optional: ["color"] },
   ForgeLabelRequest: { required: ["node"], optional: ["add", "remove"] },
   ForgeLabels: { required: ["labels"], optional: [] },
   ForgeLead: { required: ["session", "state"], optional: ["title"] },
-  ForgeList: { required: ["items"], optional: ["cursor", "errors", "forges"] },
+  ForgeLinked: { required: ["node", "title", "state"], optional: ["url"] },
+  ForgeList: { required: ["items"], optional: ["cursor", "total", "errors", "forges"] },
   ForgeListError: { required: ["forge", "message"], optional: [] },
   ForgeListRequest: { required: [], optional: ["folder", "state", "label", "assignee", "query", "cursor", "limit", "feature", "board"] },
   ForgeLog: { required: ["text"], optional: [] },
@@ -14682,32 +15050,46 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LendSignIn: { required: ["host", "from", "runtime", "allowed"], optional: [] },
   Levels: { required: [], optional: ["model", "permission", "permissionRequests"] },
   LineMember: { required: ["agentID", "askedAt", "isCallOpen"], optional: [] },
+  LineageChanged: { required: ["host", "states"], optional: ["links"] },
   LineageCost: { required: ["cost", "inputTokens", "outputTokens", "turns", "workingSeconds", "waitingSeconds"], optional: ["limitTokens"] },
-  LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["repo", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "startedAt", "level", "feature", "parent", "endedAt", "resolved", "sessions", "estimate"] },
+  LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["repo", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "startedAt", "level", "feature", "parent", "endedAt", "resolved", "sessions", "estimate", "forecast"] },
   LineageCostRollup: { required: ["node", "own", "total", "waste", "unlinked", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "parts"], optional: ["limited"] },
   LineageEndRequest: { required: ["from", "to", "rel"], optional: [] },
-  LineageEstimate: { required: ["node", "closedIssues", "matches"], optional: ["type", "level", "step", "matchedBy", "cost", "inputTokens", "outputTokens", "workingSeconds", "leadTimeSeconds", "cycleTimeSeconds", "landsAt", "openChildren", "closedChildren", "spent", "children", "kept", "actual"] },
+  LineageEstimate: { required: ["node", "closedIssues", "matches"], optional: ["type", "level", "step", "matchedBy", "cost", "inputTokens", "outputTokens", "workingSeconds", "leadTimeSeconds", "cycleTimeSeconds", "landsAt", "openChildren", "closedChildren", "spent", "children", "kept", "actual", "loaded", "overhead"] },
   LineageEstimateDates: { required: ["median", "p10", "p90"], optional: [] },
   LineageEstimateKept: { required: ["at", "matches"], optional: ["matchedBy", "cost", "costP10", "costP90", "outputTokens", "outputTokensP10", "outputTokensP90", "workingSeconds", "workingSecondsP10", "workingSecondsP90", "cycleTimeSeconds", "landsAt"] },
   LineageEstimateRange: { required: ["median", "p10", "p90"], optional: [] },
   LineageEstimateRequest: { required: ["node"], optional: ["startAt"] },
   LineageFigures: { required: ["node", "cost", "sessions", "running", "runtimes"], optional: ["leadTimeSeconds", "limited"] },
+  LineageForecast: { required: ["at", "windowDays", "landings", "burn", "serviceLevels"], optional: ["node", "lands", "noForecast", "toComplete", "kept", "spend", "overhead"] },
+  LineageForecastBurn: { required: ["credentialKey", "window", "used", "at", "resetsAt", "lasts"], optional: ["runsOutAt"] },
+  LineageForecastKept: { required: ["at", "p50", "p85", "windowDays", "share", "open"], optional: [] },
+  LineageForecastLands: { required: ["p50", "p85", "open", "closed", "stepsLeft", "share", "groups"], optional: [] },
+  LineageForecastRequest: { required: [], optional: ["node"] },
+  LineageForecastServiceLevel: { required: ["level", "closed", "p50Seconds", "p85Seconds"], optional: [] },
+  LineageForecastSpend: { required: ["week", "month"], optional: ["loadedWeek", "loadedMonth"] },
+  LineageForecastToComplete: { required: ["cost", "ratio", "closed", "leadRatio"], optional: ["loaded"] },
   LineageGraph: { required: ["nodes", "links"], optional: ["limited", "resolving", "resolved", "states"] },
   LineageLink: { required: ["from", "to", "rel", "source", "at"], optional: ["endedAt"] },
   LineageLinkRequest: { required: ["from", "to", "rel", "source"], optional: [] },
   LineageLinks: { required: ["links"], optional: ["limited", "states"] },
   LineageNode: { required: ["kind", "ref"], optional: [] },
   LineageNodeRequest: { required: ["node"], optional: ["depth"] },
+  LineageOverhead: { required: ["windowDays", "linked", "unlinked", "uncounted"], optional: ["currency", "unlinkedRatio", "epicRatio"] },
   LineageResolved: { required: ["title"], optional: ["state", "labels"] },
   LineageRuntimeCount: { required: ["runtimeID", "sessions"], optional: [] },
   LineageSessionIssue: { required: ["node"], optional: ["title"] },
   LineageSessionMatch: { required: ["agentID", "on"], optional: [] },
+  LineageSessionOn: { required: ["node", "host", "on", "at"], optional: ["state"] },
   LineageSessionState: { required: ["state", "at"], optional: [] },
   LineageSessions: { required: ["matches"], optional: ["issues", "limited"] },
+  LineageSessionsOn: { required: ["sessions"], optional: ["limited"] },
+  LineageSessionsOnRequest: { required: ["nodes"], optional: ["scope"] },
   LineageSessionsRequest: { required: ["number"], optional: [] },
   LineageStateChange: { required: ["node", "state", "at"], optional: [] },
   LineageSync: { required: [], optional: ["links", "states", "reset"] },
   LineageSyncAnswer: { required: [], optional: ["full"] },
+  LineageWalkAllRequest: { required: ["node"], optional: ["depth", "scope"] },
   ListCursor: { required: ["lastActivityAt", "id"], optional: ["archivedAt"] },
   ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID", "after", "query", "project"] },
   ListedSkill: { required: ["name", "folder"], optional: ["description", "managed"] },
@@ -14785,7 +15167,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineFolderSent: { required: [], optional: ["state", "folder", "facts", "pack", "read"] },
   MachineHello: { required: ["version", "platform", "machineID"], optional: ["host", "name", "implementation", "capabilities"] },
   MachineHelloAnswer: { required: [], optional: ["capabilities"] },
-  MachineInfo: { required: ["id", "name", "state"], optional: ["ssh", "tunnel", "hostKeyRenews", "cost", "host", "reason"] },
+  MachineInfo: { required: ["id", "name", "state"], optional: ["ssh", "tunnel", "hostKeyRenews", "cost", "host", "reason", "joining", "notJoined"] },
   MachineInstall: { required: ["destination"], optional: ["name", "key", "trust", "tunnel", "provider", "workspace"] },
   MachineJoinAsk: { required: ["name", "platform", "publicKey"], optional: ["version", "machineID", "person"] },
   MachineJoinDecision: { required: ["result"], optional: ["host", "controlKey", "name"] },
@@ -15034,6 +15416,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ProviderSSHResult: { required: [], optional: ["knownHosts", "needsTrust"] },
   ProviderSecretsKeep: { required: ["provider", "secrets"], optional: [] },
   ProviderSummary: { required: ["id", "name", "kind", "secrets", "capabilities", "contract", "mapped", "workspaces", "current"], optional: ["preset", "listedAt", "problem", "group", "mayUse", "default", "machine", "machineName", "machineOffline", "sshToolMissing"] },
+  ProviderWorkspaceRequest: { required: ["id", "workspace"], optional: [] },
   PushToken: { required: ["environment"], optional: ["token"] },
   QueuedPrompt: { required: ["id", "text", "attachments", "queuedAt", "from"], optional: ["preface", "sender"] },
   QueuedStart: { required: ["labels"], optional: ["runtimeID", "permissionMode", "model", "worktree"] },
@@ -15073,7 +15456,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ReportScope: { required: ["kind"], optional: ["group"] },
   ReportScopeOption: { required: ["scope", "name"], optional: [] },
   ReportScopes: { required: ["scopes", "admin"], optional: [] },
-  ReportValue: { required: ["range", "scope", "total", "waste", "unlinked", "perMergedPR", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "issues", "releases"], optional: ["leadTimeSeconds", "cycleTimeSeconds", "estimateError", "limited"] },
+  ReportValue: { required: ["range", "scope", "total", "waste", "unlinked", "perMergedPR", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "issues", "releases"], optional: ["loaded", "overhead", "leadTimeSeconds", "cycleTimeSeconds", "estimateError", "limited"] },
   ReportValueRow: { required: ["node", "total", "waste", "prsMerged", "prsClosed", "prsReverted", "failedChecks"], optional: ["leadTimeSeconds", "cycleTimeSeconds", "level"] },
   ReportView: { required: ["id", "name", "page", "scope", "range"], optional: ["by"] },
   ReportViewID: { required: ["id"], optional: [] },
@@ -15165,10 +15548,13 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SendFacts: { required: ["branches", "hasChanges"], optional: ["current", "origin"] },
   SendFactsRequest: { required: ["folder"], optional: [] },
   SendFile: { required: ["id", "size"], optional: [] },
+  SendNotification: { required: ["send", "sent", "total", "finished"], optional: ["problem", "received"] },
   SendPack: { required: ["commits"], optional: ["bundle", "patch"] },
   SendPackRequest: { required: ["folder", "branches", "leavingOut", "includeChanges"], optional: [] },
   SendRead: { required: ["data", "end"], optional: [] },
   SendReadRequest: { required: ["id", "offset"], optional: [] },
+  SendRequest: { required: ["folder", "machine", "destination", "branches", "checkout", "includeChanges"], optional: ["machineName", "origin"] },
+  SendSummary: { required: ["id", "folder", "machine", "machineName", "destination", "startedAt"], optional: [] },
   SentBranch: { required: ["name", "commit"], optional: [] },
   SentNotice: { required: ["title", "outcome"], optional: ["body", "nextAt", "to"] },
   ServedRequest: { required: ["kind", "outcome"], optional: [] },

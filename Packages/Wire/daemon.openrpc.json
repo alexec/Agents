@@ -4236,6 +4236,26 @@
       }
     },
     {
+      "name": "folders/send",
+      "x-capability": "send/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SendRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SendSummary"
+        }
+      }
+    },
+    {
       "name": "folders/sendFacts",
       "x-capability": "folders/1",
       "paramStructure": "by-name",
@@ -4292,6 +4312,29 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/SendRead"
+        }
+      }
+    },
+    {
+      "name": "folders/sends",
+      "x-capability": "send/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "daemon.schema.json#/definitions/SendNotification"
+          }
         }
       }
     },
@@ -5053,6 +5096,31 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/LineageFigures"
+        }
+      }
+    },
+    {
+      "name": "lineage/forecast",
+      "x-capability": "lineage.forecast/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LineageForecastRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LineageForecast"
         }
       }
     },
@@ -8585,6 +8653,21 @@
           "$ref": "daemon.schema.json#/definitions/SelfUpdate"
         }
       }
+    },
+    {
+      "name": "send/changed",
+      "x-capability": "send/1",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SendNotification"
+          }
+        }
+      ]
     },
     {
       "name": "sessions/adopt",

@@ -36,6 +36,7 @@ func (d *Daemon) register() {
 	d.registerLockReset()
 	d.registerReceive()
 	d.registerSend()
+	d.registerFolderSend()
 	d.registerExports()
 	d.registerBringBack()
 	d.registerLeases()
@@ -280,7 +281,7 @@ func (d *Daemon) folders(includeArchived bool) []wire.FolderSummary {
 		if !includeArchived && s.Folder.ArchivedAt != nil {
 			continue
 		}
-		d.dress(&s)
+		d.dress(&s, agents[f])
 		d.markHelperLimits(&s)
 		out = append(out, s)
 	}
@@ -310,12 +311,7 @@ func (d *Daemon) folderSummary(folder string) (wire.FolderSummary, bool) {
 			break
 		}
 	}
-	var agents []wire.Agent
-	for _, a := range d.Store.Agents() {
-		if folderPath(&a) == folder {
-			agents = append(agents, a)
-		}
-	}
+	agents := d.Store.AgentsIn(folder)
 	if !found && len(agents) == 0 {
 		return wire.FolderSummary{}, false
 	}
@@ -324,17 +320,12 @@ func (d *Daemon) folderSummary(folder string) (wire.FolderSummary, bool) {
 		records[folder] = record
 	}
 	s := summary(folder, records, agents)
-	d.dress(&s)
+	d.dress(&s, agents)
 	d.markHelperLimits(&s)
 	return s, true
 }
 
-func folderPath(a *wire.Agent) string {
-	if a.Worktree != nil && a.Worktree.Folder != "" {
-		return store.FolderPath(a.Worktree.Folder)
-	}
-	return store.FolderPath(a.Cwd)
-}
+func folderPath(a *wire.Agent) string { return store.AgentFolder(a) }
 
 func summary(folder string, records map[string]wire.Folder, agents []wire.Agent) wire.FolderSummary {
 	p, ok := records[folder]

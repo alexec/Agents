@@ -86,6 +86,11 @@ final class AppModel {
     /// The machine providers New Machine can use, as the control plane last listed them for
     /// this person (#3979): the Machines header's New Machine on ▸.
     private(set) var machineProviders: [DaemonAPI.ProviderSummary] = []
+    /// How many New Machine calls wait for the provider's answer (#4610): a *Making…* row
+    /// each, until the control plane lists the machine as joining.
+    private(set) var machinesBeingMade = 0
+    /// Goes up on each `control/lineageChanged` (#4276): Work ▸ Timeline reads the sessions again.
+    private(set) var lineageChanges = 0
     /// A runtime of this Mac's that refused for want of a sign-in: the window answers
     /// with its sign-in sheet rather than an error nobody can act on.
     var signInRuntimeID: String?
@@ -95,6 +100,12 @@ final class AppModel {
     /// Clones under way on this Mac, from whichever window started them (027). Each is
     /// a row in the Folders column until it becomes a folder or fails.
     private(set) var clones: [DaemonAPI.CloneSummary] = []
+    /// Sends under way from this Mac's host, and those that stopped with a problem (#4613).
+    /// Each is a row in the Folders column until it is a folder there, or is put away.
+    var sends: [FolderSend] = []
+    /// The sends that ended, so an answer to `folders/send` that comes after the end adds
+    /// no row.
+    @ObservationIgnored var sendsEnded: Set<UUID> = []
 
     // What the window reads, which is the shared model under another name. Forwarded
     // rather than mirrored: a copy is a thing that can fall behind.
@@ -604,7 +615,8 @@ final class AppModel {
             guard let key = selectedFolderKey else { return selection == nil && !composing ? .multiplier : nil }
             if let id = openWorkflow { return .workflow(id, in: key) }
             if case .review(let id)? = folderPage { return .review(id, in: key) }
-            if folderPage == .archive { return .archive(key) }
+            if folderPage == .archivedSessions { return .archivedSessions(key) }
+            if folderPage == .archivedWorkflows { return .archivedWorkflows(key) }
             if folderPage == .mcpServers { return .folderMCPServers(key) }
             if let openPin { return .pin(openPin, in: key) }
             if let selection { return .session(selection) }
@@ -632,8 +644,10 @@ final class AppModel {
                 openWorkflow = id
             case .pin(let path, let key):
                 showPin(path, in: key)
-            case .archive(let key):
-                showFolderPage(.archive, of: key)
+            case .archivedSessions(let key):
+                showFolderPage(.archivedSessions, of: key)
+            case .archivedWorkflows(let key):
+                showFolderPage(.archivedWorkflows, of: key)
             case .folderMCPServers(let key):
                 showFolderPage(.mcpServers, of: key)
             case .review(let id, let key):
@@ -957,7 +971,9 @@ final class AppModel {
     }
 
     enum FolderPage: Equatable {
-        case archive
+        /// Archived Sessions and Archived Workflows (#4448).
+        case archivedSessions
+        case archivedWorkflows
         /// Its MCP servers and how each is doing (#753).
         case mcpServers
         /// A change waiting for an OK, by its `Approval.id` (#1472).
@@ -1535,6 +1551,19 @@ final class AppModel {
     func loadArchived(in key: FolderKey, limit: Int = archivedShown) async -> Bool {
         let request = DaemonAPI.ListRequest(archivedOnly: true, folder: key.folder,
                                             limit: limit, lean: true)
+        guard let listed = try? await client(for: key.host).call(DaemonAPI.Method.agentsList, request,
+                                                                  returning: [Agent].self) else { return false }
+        work.takeListed(listed.map { var agent = $0; agent.host = key.host; return agent })
+        return true
+    }
+
+    /// The archived sessions of a folder that hold `words`, for the Archived Sessions page's
+    /// filter (#4448), so one older than the page held is found too. Let go with the rest
+    /// when the page closes.
+    @discardableResult
+    func searchArchived(in key: FolderKey, words: String) async -> Bool {
+        let request = DaemonAPI.ListRequest(archivedOnly: true, folder: key.folder, limit: Self.searchShown,
+                                            lean: true, query: words)
         guard let listed = try? await client(for: key.host).call(DaemonAPI.Method.agentsList, request,
                                                                   returning: [Agent].self) else { return false }
         work.takeListed(listed.map { var agent = $0; agent.host = key.host; return agent })
@@ -3597,6 +3626,10 @@ final class AppModel {
             clones.removeAll { $0.id == change.clone.id }
             if !change.finished { clones.append(change.clone) }
 
+        case DaemonAPI.Notification.sendChanged:
+            guard let change = try? params?.decode(DaemonAPI.SendNotification.self) else { return }
+            sendChanged(change)
+
         case DaemonAPI.Notification.clientPermissionsChanged:
             guard let settings = try? params?.decode(ClientPermissionSettings.self) else { return }
             let changed = clientPermissions != settings
@@ -3803,6 +3836,9 @@ final class AppModel {
                             if let listed = try? note.params?["providers"]?.decode([DaemonAPI.ProviderSummary].self) {
                                 self?.machineProviders = listed.filter { $0.capabilities.contains("create") && $0.usable }
                             }
+                        case DaemonAPI.Notification.controlLineageChanged:
+                            // Work ▸ Timeline reads the sessions again (#4276).
+                            self?.lineageChanges += 1
                         case DaemonAPI.Notification.controlThisMacHostChanged:
                             // The join file changed and the host list may not have (#303).
                             await self?.refreshMacHostJoin(control)
@@ -3935,6 +3971,9 @@ final class AppModel {
     /// the provider's reason, with Try Again.
     func newMachine(on provider: ProviderID? = nil) async {
         guard let controlRequests else { return }
+        // A row at once (#4610), until the list says the machine is joining or the make failed.
+        machinesBeingMade += 1
+        defer { machinesBeingMade -= 1 }
         do {
             let made = try await controlRequests.call(DaemonAPI.Method.providersCreate, DaemonAPI.ProviderRequest(id: provider),
                                                       returning: DaemonAPI.ProviderCreated.self)
@@ -3946,6 +3985,26 @@ final class AppModel {
             makeFailed = MachineMakeFailure(reason: HostProblem.controlRefusal(error), provider: provider)
         } catch {
             problem = "The control plane can’t be reached, so no machine can be made."
+        }
+        await loadMachineProviders()
+    }
+
+    /// The machines New Machine made that have not joined yet (#4610): a *Making…* row each
+    /// under Machines, red with the reason once the control plane gave up on one.
+    var machinesMaking: [MachineMaking] {
+        MachineMaking.rows(machineProviders, hostNames: Set(hosts.controlRows.values.map(\.name)))
+    }
+
+    /// Delete on a row the control plane gave up on (#4610): the provider deletes the workspace.
+    func deleteWorkspace(_ provider: ProviderID, workspace: String) async {
+        guard let controlRequests else { return }
+        do {
+            _ = try await controlRequests.call(DaemonAPI.Method.providersDeleteWorkspace,
+                                               DaemonAPI.ProviderWorkspaceRequest(id: provider, workspace: workspace))
+        } catch let error as JSONRPCError {
+            problem = HostProblem.controlRefusal(error)
+        } catch {
+            problem = "The control plane can’t be reached, so the machine wasn’t deleted."
         }
         await loadMachineProviders()
     }
@@ -4450,6 +4509,7 @@ final class AppModel {
         async let person: Void = refreshPerson()
         async let runtimeStates: Void = refreshRuntimeAllowances()
         async let cloning: Void = refreshClones()
+        async let sending: Void = refreshSends()
         async let wake: Void = refreshWakeState()
         async let storeNotes: Void = refreshStoreNotes()
         async let achievements: Void = refreshAchievements()
@@ -4468,7 +4528,7 @@ final class AppModel {
         async let dailySummary: Void = refreshDailySummarySettings()
         async let summaries: Void = refreshSummaryPages()
         _ = await (popped, runtimes, accounts, workflows, pinned, requests, permissions,
-                   elicitations, attention, resuming, cost, retention, clientPermissions, cloning, wake, leases, events, modes,
+                   elicitations, attention, resuming, cost, retention, clientPermissions, cloning, sending, wake, leases, events, modes,
                    transcript, runtimeStates, sandbox, person, disk, storeNotes, hostedMCP, mcpHealth, achievements, multiplier,
                    display, auto, dailySummary, summaries)
     }
@@ -6529,6 +6589,11 @@ final class AppModel {
                                           returning: DaemonAPI.LineageEstimate.self)
     }
 
+    func lineageForecast(_ node: DaemonAPI.LineageNode, on host: MachineRef) async -> DaemonAPI.LineageForecast? {
+        try? await client(for: host).call(DaemonAPI.Method.lineageForecast, DaemonAPI.LineageForecastRequest(node: node),
+                                          returning: DaemonAPI.LineageForecast.self)
+    }
+
     /// The machines that keep links (#3157), for an Issue page's estimate and an epic's plan: This
     /// Mac first, then the rest by name. Empty without a control plane, where there is only one.
     var lineageMachines: [(id: MachineRef, name: String)] {
@@ -6655,6 +6720,14 @@ final class AppModel {
     func reportNodes(_ query: DaemonAPI.ReportNodesQuery) async throws -> DaemonAPI.ReportNodes? {
         guard let controlRequests else { return nil }
         return try await controlRequests.call(DaemonAPI.Method.reportsNodes, query, returning: DaemonAPI.ReportNodes.self)
+    }
+
+    /// Every machine's sessions on these nodes, from the control plane's merged copy (#4276): Work ▸
+    /// Timeline's starts; nil with no control plane, or one from before it.
+    func lineageSessionsOn(_ nodes: [DaemonAPI.LineageNode]) async -> DaemonAPI.LineageSessionsOn? {
+        guard let controlRequests, !nodes.isEmpty else { return nil }
+        return try? await controlRequests.call(DaemonAPI.Method.lineageSessionsOn, DaemonAPI.LineageSessionsOnRequest(nodes: nodes),
+                                               returning: DaemonAPI.LineageSessionsOn.self)
     }
 
 

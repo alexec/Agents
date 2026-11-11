@@ -97,24 +97,65 @@ public enum WorkLook {
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
-    /// The row's second line. Wide: "#4328 · updated 2 h ago by alexec · 2 sessions · $0.42".
-    /// On a phone: "#4328 · 2 h · alexec · $0.42". With no lineage it ends after the author.
-    /// The age is the last update's: the forges' opened and closed times come with #4373.
+    /// "2 h ago", or "now".
+    public static func ago(_ at: Date, now: Date = Date()) -> String {
+        let age = ageWords(now.timeIntervalSince(at))
+        return age == "now" ? age : "\(age) ago"
+    }
+
+    /// The time a row's second line says, and its verb: an open item's opening, a closed or
+    /// merged one's close, where the forge says them (#4373); else the last update.
+    static func rowTime(_ row: WorkList.Row) -> (verb: String, at: Date) {
+        switch row.state {
+        case "open": if let created = row.created { return ("opened", created) }
+        case "closed", "merged": if let closed = row.closed { return (row.state, closed) }
+        default: break
+        }
+        return ("updated", row.updated)
+    }
+
+    /// The row's second line. Wide: "#4328 · opened 2 h ago by alexec · 2 sessions · $0.42";
+    /// closed: "#4328 · closed 5 d ago", and "not planned" at the end for one closed so (lists.md
+    /// section 2, note 13). On a phone: "#4328 · 2 h · alexec · $0.42". With no lineage it ends
+    /// after the author; a forge that gives no opened or closed time says the last update's.
     public static func rowLine(_ row: WorkList.Row, compact: Bool, now: Date = Date()) -> String {
         var parts: [String] = []
         if !WorkList.titleSaysRef(row.title, row.node.ref) { parts.append(WorkList.shortRef(row.node.ref)) }
         // A draft says so in grey after its number (lists.md section 2), as its grey glyph does.
         if row.draft, row.state == "open" { parts.append("Draft") }
         if let status = row.status, !status.isEmpty { parts.append(status) }
-        let age = ageWords(now.timeIntervalSince(row.updated))
-        if compact {
-            parts.append(age)
+        let time = rowTime(row)
+        if row.node.kind == "release" {
+            // Lineage's links to a release are at its tag's commit time (#4421).
+            parts.append(WorkReleaseLook.releasedWords(row.updated, compact: compact, now: now))
+        } else if compact {
+            parts.append(ageWords(now.timeIntervalSince(time.at)))
             if let author = row.author { parts.append(author) }
         } else {
-            let when = age == "now" ? "updated now" : "updated \(age) ago"
-            parts.append(row.author.map { "\(when) by \($0)" } ?? when)
+            let when = "\(time.verb) \(ago(time.at, now: now))"
+            // "closed 5 d ago by alexec" would name the closer: the author goes with the opening.
+            let byAuthor = ["opened", "updated"].contains(time.verb)
+            parts.append(byAuthor ? row.author.map { "\(when) by \($0)" } ?? when : when)
         }
         if let lineage = lineageWords(row.lineage, compact: compact) { parts.append(lineage) }
+        if row.node.kind == "issue", row.state == "closed", row.stateReason == "not_planned" { parts.append("not planned") }
+        return parts.joined(separator: " · ")
+    }
+
+    /// An issue's state line after its pill. Wide: "alexec opened this 3 d ago · closed 1 d ago ·
+    /// 4 comments"; on a phone: "alexec · 3 d · 4 comments". With no opened time from the forge
+    /// (#4373): "alexec opened this · updated 2 h ago".
+    public static func issueStateWords(author: String?, state: String, updated: Date?, comments: Int, narrow: Bool,
+                                       created: Date? = nil, closed: Date? = nil, now: Date = Date()) -> String {
+        var parts: [String] = []
+        if narrow {
+            parts += [author, (created ?? updated).map { ageWords(now.timeIntervalSince($0)) }].compactMap { $0 }
+        } else {
+            if let author { parts.append("\(author) opened this" + (created.map { " " + ago($0, now: now) } ?? "")) }
+            if state == "closed", let closed { parts.append("closed " + ago(closed, now: now)) }
+            if created == nil, let updated { parts.append("updated " + ago(updated, now: now)) }
+        }
+        if comments > 0 { parts.append(comments == 1 ? "1 comment" : "\(comments) comments") }
         return parts.joined(separator: " · ")
     }
 
@@ -295,6 +336,59 @@ public enum WorkLook {
         return Double(hash % 360) / 360
     }
 
+    /// An event on an issue's timeline (#4373), as one grey line: "alexec added the label bug",
+    /// "alexec closed this in #4331". Nil for a kind this client does not know: it draws nothing.
+    public static func eventWords(_ e: DaemonAPI.ForgeEvent) -> String? {
+        let who = e.actor ?? "Someone"
+        let source = e.source.map { " in \(WorkList.shortRef($0.ref))" } ?? ""
+        switch e.kind {
+        case "labeled": return e.label.map { "\(who) added the label \($0.name)" }
+        case "unlabeled": return e.label.map { "\(who) removed the label \($0.name)" }
+        case "assigned":
+            guard let to = e.assignee else { return nil }
+            return to == e.actor ? "\(who) self-assigned this" : "\(who) assigned \(to)"
+        case "unassigned":
+            guard let to = e.assignee else { return nil }
+            return to == e.actor ? "\(who) removed their assignment" : "\(who) unassigned \(to)"
+        case "closed": return "\(who) closed this\(source)"
+        case "reopened": return "\(who) reopened this"
+        case "referenced": return e.source.map { "\(who) mentioned this in \(WorkList.shortRef($0.ref))" }
+        default: return nil
+        }
+    }
+
+    /// A line of an item page's timeline after its body: a comment, or an event.
+    public enum TimelineEntry: Sendable, Hashable {
+        case comment(DaemonAPI.ForgeComment)
+        case event(DaemonAPI.ForgeEvent)
+
+        public var at: Date {
+            switch self {
+            case let .comment(c): c.at
+            case let .event(e): e.at
+            }
+        }
+    }
+
+    /// The comments and the events in time order (#4373). While older comments are still to
+    /// read (`older`), the events before the first comment read wait with them, so the timeline
+    /// never shows an event out of its place. An event no words say is left out.
+    public static func timeline(comments: [DaemonAPI.ForgeComment], events: [DaemonAPI.ForgeEvent]?,
+                                older: Bool) -> [TimelineEntry] {
+        let from = older ? comments.map(\.at).min() : nil
+        let shown = (events ?? []).filter { e in eventWords(e) != nil && from.map { e.at >= $0 } != false }
+        let all = comments.map(TimelineEntry.comment) + shown.map(TimelineEntry.event)
+        return all.enumerated().sorted { a, b in
+            a.element.at == b.element.at ? a.offset < b.offset : a.element.at < b.element.at
+        }.map(\.element)
+    }
+
+    /// Whether the forge gave the item's own events: the page then draws its close from them,
+    /// not from its state alone.
+    public static func eventsSayClose(_ events: [DaemonAPI.ForgeEvent]?) -> Bool {
+        events?.contains { $0.kind == "closed" } == true
+    }
+
     /// "commented 20 min ago", for a comment's header.
     public static func commentedWords(_ at: Date, now: Date = Date()) -> String {
         let age = ageWords(now.timeIntervalSince(at))
@@ -311,6 +405,7 @@ public enum WorkLook {
     public static func emptyTitle(_ kind: WorkList.Kind, state: WorkList.State, filtered: Bool) -> String {
         let noun = kind.title.lowercased()
         if filtered { return "No \(noun) match" }
+        if kind == .release { return "No releases yet" }
         guard kind.fromForge, state != .all else { return "No \(noun)" }
         return "No \(state.rawValue) \(noun)"
     }
@@ -332,12 +427,27 @@ public enum WorkLook {
         return "\(n)\(more ? "+" : "") \(one)"
     }
 
-    /// The footer while the next page loads (lists.md section 2): "Loading more… · 50 shown".
-    public static func loadingMore(shown: Int) -> String { "Loading more… · \(shown) shown" }
+    /// The footer while the next page loads (lists.md section 2): "Loading more… · 50 shown";
+    /// "Loading more… · 50 of 128 shown" with the forge's total (#4396).
+    public static func loadingMore(shown: Int, total: Int? = nil) -> String {
+        "Loading more… · \(shown)\(total.map { " of \($0)" } ?? "") shown"
+    }
 
-    /// The end of the list, in grey: "128 issues"; "50+ issues" while more pages are there and
-    /// the forge gives no total (`ForgeList.total` comes with #4397).
-    public static func endWords(_ kind: WorkList.Kind, shown: Int, more: Bool) -> String { count(kind, shown, more: more) }
+    /// The end of the list, in grey: "128 issues", the forge's total where it gives one (#4396);
+    /// with none, "50+ issues" while more pages are there, else the rows read.
+    public static func endWords(_ kind: WorkList.Kind, shown: Int, more: Bool, total: Int? = nil) -> String {
+        total.map { count(kind, $0) } ?? count(kind, shown, more: more)
+    }
+
+    /// The forge's total for a list as the person sees it, or nil: only from one machine's read
+    /// (two machines read the same repos, so their counts overlap), and only while no filter
+    /// narrows it on the client (the forge counts what it was asked: the state and the board).
+    public static func listTotal(_ totals: [Int?], filter: WorkList.Filter) -> Int? {
+        guard totals.count == 1, let total = totals[0] else { return nil }
+        var f = filter
+        f.board = ""
+        return narrows(f) ? nil : total
+    }
 
     /// A page after the first that did not load: one line at the end, and Try again.
     public static let couldNotLoadMore = "Could not load more."

@@ -33,8 +33,7 @@ test("a feature with no open work is finished", () => {
   assert.deepEqual(groups.map((g) => g.group), ["idle", "finished"]);
   assert.deepEqual(groups[0].features.map((x) => x.name), ["lineage", "old", "work"]);
   assert.deepEqual(groups[1].features.map((x) => x.name), ["browser"]);
-  assert.equal(f.finishedWords(7), "Finished (7)");
-  assert.equal(f.groupWords("finished", 7), "Finished (7)");
+  assert.equal(f.groupWords.finished, "Finished");
 });
 
 // #4115: each feature in the first group it matches, from the sessions labelled with its work.
@@ -61,7 +60,7 @@ test("features are in Needs you, In flight, Idle and Finished", () => {
   assert.equal(f.sessionWords(3), "3 sessions");
   // Without the approval, a stopped session that waits for it is still in flight.
   assert.deepEqual(f.featureGroups([features[1]], agents).map((g) => g.group), ["inFlight"]);
-  assert.deepEqual(f.featureGroupOrder.map((g) => f.groupWords(g, 2)), ["Needs you", "In flight", "Idle", "Finished (2)"]);
+  assert.deepEqual(f.featureGroupOrder.map((g) => f.groupWords[g]), ["Needs you", "In flight", "Idle", "Finished"]);
 });
 
 test("several machines' features add up by name", () => {
@@ -90,8 +89,8 @@ test("an opened feature shows its epics and its loose issues", () => {
   ]);
   assert.deepEqual(shown.epics.map((i) => i.node.ref), ["github:alexec/Agents#3100", "github:alexec/Agents#3265"]);
   assert.deepEqual(shown.loose.map((i) => i.node.ref), ["github:alexec/Agents#3131"]);
-  assert.equal(f.epicProgressWords(shown.epics[1]), "1/6");
-  assert.equal(f.epicProgressWords(issue(1, { level: "epic" })), "0/0");
+  assert.equal(f.epicProgressWords(shown.epics[1]), "1 of 6");
+  assert.equal(f.epicProgressWords(issue(1, { level: "epic" })), "0 of 0");
 });
 
 test("the lead is the live session labelled lead and the epic", () => {
@@ -108,9 +107,27 @@ test("the lead is the live session labelled lead and the epic", () => {
 
 test("the lead says its state", () => {
   assert.equal(f.leadRowWords(undefined), "—");
-  assert.equal(f.leadRowWords("running"), "● lead running");
+  assert.equal(f.leadRowWords("running"), "● lead working");
   assert.equal(f.leadRowWords("waitingOnUser"), "● lead needs you");
   assert.equal(f.leadRowWords("stopped"), "lead stopped");
+});
+
+// #4418: a feature's bar and what waits for the person on it.
+test("a feature's bar is its epics closed of all", () => {
+  assert.equal(f.epicsDone({ name: "work", epics: 4, open: 1 }), 0.75);
+  assert.equal(f.epicsDone({ name: "work", epics: 0, open: 0 }), undefined);
+  assert.equal(f.epicsDoneWords({ name: "work", epics: 2, open: 1 }), "1 of 2 epics done");
+  assert.equal(f.epicsDoneWords({ name: "work", epics: 1, open: 1 }), "0 of 1 epic done");
+});
+
+test("a Needs you feature says what waits", () => {
+  const feature = { name: "work", epics: 1, open: 1, waiting: [node(4290).ref] };
+  const approval = [agent("a", ["#4300", "P#4405"], "stopped")];
+  assert.equal(f.needsWords(feature, approval, [{ kind: "pr", ref: "github:alexec/Agents#4405" }.ref]), "P#4405 waits for your approval");
+  assert.equal(f.needsWords(feature, [], []), "#4290 waits for you");
+  const asks = { ...agent("b", ["#4300"], "waitingOnUser"), title: "Work look: epic page" };
+  assert.equal(f.needsWords({ ...feature, waiting: [] }, [asks], []), "“Work look: epic page” needs you");
+  assert.equal(f.needsWords({ ...feature, waiting: [] }, [], []), undefined);
 });
 
 test("Work lists Features after Pull requests", () => {

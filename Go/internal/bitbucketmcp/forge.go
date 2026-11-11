@@ -44,6 +44,9 @@ type Item struct {
 	PR     bool
 	// State is open, closed or merged.
 	State, Title, URL, Author, Milestone, UpdatedAt string
+	// CreatedAt is when it opened (#4373). Bitbucket says no time that it closed or merged, only
+	// updated_on, so ClosedAt is always "".
+	CreatedAt, ClosedAt string
 	// AuthorAvatar is the author's picture, on Atlassian's avatar host or Gravatar; "" for none (#4363).
 	AuthorAvatar string
 	// StateReason is why a closed issue closed, from its state: completed, not_planned or
@@ -114,7 +117,7 @@ type forgePullJSON struct {
 const forgePullFields = pullFields + ",%2Bvalues.participants"
 
 func (p forgePullJSON) item(repo string) Item {
-	i := Item{Repo: repo, Number: p.ID, PR: true, Title: p.Title, URL: p.Links.HTML.Href, Author: p.Author.name(), AuthorAvatar: p.Author.avatar(), UpdatedAt: p.UpdatedOn,
+	i := Item{Repo: repo, Number: p.ID, PR: true, Title: p.Title, URL: p.Links.HTML.Href, Author: p.Author.name(), AuthorAvatar: p.Author.avatar(), UpdatedAt: p.UpdatedOn, CreatedAt: p.CreatedOn,
 		Comments: p.CommentCount, Labels: []string{}, Assignees: []string{}, Draft: p.Draft, Mergeable: "unknown"}
 	switch p.State {
 	case "OPEN":
@@ -152,7 +155,7 @@ func (p forgePullJSON) review() string {
 
 // forgeItem is an issue as a list says it.
 func (i issueJSON) forgeItem(repo string) Item {
-	it := Item{Repo: repo, Number: i.ID, Title: i.Title, URL: i.Links.HTML.Href, Author: i.Reporter.name(), AuthorAvatar: i.Reporter.avatar(), UpdatedAt: i.UpdatedOn,
+	it := Item{Repo: repo, Number: i.ID, Title: i.Title, URL: i.Links.HTML.Href, Author: i.Reporter.name(), AuthorAvatar: i.Reporter.avatar(), UpdatedAt: i.UpdatedOn, CreatedAt: i.CreatedOn,
 		Labels: i.labels(), Assignees: i.issue().Assignees, State: "open"}
 	if closedStates[i.State] {
 		it.State, it.StateReason = "closed", stateReasons[i.State]

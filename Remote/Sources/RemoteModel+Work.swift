@@ -80,6 +80,11 @@ extension RemoteModel {
                                          returning: DaemonAPI.LineageEstimate.self)
     }
 
+    func lineageForecast(_ node: DaemonAPI.LineageNode, on host: MachineRef) async -> DaemonAPI.LineageForecast? {
+        try? await workClient(host).call(DaemonAPI.Method.lineageForecast, DaemonAPI.LineageForecastRequest(node: node),
+                                         returning: DaemonAPI.LineageForecast.self)
+    }
+
     func workSessionTitle(_ id: UUID) -> String? { work.agent(id)?.title }
 
     func workSessionState(_ id: UUID) -> AgentState? { work.agent(id)?.state }

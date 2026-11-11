@@ -33,24 +33,22 @@ export function parts(date: Date, timeZone?: string): { year: number; month: num
   return { year: made.year!, month: made.month!, day: made.day!, hour: made.hour!, minute: made.minute! };
 }
 
+/** Whole minutes as a time ago, in the largest unit: "5 minutes ago", "1 hour ago", "3 days ago". */
+function ago(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const [count, unit] = hours < 1 ? [minutes, "minute"] : hours < 24 ? [hours, "hour"] : [Math.floor(hours / 24), "day"];
+  return count === 1 ? `1 ${unit} ago` : `${count} ${unit}s ago`;
+}
+
 /**
- * How long a chat has been quiet, at the foot of its transcript (#1564): "Last activity 12 minutes
- * ago · 14:32". Null under five minutes. ActivityWords.quiet, held to Fixtures/web/activity/quiet.json.
+ * How long a chat has been quiet and how old it is, at the foot of its transcript (#1564): "Last
+ * activity 12 minutes ago · started 3 hours ago". Null under five minutes. ActivityWords.quiet,
+ * held to Fixtures/web/activity/quiet.json.
  */
-export function quietLine(date: Date, now = new Date(), timeZone?: string): string | null {
+export function quietLine(date: Date, startedAt: Date, now = new Date()): string | null {
   const minutes = Math.floor((now.getTime() - date.getTime()) / 60_000);
   if (minutes < quietMinutes) return null;
-  const at = parts(date, timeZone);
-  const time = `${String(at.hour).padStart(2, "0")}:${String(at.minute).padStart(2, "0")}`;
-  const hours = Math.floor(minutes / 60);
-  let when: string;
-  if (hours < 1) when = `${minutes} minutes ago`;
-  else if (hours < 24) when = hours === 1 ? "1 hour ago" : `${hours} hours ago`;
-  else {
-    const today = parts(now, timeZone);
-    const days = Math.round((Date.UTC(today.year, today.month - 1, today.day) - Date.UTC(at.year, at.month - 1, at.day)) / 86_400_000);
-    const day = `${at.day} ${months[at.month - 1]}`;
-    when = days === 1 ? "yesterday" : at.year === today.year ? day : `${day} ${at.year}`;
-  }
-  return `Last activity ${when} · ${time}`;
+  // Never younger than its quiet: a host's clock can put the start a little late.
+  const age = Math.max(minutes, Math.floor((now.getTime() - startedAt.getTime()) / 60_000));
+  return `Last activity ${ago(minutes)} · started ${ago(age)}`;
 }

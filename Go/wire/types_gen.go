@@ -4661,7 +4661,7 @@ type ForgeBoardsRequest struct {
 	Folder *string `json:"folder,omitzero"`
 }
 
-// What one forge on a list's page fills (#4329, #4361), so a client hides what it does not: issues and pulls say it has them; labelColors that its labels have a #rrggbb colour; avatars that its items have authorAvatar; stateReason that its closed issues have stateReason. commentCount says how to read ForgeItem.comments: exact; capped at commentsMost (show 50+ there); or detail, only on an item's own page (hide it on the row).
+// What one forge on a list's page fills (#4329, #4361), so a client hides what it does not: issues and pulls say it has them; labelColors that its labels have a #rrggbb colour; avatars that its items have authorAvatar; stateReason that its closed issues have stateReason. createdAt that its items have createdAt, and closedAt that its closed and merged items have closedAt; children, linkedPulls and events that an item's read has them (#4373); total that it counts a list's items, for ForgeList.total (#4396); each is absent from an earlier daemon, which has none. commentCount says how to read ForgeItem.comments: exact; capped at commentsMost (show 50+ there); or detail, only on an item's own page (hide it on the row).
 type ForgeCapabilities struct {
 	Forge string `json:"forge"`
 
@@ -4674,6 +4674,18 @@ type ForgeCapabilities struct {
 	Avatars bool `json:"avatars"`
 
 	StateReason bool `json:"stateReason"`
+
+	CreatedAt *bool `json:"createdAt,omitzero"`
+
+	ClosedAt *bool `json:"closedAt,omitzero"`
+
+	Children *bool `json:"children,omitzero"`
+
+	LinkedPulls *bool `json:"linkedPulls,omitzero"`
+
+	Events *bool `json:"events,omitzero"`
+
+	Total *bool `json:"total,omitzero"`
 
 	CommentCount ForgeCommentCount `json:"commentCount"`
 
@@ -4771,6 +4783,32 @@ type ForgeDone struct {
 	Reran *int64 `json:"reran,omitzero"`
 }
 
+// One event on an issue's timeline (#4373), as its forge says it: kind is what happened; actor is who did it, absent when the forge says nobody (a deleted account); label is the label that labelled and unlabelled name; assignee is the person that assigned and unassigned name; source is the issue or pull request that referenced names, or the pull request that closed closed it with.
+type ForgeEvent struct {
+	Kind ForgeEventKind `json:"kind"`
+
+	Actor *string `json:"actor,omitzero"`
+
+	At Date `json:"at"`
+
+	Label *ForgeLabel `json:"label,omitzero"`
+
+	Assignee *string `json:"assignee,omitzero"`
+
+	Source *LineageNode `json:"source,omitzero"`
+}
+
+// What happened on an issue (#4373): a label was added or removed, a person assigned or unassigned, it closed or reopened, or another issue or pull request named it.
+type ForgeEventKind string
+
+const ForgeEventKindLabeled ForgeEventKind = "labeled"
+const ForgeEventKindUnlabeled ForgeEventKind = "unlabeled"
+const ForgeEventKindAssigned ForgeEventKind = "assigned"
+const ForgeEventKindUnassigned ForgeEventKind = "unassigned"
+const ForgeEventKindClosed ForgeEventKind = "closed"
+const ForgeEventKindReopened ForgeEventKind = "reopened"
+const ForgeEventKindReferenced ForgeEventKind = "referenced"
+
 // A feature (#3267): name is its label's after feature:, with the label's colour where the forge gives one; epics counts its epics, open the open ones. issues counts its open issues that are not epics, of the newest 500 open issues (#3741); a feature with no open epic and no such issue is finished. refs are the lineage refs of its open issues and open epics, waiting the ones labelled alex-todo, and updatedAt the newest update of any of them (#4115), so a client finds the sessions labelled #<n> for them and which wait for Alex.
 type ForgeFeature struct {
 	Name string `json:"name"`
@@ -4819,7 +4857,7 @@ type ForgeImageRequest struct {
 	URL string `json:"url"`
 }
 
-// An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for GitHub, GitLab, Linear and Jira (#3260), so one page draws each. node is its lineage node (kind issue or pr, ref github:alexec/Agents#12). state is open, closed or merged; status is the tracker's own name for its step, where its workflow has steps (a Jira status, as In Progress; one in Jira's Done category is closed). folder is a folder on this machine on its repo, to act from. labels have their #rrggbb colour where the forge gives one (#2956). The pull request's own fields: draft; checks is passing, failing, running or none; review is approved, changes_requested or review_required; mergeable is mergeable, conflicting or unknown; autoMerge says auto-merge is on. The hierarchy (#3267): parent is the issue it is a sub-issue (a Linear or GitLab child) of; level is epic, story, task or spike, from its labels; feature is the name of its feature:<name> label; progress is a parent's closed children of all of them, where the forge says it: in a GitHub list, and on an issue's own read. standing says it has the label standing: a standing epic, whose plan is a query (#3659). authorAvatar is the author's picture, a URL that only forge/image reads (#4363), where the forge gives one (ForgeCapabilities.avatars). stateReason is why a closed issue closed (#4365): completed, not_planned or duplicate, where the forge says it (ForgeCapabilities.stateReason); absent on an open issue and on a pull request.
+// An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for GitHub, GitLab, Linear and Jira (#3260), so one page draws each. node is its lineage node (kind issue or pr, ref github:alexec/Agents#12). state is open, closed or merged; status is the tracker's own name for its step, where its workflow has steps (a Jira status, as In Progress; one in Jira's Done category is closed). folder is a folder on this machine on its repo, to act from. labels have their #rrggbb colour where the forge gives one (#2956). The pull request's own fields: draft; checks is passing, failing, running or none; review is approved, changes_requested or review_required; mergeable is mergeable, conflicting or unknown; autoMerge says auto-merge is on. The hierarchy (#3267): parent is the issue it is a sub-issue (a Linear or GitLab child) of; level is epic, story, task or spike, from its labels; feature is the name of its feature:<name> label; progress is a parent's closed children of all of them, where the forge says it: in a GitHub list, and on an issue's own read. standing says it has the label standing: a standing epic, whose plan is a query (#3659). authorAvatar is the author's picture, a URL that only forge/image reads (#4363), where the forge gives one (ForgeCapabilities.avatars). stateReason is why a closed issue closed (#4365): completed, not_planned or duplicate, where the forge says it (ForgeCapabilities.stateReason); absent on an open issue and on a pull request. createdAt is when it opened and closedAt when it closed or merged (#4373), where the forge says them (ForgeCapabilities.createdAt and closedAt); closedAt is absent while it is open.
 type ForgeItem struct {
 	Node LineageNode `json:"node"`
 
@@ -4844,6 +4882,10 @@ type ForgeItem struct {
 	Assignees []string `json:"assignees"`
 
 	Milestone *string `json:"milestone,omitzero"`
+
+	CreatedAt *Date `json:"createdAt,omitzero"`
+
+	ClosedAt *Date `json:"closedAt,omitzero"`
 
 	UpdatedAt Date `json:"updatedAt"`
 
@@ -4870,7 +4912,7 @@ type ForgeItem struct {
 	Standing *bool `json:"standing,omitzero"`
 }
 
-// forge/issue and forge/pull (#3129): one item with its body (Markdown) and a page of its comments, the newest page first and at most 50, oldest first in the page; cursor is the page before it, absent at the first comment. A pull request's checks, review threads (line comments, in threads) and files changed come with it. head is a pull request's head commit, which forge/merge and forge/approve name (#3130); mergeMethods are the ways its repo allows, the repo's default first; start is the new-agent form for an issue. transitions are the moves an issue's workflow allows now (Jira, #3260), which forge/close takes in place of a close or a reopen. actions are what the item's page offers now, from its forge and its state (#4361): a merged pull request has no merge and no reopen, a closed item no close; absent from an earlier daemon, when the page shows what it did before.
+// forge/issue and forge/pull (#3129): one item with its body (Markdown) and a page of its comments, the newest page first and at most 50, oldest first in the page; cursor is the page before it, absent at the first comment. A pull request's checks, review threads (line comments, in threads) and files changed come with it. head is a pull request's head commit, which forge/merge and forge/approve name (#3130); mergeMethods are the ways its repo allows, the repo's default first; start is the new-agent form for an issue. transitions are the moves an issue's workflow allows now (Jira, #3260), which forge/close takes in place of a close or a reopen. actions are what the item's page offers now, from its forge and its state (#4361): a merged pull request has no merge and no reopen, a closed item no close; absent from an earlier daemon, when the page shows what it did before. On an issue's read (#4373), where the forge says them (ForgeCapabilities): children are its sub-issues, linkedPulls the pull requests that close it, and events its timeline, oldest first (labelled, assigned, closed, referenced and the like); each is absent where the forge gives none.
 type ForgeItemDetail struct {
 	Item ForgeItem `json:"item"`
 
@@ -4895,6 +4937,12 @@ type ForgeItemDetail struct {
 	Transitions []ForgeTransition `json:"transitions,omitzero"`
 
 	Actions []ForgeAction `json:"actions,omitzero"`
+
+	Children []ForgeLinked `json:"children,omitzero"`
+
+	LinkedPulls []ForgeLinked `json:"linkedPulls,omitzero"`
+
+	Events []ForgeEvent `json:"events,omitzero"`
 }
 
 // forge/issue and forge/pull (#3129): the item's lineage node, and for an older page of its comments the cursor of the page after it.
@@ -4934,11 +4982,24 @@ type ForgeLead struct {
 	State AgentState `json:"state"`
 }
 
-// forge/issues and forge/pulls (#3129): a page of items, the last updated first. cursor is the next page, absent at the end. errors says a forge that could not be read (not connected, a rate limit), and the items of the others still come. forges says what each forge on the page fills (#4361); absent from an earlier daemon.
+// An item that an issue's read names (#4373): a sub-issue, or a pull request that closes it. state is open, closed or merged, as ForgeItem.state.
+type ForgeLinked struct {
+	Node LineageNode `json:"node"`
+
+	Title string `json:"title"`
+
+	State string `json:"state"`
+
+	URL *string `json:"url,omitzero"`
+}
+
+// forge/issues and forge/pulls (#3129): a page of items, the last updated first. cursor is the next page, absent at the end. errors says a forge that could not be read (not connected, a rate limit), and the items of the others still come. forges says what each forge on the page fills (#4361); absent from an earlier daemon. total is how many items the whole list has, the sum of each forge's count, kept from each forge's first page (#4396); absent when a forge on the list gives no count (ForgeCapabilities.total) or could not be read, and from an earlier daemon.
 type ForgeList struct {
 	Items []ForgeItem `json:"items"`
 
 	Cursor *string `json:"cursor,omitzero"`
+
+	Total *int64 `json:"total,omitzero"`
 
 	Errors []ForgeListError `json:"errors,omitzero"`
 
@@ -5582,6 +5643,17 @@ type LineMember struct {
 	IsCallOpen bool `json:"isCallOpen"`
 }
 
+// control/lineageChanged (#4276): a machine sent lineage the control plane's copy did not have, to the machine's person and to the admins: the changes of state it sent, so a client that shows working does not poll, and links when links changed too. Only refs, states and times.
+type LineageChanged struct {
+	// The machine's id.
+	Host string `json:"host"`
+
+	States []LineageStateChange `json:"states"`
+
+	// Links started or ended too: a read of them is out of date.
+	Links *bool `json:"links,omitzero"`
+}
+
 // What was banked under lineage nodes (#2350): a turn's cost, tokens and time, split evenly among the links active when it was banked. turns is a share of turns, so a turn on two nodes is half a turn on each.
 type LineageCost struct {
 	// By currency.
@@ -5652,6 +5724,9 @@ type LineageCostNode struct {
 
 	// An issue's estimate when its work started (#3561), kept once made, for the estimate against the actual when it closes.
 	Estimate *LineageEstimateKept `json:"estimate,omitzero"`
+
+	// An epic's first landing forecast (#4526), kept once made, for the forecast against when it lands.
+	Forecast *LineageForecastKept `json:"forecast,omitzero"`
 }
 
 // lineage/cost (#2350): a node's cost rolled up. own is what was banked on the node itself. total adds its parts: an issue's PRs (the PRs that fix it); a release's PRs and the issues they fix; a repo's every node (kind repo, ref github:alexec/agents). waste is the parts' PRs closed without a merge or reverted. unlinked is the parts' sessions: turns with no active link. parts is the nodes added up, newest first, at most 500; limited says there are more.
@@ -5745,6 +5820,12 @@ type LineageEstimate struct {
 
 	// What a closed issue or epic took (#3561): an issue's own cost and its PRs'; an epic's, its own and every child's. Absent while open.
 	Actual *LineageCost `json:"actual,omitzero"`
+
+	// cost with the overhead loaded in (#4524), by currency: each figure times (1 + overhead.unlinkedRatio), and an epic's times (1 + overhead.epicRatio) too, as "direct $100, about $165 all in". Absent when cost is, or the overhead has no ratio.
+	Loaded map[string]LineageEstimateRange `json:"loaded,omitzero"`
+
+	// The overhead that loaded is made with (#4524), on this machine.
+	Overhead *LineageOverhead `json:"overhead,omitzero"`
 }
 
 // When work lands (#3559): the median and the P10 to P90 range.
@@ -5834,6 +5915,126 @@ type LineageFigures struct {
 	Limited *bool `json:"limited,omitzero"`
 }
 
+// lineage/forecast (#4526; the method is specs/4533-forecasting/spec.md): what comes next, from this machine's totals. landings is the issues (not epics) that landed with a merged PR in the window of windowDays (14) before at, in the epic's repo when a node is asked for, else in every repo. lands is when the epic lands; noForecast says why there is none (too little history, too few closed epics, nothing open). toComplete is the epic's estimate to complete, once three of its children closed with an estimate kept at their start. kept is the forecast kept on the epic's node, the first one made, so it can be scored when the epic lands. spend is what a week and a month cost at the window's pace, burn is each weekly allowance's pace, and serviceLevels is how long each level's issues took. Every figure says its window; a range is a probability, not a promise.
+type LineageForecast struct {
+	Node *LineageNode `json:"node,omitzero"`
+
+	At Date `json:"at"`
+
+	WindowDays int64 `json:"windowDays"`
+
+	Landings int64 `json:"landings"`
+
+	Lands *LineageForecastLands `json:"lands,omitzero"`
+
+	NoForecast *string `json:"noForecast,omitzero"`
+
+	ToComplete *LineageForecastToComplete `json:"toComplete,omitzero"`
+
+	Kept *LineageForecastKept `json:"kept,omitzero"`
+
+	Spend *LineageForecastSpend `json:"spend,omitzero"`
+
+	Burn []LineageForecastBurn `json:"burn"`
+
+	ServiceLevels []LineageForecastServiceLevel `json:"serviceLevels"`
+
+	// The overhead that toComplete.loaded and spend's loaded figures are made with (#4524).
+	Overhead *LineageOverhead `json:"overhead,omitzero"`
+}
+
+// A weekly allowance's pace (#4526): used (0 to 1) at its last reading at, of the week that resets at resetsAt. runsOutAt is when it runs out at that pace, absent when it lasts to the reset (lasts).
+type LineageForecastBurn struct {
+	CredentialKey string `json:"credentialKey"`
+
+	Window string `json:"window"`
+
+	Used float64 `json:"used"`
+
+	At Date `json:"at"`
+
+	ResetsAt Date `json:"resetsAt"`
+
+	RunsOutAt *Date `json:"runsOutAt,omitzero"`
+
+	Lasts bool `json:"lasts"`
+}
+
+// An epic's landing forecast as it was made (#4526), kept once on its node, so it can be scored when the epic lands: the P50 and P85 dates, the window, the share and the open children then.
+type LineageForecastKept struct {
+	At Date `json:"at"`
+
+	P50 Date `json:"p50"`
+
+	P85 Date `json:"p85"`
+
+	WindowDays int64 `json:"windowDays"`
+
+	Share float64 `json:"share"`
+
+	Open int64 `json:"open"`
+}
+
+// When an epic lands (#4526, method H of specs/4533-forecasting/spec.md): a Monte Carlo of 1,000 draws with a fixed seed, each resampling hours of the window and keeping each landing in an hour with the chance share, until the open children are done. p50 and p85 are dates. share is the median share of the folder's landings that the closed epics had over their lives, from groups of them. open and closed are the children as the plan says now, with no growth for children not filed yet; stepsLeft is the blocked-by steps of the open ones, as context only: they do not enter the dates.
+type LineageForecastLands struct {
+	P50 Date `json:"p50"`
+
+	P85 Date `json:"p85"`
+
+	Open int64 `json:"open"`
+
+	Closed int64 `json:"closed"`
+
+	StepsLeft int64 `json:"stepsLeft"`
+
+	Share float64 `json:"share"`
+
+	Groups int64 `json:"groups"`
+}
+
+// lineage/forecast (#4526): an epic, for when it lands and its estimate to complete; without one, only the spend, the burn and the service levels, over every repo.
+type LineageForecastRequest struct {
+	Node *LineageNode `json:"node,omitzero"`
+}
+
+// How long a level's issues took (#4526): of the closed issues of the level that landed in the window, half took up to p50Seconds and 85% up to p85Seconds, from the start of work to the last PR merged. Only a level with five or more.
+type LineageForecastServiceLevel struct {
+	Level string `json:"level"`
+
+	Closed int64 `json:"closed"`
+
+	P50Seconds float64 `json:"p50Seconds"`
+
+	P85Seconds float64 `json:"p85Seconds"`
+}
+
+// What a week and a month cost at the window's pace (#4526): dollars by currency, P10 to P90, from 1,000 draws of 7 and 30 of the window's days. A day's cost is what the issues that landed on it took, all of their work, so it follows the landings, not the hour the money went.
+type LineageForecastSpend struct {
+	Week map[string]LineageEstimateRange `json:"week"`
+
+	Month map[string]LineageEstimateRange `json:"month"`
+
+	// week with the overhead loaded in (#4524): times (1 + overhead.unlinkedRatio). Absent with no ratio.
+	LoadedWeek map[string]LineageEstimateRange `json:"loadedWeek,omitzero"`
+
+	// month, loaded as loadedWeek is.
+	LoadedMonth map[string]LineageEstimateRange `json:"loadedMonth,omitzero"`
+}
+
+// An epic's estimate to complete (#4526): dollars by currency, P10 to P90, for its open children and the lead. Each child's estimate is drawn from its matches and scaled by one factor per draw, shared by every child, lognormal from the closed children's actual over their kept estimate (ratio is its median, from closed of them). The lead's term is the epic's own cost over its closed children's, leadRatio, times the children's.
+type LineageForecastToComplete struct {
+	Cost map[string]LineageEstimateRange `json:"cost"`
+
+	Ratio float64 `json:"ratio"`
+
+	Closed int64 `json:"closed"`
+
+	LeadRatio float64 `json:"leadRatio"`
+
+	// cost with the overhead loaded in (#4524): times (1 + overhead.unlinkedRatio). The lead is in cost already, so not the epic ratio. Absent with no ratio.
+	Loaded map[string]LineageEstimateRange `json:"loaded,omitzero"`
+}
+
 // lineage/walk (#2348): the nodes the walk reached and the links it went along. limited says the walk stopped at its limit on nodes, so there is more. resolved is each node's title, state and labels from its connector, by ref, for the nodes a connector could resolve (#3089). resolving says some nodes are still being resolved in the background, so walk again shortly for them (#3102). states is the current state of each session node in it that has one, by ref (#4274).
 type LineageGraph struct {
 	Nodes []LineageNode `json:"nodes"`
@@ -5898,6 +6099,25 @@ type LineageNodeRequest struct {
 	Depth *int64 `json:"depth,omitzero"`
 }
 
+// The overhead (#4524): the cost no issue, PR or release carries, over the nodes that last changed in the last windowDays days (a rolling 14). unlinked is the sessions' cost that went on no work (a Scrum Master's turn that started nothing, a review, a check); linked is the cost on issues, PRs and releases. unlinkedRatio is unlinked over linked, and epicRatio is the epics' own cost (their leads') over their children's and their PRs', each in currency, the currency with the most linked cost; absent when there is nothing to divide by. A loaded figure is a direct one times (1 + unlinkedRatio), and an epic's plan times (1 + epicRatio) too. uncounted names what no figure has.
+type LineageOverhead struct {
+	WindowDays int64 `json:"windowDays"`
+
+	// The currency of the ratios; absent with no linked cost.
+	Currency *string `json:"currency,omitzero"`
+
+	Linked LineageCost `json:"linked"`
+
+	Unlinked LineageCost `json:"unlinked"`
+
+	UnlinkedRatio *float64 `json:"unlinkedRatio,omitzero"`
+
+	EpicRatio *float64 `json:"epicRatio,omitzero"`
+
+	// What no figure here counts: people-time (a person's reviews and answers) and ci-minutes (the forge's runners).
+	Uncounted []string `json:"uncounted"`
+}
+
 // A node's title, state and labels from its connector (#3089), resolved and cached on the daemon so a lineage renderer shows "Fix flaky test" rather than its ref. state is open, closed or merged (a pull request's; an issue's is open or closed); absent when the connector does not say. labels is empty when it has none. Resolved for a GitHub or GitLab issue or pull request only; Linear and releases are not resolved yet.
 type LineageResolved struct {
 	Title string `json:"title"`
@@ -5926,6 +6146,20 @@ type LineageSessionMatch struct {
 	AgentID UUID `json:"agentID"`
 
 	On LineageNode `json:"on"`
+}
+
+// A session that lineage links to one or more of the nodes asked for (#4276), on any machine in the scope: the session's node, its machine, the nodes asked for it is linked to, when its first link to them started, and its state now when its machine sent one.
+type LineageSessionOn struct {
+	Node LineageNode `json:"node"`
+
+	// The id of the machine that sent the link.
+	Host string `json:"host"`
+
+	On []LineageNode `json:"on"`
+
+	At Date `json:"at"`
+
+	State *LineageSessionState `json:"state,omitzero"`
 }
 
 // A change of a session node's state, as its machine recorded it (#4274): state is what it changed to, at is when. The machine keeps the changes of the last 90 days, and each session's latest whatever its age.
@@ -5975,6 +6209,20 @@ type LineageSessions struct {
 	Limited *bool `json:"limited,omitzero"`
 }
 
+// lineage/sessionsOn (#4276): the sessions linked to the nodes asked for, each once, the earliest link first. limited says there were more than lineage's answer bound (500).
+type LineageSessionsOn struct {
+	Sessions []LineageSessionOn `json:"sessions"`
+
+	Limited *bool `json:"limited,omitzero"`
+}
+
+// lineage/sessionsOn (#4276): the nodes (at most 500, such as an epic and its children) whose sessions to say, over every machine's copy that the scope takes. The scope is as reports/value's: me when absent for a member, the organisation for an admin.
+type LineageSessionsOnRequest struct {
+	Nodes []LineageNode `json:"nodes"`
+
+	Scope *ReportScope `json:"scope,omitzero"`
+}
+
 // lineage/sessions (#3899): a session search for #<number> asks for the sessions on that issue, on the issues part-of it (its sub-issues, at most 100) and on the PRs that fix them. The issue is #<number> in the forge repo of each of this machine's folders.
 type LineageSessionsRequest struct {
 	Number int64 `json:"number"`
@@ -6001,6 +6249,15 @@ type LineageSync struct {
 // lineage/sync's answer (#4275). full: the control plane has no copy of this machine's links (a new or moved control plane), so the machine sends them all again, the first with reset.
 type LineageSyncAnswer struct {
 	Full *bool `json:"full,omitzero"`
+}
+
+// lineage/walkAll (#4276): lineage/walk over the control plane's merged copy, every machine's links that the scope takes, so a machine that sleeps is still in it. depth is as lineage/walk's; the scope is as reports/value's. The answer has no resolved: the control plane keeps no titles (principle 7).
+type LineageWalkAllRequest struct {
+	Node LineageNode `json:"node"`
+
+	Depth *int64 `json:"depth,omitzero"`
+
+	Scope *ReportScope `json:"scope,omitzero"`
 }
 
 type ListCursor struct {
@@ -7088,7 +7345,7 @@ type MachineHelloAnswer struct {
 	Capabilities []string `json:"capabilities,omitzero"`
 }
 
-// One workspace, as its provider last listed it. `state` is running, starting, stopping, stopped or unknown; or failed, for a make that failed, with the provider's `reason` (#3972).
+// One workspace, as its provider last listed it. `state` is running, starting, stopping, stopped or unknown; or failed, for a make that failed, with the provider's `reason` (#3972). `joining` while New Machine waits for it to join the control plane, and `notJoined` once the control plane gave up waiting (#4610).
 type MachineInfo struct {
 	ID string `json:"id"`
 
@@ -7109,6 +7366,12 @@ type MachineInfo struct {
 
 	// Why the make failed, in the provider's words, when `state` is failed.
 	Reason *string `json:"reason,omitzero"`
+
+	// New Machine made it and the control plane waits for it to join: the row says Making… (#4610).
+	Joining *bool `json:"joining,omitzero"`
+
+	// Why the control plane gave up waiting for it to join, once it did (#4610): the row says so, with Delete.
+	NotJoined *string `json:"notJoined,omitzero"`
 }
 
 // machines/install (MachineInstall.Request): a server over ssh, with its key, the fingerprint trusted, a tunnel. Add as Machine… names the provider and the workspace too (#3497): a codespace whose provider a machine carries is installed from that machine, with the token kept there.
@@ -10187,6 +10450,13 @@ type ProviderSummary struct {
 	SshToolMissing *string `json:"sshToolMissing,omitzero"`
 }
 
+// providers/deleteWorkspace (#4610): one of a provider's workspaces that no machine is linked to.
+type ProviderWorkspaceRequest struct {
+	ID ProviderID `json:"id"`
+
+	Workspace string `json:"workspace"`
+}
+
 // Which APNs a device token belongs to (#1460): a Debug build's (sandbox) or a TestFlight and App Store build's.
 type PushEnvironment string
 
@@ -10719,7 +10989,7 @@ type ReportScopes struct {
 	Admin bool `json:"admin"`
 }
 
-// reports/value (#2351): what the work in a scope cost and what it delivered, from the lineage nodes that the scope's machines send (#2350). A node is in the range when it last changed in it, with its whole cost. total is the work on issues and PRs; waste is the PRs closed without a merge and merged reverts; unlinked is the turns with no issue or PR. perMergedPR is total by the PRs merged, by currency. leadTimeSeconds is the median of the issues' lead times. issues and releases (#3023) are the most costly first, at most 100 each; limited says there are more.
+// reports/value (#2351): what the work in a scope cost and what it delivered, from the lineage nodes that the scope's machines send (#2350). A node is in the range when it last changed in it, with its whole cost. total is the work on issues, PRs and releases (a release session's own, #4524); waste is the PRs closed without a merge and merged reverts; unlinked is the turns with no issue or PR. perMergedPR is total by the PRs merged, by currency. leadTimeSeconds is the median of the issues' lead times. issues and releases (#3023) are the most costly first, at most 100 each; limited says there are more.
 type ReportValue struct {
 	Range ReportRange `json:"range"`
 
@@ -10730,6 +11000,12 @@ type ReportValue struct {
 	Waste LineageCost `json:"waste"`
 
 	Unlinked LineageCost `json:"unlinked"`
+
+	// total and unlinked together (#4524): what the work cost all in, as the agents spent it.
+	Loaded *LineageCost `json:"loaded,omitzero"`
+
+	// The scope's overhead over the 14 days to now (#4524), whatever the range.
+	Overhead *LineageOverhead `json:"overhead,omitzero"`
 
 	// By currency.
 	PerMergedPR map[string]float64 `json:"perMergedPR"`
@@ -11945,6 +12221,21 @@ type SendFile struct {
 	Size int64 `json:"size"`
 }
 
+// send/changed (#4613): how a send that folders/send started goes. `sent` of `total` bytes are on the other machine (0 of 0 while the bundle is made); `finished` once it ended, whichever way: `received` is the folder it became there, or `problem` says why it stopped, in the person's words.
+type SendNotification struct {
+	Send SendSummary `json:"send"`
+
+	Sent int64 `json:"sent"`
+
+	Total int64 `json:"total"`
+
+	Finished bool `json:"finished"`
+
+	Problem *string `json:"problem,omitzero"`
+
+	Received *FolderSummary `json:"received,omitzero"`
+}
+
 // What folders/sendPack made (#1123): each branch at its commit, the bundle (none when the receiving host has every commit) and the patch (none when nothing is uncommitted).
 type SendPack struct {
 	Commits []SentBranch `json:"commits"`
@@ -11977,6 +12268,40 @@ type SendReadRequest struct {
 	ID UUID `json:"id"`
 
 	Offset int64 `json:"offset"`
+}
+
+// folders/send (#4613): Send to ‹machine›… from a client. This host sends `branches` of the repository at `folder`, less the commits the folder there has, and with `includeChanges` its uncommitted changes, to `destination` on `machine` (the control plane's id or name for it; `machineName` is the name the person knows it by, for the words), through the control plane, as start_session with send does (#2929). There `checkout` is checked out and `origin` set.
+type SendRequest struct {
+	Folder URL `json:"folder"`
+
+	Machine string `json:"machine"`
+
+	MachineName *string `json:"machineName,omitzero"`
+
+	Destination string `json:"destination"`
+
+	Branches []string `json:"branches"`
+
+	Checkout string `json:"checkout"`
+
+	IncludeChanges bool `json:"includeChanges"`
+
+	Origin *string `json:"origin,omitzero"`
+}
+
+// One send folders/send started (#4613): the folder here, and the folder on the machine it goes to.
+type SendSummary struct {
+	ID UUID `json:"id"`
+
+	Folder URL `json:"folder"`
+
+	Machine string `json:"machine"`
+
+	MachineName string `json:"machineName"`
+
+	Destination string `json:"destination"`
+
+	StartedAt Date `json:"startedAt"`
 }
 
 // A branch the Mac sends, at the commit it has (#1123).

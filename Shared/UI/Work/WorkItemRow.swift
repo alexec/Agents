@@ -11,12 +11,14 @@ struct WorkItemRow: View {
     /// The list shows more than one repo: the row says its own.
     let several: Bool
     var compact = false
+    /// The latest release of its repo: a green Latest chip after its name (#4421).
+    var latest = false
     /// Sets the list's Label filter to a chip (Mac); nil leaves the chips as words.
     var pick: ((String) -> Void)?
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            WorkStateIcon(kind: row.node.kind, state: row.state, draft: row.draft)
+            WorkStateIcon(kind: row.node.kind, state: row.state, draft: row.draft, stateReason: row.stateReason)
                 .frame(width: 16)
             if compact { stacked } else { wide }
         }
@@ -26,19 +28,26 @@ struct WorkItemRow: View {
         .accessibilityLabel(accessibilityWords)
     }
 
+    /// The pictures the forge gives on a row: the author's, for an assignee who wrote it (#4363).
+    private var avatars: [String: String] {
+        guard let author = row.author, let avatar = row.avatar else { return [:] }
+        return [author: avatar]
+    }
+
     private var title: Text { Text.forgeTitle(row.title).fontWeight(.semibold) }
 
     private var wide: some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 6) {
                 title.lineLimit(1).truncationMode(.tail).layoutPriority(1)
+                if latest { WorkReleaseChip.latest.fixedSize() }
                 // As many chips as fit whole, the rest as "+2", so a narrow window never squeezes one.
                 ViewThatFits(in: .horizontal) {
                     ForEach((0 ... WorkLook.rowChips).reversed(), id: \.self) { chips($0) }
                 }
                 Spacer(minLength: 8)
                 trailing
-                WorkAvatarStack(logins: row.assignees)
+                WorkAvatarStack(logins: row.assignees, avatars: avatars)
             }
             HStack(spacing: 6) {
                 secondLine
@@ -60,7 +69,10 @@ struct WorkItemRow: View {
 
     private var stacked: some View {
         VStack(alignment: .leading, spacing: 4) {
-            title.lineLimit(2)
+            HStack(spacing: 6) {
+                title.lineLimit(2)
+                if latest { WorkReleaseChip.latest.fixedSize() }
+            }
             if !row.labels.isEmpty || several {
                 WrappingHStack(spacing: 4) {
                     ForEach(row.labels, id: \.name) { WorkLabelChip(label: $0) }
@@ -109,7 +121,9 @@ struct WorkItemRow: View {
     }
 
     private var accessibilityWords: String {
-        var parts = [WorkLook.glyph(kind: row.node.kind, state: row.state, draft: row.draft)?.accessibilityLabel, row.title]
+        var parts = [WorkLook.glyph(kind: row.node.kind, state: row.state, draft: row.draft, stateReason: row.stateReason)?
+            .accessibilityLabel, row.title,
+                     latest ? WorkReleaseChip.latest.words : nil]
         parts.append(row.labels.isEmpty ? nil : "labels " + row.labels.map(\.name).joined(separator: ", "))
         parts.append(WorkLook.rowLine(row, compact: false))
         parts.append(WorkLook.checks(row.checks)?.accessibilityLabel)

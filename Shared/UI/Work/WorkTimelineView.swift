@@ -29,7 +29,12 @@ final class WorkTimelineState {
     var nowAsked = 0
     /// Children that closed since the last read, and when they were seen: their dots pulse once.
     var landed: [String: Date] = [:]
+    /// Every machine's sessions on the epics and their children, from the control plane's merged
+    /// copy (#4276): a sleeping machine's sessions still start their children.
+    var sessions: [DaemonAPI.LineageSessionOn] = []
     private var read: Ask?
+    /// The machines' timelines as one, before the sessions start their children.
+    private var fromMachines: DaemonAPI.WorkTimeline?
 
     struct Ask: Equatable {
         var asked: Int
@@ -122,7 +127,19 @@ final class WorkTimelineState {
                 landed[child.item.node.ref] = seen
             }
         }
-        timeline = merged
+        fromMachines = merged
+        sessions = await model.lineageSessionsOn(WorkTimeline.sessionNodes(merged))?.sessions ?? []
+        guard ask == mine, fromMachines == merged else { return }
+        timeline = WorkTimeline.started(merged, by: sessions)
+    }
+
+    /// The sessions again, on `control/lineageChanged` (#4276): a session that starts on a child on
+    /// any machine starts it, with no read of the machines' forges.
+    func readSessions(model: any WorkModel) async {
+        guard let machines = fromMachines, let got = await model.lineageSessionsOn(WorkTimeline.sessionNodes(machines)),
+              fromMachines == machines else { return }
+        sessions = got.sessions
+        timeline = WorkTimeline.started(machines, by: got.sessions)
     }
 }
 
@@ -161,6 +178,13 @@ struct WorkTimelinePane: View {
             }
         }
         .workTask(id: state.ask) { await state.load(model: model) }
+        // A machine sent new lineage to the control plane (#4276): the sessions again, no polling.
+        .task(id: model.lineageChanges) {
+            guard model.lineageChanges > 0 else { return }
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled else { return }
+            await state.readSessions(model: model)
+        }
         // Read again every five minutes, so closes land while the page is open.
         .task(id: state.project) {
             while !Task.isCancelled {

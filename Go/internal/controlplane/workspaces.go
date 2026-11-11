@@ -66,7 +66,9 @@ func (s *Service) makeProviders(home string) *providers.Providers {
 					Caller{Session: caller.Session, Client: caller.Client, Kind: caller.Kind, Person: caller.Person})
 			},
 			HostCommand: func(person string) (string, error) {
-				shown, err := s.codes.Issue(withCodeOwner(context.Background(), person), true, false, 5*time.Minute)
+				// The code lives as long as the control plane waits for the machine to join
+				// (#4610): a machine that boots slowly still joins with it.
+				shown, err := s.codes.Issue(withCodeOwner(context.Background(), person), true, false, providers.StandardTiming.GiveUp)
 				if err != nil {
 					return "", err
 				}
