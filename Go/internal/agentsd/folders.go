@@ -99,6 +99,11 @@ func (d *Daemon) agentsOf(folder string) []wire.Agent {
 	return d.Store.AgentsIn(folder)
 }
 
+// liveAgentsOf is agentsOf without the archived (#4510).
+func (d *Daemon) liveAgentsOf(folder string) []wire.Agent {
+	return d.Store.LiveAgentsIn(folder)
+}
+
 func holdsRuntime(s wire.AgentState) bool {
 	return s == wire.AgentStateStarting || s == wire.AgentStateRunning || s == wire.AgentStateWaitingOnUser
 }
@@ -108,7 +113,7 @@ func (d *Daemon) archiveFolder(folder string) (wire.FolderSummary, error) {
 		return wire.FolderSummary{}, noSuchFolder(folder + " is not a folder.")
 	}
 	var working []wire.Agent
-	for _, a := range d.agentsOf(folder) {
+	for _, a := range d.liveAgentsOf(folder) {
 		if holdsRuntime(a.State) {
 			working = append(working, a)
 		}

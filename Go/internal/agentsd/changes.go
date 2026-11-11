@@ -347,7 +347,7 @@ func (d *Daemon) ownsItsFolder(a *wire.Agent) bool {
 		return false
 	}
 	root := changeKey(store.FolderPath(a.Worktree.Root))
-	for _, o := range d.Store.Agents() {
+	for _, o := range d.Store.LiveAgents() {
 		if o.ID != a.ID && o.State != wire.AgentStateArchived && inside(root, changeKey(store.FolderPath(o.Cwd))) {
 			return false
 		}

@@ -1,0 +1,348 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1260" height="1040" viewBox="0 0 1260 1040" font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif">
+<defs>
+  <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#20242A" flood-opacity="0.12"/></filter>
+  <symbol id="back" viewBox="0 0 16 16"><path d="M10 3L5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="chev" viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="updown" viewBox="0 0 16 16"><path d="M5 6.5L8 3.5l3 3M5 9.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="tick" viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="up" viewBox="0 0 16 16"><path d="M8 13V3M3.5 7.5L8 3l4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="mic" viewBox="0 0 16 16"><rect x="5.5" y="1.5" width="5" height="8" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M3.5 7.5a4.5 4.5 0 0 0 9 0M8 12v2.5M5.5 14.5h5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+  <symbol id="wave" viewBox="0 0 16 16"><path d="M2 8v0M4.5 5.5v5M7 3v10M9.5 5v6M12 6.5v3M14 8v0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="paperclip" viewBox="0 0 16 16"><path d="M10.5 5.5l-4.6 4.6a1.6 1.6 0 0 0 2.3 2.3l5-5a3 3 0 0 0-4.3-4.3l-5.3 5.3a4.2 4.2 0 0 0 6 6l3.6-3.6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="branch" viewBox="0 0 16 16"><circle cx="4" cy="3.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="4" cy="12.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="12" cy="5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M4 5.1v5.8M12 6.6c0 2.6-3 3.4-6.3 3.9" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+  <symbol id="folder" viewBox="0 0 16 16"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h3l1.5 1.5h4.5A1.5 1.5 0 0 1 14 6v6a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 12z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
+  <symbol id="spark" viewBox="0 0 16 16"><path d="M8 2l1.4 4.6L14 8l-4.6 1.4L8 14l-1.4-4.6L2 8l4.6-1.4z" fill="currentColor"/></symbol>
+  <symbol id="shield" viewBox="0 0 16 16"><path d="M8 1.8l5 2v4.2c0 3-2.2 5.2-5 6.2-2.8-1-5-3.2-5-6.2V3.8z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
+  <symbol id="more" viewBox="0 0 16 16"><circle cx="3.5" cy="8" r="1.4" fill="currentColor"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><circle cx="12.5" cy="8" r="1.4" fill="currentColor"/></symbol>
+  <symbol id="lock" viewBox="0 0 16 16"><rect x="3.5" y="7" width="9" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" fill="none" stroke="currentColor" stroke-width="1.3"/></symbol>
+  <symbol id="photo" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="5.5" cy="6.5" r="1.2" fill="currentColor"/><path d="M3 12l3.5-3.5 2.5 2.5 2-2L14 12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
+  <symbol id="shift" viewBox="0 0 16 16"><path d="M8 2.5l5.5 6H10v5H6v-5H2.5z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
+  <symbol id="del" viewBox="0 0 16 16"><path d="M5.5 3.5h8v9h-8L2 8zM7.5 6l3 4M10.5 6l-3 4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></symbol>
+  <symbol id="globe" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M2 8h12M8 2c2.5 2.5 2.5 9.5 0 12M8 2C5.5 4.5 5.5 11.5 8 14" fill="none" stroke="currentColor" stroke-width="1.3"/></symbol>
+  <symbol id="warn" viewBox="0 0 16 16"><path d="M8 2.2L14.3 13.5H1.7z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M8 6.5v3.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="11.6" r=".8" fill="currentColor"/></symbol>
+  <symbol id="plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="sidebar" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M6 3v10" stroke="currentColor" stroke-width="1.3"/></symbol>
+</defs>
+<rect width="1260" height="1040" fill="#E7EAEE"/>
+<text x="24.0" y="34.0" font-size="15" fill="#1C1D20" font-weight="600">After (#4556): the card's states</text>
+<text x="24.0" y="54.0" font-size="12" fill="#5B616B" >Each is the card cut from the page, 358 pt wide, as it is on an iPhone. The chips stay where they are in every state.</text>
+<text x="24.0" y="98.0" font-size="12" fill="#5B616B" font-weight="600">A. Not a repository: no Where chip. A runtime</text>
+<text x="24.0" y="113.0" font-size="12" fill="#5B616B" font-weight="600">chosen by name, and its Account chip (two accounts)</text>
+<g filter="url(#shadow)"><rect x="24" y="124" width="358" height="190" rx="18" fill="#FFFFFF" stroke="#DDE1E6"/></g>
+<rect x="34.0" y="134.0" width="70.4" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="44.0" y="154.5" font-size="13" fill="#1C1D20" font-weight="500">Codex</text>
+<use href="#chev" x="84.4" y="145.0" width="10" height="10" color="#8A9099"/>
+<rect x="112.4" y="134.0" width="118.4" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="122.4" y="154.5" font-size="13" fill="#1C1D20" font-weight="500">Work account</text>
+<use href="#chev" x="210.8" y="145.0" width="10" height="10" color="#8A9099"/>
+<rect x="238.8" y="134.0" width="70.4" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="248.8" y="154.5" font-size="13" fill="#1C1D20" font-weight="500">Smart</text>
+<use href="#chev" x="289.2" y="145.0" width="10" height="10" color="#8A9099"/>
+<rect x="34.0" y="174.0" width="55.8" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="44.0" y="194.5" font-size="13" fill="#1C1D20" font-weight="500">Ask</text>
+<use href="#chev" x="69.8" y="185.0" width="10" height="10" color="#8A9099"/>
+<rect x="97.8" y="174.0" width="137.2" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="107.8" y="194.5" font-size="13" fill="#1C1D20" font-weight="500">Runtime sandbox</text>
+<use href="#chev" x="215.1" y="185.0" width="10" height="10" color="#8A9099"/>
+<rect x="243.1" y="174.0" width="38.0" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<use href="#more" x="253.1" y="182.0" width="16" height="16" color="#5B616B"/>
+<text x="271.1" y="194.5" font-size="13" fill="#1C1D20" font-weight="500"></text>
+<text x="34.0" y="236.0" font-size="16" fill="#8A9099" >What should it do?</text>
+<circle cx="50.0" cy="288.0" r="16" fill="#FFFFFF" stroke="#DDE1E6"/>
+<use href="#paperclip" x="41.0" y="279.0" width="18" height="18" color="#5B616B"/>
+<circle cx="356.0" cy="288.0" r="16" fill="#0A6CDB"/>
+<use href="#up" x="348.0" y="280.0" width="16" height="16" color="#FFF"/>
+<circle cx="316.0" cy="288.0" r="16" fill="#FFFFFF" stroke="#DDE1E6"/>
+<use href="#wave" x="307.0" y="279.0" width="18" height="18" color="#5B616B"/>
+<circle cx="276.0" cy="288.0" r="16" fill="#FFFFFF" stroke="#DDE1E6"/>
+<use href="#mic" x="267.0" y="279.0" width="18" height="18" color="#5B616B"/>
+<circle cx="392.0" cy="150.0" r="9" fill="#B35900"/>
+<text x="392.0" y="154.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">13</text>
+<text x="430.0" y="98.0" font-size="12" fill="#5B616B" font-weight="600">B. Starting: the words held, the spinner,</text>
+<text x="430.0" y="113.0" font-size="12" fill="#5B616B" font-weight="600">and the host it tells</text>
+<text x="430.0" y="136.0" font-size="12" fill="#5B616B" >Starting — telling your Mac</text>
+<g filter="url(#shadow)"><rect x="430" y="146" width="358" height="190" rx="18" fill="#FFFFFF" stroke="#DDE1E6"/></g>
+<rect x="440.0" y="156.0" width="136.4" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1" opacity="0.55"/>
+<use href="#branch" x="450.0" y="164.0" width="16" height="16" color="#5B616B"/>
+<text x="468.0" y="176.5" font-size="13" fill="#1C1D20" font-weight="500">New worktree</text>
+<use href="#chev" x="556.4" y="167.0" width="10" height="10" color="#8A9099"/>
+<rect x="584.4" y="156.0" width="116.7" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1" opacity="0.55"/>
+<text x="594.4" y="176.5" font-size="13" fill="#1C1D20" font-weight="500">Auto · Claude</text>
+<use href="#chev" x="681.0" y="167.0" width="10" height="10" color="#8A9099"/>
+<rect x="440.0" y="196.0" width="70.4" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1" opacity="0.55"/>
+<text x="450.0" y="216.5" font-size="13" fill="#1C1D20" font-weight="500">Smart</text>
+<use href="#chev" x="490.4" y="207.0" width="10" height="10" color="#8A9099"/>
+<rect x="518.4" y="196.0" width="55.8" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1" opacity="0.55"/>
+<text x="528.4" y="216.5" font-size="13" fill="#1C1D20" font-weight="500">Ask</text>
+<use href="#chev" x="554.2" y="207.0" width="10" height="10" color="#8A9099"/>
+<rect x="582.2" y="196.0" width="137.2" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1" opacity="0.55"/>
+<text x="592.2" y="216.5" font-size="13" fill="#1C1D20" font-weight="500">Default sandbox</text>
+<use href="#chev" x="699.5" y="207.0" width="10" height="10" color="#8A9099"/>
+<rect x="727.5" y="196.0" width="38.0" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1" opacity="0.55"/>
+<use href="#more" x="737.5" y="204.0" width="16" height="16" color="#5B616B"/>
+<text x="755.5" y="216.5" font-size="13" fill="#1C1D20" font-weight="500"></text>
+<text x="440.0" y="258.0" font-size="16" fill="#8A9099" >Rework the new-session layout for the iPhone</text>
+<circle cx="456.0" cy="310.0" r="16" fill="#FFFFFF" stroke="#DDE1E6"/>
+<use href="#paperclip" x="447.0" y="301.0" width="18" height="18" color="#8A9099"/>
+<circle cx="762.0" cy="310.0" r="16" fill="#0A6CDB"/>
+<circle cx="762" cy="310" r="7" fill="none" stroke="#FFF" stroke-width="2" stroke-dasharray="26 18"/>
+<circle cx="722.0" cy="310.0" r="16" fill="#FFFFFF" stroke="#DDE1E6"/>
+<use href="#wave" x="713.0" y="301.0" width="18" height="18" color="#5B616B"/>
+<circle cx="682.0" cy="310.0" r="16" fill="#FFFFFF" stroke="#DDE1E6"/>
+<use href="#mic" x="673.0" y="301.0" width="18" height="18" color="#5B616B"/>
+<circle cx="798.0" cy="172.0" r="9" fill="#B35900"/>
+<text x="798.0" y="176.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">14</text>
+<text x="836.0" y="98.0" font-size="12" fill="#5B616B" font-weight="600">C. The runtime is out: said once above the words,</text>
+<text x="836.0" y="113.0" font-size="12" fill="#5B616B" font-weight="600">and a dot on its chip; Send still sends</text>
+<text x="836.0" y="136.0" font-size="12" fill="#9A6700" >Claude’s plan is spent until 3:00 pm. It will say no until then.</text>
+<g filter="url(#shadow)"><rect x="836" y="146" width="358" height="190" rx="18" fill="#FFFFFF" stroke="#DDE1E6"/></g>
+<rect x="846.0" y="156.0" width="136.4" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<use href="#branch" x="856.0" y="164.0" width="16" height="16" color="#5B616B"/>
+<text x="874.0" y="176.5" font-size="13" fill="#1C1D20" font-weight="500">New worktree</text>
+<use href="#chev" x="962.4" y="167.0" width="10" height="10" color="#8A9099"/>
+<rect x="990.4" y="156.0" width="74.7" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="1000.4" y="176.5" font-size="13" fill="#1C1D20" font-weight="500">Claude</text>
+<use href="#chev" x="1045.1" y="167.0" width="10" height="10" color="#8A9099"/>
+<circle cx="1061.1" cy="160.0" r="4.5" fill="#9A6700" stroke="#FFFFFF"/>
+<rect x="1073.1" y="156.0" width="70.4" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="1083.1" y="176.5" font-size="13" fill="#1C1D20" font-weight="500">Smart</text>
+<use href="#chev" x="1123.5" y="167.0" width="10" height="10" color="#8A9099"/>
+<rect x="846.0" y="196.0" width="55.8" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="856.0" y="216.5" font-size="13" fill="#1C1D20" font-weight="500">Ask</text>
+<use href="#chev" x="881.8" y="207.0" width="10" height="10" color="#8A9099"/>
+<rect x="909.8" y="196.0" width="137.2" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="919.8" y="216.5" font-size="13" fill="#1C1D20" font-weight="500">Default sandbox</text>
+<use href="#chev" x="1027.1" y="207.0" width="10" height="10" color="#8A9099"/>
+<rect x="1055.1" y="196.0" width="38.0" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<use href="#more" x="1065.1" y="204.0" width="16" height="16" color="#5B616B"/>
+<text x="1083.1" y="216.5" font-size="13" fill="#1C1D20" font-weight="500"></text>
+<text x="846.0" y="258.0" font-size="16" fill="#8A9099" >What should it do?</text>
+<circle cx="862.0" cy="310.0" r="16" fill="#FFFFFF" stroke="#DDE1E6"/>
+<use href="#paperclip" x="853.0" y="301.0" width="18" height="18" color="#5B616B"/>
+<circle cx="1168.0" cy="310.0" r="16" fill="#0A6CDB"/>
+<use href="#up" x="1160.0" y="302.0" width="16" height="16" color="#FFF"/>
+<circle cx="1128.0" cy="310.0" r="16" fill="#FFFFFF" stroke="#DDE1E6"/>
+<use href="#wave" x="1119.0" y="301.0" width="18" height="18" color="#5B616B"/>
+<circle cx="1088.0" cy="310.0" r="16" fill="#FFFFFF" stroke="#DDE1E6"/>
+<use href="#mic" x="1079.0" y="301.0" width="18" height="18" color="#5B616B"/>
+<circle cx="1204.0" cy="172.0" r="9" fill="#B35900"/>
+<text x="1204.0" y="176.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">15</text>
+<text x="24.0" y="408.0" font-size="12" fill="#5B616B" font-weight="600">D. The folder's host is not answering: the strip,</text>
+<text x="24.0" y="423.0" font-size="12" fill="#5B616B" font-weight="600">the chips and Send dimmed</text>
+<rect x="24.0" y="434.0" width="358.0" height="36.0" rx="8" fill="#FFF4D6"/>
+<use href="#warn" x="36.0" y="444.0" width="16" height="16" color="#9A6700"/>
+<text x="60.0" y="457.0" font-size="13" fill="#9A6700" >Your Mac is not answering. Waiting for it.</text>
+<g filter="url(#shadow)"><rect x="24" y="482" width="358" height="190" rx="18" fill="#FFFFFF" stroke="#DDE1E6"/></g>
+<rect x="34.0" y="492.0" width="136.4" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1" opacity="0.55"/>
+<use href="#branch" x="44.0" y="500.0" width="16" height="16" color="#5B616B"/>
+<text x="62.0" y="512.5" font-size="13" fill="#1C1D20" font-weight="500">New worktree</text>
+<use href="#chev" x="150.4" y="503.0" width="10" height="10" color="#8A9099"/>
+<rect x="178.4" y="492.0" width="116.7" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1" opacity="0.55"/>
+<text x="188.4" y="512.5" font-size="13" fill="#1C1D20" font-weight="500">Auto · Claude</text>
+<use href="#chev" x="275.1" y="503.0" width="10" height="10" color="#8A9099"/>
+<rect x="34.0" y="532.0" width="70.4" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1" opacity="0.55"/>
+<text x="44.0" y="552.5" font-size="13" fill="#1C1D20" font-weight="500">Smart</text>
+<use href="#chev" x="84.4" y="543.0" width="10" height="10" color="#8A9099"/>
+<rect x="112.4" y="532.0" width="55.8" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1" opacity="0.55"/>
+<text x="122.4" y="552.5" font-size="13" fill="#1C1D20" font-weight="500">Ask</text>
+<use href="#chev" x="148.2" y="543.0" width="10" height="10" color="#8A9099"/>
+<rect x="176.2" y="532.0" width="137.2" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1" opacity="0.55"/>
+<text x="186.2" y="552.5" font-size="13" fill="#1C1D20" font-weight="500">Default sandbox</text>
+<use href="#chev" x="293.5" y="543.0" width="10" height="10" color="#8A9099"/>
+<rect x="321.5" y="532.0" width="38.0" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1" opacity="0.55"/>
+<use href="#more" x="331.5" y="540.0" width="16" height="16" color="#5B616B"/>
+<text x="349.5" y="552.5" font-size="13" fill="#1C1D20" font-weight="500"></text>
+<text x="34.0" y="594.0" font-size="16" fill="#8A9099" >What should it do?</text>
+<circle cx="50.0" cy="646.0" r="16" fill="#FFFFFF" stroke="#DDE1E6"/>
+<use href="#paperclip" x="41.0" y="637.0" width="18" height="18" color="#8A9099"/>
+<circle cx="356.0" cy="646.0" r="16" fill="#B9C6D6"/>
+<use href="#up" x="348.0" y="638.0" width="16" height="16" color="#FFF"/>
+<circle cx="316.0" cy="646.0" r="16" fill="#FFFFFF" stroke="#DDE1E6"/>
+<use href="#wave" x="307.0" y="637.0" width="18" height="18" color="#5B616B"/>
+<circle cx="276.0" cy="646.0" r="16" fill="#FFFFFF" stroke="#DDE1E6"/>
+<use href="#mic" x="267.0" y="637.0" width="18" height="18" color="#5B616B"/>
+<circle cx="392.0" cy="452.0" r="9" fill="#B35900"/>
+<text x="392.0" y="456.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">16</text>
+<text x="430.0" y="408.0" font-size="12" fill="#5B616B" font-weight="600">E. A persona picked: its choices in the chips, its labels</text>
+<text x="430.0" y="423.0" font-size="12" fill="#5B616B" font-weight="600">as tags after ⋯, and ⋯ counts what is set in More</text>
+<g filter="url(#shadow)"><rect x="430" y="434" width="358" height="230" rx="18" fill="#FFFFFF" stroke="#DDE1E6"/></g>
+<rect x="440.0" y="444.0" width="136.4" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<use href="#branch" x="450.0" y="452.0" width="16" height="16" color="#5B616B"/>
+<text x="468.0" y="464.5" font-size="13" fill="#1C1D20" font-weight="500">New worktree</text>
+<use href="#chev" x="556.4" y="455.0" width="10" height="10" color="#8A9099"/>
+<rect x="584.4" y="444.0" width="74.7" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="594.4" y="464.5" font-size="13" fill="#1C1D20" font-weight="500">Claude</text>
+<use href="#chev" x="639.1" y="455.0" width="10" height="10" color="#8A9099"/>
+<rect x="667.1" y="444.0" width="70.4" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="677.1" y="464.5" font-size="13" fill="#1C1D20" font-weight="500">Smart</text>
+<use href="#chev" x="717.5" y="455.0" width="10" height="10" color="#8A9099"/>
+<rect x="440.0" y="484.0" width="129.9" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="450.0" y="504.5" font-size="13" fill="#1C1D20" font-weight="500">Approve for me</text>
+<use href="#chev" x="549.9" y="495.0" width="10" height="10" color="#8A9099"/>
+<rect x="577.9" y="484.0" width="137.2" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="587.9" y="504.5" font-size="13" fill="#1C1D20" font-weight="500">Default sandbox</text>
+<use href="#chev" x="695.2" y="495.0" width="10" height="10" color="#8A9099"/>
+<rect x="440.0" y="524.0" width="56.0" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<use href="#more" x="450.0" y="532.0" width="16" height="16" color="#5B616B"/>
+<text x="468.0" y="544.5" font-size="13" fill="#1C1D20" font-weight="500"></text>
+<circle cx="478.0" cy="540.0" r="8" fill="#0A6CDB"/>
+<text x="478.0" y="543.5" font-size="10" fill="#FFF" font-weight="700" text-anchor="middle">2</text>
+<rect x="504.0" y="524.0" width="46.1" height="32.0" rx="16" fill="#EEF0F3"/>
+<text x="514.0" y="544.5" font-size="13" fill="#5B616B" >lead</text>
+<rect x="558.1" y="524.0" width="56.4" height="32.0" rx="16" fill="#EEF0F3"/>
+<text x="568.1" y="544.5" font-size="13" fill="#5B616B" >#4327</text>
+<text x="440.0" y="586.0" font-size="16" fill="#8A9099" >What should it do?</text>
+<circle cx="456.0" cy="638.0" r="16" fill="#FFFFFF" stroke="#DDE1E6"/>
+<use href="#paperclip" x="447.0" y="629.0" width="18" height="18" color="#5B616B"/>
+<circle cx="762.0" cy="638.0" r="16" fill="#0A6CDB"/>
+<use href="#up" x="754.0" y="630.0" width="16" height="16" color="#FFF"/>
+<circle cx="722.0" cy="638.0" r="16" fill="#FFFFFF" stroke="#DDE1E6"/>
+<use href="#wave" x="713.0" y="629.0" width="18" height="18" color="#5B616B"/>
+<circle cx="682.0" cy="638.0" r="16" fill="#FFFFFF" stroke="#DDE1E6"/>
+<use href="#mic" x="673.0" y="629.0" width="18" height="18" color="#5B616B"/>
+<circle cx="798.0" cy="500.0" r="9" fill="#B35900"/>
+<text x="798.0" y="504.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">17</text>
+<text x="836.0" y="408.0" font-size="12" fill="#5B616B" font-weight="600">F. Set by the organisation: a lock on the chip; it opens,</text>
+<text x="836.0" y="423.0" font-size="12" fill="#5B616B" font-weight="600">and offers no other value</text>
+<text x="836.0" y="446.0" font-size="12" fill="#5B616B" >Permission mode and Sandbox are set by your organisation.</text>
+<g filter="url(#shadow)"><rect x="836" y="456" width="358" height="230" rx="18" fill="#FFFFFF" stroke="#DDE1E6"/></g>
+<rect x="846.0" y="466.0" width="136.4" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<use href="#branch" x="856.0" y="474.0" width="16" height="16" color="#5B616B"/>
+<text x="874.0" y="486.5" font-size="13" fill="#1C1D20" font-weight="500">New worktree</text>
+<use href="#chev" x="962.4" y="477.0" width="10" height="10" color="#8A9099"/>
+<rect x="990.4" y="466.0" width="116.7" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="1000.4" y="486.5" font-size="13" fill="#1C1D20" font-weight="500">Auto · Claude</text>
+<use href="#chev" x="1087.0" y="477.0" width="10" height="10" color="#8A9099"/>
+<rect x="846.0" y="506.0" width="70.4" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="856.0" y="526.5" font-size="13" fill="#1C1D20" font-weight="500">Smart</text>
+<use href="#chev" x="896.4" y="517.0" width="10" height="10" color="#8A9099"/>
+<rect x="924.4" y="506.0" width="71.8" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="934.4" y="526.5" font-size="13" fill="#1C1D20" font-weight="500">Ask</text>
+<use href="#lock" x="959.2" y="515.0" width="13" height="13" color="#8A9099"/>
+<use href="#chev" x="976.2" y="517.0" width="10" height="10" color="#8A9099"/>
+<rect x="1004.2" y="506.0" width="153.2" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="1014.2" y="526.5" font-size="13" fill="#1C1D20" font-weight="500">Default sandbox</text>
+<use href="#lock" x="1120.5" y="515.0" width="13" height="13" color="#8A9099"/>
+<use href="#chev" x="1137.5" y="517.0" width="10" height="10" color="#8A9099"/>
+<rect x="846.0" y="546.0" width="38.0" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<use href="#more" x="856.0" y="554.0" width="16" height="16" color="#5B616B"/>
+<text x="874.0" y="566.5" font-size="13" fill="#1C1D20" font-weight="500"></text>
+<text x="846.0" y="608.0" font-size="16" fill="#8A9099" >What should it do?</text>
+<circle cx="862.0" cy="660.0" r="16" fill="#FFFFFF" stroke="#DDE1E6"/>
+<use href="#paperclip" x="853.0" y="651.0" width="18" height="18" color="#5B616B"/>
+<circle cx="1168.0" cy="660.0" r="16" fill="#0A6CDB"/>
+<use href="#up" x="1160.0" y="652.0" width="16" height="16" color="#FFF"/>
+<circle cx="1128.0" cy="660.0" r="16" fill="#FFFFFF" stroke="#DDE1E6"/>
+<use href="#wave" x="1119.0" y="651.0" width="18" height="18" color="#5B616B"/>
+<circle cx="1088.0" cy="660.0" r="16" fill="#FFFFFF" stroke="#DDE1E6"/>
+<use href="#mic" x="1079.0" y="651.0" width="18" height="18" color="#5B616B"/>
+<circle cx="1204.0" cy="482.0" r="9" fill="#B35900"/>
+<text x="1204.0" y="486.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">18</text>
+<text x="24.0" y="728.0" font-size="12" fill="#5B616B" font-weight="600">G. A picture attached that the runtime does not take:</text>
+<text x="24.0" y="743.0" font-size="12" fill="#5B616B" font-weight="600">refused before sending, in the runtime's name</text>
+<text x="24.0" y="766.0" font-size="12" fill="#B42318" >Codex does not take pictures.</text>
+<g filter="url(#shadow)"><rect x="24" y="776" width="358" height="260" rx="18" fill="#FFFFFF" stroke="#DDE1E6"/></g>
+<rect x="34.0" y="786.0" width="136.4" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<use href="#branch" x="44.0" y="794.0" width="16" height="16" color="#5B616B"/>
+<text x="62.0" y="806.5" font-size="13" fill="#1C1D20" font-weight="500">New worktree</text>
+<use href="#chev" x="150.4" y="797.0" width="10" height="10" color="#8A9099"/>
+<rect x="178.4" y="786.0" width="70.4" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="188.4" y="806.5" font-size="13" fill="#1C1D20" font-weight="500">Codex</text>
+<use href="#chev" x="228.8" y="797.0" width="10" height="10" color="#8A9099"/>
+<rect x="256.8" y="786.0" width="70.4" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="266.8" y="806.5" font-size="13" fill="#1C1D20" font-weight="500">Smart</text>
+<use href="#chev" x="307.2" y="797.0" width="10" height="10" color="#8A9099"/>
+<rect x="34.0" y="826.0" width="55.8" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="44.0" y="846.5" font-size="13" fill="#1C1D20" font-weight="500">Ask</text>
+<use href="#chev" x="69.8" y="837.0" width="10" height="10" color="#8A9099"/>
+<rect x="97.8" y="826.0" width="137.2" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="107.8" y="846.5" font-size="13" fill="#1C1D20" font-weight="500">Runtime sandbox</text>
+<use href="#chev" x="215.1" y="837.0" width="10" height="10" color="#8A9099"/>
+<rect x="243.1" y="826.0" width="38.0" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<use href="#more" x="253.1" y="834.0" width="16" height="16" color="#5B616B"/>
+<text x="271.1" y="846.5" font-size="13" fill="#1C1D20" font-weight="500"></text>
+<rect x="34.0" y="868.0" width="60.0" height="60.0" rx="8" fill="#C9D7E8"/>
+<use href="#photo" x="54.0" y="888.0" width="20" height="20" color="#5F7A99"/>
+<circle cx="92.0" cy="870.0" r="8" fill="#1C1D20"/>
+<text x="92.0" y="873.5" font-size="11" fill="#FFF" text-anchor="middle">×</text>
+<text x="34.0" y="958.0" font-size="16" fill="#8A9099" >What should it do?</text>
+<circle cx="50.0" cy="1010.0" r="16" fill="#FFFFFF" stroke="#DDE1E6"/>
+<use href="#paperclip" x="41.0" y="1001.0" width="18" height="18" color="#5B616B"/>
+<circle cx="356.0" cy="1010.0" r="16" fill="#0A6CDB"/>
+<use href="#up" x="348.0" y="1002.0" width="16" height="16" color="#FFF"/>
+<circle cx="316.0" cy="1010.0" r="16" fill="#FFFFFF" stroke="#DDE1E6"/>
+<use href="#wave" x="307.0" y="1001.0" width="18" height="18" color="#5B616B"/>
+<circle cx="276.0" cy="1010.0" r="16" fill="#FFFFFF" stroke="#DDE1E6"/>
+<use href="#mic" x="267.0" y="1001.0" width="18" height="18" color="#5B616B"/>
+<circle cx="392.0" cy="802.0" r="9" fill="#B35900"/>
+<text x="392.0" y="806.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">19</text>
+<text x="430.0" y="728.0" font-size="12" fill="#5B616B" font-weight="600">H. Voice mode on: the first words start the session;</text>
+<text x="430.0" y="743.0" font-size="12" fill="#5B616B" font-weight="600">the chips stay</text>
+<g filter="url(#shadow)"><rect x="430" y="754" width="358" height="190" rx="18" fill="#FFFFFF" stroke="#DDE1E6"/></g>
+<rect x="440.0" y="764.0" width="136.4" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<use href="#branch" x="450.0" y="772.0" width="16" height="16" color="#5B616B"/>
+<text x="468.0" y="784.5" font-size="13" fill="#1C1D20" font-weight="500">New worktree</text>
+<use href="#chev" x="556.4" y="775.0" width="10" height="10" color="#8A9099"/>
+<rect x="584.4" y="764.0" width="116.7" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="594.4" y="784.5" font-size="13" fill="#1C1D20" font-weight="500">Auto · Claude</text>
+<use href="#chev" x="681.0" y="775.0" width="10" height="10" color="#8A9099"/>
+<rect x="440.0" y="804.0" width="70.4" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="450.0" y="824.5" font-size="13" fill="#1C1D20" font-weight="500">Smart</text>
+<use href="#chev" x="490.4" y="815.0" width="10" height="10" color="#8A9099"/>
+<rect x="518.4" y="804.0" width="55.8" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="528.4" y="824.5" font-size="13" fill="#1C1D20" font-weight="500">Ask</text>
+<use href="#chev" x="554.2" y="815.0" width="10" height="10" color="#8A9099"/>
+<rect x="582.2" y="804.0" width="137.2" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="592.2" y="824.5" font-size="13" fill="#1C1D20" font-weight="500">Default sandbox</text>
+<use href="#chev" x="699.5" y="815.0" width="10" height="10" color="#8A9099"/>
+<rect x="727.5" y="804.0" width="38.0" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<use href="#more" x="737.5" y="812.0" width="16" height="16" color="#5B616B"/>
+<text x="755.5" y="824.5" font-size="13" fill="#1C1D20" font-weight="500"></text>
+<g transform="translate(440,850)"><rect x="0" y="14.0" width="4" height="8" rx="2" fill="#0A6CDB"/><rect x="7" y="10.0" width="4" height="16" rx="2" fill="#0A6CDB"/><rect x="14" y="5.0" width="4" height="26" rx="2" fill="#0A6CDB"/><rect x="21" y="11.0" width="4" height="14" rx="2" fill="#0A6CDB"/><rect x="28" y="3.0" width="4" height="30" rx="2" fill="#0A6CDB"/><rect x="35" y="8.0" width="4" height="20" rx="2" fill="#0A6CDB"/><rect x="42" y="13.0" width="4" height="10" rx="2" fill="#0A6CDB"/><rect x="49" y="6.0" width="4" height="24" rx="2" fill="#0A6CDB"/><rect x="56" y="10.0" width="4" height="16" rx="2" fill="#0A6CDB"/><rect x="63" y="14.0" width="4" height="8" rx="2" fill="#0A6CDB"/><rect x="70" y="8.0" width="4" height="20" rx="2" fill="#0A6CDB"/><rect x="77" y="4.0" width="4" height="28" rx="2" fill="#0A6CDB"/><rect x="84" y="12.0" width="4" height="12" rx="2" fill="#0A6CDB"/></g>
+<text x="540.0" y="870.0" font-size="16" fill="#5B616B" >Listening…</text>
+<circle cx="456.0" cy="918.0" r="16" fill="#FFFFFF" stroke="#DDE1E6"/>
+<use href="#paperclip" x="447.0" y="909.0" width="18" height="18" color="#5B616B"/>
+<circle cx="762.0" cy="918.0" r="16" fill="#0A6CDB"/>
+<use href="#up" x="754.0" y="910.0" width="16" height="16" color="#FFF"/>
+<circle cx="722.0" cy="918.0" r="16" fill="#FFFFFF" stroke="#DDE1E6"/>
+<use href="#wave" x="713.0" y="909.0" width="18" height="18" color="#5B616B"/>
+<circle cx="682.0" cy="918.0" r="16" fill="#FFFFFF" stroke="#DDE1E6"/>
+<use href="#mic" x="673.0" y="909.0" width="18" height="18" color="#5B616B"/>
+<circle cx="798.0" cy="780.0" r="9" fill="#B35900"/>
+<text x="798.0" y="784.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">20</text>
+<text x="836.0" y="728.0" font-size="12" fill="#5B616B" font-weight="600">I. Auto picks nothing: the chip says so with a red dot,</text>
+<text x="836.0" y="743.0" font-size="12" fill="#5B616B" font-weight="600">and the line says why</text>
+<text x="836.0" y="766.0" font-size="12" fill="#B42318" >No runtime can start now: Claude is out, Codex is not signed in.</text>
+<g filter="url(#shadow)"><rect x="836" y="776" width="358" height="190" rx="18" fill="#FFFFFF" stroke="#DDE1E6"/></g>
+<rect x="846.0" y="786.0" width="136.4" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<use href="#branch" x="856.0" y="794.0" width="16" height="16" color="#5B616B"/>
+<text x="874.0" y="806.5" font-size="13" fill="#1C1D20" font-weight="500">New worktree</text>
+<use href="#chev" x="962.4" y="797.0" width="10" height="10" color="#8A9099"/>
+<rect x="990.4" y="786.0" width="142.8" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="1000.4" y="806.5" font-size="13" fill="#1C1D20" font-weight="500">Auto · no runtime</text>
+<use href="#chev" x="1113.2" y="797.0" width="10" height="10" color="#8A9099"/>
+<circle cx="1129.2" cy="790.0" r="4.5" fill="#B42318" stroke="#FFFFFF"/>
+<rect x="846.0" y="826.0" width="70.4" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="856.0" y="846.5" font-size="13" fill="#1C1D20" font-weight="500">Smart</text>
+<use href="#chev" x="896.4" y="837.0" width="10" height="10" color="#8A9099"/>
+<rect x="924.4" y="826.0" width="55.8" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="934.4" y="846.5" font-size="13" fill="#1C1D20" font-weight="500">Ask</text>
+<use href="#chev" x="960.2" y="837.0" width="10" height="10" color="#8A9099"/>
+<rect x="988.2" y="826.0" width="137.2" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="998.2" y="846.5" font-size="13" fill="#1C1D20" font-weight="500">Default sandbox</text>
+<use href="#chev" x="1105.5" y="837.0" width="10" height="10" color="#8A9099"/>
+<rect x="1133.5" y="826.0" width="38.0" height="32.0" rx="16" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<use href="#more" x="1143.5" y="834.0" width="16" height="16" color="#5B616B"/>
+<text x="1161.5" y="846.5" font-size="13" fill="#1C1D20" font-weight="500"></text>
+<text x="846.0" y="888.0" font-size="16" fill="#8A9099" >What should it do?</text>
+<circle cx="862.0" cy="940.0" r="16" fill="#FFFFFF" stroke="#DDE1E6"/>
+<use href="#paperclip" x="853.0" y="931.0" width="18" height="18" color="#5B616B"/>
+<circle cx="1168.0" cy="940.0" r="16" fill="#B9C6D6"/>
+<use href="#up" x="1160.0" y="932.0" width="16" height="16" color="#FFF"/>
+<circle cx="1128.0" cy="940.0" r="16" fill="#FFFFFF" stroke="#DDE1E6"/>
+<use href="#wave" x="1119.0" y="931.0" width="18" height="18" color="#5B616B"/>
+<circle cx="1088.0" cy="940.0" r="16" fill="#FFFFFF" stroke="#DDE1E6"/>
+<use href="#mic" x="1079.0" y="931.0" width="18" height="18" color="#5B616B"/>
+<circle cx="1204.0" cy="802.0" r="9" fill="#B35900"/>
+<text x="1204.0" y="806.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">21</text>
+</svg>

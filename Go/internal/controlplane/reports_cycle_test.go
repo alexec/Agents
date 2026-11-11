@@ -145,3 +145,65 @@ func TestValueSaysTheEstimateError(t *testing.T) {
 }
 
 func f(v float64) *float64 { return &v }
+
+// #4528: reports/value scores the landing forecasts kept on the epics that landed in the range,
+// by their P50 and P85 dates, and lists the open epics for Reports ▸ Planning to forecast; a
+// machine's kept forecast survives the merge of the machines' copies.
+func TestValueScoresTheKeptForecasts(t *testing.T) {
+	now := time.Now().Truncate(time.Second)
+	day := 24 * time.Hour
+	at := func(d time.Duration) wire.Date { return wire.DateOf(now.Add(d)) }
+	str := func(s string) *string { return &s }
+	node := func(kind, ref string) wire.LineageCostNode {
+		return wire.LineageCostNode{Node: wire.LineageNode{Kind: kind, Ref: ref},
+			Banked: wire.LineageCost{Cost: map[string]float64{"USD": 1}}, LastAt: wire.DateOf(now)}
+	}
+	state := func(n *wire.LineageCostNode, s string) { n.Resolved = &wire.LineageResolved{State: str(s)} }
+	var nodes []wire.LineageCostNode
+	// An epic with one child, whose PR merged landed ago; its forecast kept p50 and p85 from now.
+	epic := func(n int, landed, p50, p85 time.Duration) {
+		e := node("issue", "github:o/r#"+string(rune('a'+n)))
+		e.Level = str("epic")
+		state(&e, "closed")
+		e.Forecast = &wire.LineageForecastKept{At: at(-10 * day), P50: at(p50), P85: at(p85), WindowDays: 14, Share: 0.1, Open: 1}
+		c := node("issue", e.Node.Ref+"-1")
+		c.Parent = &e.Node.Ref
+		state(&c, "closed")
+		pr := node("pr", e.Node.Ref+"-pr")
+		pr.Fixes, pr.Outcome = []string{c.Node.Ref}, str("merged")
+		end := at(landed)
+		pr.EndedAt = &end
+		nodes = append(nodes, e, c, pr)
+	}
+	epic(0, -2*day, -3*day, -1*day) // after its P50, by its P85
+	epic(1, -2*day, -1*day, 0)      // by both
+	epic(2, -2*day, -5*day, -4*day) // after both
+	epic(3, -40*day, -40*day, -40*day)
+	open := node("issue", "github:o/r#open")
+	open.Level = str("epic")
+	state(&open, "open")
+	nodes = append(nodes, open)
+
+	v := valueOf(nodes, at(-30*day))
+	s := v.ForecastScore
+	if s == nil || s.Epics != 3 || s.P50Held != 1 || s.P85Held != 2 || s.ErrorDays == nil || math.Abs(*s.ErrorDays-1) > 1e-9 {
+		t.Fatalf("score %+v", s)
+	}
+	if len(v.OpenEpics) != 1 || v.OpenEpics[0] != open.Node {
+		t.Fatalf("open epics %+v", v.OpenEpics)
+	}
+	if v := valueOf(nodes[3:6], at(-day)); v.ForecastScore != nil {
+		t.Fatalf("an epic that landed before the range is scored: %+v", v.ForecastScore)
+	}
+
+	have := node("issue", "github:o/r#x")
+	later := node("issue", "github:o/r#x")
+	later.Forecast = &wire.LineageForecastKept{At: at(-day), P50: at(0), P85: at(day)}
+	mergeNode(&have, later)
+	earlier := node("issue", "github:o/r#x")
+	earlier.Forecast = &wire.LineageForecastKept{At: at(-2 * day), P50: at(0), P85: at(day)}
+	mergeNode(&have, earlier)
+	if have.Forecast == nil || have.Forecast.At != at(-2*day) {
+		t.Fatalf("merged forecast %+v", have.Forecast)
+	}
+}

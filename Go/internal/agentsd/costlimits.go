@@ -264,7 +264,7 @@ func (d *Daemon) drainHeld() {
 	d.costMu.Lock()
 	d.held = nil
 	d.costMu.Unlock()
-	for _, a := range d.Store.Agents() {
+	for _, a := range d.Store.LiveAgents() {
 		if a.State != wire.AgentStateArchived && len(a.QueuedPrompts) > 0 && !inFlight(a.State) {
 			d.live(a.ID).kick()
 		}

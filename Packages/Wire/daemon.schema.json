@@ -23724,6 +23724,30 @@
       ],
       "additionalProperties": false
     },
+    "ReportForecastScore": {
+      "type": "object",
+      "description": "How the kept landing forecasts scored (#4528): of the epics that landed in the range with a forecast kept on their node (lineage/forecast's first one, #4526), how many landed by its P50 date and by its P85 date. A good P85 holds about 85% of the time, and a P50 about half. errorDays is the median of how many days the P50 date was off by. An epic lands when the last PR of it or its children merges.",
+      "properties": {
+        "epics": {
+          "type": "integer"
+        },
+        "p50Held": {
+          "type": "integer"
+        },
+        "p85Held": {
+          "type": "integer"
+        },
+        "errorDays": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "epics",
+        "p50Held",
+        "p85Held"
+      ],
+      "additionalProperties": false
+    },
     "ReportFormat": {
       "type": "string",
       "enum": [
@@ -24185,6 +24209,17 @@
         },
         "estimateError": {
           "$ref": "#/definitions/ReportEstimateError"
+        },
+        "forecastScore": {
+          "$ref": "#/definitions/ReportForecastScore",
+          "description": "How the kept landing forecasts of the epics that landed in the range scored (#4528); absent when none had one."
+        },
+        "openEpics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LineageNode"
+          },
+          "description": "The open epics in the scope (#4528), the most recently changed first, at most 20, so Reports ▸ Planning can ask lineage/forecast when each lands."
         },
         "issues": {
           "type": "array",

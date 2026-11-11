@@ -9809,6 +9809,20 @@ export interface ReportExport {
   format: ReportFormat;
 }
 
+/**
+ * How the kept landing forecasts scored (#4528): of the epics that landed in the range with a
+ * forecast kept on their node (lineage/forecast's first one, #4526), how many landed by its P50
+ * date and by its P85 date. A good P85 holds about 85% of the time, and a P50 about half. errorDays
+ * is the median of how many days the P50 date was off by. An epic lands when the last PR of it or
+ * its children merges.
+ */
+export interface ReportForecastScore {
+  epics: number;
+  p50Held: number;
+  p85Held: number;
+  errorDays?: number;
+}
+
 export type ReportFormat =
   | "csv"
   | "jsonl";
@@ -10038,6 +10052,16 @@ export interface ReportValue {
   /** The median of the issues' cycle times (#3562). */
   cycleTimeSeconds?: number;
   estimateError?: ReportEstimateError;
+  /**
+   * How the kept landing forecasts of the epics that landed in the range scored (#4528); absent
+   * when none had one.
+   */
+  forecastScore?: ReportForecastScore;
+  /**
+   * The open epics in the scope (#4528), the most recently changed first, at most 20, so Reports ▸
+   * Planning can ask lineage/forecast when each lands.
+   */
+  openEpics?: LineageNode[];
   issues: ReportValueRow[];
   /** One row per release (#3023): the PRs part-of it and the issues those PRs fix. */
   releases: ReportValueRow[];
@@ -15446,6 +15470,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ReportCounts: { required: ["sessions", "failedSessions", "prsOpened", "prsMerged", "prsReverted", "mergeSeconds", "waits", "waitBuckets", "workflowRuns", "workflowFailures"], optional: [] },
   ReportEstimateError: { required: ["issues"], optional: ["cost", "workingSeconds", "coverage", "landsAtErrorDays"] },
   ReportExport: { required: ["text", "count", "format"], optional: [] },
+  ReportForecastScore: { required: ["epics", "p50Held", "p85Held"], optional: ["errorDays"] },
   ReportNode: { required: ["node", "cost", "sessions", "lastAt"], optional: ["repo", "resolved", "leadTimeSeconds", "cycleTimeSeconds", "startedAt", "level", "feature", "outcome"] },
   ReportNodeCost: { required: ["own", "total", "waste"], optional: [] },
   ReportNodes: { required: ["nodes", "limited", "unresolved"], optional: ["cursor"] },
@@ -15456,7 +15481,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ReportScope: { required: ["kind"], optional: ["group"] },
   ReportScopeOption: { required: ["scope", "name"], optional: [] },
   ReportScopes: { required: ["scopes", "admin"], optional: [] },
-  ReportValue: { required: ["range", "scope", "total", "waste", "unlinked", "perMergedPR", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "issues", "releases"], optional: ["loaded", "overhead", "leadTimeSeconds", "cycleTimeSeconds", "estimateError", "limited"] },
+  ReportValue: { required: ["range", "scope", "total", "waste", "unlinked", "perMergedPR", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "issues", "releases"], optional: ["loaded", "overhead", "leadTimeSeconds", "cycleTimeSeconds", "estimateError", "forecastScore", "openEpics", "limited"] },
   ReportValueRow: { required: ["node", "total", "waste", "prsMerged", "prsClosed", "prsReverted", "failedChecks"], optional: ["leadTimeSeconds", "cycleTimeSeconds", "level"] },
   ReportView: { required: ["id", "name", "page", "scope", "range"], optional: ["by"] },
   ReportViewID: { required: ["id"], optional: [] },

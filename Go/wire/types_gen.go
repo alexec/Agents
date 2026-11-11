@@ -10773,6 +10773,17 @@ type ReportExport struct {
 	Format ReportFormat `json:"format"`
 }
 
+// How the kept landing forecasts scored (#4528): of the epics that landed in the range with a forecast kept on their node (lineage/forecast's first one, #4526), how many landed by its P50 date and by its P85 date. A good P85 holds about 85% of the time, and a P50 about half. errorDays is the median of how many days the P50 date was off by. An epic lands when the last PR of it or its children merges.
+type ReportForecastScore struct {
+	Epics int64 `json:"epics"`
+
+	P50Held int64 `json:"p50Held"`
+
+	P85Held int64 `json:"p85Held"`
+
+	ErrorDays *float64 `json:"errorDays,omitzero"`
+}
+
 type ReportFormat string
 
 const ReportFormatCsv ReportFormat = "csv"
@@ -11024,6 +11035,12 @@ type ReportValue struct {
 	CycleTimeSeconds *float64 `json:"cycleTimeSeconds,omitzero"`
 
 	EstimateError *ReportEstimateError `json:"estimateError,omitzero"`
+
+	// How the kept landing forecasts of the epics that landed in the range scored (#4528); absent when none had one.
+	ForecastScore *ReportForecastScore `json:"forecastScore,omitzero"`
+
+	// The open epics in the scope (#4528), the most recently changed first, at most 20, so Reports ▸ Planning can ask lineage/forecast when each lands.
+	OpenEpics []LineageNode `json:"openEpics,omitzero"`
 
 	Issues []ReportValueRow `json:"issues"`
 

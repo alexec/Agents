@@ -78,6 +78,11 @@ then UI changes, bugs before features, then the rest):
    `work-github-issue-<child>` (anything else), no runtime.
 3. If `start_session` refuses (the folder's limits are full), unassign the child and
    start no more until a lane ends.
+4. After the epic's first lane starts, ask `estimate_issue` for the epic once. This keeps
+   the epic's estimate on its node. Then, when the epic's spend passes 2× and then 3× that
+   estimate, Alex gets a notice on your session, once for each (#4529). Do not post
+   anything for it yourself: the notice is enough. When Alex answers in your chat (stop,
+   trim or go on), do that.
 
 **A spike** can be yours: when its question is small and needs no code (read the code,
 the docs or the forge), settle it yourself. Write the decision in the spike's issue

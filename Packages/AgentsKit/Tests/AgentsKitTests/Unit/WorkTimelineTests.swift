@@ -108,7 +108,8 @@ struct WorkTimelineTests {
         #expect(lines[0].end == Self.h(5))
         #expect(lines[0].band == DateInterval(start: Self.h(2), end: Self.h(11)))
         #expect(lines[0].dots.map(\.closed) == [true, false, false])
-        #expect(lines[0].working == 1)
+        // A start is history: no session in a turn, no line works (#4265).
+        #expect(lines.allSatisfy { $0.working == 0 })
         #expect(lines[2].end == Self.now)
         #expect(lines[3].start == Self.h(6))
         // Forecast off: the past only.
@@ -332,6 +333,42 @@ struct WorkTimelineTests {
         #expect(epic.segments.map(\.startedAt) == [Self.h(-12), Self.h(-4)])
         #expect(WorkTimeline.started(timeline, by: []) == timeline)
         #expect(WorkTimeline.sessionNodes(got).map(\.ref) == [1, 3, 2, 4].map { "github:alexec/Agents#\($0)" })
+    }
+
+    /// #4265: a line works only while a session is in a turn on its epic or an open child, on its
+    /// open segment; a session that waits does not count, and this app's own state is the newest.
+    @Test func aLineWorksOnlyWhileASessionIsInATurnOnIt() throws {
+        let timeline = DaemonAPI.WorkTimeline(epics: [
+            Self.epic(1, [Self.child(2, started: -10, closed: -6), Self.child(3, started: -2)], segments: [(-10, -6), (-3, nil)]),
+            Self.epic(4, [Self.child(5, started: -2)], segments: [(-2, nil)]),
+            Self.epic(6, [Self.child(7, started: -2)], segments: [(-2, nil)]),
+        ])
+        func ref(_ n: Int) -> String { "github:alexec/Agents#\(n)" }
+        func on(_ n: Int, _ state: String, id: UUID = UUID()) -> DaemonAPI.LineageSessionOn {
+            .init(node: LineageList.node(ofSession: id), host: "BEAS-MAC", on: [Node(kind: "issue", ref: ref(n))],
+                  at: Self.h(-1), state: .init(state: state, at: Self.h(-1)))
+        }
+        func agent(_ label: String, _ state: AgentState) -> Agent {
+            var a = Agent(runtimeID: "claude", cwd: URL(fileURLWithPath: "/tmp/work"))
+            a.labels = [SessionLabel(value: label, owner: .agent)]
+            a.state = state
+            return a
+        }
+        // Here: a lead on #4 between turns, and a lane on #7 in one. There: a lane on #3 in a turn,
+        // one on #5 waiting, and one that is #4's lead, whose old copy still says working.
+        let lead = agent("#4", .finished)
+        let working = WorkTimeline.workingNow(
+            timeline, sessions: [on(3, "working"), on(5, "waiting"), on(4, "working", id: lead.id)],
+            agents: [lead, agent("#7", .running), agent("#9", .running)])
+        #expect(working == [ref(3), ref(7)])
+        let lines = WorkTimeline.lines(timeline, now: Self.now, working: working)
+        try #require(lines.count == 4)
+        // #1's closed segment does not work; its open one does.
+        #expect(lines.map(\.working) == [0, 1, 0, 1])
+        // The epic's own session counts too: a lead in a turn.
+        let leading = WorkTimeline.lines(timeline, now: Self.now, working: [ref(4)])
+        #expect(leading.map(\.working) == [0, 0, 1, 0])
+        #expect(WorkTimeline.workingNow(timeline, sessions: [], agents: []).isEmpty)
     }
 
     @Test func timelineIsAWorkListWithNoLineagePage() {

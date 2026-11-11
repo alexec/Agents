@@ -434,7 +434,7 @@ func (d *Daemon) queueHelper(caller *wire.Agent, prompt, runtimeID, model string
 // checkEveryQueue looks at every folder with a queue, as a restart does.
 func (d *Daemon) checkEveryQueue() {
 	seen := map[string]bool{}
-	for _, a := range d.Store.Agents() {
+	for _, a := range d.Store.LiveAgents() {
 		if f := folderPath(&a); a.State == wire.AgentStateQueued && !seen[f] {
 			seen[f] = true
 			d.checkQueueSoon(f)

@@ -236,12 +236,14 @@ func (d *Daemon) leaseResource(agent wire.UUID, args map[string]json.RawMessage)
 			wanted = l.ExpiresAt.Time()
 		}
 		ceiling := t.Time().Add(time.Duration(e.Rules.ceiling()) * time.Minute)
-		l.ExpiresAt, l.Warned = wire.DateOf(minTime(wanted, ceiling)), false
+		l.ExpiresAt = wire.DateOf(minTime(wanted, ceiling))
+		l.Warned = toldWhenItEnds(l, t)
 		e.Leases[i] = l
 		events = append(events, leaseEvent{extended: true, lease: l})
 		reply = extendedWords(l, capped || wanted.After(ceiling))
 	case !e.full() && len(e.Line) == 0:
 		l := wire.Lease{Resource: name, DisplayName: e.DisplayName, Holder: agent, GrantedAt: t, ExpiresAt: wire.DateOf(t.Time().Add(length))}
+		l.Warned = toldWhenItEnds(l, t)
 		e.Leases = append(e.Leases, l)
 		events = append(events, leaseEvent{granted: true, lease: l})
 		reply = grantedWords(l, capped)

@@ -99,7 +99,8 @@ export function breathStyles(period: number, samples = 48): string {
     `@media (prefers-reduced-motion: reduce){.waiting-beacon{--breath-period:${+(period * reducedMotionSlowing).toFixed(3)}s}}`;
 }
 
-const clocked = /^(spin|ring-(think|do)-[0-2]|breathe)$/;
+// Work ▸ Timeline's working lines breathe and their ◐ turns on the same clock (#4265).
+const clocked = /^(spin|ring-(think|do)-[0-2]|breathe|timeline-breathe|timeline-turn)$/;
 /** SpinnerClock's epoch, 2001-01-01, in ms since 1970. */
 const epoch = 978_307_200_000;
 
