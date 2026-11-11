@@ -1,6 +1,14 @@
 #!/bin/sh
 # The design system (#4600; specs/4600-design-system/spec.md).
 #
+#   scripts/design.sh gen             write the CSS token files from design/tokens.json (#4602):
+#                                     Web/src/theme/tokens.css, www/tokens.css,
+#                                     docs/stylesheets/tokens.css, Go/internal/forgepages/tokens.css;
+#                                     DesignTokensTests checks Paper.swift, StateTint.swift,
+#                                     TypeScale.swift and the AccentColor assets against the JSON
+#   scripts/design.sh check           write nothing; fail when a token file is not what the JSON
+#                                     makes (scripts/lint.sh runs it, so CI fails on a stale file)
+#   scripts/design.sh selftest        scripts/design.py's own test
 #   scripts/design.sh marks           draw the Blob (#1237) and write every mark made from it: the
 #                                     SVG parts in design/logo/blob/final/, the Mac and iOS app
 #                                     icons, the Dock moods, the menu bar template, and the icons,
@@ -149,6 +157,8 @@ marks() {
 }
 
 case "${1:-} ${2:-}" in
+"gen " | "check ") exec python3 "$root/scripts/design.py" "$1" ;;
+"selftest ") exec python3 "$root/scripts/design.py" --selftest ;;
 "marks ")
 	marks "$root"
 	rm "$root/.marks"
@@ -178,7 +188,7 @@ case "${1:-} ${2:-}" in
 	echo "design.sh: every mark is what the Blob source makes ($(wc -l <"$out/.marks" | tr -d ' ') files)"
 	;;
 *)
-	echo "usage: scripts/design.sh marks [--check]" >&2
+	echo "usage: scripts/design.sh gen | check | selftest | marks [--check]" >&2
 	exit 2
 	;;
 esac

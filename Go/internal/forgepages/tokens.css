@@ -1,0 +1,60 @@
+/* Made by scripts/design.sh gen from design/tokens.json (#4602). Do not edit: change the
+   JSON and run gen again. */
+
+:root {
+  color-scheme: light dark;
+  /* The page every column sits on. */
+  --paper-ground: light-dark(#f7f8f9, #1c1d20);
+  /* The folders column, one shade deeper. */
+  --paper-sidebar: light-dark(#f0f1f3, #161719);
+  /* What floats: the prompt bar, cards, menus. */
+  --paper-raised: light-dark(#ffffff, #26282c);
+  /* What is set into the page: code, your own message. */
+  --paper-well: light-dark(#f0f2f4, #2a2d31);
+  /* A row under the pointer, a picked item. */
+  --paper-wash: light-dark(#e7eaee, #33363b);
+  /* Hairlines between rows, and round raised things. */
+  --paper-rule: light-dark(#dde1e6, #3a3e44);
+  /* Text, and the prominent button's fill. */
+  --paper-ink: light-dark(#1c1d20, #e8eaed);
+  /* A selection. Nothing is drawn in the accent on it. */
+  --paper-selection: light-dark(#d8dee6, #3a3e44);
+  /* Under a raised thing: short and neutral, paper lifted a little off the desk. */
+  --paper-shadow: light-dark(rgb(32 36 42 / 10%), rgb(0 0 0 / 10%));
+  /* The app icon's cobalt: links, focus, controls and the prominent button's fill. */
+  --accent: light-dark(#1f5fc8, #7fb0ff);
+  /* Needs you; the only tint drawn in a list. */
+  --tint-attention: light-dark(#ba4a13, #f0a06b);
+  /* Failed. */
+  --tint-failure: light-dark(#b4232b, #f08086);
+  /* Approved, done: an ending the app can vouch for. */
+  --tint-vouched: light-dark(#2d765c, #8bc6a7);
+  /* A label naming an issue, #12. */
+  --label-issue: light-dark(#0e6b82, #6cc6db);
+  /* A label naming a pull request, P#12. */
+  --label-pull: light-dark(#7442b8, #b79af0);
+  /* Chips, the rail, inputs. */
+  --radius-control: 7px;
+  /* Rows, wells, cards. */
+  --radius-card: 10px;
+  /* Sheets, menus, the prompt bar (web). */
+  --radius-floating: 16px;
+  /* The system's sans-serif, for everything a person reads. Nothing is loaded from the network. */
+  --font-text: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  /* The system's monospace, for code. */
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  /* A page's title. */
+  --type-title: 1.375rem;
+  /* Prose: what everything is read at unless there is a reason otherwise. */
+  --type-reading: 1rem;
+  /* A row's second line. */
+  --type-supporting: 0.875rem;
+  /* A timestamp, a count. */
+  --type-fine: 0.75rem;
+  /* Code, paths, commands, in the monospace. */
+  --type-code: 0.875rem;
+  /* www's hero title. */
+  --type-display-1: clamp(2rem, 5vw, 3.2rem);
+  /* www's section titles. */
+  --type-display-2: 1.8rem;
+}

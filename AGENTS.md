@@ -41,6 +41,8 @@
 - **`Web/dist` is not checked in** (#473); it is in `.gitignore`. Agents Host's build makes it with `scripts/web.sh dist` (the Node in `Web/.node-version`; without it, an empty one and a warning). Run `scripts/web.sh build`, under the "build" lease, to see a web change without a Mac build.
 - **The wire's types come from `Packages/Wire` (#1135).** A change to a protocol type changes `Packages/Wire/daemon.schema.json` (or a method in its `*.openrpc.json`) first, runs `scripts/wire.sh gen`, and commits what it makes (`Web/src/protocol/generated.ts`, `Go/wire/*_gen.go`); `WireSchemaTests` then says what to change in Swift by hand. A conflict in a generated file is settled by running that again, never by hand.
 
+- **The design tokens come from `design/tokens.json` (#4602).** A change to a colour, radius, font or type step changes the JSON first, runs `scripts/design.sh gen`, and commits the CSS it makes (`Web/src/theme/tokens.css`, `www/tokens.css`, `docs/stylesheets/tokens.css`, `Go/internal/forgepages/tokens.css`); `DesignTokensTests` then says what to change in `Paper.swift`, `StateTint.swift`, `TypeScale.swift` or the AccentColor assets by hand, and `scripts/lint.sh` fails on a stale file.
+
 ## Verifying a lane's work
 
 - **A lane verifies only what it touched:** the schemes and tests for the paths its branch changes, as `merge-wave.sh plan` lists them. An `App/` change builds `AgentsHost` (Agents, the one Mac app); a `Remote/` change builds the Remote; a package change runs that package's tests, filtered by `scripts/select-test-suites.sh`. The full AgentsKit suite and every scheme run once, in the merge wave, which also skips any check that already passed at the same tree.
