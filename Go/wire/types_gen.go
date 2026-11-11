@@ -14885,7 +14885,7 @@ type WorkTimelineBacktest struct {
 	At Date `json:"at"`
 }
 
-// A child of an epic in work/timeline (#4172). stateReason is completed or not_planned, where the forge says it. startedAt is the earliest of the first session linked to it in lineage, the opening of the first pull request that closes it, and its close; absent while nothing has started it. waitsForPerson: it is open and labelled alex-todo or needs-account, so it is not forecast. forecastAt is an open child's forecast close: its epic's P50 shared out along the line, in the order of the children.
+// A child of an epic in work/timeline (#4172). item has its labels with their colours, for the hover card's chips (#4428). stateReason is completed or not_planned, where the forge says it. startedAt is the earliest of the first session linked to it in lineage, the opening of the first pull request that closes it, and its close; absent while nothing has started it. waitsForPerson: it is open and labelled alex-todo or needs-account, so it is not forecast. forecastAt is an open child's forecast close: its epic's P50 shared out along the line, in the order of the children.
 type WorkTimelineChild struct {
 	Item ForgeItem `json:"item"`
 
