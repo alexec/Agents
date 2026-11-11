@@ -5165,6 +5165,14 @@ export interface LineageEstimate {
    * and every child's. Absent while open.
    */
   actual?: LineageCost;
+  /**
+   * cost with the overhead loaded in (#4524), by currency: each figure times (1 +
+   * overhead.unlinkedRatio), and an epic's times (1 + overhead.epicRatio) too, as "direct $100,
+   * about $165 all in". Absent when cost is, or the overhead has no ratio.
+   */
+  loaded?: Record<string, LineageEstimateRange>;
+  /** The overhead that loaded is made with (#4524), on this machine. */
+  overhead?: LineageOverhead;
 }
 
 /** When work lands (#3559): the median and the P10 to P90 range. */
@@ -5438,6 +5446,31 @@ export interface LineageNode {
 export interface LineageNodeRequest {
   node: LineageNode;
   depth?: number;
+}
+
+/**
+ * The overhead (#4524): the cost no issue, PR or release carries, over the nodes that last changed
+ * in the last windowDays days (a rolling 14). unlinked is the sessions' cost that went on no work
+ * (a Scrum Master's turn that started nothing, a review, a check); linked is the cost on issues,
+ * PRs and releases. unlinkedRatio is unlinked over linked, and epicRatio is the epics' own cost
+ * (their leads') over their children's and their PRs', each in currency, the currency with the most
+ * linked cost; absent when there is nothing to divide by. A loaded figure is a direct one times (1
+ * + unlinkedRatio), and an epic's plan times (1 + epicRatio) too. uncounted names what no figure
+ * has.
+ */
+export interface LineageOverhead {
+  windowDays: number;
+  /** The currency of the ratios; absent with no linked cost. */
+  currency?: string;
+  linked: LineageCost;
+  unlinked: LineageCost;
+  unlinkedRatio?: number;
+  epicRatio?: number;
+  /**
+   * What no figure here counts: people-time (a person's reviews and answers) and ci-minutes (the
+   * forge's runners).
+   */
+  uncounted: string[];
 }
 
 /**
@@ -9903,10 +9936,11 @@ export interface ReportScopes {
 /**
  * reports/value (#2351): what the work in a scope cost and what it delivered, from the lineage
  * nodes that the scope's machines send (#2350). A node is in the range when it last changed in it,
- * with its whole cost. total is the work on issues and PRs; waste is the PRs closed without a merge
- * and merged reverts; unlinked is the turns with no issue or PR. perMergedPR is total by the PRs
- * merged, by currency. leadTimeSeconds is the median of the issues' lead times. issues and releases
- * (#3023) are the most costly first, at most 100 each; limited says there are more.
+ * with its whole cost. total is the work on issues, PRs and releases (a release session's own,
+ * #4524); waste is the PRs closed without a merge and merged reverts; unlinked is the turns with no
+ * issue or PR. perMergedPR is total by the PRs merged, by currency. leadTimeSeconds is the median
+ * of the issues' lead times. issues and releases (#3023) are the most costly first, at most 100
+ * each; limited says there are more.
  */
 export interface ReportValue {
   range: ReportRange;
@@ -9914,6 +9948,10 @@ export interface ReportValue {
   total: LineageCost;
   waste: LineageCost;
   unlinked: LineageCost;
+  /** total and unlinked together (#4524): what the work cost all in, as the agents spent it. */
+  loaded?: LineageCost;
+  /** The scope's overhead over the 14 days to now (#4524), whatever the range. */
+  overhead?: LineageOverhead;
   /** By currency. */
   perMergedPR: Record<string, number>;
   prsMerged: number;
@@ -14890,7 +14928,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["repo", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "startedAt", "level", "feature", "parent", "endedAt", "resolved", "sessions", "estimate", "forecast"] },
   LineageCostRollup: { required: ["node", "own", "total", "waste", "unlinked", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "parts"], optional: ["limited"] },
   LineageEndRequest: { required: ["from", "to", "rel"], optional: [] },
-  LineageEstimate: { required: ["node", "closedIssues", "matches"], optional: ["type", "level", "step", "matchedBy", "cost", "inputTokens", "outputTokens", "workingSeconds", "leadTimeSeconds", "cycleTimeSeconds", "landsAt", "openChildren", "closedChildren", "spent", "children", "kept", "actual"] },
+  LineageEstimate: { required: ["node", "closedIssues", "matches"], optional: ["type", "level", "step", "matchedBy", "cost", "inputTokens", "outputTokens", "workingSeconds", "leadTimeSeconds", "cycleTimeSeconds", "landsAt", "openChildren", "closedChildren", "spent", "children", "kept", "actual", "loaded", "overhead"] },
   LineageEstimateDates: { required: ["median", "p10", "p90"], optional: [] },
   LineageEstimateKept: { required: ["at", "matches"], optional: ["matchedBy", "cost", "costP10", "costP90", "outputTokens", "outputTokensP10", "outputTokensP90", "workingSeconds", "workingSecondsP10", "workingSecondsP90", "cycleTimeSeconds", "landsAt"] },
   LineageEstimateRange: { required: ["median", "p10", "p90"], optional: [] },
@@ -14910,6 +14948,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineageLinks: { required: ["links"], optional: ["limited", "states"] },
   LineageNode: { required: ["kind", "ref"], optional: [] },
   LineageNodeRequest: { required: ["node"], optional: ["depth"] },
+  LineageOverhead: { required: ["windowDays", "linked", "unlinked", "uncounted"], optional: ["currency", "unlinkedRatio", "epicRatio"] },
   LineageResolved: { required: ["title"], optional: ["state", "labels"] },
   LineageRuntimeCount: { required: ["runtimeID", "sessions"], optional: [] },
   LineageSessionIssue: { required: ["node"], optional: ["title"] },
@@ -15286,7 +15325,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ReportScope: { required: ["kind"], optional: ["group"] },
   ReportScopeOption: { required: ["scope", "name"], optional: [] },
   ReportScopes: { required: ["scopes", "admin"], optional: [] },
-  ReportValue: { required: ["range", "scope", "total", "waste", "unlinked", "perMergedPR", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "issues", "releases"], optional: ["leadTimeSeconds", "cycleTimeSeconds", "estimateError", "limited"] },
+  ReportValue: { required: ["range", "scope", "total", "waste", "unlinked", "perMergedPR", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "issues", "releases"], optional: ["loaded", "overhead", "leadTimeSeconds", "cycleTimeSeconds", "estimateError", "limited"] },
   ReportValueRow: { required: ["node", "total", "waste", "prsMerged", "prsClosed", "prsReverted", "failedChecks"], optional: ["leadTimeSeconds", "cycleTimeSeconds", "level"] },
   ReportView: { required: ["id", "name", "page", "scope", "range"], optional: ["by"] },
   ReportViewID: { required: ["id"], optional: [] },

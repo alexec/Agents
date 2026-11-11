@@ -24,6 +24,10 @@ branch that has moved past it. A branch without a pin is taken at its tip, on tr
 The first branch that still fast-forwards from main becomes the wave's base as it is, with
 no rebuild. The rest are merged in the order given, one merge commit each.
 
+Before `start`, label this session `P#<n>` for the pull request of each branch in the wave
+(`set_session_labels`), so the wave's cost splits over the PRs it lands (#4524). Each PR's
+merge ends its link; take off the label of a branch that leaves the wave.
+
 ## The loop
 
 ```sh

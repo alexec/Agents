@@ -80,10 +80,16 @@ func Split(c wire.LineageCost, n int) []wire.LineageCost {
 	return out
 }
 
-// RepoOf is the repo or tracker an issue's or PR's ref is in: github:alexec/agents for
-// github:alexec/agents#12, gitlab:group/repo for gitlab:group/repo!4, linear for
-// linear:ENG-4. Other refs have none.
+// RepoOf is the repo or tracker an issue's, PR's or release's ref is in: github:alexec/agents
+// for github:alexec/agents#12 or github:alexec/agents/release/v1.2.0, gitlab:group/repo for
+// gitlab:group/repo!4, linear for linear:ENG-4. Other refs have none.
 func RepoOf(n wire.LineageNode) string {
+	if n.Kind == KindRelease {
+		if repo, _, ok := strings.Cut(n.Ref, "/release/"); ok {
+			return repo
+		}
+		return ""
+	}
 	if n.Kind != KindIssue && n.Kind != KindPR {
 		return ""
 	}
@@ -104,7 +110,8 @@ func IsReleaseRef(ref string) bool { return strings.Contains(ref, "/release/") }
 //
 //   - a PR, or any other node: itself;
 //   - an issue: itself and the PRs that fix it;
-//   - a release (#3023): the PRs part of it, and the issues those PRs fix;
+//   - a release (#3023): itself (a release session's own work, #4524), the PRs part of it,
+//     and the issues those PRs fix;
 //   - a repo (kind repo, ref as LineageCostNode.repo): every node in it.
 //
 // Each part counts once. Waste is the parts' PRs closed without a merge or reverted, and
@@ -130,6 +137,7 @@ func Rollup(nodes []wire.LineageCostNode, of wire.LineageNode) wire.LineageCostR
 			}
 		}
 	case KindRelease:
+		in[of] = true
 		fixed := map[string]bool{}
 		for _, n := range nodes {
 			if n.Node.Kind == KindPR && has(n.PartOf, of.Ref) {
