@@ -295,15 +295,17 @@ struct WorkTimelinePane: View {
             let visible = max(geo.size.width, 1)
             let content = state.content
             let axis = WorkTimeline.Axis(interval: content, width: visible * content.duration / state.range.span)
+            // The epics and children a session is in a turn on now (#4265): their open lines pulse.
+            let working = WorkTimeline.workingNow(timeline, sessions: state.sessions, agents: model.workAgents)
             let lines = WorkTimeline.layout(
-                WorkTimeline.overlapping(WorkTimeline.lines(timeline, now: now), content),
+                WorkTimeline.overlapping(WorkTimeline.lines(timeline, now: now, working: working), content),
                 axis: axis, labelWidth: { Self.measure($0.label) })
             let lanes = WorkTimeline.lanes(lines)
             let sides = Double(max(lanes.above, lanes.below, 2))
             let height = max((2 * sides + 2) * Self.laneHeight, geo.size.height - Self.axisHeight)
             let drawing = Drawing(lines: lines, releases: timeline.releases, backtest: timeline.backtest, axis: axis,
                                   now: now, trunk: height / 2, height: height, offset: offset, visible: visible,
-                                  night: scheme == .dark, project: projectName, loading: loading)
+                                  night: scheme == .dark, project: projectName, loading: loading, moving: !reduceMotion)
             ScrollView(.horizontal) {
                 VStack(spacing: 0) {
                     ScrollView(.vertical) {
@@ -440,8 +442,9 @@ struct WorkTimelinePane: View {
         }
     }
 
-    /// An epic worked on now: its open line is drawn twice as thick, and a glow under it breathes;
-    /// with Reduce Motion, the thick line alone. One clock for every working line (#1653).
+    /// An epic a session is in a turn on now (#4265): its open line is drawn twice as thick, a glow
+    /// under it breathes and its ◐ at Now turns; with Reduce Motion, the thick line and a still ◐.
+    /// One clock for every working line and ring (#1653).
     @ViewBuilder
     private func working(_ drawing: Drawing) -> some View {
         if !reduceMotion, drawing.lines.contains(where: drawing.isWorking) {
@@ -561,6 +564,11 @@ private struct Drawing {
     var project: String
     /// Before the first read (S10): grey lanes that shimmer with the clock.
     var loading = false
+    /// Not Reduce Motion: the working lines' ◐ turns in the overlay, on the glow's clock.
+    var moving = true
+
+    /// One breath of a working line's glow and one turn of its ◐, in seconds (#4265).
+    static let pulsePeriod = 1.6
 
     /// The system colours for the features; the last, grey, for an epic with none.
     static let palette: [Color] = [.blue, .purple, .pink, Color.orange, Color.green, .teal, .indigo, .mint, .brown, .cyan, Color.red, .gray]
@@ -651,16 +659,8 @@ private struct Drawing {
                     gc.stroke(circle, with: .color(c), lineWidth: 1.5)
                 }
             }
-            if isWorking(line) {
-                // ◐: a ring at Now, its left half filled.
-                let rect = CGRect(x: nowX - 5, y: y(line.lane) - 5, width: 10, height: 10)
-                gc.fill(Path(ellipseIn: rect), with: .color(plot))
-                var half = Path()
-                half.addArc(center: CGPoint(x: rect.midX, y: rect.midY), radius: 5, startAngle: .degrees(90),
-                            endAngle: .degrees(270), clockwise: false)
-                gc.fill(half, with: .color(c))
-                gc.stroke(Path(ellipseIn: rect), with: .color(c), lineWidth: 1.5)
-            }
+            // With motion the ◐ turns in the overlay; with Reduce Motion it is still, here.
+            if isWorking(line), !moving { drawHalfRing(&gc, line, x: nowX, turn: 0) }
             switch line.how {
             case .dropped:
                 let x = axis.x(line.end), yl = y(line.lane)
@@ -829,12 +829,29 @@ private struct Drawing {
         line.working > 0 && line.start <= now && line.end >= now
     }
 
-    /// The working lines' glow: wider than the line, breathing once in 1.6 s.
+    /// ◐: a ring at Now, half of it filled; `turn` of a full turn on from the left half, clockwise.
+    func drawHalfRing(_ gc: inout GraphicsContext, _ line: WorkTimeline.Line, x: Double, turn: Double) {
+        let c = colour(line)
+        let rect = CGRect(x: x - 5, y: y(line.lane) - 5, width: 10, height: 10)
+        gc.fill(Path(ellipseIn: rect), with: .color(plot))
+        var half = Path()
+        let from = 90 + 360 * turn
+        half.addArc(center: CGPoint(x: rect.midX, y: rect.midY), radius: 5, startAngle: .degrees(from),
+                    endAngle: .degrees(from + 180), clockwise: false)
+        gc.fill(half, with: .color(c))
+        gc.stroke(Path(ellipseIn: rect), with: .color(c), lineWidth: 1.5)
+    }
+
+    /// The working lines' glow, wider than the line and breathing, and their ◐ turning: one breath
+    /// and one turn in `pulsePeriod`, read off the wall clock (`SpinnerClock`), so all are in step.
     func drawWorking(_ gc: inout GraphicsContext, at time: Date) {
-        let phase = 0.5 + 0.5 * sin(time.timeIntervalSinceReferenceDate * 2 * .pi / 1.6)
+        let turn = SpinnerClock.fraction(at: time, period: Self.pulsePeriod)
+        let phase = 0.5 - 0.5 * cos(2 * .pi * turn)
+        let nowX = axis.x(now)
         for line in lines where isWorking(line) && axis.x(line.start) <= seen.upperBound && axis.x(line.end) >= seen.lowerBound {
             gc.stroke(path(line), with: .color(colour(line).opacity(0.1 + 0.3 * phase)),
                       style: StrokeStyle(lineWidth: 4 + 8 * phase, lineCap: .round))
+            drawHalfRing(&gc, line, x: nowX, turn: turn)
         }
     }
 
