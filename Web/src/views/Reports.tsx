@@ -17,7 +17,10 @@ import { adoption, adoptionLine, barCaption, adoptionNote, budgetWords, dimensio
 import type { OutcomeGroup, OutcomeOrder, ReportDimension, ReportGroup } from "../model/reports";
 import { featureLine, featureUnused, featuresNote, mergeFeatures, noFeatures } from "../model/features";
 import { hostAnswers } from "../model/capabilities";
-import { estimateErrorLine, leadLine, noValue, noValueHere, nodeName, rowLine, unlinkedLine, valueHeadline, valueNote, wasteLine } from "../model/value";
+import {
+  estimateCoverageLine, estimateErrorLine, estimateLandsAtLine, leadLine, noValue, noValueHere, nodeName, rowLine,
+  unlinkedLine, valueHeadline, valueNote, wasteLine,
+} from "../model/value";
 import type { Section } from "../model/console";
 import { Choice } from "./Choice";
 
@@ -391,6 +394,8 @@ function ValuePane({ store, scope, initial }: { store: Store; scope: ReportScope
   const lead = shown && leadLine(shown);
   const unlinked = shown && unlinkedLine(shown);
   const estimates = shown && estimateErrorLine(shown);
+  const coverage = shown && estimateCoverageLine(shown);
+  const landsAt = shown && estimateLandsAtLine(shown);
   return (
     <div class="reports-pane">
       <div class="reports-head">
@@ -406,6 +411,8 @@ function ValuePane({ store, scope, initial }: { store: Store; scope: ReportScope
             <li class="report-total"><span class="strong">{valueHeadline(shown)}</span><span class="quiet small">{wasteLine(shown)}</span></li>
             {lead && <li><span>{lead}</span></li>}
             {estimates && <li><span>{estimates}</span></li>}
+            {coverage && <li><span class="quiet small">{coverage}</span></li>}
+            {landsAt && <li><span class="quiet small">{landsAt}</span></li>}
             {unlinked && <li><span class="quiet">{unlinked}</span></li>}
           </ul>
           {shown.issues.length > 0 && <h3>Issues</h3>}

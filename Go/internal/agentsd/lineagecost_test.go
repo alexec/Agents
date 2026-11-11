@@ -250,7 +250,7 @@ func TestCostNodeKeepsStartAndLevel(t *testing.T) {
 	asked := make(chan int, 4)
 	d.resolveLookup = func(_ context.Context, _ string, _ forgeRepo, _ string, n int) (wire.LineageResolved, error) {
 		asked <- n
-		return wire.LineageResolved{Title: "Fix it", Labels: []string{"Story", "feature:estimates", "area:lineage"}}, nil
+		return wire.LineageResolved{Title: "Fix it", Labels: []string{"Story", "feature:estimates"}}, nil
 	}
 	s := wire.LineageNode{Kind: "session", Ref: "session:a"}
 	began := time.Now().Add(-3 * time.Hour)
@@ -290,7 +290,7 @@ func TestCostNodeKeepsStartAndLevel(t *testing.T) {
 	d.resolveMu.Unlock()
 	n = node()
 	if n.Level == nil || *n.Level != "story" || n.Feature == nil || *n.Feature != "estimates" ||
-		n.Area == nil || *n.Area != "lineage" || n.Parent == nil || *n.Parent != epic.Ref {
+		n.Parent == nil || *n.Parent != epic.Ref {
 		t.Fatalf("%+v", n)
 	}
 
@@ -402,5 +402,43 @@ func TestLineageEstimateKeepsTheStartAndSaysTheActual(t *testing.T) {
 	d.workMu.Unlock()
 	if kept == nil || kept.Cost["USD"] != 3.5 {
 		t.Fatalf("%+v", kept)
+	}
+}
+
+// #4525: an estimate kept before the cycle time and landsAt were added gets them the next time
+// the backfill runs, from the same history, so its median dollars does not change.
+func TestKeepEstimatesBackfillsCycleTimeAndLandsAt(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	issue := func(n int) wire.LineageNode {
+		return wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#" + strconv.Itoa(n)}
+	}
+	str := func(s string) *string { return &s }
+	now := time.Now()
+	state, merged, level := "closed", lineage.OutcomeMerged, "task"
+	labels := []string{"enhancement", "task"}
+	d.workMu.Lock()
+	f := d.costLedgerLocked()
+	for n := 1; n <= 5; n++ {
+		started, ended := wire.DateOf(now.Add(-10*time.Hour)), wire.DateOf(now.Add(-9*time.Hour))
+		c := wire.LineageCostNode{Node: issue(n), Banked: wire.LineageCost{Cost: map[string]float64{"USD": float64(n)}}, Level: &level,
+			StartedAt: &started, Resolved: &wire.LineageResolved{Title: "Done", State: &state, Labels: labels}}
+		pr := wire.LineageCostNode{Node: wire.LineageNode{Kind: "pr", Ref: "github:alexec/agents#" + strconv.Itoa(100+n)},
+			Banked: wire.LineageCost{Cost: map[string]float64{}}, Fixes: []string{c.Node.Ref}, Outcome: &merged, EndedAt: &ended}
+		f.Nodes[costKey(c.Node)], f.Nodes[costKey(pr.Node)] = c, pr
+	}
+	// The target: an old-shape kept estimate, made before #4525, with no cycle time.
+	began := wire.DateOf(now.Add(-time.Hour))
+	target := issue(20)
+	f.Nodes[costKey(target)] = wire.LineageCostNode{Node: target, StartedAt: &began,
+		Resolved: &wire.LineageResolved{Title: "Open", State: str("open"), Labels: labels},
+		Estimate: &wire.LineageEstimateKept{At: began, Matches: 5, MatchedBy: str(lineage.MatchedByLevel), Cost: map[string]float64{"USD": 3}}}
+	d.keepEstimatesLocked()
+	got := d.costLedgerLocked().Nodes[costKey(target)].Estimate
+	d.workMu.Unlock()
+	// The same median as before: the history it was made from has not changed.
+	if got == nil || got.Cost["USD"] != 3 || got.CycleTimeSeconds == nil || got.CycleTimeSeconds.Median != 3600 ||
+		got.LandsAt == nil || got.LandsAt.Median != began+3600 {
+		t.Fatalf("%+v", got)
 	}
 }

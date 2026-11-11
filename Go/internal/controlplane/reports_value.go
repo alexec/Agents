@@ -3,6 +3,7 @@ package controlplane
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"slices"
 	"sort"
 	"strings"
@@ -168,14 +169,14 @@ func mergeNode(have *wire.LineageCostNode, n wire.LineageCostNode) {
 	if n.EndedAt != nil && (have.EndedAt == nil || *n.EndedAt > *have.EndedAt) {
 		have.EndedAt = n.EndedAt
 	}
-	// The first start any machine saw, and the level, feature, area and epic of the copy
-	// that knows them, the newest first (#3562).
+	// The first start any machine saw, and the level, feature and epic of the copy that
+	// knows them, the newest first (#3562).
 	if n.StartedAt != nil && (have.StartedAt == nil || *n.StartedAt < *have.StartedAt) {
 		have.StartedAt = n.StartedAt
 	}
 	newer := n.LastAt > have.LastAt
 	for _, f := range []struct{ have, n **string }{{&have.Level, &n.Level}, {&have.Feature, &n.Feature},
-		{&have.Area, &n.Area}, {&have.Parent, &n.Parent}} {
+		{&have.Parent, &n.Parent}} {
 		if *f.n != nil && (*f.have == nil || newer) {
 			*f.have = *f.n
 		}
@@ -302,13 +303,19 @@ func valueOf(nodes []wire.LineageCostNode, since wire.Date) wire.ReportValue {
 	return out
 }
 
+// secondsPerDay converts a span of wire.Date (seconds) to days.
+const secondsPerDay = 24 * 60 * 60
+
 // estimateError is how far the estimates kept at the start of work were from what the issues
 // took (#3561), over the issues closed in the range: those with a merged PR that ended since,
-// that are not open and not an epic. None when no issue had an estimate.
+// that are not open and not an epic. None when no issue had an estimate. coverage (#4525) is
+// how often the kept P10-P90 dollar range held the actual, over the issues whose kept estimate
+// has one; landsAtErrorDays is the median of how many days the kept landing date was off by,
+// over the issues whose kept estimate has one.
 func estimateError(issues []string, byRef map[string]wire.LineageCostNode, issueParts func(string) []wire.LineageCostNode,
 	children map[string][]string, since wire.Date) *wire.ReportEstimateError {
-	var costs, works []float64
-	var n int64
+	var costs, works, landsAtDays []float64
+	var n, checked, covered int64
 	for _, ref := range issues {
 		node, ok := byRef[ref]
 		if !ok || node.Estimate == nil || len(children[ref]) > 0 || (node.Level != nil && *node.Level == "epic") ||
@@ -316,15 +323,15 @@ func estimateError(issues []string, byRef map[string]wire.LineageCostNode, issue
 			continue
 		}
 		actual := wire.LineageCost{Cost: map[string]float64{}}
-		closed := false
+		var merged *wire.Date
 		for _, p := range issueParts(ref) {
 			lineage.AddCost(&actual, p.Banked)
 			if p.Node.Kind == lineage.KindPR && p.Outcome != nil && *p.Outcome == lineage.OutcomeMerged && p.EndedAt != nil &&
-				*p.EndedAt >= since {
-				closed = true
+				(merged == nil || *p.EndedAt > *merged) {
+				merged = p.EndedAt
 			}
 		}
-		if !closed {
+		if merged == nil || *merged < since {
 			continue
 		}
 		n++
@@ -336,11 +343,29 @@ func estimateError(issues []string, byRef map[string]wire.LineageCostNode, issue
 				works = append(works, v)
 			}
 		}
+		if p10, ok := node.Estimate.CostP10["USD"]; ok {
+			if p90, ok := node.Estimate.CostP90["USD"]; ok {
+				if a, ok := actual.Cost["USD"]; ok {
+					checked++
+					if a >= p10 && a <= p90 {
+						covered++
+					}
+				}
+			}
+		}
+		if node.Estimate.LandsAt != nil {
+			landsAtDays = append(landsAtDays, math.Abs(float64(*merged-node.Estimate.LandsAt.Median))/secondsPerDay)
+		}
 	}
 	if n == 0 {
 		return nil
 	}
-	return &wire.ReportEstimateError{Issues: n, Cost: median(costs), WorkingSeconds: median(works)}
+	out := &wire.ReportEstimateError{Issues: n, Cost: median(costs), WorkingSeconds: median(works), LandsAtErrorDays: median(landsAtDays)}
+	if checked > 0 {
+		c := float64(covered) / float64(checked)
+		out.Coverage = &c
+	}
+	return out
 }
 
 // median is the middle of values, or none when there are none.

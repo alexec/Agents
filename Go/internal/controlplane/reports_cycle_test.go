@@ -1,6 +1,7 @@
 package controlplane
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -22,7 +23,7 @@ func TestCycleTimeFromStartToMerge(t *testing.T) {
 	epic.Level, epic.Feature = str("epic"), str("estimates")
 	epic.StartedAt = at(1 * time.Hour)
 	story := node("issue", "github:o/r#2")
-	story.Level, story.Area, story.Parent = str("story"), str("lineage"), str(epic.Node.Ref)
+	story.Level, story.Parent = str("story"), str(epic.Node.Ref)
 	story.FirstAt, story.StartedAt = at(20*time.Hour), at(10*time.Hour)
 	pr := node("pr", "github:o/r#3")
 	pr.Fixes, pr.Outcome, pr.EndedAt, pr.StartedAt = []string{story.Node.Ref}, str("merged"), at(2*time.Hour), at(9*time.Hour)
@@ -76,7 +77,7 @@ func TestCycleTimeFromStartToMerge(t *testing.T) {
 	}
 	s, e := rows[story.Node.Ref], rows[epic.Node.Ref]
 	if s.CycleTimeSeconds == nil || *s.CycleTimeSeconds != hours(8) || s.StartedAt == nil || *s.StartedAt != *story.StartedAt ||
-		s.Level == nil || *s.Level != "story" || s.Area == nil || *s.Area != "lineage" {
+		s.Level == nil || *s.Level != "story" {
 		t.Fatalf("story row %+v", s)
 	}
 	if e.CycleTimeSeconds == nil || *e.CycleTimeSeconds != hours(8) || e.StartedAt == nil || *e.StartedAt != *story.StartedAt ||
@@ -87,17 +88,26 @@ func TestCycleTimeFromStartToMerge(t *testing.T) {
 
 // #3561: Reports ▸ Value says how far the estimates kept at the start of work were from what
 // the issues closed in the range took: the median of how many times too high or too low.
-// An issue with no estimate, still open, or closed before the range is not counted.
+// An issue with no estimate, still open, or closed before the range is not counted. #4525:
+// it also says how often the kept P10-P90 dollar range held the actual, and the median days
+// the kept landing date was off by, over the issues whose kept estimate has those figures.
 func TestValueSaysTheEstimateError(t *testing.T) {
 	str := func(s string) *string { return &s }
 	date := func(d wire.Date) *wire.Date { return &d }
 	work := func(v float64) *float64 { return &v }
-	issue := func(n string, est, actual float64, kept bool, state string) wire.LineageCostNode {
+	issue := func(n string, est, actual float64, kept bool, state string, landsAt *wire.Date, p10, p90 *float64) wire.LineageCostNode {
 		c := wire.LineageCostNode{Node: wire.LineageNode{Kind: "issue", Ref: "github:o/r#" + n},
 			Banked: wire.LineageCost{Cost: map[string]float64{"USD": actual}, WorkingSeconds: actual * 60}, LastAt: 500,
 			Resolved: &wire.LineageResolved{Title: n, State: str(state)}}
 		if kept {
-			c.Estimate = &wire.LineageEstimateKept{At: 100, Matches: 5, Cost: map[string]float64{"USD": est}, WorkingSeconds: work(est * 60)}
+			e := &wire.LineageEstimateKept{At: 100, Matches: 5, Cost: map[string]float64{"USD": est}, WorkingSeconds: work(est * 60)}
+			if p10 != nil && p90 != nil {
+				e.CostP10, e.CostP90 = map[string]float64{"USD": *p10}, map[string]float64{"USD": *p90}
+			}
+			if landsAt != nil {
+				e.LandsAt = &wire.LineageEstimateDates{Median: *landsAt}
+			}
+			c.Estimate = e
 		}
 		return c
 	}
@@ -107,18 +117,31 @@ func TestValueSaysTheEstimateError(t *testing.T) {
 			Outcome: str("merged"), EndedAt: date(ended), LastAt: ended}
 	}
 	v := valueOf([]wire.LineageCostNode{
-		issue("1", 2, 4, true, "closed"), pr("11", "1", 500), // x2
-		issue("2", 3, 3, true, "closed"), pr("12", "2", 500), // x1
-		issue("3", 6, 2, true, "closed"), pr("13", "3", 500), // x3
-		issue("4", 1, 50, false, "closed"), pr("14", "4", 500),
-		issue("5", 1, 50, true, "open"), pr("15", "5", 500),
-		issue("6", 1, 50, true, "closed"), pr("16", "6", 100),
+		// Off by x2, 2 days late, out of its $1-$3 range (not covered).
+		issue("1", 2, 4, true, "closed", date(500-2*secondsPerDay), f(1), f(3)), pr("11", "1", 500),
+		// Off by x1, on time, inside its $2-$5 range (covered).
+		issue("2", 3, 3, true, "closed", date(500), f(2), f(5)), pr("12", "2", 500),
+		// Off by x3, 1 day late, inside its $1-$10 range (covered).
+		issue("3", 6, 2, true, "closed", date(500-secondsPerDay), f(1), f(10)), pr("13", "3", 500),
+		issue("4", 1, 50, false, "closed", nil, nil, nil), pr("14", "4", 500),
+		issue("5", 1, 50, true, "open", nil, nil, nil), pr("15", "5", 500),
+		issue("6", 1, 50, true, "closed", nil, nil, nil), pr("16", "6", 100),
 	}, 400)
 	e := v.EstimateError
 	if e == nil || e.Issues != 3 || *e.Cost != 2 || *e.WorkingSeconds != 2 {
 		t.Fatalf("%+v", e)
 	}
+	// 2 of the 3 held the actual (issue 1 did not).
+	if e.Coverage == nil || math.Abs(*e.Coverage-2.0/3.0) > 1e-9 {
+		t.Fatalf("coverage %+v", e)
+	}
+	// Off by 2, 0 and 1 days: the median is 1.
+	if e.LandsAtErrorDays == nil || *e.LandsAtErrorDays != 1 {
+		t.Fatalf("landsAtErrorDays %+v", e)
+	}
 	if v := valueOf(nil, 0); v.EstimateError != nil {
 		t.Fatalf("%+v", v.EstimateError)
 	}
 }
+
+func f(v float64) *float64 { return &v }

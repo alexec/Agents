@@ -5638,9 +5638,6 @@ type LineageCostNode struct {
 	// An issue's feature: the name of its feature:<name> label (#3562).
 	Feature *string `json:"feature,omitzero"`
 
-	// An issue's area: the name of its area:<name> label (#3562).
-	Area *string `json:"area,omitzero"`
-
 	// An issue's epic, by ref, as the forge's plan says it (#3562).
 	Parent *string `json:"parent,omitzero"`
 
@@ -5764,7 +5761,7 @@ type LineageEstimateDates struct {
 	P90 Date `json:"p90"`
 }
 
-// An estimate as it was when work started (#3561): the medians of lineage/estimate's figures, made from the closed issues that had merged before the start, so it can be set against what the work took when it closes.
+// An estimate as it was when work started (#3561): lineage/estimate's figures, made from the closed issues that had merged before the start, so it can be set against what the work took when it closes. Dollars, output tokens and working seconds keep the median, and (#4525) the P10 and P90 beside it; the cycle time and the landing date keep the median and the P10 to P90 range, so Reports ▸ Value can say how often the range held the actual.
 type LineageEstimateKept struct {
 	// The start of work it was made for: the history is the issues merged before it.
 	At Date `json:"at"`
@@ -5778,11 +5775,35 @@ type LineageEstimateKept struct {
 	// Dollars, by currency: the median.
 	Cost map[string]float64 `json:"cost,omitzero"`
 
+	// Dollars, by currency: P10 (#4525).
+	CostP10 map[string]float64 `json:"costP10,omitzero"`
+
+	// Dollars, by currency: P90 (#4525).
+	CostP90 map[string]float64 `json:"costP90,omitzero"`
+
 	// The median.
 	OutputTokens *float64 `json:"outputTokens,omitzero"`
 
+	// P10 (#4525).
+	OutputTokensP10 *float64 `json:"outputTokensP10,omitzero"`
+
+	// P90 (#4525).
+	OutputTokensP90 *float64 `json:"outputTokensP90,omitzero"`
+
 	// The agents' time at work: the median.
 	WorkingSeconds *float64 `json:"workingSeconds,omitzero"`
+
+	// The agents' time at work: P10 (#4525).
+	WorkingSecondsP10 *float64 `json:"workingSecondsP10,omitzero"`
+
+	// The agents' time at work: P90 (#4525).
+	WorkingSecondsP90 *float64 `json:"workingSecondsP90,omitzero"`
+
+	// From the start of work to the last PR merged (#4525).
+	CycleTimeSeconds *LineageEstimateRange `json:"cycleTimeSeconds,omitzero"`
+
+	// When it was expected to land (#4525).
+	LandsAt *LineageEstimateDates `json:"landsAt,omitzero"`
 }
 
 // A figure's estimate (#3559): the median and the P10 to P90 range.
@@ -10568,7 +10589,7 @@ type ReportCounts struct {
 	WorkflowFailures int64 `json:"workflowFailures"`
 }
 
-// How far the estimates were from the actual figures (#3561), over the issues closed in the range that had an estimate when their work started: the median of max(estimate/actual, actual/estimate), so 1.5 means 1.5 times too high or too low. A figure is absent when no issue had it.
+// How far the estimates were from the actual figures (#3561), over the issues closed in the range that had an estimate when their work started: the median of max(estimate/actual, actual/estimate), so 1.5 means 1.5 times too high or too low. A figure is absent when no issue had it. coverage and landsAtErrorDays (#4525) check the claims the kept estimate made: how often its P10-P90 dollar range held the actual, and how many days its landing date was off by, the median over the same issues.
 type ReportEstimateError struct {
 	// The closed issues with an estimate.
 	Issues int64 `json:"issues"`
@@ -10578,6 +10599,12 @@ type ReportEstimateError struct {
 
 	// In the agents' time at work.
 	WorkingSeconds *float64 `json:"workingSeconds,omitzero"`
+
+	// How often the kept estimate's P10 to P90 dollar range held the actual, 0 to 1; it should be about 0.8 (#4525).
+	Coverage *float64 `json:"coverage,omitzero"`
+
+	// The median of how many days the kept landing date was off by (#4525).
+	LandsAtErrorDays *float64 `json:"landsAtErrorDays,omitzero"`
 }
 
 // reports/export's answer (#1811): the rows as CSV or JSON lines.
@@ -10619,8 +10646,6 @@ type ReportNode struct {
 	Level *string `json:"level,omitzero"`
 
 	Feature *string `json:"feature,omitzero"`
-
-	Area *string `json:"area,omitzero"`
 
 	// A PR's end, as LineageCostNode's; absent while open.
 	Outcome *string `json:"outcome,omitzero"`

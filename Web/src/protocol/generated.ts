@@ -4990,8 +4990,6 @@ export interface LineageCostNode {
   level?: string;
   /** An issue's feature: the name of its feature:<name> label (#3562). */
   feature?: string;
-  /** An issue's area: the name of its area:<name> label (#3562). */
-  area?: string;
   /** An issue's epic, by ref, as the forge's plan says it (#3562). */
   parent?: string;
   /** When a PR ended (#2351): merged, closed or reverted. Absent while open. */
@@ -5121,9 +5119,11 @@ export interface LineageEstimateDates {
 }
 
 /**
- * An estimate as it was when work started (#3561): the medians of lineage/estimate's figures, made
- * from the closed issues that had merged before the start, so it can be set against what the work
- * took when it closes.
+ * An estimate as it was when work started (#3561): lineage/estimate's figures, made from the closed
+ * issues that had merged before the start, so it can be set against what the work took when it
+ * closes. Dollars, output tokens and working seconds keep the median, and (#4525) the P10 and P90
+ * beside it; the cycle time and the landing date keep the median and the P10 to P90 range, so
+ * Reports ▸ Value can say how often the range held the actual.
  */
 export interface LineageEstimateKept {
   /** The start of work it was made for: the history is the issues merged before it. */
@@ -5137,10 +5137,26 @@ export interface LineageEstimateKept {
   matches: number;
   /** Dollars, by currency: the median. */
   cost?: Record<string, number>;
+  /** Dollars, by currency: P10 (#4525). */
+  costP10?: Record<string, number>;
+  /** Dollars, by currency: P90 (#4525). */
+  costP90?: Record<string, number>;
   /** The median. */
   outputTokens?: number;
+  /** P10 (#4525). */
+  outputTokensP10?: number;
+  /** P90 (#4525). */
+  outputTokensP90?: number;
   /** The agents' time at work: the median. */
   workingSeconds?: number;
+  /** The agents' time at work: P10 (#4525). */
+  workingSecondsP10?: number;
+  /** The agents' time at work: P90 (#4525). */
+  workingSecondsP90?: number;
+  /** From the start of work to the last PR merged (#4525). */
+  cycleTimeSeconds?: LineageEstimateRange;
+  /** When it was expected to land (#4525). */
+  landsAt?: LineageEstimateDates;
 }
 
 /** A figure's estimate (#3559): the median and the P10 to P90 range. */
@@ -9582,7 +9598,9 @@ export interface ReportCounts {
  * How far the estimates were from the actual figures (#3561), over the issues closed in the range
  * that had an estimate when their work started: the median of max(estimate/actual,
  * actual/estimate), so 1.5 means 1.5 times too high or too low. A figure is absent when no issue
- * had it.
+ * had it. coverage and landsAtErrorDays (#4525) check the claims the kept estimate made: how often
+ * its P10-P90 dollar range held the actual, and how many days its landing date was off by, the
+ * median over the same issues.
  */
 export interface ReportEstimateError {
   /** The closed issues with an estimate. */
@@ -9591,6 +9609,13 @@ export interface ReportEstimateError {
   cost?: number;
   /** In the agents' time at work. */
   workingSeconds?: number;
+  /**
+   * How often the kept estimate's P10 to P90 dollar range held the actual, 0 to 1; it should be
+   * about 0.8 (#4525).
+   */
+  coverage?: number;
+  /** The median of how many days the kept landing date was off by (#4525). */
+  landsAtErrorDays?: number;
 }
 
 /** reports/export's answer (#1811): the rows as CSV or JSON lines. */
@@ -9630,7 +9655,6 @@ export interface ReportNode {
   /** An issue's level, as LineageCostNode's (#3562). */
   level?: string;
   feature?: string;
-  area?: string;
   /** A PR's end, as LineageCostNode's; absent while open. */
   outcome?: string;
   /** The last change to it or any of its parts. */
@@ -14784,12 +14808,12 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Levels: { required: [], optional: ["model", "permission", "permissionRequests"] },
   LineMember: { required: ["agentID", "askedAt", "isCallOpen"], optional: [] },
   LineageCost: { required: ["cost", "inputTokens", "outputTokens", "turns", "workingSeconds", "waitingSeconds"], optional: ["limitTokens"] },
-  LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["repo", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "startedAt", "level", "feature", "area", "parent", "endedAt", "resolved", "sessions", "estimate", "forecast"] },
+  LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["repo", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "startedAt", "level", "feature", "parent", "endedAt", "resolved", "sessions", "estimate", "forecast"] },
   LineageCostRollup: { required: ["node", "own", "total", "waste", "unlinked", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "parts"], optional: ["limited"] },
   LineageEndRequest: { required: ["from", "to", "rel"], optional: [] },
   LineageEstimate: { required: ["node", "closedIssues", "matches"], optional: ["type", "level", "step", "matchedBy", "cost", "inputTokens", "outputTokens", "workingSeconds", "leadTimeSeconds", "cycleTimeSeconds", "landsAt", "openChildren", "closedChildren", "spent", "children", "kept", "actual"] },
   LineageEstimateDates: { required: ["median", "p10", "p90"], optional: [] },
-  LineageEstimateKept: { required: ["at", "matches"], optional: ["matchedBy", "cost", "outputTokens", "workingSeconds"] },
+  LineageEstimateKept: { required: ["at", "matches"], optional: ["matchedBy", "cost", "costP10", "costP90", "outputTokens", "outputTokensP10", "outputTokensP90", "workingSeconds", "workingSecondsP10", "workingSecondsP90", "cycleTimeSeconds", "landsAt"] },
   LineageEstimateRange: { required: ["median", "p10", "p90"], optional: [] },
   LineageEstimateRequest: { required: ["node"], optional: ["startAt"] },
   LineageFigures: { required: ["node", "cost", "sessions", "running", "runtimes"], optional: ["leadTimeSeconds", "limited"] },
@@ -15170,9 +15194,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RemoveResourceRequest: { required: ["name"], optional: [] },
   RenameRequest: { required: ["agentID", "title"], optional: [] },
   ReportCounts: { required: ["sessions", "failedSessions", "prsOpened", "prsMerged", "prsReverted", "mergeSeconds", "waits", "waitBuckets", "workflowRuns", "workflowFailures"], optional: [] },
-  ReportEstimateError: { required: ["issues"], optional: ["cost", "workingSeconds"] },
+  ReportEstimateError: { required: ["issues"], optional: ["cost", "workingSeconds", "coverage", "landsAtErrorDays"] },
   ReportExport: { required: ["text", "count", "format"], optional: [] },
-  ReportNode: { required: ["node", "cost", "sessions", "lastAt"], optional: ["repo", "resolved", "leadTimeSeconds", "cycleTimeSeconds", "startedAt", "level", "feature", "area", "outcome"] },
+  ReportNode: { required: ["node", "cost", "sessions", "lastAt"], optional: ["repo", "resolved", "leadTimeSeconds", "cycleTimeSeconds", "startedAt", "level", "feature", "outcome"] },
   ReportNodeCost: { required: ["own", "total", "waste"], optional: [] },
   ReportNodes: { required: ["nodes", "limited", "unresolved"], optional: ["cursor"] },
   ReportNodesQuery: { required: ["kind"], optional: ["state", "repo", "label", "since", "sort", "cursor", "limit", "scope"] },

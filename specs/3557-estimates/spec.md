@@ -147,6 +147,14 @@ Decided: a points rubric, not the Product Owner's judgement of S to XL, because 
 Decided: no backfill of the open issues, because a size set after the work started is not an input at filing, and the folder closes about 50 issues a day, so 100 sized issues close in a few days to two weeks. Alex can overrule.
 Decided: an epic gets no size, because its estimate is the sum of its children's. Alex can overrule.
 
+## Keeping enough to check the claims (#4525)
+
+- **`LineageEstimateKept` keeps the P10 to P90 of each figure beside its median** (as `costP10`/`costP90`, `outputTokensP10`/`outputTokensP90`, `workingSecondsP10`/`workingSecondsP90`, additive fields so a kept estimate already on a Mac does not fail to read back), and the cycle time and `landsAt` as ranges, so "8 in 10 land here" and the landing date can be checked once the issue closes.
+- **The backfill:** an estimate kept before this change has no `cycleTimeSeconds`; `keepEstimatesLocked` (issues) and `keptEpic` (epics) make it again from the same history, so the medians already kept do not change, only the new figures are added. One whose cycle time is still absent after that (too little history) is tried again each time, harmlessly: the result comes back the same, so nothing is marked unsent again.
+- **Reports ▸ Value adds coverage and the landing date's error:** `ReportEstimateError.coverage` is how often the kept P10–P90 dollar range held the actual, over the issues closed in the range whose kept estimate has one; `landsAtErrorDays` is the median of how many days the kept landing date was off by. Both are additive fields on `ReportEstimateError`; a report with no issue to check either from leaves it absent.
+
+Decided: dollars only for coverage, not output tokens or working time too, because the dollar range is the headline figure on the issue's own page and the one line should not grow to one per figure. Alex can overrule.
+
 ## What the backtest does not cover
 
 - **6 days of history.** The store starts on 2026-10-30. These numbers will change as history grows. Story 4 (estimate against actual) keeps track of them.

@@ -33,7 +33,7 @@ steps. They are the limits of this run.
       with the link and five short lines on what a viewer sees, from the scene's `LINES`.
       Write in ASD-STE100. A take that was made but not uploaded (the log says
       `not uploaded`) is a skip: say why in the report.
-   6. **A failed take**: file a bug (label `bug`, `integration`, `area:video`, the open
+   6. **A failed take**: file a bug (label `bug`, `integration`, the open
       milestone) titled `Integration video <id>: <the first error>`, with the last 60
       lines of the log in a fenced block. Read the log first and leave out anything that
       looks like a token. Search for an open issue with the same title first; comment on

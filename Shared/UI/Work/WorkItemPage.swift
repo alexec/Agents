@@ -77,6 +77,8 @@ struct WorkItemPage: View {
                             if let detail, detail.got.item.node.kind == "pr" {
                                 WorkFilesChanged(model: model, host: detail.host, detail: detail.got, compact: true)
                             }
+                            // An epic's Plan before the panel's rows: it is what a person opens an epic for (epic.md note 15).
+                            plan
                             sidePanel(compact: true) { details }
                             main
                             if detail != nil {
@@ -90,7 +92,10 @@ struct WorkItemPage: View {
                         header
                         problemStrip
                         HStack(alignment: .top, spacing: 24) {
-                            VStack(alignment: .leading, spacing: 16) { main }
+                            VStack(alignment: .leading, spacing: 16) {
+                                plan
+                                main
+                            }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             sidePanel(compact: false) {
                                 details
@@ -439,16 +444,18 @@ struct WorkItemPage: View {
 
     // MARK: Main column
 
+    /// An epic's plan (#3268), above the timeline; on a narrow page above the panel's rows too (#4417).
     @ViewBuilder
-    private var main: some View {
-        #if os(macOS)
-        // An epic's plan (#3268): Mac + web, so not on the Remote (#2796).
+    private var plan: some View {
         if let detail, WorkPlan.hasPlan(detail.got.item) {
             WorkPlanSection(model: model, host: detail.host, lineageHost: lineageHost, detail: detail.got, asked: asked,
-                            estimates: estimate?.children ?? [],
+                            estimates: estimate?.children ?? [], compact: compact,
                             writes: writes, wrote: { Task { await reread() } })
         }
-        #endif
+    }
+
+    @ViewBuilder
+    private var main: some View {
         if let detail {
             timeline(detail.got, on: detail.host)
         } else if place.kind.fromForge {

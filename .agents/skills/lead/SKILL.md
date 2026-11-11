@@ -69,15 +69,14 @@ gh api repos/alexec/Agents/issues/<child>/dependencies/blocked_by \
 For each ready child that is open and not taken, in the AGENTS.md order (`priority:high`,
 then UI changes, bugs before features, then the rest):
 
-1. If its `area:` is held by an open PR or a running lane, leave it for later.
-2. Assign it: `gh issue edit <child> --add-assignee alexec`.
-3. Start its lane with `start_session`, with the prompt and labels from
+1. Assign it: `gh issue edit <child> --add-assignee alexec`.
+2. Start its lane with `start_session`, with the prompt and labels from
    `.agents/personas/software-engineer.md`, as the Scrum Master does
    (`.agents/personas/scrum-master.md`, "Starting a lane"): the first line of the prompt
    is `#<child>: <title>`, then a blank line and the persona's instructions. Title
    `#<child>: <title>`, worktree `fix-github-issue-<child>` (a bug) or
    `work-github-issue-<child>` (anything else), no runtime.
-4. If `start_session` refuses (the folder's limits are full), unassign the child and
+3. If `start_session` refuses (the folder's limits are full), unassign the child and
    start no more until a lane ends.
 
 **A spike** can be yours: when its question is small and needs no code (read the code,
@@ -109,7 +108,7 @@ only the keys it has. A wait that names nothing is refused. When you start again
 - **New work that a lane finds** (a follow-up, a missing part, a bug in the epic's work):
   file it as a new child. Look for a duplicate first (`gh issue list --search`). Give it
   its level (`story`, `task`, `spike`, or `bug`), its type label, the epic's `feature:`
-  label, its `area:` label, and the epic's milestone (a bug gets none, unless it blocks
+  label, and the epic's milestone (a bug gets none, unless it blocks
   the milestone's goal). Then add it to the epic and set what it waits for:
 
   ```zsh

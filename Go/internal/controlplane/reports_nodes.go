@@ -278,8 +278,8 @@ func nodeRows(nodes []wire.LineageCostNode, kind string) []wire.ReportNode {
 }
 
 // nodeRow is of's row from its parts; its own node, when a machine sent one, says its own
-// cost, project, title, state and labels, how a PR ended, and an issue's level, feature and
-// area (#3562).
+// cost, project, title, state and labels, how a PR ended, and an issue's level and feature
+// (#3562).
 func nodeRow(of wire.LineageNode, byNode map[wire.LineageNode]wire.LineageCostNode, parts []wire.LineageCostNode) wire.ReportNode {
 	sum, _ := valueRow(of, parts, wire.Date(-math.MaxFloat64))
 	row := wire.ReportNode{Node: of, Cost: wire.ReportNodeCost{Own: wire.LineageCost{Cost: map[string]float64{}},
@@ -288,7 +288,7 @@ func nodeRow(of wire.LineageNode, byNode map[wire.LineageNode]wire.LineageCostNo
 	if own, ok := byNode[of]; ok {
 		lineage.AddCost(&row.Cost.Own, own.Banked)
 		row.Repo, row.Resolved, row.Outcome = own.Repo, own.Resolved, own.Outcome
-		row.Level, row.Feature, row.Area = own.Level, own.Feature, own.Area
+		row.Level, row.Feature = own.Level, own.Feature
 	}
 	if row.Repo == nil {
 		if p := lineage.RepoOf(of); p != "" {
