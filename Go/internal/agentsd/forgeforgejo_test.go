@@ -101,6 +101,16 @@ func (f *fakeForgeForgejo) Merge(_ context.Context, repo string, number int, sha
 	return nil
 }
 
+func (f *fakeForgeForgejo) CancelAutoMerge(_ context.Context, repo string, number int) error {
+	f.note(&f.wrote, fmt.Sprintf("auto-merge off %s#%d", repo, number))
+	return nil
+}
+
+func (f *fakeForgeForgejo) MarkReady(_ context.Context, repo string, number int) error {
+	f.note(&f.wrote, fmt.Sprintf("ready %s#%d", repo, number))
+	return nil
+}
+
 func (f *fakeForgeForgejo) Approve(_ context.Context, repo string, number int, sha string) (string, error) {
 	f.note(&f.wrote, fmt.Sprintf("approve %s#%d %s", repo, number, sha))
 	return "http://localhost:3753/r/1", nil

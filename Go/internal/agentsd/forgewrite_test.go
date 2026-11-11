@@ -46,6 +46,16 @@ func (f *fakeForgeGitHub) MergeBy(_ context.Context, repo string, number int, sh
 	return map[string]any{"url": "https://github.com/" + repo + "/pull/12"}, nil
 }
 
+func (f *fakeForgeGitHub) DisableAutoMerge(_ context.Context, repo string, number int) error {
+	f.note("auto-merge off %s#%d", repo, number)
+	return nil
+}
+
+func (f *fakeForgeGitHub) MarkReady(_ context.Context, repo string, number int) error {
+	f.note("ready %s#%d", repo, number)
+	return nil
+}
+
 func (f *fakeForgeGitHub) ReviewPR(_ context.Context, repo string, number int, sha string, approve bool, _ string) (map[string]any, error) {
 	f.note("review %s#%d %s approve=%v", repo, number, sha, approve)
 	return map[string]any{}, nil
@@ -104,6 +114,16 @@ func (f *fakeForgeGitLab) MergeMethods(context.Context, string) ([]string, error
 
 func (f *fakeForgeGitLab) Merge(_ context.Context, project string, number int, sha string, squash, auto bool) error {
 	f.note("merge %s %d %s squash=%v auto=%v", project, number, sha, squash, auto)
+	return nil
+}
+
+func (f *fakeForgeGitLab) CancelAutoMerge(_ context.Context, project string, number int) error {
+	f.note("auto-merge off %s %d", project, number)
+	return nil
+}
+
+func (f *fakeForgeGitLab) MarkReady(_ context.Context, project string, number int) error {
+	f.note("ready %s %d", project, number)
 	return nil
 }
 
@@ -248,6 +268,54 @@ func TestForgePullWritesGoToGitHub(t *testing.T) {
 	}
 }
 
+// #4410: a pull request's auto-merge turns off and a draft is marked ready, on GitHub; an issue
+// is refused before GitHub is asked, and Bitbucket, which has no auto-merge, says why.
+func TestForgeCancelAutoMergeAndReady(t *testing.T) {
+	_, c, gh, _ := forgeDaemon(t)
+	c.call(t, 1, "forge/cancel-auto-merge", wire.ForgeNodeRequest{Node: ghPull})
+	c.call(t, 2, "forge/ready", wire.ForgeNodeRequest{Node: ghPull})
+	for i, m := range []string{"forge/cancel-auto-merge", "forge/ready"} {
+		if e := c.callError(t, 3+i, m, wire.ForgeNodeRequest{Node: ghIssue}); e == nil || !strings.Contains(e.Message, "not a pull request") {
+			t.Fatalf("%s on an issue: %v", m, e)
+		}
+	}
+	want := []string{"auto-merge off alexec/agents#12", "ready alexec/agents#12"}
+	if got := gh.writes(); !slices.Equal(got, want) {
+		t.Fatalf("writes:\n%q\nwant\n%q", got, want)
+	}
+	var b Forge = bitbucketForge{}
+	if err := b.CancelAutoMerge(context.Background(), forgeRef{}); cannotReason(b, err) != bitbucketNoAutoMerge {
+		t.Fatalf("Bitbucket: %v", err)
+	}
+}
+
+// #4410: the page offers Turn off auto-merge only while it is on, and Ready for review only on a
+// draft, and neither once the pull request is closed.
+func TestForgeItemActionsFollowAutoMergeAndDraft(t *testing.T) {
+	caps := githubForge{}.Caps()
+	for _, tc := range []struct {
+		state       string
+		auto, draft bool
+		want        []wire.ForgeAction
+	}{
+		{"open", true, false, []wire.ForgeAction{wire.ForgeActionCancelAutoMerge}},
+		{"open", false, true, []wire.ForgeAction{wire.ForgeActionReady}},
+		{"open", false, false, nil},
+		{"closed", true, true, nil},
+	} {
+		d := wire.ForgeItemDetail{Item: wire.ForgeItem{Node: ghPull, State: tc.state, AutoMerge: new(tc.auto), Draft: new(tc.draft)}}
+		var got []wire.ForgeAction
+		for _, a := range caps.itemActions(d) {
+			if a == wire.ForgeActionCancelAutoMerge || a == wire.ForgeActionReady {
+				got = append(got, a)
+			}
+		}
+		if !slices.Equal(got, tc.want) {
+			t.Errorf("%s auto=%v draft=%v: %v, want %v", tc.state, tc.auto, tc.draft, got, tc.want)
+		}
+	}
+}
+
 // #3130: a write says what is wrong with it, and asks the forge nothing: an empty comment, no
 // label, a merge with no head, a pull request's action on an issue, a forge it does not know.
 func TestForgeWritesRefuseWhatIsWrong(t *testing.T) {
@@ -277,7 +345,7 @@ func TestForgeWritesRefuseWhatIsWrong(t *testing.T) {
 
 // #3130: an agent's connection may call none of the writes: a person writes, from their own page.
 func TestForgeWritesAreNotAnAgents(t *testing.T) {
-	for _, m := range []string{"forge/comment", "forge/label", "forge/assign", "forge/close", "forge/merge", "forge/approve", "forge/rerun"} {
+	for _, m := range []string{"forge/comment", "forge/label", "forge/assign", "forge/close", "forge/merge", "forge/cancel-auto-merge", "forge/ready", "forge/approve", "forge/rerun"} {
 		if RoleAgent.Allows(m) {
 			t.Fatalf("an agent may call %s", m)
 		}

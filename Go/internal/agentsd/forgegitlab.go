@@ -35,7 +35,7 @@ func (gitlabForge) Caps() forgeCaps {
 		Issues: true, PRs: true,
 		Issue: forgeActions{Comment: true, Label: true, Assign: true, Close: true, Reopen: true},
 		PR: forgeActions{Comment: true, Label: true, Assign: true, Close: true, Reopen: true, Merge: true, AutoMerge: true, Approve: true,
-			Rerun: true, Log: true, Diff: true},
+			Rerun: true, Log: true, Diff: true, CancelAutoMerge: true, Ready: true},
 		LabelColors: true,
 		Avatars:     true,
 		CreatedAt:   true, ClosedAt: true,
@@ -352,6 +352,28 @@ func (g gitlabForge) Merge(ctx context.Context, r forgeRef, sha, how string, aut
 		return wire.ForgeDone{}, err
 	}
 	return wire.ForgeDone{Auto: optionalTrue(auto)}, nil
+}
+
+func (g gitlabForge) CancelAutoMerge(ctx context.Context, r forgeRef) error {
+	if !r.pr() {
+		return cannot(actionCancelAuto)
+	}
+	gl, project, _, err := g.of(ctx, "forge/cancel-auto-merge", r)
+	if err != nil {
+		return err
+	}
+	return gl.CancelAutoMerge(ctx, project, r.Number)
+}
+
+func (g gitlabForge) Ready(ctx context.Context, r forgeRef) error {
+	if !r.pr() {
+		return cannot(actionReady)
+	}
+	gl, project, _, err := g.of(ctx, "forge/ready", r)
+	if err != nil {
+		return err
+	}
+	return gl.MarkReady(ctx, project, r.Number)
 }
 
 func (g gitlabForge) Approve(ctx context.Context, r forgeRef, sha string) (wire.ForgeDone, error) {

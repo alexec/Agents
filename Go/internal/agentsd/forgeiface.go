@@ -59,6 +59,10 @@ type Forge interface {
 	SetAssignees(ctx context.Context, r forgeRef, add, remove []string) error
 	SetState(ctx context.Context, r forgeRef, closed bool, transition string) error
 	Merge(ctx context.Context, r forgeRef, sha, method string, auto bool) (wire.ForgeDone, error)
+	// CancelAutoMerge turns off a pull request's auto-merge, and Ready marks a draft ready for
+	// review (#4410).
+	CancelAutoMerge(ctx context.Context, r forgeRef) error
+	Ready(ctx context.Context, r forgeRef) error
 	Approve(ctx context.Context, r forgeRef, sha string) (wire.ForgeDone, error)
 	Rerun(ctx context.Context, r forgeRef) (wire.ForgeDone, error)
 	AddChild(ctx context.Context, epic forgeRef, child forgeChild) (wire.ForgeDone, error)
@@ -95,6 +99,8 @@ type forgeCaps struct {
 // forgeActions are the writes a forge allows on one kind of item.
 type forgeActions struct {
 	Comment, Label, Assign, Close, Reopen, Transition, Merge, AutoMerge, Approve, Rerun, Log, Diff bool
+	// CancelAutoMerge turns auto-merge off; Ready marks a draft ready for review (#4410).
+	CancelAutoMerge, Ready bool
 }
 
 // The actions' names, as forgeCaps.Reasons and errForgeCannot name them.
@@ -107,6 +113,8 @@ const (
 	actionTransition = "transition"
 	actionMerge      = "merge"
 	actionAutoMerge  = "autoMerge"
+	actionCancelAuto = "cancelAutoMerge"
+	actionReady      = "ready"
 	actionApprove    = "approve"
 	actionRerun      = "rerun"
 	actionLog        = "log"
@@ -121,7 +129,7 @@ const (
 func (a forgeActions) on(action string) bool {
 	return map[string]bool{actionComment: a.Comment, actionLabel: a.Label, actionAssign: a.Assign, actionClose: a.Close, actionReopen: a.Reopen,
 		actionTransition: a.Transition, actionMerge: a.Merge, actionAutoMerge: a.AutoMerge, actionApprove: a.Approve,
-		actionRerun: a.Rerun, actionLog: a.Log, actionDiff: a.Diff}[action]
+		actionRerun: a.Rerun, actionLog: a.Log, actionDiff: a.Diff, actionCancelAuto: a.CancelAutoMerge, actionReady: a.Ready}[action]
 }
 
 // wire is the capabilities of the forge called name as ForgeList.forges says them (#4361).
@@ -146,7 +154,8 @@ func (c forgeCaps) wire(name string) wire.ForgeCapabilities {
 // itemActions are what the page of item allows now (#4361), from c and the item's state: only an
 // open item closes, merges, auto-merges, is approved or runs its checks again, and only a closed
 // one reopens (a merged pull request does not). A transition needs a move that the workflow
-// allows now; a plan's writes are an issue's.
+// allows now; a plan's writes are an issue's. Auto-merge turns off only while it is on, and only a
+// draft is marked ready (#4410).
 func (c forgeCaps) itemActions(d wire.ForgeItemDetail) []wire.ForgeAction {
 	i := d.Item
 	a := c.Issue
@@ -172,6 +181,8 @@ func (c forgeCaps) itemActions(d wire.ForgeItemDetail) []wire.ForgeAction {
 		{wire.ForgeActionRerun, a.Rerun && open},
 		{wire.ForgeActionLog, a.Log},
 		{wire.ForgeActionDiff, a.Diff},
+		{wire.ForgeActionCancelAutoMerge, a.CancelAutoMerge && open && i.AutoMerge != nil && *i.AutoMerge},
+		{wire.ForgeActionReady, a.Ready && open && i.Draft != nil && *i.Draft},
 		{wire.ForgeActionAddChild, c.AddChild && issue},
 		{wire.ForgeActionBlockedBy, c.BlockedBy && issue},
 	} {
@@ -271,6 +282,12 @@ func (forgeNone) SetState(_ context.Context, _ forgeRef, closed bool, transition
 }
 func (forgeNone) Merge(context.Context, forgeRef, string, string, bool) (wire.ForgeDone, error) {
 	return wire.ForgeDone{}, cannot(actionMerge)
+}
+func (forgeNone) CancelAutoMerge(context.Context, forgeRef) error {
+	return cannot(actionCancelAuto)
+}
+func (forgeNone) Ready(context.Context, forgeRef) error {
+	return cannot(actionReady)
 }
 func (forgeNone) Approve(context.Context, forgeRef, string) (wire.ForgeDone, error) {
 	return wire.ForgeDone{}, cannot(actionApprove)

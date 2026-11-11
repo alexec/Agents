@@ -40,3 +40,42 @@ func TestSetAssignees(t *testing.T) {
 		t.Fatalf("assignees %v, want [kim sam]", patched)
 	}
 }
+
+// #4410: auto-merge is cancelled by DELETE on the merge; a draft's WIP marks leave its title.
+func TestCancelAutoMergeAndMarkReady(t *testing.T) {
+	var asked, titles []string
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		asked = append(asked, r.Method+" "+r.URL.Path)
+		switch {
+		case r.URL.Path == "/api/v1/repos/walkalex/app/pulls/3" && r.Method == http.MethodGet:
+			_, _ = io.WriteString(w, `{"number": 3, "title": "WIP: [wip] Fix it"}`)
+		case r.URL.Path == "/api/v1/repos/walkalex/app/pulls/3" && r.Method == http.MethodPatch:
+			var body struct {
+				Title string `json:"title"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			titles = append(titles, body.Title)
+			_, _ = io.WriteString(w, `{}`)
+		default:
+			w.WriteHeader(http.StatusNoContent)
+		}
+	}))
+	t.Cleanup(s.Close)
+	f := NewRealForgejo(s.URL, func() string { return token }, nil)
+	ctx := context.Background()
+	if err := f.CancelAutoMerge(ctx, "walkalex/app", 3); err != nil {
+		t.Fatal(err)
+	}
+	if asked[0] != "DELETE /api/v1/repos/walkalex/app/pulls/3/merge" {
+		t.Fatalf("cancel: %q", asked)
+	}
+	if err := f.MarkReady(ctx, "walkalex/app", 3); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(titles, []string{"Fix it"}) {
+		t.Fatalf("titles %q, want [Fix it]", titles)
+	}
+	if got := readyTitle("Fix it"); got != "Fix it" {
+		t.Fatalf("readyTitle of a title with no mark: %q", got)
+	}
+}

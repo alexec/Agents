@@ -199,6 +199,8 @@ func (azureBoardsForge) Caps() forgeCaps {
 			actionReleases: "Azure Boards has no releases: it is a tracker, with no repositories",
 			actionMerge:     boardsNoPRs,
 			actionAutoMerge: boardsNoPRs,
+			actionCancelAuto: boardsNoPRs,
+			actionReady: boardsNoPRs,
 			actionApprove:   boardsNoPRs,
 			actionRerun:     boardsNoPRs,
 			actionLog:       boardsNoPRs,

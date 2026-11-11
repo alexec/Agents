@@ -31,7 +31,7 @@ func (githubForge) Caps() forgeCaps {
 		Issues: true, PRs: true,
 		Issue: forgeActions{Comment: true, Label: true, Assign: true, Close: true, Reopen: true},
 		PR: forgeActions{Comment: true, Label: true, Assign: true, Close: true, Reopen: true, Merge: true, AutoMerge: true, Approve: true,
-			Rerun: true, Log: true, Diff: true},
+			Rerun: true, Log: true, Diff: true, CancelAutoMerge: true, Ready: true},
 		LabelColors: true,
 		Avatars:     true,
 		StateReason: true,
@@ -374,6 +374,28 @@ func (g githubForge) Merge(ctx context.Context, r forgeRef, sha, method string, 
 	}
 	url, _ := out["url"].(string)
 	return wire.ForgeDone{URL: optional(url), Auto: optionalTrue(auto)}, nil
+}
+
+func (g githubForge) CancelAutoMerge(ctx context.Context, r forgeRef) error {
+	if !r.pr() {
+		return cannot(actionCancelAuto)
+	}
+	gh, err := g.d.forgeGitHub()
+	if err != nil {
+		return err
+	}
+	return gh.DisableAutoMerge(ctx, r.Repo, r.Number)
+}
+
+func (g githubForge) Ready(ctx context.Context, r forgeRef) error {
+	if !r.pr() {
+		return cannot(actionReady)
+	}
+	gh, err := g.d.forgeGitHub()
+	if err != nil {
+		return err
+	}
+	return gh.MarkReady(ctx, r.Repo, r.Number)
 }
 
 func (g githubForge) Approve(ctx context.Context, r forgeRef, sha string) (wire.ForgeDone, error) {

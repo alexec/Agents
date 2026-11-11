@@ -844,6 +844,8 @@ func conformActions(f Forge, r forgeRef) map[string]func(context.Context) error 
 		actionMerge:     func(ctx context.Context) error { _, err := f.Merge(ctx, r, "abc", "", false); return err },
 		actionAutoMerge: func(ctx context.Context) error { _, err := f.Merge(ctx, r, "abc", "", true); return err },
 		actionApprove:   func(ctx context.Context) error { _, err := f.Approve(ctx, r, "abc"); return err },
+		actionCancelAuto: func(ctx context.Context) error { return f.CancelAutoMerge(ctx, r) },
+		actionReady:      func(ctx context.Context) error { return f.Ready(ctx, r) },
 		actionRerun:     func(ctx context.Context) error { _, err := f.Rerun(ctx, r); return err },
 		actionLog:       func(ctx context.Context) error { _, err := f.Log(ctx, r, ""); return err },
 		actionDiff:      func(ctx context.Context) error { _, err := f.Diff(ctx, r); return err },

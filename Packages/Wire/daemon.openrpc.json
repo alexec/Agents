@@ -4639,6 +4639,32 @@
       }
     },
     {
+      "name": "forge/cancel-auto-merge",
+      "description": "Turn off a pull request's auto-merge (#4410): it no longer merges on its own when its checks pass. Offered where the page's actions has cancelAutoMerge: an open pull request with autoMerge on.",
+      "x-capability": "forge.cancel-auto-merge/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ForgeNodeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ForgeDone"
+        }
+      }
+    },
+    {
       "name": "forge/close",
       "x-capability": "forge-write/1",
       "tags": [
@@ -4985,6 +5011,32 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/ForgeList"
+        }
+      }
+    },
+    {
+      "name": "forge/ready",
+      "description": "Mark a draft pull request ready for review (#4410). Offered where the page's actions has ready: an open pull request that is a draft.",
+      "x-capability": "forge.ready/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ForgeNodeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ForgeDone"
         }
       }
     },

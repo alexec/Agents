@@ -169,6 +169,21 @@ func (f *RealAzureDevOps) Merge(ctx context.Context, repo string, number int, sh
 	return f.send(ctx, http.MethodPatch, api(fmt.Sprintf("%s/pullrequests/%d", repoPath(repo), number), nil), body, nil)
 }
 
+// noOne is the id that clears a pull request's autoCompleteSetBy.
+const noOne = "00000000-0000-0000-0000-000000000000"
+
+// CancelAutoMerge turns off a pull request's auto-complete (#4410).
+func (f *RealAzureDevOps) CancelAutoMerge(ctx context.Context, repo string, number int) error {
+	return f.send(ctx, http.MethodPatch, api(fmt.Sprintf("%s/pullrequests/%d", repoPath(repo), number), nil),
+		map[string]any{"autoCompleteSetBy": map[string]any{"id": noOne}}, nil)
+}
+
+// MarkReady publishes a draft pull request: it is ready for review (#4410).
+func (f *RealAzureDevOps) MarkReady(ctx context.Context, repo string, number int) error {
+	return f.send(ctx, http.MethodPatch, api(fmt.Sprintf("%s/pullrequests/%d", repoPath(repo), number), nil),
+		map[string]any{"isDraft": false}, nil)
+}
+
 // Approve votes approved on a pull request at the head commit sha, and says its link.
 func (f *RealAzureDevOps) Approve(ctx context.Context, repo string, number int, sha string) (string, error) {
 	if _, err := f.atHead(ctx, repo, number, sha); err != nil {

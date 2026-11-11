@@ -69,7 +69,9 @@ public enum Capability {
     public static let forgeWrite1 = "forge-write/1"
     public static let forgeAssign1 = "forge.assign/1"
     public static let forgeBoards1 = "forge.boards/1"
+    public static let forgeCancelAutoMerge1 = "forge.cancel-auto-merge/1"
     public static let forgeImage1 = "forge.image/1"
+    public static let forgeReady1 = "forge.ready/1"
     public static let forgeReleases1 = "forge.releases/1"
     public static let forge1 = "forge/1"
     public static let git1 = "git/1"
@@ -374,6 +376,7 @@ public enum Capability {
         "forge/assign": "forge.assign/1",
         "forge/blocked-by": "forge-write/1",
         "forge/boards": "forge.boards/1",
+        "forge/cancel-auto-merge": "forge.cancel-auto-merge/1",
         "forge/close": "forge-write/1",
         "forge/comment": "forge-write/1",
         "forge/diff": "forge-write/1",
@@ -388,6 +391,7 @@ public enum Capability {
         "forge/plan": "forge/1",
         "forge/pull": "forge/1",
         "forge/pulls": "forge/1",
+        "forge/ready": "forge.ready/1",
         "forge/release": "forge.releases/1",
         "forge/releases": "forge.releases/1",
         "forge/rerun": "forge-write/1",

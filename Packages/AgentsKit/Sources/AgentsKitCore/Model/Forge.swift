@@ -297,8 +297,8 @@ public extension DaemonAPI {
     /// the default first (#3130); an issue's `start` is its new-agent form, and `transitions` the
     /// moves its workflow allows (Jira, #3260), in place of Close and Reopen. `actions` are what
     /// the page offers now, by name (comment, label, close, reopen, transition, merge, autoMerge,
-    /// approve, rerun, log, diff, addChild, blockedBy; #4361), as strings so a later daemon's new
-    /// one does not break this decoder; nil from an earlier daemon. On an issue's read, where the
+    /// approve, rerun, log, diff, addChild, blockedBy, assign, cancelAutoMerge, ready; #4361), as
+    /// strings so a later daemon's new one does not break this decoder; nil from an earlier daemon. On an issue's read, where the
     /// forge says them (#4373): `children` are its sub-issues, `linkedPulls` the pull requests that
     /// close it, and `events` its timeline, oldest first; nil where the forge gives none.
     struct ForgeItemDetail: Codable, Sendable, Hashable {
@@ -794,6 +794,10 @@ public extension DaemonAPI.Method {
     static let forgeMerge = "forge/merge"
     static let forgeApprove = "forge/approve"
     static let forgeRerun = "forge/rerun"
+    /// `ForgeNodeRequest` → `ForgeDone` (#4410): turn off a pull request's auto-merge, and mark
+    /// a draft ready for review. Offered where the page's `actions` has `cancelAutoMerge`, `ready`.
+    static let forgeCancelAutoMerge = "forge/cancel-auto-merge"
+    static let forgeReady = "forge/ready"
     /// `ForgeNodeRequest` → `ForgeLabels`, `ForgeLogRequest` → `ForgeLog`, `ForgeNodeRequest` → `ForgeDiff` (#3130).
     static let forgeLabels = "forge/labels"
     /// `ForgeAssignRequest` → `ForgeDone` (#4403).

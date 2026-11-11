@@ -36,6 +36,9 @@ type forgeForgejo interface {
 	RepoLabels(ctx context.Context, repo string) ([]string, map[string]string, error)
 	MergeMethods(ctx context.Context, repo string) ([]string, error)
 	Merge(ctx context.Context, repo string, number int, sha, method string, auto bool) error
+	// The pull request page's Auto-merge row and Draft state (#4410).
+	CancelAutoMerge(ctx context.Context, repo string, number int) error
+	MarkReady(ctx context.Context, repo string, number int) error
 	Approve(ctx context.Context, repo string, number int, sha string) (string, error)
 	PRDiff(ctx context.Context, repo string, number int) (map[string]any, error)
 	// What lineage asks (lineageforgejo.go).
@@ -138,7 +141,7 @@ func (forgejoForge) Caps() forgeCaps {
 		Issues: true, PRs: true,
 		Issue: forgeActions{Comment: true, Label: true, Assign: true, Close: true, Reopen: true},
 		PR: forgeActions{Comment: true, Label: true, Assign: true, Close: true, Reopen: true, Merge: true, AutoMerge: true, Approve: true,
-			Diff: true},
+			Diff: true, CancelAutoMerge: true, Ready: true},
 		LabelColors: true,
 		Avatars:     true,
 		CreatedAt:   true, ClosedAt: true,
@@ -426,6 +429,28 @@ func (g forgejoForge) Merge(ctx context.Context, r forgeRef, sha, how string, au
 		return wire.ForgeDone{}, err
 	}
 	return wire.ForgeDone{Auto: optionalTrue(auto)}, nil
+}
+
+func (g forgejoForge) CancelAutoMerge(ctx context.Context, r forgeRef) error {
+	if !r.pr() {
+		return cannot(actionCancelAuto)
+	}
+	fj, named, _, err := g.of(ctx, "forge/cancel-auto-merge", r)
+	if err != nil {
+		return err
+	}
+	return fj.CancelAutoMerge(ctx, named, r.Number)
+}
+
+func (g forgejoForge) Ready(ctx context.Context, r forgeRef) error {
+	if !r.pr() {
+		return cannot(actionReady)
+	}
+	fj, named, _, err := g.of(ctx, "forge/ready", r)
+	if err != nil {
+		return err
+	}
+	return fj.MarkReady(ctx, named, r.Number)
 }
 
 func (g forgejoForge) Approve(ctx context.Context, r forgeRef, sha string) (wire.ForgeDone, error) {

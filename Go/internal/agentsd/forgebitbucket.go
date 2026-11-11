@@ -39,6 +39,8 @@ type forgeBitbucket interface {
 	RepoLabels(ctx context.Context, repo string) ([]string, error)
 	MergeMethods(ctx context.Context, repo string, number int) ([]string, error)
 	Merge(ctx context.Context, repo string, number int, sha, method string) error
+	// MarkReady marks a draft pull request ready for review (#4410).
+	MarkReady(ctx context.Context, repo string, number int) error
 	Approve(ctx context.Context, repo string, number int, sha string) (string, error)
 	PRDiff(ctx context.Context, repo string, number int) (map[string]any, error)
 	RetryPipeline(ctx context.Context, repo string, run int) (map[string]any, error)
@@ -131,7 +133,7 @@ func (bitbucketForge) Caps() forgeCaps {
 	return forgeCaps{
 		Issues: true, PRs: true,
 		Issue:       forgeActions{Comment: true, Label: true, Close: true, Reopen: true},
-		PR:          forgeActions{Comment: true, Close: true, Merge: true, Approve: true, Rerun: true, Log: true, Diff: true},
+		PR:          forgeActions{Comment: true, Close: true, Merge: true, Approve: true, Rerun: true, Log: true, Diff: true, Ready: true},
 		Avatars:     true,
 		StateReason: true,
 		// Bitbucket says when an item opened, but no time that it closed or merged.
@@ -143,6 +145,7 @@ func (bitbucketForge) Caps() forgeCaps {
 			actionReleases: "Bitbucket Cloud has no releases, only tags",
 			actionTransition: "only a Jira issue or an Azure Boards work item moves by a transition",
 			actionAutoMerge:  bitbucketNoAutoMerge,
+			actionCancelAuto: bitbucketNoAutoMerge,
 			actionLabel:      bitbucketmcp.NoPRLabels,
 			actionReopen:     bitbucketNoReopen,
 			actionPlan:       bitbucketNoPlan,
@@ -382,6 +385,17 @@ func (b bitbucketForge) Merge(ctx context.Context, r forgeRef, sha, how string, 
 		return wire.ForgeDone{}, Invalid("%s: this branch merges by %s", method, strings.Join(methods, " or "))
 	}
 	return wire.ForgeDone{}, bb.Merge(ctx, named, r.Number, sha, how)
+}
+
+func (b bitbucketForge) Ready(ctx context.Context, r forgeRef) error {
+	if !r.pr() {
+		return cannot(actionReady)
+	}
+	bb, named, _, err := b.of(ctx, "forge/ready", r)
+	if err != nil {
+		return err
+	}
+	return bb.MarkReady(ctx, named, r.Number)
 }
 
 func (b bitbucketForge) Approve(ctx context.Context, r forgeRef, sha string) (wire.ForgeDone, error) {

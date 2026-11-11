@@ -36,6 +36,9 @@ type forgeAzureDevOps interface {
 	RepoLabels(ctx context.Context, repo string) ([]string, error)
 	MergeMethods(ctx context.Context, repo string, number int) ([]string, error)
 	Merge(ctx context.Context, repo string, number int, sha, method string, auto bool) error
+	// The pull request page's Auto-complete row and Draft state (#4410).
+	CancelAutoMerge(ctx context.Context, repo string, number int) error
+	MarkReady(ctx context.Context, repo string, number int) error
 	Approve(ctx context.Context, repo string, number int, sha string) (string, error)
 	PRDiff(ctx context.Context, repo string, number int) (map[string]any, error)
 	RetryBuild(ctx context.Context, repo string, build int) (string, error)
@@ -131,7 +134,7 @@ func (azureDevOpsForge) Caps() forgeCaps {
 	return forgeCaps{
 		PRs: true,
 		PR: forgeActions{Comment: true, Label: true, Close: true, Reopen: true, Merge: true, AutoMerge: true, Approve: true,
-			Rerun: true, Log: true, Diff: true},
+			Rerun: true, Log: true, Diff: true, CancelAutoMerge: true, Ready: true},
 		Avatars:   true,
 		CreatedAt: true, ClosedAt: true,
 		// A pull request's comment count is on its own page only.
@@ -384,6 +387,23 @@ func (a azureDevOpsForge) Merge(ctx context.Context, r forgeRef, sha, how string
 		return wire.ForgeDone{}, err
 	}
 	return wire.ForgeDone{Auto: optionalTrue(auto)}, nil
+}
+
+// CancelAutoMerge turns off a pull request's auto-complete.
+func (a azureDevOpsForge) CancelAutoMerge(ctx context.Context, r forgeRef) error {
+	ado, named, _, err := a.of(ctx, "forge/cancel-auto-merge", r)
+	if err != nil {
+		return err
+	}
+	return ado.CancelAutoMerge(ctx, named, r.Number)
+}
+
+func (a azureDevOpsForge) Ready(ctx context.Context, r forgeRef) error {
+	ado, named, _, err := a.of(ctx, "forge/ready", r)
+	if err != nil {
+		return err
+	}
+	return ado.MarkReady(ctx, named, r.Number)
 }
 
 func (a azureDevOpsForge) Approve(ctx context.Context, r forgeRef, sha string) (wire.ForgeDone, error) {
