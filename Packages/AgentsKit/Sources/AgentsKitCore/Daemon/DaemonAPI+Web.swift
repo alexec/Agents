@@ -290,6 +290,8 @@ public extension DaemonAPI {
                 Row(Method.forgeFeatures, params: ForgeFeaturesRequest.self, result: ForgeFeatures.self, kind: .hostRequest),
                 Row(Method.forgeBoards, params: ForgeBoardsRequest.self, result: ForgeBoards.self, kind: .hostRequest),
                 Row(Method.forgeImage, params: ForgeImageRequest.self, result: ForgeImage.self, kind: .hostRequest),
+                Row(Method.forgeReleases, params: ForgeReleasesRequest.self, result: ForgeReleases.self, kind: .hostRequest),
+                Row(Method.forgeRelease, params: ForgeReleaseRequest.self, result: ForgeReleaseDetail.self, kind: .hostRequest),
                 Row(Method.forgeAddChild, params: ForgeAddChildRequest.self, result: ForgeDone.self, kind: .hostRequest),
                 Row(Method.forgeBlockedBy, params: ForgeBlockedByRequest.self, result: ForgeDone.self, kind: .hostRequest),
                 // The Messages page's reads and its reply (#4343, #4344, #4345).
