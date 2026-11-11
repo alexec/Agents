@@ -99,6 +99,11 @@ type live struct {
 	// (unprompted.go, #4323), and quiet the timer that ends it when nothing more comes.
 	unprompted bool
 	quiet      *time.Timer
+	// answered is whether the prompt in flight has had its answer, while its turn still
+	// ends; late is work the runtime began in that gap, a cycle of its own that begins
+	// once the turn has ended (#4568), and latePrefix the last words it came after.
+	answered, late bool
+	latePrefix     string
 	// warm is what its runtime started with, and pool its place in the warm pool
 	// (warmpool.go, #4044).
 	warm warmStart
@@ -510,6 +515,8 @@ func (l *live) run() {
 	defer l.d.resumeIfCleared(l.id)
 	// The runtime left goes to the warm pool, which may release it (#4044).
 	defer l.d.warmSoon(l)
+	// Work the runtime began as the last turn ended is a turn of its own (#4568).
+	defer l.beginLate()
 	for {
 		l.mu.Lock()
 		a := l.d.Store.Agent(l.id)
@@ -562,6 +569,7 @@ func (l *live) turn() bool {
 	l.heldBlock = nil
 	// A prompt takes over from the runtime's own turn (#4323): its end is this turn's.
 	l.unprompted = false
+	l.answered, l.late, l.latePrefix = false, false, ""
 	if l.quiet != nil {
 		l.quiet.Stop()
 		l.quiet = nil
@@ -731,6 +739,13 @@ func (l *live) turn() bool {
 	}
 	r, err := s.Prompt(promptCtx, acpBlocks(bs))
 	endPrompt()
+	// What the runtime begins from here is its own, not this prompt's (#4568).
+	l.mu.Lock()
+	l.answered = true
+	l.mu.Unlock()
+	if hold := promptAnswered.Load(); hold != nil {
+		(*hold)(l)
+	}
 	// The turn is over: what a message chunk held back goes now (#1001).
 	l.flushHeld()
 	if said := refused.Load(); said != nil && ctx.Err() == nil {
@@ -1208,6 +1223,9 @@ func (l *live) Update(n sdk.SessionNotification) {
 	// The runtime working with no prompt in flight is a turn of its own (#4323).
 	if !beginsWork(u) || !l.beginUnprompted() {
 		l.heard()
+		if beginsWork(u) {
+			l.noteLate()
+		}
 	}
 	// What a message chunk held back goes before any other update (#1001).
 	if u.AgentMessageChunk == nil {
@@ -1347,7 +1365,7 @@ func (l *live) Update(n sdk.SessionNotification) {
 		}
 		// The result of a cycle the runtime began itself ends its turn (#4323).
 		if endsCycle(uu.Meta) {
-			l.endUnprompted(wire.AgentStateFinished, wire.EndedReasonEndTurn)
+			l.cycleEnded()
 		}
 	case u.SessionInfoUpdate != nil:
 		// A typed failure (052): the turn's, kept for its end; between turns, said.

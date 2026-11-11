@@ -113,11 +113,13 @@ func (l *live) holdForm(ctx context.Context, req wire.ElicitationRequest) elicit
 func (l *live) showForm(req wire.ElicitationRequest) *pendingElicitation {
 	d := l.d
 	pe := &pendingElicitation{req: req, reply: make(chan elicitationReply, 1)}
+	d.record(l.id, wire.TranscriptEntryKind{ElicitationAsked: &wire.TranscriptEntryKindElicitationAsked{Value: req}})
+	// The state moves before the form can be answered (#4568): an answer that came first
+	// would move it back to running, then this to waiting on a form already gone.
+	d.moveIf(l.id, wire.AgentStateRunning, wire.AgentStateWaitingOnUser)
 	l.mu.Lock()
 	l.elicitations[req.ID] = pe
 	l.mu.Unlock()
-	d.record(l.id, wire.TranscriptEntryKind{ElicitationAsked: &wire.TranscriptEntryKindElicitationAsked{Value: req}})
-	d.moveIf(l.id, wire.AgentStateRunning, wire.AgentStateWaitingOnUser)
 	d.openFormRequest(req)
 	Broadcast(d, wire.NotifyAgentElicitation, wire.ElicitationNotification{AgentID: l.id, RequestID: req.ID, Request: &req})
 	d.raiseAgentEvent("agent.asked_form", l.id, "is asking for a form to be filled in.", nil)

@@ -58,6 +58,34 @@ func TestAHandOffWorksInATurnTheRuntimeBeganItself(t *testing.T) {
 	}
 }
 
+// A cycle whose first words come as the prompt's turn still ends begins its own turn when
+// that one has ended (#4568), and keeps those words for its report.
+func TestACycleBegunAsThePromptEndsIsATurnOfItsOwn(t *testing.T) {
+	hold := func(l *live) {
+		deadline := time.Now().Add(10 * time.Second)
+		for time.Now().Before(deadline) {
+			l.mu.Lock()
+			late := l.late
+			l.mu.Unlock()
+			if late {
+				return
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+	}
+	promptAnswered.Store(&hold)
+	defer promptAnswered.Store(nil)
+	d, c, id, release := backgroundBuild(t, "Run the build in the background, then wait for ")
+	if l := d.live(id); func() bool { l.mu.Lock(); defer l.mu.Unlock(); return !l.unprompted }() {
+		t.Fatal("no turn of its own")
+	}
+	os.WriteFile(release, nil, 0o600)
+	c.until(t, "the runtime's own turn's end", ended(id, wire.AgentStateFinished))
+	if a := d.Store.Agent(id); a.Report == nil || a.Report.Message != "The build finished." {
+		t.Fatalf("%+v", a.Report)
+	}
+}
+
 func TestATurnTheRuntimeBeganEndsWhenItGoesQuiet(t *testing.T) {
 	was := unpromptedQuiet
 	unpromptedQuiet = 300 * time.Millisecond
@@ -81,7 +109,7 @@ func TestAStopEndsATurnTheRuntimeBegan(t *testing.T) {
 
 // A call from the runtime before any word of its own cycle begins the turn too.
 func TestAnAskerBeginsATurnForALiveRuntime(t *testing.T) {
-	d, _, id, release := backgroundBuild(t, "Run the build in the background, then wait for ")
+	d, c, id, release := backgroundBuild(t, "Run the build in the background, then wait for ")
 	l := d.live(id)
 	if !l.leaveUnprompted() {
 		t.Fatal("no turn of its own")
@@ -93,4 +121,7 @@ func TestAnAskerBeginsATurnForALiveRuntime(t *testing.T) {
 		t.Fatal("the call began no turn")
 	}
 	os.WriteFile(release, nil, 0o600)
+	// The cycle's last words and result end a turn of their own: wait for it, so the
+	// daemon writes nothing in its root as the test's folders go (#4568).
+	c.until(t, "the runtime's own turn's end", ended(id, wire.AgentStateFinished))
 }
