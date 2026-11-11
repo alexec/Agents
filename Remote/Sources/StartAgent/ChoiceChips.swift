@@ -498,7 +498,7 @@ struct StartChip: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 5)
                     .frame(minWidth: 18, minHeight: 18)
-                    .background(Color.accentColor, in: Capsule())
+                    .background(Paper.accent, in: Capsule())
             }
             if chevron {
                 Image(systemName: "chevron.down")
