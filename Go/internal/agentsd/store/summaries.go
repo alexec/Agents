@@ -202,4 +202,3 @@ func (s *Store) commandsOnDisk(id wire.UUID) []wire.SlashCommand {
 	}
 	return r.AvailableCommands
 }
-

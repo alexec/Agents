@@ -217,7 +217,6 @@ func TestArchivedSummariesRebuilt(t *testing.T) {
 	}
 }
 
-
 // A write the timer began is done when FlushSummaries returns, and nothing writes after it
 // (#4666): BenchmarkChangeAgent's TempDir cleanup found the root not empty when the host's
 // stop came while the timer's write of 2,700 summaries went on.
