@@ -4,17 +4,21 @@
 // and the total cost; and the new-session form that Start lead fills in. A standing epic's plan
 // (#3662) is its query's open issues in one list, with no end.
 import type {
-  AgentState, ForgeAddChildRequest, ForgeBlockedByRequest, ForgeItem, ForgeLead, ForgePlan, ForgePlanChild, ForgePlanStep, ForgeStanding, ForgeStart,
-  LineageCost, LineageCostNode, LineageCostRollup, LineageLink, LineageNode,
+  AgentState, ForgeAddChildRequest, ForgeBlockedByRequest, ForgeItem, ForgePlan, ForgePlanChild, ForgePlanStep, ForgeStanding, ForgeStart,
+  LineageCost, LineageCostNode, LineageCostRollup, LineageEstimate, LineageLink, LineageNode,
 } from "../protocol/generated";
+import { fromWireDate } from "../protocol/dates";
+import { money } from "./limits";
+import { timeWords } from "./time";
 import { costWords, spent } from "./value";
-import { shortRef } from "./work";
+import { shortAge, shortRef } from "./work";
 
 /** A child's mark: closed; a lane runs or a PR is open; a question waits or a check failed; waiting
- * for its step; blocked by an open issue outside the plan. */
-export type PlanMark = "✓" | "◐" | "⚠" | "○" | "⊘";
+ * for its step; blocked by an open issue outside the plan. In the Work look (#4418) it is a glyph in
+ * colour before line 2's words; the state icon says open or closed. */
+export type PlanMark = "done" | "working" | "attention" | "waiting" | "blocked";
 export const markWords: Record<PlanMark, string> = {
-  "✓": "Done", "◐": "Working", "⚠": "Needs you", "○": "Waiting", "⊘": "Blocked outside the plan",
+  done: "Done", working: "Working", attention: "Needs you", waiting: "Waiting", blocked: "Blocked outside the plan",
 };
 
 const holdsRuntime = (s: AgentState) => s === "starting" || s === "running" || s === "waitingOnUser";
@@ -48,31 +52,68 @@ export function planSessions(child: LineageNode, links: readonly LineageLink[], 
 
 /** A child's mark, from its state, its PR and the states of its sessions this page knows. */
 export function planMark(child: ForgePlanChild, pr: LineageCostNode | undefined, states: AgentState[]): PlanMark {
-  if (child.item.state === "closed") return "✓";
+  if (child.item.state === "closed") return "done";
   const open = pr !== undefined && pr.outcome === undefined;
-  if (states.includes("waitingOnUser") || (open && (pr.failedChecks ?? 0) > 0)) return "⚠";
-  if (states.some(holdsRuntime) || open) return "◐";
-  if ((child.blockedOutside ?? []).length > 0) return "⊘";
-  return "○";
+  if (states.includes("waitingOnUser") || (open && (pr.failedChecks ?? 0) > 0)) return "attention";
+  if (states.some(holdsRuntime) || open) return "working";
+  if ((child.blockedOutside ?? []).length > 0) return "blocked";
+  return "waiting";
 }
 
-/** What works on a child: "● lane running · PR #3266 open"; undefined with nothing. */
-export function planWorkWords(pr: LineageCostNode | undefined, states: AgentState[]): string | undefined {
-  const parts: string[] = [];
-  if (states.includes("waitingOnUser")) parts.push("● lane needs you");
-  else if (states.some(holdsRuntime)) parts.push("● lane running");
-  if (pr) {
-    let words = `PR ${shortRef(pr.node.ref)} ${pr.outcome ?? "open"}`;
-    const failed = pr.failedChecks ?? 0;
-    if (pr.outcome === undefined && failed > 0) words += failed === 1 ? " · 1 failed check" : ` · ${failed} failed checks`;
-    parts.push(words);
+/** A child's line 2 after its number (#4418, epic.md note 7), as WorkPlan.lineWords: what works on it, by its mark.
+ * "Working · “Work look: epic page”" (the lane's title), "Working · P#4411 open", "Needs you · its lane asks a
+ * question", "Needs you · 1 failed check", "Waiting for #4329", "Blocked by #4100, outside the plan", "merged P#4390 ·
+ * 6 h ago"; undefined for an open child with nothing on it. */
+export function lineWords(child: ForgePlanChild, mark: PlanMark, pr: LineageCostNode | undefined, states: AgentState[],
+  lane: string | undefined, plan: ForgePlan, now: number = Date.now()): string | undefined {
+  const prRef = pr ? `P${shortRef(pr.node.ref)}` : undefined;
+  switch (mark) {
+    case "done": {
+      if (!pr || !prRef || !pr.outcome) return undefined;
+      const age = shortAge(Math.max(0, (now - fromWireDate(pr.lastAt).getTime()) / 1000));
+      return `${pr.outcome} ${prRef} · ${age === "now" ? "now" : `${age} ago`}`;
+    }
+    case "attention": {
+      if (states.includes("waitingOnUser")) return "Needs you · its lane asks a question";
+      const failed = pr?.failedChecks ?? 0;
+      return `Needs you · ${failed === 1 ? "1 failed check" : `${failed} failed checks`}`;
+    }
+    case "working":
+      if (states.some(holdsRuntime) && lane) return `Working · “${lane}”`;
+      return prRef ? `Working · ${prRef} open` : "Working";
+    case "blocked":
+      return blockedWords(child);
+    case "waiting": {
+      const open = new Set(plan.children.filter((c) => c.item.state !== "closed").map((c) => c.item.node.ref));
+      const waits = child.blockedBy.filter((b) => open.has(b.ref));
+      return waits.length === 0 ? undefined : `Waiting for ${waits.map((b) => shortRef(b.ref)).join(", ")}`;
+    }
   }
-  return parts.length === 0 ? undefined : parts.join(" · ");
 }
 
-/** The open issues outside the plan that block a child: "blocked by #17"; undefined with none. */
+/** A phone's line 2 (note 15): the words up to their first " · ", without ", outside the plan". */
+export function phoneWords(words: string | undefined): string | undefined {
+  if (words === undefined) return undefined;
+  const head = words.split(" · ")[0] ?? words;
+  return head.endsWith(", outside the plan") ? head.slice(0, -", outside the plan".length) : head;
+}
+
+/** The open issues outside the plan that block a child: "Blocked by #17, outside the plan"; undefined with none. */
 export const blockedWords = (child: ForgePlanChild) => child.item.state !== "closed" && (child.blockedOutside ?? []).length > 0
-  ? `blocked by ${child.blockedOutside!.map((n) => shortRef(n.ref)).join(", ")}` : undefined;
+  ? `Blocked by ${child.blockedOutside!.map((n) => shortRef(n.ref)).join(", ")}, outside the plan` : undefined;
+
+/** Money per currency: "$4.70", "$4.70 + €1.00"; undefined with none. */
+function moneyWords(cost: Record<string, number>): string | undefined {
+  const priced = Object.entries(cost).filter(([, v]) => v > 0).sort(([a], [b]) => a.localeCompare(b));
+  return priced.length === 0 ? undefined : priced.map(([currency, v]) => money(v, currency)).join(" + ");
+}
+
+/** An open child's estimate on its row, with no cost yet: "~$0.60", else "~2h 10m"; undefined with no figures. */
+export function estimateWords(e: LineageEstimate): string | undefined {
+  const cash = moneyWords(Object.fromEntries(Object.entries(e.cost ?? {}).map(([c, r]) => [c, r.median])));
+  if (cash) return `~${cash}`;
+  return e.workingSeconds ? `~${timeWords(e.workingSeconds.median)}` : undefined;
+}
 
 /** A child's cost, or undefined with nothing spent. */
 export const planCostWords = (rollup: LineageCostRollup | undefined) => rollup && spent(rollup.total) ? costWords(rollup.total) : undefined;
@@ -102,28 +143,73 @@ export function sumCosts(costs: LineageCost[]): LineageCost {
   return out;
 }
 
-/** The header's figures: "5/7 done · 1 running · $41.20". */
-export function progressWords(plan: ForgePlan, running: number, rollups: LineageCostRollup[]): string {
+/** The header's figures (epic.md note 3): "4 of 9 done · 2 running · $3.09 spent · about $4.70 to go". To go is the
+ * open children's estimates added up; it goes with none. */
+export function progressWords(plan: ForgePlan, running: number, rollups: LineageCostRollup[], estimates: readonly LineageEstimate[] = []): string {
   const done = plan.children.filter((c) => c.item.state === "closed").length;
-  const parts = [`${done}/${plan.children.length} done`];
+  const parts = [`${done} of ${plan.children.length} done`];
   if (running > 0) parts.push(`${running} running`);
   const total = sumCosts(rollups.map((r) => r.total));
-  if (spent(total)) parts.push(costWords(total));
+  if (spent(total)) parts.push(`${costWords(total)} spent`);
+  const open = new Set(plan.children.filter((c) => c.item.state !== "closed").map((c) => c.item.node.ref));
+  const toGo: Record<string, number> = {};
+  for (const e of estimates) {
+    if (!open.has(e.node.ref)) continue;
+    for (const [currency, r] of Object.entries(e.cost ?? {})) toGo[currency] = (toGo[currency] ?? 0) + r.median;
+  }
+  const cash = moneyWords(toGo);
+  if (cash) parts.push(`about ${cash} to go`);
   return parts.join(" · ");
 }
+
+/** The shares of the plan's bar (note 3): done (purple), running (green); the rest is grey. */
+export function planBar(plan: ForgePlan, running: number): { done: number; running: number } {
+  const total = plan.children.length;
+  if (total === 0) return { done: 0, running: 0 };
+  const done = plan.children.filter((c) => c.item.state === "closed").length;
+  return { done: done / total, running: Math.min(running, total - done) / total };
+}
+
+/** A step's band at its trailing end (note 5): "3 of 5 done"; a step that is all done adds what it cost, "1 of 1 done ·
+ * $0.90". */
+export function stepWords(step: ForgePlanStep, plan: ForgePlan, rollups: Readonly<Record<string, LineageCostRollup>>): string {
+  const children = plan.children.filter((c) => c.step === step.step);
+  const done = children.filter((c) => c.item.state === "closed").length;
+  let words = `${done} of ${children.length} done`;
+  if (done === children.length) {
+    const total = sumCosts(children.flatMap((c) => rollups[c.item.node.ref] ? [rollups[c.item.node.ref]!.total] : []));
+    if (spent(total)) words += ` · ${costWords(total)}`;
+  }
+  return words;
+}
+
+/** A step whose children are all closed starts folded (note 5). */
+export function startsFolded(step: ForgePlanStep, plan: ForgePlan): boolean {
+  const children = plan.children.filter((c) => c.step === step.step);
+  return children.length > 0 && children.every((c) => c.item.state === "closed");
+}
+
+/** The rows a standing epic shows before "9 more" (note 18). */
+export const standingShown = 10;
+
+/** "9 more": the rows of a standing epic's list past the first ten; undefined with none. */
+export const moreWords = (count: number) => count > standingShown ? `${count - standingShown} more` : undefined;
+
+/** A child's priority: label, for a standing epic's row (note 18). */
+export const priorityLabel = (item: ForgeItem) => item.labels.find((l) => l.name.toLowerCase().startsWith("priority:"));
 
 /** The most issues forge/plan reads for a standing epic's query. */
 const standingLimit = 100;
 
-/** A standing epic's header figures (#3662), with no end: "Standing · 4 running · 31 open · $41.20".
- * The daemon reads at most 100 issues, so 100 is "100+ open"; a query with an error counts none. */
+/** A standing epic's header figures (#3662, note 17), with no end: "14 open · 1 running · $6.40 spent". The daemon
+ * reads at most 100 issues, so 100 is "100+ open"; a query with an error counts none. */
 export function standingWords(plan: ForgePlan, running: number, rollups: LineageCostRollup[]): string {
-  const parts = ["Standing"];
-  if (running > 0) parts.push(`${running} running`);
+  const parts: string[] = [];
   const open = plan.children.filter((c) => c.item.state !== "closed").length;
   if (!plan.standing?.error) parts.push(open >= standingLimit ? `${standingLimit}+ open` : `${open} open`);
+  if (running > 0) parts.push(`${running} running`);
   const total = sumCosts(rollups.map((r) => r.total));
-  if (spent(total)) parts.push(costWords(total));
+  if (spent(total)) parts.push(`${costWords(total)} spent`);
   return parts.join(" · ");
 }
 
@@ -142,14 +228,23 @@ export function queryWords(standing: ForgeStanding): string {
   return parts.join(" · ");
 }
 
+/** A standing epic's query after its labels, which show as chips (note 17): "· no milestone · 1 lane at a time",
+ * "· or polish, competitor · not wontfix · 2 lanes at a time". */
+export function queryRestWords(standing: ForgeStanding): string {
+  const parts: string[] = [];
+  if (standing.any.length > 0) parts.push(`${standing.labels.length > 0 ? "and " : ""}${standing.any.join(" or ")}`);
+  // The words after the first part, the labels' (milestone, lanes and not), as queryWords says them.
+  parts.push(...queryWords(standing).split(" · ").slice(1));
+  return parts.map((p) => `· ${p}`).join(" ");
+}
+
 const leadState: Record<AgentState, string> = {
   starting: "starting", running: "working", waitingOnUser: "needs you", finished: "waiting", stopped: "stopped",
   queued: "queued", archived: "archived",
 };
 
-/** The lead in the header: "Lead: “Work pages lead” (working)". */
-export const leadWords = (lead: ForgeLead, title: string | undefined) =>
-  `Lead: “${title ?? lead.title ?? "A session"}” (${leadState[lead.state]})`;
+/** The lead's state in words (note 4): working, needs you, waiting, stopped. */
+export const leadWords = (state: AgentState) => leadState[state];
 
 /** Start lead's form (the lead skill's "Starting a lead"): the issue's own first line, the skill and
  * the epic's address, its labels and lead, and no worktree. */

@@ -2486,42 +2486,165 @@ dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
 .work-log header { display: flex; align-items: center; }
 .work-log header .spacer { flex: 1; }
 .work-log pre { max-height: 60vh; overflow: auto; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-/* An epic's plan on its Work page (#3268). */
-.work-plan-head { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin-bottom: 8px; }
-.work-plan-head .attention, .work-plan-mark.attention { color: var(--tint-attention); }
-.work-plan-steps { border: 1px solid var(--paper-rule); border-radius: 8px; overflow: hidden; }
-.work-plan-step h4 { margin: 0; padding: 5px 10px; background: var(--paper-wash); font-weight: 600; opacity: 0.8; }
-.work-plan-step ul { list-style: none; margin: 0; padding: 0; }
-.work-plan-row { display: flex; gap: 10px; align-items: baseline; width: 100%; padding: 5px 10px; text-align: left; background: none; border: none; color: inherit; font: inherit; cursor: pointer; }
-.work-plan-row:hover { background: var(--paper-wash); }
-.work-plan-mark { width: 1.2em; flex: none; text-align: center; }
-.work-plan-mark.done { color: var(--tint-vouched); }
-.work-plan-mark.waiting, .work-plan-mark.blocked { opacity: 0.6; }
-.work-plan-level { width: 3.2em; flex: none; }
-.work-plan-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* An epic's Plan on its Work page (#3268), in the Work look (#4418, specs/4328-work-look/epic.md), as the window's
+   WorkPlanSection (#4416): a box above the timeline with its header, the lead's line, the steps' bands and the two-line
+   rows; under 700 px the phone's rows. */
+.work-plan { --plan-done: #8250df; --plan-running: #1a7f37; --plan-red: #cf222e; margin: 0 0 16px; border: 1px solid var(--paper-rule);
+  border-radius: var(--radius-card); background: var(--paper-raised); overflow: hidden; }
+.work-plan-head { display: flex; gap: 10px; align-items: center; padding: 12px 12px 0; }
+.work-plan-name { display: inline-flex; gap: 8px; align-items: center; flex: none; }
+.work-plan-glyph { flex: none; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; opacity: 0.65; }
+.work-plan-bar { flex: none; display: flex; width: 140px; height: 6px; border-radius: 3px; overflow: hidden; background: var(--paper-wash); }
+.work-plan-bar .done { background: var(--plan-done); }
+.work-plan-bar .running { background: var(--plan-running); }
+.work-plan-bar.placeholder { width: 200px; height: 8px; }
+.work-plan-figures { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.work-plan-never { margin-left: auto; }
+.work-plan-lead { display: flex; gap: 6px; align-items: center; margin: 0; padding: 6px 12px 10px; white-space: nowrap; min-width: 0; }
+.work-plan-lead.placeholder { color: transparent; }
+.work-plan-lead-mark { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--plan-done); color: #fff; font-size: 10px; }
+.work-plan-lead .link { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.work-lead-state { display: inline-flex; gap: 4px; align-items: center; opacity: 0.75; }
+.work-lead-state .dot, .work-open-lead .dot { width: 7px; height: 7px; border-radius: 50%; background: color-mix(in srgb, currentColor 40%, transparent); }
+.work-lead-state.working .dot, .work-open-lead .dot.working { background: var(--plan-running, #1a7f37); }
+.work-lead-state.attention { color: var(--tint-attention); opacity: 1; }
+.work-lead-state.attention .dot, .work-open-lead .dot.attention { background: var(--tint-attention); }
+.work-plan > .work-placeholder { border-top: 1px solid var(--paper-rule); }
+.work-plan-strip { padding: 0 12px 10px; }
+.work-plan-strip .work-error { margin: 0; }
+.work-plan-body { border-top: 1px solid var(--paper-rule); }
+.work-plan-body.stale { opacity: 0.5; }
+.work-plan-band { display: flex; gap: 6px; align-items: baseline; width: 100%; box-sizing: border-box; padding: 7px 12px; border: none; border-radius: 0;
+  background: var(--paper-well); color: color-mix(in srgb, currentColor 70%, transparent); font: inherit; font-size: 0.875rem; text-align: left; cursor: pointer; }
+.work-plan-band .strong { color: var(--paper-ink); }
+.work-plan-band.still { cursor: default; }
+.work-plan-band .chevron { display: inline-block; width: 12px; }
+.work-plan-band .end { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.work-plan-step + .work-plan-step, .work-plan-rows + .work-plan-step { border-top: 1px solid var(--paper-rule); }
+.work-plan-rows { list-style: none; margin: 0; padding: 0; }
+.work-plan-item { position: relative; display: flex; align-items: center; border-top: 1px solid var(--paper-rule); }
+.work-plan-item:hover { background: color-mix(in srgb, var(--paper-well) 60%, transparent); }
+.work-plan-row { flex: 1; min-width: 0; display: flex; gap: 8px; align-items: flex-start; padding: 7px 4px 7px 12px; color: inherit; text-decoration: none; }
+.work-plan-row .work-row-head { display: flex; gap: 6px; align-items: center; min-width: 0; }
+.work-plan-row .work-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.work-plan-level { flex: none; }
+.work-plan-pr { flex: none; display: inline-flex; gap: 3px; align-items: center; margin-left: auto; opacity: 0.75; font-variant-numeric: tabular-nums; }
+.work-plan-row .work-row-line { align-items: baseline; gap: 4px; font-size: 0.8rem; }
+.work-plan-row .work-row-line .quiet:first-child { font-variant-numeric: tabular-nums; }
+.work-plan-mark { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.75; }
+.work-plan-mark .short-line { display: none; }
+.work-plan-mark.is-working { color: var(--plan-running); opacity: 1; }
+.work-plan-mark.is-attention { color: var(--tint-attention); font-weight: 600; opacity: 1; }
+.work-plan-mark.is-blocked { color: var(--plan-red); opacity: 1; }
+.work-plan-end { display: inline-flex; gap: 6px; align-items: baseline; margin-left: auto; padding-left: 8px; white-space: nowrap; }
 .work-plan-cost { font-variant-numeric: tabular-nums; }
-/* An estimate (#3560): fainter than what was spent. */
-.work-plan-estimate { opacity: 0.75; }
+/* An estimate (#3560): fainter than what was spent, in the tertiary colour. */
+.work-plan-estimate { opacity: 0.5; }
 .work-estimate { font-variant-numeric: tabular-nums; }
-/* Work ▸ Features (#3269): a row per feature: label; opened, its epics and its issues with no epic. */
-.work-feature-head { display: flex; gap: 8px; align-items: baseline; width: 100%; padding: 8px 4px; text-align: left; background: none; border: none;
-  border-radius: 0; color: inherit; font: inherit; cursor: pointer; }
+/* The row's ⋯ (note 9): on hover or keyboard focus; a right-click opens the same menu. */
+.work-plan-more { flex: none; width: 28px; height: 28px; margin-right: 8px; padding: 0; border: none; border-radius: var(--radius-control); background: none;
+  color: inherit; font: inherit; cursor: pointer; opacity: 0; }
+.work-plan-item:hover .work-plan-more, .work-plan-item:focus-within .work-plan-more { opacity: 0.8; }
+.work-plan-more:hover, .work-plan-more:focus-visible { opacity: 1; background: var(--paper-wash); }
+@media (hover: none) { .work-plan-more { opacity: 0.8; } }
+.work-plan-more-rows { display: block; padding: 8px 12px; border-top: 1px solid var(--paper-rule); }
+.work-plan-empty { padding: 12px; }
+.work-plan-empty p { margin: 0 0 2px; }
+.work-plan-add { padding: 10px 12px; border-top: 1px solid var(--paper-rule); }
+.work-plan-body > .work-plan-empty + .work-plan-add { border-top: none; padding-top: 0; }
+.work-plan-add p { margin: 6px 0 0; }
+.work-plan-add-row { display: inline-flex; gap: 6px; align-items: center; padding: 0; border: none; background: none; color: var(--accent); font: inherit; cursor: pointer; }
+.work-plan-add-row span { font-size: 1.1em; }
+.work-plan-add-field { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.work-plan-add-field input { flex: 1; min-width: 12em; }
+.work-plan-no-writes { margin: 0; padding: 10px 12px; border-top: 1px solid var(--paper-rule); background: var(--paper-well); }
+.work-plan-could-not { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 24px 12px; text-align: center; }
+.work-plan-could-not p { margin: 0; }
+.work-plan-could-not .mark { font-size: 22px; color: var(--tint-attention); }
+.work-plan-query { padding: 10px 12px; }
+.work-plan-query p { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 4px; }
+.work-plan-query-error { display: flex; gap: 8px; align-items: baseline; padding: 10px; color: var(--plan-red); background: color-mix(in srgb, var(--plan-red) 8%, transparent); }
+.work-plan-query-error .words { flex: 1; min-width: 0; }
+.work-standing { padding: 2px 8px; border: 1px solid var(--paper-rule); border-radius: 99px; background: var(--paper-well); font-size: 0.8em; font-weight: 500; opacity: 0.85; }
+.work-open-lead { display: inline-flex; gap: 6px; align-items: center; }
+@media (prefers-color-scheme: dark) {
+  .work-plan { --plan-done: #8957e5; --plan-running: #3fb950; --plan-red: #f85149; }
+  .work-lead-state.working .dot, .work-open-lead .dot.working { background: #3fb950; }
+}
+/* The phone's page (note 19): the Plan before the panel's rows (note 15); the bar takes the width with the words under
+   it; a child's title on up to two lines, no level chip or pull request, and the short line 2. */
+@container (max-width: 699px) {
+  .work-item-grid { display: flex; flex-direction: column; }
+  .work-item-grid > .work-main { display: contents; }
+  .work-item-grid > * { order: 10; }
+  .work-item-grid > .work-page-bar { order: 1; }
+  .work-item-grid > .work-page-head { order: 2; }
+  .work-item-grid > .work-problem { order: 3; }
+  .work-item-grid > .work-pull-top { order: 4; }
+  .work-item-grid > .work-main > .work-plan { order: 5; }
+  .work-item-grid > .work-side.people { order: 6; }
+  .work-item-grid > .work-main > * { order: 7; min-width: 0; }
+  .work-item-grid > .work-side.links { order: 8; }
+  .work-plan-head { flex-wrap: wrap; }
+  .work-plan-head .work-plan-bar:not(.placeholder) { order: 2; flex: 1 1 100%; width: auto; }
+  .work-plan-head .work-plan-figures { order: 3; flex-basis: 100%; white-space: normal; }
+  .work-plan-row .work-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .work-plan-row .work-plan-level, .work-plan-row .work-plan-pr, .work-plan-more { display: none; }
+  .work-plan-row { padding-right: 12px; }
+  .work-plan-mark .wide-line { display: none; }
+  .work-plan-mark .short-line { display: inline; }
+}
+/* Work ▸ Features (#3269), in the Work look (#4418, epic.md, Features): the page's bar, the groups' heads with their count,
+   two-line features with a chip and a bar of epics done, and an open feature's mini rows. */
+.work-features-bar { display: flex; gap: 8px; align-items: center; justify-content: flex-end; margin-bottom: 8px; }
+.work-features .stale { opacity: 0.5; }
+.work-empty-glyph { opacity: 0.45; margin-bottom: 4px; }
+.work-group-head { display: flex; gap: 8px; align-items: baseline; width: 100%; margin-top: 12px; padding: 4px; border: none; border-radius: 0; background: none;
+  color: color-mix(in srgb, currentColor 70%, transparent); font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
+.work-group-head.attention .words { color: var(--tint-attention); }
+.work-group-head .chevron { display: inline-block; width: 12px; font-weight: normal; }
+.work-group-head .count { font-weight: normal; opacity: 0.6; font-variant-numeric: tabular-nums; }
+.work-feature-rows { list-style: none; margin: 0; padding: 0; }
+.work-feature-head { display: flex; gap: 8px; align-items: flex-start; width: 100%; padding: 8px 4px; border: none; border-radius: 0; background: none;
+  color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .work-feature-head:hover, .work-feature-row:hover { background: var(--paper-wash); }
-.work-feature-head .chevron { display: inline-block; width: 1em; opacity: 0.6; }
-.work-feature-head .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
-.work-feature-head .counts, .work-feature-row .figures { margin-left: auto; opacity: 0.7; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.work-group-head { margin-top: 12px; opacity: 0.75; }
-.work-group-head.attention { color: var(--tint-attention); opacity: 1; }
-.work-feature-head .counts + .counts { margin-left: 12px; }
-.work-feature-open { padding: 0 0 6px 22px; }
+.work-feature-head .chevron { display: inline-block; width: 12px; flex: none; opacity: 0.6; }
+.work-feature-head .dot { flex: none; width: 9px; height: 9px; margin-top: 5px; border-radius: 50%; background: color-mix(in srgb, currentColor 40%, transparent); }
+.work-feature-head .work-row-head { display: flex; gap: 6px; align-items: center; }
+.work-feature-head .work-title { font-weight: 600; }
+.work-feature-head .work-row-line { display: flex; flex-wrap: wrap; gap: 4px; }
+.work-needs { color: var(--tint-attention); font-weight: 600; }
+.work-feature-done { flex: none; display: flex; gap: 10px; align-items: center; margin-left: auto; padding-top: 6px; }
+.work-feature-done .work-plan-bar { width: 120px; }
+.work-feature-done .words { min-width: 110px; text-align: right; font-variant-numeric: tabular-nums; }
+.work-feature-open { padding: 0 0 6px 40px; }
+.work-feature-open .work-error { margin-top: 4px; }
 .work-feature-items { list-style: none; margin: 0; padding: 0; }
 .work-rows .work-feature-items li { border: none; }
 .work-feature-open h4 { margin: 6px 0 2px; font-weight: 600; opacity: 0.7; }
-.work-feature-row { display: flex; gap: 10px; align-items: baseline; width: 100%; padding: 3px 4px; text-align: left; background: none; border: none;
-  border-radius: 0; color: inherit; font: inherit; cursor: pointer; }
+.work-feature-row { display: flex; gap: 8px; align-items: center; width: 100%; box-sizing: border-box; padding: 3px 4px; color: inherit; text-decoration: none; }
 .work-feature-row .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.work-feature-row .lead { min-width: 12em; opacity: 0.7; white-space: nowrap; }
-.work-feature-row .lead.attention { color: var(--tint-attention); opacity: 1; }
+.work-feature-epic-end { display: inline-flex; gap: 10px; align-items: center; margin-left: auto; white-space: nowrap; }
+.work-feature-epic-end .work-plan-bar { width: 110px; }
+.work-feature-epic-end .figures { min-width: 50px; font-variant-numeric: tabular-nums; }
+.work-feature-epic-end .lead { min-width: 130px; opacity: 0.75; }
+.work-feature-epic-end .lead.working { color: #1a7f37; opacity: 1; }
+.work-feature-epic-end .lead.attention { color: var(--tint-attention); opacity: 1; }
+.work-features .work-plan-bar .done { background: #8250df; }
+@media (prefers-color-scheme: dark) {
+  .work-features .work-plan-bar .done { background: #8957e5; }
+  .work-feature-epic-end .lead.working { color: #3fb950; }
+}
+@container (max-width: 699px) {
+  .work-feature-chip, .work-feature-done .words { display: none; }
+  .work-feature-done .work-plan-bar { width: 60px; }
+  .work-feature-open { padding-left: 24px; }
+  .work-feature-row { flex-wrap: wrap; align-items: baseline; }
+  .work-feature-row .name { flex-basis: calc(100% - 22px); white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .work-feature-epic-end { margin-left: 22px; }
+  .work-feature-epic-end .work-plan-bar { display: none; }
+  .work-feature-epic-end .figures, .work-feature-epic-end .lead { min-width: 0; }
+}
 /* Work ▸ Timeline (#4206), as the window's (#4173): white by day, navy at night, where the lines glow and the
    features' colours are mixed 25% with white to keep 3:1 on the navy (wireframe section 11). */
 /* One background before and after Now, and Now grey (Alex, 2026-11-10). */
@@ -2598,11 +2721,6 @@ dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
   50% { stroke-width: 12px; stroke-opacity: 0.4; }
 }
 @keyframes timeline-pulse { from { r: 4px; opacity: 1; } to { r: 14px; opacity: 0; } }
-.work-plan-item { display: flex; align-items: baseline; }
-.work-plan-blocked { flex: none; margin-right: 8px; background: none; border: none; color: inherit; font: inherit; font-size: 0.85em; opacity: 0.7; cursor: pointer; white-space: nowrap; }
-.work-plan-blocked:hover:not(:disabled) { opacity: 1; text-decoration: underline; }
-.work-plan-add { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
-.work-plan-add input { flex: 1; min-width: 16em; }
 
 /* Settings ▸ Processes (#3453): the numbers line up. */
 .process-usage { white-space: nowrap; font-variant-numeric: tabular-nums; }

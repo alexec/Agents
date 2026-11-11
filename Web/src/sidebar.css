@@ -270,6 +270,10 @@
 .context-menu { position: fixed; top: 0; left: 0; display: flex; flex-direction: column; }
 .context-menu button { text-align: left; border: none; background: none; padding: 5px 10px; border-radius: var(--radius-control); }
 .context-menu button:hover:not(:disabled), .context-menu button:focus-visible { background: var(--paper-selection); outline: none; }
+.context-menu-heading { margin: 0; padding: 5px 10px 2px; font-weight: 600; opacity: 0.6; }
+.context-menu button[role=menuitemcheckbox] { display: flex; max-width: 300px; }
+.context-menu button .tick { flex: none; display: inline-block; width: 1.2em; }
+.context-menu [role=menuitemcheckbox] + [role=menuitem] { margin-top: 4px; border-top: 1px solid var(--paper-rule); border-radius: 0; }
 
 /* A folder's pinned pages (#159), and New Session at the sidebar's top (#495): a mark in the
    accent and a title, as a session's row is tall. */

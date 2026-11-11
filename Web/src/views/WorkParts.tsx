@@ -150,11 +150,11 @@ export function RefreshButton({ busy, onClick }: { busy: boolean; onClick: () =>
   );
 }
 
-/** A first read (section 7): six placeholder rows, a circle and two bars each, with a slow shimmer. */
-export function PlaceholderRows() {
+/** A first read (section 7): six placeholder rows (or `count`), a circle and two bars each, with a slow shimmer. */
+export function PlaceholderRows({ count = 6 }: { count?: number }) {
   return (
     <ul class="work-rows work-item-rows work-placeholder" aria-busy="true" aria-label="Loading">
-      {[62, 48, 70, 40, 56, 66].map((w, i) => (
+      {[62, 48, 70, 40, 56, 66].slice(0, count).map((w, i) => (
         <li key={i} aria-hidden="true"><span class="work-row work-item-row">
           <span class="dot" /><span class="work-row-main"><span class="bar" style={{ width: `${w}%` }} /><span class="bar short" style={{ width: `${w / 2}%` }} /></span>
         </span></li>

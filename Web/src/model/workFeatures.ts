@@ -25,15 +25,8 @@ export const isFinished = (f: ForgeFeature) => f.open === 0 && f.issues === 0;
 export type FeatureGroup = "needsYou" | "inFlight" | "idle" | "finished";
 export const featureGroupOrder: readonly FeatureGroup[] = ["needsYou", "inFlight", "idle", "finished"];
 
-/** A group's head: "Needs you", "Finished (7)". */
-export function groupWords(group: FeatureGroup, count: number): string {
-  switch (group) {
-    case "needsYou": return "Needs you";
-    case "inFlight": return "In flight";
-    case "idle": return "Idle";
-    case "finished": return finishedWords(count);
-  }
-}
+/** A group's head: "Needs you", "Finished"; its count follows it in the tertiary colour (#4418). */
+export const groupWords: Record<FeatureGroup, string> = { needsYou: "Needs you", inFlight: "In flight", idle: "Idle", finished: "Finished" };
 
 /** The sessions on a feature's work (#4115), of those this page knows: not archived, and labelled
  * with the short ref of one of its open issues or epics (#3265, or ENG-5), as a lane and a lead label theirs. */
@@ -67,8 +60,24 @@ export function featureGroups(features: readonly ForgeFeature[], agents: readonl
 /** An In flight feature's sessions: "1 session", "3 sessions". */
 export const sessionWords = (count: number) => `${count} ${count === 1 ? "session" : "sessions"}`;
 
-/** The Finished group's head: "Finished (7)". */
-export const finishedWords = (count: number) => `Finished (${count})`;
+/** A feature's bar (epic.md, Features note 2): its epics closed, of all; undefined with no epic. */
+export const epicsDone = (f: ForgeFeature) => f.epics > 0 ? Math.max(f.epics - f.open, 0) / f.epics : undefined;
+
+/** The words at a feature's bar: "1 of 2 epics done", "0 of 1 epic done". */
+export const epicsDoneWords = (f: ForgeFeature) => `${Math.max(f.epics - f.open, 0)} of ${f.epics} ${f.epics === 1 ? "epic" : "epics"} done`;
+
+/** What waits for the person on a Needs you feature (Features note 2): "P#4405 waits for your approval", "#4290 waits
+ * for you", "“Work look: epic page” needs you"; undefined with nothing. */
+export function needsWords(f: ForgeFeature, sessions: readonly Agent[], approvals: readonly string[]): string | undefined {
+  const waiting = approvals.map((r) => `P${shortRef(r)}`);
+  const pr = waiting.find((p) => sessions.some((a) => (a.labels ?? []).some((l) => l.value === p)));
+  if (pr) return `${pr} waits for your approval`;
+  const ref = f.waiting?.[0];
+  if (ref) return `${shortRef(ref)} waits for you`;
+  const session = sessions.find((a) => a.state === "waitingOnUser");
+  if (session) return session.title ? `“${session.title}” needs you` : "A session needs you";
+  return undefined;
+}
 
 const union = (a: string[] | undefined, b: string[] | undefined) => !a ? b : !b ? a : [...a, ...b.filter((r) => !a.includes(r))];
 
@@ -106,8 +115,8 @@ export function openedFeature(items: readonly ForgeItem[]): { epics: ForgeItem[]
   return { epics: mine.filter(isEpic), loose: mine.filter((i) => !isEpic(i) && i.parent === undefined) };
 }
 
-/** An epic's progress: "1/6", its closed sub-issues of all; "0/0" with none yet. */
-export const epicProgressWords = (item: ForgeItem) => `${item.progress?.done ?? 0}/${item.progress?.total ?? 0}`;
+/** An epic's progress: "1 of 6", its closed sub-issues of all; "0 of 0" with none yet. */
+export const epicProgressWords = (item: ForgeItem) => `${item.progress?.done ?? 0} of ${item.progress?.total ?? 0}`;
 
 const holdsRuntime = (s: AgentState) => s === "starting" || s === "running" || s === "waitingOnUser";
 
@@ -125,17 +134,20 @@ export function epicLead(epic: LineageNode, agents: readonly Agent[]): Agent | u
   return best;
 }
 
-/** An epic's lead on its row: "● lead running", "● lead needs you", "lead stopped"; "—" with none. */
+/** An epic's lead on its row: "● lead working", "● lead needs you", "lead stopped"; "—" with none. */
 export function leadRowWords(state: AgentState | undefined): string {
   switch (state) {
     case undefined: case "archived": return "—";
     case "waitingOnUser": return "● lead needs you";
-    case "starting": case "running": return "● lead running";
+    case "starting": case "running": return "● lead working";
     case "finished": return "lead waiting";
     case "stopped": return "lead stopped";
     case "queued": return "lead queued";
   }
 }
 
-export const noFeatures = "No features yet. A feature is a feature:<name> label on an epic.";
+/** When no feature is on any epic yet (states board, 10): the title, then two lines. */
+export const noFeaturesTitle = "No features yet";
+export const noFeatures = "A feature is a feature:<name> label on an epic.";
+export const noFeaturesLabel = "Label an epic on its forge to see it here.";
 export const nothingOpen = "No open epics or issues.";
