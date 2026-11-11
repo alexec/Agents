@@ -1,17 +1,10 @@
 {
-  "pins" : [
-    {
-      "pinned_by" : {
-        "person" : true
-      },
-      "title" : "Mail",
-      "view" : {
-        "server" : "email",
-        "tool" : "show_mail",
-        "uri" : "ui://email/mail"
-      }
-    }
+  "hidden_views" : [
+    "ui://github/issues",
+    "ui://github/pulls",
+    "ui://email/mail"
   ],
+  "pins" : [],
   "sessions" : [
     {
       "pinned_by" : {
