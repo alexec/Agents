@@ -252,6 +252,9 @@ struct ControlProvidersPage: View {
         var parts = [workspace.state.capitalized]
         if let host = workspace.host {
             parts.append("linked to \(control.hosts.first { $0.id == host }?.name ?? "a machine")")
+        } else if workspace.state == "failed", let reason = workspace.reason, !reason.isEmpty {
+            // A make that failed says why (#4706), in place of "not joined".
+            parts.append(reason)
         } else {
             parts.append("not joined")
         }

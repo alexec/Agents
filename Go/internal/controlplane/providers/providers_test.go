@@ -725,6 +725,16 @@ func TestAMakeThatFailsStaysAsAFailedRow(t *testing.T) {
 	if owner, ok := h.providers.failedOwner(string(providers[0].ID), failed.ID); !ok || owner != "" {
 		t.Errorf("%q %v", owner, ok)
 	}
+	// An agent's list_machines says why too (#4706).
+	var said *AgentWorkspace
+	for _, w := range h.providers.forAgent("").Providers[0].Workspaces {
+		if w.State == "failed" {
+			said = &w
+		}
+	}
+	if said == nil || deref(said.Reason) != "The droplet limit is reached." {
+		t.Errorf("%+v", said)
+	}
 }
 
 // The last-used provider and options, and Make Default (#3979).
