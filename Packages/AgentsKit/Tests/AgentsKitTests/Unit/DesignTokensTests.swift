@@ -80,10 +80,40 @@ struct DesignTokensTests {
         }
     }
 
-    @Test("Paper's and StateTint's colours are the tokens'")
+    /// The text between `start` and the next `end` after it in a source: one `switch` or one
+    /// dictionary literal.
+    static func block(_ text: String, from start: String, to end: String) -> Substring? {
+        guard let open = text.range(of: start), let close = text[open.upperBound...].range(of: end) else { return nil }
+        return text[open.upperBound..<close.lowerBound]
+    }
+
+    /// The `0x…` after `<key>: ` in a block (`case .green: 0x1A7F37`, `.keyword: 0x2B4C8C,`).
+    static func keyed(_ key: String, in block: Substring?) -> String? {
+        guard let block, let found = block.range(of: "\(key): 0x") else { return nil }
+        return "0x" + String(block[found.upperBound...].prefix { $0.isHexDigit }).uppercased()
+    }
+
+    /// What is wrong with a colour token whose Swift home holds its light and dark apart, in a
+    /// `switch` (`WorkLook.Tone`) or a dictionary (`InkValues`); nil when they agree.
+    static func splitMismatch(_ token: Token, file: String, key: String, light: Substring?, dark: Substring?) -> [String] {
+        guard let want = token.fields["$value"] as? String, let wantDark = token.string("dev.agentloops.dark") else {
+            return ["design/tokens.json: \(token.path) has no light and dark value"]
+        }
+        let found = (light: keyed(key, in: light), dark: keyed(key, in: dark))
+        guard found.light == hex(want), found.dark == hex(wantDark) else {
+            return ["\(file): \(key) is light \(found.light ?? "missing"), dark \(found.dark ?? "missing"); "
+                + "design/tokens.json's \(token.path) is light \(hex(want)), dark \(hex(wantDark)): change \(file)"]
+        }
+        return []
+    }
+
+    @Test("Paper's, StateTint's, WorkLook's and the code inks' colours are the tokens'")
     func colours() throws {
         let paper = try Self.source("Shared/UI/Paper.swift")
         let tints = try Self.source("Shared/UI/StateTint.swift")
+        let workLook = try Self.source("Packages/AgentsKit/Sources/AgentsKitCore/Model/WorkLook.swift")
+        let actions = try Self.source("Shared/UI/Work/WorkItemActions.swift")
+        let inks = try Self.source("Packages/CodeText/Sources/CodeText/InkValues.swift")
         var wrong: [String] = []
         var checked = 0
         for token in try Self.tokens() where token.path.hasPrefix("color.") {
@@ -92,7 +122,29 @@ struct DesignTokensTests {
                 continue
             }
             if swift == "AccentColor.colorset" { continue }   // `accent()`, below
+            if swift.hasPrefix("none:") { continue }          // the web page's alone; the words say why
             let parts = swift.split(separator: ".").map(String.init)
+            switch parts.first {
+            case "WorkLook":
+                let file = "Packages/AgentsKit/Sources/AgentsKitCore/Model/WorkLook.swift"
+                wrong += Self.splitMismatch(token, file: file, key: "case .\(parts.last ?? swift)",
+                                            light: Self.block(workLook, from: "public var light: UInt32 {", to: "public var dark"),
+                                            dark: Self.block(workLook, from: "public var dark: UInt32 {", to: "\n        }"))
+                checked += 1
+                continue
+            case "InkValues":
+                let file = "Packages/CodeText/Sources/CodeText/InkValues.swift"
+                wrong += Self.splitMismatch(token, file: file, key: ".\(parts.last ?? swift)",
+                                            light: Self.block(inks, from: "static let light: [CodeRole: UInt32] = [", to: "]"),
+                                            dark: Self.block(inks, from: "static let dark: [CodeRole: UInt32] = [", to: "]"))
+                checked += 1
+                continue
+            case "WorkItemActions":
+                wrong += Self.colourMismatch(token, file: "Shared/UI/Work/WorkItemActions.swift", name: parts.last ?? swift, text: actions)
+                checked += 1
+                continue
+            default: break
+            }
             let (file, text, name) = parts.first == "StateTint"
                 ? ("Shared/UI/StateTint.swift", tints, parts.last ?? swift)
                 : ("Shared/UI/Paper.swift", paper, parts.last ?? swift)
@@ -109,7 +161,7 @@ struct DesignTokensTests {
             let token = try #require(byPath[path])
             wrong += Self.colourMismatch(token, file: "Shared/UI/Paper.swift", name: name, text: paper)
         }
-        #expect(checked >= 14, "the scan found \(checked) colours; it should find every Paper and StateTint one")
+        #expect(checked >= 27, "the scan found \(checked) colours; it should find every Paper, StateTint, WorkLook and InkValues one")
         #expect(wrong.isEmpty, "\(wrong.joined(separator: "\n"))")
     }
 
@@ -177,6 +229,19 @@ struct DesignTokensTests {
             checked += 1
         }
         #expect(checked == 5)
+    }
+
+    /// A switch's light and dark are read apart, and a wrong one is named with the fix.
+    @Test("A tone that disagrees is named with the value to change")
+    func splitMismatchIsReported() {
+        let token = Token(path: "color.forge.open", fields: ["$value": "#1a7f37", "$extensions": ["dev.agentloops.dark": "#3fb950"]])
+        let light: Substring = "\n            case .green: 0x1A7F37\n"
+        let right: Substring = "\n            case .green: 0x3FB950\n"
+        let wrongDark: Substring = "\n            case .green: 0x2EA043\n"
+        #expect(Self.splitMismatch(token, file: "WorkLook.swift", key: "case .green", light: light, dark: right).isEmpty)
+        #expect(Self.splitMismatch(token, file: "WorkLook.swift", key: "case .green", light: light, dark: wrongDark)
+            == ["WorkLook.swift: case .green is light 0x1A7F37, dark 0x2EA043; design/tokens.json's color.forge.open is light 0x1A7F37, dark 0x3FB950: change WorkLook.swift"])
+        #expect(Self.splitMismatch(token, file: "WorkLook.swift", key: "case .green", light: nil, dark: right).count == 1)
     }
 
     /// The scan bites: a wrong value in a source is found, and named with the fix.

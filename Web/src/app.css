@@ -440,12 +440,12 @@ button.link {
   white-space: pre;
 }
 .markdown code { font: 0.92em var(--font-mono); }
-:is(.markdown pre, pre.code) .code-keyword { color: var(--code-keyword, #8656a3); }
-:is(.markdown pre, pre.code) .code-string { color: var(--code-string, #287a50); }
-:is(.markdown pre, pre.code) .code-number { color: var(--code-number, #a45a12); }
-:is(.markdown pre, pre.code) .code-comment { color: var(--code-comment, #777); font-style: italic; }
-:is(.markdown pre, pre.code) .code-type { color: var(--code-type, #246b8a); }
-:is(.markdown pre, pre.code) :is(.code-operator, .code-punctuation) { color: var(--code-operator, #8656a3); }
+:is(.markdown pre, pre.code) .code-keyword { color: var(--code-keyword); }
+:is(.markdown pre, pre.code) .code-string { color: var(--code-string); }
+:is(.markdown pre, pre.code) .code-number { color: var(--code-number); }
+:is(.markdown pre, pre.code) .code-comment { color: var(--code-comment); font-style: italic; }
+:is(.markdown pre, pre.code) .code-type { color: var(--code-type); }
+:is(.markdown pre, pre.code) :is(.code-operator, .code-punctuation) { color: var(--code-punctuation); }
 .markdown blockquote { border-left: 2px solid var(--paper-rule); padding-left: 10px; opacity: 0.8; }
 .markdown .table-scroll { overflow-x: auto; max-width: 100%; margin: 0 0 8px; }
 .markdown table { border-collapse: collapse; }
@@ -649,8 +649,8 @@ a.wait-card-filters { color: var(--accent); opacity: 1; text-decoration: underli
    turning once a second as SpinnerClock does. --notch is its colour, --notch-width the ring's. */
 .spinner {
   background: conic-gradient(var(--notch, var(--paper-ink)) 0 80%, transparent 0);
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - var(--notch-width, 2px) - 0.5px), #000 calc(100% - var(--notch-width, 2px)));
-  mask: radial-gradient(farthest-side, transparent calc(100% - var(--notch-width, 2px) - 0.5px), #000 calc(100% - var(--notch-width, 2px)));
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - var(--notch-width, 2px) - 0.5px), var(--paper-ink) calc(100% - var(--notch-width, 2px)));
+  mask: radial-gradient(farthest-side, transparent calc(100% - var(--notch-width, 2px) - 0.5px), var(--paper-ink) calc(100% - var(--notch-width, 2px)));
   animation: spin 1s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -946,7 +946,7 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
 .model-effort { position: relative; }
 .model-effort > summary { list-style: none; cursor: pointer; }
 .model-effort > summary::-webkit-details-marker { display: none; }
-.model-effort-menu { position: absolute; z-index: 20; right: 0; bottom: calc(100% + 6px); display: flex; gap: 6px; padding: 8px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-raised); box-shadow: 0 4px 18px #0002; }
+.model-effort-menu { position: absolute; z-index: 20; right: 0; bottom: calc(100% + 6px); display: flex; gap: 6px; padding: 8px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-raised); box-shadow: 0 4px 18px var(--paper-shadow); }
 /* The shared words' pills (#2658): the values in a column, the runtime's own behind ⋯. */
 .level-select { position: relative; }
 .level-select .model-effort-menu { flex-direction: column; align-items: stretch; min-width: 260px; left: 0; right: auto; }
@@ -964,7 +964,7 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
 .client-permission-control { position: relative; flex: none; }
 .client-permission-control > summary { list-style: none; cursor: pointer; }
 .client-permission-control > summary::-webkit-details-marker { display: none; }
-.client-permission-menu { position: absolute; z-index: 20; left: 0; bottom: calc(100% + 6px); width: min(330px, calc(100vw - 36px)); padding: 6px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-raised); box-shadow: 0 4px 18px #0002; }
+.client-permission-menu { position: absolute; z-index: 20; left: 0; bottom: calc(100% + 6px); width: min(330px, calc(100vw - 36px)); padding: 6px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-raised); box-shadow: 0 4px 18px var(--paper-shadow); }
 .client-permission-choice { display: grid; width: 100%; gap: 2px; padding: 7px 8px; border: 0; border-radius: 6px; background: transparent; color: inherit; text-align: left; cursor: pointer; }
 .client-permission-choice:hover, .client-permission-choice[aria-pressed=true] { background: var(--paper-selection); }
 .client-permission-choice:disabled { opacity: 0.55; cursor: default; }
@@ -976,7 +976,7 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
 .client-permission-actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 8px; }
 .context-meter { display: inline-flex; align-items: center; gap: 5px; opacity: 0.72; font-size: 0.6875rem; font-variant-numeric: tabular-nums; }
 .context-ring { --used: 0%; width: 12px; height: 12px; box-sizing: border-box; border: 2px solid var(--paper-rule); border-radius: 50%; background: conic-gradient(var(--paper-ink) var(--used), transparent 0); }
-.context-ring.close { background: conic-gradient(var(--danger, #bd4238) var(--used), transparent 0); }
+.context-ring.close { background: conic-gradient(var(--tint-failure) var(--used), transparent 0); }
 .cost-limit { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; padding: 6px 10px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-raised); font-size: 0.75rem; }
 .cost-limit button { white-space: nowrap; }
 .pill {
@@ -1137,7 +1137,7 @@ button.remove:hover { opacity: 1; }
 }
 .source-editor:focus { outline: none; border-color: var(--paper-rule); }
 /* Open File… (#415): a field over the window, and what it found under it. */
-.file-search-backdrop { position: fixed; inset: 0; z-index: 50; background: rgba(0, 0, 0, 0.08); display: flex; justify-content: center; align-items: flex-start; }
+.file-search-backdrop { position: fixed; inset: 0; z-index: 50; background: color-mix(in srgb, var(--paper-scrim) 8%, transparent); display: flex; justify-content: center; align-items: flex-start; }
 .file-search { margin-top: 48px; width: min(520px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 8px; }
 .file-search input { width: 100%; box-sizing: border-box; padding: 10px 12px; font: inherit; font-size: 0.9375rem; border-radius: 12px; border: 1px solid var(--paper-rule); background: var(--paper-raised); color: inherit; }
 .file-search .completions { margin: 0; }
@@ -1178,7 +1178,7 @@ dialog.image-viewer {
   overflow: hidden;
 }
 dialog.image-viewer[open] { display: flex; flex-direction: column; }
-dialog.image-viewer::backdrop { background: rgb(0 0 0 / 0.45); }
+dialog.image-viewer::backdrop { background: color-mix(in srgb, var(--paper-scrim) 45%, transparent); }
 .image-viewer-stage { flex: 1; min-height: 0; display: flex; overflow: auto; touch-action: none; user-select: none; }
 .image-viewer-stage.zoomed { cursor: grab; }
 .image-viewer-stage.zoomed:active { cursor: grabbing; }
@@ -1326,7 +1326,7 @@ dialog.image-viewer::backdrop { background: rgb(0 0 0 / 0.45); }
   padding: 0 6px; font: inherit; color: inherit; cursor: pointer; opacity: 0; }
 .machine-row:hover .machine-more, .machine-more:focus-visible { opacity: 1; }
 @media (hover: none) { .machine-more { display: none; } }
-.machine-swipe { position: absolute; inset: 0; display: flex; align-items: center; padding: 0 14px; font-size: 0.8125rem; font-weight: 600; color: #fff;
+.machine-swipe { position: absolute; inset: 0; display: flex; align-items: center; padding: 0 14px; font-size: 0.8125rem; font-weight: 600; color: var(--paper-on-fill);
   background: var(--tint-vouched); }
 .machine-swipe.trailing { justify-content: flex-end; }
 .machine-swipe.stop, .machine-swipe.remove { background: var(--paper-rule); color: inherit; }
@@ -1443,7 +1443,7 @@ dialog.image-viewer::backdrop { background: rgb(0 0 0 / 0.45); }
 .org-policy textarea { font-family: var(--mono, ui-monospace, monospace); font-size: 0.75rem; }
 .policy-routes { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
 .fleet-state::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; background: currentColor; opacity: 0.5; vertical-align: 1px; }
-.fleet-state.online::before { background: var(--tint-success, #1e8a4c); opacity: 1; }
+.fleet-state.online::before { background: var(--tint-vouched); opacity: 1; }
 .fleet-state.needsUpdate::before, .fleet-state.failed::before { background: var(--tint-failure); opacity: 1; }
 .console-card .link, .sub-app-page .link { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; font: inherit; }
 @media (max-width: 759px) {
@@ -1546,7 +1546,7 @@ dialog.sheet {
   border-radius: var(--radius-card);
   box-shadow: 0 12px 40px var(--paper-shadow);
 }
-dialog.sheet::backdrop { background: rgb(0 0 0 / 0.25); }
+dialog.sheet::backdrop { background: color-mix(in srgb, var(--paper-scrim) 25%, transparent); }
 /* Project Settings and Folder Settings (#3280): tabs over a grid of a label and its value. */
 dialog.sheet:has(.settings-sheet) { width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 64px); }
 .settings-sheet [role="tabpanel"] { min-height: 260px; }
@@ -1789,7 +1789,7 @@ button.plain:hover { opacity: 1; }
 .setup-row .setup-heading { margin: 18px 0 8px; }
 .connector-setup .grow, .connections .grow, .connect-sheet .grow { flex: 1; min-width: 0; }
 .connector-mark { flex: none; width: 34px; height: 34px; border-radius: 50%; display: inline-flex; align-items: center;
-  justify-content: center; font-size: 13px; font-weight: 700; background: #222; color: white; }
+  justify-content: center; font-size: 13px; font-weight: 700; background: var(--paper-ink); color: var(--paper-ground); }
 .connector-mark.soft { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); }
 .slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
 .setup-card.slot { min-height: 104px; }
@@ -2005,14 +2005,14 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .plane-move-lines, .plane-move-members { list-style: none; padding: 0; margin: 8px 0; }
 .plane-move-lines li { display: flex; gap: 10px; padding: 3px 0; }
 .plane-move-lines li .mark { width: 16px; flex: none; text-align: center; opacity: 0.6; }
-.plane-move-lines li.line-yes .mark, .plane-move-lines li.line-done .mark { color: var(--tint-success, #1e8a4c); opacity: 1; }
+.plane-move-lines li.line-yes .mark, .plane-move-lines li.line-done .mark { color: var(--tint-vouched); opacity: 1; }
 .plane-move-lines li.line-bad .mark { color: var(--tint-attention); opacity: 1; }
 .plane-move-lines .hint, .plane-move-members .hint { display: block; font-size: 0.75rem; opacity: 0.65; }
 .plane-move-members { background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: 8px; }
 .plane-move-members li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 10px; border-top: 1px solid var(--paper-rule); }
 .plane-move-members li:first-child { border-top: 0; }
 .plane-move-members li > span:last-child { width: 250px; flex: none; }
-.plane-move-members li.member-knows > span:last-child { color: var(--tint-success, #1e8a4c); }
+.plane-move-members li.member-knows > span:last-child { color: var(--tint-vouched); }
 .plane-move-members li.member-cantFollow > span:last-child { color: var(--tint-attention); }
 .plane-move-sheet .sheet-actions .leading { margin-right: auto; }
 .provider-sheet .token-form textarea { font: inherit; font-family: var(--font-mono); font-size: 0.75rem; }
@@ -2102,11 +2102,11 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 @media (prefers-color-scheme: dark) {
   .work-label.coloured { background: var(--chip-fill-dark); border-color: var(--chip-border-dark); color: var(--chip-ink-dark); }
 }
-.work-state { display: inline-block; padding: 0 7px; border-radius: 99px; font-size: 0.8em; line-height: 1.6; color: #fff; background: #59636e; }
-.work-state.open { background: #1f883d; }
-.work-state.merged { background: #8250df; }
-.work-state.closed { background: #cf222e; }
-.work-state.draft { background: #59636e; }
+.work-state { display: inline-block; padding: 0 7px; border-radius: 99px; font-size: 0.8em; line-height: 1.6; color: var(--paper-on-fill); background: var(--forge-fill-draft); }
+.work-state.open { background: var(--forge-fill-open); }
+.work-state.merged { background: var(--forge-fill-done); }
+.work-state.closed { background: var(--forge-fill-closed); }
+.work-state.draft { background: var(--forge-fill-draft); }
 .work-page-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
 .work-page-bar > button:not(.link) { min-width: 28px; }
 .work-stepper { display: inline-flex; gap: 6px; align-items: center; margin-left: auto; }
@@ -2118,15 +2118,12 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 /* Work's look (#4392, specs/4328-work-look/parts.md): the state icon, the two-line row, the filter bar, the side
    panel, the comment timeline and the empty, loading and error states, wide and at 390 px. */
 .work-state-icon { flex: none; fill: none; stroke: var(--state); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;
-  --open: #1a7f37; --done: #8250df; --grey: #6e7781; --red: #cf222e; }
+  --open: var(--forge-open); --done: var(--forge-done); --grey: var(--forge-draft); --red: var(--forge-closed); }
 .work-state-icon .fill { fill: var(--state); stroke: none; }
 .work-state-icon.issue-open, .work-state-icon.pr-open { --state: var(--open); }
 .work-state-icon.issue-done, .work-state-icon.pr-merged { --state: var(--done); }
 .work-state-icon.issue-dropped, .work-state-icon.pr-draft { --state: var(--grey); }
 .work-state-icon.pr-closed { --state: var(--red); }
-@media (prefers-color-scheme: dark) {
-  .work-state-icon { --open: #3fb950; --done: #a371f7; --grey: #8b949e; --red: #f85149; }
-}
 .work-list { container-type: inline-size; }
 .work-filters input[type="search"] { padding: 5px 8px; border: 1px solid var(--paper-rule); border-radius: var(--radius-control); background: var(--paper-raised); color: inherit; font: inherit; }
 .work-menus { display: flex; gap: 2px; align-items: center; }
@@ -2162,21 +2159,16 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .work-row-line .short-line { display: none; }
 .work-row-repo { margin-left: auto; white-space: nowrap; }
 .work-row-end { flex: none; display: inline-flex; gap: 10px; align-items: center; padding-top: 1px; opacity: 0.85; }
-.work-checks.good { color: #1a7f37; }
-.work-checks.bad, .work-review.bad { color: #cf222e; }
-.work-checks.running { color: #bf8700; }
-@media (prefers-color-scheme: dark) {
-  .work-checks.good { color: #3fb950; }
-  .work-checks.bad, .work-review.bad { color: #f85149; }
-  .work-checks.running { color: #d29922; }
-}
+.work-checks.good { color: var(--forge-open); }
+.work-checks.bad, .work-review.bad { color: var(--forge-closed); }
+.work-checks.running { color: var(--forge-waiting); }
 .work-count { display: inline-flex; gap: 3px; align-items: center; font-variant-numeric: tabular-nums; }
 .work-count svg { fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linejoin: round; }
 .work-avatars { display: inline-flex; align-items: center; }
 .work-avatars .work-avatar + .work-avatar { margin-left: -6px; }
 .work-avatars .more { margin-left: 3px; font-size: 0.85em; opacity: 0.7; }
 .work-avatar { flex: none; display: inline-grid; place-items: center; border-radius: 50%; box-shadow: 0 0 0 1.5px var(--paper-raised);
-  background: hsl(var(--hue) 55% 45%); color: #fff; font-weight: 600; line-height: 1; }
+  background: hsl(var(--hue) 55% 45%); color: var(--paper-on-fill); font-weight: 600; line-height: 1; }
 img.work-avatar { object-fit: cover; background: var(--paper-wash); }
 .work-item-rows li.stale { opacity: 0.5; }
 /* The lists (#4395, lists.md): a row is a link; the selected row (the focus) has a 2 px accent ring on the light accent fill. */
@@ -2273,11 +2265,11 @@ a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
 .work-page-byline { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; margin: 4px 0 12px; }
 .work-open-on { display: inline-flex; gap: 4px; align-items: center; margin-left: auto; white-space: nowrap; }
 .work-state.with-glyph { display: inline-flex; gap: 4px; align-items: center; padding: 2px 10px 2px 8px; font-size: 0.9em; font-weight: 500; }
-.work-state.with-glyph .work-state-icon { --state: #fff; }
-.work-state.with-glyph.open { background: #1a7f37; }
-.work-state.with-glyph.closed.pr-closed { background: #cf222e; }
-.work-state.with-glyph.closed, .work-state.with-glyph.merged { background: #8250df; }
-.work-state.with-glyph.closed.not-planned { background: #59636e; }
+.work-state.with-glyph .work-state-icon { --state: var(--paper-on-fill); }
+.work-state.with-glyph.open { background: var(--forge-fill-open); }
+.work-state.with-glyph.closed.pr-closed { background: var(--forge-fill-closed); }
+.work-state.with-glyph.closed, .work-state.with-glyph.merged { background: var(--forge-fill-done); }
+.work-state.with-glyph.closed.not-planned { background: var(--forge-fill-draft); }
 .work-status-menu { border: none; cursor: pointer; font: inherit; font-size: 0.9em; padding: 2px 10px; }
 .work-status-menu:disabled { cursor: default; opacity: 0.7; }
 /* Placeholders while the page reads (section 7): grey bars with a slow shimmer, no spinner. */
@@ -2329,7 +2321,7 @@ a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
   font: inherit; text-align: left; cursor: pointer; }
 .work-session:disabled { color: inherit; opacity: 0.6; cursor: default; }
 .work-session .dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: color-mix(in srgb, currentColor 40%, transparent); }
-.work-session .dot.runs { background: #1a7f37; }
+.work-session .dot.runs { background: var(--forge-open); }
 .work-session .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .work-doc-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; width: 100%; }
 .work-doc-row { display: flex; gap: 6px; align-items: baseline; width: 100%; padding: 2px 0; border: none; background: none; color: inherit; font: inherit;
@@ -2368,8 +2360,8 @@ a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
 .work-event { position: relative; display: flex; gap: 10px; align-items: center; }
 .work-event .mark { flex: none; display: inline-grid; place-items: center; width: 22px; height: 22px; margin: 0 3px; border-radius: 50%; background: var(--paper-well);
   font-size: 12px; box-shadow: 0 0 0 3px var(--paper-ground); }
-.work-event .mark.closed { background: #8250df; color: #fff; }
-.work-event .mark.not-planned { background: #59636e; color: #fff; }
+.work-event .mark.closed { background: var(--forge-fill-done); color: var(--paper-on-fill); }
+.work-event .mark.not-planned { background: var(--forge-fill-draft); color: var(--paper-on-fill); }
 .work-event .mark .work-state-icon { --state: currentColor; }
 /* The comment box (note 11): the person's glyph on the timeline's column, the field, then Close issue and Comment. */
 .work-comment-box { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; margin-top: 16px; }
@@ -2379,8 +2371,8 @@ a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
 .work-comment-box textarea { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card);
   background: var(--paper-raised); color: inherit; font: inherit; resize: vertical; }
 .work-comment-box .work-actions-bar button { display: inline-flex; gap: 6px; align-items: center; }
-.work-close-mark.open { color: #8250df; }
-.work-close-mark.open.pull { color: #cf222e; }
+.work-close-mark.open { color: var(--forge-done); }
+.work-close-mark.open.pull { color: var(--forge-closed); }
 .work-comment-box p { margin: 0; }
 .work-no-writes { margin: 16px 0 0; }
 /* The phone's page (under 700 px, as an iPhone): ‹ Issues, 3/42 and Open on GitHub's icon in the bar; the short state
@@ -2402,15 +2394,6 @@ a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
   .work-comment-me { display: none; }
   .work-side.links .work-side-section h3 { text-transform: uppercase; letter-spacing: 0.04em; }
 }
-@media (prefers-color-scheme: dark) {
-  .work-state.with-glyph.open { background: #238636; }
-  .work-state.with-glyph.closed, .work-state.with-glyph.merged { background: #8957e5; }
-  .work-state.with-glyph.closed.pr-closed { background: #da3633; }
-  .work-state.with-glyph.closed.not-planned { background: #6e7681; }
-  .work-session .dot.runs { background: #3fb950; }
-  .work-close-mark.open { color: #a371f7; }
-  .work-close-mark.open.pull { color: #f85149; }
-}
 /* A pull request's page (#4408, specs/4328-work-look/pull-request.md), as the window's (#4406): Files changed at the
    title's end; the merge box at the end of the timeline, a pr glyph in a green circle on the line, its border green
    when it can merge, red when a check failed or it has conflicts; under 700 px the box at the top, then Files changed
@@ -2425,32 +2408,32 @@ a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
 .work-branch { display: inline-flex; gap: 6px; align-items: center; font-variant-numeric: tabular-nums; }
 .work-merge { position: relative; display: flex; gap: 10px; align-items: flex-start; }
 .work-merge-mark { flex: none; display: inline-grid; place-items: center; width: 26px; height: 26px; margin: 4px 1px 0; border-radius: 50%;
-  background: var(--open, #1a7f37); box-shadow: 0 0 0 3px var(--paper-ground); }
-.work-merge-mark.draft { background: #6e7781; }
-.work-merge-mark .work-state-icon { --state: #fff; }
+  background: var(--forge-fill-open); box-shadow: 0 0 0 3px var(--paper-ground); }
+.work-merge-mark.draft { background: var(--forge-fill-draft); }
+.work-merge-mark .work-state-icon { --state: var(--paper-on-fill); }
 .work-merge-box { flex: 1; min-width: 0; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-raised); overflow: hidden; }
-.work-merge-box.pass { border: 1.5px solid #1a7f37; }
-.work-merge-box.fail { border: 1.5px solid #cf222e; }
+.work-merge-box.pass { border: 1.5px solid var(--forge-open); }
+.work-merge-box.fail { border: 1.5px solid var(--forge-closed); }
 .work-merge-row-wrap { border-bottom: 1px solid var(--paper-rule); }
 .work-merge-row { display: flex; gap: 10px; align-items: baseline; width: 100%; box-sizing: border-box; padding: 12px; }
 button.work-merge-row { border: none; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 button.work-merge-row:hover { background: var(--paper-wash); }
 .work-merge-row .words { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-variant-numeric: tabular-nums; }
 .work-merge-glyph { flex: none; width: 16px; text-align: center; color: color-mix(in srgb, currentColor 60%, transparent); }
-.work-merge-glyph.pass { color: #1a7f37; }
-.work-merge-glyph.fail { color: #cf222e; }
-.work-merge-glyph.wait { color: #9a6700; }
+.work-merge-glyph.pass { color: var(--forge-open); }
+.work-merge-glyph.fail { color: var(--forge-closed); }
+.work-merge-glyph.wait { color: var(--forge-waiting); }
 .work-checks { list-style: none; margin: 0; padding: 0 12px 12px 38px; display: grid; gap: 6px; font-size: 0.875rem; }
 .work-checks li { display: flex; gap: 8px; align-items: baseline; }
 .work-checks .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .work-merge-buttons { padding: 12px; display: grid; gap: 6px; }
 .work-merge-buttons p { margin: 0; }
-.work-merge-button > button.prominent { background: #1f883d; border-color: #1f883d; color: #fff; }
+.work-merge-button > button.prominent { background: var(--forge-fill-open); border-color: var(--forge-fill-open); color: var(--paper-on-fill); }
 .work-merge-button.waits > button.prominent { background: var(--accent); border-color: var(--accent); color: var(--paper-ground); }
 .work-merged-strip { display: grid; gap: 4px; margin-left: 38px; padding: 12px; border-radius: var(--radius-card); background: var(--paper-well); }
-.work-event .mark.merged { background: #8250df; }
-.work-event .mark.merged .work-state-icon { --state: #fff; }
-.work-event .mark.pr-closed { background: #cf222e; color: #fff; }
+.work-event .mark.merged { background: var(--forge-fill-done); }
+.work-event .mark.merged .work-state-icon { --state: var(--paper-on-fill); }
+.work-event .mark.pr-closed { background: var(--forge-fill-closed); color: var(--paper-on-fill); }
 /* A release (#4423, specs/4328-work-look/milestones.md notes 19 and 22 to 29), as the window's WorkReleasePage (#4421):
    the box glyph and the green Latest chip on its row and its header; its page the notes, then the pull requests, and the
    side panel a 240 px column over 900 px, rows under the notes under it; under 700 px the pull requests a row that
@@ -2458,7 +2441,7 @@ button.work-merge-row:hover { background: var(--paper-wash); }
 .work-release-glyph { flex: none; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; opacity: 0.7; }
 .work-release-chip { flex: none; display: inline-block; padding: 0 7px; border: 1px solid; border-radius: 99px; font-size: 0.75rem; font-weight: 500;
   line-height: 1.5; vertical-align: middle; white-space: nowrap; }
-.work-release-chip.latest { color: #1a7f37; border-color: color-mix(in srgb, #1a7f37 60%, transparent); }
+.work-release-chip.latest { color: var(--forge-open); border-color: color-mix(in srgb, var(--forge-open) 60%, transparent); }
 .work-release-grid { display: grid; grid-template-columns: minmax(0, 1fr);
   grid-template-areas: "bar" "head" "problem" "notes" "people" "main"; column-gap: 24px; }
 .work-release-grid > .work-page-bar { grid-area: bar; }
@@ -2482,7 +2465,7 @@ button.work-merge-row:hover { background: var(--paper-wash); }
 .work-release-pulls { border: 1px solid var(--paper-rule); border-radius: var(--radius-card); overflow: hidden; }
 .work-release-none { display: flex; gap: 8px; align-items: baseline; }
 .work-release-stage { display: inline-flex; gap: 6px; align-items: baseline; }
-.work-release-stage .tick { color: #1a7f37; font-weight: 600; }
+.work-release-stage .tick { color: var(--forge-open); font-weight: 600; }
 .work-release-figures { font-variant-numeric: tabular-nums; }
 .work-release-pulls-title { margin: 4px 0 8px; }
 .work-release-pulls-bar { margin-bottom: 8px; }
@@ -2494,10 +2477,6 @@ button.work-merge-row:hover { background: var(--paper-wash); }
     grid-template-areas: "bar bar" "head head" "problem problem" "notes people" "main people"; }
   .work-release-grid > .work-side.people { margin: 0; border-bottom: none; }
   .work-release-grid > .work-side.people > .work-side-section:first-child { border-top: none; padding-top: 0; }
-}
-@media (prefers-color-scheme: dark) {
-  .work-release-chip.latest { color: #3fb950; border-color: color-mix(in srgb, #3fb950 60%, transparent); }
-  .work-release-stage .tick { color: #3fb950; }
 }
 /* The Checks page (note 17): ‹ #4402, the counts, Rerun failed full width, a row per check with a chevron. */
 .work-checks-page h2 { margin: 4px 0 2px; }
@@ -2518,16 +2497,6 @@ button.work-merge-row:hover { background: var(--paper-wash); }
   .work-merge-button > button:first-child { flex: 1; }
   .work-merge-buttons .work-actions-bar > button { justify-content: center; padding: 8px; }
 }
-@media (prefers-color-scheme: dark) {
-  .work-merge-box.pass { border-color: #3fb950; }
-  .work-merge-box.fail { border-color: #f85149; }
-  .work-merge-glyph.pass { color: #3fb950; }
-  .work-merge-glyph.fail { color: #f85149; }
-  .work-merge-glyph.wait { color: #d29922; }
-  .work-merge-mark { background: #238636; }
-  .work-event .mark.merged { background: #8957e5; }
-  .work-merge-button > button.prominent { background: #238636; border-color: #238636; }
-}
 /* The page's actions (#3130): a row of buttons, the merge button split for its other methods. */
 .work-actions { margin-top: 8px; }
 .work-actions-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -2544,7 +2513,7 @@ dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
 /* An epic's Plan on its Work page (#3268), in the Work look (#4418, specs/4328-work-look/epic.md), as the window's
    WorkPlanSection (#4416): a box above the timeline with its header, the lead's line, the steps' bands and the two-line
    rows; under 700 px the phone's rows. */
-.work-plan { --plan-done: #8250df; --plan-running: #1a7f37; --plan-red: #cf222e; margin: 0 0 16px; border: 1px solid var(--paper-rule);
+.work-plan { --plan-done: var(--forge-done); --plan-running: var(--forge-open); --plan-red: var(--forge-closed); margin: 0 0 16px; border: 1px solid var(--paper-rule);
   border-radius: var(--radius-card); background: var(--paper-raised); overflow: hidden; }
 .work-plan-head { display: flex; gap: 10px; align-items: center; padding: 12px 12px 0; }
 .work-plan-name { display: inline-flex; gap: 8px; align-items: center; flex: none; }
@@ -2557,11 +2526,11 @@ dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
 .work-plan-never { margin-left: auto; }
 .work-plan-lead { display: flex; gap: 6px; align-items: center; margin: 0; padding: 6px 12px 10px; white-space: nowrap; min-width: 0; }
 .work-plan-lead.placeholder { color: transparent; }
-.work-plan-lead-mark { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--plan-done); color: #fff; font-size: 10px; }
+.work-plan-lead-mark { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--plan-done); color: var(--paper-on-fill); font-size: 10px; }
 .work-plan-lead .link { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .work-lead-state { display: inline-flex; gap: 4px; align-items: center; opacity: 0.75; }
 .work-lead-state .dot, .work-open-lead .dot { width: 7px; height: 7px; border-radius: 50%; background: color-mix(in srgb, currentColor 40%, transparent); }
-.work-lead-state.working .dot, .work-open-lead .dot.working { background: var(--plan-running, #1a7f37); }
+.work-lead-state.working .dot, .work-open-lead .dot.working { background: var(--plan-running, var(--forge-open)); }
 .work-lead-state.attention { color: var(--tint-attention); opacity: 1; }
 .work-lead-state.attention .dot, .work-open-lead .dot.attention { background: var(--tint-attention); }
 .work-plan > .work-placeholder { border-top: 1px solid var(--paper-rule); }
@@ -2622,10 +2591,6 @@ dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
 .work-plan-query-error .words { flex: 1; min-width: 0; }
 .work-standing { padding: 2px 8px; border: 1px solid var(--paper-rule); border-radius: 99px; background: var(--paper-well); font-size: 0.8em; font-weight: 500; opacity: 0.85; }
 .work-open-lead { display: inline-flex; gap: 6px; align-items: center; }
-@media (prefers-color-scheme: dark) {
-  .work-plan { --plan-done: #8957e5; --plan-running: #3fb950; --plan-red: #f85149; }
-  .work-lead-state.working .dot, .work-open-lead .dot.working { background: #3fb950; }
-}
 /* The phone's page (note 19): the Plan before the panel's rows (note 15); the bar takes the width with the words under
    it; a child's title on up to two lines, no level chip or pull request, and the short line 2. */
 @container (max-width: 699px) {
@@ -2683,24 +2648,20 @@ dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
 .work-feature-epic-end .work-plan-bar { width: 110px; }
 .work-feature-epic-end .figures { min-width: 50px; font-variant-numeric: tabular-nums; }
 .work-feature-epic-end .lead { min-width: 130px; opacity: 0.75; }
-.work-feature-epic-end .lead.working { color: #1a7f37; opacity: 1; }
+.work-feature-epic-end .lead.working { color: var(--forge-open); opacity: 1; }
 .work-feature-epic-end .lead.attention { color: var(--tint-attention); opacity: 1; }
-.work-features .work-plan-bar .done { background: #8250df; }
-@media (prefers-color-scheme: dark) {
-  .work-features .work-plan-bar .done { background: #8957e5; }
-  .work-feature-epic-end .lead.working { color: #3fb950; }
-}
+.work-features .work-plan-bar .done { background: var(--forge-done); }
 /* Features as a delivery view (#4589, features-delivery.md): an epic's line with where it is, its children in flight under
    it (a green dot for Working, the warn glyph and the attention colour for Needs you), and the rest in words. */
-.work-features .work-plan-bar .running { background: #1a7f37; }
-.work-epic-glyph { flex: none; color: #1a7f37; }
-.work-epic-glyph.closed { color: #8250df; }
+.work-features .work-plan-bar .running { background: var(--forge-open); }
+.work-epic-glyph { flex: none; color: var(--forge-open); }
+.work-epic-glyph.closed { color: var(--forge-done); }
 .work-delivery-epic { margin-top: 4px; }
 .work-delivery-epic-row .work-title { font-weight: 600; }
 .work-delivery-epic-row .where { white-space: nowrap; }
 .work-delivery-phone { display: none; }
 .work-flight-lines { padding-left: 22px; }
-.work-flight-row .mark { flex: none; width: 14px; text-align: center; color: #1a7f37; font-size: 0.8em; }
+.work-flight-row .mark { flex: none; width: 14px; text-align: center; color: var(--forge-open); font-size: 0.8em; }
 .work-flight-row.is-attention .mark { color: var(--tint-attention); font-size: 1em; }
 .work-flight-row .name { flex: 0 1 auto; }
 .work-flight-row .ref { font-variant-numeric: tabular-nums; }
@@ -2710,11 +2671,6 @@ dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
 .work-delivery-rest { margin: 2px 0 4px; padding-left: 26px; }
 .work-delivery-rest .short-line { display: none; }
 .work-delivery-rest a { color: inherit; }
-@media (prefers-color-scheme: dark) {
-  .work-features .work-plan-bar .running, .work-epic-glyph, .work-flight-row .mark { color: #3fb950; }
-  .work-features .work-plan-bar .running { background: #3fb950; }
-  .work-epic-glyph.closed { color: #8957e5; }
-}
 @container (max-width: 899px) {
   .work-flight-row .pr { display: none; }
   .work-feature-epic-end .lead { min-width: 0; }
@@ -2728,7 +2684,7 @@ dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
   .work-delivery-epic-row .where, .work-feature-epic-end .figures, .work-feature-epic-end .lead { display: none; }
   .work-feature-epic-end .work-plan-bar { width: 60px; }
   .work-delivery-phone { display: block; flex-basis: 100%; padding-left: 22px; opacity: 0.75; }
-  .work-delivery-phone.working { color: #1a7f37; opacity: 1; }
+  .work-delivery-phone.working { color: var(--forge-open); opacity: 1; }
   .work-delivery-phone.attention { color: var(--tint-attention); opacity: 1; }
   .work-flight-lines { padding-left: 14px; }
   .work-flight-lines .wide-only { display: none; }
@@ -2741,12 +2697,10 @@ dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
 /* Work ▸ Timeline (#4206), as the window's (#4173): white by day, navy at night, where the lines glow and the
    features' colours are mixed 25% with white to keep 3:1 on the navy (wireframe section 11). */
 /* One background before and after Now, and Now grey (Alex, 2026-11-10). */
-.timeline-page { --timeline-plot: #ffffff; --timeline-faint: #8c8c8c; --timeline-trunk: #999999;
-  --timeline-release: #000000; --timeline-now: #8c8c8c; --timeline-glow: 0; }
+.timeline-page { --timeline-glow: 0; }
 @media (prefers-color-scheme: dark) {
-  .timeline-page { --timeline-plot: #0d1429; --timeline-faint: #999999; --timeline-trunk: rgb(255 255 255 / 90%);
-    --timeline-release: #ffffff; --timeline-glow: 1; }
-  .timeline-page [style*="--c"] { --c-shown: color-mix(in srgb, var(--c) 75%, white); }
+  .timeline-page { --timeline-glow: 1; }
+  .timeline-page [style*="--c"] { --c-shown: color-mix(in srgb, var(--c) 75%, var(--paper-on-fill)); }
 }
 .timeline-page .spacer { flex: 1; }
 .timeline { position: relative; }
@@ -2762,7 +2716,7 @@ dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
 .timeline-band { fill: var(--c-shown, var(--c)); opacity: 0.13; }
 .timeline-join circle { fill: var(--c-shown, var(--c)); }
 .timeline-join.forecast circle { fill: var(--timeline-plot); stroke: var(--c-shown, var(--c)); stroke-width: 2; }
-.timeline-join text { fill: white; font-weight: 700; }
+.timeline-join text { fill: var(--paper-on-fill); font-weight: 700; }
 .timeline-join.forecast text { fill: var(--c-shown, var(--c)); }
 .timeline-release { fill: var(--timeline-plot); stroke: var(--timeline-release); stroke-width: 2; }
 .timeline-dot { fill: var(--c-shown, var(--c)); }
@@ -2777,7 +2731,7 @@ dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
 .timeline-label .name { fill: var(--c-shown, var(--c)); }
 .timeline-project { font-weight: 600; }
 .timeline-more { font-weight: 700; }
-.timeline-pill text { font-weight: 600; fill: white; }
+.timeline-pill text { font-weight: 600; fill: var(--paper-on-fill); }
 .timeline-pill.waits rect { fill: var(--tint-attention); }
 .timeline-pill.now rect { fill: var(--timeline-now); }
 .timeline-pill.tag rect { fill: var(--timeline-release); }
@@ -2906,8 +2860,8 @@ dialog.sheet:has(.persona-sheet) { width: min(900px, calc(100vw - 32px)); max-he
 .multiplier-badges { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 24px; }
 .badge-row { display: flex; align-items: center; gap: 8px; }
 .badge { width: 30px; height: 30px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
-  color: #fff; font-size: 15px; font-weight: 600; background: linear-gradient(var(--accent), color-mix(in srgb, var(--accent) 80%, black));
-  box-shadow: inset 0 0 0 1.5px rgb(255 255 255 / 0.35), 0 1px 1px rgb(0 0 0 / 0.18); cursor: default; }
+  color: var(--paper-on-fill); font-size: 15px; font-weight: 600; background: linear-gradient(var(--accent), color-mix(in srgb, var(--accent) 80%, var(--paper-scrim)));
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--paper-on-fill) 35%, transparent), 0 1px 1px color-mix(in srgb, var(--paper-scrim) 18%, transparent); cursor: default; }
 .badge.new { animation: badge-in 0.5s cubic-bezier(0.3, 1.6, 0.5, 1); }
 @keyframes badge-in { from { transform: scale(0); } to { transform: scale(1); } }
 .badge-count { margin-left: 6px; font-variant-numeric: tabular-nums; }

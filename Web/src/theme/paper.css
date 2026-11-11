@@ -15,6 +15,10 @@
    4.5:1 on the ground and the well. A session label's hue is by what it names (#2958), an
    issue or a pull request, not a tint, so a label never reads as a state.
 
+   Work's states are the forge's own hues (--forge-*, #4608), code is in the window's inks
+   (--code-*, InkValues), and the Timeline has its own plot (--timeline-*). What stays data
+   is the forge's: a label's own colour, and an avatar's hue from its name.
+
    The system's own fonts; nothing is loaded from anywhere (FR-034). Every font-size, and the
    marks drawn beside text, is in rem, so the page follows the browser's own font size and
    zoom (#1034): 1rem is the root's size, 112.5% of the browser's (18px at its default,
