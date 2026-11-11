@@ -59,6 +59,16 @@ type fakeForgeGitHub struct {
 	authors map[int]string
 	// labeled are what a list of a label gives, when set for that label (#3661).
 	labeled map[string][]githubmcp.Item
+	// milestones are what Milestones gives, and milestoneReads how often it was asked (#4654).
+	milestones     []githubmcp.Milestone
+	milestoneReads int
+}
+
+func (f *fakeForgeGitHub) Milestones(context.Context, string) ([]githubmcp.Milestone, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.milestoneReads++
+	return f.milestones, nil
 }
 
 func (f *fakeForgeGitHub) Search(_ context.Context, repos []string, sf githubmcp.SearchFilter, after string, first int) (githubmcp.SearchPage, error) {
