@@ -193,7 +193,9 @@ func TestArchivedSummariesRebuilt(t *testing.T) {
 	if err := os.WriteFile(o.Loc.Record(string(ids[1])), append(b, '\n'), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	os.RemoveAll(o.Loc.Agent(string(ids[3])))
+	if err := os.RemoveAll(o.Loc.Agent(string(ids[3]))); err != nil {
+		t.Fatal(err)
+	}
 	o, out = reopen(t, root)
 	if !strings.Contains(out, "summaries were 1 new or changed, 1 gone: read 1 of 2 archived records in full") {
 		t.Fatalf("no line for stale summaries: %q", out)
@@ -206,7 +208,9 @@ func TestArchivedSummariesRebuilt(t *testing.T) {
 	}
 
 	// A file this build cannot read is rebuilt too.
-	os.WriteFile(o.Loc.Summaries(), []byte("{"), 0o600)
+	if err := os.WriteFile(o.Loc.Summaries(), []byte("{"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	if _, out := reopen(t, root); !strings.Contains(out, "summaries were unreadable") {
 		t.Fatalf("no line for unreadable summaries: %q", out)
 	}
