@@ -250,7 +250,7 @@ func TestCostNodeKeepsStartAndLevel(t *testing.T) {
 	asked := make(chan int, 4)
 	d.resolveLookup = func(_ context.Context, _ string, _ forgeRepo, _ string, n int) (wire.LineageResolved, error) {
 		asked <- n
-		return wire.LineageResolved{Title: "Fix it", Labels: []string{"Story", "feature:estimates", "area:lineage"}}, nil
+		return wire.LineageResolved{Title: "Fix it", Labels: []string{"Story", "feature:estimates"}}, nil
 	}
 	s := wire.LineageNode{Kind: "session", Ref: "session:a"}
 	began := time.Now().Add(-3 * time.Hour)
@@ -290,7 +290,7 @@ func TestCostNodeKeepsStartAndLevel(t *testing.T) {
 	d.resolveMu.Unlock()
 	n = node()
 	if n.Level == nil || *n.Level != "story" || n.Feature == nil || *n.Feature != "estimates" ||
-		n.Area == nil || *n.Area != "lineage" || n.Parent == nil || *n.Parent != epic.Ref {
+		n.Parent == nil || *n.Parent != epic.Ref {
 		t.Fatalf("%+v", n)
 	}
 

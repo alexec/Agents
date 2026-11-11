@@ -168,14 +168,14 @@ func mergeNode(have *wire.LineageCostNode, n wire.LineageCostNode) {
 	if n.EndedAt != nil && (have.EndedAt == nil || *n.EndedAt > *have.EndedAt) {
 		have.EndedAt = n.EndedAt
 	}
-	// The first start any machine saw, and the level, feature, area and epic of the copy
-	// that knows them, the newest first (#3562).
+	// The first start any machine saw, and the level, feature and epic of the copy that
+	// knows them, the newest first (#3562).
 	if n.StartedAt != nil && (have.StartedAt == nil || *n.StartedAt < *have.StartedAt) {
 		have.StartedAt = n.StartedAt
 	}
 	newer := n.LastAt > have.LastAt
 	for _, f := range []struct{ have, n **string }{{&have.Level, &n.Level}, {&have.Feature, &n.Feature},
-		{&have.Area, &n.Area}, {&have.Parent, &n.Parent}} {
+		{&have.Parent, &n.Parent}} {
 		if *f.n != nil && (*f.have == nil || newer) {
 			*f.have = *f.n
 		}

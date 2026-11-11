@@ -249,7 +249,6 @@ run_checks() {
 	python3 scripts/check-workflow-github-reads.py || status=1
 	python3 scripts/check-deploy-bounds.py --selftest || status=1
 	python3 scripts/check-deploy-bounds.py || status=1
-	python3 scripts/pr-risk.py --selftest || status=1
 	python3 scripts/wire-compat.py --selftest || status=1
 	python3 -m unittest discover -s .agents/skills/ship-app/scripts -p 'test_*.py' -q || status=1
 	sh scripts/version.sh --selftest || status=1

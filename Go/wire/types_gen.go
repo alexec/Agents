@@ -5638,9 +5638,6 @@ type LineageCostNode struct {
 	// An issue's feature: the name of its feature:<name> label (#3562).
 	Feature *string `json:"feature,omitzero"`
 
-	// An issue's area: the name of its area:<name> label (#3562).
-	Area *string `json:"area,omitzero"`
-
 	// An issue's epic, by ref, as the forge's plan says it (#3562).
 	Parent *string `json:"parent,omitzero"`
 
@@ -10508,8 +10505,6 @@ type ReportNode struct {
 	Level *string `json:"level,omitzero"`
 
 	Feature *string `json:"feature,omitzero"`
-
-	Area *string `json:"area,omitzero"`
 
 	// A PR's end, as LineageCostNode's; absent while open.
 	Outcome *string `json:"outcome,omitzero"`

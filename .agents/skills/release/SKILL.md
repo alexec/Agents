@@ -135,8 +135,7 @@ Collect, in order:
   with the alert's number and link, the advisory (`security_advisory.ghsa_id`), the
   manifest, the first patched version, and Dependabot's own pull request if any (`gh pr
   list --author app/dependabot --search <package>`); the labels `bug`, `security`,
-  `dependencies`, `priority:high`, and its `area:<name>` from `.agents/areas` when the
-  manifest has one. No milestone. A medium or low alert gets no issue: Dependabot's own
+  `dependencies`, `priority:high`. No milestone. A medium or low alert gets no issue: Dependabot's own
   pull requests take it. Never dismiss an alert: that is Alex's.
 - **Draft security advisories** from earlier releases: see "Security findings" below.
 - **Runtimes:** open issues the runtime check filed in this release (their titles start with
@@ -146,8 +145,7 @@ Collect, in order:
   Dependabot bugs above too.
 
 For each runtime finding with no issue yet, file one: title `Runtime (<severity>): <title>`,
-the finding's fields in the body, the label `priority:medium`, `bug`, and its
-`area:<name>` from `.agents/areas` when its files have one. No milestone.
+the finding's fields in the body, the labels `priority:medium` and `bug`. No milestone.
 
 Then send the Scrum Master one message (`list_sessions`, then `message_session` to the
 session not archived whose title has "scrum master" in it, any case, and that is labelled
@@ -371,7 +369,7 @@ A tag that already exists for this version means another release ran: end with
 
    If `up.sh` or a check fails, never roll back the store and never run `down.sh`. File a
    bug: title `Release v<version>: the control plane deploy failed`, labels `bug`,
-   `priority:high`, `area:control-plane`, with no milestone, with the step and its first
+   `priority:high`, with no milestone, with the step and its first
    error (never a secret). Say it in the report. It does not hold step 9: the release is
    out.
 6. **Remove the scratch worktree** when the deploy and its checks are done, also when they

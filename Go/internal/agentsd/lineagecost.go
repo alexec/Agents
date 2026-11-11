@@ -304,7 +304,6 @@ func (d *Daemon) refreshCostResolvedLocked() {
 			}
 			keep(&c.Level, lineage.LevelOf(r.Labels))
 			keep(&c.Feature, lineage.LabelValue(r.Labels, "feature:"))
-			keep(&c.Area, lineage.LabelValue(r.Labels, "area:"))
 			if e.parent != nil {
 				keep(&c.Parent, e.parent.Ref)
 			}

@@ -1,0 +1,25 @@
+# Code owners (Alex, 2026-11-10; AGENTS.md, "Landing a change"). GitHub asks the owner to
+# review a pull request that changes one of these paths, so Alex sees every change where
+# a mistake costs the most: CI and release workflows, release and secret scripts, the
+# deploy files, entitlements, the control plane, the control link, sign-in and the
+# Keychain. It replaces the `risk` check (#3040), which scored the same paths and labelled
+# the PR, a score nobody acted on. The lane lands its PR as usual: `main`'s ruleset does
+# not require a code owner's review. No UI path is here (#3860): that would hold every
+# UI PR, where #3474 holds only a new screen, control or layout.
+#
+# The last matching line wins, as in .gitignore.
+
+# CI, release and supply chain
+/.github/                                  @alexec
+/scripts/release*.sh                       @alexec
+/scripts/*secret*                          @alexec
+/deploy/                                   @alexec
+*.entitlements                             @alexec
+
+# Sign-in, tokens and the Keychain
+/Go/internal/controlplane/                 @alexec
+/Go/internal/controllink/                  @alexec
+/Go/internal/mac/signin/                   @alexec
+/Go/internal/mac/keychain_darwin.go        @alexec
+/Packages/AgentsKit/Sources/AgentsKitCore/Remote/  @alexec
+/App/Sources/Hosts/Lending.swift           @alexec

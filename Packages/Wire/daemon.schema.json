@@ -12305,10 +12305,6 @@
           "type": "string",
           "description": "An issue's feature: the name of its feature:<name> label (#3562)."
         },
-        "area": {
-          "type": "string",
-          "description": "An issue's area: the name of its area:<name> label (#3562)."
-        },
         "parent": {
           "type": "string",
           "description": "An issue's epic, by ref, as the forge's plan says it (#3562)."
@@ -23154,9 +23150,6 @@
           "description": "An issue's level, as LineageCostNode's (#3562)."
         },
         "feature": {
-          "type": "string"
-        },
-        "area": {
           "type": "string"
         },
         "outcome": {

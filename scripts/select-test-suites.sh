@@ -70,7 +70,7 @@ else
 
 		while IFS= read -r -d '' path; do
 			case "$path" in
-				docs/*|mkdocs.yml|specs/*|design/*|.agents/*|.claude/*|*.md|Go/*|Packages/Wire/*|scripts/wire.sh|scripts/pr-areas.py|scripts/replay-conflicts.py|scripts/rerun-cancelled-ci.py|scripts/lint.sh|ruff.toml|.shellcheckrc|.swiftlint.yml|Web/biome.json) ;;
+				docs/*|mkdocs.yml|specs/*|design/*|.agents/*|.claude/*|*.md|Go/*|Packages/Wire/*|scripts/wire.sh|scripts/rerun-cancelled-ci.py|scripts/lint.sh|ruff.toml|.shellcheckrc|.swiftlint.yml|Web/biome.json) ;;
 				*) apps=build ;;
 			esac
 			case "$path" in
@@ -169,7 +169,7 @@ else
 					codetext_full_required=true
 					;;
 				# These areas cannot affect either SwiftPM package's tests.
-				App/*|Host/*|Remote/*|RemoteNotify/*|RemoteWidget/*|docs/*|mkdocs.yml|specs/*|design/*|.agents/*|.claude/*|.github/workflows/*|scripts/select-test-suites.sh|scripts/check-test-indexing.py|scripts/web.sh|scripts/slow-tests.sh|scripts/flaky-tests.sh|scripts/normalize-metaltoolchain-cache.py|scripts/pr-areas.py|scripts/replay-conflicts.py|scripts/rerun-cancelled-ci.py)
+				App/*|Host/*|Remote/*|RemoteNotify/*|RemoteWidget/*|docs/*|mkdocs.yml|specs/*|design/*|.agents/*|.claude/*|.github/workflows/*|scripts/select-test-suites.sh|scripts/check-test-indexing.py|scripts/web.sh|scripts/slow-tests.sh|scripts/flaky-tests.sh|scripts/normalize-metaltoolchain-cache.py|scripts/rerun-cancelled-ci.py)
 					;;
 				*)
 					# Root config, CI, scripts, or a new area may change test behavior.
