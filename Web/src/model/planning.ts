@@ -5,35 +5,46 @@
 import type { LineageEstimateRange, LineageForecast, LineageForecastBurn, LineageForecastServiceLevel, ReportForecastScore,
   ReportValue } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
-import { rough, roughTime } from "./estimate";
+import { roughTime } from "./estimate";
+import { money as moneyWords } from "./limits";
 import { costWords } from "./value";
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
-/** A date as the page says it: "Thu 13 Nov", with the hour when it is within two days of now: "Thu 3 PM". */
+/** A date as the page says it: the day and the hour within a week of now, "Fri 3 PM"; else the day, "Thu 20 Nov". */
 export function dayWords(seconds: number, now = Date.now()): string {
   const t = fromWireDate(seconds as never);
-  const near = Math.abs(t.getTime() - now) < 2 * 86400 * 1000;
+  const near = Math.abs(t.getTime() - now) < 7 * 86400 * 1000;
   return t.toLocaleString(undefined, near ? { weekday: "short", hour: "numeric" } : { weekday: "short", day: "numeric", month: "short" });
 }
 
-/** A range by currency, rounded as an estimate is: "$40 to $90, typically $60". */
+/** Money to two significant figures, as a forecast is wide but a spend or a cost to complete is read closely: "$250",
+ * "$1,100", "$4.20". */
+export function money2(v: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumSignificantDigits: 2 }).format(v);
+  } catch {
+    return moneyWords(v, currency);
+  }
+}
+
+/** A range by currency: "$220 to $280, typically $250". */
 export function rangeWords(r: Record<string, LineageEstimateRange> | undefined): string | undefined {
   const priced = Object.entries(r ?? {}).sort(([a], [b]) => a.localeCompare(b));
   if (priced.length === 0) return undefined;
   return priced.map(([currency, v]) => {
-    const low = rough(v.p10, currency), high = rough(v.p90, currency), mid = rough(v.median, currency);
+    const low = money2(v.p10, currency), high = money2(v.p90, currency), mid = money2(v.median, currency);
     return low === high ? `about ${mid}` : `${low} to ${high}, typically ${mid}`;
   }).join("; ");
 }
 
-/** The direct figure with the loaded one beside it: "$40 to $90, typically $60 (about $100 all in)". */
+/** The direct figure with the loaded one beside it: "$220 to $280, typically $250 (about $260 all in)". */
 function withLoaded(direct: Record<string, LineageEstimateRange> | undefined, loaded: Record<string, LineageEstimateRange> | undefined): string | undefined {
   const words = rangeWords(direct);
   if (!words) return undefined;
   const all = Object.entries(loaded ?? {}).sort(([a], [b]) => a.localeCompare(b));
   if (all.length === 0) return words;
-  return `${words} (about ${all.map(([currency, v]) => rough(v.median, currency)).join(" + ")} all in)`;
+  return `${words} (about ${all.map(([currency, v]) => money2(v.median, currency)).join(" + ")} all in)`;
 }
 
 /** What a week and a month cost at the window's pace: "A week: $40 to $90, typically $60 (about $100 all in)". */
@@ -43,10 +54,14 @@ export function spendLines(f: LineageForecast): string[] {
   return [week && `A week: ${week}`, month && `A month: ${month}`].filter((s): s is string => !!s);
 }
 
-/** A weekly allowance's burn: "Claude, 7 days: 62% used; at this pace it runs out Fri 14 Nov, before it resets Sun 16 Nov",
- * or "… lasts to the reset Sun 16 Nov". */
+const windowNames: Record<string, string> = {
+  seven_day: "this week", weekly: "this week", seven_day_opus: "this week of Opus", seven_day_sonnet: "this week of Sonnet",
+};
+
+/** A weekly allowance's burn: "Claude, this week: 62% used; at this pace it runs out Thu 4 PM, before it resets Fri 3 PM",
+ * or "… it lasts to the reset Fri 3 PM". */
 export function burnLine(b: LineageForecastBurn, name: string, now = Date.now()): string {
-  const used = `${name}, ${b.window}: ${Math.round(b.used * 100)}% used`;
+  const used = `${name}, ${windowNames[b.window] ?? b.window}: ${Math.round(b.used * 100)}% used`;
   if (b.used >= 1) return `${used}; it ran out, and resets ${dayWords(b.resetsAt, now)}`;
   if (!b.lasts && b.runsOutAt !== undefined) return `${used}; at this pace it runs out ${dayWords(b.runsOutAt, now)}, before it resets ${dayWords(b.resetsAt, now)}`;
   return `${used}; at this pace it lasts to the reset ${dayWords(b.resetsAt, now)}`;
@@ -60,8 +75,8 @@ export function serviceLevelLine(s: LineageForecastServiceLevel): string {
   return `${head}: half within ${roughTime(s.p50Seconds, s.p50Seconds)}, 85% within ${roughTime(s.p85Seconds, s.p85Seconds)} (${s.closed} landed)`;
 }
 
-/** An open epic's landing: "6 open children: P50 Thu 13 Nov, P85 Fri 14 Nov · $40 to $90, typically $60 to complete
- * (about $100 all in)", or why there is none. */
+/** An open epic's landing: "6 open children: P50 Thu 3 PM, P85 Fri 10 AM · $40 to $90, typically $60 (about $80 all
+ * in) to complete", or why there is none. */
 export function landsLine(f: LineageForecast, now = Date.now()): string {
   const parts: string[] = [];
   if (f.lands) {
@@ -85,11 +100,11 @@ export function forecastScoreLine(s: ReportForecastScore | undefined): string | 
 }
 
 /** The cost all in, beside the direct one: "$16.20 all in, with the turns on no issue or pull request (the overhead
- * was ×1.3 over the last 14 days)". */
+ * was ×1.30 over the last 14 days)". */
 export function loadedLine(v: ReportValue): string | undefined {
   if (!v.loaded) return undefined;
   const ratio = v.overhead?.unlinkedRatio;
-  const over = ratio !== undefined && v.overhead ? ` (the overhead was ×${(1 + ratio).toFixed(1)} over the last ${v.overhead.windowDays} days)` : "";
+  const over = ratio !== undefined && v.overhead ? ` (the overhead was ×${(1 + ratio).toFixed(2)} over the last ${v.overhead.windowDays} days)` : "";
   return `${costWords(v.loaded)} all in, with the turns on no issue or pull request${over}`;
 }
 
@@ -108,4 +123,5 @@ export const burnRuntime = (b: LineageForecastBurn) => b.credentialKey.split(":"
 
 export const noNext = "Not enough history on this machine to say what comes next: it needs 7 days of issues landed with a merged pull request.";
 export const nextNote = "What comes next is this machine’s: its last 14 days of landings, drawn 1,000 times. A range is P10 to P90; P50 is as likely early as late, and P85 holds about 85% of the time. An epic’s date counts the children filed now, so it moves when more are filed. “All in” adds the turns that went on no issue or pull request (a Scrum Master’s, a review’s); people’s time and CI minutes are in no figure.";
+export const noNextOffline = "None of your machines is online, so nothing says what comes next. It shows when one is back.";
 export const noNextHere = "This machine does not forecast yet. Update it to see what comes next.";

@@ -21,7 +21,7 @@ import {
   estimateCoverageLine, estimateErrorLine, estimateLandsAtLine, leadLine, noValue, noValueHere, nodeName, rowLine,
   unlinkedLine, valueHeadline, valueNote, wasteLine,
 } from "../model/value";
-import { burnLine, burnRuntime, forecastScoreLine, landsLine, loadedLine, mergeBurns, nextNote, noNext, noNextHere, serviceLevelLine,
+import { burnLine, burnRuntime, forecastScoreLine, landsLine, loadedLine, mergeBurns, nextNote, noNext, noNextHere, noNextOffline, serviceLevelLine,
   spendLines } from "../model/planning";
 import { Capability } from "../protocol/capabilities.generated";
 import type { Section } from "../model/console";
@@ -447,7 +447,8 @@ function PlanningPane({ store, scope, initial }: { store: Store; scope: ReportSc
  * allowance's burn, the newest reading of it from any machine; the spend and the service levels of the machine with
  * the most landings (this Mac first); and when each open epic lands, from that machine. */
 function NextPart({ store, epics }: { store: Store; epics: readonly LineageNode[] }) {
-  const hosts = store.hosts.value.filter((h) => hostAnswers(h.state) && store.has(h.id, Capability.lineageForecast1)).map((h) => h.id);
+  const answering = store.hosts.value.filter((h) => hostAnswers(h.state));
+  const hosts = answering.filter((h) => store.has(h.id, Capability.lineageForecast1)).map((h) => h.id);
   const all = useSignal<{ host: MachineRef; forecast: LineageForecast }[] | null>(null);
   // Each open epic's forecast, or why it could not be made.
   const lands = useSignal<Record<string, LineageForecast | string>>({});
@@ -474,7 +475,7 @@ function NextPart({ store, epics }: { store: Store; epics: readonly LineageNode[
       });
     return () => { live = false; };
   }, [hosts.join(" "), epicKey]);
-  if (hosts.length === 0) return <><h3>What comes next</h3><p class="hint">{noNextHere}</p></>;
+  if (hosts.length === 0) return <><h3>What comes next</h3><p class="hint">{answering.length === 0 ? noNextOffline : noNextHere}</p></>;
   if (all.value === null) return <><h3>What comes next</h3><p class="hint">Loading…</p></>;
   const main = mainForecast(all.value, store.macHostID.value);
   const burns = mergeBurns(all.value.map((a) => a.forecast));
