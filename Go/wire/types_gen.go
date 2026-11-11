@@ -14673,6 +14673,9 @@ type WakeSettings struct {
 
 	// How long a finished runtime whose background processes (a dev server, a build, a watcher) still run is kept, counted from its last turn's end (#4044): 1 to 24 hours, default 4. Its processes are then ended with it. 0, or missing, from a client that does not know it, keeps the value the host has.
 	BackgroundHours *int64 `json:"backgroundHours,omitzero"`
+
+	// How long a finished runtime with no background processes is kept, counted from its last turn's end, before the host ends it (#4044, #4513): 0 to 1440 minutes, default 10. An agent that waits for an event (wait_for_event, check_again, a lease) is then continued with session/load when the event comes. 0 releases none for being idle; warmRuntimes still holds. Missing, from a client that does not know it, keeps the value the host has. A runtime that can neither load nor resume a conversation is kept while its agent waits.
+	ReleaseAfterMinutes *int64 `json:"releaseAfterMinutes,omitzero"`
 }
 
 // Why the Mac is, or is not, being kept awake (024).

@@ -72,8 +72,16 @@ type waker struct {
 }
 
 func defaultWake() wire.WakeSettings {
-	return wire.WakeSettings{KeepsAwake: true, GraceHours: 1, WarmRuntimes: 3, BackgroundHours: new(int64(defaultBackgroundHours))}
+	return wire.WakeSettings{KeepsAwake: true, GraceHours: 1, WarmRuntimes: 3, BackgroundHours: new(int64(defaultBackgroundHours)),
+		ReleaseAfterMinutes: new(int64(defaultReleaseAfterMinutes))}
 }
+
+// defaultReleaseAfterMinutes is how long a finished runtime with no background processes is
+// kept (#4044, #4513), from 0 (none released for being idle) to a day.
+const (
+	defaultReleaseAfterMinutes = 10
+	maxReleaseAfterMinutes     = 1440
+)
 
 // defaultBackgroundHours is how long a finished runtime with background processes is kept
 // (#4044), from 1 to 24.
@@ -101,6 +109,10 @@ func readWakeSettings(path string) wire.WakeSettings {
 	if json.Unmarshal(m["backgroundHours"], &hours) == nil && hours != 0 {
 		s.BackgroundHours = &hours
 	}
+	var minutes int64
+	if json.Unmarshal(m["releaseAfterMinutes"], &minutes) == nil {
+		s.ReleaseAfterMinutes = &minutes
+	}
 	return clampWake(s)
 }
 
@@ -112,6 +124,11 @@ func clampWake(s wire.WakeSettings) wire.WakeSettings {
 		hours = min(max(*s.BackgroundHours, 1), 24)
 	}
 	s.BackgroundHours = &hours
+	minutes := int64(defaultReleaseAfterMinutes)
+	if s.ReleaseAfterMinutes != nil {
+		minutes = min(max(*s.ReleaseAfterMinutes, 0), maxReleaseAfterMinutes)
+	}
+	s.ReleaseAfterMinutes = &minutes
 	return s
 }
 
@@ -135,6 +152,11 @@ func (w *waker) Set(s wire.WakeSettings) wire.WakeSettings {
 	// A client that does not know the background hours (#4044) leaves them as they are.
 	if s.BackgroundHours == nil || *s.BackgroundHours == 0 {
 		s.BackgroundHours = w.load().BackgroundHours
+	}
+	// As do the release minutes (#4513), which no client shows; 0 is a value, so only a
+	// missing one keeps.
+	if s.ReleaseAfterMinutes == nil {
+		s.ReleaseAfterMinutes = w.load().ReleaseAfterMinutes
 	}
 	s = clampWake(s)
 	w.settings = &s
