@@ -96,6 +96,14 @@ public enum WorkPlan {
         }
     }
 
+    /// A child's line 2 on a phone (#4417, epic.md note 15): the words up to their first " · ",
+    /// *Working*, *Needs you*, *merged P#4390*, *Waiting for #4329*, *Blocked by #4100*.
+    public static func phoneWords(_ words: String?) -> String? {
+        guard let words else { return nil }
+        let head = words.components(separatedBy: " · ")[0]
+        return head.hasSuffix(", outside the plan") ? String(head.dropLast(", outside the plan".count)) : head
+    }
+
     /// The open issues outside the plan that block a child: "Blocked by #17, outside the plan"; nil with none.
     public static func blockedWords(_ child: DaemonAPI.ForgePlanChild) -> String? {
         guard child.item.state != "closed", let outside = child.blockedOutside, !outside.isEmpty else { return nil }

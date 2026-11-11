@@ -12,7 +12,9 @@ import SwiftUI
 /// GitHub. **Add child** is a row that opens the field. A standing epic's plan (#3662) is its
 /// query: the labels as chips and the rest in words, then its open issues in one list, the first
 /// ten and *N more*, with no steps, Add child or Blocked by. Start lead and Open lead are the
-/// page header's.
+/// page header's. On a phone (#4417, note 15) the bar takes the width with the words under it, and
+/// a child is the phone row: its title on up to two lines, no level chip or pull request, and a
+/// short line 2; the menu is a long press, with the row as its preview.
 struct WorkPlanSection: View {
     let model: any WorkModel
     let host: MachineRef
@@ -21,6 +23,8 @@ struct WorkPlanSection: View {
     let asked: Int
     /// The epic's open children's estimates (#3560).
     var estimates: [DaemonAPI.LineageEstimate] = []
+    /// A phone: the header's bar and words stack, and the rows are the phone rows.
+    var compact = false
     let writes: Bool
     let wrote: () -> Void
 
@@ -106,14 +110,21 @@ struct WorkPlanSection: View {
             if plan.standing != nil {
                 title(standing: true)
             } else {
-                HStack(spacing: 10) {
-                    title(standing: false).fixedSize()
-                    let bar = WorkPlan.bar(plan, running: running)
+                let bar = WorkPlan.bar(plan, running: running)
+                let progress = Text(WorkPlan.progressWords(plan, running: running, rollups: Array(rollups.values), estimates: estimates))
+                    .appText(.supporting).foregroundStyle(.secondary).monospacedDigit()
+                    .textSelection(.enabled)
+                if compact {
+                    title(standing: false)
                     WorkBar(parts: [(bar.done, WorkLook.Tone.purple.color), (bar.running, WorkLook.Tone.green.color)])
-                        .frame(width: 140)
-                    Text(WorkPlan.progressWords(plan, running: running, rollups: Array(rollups.values), estimates: estimates))
-                        .appText(.supporting).foregroundStyle(.secondary).monospacedDigit().lineLimit(1)
-                        .textSelection(.enabled)
+                    progress.lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                } else {
+                    HStack(spacing: 10) {
+                        title(standing: false).fixedSize()
+                        WorkBar(parts: [(bar.done, WorkLook.Tone.purple.color), (bar.running, WorkLook.Tone.green.color)])
+                            .frame(width: 140)
+                        progress.lineLimit(1)
+                    }
                 }
             }
             leadLine(plan)
@@ -337,8 +348,10 @@ struct WorkPlanSection: View {
         let lane = lane(child)
         let estimate = estimates.first { $0.node == child.item.node }
         return WorkPlanRow(
-            child: child, mark: mark, pr: pr,
-            words: WorkPlan.lineWords(child, mark: mark, pr: pr, states: states, lane: lane?.title, in: plan),
+            child: child, mark: mark, pr: compact ? nil : pr,
+            words: { let words = WorkPlan.lineWords(child, mark: mark, pr: pr, states: states, lane: lane?.title, in: plan)
+                     return compact ? WorkPlan.phoneWords(words) : words }(),
+            compact: compact,
             cost: WorkPlan.costWords(rollup),
             estimate: child.item.state == "open" ? estimate.flatMap(WorkPlan.estimateWords) : nil,
             estimateRange: estimate.flatMap(EstimateWords.rangeWords),
@@ -489,12 +502,14 @@ struct WorkPlanSection: View {
 /// icon, the title, the level chip, and at the end the pull request lineage links to it. Line 2:
 /// the number, the mark and its words (the attention colour and semibold for Needs you, red for
 /// blocked outside the plan), and at the end the cost, or the estimate in the tertiary colour. The
-/// ⋯ shows on hover and keyboard focus; a right-click opens the same menu.
+/// ⋯ shows on hover and keyboard focus; a right-click opens the same menu. On a phone there is no
+/// ⋯ and no level chip, the title takes up to two lines, and a long press opens the menu.
 private struct WorkPlanRow<BlockedBy: View>: View {
     let child: DaemonAPI.ForgePlanChild
     let mark: WorkPlan.Mark
     let pr: DaemonAPI.LineageCostNode?
     let words: String?
+    var compact = false
     let cost: String?
     let estimate: String?
     let estimateRange: String?
@@ -519,19 +534,28 @@ private struct WorkPlanRow<BlockedBy: View>: View {
             .buttonStyle(.plain)
             .focused($focused)
             .help("Open \(ref)'s page")
-            Menu { menu } label: { Image(systemName: "ellipsis") }
-                .menuStyle(.button)
-                .buttonStyle(.borderless)
-                .menuIndicator(.hidden)
-                .fixedSize()
-                .opacity(hovered || focused ? 1 : 0)
-                .help("More for \(ref)")
-                .accessibilityLabel("More for \(ref)")
+            if !compact {
+                Menu { menu } label: { Image(systemName: "ellipsis") }
+                    .menuStyle(.button)
+                    .buttonStyle(.borderless)
+                    .menuIndicator(.hidden)
+                    .fixedSize()
+                    .opacity(hovered || focused ? 1 : 0)
+                    .help("More for \(ref)")
+                    .accessibilityLabel("More for \(ref)")
+            }
         }
         .padding(.horizontal, 12).padding(.vertical, 7)
         .background(hovered ? Paper.well.opacity(0.6) : .clear)
         .onHover { hovered = $0 }
+        #if os(iOS)
+        // A long press (note 9): the menu, with the row as its preview.
+        .contextMenu { menu } preview: {
+            label.padding(12).frame(width: 340, alignment: .leading).background(Paper.raised)
+        }
+        #else
         .contextMenu { menu }
+        #endif
     }
 
     private var label: some View {
@@ -539,9 +563,9 @@ private struct WorkPlanRow<BlockedBy: View>: View {
             WorkStateIcon(kind: "issue", state: child.item.state).frame(width: 16)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
-                    Text.forgeTitle(child.item.title).fontWeight(.semibold).lineLimit(1).truncationMode(.tail)
+                    Text.forgeTitle(child.item.title).fontWeight(.semibold).lineLimit(compact ? 2 : 1).truncationMode(.tail)
                         .layoutPriority(1)
-                    if let level = child.item.level {
+                    if !compact, let level = child.item.level {
                         WorkLabelChip(label: child.item.labels.first { $0.name.lowercased() == level } ?? .init(name: level))
                             .fixedSize()
                     }

@@ -125,8 +125,8 @@ final class WorkFeaturesState {
 /// Finished (folded, #3741), each head with its count. A feature is two lines: its colour, title
 /// and label chip; its counts and, in Needs you, what waits; a bar of its epics done at the end.
 /// Opened, its open epics, each a mini row with its bar and lead, and its issues with no epic. A
-/// row opens the issue's page. The Remote draws it too: on a phone the bar goes alone, and an
-/// epic's counts and lead go under its title.
+/// row opens the issue's page. The Remote draws it too (#4417), with Refresh as a bar button and
+/// pull to refresh: on a phone the bar goes alone, and an epic's counts and lead go under its title.
 struct WorkFeaturesPane: View {
     let model: any WorkModel
     @Bindable var state: WorkFeaturesState
@@ -156,12 +156,10 @@ struct WorkFeaturesPane: View {
             #endif
             content
         }
-        // Refresh in the toolbar (⌘R); a phone has pull to refresh in its place.
+        // Refresh in the toolbar (⌘R); the Remote has it as a bar button and pull to refresh (Features note 7).
         .toolbar {
-            if !compact {
-                ToolbarItem(placement: .primaryAction) {
-                    WorkRefreshButton(running: state.features == nil) { state.asked += 1 }
-                }
+            ToolbarItem(placement: .primaryAction) {
+                WorkRefreshButton(running: state.features == nil) { state.asked += 1 }
             }
         }
         .workTask(id: [String(state.asked), state.board]) { await state.load(model: model) }
