@@ -59,7 +59,23 @@ test("New Machine names the default once there are two providers (#3979)", () =>
 });
 
 test("a machine being made has a row until one of its name joins", () => {
-  assert.deepEqual(m.makingRows(["", "machine-2", "machine-1"], [{ name: "machine-1" }]), ["", "machine-2"]);
+  const names = (rows) => rows.map((r) => r.name);
+  assert.deepEqual(names(m.makingRows(["", "machine-2", "machine-1"], null, [{ name: "machine-1" }])), ["", "machine-2"]);
+  // The control plane's list (#4610): Making… while it waits, the reason once it gave up; a linked one, and one a
+  // machine of the name joined as, have no row; the page's own name goes once the list has it.
+  const providers = [{ id: "do", name: "Do", workspaces: [
+    { id: "ws-2", name: "machine-2", state: "running", notJoined: "Made at Do, but it didn’t join in 10 minutes." },
+    { id: "ws-5", name: "old", state: "running" },
+    { id: "ws-1", name: "machine-1", state: "starting", joining: true },
+    { id: "ws-3", name: "machine-3", state: "running", host: "h3", joining: true },
+    { id: "ws-4", name: "machine-4", state: "running", joining: true },
+  ] }];
+  const rows = m.makingRows(["machine-1", ""], providers, [{ name: "machine-4" }]);
+  assert.deepEqual(names(rows), ["", "machine-1", "machine-2"]);
+  assert.deepEqual(rows[1], { provider: "do", providerName: "Do", workspace: "ws-1", name: "machine-1", notJoined: null });
+  assert.equal(rows[2].notJoined, "Made at Do, but it didn’t join in 10 minutes.");
+  assert.equal(m.deleteMakingQuestion(rows[2]),
+    "Delete machine-2? Do deletes it. Nothing was installed on it, so there is nothing to back up.");
 });
 
 test("the icon's colour says the state, the most urgent first (#4113)", () => {

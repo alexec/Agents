@@ -1305,6 +1305,8 @@ dialog.image-viewer::backdrop { background: rgb(0 0 0 / 0.45); }
 .sub-app-row .attention { color: var(--tint-attention); }
 .machine-need, .page-need { padding: 0 20px 6px; margin-top: -6px; font-size: 0.75rem; line-height: 1.35; }
 .machine-need .foot-start { margin-left: 6px; font-size: inherit; }
+/* A machine the control plane gave up waiting for (#4610): its reason in red, as the window's. */
+.machine-need.failure { color: var(--tint-failure); }
 /* A machine's row (#3974), as the window's MachineRow: the icon, ··· on hover, and a swipe on a touch screen. */
 .machine-row { position: relative; overflow: hidden; touch-action: pan-y; }
 .machine-row-body { position: relative; background: var(--paper-sidebar); transition: transform 0.15s ease-out; }

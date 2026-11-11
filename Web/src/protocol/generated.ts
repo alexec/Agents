@@ -6237,7 +6237,9 @@ export interface MachineHelloAnswer {
 
 /**
  * One workspace, as its provider last listed it. `state` is running, starting, stopping, stopped or
- * unknown; or failed, for a make that failed, with the provider's `reason` (#3972).
+ * unknown; or failed, for a make that failed, with the provider's `reason` (#3972). `joining` while
+ * New Machine waits for it to join the control plane, and `notJoined` once the control plane gave
+ * up waiting (#4610).
  */
 export interface MachineInfo {
   id: string;
@@ -6254,6 +6256,15 @@ export interface MachineInfo {
   host?: MachineRef;
   /** Why the make failed, in the provider's words, when `state` is failed. */
   reason?: string;
+  /**
+   * New Machine made it and the control plane waits for it to join: the row says Making… (#4610).
+   */
+  joining?: boolean;
+  /**
+   * Why the control plane gave up waiting for it to join, once it did (#4610): the row says so,
+   * with Delete.
+   */
+  notJoined?: string;
 }
 
 /**
@@ -9194,6 +9205,14 @@ export interface ProviderSummary {
    * has none (#3367). Absent when it needs none or has it.
    */
   sshToolMissing?: string;
+}
+
+/**
+ * providers/deleteWorkspace (#4610): one of a provider's workspaces that no machine is linked to.
+ */
+export interface ProviderWorkspaceRequest {
+  id: ProviderID;
+  workspace: string;
 }
 
 /**
@@ -13634,6 +13653,7 @@ export interface Methods {
   "projects/setSlot": { params: ProjectSlotSet; result: Project };
   "providers/add": { params: ProviderAdd; result: ProviderSummary };
   "providers/create": { params: ProviderCreate; result: ProviderCreated };
+  "providers/deleteWorkspace": { params: ProviderWorkspaceRequest; result: Empty };
   "providers/list": { params: Empty; result: ProviderList };
   "providers/makeDefault": { params: ProviderRequest; result: Empty };
   "providers/options": { params: ProviderRequest; result: ProviderOptions };
@@ -14054,6 +14074,7 @@ export const MethodTarget = {
   "projects/setSlot": "control",
   "providers/add": "control",
   "providers/create": "control",
+  "providers/deleteWorkspace": "control",
   "providers/list": "control",
   "providers/makeDefault": "control",
   "providers/options": "control",
@@ -14762,7 +14783,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineFolderSent: { required: [], optional: ["state", "folder", "facts", "pack", "read"] },
   MachineHello: { required: ["version", "platform", "machineID"], optional: ["host", "name", "implementation", "capabilities"] },
   MachineHelloAnswer: { required: [], optional: ["capabilities"] },
-  MachineInfo: { required: ["id", "name", "state"], optional: ["ssh", "tunnel", "hostKeyRenews", "cost", "host", "reason"] },
+  MachineInfo: { required: ["id", "name", "state"], optional: ["ssh", "tunnel", "hostKeyRenews", "cost", "host", "reason", "joining", "notJoined"] },
   MachineInstall: { required: ["destination"], optional: ["name", "key", "trust", "tunnel", "provider", "workspace"] },
   MachineJoinAsk: { required: ["name", "platform", "publicKey"], optional: ["version", "machineID", "person"] },
   MachineJoinDecision: { required: ["result"], optional: ["host", "controlKey", "name"] },
@@ -15011,6 +15032,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ProviderSSHResult: { required: [], optional: ["knownHosts", "needsTrust"] },
   ProviderSecretsKeep: { required: ["provider", "secrets"], optional: [] },
   ProviderSummary: { required: ["id", "name", "kind", "secrets", "capabilities", "contract", "mapped", "workspaces", "current"], optional: ["preset", "listedAt", "problem", "group", "mayUse", "default", "machine", "machineName", "machineOffline", "sshToolMissing"] },
+  ProviderWorkspaceRequest: { required: ["id", "workspace"], optional: [] },
   PushToken: { required: ["environment"], optional: ["token"] },
   QueuedPrompt: { required: ["id", "text", "attachments", "queuedAt", "from"], optional: ["preface", "sender"] },
   QueuedStart: { required: ["labels"], optional: ["runtimeID", "permissionMode", "model", "worktree"] },

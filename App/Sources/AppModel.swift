@@ -86,6 +86,9 @@ final class AppModel {
     /// The machine providers New Machine can use, as the control plane last listed them for
     /// this person (#3979): the Machines header's New Machine on ▸.
     private(set) var machineProviders: [DaemonAPI.ProviderSummary] = []
+    /// How many New Machine calls wait for the provider's answer (#4610): a *Making…* row
+    /// each, until the control plane lists the machine as joining.
+    private(set) var machinesBeingMade = 0
     /// A runtime of this Mac's that refused for want of a sign-in: the window answers
     /// with its sign-in sheet rather than an error nobody can act on.
     var signInRuntimeID: String?
@@ -3935,6 +3938,9 @@ final class AppModel {
     /// the provider's reason, with Try Again.
     func newMachine(on provider: ProviderID? = nil) async {
         guard let controlRequests else { return }
+        // A row at once (#4610), until the list says the machine is joining or the make failed.
+        machinesBeingMade += 1
+        defer { machinesBeingMade -= 1 }
         do {
             let made = try await controlRequests.call(DaemonAPI.Method.providersCreate, DaemonAPI.ProviderRequest(id: provider),
                                                       returning: DaemonAPI.ProviderCreated.self)
@@ -3946,6 +3952,26 @@ final class AppModel {
             makeFailed = MachineMakeFailure(reason: HostProblem.controlRefusal(error), provider: provider)
         } catch {
             problem = "The control plane can’t be reached, so no machine can be made."
+        }
+        await loadMachineProviders()
+    }
+
+    /// The machines New Machine made that have not joined yet (#4610): a *Making…* row each
+    /// under Machines, red with the reason once the control plane gave up on one.
+    var machinesMaking: [MachineMaking] {
+        MachineMaking.rows(machineProviders, hostNames: Set(hosts.controlRows.values.map(\.name)))
+    }
+
+    /// Delete on a row the control plane gave up on (#4610): the provider deletes the workspace.
+    func deleteWorkspace(_ provider: ProviderID, workspace: String) async {
+        guard let controlRequests else { return }
+        do {
+            _ = try await controlRequests.call(DaemonAPI.Method.providersDeleteWorkspace,
+                                               DaemonAPI.ProviderWorkspaceRequest(id: provider, workspace: workspace))
+        } catch let error as JSONRPCError {
+            problem = HostProblem.controlRefusal(error)
+        } catch {
+            problem = "The control plane can’t be reached, so the machine wasn’t deleted."
         }
         await loadMachineProviders()
     }

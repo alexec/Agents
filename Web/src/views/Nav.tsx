@@ -26,7 +26,7 @@ import { ConversationPage, MessagesList } from "./Messages";
 import { MachinePage } from "./MachinePage";
 import { machineNeed, machineNeedLine } from "./OfflineStrip";
 import { MachineRow, MakingRow } from "./MachineRow";
-import { makingRows, newMachineItems } from "../model/machineRow";
+import { deleteMakingQuestion, makingRows, newMachineItems } from "../model/machineRow";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { AddMachineDialog } from "./AddMachineDialog";
 import { addMachineWords } from "../model/addMachine";
@@ -217,8 +217,9 @@ export function SectionPage({ store, section, down }: { store: Store; section: E
                   {isRuntimesPage(p) && <RuntimesLowLine store={store} />}
                 </Fragment>
               ))}
-              {machinesHead(group) && makingRows(store.machinesMaking.value, store.hosts.value)
-                .map((name, i) => <MakingRow key={`making-${i}`} name={name} />)}
+              {machinesHead(group) && makingRows(store.machinesMaking.value, store.providers.list.value, store.hosts.value)
+                .map((row) => <MakingRow key={`making-${row.provider}/${row.workspace}/${row.name}`} row={row}
+                  onDelete={() => { if (window.confirm(deleteMakingQuestion(row))) void store.deleteWorkspace(row.provider, row.workspace); }} />)}
             </div>
           ))}
         </nav>

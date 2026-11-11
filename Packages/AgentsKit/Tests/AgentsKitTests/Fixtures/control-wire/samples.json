@@ -197,7 +197,9 @@
     "ssh": "ssh",
     "tunnel": true,
     "cost": "cost",
-    "host": "box"
+    "host": "box",
+    "joining": true,
+    "notJoined": "notJoined"
   },
   "ProviderSummary": {
     "id": "digitalocean-x7k2",
@@ -253,6 +255,10 @@
   },
   "ProviderRequest": {
     "id": "digitalocean-x7k2"
+  },
+  "ProviderWorkspaceRequest": {
+    "id": "digitalocean-x7k2",
+    "workspace": "workspace"
   },
   "MachineLink": {
     "host": "box",

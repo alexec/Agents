@@ -205,6 +205,9 @@ public extension DaemonAPI.Method {
     static let hostsDeletePreview = "machines/deletePreview"
     /// `ProviderRequest` → `{}`: Make Default, the provider New Machine uses (#3979).
     static let providersMakeDefault = "providers/makeDefault"
+    /// `ProviderWorkspaceRequest` → `{}`: Delete on a machine New Machine made that never
+    /// joined (#4610). The provider deletes the workspace.
+    static let providersDeleteWorkspace = "providers/deleteWorkspace"
 
     /// Every method the control plane's workspace part answers.
     static let workspaceMethods: Set<String> = [
@@ -213,7 +216,7 @@ public extension DaemonAPI.Method {
         hostsKeep, hostsListKept, hostsDropKept, hostsRetryKept,
         providersOptions, providersCreate, hostsDeleteMachine,
         providersDraftStart, providersDraftCancel, providersDraftAnswer, providersDraftSigned, providersRuntimes,
-        providersMakeDefault,
+        providersMakeDefault, providersDeleteWorkspace,
     ]
 }
 
@@ -252,9 +255,16 @@ public extension DaemonAPI {
         public var host: MachineRef?
         /// Why the make failed, in the provider's words, when `state` is failed (#3973).
         public var reason: String?
+        /// New Machine made it and the control plane waits for it to join (#4610): the row
+        /// says Making….
+        public var joining: Bool?
+        /// Why the control plane gave up waiting for it to join, once it did (#4610): the row
+        /// says so, with Delete.
+        public var notJoined: String?
 
         public init(id: String, name: String, state: String, ssh: String? = nil, tunnel: Bool? = nil,
-                    hostKeyRenews: Bool? = nil, cost: String? = nil, host: MachineRef? = nil) {
+                    hostKeyRenews: Bool? = nil, cost: String? = nil, host: MachineRef? = nil,
+                    joining: Bool? = nil, notJoined: String? = nil) {
             self.id = id
             self.name = name
             self.state = state
@@ -263,6 +273,8 @@ public extension DaemonAPI {
             self.hostKeyRenews = hostKeyRenews
             self.cost = cost
             self.host = host
+            self.joining = joining
+            self.notJoined = notJoined
         }
 
         /// Whether a host added by hand may be this workspace (#976): its name is the
@@ -461,6 +473,17 @@ public extension DaemonAPI {
     struct ProviderRequest: Codable, Sendable, Hashable {
         public var id: ProviderID?
         public init(id: ProviderID?) { self.id = id }
+    }
+
+    /// `providers/deleteWorkspace` (#4610): one of a provider's workspaces that no machine is
+    /// linked to.
+    struct ProviderWorkspaceRequest: Codable, Sendable, Hashable {
+        public var id: ProviderID
+        public var workspace: String
+        public init(id: ProviderID, workspace: String) {
+            self.id = id
+            self.workspace = workspace
+        }
     }
 
     /// `machines/link`.

@@ -195,6 +195,15 @@ type joining struct {
 	caller *Caller
 }
 
+// notJoinedMake is a machine New Machine made that the control plane gave up waiting for
+// (#4610): its row says so, with Delete, until it is deleted or a host is linked to it.
+type notJoinedMake struct {
+	provider, workspace, name, reason string
+}
+
+// keptNotJoined is how many makes that never joined are kept: the oldest goes first.
+const keptNotJoined = 20
+
 // ClonePatience is WorkspaceProviders.clonePatience: how long one clone on a new host may
 // take before the next is sent.
 const ClonePatience = time.Hour
@@ -240,6 +249,8 @@ type Providers struct {
 	joining     map[string]*joining
 	// Makes that failed, by provider (#3972).
 	failedMakes map[string][]failedMake
+	// The makes the control plane gave up waiting for (#4610), the oldest first.
+	notJoined []notJoinedMake
 	// The machines installing Agents in a codespace for Add as Machine… (#3497), by how
 	// many installs: only their machine/installProgress is said to clients.
 	installing map[string]int
@@ -722,6 +733,12 @@ func (p *Providers) answer(method string, params json.RawMessage, caller Caller,
 			return nil, err
 		}
 		return p.create(request, who, &caller)
+	case MethodProvidersDeleteWorkspace:
+		var request wire.ProviderWorkspaceRequest
+		if err := requireParams(params, &request, "ProviderWorkspaceRequest", "id", "workspace"); err != nil {
+			return nil, err
+		}
+		return map[string]any{}, p.deleteWorkspace(string(request.ID), request.Workspace, who)
 	case MethodHostsDelete:
 		var request hostRequest
 		if err := requireParams(params, &request, "MachineRequest", "host"); err != nil {
@@ -858,6 +875,15 @@ func (p *Providers) Summaries() []ProviderSummary {
 	for id, f := range p.failedMakes {
 		failed[id] = append([]failedMake{}, f...)
 	}
+	// The makes New Machine still waits for, and the ones it gave up on (#4610).
+	joiningNow := map[string]bool{}
+	for _, j := range p.joining {
+		joiningNow[j.provider+"/"+j.workspace] = true
+	}
+	notJoinedNow := map[string]string{}
+	for _, n := range p.notJoined {
+		notJoinedNow[n.provider+"/"+n.workspace] = n.reason
+	}
 	p.mu.Unlock()
 	sort.Slice(held, func(i, j int) bool { return held[i].record.Name < held[j].record.Name })
 	out := []ProviderSummary{}
@@ -875,6 +901,14 @@ func (p *Providers) Summaries() []ProviderSummary {
 		workspaces := []MachineInfo{}
 		for _, w := range l.workspaces {
 			w.Host = optional(wire.MachineRef(linked[r.ID+"/"+w.ID]))
+			if w.Host == nil {
+				if joiningNow[r.ID+"/"+w.ID] {
+					w.Joining = new(true)
+				}
+				if why, ok := notJoinedNow[r.ID+"/"+w.ID]; ok {
+					w.NotJoined = &why
+				}
+			}
 			workspaces = append(workspaces, w)
 		}
 		for _, f := range failed[r.ID] {
@@ -1377,6 +1411,7 @@ func (p *Providers) link(request MachineLink) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	p.forgetNotJoined(provider, request.Workspace)
 	// One host per workspace: linking moves the link.
 	for _, other := range p.records.Hosts() {
 		link := LinkOf(&other)
@@ -1883,6 +1918,7 @@ func (p *Providers) LinkJoined(host, provider, workspace, trust string) {
 // linkWhenJoined links a made workspace's host once it has joined, within the start's time.
 func (p *Providers) linkWhenJoined(name string) {
 	began := time.Now()
+	var last *joining
 	for time.Since(began) < p.timing.GiveUp {
 		p.mu.Lock()
 		wanted := p.joining[name]
@@ -1890,6 +1926,7 @@ func (p *Providers) linkWhenJoined(name string) {
 		if wanted == nil {
 			return
 		}
+		last = wanted
 		for _, h := range p.records.Hosts() {
 			if h.Name == name && LinkOf(&h) == nil {
 				p.mu.Lock()
@@ -1907,10 +1944,80 @@ func (p *Providers) linkWhenJoined(name string) {
 	p.mu.Lock()
 	_, still := p.joining[name]
 	delete(p.joining, name)
-	p.mu.Unlock()
-	if still {
-		p.log(fmt.Sprintf("workspace: %s was made but didn't join in %s", name, durationWords(p.timing.GiveUp)))
+	providerName := ""
+	if last != nil {
+		if held, ok := p.providers[last.provider]; ok {
+			providerName = held.record.Name
+		}
 	}
+	p.mu.Unlock()
+	if still && last != nil {
+		waited := durationWords(p.timing.GiveUp)
+		p.log(fmt.Sprintf("workspace: %s was made but didn't join in %s", name, waited))
+		// Said to every client (#4610): the row says so, with Delete, not only the log.
+		p.gaveUp(last.provider, last.workspace, name,
+			fmt.Sprintf("Made at %s, but it didn’t join in %s. Delete it, or check its install and register it by hand.",
+				providerName, waited))
+	}
+}
+
+// gaveUp keeps a make the control plane stopped waiting for (#4610), so that its row says
+// so until it is deleted or a host is linked to it.
+func (p *Providers) gaveUp(provider, workspace, name, reason string) {
+	p.mu.Lock()
+	kept := append(p.notJoined, notJoinedMake{provider: provider, workspace: workspace, name: name, reason: reason})
+	if len(kept) > keptNotJoined {
+		kept = kept[len(kept)-keptNotJoined:]
+	}
+	p.notJoined = kept
+	p.mu.Unlock()
+	p.changed()
+}
+
+// forgetNotJoined drops a give-up for a workspace that is linked or deleted (#4610).
+func (p *Providers) forgetNotJoined(provider, workspace string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	kept := p.notJoined[:0:0]
+	for _, n := range p.notJoined {
+		if n.provider != provider || n.workspace != workspace {
+			kept = append(kept, n)
+		}
+	}
+	p.notJoined = kept
+}
+
+// deleteWorkspace is providers/deleteWorkspace (#4610): Delete on a machine New Machine
+// made that never joined. The provider deletes the workspace. A workspace a machine is
+// linked to is deleted by machines/deleteMachine instead, with the machine's backup.
+func (p *Providers) deleteWorkspace(id, workspace, who string) error {
+	p.mu.Lock()
+	_, ok := p.providers[id]
+	p.mu.Unlock()
+	if !ok {
+		return invalid("There is no such provider.")
+	}
+	for _, h := range p.records.Hosts() {
+		if link := LinkOf(&h); link != nil && link.Provider == id && link.Workspace == workspace {
+			return invalid("%s is the machine %s. Delete the machine instead.", workspace, h.Name)
+		}
+	}
+	what := fmt.Sprintf("%s/%s", id, workspace)
+	if _, err := p.providerCall(id, func(c Provider) (any, error) { return nil, c.Delete(workspace) }); err != nil {
+		p.log(fmt.Sprintf("workspace: delete %s by %s: failed: %s", what, who, errorWords(err)))
+		return err
+	}
+	p.mu.Lock()
+	for name, j := range p.joining {
+		if j.provider == id && j.workspace == workspace {
+			delete(p.joining, name)
+		}
+	}
+	p.mu.Unlock()
+	p.forgetNotJoined(id, workspace)
+	p.log(fmt.Sprintf("workspace: delete %s by %s: ok", what, who))
+	p.Refresh(id)
+	return nil
 }
 
 // clone is WorkspaceProviders.clone (#1122): each folder sent to the new host as File ▸

@@ -2675,6 +2675,15 @@ export class Store extends Work {
     }
   }
 
+  /** Delete on a machine New Machine made that never joined (#4610): the provider deletes the workspace. */
+  async deleteWorkspace(provider: string, workspace: string): Promise<void> {
+    try {
+      await this.link.call("providers/deleteWorkspace", { id: provider as ProviderID, workspace });
+    } catch (error) {
+      this.say(describe(error));
+    }
+  }
+
   /** Check Again on a machine's row (#3979): the control plane asks it how it is now. */
   async checkAgain(host: string): Promise<void> {
     try {

@@ -15688,7 +15688,7 @@
     },
     "MachineInfo": {
       "type": "object",
-      "description": "One workspace, as its provider last listed it. `state` is running, starting, stopping, stopped or unknown; or failed, for a make that failed, with the provider's `reason` (#3972).",
+      "description": "One workspace, as its provider last listed it. `state` is running, starting, stopping, stopped or unknown; or failed, for a make that failed, with the provider's `reason` (#3972). `joining` while New Machine waits for it to join the control plane, and `notJoined` once the control plane gave up waiting (#4610).",
       "properties": {
         "id": {
           "type": "string"
@@ -15718,6 +15718,14 @@
         "reason": {
           "type": "string",
           "description": "Why the make failed, in the provider's words, when `state` is failed."
+        },
+        "joining": {
+          "type": "boolean",
+          "description": "New Machine made it and the control plane waits for it to join: the row says Making… (#4610)."
+        },
+        "notJoined": {
+          "type": "string",
+          "description": "Why the control plane gave up waiting for it to join, once it did (#4610): the row says so, with Delete."
         }
       },
       "required": [
@@ -22417,6 +22425,23 @@
         "mapped",
         "workspaces",
         "current"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderWorkspaceRequest": {
+      "type": "object",
+      "description": "providers/deleteWorkspace (#4610): one of a provider's workspaces that no machine is linked to.",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/ProviderID"
+        },
+        "workspace": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "workspace"
       ],
       "additionalProperties": false
     },

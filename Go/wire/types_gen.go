@@ -7069,7 +7069,7 @@ type MachineHelloAnswer struct {
 	Capabilities []string `json:"capabilities,omitzero"`
 }
 
-// One workspace, as its provider last listed it. `state` is running, starting, stopping, stopped or unknown; or failed, for a make that failed, with the provider's `reason` (#3972).
+// One workspace, as its provider last listed it. `state` is running, starting, stopping, stopped or unknown; or failed, for a make that failed, with the provider's `reason` (#3972). `joining` while New Machine waits for it to join the control plane, and `notJoined` once the control plane gave up waiting (#4610).
 type MachineInfo struct {
 	ID string `json:"id"`
 
@@ -7090,6 +7090,12 @@ type MachineInfo struct {
 
 	// Why the make failed, in the provider's words, when `state` is failed.
 	Reason *string `json:"reason,omitzero"`
+
+	// New Machine made it and the control plane waits for it to join: the row says Making… (#4610).
+	Joining *bool `json:"joining,omitzero"`
+
+	// Why the control plane gave up waiting for it to join, once it did (#4610): the row says so, with Delete.
+	NotJoined *string `json:"notJoined,omitzero"`
 }
 
 // machines/install (MachineInstall.Request): a server over ssh, with its key, the fingerprint trusted, a tunnel. Add as Machine… names the provider and the workspace too (#3497): a codespace whose provider a machine carries is installed from that machine, with the token kept there.
@@ -10166,6 +10172,13 @@ type ProviderSummary struct {
 
 	// The CLI its machines are reached through over ssh (gh, coder) when the control plane's machine has none (#3367). Absent when it needs none or has it.
 	SshToolMissing *string `json:"sshToolMissing,omitzero"`
+}
+
+// providers/deleteWorkspace (#4610): one of a provider's workspaces that no machine is linked to.
+type ProviderWorkspaceRequest struct {
+	ID ProviderID `json:"id"`
+
+	Workspace string `json:"workspace"`
 }
 
 // Which APNs a device token belongs to (#1460): a Debug build's (sandbox) or a TestFlight and App Store build's.

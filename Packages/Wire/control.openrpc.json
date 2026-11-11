@@ -4760,6 +4760,32 @@
       }
     },
     {
+      "name": "providers/deleteWorkspace",
+      "x-capability": "providers/2",
+      "description": "Delete on a machine New Machine made that never joined (#4610): the provider deletes the workspace. Refused when a machine is linked to it (Delete that machine instead), or when the caller may not use the provider.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ProviderWorkspaceRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "providers/draftAnswer",
       "x-capability": "providers/1",
       "paramStructure": "by-name",
