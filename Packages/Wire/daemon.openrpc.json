@@ -5057,6 +5057,31 @@
       }
     },
     {
+      "name": "lineage/forecast",
+      "x-capability": "lineage.forecast/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LineageForecastRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LineageForecast"
+        }
+      }
+    },
+    {
       "name": "lineage/link",
       "x-capability": "lineage/1",
       "paramStructure": "by-name",

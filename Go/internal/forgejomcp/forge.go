@@ -41,6 +41,8 @@ type Item struct {
 	PR     bool
 	// State is open, closed or merged.
 	State, Title, URL, Author, Milestone, UpdatedAt string
+	// CreatedAt is when it opened; ClosedAt when it closed or merged, "" while open (#4373).
+	CreatedAt, ClosedAt string
 	// AuthorAvatar is the author's picture, on the Forgejo or on Gravatar; "" for none (#4363).
 	AuthorAvatar string
 	Labels       []string
@@ -109,23 +111,26 @@ type forgeJSON struct {
 		Title string `json:"title"`
 	} `json:"milestone"`
 	UpdatedAt   string `json:"updated_at"`
+	CreatedAt   string `json:"created_at"`
+	ClosedAt    string `json:"closed_at"`
 	Comments    int    `json:"comments"`
 	PullRequest *struct {
-		Merged bool `json:"merged"`
-		Draft  bool `json:"draft"`
+		Merged   bool   `json:"merged"`
+		MergedAt string `json:"merged_at"`
+		Draft    bool   `json:"draft"`
 	} `json:"pull_request"`
 }
 
 func (j forgeJSON) item(repo string) Item {
 	i := Item{Repo: repo, Number: j.Number, PR: j.PullRequest != nil, Title: j.Title, URL: j.HTMLURL, Author: j.User.Login,
 		AuthorAvatar: j.User.AvatarURL,
-		UpdatedAt:    j.UpdatedAt, Comments: j.Comments, Assignees: []string{}, Labels: []string{}, LabelColors: map[string]string{}}
+		UpdatedAt:    j.UpdatedAt, CreatedAt: j.CreatedAt, Comments: j.Comments, Assignees: []string{}, Labels: []string{}, LabelColors: map[string]string{}}
 	i.State = "open"
 	switch {
 	case j.PullRequest != nil && j.PullRequest.Merged:
-		i.State = "merged"
+		i.State, i.ClosedAt = "merged", cmp.Or(j.PullRequest.MergedAt, j.ClosedAt)
 	case j.State == "closed":
-		i.State = "closed"
+		i.State, i.ClosedAt = "closed", j.ClosedAt
 	}
 	for _, l := range j.Labels {
 		i.Labels = append(i.Labels, l.Name)

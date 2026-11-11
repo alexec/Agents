@@ -34,6 +34,11 @@ protocol WorkModel: AnyObject, Sendable {
                                         on host: MachineRef) async throws -> R
     /// A page of the lineage nodes of a kind, from the control plane; nil with none.
     func reportNodes(_ query: DaemonAPI.ReportNodesQuery) async throws -> DaemonAPI.ReportNodes?
+    /// The sessions on every machine that lineage links to these nodes, with their state now, from
+    /// the control plane's merged copy (#4276); nil with no control plane, or one too old to say.
+    func lineageSessionsOn(_ nodes: [DaemonAPI.LineageNode]) async -> DaemonAPI.LineageSessionsOn?
+    /// Goes up on each `control/lineageChanged` (#4276): a machine sent new lineage.
+    var lineageChanges: Int { get }
     /// What a node is linked to, `depth` links away (1 to 4).
     func lineageWalk(_ node: DaemonAPI.LineageNode, depth: Int, on host: MachineRef) async throws -> DaemonAPI.LineageGraph
     func lineageCost(_ node: DaemonAPI.LineageNode, on host: MachineRef) async -> DaemonAPI.LineageCostRollup?
@@ -60,6 +65,8 @@ extension WorkModel {
     var workProjects: [WorkList.Project] { [] }
     func askWorkConnectors() -> Bool { false }
     var timelineMachines: [(id: MachineRef, name: String)] { [] }
+    func lineageSessionsOn(_ nodes: [DaemonAPI.LineageNode]) async -> DaemonAPI.LineageSessionsOn? { nil }
+    var lineageChanges: Int { 0 }
 
     /// The boards of every machine's folders' projects (#3282), each once, by url, the first
     /// name kept; none from a machine that cannot be read.

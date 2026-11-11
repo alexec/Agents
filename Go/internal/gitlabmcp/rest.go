@@ -227,6 +227,28 @@ func (g *RealGitLab) get(ctx context.Context, path string, shared bool, into any
 	return nil
 }
 
+// getCounted is path's JSON, as get gives it unshared, and GitLab's X-Total: how many items the
+// list has in all (#4396), -1 where GitLab does not say (a list of over 10,000).
+func (g *RealGitLab) getCounted(ctx context.Context, path string, into any) (int, error) {
+	res, err := g.request(ctx, http.MethodGet, path, nil, "")
+	if err != nil {
+		return 0, err
+	}
+	defer res.Body.Close()
+	body, err := answer(res)
+	if err != nil {
+		return 0, err
+	}
+	if json.Unmarshal(body, into) != nil {
+		return 0, &GitLabError{Kind: Failed, Message: "GitLab's answer is not JSON"}
+	}
+	total, err := strconv.Atoi(res.Header.Get("X-Total"))
+	if err != nil || total < 0 {
+		return -1, nil
+	}
+	return total, nil
+}
+
 // getAsOf is path's JSON shared as get shares it, but only with a fetch for the same asOf: a
 // time the thing at path changed at, or something newer than it was seen at, so what is
 // shared is never older than what the caller has seen.

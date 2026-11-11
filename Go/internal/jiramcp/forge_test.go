@@ -2,6 +2,7 @@ package jiramcp
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -20,9 +21,13 @@ func TestSearchJQLNarrowsByProjectStateAndFilters(t *testing.T) {
 }
 
 // Jira Cloud gives a token per page: a cursor after an issue in a page's middle names the page
-// and how far into it, and reads it again from there.
+// and how far into it, and reads it again from there. The first page counts the list, by Jira
+// Cloud's approximate count (#4396).
 func TestSearchOnCloudGoesOnInAPagesMiddle(t *testing.T) {
-	f, j := newSite(t, true, func(_ string, body map[string]any) any {
+	f, j := newSite(t, true, func(path string, body map[string]any) any {
+		if path == "/search/approximate-count" {
+			return map[string]any{"count": 7}
+		}
 		return map[string]any{"issues": []any{
 			restIssueJSON("ENG-3", "2026-11-01T10:00:00.000+0000", map[string]any{"fixVersions": []any{map[string]any{"name": "2.4"}},
 				"comment": map[string]any{"total": 3}, "parent": map[string]any{"key": "ENG-1"},
@@ -33,8 +38,11 @@ func TestSearchOnCloudGoesOnInAPagesMiddle(t *testing.T) {
 		}, "nextPageToken": "tok~2", "isLast": false}
 	})
 	page, err := j.Search(context.Background(), []string{"ENG"}, SearchFilter{}, "", 1)
-	if err != nil || len(page.Items) != 1 || page.Cursors[0] != "~1" || page.Next != "~1" {
+	if err != nil || len(page.Items) != 1 || page.Cursors[0] != "~1" || page.Next != "~1" || page.Total == nil || *page.Total != 7 {
 		t.Fatalf("%+v %v", page, err)
+	}
+	if f.asked[1] != "POST /search/approximate-count" || f.bodies[1]["jql"] != f.bodies[0]["jql"] {
+		t.Fatalf("count: %v %v", f.asked, f.bodies[1])
 	}
 	i := page.Items[0]
 	if i.Key != "ENG-3" || i.State != "closed" || i.Status != "Shipped" || i.Milestone != "2.4" || i.Comments != 3 || i.Parent != "ENG-1" ||
@@ -42,14 +50,14 @@ func TestSearchOnCloudGoesOnInAPagesMiddle(t *testing.T) {
 		t.Fatalf("item %+v", i)
 	}
 	page, err = j.Search(context.Background(), []string{"ENG"}, SearchFilter{}, page.Next, 2)
-	if err != nil || len(page.Items) != 1 || page.Items[0].Key != "ENG-2" || page.Next != "tok~2~0" {
+	if err != nil || len(page.Items) != 1 || page.Items[0].Key != "ENG-2" || page.Next != "tok~2~0" || page.Total != nil {
 		t.Fatalf("second %+v %v", page, err)
 	}
-	if f.bodies[1]["nextPageToken"] != nil || f.bodies[1]["maxResults"] != float64(3) {
-		t.Fatalf("the second read asks the first page again, for one more: %v", f.bodies[1])
+	if f.bodies[2]["nextPageToken"] != nil || f.bodies[2]["maxResults"] != float64(3) {
+		t.Fatalf("the second read asks the first page again, for one more: %v", f.bodies[2])
 	}
-	if _, err := j.Search(context.Background(), []string{"ENG"}, SearchFilter{}, page.Next, 2); err != nil || f.bodies[2]["nextPageToken"] != "tok~2" {
-		t.Fatalf("a token with a ~ in it: %v %v", f.bodies[2], err)
+	if _, err := j.Search(context.Background(), []string{"ENG"}, SearchFilter{}, page.Next, 2); err != nil || f.bodies[3]["nextPageToken"] != "tok~2" {
+		t.Fatalf("a token with a ~ in it: %v %v", f.bodies[3], err)
 	}
 	if _, err := j.Search(context.Background(), []string{"ENG"}, SearchFilter{}, "nope", 2); err == nil {
 		t.Fatal("a cursor no list gave")
@@ -62,8 +70,12 @@ func TestSearchOnDataCenterPagesByStart(t *testing.T) {
 		return map[string]any{"total": 5, "issues": []any{restIssueJSON("ENG-2", "2026-11-01T09:00:00.000+0000", nil)}}
 	})
 	page, err := j.Search(context.Background(), []string{"ENG"}, SearchFilter{}, "3~0", 1)
-	if err != nil || f.asked[0] != "POST /search" || f.bodies[0]["startAt"] != float64(3) || page.Next != "4~0" {
+	if err != nil || f.asked[0] != "POST /search" || f.bodies[0]["startAt"] != float64(3) || page.Next != "4~0" || page.Total != nil {
 		t.Fatalf("%+v %v %v", page, f.bodies, err)
+	}
+	// Data Center counts with the first page itself (#4396).
+	if page, err = j.Search(context.Background(), []string{"ENG"}, SearchFilter{}, "", 1); err != nil || page.Total == nil || *page.Total != 5 || len(f.asked) != 2 {
+		t.Fatalf("first page %+v %v %v", page, f.asked, err)
 	}
 }
 
@@ -242,6 +254,22 @@ func TestStateReasonOf(t *testing.T) {
 	} {
 		if got := stateReasonOf(c.resolution); got != c.want {
 			t.Errorf("%q: %q, want %q", c.resolution, got, c.want)
+		}
+	}
+}
+
+// #4373: an issue says when it was made, and a done one its resolution date.
+func TestItemDates(t *testing.T) {
+	for category, closed := range map[string]bool{"indeterminate": false, "done": true} {
+		var r restIssue
+		if err := json.Unmarshal([]byte(`{"key":"ENG-1","fields":{"status":{"name":"S","statusCategory":{"key":"`+category+`"}},
+			"created":"2026-10-01T10:00:00.000+0000","resolutiondate":"2026-10-02T10:00:00.000+0000"}}`), &r); err != nil {
+			t.Fatal(err)
+		}
+		i := r.item("https://acme.atlassian.net")
+		if i.CreatedAt != normalized("2026-10-01T10:00:00.000+0000") || i.CreatedAt == "" ||
+			(i.ClosedAt == normalized("2026-10-02T10:00:00.000+0000")) != closed || closed && i.ClosedAt == "" {
+			t.Errorf("%s: %q %q", category, i.CreatedAt, i.ClosedAt)
 		}
 	}
 }

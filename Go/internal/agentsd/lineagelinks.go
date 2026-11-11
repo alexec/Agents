@@ -21,11 +21,12 @@ import (
 
 // The links the host makes on its own (#2349), so agents and people seldom have to:
 //
-//   - A session's label #n, P#n or a Linear key (ENG-4) is a works-on link to that issue or
-//     PR: from the start (the Issues and PR pages give one), or added later by the agent
+//   - A session's label #n, P#n, a Linear key (ENG-4) or a version tag (v1.2.0, #4524) is a
+//     works-on link to that issue, PR or release: from the start (the Issues and PR pages give one), or added later by the agent
 //     (set_session_labels) or the person. Taking the label off ends the link.
 //   - A helper is started by its parent session, a workflow's session by its run, and the
-//     run is part of its workflow.
+//     run is part of its workflow. A run started by a PR's checks.* or pr.* event works on
+//     that PR (#4524).
 //   - pr.opened links the PR to every session that worked on its branch (opens), and the
 //     PR to the issues its body closes (fixes). pr.merged and pr.closed link what its body
 //     closes too, so a closed PR's cost stays against its issues (#2350).
@@ -274,10 +275,16 @@ var (
 	keyInText = regexp.MustCompile(`(?i)\b[A-Z][A-Z0-9]{0,9}-[0-9]{1,9}\b`)
 )
 
-// labelNode is the issue or PR a label names, in the folder's repo: #n, P#n, or a key such as
-// ENG-4: on Jira when the folder's .agents/folder.json names its project in "jiraProjects"
-// (#3260), else on Linear; or AB#n, a work item of the folder's Azure Boards project (#3815).
+// labelNode is the issue, PR or release a label names, in the folder's repo: #n, P#n, a
+// version tag such as v1.2.0 (its release, so a release session's cost goes on it, #4524), or
+// a key such as ENG-4: on Jira when the folder's .agents/folder.json names its project in
+// "jiraProjects" (#3260), else on Linear; or AB#n, a work item of the folder's Azure Boards
+// project (#3815).
 func (d *Daemon) labelNode(folder, label string) (wire.LineageNode, bool) {
+	if versionTagPattern.MatchString(label) {
+		repo := d.folderRepo(folder)
+		return repo.release(label), repo.forge != ""
+	}
 	if linearLabel.MatchString(label) {
 		return keyNode(label, d.folderJiraProjects(folder)), true
 	}
@@ -580,6 +587,29 @@ type prEventPayload struct {
 		URL    string   `json:"url"`
 		Fixes  []string `json:"fixes"`
 	} `json:"pr"`
+}
+
+// lineagePRStarted links the session a workflow run started works-on the PR the event that
+// started it names (#4524), so a fix-failed-checks run's cost goes on its PR: checks.*, and
+// pr.* on an open PR. Not pr.merged or pr.closed: the PR is done, and what follows (a ship,
+// a clean-up) is other work. pr.merged and pr.closed end the link, as they do every session's.
+func (d *Daemon) lineagePRStarted(e wire.Event, session wire.UUID) {
+	switch e.Name {
+	case "pr.merged", "pr.closed":
+		return
+	}
+	if !strings.HasPrefix(e.Name, "pr.") && !strings.HasPrefix(e.Name, "checks.") {
+		return
+	}
+	var p prEventPayload
+	if json.Unmarshal([]byte(e.Details["payload"]), &p) != nil || p.PR.URL == "" {
+		return
+	}
+	repo, n, ok := d.prOfURLHere(p.PR.URL)
+	if !ok {
+		return
+	}
+	d.lineageDo(func() { d.link(sessionNode(session), repo.pr(n), lineage.RelWorksOn, lineage.SourceHelper) })
 }
 
 // lineageEvent makes the links a raised event says: pr.opened, pr.merged and pr.closed,

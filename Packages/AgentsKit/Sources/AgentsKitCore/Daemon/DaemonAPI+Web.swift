@@ -311,6 +311,8 @@ public extension DaemonAPI {
                     kind: .hostRequest),
                 Row(Method.lineageEstimate, params: LineageEstimateRequest.self, result: LineageEstimate.self,
                     kind: .hostRequest),
+                Row(Method.lineageForecast, params: LineageForecastRequest.self, result: LineageForecast.self,
+                    kind: .hostRequest),
                 Row(Method.simulatorsList, params: Empty.self, result: SimulatorList.self, kind: .hostRequest),
                 Row(Method.simulatorsBoot, params: SimulatorRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.simulatorsShutdown, params: SimulatorRequest.self, result: Empty.self, kind: .hostRequest),
@@ -534,6 +536,10 @@ public extension DaemonAPI {
                 // Work ▸ Issues, Pull requests and Releases (#3118).
                 Row(Method.reportsNodes, params: ReportNodesQuery.self, result: ReportNodes.self, kind: .controlRequest),
                 Row(Method.reportsScopes, params: Empty.self, result: ReportScopes.self, kind: .controlRequest),
+                // Lineage over every machine's copy (#4276): Work ▸ Timeline's sessions.
+                Row(Method.lineageWalkAll, params: LineageWalkAllRequest.self, result: LineageGraph.self, kind: .controlRequest),
+                Row(Method.lineageSessionsOn, params: LineageSessionsOnRequest.self, result: LineageSessionsOn.self,
+                    kind: .controlRequest),
                 Row(Method.reportsPolicy, params: Empty.self, result: ReportPolicy.self, kind: .controlRequest),
                 Row(Method.reportsSetPolicy, params: ReportPolicy.self, result: ReportPolicy.self, kind: .controlRequest),
                 // Saved views of Reports (#2019).
@@ -756,6 +762,8 @@ public extension DaemonAPI {
                 Row(Notification.controlGroupsChanged, params: GroupsChanged.self, result: Empty.self,
                     kind: .controlNotification),
                 Row(Notification.controlProjectsChanged, params: ProjectsChanged.self, result: Empty.self,
+                    kind: .controlNotification),
+                Row(Notification.controlLineageChanged, params: LineageChanged.self, result: Empty.self,
                     kind: .controlNotification),
                 Row(Notification.controlCapReached, params: CapReached.self, result: Empty.self,
                     kind: .controlNotification),

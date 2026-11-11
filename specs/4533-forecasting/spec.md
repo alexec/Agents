@@ -101,6 +101,27 @@ The figures move by about ±0.05 in the ratio from one seed to the next. The gro
 
 Decided: method H (hourly throughput, 14-day window, past groups' median share, no step floor, no growth factor), because it equals today's step model on a typical epic, beats it on large epics and milestones, and its P85 is the only one that holds about 85% of the time. Alex can overrule.
 
+## What `lineage/forecast` built (#4526)
+
+- **When an epic lands:** method H as decided, in `Go/internal/lineage/throughput.go`. The landings are the store's issues (not epics) with a merged PR, in the epic's repo. A closed epic is one whose node is closed, or, when the store has no node for it, one whose children are all closed. Its start is the first work on it or a child. With no date, `noForecast` says why.
+- **Kept:** the first forecast is kept on the epic's cost node (`LineageCostNode.forecast`), once, for scoring.
+- **Estimate to complete:** each open child's cost drawn from its matches, times one lognormal factor per draw from the closed children's actual over their kept estimate (3 or more), times one plus the lead's share (the epic's own cost over its closed children's).
+- **Spend:** a week and a month from 7 and 30 draws of the window's days. A day's cost is what the issues that landed on it took.
+- **Burn:** each weekly allowance's last reading of the week now running, at its pace since the week started: when it runs out, or that it lasts to the reset.
+- **Service levels:** each level's P50 and P85 cycle time over the window's landings, with 5 or more.
+- **Milestones are not in it yet (#4620):** the store does not keep an issue's milestone, so there are no closed milestones to take a share from.
+
+Decided: milestones go in #4620, not in #4526, because their membership must first be kept in the store, which is a change of its own. Alex can overrule.
+
+## The overhead, loaded in (#4524)
+
+- **Linked where it can be:** a turn with no work that started sessions goes on their work, so a Scrum Master's turn that starts a lead or a lane goes on that epic or issue. A workflow run started by a PR's `checks.*` or `pr.*` event (fix-failed-checks) works on that PR until it merges. A session labelled with a version tag (`v1.2.0`) works on that release, and the release's rollup counts it. The merge wave labels itself `P#<n>` for each PR it lands; the release labels itself `v<next>`.
+- **Measured where it cannot be:** `lineage.Overhead` takes the nodes that changed in the last 14 days. `unlinkedRatio` is the sessions' cost over the issues', PRs' and releases'. `epicRatio` is the epics' own cost over their children's and those children's PRs'.
+- **Shown as a loaded figure:** `lineage/estimate` has `loaded` beside `cost`: times (1 + `unlinkedRatio`), and for an epic times (1 + `epicRatio`) too, as its cost leaves its lead out. `lineage/forecast`'s `toComplete.loaded` and `spend.loadedWeek`/`loadedMonth` are times (1 + `unlinkedRatio`) only: the lead is in `toComplete` already. `reports/value` has `loaded` (total and unlinked) and the scope's `overhead`.
+- **Uncounted:** people's time and CI minutes are in no store; `overhead.uncounted` names them.
+
+Decided: a workflow run started by `pr.merged` or `pr.closed` is not linked to the PR, because the PR is done and what follows (a ship, a clean-up) is other work. Alex can overrule.
+
 ## Not in this spike
 
 - Cost forecasts, the burn against the allowance, and the estimate to complete. #4526 has them; this backtest is about dates only.

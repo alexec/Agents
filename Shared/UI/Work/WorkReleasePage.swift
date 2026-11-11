@@ -4,8 +4,9 @@ import SwiftUI
 /// A release's page in the Work look (#4421, `specs/4328-work-look/milestones.md` notes 22 to
 /// 29): the header with its Latest chip and Open on GitHub, the state line with the range to
 /// the release before it, the notes, the pull requests in it, and the side panel (Tag, Compared
-/// with, Pipeline, Lineage). Under 700 points the panel is a block of rows under the notes. It
-/// draws what lineage knows (`lineage/walk`, `lineage/cost`, `lineage/figures`); the forge's releases (#4426)
+/// with, Pipeline, Lineage). Under 700 points the panel is a block of rows under the notes; on a
+/// phone the pull requests are a row, **Pull requests · 23 ›**, that pushes their list (note 43,
+/// #4422). It draws what lineage knows (`lineage/walk`, `lineage/cost`, `lineage/figures`); the forge's releases (#4426)
 /// bring the name, the notes, the author, drafts and pre-releases.
 struct WorkReleasePage: View {
     let model: any WorkModel
@@ -27,6 +28,8 @@ struct WorkReleasePage: View {
     @State private var width: CGFloat = 0
     /// The pull requests' search and Label filter (note 25).
     @State private var filter = WorkList.Filter(state: .all)
+    /// The phone's list of the pull requests is pushed (note 43).
+    @State private var showsPulls = false
 
     private var node: DaemonAPI.LineageNode { place.node ?? .init(kind: WorkList.Kind.release.rawValue, ref: "") }
     private var tag: String { WorkReleaseLook.tag(node.ref) }
@@ -53,7 +56,7 @@ struct WorkReleasePage: View {
                     if narrow {
                         notes
                         WorkSidePanel(compact: true) { panel }
-                        pullRequests
+                        if compact { pullsRow } else { pullRequests }
                     } else {
                         HStack(alignment: .top, spacing: 24) {
                             VStack(alignment: .leading, spacing: 16) {
@@ -73,6 +76,13 @@ struct WorkReleasePage: View {
         .onGeometryChange(for: CGFloat.self, of: \.size.width) { width = $0 }
         #if os(iOS)
         .refreshable { asked += 1 }
+        .navigationDestination(isPresented: $showsPulls) {
+            WorkReleasePulls(tag: tag, pulls: pulls ?? []) { ref in
+                showsPulls = false
+                model.showWork(WorkPlace(kind: .pr, ref: ref))
+            }
+            .paperGround()
+        }
         .navigationSubtitle(model.workNeighbours.map { WorkList.positionWords($0, more: list.hasMore) } ?? "")
         .navigationBarBackButtonHidden(true)
         .toolbar { barItems }
@@ -130,8 +140,7 @@ struct WorkReleasePage: View {
     #endif
 
     #if os(iOS)
-    /// The Remote's bar: ‹ Releases, then ↑ and ↓, and on the iPhone Open on GitHub. The Remote's
-    /// own release page is #4422.
+    /// The Remote's bar: ‹ Releases, then ↑ and ↓, and on the iPhone Open on GitHub.
     @ToolbarContentBuilder
     private var barItems: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
@@ -268,6 +277,32 @@ struct WorkReleasePage: View {
         }
     }
 
+    #if os(iOS)
+    /// The phone's **Pull requests · 23 ›** (note 43): a release is read for its notes, and its
+    /// list of pull requests is long, so it is a page of its own.
+    private var pullsRow: some View {
+        Button { showsPulls = true } label: {
+            HStack(spacing: 8) {
+                Image(systemName: WorkList.Kind.pr.sidebarIcon).foregroundStyle(.secondary).accessibilityHidden(true)
+                Text(pulls.map { "Pull requests · \($0.count)" } ?? "Pull requests").monospacedDigit()
+                Spacer(minLength: 8)
+                if pulls == nil { ProgressView().controlSize(.small) }
+                Image(systemName: "chevron.right").foregroundStyle(.tertiary).accessibilityHidden(true)
+            }
+            .appText(.supporting)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .background(RoundedRectangle(cornerRadius: Paper.Radius.card).fill(Paper.well))
+        .disabled(pulls == nil)
+        .accessibilityLabel(pulls.map { WorkReleaseLook.pullsWords($0.count) } ?? "Pull requests")
+    }
+    #else
+    private var pullsRow: some View { pullRequests }
+    #endif
+
     // MARK: Side panel
 
     /// Tag, Compared with, Pipeline and Lineage (notes 26, 28 and 29).
@@ -395,3 +430,47 @@ struct WorkReleaseChip: View {
             .overlay(Capsule().strokeBorder(color.opacity(0.6)))
     }
 }
+
+#if os(iOS)
+/// A release's pull requests on a phone (note 43), pushed from its page: the search field in the
+/// bar, then a phone row for each; a row opens the pull request's page.
+private struct WorkReleasePulls: View {
+    let tag: String
+    let pulls: [WorkList.Row]
+    let open: (String) -> Void
+    @State private var filter = WorkList.Filter(state: .all)
+
+    var body: some View {
+        let shown = WorkList.filter(pulls, filter)
+        List {
+            if pulls.isEmpty {
+                Text(WorkReleaseLook.noPulls).appText(.supporting).foregroundStyle(.secondary)
+            } else if shown.isEmpty {
+                HStack(spacing: 8) {
+                    Text("No pull requests match").foregroundStyle(.secondary)
+                    Button(WorkLook.clearFilters) { filter = WorkList.Filter(state: .all) }.linkStyle()
+                }
+                .appText(.supporting)
+            }
+            ForEach(shown) { pr in
+                Button { open(pr.id) } label: { WorkItemRow(row: pr, several: false, compact: true) }
+                    .buttonStyle(.plain)
+            }
+        }
+        .listStyle(.inset)
+        .searchable(text: $filter.text, prompt: "Filter pull requests")
+        .navigationTitle("Pull requests")
+        .navigationSubtitle(tag)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            let labels = WorkList.choices(pulls).labels
+            if !labels.isEmpty || !filter.label.isEmpty {
+                ToolbarItem(placement: .topBarTrailing) {
+                    WorkFilterMenu(name: "Label", selection: $filter.label, options: labels, words: { $0 }, any: "", anyWords: "Any",
+                                   compact: true)
+                }
+            }
+        }
+    }
+}
+#endif

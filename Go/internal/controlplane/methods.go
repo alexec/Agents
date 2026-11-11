@@ -120,6 +120,8 @@ var own = methodSet(
 	"machines/sshHosts",
 	"machines/startEnroll",
 	"machines/update",
+	"lineage/sessionsOn",
+	"lineage/walkAll",
 	"links/approve",
 	"links/deny",
 	"links/list",
@@ -402,6 +404,8 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return m.orgRoutesMethod(ctx, method, params, from)
 	case "sealing/work", "sealing/add":
 		return m.sealingMethod(ctx, method, params, from)
+	case "lineage/walkAll", "lineage/sessionsOn":
+		return m.lineageReadMethod(ctx, method, params, from)
 	case "links/list", "links/requests", "links/approve", "links/deny", "links/remove":
 		return m.linksMethod(ctx, method, params, from)
 	case "lock/get", "lock/add", "lock/reset":

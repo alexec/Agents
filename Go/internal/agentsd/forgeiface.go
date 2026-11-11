@@ -61,10 +61,17 @@ type forgeCaps struct {
 	Issue, PR forgeActions
 	// The fields a forge fills (the spec's "The new fields").
 	LabelColors, Avatars, StateReason bool
+	// CreatedAt: items say when they opened; ClosedAt: closed and merged items say when they
+	// closed. Children, LinkedPulls and Events: an issue's read has its sub-issues, the pull
+	// requests that close it, and its timeline (#4373).
+	CreatedAt, ClosedAt, Children, LinkedPulls, Events bool
 	// CommentCount is "exact", "capped" (at CommentsMost, Linear's 50) or "detail" (only on an
 	// item's own page: Bitbucket issues, Azure Repos).
 	CommentCount string
 	CommentsMost int
+	// Total: a list's first page says how many items the whole list has (forgePage.total, #4396).
+	// A forge without it has a total only when its list ends on its first page.
+	Total bool
 	// Plans: sub-issues, blocked-by, a new child.
 	Plan, BlockedBy, AddChild bool
 	// Reasons say why an action is missing, by the action's name, in the words a person reads,
@@ -108,6 +115,15 @@ func (c forgeCaps) wire(name string) wire.ForgeCapabilities {
 		Avatars: c.Avatars, StateReason: c.StateReason, CommentCount: wire.ForgeCommentCount(c.CommentCount)}
 	if c.CommentsMost > 0 {
 		out.CommentsMost = new(int64(c.CommentsMost))
+	}
+	// An earlier daemon leaves these out, which a client reads as false, so only true is sent.
+	for _, f := range []struct {
+		on  bool
+		out **bool
+	}{{c.CreatedAt, &out.CreatedAt}, {c.ClosedAt, &out.ClosedAt}, {c.Children, &out.Children}, {c.LinkedPulls, &out.LinkedPulls}, {c.Events, &out.Events}, {c.Total, &out.Total}} {
+		if f.on {
+			*f.out = new(true)
+		}
 	}
 	return out
 }

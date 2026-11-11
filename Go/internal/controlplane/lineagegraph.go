@@ -90,6 +90,13 @@ func (s *Service) keepLineageSync(ctx context.Context, host string, sync wire.Li
 	if err := s.keepSyncStates(ctx, host, sync.States, now); err != nil {
 		return wire.LineageSyncAnswer{}, err
 	}
+	if len(sync.Links) > 0 && !full || len(sync.States) > 0 {
+		kept := sync
+		if full {
+			kept.Links = nil
+		}
+		s.lineageChanged(host, kept)
+	}
 	if full {
 		t := true
 		return wire.LineageSyncAnswer{Full: &t}, nil

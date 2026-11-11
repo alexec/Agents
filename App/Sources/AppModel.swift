@@ -89,6 +89,8 @@ final class AppModel {
     /// How many New Machine calls wait for the provider's answer (#4610): a *Making…* row
     /// each, until the control plane lists the machine as joining.
     private(set) var machinesBeingMade = 0
+    /// Goes up on each `control/lineageChanged` (#4276): Work ▸ Timeline reads the sessions again.
+    private(set) var lineageChanges = 0
     /// A runtime of this Mac's that refused for want of a sign-in: the window answers
     /// with its sign-in sheet rather than an error nobody can act on.
     var signInRuntimeID: String?
@@ -3824,6 +3826,9 @@ final class AppModel {
                             if let listed = try? note.params?["providers"]?.decode([DaemonAPI.ProviderSummary].self) {
                                 self?.machineProviders = listed.filter { $0.capabilities.contains("create") && $0.usable }
                             }
+                        case DaemonAPI.Notification.controlLineageChanged:
+                            // Work ▸ Timeline reads the sessions again (#4276).
+                            self?.lineageChanges += 1
                         case DaemonAPI.Notification.controlThisMacHostChanged:
                             // The join file changed and the host list may not have (#303).
                             await self?.refreshMacHostJoin(control)
@@ -6699,6 +6704,14 @@ final class AppModel {
     func reportNodes(_ query: DaemonAPI.ReportNodesQuery) async throws -> DaemonAPI.ReportNodes? {
         guard let controlRequests else { return nil }
         return try await controlRequests.call(DaemonAPI.Method.reportsNodes, query, returning: DaemonAPI.ReportNodes.self)
+    }
+
+    /// Every machine's sessions on these nodes, from the control plane's merged copy (#4276): Work ▸
+    /// Timeline's starts; nil with no control plane, or one from before it.
+    func lineageSessionsOn(_ nodes: [DaemonAPI.LineageNode]) async -> DaemonAPI.LineageSessionsOn? {
+        guard let controlRequests, !nodes.isEmpty else { return nil }
+        return try? await controlRequests.call(DaemonAPI.Method.lineageSessionsOn, DaemonAPI.LineageSessionsOnRequest(nodes: nodes),
+                                               returning: DaemonAPI.LineageSessionsOn.self)
     }
 
 

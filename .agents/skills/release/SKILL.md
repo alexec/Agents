@@ -90,6 +90,9 @@ calendar day in America/Los_Angeles, not 24 hours since the tag.
 1. Note the time T0, then `git fetch --quiet --tags origin main`.
 2. `.agents/skills/release/scripts/release-plan.py`. It prints the last tag and the next
    version. If it says nothing merged since the last tag, end with `nothing_to_do`.
+   Otherwise label this session with that version, `v<next>` (`set_session_labels`), so the
+   release's cost goes on its release node (#4524). If step 6 picks another version, change
+   the label to it.
 3. No milestone holds the release (#3760). Only for 1.0.0, which Alex's prompt names:
    when `1.0 Public release` has an open issue
    (`gh issue list --milestone "1.0 Public release" --state open`), end with `nothing_to_do`

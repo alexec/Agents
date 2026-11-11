@@ -637,6 +637,47 @@ public enum WorkTimeline {
         return out
     }
 
+    /// The children's starts with every machine's sessions on them (#4276, `lineage/sessionsOn`),
+    /// so a child a sleeping machine's session started still starts then: a child starts at the
+    /// earliest of its own start, its close and its first session's link, and its line no later.
+    public static func started(_ timeline: DaemonAPI.WorkTimeline, by sessions: [DaemonAPI.LineageSessionOn]) -> DaemonAPI.WorkTimeline {
+        var first: [String: Date] = [:]
+        for session in sessions {
+            for node in session.on { first[node.ref] = min(first[node.ref] ?? session.at, session.at) }
+        }
+        guard !first.isEmpty else { return timeline }
+        var out = timeline
+        for e in out.epics.indices {
+            var epic = out.epics[e]
+            let last = epic.segments.count - 1
+            for c in epic.children.indices {
+                let child = epic.children[c]
+                guard let at = first[child.item.node.ref] else { continue }
+                let start = min(child.startedAt ?? at, child.closedAt ?? at, at)
+                guard start != child.startedAt else { continue }
+                epic.children[c].startedAt = start
+                guard last >= 0 else { continue }
+                // Its line, as `lines` finds it: an open child is on the last; a closed one on the
+                // line it closed in.
+                var i = last
+                if let closed = child.closedAt {
+                    i = epic.segments.indices.first { $0 == last || closed < epic.segments[$0 + 1].startedAt ?? .distantFuture } ?? last
+                }
+                if epic.segments[i].startedAt.map({ start < $0 }) ?? true { epic.segments[i].startedAt = start }
+            }
+            out.epics[e] = epic
+        }
+        return out
+    }
+
+    /// The nodes a timeline asks `lineage/sessionsOn` for: its epics and their children, each once,
+    /// at most 500.
+    public static func sessionNodes(_ timeline: DaemonAPI.WorkTimeline) -> [DaemonAPI.LineageNode] {
+        var seen = Set<String>()
+        let all = timeline.epics.flatMap { [$0.item.node] + $0.children.map(\.item.node) }
+        return Array(all.filter { seen.insert($0.ref).inserted }.prefix(500))
+    }
+
     public static let showTheWeek = "Show the week"
     /// S12: no project to draw.
     public static let noProject = "No project to draw"

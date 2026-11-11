@@ -243,6 +243,22 @@ test("machines merge each epic and release once", () => {
   assert.deepEqual(merged.errors, ["x", "y"]);
 });
 
+// #4276: a session on another machine, from the control plane's copy, starts a child this machine
+// had no start for, and an earlier one moves a start and its line back; as the window's test.
+test("sessions on every machine start the children", () => {
+  const timeline = { epics: [epic(1, [child(3, { started: -10, closed: -5 }), child(2), child(4, { started: -3 })], [[-10, -5], [-3, null]])], releases: [] };
+  const on = (n, hours) => ({ node: { kind: "session", ref: `session:${n}-${hours}` }, host: "BEAS-MAC",
+    on: [{ kind: "issue", ref: `github:alexec/Agents#${n}` }], at: wire(hours) });
+  const got = t.startedBySessions(timeline, [on(2, -4), on(3, -12), on(4, -1), on(9, -50)]);
+  // #3 started earlier on Bea's machine; #2 started there; #4 started here first.
+  assert.deepEqual(got.epics[0].children.map((c) => c.startedAt), [wire(-12), wire(-4), wire(-3)]);
+  assert.deepEqual(got.epics[0].segments.map((s) => s.startedAt), [wire(-12), wire(-4)]);
+  assert.equal(t.startedBySessions(timeline, []), timeline);
+  assert.deepEqual(t.sessionNodes(got).map((n) => n.ref), [1, 3, 2, 4].map((n) => `github:alexec/Agents#${n}`));
+  // The machines' read is left as it was.
+  assert.equal(timeline.epics[0].children[1].startedAt, undefined);
+});
+
 test("a child that closed since the last read lands", () => {
   const before = { epics: [epic(24, [child(2, { started: -2 }), child(3, { started: -1 })], [[-2, null]])], releases: [] };
   const after = { epics: [epic(24, [child(2, { started: -2, closed: 0 }), child(3, { started: -1 })], [[-2, null]]),

@@ -517,6 +517,8 @@ export class Work {
   readonly linksChanges = signal(0);
   /** Goes up on control/projectsChanged (#2317), so Console ▸ Projects loads again (#2671). */
   readonly projectsChanges = signal(0);
+  /** Goes up on control/lineageChanged (#4276), so Work ▸ Timeline reads the sessions again. */
+  readonly lineageChanges = signal(0);
   /** Counts each control/clientChanged: a pairing code's dialog (#4253) names the client it let in. */
   readonly clientChanges = signal(0);
   /** Counts each control/peopleChanged (#994): Settings ▸ People loads its list again when it moves. */
@@ -1478,6 +1480,10 @@ export class Store extends Work {
       }
       if (method === "control/projectsChanged") {
         this.projectsChanges.value += 1;
+        return;
+      }
+      if (method === "control/lineageChanged") {
+        this.lineageChanges.value += 1;
         return;
       }
       if (method === "control/groupsChanged") {

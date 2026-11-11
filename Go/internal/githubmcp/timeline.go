@@ -10,19 +10,19 @@ import (
 // pages of epics. The daemon puts the epics of a project's repos on one time axis and forecasts
 // the open ones (lineage/forecast.go).
 
-// TimelineChild is an epic's sub-issue with its dates: CreatedAt, ClosedAt ("" while open),
+// TimelineChild is an epic's sub-issue with its dates (the Item's CreatedAt and ClosedAt),
 // StateReason (completed, not_planned or ""), and when each pull request that closes it opened.
 type TimelineChild struct {
 	Item
-	CreatedAt, ClosedAt, StateReason string
-	PROpenedAt                       []string
+	StateReason string
+	PROpenedAt  []string
 }
 
 // TimelineEpic is an epic with its dates and its sub-issues (at most 100), in GitHub's order.
 type TimelineEpic struct {
 	Item
-	CreatedAt, ClosedAt, StateReason string
-	Children                         []TimelineChild
+	StateReason string
+	Children    []TimelineChild
 }
 
 // Release is a published release: its tag, when, and its page.
@@ -44,24 +44,14 @@ const (
 	timelineReleases = 50
 )
 
-// timelineFields are an issue's dates, as both an epic and a child say them; its stateReason is
-// in issueFields.
-const timelineFields = `createdAt closedAt`
-
 const timelineQuery = `query($owner: String!, $name: String!, $states: [IssueState!], $since: DateTime, $first: Int!, $after: String, $releases: Int!) {
   repository(owner: $owner, name: $name) {
     issues(labels: ["epic"], states: $states, filterBy: {since: $since}, first: $first, after: $after, orderBy: {field: UPDATED_AT, direction: DESC}) {
       pageInfo { hasNextPage endCursor }
-      nodes { issueState: state ` + itemFields + ` ` + issueFields + ` ` + timelineFields + `
-        subIssues(first: 100) { nodes { issueState: state ` + itemFields + ` ` + issueFields + ` ` + timelineFields + `
+      nodes { issueState: state ` + itemFields + ` ` + issueFields + `
+        subIssues(first: 100) { nodes { issueState: state ` + itemFields + ` ` + issueFields + `
           closedByPullRequestsReferences(first: 5, includeClosedPrs: true) { nodes { createdAt } } } } } }
     releases(first: $releases, orderBy: {field: CREATED_AT, direction: DESC}) { nodes { tagName publishedAt url isDraft } } } }`
-
-type gqlTimelineIssue struct {
-	gqlItem
-	CreatedAt string `json:"createdAt"`
-	ClosedAt  string `json:"closedAt"`
-}
 
 // Timeline is repo's open epics, and those closed since since (RFC 3339), with their
 // sub-issues, and its newest releases (drafts left out).
@@ -95,10 +85,10 @@ func (g *RealGitHub) Timeline(ctx context.Context, repo, since string) (Timeline
 							EndCursor   string `json:"endCursor"`
 						} `json:"pageInfo"`
 						Nodes []struct {
-							gqlTimelineIssue
+							gqlItem
 							SubIssues struct {
 								Nodes []struct {
-									gqlTimelineIssue
+									gqlItem
 									ClosedBy struct {
 										Nodes []struct {
 											CreatedAt string `json:"createdAt"`
@@ -136,7 +126,7 @@ func (g *RealGitHub) Timeline(ctx context.Context, repo, since string) (Timeline
 					continue
 				}
 				seen[e.Number] = true
-				epic := TimelineEpic{Item: e.item(), CreatedAt: e.CreatedAt, ClosedAt: e.ClosedAt, StateReason: strings.ToLower(e.StateReason),
+				epic := TimelineEpic{Item: e.item(), StateReason: strings.ToLower(e.StateReason),
 					Children: []TimelineChild{}}
 				if epic.Repo == "" {
 					epic.Repo = repo
@@ -145,7 +135,7 @@ func (g *RealGitHub) Timeline(ctx context.Context, repo, since string) (Timeline
 					if c.Number < 1 || c.Repository.NameWithOwner == "" {
 						continue
 					}
-					child := TimelineChild{Item: c.item(), CreatedAt: c.CreatedAt, ClosedAt: c.ClosedAt, StateReason: strings.ToLower(c.StateReason)}
+					child := TimelineChild{Item: c.item(), StateReason: strings.ToLower(c.StateReason)}
 					for _, pr := range c.ClosedBy.Nodes {
 						if pr.CreatedAt != "" {
 							child.PROpenedAt = append(child.PROpenedAt, pr.CreatedAt)

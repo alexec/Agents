@@ -1,6 +1,7 @@
 package linearmcp
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"slices"
@@ -25,6 +26,9 @@ type Item struct {
 	Identifier, Team string
 	// State is open or closed.
 	State, Title, URL, Author, Milestone, UpdatedAt string
+	// CreatedAt is when it was made; ClosedAt when it was completed or canceled, "" while open
+	// (#4373).
+	CreatedAt, ClosedAt string
 	// AuthorAvatar is the author's picture, on Linear's public upload host; "" for none (#4363).
 	AuthorAvatar string
 	// StateReason is why a closed issue closed: completed, not_planned or duplicate; "" while
@@ -64,12 +68,19 @@ type ItemDetail struct {
 	Body   string
 	Thread []Comment
 	Before string
+	// Children are its sub-issues, at most 50, in Linear's order (#4373).
+	Children []Child
+}
+
+// Child is a sub-issue on an issue's read: State is open or closed.
+type Child struct {
+	Identifier, Title, URL, State string
 }
 
 // forgeComments is a page of an issue's comments.
 const forgeComments = 50
 
-const forgeFields = `identifier title url updatedAt team { key } state { type name } projectMilestone { name }
+const forgeFields = `identifier title url createdAt completedAt canceledAt updatedAt team { key } state { type name } projectMilestone { name }
   labels { nodes { name color } } assignee { displayName } creator { displayName avatarUrl } botActor { name avatarUrl }
   commentCount: comments(first: 50) { nodes { id } } parent { identifier }`
 
@@ -82,6 +93,7 @@ const forgeSearch = `query ForgeIssues($filter: IssueFilter, $first: Int, $after
 
 // Linear's pages go newest first, so the page before a comment is the one after it.
 const forgeItem = `query ForgeIssue($id: String!, $comments: Int, $before: String) { issue(id: $id) { ` + forgeFields + ` ` + forgeChildren + ` description
+  subIssues: children(first: 50) { nodes { identifier title url state { type } } }
   comments(first: $comments, after: $before) { pageInfo { hasNextPage endCursor }
     nodes { body createdAt url user { displayName avatarUrl } botActor { name avatarUrl } } } } }`
 
@@ -96,7 +108,11 @@ type forgeNode struct {
 	Title      string `json:"title"`
 	URL        string `json:"url"`
 	UpdatedAt  string `json:"updatedAt"`
-	Team       *struct {
+	CreatedAt  string `json:"createdAt"`
+	// CompletedAt and CanceledAt are when it moved to a completed or a canceled state.
+	CompletedAt string `json:"completedAt"`
+	CanceledAt  string `json:"canceledAt"`
+	Team        *struct {
 		Key string `json:"key"`
 	} `json:"team"`
 	State *struct {
@@ -133,13 +149,14 @@ type forgeNode struct {
 }
 
 func (n forgeNode) item() Item {
-	i := Item{Identifier: n.Identifier, Title: n.Title, URL: n.URL, UpdatedAt: n.UpdatedAt, State: "open",
+	i := Item{Identifier: n.Identifier, Title: n.Title, URL: n.URL, UpdatedAt: n.UpdatedAt, CreatedAt: n.CreatedAt, State: "open",
 		Labels: []string{}, LabelColors: map[string]string{}, Assignees: []string{}, Comments: len(n.CommentCount.Nodes)}
 	if n.Team != nil {
 		i.Team = n.Team.Key
 	}
 	if n.State != nil && isClosed(n.State.Type) {
 		i.State, i.StateReason = "closed", stateReasonOf(n.State.Type, n.State.Name)
+		i.ClosedAt = cmp.Or(n.CompletedAt, n.CanceledAt)
 	}
 	if n.ProjectMilestone != nil {
 		i.Milestone = n.ProjectMilestone.Name
@@ -282,6 +299,16 @@ func (l *RealLinear) ItemPage(ctx context.Context, identifier, before string) (I
 					BotActor  *gqlBot      `json:"botActor"`
 				} `json:"nodes"`
 			} `json:"comments"`
+			SubIssues struct {
+				Nodes []struct {
+					Identifier string `json:"identifier"`
+					Title      string `json:"title"`
+					URL        string `json:"url"`
+					State      *struct {
+						Type string `json:"type"`
+					} `json:"state"`
+				} `json:"nodes"`
+			} `json:"subIssues"`
 		} `json:"issue"`
 	}
 	if err := l.query(ctx, forgeItem, vars, &out); err != nil {
@@ -290,7 +317,14 @@ func (l *RealLinear) ItemPage(ctx context.Context, identifier, before string) (I
 	if out.Issue == nil {
 		return ItemDetail{}, &LinearError{Kind: NotFound, Message: fmt.Sprintf("Linear issue %s was not found", identifier)}
 	}
-	d := ItemDetail{Item: out.Issue.item(), Body: out.Issue.Description, Thread: []Comment{}}
+	d := ItemDetail{Item: out.Issue.item(), Body: out.Issue.Description, Thread: []Comment{}, Children: []Child{}}
+	for _, c := range out.Issue.SubIssues.Nodes {
+		state := "open"
+		if c.State != nil && isClosed(c.State.Type) {
+			state = "closed"
+		}
+		d.Children = append(d.Children, Child{Identifier: c.Identifier, Title: c.Title, URL: c.URL, State: state})
+	}
 	for _, c := range slices.Backward(out.Issue.Comments.Nodes) {
 		comment := Comment{Body: c.Body, At: c.CreatedAt, URL: c.URL}
 		switch {

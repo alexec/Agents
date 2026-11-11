@@ -49,6 +49,8 @@ type Item struct {
 	MR      bool
 	// State is open, closed or merged.
 	State, Title, URL, Author, Milestone, UpdatedAt string
+	// CreatedAt is when it opened; ClosedAt when it closed or merged, "" while open (#4373).
+	CreatedAt, ClosedAt string
 	// AuthorAvatar is the author's picture, on the GitLab or on Gravatar; "" for none (#4363).
 	AuthorAvatar string
 	Labels       []string
@@ -70,11 +72,13 @@ type Item struct {
 
 // SearchPage is a page of a list, the last updated first. Cursors[i] goes on after Items[i],
 // so a caller that keeps only some of the page goes on from the last it kept; Next is the
-// cursor after the page, "" at the end.
+// cursor after the page, "" at the end. Total is how many items the whole list has, on its
+// first page only (#4396); nil where GitLab does not say.
 type SearchPage struct {
 	Items   []Item
 	Cursors []string
 	Next    string
+	Total   *int
 }
 
 // Comment is a comment on an item, as Markdown.
@@ -134,6 +138,9 @@ type forgeJSON struct {
 		Title string `json:"title"`
 	} `json:"milestone"`
 	UpdatedAt      string `json:"updated_at"`
+	CreatedAt      string `json:"created_at"`
+	ClosedAt       string `json:"closed_at"`
+	MergedAt       string `json:"merged_at"`
 	UserNotesCount int    `json:"user_notes_count"`
 	// A merge request's.
 	Draft                     bool   `json:"draft"`
@@ -153,10 +160,12 @@ type forgeJSON struct {
 func (j forgeJSON) item(project string, mr bool) Item {
 	i := Item{Project: project, Number: j.IID, MR: mr, Title: j.Title, URL: j.WebURL, Author: j.Author.Username,
 		AuthorAvatar: j.Author.avatar(j.WebURL),
-		UpdatedAt:    j.UpdatedAt, Comments: j.UserNotesCount, Assignees: []string{}, Labels: []string{}, LabelColors: map[string]string{}}
+		UpdatedAt:    j.UpdatedAt, CreatedAt: j.CreatedAt, Comments: j.UserNotesCount, Assignees: []string{}, Labels: []string{}, LabelColors: map[string]string{}}
 	switch j.State {
 	case "merged", "closed":
 		i.State = j.State
+		// A merged merge request has merged_at, and closed_at only when it was closed first.
+		i.ClosedAt = cmp.Or(j.MergedAt, j.ClosedAt)
 	default:
 		i.State = "open"
 	}
@@ -304,10 +313,26 @@ func (g *RealGitLab) Search(ctx context.Context, projects []string, f SearchFilt
 	ask := min(perPage, first+len(c.Seen))
 	var all []Item
 	more := false
+	// The first page counts each project's list in each state; later pages leave the count out.
+	total := 0
+	if after != "" {
+		total = -1
+	}
 	for _, project := range projects {
 		for _, state := range listStates(f) {
 			var list []forgeJSON
-			if err := g.get(ctx, listPath(project, f, state, c.Before, ask), false, &list); err != nil {
+			path := listPath(project, f, state, c.Before, ask)
+			if total < 0 {
+				err = g.get(ctx, path, false, &list)
+			} else {
+				var n int
+				if n, err = g.getCounted(ctx, path, &list); n < 0 {
+					total = -1
+				} else {
+					total += n
+				}
+			}
+			if err != nil {
 				return SearchPage{}, err
 			}
 			more = more || len(list) >= ask
@@ -332,6 +357,9 @@ func (g *RealGitLab) Search(ctx context.Context, projects []string, f SearchFilt
 	}
 	if more && len(page.Items) > 0 {
 		page.Next = page.Cursors[len(page.Cursors)-1]
+	}
+	if total >= 0 {
+		page.Total = &total
 	}
 	return page, nil
 }

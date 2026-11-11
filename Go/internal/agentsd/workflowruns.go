@@ -595,9 +595,11 @@ func (d *Daemon) runAgent(w wire.Workflow, run workflowRun, fr fireRequest) (wir
 	})
 	if e := fr.event; e != nil {
 		d.lineageHealthStarted(*e, id)
+		d.lineagePRStarted(*e, id)
 	} else if fr.causingEvent != nil {
 		if e := d.event(*fr.causingEvent); e != nil {
 			d.lineageHealthStarted(*e, id)
+			d.lineagePRStarted(*e, id)
 		}
 	}
 	if w.Mode == wire.WorkflowModeStanding {

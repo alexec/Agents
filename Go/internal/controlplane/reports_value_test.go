@@ -43,6 +43,8 @@ func TestReportsValueAddsUpTheWork(t *testing.T) {
 	closed := node("pr", "github:o/r#3", 3)
 	closed.Fixes, closed.Outcome, closed.EndedAt = []string{"github:o/r#1"}, str("closed"), at(2*time.Hour)
 	session := node("session", "session:a", 0.5)
+	// A release session's own cost, on its release (#4524).
+	release := node("release", "github:o/r/release/v1.0.0", 0.25)
 	old := node("issue", "github:o/r#9", 100)
 	old.LastAt = wire.DateOf(now.Add(-40 * 24 * time.Hour))
 	// Bea's machine banked its own turns on the same issue.
@@ -56,7 +58,7 @@ func TestReportsValueAddsUpTheWork(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	send(owner.member.Host, issue, merged, closed, session, old)
+	send(owner.member.Host, issue, merged, closed, session, release, old)
 	send(beas.member.Host, beaIssue)
 
 	value := func(s *controllink.Session, r wire.ReportRange, scope *wire.ReportScope) wire.ReportValue {
@@ -68,11 +70,16 @@ func TestReportsValueAddsUpTheWork(t *testing.T) {
 		return v
 	}
 	org := value(admin, wire.ReportRangeMonth, &wire.ReportScope{Kind: wire.ReportScopeKindOrg})
-	// 1 + 2 (two machines) + 4 + 3; the old issue is out of the month.
-	if org.Total.Cost["USD"] != 10 || org.Waste.Cost["USD"] != 3 || org.Unlinked.Cost["USD"] != 0.5 {
+	// 1 + 2 (two machines) + 4 + 3 + the release's 0.25; the old issue is out of the month.
+	if org.Total.Cost["USD"] != 10.25 || org.Waste.Cost["USD"] != 3 || org.Unlinked.Cost["USD"] != 0.5 {
 		t.Fatalf("%+v", org)
 	}
-	if org.PrsMerged != 1 || org.PrsClosed != 1 || org.FailedChecks != 2 || org.PerMergedPR["USD"] != 10 {
+	// All in, and the overhead over 14 days (#4524).
+	if org.Loaded == nil || org.Loaded.Cost["USD"] != 10.75 || org.Overhead == nil || org.Overhead.UnlinkedRatio == nil ||
+		*org.Overhead.UnlinkedRatio != 0.5/10.25 || len(org.Overhead.Uncounted) != 2 {
+		t.Fatalf("%+v %+v", org.Loaded, org.Overhead)
+	}
+	if org.PrsMerged != 1 || org.PrsClosed != 1 || org.FailedChecks != 2 || org.PerMergedPR["USD"] != 10.25 {
 		t.Fatalf("%+v", org)
 	}
 	if len(org.Issues) != 1 || org.Issues[0].Node.Ref != "github:o/r#1" || org.Issues[0].Total.Cost["USD"] != 10 ||
@@ -84,10 +91,10 @@ func TestReportsValueAddsUpTheWork(t *testing.T) {
 		org.LeadTimeSeconds == nil || *org.LeadTimeSeconds != *lead {
 		t.Fatalf("%v %v", lead, org.LeadTimeSeconds)
 	}
-	// The release has only the merged PR and the issue it fixes: 4 (the PR) + 1 + 2 (the
-	// issue, from both machines), not the closed PR, which is not part-of it.
+	// The release has its own 0.25, the merged PR and the issue it fixes: 4 (the PR) + 1 + 2
+	// (the issue, from both machines), not the closed PR, which is not part-of it.
 	if len(org.Releases) != 1 || org.Releases[0].Node.Ref != "github:o/r/release/v1.0.0" ||
-		org.Releases[0].Total.Cost["USD"] != 7 || org.Releases[0].PrsMerged != 1 || org.Releases[0].PrsClosed != 0 {
+		org.Releases[0].Total.Cost["USD"] != 7.25 || org.Releases[0].PrsMerged != 1 || org.Releases[0].PrsClosed != 0 {
 		t.Fatalf("%+v", org.Releases)
 	}
 	if all := value(admin, wire.ReportRangeThreeMonths, &wire.ReportScope{Kind: wire.ReportScopeKindOrg}); len(all.Issues) != 2 ||
