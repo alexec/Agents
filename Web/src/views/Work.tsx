@@ -13,10 +13,10 @@ import { Capability } from "../protocol/capabilities.generated";
 import { describe } from "../model/errors";
 import { hostAnswers } from "../model/capabilities";
 import {
-  boardChoices, boardName, checksGlyph, checksWords, choices, clearedFilter, connectForge, couldNotLoadMore, couldNotRead, countWords,
+  boardChoices, boardName, checksGlyph, choices, clearedFilter, connectForge, couldNotLoadMore, couldNotRead, countWords,
   credentialProblem, emptyWords, errorWords, filtered, fromForge, loadingMore, parseWorkQuery, setFilters, workQuery,
   lineageOnlyNote, noForgeHere, notReadHere, openOnWords, positionWords, repoName, repoOf, rowLine, rowReviewWords,
-  reviewWords, shortRef, titleSaysRef, workKindTitle, workSortTitle, allProjects, projectOfFolder, workFolderKey,
+  shortRef, titleSaysRef, workKindTitle, workSortTitle, allProjects, projectOfFolder, workFolderKey,
   doneWords, forgeName, lineageCountWords, pageStateWords, shortPositionWords, stateGlyph, takesLabels,
   type WorkFilter, type WorkKind, type WorkProject, type WorkRow, type WorkSort, type WorkState,
 } from "../model/work";
@@ -34,7 +34,8 @@ import { bytesOf } from "../model/pageImage";
 import { forgeMarkdown } from "../model/forgeMarkdown";
 import { ForgeTitle } from "../render/ForgeTitle";
 import { Avatar, Avatars, EmptyState, ErrorStrip, FilterMenu, LabelChip, PlaceholderRows, RefreshButton, StateIcon, type MenuChoice } from "./WorkParts";
-import { WorkActions, WorkCommentBox, WorkLabelsPicker, WorkStatusMenu } from "./WorkActions";
+import { WorkChecksPage, WorkCommentBox, WorkFilesChanged, WorkLabelsPicker, WorkMergeBox, WorkStatusMenu } from "./WorkActions";
+import { branchWords, mergeBox, mergedStrip, offers, pullStateWords, reviewersWords } from "../model/workPull";
 import { WorkPlan } from "./WorkPlan";
 import { WorkDocs } from "./Docs";
 import { hasPlan, planSessions } from "../model/epicPlan";
@@ -276,8 +277,10 @@ function WorkRowView({ row, several, dim, pick, open }: { row: WorkRow; several:
  * forge/pull) on the first machine that reads it. An issue's page is in the Work look (#4402,
  * specs/4328-work-look/issue.md), as the window's WorkItemPage (#4400): the page's bar (the place, ↑ 3 of 42 ↓,
  * Refresh), the header with Start Agent, one timeline (the body, then the comments), the comment box with Close or
- * Reopen, and the side panel (Assignees, Labels with its gear, Repo, Linked, Lineage, Docs). A pull
- * request keeps its actions row (#4408 redoes it). Its writes (#3130) go to the machine that read it. */
+ * Reopen, and the side panel (Assignees, Labels with its gear, Repo, Linked, Lineage, Docs). A pull request's page (#4408,
+ * specs/4328-work-look/pull-request.md), as the window's (#4406): Files changed at the title's end, the merge box at the
+ * end of the timeline (at the top under 700 px, its checks row opening the Checks page), Close or Reopen pull request in
+ * the comment box, and Reviewers and Branch on the panel. Its writes (#3130) go to the machine that read it. */
 export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; ref: string }) {
   const node = useMemo(() => ({ kind, ref }), [kind, ref]);
   const asked = useSignal(0);
@@ -291,6 +294,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
   const said = useSignal<{ words: string; failed: boolean } | null>(null);
   const writing = useSignal(false);
   const pickingLabels = useSignal(false);
+  const checksPage = useSignal(false);
   const forgeHosts = store.hosts.value.filter((h) => hostAnswers(h.state) && store.has(h.id, Capability.forge1));
   const lineageHosts = store.hosts.value.filter((h) => hostAnswers(h.state) && store.has(h.id, Capability.lineage1));
   // The page's images, read by the machine that read the page (#4011); without forge/image there, their words.
@@ -302,7 +306,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
   const lineageHost = lineageHosts.find((h) => h.id === detail.value?.host)?.id
     ?? lineageHosts.find((h) => h.id === store.macHostID.value)?.id ?? lineageHosts[0]?.id;
   // A new item starts empty; a refresh keeps the page, and Refresh spins, until the new read comes.
-  useEffect(() => { detail.value = null; forgeProblem.value = null; said.value = null; pickingLabels.value = false; }, [kind, ref]);
+  useEffect(() => { detail.value = null; forgeProblem.value = null; said.value = null; pickingLabels.value = false; checksPage.value = false; }, [kind, ref]);
   useEffect(() => {
     let current = true;
     if (!fromForge(kind)) return;
@@ -423,10 +427,20 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
   // The project the item was read for (#3283), when the person has more than one: with one, the page says nothing new.
   const projects = workProjects(store);
   const project = projects.length > 1 && detail.value ? projectOfFolder(item?.folder, detail.value.host, projects) : undefined;
-  const checks = item?.node.kind === "pr" ? checksWords(got?.checks, item.checks) : undefined;
-  const review = item?.node.kind === "pr" ? reviewWords(item.review) : undefined;
   const updated = item ? fromWireDate(item.updatedAt) : row && row.updated > 0 ? new Date(row.updated * 1000) : undefined;
-  const words = pageStateWords({ author: item?.author ?? row?.author, updated, comments: item?.comments ?? row?.comments ?? got?.comments.length ?? 0 });
+  const byline = { author: item?.author ?? row?.author, updated, comments: item?.comments ?? row?.comments ?? got?.comments.length ?? 0 };
+  const words = kind === "pr" ? pullStateWords({ ...byline, state }) : pageStateWords(byline);
+  // A pull request's merge box (note 10): an open one's; Files changed, the diff, in the header.
+  const box = got ? mergeBox(got) : undefined;
+  const isPull = kind === "pr" && got !== undefined;
+  const writeBox = (top: boolean) => box && detail.value && (
+    <WorkMergeBox store={store} host={detail.value.host} detail={detail.value.got} box={box} writes={writes} top={top}
+      checksPage={top ? () => { checksPage.value = true; } : undefined} wrote={() => void reread()} />
+  );
+  // The comment box's Close or Reopen: an issue with no tracker's status; a pull request's as its forge offers them.
+  const closes = !got || got.transitions ? undefined : kind === "issue" ? got.item.state
+    : kind === "pr" && got.item.state === "open" && offers(got, "close") ? "open"
+    : kind === "pr" && got.item.state === "closed" && offers(got, "reopen") ? "closed" : undefined;
   // Start Agent: on an open issue whose read gives a start (one in a folder), when a machine of the person's writes.
   const start = kind === "issue" && writes && item?.state === "open" ? got?.start : undefined;
   const startAgent = () => {
@@ -435,7 +449,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
     const why = offerStart(store, detail.value.host, item.folder, { prompt: start.prompt, labels: start.labels, worktree: start.worktree });
     if (why) said.value = { words: why, failed: true };
   };
-  const labelsEdit = kind === "issue" && writes && item && takesLabels(item.node);
+  const labelsEdit = (kind === "issue" || kind === "pr") && writes && item && takesLabels(item.node);
   const pickLabel = (name: string) => { workList(kind).filter.value = { ...workList(kind).filter.value, label: name }; go({ nav: "work", section: kind }); };
 
   // Lineage (#4402 note 14): the cost and the sessions, then the estimate of an open issue, or what a closed one spent;
@@ -464,6 +478,16 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
     <button type="button" class="prominent work-start" disabled={writing.value} onClick={startAgent}
       title="The new-agent form in this issue's folder, filled in for it"><span aria-hidden="true">✦</span>Start Agent</button>
   );
+
+  // The Checks page (note 17), pushed from the checks row of a page under 700 px.
+  if (checksPage.value && detail.value && kind === "pr") {
+    return (
+      <article class="work-page work-item-page">
+        <WorkChecksPage store={store} host={detail.value.host} detail={detail.value.got} writes={writes}
+          back={() => { checksPage.value = false; }} wrote={() => void reread()} />
+      </article>
+    );
+  }
 
   return (
     <article class={`work-page work-item-page${loading ? " loading" : ""}`} aria-busy={loading}>
@@ -501,6 +525,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
               : <><span class="work-title"><ForgeTitle text={title} /></span> {!titleSaysRef({ title, node }) && <span class="work-ref">{shortRef(ref)}</span>}</>}
           </h2>
           {narrowStart && <span class="wide-only">{narrowStart}</span>}
+          {isPull && detail.value && <span class="work-wide-only"><WorkFilesChanged store={store} host={detail.value.host} detail={detail.value.got} /></span>}
         </div>
         <p class="work-page-byline small">
           {got?.transitions && writes && item
@@ -515,6 +540,13 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
       {detail.value && forgeProblem.value && (
         <div class="work-problem"><ErrorStrip lines={[forgeProblem.value]} retry={() => { asked.value++; }} /></div>
       )}
+      {/* A pull request under 700 px (pull-request.md, Narrow): the merge box at the top, then Files changed as a row. */}
+      {isPull && detail.value && (
+        <div class="work-pull-top work-narrow-only">
+          {writeBox(true)}
+          <WorkFilesChanged store={store} host={detail.value.host} detail={detail.value.got} row />
+        </div>
+      )}
       {/* The side panel (parts.md section 5): a column on a page over 900 px; rows under the header on a narrower one,
           with Linked, Lineage and Docs at the end. */}
       {(item || loading) && (
@@ -523,6 +555,12 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
             {loading && !row ? <span class="bar" /> : assignees.length === 0 ? <span class="quiet">No one</span>
               : assignees.map((a) => <span key={a} class="work-person"><Avatar login={a} />{a}</span>)}
           </SideSection>
+          {kind === "pr" && (
+            // Each reviewer and their state come with the forge's reviewers (#4406, missing fields).
+            <SideSection title="Reviewers">
+              {loading && !row ? <span class="bar" /> : <span class={(item?.review ?? row?.review) ? undefined : "quiet"}>{reviewersWords(item?.review ?? row?.review)}</span>}
+            </SideSection>
+          )}
           <SideSection title="Labels" edit={labelsEdit ? () => { pickingLabels.value = !pickingLabels.value; } : undefined}
             editing={pickingLabels.value}>
             {loading && !row ? <span class="bar" /> : labels.length === 0 ? <span class="quiet">None</span>
@@ -532,13 +570,15 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
                 pick={(name, add) => void act("forge/label", { node: item.node, ...add ? { add: [name] } : { remove: [name] } })} />
             )}
           </SideSection>
+          {kind === "pr" && branchWords(got?.filesChanged) && (
+            // The head and base branches and the size come with the forge's fields (#4406).
+            <SideSection title="Branch"><span class="work-branch"><BranchGlyph />{branchWords(got?.filesChanged)}</span></SideSection>
+          )}
           <SideSection title="Repo"><span>{repoName(repoOf(ref))}</span></SideSection>
           {project && <SideSection title="Project"><span>{project.name}</span></SideSection>}
         </aside>
       )}
       <div class="work-main">
-        {(checks || review) && <p class="small">{[checks, review].filter(Boolean).join(" · ")}</p>}
-        {writes && detail.value && kind === "pr" && <WorkActions store={store} host={detail.value.host} detail={detail.value.got} wrote={() => void reread()} />}
         {detail.value && hasPlan(detail.value.got.item) && (
           <WorkPlan store={store} host={detail.value.host} lineageHost={lineageHost} detail={detail.value.got} asked={asked.value}
             estimates={estimate.value?.children ?? []}
@@ -567,13 +607,27 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
             {kind === "issue" && got.item.state === "closed" && !got.transitions && (
               <div class="work-event"><span class="mark closed" aria-hidden="true">✓</span><span class="quiet small">Closed</span></div>
             )}
+            {kind === "pr" && got.item.state === "merged" && (
+              <>
+                <div class="work-event"><span class="mark merged" aria-hidden="true"><StateIcon kind="pr" state="merged" size={12} /></span>
+                  <span class="quiet small">Merged</span></div>
+                <div class="work-merged-strip">
+                  <span class="strong small">{mergedStrip}</span>
+                  {pipeline.value.length > 0 && <PipelineLine steps={pipeline.value} />}
+                </div>
+              </>
+            )}
+            {kind === "pr" && got.item.state === "closed" && (
+              <div class="work-event"><span class="mark pr-closed" aria-hidden="true">✕</span><span class="quiet small">Closed with unmerged commits</span></div>
+            )}
+            {box && <div class="work-wide-only work-merge-end">{writeBox(false)}</div>}
           </section>
         )}
         {got && detail.value && (writes
           ? <WorkCommentBox store={store} host={detail.value.host} node={node} noun={kind === "pr" ? "pull request" : "issue"}
-              closes={kind === "issue" && !got.transitions ? got.item.state : undefined} said={kind === "issue" ? said.value : undefined}
+              closes={closes} said={said.value}
               wrote={(w, failed) => { said.value = { words: w, failed }; if (!failed) void reread(); }} />
-          : <p class="quiet small work-no-writes">No machine of yours can write to {forgeName(ref)}.</p>)}
+          : !box && <p class="quiet small work-no-writes">No machine of yours can write to {forgeName(ref)}.</p>)}
       </div>
       {item && (
         <aside class="work-side links" aria-label="Linked, lineage and docs">
@@ -601,11 +655,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
                   {[estimateLine(estimate.value), ...spentWords ? [spentWords] : []].join(" · ")}</span>
               )}
               {!isOpen && actual && <span class="quiet small">{actual}</span>}
-              {pipeline.value.length > 0 && (
-                <span class="small work-pipeline">{pipeline.value.map((s, i) => (
-                  <Fragment key={i}>{i > 0 && " · "}{s.url ? <a href={s.url} target="_blank" rel="noopener noreferrer">{s.words}</a> : <span class="quiet">{s.words}</span>}</Fragment>
-                ))}</span>
-              )}
+              {pipeline.value.length > 0 && <PipelineLine steps={pipeline.value} />}
             </SideSection>
           )}
           {(kind === "issue" || kind === "pr") && (
@@ -626,7 +676,22 @@ function PagePill({ kind, state, draft, status }: { kind: string; state: string;
   if (!state) return <span class="work-state placeholder" aria-hidden="true">Open</span>;
   if (status || !stateGlyph(kind, state, draft)) return <StatePill state={state} draft={draft} status={status} />;
   const word = draft && state === "open" ? "Draft" : state.charAt(0).toUpperCase() + state.slice(1);
-  return <span class={`work-state with-glyph ${draft && state === "open" ? "draft" : state}`}><StateIcon kind={kind} state={state} draft={draft} size={14} />{word}</span>;
+  return <span class={`work-state with-glyph ${draft && state === "open" ? "draft" : state}${kind === "pr" && state === "closed" ? " pr-closed" : ""}`}><StateIcon kind={kind} state={state} draft={draft} size={14} />{word}</span>;
+}
+
+/** The pipeline line (#3588): its releases, CI runs, deploys and health, each a link where it has one. */
+function PipelineLine({ steps }: { steps: readonly PipelineStep[] }) {
+  return (
+    <span class="small work-pipeline">{steps.map((s, i) => (
+      <Fragment key={i}>{i > 0 && " · "}{s.url ? <a href={s.url} target="_blank" rel="noopener noreferrer">{s.words}</a> : <span class="quiet">{s.words}</span>}</Fragment>
+    ))}</span>
+  );
+}
+
+/** Branch's glyph: a branch off a line. */
+function BranchGlyph() {
+  return <svg class="work-branch-glyph" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="4.5" cy="3.5" r="1.5" /><circle cx="4.5" cy="12.5" r="1.5" />
+    <circle cx="11.5" cy="5" r="1.5" /><path d="M4.5 5v6M11.5 6.5c0 3-7 2-7 4.5" /></svg>;
 }
 
 /** Open on GitHub's glyph: a square with an arrow out of it. */

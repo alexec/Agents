@@ -2238,7 +2238,8 @@ a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
    header under it, with Linked, Lineage and Docs at the end. Under 700 px, the phone's page. */
 .work-item-page { container-type: inline-size; }
 .work-item-grid { display: grid; grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: "bar" "head" "problem" "people" "main" "links" "none"; column-gap: 24px; }
+  grid-template-areas: "bar" "head" "problem" "pulltop" "people" "main" "links" "none"; column-gap: 24px; }
+.work-item-grid > .work-pull-top { grid-area: pulltop; }
 .work-item-grid > .work-page-bar { grid-area: bar; }
 .work-item-grid > .work-page-head { grid-area: head; }
 .work-item-grid > .work-problem { grid-area: problem; }
@@ -2270,6 +2271,7 @@ a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
 .work-state.with-glyph { display: inline-flex; gap: 4px; align-items: center; padding: 2px 10px 2px 8px; font-size: 0.9em; font-weight: 500; }
 .work-state.with-glyph .work-state-icon { --state: #fff; }
 .work-state.with-glyph.open { background: #1a7f37; }
+.work-state.with-glyph.closed.pr-closed { background: #cf222e; }
 .work-state.with-glyph.closed, .work-state.with-glyph.merged { background: #8250df; }
 .work-status-menu { border: none; cursor: pointer; font: inherit; font-size: 0.9em; padding: 2px 10px; }
 .work-status-menu:disabled { cursor: default; opacity: 0.7; }
@@ -2370,6 +2372,7 @@ a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
   background: var(--paper-raised); color: inherit; font: inherit; resize: vertical; }
 .work-comment-box .work-actions-bar button { display: inline-flex; gap: 6px; align-items: center; }
 .work-close-mark.open { color: #8250df; }
+.work-close-mark.open.pull { color: #cf222e; }
 .work-comment-box p { margin: 0; }
 .work-no-writes { margin: 16px 0 0; }
 /* The phone's page (under 700 px, as an iPhone): ‹ Issues, 3/42 and Open on GitHub's icon in the bar; the short state
@@ -2394,8 +2397,79 @@ a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
 @media (prefers-color-scheme: dark) {
   .work-state.with-glyph.open { background: #238636; }
   .work-state.with-glyph.closed, .work-state.with-glyph.merged { background: #8957e5; }
+  .work-state.with-glyph.closed.pr-closed { background: #da3633; }
   .work-session .dot.runs { background: #3fb950; }
   .work-close-mark.open { color: #a371f7; }
+  .work-close-mark.open.pull { color: #f85149; }
+}
+/* A pull request's page (#4408, specs/4328-work-look/pull-request.md), as the window's (#4406): Files changed at the
+   title's end; the merge box at the end of the timeline, a pr glyph in a green circle on the line, its border green
+   when it can merge, red when a check failed or it has conflicts; under 700 px the box at the top, then Files changed
+   as a row, and the checks row opens the Checks page. */
+.work-narrow-only { display: none; }
+.work-files button, .work-files-row button, .work-approve, .work-rerun { display: inline-flex; gap: 6px; align-items: center; }
+.work-files-glyph, .work-branch-glyph { fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
+.work-files { display: inline-flex; flex-direction: column; gap: 4px; align-items: flex-end; flex: none; }
+.work-files-row { display: block; margin-top: 12px; }
+.work-files-row button { width: 100%; padding: 10px 12px; border: none; border-radius: var(--radius-card); background: var(--paper-well); color: inherit; font: inherit; text-align: left; }
+.work-files-row button .words { flex: 1; }
+.work-branch { display: inline-flex; gap: 6px; align-items: center; font-variant-numeric: tabular-nums; }
+.work-merge { position: relative; display: flex; gap: 10px; align-items: flex-start; }
+.work-merge-mark { flex: none; display: inline-grid; place-items: center; width: 26px; height: 26px; margin: 4px 1px 0; border-radius: 50%;
+  background: var(--open, #1a7f37); box-shadow: 0 0 0 3px var(--paper-ground); }
+.work-merge-mark.draft { background: #6e7781; }
+.work-merge-mark .work-state-icon { --state: #fff; }
+.work-merge-box { flex: 1; min-width: 0; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-raised); overflow: hidden; }
+.work-merge-box.pass { border: 1.5px solid #1a7f37; }
+.work-merge-box.fail { border: 1.5px solid #cf222e; }
+.work-merge-row-wrap { border-bottom: 1px solid var(--paper-rule); }
+.work-merge-row { display: flex; gap: 10px; align-items: baseline; width: 100%; box-sizing: border-box; padding: 12px; }
+button.work-merge-row { border: none; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+button.work-merge-row:hover { background: var(--paper-wash); }
+.work-merge-row .words { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-variant-numeric: tabular-nums; }
+.work-merge-glyph { flex: none; width: 16px; text-align: center; color: color-mix(in srgb, currentColor 60%, transparent); }
+.work-merge-glyph.pass { color: #1a7f37; }
+.work-merge-glyph.fail { color: #cf222e; }
+.work-merge-glyph.wait { color: #9a6700; }
+.work-checks { list-style: none; margin: 0; padding: 0 12px 12px 38px; display: grid; gap: 6px; font-size: 0.875rem; }
+.work-checks li { display: flex; gap: 8px; align-items: baseline; }
+.work-checks .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.work-merge-buttons { padding: 12px; display: grid; gap: 6px; }
+.work-merge-buttons p { margin: 0; }
+.work-merge-button > button.prominent { background: #1f883d; border-color: #1f883d; color: #fff; }
+.work-merge-button.waits > button.prominent { background: var(--accent); border-color: var(--accent); color: var(--paper-ground); }
+.work-merged-strip { display: grid; gap: 4px; margin-left: 38px; padding: 12px; border-radius: var(--radius-card); background: var(--paper-well); }
+.work-event .mark.merged { background: #8250df; }
+.work-event .mark.merged .work-state-icon { --state: #fff; }
+.work-event .mark.pr-closed { background: #cf222e; color: #fff; }
+/* The Checks page (note 17): ‹ #4402, the counts, Rerun failed full width, a row per check with a chevron. */
+.work-checks-page h2 { margin: 4px 0 2px; }
+.work-checks-page > p { margin: 0 0 12px; }
+.work-rerun.wide { width: 100%; justify-content: center; padding: 8px; margin-bottom: 12px; }
+.work-checks-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); overflow: hidden; }
+.work-checks-list li + li { border-top: 1px solid var(--paper-rule); }
+.work-checks-list button { display: flex; gap: 10px; align-items: center; width: 100%; min-height: 44px; padding: 8px 12px; border: none; border-radius: 0;
+  background: var(--paper-raised); color: inherit; font: inherit; text-align: left; }
+.work-checks-list button:disabled { opacity: 1; cursor: default; }
+.work-checks-list .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@container (max-width: 699px) {
+  .work-wide-only { display: none; }
+  .work-narrow-only { display: block; margin-bottom: 12px; }
+  .work-merge-buttons .work-actions-bar { display: grid; grid-template-columns: 62fr 38fr; }
+  .work-merge-buttons .work-actions-bar > :only-child, .work-merge-buttons .work-actions-bar > .work-merge-button:last-child { grid-column: 1 / -1; }
+  .work-merge-button { display: flex; }
+  .work-merge-button > button:first-child { flex: 1; }
+  .work-merge-buttons .work-actions-bar > button { justify-content: center; padding: 8px; }
+}
+@media (prefers-color-scheme: dark) {
+  .work-merge-box.pass { border-color: #3fb950; }
+  .work-merge-box.fail { border-color: #f85149; }
+  .work-merge-glyph.pass { color: #3fb950; }
+  .work-merge-glyph.fail { color: #f85149; }
+  .work-merge-glyph.wait { color: #d29922; }
+  .work-merge-mark { background: #238636; }
+  .work-event .mark.merged { background: #8957e5; }
+  .work-merge-button > button.prominent { background: #238636; border-color: #238636; }
 }
 /* The page's actions (#3130): a row of buttons, the merge button split for its other methods. */
 .work-actions { margin-top: 8px; }

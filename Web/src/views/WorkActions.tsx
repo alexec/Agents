@@ -1,53 +1,80 @@
-// The actions on an issue's or a pull request's Work page (#3130), as the window's WorkItemActions:
-// Start Agent, labels and Close or Reopen on an issue (a Jira issue's status menu in their place,
-// #3260); Merge, Approve, Rerun, the failed checks' logs and Show Diff on a pull request; a comment
-// on either. Each goes to the machine that read the item (forge/*), as the person: their own click,
-// so no approval card. `wrote` reads the page again.
+// The actions on an issue's or a pull request's Work page (#3130): the comment box with Close or Reopen, a tracker's
+// status menu (#3260) and the labels picker on any item; on a pull request the merge box (Merge, Approve, Rerun
+// failed and the failed checks' logs), Files changed and the Checks page (#4408). Each goes to the machine that read the
+// item (forge/*), as the person: their own click, so no approval card. `wrote` reads the page again.
 import { signal, useSignal } from "@preact/signals";
 import { useEffect, useMemo, useRef } from "preact/hooks";
-import type { ForgeDone, ForgeItemDetail, ForgeLabel, ForgeMergeMethod, LineageNode } from "../protocol/generated";
+import type { ForgeCheck, ForgeDone, ForgeItemDetail, ForgeLabel, ForgeMergeMethod, LineageNode } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { describe } from "../model/errors";
-import { closeTitle, doneWords, failedChecks, forgeName, mergeButton, mergeWaits, shortRef, takesLabels } from "../model/work";
+import { doneWords, forgeName, mergeButton, shortRef } from "../model/work";
+import {
+  checkSign, checksInOrder, checksPageWords, filesChangedWords, mergeMain, noWriter, offers, readyOnForge, resolveOnForge,
+  type MergeBox, type MergeRow,
+} from "../model/workPull";
 import type { Diff } from "./chat/appViewBridge";
 import { ViewDiff } from "./chat/ViewDiff";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { Modal } from "./Modal";
-import { offerStart } from "./NewAgent";
-
-type Write = "forge/comment" | "forge/label" | "forge/close" | "forge/merge" | "forge/approve" | "forge/rerun";
+import { StateIcon } from "./WorkParts";
 
 const openLink = (url: string) => { window.open(url, "_blank", "noopener,noreferrer"); };
 
-export function WorkActions({ store, host, detail, wrote }: {
-  store: Store; host: string; detail: ForgeItemDetail; wrote: () => void;
+/** The end of a check's log, in a sheet (forge/log). */
+export function WorkLogSheet({ log, close }: { log: { title: string; text: string } | null; close: () => void }) {
+  if (!log) return null;
+  return (
+    <Modal label={log.title} close={close}>
+      <div class="work-log">
+        <header><h2>{log.title}</h2><span class="spacer" />
+          <button type="button" class="prominent" onClick={close}>Done</button></header>
+        <pre>{log.text}</pre>
+      </div>
+    </Modal>
+  );
+}
+
+/** A merge box row's glyph, in its sign's colour: a tick, a cross, an eye (a review to give), a dot (running), a
+ * warning (conflicts), a clock (auto-merge), a page (a draft). */
+function MergeGlyph({ row }: { row: MergeRow }) {
+  const glyph = row.kind === "draft" ? "▤" : row.kind === "autoMerge" ? "◷" : row.kind === "review" && row.sign === "wait" ? "◉"
+    : row.kind === "conflicts" && row.sign === "fail" ? "⚠" : row.sign === "fail" ? "✕" : row.sign === "wait" ? "●" : "✓";
+  return <span class={`work-merge-glyph ${row.sign}`} aria-hidden="true">{glyph}</span>;
+}
+
+const checkGlyph = (state: string) => state === "passing" ? "✓" : state === "failing" ? "✕" : state === "running" ? "●" : "⊘";
+const checkWord: Record<string, string> = { passing: "passed", failing: "failed", running: "running", skipped: "skipped" };
+
+/** A check's glyph in its sign's colour, its state said to a screen reader. */
+function CheckGlyph({ state }: { state: string }) {
+  return <span class={`work-merge-glyph ${checkSign(state)}`} role="img" aria-label={checkWord[state] ?? state}>{checkGlyph(state)}</span>;
+}
+
+/** A pull request's merge box (pull-request.md note 10), as the window's WorkMergeBox (#4406): a bordered box at the end
+ * of the timeline (at the top of a page under 700 px, `top`) with a row for the review, the checks and conflicts, each
+ * with a glyph in its state's colour, then Merge ▾, Approve and Rerun failed. The checks list opens with Show all, and
+ * is open from the start when a check failed; a failed check has Log. On the top box the checks row opens the Checks
+ * page (`checksPage`) in place of the list. `writes`: a machine of the person's writes to the forge; else the rows and
+ * why no buttons. */
+export function WorkMergeBox({ store, host, detail, box, writes, top = false, checksPage, wrote }: {
+  store: Store; host: string; detail: ForgeItemDetail; box: MergeBox; writes: boolean; top?: boolean;
+  checksPage?: (() => void) | undefined; wrote: () => void;
 }) {
   const busy = useSignal(false);
   const said = useSignal<{ words: string; failed: boolean } | null>(null);
-  const labelChoices = useSignal<ForgeLabel[] | null>(null);
   const log = useSignal<{ title: string; text: string } | null>(null);
-  const diff = useMemo(() => signal<Diff | null>(null), []);
+  const shows = useSignal<boolean | null>(null);
   const item = detail.item;
   const node = item.node;
-  const isPR = node.kind === "pr";
-  const failed = isPR ? failedChecks(detail) : [];
+  const checks = checksInOrder(detail.checks ?? []);
+  const open = shows.value ?? box.checksOpen;
+  const reads = offers(detail, "log");
 
-  useEffect(() => {
-    let current = true;
-    labelChoices.value = null;
-    if (!takesLabels(node)) return;
-    store.link.call("forge/labels", { node }, host).then((r) => { if (current) labelChoices.value = r.labels; }, () => {
-      if (current) labelChoices.value = [];
-    });
-    return () => { current = false; };
-  }, [node.ref, host]);
-
-  const act = async (method: Write, params: unknown) => {
+  const act = async (method: "forge/merge" | "forge/approve" | "forge/rerun", params: unknown) => {
     busy.value = true;
     try {
       const done = await store.link.call(method, params as never, host) as ForgeDone;
-      const close = method === "forge/close" ? params as { reopen?: boolean; transition?: string } : {};
-      said.value = { words: doneWords(method, done, close.reopen === true, close.transition !== undefined), failed: false };
+      said.value = { words: doneWords(method, done), failed: false };
       wrote();
     } catch (e) {
       said.value = { words: describe(e), failed: true };
@@ -55,7 +82,149 @@ export function WorkActions({ store, host, detail, wrote }: {
       busy.value = false;
     }
   };
-  const read = async <T,>(get: () => Promise<T>, then: (t: T) => void) => {
+  const readLog = async (check: string) => {
+    busy.value = true;
+    try {
+      const r = await store.link.call("forge/log", { node, check }, host);
+      log.value = { title: check, text: r.text };
+    } catch (e) {
+      said.value = { words: describe(e), failed: true };
+    } finally {
+      busy.value = false;
+    }
+  };
+
+  const methods = detail.mergeMethods ?? [];
+  const merge = (method: ForgeMergeMethod | undefined, auto: boolean) => detail.head && void act("forge/merge", {
+    node, sha: detail.head, ...method ? { method } : {}, ...auto ? { auto: true } : {},
+  });
+  // The menu: the other methods, then Merge when checks pass (auto-merge, when the forge offers it).
+  const menu: MenuItem[] = [
+    ...methods.slice(1).map((m): MenuItem => ({ label: mergeButton(m, box.waits), run: () => merge(m, box.waits) })),
+    ...box.waits || !offers(detail, "autoMerge") ? [] : [{ label: "Merge when checks pass", run: () => merge(methods[0], true) }],
+  ];
+
+  return (
+    <div class={`work-merge${top ? " top" : ""}`}>
+      {!top && (
+        <span class={`work-merge-mark${item.draft ? " draft" : ""}`} aria-hidden="true"><StateIcon kind="pr" state="open" draft={item.draft} size={14} /></span>
+      )}
+      <section class={`work-merge-box ${box.border}`} aria-label="Merge">
+        {box.rows.map((row) => (
+          <div key={row.kind} class="work-merge-row-wrap">
+            {row.kind === "checks" && top && checks.length > 0 && checksPage ? (
+              <button type="button" class="work-merge-row link-row" onClick={checksPage} aria-label={`${row.title}: the checks`}>
+                <MergeGlyph row={row} />
+                <span class="words"><span class="strong">{row.title}</span>{row.line && <span class="quiet small">{row.line}</span>}</span>
+                <span class="quiet small">{checks.length} <span aria-hidden="true">›</span></span>
+              </button>
+            ) : (
+              <div class="work-merge-row">
+                <MergeGlyph row={row} />
+                <span class="words"><span class="strong">{row.title}</span>{row.line && <span class="quiet small">{row.line}</span>}</span>
+                {row.kind === "checks" && checks.length > 0 && (
+                  <button type="button" class="link small" aria-expanded={open} onClick={() => { shows.value = !open; }}>{open ? "Hide" : "Show all"}</button>
+                )}
+              </div>
+            )}
+            {row.kind === "checks" && open && !top && checks.length > 0 && (
+              <ul class="work-checks">
+                {checks.map((c, i) => (
+                  <li key={`${c.name}-${i}`}>
+                    <CheckGlyph state={c.state} />
+                    <span class="name" title={c.name}>{c.name}</span>
+                    {c.state === "failing" && writes && reads
+                      ? <button type="button" class="link" disabled={busy.value} title="The end of this check's log" onClick={() => void readLog(c.name)}>Log</button>
+                      : c.url && <a href={c.url} target="_blank" rel="noopener noreferrer">Details</a>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ))}
+        <div class="work-merge-buttons">
+          {!writes ? <p class="quiet small">{noWriter(node.ref)}</p>
+            : item.draft ? <p class="quiet small">{readyOnForge(node.ref)}</p>
+            : (
+              <div class="work-actions-bar">
+                {box.merges && detail.head && (
+                  <span class={`split-button work-merge-button${box.waits ? " waits" : ""}`}>
+                    <button type="button" class="prominent" disabled={busy.value} onClick={() => merge(methods[0], box.waits)}>{mergeMain(methods, box.waits)}</button>
+                    <button type="button" class="prominent" disabled={busy.value || menu.length === 0} aria-label="More ways to merge"
+                      onClick={(e) => openContextMenu(e, menu)}>▾</button>
+                  </span>
+                )}
+                {box.resolve && item.url && <button type="button" onClick={() => openLink(`${item.url}/conflicts`)}>{resolveOnForge(node.ref)}</button>}
+                {box.approves && detail.head && (
+                  <button type="button" class="work-approve" disabled={busy.value} onClick={() => void act("forge/approve", { node, sha: detail.head })}>
+                    <span aria-hidden="true">✓</span>Approve</button>
+                )}
+                {box.reruns && (
+                  <button type="button" class="work-rerun" disabled={busy.value} onClick={() => void act("forge/rerun", { node })}>
+                    <span aria-hidden="true">↻</span>Rerun failed</button>
+                )}
+                {busy.value && <span class="work-spinner" aria-label="Working" />}
+              </div>
+            )}
+          {said.value && <p class={said.value.failed ? "hint failure small" : "quiet small"} role="status">{said.value.words}</p>}
+        </div>
+      </section>
+      <WorkLogSheet log={log.value} close={() => { log.value = null; }} />
+    </div>
+  );
+}
+
+/** Files changed 6 (pull-request.md note 5), as the window's WorkFilesChanged: a bordered button at the title's
+ * trailing end, or (`row`, a page under 700 px) a full-width row, Files changed · 6 ›. It opens the diff (forge/diff)
+ * as a sheet. */
+export function WorkFilesChanged({ store, host, detail, row = false }: { store: Store; host: string; detail: ForgeItemDetail; row?: boolean }) {
+  const loading = useSignal(false);
+  const problem = useSignal<string | null>(null);
+  const diff = useMemo(() => signal<Diff | null>(null), []);
+  const node = detail.item.node;
+  if (!offers(detail, "diff")) return null;
+  const show = async () => {
+    loading.value = true;
+    problem.value = null;
+    try {
+      const d = await store.link.call("forge/diff", { node }, host);
+      diff.value = { title: `${shortRef(node.ref)} ${detail.item.title}`, url: d.url, files: d.files, cut: d.cut, site: forgeName(node.ref) };
+    } catch (e) {
+      problem.value = describe(e);
+    } finally {
+      loading.value = false;
+    }
+  };
+  const n = detail.filesChanged;
+  return (
+    <span class={row ? "work-files-row" : "work-files"}>
+      <button type="button" disabled={loading.value} onClick={() => void show()} title="The pull request's diff">
+        <svg class="work-files-glyph" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M5.5 1.75h5.25l3 3v7.5a1 1 0 0 1-1 1H5.5a1 1 0 0 1-1-1v-9.5a1 1 0 0 1 1-1ZM2.25 4.5v9.25a1 1 0 0 0 1 1h7" /></svg>
+        {row ? <><span class="words">Files changed</span>{loading.value && <span class="work-spinner" aria-label="Loading" />}
+          {n !== undefined && <span class="quiet">{n}</span>}<span class="quiet" aria-hidden="true">›</span></>
+          : <>{filesChangedWords(n)}{loading.value && <span class="work-spinner" aria-label="Loading" />}</>}
+      </button>
+      {problem.value && <span class="hint failure small">{problem.value}</span>}
+      <ViewDiff layer={{ diff }} openLink={openLink} />
+    </span>
+  );
+}
+
+/** The Checks page of a page under 700 px (pull-request.md note 17), pushed from the merge box's checks row: ‹ #4402,
+ * "1 failed, 12 passed, 1 running", Rerun failed full width, then a row per check with a chevron. A check opens the end
+ * of its log in a sheet; one with no log, or with no machine that reads it, its page on the forge. */
+export function WorkChecksPage({ store, host, detail, writes, back, wrote }: {
+  store: Store; host: string; detail: ForgeItemDetail; writes: boolean; back: () => void; wrote: () => void;
+}) {
+  const busy = useSignal(false);
+  const said = useSignal<{ words: string; failed: boolean } | null>(null);
+  const log = useSignal<{ title: string; text: string } | null>(null);
+  const node = detail.item.node;
+  const checks = checksInOrder(detail.checks ?? []);
+  const failed = checks.some((c) => c.state === "failing");
+  const reads = writes && offers(detail, "log");
+  const run = async <T,>(get: () => Promise<T>, then: (t: T) => void) => {
     busy.value = true;
     try {
       then(await get());
@@ -65,88 +234,54 @@ export function WorkActions({ store, host, detail, wrote }: {
       busy.value = false;
     }
   };
-
-  const startAgent = () => {
-    const start = detail.start;
-    if (!start) return;
-    if (!item.folder) { said.value = { words: "No folder on this machine is on this issue's repo.", failed: true }; return; }
-    const why = offerStart(store, host, item.folder, { prompt: start.prompt, labels: start.labels, worktree: start.worktree });
-    if (why) said.value = { words: why, failed: true };
+  const open = (c: ForgeCheck) => {
+    if (reads && c.state === "failing") void run(() => store.link.call("forge/log", { node, check: c.name }, host), (r) => { log.value = { title: c.name, text: r.text }; });
+    else if (c.url) openLink(c.url);
   };
-
-  const methods = detail.mergeMethods ?? [];
-  const waits = mergeWaits(detail);
-  const merge = (method: ForgeMergeMethod | undefined, auto: boolean) => detail.head && void act("forge/merge", {
-    node, sha: detail.head, ...method ? { method } : {}, ...auto ? { auto: true } : {},
-  });
-  const mergeMenu = (event: MouseEvent) => openContextMenu(event, [
-    ...methods.slice(1).map((m): MenuItem => ({ label: mergeButton(m, waits), run: () => merge(m, waits) })),
-    ...waits ? [] : [{ label: "Merge when checks pass", run: () => merge(methods[0], true) }],
-  ]);
-  // A Jira issue's status (#3260): the moves its workflow allows now, as Jira shows them.
-  const transitions = detail.transitions;
-  const statusMenu = (event: MouseEvent) => openContextMenu(event, (transitions ?? []).map((t): MenuItem => ({
-    label: t.name, run: () => void act("forge/close", { node, transition: t.id }),
-  })));
-  const labelMenu = (event: MouseEvent) => openContextMenu(event, (labelChoices.value ?? []).map((l): MenuItem => {
-    const on = item.labels.some((x) => x.name === l.name);
-    return { label: `${on ? "✓ " : ""}${l.name}`, help: on ? "Take it off" : "Add it",
-      run: () => void act("forge/label", { node, ...on ? { remove: [l.name] } : { add: [l.name] } }) };
-  }));
-
+  useEffect(() => {
+    const escape = (e: KeyboardEvent) => { if (e.key === "Escape" && !log.value) back(); };
+    addEventListener("keydown", escape);
+    return () => removeEventListener("keydown", escape);
+  }, []);
   return (
-    <div class="work-actions">
-      <div class="work-actions-bar">
-        {!isPR && detail.start && <button type="button" class="prominent" disabled={busy.value} onClick={startAgent}
-          title="The new-agent form in this issue's folder, filled in for it">Start Agent</button>}
-        {isPR && item.state === "open" && detail.head && (
-          <span class="split-button">
-            <button type="button" class="prominent" disabled={busy.value} onClick={() => merge(methods[0], waits)}>{mergeButton(methods[0], waits)}</button>
-            <button type="button" class="prominent" disabled={busy.value} aria-label="More ways to merge" onClick={mergeMenu}>▾</button>
-          </span>
-        )}
-        {isPR && item.state === "open" && detail.head && (
-          <button type="button" disabled={busy.value} onClick={() => void act("forge/approve", { node, sha: detail.head })}>Approve</button>
-        )}
-        {item.state === "open" && failed.length > 0 && <button type="button" disabled={busy.value} onClick={() => void act("forge/rerun", { node })}>Rerun failed</button>}
-        {isPR && <button type="button" disabled={busy.value} onClick={() => void read(() => store.link.call("forge/diff", { node }, host), (d) => {
-          diff.value = { title: `${shortRef(node.ref)} ${item.title}`, url: d.url, files: d.files, cut: d.cut, site: forgeName(node.ref) };
-        })}>Show Diff</button>}
-        {transitions && <button type="button" disabled={busy.value || transitions.length === 0} onClick={statusMenu}
-          title={transitions.length === 0 ? "No moves" : "Move it by its workflow"}>{item.status ?? "Status"} ▾</button>}
-        {!transitions && (item.state === "open" || item.state === "closed") && (
-          <button type="button" disabled={busy.value}
-            onClick={() => void act("forge/close", { node, ...item.state === "open" ? {} : { reopen: true } })}>{closeTitle(item.state)}</button>
-        )}
-        {takesLabels(node) && <button type="button" disabled={busy.value || !labelChoices.value?.length} onClick={labelMenu}
-          title={labelChoices.value === null ? "Loading…" : labelChoices.value.length === 0 ? "No labels" : undefined}>Labels ▾</button>}
-        {busy.value && <span class="quiet small">Working…</span>}
+    <section class="work-checks-page" aria-label="Checks">
+      <div class="work-page-bar">
+        <nav class="work-place" aria-label="Place">
+          <button type="button" class="link" onClick={back}><span aria-hidden="true">‹ </span>{shortRef(node.ref)}</button>
+        </nav>
       </div>
-      {failed.length > 0 && (
-        <p class="small"><span class="quiet">Failed:</span> {failed.map((c) => (
-          <button key={c.name} type="button" class="link" disabled={busy.value} title="The end of this check's log"
-            onClick={() => void read(() => store.link.call("forge/log", { node, check: c.name }, host), (r) => { log.value = { title: c.name, text: r.text }; })}>
-            {c.name} log</button>
-        ))}</p>
+      <h2>Checks</h2>
+      <p class="quiet small">{checksPageWords(checks)}</p>
+      {failed && writes && offers(detail, "rerun") && (
+        <button type="button" class="work-rerun wide" disabled={busy.value}
+          onClick={() => void run(() => store.link.call("forge/rerun", { node }, host) as Promise<ForgeDone>, (done) => {
+            said.value = { words: doneWords("forge/rerun", done), failed: false };
+            wrote();
+          })}><span aria-hidden="true">↻</span>Rerun failed</button>
       )}
       {said.value && <p class={said.value.failed ? "hint failure small" : "quiet small"} role="status">{said.value.words}</p>}
-      {log.value && (
-        <Modal label={log.value.title} close={() => { log.value = null; }}>
-          <div class="work-log">
-            <header><h2>{log.value.title}</h2><span class="spacer" />
-              <button type="button" class="prominent" onClick={() => { log.value = null; }}>Done</button></header>
-            <pre>{log.value.text}</pre>
-          </div>
-        </Modal>
-      )}
-      <ViewDiff layer={{ diff }} openLink={openLink} />
-    </div>
+      <ul class="work-checks-list">
+        {checks.map((c, i) => {
+          const opens = (reads && c.state === "failing") || !!c.url;
+          return (
+            <li key={`${c.name}-${i}`}>
+              <button type="button" disabled={!opens || busy.value} onClick={() => open(c)}
+                title={reads && c.state === "failing" ? "The end of this check's log" : c.url ? `Its page on ${forgeName(node.ref)}` : undefined}>
+                <CheckGlyph state={c.state} /><span class="name">{c.name}</span>
+                {opens && <span class="quiet" aria-hidden="true">›</span>}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      <WorkLogSheet log={log.value} close={() => { log.value = null; }} />
+    </section>
   );
 }
 
 /** The comment box at the end of the timeline (#3130; #4402 note 11): the person's glyph, a Markdown field, then Close
  * issue (Close with comment, with text in the field) or Reopen issue beside Comment (⌘↩). `closes` is the item's state
- * when its close is here (an issue with no tracker's status); a pull request's is in its actions row (#4408 moves it).
+ * when its close is here (an issue with no tracker's status, an open or closed pull request, #4408).
  * What a write did, or why not, is the line under the buttons. */
 export function WorkCommentBox({ store, host, node, closes, noun = "issue", said, wrote }: {
   store: Store; host: string; node: LineageNode; closes?: string | undefined; noun?: string;
@@ -200,7 +335,7 @@ export function WorkCommentBox({ store, host, node, closes, noun = "issue", said
           {(closes === "open" || closes === "closed") && (
             <button type="button" disabled={sending.value} onClick={() => void send(closes === "open" ? "close" : "reopen")}
               title={closes === "open" ? (noun === "issue" ? "Close it as completed" : "Close it without merging") : undefined}>
-              <span aria-hidden="true" class={`work-close-mark ${closes}`}>{closes === "open" ? "✓" : "↺"}</span>{closeWords}</button>
+              <span aria-hidden="true" class={`work-close-mark ${closes}${noun === "issue" ? "" : " pull"}`}>{closes === "open" ? (noun === "issue" ? "✓" : "✕") : "↺"}</span>{closeWords}</button>
           )}
           <button type="submit" class="prominent" disabled={sending.value || empty} title="Comment (⌘↩)">Comment</button>
         </div>
