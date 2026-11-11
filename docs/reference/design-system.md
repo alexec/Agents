@@ -59,6 +59,30 @@ Mac window and the iPhone and iPad app hold the same value.
 | tint.vouched | `--tint-vouched` | `StateTint.green` | `#2d765c` | `#8bc6a7` | Approved, done: an ending the app can vouch for. |
 | label.issue | `--label-issue` | `Paper.issue` | `#0e6b82` | `#6cc6db` | A label naming an issue, #12. |
 | label.pull | `--label-pull` | `Paper.pull` | `#7442b8` | `#b79af0` | A label naming a pull request, P#12. |
+| on-fill | `--paper-on-fill` | `none: SwiftUI's Color.white` | `#ffffff` | `#ffffff` | What is drawn on a filled mark: a state's badge, a swipe's action. |
+| scrim | `--paper-scrim` | `none: SwiftUI's Color.black` | `#000000` | `#000000` | Behind a sheet or a viewer, mixed with transparent to the strength it needs. |
+| forge.open | `--forge-open` | `WorkLook.Tone.green` | `#1a7f37` | `#3fb950` | Open; a check that passed; running. |
+| forge.done | `--forge-done` | `WorkLook.Tone.purple` | `#8250df` | `#a371f7` | A closed issue, a merged pull request. |
+| forge.closed | `--forge-closed` | `WorkLook.Tone.red` | `#cf222e` | `#f85149` | A pull request closed unmerged; a check that failed; changes asked for. |
+| forge.draft | `--forge-draft` | `WorkLook.Tone.grey` | `#6e7781` | `#8b949e` | A draft, an issue not planned. |
+| forge.waiting | `--forge-waiting` | `WorkItemActions.amber` | `#9a6700` | `#d29922` | A check still running; an agent that waits on the person. |
+| forge.fill.open | `--forge-fill-open` | `none: the window fills with WorkLook.Tone` | `#1f883d` | `#238636` | An open badge; the merge button. |
+| forge.fill.done | `--forge-fill-done` | `none: the window fills with WorkLook.Tone` | `#8250df` | `#8957e5` | A merged or closed badge. |
+| forge.fill.closed | `--forge-fill-closed` | `none: the window fills with WorkLook.Tone` | `#cf222e` | `#da3633` | A closed pull request's badge. |
+| forge.fill.draft | `--forge-fill-draft` | `none: the window fills with WorkLook.Tone` | `#59636e` | `#6e7681` | A draft's or a not planned issue's badge. |
+| code.comment | `--code-comment` | `InkValues.comment` | `#64707a` | `#a3adb8` | A comment, in italic. |
+| code.keyword | `--code-keyword` | `InkValues.keyword` | `#2b4c8c` | `#8fb0e8` | A keyword, true, false, null. |
+| code.string | `--code-string` | `InkValues.string` | `#4e6420` | `#a9c27a` | A string. |
+| code.number | `--code-number` | `InkValues.number` | `#7a3e7a` | `#d5a3d5` | A number. |
+| code.type | `--code-type` | `InkValues.type` | `#1f6a6a` | `#7cc4c0` | A type. |
+| code.function | `--code-function` | `InkValues.function` | `#5b4bb5` | `#b3a6f0` | A function. |
+| code.property | `--code-property` | `InkValues.property` | `#52627a` | `#bac5d7` | A property. |
+| code.punctuation | `--code-punctuation` | `InkValues.punctuation` | `#5e6470` | `#a9b2bd` | Punctuation and operators. |
+| timeline.plot | `--timeline-plot` | `none: WorkTimelinePane.plot` | `#ffffff` | `#0d1429` | The plot behind the lines. |
+| timeline.faint | `--timeline-faint` | `none: WorkTimelinePane.faint` | `#8c8c8c` | `#999999` | The axis's marks. |
+| timeline.trunk | `--timeline-trunk` | `none: WorkTimelinePane's trunk` | `#999999` | `#e7e8ea` | The trunk every feature leaves from. |
+| timeline.release | `--timeline-release` | `none: WorkTimelinePane's release` | `#000000` | `#ffffff` | A release's ring on the trunk. |
+| timeline.now | `--timeline-now` | `none: WorkTimelinePane.nowGrey` | `#8c8c8c` | `#8c8c8c` | The Now line. |
 <!-- /design.sh gen -->
 
 ## Shape
