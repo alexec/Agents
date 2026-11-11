@@ -94,13 +94,17 @@ func (f *forgeFake) serve(w http.ResponseWriter, r *http.Request) {
 		f.write(w, []obj{})
 	case p == "repos/acme/app/pulls/8":
 		f.write(w, obj{"number": 8, "title": "WIP: Add hello", "state": "open", "html_url": "https://fj.test/acme/app/pulls/8", "mergeable": false,
-			"changed_files": 2, "head": obj{"sha": "abc123", "ref": "hello"}, "base": obj{"ref": "main"}})
+			"changed_files": 2, "additions": 12, "deletions": 3, "head": obj{"sha": "abc123", "ref": "hello"}, "base": obj{"ref": "main"},
+			"requested_reviewers": []obj{dev}, "requested_reviewers_teams": []obj{{"name": "reviewers"}}})
+	case p == "repos/acme/app/pulls/8/commits":
+		f.write(w, []obj{{"sha": "c1"}, {"sha": "c2"}})
 	case p == "repos/acme/app/commits/abc123/status":
 		f.write(w, obj{"state": "failure", "sha": "abc123", "statuses": []obj{
 			{"context": "ci / test", "status": "failure", "target_url": "https://fj.test/acme/app/actions/runs/3/jobs/0"},
 			{"context": "ci / lint", "status": "success"}}})
 	case p == "repos/acme/app/pulls/8/reviews" && r.Method == http.MethodGet:
-		f.write(w, []obj{{"id": 1, "user": alex, "state": "APPROVED", "comments_count": 1}, {"id": 2, "user": dev, "state": "REQUEST_CHANGES", "comments_count": 2}})
+		f.write(w, []obj{{"id": 1, "user": alex, "state": "APPROVED", "comments_count": 1}, {"id": 2, "user": dev, "state": "REQUEST_CHANGES", "comments_count": 2},
+			{"id": 4, "user": alex, "state": "COMMENT"}, {"id": 5, "user": obj{"id": 3, "login": "kim"}, "state": "REQUEST_CHANGES", "dismissed": true}})
 	case p == "repos/acme/app/pulls/8/reviews":
 		f.write(w, obj{"id": 3, "html_url": "https://fj.test/acme/app/pulls/8#issuecomment-3"})
 	case p == "repos/acme/app/pulls/8.diff":
@@ -227,6 +231,15 @@ func TestTheForgeItemPageReadsAnIssueAndAPullRequest(t *testing.T) {
 	if !p.PR || !p.Draft || p.Head != "abc123" || p.FilesChanged != 2 || p.Mergeable != "conflicting" || p.Checks != "failing" ||
 		p.Review != "changes_requested" || p.ReviewThreads != 3 || len(p.CheckRuns) != 2 || p.CheckRuns[0].State != "failing" || p.CheckRuns[1].State != "passing" {
 		t.Fatalf("a pull request's page: %+v", p)
+	}
+	// #4682: its size, and each reviewer once: asked again since a review is pending, a comment
+	// after an approval leaves it approved, and a dismissed review says nothing.
+	if p.Size == nil || *p.Size != (Size{Additions: 12, Deletions: 3, Commits: 2}) {
+		t.Fatalf("size: %+v", p.Size)
+	}
+	if !slices.Equal(p.Reviewers, []Reviewer{{Login: "dev", State: "pending"}, {Login: "reviewers", State: "pending"},
+		{Login: "alex", Avatar: "https://fj.test/avatars/a1", State: "approved"}}) {
+		t.Fatalf("reviewers: %+v", p.Reviewers)
 	}
 }
 

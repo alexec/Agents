@@ -86,7 +86,17 @@ type Comment struct {
 type CheckRun struct {
 	Name, State, URL string
 	Run              int
+	// StartedAt is when the status was first sent and FinishedAt when it last changed, once it
+	// is not running (#4682).
+	StartedAt, FinishedAt string
 }
+
+// Size is a pull request's lines added and deleted, and its commits (#4682).
+type Size struct{ Additions, Deletions, Commits int }
+
+// Reviewer is a person asked to review a pull request or who reviewed it (#4682): State is
+// approved, changes_requested, or pending while asked and not answered.
+type Reviewer struct{ Login, Avatar, State string }
 
 // ItemDetail is an item with its body and a page of its comments (Thread), oldest first in the
 // page. Before is the cursor of the page before it, "" at the first comment. CheckRuns are a
@@ -103,6 +113,10 @@ type ItemDetail struct {
 	Head          string
 	// Events are an issue's changes (#4626), oldest first, from its first page of them.
 	Events []Event
+	// A pull request's (#4682): its Size (nil when its commits cannot be read, the one read more
+	// of its page) and its Reviewers.
+	Size      *Size
+	Reviewers []Reviewer
 }
 
 // Event is one change to an issue: Kind is labeled, unlabeled, assigned, unassigned, closed or
@@ -202,6 +216,37 @@ func (p forgePullJSON) review() string {
 		return "review_required"
 	}
 	return ""
+}
+
+// reviewers are a pull request's reviewers, each once: a participant who approved or asked for
+// changes by that, and a reviewer who has not yet pending. Bitbucket has no review that only
+// comments: a participant who commented and is no reviewer is not one.
+func (p forgePullJSON) reviewers() []Reviewer {
+	out := []Reviewer{}
+	seen := map[string]bool{}
+	add := func(u *user, state string) {
+		if login := u.name(); login != "" && !seen[login] {
+			seen[login] = true
+			out = append(out, Reviewer{Login: login, Avatar: u.avatar(), State: state})
+		}
+	}
+	for _, r := range p.Participants {
+		switch {
+		case r.State == "changes_requested":
+			add(&r.User, "changes_requested")
+		case r.Approved || r.State == "approved":
+			add(&r.User, "approved")
+		}
+	}
+	for _, r := range p.Participants {
+		if r.Role == "REVIEWER" {
+			add(&r.User, "pending")
+		}
+	}
+	for _, r := range p.Reviewers {
+		add(&r, "pending")
+	}
+	return out
 }
 
 // forgeItem is an issue as a list says it.
@@ -506,13 +551,23 @@ func (b *RealBitbucket) ItemPage(ctx context.Context, repo string, number int, p
 		return d, nil
 	}
 	d.Head = p.Source.hash()
-	files, _, err := all[struct {
-		Status string `json:"status"`
-	}](ctx, b, fmt.Sprintf("%s/pullrequests/%d/diffstat", repoPath(repo), number), false)
+	files, _, err := all[fileJSON](ctx, b, fmt.Sprintf("%s/pullrequests/%d/diffstat", repoPath(repo), number), false)
 	if err != nil {
 		return ItemDetail{}, err
 	}
 	d.FilesChanged = len(files)
+	additions, deletions := 0, 0
+	for _, f := range files {
+		additions, deletions = additions+f.Added, deletions+f.Removed
+	}
+	// The commits are the one read more of a pull request's page, and a nicety: without them it
+	// has no size.
+	if commits, _, err := all[struct {
+		Hash string `json:"hash"`
+	}](ctx, b, fmt.Sprintf("%s/pullrequests/%d/commits", repoPath(repo), number), false); err == nil {
+		d.Size = &Size{Additions: additions, Deletions: deletions, Commits: len(commits)}
+	}
+	d.Reviewers = p.reviewers()
 	if d.State == "open" {
 		d.Mergeable = "mergeable"
 		for _, f := range files {
@@ -529,7 +584,11 @@ func (b *RealBitbucket) ItemPage(ctx context.Context, repo string, number int, p
 			return ItemDetail{}, err
 		}
 		for _, s := range statuses {
-			d.CheckRuns = append(d.CheckRuns, CheckRun{Name: s.title(), State: checkState(s.State), URL: s.URL, Run: PipelineRun(s.URL)})
+			run := CheckRun{Name: s.title(), State: checkState(s.State), URL: s.URL, Run: PipelineRun(s.URL), StartedAt: s.CreatedOn}
+			if run.State != "running" && s.CreatedOn != "" {
+				run.FinishedAt = s.UpdatedOn
+			}
+			d.CheckRuns = append(d.CheckRuns, run)
 		}
 		if state := combined(statuses); state != "" {
 			d.Checks = checkState(state)

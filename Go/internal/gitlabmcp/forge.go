@@ -91,7 +91,15 @@ type Comment struct {
 }
 
 // Check is one of a merge request's pipeline jobs: State is passing, failing, running or skipped.
-type Check struct{ Name, State, URL string }
+// StartedAt and FinishedAt are a job's times, "" before it starts and while it runs (#4682).
+type Check struct{ Name, State, URL, StartedAt, FinishedAt string }
+
+// Reviewer is a person asked to review a merge request or who reviewed it (#4682): State is
+// approved, changes_requested, commented, or pending while asked and not answered.
+type Reviewer struct{ Login, Avatar, State string }
+
+// Size is a merge request's lines added and deleted, and its commits (#4682).
+type Size struct{ Additions, Deletions, Commits int }
 
 // ItemDetail is an item with its body and a page of its comments (Thread), oldest first in the
 // page. Before is the cursor of the page before it, "" at the first comment. CheckRuns are a
@@ -111,6 +119,11 @@ type ItemDetail struct {
 	// An issue's (#4626): Children are its child work items, in GitLab's order (empty on a GitLab
 	// without work items), and ClosedBy the merge requests that close it.
 	Children, ClosedBy []Linked
+	// A merge request's (#4682), from the one read more of its page: its Size, its Reviewers, and
+	// the issues of its project that its description closes. All nil when GitLab does not say them.
+	Size      *Size
+	Reviewers []Reviewer
+	Closes    []Linked
 }
 
 // Linked is an item that another names, with its title: State is open, closed or merged.
@@ -465,10 +478,147 @@ func (g *RealGitLab) ItemPage(ctx context.Context, project string, number int, m
 			if job.Status == "failed" && job.AllowFailure {
 				state = "skipped"
 			}
-			d.CheckRuns = append(d.CheckRuns, Check{Name: job.Stage + ": " + job.Name, State: state, URL: job.WebURL})
+			check := Check{Name: job.Stage + ": " + job.Name, State: state, URL: job.WebURL, StartedAt: job.StartedAt}
+			if state != "running" && job.StartedAt != "" {
+				check.FinishedAt = job.FinishedAt
+			}
+			d.CheckRuns = append(d.CheckRuns, check)
 		}
 	}
+	// The size, reviewers and closing issues are the one read more of a merge request's page, and a
+	// nicety: a page still reads when GitLab does not give them.
+	if r, err := g.mergeRequestRead(ctx, project, number, j.Description); err == nil {
+		d.Size, d.Reviewers, d.Closes = r.size, r.reviewers, r.closes
+	}
 	return d, nil
+}
+
+// mrReadQuery is a merge request's size and reviewers, and the titles of the issues of its
+// project that its description closes (#4682): GitLab's REST says none of them in one read.
+const mrReadQuery = `query($path: ID!, $iid: String!, $closes: [String!], $hasCloses: Boolean!) { project(fullPath: $path) {
+  mergeRequest(iid: $iid) { diffStatsSummary { additions deletions } commitCount
+    reviewers(first: 100) { nodes { username avatarUrl webUrl mergeRequestInteraction { reviewState } } }
+    approvedBy(first: 100) { nodes { username avatarUrl webUrl } } }
+  issues(iids: $closes, first: 20) @include(if: $hasCloses) { nodes { iid title state webUrl } } } }`
+
+type gqlPerson struct {
+	Username  string `json:"username"`
+	AvatarURL string `json:"avatarUrl"`
+	WebURL    string `json:"webUrl"`
+}
+
+// avatar is the person's picture as an absolute URL: GitLab can give its own upload's path.
+func (p gqlPerson) avatar() string {
+	return user{AvatarURL: p.AvatarURL}.avatar(p.WebURL)
+}
+
+// reviewStates are GitLab's review states in the one model's words; unreviewed, started and
+// unapproved are pending.
+var reviewStates = map[string]string{"APPROVED": "approved", "REQUESTED_CHANGES": "changes_requested", "REVIEWED": "commented"}
+
+type mrRead struct {
+	size      *Size
+	reviewers []Reviewer
+	closes    []Linked
+}
+
+func (g *RealGitLab) mergeRequestRead(ctx context.Context, project string, number int, description string) (mrRead, error) {
+	// The issues of this project the description closes, in its order; another project's would
+	// need a read each.
+	var iids []string
+	for _, ref := range closingRefs(description) {
+		path, n, _ := strings.Cut(ref, "#")
+		if path == "" || strings.EqualFold(path, project) {
+			iids = append(iids, n)
+		}
+	}
+	var data struct {
+		Project *struct {
+			MergeRequest *struct {
+				DiffStatsSummary *struct {
+					Additions int `json:"additions"`
+					Deletions int `json:"deletions"`
+				} `json:"diffStatsSummary"`
+				CommitCount *int `json:"commitCount"`
+				Reviewers   struct {
+					Nodes []struct {
+						gqlPerson
+						Interaction *struct {
+							ReviewState string `json:"reviewState"`
+						} `json:"mergeRequestInteraction"`
+					} `json:"nodes"`
+				} `json:"reviewers"`
+				ApprovedBy struct {
+					Nodes []gqlPerson `json:"nodes"`
+				} `json:"approvedBy"`
+			} `json:"mergeRequest"`
+			Issues struct {
+				Nodes []struct {
+					IID    string `json:"iid"`
+					Title  string `json:"title"`
+					State  string `json:"state"`
+					WebURL string `json:"webUrl"`
+				} `json:"nodes"`
+			} `json:"issues"`
+		} `json:"project"`
+	}
+	vars := map[string]any{"path": project, "iid": strconv.Itoa(number), "closes": iids, "hasCloses": len(iids) > 0}
+	if err := g.graphql(ctx, mrReadQuery, vars, &data); err != nil {
+		return mrRead{}, err
+	}
+	if data.Project == nil || data.Project.MergeRequest == nil {
+		return mrRead{}, &GitLabError{Kind: NotFound, Message: "not found on GitLab"}
+	}
+	m := data.Project.MergeRequest
+	var out mrRead
+	if m.DiffStatsSummary != nil && m.CommitCount != nil {
+		out.size = &Size{Additions: m.DiffStatsSummary.Additions, Deletions: m.DiffStatsSummary.Deletions, Commits: *m.CommitCount}
+	}
+	// Each reviewer once, by their review; an approval makes a pending reviewer approved, and one
+	// who approved and is no reviewer is a reviewer too.
+	out.reviewers = []Reviewer{}
+	seen := map[string]int{}
+	for _, r := range m.Reviewers.Nodes {
+		if _, ok := seen[r.Username]; r.Username == "" || ok {
+			continue
+		}
+		seen[r.Username] = len(out.reviewers)
+		state := "pending"
+		if r.Interaction != nil && reviewStates[r.Interaction.ReviewState] != "" {
+			state = reviewStates[r.Interaction.ReviewState]
+		}
+		out.reviewers = append(out.reviewers, Reviewer{Login: r.Username, Avatar: r.avatar(), State: state})
+	}
+	for _, a := range m.ApprovedBy.Nodes {
+		if i, ok := seen[a.Username]; ok {
+			if out.reviewers[i].State == "pending" {
+				out.reviewers[i].State = "approved"
+			}
+		} else if a.Username != "" {
+			seen[a.Username] = len(out.reviewers)
+			out.reviewers = append(out.reviewers, Reviewer{Login: a.Username, Avatar: a.avatar(), State: "approved"})
+		}
+	}
+	out.closes = []Linked{}
+	byIID := map[string]Linked{}
+	for _, i := range data.Project.Issues.Nodes {
+		n, err := strconv.Atoi(i.IID)
+		if err != nil || n < 1 {
+			continue
+		}
+		state := "open"
+		if i.State == "closed" {
+			state = "closed"
+		}
+		byIID[i.IID] = Linked{Project: project, Number: n, State: state, Title: i.Title, URL: i.WebURL}
+	}
+	for _, iid := range iids {
+		if l, ok := byIID[iid]; ok {
+			out.closes = append(out.closes, l)
+			delete(byIID, iid)
+		}
+	}
+	return out, nil
 }
 
 // IsNotFound says whether err is GitLab's 404.

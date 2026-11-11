@@ -137,8 +137,9 @@ func (azureDevOpsForge) Caps() forgeCaps {
 			Rerun: true, Log: true, Diff: true, CancelAutoMerge: true, Ready: true},
 		Avatars:   true,
 		CreatedAt: true, ClosedAt: true,
-		// A pull request's branches and merge (#4409); its size, reviewers, closing issues and check times are #4682.
-		Branches: true, MergedBy: true, MergeCommit: true,
+		// A pull request's branches and merge (#4409), its reviewers and its builds' times (#4682).
+		// Azure Repos counts no lines, and the work items a pull request links are Azure Boards'.
+		Branches: true, MergedBy: true, MergeCommit: true, Reviewers: true, CheckTimes: true,
 		// A pull request's comment count is on its own page only.
 		CommentCount: "detail",
 		Reasons: map[string]string{
@@ -270,10 +271,14 @@ func (a azureDevOpsForge) Item(ctx context.Context, r forgeRef, cursor string) (
 		out.Comments = append(out.Comments, forgeCommentOf(c.Author, c.Avatar, c.Body, c.At, c.URL, c.Bot))
 	}
 	for _, c := range p.CheckRuns {
-		out.Checks = append(out.Checks, wire.ForgeCheck{Name: c.Name, State: c.State, URL: optional(c.URL)})
+		out.Checks = append(out.Checks, forgeCheckOf(c.Name, c.State, c.URL, c.StartedAt, c.FinishedAt))
 	}
 	out.ReviewThreads, out.FilesChanged = new(int64(p.ReviewThreads)), new(int64(p.FilesChanged))
 	out.Head = optional(p.Head)
+	out.Reviewers = []wire.ForgeReviewer{}
+	for _, r := range p.Reviewers {
+		out.Reviewers = append(out.Reviewers, forgeReviewerOf(r.Login, r.Avatar, r.State))
+	}
 	// The merge menu is a nicety: a page still reads when the branch's policy cannot be read.
 	if p.State == "open" {
 		if methods, err := ado.MergeMethods(ctx, named, r.Number); err == nil {

@@ -472,6 +472,7 @@ type buildJSON struct {
 	Status       string            `json:"status"`
 	Result       string            `json:"result"`
 	QueueTime    string            `json:"queueTime"`
+	StartTime    string            `json:"startTime"`
 	FinishTime   string            `json:"finishTime"`
 	SourceBranch string            `json:"sourceBranch"`
 	SourceVer    string            `json:"sourceVersion"`

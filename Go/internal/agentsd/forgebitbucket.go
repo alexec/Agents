@@ -141,8 +141,9 @@ func (bitbucketForge) Caps() forgeCaps {
 		CreatedAt: true,
 		// An issue's changes: its kind and component (its labels), assignee and state (#4626).
 		Events: true,
-		// A pull request's branches and merge (#4409); its size, reviewers, closing issues and check times are #4682.
-		Branches: true, MergeCommit: true,
+		// A pull request's branches and merge (#4409), its size, reviewers and its statuses' times
+		// (#4682). Bitbucket says no issue that a pull request closes.
+		Branches: true, MergeCommit: true, Size: true, Reviewers: true, CheckTimes: true,
 		// An issue's comment count is on its own page only.
 		CommentCount: "detail",
 		Reasons: map[string]string{
@@ -261,10 +262,17 @@ func (b bitbucketForge) Item(ctx context.Context, r forgeRef, cursor string) (wi
 	}
 	out.Checks = []wire.ForgeCheck{}
 	for _, c := range p.CheckRuns {
-		out.Checks = append(out.Checks, wire.ForgeCheck{Name: c.Name, State: c.State, URL: optional(c.URL)})
+		out.Checks = append(out.Checks, forgeCheckOf(c.Name, c.State, c.URL, c.StartedAt, c.FinishedAt))
 	}
 	out.ReviewThreads, out.FilesChanged = new(int64(p.ReviewThreads)), new(int64(p.FilesChanged))
 	out.Head = optional(p.Head)
+	if p.Size != nil {
+		withPullSize(&out, p.Size.Additions, p.Size.Deletions, p.Size.Commits)
+	}
+	out.Reviewers = []wire.ForgeReviewer{}
+	for _, r := range p.Reviewers {
+		out.Reviewers = append(out.Reviewers, forgeReviewerOf(r.Login, r.Avatar, r.State))
+	}
 	// The merge menu is a nicety: a page still reads when Bitbucket does not say the branch's.
 	if p.State == "open" {
 		if methods, err := bb.MergeMethods(ctx, named, r.Number); err == nil {

@@ -148,8 +148,9 @@ func (forgejoForge) Caps() forgeCaps {
 		// An issue's read has the pull requests that name it and its timeline (#4626); Forgejo
 		// has no sub-issues.
 		LinkedPulls: true, Events: true,
-		// A pull request's branches and merge (#4409); its size, reviewers, closing issues and check times are #4682.
-		Branches: true, MergedBy: true, MergeCommit: true,
+		// A pull request's branches and merge (#4409), its size and reviewers (#4682). The issues it
+		// closes would need a read each for their titles, and a commit status has no times.
+		Branches: true, MergedBy: true, MergeCommit: true, Size: true, Reviewers: true,
 		CommentCount: "exact",
 		Releases:     true,
 		Plan:         true, BlockedBy: true, AddChild: true,
@@ -282,6 +283,13 @@ func (g forgejoForge) Item(ctx context.Context, r forgeRef, cursor string) (wire
 	}
 	out.ReviewThreads, out.FilesChanged = new(int64(p.ReviewThreads)), new(int64(p.FilesChanged))
 	out.Head = optional(p.Head)
+	if p.Size != nil {
+		withPullSize(&out, p.Size.Additions, p.Size.Deletions, p.Size.Commits)
+	}
+	out.Reviewers = []wire.ForgeReviewer{}
+	for _, r := range p.Reviewers {
+		out.Reviewers = append(out.Reviewers, forgeReviewerOf(r.Login, r.Avatar, r.State))
+	}
 	// The merge menu is a nicety: a page still reads when Forgejo does not say the repository's.
 	if methods, err := fj.MergeMethods(ctx, named); err == nil {
 		out.MergeMethods = mergeMethodsOf(methods)

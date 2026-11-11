@@ -108,7 +108,7 @@ func (f *forgeFake) serve(w http.ResponseWriter, r *http.Request) {
 	case p == "acme/app/pullrequests/8" && r.Method == http.MethodGet:
 		f.write(w, pull(8, "hello", dev, obj{"title": "Add hello", "description": "Fixes #7", "updated_on": at(6), "comment_count": 2,
 			"source":       obj{"branch": obj{"name": "hello"}, "commit": obj{"hash": "abc123def456"}, "repository": obj{"full_name": repo}},
-			"reviewers":    []obj{alex},
+			"reviewers":    []obj{alex, person(3, "kim")},
 			"participants": []obj{{"user": alex, "role": "REVIEWER", "approved": true, "state": "approved"}, {"user": dev, "role": "PARTICIPANT"}}}))
 	case p == "acme/app/pullrequests/8/comments" && r.Method == http.MethodGet:
 		page([]obj{
@@ -116,10 +116,12 @@ func (f *forgeFake) serve(w http.ResponseWriter, r *http.Request) {
 			comment(200, alex, "Rename this", at(3), obj{"inline": obj{"path": "hello.txt", "to": 1}}),
 		}, false)
 	case p == "acme/app/pullrequests/8/diffstat":
-		page([]obj{{"status": "added"}, {"status": "merge conflict"}}, false)
+		page([]obj{{"status": "added", "lines_added": 2}, {"status": "merge conflict", "lines_added": 1, "lines_removed": 4}}, false)
+	case p == "acme/app/pullrequests/8/commits":
+		page([]obj{{"hash": "c1"}, {"hash": "c2"}, {"hash": "c3"}}, false)
 	case p == "acme/app/commit/abc123def456/statuses":
 		page([]obj{
-			{"key": "test", "name": "Pipeline #12", "state": "FAILED", "url": "https://bitbucket.org/acme/app/pipelines/results/12"},
+			{"key": "test", "name": "Pipeline #12", "state": "FAILED", "url": "https://bitbucket.org/acme/app/pipelines/results/12", "created_on": at(1), "updated_on": at(3)},
 			{"key": "lint", "name": "lint", "state": "SUCCESSFUL", "url": "https://ci.example/lint"},
 		}, false)
 	case p == "acme/app/refs/branches/main":
@@ -273,6 +275,18 @@ func TestItemPageReadsAPullRequest(t *testing.T) {
 		d.CheckRuns[1].State != "passing" || d.Review != "approved" || d.FilesChanged != 2 || d.Mergeable != "conflicting" ||
 		d.ReviewThreads != 1 || len(d.Thread) != 1 || d.Thread[0].Body != "Looks good" || d.Body != "Fixes #7" || d.Comments != 2 {
 		t.Fatalf("pull request: %+v", d)
+	}
+	// #4682: its size from the diffstat and its commits, its reviewers by their part, and a
+	// status's times.
+	if d.Size == nil || *d.Size != (Size{Additions: 3, Deletions: 4, Commits: 3}) {
+		t.Fatalf("size: %+v", d.Size)
+	}
+	if !slices.Equal(d.Reviewers, []Reviewer{{Login: "alex", Avatar: "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/a-alex/48", State: "approved"},
+		{Login: "kim", Avatar: "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/a-kim/48", State: "pending"}}) {
+		t.Fatalf("reviewers: %+v", d.Reviewers)
+	}
+	if c := d.CheckRuns[0]; c.StartedAt != at(1) || c.FinishedAt != at(3) || d.CheckRuns[1].StartedAt != "" || d.CheckRuns[1].FinishedAt != "" {
+		t.Fatalf("times: %+v", d.CheckRuns)
 	}
 }
 

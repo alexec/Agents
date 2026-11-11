@@ -38,7 +38,7 @@ import (
 // #4363, stateReason since #4365, createdAt, closedAt and an issue's children, linkedPulls and
 // events since #4373, ForgeList.total since #4396, the comment count by commentCount since
 // #4364, and a pull request's branches, merge, size, reviewers, closing issues and check times
-// since #4409.
+// since #4409 (GitHub) and #4682 (the others).
 
 type conformRow struct {
 	name string
@@ -206,7 +206,11 @@ func (g conformGitLab) ItemPage(_ context.Context, _ string, number int, mr bool
 				Thread: []gitlabmcp.Comment{{Author: "kim", Avatar: "https://gitlab.com/uploads/-/system/user/avatar/7/avatar.png", Body: "A comment.", At: i.UpdatedAt}}}
 			if i.MR {
 				d.Head, d.Pipeline = "abc", 7
-				d.CheckRuns = []gitlabmcp.Check{{Name: "test: unit", State: "failing"}}
+				d.CheckRuns = []gitlabmcp.Check{{Name: "test: unit", State: "failing", StartedAt: "2026-11-03T10:00:00Z", FinishedAt: "2026-11-03T10:02:10Z"},
+					{Name: "test: lint", State: "running", StartedAt: "2026-11-03T10:00:05Z"}, {Name: "deploy: app", State: "running"}}
+				d.Size = &gitlabmcp.Size{Additions: 412, Deletions: 18, Commits: 3}
+				d.Reviewers = []gitlabmcp.Reviewer{{Login: "kim", Avatar: "https://gitlab.com/uploads/-/system/user/avatar/7/avatar.png", State: "approved"}, {Login: "lee", State: "pending"}}
+				d.Closes = []gitlabmcp.Linked{{Project: "Group/App", Number: 2, State: "closed", Title: "Closed", URL: "https://gitlab.com/Group/App/-/issues/2"}}
 			} else if i.State == "open" {
 				d.Children = []gitlabmcp.Linked{{Project: "Group/App", Number: 2, State: "closed", Title: "Closed", URL: "https://gitlab.com/Group/App/-/issues/2"}}
 				d.ClosedBy = []gitlabmcp.Linked{{Project: "Group/App", Number: 4, MR: true, State: "merged", Title: "Merged", URL: "https://gitlab.com/Group/App/-/merge_requests/4"}}
@@ -286,6 +290,8 @@ func (g conformForgejo) ItemPage(_ context.Context, _ string, number int, pr boo
 			if i.PR {
 				d.Head = "abc"
 				d.CheckRuns = []forgejomcp.CheckRun{{Name: "ci / test", State: "failing"}}
+				d.Size = &forgejomcp.Size{Additions: 412, Deletions: 18, Commits: 3}
+				d.Reviewers = []forgejomcp.Reviewer{{Login: "kim", Avatar: "http://localhost:3753/avatars/k", State: "changes_requested"}, {Login: "reviewers", State: "pending"}}
 			} else if i.State == "open" {
 				d.LinkedPulls = []forgejomcp.Linked{{Repo: "walkalex/App", Number: 4, Title: "Merged", State: "merged", URL: "http://localhost:3753/walkalex/App/pulls/4"}}
 				d.Events = []forgejomcp.Event{
@@ -365,7 +371,10 @@ func (g conformBitbucket) ItemPage(_ context.Context, _ string, number int, pr b
 				Thread: []bitbucketmcp.Comment{{Author: "kim", Avatar: "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/k/48", Body: "A comment.", At: i.UpdatedAt}}}
 			if i.PR {
 				d.Head = "abc"
-				d.CheckRuns = []bitbucketmcp.CheckRun{{Name: "Pipeline #12", State: "failing", Run: 12}}
+				d.CheckRuns = []bitbucketmcp.CheckRun{{Name: "Pipeline #12", State: "failing", Run: 12, StartedAt: "2026-11-03T10:00:00Z", FinishedAt: "2026-11-03T10:02:10Z"},
+					{Name: "Pipeline #13", State: "running", Run: 13, StartedAt: "2026-11-03T10:00:05Z"}}
+				d.Size = &bitbucketmcp.Size{Additions: 412, Deletions: 18, Commits: 3}
+				d.Reviewers = []bitbucketmcp.Reviewer{{Login: "kim", Avatar: "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/k/48", State: "approved"}, {Login: "lee", State: "pending"}}
 			} else {
 				// An issue's count is only on its page (commentCount detail).
 				d.Comments = len(d.Thread)
@@ -436,8 +445,11 @@ func (g conformAzureDevOps) ItemPage(_ context.Context, _ string, number int, _ 
 			// The count is only on the page (commentCount detail).
 			i.Comments = 1
 			return azuredevopsmcp.ItemDetail{Item: i, Body: "The body.", Head: "abc",
-				Thread:    []azuredevopsmcp.Comment{{Author: "kim@example.com", Avatar: "https://dev.azure.com/acme/_apis/GraphProfile/MemberAvatars/aad.aw0", Body: "A comment.", At: i.UpdatedAt}},
-				CheckRuns: []azuredevopsmcp.CheckRun{{Name: "ci", State: "failing", Build: 70}}}, nil
+				Thread: []azuredevopsmcp.Comment{{Author: "kim@example.com", Avatar: "https://dev.azure.com/acme/_apis/GraphProfile/MemberAvatars/aad.aw0", Body: "A comment.", At: i.UpdatedAt}},
+				CheckRuns: []azuredevopsmcp.CheckRun{{Name: "ci", State: "failing", Build: 70, StartedAt: "2026-11-03T10:00:00Z", FinishedAt: "2026-11-03T10:02:10Z"},
+					{Name: "policy/status", State: "passing"}},
+				Reviewers: []azuredevopsmcp.Reviewer{{Login: "kim@example.com", Avatar: "https://dev.azure.com/acme/_apis/GraphProfile/MemberAvatars/aad.aw0", State: "approved"},
+					{Login: "[Web App]\\Web App Team", State: "pending"}}}, nil
 		}
 	}
 	return azuredevopsmcp.ItemDetail{}, &azuredevopsmcp.AzureDevOpsError{Kind: azuredevopsmcp.NotFound, Message: "not found on Azure DevOps"}
@@ -1088,6 +1100,10 @@ func conformPull(t *testing.T, d *Daemon, f Forge, caps forgeCaps, listed wire.F
 		if g, _, ok := d.forgeOwning(c.Node); !ok || g.Name() != f.Name() || c.Node.Kind != lineage.KindIssue || c.Title == "" {
 			t.Errorf("%v: closes %+v, not an issue of %s", node, c, f.Name())
 		}
+	}
+	// A forge that gives check times gives them on its page: the fixtures have a check that started.
+	if caps.CheckTimes && pr && !slices.ContainsFunc(page.Checks, func(c wire.ForgeCheck) bool { return c.StartedAt != nil }) {
+		t.Errorf("%v: no check has times; caps say checkTimes=true", node)
 	}
 	for _, c := range page.Checks {
 		switch {
