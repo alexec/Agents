@@ -274,6 +274,35 @@ func TestTokenReaderReadsTheHostsStore(t *testing.T) {
 	}
 }
 
+// #5023: GitHub ends the old token as the host renews it, so a token that is due for its
+// renewal is read again within seconds, not after a minute; one far from its end is held.
+func TestTokenReaderSeesARenewalSoon(t *testing.T) {
+	defer func(h time.Duration) { RenewingHold = h }(RenewingHold)
+	RenewingHold = 20 * time.Millisecond
+	path := filepath.Join(t.TempDir(), FileName)
+	l := Locator("file:" + path)
+	s, _ := Open(l)
+	read := TokenReader(l, GitHub)
+	s.Put(Connection{Provider: GitHub, Access: "ghu_far", AccessExpiresAt: time.Now().Add(time.Hour)})
+	if got := read(); got != "ghu_far" {
+		t.Fatalf("got %q", got)
+	}
+	s.Put(Connection{Provider: GitHub, Access: "ghu_due", AccessExpiresAt: time.Now().Add(RefreshMargin / 2)})
+	time.Sleep(40 * time.Millisecond)
+	if got := read(); got != "ghu_far" {
+		t.Fatalf("a token far from its end is read again at once: %q", got)
+	}
+	read = TokenReader(l, GitHub)
+	if got := read(); got != "ghu_due" {
+		t.Fatalf("got %q", got)
+	}
+	s.Put(Connection{Provider: GitHub, Access: "ghu_renewed", AccessExpiresAt: time.Now().Add(8 * time.Hour)})
+	time.Sleep(40 * time.Millisecond)
+	if got := read(); got != "ghu_renewed" {
+		t.Fatalf("the renewal is not seen: %q", got)
+	}
+}
+
 func TestEachRootHasItsOwnStore(t *testing.T) {
 	a, b := KeychainService("/Users/x/Library/Application Support/Agents"), KeychainService("/tmp/run-1/root")
 	if a == b || !strings.HasPrefix(a, "agents.connection.") {

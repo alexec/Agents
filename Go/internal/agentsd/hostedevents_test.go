@@ -98,3 +98,31 @@ func TestAHostedStartEndsTheOldProcess(t *testing.T) {
 	}
 	waitFor(t, "the old process ended", func() bool { return syscall.Kill(old, 0) != nil })
 }
+
+// #5023: a hosted copy's refusal keeps its data, so a GitHub sign-in that ended for a moment
+// (the old token ended as the host renewed it) is tried again, as a direct server's is; it was
+// read as a refusal for good, and every wait on github ended.
+func TestAHostedRefusalKeepsItsReason(t *testing.T) {
+	_, err := hostedReplyOf(json.RawMessage(`{"jsonrpc":"2.0","id":3,"error":{"code":-32012,` +
+		`"message":"GitHub is not connected, or its sign-in ended","data":{"reason":"not connected"}}}`))
+	if err == nil {
+		t.Fatal("no error")
+	}
+	if e := mcpEventsErrorOf(hostedRefusal(err)); e.kind != "needsSignIn" {
+		t.Fatalf("a sign-in that ended is %q, not tried again", e.kind)
+	}
+	// Another -32012 is still a refusal for good.
+	_, err = hostedReplyOf(json.RawMessage(`{"error":{"code":-32012,"message":"no","data":{"reason":"no access"}}}`))
+	if e := mcpEventsErrorOf(hostedRefusal(err)); e.kind != "forbidden" {
+		t.Fatalf("got %q", e.kind)
+	}
+	// An error with no data has none, and a session still gets the data as JSON.
+	_, err = hostedReplyOf(json.RawMessage(`{"error":{"code":-32603,"message":"boom"}}`))
+	if err.Data != nil || hostedRefusal(err).data != nil {
+		t.Fatalf("data from nowhere: %+v", err)
+	}
+	b, _ := json.Marshal(&Error{Code: -32012, Message: "m", Data: json.RawMessage(`{"reason":"not connected"}`)})
+	if string(b) != `{"code":-32012,"message":"m","data":{"reason":"not connected"}}` {
+		t.Fatal(string(b))
+	}
+}

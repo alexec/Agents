@@ -12,6 +12,9 @@ import (
 // reads it again each minute never holds an ended one.
 const RefreshMargin = 10 * time.Minute
 
+// RenewingHold is how long a reader holds a token that the host is due to renew.
+var RenewingHold = 5 * time.Second
+
 // RefreshResult is what one look at a connection did.
 type RefreshResult int
 
@@ -70,7 +73,10 @@ func signInAgain(c Connection) Connection {
 
 // TokenReader is a provider's access token as the host keeps it, read again after a
 // minute, at once when the one held has ended, and after a failed read: a server sees a
-// renewal or a new sign-in without a restart. It never refreshes (the host does).
+// renewal or a new sign-in without a restart. It never refreshes (the host does). Within
+// RefreshMargin of its end, when the host renews it, it is read again after RenewingHold: a
+// provider that ends the old token as it renews it (GitHub) otherwise refused the server's
+// calls for up to a minute (#5023).
 func TokenReader(l Locator, provider string) func() string {
 	read := Reader(l, provider)
 	return func() string {
@@ -92,7 +98,11 @@ func Reader(l Locator, provider string) func() (Connection, bool) {
 		mu.Lock()
 		defer mu.Unlock()
 		now := time.Now()
-		if held.Usable(now) && now.Sub(at) < time.Minute {
+		hold := time.Minute
+		if !held.AccessExpiresAt.IsZero() && !now.Add(RefreshMargin).Before(held.AccessExpiresAt) {
+			hold = RenewingHold
+		}
+		if held.Usable(now) && now.Sub(at) < hold {
 			return held, true
 		}
 		held = Connection{}

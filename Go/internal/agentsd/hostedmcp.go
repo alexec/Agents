@@ -629,11 +629,19 @@ func (d *Daemon) hostedSend(h *hostedServer, method string, params json.RawMessa
 		d.hostedMu.Unlock()
 		return nil, &Error{Code: -32001, Message: h.key.name + " did not answer in time."}
 	}
+	return hostedReplyOf(raw)
+}
+
+// hostedReplyOf is the server's answer: its result, or its error with the error's data. The
+// data says why (#5023): a GitHub sign-in that ended has the reason "not connected", which is
+// tried again; without it the refusal stopped every wait on the server.
+func hostedReplyOf(raw json.RawMessage) (json.RawMessage, *Error) {
 	var reply struct {
 		Result json.RawMessage `json:"result"`
 		Error  *struct {
-			Code    *int    `json:"code"`
-			Message *string `json:"message"`
+			Code    *int            `json:"code"`
+			Message *string         `json:"message"`
+			Data    json.RawMessage `json:"data"`
 		} `json:"error"`
 	}
 	json.Unmarshal(raw, &reply)
@@ -644,6 +652,9 @@ func (d *Daemon) hostedSend(h *hostedServer, method string, params json.RawMessa
 		}
 		if reply.Error.Message != nil {
 			e.Message = *reply.Error.Message
+		}
+		if len(reply.Error.Data) > 0 && string(reply.Error.Data) != "null" {
+			e.Data = reply.Error.Data
 		}
 		return nil, e
 	}
