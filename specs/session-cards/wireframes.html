@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Session cards — every card in a session's chat</title>
+<style>
+@font-face{font-family:"Atkinson Hyperlegible Next";src:url("https://cdn.jsdelivr.net/fontsource/fonts/atkinson-hyperlegible-next:vf@latest/latin-wght-normal.woff2") format("woff2-variations");font-weight:200 800}
+@font-face{font-family:"Atkinson Hyperlegible Mono";src:url("https://cdn.jsdelivr.net/fontsource/fonts/atkinson-hyperlegible-mono:vf@latest/latin-wght-normal.woff2") format("woff2-variations");font-weight:200 800}
+:root{
+  /* Paper v2 (#4926, design/tokens.json) and #5016: yellow = needs you, orange = warning, red = failure */
+  --paper-ground:#fcfbf9;--paper-sidebar:#f8f7f4;--paper-raised:#fff;--paper-well:#f6f5f2;--paper-wash:#f1f0ec;
+  --paper-rule:#d6d2c9;--paper-edge:#7d786e;--paper-ink:#1a1918;--paper-secondary:#4a4741;--paper-tertiary:#625e57;
+  --paper-shadow:rgb(26 25 24/10%);--accent:#1a52c0;
+  --tint-attention:#856a00;--tint-warning:#ba4a13;--tint-failure:#b0222a;--tint-vouched:#25684f;
+  --line-attention:#e3d38f;--line-warning:#ebbf9f;--line-failure:#eeb0b3;--line-vouched:#a9d3bb;--line-accent:#a9c2ee;
+  --radius-control:7px;--radius-card:10px;--radius-floating:16px;
+  --font-text:"Atkinson Hyperlegible Next",-apple-system,BlinkMacSystemFont,system-ui,sans-serif;--font-mono:"Atkinson Hyperlegible Mono",ui-monospace,"SF Mono",Menlo,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:#f1f0ec;line-height:1.5;word-spacing:.06em;color:var(--paper-ink);font:13px/1.4 var(--font-text)}
+header.doc{padding:28px 40px 8px;max-width:1500px;margin:auto}
+header.doc h1{margin:0 0 4px;font-size:24px}
+header.doc p{margin:4px 0;max-width:900px;opacity:.8}
+main{max-width:1500px;margin:auto;padding:0 40px 60px}
+h2{font-size:17px;margin:34px 0 4px;display:flex;gap:10px;align-items:baseline}
+h2 .zone{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding:2px 8px;border-radius:99px;background:var(--paper-ink);color:#fff}
+.zone-intro{margin:0 0 14px;opacity:.75;max-width:900px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(440px,1fr));gap:18px}
+.spec{background:var(--paper-ground);border:1px solid var(--paper-rule);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.spec .stage{padding:18px;flex:1;display:flex;flex-direction:column;gap:10px;justify-content:center}
+.spec .cap{background:#fff;border-top:1px solid var(--paper-rule);padding:10px 14px;font-size:12px}
+.cap b.n{display:inline-block;min-width:22px;height:22px;line-height:22px;text-align:center;border-radius:6px;background:var(--paper-ink);color:#fff;font-size:11px;margin-right:6px}
+.cap .name{font-weight:600;font-size:13px}
+.cap .meta{margin-top:4px;opacity:.75}
+.cap .src{font-family:var(--font-mono);font-size:11px;opacity:.55}
+.chips{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+.chip{font-size:10.5px;padding:1px 7px;border-radius:99px;border:1px solid var(--paper-rule);background:var(--paper-well)}
+.chip.fam{background:#eef3fb;border-color:#c9d8f2;color:#1f4a96}
+.chip.warn{background:var(--paper-raised);border-color:var(--line-attention);color:var(--tint-attention)}
+.chip.bug{background:#fbeaea;border-color:#efbcbc;color:var(--tint-failure)}
+
+/* ---- the app's own shapes ---- */
+.card{background:var(--paper-raised);border:1px solid var(--paper-rule);border-radius:var(--radius-floating);padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.card.att{border-color:var(--line-attention)}
+.card.att.bg{box-shadow:inset 3px 0 0 var(--tint-attention)}
+.att-t{color:var(--tint-attention);font-weight:600}
+.asker{font-size:11px;opacity:.65}
+.title{font-weight:600}
+.quiet{opacity:.65}.faint{opacity:.45}.small{font-size:11.5px}
+.opts{display:flex;flex-direction:column;gap:6px}
+.opt{text-align:left;border:1px solid var(--paper-rule);border-radius:var(--radius-control);background:var(--paper-ground);padding:6px 10px;font:inherit;color:inherit}
+.opt small{display:block;opacity:.65;font-size:11px}
+.btn{border:1px solid var(--paper-rule);border-radius:var(--radius-control);background:var(--paper-ground);padding:4px 10px;font:inherit;color:inherit;white-space:nowrap}
+.prominent{background:var(--accent);color:#fff;border-color:var(--accent)}
+.destructive{color:var(--tint-failure)}
+.link{color:var(--accent);background:none;border:0;padding:0;font:inherit}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sp{flex:1}
+.field{display:flex;flex-direction:column;gap:4px}
+.input{border:1px solid var(--paper-rule);border-radius:var(--radius-control);background:var(--paper-ground);padding:5px 8px;color:#888}
+.hint{font-size:11px;opacity:.6}
+.banner{background:var(--paper-well);border:1px solid var(--paper-rule);border-radius:var(--radius-card);padding:8px 12px;font-size:13px;display:flex;align-items:center;gap:10px}
+.banner .g{width:16px;text-align:center}
+.banner.attg .g{color:var(--tint-attention)}
+.well{background:var(--paper-well);border-radius:var(--radius-card);padding:10px 14px}
+.bar{height:4px;border-radius:2px;background:var(--paper-rule);overflow:hidden}.bar i{display:block;height:100%;background:var(--accent)}
+.bubble{align-self:flex-end;max-width:70%;background:var(--paper-well);border-radius:var(--radius-card);padding:8px 12px}
+.bubble.dash{border:1px dashed #b9c0c8;opacity:.65}
+.mono{font-family:var(--font-mono);font-size:11.5px}
+.diff{background:var(--paper-well);border-radius:8px;padding:6px 8px;font-family:var(--font-mono);font-size:11px;line-height:1.5}
+.diff .a{color:#1a7f37}.diff .d{color:#cf222e}
+.beacon{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 20%,transparent)}
+.shot{background:#2a2d31;border-radius:8px;height:130px;display:flex;align-items:flex-end;padding:8px;color:#cfd3d8;font-size:11px;}
+.ph{background:var(--paper-well);border-radius:8px;height:110px;display:flex;align-items:center;justify-content:center;opacity:.8}
+.toolline{display:flex;gap:6px;align-items:center;opacity:.8}
+.note-switch{background:var(--paper-raised);border:1px solid var(--line-attention);box-shadow:inset 3px 0 0 var(--tint-attention);border-radius:var(--radius-card);padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.filecard{background:#fff;border:1px solid var(--paper-rule);border-radius:var(--radius-card);max-width:340px;overflow:hidden}
+.filecard .pv{height:110px;background:var(--paper-well);display:flex;align-items:flex-end;gap:6px;padding:12px 18px}
+.filecard .pv i{flex:1;background:var(--accent);opacity:.75;border-radius:2px 2px 0 0}
+.filecard .bt{display:flex;align-items:center;gap:8px;padding:8px 10px}
+.prompt{background:#fff;border:1px solid var(--paper-rule);border-radius:var(--radius-floating);padding:10px;display:flex;flex-direction:column;gap:8px;box-shadow:0 4px 16px var(--paper-shadow)}
+.costlimit{background:#fff;border:1px solid var(--paper-rule);border-radius:var(--radius-card);padding:8px 10px;font-size:12px;display:flex;gap:8px;align-items:center}
+
+/* ---- map ---- */
+.map{display:grid;grid-template-columns:420px 1fr;gap:28px;align-items:start;margin-top:14px}
+.phone{background:var(--paper-ground);border:1px solid var(--paper-rule);border-radius:14px;overflow:hidden;box-shadow:0 8px 30px rgb(0 0 0/8%)}
+.phone .hd{padding:10px 14px;border-bottom:1px solid var(--paper-rule);background:#fff;font-weight:600;display:flex;justify-content:space-between}
+.phone .body{padding:10px;display:flex;flex-direction:column;gap:6px}
+.zonebox{border:2px dashed;border-radius:10px;padding:8px 10px;font-size:12px}
+.zonebox b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
+.zA{border-color:#7b8bd6;background:#f1f3fc}.zB{border-color:#9aa3ad;background:#fff}.zC{border-color:#8fb3a3;background:#f1f8f4}
+.zD{border-color:#d9a07c;background:#fdf4ee}.zE{border-color:#a99ad6;background:#f5f2fc}.zF{border-color:#c0c0c0;background:#fafafa}
+table.fam{border-collapse:collapse;width:100%;background:#fff;border-radius:10px;overflow:hidden;font-size:12.5px}
+table.fam th,table.fam td{border-bottom:1px solid var(--paper-rule);padding:7px 10px;text-align:left;vertical-align:top}
+table.fam th{background:var(--paper-well);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+</style>
+</head>
+<body>
+<header class="doc">
+  <h1>Session cards</h1>
+  <p>Every card, strip, banner and tile drawn inside one session's chat, in the order a person meets them from the top of the chat to the prompt bar. Drawn from the web client (<span class="mono">Web/src/views/Chat.tsx</span>) with the real design tokens; the Mac window and the Remote draw the same set from <span class="mono">Shared/UI</span>, with the differences listed in section H.</p>
+  <p><b>Count:</b> 40 kinds in 7 places, plus 7 variants of the question card. The blue chips name the <b>family</b> each card belongs to; the families are the start point for making them simpler.</p>
+</header>
+<main>
+
+<h2>Where they go</h2>
+<div class="map">
+  <div class="phone">
+    <div class="hd"><span>Fix login redirect</span><span class="quiet">⋯</span></div>
+    <div class="body">
+      <div class="zonebox zA"><b>A · Top strips</b>Offline · Folder gone · Folder missing · Account move · Continue · Goal · Plan · Find</div>
+      <div class="zonebox zB"><b>B · Transcript</b>Bubbles · tool lines · thoughts · plan · sandbox · policy stop · changed files · file · view · report · notified · notes</div>
+      <div class="zonebox zC"><b>C · Foot</b>Queued · kept · working line · lease line</div>
+      <div class="zonebox zD"><b>D · Waiting for you</b>Guarded change · permission · question (7 kinds) · live tile · paused driving · archive</div>
+      <div class="zonebox zE"><b>E · Agent waits</b>Wait on sessions/time · wait on events · quiet line</div>
+      <div class="zonebox zF"><b>F · Prompt bar</b>Background rows · cost limit</div>
+      <div class="zonebox zF" style="border-style:dotted"><b>G · Over the chat</b>Subagent steps · view diff · prompt list · file search · jump to end</div>
+    </div>
+  </div>
+  <div>
+    <table class="fam">
+      <tr><th>Family</th><th>Shape today</th><th>Cards</th></tr>
+      <tr><td><b>Banner</b></td><td>grey well strip, glyph + words + buttons right</td><td>1 Offline, 2 Folder gone, 3 Folder missing, 4 Account move (unstyled), 5 Continue, 36 Cost limit (own box)</td></tr>
+      <tr><td><b>Progress strip</b></td><td>well button, line + chevron + 4px bar</td><td>6 Goal, 7 Plan</td></tr>
+      <tr><td><b>Note in the transcript</b></td><td>three looks: tinted box, well box, no box</td><td>15 Sandbox failure (tinted), 16 Policy stop (no box), 17 Changed files (well), 20 Report, 21 Notified, 22 others</td></tr>
+      <tr><td><b>Object card</b></td><td>raised box you click</td><td>18 File, 19 View</td></tr>
+      <tr><td><b>Ask card</b></td><td>raised floating card, title + options</td><td>26 Guarded change, 27 Permission, 28a–g Question, 30 Paused driving, 31 Archive</td></tr>
+      <tr><td><b>Live tile</b></td><td>raised card with picture</td><td>29 Live tile</td></tr>
+      <tr><td><b>Wait card</b></td><td>raised card, beacon + time + bar</td><td>32 Block wait, 33 Event wait (3 kinds), 25 Lease line (text)</td></tr>
+      <tr><td><b>Pending message</b></td><td>dashed bubble</td><td>23 Queued, 24 Kept</td></tr>
+    </table>
+    <p class="quiet small" style="margin-top:10px">Tints in use: <span style="color:var(--tint-attention)">attention</span> on 2, 3, 15, 20, 26, 30, 31, 33-person; accent on bars and beacons; failure red for text only. Three different "tinted" recipes exist: border only (26), border + 7% wash (15, 30, 31, 33), title colour only (20).</p>
+  </div>
+</div>
+
+<!-- =================== A =================== -->
+<h2><span class="zone">A</span> Top strips, under the chat's header</h2>
+<p class="zone-intro">Fixed above the transcript. They say what is wrong with the session or its place, or what it works towards.</p>
+<div class="grid">
+
+<div class="spec"><div class="stage">
+  <div class="banner"><span class="g">ⓘ</span><span class="sp">This Mac hasn’t answered since 3:04 PM. Nothing here can change until it’s back. Trying again…</span></div>
+  <div class="banner"><span class="g">ⓘ</span><span class="sp">devbox is stopped. Agents there are paused until it starts.</span><button class="btn">Start</button></div>
+</div><div class="cap"><b class="n">1</b><span class="name">Offline strip</span> <span class="src">OfflineStrip.tsx:131</span>
+<div class="meta">The host is down, starting, stopping or stopped. Variants: Mac, server, workspace ("Starting X… 0:24").</div>
+<div class="chips"><span class="chip fam">banner</span><span class="chip">neutral</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="banner attg"><span class="g">⚠︎</span><span class="sp">The folder is gone. What you typed is still in the prompt.</span></div>
+  <div class="row" style="padding-left:26px"><button class="btn">Continue in the folder</button><button class="btn">Recreate the worktree</button><button class="btn">Archive</button><button class="link">Cancel</button></div>
+</div><div class="cap"><b class="n">2</b><span class="name">Folder gone notice</span> <span class="src">MissingFolder.tsx:44</span>
+<div class="meta">A send was refused because the folder went. Hides 3 while it shows.</div>
+<div class="chips"><span class="chip fam">banner</span><span class="chip warn">attention</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="banner attg"><span class="g">⚠︎</span><span class="sp">Folder is missing · <span class="quiet">~/Agents-worktrees/fix-login</span></span><button class="btn">Continue in the folder</button><button class="btn">Archive</button></div>
+</div><div class="cap"><b class="n">3</b><span class="name">Missing folder strip</span> <span class="src">MissingFolder.tsx:32</span>
+<div class="meta">The session's folder or worktree is not on disk. Same buttons as 2.</div>
+<div class="chips"><span class="chip fam">banner</span><span class="chip warn">attention</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="row" style="padding:4px 2px"><span class="sp">This session’s account can no longer reach claude-opus-5-5.</span><button class="btn">Continue in New</button></div>
+</div><div class="cap"><b class="n">4</b><span class="name">Account move strip</span> <span class="src">AccountMove.tsx:9</span>
+<div class="meta">The session's account lost the model. Drawn with no box, tint or glyph: its CSS class has no rule.</div>
+<div class="chips"><span class="chip fam">banner</span><span class="chip bug">unstyled</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="banner"><span class="g">ⓘ</span><span class="sp"></span><button class="btn">↻ Continue at 07:00</button><button class="btn">Continue on Codex</button></div>
+  <div class="banner"><span class="g">ⓘ</span><span class="sp">Continues at 07:00</span><button class="btn">Cancel</button></div>
+</div><div class="cap"><b class="n">5</b><span class="name">Continue strip</span> <span class="src">ContinueStrip.tsx:14</span>
+<div class="meta">The allowance ran out. Before / after asking. "Continue on ‹runtime›" only for Auto.</div>
+<div class="chips"><span class="chip fam">banner</span><span class="chip">neutral</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="well"><div class="row"><span>◎</span><span class="sp">Every login test passes on CI</span><span class="quiet small">Active</span><span class="quiet">▾</span></div>
+  <div class="quiet small" style="margin:4px 0 6px 22px">3 turns · 1,000 of 5,000 tokens · 4 min</div><div class="bar"><i style="width:20%"></i></div></div>
+</div><div class="cap"><b class="n">6</b><span class="name">Goal card</span> <span class="src">GoalCard.tsx:10</span>
+<div class="meta">The agent has a goal (/goal). States: Active, Paused, Blocked, Limit reached, Met (✓). Opens on tap.</div>
+<div class="chips"><span class="chip fam">progress strip</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="well"><div class="row"><span>☑</span><span class="sp">Write the redirect test</span><span class="quiet small">2 of 5</span><span class="quiet">▾</span></div>
+  <div class="bar" style="margin:6px 0"><i style="width:40%"></i></div>
+  <div style="border-top:1px solid var(--paper-rule);padding-top:6px" class="small"><div class="faint">● Read the login handler</div><div>◐ Write the redirect test</div><div>○ Fix the handler</div><div>○ Run the suite</div></div></div>
+</div><div class="cap"><b class="n">7</b><span class="name">Current plan strip</span> <span class="src">PlanStrip.tsx:12</span>
+<div class="meta">A plan is in force. Same shell as 6; opened, it shows the plan view (14).</div>
+<div class="chips"><span class="chip fam">progress strip</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="row" style="background:var(--paper-well);border-radius:99px;padding:5px 10px"><span class="input" style="flex:1;background:#fff">Find in Chat</span><span class="quiet small">2 of 14+</span><button class="link">↑</button><button class="link">↓</button><button class="btn">Done</button></div>
+</div><div class="cap"><b class="n">8</b><span class="name">Find bar</span> <span class="src">Chat.tsx:1105</span>
+<div class="meta">⌘F. Tool, not status; listed for completeness.</div>
+<div class="chips"><span class="chip">control</span></div></div></div>
+</div>
+
+<!-- =================== B =================== -->
+<h2><span class="zone">B</span> In the transcript</h2>
+<p class="zone-intro">They scroll with the conversation and stay on the record.</p>
+<div class="grid">
+
+<div class="spec"><div class="stage">
+  <p class="quiet" style="margin:0">This chat's history did not load: the Mac did not answer. <button class="link">Try Again</button></p>
+</div><div class="cap"><b class="n">9</b><span class="name">Load failure line</span> <span class="src">Chat.tsx:635</span>
+<div class="meta">History or earlier turns failed to load. A centred spinner while it pages back.</div>
+<div class="chips"><span class="chip fam">note</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="faint small" style="align-self:flex-end">From Lead · #4207</div>
+  <div class="bubble">Fix the login redirect and open a PR.</div>
+  <div class="bubble" style="opacity:.65">And add a test for it.</div>
+  <div>I’ll start with the handler. <span class="faint small">Quote · Copy</span></div>
+</div><div class="cap"><b class="n">10–11</b><span class="name">Person bubble, sending bubble, agent reply</span> <span class="src">Rows.tsx:365</span>
+<div class="meta">Hover: Branch from Here, Copy (bubble); Quote, Copy (reply). Sending = 65%.</div>
+<div class="chips"><span class="chip">message</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="toolline">▸ <b>Edit</b> <span class="mono">Go/internal/auth/login.go</span></div>
+  <div class="toolline">▾ <b>Edit</b> <span class="mono">Go/internal/auth/redirect.go</span></div>
+  <div class="diff"><div class="d">- return "/"</div><div class="a">+ return safeNext(r)</div></div>
+  <div class="small"><button class="link">Show in Changes</button></div>
+  <div class="toolline faint">▸ Thought: the handler drops the next parameter…</div>
+</div><div class="cap"><b class="n">12–13</b><span class="name">Tool line, tool run, thought line</span> <span class="src">Rows.tsx:177, 245</span>
+<div class="meta">One line each; open to the diff or Argument/Return. Load steps, Earlier steps.</div>
+<div class="chips"><span class="chip">step</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="small"><div>● Read the login handler</div><div>◐ Write the redirect test</div><div>○ Fix the handler</div></div>
+  <div class="small faint"><s>○ Rewrite the router</s> — The agent dropped this plan</div>
+</div><div class="cap"><b class="n">14</b><span class="name">Plan view</span> <span class="src">Rows.tsx:102</span>
+<div class="meta">The plan as the agent sent it, unboxed. Same list as 7, opened.</div>
+<div class="chips"><span class="chip fam">progress strip</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="note-switch">
+    <div class="att-t">Claude’s sandbox could not start</div>
+    <div>The agent stopped before its first tool. <button class="link">Show error details</button></div>
+    <div class="quiet small">This turns Claude’s sandbox off for this agent only. Your prompt is sent again. The app’s own folder and tool rules still apply.</div>
+    <div class="row"><span class="sp"></span><button class="btn">Keep stopped</button><button class="btn prominent">Continue without sandbox</button></div>
+  </div>
+</div><div class="cap"><b class="n">15</b><span class="name">Sandbox failure card</span> <span class="src">Rows.tsx:257</span>
+<div class="meta">The runtime's sandbox failed. An ask, but inside the transcript, not in D. Answered: no buttons.</div>
+<div class="chips"><span class="chip fam">note</span><span class="chip fam">ask</span><span class="chip warn">attention wash</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="row" style="align-items:flex-start"><div class="sp"><b>Stopped by a policy</b><div>Budget</div><div class="quiet small">Organisation: $20 a day</div><div class="small">Today’s spending reached the limit.</div></div>
+  <div class="row"><button class="btn">Ask for More</button><button class="btn">See Organisation Policy</button></div></div>
+</div><div class="cap"><b class="n">16</b><span class="name">Policy stop card</span> <span class="src">chat/PolicyStopCard.tsx:39</span>
+<div class="meta">A rule stopped the agent. No box. After asking: "Asked…", "Raised to $X…", "Refused for today."</div>
+<div class="chips"><span class="chip fam">note</span><span class="chip fam">ask</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="well"><b>Changed 3 files</b>
+  <div class="mono" style="margin:6px 0"><div>✎ Go/internal/auth/redirect.go</div><div>+ Go/internal/auth/redirect_test.go</div><div>− Go/internal/auth/legacy.go</div></div>
+  <div class="row"><span class="sp"></span><button class="btn">Undo These Changes</button></div></div>
+</div><div class="cap"><b class="n">17</b><span class="name">Turn changes card</span> <span class="src">chat/TurnChangesCard.tsx:12</span>
+<div class="meta">End of a turn that changed files. Lines: another agent worked here; ⚠︎ cannot undo; ↩︎ Undone; error.</div>
+<div class="chips"><span class="chip fam">note</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="filecard"><div class="pv"><i style="height:40%"></i><i style="height:75%"></i><i style="height:55%"></i><i style="height:90%"></i></div>
+  <div class="bt"><span>📊</span><div class="sp"><b>ci-times.md</b><div class="quiet small">Bar chart · reports/ · line 12</div></div><span class="quiet">›</span></div></div>
+</div><div class="cap"><b class="n">18</b><span class="name">File card</span> <span class="src">chat/FileCard.tsx:28</span>
+<div class="meta">show_file. Preview for chart/diagram/picture; plain files are only the bottom row. "Not there now".</div>
+<div class="chips"><span class="chip fam">object</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="row small"><span class="faint sp">Release checklist</span><button class="link">Pin</button><button class="link">Full screen</button></div>
+  <div class="well"><div><b>Claude wants to show a view here.</b></div><div class="quiet small">It is drawn in a sandbox and cannot reach your files.</div>
+  <div class="row" style="margin-top:6px"><button class="btn prominent">Show</button><button class="btn">Don't Show</button></div></div>
+  <div class="quiet small">With your next message the agent is told: “3 of 7 ticked”. <button class="link">Don't Tell</button></div>
+</div><div class="cap"><b class="n">19</b><span class="name">App view</span> <span class="src">chat/AppView.tsx:13</span>
+<div class="meta">An agent's live view (iframe). Asks: Show / Don't Show; Send / Don't Send. Loading, failed, closed, full screen.</div>
+<div class="chips"><span class="chip fam">object</span><span class="chip fam">ask</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div><b>Complete</b><div class="quiet">Opened P#4990; auto-merge is on.</div></div>
+  <div><b style="color:var(--tint-attention)">Waiting on your answer</b><div class="quiet">Which redirect target should a guest get?</div></div>
+</div><div class="cap"><b class="n">20</b><span class="name">Report line</span> <span class="src">Rows.tsx:120</span>
+<div class="meta">How a turn ended: Complete, Nothing to do, Partly done, Waiting, Waiting on your answer.</div>
+<div class="chips"><span class="chip fam">note</span><span class="chip warn">title tint</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div style="background:color-mix(in srgb,var(--accent) 18%,transparent);border-radius:8px;padding:6px 10px">🔔︎ <b>PR ready</b> — P#4990 is green<div class="faint small">09:41 · opened</div></div>
+  <div class="small quiet">Compacted the conversation · 120k → 18k tokens</div>
+  <div class="small">Asked: Which target? — <span class="quiet">You chose “/home”</span></div>
+  <div class="small" style="color:var(--tint-failure)">The runtime crashed</div>
+  <div class="small">Subagent · reviewer · failed <button class="link">Steps</button></div>
+</div><div class="cap"><b class="n">21–22</b><span class="name">Notified line, other entry lines</span> <span class="src">Rows.tsx:449</span>
+<div class="meta">Notices, compaction, asked/chose, answered-form recap (well box), state line, served requests, background entry, runtime note.</div>
+<div class="chips"><span class="chip fam">note</span></div></div></div>
+</div>
+
+<!-- =================== C =================== -->
+<h2><span class="zone">C</span> Foot of the transcript</h2>
+<p class="zone-intro">What is on its way: messages not yet read, and what the agent holds or waits in line for.</p>
+<div class="grid">
+<div class="spec"><div class="stage">
+  <div class="bubble dash">Also update the docs.</div>
+  <div class="row small" style="align-self:flex-end"><button class="link">↑ Send now</button><button class="link">Edit</button><button class="link">×</button></div>
+  <div class="bubble dash">Run the suite again.<div style="color:var(--tint-failure)" class="small">Not sent: the Mac is offline <button class="link">Try Again</button> ×</div></div>
+</div><div class="cap"><b class="n">23–24</b><span class="name">Queued and kept bubbles</span> <span class="src">Chat.tsx:797, Kept.tsx:13</span>
+<div class="meta">Queued: waits for the turn to end. Kept: waits for the session to start ("Waiting for X to start"), or failed.</div>
+<div class="chips"><span class="chip fam">pending message</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="quiet">◌ Running tests…</div>
+  <div class="small" style="opacity:.7">▣ build · 12 min left ›</div>
+  <div class="small" style="opacity:.7">◷ Waiting for sim · iPhone 17 · 2nd ›</div>
+</div><div class="cap"><b class="n">25</b><span class="name">Working line and lease line</span> <span class="src">Chat.tsx:880</span>
+<div class="meta">What the agent does now; what it holds or is in line for. Each lease row links to Resources. Overlaps with 33 (lease wait).</div>
+<div class="chips"><span class="chip fam">wait</span></div></div></div>
+</div>
+
+<!-- =================== D =================== -->
+<h2><span class="zone">D</span> Waiting for you</h2>
+<p class="zone-intro">After all of the transcript, where the reader is. The first card answers on Return. Shared states for 26–28: <b>sending</b> (chosen button says "⟳ telling your Mac", others 45%), <b>host down</b> (all 45%), <b>answered elsewhere</b> (inert, "Answered on another device." for 4 s).</p>
+<div class="grid">
+
+<div class="spec"><div class="stage">
+  <div class="card att"><div class="att-t">Claude changed .agents/mcp.json</div>
+  <div class="row"><span class="mono"><span style="color:#1a7f37">+12</span> <span style="color:#cf222e">−3</span></span><span class="sp"></span><button class="btn">Review…</button><button class="btn">Undo</button><button class="btn prominent">Keep</button></div></div>
+</div><div class="cap"><b class="n">26</b><span class="name">Guarded change card</span> <span class="src">GuardedChange.tsx:54</span>
+<div class="meta">The agent, a merge or something outside changed the folder's own files. Policy variant: Show Change, Keep Old Rules, Approve.</div>
+<div class="chips"><span class="chip fam">ask</span><span class="chip warn">attention border</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="card"><div class="asker">Claude (Fix login redirect)</div><div class="title">Run <span class="mono">go test ./internal/auth/...</span></div><div class="asker">execute</div>
+  <div class="opts"><button class="opt prominent">Allow once</button><button class="opt prominent">Allow always</button><button class="opt">Reject</button></div></div>
+</div><div class="cap"><b class="n">27</b><span class="name">Permission card</span> <span class="src">Cards.tsx:243</span>
+<div class="meta">A runtime asks to use a tool. Labels are the runtime's own. ⌥1–9 by position.</div>
+<div class="chips"><span class="chip fam">ask</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="card"><div class="asker">Claude (Fix login redirect)</div><div class="title">Ready to code?</div>
+  <div class="small">The plan is open beside this conversation. <button class="link">Show plan</button></div>
+  <div class="opts"><button class="opt prominent">Yes, and auto-accept edits</button><button class="opt prominent">Yes, and ask for edits</button><button class="opt">No, keep planning</button></div></div>
+</div><div class="cap"><b class="n">27p</b><span class="name">Permission card · plan</span> <span class="src">Cards.tsx:243</span>
+<div class="meta">switch_mode: the plan beside the chat, or inline Markdown.</div>
+<div class="chips"><span class="chip fam">ask</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="card"><div class="asker">Claude (Fix login redirect)</div><div class="title">Where should a guest go after login?</div>
+  <div class="opts"><button class="opt prominent">/home<small>The dashboard, as today</small></button><button class="opt prominent">Back where they were<small>Uses the next parameter</small></button></div>
+  <div class="row"><span class="sp"></span><button class="btn">No thanks</button><button class="btn">No, because…</button></div></div>
+</div><div class="cap"><b class="n">28a</b><span class="name">Question · choices</span> <span class="src">Cards.tsx:353</span>
+<div class="meta">ask_question with one choice field. "No answer" when optional.</div>
+<div class="chips"><span class="chip fam">ask</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="card"><div class="asker">Codex (Release notes)</div><div class="title">Release details</div>
+  <div class="field"><b>Version name <span class="faint small">needed</span></b><span class="input">Loops 0.20</span></div>
+  <div class="field"><label><input type="checkbox" checked> Send to TestFlight</label></div>
+  <div class="row"><button class="btn">‹</button><span class="quiet small">2/5</span><span class="sp"></span><button class="btn">No thanks</button><button class="btn">No, because…</button><button class="btn prominent">Next</button></div></div>
+</div><div class="cap"><b class="n">28b</b><span class="name">Question · paged form</span> <span class="src">Cards.tsx:304</span>
+<div class="meta">One page per field: choice, multi-select, yes/no, text, number, date, email, URL. Errors under the field.</div>
+<div class="chips"><span class="chip fam">ask</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="card"><div class="asker">Claude (Connect Linear)</div><div class="title">Sign in to Linear</div><div class="quiet">Open the page, sign in, then come back.</div>
+  <div class="row"><button class="btn prominent">Open</button><button class="btn">Done</button><button class="btn">Gave up</button><button class="btn">No, because…</button></div></div>
+</div><div class="cap"><b class="n">28c</b><span class="name">Question · URL</span> <span class="src">Cards.tsx:353</span>
+<div class="meta">An elicitation in URL mode (MCP).</div>
+<div class="chips"><span class="chip fam">ask</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="card"><div class="asker">Claude (Deploy)</div><div><b>🔒 <span class="mono">OPENAI_API_KEY</span></b></div><div class="small">To run the eval suite. Get it at <span style="color:var(--accent)">platform.openai.com</span></div>
+  <div class="field"><span class="input">Paste OPENAI_API_KEY</span><span class="hint">Saved to your secrets on your Mac. The agent gets its name, never the value.</span></div>
+  <div class="field"><b class="small">Description</b><span class="input" style="height:40px">What it is for: which account, which scopes, whose</span></div>
+  <label class="small"><input type="checkbox"> For this session only</label><label class="small"><input type="checkbox" checked> Ask before use</label>
+  <div class="row"><span class="sp"></span><button class="btn">No thanks</button><button class="btn">No, because…</button><button class="btn prominent">Save securely</button></div></div>
+</div><div class="cap"><b class="n">28d</b><span class="name">Question · secret</span> <span class="src">Cards.tsx:590</span>
+<div class="meta">ask_secret. The tallest card: 2 fields, 2 checkboxes, 3 buttons.</div>
+<div class="chips"><span class="chip fam">ask</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="card"><div class="asker">Claude (Sign up)</div><div><b>✋ Solve the CAPTCHA</b></div><div class="quiet">The sign-up page asks for one.</div>
+  <div class="row"><button class="btn prominent">Open the page</button><span class="sp"></span><button class="btn">Can't do it</button><button class="btn">Done</button></div></div>
+</div><div class="cap"><b class="n">28e</b><span class="name">Question · hand to person</span> <span class="src">Cards.tsx:543</span>
+<div class="meta">hand_to_person. Can't do it → "What stopped you (optional)", Back, Send. Remote: no Open the page.</div>
+<div class="chips"><span class="chip fam">ask</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="card"><div class="asker">Claude (Fix login redirect)</div><div class="title">Where should a guest go after login?</div>
+  <div class="field"><span class="input">Why not? The agent reads this</span></div>
+  <div class="row"><span class="sp"></span><button class="btn">Back</button><button class="btn prominent">Send</button></div></div>
+</div><div class="cap"><b class="n">28f</b><span class="name">Question · decline reason</span> <span class="src">Cards.tsx:511</span>
+<div class="meta">After "No, because…" on any question.</div>
+<div class="chips"><span class="chip fam">ask</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="card"><div class="asker">Claude (Lead #4207)</div><div class="title">Claude wants to start a session on devbox</div>
+  <div class="small faint" style="border:1px dashed var(--tint-failure);border-radius:6px;padding:4px 6px">Not drawn on the web: “Start a session on devbox, in ~/Agents, to fix #4990?”</div>
+  <div class="opts"><button class="opt prominent">Start it</button><button class="opt prominent">Don’t</button></div>
+  <div class="row"><span class="sp"></span><button class="btn">No thanks</button><button class="btn">No, because…</button></div></div>
+</div><div class="cap"><b class="n">28g</b><span class="name">Question · confirm</span> <span class="src">workspacetools.go:294</span>
+<div class="meta">make / delete machine, start / move session, bring back, replace account: Make it, Delete it, Start it, Move it, Bring it back, Replace.</div>
+<div class="chips"><span class="chip fam">ask</span><span class="chip bug">question line missing on web</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="card"><div class="row"><span>🌐</span><b class="sp">Linear — Sign in</b><button class="btn">Open</button></div>
+  <div class="shot">linear.app/login</div><div class="quiet small">Typed the email into the sign-in field</div></div>
+</div><div class="cap"><b class="n">29</b><span class="name">Live tile</span> <span class="src">LiveTile.tsx:25</span>
+<div class="meta">The agent drives the screen, browser or simulator. Waiting placeholder; "Mac is locked". Not an ask, but sits in "Waiting for you".</div>
+<div class="chips"><span class="chip fam">live tile</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="card att bg"><div class="att-t">Paused driving Xcode: you used the mouse or keyboard</div><div class="quiet">The agent stopped so it does not fight you for the screen.</div>
+  <div class="row"><span class="sp"></span><button class="btn">Take Over</button><button class="btn prominent">Resume</button></div></div>
+</div><div class="cap"><b class="n">30</b><span class="name">Paused driving card</span> <span class="src">DesktopControlPauseCard.tsx:9</span>
+<div class="meta">drive_screen paused by the person's touch.</div>
+<div class="chips"><span class="chip fam">ask</span><span class="chip warn">attention wash</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="card att bg"><div class="att-t">The agent asks to archive this session</div><div class="quiet">Opened P#4990 and it merged.</div>
+  <div class="row"><span class="sp"></span><button class="btn">Keep Session</button><button class="btn prominent">Approve</button></div></div>
+</div><div class="cap"><b class="n">31</b><span class="name">Archive card</span> <span class="src">ArchiveCard.tsx:11</span>
+<div class="meta">archive_session where it needs approval.</div>
+<div class="chips"><span class="chip fam">ask</span><span class="chip warn">attention wash</span></div></div></div>
+</div>
+
+<!-- =================== E =================== -->
+<h2><span class="zone">E</span> Under them: the agent waits</h2>
+<p class="zone-intro">The agent waits, not the person, except a wait only the person can settle.</p>
+<div class="grid">
+<div class="spec"><div class="stage">
+  <div class="card"><div class="row"><span class="beacon"></span><b class="sp">Waiting for sessions</b><span class="quiet small">12 / 30 min</span></div>
+  <div class="quiet small">Carries on when all of these have finished</div>
+  <div class="small">Fix login redirect — <span class="quiet">still working</span></div><div class="small">Docs pass — <span class="quiet">Complete</span></div>
+  <div class="bar" style="height:3px"><i style="width:40%"></i></div>
+  <div class="row"><span class="sp"></span><button class="btn">Carry On</button></div></div>
+</div><div class="cap"><b class="n">32</b><span class="name">Block wait card</span> <span class="src">Chat.tsx:974</span>
+<div class="meta">wait_for_event on agent.ended or time.reached. "Waiting for a session", "Waiting until a set time".</div>
+<div class="chips"><span class="chip fam">wait</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="card"><div class="row"><span class="beacon"></span><b class="sp">Waiting for event</b><span class="quiet small">4 / 30 min</span></div>
+  <div class="small">GitHub · pull request merged <span style="color:var(--accent)">(pr: 4990)</span></div><div class="small">GitHub · checks failed</div>
+  <div class="bar" style="height:3px"><i style="width:13%"></i></div>
+  <div class="row"><span class="sp"></span><button class="btn">Carry On</button><button class="btn destructive">End Wait</button></div></div>
+</div><div class="cap"><b class="n">33</b><span class="name">Event wait card</span> <span class="src">Chat.tsx:914</span>
+<div class="meta">Any other wait_for_event. Time-only: "Waiting until 3:00 PM", no event lines.</div>
+<div class="chips"><span class="chip fam">wait</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="card att bg"><div class="row"><b class="att-t sp">! Review requested: alexec/Agents#4990</b><span class="quiet small">1 h 5 min</span></div>
+  <div class="row"><span class="sp"></span><a class="btn prominent">Open</a><button class="btn">Carry On</button><button class="btn destructive">End Wait</button></div></div>
+  <div class="card"><b>◷ Waiting for build · held by “Fix login” · 2nd in line</b>
+  <div class="row"><span class="sp"></span><button class="btn">Carry on without build</button><button class="btn destructive">End Wait</button></div></div>
+</div><div class="cap"><b class="n">33p · 33l</b><span class="name">Event wait · person-settled, lease</span> <span class="src">Chat.tsx:914</span>
+<div class="meta">A review or an assigned issue only the person can settle; a place in a lease's line (repeats 25).</div>
+<div class="chips"><span class="chip fam">wait</span><span class="chip warn">attention wash</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="faint small" style="text-align:center">Last activity 2 h ago · started 3 d ago</div>
+</div><div class="cap"><b class="n">34</b><span class="name">Quiet line</span> <span class="src">Chat.tsx:1088</span>
+<div class="meta">The agent is not running.</div>
+<div class="chips"><span class="chip fam">note</span></div></div></div>
+</div>
+
+<!-- =================== F/G =================== -->
+<h2><span class="zone">F</span> Prompt bar &nbsp;<span class="zone">G</span> Over the chat</h2>
+<div class="grid">
+<div class="spec"><div class="stage">
+  <div class="small row"><span class="quiet">Subagent</span> <b>reviewer</b> <span class="faint">2 min</span><span class="sp"></span><button class="link">Steps</button><button class="link">Stop</button></div>
+  <div class="prompt"><div class="costlimit"><span class="sp">This agent reached its cost limit. $4.20 spent. Anything you send waits until you allow more.</span><button class="btn">Let this one go on</button></div>
+  <div class="faint">Ask Claude… (Tab)</div></div>
+</div><div class="cap"><b class="n">35–36</b><span class="name">Background rows, cost limit banner</span> <span class="src">Chat.tsx:1047, PromptStatus.tsx:9</span>
+<div class="meta">Background work above the prompt; the cost limit inside it. Day limit: no button.</div>
+<div class="chips"><span class="chip fam">banner</span><span class="chip">own box, not MessageBanner</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="card" style="gap:6px"><div class="row"><b class="sp">reviewer</b><span class="quiet small">Finished</span></div><div class="well small">Asked to: review the diff for the redirect fix</div><div class="toolline small">▸ Read redirect.go</div><div class="toolline small">▸ Grep safeNext</div><div class="row"><span class="sp"></span><button class="btn prominent">Done</button></div></div>
+</div><div class="cap"><b class="n">38–40</b><span class="name">Subagent steps, view diff, prompt list, file search, jump to end</span> <span class="src">Chat.tsx:1013, chat/ViewDiff.tsx</span>
+<div class="meta">Sheets and overlays. Not cards in the flow; listed so the count is complete.</div>
+<div class="chips"><span class="chip">overlay</span></div></div></div>
+</div>
+
+<!-- =================== H =================== -->
+<h2><span class="zone">H</span> Mac window and Remote</h2>
+<p class="zone-intro" id="mac">The Mac (<span class="mono">App/Sources/Chat/ChatView.swift</span>) and the Remote (<span class="mono">Remote/Sources/Chat/RemoteChatView.swift</span>) draw the same transcript from <span class="mono">Shared/UI/Chat/ChatTranscript.swift</span>. Most strips are one shared <span class="mono">PaneBanner</span>, tinted on the icon only. The words come from shared word files, so the labels match on all three clients. These cards are extra or different:</p>
+<div class="grid">
+<div class="spec"><div class="stage">
+  <div class="banner"><span class="g">⌁</span><span class="sp">Can’t reach the control plane. Your agents are still working.</span><button class="btn">Try Again</button></div>
+  <div class="banner attg"><span class="g">⌗</span><span class="sp">Scan the code on your Mac to connect</span></div>
+  <div class="banner"><span class="g">🏢</span><span class="sp">Your organisation stopped all work <span class="quiet small">· stopped by Policy</span></span></div>
+</div><div class="cap"><b class="n">H1</b><span class="name">Control away (Mac), Stale banner (Remote), Org policy strip</span>
+<div class="meta">Window-level strips above the chat. The web covers some of this with Banner.tsx and Columns.tsx.</div>
+<div class="chips"><span class="chip fam">banner</span><span class="chip">Mac / Remote</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="banner" style="border-radius:0"><span class="g">📄</span><span class="sp">Wants you to see <b>plan.md</b></span><button class="btn">Open</button><span class="quiet">✕</span></div>
+</div><div class="cap"><b class="n">H2</b><span class="name">Offered file strip</span> <span class="src">RemoteChatView.swift:853</span>
+<div class="meta">Remote only: on the phone, show_file is a strip at the top, not the file card (18). A fourth way to show a file.</div>
+<div class="chips"><span class="chip fam">banner</span><span class="chip fam">object</span><span class="chip">Remote only</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="row"><span class="sp"></span><button class="link">⤴ Unarchive</button></div>
+  <div class="card"><div class="row"><span class="asker sp">Claude (Release notes)</span><button class="link small">Later</button></div><div class="title">Release details</div><div class="quiet small">…form…</div></div>
+</div><div class="cap"><b class="n">H3</b><span class="name">Unarchive row, form card's Later</span> <span class="src">ChatView.swift:321, RequestLater.swift</span>
+<div class="meta">Mac only. The web and Remote put Unarchive in the header/menu, and have no Later.</div>
+<div class="chips"><span class="chip">Mac only</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="card" style="border-radius:18px"><div class="asker">Claude (Fix login redirect)</div><div class="title">Run go test ./internal/auth/...</div>
+  <button class="opt prominent" style="text-align:center;padding:10px">Allow once</button><button class="opt" style="text-align:center;padding:10px">Reject</button></div>
+  <div class="row small"><span class="chip">2 in the background ›</span><span class="chip">Suggest: run the suite</span></div>
+</div><div class="cap"><b class="n">H4</b><span class="name">Remote sheets and phone shapes</span> <span class="src">PermissionSheet.swift, ElicitationSheet.swift</span>
+<div class="meta">The permission and form cards have large centred buttons (r18, 380pt cap) and "Sending…" in place of the buttons. Compact: a "N in the background ›" capsule and a suggestion chip.</div>
+<div class="chips"><span class="chip fam">ask</span><span class="chip">Remote only</span></div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="banner"><span class="g" style="color:var(--tint-failure)">✕</span><span class="sp">This agent reached its cost limit. $4.20 spent.</span><button class="btn">Raise the limit</button><button class="btn">Let this one go on</button></div>
+  <div class="card" style="flex-direction:row;align-items:center;border-radius:99px;padding:6px 12px"><span style="color:var(--tint-vouched)">✓</span><span class="sp">Archived “Fix login redirect”</span><button class="link">Undo</button></div>
+</div><div class="cap"><b class="n">H5</b><span class="name">Cost limit (failure tone, Raise the limit), archive undo toast</span> <span class="src">PromptPieces.swift:103, ArchiveUndoStrip.swift</span>
+<div class="meta">The Mac's cost banner is a failure banner with one more button. The Remote says "Change the limit in Settings on your Mac."</div>
+<div class="chips"><span class="chip fam">banner</span></div></div></div>
+</div>
+<table class="fam" style="margin-top:14px">
+<tr><th>Same card, different on a client</th><th>Difference</th></tr>
+<tr><td>Waiting cards' order</td><td>Mac/Remote: permission, guarded change, form, archive, live tile, pause, block wait, event wait. Web: guarded change first, and the waits are outside "Waiting for you".</td></tr>
+<tr><td>Top strips</td><td>The Mac shows only one of strips 3, 4, 5. The Remote and web can stack them.</td></tr>
+<tr><td>Offline strip</td><td>The Mac has "Next try in N s", "Try Again" and "Try now". The web and Remote have only Start or the elapsed time.</td></tr>
+<tr><td>Folder gone notice (2)</td><td>Only on the web.</td></tr>
+<tr><td>Account move strip (4)</td><td>An attention banner on the Mac/Remote; no style on the web.</td></tr>
+<tr><td>Policy stop card (16)</td><td>An attention card (5% wash, ✋) on the Mac/Remote; no box on the web. The Remote has only "Ask for More".</td></tr>
+<tr><td>Archive card (31)</td><td>The Mac/Remote show an archivebox icon and an orange title; the web shows plain bold text.</td></tr>
+<tr><td>Continue strip (5), paused</td><td>The Mac/Remote say "This runtime’s allowance is spent. The chat stopped." The web shows no words.</td></tr>
+<tr><td>Permission / form options</td><td>The Mac sets them in a row with ⌘1–9. The web stacks them with ⌥1–9. The Remote stacks them full width.</td></tr>
+<tr><td>Answered elsewhere</td><td>Only the web says "Answered on another device."</td></tr>
+</table>
+
+<h2>What stands out (for the simpler set)</h2>
+<ul style="max-width:900px;line-height:1.6">
+  <li><b>Eight families, many recipes.</b> "Attention" is drawn three ways (border, border + wash, title only); a "note" is drawn three ways (tinted box, well box, no box).</li>
+  <li><b>Asks live in two places.</b> Sandbox failure (15), policy stop (16) and the view's Show (19) ask the person from inside the transcript; every other ask is in "Waiting for you".</li>
+  <li><b>"Waiting for you" holds things that are not asks:</b> the live tile (29).</li>
+  <li><b>Leases are said twice:</b> the lease line (25) and the lease wait card (33l).</li>
+  <li><b>Progress is said twice:</b> the plan strip (7) and the plan view in the transcript (14).</li>
+  <li><b>Six top banners</b> can stack (1–5, plus cost limit at the bottom), each with its own buttons.</li>
+  <li><b>The clients do not agree on the look.</b> The policy stop, account move and archive cards each have a different tint per client. A shown file is a card (18) on two clients and a strip (H2) on the phone.</li>
+  <li><b>Bugs seen:</b> the confirm card (28g) does not show its question on the web; the account move strip (4) has no style.</li>
+</ul>
+</main>
+</body>
+</html>
