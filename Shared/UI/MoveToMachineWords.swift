@@ -10,6 +10,17 @@ enum MoveToMachineWords {
     static let folderPlaceholder = "The project’s folder there"
     static let folderHelp = "Leave the folder empty to use this project’s folder on that machine, or give an absolute path, such as /home/me/project."
     static let moving = "Moving…"
+    /// Takes a move that stopped off the session's row (#4641).
+    static let putAway = "Put away"
+
+    /// A move under way, on the session's row (#4641): the branch's bytes once there are a
+    /// megabyte or more of them, then the session itself.
+    static func moving(to machine: String, sent: Int, total: Int, branchSent: Bool) -> String {
+        if branchSent { return "Moving to \(machine): sending the session…" }
+        guard total >= 1_000_000 else { return "Moving to \(machine): sending its branch…" }
+        let size = { (n: Int) in Int64(n).formatted(.byteCount(style: .file)) }
+        return "Moving to \(machine): sending its branch, \(size(sent)) of \(size(total))…"
+    }
     /// The Remote's bar, where the whole title does not fit; the title goes over the machine.
     static let barTitle = "Move to Machine"
 

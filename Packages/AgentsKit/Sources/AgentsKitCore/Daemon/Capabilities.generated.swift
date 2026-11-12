@@ -182,6 +182,7 @@ public enum Capability {
     public static let send1 = "send/1"
     public static let sessionsElsewhere1 = "sessions.elsewhere/1"
     public static let sessionsMove1 = "sessions.move/1"
+    public static let sessionsMoving1 = "sessions.moving/1"
     public static let sessionsOnMachine1 = "sessions.on-machine/1"
     public static let sessionsProject1 = "sessions.project/1"
     public static let sessions1 = "sessions/1"
@@ -238,6 +239,7 @@ public enum Capability {
         "agents/move": "agents/1",
         "agents/moveIn": "sessions.move/1",
         "agents/moveToMachine": "sessions.move/1",
+        "agents/moves": "sessions.moving/1",
         "agents/options": "agents/1",
         "agents/prewarm": "agents/1",
         "agents/prompt": "agents/1",
@@ -638,6 +640,7 @@ public enum Capability {
         "mcp/healthChanged": "mcp/1",
         "mcp/hostedChanged": "mcp/1",
         "modes/changed": "modes/1",
+        "move/changed": "sessions.moving/1",
         "multiplier/changed": "multiplier/1",
         "pages/changed": "pages/1",
         "person/changed": "person/1",

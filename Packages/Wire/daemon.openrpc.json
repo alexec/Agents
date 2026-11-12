@@ -850,7 +850,7 @@
     {
       "name": "agents/moveToMachine",
       "x-capability": "sessions.move/1",
-      "description": "Move to Machine… (#3790): the person moves a session to another of their machines, as move_session does (#3717). Its turn stops if one runs, its branch goes there with its uncommitted changes, and it goes on there with the same id; this machine lets it go. It answers once that machine has it.",
+      "description": "Move to Machine… (#3790): the person moves a session to another of their machines, as move_session does (#3717). Its turn stops if one runs, its branch goes there with its uncommitted changes, and it goes on there with the same id; this machine lets it go. It checks the move and answers at once (#4641): move/changed says how it goes, and the session stays here until that machine has it.",
       "tags": [
         {
           "name": "web"
@@ -872,6 +872,15 @@
           "$ref": "daemon.schema.json#/definitions/MoveToMachineAnswer"
         }
       }
+    },
+    {
+      "name": "agents/moves",
+      "x-capability": "sessions.moving/1",
+      "description": "The moves to another machine this host is making (#4641), the oldest first, for a client that connects mid-move.",
+      "tags": [{ "name": "web" }],
+      "paramStructure": "by-name",
+      "params": [{ "name": "params", "required": true, "schema": { "$ref": "daemon.schema.json#/definitions/Empty" } }],
+      "result": { "name": "result", "schema": { "type": "array", "items": { "$ref": "daemon.schema.json#/definitions/MoveNotification" } } }
     },
     {
       "name": "agents/options",
@@ -6246,6 +6255,14 @@
           }
         }
       }
+    },
+    {
+      "name": "move/changed",
+      "x-capability": "sessions.moving/1",
+      "tags": [{ "name": "web" }],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [{ "name": "params", "required": true, "schema": { "$ref": "daemon.schema.json#/definitions/MoveNotification" } }]
     },
     {
       "name": "multiplier/changed",

@@ -353,6 +353,12 @@ final class RemoteModel {
         pictures = PhonePictures(files: files)
         #if DEBUG
         WalkNotify.model = work
+        WalkNotify.also = { [weak self] method, params in
+            guard method == DaemonAPI.Notification.moveChanged,
+                  let change = try? params?.decode(DaemonAPI.MoveNotification.self) else { return false }
+            self?.moveChanged(change)
+            return true
+        }
         #endif
         // From the start, not once connected: a banner tapped to launch or wake the app
         // arrives before then, and was dropped (#1045).
@@ -3010,6 +3016,7 @@ final class RemoteModel {
             }
             await refreshServerRuntimes(id)
             await refreshServerDisk(id)
+            await refreshMoves(on: id, through: other)
             await machineBrowsers[id]?.rewatchIfWatching()
             let notes = other.notifications()
             let shown = work.shown
@@ -3026,6 +3033,13 @@ final class RemoteModel {
                         || note.method == DaemonAPI.Notification.costChanged
                         || note.method == DaemonAPI.Notification.draftOptions {
                         await self?.received(note.method, note.params, fromOther: id)
+                        continue
+                    }
+                    // A move from that machine to another (#4641), for the session's card.
+                    if note.method == DaemonAPI.Notification.moveChanged {
+                        if let change = try? note.params?.decode(DaemonAPI.MoveNotification.self) {
+                            await self?.moveChanged(change)
+                        }
                         continue
                     }
                     // A machine's disks, for its row and its page (#4034).
@@ -3144,6 +3158,10 @@ final class RemoteModel {
         }
         if let removedFolder, self.labelVocabularies[removedFolder] != nil {
             self.reloadLabelVocabulary(in: removedFolder)
+        }
+        if notification.method == DaemonAPI.Notification.moveChanged,
+           let change = try? notification.params?.decode(DaemonAPI.MoveNotification.self) {
+            moveChanged(change)
         }
         if notification.method == DaemonAPI.Notification.dailySummaryChanged,
            let settings = try? notification.params?.decode(DailySummarySettings.self) {
@@ -3390,7 +3408,8 @@ final class RemoteModel {
         // The Multiplier page (#4116), on the iPad's empty detail as well as its row.
         async let multiplier: Void = refreshMultiplier()
         async let achievements: Void = refreshAchievements()
-        _ = await (dailySummary, summaries, multiplier, achievements)
+        async let moving: Void = refreshMoves(on: .mac, through: client)
+        _ = await (dailySummary, summaries, multiplier, achievements, moving)
         if let pendingNeed {
             self.pendingNeed = nil
             if let agentID = agentID(forNeedToken: pendingNeed) { open(agentID) } else { openUnheld(needToken: pendingNeed) }
@@ -5462,6 +5481,12 @@ final class RemoteModel {
     }
     /// The session a menu's Move to Machine… is moving (#4037), asked at the root as Rename… is.
     var movingToMachine: Agent?
+    /// Moves to another machine under way, by session, and those that stopped with a problem
+    /// until they are put away (#4641): a line on the session's card, as on the Mac's row.
+    var moves: [UUID: DaemonAPI.MoveNotification] = [:]
+    /// Where a session this phone moved goes on, so a chat open on it follows it there once
+    /// that machine has it (#4641).
+    private var moveFollows: [UUID: FolderKey] = [:]
 
     /// The machines `agent` can move to (#3790), as the window's sheet lists them: the Machines
     /// group's others that are online now, This Mac first. Nil when its host cannot move a
@@ -5472,8 +5497,9 @@ final class RemoteModel {
     }
 
     /// Moves `agent` to `machine`, into `folder` there, or the folder of its project there when
-    /// `folder` is empty (#3790). It answers once that machine has it; a chat open on it then
-    /// follows it to its folder there. Sent once: a move is not a call to send twice.
+    /// `folder` is empty (#3790). It answers once its host has checked the move (#4641), and
+    /// `move/changed` says how it goes; once that machine has it, a chat open on it follows it
+    /// to its folder there. Sent once: a move is not a call to send twice.
     func moveToMachine(_ agent: Agent, machine: MachineRef, folder: String) async throws {
         let folder = folder.trimmingCharacters(in: .whitespaces)
         guard let id = machine == .mac ? controlHome : machine else { throw HostAway(host: machine) }
@@ -5482,10 +5508,49 @@ final class RemoteModel {
         let answer = try await client(for: request, on: agent.host)
             .callWhileAnswering(DaemonAPI.Method.agentsMoveToMachine, request, checkingEvery: .seconds(10))
             .decode(DaemonAPI.MoveToMachineAnswer.self)
-        if selection == agent.id {
-            selectedKey = FolderKey(host: machine, folder: URL(fileURLWithPath: answer.folder))
-            selection = agent.id
+        let there = FolderKey(host: machine, folder: URL(fileURLWithPath: answer.folder))
+        // A host from before #4641 answers once that machine has it, and says nothing more.
+        guard host(agent.host, has: Capability.sessionsMoving1) else {
+            if selection == agent.id {
+                selectedKey = there
+                selection = agent.id
+            }
+            return
         }
+        moveFollows[agent.id] = there
+    }
+
+    /// The moves `host` is making, for a phone that connects mid-move (#4641). Those that
+    /// stopped stay until they are put away.
+    func refreshMoves(on host: MachineRef, through link: DaemonClient) async {
+        guard self.host(host, has: Capability.sessionsMoving1),
+              let running = try? await link.call(DaemonAPI.Method.agentsMoves,
+                                                 returning: [DaemonAPI.MoveNotification].self) else { return }
+        for move in running { moves[move.agentID] = move }
+    }
+
+    /// A `move/changed` from any host: the card's line goes a step further, says why it
+    /// stopped, or, once the session is there, goes, and a chat open on it follows it.
+    func moveChanged(_ change: DaemonAPI.MoveNotification) {
+        guard change.finished else {
+            moves[change.agentID] = change
+            return
+        }
+        let follow = moveFollows.removeValue(forKey: change.agentID)
+        if change.problem != nil {
+            moves[change.agentID] = change
+            return
+        }
+        moves[change.agentID] = nil
+        if let follow, selection == change.agentID {
+            selectedKey = follow
+            selection = change.agentID
+        }
+    }
+
+    /// Takes a move that stopped off its session's card.
+    func putAwayMove(_ agentID: UUID) {
+        if moves[agentID]?.finished == true { moves[agentID] = nil }
     }
 
     /// What the sheet says when a move did not go.

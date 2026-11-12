@@ -689,6 +689,18 @@
     "finished": true,
     "problem": "app did not reach pc: pc is offline."
   },
+  "MoveNotification": {
+    "agentID": "A0000000-0000-4000-8000-000000000001",
+    "machine": "pc-id",
+    "machineName": "pc",
+    "folder": "/home/p/app",
+    "startedAt": 800000000,
+    "sent": 4194304,
+    "total": 4194304,
+    "branchSent": true,
+    "finished": true,
+    "problem": "“Fix login” was not moved to pc: pc is offline. It stays here."
+  },
   "ActivityToken": {
     "agentID": "A0000000-0000-4000-8000-000000000001",
     "token": "b1b2c3d4",

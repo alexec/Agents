@@ -181,6 +181,7 @@ const CapSealing1 = "sealing/1"
 const CapSend1 = "send/1"
 const CapSessionsElsewhere1 = "sessions.elsewhere/1"
 const CapSessionsMove1 = "sessions.move/1"
+const CapSessionsMoving1 = "sessions.moving/1"
 const CapSessionsOnMachine1 = "sessions.on-machine/1"
 const CapSessionsProject1 = "sessions.project/1"
 const CapSessions1 = "sessions/1"
@@ -237,6 +238,7 @@ var HostCapabilities = pairs([][2]string{
 	{"agents/move", "agents/1"},
 	{"agents/moveIn", "sessions.move/1"},
 	{"agents/moveToMachine", "sessions.move/1"},
+	{"agents/moves", "sessions.moving/1"},
 	{"agents/options", "agents/1"},
 	{"agents/prewarm", "agents/1"},
 	{"agents/prompt", "agents/1"},
@@ -637,6 +639,7 @@ var HostCapabilities = pairs([][2]string{
 	{"mcp/healthChanged", "mcp/1"},
 	{"mcp/hostedChanged", "mcp/1"},
 	{"modes/changed", "modes/1"},
+	{"move/changed", "sessions.moving/1"},
 	{"multiplier/changed", "multiplier/1"},
 	{"pages/changed", "pages/1"},
 	{"person/changed", "person/1"},
@@ -699,6 +702,7 @@ var HostNotifications = set([]string{
 	"mcp/healthChanged",
 	"mcp/hostedChanged",
 	"modes/changed",
+	"move/changed",
 	"multiplier/changed",
 	"pages/changed",
 	"person/changed",

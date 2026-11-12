@@ -18390,6 +18390,24 @@
         "person"
       ]
     },
+    "MoveNotification": {
+      "type": "object",
+      "description": "move/changed (#4641): how a move to another machine goes, whoever asked for it. `sent` of `total` bytes of the branch are on that machine (0 of 0 while the bundle is made); `branchSent` once they are all there and the session itself goes; `finished` once it ended, whichever way: with no `problem` the session is there and gone from here, else `problem` says why it stopped, in the person's words, and the session stays here.",
+      "properties": {
+        "agentID": { "$ref": "#/definitions/UUID" },
+        "machine": { "type": "string" },
+        "machineName": { "type": "string" },
+        "folder": { "type": "string" },
+        "startedAt": { "$ref": "#/definitions/WireDate" },
+        "sent": { "type": "integer" },
+        "total": { "type": "integer" },
+        "branchSent": { "type": "boolean" },
+        "finished": { "type": "boolean" },
+        "problem": { "type": "string" }
+      },
+      "required": ["agentID", "machine", "machineName", "folder", "startedAt", "sent", "total", "branchSent", "finished"],
+      "additionalProperties": false
+    },
     "MoveRequest": {
       "type": "object",
       "description": "The person moving an agent (053). No target takes back the person's move that is waiting.",

@@ -49,6 +49,8 @@ type Daemon struct {
 	// machineMoves is the moves to another machine agents asked for, made when their turn
 	// ends (move_session, #3717), by agent.
 	machineMoves sync.Map
+	// moves are the moves to another machine under way, whoever asked (#4641).
+	moves movesUnderWay
 
 	mu      sync.Mutex
 	clients map[int64]*Client

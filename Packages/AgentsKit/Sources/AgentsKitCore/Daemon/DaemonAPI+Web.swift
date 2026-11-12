@@ -224,6 +224,7 @@ public extension DaemonAPI {
                 Row(Method.agentsExport, params: AgentsExportRequest.self, result: AgentsExport.self, kind: .hostRequest),
                 // Move to Machine… (#3790).
                 Row(Method.agentsMoveToMachine, params: MoveToMachineRequest.self, result: MoveToMachineAnswer.self, kind: .hostRequest),
+                Row(Method.agentsMoves, params: Empty.self, result: [MoveNotification].self, kind: .hostRequest),
                 Row(Method.agentsExportRead, params: SendReadRequest.self, result: SendRead.self, kind: .hostRequest),
                 Row(Method.agentsImportUpload, params: ReceiveUploadRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsImport, params: AgentsImportRequest.self, result: BackupRestoreResult.self,
@@ -703,6 +704,7 @@ public extension DaemonAPI {
                 Row(Notification.folderRemoved, params: FolderRemovedNotification.self, result: Empty.self,
                     kind: .hostNotification),
                 Row(Notification.cloneChanged, params: CloneNotification.self, result: Empty.self, kind: .hostNotification),
+                Row(Notification.moveChanged, params: MoveNotification.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.draftOptions, params: DraftOptionsNotification.self, result: Empty.self,
                     kind: .hostNotification),
                 Row(Notification.modesChanged, params: RememberedModes.self, result: Empty.self, kind: .hostNotification),

@@ -4,7 +4,8 @@ import SwiftUI
 /// Move to Machine… (#3790): a session goes on on another of the person's machines, as an
 /// agent's move_session does (#3717). Its host stops the turn if one runs, sends the branch
 /// with its uncommitted changes to the folder there, and that machine takes the session with
-/// its id, labels and transcript; this host then lets it go.
+/// its id, labels and transcript; this host then lets it go. The host answers once it has
+/// checked the move (#4641): the sheet closes, and the session's row says how it goes.
 extension AppModel {
     /// The machines `agent` can move to: the others that are online now. Nil when its host
     /// cannot move a session, or is not answering.
@@ -15,7 +16,8 @@ extension AppModel {
     }
 
     /// Moves `agent` to `machine`, into `folder` there, or the folder of its project there
-    /// when `folder` is empty. It answers once that machine has it.
+    /// when `folder` is empty. It answers once the host has checked the move, and
+    /// `move/changed` says how it goes; the session stays here until that machine has it.
     func moveToMachine(_ agent: Agent, machine: MachineRef, folder: String) async throws -> DaemonAPI.MoveToMachineAnswer {
         let folder = folder.trimmingCharacters(in: .whitespaces)
         return try await client(for: agent.host).callWhileAnswering(
@@ -23,6 +25,30 @@ extension AppModel {
             DaemonAPI.MoveToMachineRequest(agentID: agent.id, machine: machine.rawValue, machineName: hosts.label(machine),
                                            folder: folder.isEmpty ? nil : folder),
             checkingEvery: .seconds(10)).decode(DaemonAPI.MoveToMachineAnswer.self)
+    }
+
+    /// A `move/changed`: the row's line goes a step further, says why it stopped, or, once
+    /// the session is there, goes.
+    func moveChanged(_ change: DaemonAPI.MoveNotification) {
+        if change.finished, change.problem == nil {
+            moves[change.agentID] = nil
+        } else {
+            moves[change.agentID] = change
+        }
+    }
+
+    /// Takes a move that stopped off its session's row.
+    func putAwayMove(_ agentID: UUID) {
+        if moves[agentID]?.finished == true { moves[agentID] = nil }
+    }
+
+    /// The moves `host` is making, for a window that connects mid-move. Those that
+    /// stopped stay until they are put away.
+    func refreshMoves(on host: MachineRef) async {
+        guard self.host(host, has: Capability.sessionsMoving1),
+              let running = try? await client(for: host).call(DaemonAPI.Method.agentsMoves,
+                                                               returning: [DaemonAPI.MoveNotification].self) else { return }
+        for move in running { moves[move.agentID] = move }
     }
 }
 
