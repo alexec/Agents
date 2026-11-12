@@ -122,6 +122,8 @@ struct ConnectorSetupView: View {
         .sheet(isPresented: $connecting) {
             if setup?.forgeOrGitHub == .gitlab {
                 ConnectGitLabSheet(host: folder.host, onConnected: { Task { await load(.fresh) } })
+            } else if setup?.forgeOrGitHub == .azuredevops {
+                ConnectAzureDevOpsSheet(host: folder.host, onConnected: { Task { await load(.fresh) } })
             } else if let words = setup.flatMap({ ConnectorSetupWords.tokenSheet($0.forgeOrGitHub) }) {
                 ConnectTokenSheet(words, host: folder.host, onConnected: { Task { await load(.fresh) } })
             } else {

@@ -66,6 +66,8 @@ type RunRef struct {
 	Branch    string
 	PRNumber  int // 0 when the run names none
 	UpdatedAt string
+	// CreatedAt is when the run was made, by the push that started it; a rerun keeps it (#4554).
+	CreatedAt string
 }
 
 // Job is a failed job of a run.
@@ -85,7 +87,9 @@ type RunData struct {
 func (d RunData) run() map[string]any {
 	return map[string]any{
 		"pr": d.PR.json(), "headSha": d.HeadSHA,
-		"run": map[string]any{"id": d.Run.ID, "attempt": d.Run.Attempt, "name": d.Run.Name, "url": d.Run.URL},
+		"run": map[string]any{"id": d.Run.ID, "attempt": d.Run.Attempt, "name": d.Run.Name, "url": d.Run.URL, "createdAt": d.Run.CreatedAt},
+		// When the run finished: the daemon's CI time to green (#4554).
+		"completedAt": d.Run.UpdatedAt,
 	}
 }
 

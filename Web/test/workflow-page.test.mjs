@@ -120,3 +120,26 @@ test("on Auto the page offers the shared words, says effort does nothing, and wh
   assert.equal(ws.picked({ runtimeID: "codex", levels: {}, native: {}, skipped: [{ runtimeID: "claude", reason: "not signed in" }] }, name),
     "Auto picked Codex. Claude: not signed in");
 });
+
+test("the Hours setting writes a whole hours:, as the window's does (#4820)", async () => {
+  const h = await load("src/model/workflowHours.ts");
+  assert.equal(h.hoursSentence(undefined), "Any time: a trigger starts it at any hour.");
+  assert.equal(h.hoursSentence(h.workingHours),
+    "Starts only 09:00-17:00 on Mon, Tue, Wed, Thu, Fri. A trigger outside them waits, and starts it once they open.");
+  assert.deepEqual(h.hoursWindow(h.workingHours), { from: 540, to: 1020 });
+  assert.equal(h.startingAt(h.workingHours, 18 * 60).between, "18:00-17:00");
+  assert.equal(h.startingAt(h.workingHours, 17 * 60).between, "17:00-01:00");
+  assert.equal(h.startingAt(h.workingHours, null).between, undefined);
+  assert.equal(h.startingAt({}, 22 * 60 + 30).between, "22:30-06:30");
+  assert.equal(h.endingAt(h.workingHours, 9 * 60 + 30)?.between, "09:00-09:30");
+  assert.equal(h.endingAt(h.workingHours, 9 * 60), null);
+  assert.equal(h.endingAt({}, 60), null);
+  assert.deepEqual(h.toggling(h.workingHours, "sat").days, ["mon", "tue", "wed", "thu", "fri", "sat"]);
+  assert.equal(h.toggling(h.toggling(h.workingHours, "sat"), "sun").days, undefined);
+  assert.equal(h.toggling({ days: ["mon"] }, "mon"), null);
+  assert.ok(h.admits({}, "sun") && !h.admits(h.workingHours, "sun"));
+  assert.equal(h.inZone(h.workingHours, "Europe/London").timeZone, "Europe/London");
+  assert.deepEqual(h.hoursZones("Mars/Up", ["UTC"]), ["Mars/Up", "UTC"]);
+  assert.equal(h.halfHours.length, 48);
+  assert.equal(h.clockText(h.halfHours.at(-1)), "23:30");
+});

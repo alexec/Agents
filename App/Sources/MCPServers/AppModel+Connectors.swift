@@ -45,10 +45,11 @@ extension AppModel {
         }
     }
 
-    func startSignIn(_ provider: DaemonAPI.ConnectionProvider, on host: MachineRef) async
+    /// url is Azure DevOps's organization, for its Microsoft Entra sign-in (#3921).
+    func startSignIn(_ provider: DaemonAPI.ConnectionProvider, url: String? = nil, on host: MachineRef) async
         -> Result<DaemonAPI.ConnectionSignIn, ConnectorProblem> {
         await connectorCall(host) {
-            try await $0.call(DaemonAPI.Method.connectionsSignIn, DaemonAPI.ConnectionProviderRequest(provider: provider),
+            try await $0.call(DaemonAPI.Method.connectionsSignIn, DaemonAPI.ConnectionProviderRequest(provider: provider, url: url),
                               returning: DaemonAPI.ConnectionSignIn.self)
         }
     }

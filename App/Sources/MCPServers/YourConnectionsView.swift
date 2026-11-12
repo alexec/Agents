@@ -73,7 +73,8 @@ struct YourConnectionsView: View {
             case .gitlab: ConnectGitLabSheet(host: .mac, again: again, onConnected: { Task { await load() } })
             case .email: ConnectEmailSheet(host: .mac, onConnected: { Task { await load() } })
             case .atlassian: ConnectJiraSheet(host: .mac, onConnected: { Task { await load() } })
-            case .forgejo, .bitbucket, .azuredevops:
+            case .azuredevops: ConnectAzureDevOpsSheet(host: .mac, again: again, onConnected: { Task { await load() } })
+            case .forgejo, .bitbucket:
                 if let words = ConnectorSetupWords.tokenSheet(p) {
                     ConnectTokenSheet(words, host: .mac, again: again, onConnected: { Task { await load() } })
                 }

@@ -341,7 +341,9 @@ export function connectionNote(c: Connection, now: Date = new Date()): string {
   }
   const how = c.expiresAt !== undefined ? `Access token · ${tokenEnds(fromWireDate(c.expiresAt), now)}`
     : c.provider === "forgejo" ? forgejo.how : c.provider === "bitbucket" ? bitbucket.how
-    : c.provider === "azuredevops" ? azureDevOps.how : c.byToken ? jira.tokenWay : "OAuth · renews by itself";
+    // Azure DevOps (#3921): a token, or a Microsoft Entra sign-in that renews by itself.
+    : c.provider === "azuredevops" ? (c.byToken ? azureDevOps.how : azureDevOps.entraHow)
+    : c.byToken ? jira.tokenWay : "OAuth · renews by itself";
   return [c.workspace, how].filter((x): x is string => !!x).join(" · ");
 }
 
@@ -549,7 +551,8 @@ export const bitbucket = {
 
 /**
  * Connect Azure DevOps (#3802): a personal access token on one organization of dev.azure.com or
- * one collection of an Azure DevOps Server. No device page for Agents. The Mac's
+ * one collection of an Azure DevOps Server; or, on dev.azure.com, a sign-in with Microsoft Entra
+ * (#3921), Entra's device page, which the host renews by itself. The Mac's
  * ConnectorSetupWords.AzureDevOps.
  */
 export const azureDevOps = {
@@ -574,6 +577,19 @@ export const azureDevOps = {
   checking: "Checking the token with Azure DevOps…",
   choose: "The token ends on the date you gave it. You can take it back in User settings ▸ Personal access tokens, or with Disconnect on Connectors.",
   how: "Personal access token",
+  /** An Entra sign-in's note after its organization (#3921). */
+  entraHow: "Microsoft Entra · renews by itself",
+  /** The dialog's two ways in (#3921): a token first, Microsoft Entra second. */
+  tokenWay: "Personal access token",
+  signInWay: "Microsoft Entra",
+  signInIntro: "Sign in with your work or school Microsoft account. Give the organization, then type the code that Agents shows on Microsoft's sign-in page. Microsoft Entra is for dev.azure.com only.",
+  signInChoose: "Agents renews the sign-in by itself. You can take it back with Disconnect on Connectors.",
+  signInButton: "Sign In with Microsoft",
+  starting: "Asking Microsoft for a code…",
+  openAgain: "Open the Microsoft Page Again",
+  site: "Microsoft's sign-in page",
+  /** Whether Connect Again… opens on the Entra way: the connection was not a token. */
+  againWithEntra: (c: Connection): boolean => !c.byToken,
   disconnectNote: "Disconnect deletes the machine's token. Every folder's Azure DevOps slots wait for a connection again. Azure DevOps's and Azure Boards' events stop until you connect again or set AZURE_DEVOPS_TOKEN. To revoke it too, go to User settings ▸ Personal access tokens in the organization.",
 };
 
@@ -765,7 +781,7 @@ export function sheetStatus(s: ConnectionSignIn): string {
   switch (s.status) {
     case "waiting":
       if (s.grant === "authorizationCode") return s.provider === "atlassian" ? jira.waiting : linear.waiting;
-      return `Waiting for ${site(s.provider)}… Type the code there, then approve.`;
+      return `Waiting for ${s.provider === "azuredevops" ? azureDevOps.site : site(s.provider)}… Type the code there, then approve.`;
     case "connected": return "Connected.";
     case "expired": return s.message ?? "The code expired before it was approved. Try again.";
     case "denied": return s.message ?? `The sign-in was cancelled on ${name(s.provider)}.`;

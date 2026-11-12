@@ -68,19 +68,21 @@ var fixesSchema = map[string]any{"type": "array", "items": str}
 // events are the events this server offers, in CIWatcher's order.
 var events = append([]event{
 	{Name: "checks.failed", Title: "Checks failed",
-		Description: "A pull request's checks finished with a failure: one event per run and attempt, so a rerun that fails again is a new one." + ownPRs,
+		Description: "A pull request's checks finished with a failure: one event per run and attempt, so a rerun that fails again is a new one. run.createdAt is when the run was made, by its push (a rerun keeps it); completedAt is when it finished." + ownPRs,
 		Input:       schema{repoProperty, branchProperty("Only runs on this PR branch."), prProperty, fixesProperty, anyoneProperty, mineProperty, anyProperty},
 		Payload: object(map[string]any{
 			"pr": prSchema(nil), "headSha": str,
-			"run":        object(map[string]any{"id": integer, "attempt": integer, "name": str, "url": str}),
-			"failedJobs": map[string]any{"type": "array", "items": object(map[string]any{"name": str, "url": str})},
+			"run":         object(map[string]any{"id": integer, "attempt": integer, "name": str, "url": str, "createdAt": str}),
+			"completedAt": str,
+			"failedJobs":  map[string]any{"type": "array", "items": object(map[string]any{"name": str, "url": str})},
 		})},
 	{Name: "checks.passed", Title: "Checks passed",
-		Description: "A pull request's checks finished with a success: one event per run and attempt, so a lane waiting on CI going green wakes without polling." + ownPRs,
+		Description: "A pull request's checks finished with a success: one event per run and attempt, so a lane waiting on CI going green wakes without polling. run.createdAt is when the run was made, by its push (a rerun keeps it); completedAt is when it finished." + ownPRs,
 		Input:       schema{repoProperty, branchProperty("Only runs on this PR branch."), prProperty, fixesProperty, anyoneProperty, mineProperty, anyProperty},
 		Payload: object(map[string]any{
 			"pr": prSchema(nil), "headSha": str,
-			"run": object(map[string]any{"id": integer, "attempt": integer, "name": str, "url": str}),
+			"run":         object(map[string]any{"id": integer, "attempt": integer, "name": str, "url": str, "createdAt": str}),
+			"completedAt": str,
 		})},
 	// A run no pull request owns, as a tag's release or a workflow_dispatch run (#3444).
 	{Name: "run.completed", Title: "Workflow run finished",

@@ -22,6 +22,9 @@ import (
 //     so it is the same node.
 //   - run.completed on a version tag (as release.yml on v0.16.0) links the run builds the
 //     tag's release, whatever its conclusion: a failed release build is part of the story.
+//   - CI time to green (#4554): checks.* say the run's head commit, when the run was made and
+//     when it finished. The PR's cost node keeps its last head commit's first run and last
+//     pass (notePRCI), for lineage.DeliveryOf.
 //   - A PR keeps at most ciRunsPerPR active runs: an older run's link ends, and the store's
 //     own bounds (KeepEnded, MostLinks) let it go.
 //   - Deploys (#3584): what run.completed on a version tag says the run deployed (each a
@@ -47,10 +50,14 @@ type ciRunPayload struct {
 	PR struct {
 		URL string `json:"url"`
 	} `json:"pr"`
-	Run struct {
+	// HeadSHA is checks.*'s head commit of the PR.
+	HeadSHA string `json:"headSha"`
+	Run     struct {
 		ID     int64  `json:"id"`
 		Branch string `json:"branch"`
 		URL    string `json:"url"`
+		// CreatedAt is when the run was made, by its push; a rerun keeps it (#4554).
+		CreatedAt string `json:"createdAt"`
 	} `json:"run"`
 	CompletedAt string   `json:"completedAt"`
 	Deploys     []string `json:"deploys"`
@@ -95,7 +102,43 @@ func (d *Daemon) lineageCIEvent(e wire.Event) {
 	d.lineageDo(func() {
 		d.link(run, pr, lineage.RelBuilds, lineage.SourceForge)
 		d.boundCIRuns(pr)
+		d.notePRCI(pr, p, e.Name == "checks.passed")
 	})
+}
+
+// notePRCI keeps a PR's CI on its last head commit (#4554): when that commit's first run was
+// made, and when the last of its runs that passed finished. A run of a new head commit starts
+// it again; a run of an older commit, made before the kept one, changes nothing. An event
+// with no head commit or no times (GitLab, Bitbucket, Azure DevOps) keeps nothing.
+func (d *Daemon) notePRCI(pr wire.LineageNode, p ciRunPayload, passed bool) {
+	created, err := time.Parse(time.RFC3339, p.Run.CreatedAt)
+	if p.HeadSHA == "" || err != nil {
+		return
+	}
+	pushed := wire.DateOf(created)
+	var green *wire.Date
+	if t, err := time.Parse(time.RFC3339, p.CompletedAt); passed && err == nil {
+		g := wire.DateOf(t)
+		green = &g
+	}
+	d.workMu.Lock()
+	defer d.workMu.Unlock()
+	if c, ok := d.costLedgerLocked().Nodes[costKey(pr)]; ok && c.Ci != nil && c.Ci.HeadSha != p.HeadSHA &&
+		c.Ci.PushedAt != nil && pushed < *c.Ci.PushedAt {
+		return
+	}
+	d.noteCostLocked(pr, nowFunc(), func(c *wire.LineageCostNode) {
+		if c.Ci == nil || c.Ci.HeadSha != p.HeadSHA {
+			c.Ci = &wire.LineagePRCI{HeadSha: p.HeadSHA}
+		}
+		if c.Ci.PushedAt == nil || pushed < *c.Ci.PushedAt {
+			c.Ci.PushedAt = &pushed
+		}
+		if green != nil && (c.Ci.GreenAt == nil || *green > *c.Ci.GreenAt) {
+			c.Ci.GreenAt = green
+		}
+	})
+	d.costChangedLocked()
 }
 
 // boundCIRuns ends the builds links into pr past the newest ciRunsPerPR.

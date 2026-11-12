@@ -31,6 +31,8 @@ type DeviceFlow struct {
 	// CodePath and TokenPath are on Base; UserPath, the account, is on API. Scope is asked for
 	// at the start (GitHub's App asks none: its permissions are the App's).
 	CodePath, TokenPath, UserPath, Scope string
+	// RefreshScope sends Scope with a refresh too, as Microsoft Entra wants it.
+	RefreshScope bool
 	// Base is github.com's root with a trailing slash; API is the REST API's. A test gives
 	// a fake of each.
 	Base, API string
@@ -236,7 +238,8 @@ func (f *DeviceFlow) Wait(ctx context.Context, code DeviceCode) (Token, error) {
 			}
 		case "expired_token":
 			return Token{}, ErrExpired
-		case "access_denied":
+		case "access_denied", "authorization_declined":
+			// authorization_declined is Microsoft Entra's word for it.
 			return Token{}, ErrDenied
 		default:
 			return Token{}, &Failure{Name: f.Name, Code: a.Error, Words: a.ErrorDescription}
@@ -247,15 +250,18 @@ func (f *DeviceFlow) Wait(ctx context.Context, code DeviceCode) (Token, error) {
 // Refresh spends the refresh token for a new pair: GitHub's and GitLab's refresh tokens are
 // single use.
 func (f *DeviceFlow) Refresh(ctx context.Context, refresh string) (Token, error) {
-	a, err := f.post(ctx, f.tokenPath(), url.Values{"client_id": {f.ClientID},
-		"grant_type": {"refresh_token"}, "refresh_token": {refresh}})
+	form := url.Values{"client_id": {f.ClientID}, "grant_type": {"refresh_token"}, "refresh_token": {refresh}}
+	if f.RefreshScope && f.Scope != "" {
+		form.Set("scope", f.Scope)
+	}
+	a, err := f.post(ctx, f.tokenPath(), form)
 	if err != nil {
 		return Token{}, err
 	}
 	switch a.Error {
 	case "":
 		return f.token(a)
-	case "bad_refresh_token", "unauthorized_client", "incorrect_client_credentials", "invalid_grant":
+	case "bad_refresh_token", "unauthorized_client", "incorrect_client_credentials", "invalid_grant", "interaction_required":
 		return Token{}, ErrRefused
 	}
 	return Token{}, &Failure{Name: f.Name, Code: a.Error, Words: a.ErrorDescription}

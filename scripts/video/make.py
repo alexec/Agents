@@ -56,6 +56,7 @@ sys.path.insert(0, str(HERE))
 from rpc import Client  # noqa: E402
 from walk import Walk  # noqa: E402
 import frame  # noqa: E402
+import sound  # noqa: E402
 import tokens  # noqa: E402
 import voice  # noqa: E402
 
@@ -548,6 +549,10 @@ class Video:
         """Ends the tape, if one is on: the window writes speech.wav."""
         if getattr(self, "taped", False):
             self.taped = False
+            # What the walk says the app said, for the sound test's words (#4855).
+            said = self.walk.call("voice").get("said") or []
+            (self.work / "voice").mkdir(parents=True, exist_ok=True)
+            (self.work / "voice/said.json").write_text(json.dumps(said, indent=1))
             reply = self.walk.call("voice", tape="")
             if not reply.get("ok"):
                 raise RuntimeError(f"voice tape: {reply.get('error')}")
@@ -909,10 +914,14 @@ def main():
     parser.add_argument("--upload", action="store_true", help="upload each video made (upload.py)")
     parser.add_argument("--sign-in", metavar="PROFILE", help="open the video Chrome on PROFILE for the person to sign in, then quit")
     parser.add_argument("--preflight", action="store_true", help="check what each scene needs of Alex's hands; take nothing")
+    parser.add_argument("--sound-self-test", action="store_true", help="test the sound test on a made-up track; take nothing")
     parser.add_argument("--changed", action="store_true", help="list the integration scenes changed between two refs (the scenes argument)")
     args = parser.parse_args()
     if args.preflight:
         preflight(args.scenes)
+        return
+    if args.sound_self_test:
+        sound.self_test()
         return
     if args.changed:
         if not 1 <= len(args.scenes) <= 2:
@@ -942,9 +951,17 @@ def main():
         mp4 = frame.compose(scene, takes, work, OUT)
         try:
             check(scene, mp4, work)
+            sound.test(work, mp4, frame.FPS)
+            log(f"{scene.ID}: the sound test passed (sound-test.json)")
             if secrets:
                 n = tokens.check_video(mp4, secrets)
                 log(f"token check: none of {n} frames of {mp4.name} shows part of a token")
+        except sound.SoundTestFailed:
+            # Kept for a person to look at, as the OCR checks keep theirs (#4855).
+            kept = work / f"failed-{mp4.name}"
+            shutil.move(mp4, kept)
+            log(f"{scene.ID}: the take's files are in {work}: {kept.name}, scene.mov (the mix), sound.json, sound-test.json")
+            raise
         except Exception:
             mp4.unlink(missing_ok=True)
             raise

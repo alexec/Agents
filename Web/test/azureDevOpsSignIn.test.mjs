@@ -8,10 +8,20 @@ import { load } from "./load.mjs";
 const c = await load("src/model/connectorSetup.ts");
 
 test("an Azure DevOps connection's row says its organization and that it is a personal access token", () => {
-  const conn = { provider: "azuredevops", login: "Agents Test", state: "connected", connectedAt: 0, workspace: "dev.azure.com/acme" };
+  const conn = { provider: "azuredevops", login: "Agents Test", state: "connected", connectedAt: 0, workspace: "dev.azure.com/acme", byToken: true };
   assert.equal(c.connectionTitle(conn), "Azure DevOps · Agents Test");
   assert.equal(c.connectionNote(conn), "dev.azure.com/acme · Personal access token");
   assert.equal(c.tokenSheet("azuredevops").again(conn), "dev.azure.com/acme");
+});
+
+test("an Entra sign-in's row renews by itself, and Connect Again opens on the Entra way (#3921)", () => {
+  const conn = { provider: "azuredevops", login: "Agents Test", state: "connected", connectedAt: 0, workspace: "dev.azure.com/acme" };
+  assert.equal(c.connectionNote(conn), "dev.azure.com/acme · Microsoft Entra · renews by itself");
+  assert.equal(c.azureDevOps.againWithEntra(conn), true);
+  assert.equal(c.azureDevOps.againWithEntra({ ...conn, byToken: true }), false);
+  assert.equal(c.connectionNote({ ...conn, state: "signInAgain" }), "Azure DevOps refused the renewal: sign in again");
+  const waiting = { flowID: "f", provider: "azuredevops", status: "waiting", grant: "deviceCode", verificationURL: "https://microsoft.com/devicelogin", expiresAt: 0 };
+  assert.equal(c.sheetStatus(waiting), "Waiting for Microsoft's sign-in page… Type the code there, then approve.");
 });
 
 test("Make a Token opens the organization's tokens page", () => {

@@ -83,7 +83,7 @@ func TestFailedRunsAndTheirDetails(t *testing.T) {
 	}
 	equal(t, len(runs), 2, "runs since")
 	equal(t, runs[1], RunRef{ID: 1, Attempt: 2, Name: "CI", URL: "u1", HeadSHA: "s1", Branch: "agents/a", PRNumber: 7,
-		UpdatedAt: "2026-10-16T10:01:00Z"}, "run")
+		UpdatedAt: "2026-10-16T10:01:00Z", CreatedAt: "2026-10-15T10:00:00Z"}, "run")
 	details, err := g.RunDetails(context.Background(), repo, runs[0], true)
 	if err != nil {
 		t.Fatal(err)
@@ -132,7 +132,7 @@ func TestPassedRunsOnlyMatchesSuccess(t *testing.T) {
 		t.Fatal(err, truncated)
 	}
 	equal(t, runs, []RunRef{{ID: 3, Attempt: 1, Name: "CI", URL: "u3", HeadSHA: "s3", Branch: "agents/b", PRNumber: 11,
-		UpdatedAt: "2026-10-16T10:05:00Z"}}, "only the successful run")
+		UpdatedAt: "2026-10-16T10:05:00Z", CreatedAt: "2026-10-16T10:00:00Z"}}, "only the successful run")
 }
 
 func TestCompletedRunsOfAWorkflowAndByID(t *testing.T) {
@@ -159,7 +159,7 @@ func TestCompletedRunsOfAWorkflowAndByID(t *testing.T) {
 		t.Fatal(err, truncated)
 	}
 	equal(t, runs, []CompletedRun{{Run: RunRef{ID: 5, Attempt: 1, Name: "Release", URL: "u5", HeadSHA: "s5", Branch: "v0.16.0",
-		UpdatedAt: "2026-10-16T10:30:00Z"}, CheckSuite: 55, Workflow: "release.yml", Event: "push", Conclusion: "success", Actor: "alexec", Trusted: true}},
+		UpdatedAt: "2026-10-16T10:30:00Z", CreatedAt: "2026-10-16T09:00:00Z"}, CheckSuite: 55, Workflow: "release.yml", Event: "push", Conclusion: "success", Actor: "alexec", Trusted: true}},
 		"only the finished run since")
 	byID, _, err := g.CompletedRuns(context.Background(), repo, "", "", 8, since)
 	if err != nil {

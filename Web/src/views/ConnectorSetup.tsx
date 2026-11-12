@@ -456,7 +456,8 @@ const signInWindow = "agents-sign-in";
  * ends on the site's newest issue, which proves it. Connect Email (#1780): an IMAP server, a user and an app password, which go to the host only.
  * Connect Forgejo (#3752), Connect Bitbucket (#3785) and Connect Azure DevOps (#3802): one token sheet
  * (GitLab's access token way alone), with each provider's one field beside the token: Forgejo's
- * address, Bitbucket's Atlassian email, Azure DevOps's organization.
+ * address, Bitbucket's Atlassian email, Azure DevOps's organization. Connect Azure DevOps has a
+ * second way (#3921): Microsoft Entra's device flow for the organization, on dev.azure.com.
  */
 export function ConnectDialog({ store, host, provider, folder, again, connected, close }: {
   store: Store; host: string; provider: ConnectionProvider; folder?: string;
@@ -467,6 +468,7 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
   const sheet = words.tokenSheet(provider);
   const opening = provider === "gitlab" && again ? words.gitlabAgain(again)
     : provider === "github" && again?.byToken ? { withToken: true, address: "" }
+    : provider === "azuredevops" && again ? { withToken: !words.azureDevOps.againWithEntra(again), address: sheet?.again(again) ?? "" }
     : sheet ? { withToken: true, address: again ? sheet.again(again) : "" } : undefined;
   type Step = { kind: "asking" } | { kind: "starting" } | { kind: "waiting"; flow: ConnectionSignIn }
     | { kind: "finishing" } | { kind: "install"; login: string; repository: string; url: string }
@@ -485,6 +487,8 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
   const isEmail = provider === "email";
   const isJira = provider === "atlassian";
   const isGitHub = provider === "github";
+  /** Azure DevOps (#3921): a token, or Microsoft Entra's device flow for the organization. */
+  const isAzure = provider === "azuredevops";
   /** The authorization code with PKCE, handed back by postMessage: Linear and Atlassian. */
   const codeFlow = provider === "linear" || isJira;
   const busy = step.kind === "starting" || step.kind === "waiting" || step.kind === "finishing" || step.kind === "checking";
@@ -508,7 +512,7 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
     let flow: ConnectionSignIn;
     try {
       flow = await store.link.call("connections/sign-in",
-        codeFlow ? { provider, origin: location.origin } : { provider }, host);
+        codeFlow ? { provider, origin: location.origin } : isAzure ? { provider, url: address.trim() } : { provider }, host);
     } catch (e) {
       popup?.close();
       setStep({ kind: "failed", why: why(e) });
@@ -654,12 +658,13 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
           </div>
         )}
         {step.kind !== "jira" && <>
-        {(provider === "gitlab" || isGitHub || isJira) && (
+        {(provider === "gitlab" || isGitHub || isJira || isAzure) && (
           <div class="button-group" role="radiogroup" aria-label="Connect with">
-            {([false, true] as const).map((t) => (
+            {(isAzure ? [true, false] as const : [false, true] as const).map((t) => (
               <button key={String(t)} type="button" role="radio" aria-checked={withToken === t} class={withToken === t ? "on" : ""}
                 disabled={busy} onClick={() => { setWithToken(t); if (step.kind === "failed") setStep({ kind: "asking" }); }}>
                 {isJira ? (t ? words.jira.tokenWay : words.jira.signInWay)
+                  : isAzure ? (t ? words.azureDevOps.tokenWay : words.azureDevOps.signInWay)
                   : isGitHub ? (t ? words.githubTokens.tokenWay : words.githubTokens.signInWay)
                   : (t ? words.gitlab.tokenWay : words.gitlab.signInWay)}
               </button>
@@ -688,7 +693,17 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
             <button type="button" class="link small" onClick={() => openOut(words.jira.newTokenURL)}>{words.jira.newTokenButton}</button>
           </form>
         )}
-        {sheet && (
+        {isAzure && !withToken && (
+          <form id="connect-entra" class="token-form" onSubmit={(e) => { e.preventDefault(); if (address.trim() && !busy) void start(); }}>
+            <p class="small">{words.azureDevOps.signInIntro}</p>
+            <label>{words.azureDevOps.addressLabel}
+              <input type="text" value={address} placeholder={words.azureDevOps.addressPrompt} disabled={busy}
+                autocomplete="off" autocapitalize="off" spellcheck={false}
+                onInput={(e) => setAddress((e.target as HTMLInputElement).value)} />
+            </label>
+          </form>
+        )}
+        {sheet && (!isAzure || withToken) && (
           <form id="connect-token" class="token-form" onSubmit={(e) => { e.preventDefault(); void connectWithToken(); }}>
             <p class="small">{sheet.intro}</p>
             <label>{sheet.fieldLabel}
@@ -750,10 +765,10 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
           </form>
         )}
         {/* The repositories are chosen on github.com for the App only, not for a token. */}
-        {!(isGitHub && withToken) && <p class="quiet small">{words.sheetChooseFor(provider)}</p>}
+        {!(isGitHub && withToken) && <p class="quiet small">{isAzure && !withToken ? words.azureDevOps.signInChoose : words.sheetChooseFor(provider)}</p>}
         </>}
         {step.kind === "starting" && (
-          <p class="quiet small">{codeFlow ? "Starting the sign-in…" : `Asking ${providerName} for a code…`}</p>
+          <p class="quiet small">{codeFlow ? "Starting the sign-in…" : isAzure ? words.azureDevOps.starting : `Asking ${providerName} for a code…`}</p>
         )}
         {step.kind === "waiting" && (
           <div class="sign-in-code">
@@ -763,7 +778,7 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
             )}
             <p class="small">{words.sheetStatus(step.flow)}</p>
             <button class="link small" onClick={() => openAgain(step.flow)}>
-              Open {words.site(step.flow.provider)} Again
+              {isAzure ? words.azureDevOps.openAgain : `Open ${words.site(step.flow.provider)} Again`}
             </button>
           </div>
         )}
@@ -797,7 +812,9 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
                   <button type="submit" form="connect-token" class="prominent"
                     disabled={!token.trim() || (isJira && !address.trim())}>{words.gitlab.tokenButton}</button>
                 : <>
-                  {step.kind === "asking" && <button class="prominent" onClick={() => void start()}>{words.continueButtonFor(provider)}</button>}
+                  {step.kind === "asking" && (isAzure
+                    ? <button type="submit" form="connect-entra" class="prominent" disabled={!address.trim()}>{words.azureDevOps.signInButton}</button>
+                    : <button class="prominent" onClick={() => void start()}>{words.continueButtonFor(provider)}</button>)}
                   {step.kind === "failed" && <button class="prominent" onClick={() => void start()}>Try Again</button>}
                 </>}
             </>

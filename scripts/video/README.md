@@ -162,7 +162,26 @@ permission, and the screen may be locked.
 heard, the reply spoken, voice mode off. A Remote's marks name SystemSoundIDs, which have no
 file on the Mac: they are left out, with a warning.
 
+### The sound test (#4855)
 
+After Whisper's check, `sound.py` tests every take's track, and the take fails when one check
+fails, with the check's name:
+
+1. **The words:** Whisper hears the sentences of `speech.wav`, and they agree with what the app
+   said (the tape's marks, and the walk's `said`, kept in `voice/said.json`): at most one word in
+   ten different.
+2. **The sounds at their marks:** the mix is louder than −50 dBFS in the 100 ms after each
+   sound's mark, and quiet in the 100 ms before it when nothing else plays there.
+3. **Nothing else:** where no sentence, sound or narration line plays, the mix is below −50 dBFS.
+4. **The length:** the video's track is as long as its frames, within one frame.
+
+`frame.compose` writes `sound.json`, where each part of the track plays in the video's time.
+A failed test keeps the video as `failed-<id>.mp4` in the take's folder
+(`~/.cache/agents-video/work/<id>/`), with the mix (`scene.mov`), `sound.json` and
+`sound-test.json`, for a person to look at. `make.sh --sound-self-test` makes a track with each
+fault and shows that the test finds it.
+
+## What it needs
 
 - `ffmpeg` (Homebrew), `uv`, Node and Chrome. The first run makes
   `~/.cache/agents-video/venv` with Chatterbox and mlx-whisper.

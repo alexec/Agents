@@ -227,10 +227,21 @@ struct ConnectorSetupWordsTests {
     /// organization's tokens page, and an Azure DevOps folder says work items, pull requests and
     /// builds, as the web page's.
     @Test func azureDevOpsWords() throws {
-        let c = DaemonAPI.Connection(provider: .azuredevops, login: "Agents Test", connectedAt: Date(), workspace: "dev.azure.com/acme")
+        let c = DaemonAPI.Connection(provider: .azuredevops, login: "Agents Test", connectedAt: Date(), workspace: "dev.azure.com/acme",
+                                     byToken: true)
         #expect(ConnectorSetupWords.connectionTitle(c) == "Azure DevOps \u{00B7} Agents Test")
         #expect(ConnectorSetupWords.connectionNote(c) == "dev.azure.com/acme \u{00B7} Personal access token")
         #expect(ConnectorSetupWords.AzureDevOps.again(c) == "dev.azure.com/acme")
+        #expect(!ConnectorSetupWords.AzureDevOps.againWithEntra(c))
+        // #3921: an Entra sign-in renews by itself; one that must sign in again says so.
+        let entra = DaemonAPI.Connection(provider: .azuredevops, login: "Agents Test", connectedAt: Date(), workspace: "dev.azure.com/acme")
+        #expect(ConnectorSetupWords.connectionNote(entra) == "dev.azure.com/acme \u{00B7} Microsoft Entra \u{00B7} renews by itself")
+        #expect(ConnectorSetupWords.AzureDevOps.againWithEntra(entra))
+        let ended = DaemonAPI.Connection(provider: .azuredevops, state: .signInAgain, connectedAt: Date(), workspace: "dev.azure.com/acme")
+        #expect(ConnectorSetupWords.connectionNote(ended) == "Azure DevOps refused the renewal: sign in again")
+        let waiting = DaemonAPI.ConnectionSignIn(flowID: UUID(), provider: .azuredevops, status: .waiting, grant: .deviceCode,
+                                                 verificationURL: "https://microsoft.com/devicelogin", expiresAt: Date())
+        #expect(ConnectorSetupWords.sheetStatus(waiting) == "Waiting for Microsoft's sign-in page\u{2026} Type the code there, then approve.")
         for (typed, page) in [("", "https://dev.azure.com/"), ("acme", "https://dev.azure.com/acme/_usersSettings/tokens"),
                               ("https://dev.azure.com/acme/Web/_git/app", "https://dev.azure.com/acme/_usersSettings/tokens"),
                               ("acme.visualstudio.com", "https://dev.azure.com/acme/_usersSettings/tokens"),

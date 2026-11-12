@@ -59,10 +59,13 @@ import (
 // with Bitbucket Cloud (connections/sign-in/token) and keeps it. The token has no refresh: it
 // ends on the date the person gave it, and the bitbucket server then says to connect again.
 //
-// Azure DevOps (#3802) has no device flow for Agents: the person makes a personal access token
-// in one organization of dev.azure.com (or one collection of an Azure DevOps Server), and the
-// host checks it with that organization (connections/sign-in/token) and keeps it with its
-// address. The token has no refresh: it ends on the date the person gave it.
+// Azure DevOps (#3802) takes a personal access token made in one organization of dev.azure.com
+// (or one collection of an Azure DevOps Server): the host checks it with that organization
+// (connections/sign-in/token) and keeps it with its address. The token has no refresh: it ends
+// on the date the person gave it. On dev.azure.com it also signs in with Microsoft Entra
+// (#3921): Entra's device flow (connections/sign-in with the organization as url), with the
+// Entra app in the person's secrets (connections.AzureDevOpsClientIDName). The host checks the
+// access token with the organization, keeps the pair, and renews it, as GitHub's.
 
 var (
 	// connectionWaitLimit is one long poll of connections/sign-in/wait.
@@ -107,6 +110,8 @@ type connectionFlow struct {
 	changed chan struct{} // closed and replaced at each change
 	cancel  context.CancelFunc
 	endedAt time.Time
+	// Azure DevOps's Entra sign-in (#3921): the organization it is for.
+	azureRoot, azureOrg string
 	// The code flow's own: the PKCE secrets (never sent to a client), the page's origin,
 	// and the flow that spends the code. completing is set while a code is being spent.
 	pkce       connections.PKCE
@@ -142,7 +147,7 @@ func (d *Daemon) registerConnections() {
 		return d.connectionsList()
 	})
 	On(d, wire.CallConnectionsSignIn, func(ctx context.Context, c *Client, r wire.ConnectionProviderRequest) (wire.ConnectionSignIn, error) {
-		return d.connectionSignIn(ctx, r.Provider, deref(r.Origin))
+		return d.connectionSignIn(ctx, r.Provider, deref(r.Origin), deref(r.URL))
 	})
 	On(d, wire.CallConnectionsSignInWait, func(ctx context.Context, c *Client, r wire.ConnectionSignInFlowRequest) (wire.ConnectionSignIn, error) {
 		return d.connectionSignInWait(ctx, r.FlowID)
@@ -225,6 +230,17 @@ func (d *Daemon) deviceFlow(p wire.ConnectionProvider) *connections.DeviceFlow {
 	if p == wire.ConnectionProviderGitlab {
 		return connections.NewGitLabFlow()
 	}
+	if p == wire.ConnectionProviderAzuredevops {
+		id, tenant := d.azureDevOpsApp()
+		f := connections.NewAzureDevOpsEntraFlow(id, tenant)
+		// A walk's fake Entra (AGENTS_TEST_ENTRA_URL), on this machine only.
+		if test := os.Getenv("AGENTS_TEST_ENTRA_URL"); test != "" {
+			if u, err := url.Parse(test); err == nil && u.Scheme == "http" && isLoopbackHost(u.Hostname()) {
+				f.Base = strings.TrimSuffix(test, "/") + "/" + connections.EntraTenant + "/"
+			}
+		}
+		return f
+	}
 	f := connections.NewGitHubFlow()
 	// A walk's fixture GitHub (AGENTS_TEST_GITHUB_URL) checks a token too, so a scratch root can
 	// connect GitHub with connections/sign-in/token and read the fixture's issues (#4391).
@@ -260,6 +276,35 @@ func (d *Daemon) atlassianApp() (id, secret string) {
 		}
 	}
 	return strings.TrimSpace(id), strings.TrimSpace(secret)
+}
+
+// azureDevOpsApp is the Entra app's client id and tenant for Azure DevOps's sign-in (#3921):
+// AGENTS_AZURE_DEVOPS_CLIENT_ID and AGENTS_AZURE_DEVOPS_TENANT in the host's environment (a
+// scratch root's), else the person's secrets.env. No id: Connect Azure DevOps takes a token only.
+func (d *Daemon) azureDevOpsApp() (id, tenant string) {
+	id, tenant = os.Getenv("AGENTS_"+connections.AzureDevOpsClientIDName), os.Getenv("AGENTS_"+connections.AzureDevOpsTenantName)
+	if id == "" {
+		kept := d.secrets()
+		id, tenant = kept[connections.AzureDevOpsClientIDName], kept[connections.AzureDevOpsTenantName]
+		if home := d.personalHome(); home != "" && isSealedSecret(home, connections.AzureDevOpsClientIDName) {
+			log.Printf("connections: the Entra app's %s has Ask before use, so Connect Azure DevOps does not use it: turn Ask before use off for it", connections.AzureDevOpsClientIDName)
+		}
+	}
+	return strings.TrimSpace(id), strings.TrimSpace(tenant)
+}
+
+// isLoopbackRoot is an http root on this machine: a fake Azure DevOps in a test or a walk.
+func isLoopbackRoot(root string) bool {
+	u, err := url.Parse(root)
+	return err == nil && u.Scheme == "http" && isLoopbackHost(u.Hostname())
+}
+
+func isLoopbackHost(host string) bool {
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 // refresher is the flow that renews provider's tokens.
@@ -299,6 +344,10 @@ func wireConnection(c connections.Connection) wire.Connection {
 	if c.Provider == connections.Atlassian && c.Resource == "" {
 		w.ByToken = new(true)
 	}
+	if c.Provider == connections.AzureDevOps && !connections.ByEntra(c) {
+		// A personal access token (#3802); an Entra sign-in (#3921) renews by itself.
+		w.ByToken = new(true)
+	}
 	return w
 }
 
@@ -327,7 +376,7 @@ func (d *Daemon) connectionFlowNamed(id wire.UUID) *connectionFlow {
 // connectionSignIn starts the device flow, or answers with the one already waiting for
 // the provider, so two clients show the same code. A code flow (Linear) is shared only by
 // clients that hand back the same way: the Mac and the Remote, or one web page's origin.
-func (d *Daemon) connectionSignIn(ctx context.Context, p wire.ConnectionProvider, origin string) (wire.ConnectionSignIn, error) {
+func (d *Daemon) connectionSignIn(ctx context.Context, p wire.ConnectionProvider, origin, address string) (wire.ConnectionSignIn, error) {
 	if !knownProvider(p) {
 		return wire.ConnectionSignIn{}, invalid("Agents does not connect to " + string(p) + ".")
 	}
@@ -340,8 +389,16 @@ func (d *Daemon) connectionSignIn(ctx context.Context, p wire.ConnectionProvider
 	if p == wire.ConnectionProviderBitbucket {
 		return wire.ConnectionSignIn{}, invalid("Bitbucket has no sign-in page: connect it with an API token or an access token.")
 	}
+	var azureRoot, azureOrg string
 	if p == wire.ConnectionProviderAzuredevops {
-		return wire.ConnectionSignIn{}, invalid("Azure DevOps has no sign-in page: connect it with a personal access token.")
+		root, org, err := connections.AzureDevOpsOrganization(address)
+		if err != nil {
+			return wire.ConnectionSignIn{}, invalid(sentence(err.Error()))
+		}
+		if !connections.IsAzureDevOpsServices(root) && !isLoopbackRoot(root) {
+			return wire.ConnectionSignIn{}, invalid("An Azure DevOps Server signs in with a personal access token only: Microsoft Entra is for dev.azure.com.")
+		}
+		azureRoot, azureOrg = root, org
 	}
 	if origin != "" {
 		o, err := connections.CleanOrigin(origin)
@@ -364,7 +421,7 @@ func (d *Daemon) connectionSignIn(ctx context.Context, p wire.ConnectionProvider
 		ended := f.endedAt
 		f.mu.Unlock()
 		if state.Status == wire.ConnectionSignInStatusWaiting && state.Provider == p && (f.code == nil || f.origin == origin) &&
-			time.Now().Before(state.ExpiresAt.Time()) {
+			f.azureRoot == azureRoot && f.azureOrg == azureOrg && time.Now().Before(state.ExpiresAt.Time()) {
 			d.connMu.Unlock()
 			return state, nil
 		}
@@ -378,6 +435,10 @@ func (d *Daemon) connectionSignIn(ctx context.Context, p wire.ConnectionProvider
 	}
 
 	flow := d.deviceFlow(p)
+	if flow.ClientID == "" && p == wire.ConnectionProviderAzuredevops {
+		return wire.ConnectionSignIn{}, invalid("This machine has no Entra app for Azure DevOps: connect with a personal access token, " +
+			"or set " + connections.AzureDevOpsClientIDName + " in its secrets to the client id of an Entra app that allows public client flows.")
+	}
 	if flow.ClientID == "" {
 		return wire.ConnectionSignIn{}, invalid("This build has no Agents application on " + flow.Name + ": connect with a personal access token.")
 	}
@@ -386,7 +447,7 @@ func (d *Daemon) connectionSignIn(ctx context.Context, p wire.ConnectionProvider
 		log.Printf("connections: %s sign-in did not start", p)
 		return wire.ConnectionSignIn{}, invalid("The sign-in could not start: " + err.Error())
 	}
-	f := &connectionFlow{changed: make(chan struct{}), state: wire.ConnectionSignIn{
+	f := &connectionFlow{changed: make(chan struct{}), azureRoot: azureRoot, azureOrg: azureOrg, state: wire.ConnectionSignIn{
 		FlowID: store.NewUUID(), Provider: p, Status: wire.ConnectionSignInStatusWaiting,
 		Grant: wire.ConnectionSignInGrantDeviceCode, UserCode: &code.UserCode, VerificationURL: code.VerificationURL,
 		ExpiresAt: wire.DateOf(code.ExpiresAt)}}
@@ -427,13 +488,26 @@ func (d *Daemon) finishConnection(ctx context.Context, f *connectionFlow, flow *
 		f.end(wire.ConnectionSignInStatusFailed, nil, err.Error())
 		return
 	}
-	login, err := flow.Login(ctx, t.Access)
-	if err != nil {
-		log.Printf("connections: %s account not read", p)
-		f.end(wire.ConnectionSignInStatusFailed, nil, err.Error())
-		return
+	var c connections.Connection
+	if p == wire.ConnectionProviderAzuredevops {
+		// Entra's token reaches every organization the account is in: the one asked for is
+		// checked, and kept, as a personal access token's is.
+		login, err := connections.CheckAzureDevOpsToken(ctx, d.azureDevOpsHTTP, f.azureRoot, f.azureOrg, t.Access)
+		if err != nil {
+			log.Printf("connections: %s account not read", p)
+			f.end(wire.ConnectionSignInStatusFailed, nil, sentence(err.Error()))
+			return
+		}
+		c = connections.AzureDevOpsSignedIn(f.azureRoot, f.azureOrg, login, t, time.Now())
+	} else {
+		login, err := flow.Login(ctx, t.Access)
+		if err != nil {
+			log.Printf("connections: %s account not read", p)
+			f.end(wire.ConnectionSignInStatusFailed, nil, err.Error())
+			return
+		}
+		c = t.Connection(string(p), login, time.Now())
 	}
-	c := t.Connection(string(p), login, time.Now())
 	d.connRenew.Lock()
 	err = s.Put(c)
 	d.connRenew.Unlock()
