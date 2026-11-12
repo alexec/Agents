@@ -1551,6 +1551,9 @@ public final class AgentsModel {
     /// The most events paging back brings in (#3650), as on the web page.
     static let eventsPagedMost = 5_000
 
+    /// What kind of wait an agent's mark draws (#5022).
+    public func waitKind(of agent: Agent) -> WaitKind { WaitKind.of(agent) }
+
     /// What an agent is waiting on, in the words its row, card and capsule use.
     public func waitStatus(of agent: Agent) -> WaitStatus? {
         WaitStatus.of(agent, names: { self.agentTitles[$0] }, lease: leaseStatus(of: agent.id))
@@ -2231,7 +2234,7 @@ public final class AgentsModel {
             things += lease.waiting.map(\.shortName)
             detail += lease.waitingLines
         }
-        guard let line = WaitStatus.rowLine(things) ?? detail.first.map({ "\(WaitStatus.symbol) \($0)" })
+        guard let line = WaitStatus.rowLine(things) ?? detail.first
         else { return nil }
         return WaitMark(line: line, detail: detail.joined(separator: "\n"))
     }

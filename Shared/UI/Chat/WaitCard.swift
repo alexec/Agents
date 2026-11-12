@@ -123,7 +123,7 @@ struct WaitCard: View {
                     Text(personLine).fontWeight(.semibold).tinted(.attention)
                 } else {
                     // The waiting mark's beacon, breathing as it does everywhere else (#2657).
-                    WaitingBeacon(size: 14)
+                    WaitingBeacon(size: 14, kind: WaitKind.of(wait))
                     Text(wait.cardTitle).fontWeight(.semibold)
                 }
                 Spacer(minLength: 6)
@@ -216,7 +216,7 @@ struct BlockWaitCard: View {
         let elapsed = max(0, Int(now.timeIntervalSince(since) / 60))
         VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 7) {
-                WaitingBeacon(size: 14)
+                WaitingBeacon(size: 14, kind: .agents)
                 Text(block.cardTitle()).fontWeight(.semibold)
                 Spacer(minLength: 6)
                 Text(WaitStatus.cardTime(elapsed: elapsed, total: total))

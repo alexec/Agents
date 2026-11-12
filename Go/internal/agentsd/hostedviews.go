@@ -75,12 +75,25 @@ func (c *hostedViewConn) call(ctx context.Context, _ int, method string, params 
 	select {
 	case a := <-done:
 		if a.err != nil {
-			return nil, &mcpCheckFailure{kind: "refused", message: a.err.Message, code: a.err.Code}
+			return nil, hostedRefusal(a.err)
 		}
 		return a.result, nil
 	case <-ctx.Done():
 		return nil, &mcpCheckFailure{kind: "timedOut"}
 	}
+}
+
+// hostedRefusal is a hosted copy's error as a server's refusal, with its data (#5023).
+func hostedRefusal(e *Error) *mcpCheckFailure {
+	f := &mcpCheckFailure{kind: "refused", message: e.Message, code: e.Code}
+	switch data := e.Data.(type) {
+	case json.RawMessage:
+		f.data = data
+	case nil:
+	default:
+		f.data, _ = json.Marshal(data)
+	}
+	return f
 }
 
 // notify: the host is the copy's one client, and has initialized it already.

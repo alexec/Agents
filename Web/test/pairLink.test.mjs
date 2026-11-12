@@ -50,6 +50,21 @@ test("a route, or no fragment at all, is left alone", async () => {
   }
 });
 
+// #4937: a link of the Web + Mac link tier pairs, then opens its place.
+test("a place after the code is where the address goes once the code is taken", async () => {
+  const { linkedCode, replaced } = await open("#code=" + encodeURIComponent(text) + "&to=" + encodeURIComponent("/reports/spend?range=month"));
+  assert.equal(linkedCode, text);
+  assert.deepEqual(replaced, ["/#/reports/spend?range=month"]);
+});
+
+test("a place that is not a route of the page, or carries a code, opens the Overview", async () => {
+  for (const to of ["https://evil.example/", "/x#code=1", "/x?code=1", "%E0%A4%A"]) {
+    const { linkedCode, replaced } = await open("#code=" + encodeURIComponent(text) + "&to=" + (to.startsWith("%") ? to : encodeURIComponent(to)));
+    assert.equal(linkedCode, text, to);
+    assert.deepEqual(replaced, ["/"], to);
+  }
+});
+
 test("a fragment that doesn't decode is still taken out of the address", async () => {
   const { linkedCode, replaced } = await open("#code=%E0%A4%A");
   assert.equal(linkedCode, null);

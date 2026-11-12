@@ -10,6 +10,13 @@ export const dimensions: readonly ReportDimension[] = ["person", "project", "fol
 export const dimensionTitle: Record<ReportDimension, string> = { person: "Person", project: "Project", folder: "Folder", machine: "Machine", runtime: "Runtime", group: "Group",
   workflow: "Workflow" };
 export const ranges: readonly ReportRange[] = ["day", "week", "month", "threeMonths"];
+
+/** The range a page's address names after its "?" (`range=month`), as Cost's Open Reports on the Mac
+ * writes it (#4938); undefined for none, or one the page does not have. */
+export function rangeAsked(query: string | undefined): ReportRange | undefined {
+  const named = new URLSearchParams(query ?? "").get("range");
+  return ranges.find((r) => r === named);
+}
 /** The range's name as a screen reader says it: "D" alone means nothing (#2440). */
 export const rangeSpoken: Record<ReportRange, string> = { day: "Day", week: "Week", month: "Month", threeMonths: "3 months" };
 /** What Spend's bars measure (#2440). */

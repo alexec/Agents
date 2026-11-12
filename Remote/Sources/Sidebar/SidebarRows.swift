@@ -73,7 +73,8 @@ struct SidebarSessionRow: View {
                            endedReason: agent.endedReason,
                            outcomeUnknown: agent.endingIsUnaccountedFor,
                            isWaitingForPerson: agent.isWaitingForPerson,
-                           tool: RunningToolWords.tool(agent))
+                           tool: RunningToolWords.tool(agent),
+                           waitKind: WaitKind.of(agent))
             }
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
@@ -297,7 +298,8 @@ private struct SessionMark: View {
                 Image(systemName: "list.number").sidebarMark(Paper.accent)
             case .waiting:
                 // The waiting card's beacon, breathing in step with every other (#2456, #2657).
-                WaitingBeacon(size: 14 * scale, color: onAccent ? Paper.ground : Paper.accent)
+                WaitingBeacon(size: 14 * scale, color: onAccent ? Paper.ground : Paper.accent,
+                              kind: WaitKind.of(agent))
             case .paused:
                 Image(systemName: "pause.circle").sidebarMark(Paper.accent)
             case .done:

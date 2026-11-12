@@ -15,10 +15,16 @@ struct OrgPolicyPane: View {
     let people: PeopleState
 
     @Environment(\.openURL) private var openURL
+    /// Opens a place on the web page, signed in as Open in Browser is (#4937); set by the Mac
+    /// window only, so the Remote draws no Console links (tier web+link).
+    @Environment(\.openWebPlace) private var openWebPlace
     @State private var view: DaemonAPI.PolicyView?
     /// The routes this person may use (#999); nil from a control plane before them, which shows none.
     @State private var routes: [DaemonAPI.OrgRouteMine]?
     @State private var console: URL?
+    /// The Console's admin pages the Mac does not draw (#4939); empty unless this Mac can open them.
+    @State private var consoleLinks: [ConsoleLinks.Link] = []
+    @State private var linkProblem: String?
     @State private var problem: String?
     @State private var isChanging = false
     /// The question before the kill switch moves, with the running agents it names.
@@ -129,6 +135,9 @@ struct OrgPolicyPane: View {
                     }
                     .paperListRow()
                 }
+                if isAdmin, let openWebPlace, !consoleLinks.isEmpty {
+                    consoleLinksSection(openWebPlace)
+                }
             } else if problem == nil {
                 Text("Loading…").appText(.supporting).foregroundStyle(.secondary).paperListRow()
             }
@@ -207,8 +216,31 @@ struct OrgPolicyPane: View {
         if isAdmin {
             let status = try? await control.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self)
             console = OrgPolicyWords.consoleURL(status)
+            consoleLinks = ConsoleLinks.shown(admin: true, status: status, onThisMac: status?.machineID == MachineID.current)
         }
         return true
+    }
+
+    /// The Console's admin pages the Mac does not draw (#4939): one link each, as Edit in Console is.
+    private func consoleLinksSection(_ open: OpenWebPlace) -> some View {
+        Section {
+            ForEach(consoleLinks) { link in
+                VStack(alignment: .leading, spacing: 2) {
+                    Button(link.title) { Task { linkProblem = await open.run(link.place) } }
+                    Text(link.about).appText(.fine).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            if let linkProblem {
+                Text(linkProblem).appText(.fine).tinted(.failure)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        } header: {
+            Text(ConsoleLinks.title)
+        } footer: {
+            Text(ConsoleLinks.foot).appText(.fine).foregroundStyle(.secondary)
+        }
+        .paperListRow()
     }
 
     /// The person's own requests. A control plane before them does not know the method: no ask.
@@ -256,4 +288,15 @@ struct OrgPolicyPane: View {
             problem = PeopleWords.refusal(error)
         }
     }
+}
+
+/// Opens a place on the web page (`/settings/reportPolicy`) in the default browser, signed in as
+/// Open in Browser is (#4937): nil once opened, else why not. The Mac window sets it; the Remote
+/// does not, so it shows no link of the Web + Mac link tier.
+struct OpenWebPlace {
+    let run: @MainActor (String) async -> String?
+}
+
+extension EnvironmentValues {
+    @Entry var openWebPlace: OpenWebPlace? = nil
 }
