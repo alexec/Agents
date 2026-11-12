@@ -6,7 +6,7 @@
 Each screen of specs/071-web-remote/walks/parity.md is a file of its own under parity/. A
 row's verdict is its last cell: a row with any **delta** counts as delta, else one with
 **by design** as by design, else **same**. A row's tier is its second cell: Core,
-Mac + web or One client. The script fails on a row with no tier it knows.
+Mac + web, Web + Mac link (#4937) or One client. The script fails on a row with no tier it knows.
 """
 
 import glob
@@ -16,7 +16,7 @@ import sys
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 SCREENS = os.path.join(ROOT, "specs", "071-web-remote", "walks", "parity", "*.md")
 VERDICTS = ("same", "by design", "delta")
-TIERS = ("Core", "Mac + web", "One client")
+TIERS = ("Core", "Mac + web", "Web + Mac link", "One client")
 
 
 def verdict(row):
@@ -35,8 +35,8 @@ def tier(row):
 def main():
     totals = dict.fromkeys(VERDICTS + TIERS, 0)
     bad = []
-    print("| Screen | Same | By design | Delta | Core | Mac + web | One client |")
-    print("|---|---|---|---|---|---|---|")
+    print("| Screen | Same | By design | Delta | " + " | ".join(TIERS) + " |")
+    print("|---" * (4 + len(TIERS)) + "|")
     for path in sorted(glob.glob(SCREENS)):
         with open(path) as f:
             lines = f.read().splitlines()
@@ -56,8 +56,7 @@ def main():
         print(f"| {title} | " + " | ".join(str(counts[k]) for k in VERDICTS + TIERS) + " |")
     print(f"\nOf {sum(totals[v] for v in VERDICTS)} rows: **{totals['same']} same**, "
           f"**{totals['by design']} by design**, **{totals['delta']} delta**; "
-          f"**{totals['Core']} Core**, **{totals['Mac + web']} Mac + web**, "
-          f"**{totals['One client']} One client**.")
+          + ", ".join(f"**{totals[t]} {t}**" for t in TIERS) + ".")
     if bad:
         print("\n" + "\n".join(bad), file=sys.stderr)
         sys.exit(1)

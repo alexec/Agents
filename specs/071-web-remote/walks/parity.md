@@ -15,10 +15,11 @@
 
 ## Tiers (#2796)
 
-Alex chose tiers on 2026-10-27 (#2796). Each row has a **Tier** cell after its Feature. The tier says which clients must have the feature. The Mac window and the web page are full clients: they are never trimmed. The tiers trim only the Remote.
+Alex chose tiers on 2026-10-27 (#2796). Each row has a **Tier** cell after its Feature. The tier says which clients must have the feature. The Mac window and the web page are full clients. The tiers trim only the Remote, except Web + Mac link (#4937), which the Mac window does not draw.
 
 - **Core:** all three clients. A change is made on all three in the same branch, or a parity issue is filed for each client that does not get it yet.
 - **Mac + web:** the Mac window and the web page. The Remote does not have them: #2798 removes each one from the Remote completely, with no line in its place (Alex, 2026-10-29). Nobody files a Remote parity issue. Until a feature is removed, the Remote's cell says what the Remote has now.
+- **Web + Mac link (#4937, epic #4936):** the web page has the feature. The Mac window shows one link to it, in the place where a person looks for it, and draws nothing more. The Remote gets nothing, as for Mac + web. It is for features that people use rarely and that cost much to build natively. Each link shows only when the web page is served and this Mac can open it (the rule of **Edit in Console**, #1002 D17), so a Mac with no web page has no link and no feature; opens the right place (the section, page, scope and range, as `#/reports/…`), not the Overview; and signs the browser in as **Open in Browser** does (with the control plane on this Mac, it pairs the default browser in the same step the first time; with the control plane somewhere else, the web page's own sign-in, which keeps the address). The link carries no code or token. Until the link is there, the row's Mac cell says so and the row is a **delta**.
 - **One client:** one client only, by design (hover, keyboard, Finder, the Mac's own host). No follow-up.
 
 **Core** is:
@@ -35,17 +36,19 @@ Alex chose tiers on 2026-10-27 (#2796). Each row has a **Tier** cell after its F
 
 **Mac + web** is: Console and Reports; every control plane management page (Sign-ins, People, Groups, Bots and their caps, Channels, Sign-in Providers, Policy and its kill switch, Secrets, Backups, Git access, Add a Browser); Add a Machine, machine providers, Start a Machine from a Repository and Versions; Connectors and connector set-up (Connect your tools, GitLab, Email); Agent Configuration (Skills, Personas and Workflows editors) and Auto's settings (#2923, #2924); the workflow page's Configuration pane, Edit File… and Delete…; folder management (a folder's Project, Archive, Archived folders, Export/Import and the Drop Box); the usage pages (Cost, Tokens, Time, Milestones and their charts; Velocity is Core, #4758); and Folder Settings (Alex, 2026-10-29, #2798). Add Folder, Clone Git URL, the person's Secrets and Accounts, the Machines group and Move to Machine moved to Core (Alex, 2026-11-07, #4030).
 
+**Web + Mac link** is: Reports (every page: Spend, Outcomes, Time, Planning and Delivery, Runtimes, Adoption, Workflows, Features and Saved Views; link #4938); and the Console's Report Policy, Catalogue, Read API and Requests (links #4939) (Alex, 2026-11-12, #4936). The Console's other pages stay Mac + web: the Mac draws them in Settings, or draws a part of them with **Edit in Console**.
+
 A new row gets its tier when it is added, from the lists above. When a new feature is on neither list, its tier is Mac + web, because the Remote keeps only Core by default (Alex, #2796). An issue that wants it on the Remote says why.
 
 ## Counts
 
-`scripts/parity-counts.py` counts the rows of every screen by verdict: **same**, **by design** and **delta**, and by tier: **Core**, **Mac + web** and **One client**. A row with any open delta counts as delta, even where another side's difference is by design. The script fails when a row has no tier it knows. The counts are not kept by hand (#2020).
+`scripts/parity-counts.py` counts the rows of every screen by verdict: **same**, **by design** and **delta**, and by tier: **Core**, **Mac + web**, **Web + Mac link** and **One client**. A row with any open delta counts as delta, even where another side's difference is by design. The script fails when a row has no tier it knows. The counts are not kept by hand (#2020).
 
-The deltas are tracked by 31 issues:
+The deltas are tracked by 33 issues:
 - **Already open:** #226 (the Remote's one sidebar) and #235 (the page's one sidebar at phone width).
 - **Filed by this audit, the Remote to change:** #238 (with the page), #239, #240, #241, #242, #243, #244, #245, #246 (with one web row), #247, #248, #249, #888.
 - **The page to change:** #250, #251, #252, #253, #254, #255, #256, #257, #260, #261, #262, #1480.
-- **The window to change, or more than one side:** #264, #265, #266.
+- **The window to change, or more than one side:** #264, #265, #266, and the Mac's links to Web + Mac link pages: #4938 (Reports) and #4939 (the Console's admin pages).
 - **Alex to decide** (one client only, nothing says whether that is meant): #267.
 
 ## Screens
