@@ -45,7 +45,7 @@ and paste in it at any time, and an address typed in its bar starts it.
 Every machine also offers `capacity`, **Capacity of this Mac** (#4579). Agents lease it
 before heavy work that no declared resource names: a long test suite, a Chromium, a
 simulator, a script that builds. It has no count. It follows the machine's level (ok,
-near or full, from load per core, memory pressure and swap; #4578): a lease is granted
+near or full, from load per core and memory pressure; #4578, #4583): a lease is granted
 at ok and goes in line at near and full. A resource named `build` follows the level in
 the same way, as well as its count. So an agent that leases `build` needs nothing more.
 

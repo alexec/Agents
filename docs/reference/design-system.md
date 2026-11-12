@@ -126,6 +126,104 @@ the website only.
 | display.2 | `--type-display-2` | — | — | `1.8rem` | www's section titles. |
 <!-- /design.sh gen -->
 
+## Messages
+
+A message tells the person about a status, a warning, a failure or a success. Every client
+uses the same six kinds, and each kind has one place on the screen. A message never pushes
+the content that the person reads or types into (#4737).
+
+### The kinds
+
+| Kind | Use it for | Where it goes | Reflow | Goes away |
+|---|---|---|---|---|
+| **Field note** | One field: a value that is not correct, a hint for that field. | Under the field, on a line that is kept for it. Show a failure after Submit, not while the person types. | None: the line is always there. | When the value is correct. |
+| **Sheet note** | The action of a sheet or a form: it failed, or it is in progress. | Beside or above the sheet's buttons, in a space that is kept for it (two lines, as the web's `.sheet-note`). | None. | When the action starts again, or the sheet closes. |
+| **Banner** | A condition of a pane or a page: offline, stale, a read that failed, a limit that is reached, a folder that has gone. | Across the top of the pane that it is about, inset, under the toolbar. Never over the content. | Only when the condition starts or ends, with a short animation. | When the condition ends. The person cannot close it. |
+| **Toast** | The result of an action that the person did outside a sheet: copied, archived, sent, or that it failed. | Floats at the bottom centre of the window (the web page: of the viewport), above the prompt bar. One at a time: a new toast replaces the last one. | None: it floats. | A success after 4 seconds; a toast with Undo after 8 seconds. A failure stays until the person closes it. The time stops while the pointer, the focus or VoiceOver is on the toast. |
+| **Alert** | A choice that blocks the work: the person must decide before the app can continue (Delete? Let it use this sign-in?). | Modal, from the platform (`HeldAlert` on the Mac, `.alert` on the Remote, `<dialog>` on the web). | None. | When the person chooses. |
+| **Notice or transcript row** | Work that the person did not start now: an agent's `notify`, a turn that failed, background work that failed. | Not on the page: the Notices list, the system notification, or a row in the transcript. | None. | As the notice or the transcript does. |
+
+To choose a kind, ask these questions in this order:
+
+1. Must the person choose something before the work can continue? Use an **alert**.
+2. Is it about one field? Use a **field note**.
+3. Is it about the action of an open sheet? Use a **sheet note**.
+4. Does it stay true until something changes (a condition)? Use a **banner**.
+5. Is it the result of something that the person did now? Use a **toast**.
+6. If not, use a **notice or transcript row**.
+
+A button that copies something changes its own label for 2 seconds ("Copied"), and keeps
+its width. It shows no toast. A copy from a menu item or a keyboard shortcut shows a toast,
+because no control is in view to change.
+
+### Tone, colour and icon
+
+| Tone | Means | Tint | Mac and Remote icon (SF Symbol) | Web icon |
+|---|---|---|---|---|
+| **Neutral** | A status: offline, stale, in progress, set by your organisation. | None: `ink` on the `well`. | `info.circle`, or `wifi.slash` when offline | ⓘ |
+| **Attention** | A person is needed: pair, sign in, approve, choose the folder again. | `tint.attention` | `exclamationmark.circle.fill` | ⚠︎ |
+| **Failure** | Something failed: a read, an action, a limit that stopped the work. | `tint.failure` | `xmark.octagon.fill` | ✕ |
+| **Success** | An ending that the app can vouch for: done, sent, archived. | `tint.vouched` | `checkmark.circle.fill` | ✓ |
+
+- **There is no warning tone.** A warning is a status (neutral) or a failure. Yellow and
+  amber are not message colours: `forge.waiting` is for a check that runs, not a message.
+- **Orange means only that a person is needed** (specs/018 FR-006a). A cost limit that
+  stopped the work is a failure, not attention.
+- **The tint is on the icon only.** The words are in `ink`, the ground is `well` (a banner)
+  or `raised` (a toast). A message never fills its ground with a tint.
+- **Never colour alone.** Each message has an icon and words.
+
+### Words
+
+- The words say what happened, then what to do: "Could not archive the session. Try
+  again." Follow **Copy** below.
+- A banner or a toast has at most two actions, as buttons (Try Again, Undo, Open
+  Account). A field note has none.
+
+### Screen readers
+
+| Kind | Web | Mac and Remote |
+|---|---|---|
+| Field note | `aria-describedby` from the field; `aria-invalid` on a failure | `.accessibilityHint` on the field |
+| Sheet note, banner, toast | `role="status"` (`role="alert"` for a failure), in a live region that is always in the page | An announcement (`AccessibilityNotification.Announcement`) when it appears |
+| Alert | `<dialog>` | The platform's alert |
+
+### Where each pattern goes
+
+The client stories (#4600) move each pattern to its kind. Inline error text in a form (about
+130 SwiftUI sites and 45 on the web) is a field note or a sheet note, by the questions above.
+
+| Pattern today | Client | Kind | Tone |
+|---|---|---|---|
+| `WindowAlert.problem` ("Could not finish that"), `.makeFailed` (`ContentView.swift`) | Mac | Toast | Failure |
+| `WindowAlert.lend`, `.lendGit`, `.folderGone`; Delete archived agents now? | Mac | Alert (no change) | — |
+| `.alert` for a failed action (`RemoteApp.swift`, `RuntimesView.swift`) | Remote | Toast | Failure |
+| `.problem` strip (`Errors.tsx`), with OK | Web | Toast | Failure |
+| `ControlAwayStrip` | Mac | Banner | Neutral; attention when the address refused and Open Account shows |
+| `StaleBanner` (reach) | Remote | Banner | Neutral; attention when it must pair |
+| `.banner` (`Banner.tsx`), control plane away | Web | Banner | Neutral; attention when refused |
+| `OfflineStrip`, `MacHostDownNotice` | Mac | Banner | Neutral |
+| `HostOfflineStrip` | Remote | Banner | Neutral |
+| `.offline-strip` (`OfflineStrip.tsx`), its orange dot | Web | Banner | Neutral (the dot is not orange) |
+| `ArchivedStaleStrip`, `.offline-strip.archived-stale` | All | Banner | Neutral |
+| `MissingFolderStrip`, `RemoteMissingFolderStrip`, `.problem.folder-gone` | All | Banner | Attention |
+| `AccountMoveStrip`, `RemoteAccountMoveStrip` | Mac, Remote | Banner | Attention |
+| `ContinueWhenBackStrip`, `RemoteContinueWhenBackStrip` | Mac, Remote | Banner | Neutral |
+| `CostLimitBanner` | Mac, Remote | Banner | Failure |
+| `OrgPolicyStrip`, `.policy-banner` | All | Banner | Neutral |
+| `WorkErrorStrip` (amber, the `forge.waiting` wash), `ErrorStrip` in `.work-problem` | All | Banner | Failure |
+| `ArchiveUndoStrip` (a card at the foot of the list) | Mac, Remote | Toast with Undo | Success |
+| `.archive-undo` foot line (`Sidebar.tsx`) | Web | Toast with Undo | Success |
+| A turn's Undo These Changes result ("↩︎ undone", its failure) | All | Sheet note in the card (no change) | Success, failure |
+| A button's "Copied" label | All | Its own label (no change) | — |
+| `.sheet-note`, `.sheet-note.failure` | Web | Sheet note (no change) | Neutral, failure |
+| `.hint.failure`, `.hint.attention` beside a field | Web | Field note | Failure, attention |
+| Inline red, orange or grey error `Text` | Mac, Remote | Field note or sheet note | Failure (never orange or grey) |
+| `SentNotice`, the Notices list, `TurnError` rows | All | Notice or transcript row (no change) | — |
+
+On the web, the fallbacks `--tint-success` and `--danger`, which no token declares, become
+`--tint-vouched` and `--tint-failure`.
+
 ## Where each surface reads it
 
 | Surface | Reads | How it stays the same as `design/tokens.json` |

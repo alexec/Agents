@@ -48,20 +48,20 @@ func TestCapacityRisesAtOnceAndFallsAfterTwoLooks(t *testing.T) {
 	}
 	// One look under the line keeps it near.
 	look(quiet, wire.CapacityLevelNear)
-	// Swap more than half used is full, at once; no second machine.busy, as it was not ok.
-	look(capacitySample{load1: 1.6, swap: 60}, wire.CapacityLevelFull)
+	// Load above the full line is full, at once; no second machine.busy, as it was not ok.
+	look(capacitySample{load1: 3.1, swap: 60}, wire.CapacityLevelFull)
 	if n := len(raised(d, "machine.busy")); n != 1 {
 		t.Fatalf("%d machine.busy", n)
 	}
 	// Two looks under full: the higher of the two (near) is where it goes.
-	look(capacitySample{pressure: wire.MemoryPressureWarn}, wire.CapacityLevelFull)
+	look(capacitySample{load1: 2.1}, wire.CapacityLevelFull)
 	look(quiet, wire.CapacityLevelNear)
 	if n := len(raised(d, "machine.ok")); n != 0 {
 		t.Fatalf("machine.ok at near")
 	}
 	// A look over the line starts the count again.
 	look(quiet, wire.CapacityLevelNear)
-	look(capacitySample{load1: 1.7}, wire.CapacityLevelNear)
+	look(capacitySample{load1: 2.2}, wire.CapacityLevelNear)
 	look(quiet, wire.CapacityLevelNear)
 	look(quiet, wire.CapacityLevelOk)
 	ok := raised(d, "machine.ok")
@@ -89,13 +89,13 @@ func TestCapacityTargetTakesTheWorstSignal(t *testing.T) {
 		level  wire.CapacityLevel
 		signal string
 	}{
-		{capacitySample{load1: 1.5}, wire.CapacityLevelOk, ""},
-		{capacitySample{load1: 1.51}, wire.CapacityLevelNear, "load"},
-		{capacitySample{load1: 2.6}, wire.CapacityLevelFull, "load"},
-		{capacitySample{pressure: wire.MemoryPressureWarn}, wire.CapacityLevelNear, "memory_pressure"},
-		{capacitySample{pressure: wire.MemoryPressureCritical, load1: 2}, wire.CapacityLevelFull, "memory_pressure"},
-		{capacitySample{swap: 50}, wire.CapacityLevelOk, ""},
-		{capacitySample{swap: 51, load1: 2}, wire.CapacityLevelFull, "swap"},
+		{capacitySample{load1: 2.0}, wire.CapacityLevelOk, ""},
+		{capacitySample{load1: 2.01}, wire.CapacityLevelNear, "load"},
+		{capacitySample{load1: 3.1}, wire.CapacityLevelFull, "load"},
+		// Warn and swap are reported, not a level (#4583).
+		{capacitySample{pressure: wire.MemoryPressureWarn}, wire.CapacityLevelOk, ""},
+		{capacitySample{pressure: wire.MemoryPressureCritical, load1: 2.5}, wire.CapacityLevelFull, "memory_pressure"},
+		{capacitySample{swap: 95}, wire.CapacityLevelOk, ""},
 	} {
 		if level, signal := capacityTarget(tc.s); level != tc.level || signal != tc.signal {
 			t.Errorf("%+v: %s %q, want %s %q", tc.s, level, signal, tc.level, tc.signal)

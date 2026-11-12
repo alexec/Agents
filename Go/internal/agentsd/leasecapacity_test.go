@@ -68,11 +68,11 @@ func TestComputeLeasesFollowTheMachine(t *testing.T) {
 	}
 
 	// full: a release does not hand capacity on.
-	look(capacitySample{load1: 3})
+	look(capacitySample{load1: 3.5})
 	if text, _ := me.tool(7, "release_resource", map[string]any{"name": "capacity"}); text != "Released "+capacityDisplay()+"." {
 		t.Fatal(text)
 	}
-	if text, _ := me.tool(8, "lease_resource", map[string]any{"name": "build", "wait": false}); text != sentenceMachine()+" is at capacity (load 3.0 per core). You are not in line." {
+	if text, _ := me.tool(8, "lease_resource", map[string]any{"name": "build", "wait": false}); text != sentenceMachine()+" is at capacity (load 3.5 per core). You are not in line." {
 		t.Fatal(text)
 	}
 
