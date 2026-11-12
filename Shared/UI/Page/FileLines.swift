@@ -76,7 +76,7 @@ struct FileLines: View {
                 // exist. Without it the reader is asked to find a row the lazy stack
                 // has not built.
                 try? await Task.sleep(for: .milliseconds(50))
-                withAnimation(.easeOut(duration: 0.2)) {
+                withAnimation(ResponseMotion.response) {
                     reader.scrollTo(line - 1, anchor: .center)
                 }
             }

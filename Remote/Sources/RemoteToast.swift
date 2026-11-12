@@ -74,7 +74,7 @@ struct RemoteToasts: ViewModifier {
                         .id(toast.id)
                 }
             }
-            .animation(.easeOut(duration: 0.2), value: toast?.id)
+            .animation(ResponseMotion.response, value: toast?.id)
             .onChange(of: model.problem, initial: true) { _, problem in
                 if let problem { show(.problem(problem, UUID())) }
             }

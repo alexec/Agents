@@ -145,7 +145,7 @@ struct ChangeFileView: View {
                     }
                     .onChange(of: scrollTarget) {
                         guard let scrollTarget else { return }
-                        withAnimation(.easeOut(duration: 0.2)) {
+                        withAnimation(ResponseMotion.response) {
                             reader.scrollTo(scrollTarget, anchor: .top)
                         }
                     }
@@ -333,7 +333,7 @@ struct ChangeFileView: View {
         reader.scrollTo(edit.id, anchor: .top)
         outlined = edit.id
         try? await Task.sleep(for: .seconds(1.6))
-        withAnimation(.easeOut(duration: 0.3)) { outlined = nil }
+        withAnimation(ResponseMotion.response) { outlined = nil }
     }
 
     private func changedLines(_ detail: ChangedFileDetail) -> Int {

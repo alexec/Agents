@@ -280,7 +280,7 @@ struct RemoteChangeFileView: View {
                     }
                     .onChange(of: scrollTarget) {
                         guard let scrollTarget else { return }
-                        withAnimation(.easeOut(duration: 0.2)) {
+                        withAnimation(ResponseMotion.response) {
                             reader.scrollTo(scrollTarget, anchor: .top)
                         }
                     }

@@ -215,7 +215,7 @@ private struct LaterRows: View {
             }
             .appText(.supporting)
             .contentShape(Rectangle())
-            .onTapGesture { withAnimation(.snappy) { open.toggle() } }
+            .onTapGesture { withAnimation(ResponseMotion.snappy) { open.toggle() } }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Later, \(requests.count)")
             .accessibilityValue(open ? "unfolded" : "folded")

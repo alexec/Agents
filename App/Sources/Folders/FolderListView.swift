@@ -956,13 +956,13 @@ private struct DropboxDrop: ViewModifier {
 
     private func show(_ count: Int) {
         let said = "Put \(count == 1 ? "1 file" : "\(count) files") in \(folder.folder.lastPathComponent)\u{2019}s drop box"
-        withAnimation { note = said }
+        withAnimation(ResponseMotion.response) { note = said }
         AccessibilityNotification.Announcement(said).post()
         clearing?.cancel()
         clearing = Task {
             try? await Task.sleep(for: .seconds(4))
             guard !Task.isCancelled else { return }
-            withAnimation { note = nil }
+            withAnimation(ResponseMotion.response) { note = nil }
         }
     }
 }

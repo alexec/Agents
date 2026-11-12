@@ -73,11 +73,10 @@ struct LivePage: View {
     /// hundred a second.
     private static let typingTick: Duration = .milliseconds(40)
 
-    /// How long a mark stays before it starts to fade, and how long the fade takes.
+    /// How long a mark stays before it starts to fade (the fade is `ResponseMotion.response`).
     /// Long enough to be found by an eye that was elsewhere; short enough that a
     /// document written in twenty steps is not twenty tints deep.
     private static let markHold: Duration = .seconds(2)
-    private static let markFade: Double = 1.2
 
     var body: some View {
         GeometryReader { geometry in
@@ -247,7 +246,7 @@ struct LivePage: View {
                 RoundedRectangle(cornerRadius: 6)
                     .fill(.tint.opacity(isMarked ? 0.18 : 0))
             )
-            .animation(.easeOut(duration: Self.markFade), value: isMarked)
+            .animation(ResponseMotion.response, value: isMarked)
             .padding(.horizontal, metrics.padding - 8)
             .frame(maxWidth: .infinity)
     }
@@ -367,7 +366,7 @@ struct LivePage: View {
     /// beat `FileLines` takes, for the same reason.
     private func go(to index: Int, proxy: ScrollViewProxy) async {
         try? await Task.sleep(for: .milliseconds(50))
-        withAnimation(.easeOut(duration: 0.2)) {
+        withAnimation(ResponseMotion.response) {
             proxy.scrollTo(index, anchor: .center)
         }
     }

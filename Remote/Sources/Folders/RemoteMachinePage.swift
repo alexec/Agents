@@ -130,7 +130,7 @@ struct RemoteMachinePage: View {
     /// To the Resources sections, once, when a chat's lease line opened the page (#4027).
     private func scrollToResources(_ proxy: ScrollViewProxy) {
         guard host == .mac, model.resourcesAsked, model.work.leases != nil else { return }
-        withAnimation { proxy.scrollTo(ResourcesSections.top, anchor: .top) }
+        withAnimation(ResponseMotion.response) { proxy.scrollTo(ResourcesSections.top, anchor: .top) }
         model.resourcesAsked = false
     }
 

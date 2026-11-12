@@ -113,8 +113,8 @@ struct PromptBar: View {
         // at every width, as on the Mac (FR-020, FR-021).
         .chatColumn()
         .padding(.vertical, 12)
-        .animation(.easeOut(duration: 0.15), value: isCompleting)
-        .animation(.easeOut(duration: 0.15), value: isMentioning)
+        .animation(ResponseMotion.response, value: isCompleting)
+        .animation(ResponseMotion.response, value: isMentioning)
         .onAppear { restoreDraft() }
         .onChange(of: agent.id) { restoreDraft() }
         // Voice mode listens with its own dictation: this bar's stops, so the same words do
