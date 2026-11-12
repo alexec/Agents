@@ -43,7 +43,7 @@ func TestLineageForecastOfAnEpic(t *testing.T) {
 	epic := wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#10"}
 	key, _ := json.Marshal([]any{"forge/plan", epic.Ref})
 	d.forgeRemember(string(key), forgeAnswer{plan: &forgePlanAnswer{
-		epic: wire.ForgeItem{Node: epic, State: "open", Labels: []wire.ForgeLabel{{Name: "epic"}}},
+		epic:     wire.ForgeItem{Node: epic, State: "open", Labels: []wire.ForgeLabel{{Name: "epic"}}},
 		children: []planChild{{item: wire.ForgeItem{Node: wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#11"}, State: "open"}}}}})
 	var f wire.LineageForecast
 	if err := json.Unmarshal(c.call(t, 1, "lineage/forecast", wire.LineageForecastRequest{Node: &epic}), &f); err != nil {

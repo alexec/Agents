@@ -366,6 +366,7 @@ var CallSummariesRead = Method[SummaryReadRequest, SummaryPageText]{"summaries/r
 var CallSurfaceIdentify = Method[SurfaceIdentification, Empty]{"surface/identify"}
 var CallTimeHistory = Method[Empty, TimeHistory]{"time/history"}
 var CallUsageHistory = Method[Empty, UsageHistory]{"usage/history"}
+var CallVelocityHistory = Method[Empty, VelocityHistory]{"velocity/history"}
 var CallViewsCall = Method[ViewCallRequest, JSONValue]{"views/call"}
 var CallViewsContext = Method[ViewContextRequest, Empty]{"views/context"}
 var CallViewsLog = Method[ViewLogRequest, Empty]{"views/log"}

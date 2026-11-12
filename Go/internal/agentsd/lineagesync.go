@@ -101,7 +101,9 @@ func lineageSyncKey(l wire.LineageLink) string {
 		strconv.FormatFloat(float64(l.At), 'g', -1, 64)
 }
 
-func (d *Daemon) lineageSyncPath() string { return filepath.Join(d.Store.Loc.Root, "lineage-sync.json") }
+func (d *Daemon) lineageSyncPath() string {
+	return filepath.Join(d.Store.Loc.Root, "lineage-sync.json")
+}
 
 // syncLocked is the file, read on first use. None, or one that cannot be read, is a whole
 // send to make.

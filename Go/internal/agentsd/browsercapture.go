@@ -6,7 +6,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-
 )
 
 // capture_secret (#4028): agentsd reads a value the page shows once (an app password, an

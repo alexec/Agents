@@ -181,10 +181,10 @@ func TestLineageWalkResolvesOffTheRequestPath(t *testing.T) {
 
 func TestNodeOfRepo(t *testing.T) {
 	for ref, kind := range map[string]string{
-		"github:alexec/agents#12":          "issue",
-		"github:alexec/agents#13":          "pr",
-		"gitlab:group/project#4":           "issue",
-		"gitlab:group/project!5":           "pr",
+		"github:alexec/agents#12": "issue",
+		"github:alexec/agents#13": "pr",
+		"gitlab:group/project#4":  "issue",
+		"gitlab:group/project!5":  "pr",
 	} {
 		repo, n, ok := nodeOfRepo(wire.LineageNode{Kind: kind, Ref: ref})
 		if !ok || n <= 0 || repo.forge == "" {

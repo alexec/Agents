@@ -106,11 +106,11 @@ func TestCapacityTargetTakesTheWorstSignal(t *testing.T) {
 // Linux's PSI text gives the pressure (#4578).
 func TestPSIPressure(t *testing.T) {
 	for text, want := range map[string]wire.MemoryPressure{
-		"some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n":  wire.MemoryPressureNormal,
-		"some avg10=12.50 avg60=3.00 avg300=1.00 total=9\nfull avg10=2.00 avg60=0.00 avg300=0.00 total=1\n": wire.MemoryPressureWarn,
+		"some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n":   wire.MemoryPressureNormal,
+		"some avg10=12.50 avg60=3.00 avg300=1.00 total=9\nfull avg10=2.00 avg60=0.00 avg300=0.00 total=1\n":  wire.MemoryPressureWarn,
 		"some avg10=40.00 avg60=3.00 avg300=1.00 total=9\nfull avg10=10.00 avg60=0.00 avg300=0.00 total=1\n": wire.MemoryPressureCritical,
-		"some avg10=11.00 avg60=0.00 avg300=0.00 total=0\n": wire.MemoryPressureWarn,
-		"":         "",
+		"some avg10=11.00 avg60=0.00 avg300=0.00 total=0\n":                                                  wire.MemoryPressureWarn,
+		"":          "",
 		"garbage\n": "",
 	} {
 		if got := psiPressure(text); got != want {
