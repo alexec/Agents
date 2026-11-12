@@ -44,6 +44,9 @@ Two kinds, so the PR is safe to merge at any time:
 
 1. **Owner from the repo, not a literal (safe now):**
    - `.github/workflows/release.yml`: `IMAGE: ghcr.io/${{ github.repository_owner }}/agents-control`.
+     The agents' bot cannot push a workflow file (#4291), so this one goes on its own PR,
+     pushed as `alexec` with Alex's yes. It must land before the first release after the
+     transfer: an organisation's release cannot push to the user's package.
    - `scripts/release-secrets.sh`: `RELEASE_REPO` defaults to the `origin` remote's repo.
    - `.agents/skills/release/scripts/advisory.py`: the repo from `gh repo view`.
    - `scripts/docs-check.py`: the private-repo link check (#1064) also matches `agentloops-dev/Agents`.
