@@ -24,7 +24,7 @@ func TestDeclaringAResource(t *testing.T) {
 	if len(snap.Resources) != 4 || snap.Resources[0].Name != "screen" || snap.Resources[0].DisplayName != "Screen, mouse and keyboard" ||
 		snap.Resources[1].Name != "browser:agents" || snap.Resources[1].Kind != "browser" ||
 		!strings.HasPrefix(string(snap.Resources[2].Name), "person:") ||
-		snap.Resources[3].Name != "capacity" || snap.Resources[3].DisplayName != "Capacity of this Mac" {
+		snap.Resources[3].Name != "capacity" || snap.Resources[3].DisplayName != capacityDisplay() {
 		t.Fatalf("%+v", snap)
 	}
 	two := int64(2)

@@ -38,25 +38,25 @@ func TestComputeLeasesFollowTheMachine(t *testing.T) {
 	// ok, on a machine with no declared resources: capacity is granted, and list_resources
 	// says what it is for.
 	look(quiet)
-	if text, _ := me.tool(2, "lease_resource", map[string]any{"name": "capacity", "minutes": 10}); !strings.HasPrefix(text, "You hold Capacity of this Mac until ") {
+	if text, _ := me.tool(2, "lease_resource", map[string]any{"name": "capacity", "minutes": 10}); !strings.HasPrefix(text, "You hold "+capacityDisplay()+" until ") {
 		t.Fatal(text)
 	}
-	if text, _ := me.tool(3, "list_resources", nil); !strings.Contains(text, "- capacity — Capacity of this Mac: lease it before heavy work") ||
-		!strings.Contains(text, "granted now: this Mac has capacity; you hold it until ") {
+	if text, _ := me.tool(3, "list_resources", nil); !strings.Contains(text, "- capacity — "+capacityDisplay()+": lease it before heavy work") ||
+		!strings.Contains(text, "granted now: "+thisMachine()+" has capacity; you hold it until ") {
 		t.Fatal(text)
 	}
 
 	// near: a new grant of capacity or build goes in line with the reason, though places are free.
 	look(capacitySample{load1: 2.4})
 	inLine := ". You are 1st in line. You will get a lease.granted event when it is yours. End your turn, and you will be started again with it."
-	if text, _ := ma.tool(2, "lease_resource", map[string]any{"name": "capacity"}); text != "This Mac is near capacity (load 2.4 per core)"+inLine {
+	if text, _ := ma.tool(2, "lease_resource", map[string]any{"name": "capacity"}); text != sentenceMachine()+" is near capacity (load 2.4 per core)"+inLine {
 		t.Fatal(text)
 	}
-	if text, _ := mb.tool(2, "lease_resource", map[string]any{"name": "build"}); text != "This Mac is near capacity (load 2.4 per core)"+inLine {
+	if text, _ := mb.tool(2, "lease_resource", map[string]any{"name": "build"}); text != sentenceMachine()+" is near capacity (load 2.4 per core)"+inLine {
 		t.Fatal(text)
 	}
 	// The holder is not disturbed: it extends what it holds.
-	if text, _ := me.tool(4, "lease_resource", map[string]any{"name": "capacity", "minutes": 20}); !strings.HasPrefix(text, "You still hold Capacity of this Mac") {
+	if text, _ := me.tool(4, "lease_resource", map[string]any{"name": "capacity", "minutes": 20}); !strings.HasPrefix(text, "You still hold "+capacityDisplay()) {
 		t.Fatal(text)
 	}
 	// Not compute: the screen and the person's booking are granted at any level.
@@ -69,10 +69,10 @@ func TestComputeLeasesFollowTheMachine(t *testing.T) {
 
 	// full: a release does not hand capacity on.
 	look(capacitySample{load1: 3})
-	if text, _ := me.tool(7, "release_resource", map[string]any{"name": "capacity"}); text != "Released Capacity of this Mac." {
+	if text, _ := me.tool(7, "release_resource", map[string]any{"name": "capacity"}); text != "Released "+capacityDisplay()+"." {
 		t.Fatal(text)
 	}
-	if text, _ := me.tool(8, "lease_resource", map[string]any{"name": "build", "wait": false}); text != "This Mac is at capacity (load 3.0 per core). You are not in line." {
+	if text, _ := me.tool(8, "lease_resource", map[string]any{"name": "build", "wait": false}); text != sentenceMachine()+" is at capacity (load 3.0 per core). You are not in line." {
 		t.Fatal(text)
 	}
 
@@ -95,7 +95,7 @@ func TestComputeLeasesFollowTheMachine(t *testing.T) {
 		return false
 	})
 	// While the line is served, a new compute grant waits behind it.
-	if text, _ := me.tool(9, "lease_resource", map[string]any{"name": "capacity", "wait": false}); text != "This Mac has capacity again, and its line is served one agent every 15 seconds. You are not in line." {
+	if text, _ := me.tool(9, "lease_resource", map[string]any{"name": "capacity", "wait": false}); text != sentenceMachine()+" has capacity again, and its line is served one agent every 15 seconds. You are not in line." {
 		t.Fatal(text)
 	}
 	look(quiet)
@@ -104,7 +104,7 @@ func TestComputeLeasesFollowTheMachine(t *testing.T) {
 	}
 	// The line is empty: the next look ends the serving, and grants are at once again.
 	look(quiet)
-	if text, _ := me.tool(10, "lease_resource", map[string]any{"name": "capacity"}); !strings.HasPrefix(text, "You hold Capacity of this Mac until ") {
+	if text, _ := me.tool(10, "lease_resource", map[string]any{"name": "capacity"}); !strings.HasPrefix(text, "You hold "+capacityDisplay()+" until ") {
 		t.Fatal(text)
 	}
 }
