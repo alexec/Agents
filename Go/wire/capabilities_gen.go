@@ -155,6 +155,7 @@ const CapProjectsBoards1 = "projects.boards/1"
 const CapProjectsSessions1 = "projects.sessions/1"
 const CapProjects1 = "projects/1"
 const CapProvidersCarry1 = "providers.carry/1"
+const CapProvidersCarry2 = "providers.carry/2"
 const CapProviders1 = "providers/1"
 const CapProviders2 = "providers/2"
 const CapReadapi1 = "readapi/1"
@@ -492,7 +493,7 @@ var HostCapabilities = pairs([][2]string{
 	{"providers/carry", "providers.carry/1"},
 	{"providers/forget", "providers.carry/1"},
 	{"providers/keepSecrets", "providers.carry/1"},
-	{"providers/ssh", "providers.carry/1"},
+	{"providers/ssh", "providers.carry/2"},
 	{"relay/grant", "relay/1"},
 	{"relay/offer", "relay/1"},
 	{"reports/features", "features/1"},

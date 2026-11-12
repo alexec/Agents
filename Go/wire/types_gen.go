@@ -10707,7 +10707,7 @@ type ProviderRuntimes struct {
 	Why *string `json:"why,omitzero"`
 }
 
-// providers/ssh (#3398): the machine that carries a codespaces provider starts a codespace's agentsd over ssh (`start`), reads its host key (`hostKey`), or installs Agents in it with a host code from the control plane (`install`, #3497), with the token it keeps. Its result is ProviderSSHResult.
+// providers/ssh (#3398): the machine that carries a codespaces provider starts a codespace's agentsd over ssh (`start`), reads its host key (`hostKey`), installs Agents in it with a host code from the control plane (`install`, #3497), or holds an ssh session to it that GitHub counts as use while its machine works (`keepAwake`, renewed each few minutes, and `letSleep`, #4637), with the token it keeps. Its result is ProviderSSHResult.
 type ProviderSSH struct {
 	Provider ProviderID `json:"provider"`
 
