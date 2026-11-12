@@ -1033,6 +1033,8 @@ button.remove:hover { opacity: 1; }
 .popover.right { right: 0; left: auto; min-width: 160px; display: flex; flex-direction: column; }
 .popover [role^=menuitem] { text-align: left; background: none; border: none; padding: 6px 10px; border-radius: var(--radius-control); }
 .popover [role^=menuitem]:hover { background: var(--paper-wash); }
+/* An item's single key at its end (#4796), grey, as the window's menus draw one. */
+.popover [role^=menuitem] .menu-key { float: right; margin-left: 16px; font: inherit; font-size: 0.6875rem; opacity: 0.6; }
 .queued-actions { display: flex; align-items: center; gap: 10px; font-size: 0.75rem; }
 /* A new session: the folder's name and folder in the middle, the bar at the foot (#108). */
 .new-heading { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 20px; text-align: center; }

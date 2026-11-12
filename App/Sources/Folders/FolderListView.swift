@@ -423,6 +423,12 @@ struct FolderListView: View {
         .onDeleteCommand { archivePicked() }
         // Return renames the one session highlighted, as Finder renames a file (#751).
         .onKeyPress(.return, action: renamePicked)
+        // Single keys while the list has the keyboard (#4796), as Linear's: j and k, e, l and r.
+        // The search field and a title being renamed keep their letters.
+        .onKeyPress(characters: CharacterSet(charactersIn: ListKey.characters), phases: .down) { press in
+            guard let key = ListKey(typed: press.characters, modified: !press.modifiers.isEmpty) else { return .ignored }
+            return listKey(key)
+        }
         .onChange(of: picked) { _, picks in applyPicked(picks) }
         .onChange(of: selection, initial: true) { _, item in applySelection(item) }
         .onChange(of: requests.wantsSessionSearchFocus) { _, wants in
@@ -542,6 +548,36 @@ struct FolderListView: View {
         guard model.renaming == nil, picked.count == 1, case .session(let id)? = picked.first,
               let agent = model.work.agent(id), agent.state != .archived else { return .ignored }
         model.renaming = Renaming(id: id)
+        return .handled
+    }
+
+    /// The one session highlighted, or open when nothing is highlighted.
+    private var pickedSession: UUID? {
+        if picked.count == 1, case .session(let id)? = picked.first { return id }
+        if picked.isEmpty, case .session(let id)? = selection { return id }
+        return nil
+    }
+
+    /// j and k through the open folder's sessions, as ⌥⌘↓ and ⌥⌘↑ go; e archives the session
+    /// and opens the next; l puts its request in Later; r renames it (#4796).
+    private func listKey(_ key: ListKey) -> KeyPress.Result {
+        guard model.renaming == nil else { return .ignored }
+        let current = pickedSession
+        let order = model.sessionsInFront
+        switch key {
+        case .next, .previous:
+            if let id = ListKey.step(from: current, in: order, forward: key == .next) { model.openAgent(id) }
+        case .archive:
+            guard picked.count <= 1, let current, model.work.agent(current)?.state != .archived else { return .ignored }
+            let next = ListKey.after(archiving: current, in: order)
+            if let next { model.openAgent(next) }
+            Task { await model.archive(current, andLeave: next == nil) }
+        case .later:
+            guard let current, let request = model.work.laterRequest(askedBy: current) else { return .ignored }
+            Task { await model.deferRequest(request, ListKey.laterTime.params(id: request.id)) }
+        case .rename:
+            return renamePicked()
+        }
         return .handled
     }
 

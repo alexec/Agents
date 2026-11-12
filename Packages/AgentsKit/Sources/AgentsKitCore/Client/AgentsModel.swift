@@ -1102,6 +1102,12 @@ public final class AgentsModel {
         }
     }
 
+    /// The request that the list's l puts in Later (#4796): the oldest that the session asked
+    /// and that is not in Later already; nil when it asked none.
+    public func laterRequest(askedBy id: UUID) -> NeedRequest? {
+        requests.filter { $0.askedBy == id && !$0.isDeferred }.min { $0.askedAt < $1.askedAt }
+    }
+
     /// The open requests of a terminal's `agents-secret NAME` (#4179): no session asked them,
     /// so no folder lists them; Needs You lists them with the rest. Not the deferred ones.
     public var terminalRequests: [NeedRequest] { requests.filter { $0.isTerminal && !$0.isDeferred } }

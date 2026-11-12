@@ -35,8 +35,22 @@ enum RemoteCommandMenu {
             }
             actions.append(Action("Open File…", key: Keys.openFile) { model.chatAsk = .openFile })
             actions.append(Action("Prompts", key: Keys.prompts) { model.chatAsk = .prompts })
-            actions.append(Action("Rename Session…") { model.askToRename(agent) })
-            actions.append(Action("Archive Session") { Task { await model.archive(agent.id) } })
+            // With the list's keys (#4796), which work while the sidebar has the keyboard.
+            actions.append(Action("Rename Session…", listKey: .rename) { model.askToRename(agent) })
+            actions.append(Action("Archive Session", listKey: .archive) { Task { await model.archive(agent.id) } })
+            if let request = model.work.laterRequest(askedBy: agent.id) {
+                actions.append(Action(ListKey.laterWord, listKey: .later, keywords: ["Needs you"]) {
+                    Task { await model.deferRequest(request, ListKey.laterTime) }
+                })
+            }
+        }
+        // Through the open folder's sessions, as j and k go (#4796).
+        let order = model.sessionsInFront
+        if let next = ListKey.step(from: model.selectedAgent?.id, in: order, forward: true) {
+            actions.append(Action("Next Session", listKey: .next) { model.sidebarItem = .session(next) })
+        }
+        if let previous = ListKey.step(from: model.selectedAgent?.id, in: order, forward: false) {
+            actions.append(Action("Previous Session", listKey: .previous) { model.sidebarItem = .session(previous) })
         }
         if let openTerminal {
             actions.append(Action("Folder Terminal", key: Keys.terminal, perform: openTerminal))

@@ -13,6 +13,8 @@ export interface MenuItem {
   heading?: boolean;
   /** A tick before the label, for a choice that is on now. */
   checked?: boolean;
+  /** Its single key at the item's end (#4796), `E`: the list's key, which also picks it while the menu is open. */
+  shortcut?: string;
   run: () => void;
 }
 
@@ -143,6 +145,11 @@ export function ContextMenu() {
     if (e.key === "Escape" || e.key === "Tab") { e.preventDefault(); close(); }
     else if (e.key === "ArrowDown") { e.preventDefault(); items[(at + 1) % items.length]?.focus(); }
     else if (e.key === "ArrowUp") { e.preventDefault(); items[(at - 1 + items.length) % items.length]?.focus(); }
+    else if (!e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+      // An item's own key picks it, as a menu's key does on the Mac (#4796).
+      const keyed = shown?.items.find((item) => !item.heading && !item.disabled && item.shortcut?.toLowerCase() === e.key);
+      if (keyed) { e.preventDefault(); close(); keyed.run(); }
+    }
   };
   return (
     <div class="popover context-menu" role="menu" ref={menu} style={{ left: `${left}px`, top: `${top}px` }} onKeyDown={keys}>
@@ -151,8 +158,14 @@ export function ContextMenu() {
         : (
           <button key={item.label} role={item.checked === undefined ? "menuitem" : "menuitemcheckbox"} aria-checked={item.checked}
             title={item.help} disabled={item.disabled} onClick={() => { close(); item.run(); }}>
-            {item.checked !== undefined && <span class="tick" aria-hidden="true">{item.checked ? "✓" : ""}</span>}{item.label}</button>
+            {item.checked !== undefined && <span class="tick" aria-hidden="true">{item.checked ? "✓" : ""}</span>}{item.label}
+            {item.shortcut && <MenuKey keys={item.shortcut} />}</button>
         ))}
     </div>
   );
+}
+
+/** A menu item's key at its end (#4796), as the window's menus draw one; read out as "Shortcut E". */
+export function MenuKey({ keys }: { keys: string }) {
+  return <kbd class="menu-key" aria-label={`Shortcut ${keys}`}>{keys}</kbd>;
 }

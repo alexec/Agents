@@ -16,7 +16,7 @@ import { healthTally, folderServers } from "../model/hostedMCP";
 import { signal, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { ComponentChildren } from "preact";
-import { byBack } from "../model/later";
+import { byBack, laterWords } from "../model/later";
 import { nonePage } from "./SummaryPage";
 import { FolderSettingsModal, ProjectSettingsModal } from "./ProjectSettings";
 import { projectSettingsWords } from "../model/projectSettings";
@@ -66,6 +66,8 @@ import { LockJoins } from "./LockJoins";
 import { approvalID, failedRuns, opensItsSubject } from "../model/approvals";
 import { memo } from "../render/memo";
 import { ask } from "./MessageKinds";
+import { laterRequestOf, useListKeys } from "./ListKeys";
+import { laterTime, listKeyGlyph } from "../model/listKeys";
 
 
 /** Folder Settings asked for another folder of the project, from Project Settings' Folders (#3280). */
@@ -155,6 +157,8 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
   // field and not a pass over every folder (#176, #193).
   const searched = useSignal("");
   const r = route.value;
+  // j and k, e, l and r, while no field has the keys (#4796).
+  useListKeys(store);
   // After a pause in the typing: the folds filter what is held, and the archived sessions that
   // match are the hosts' to find, a capped page each (#165).
   useEffect(() => {
@@ -1060,10 +1064,12 @@ export const SidebarSession = memo(function SidebarSession({ store, host, folder
     // Beside this tab or in a window of its own (#826), as the Mac's Open in New Window.
     { label: "Open in New Tab", help: "Open this session in a new browser tab", run: () => openInNewTab(host, agent) },
     ...sessionActions(agent, store.sessionPinsIn(host, folder).includes(agent.id), startedBy(store, host, agent),
-      store.has(host, Capability.mute1), canMoveOn(store, host)).map(({ action, label: words, help }) => ({
-      label: words, help, disabled: down || !!store.onItsWay.value[agent.id],
+      store.has(host, Capability.mute1), canMoveOn(store, host)).map(({ action, label: words, help, shortcut }) => ({
+      label: words, help, disabled: down || !!store.onItsWay.value[agent.id], ...shortcut ? { shortcut } : {},
       run: () => runSessionAction(store, host, agent, action),
     })),
+    // A question it asked, out of Needs You for an hour, as l does (#4796).
+    ...laterItem(store, host, agent, down),
     // Its record and transcript as a .tar.gz (#1001), as the window's Export….
     ...(store.has(host, Capability.agentsExport1) ? [
       { label: "Export…", help: "Download this session as a .tar.gz", disabled: down || !!store.exportImport.value,
@@ -1112,6 +1118,13 @@ export const SidebarSession = memo(function SidebarSession({ store, host, folder
     </>
   );
 });
+
+/** Later on the request a session asked (#4796), in its row's menu, with l; none when it asked none. */
+function laterItem(store: Store, host: string, agent: Agent, down: boolean): MenuItem[] {
+  const request = agent.state === "archived" ? undefined : laterRequestOf(store, host, agent);
+  return request ? [{ label: laterWords[laterTime], help: "Out of Needs You until then", shortcut: listKeyGlyph.later,
+    disabled: down, run: () => void store.deferRequest(host, request.id, laterTime) }] : [];
+}
 
 /** Where files dropped on the row above went (#934), for a moment; read out as it comes. */
 function DropNote({ note }: { note: string | null }) {

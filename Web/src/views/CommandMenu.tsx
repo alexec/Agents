@@ -20,10 +20,18 @@ import {
 } from "../model/commandMenu";
 import { orderedFolders } from "./Sidebar";
 import { archiveAndLeave, runSessionAction } from "./SessionMenu";
+import { laterRequestOf } from "./ListKeys";
+import { laterTime, listKeyGlyph } from "../model/listKeys";
+import { laterWords } from "../model/later";
 
 /** A key press as the page's own handlers take it, so an action does what its shortcut does. */
 function press(key: string, apple: boolean) {
   document.dispatchEvent(new KeyboardEvent("keydown", { key, metaKey: apple, ctrlKey: !apple, bubbles: true, cancelable: true }));
+}
+
+/** A key with no modifier, as the list's keys take it (#4796). */
+function pressBare(key: string) {
+  dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
 }
 
 /** The words of a section's `g` key: `G then S`. */
@@ -71,15 +79,23 @@ export function commandItems(store: Store, apple: boolean): { items: CommandItem
     const host = r.host;
     const busy = !!store.onItsWay.value[agent.id];
     const live = agent.state !== "archived";
-    if (live && !busy) add("Archive Session", () => archiveAndLeave(store, host, agent));
+    // With the list's keys (#4796), which work on the page while no field has the keys.
+    if (live && !busy) add("Archive Session", () => archiveAndLeave(store, host, agent), listKeyGlyph.archive);
     if (!live && !busy) add("Unarchive Session", () => runSessionAction(store, host, agent, "agents/unarchive"));
     if (canStop(agent) && !busy) add("Stop Session", () => runSessionAction(store, host, agent, "agents/stop"));
-    if (live) add("Rename Session…", () => runSessionAction(store, host, agent, "rename", true));
+    if (live) add("Rename Session…", () => runSessionAction(store, host, agent, "rename", true), listKeyGlyph.rename);
+    const request = live ? laterRequestOf(store, host, agent) : undefined;
+    if (request) add(laterWords[laterTime], () => void store.deferRequest(host, request.id, laterTime), listKeyGlyph.later, ["Needs You"]);
     if (live) add("Branch Session", () => runSessionAction(store, host, agent, "fork"));
     const pinned = store.sessionPinsIn(host, folderPath(agent)).includes(agent.id);
     if (live) add(pinned ? "Unpin Session" : "Pin Session", () => runSessionAction(store, host, agent, pinned ? "unpin" : "pin"));
     if (store.has(host, Capability.agentsFind1)) add("Find in Chat", () => press("f", apple), commandKey("f", apple));
     add("Open File…", () => press("p", apple), commandKey("p", apple));
+  }
+  // Through the sidebar's sessions, as j and k go (#4796), on the page that draws it.
+  if (document.querySelector("nav.sidebar .row.session")) {
+    add("Next Session", () => pressBare("j"), listKeyGlyph.next);
+    add("Previous Session", () => pressBare("k"), listKeyGlyph.previous);
   }
   if (store.archiveUndo.value) add("Undo Archive", () => void store.undoArchive(), commandKey("z", apple));
   // The same for Unarchive, Rename, the labels, Mute and Later (#4793).
