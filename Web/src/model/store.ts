@@ -21,7 +21,7 @@ import type {
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ConnectAnotherRequest, ConnectReport, ControlPerson, DailySummarySettings, SummaryPage, SummaryPageText, DesktopControlSettings, DriveApproval, WakeSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
   PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, BudgetRequest, RemoveRequest, ClientPermissionSettings, PRCostComment,
   Connection, LineageNode, LineageSessionIssue, MoveNotification, MoveToMachineAnswer, ProblemReport, ProblemReportRequest, Request as PersonRequest, RequestSecretUse, LockDelivery, RequestUpdate, ProviderID, StartedMachinePreview, FoldersFindRequest, FoundFolder,
-  OutsideAccount, OutsideAccounts, PlaneMoveAsk, PlaneMoveReport, UserSecretRow, WebRemoteStatus, WireDate } from "../protocol/generated";
+  OutsideAccount, OutsideAccounts, AgentChanges, ListRevision, PlaneMoveAsk, PlaneMoveReport, UserSecretRow, WebRemoteStatus, WireDate } from "../protocol/generated";
 import { endedConnections, endedLine, hasEnded } from "./connectorSetup";
 import { parseQuery } from "./labels";
 import { Failure } from "../protocol/generated";
@@ -655,6 +655,13 @@ export class Work {
   private leadAsk: TranscriptEntry | null = null;
   /** What was heard while a page is on its way, to lay over it; null when none is (#214). */
   protected heardSincePage: TranscriptEntry[] | null = [];
+  /**
+   * How many entries the open chat's host had when it last gave a page of it (#4794): every entry
+   * from here on was written after, so a reconnect asks `from` here. Null when no page is held.
+   */
+  protected transcriptEnd: number | null = null;
+  /** Each host's point in its order of changes, as its last catch-up said (#4794). */
+  protected readonly listPoints = new Map<string, ListRevision>();
 
   /** One notification from one host. Returns false for one this does not know. */
   apply(method: string, params: unknown, host: string): boolean {
@@ -908,6 +915,70 @@ export class Work {
   }
 
   /**
+   * What changed on a host since the point held (#4794), in place of its whole list: each changed
+   * record laid on, each removed one let go, and the new point kept. An archived one not held stays
+   * out, as `agent/changed` of one does. What this device's copy drew is the host's now.
+   */
+  takeChanges(changed: Agent[], changes: AgentChanges, host: string): void {
+    const held = new Map((this.agents.value[host] ?? []).map((a) => [a.id, a]));
+    const gone = new Set(changes.removed);
+    const touched: string[] = [];
+    for (const agent of changed) {
+      const was = held.get(agent.id);
+      if (!was && agent.state === "archived") continue;
+      if (was) touched.push(agentFolderPath(was));
+      touched.push(agentFolderPath(agent));
+      held.set(agent.id, keepingLists(agent, was));
+    }
+    for (const id of gone) {
+      const was = held.get(id);
+      if (!was) continue;
+      touched.push(agentFolderPath(was));
+      held.delete(id);
+    }
+    batch(() => {
+      this.setAgents(host, newestFirst([...held.values()]), touched);
+      this.listPoints.set(host, { epoch: changes.epoch, revision: changes.revision });
+      this.answered(host);
+    });
+  }
+
+  /** A host's catch-up said where its list is (#4794); none, from a host before it, asks for all next time. */
+  notePoint(changes: AgentChanges | undefined, host: string): void {
+    if (changes) this.listPoints.set(host, { epoch: changes.epoch, revision: changes.revision });
+    else this.listPoints.delete(host);
+  }
+
+  /** The open chat's host's count of entries at its last page (#4794): what the copy keeps as its end. */
+  chatEnd(): number | null {
+    return this.transcriptEnd;
+  }
+
+  /** Where a host's sessions held here are in its order of changes (#4794). */
+  listPoint(host: string): ListRevision | undefined {
+    return this.listPoints.get(host);
+  }
+
+  /**
+   * The entries written since the open chat's last page (#4794), asked `from` its end, laid after
+   * what is held with what was heard meanwhile. False, and nothing changed, when the page does not
+   * start where the held one ended: the chat then opens whole.
+   */
+  takeResumed(page: TranscriptPage): boolean {
+    const end = this.transcriptEnd;
+    if (end === null || page.firstIndex !== end || page.total < end) return false;
+    const entries = keepingLatestByID([...this.entries.value, ...page.entries, ...(this.heardSincePage ?? [])]);
+    this.heardSincePage = null;
+    this.transcriptEnd = page.total;
+    batch(() => {
+      this.transcriptLoadFailure.value = null;
+      this.transcriptSource.value = "host";
+      this.refold(entries);
+    });
+    return true;
+  }
+
+  /**
    * One folder's archived agents let go, when its Archived fold closes: the page holds the live
    * agents and a page of archived ones per open fold, no more (#170). The open session stays.
    */
@@ -1147,6 +1218,7 @@ export class Work {
   replaceTranscript(page: TranscriptPage, ask?: TranscriptEntry): void {
     const entries = keepingLatestByID([...page.entries, ...(this.heardSincePage ?? [])]);
     this.heardSincePage = null;
+    this.transcriptEnd = page.total;
     this.leadAsk = page.firstIndex > this.openTurnStart.value && ask && isAskEntry(ask) ? ask : null;
     batch(() => {
       this.firstEntryIndex.value = page.firstIndex;
@@ -1170,6 +1242,7 @@ export class Work {
       // Earlier pages wait for the host's answer.
       this.hasMoreBefore.value = false;
       this.transcriptSource.value = "device";
+      this.transcriptEnd = copy.page.total;
       // A load that failed before the copy was read said nothing was on show; now something is.
       if (this.transcriptLoadFailure.value?.nothingLoaded) this.transcriptLoadFailure.value = null;
       this.refold(keepingLatestByID([...copy.page.entries, ...this.entries.value]));
@@ -1185,7 +1258,11 @@ export class Work {
     batch(() => {
       this.takeHosts(machines.map((m) => m.host));
       this.folders.value = { ...this.folders.value, ...Object.fromEntries(machines.filter((m) => m.folders).map((m) => [m.host.id, m.folders!])) };
-      for (const m of machines) this.replaceAgents(m.agents, m.host.id);
+      for (const m of machines) {
+        this.replaceAgents(m.agents, m.host.id);
+        // The host's first catch-up asks only for what changed since the copy (#4794).
+        if (m.point) this.listPoints.set(m.host.id, m.point);
+      }
       this.fromDevice.value = new Set(machines.map((m) => m.host.id));
     });
   }
@@ -1212,6 +1289,7 @@ export class Work {
   private clearTranscript(): void {
     // A chat chosen is a page on its way.
     this.heardSincePage = [];
+    this.transcriptEnd = null;
     this.transcriptLoadFailure.value = null;
     this.transcriptSource.value = "none";
     this.firstEntryIndex.value = 0;
@@ -1956,6 +2034,7 @@ export class Store extends Work {
   /** A host removed: what was held of it goes with it, the runtimes included (#291). */
   private forgetHost(host: string): void {
     const prefix = `${host}|`;
+    this.listPoints.delete(host);
     pruneFolderKeys(host, []);
     const without = <T,>(held: Record<string, T>) => Object.fromEntries(Object.entries(held).filter(([key]) => key !== host));
     const notOf = <T,>(held: Record<string, T>) => Object.fromEntries(Object.entries(held).filter(([key]) => !key.startsWith(prefix)));
@@ -2022,11 +2101,7 @@ export class Store extends Work {
     };
     // Lean: the columns read none of the option and command lists, 4 MB of 200 agents (#107).
     // The open session's come with loadWhole.
-    const agents = await this.listLive(host).catch(failed("agents/list"));
-    if (agents) batch(() => {
-      this.replaceAgents(agents, host);
-      this.answered(host);
-    });
+    await this.listSessions(host).catch(failed("client/catchUp"));
     // The Archived folds that were open are listed again rather than left empty by the live list,
     // and the workflows on screen asked again: they may have changed meanwhile.
     const prefix = `${host}|`;
@@ -2140,6 +2215,36 @@ export class Store extends Work {
       if (permissions) this.permissions.value = { ...this.permissions.value,
         [host]: [...permissions].sort((a, b) => a.askedAt - b.askedAt) };
       if (elicitations) this.elicitations.value = { ...this.elicitations.value, [host]: elicitations };
+    });
+  }
+
+  /**
+   * A host's sessions (#4794): only what changed since the point held (the last catch-up's, or this
+   * device's copy's), by `client/catchUp`; all of them when the host cannot say what changed since
+   * then, and a page at a time from a host before `client/catchUp`.
+   */
+  private async listSessions(host: string): Promise<void> {
+    const point = this.listPoint(host);
+    const snapshot = !this.has(host, Capability.client1) ? null : await this.link.call("client/catchUp", {
+      agents: { includeArchived: false, archivedCommands: false, archivedOnly: false, lean: true, ...(point ? { changedSince: point } : {}) },
+      parts: [],
+    }, host).catch(() => null);
+    // A host before it, or one that does not answer it, lists as before, a page at a time.
+    if (!snapshot) {
+      const agents = await this.listLive(host);
+      batch(() => {
+        this.replaceAgents(agents, host);
+        this.notePoint(undefined, host);
+        this.answered(host);
+      });
+      return;
+    }
+    const changes = snapshot.agentChanges;
+    if (point && changes && !changes.all) return this.takeChanges(snapshot.agents, changes, host);
+    batch(() => {
+      this.replaceAgents(snapshot.agents, host);
+      this.notePoint(changes, host);
+      this.answered(host);
     });
   }
 
@@ -2403,6 +2508,9 @@ export class Store extends Work {
     if (now?.host === host && now.session === session) this.prefetchNeighbours(host, session);
   }
 
+  /** This device's copy of a chat (#4790), set by `startLocalCopy`: read before a chat with nothing held is asked for. */
+  readCopy: ((session: string) => Promise<TranscriptCopy | null | undefined>) | undefined;
+
   /** Chats fetched before they are opened (#4795): in memory only, the newest few, for a minute. */
   private prefetched = new Map<string, TranscriptCopy>();
   private prefetching = new Set<string>();
@@ -2488,6 +2596,23 @@ export class Store extends Work {
     this.heardSincePage = [];
     const load = ++this.transcriptLoads;
     const agentID = session as never;
+    const current = () => {
+      const now = this.watching.value;
+      return now?.host === host && now.session === session && load === this.transcriptLoads;
+    };
+    // Nothing held: this device's copy first, read from IndexedDB, so the chat can resume from it (#4794).
+    if (this.chatEnd() === null && this.readCopy) {
+      const copy = await this.readCopy(session).catch(() => undefined);
+      if (copy && current()) this.drawTranscriptCopy(copy);
+    }
+    // What was written since the end held (#4794), one page from it, in place of the whole opening;
+    // a page that leaves a gap, or no answer, opens it whole.
+    const end = this.chatEnd();
+    if (end !== null) {
+      const resumed = await this.link.call("agents/transcript", { agentID, limit: turnPage, from: end }, host).catch(() => null);
+      if (!current()) return false;
+      if (resumed && this.takeResumed(resumed)) return true;
+    }
     // The last 12, as the window opens a chat (#90); the rest come as the top is reached. A host
     // too old to keep turns gives the lot; any other failure is said, and the chat still opens (#400).
     const failed: { turns?: string; page?: string } = {};

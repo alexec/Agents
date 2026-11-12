@@ -4745,10 +4745,25 @@ final class AppModel {
             // Live only, a page at a time (#164, #165). Archived agents come a folder at a
             // time when its Archived fold opens, or by search; the ones already here (an
             // open fold, the chat being read) are kept, and the live copy wins.
-            let listed = try await self.client.listAgents(DaemonAPI.ListRequest(includeArchived: false, lean: true))
-            let live = Set(listed.map(\.id))
-            let archived = self.work.agents.filter { $0.host == .mac && $0.state == .archived && !live.contains($0.id) }
-            self.work.replaceAgents(listed + archived, from: .mac)
+            //
+            // Only what changed since the point held (#4794): the last catch-up's, or the copy's
+            // at launch. A host that cannot say what changed since then sends all, and a host
+            // that predates it sends no point, so the next one asks for all again.
+            let lean = DaemonAPI.ListRequest(includeArchived: false, lean: true)
+            var asked = lean
+            asked.changedSince = self.work.listPoint(of: .mac)
+            let snapshot = try await self.client.catchUp(.init(agents: asked))
+            if let changes = snapshot.agentChanges, !changes.all, asked.changedSince != nil {
+                self.work.takeChanges(snapshot.agents, changes, from: .mac)
+            } else {
+                // All of them: a full first page means more, a page at a time (#164).
+                let listed = lean.next(after: snapshot.agents) == nil ? snapshot.agents
+                    : try await self.client.listAgents(lean)
+                let live = Set(listed.map(\.id))
+                let archived = self.work.agents.filter { $0.host == .mac && $0.state == .archived && !live.contains($0.id) }
+                self.work.replaceAgents(listed + archived, from: .mac)
+                self.work.notePoint(snapshot.agentChanges, of: .mac)
+            }
             self.hasLoadedAgents = true
             self.weighGetStarted()
             Perf.sinceLaunch("first-list")
@@ -5331,8 +5346,10 @@ final class AppModel {
         let load = work.beginTranscriptLoad()
         // What was fetched for it under the pointer or beside the last one opened, at once
         // (#4795); else this device's copy of its end, while the host's page is on its way (#4791).
-        if localCopy?.drawPrefetched(of: selection, load: load) != true {
-            Task { [localCopy] in await localCopy?.drawOpening(of: selection, load: load) }
+        // Awaited when nothing of the chat is held, so a reconnect or a launch can resume from
+        // the copy's end (#4794): a read of one small file, not a wait on the host.
+        if localCopy?.drawPrefetched(of: selection, load: load) != true, work.transcriptEnd == nil {
+            await localCopy?.drawOpening(of: selection, load: load)
         }
         // Beside the transcript rather than before it: neither waits on the other.
         async let whole = loadWholeAgent(selection)
@@ -5344,6 +5361,19 @@ final class AppModel {
         var gone = false
         let loaded = await attempt(on: host, quietWhenDown: true) {
             let client = self.client(for: host)
+            // What was written since the end held (#4794), one page from it, in place of the
+            // whole opening; a page that leaves a gap, or no answer, opens it whole.
+            if let resumed = await self.work.resumeTranscript(load: load, transcript: { from, limit in
+                try await client.call(DaemonAPI.Method.agentsTranscript,
+                                      DaemonAPI.TranscriptRequest(agentID: selection, limit: limit, from: from),
+                                      returning: TranscriptPage.self)
+            }) {
+                if let started = self.chatOpening, started.agent == selection {
+                    self.chatOpening = nil
+                    Perf.endWhenDrawn(started.timing, "resumed, \(resumed.entries.count) entries")
+                }
+                return
+            }
             do {
                 // A few turns rather than a full page: a screen holds two or three, the
                 // rest come as the reader nears the top, and fifty replies were a quarter

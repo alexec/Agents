@@ -3465,7 +3465,11 @@ final class RemoteModel {
     private func refreshSnapshot(with parts: Set<CatchUpPart>) async -> DaemonAPI.CatchUpSnapshot? {
         let snapshot: DaemonAPI.CatchUpSnapshot
         do {
-            snapshot = try await client.catchUp(.init(parts: CatchUpPart.allCases.filter(parts.contains)))
+            // Only what changed since the point held (#4794): the last catch-up's, or the copy's
+            // at launch. A host that cannot say what changed since then sends the first page.
+            var asked = DaemonAPI.CatchUpRequest.firstPage
+            asked.changedSince = work.listPoint(of: .mac)
+            snapshot = try await client.catchUp(.init(agents: asked, parts: CatchUpPart.allCases.filter(parts.contains)))
         } catch {
             note("catch-up: the snapshot failed: \(error)")
             return nil
@@ -3473,7 +3477,15 @@ final class RemoteModel {
         work.replaceFolders(snapshot.folders, from: .mac)
         pruneFolderDefaults(of: .mac, listed: snapshot.folders)
         startHostMoved()
-        takeLiveAgents(snapshot.agents, page: DaemonAPI.CatchUpRequest.firstPage)
+        if let changes = snapshot.agentChanges, !changes.all {
+            work.takeChanges(snapshot.agents, changes, from: .mac)
+            // A first page's worth held means there may be more, a folder at a time.
+            let live = work.agents.lazy.filter { $0.host == .mac && $0.state != .archived }.count
+            moreLiveAgents = moreLiveAgents || live >= DaemonAPI.CatchUpRequest.firstPage.pageSize
+        } else {
+            takeLiveAgents(snapshot.agents, page: DaemonAPI.CatchUpRequest.firstPage)
+            work.notePoint(snapshot.agentChanges, of: .mac)
+        }
         work.replacePermissions(snapshot.permissions)
         work.replaceElicitations(snapshot.elicitations)
         work.replaceAttention(snapshot.attention)
@@ -4851,8 +4863,21 @@ final class RemoteModel {
         let load = work.beginTranscriptLoad()
         // What was fetched for it under the pointer or beside the last one opened, at once
         // (#4795); else this device's copy of its end, while the Mac's page is on its way (#4791).
-        if localCopy?.drawPrefetched(of: selection, load: load) != true {
-            Task { [localCopy] in await localCopy?.drawOpening(of: selection, load: load) }
+        // Awaited when nothing of the chat is held, so a reconnect or a launch can resume from
+        // the copy's end (#4794): a read of one small file, not a wait on the Mac.
+        if localCopy?.drawPrefetched(of: selection, load: load) != true, work.transcriptEnd == nil {
+            await localCopy?.drawOpening(of: selection, load: load)
+        }
+        // What was written since the end held (#4794), one page from it, in place of the whole
+        // opening; a page that leaves a gap, or no answer, opens it whole.
+        if await work.resumeTranscript(load: load, transcript: { from, limit in
+            let request = DaemonAPI.TranscriptRequest(agentID: selection, limit: limit, from: from)
+            return try await self.client(for: request).call(DaemonAPI.Method.agentsTranscript, request,
+                                                            returning: TranscriptPage.self)
+        }) != nil {
+            guard await whole.value, self.selection == selection else { return }
+            lookedForSelection = selection
+            return
         }
         let turnsRequest = DaemonAPI.TurnsRequest.opening(selection)
         let pageSize = firstPageSize
