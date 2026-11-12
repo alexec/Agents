@@ -50,6 +50,10 @@ type fakeForgeGitHub struct {
 	// bare is the repository MakeRepository gives as the clone address, and made the ones it made (#3708).
 	bare string
 	made []string
+	// public are the repositories MakePublicRepository was asked for, and private the ones
+	// there already that are private (#4921).
+	public  []string
+	private []string
 	// todos are what a list of the label alex-todo gives; bodies and states are ItemPage's
 	// body and state by number, when set (#3865).
 	todos  []githubmcp.Item

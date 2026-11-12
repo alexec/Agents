@@ -2,6 +2,7 @@ package agentsd
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,6 +22,24 @@ func (f *fakeForgeGitHub) MakeRepository(_ context.Context, owner, name, _ strin
 		owner = "alexec"
 	}
 	full := owner + "/" + name
+	made := !slices.Contains(f.made, full)
+	if made {
+		f.made = append(f.made, full)
+	}
+	return githubmcp.Repository{FullName: full, CloneURL: f.bare, Login: "alexec", UserID: 1142830}, made, nil
+}
+
+func (f *fakeForgeGitHub) MakePublicRepository(_ context.Context, owner, name, _ string, template bool) (githubmcp.Repository, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if owner == "" {
+		owner = "alexec"
+	}
+	full := owner + "/" + name
+	f.public = append(f.public, fmt.Sprintf("%s template=%v", full, template))
+	if slices.Contains(f.private, full) {
+		return githubmcp.Repository{FullName: full, CloneURL: f.bare, Private: true, Login: "alexec", UserID: 1142830}, false, nil
+	}
 	made := !slices.Contains(f.made, full)
 	if made {
 		f.made = append(f.made, full)
