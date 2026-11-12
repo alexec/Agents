@@ -165,3 +165,55 @@ struct RemoteMachineRow: View {
         }
     }
 }
+
+/// A machine New Machine made that has not joined yet (#4612), as the window's
+/// `MakingMachineRow` and the web page's (#4610): an amber, pulsing cloud and *Making…* while
+/// the control plane waits for it; red with the reason once it gave up, when the long press
+/// and a swipe left offer Delete, asked first. Nil while providers/create has not answered:
+/// a row at once, named once the provider names it.
+struct RemoteMakingMachineRow: View {
+    @Environment(RemoteModel.self) private var model
+    let making: MachineMaking?
+    @State private var deleting = false
+
+    var body: some View {
+        let name = making?.name ?? "New machine"
+        let line = making?.line ?? "Making…"
+        let gaveUp = making?.notJoined != nil
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            MachineIconView(symbol: "cloud", icon: gaveUp ? .failure : .busy)
+                .frame(width: 20)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name).lineLimit(1)
+                Text(line)
+                    .appText(.fine)
+                    .foregroundStyle(gaveUp ? StateTint.failure.style(or: .secondary) : AnyShapeStyle(.secondary))
+                    .lineLimit(3)
+            }
+            Spacer(minLength: 0)
+        }
+        .appText(.supporting)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(name)
+        .accessibilityValue(line)
+        // A full swipe never deletes: Delete asks first.
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            if gaveUp {
+                Button("Delete", systemImage: "trash") { deleting = true }.tint(StateTint.failure.color)
+            }
+        }
+        .contextMenu {
+            if gaveUp {
+                Button("Delete \(name)…", systemImage: "trash", role: .destructive) { deleting = true }
+            }
+        }
+        .confirmationDialog("Delete \(name)?", isPresented: $deleting, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                if let making { Task { await model.deleteWorkspace(making.provider, workspace: making.workspace) } }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(making?.deleteMessage ?? "")
+        }
+    }
+}

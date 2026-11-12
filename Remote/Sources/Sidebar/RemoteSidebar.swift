@@ -196,6 +196,14 @@ struct RemoteSidebar: View {
                         ForEach(model.machines, id: \.self) { host in
                             RemoteMachineRow(host: host).tag(SidebarItem.machine(host))
                         }
+                        // The machines New Machine is making, and the ones the control plane
+                        // gave up waiting for (#4612): a row each until a machine of the name joins.
+                        ForEach(0..<model.machinesBeingMade, id: \.self) { _ in
+                            RemoteMakingMachineRow(making: nil)
+                        }
+                        ForEach(model.machinesMaking) { making in
+                            RemoteMakingMachineRow(making: making)
+                        }
                         NewMachineRow()
                     } header: {
                         Text("Machines")

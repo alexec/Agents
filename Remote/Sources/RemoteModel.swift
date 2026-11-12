@@ -2634,6 +2634,32 @@ final class RemoteModel {
     /// A New Machine the provider could not make, with its reason, and Try Again.
     var makeFailed: MachineMakeFailure?
 
+    /// How many New Machine calls wait for the provider's answer (#4612, as the window's #4610):
+    /// a *Making…* row each, until the control plane lists the machine as joining.
+    private(set) var machinesBeingMade = 0
+
+    /// The machines New Machine made that have not joined (#4612): *Making…* while the control
+    /// plane waits for them, red with its reason once it gave up. A row each under Machines.
+    var machinesMaking: [MachineMaking] {
+        MachineMaking.rows(machineProviders, hostNames: Set(controlHosts.map(\.name)))
+    }
+
+    /// Delete on a machine the control plane gave up waiting for (#4612): the provider deletes
+    /// the workspace. Nothing was installed on it.
+    func deleteWorkspace(_ provider: ProviderID, workspace: String) async {
+        guard let control = controlPlane else {
+            problem = "The control plane isn’t answering, so the machine wasn’t deleted."
+            return
+        }
+        do {
+            _ = try await control.call(DaemonAPI.Method.providersDeleteWorkspace,
+                                       DaemonAPI.ProviderWorkspaceRequest(id: provider, workspace: workspace))
+        } catch {
+            problem = sentence(for: error)
+        }
+        await loadMachineProviders()
+    }
+
     /// Stop on a machine's row (#3973). Unconfirmed while agents work there, the control plane
     /// says who they are, and they are returned for the question; nil once it is stopping or refused.
     func stopHost(_ host: MachineRef, confirmed: Bool = false) async -> [String]? {
@@ -2691,6 +2717,8 @@ final class RemoteModel {
             problem = "The control plane isn’t answering, so no machine can be made."
             return
         }
+        machinesBeingMade += 1
+        defer { machinesBeingMade -= 1 }
         do {
             let made = try await control.call(DaemonAPI.Method.providersCreate, DaemonAPI.ProviderRequest(id: provider),
                                               returning: DaemonAPI.ProviderCreated.self)
