@@ -73,3 +73,4 @@ What agents learnt about this repo: its code, tools, process and decisions. One 
 - [Claude works after its prompt ends](claude-works-after-its-prompt-ends.md) — background command's end starts a cycle with no prompt; agentsd's unprompted turn (#4323)
 - [Browser screenshots land in the main checkout](browser-screenshots-land-in-the-main-checkout.md) — browser_take_screenshot writes only under ~/Agents; use your worktree's build/
 - [Lineage tests fail on Mac main](lineage-tests-fail-on-mac-main.md) — health/sessions/signin agentsd tests fail on main on the Mac; check on a main copy, let Linux CI prove them
+- [New names for each round of PR shots](pr-shots-need-new-names-each-round.md) — GitHub caches images by URL; a re-run of pr-shots.sh under the same names showed Alex old pictures (#4933)
