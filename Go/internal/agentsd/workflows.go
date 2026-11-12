@@ -1073,6 +1073,15 @@ func (d *Daemon) workflowSettingsChange(r wire.WorkflowSettingsRequest, byPerson
 				return "", err
 			}
 		}
+		if r.Hours != nil {
+			lines, err := hoursLines(*r.Hours)
+			if err != nil {
+				return "", err
+			}
+			if text, err = setHoursBlock(lines, text); err != nil {
+				return "", err
+			}
+		}
 		if r.Labels != nil {
 			if text, err = setFrontMatterList("labels", r.Labels, text); err != nil {
 				return "", err

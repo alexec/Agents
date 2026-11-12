@@ -14474,6 +14474,12 @@ export interface WorkflowSettingsRequest {
   workflowID: string;
   settings: WorkflowSettings;
   cooldown?: string;
+  /**
+   * The hours: to write (#4820): between:, days: and time-zone:. With no between: and no days: it
+   * takes hours: out, so the workflow may start at any time. Left out means left alone, as the
+   * cooldown is.
+   */
+  hours?: WorkflowHours;
   labels?: string[];
   whenDone?: string;
   continueWhenBack?: boolean;
@@ -16793,7 +16799,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkflowRequest: { required: ["folder", "workflowID"], optional: [] },
   WorkflowSchedule: { required: ["minutes", "hours", "startMinute", "endMinute", "days"], optional: [] },
   WorkflowSettings: { required: ["options", "labels"], optional: ["permissionMode", "runtimeID", "model", "effort", "permissionRequests", "sandbox"] },
-  WorkflowSettingsRequest: { required: ["folder", "workflowID", "settings"], optional: ["cooldown", "labels", "whenDone", "continueWhenBack", "runsOn"] },
+  WorkflowSettingsRequest: { required: ["folder", "workflowID", "settings"], optional: ["cooldown", "hours", "labels", "whenDone", "continueWhenBack", "runsOn"] },
   WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire", "queued"], optional: ["scope", "content", "overLimit", "totalLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "hearsFor", "readyMadeUpdatedAt", "newerReadyMade", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "hoursOpenAt", "offReason", "standingAgentID", "mcpTriggers"] },
   WorkflowWriteRequest: { required: ["workflowID", "content"], optional: [] },
   WorkflowsListRequest: { required: [], optional: ["folder", "scope"] },

@@ -15885,6 +15885,9 @@ type WorkflowSettingsRequest struct {
 
 	Cooldown *string `json:"cooldown,omitzero"`
 
+	// The hours: to write (#4820): between:, days: and time-zone:. With no between: and no days: it takes hours: out, so the workflow may start at any time. Left out means left alone, as the cooldown is.
+	Hours *WorkflowHours `json:"hours,omitzero"`
+
 	Labels []string `json:"labels,omitzero"`
 
 	WhenDone *string `json:"whenDone,omitzero"`

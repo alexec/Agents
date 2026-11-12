@@ -2209,9 +2209,10 @@ final class AppModel {
     /// matter it will not touch, a file it cannot write — has to reach them, or the
     /// app has silently kept a change it never made (FR-025).
     /// `cooldown` is the file's `cooldown:` to write (#103), empty to remove it; left
-    /// `nil`, the file's is left as it is.
+    /// `nil`, the file's is left as it is. `hours` is the file's `hours:` (#4820), one that
+    /// limits nothing to remove it; left `nil`, left alone.
     func setWorkflowSettings(_ summary: WorkflowSummary, _ settings: WorkflowSettings,
-                             cooldown: String? = nil, labels: [String]? = nil,
+                             cooldown: String? = nil, hours: WorkflowHours? = nil, labels: [String]? = nil,
                              runsOn: [String]? = nil, whenDone: String? = nil,
                              continueWhenBack: Bool? = nil) async {
         let host = selectedFolderHost
@@ -2220,7 +2221,7 @@ final class AppModel {
                 DaemonAPI.Method.workflowsSettings,
                 DaemonAPI.WorkflowSettingsRequest(folder: summary.folder,
                                                   workflowID: summary.workflowID,
-                                                  settings: settings, cooldown: cooldown,
+                                                  settings: settings, cooldown: cooldown, hours: hours,
                                                   labels: labels, runsOn: runsOn, whenDone: whenDone,
                                                   continueWhenBack: continueWhenBack),
                 returning: WorkflowSummary.self)

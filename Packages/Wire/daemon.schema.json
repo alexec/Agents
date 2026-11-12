@@ -35351,6 +35351,10 @@
         "cooldown": {
           "type": "string"
         },
+        "hours": {
+          "$ref": "#/definitions/WorkflowHours",
+          "description": "The hours: to write (#4820): between:, days: and time-zone:. With no between: and no days: it takes hours: out, so the workflow may start at any time. Left out means left alone, as the cooldown is."
+        },
         "labels": {
           "type": "array",
           "items": {
