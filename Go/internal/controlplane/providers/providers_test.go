@@ -116,6 +116,17 @@ func TestProvidersAreReadBackAfterARestart(t *testing.T) {
 	}
 }
 
+func TestALinkedHostsWorkspaceSaysItsProvidersIdleTimeout(t *testing.T) {
+	h := newHarness(t, func(o *harnessOptions) {
+		o.workspaces = []MachineInfo{{ID: "agents-devbox", Name: "agents-devbox", State: "stopped",
+			SSH: new("alex@127.0.0.1 -p 2222"), IdleTimeoutMinutes: new(int64(240))}}
+	})
+	h.link(h.add(), devbox, "agents-devbox")
+	if r := h.row(devbox); r.Workspace == nil || r.Workspace.IdleTimeoutMinutes == nil || *r.Workspace.IdleTimeoutMinutes != 240 {
+		t.Fatalf("%+v", r.Workspace)
+	}
+}
+
 func TestALinkedHostWhoseWorkspaceIsStoppedIsShownStopped(t *testing.T) {
 	h := newHarness(t)
 	h.link(h.add(), devbox, "agents-devbox")

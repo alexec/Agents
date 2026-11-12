@@ -78,6 +78,10 @@ func (w Workspace) JSON() map[string]any {
 	if w.Commands.Cost != nil {
 		o["cost"] = Fill(*w.Commands.Cost, w.Values, false)
 	}
+	// The provider's own idle timeout, as a codespace's list says it (#4803).
+	if n, err := strconv.Atoi(w.Values["idleTimeoutMinutes"]); err == nil && n > 0 {
+		o["idleTimeoutMinutes"] = n
+	}
 	return o
 }
 

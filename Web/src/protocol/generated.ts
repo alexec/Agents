@@ -6913,6 +6913,11 @@ export interface MachineInfo {
    */
   hostKeyRenews?: boolean;
   cost?: string;
+  /**
+   * The provider stops it by itself after this many minutes with no use, as GitHub stops a
+   * codespace (#4803): the machine's page says so.
+   */
+  idleTimeoutMinutes?: number;
   host?: MachineRef;
   /** Why the make failed, in the provider's words, when `state` is failed. */
   reason?: string;
@@ -7236,6 +7241,11 @@ export interface MachineWorkspace {
   startWhenUsed: boolean;
   stopWhenIdleMinutes?: number;
   cost?: string;
+  /**
+   * As its provider last listed it: the provider stops it after this many minutes with no use
+   * (#4803).
+   */
+  idleTimeoutMinutes?: number;
   current: boolean;
   startForSchedules?: boolean;
   tellsSchedule?: boolean;
@@ -15747,7 +15757,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineFolderSent: { required: [], optional: ["state", "folder", "facts", "pack", "read"] },
   MachineHello: { required: ["version", "platform", "machineID"], optional: ["host", "name", "implementation", "capabilities"] },
   MachineHelloAnswer: { required: [], optional: ["capabilities"] },
-  MachineInfo: { required: ["id", "name", "state"], optional: ["ssh", "tunnel", "hostKeyRenews", "cost", "host", "reason", "joining", "notJoined"] },
+  MachineInfo: { required: ["id", "name", "state"], optional: ["ssh", "tunnel", "hostKeyRenews", "cost", "idleTimeoutMinutes", "host", "reason", "joining", "notJoined"] },
   MachineInstall: { required: ["destination"], optional: ["name", "key", "trust", "tunnel", "provider", "workspace"] },
   MachineJoinAsk: { required: ["name", "platform", "publicKey"], optional: ["version", "machineID", "person"] },
   MachineJoinDecision: { required: ["result"], optional: ["host", "controlKey", "name"] },
@@ -15776,7 +15786,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineUsageState: { required: ["machine", "disks"], optional: [] },
   MachineUser: { required: ["user", "kind", "name", "labels"], optional: ["capReachedUntil", "bots"] },
   MachineUserSettings: { required: ["user", "settings", "secrets"], optional: ["waiting"] },
-  MachineWorkspace: { required: ["provider", "providerName", "workspace", "workspaceName", "workspaceState", "canStart", "canStop", "startWhenUsed", "current"], optional: ["hostState", "phase", "since", "problem", "stoppedBy", "stopWhenIdleMinutes", "cost", "startForSchedules", "tellsSchedule", "nextWorkflow", "nextWorkflowAt", "wakeAt"] },
+  MachineWorkspace: { required: ["provider", "providerName", "workspace", "workspaceName", "workspaceState", "canStart", "canStop", "startWhenUsed", "current"], optional: ["hostState", "phase", "since", "problem", "stoppedBy", "stopWhenIdleMinutes", "cost", "idleTimeoutMinutes", "startForSchedules", "tellsSchedule", "nextWorkflow", "nextWorkflowAt", "wakeAt"] },
   MachineWorkspaceCall: { required: ["agent", "method", "params"], optional: ["deliver"] },
   MachinesSummaryFacts: { required: ["machines"], optional: [] },
   ManagedMCPServer: { required: ["name", "registryName", "version", "run", "addedAt", "destination"], optional: ["byHand"] },

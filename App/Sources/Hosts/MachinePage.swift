@@ -290,6 +290,7 @@ private struct MachineLinkSections: View {
         if let problem = workspace.problem { lines.append(problem) }
         if row.state != "online", let wake = OfflineWords.wakeLine(workspace) { lines.append(wake) }
         if row.state == "online", let up = OfflineWords.staysUpLine(workspace) { lines.append(up) }
+        if let awake = OfflineWords.keptAwakeLine(workspace) { lines.append(awake) }
         let started = (workspace.startForSchedules ?? true) && workspace.tellsSchedule == true
         let scheduled = workspace.stopWhenIdleMinutes == nil || started ? 0 : model.work.folders.filter { $0.host == row.id }
             .flatMap { model.work.workflows(in: $0.folder.folder) }

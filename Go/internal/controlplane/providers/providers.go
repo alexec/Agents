@@ -2500,6 +2500,7 @@ func (p *Providers) overlay(record records.MachineRecord) *MachineWorkspace {
 	if found != nil {
 		ws.WorkspaceName = found.Name
 		ws.Cost = found.Cost
+		ws.IdleTimeoutMinutes = found.IdleTimeoutMinutes
 	}
 	if a != nil {
 		ws.Since = dateOf(a.since)

@@ -308,7 +308,7 @@ func codespacesAPI(o map[string]any) (Config, error) {
 	return newConfig(nil, &Listing{
 		Request: &Request{Method: "GET", URL: list, Headers: headers},
 		Shape: Shape{Items: "codespaces", Fields: map[string]string{"id": "name", "name": "display_name",
-			"state": "state", "ref": "git_status.ref"}},
+			"state": "state", "ref": "git_status.ref", "idleTimeoutMinutes": "idle_timeout_minutes"}},
 		Commands: Commands{
 			StartRequest: &Request{Method: "POST", URL: base + "/user/codespaces/${id}/start", Headers: headers},
 			StopRequest:  &Request{Method: "POST", URL: base + "/user/codespaces/${id}/stop", Headers: headers},

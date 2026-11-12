@@ -251,6 +251,9 @@ public extension DaemonAPI {
         /// Its ssh host key is made again at each start (#1701).
         public var hostKeyRenews: Bool?
         public var cost: String?
+        /// The provider stops it by itself after this many minutes with no use, as GitHub
+        /// stops a codespace (#4803).
+        public var idleTimeoutMinutes: Int?
         /// The host it is linked to, in `providers/list`.
         public var host: MachineRef?
         /// Why the make failed, in the provider's words, when `state` is failed (#3973).
@@ -263,8 +266,8 @@ public extension DaemonAPI {
         public var notJoined: String?
 
         public init(id: String, name: String, state: String, ssh: String? = nil, tunnel: Bool? = nil,
-                    hostKeyRenews: Bool? = nil, cost: String? = nil, host: MachineRef? = nil,
-                    joining: Bool? = nil, notJoined: String? = nil) {
+                    hostKeyRenews: Bool? = nil, cost: String? = nil, idleTimeoutMinutes: Int? = nil,
+                    host: MachineRef? = nil, joining: Bool? = nil, notJoined: String? = nil) {
             self.id = id
             self.name = name
             self.state = state
@@ -272,6 +275,7 @@ public extension DaemonAPI {
             self.tunnel = tunnel
             self.hostKeyRenews = hostKeyRenews
             self.cost = cost
+            self.idleTimeoutMinutes = idleTimeoutMinutes
             self.host = host
             self.joining = joining
             self.notJoined = notJoined
@@ -383,6 +387,9 @@ public extension DaemonAPI {
         public var startWhenUsed: Bool
         public var stopWhenIdleMinutes: Int?
         public var cost: String?
+        /// As its provider last listed it: the provider stops it after this many minutes
+        /// with no use (#4803).
+        public var idleTimeoutMinutes: Int?
         /// False when the provider's last list failed.
         public var current: Bool
         /// The Start for scheduled workflows switch (#1004 FR-009).
@@ -401,7 +408,7 @@ public extension DaemonAPI {
                     workspaceState: String, hostState: String? = nil, phase: String? = nil, since: Date? = nil,
                     problem: String? = nil, stoppedBy: String? = nil, canStart: Bool = false, canStop: Bool = false,
                     startWhenUsed: Bool = true, stopWhenIdleMinutes: Int? = nil, cost: String? = nil,
-                    current: Bool = true, startForSchedules: Bool? = nil, tellsSchedule: Bool? = nil,
+                    idleTimeoutMinutes: Int? = nil, current: Bool = true, startForSchedules: Bool? = nil, tellsSchedule: Bool? = nil,
                     nextWorkflow: String? = nil, nextWorkflowAt: Date? = nil, wakeAt: Date? = nil) {
             self.startForSchedules = startForSchedules
             self.tellsSchedule = tellsSchedule
@@ -423,6 +430,7 @@ public extension DaemonAPI {
             self.startWhenUsed = startWhenUsed
             self.stopWhenIdleMinutes = stopWhenIdleMinutes
             self.cost = cost
+            self.idleTimeoutMinutes = idleTimeoutMinutes
             self.current = current
         }
     }
