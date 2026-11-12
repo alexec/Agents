@@ -303,6 +303,12 @@ public enum DaemonAPI {
         /// The sending side, on this Mac's host, since the window reads no repository
         /// itself: the sheet's facts, the bundle and patch made, and one part of either.
         public static let foldersBringBack = "folders/bringBack"
+        /// Bring Back from ‹machine›… (#4640): this Mac's host brings the branches back
+        /// itself, through the control plane, and answers at once; `bringBack/changed` says
+        /// how it goes, and `folders/bringingBack` lists those under way for a window that
+        /// connects mid-way.
+        public static let foldersBringBackFrom = "folders/bringBackFrom"
+        public static let foldersBringingBack = "folders/bringingBack"
         public static let foldersSendFacts = "folders/sendFacts"
         public static let foldersSendPack = "folders/sendPack"
         public static let foldersSendRead = "folders/sendRead"
@@ -609,6 +615,9 @@ public enum DaemonAPI {
         /// A send went a part further, or ended either way (#4613). Carries
         /// `SendNotification`.
         public static let sendChanged = "send/changed"
+        /// A bring-back went a part further, or ended either way (#4640). Carries
+        /// `BringBackNotification`.
+        public static let bringBackChanged = "bringBack/changed"
         /// A write nobody was waiting on was refused: a line of a chat, an agent's record,
         /// the day's spend (#88). Carries `WriteFailure`; a window shows its message.
         /// Sent once in a while per cause, not once per write.
@@ -4476,6 +4485,65 @@ public extension DaemonAPI {
         public init(moved: [String], applied: Bool) {
             self.moved = moved
             self.applied = applied
+        }
+    }
+
+    /// `folders/bringBackFrom` (#4640): `branches` of the repository at `source` on `machine`
+    /// (the control plane's id; `machineName` is for the words), less the commits this Mac
+    /// has, and with `includeChanges` what is uncommitted there, into `folder` on this Mac.
+    struct BringBackFromRequest: Codable, Hashable, Sendable {
+        public var folder: URL
+        public var machine: String
+        public var machineName: String?
+        public var source: String
+        public var branches: [String]
+        public var includeChanges: Bool
+        public init(folder: URL, machine: String, machineName: String? = nil, source: String, branches: [String],
+                    includeChanges: Bool) {
+            self.folder = folder
+            self.machine = machine
+            self.machineName = machineName
+            self.source = source
+            self.branches = branches
+            self.includeChanges = includeChanges
+        }
+    }
+
+    /// One bring-back under way: the folder here, and the folder on the machine it comes from.
+    struct BringBackSummary: Codable, Hashable, Sendable, Identifiable {
+        public var id: UUID
+        public var folder: URL
+        public var machine: String
+        public var machineName: String
+        public var source: String
+        public var startedAt: Date
+        public init(id: UUID, folder: URL, machine: String, machineName: String, source: String, startedAt: Date) {
+            self.id = id
+            self.folder = folder
+            self.machine = machine
+            self.machineName = machineName
+            self.source = source
+            self.startedAt = startedAt
+        }
+    }
+
+    /// `bringBack/changed`: `read` of `total` bytes are here (0 of 0 while the bundle is made
+    /// there). Once `finished`, `result` is what it did, or `problem` says why not.
+    struct BringBackNotification: Codable, Hashable, Sendable {
+        public var bringBack: BringBackSummary
+        public var read: Int
+        public var total: Int
+        public var finished: Bool
+        public var problem: String?
+        public var result: BringBack?
+        public init(bringBack: BringBackSummary, read: Int = 0, total: Int = 0, finished: Bool = false,
+                    problem: String? = nil, result: BringBack? = nil) {
+            self.bringBack = bringBack
+            self.read = read
+            self.total = total
+            self.finished = finished
+            self.problem = problem
+            self.result = result
         }
     }
 

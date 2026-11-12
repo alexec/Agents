@@ -1868,6 +1868,21 @@
       }
     },
     {
+      "name": "bringBack/changed",
+      "x-capability": "bring.back/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BringBackNotification"
+          }
+        }
+      ],
+      "x-notification": true
+    },
+    {
       "name": "browser/ack",
       "x-capability": "browser/1",
       "tags": [
@@ -3963,6 +3978,49 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/BringBack"
+        }
+      }
+    },
+    {
+      "name": "folders/bringBackFrom",
+      "x-capability": "bring.back/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BringBackFromRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/BringBackSummary"
+        }
+      }
+    },
+    {
+      "name": "folders/bringingBack",
+      "x-capability": "bring.back/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "daemon.schema.json#/definitions/BringBackNotification"
+          }
         }
       }
     },
