@@ -107,6 +107,10 @@ services:
       # adds a line for each request).
       AGENTS_CONTROL_LOG_FORMAT: ${AGENTS_CONTROL_LOG_FORMAT:-text}
       AGENTS_CONTROL_LOG_LEVEL: ${AGENTS_CONTROL_LOG_LEVEL:-info}
+      # A copy of every log line in the data volume, rolled at 4 MB to control.previous.log
+      # (#174), as well as Docker's log (#4747): a redeploy recreates the container, and
+      # Docker's log goes with it. Empty writes no copy.
+      AGENTS_CONTROL_LOG: ${AGENTS_CONTROL_LOG-/data/control.log}
     secrets: [gcp-service-account, apns-key, vapid-key]
     # The Linux host (/servers, served at /v1/servers/… to servers joining with the install
     # command) and the runtimes' toolsets (/toolsets, at /v1/toolsets/…, so a server that joins

@@ -737,6 +737,47 @@ func TestAMakeThatFailsStaysAsAFailedRow(t *testing.T) {
 	}
 }
 
+// A failed make's row and its reason are kept in the store, so a restart or a redeploy
+// keeps them (#4747), still at most keptFailedMakes; removing the provider forgets them.
+func TestAFailedMakeIsThereAfterARestart(t *testing.T) {
+	h := newHarness(t)
+	id := h.add()
+	h.provider.mu.Lock()
+	h.provider.failCreate = "The droplet limit is reached."
+	h.provider.mu.Unlock()
+	for range keptFailedMakes + 2 {
+		if _, err := h.createNameless(); err == nil {
+			t.Fatal("the make did not fail")
+		}
+	}
+	again := NewProviders(Config{Store: h.store, Records: h.records, Router: h.router, Methods: h.methods,
+		Timing: quickTiming(),
+		Hooks: Hooks{Connect: func(ProviderRecord, map[string]string) (Provider, error) { return h.provider, nil }}})
+	again.Start()
+	defer again.Stop()
+	var names []string
+	for _, w := range again.Summaries()[0].Workspaces {
+		if w.State == "failed" {
+			if deref(w.Reason) != "The droplet limit is reached." {
+				t.Errorf("reason %q", deref(w.Reason))
+			}
+			names = append(names, w.Name)
+		}
+	}
+	if want := []string{"machine-3", "machine-4", "machine-5", "machine-6", "machine-7"}; !reflect.DeepEqual(names, want) {
+		t.Fatalf("failed rows %v, want %v", names, want)
+	}
+	if owner, ok := again.failedOwner(id, "failed-machine-7"); !ok || owner != "" {
+		t.Errorf("%q %v", owner, ok)
+	}
+	if err := again.remove(id); err != nil {
+		t.Fatal(err)
+	}
+	if object, _ := h.store.Get(context.Background(), failedMakesKey(id)); object != nil {
+		t.Errorf("the failed makes are still kept: %s", object.Data)
+	}
+}
+
 // The last-used provider and options, and Make Default (#3979).
 
 func defaultOf(t *testing.T, h *harness) string {

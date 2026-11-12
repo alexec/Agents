@@ -422,6 +422,7 @@ func (p *Providers) load() {
 		p.mu.Lock()
 		p.providers[record.ID] = heldProvider{record, object.ETag}
 		p.mu.Unlock()
+		p.loadFailed(record.ID)
 	}
 }
 
@@ -1173,6 +1174,7 @@ func (p *Providers) remove(id string) error {
 		connection.End()
 	}
 	p.forget(held.record)
+	p.forgetFailed(id)
 	for _, h := range p.records.Hosts() {
 		if link := LinkOf(&h); link != nil && link.Provider == id {
 			setLink(&h, nil)

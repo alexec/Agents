@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -261,4 +263,30 @@ func (s *syncBuffer) String() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.b.String()
+}
+
+// With Copy, each line goes to the file and still to standard error (#4747), so a
+// container's file on a volume keeps the lines across a redeploy.
+func TestACopiedLogWritesTheFileAndStandardError(t *testing.T) {
+	t.Parallel()
+	var out syncBuffer
+	logs := NewLog()
+	logs.to = &out
+	file := filepath.Join(t.TempDir(), "control.log")
+	if err := logs.Copy(file, LogLimit); err != nil {
+		t.Fatal(err)
+	}
+	logs.Write("workspace: create machine-1 at Codespaces by alex: failed: token=tok-123 no quota")
+	data, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, got := range map[string]string{"file": string(data), "standard error": out.String()} {
+		if !strings.Contains(got, "failed: token=<redacted> no quota") || strings.Contains(got, "tok-123") {
+			t.Errorf("%s: %q", name, got)
+		}
+	}
+	if !logs.Taken() {
+		t.Error("not taken")
+	}
 }
