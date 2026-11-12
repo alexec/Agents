@@ -36,15 +36,10 @@ import (
 // ciRunsPerPR is how many runs a PR keeps active.
 const ciRunsPerPR = 20
 
+// ciRun is a CI run of r (#4800): <forge>:run:<path>#<id>, a GitHub Actions run, a GitLab or
+// Bitbucket pipeline or an Azure Pipelines build.
 func (r forgeRepo) ciRun(id int64) wire.LineageNode {
-	ref := r.forge + ":" + r.path + "/actions/run/" + strconv.FormatInt(id, 10)
-	switch r.forge {
-	case "gitlab", "bitbucket":
-		ref = r.forge + ":" + r.path + "/pipelines/" + strconv.FormatInt(id, 10)
-	case "azuredevops":
-		ref = r.forge + ":" + r.path + "/builds/" + strconv.FormatInt(id, 10)
-	}
-	return wire.LineageNode{Kind: lineage.KindCIRun, Ref: ref}
+	return r.node(lineage.KindCIRun, "run", strconv.FormatInt(id, 10))
 }
 
 // ciRunPayload is what checks.passed, checks.failed and run.completed say of a run.
@@ -118,15 +113,19 @@ func (d *Daemon) boundCIRuns(pr wire.LineageNode) {
 // mostDeploys bounds the deploys one run may link.
 const mostDeploys = 10
 
-// deployNodes are a deploy's node and its target's, from its ref <target>:<id>/<version>.
-func deployNodes(ref string) (deploy, target wire.LineageNode, ok bool) {
-	where, _, ok := strings.Cut(ref, "/")
-	i := strings.LastIndex(ref, "/")
-	if !ok || i == len(ref)-1 || strings.ContainsAny(ref, " \t\n") || !strings.Contains(where, ":") {
+// deployNodes are a deploy's node and its target's, from what a run says, <target>:<id>/<version>
+// (#4800): <target>:deploy:<id>#<version>, and <target>:target:#<id>.
+func deployNodes(said string) (deploy, target wire.LineageNode, ok bool) {
+	where, _, ok := strings.Cut(said, "/")
+	if !ok || strings.ContainsAny(said, " \t\n") || !strings.Contains(where, ":") {
 		return deploy, target, false
 	}
-	return wire.LineageNode{Kind: lineage.KindDeploy, Ref: ref},
-		wire.LineageNode{Kind: lineage.KindTarget, Ref: "target:" + ref[:i]}, true
+	r, ok := wire.RefFromLineage(lineage.KindDeploy, said, wire.RefContext{})
+	if !ok || r.Type != "deploy" {
+		return deploy, target, false
+	}
+	return lineage.NodeOf(lineage.KindDeploy, r),
+		lineage.NodeOf(lineage.KindTarget, wire.Ref{Provider: r.Provider, Type: "target", ID: r.Topic}), true
 }
 
 // submittedBuilds pairs each TestFlight build one run says with each App Store version of the
@@ -135,12 +134,13 @@ func submittedBuilds(refs []string) [][2]wire.LineageNode {
 	var pairs [][2]wire.LineageNode
 	for _, store := range refs {
 		storeDeploy, storeTarget, ok := deployNodes(store)
-		bundle, isStore := strings.CutPrefix(storeTarget.Ref, "target:appstore:")
-		if !ok || !isStore {
+		st, _ := lineage.RefOf(storeTarget)
+		if !ok || st.Provider != "appstore" {
 			continue
 		}
+		testflight := lineage.NodeOf(lineage.KindTarget, wire.Ref{Provider: "testflight", Type: "target", ID: st.ID})
 		for _, build := range refs {
-			if deploy, target, ok := deployNodes(build); ok && target.Ref == "target:testflight:"+bundle {
+			if deploy, target, ok := deployNodes(build); ok && target == testflight {
 				pairs = append(pairs, [2]wire.LineageNode{deploy, storeDeploy})
 			}
 		}

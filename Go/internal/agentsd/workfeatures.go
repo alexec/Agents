@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/alexec/agents/Go/internal/lineage"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -70,7 +71,8 @@ func (d *Daemon) workFeatures(ctx context.Context, r wire.WorkFeaturesRequest) (
 	for n, e := range epics {
 		planOfEpic[e.Node.Ref] = n
 		if planErrs[n] != nil {
-			forge, _, _ := strings.Cut(e.Node.Ref, ":")
+			r, _ := lineage.RefOf(e.Node)
+			forge := r.Provider
 			addError(wire.ForgeListError{Forge: forge, Message: e.Node.Ref + ": " + planErrs[n].Error()})
 		}
 	}

@@ -15,14 +15,14 @@ func TestOverheadAndLoad(t *testing.T) {
 	now := time.Date(2026, 11, 10, 12, 0, 0, 0, time.UTC)
 	in, old := wire.DateOf(now.Add(-time.Hour)), wire.DateOf(now.Add(-15*24*time.Hour))
 	cost := func(v float64) wire.LineageCost { return wire.LineageCost{Cost: map[string]float64{"USD": v}} }
-	epic, level := "github:o/r#1", "epic"
+	epic, level := "github:issue:o/r#1", "epic"
 	nodes := []wire.LineageCostNode{
 		{Node: wire.LineageNode{Kind: KindIssue, Ref: epic}, Level: &level, Banked: cost(2), LastAt: in},
-		{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#2"}, Parent: &epic, Banked: cost(3), LastAt: in},
-		{Node: wire.LineageNode{Kind: KindPR, Ref: "github:o/r#3"}, Fixes: []string{"github:o/r#2"}, Banked: cost(5), LastAt: in},
-		{Node: wire.LineageNode{Kind: KindSession, Ref: "session:a"}, Banked: cost(6), LastAt: in},
-		{Node: wire.LineageNode{Kind: KindSession, Ref: "session:old"}, Banked: cost(100), LastAt: old},
-		{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#4"}, Banked: cost(100), LastAt: old},
+		{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:issue:o/r#2"}, Parent: &epic, Banked: cost(3), LastAt: in},
+		{Node: wire.LineageNode{Kind: KindPR, Ref: "github:pr:o/r#3"}, Fixes: []string{"github:issue:o/r#2"}, Banked: cost(5), LastAt: in},
+		{Node: wire.LineageNode{Kind: KindSession, Ref: "agents:session:#a"}, Banked: cost(6), LastAt: in},
+		{Node: wire.LineageNode{Kind: KindSession, Ref: "agents:session:#old"}, Banked: cost(100), LastAt: old},
+		{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:issue:o/r#4"}, Banked: cost(100), LastAt: old},
 	}
 	o := Overhead(nodes, now)
 	// Unlinked 6 over linked 2 + 3 + 5; the epic's 2 over its child's 3 and its PR's 5.
@@ -52,16 +52,16 @@ func TestOverheadAndLoad(t *testing.T) {
 
 // #4524: a release's rollup counts its own node.
 func TestRollupOfAReleaseCountsItself(t *testing.T) {
-	rel := "github:o/r/release/v1.2.0"
+	rel := "github:release:o/r#v1.2.0"
 	nodes := []wire.LineageCostNode{
 		{Node: wire.LineageNode{Kind: KindRelease, Ref: rel}, Banked: wire.LineageCost{Cost: map[string]float64{"USD": 1}}},
-		{Node: wire.LineageNode{Kind: KindPR, Ref: "github:o/r#2"}, PartOf: []string{rel}, Banked: wire.LineageCost{Cost: map[string]float64{"USD": 2}}},
+		{Node: wire.LineageNode{Kind: KindPR, Ref: "github:pr:o/r#2"}, PartOf: []string{rel}, Banked: wire.LineageCost{Cost: map[string]float64{"USD": 2}}},
 	}
 	r := Rollup(nodes, wire.LineageNode{Kind: KindRelease, Ref: rel})
 	if r.Own.Cost["USD"] != 1 || r.Total.Cost["USD"] != 3 {
 		t.Fatalf("%+v", r)
 	}
-	if got := RepoOf(wire.LineageNode{Kind: KindRelease, Ref: rel}); got != "github:o/r" {
+	if got := RepoOf(wire.LineageNode{Kind: KindRelease, Ref: rel}); got != "github:repo:#o/r" {
 		t.Fatalf("%q", got)
 	}
 }

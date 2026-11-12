@@ -33,8 +33,8 @@ func TestAnEpicPastTwiceItsEstimateTellsThePerson(t *testing.T) {
 		a.State, a.ArchivedReason = wire.AgentStateArchived, &r
 	}).ID
 	lead := seeded(t, d, folder, nil).ID
-	epic := wire.LineageNode{Kind: lineage.KindIssue, Ref: "github:alexec/agents#10"}
-	child := wire.LineageNode{Kind: lineage.KindIssue, Ref: "github:alexec/agents#11"}
+	epic := wire.LineageNode{Kind: lineage.KindIssue, Ref: "github:issue:alexec/agents#10"}
+	child := wire.LineageNode{Kind: lineage.KindIssue, Ref: "github:issue:alexec/agents#11"}
 	level, parent := "epic", epic.Ref
 	usd := func(v float64) wire.LineageCost { return wire.LineageCost{Cost: map[string]float64{"USD": v}} }
 	set := func(spent float64, sessions ...wire.UUID) []overrunNotice {

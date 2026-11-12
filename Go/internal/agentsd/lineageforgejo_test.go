@@ -71,7 +71,7 @@ func TestLineageAsksForgejo(t *testing.T) {
 	release := repo.release("v0.2.0")
 	wantLinks(t, active(d, release),
 		pr.Ref+" part-of "+release.Ref+" (forge)",
-		"forgejo:walkalex/app#9 part-of "+release.Ref+" (forge)")
+		"forgejo:pr:walkalex/app#9 part-of "+release.Ref+" (forge)")
 
 	// The cost comment, by the connection.
 	if id, err := d.forgejoCostComment(ctx, prCommentRecord{Folder: folder, Forge: "forgejo", Path: "walkalex/app", Number: 8}, "body"); err != nil || id != "41" {
@@ -217,7 +217,7 @@ func TestLineageSessionOpensTheIssuesTeaAndFjFile(t *testing.T) {
 	wantLinks(t, active(d, s),
 		s.Ref+" opens "+repo.issue(1).Ref+" (agent)",
 		s.Ref+" opens "+repo.issue(2).Ref+" (agent)",
-		s.Ref+" opens forgejo:kim/notes#5 (agent)")
+		s.Ref+" opens forgejo:issue:kim/notes#5 (agent)")
 	if l.filing["f1"] != (forgeRepo{}) || len(l.filing) != 0 {
 		t.Errorf("calls still held: %v", l.filing)
 	}

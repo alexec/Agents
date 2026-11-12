@@ -12,9 +12,9 @@ import (
 func TestLineageOverTheWire(t *testing.T) {
 	root := t.TempDir()
 	d, c := start(t, root)
-	issue := wire.LineageNode{Kind: "issue", Ref: "github:alexec/Agents#2348"}
-	session := wire.LineageNode{Kind: "session", Ref: "session:00000000-0000-0000-0000-000000000001"}
-	pr := wire.LineageNode{Kind: "pr", Ref: "github:alexec/Agents#2999"}
+	issue := wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#2348"}
+	session := wire.LineageNode{Kind: "session", Ref: "agents:session:#00000000-0000-0000-0000-000000000001"}
+	pr := wire.LineageNode{Kind: "pr", Ref: "github:pr:alexec/agents#2999"}
 	c.call(t, 1, "lineage/link", wire.LineageLinkRequest{From: session, To: issue, Rel: "works-on", Source: "start"})
 	c.call(t, 2, "lineage/link", wire.LineageLinkRequest{From: session, To: pr, Rel: "opens", Source: "agent"})
 	var g wire.LineageGraph

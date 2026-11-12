@@ -178,7 +178,7 @@ func TestForgePullsListsEveryRepoInOneSearch(t *testing.T) {
 		t.Fatalf("list: %+v", list)
 	}
 	i := list.Items[0]
-	if i.Node != (wire.LineageNode{Kind: "pr", Ref: "github:alexec/agents#12"}) || i.State != "merged" || i.Title != "Forge reads" ||
+	if i.Node != (wire.LineageNode{Kind: "pr", Ref: "github:pr:alexec/agents#12"}) || i.State != "merged" || i.Title != "Forge reads" ||
 		deref(i.Folder) == "" || deref(i.Author) != "alexec" || deref(i.Milestone) != "0.16" || i.Comments != 3 ||
 		len(i.Assignees) != 1 || i.UpdatedAt.Time().UTC().Format(time.RFC3339) != "2026-11-01T10:00:00Z" {
 		t.Fatalf("item: %+v", i)
@@ -267,7 +267,7 @@ func TestForgeListRefusals(t *testing.T) {
 // are refused.
 func TestForgePullReadsOne(t *testing.T) {
 	_, c, gh, _ := forgeDaemon(t)
-	pr := wire.LineageNode{Kind: "pr", Ref: "github:alexec/agents#12"}
+	pr := wire.LineageNode{Kind: "pr", Ref: "github:pr:alexec/agents#12"}
 	var p wire.ForgeItemDetail
 	json.Unmarshal(c.call(t, 1, "forge/pull", wire.ForgeItemRequest{Node: pr}), &p)
 	if p.Item.Node != pr || p.Body != "The body." || deref(p.Cursor) != "b2xkZXI=" || deref(p.Item.Folder) == "" {
@@ -288,11 +288,11 @@ func TestForgePullReadsOne(t *testing.T) {
 		method string
 		node   wire.LineageNode
 	}{
-		{"forge/issue", wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#12"}},
-		{"forge/pull", wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#13"}},
-		{"forge/pull", wire.LineageNode{Kind: "pr", Ref: "github:alexec/agents#404"}},
+		{"forge/issue", wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#12"}},
+		{"forge/pull", wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#13"}},
+		{"forge/pull", wire.LineageNode{Kind: "pr", Ref: "github:pr:alexec/agents#404"}},
 		{"forge/issue", wire.LineageNode{Kind: "issue", Ref: "bitbucket:ENG-4"}},
-		{"forge/pull", wire.LineageNode{Kind: "pr", Ref: "linear:ENG-4"}},
+		{"forge/pull", wire.LineageNode{Kind: "pr", Ref: "linear:issue:eng#ENG-4"}},
 	} {
 		if e := c.callError(t, 10+i, ask.method, wire.ForgeItemRequest{Node: ask.node}); e == nil || !strings.Contains(e.Message, ask.method) {
 			t.Fatalf("%s %s: %v", ask.method, ask.node.Ref, e)
@@ -422,7 +422,7 @@ func TestForgeIssuesMergesEveryForgeByTime(t *testing.T) {
 		refs = append(refs, i.Node.Ref)
 	}
 	// GitHub 10:00, GitLab 11:00 and 07:00, Linear 09:00: the newest three.
-	if strings.Join(refs, " ") != "gitlab:group/app#4 github:alexec/agents#12 linear:ENG-4" || len(list.Errors) != 0 || list.Cursor == nil {
+	if strings.Join(refs, " ") != "gitlab:issue:group/app#4 github:issue:alexec/agents#12 linear:issue:eng#ENG-4" || len(list.Errors) != 0 || list.Cursor == nil {
 		t.Fatalf("list: %v %+v", refs, list.Errors)
 	}
 	if searches, _ := gh.asked(); len(searches) != 1 {
@@ -460,7 +460,7 @@ func TestForgePullsHasNoLinear(t *testing.T) {
 	_, c, _, _, ln, _ := allForgesDaemon(t)
 	var list wire.ForgeList
 	json.Unmarshal(c.call(t, 1, "forge/pulls", wire.ForgeListRequest{}), &list)
-	if len(ln.searches) != 0 || len(list.Items) != 3 || list.Items[0].Node != (wire.LineageNode{Kind: "pr", Ref: "gitlab:group/app!4"}) ||
+	if len(ln.searches) != 0 || len(list.Items) != 3 || list.Items[0].Node != (wire.LineageNode{Kind: "pr", Ref: "gitlab:mr:group/app#4"}) ||
 		!*list.Items[0].Draft || *list.Items[0].Review != "review_required" {
 		t.Fatalf("pulls: %+v (Linear %q)", list.Items, ln.searches)
 	}
@@ -483,7 +483,7 @@ func TestForgeListSaysGitLabIsNotConnected(t *testing.T) {
 // and a project on another GitLab, are refused.
 func TestForgeReadsAGitLabAndALinearItem(t *testing.T) {
 	_, c, _, gl, _, _ := allForgesDaemon(t)
-	mr := wire.LineageNode{Kind: "pr", Ref: "gitlab:group/app!4"}
+	mr := wire.LineageNode{Kind: "pr", Ref: "gitlab:mr:group/app#4"}
 	var p wire.ForgeItemDetail
 	json.Unmarshal(c.call(t, 1, "forge/pull", wire.ForgeItemRequest{Node: mr}), &p)
 	if p.Item.Node != mr || p.Body != "The body." || deref(p.Cursor) != "2" || p.Item.State != "merged" || deref(p.Item.Folder) == "" ||
@@ -495,7 +495,7 @@ func TestForgeReadsAGitLabAndALinearItem(t *testing.T) {
 	}
 
 	var i wire.ForgeItemDetail
-	json.Unmarshal(c.call(t, 2, "forge/issue", wire.ForgeItemRequest{Node: wire.LineageNode{Kind: "issue", Ref: "linear:ENG-4"}}), &i)
+	json.Unmarshal(c.call(t, 2, "forge/issue", wire.ForgeItemRequest{Node: wire.LineageNode{Kind: "issue", Ref: "linear:issue:eng#ENG-4"}}), &i)
 	if i.Body != "Linear's body." || i.Item.State != "closed" || deref(i.Item.Folder) != deref(p.Item.Folder) || len(i.Comments) != 1 ||
 		i.Comments[0].Bot == nil || i.Checks != nil {
 		t.Fatalf("Linear issue: %+v", i)
@@ -505,10 +505,10 @@ func TestForgeReadsAGitLabAndALinearItem(t *testing.T) {
 		method string
 		node   wire.LineageNode
 	}{
-		{"forge/issue", wire.LineageNode{Kind: "issue", Ref: "gitlab:group/app#404"}},
-		{"forge/issue", wire.LineageNode{Kind: "issue", Ref: "gitlab:ops/tool#1"}},
-		{"forge/issue", wire.LineageNode{Kind: "issue", Ref: "gitlab:nobody/here#1"}},
-		{"forge/issue", wire.LineageNode{Kind: "issue", Ref: "linear:ENG-404"}},
+		{"forge/issue", wire.LineageNode{Kind: "issue", Ref: "gitlab:issue:group/app#404"}},
+		{"forge/issue", wire.LineageNode{Kind: "issue", Ref: "gitlab:issue:ops/tool#1"}},
+		{"forge/issue", wire.LineageNode{Kind: "issue", Ref: "gitlab:issue:nobody/here#1"}},
+		{"forge/issue", wire.LineageNode{Kind: "issue", Ref: "linear:issue:eng#ENG-404"}},
 	} {
 		if e := c.callError(t, 10+n, ask.method, wire.ForgeItemRequest{Node: ask.node}); e == nil || !strings.Contains(e.Message, ask.method) {
 			t.Fatalf("%s %s: %v", ask.method, ask.node.Ref, e)
@@ -537,7 +537,7 @@ func TestForgeIssuesListsTheLinearWorkspace(t *testing.T) {
 	}
 	var l wire.ForgeItem
 	for _, i := range list.Items {
-		if i.Node.Ref == "linear:ENG-4" {
+		if i.Node.Ref == "linear:issue:eng#ENG-4" {
 			l = i
 		}
 	}
@@ -545,7 +545,7 @@ func TestForgeIssuesListsTheLinearWorkspace(t *testing.T) {
 		t.Fatalf("Linear item: %+v (folders %v)", l, d.folderPaths())
 	}
 	var i wire.ForgeItemDetail
-	json.Unmarshal(c.call(t, 3, "forge/issue", wire.ForgeItemRequest{Node: wire.LineageNode{Kind: "issue", Ref: "linear:ENG-4"}}), &i)
+	json.Unmarshal(c.call(t, 3, "forge/issue", wire.ForgeItemRequest{Node: wire.LineageNode{Kind: "issue", Ref: "linear:issue:eng#ENG-4"}}), &i)
 	if deref(i.Item.Folder) != deref(l.Folder) || i.Start == nil {
 		t.Fatalf("Linear issue: %+v", i)
 	}

@@ -49,7 +49,7 @@ public enum WorkPlan {
         refs += (rollup?.parts ?? []).flatMap { $0.sessions ?? [] }
         var seen: [UUID] = []
         for ref in refs {
-            if let id = UUID(uuidString: String(ref.dropFirst("session:".count))), !seen.contains(id) { seen.append(id) }
+            if let id = WireRef.sessionID(fromRef: ref).flatMap(UUID.init(uuidString:)), !seen.contains(id) { seen.append(id) }
         }
         return seen
     }

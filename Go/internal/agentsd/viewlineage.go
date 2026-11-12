@@ -93,8 +93,8 @@ func (d *Daemon) lineageViewResult(s viewServer, args json.RawMessage) (wire.JSO
 	// A session labelled PROJ-12 is in the record as linear:PROJ-12: a key does not say which
 	// tracker it is on (#3260 tells them apart). A Jira issue with nothing of its own reads
 	// that one. Its pull requests are on GitHub or GitLab, never on the Jira site.
-	if key, ok := strings.CutPrefix(node.Ref, "jira:"); ok && len(v.Sessions) == 0 && len(v.PRs) == 0 {
-		v = d.lineageViewOf(wire.LineageNode{Kind: node.Kind, Ref: "linear:" + key}, "")
+	if key, ok := keyOfIssue(node, "jira"); ok && len(v.Sessions) == 0 && len(v.PRs) == 0 {
+		v = d.lineageViewOf(linearNode(key), "")
 		v.Ref = node.Ref
 	}
 	text, _ := json.Marshal(v)
@@ -125,7 +125,7 @@ func nodeOfURL(raw string) (wire.LineageNode, string, bool) {
 	if strings.EqualFold(u.Host, "linear.app") {
 		parts := strings.Split(path, "/")
 		if len(parts) >= 3 && parts[1] == "issue" && linearLabel.MatchString(strings.ToUpper(parts[2])) {
-			return wire.LineageNode{Kind: lineage.KindIssue, Ref: "linear:" + strings.ToUpper(parts[2])}, base, true
+			return linearNode(strings.ToUpper(parts[2])), base, true
 		}
 		return wire.LineageNode{}, "", false
 	}
@@ -133,7 +133,7 @@ func nodeOfURL(raw string) (wire.LineageNode, string, bool) {
 		return boardsNode(project, id), "", true
 	}
 	if key, ok := strings.CutPrefix(path, "browse/"); ok && !strings.EqualFold(u.Host, "github.com") && linearLabel.MatchString(strings.ToUpper(key)) {
-		return wire.LineageNode{Kind: lineage.KindIssue, Ref: "jira:" + strings.ToUpper(key)}, "", true
+		return jiraNode(strings.ToUpper(key)), "", true
 	}
 	if r, n, ok := ofURL(u.Host, path, false); ok {
 		return r.issue(n), base, true
@@ -303,7 +303,7 @@ func (d *Daemon) lineageViewNodeOf(n, page wire.LineageNode, base string, parts 
 }
 
 func (d *Daemon) lineageSessionTitle(s wire.LineageNode) string {
-	id, _ := strings.CutPrefix(s.Ref, "session:")
+	id, _ := lineage.SessionID(s.Ref)
 	if a := d.Store.Agent(wire.UUID(id)); a != nil {
 		return agentName(a.Title)
 	}
@@ -311,7 +311,7 @@ func (d *Daemon) lineageSessionTitle(s wire.LineageNode) string {
 }
 
 func (d *Daemon) lineageViewSessionOf(s wire.LineageNode, how string) lineageViewSession {
-	id, _ := strings.CutPrefix(s.Ref, "session:")
+	id, _ := lineage.SessionID(s.Ref)
 	out := lineageViewSession{ID: id, Title: "A session no longer here", How: how}
 	a := d.Store.Agent(wire.UUID(id))
 	if a == nil {
@@ -402,14 +402,12 @@ func lineageCostZero(c wire.LineageCost) bool {
 // refName is a node as the page names it: #7 or !4 in the page's own repo, owner/repo#7 in
 // another, ENG-4 on Linear, PROJ-12 on Jira, AB#12 on Azure Boards.
 func refName(ref, page string) string {
-	if rest, ok := strings.CutPrefix(ref, "linear:"); ok {
-		return rest
-	}
-	if rest, ok := strings.CutPrefix(ref, "jira:"); ok {
-		return rest
-	}
-	if _, id, ok := boardsOfNode(wire.LineageNode{Kind: lineage.KindIssue, Ref: ref}); ok {
-		return "AB#" + strconv.Itoa(id)
+	r, ok := lineage.RefOfText(ref)
+	switch {
+	case ok && (r.Provider == "linear" || r.Provider == "jira"):
+		return r.ID
+	case ok && r.Provider == "azureboards":
+		return "AB#" + r.ID
 	}
 	return shortRef(ref, page)
 }
@@ -418,12 +416,11 @@ func refName(ref, page string) string {
 // Azure DevOps's (dev.azure.com without one) on the page's own host. Linear's pull requests are on GitHub or GitLab; its issues have none here. A forge
 // with no case has none.
 func refURL(n wire.LineageNode, base string) string {
-	scheme, id, _ := strings.Cut(n.Ref, ":")
-	i := strings.LastIndexAny(id, "#!")
-	if i <= 0 {
+	r, ok := lineage.RefOf(n)
+	if !ok || r.Topic == "" {
 		return ""
 	}
-	path, num := id[:i], id[i+1:]
+	scheme, path, num := r.Provider, r.Topic, r.ID
 	switch scheme {
 	case "github":
 		if n.Kind == lineage.KindPR {

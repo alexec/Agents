@@ -21,10 +21,11 @@ func TestSplitAddsUp(t *testing.T) {
 
 func TestRepoOf(t *testing.T) {
 	for n, want := range map[wire.LineageNode]string{
-		{Kind: KindIssue, Ref: "github:alexec/agents#12"}: "github:alexec/agents",
-		{Kind: KindPR, Ref: "gitlab:group/sub/repo!4"}:    "gitlab:group/sub/repo",
-		{Kind: KindIssue, Ref: "linear:ENG-4"}:            "linear",
-		{Kind: KindSession, Ref: "session:x"}:             "",
+		{Kind: KindIssue, Ref: "github:issue:alexec/agents#12"}: "github:repo:#alexec/agents",
+		{Kind: KindIssue, Ref: "github:alexec/Agents#12"}:       "github:repo:#alexec/agents",
+		{Kind: KindPR, Ref: "gitlab:mr:group/sub/repo#4"}:       "gitlab:repo:#group/sub/repo",
+		{Kind: KindIssue, Ref: "linear:issue:eng#ENG-4"}:        "linear:repo:#eng",
+		{Kind: KindSession, Ref: "agents:session:#x"}:           "",
 	} {
 		if got := RepoOf(n); got != want {
 			t.Errorf("%v: %q, want %q", n, got, want)
@@ -35,21 +36,21 @@ func TestRepoOf(t *testing.T) {
 // #2350: a repo adds up every node in it once; a merged revert is waste.
 func TestRollupOfARepo(t *testing.T) {
 	cost := func(v float64) wire.LineageCost { return wire.LineageCost{Cost: map[string]float64{"USD": v}} }
-	p, other := "github:o/r", "github:o/other"
+	p, other := "github:repo:#o/r", "github:repo:#o/other"
 	reverted, merged := OutcomeReverted, OutcomeMerged
 	nodes := []wire.LineageCostNode{
-		{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#1"}, Repo: &p, Banked: cost(1), LastAt: 1},
-		{Node: wire.LineageNode{Kind: KindPR, Ref: "github:o/r#2"}, Repo: &p, Banked: cost(2), Fixes: []string{"github:o/r#1"}, Outcome: &merged, LastAt: 2},
-		{Node: wire.LineageNode{Kind: KindPR, Ref: "github:o/r#3"}, Repo: &p, Banked: cost(4), Outcome: &reverted, LastAt: 3},
-		{Node: wire.LineageNode{Kind: KindSession, Ref: "session:a"}, Repo: &p, Banked: cost(8), LastAt: 4},
-		{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:o/other#1"}, Repo: &other, Banked: cost(16), LastAt: 5},
+		{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:issue:o/r#1"}, Repo: &p, Banked: cost(1), LastAt: 1},
+		{Node: wire.LineageNode{Kind: KindPR, Ref: "github:pr:o/r#2"}, Repo: &p, Banked: cost(2), Fixes: []string{"github:issue:o/r#1"}, Outcome: &merged, LastAt: 2},
+		{Node: wire.LineageNode{Kind: KindPR, Ref: "github:pr:o/r#3"}, Repo: &p, Banked: cost(4), Outcome: &reverted, LastAt: 3},
+		{Node: wire.LineageNode{Kind: KindSession, Ref: "agents:session:#a"}, Repo: &p, Banked: cost(8), LastAt: 4},
+		{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:issue:o/other#1"}, Repo: &other, Banked: cost(16), LastAt: 5},
 	}
 	r := Rollup(nodes, wire.LineageNode{Kind: KindRepo, Ref: p})
 	if r.Total.Cost["USD"] != 15 || r.Waste.Cost["USD"] != 4 || r.Unlinked.Cost["USD"] != 8 || r.PrsMerged != 2 || r.PrsReverted != 1 ||
-		len(r.Parts) != 4 || r.Parts[0].Node.Ref != "session:a" {
+		len(r.Parts) != 4 || r.Parts[0].Node.Ref != "agents:session:#a" {
 		t.Fatalf("%+v", r)
 	}
-	if got := Rollup(nodes, wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#1"}); got.Own.Cost["USD"] != 1 || got.Total.Cost["USD"] != 3 {
+	if got := Rollup(nodes, wire.LineageNode{Kind: KindIssue, Ref: "github:issue:o/r#1"}); got.Own.Cost["USD"] != 1 || got.Total.Cost["USD"] != 3 {
 		t.Fatalf("%+v", got)
 	}
 }

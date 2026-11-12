@@ -4454,7 +4454,7 @@ export interface ForgeImageRequest {
 /**
  * An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for
  * GitHub, GitLab, Linear and Jira (#3260), so one page draws each. node is its lineage node (kind
- * issue or pr, ref github:alexec/Agents#12). state is open, closed or merged; status is the
+ * issue or pr, ref github:issue:alexec/agents#12). state is open, closed or merged; status is the
  * tracker's own name for its step, where its workflow has steps (a Jira status, as In Progress; one
  * in Jira's Done category is closed). folder is a folder on this machine on its repo, to act from.
  * labels have their #rrggbb colour where the forge gives one (#2956). The pull request's own
@@ -5313,8 +5313,9 @@ export interface LineageCost {
 export interface LineageCostNode {
   node: LineageNode;
   /**
-   * The repo or tracker the node is in: github:alexec/agents, linear, or for a session its folder's
-   * repo (folder:<name> without one). Not a project (#3275).
+   * The repo or tracker the node is in, as a ref (#4800): github:repo:#alexec/agents,
+   * linear:repo:#eng, or for a session its folder's repo (folder:repo:#<name> without one). Not a
+   * project (#3275).
    */
   repo?: string;
   banked: LineageCost;
@@ -5380,9 +5381,9 @@ export interface LineageCostNode {
 /**
  * lineage/cost (#2350): a node's cost rolled up. own is what was banked on the node itself. total
  * adds its parts: an issue's PRs (the PRs that fix it); a release's PRs and the issues they fix; a
- * repo's every node (kind repo, ref github:alexec/agents). waste is the parts' PRs closed without a
- * merge or reverted. unlinked is the parts' sessions: turns with no active link. parts is the nodes
- * added up, newest first, at most 500; limited says there are more.
+ * repo's every node (kind repo, ref github:repo:#alexec/agents). waste is the parts' PRs closed
+ * without a merge or reverted. unlinked is the parts' sessions: turns with no active link. parts is
+ * the nodes added up, newest first, at most 500; limited says there are more.
  */
 export interface LineageCostRollup {
   node: LineageNode;
@@ -5818,9 +5819,11 @@ export interface LineageLinks {
 
 /**
  * A node in the lineage graph (#2348). kind is what it is: issue, pr, session, workflow-run,
- * commit, file, branch or release, and the list is open. ref names it apart from any tracker, as
- * <scheme>:<id>: github:alexec/Agents#123, gitlab:group/repo!45, linear:ENG-4, jira:ABC-9,
- * session:<agent id>.
+ * commit, file, branch or release, and the list is open. ref names it apart from any tracker, in
+ * the full ref form provider:type:topic#id (#4800): github:issue:alexec/agents#123,
+ * gitlab:mr:group/repo#45, linear:issue:eng#ENG-4, jira:issue:abc#ABC-9,
+ * agents:session:alexec/agents#<agent id>. A reader takes the old form (<scheme>:<id>, as
+ * github:alexec/Agents#123 or session:<agent id>) for one release.
  */
 export interface LineageNode {
   kind: string;
@@ -10300,9 +10303,9 @@ export interface ReportNodes {
 /**
  * reports/nodes (#3118): the lineage nodes of one kind in a scope, with filters and pages. The
  * scope is as reports/value's. state is open, closed or merged, from the node's resolved state (a
- * PR with none falls back to its outcome); releases have no state in v1. repo is a ref prefix
- * (github:alexec/Agents). since is on the node's last change. limit is 1 to 100, 50 when absent.
- * cursor is the last page's, opaque.
+ * PR with none falls back to its outcome); releases have no state in v1. repo is a repo's ref
+ * (github:repo:#alexec/agents; the old github:alexec/agents is read too). since is on the node's
+ * last change. limit is 1 to 100, 50 when absent. cursor is the last page's, opaque.
  */
 export interface ReportNodesQuery {
   /** issue, pr or release. */
@@ -13494,8 +13497,8 @@ export interface VelocityBucket {
 
 /**
  * velocity/history's answer (#4596): the PRs that landed, by the hour (168 hours) and by the day
- * (90 days), then by repository (github:alexec/agents), from this machine's lineage store. Shaped
- * as usage/history is.
+ * (90 days), then by repository (its ref, github:repo:#alexec/agents), from this machine's lineage
+ * store. Shaped as usage/history is.
  */
 export interface VelocityHistory {
   hours: Record<string, Record<string, VelocityBucket>>;

@@ -105,9 +105,9 @@ func TestDocsListSearchAndRead(t *testing.T) {
 	}
 	want := []string{
 		"mcp:kb/P1 Payments: requirements",
-		"github:alexec/agents/doc/docs/leases.md leases.md",
-		"github:alexec/agents/doc/specs/3319-docs/spec.md Docs, first-class",
-		"github:alexec/agents/doc/README.md Agents",
+		"github:doc:alexec/agents#docs/leases.md leases.md",
+		"github:doc:alexec/agents#specs/3319-docs/spec.md Docs, first-class",
+		"github:doc:alexec/agents#README.md Agents",
 	}
 	// The two docs written now can have the same time: check the first and the last.
 	if len(refs) != len(want) || refs[0] != want[0] || refs[3] != want[3] {
@@ -153,18 +153,24 @@ func TestDocsListSearchAndRead(t *testing.T) {
 	}
 
 	var read wire.DocsReading
-	json.Unmarshal(c.call(t, 7, "docs/read", wire.DocsReadRequest{Ref: "github:alexec/agents/doc/specs/3319-docs/spec.md", From: new(int64(3)), To: new(int64(3))}), &read)
+	json.Unmarshal(c.call(t, 7, "docs/read", wire.DocsReadRequest{Ref: "github:doc:alexec/agents#specs/3319-docs/spec.md", From: new(int64(3)), To: new(int64(3))}), &read)
 	if read.Text != "The Docs list.\n" || read.Lines != 4 || read.From != 3 || read.To != 3 || read.Next == nil || *read.Next != 4 ||
 		read.Doc.Title != "Docs, first-class" {
 		t.Fatalf("docs/read of a folder doc: %+v", read)
+	}
+	// A ref in the form from before #4800 reads the same doc.
+	var oldForm wire.DocsReading
+	json.Unmarshal(c.call(t, 20, "docs/read", wire.DocsReadRequest{Ref: "github:alexec/agents/doc/specs/3319-docs/spec.md"}), &oldForm)
+	if oldForm.Doc.Ref != "github:doc:alexec/agents#specs/3319-docs/spec.md" {
+		t.Fatalf("docs/read in the old form: %+v", oldForm)
 	}
 	var page wire.DocsReading
 	json.Unmarshal(c.call(t, 8, "docs/read", wire.DocsReadRequest{Ref: "mcp:kb/P2"}), &page)
 	if page.Text != "# Checkout redesign\n\nOne\nTwo\n" || page.Lines != 4 || page.Next != nil || page.Doc.Title != "Checkout redesign" {
 		t.Fatalf("docs/read of a connector doc: %+v", page)
 	}
-	for i, ref := range []string{"github:alexec/agents/doc/src/notes.md", "github:alexec/agents/doc/../x.md",
-		"github:alexec/agents/doc/docs/missing.md", "mcp:kb/P9", "notion:abc", "nowhere"} {
+	for i, ref := range []string{"github:doc:alexec/agents#src/notes.md", "github:doc:alexec/agents#../x.md",
+		"github:doc:alexec/agents#docs/missing.md", "mcp:kb/P9", "notion:abc", "nowhere"} {
 		if e := c.callError(t, 9+i, "docs/read", wire.DocsReadRequest{Ref: ref}); e == nil {
 			t.Fatalf("docs/read %s worked", ref)
 		}
@@ -188,7 +194,7 @@ func TestDocsOfAFolderWithNoForge(t *testing.T) {
 	writeFile(t, filepath.Join(folder, "docs", "plan.md"), "# Plan\n")
 	var list wire.DocsList
 	json.Unmarshal(c.call(t, 2, "docs/list", wire.DocsListRequest{Folder: &folder}), &list)
-	want := "folder:" + docsMachine() + "/" + filepath.Base(folder) + "/doc/docs/plan.md"
+	want := "folder:doc:" + strings.ToLower(docsMachine()+"/"+filepath.Base(folder)) + "#docs/plan.md"
 	if len(list.Docs) != 1 || list.Docs[0].Ref != want {
 		t.Fatalf("docs/list: %+v", list.Docs)
 	}

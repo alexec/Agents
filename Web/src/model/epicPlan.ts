@@ -12,6 +12,7 @@ import { money } from "./limits";
 import { timeWords } from "./time";
 import { costWords, spent } from "./value";
 import { shortAge, shortRef } from "./work";
+import { sessionIdOf } from "../protocol/ref";
 
 /** A child's mark: closed; a lane runs or a PR is open; a question waits or a check failed; waiting
  * for its step; blocked by an open issue outside the plan. In the Work look (#4418) it is a glyph in
@@ -44,7 +45,7 @@ export function planSessions(child: LineageNode, links: readonly LineageLink[], 
   for (const part of rollup?.parts ?? []) refs.push(...part.sessions ?? []);
   const seen: string[] = [];
   for (const ref of refs) {
-    const id = ref.slice("session:".length).toUpperCase();
+    const id = (sessionIdOf(ref) ?? "").toUpperCase();
     if (id && !seen.includes(id)) seen.push(id);
   }
   return seen;

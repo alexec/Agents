@@ -102,3 +102,148 @@ export function parseShortRef(input: string, c: RefContext = {}): RefParts {
   if (wrong) throw new Error(`ref "${s}": ${wrong}`);
   return r;
 }
+
+const cutLast = (s: string, sep: string): [string, string] | undefined => {
+  const i = s.lastIndexOf(sep);
+  return i <= 0 || i + sep.length === s.length ? undefined : [s.slice(0, i), s.slice(i + sep.length)];
+};
+
+const tryParse = (s: string): RefParts | undefined => {
+  try {
+    return parseRef(s);
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * A lineage node's ref in the form it had before #4800, given the node's kind, as the full ref:
+ * the same rows as Go's wire.RefFromLineage. A ref in the full form is read as parseRef reads it.
+ * Undefined for a form it does not know. topic is the project of an agents node, which the old
+ * form did not say; it can be empty.
+ */
+export function refFromLineage(kind: string, old: string, topic = ""): RefParts | undefined {
+  const full = tryParse(old);
+  if (full) return full;
+  const colon = old.indexOf(":");
+  const scheme = colon < 0 ? "" : old.slice(0, colon);
+  const rest = colon < 0 ? "" : old.slice(colon + 1);
+  if (rest === "" || !word.test(scheme)) return undefined;
+  const project = topic.toLowerCase();
+  let r: RefParts | undefined;
+  if (kind === "session" && scheme === "session") r = { provider: "agents", type: "session", topic: project, id: rest };
+  else if (kind === "workflow" && scheme === "workflow") r = { provider: "agents", type: "workflow", topic: project, id: rest };
+  else if (kind === "workflow-run" && scheme === "run") r = { provider: "agents", type: "workflow-run", topic: project, id: rest };
+  else if (kind === "issue" && (scheme === "linear" || scheme === "jira")) {
+    const dash = rest.indexOf("-");
+    if (dash <= 0) return undefined;
+    r = { provider: scheme, type: "issue", topic: rest.slice(0, dash).toLowerCase(), id: rest };
+  } else if (kind === "pr" && scheme === "gitlab" && rest.includes("!")) {
+    const i = rest.lastIndexOf("!");
+    r = { provider: scheme, type: "mr", topic: rest.slice(0, i).toLowerCase(), id: rest.slice(i + 1) };
+  } else if (kind === "issue" || kind === "pr") {
+    const i = rest.lastIndexOf("#");
+    if (i < 0) return undefined;
+    r = { provider: scheme, type: kind === "pr" ? pullType(scheme) : kind, topic: rest.slice(0, i).toLowerCase(), id: rest.slice(i + 1) };
+  } else if (kind === "release" || kind === "milestone") {
+    const cut = cutLast(rest, `/${kind}/`);
+    if (!cut) return undefined;
+    r = { provider: scheme, type: kind, topic: cut[0].toLowerCase(), id: cut[1] };
+  } else if (kind === "doc" && scheme === "file") r = { provider: "file", type: "doc", topic: "", id: rest };
+  else if (kind === "doc" && (scheme === "https" || scheme === "http")) {
+    const tail = rest.replace(/^\/\//, "");
+    const slash = tail.indexOf("/");
+    const host = slash < 0 ? tail : tail.slice(0, slash);
+    if (host === "") return undefined;
+    r = { provider: "web", type: "doc", topic: host.toLowerCase(), id: "/" + (slash < 0 ? "" : tail.slice(slash + 1)) };
+  } else if (kind === "doc") {
+    const i = rest.indexOf("/doc/");
+    if (i < 0) return undefined;
+    r = { provider: scheme, type: "doc", topic: rest.slice(0, i).toLowerCase(), id: rest.slice(i + "/doc/".length) };
+  } else if (kind === "ci-run") {
+    const cut = cutLast(rest, "/actions/run/") ?? cutLast(rest, "/pipelines/") ?? cutLast(rest, "/builds/");
+    if (!cut) return undefined;
+    r = { provider: scheme, type: "run", topic: cut[0].toLowerCase(), id: cut[1] };
+  } else if (kind === "deploy") {
+    const i = rest.lastIndexOf("/");
+    if (i <= 0) return undefined;
+    r = { provider: scheme, type: "deploy", topic: rest.slice(0, i).toLowerCase(), id: rest.slice(i + 1) };
+  } else if (kind === "target" && scheme === "target") {
+    const c = rest.indexOf(":");
+    if (c < 0) return undefined;
+    r = { provider: rest.slice(0, c), type: "target", topic: "", id: rest.slice(c + 1).toLowerCase() };
+  } else if (kind === "health" && scheme === "sentry") {
+    const slash = rest.indexOf("/");
+    if (slash < 0) return undefined;
+    r = { provider: scheme, type: "issue", topic: rest.slice(0, slash).toLowerCase(), id: rest.slice(slash + 1) };
+  } else if (kind === "health") r = { provider: scheme, type: "incident", topic: "", id: rest };
+  else if (kind === "repo" && !rest.includes("#")) r = { provider: scheme, type: "repo", topic: "", id: rest.toLowerCase() };
+  return r && checkRef(r) === undefined ? r : undefined;
+}
+
+/** A lineage ref with no kind, in either form: the full form, or the old form of a release
+ * (…/release/<tag>), a GitLab merge request (!), a session or an issue. */
+export function anyLineageRef(ref: string): RefParts | undefined {
+  const full = tryParse(ref);
+  if (full) return full;
+  const kind = ref.startsWith("session:") ? "session" : ref.includes("/release/") ? "release"
+    : ref.startsWith("gitlab:") && ref.includes("!") ? "pr" : "issue";
+  return refFromLineage(kind, ref);
+}
+
+/** A node's ref, parsed, in either form. */
+export const nodeRef = (n: { kind: string; ref: string }): RefParts | undefined => refFromLineage(n.kind, n.ref) ?? anyLineageRef(n.ref);
+
+/** The session id of a session's ref: agents:session:<topic>#<id>, or session:<id> in the old form. */
+export function sessionIdOf(ref: string): string | undefined {
+  const r = refFromLineage("session", ref);
+  return r && r.provider === "agents" && r.type === "session" ? r.id : undefined;
+}
+
+/** A session's ref as a client names it: it does not know the project, so the topic is empty; the
+ * daemon names the node as it keeps it (#4800). */
+export const sessionRef = (id: string) => `agents:session:#${id}`;
+
+/** A repo's ref in either form: github:repo:#alexec/agents, or the old github:alexec/agents. */
+export function repoRefOf(repo: string): RefParts | undefined {
+  const r = refFromLineage("repo", repo);
+  return r && r.type === "repo" ? r : undefined;
+}
+
+/** The ref of the repo or tracker a ref is in: github:repo:#alexec/agents of github:issue:alexec/agents#12. */
+export function repoOfRef(r: RefParts): RefParts | undefined {
+  if (r.type === "repo") return r;
+  return r.topic === "" ? undefined : { provider: r.provider, type: "repo", topic: "", id: r.topic };
+}
+
+/** The old lineage form of a ref (before #4800), which the page's words and addresses are made
+ * from: github:alexec/agents#12 of github:issue:alexec/agents#12, session:<id> of a session. A ref
+ * in the old form, or one it does not know, is as it is. */
+export function legacyRef(ref: string): string {
+  const r = tryParse(ref);
+  if (!r) return ref;
+  const { provider: p, type, topic, id } = r;
+  if (p === "agents") return type === "session" ? `session:${id}` : type === "workflow" ? `workflow:${id}` : type === "workflow-run" ? `run:${id}` : ref;
+  switch (type) {
+    case "issue":
+      if (p === "linear" || p === "jira") return `${p}:${id}`;
+      if (p === "sentry") return `sentry:${topic}/${id}`;
+      return `${p}:${topic}#${id}`;
+    case "pr": return `${p}:${topic}#${id}`;
+    case "mr": return `${p}:${topic}!${id}`;
+    case "release": case "milestone": return `${p}:${topic}/${type}/${id}`;
+    case "doc":
+      if (p === "file") return `file:${id}`;
+      if (p === "web") return `https://${topic}${id === "/" ? "" : id}`;
+      return `${p}:${topic}/doc/${id}`;
+    case "run": {
+      const mark = p === "gitlab" || p === "bitbucket" ? "/pipelines/" : p === "azuredevops" ? "/builds/" : "/actions/run/";
+      return `${p}:${topic}${mark}${id}`;
+    }
+    case "deploy": return `${p}:${topic}/${id}`;
+    case "target": return `target:${p}:${id}`;
+    case "incident": return `${p}:${id}`;
+    case "repo": return `${p}:${id}`;
+    default: return ref;
+  }
+}

@@ -147,7 +147,7 @@ func boardsDaemon(t *testing.T) (*Daemon, *conn, *fakeForgeBoards, string) {
 	return d, c, b, app
 }
 
-var boardsItem = wire.LineageNode{Kind: "issue", Ref: "azureboards:acme/web app#12"}
+var boardsItem = wire.LineageNode{Kind: "issue", Ref: "azureboards:issue:acme/web app#12"}
 
 // #3815: forge/issues reads the Azure Boards projects the folders name, beside GitHub, in the
 // one model: an azureboards: node, the state's name beside open or closed, its parent, and the
@@ -173,7 +173,7 @@ func TestForgeIssuesReadsTheFoldersAzureBoardsProjects(t *testing.T) {
 		t.Fatalf("list: %+v", list)
 	}
 	if item.Node != boardsItem || item.State != "open" || deref(item.Status) != "Active" || deref(item.Folder) != app ||
-		item.Comments != 2 || item.Parent == nil || item.Parent.Ref != "azureboards:acme/web app#3" || len(item.Labels) != 1 {
+		item.Comments != 2 || item.Parent == nil || item.Parent.Ref != "azureboards:issue:acme/web app#3" || len(item.Labels) != 1 {
 		t.Fatalf("Azure Boards item: %+v", *item)
 	}
 	json.Unmarshal(c.call(t, 2, "forge/pulls", wire.ForgeListRequest{}), &list)
@@ -199,11 +199,11 @@ func TestForgeReadsAnAzureBoardsWorkItem(t *testing.T) {
 		!strings.Contains(i.Start.Prompt, "Work on this Azure Boards work item: https://dev.azure.com/acme/web%20app/_workitems/edit/12") {
 		t.Fatalf("start: %+v", i.Start)
 	}
-	missing := wire.LineageNode{Kind: "issue", Ref: "azureboards:acme/web app#404"}
+	missing := wire.LineageNode{Kind: "issue", Ref: "azureboards:issue:acme/web app#404"}
 	if e := c.callError(t, 2, "forge/issue", wire.ForgeItemRequest{Node: missing}); e == nil || !strings.Contains(e.Message, "forge/issue") {
 		t.Fatalf("#404: %+v", e)
 	}
-	for n, ref := range []string{"azureboards:acme#12", "azureboards:acme/web app#0", "azureboards:acme/web app"} {
+	for n, ref := range []string{"azureboards:issue:acme#12", "azureboards:issue:acme/web app#0", "azureboards:acme/web app"} {
 		if e := c.callError(t, 3+n, "forge/issue", wire.ForgeItemRequest{Node: wire.LineageNode{Kind: "issue", Ref: ref}}); e == nil {
 			t.Fatalf("%s was read", ref)
 		}
@@ -253,13 +253,13 @@ func TestForgePlanOfAnAzureBoardsWorkItem(t *testing.T) {
 	_, c, b, _ := boardsDaemon(t)
 	var plan wire.ForgePlan
 	json.Unmarshal(c.call(t, 1, "forge/plan", wire.ForgePlanRequest{Node: boardsItem}), &plan)
-	if plan.Item.Node != boardsItem || len(plan.Children) != 2 || plan.Children[1].Item.Node.Ref != "azureboards:acme/web app#14" || plan.Children[1].Step != 2 {
+	if plan.Item.Node != boardsItem || len(plan.Children) != 2 || plan.Children[1].Item.Node.Ref != "azureboards:issue:acme/web app#14" || plan.Children[1].Step != 2 {
 		t.Fatalf("plan: %+v", plan)
 	}
 	c.call(t, 2, "forge/add-child", wire.ForgeAddChildRequest{Node: boardsItem, Title: new("Send the export"), Level: new("task")})
 	c.call(t, 3, "forge/add-child", wire.ForgeAddChildRequest{Node: boardsItem, Issue: new("AB#20")})
 	c.call(t, 4, "forge/add-child", wire.ForgeAddChildRequest{Node: boardsItem, Issue: new("https://dev.azure.com/acme/Web%20App/_workitems/edit/21")})
-	other := wire.LineageNode{Kind: "issue", Ref: "azureboards:acme/web app#13"}
+	other := wire.LineageNode{Kind: "issue", Ref: "azureboards:issue:acme/web app#13"}
 	c.call(t, 5, "forge/blocked-by", wire.ForgeBlockedByRequest{Node: boardsItem, Add: []wire.LineageNode{other}})
 	_, wrote := b.asked()
 	want := []string{`child acme/web app#12 "Send the export" task task`, "parent acme/web app#20 12", "parent acme/web app#21 12",
@@ -272,7 +272,7 @@ func TestForgePlanOfAnAzureBoardsWorkItem(t *testing.T) {
 			t.Fatalf("added %s", deref(r.Issue))
 		}
 	}
-	elsewhere := wire.LineageNode{Kind: "issue", Ref: "azureboards:contoso/web#3"}
+	elsewhere := wire.LineageNode{Kind: "issue", Ref: "azureboards:issue:contoso/web#3"}
 	if e := c.callError(t, 9, "forge/blocked-by", wire.ForgeBlockedByRequest{Node: boardsItem, Add: []wire.LineageNode{elsewhere}}); e == nil {
 		t.Fatal("a blocker in another organization was linked")
 	}
@@ -296,7 +296,7 @@ func TestAzureBoardsKeysInLabelsTitlesAndURLs(t *testing.T) {
 	}
 	for url, want := range map[string]string{
 		"https://dev.azure.com/acme/Web%20App/_workitems/edit/12":        boardsItem.Ref,
-		"https://tfs.acme.test/DefaultCollection/Web/_workitems/edit/7/": "azureboards:defaultcollection/web#7",
+		"https://tfs.acme.test/DefaultCollection/Web/_workitems/edit/7/": "azureboards:issue:defaultcollection/web#7",
 	} {
 		if n, _, ok := nodeOfURL(url); !ok || n.Ref != want {
 			t.Fatalf("%s: %+v", url, n)

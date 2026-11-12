@@ -83,10 +83,10 @@ func TestLineageAsksEachGitHubIssueOnce(t *testing.T) {
 	defer d.Shutdown()
 	folder := t.TempDir()
 	d.repos = map[string]forgeRepo{folder: {"github", "alexec/agents"}}
-	forge := &fakeParents{known: map[string]bool{"github:alexec/agents#12": true, "github:alexec/agents#7": true},
-		parents: map[string]string{"github:alexec/agents#12": "github:alexec/agents#1"}, asked: map[string]int{}}
+	forge := &fakeParents{known: map[string]bool{"github:issue:alexec/agents#12": true, "github:issue:alexec/agents#7": true},
+		parents: map[string]string{"github:issue:alexec/agents#12": "github:issue:alexec/agents#1"}, asked: map[string]int{}}
 	d.issueLookup = forge.lookup
-	issue := wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#12"}
+	issue := wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#12"}
 
 	a := seeded(t, d, folder, func(a *wire.Agent) {
 		a.Labels = []wire.SessionLabel{{Value: "#12", Owner: wire.SessionLabelOwnerPerson}, {Value: "ENG-4", Owner: wire.SessionLabelOwnerPerson}}
@@ -96,7 +96,7 @@ func TestLineageAsksEachGitHubIssueOnce(t *testing.T) {
 	s := sessionNode(a.ID)
 	wantLinks(t, active(d, issue),
 		s.Ref+" works-on "+issue.Ref+" (start)",
-		issue.Ref+" part-of github:alexec/agents#1 (forge)")
+		issue.Ref+" part-of github:issue:alexec/agents#1 (forge)")
 
 	// Named again within the hour: not asked again.
 	payload := `{"pr":{"number":9,"url":"https://github.com/alexec/Agents/pull/9","fixes":["#12","#7","Other/Repo#3"]}}`
@@ -105,17 +105,17 @@ func TestLineageAsksEachGitHubIssueOnce(t *testing.T) {
 	if n := forge.times(issue.Ref); n != 1 {
 		t.Fatalf("#12 was asked %d times, want 1", n)
 	}
-	if n := forge.times("github:alexec/agents#7"); n != 1 {
+	if n := forge.times("github:issue:alexec/agents#7"); n != 1 {
 		t.Fatalf("#7 was asked %d times, want 1", n)
 	}
 	// The forge could not say: no link, and the links stay.
-	if got := active(d, wire.LineageNode{Kind: "issue", Ref: "github:other/repo#3"}); len(got) != 1 {
+	if got := active(d, wire.LineageNode{Kind: "issue", Ref: "github:issue:other/repo#3"}); len(got) != 1 {
 		t.Fatalf("other/repo#3: %v", got)
 	}
 	// GitLab says no parent: not asked.
 	d.noteIssueParent(folder, forgeRepo{"gitlab", "group/project"}, 4)
 	settleParents(t, d)
-	if n := forge.times("gitlab:group/project#4"); n != 0 {
+	if n := forge.times("gitlab:issue:group/project#4"); n != 0 {
 		t.Fatalf("a GitLab issue was asked %d times, want 0", n)
 	}
 }
@@ -130,9 +130,9 @@ func TestLineageLinksEachIssueToItsParent(t *testing.T) {
 	repo := forgeRepo{"github", "alexec/agents"}
 	d.repos = map[string]forgeRepo{folder: repo}
 	forge := &fakeParents{
-		known:    map[string]bool{"github:alexec/agents#12": true, "github:alexec/agents#1": true},
-		parents:  map[string]string{"github:alexec/agents#12": "github:alexec/agents#1"},
-		children: map[string][]string{"github:alexec/agents#1": {"github:alexec/agents#12", "github:alexec/agents#13"}},
+		known:    map[string]bool{"github:issue:alexec/agents#12": true, "github:issue:alexec/agents#1": true},
+		parents:  map[string]string{"github:issue:alexec/agents#12": "github:issue:alexec/agents#1"},
+		children: map[string][]string{"github:issue:alexec/agents#1": {"github:issue:alexec/agents#12", "github:issue:alexec/agents#13"}},
 		asked:    map[string]int{},
 	}
 	d.issueLookup = forge.lookup
@@ -143,14 +143,14 @@ func TestLineageLinksEachIssueToItsParent(t *testing.T) {
 	settleParents(t, d)
 	wantLinks(t, active(d, epic),
 		child.Ref+" part-of "+epic.Ref+" (forge)",
-		"github:alexec/agents#13 part-of "+epic.Ref+" (forge)")
+		"github:issue:alexec/agents#13 part-of "+epic.Ref+" (forge)")
 
 	// Moved under #2: after the hour, the next lookup moves the link.
-	forge.setParent(child.Ref, "github:alexec/agents#2")
+	forge.setParent(child.Ref, "github:issue:alexec/agents#2")
 	clock.add(parentRecheck + time.Minute)
 	d.noteIssueParent(folder, repo, 12)
 	settleParents(t, d)
-	wantLinks(t, active(d, child), child.Ref+" part-of github:alexec/agents#2 (forge)")
+	wantLinks(t, active(d, child), child.Ref+" part-of github:issue:alexec/agents#2 (forge)")
 
 	// No parent now: the link ends.
 	forge.setParent(child.Ref, "")
@@ -163,7 +163,7 @@ func TestLineageLinksEachIssueToItsParent(t *testing.T) {
 func TestIssueOnForgeOf(t *testing.T) {
 	got, subs, err := issueOnForgeOf([]byte(`{"number":3582,` +
 		`"parent_issue_url":"https://api.github.com/repos/alexec/Agents/issues/3579","sub_issues_summary":{"total":0}}`))
-	if err != nil || got.parent.Ref != "github:alexec/agents#3579" || subs != 0 {
+	if err != nil || got.parent.Ref != "github:issue:alexec/agents#3579" || subs != 0 {
 		t.Errorf("a sub-issue: %+v, %d, %v", got, subs, err)
 	}
 	got, subs, err = issueOnForgeOf([]byte(`{"number":3579,"parent_issue_url":null,"sub_issues_summary":{"total":8}}`))
@@ -171,13 +171,13 @@ func TestIssueOnForgeOf(t *testing.T) {
 		t.Errorf("an epic: %+v, %d, %v", got, subs, err)
 	}
 	children, err := subIssuesOf([]byte(`[{"html_url":"https://github.com/alexec/Agents/issues/3581"},{"html_url":"https://github.com/Other/Repo/issues/7"}]`))
-	if err != nil || len(children) != 2 || children[0].Ref != "github:alexec/agents#3581" || children[1].Ref != "github:other/repo#7" {
+	if err != nil || len(children) != 2 || children[0].Ref != "github:issue:alexec/agents#3581" || children[1].Ref != "github:issue:other/repo#7" {
 		t.Errorf("sub-issues: %v, %v", children, err)
 	}
 	for raw, want := range map[string]string{
-		"https://github.com/alexec/Agents/issues/12":                "github:alexec/agents#12",
-		"https://gitlab.com/group/sub/project/-/issues/4":           "gitlab:group/sub/project#4",
-		"https://github.com/alexec/Agents/issues/12#issuecomment-1": "github:alexec/agents#12",
+		"https://github.com/alexec/Agents/issues/12":                "github:issue:alexec/agents#12",
+		"https://gitlab.com/group/sub/project/-/issues/4":           "gitlab:issue:group/sub/project#4",
+		"https://github.com/alexec/Agents/issues/12#issuecomment-1": "github:issue:alexec/agents#12",
 		"https://github.com/alexec/Agents/pull/12":                  "",
 		"https://gitlab.com/group/project/issues/4":                 "",
 		"https://api.github.com/repos/alexec/Agents/issues/12":      "",

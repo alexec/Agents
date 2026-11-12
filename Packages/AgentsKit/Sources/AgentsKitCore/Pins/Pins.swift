@@ -446,7 +446,7 @@ public struct ReviewPull: Codable, Sendable, Hashable, Identifiable {
     public var title: String
     /// owner/name.
     public var repo: String
-    /// Its lineage ref, "github:owner/name#12": a press opens its Work page. Nil from an older
+    /// Its lineage ref, "github:pr:owner/name#12": a press opens its Work page. Nil from an older
     /// host: a press opens its forge page.
     public var ref: String?
     public var author: String?

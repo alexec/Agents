@@ -65,7 +65,7 @@ func TestLineageFiguresOfARelease(t *testing.T) {
 	if r := figures(2, v41); usd(r.Cost) != 1 || r.Sessions != 1 {
 		t.Fatalf("v0.41.0 %+v", r)
 	}
-	milestone := wire.LineageNode{Kind: "milestone", Ref: "github:alexec/agents/milestone/3"}
+	milestone := wire.LineageNode{Kind: "milestone", Ref: "github:milestone:alexec/agents#3"}
 	if e := c.callError(t, 3, "lineage/figures", wire.LineageNodeRequest{Node: milestone}); e == nil {
 		t.Fatal("a milestone's figures were not refused")
 	}

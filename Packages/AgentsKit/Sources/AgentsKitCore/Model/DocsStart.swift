@@ -67,9 +67,10 @@ public extension DocsList {
     static func linkedRefs(body: String, itemRef: String) -> [String] {
         // `#/docs/<ref>` (the web page's, its ref encoded) or `agents://docs/<ref>` (the Mac window's).
         let addressPattern = /(?:#\/docs\/|agents:\/\/docs\/)([^\s)\]>`'"]+)/
-        // A folder doc's ref (`<scheme>:<repo or machine/folder>/doc/<path>`), or a connector doc's.
+        // A folder doc's ref (`<scheme>:doc:<repo or machine/folder>#<path>`, #4800; before it
+        // `<scheme>:<repo or machine/folder>/doc/<path>`), or a connector doc's.
         let refPattern =
-            /\b(?:[a-z]+:[^\s\/:]+(?:\/[^\s\/]+)+\/doc\/[^\s)\]>`'"]+|(?:confluence|notion|gdrive|mcp):[^\s)\]>`'"]+)/
+            /\b(?:[a-z]+:doc:[^\s:#]+#[^\s)\]>`'"]+|[a-z]+:[^\s\/:]+(?:\/[^\s\/]+)+\/doc\/[^\s)\]>`'"]+|(?:confluence|notion|gdrive|mcp):[^\s)\]>`'"]+)/
         // A Markdown path under specs/ or docs/, not inside a longer path or a URL.
         let pathPattern = /(?:^|[^\w\/.:-])((?:specs|docs)\/[\w.\/-]+\.md)\b/
         let repo = repoPrefix(itemRef)
@@ -96,8 +97,13 @@ public extension DocsList {
             .prefix(linkedMost).map { $0 }
     }
 
-    /// `github:alexec/agents/doc/` for `github:alexec/agents#12`; nil for an item of no repo.
+    /// `github:doc:alexec/agents#` for `github:issue:alexec/agents#12` (#4800); nil for an item
+    /// of no repo. An item's ref in the old form gives the old prefix, `github:alexec/agents/doc/`.
     static func repoPrefix(_ itemRef: String) -> String? {
+        if let r = try? WireRef(parsing: itemRef) {
+            guard r.topic.contains("/") else { return nil }
+            return "\(r.provider):doc:\(r.topic)#"
+        }
         guard let match = itemRef.wholeMatch(of: /([a-z]+:[^\s#!]+\/[^\s#!]+)[#!][0-9]+/) else { return nil }
         return String(match.output.1).lowercased() + "/doc/"
     }

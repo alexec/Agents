@@ -36,13 +36,13 @@ func TestLineageCIRunsBuildTheirPR(t *testing.T) {
 	d.lineageEvent(checks("checks.failed", "https://github.com/alexec/Agents/pull/9", 100))
 	d.lineageEvent(checks("checks.passed", "https://github.com/alexec/Agents/pull/9", 101))
 	d.lineageEvent(checks("checks.failed", "https://gitlab.example.com/group/project/-/merge_requests/4", 7))
-	pr := wire.LineageNode{Kind: "pr", Ref: "github:alexec/agents#9"}
+	pr := wire.LineageNode{Kind: "pr", Ref: "github:pr:alexec/agents#9"}
 	wantLinks(t, active(d, pr),
-		"github:alexec/agents/actions/run/100 builds "+pr.Ref+" (forge)",
-		"github:alexec/agents/actions/run/101 builds "+pr.Ref+" (forge)")
-	walkReaches(t, d, pr, "github:alexec/agents/actions/run/101 builds "+pr.Ref)
-	wantLinks(t, active(d, wire.LineageNode{Kind: "pr", Ref: "gitlab:group/project!4"}),
-		"gitlab:group/project/pipelines/7 builds gitlab:group/project!4 (forge)")
+		"github:run:alexec/agents#100 builds "+pr.Ref+" (forge)",
+		"github:run:alexec/agents#101 builds "+pr.Ref+" (forge)")
+	walkReaches(t, d, pr, "github:run:alexec/agents#101 builds "+pr.Ref)
+	wantLinks(t, active(d, wire.LineageNode{Kind: "pr", Ref: "gitlab:mr:group/project#4"}),
+		"gitlab:run:group/project#7 builds gitlab:mr:group/project#4 (forge)")
 }
 
 // #3581: a PR keeps its newest ciRunsPerPR runs; the older ones' links end.
@@ -53,17 +53,17 @@ func TestLineageCIRunsPerPRAreBounded(t *testing.T) {
 		d.lineageEvent(wire.Event{Name: "checks.passed", Details: map[string]string{"payload": fmt.Sprintf(
 			`{"pr":{"number":9,"url":"https://github.com/alexec/Agents/pull/9"},"run":{"id":%d}}`, run)}})
 	}
-	pr := wire.LineageNode{Kind: "pr", Ref: "github:alexec/agents#9"}
+	pr := wire.LineageNode{Kind: "pr", Ref: "github:pr:alexec/agents#9"}
 	got := active(d, pr)
 	if len(got) != ciRunsPerPR {
 		t.Fatalf("got %d active runs, want %d: %v", len(got), ciRunsPerPR, got)
 	}
 	for run := 1; run <= 3; run++ {
-		if got[fmt.Sprintf("github:alexec/agents/actions/run/%d builds %s (forge)", run, pr.Ref)] {
+		if got[fmt.Sprintf("github:run:alexec/agents#%d builds %s (forge)", run, pr.Ref)] {
 			t.Fatalf("run %d is still active: %v", run, got)
 		}
 	}
-	if !got[fmt.Sprintf("github:alexec/agents/actions/run/%d builds %s (forge)", ciRunsPerPR+3, pr.Ref)] {
+	if !got[fmt.Sprintf("github:run:alexec/agents#%d builds %s (forge)", ciRunsPerPR+3, pr.Ref)] {
 		t.Fatalf("the newest run is not active: %v", got)
 	}
 }
@@ -82,13 +82,13 @@ func TestLineageCIRunBuildsItsRelease(t *testing.T) {
 	}
 	d.lineageEvent(completed("v0.16.0", 500))
 	d.lineageEvent(completed("main", 501))
-	release := wire.LineageNode{Kind: "release", Ref: "github:alexec/agents/release/v0.16.0"}
-	wantLinks(t, active(d, release), "github:alexec/agents/actions/run/500 builds "+release.Ref+" (forge)")
-	walkReaches(t, d, release, "github:alexec/agents/actions/run/500 builds "+release.Ref)
+	release := wire.LineageNode{Kind: "release", Ref: "github:release:alexec/agents#v0.16.0"}
+	wantLinks(t, active(d, release), "github:run:alexec/agents#500 builds "+release.Ref+" (forge)")
+	walkReaches(t, d, release, "github:run:alexec/agents#500 builds "+release.Ref)
 	if l := d.lineage().Links(release).Links[0]; !l.At.Time().Equal(time.Date(2026, 11, 4, 10, 0, 0, 0, time.UTC)) {
 		t.Fatalf("linked at %v, want the run's end", l.At.Time())
 	}
-	if got := active(d, wire.LineageNode{Kind: "ci-run", Ref: "github:alexec/agents/actions/run/501"}); len(got) != 0 {
+	if got := active(d, wire.LineageNode{Kind: "ci-run", Ref: "github:run:alexec/agents#501"}); len(got) != 0 {
 		t.Fatalf("a branch's run: %v", got)
 	}
 }
@@ -117,9 +117,9 @@ func TestRepoOfRunURL(t *testing.T) {
 func TestLineageReleaseDeployedAsATestFlightBuild(t *testing.T) {
 	d, _ := start(t, t.TempDir())
 	defer d.Shutdown()
-	issue := wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#3584"}
-	pr := wire.LineageNode{Kind: "pr", Ref: "github:alexec/agents#9"}
-	release := wire.LineageNode{Kind: "release", Ref: "github:alexec/agents/release/v0.17.0"}
+	issue := wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#3584"}
+	pr := wire.LineageNode{Kind: "pr", Ref: "github:pr:alexec/agents#9"}
+	release := wire.LineageNode{Kind: "release", Ref: "github:release:alexec/agents#v0.17.0"}
 	d.lineageDo(func() {
 		d.link(pr, issue, "fixes", "pr-body")
 		d.link(pr, release, "part-of", "forge")
@@ -128,14 +128,14 @@ func TestLineageReleaseDeployedAsATestFlightBuild(t *testing.T) {
 		`"workflow":"release.yml","event":"push","branch":"v0.17.0","url":"https://github.com/alexec/Agents/actions/runs/500",` +
 		`"conclusion":"success"},"completedAt":"2026-11-05T10:00:00Z",` +
 		`"deploys":["testflight:com.alexecollins.agents.remote/812","not a deploy","testflight:"]}`}})
-	deploy := "testflight:com.alexecollins.agents.remote/812"
+	deploy := "testflight:deploy:com.alexecollins.agents.remote#812"
 	wantLinks(t, active(d, release),
-		"github:alexec/agents/actions/run/500 builds "+release.Ref+" (forge)",
+		"github:run:alexec/agents#500 builds "+release.Ref+" (forge)",
 		release.Ref+" deployed-as "+deploy+" (forge)",
 		pr.Ref+" part-of "+release.Ref+" (forge)")
 	wantLinks(t, active(d, wire.LineageNode{Kind: "deploy", Ref: deploy}),
 		release.Ref+" deployed-as "+deploy+" (forge)",
-		deploy+" part-of target:testflight:com.alexecollins.agents.remote (forge)")
+		deploy+" part-of testflight:target:#com.alexecollins.agents.remote (forge)")
 	// Issue, PR, release, deploy: 3 links, past the default depth of 2 (#3588 walks further).
 	reached := false
 	for _, l := range d.lineage().Walk(issue, lineage.MostDepth).Links {
@@ -149,9 +149,9 @@ func TestLineageReleaseDeployedAsATestFlightBuild(t *testing.T) {
 func TestLineageTestFlightBuildDeployedAsAnAppStoreVersion(t *testing.T) {
 	d, _ := start(t, t.TempDir())
 	defer d.Shutdown()
-	issue := wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#3657"}
-	pr := wire.LineageNode{Kind: "pr", Ref: "github:alexec/agents#9"}
-	release := wire.LineageNode{Kind: "release", Ref: "github:alexec/agents/release/v0.17.0"}
+	issue := wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#3657"}
+	pr := wire.LineageNode{Kind: "pr", Ref: "github:pr:alexec/agents#9"}
+	release := wire.LineageNode{Kind: "release", Ref: "github:release:alexec/agents#v0.17.0"}
 	d.lineageDo(func() {
 		d.link(pr, issue, "fixes", "pr-body")
 		d.link(pr, release, "part-of", "forge")
@@ -161,11 +161,11 @@ func TestLineageTestFlightBuildDeployedAsAnAppStoreVersion(t *testing.T) {
 		`"conclusion":"success"},"completedAt":"2026-11-06T10:00:00Z",` +
 		`"deploys":["testflight:com.alexecollins.agents.remote/812","appstore:com.alexecollins.agents.remote/0.17.0",` +
 		`"testflight:com.example.other/3"]}`}})
-	build, store := "testflight:com.alexecollins.agents.remote/812", "appstore:com.alexecollins.agents.remote/0.17.0"
+	build, store := "testflight:deploy:com.alexecollins.agents.remote#812", "appstore:deploy:com.alexecollins.agents.remote#0.17.0"
 	wantLinks(t, active(d, wire.LineageNode{Kind: "deploy", Ref: store}),
 		build+" deployed-as "+store+" (forge)",
 		release.Ref+" deployed-as "+store+" (forge)",
-		store+" part-of target:appstore:com.alexecollins.agents.remote (forge)")
+		store+" part-of appstore:target:#com.alexecollins.agents.remote (forge)")
 	// Issue, PR, release, App Store version: 3 links.
 	reached := false
 	for _, l := range d.lineage().Walk(issue, lineage.MostDepth).Links {
@@ -178,9 +178,9 @@ func TestLineageTestFlightBuildDeployedAsAnAppStoreVersion(t *testing.T) {
 
 func TestDeployNodes(t *testing.T) {
 	for ref, want := range map[string]string{
-		"testflight:com.example.app/42":      "target:testflight:com.example.app",
-		"cloudrun:project/service/rev-00042": "target:cloudrun:project/service",
-		"appstore:com.example.app/1.2.0":     "target:appstore:com.example.app",
+		"testflight:com.example.app/42":      "testflight:target:#com.example.app",
+		"cloudrun:project/service/rev-00042": "cloudrun:target:#project/service",
+		"appstore:com.example.app/1.2.0":     "appstore:target:#com.example.app",
 		"testflight:com.example.app/":        "",
 		"testflight:com.example.app":         "",
 		"com.example.app/42":                 "",

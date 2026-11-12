@@ -7,6 +7,7 @@
 import type { LineageGraph, LineageNode } from "../protocol/generated";
 import { lineageUrl } from "./lineage";
 import { shortRef } from "./work";
+import { legacyRef } from "../protocol/ref";
 
 /** How far its walk goes: issue, PR, release, deploy, health is 4 links. */
 export const pipelineDepth = 4;
@@ -24,7 +25,9 @@ const same = (a: LineageNode, b: LineageNode) => a.kind === b.kind && a.ref === 
 const has = (list: readonly LineageNode[], n: LineageNode) => list.some((m) => same(m, n));
 const unique = (nodes: LineageNode[]) => nodes.filter((n, i) => nodes.findIndex((m) => same(m, n)) === i);
 
-function split(ref: string): [string, string] {
+// The old form (#4800): the words and addresses below are made from it.
+function split(full: string): [string, string] {
+  const ref = legacyRef(full);
   const i = ref.indexOf(":");
   return i < 0 ? ["", ref] : [ref.slice(0, i), ref.slice(i + 1)];
 }

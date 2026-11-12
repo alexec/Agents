@@ -19,15 +19,15 @@ func TestCycleTimeFromStartToMerge(t *testing.T) {
 		return wire.LineageCostNode{Node: wire.LineageNode{Kind: kind, Ref: ref},
 			Banked: wire.LineageCost{Cost: map[string]float64{"USD": 1}}, LastAt: wire.DateOf(now)}
 	}
-	epic := node("issue", "github:o/r#1")
+	epic := node("issue", "github:issue:o/r#1")
 	epic.Level, epic.Feature = str("epic"), str("estimates")
 	epic.StartedAt = at(1 * time.Hour)
-	story := node("issue", "github:o/r#2")
+	story := node("issue", "github:issue:o/r#2")
 	story.Level, story.Parent = str("story"), str(epic.Node.Ref)
 	story.FirstAt, story.StartedAt = at(20*time.Hour), at(10*time.Hour)
-	pr := node("pr", "github:o/r#3")
+	pr := node("pr", "github:issue:o/r#3")
 	pr.Fixes, pr.Outcome, pr.EndedAt, pr.StartedAt = []string{story.Node.Ref}, str("merged"), at(2*time.Hour), at(9*time.Hour)
-	bug := node("issue", "github:o/r#4")
+	bug := node("issue", "github:issue:o/r#4")
 	bug.Level, bug.StartedAt = str("bug"), at(3*time.Hour)
 
 	// Another machine's copy: a later start, and no level.
@@ -96,7 +96,7 @@ func TestValueSaysTheEstimateError(t *testing.T) {
 	date := func(d wire.Date) *wire.Date { return &d }
 	work := func(v float64) *float64 { return &v }
 	issue := func(n string, est, actual float64, kept bool, state string, landsAt *wire.Date, p10, p90 *float64) wire.LineageCostNode {
-		c := wire.LineageCostNode{Node: wire.LineageNode{Kind: "issue", Ref: "github:o/r#" + n},
+		c := wire.LineageCostNode{Node: wire.LineageNode{Kind: "issue", Ref: "github:issue:o/r#" + n},
 			Banked: wire.LineageCost{Cost: map[string]float64{"USD": actual}, WorkingSeconds: actual * 60}, LastAt: 500,
 			Resolved: &wire.LineageResolved{Title: n, State: str(state)}}
 		if kept {
@@ -112,8 +112,8 @@ func TestValueSaysTheEstimateError(t *testing.T) {
 		return c
 	}
 	pr := func(n, fixes string, ended wire.Date) wire.LineageCostNode {
-		return wire.LineageCostNode{Node: wire.LineageNode{Kind: "pr", Ref: "github:o/r#" + n},
-			Banked: wire.LineageCost{Cost: map[string]float64{}}, Fixes: []string{"github:o/r#" + fixes},
+		return wire.LineageCostNode{Node: wire.LineageNode{Kind: "pr", Ref: "github:pr:o/r#" + n},
+			Banked: wire.LineageCost{Cost: map[string]float64{}}, Fixes: []string{"github:issue:o/r#" + fixes},
 			Outcome: str("merged"), EndedAt: date(ended), LastAt: ended}
 	}
 	v := valueOf([]wire.LineageCostNode{
@@ -162,7 +162,7 @@ func TestValueScoresTheKeptForecasts(t *testing.T) {
 	var nodes []wire.LineageCostNode
 	// An epic with one child, whose PR merged landed ago; its forecast kept p50 and p85 from now.
 	epic := func(n int, landed, p50, p85 time.Duration) {
-		e := node("issue", "github:o/r#"+string(rune('a'+n)))
+		e := node("issue", "github:issue:o/r#"+string(rune('a'+n)))
 		e.Level = str("epic")
 		state(&e, "closed")
 		e.Forecast = &wire.LineageForecastKept{At: at(-10 * day), P50: at(p50), P85: at(p85), WindowDays: 14, Share: 0.1, Open: 1}
@@ -179,7 +179,7 @@ func TestValueScoresTheKeptForecasts(t *testing.T) {
 	epic(1, -2*day, -1*day, 0)      // by both
 	epic(2, -2*day, -5*day, -4*day) // after both
 	epic(3, -40*day, -40*day, -40*day)
-	open := node("issue", "github:o/r#open")
+	open := node("issue", "github:issue:o/r#open")
 	open.Level = str("epic")
 	state(&open, "open")
 	nodes = append(nodes, open)
@@ -196,11 +196,11 @@ func TestValueScoresTheKeptForecasts(t *testing.T) {
 		t.Fatalf("an epic that landed before the range is scored: %+v", v.ForecastScore)
 	}
 
-	have := node("issue", "github:o/r#x")
-	later := node("issue", "github:o/r#x")
+	have := node("issue", "github:issue:o/r#x")
+	later := node("issue", "github:issue:o/r#x")
 	later.Forecast = &wire.LineageForecastKept{At: at(-day), P50: at(0), P85: at(day)}
 	mergeNode(&have, later)
-	earlier := node("issue", "github:o/r#x")
+	earlier := node("issue", "github:issue:o/r#x")
 	earlier.Forecast = &wire.LineageForecastKept{At: at(-2 * day), P50: at(0), P85: at(day)}
 	mergeNode(&have, earlier)
 	if have.Forecast == nil || have.Forecast.At != at(-2*day) {

@@ -181,8 +181,8 @@ func (f *fakeForgeLinear) Labels(context.Context, string) ([]string, map[string]
 }
 
 var (
-	ghIssue = wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#7"}
-	ghPull  = wire.LineageNode{Kind: "pr", Ref: "github:alexec/agents#12"}
+	ghIssue = wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#7"}
+	ghPull  = wire.LineageNode{Kind: "pr", Ref: "github:pr:alexec/agents#12"}
 )
 
 // #3130: an issue's comment, labels and close go to GitHub with the host's connection; a write
@@ -243,7 +243,7 @@ func TestForgeCloseAsNotPlanned(t *testing.T) {
 		{wire.ForgeCloseRequest{Node: ghPull, Reason: &notPlanned}, githubPRNoReason},
 		{wire.ForgeCloseRequest{Node: ghIssue, Reopen: new(true), Reason: &notPlanned}, "no reopen"},
 		{wire.ForgeCloseRequest{Node: ghIssue, Reason: new(wire.ForgeCloseReason("wontfix"))}, "completed or not_planned"},
-		{wire.ForgeCloseRequest{Node: wire.LineageNode{Kind: "issue", Ref: "gitlab:group/app#3"}, Reason: &notPlanned}, forgeNoNotPlanned},
+		{wire.ForgeCloseRequest{Node: wire.LineageNode{Kind: "issue", Ref: "gitlab:issue:group/app#3"}, Reason: &notPlanned}, forgeNoNotPlanned},
 	} {
 		if e := c.callError(t, 10+i, "forge/close", ask.r); e == nil || !strings.Contains(e.Message, ask.says) {
 			t.Errorf("%+v: %v, want %q", ask.r, e, ask.says)
@@ -371,7 +371,7 @@ func TestForgeWritesRefuseWhatIsWrong(t *testing.T) {
 		{"forge/label", wire.ForgeLabelRequest{Node: ghIssue, Add: []string{" "}}},
 		{"forge/assign", wire.ForgeAssignRequest{Node: ghIssue, Add: []string{" @ "}}},
 		{"forge/assign", wire.ForgeAssignRequest{Node: ghIssue, Add: []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k"}}},
-		{"forge/assign", wire.ForgeAssignRequest{Node: wire.LineageNode{Kind: "issue", Ref: "linear:ENG-4"}, Add: []string{"kim"}}},
+		{"forge/assign", wire.ForgeAssignRequest{Node: wire.LineageNode{Kind: "issue", Ref: "linear:issue:eng#ENG-4"}, Add: []string{"kim"}}},
 		{"forge/merge", wire.ForgeMergeRequest{Node: ghPull}},
 		{"forge/approve", wire.ForgeApproveRequest{Node: ghIssue, Sha: "abc"}},
 		{"forge/rerun", wire.ForgeNodeRequest{Node: ghIssue}},
@@ -400,7 +400,7 @@ func TestForgeWritesAreNotAnAgents(t *testing.T) {
 // and close; a merge on Linear is refused.
 func TestForgeWritesGoToGitLabAndLinear(t *testing.T) {
 	_, c, _, gl, ln, _ := allForgesDaemon(t)
-	mr := wire.LineageNode{Kind: "pr", Ref: "gitlab:group/app!4"}
+	mr := wire.LineageNode{Kind: "pr", Ref: "gitlab:mr:group/app#4"}
 	c.call(t, 1, "forge/comment", wire.ForgeCommentRequest{Node: mr, Body: "Fine."})
 	c.call(t, 2, "forge/merge", wire.ForgeMergeRequest{Node: mr, Sha: "head4"})
 	squash, rebase := wire.ForgeMergeMethodSquash, wire.ForgeMergeMethodRebase
@@ -422,7 +422,7 @@ func TestForgeWritesGoToGitLabAndLinear(t *testing.T) {
 		t.Fatalf("GitLab writes:\n%q\nwant\n%q", got, want)
 	}
 
-	eng := wire.LineageNode{Kind: "issue", Ref: "linear:ENG-4"}
+	eng := wire.LineageNode{Kind: "issue", Ref: "linear:issue:eng#ENG-4"}
 	c.call(t, 10, "forge/comment", wire.ForgeCommentRequest{Node: eng, Body: "Done."})
 	c.call(t, 11, "forge/label", wire.ForgeLabelRequest{Node: eng, Add: []string{"Bug"}})
 	c.call(t, 12, "forge/close", wire.ForgeCloseRequest{Node: eng})

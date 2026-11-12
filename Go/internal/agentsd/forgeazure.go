@@ -60,21 +60,16 @@ var (
 
 // boardsNode is the work item project#id.
 func boardsNode(project string, id int) wire.LineageNode {
-	return wire.LineageNode{Kind: lineage.KindIssue, Ref: "azureboards:" + strings.ToLower(project) + "#" + strconv.Itoa(id)}
+	return numbered(lineage.KindIssue, "azureboards", project, id)
 }
 
 // boardsOfNode is the project and id of a work item's node.
 func boardsOfNode(n wire.LineageNode) (string, int, bool) {
-	rest, ok := strings.CutPrefix(n.Ref, "azureboards:")
-	at := strings.LastIndex(rest, "#")
-	if !ok || n.Kind != lineage.KindIssue || at < 0 || !boardsProject.MatchString(rest[:at]) {
+	project, id, ok := numberedNode(n, "azureboards", lineage.KindIssue)
+	if !ok || !boardsProject.MatchString(project) {
 		return "", 0, false
 	}
-	id, err := strconv.Atoi(rest[at+1:])
-	if err != nil || id <= 0 {
-		return "", 0, false
-	}
-	return rest[:at], id, true
+	return project, id, true
 }
 
 // boardsOrg is a project's organization.

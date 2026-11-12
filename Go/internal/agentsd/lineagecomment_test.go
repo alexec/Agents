@@ -153,8 +153,8 @@ func TestCostCommentWords(t *testing.T) {
 		{tokenWords(950), "950"}, {tokenWords(1_260_000), "1.3M"},
 		{durationWords(45), "45s"}, {durationWords(725), "12m"}, {durationWords(3900), "1h 5m"},
 		{amountsWords(map[string]float64{"USD": 1.5, "EUR": 2}), "2.00 EUR + $1.50"},
-		{shortRef("github:alexec/agents#7", "github:alexec/agents#10"), "#7"},
-		{shortRef("github:alexec/other#7", "github:alexec/agents#10"), "alexec/other#7"},
+		{shortRef("github:issue:alexec/agents#7", "github:issue:alexec/agents#10"), "#7"},
+		{shortRef("github:issue:alexec/other#7", "github:issue:alexec/agents#10"), "alexec/other#7"},
 	} {
 		if c.got != c.want {
 			t.Errorf("%q, not %q", c.got, c.want)
@@ -178,7 +178,7 @@ func BenchmarkFlushPRComments(b *testing.B) {
 	d.workMu.Lock()
 	f := d.costLedgerLocked()
 	for i := range costNodesKept {
-		n := wire.LineageNode{Kind: lineage.KindIssue, Ref: fmt.Sprintf("github:alexec/agents#%d", i)}
+		n := wire.LineageNode{Kind: lineage.KindIssue, Ref: fmt.Sprintf("github:issue:alexec/agents#%d", i)}
 		f.Nodes[costKey(n)] = wire.LineageCostNode{Node: n, Banked: blankLineageCost()}
 	}
 	d.workMu.Unlock()

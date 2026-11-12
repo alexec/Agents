@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"log"
 	"net/url"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -226,7 +224,7 @@ func (d *Daemon) dropOldestResolvedLocked() {
 }
 
 // nodeOfRepo is the repo and number of an issue or pull request node of a forge lineage
-// asks by its CLI (forgeKind.cli): github:o/r#12, gitlab:g/p!4. The Work pages ask the other forges by their own nodes first.
+// asks by its CLI (forgeKind.cli): github:issue:o/r#12, gitlab:mr:g/p#4. The Work pages ask the other forges by their own nodes first.
 func nodeOfRepo(n wire.LineageNode) (forgeRepo, int, bool) {
 	repo, i, ok := askedNode(n)
 	if k, _ := kindOf(repo.forge); !ok || k.cli == "" {
@@ -236,26 +234,16 @@ func nodeOfRepo(n wire.LineageNode) (forgeRepo, int, bool) {
 }
 
 // askedNode is nodeOfRepo on any forge lineage asks, by its CLI or its connection:
-// forgejo:o/r#12 and bitbucket:w/r#12 too.
+// forgejo:pr:o/r#12 and bitbucket:issue:w/r#12 too.
 func askedNode(n wire.LineageNode) (forgeRepo, int, bool) {
 	if n.Kind != lineage.KindIssue && n.Kind != lineage.KindPR {
 		return forgeRepo{}, 0, false
 	}
-	forge, rest, ok := strings.Cut(n.Ref, ":")
-	if !ok || !(forgeRepo{forge: forge}).asks() {
+	repo, i, ok := repoOfRef(n)
+	if !ok || i <= 0 || !repo.asks() {
 		return forgeRepo{}, 0, false
 	}
-	k, _ := kindOf(forge)
-	sep := "#"
-	if n.Kind == lineage.KindPR {
-		sep = k.prMark
-	}
-	path, num, ok := strings.Cut(rest, sep)
-	i, err := strconv.Atoi(num)
-	if !ok || err != nil || i <= 0 || path == "" {
-		return forgeRepo{}, 0, false
-	}
-	return forgeRepo{forge, path}, i, true
+	return repo, i, true
 }
 
 // forgeResolveNode asks gh or glab, in folder, for an issue's or pull request's title,

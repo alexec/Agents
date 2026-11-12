@@ -86,6 +86,17 @@ func (d *Daemon) prCommentsLocked() *prCommentFile {
 		if d.comments.PRs == nil {
 			d.comments.PRs = map[string]*prCommentRecord{}
 		}
+		// A file from before #4800 names its PRs and parts in the old ref form.
+		prs := make(map[string]*prCommentRecord, len(d.comments.PRs))
+		for ref, r := range d.comments.PRs {
+			for i, p := range r.Parts {
+				if full, ok := lineage.RefOfText(p); ok {
+					r.Parts[i] = full.String()
+				}
+			}
+			prs[lineage.FullRefText(lineage.KindPR, ref, "")] = r
+		}
+		d.comments.PRs = prs
 		d.commentDirty = map[string]bool{}
 	}
 	return d.comments
@@ -328,18 +339,21 @@ func prCostText(c wire.LineageCost, sessions int, failed int64, mode wire.PRCost
 	return b.String()
 }
 
-// shortRef is an issue as the PR's page names it: #7 in the PR's own repo, owner/repo#7 in another.
+// shortRef is an issue as the PR's page names it: #7 in the PR's own repo, owner/repo#7 in
+// another; a GitLab merge request is !4. A ref that is not read is as it is.
 func shortRef(ref, pr string) string {
-	repo, _, _ := strings.Cut(ref, "#")
-	prRepo := pr
-	if i := strings.LastIndexAny(pr, "#!"); i > 0 {
-		prRepo = pr[:i]
+	r, ok := lineage.RefOfText(ref)
+	if !ok {
+		return ref
 	}
-	if repo == prRepo {
-		return ref[len(repo):]
+	mark := "#"
+	if r.Type == "mr" {
+		mark = "!"
 	}
-	_, id, _ := strings.Cut(ref, ":")
-	return id
+	if p, ok := lineage.RefOfText(pr); ok && p.Provider == r.Provider && p.Topic == r.Topic {
+		return mark + r.ID
+	}
+	return r.Topic + mark + r.ID
 }
 
 // amountsWords is "$1.25", or "1.25 EUR", one amount for each currency.
