@@ -687,7 +687,7 @@ final class RemoteModel {
             case .multiplier:
                 // The Multiplier page (#4116), from its row under Status.
                 openActivity = newValue
-            case .spending, .tokens, .time,
+            case .spending, .tokens, .time, .velocity,
                  .folderMCPServers, .docs, .messages:
                 // Usage, a folder's connectors and Docs are Mac + web (#2798, #3321): the
                 // Remote opens none of them.

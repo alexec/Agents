@@ -277,6 +277,8 @@ struct FolderListView: View {
                     .appText(.supporting).sidebarInk(.tokens).tag(SidebarItem.tokens)
                 TimeRow().activityIcon("clock")
                     .appText(.supporting).sidebarInk(.time).tag(SidebarItem.time)
+                VelocityRow().activityIcon("arrow.triangle.merge")
+                    .appText(.supporting).sidebarInk(.velocity).tag(SidebarItem.velocity)
             } header: {
                 // The size of every other group's heading (#495).
                 Text("Usage").appText(.supporting)

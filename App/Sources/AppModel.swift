@@ -222,6 +222,7 @@ final class AppModel {
             showsRuntimes = false
             statusSecretsPage = nil
             showsTime = false
+            showsVelocity = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -248,6 +249,7 @@ final class AppModel {
             showsRuntimes = false
             statusSecretsPage = nil
             showsTime = false
+            showsVelocity = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -273,6 +275,7 @@ final class AppModel {
             statusSecretsPage = nil
             showsEvents = false
             showsTime = false
+            showsVelocity = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -295,6 +298,7 @@ final class AppModel {
             showsEvents = false
             showsRuntimes = false
             showsTime = false
+            showsVelocity = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -313,10 +317,34 @@ final class AppModel {
     var showsTime = false {
         didSet {
             guard showsTime, showsTime != oldValue else { return }
+            showsVelocity = false
             showsSpending = false
             showsEvents = false
             showsRuntimes = false
             statusSecretsPage = nil
+            showsTokens = false
+            machinePage = nil
+            showsWork = false
+            showsDocs = false
+            showsMessages = false
+            showsSummary = false
+            selection = nil
+            openWorkflow = nil
+            folderPage = nil
+            composing = false
+        }
+    }
+
+    /// Whether the window is showing Velocity: the pull requests that landed, over time (#4597).
+    /// A page like Time, and not persisted for the same reason.
+    var showsVelocity = false {
+        didSet {
+            guard showsVelocity, showsVelocity != oldValue else { return }
+            showsSpending = false
+            showsEvents = false
+            showsRuntimes = false
+            statusSecretsPage = nil
+            showsTime = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -340,6 +368,7 @@ final class AppModel {
             showsRuntimes = false
             statusSecretsPage = nil
             showsTime = false
+            showsVelocity = false
             machinePage = nil
             showsWork = false
             showsDocs = false
@@ -366,6 +395,7 @@ final class AppModel {
             showsRuntimes = false
             statusSecretsPage = nil
             showsTime = false
+            showsVelocity = false
             showsTokens = false
             selection = nil
             openWorkflow = nil
@@ -388,6 +418,7 @@ final class AppModel {
             showsRuntimes = false
             statusSecretsPage = nil
             showsTime = false
+            showsVelocity = false
             showsTokens = false
             machinePage = nil
             selection = nil
@@ -408,6 +439,7 @@ final class AppModel {
             showsRuntimes = false
             statusSecretsPage = nil
             showsTime = false
+            showsVelocity = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -430,6 +462,7 @@ final class AppModel {
             showsRuntimes = false
             statusSecretsPage = nil
             showsTime = false
+            showsVelocity = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -455,6 +488,7 @@ final class AppModel {
             showsRuntimes = false
             statusSecretsPage = nil
             showsTime = false
+            showsVelocity = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -537,6 +571,7 @@ final class AppModel {
         showsRuntimes = false
         statusSecretsPage = nil
         showsTime = false
+        showsVelocity = false
         showsTokens = false
         machinePage = nil
         showsWork = false
@@ -563,6 +598,7 @@ final class AppModel {
         showsRuntimes = false
         statusSecretsPage = nil
         showsTime = false
+        showsVelocity = false
         showsTokens = false
         machinePage = nil
         showsWork = false
@@ -614,6 +650,7 @@ final class AppModel {
             if showsSpending { return .spending }
             if showsTokens { return .tokens }
             if showsTime { return .time }
+            if showsVelocity { return .velocity }
             if showsWork { return .work(workPlace.kind) }
             if showsDocs { return .docs }
             if showsMessages { return .messages }
@@ -641,6 +678,7 @@ final class AppModel {
                 showsRuntimes = false
                 statusSecretsPage = nil
                 showsTime = false
+                showsVelocity = false
                 showsTokens = false
                 machinePage = nil
                 showsWork = false
@@ -667,6 +705,8 @@ final class AppModel {
                 showsTokens = true
             case .time:
                 showsTime = true
+            case .velocity:
+                showsVelocity = true
             case .work(let kind):
                 // The list's row: its list, or the place in it still open.
                 showWork(workPlace.kind == kind ? workPlace : WorkPlace(kind: kind))
@@ -695,6 +735,7 @@ final class AppModel {
                 showsRuntimes = false
                 statusSecretsPage = nil
                 showsTime = false
+                showsVelocity = false
                 showsTokens = false
                 machinePage = nil
                 showsWork = false
@@ -719,6 +760,7 @@ final class AppModel {
         showsRuntimes = false
         statusSecretsPage = nil
         showsTime = false
+        showsVelocity = false
         showsTokens = false
         machinePage = nil
         showsWork = false
@@ -735,6 +777,7 @@ final class AppModel {
         showsRuntimes = false
         statusSecretsPage = nil
         showsTime = false
+        showsVelocity = false
         showsTokens = false
         machinePage = nil
         showsWork = false
@@ -766,6 +809,7 @@ final class AppModel {
         showsRuntimes = false
         statusSecretsPage = nil
         showsTime = false
+        showsVelocity = false
         showsTokens = false
         machinePage = nil
         showsWork = false
@@ -1006,6 +1050,7 @@ final class AppModel {
         showsRuntimes = false
         statusSecretsPage = nil
         showsTime = false
+        showsVelocity = false
         showsTokens = false
         machinePage = nil
         showsWork = false
@@ -2448,6 +2493,15 @@ final class AppModel {
             }
         }
         return histories.isEmpty ? nil : .merged(histories)
+    }
+
+    /// The PRs that landed (#4597), for the Velocity page: this Mac's lineage alone, as the
+    /// Multiplier is (#4595, v1), since two hosts that worked on one PR would count it twice.
+    /// Nil when the host does not know the method, and the page keeps its progress wheel.
+    func velocityHistory() async -> VelocityHistory? {
+        guard let history = try? await macClient.call(DaemonAPI.Method.velocityHistory, Optional<String>.none,
+                                                    returning: VelocityHistory.self) else { return nil }
+        return .merged([history])
     }
 
     /// This Mac first, then every server that has said what it spends.
