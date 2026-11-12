@@ -406,7 +406,7 @@ button.link {
 }
 .from-agent .bubble { max-width: 100%; }
 
-.reply { margin: 0; line-height: 1.5; }
+.reply { margin: 0; line-height: var(--type-leading-reading); letter-spacing: var(--type-tracking-reading); word-spacing: var(--type-word-spacing-reading); }
 
 /* Copy Message (#519), there only while the message is pointed at or the button focused, and
    out of the flow so nothing moves when it shows: beside the person's bubble, in the free margin
@@ -704,7 +704,7 @@ p.working .working-ring { --well: 16px; opacity: 0.6; }
   padding: 4px 12px;
   background: var(--paper-raised);
   border: 1px solid var(--paper-rule);
-  box-shadow: 0 2px 8px var(--paper-shadow);
+  box-shadow: var(--shadow-floating);
 }
 .chat .detail { font: inherit; font-size: 0.75rem; background: none; border: 1px solid var(--paper-rule); border-radius: var(--radius-control); }
 
@@ -732,7 +732,6 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
   background: var(--paper-raised);
   border: 1px solid var(--paper-rule);
   border-radius: var(--radius-floating);
-  box-shadow: 0 4px 16px var(--paper-shadow);
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
@@ -820,7 +819,7 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
 
 /* The runtime's commands and the host's files, over the field (CommandList, MentionList; #255). */
 .completions { list-style: none; margin: 0 0 8px; padding: 6px; max-height: 220px; overflow-y: auto;
-  background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: 14px; box-shadow: 0 2px 8px var(--paper-shadow); }
+  background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: 14px; box-shadow: var(--shadow-floating); }
 .completions li { display: flex; align-items: baseline; gap: 8px; padding: 5px 8px; border-radius: 7px; cursor: pointer;
   white-space: nowrap; overflow: hidden; }
 .completions li > :last-child { overflow: hidden; text-overflow: ellipsis; }
@@ -904,7 +903,7 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
   background: var(--paper-raised);
   border: 1px solid var(--paper-rule);
   border-radius: var(--radius-card);
-  box-shadow: 0 6px 20px var(--paper-shadow);
+  box-shadow: var(--shadow-floating);
   padding: 4px;
 }
 
@@ -934,7 +933,7 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
 .model-effort { position: relative; }
 .model-effort > summary { list-style: none; cursor: pointer; }
 .model-effort > summary::-webkit-details-marker { display: none; }
-.model-effort-menu { position: absolute; z-index: 20; right: 0; bottom: calc(100% + 6px); display: flex; gap: 6px; padding: 8px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-raised); box-shadow: 0 4px 18px var(--paper-shadow); }
+.model-effort-menu { position: absolute; z-index: 20; right: 0; bottom: calc(100% + 6px); display: flex; gap: 6px; padding: 8px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-raised); box-shadow: var(--shadow-floating); }
 /* The shared words' pills (#2658): the values in a column, the runtime's own behind ⋯. */
 .level-select { position: relative; }
 .level-select .model-effort-menu { flex-direction: column; align-items: stretch; min-width: 260px; left: 0; right: auto; }
@@ -952,7 +951,7 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
 .client-permission-control { position: relative; flex: none; }
 .client-permission-control > summary { list-style: none; cursor: pointer; }
 .client-permission-control > summary::-webkit-details-marker { display: none; }
-.client-permission-menu { position: absolute; z-index: 20; left: 0; bottom: calc(100% + 6px); width: min(330px, calc(100vw - 36px)); padding: 6px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-raised); box-shadow: 0 4px 18px var(--paper-shadow); }
+.client-permission-menu { position: absolute; z-index: 20; left: 0; bottom: calc(100% + 6px); width: min(330px, calc(100vw - 36px)); padding: 6px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-raised); box-shadow: var(--shadow-floating); }
 .client-permission-choice { display: grid; width: 100%; gap: 2px; padding: 7px 8px; border: 0; border-radius: 6px; background: transparent; color: inherit; text-align: left; cursor: pointer; }
 .client-permission-choice:hover, .client-permission-choice[aria-pressed=true] { background: var(--paper-selection); }
 .client-permission-choice:disabled { opacity: 0.55; cursor: default; }
@@ -975,7 +974,6 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
   border-radius: 999px;
   background: var(--paper-raised);
   border: 1px solid var(--paper-rule);
-  box-shadow: 0 1px 2px var(--paper-shadow);
   white-space: nowrap;
   color: inherit;
 }
@@ -1074,7 +1072,7 @@ button.remove:hover { opacity: 1; }
 
 /* US4: the files pane's tabs, the browser, a file, the changes and a live page. */
 .files .tabs button.tab { border: none; background: none; padding: 3px 10px; border-radius: var(--radius-control); }
-.files .tabs button.tab.chosen { background: var(--paper-raised); box-shadow: 0 1px 2px var(--paper-shadow); }
+.files .tabs button.tab.chosen { background: var(--paper-raised); box-shadow: 0 0 0 1px var(--paper-rule); }
 .files ul { margin: 0; padding: 0; }
 .files li { padding: 0; }
 .pane-body { padding: 10px 12px; }
@@ -1124,7 +1122,7 @@ button.remove:hover { opacity: 1; }
 .file-search .completions { margin: 0; }
 .file-search .hint { margin: 0 12px; }
 /* The Prompts list (#1658): as Open File…, with a heading, and two lines and a ··· to a row. */
-.prompt-list { background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: 14px; box-shadow: 0 6px 20px var(--paper-shadow); padding: 12px; }
+.prompt-list { background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: 14px; box-shadow: var(--shadow-floating); padding: 12px; }
 .prompt-list h2 { margin: 0 4px; font-size: 0.9375rem; }
 .prompt-list .prompt-earlier { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 0 4px; }
 .prompt-list .completions { max-height: min(420px, 60vh); box-shadow: none; }
@@ -1155,7 +1153,7 @@ dialog.image-viewer {
   background: var(--paper-raised);
   border: 1px solid var(--paper-rule);
   border-radius: var(--radius-card);
-  box-shadow: 0 12px 40px var(--paper-shadow);
+  box-shadow: var(--shadow-sheet);
   overflow: hidden;
 }
 dialog.image-viewer[open] { display: flex; flex-direction: column; }
@@ -1355,7 +1353,7 @@ dialog.image-viewer::backdrop { background: color-mix(in srgb, var(--paper-scrim
   padding: 4px 10px; display: inline-flex; gap: 6px; align-items: center; }
 .nav-menu-list { position: absolute; right: 8px; top: 100%; z-index: 20; display: flex; flex-direction: column; min-width: 200px;
   padding: 4px; background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-card);
-  box-shadow: 0 6px 20px var(--paper-shadow); }
+  box-shadow: var(--shadow-floating); }
 /* Only the bar's: the sidebar's rows have a .nav-item of their own (Pins, approvals). */
 :is(.nav-bar, .nav-menu-list) .nav-item { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 6px; background: none;
   font: inherit; color: inherit; padding: 4px 10px; cursor: pointer; }
@@ -1532,7 +1530,7 @@ dialog.sheet {
   background: var(--paper-raised);
   border: 1px solid var(--paper-rule);
   border-radius: var(--radius-card);
-  box-shadow: 0 12px 40px var(--paper-shadow);
+  box-shadow: var(--shadow-sheet);
 }
 dialog.sheet::backdrop { background: color-mix(in srgb, var(--paper-scrim) 25%, transparent); }
 /* Project Settings and Folder Settings (#3280): tabs over a grid of a label and its value. */
@@ -2731,7 +2729,7 @@ dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
 /* S11: a card in the middle of the plot, with Show the week. */
 .timeline-empty { position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%); width: max-content; max-width: 80%; margin: 0;
   display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 14px; border: 1px solid var(--paper-rule);
-  border-radius: 6px; background: var(--paper-raised); box-shadow: 0 1px 4px var(--paper-shadow); text-align: center; }
+  border-radius: 6px; background: var(--paper-raised); text-align: center; }
 .timeline-empty button { margin-top: 4px; }
 /* The bar (notes 30 to 32): the range and a bordered Now at the trailing edge, then Refresh. */
 .timeline-bar .work-menus { gap: 8px; }
@@ -2766,7 +2764,7 @@ dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
   .timeline-trailing { margin-left: 0; }
 }
 .timeline-card { position: absolute; z-index: 2; max-width: 360px; padding: 8px; border: 1px solid var(--paper-rule); border-radius: 6px;
-  background: var(--paper-raised); box-shadow: 0 2px 8px var(--paper-shadow); pointer-events: none; line-height: 1.35; }
+  background: var(--paper-raised); box-shadow: var(--shadow-floating); pointer-events: none; line-height: 1.35; }
 .timeline-card .strong { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .timeline-card-title { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .timeline-card-title svg { flex: none; }
@@ -2849,8 +2847,8 @@ dialog.sheet:has(.persona-sheet) { width: min(900px, calc(100vw - 32px)); max-he
 .multiplier-badges { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 24px; }
 .badge-row { display: flex; align-items: center; gap: 8px; }
 .badge { width: 30px; height: 30px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
-  color: var(--paper-on-fill); font-size: 15px; font-weight: 600; background: linear-gradient(var(--accent), color-mix(in srgb, var(--accent) 80%, var(--paper-scrim)));
-  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--paper-on-fill) 35%, transparent), 0 1px 1px color-mix(in srgb, var(--paper-scrim) 18%, transparent); cursor: default; }
+  color: var(--paper-on-fill); font-size: 15px; font-weight: 600; background: var(--accent);
+  cursor: default; }
 .badge.new { animation: badge-in 0.5s cubic-bezier(0.3, 1.6, 0.5, 1); }
 @keyframes badge-in { from { transform: scale(0); } to { transform: scale(1); } }
 .badge-count { margin-left: 6px; font-variant-numeric: tabular-nums; }
@@ -2891,7 +2889,7 @@ dialog.sheet:has(.persona-sheet) { width: min(900px, calc(100vw - 32px)); max-he
   max-width: min(560px, calc(100vw - 32px)); pointer-events: none; }
 .message-toast { display: flex; align-items: center; gap: 10px; padding: 9px 12px 9px 14px; font-size: 0.8125rem;
   color: var(--paper-ink); background: var(--paper-raised); border: 1px solid var(--paper-rule);
-  border-radius: var(--radius-floating); box-shadow: 0 4px 16px var(--paper-shadow); pointer-events: auto;
+  border-radius: var(--radius-floating); box-shadow: var(--shadow-floating); pointer-events: auto;
   animation: toast-in 150ms ease-out; }
 .message-toast button.link { flex: none; }
 .message-close { flex: none; border: none; background: none; color: inherit; opacity: 0.6; padding: 0 2px; font: inherit; cursor: pointer; }

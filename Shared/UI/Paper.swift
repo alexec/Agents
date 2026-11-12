@@ -7,47 +7,69 @@ import UIKit
 
 /// The app's surfaces: what the page is printed on, and the few ways a thing sits on it.
 ///
-/// The theme is paper. Most of what this app shows is prose — a report, a transcript, a
-/// document an agent is writing — so the ground is cool near-white rather than pure
-/// white, the ink is charcoal rather than pure black, and a list is rows under hairline
-/// rules rather than a stack of glass cards. Glass made every row a floating object;
-/// on paper a row is a line in a ledger, and the only things that float are the ones
-/// that really are on top: the prompt bar, a question, a menu.
+/// The theme is paper, version 2 (`specs/4926-paper-v2/spec.md`). Most of what this app
+/// shows is prose — a report, a transcript, a document an agent is writing — so the ground
+/// is warm near-white rather than pure white, the ink is a deep charcoal (17:1) rather than
+/// pure black, and a list is rows under rules rather than a stack of glass cards. Lines, not
+/// shading: a rule sets things apart, nothing on the page casts a shadow, and only what
+/// floats over it (a menu, the prompt bar, a toast, a sheet) has a short one. Flat, with
+/// light greys one small step from the page, and no gradients.
 ///
 /// `StateTint` still owns the three state colours and `TextStep` the sizes. This owns
 /// everything else a surface is drawn in, so no view picks a background of its own.
 ///
-///     TOKEN     LIGHT     DARK      FOR
-///     ground    #F7F8F9   #1C1D20   the page every column sits on
-///     sidebar   #F0F1F3   #161719   the folders column, one shade deeper
-///     raised    #FFFFFF   #26282C   what floats: prompt bar, cards, menus
-///     well      #F0F2F4   #2A2D31   what is set into the page: code, your own message
-///     wash      #E7EAEE   #33363B   a row under the pointer, a picked item
-///     rule      #DDE1E6   #3A3E44   hairlines between rows and round raised things
-///     ink       #1C1D20   #E8EAED   text drawn as ink
-///     accent    #1F5FC8   #7FB0FF   the icon's cobalt (#156, #695): links, focus, the prominent
-///                                   button's fill; `Color.accentColor`, from the asset
-///     issue     #0E6B82   #6CC6DB   a session label naming an issue, `#12` (#2958)
-///     pull      #7442B8   #B79AF0   a session label naming a pull request, `P#12` (#2958)
+///     TOKEN      LIGHT     DARK      FOR
+///     ground     #FCFBF9   #1A1A19   the page every column sits on
+///     sidebar    #F8F7F4   #171716   the folders column, one small step from the page
+///     raised     #FFFFFF   #212120   cards, the prompt bar, menus, sheets
+///     well       #F6F5F2   #262625   what is set into the page: code, your own message
+///     wash       #F1F0EC   #2E2E2C   hover; a pressed quiet button
+///     rule       #D6D2C9   #3D3D3A   the line that sets things apart, 1.5:1
+///     edge       #7D786E   #85817A   a field's, checkbox's or toggle's edge, 3:1 or more
+///     ink        #1A1918   #F4F2ED   text, icons
+///     secondary  #4A4741   #BDB9B0   second lines, speakers, section headings
+///     tertiary   #625E57   #A29E95   timestamps, counts, placeholders
+///     accent     #1A52C0   #86B4FF   the icon's cobalt (#156, #695): links, focus, the chosen
+///                                    control; `Color.accentColor`, from the asset
+///     issue      #0C6278   #73CBE0   a session label naming an issue, `#12` (#2958)
+///     pull       #6C3CAE   #BEA3F2   a session label naming a pull request, `P#12` (#2958)
+///     line…      pale      deep      a state's line: accent, attention, vouched, failure
 ///     forge…    GitHub's  own       an item's state on its forge (Work; #4618), below
 ///
 /// `design/tokens.json` holds every value here, and `DesignTokensTests` fails when one
 /// differs. Code's ink is `Packages/CodeText/Sources/CodeText/InkValues.swift`'s.
 enum Paper {
-    static let ground = Color(light: 0xF7F8F9, dark: 0x1C1D20)
-    static let sidebar = Color(light: 0xF0F1F3, dark: 0x161719)
-    static let raised = Color(light: 0xFFFFFF, dark: 0x26282C)
-    static let well = Color(light: 0xF0F2F4, dark: 0x2A2D31)
-    static let wash = Color(light: 0xE7EAEE, dark: 0x33363B)
-    static let rule = Color(light: 0xDDE1E6, dark: 0x3A3E44)
-    static let ink = Color(light: 0x1C1D20, dark: 0xE8EAED)
+    static let ground = Color(light: 0xFCFBF9, dark: 0x1A1A19)
+    static let sidebar = Color(light: 0xF8F7F4, dark: 0x171716)
+    static let raised = Color(light: 0xFFFFFF, dark: 0x212120)
+    static let well = Color(light: 0xF6F5F2, dark: 0x262625)
+    static let wash = Color(light: 0xF1F0EC, dark: 0x2E2E2C)
+    static let rule = Color(light: 0xD6D2C9, dark: 0x3D3D3A)
+    /// A control's edge (a field, a checkbox, a toggle's track): 3:1 or more on every
+    /// surface, so a control can be found (WCAG 1.4.11). A rule is for setting apart.
+    static let edge = Color(light: 0x7D786E, dark: 0x85817A)
+    static let ink = Color(light: 0x1A1918, dark: 0xF4F2ED)
+    /// Text a step quieter than ink, opaque so it is 4.5:1 or more on every surface, the
+    /// selection too: a row's second line, a speaker, a section heading.
+    static let secondary = Color(light: 0x4A4741, dark: 0xBDB9B0)
+    /// Quieter still, and still 4.5:1 or more: timestamps, counts, placeholders.
+    static let tertiary = Color(light: 0x625E57, dark: 0xA29E95)
+    /// The picked row, with a bar in the accent at its edge.
+    static let selection = Color(light: 0xEBE9E4, dark: 0x363633)
     /// The cobalt, from the asset catalogue rather than a hex here, so a control and
     /// the system's own focus rings and selections agree. The one place a view reaches it.
     static let accent = Color.accentColor
     /// A label chip's hue by what the label names (`SessionLabel.Kind`, #2958): not the
     /// state tints, so a label never reads as a session needing someone or failing.
-    static let issue = Color(light: 0x0E6B82, dark: 0x6CC6DB)
-    static let pull = Color(light: 0x7442B8, dark: 0xB79AF0)
+    static let issue = Color(light: 0x0C6278, dark: 0x73CBE0)
+    static let pull = Color(light: 0x6C3CAE, dark: 0xBEA3F2)
+
+    /// A state's line (`design/tokens.json`'s `color.line`): a state shows its colour in
+    /// its text, its icon and this line, never in a fill.
+    static let lineAccent = Color(light: 0xA9C2EE, dark: 0x3D5687)
+    static let lineAttention = Color(light: 0xEBBF9F, dark: 0x6B4A33)
+    static let lineVouched = Color(light: 0xA9D3BB, dark: 0x36614D)
+    static let lineFailure = Color(light: 0xEEB0B3, dark: 0x6B3A3D)
 
     /// An item's state on its forge, in GitHub's own colours (`specs/4328-work-look/parts.md`,
     /// `design/tokens.json`'s `color.forge`): the forge's state, not the app's, which is
@@ -69,29 +91,64 @@ enum Paper {
     static let forgeFillClosed = Color(light: 0xCF222E, dark: 0xDA3633)
     static let forgeFillDraft = Color(light: 0x59636E, dark: 0x6E7681)
 
-    /// Corner radii: control (chips, rail), card (rows, wells).
+    /// Corner radii: code, control (chips, rail), card (rows, wells), and a pill for a
+    /// state badge.
     enum Radius {
+        static let code: CGFloat = 5
         static let control: CGFloat = 7
         static let card: CGFloat = 10
+        static let pill: CGFloat = 99
     }
 
-    /// The shadow under a raised thing. Soft and short: paper lifted a little off the
-    /// desk, not a window hovering over it.
-    static let shadow = Color(light: 0x20242A, dark: 0x000000).opacity(0.10)
+    /// Depth. Only what floats over the page casts a shadow; cards, buttons and rows have
+    /// none, only a rule. The ink's colour in the light, black in the dark.
+    struct Shadow {
+        let color: Color
+        let radius: CGFloat
+        let y: CGFloat
+
+        /// Menus, the prompt bar, toasts: `0 4px 12px`, 10% light and 40% dark.
+        static let floating = Shadow(color: Color(light: 0x1A1918, dark: 0x000000, lightAlpha: 0.10, darkAlpha: 0.40),
+                                     blur: 12, y: 4)
+        /// Sheets and dialogs, over a dimmed page: `0 12px 32px`, 18% light and 55% dark.
+        static let sheet = Shadow(color: Color(light: 0x1A1918, dark: 0x000000, lightAlpha: 0.18, darkAlpha: 0.55),
+                                  blur: 32, y: 12)
+
+        /// A CSS blur is twice SwiftUI's radius.
+        init(color: Color, blur: CGFloat, y: CGFloat) {
+            self.color = color
+            radius = blur / 2
+            self.y = y
+        }
+    }
+
+    /// Keyboard focus: a ring in the accent, `gap` from the control.
+    enum Focus {
+        static let width: CGFloat = 2
+        static let gap: CGFloat = 2
+    }
+}
+
+extension View {
+    /// One of Paper's shadows, for what floats.
+    func paperShadow(_ shadow: Paper.Shadow) -> some View {
+        self.shadow(color: shadow.color, radius: shadow.radius, y: shadow.y)
+    }
 }
 
 extension Color {
     /// A colour that follows the appearance. Paper's only constructor, so a hex value
     /// appears nowhere outside this file.
-    init(light: UInt32, dark: UInt32) {
+    init(light: UInt32, dark: UInt32, lightAlpha: CGFloat = 1, darkAlpha: CGFloat = 1) {
         #if os(macOS)
         self.init(nsColor: NSColor(name: nil) { appearance in
             let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            return NSColor(hex: isDark ? dark : light)
+            return NSColor(hex: isDark ? dark : light).withAlphaComponent(isDark ? darkAlpha : lightAlpha)
         })
         #else
         self.init(uiColor: UIColor { traits in
-            UIColor(hex: traits.userInterfaceStyle == .dark ? dark : light)
+            let isDark = traits.userInterfaceStyle == .dark
+            return UIColor(hex: isDark ? dark : light).withAlphaComponent(isDark ? darkAlpha : lightAlpha)
         })
         #endif
     }
@@ -101,9 +158,9 @@ extension Color {
 extension NSColor {
     /// Paper for AppKit views that take an `NSColor` rather than a `Color` — the
     /// terminal. Dynamic, like the `Color`s, so the appearance can change under them.
-    static let paperGround = NSColor(light: 0xF7F8F9, dark: 0x1C1D20)
-    static let paperInk = NSColor(light: 0x1C1D20, dark: 0xE8EAED)
-    static let paperSelection = NSColor(light: 0xD8DEE6, dark: 0x3A3E44)
+    static let paperGround = NSColor(light: 0xFCFBF9, dark: 0x1A1A19)
+    static let paperInk = NSColor(light: 0x1A1918, dark: 0xF4F2ED)
+    static let paperSelection = NSColor(light: 0xEBE9E4, dark: 0x363633)
 
     private convenience init(light: UInt32, dark: UInt32) {
         self.init(name: nil) { appearance in
@@ -124,9 +181,9 @@ private extension NSColor {
 extension UIColor {
     /// Paper for the phone's terminal, which takes a `UIColor` (034). The same values
     /// as the Mac's, dynamic in the same way.
-    static let paperGround = UIColor(light: 0xF7F8F9, dark: 0x1C1D20)
-    static let paperInk = UIColor(light: 0x1C1D20, dark: 0xE8EAED)
-    static let paperSelection = UIColor(light: 0xD8DEE6, dark: 0x3A3E44)
+    static let paperGround = UIColor(light: 0xFCFBF9, dark: 0x1A1A19)
+    static let paperInk = UIColor(light: 0x1A1918, dark: 0xF4F2ED)
+    static let paperSelection = UIColor(light: 0xEBE9E4, dark: 0x363633)
 
     private convenience init(light: UInt32, dark: UInt32) {
         self.init { traits in UIColor(hex: traits.userInterfaceStyle == .dark ? dark : light) }
@@ -163,13 +220,13 @@ extension View {
         #endif
     }
 
-    /// A thing that floats above the page: raised paper with a hairline edge and a
-    /// short shadow. Replaces `.glassEffect(.regular, in:)`.
+    /// A thing that floats above the page: raised paper with a rule round it and the
+    /// short `floating` shadow. Replaces `.glassEffect(.regular, in:)`.
     func paperRaised(in shape: some InsettableShape) -> some View {
         self
             .background(Paper.raised, in: shape)
             .overlay(shape.strokeBorder(Paper.rule, lineWidth: 1))
-            .shadow(color: Paper.shadow, radius: 6, y: 2)
+            .paperShadow(.floating)
     }
 
     /// Something set into the page: a code block, your own message, a diff.

@@ -38,7 +38,7 @@
   border: 1px solid var(--paper-rule); border-radius: 4px; pointer-events: none; }
 .top-search-found { position: absolute; top: calc(100% + 4px); right: 0; width: 24rem; max-width: 90vw; margin: 0; padding: 4px;
   list-style: none; background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-console);
-  box-shadow: 0 8px 24px var(--paper-shadow); z-index: 30; }
+  box-shadow: var(--shadow-floating); z-index: 30; }
 .top-search-found li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 10px; border-radius: 4px; cursor: pointer; }
 .top-search-found li.on { background: var(--paper-wash); }
 .top-search-found li.none { cursor: default; opacity: 0.65; }
@@ -51,7 +51,7 @@
   font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
 .person-list { position: absolute; top: calc(100% + 6px); right: 0; width: 16rem; display: flex; flex-direction: column; padding: 4px 0;
   background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-console);
-  box-shadow: 0 8px 24px var(--paper-shadow); z-index: 30; }
+  box-shadow: var(--shadow-floating); z-index: 30; }
 .person-list .person-who { display: flex; flex-direction: column; gap: 2px; padding: 8px 14px 10px; border-bottom: 1px solid var(--paper-rule); }
 .person-list > button { text-align: left; border: 0; border-radius: 0; background: none; padding: 0 14px; min-height: var(--console-control); }
 .person-list > button:hover { background: var(--paper-wash); }
@@ -209,10 +209,10 @@ dialog.command-menu::backdrop { background: color-mix(in srgb, var(--paper-scrim
 .command-menu-box { display: flex; flex-direction: column; gap: 8px; }
 .command-menu-box input { width: 100%; box-sizing: border-box; padding: 10px 12px; font: inherit; font-size: 0.9375rem; color: inherit;
   background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-console);
-  box-shadow: 0 8px 24px var(--paper-shadow); }
+  box-shadow: var(--shadow-floating); }
 .command-menu-box input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .command-menu-found { max-height: 360px; overflow-y: auto; margin: 0; padding: 4px; list-style: none; background: var(--paper-raised);
-  border: 1px solid var(--paper-rule); border-radius: var(--radius-console); box-shadow: 0 8px 24px var(--paper-shadow); }
+  border: 1px solid var(--paper-rule); border-radius: var(--radius-console); box-shadow: var(--shadow-floating); }
 .command-menu-found li { display: flex; align-items: baseline; gap: 8px; padding: 6px 8px; border-radius: 4px; cursor: pointer; }
 .command-menu-found li.on { background: var(--paper-wash); }
 .command-kind { flex: none; width: 1rem; text-align: center; opacity: 0.6; }

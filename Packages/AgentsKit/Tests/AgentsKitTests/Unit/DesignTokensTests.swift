@@ -144,7 +144,7 @@ struct DesignTokensTests {
         }
         // The AppKit and UIKit copies of the ground and the ink (the terminals').
         let byPath = Dictionary(try Self.tokens().map { ($0.path, $0) }, uniquingKeysWith: { a, _ in a })
-        for (name, path) in [("paperGround", "color.ground"), ("paperInk", "color.ink")] {
+        for (name, path) in [("paperGround", "color.ground"), ("paperInk", "color.ink"), ("paperSelection", "color.selection")] {
             let token = try #require(byPath[path])
             wrong += Self.colourMismatch(token, file: "Shared/UI/Paper.swift", name: name, text: paper)
         }
@@ -206,7 +206,8 @@ struct DesignTokensTests {
         let mac = Self.styles(in: rest[..<split.lowerBound])
         let ios = Self.styles(in: rest[split.upperBound..<end.lowerBound])
         var checked = 0
-        for token in try Self.tokens() where token.path.hasPrefix("type.") && !token.path.hasPrefix("type.display") {
+        let notSteps = ["type.display", "type.leading", "type.tracking", "type.word-spacing"]
+        for token in try Self.tokens() where token.path.hasPrefix("type.") && !notSteps.contains(where: token.path.hasPrefix) {
             let step = String(token.path.dropFirst("type.".count))
             for (platform, styles) in [("mac", mac), ("ios", ios)] {
                 let want = token.string("dev.agentloops.\(platform)")
@@ -216,6 +217,87 @@ struct DesignTokensTests {
             checked += 1
         }
         #expect(checked == 5)
+    }
+
+    @Test("Paper's shadows, focus ring and TypeScale's reading spacing are the tokens'")
+    func depthAndSpacing() throws {
+        let paper = try Self.source("Shared/UI/Paper.swift")
+        let scale = try Self.source("Shared/UI/TypeScale.swift")
+        var checked = 0
+        for token in try Self.tokens() {
+            guard let swift = token.string("dev.agentloops.swift"), let name = swift.split(separator: ".").last else { continue }
+            if token.path.hasPrefix("shadow.") {
+                let value = try #require(token.fields["$value"] as? [String: Any])
+                let dark = try #require(token.extensions["dev.agentloops.dark"] as? [String: Any])
+                func px(_ key: String) -> Int { ((value[key] as? [String: Any])?["value"] as? Int) ?? -1 }
+                func alpha(_ object: [String: Any]) -> String { String(format: "%.2f", object["alpha"] as? Double ?? -1) }
+                let colour = "Color(light: \(Self.hex(value["color"] as? String ?? "")), dark: \(Self.hex(dark["color"] as? String ?? "")), "
+                    + "lightAlpha: \(alpha(value)), darkAlpha: \(alpha(dark)))"
+                let want = "static let \(name) = Shadow(color: \(colour),"
+                let rest = "blur: \(px("blur")), y: \(px("offsetY")))"
+                let found = paper.range(of: want).map { paper[$0.upperBound...].prefix(80) }
+                #expect(found?.contains(rest) == true,
+                        "Shared/UI/Paper.swift: \(swift) is not design/tokens.json's \(token.path): want `\(want) \(rest)`")
+                checked += 1
+            } else if token.path.hasPrefix("focus.") {
+                let value = try #require((token.fields["$value"] as? [String: Any])?["value"] as? Int)
+                let focus = Self.block(paper, from: "enum Focus {", to: "}")
+                #expect(focus?.contains("static let \(name): CGFloat = \(value)\n") == true,
+                        "Shared/UI/Paper.swift: \(swift) is not design/tokens.json's \(token.path), \(value)")
+                checked += 1
+            } else if swift.hasPrefix("TextStep.") {
+                let number = token.fields["$value"] as? Double ?? ((token.fields["$value"] as? [String: Any])?["value"] as? Double)
+                let value = try #require(number)
+                #expect(scale.contains("static let \(name): CGFloat = \(value)\n"),
+                        "Shared/UI/TypeScale.swift: \(swift) is not design/tokens.json's \(token.path), \(value)")
+                checked += 1
+            }
+        }
+        #expect(checked == 6, "the scan found \(checked) shadow, focus and spacing tokens")
+    }
+
+    /// WCAG 2.x relative luminance of `#rrggbb`.
+    static func luminance(_ css: String) -> Double {
+        let value = UInt32(css.dropFirst(), radix: 16) ?? 0
+        let channels = [16, 8, 0].map { Double((value >> UInt32($0)) & 0xFF) / 255 }
+            .map { $0 <= 0.04045 ? $0 / 12.92 : pow(($0 + 0.055) / 1.055, 2.4) }
+        return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
+    }
+
+    static func contrast(_ a: String, _ b: String) -> Double {
+        let (x, y) = (luminance(a), luminance(b))
+        return (max(x, y) + 0.05) / (min(x, y) + 0.05)
+    }
+
+    /// Paper v2's contrast (`specs/4926-paper-v2/spec.md`, WCAG 2.2 AA): every text colour is
+    /// 4.5:1 or more on every surface, the selection included, and a control's edge 3:1 or
+    /// more (1.4.11), in the light and the dark.
+    @Test("Every text colour reads on every surface, and a control's edge can be found")
+    func contrastPairs() throws {
+        let byPath = Dictionary(try Self.tokens().map { ($0.path, $0) }, uniquingKeysWith: { a, _ in a })
+        func value(_ path: String, dark: Bool) throws -> String {
+            let token = try #require(byPath["color.\(path)"], "design/tokens.json has no color.\(path)")
+            return try #require(dark ? token.string("dev.agentloops.dark") : token.fields["$value"] as? String)
+        }
+        let surfaces = ["ground", "sidebar", "raised", "well", "wash", "selection"]
+        let texts = ["ink", "secondary", "tertiary", "accent", "tint.attention", "tint.failure", "tint.vouched",
+                     "label.issue", "label.pull"]
+        var low: [String] = []
+        for dark in [false, true] {
+            let look = dark ? "dark" : "light"
+            for surface in surfaces {
+                let ground = try value(surface, dark: dark)
+                for text in texts {
+                    let ratio = Self.contrast(try value(text, dark: dark), ground)
+                    if ratio < 4.5 { low.append("\(text) on \(surface), \(look): \(String(format: "%.2f", ratio)):1, under 4.5:1") }
+                }
+                let edge = Self.contrast(try value("edge", dark: dark), ground)
+                if edge < 3 { low.append("edge on \(surface), \(look): \(String(format: "%.2f", edge)):1, under 3:1") }
+            }
+        }
+        #expect(low.isEmpty, "design/tokens.json:\n\(low.joined(separator: "\n"))")
+        // The ratio is WCAG's: black on white is 21:1.
+        #expect(abs(Self.contrast("#000000", "#ffffff") - 21) < 0.01)
     }
 
     /// A switch's light and dark are read apart, and a wrong one is named with the fix.

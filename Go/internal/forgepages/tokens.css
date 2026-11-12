@@ -3,36 +3,48 @@
 
 :root {
   color-scheme: light dark;
-  /* The page every column sits on. */
-  --paper-ground: light-dark(#f7f8f9, #1c1d20);
-  /* The folders column, one shade deeper. */
-  --paper-sidebar: light-dark(#f0f1f3, #161719);
-  /* What floats: the prompt bar, cards, menus. */
-  --paper-raised: light-dark(#ffffff, #26282c);
-  /* What is set into the page: code, your own message. */
-  --paper-well: light-dark(#f0f2f4, #2a2d31);
-  /* A row under the pointer, a picked item. */
-  --paper-wash: light-dark(#e7eaee, #33363b);
-  /* Hairlines between rows, and round raised things. */
-  --paper-rule: light-dark(#dde1e6, #3a3e44);
-  /* Text, and the prominent button's fill. */
-  --paper-ink: light-dark(#1c1d20, #e8eaed);
-  /* A selection. Nothing is drawn in the accent on it. */
-  --paper-selection: light-dark(#d8dee6, #3a3e44);
-  /* Under a raised thing: short and neutral, paper lifted a little off the desk. */
-  --paper-shadow: light-dark(rgb(32 36 42 / 10%), rgb(0 0 0 / 10%));
-  /* The app icon's cobalt: links, focus, controls and the prominent button's fill. */
-  --accent: light-dark(#1f5fc8, #7fb0ff);
-  /* Needs you; the only tint drawn in a list. */
-  --tint-attention: light-dark(#ba4a13, #f0a06b);
+  /* The page every column sits on: near-white paper. */
+  --paper-ground: light-dark(#fcfbf9, #1a1a19);
+  /* The folders column, one small step from the page; a rule sets it apart. */
+  --paper-sidebar: light-dark(#f8f7f4, #171716);
+  /* Cards, the prompt bar, menus, sheets. Set apart by a rule, not a shadow. */
+  --paper-raised: light-dark(#ffffff, #212120);
+  /* What is set into the page: code, your own message, a filled field. */
+  --paper-well: light-dark(#f6f5f2, #262625);
+  /* Hover; a pressed quiet button. */
+  --paper-wash: light-dark(#f1f0ec, #2e2e2c);
+  /* The line that sets things apart, in place of a shadow (1.5:1): rows, cards, columns. */
+  --paper-rule: light-dark(#d6d2c9, #3d3d3a);
+  /* The edge of a field, a checkbox, a toggle's track: 3:1 or more, so a control can be found (WCAG 1.4.11). */
+  --paper-edge: light-dark(#7d786e, #85817a);
+  /* Text and icons: deep charcoal, 17:1 on the ground. */
+  --paper-ink: light-dark(#1a1918, #f4f2ed);
+  /* A row's second line, a speaker's name, a section heading. */
+  --paper-secondary: light-dark(#4a4741, #bdb9b0);
+  /* Timestamps, counts, placeholders. */
+  --paper-tertiary: light-dark(#625e57, #a29e95);
+  /* The picked row, with a 3px accent bar at its edge. Every text colour is 4.5:1 or more on it. */
+  --paper-selection: light-dark(#ebe9e4, #363633);
+  /* The app icon's cobalt: links, focus, the chosen control, a switch that is on. */
+  --accent: light-dark(#1a52c0, #86b4ff);
+  /* The chosen thing, a link card. */
+  --line-accent: light-dark(#a9c2ee, #3d5687);
+  /* Needs you. */
+  --line-attention: light-dark(#ebbf9f, #6b4a33);
+  /* Done, approved. */
+  --line-vouched: light-dark(#a9d3bb, #36614d);
   /* Failed. */
-  --tint-failure: light-dark(#b4232b, #f08086);
+  --line-failure: light-dark(#eeb0b3, #6b3a3d);
+  /* Needs you; the only tint drawn in a list. */
+  --tint-attention: light-dark(#a3400e, #f3a672);
+  /* Failed. */
+  --tint-failure: light-dark(#b0222a, #f4878d);
   /* Approved, done: an ending the app can vouch for. */
-  --tint-vouched: light-dark(#2d765c, #8bc6a7);
+  --tint-vouched: light-dark(#25684f, #92ccad);
   /* A label naming an issue, #12. */
-  --label-issue: light-dark(#0e6b82, #6cc6db);
+  --label-issue: light-dark(#0c6278, #73cbe0);
   /* A label naming a pull request, P#12. */
-  --label-pull: light-dark(#7442b8, #b79af0);
+  --label-pull: light-dark(#6c3cae, #bea3f2);
   /* What is drawn on a filled mark: a state's badge, a swipe's action. */
   --paper-on-fill: light-dark(#ffffff, #ffffff);
   /* Behind a sheet or a viewer, mixed with transparent to the strength it needs. */
@@ -87,12 +99,24 @@
   --timeline-release: light-dark(#000000, #ffffff);
   /* The Now line. */
   --timeline-now: light-dark(#8c8c8c, #8c8c8c);
+  /* Menus, the prompt bar, toasts, with a rule line. */
+  --shadow-floating: light-dark(0 4px 12px rgb(26 25 24 / 10%), 0 4px 12px rgb(0 0 0 / 40%));
+  /* Sheets and dialogs, over a dimmed page. */
+  --shadow-sheet: light-dark(0 12px 32px rgb(26 25 24 / 18%), 0 12px 32px rgb(0 0 0 / 55%));
+  /* The ring's width. */
+  --focus-width: 2px;
+  /* The gap between the control and the ring. */
+  --focus-gap: 2px;
+  /* Code, inline and in a block. */
+  --radius-code: 5px;
   /* Chips, the rail, inputs. */
   --radius-control: 7px;
   /* Rows, wells, cards. */
   --radius-card: 10px;
   /* Sheets, menus, the prompt bar (web). */
   --radius-floating: 16px;
+  /* A state badge: round ends. */
+  --radius-pill: 99px;
   /* The system's sans-serif, for everything a person reads. Nothing is loaded from the network. */
   --font-text: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   /* The system's monospace, for code. */
@@ -111,4 +135,10 @@
   --type-display-1: clamp(2rem, 5vw, 3.2rem);
   /* www's section titles. */
   --type-display-2: 1.8rem;
+  /* Reading text: prose, messages. */
+  --type-leading-reading: 1.5;
+  /* Reading text: a little letter spacing. */
+  --type-tracking-reading: 0.01em;
+  /* Reading text: a little word spacing. */
+  --type-word-spacing-reading: 0.06em;
 }

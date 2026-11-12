@@ -3,37 +3,49 @@
 
 :root {
   color-scheme: light dark;
-  /* The page every column sits on. */
-  --paper-ground: #f7f8f9;
-  /* The folders column, one shade deeper. */
-  --paper-sidebar: #f0f1f3;
-  /* What floats: the prompt bar, cards, menus. */
+  /* The page every column sits on: near-white paper. */
+  --paper-ground: #fcfbf9;
+  /* The folders column, one small step from the page; a rule sets it apart. */
+  --paper-sidebar: #f8f7f4;
+  /* Cards, the prompt bar, menus, sheets. Set apart by a rule, not a shadow. */
   --paper-raised: #ffffff;
-  /* What is set into the page: code, your own message. */
-  --paper-well: #f0f2f4;
-  /* A row under the pointer, a picked item. */
-  --paper-wash: #e7eaee;
-  /* Hairlines between rows, and round raised things. */
-  --paper-rule: #dde1e6;
-  /* Text, and the prominent button's fill. */
-  --paper-ink: #1c1d20;
-  /* A selection. Nothing is drawn in the accent on it. */
-  --paper-selection: #d8dee6;
-  /* Under a raised thing: short and neutral, paper lifted a little off the desk. */
-  --paper-shadow: rgb(32 36 42 / 10%);
-  /* The app icon's cobalt: links, focus, controls and the prominent button's fill. */
-  --accent: #1f5fc8;
+  /* What is set into the page: code, your own message, a filled field. */
+  --paper-well: #f6f5f2;
+  /* Hover; a pressed quiet button. */
+  --paper-wash: #f1f0ec;
+  /* The line that sets things apart, in place of a shadow (1.5:1): rows, cards, columns. */
+  --paper-rule: #d6d2c9;
+  /* The edge of a field, a checkbox, a toggle's track: 3:1 or more, so a control can be found (WCAG 1.4.11). */
+  --paper-edge: #7d786e;
+  /* Text and icons: deep charcoal, 17:1 on the ground. */
+  --paper-ink: #1a1918;
+  /* A row's second line, a speaker's name, a section heading. */
+  --paper-secondary: #4a4741;
+  /* Timestamps, counts, placeholders. */
+  --paper-tertiary: #625e57;
+  /* The picked row, with a 3px accent bar at its edge. Every text colour is 4.5:1 or more on it. */
+  --paper-selection: #ebe9e4;
+  /* The app icon's cobalt: links, focus, the chosen control, a switch that is on. */
+  --accent: #1a52c0;
   accent-color: var(--accent);
-  /* Needs you; the only tint drawn in a list. */
-  --tint-attention: #ba4a13;
+  /* The chosen thing, a link card. */
+  --line-accent: #a9c2ee;
+  /* Needs you. */
+  --line-attention: #ebbf9f;
+  /* Done, approved. */
+  --line-vouched: #a9d3bb;
   /* Failed. */
-  --tint-failure: #b4232b;
+  --line-failure: #eeb0b3;
+  /* Needs you; the only tint drawn in a list. */
+  --tint-attention: #a3400e;
+  /* Failed. */
+  --tint-failure: #b0222a;
   /* Approved, done: an ending the app can vouch for. */
-  --tint-vouched: #2d765c;
+  --tint-vouched: #25684f;
   /* A label naming an issue, #12. */
-  --label-issue: #0e6b82;
+  --label-issue: #0c6278;
   /* A label naming a pull request, P#12. */
-  --label-pull: #7442b8;
+  --label-pull: #6c3cae;
   /* What is drawn on a filled mark: a state's badge, a swipe's action. */
   --paper-on-fill: #ffffff;
   /* Behind a sheet or a viewer, mixed with transparent to the strength it needs. */
@@ -88,35 +100,73 @@
   --timeline-release: #000000;
   /* The Now line. */
   --timeline-now: #8c8c8c;
+  /* Menus, the prompt bar, toasts, with a rule line. */
+  --shadow-floating: 0 4px 12px rgb(26 25 24 / 10%);
+  /* Sheets and dialogs, over a dimmed page. */
+  --shadow-sheet: 0 12px 32px rgb(26 25 24 / 18%);
+  /* The ring's width. */
+  --focus-width: 2px;
+  /* The gap between the control and the ring. */
+  --focus-gap: 2px;
+  /* Code, inline and in a block. */
+  --radius-code: 5px;
   /* Chips, the rail, inputs. */
   --radius-control: 7px;
   /* Rows, wells, cards. */
   --radius-card: 10px;
   /* Sheets, menus, the prompt bar (web). */
   --radius-floating: 16px;
+  /* A state badge: round ends. */
+  --radius-pill: 99px;
   /* The system's sans-serif, for everything a person reads. Nothing is loaded from the network. */
   --font-text: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   /* The system's monospace, for code. */
   --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  /* A page's title. */
+  --type-title: 1.375rem;
+  /* Prose: what everything is read at unless there is a reason otherwise. */
+  --type-reading: 1rem;
+  /* A row's second line. */
+  --type-supporting: 0.875rem;
+  /* A timestamp, a count. */
+  --type-fine: 0.75rem;
+  /* Code, paths, commands, in the monospace. */
+  --type-code: 0.875rem;
+  /* www's hero title. */
+  --type-display-1: clamp(2rem, 5vw, 3.2rem);
+  /* www's section titles. */
+  --type-display-2: 1.8rem;
+  /* Reading text: prose, messages. */
+  --type-leading-reading: 1.5;
+  /* Reading text: a little letter spacing. */
+  --type-tracking-reading: 0.01em;
+  /* Reading text: a little word spacing. */
+  --type-word-spacing-reading: 0.06em;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper-ground: #1c1d20;
-    --paper-sidebar: #161719;
-    --paper-raised: #26282c;
-    --paper-well: #2a2d31;
-    --paper-wash: #33363b;
-    --paper-rule: #3a3e44;
-    --paper-ink: #e8eaed;
-    --paper-selection: #3a3e44;
-    --paper-shadow: rgb(0 0 0 / 10%);
-    --accent: #7fb0ff;
-    --tint-attention: #f0a06b;
-    --tint-failure: #f08086;
-    --tint-vouched: #8bc6a7;
-    --label-issue: #6cc6db;
-    --label-pull: #b79af0;
+    --paper-ground: #1a1a19;
+    --paper-sidebar: #171716;
+    --paper-raised: #212120;
+    --paper-well: #262625;
+    --paper-wash: #2e2e2c;
+    --paper-rule: #3d3d3a;
+    --paper-edge: #85817a;
+    --paper-ink: #f4f2ed;
+    --paper-secondary: #bdb9b0;
+    --paper-tertiary: #a29e95;
+    --paper-selection: #363633;
+    --accent: #86b4ff;
+    --line-accent: #3d5687;
+    --line-attention: #6b4a33;
+    --line-vouched: #36614d;
+    --line-failure: #6b3a3d;
+    --tint-attention: #f3a672;
+    --tint-failure: #f4878d;
+    --tint-vouched: #92ccad;
+    --label-issue: #73cbe0;
+    --label-pull: #bea3f2;
     --paper-on-fill: #ffffff;
     --paper-scrim: #000000;
     --forge-open: #3fb950;
@@ -144,5 +194,7 @@
     --timeline-trunk: #e7e8ea;
     --timeline-release: #ffffff;
     --timeline-now: #8c8c8c;
+    --shadow-floating: 0 4px 12px rgb(0 0 0 / 40%);
+    --shadow-sheet: 0 12px 32px rgb(0 0 0 / 55%);
   }
 }

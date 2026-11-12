@@ -47,10 +47,10 @@ enum StateTint {
     }
 
     /// Orange, red and green mixed for cool paper rather than taken from the system.
-    /// Each clears 4.5:1 against the ground and the well in both appearances.
-    private static let orange = Color(light: 0xBA4A13, dark: 0xF0A06B)
-    private static let red = Color(light: 0xB4232B, dark: 0xF08086)
-    private static let green = Color(light: 0x2D765C, dark: 0x8BC6A7)
+    /// Each clears 4.5:1 on every surface in both appearances (DesignTokensTests).
+    private static let orange = Color(light: 0xA3400E, dark: 0xF3A672)
+    private static let red = Color(light: 0xB0222A, dark: 0xF4878D)
+    private static let green = Color(light: 0x25684F, dark: 0x92CCAD)
 
     /// The tint as a style, or whatever the surface already draws in when there is
     /// no tint. For the sites that pick between a colour and their own grey.
