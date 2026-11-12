@@ -26,6 +26,8 @@ struct WorkItemPage: View {
     @State private var detail: (host: MachineRef, got: DaemonAPI.ForgeItemDetail)?
     @State private var forgeProblem: String?
     @State private var reading = false
+    /// The item on screen came from this device's copy (#4930): no writes until its machine answers.
+    @State private var fromDevice = false
     @State private var olderLoading = false
     @State private var estimate: DaemonAPI.LineageEstimate?
     @State private var estimateRange = false
@@ -61,7 +63,8 @@ struct WorkItemPage: View {
     }
 
     /// The person's machine that read it takes writes: else no Start Agent, comment box or gears.
-    private var writes: Bool { detail.map { model.forgeWrites(on: $0.host) } ?? false }
+    /// None while the page is this device's copy (#4930): a write acts on the machine's own answer.
+    private var writes: Bool { !fromDevice && (detail.map { model.forgeWrites(on: $0.host) } ?? false) }
 
     var body: some View {
         ScrollView {
@@ -417,6 +420,7 @@ struct WorkItemPage: View {
         if detail != nil, let forgeProblem {
             WorkErrorStrip(lines: [forgeProblem]) { asked += 1 }
         }
+        WorkFromDeviceStrip(on: fromDevice && forgeProblem == nil)
     }
 
     /// Nothing read: in the middle, the warning glyph, *Could not read #4331*, the forge's words,
@@ -450,7 +454,7 @@ struct WorkItemPage: View {
         if let detail, WorkPlan.hasPlan(detail.got.item) {
             WorkPlanSection(model: model, host: detail.host, lineageHost: lineageHost, detail: detail.got, asked: asked,
                             estimates: estimate?.children ?? [], compact: compact,
-                            writes: writes, wrote: { Task { await reread() } })
+                            writes: writes, waiting: fromDevice, wrote: { Task { await reread() } })
         }
     }
 
@@ -520,7 +524,7 @@ struct WorkItemPage: View {
                 said = (words, failed)
                 if !failed { Task { await reread() } }
             }
-        } else if WorkLook.mergeBox(got) == nil {
+        } else if !fromDevice, WorkLook.mergeBox(got) == nil {
             Text("No machine of yours can write to \(WorkList.forgeName(node.ref)).")
                 .appText(.supporting).foregroundStyle(.secondary)
         }
@@ -543,7 +547,7 @@ struct WorkItemPage: View {
     }
 
     private func mergeBox(_ box: WorkLook.MergeBox, _ got: DaemonAPI.ForgeItemDetail, on host: MachineRef) -> some View {
-        WorkMergeBox(model: model, host: host, detail: got, box: box, writes: writes, compact: narrow) {
+        WorkMergeBox(model: model, host: host, detail: got, box: box, writes: writes, waiting: fromDevice, compact: narrow) {
             Task { await reread() }
         }
     }
@@ -888,13 +892,18 @@ struct WorkItemPage: View {
     /// `forge/image`), so the app never loads the page's remote URL. Nil when it cannot.
     private func image(on host: MachineRef) -> RemoteImageLoader {
         { [model] url in
-            guard let got = try? await model.forge(DaemonAPI.Method.forgeImage, DaemonAPI.ForgeImageRequest(url: url.absoluteString),
-                                                   returning: DaemonAPI.ForgeImage.self, on: host) else { return nil }
-            return PlatformImage(data: got.data)
+            guard let data = await model.forgeImage(url.absoluteString, on: host) else { return nil }
+            return PlatformImage(data: data)
         }
     }
 
     // MARK: Loading
+
+    /// An item as this device keeps it (#4930): the machine that read it, its body and its newest page of comments.
+    struct KeptItem: Codable, Sendable {
+        var host: MachineRef
+        var got: DaemonAPI.ForgeItemDetail
+    }
 
     /// The item, from the first machine that reads it. A refresh keeps the page as it is, and
     /// the toolbar's Refresh spins, until the new read comes.
@@ -905,13 +914,20 @@ struct WorkItemPage: View {
         guard !machines.isEmpty else { forgeProblem = WorkList.noForgeHere; return }
         reading = true
         defer { if asked == mine { reading = false } }
+        // Seen before: this device's copy at once, until a machine answers (#4930).
+        if detail == nil, let kept = await model.keptWork(KeptItem.self, .item, node.ref), asked == mine, detail == nil {
+            detail = (kept.host, kept.got)
+            fromDevice = true
+        }
         var last: String?
         for machine in machines {
             do {
                 let got = try await model.forgeItem(node, cursor: nil, on: machine.id)
                 guard asked == mine else { return }
                 detail = (machine.id, got)
+                fromDevice = false
                 forgeProblem = nil
+                model.keepWork(KeptItem(host: machine.id, got: got), .item, node.ref)
                 return
             } catch {
                 last = WorkList.failureWords(error)
@@ -928,13 +944,15 @@ struct WorkItemPage: View {
         do {
             let got = try await model.forgeItem(node, cursor: nil, on: had.host)
             detail = (had.host, got)
+            fromDevice = false
+            model.keepWork(KeptItem(host: had.host, got: got), .item, node.ref)
         } catch {
             forgeProblem = error.localizedDescription
         }
     }
 
     private func readOlder() async {
-        guard let had = detail, let cursor = had.got.cursor else { return }
+        guard !fromDevice, let had = detail, let cursor = had.got.cursor else { return }
         olderLoading = true
         defer { olderLoading = false }
         do {

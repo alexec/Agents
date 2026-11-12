@@ -1202,7 +1202,7 @@ final class AppModel {
 
     init() {
         userScope.lock = lock
-        let localCopy = LocalCopyKeeper(copy: .mac(), work: work)
+        let localCopy = LocalCopyKeeper(copy: Self.windowCopy(), work: work)
         self.localCopy = localCopy
         // At once, so the sidebar and a chat restored at launch draw before the host answers.
         Task { await localCopy.drawMachines() }
@@ -7049,6 +7049,17 @@ final class AppModel {
             }))
         }
     }
+
+    /// This window's copy (#4791). A walk's window (`--walk`, run-app) keeps its copy in the walk's
+    /// own folder, never the person's: a scratch session must not draw in the person's window, nor
+    /// the person's in a walk's screenshots (#4930).
+    static func windowCopy() -> LocalCopy {
+        guard let walk = ControlConfig.walkFolder else { return .mac() }
+        return LocalCopy(folder: walk.appendingPathComponent("copy", isDirectory: true), cap: LocalCopy.macCap)
+    }
+
+    /// Work's part of this device's copy (#4930).
+    var workCopy: LocalCopy? { localCopy?.copy }
 
     /// The machines that read their forges (#3119), This Mac first: Work's issues and PRs come from each.
     var forgeMachines: [(id: MachineRef, name: String)] {

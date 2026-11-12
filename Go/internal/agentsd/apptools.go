@@ -109,6 +109,7 @@ func appToolCalls() []appTool {
 		{"set_ci_variable", (*Daemon).setCIVariable},
 		{"set_environment_gate", (*Daemon).setEnvironmentGate},
 		{"make_app_repository", (*Daemon).makeAppRepository},
+		{"make_public_repository", (*Daemon).makePublicRepository},
 	}
 }
 

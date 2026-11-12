@@ -26,11 +26,15 @@ struct WorkPlanSection: View {
     /// A phone: the header's bar and words stack, and the rows are the phone rows.
     var compact = false
     let writes: Bool
+    /// The page is this device's copy (#4930): no changes, and no words on why, until the machine answers.
+    var waiting = false
     let wrote: () -> Void
 
     @Environment(\.openURL) private var openURL
     @State private var plan: DaemonAPI.ForgePlan?
     @State private var problem: String?
+    /// The plan on screen came from this device's copy (#4930): no changes until its machine answers.
+    @State private var fromDevice = false
     @State private var rollups: [DaemonAPI.LineageNode: DaemonAPI.LineageCostRollup] = [:]
     @State private var links: [DaemonAPI.LineageNode: [DaemonAPI.LineageLink]] = [:]
     @State private var said: (words: String, failed: Bool)?
@@ -57,7 +61,7 @@ struct WorkPlanSection: View {
 
     /// Add child and Blocked by: an open epic, not a standing one, on a machine that writes.
     private func changes(_ plan: DaemonAPI.ForgePlan) -> Bool {
-        writes && plan.item.state == "open" && plan.standing == nil
+        writes && !fromDevice && plan.item.state == "open" && plan.standing == nil
     }
 
     var body: some View {
@@ -259,7 +263,7 @@ struct WorkPlanSection: View {
             if changes(plan) {
                 Divider()
                 addChild(open: plan.children.isEmpty)
-            } else if !writes, plan.item.state == "open", plan.standing == nil {
+            } else if !writes, !waiting, !fromDevice, plan.item.state == "open", plan.standing == nil {
                 Divider()
                 Text("No machine of yours can write to \(WorkList.forgeName(plan.item.node.ref)).")
                     .appText(.supporting).foregroundStyle(.secondary)
@@ -462,6 +466,11 @@ struct WorkPlanSection: View {
     private func load() async {
         let mine = ask
         if mine.changed == 0 { said = nil }
+        // Seen before: this device's copy at once, until the machine answers (#4930).
+        if plan == nil, let kept = await model.keptWork(DaemonAPI.ForgePlan.self, .plan, mine.node.ref), ask == mine, plan == nil {
+            plan = kept
+            fromDevice = true
+        }
         let got: DaemonAPI.ForgePlan
         do {
             got = try await model.forge(DaemonAPI.Method.forgePlan, DaemonAPI.ForgePlanRequest(node: mine.node),
@@ -473,7 +482,9 @@ struct WorkPlanSection: View {
         }
         guard ask == mine else { return }
         plan = got
+        fromDevice = false
         problem = nil
+        model.keepWork(got, .plan, mine.node.ref)
         guard let lineageHost else { rollups = [:]; links = [:]; return }
         // Each child's cost and links: the links name a lane at once, the cost once it banked a turn.
         var found: [DaemonAPI.LineageNode: DaemonAPI.LineageCostRollup] = [:]

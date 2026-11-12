@@ -99,6 +99,17 @@ try {
     times["send to echo"].push(await sendToEcho(echoID, i));
   }
 
+  // Work ▸ Issues opened again after a reload (#4930): its rows from this device's copy, before the host answers. A
+  // scratch root whose forge never answered keeps no copy, so the line says skip rather than over.
+  const work = [];
+  for (let i = 0; i < runs; i++) {
+    await page.goto("about:blank");
+    await page.goto(url.replace(/#.*$/, "") + "#/work/issue");
+    const came = await page.waitFor(`performance.getEntriesByName("agents:work-list-copy", "measure").length > 0`, 15_000)
+      .then(() => true, () => false);
+    work.push(came ? await markAt("work-list-copy", "measure") : -1);
+  }
+
   const median = (values) => {
     const kept = values.filter((v) => v >= 0).sort((a, b) => a - b);
     return kept.length ? Math.round(kept[Math.floor((kept.length - 1) / 2)]) : null;
@@ -109,6 +120,17 @@ try {
     const bad = m === null || m > budget;
     over ||= bad;
     console.log(`${bad ? "OVER" : "ok  "} web: ${name.padEnd(29)} median ${String(m ?? "-").padStart(6)} ms  (all: ${values.map(Math.round).join(" ")}; budget ${budget})`);
+  }
+  {
+    const name = "work list, second open";
+    const m = median(work);
+    const budget = budgets[name];
+    if (m === null) {
+      console.log(`skip web: ${name.padEnd(29)} no copy drawn (the scratch forge kept none; budget ${budget})`);
+    } else {
+      over ||= m > budget;
+      console.log(`${m > budget ? "OVER" : "ok  "} web: ${name.padEnd(29)} median ${String(m).padStart(6)} ms  (all: ${work.map(Math.round).join(" ")}; budget ${budget})`);
+    }
   }
   console.log(`page errors: ${JSON.stringify(page.errors)}`);
 } finally {

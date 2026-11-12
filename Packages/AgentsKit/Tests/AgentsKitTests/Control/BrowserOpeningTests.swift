@@ -45,4 +45,46 @@ struct BrowserOpeningTests {
         #expect(BrowserOpening.family(bundleID: "company.thebrowser.Browser") == nil)
         #expect(BrowserOpening.family(bundleID: nil) == nil)
     }
+
+    // MARK: Links of the Web + Mac link tier (#4937, #4938)
+
+    @Test func aPlaceRidesAfterTheCodeAndComesBackWhole() throws {
+        let url = try #require(BrowserOpening.pairingURL(served, code: "a:b", place: "/reports/spend?range=week"))
+        #expect(url.query == nil)
+        #expect(url.path == "/")
+        let fragment = try #require(url.fragment(percentEncoded: true))
+        #expect(fragment.hasPrefix("code=a%3Ab&to="))
+        #expect(!fragment.dropFirst("code=a%3Ab&to=".count).contains("/"))
+        #expect(String(fragment.dropFirst("code=a%3Ab&to=".count)).removingPercentEncoding == "/reports/spend?range=week")
+    }
+
+    @Test func aPairedBrowserOpensThePlace() {
+        #expect(BrowserOpening.pageURL("http://localhost:8792", place: "/reports/spend?range=month")?.absoluteString
+            == "http://localhost:8792/#/reports/spend?range=month")
+        #expect(BrowserOpening.pageURL("https://control.example.dev/", place: "/reports/spend?range=day")?.absoluteString
+            == "https://control.example.dev/#/reports/spend?range=day")
+        #expect(BrowserOpening.pageURL("http://localhost:8792", place: nil)?.absoluteString == "http://localhost:8792")
+    }
+
+    @Test func theLinkShowsOnlyWhereThisMacCanOpenThePage() {
+        var status = DaemonAPI.ControlStatus(name: "c", version: "0.19", homeHost: nil, machineID: "m1")
+        #expect(BrowserOpening.linkPage(nil, onThisMac: true) == nil)
+        #expect(BrowserOpening.linkPage(status, onThisMac: true) == nil)
+        status.web = DaemonAPI.WebRemoteStatus(port: 8792, served: false, reason: DaemonAPI.WebRemoteStatus.portInUse)
+        #expect(BrowserOpening.linkPage(status, onThisMac: true) == nil)
+        status.web = served
+        #expect(BrowserOpening.linkPage(status, onThisMac: true) == "http://localhost:8792")
+        // Another Mac's loopback page is not this Mac's to open.
+        #expect(BrowserOpening.linkPage(status, onThisMac: false) == nil)
+        status.publicWeb = "https://control.example.dev"
+        #expect(BrowserOpening.linkPage(status, onThisMac: false) == "https://control.example.dev")
+        #expect(BrowserOpening.linkPage(status, onThisMac: true) == "http://localhost:8792")
+    }
+
+    @Test func reportsOpensSpendInTheCostPagesRange() {
+        #expect(ReportsLink.place(range: .day) == "/reports/spend?range=day")
+        #expect(ReportsLink.place(range: .week) == "/reports/spend?range=week")
+        #expect(ReportsLink.place(range: .month) == "/reports/spend?range=month")
+        #expect(ReportsLink.place(range: .threeMonths) == "/reports/spend?range=threeMonths")
+    }
 }

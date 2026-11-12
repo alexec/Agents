@@ -63,6 +63,8 @@ type forgeGitHubWrites interface {
 	SetEnvironmentGate(ctx context.Context, repo, environment string, reviewers []string) error
 	// A new app's repository (#3708).
 	MakeRepository(ctx context.Context, owner, name, description string) (githubmcp.Repository, bool, error)
+	// A public repository, after the person's yes (#4921).
+	MakePublicRepository(ctx context.Context, owner, name, description string, template bool) (githubmcp.Repository, bool, error)
 	// A forge request's answer (#3865).
 	SetBody(ctx context.Context, repo string, number int, body string) error
 	Unassign(ctx context.Context, repo string, number int, logins []string) error

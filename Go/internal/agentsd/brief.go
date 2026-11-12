@@ -304,7 +304,7 @@ const memoryBrief = "Keep what you must remember after this session as one fact 
 // defers MCP tools, so a tool no paragraph names is one it does not know it has; and a
 // folder's AGENTS.md and skills reach only that folder. The browser and drive_screen are
 // named only where this host lists them, as tools/list does; hand_to_person not on a bot's
-// machine, where nobody answers it. The CI tools (#3706), make_app_repository (#3708) and the start-a-new-app skill (#3712) only where GitHub is connected.
+// machine, where nobody answers it. The CI tools (#3706), make_app_repository (#3708), make_public_repository (#4921) and the start-a-new-app skill (#3712) only where GitHub is connected.
 func toolsBrief(browser, screen, bot, github bool) string {
 	lines := []string{
 		"- notify: tell me that something happened, when you have no question for me.",
@@ -327,6 +327,8 @@ func toolsBrief(browser, screen, bot, github bool) string {
 			"- make_app_repository: make a new app's private GitHub repository from a starter, cloned here and added as a folder. "+
 				"The starters are template repositories: iphone-app (alexec/iphone-app-starter), web-service (alexec/web-service-starter), "+
 				"or one I name as owner/name. Call it again after a step fails: it skips what is there.",
+			"- make_public_repository: make a public GitHub repository from a folder's files. It is the only way to make one: "+
+				"it asks me on a card and makes nothing until I say yes. Never make a repository public with gh or git.",
 			"- When I ask for a new app (an iPhone app or a web service), by voice or typed, follow the start-a-new-app skill: "+
 				"it goes from the first question to my approval of the first deploy.")
 	}

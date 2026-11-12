@@ -8,7 +8,8 @@ import { archivedOrder, archivedTime as archivedWhen } from "../model/archivedPa
 import type { Agent, MoveNotification } from "../protocol/generated";
 import { movingLine } from "../model/moveToMachine";
 import type { Store } from "../model/store";
-import { leaseMark, lineResource, startedByAgentLabel, waitMark, worktreeHelp, type LeaseMark, type WaitMark } from "../model/rowLines";
+import { leaseMark, lineResource, startedByAgentLabel, waitKind, waitMark, worktreeHelp, type LeaseMark, type WaitKind,
+  type WaitMark } from "../model/rowLines";
 import { blockWaitNames, openBlock } from "../model/block";
 import { backgroundMark } from "../model/background";
 import { drawsUnread, folderPath } from "../model/groups";
@@ -34,7 +35,7 @@ export function StatusMark({ agent, comingBack = false }: { agent: Agent; coming
     <span class={`status ${status.shape}${status.tinted ? " tinted" : ""}`} role="img" aria-label={status.words}
       title={status.words}>
       {status.shape === "working" && <WorkingMark tool={runningTool(agent)} />}
-      {status.shape === "waiting" && <WaitingMark />}
+      {status.shape === "waiting" && <WaitingMark kind={waitKind(agent)} />}
       {status.shape !== "working" && status.shape !== "waiting"
         && <span class="glyph" aria-hidden="true">{glyphs[status.shape]}</span>}
     </span>
@@ -64,7 +65,7 @@ export function SidebarMark({ agent, comingBack = false }: { agent: Agent; comin
       {mark === "needsYou" && <span class="glyph" aria-hidden="true">✋&#xFE0E;</span>}
       {(mark === "working" || mark === "tool") && <WorkingMark tool={tool} />}
       {mark === "queued" && <span class="glyph" aria-hidden="true">≡</span>}
-      {mark === "waiting" && <WaitingMark />}
+      {mark === "waiting" && <WaitingMark kind={waitKind(agent)} />}
       {mark === "paused" && <span class="glyph" aria-hidden="true">⏸&#xFE0E;</span>}
       {mark === "done" && <span class="glyph" aria-hidden="true">✓&#xFE0E;</span>}
       {mark === "asksToArchive" && <span class="glyph" aria-hidden="true">🗃&#xFE0E;</span>}
@@ -85,13 +86,40 @@ export function WorkingMark({ tool }: { tool: string | null }) {
 /**
  * The beacon (#2657), the SF Symbol `dot.radiowaves.left.and.right` the window and the Remote draw
  * for waiting: a dot with two arcs on each side, in the colour around it. The waiting mark and the
- * waiting card's icon (`Chat.tsx`), so one icon says waiting everywhere.
+ * waiting card's icon (`Chat.tsx`), so one icon says waiting everywhere. For a wait the app can
+ * name (#5022) it draws what it waits on instead, as `WaitKind.symbol` does: `clock`,
+ * `arrow.triangle.pull`, `checkmark.seal`, `person.2` and `lock`.
  */
-export function Beacon() {
+export function Beacon({ kind = "other" }: { kind?: WaitKind }) {
   return (
     <svg class="beacon" viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="12" cy="12" r="2.4" />
-      <path d="M15.5 7.8A5.5 5.5 0 0 1 15.5 16.2M8.5 16.2A5.5 5.5 0 0 1 8.5 7.8M18.1 4.7A9.5 9.5 0 0 1 18.1 19.3M5.9 19.3A9.5 9.5 0 0 1 5.9 4.7" />
+      {kind === "time" && <>
+        <circle class="ring" cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3.2 2.2" />
+      </>}
+      {kind === "pullRequest" && <>
+        <circle class="ring" cx="6" cy="5" r="2.2" />
+        <circle class="ring" cx="6" cy="19" r="2.2" />
+        <circle class="ring" cx="18" cy="19" r="2.2" />
+        <path d="M6 7.2v9.6M18 16.8V9a3 3 0 0 0-3-3h-4.5M13 3.5 10.5 6 13 8.5" />
+      </>}
+      {kind === "checks" && <>
+        <path d="M12 2.8l2.3 1.7 2.8-.2.9 2.7 2.3 1.6-.9 2.7.9 2.7-2.3 1.6-.9 2.7-2.8-.2L12 21.2l-2.3-1.7-2.8.2-.9-2.7-2.3-1.6.9-2.7-.9-2.7 2.3-1.6.9-2.7 2.8.2z" />
+        <path d="M8.4 12.2l2.5 2.5 4.8-5" />
+      </>}
+      {kind === "agents" && <>
+        <circle class="ring" cx="9" cy="8" r="3.2" />
+        <circle class="ring" cx="16.8" cy="8.6" r="2.6" />
+        <path d="M3 19.5a6 6 0 0 1 12 0M15.6 13.4A4.8 4.8 0 0 1 21 18.5" />
+      </>}
+      {kind === "line" && <>
+        <rect x="5.5" y="10.5" width="13" height="10" rx="2" />
+        <path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3" />
+      </>}
+      {kind === "other" && <>
+        <circle cx="12" cy="12" r="2.4" />
+        <path d="M15.5 7.8A5.5 5.5 0 0 1 15.5 16.2M8.5 16.2A5.5 5.5 0 0 1 8.5 7.8M18.1 4.7A9.5 9.5 0 0 1 18.1 19.3M5.9 19.3A9.5 9.5 0 0 1 5.9 4.7" />
+      </>}
     </svg>
   );
 }
@@ -101,8 +129,8 @@ export function Beacon() {
  * between dim and full once in 4 s, in step on the page (spinnerClock.ts) and slower under Reduce
  * Motion. In the colour around it: the accent, where the unread dot is grey, round and still.
  */
-export function WaitingMark() {
-  return <span class="waiting-beacon" aria-hidden="true"><Beacon /></span>;
+export function WaitingMark({ kind = "other" }: { kind?: WaitKind }) {
+  return <span class="waiting-beacon" aria-hidden="true"><Beacon kind={kind} /></span>;
 }
 
 const relative = new Intl.RelativeTimeFormat("en", { numeric: "always" });

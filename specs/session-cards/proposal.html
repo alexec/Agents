@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Session cards: a simpler set</title>
+<style>
+@font-face{font-family:"Atkinson Hyperlegible Next";src:url("https://cdn.jsdelivr.net/fontsource/fonts/atkinson-hyperlegible-next:vf@latest/latin-wght-normal.woff2") format("woff2-variations");font-weight:200 800}
+@font-face{font-family:"Atkinson Hyperlegible Mono";src:url("https://cdn.jsdelivr.net/fontsource/fonts/atkinson-hyperlegible-mono:vf@latest/latin-wght-normal.woff2") format("woff2-variations");font-weight:200 800}
+:root{
+  /* Paper v2 (#4926, design/tokens.json) and #5016: yellow = needs you, orange = warning, red = failure */
+  --paper-ground:#fcfbf9;--paper-sidebar:#f8f7f4;--paper-raised:#fff;--paper-well:#f6f5f2;--paper-wash:#f1f0ec;
+  --paper-rule:#d6d2c9;--paper-edge:#7d786e;--paper-ink:#1a1918;--paper-secondary:#4a4741;--paper-tertiary:#625e57;
+  --paper-shadow:rgb(26 25 24/10%);--accent:#1a52c0;
+  --tint-attention:#856a00;--tint-warning:#ba4a13;--tint-failure:#b0222a;--tint-vouched:#25684f;
+  --line-attention:#e3d38f;--line-warning:#ebbf9f;--line-failure:#eeb0b3;--line-vouched:#a9d3bb;--line-accent:#a9c2ee;
+  --radius-control:7px;--radius-card:10px;--radius-floating:16px;
+  --font-text:"Atkinson Hyperlegible Next",-apple-system,BlinkMacSystemFont,system-ui,sans-serif;--font-mono:"Atkinson Hyperlegible Mono",ui-monospace,"SF Mono",Menlo,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:#f1f0ec;line-height:1.5;word-spacing:.06em;color:var(--paper-ink);font:13px/1.4 var(--font-text)}
+header.doc{padding:28px 40px 8px;max-width:1500px;margin:auto}
+header.doc h1{margin:0 0 4px;font-size:24px}
+header.doc p{margin:4px 0;max-width:900px;opacity:.8}
+main{max-width:1500px;margin:auto;padding:0 40px 60px}
+h2{font-size:17px;margin:34px 0 4px;display:flex;gap:10px;align-items:baseline}
+h2 .zone{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding:2px 8px;border-radius:99px;background:var(--paper-ink);color:#fff}
+.zone-intro{margin:0 0 14px;opacity:.75;max-width:900px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(440px,1fr));gap:18px}
+.spec{background:var(--paper-ground);border:1px solid var(--paper-rule);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.spec .stage{padding:18px;flex:1;display:flex;flex-direction:column;gap:10px;justify-content:center}
+.spec .cap{background:#fff;border-top:1px solid var(--paper-rule);padding:10px 14px;font-size:12px}
+.cap b.n{display:inline-block;min-width:22px;height:22px;line-height:22px;text-align:center;border-radius:6px;background:var(--paper-ink);color:#fff;font-size:11px;margin-right:6px}
+.cap .name{font-weight:600;font-size:13px}
+.cap .meta{margin-top:4px;opacity:.75}
+.cap .src{font-family:var(--font-mono);font-size:11px;opacity:.55}
+.chips{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+.chip{font-size:10.5px;padding:1px 7px;border-radius:99px;border:1px solid var(--paper-rule);background:var(--paper-well)}
+.chip.fam{background:#eef3fb;border-color:#c9d8f2;color:#1f4a96}
+.chip.warn{background:var(--paper-raised);border-color:var(--line-attention);color:var(--tint-attention)}
+.chip.bug{background:#fbeaea;border-color:#efbcbc;color:var(--tint-failure)}
+
+/* ---- the app's own shapes ---- */
+.card{background:var(--paper-raised);border:1px solid var(--paper-rule);border-radius:var(--radius-floating);padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.card.att{border-color:var(--line-attention)}
+.card.att.bg{box-shadow:inset 3px 0 0 var(--tint-attention)}
+.att-t{color:var(--tint-attention);font-weight:600}
+.asker{font-size:11px;opacity:.65}
+.title{font-weight:600}
+.quiet{opacity:.65}.faint{opacity:.45}.small{font-size:11.5px}
+.opts{display:flex;flex-direction:column;gap:6px}
+.opt{text-align:left;border:1px solid var(--paper-rule);border-radius:var(--radius-control);background:var(--paper-ground);padding:6px 10px;font:inherit;color:inherit}
+.opt small{display:block;opacity:.65;font-size:11px}
+.btn{border:1px solid var(--paper-rule);border-radius:var(--radius-control);background:var(--paper-ground);padding:4px 10px;font:inherit;color:inherit;white-space:nowrap}
+.prominent{background:var(--accent);color:#fff;border-color:var(--accent)}
+.destructive{color:var(--tint-failure)}
+.link{color:var(--accent);background:none;border:0;padding:0;font:inherit}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sp{flex:1}
+.field{display:flex;flex-direction:column;gap:4px}
+.input{border:1px solid var(--paper-rule);border-radius:var(--radius-control);background:var(--paper-ground);padding:5px 8px;color:#888}
+.hint{font-size:11px;opacity:.6}
+.banner{background:var(--paper-well);border:1px solid var(--paper-rule);border-radius:var(--radius-card);padding:8px 12px;font-size:13px;display:flex;align-items:center;gap:10px}
+.banner .g{width:16px;text-align:center}
+.banner.attg .g{color:var(--tint-attention)}
+.well{background:var(--paper-well);border-radius:var(--radius-card);padding:10px 14px}
+.bar{height:4px;border-radius:2px;background:var(--paper-rule);overflow:hidden}.bar i{display:block;height:100%;background:var(--accent)}
+.bubble{align-self:flex-end;max-width:70%;background:var(--paper-well);border-radius:var(--radius-card);padding:8px 12px}
+.bubble.dash{border:1px dashed #b9c0c8;opacity:.65}
+.mono{font-family:var(--font-mono);font-size:11.5px}
+.diff{background:var(--paper-well);border-radius:8px;padding:6px 8px;font-family:var(--font-mono);font-size:11px;line-height:1.5}
+.diff .a{color:#1a7f37}.diff .d{color:#cf222e}
+.beacon{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 20%,transparent)}
+.shot{background:#2a2d31;border-radius:8px;height:130px;display:flex;align-items:flex-end;padding:8px;color:#cfd3d8;font-size:11px;}
+.ph{background:var(--paper-well);border-radius:8px;height:110px;display:flex;align-items:center;justify-content:center;opacity:.8}
+.toolline{display:flex;gap:6px;align-items:center;opacity:.8}
+.note-switch{background:var(--paper-raised);border:1px solid var(--line-attention);box-shadow:inset 3px 0 0 var(--tint-attention);border-radius:var(--radius-card);padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.filecard{background:#fff;border:1px solid var(--paper-rule);border-radius:var(--radius-card);max-width:340px;overflow:hidden}
+.filecard .pv{height:110px;background:var(--paper-well);display:flex;align-items:flex-end;gap:6px;padding:12px 18px}
+.filecard .pv i{flex:1;background:var(--accent);opacity:.75;border-radius:2px 2px 0 0}
+.filecard .bt{display:flex;align-items:center;gap:8px;padding:8px 10px}
+.prompt{background:#fff;border:1px solid var(--paper-rule);border-radius:var(--radius-floating);padding:10px;display:flex;flex-direction:column;gap:8px;box-shadow:0 4px 16px var(--paper-shadow)}
+.costlimit{background:#fff;border:1px solid var(--paper-rule);border-radius:var(--radius-card);padding:8px 10px;font-size:12px;display:flex;gap:8px;align-items:center}
+
+/* ---- map ---- */
+.map{display:grid;grid-template-columns:420px 1fr;gap:28px;align-items:start;margin-top:14px}
+.phone{background:var(--paper-ground);border:1px solid var(--paper-rule);border-radius:14px;overflow:hidden;box-shadow:0 8px 30px rgb(0 0 0/8%)}
+.phone .hd{padding:10px 14px;border-bottom:1px solid var(--paper-rule);background:#fff;font-weight:600;display:flex;justify-content:space-between}
+.phone .body{padding:10px;display:flex;flex-direction:column;gap:6px}
+.zonebox{border:2px dashed;border-radius:10px;padding:8px 10px;font-size:12px}
+.zonebox b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
+.zA{border-color:#7b8bd6;background:#f1f3fc}.zB{border-color:#9aa3ad;background:#fff}.zC{border-color:#8fb3a3;background:#f1f8f4}
+.zD{border-color:#d9a07c;background:#fdf4ee}.zE{border-color:#a99ad6;background:#f5f2fc}.zF{border-color:#c0c0c0;background:#fafafa}
+table.fam{border-collapse:collapse;width:100%;background:#fff;border-radius:10px;overflow:hidden;font-size:12.5px}
+table.fam th,table.fam td{border-bottom:1px solid var(--paper-rule);padding:7px 10px;text-align:left;vertical-align:top}
+table.fam th{background:var(--paper-well);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+</style>
+</head><body>
+<style>
+.pair{display:grid;grid-template-columns:1.15fr 1fr;gap:0;background:var(--paper-ground);border:1px solid var(--paper-rule);border-radius:12px;overflow:hidden;margin-bottom:18px}
+.pair>div{padding:18px;display:flex;flex-direction:column;gap:10px}
+.pair .old{background:var(--paper-sidebar);border-left:1px solid var(--paper-rule)}
+.lbl{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;opacity:.55}
+.oldlist{display:flex;flex-wrap:wrap;gap:6px}
+.oldlist span{font-size:11.5px;background:#fff;border:1px solid var(--paper-rule);border-radius:6px;padding:2px 7px}
+.mini{transform:scale(.82);transform-origin:top left;width:122%;opacity:.8}
+/* the five new shapes */
+.strip{background:var(--paper-well);border-radius:var(--radius-card);padding:8px 12px;display:flex;align-items:center;gap:10px}
+.strip .g{width:16px;text-align:center}
+.tone-att .g{color:var(--tint-attention)}.tone-warn .g{color:var(--tint-warning)}.tone-fail .g{color:var(--tint-failure)}
+.more{font-size:11.5px;color:var(--accent)}
+.line{display:flex;gap:8px;align-items:baseline}
+.line .g{width:16px;text-align:center;opacity:.7;flex:none}
+.line .t{flex:1}
+.line .act{font-size:12px;color:var(--accent);white-space:nowrap}
+.obj{background:var(--paper-raised);border:1px solid var(--paper-rule);border-radius:var(--radius-card);max-width:360px;overflow:hidden}
+.obj .pv{height:96px;background:var(--paper-well);display:flex;align-items:flex-end;gap:6px;padding:10px 16px}
+.obj .pv i{flex:1;background:var(--accent);opacity:.75;border-radius:2px 2px 0 0}
+.obj .bt{display:flex;align-items:center;gap:8px;padding:8px 10px}
+.ask{background:var(--paper-raised);border:1px solid var(--paper-rule);border-left:3px solid var(--tint-attention);border-radius:var(--radius-floating);padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.ask .head{display:flex;gap:8px;align-items:baseline}
+.ask .head .g{color:var(--tint-attention)}
+.ask .foot{display:flex;align-items:center;gap:8px;border-top:1px solid var(--paper-rule);padding-top:8px;margin-top:2px}
+.ask .decline{font-size:12px;color:var(--accent)}
+.waitfor{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--tint-attention)}
+.prog{background:var(--paper-well);border-radius:var(--radius-card);padding:9px 12px;display:flex;flex-direction:column;gap:6px}
+.prog .r{display:flex;align-items:center;gap:8px}
+.prog .r .t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prog .meta{font-size:11.5px;opacity:.65;white-space:nowrap}
+.prog .sub{font-size:11.5px;opacity:.7;padding-left:24px}
+.rule{border-top:1px solid var(--paper-rule)}
+.anat{font-family:var(--font-mono);font-size:11.5px;background:#fff;border:1px solid var(--paper-rule);border-radius:8px;padding:8px 10px;white-space:pre;line-height:1.5;overflow:auto}
+.decided{background:#fff;border:1px solid var(--paper-rule);border-left:3px solid var(--accent);border-radius:8px;padding:8px 12px;margin:6px 0;max-width:1000px}
+</style>
+<header class="doc">
+  <h1>Session cards: a simpler set</h1>
+  <p>From the 40 kinds of card in <a href="wireframes.html">wireframes.html</a> down to <b>five families</b>. Each family has one shape, one place in the chat and one set of rules, and all three clients draw it the same way. Every old card has a place in the new set; a card that remains has only its words.</p>
+  <p class="quiet small">Proposal, 2026-11-12, on Paper v2 (#4926) with the colours of #5016. No code changed. The spec is <code>spec.md</code> beside this page. The numbers (1–40, H1–H5) are the numbers in the wireframes.</p>
+</header>
+<main>
+
+<h2>The five families</h2>
+<table class="fam">
+<tr><th>Family</th><th>What it is for</th><th>Place</th><th>Shape</th><th>Replaces</th></tr>
+<tr><td><b>1 · Strip</b></td><td>The session's place is not right (host, folder, account, allowance, limit)</td><td>Top, one at a time</td><td>Well, tone glyph, one line, ≤ 2 buttons</td><td>1, 2, 3, 4, 5, 36, H1, H5 cost</td></tr>
+<tr><td><b>2 · Line</b></td><td>The record: what happened</td><td>Transcript</td><td>No box: glyph, words, an action link</td><td>9, 12–14, 16–17 answered, 20–22, 25, 34</td></tr>
+<tr><td><b>3 · Object</b></td><td>Something the agent made, to open</td><td>Transcript</td><td>Raised box, preview, name, ›</td><td>17, 18, 19, H2</td></tr>
+<tr><td><b>4 · Ask</b></td><td>The person must answer before the agent goes on</td><td>End of chat, "Waiting for you"</td><td>Raised card, attention edge, head, body, foot</td><td>15, 16, 19 asks, 26–28g, 30, 31, 33 person</td></tr>
+<tr><td><b>5 · Now</b></td><td>What the agent works towards, does, or waits on</td><td>Top (goal + plan) and foot (now)</td><td>Well, mark, line, meta right, bar, chevron</td><td>6, 7, 25, 29, 32, 33, 35</td></tr>
+</table>
+<p class="quiet small">Messages are not cards. Bubbles, sending bubbles, queued and kept bubbles (10, 23, 24) stay as they are: a dashed edge means "not sent yet". Sheets and overlays (8, 38–40) are controls, not cards.</p>
+
+<h2>The rules every family keeps</h2>
+<ul style="max-width:1000px;line-height:1.6">
+  <li><b>One tint, one meaning (#5016).</b> <span style="color:var(--tint-attention);font-weight:700">Yellow</span> means "you must answer": only the Ask's left edge and the "Waiting for you" label have it. <span style="color:var(--tint-warning);font-weight:700">Orange</span> means "something is wrong": a Strip's glyph. <span style="color:var(--tint-failure);font-weight:700">Red</span> means "it failed": a Line's glyph and words. Colour never fills a card: it is in the text, the icon and a line (Paper v2). The accent is for links, bars and the primary button.</li>
+  <li><b>Buttons:</b> the primary button is on the right and filled. One more button is next to it. Everything else is in a <b>⋯</b> menu. "No thanks" and "No, because…" are the same two links on every Ask.</li>
+  <li><b>An answer becomes a Line.</b> When an Ask is answered, it leaves "Waiting for you", and the transcript gets one Line: "You chose ‹option›", or "Answered on another device".</li>
+  <li><b>Keys:</b> Return presses the primary button of the first Ask. ⌘1–9 picks an option on the Mac and the web (the web uses ⌥1–9 today, because the browser takes ⌘1–9: see question 3).</li>
+  <li><b>One look on all three clients:</b> the same radius tokens, the same order of parts, and the same words from the shared word files. The phone changes only the width. Buttons go under the words when the pane is narrower than 480 pt, as the PaneBanner does today.</li>
+</ul>
+
+<!-- ================= 1 STRIP ================= -->
+<h2><span class="zone">1</span> Strip</h2>
+<div class="pair">
+  <div>
+    <span class="lbl">New</span>
+    <div class="strip"><span class="g">ⓘ</span><span class="sp">This Mac hasn’t answered since 3:04 PM. Trying again…</span><span class="more">+1 more</span></div>
+    <div class="strip tone-warn"><span class="g">⚠︎</span><span class="sp">Folder is missing · <span class="quiet">~/Agents-worktrees/fix-login</span></span><button class="btn">Archive</button><button class="btn prominent">Continue in the folder</button><span class="quiet">⋯</span></div>
+    <div class="strip tone-warn"><span class="g">⚠︎</span><span class="sp">This agent reached its cost limit · $4.20</span><button class="btn prominent">Let this one go on</button><span class="quiet">⋯</span></div>
+    <div class="anat">[tone glyph] words · quiet detail ……… [second] [primary] [⋯]
+only one shows; "+N more" opens the others in a list</div>
+  </div>
+  <div class="old">
+    <span class="lbl">Replaces</span>
+    <div class="oldlist"><span>1 Offline</span><span>2 Folder gone</span><span>3 Folder missing</span><span>4 Account move</span><span>5 Continue</span><span>36 Cost limit (in the prompt bar)</span><span>H1 Control away / Stale / Org policy</span></div>
+    <div class="mini">
+      <div class="banner attg"><span class="g">⚠︎</span><span class="sp">The folder is gone. What you typed is still in the prompt.</span></div>
+      <div class="row" style="padding:6px 0 6px 26px"><button class="btn">Continue in the folder</button><button class="btn">Recreate the worktree</button><button class="btn">Archive</button><button class="link">Cancel</button></div>
+      <div class="costlimit"><span class="sp">This agent reached its cost limit. $4.20 spent. Anything you send waits until you allow more.</span><button class="btn">Let this one go on</button></div>
+    </div>
+    <ul class="small" style="margin:0;padding-left:18px">
+      <li><b>Folder gone (2)</b> merges with <b>Folder missing (3)</b>: one strip. When a send was refused, it adds "What you typed is still in the prompt."</li>
+      <li><b>Cost limit (36)</b> moves out of the prompt bar, so every "the agent cannot go on" is in one place.</li>
+      <li><b>Account move (4)</b> gets its style at last.</li>
+      <li>The Mac's "show only one" rule applies on every client. Order: host, then folder, then account, then allowance, then limit.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ================= 2 LINE ================= -->
+<h2><span class="zone">2</span> Line</h2>
+<div class="pair">
+  <div>
+    <span class="lbl">New</span>
+    <div class="line"><span class="g">✓</span><span class="t"><b>Complete</b> · <span class="quiet">Opened P#4990; auto-merge is on.</span></span></div>
+    <div class="line"><span class="g">▸</span><span class="t"><b>Edit</b> <span class="mono">Go/internal/auth/redirect.go</span> <span class="quiet small">+4 −1</span></span></div>
+    <div class="line"><span class="g">✋</span><span class="t"><b>Stopped by a policy</b> · <span class="quiet">Budget, organisation: $20 a day</span></span><span class="act">See Policy</span></div>
+    <div class="line"><span class="g">↩︎</span><span class="t">You chose <b>Back where they were</b> <span class="quiet small">· Where should a guest go after login?</span></span></div>
+    <div class="line"><span class="g">🔔︎</span><span class="t"><b>PR ready</b> · <span class="quiet">P#4990 is green · 09:41</span></span></div>
+    <div class="line"><span class="g" style="color:var(--tint-failure)">✕</span><span class="t" style="color:var(--tint-failure)">The runtime crashed</span><span class="act">Show details</span></div>
+    <div class="line faint small"><span class="g"></span><span class="t">Last activity 2 h ago · started 3 d ago</span></div>
+    <div class="anat">[glyph] bold head · quiet detail ……………… [one action link]
+opens in place when it has detail (▸ / ▾)</div>
+  </div>
+  <div class="old">
+    <span class="lbl">Replaces</span>
+    <div class="oldlist"><span>9 Load failure</span><span>12 Tool line</span><span>13 Thought</span><span>14 Plan view</span><span>16 Policy stop (once settled)</span><span>20 Report</span><span>21 Notified</span><span>22 Notices, compaction, asked / chose, state, served, background, runtime note</span><span>34 Quiet line</span></div>
+    <ul class="small" style="margin:0;padding-left:18px">
+      <li>Every line on the record has the same four parts. Today they are about ten one-off shapes.</li>
+      <li><b>Report (20)</b> loses its attention title. "Waiting on your answer" has its Ask under it, so the tint shows there only once.</li>
+      <li><b>Plan view (14)</b> leaves the transcript: the plan is in Now (5). The transcript keeps one Line: "Plan · 5 steps", which opens the Now card.</li>
+      <li><b>Answered-form recap</b> becomes a "You answered" Line that opens to the pairs.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ================= 3 OBJECT ================= -->
+<h2><span class="zone">3</span> Object</h2>
+<div class="pair">
+  <div>
+    <span class="lbl">New</span>
+    <div class="obj"><div class="pv"><i style="height:40%"></i><i style="height:75%"></i><i style="height:55%"></i><i style="height:90%"></i></div>
+    <div class="bt"><span>📊</span><div class="sp"><b>ci-times.md</b><div class="quiet small">Bar chart · reports/ · line 12</div></div><span class="quiet">›</span></div></div>
+    <div class="obj"><div class="bt"><span>✎</span><div class="sp"><b>Changed 3 files</b><div class="quiet small">redirect.go, redirect_test.go, legacy.go</div></div><span class="quiet">⋯</span><span class="quiet">›</span></div></div>
+    <div class="obj"><div class="pv" style="align-items:center;justify-content:center;opacity:.7">Release checklist (live view)</div>
+    <div class="bt"><span>▦</span><div class="sp"><b>Release checklist</b><div class="quiet small">View · 3 of 7 ticked</div></div><span class="quiet">⋯</span><span class="quiet">›</span></div></div>
+    <div class="anat">[preview, when it has one]
+[kind icon] name · kind · where ………… [⋯] [›]
+tap opens; ⋯ holds Undo These Changes, Pin, Full screen</div>
+  </div>
+  <div class="old">
+    <span class="lbl">Replaces</span>
+    <div class="oldlist"><span>17 Turn changes</span><span>18 File</span><span>19 App view frame</span><span>H2 Offered file strip (Remote)</span></div>
+    <ul class="small" style="margin:0;padding-left:18px">
+      <li><b>Changed files (17)</b> is an object you open in Changes. "Undo These Changes" goes in its ⋯, with the same confirmation as today.</li>
+      <li><b>App view (19)</b> keeps its frame, under the same caption row as a file. Its "Show / Don't Show" and "Send / Don't Send" go to Ask (4), so every question is in one place.</li>
+      <li><b>Offered file strip (H2)</b> goes: the phone draws the same Object card as the Mac and the web.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ================= 4 ASK ================= -->
+<h2><span class="zone">4</span> Ask</h2>
+<p class="zone-intro">The biggest win: 13 cards and variants become one card with a fixed head and foot. Only the body changes.</p>
+<div class="anat" style="max-width:760px;margin-bottom:12px">WAITING FOR YOU                         ← one label, attention colour
+┃ [glyph] Title                         asker · quiet
+┃ body: one of  · question text
+┃               · choices (stacked options)
+┃               · fields (paged form, secret)
+┃               · a diff / plan / picture
+┃ ─────────────────────────────────────────
+┃ No thanks · No, because…      [second] [Primary]
+┗ attention edge on the left</div>
+<div class="grid">
+<div class="spec"><div class="stage">
+  <div class="waitfor">Waiting for you</div>
+  <div class="ask"><div class="head"><span class="g">?</span><b class="sp">Where should a guest go after login?</b><span class="asker">Claude · Fix login</span></div>
+  <div class="opts"><button class="opt">/home<small>The dashboard, as today</small></button><button class="opt">Back where they were<small>Uses the next parameter</small></button></div>
+  <div class="foot"><span class="decline">No thanks · No, because…</span><span class="sp"></span></div></div>
+</div><div class="cap"><span class="name">Question</span><div class="meta">Replaces 28a choices, 28b form (paged body), 28c link, 28f decline reason (opens in the foot).</div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="ask"><div class="head"><span class="g">⌘</span><b class="sp">Run <span class="mono">go test ./internal/auth/...</span></b><span class="asker">Claude · Fix login</span></div>
+  <div class="diff">$ go test ./internal/auth/...</div>
+  <div class="foot"><span class="decline">Reject</span><span class="sp"></span><button class="btn">Allow always</button><button class="btn prominent">Allow once</button></div></div>
+</div><div class="cap"><span class="name">Permission</span><div class="meta">Replaces 27, 27p. The runtime's options keep their labels; the reject option goes on the left, as a link.</div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="ask"><div class="head"><span class="g">⚠︎</span><b class="sp">Start a session on devbox?</b><span class="asker">Claude · Lead #4207</span></div>
+  <div>In <span class="mono">~/Agents</span>, to fix #4990.</div>
+  <div class="foot"><span class="decline">No thanks · No, because…</span><span class="sp"></span><button class="btn">Don’t</button><button class="btn prominent">Start it</button></div></div>
+</div><div class="cap"><span class="name">Confirm</span><div class="meta">Replaces 28g, and fixes the bug: the question is the title, and the details are the body.</div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="ask"><div class="head"><span class="g">🔒</span><b class="sp mono">OPENAI_API_KEY</b><span class="asker">Claude · Deploy</span></div>
+  <div class="small quiet">To run the eval suite · Get it at platform.openai.com</div>
+  <span class="input">Paste OPENAI_API_KEY</span>
+  <div class="small"><span class="link">Description, session only, ask before use ▸</span></div>
+  <div class="foot"><span class="decline">No thanks · No, because…</span><span class="sp"></span><button class="btn prominent">Save securely</button></div></div>
+</div><div class="cap"><span class="name">Secret</span><div class="meta">Replaces 28d, and the secret-use card of #4918 (Allow / Deny). The three extra settings fold under one disclosure, so the card is half as tall.</div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="ask"><div class="head"><span class="g">✋</span><b class="sp">Solve the CAPTCHA</b><span class="asker">Claude · Sign up</span></div>
+  <div class="quiet">The sign-up page asks for one.</div>
+  <div class="foot"><span class="decline">Can't do it</span><span class="sp"></span><button class="btn">Done</button><button class="btn prominent">Open the page</button></div></div>
+</div><div class="cap"><span class="name">Hand-off</span><div class="meta">Replaces 28e, and 30 Paused driving: "Paused driving Xcode" with Take Over and Resume.</div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="ask"><div class="head"><span class="g">◇</span><b class="sp">Claude changed .agents/mcp.json</b><span class="asker">+12 −3</span></div>
+  <div class="foot"><span class="decline">Review…</span><span class="sp"></span><button class="btn">Undo</button><button class="btn prominent">Keep</button></div></div>
+  <div class="ask"><div class="head"><span class="g">◇</span><b class="sp">Claude’s sandbox could not start</b><span class="asker">Claude</span></div>
+  <div class="small quiet">Continue turns it off for this agent only. <span class="link">Show error details</span></div>
+  <div class="foot"><span class="decline">Keep stopped</span><span class="sp"></span><button class="btn prominent">Continue without sandbox</button></div></div>
+</div><div class="cap"><span class="name">Change, sandbox, policy</span><div class="meta">Replaces 26, 15, and 16 while it can be raised ("Ask for More"). They leave the transcript and join the other asks.</div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="ask"><div class="head"><span class="g">▦</span><b class="sp">Show the view “Release checklist”?</b><span class="asker">Claude</span></div>
+  <div class="small quiet">It is drawn in a sandbox and cannot reach your files.</div>
+  <div class="foot"><span class="decline">Don't Show</span><span class="sp"></span><button class="btn prominent">Show</button></div></div>
+  <div class="ask"><div class="head"><span class="g">⤓</span><b class="sp">Archive this session?</b><span class="asker">Claude</span></div>
+  <div class="quiet small">Opened P#4990 and it merged.</div>
+  <div class="foot"><span class="sp"></span><button class="btn">Keep Session</button><button class="btn prominent">Archive</button></div></div>
+</div><div class="cap"><span class="name">View, archive</span><div class="meta">Replaces the asks in 19, and 31. "Approve" becomes "Archive": the button says what it does.</div></div></div>
+
+<div class="spec"><div class="stage">
+  <div class="ask"><div class="head"><span class="g">!</span><b class="sp">Review requested: alexec/Agents#4990</b><span class="asker">1 h 5 min</span></div>
+  <div class="small quiet">Claude carries on when you review it.</div>
+  <div class="foot"><span class="decline">End Wait</span><span class="sp"></span><button class="btn">Carry On</button><button class="btn prominent">Open</button></div></div>
+</div><div class="cap"><span class="name">A wait only Alex can settle</span><div class="meta">Replaces 33p. It is an ask, so it is drawn as one.</div></div></div>
+</div>
+<p class="small quiet">Shared states stay as today: sending ("⟳ telling your Mac" on the chosen button), host down (all held), answered elsewhere (→ a Line). The Remote's sheets (H4) draw this same card at full width. The Mac's "Later" (H3) goes in the head's ⋯ on all three clients.</p>
+
+<!-- ================= 5 NOW ================= -->
+<h2><span class="zone">5</span> Now</h2>
+<div class="pair">
+  <div>
+    <span class="lbl">New · top: what it works towards</span>
+    <div class="prog">
+      <div class="r"><span>◎</span><span class="t">Every login test passes on CI</span><span class="meta">Active · 1,000 / 5,000 tokens</span></div>
+      <div class="rule"></div>
+      <div class="r"><span>☑</span><span class="t">Write the redirect test</span><span class="meta">2 of 5</span><span class="quiet">▾</span></div>
+      <div class="bar"><i style="width:40%"></i></div>
+    </div>
+    <span class="lbl" style="margin-top:8px">New · foot: what it does or waits on now</span>
+    <div class="prog">
+      <div class="r"><span class="beacon"></span><span class="t"><b>Waiting for sessions</b> · Fix login still working, Docs pass Complete</span><span class="meta">12 / 30 min</span><span class="quiet">▾</span></div>
+      <div class="bar" style="height:3px"><i style="width:40%"></i></div>
+      <div class="r small"><span class="sp"></span><button class="link">End Wait</button><button class="btn">Carry On</button></div>
+    </div>
+    <div class="prog">
+      <div class="r"><span>🌐</span><span class="t"><b>Driving the browser</b> · Typed the email into the sign-in field</span><span class="meta">▣ build · 12 min</span><span class="quiet">▾</span></div>
+      <div class="shot" style="height:90px">linear.app/login</div>
+      <div class="sub">Subagent reviewer · 2 min · <span class="link">Steps</span> · <span class="link">Stop</span></div>
+    </div>
+    <div class="anat">[mark] bold what · quiet detail ……… [meta] [▾]
+[bar, when there is a deadline or a count]
+[opened: picture, lines, subagents]   [End Wait] [Carry On]</div>
+  </div>
+  <div class="old">
+    <span class="lbl">Replaces</span>
+    <div class="oldlist"><span>6 Goal</span><span>7 Plan</span><span>14 Plan view</span><span>25 Working + lease line</span><span>29 Live tile</span><span>32 Block wait</span><span>33 Event wait, time, lease</span><span>35 Background rows</span></div>
+    <ul class="small" style="margin:0;padding-left:18px">
+      <li><b>Goal and plan (6, 7)</b> become one card, with two rows. Today they are two strips of the same shape.</li>
+      <li><b>One Now card at the foot,</b> always the last thing before the prompt bar. It is the working line when the agent works, the wait when it waits, and the live picture when it drives the screen. Leases (25, 33l) and background work (35) are its detail, so a lease is said once.</li>
+      <li><b>Live tile (29)</b> leaves "Waiting for you": it is not an ask.</li>
+      <li>When the agent is not running, the Now card goes, and the quiet Line (34) is in its place.</li>
+    </ul>
+  </div>
+</div>
+
+<h2>The chat, top to bottom</h2>
+<div class="map">
+  <div class="phone">
+    <div class="hd"><span>Fix login redirect</span><span class="quiet">⋯</span></div>
+    <div class="body">
+      <div class="strip tone-warn"><span class="g">⚠︎</span><span class="sp">Folder is missing</span><button class="btn prominent">Continue in the folder</button></div>
+      <div class="prog"><div class="r"><span>☑</span><span class="t">Write the redirect test</span><span class="meta">2 of 5</span></div><div class="bar"><i style="width:40%"></i></div></div>
+      <div class="bubble">Fix the login redirect and open a PR.</div>
+      <div class="line"><span class="g">▸</span><span class="t"><b>Edit</b> <span class="mono">redirect.go</span></span></div>
+      <div class="obj"><div class="bt"><span>✎</span><div class="sp"><b>Changed 3 files</b></div><span class="quiet">›</span></div></div>
+      <div class="line"><span class="g">✓</span><span class="t"><b>Waiting on your answer</b></span></div>
+      <div class="waitfor">Waiting for you</div>
+      <div class="ask"><div class="head"><span class="g">?</span><b class="sp">Where should a guest go?</b></div><div class="opts"><button class="opt">/home</button><button class="opt">Back where they were</button></div></div>
+      <div class="prog"><div class="r"><span class="beacon"></span><span class="t"><b>Waiting for your answer</b></span><span class="meta">4 min</span></div></div>
+      <div class="prompt"><div class="faint">Ask Claude…</div></div>
+    </div>
+  </div>
+  <div>
+    <table class="fam">
+      <tr><th>Place</th><th>Family</th><th>How many at once</th></tr>
+      <tr><td>Under the header</td><td>Strip, then Now (goal + plan)</td><td>1 strip (+N more), 1 Now</td></tr>
+      <tr><td>Transcript</td><td>Messages, Lines, Objects</td><td>any</td></tr>
+      <tr><td>After the transcript</td><td>Ask, under "Waiting for you"</td><td>any; the first answers on Return</td></tr>
+      <tr><td>Above the prompt bar</td><td>Now (what it does now)</td><td>1</td></tr>
+      <tr><td>Prompt bar</td><td>no cards</td><td>—</td></tr>
+    </table>
+    <h3 style="font-size:14px;margin:18px 0 6px">From 40 to 5</h3>
+    <table class="fam">
+      <tr><th></th><th>Today</th><th>Proposed</th></tr>
+      <tr><td>Kinds of card</td><td>40 + 7 question variants</td><td>5 families, about 20 sets of words</td></tr>
+      <tr><td>Ways to tint "attention"</td><td>3</td><td>1 (the Ask's edge, and the glyph)</td></tr>
+      <tr><td>Places a person is asked</td><td>2 (transcript and end)</td><td>1</td></tr>
+      <tr><td>Places a lease is said</td><td>2</td><td>1</td></tr>
+      <tr><td>Places the plan is drawn</td><td>2</td><td>1</td></tr>
+      <tr><td>Ways to show a file</td><td>2 (card; strip on the phone)</td><td>1</td></tr>
+    </table>
+  </div>
+</div>
+
+<h2>Decided, and open</h2>
+<div class="decided">Decided: five families (Strip, Line, Object, Ask, Now), not four. A Line with a preview would mean one fewer family, but a picture in an unboxed line reads badly. Alex can overrule.</div>
+<div class="decided">Decided: the Ask's attention mark is a left edge, not a wash. A wash on each of several cards is loud; one edge per card and one label is enough. Alex can overrule.</div>
+<div class="decided">Decided: a Strip's glyph is orange (a warning), never yellow, also for the cost limit, because #5016 keeps yellow for an Ask; the Strip says what is wrong and its button fixes it. Alex can overrule.</div>
+<div class="decided">Decided: the secret-use card of #4918 (Ask before use) is an Ask, with the secret's name as the title and Allow / Deny as the foot. Alex can overrule.</div>
+<div class="decided">Decided: messages (bubbles) are not a family of cards. They keep the dashed edge for "not sent yet". Alex can overrule.</div>
+<p><b>Open, for Alex:</b></p>
+<ol style="max-width:1000px;line-height:1.6">
+  <li><b>The cost limit moves to the top Strip.</b> It is next to the prompt today, where the person is typing. Move it or keep it there?</li>
+  <li><b>Moving the asks from the transcript</b> (sandbox, policy, view) to "Waiting for you" changes where those three show (a new layout under #3474), so the PRs that do it wait for Alex's approval.</li>
+  <li><b>⌘1–9 on the web</b> works only when the browser does not take it. Keep ⌥1–9 on the web?</li>
+  <li><b>Order of the work,</b> if Alex likes this. Each family is a story for all three clients: Ask first (most cards, one bug), then Now, Strip, Object and Line. The two bugs (28g's missing question, 4's style) are fixed first, on their own, as they are bugs today.</li>
+</ol>
+</main>
+</body>
+</html>

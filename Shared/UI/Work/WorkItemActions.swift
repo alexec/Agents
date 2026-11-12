@@ -15,6 +15,8 @@ struct WorkMergeBox: View {
     let box: WorkLook.MergeBox
     /// A machine of the person's writes to the forge: else the rows only, and why no buttons.
     let writes: Bool
+    /// The page is this device's copy (#4930): no writes, and no words on why, until the machine answers.
+    var waiting = false
     var compact = false
     let wrote: () -> Void
 
@@ -146,7 +148,9 @@ struct WorkMergeBox: View {
     @ViewBuilder
     private var buttons: some View {
         VStack(alignment: .leading, spacing: 6) {
-            if !writes {
+            if waiting {
+                EmptyView()
+            } else if !writes {
                 Text(WorkLook.noWriter(node.ref)).appText(.supporting).foregroundStyle(.secondary)
             } else if item.draft == true {
                 Text(WorkLook.readyOnForge(node.ref)).appText(.supporting).foregroundStyle(.secondary)

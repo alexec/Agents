@@ -12,14 +12,20 @@ struct UsageChartsSection<Refresh: Equatable>: View {
     let metric: UsageChart.Metric
     let load: () async -> UsageHistory?
     let refresh: Refresh
+    /// The range, when the page beside the charts needs it too (Cost's Open Reports, #4938);
+    /// else the charts keep their own.
+    var shown: Binding<UsageChart.Range>?
 
     @State private var history: UsageHistory?
-    @State private var range: UsageChart.Range = .week
+    @State private var own: UsageChart.Range = .week
     @State private var picked: Date?
+
+    private var rangeBinding: Binding<UsageChart.Range> { shown ?? $own }
+    private var range: UsageChart.Range { rangeBinding.wrappedValue }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Picker("Range", selection: $range) {
+            Picker("Range", selection: rangeBinding) {
                 ForEach(UsageChart.Range.allCases) { Text($0.rawValue).tag($0) }
             }
             .pickerStyle(.segmented)

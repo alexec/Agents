@@ -217,6 +217,13 @@ export function EmptyState({ kind, title, line, action }: {
 /** A forge that could not be read (section 7): a strip with what it said and Try again. In the middle of a list that read
  * nothing, a heading first ("Could not read issues", lists.md section 5), and `also` beside Try again (Settings ▸
  * Connectors, for a credential the forge refused). */
+/** A Work page drawn from this device's copy (#4930) while its machine is asked again: a neutral banner with a spinner,
+ * gone when the machine answers. The window says the same (WorkLook.fromDevice). */
+export function FromDeviceStrip({ on }: { on: boolean }) {
+  if (!on) return null;
+  return <MessageBanner tone="neutral" name="work-from-device" busy><strong>From this device.</strong> Reading it again.</MessageBanner>;
+}
+
 export function ErrorStrip({ lines, retry, middle, title, also }: {
   lines: readonly string[]; retry: () => void; middle?: boolean; title?: string | undefined;
   also?: { words: string; run: () => void } | undefined;

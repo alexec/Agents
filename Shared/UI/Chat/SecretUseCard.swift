@@ -20,7 +20,7 @@ struct SecretUseCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label(title, systemImage: request.symbol)
+            Label(title, icon: request.symbol)
                 .appText(.reading).fontWeight(.semibold)
                 .tinted(.attention)
             Text(use.where)

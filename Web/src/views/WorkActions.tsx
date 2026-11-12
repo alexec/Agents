@@ -56,8 +56,10 @@ function CheckGlyph({ state }: { state: string }) {
  * is open from the start when a check failed; a failed check has Log. On the top box the checks row opens the Checks
  * page (`checksPage`) in place of the list. `writes`: a machine of the person's writes to the forge; else the rows and
  * why no buttons. */
-export function WorkMergeBox({ store, host, detail, box, writes, top = false, checksPage, wrote }: {
-  store: Store; host: string; detail: ForgeItemDetail; box: MergeBox; writes: boolean; top?: boolean;
+export function WorkMergeBox({ store, host, detail, box, writes, waiting = false, top = false, checksPage, wrote }: {
+  store: Store; host: string; detail: ForgeItemDetail; box: MergeBox; writes: boolean;
+  /** The page is this device's copy (#4930): no writes, and no words on why, until the machine answers. */
+  waiting?: boolean; top?: boolean;
   checksPage?: (() => void) | undefined; wrote: () => void;
 }) {
   const busy = useSignal(false);
@@ -143,7 +145,7 @@ export function WorkMergeBox({ store, host, detail, box, writes, top = false, ch
           </div>
         ))}
         <div class="work-merge-buttons">
-          {!writes ? <p class="quiet small">{noWriter(node.ref)}</p>
+          {waiting ? null : !writes ? <p class="quiet small">{noWriter(node.ref)}</p>
             : item.draft ? <p class="quiet small">{readyOnForge(node.ref)}</p>
             : (
               <div class="work-actions-bar">

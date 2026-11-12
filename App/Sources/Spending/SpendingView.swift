@@ -15,13 +15,60 @@ import SwiftUI
 /// to the sidebar. It fetches nothing.
 ///
 /// Read-only. Nothing on this page starts, stops, archives or deletes anything.
+///
+/// **Open Reports** (#4938) opens Reports ▸ Spend on the web page, in the Me scope and the range
+/// the charts show: Reports is a Web + Mac link feature (#4937), so the Mac draws this one link
+/// and nothing more. It shows only when this Mac can open the page; with no control plane, or no
+/// page served, there is no link and no Reports.
 struct SpendingView: View {
     @Environment(AppModel.self) private var model
 
+    @State private var range: UsageChart.Range = .week
+    /// Its own link to the control plane, while the page is open; nil with none.
+    @State private var control: ControlSettingsModel?
+    @State private var reportsProblem: String?
+
     private var spending: Spending { Spending(model.folders) }
+
+    /// Whether this Mac can open the web page now.
+    private var reportsShown: Bool {
+        guard let control, control.isReachable else { return false }
+        return BrowserOpening.linkPage(control.status, onThisMac: control.isOnThisMac) != nil
+    }
 
     var body: some View {
         cost.navigationTitle("Cost")
+            .toolbar {
+                if reportsShown {
+                    ToolbarItem {
+                        Button(ReportsLink.title, icon: "chart.bar.doc.horizontal") { openReports() }
+                            .labelStyle(.titleAndIcon)
+                            .help(ReportsLink.help)
+                    }
+                }
+            }
+            .task {
+                guard control == nil, let endpoint = ControlConfig.endpoint,
+                      let made = ControlSettingsModel(endpoint: endpoint) else { return }
+                control = made
+                await made.refresh()
+            }
+            .onDisappear {
+                control?.stop()
+                control = nil
+            }
+            .alert("Agents can’t open Reports", isPresented: Binding(get: { reportsProblem != nil },
+                                                                      set: { if !$0 { reportsProblem = nil } })) {
+                Button("OK") { reportsProblem = nil }
+            } message: {
+                Text(reportsProblem ?? "")
+            }
+    }
+
+    private func openReports() {
+        guard let control else { return }
+        let place = ReportsLink.place(range: range)
+        Task { reportsProblem = await control.openInBrowser(place: place) }
     }
 
     private var cost: some View {
@@ -34,7 +81,7 @@ struct SpendingView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 // Over time, as Health draws it (#823).
-                UsageChartsSection(metric: .cost, load: { await model.usageHistory() }, refresh: model.costState)
+                UsageChartsSection(metric: .cost, load: { await model.usageHistory() }, refresh: model.costState, shown: $range)
                     .padding(.bottom, 8)
                 if spending.isEmpty {
                     nothingSpent

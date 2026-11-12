@@ -28,7 +28,8 @@
       "first list": 2000,
       "open a session": 500,
       "open a long transcript": 1000,
-      "send to echo": 300
+      "send to echo": 300,
+      "work list, second open": 100
     },
     "counts": {
       "mac.callsBeforeFirstList": 2,

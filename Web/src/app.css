@@ -691,7 +691,8 @@ a.wait-card-filters { color: var(--accent); opacity: 1; text-decoration: underli
 /* The beacon (#2657), as `dot.radiowaves.left.and.right`: a filled dot, and arcs stroked in the colour around it. */
 .beacon { display: block; width: 100%; height: 100%; overflow: visible; }
 .beacon circle { fill: currentColor; }
-.beacon path { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.beacon path, .beacon rect, .beacon circle.ring { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round;
+  stroke-linejoin: round; }
 /* A waiting session's mark on all three clients (#2456, #2657), as WaitingBeacon: the waiting card's beacon,
    breathing between 0.3 and full once in 4 s. The keyframes (breathe) and --breath-period come from
    spinnerClock.ts, which keeps every beacon on the page in step and reads `waitingMarkPeriod` from
@@ -2217,7 +2218,7 @@ a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
 .work-empty p { margin: 0; }
 .work-empty .work-state-icon { --open: var(--paper-ink); opacity: 0.45; margin-bottom: 4px; }
 .work-empty button { margin-top: 8px; }
-.work-error { margin: 0 0 8px; }
+.work-error, .work-from-device { margin: 0 0 8px; }
 .work-error .message-words { display: flex; flex-direction: column; }
 .work-error.middle { margin: 48px auto; max-width: 520px; }
 /* An item's page (#4402, specs/4328-work-look/issue.md), as the window's WorkItemPage (#4400): the page's bar, the header

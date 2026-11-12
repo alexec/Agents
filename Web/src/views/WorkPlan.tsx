@@ -10,6 +10,7 @@
 // Blocked by. Start lead and Open lead are the page header's. Under 700 px (note 19) the bar takes the width with the
 // words under it, and a child is the phone row: its title on up to two lines, no level chip or pull request, a short
 // line 2.
+import { keepWork, keptWork } from "../model/localCopy";
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { AgentState, ForgeDone, ForgeItemDetail, ForgePlan, ForgePlanChild, ForgePlanStep, ForgeStanding, LineageCostRollup, LineageEstimate, LineageLink } from "../protocol/generated";
@@ -32,12 +33,16 @@ const holdsRuntime = (s: AgentState) => s === "starting" || s === "running" || s
 /** The mark's glyph before line 2's words; a closed child's state icon says it is done. */
 const markGlyph: Record<PlanMark, string | undefined> = { done: undefined, working: "●", attention: "⚠", waiting: "○", blocked: "⊘" };
 
-export function WorkPlan({ store, host, lineageHost, detail, asked, estimates = [], writes, wrote }: {
+export function WorkPlan({ store, host, lineageHost, detail, asked, estimates = [], writes, waiting = false, wrote }: {
   store: Store; host: string; lineageHost: string | undefined; detail: ForgeItemDetail; asked: number;
-  estimates?: readonly LineageEstimate[]; writes: boolean; wrote: () => void;
+  estimates?: readonly LineageEstimate[]; writes: boolean;
+  /** The page is this device's copy (#4930): no changes, and no words on why, until the machine answers. */
+  waiting?: boolean; wrote: () => void;
 }) {
   const plan = useSignal<ForgePlan | null>(null);
   const problem = useSignal<string | null>(null);
+  /** The plan on screen came from this device's copy (#4930): no changes until its machine answers. */
+  const fromDevice = useSignal(false);
   const rollups = useSignal<Record<string, LineageCostRollup>>({});
   const links = useSignal<Record<string, LineageLink[]>>({});
   const said = useSignal<{ words: string; failed: boolean } | null>(null);
@@ -58,6 +63,11 @@ export function WorkPlan({ store, host, lineageHost, detail, asked, estimates = 
     // After a write the plan stays up while it is read again, and its line says what was done.
     if (changed.value === 0) said.value = null;
     void (async () => {
+      // Seen before: this device's copy at once, until the machine answers (#4930).
+      if (!plan.peek()) {
+        const kept = await keptWork<ForgePlan>("plan", node.ref);
+        if (current && kept && !plan.peek()) { plan.value = kept; fromDevice.value = true; }
+      }
       let got: ForgePlan;
       try {
         got = await store.link.call("forge/plan", { node }, host);
@@ -68,7 +78,9 @@ export function WorkPlan({ store, host, lineageHost, detail, asked, estimates = 
       }
       if (!current) return;
       plan.value = got;
+      fromDevice.value = false;
       problem.value = null;
+      keepWork("plan", node.ref, got);
       if (!lineageHost) { rollups.value = {}; links.value = {}; return; }
       // Each child's cost and links: the links name a lane at once, the cost once it banked a turn.
       const read = await Promise.all(got.children.map(async (c) => {
@@ -127,7 +139,7 @@ export function WorkPlan({ store, host, lineageHost, detail, asked, estimates = 
 
   const p = plan.value;
   /** Add child and Blocked by: an open epic, not a standing one, on a machine that writes. */
-  const changes = !!p && writes && p.item.state === "open" && !p.standing;
+  const changes = !!p && writes && !fromDevice.value && p.item.state === "open" && !p.standing;
   const running = p ? p.children.filter((c) => states(c).some(holdsRuntime)).length : 0;
 
   /** The row's menu (note 9): Blocked by, with a tick on each child that blocks it now; Open; Open lane; Open on GitHub. */
@@ -270,7 +282,7 @@ export function WorkPlan({ store, host, lineageHost, detail, asked, estimates = 
                 )}
                 {said.value && <p class={said.value.failed ? "hint failure small" : "quiet small"} role="status">{said.value.words}</p>}
               </div>
-            ) : !writes && p.item.state === "open" && !p.standing && (
+            ) : !writes && !waiting && !fromDevice.value && p.item.state === "open" && !p.standing && (
               <p class="work-plan-no-writes quiet small">No machine of yours can write to {forgeName(p.item.node.ref)}.</p>
             )}
           </div>

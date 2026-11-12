@@ -7,13 +7,14 @@
 // (from the sessions labelled with them) and the rest in words; then its issues with no epic that are in flight. Under 700 px
 // the chip and the bars' words go, an epic's where and lead go on its second line, a child's words on its second line, and
 // an epic shows at most two children.
-import { signal } from "@preact/signals";
+import { effect, signal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
+import { keepWork, keptWork } from "../model/localCopy";
 import type { Agent, ForgeFeature, ForgeItem, ForgePlan } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { describe } from "../model/errors";
 import { boardChoices, boardName, errorWords, labelColor, noForgeHere, shortRef, withBoard } from "../model/work";
-import { ErrorStrip, LabelChip, PlaceholderRows, RefreshButton, StateIcon } from "./WorkParts";
+import { ErrorStrip, FromDeviceStrip, LabelChip, PlaceholderRows, RefreshButton, StateIcon } from "./WorkParts";
 import { boardHosts, boards, forgeHosts, listHosts, loadBoards } from "../model/workLists";
 import { Choice } from "./Work";
 import {
@@ -48,6 +49,35 @@ const reading = signal(false);
 /** The board chosen, by its url; empty for all. */
 const board = signal("");
 let read: string | undefined;
+/** The features on screen came from this device's copy (#4930), until the machines answer. */
+const fromDevice = signal(false);
+/** The board the features on screen were read for: the copy is drawn only for another. */
+let shownFor: string | undefined;
+/** The machines answered for `shownFor`: what is on screen is theirs, and is kept as it fills in. */
+let answered = false;
+
+/** Work ▸ Features as this device keeps it (#4930). */
+interface KeptFeatures {
+  features: ForgeFeature[]; approvals: string[];
+  items: Record<string, { items: { host: string; item: ForgeItem }[]; errors: string[] }>; plans: Record<string, ForgePlan>;
+}
+
+// Kept a second after the features, their issues and their plans last changed, while every read answered (#4930).
+let keepTimer: ReturnType<typeof setTimeout> | undefined;
+effect(() => {
+  const list = features.value;
+  void items.value;
+  void plans.value;
+  if (keepTimer) clearTimeout(keepTimer);
+  if (!list || !answered || fromDevice.value || errors.value.length > 0) return;
+  const on = shownFor ?? "";
+  keepTimer = setTimeout(() => {
+    if (!answered || shownFor !== on || errors.peek().length > 0) return;
+    const fine = Object.fromEntries(Object.entries(items.peek()).filter(([, v]) => v.errors.length === 0));
+    const read = Object.fromEntries(Object.entries(plans.peek()).filter((e): e is [string, ForgePlan] => typeof e[1] !== "string"));
+    keepWork("features", on, { features: features.peek() ?? [], approvals: approvals.peek(), items: fine, plans: read } satisfies KeptFeatures);
+  }, 1_000);
+});
 
 async function loadFeatures(store: Store) {
   const mine = asked.value;
@@ -57,14 +87,22 @@ async function loadFeatures(store: Store) {
   if (read === key && features.value !== null) return;
   read = key;
   reading.value = true;
-  features.value = null;
-  approvals.value = [];
-  errors.value = [];
-  items.value = {};
-  plans.value = {};
-  planning.clear();
-  itemReads.clear();
-  featureOpen.value = {};
+  // The features on screen stay until the machines answer (#4930); a board not shown yet draws this device's copy.
+  if (shownFor !== on) {
+    const kept = await keptWork<KeptFeatures>("features", on);
+    if (kept && asked.value === mine && board.value === on && shownFor !== on) {
+      features.value = kept.features;
+      approvals.value = kept.approvals;
+      errors.value = [];
+      items.value = kept.items;
+      plans.value = kept.plans;
+      shownFor = on;
+      answered = false;
+      fromDevice.value = true;
+    } else if (shownFor !== on) {
+      features.value = null;
+    }
+  }
   const got = await Promise.all(hosts.map(async (h) => {
     try {
       return { host: h, list: await store.link.call("forge/features", withBoard({}, on), h.id) };
@@ -74,6 +112,15 @@ async function loadFeatures(store: Store) {
   }));
   if (asked.value !== mine || board.value !== on) return;
   reading.value = false;
+  approvals.value = [];
+  items.value = {};
+  plans.value = {};
+  planning.clear();
+  itemReads.clear();
+  featureOpen.value = {};
+  shownFor = on;
+  answered = true;
+  fromDevice.value = false;
   errors.value = got.flatMap(({ host, list }) => (list.errors ?? []).map((e) => errorWords(e, hosts.length > 1 ? host.name : undefined)));
   features.value = mergeFeatures(got.map(({ list }) => list.features));
   approvals.value = got.flatMap(({ list }) => list.approvals ?? []);
@@ -149,6 +196,7 @@ export function WorkFeatures({ store }: { store: Store }) {
           </div>
         ) : (
           <>
+            <FromDeviceStrip on={fromDevice.value} />
             <ErrorStrip lines={errors.value} retry={refresh} />
             <div class={errors.value.length > 0 ? "stale" : undefined}><FeatureGroups store={store} list={list} /></div>
           </>

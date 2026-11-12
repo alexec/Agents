@@ -33,10 +33,11 @@ import { ago } from "../model/connectorSetup";
 import { fromWireDate } from "../protocol/dates";
 import { type ForgeImages, Markdown } from "../render/markdown";
 import { bytesOf } from "../model/pageImage";
+import { keepWork, keptPicture, keptWork } from "../model/localCopy";
 import { forgeMarkdown } from "../model/forgeMarkdown";
 import { ForgeTitle } from "../render/ForgeTitle";
 import {
-  Avatar, Avatars, EmptyState, ErrorStrip, FilterMenu, LabelChip, PlaceholderRows, RefreshButton, StateIcon, picture, type MenuChoice, type ReadPicture,
+  Avatar, Avatars, EmptyState, ErrorStrip, FilterMenu, FromDeviceStrip, LabelChip, PlaceholderRows, RefreshButton, StateIcon, picture, type MenuChoice, type ReadPicture,
 } from "./WorkParts";
 import { WorkChecksPage, WorkCommentBox, WorkFilesChanged, WorkLabelsPicker, WorkMergeBox, WorkStatusMenu } from "./WorkActions";
 import { branchWords, mergeBox, mergedStrip, offers, pullStateWords, reviewersWords } from "../model/workPull";
@@ -68,7 +69,9 @@ export function pictureReader(store: Store, host: string | undefined): ReadPictu
   if (!host || !store.has(host, Capability.forgeImage1)) return undefined;
   let r = readers.get(host);
   if (!r) {
-    r = (url) => picture(url, (u) => store.link.call("forge/image", { url: u }, host).then((got) => ({ bytes: bytesOf(got.data), type: got.mimeType })));
+    // From this device's copy when it holds it (#4930): a picture does not change at its URL.
+    r = (url) => picture(url, (u) => keptPicture(u, (v) => store.link.call("forge/image", { url: v }, host))
+      .then((got) => ({ bytes: bytesOf(got.data), type: got.mimeType })));
     readers.set(host, r);
   }
   return r;
@@ -211,6 +214,7 @@ export function WorkList({ store, kind }: { store: Store; kind: WorkKind }) {
               also={problems.some(credentialProblem) ? { words: "Settings ▸ Connectors", run: connectors } : undefined} />
         : (
           <>
+            <FromDeviceStrip on={l.fromDevice.value} />
             <ErrorStrip lines={problems} retry={refresh} />
             {rows.length === 0
               ? <EmptyState kind={kind} title={empty.title}
@@ -313,6 +317,8 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
   const detail = useSignal<{ host: string; got: ForgeItemDetail } | null>(null);
   const forgeProblem = useSignal<string | null>(null);
   const reading = useSignal(false);
+  /** The item on screen came from this device's copy (#4930): no writes until its machine answers. */
+  const fromDevice = useSignal(false);
   const older = useSignal(false);
   const estimate = useSignal<LineageEstimate | null>(null);
   const forecast = useSignal<LineageForecast | null>(null);
@@ -327,13 +333,14 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
   // The page's images, read by the machine that read the page (#4011); without forge/image there, their words.
   const imageHost = detail.value && store.has(detail.value.host, Capability.forgeImage1) ? detail.value.host : null;
   const forgeImages = useMemo<ForgeImages | undefined>(() => imageHost === null ? undefined
-    : (url) => store.link.call("forge/image", { url }, imageHost).then((got) => ({ bytes: bytesOf(got.data), type: got.mimeType })),
+    : (url) => keptPicture(url, (u) => store.link.call("forge/image", { url: u }, imageHost))
+      .then((got) => ({ bytes: bytesOf(got.data), type: got.mimeType })),
   [imageHost]);
   // Lineage from the machine that read the forge, else this Mac, else the first that keeps links.
   const lineageHost = lineageHosts.find((h) => h.id === detail.value?.host)?.id
     ?? lineageHosts.find((h) => h.id === store.macHostID.value)?.id ?? lineageHosts[0]?.id;
   // A new item starts empty; a refresh keeps the page, and Refresh spins, until the new read comes.
-  useEffect(() => { detail.value = null; forgeProblem.value = null; said.value = null; pickingLabels.value = false; checksPage.value = false; }, [kind, ref]);
+  useEffect(() => { detail.value = null; fromDevice.value = false; forgeProblem.value = null; said.value = null; pickingLabels.value = false; checksPage.value = false; }, [kind, ref]);
   useEffect(() => {
     let current = true;
     if (!fromForge(kind)) return;
@@ -345,11 +352,19 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
       return () => { current = false; clearTimeout(none); };
     }
     void (async () => {
+      // Seen before: this device's copy at once, until a machine answers (#4930).
+      if (!detail.peek()) {
+        const kept = await keptWork<{ host: string; got: ForgeItemDetail }>("item", ref);
+        if (current && kept && !detail.peek()) { detail.value = kept; fromDevice.value = true; }
+      }
       let last: string | null = null;
       for (const h of forgeHosts) {
         try {
           const got = await store.link.call(kind === "pr" ? "forge/pull" : "forge/issue", { node }, h.id);
-          if (current) { detail.value = { host: h.id, got }; forgeProblem.value = null; }
+          if (current) {
+            detail.value = { host: h.id, got }; fromDevice.value = false; forgeProblem.value = null;
+            keepWork("item", ref, { host: h.id, got });
+          }
           return;
         } catch (e) {
           last = describe(e);
@@ -414,11 +429,14 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
     try {
       const got = await store.link.call(kind === "pr" ? "forge/pull" : "forge/issue", { node }, had.host);
       detail.value = { host: had.host, got };
+      fromDevice.value = false;
+      keepWork("item", ref, { host: had.host, got });
     } catch (e) {
       forgeProblem.value = describe(e);
     }
   };
-  const writes = detail.value !== null && store.has(detail.value.host, Capability.forgeWrite1);
+  // None while the page is this device's copy (#4930): a write acts on the machine's own answer.
+  const writes = detail.value !== null && !fromDevice.value && store.has(detail.value.host, Capability.forgeWrite1);
   // A write from the header or the side panel (the status menu, a label); what it did is the line under the comment box.
   const act = async (method: "forge/close" | "forge/label", params: ForgeCloseRequest | ForgeLabelRequest) => {
     const host = detail.value?.host;
@@ -438,7 +456,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
 
   const readOlder = async () => {
     const had = detail.value;
-    if (!had?.got.cursor) return;
+    if (!had?.got.cursor || fromDevice.peek()) return;
     older.value = true;
     try {
       const page = await store.link.call(kind === "pr" ? "forge/pull" : "forge/issue", { node, cursor: had.got.cursor }, had.host);
@@ -483,7 +501,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
   const box = got ? mergeBox(got) : undefined;
   const isPull = kind === "pr" && got !== undefined;
   const writeBox = (top: boolean) => box && detail.value && (
-    <WorkMergeBox store={store} host={detail.value.host} detail={detail.value.got} box={box} writes={writes} top={top}
+    <WorkMergeBox store={store} host={detail.value.host} detail={detail.value.got} box={box} writes={writes} waiting={fromDevice.value} top={top}
       checksPage={top ? () => { checksPage.value = true; } : undefined} wrote={() => void reread()} />
   );
   // The comment box's Close or Reopen: an issue with no tracker's status; a pull request's as its forge offers them.
@@ -601,6 +619,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
       {detail.value && forgeProblem.value && (
         <div class="work-problem"><ErrorStrip lines={[forgeProblem.value]} retry={() => { asked.value++; }} /></div>
       )}
+      {fromDevice.value && !forgeProblem.value && <div class="work-problem"><FromDeviceStrip on /></div>}
       {/* A pull request under 700 px (pull-request.md, Narrow): the merge box at the top, then Files changed as a row. */}
       {isPull && detail.value && (
         <div class="work-pull-top work-narrow-only">
@@ -644,7 +663,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
         {detail.value && hasPlan(detail.value.got.item) && (
           <WorkPlan store={store} host={detail.value.host} lineageHost={lineageHost} detail={detail.value.got} asked={asked.value}
             estimates={estimate.value?.children ?? []}
-            writes={writes} wrote={() => void reread()} />
+            writes={writes} waiting={fromDevice.value} wrote={() => void reread()} />
         )}
         {loading && (
           <div class="work-timeline" aria-hidden="true">
@@ -694,7 +713,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
           ? <WorkCommentBox store={store} host={detail.value.host} node={node} noun={kind === "pr" ? "pull request" : "issue"}
               closes={closes} said={said.value}
               wrote={(w, failed) => { said.value = { words: w, failed }; if (!failed) void reread(); }} />
-          : !box && <p class="quiet small work-no-writes">No machine of yours can write to {forgeName(ref)}.</p>)}
+          : !box && !fromDevice.value && <p class="quiet small work-no-writes">No machine of yours can write to {forgeName(ref)}.</p>)}
       </div>
       {item && (
         <aside class="work-side links" aria-label="Linked, lineage and docs">

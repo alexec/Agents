@@ -8,6 +8,8 @@ import { Capability } from "../protocol/capabilities.generated";
 import { CallFailed } from "../wire/link";
 import { describe } from "./errors";
 import { hostAnswers } from "./capabilities";
+import { keepWork, keptWork } from "./localCopy";
+import { mark } from "./marks";
 import {
   anyFilter, defaultSort, filterRows, forgeListRequest, fromForge, lineageRow, mergeBoards, mergeForge, neighbours, projectRepos, sortRows,
   type Neighbours, type WorkFilter, type WorkKind, type WorkProject, type WorkProjectRepos, type WorkRow, type WorkSort, type WorkState,
@@ -45,7 +47,14 @@ export interface WorkListState {
   opened: Signal<string | undefined>;
   /** What the rows were read for; the list reads them again only when that changes. */
   read: string | undefined;
+  /** The rows on screen came from this device's copy (#4930): the machines are asked again, and the list says so. */
+  fromDevice: Signal<boolean>;
+  /** What the rows on screen were read for, without Refresh (`copyAsk`): the copy is drawn only for another. */
+  shownFor: string | undefined;
 }
+
+/** A list's first page as this device keeps it (#4930): each machine's page, the lineage figures, and the boards. */
+export interface KeptList { lists: HostList[]; lineage: ReportNode[]; lineageCursor?: string | undefined; boards?: ProjectBoard[] | undefined }
 
 const lists = new Map<WorkKind, WorkListState>();
 
@@ -59,7 +68,7 @@ export function workList(kind: WorkKind): WorkListState {
     l = {
       kind, filter: signal(anyFilter), projects: signal([]), sort: signal<WorkSort>(defaultSort(kind)), lists: signal(null), loading: signal(false), lineage: signal([]),
       lineageCursor: signal(undefined), problem: signal(null), more: signal(false), moreFailed: signal(null), asked: signal(0), opened: signal(undefined),
-      read: undefined,
+      read: undefined, fromDevice: signal(false), shownFor: undefined,
     };
     lists.set(kind, l);
   }
@@ -89,8 +98,15 @@ export async function loadBoards(store: Store, again = false): Promise<void> {
   const mine = hosts.map((h) => h.id).join(",");
   if (boardsRead === mine && !again) return;
   boardsRead = mine;
+  // The boards this device kept from the same machines at once (#4930), until they answer.
+  if (boards.peek().length === 0) {
+    const kept = await keptWork<ProjectBoard[]>("boards", mine);
+    if (kept && boardsRead === mine && boards.peek().length === 0) boards.value = kept;
+  }
   const got = await Promise.all(hosts.map((h) => store.link.call("forge/boards", {}, h.id).then((b) => b.boards, () => [])));
-  if (boardsRead === mine) boards.value = mergeBoards(got);
+  if (boardsRead !== mine) return;
+  boards.value = mergeBoards(got);
+  if (boards.peek().length > 0) keepWork("boards", mine, boards.peek());
 }
 
 /** Every row read, one per ref. */
@@ -141,29 +157,62 @@ export function carryStale(got: HostList, had: HostList | undefined): HostList {
   return kept.length === 0 ? got : { ...got, items: [...got.items, ...kept], stale: kept.map((i) => i.node.ref) };
 }
 
-/** Read the list for what it is asked, unless it was read for that already. */
+/** What a list's first page is kept under in this device's copy (#4930): kind, state, sort and board, as the window's. */
+export function copyAsk(l: WorkListState): string {
+  const { state, board } = l.filter.peek();
+  return [l.kind, forgeState(state), nodesSort(l), board].join("|");
+}
+
+/** Draws the first page this device kept for what is asked, unless rows read for it are on screen (#4930). */
+export async function drawKept(l: WorkListState): Promise<boolean> {
+  const wanted = copyAsk(l);
+  if (l.shownFor === wanted) return false;
+  const kept = await keptWork<KeptList>("list", wanted);
+  if (!kept || copyAsk(l) !== wanted || l.shownFor === wanted) return false;
+  l.lineage.value = kept.lineage;
+  l.lineageCursor.value = kept.lineageCursor;
+  l.lists.value = kept.lists;
+  if (kept.boards && boards.peek().length === 0) boards.value = kept.boards;
+  l.shownFor = wanted;
+  l.fromDevice.value = true;
+  // "Work list, second open" (#4930): from the read's start to the copy's rows, which the night's walk times.
+  mark("work-list-copy", "work-list-read");
+  return true;
+}
+
+/** Read the list for what it is asked, unless it was read for that already. A list not read for it yet draws this
+ * device's copy first (#4930), and the machines' answer replaces it. */
 export async function loadList(store: Store, l: WorkListState): Promise<void> {
   const mine = askKey(store, l);
   if (l.read === mine && l.lists.peek() !== null) return;
   l.read = mine;
   const current = () => l.read === mine;
+  const wanted = copyAsk(l);
+  mark("work-list-read");
   const { kind } = l;
   const sort = nodesSort(l);
   const { state, board } = l.filter.peek();
   const hosts = listHosts(store, board);
-  // The rows read before stay until the new ones come (#4392): a first read shows placeholders, a refresh the rows.
-  const before = l.lists.peek() ?? [];
   l.loading.value = true;
   l.problem.value = null;
   l.moreFailed.value = null;
   try {
+    await drawKept(l);
+    if (!current()) return;
+    // The rows read before stay until the new ones come (#4392): a first read shows placeholders, a refresh the rows.
+    const before = l.lists.peek() ?? [];
     // Lineage first, so the rows come with their figures; a control plane that does not list nodes gives none.
     const known = await readLineage(store, kind, sort).catch((e: unknown) => {
       if (current() && !(e instanceof CallFailed && e.code === -32601) && !fromForge(kind)) l.problem.value = describe(e);
       return { nodes: [] as ReportNode[], cursor: undefined };
     });
     if (!current()) return;
-    if (!fromForge(kind)) { l.lineage.value = known.nodes; l.lineageCursor.value = known.cursor; l.lists.value = []; return; }
+    if (!fromForge(kind)) {
+      l.lineage.value = known.nodes; l.lineageCursor.value = known.cursor; l.lists.value = [];
+      l.shownFor = wanted; l.fromDevice.value = false;
+      if (!l.problem.peek()) keepWork("list", wanted, { lists: [], lineage: known.nodes, lineageCursor: known.cursor } satisfies KeptList);
+      return;
+    }
     const method = kind === "issue" ? "forge/issues" : "forge/pulls";
     const read = await Promise.all(hosts.map(async (h): Promise<HostList> => {
       const had = before.find((b) => b.host === h.id);
@@ -178,6 +227,16 @@ export async function loadList(store: Store, l: WorkListState): Promise<void> {
     l.lineage.value = known.nodes;
     l.lineageCursor.value = known.cursor;
     l.lists.value = read;
+    l.shownFor = wanted;
+    l.fromDevice.value = false;
+    // Only a read some forge answered is kept, without what was carried from the last one: a failed read would draw
+    // an empty list next time.
+    if (read.some((h) => h.errors.length === 0)) {
+      keepWork("list", wanted, {
+        lists: read.map(({ stale, ...h }) => ({ ...h, items: h.items.filter((i) => !stale?.includes(i.node.ref)) })),
+        lineage: known.nodes, lineageCursor: known.cursor, boards: boards.peek(),
+      } satisfies KeptList);
+    }
   } finally {
     if (current()) l.loading.value = false;
   }
@@ -185,7 +244,8 @@ export async function loadList(store: Store, l: WorkListState): Promise<void> {
 
 /** The next page (Load more, or the end of the list in view) of each machine's list, or of lineage's. */
 export async function loadMore(store: Store, l: WorkListState): Promise<void> {
-  if (l.more.peek()) return;
+  // A page after the copy's is read once the machines answered (#4930): the copy's cursors may be old.
+  if (l.more.peek() || l.fromDevice.peek()) return;
   l.more.value = true;
   l.moreFailed.value = null;
   try {

@@ -26,8 +26,15 @@ final class WorkListState {
     var opened: String?
     /// The selected row on the Mac (lists.md section 2): ↑ and ↓ move it, Return opens it.
     var selected: String?
+    /// The rows on screen came from this device's copy (#4930): the machines are asked again,
+    /// and the list says so until they answer.
+    var fromDevice = false
+    /// A read runs: the rows read before stay until the new ones come (#4930), and Refresh spins.
+    var reading = false
     /// What the rows were read for; the list reads them again only when that changes.
     private var read: Ask?
+    /// What the rows on screen were read for, without Refresh: the copy is drawn only for another.
+    private var shownFor: String?
 
     /// How many pages of `reports/nodes` a list reads for its lineage: at most 500 nodes.
     private static let lineagePages = 5
@@ -45,6 +52,35 @@ final class WorkListState {
     }
 
     var ask: Ask { Ask(state: filter.state.forge, sort: nodesSort, asked: asked, board: filter.board) }
+
+    /// What a list's first page is kept under in this device's copy (#4930): the kind, state, sort and board.
+    var copyAsk: String { [kind.rawValue, filter.state.forge, nodesSort.rawValue, filter.board].joined(separator: "|") }
+
+    /// A list's first page as this device keeps it (#4930): each machine's page, the lineage
+    /// figures, and the boards the Board menu offers.
+    struct Kept: Codable, Sendable {
+        var hosts: [MachineRef]
+        var lists: [DaemonAPI.ForgeList]
+        var lineage: [DaemonAPI.ReportNode]
+        var lineageCursor: String?
+        var boards: [DaemonAPI.ProjectBoard]
+    }
+
+    /// Draws the first page this device kept for what is asked, unless rows read for it are on
+    /// screen. Whether there was one.
+    @discardableResult
+    func drawKept(model: any WorkModel) async -> Bool {
+        let wanted = copyAsk
+        guard shownFor != wanted, let kept = await model.keptWork(Kept.self, .list, wanted),
+              copyAsk == wanted, shownFor != wanted, kept.hosts.count == kept.lists.count else { return false }
+        lists = Array(zip(kept.hosts, kept.lists)).map { (host: $0.0, list: $0.1) }
+        lineage = kept.lineage
+        lineageCursor = kept.lineageCursor
+        if kind == .issue { boards = kept.boards }
+        shownFor = wanted
+        fromDevice = true
+        return true
+    }
 
     /// An issue's or a PR's lineage is joined by ref, in any order; a release's list is lineage's own.
     private var nodesSort: DaemonAPI.ReportNodesSort { !kind.fromForge && sort == .cost ? .cost : .newest }
@@ -101,33 +137,45 @@ final class WorkListState {
         return (nodes, next)
     }
 
-    /// Read the list for what it is asked, unless it was read for that already.
+    /// Read the list for what it is asked, unless it was read for that already. The rows on
+    /// screen stay until the new ones come (#4930); a list not read yet this run draws this
+    /// device's copy first, and the machines' answer replaces it.
     func load(model: any WorkModel) async {
         let mine = ask
         guard read != mine || lists == nil else { return }
         read = mine
-        lists = nil
-        lineage = []
         problem = nil
         pageProblem = nil
+        reading = true
+        defer { if ask == mine { reading = false } }
+        await drawKept(model: model)
+        guard ask == mine else { return }
+        let wanted = copyAsk
+        var known: (nodes: [DaemonAPI.ReportNode], cursor: String?) = ([], nil)
         do {
-            let known = try await readLineage(model)
+            known = try await readLineage(model)
             guard ask == mine else { return }
-            lineage = known.nodes
-            lineageCursor = known.cursor
         } catch {
             guard ask == mine else { return }
             // A control plane that does not list nodes yet leaves the issues and PRs without figures.
             if !kind.fromForge { problem = ReportValueWords.sentence(error) }
         }
-        guard kind.fromForge else { lists = []; return }
+        guard kind.fromForge else {
+            lineage = known.nodes
+            lineageCursor = known.cursor
+            lists = []
+            answered(wanted)
+            if problem == nil { model.keepWork(Kept(hosts: [], lists: [], lineage: known.nodes, lineageCursor: known.cursor, boards: []),
+                                               .list, wanted) }
+            return
+        }
         let state = filter.state.forge
         let kind = kind
         let board = filter.board
+        var readBoards: [DaemonAPI.ProjectBoard] = []
         if kind == .issue {
-            let boards = await model.workBoards()
+            readBoards = await model.workBoards()
             guard ask == mine else { return }
-            self.boards = boards
         }
         var got: [(host: MachineRef, list: DaemonAPI.ForgeList)] = []
         await withTaskGroup(of: (MachineRef, DaemonAPI.ForgeList).self) { group in
@@ -145,10 +193,38 @@ final class WorkListState {
             for await (host, list) in group { got.append((host, list)) }
         }
         guard ask == mine else { return }
+        if kind == .issue, !readBoards.isEmpty || !fromDevice { boards = readBoards }
+        // Every machine failed over this device's copy: its rows stay, dimmed under what the forges said, with no
+        // next page (#4392, #4930), as the web page keeps them.
+        let failed = got.allSatisfy { $0.list.items.isEmpty && !($0.list.errors ?? []).isEmpty }
+        if failed, fromDevice, let kept = lists, kept.contains(where: { !$0.list.items.isEmpty }) {
+            let said = got.flatMap { $0.list.errors ?? [] }
+            lists = kept.enumerated().map { i, entry in
+                (entry.host, DaemonAPI.ForgeList(items: entry.list.items, errors: i == 0 ? said : nil, total: entry.list.total))
+            }
+            answered(wanted)
+            return
+        }
+        lineage = known.nodes
+        lineageCursor = known.cursor
         lists = got
+        answered(wanted)
+        // Only a read some forge answered is kept: a failed one would draw an empty list next time.
+        if got.contains(where: { ($0.list.errors ?? []).isEmpty }) {
+            model.keepWork(Kept(hosts: got.map(\.host), lists: got.map(\.list), lineage: known.nodes,
+                                lineageCursor: known.cursor, boards: readBoards), .list, wanted)
+        }
+    }
+
+    /// The machines answered for what is asked: the rows are theirs now.
+    private func answered(_ wanted: String) {
+        shownFor = wanted
+        fromDevice = false
     }
 
     func loadMore(model: any WorkModel) async {
+        // A page after the copy's is read once the machines answered (#4930): the copy's cursors may be old.
+        guard !fromDevice else { return }
         loadingMore = true
         pageProblem = nil
         defer { loadingMore = false }

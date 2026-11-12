@@ -49,6 +49,40 @@ final class WorkFeaturesState {
         var board: String
     }
 
+    /// A read runs: the features on screen stay until the new ones come (#4930), and Refresh spins.
+    var reading = false
+    /// The features on screen came from this device's copy (#4930), until the machines answer.
+    var fromDevice = false
+    /// The board the features on screen were read for.
+    private var shownFor: String?
+
+    /// Work ▸ Features as this device keeps it (#4930), from machines that each gave it in one read.
+    struct Kept: Codable, Sendable {
+        var features: [DaemonAPI.ForgeFeature]
+        var approvals: [String]
+        var items: [String: [DaemonAPI.ForgeItem]]
+        var places: [String: WorkFeatures.Place]
+        var unread: Set<String>
+        var waiting: Set<String>
+        var pulls: [String: DaemonAPI.ForgeItem]
+        var boards: [DaemonAPI.ProjectBoard]
+    }
+
+    private func draw(_ kept: Kept) {
+        features = kept.features
+        approvals = kept.approvals
+        errors = []
+        items = kept.items
+        itemErrors = [:]
+        places = kept.places
+        unread = kept.unread
+        waiting = kept.waiting
+        pulls = kept.pulls
+        boards = kept.boards
+        oneRead = kept.items
+        older = []
+    }
+
     private var ask: Ask { Ask(asked: asked, board: board) }
 
     /// Whether a feature is open: as a person left it, else as its group starts it (note 3).
@@ -67,17 +101,16 @@ final class WorkFeaturesState {
         let mine = ask
         guard read != mine || features == nil else { return }
         read = mine
-        features = nil
-        approvals = []
-        errors = []
-        items = [:]
-        itemErrors = [:]
-        places = [:]
-        unread = []
-        waiting = []
-        pulls = [:]
-        oneRead = [:]
+        reading = true
+        defer { if ask == mine { reading = false } }
         let board = board
+        // The features on screen stay until the machines answer (#4930); a board not shown yet
+        // draws this device's copy first.
+        if shownFor != board, let kept = await model.keptWork(Kept.self, .features, board), ask == mine, shownFor != board {
+            draw(kept)
+            shownFor = board
+            fromDevice = true
+        }
         let found = await model.workBoards()
         guard ask == mine else { return }
         boards = found
@@ -113,6 +146,15 @@ final class WorkFeaturesState {
             }
         }
         guard ask == mine else { return }
+        approvals = []
+        errors = []
+        items = [:]
+        itemErrors = [:]
+        places = [:]
+        unread = []
+        waiting = []
+        pulls = [:]
+        oneRead = [:]
         var lists: [[DaemonAPI.ForgeFeature]] = []
         var ones: [DaemonAPI.WorkFeatures] = []
         for entry in got {
@@ -141,7 +183,16 @@ final class WorkFeaturesState {
         }
         pulls = WorkFeatures.pullsByLabel(prs)
         features = merged
-        guard !older.isEmpty else { return }
+        shownFor = board
+        fromDevice = false
+        guard !older.isEmpty else {
+            // Kept whole only when every machine gave it in one read, and none failed.
+            if errors.isEmpty {
+                model.keepWork(Kept(features: merged, approvals: approvals, items: items, places: places, unread: unread,
+                                    waiting: waiting, pulls: pulls, boards: boards), .features, board)
+            }
+            return
+        }
         let groups = WorkFeatures.groups(merged, agents: model.workAgents, approvals: approvals)
         let open = groups.flatMap { entry in
             entry.features.filter { isOpen($0.name, in: entry.group, of: groups.map(\.group)) }.map(\.name)
@@ -272,7 +323,7 @@ struct WorkFeaturesPane: View {
         // Refresh in the toolbar (⌘R); the Remote has it as a bar button and pull to refresh (Features note 7).
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                WorkRefreshButton(running: state.features == nil) { state.asked += 1 }
+                WorkRefreshButton(running: state.reading) { state.asked += 1 }
             }
         }
         .workTask(id: [String(state.asked), state.board]) { await state.load(model: model) }
@@ -369,6 +420,9 @@ struct WorkFeaturesPane: View {
 
     private func list(_ features: [DaemonAPI.ForgeFeature]) -> some View {
         List {
+            if state.fromDevice {
+                WorkFromDeviceStrip(on: true).listRowSeparator(.hidden)
+            }
             if !state.errors.isEmpty {
                 WorkErrorStrip(lines: state.errors) { state.asked += 1 }
                     .listRowSeparator(.hidden)

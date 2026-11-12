@@ -1361,5 +1361,47 @@
         "values"
       ]
     }
+  },
+  {
+    "name": "make_public_repository",
+    "title": "Make a public repository",
+    "annotations": {
+      "destructiveHint": false,
+      "openWorldHint": true
+    },
+    "description": "Make a public GitHub repository with the person's GitHub connection, with the files of a folder on this machine as its first commit on main. This is the only way an agent makes a repository public: anyone can see it, so it is the person's choice. The call puts a card in front of the person that names the repository, the folder and its files, and makes and pushes nothing until they say yes. When the card is still open, end your turn: you are started again with the result. A no is final: do not make it another way, such as with gh or git. The files are read when you call, before the card: change them first. .git is left out; a link or a special file is refused. Nothing is cloned or kept on this machine. A repository that is there already is used when it is public and empty; a private one is left as it is.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
+        },
+        "name": {
+          "type": "string",
+          "description": "The repository's name: letters, digits, '.', '-' and '_', e.g. app-starter."
+        },
+        "folder": {
+          "type": "string",
+          "description": "The folder whose files are the first commit, as an absolute path or under ~/. Not the home folder, nor one with keys or secrets."
+        },
+        "about": {
+          "type": "string",
+          "description": "The repository's one-line description on GitHub."
+        },
+        "template": {
+          "type": "boolean",
+          "description": "Make it a template repository, as a starter for make_app_repository is."
+        },
+        "owner": {
+          "type": "string",
+          "description": "A GitHub organisation to make it in. Leave it out for the person's own account."
+        }
+      },
+      "required": [
+        "name",
+        "folder"
+      ]
+    }
   }
 ]
