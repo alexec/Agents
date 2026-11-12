@@ -7,6 +7,7 @@ TITLE = "Your first agent"
 WINDOW = (1360, 820)
 # The card is the story here: make.py and v.tidy() leave it showing.
 GET_STARTED = True
+DOCS = "tutorials/first-agent/"  # the docs page, on docs.agentloops.dev (upload.py)
 
 LINES = {
     "intro": "This is Agents. Here's how to start your first agent.",

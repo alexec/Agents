@@ -26,8 +26,8 @@ every frame as it is kept; then every frame is read with OCR (tokens.py) and a t
 any part of a token fails. After the take the scene revokes each token, and a token that the
 provider still takes fails the take too.
 
-Nothing is uploaded unless --upload is given (upload.py: private, to the playlist "Agents
-integrations"). Real Claude agents run in the scenes, on scratch folders: a few cents a
+Nothing is uploaded unless --upload is given (upload.py: private, on the Loops channel, to
+the playlist of the scene's GROUP, with its captions and a thumbnail; #4836). Real Claude agents run in the scenes, on scratch folders: a few cents a
 video.
 """
 import argparse
@@ -787,17 +787,15 @@ INTEGRATIONS = REPO / "docs/reference/integrations.md"
 
 
 def preflight(scene_ids):
-    """Checks what a take needs from Alex's hands: the YouTube refresh token works, and the
+    """Checks what a take needs from Alex's hands, for a scene of any GROUP (#4836): the
+    YouTube refresh token works and is the Loops channel's, the scene's GROUP has a playlist, and the
     scene's video Chrome profile is signed in to its site. Each failure adds one line to
     Alex's checklist on #1793 (once) and fails that scene. Prints `ready <id>` or
     `skip <id>: <why>` per scene; exits 3 when any is skipped."""
     import upload
     youtube = None
     try:
-        yt = upload.YouTube()
-        mine = yt.call("GET", "channels", {"part": "snippet", "mine": "true"}).get("items", [])
-        if not mine:
-            youtube = "the YouTube sign-in has no channel"
+        youtube = upload.check_channel(upload.YouTube())
     except upload.NotSignedIn as why:
         youtube = str(why)
     except Exception as error:
@@ -806,6 +804,8 @@ def preflight(scene_ids):
     for scene_id in scene_ids:
         scene = load_scene(scene_id)
         why = []
+        if getattr(scene, "GROUP", "") not in upload.PLAYLISTS:
+            why.append(f"GROUP {getattr(scene, 'GROUP', '')!r} has no playlist (one of {', '.join(upload.PLAYLISTS)})")
         if youtube:
             why.append(youtube)
             todo("Run `scripts/video/upload.py --sign-in` and approve with the Google account of the YouTube channel (#1856).",

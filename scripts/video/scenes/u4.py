@@ -3,6 +3,7 @@ list of files, and the changed words coloured."""
 GROUP = "usage"
 LAYOUT = "mac"
 TITLE = "Read an agent's changes"
+DOCS = "how-to/read-an-agents-changes/"  # the docs page, on docs.agentloops.dev (upload.py)
 WINDOW = (1360, 820)
 
 LINES = {

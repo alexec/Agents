@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Uploads a finished video to YouTube (#1793, #1794), with the YouTube Data API v3.
+"""Uploads a finished video to YouTube (#1793, #1794, #4836), with the YouTube Data API v3.
 
     scripts/video/upload.py --sign-in           once: the person approves with the Google
                                                 account of the channel
@@ -7,14 +7,18 @@
                                                 the same, but only print the consent address,
                                                 so an agent opens it in the Safari MCP (#1856)
     scripts/video/upload.py <scene id> [mp4]    upload ~/Movies/agents-video/out/<id>.mp4
-    scripts/video/make.sh i-linear --upload     make it, check it, then upload it
+    scripts/video/make.sh u1 --upload           make it, check it, then upload it
+    scripts/video/upload.py --self-test         prove each API call against a fake YouTube
 
 Every video is **private** (an API project that Google has not audited can upload only
-private videos anyway) and goes in the playlist "Agents integrations". The title names the
-integration and the app version (`git describe`); the description gives the commit, the date
-and the scene file, so a video always says which build it shows. A new take of a video
-replaces the old one in the playlist: the old video is made private and taken out of the
-playlist, never deleted. The local file is deleted after a good upload.
+private videos anyway; a flag for public comes later) and goes on the Loops channel, in the
+playlist of its scene's GROUP: "Loops usage", "Loops marketing" or "Loops integrations",
+each made private the first time. The title is `<TITLE> — Loops <version>` (`git describe`);
+the description gives the commit, the date, the scene file and the docs page, so a video
+always says which build it shows. The captions are the take's `<id>.vtt` (English), and the
+thumbnail is a frame of the take, at one of the contact sheet's moments. A new take of a
+video replaces the old one in its playlist: the old video is made private and taken out of
+the playlist, never deleted. The local files are deleted after a good upload.
 
 The OAuth client (a Desktop app) is ~/.agents/secrets/youtube-client.json, made by the person
 (#1793). Its refresh token is kept in ~/.agents/secrets/youtube-token.json, mode 600. No token
@@ -42,11 +46,23 @@ SECRETS = Path.home() / ".agents/secrets"
 CLIENT = SECRETS / "youtube-client.json"
 TOKEN = SECRETS / "youtube-token.json"
 OUT = Path(os.environ.get("AGENTS_VIDEO_OUT", Path.home() / "Movies/agents-video/out"))
-PLAYLIST = "Agents integrations"
+CHANNEL = "Loops"
+# A playlist per scene GROUP (#4836): its title and its description.
+PLAYLISTS = {
+    "usage": ("Loops usage", "How to use Loops: Agent Workflows, a step at a time. Each video is made by a script (#1078)."),
+    "marketing": ("Loops marketing", "What Loops: Agent Workflows does, in short videos. Each video is made by a script (#1078)."),
+    "integration": ("Loops integrations", "Loops' integrations, each in a video made by a script on a real account (#1793)."),
+}
+DOCS = "https://docs.agentloops.dev/"
+# The contact sheet takes a frame every two seconds (make.contact_sheet): the thumbnail is
+# one of those moments.
+SHEET_EVERY = 2
 # Upload, playlists and a video's privacy: the one scope that has all three.
 SCOPE = "https://www.googleapis.com/auth/youtube"
 API = "https://www.googleapis.com/youtube/v3"
 UPLOAD = "https://www.googleapis.com/upload/youtube/v3/videos"
+CAPTIONS = "https://www.googleapis.com/upload/youtube/v3/captions"
+THUMBNAILS = "https://www.googleapis.com/upload/youtube/v3/thumbnails/set"
 SCIENCE_AND_TECHNOLOGY = "28"
 
 
@@ -149,21 +165,35 @@ def access_token():
 
 
 # --- the API -----------------------------------------------------------------------------
+class APIError(RuntimeError):
+    def __init__(self, method, url, code, body):
+        path = urllib.parse.urlsplit(url).path
+        super().__init__(f"YouTube {method} {path}: {code} {body[:400].decode(errors='replace')}")
+        self.code = code
+
+
 class YouTube:
-    def __init__(self):
-        self.token = access_token()
+    """The calls upload.py makes. Every request goes through `send`, which the self-test's
+    fake replaces."""
+
+    def __init__(self, token=None):
+        self.token = token or access_token()
+
+    def send(self, method, url, data=None, headers=None, timeout=120):
+        """One request: the answer's headers and body. Fails with APIError on an HTTP error."""
+        request = urllib.request.Request(url, data=data, method=method, headers={
+            "Authorization": f"Bearer {self.token}", **(headers or {})})
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as answer:
+                return dict(answer.headers), answer.read()
+        except urllib.error.HTTPError as error:
+            raise APIError(method, url, error.code, error.read()) from None
 
     def call(self, method, path, query=None, body=None):
         url = f"{API}/{path}" + ("?" + urllib.parse.urlencode(query) if query else "")
         data = json.dumps(body).encode() if body is not None else None
-        request = urllib.request.Request(url, data=data, method=method, headers={
-            "Authorization": f"Bearer {self.token}", **({"Content-Type": "application/json"} if data else {})})
-        try:
-            with urllib.request.urlopen(request, timeout=120) as answer:
-                raw = answer.read()
-                return json.loads(raw) if raw else {}
-        except urllib.error.HTTPError as error:
-            raise RuntimeError(f"YouTube {method} {path}: {error.code} {error.read()[:400].decode(errors='replace')}") from None
+        _, raw = self.send(method, url, data, {"Content-Type": "application/json"} if data else None)
+        return json.loads(raw) if raw else {}
 
     def pages(self, path, query):
         query = dict(query)
@@ -174,34 +204,69 @@ class YouTube:
                 return
             query["pageToken"] = answer["nextPageToken"]
 
-    def playlist(self):
+    def channel(self):
+        """The signed-in channel's title, or None when the sign-in has no channel."""
+        mine = self.call("GET", "channels", {"part": "snippet", "mine": "true"}).get("items", [])
+        return mine[0]["snippet"]["title"] if mine else None
+
+    def playlist(self, title, description):
         """The playlist's id, made (private) the first time."""
         for item in self.pages("playlists", {"part": "snippet", "mine": "true", "maxResults": 50}):
-            if item["snippet"]["title"] == PLAYLIST:
+            if item["snippet"]["title"] == title:
                 return item["id"]
         made = self.call("POST", "playlists", {"part": "snippet,status"}, {
-            "snippet": {"title": PLAYLIST, "description": "Agents' integrations, each in a video made by a script on a real account (#1793)."},
+            "snippet": {"title": title, "description": description},
             "status": {"privacyStatus": "private"}})
-        log(f"made the playlist {PLAYLIST!r}")
+        log(f"made the playlist {title!r}, private")
         return made["id"]
 
     def upload(self, mp4, snippet):
         """A resumable upload, in one piece."""
         size = mp4.stat().st_size
-        start = urllib.request.Request(f"{UPLOAD}?uploadType=resumable&part=snippet,status", method="POST",
-                                       data=json.dumps({"snippet": snippet, "status": {
-                                           "privacyStatus": "private", "selfDeclaredMadeForKids": False}}).encode(),
-                                       headers={"Authorization": f"Bearer {self.token}",
-                                                "Content-Type": "application/json; charset=UTF-8",
-                                                "X-Upload-Content-Type": "video/mp4",
-                                                "X-Upload-Content-Length": str(size)})
-        with urllib.request.urlopen(start, timeout=60) as answer:
-            where = answer.headers["Location"]
-        with open(mp4, "rb") as body:
-            put = urllib.request.Request(where, data=body, method="PUT", headers={
-                "Content-Type": "video/mp4", "Content-Length": str(size)})
-            with urllib.request.urlopen(put, timeout=3600) as answer:
-                return json.load(answer)["id"]
+        headers, _ = self.send("POST", f"{UPLOAD}?uploadType=resumable&part=snippet,status",
+                               json.dumps({"snippet": snippet, "status": {
+                                   "privacyStatus": "private", "selfDeclaredMadeForKids": False}}).encode(),
+                               {"Content-Type": "application/json; charset=UTF-8",
+                                "X-Upload-Content-Type": "video/mp4", "X-Upload-Content-Length": str(size)},
+                               timeout=60)
+        where = {k.lower(): v for k, v in headers.items()}["location"]
+        with open(mp4, "rb") as body:  # streamed: a take can be hundreds of MB
+            _, raw = self.send("PUT", where, body, {"Content-Type": "video/mp4", "Content-Length": str(size)},
+                               timeout=3600)
+        return json.loads(raw)["id"]
+
+    def captions(self, video, vtt, language="en", name="English"):
+        """captions.insert: the take's WebVTT as the video's captions, in one multipart request."""
+        boundary = "agents-" + secrets.token_hex(8)
+        meta = json.dumps({"snippet": {"videoId": video, "language": language, "name": name, "isDraft": False}})
+        body = (f"--{boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{meta}\r\n"
+                f"--{boundary}\r\nContent-Type: text/vtt\r\n\r\n").encode() + vtt.read_bytes() + f"\r\n--{boundary}--\r\n".encode()
+        _, raw = self.send("POST", f"{CAPTIONS}?uploadType=multipart&part=snippet", body,
+                           {"Content-Type": f"multipart/related; boundary={boundary}"})
+        return json.loads(raw)["id"]
+
+    def thumbnail(self, video, jpg):
+        """thumbnails.set: a JPEG of at most 2 MB."""
+        self.send("POST", f"{THUMBNAILS}?{urllib.parse.urlencode({'videoId': video})}", jpg.read_bytes(),
+                  {"Content-Type": "image/jpeg"})
+
+
+def check_channel(yt):
+    """Why the sign-in cannot upload, or None: it must be the Loops channel's."""
+    title = yt.channel()
+    if title is None:
+        return "the YouTube sign-in has no channel"
+    if title != CHANNEL:
+        return f"the YouTube sign-in is the channel {title!r}, not {CHANNEL!r}: sign in again and pick {CHANNEL}"
+    return None
+
+
+def playlist_of(scene):
+    """The playlist (title, description) of the scene's GROUP."""
+    group = getattr(scene, "GROUP", "")
+    if group not in PLAYLISTS:
+        raise SystemExit(f"{scene.ID}: GROUP {group!r} has no playlist (one of {', '.join(PLAYLISTS)})")
+    return PLAYLISTS[group]
 
 
 # --- what a video says of itself ---------------------------------------------------------
@@ -214,41 +279,74 @@ def marker(scene_id):
     return f"Scene: scripts/video/scenes/{scene_id}.py"
 
 
+def docs_page(scene):
+    """The docs page the scene is for: DOCS is a path on the docs site (the site's home when
+    the scene has none)."""
+    return DOCS + getattr(scene, "DOCS", "").lstrip("/")
+
+
 def describe(scene):
     version = git("describe", "--tags", "--match", "v*") or "unreleased"
     commit = git("rev-parse", "HEAD")
     changed = " (with changes not committed)" if git("status", "--porcelain", "--untracked-files=no") else ""
-    title = f"{getattr(scene, 'TITLE', scene.ID)}: Agents {version}"
+    name = getattr(scene, "TITLE", scene.ID)
+    group = getattr(scene, "GROUP", "")
     lines = [*getattr(scene, "LINES", {}).values()]
     description = "\n".join([
-        f"{getattr(scene, 'TITLE', scene.ID)}, in Agents {version}.",
+        f"{name}, in Loops {version}.",
+        "",
+        f"Docs: {docs_page(scene)}",
         "",
         f"Commit: {commit}{changed}",
         f"Made: {time.strftime('%Y-%m-%d %H:%M %Z')}",
         marker(scene.ID),
         "",
-        "Made by a script on a real account (#1793). The tokens it made were revoked after the take.",
-        "",
+        *(["Made by a script on a real account (#1793). The tokens it made were revoked after the take.", ""]
+          if group == "integration" else ["Made by a script, on a scratch set-up (#1078).", ""]),
         "What it says:",
         *lines,
     ])
-    return {"title": title[:100], "description": description[:4900], "categoryId": SCIENCE_AND_TECHNOLOGY,
-            "tags": ["Agents", "integration", getattr(scene, "INTEGRATION", scene.ID)]}
+    return {"title": f"{name} — Loops {version}"[:100], "description": description[:4900],
+            "categoryId": SCIENCE_AND_TECHNOLOGY,
+            "tags": ["Loops", "Agents", group, getattr(scene, "INTEGRATION", scene.ID)]}
 
 
-def upload(scene, mp4):
-    """Uploads `mp4`, puts it first in the playlist, and replaces older takes of the scene."""
-    try:
-        yt = YouTube()
-    except NotSignedIn as why:
-        log(f"not uploaded, {mp4} is kept: {why}")
-        return None
-    playlist = yt.playlist()
+def duration(mp4):
+    out = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(mp4)],
+                         capture_output=True, text=True, check=True).stdout
+    return float(out.strip() or 0)
+
+
+def thumbnail_of(scene, mp4, jpg):
+    """A frame of the take, 1280 wide, as JPEG: the scene's THUMBNAIL second, or two fifths
+    in, each put on the contact sheet's two-second step."""
+    length = duration(mp4)
+    at = getattr(scene, "THUMBNAIL", length * 0.4)
+    at = max(0, min(round(at / SHEET_EVERY) * SHEET_EVERY, int(length // SHEET_EVERY) * SHEET_EVERY))
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-ss", str(at), "-i", str(mp4), "-frames:v", "1",
+                    "-vf", "scale=1280:-2", "-q:v", "3", str(jpg)], check=True)
+    return at
+
+
+def upload(scene, mp4, yt=None):
+    """Uploads `mp4` with its captions and a thumbnail, puts it first in its group's
+    playlist, and replaces older takes of the scene there."""
+    title, about = playlist_of(scene)
+    vtt = mp4.with_suffix(".vtt")
+    if not vtt.exists():
+        raise SystemExit(f"no captions at {vtt}: make the video again (scripts/video/make.sh {scene.ID})")
+    if yt is None:
+        try:
+            yt = YouTube()
+        except NotSignedIn as why:
+            log(f"not uploaded, {mp4} is kept: {why}")
+            return None
+    playlist = yt.playlist(title, about)
     older = []
     for item in yt.pages("playlistItems", {"part": "snippet", "playlistId": playlist, "maxResults": 50}):
         if marker(scene.ID) in item["snippet"].get("description", ""):
             older.append((item["id"], item["snippet"]["resourceId"]["videoId"]))
-    log(f"uploading {mp4.name} ({mp4.stat().st_size // 1_000_000} MB), private")
+    log(f"uploading {mp4.name} ({mp4.stat().st_size // 1_000_000} MB), private, to {title!r}")
     video = yt.upload(mp4, describe(scene))
     yt.call("POST", "playlistItems", {"part": "snippet"}, {"snippet": {
         "playlistId": playlist, "position": 0, "resourceId": {"kind": "youtube#video", "videoId": video}}})
@@ -256,14 +354,181 @@ def upload(scene, mp4):
         yt.call("PUT", "videos", {"part": "status"}, {"id": old, "status": {"privacyStatus": "private"}})
         yt.call("DELETE", "playlistItems", {"id": item})
         log(f"the older take {old} is private and out of the playlist (not deleted)")
+    yt.captions(video, vtt)
+    log("captions: English, from", vtt.name)
+    jpg = mp4.with_suffix(".jpg")
+    try:
+        at = thumbnail_of(scene, mp4, jpg)
+        yt.thumbnail(video, jpg)
+        log(f"thumbnail: the frame at {at}s")
+    except APIError as error:
+        # A channel must be verified (a phone number) before it can set a thumbnail.
+        log(f"no thumbnail ({error}): the channel may not be verified yet; YouTube picks one")
+    finally:
+        jpg.unlink(missing_ok=True)
     log(f"uploaded: https://youtu.be/{video}")
     mp4.unlink()
-    mp4.with_suffix(".vtt").unlink(missing_ok=True)
+    vtt.unlink(missing_ok=True)
     return video
+
+
+# --- the self-test: every call against a fake YouTube (#4836) ----------------------------
+class FakeYouTube(YouTube):
+    """Answers as the API does, from state in memory, and keeps every request."""
+
+    def __init__(self, channel=CHANNEL, thumbnails=True):
+        self.token = "fake"
+        self.requests = []
+        self.playlists, self.items, self.videos = {}, {}, {}
+        self.captions_of, self.thumbnails = {}, {}
+        self.channel_title, self.thumbnails_allowed = channel, thumbnails
+        self.n = 0
+
+    def new_id(self, kind):
+        self.n += 1
+        return f"{kind}{self.n}"
+
+    def send(self, method, url, data=None, headers=None, timeout=120):
+        self.requests.append((method, url, data, headers or {}))
+        parts = urllib.parse.urlsplit(url)
+        query = {k: v[0] for k, v in urllib.parse.parse_qs(parts.query).items()}
+        body = json.loads(data) if data and (headers or {}).get("Content-Type", "").startswith("application/json") else None
+        path = parts.path
+        answer = lambda value: ({}, json.dumps(value).encode())
+        if path.endswith("/channels"):
+            return answer({"items": [{"snippet": {"title": self.channel_title}}] if self.channel_title else []})
+        if path.endswith("/youtube/v3/playlists") and method == "GET":
+            return answer({"items": [{"id": i, "snippet": p["snippet"]} for i, p in self.playlists.items()]})
+        if path.endswith("/youtube/v3/playlists") and method == "POST":
+            made = self.new_id("PL")
+            self.playlists[made] = body
+            return answer({"id": made})
+        if path.endswith("/playlistItems") and method == "GET":
+            return answer({"items": [{"id": i, "snippet": {**self.videos[v["snippet"]["resourceId"]["videoId"]]["snippet"],
+                                                           "resourceId": v["snippet"]["resourceId"]}}
+                                     for i, v in self.items.items() if v["snippet"]["playlistId"] == query["playlistId"]]})
+        if path.endswith("/playlistItems") and method == "POST":
+            made = self.new_id("PI")
+            self.items[made] = body
+            return answer({"id": made})
+        if path.endswith("/playlistItems") and method == "DELETE":
+            del self.items[query["id"]]
+            return {}, b""
+        if path.endswith("/youtube/v3/videos") and method == "PUT":
+            self.videos[body["id"]]["status"] = body["status"]
+            return answer({"id": body["id"]})
+        if path.endswith("/youtube/v3/videos") and method == "DELETE":
+            raise AssertionError("a video was deleted")
+        if path.endswith("/upload/youtube/v3/videos") and method == "POST":
+            made = self.new_id("V")
+            self.videos[made] = dict(body, bytes=None)
+            return {"Location": f"https://upload.example/{made}"}, b""
+        if parts.netloc == "upload.example" and method == "PUT":
+            made = path.strip("/")
+            self.videos[made]["bytes"] = data.read()
+            return answer({"id": made})
+        if path.endswith("/upload/youtube/v3/captions"):
+            boundary = headers["Content-Type"].split("boundary=")[1]
+            meta, vtt = [chunk.split(b"\r\n\r\n", 1)[1].rsplit(b"\r\n", 1)[0]
+                         for chunk in data.split(f"--{boundary}".encode())[1:3]]
+            meta = json.loads(meta)
+            self.captions_of[meta["snippet"]["videoId"]] = (meta, vtt)
+            return answer({"id": self.new_id("C")})
+        if path.endswith("/thumbnails/set"):
+            if not self.thumbnails_allowed:
+                raise APIError(method, url, 403, b'{"error": "forbidden"}')
+            self.thumbnails[query["videoId"]] = data
+            return answer({})
+        raise AssertionError(f"an unexpected call: {method} {url}")
+
+
+def self_test():
+    import shutil
+    import tempfile
+    import types
+
+    if not shutil.which("ffmpeg"):
+        raise SystemExit("--self-test needs ffmpeg (brew install ffmpeg)")
+    work = Path(tempfile.mkdtemp(prefix="upload-self-test-"))
+    vtt_text = b"WEBVTT\n\n00:00.000 --> 00:02.000\nThis is Loops.\n"
+
+    def take(scene_id, seconds=6):
+        mp4 = work / f"{scene_id}.mp4"
+        subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i", f"testsrc=size=640x360:rate=10:duration={seconds}",
+                        "-pix_fmt", "yuv420p", str(mp4)], check=True)
+        mp4.with_suffix(".vtt").write_bytes(vtt_text)
+        return mp4
+
+    def scene(scene_id, group, **more):
+        return types.SimpleNamespace(ID=scene_id, GROUP=group, TITLE=f"Scene {scene_id}",
+                                     LINES={"a": "This is Loops."}, **more)
+
+    try:
+        yt = FakeYouTube()
+        u1 = scene("u1", "usage", DOCS="tutorials/first-agent/")
+        first = upload(u1, take("u1"), yt)
+        (playlist, made), = yt.playlists.items()
+        assert made["snippet"]["title"] == "Loops usage" and made["status"]["privacyStatus"] == "private", made
+        video = yt.videos[first]
+        assert video["status"]["privacyStatus"] == "private", video
+        assert video["snippet"]["title"].startswith("Scene u1 — Loops "), video["snippet"]["title"]
+        about = video["snippet"]["description"]
+        for want in ("Commit: ", "Made: ", marker("u1"), "Docs: https://docs.agentloops.dev/tutorials/first-agent/"):
+            assert want in about, (want, about)
+        assert video["bytes"] and video["bytes"][4:8] == b"ftyp", "the mp4 was not sent"
+        (item,) = yt.items.values()
+        assert item["snippet"] == {"playlistId": playlist, "position": 0,
+                                   "resourceId": {"kind": "youtube#video", "videoId": first}}, item
+        meta, vtt = yt.captions_of[first]
+        assert meta["snippet"] == {"videoId": first, "language": "en", "name": "English", "isDraft": False}, meta
+        assert vtt == vtt_text, vtt
+        assert yt.thumbnails[first][:2] == b"\xff\xd8", "the thumbnail is not a JPEG"
+        assert not (work / "u1.mp4").exists() and not (work / "u1.vtt").exists() and not (work / "u1.jpg").exists()
+        print("ok: a usage take goes private to 'Loops usage' (made private), with its captions and a thumbnail")
+
+        second = upload(u1, take("u1"), yt)
+        assert len(yt.playlists) == 1, "the playlist was made twice"
+        assert [i["snippet"]["resourceId"]["videoId"] for i in yt.items.values()] == [second], yt.items
+        assert first in yt.videos and yt.videos[first]["status"] == {"privacyStatus": "private"}, yt.videos[first]
+        print("ok: a new take replaces the old one in its playlist; the old one stays, private")
+
+        for scene_id, group, title in (("a2", "marketing", "Loops marketing"), ("i-x", "integration", "Loops integrations")):
+            made = upload(scene(scene_id, group, INTEGRATION="x"), take(scene_id), yt)
+            (home,) = [i["snippet"]["playlistId"] for i in yt.items.values() if i["snippet"]["resourceId"]["videoId"] == made]
+            assert yt.playlists[home]["snippet"]["title"] == title, yt.playlists[home]
+            if group == "marketing":
+                assert "Docs: https://docs.agentloops.dev/\n" in yt.videos[made]["snippet"]["description"]
+        assert len(yt.playlists) == 3, yt.playlists
+        print("ok: a playlist per group: Loops usage, Loops marketing, Loops integrations")
+
+        sent = len(yt.requests)
+        try:
+            upload(scene("x1", "nothing"), take("x1"), yt)
+            raise AssertionError("a scene with no group's playlist was uploaded")
+        except SystemExit:
+            pass
+        assert len(yt.requests) == sent, "a call was made for a scene with no playlist"
+        print("ok: a GROUP with no playlist fails before any call")
+
+        bare = FakeYouTube(thumbnails=False)
+        made = upload(scene("u3", "usage"), take("u3"), bare)
+        assert made in bare.captions_of and not bare.thumbnails
+        print("ok: a channel that cannot set a thumbnail still gets the video and its captions")
+
+        assert check_channel(FakeYouTube()) is None
+        assert "not 'Loops'" in check_channel(FakeYouTube(channel="Someone else"))
+        assert "no channel" in check_channel(FakeYouTube(channel=None))
+        print("ok: --preflight takes only the Loops channel's sign-in")
+        assert not [r for r in yt.requests if r[0] == "DELETE" and "/videos" in r[1]], "a video was deleted"
+        print("self-test passed")
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
 
 
 def main():
     args = sys.argv[1:]
+    if args == ["--self-test"]:
+        return self_test()
     if "--sign-in" in args:
         unknown = set(args) - {"--sign-in", "--no-browser"}
         if unknown:

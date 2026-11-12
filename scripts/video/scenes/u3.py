@@ -3,6 +3,7 @@ Submit, on the Mac and the phone at once."""
 GROUP = "usage"
 LAYOUT = "mac+phone"
 TITLE = "Answer a question"
+DOCS = "how-to/answer-a-question/"  # the docs page, on docs.agentloops.dev (upload.py)
 
 LINES = {
     "card": "When an agent asks you something, its card waits in the conversation, on your Mac and on your phone.",
