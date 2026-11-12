@@ -471,6 +471,9 @@ button.link {
    A turn that grows as it comes into view resizes, and the chat holds the reader's turn as for any growth.
    The transcript is a flex column: a turn never shrinks, or one not drawn would shrink to nothing. */
 .transcript > .turn { content-visibility: auto; contain-intrinsic-block-size: auto 240px; flex-shrink: 0; }
+/* Nothing else in the transcript shrinks either (#4941): it scrolls. A card at its end (the wait card,
+   Waiting for you) squashed to one line under a long transcript; under .foot a card still shrinks. */
+.transcript > * { flex-shrink: 0; }
 /* Plain text you click, flush with the turn's edge: no capsule, no padding (#758). */
 .steps-control {
   align-self: flex-start;
