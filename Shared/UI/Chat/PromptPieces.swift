@@ -110,78 +110,26 @@ struct CostLimitBanner<Raise: View>: View {
     @ViewBuilder let raise: () -> Raise
 
     var body: some View {
+        // A failure banner (#4737), both cases: a limit that stopped the work is broken about
+        // the agent's situation, not a question it has asked; orange is for the latter
+        // (FR-006a). Over the prompt bar rather than at the top of the chat, because what
+        // it holds back is what is sent.
         if agent.isAtCostLimit(under: limits) {
-            banner {
-                // The failure tint, not attention. An agent at its limit is waiting on
-                // a ceiling being raised, which is a thing broken about its situation
-                // rather than a question it has asked; orange is reserved for the
-                // latter (FR-006a).
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .tinted(.failure)
-            } words: {
-                Text(PromptWords.atItsCostLimit)
-                    .appText(.fine).fontWeight(.medium)
-                Text(agent.spentWords(under: limits) + " Anything you send waits until you allow more.")
-                    .appText(.fine)
-                    .foregroundStyle(.secondary)
-            } actions: {
+            PaneBanner(tone: .failure, PromptWords.atItsCostLimit,
+                       detail: agent.spentWords(under: limits) + " Anything you send waits until you allow more.") {
                 raise()
                 Button("Let this one go on", action: goOn)
-                    .buttonStyle(.paper)
-                    .appText(.fine)
                     .help("Raises this agent's own ceiling. No other agent is changed.")
             }
         } else if costState?.dayLimitReached == true {
-            banner {
-                Image(systemName: "clock")
-                    .foregroundStyle(.secondary)
-            } words: {
-                Text(costState?.limits.isDayTokenLimitReached(tokensToday: costState?.tokensToday ?? 0) == true
-                     ? "The day's token limit has been reached"
-                     : "The day's spending limit has been reached")
-                    .appText(.fine).fontWeight(.medium)
-                Text("What you send waits here, and goes when the day rolls over.")
-                    .appText(.fine)
-                    .foregroundStyle(.secondary)
-            } actions: {
+            PaneBanner(tone: .failure,
+                       costState?.limits.isDayTokenLimitReached(tokensToday: costState?.tokensToday ?? 0) == true
+                           ? "The day's token limit has been reached"
+                           : "The day's spending limit has been reached",
+                       detail: "What you send waits here, and goes when the day rolls over.") {
                 raise()
             }
         }
-    }
-
-    /// One row on a Mac. On a phone the buttons go under the words: a row holding two
-    /// sentences and two buttons at 390 points is a row of truncations.
-    @ViewBuilder
-    private func banner<Icon: View, Words: View, Actions: View>(
-        @ViewBuilder icon: () -> Icon,
-        @ViewBuilder words: () -> Words,
-        @ViewBuilder actions: () -> Actions) -> some View {
-        #if os(macOS)
-        HStack(spacing: 10) {
-            icon()
-            VStack(alignment: .leading, spacing: 1) { words() }
-            Spacer(minLength: 8)
-            actions()
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .paperRaised(in: Capsule())
-        #else
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                icon()
-                VStack(alignment: .leading, spacing: 1) { words() }
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 0)
-            }
-            HStack(spacing: 8) {
-                actions()
-                Spacer(minLength: 0)
-            }
-        }
-        .padding(12)
-        .paperRaised(in: RoundedRectangle(cornerRadius: 16))
-        #endif
     }
 }
 

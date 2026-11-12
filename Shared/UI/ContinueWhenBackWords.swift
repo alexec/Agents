@@ -10,6 +10,8 @@ import Foundation
 enum ContinueWhenBackWords {
     static let symbol = "clock.arrow.circlepath"
     static let cancel = "Cancel"
+    /// The banner over a paused chat, before it is asked to continue (#4737).
+    static let paused = "This runtime’s allowance is spent. The chat stopped."
     static let help = "Sends “continue” in this chat when the allowance is back, or sooner if a turn on this runtime works."
 
     /// Whether the chat offers the button: paused by a spent allowance, and not waiting yet.

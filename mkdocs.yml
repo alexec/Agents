@@ -11,6 +11,8 @@ strict: true
 
 theme:
   name: material
+  # The system's sans and mono, as the app: nothing from Google Fonts (#4605).
+  font: false
   logo: assets/logo.png
   favicon: assets/favicon.png
   features:
@@ -25,18 +27,25 @@ theme:
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: white
-      accent: indigo
+      # custom: Material draws no colour of its own; stylesheets/paper.css sets them all.
+      primary: custom
+      accent: custom
       toggle:
         icon: material/brightness-7
         name: Dark
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: black
-      accent: indigo
+      primary: custom
+      accent: custom
       toggle:
         icon: material/brightness-4
         name: Light
+
+# The design system (#4600): the tokens made from design/tokens.json, then Material's
+# variables set from them.
+extra_css:
+  - stylesheets/tokens.css
+  - stylesheets/paper.css
 
 plugins:
   - search

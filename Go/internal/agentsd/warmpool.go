@@ -9,7 +9,6 @@ import (
 	"log"
 	"os"
 	"slices"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -81,6 +80,9 @@ type warmLive struct {
 	quietSince time.Time
 	// background is whether it had background processes at the last look.
 	background bool
+	// seen is its background processes at the last look that had any, for
+	// agent.background_ended (#4577): nil once they ended.
+	seen []acp.Command
 	// prewarming is a prewarm under way: it counts against the cap.
 	prewarming bool
 	// failedAt is its last prewarm's failure; asked is each reason's last prewarm.
@@ -357,19 +359,7 @@ func backgroundOf(s *acp.Session, own map[int32]bool, groups map[int]bool, table
 
 // backgroundNote is the chat's line when a release ended background processes.
 func backgroundNote(hours int, cmds []acp.Command) string {
-	var names []string
-	for i, c := range cmds {
-		if i == 4 {
-			names = append(names, fmt.Sprintf("and %d more", len(cmds)-4))
-			break
-		}
-		line := strings.TrimSpace(c.Line)
-		if r := []rune(line); len(r) > 60 {
-			line = string(r[:60]) + "…"
-		}
-		names = append(names, "`"+line+"`")
-	}
-	return fmt.Sprintf("Released after %d h idle; ended its background processes: %s", hours, strings.Join(names, ", "))
+	return fmt.Sprintf("Released after %d h idle; ended its background processes: %s", hours, commandNames(cmds))
 }
 
 // MARK: the pool
@@ -421,12 +411,22 @@ func (d *Daemon) warmPass() {
 	}
 	table := processTable(d.ctx)
 	background := map[wire.UUID][]acp.Command{}
+	ended := map[wire.UUID][]acp.Command{}
 	for _, i := range looks {
 		l := i.l
-		w := waitOf(d.Store.Agent(l.id))
+		a := d.Store.Agent(l.id)
+		w := waitOf(a)
+		selfWaking := a != nil && wakesItself(a.RuntimeID)
 		// A turn's look only gathers the groups its commands run in.
 		l.mu.Lock()
 		bg := backgroundOf(i.session, i.own, i.groups, table)
+		if l.session == i.session {
+			// Ended in a turn, the turn saw it end; unless the session waits already.
+			busy := i.busy || l.running || l.inTurn
+			if e := l.pool.noteBackground(bg); e != nil && !selfWaking && (!busy || w != nil) {
+				ended[l.id] = e
+			}
+		}
 		if i.busy || l.session != i.session {
 			l.mu.Unlock()
 			continue
@@ -441,6 +441,9 @@ func (d *Daemon) warmPass() {
 		kept := keptForWait(l, i.session, w)
 		es = append(es, warmEntry{id: l.id, lastUsed: l.pool.lastUsed, quietSince: l.pool.quietSince, background: l.pool.background, kept: kept})
 		l.mu.Unlock()
+	}
+	for id, cmds := range ended {
+		d.raiseBackgroundEnded(id, cmds, false)
 	}
 	if idles == 0 {
 		return
@@ -552,7 +555,8 @@ func endProcess(pid int) {
 	})
 }
 
-// registerWarmPool serves agents/prewarm and looks at the pool every warmEvery.
+// registerWarmPool serves agents/prewarm and looks at the pool, and at the background
+// processes adopted over a restart (#4577), every warmEvery.
 func (d *Daemon) registerWarmPool() {
 	On(d, wire.CallAgentsPrewarm, func(_ context.Context, _ *Client, r wire.PrewarmRequest) (wire.Empty, error) {
 		d.prewarm(r)
@@ -566,6 +570,7 @@ func (d *Daemon) registerWarmPool() {
 			case <-ctx.Done():
 				return
 			case <-t.C:
+				d.adoptedPass()
 				d.warmPass()
 			}
 		}

@@ -447,5 +447,7 @@ struct ChatView: View {
             .frame(maxWidth: .infinity)
             .background(Paper.ground, ignoresSafeAreaEdges: [])
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { formHeight = $0 }
+            // The window's toasts float above the bar (#4737).
+            .liftsToasts()
     }
 }

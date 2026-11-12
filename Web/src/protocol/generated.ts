@@ -1245,6 +1245,36 @@ export interface BringBack {
 }
 
 /**
+ * folders/bringBackFrom (#4640): Bring Back from ‹machine›… from a client. This host brings
+ * `branches` of the repository at `source` on `machine` (the control plane's id or name for it;
+ * `machineName` is the name the person knows it by, for the words), less the commits it has, and
+ * with `includeChanges` the uncommitted changes there, into the repository at `folder` here,
+ * through the control plane, as bring_back does (#2947). Branches move forward only.
+ */
+export interface BringBackFromRequest {
+  folder: URLString;
+  machine: string;
+  machineName?: string;
+  source: string;
+  branches: string[];
+  includeChanges: boolean;
+}
+
+/**
+ * bringBack/changed (#4640): how a bring-back that folders/bringBackFrom started goes. `read` of
+ * `total` bytes are here (0 of 0 while the bundle is made there); `finished` once it ended,
+ * whichever way: `result` is what it did, or `problem` says why it stopped, in the person's words.
+ */
+export interface BringBackNotification {
+  bringBack: BringBackSummary;
+  read: number;
+  total: number;
+  finished: boolean;
+  problem?: string;
+  result?: BringBack;
+}
+
+/**
  * Brings a host's branches back into this Mac's repository at `folder` (Bring back from ‹host›…,
  * #1473): fetches the `bundle` upload, moves `branches` forward only, also where a worktree has one
  * checked out, and applies the `patch` upload (the host's uncommitted changes) in `folder`, whose
@@ -1257,6 +1287,19 @@ export interface BringBackRequest {
   patch?: UUID;
   patchOn?: string;
   branches: SentBranch[];
+}
+
+/**
+ * One bring-back folders/bringBackFrom started (#4640): the folder here, and the folder on the
+ * machine it comes from.
+ */
+export interface BringBackSummary {
+  id: UUID;
+  folder: URLString;
+  machine: string;
+  machineName: string;
+  source: string;
+  startedAt: WireDate;
 }
 
 /**
@@ -15116,7 +15159,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BranchFromRequest: { required: ["agentID", "entryID"], optional: [] },
   BranchSummary: { required: ["name"], optional: ["remote"] },
   BringBack: { required: ["moved", "applied"], optional: [] },
+  BringBackFromRequest: { required: ["folder", "machine", "source", "branches", "includeChanges"], optional: ["machineName"] },
+  BringBackNotification: { required: ["bringBack", "read", "total", "finished"], optional: ["problem", "result"] },
   BringBackRequest: { required: ["folder", "branches"], optional: ["bundle", "patch", "patchOn"] },
+  BringBackSummary: { required: ["id", "folder", "machine", "machineName", "source", "startedAt"], optional: [] },
   BrowserAckRequest: { required: ["ack"], optional: [] },
   BrowserClearRequest: { required: [], optional: ["site"] },
   BrowserFrame: { required: ["image", "ack", "width", "height"], optional: [] },

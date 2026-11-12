@@ -1420,6 +1420,36 @@ type BringBack struct {
 	Applied bool `json:"applied"`
 }
 
+// folders/bringBackFrom (#4640): Bring Back from ‹machine›… from a client. This host brings `branches` of the repository at `source` on `machine` (the control plane's id or name for it; `machineName` is the name the person knows it by, for the words), less the commits it has, and with `includeChanges` the uncommitted changes there, into the repository at `folder` here, through the control plane, as bring_back does (#2947). Branches move forward only.
+type BringBackFromRequest struct {
+	Folder URL `json:"folder"`
+
+	Machine string `json:"machine"`
+
+	MachineName *string `json:"machineName,omitzero"`
+
+	Source string `json:"source"`
+
+	Branches []string `json:"branches"`
+
+	IncludeChanges bool `json:"includeChanges"`
+}
+
+// bringBack/changed (#4640): how a bring-back that folders/bringBackFrom started goes. `read` of `total` bytes are here (0 of 0 while the bundle is made there); `finished` once it ended, whichever way: `result` is what it did, or `problem` says why it stopped, in the person's words.
+type BringBackNotification struct {
+	BringBack BringBackSummary `json:"bringBack"`
+
+	Read int64 `json:"read"`
+
+	Total int64 `json:"total"`
+
+	Finished bool `json:"finished"`
+
+	Problem *string `json:"problem,omitzero"`
+
+	Result *BringBack `json:"result,omitzero"`
+}
+
 // Brings a host's branches back into this Mac's repository at `folder` (Bring back from ‹host›…, #1473): fetches the `bundle` upload, moves `branches` forward only, also where a worktree has one checked out, and applies the `patch` upload (the host's uncommitted changes) in `folder`, whose checked-out branch must be `patchOn`. It stops, and changes nothing, when a branch here has commits of its own or a worktree with a branch that moves has uncommitted changes.
 type BringBackRequest struct {
 	Folder URL `json:"folder"`
@@ -1431,6 +1461,21 @@ type BringBackRequest struct {
 	PatchOn *string `json:"patchOn,omitzero"`
 
 	Branches []SentBranch `json:"branches"`
+}
+
+// One bring-back folders/bringBackFrom started (#4640): the folder here, and the folder on the machine it comes from.
+type BringBackSummary struct {
+	ID UUID `json:"id"`
+
+	Folder URL `json:"folder"`
+
+	Machine string `json:"machine"`
+
+	MachineName string `json:"machineName"`
+
+	Source string `json:"source"`
+
+	StartedAt Date `json:"startedAt"`
 }
 
 // browser/ack: the client drew browser/frame number ack, so the host may send the next one (#3528). The host asks Chromium for a new frame only after an ack, so a slow client gets fewer frames, not a backlog.

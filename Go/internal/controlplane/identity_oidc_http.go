@@ -14,6 +14,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/signin"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/internal/paperpage"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -55,9 +56,11 @@ func (si *signIns) serveOIDC(w http.ResponseWriter, r *http.Request) {
 // page is the little page a browser shows when it cannot be sent back to the client.
 func page(w http.ResponseWriter, status int, text string) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Content-Security-Policy", "default-src 'none'")
+	// On Paper (#4617): the style is inline, and the policy lets in only its hash.
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src "+paperpage.StyleSource)
 	w.WriteHeader(status)
-	w.Write([]byte("<!doctype html><meta charset=utf-8><title>Agents</title><p>" + html.EscapeString(text) + "</p>\n"))
+	w.Write([]byte("<!doctype html><meta charset=utf-8><meta name=viewport content=\"width=device-width, initial-scale=1\"><title>Agents</title><style>" +
+		paperpage.Style + "</style><p>" + html.EscapeString(text) + "</p>\n"))
 }
 
 // readState is a started flow by its id, and where it is kept.

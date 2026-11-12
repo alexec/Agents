@@ -73,8 +73,12 @@ func LoadFiles(folder string) (Files, error) {
 			return nil, &FilesError{relative + " has a type the web remote never serves"}
 		}
 		data, err := os.ReadFile(filepath.Join(folder, filepath.FromSlash(relative)))
+		if err != nil {
+			// Not "does not match": a file this user cannot read is a mode, not a build (#4756).
+			return nil, &FilesError{relative + " cannot be read: " + err.Error()}
+		}
 		sum := sha256.Sum256(data)
-		if err != nil || hex.EncodeToString(sum[:]) != hash {
+		if hex.EncodeToString(sum[:]) != hash {
 			return nil, &FilesError{relative + " does not match its manifest"}
 		}
 		files["/"+relative] = File{Data: data, ContentType: kind}

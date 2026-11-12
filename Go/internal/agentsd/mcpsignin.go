@@ -16,6 +16,7 @@ import (
 
 	"github.com/alexec/agents/Go/internal/agentsd/mcpcatalog"
 	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/alexec/agents/Go/internal/paperpage"
 	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -564,9 +565,10 @@ func (lb *loopback) serve(w http.ResponseWriter, r *http.Request) {
 	select {
 	case p := <-lb.page:
 		h.Set("Content-Type", "text/html; charset=utf-8")
-		w.Write([]byte(`<!doctype html><meta charset="utf-8"><title>` + html.EscapeString(p[0]) + `</title>` +
-			`<body style="font: 15px -apple-system, sans-serif; margin: 4em auto; max-width: 32em; color: #222">` +
-			`<h1 style="font-size: 20px">` + html.EscapeString(p[0]) + `</h1><p>` + html.EscapeString(p[1]) + `</p></body>`))
+		// On Paper, as the hosted sign-in pages are (#4617).
+		w.Write([]byte(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">` +
+			`<title>` + html.EscapeString(p[0]) + `</title><style>` + paperpage.Style + `</style>` +
+			`<body><h1>` + html.EscapeString(p[0]) + `</h1><p>` + html.EscapeString(p[1]) + `</p></body>`))
 	case <-time.After(time.Minute):
 	}
 }

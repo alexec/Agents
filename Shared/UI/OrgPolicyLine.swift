@@ -61,34 +61,29 @@ struct OrgPolicyMenuItem: View {
     }
 }
 
-/// The red strip on every screen while this machine starts no work for its organisation (#998,
-/// US5 scenario 2): the kill switch, with who turned it on and when, or the machine's own reason
-/// (no policy it can trust, an update it needs). Nothing otherwise.
+/// The neutral banner (#4737) on every screen while this machine starts no work for its
+/// organisation (#998, US5 scenario 2): the kill switch, with who turned it on and when, or the
+/// machine's own reason (no policy it can trust, an update it needs). Nothing otherwise.
 struct OrgPolicyStrip: View {
     let state: DaemonAPI.PolicyState?
 
     var body: some View {
-        if let state, state.startsNothing {
-            VStack(alignment: .leading, spacing: 2) {
-                if state.stopAll {
-                    Text(OrgPolicyWords.stoppedStrip).appText(.supporting).bold()
-                    if let stop = state.policy?.stopAll, stop.on {
-                        Text(OrgPolicyWords.stoppedBy(stop)).appText(.fine)
-                        if let note = stop.note, !note.isEmpty { Text(note).appText(.fine) }
-                    }
-                } else if let refusal = state.refusal {
-                    Text(refusal.line).appText(.supporting).bold()
-                }
-            }
-            .tinted(.failure)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(StateTint.failure.color?.opacity(0.1) ?? .clear)
-            .accessibilityElement(children: .combine)
-            .accessibilityAddTraits(.isStaticText)
+        // A neutral banner (#4737): set by the organisation, nothing for the person to do here.
+        if let state, state.startsNothing, let line = Self.line(state) {
+            PaneBanner(tone: .neutral, symbol: "building.2", line, detail: Self.detail(state))
+                .paneBannerInset()
         }
+    }
+
+    private static func line(_ state: DaemonAPI.PolicyState) -> String? {
+        if state.stopAll { return OrgPolicyWords.stoppedStrip }
+        return state.refusal?.line
+    }
+
+    private static func detail(_ state: DaemonAPI.PolicyState) -> String? {
+        guard state.stopAll, let stop = state.policy?.stopAll, stop.on else { return nil }
+        return [OrgPolicyWords.stoppedBy(stop), stop.note].compactMap { $0?.isEmpty == false ? $0 : nil }
+            .joined(separator: "\n")
     }
 }
 

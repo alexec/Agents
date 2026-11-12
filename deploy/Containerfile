@@ -74,7 +74,10 @@ WORKDIR /src/Web
 COPY Web/package.json Web/package-lock.json ./
 RUN npm ci --ignore-scripts --no-audit --no-fund
 COPY Web/ ./
-RUN npm run build
+# Readable by every user (#4756): the build context is the build machine's checkout, whose
+# files can be 0600 where git has 0644, and cpSync keeps the mode. agents-control runs as
+# control, and a /web file it cannot read turns the whole page off.
+RUN npm run build && chmod -R a+rX dist
 
 # Named base: deploy/demo builds its codes job from it.
 FROM alpine:3.24 AS base
