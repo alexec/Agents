@@ -31,7 +31,7 @@ import { sealWork } from "../wire/sealing";
 import type { FolderGoneAsk } from "./missingFolder";
 import { describe, knowVersions, methodNotFound } from "./errors";
 import { freeProjectName } from "./projectSettings";
-import { fromWireDate } from "../protocol/dates";
+import { fromWireDate, toWireDate } from "../protocol/dates";
 import { addCap, dropCap, openCaps } from "./teamGroups";
 import { withGovernanceRequest } from "./governance";
 import { withBudgetRequest } from "./console";
@@ -68,6 +68,7 @@ import type { ChartHint } from "./chart";
 import { Providers } from "./providers";
 import { MachineLock } from "./machineLock";
 import { isLead, leadEpic, leadProgressWords } from "./leadProgress";
+import { type AgentWrite, PendingWrites, omitting, writeFailure } from "./pendingWrites";
 
 /** What this page keeps by folder on a host, kept to the folders it lists (#3750). */
 function pruneFolderKeys(host: string, folders: readonly string[]): void {
@@ -898,6 +899,8 @@ export class Work {
 
   /** Each folder's agents by `host|folder`, kept as each change lands: one change redraws one folder (#170). */
   private slices = new Map<string, Signal<Agent[]>>();
+  /** The changes drawn on agents before their hosts answer (#4786): one layer for every action. */
+  protected readonly pending = new PendingWrites();
   private views = new Map<string, ReadonlySignal<FolderView>>();
   private byID = new Map<string, ReadonlySignal<Agent | undefined>>();
 
@@ -905,8 +908,10 @@ export class Work {
    * Every write to a host's agents. `touched` names the folders that changed; without it every
    * folder of the host is worked out again, and only those whose agents differ are told.
    */
-  protected setAgents(host: string, list: Agent[], touched?: readonly string[]): void {
+  protected setAgents(host: string, heard: Agent[], touched?: readonly string[]): void {
     const prefix = `${host}|`;
+    // What is pending is drawn over the host's records here, on every way in (#4786).
+    const list = heard.map((a) => this.pending.overlay(host, a));
     batch(() => {
       this.agents.value = { ...this.agents.value, [host]: list };
       if (touched) {
@@ -2786,15 +2791,40 @@ export class Store extends Work {
     await this.link.call("machines/retryKept", { host: kept.host, id: kept.id }).catch((error: unknown) => this.say(describe(error)));
   }
 
-  /** Calls `method`, and on failure says why in `problem` and answers null. */
-  async act<M extends keyof Methods>(method: M, params: Methods[M]["params"], host: string): Promise<Methods[M]["result"] | null> {
+  /**
+   * Calls `method`, and on failure says why in `problem` and answers null. With `write`, the line
+   * says what failed first: "Could not archive — …" (#4786).
+   */
+  async act<M extends keyof Methods>(method: M, params: Methods[M]["params"], host: string,
+                                     write?: AgentWrite): Promise<Methods[M]["result"] | null> {
     try {
       return await this.link.call(method, params, host);
     } catch (error) {
       log("call.failed", error instanceof CallFailed ? error.code : undefined);
-      this.say(describe(error));
+      this.say(write ? writeFailure(write, describe(error)) : describe(error));
       return null;
     }
+  }
+
+  /**
+   * A change drawn on the agent at once, and settled by `send`: kept on screen when it went,
+   * and the host's record put back when it did not (#4786).
+   */
+  private async optimistic(host: string, agentID: string, write: AgentWrite, send: () => Promise<boolean>): Promise<boolean> {
+    const shown = (this.agents.peek()[host] ?? []).find((a) => a.id === agentID);
+    const begun = shown ? this.pending.begin(host, shown, write) : null;
+    if (begun) this.showAgent(host, begun.agent);
+    const sent = await send();
+    const back = begun ? this.pending.settle(host, agentID, begun.id, !sent) : null;
+    if (back) this.showAgent(host, back);
+    return sent;
+  }
+
+  /** One agent as this page now shows it, in its place. */
+  private showAgent(host: string, agent: Agent): void {
+    const held = this.agents.peek()[host] ?? [];
+    if (!held.some((a) => a.id === agent.id)) return;
+    this.setAgents(host, held.map((a) => (a.id === agent.id ? agent : a)), [agentFolderPath(agent)]);
   }
 
   /**
@@ -3388,8 +3418,9 @@ export class Store extends Work {
   }
 
   async sendNow(host: string, agentID: string, promptID: string): Promise<void> {
-    await this.acting(agentID, { sendNow: promptID }, () =>
-      this.act("agents/sendNow", { agentID: agentID as UUID, promptID: promptID as UUID }, host));
+    const write: AgentWrite = { kind: "sendNow", promptID };
+    await this.acting(agentID, { sendNow: promptID }, () => this.optimistic(host, agentID, write, async () =>
+      await this.act("agents/sendNow", { agentID: agentID as UUID, promptID: promptID as UUID }, host, write) !== null));
   }
 
   /**
@@ -3461,7 +3492,11 @@ export class Store extends Work {
   async perform(host: string, agentID: string,
                 action: "agents/stop" | "agents/archive" | "agents/unarchive"): Promise<boolean> {
     let done = false;
-    await this.acting(agentID, action, async () => { done = await this.act(action, { agentID: agentID as UUID }, host) !== null; });
+    const write: AgentWrite = { kind: action === "agents/stop" ? "stop" : action === "agents/archive" ? "archive" : "unarchive" };
+    await this.acting(agentID, action, async () => {
+      done = await this.optimistic(host, agentID, write, async () =>
+        await this.act(action, { agentID: agentID as UUID }, host, write) !== null);
+    });
     return done;
   }
 
@@ -3647,14 +3682,30 @@ export class Store extends Work {
 
   /** Later on a request (#4236): out of Needs You until its time, or until the person is next at the Mac. */
   async deferRequest(host: string, request: string, later: Later): Promise<void> {
-    const changed = await this.act("requests/defer", deferParams(request, later), host);
+    const params = deferParams(request, later);
+    const at = toWireDate(new Date());
+    const deferred = params.atMac ? { atMac: true, at } : params.until === undefined ? { at } : { until: params.until, at };
+    await this.changingRequest(host, request, (r) => ({ ...r, deferred }), () => this.act("requests/defer", params, host));
+  }
+
+  /**
+   * Later or Bring Back, drawn at once (#4786), the host's answer placed when it comes, and the
+   * request put back as it was when the call did not go, unless the host changed it meanwhile.
+   */
+  private async changingRequest(host: string, id: string, draw: (r: PersonRequest) => PersonRequest,
+                                send: () => Promise<RequestUpdate | null>): Promise<void> {
+    const held = (this.personRequests.peek()[host] ?? []).find((r) => r.id === id);
+    const shown = held ? draw(held) : null;
+    if (shown) this.placeRequest(host, shown);
+    const changed = await send();
     if (changed) this.placeRequest(host, changed.request);
+    else if (held && (this.personRequests.peek()[host] ?? []).find((r) => r.id === id) === shown) this.placeRequest(host, held);
   }
 
   /** Bring Back Now (#4236): a deferred request back into Needs You at once. */
   async undeferRequest(host: string, request: string): Promise<void> {
-    const changed = await this.act("requests/undefer", { id: request as never }, host);
-    if (changed) this.placeRequest(host, changed.request);
+    await this.changingRequest(host, request, (r) => omitting(r, "deferred"),
+      () => this.act("requests/undefer", { id: request as never }, host));
   }
 
   /** A folder's pull requests waiting for the person's approval (#3330), newest first. */
@@ -3908,12 +3959,16 @@ export class Store extends Work {
 
   /** The person's title for a session (#751); empty, the runtime names it again. */
   async rename(host: string, agentID: string, title: string): Promise<void> {
-    await this.act("agents/rename", { agentID: agentID as UUID, title }, host);
+    const write: AgentWrite = { kind: "rename", title };
+    await this.optimistic(host, agentID, write, async () =>
+      await this.act("agents/rename", { agentID: agentID as UUID, title }, host, write) !== null);
   }
 
   /** Mute Notifications / Unmute Notifications (#2003): kept by the session's host. */
   async setMuted(host: string, agentID: string, muted: boolean): Promise<void> {
-    await this.act("agents/setMuted", { agentID: agentID as UUID, muted }, host);
+    const write: AgentWrite = { kind: "mute", muted };
+    await this.optimistic(host, agentID, write, async () =>
+      await this.act("agents/setMuted", { agentID: agentID as UUID, muted }, host, write) !== null);
   }
 
   /** Mute Notifications for a workflow's runs, or Unmute (#2003): `muted: true` in its file. */
@@ -3939,9 +3994,12 @@ export class Store extends Work {
   }
 
   async setLabels(host: string, agentID: string, add: string[], remove: string[]): Promise<boolean> {
-    const agent = await this.act("agents/setLabels", { agentID: agentID as UUID, add, remove }, host);
-    if (agent) this.upsertAgent(agent, host);
-    return agent !== null;
+    const write: AgentWrite = { kind: "labels", add, remove };
+    return this.optimistic(host, agentID, write, async () => {
+      const agent = await this.act("agents/setLabels", { agentID: agentID as UUID, add, remove }, host, write);
+      if (agent) this.upsertAgent(agent, host);
+      return agent !== null;
+    });
   }
 
   async labelVocabulary(host: string, folder: string): Promise<string[]> {
